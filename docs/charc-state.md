@@ -46,11 +46,14 @@ Repository local + mirrored to private GitHub `rwsmythe/clearwater` (verify:
 
 ### Pending items
 
-1. **Owner decision request posted 2026-10-14T22:59Z** (`comms/operator/inbox/
-   ...-0a0cc8c4.md`): (a) confirm orchestrator opus/high/auto and the three cell
-   tiers (recommended: keep as is); (b) the footage path (read-only) and the
-   working folder path. Unanswered until the owner's word is read back verbatim
-   with its time. Do not guess the paths.
+1. **Owner rulings 2026-10-14 (chat), verbatim:** "1. concur" (orchestrator
+   opus/high/auto and the three cell tiers confirmed); "2. working folder, let's
+   create an untracked folder within clearwater" -> `C:\Users\rwsmy\clearwater\work\`
+   (`work/` gitignored, commit 69311b1; also a `footage/` safety-net ignore).
+   **Footage path STILL OPEN**: owner is downloading the footage and asked CHARC to
+   propose; CHARC proposed `C:\Users\rwsmy\clearwater-footage\` (outside the
+   repo: `git clean -x` deletes ignored files in-tree). Await the owner's word; do
+   not create `clearwater.local.toml` before it.
 2. **Next harness act:** QA the orchestrator's WP0.1 accept when it lands (CHARC
    QAs the orchestrator's product: accept record, ledger, gate assertions, the
    claim list against the brief). Then commission WP0.2 (footage inventory; needs
