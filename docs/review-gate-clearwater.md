@@ -13,7 +13,7 @@ incident history; the history is in those harnesses' fills if ever needed.
 
 - `REVIEWER` = the Codex CLI as an adversarial correctness reviewer
   (`docs/codex-reviewer.md`). **Transport pinned at bootstrap: WSL** (`wsl.exe
-  bash -ilc` with the PATH prefix; `codex-cli 0.157.0` verified live 2026-10-14;
+  bash -ilc` with the PATH prefix; `codex-cli 0.162.1` verified live 2026-10-14 at the WP0.1 accept (0.157.0 at bootstrap);
   no Windows-native codex is installed on this machine). Re-probe liveness at the
   bring-up of every review loop with a one-command probe through the exact
   invocation and require one `^ succeeded in` line before round 1. Tier by the

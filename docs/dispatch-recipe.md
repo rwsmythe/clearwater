@@ -126,10 +126,11 @@ yield.
 - **Ground, don't guess.** Verify shapes against reality (the live system, real
   output), not just the brief text.
 - **Conventional commits** carrying the task id; the ATTRIBUTION FOOTER the
-  harness mandates (`Co-Authored-By:` + `Claude-Session:`) is REQUIRED -- it is
+  harness mandates (`Co-Authored-By:` naming the model) is REQUIRED -- it is
   the commit's provenance, not a vanity trailer (amended 2026-09-02: the prior
   "NO co-author footer" line was violated by every commit on master, so it was
-  never a rule; the practice wins and a directive requires it); no OTHER
+  never a rule; the practice wins and a directive requires it; the `Claude-Session:`
+  trailer was dropped 2026-10-14 for the same reason -- no commit ever carried it); no OTHER
   trailers; no verification-skipping; a new commit per fix. Keep user-facing strings within
   the substrate's safe encoding (the Windows console is unforgiving of
   non-ASCII).

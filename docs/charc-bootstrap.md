@@ -174,7 +174,7 @@ STOP and await the operator.
 
 Then report to the operator the live state + the next action you believe is
 queued, and AWAIT the operator. Honor the binding conventions (conventional
-commits, no co-author footer, no verification-skipping).
+commits, the `Co-Authored-By:` attribution footer, no verification-skipping).
 ```
 
 *(By default this bring-up block lives HERE, in this bootstrap doc's step-5
