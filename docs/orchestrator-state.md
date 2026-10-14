@@ -11,15 +11,20 @@
 
 ### Live cells
 
-- None (verify: `git worktree list` shows only the main tree).
+- **wp01-cell** (implementer-sonnet-high, background subagent) -- WP0.1, worktree
+  `.worktrees/wp0.1`, branch `wp0.1`, base `214f2b2`. Dispatched 2026-10-14 ~23:10Z; round 0
+  (building). Depth not yet read (read with `scripts/cell_depth.py` at the round gate).
+  A successor RE-DISPATCHES from the branch head + ledger; the cell dies with this generation.
 
 ### Workstreams
 
-- **WP0.1** -- draft brief `docs/briefs/wp0.1-brief.md` (CHARC). Not yet commissioned to
-  this seat; awaiting CHARC's commission. Owner paths (footage folder, working folder)
-  still open; the cell can run end to end with `--out <tmp>` without them.
+- **WP0.1** -- commissioned by CHARC (msg `e6c9aa020250139a`); FINAL brief
+  `docs/briefs/wp0.1-brief.md` at `214f2b2`. Reviewer A = fast tier, WSL. Next: on return,
+  QA + dispatch Reviewer B (a different cell, same tier), then gate + merge, accept record in
+  `docs/proofs/`, report to CHARC, info-update to operator. Owner paths still open
+  (CHARC posted the decision_request 22:59Z); the cell runs with `--out <tmp>`.
 - WP0.2 queued behind WP0.1; CP1 follows.
 
 ### Pending
 
-- Inbox empty at pickup (verify: `uv run python scripts/role_mail.py list --role orchestrator`).
+- Inbox drained through the WP0.1 commission (verify: `uv run python scripts/role_mail.py list --role orchestrator`).
