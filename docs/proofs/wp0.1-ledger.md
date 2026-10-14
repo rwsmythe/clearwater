@@ -19,4 +19,4 @@ Banked (out of loop, nominal minor): no tests for Windows-only path forms (case 
 
 Post-convergence amendment (0fa8315): `report_version` (integer 1, first key) added to the environment report; no review round (reason: CHARC ruling, brief amendment).
 
-Round 3 (post-Reviewer-B): B returned BLOCKING on ad1acd5 (F1 major EXECUTED: UTF-16 config -> uncaught UnicodeDecodeError; F2-F5 minor: key order and --out tests, probe decoding and report overwrite, report write errors, template docs). All five confirmed and fixed in 3d12831, 90dc168, f2a5526. Reviewer A round 3 on the delta converged. Evidence: clearwater-review-evidence\wp0.13\.
+Round 3 (post-Reviewer-B): B returned BLOCKING on ad1acd5 (F1 major EXECUTED: UTF-16 config -> uncaught UnicodeDecodeError; F2-F5 minor: key order and --out tests, probe decoding and report overwrite, report write errors, template docs). All five confirmed and fixed in 3d12831, 90dc168, f2a5526. Reviewer A round 3 on the delta converged. Evidence: clearwater-review-evidence\wp0.1\r3\.
