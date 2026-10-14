@@ -938,12 +938,15 @@ def main(argv: list[str] | None = None) -> int:
         print(f"error: footage folder not found: {footage}", file=sys.stderr)
         return 2
     footage_resolved = _resolved(footage)
-    working_resolved = _resolved(working)
-    if working_resolved == footage_resolved or footage_resolved in working_resolved.parents:
-        print(
-            f"error: working folder {working} must lie outside the footage folder", file=sys.stderr
-        )
-        return 2
+    # The reports folder is checked too: it may be a link that leads back into the footage.
+    for target in (working, working / "reports"):
+        target_resolved = _resolved(target)
+        if target_resolved == footage_resolved or footage_resolved in target_resolved.parents:
+            print(
+                f"error: working folder {working} must lie outside the footage folder",
+                file=sys.stderr,
+            )
+            return 2
     try:
         (working / "reports").mkdir(parents=True, exist_ok=True)
     except OSError as exc:

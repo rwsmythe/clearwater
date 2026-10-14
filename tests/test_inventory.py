@@ -834,6 +834,20 @@ class TestMain:
         assert "outside the footage folder" in err
         assert _snapshot(tree) == before
 
+    def test_reports_folder_linked_into_footage_is_refused(
+        self, tree: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        work = tmp_path / "work"
+        work.mkdir()
+        try:
+            os.symlink(tree / "dive1", work / "reports", target_is_directory=True)
+        except OSError:
+            pytest.skip("cannot create symbolic links here")
+        before = _snapshot(tree)
+        assert inventory.main(["--footage", str(tree), "--out", str(work)]) == 2
+        assert "outside the footage folder" in capsys.readouterr().err
+        assert _snapshot(tree) == before
+
     def test_unwritable_working_folder(
         self, tree: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]
     ) -> None:
