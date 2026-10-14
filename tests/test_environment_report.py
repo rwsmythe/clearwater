@@ -10,6 +10,7 @@ import pytest
 import environment_report
 
 EXPECTED_KEYS = {
+    "report_version",
     "timestamp_utc",
     "cpu_model",
     "cpu_physical_cores",
@@ -83,6 +84,8 @@ def test_report_has_every_key(
     data = _run_main(tmp_path, monkeypatch)
     assert set(data) == EXPECTED_KEYS
     assert data["unavailable"] == {}
+    assert data["report_version"] == 1
+    assert next(iter(data)) == "report_version"
     assert data["cpu_model"] == "Test CPU @ 1.0GHz"
     assert data["uv_version"] == "uv 0.10.0 (abc 2026-01-01)"
     assert data["ffmpeg_version"] == "ffmpeg version 9.0.2-full_build"

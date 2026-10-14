@@ -28,6 +28,7 @@ from local_config import LocalConfigError, load_local_config
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 PROBE_TIMEOUT_SECONDS = 20.0
+REPORT_VERSION = 1
 _MIB = 1024 * 1024
 _GPU_KEYS = ("gpu_model", "gpu_memory_bytes", "gpu_driver_version")
 _NVIDIA_SMI = [
@@ -136,6 +137,7 @@ def collect() -> dict[str, object]:
     """
     unavailable: dict[str, str] = {}
     report: dict[str, object] = {
+        "report_version": REPORT_VERSION,
         "timestamp_utc": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
     }
 
