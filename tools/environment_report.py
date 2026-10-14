@@ -102,6 +102,8 @@ def parse_nvidia_smi(output: str) -> tuple[str, int, str]:
         memory_mib = int(parts[1])
     except ValueError:
         raise ProbeError("nvidia-smi memory is not an integer") from None
+    if memory_mib < 0:
+        raise ProbeError("nvidia-smi memory is negative")
     return parts[0], memory_mib * _MIB, parts[2]
 
 

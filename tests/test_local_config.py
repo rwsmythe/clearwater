@@ -72,7 +72,9 @@ def test_relative_path(tmp_path: Path) -> None:
         load_local_config(_write(tmp_path / "cfg.toml", text))
 
 
-@pytest.mark.parametrize("suffix", ["", "work", "work/deeper", "../footage/x"])
+@pytest.mark.parametrize(
+    "suffix", ["", "work", "work/deeper", "../footage/x", "work/", "a/../work"]
+)
 def test_working_inside_footage(tmp_path: Path, suffix: str) -> None:
     footage = tmp_path / "footage"
     working = footage / suffix if suffix else footage

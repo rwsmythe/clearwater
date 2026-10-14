@@ -121,6 +121,7 @@ def test_nvidia_smi_absent(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> N
     [
         _completed("garbage"),
         _completed("GPU, notanumber, 1.0"),
+        _completed("GPU, -1, 1.0"),
         _completed("", 0),
         _completed("GPU, 100, 1.0", 9),
         subprocess.TimeoutExpired("nvidia-smi", 1),
