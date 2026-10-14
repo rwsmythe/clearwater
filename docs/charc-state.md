@@ -12,39 +12,42 @@
 ### Phase / state
 
 Phase 0 of the implementation plan (`docs/clearwater-implementation-plan.md`
-section 6). Harness bootstrapped 2026-10-14 by the first CHARC generation
-(hand-launched session `clearwater-9b`), which ROLLED OVER at ~423K context after
-the owner's launch-default correction; the successor is the first generation
-launched through `scripts/launch_role.ps1` (fable/medium). The repository is
-initialized locally and mirrored to the private GitHub repository
-`rwsmythe/clearwater` (verify: `git -C C:\Users\rwsmy\clearwater remote -v`;
-`git -C C:\Users\rwsmy\clearwater status -sb`).
+section 6). Second CHARC generation, `clearwater-charc-20261014-1257`, the first
+launched through `scripts/launch_role.ps1` (fable/medium). Bootstrap steps 1-4 were
+done by the first generation; this generation re-verified comms (CHARC-side
+round-trip 2026-10-14T22:57Z, both hooks import clean) and executed step 5.
+Repository local + mirrored to private GitHub `rwsmythe/clearwater` (verify:
+`git -C C:\Users\rwsmy\clearwater remote -v`; `git status -sb`).
+
+**Bash-launch gauge (bootstrap step 2):** 47 ms for one `bash-cc.exe -c true`
+(2026-10-14; re-measure with PowerShell
+`Measure-Command { & $env:CLAUDE_CODE_GIT_BASH_PATH -c true }`). Under the 1 s flag.
 
 ### Live workstreams
 
-- None dispatched. No orchestrator generation has been brought up yet (bootstrap
-  step 5 pending; verify: `comms/.launch-sessions.json` has no orchestrator entry
-  and `ListAgents` shows no `clearwater-orchestrator-*`).
-- No cell, no worktree (verify: `git -C C:\Users\rwsmy\clearwater worktree list`).
-- No authority was granted by `SendMessage` in the outgoing generation; the two
-  sibling CHARCs' replies (comms lessons) are folded into the docs, nothing owed.
+- **Orchestrator generation launched** 2026-10-14T22:58Z as
+  `clearwater-orchestrator-20261014-1258` (opus/high/auto, psmux vehicle; verify:
+  `comms/.launch-sessions.json` orchestrator entry; `ListAgents`). Post-step-5
+  round-trip ping posted to `comms/orchestrator/inbox` at 22:59Z (msg
+  `...-b4120977.md`); its ack to `comms/charc/inbox` is the live-state proof
+  (verify: `uv run python scripts/role_mail.py list --role charc`, and the ping
+  present under `comms/orchestrator/read/`). **Commission WP0.1 only after the ack.**
+- No cell, no worktree (verify: `git worktree list`).
+- No authority granted by `SendMessage` this generation; the only cue sent was
+  the content-free post-cue to the orchestrator.
 
 ### Pending items
 
-1. **Owner inputs still open** (CLAUDE.md "Inputs the owner still has to supply"):
-   the footage folder path (read-only) and the working folder location. WP0.1's
-   local configuration template needs both for the real run. Do not guess them.
-2. **Owner rulings recorded 2026-10-14:** CHARC launches at fable/medium (launcher
-   seam-4 table, `scripts/launch_role.ps1`), verbatim "The harness should launch
-   CHARC as fable medium." The orchestrator default (opus/high) and the three cell
-   tiers under `.claude/agents/` have NOT been explicitly confirmed; raise them
-   once with the recommended option first.
-3. **Next harness act:** bring up the orchestrator (`powershell -NoProfile -File
-   scripts/launch_role.ps1 -Role orchestrator`), run the post-step-5 round-trip
-   (`--to orchestrator` lands in `comms/orchestrator/inbox` and the generation
-   drains it), then commission **WP0.1** from the draft brief
-   `docs/briefs/wp0.1-brief.md` (the orchestrator issues the final brief) and
-   WP0.2 (footage inventory) behind it; CP1 follows.
+1. **Owner decision request posted 2026-10-14T22:59Z** (`comms/operator/inbox/
+   ...-0a0cc8c4.md`): (a) confirm orchestrator opus/high/auto and the three cell
+   tiers (recommended: keep as is); (b) the footage path (read-only) and the
+   working folder path. Unanswered until the owner's word is read back verbatim
+   with its time. Do not guess the paths.
+2. **Next harness act:** on the orchestrator's round-trip ack, commission
+   **WP0.1** from `docs/briefs/wp0.1-brief.md` (the orchestrator issues the final
+   brief in plan section 4.6 format; cell: `implementer-sonnet-high`; the
+   end-to-end run uses `--out` to a tmp folder until the paths arrive). Then WP0.2
+   (footage inventory, needs the footage path), then checkpoint CP1.
 
 ### Behavioral pointers
 
@@ -61,6 +64,9 @@ initialized locally and mirrored to the private GitHub repository
 - Clearwater's application toolchain is uv + Python 3.12 (`uv sync`, then
   `uv run pytest` / `ruff` / `mypy`); the harness suite is NOT run by pytest
   (`norecursedirs` excludes `tests/harness`). FFmpeg is not installed yet (WP0.1).
+- Review gate: `docs/review-gate-clearwater.md` (Codex via WSL, tiers `strong` for
+  product code, `fast` for docs/tools); the orchestrator runs it, CHARC QAs the
+  orchestrator's product at the phase audit.
 - Owner-reserved decisions (plan section 3) go to the operator as
   `decision_request`; put the recommended option FIRST, read the owner's word
   back verbatim with its time, and end every turn with the open owner decisions.
