@@ -25,45 +25,30 @@ Repository local + mirrored to private GitHub `rwsmythe/clearwater` (verify:
 
 ### Live workstreams
 
-- **Orchestrator generation launched** 2026-10-14T22:58Z as
-  `clearwater-orchestrator-20261014-1258` (opus/high/auto, psmux vehicle; verify:
-  `comms/.launch-sessions.json` orchestrator entry; `ListAgents`). Post-step-5
-  round-trip VERIFIED 2026-10-14T23:00Z: ping drained to
-  `comms/orchestrator/read/...-b4120977.md`, ack in `comms/charc/read/...-66a8d529.md`
-  (HEAD b7fa4c8, harness gate 366 OK on its side).
-- **WP0.1 commissioned** to the orchestrator 2026-10-14 ~23:03Z (type status, subject
-  "Commission WP0.1 ..."): final brief + dispatch are the orchestrator's; cell
-  `implementer-sonnet-high`; base b7fa4c8; tripwire pass done in the brief (two
-  dev-group deps). **DISPATCHED 2026-10-14T23:04Z**: cell `implementer-sonnet-high`
-  in `.worktrees/wp0.1` (branch `wp0.1`, base 214f2b2 = final brief commit). That
-  worktree is OCCUPIED (charter 5.1 incoming precondition) until the orchestrator
-  records its return. CHARC ruled 23:08Z: all six brief decisions accepted, one
-  advisory banked (`report_version` key). Accept report expected `--to charc`.
-  Verify: `git worktree list`, `docs/orchestrator-state.md`, `comms/charc/read/`.
-- No cell, no worktree (verify: `git worktree list`).
-- No authority granted by `SendMessage` this generation; the only cue sent was
-  the content-free post-cue to the orchestrator.
+- **Orchestrator generation** `clearwater-orchestrator-20261014-1258` (opus/high/auto,
+  confirmed by the owner; verify: `comms/.launch-sessions.json`, `ListAgents`).
+- **WP0.1 ACCEPTED and merged** (main c09f747, accept record `docs/proofs/wp0.1-accept.md`,
+  ledger `docs/proofs/wp0.1-ledger.md`). CHARC QA 2026-10-14T23:45Z: four gates + harness
+  gate re-run green at this seat; `clearwater.local.toml` (uncommitted) loads with the two
+  owner paths; `footage_available()` False until the download lands. Branch `wp0.1` kept.
+- **WP0.2 commissioned** 2026-10-14T23:45Z (draft brief `docs/briefs/wp0.2-brief.md`,
+  main b415faf; cell `implementer-sonnet-high`; tripwire pass: dev-group grants Pillow +
+  pillow-heif). Orchestrator issues the final brief and dispatches. Verify: `git worktree
+  list`, `docs/orchestrator-state.md`. A `.worktrees/wp0.2` tree is OCCUPIED until the
+  orchestrator records the cell's return.
+- Debt register opened: `docs/debt-register.md` (DR-1..DR-5).
+- No authority granted by `SendMessage` this generation (cues only).
 
 ### Pending items
 
-1. **Owner rulings 2026-10-14 (chat), verbatim:** "1. concur" (orchestrator
-   opus/high/auto and the three cell tiers confirmed); "2. working folder, let's
-   create an untracked folder within clearwater" -> `C:\Users\rwsmy\clearwater\work\`
-   (`work/` gitignored, commit 69311b1; also a `footage/` safety-net ignore).
-   **Footage path RULED** (chat, "concur with footage location"):
-   `C:\Users\rwsmy\clearwater-footage\` (outside the repo; owner still downloading
-   into it). Both paths recorded in CLAUDE.md. `clearwater.local.toml` is created
-   at the WP0.1 accept (the orchestrator, from the template); the owner then runs
-   the real environment report.
-2. **Next harness act:** QA the orchestrator's WP0.1 accept when it lands (CHARC
-   QAs the orchestrator's product: accept record, ledger, gate assertions, the
-   claim list against the brief). Then commission WP0.2 (footage inventory; needs
-   the footage path), then checkpoint CP1.
-3. Doc nits for a later kernel-doc pass (touches the harness gate; run it then):
-   `docs/charc-bootstrap.md` bring-up block still says "no co-author footer" while
-   `docs/dispatch-recipe.md` (2026-09-02) requires the footer and every commit on
-   main carries it; `role_mail.py` has no `dispatch` type -- commissions go as
-   `status` (valid: fyi|status|query|return_report|decision_request).
+1. **Owner decision request 2026-10-14T23:45Z** (`comms/operator/inbox/...-c4281ff7.md`):
+   spec text amendments recording the measured CPU/GPU (D117, section 12, 14.2, Q1).
+   Recommended: approve as written; CHARC applies as a docs(spec) commit. Debt register DR-5.
+2. **Next harness act:** QA the WP0.2 accept when it lands; then CP1 (owner sorts the
+   inventory into categories: owner-reserved, decision_request). Phase 1 commissions
+   follow CP1 (WP1.1 can start before CP1: it needs one image, not the inventory).
+3. Main is ~36 commits ahead of `origin/main`, unpushed; the owner has not asked for a push.
+4. Footage download in progress into `C:\Users\rwsmy\clearwater-footage\` (owner).
 
 ### Standing delegation (owner, 2026-10-14, chat to CHARC, verbatim)
 
