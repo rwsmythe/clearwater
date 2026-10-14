@@ -9,6 +9,13 @@
   (verify: `comms/.launch-sessions.json`). Brought up 2026-10-14.
 - Bash-launch gauge at bring-up: 30 ms (PowerShell `Measure-Command { & $env:CLAUDE_CODE_GIT_BASH_PATH -c true }`); under the 1 s flag line.
 
+### Standing operator rulings
+
+- 2026-10-14 ~23:12Z, owner in chat to the orchestrator, verbatim: "Intent is for you to run
+  unattended today. Send all operator questions to CHARC for answering. CHARC will answer
+  and/or pause execution for my response." So: no AskUserQuestion and no direct operator asks
+  from this seat today; every question goes `--to charc`. Info-updates to the operator continue.
+
 ### Live cells
 
 - **wp01-cell** (implementer-sonnet-high, background subagent) -- WP0.1, worktree
