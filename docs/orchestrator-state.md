@@ -25,10 +25,12 @@
 
 - **wp01-cell** -- RETURNED (converged in 2 rounds, Reviewer A fast/WSL); branch `wp0.1` head
   `ad1acd5` (report_version amendment in 0fa8315, no extra round per CHARC). Depth 82K at return.
-- **wp01-reviewer-b** (implementer-sonnet-high, background) -- Reviewer B on `ad1acd5`, brief
-  `docs/briefs/wp0.1-review-brief.md`, evidence `clearwater-review-evidence\wp0.1\B\`.
-  Dispatched ~23:24Z. Read-only on the wp0.1 worktree -- do not touch it while B runs.
-  A successor re-dispatches B from the brief if this generation dies.
+- **wp01-reviewer-b** -- RETURNED BLOCKING on `ad1acd5` (F1 major: UTF-16 config ->
+  uncaught UnicodeDecodeError in load_local_config/footage_available; F2-F5 minor). Evidence
+  `clearwater-review-evidence\wp0.1\B\`. Codex pass luna/medium, VERDICT BLOCKING.
+- **wp01-cell** re-engaged ~23:28Z to fix F1-F5 + one Reviewer A round 3 on the delta.
+  Next: B re-check pass on the fixed head (same B brief, B's transcript must cover the merged
+  tree), then gate + merge.
 
 ### Workstreams
 
