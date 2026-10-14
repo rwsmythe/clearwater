@@ -33,9 +33,10 @@ Repository local + mirrored to private GitHub `rwsmythe/clearwater` (verify:
   owner paths; `footage_available()` False until the download lands. Branch `wp0.1` kept.
 - **WP0.2 commissioned** 2026-10-14T23:45Z (draft brief `docs/briefs/wp0.2-brief.md`,
   main b415faf; cell `implementer-sonnet-high`; tripwire pass: dev-group grants Pillow +
-  pillow-heif). Orchestrator issues the final brief and dispatches. Verify: `git worktree
-  list`, `docs/orchestrator-state.md`. A `.worktrees/wp0.2` tree is OCCUPIED until the
-  orchestrator records the cell's return.
+  pillow-heif). **DISPATCHED 2026-10-14T23:47Z**: cell `implementer-sonnet-high` in
+  `.worktrees/wp0.2` (branch `wp0.2`, base b0287a2); seven brief decisions ruled accepted
+  by CHARC at ~23:50Z. That worktree is OCCUPIED until the orchestrator records the
+  cell's return. Verify: `git worktree list`, `docs/orchestrator-state.md`.
 - Debt register opened: `docs/debt-register.md` (DR-1..DR-5).
 - No authority granted by `SendMessage` this generation (cues only).
 
