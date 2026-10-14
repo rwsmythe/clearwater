@@ -23,10 +23,12 @@
 
 ### Live cells
 
-- **wp01-cell** (implementer-sonnet-high, background subagent) -- WP0.1, worktree
-  `.worktrees/wp0.1`, branch `wp0.1`, base `214f2b2`. Dispatched 2026-10-14 ~23:10Z; round 0
-  (building). Depth not yet read (read with `scripts/cell_depth.py` at the round gate).
-  A successor RE-DISPATCHES from the branch head + ledger; the cell dies with this generation.
+- **wp01-cell** -- RETURNED (converged in 2 rounds, Reviewer A fast/WSL); branch `wp0.1` head
+  `ad1acd5` (report_version amendment in 0fa8315, no extra round per CHARC). Depth 82K at return.
+- **wp01-reviewer-b** (implementer-sonnet-high, background) -- Reviewer B on `ad1acd5`, brief
+  `docs/briefs/wp0.1-review-brief.md`, evidence `clearwater-review-evidence\wp0.1\B\`.
+  Dispatched ~23:24Z. Read-only on the wp0.1 worktree -- do not touch it while B runs.
+  A successor re-dispatches B from the brief if this generation dies.
 
 ### Workstreams
 
