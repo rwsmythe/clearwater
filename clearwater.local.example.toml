@@ -2,7 +2,11 @@
 #
 # Copy this file to `clearwater.local.toml` in the repository root and replace
 # both placeholder paths with absolute paths. `clearwater.local.toml` is never
-# committed (it is ignored by version control).
+# committed (it is ignored by version control). Save it as UTF-8 text.
+#
+# Windows paths: write them as TOML literal strings in single quotes, for example
+# 'C:\Users\you\Footage', or use forward slashes, for example "C:/Users/you/Footage".
+# A double-quoted "C:\Users\..." string is a TOML error because backslash is an escape.
 
 # The owner's footage folder. Clearwater treats it as READ-ONLY: nothing is ever
 # written to, renamed in or deleted from it, and it is never committed.
