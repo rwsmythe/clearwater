@@ -19,6 +19,8 @@ dev = [
     "mypy>=1.11,<2",
     "psutil>=6,<8",
     "py-cpuinfo>=9,<10",
+    "pillow>=11,<13",
+    "pillow-heif>=0.20,<2",
 ]
 # The harness's optional mail UI (scripts/comms_ui.py). The comms CORE
 # (role_mail.py, the hooks, cell_depth.py) is stdlib-only and never imports it.
