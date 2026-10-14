@@ -106,3 +106,17 @@ def test_footage_available_existing_directory(tmp_path: Path) -> None:
     (tmp_path / "footage").mkdir()
     cfg = _write(tmp_path / "cfg.toml", _toml(tmp_path / "footage", tmp_path / "work"))
     assert footage_available(cfg) is True
+
+
+def test_utf16_file_raises_config_error(tmp_path: Path) -> None:
+    cfg = tmp_path / "cfg.toml"
+    cfg.write_text(_toml(tmp_path / "f", tmp_path / "w"), encoding="utf-16")
+    with pytest.raises(LocalConfigError, match=TEMPLATE_NAME):
+        load_local_config(cfg)
+
+
+def test_footage_available_false_for_utf16_file(tmp_path: Path) -> None:
+    (tmp_path / "footage").mkdir()
+    cfg = tmp_path / "cfg.toml"
+    cfg.write_text(_toml(tmp_path / "footage", tmp_path / "w"), encoding="utf-16")
+    assert footage_available(cfg) is False

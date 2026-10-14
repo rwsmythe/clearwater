@@ -84,6 +84,8 @@ def load_local_config(path: Path | None = None) -> LocalConfig:
             data = tomllib.load(handle)
     except FileNotFoundError:
         raise _fail(config_path, "file not found") from None
+    except UnicodeDecodeError:
+        raise _fail(config_path, "file must be UTF-8 text (not UTF-16)") from None
     except (OSError, tomllib.TOMLDecodeError) as exc:
         raise _fail(config_path, f"cannot read as TOML: {exc}") from None
     footage, working = (_read_path(data, key, config_path) for key in _KEYS)
