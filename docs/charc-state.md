@@ -34,8 +34,12 @@ Repository local + mirrored to private GitHub `rwsmythe/clearwater` (verify:
 - **WP0.1 commissioned** to the orchestrator 2026-10-14 ~23:03Z (type status, subject
   "Commission WP0.1 ..."): final brief + dispatch are the orchestrator's; cell
   `implementer-sonnet-high`; base b7fa4c8; tripwire pass done in the brief (two
-  dev-group deps). Accept report expected `--to charc`. Verify progress:
-  `git worktree list`, `docs/orchestrator-state.md`.
+  dev-group deps). **DISPATCHED 2026-10-14T23:04Z**: cell `implementer-sonnet-high`
+  in `.worktrees/wp0.1` (branch `wp0.1`, base 214f2b2 = final brief commit). That
+  worktree is OCCUPIED (charter 5.1 incoming precondition) until the orchestrator
+  records its return. CHARC ruled 23:08Z: all six brief decisions accepted, one
+  advisory banked (`report_version` key). Accept report expected `--to charc`.
+  Verify: `git worktree list`, `docs/orchestrator-state.md`, `comms/charc/read/`.
 - No cell, no worktree (verify: `git worktree list`).
 - No authority granted by `SendMessage` this generation; the only cue sent was
   the content-free post-cue to the orchestrator.
