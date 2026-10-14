@@ -65,6 +65,17 @@ Repository local + mirrored to private GitHub `rwsmythe/clearwater` (verify:
    main carries it; `role_mail.py` has no `dispatch` type -- commissions go as
    `status` (valid: fyi|status|query|return_report|decision_request).
 
+### Standing delegation (owner, 2026-10-14 ~23:12Z, chat to the orchestrator, verbatim)
+
+"Intent is for you to run unattended today. Send all operator questions to CHARC
+for answering. CHARC will answer and/or pause execution for my response." So: the
+orchestrator posts every operator-bound question `--to charc` (type query); CHARC
+answers what is within its authority (architecture, brief ambiguity, scope within
+the plan) and PAUSES on owner-reserved items (plan section 3: footage categories,
+look check / V2, scope relaxations, spec changes) by posting a `decision_request`
+to the operator and telling the orchestrator to hold. Valid for 2026-10-14 only
+unless renewed; re-verify with the owner on the next session.
+
 ### Behavioral pointers
 
 - Port **8775** is Clearwater's comms-UI port (`scripts/comms_ui.py` DEFAULT_PORT);
