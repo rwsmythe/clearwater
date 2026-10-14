@@ -28,10 +28,14 @@ Repository local + mirrored to private GitHub `rwsmythe/clearwater` (verify:
 - **Orchestrator generation launched** 2026-10-14T22:58Z as
   `clearwater-orchestrator-20261014-1258` (opus/high/auto, psmux vehicle; verify:
   `comms/.launch-sessions.json` orchestrator entry; `ListAgents`). Post-step-5
-  round-trip ping posted to `comms/orchestrator/inbox` at 22:59Z (msg
-  `...-b4120977.md`); its ack to `comms/charc/inbox` is the live-state proof
-  (verify: `uv run python scripts/role_mail.py list --role charc`, and the ping
-  present under `comms/orchestrator/read/`). **Commission WP0.1 only after the ack.**
+  round-trip VERIFIED 2026-10-14T23:00Z: ping drained to
+  `comms/orchestrator/read/...-b4120977.md`, ack in `comms/charc/read/...-66a8d529.md`
+  (HEAD b7fa4c8, harness gate 366 OK on its side).
+- **WP0.1 commissioned** to the orchestrator 2026-10-14 ~23:03Z (type status, subject
+  "Commission WP0.1 ..."): final brief + dispatch are the orchestrator's; cell
+  `implementer-sonnet-high`; base b7fa4c8; tripwire pass done in the brief (two
+  dev-group deps). Accept report expected `--to charc`. Verify progress:
+  `git worktree list`, `docs/orchestrator-state.md`.
 - No cell, no worktree (verify: `git worktree list`).
 - No authority granted by `SendMessage` this generation; the only cue sent was
   the content-free post-cue to the orchestrator.
@@ -43,11 +47,15 @@ Repository local + mirrored to private GitHub `rwsmythe/clearwater` (verify:
    tiers (recommended: keep as is); (b) the footage path (read-only) and the
    working folder path. Unanswered until the owner's word is read back verbatim
    with its time. Do not guess the paths.
-2. **Next harness act:** on the orchestrator's round-trip ack, commission
-   **WP0.1** from `docs/briefs/wp0.1-brief.md` (the orchestrator issues the final
-   brief in plan section 4.6 format; cell: `implementer-sonnet-high`; the
-   end-to-end run uses `--out` to a tmp folder until the paths arrive). Then WP0.2
-   (footage inventory, needs the footage path), then checkpoint CP1.
+2. **Next harness act:** QA the orchestrator's WP0.1 accept when it lands (CHARC
+   QAs the orchestrator's product: accept record, ledger, gate assertions, the
+   claim list against the brief). Then commission WP0.2 (footage inventory; needs
+   the footage path), then checkpoint CP1.
+3. Doc nits for a later kernel-doc pass (touches the harness gate; run it then):
+   `docs/charc-bootstrap.md` bring-up block still says "no co-author footer" while
+   `docs/dispatch-recipe.md` (2026-09-02) requires the footer and every commit on
+   main carries it; `role_mail.py` has no `dispatch` type -- commissions go as
+   `status` (valid: fyi|status|query|return_report|decision_request).
 
 ### Behavioral pointers
 
