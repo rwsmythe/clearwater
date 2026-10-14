@@ -17,6 +17,8 @@ dev = [
     "pytest>=8.3,<9",
     "ruff>=0.6,<1",
     "mypy>=1.11,<2",
+    "psutil>=6,<8",
+    "py-cpuinfo>=9,<10",
 ]
 # The harness's optional mail UI (scripts/comms_ui.py). The comms CORE
 # (role_mail.py, the hooks, cell_depth.py) is stdlib-only and never imports it.
@@ -40,6 +42,7 @@ testpaths = ["tests"]
 # The harness suite under tests/harness runs under the stdlib unittest runner
 # (python -m unittest discover -s tests/harness); keep it out of the product run.
 norecursedirs = ["harness", ".worktrees", ".venv"]
+pythonpath = ["tools"]
 addopts = "--strict-markers"
 markers = [
     "gpu: needs the graphics card",
@@ -67,6 +70,6 @@ convention = "google"
 
 [tool.mypy]
 python_version = "3.12"
-files = ["src/clearwater"]  # WP0.1 adds "tools" once tools/ has modules
+files = ["src/clearwater", "tools"]
 strict = true
 warn_unreachable = true

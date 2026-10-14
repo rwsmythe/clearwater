@@ -1,0 +1,13 @@
+# Clearwater local configuration template.
+#
+# Copy this file to `clearwater.local.toml` in the repository root and replace
+# both placeholder paths with absolute paths. `clearwater.local.toml` is never
+# committed (it is ignored by version control).
+
+# The owner's footage folder. Clearwater treats it as READ-ONLY: nothing is ever
+# written to, renamed in or deleted from it, and it is never committed.
+footage_path = "REPLACE-WITH-ABSOLUTE-PATH-TO-FOOTAGE-FOLDER"
+
+# The working folder for every output, cache, extracted frame and report. It must
+# lie outside the footage folder and outside version control.
+working_path = "REPLACE-WITH-ABSOLUTE-PATH-TO-WORKING-FOLDER"
