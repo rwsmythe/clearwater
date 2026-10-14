@@ -15,6 +15,11 @@
   unattended today. Send all operator questions to CHARC for answering. CHARC will answer
   and/or pause execution for my response." So: no AskUserQuestion and no direct operator asks
   from this seat today; every question goes `--to charc`. Info-updates to the operator continue.
+- SUPERSEDED in scope by the owner's word to CHARC (relayed msg `132932a7b891bfa0`, now in
+  CLAUDE.md "Roles"): standing, not day-scoped. Every operator-bound question goes `--to charc`
+  (type query, recommended answer first, cue after posting); CHARC answers in the operator's
+  stead except plan §3 owner-reserved items, which come back "HOLD <item>" -- pause that item,
+  continue everything else.
 
 ### Live cells
 
