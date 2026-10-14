@@ -47,6 +47,8 @@ A work package is done only when: scope met within its owned files with frozen i
 
 Chief architect (harness role **CHARC**, the director) directs an orchestrator, which runs implementer cells in git worktrees. Only the orchestrator merges to main. Owner-reserved decisions: footage categories, the look check and V2 visual review, scope decisions (chapter handling, gain caps, anything relaxing a mandatory requirement), and any change to the spec. The owner is the harness's **operator**, the only `decision_request` recipient.
 
+**Standing owner direction (2026-10-14, verbatim):** "intent is for this development to run as unattended as possible. orchestrator will send you operator related questions. Answer for operator unless the question truly requires my input." So the orchestrator routes every operator-bound question to CHARC (`--to charc`, type query, recommended answer first); CHARC answers in the operator's stead. "Truly requires the owner" = the owner-reserved list above (footage categories, the look check and V2 visual review, anything relaxing a mandatory requirement, any spec change); only those become a `decision_request`, and the orchestrator holds that item while continuing everything else.
+
 ## The harness
 
 The repository doubles as a multi-agent harness instance (template: `rwsmythe/harness-template`, comms core from the coa-chess lineage). The kernel docs are `docs/charc-charter.md`, `docs/charc-bootstrap.md`, `docs/orchestrator-context.md`, `docs/dispatch-recipe.md`, `docs/review-gate-seam.md`, `docs/codex-reviewer.md`, `docs/model-prompting-standard.md`; CHARC's state pointer is `docs/charc-state.md` (read first, overwritten each session).

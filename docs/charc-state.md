@@ -65,16 +65,16 @@ Repository local + mirrored to private GitHub `rwsmythe/clearwater` (verify:
    main carries it; `role_mail.py` has no `dispatch` type -- commissions go as
    `status` (valid: fyi|status|query|return_report|decision_request).
 
-### Standing delegation (owner, 2026-10-14 ~23:12Z, chat to the orchestrator, verbatim)
+### Standing delegation (owner, 2026-10-14, chat to CHARC, verbatim)
 
-"Intent is for you to run unattended today. Send all operator questions to CHARC
-for answering. CHARC will answer and/or pause execution for my response." So: the
-orchestrator posts every operator-bound question `--to charc` (type query); CHARC
-answers what is within its authority (architecture, brief ambiguity, scope within
-the plan) and PAUSES on owner-reserved items (plan section 3: footage categories,
-look check / V2, scope relaxations, spec changes) by posting a `decision_request`
-to the operator and telling the orchestrator to hold. Valid for 2026-10-14 only
-unless renewed; re-verify with the owner on the next session.
+"intent is for this development to run as unattended as possible. orchestrator
+will send you operator related questions. Answer for operator unless the question
+truly requires my input." Standing, not day-scoped (it superseded the ~23:12Z
+"today" ruling given to the orchestrator). Recorded in CLAUDE.md "Roles". CHARC
+answers in the operator's stead; the plan section 3 owner-reserved list is the
+only trigger for a `decision_request` (the orchestrator HOLDS that item, continues
+the rest). Read every answer back to the owner in the turn's recap so they can
+override.
 
 ### Behavioral pointers
 
