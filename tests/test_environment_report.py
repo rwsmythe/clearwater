@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -9,7 +10,7 @@ import pytest
 
 import environment_report
 
-EXPECTED_KEYS = {
+EXPECTED_KEY_ORDER = [
     "report_version",
     "timestamp_utc",
     "cpu_model",
@@ -28,7 +29,8 @@ EXPECTED_KEYS = {
     "ffmpeg_version",
     "clearwater_commit",
     "unavailable",
-}
+]
+EXPECTED_KEYS = set(EXPECTED_KEY_ORDER)
 GPU_KEYS = ("gpu_model", "gpu_memory_bytes", "gpu_driver_version")
 
 
@@ -83,6 +85,7 @@ def test_report_has_every_key(
 ) -> None:
     data = _run_main(tmp_path, monkeypatch)
     assert set(data) == EXPECTED_KEYS
+    assert list(data) == EXPECTED_KEY_ORDER
     assert data["unavailable"] == {}
     assert data["report_version"] == 1
     assert next(iter(data)) == "report_version"
@@ -185,3 +188,46 @@ def test_missing_config_without_out_fails(
 ) -> None:
     assert environment_report.main(["--config", str(tmp_path / "absent.toml")]) == 2
     assert "clearwater.local.example.toml" in capsys.readouterr().err
+
+
+def test_out_never_reads_the_config(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    def boom(path: Path | None = None) -> object:
+        raise AssertionError("--out must not read the configuration")
+
+    monkeypatch.setattr(environment_report, "load_local_config", boom)
+    monkeypatch.setattr(environment_report.subprocess, "run", FakeRun(**_healthy()))
+    assert environment_report.main(["--out", str(tmp_path)]) == 0
+
+
+def test_run_decodes_undecodable_output_with_replacement() -> None:
+    code = "import sys; sys.stdout.buffer.write(b'ab\\xff\\n')"
+    assert environment_report._run([sys.executable, "-c", code]) == "ab\ufffd"
+
+
+def test_same_second_reports_never_overwrite(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        environment_report,
+        "collect",
+        lambda: {"timestamp_utc": "2026-01-02T03:04:05Z", "marker": 0},
+    )
+    for _ in range(3):
+        assert environment_report.main(["--out", str(tmp_path)]) == 0
+    names = sorted(p.name for p in (tmp_path / "reports").iterdir())
+    assert names == [
+        "environment-20260102T030405Z-1.json",
+        "environment-20260102T030405Z-2.json",
+        "environment-20260102T030405Z.json",
+    ]
+
+
+def test_unwritable_reports_dir_returns_2(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr(environment_report.subprocess, "run", FakeRun(**_healthy()))
+    (tmp_path / "reports").write_text("a file, not a directory", encoding="utf-8")
+    assert environment_report.main(["--out", str(tmp_path)]) == 2
+    err = capsys.readouterr().err.strip()
+    assert err.startswith("error: ")
+    assert "\n" not in err

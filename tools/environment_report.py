@@ -7,7 +7,8 @@ Usage::
 The report lands in ``<working>/reports/environment-<YYYYMMDDTHHMMSSZ>.json``. A probe
 that cannot run (tool absent, non-zero exit, unparsable output, timeout) yields
 ``null`` for its fields and a one-line reason under ``unavailable``; the report is
-still written. Only portable standard-library and third-party calls are used.
+still written. An existing report is never overwritten: a name collision gets a numeric
+suffix. Only portable standard-library and third-party calls are used.
 """
 
 from __future__ import annotations
@@ -61,6 +62,8 @@ def _run(command: list[str], cwd: Path | None = None) -> str:
             command,
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             timeout=PROBE_TIMEOUT_SECONDS,
             check=False,
             cwd=cwd,
@@ -185,7 +188,8 @@ def main(argv: list[str] | None = None) -> int:
         argv: Command-line arguments; defaults to ``sys.argv[1:]``.
 
     Returns:
-        0 on success, 2 when the working folder cannot be determined.
+        0 on success; 2 when the working folder cannot be determined or the report
+        cannot be written (a one-line ``error: ...`` goes to standard error).
     """
     parser = argparse.ArgumentParser(description="Write an environment report JSON file.")
     parser.add_argument("--config", type=Path, help="local configuration file to read")
@@ -205,12 +209,45 @@ def main(argv: list[str] | None = None) -> int:
 
     report = collect()
     stamp = str(report["timestamp_utc"]).replace("-", "").replace(":", "")
-    reports_dir = working / "reports"
-    reports_dir.mkdir(parents=True, exist_ok=True)
-    target = reports_dir / f"environment-{stamp}.json"
-    target.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+    try:
+        target = _write_report(working / "reports", stamp, report)
+    except OSError as exc:
+        print(f"error: cannot write the report under {working}: {exc}", file=sys.stderr)
+        return 2
     print(target)
     return 0
+
+
+def _write_report(reports_dir: Path, stamp: str, report: dict[str, object]) -> Path:
+    """Write the report to a new file in ``reports_dir`` and return its path.
+
+    The file is created exclusively, so an existing report is never overwritten: on a
+    name collision a numeric suffix is added (``environment-<stamp>-1.json``, ``-2``, ...).
+
+    Args:
+        reports_dir: Directory for reports; created when absent.
+        stamp: The ``YYYYMMDDTHHMMSSZ`` text used in the file name.
+        report: The JSON-ready report.
+
+    Returns:
+        The path of the file written.
+
+    Raises:
+        OSError: If the directory cannot be created or the file cannot be written.
+    """
+    reports_dir.mkdir(parents=True, exist_ok=True)
+    text = json.dumps(report, indent=2) + "\n"
+    attempt = 0
+    while True:
+        suffix = f"-{attempt}" if attempt else ""
+        target = reports_dir / f"environment-{stamp}{suffix}.json"
+        try:
+            with target.open("x", encoding="utf-8") as handle:
+                handle.write(text)
+        except FileExistsError:
+            attempt += 1
+            continue
+        return target
 
 
 if __name__ == "__main__":
