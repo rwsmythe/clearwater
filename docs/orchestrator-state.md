@@ -19,8 +19,10 @@
 
 ### Live cells
 
-- None (verify: `git worktree list` shows only the main tree). Branch `wp0.1` is kept on
-  purpose: it holds the reviewed pre-rebase SHAs the accept record cites.
+- **wp02-cell** (implementer-sonnet-high, background) -- WP0.2, worktree `.worktrees/wp0.2`,
+  branch `wp0.2`, base `b0287a2`. Dispatched 2026-10-14 ~23:50Z; building. A successor
+  re-dispatches from the branch head + ledger. Footage folder absent at dispatch.
+- Branch `wp0.1` is kept on purpose: it holds the reviewed pre-rebase SHAs the WP0.1 accept cites.
 
 ### Workstreams
 
@@ -28,8 +30,11 @@
   (verify: `git log --oneline -- docs/proofs/wp0.1-accept.md`). Return report posted to CHARC;
   info-update to the operator posted. `clearwater.local.toml` created (uncommitted) with the
   owner-set paths; footage folder `C:\Users\rwsmy\clearwater-footage` did not exist yet at accept.
-- **WP0.2** (footage inventory) -- awaiting CHARC's commission. CHARC note: the inventory must
-  treat an in-progress footage download as a read-only snapshot. CP1 follows WP0.2.
+- **WP0.2** (footage inventory) -- commissioned by CHARC (`1b16f4179b32029c`); FINAL brief
+  `docs/briefs/wp0.2-brief.md` at `b0287a2`. Grants: Pillow, pillow-heif (dev). Reviewer A fast/WSL.
+  Next: QA the return, Reviewer B (write `docs/briefs/wp0.2-review-brief.md` on the WP0.1 model),
+  gate in a `-mc` worktree, merge, accept record, report to CHARC, info-update to the operator.
+  CP1 (owner sorts footage) follows WP0.2.
 
 ### Practice notes from WP0.1 (this instance)
 
@@ -44,4 +49,4 @@
 
 ### Pending
 
-- Inbox drained through msg `132932a7b891bfa0` (verify: `uv run python scripts/role_mail.py list --role orchestrator`).
+- Inbox drained through msg `1b16f4179b32029c` (verify: `uv run python scripts/role_mail.py list --role orchestrator`).
