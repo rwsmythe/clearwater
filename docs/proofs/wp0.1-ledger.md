@@ -5,8 +5,8 @@ Bring-up probe: one `^ succeeded in` line before round 1. Evidence: `C:\Users\rw
 
 | Round | Head reviewed | crit / major / minor | In / out envelope | NEW / REOPENED | Reverts | Fixes changed | Assertions | Verdict | Depth |
 |---|---|---|---|---|---|---|---|---|---|
-| 1 | 37af41f | 0 / 1 / 3 | all in | 4 NEW / 0 | 0 | product (psutil containment) + tests + 1 docstring | banner ok; ^ERROR 0; `ERROR codex_core` 1 = echoed brief text, not transport; footer 1; succeeded 5 | BLOCKING_FINDINGS | (dispatcher) |
-| 2 | a305c85 | 0 / 0 / 2 | all in | 2 NEW / 0 | 0 | cleanup only: 1 product line (negative GPU memory) + tests | banner ok; ^ERROR 0; codex_core 0; footer 1; succeeded 3 | NO_NEW_CRITICAL_MAJOR (converged) | (dispatcher) |
+| 1 | 37af41f | 0 / 1 / 3 | all in | 4 NEW / 0 | 0 | product (psutil containment) + tests + 1 docstring | banner ok; ^ERROR 0; `ERROR codex_core` 1 = echoed brief text, not transport; footer 1; succeeded 5 | BLOCKING_FINDINGS | 82K at return (dispatcher-read) |
+| 2 | a305c85 | 0 / 0 / 2 | all in | 2 NEW / 0 | 0 | cleanup only: 1 product line (negative GPU memory) + tests | banner ok; ^ERROR 0; codex_core 0; footer 1; succeeded 3 | NO_NEW_CRITICAL_MAJOR (converged) | 82K at return (dispatcher-read) |
 
 ## Findings and adjudication
 
@@ -15,3 +15,5 @@ Round 1: (1) major, EXECUTED, `psutil.virtual_memory()` failure aborted the repo
 Round 2: (1) minor, EXECUTED, negative nvidia-smi memory accepted -- fixed. (2) minor, Windows path-variant tests -- trailing-separator and `a/../work` cases added; OS-specific variants banked.
 
 Banked (out of loop, nominal minor): no tests for Windows-only path forms (case folding, UNC, drive-relative); `parse_nvidia_smi` multi-GPU behaviour is first-line-only by brief.
+
+Post-convergence amendment (0fa8315): `report_version` (integer 1, first key) added to the environment report; no review round (reason: CHARC ruling, brief amendment).
