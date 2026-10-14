@@ -36,6 +36,11 @@ comms/*
 clearwater.local.toml
 *.local.toml
 !clearwater.local.example.toml
+# The working folder (outputs, caches, extracted frames, reports): untracked, inside
+# the repo by the owner's ruling of 2026-10-14. NEVER run `git clean -x` in this tree.
+work/
+# Safety net: footage must never be committed even if a copy lands in-tree.
+footage/
 # Toolchain caches
 .pytest_cache/
 .mypy_cache/
