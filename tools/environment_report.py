@@ -115,9 +115,14 @@ def _cpu_model() -> str:
     return brand
 
 
-def _counted(value: int | None, what: str) -> int:
+def _psutil_value(what: str, read: Callable[[], int | None]) -> int:
+    """Read one psutil figure, turning any failure into a ``ProbeError``."""
+    try:
+        value = read()
+    except Exception as exc:  # psutil raises OSError, RuntimeError and others.
+        raise ProbeError(f"psutil could not read {what}: {type(exc).__name__}") from None
     if value is None:
-        raise ProbeError(f"psutil could not count {what}")
+        raise ProbeError(f"psutil could not read {what}")
     return value
 
 
@@ -144,9 +149,18 @@ def collect() -> dict[str, object]:
             report[key] = value
 
     probe(("cpu_model",), lambda: (_cpu_model(),))
-    probe(("cpu_physical_cores",), lambda: (_counted(psutil.cpu_count(logical=False), "cores"),))
-    probe(("cpu_logical_cores",), lambda: (_counted(psutil.cpu_count(logical=True), "threads"),))
-    probe(("ram_total_bytes",), lambda: (psutil.virtual_memory().total,))
+    probe(
+        ("cpu_physical_cores",),
+        lambda: (_psutil_value("physical cores", lambda: psutil.cpu_count(logical=False)),),
+    )
+    probe(
+        ("cpu_logical_cores",),
+        lambda: (_psutil_value("logical cores", lambda: psutil.cpu_count(logical=True)),),
+    )
+    probe(
+        ("ram_total_bytes",),
+        lambda: (_psutil_value("total memory", lambda: psutil.virtual_memory().total),),
+    )
     probe(_GPU_KEYS, lambda: parse_nvidia_smi(_run(_NVIDIA_SMI)))
     report["os_name"] = platform.system()
     report["os_release"] = platform.release()

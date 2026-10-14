@@ -152,6 +152,19 @@ def test_cpuinfo_failure(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Non
     assert "cpu_model" in data["unavailable"]
 
 
+def test_psutil_failures_degrade(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    def boom() -> object:
+        raise OSError("psutil boom")
+
+    monkeypatch.setattr(environment_report.psutil, "virtual_memory", boom)
+    monkeypatch.setattr(environment_report.psutil, "cpu_count", lambda logical=True: None)
+    data = _run_main(tmp_path, monkeypatch)
+    for key in ("ram_total_bytes", "cpu_physical_cores", "cpu_logical_cores"):
+        assert data[key] is None
+        assert data["unavailable"][key]
+    assert data["gpu_model"] == "NVIDIA Test GPU"
+
+
 def test_config_used_when_no_out(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     working = tmp_path / "work"
     config = tmp_path / "cfg.toml"

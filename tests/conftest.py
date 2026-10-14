@@ -8,6 +8,7 @@ from local_config import footage_available
 
 
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
+    """Skip every ``footage``-marked test when no footage folder is configured."""
     if footage_available():
         return
     skip = pytest.mark.skip(
