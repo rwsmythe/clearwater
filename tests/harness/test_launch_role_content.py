@@ -998,7 +998,7 @@ class LaunchRoleDryRunGoldenTest(unittest.TestCase):
         is_wt = any(ln.startswith("  spawn : wt -w 0 new-tab") for ln in lines)
         prompt = ("Read and follow docs/charc-bootstrap.md -- it is your role "
                   "bootstrap. Begin now.")
-        args = ('--permission-mode auto --model fable --effort high -n "' + name +
+        args = ('--permission-mode auto --model fable --effort medium -n "' + name +
                 '" "' + prompt + '"')
         inner = (_marker_scrub_prefix() + _spawn_env_prefix() + "$env:HARNESS_ROLE='charc'; Set-Location '" + str(REPO_ROOT) +
                  "'; claude " + args)
@@ -1035,7 +1035,7 @@ class LaunchRoleDryRunGoldenTest(unittest.TestCase):
         self.assertFalse(is_wt, "-NoWT must not print a wt-tab spawn")
         prompt = ("Read and follow docs/charc-bootstrap.md -- it is your role "
                   "bootstrap. Begin now.")
-        args = ('--permission-mode auto --model fable --effort high -n "' + name +
+        args = ('--permission-mode auto --model fable --effort medium -n "' + name +
                 '" "' + prompt + '"')
         inner = (_marker_scrub_prefix() + _spawn_env_prefix() + "$env:HARNESS_ROLE='charc'; Set-Location '" + str(REPO_ROOT) +
                  "'; claude " + args)
@@ -1153,7 +1153,7 @@ class LaunchRoleDryRunGoldenTest(unittest.TestCase):
             prompt = ("Resuming your charc session: re-read your role doc, drain "
                       "your inbox with role_mail, then report current state and "
                       "await the operator.")
-            args = ('--permission-mode auto --model fable --effort high --resume "' +
+            args = ('--permission-mode auto --model fable --effort medium --resume "' +
                     name + '" "' + prompt + '"')
             inner = (_marker_scrub_prefix() + _spawn_env_prefix() + "$env:HARNESS_ROLE='charc'; Set-Location '" +
                      str(REPO_ROOT) + "'; claude " + args)
@@ -1221,7 +1221,7 @@ class LaunchRoleDryRunGoldenTest(unittest.TestCase):
             prompt = ("Resuming your charc session: re-read your role doc, drain "
                       "your inbox with role_mail, then report current state and "
                       "await the operator.")
-            args = ('--permission-mode auto --model fable --effort high --resume "' +
+            args = ('--permission-mode auto --model fable --effort medium --resume "' +
                     name + '" "' + prompt + '"')
             inner = (_marker_scrub_prefix() + _spawn_env_prefix() + "$env:HARNESS_ROLE='charc'; Set-Location '" +
                      str(REPO_ROOT) + "'; claude " + args)

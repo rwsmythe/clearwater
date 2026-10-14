@@ -53,7 +53,7 @@ The repository doubles as a multi-agent harness instance (template: `rwsmythe/ha
 
 - **Comms:** file mailboxes under `comms/` (gitignored), one singular inbox per role (`charc`, `orchestrator`, `operator`): `uv run python scripts/role_mail.py post|list|peek|read ...`. Drain to a file, re-list before every post, bodies via `--body-file`, subjects under 120 characters. After every post, one cross-session `SendMessage` cue to the exact session name in `comms/.launch-sessions.json`.
 - **Comms UI:** `uv run python scripts/comms_ui.py` serves on **port 8775** (the sibling harnesses on this machine use 8765).
-- **Launcher:** `powershell -NoProfile -File scripts/launch_role.ps1 -Role charc|orchestrator` (psmux session `clearwater`, session names `clearwater-<role>-<stamp>`; `-DryRun` to preview). CHARC fable/high, orchestrator opus/high, permission-mode auto (seam 4; tunable).
+- **Launcher:** `powershell -NoProfile -File scripts/launch_role.ps1 -Role charc|orchestrator` (psmux session `clearwater`, session names `clearwater-<role>-<stamp>`; `-DryRun` to preview). CHARC fable/medium, orchestrator opus/high, permission-mode auto (seam 4; owner-set 2026-10-14).
 - **Harness gate:** `uv run python -m unittest discover -s tests/harness` — run it whenever `scripts/`, `.claude/`, the kernel docs or `tests/harness/` change. The harness core stays stdlib-only and application-agnostic; application vocabulary lives on the instance surface registered in `tests/harness/genericity_lists.py`.
 
 ## Hardware rule (plan §4.3)

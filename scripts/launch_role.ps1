@@ -194,17 +194,15 @@ $RoleTitles = @{ 'charc' = 'CHARC'; 'orchestrator' = 'ORCHESTRATOR' }
 #     the EFFORT is a per-project operator choice.
 # Rationale for every assignment + the operating economy they serve:
 # docs/model-prompting-standard.md sec 10 (operator-approved 2026-08-02).
-# Clearwater starter (bootstrap 2026-10-14): CHARC fable/high -- the owner set
-# effort high for the bootstrap session; the sibling harnesses run their
-# directors at medium (higher effort over-deliberates on routine routing and
-# rulings), so drop to medium after the design freeze if the owner agrees. The
-# orchestrator is opus/high (agentic coordination, accept-time review
+# Clearwater (owner-directed 2026-10-14): CHARC fable/medium -- higher effort
+# over-deliberates on routine routing and rulings, the director lane's bulk.
+# The orchestrator is opus/high (agentic coordination, accept-time review
 # precision). Implementer tiers are per-cell frontmatter (.claude/agents).
 # All roles share '--permission-mode auto' (a sensible generic default).
 $LaunchArgsCommon = @('--permission-mode', 'auto')
 $LaunchArgsByRole = @{
     # FIXED -- CHARC is the top-capability tier in any harness (B-3).
-    'charc'        = @('--model', 'fable', '--effort', 'high')
+    'charc'        = @('--model', 'fable', '--effort', 'medium')
     # Opus/high (operator-approved 2026-08-02; 'opus' is the CLI ALIAS and
     # tracks the latest Opus -- 5.5 as of 2026-09-22, operator-directed): the
     # delivery-manager lane is the Opus profile -- agentic coordination, review
