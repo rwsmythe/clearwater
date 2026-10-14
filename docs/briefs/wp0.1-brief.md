@@ -46,6 +46,7 @@ returns 0. JSON keys, exactly:
 
 | key | source |
 |---|---|
+| `report_version` | integer `1`, first key (amended 2026-10-14 on CHARC's advisory, msg `9fd533ea0fe6e3e8`) |
 | `timestamp_utc` | ISO 8601 with `Z` |
 | `cpu_model` | `cpuinfo.get_cpu_info()["brand_raw"]` |
 | `cpu_physical_cores`, `cpu_logical_cores` | `psutil.cpu_count(logical=False/True)` |

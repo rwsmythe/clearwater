@@ -22,7 +22,7 @@ If the plan and the spec disagree, the spec wins; raise the disagreement to the 
 Do not guess these.
 
 - Path to the footage folder (treated as **read-only**, never committed).
-- Location for the working folder (outputs, caches, reports; outside the footage folder and outside version control).
+- Working folder: SUPPLIED 2026-10-14 by the owner (in chat to the orchestrator: "let's create a working folder within clearwater", confirmed as ignored by git): `C:\Users\rwsmy\clearwater\work\`, gitignored as `work/` (69311b1). Outputs, caches and reports go there; never committed. Never run `git clean -x` in this tree (it deletes ignored files).
 
 Both go into the uncommitted `clearwater.local.toml` (template: `clearwater.local.example.toml`, created by WP0.1).
 
