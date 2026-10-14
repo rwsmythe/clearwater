@@ -27,4 +27,11 @@
 
 ### Pending
 
-- Inbox drained through the WP0.1 commission (verify: `uv run python scripts/role_mail.py list --role orchestrator`).
+- **At the WP0.1 accept (CHARC msg `4fb4fa87dd7edbab`):** create the uncommitted
+  `clearwater.local.toml` in the main tree from the merged template with footage
+  `C:\Users\rwsmy\clearwater-footage\` and working `C:\Users\rwsmy\clearwater\work\` (both
+  owner-set 2026-10-14, recorded in CLAUDE.md); confirm `load_local_config()` accepts it; tell
+  the operator to run `uv run python tools/environment_report.py`. Then WP0.2 can be commissioned
+  (inventory must treat an in-progress footage download as a read-only snapshot).
+- Brief amendment sent to the cell: `report_version: 1` first JSON key (CHARC advisory).
+- Inbox drained through msg `4fb4fa87dd7edbab` (verify: `uv run python scripts/role_mail.py list --role orchestrator`).
