@@ -14,14 +14,14 @@ If the plan and the spec disagree, the spec wins; raise the disagreement to the 
 
 - **Harness bootstrapped (2026-10-14).** The repository is a live multi-agent harness instance (see "The harness" below) with the application defined in `APPLICATION.md`, three implementer cells under `.claude/agents/`, the review/gate fill in `docs/review-gate-clearwater.md`, and the uv project skeleton (`pyproject.toml`, Python 3.12, `src/clearwater/`, `tests/`, `tools/`).
 - **No product code yet.** `src/clearwater/__init__.py` is a stub.
-- **Next task: WP0.1** (plan §6, Phase 0) — remaining scope: the local configuration template and loader, `tools/environment_report.py`, the FFmpeg development tools, and the first green `ruff`/`mypy`/`pytest` run. Brief: `docs/briefs/wp0.1-brief.md`. It is dispatched by the orchestrator once the owner supplies the two paths below.
+- **Next task: WP0.1** (plan §6, Phase 0) — remaining scope: the local configuration template and loader, `tools/environment_report.py`, the FFmpeg development tools, and the first green `ruff`/`mypy`/`pytest` run. Brief: `docs/briefs/wp0.1-brief.md`. Dispatched 2026-10-14 (cell in `.worktrees/wp0.1`).
 - Then WP0.2 (footage inventory tool), then the owner sorts the footage (checkpoint CP1).
 
-## Inputs the owner still has to supply
+## Inputs the owner has supplied
 
-Do not guess these.
+Both were owner-set on 2026-10-14; do not substitute other paths.
 
-- Path to the footage folder (treated as **read-only**, never committed).
+- Footage folder: SUPPLIED 2026-10-14 by the owner (in chat to CHARC: \"concur with footage location\"): `C:\Users\rwsmy\clearwater-footage\`, OUTSIDE the repository so no git command in this tree can reach it. Treated as **read-only**, never committed. The owner is still downloading into it.
 - Working folder: SUPPLIED 2026-10-14 by the owner (in chat to the orchestrator: "let's create a working folder within clearwater", confirmed as ignored by git): `C:\Users\rwsmy\clearwater\work\`, gitignored as `work/` (69311b1). Outputs, caches and reports go there; never committed. Never run `git clean -x` in this tree (it deletes ignored files).
 
 Both go into the uncommitted `clearwater.local.toml` (template: `clearwater.local.example.toml`, created by WP0.1).

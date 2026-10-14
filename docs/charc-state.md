@@ -50,10 +50,11 @@ Repository local + mirrored to private GitHub `rwsmythe/clearwater` (verify:
    opus/high/auto and the three cell tiers confirmed); "2. working folder, let's
    create an untracked folder within clearwater" -> `C:\Users\rwsmy\clearwater\work\`
    (`work/` gitignored, commit 69311b1; also a `footage/` safety-net ignore).
-   **Footage path STILL OPEN**: owner is downloading the footage and asked CHARC to
-   propose; CHARC proposed `C:\Users\rwsmy\clearwater-footage\` (outside the
-   repo: `git clean -x` deletes ignored files in-tree). Await the owner's word; do
-   not create `clearwater.local.toml` before it.
+   **Footage path RULED** (chat, "concur with footage location"):
+   `C:\Users\rwsmy\clearwater-footage\` (outside the repo; owner still downloading
+   into it). Both paths recorded in CLAUDE.md. `clearwater.local.toml` is created
+   at the WP0.1 accept (the orchestrator, from the template); the owner then runs
+   the real environment report.
 2. **Next harness act:** QA the orchestrator's WP0.1 accept when it lands (CHARC
    QAs the orchestrator's product: accept record, ledger, gate assertions, the
    claim list against the brief). Then commission WP0.2 (footage inventory; needs
