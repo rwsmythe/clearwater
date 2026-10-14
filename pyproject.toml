@@ -1,0 +1,72 @@
+[project]
+name = "clearwater"
+version = "0.0.0"
+description = "Desktop tool that corrects color cast, contrast loss and haze in amateur underwater photos and video."
+readme = "APPLICATION.md"
+requires-python = ">=3.12,<3.13"
+license = "GPL-2.0-or-later"
+license-files = ["LICENSE"]
+authors = [{ name = "Robert Smythe" }]
+# Product dependencies are added only by the work package whose brief allows it,
+# and only after the architecture document names them (plan section 4.1, spec N13).
+dependencies = []
+
+[dependency-groups]
+# The application toolchain (plan PD9).
+dev = [
+    "pytest>=8.3,<9",
+    "ruff>=0.6,<1",
+    "mypy>=1.11,<2",
+]
+# The harness's optional mail UI (scripts/comms_ui.py). The comms CORE
+# (role_mail.py, the hooks, cell_depth.py) is stdlib-only and never imports it.
+comms = [
+    "fastapi>=0.115,<1.0",
+    "uvicorn[standard]>=0.30,<1.0",
+    "jinja2>=3.1,<4.0",
+    "httpx>=0.27,<1.0",
+    "python-multipart>=0.0.9,<1.0",
+]
+
+[build-system]
+requires = ["uv_build>=0.10,<0.11"]
+build-backend = "uv_build"
+
+[tool.uv]
+default-groups = ["dev", "comms"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# The harness suite under tests/harness runs under the stdlib unittest runner
+# (python -m unittest discover -s tests/harness); keep it out of the product run.
+norecursedirs = ["harness", ".worktrees", ".venv"]
+addopts = "--strict-markers"
+markers = [
+    "gpu: needs the graphics card",
+    "footage: needs the owner's footage folder (skipped when the path is absent)",
+    "gui: drives the PySide6 interface",
+    "slow: takes more than a few seconds",
+]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+src = ["src", "tools", "tests"]
+# The harness core and its suite are upstream scaffold code, not product code.
+extend-exclude = ["scripts", ".claude", "tests/harness", ".worktrees"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "D", "ANN", "RUF", "SIM"]
+ignore = ["D203", "D213", "ANN401"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["D", "ANN"]
+
+[tool.mypy]
+python_version = "3.12"
+files = ["src/clearwater"]  # WP0.1 adds "tools" once tools/ has modules
+strict = true
+warn_unreachable = true

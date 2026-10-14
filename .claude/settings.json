@@ -1,0 +1,25 @@
+{
+  "_comment": "Hook registration for the harness comms lifecycle. ARC-8 collapsed the comms model onto uniform singular inboxes, so the per-generation SessionStart/SessionEnd registry lifecycle is gone -- only UserPromptSubmit (role recovery + unread notice) and Stop (continue-on-unread) remain. Paths are PORTABLE -- they resolve against $CLAUDE_PROJECT_DIR (the clone's own root), so this ships to other machines unchanged. INTERPRETER: the commands use 'python', the canonical launcher on the Windows substrate this harness targets (verified to resolve there). On a clone where the Python launcher is named 'python3' instead (some Linux/macOS shells have no bare 'python'), substitute 'python' -> 'python3' in both commands below -- a one-line per-machine edit. Likewise if your Claude Code version does not expand $CLAUDE_PROJECT_DIR in a hook command, replace it with the absolute path to THIS clone's .claude/hooks dir. See docs/charc-bootstrap.md.",
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/user_prompt_submit.py\""
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/stop.py\""
+          }
+        ]
+      }
+    ]
+  }
+}

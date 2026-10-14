@@ -1,0 +1,46 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Inter-role file mailbox + the orchestrator session registry. Runtime
+# coordination state -- never tracked. The committed comms/.gitkeep anchor
+# (un-ignored below) keeps the mailbox root present in a fresh clone; role
+# inboxes (comms/<role>/inbox), per-generation orchestrator inboxes
+# (comms/orchestrator/<session_id>/inbox), and the registry (comms/sessions/)
+# all auto-create at first use and stay out of git.
+#
+# NOTE the two-line ignore-glob + negation form: `comms/*` (ignore every child)
+# followed by `!comms/.gitkeep` (un-ignore the anchor). A bare directory-ignore
+# `comms/` would ALSO ignore the .gitkeep child (a directory ignore cannot be
+# negated for a contained path) -- so this exact two-line form is required.
+comms/*
+!comms/.gitkeep
+
+# Isolated implementer workspaces (the substrate default; see docs/dispatch-recipe.md)
+.worktrees/
+
+# Adversarial-review / findings artifacts (the review loop writes these locally)
+.codex-*
+.copowers-*
+
+# --- Clearwater (application) --------------------------------------------
+# The local configuration file (footage + working folder paths) is per machine
+# and never committed; the committed template is clearwater.local.example.toml.
+clearwater.local.toml
+*.local.toml
+!clearwater.local.example.toml
+# Toolchain caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+dist/
+build/
+# Review-loop evidence lives OUTSIDE the repo (C:\Users\rwsmy\clearwater-review-evidence\);
+# anything a loop stages in-tree is covered by the .codex-* / .copowers-* rules above.
