@@ -15,8 +15,8 @@ drive): the guard stays active (fail safe); a test pins it.
 
 The guard refuses before pytest creates or clears any temporary FOLDER; not the TEMP-variable file
 writes. Pytest starts output capture, and `tempfile` probes for a writable directory, BEFORE it loads
-any conftest. With `TMPDIR`/`TEMP`/`TMP` inside the footage folder (or with `TMP` there next to any
-other setting, including `--basetemp` or `PYTEST_DEBUG_TEMPROOT`), pytest creates and removes
+any conftest. With `TMPDIR`/`TEMP`/`TMP` inside the footage folder (or with `TMP` there and no usable
+earlier candidate, alongside `--basetemp` or `PYTEST_DEBUG_TEMPROOT`) [erratum at the gate], pytest creates and removes
 short-lived, randomly named files there before the guard refuses. Measured with an audit hook on a
 fake footage folder: one probe file created and removed, two capture temp files opened; nothing
 existing touched, the planted files byte-identical. Closing it needs an early `-p` plugin (a
@@ -25,7 +25,8 @@ existing touched, the planted files byte-identical. Closing it needs an early `-
 Ordering: the factory is built in `_pytest/tmpdir.py:211-220` without touching disk; removal and
 creation happen in `getbasetemp()` (`tmpdir.py:139-`), on the first `tmp_path`/`tmpdir`/factory
 request. The guard runs before even the factory exists. The cache provider's `--cache-clear` clears
-only `.pytest_cache` subfolders; it runs after the guard (a conftest registers after the built-in
+the subfolders of the configured `cache_dir` (`.pytest_cache` by default; an explicit
+`-o cache_dir=<footage>` is NOT guarded, DR-22) [erratum at the gate]; it runs after the guard (a conftest registers after the built-in
 plugins and later-registered hooks run first). Tests pin both: the control runs the miniature
 WITHOUT the guard and `--basetemp=<fake footage>` and pytest deletes the planted files; with the
 guard, the `tmp_path`, `tmpdir`, session `tmp_path_factory` and direct `getbasetemp()` tests, `-s`,
@@ -48,7 +49,9 @@ as the footage folder.
   would write inside a footage folder named by `TMPDIR`. The guard mirrors the candidate list
   without touching disk and approximates the probe by "an existing directory `os.access` accepts
   for writing"; it checks every candidate up to and including that one (candidates before it are
-  over-refused, never missed). If `tempfile.tempdir` is already cached (the normal case, because
+  over-refused). [Erratum at the gate: on Windows `os.access` is not an ACL-accurate create
+  probe, so a candidate it accepts but CPython's real write probe rejects can make the guard
+  stop one candidate early and miss the root CPython then picks; DR-22.] If `tempfile.tempdir` is already cached (the normal case, because
   capture caches it) only that value is checked. With capture off (`-s`) a safe `TMPDIR` plus
   `TEMP=<footage>` passes; `TMPDIR=<footage>` is refused.
 * A default root is also refused when the footage folder lies in `<root>/pytest-of-*`, or when
@@ -70,6 +73,14 @@ as the footage folder.
 
 ## When the guard loads, and other limits
 
+* **Accepted at the gate after Reviewer B's re-run (orchestrator, DR-22).** The guard does not
+  cover these deliberately constructed states: a temp candidate whose ACL `os.access` misreads
+  (above); a configured footage path reached through a junction whose resolution is denied
+  (`Path.resolve()` is non-strict and degrades silently, and `samefile` errors are ignored); a
+  footage folder placed inside `<root>/pytest-of-<user>/` under an aliased (volume-GUID) temp
+  root; `--cache-clear` with `-o cache_dir=<footage>`. A stale `pytest-of-unknown` link into the
+  footage folder over-refuses. See `docs/proofs/wp-t1-accept.md`.
+
 * The guard runs only when `tests/conftest.py` is loaded. Pytest 8.4.2
   (`config/__init__.py`, `_set_initial_conftests` ~548-596, `_try_load_conftest`, `_is_in_confcutdir`
   ~598, `--noconftest` ~646) loads, for every existing path argument (`testpaths` when none is
@@ -90,7 +101,7 @@ as the footage folder.
   The test subprocesses never read the real `clearwater.local.toml`; the containing session's
   guard does, by design.
 
-## Tests (`tests/test_conftest_guard.py`, 44 cases; each in a subprocess on a miniature repository
+## Tests (`tests/test_conftest_guard.py`, 44 cases; 41 in a subprocess on a miniature repository, 3 in process
 under `tmp_path` with fake footage and working folders, except the three in-process unit tests)
 
 Control (no guard wipes the footage); `--basetemp` refused (equal, trailing separator, existing and
