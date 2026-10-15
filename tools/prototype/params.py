@@ -180,6 +180,8 @@ class Params:
             raise ValueError(
                 f"pyramid_min_level_size must be an integer >= 1, got {self.pyramid_min_level_size}"
             )
+        if not 0.0 <= self.c3_mask_threshold <= 1.0:
+            raise ValueError(f"c3_mask_threshold must be in [0, 1], got {self.c3_mask_threshold}")
         if not 0.0 <= self.blend_with_original <= 1.0:
             raise ValueError(
                 f"blend_with_original must be in [0, 1], got {self.blend_with_original}"

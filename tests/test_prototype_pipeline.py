@@ -562,6 +562,8 @@ def test_spatial_sigma_is_a_fraction_of_the_short_side() -> None:
         {"alpha": "1"},
         {"blue_compensation": 1},
         {"red_gain_cap": "2"},
+        {"c3_mask_threshold": -1.0},
+        {"c3_mask_threshold": 2.0},
         {"alpha": np.float32("nan")},
         {"laplacian_fraction": np.float64("inf")},
         {"kappa": float("nan")},
