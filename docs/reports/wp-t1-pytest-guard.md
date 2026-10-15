@@ -30,7 +30,8 @@ ancestor of the candidate is the same file (`os.path.samefile`) as the footage f
   would write inside a footage folder named by `TMPDIR`), the guard mirrors its candidate list
   without touching disk and refuses if ANY candidate is inside or equal to the footage folder,
   unless `tempfile.tempdir` is already cached (then only that value is checked). A default root
-  is also refused when the footage folder lies in `<root>/pytest-of-*`, where pytest writes.
+  is also refused when the footage folder lies in `<root>/pytest-of-*`, where pytest writes, or when
+  an existing `<root>/pytest-of-*` entry (link, junction) leads into the footage folder.
 
 ## Pytest lines mirrored (pytest 8.4.2, `.venv/Lib/site-packages/_pytest/`)
 
@@ -45,6 +46,16 @@ ancestor of the candidate is the same file (`os.path.samefile`) as the footage f
 
 ## Limits
 
+* **Pytest writes before any conftest can run (STOP-class finding, reported to the dispatcher).**
+  Pytest starts output capture, and `tempfile` probes for a writable directory, BEFORE loading
+  `tests/conftest.py`. With `TMPDIR`/`TEMP`/`TMP` inside the footage folder, pytest therefore
+  creates and removes short-lived, randomly named files there before the guard refuses.
+  Measured with an audit hook on a fake footage folder: one probe file created and removed, two
+  capture temp files opened; nothing existing touched, the planted files byte-identical.
+  `--basetemp` and `PYTEST_DEBUG_TEMPROOT` are refused before any write. Closing the gap needs an
+  early plugin (`-p`, loaded before capture starts; `pythonpath = ["tools"]` is applied first),
+  which means a `pyproject.toml` addopts change and a file under `tools/`: outside this package.
+
 * The guard runs only when `tests/conftest.py` is loaded: pytest arguments (or `testpaths` when
   none are given) at or below `tests/`, from this repository's rootdir. `pytest tools/`, a path
   outside `tests/`, `--noconftest`, `--confcutdir` above `tests/`, or another rootdir does not
@@ -54,13 +65,13 @@ ancestor of the candidate is the same file (`os.path.samefile`) as the footage f
   folder lies in `<root>/pytest-of-*`; pytest touches nothing else below the root.
 * The guard needs the local configuration; without footage configured there is nothing to guard.
 
-## Tests (`tests/test_conftest_guard.py`, 27 cases, each in a subprocess on a miniature repository
+## Tests (`tests/test_conftest_guard.py`, 30 cases, each in a subprocess on a miniature repository
 under `tmp_path`; fake footage and working folders; no real path named)
 
 control without guard wipes the footage; `--basetemp` refused (equal, trailing separator, existing
 subfolder, missing subfolder, missing nested, `..` inside, relative inside, relative equal,
 ancestor); `TMPDIR`/`TEMP`/`TMP` inside and equal; `PYTEST_DEBUG_TEMPROOT` inside; case variant
-(Windows); extended-length prefix and 8.3 short name (Windows); default root whose
-`pytest-of-*` folder is the footage; symlink or junction (`--basetemp` and temp variables); passes: `--basetemp` and temp
+(Windows); extended-length prefix and 8.3 short name (Windows); volume GUID path (Windows);
+default root whose `pytest-of-*` folder is, or is linked to, the footage; unusable configured path; symlink or junction (`--basetemp` and temp variables); passes: `--basetemp` and temp
 variables in the working folder, sibling `footage-other`; inert (no file, invalid TOML, relative
 path, no keys); DR-9 skip reasons (absent versus not configured).

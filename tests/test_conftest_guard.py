@@ -350,3 +350,47 @@ def test_footage_skip_reason_distinguishes_absent_from_unconfigured(
     assert result.returncode == 0, result.stdout + result.stderr
     assert "SKIPPED" in result.stdout
     assert expected in result.stdout
+
+
+@pytest.mark.skipif(os.name != "nt", reason="volume GUID paths exist only on Windows")
+def test_basetemp_through_a_volume_guid_path_is_refused(tmp_path: Path) -> None:
+    import ctypes
+
+    mini = _build(tmp_path)
+    drive = mini.footage.resolve().anchor
+    buffer = ctypes.create_unicode_buffer(1024)
+    found = ctypes.windll.kernel32.GetVolumeNameForVolumeMountPointW(drive, buffer, 1024)  # type: ignore[attr-defined]
+    if not found or not buffer.value.startswith("\\\\?\\Volume{"):
+        pytest.skip("no volume GUID path for the fake footage's drive")
+    guid_root = buffer.value
+    relative = str(mini.footage.resolve())[len(drive) :]
+    before = _snapshot(mini.footage)
+    for tail in ("", "\\sub", "\\not-yet-there"):
+        _assert_refused(
+            _run(tmp_path, mini, f"--basetemp={guid_root}{relative}{tail}"), mini, before
+        )
+
+
+def test_pytest_of_entry_linked_into_footage_is_refused(tmp_path: Path) -> None:
+    mini = _build(tmp_path)
+    root = tmp_path / "temproot"
+    root.mkdir()
+    # Any user name pytest may derive: the guard checks every pytest-of-* entry of the root.
+    _make_dir_link(root / "pytest-of-someone", mini.footage)
+    before = _snapshot(mini.footage)
+    env = {"TEMP": str(root), "TMP": str(root), "TMPDIR": str(root)}
+    _assert_refused(_run(tmp_path, mini, env_extra=env), mini, before)
+    result = _run(tmp_path, mini, env_extra={"PYTEST_DEBUG_TEMPROOT": str(root)})
+    _assert_refused(result, mini, before)
+
+
+def test_guard_is_inert_when_the_configured_path_is_not_a_usable_path(tmp_path: Path) -> None:
+    mini = _build(tmp_path)
+    good = _toml(mini.footage / "nul", mini.work).splitlines()[0]
+    bad = good.rstrip('"') + '\\u0000x"'  # TOML escape for an embedded NUL
+    (mini.root / "clearwater.local.toml").write_text(
+        bad + f"\nworking_path = '{mini.work}'\n", encoding="utf-8"
+    )
+    result = _run(tmp_path, mini, f"--basetemp={mini.work / 'bt'}")
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "footage guard" not in result.stdout + result.stderr

@@ -20,6 +20,13 @@ identity (``os.path.samefile``) for any existing ancestor. A legitimate basetemp
 such as a folder under the working folder, passes. The guard is inert, and silent, when
 there is no valid local configuration: it never fails a run on a machine without footage.
 
+Limit: pytest starts output capture before it loads any conftest, and capture (and
+``tempfile``'s writability probe) makes short-lived, randomly named files in the
+``TMPDIR``/``TEMP``/``TMP`` directory. A guard in this file cannot stop that, so with
+those variables pointing into the footage folder the run is refused only after such
+transient files came and went; nothing existing is touched. ``--basetemp`` and
+``PYTEST_DEBUG_TEMPROOT`` are refused before anything is written.
+
 The guard only runs when this file is loaded, that is, when the pytest arguments
 (or ``testpaths``, when none are given) lie at or below ``tests/``. A run on a
 path outside ``tests/``, with ``--noconftest`` or ``--confcutdir`` above this
@@ -56,10 +63,12 @@ def _canonical(path: str | os.PathLike[str]) -> Path:
     text = str(Path(os.path.abspath(os.fspath(path))).resolve())
     if os.name == "nt":
         # resolve() keeps an extended-length prefix that was in the input; strip it to compare.
-        if text.startswith("\\\\?\\UNC\\"):
-            text = "\\\\" + text[8:]
-        elif text.startswith("\\\\?\\"):
-            text = text[4:]
+        # Other forms (\\?\Volume{GUID}\...) stay as they are; samefile() covers them.
+        extended, unc = "\\\\?\\", "\\\\?\\UNC\\"
+        if text.startswith(unc):
+            text = "\\\\" + text[len(unc) :]
+        elif text.startswith(extended) and text[4:5].isalpha() and text[5:6] == ":":
+            text = text[len(extended) :]
     return Path(os.path.normcase(text))
 
 
@@ -89,6 +98,25 @@ def _holds_pytest_of(root: Path, folder: Path) -> bool:
     except ValueError:
         return False
     return bool(parts) and parts[0].startswith("pytest-of-")
+
+
+def _pytest_of_child_in(root: Path, footage: Path) -> Path | None:
+    """Return an existing ``root/pytest-of-*`` entry that lies in ``footage``, if any.
+
+    pytest writes its numbered folders into ``root/pytest-of-<user>``; if that entry
+    is a link into the footage folder, the write lands there.
+    """
+    try:
+        children = [c for c in root.iterdir() if c.name.startswith("pytest-of-")]
+    except OSError:
+        return None
+    for child in children:
+        try:
+            if _inside_or_equal(_canonical(child), footage):
+                return child
+        except (OSError, RuntimeError, ValueError):
+            continue
+    return None
 
 
 def _temp_root_candidates() -> list[str]:
@@ -148,7 +176,7 @@ def _offending_root(config: pytest.Config, footage: Path) -> str | None:
         origin, roots = "PYTEST_DEBUG_TEMPROOT", [from_env]
     else:
         origin, roots = (
-            "the default temp root (TMPDIR/TEMP/TMP or a system default)",
+            "a default temp-root candidate (TMPDIR/TEMP/TMP or a system default)",
             _temp_root_candidates(),
         )
     for root_text in roots:
@@ -156,6 +184,8 @@ def _offending_root(config: pytest.Config, footage: Path) -> str | None:
         # pytest makes pytest-of-<user>/ under the root, so a footage folder there is hit too.
         if _inside_or_equal(root, footage) or _holds_pytest_of(root, footage):
             return f"{origin} {root_text}"
+        if (child := _pytest_of_child_in(root, footage)) is not None:
+            return f"{origin} {root_text} (its {child.name} entry leads into the footage folder)"
     return None
 
 
@@ -181,11 +211,14 @@ def pytest_configure(config: pytest.Config) -> None:
         return
     try:
         footage = _canonical(footage_raw)
+    except ValueError:
+        return  # not a usable path (embedded NUL): an invalid configuration, so inert
     except (OSError, RuntimeError):
+        # Unresolvable (e.g. a symlink loop): compare its absolute spelling and file identity.
         footage = Path(os.path.normcase(os.path.abspath(footage_raw)))
     try:
         offending = _offending_root(config, footage)
-    except (OSError, RuntimeError) as exc:
+    except (OSError, RuntimeError, ValueError) as exc:
         raise pytest.UsageError(
             f"footage guard: cannot resolve the pytest temp root ({exc}); "
             f"refusing to run with a footage folder configured at {footage_raw}"
