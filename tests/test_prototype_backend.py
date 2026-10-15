@@ -517,3 +517,23 @@ def test_run_bad_or_unusable_device_exits_2(
 @requires_gpu
 def test_run_on_the_gpu_records_the_backend(tmp_path: Path) -> None:
     assert _run_backend(tmp_path, "--device", "gpu") == "gpu"
+
+
+@pytest.mark.gpu
+@requires_gpu
+@pytest.mark.parametrize("method", METHODS)
+def test_memory_estimate_bounds_the_measured_pool_peak(method: str) -> None:
+    """At a size where the per-pixel term dominates, the estimate covers the pool's peak."""
+    gpu = select_backend("gpu")
+    frame = bench.synthetic_frame(1024, 1536)
+    params = Params(method=method)  # type: ignore[arg-type]
+    tracker = bench._PoolTracker(gpu)
+    try:
+        pipeline.correct(frame, params, gpu)
+        gpu.synchronize()
+    finally:
+        tracker.close()
+    reserved = int(gpu.xp.get_default_memory_pool().total_bytes())
+    estimate = memory_estimate_bytes(frame.shape, params)
+    assert estimate >= reserved >= tracker.peak_used
+    assert estimate <= 1.5 * reserved  # an upper bound, not a loose one
