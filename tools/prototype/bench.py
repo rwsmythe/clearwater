@@ -514,10 +514,12 @@ class _PeakRssSampler:
         self._sample()
 
     def _run(self) -> None:
+        """Sample until :meth:`stop` is called."""
         while not self._stop.wait(RSS_SAMPLE_INTERVAL_S):
             self._sample()
 
     def _sample(self) -> None:
+        """Take one RSS sample and keep the maximum."""
         self.peak = max(self.peak, int(self._process.memory_info().rss))
 
 
@@ -533,6 +535,7 @@ class _PoolTracker:
         self._cupy.cuda.set_allocator(self._malloc)
 
     def _malloc(self, size: int) -> Any:
+        """Allocate from the pool and update the high-water mark of its used bytes."""
         memory = self._pool.malloc(size)
         self.peak_used = max(self.peak_used, int(self._pool.used_bytes()))
         return memory

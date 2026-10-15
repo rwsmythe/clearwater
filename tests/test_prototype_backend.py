@@ -537,3 +537,16 @@ def test_memory_estimate_bounds_the_measured_pool_peak(method: str) -> None:
     estimate = memory_estimate_bytes(frame.shape, params)
     assert estimate >= reserved >= tracker.peak_used
     assert estimate <= 1.5 * reserved  # an upper bound, not a loose one
+
+
+def test_auto_falls_back_when_cupyx_does_not_import(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    monkeypatch.setitem(sys.modules, "cupy", _fake_cupy())
+    monkeypatch.setitem(sys.modules, "cupyx.scipy.ndimage", None)
+    with caplog.at_level(logging.INFO, logger="prototype.backend"):
+        backend = select_backend("auto")
+    assert backend.name == "cpu"
+    assert "cupyx.scipy.ndimage did not import" in backend.reason
+    with pytest.raises(RuntimeError, match="cupyx"):
+        select_backend("gpu")

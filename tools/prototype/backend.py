@@ -211,7 +211,10 @@ def _probe_gpu() -> tuple[Backend | None, str]:
             return None, "a test kernel on the CUDA device returned a wrong result"
     except Exception as exc:  # a missing runtime library or header shows here
         return None, f"a test kernel failed on the CUDA device ({_one_line(exc)})"
-    return _gpu_backend(cupy), ""
+    try:
+        return _gpu_backend(cupy), ""
+    except Exception as exc:  # an incomplete CuPy installation without cupyx
+        return None, f"cupyx.scipy.ndimage did not import ({_one_line(exc)})"
 
 
 def _gpu_backend(cupy: ModuleType) -> Backend:

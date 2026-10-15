@@ -69,7 +69,8 @@ was missing: nothing is implemented twice.
   `tests/test_prototype_pipeline.py` passes unedited (claim 2).
 - **`select_backend`**: `"cpu"`; `"gpu"`, which raises `RuntimeError` with the reason when
   CuPy is missing, the CUDA runtime does not answer, it reports no device, or a 4-element
-  test kernel fails (the last catches the missing-header case of section 1); `"auto"`,
+  test kernel fails (this catches the missing-header case of section 1), or
+  `cupyx.scipy.ndimage` does not import; `"auto"`,
   which never raises and falls back to the CPU with the reason logged at INFO and stored
   in `Backend.reason` (claim 4).
 - **Accepted interface deviations** (CHARC ruling 4db6db642c117b1e):
@@ -126,7 +127,7 @@ rejected it (option B) and banked the ill-conditioning of N{} on low-texture fra
 - **Timing.** `time.perf_counter()` around `correct(frame, params, backend)` on the NumPy
   frame followed by `backend.synchronize()`, so each frame's time includes the host-to-device
   copy of the input, every kernel, and the device-to-host copy of **every** array of the
-  `Result` (seven images and ten weight maps, about 1 GiB at 4K). N = 60 at 4K and 30 at 5.3K,
+  `Result` (six images and ten weight maps, 28 planes, about 0.87 GiB at 4K). N = 60 at 4K and 30 at 5.3K,
   in sequence; the first frame (kernel compilation, pool growth) is discarded; median and
   p95 over the rest; drift = median of the last ten over the median of the first ten.
 - **Supplementary, GPU only: device-resident.** A second loop of N frames times what a
@@ -172,7 +173,7 @@ steady frames -> the median of the last ten.
 
 Supplementary (GPU, not the brief's figure): the device-resident path, the input copied in
 and only the output copied back, same frame, N, window and head. The difference to the main
-table is the device-to-host copy of the sixteen other result arrays.
+table is the device-to-host copy of the other fifteen result arrays.
 
 | Size | Method | Device-resident median (s) | p95 (s) | Drift | Share of 0.111 s | nvidia-smi used before -> after (MiB) | CUDA used after context -> after loop (MiB) |
 |---|---|---|---|---|---|---|---|
