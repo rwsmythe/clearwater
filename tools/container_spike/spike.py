@@ -311,7 +311,7 @@ def encode_proof(
         encoder: ``hevc_nvenc`` or ``libx265``.
         pix_fmt: The encoder input pixel format.
         profile: ``main`` or ``main10``.
-        folder: Where the proof clip is written.
+        folder: Where the proof clip is written (created if absent).
         allowed: The spike folder (output check).
         footage: The footage folder (output check).
 
@@ -320,6 +320,7 @@ def encode_proof(
         reading, the GPU samples and ``proven``.
     """
     output = check_output_path(folder / f"proof-{encoder}-{pix_fmt}.mp4", allowed, footage)
+    output.parent.mkdir(parents=True, exist_ok=True)
     command = synthetic_encode_command(encoder, pix_fmt, profile, output)
     record: dict[str, Any] = {"command": command}
     started = time.monotonic()

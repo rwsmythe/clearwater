@@ -367,6 +367,43 @@ class TestCapabilityListing:
         assert spike._codec_names(self.ENCODERS) == {"libx265", "av1_nvenc"}
 
 
+class TestEncodeProofs:
+    @staticmethod
+    def _prove(tmp_path: Path, encoder: str, pix_fmt: str, profile: str) -> dict[str, Any]:
+        allowed, footage = tmp_path / "work" / "wp1.5", tmp_path / "footage"
+        # The proof folder does not exist yet: the proof creates it.
+        return spike.encode_proof(
+            encoder, pix_fmt, profile, allowed / "capability", allowed, footage
+        )
+
+    def test_software_ten_bit_proof_holds(self, tmp_path: Path) -> None:
+        proof = self._prove(tmp_path, "libx265", "yuv420p10le", "main10")
+        assert proof["exit_status"] == 0
+        assert proof["ffprobe"]["pix_fmt"] == "yuv420p10le"
+        assert proof["ffprobe"]["profile"] == "Main 10"
+        assert proof["proven"] is True
+
+    def test_proof_fails_when_the_reading_does_not_match(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        real = spike.run_ffprobe
+
+        def eight_bit(arguments: list[str]) -> dict[str, Any]:
+            data = real(arguments)
+            data["streams"][0]["pix_fmt"] = "yuv420p"
+            return data
+
+        monkeypatch.setattr(spike, "run_ffprobe", eight_bit)
+        assert self._prove(tmp_path, "libx265", "yuv420p10le", "main10")["proven"] is False
+
+    @pytest.mark.gpu
+    @pytest.mark.parametrize(("pix_fmt", "profile"), [("p010le", "main10"), ("yuv420p", "main")])
+    def test_nvenc_proofs_hold(self, tmp_path: Path, pix_fmt: str, profile: str) -> None:
+        proof = self._prove(tmp_path, "hevc_nvenc", pix_fmt, profile)
+        assert proof["proven"] is True, proof.get("stderr_tail")
+        assert proof["gpu"]["available"] is True
+
+
 class TestReencodeCommand:
     def _probe(self, pix_fmt: str, **colour: str) -> dict[str, Any]:
         video = {"index": 0, "codec_type": "video", "pix_fmt": pix_fmt, **colour}
