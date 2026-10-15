@@ -18,7 +18,7 @@ the planted files; every refused case with the guard leaves the footage byte-ide
 ## The rule
 
 All paths: `os.path.abspath` then `Path.resolve()` (symlinks and junctions followed; `..`, relative
-paths, trailing separators and 8.3 names collapse), a Windows extended-length prefix (`\?\`,
+paths, trailing separators and 8.3 names collapse), a Windows extended-length prefix (the `\\?\` form,
 which `resolve()` keeps when the input has it) stripped, then `os.path.normcase` (case-insensitive
 on Windows). "Inside" = equal to the footage folder or having it as an ancestor, OR any existing
 ancestor of the candidate is the same file (`os.path.samefile`) as the footage folder.
