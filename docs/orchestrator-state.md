@@ -19,9 +19,12 @@
 
 ### Live cells
 
-- **wp11-cell** (implementer-opus-high, background) -- WP1.1, worktree `.worktrees/wp1.1`,
-  branch `wp1.1`, base `46a10b9`. Dispatched 2026-10-15 ~00:40Z; building. Reviewer A STRONG.
-  A successor re-dispatches from the branch head + ledger.
+- **wp11-cell** (implementer-opus-high, idle) -- WP1.1, worktree `.worktrees/wp1.1`, branch
+  `wp1.1`, base `46a10b9`, author head `8e149db` (verify: `git -C .worktrees/wp1.1 log -1`).
+  Reviewer A STRONG converged r3. Informal 4K run done (both methods exit 0, 8 levels, coarsest
+  17 px; ~14 s / ~26 s informal). Depth 267K at first return.
+- **wp11-reviewer-b** (implementer-opus-high, background) -- Reviewer B on `8e149db`, brief
+  `docs/briefs/wp1.1-review-brief.md`; evidence `clearwater-review-evidence\wp1.1\B\`.
 - Branches `wp0.1` and `wp0.2` are kept on purpose: they hold the reviewed pre-rebase SHAs the
   accept records cite.
 
@@ -55,4 +58,6 @@
 
 ### Pending
 
-- Inbox drained through msg `b24ccecab030aad9` (verify: `uv run python scripts/role_mail.py list --role orchestrator`).
+- WP1.1 CHARC rulings `ad686b8b65a71061`: Laplacian LoG form ACCEPTED; Q2/Q3 banked DR-11/DR-12;
+  the three report edits it required are in `8e149db`. Next: B return -> gate -> merge -> accept.
+- Inbox drained through msg `ad686b8b65a71061` (verify: `uv run python scripts/role_mail.py list --role orchestrator`).
