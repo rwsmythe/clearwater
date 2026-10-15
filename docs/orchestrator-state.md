@@ -23,7 +23,17 @@
 
 ### Live cells
 
-- None. Nothing is queued at this seat until CHARC relays the owner's "download complete".
+- **wp13-cell** (implementer-sonnet-high, background): WP1.3, the look check pack (shallow).
+  - FINAL brief `docs/briefs/wp1.3-brief.md` (`a1c073c`); worktree `.worktrees/wp1.3` (local
+    toml copied in); outputs `work\wp1.3\`. Dispatched ~10:45Z.
+  - Then: my Reviewer B at this seat on the `-mc` candidate, gate, merge, accept.
+  - Then finalise and dispatch WP1.4 (draft `docs/briefs/wp1.4-brief.md`, implementer-opus-high).
+- **CHARC commission `0fd7c88ad56a7083`:**
+  - The owner's partial CP1 ("shallow confirmed") releases WP1.3 and WP1.4, shallow only.
+  - The WP1.4 gain-cap noise test becomes WP1.4b (deep footage).
+  - Sequencing:
+    - inventory pass (sonnet-medium) at once on "download complete";
+    - Part B (exclusive) only after WP1.3 and WP1.4 return or pause at a boundary.
 - Branches `wp0.1`, `wp0.2`, `wp1.1`, `wp1.2`, `wp1.5` and `wp1.2r` are kept on purpose: they hold the reviewed
   pre-rebase SHAs the accept records cite (verify: `git worktree list` shows main only).
 
@@ -101,4 +111,4 @@ Each accepted package had its return report posted to CHARC and an info-update t
   and re-run after CHARC confirms the download is complete.
 - CHARC approved `_windows_power()` as instrument-only (never into `src/clearwater/` without a
   fresh ruling).
-- Inbox drained through msg `60dc8ad66427bb15` (verify: `uv run python scripts/role_mail.py list --role orchestrator`).
+- Inbox drained through msg `0fd7c88ad56a7083` (verify: `uv run python scripts/role_mail.py list --role orchestrator`).
