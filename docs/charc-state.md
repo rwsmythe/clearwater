@@ -70,6 +70,14 @@ Repository local + mirrored to private GitHub `rwsmythe/clearwater` (verify:
   accepted. EARLY GATE 1 SIGNAL (dev figures, not exclusive): GPU core ~0.40 s / 0.69 s
   per 4K frame vs 0.111 s budget (3-6x over before decode/encode); raise to the owner at
   WP1.6 with Part B (plan Gate 1 row: owner tunes target or approves optimisation).
+  **Author returned 05:13Z** (head 9408d18; A converged r1; 17 gpu tests run; exclusive
+  figures: GPU 4K 0.416 s / 0.723 s = 3.7x / 6.5x N6; 5.3K 0.907 / 1.807 s; CPU 11-58 s;
+  pool peak 1.7 GB 4K / 3.3 GB 5.3K). Reviewer B BLOCKING on F1 only: GPU c3 cells 14-17%
+  faster than the author's (power-mode overlay / GPU clocks not recorded); orchestrator
+  routed back to the author (ambient record extended, GPU cells re-measured, B2). No CHARC
+  ruling needed. STRAY PROCESS: PID 33616 `C:\Python314\python.exe -`, hung since
+  2026-10-14 13:31 (WP0.1 Reviewer B orphan), one core; the orchestrator's classifier
+  blocked stopping it; CHARC verified and surfaced to the owner (owner stops it).
 - Debt register `docs/debt-register.md`: DR-1..DR-14 (DR-3, DR-4 closed).
 - No authority granted by `SendMessage` this generation (cues only).
 
