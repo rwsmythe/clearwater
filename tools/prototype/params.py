@@ -56,7 +56,8 @@ class Params:
         white_balance_strength: Gray-world strength, 1.0 = full gray-world gains, 0.0 =
             none (spec 6.2 step 2, 6.7 Basic). Default 1.0 (the paper's full gray world);
             the interpolation rule is a WP1.1 choice, see open-values report.
-        max_white_balance_gain: Upper clamp on every white-balance gain (spec 6.2, D99).
+        max_white_balance_gain: Upper clamp on every white-balance gain (spec 6.2, D99);
+            at least 1, so that it never lowers a gain of 1.
             Default 3.0: WP1.1 choice, see open-values report.
         gamma: Exponent of fusion input 1, ``I ** gamma`` (spec 6.2 step 3). Default 1.5:
             WP1.1 choice (the paper gives no value), see open-values report.
@@ -140,7 +141,6 @@ class Params:
         positive = (
             "c3_kernel_fraction",
             "c3_mask_smooth_fraction",
-            "max_white_balance_gain",
             "gamma",
             "sharpen_blur_fraction",
             "laplacian_fraction",
@@ -150,6 +150,11 @@ class Params:
         for name in positive:
             if getattr(self, name) <= 0.0:
                 raise ValueError(f"{name} must be > 0, got {getattr(self, name)}")
+        if self.max_white_balance_gain < 1.0:
+            # A maximum below 1 would lower every gain, so strength 0 would not be "none".
+            raise ValueError(
+                f"max_white_balance_gain must be >= 1, got {self.max_white_balance_gain}"
+            )
         if not 0.0 <= self.normalisation_low < self.normalisation_high <= 100.0:
             raise ValueError(
                 "normalisation percentiles must satisfy 0 <= low < high <= 100, got "

@@ -10,6 +10,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 from PIL import Image
+from scipy import ndimage
 
 from prototype import run
 from prototype.params import Params
@@ -22,6 +23,7 @@ from prototype.pipeline import (
     pyramid_levels,
     rgb_to_ycbcr,
     spatial_sigma,
+    srgb_to_lab,
     weight_maps,
     white_balance,
 )
@@ -34,6 +36,9 @@ NEUTRAL_TOLERANCE = 1e-6
 # absolute difference between the downscaled output and the output of the downscaled input.
 RESOLUTION_MEAN_TOLERANCE = 0.01
 RESOLUTION_P99_TOLERANCE = 0.02
+# The same with the default Params on a 512 x 768 textured scene.
+DEFAULTS_RESOLUTION_MEAN_TOLERANCE = 0.0015
+DEFAULTS_RESOLUTION_P99_TOLERANCE = 0.005
 
 
 def _synthetic(height: int, width: int, seed: int = 0) -> np.ndarray:
@@ -62,6 +67,15 @@ def _smooth_scene(height: int, width: int) -> np.ndarray:
     green = 0.45 + 0.20 * np.sin(np.pi * (x + y))
     blue = 0.55 + 0.15 * np.cos(2 * np.pi * y) * np.sin(np.pi * x)
     return np.clip(np.stack([red, green, blue], axis=2), 0.0, 1.0).astype(np.float32)
+
+
+def _textured_scene(height: int, width: int) -> np.ndarray:
+    """The smooth scene modulated by a random texture of scale 0.01 of the short side."""
+    rng = np.random.default_rng(5)
+    field = ndimage.gaussian_filter(rng.random((height, width)), 0.01 * min(height, width))
+    field = (field - field.min()) / (field.max() - field.min())
+    textured = _smooth_scene(height, width) * (0.6 + 0.8 * field[..., None])
+    return np.clip(textured, 0.0, 1.0).astype(np.float32)
 
 
 def _box_down2(image: np.ndarray) -> np.ndarray:
@@ -156,6 +170,27 @@ def test_fusion_with_weights_one_and_zero_returns_the_first_input(size: tuple[in
     np.testing.assert_allclose(fused, first, atol=1e-4, rtol=0)
 
 
+def test_fusion_blends_a_weight_seam_across_scales() -> None:
+    # Two flat inputs and a hard weight seam: a per-pixel blend keeps the seam hard; the
+    # pyramid blends it through the Gaussian pyramid of the weights.
+    first = _flat(64, 96, (0.2, 0.2, 0.2))
+    second = _flat(64, 96, (0.8, 0.8, 0.8))
+    weight = np.zeros((64, 96), dtype=np.float32)
+    weight[:, :48] = 1.0
+    weights = [weight, 1 - weight]
+    single = multiscale_fusion([first, second], weights, Params(pyramid_min_level_size=64))
+    per_pixel = weight[..., None] * first + (1 - weight[..., None]) * second
+    np.testing.assert_allclose(single, per_pixel, atol=1e-6)  # one level = per-pixel blend
+    fused = multiscale_fusion([first, second], weights, Params(pyramid_min_level_size=4))
+    row = fused[32, :, 0]
+    assert row[44] > 0.25  # 4 px left of the seam: already blended
+    assert row[51] < 0.75
+    assert row[0] < row[44] < row[51] < row[95]
+    assert (np.diff(row) >= -1e-6).all()  # a smooth, monotone transition
+    assert fused.min() >= 0.2 - 1e-6
+    assert fused.max() <= 0.8 + 1e-6
+
+
 def test_pyramid_depth_follows_the_minimum_level_size() -> None:
     assert pyramid_levels((64, 96, 3), 16) == 3  # 64 -> 32 -> 16
     assert pyramid_levels((97, 65, 3), 16) == 3  # 65 -> 33 -> 17
@@ -197,6 +232,38 @@ def test_weight_maps_follow_their_definitions() -> None:
     np.testing.assert_allclose(weights.saturation[1], expected, rtol=1e-5)
     # (W_k + delta) / (sum W_k + 2 delta) with W_0 = 0.
     np.testing.assert_allclose(weights.normalised[0], 0.1 / (expected + 0.2), rtol=1e-5, atol=1e-6)
+
+
+def test_srgb_to_lab_matches_reference_values() -> None:
+    # CIELAB (D65) of the sRGB white and primaries, as published for IEC 61966-2-1.
+    colours = np.array([[[1, 1, 1], [1, 0, 0], [0, 1, 0], [0, 0, 1]]], dtype=np.float32)
+    expected = [[100.0, 0.0, 0.0], [53.24, 80.09, 67.20], [87.73, -86.18, 83.18]]
+    expected.append([32.30, 79.19, -107.86])
+    np.testing.assert_allclose(srgb_to_lab(colours)[0], expected, atol=0.1)
+
+
+def test_laplacian_weight_on_an_edge() -> None:
+    image = _flat(64, 96, (0.2, 0.2, 0.2))
+    image[:, 48:] = 0.8
+    weights = weight_maps((image, image), Params(laplacian_fraction=0.02))
+    sigma = 0.02 * 64
+    luma = image[..., 0].astype(np.float64)  # gray: luma equals every channel
+    smoothed = ndimage.gaussian_filter(luma, sigma, mode="reflect", truncate=4.0)
+    expected = sigma**2 * np.abs(ndimage.laplace(smoothed, mode="reflect"))
+    np.testing.assert_allclose(weights.laplacian[0], expected, atol=1e-5)
+    assert weights.laplacian[0][:, 46:50].min() > 0.05  # strong at the edge
+    assert weights.laplacian[0][:, :30].max() < 1e-6  # zero far from it
+
+
+def test_saliency_weight_on_a_coloured_patch() -> None:
+    image = _flat(64, 96, (0.4, 0.4, 0.4))
+    image[20:40, 30:60] = (0.8, 0.3, 0.2)
+    weights = weight_maps((image, image), Params(saliency_blur_fraction=0.02))
+    lab = srgb_to_lab(image).astype(np.float64)
+    blurred = ndimage.gaussian_filter(lab, (1.28, 1.28, 0), mode="reflect", truncate=4.0)
+    expected = np.linalg.norm(blurred - lab.reshape(-1, 3).mean(axis=0), axis=2) / 100
+    np.testing.assert_allclose(weights.saliency[0], expected, atol=1e-4)
+    assert weights.saliency[0][30, 45] > 3 * weights.saliency[0][5, 5]
 
 
 # --- Ancuti 2018 compensation ----------------------------------------------------------
@@ -273,6 +340,30 @@ def test_c3_raises_cr_on_a_red_deficient_image() -> None:
     assert info.effective == {"cr": 1.0, "cb": pytest.approx(0.7)}
     # Y is unchanged where nothing was clipped.
     np.testing.assert_allclose(rgb_to_ycbcr(out)[..., 0], rgb_to_ycbcr(image)[..., 0], atol=1e-5)
+
+
+def test_c3_matches_the_equations_pixel_by_pixel() -> None:
+    # An independent float64 evaluation of spec 6.3.2 with the BT.709 equations written out.
+    image = _synthetic(64, 96)
+    image[:20, :30] = (0.9, 0.95, 0.9)  # a masked bright patch
+    params = Params(method="c3", kappa=0.9, lambda_=0.6, c3_strength=0.8)
+    out, _ = compensate_c3(image, params)
+    r, g, b = (image[..., i].astype(np.float64) for i in range(3))
+    y = 0.2126 * r + 0.7152 * g + 0.0722 * b
+    cb, cr = (b - y) / 1.8556, (r - y) / 1.5748
+    assert abs(cb.mean()) > 0.02  # the image has a Cb component to compensate
+    bright = (image.mean(axis=2) <= 0.85).astype(np.float64)
+    mask = ndimage.gaussian_filter(bright, 0.01 * 64, mode="reflect", truncate=4.0)
+
+    def local_mean(channel: np.ndarray) -> np.ndarray:
+        return ndimage.gaussian_filter(channel, 0.05 * 64, mode="reflect", truncate=4.0)
+
+    cr2 = cr - 0.8 * 0.9 * mask * local_mean(cr)
+    cb2 = cb - 0.8 * 0.6 * mask * local_mean(cb)
+    r2, b2 = y + 1.5748 * cr2, y + 1.8556 * cb2
+    g2 = (y - 0.2126 * r2 - 0.0722 * b2) / 0.7152
+    expected = np.clip(np.stack([r2, g2, b2], axis=2), 0.0, 1.0)
+    np.testing.assert_allclose(out, expected, atol=1e-5)
 
 
 def test_c3_strength_scales_kappa_and_lambda_together() -> None:
@@ -368,7 +459,7 @@ def test_blend_with_original_runs_from_corrected_to_original() -> None:
 def test_output_is_resolution_independent_at_2x(method: str) -> None:
     large = _smooth_scene(128, 192)
     small = _box_down2(large)
-    # Fractions large enough that every sigma is above the 0.5 px floor on the small image.
+    # Fractions large enough that every spatial scale is resolved on the 64 px short side.
     params = Params(
         method=method,  # type: ignore[arg-type]
         laplacian_fraction=0.02,
@@ -385,10 +476,21 @@ def test_output_is_resolution_independent_at_2x(method: str) -> None:
     assert np.percentile(difference, 99) <= RESOLUTION_P99_TOLERANCE
 
 
+@pytest.mark.parametrize("method", METHODS)
+def test_default_params_are_resolution_independent_at_2x(method: str) -> None:
+    large = _textured_scene(512, 768)
+    params = Params(method=method)  # type: ignore[arg-type]
+    from_large = _box_down2(correct(large, params).output)
+    from_small = correct(_box_down2(large), params).output
+    difference = np.abs(from_large - from_small)
+    assert difference.mean() <= DEFAULTS_RESOLUTION_MEAN_TOLERANCE
+    assert np.percentile(difference, 99) <= DEFAULTS_RESOLUTION_P99_TOLERANCE
+
+
 def test_spatial_sigma_is_a_fraction_of_the_short_side() -> None:
     assert spatial_sigma((300, 400, 3), 0.01) == pytest.approx(3.0)
     assert spatial_sigma((400, 300), 0.01) == pytest.approx(3.0)
-    assert spatial_sigma((10, 10, 3), 0.001) == 0.5  # the floor
+    assert spatial_sigma((10, 10, 3), 0.001) == pytest.approx(0.01)  # no floor
 
 
 # --- parameters ---------------------------------------------------------------------------
@@ -406,12 +508,21 @@ def test_spatial_sigma_is_a_fraction_of_the_short_side() -> None:
         {"pyramid_min_level_size": 0},
         {"blend_with_original": 1.5},
         {"laplacian_fraction": 0.0},
+        {"max_white_balance_gain": 0.5},
         {"kappa": float("nan")},
     ],
 )
 def test_params_reject_unusable_values(changes: dict[str, object]) -> None:
     with pytest.raises(ValueError):
         Params(**changes)  # type: ignore[arg-type]
+
+
+def test_white_balance_strength_zero_is_neutral_at_any_allowed_maximum() -> None:
+    image = _synthetic(16, 16)
+    params = Params(white_balance_strength=0.0, max_white_balance_gain=1.0)
+    out, info = white_balance(image, params)
+    np.testing.assert_array_equal(out, image)
+    assert info.applied_gains == (1.0, 1.0, 1.0)
 
 
 def test_neutral_params() -> None:

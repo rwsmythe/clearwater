@@ -46,9 +46,6 @@ Image = NDArray[np.float32]
 Map = NDArray[np.float32]
 """A single-channel map, float32, shape ``(H, W)``."""
 
-MIN_SIGMA_PX = 0.5
-"""Floor, in pixels, of every Gaussian sigma; below it a sampled Gaussian degenerates."""
-
 _GAUSSIAN_TRUNCATE = 4.0
 _EPS = 1e-6
 
@@ -197,9 +194,10 @@ def spatial_sigma(image_shape: tuple[int, ...], fraction: float) -> float:
     """Turn a spatial parameter given as a fraction of the short side into pixels (D56).
 
     This is the single place where the conversion happens, so that every spatial
-    parameter scales with the image (spec 6.6). The result is floored at
-    :data:`MIN_SIGMA_PX`; the floor only engages on images so small that ``fraction``
-    times the short side is under half a pixel.
+    parameter scales with the image (spec 6.6). There is no floor: a sigma well under
+    one pixel gives a sampled Gaussian close to the identity (``scipy.ndimage`` keeps a
+    support of ``round(4 * sigma)`` pixels, so under 1/8 px the kernel is exactly
+    ``[1]``), which is the right limit for an image too small to hold that detail.
 
     Args:
         image_shape: The image shape; the first two entries are height and width.
@@ -209,7 +207,7 @@ def spatial_sigma(image_shape: tuple[int, ...], fraction: float) -> float:
         The parameter in pixels.
     """
     short_side = min(image_shape[0], image_shape[1])
-    return max(fraction * short_side, MIN_SIGMA_PX)
+    return fraction * short_side
 
 
 def compensate_ancuti2018(image: Image, params: Params) -> tuple[Image, CompensationInfo]:
@@ -709,6 +707,7 @@ def expand(image: NDArray[np.float32], shape: tuple[int, ...]) -> NDArray[np.flo
 
 
 def _laplacian_weight(image: Image, params: Params) -> Map:
+    """W_L of one input: ``|sigma^2 * Lap(G_sigma * L)|`` (see :func:`weight_maps`)."""
     # The discrete Laplacian (zero-sum, so a flat image gives exactly 0) of the
     # Gaussian-smoothed luminance; scipy's sampled Gaussian second derivative is not
     # zero-sum at small sigma and would give a flat image a nonzero contrast weight.
@@ -718,6 +717,7 @@ def _laplacian_weight(image: Image, params: Params) -> Map:
 
 
 def _saliency_weight(image: Image, params: Params) -> Map:
+    """W_S of one input: ``||mean Lab - blurred Lab|| / 100`` (see :func:`weight_maps`)."""
     lab = srgb_to_lab(image)
     mean = lab.reshape(-1, 3).mean(axis=0, dtype=np.float64).astype(np.float32)
     blurred = _gaussian(lab, spatial_sigma(image.shape, params.saliency_blur_fraction))
@@ -726,6 +726,7 @@ def _saliency_weight(image: Image, params: Params) -> Map:
 
 
 def _saturation_weight(image: Image) -> Map:
+    """W_Sat of one input: the RMS deviation of R, G, B from the luma."""
     luma = luminance(image)
     deviation = np.mean((image - luma[..., None]) ** 2, axis=2)
     return np.sqrt(deviation).astype(np.float32, copy=False)
@@ -748,17 +749,20 @@ def _binomial_blur(array: NDArray[np.float32]) -> NDArray[np.float32]:
 
 
 def _channel_means(image: Image) -> tuple[float, float, float]:
+    """Mean of each RGB channel over the whole image, accumulated in float64."""
     means = image.reshape(-1, 3).mean(axis=0, dtype=np.float64)
     return float(means[0]), float(means[1]), float(means[2])
 
 
 def _mean_added(before: Image, after: Image) -> dict[str, float]:
+    """Mean change of each RGB channel, ``after`` minus ``before``."""
     added = _channel_means(after)
     original = _channel_means(before)
     return {name: added[i] - original[i] for i, name in enumerate(("red", "green", "blue"))}
 
 
 def _triple(values: tuple[float, ...]) -> tuple[float, float, float]:
+    """The first three values as a tuple of three Python floats."""
     return float(values[0]), float(values[1]), float(values[2])
 
 

@@ -283,15 +283,18 @@ def _write_dump(out_dir: Path, stem: str, result: Result) -> None:
 
 
 def _write_json(path: Path, record: dict[str, Any]) -> None:
+    """Write ``record`` as indented UTF-8 JSON."""
     path.write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
 
 
 def _png_chunk(kind: bytes, data: bytes) -> bytes:
+    """One PNG chunk: length, type, data and the CRC-32 of type and data."""
     crc = zlib.crc32(kind + data) & 0xFFFFFFFF
     return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", crc)
 
 
 def _one_line(exc: BaseException) -> str:
+    """The exception's message on one line (its class name when the message is empty)."""
     return " ".join(str(exc).split()) or type(exc).__name__
 
 
