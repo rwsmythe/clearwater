@@ -12,6 +12,7 @@ per-finding adjudication, md5sums.txt) and the probe transcript in `r1\probe-tra
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | 1 | `72bdf9e` | WSL / 0.162.1 | 0 | 1 | 5 | 6 of 6 | 6 | 0 | 0 | product (frames.py, pack.py) + tests + text | dispatcher fills | banner OK; `^ERROR` 0; `ERROR codex_core` 2 (1 prompt echo, 1 the reviewer's own `mktemp /tmp` rejected by the read-only sandbox); footer 1; `^ succeeded in` 23; VERDICT anchored; no withheld access | NEW_CRITICAL_MAJOR_FOUND |
 | 2 | `9addcd0` | WSL / 0.162.1 | 0 | 0 | 3 | 3 of 3 | 3 | 0 | 0 | product (pack.py) + tests | dispatcher fills | banner OK; `^ERROR` 0; `ERROR codex_core` 1 (echo of the brief); footer 1; `^ succeeded in` 30; VERDICT anchored; no withheld access | NO_NEW_CRITICAL_MAJOR |
+| 3 (remediation, after Reviewer B round 1) | `6a5aec0` (delta `0233a8e..6a5aec0`) | WSL / 0.162.1 | 0 | 1 | 5 | 6 of 6 | 6 | 0 | 0 | product (pack.py) + tests + text | author cell `wp13-cell`: 412K at its return; remediation cell: dispatcher fills | probe: banner v0.162.1 / gpt-5.6-sol / high / read-only, footer present; review: banner OK; `^ERROR` 0; `ERROR codex_core` 0 (one match of the string ERROR is the brief's own assertion text, an echo); footer 1; `^ succeeded in` 21; VERDICT anchored; `docs/proofs` hits all classified: the prompt (echo), the report and brief text (echo of files the reviewer was allowed to read), and one reviewer command using `:(exclude)docs/proofs/**` as a pathspec exclusion; no access to a withheld path | NEW_CRITICAL_MAJOR_FOUND |
 
 Round 1 major: the open-blue-water case marked PENDING while the `GX011628` stills are water-dominant. REJECTED by the
 brief ("Pending cases are named, not approximated"; claim 6 pre-fills the three spec section 12 cases PENDING),
@@ -39,3 +40,37 @@ report's section 8 follow.
 | 8 | a seek one frame late would mislabel frames | guarded | mutation: both pts tests fail by name | none needed |
 | 9 | the gray quadrant read 126 vs 128 means swscale RGB->YUV is wrong | rejected (false positive) | the lavfi `color` source's own conversion; stored YUV matched the independent calculation exactly | none |
 | 10 | unsmoothed MP4 lacks the source's primaries and transfer | yes (found by round 1's finding 3 and a stricter `verify_clip`) | ffprobe of the clips | fixed (`setparams`) |
+
+
+## Round 3 (remediation after Reviewer B round 1; the ONE bounded remediation, no further round)
+
+Cell: remediation cell (Sonnet 5.5), same worktree and branch, from head `0233a8e`. Reviewer B (the orchestrator's seat
+pass) found B1-B3 and B6 major, B4, B5, B7-B11 minor; B6-B10 are banked as out of envelope (DR-20) and are not in this
+round's code. Closed here: B1, B2, B3, B4, B5, B11 (report section 8 and the return report). Evidence:
+`C:\Users\rwsmy\clearwater-review-evidence\wp1.3\r3\` (prompt, diff, transcript, adjudication, md5sums.txt).
+
+Round 3 reviewed `6a5aec0`: one major (REASONED), five minors, all in envelope, all adjudicated CONFIRMED
+(`adjudication-r3.md`). The major was introduced by this remediation (the cleanup of `encode_verified_pair` stopped at the
+first removal that raised) and is FIXED in `2b0e77a`; the five minors are fixed once in the same cleanup. The remediation
+allows one Reviewer A round, so the fixes are not re-reviewed; this is stated plainly here and in the report.
+
+| # | Finding (round 3) | Tag | Kind | Disposition |
+|---|---|---|---|---|
+| 1 | cleanup stops at the first failing removal and masks the original error | major, REASONED | product | fixed: `discard`, best effort with notes; new test (fails against the old loop) |
+| 2 | direct `mkdir` of a fabricated footage in a refusal test; report wording | minor | test + text | fixed |
+| 3 | quadrant interior not proved by a test | minor | test | fixed: planted pixel off the centre and in the margin |
+| 4 | read-back scratch not cleared, `rmtree` errors silent | minor | product + test | fixed: cleared on entry, warning on failure, stale-frame test |
+| 5 | "dropped frame fails by name" false (fails on the count) | minor | text | fixed |
+| 6 | report cites g3 gates as green, `g3-ruff.log` holds one error | minor, EXECUTED | text | fixed: error fixed, gates re-run as `g4-*.log` |
+
+Remediation commits: `01784a9` fix (read-back, naming), `7470ec8` test (guard, interior, read-back, naming), `6a5aec0`
+docs (report), `2b0e77a` fix (round 3 cleanup), `d2ac044` docs (report text); this ledger follows.
+
+## Verification loop (remediation cell)
+
+| # | Suspected | Confirmed? | How | Disposition |
+|---|---|---|---|---|
+| 11 | a lossy encode's frames are too alike to tell apart on the real clip | rejected (false positive) | per-frame read-back of the 180 frames of both clips: smallest margin to a neighbour 6.41 levels (source clip) and 7.60 (unsmoothed), worst own difference 2.52 and 2.85 | none; recorded in `flicker\statistics.json` |
+| 12 | converting and resizing in one `scale` step is accurate enough for the read-back | no | lossless test frames: 4.2 levels of error against 0.12 when the colour conversion is done first and the reduction second | fixed (two-stage chain, `reduced_clip_command`) |
+| 13 | the 180 frames' statistics change on the re-run | rejected | parsed `frames`, `summary`, `bound_counts`, `excerpt` equal to the kept first-run copy; both MP4s byte-identical (md5) | none |
+| 14 | the 3.0-level bound on the own difference is too tight for the real clip | partly | worst real value 2.85 | left at 3.0 (set before the run; the margin to the neighbours is the discriminator); disclosed |
