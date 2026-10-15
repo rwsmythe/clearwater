@@ -86,8 +86,11 @@ Owner 2026-10-15 ~05:25Z in chat: four shallow snorkel chapters GX011625-GX01162
 come. At 2026-10-15 ~09:45Z: `SCUBA/` holds six real files (GX011589-93, GX011601;
 49 MB-4.4 GB), one growing `.crswap`, and THREE zero-byte files (`GX011598.mp4`,
 `GX011600.mp4`, `GX011598 (1).mp4`) -- raise the zero-byte files with the owner before
-the inventory dispatch; ask for `.LRV` files if the GoPro exported them. The download is
-NOT reported complete.
+the inventory dispatch. **Owner 2026-10-15 (verbatim): "There will be no .lrv or .thm files,
+those were apparently deleted off of the camera when the cloud upload was completed several
+days ago"** -> D60 LRV leg untestable (Clearwater generates its own proxy, spec 7.3); Part B
+drops the LRV column; a one-line D60 closure proposed to the owner (spec change, owner-
+reserved; OPEN until approved). The download is NOT reported complete.
 
 ### Standing delegation (owner, 2026-10-14, chat to CHARC, verbatim)
 

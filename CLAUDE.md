@@ -21,7 +21,7 @@ If the plan and the spec disagree, the spec wins; raise the disagreement to the 
 
 Both were owner-set on 2026-10-14; do not substitute other paths.
 
-- Footage folder: SUPPLIED 2026-10-14 by the owner (in chat to CHARC: \"concur with footage location\"): `C:\Users\rwsmy\clearwater-footage\`, OUTSIDE the repository so no git command in this tree can reach it. Treated as **read-only**, never committed. The owner is still downloading into it.
+- Footage folder: SUPPLIED 2026-10-14 by the owner (in chat to CHARC: \"concur with footage location\"): `C:\Users\rwsmy\clearwater-footage\`, OUTSIDE the repository so no git command in this tree can reach it. Treated as **read-only**, never committed. The owner is still downloading into it. No `.LRV`/`.THM` sidecars exist for this footage (owner, 2026-10-15: deleted from the camera at cloud upload), so D60's proxy leg is not testable here.
 - Working folder: SUPPLIED 2026-10-14 by the owner (in chat to the orchestrator: "let's create a working folder within clearwater", confirmed as ignored by git): `C:\Users\rwsmy\clearwater\work\`, gitignored as `work/` (69311b1). Outputs, caches and reports go there; never committed. Never run `git clean -x` in this tree (it deletes ignored files).
 
 Both go into the uncommitted `clearwater.local.toml` (template: `clearwater.local.example.toml`, created by WP0.1).
