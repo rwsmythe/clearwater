@@ -24,8 +24,12 @@
 - **wp02-reviewer-b** (background) -- Reviewer B on `a309046`, brief
   `docs/briefs/wp0.2-review-brief.md`, evidence `clearwater-review-evidence\wp0.2\B\`.
   Dispatched ~00:05Z 2026-10-15; read-only on the worktree.
-- **BLOCKER for any accept:** harness gate red on main (`docs/debt-register.md` unaccounted,
-  from CHARC's fe90033); routed to CHARC 00:03Z.
+- Harness gate fixed on main by CHARC at `75c091a` (366 OK re-run here). Rebase the WP0.2
+  candidate onto 75c091a or later.
+- **Queued for the author after B returns** (CHARC `800be25ceb015347`): (a) the summary header
+  says "dimensions are as stored; apply the orientation column for display"; (b) the
+  `rotation_degrees` docstring says "0 when absent". Photo dimensions ruled: stored, as built.
+  Then a B re-check on the final head.
 - Branch `wp0.1` is kept on purpose: it holds the reviewed pre-rebase SHAs the WP0.1 accept cites.
 
 ### Workstreams
@@ -53,4 +57,4 @@
 
 ### Pending
 
-- Inbox drained through msg `1b16f4179b32029c` (verify: `uv run python scripts/role_mail.py list --role orchestrator`).
+- Inbox drained through msg `800be25ceb015347` (verify: `uv run python scripts/role_mail.py list --role orchestrator`).
