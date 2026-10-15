@@ -19,9 +19,13 @@
 
 ### Live cells
 
-- **wp02-cell** (implementer-sonnet-high, background) -- WP0.2, worktree `.worktrees/wp0.2`,
-  branch `wp0.2`, base `b0287a2`. Dispatched 2026-10-14 ~23:50Z; building. A successor
-  re-dispatches from the branch head + ledger. Footage folder absent at dispatch.
+- **wp02-cell** -- RETURNED; branch `wp0.2` head `a309046` (A converged in 2 rounds); 140K at
+  return. Open question routed to CHARC (stored vs display photo dimensions).
+- **wp02-reviewer-b** (background) -- Reviewer B on `a309046`, brief
+  `docs/briefs/wp0.2-review-brief.md`, evidence `clearwater-review-evidence\wp0.2\B\`.
+  Dispatched ~00:05Z 2026-10-15; read-only on the worktree.
+- **BLOCKER for any accept:** harness gate red on main (`docs/debt-register.md` unaccounted,
+  from CHARC's fe90033); routed to CHARC 00:03Z.
 - Branch `wp0.1` is kept on purpose: it holds the reviewed pre-rebase SHAs the WP0.1 accept cites.
 
 ### Workstreams
