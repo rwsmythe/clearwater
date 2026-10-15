@@ -1,6 +1,7 @@
-# WP1.3 — Look check pack, shallow part (dispatch brief, DRAFT by CHARC)
+# WP1.3 — Look check pack, shallow part (dispatch brief, FINAL)
 
-**Status:** DRAFT by CHARC 2026-10-15 for the orchestrator to finalise and dispatch. Spec
+**Status:** FINAL, issued by the orchestrator 2026-10-15 from CHARC's draft (`03a6904`) on
+CHARC's commission `0fd7c88ad56a7083`. Spec
 **v0.5.2**. Released on the owner's partial CP1 ("shallow confirmed", 2026-10-15; record
 `docs/proofs/cp1-footage-sorting.md`). Cell: `implementer-sonnet-high` (the brief fixes the
 frames, the variants, the outputs and the tests; nothing to design). Worktree
@@ -92,6 +93,38 @@ run inside WP1.2 Part B's bench window (the orchestrator sequences).
   each run that the resolved output path is inside the working folder and outside the footage
   folder (the WP1.5 refusal pattern, hard links included).
 
+## Decisions fixed at issue (orchestrator)
+
+- **Local configuration in the worktree.**
+  - `tools/local_config.py` reads `<repo root>/clearwater.local.toml`. That file is
+    uncommitted and gitignored.
+  - The orchestrator copies it into the worktree root at creation. Its paths are absolute:
+    footage `C:\Users\rwsmy\clearwater-footage`, working `C:\Users\rwsmy\clearwater\work`.
+  - So the `footage` tests RUN in the worktree, and `work/wp1.3/` means the MAIN tree's
+    `C:\Users\rwsmy\clearwater\work\wp1.3\`.
+  - Never edit or commit that file.
+- **FFmpeg on PATH.** Prepend `/c/Users/rwsmy/AppData/Local/Microsoft/WinGet/Links` for every
+  ffmpeg, ffprobe and pytest run. Without it the module skip hides the tests, and a skip at the
+  gate fails claim 7.
+- **Output-path assertion.** Before each ffmpeg run, and before each record or image write,
+  check the RESOLVED path (links resolved):
+  - it is inside `<working folder>/wp1.3/`;
+  - it is NOT inside the footage folder;
+  - an existing target with more than one hard link is refused.
+
+  Reuse the WP1.5 pattern: `tools/container_spike/spike.py` `check_output_path` /
+  `write_checked`. Import them, or mirror them in `tools/lookcheck/`; say which. Strip
+  `FFREPORT` from every ffmpeg/ffprobe subprocess environment, as WP1.5's `tool_env()` does.
+- **Disk.** C: has about 168 GB free.
+  - The flicker excerpt's two sets of 16-bit full-resolution PNGs (about 180 source and 180
+    corrected, at about 25-50 MB each) MAY be deleted after the two MP4s are encoded and
+    verified.
+  - Keep the first, middle and last frame of each set, plus `statistics.json`.
+  - WP1.4 re-extracts from the pts range; it does not need these PNGs.
+- **Spec version:** **v0.5.2** (`docs/underwater-correction-spec.md` on main).
+- **Never `git stash`** in the worktree: the stash stack is shared across sessions. Use a
+  temporary commit, or a copy in your scratchpad, for red/green checks.
+
 ## Declared operating envelope
 
 Windows 11, the installed FFmpeg 9.0.2 (NVENC for the flicker clip's encode), the four
@@ -111,7 +144,29 @@ synthetic frames, the statistics-field test, and the one `footage` smoke test.
   variant label would mislead a reserved decision). Transport, flags, probe, diff, prompt,
   per-round assertions, evidence folder `clearwater-review-evidence/wp1.3/rN/` and ledger
   `docs/proofs/wp1.3-ledger.md` exactly as the WP1.5 brief states them, with `wp1.3`
-  substituted.
+  substituted. Spelled out, so nothing hangs on that cross-reference:
+  - **Transport and flags:** WSL, codex-cli 0.162.1. Per-call flags
+    `-m gpt-5.6-sol -c model_reasoning_effort=high -s read-only --skip-git-repo-check`.
+  - **Probe:** run one probe through the exact invocation before round 1.
+  - **Diff:** generated Windows-side with
+    `git -C <worktree> diff -U8 <base>..HEAD -- . ':!uv.lock' ':!docs/proofs'`; WSL never runs
+    git.
+  - **The prompt** includes the claim list, the envelope with a request to TAG
+    out-of-envelope findings, and the report. It carries the EXECUTED/REASONED paragraph
+    verbatim from `docs/codex-reviewer.md`, and its own paragraph: "Do NOT read
+    `docs/proofs/` or anything under `clearwater-review-evidence`; those are withheld. Never
+    read or list `/mnt/c/Users/rwsmy/clearwater-footage`." The pack under
+    `/mnt/c/Users/rwsmy/clearwater/work/wp1.3/` MAY be read.
+  - **Assertions** (all `grep -a`):
+    - the banner reads gpt-5.6-sol / high;
+    - every `^ERROR` and `ERROR codex_core` line is classified by provenance;
+    - the `^tokens used` footer is present;
+    - an anchored VERDICT line;
+    - at least one `^ succeeded in`;
+    - `grep -a -n 'docs/proofs\|wp1.3-ledger'`, with every hit classified as an echo or an
+      access.
+  - **Convergence:** zero NEW in-envelope blocking findings. Minors are fixed once in that
+    round's cleanup. FIVE_ROUND_GATE.
 - WHAT TO EXAMINE: whether the extraction honours the stream's range and matrix (and the test
   proves it); whether every variant is labelled with the parameters actually used; whether the
   per-frame statistics in the JSON are the ones the prototype measured on that frame (not a
