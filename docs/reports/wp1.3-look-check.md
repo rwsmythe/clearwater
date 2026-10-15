@@ -86,8 +86,10 @@ folder"), checked on the resolved path before every FFmpeg run (all scratch name
 MP4), every PNG, JPEG, JSON and HTML write and every delete: inside `work\wp1.3\`, outside the
 footage folder, no existing target with more than one hard link. `FFREPORT` is removed from
 every FFmpeg and ffprobe environment. The tests use the REAL configured footage folder as the
-footage root of every `OutputRoots` they build (a never-created folder only when no local
-configuration loads), so the production check refuses a write there; an autouse guard fails a test
+footage root of the `OutputRoots` they build (a never-created folder only when no local
+configuration loads; two refusal tests build a fabricated footage folder below `tmp_path` on
+purpose, to show the refusals and that the folder stays empty), so the production check refuses a
+write there; an autouse guard fails a test
 at once if `tmp_path` (a `--basetemp`, `TMP` or `TEMP`) resolves inside that folder, and the
 tests' own writes outside `roots.allowed` go through the same check
 (`test_a_root_under_the_configured_footage_folder_is_refused`,
@@ -214,9 +216,12 @@ format and the timing are the same and are checked, below).
 Checks (`flicker\statistics.json` `checks`). Both clips are written as `*.partial.mp4`, verified,
 and renamed to their names only when BOTH have passed everything below; any exception, including
 a probe that raises, a timeout or a failed read-back, removes every clip name again and leaves the
-frame PNGs (a clip of an earlier run is removed first, so a failed run leaves none;
+frame PNGs (the removal is best effort, `discard`: one removal that fails does not stop the others
+or replace the error, it is attached to it as a note; a clip of an earlier run is removed first, so a
+failed run leaves none;
 `test_a_raising_verification_leaves_no_clip`, `test_a_failing_second_encode_leaves_neither_clip`,
-`test_a_failed_readback_leaves_neither_clip_and_a_pass_names_both`).
+`test_a_failed_readback_leaves_neither_clip_and_a_pass_names_both`,
+`test_a_failing_second_rename_and_a_failing_cleanup_leave_no_final_name_and_keep_the_error`).
 
 - `verify_clip`: both clips one HEVC Main stream, `yuvj420p`, 3840x2160, range `pc`, matrix,
   primaries and transfer `bt709`, 180 frames, first pts 0, every step 1001 ticks of 1/30000, no
@@ -233,9 +238,14 @@ frame PNGs (a clip of an earlier run is removed first, so a failed run leaves no
   conversion is done first.) A frame passes only if its difference to its own PNG is at most 3.0
   levels AND is smaller than its difference to either neighbour; the clip also fails on a wrong
   frame count, a range or matrix tag that differs from the source's, or a per-channel mean bias
-  over 2.0 levels. A duplicated, dropped or swapped frame fails by name (`failed_frames`;
-  `test_a_duplicated_frame_fails_the_readback_by_name`, `test_two_swapped_frames_...`,
-  `test_a_dropped_frame_...`). The per-frame `own`, `previous`, `next`, `margin` and per-channel
+  over 2.0 levels. A duplicated or swapped frame fails by frame index (`failed_frames`;
+  `test_a_duplicated_frame_fails_the_readback_by_name`,
+  `test_two_swapped_frames_fail_the_readback_by_name`); a dropped frame fails the clip on the count
+  (`problems`, no per-frame record: `test_a_dropped_frame_fails_the_readback_on_the_count`). The
+  scratch folder `flicker
+eadback\<clip>` is cleared before use (a surplus frame left by a crashed
+  run cannot change the count: `test_stale_read_back_scratch_does_not_count_as_clip_frames`) and
+  removed after; a removal that fails prints a warning. The per-frame `own`, `previous`, `next`, `margin` and per-channel
   `bias` of all 180 frames of both clips are in the JSON.
 - Result on the delivered clips (2026-10-15 re-run): **all 180 frames of both clips pass.**
   Unsmoothed clip: worst difference to its own PNG 2.85 levels (frame 65), mean 2.21; smallest
@@ -320,20 +330,23 @@ record observations about them under the open-water row at CP2 is the owner's ca
 
 ## 8. Verification
 
-- Gates on the remediation head (the head named in the ledger), run with the WinGet
-  `ffmpeg`/`ffprobe` folder on PATH: `uv run ruff check .` all checks passed; `uv run ruff format
-  --check .` 74 files already formatted; `uv run mypy` no issues in 16 source files; `uv run pytest
-  -q -rs` **492 passed, 0 skipped** (the `footage` smoke test and the `gpu` flicker test ran; this
-  package's tests are 49); `uv run pytest -q -m gpu` 21 passed. Logs: `work\wp1.3\logs\g3-*.log`
-  (the first original gates, `g2-*.log`).
+- Gates on the remediation head after Reviewer A's round 3 cleanup (the head named in the ledger),
+  run with the WinGet `ffmpeg`/`ffprobe` folder on PATH: `uv run ruff check .` all checks passed;
+  `uv run ruff format --check .` 74 files already formatted; `uv run mypy` no issues in 16 source
+  files; `uv run pytest -q -rs` **495 passed, 0 skipped** (the `footage` smoke test and the `gpu`
+  flicker test ran; this package's tests are 52); `uv run pytest -q -m gpu` 21 passed. Logs:
+  `work\wp1.3\logs\g4-*.log` (the gates before the cleanup, `g3-*.log`, whose ruff log records
+  one style error fixed in the cleanup; the original gates, `g2-*.log`).
 - Controls with planted defects, each failing by name: limited-range data tagged full; a wrong
   range and a wrong matrix argument (full and limited clips); a seek one frame late; the two pair
   halves swapped; the unsmoothed clip encoded from the source frames; a 10-bit, wrongly sized,
   mis-tagged, mistimed, short or out-of-order clip against `verify_clip`; a faked FFmpeg that
   leaves a partial file; (remediation) a clip with one frame duplicated, one with two frames
   swapped, one with a dropped frame and one with a colour shift against the read-back; a
-  verification that raises, a second encode that fails and a failed read-back against the
-  naming; a `tmp_path` inside a monkeypatched footage folder against the guard.
+  verification that raises, a second encode that fails, a failed read-back, and a second rename that
+  fails together with a cleanup that fails, against the naming; a `tmp_path` inside a
+  monkeypatched footage folder against the guard; a single wrong pixel inside a quadrant, off the
+  centre, against the range control.
 - Reviewer A (Codex, STRONG): two rounds; round 1 one major (rejected by the brief, mitigated in
   text) and five minors, all fixed; round 2 zero blocking, three minors fixed in the cleanup.
   Ledger `docs/proofs/wp1.3-ledger.md`; transcripts under
@@ -343,8 +356,18 @@ record observations about them under the open-water row at CP2 is the owner's ca
   checked metadata and timing, not frames), B3 (an exception left an unverified clip under its
   final name), B4 (an unrecorded bias figure), B5 (the output-scope wording), B11 (the range
   control read one pixel per quadrant). Not implemented and banked as out of envelope: B6 (D54's
-  fallback) and B7 to B10 (section 2, "Limits of the instrument"). Reviewer A's round 3 over the
-  remediation delta is recorded in the ledger.
+  fallback) and B7 to B10 (section 2, "Limits of the instrument").
+- **Reviewer A round 3** (Codex, STRONG, delta `0233a8e..6a5aec0`; the one round the remediation
+  allows): one major and five minors, all in envelope. The major (REASONED, introduced by this
+  remediation): the cleanup in `encode_verified_pair` stopped at the first removal that raised, and
+  could mask the original error; fixed (`discard`, best effort, notes on the error; test for a
+  failing second rename with a failing cleanup). Minors fixed once: a direct `mkdir` in a refusal
+  test and the footage-root wording; the range control's interior comparison was not proved by a
+  planted pixel (test added); the read-back scratch folder is now cleared on entry and a failed
+  removal warns; the "dropped frame fails by name" sentence (it fails on the count); the g3 ruff
+  log recorded one style error (fixed, gates re-run as g4). The fixes are NOT re-reviewed: the
+  remediation allows one round. Ledger `docs/proofs/wp1.3-ledger.md`; evidence
+  `C:\Users\rwsmy\clearwater-review-evidence\wp1.3\r3\`.
 
 ## 9. CP2 sheet (the owner fills the last three columns)
 
