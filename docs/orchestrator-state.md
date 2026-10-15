@@ -25,9 +25,8 @@
   converged r1; depth 319K. **EXCLUSIVE** window continues through Reviewer B.
 - **wp12-reviewer-b** (implementer-opus-high, background) -- Reviewer B on `9408d18`, brief
   `docs/briefs/wp1.2-review-brief.md`; bench re-run to `work/wp1.2a-B/`; evidence `...\wp1.2\B\`.
-- Stray `python.exe` PID 33616 (orphan `python -` from WP0.1 Reviewer B, spinning 1 core since
-  2026-10-14 13:31) -- auto-mode classifier DENIED my Stop-Process; the USER will stop it after Reviewer B completes (tell them when B returns). Present
-  during the author's bench; B re-runs under the same condition.
+- Stray PID 33616: STOPPED ~05:20Z on owner direction (CHARC f314b0c26cc1a0b2); GPU re-measure + B2 on a clean machine.
+- WP1.2 Reviewer B pass 1: BLOCKING on F1 (GPU c3 cells -14/-17% vs author); F1-F4 routed to the author (ambient overlay + GPU clocks, re-measure the 4 GPU cells, minors). Next: author return -> B2 (GPU cells reproduction + fixes) -> gate -> merge.
 - Branches `wp0.1`, `wp0.2` and `wp1.1` are kept on purpose: they hold the reviewed pre-rebase
   SHAs the accept records cite.
 
@@ -71,4 +70,4 @@
 - Lesson carried forward: every Reviewer B brief's Codex prompt must NAME the withheld paths in
   its own paragraph, plus a transcript `grep -a 'docs/proofs\|<wp>-ledger'` access assertion
   (WP1.1 B pass 1 Codex read the ledger).
-- Inbox drained through msg `4db6db642c117b1e` (WP1.2A STOP ruled: F1 Option A + near-flat 1e-4/1e-5 test; F2 cpu default; deviations accepted; DR-14). Cell resumed.
+- Inbox drained through msg `f314b0c26cc1a0b2`.
