@@ -539,6 +539,27 @@ def render_index(
 # --- the flicker clip -----------------------------------------------------------------------------
 
 
+def _properties_filter(tags: StreamTags) -> str:
+    """The ``setparams`` filter that puts the source's colour description on every frame.
+
+    FFmpeg's encoder takes the colour description from the frames, and the ``scale`` filter
+    sets only matrix and range, so without this the encoded stream would lose the primaries
+    and the transfer characteristic (a tag that is ``unknown`` is left out).
+
+    Args:
+        tags: The source stream's tags.
+
+    Returns:
+        The filter text.
+    """
+    parts = [f"range={tags.color_range}", f"colorspace={tags.color_space}"]
+    if tags.color_primaries != "unknown":
+        parts.append(f"color_primaries={tags.color_primaries}")
+    if tags.color_transfer != "unknown":
+        parts.append(f"color_trc={tags.color_transfer}")
+    return "setparams=" + ":".join(parts)
+
+
 def encode_command(
     pattern: Path, output: Path, tags: StreamTags, frame_rate: Fraction
 ) -> list[str]:
@@ -547,7 +568,8 @@ def encode_command(
     The 16-bit RGB frames are converted with the source's matrix and range (the same
     ``scale`` arguments :func:`lookcheck.frames.colour_filter` reads the source with) to
     8-bit 4:2:0 and encoded as HEVC with the settings WP1.5 used (``p5``, ``hq``, constant
-    quality 20), tagged with the source's colour tags and frame rate; no audio.
+    quality 20), tagged with the source's colour tags (range, matrix, primaries, transfer:
+    on the frames by ``setparams`` and by the encoder options) and frame rate; no audio.
 
     Args:
         pattern: The input path with a ``%04d`` counter, counting from 0.
@@ -571,7 +593,8 @@ def encode_command(
         "-i",
         str(pattern),
         "-vf",
-        f"scale=out_color_matrix={scale_matrix(tags)}:out_range={scale_range(tags)},format=yuv420p",
+        f"scale=out_color_matrix={scale_matrix(tags)}:out_range={scale_range(tags)},"
+        f"format=yuv420p,{_properties_filter(tags)}",
         *_NVENC_SETTINGS,
     ]
     for option, value in (

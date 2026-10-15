@@ -32,6 +32,7 @@ pytestmark = pytest.mark.skipif(
 # the full and the limited range: the clips can then hold the SAME RGB in either range.
 COLOURS = ((165, 107, 20), (22, 5, 191), (118, 193, 94), (42, 42, 42))
 TOLERANCE = 1.0  # 8-bit levels, the brief's 1/255
+_FULL_BT709 = "range=full:colorspace=bt709:color_primaries=bt709:color_trc=bt709"
 _KR, _KB = 0.2126, 0.0722
 _KG = 1.0 - _KR - _KB
 
@@ -91,7 +92,12 @@ def _encode(roots: OutputRoots, output: Path, lavfi: str, *, tag_full: bool) -> 
     done = frames.run_tool(
         [
             *("ffmpeg", "-nostdin", "-hide_banner", "-y", "-loglevel", "error"),
-            *("-f", "lavfi", "-i", f"{lavfi},setparams=range={flag}:colorspace=bt709"),
+            *(
+                "-f",
+                "lavfi",
+                "-i",
+                f"{lavfi},setparams=range={flag}:colorspace=bt709:color_primaries=bt709:color_trc=bt709",
+            ),
             *("-c:v", "libx265", "-x265-params", "lossless=1:log-level=error"),
             *("-pix_fmt", "yuv420p", "-color_range", "pc" if tag_full else "tv"),
             *("-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "bt709"),
@@ -144,10 +150,13 @@ def test_a_range_tag_that_lies_makes_the_control_fail(tmp_path: Path) -> None:
     roots = _roots(tmp_path)
     honest = _quadrant_clip(roots, "honest", data_full=False, tag_full=False)
     clip = roots.allowed / "liar.mp4"
+    roots.check(clip)
+    # Relabel the bitstream's range flag and the container's range together, data untouched.
     done = frames.run_tool(
         [
             *("ffmpeg", "-nostdin", "-hide_banner", "-y", "-loglevel", "error", "-i", str(honest)),
-            *("-c", "copy", "-bsf:v", "hevc_metadata=video_full_range_flag=1", str(clip)),
+            *("-c", "copy", "-bsf:v", "hevc_metadata=video_full_range_flag=1"),
+            *("-color_range", "pc", str(clip)),
         ]
     )
     assert done.returncode == 0, done.stderr.decode(errors="replace")[-200:]
@@ -633,6 +642,7 @@ def test_the_flicker_clip_is_built_checked_and_pruned(tmp_path: Path) -> None:
         [
             *("ffmpeg", "-nostdin", "-hide_banner", "-y", "-loglevel", "error"),
             *("-f", "lavfi", "-i", "testsrc2=size=320x240:rate=30000/1001:duration=10"),
+            *("-vf", f"format=yuv420p,setparams={_FULL_BT709}"),
             *("-c:v", "libx265", "-crf", "20", "-x265-params", "log-level=error"),
             *("-pix_fmt", "yuv420p", "-color_range", "pc", "-colorspace", "bt709"),
             *("-color_primaries", "bt709", "-color_trc", "bt709", str(clip)),
@@ -644,6 +654,11 @@ def test_the_flicker_clip_is_built_checked_and_pruned(tmp_path: Path) -> None:
     count = document["excerpt"]["frames"]
     assert 179 <= count <= 180
     assert all(check["ok"] for check in document["checks"].values())
+    # The source's full colour description reaches both encodes (not only range and matrix).
+    assert document["tags"]["color_primaries"] == document["tags"]["color_transfer"] == "bt709"
+    for label in ("unsmoothed", "source"):
+        assert document["checks"][label]["color_primaries"] == "bt709", label
+        assert document["checks"][label]["color_transfer"] == "bt709", label
     assert len(document["frames"]) == count
     assert document["smoothing"].startswith("none")
     for name in ("flick_unsmoothed.mp4", "flick_source.mp4", "statistics.json", "statistics.png"):
@@ -719,6 +734,11 @@ def test_the_encode_command_carries_the_source_tags_and_rate() -> None:
     assert "-framerate 30000/1001" in joined
     assert "-color_range pc" in joined and "-colorspace bt709" in joined
     assert "out_range=full" in joined and "hevc_nvenc" in joined and "-an" in joined
+    assert "setparams=range=pc:colorspace=bt709:color_primaries=bt709:color_trc=bt709" in joined
+    untagged = StreamTags("yuv420p", "tv", "bt709", "unknown", "unknown")
+    bare = " ".join(pack.encode_command(Path("a%04d.png"), Path("o.mp4"), untagged, Fraction(25)))
+    assert "setparams=range=tv:colorspace=bt709 " in bare
+    assert "color_trc" not in bare.replace("-color_trc", "")
     assert command[:5] == ["ffmpeg", "-nostdin", "-hide_banner", "-nostats", "-y"]
 
 
