@@ -94,7 +94,11 @@ _PIXEL_FORMATS: dict[str, dict[tuple[str, int], tuple[str, str]]] = {
 # other identifiers are deliberately not read.
 GPMF_SETTING_KEYS = ("MINF", "FMWR", "HDRV", "PRTN", "PTCL", "BITR")
 _HDR_TRANSFERS = frozenset({"arib-std-b67", "smpte2084"})
-_GPU_QUERY = "name,utilization.encoder,utilization.decoder,encoder.stats.sessionCount"
+_GPU_QUERY = (
+    "name,driver_version,utilization.encoder,utilization.decoder,encoder.stats.sessionCount"
+)
+# The synthetic proof clip: 2 s of 4K at 30 fps (long enough for nvidia-smi to sample).
+_PROOF_WIDTH, _PROOF_HEIGHT, _PROOF_FRAMES = 3840, 2160, 60
 _GPU_SAMPLE_SECONDS = 0.1
 _PSNR = re.compile(r"PSNR y:(\S+) u:(\S+) v:(\S+) average:(\S+) min:(\S+) max:(\S+)")
 _DECODED = re.compile(r"(\d+) frames decoded; (\d+) decode errors")
@@ -212,7 +216,7 @@ def capability_listing() -> dict[str, dict[str, bool]]:
 
 
 def _gpu_query() -> list[list[str]]:
-    """Run one ``nvidia-smi`` query and return its rows (name, encoder %, decoder %, sessions).
+    """Run one ``nvidia-smi`` query; rows of (name, driver, encoder %, decoder %, sessions).
 
     Raises:
         SpikeError: If ``nvidia-smi`` is absent, fails, times out or exits non-zero.
@@ -238,9 +242,10 @@ def gpu_samples(record: dict[str, Any]) -> Iterator[None]:
     """Sample ``nvidia-smi`` about every 0.1 s while the ``with`` body runs.
 
     On exit, ``record`` receives ``gpu``: ``available`` (True only when at least one
-    sample succeeded and named a GPU), the GPU names seen, the sample count, the highest
-    encoder and decoder utilisation and NVENC session count, and the first sampling error
-    if any.
+    sample succeeded and named a GPU), the GPU names and driver versions seen, the sample
+    count, the highest encoder and decoder utilisation and NVENC session count, and the
+    first sampling error if any. Utilisation is nvidia-smi's average over its last sample
+    period, so it can carry over from a run just before; it is supporting evidence only.
 
     Args:
         record: The dict that receives the ``gpu`` entry.
@@ -270,7 +275,7 @@ def gpu_samples(record: dict[str, Any]) -> Iterator[None]:
     finally:
         stop.set()
         worker.join(timeout=15)
-        usable = [row for row in rows if len(row) == 4 and row[0]]
+        usable = [row for row in rows if len(row) == 5 and row[0]]
 
         def highest(column: int) -> int | None:
             values = [int(row[column]) for row in usable if row[column].isdigit()]
@@ -279,10 +284,11 @@ def gpu_samples(record: dict[str, Any]) -> Iterator[None]:
         record["gpu"] = {
             "available": bool(usable),
             "names": sorted({row[0] for row in usable}),
+            "driver_versions": sorted({row[1] for row in usable}),
             "samples": len(usable),
-            "max_encoder_utilisation_percent": highest(1),
-            "max_decoder_utilisation_percent": highest(2),
-            "max_nvenc_sessions": highest(3),
+            "max_encoder_utilisation_percent": highest(2),
+            "max_decoder_utilisation_percent": highest(3),
+            "max_nvenc_sessions": highest(4),
             "error": errors[0] if errors else None,
         }
 
@@ -310,7 +316,7 @@ def synthetic_encode_command(encoder: str, pix_fmt: str, profile: str, output: P
         "-f",
         "lavfi",
         "-i",
-        "testsrc2=size=3840x2160:rate=30:duration=2",
+        f"testsrc2=size={_PROOF_WIDTH}x{_PROOF_HEIGHT}:rate=30:duration=2",
         "-c:v",
         encoder,
         "-pix_fmt",
@@ -327,10 +333,12 @@ def encode_proof(
     """Encode the synthetic clip and confirm the result with ``ffprobe``.
 
     The proof holds when FFmpeg exits 0 and ``ffprobe`` reads an HEVC stream of 60
-    frames with the expected profile and pixel format; for ``hevc_nvenc`` it also needs
-    ``nvidia-smi`` to have named a GPU and seen NVENC at work during the encode: an NVENC
-    session counted or encoder utilisation above 0 (the session counter alone misses some
-    sub-second encodes).
+    frames at 3840x2160 with the expected profile and pixel format, whose ``encoder``
+    tag names the encoder used; for ``hevc_nvenc`` it also needs ``nvidia-smi`` to have
+    named a GPU during the encode. Each of these is a gating check in ``checks``. The
+    NVENC session count and encoder utilisation are recorded under ``gpu`` as supporting
+    evidence only: the session counter misses some short encodes, and utilisation can
+    carry over from an earlier run.
 
     Args:
         encoder: ``hevc_nvenc`` or ``libx265``.
@@ -342,7 +350,8 @@ def encode_proof(
 
     Returns:
         The proof record: command, exit status, elapsed seconds, the ``ffprobe``
-        reading, the GPU samples and ``proven``.
+        reading, the GPU samples, the gating ``checks`` and ``proven`` (every check
+        True).
     """
     output = check_output_path(folder / f"proof-{encoder}-{pix_fmt}.mp4", allowed, footage)
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -368,23 +377,20 @@ def encode_proof(
     )
     stream = next((s for s in data.get("streams", []) if isinstance(s, dict)), {})
     record["ffprobe"] = stream
-    gpu = record["gpu"]
-    record["proven"] = (
-        stream.get("codec_name") == "hevc"
-        and stream.get("profile") == expected_profile
-        and stream.get("pix_fmt") == expected_pix_fmt
-        and str(stream.get("nb_frames")) == "60"
-        and (
-            encoder != "hevc_nvenc"
-            or (
-                bool(gpu["names"])
-                and (
-                    (gpu["max_nvenc_sessions"] or 0) >= 1
-                    or (gpu["max_encoder_utilisation_percent"] or 0) > 0
-                )
-            )
-        )
-    )
+    encoder_tag = str(dict(stream.get("tags") or {}).get("encoder", ""))
+    checks = {
+        "codec hevc": stream.get("codec_name") == "hevc",
+        f"profile {expected_profile}": stream.get("profile") == expected_profile,
+        f"pixel format {expected_pix_fmt}": stream.get("pix_fmt") == expected_pix_fmt,
+        f"frame size {_PROOF_WIDTH}x{_PROOF_HEIGHT}": (stream.get("width"), stream.get("height"))
+        == (_PROOF_WIDTH, _PROOF_HEIGHT),
+        f"{_PROOF_FRAMES} frames": str(stream.get("nb_frames")) == str(_PROOF_FRAMES),
+        f"encoder tag names {encoder}": encoder in encoder_tag.split(),
+    }
+    if encoder == "hevc_nvenc":
+        checks["gpu named during the encode"] = bool(record["gpu"]["names"])
+    record["checks"] = checks
+    record["proven"] = all(checks.values())
     return record
 
 

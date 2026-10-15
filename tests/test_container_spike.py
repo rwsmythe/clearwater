@@ -632,13 +632,24 @@ class TestEncodeProofs:
         )
 
     @staticmethod
-    def _fake_nvenc_run(monkeypatch: pytest.MonkeyPatch, gpu_rows: list[list[str]] | None) -> None:
+    def _fake_nvenc_run(
+        monkeypatch: pytest.MonkeyPatch,
+        gpu_rows: list[list[str]] | None,
+        encoder_tag: str = "Lavc63.1.102 hevc_nvenc",
+        width: int = 3840,
+    ) -> None:
         """An NVENC encode and ffprobe reading that succeed, with the given nvidia-smi rows."""
         monkeypatch.setattr(spike, "run_tool", lambda *_, **__: (0, ""))
-        stream = {"codec_name": "hevc", "profile": "Main 10", "pix_fmt": "yuv420p10le"}
-        monkeypatch.setattr(
-            spike, "run_ffprobe", lambda _: {"streams": [{**stream, "nb_frames": "60"}]}
-        )
+        stream = {
+            "codec_name": "hevc",
+            "profile": "Main 10",
+            "pix_fmt": "yuv420p10le",
+            "width": width,
+            "height": 2160,
+            "nb_frames": "60",
+            "tags": {"encoder": encoder_tag},
+        }
+        monkeypatch.setattr(spike, "run_ffprobe", lambda _: {"streams": [stream]})
 
         def query() -> list[list[str]]:
             if gpu_rows is None:
@@ -654,28 +665,47 @@ class TestEncodeProofs:
         proof = self._prove(tmp_path, "hevc_nvenc", "p010le", "main10")
         assert proof["gpu"]["available"] is False
         assert proof["gpu"]["error"] == "nvidia-smi exited with status 9"
+        assert proof["checks"]["gpu named during the encode"] is False
         assert proof["proven"] is False
 
-    def test_nvenc_proof_needs_nvenc_activity(
+    def test_nvenc_proof_needs_the_encoder_tag(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        self._fake_nvenc_run(monkeypatch, [["NVIDIA GeForce", "0", "0", "0"]])
-        assert self._prove(tmp_path, "hevc_nvenc", "p010le", "main10")["proven"] is False
+        gpu = [["NVIDIA GeForce", "610.62", "90", "0", "1"]]
+        self._fake_nvenc_run(monkeypatch, gpu, encoder_tag="Lavc63.1.102 libx265")
+        proof = self._prove(tmp_path, "hevc_nvenc", "p010le", "main10")
+        assert proof["checks"]["encoder tag names hevc_nvenc"] is False
+        assert proof["proven"] is False
 
-    def test_nvenc_proof_holds_on_encoder_utilisation_without_a_counted_session(
+    def test_proof_needs_the_4k_frame_size(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        # Seen on the real card: sub-second encodes at 85-90 % encoder load with no session
-        # counted in any sample.
-        self._fake_nvenc_run(monkeypatch, [["NVIDIA GeForce", "90", "0", "0"]])
-        assert self._prove(tmp_path, "hevc_nvenc", "p010le", "main10")["proven"] is True
+        gpu = [["NVIDIA GeForce", "610.62", "90", "0", "1"]]
+        self._fake_nvenc_run(monkeypatch, gpu, width=1920)
+        proof = self._prove(tmp_path, "hevc_nvenc", "p010le", "main10")
+        assert proof["checks"]["frame size 3840x2160"] is False
+        assert proof["proven"] is False
+
+    def test_nvenc_activity_readings_are_supporting_only(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # A named GPU with no session counted and no encoder load still proves NVENC when
+        # the ffprobe reading (encoder tag included) matches; a leftover utilisation
+        # reading can no longer stand in for the encode.
+        self._fake_nvenc_run(monkeypatch, [["NVIDIA GeForce", "610.62", "0", "0", "0"]])
+        proof = self._prove(tmp_path, "hevc_nvenc", "p010le", "main10")
+        assert proof["proven"] is True
+        assert proof["gpu"]["max_nvenc_sessions"] == 0
+        assert proof["gpu"]["max_encoder_utilisation_percent"] == 0
+        assert not any("session" in name or "utilisation" in name for name in proof["checks"])
 
     def test_nvenc_proof_holds_with_a_named_gpu_and_a_session(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        self._fake_nvenc_run(monkeypatch, [["NVIDIA GeForce", "35", "0", "1"]])
+        self._fake_nvenc_run(monkeypatch, [["NVIDIA GeForce", "610.62", "35", "0", "1"]])
         proof = self._prove(tmp_path, "hevc_nvenc", "p010le", "main10")
         assert proof["gpu"]["names"] == ["NVIDIA GeForce"]
+        assert proof["gpu"]["driver_versions"] == ["610.62"]
         assert proof["proven"] is True
 
     def test_software_ten_bit_proof_holds(self, tmp_path: Path) -> None:
@@ -683,6 +713,9 @@ class TestEncodeProofs:
         assert proof["exit_status"] == 0
         assert proof["ffprobe"]["pix_fmt"] == "yuv420p10le"
         assert proof["ffprobe"]["profile"] == "Main 10"
+        assert (proof["ffprobe"]["width"], proof["ffprobe"]["height"]) == (3840, 2160)
+        assert all(proof["checks"].values())
+        assert "gpu named during the encode" not in proof["checks"]
         assert proof["proven"] is True
 
     def test_proof_fails_when_the_reading_does_not_match(
