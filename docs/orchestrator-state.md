@@ -81,9 +81,19 @@ Each accepted package had its return report posted to CHARC and an info-update t
 - Awaiting: WP1.5 Reviewer B. Then the `-mc` merge, the gate (footage test RUN) and the accept
   record. Status posted to CHARC (07:10Z) with the open questions: the edit-list reading,
   the REQUIRED class, D54 full range, and the `udta` repair.
+- CHARC pre-rulings `bdae7c6214ae1247`, to route to the author TOGETHER with B's findings, after B
+  returns (the author must not move HEAD while B reads the worktree):
+  1. MANDATORY = the VIDEO track's elst AS WRITTEN plus the presentation effect on every track.
+     The muxer-added identity edits on audio and data are BEST-EFFORT. `compare.py` needs a
+     MANDATORY "video elst as written" item; the report's reading 1 is to be revised.
+  2. The class label becomes "REQUIRED (D55/D114)"; a REQUIRED DIFFERENT weighs as MANDATORY.
+  3. D54: no conflict. The report gains a WP2.1 note: full range end to end; the 6.5 limited
+     default is the fallback only.
+  4. udta: CHARC banks the debt at the accept.
+  Then B2 checks the delta.
 - Gate hazard: the WP0.2 test `test_real_footage_has_one_row_per_media_file` fails while the
   SCUBA download runs (its footage snapshot changes). If it fails at the gate, show the cause
   and re-run after CHARC confirms the download is complete.
 - CHARC approved `_windows_power()` as instrument-only (never into `src/clearwater/` without a
   fresh ruling).
-- Inbox drained through msg `bac37599277c1365` (verify: `uv run python scripts/role_mail.py list --role orchestrator`).
+- Inbox drained through msg `bdae7c6214ae1247` (verify: `uv run python scripts/role_mail.py list --role orchestrator`).
