@@ -55,8 +55,9 @@ completion report, which you are not given.
    - **Specific question:** the Laplacian contrast weight is implemented as
      `|sigma^2 * Lap(G_sigma * L)|` (sigma from `laplacian_fraction`), not the paper's per-pixel
      `|Lap(L)|`. Give your independent judgement: is it a faithful reading of spec 6.6/D56, what
-     does it change in practice at photo and 4K sizes, and is any alternative better? CHARC is
-     ruling on it; your view informs that ruling.
+     does it change in practice at photo and 4K sizes? CHARC has RULED it accepted
+     (`ad686b8b65a71061`, spec-driven departure from [A18]), so the form is not itself a finding.
+     Report a defect only in how it is implemented, or a concrete harm the ruling did not weigh.
 4. **The two reports.**
    - `docs/reports/wp1.1-3c-correspondence.md`: check the kappa -> Cr / lambda -> Cb
      derivation, and reproduce its synthetic red-deficient demonstration.
