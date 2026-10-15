@@ -1463,7 +1463,10 @@ def _cell(value: Any) -> str:
 
 
 def markdown_table(record: Mapping[str, Any]) -> str:
-    """Render a record as a markdown table (cells shortened; the JSON holds every value).
+    """Render a record as a markdown table (cells shortened; the JSON holds the full values).
+
+    A sequence (pts, packets) appears in both as its summary: count, first, last and the
+    SHA-256 of the whole sequence; the whole sequences are compared in memory.
 
     Args:
         record: A record from :func:`build_record`.

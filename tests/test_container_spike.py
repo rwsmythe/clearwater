@@ -29,9 +29,12 @@ pytestmark = pytest.mark.skipif(
 )
 
 
-def _ffmpeg(*arguments: str) -> None:
+def _ffmpeg(folders: tuple[Path, Path], output: Path, *arguments: str) -> None:
+    """Run FFmpeg writing ``output``, after the spike's own check on the output path."""
+    spike_root, footage = folders
+    compare.check_output_path(output, spike_root, footage)
     subprocess.run(
-        ["ffmpeg", "-nostdin", "-hide_banner", "-v", "error", "-y", *arguments],
+        ["ffmpeg", "-nostdin", "-hide_banner", "-v", "error", "-y", *arguments, str(output)],
         check=True,
         stdin=subprocess.DEVNULL,
         capture_output=True,
@@ -39,7 +42,11 @@ def _ffmpeg(*arguments: str) -> None:
 
 
 def _synthetic(
-    path: Path, offset: str = "0.5", video_filter: str | None = None, rotation: str | None = None
+    folders: tuple[Path, Path],
+    path: Path,
+    offset: str = "0.5",
+    video_filter: str | None = None,
+    rotation: str | None = None,
 ) -> Path:
     """2 s testsrc2 + sine, 30 fps, yuv420p H.264 + AAC, start offset ``offset`` seconds.
 
@@ -49,6 +56,8 @@ def _synthetic(
     """
     filters = ["-vf", video_filter, "-fps_mode", "passthrough"] if video_filter else []
     _ffmpeg(
+        folders,
+        path,
         "-f",
         "lavfi",
         "-i",
@@ -74,11 +83,10 @@ def _synthetic(
         "aac",
         "-output_ts_offset",
         offset,
-        str(path),
     )
     if rotation is not None:
         rotated = path.with_name(f"{path.stem}-rot{path.suffix}")
-        _ffmpeg("-display_rotation", rotation, "-i", str(path), "-c", "copy", str(rotated))
+        _ffmpeg(folders, rotated, "-display_rotation", rotation, "-i", str(path), "-c", "copy")
         return rotated
     return path
 
@@ -92,24 +100,27 @@ def _different(record: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 @pytest.fixture(scope="module")
-def clips(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Path]:
-    root = tmp_path_factory.mktemp("clips")
-    return {
-        "base": _synthetic(root / "base.mp4"),
-        "shifted": _synthetic(root / "shifted.mp4", offset="0.25"),
-        # Frames 10-14 dropped with their timestamps kept: a variable-frame-rate gap.
-        "vfr": _synthetic(root / "vfr.mp4", video_filter="select='not(between(n,10,14))'"),
-        "rotated": _synthetic(root / "rot.mp4", rotation="90"),
-    }
-
-
-@pytest.fixture(scope="module")
 def folders(tmp_path_factory: pytest.TempPathFactory) -> tuple[Path, Path]:
+    """A test spike folder (``work/wp1.5``) and an empty test footage folder."""
     root = tmp_path_factory.mktemp("folders")
     footage, spike_root = root / "footage", root / "work" / "wp1.5"
     footage.mkdir()
     spike_root.mkdir(parents=True)
     return spike_root, footage
+
+
+@pytest.fixture(scope="module")
+def clips(folders: tuple[Path, Path]) -> dict[str, Path]:
+    """The synthetic sources, written under the test spike folder like every other output."""
+    root = folders[0] / "clips"
+    root.mkdir()
+    return {
+        "base": _synthetic(folders, root / "base.mp4"),
+        "shifted": _synthetic(folders, root / "shifted.mp4", offset="0.25"),
+        # Frames 10-14 dropped with their timestamps kept: a variable-frame-rate gap.
+        "vfr": _synthetic(folders, root / "vfr.mp4", video_filter="select='not(between(n,10,14))'"),
+        "rotated": _synthetic(folders, root / "rot.mp4", rotation="90"),
+    }
 
 
 @pytest.fixture(scope="module")
@@ -524,7 +535,10 @@ class TestReencodeCommand:
 
 class TestCompositionOffsets:
     def test_ctts_offsets_read_signed_as_ffmpeg_reads_them(self) -> None:
-        # A version-0 ctts with one run of offset -1001 (0xFFFFFC17), then two runs of 0.
+        # A version-0 ctts whose first offset is 0xFFFFFC17. ISO/IEC 14496-12 reads a
+        # version-0 offset unsigned (4294966295); FFmpeg's demuxer, which produces the pts
+        # the comparison checks, reads it signed (-1001) in both versions, and so does the
+        # walker, keeping the edit-list effect on the demuxer's timeline (deliberate).
         payload = struct.pack(">I I II II", 0, 2, 1, (-1001) & 0xFFFFFFFF, 2, 0)
         assert compare._runs(payload, (0, len(payload)), signed=True) == [(1, -1001), (2, 0)]
 

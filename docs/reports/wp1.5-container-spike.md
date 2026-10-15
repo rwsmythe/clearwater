@@ -180,7 +180,10 @@ up; a full-to-limited range error would also show as a far lower figure.
 ## 5. Comparison (D105)
 
 Primary chapter, `work\wp1.5\reencode\GX011627_corrected.compare.json` (md
-`GX011627_corrected.compare.md`); values shortened, the JSON holds every value.
+`GX011627_corrected.compare.md`); values shortened here, full in the JSON, except that a
+sequence (the pts, each packet track) is recorded in both as count, first, last and the SHA-256
+of the whole sequence: the whole sequences are compared in memory, element by element, and
+re-running `compare.py` on the two files reproduces them.
 
 | Item | Class | Clause | Source | Output | Result |
 |---|---|---|---|---|---|
