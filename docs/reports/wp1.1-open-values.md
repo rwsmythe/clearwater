@@ -48,10 +48,11 @@ side (spec 6.6, D56), turned into pixels only by `spatial_sigma`.
 | 3C correspondence | kappa -> Cr, lambda -> Cb, confirmed. | See `docs/reports/wp1.1-3c-correspondence.md`. |
 | N{} (histogram stretch) | One shift and one scale for all three channels ([A18]: "a unique shifting and scaling factor"), bounds = the two percentiles above taken jointly over all pixels and channels of `I - G*I`, with linear interpolation between order statistics (NumPy `percentile`, `method="linear"`, the R-7 / Hyndman-Fan type 7 definition), values outside clipped. A flat high-pass (bounds closer than 1e-6) maps to 0.5. | [A18] for the form; percentiles and the flat case are WP1.1's. |
 | Luminance for the weights | BT.709 luma `0.2126 R + 0.7152 G + 0.0722 B` on display-encoded values (the Y of the 3C matrix). | WP1.1 choice; [A18] says "luminance" without a definition. |
-| Laplacian contrast | **Adaptation of the paper's equation, required by spec 6.6 (D56) and the brief's `laplacian_fraction`.** [A18]: `W_L = |Lap(L)|`, the absolute Laplacian of the luminance at the pixel scale (no spatial parameter). Spec 6.6 lists the Laplacian among the spatial parameters expressed as a fraction of the short side. Implemented: `|sigma^2 x Lap(G_sigma * L)|`, the paper's 5-point discrete Laplacian on the Gaussian-smoothed luma, times sigma^2 (scale normalisation, so the weight keeps its size relative to W_S and W_Sat across resolutions); the paper's form is the sigma -> 0 limit up to the factor sigma^2. The form of the adaptation (prefilter and sigma^2) is the WP1.1 choice; the return report raises it for a ruling. scipy's `gaussian_laplace` is not used: its sampled kernel is not zero-sum at small sigma and gave a flat image a nonzero weight (caught by `test_weight_maps_follow_their_definitions`). | WP1.1 choice. |
+| Laplacian contrast | **Adaptation of the paper's equation, required by spec 6.6 (D56) and the brief's `laplacian_fraction`.** [A18]: `W_L = |Lap(L)|`, the absolute Laplacian of the luminance at the pixel scale (no spatial parameter). Spec 6.6 lists the Laplacian among the spatial parameters expressed as a fraction of the short side. Implemented: `|sigma^2 x Lap(G_sigma * L)|`, the paper's 5-point discrete Laplacian on the Gaussian-smoothed luma, times sigma^2 (scale normalisation, so the weight keeps its size relative to W_S and W_Sat across resolutions); the paper's form is the sigma -> 0 limit up to the factor sigma^2. The form of the adaptation (prefilter and sigma^2) is the WP1.1 choice; RULED by CHARC 2026-10-15 (ad686b8b65a71061): accepted as a spec-driven departure from [A18] (spec 6.6 / D56); the pixel form was rejected because it breaks V8 / F3. scipy's `gaussian_laplace` is not used: its sampled kernel is not zero-sum at small sigma and gave a flat image a nonzero weight (caught by `test_weight_maps_follow_their_definitions`). | spec 6.6 / D56; form ruled by CHARC. |
 | Saliency conversion | sRGB EOTF and sRGB-to-XYZ matrix (IEC 61966-2-1:1999), CIELAB with the D65 white (CIE 15:2004); `W_S = ||mean Lab - blurred Lab|| / 100`. A Display P3 source is read as sRGB here (weight only; no colour management in scope). The /100 puts W_S on the same order as W_L and W_Sat (L\* spans [0, 1]) without a per-image normaliser, so it adds no flickering statistic; the mean Lab vector is the "saliency reference value" of spec 7.1. | Achanta et al. 2009 (form and Lab); scale and conversion standard are WP1.1's. |
 | Saturation | `sqrt(((R - L)^2 + (G - L)^2 + (B - L)^2) / 3)`. | paper ([A18]). |
 | Weight aggregation | `W_k = W_L + W_S + W_Sat` (sum), then `(W_k + delta) / (sum W_k + K delta)`. | paper ([A18]: the three maps are summed). |
+| `weight_maps` signature | As built: `weight_maps(input_: Sequence[Image], params: Params) -> Weights`, taking ALL the fusion inputs (input 1, input 2) in order, not one input. The normalisation `(W_k + delta) / (sum_k W_k + K delta)` needs every input's aggregated weight at each pixel, and `Weights` returns the six raw maps together with the two normalised ones, so one call must see both inputs. | **Accepted brief-interface deviation** (the brief's signature names a single `input_`); prototype interface, not frozen. |
 | Pyramid resampling | REDUCE: separable 5-tap binomial `[1 4 6 4 1] / 16`, symmetric borders (`d c b a | a b c d`), keep rows and columns 0, 2, 4, ... (odd n -> (n + 1) / 2). EXPAND: zero-insert at the even positions, same filter, divided by the filter applied to the sample indicator (exactly x4 in the interior; keeps constants constant at the borders). The Laplacian pyramid uses the same EXPAND for building and collapsing, so reconstruction is exact up to float round-off. | Burt and Adelson, the paper's practice; the border normalisation is WP1.1's. |
 | Gaussian filters | `scipy.ndimage`, symmetric borders, truncated at 4 sigma, sigma = fraction x short side with no floor: a sigma well under 1 px gives a kernel close to the identity (exactly `[1]` under 1/8 px), the right limit for an image too small to hold that detail. | WP1.1 choice. |
 
@@ -101,11 +102,15 @@ raises the 3C p99 to 0.015. With a hard-edged disc instead, the p99 rises to 0.0
 output is not the output of the box-downscaled edge once the nonlinear steps (clipping, the
 N{} stretch) act on it.
 
-**Limit (disclosed, not a test):** the defaults are resolution independent only where
-their scales are resolved. On thumbnails (a 64 vs 128 px short side, smooth scene) the
-default sharpening and Laplacian sigmas are under one pixel, the high-pass that N{}
-stretches is nearly empty, and the two outputs differ by p99 0.06-0.07. The spec 6.6 /
-V8 use, a screen-resolution preview (typically 1000 px or more on the short side), is well above that.
+**Stated floor for resolution independence at the defaults (not a test):** the default
+`Params` are resolution independent only where their scales are resolved; the claim is
+NOT made at or below a 128 px short side (the tested pair is 256 vs 512 px, textured
+scene, see above). In the 64-128 px short-side
+range (a 64 vs 128 px short side, smooth scene) the default sharpening and Laplacian sigmas
+are under one pixel, the high-pass that N{} stretches is nearly empty, and the two outputs
+differ at 2x by p99 0.06-0.07. Preview sizing (WP1.3, spec 6.6 / V8) must stay above this
+floor; a screen-resolution preview (typically 1000 px or more on the short side) is well
+above it.
 
 ## 5. Input and output of `run.py`
 
