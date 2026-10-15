@@ -70,4 +70,5 @@
 - Lesson carried forward: every Reviewer B brief's Codex prompt must NAME the withheld paths in
   its own paragraph, plus a transcript `grep -a 'docs/proofs\|<wp>-ledger'` access assertion
   (WP1.1 B pass 1 Codex read the ledger).
-- Inbox drained through msg `f314b0c26cc1a0b2`.
+- Spec is now **v0.5.1** (073ca1f, owner-approved; target machine recorded, DR-5 closed): cite v0.5.1 in every future brief.
+- Inbox drained through msg `9a4812a7f3379d6d`.
