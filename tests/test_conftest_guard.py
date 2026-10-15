@@ -3,17 +3,22 @@
 Every test builds a MINIATURE repository under ``tmp_path`` (real copies of
 ``tools/local_config.py`` and ``tests/conftest.py``, a fake footage folder with
 planted files, a fake working folder) and runs pytest on it in a subprocess.
-Nothing here reads the real ``clearwater.local.toml`` or names the real footage
-folder, and every path a test sets lies under its own ``tmp_path``.
+The subprocesses never read the real ``clearwater.local.toml`` and no test names the
+real footage folder; every path a test sets lies under its own ``tmp_path``. (The
+containing pytest session loads the real ``tests/conftest.py``, whose guard reads the
+real configuration by design, as for every run of this repository.)
 """
 
 from __future__ import annotations
 
+import getpass
+import importlib.util
 import os
 import subprocess
 import sys
 from dataclasses import dataclass, replace
 from pathlib import Path
+from types import ModuleType, SimpleNamespace
 
 import pytest
 
@@ -33,6 +38,18 @@ _MINI_TEST = (
     "def test_needs_footage():\n"
     "    pass\n"
 )
+_MINI_EXTRA_TESTS = (
+    "import pytest\n\n\n"
+    "@pytest.fixture(scope='session')\n"
+    "def shared(tmp_path_factory):\n"
+    "    return tmp_path_factory.mktemp('shared')\n\n\n"
+    "def test_tmpdir(tmpdir):\n"
+    "    tmpdir.join('y.txt').write('y')\n\n\n"
+    "def test_session_factory(shared):\n"
+    "    (shared / 'z.txt').write_text('z')\n\n\n"
+    "def test_direct_factory(tmp_path_factory):\n"
+    "    tmp_path_factory.getbasetemp()\n"
+)
 
 
 @dataclass
@@ -46,13 +63,24 @@ class Mini:
     safe_tmp: Path
 
 
+def _plain(path: Path) -> Path:
+    """Drop a Windows extended-length prefix before a drive letter; leave every other form."""
+    text = str(path)
+    extended = "\\\\?\\"
+    if os.name == "nt" and text.startswith(extended) and text[4:5].isalpha() and text[5:6] == ":":
+        return Path(text[len(extended) :])
+    return path
+
+
 def _assert_under(tmp_path: Path, *paths: Path | str) -> None:
-    base = tmp_path.resolve()
+    """Assert every path, fully resolved, lies in ``tmp_path``.
+
+    A volume-GUID form is resolved like any other; if it does not resolve to a drive
+    path under ``tmp_path`` the assertion fails (it never passes unchecked).
+    """
+    base = _plain(tmp_path.resolve())
     for path in paths:
-        text = os.fspath(path)
-        # An extended-length prefix (a deliberate test input) is the same place; drop it to compare.
-        text = text.removeprefix("\\\\?\\") if os.name == "nt" else text
-        resolved = Path(os.path.abspath(os.path.join(base, text))).resolve()
+        resolved = _plain(Path(os.path.abspath(os.path.join(base, os.fspath(path)))).resolve())
         assert resolved == base or base in resolved.parents, f"{path} escapes {tmp_path}"
 
 
@@ -85,6 +113,7 @@ def _build(tmp_path: Path, *, config: str | None = "fake", guard: bool = True) -
         conftest.write_text("", encoding="utf-8")
     (root / "pyproject.toml").write_text(_MINI_PYPROJECT, encoding="utf-8")
     (root / "tests" / "test_trivial.py").write_text(_MINI_TEST, encoding="utf-8")
+    (root / "tests" / "test_extra.py").write_text(_MINI_EXTRA_TESTS, encoding="utf-8")
     if config == "fake":
         (root / "clearwater.local.toml").write_text(_toml(footage, work), encoding="utf-8")
     elif config is not None:
@@ -108,6 +137,7 @@ def _run(
     mini: Mini,
     *args: str,
     env_extra: dict[str, str] | None = None,
+    cache: bool = False,
 ) -> subprocess.CompletedProcess[str]:
     env = {k: v for k, v in os.environ.items() if k not in _SCRUBBED_ENV}
     # Keep the miniature's own default temp root away from the machine's.
@@ -118,7 +148,15 @@ def _run(
         if arg.startswith("--basetemp="):
             _assert_under(tmp_path, mini.root / arg.partition("=")[2])
     return subprocess.run(
-        [sys.executable, "-m", "pytest", "-p", "no:cacheprovider", "-q", "tests", *args],
+        [
+            sys.executable,
+            "-m",
+            "pytest",
+            *([] if cache else ["-p", "no:cacheprovider"]),
+            "-q",
+            "tests",
+            *args,
+        ],
         cwd=mini.root,
         env=env,
         capture_output=True,
@@ -334,7 +372,8 @@ def test_guard_is_inert_without_usable_configuration(tmp_path: Path, config: str
 @pytest.mark.parametrize(
     ("config", "expected"),
     [
-        ("absent", "configured but absent"),
+        ("absent", "configured but not an existing folder"),
+        ("file", "configured but not an existing folder"),
         (None, "not configured"),
     ],
 )
@@ -344,6 +383,10 @@ def test_footage_skip_reason_distinguishes_absent_from_unconfigured(
     text = None
     if config == "absent":
         text = _toml(tmp_path / "area" / "missing-footage", tmp_path / "work")
+    elif config == "file":
+        (tmp_path / "area").mkdir()
+        (tmp_path / "area" / "a-file").write_text("not a folder", encoding="utf-8")
+        text = _toml(tmp_path / "area" / "a-file", tmp_path / "work")
     mini = _build(tmp_path, config=text)
     # The fake footage folder from _build is not the configured one in the absent case.
     result = _run(tmp_path, mini, "-rs")
@@ -394,3 +437,162 @@ def test_guard_is_inert_when_the_configured_path_is_not_a_usable_path(tmp_path: 
     result = _run(tmp_path, mini, f"--basetemp={mini.work / 'bt'}")
     assert result.returncode == 0, result.stdout + result.stderr
     assert "footage guard" not in result.stdout + result.stderr
+
+
+# --- Reviewer B round 1 remediation -------------------------------------------------
+
+
+def _load_guard() -> ModuleType:
+    """Import the repository's ``tests/conftest.py`` as a plain module for in-process tests."""
+    spec = importlib.util.spec_from_file_location(
+        "wp_t1_guard_conftest", REPO_ROOT / "tests" / "conftest.py"
+    )
+    assert spec is not None
+    assert spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+@pytest.mark.parametrize(
+    "extra",
+    [
+        [],
+        ["-s"],
+        ["-p", "no:capture"],
+        ["--collect-only"],
+        ["--setup-plan"],
+    ],
+    ids=["default", "no-capture-s", "no-capture-plugin", "collect-only", "setup-plan"],
+)
+def test_refused_before_any_fixture_or_mode_touches_a_temp_folder(
+    tmp_path: Path, extra: list[str]
+) -> None:
+    # The miniature has tmpdir, tmp_path, session tmp_path_factory and direct getbasetemp tests.
+    mini = _build(tmp_path)
+    before = _snapshot(mini.footage)
+    result = _run(tmp_path, mini, f"--basetemp={mini.footage}", *extra)
+    _assert_refused(result, mini, before)
+    assert sorted(before) == sorted(_snapshot(mini.footage))
+
+
+def test_cache_clear_with_the_cache_provider_enabled_is_refused_unchanged(tmp_path: Path) -> None:
+    mini = _build(tmp_path)
+    before = _snapshot(mini.footage)
+    result = _run(tmp_path, mini, f"--basetemp={mini.footage}", "--cache-clear", cache=True)
+    _assert_refused(result, mini, before)
+    # The same run, harmless, still works with the cache provider on.
+    result = _run(tmp_path, mini, f"--basetemp={mini.work / 'bt'}", "--cache-clear", cache=True)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert _snapshot(mini.footage) == before
+
+
+@pytest.mark.parametrize(
+    "extra", [["-s"], ["-p", "no:capture"]], ids=["no-capture-s", "no-capture-plugin"]
+)
+def test_uncached_tempdir_checks_the_one_root_cpython_would_pick(
+    tmp_path: Path, extra: list[str]
+) -> None:
+    mini = _build(tmp_path)
+    before = _snapshot(mini.footage)
+    # TMPDIR (first, existing, writable) is safe; TEMP, never chosen, names the fake footage.
+    env = {"TEMP": str(mini.footage), "TMP": str(mini.footage)}
+    result = _run(tmp_path, mini, *extra, env_extra=env)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "footage guard" not in result.stdout + result.stderr
+    assert _snapshot(mini.footage) == before
+    # The first candidate names the footage: refused.
+    result = _run(tmp_path, mini, *extra, env_extra={"TMPDIR": str(mini.footage)})
+    _assert_refused(result, mini, before)
+    # Earlier candidate unusable (absent), later one the footage: refused (over-refuse is safe).
+    env = {"TMPDIR": str(tmp_path / "no-such-dir"), "TEMP": str(mini.footage)}
+    _assert_refused(_run(tmp_path, mini, *extra, env_extra=env), mini, before)
+
+
+@pytest.mark.skipif(
+    os.name != "nt", reason="a differently cased name is the same entry only on NTFS"
+)
+def test_mixed_case_pytest_of_junction_is_refused(tmp_path: Path) -> None:
+    mini = _build(tmp_path)
+    root = tmp_path / "temproot"
+    root.mkdir()
+    _make_dir_link(root / ("PYTEST-OF-" + getpass.getuser().upper()), mini.footage)
+    before = _snapshot(mini.footage)
+    result = _run(tmp_path, mini, env_extra={"PYTEST_DEBUG_TEMPROOT": str(root)})
+    _assert_refused(result, mini, before)
+
+
+def test_pytests_own_child_decides_when_the_root_cannot_be_listed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    guard = _load_guard()
+    footage = tmp_path / "footage"
+    footage.mkdir()
+    (footage / "keep.txt").write_bytes(b"keep")
+    root = tmp_path / "root"
+    root.mkdir()
+    _make_dir_link(root / f"pytest-of-{guard._pytest_user()}", footage)
+
+    def refuse_listing(self: Path) -> None:
+        raise PermissionError("listing denied")
+
+    monkeypatch.setattr(Path, "iterdir", refuse_listing)
+    canonical_root, canonical_footage = guard._canonical(root), guard._canonical(footage)
+    found = guard._pytest_of_child_in(canonical_root, canonical_footage)
+    assert found is not None
+    # A listing that fails with no dangerous direct child is not a refusal.
+    other = tmp_path / "other"
+    other.mkdir()
+    assert guard._pytest_of_child_in(guard._canonical(other), canonical_footage) is None
+
+
+def test_a_check_that_cannot_be_made_refuses(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    guard = _load_guard()
+    footage = tmp_path / "footage"
+    footage.mkdir()
+    root = tmp_path / "root"
+    root.mkdir()
+    original = guard._canonical
+
+    def canonical(path: str | os.PathLike[str]) -> Path:
+        if os.path.basename(os.fspath(path)).startswith("pytest-of-"):
+            raise PermissionError("cannot resolve")
+        return original(path)  # type: ignore[no-any-return]
+
+    monkeypatch.setattr(guard, "_canonical", canonical)
+    monkeypatch.setattr(guard, "load_local_config", lambda: SimpleNamespace(footage_path=footage))
+    monkeypatch.setenv("PYTEST_DEBUG_TEMPROOT", str(root))
+    config = SimpleNamespace(option=SimpleNamespace(basetemp=None))
+    with pytest.raises(pytest.UsageError, match="could not be made"):
+        guard.pytest_configure(config)
+
+
+def test_configured_but_missing_footage_still_guards(tmp_path: Path) -> None:
+    # Pinned by design (fail safe): a missing folder may be a disconnected drive, so the
+    # guard is inert only without a valid configuration, not for a missing folder.
+    missing = tmp_path / "area" / "missing-footage"
+    (tmp_path / "area").mkdir()
+    mini = _build(tmp_path, config=_toml(missing, tmp_path / "work"))
+    mini = replace(mini, footage=missing)
+    result = _run(tmp_path, mini, f"--basetemp={missing}")
+    _assert_refused(result, mini, {})
+    assert not missing.exists()
+
+
+@pytest.mark.skipif(os.name != "nt", reason="volume GUID paths exist only on Windows")
+def test_the_safety_helper_resolves_volume_guid_paths(tmp_path: Path) -> None:
+    import ctypes
+
+    drive = tmp_path.resolve().anchor
+    buffer = ctypes.create_unicode_buffer(1024)
+    found = ctypes.windll.kernel32.GetVolumeNameForVolumeMountPointW(drive, buffer, 1024)  # type: ignore[attr-defined]
+    if not found or not buffer.value.startswith("\\\\?\\Volume{"):
+        pytest.skip("no volume GUID path for the temp drive")
+    guid_root = buffer.value
+    inside = guid_root + str(tmp_path.resolve())[len(drive) :]
+    outside = guid_root + str(tmp_path.resolve().parent)[len(drive) :]
+    _assert_under(tmp_path, inside)  # a real path under tmp_path passes
+    with pytest.raises(AssertionError):
+        _assert_under(tmp_path, outside)  # one above it must not pass as a relative path

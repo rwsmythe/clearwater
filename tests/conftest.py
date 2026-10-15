@@ -9,33 +9,51 @@ the footage folder and the offending root) when the temp root would be:
 
 * ``--basetemp``: inside the footage folder, equal to it, or an ancestor of it
   (pytest removes the whole basetemp tree, which would take the footage with it);
-* otherwise the default temp root (``PYTEST_DEBUG_TEMPROOT`` if set, else the
-  directory ``tempfile.gettempdir()`` would pick), inside or equal to the
-  footage folder, or when the footage folder lies in the ``pytest-of-<user>``
-  folder pytest makes under that root.
+* otherwise the default temp root (``PYTEST_DEBUG_TEMPROOT`` if set, else the one
+  directory ``tempfile.gettempdir()`` would pick), inside or equal to the footage
+  folder, or when pytest's own ``pytest-of-<user>`` folder under that root (or any
+  other ``pytest-of-*`` entry there) is, or leads into, the footage folder.
 
 Paths are compared fully resolved (symlinks and junctions followed; a Windows
 extended-length prefix removed) and, on Windows, case-insensitively, then by file
 identity (``os.path.samefile``) for any existing ancestor. A legitimate basetemp,
-such as a folder under the working folder, passes. The guard is inert, and silent, when
-there is no valid local configuration: it never fails a run on a machine without footage.
+such as a folder under the working folder, passes. The guard is inert, and silent,
+when there is no valid local configuration (none, an invalid one, no footage key):
+it never fails a run on a machine without footage. A configured footage folder that
+does not exist is NOT inert: it may be a disconnected drive, so the guard stays
+active (fail safe). If a check it needs cannot be made (an error resolving the temp
+root or pytest's own ``pytest-of-<user>`` folder), the guard refuses and says so.
 
-Limit: pytest starts output capture before it loads any conftest, and capture (and
-``tempfile``'s writability probe) makes short-lived, randomly named files in the
-``TMPDIR``/``TEMP``/``TMP`` directory. A guard in this file cannot stop that, so with
-those variables pointing into the footage folder the run is refused only after such
-transient files came and went; nothing existing is touched. ``--basetemp`` and
-``PYTEST_DEBUG_TEMPROOT`` are refused before anything is written.
+Scope of the guarantee: the guard refuses before pytest creates or clears any
+temporary FOLDER; not the TEMP-variable file writes. Pytest starts output capture
+before it loads any conftest, and capture (and ``tempfile``'s writability probe)
+makes short-lived, randomly named files in the ``TMPDIR``/``TEMP``/``TMP``
+directory. A guard in this file cannot stop that, so with those variables pointing
+into the footage folder, or with ``TMP`` there next to any other setting, such files
+come and go before the refusal; nothing existing is touched (DR-22).
 
-The guard only runs when this file is loaded, that is, when the pytest arguments
-(or ``testpaths``, when none are given) lie at or below ``tests/``. A run on a
-path outside ``tests/``, with ``--noconftest`` or ``--confcutdir`` above this
-folder, or from another rootdir, does not load it. See
-``docs/reports/wp-t1-pytest-guard.md``.
+Ordering: this hook runs before pytest's temp-path factory is built
+(``_pytest/tmpdir.py`` ``pytest_configure``), and pytest creates or clears a temp
+folder only when the first ``tmp_path`` is requested (``getbasetemp``). The cache
+provider's ``--cache-clear`` clears only ``.pytest_cache`` subfolders and runs after
+this hook (a conftest registers after the built-in plugins and later-registered
+hooks run first); tests pin both.
+
+When the guard loads (pytest 8.4.2, ``_pytest/config/__init__.py``
+``_set_initial_conftests`` and ``_try_load_conftest``): for every existing path
+argument (``testpaths`` when none is given) pytest loads the conftest files found at
+or above it, up to ``--confcutdir`` (default: the ini file's folder), and in the
+``test*`` subfolders of an argument that is a folder. So ``pytest``, ``pytest tests``,
+``pytest tests/x.py`` and ``pytest .`` at the repository root load this file;
+``pytest tools`` does not. ``--noconftest`` suppresses it; so does a ``--confcutdir``
+below ``tests/``; ``--rootdir`` alone and ``-p no:conftest`` do not. With another
+ini file (``-c``) that lacks ``pythonpath = ["tools"]`` the import below fails
+(out of envelope). See ``docs/reports/wp-t1-pytest-guard.md``.
 """
 
 from __future__ import annotations
 
+import getpass
 import os
 import tempfile
 from pathlib import Path
@@ -43,6 +61,8 @@ from pathlib import Path
 import pytest
 
 from local_config import LocalConfigError, footage_available, load_local_config
+
+_PYTEST_OF = "pytest-of-"
 
 
 def _canonical(path: str | os.PathLike[str]) -> Path:
@@ -97,20 +117,48 @@ def _holds_pytest_of(root: Path, folder: Path) -> bool:
         parts = folder.relative_to(root).parts
     except ValueError:
         return False
-    return bool(parts) and parts[0].startswith("pytest-of-")
+    return bool(parts) and os.path.normcase(parts[0]).startswith(_PYTEST_OF)
+
+
+def _pytest_user() -> str:
+    """Return the user name pytest puts in ``pytest-of-<user>`` (``tmpdir.py`` ``get_user``)."""
+    try:
+        return getpass.getuser() or "unknown"
+    except (ImportError, OSError, KeyError):
+        return "unknown"
 
 
 def _pytest_of_child_in(root: Path, footage: Path) -> Path | None:
-    """Return an existing ``root/pytest-of-*`` entry that lies in ``footage``, if any.
+    """Return a ``root/pytest-of-*`` entry that is, or leads into, ``footage``, if any.
 
-    pytest writes its numbered folders into ``root/pytest-of-<user>``; if that entry
-    is a link into the footage folder, the write lands there.
+    pytest writes its numbered folders into ``root/pytest-of-<user>``
+    (``tmpdir.py:160``; ``pytest-of-unknown`` is its fallback, ``:165``). Those two
+    children are checked DIRECTLY, listed or not, so a link there is found even when
+    the root cannot be listed or the link's spelling differs in case. An error
+    resolving them propagates: the check could not be made. Any other ``pytest-of-*``
+    entry found by listing the root is a best-effort extra; a listing error is ignored.
+
+    Args:
+        root: The canonical temp root.
+        footage: The canonical footage folder.
+
+    Returns:
+        The offending entry, or None.
+
+    Raises:
+        OSError: If pytest's own child cannot be resolved.
+        RuntimeError: If resolving it meets a symlink loop.
+        ValueError: If a path is not usable.
     """
+    direct = [root / f"{_PYTEST_OF}{name}" for name in (_pytest_user(), "unknown")]
+    for child in direct:
+        if _inside_or_equal(_canonical(child), footage):
+            return child
     try:
-        children = [c for c in root.iterdir() if c.name.startswith("pytest-of-")]
+        listed = [c for c in root.iterdir() if os.path.normcase(c.name).startswith(_PYTEST_OF)]
     except OSError:
         return None
-    for child in children:
+    for child in listed:
         try:
             if _inside_or_equal(_canonical(child), footage):
                 return child
@@ -120,17 +168,19 @@ def _pytest_of_child_in(root: Path, footage: Path) -> Path | None:
 
 
 def _temp_root_candidates() -> list[str]:
-    """Return the directories ``tempfile.gettempdir()`` may use, without touching disk.
+    """Return the temp-root candidates to check, without touching disk.
 
-    ``tempfile.gettempdir()`` itself probes by creating and deleting a file in
-    each candidate in turn, which would write inside a footage folder named by
-    ``TMPDIR``/``TEMP``/``TMP``. This mirrors its candidate list instead
-    (``tempfile._candidate_tempdir_list``, Python 3.12), and every candidate is
-    checked, which includes the one ``gettempdir()`` would pick.
+    ``tempfile.gettempdir()`` picks the first candidate in which it can create and
+    delete a probe file, which would write inside a footage folder named by
+    ``TMPDIR``/``TEMP``/``TMP``. The guard mirrors the candidate list
+    (``tempfile._candidate_tempdir_list``, Python 3.12) and approximates the probe
+    with "an existing directory that ``os.access`` accepts for writing", stopping
+    there. Candidates before the chosen one are still returned, so the approximation
+    can only over-refuse, never miss the root CPython would use.
 
     Returns:
         The cached ``tempfile.tempdir`` alone if already chosen, else every
-        candidate.
+        candidate up to and including the first usable one.
     """
     if tempfile.tempdir is not None:
         return [os.fsdecode(tempfile.tempdir)]
@@ -147,7 +197,12 @@ def _temp_root_candidates() -> list[str]:
     else:
         candidates += ["/tmp", "/var/tmp", "/usr/tmp"]
     candidates.append(os.getcwd())
-    return candidates
+    chosen: list[str] = []
+    for candidate in candidates:
+        chosen.append(candidate)
+        if os.path.isdir(candidate) and os.access(candidate, os.W_OK):
+            break
+    return chosen
 
 
 def _offending_root(config: pytest.Config, footage: Path) -> str | None:
@@ -185,7 +240,9 @@ def _offending_root(config: pytest.Config, footage: Path) -> str | None:
         if _inside_or_equal(root, footage) or _holds_pytest_of(root, footage):
             return f"{origin} {root_text}"
         if (child := _pytest_of_child_in(root, footage)) is not None:
-            return f"{origin} {root_text} (its {child.name} entry leads into the footage folder)"
+            return (
+                f"{origin} {root_text} (its {child.name} entry is or leads into the footage folder)"
+            )
     return None
 
 
@@ -193,17 +250,18 @@ def _offending_root(config: pytest.Config, footage: Path) -> str | None:
 def pytest_configure(config: pytest.Config) -> None:
     """Refuse to start when pytest's temp root would lie in the footage folder.
 
-    Runs before pytest's own ``pytest_configure`` builds the temp-path factory;
-    pytest creates or clears nothing until the first ``tmp_path`` is requested.
-    Inert without a valid local configuration.
+    Runs before pytest's own ``pytest_configure`` builds the temp-path factory, and
+    so before the first ``tmp_path`` creates or clears any temp folder (see the
+    module docstring for what this does not cover). Inert without a valid local
+    configuration.
 
     Args:
         config: The pytest configuration.
 
     Raises:
         pytest.UsageError: If the temp root equals, lies inside (or, for
-            ``--basetemp``, contains) the configured footage folder, or cannot
-            be resolved.
+            ``--basetemp``, contains) the configured footage folder, or the check
+            could not be made (an error resolving the temp root).
     """
     try:
         footage_raw = load_local_config().footage_path
@@ -220,8 +278,8 @@ def pytest_configure(config: pytest.Config) -> None:
         offending = _offending_root(config, footage)
     except (OSError, RuntimeError, ValueError) as exc:
         raise pytest.UsageError(
-            f"footage guard: cannot resolve the pytest temp root ({exc}); "
-            f"refusing to run with a footage folder configured at {footage_raw}"
+            f"footage guard: the check could not be made (cannot resolve the pytest temp "
+            f"root: {exc}); refusing to run with a footage folder configured at {footage_raw}"
         ) from None
     if offending is not None:
         raise pytest.UsageError(
@@ -236,7 +294,7 @@ def _footage_skip_reason() -> str | None:
 
     Returns:
         None if the footage folder is configured and present; otherwise a reason
-        that distinguishes "not configured" from "configured but absent".
+        that distinguishes "not configured" from "configured but not an existing folder".
     """
     if footage_available():
         return None
@@ -247,7 +305,7 @@ def _footage_skip_reason() -> str | None:
             "footage folder not configured; copy clearwater.local.example.toml "
             "to clearwater.local.toml and set footage_path"
         )
-    return f"footage folder configured but absent: {footage}"
+    return f"footage folder configured but not an existing folder: {footage}"
 
 
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
