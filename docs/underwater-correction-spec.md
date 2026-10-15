@@ -2,7 +2,7 @@
 
 ## Specification
 
-**Version:** 0.5.1 (draft)
+**Version:** 0.5.2 (draft)
 **Date:** 13 October 2026
 **Status:** Second review (10 concerns, 6 planning questions) worked through with the owner and incorporated. Requirements are stable for implementation planning. Items left to the design stage are listed in Section 14.1. Open decisions, including scope items that depend on test results, are listed in Section 14.2.
 
@@ -13,6 +13,7 @@
 - 0.4 — Incorporated adversarial review findings F1–F24 as decisions D47–D96. Added 3C definition, color management, video metadata, plug-in interface contract, failure handling, measurable acceptance criteria, feasibility gate, caching, licensing. Amended D24, D25, D41, D42, D46. Added Section 15 (review traceability).
 - 0.5 — Incorporated review of v0.4 as decisions D97–D117. Added staged statistics, white-balance gain clamp, prototype gate (replacing the feasibility gate), footage inventory, container spike, export performance target, CPU/GPU-portable core, provisional preview, photo memory limits and CPU fallback, synthetic flicker test, cache versioning, output chroma format. Deferred ProRAW/DNG. Amended D14, D30, D31, D42, D46, D57, D61, D62, D64, D68, D69, D71. Withdrew D23, D77, D78, D79. Split Section 14 into design items and open decisions; added Section 15.2.
 - 0.5.1 — Text only (owner-approved 2026-10-15): recorded the measured target machine (WP0.1 environment report, 2026-10-14) in D117, Section 12, Section 14.2 (item closed) and Section 15.2 Q1. No decision changed.
+- 0.5.2 — Text only (owner-approved 2026-10-15): D60 closed — no GoPro `.LRV` proxies exist for this project (sidecars deleted at cloud upload); Clearwater generates its own proxy (Section 7.3). Section 14.1 item closed; the `.LRV` leg removed from the analysis-speed measurement (Section 7.3, Section 13.1). No decision changed in substance.
 
 ---
 
@@ -89,7 +90,7 @@ Decisions marked *(amended)* were changed by a later decision; the body of the s
 | D57 | *(amended by D97)* All whole-frame statistics (incl. sharpening normalization, saliency reference) are analyzed and smoothed, in dependency order |
 | D58 | Flicker test covers color, brightness and contrast |
 | D59 | Parameter changes recompute statistics from a low-resolution proxy cache built during analysis |
-| D60 | Use of GoPro .LRV proxies investigated at design; used only if frame alignment is verified |
+| D60 | GoPro .LRV proxies not available for this project (sidecars deleted at cloud upload, owner 2026-10-15); Clearwater generates its own proxy (7.3). CLOSED. |
 | D61 | *(amended by D97)* Plug-in interface: ordered statistic stages, analyze per stage, smoothing declaration, parameter and stage dependencies, render, parameter schema |
 | D62 | *(amended by D105)* Video output fidelity: timing, audio sync and display orientation mandatory; creation date/time, GPMF telemetry, timecode and camera atoms best-effort |
 | D63 | Photo orientation: pixels rotated, Orientation tag reset; thumbnail dropped, dimensions updated, Software set, HEIC gain/depth maps dropped |
@@ -329,13 +330,13 @@ Each method declares its stages and statistics through the plug-in interface (Se
 
 **Provisional preview (D108).** When a clip is opened, the current frame is shown immediately, corrected with its own unsmoothed statistics, while analysis runs in the background. The preview switches to the smoothed statistics when they are available. On a still frame the two differ little, since the difference is flicker.
 
-**Analysis speed.** The prototype gate measures analysis speed with software decode, hardware decode, and `.LRV` files (D60). Sparse analysis, which takes statistics from a subset of frames, is held in reserve and considered only if those are all too slow (D109). It risks missing fast changes such as caustics and leaves gaps in the scrubbing proxies.
+**Analysis speed.** The prototype gate measures analysis speed with software decode and hardware decode (the `.LRV` leg is not available, D60). Sparse analysis, which takes statistics from a subset of frames, is held in reserve and considered only if those are all too slow (D109). It risks missing fast changes such as caustics and leaves gaps in the scrubbing proxies.
 
 ### 7.3 Parameter changes and the proxy cache
 - When a parameter changes, the statistics that depend on it, and every later stage, are recomputed from the proxy cache rather than by re-decoding the source (D59), then re-smoothed.
 - For live preview, only frames within reach of the displayed frame's smoothing windows need recomputing. The recompute scheme is a design item.
 - Statistics with a closed-form dependency on a parameter or on an earlier stage may be updated directly without touching the proxy.
-- GoPro `.LRV` files may serve as the proxy only if testing verifies exact frame alignment with the main video (D60); otherwise Clearwater generates its own.
+- GoPro `.LRV` files are not available for this project (D60, closed 2026-10-15); Clearwater generates its own proxy.
 - **Cache (D71, D113):**
   - Stored in app data, identified by source file size, modification date, and a cache format version. A version mismatch triggers re-analysis.
   - Holds only results that depend on the source file alone: the proxies, and any statistics that depend on neither parameters nor other frames.
@@ -538,7 +539,7 @@ Test material generated by the project, not supplied by the owner: the synthetic
 
 - Verification of GoPro plain "HDR video" mode output with a test clip.
 - GP-Log detection method and limitations.
-- Feasibility of `.LRV` files as proxies (frame alignment).
+- Feasibility of `.LRV` files as proxies (frame alignment) — CLOSED 2026-10-15: no `.LRV` files exist for this project's footage (D60).
 - Temporal smoothing filter type and default window (in seconds).
 - Proxy resolution and storage format.
 - Robust statistic choices for normalization bounds.

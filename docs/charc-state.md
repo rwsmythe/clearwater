@@ -34,8 +34,8 @@ unpushed, and the owner has not asked for a push (verify: `git status -sb`).
 
 CHARC QA at this seat re-ran ruff/format/mypy/pytest green on every accept (pytest
 skips the ffprobe tests here because this seat's PATH lacks ffprobe; the
-orchestrator's 398-pass run is the figure of record). Spec at v0.5.1 (073ca1f,
-owner-approved). Debt register `docs/debt-register.md`: DR-1, DR-2, DR-6..DR-17 OPEN;
+orchestrator's 398-pass run is the figure of record). Spec at v0.5.2 (D60 closed 2026-10-15,
+owner-approved; v0.5.1 073ca1f). Debt register `docs/debt-register.md`: DR-1, DR-2, DR-6..DR-17 OPEN;
 DR-3, DR-4, DR-5 CLOSED; DR-18 ordered 2026-10-15T09:5xZ (WP1.5 B pass-2 minors,
 owner WP3.10) -- verify it landed.
 
