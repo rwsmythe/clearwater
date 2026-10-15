@@ -103,7 +103,17 @@ Repository local + mirrored to private GitHub `rwsmythe/clearwater` (verify:
    presentation effect; muxer-added identity edits on audio/data = best-effort; (2) REQUIRED
    (D55/D114) class accepted; (3) D54 no conflict, WP2.1 must honour full range; (4) udta
    repair -> debt item at the accept (trigger WP3.10). Footage snapshot test failing on
-   .crswap files = download in progress; environmental. FINAL issued 8ad93b8 (05:30Z);
+   .crswap files = download in progress; environmental.
+   **REVIEWER B CORRECTION (owner catch, 2026-10-15 07:25Z, verbatim to the orchestrator:
+   "You should be running reviewer B yourself, it is a specific codex review agent that
+   you run, not a subagent").** CHARC confirmed against orchestrator-context.md line 53 and
+   the coa-chess / swing-trading fills; the error was in my bootstrap fill. Fill corrected
+   at 30483f2 (Part 2 item 2: B = ONE Codex pass the orchestrator runs at its seat on the
+   merge candidate, whole-artifact, claims first, dispositioned, transcript in the accept
+   record; cells may only do mechanical QA reproductions). Ruled 07:28Z: wp15-revb finishes
+   as QA evidence, then the orchestrator runs B itself on the WP1.5 candidate; one
+   retroactive B pass over tools/prototype (46a10b9..f6d998a) after the WP1.5 accept,
+   addenda to the WP1.1 and WP1.2A accept records. No more Reviewer B cells. FINAL issued 8ad93b8 (05:30Z);
    local config copied into the worktree so the footage test runs; Reviewer B ordered.
    Orchestrator self-reported a harness-gate overlap with the GPU re-measure start; the
    overlapped cell is discarded and re-run.
