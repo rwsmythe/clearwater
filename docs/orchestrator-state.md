@@ -19,18 +19,8 @@
 
 ### Live cells
 
-- **wp02-cell** -- RETURNED; branch `wp0.2` head `a309046` (A converged in 2 rounds); 140K at
-  return. Open question routed to CHARC (stored vs display photo dimensions).
-- **wp02-reviewer-b** (background) -- Reviewer B on `a309046`, brief
-  `docs/briefs/wp0.2-review-brief.md`, evidence `clearwater-review-evidence\wp0.2\B\`.
-  Dispatched ~00:05Z 2026-10-15; read-only on the worktree.
-- Harness gate fixed on main by CHARC at `75c091a` (366 OK re-run here). Rebase the WP0.2
-  candidate onto 75c091a or later.
-- **Queued for the author after B returns** (CHARC `800be25ceb015347`): (a) the summary header
-  says "dimensions are as stored; apply the orientation column for display"; (b) the
-  `rotation_degrees` docstring says "0 when absent". Photo dimensions ruled: stored, as built.
-  Then a B re-check on the final head.
-- Branch `wp0.1` is kept on purpose: it holds the reviewed pre-rebase SHAs the WP0.1 accept cites.
+- None (verify: `git worktree list` shows only the main tree). Branches `wp0.1` and `wp0.2` are
+  kept on purpose: they hold the reviewed pre-rebase SHAs the accept records cite.
 
 ### Workstreams
 
@@ -38,11 +28,13 @@
   (verify: `git log --oneline -- docs/proofs/wp0.1-accept.md`). Return report posted to CHARC;
   info-update to the operator posted. `clearwater.local.toml` created (uncommitted) with the
   owner-set paths; footage folder `C:\Users\rwsmy\clearwater-footage` did not exist yet at accept.
-- **WP0.2** (footage inventory) -- commissioned by CHARC (`1b16f4179b32029c`); FINAL brief
-  `docs/briefs/wp0.2-brief.md` at `b0287a2`. Grants: Pillow, pillow-heif (dev). Reviewer A fast/WSL.
-  Next: QA the return, Reviewer B (write `docs/briefs/wp0.2-review-brief.md` on the WP0.1 model),
-  gate in a `-mc` worktree, merge, accept record, report to CHARC, info-update to the operator.
-  CP1 (owner sorts footage) follows WP0.2.
+- **WP0.2 -- ACCEPTED 2026-10-15**, main `4863a90`, record `docs/proofs/wp0.2-accept.md`.
+  Return report posted to CHARC; info-update to the operator posted. Real inventory run NOT
+  done (footage folder absent at accept).
+- **Next (recommended to CHARC, awaiting word):** once the footage folder exists, a mechanical
+  implementer-sonnet-medium pass runs `uv run python tools/inventory.py` into `work/reports`
+  and reports counts and any uncovered GoPro names; that output feeds CP1 (owner-reserved
+  footage sorting).
 
 ### Practice notes from WP0.1 (this instance)
 
