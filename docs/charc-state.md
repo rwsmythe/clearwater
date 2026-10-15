@@ -68,6 +68,18 @@ path, md5, five assertions and verdict, or there is no accept.
   Gate 1 (N6 speed: core 3.5-13.5x over budget before decode/encode, unoptimised by
   ruling) goes to the owner there with measured options. Gate 6 is CHARC's at WP1.6.
 
+- **Partial CP1 (owner, 2026-10-15 ~10:50Z, verbatim: "shallow confirmed")** on the four
+  chapters: `docs/proofs/cp1-footage-sorting.md` (living record). **WP1.3 (shallow part)
+  COMMISSIONED** (draft `docs/briefs/wp1.3-brief.md`; sonnet-high; STRONG; `tools/lookcheck/`;
+  pack under `work/wp1.3/` with index.html, 24 frames x 3 variants, 6 s unsmoothed flicker
+  clip from GX011627) and **WP1.4 (shallow part) COMMISSIONED, dispatch AFTER WP1.3 merges**
+  (draft `docs/briefs/wp1.4-brief.md`; opus-high; STRONG; `tools/prototype/temporal.py` +
+  additive `correct(..., statistics=)` hook; staged vs flat D98, smoothing candidates, robust
+  N{} bounds; gain-cap noise test deferred to WP1.4b on the scuba footage). Neither is
+  exclusive; neither may overlap Part B's bench window. Verify: `git worktree list`.
+- Promised to the owner, CHARC's own next drafts: the WP1.2 Part B brief and the WP1.6 gate
+  report template (Gate 1 options framed).
+
 ### Footage (owner, read-only, never committed; verify `ls C:\Users\rwsmy\clearwater-footage`)
 
 Owner 2026-10-15 ~05:25Z in chat: four shallow snorkel chapters GX011625-GX011628.MP4
