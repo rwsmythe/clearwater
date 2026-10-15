@@ -26,7 +26,7 @@
 - **wp12-reviewer-b** (implementer-opus-high, background) -- Reviewer B on `9408d18`, brief
   `docs/briefs/wp1.2-review-brief.md`; bench re-run to `work/wp1.2a-B/`; evidence `...\wp1.2\B\`.
 - Stray PID 33616: STOPPED ~05:20Z on owner direction (CHARC f314b0c26cc1a0b2); GPU re-measure + B2 on a clean machine.
-- WP1.2 Reviewer B pass 1: BLOCKING on F1 (GPU c3 cells -14/-17% vs author); F1-F4 routed to the author (ambient overlay + GPU clocks, re-measure the 4 GPU cells, minors). Next: author return -> B2 (GPU cells reproduction + fixes) -> gate -> merge.
+- WP1.2 Reviewer B pass 1: BLOCKING on F1 (GPU c3 cells -14/-17% vs author); F1-F4 routed to the author (ambient overlay + GPU clocks, re-measure the 4 GPU cells, minors). Author fixes done, head `873ae6d` (GPU rows re-measured clean, window 3; overlapped cell discarded + re-run). B2 ORDERED on `873ae6d` (exclusive; GPU cells reproduce within 10%). Next: B2 return -> merge-candidate gate -> merge -> accept.
 - Branches `wp0.1`, `wp0.2` and `wp1.1` are kept on purpose: they hold the reviewed pre-rebase
   SHAs the accept records cite.
 
