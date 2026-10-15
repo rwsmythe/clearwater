@@ -26,6 +26,9 @@ needs_ffmpeg = pytest.mark.skipif(
 )
 
 
+# Canned ffprobe documents: a trimmed, hand-built subset of the fields that
+# `ffprobe -v error -print_format json -show_format -show_streams` prints. The field
+# names and value shapes follow ffprobe 9.0.2 (checked against real 9.0.2 output).
 def _ffprobe_doc(
     *, pix_fmt: str = "yuv420p", r_rate: str = "30/1", avg: str = "30/1", **extra: Any
 ) -> dict[str, Any]:
