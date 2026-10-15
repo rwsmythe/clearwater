@@ -13,9 +13,9 @@ If the plan and the spec disagree, the spec wins; raise the disagreement to the 
 ## Current state
 
 - **Harness bootstrapped (2026-10-14).** The repository is a live multi-agent harness instance (see "The harness" below) with the application defined in `APPLICATION.md`, three implementer cells under `.claude/agents/`, the review/gate fill in `docs/review-gate-clearwater.md`, and the uv project skeleton (`pyproject.toml`, Python 3.12, `src/clearwater/`, `tests/`, `tools/`).
-- **No product code yet.** `src/clearwater/__init__.py` is a stub.
-- **Next task: WP0.1** (plan §6, Phase 0) — remaining scope: the local configuration template and loader, `tools/environment_report.py`, the FFmpeg development tools, and the first green `ruff`/`mypy`/`pytest` run. Brief: `docs/briefs/wp0.1-brief.md`. Dispatched 2026-10-14 (cell in `.worktrees/wp0.1`).
-- Then WP0.2 (footage inventory tool), then the owner sorts the footage (checkpoint CP1).
+- **No product code yet.** `src/clearwater/__init__.py` is a stub. Prototype code (evidence, not product) lives under `tools/prototype/`.
+- **Done:** WP0.1 (local config, environment report, FFmpeg dev tools; accepted 2026-10-14), WP0.2 (footage inventory tool `tools/inventory.py`; accepted 2026-10-15), WP1.1 (reference pipeline prototype `tools/prototype/`, reports `docs/reports/wp1.1-*.md`; accepted 2026-10-15, main `9711faf`). Accept records in `docs/proofs/`; open debt in `docs/debt-register.md`.
+- **In flight:** WP1.2 Part A (CPU/GPU variant on synthetic frames, CuPy; brief `docs/briefs/wp1.2-brief.md`; exclusive). WP1.2 Part B, WP1.5, the real inventory run and CP1 wait on the footage download; WP1.3 and WP1.4 wait on CP1.
 
 ## Inputs the owner has supplied
 

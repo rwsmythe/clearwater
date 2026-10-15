@@ -47,8 +47,18 @@ Repository local + mirrored to private GitHub `rwsmythe/clearwater` (verify:
   (orchestrator inbox, msg ece409ee): Q1 W_L = |sigma^2 Lap(G_sigma L)| ACCEPTED as a
   spec-driven (6.6/D56) departure from [A18], recorded in the open-values report;
   Q2 -> DR-11, Q3 -> DR-12 (35c4e72). `weight_maps(both inputs)` deviation accepted
-  (no frozen interface before WP1.4). Awaiting the accept report.
-- Debt register `docs/debt-register.md`: DR-1..DR-12 (DR-3, DR-4 closed).
+  (no frozen interface before WP1.4).
+  **ACCEPTED 2026-10-15T02:24Z**: main 9711faf, record 2e09203; A converged r3, B
+  NO_BLOCKING x3; informal 4K run 14 s / 26 s. CHARC QA at this seat: all gates green.
+  Reviewer B calibration point -> DR-13. Worktrees removed; branch wp1.1 kept.
+- **WP1.2 Part A commissioned 2026-10-15T02:31Z** (draft `docs/briefs/wp1.2-brief.md`,
+  b5c0979; cell implementer-opus-high; STRONG; EXCLUSIVE). CHARC rulings: package split
+  A (synthetic, now) / B (real footage + WP1.5 path, later; Gate 1 closes on B); GPU
+  library CuPy first (`cupy-cuda12x`, MIT, dev group), PyTorch only on a routed STOP, no
+  CUDA toolkit install (STOP to CHARC if needed); agreement tolerance 2e-5/2e-6. Expected
+  STOPs: toolkit needed, missing cupyx counterpart, unattributable agreement gap, >8 GB
+  VRAM at 5.3K. Verify dispatch: `git worktree list`, `docs/orchestrator-state.md`.
+- Debt register `docs/debt-register.md`: DR-1..DR-13 (DR-3, DR-4 closed).
 - No authority granted by `SendMessage` this generation (cues only).
 
 ### Pending items
@@ -58,10 +68,9 @@ Repository local + mirrored to private GitHub `rwsmythe/clearwater` (verify:
    Recommended: approve as written; CHARC applies. Debt register DR-5. Unanswered.
 2. **Owner to report the footage download complete** -> CHARC tells the orchestrator to
    dispatch the real-inventory pass -> CP1 (owner sorts categories; owner-reserved).
-3. **Next harness acts:** QA the WP1.1 accept; then commission WP1.2 (CPU/GPU variant;
-   `gpu`, exclusive; the GPU-library ruling is CHARC's at that brief) and WP1.5
-   (container spike; needs footage). WP1.3 and WP1.4 need CP1.
-4. Main is ~58 commits ahead of `origin/main`, unpushed; the owner has not asked for a push.
+3. **Next harness acts:** QA the WP1.2 Part A accept when it lands; then WP1.5 (container
+   spike) and WP1.2 Part B once the footage exists; WP1.3 and WP1.4 need CP1.
+4. Main is ~66 commits ahead of `origin/main`, unpushed; the owner has not asked for a push.
 
 ### Standing delegation (owner, 2026-10-14, chat to CHARC, verbatim)
 
