@@ -129,4 +129,4 @@ Each accepted package had its return report posted to CHARC and an info-update t
   and re-run after CHARC confirms the download is complete.
 - CHARC approved `_windows_power()` as instrument-only (never into `src/clearwater/` without a
   fresh ruling).
-- Inbox drained through msg `3501648bc8844468` (verify: `uv run python scripts/role_mail.py list --role orchestrator`).
+- Inbox drained through msg `0da890ba5a2eb047` (CHARC: the WP1.4 report must state IF-3 statistics keyed by pts; relayed to `wp14-fix`; check it at the gate) (verify: `uv run python scripts/role_mail.py list --role orchestrator`).
