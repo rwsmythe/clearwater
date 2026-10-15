@@ -46,8 +46,7 @@ Each accepted package had its return report posted to CHARC and an info-update t
   - the Gate 1 signal: the GPU core is 3.5-13.5x the N6 budget.
 
   WP1.2 Part B comes later (after footage and WP1.5); CHARC commissions it.
-- **WP1.5:** dispatched (see Live cells). The accept report must carry the comparison table, the
-  capability record and the recommendation.
+- **WP1.5:** accepted (see the table). The recommendation is SIMPLE; Gate 6 is CHARC's at WP1.6.
 - **Real inventory pass:** QUEUED. It is APPROVED in principle (implementer-sonnet-medium,
   mechanical), but dispatch only on CHARC's word that the download is complete.
   - Present now: 4 shallow chapters, GX011625-GX011628.
