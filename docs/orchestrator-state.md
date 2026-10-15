@@ -23,9 +23,18 @@
 
 ### Live cells
 
-- **wp15-cell** (author): GO sent ~07:40Z. The rework covers CHARC's rulings (`bdae7c6214ae1247`,
-  `9452fe94b5465abb`; DR-15 `83df3d1`) plus the QA findings F1-F5, then ONE Reviewer A round
-  on the delta. Depth 363K at GO.
+- **wp15-fix** (implementer-opus-high, background): the ONE remediation after my BLOCKING Reviewer B.
+  - Brief `docs/briefs/wp1.5-remediation-brief.md` (`d2c2b9a`), worktree `.worktrees/wp1.5` from
+    `82e5cfc`.
+  - Scope: fix B1-B8, re-run the records, gates, one Reviewer A round (r4).
+  - Then MY Reviewer B re-run, once. A second block is adjudicated at the gate; there is no
+    third remediation.
+- **wp15-cell** (author): PAST-CAP at 478K. Do not message it again. Head `82e5cfc`.
+- **My Reviewer B r1** on candidate `wp1.5-mc` `7a490c7`: NEW_CRITICAL_MAJOR_FOUND, valid.
+  - Evidence `clearwater-review-evidence\wp1.5\reviewB\` (transcript md5 `b4810683...`).
+  - Script `run_review_B.sh probe|review`. Re-run it by rebuilding `-mc` and regenerating
+    `review-diff-B.txt`. The prompt names B1-B10 as already addressed? NO: keep it neutral.
+    Only refresh the SHAs.
 - **wp15-revb** RETURNED: verification QA, NO_BLOCKING (it is NOT Reviewer B).
   - All claims reproduce; its re-encodes are byte-identical to the author's; compare matched
     all 36 items.
@@ -111,4 +120,4 @@ Each accepted package had its return report posted to CHARC and an info-update t
   and re-run after CHARC confirms the download is complete.
 - CHARC approved `_windows_power()` as instrument-only (never into `src/clearwater/` without a
   fresh ruling).
-- Inbox drained through msg `9452fe94b5465abb` (verify: `uv run python scripts/role_mail.py list --role orchestrator`).
+- Inbox drained through msg `9452fe94b5465abb` (status posted 08:22Z) (verify: `uv run python scripts/role_mail.py list --role orchestrator`).
