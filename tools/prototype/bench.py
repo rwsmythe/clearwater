@@ -245,9 +245,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     rss_baseline = int(process.memory_info().rss)
 
     sampler = _PeakRssSampler(process)
+    gpu_start = _gpu_state()
     sampler.start()
     try:
         times = _timed_loop(frame, params, backend, args.frames)
+        gpu_end = _gpu_state()
     finally:
         sampler.stop()
         if tracker is not None:
@@ -282,7 +284,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         "proxy": _proxy_record(frame, params, backend, args.proxy),
         "versions": _versions(backend),
         "machine": _machine(ambient_gpu),
-        "ambient": _ambient(ambient_gpu, args.note),
+        "ambient": _ambient(ambient_gpu, args.note)
+        | {
+            "gpu_state_loop_start": gpu_start,
+            "gpu_state_loop_end": gpu_end,
+        },
     }
     stamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
     path = args.out / f"bench-{backend.name}-{args.size}-{args.method}-{stamp}.json"
@@ -483,14 +489,83 @@ def _machine(gpu: dict[str, str] | None) -> dict[str, Any]:
 
 
 def _ambient(gpu: dict[str, str] | None, note: str) -> dict[str, Any]:
-    """The conditions of the run: graphics memory in use before it, power source, a note."""
+    """The conditions of the run: graphics memory in use, power source and plan, a note."""
     battery = psutil.sensors_battery() if hasattr(psutil, "sensors_battery") else None
     return {
         "nvidia_smi_used_before_mb": None if gpu is None else _float(gpu.get("memory.used")),
         "power_plugged": None if battery is None else bool(battery.power_plugged),
         "battery_percent": None if battery is None else float(battery.percent),
+        **_windows_power(),
         "note": note,
     }
+
+
+def _gpu_state() -> dict[str, str] | None:
+    """The card's clocks, temperature, power draw, P-state and clock-limit reasons now.
+
+    Read with ``nvidia-smi`` (outside the timed region); ``None`` when it cannot run. The
+    reasons are ``clocks_event_reasons.active``, a bit mask (``0x...01`` = idle,
+    ``0x...04`` = power cap, ``0x...20`` / ``0x...40`` = thermal slowdown).
+    """
+    fields = (
+        "clocks.gr",
+        "clocks.sm",
+        "clocks.mem",
+        "temperature.gpu",
+        "power.draw",
+        "pstate",
+        "clocks_event_reasons.active",
+    )
+    lines = _nvidia_smi([f"--query-gpu={','.join(fields)}", "--format=csv,noheader,nounits"])
+    if not lines:
+        return None
+    values = [value.strip() for value in lines[0].split(",")]
+    if len(values) != len(fields):
+        return None
+    return dict(zip(fields, values, strict=True))
+
+
+# The overlay GUIDs of the Windows 11 power-mode slider; any other is recorded as "unknown".
+_OVERLAY_NAMES = {
+    "961cc777-2547-4f9d-8174-7d86181b8a7a": "Best power efficiency",
+    "00000000-0000-0000-0000-000000000000": "Balanced",
+    "ded574b5-45a0-4f42-8737-46345c09c238": "Best performance",
+}
+
+
+def _windows_power() -> dict[str, Any]:
+    """The Windows power plan (scheme) and power-mode overlay in effect, read only.
+
+    Windows 11 applies a power-mode overlay ("Best performance" and so on, the Settings
+    slider) on top of the power scheme that ``powercfg /getactivescheme`` reports; both
+    are read through ``powrprof`` (``PowerGetActiveScheme``,
+    ``PowerGetEffectiveOverlayScheme``) and nothing is changed. Elsewhere, and if a call
+    fails, the values are ``None``: this instrument reading is Windows-only by its nature.
+    """
+    record: dict[str, Any] = {
+        "power_scheme": None,
+        "power_overlay": None,
+        "power_overlay_name": None,
+    }
+    if sys.platform != "win32":
+        return record
+    import ctypes
+    import uuid
+
+    try:
+        powrprof = ctypes.WinDLL("powrprof")
+        scheme = ctypes.c_void_p()
+        if powrprof.PowerGetActiveScheme(None, ctypes.byref(scheme)) == 0 and scheme.value:
+            record["power_scheme"] = str(uuid.UUID(bytes_le=ctypes.string_at(scheme, 16)))
+            ctypes.windll.kernel32.LocalFree(scheme)
+        overlay = (ctypes.c_ubyte * 16)()
+        if powrprof.PowerGetEffectiveOverlayScheme(ctypes.byref(overlay)) == 0:
+            guid = str(uuid.UUID(bytes_le=bytes(overlay)))
+            record["power_overlay"] = guid
+            record["power_overlay_name"] = _OVERLAY_NAMES.get(guid, "unknown")
+    except (OSError, AttributeError):  # an older Windows without the overlay call
+        pass
+    return record
 
 
 class _PeakRssSampler:
