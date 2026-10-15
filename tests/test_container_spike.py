@@ -31,7 +31,10 @@ pytestmark = pytest.mark.skipif(
 
 
 def _ffmpeg(folders: tuple[Path, Path], output: Path, *arguments: str) -> None:
-    """Run FFmpeg writing ``output``, after the spike's own check on the output path."""
+    """Run FFmpeg writing ``output``, after the spike's own check on the output path.
+
+    FFmpeg gets the spike's tool environment (no ``FFREPORT``), like every spike run.
+    """
     spike_root, footage = folders
     compare.check_output_path(output, spike_root, footage)
     subprocess.run(
@@ -39,6 +42,7 @@ def _ffmpeg(folders: tuple[Path, Path], output: Path, *arguments: str) -> None:
         check=True,
         stdin=subprocess.DEVNULL,
         capture_output=True,
+        env=compare.tool_env(),
     )
 
 
@@ -690,17 +694,25 @@ class TestReencodeCommand:
 
 
 class TestToolEnvironment:
+    @staticmethod
+    def _positive_control(cwd: Path) -> None:
+        """With FFREPORT passed on explicitly, ffprobe writes the report into the cwd."""
+        subprocess.run(
+            ["ffprobe", "-v", "error", "-version"],
+            capture_output=True,
+            check=True,
+            cwd=cwd,
+            env={**compare.tool_env(), "FFREPORT": "file=ffreport-planted.log"},
+        )
+        assert (cwd / "ffreport-planted.log").is_file()
+        (cwd / "ffreport-planted.log").unlink()
+
     def test_ffreport_never_reaches_ffmpeg_or_ffprobe(
         self, clips: dict[str, Path], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         monkeypatch.chdir(tmp_path)
         monkeypatch.setenv("FFREPORT", "file=ffreport-planted.log")
-        # Positive control: with FFREPORT passed on, ffprobe writes the file into the cwd.
-        subprocess.run(
-            ["ffprobe", "-v", "error", "-version"], capture_output=True, check=True, cwd=tmp_path
-        )
-        assert (tmp_path / "ffreport-planted.log").is_file()
-        (tmp_path / "ffreport-planted.log").unlink()
+        self._positive_control(tmp_path)
         assert "FFREPORT" not in compare.tool_env()
         compare.run_ffprobe(["-show_format", str(clips["base"])])
         compare.compare_files(clips["base"], clips["base"])
@@ -709,6 +721,19 @@ class TestToolEnvironment:
             ["ffmpeg", "-nostdin", "-hide_banner", "-i", str(clips["base"]), "-f", "null", "-"]
         )
         assert list(tmp_path.iterdir()) == []
+
+    def test_ffreport_set_before_a_clip_is_built_writes_nothing(
+        self, folders: tuple[Path, Path], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        cwd, built = tmp_path / "cwd", folders[0] / "ffreport"
+        cwd.mkdir()
+        built.mkdir()
+        monkeypatch.chdir(cwd)
+        monkeypatch.setenv("FFREPORT", "file=ffreport-planted.log")
+        self._positive_control(cwd)
+        _synthetic(folders, built / "clip.mp4")
+        assert list(cwd.iterdir()) == []
+        assert [p.name for p in built.iterdir()] == ["clip.mp4"]
 
 
 class TestCompositionOffsets:
