@@ -45,6 +45,7 @@ from .pipeline import (
     Image,
     Statistics,
     check_derived_values,
+    check_statistics,
     compensate_ancuti2018,
     compensate_c3,
     correct,
@@ -76,6 +77,9 @@ FLAT_FLOOR = 1e-6
 TRIM_PERCENT = 1.0
 """The trimmed standard deviation drops the values below this percentile and above 100 minus it."""
 
+MIN_FRAMES = 2
+"""The fewest frames a sequence analysis accepts: the flicker measure needs one frame step."""
+
 ALPHA_CHANNELS = ("red", "blue")
 """The channels Ancuti 2018 can compensate, in the order their alphas are flattened."""
 
@@ -103,7 +107,7 @@ class Stage:
 
 
 _COMPENSATION = Stage("compensation", ("compensation_means", "compensation_alpha"))
-_WHITE_BALANCE = Stage("white_balance", ("white_balance_gains",))
+_WHITE_BALANCE = Stage("white_balance", ("white_balance_means", "white_balance_gains"))
 _FUSION = Stage("fusion", ("normalisation_bounds", "saliency_means"))
 
 STAGES: dict[str, tuple[Stage, ...]] = {
@@ -132,8 +136,9 @@ def measure(
     :func:`~prototype.pipeline.fusion_inputs`), with ``supplied`` passed to each, so a
     supplied value is used and every other one is measured on the image as it stands at
     that step. The returned record holds, per field, the supplied value or the measurement:
-    the compensation means and effective alpha (Ancuti 2018; ``None`` for 3C), the
-    gray-world gains, the N{} bounds of the white-balanced image, and the mean Lab vector of
+    the compensation means and effective alpha (Ancuti 2018; ``None`` for 3C), the channel
+    means of the compensated image that the white balance measures and the gray-world gains
+    derived from them, the N{} bounds of the white-balanced image, and the mean Lab vector of
     each fusion input (input 2 built with the bounds in the record).
 
     Args:
@@ -147,9 +152,10 @@ def measure(
 
     Raises:
         ValueError: The image or a derived value is unusable, or ``supplied`` does not fit
-            the method (as :func:`prototype.pipeline.correct`).
+            the method or holds a non-finite number (as :func:`prototype.pipeline.correct`).
     """
     given = Statistics() if supplied is None else supplied
+    check_statistics(given)
     check_derived_values(image.shape, params)
     device = of(image) if backend is None else backend
     work = device.to_device(image)
@@ -172,10 +178,15 @@ def measure(
         inputs = fusion_inputs(balanced, params, Statistics(normalisation_bounds=bounds))
         saliency = tuple(saliency_reference(fusion_input) for fusion_input in inputs)
     else:
-        saliency = tuple(_lab_triple(mean) for mean in given.saliency_means)
+        saliency = tuple(_three(mean) for mean in given.saliency_means)
     return Statistics(
         compensation_means=means,
         compensation_alpha=alpha,
+        white_balance_means=(
+            balance.channel_means
+            if given.white_balance_means is None
+            else _three(given.white_balance_means)
+        ),
         white_balance_gains=balance.gray_world_gains,
         normalisation_bounds=bounds,
         saliency_means=saliency,
@@ -281,8 +292,9 @@ def flatten(statistics: Statistics) -> dict[str, float]:
     """Return the record's scalars by name, in a fixed order (absent fields are left out).
 
     Names: ``compensation_means.R|G|B``, ``compensation_alpha.red|blue``,
-    ``white_balance_gains.R|G|B``, ``normalisation_bounds.low|high`` and
-    ``saliency_means.input1.L|a|b``, ``saliency_means.input2.L|a|b``.
+    ``white_balance_means.R|G|B``, ``white_balance_gains.R|G|B``,
+    ``normalisation_bounds.low|high`` and ``saliency_means.input1.L|a|b``,
+    ``saliency_means.input2.L|a|b``.
 
     Args:
         statistics: The record.
@@ -299,6 +311,8 @@ def flatten(statistics: Statistics) -> dict[str, float]:
                 values[f"compensation_alpha.{channel}"] = float(
                     statistics.compensation_alpha[channel]
                 )
+    if statistics.white_balance_means is not None:
+        values.update(_named("white_balance_means", _RGB, statistics.white_balance_means))
     if statistics.white_balance_gains is not None:
         values.update(_named("white_balance_gains", _RGB, statistics.white_balance_gains))
     if statistics.normalisation_bounds is not None:
@@ -321,18 +335,11 @@ def unflatten(values: Mapping[str, float]) -> Statistics:
         The record.
 
     Raises:
-        ValueError: A name is not one :func:`flatten` produces, or a field is incomplete.
+        ValueError: A name is not exactly one :func:`flatten` produces (an unknown field, or a
+            known field with an unknown suffix), the saliency inputs are not numbered 1, 2, ...
+            without a gap, or a field is incomplete.
     """
-    known = {
-        "compensation_means",
-        "compensation_alpha",
-        "white_balance_gains",
-        "normalisation_bounds",
-        "saliency_means",
-    }
-    for name in values:
-        if name.split(".", 1)[0] not in known:
-            raise ValueError(f"unknown statistic {name!r}")
+    _check_names(values)
     alpha = {
         channel: float(values[f"compensation_alpha.{channel}"])
         for channel in ALPHA_CHANNELS
@@ -342,15 +349,16 @@ def unflatten(values: Mapping[str, float]) -> Statistics:
         {name.split(".")[1] for name in values if name.startswith("saliency_means.")},
         key=lambda label: int(label.removeprefix("input")),
     )
-    saliency = tuple(
-        _lab_triple(_pick(values, f"saliency_means.{label}", _LAB)) for label in inputs
-    )
+    if [int(label.removeprefix("input")) for label in inputs] != list(range(1, len(inputs) + 1)):
+        raise ValueError(f"saliency_means inputs {inputs} are not numbered 1, 2, ... without a gap")
+    saliency = tuple(_three(_pick(values, f"saliency_means.{label}", _LAB)) for label in inputs)
     return Statistics(
         compensation_means=_optional_triple(values, "compensation_means"),
         compensation_alpha=alpha or None,
         white_balance_gains=_optional_triple(values, "white_balance_gains"),
         normalisation_bounds=_optional_bounds(values),
         saliency_means=saliency or None,
+        white_balance_means=_optional_triple(values, "white_balance_means"),
     )
 
 
@@ -489,6 +497,25 @@ class Smoother:
         """``<kind> <window> s``, for tables."""
         return f"{self.kind} {self.window_s:g} s"
 
+    def radius(self, frame_rate: Fraction) -> int:
+        """Return the frames on each side that can influence one output value.
+
+        The Gaussian's (or the moving average's) half-width, plus the running median's
+        half-width for ``median_gaussian``, whose median looks one frame further out before the
+        Gaussian is applied (60 frames at 4 s and 30000/1001 fps: 59 + 1). A value at least this
+        far from both ends of a series is untouched by the edge rule (:data:`EDGE_MODE`).
+
+        Args:
+            frame_rate: Frames per second.
+
+        Returns:
+            The reach of the whole filter chain in frames.
+        """
+        reach = half_width(self.window_s, frame_rate)
+        if self.kind == "median_gaussian":
+            reach += half_width(MEDIAN_WINDOW_S, frame_rate)
+        return reach
+
     def kernel(self, frame_rate: Fraction) -> NDArray[np.float64]:
         """Return the linear kernel (the Gaussian for ``median_gaussian``), centre in the middle.
 
@@ -607,7 +634,14 @@ def analyse_staged(
     Returns:
         The smoothed series of every stage together, and per stage name the series that
         stage measured before smoothing (its own fields only).
+
+    Raises:
+        ValueError: There are fewer than :data:`MIN_FRAMES` frames.
     """
+    if len(images) < MIN_FRAMES:
+        raise ValueError(
+            f"a sequence analysis needs at least {MIN_FRAMES} frames, got {len(images)}"
+        )
     smoothed: Series = {}
     measured: dict[str, Series] = {}
     for stage in STAGES[params.method]:
@@ -867,10 +901,36 @@ def robust_bounds(values: NDArray[np.floating[Any]], candidate: RobustBound) -> 
 
 
 def clipped_fraction(values: NDArray[np.floating[Any]], bounds: tuple[float, float]) -> float:
-    """Return the fraction of values the stretch with ``bounds`` clips (below low or above high).
+    """Return the fraction of PIXELS the stretch with ``bounds`` clips.
+
+    A pixel counts as clipped when any of its three channels is below ``low`` or above
+    ``high`` (the stretch clips each channel value; this counts the pixels it touches).
 
     Args:
-        values: The high-pass values.
+        values: The high-pass, shape ``(..., 3)`` (the last axis is the channels).
+        bounds: The low and high bound.
+
+    Returns:
+        A fraction in [0, 1].
+
+    Raises:
+        ValueError: The last axis does not hold three channels.
+    """
+    pixels = _as_pixels(values)
+    low, high = bounds
+    return float(np.count_nonzero(((pixels < low) | (pixels > high)).any(axis=1)) / len(pixels))
+
+
+def clipped_sample_fraction(
+    values: NDArray[np.floating[Any]], bounds: tuple[float, float]
+) -> float:
+    """Return the fraction of channel SAMPLES the stretch with ``bounds`` clips.
+
+    Each of the ``3 * H * W`` values counts on its own (the quantity :func:`clipped_fraction`
+    reported before WP1.4's remediation); a pixel with two clipped channels counts twice.
+
+    Args:
+        values: The high-pass, any shape.
         bounds: The low and high bound.
 
     Returns:
@@ -882,6 +942,44 @@ def clipped_fraction(values: NDArray[np.floating[Any]], bounds: tuple[float, flo
 
 
 # --- helpers --------------------------------------------------------------------------------------
+
+
+def _as_pixels(values: NDArray[np.floating[Any]]) -> NDArray[np.floating[Any]]:
+    """The values as one row of three channels per pixel; any other last axis is refused."""
+    array = np.asarray(values)
+    if array.ndim < 1 or array.shape[-1] != 3:
+        raise ValueError(f"values need a last axis of 3 channels, got shape {array.shape}")
+    return array.reshape(-1, 3)
+
+
+def _check_names(values: Mapping[str, float]) -> None:
+    """Raise ValueError naming the first name that :func:`flatten` cannot produce."""
+    suffixes = {
+        "compensation_means": _RGB,
+        "compensation_alpha": ALPHA_CHANNELS,
+        "white_balance_means": _RGB,
+        "white_balance_gains": _RGB,
+        "normalisation_bounds": ("low", "high"),
+    }
+    for name in values:
+        field, _, rest = name.partition(".")
+        if field in suffixes:
+            valid = rest in suffixes[field]
+        elif field == "saliency_means":
+            label, _, component = rest.partition(".")
+            digits = label.removeprefix("input")
+            valid = (
+                label.startswith("input")
+                and digits.isascii()
+                and digits.isdigit()
+                and digits == str(int(digits))
+                and int(digits) >= 1
+                and component in _LAB
+            )
+        else:
+            valid = False
+        if not valid:
+            raise ValueError(f"unknown statistic {name!r}")
 
 
 def _named(prefix: str, labels: Sequence[str], values: Sequence[float]) -> dict[str, float]:
@@ -915,8 +1013,8 @@ def _optional_bounds(values: Mapping[str, float]) -> tuple[float, float] | None:
     return low, high
 
 
-def _lab_triple(values: Sequence[float]) -> tuple[float, float, float]:
+def _three(values: Sequence[float]) -> tuple[float, float, float]:
     """Three floats from a sequence of exactly three."""
     if len(values) != 3:
-        raise ValueError(f"a Lab mean needs 3 values, got {len(values)}")
+        raise ValueError(f"a triple needs 3 values, got {len(values)}")
     return float(values[0]), float(values[1]), float(values[2])

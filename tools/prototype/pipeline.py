@@ -175,6 +175,12 @@ class Statistics:
             after the gain cap; the keys are exactly the compensated channels (``"red"``,
             plus ``"blue"`` when blue compensation is on). When it is given, the gain cap is
             not evaluated (the value already is the capped alpha).
+        white_balance_means: The R, G and B means of the compensated image that the
+            gray-world gains derive from (:attr:`WhiteBalanceInfo.channel_means`), as Python
+            floats. They are consumed only when ``white_balance_gains`` is ``None``: the gains
+            are then ``mean(means) / mean_c`` (the measured form on the supplied means); when
+            the gains are given too, the gains are used and the means are a record of what
+            they were measured from.
         white_balance_gains: The gray-world gains ``target / mean_c`` of R, G and B
             (:attr:`WhiteBalanceInfo.gray_world_gains`), before ``white_balance_strength``
             and before the D99 clamp, which both still apply to the supplied gains.
@@ -190,6 +196,51 @@ class Statistics:
     white_balance_gains: tuple[float, float, float] | None = None
     normalisation_bounds: tuple[float, float] | None = None
     saliency_means: tuple[tuple[float, float, float], ...] | None = None
+    white_balance_means: tuple[float, float, float] | None = None
+
+
+def check_statistics(statistics: Statistics) -> None:
+    """Refuse a supplied record that holds a non-finite number or bounds in the wrong order.
+
+    Only the numbers are checked here; a triple of the wrong length, a wrong alpha channel set
+    or a wrong number of saliency means is refused by the step that consumes it.
+
+    Args:
+        statistics: The supplied record.
+
+    Raises:
+        ValueError: A supplied number is NaN or infinite, or ``normalisation_bounds`` does not
+            hold two values with ``low <= high``; the message names the field.
+    """
+    for name in (
+        "compensation_means",
+        "white_balance_means",
+        "white_balance_gains",
+        "normalisation_bounds",
+    ):
+        values = getattr(statistics, name)
+        if values is not None:
+            _check_finite(name, values)
+    if statistics.compensation_alpha is not None:
+        for channel, value in statistics.compensation_alpha.items():
+            _check_finite(f"compensation_alpha[{channel!r}]", (value,))
+    if statistics.saliency_means is not None:
+        for number, mean in enumerate(statistics.saliency_means, start=1):
+            _check_finite(f"saliency_means[{number}]", mean)
+    bounds = statistics.normalisation_bounds
+    if bounds is not None:
+        if len(bounds) != 2:
+            raise ValueError(f"supplied normalisation_bounds needs 2 values, got {len(bounds)}")
+        if bounds[0] > bounds[1]:
+            raise ValueError(
+                f"supplied normalisation_bounds has low {bounds[0]} above high {bounds[1]}"
+            )
+
+
+def _check_finite(name: str, values: Sequence[float]) -> None:
+    """Raise ValueError naming ``name`` unless every value is a finite number."""
+    if not all(math.isfinite(float(value)) for value in values):
+        raise ValueError(f"supplied {name} is not finite: {list(values)}")
 
 
 @dataclass(frozen=True)
@@ -377,9 +428,12 @@ def compensate_ancuti2018(
         The compensated image and the step's record.
 
     Raises:
-        ValueError: The supplied alpha does not name exactly the compensated channels.
+        ValueError: The supplied alpha does not name exactly the compensated channels, or a
+            supplied number is not finite (:func:`check_statistics`).
     """
     _check_image(image)
+    if statistics is not None:
+        check_statistics(statistics)
     xp = of(image).xp
     if statistics is None or statistics.compensation_means is None:
         means = _channel_means(image)
@@ -495,7 +549,8 @@ def white_balance(
     Supplied statistics (:class:`Statistics`): ``white_balance_gains`` replaces the
     gray-world gains; the strength and the D99 clamp apply to them as to measured gains
     (spec 6.2: the clamp limits the gains used for rendering, the smoothed ones for video).
-    The record's ``channel_means`` and ``target`` are still measured on ``image``.
+    Without gains, ``white_balance_means`` stand in for the measured means in the gray-world
+    formula. The record's ``channel_means`` and ``target`` are still measured on ``image``.
 
     Args:
         image: The compensated image.
@@ -506,12 +561,19 @@ def white_balance(
         The white-balanced image and the step's record.
     """
     _check_image(image)
+    if statistics is not None:
+        check_statistics(statistics)
     means = _channel_means(image)
     target = sum(means) / 3.0
-    if statistics is None or statistics.white_balance_gains is None:
-        gray_world = tuple(target / max(mean, _EPS) for mean in means)
-    else:
+    gray_world: tuple[float, ...]
+    if statistics is not None and statistics.white_balance_gains is not None:
         gray_world = _supplied_triple(statistics.white_balance_gains, "white_balance_gains")
+    elif statistics is not None and statistics.white_balance_means is not None:
+        given = _supplied_triple(statistics.white_balance_means, "white_balance_means")
+        given_target = sum(given) / 3.0
+        gray_world = tuple(given_target / max(mean, _EPS) for mean in given)
+    else:
+        gray_world = tuple(target / max(mean, _EPS) for mean in means)
     requested = tuple(1.0 + params.white_balance_strength * (g - 1.0) for g in gray_world)
     applied = tuple(min(g, params.max_white_balance_gain) for g in requested)
     xp = of(image).xp
@@ -562,6 +624,8 @@ def fusion_inputs(
         Input 1 (gamma) and input 2 (sharpened).
     """
     _check_image(image)
+    if statistics is not None:
+        check_statistics(statistics)
     xp = of(image).xp
     input1: Image = xp.power(image, np.float32(params.gamma)).astype(np.float32, copy=False)
     if statistics is None or statistics.normalisation_bounds is None:
@@ -684,6 +748,8 @@ def weight_maps(
     """
     if not input_:
         raise ValueError("weight_maps needs at least one input")
+    if statistics is not None:
+        check_statistics(statistics)
     for image in input_:
         _check_image(image)
         if image.shape != input_[0].shape:
@@ -792,10 +858,13 @@ def correct(
             derived from ``params`` and the image size is unusable
             (:func:`check_derived_values`), or the supplied statistics do not fit the
             method (compensation statistics for 3C, a wrong alpha channel set, a wrong
-            number of saliency means).
+            number of saliency means) or hold a non-finite number or bounds with
+            ``low > high`` (:func:`check_statistics`).
     """
     _check_array(image)
     check_derived_values(image.shape, params)
+    if statistics is not None:
+        check_statistics(statistics)
     if (
         statistics is not None
         and params.method == "c3"

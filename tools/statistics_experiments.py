@@ -104,10 +104,6 @@ RENDER_METHOD = "ancuti2018"
 VERSIONS = ("unsmoothed", "staged", "flat")
 """The three full-resolution renders of the first excerpt, for the owner at CP2."""
 
-INTERIOR_WINDOW_S = 4.0
-"""The flicker's second frame set: the frames at least ``half_width(INTERIOR_WINDOW_S)`` frames
-from either end (59 frames, 1.97 s, at 30000/1001 fps), where the widest candidate's kernel (the
-4 s window, 59 frames each side) fits inside the excerpt."""
 
 PROXY_METHOD = (
     "area average in NumPy from the full-resolution 16-bit frame: each 4x4 block of the "
@@ -120,6 +116,23 @@ NEAR_FLAT_RGB = (0.10, 0.45, 0.55)
 NEAR_FLAT_NOISE = 0.002
 """The synthetic near-flat frame of the DR-14 check: a uniform blue-green 960x540 frame plus
 Gaussian noise of this standard deviation (seed :data:`NEAR_FLAT_SEED`)."""
+
+
+def interior_margin(frame_rate: Fraction) -> int:
+    """Return the flicker's interior margin in frames: the widest candidate's filter reach.
+
+    The interior frame set holds the frames at least this far from either end of an excerpt,
+    where no smoothing candidate reaches the edge rule (:attr:`prototype.temporal.Smoother.radius`:
+    the 4 s ``median_gaussian`` reaches 60 frames, 2.00 s, at 30000/1001 fps: 59 for its Gaussian
+    and 1 for its median).
+
+    Args:
+        frame_rate: Frames per second.
+
+    Returns:
+        The largest :meth:`prototype.temporal.Smoother.radius` over the smoothing candidates.
+    """
+    return max(smoother.radius(frame_rate) for smoother in SMOOTHING_CANDIDATES)
 
 
 FLICKER_DEFINITION = (
@@ -233,15 +246,50 @@ def series_record(
     ]
 
 
-def series_from_record(entries: Sequence[Mapping[str, Any]]) -> Series:
-    """Inverse of :func:`series_record`.
+def check_ticks(entries: Sequence[Mapping[str, Any]], ticks: Sequence[int], label: str) -> None:
+    """Refuse a record whose frames are not the excerpt's, in order (matched on ``pts_ticks``).
+
+    A series is applied to the frames BY POSITION, so a reordered, shortened or stale record
+    would render the wrong statistics onto a frame and nothing downstream would notice.
+
+    Args:
+        entries: The record's per-frame entries.
+        ticks: The excerpt's ``pts_ticks``, in presentation order (its ``excerpt.json``).
+        label: What the record is, for the message.
+
+    Raises:
+        ValueError: The record's ``pts_ticks`` sequence differs from ``ticks``.
+    """
+    found = [entry["pts_ticks"] for entry in entries]
+    if found == list(ticks):
+        return
+    first = next(
+        (n for n, (a, b) in enumerate(zip(found, ticks, strict=False)) if a != b),
+        min(len(found), len(ticks)),
+    )
+    raise ValueError(
+        f"{label}: the record's pts_ticks are not the excerpt's, in order ({len(found)} entries "
+        f"against {len(ticks)}; first difference at position {first})"
+    )
+
+
+def series_from_record(
+    entries: Sequence[Mapping[str, Any]], ticks: Sequence[int], label: str
+) -> Series:
+    """Inverse of :func:`series_record`, after :func:`check_ticks`.
 
     Args:
         entries: The per-frame entries.
+        ticks: The excerpt's ``pts_ticks``, in order; the entries must carry exactly these.
+        label: What the record is, for the message of a refusal.
 
     Returns:
         The series.
+
+    Raises:
+        ValueError: The entries' ``pts_ticks`` are not ``ticks``, in order.
     """
+    check_ticks(entries, ticks, label)
     names = list(entries[0]["statistics"])
     return {
         name: np.array([entry["statistics"][name] for entry in entries], dtype=np.float64)
@@ -250,6 +298,27 @@ def series_from_record(entries: Sequence[Mapping[str, Any]]) -> Series:
 
 
 # --- extract --------------------------------------------------------------------------------------
+
+
+def require_frames(name: str, count: int) -> None:
+    """Refuse an excerpt with fewer than :data:`prototype.temporal.MIN_FRAMES` frames, up front.
+
+    The flicker measure needs one frame step, so two frames is the least that can complete
+    ``analyse``. An interior result needs ``2 * margin + 2`` frames (:func:`_interior`); a
+    shorter excerpt reports it as absent (``null``) instead.
+
+    Args:
+        name: The excerpt's name, for the message.
+        count: Its number of frames.
+
+    Raises:
+        PremiseError: ``count`` is below the minimum.
+    """
+    if count < temporal.MIN_FRAMES:
+        raise PremiseError(
+            f"{name}: {count} frame(s); the experiments need at least {temporal.MIN_FRAMES} "
+            "(the flicker measure needs one frame step)"
+        )
 
 
 def extract_excerpt(
@@ -287,6 +356,7 @@ def extract_excerpt(
         f"{spec.name}: extracted {len(frames)} frames in {time.monotonic() - began:.0f} s",
         file=sys.stderr,
     )
+    require_frames(spec.name, len(frames))
     ticks = [frame.pts_ticks for frame in frames]
     if spec.expected_ticks is not None:
         first, last, step = spec.expected_ticks
@@ -395,17 +465,34 @@ def load_excerpt(folder: Path) -> Loaded:
 
     Returns:
         The loaded data.
+
+    Raises:
+        PremiseError: The excerpt has fewer than :data:`prototype.temporal.MIN_FRAMES` frames.
+        ValueError: A record's ``pts_ticks`` are not the excerpt's, in order, or the proxies
+            are not one per frame.
     """
     document = _read_json(folder / "excerpt.json")
     raw = _read_json(folder / "statistics-raw.json")
     proxies = np.load(folder / "proxies.npy", allow_pickle=False)
+    ticks = [entry["pts_ticks"] for entry in document["frames"]]
+    require_frames(folder.name, len(ticks))
+    if len(proxies) != len(ticks):
+        raise ValueError(
+            f"{folder.name}: proxies.npy holds {len(proxies)} frames, excerpt.json {len(ticks)}"
+        )
     return Loaded(
         folder=folder,
         excerpt=document,
         proxies=proxies,
         frame_rate=Fraction(document["frame_rate"]),
-        raw={name: series_from_record(m["frames"]) for name, m in raw["proxy"].items()},
-        raw_full={name: series_from_record(m["frames"]) for name, m in raw["full"].items()},
+        raw={
+            name: series_from_record(m["frames"], ticks, f"statistics-raw.json proxy {name}")
+            for name, m in raw["proxy"].items()
+        },
+        raw_full={
+            name: series_from_record(m["frames"], ticks, f"statistics-raw.json full {name}")
+            for name, m in raw["full"].items()
+        },
     )
 
 
@@ -555,8 +642,12 @@ def _difference_summary(mean_abs: Sequence[float], max_abs: Sequence[float]) -> 
 
 
 def _interior(count: int, frame_rate: Fraction) -> slice | None:
-    """The frame steps between the interior frames (:data:`INTERIOR_WINDOW_S`), if any."""
-    margin = temporal.half_width(INTERIOR_WINDOW_S, frame_rate)
+    """The frame steps between the interior frames (:func:`interior_margin`), if any.
+
+    An excerpt of ``count`` frames has an interior only when ``count >= 2 * margin + 2``
+    (122 frames at 30000/1001 fps); a shorter one returns ``None``.
+    """
+    margin = interior_margin(frame_rate)
     if count - 1 - 2 * margin < 1:
         return None
     return slice(margin, count - 1 - margin)
@@ -581,6 +672,19 @@ def _flicker_record(
     }
     if series:
         record["per_step"] = [float(v) for v in whole.per_step.mean(axis=1)]
+    return record
+
+
+def _sequence_record(
+    signals: NDArray[np.float64],
+    reference: NDArray[np.float64],
+    interior: slice | None,
+    source_signals: NDArray[np.float64],
+    series: bool = False,
+) -> dict[str, Any]:
+    """:func:`_flicker_record` plus the brief's source-referenced form, for every sequence."""
+    record = _flicker_record(signals, reference, interior, series=series)
+    record["source_referenced"] = temporal.source_referenced_flicker(signals, source_signals)
     return record
 
 
@@ -614,9 +718,10 @@ def robust_study(loaded: Loaded, params: Params, backend: Backend) -> dict[str, 
 
     Per frame, on the high-pass of the frame's own white-balanced proxy
     (:func:`prototype.temporal.white_balanced_high_pass`): each candidate's bounds and the
-    fraction of values its stretch clips; and the effect on the result: the proxy rendered
-    with the candidate's bounds supplied (everything else the frame's own) against the
-    proxy rendered at the default, as the mean absolute difference in 8-bit levels.
+    fraction of pixels its stretch clips (a pixel counts when any channel is clipped; the
+    fraction of channel samples is recorded beside it); and the effect on the result: the
+    proxy rendered with the candidate's bounds supplied (everything else the frame's own)
+    against the proxy rendered at the default, as the mean absolute difference in 8-bit levels.
 
     Args:
         loaded: The excerpt.
@@ -625,7 +730,8 @@ def robust_study(loaded: Loaded, params: Params, backend: Backend) -> dict[str, 
 
     Returns:
         Per candidate: the per-frame bounds, the coefficient of variation of each bound
-        over the frames (before smoothing), the clipped fraction (mean, max), the smallest
+        over the frames (before smoothing), the clipped fraction of pixels and of samples
+        (mean, max), the smallest
         range and how often it fell under the flat floor, and the effect on the result
         (mean, max, frame); and the near-flat synthetic frame's ranges.
     """
@@ -641,6 +747,12 @@ def robust_study(loaded: Loaded, params: Params, backend: Backend) -> dict[str, 
         ranges = highs - lows
         clipped = np.array(
             [temporal.clipped_fraction(v, b) for v, b in zip(high_passes, bounds, strict=True)]
+        )
+        clipped_samples = np.array(
+            [
+                temporal.clipped_sample_fraction(v, b)
+                for v, b in zip(high_passes, bounds, strict=True)
+            ]
         )
         effect = np.array(
             [
@@ -663,8 +775,10 @@ def robust_study(loaded: Loaded, params: Params, backend: Backend) -> dict[str, 
             "relative_step_high": _relative_step(highs),
             "mean_low": float(np.mean(lows)),
             "mean_high": float(np.mean(highs)),
-            "clipped_mean": float(clipped.mean()),
-            "clipped_max": float(clipped.max()),
+            "clipped_pixels_mean": float(clipped.mean()),
+            "clipped_pixels_max": float(clipped.max()),
+            "clipped_samples_mean": float(clipped_samples.mean()),
+            "clipped_samples_max": float(clipped_samples.max()),
             "smallest_range": float(ranges.min()),
             "smallest_range_frame": int(np.argmin(ranges)),
             "floor_triggered_frames": int(np.count_nonzero(ranges < temporal.FLAT_FLOOR)),
@@ -708,7 +822,7 @@ def run_experiments(
     The flicker measure (:func:`prototype.temporal.flicker`) is applied identically to every
     rendered sequence: its proxies rendered with the statistics under test, against the same
     proxies rendered with constant statistics (the mean of the raw series of the method), over
-    all frame steps and over the interior steps (:data:`INTERIOR_WINDOW_S`).
+    all frame steps and over the interior steps (:func:`interior_margin`).
 
     Args:
         folder: The excerpt's folder.
@@ -732,6 +846,7 @@ def run_experiments(
         "device": backend.name,
         "frames": count,
         "frame_rate": loaded.excerpt["frame_rate"],
+        "interior_margin_frames": interior_margin(rate),
         "interior_steps": None if interior is None else [interior.start, interior.stop],
         "flicker_definition": FLICKER_DEFINITION,
         "comparison_smoother": _smoother_record(COMPARISON_SMOOTHER, rate),
@@ -763,9 +878,8 @@ def run_experiments(
             ("linear_trend", trend),
         ):
             signals = _signals(loaded.proxies, params, series, backend)
-            method_flicker[label] = _flicker_record(signals, reference, interior, series=True)
-            method_flicker[label]["source_referenced"] = temporal.source_referenced_flicker(
-                signals, source_signals
+            method_flicker[label] = _sequence_record(
+                signals, reference, interior, source_signals, series=True
             )
         method_flicker["staged_vs_flat_render"] = _render_difference(
             loaded.proxies, params, staged, flat, backend
@@ -781,11 +895,17 @@ def run_experiments(
         document["smoothing"][smoother.label] = {
             "definition": _smoother_record(smoother, rate),
             "step": temporal.step_response(smoother, rate),
-            "flat": _flicker_record(
-                _signals(loaded.proxies, params, flat, backend), reference, interior
+            "flat": _sequence_record(
+                _signals(loaded.proxies, params, flat, backend),
+                reference,
+                interior,
+                source_signals,
             ),
-            "staged": _flicker_record(
-                _signals(loaded.proxies, params, staged, backend), reference, interior
+            "staged": _sequence_record(
+                _signals(loaded.proxies, params, staged, backend),
+                reference,
+                interior,
+                source_signals,
             ),
         }
         print(f"{folder.name}: smoothing {smoother.label} done", file=sys.stderr)
@@ -803,8 +923,12 @@ def run_experiments(
 # --- render ---------------------------------------------------------------------------------------
 
 
-def _render_statistics(folder: Path) -> dict[str, list[Statistics]]:
-    """Per version, the statistics each full-resolution frame is rendered with."""
+def _render_statistics(folder: Path, ticks: Sequence[int]) -> dict[str, list[Statistics]]:
+    """Per version, the statistics each full-resolution frame is rendered with.
+
+    Raises:
+        ValueError: A record's ``pts_ticks`` are not ``ticks`` (the excerpt's), in order.
+    """
     raw = _read_json(folder / "statistics-raw.json")
     staged = _read_json(folder / "statistics-staged.json")
     flat = _read_json(folder / "statistics-flat.json")
@@ -813,10 +937,63 @@ def _render_statistics(folder: Path) -> dict[str, list[Statistics]]:
         "staged": staged["methods"][RENDER_METHOD]["frames"],
         "flat": flat["methods"][RENDER_METHOD]["frames"],
     }
+    for version, entries in sources.items():
+        check_ticks(entries, ticks, f"the {version} record")
     return {
         version: [temporal.unflatten(entry["statistics"]) for entry in entries]
         for version, entries in sources.items()
     }
+
+
+def compare_witness(witness: Path, ours: Path, chapter: str, count: int) -> dict[str, Any]:
+    """Compare the kept unsmoothed frames with WP1.3's (the identity witness on real footage).
+
+    Args:
+        witness: WP1.3's ``flicker/corrected`` folder (``<chapter>_f<n>-ancuti2018.png``).
+        ours: This run's ``renders/unsmoothed`` folder (``<chapter>_f<n>.png``).
+        chapter: The chapter stem.
+        count: The excerpt's number of frames (the kept ones are first, middle and last).
+
+    Returns:
+        Per kept frame number (as a string): ``file`` and either ``identical`` and ``max_abs``
+        or ``missing: True``.
+    """
+    record: dict[str, Any] = {}
+    for number in sorted(_keep(count)):
+        theirs = witness / f"{chapter}_f{number:04d}-{RENDER_METHOD}.png"
+        mine = ours / f"{chapter}_f{number:04d}.png"
+        if theirs.is_file():
+            difference = np.abs(read_png16(theirs) - read_png16(mine))
+            record[str(number)] = {
+                "file": theirs.name,
+                "identical": bool(difference.max() == 0.0),
+                "max_abs": float(difference.max()),
+            }
+        else:
+            record[str(number)] = {"file": theirs.name, "missing": True}
+    return record
+
+
+def require_identical_witness(record: Mapping[str, Any], count: int, witness: Path) -> None:
+    """Fail the render step unless every kept frame is present in the witness and identical.
+
+    Called before anything is encoded or removed, so a failure leaves every frame in place.
+
+    Args:
+        record: :func:`compare_witness`'s result.
+        count: The excerpt's number of frames.
+        witness: The witness folder, for the message.
+
+    Raises:
+        PremiseError: A kept frame is missing from the witness or differs from it.
+    """
+    failed = [n for n in sorted(_keep(count)) if not record[str(n)].get("identical", False)]
+    if failed:
+        raise PremiseError(
+            f"STOP: the unsmoothed render of frames {failed} is not identical to WP1.3's kept "
+            f"frames in {witness} (missing or different: see the witness record); nothing was "
+            "encoded and no frame was removed"
+        )
 
 
 def render_clips(
@@ -839,23 +1016,31 @@ def render_clips(
         roots: The output safety roots.
         backend: Where the pipeline runs.
         witness: WP1.3's ``flicker/corrected`` folder, whose kept frames the unsmoothed
-            render must equal; ``None`` skips the comparison.
+            render must equal (a missing or different frame fails the step before any
+            encode or removal); ``None`` skips the comparison.
 
     Returns:
         The ``render.json`` document.
 
     Raises:
+        PremiseError: The witness is missing or not identical, or the excerpt has fewer than
+            :data:`prototype.temporal.MIN_FRAMES` frames.
+        ValueError: A statistics record's ``pts_ticks`` are not the excerpt's, in order.
         lookcheck.frames.ExtractError: A probe, encode or check fails (the PNGs are kept).
     """
     folder = roots.allowed / spec.name
     document_in = _read_json(folder / "excerpt.json")
     entries = document_in["frames"]
     count = len(entries)
-    statistics = _render_statistics(folder)
+    ticks = [entry["pts_ticks"] for entry in entries]
+    require_frames(spec.name, count)
+    statistics = _render_statistics(folder, ticks)
     params = METHODS[RENDER_METHOD]
     raw = _read_json(folder / "statistics-raw.json")
     constant = temporal.constant_statistics(
-        series_from_record(raw["full"][RENDER_METHOD]["frames"])
+        series_from_record(
+            raw["full"][RENDER_METHOD]["frames"], ticks, "statistics-raw.json full constant"
+        )
     )
     video = footage / f"{spec.chapter}.MP4"
     info = probe_stream(video)
@@ -888,18 +1073,10 @@ def render_clips(
             )
     witness_record: dict[str, Any] = {"folder": None if witness is None else str(witness)}
     if witness is not None:
-        for number in sorted(_keep(count)):
-            theirs = witness / f"{spec.chapter}_f{number:04d}-{RENDER_METHOD}.png"
-            ours = folder / "renders" / "unsmoothed" / f"{spec.chapter}_f{number:04d}.png"
-            if theirs.is_file():
-                difference = np.abs(read_png16(theirs) - read_png16(ours))
-                witness_record[str(number)] = {
-                    "file": theirs.name,
-                    "identical": bool(difference.max() == 0.0),
-                    "max_abs": float(difference.max()),
-                }
-            else:
-                witness_record[str(number)] = {"file": theirs.name, "missing": True}
+        witness_record.update(
+            compare_witness(witness, folder / "renders" / "unsmoothed", spec.chapter, count)
+        )
+        require_identical_witness(witness_record, count, witness)
     clips_dir = folder / "clips"
     commands: dict[str, list[str]] = {}
     checks: dict[str, Any] = {}

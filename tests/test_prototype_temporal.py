@@ -127,8 +127,10 @@ def test_an_empty_record_is_the_unsupplied_pipeline() -> None:
 
 def _perturbed(supplied: Statistics, field: str) -> Statistics:
     values = flatten(supplied)
+    # all three means scaled alike would leave the gray-world gains unchanged: move R only
+    suffix = ".R" if field == "white_balance_means" else ""
     changed = {
-        name: value * 1.1 if name.split(".", 1)[0] == field else value
+        name: value * 1.1 if name.split(".", 1)[0] == field and name.endswith(suffix) else value
         for name, value in values.items()
     }
     return dataclasses.replace(Statistics(), **{field: getattr(unflatten(changed), field)})
@@ -140,6 +142,7 @@ _INTERMEDIATES = ("compensated", "white_balanced", "input1", "input2", "saliency
 _CONSUMER = {
     "compensation_means": "compensated",
     "compensation_alpha": "compensated",
+    "white_balance_means": "white_balanced",
     "white_balance_gains": "white_balanced",
     "normalisation_bounds": "input2",
     "saliency_means": "saliency",
@@ -158,6 +161,7 @@ def _intermediate(result: pipeline.Result, name: str) -> np.ndarray:
     [
         "compensation_means",
         "compensation_alpha",
+        "white_balance_means",
         "white_balance_gains",
         "normalisation_bounds",
         "saliency_means",
@@ -190,6 +194,7 @@ def test_malformed_supplied_triples_are_refused() -> None:
     for statistics in (
         Statistics(compensation_means=(0.1, 0.2)),  # type: ignore[arg-type]
         Statistics(white_balance_gains=(1.0, 1.0, 1.0, 1.0)),  # type: ignore[arg-type]
+        Statistics(white_balance_means=(0.2, 0.3)),  # type: ignore[arg-type]
         Statistics(saliency_means=((50.0, 0.0), (50.0, 0.0, 0.0))),  # type: ignore[arg-type]
     ):
         with pytest.raises(ValueError, match="needs 3 values"):
@@ -233,6 +238,81 @@ def test_measure_reports_the_supplied_values_and_measures_the_rest() -> None:
     assert got.white_balance_gains == (1.5, 1.0, 0.9)
     balanced = correct(image, params, statistics=supplied).white_balanced
     assert got.normalisation_bounds == pipeline.normalisation_bounds(balanced, params)
+
+
+def test_measure_records_the_white_balance_means() -> None:
+    """The recorded means are those of the compensated image the white balance sees."""
+    image = _scene()
+    for params in VARIANTS.values():
+        result = correct(image, params)
+        got = statistics_of(image, params)
+        assert got.white_balance_means == pipeline._channel_means(result.compensated)
+        assert got.white_balance_means == result.white_balance.channel_means
+    supplied = Statistics(white_balance_means=(0.2, 0.3, 0.4))
+    assert measure(image, Params(), supplied).white_balance_means == (0.2, 0.3, 0.4)
+
+
+def test_supplied_white_balance_means_give_the_gray_world_gains() -> None:
+    """Means alone derive the gains (identity on the frame's own means); gains given with
+    them win, so a record that holds both is rendered with its gains."""
+    params = Params()
+    image = _scene()
+    own = statistics_of(image, params)
+    assert own.white_balance_means is not None and own.white_balance_gains is not None
+    only_means = Statistics(white_balance_means=own.white_balance_means)
+    _assert_bit_identical(correct(image, params, statistics=only_means), correct(image, params))
+    shifted = Statistics(white_balance_means=(0.1, 0.3, 0.4))
+    derived = correct(image, params, statistics=shifted).white_balance.gray_world_gains
+    target = (0.1 + 0.3 + 0.4) / 3.0
+    assert derived == (target / 0.1, target / 0.3, target / 0.4)
+    both = Statistics(
+        white_balance_means=(0.1, 0.3, 0.4), white_balance_gains=own.white_balance_gains
+    )
+    _assert_bit_identical(correct(image, params, statistics=both), correct(image, params))
+
+
+def test_a_supplied_blue_alpha_is_used() -> None:
+    """Positive control with blue compensation on: halving only the blue alpha changes the blue
+    channel of the compensated image and leaves red and green alone."""
+    params = Params(blue_compensation=True, red_gain_cap=None, blue_gain_cap=None)
+    image = _scene()
+    own = statistics_of(image, params)
+    assert own.compensation_alpha is not None and set(own.compensation_alpha) == {"red", "blue"}
+    red_alpha = own.compensation_alpha["red"]
+    halved = Statistics(compensation_alpha={"red": red_alpha, "blue": 0.5})
+    base = correct(image, params).compensated
+    changed = correct(image, params, statistics=halved).compensated
+    assert np.array_equal(changed[..., 0], base[..., 0])
+    assert np.array_equal(changed[..., 1], base[..., 1])
+    assert not np.array_equal(changed[..., 2], base[..., 2])
+    assert measure(image, params, halved).compensation_alpha == {"red": red_alpha, "blue": 0.5}
+
+
+def test_non_finite_or_impossible_supplied_values_are_refused_naming_the_field() -> None:
+    image = _scene()
+    nan, inf = float("nan"), float("inf")
+    cases = {
+        "compensation_means": Statistics(compensation_means=(0.1, nan, 0.3)),
+        "white_balance_means": Statistics(white_balance_means=(0.1, 0.2, inf)),
+        "white_balance_gains": Statistics(white_balance_gains=(nan, 1.0, 1.0)),
+        "normalisation_bounds": Statistics(normalisation_bounds=(0.0, nan)),
+        "compensation_alpha": Statistics(compensation_alpha={"red": -inf}),
+        "saliency_means": Statistics(saliency_means=((50.0, 0.0, 0.0), (50.0, nan, 0.0))),
+    }
+    for field, statistics in cases.items():
+        with pytest.raises(ValueError, match=f"supplied {field}.*not finite"):
+            correct(image, Params(), statistics=statistics)
+        with pytest.raises(ValueError, match=f"supplied {field}.*not finite"):
+            measure(image, Params(), statistics)
+    for bounds in ((0.3, 0.1), (nan, 0.1), (-inf, inf)):
+        with pytest.raises(ValueError, match="normalisation_bounds"):
+            correct(image, Params(), statistics=Statistics(normalisation_bounds=bounds))
+    # equal bounds stay legal (the flat-image rule); steps called directly refuse too
+    correct(image, Params(), statistics=Statistics(normalisation_bounds=(0.2, 0.2)))
+    with pytest.raises(ValueError, match="not finite"):
+        pipeline.white_balance(image, Params(), Statistics(white_balance_gains=(nan, 1.0, 1.0)))
+    with pytest.raises(ValueError, match=r"low .* above high"):
+        pipeline.fusion_inputs(image, Params(), Statistics(normalisation_bounds=(0.9, 0.1)))
 
 
 # --- test 3: staged and flat on a synthetic 3-frame sequence --------------------------------------
@@ -304,29 +384,81 @@ def test_3_staged_and_flat_differ_as_documented() -> None:
     assert report["white_balance_gains.R"]["max_abs"] > 0.011
 
 
-def test_staged_measures_each_stage_on_the_smoothed_earlier_ones() -> None:
-    """A spy on measure(): stage k is called with exactly the smoothed fields of stages < k."""
-    calls: list[tuple[str, ...]] = []
+def _spy_staged(
+    frames: list[np.ndarray], params: Params, smoother: Smoother, rate: Fraction
+) -> tuple[list[dict[str, float]], Any]:
+    """Run analyse_staged with a spy on measure(); return what each call was supplied with."""
+    received: list[dict[str, float]] = []
     original = temporal.measure
 
     def spy(image: Any, params: Params, supplied: Any = None, backend: Any = None) -> Statistics:
-        fields = (
-            () if supplied is None else tuple(sorted(n.split(".")[0] for n in flatten(supplied)))
-        )
-        calls.append(tuple(dict.fromkeys(fields)))
+        received.append({} if supplied is None else flatten(supplied))
         return original(image, params, supplied, backend)
 
-    frames = [_scene(seed=s) for s in range(4)]
-    smoother = Smoother("gaussian", 2.0)
     with pytest.MonkeyPatch.context() as patch:
         patch.setattr(temporal, "measure", spy)
-        smoothed, _ = analyse_staged(frames, Params(), smoother, Fraction(2))
-    assert calls[:4] == [()] * 4
-    assert calls[4:8] == [("compensation_alpha", "compensation_means")] * 4
-    assert calls[8:] == [("compensation_alpha", "compensation_means", "white_balance_gains")] * 4
+        result = analyse_staged(frames, params, smoother, rate)
+    return received, result
+
+
+def _spy_staged(
+    frames: list[np.ndarray], params: Params, smoother: Smoother, rate: Fraction
+) -> tuple[list[dict[str, float]], Any]:
+    """Run analyse_staged with a spy on measure(); return what each call was supplied with."""
+    received: list[dict[str, float]] = []
+    original = temporal.measure
+
+    def spy(image: Any, params: Params, supplied: Any = None, backend: Any = None) -> Statistics:
+        received.append({} if supplied is None else flatten(supplied))
+        return original(image, params, supplied, backend)
+
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr(temporal, "measure", spy)
+        result = analyse_staged(frames, params, smoother, rate)
+    return received, result
+
+
+def test_staged_measures_each_stage_on_the_smoothed_earlier_ones() -> None:
+    """A spy on measure(): stage k is called, frame by frame, with exactly the SMOOTHED values
+    (not just the field names) of the stages before it."""
+    frames = [_scene(seed=s) for s in range(4)]
+    smoother = Smoother("gaussian", 2.0)
+    rate = Fraction(2)
+    received, (smoothed, measured) = _spy_staged(frames, Params(), smoother, rate)
+
+    def smoothed_stage(stage: str) -> dict[str, np.ndarray]:
+        return {name: smoother.apply(values, rate) for name, values in measured[stage].items()}
+
+    first, second = smoothed_stage("compensation"), smoothed_stage("white_balance")
+    assert received[:4] == [{}] * 4
+    assert len(received) == 12
+    for index in range(4):
+        expected_two = {name: float(values[index]) for name, values in first.items()}
+        assert received[4 + index] == expected_two
+        expected_three = {**expected_two, **{n: float(v[index]) for n, v in second.items()}}
+        assert received[8 + index] == expected_three
+    assert set(second) == {
+        f"white_balance_{kind}.{c}" for kind in ("means", "gains") for c in "RGB"
+    }
     raw = stack([statistics_of(frame, Params()) for frame in frames])
     for name in ("compensation_means.R", "compensation_alpha.red"):
-        np.testing.assert_array_equal(smoothed[name], smoother.apply(raw[name], Fraction(2)))
+        np.testing.assert_array_equal(smoothed[name], smoother.apply(raw[name], rate))
+        np.testing.assert_array_equal(smoothed[name], first[name])
+
+
+def test_staged_3c_fusion_receives_the_smoothed_white_balance() -> None:
+    """3C's fusion stage is measured on frames corrected with the SMOOTHED gains and means."""
+    frames = [_scene(seed=s) for s in range(4)]
+    smoother = Smoother("moving_average", 2.0)
+    rate = Fraction(1)
+    received, (_, measured) = _spy_staged(frames, Params(method="c3"), smoother, rate)
+    assert len(received) == 8 and received[:4] == [{}] * 4
+    stage_one = {n: smoother.apply(v, rate) for n, v in measured["white_balance"].items()}
+    assert set(stage_one) == {
+        f"white_balance_{kind}.{c}" for kind in ("means", "gains") for c in "RGB"
+    }
+    for index in range(4):
+        assert received[4 + index] == {n: float(v[index]) for n, v in stage_one.items()}
 
 
 def test_the_stage_lists() -> None:
@@ -452,13 +584,25 @@ def test_6_robust_candidates_on_a_known_array() -> None:
     sd = math.sqrt(490 * 491 / 3) / 1000.0
     np.testing.assert_allclose(found["trimmed mean +- 2.5 sd"], (0.5 - 2.5 * sd, 0.5 + 2.5 * sd))
     np.testing.assert_allclose(found["trimmed mean +- 3 sd"], (0.5 - 3 * sd, 0.5 + 3 * sd))
-    assert clipped_fraction(values, (0.01, 0.99)) == 20 / 1001
+    assert temporal.clipped_sample_fraction(values, (0.01, 0.99)) == 20 / 1001
     # the default candidate is the pipeline's own N{} bound rule
     image = _scene()
     high_pass = temporal.white_balanced_high_pass(image, Params())
     assert robust_bounds(high_pass, ROBUST_CANDIDATES[1]) == pipeline.normalisation_bounds(
         correct(image, Params()).white_balanced, Params()
     )
+
+
+def test_the_clipped_fraction_counts_pixels_not_samples() -> None:
+    """One pixel with two clipped channels is one clipped pixel of four, two samples of twelve."""
+    values = np.zeros((2, 2, 3))
+    values[0, 0, :2] = 5.0  # two channels of pixel (0, 0) above the high bound
+    values[1, 1, 2] = -5.0  # one channel of pixel (1, 1) below the low bound
+    assert clipped_fraction(values, (-1.0, 1.0)) == 2 / 4
+    assert temporal.clipped_sample_fraction(values, (-1.0, 1.0)) == 3 / 12
+    assert clipped_fraction(np.zeros((4, 3)), (-1.0, 1.0)) == 0.0
+    with pytest.raises(ValueError, match="3 channels"):
+        clipped_fraction(np.zeros(12), (-1.0, 1.0))
 
 
 def test_6_the_flat_image_case() -> None:
@@ -486,8 +630,13 @@ def test_the_proxy_is_an_exact_block_mean() -> None:
     full = np.random.default_rng(2).random((216, 384, 3), dtype=np.float32)
     proxy = temporal.proxy(full, short_side=54)
     assert proxy.shape == (54, 96, 3) and proxy.dtype == np.float32
-    expected = full.astype(np.float64)[:4, :4].mean(axis=(0, 1)).astype(np.float32)
-    np.testing.assert_array_equal(proxy[0, 0], expected)
+    wide = full.astype(np.float64)
+    for row in range(54):  # every block, not only the first
+        for column in range(96):
+            block = wide[4 * row : 4 * row + 4, 4 * column : 4 * column + 4]
+            np.testing.assert_array_equal(
+                proxy[row, column], block.mean(axis=(0, 1)).astype(np.float32)
+            )
     with pytest.raises(ValueError, match="whole-factor"):
         temporal.proxy(np.zeros((100, 150, 3), dtype=np.float32), short_side=30)
 
@@ -503,6 +652,34 @@ def test_flatten_and_unflatten_round_trip() -> None:
         unflatten({"white_balance_gains.R": 1.0})
 
 
+def test_unflatten_refuses_every_name_flatten_cannot_produce() -> None:
+    """A known field with an unknown suffix used to be dropped silently, so the pipeline
+    measured its own value instead of the supplied one."""
+    triple = {f"white_balance_gains.{c}": 1.0 for c in "RGB"}
+    unknown = [
+        "compensation_alpha.green",
+        "white_balance_gains.X",
+        "white_balance_means.red",
+        "compensation_means.low",
+        "normalisation_bounds.mid",
+        "compensation_means",
+        "saliency_means.input1.X",
+        "saliency_means.input0.L",
+        "saliency_means.input01.L",
+        "saliency_means.inputX.L",
+        "saliency_means.two.L",
+        "saliency_means.input1",
+    ]
+    for name in unknown:
+        with pytest.raises(ValueError, match="unknown statistic") as caught:
+            unflatten({**triple, name: 1.0})
+        assert name in str(caught.value)
+    with pytest.raises(ValueError, match="without a gap"):
+        unflatten({f"saliency_means.input{n}.{c}": 1.0 for n in (1, 3) for c in "Lab"})
+    two = {f"saliency_means.input{n}.{c}": 1.0 for n in (1, 2) for c in "Lab"}
+    assert unflatten(two).saliency_means == ((1.0,) * 3,) * 2
+
+
 # --- the runner ---------------------------------------------------------------------------------
 
 
@@ -511,16 +688,125 @@ def test_series_records_round_trip_with_their_pts() -> None:
     frames = [{"index": i, "pts_ticks": 1001 * i, "pts_seconds": i / 29.97} for i in range(3)]
     record = runner.series_record(series, frames)
     assert [entry["pts_ticks"] for entry in record] == [0, 1001, 2002]
-    restored = runner.series_from_record(json.loads(json.dumps(record)))
+    ticks = [0, 1001, 2002]
+    restored = runner.series_from_record(json.loads(json.dumps(record)), ticks, "test")
     assert restored.keys() == series.keys()
     for name in series:
         np.testing.assert_array_equal(restored[name], series[name])
 
 
+def test_a_record_is_refused_unless_its_ticks_are_the_excerpts_in_order() -> None:
+    """Series are applied by position, so a reordered, short or stale record must not load."""
+    series = stack([statistics_of(_scene(seed=s), Params()) for s in range(3)])
+    frames = [{"index": i, "pts_ticks": 1001 * i, "pts_seconds": i / 29.97} for i in range(3)]
+    record = runner.series_record(series, frames)
+    ticks = [0, 1001, 2002]
+    runner.check_ticks(record, ticks, "ok")
+    for bad in (record[::-1], record[:2], [*record, record[0]], [record[0], record[2], record[1]]):
+        with pytest.raises(ValueError, match=r"my record.*not the excerpt.s"):
+            runner.series_from_record(bad, ticks, "my record")
+    with pytest.raises(ValueError, match="not the excerpt's"):
+        runner.series_from_record(record, [0, 1001, 2003], "stale")
+
+
+def test_the_render_step_refuses_a_reordered_statistics_record(tmp_path: Path) -> None:
+    ticks = [0, 1001, 2002]
+    frames = [{"index": i, "pts_ticks": t, "pts_seconds": t / 30000} for i, t in enumerate(ticks)]
+    series = stack([statistics_of(_scene(seed=s), Params()) for s in range(3)])
+    record = runner.series_record(series, frames)
+
+    def write(staged: list[dict[str, Any]]) -> None:
+        (tmp_path / "statistics-raw.json").write_text(
+            json.dumps({"full": {"ancuti2018": {"frames": record}}}), encoding="utf-8"
+        )
+        for kind, entries in (("staged", staged), ("flat", record)):
+            (tmp_path / f"statistics-{kind}.json").write_text(
+                json.dumps({"methods": {"ancuti2018": {"frames": entries}}}), encoding="utf-8"
+            )
+
+    write(record)
+    assert set(runner._render_statistics(tmp_path, ticks)) == {"unsmoothed", "staged", "flat"}
+    write(record[::-1])
+    with pytest.raises(ValueError, match="staged record"):
+        runner._render_statistics(tmp_path, ticks)
+
+
 def test_the_interior_frame_steps() -> None:
-    assert half_width(runner.INTERIOR_WINDOW_S, NTSC) == 59
-    assert runner._interior(180, NTSC) == slice(59, 120)
+    """The margin is the reach of the whole chain of the widest candidate: the 4 s
+    median_gaussian reaches 59 frames (Gaussian) + 1 (median) = 60 at 30000/1001 fps."""
+    assert half_width(4.0, NTSC) == 59
+    assert Smoother("gaussian", 4.0).radius(NTSC) == 59
+    assert Smoother("moving_average", 4.0).radius(NTSC) == 59
+    assert Smoother("median_gaussian", 4.0).radius(NTSC) == 60
+    assert runner.interior_margin(NTSC) == 60
+    assert runner._interior(180, NTSC) == slice(60, 119)
+    assert runner._interior(122, NTSC) == slice(60, 61)
+    assert runner._interior(121, NTSC) is None
     assert runner._interior(10, NTSC) is None
+
+
+def test_the_interior_is_free_of_the_edge_rule() -> None:
+    """Changing the end frames changes no smoothed value beyond a filter's own reach, for any
+    candidate; at the widest candidate's margin the 4 s median_gaussian is still touched one
+    frame inside it."""
+    count = 300
+    base = np.linspace(0.0, 1.0, count) ** 2
+    bumped = base.copy()
+    bumped[0] += 5.0
+    bumped[-1] += 5.0
+    for smoother in temporal.SMOOTHING_CANDIDATES:
+        a, b = smoother.apply(base, NTSC), smoother.apply(bumped, NTSC)
+        reach = smoother.radius(NTSC)
+        assert np.array_equal(a[reach + 1 : count - reach - 1], b[reach + 1 : count - reach - 1])
+    wide = Smoother("median_gaussian", 4.0)
+    margin = runner.interior_margin(NTSC)
+    assert margin == wide.radius(NTSC)
+    assert wide.apply(base, NTSC)[margin - 1] != wide.apply(bumped, NTSC)[margin - 1]
+
+
+def test_too_few_frames_are_refused_up_front() -> None:
+    with pytest.raises(ValueError, match="at least 2 frames"):
+        analyse_staged([_scene()], Params(), Smoother("gaussian", 1.0), NTSC)
+    with pytest.raises(runner.PremiseError, match="at least 2"):
+        runner.require_frames("one", 1)
+    runner.require_frames("two", 2)
+    assert runner._interior(2, NTSC) is None
+
+
+def _witness_folders(root: Path) -> tuple[Path, Path, np.ndarray]:
+    render, witness = root / "render", root / "witness"
+    render.mkdir()
+    witness.mkdir()
+    return render, witness, _scene(8, 8)
+
+
+def _put_witness(render: Path, witness: Path, number: int, ours: Any, theirs: Any = None) -> None:
+    from prototype.run import write_png16
+
+    write_png16(render / f"CH_f{number:04d}.png", ours)
+    if theirs is not None:
+        write_png16(witness / f"CH_f{number:04d}-ancuti2018.png", theirs)
+
+
+def test_a_missing_or_different_witness_fails_the_render_step(tmp_path: Path) -> None:
+    render, witness, image = _witness_folders(tmp_path)
+    for number in (0, 1, 2):
+        _put_witness(render, witness, number, image, image)
+    record = runner.compare_witness(witness, render, "CH", 3)
+    assert all(record[str(n)]["identical"] for n in (0, 1, 2))
+    runner.require_identical_witness(record, 3, witness)
+    other = image.copy()
+    other[0, 0, 0] = 1.0 - other[0, 0, 0]
+    _put_witness(render, witness, 1, image, other)
+    record = runner.compare_witness(witness, render, "CH", 3)
+    assert record["1"]["identical"] is False
+    with pytest.raises(runner.PremiseError, match=r"\[1\]"):
+        runner.require_identical_witness(record, 3, witness)
+    (witness / "CH_f0001-ancuti2018.png").unlink()
+    record = runner.compare_witness(witness, render, "CH", 3)
+    assert record["1"]["missing"] is True
+    with pytest.raises(runner.PremiseError, match="not identical"):
+        runner.require_identical_witness(record, 3, witness)
 
 
 def test_the_runner_writes_only_inside_its_folder(tmp_path: Path) -> None:
@@ -564,5 +850,6 @@ def test_7_the_runner_on_ten_frames_writes_its_record(tmp_path: Path) -> None:
         assert set(methods) == {"ancuti2018", "c3"}
         for method in methods.values():
             assert [entry["pts_ticks"] for entry in method["frames"]] == ticks
+            assert "white_balance_means.R" in method["frames"][0]["statistics"]
     staged = json.loads((folder / "statistics-staged.json").read_text(encoding="utf-8"))
     assert list(staged["methods"]["c3"]["measured_per_stage"]) == ["white_balance", "fusion"]
