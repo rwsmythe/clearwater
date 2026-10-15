@@ -66,6 +66,7 @@ from container_spike.compare import (
     pix_fmt_shape,
     run_ffprobe,
     udta_atom,
+    write_checked,
     write_record,
 )
 from local_config import LocalConfigError, load_local_config
@@ -92,7 +93,7 @@ _PIXEL_FORMATS: dict[str, dict[tuple[str, int], tuple[str, str]]] = {
 GPMF_SETTING_KEYS = ("MINF", "FMWR", "HDRV", "PRTN", "PTCL", "BITR")
 _HDR_TRANSFERS = frozenset({"arib-std-b67", "smpte2084"})
 _GPU_QUERY = "name,utilization.encoder,utilization.decoder,encoder.stats.sessionCount"
-_GPU_SAMPLE_SECONDS = 0.2
+_GPU_SAMPLE_SECONDS = 0.1
 _PSNR = re.compile(r"PSNR y:(\S+) u:(\S+) v:(\S+) average:(\S+) min:(\S+) max:(\S+)")
 _DECODED = re.compile(r"(\d+) frames decoded; (\d+) decode errors")
 
@@ -204,13 +205,36 @@ def capability_listing() -> dict[str, dict[str, bool]]:
     }
 
 
+def _gpu_query() -> list[list[str]]:
+    """Run one ``nvidia-smi`` query and return its rows (name, encoder %, decoder %, sessions).
+
+    Raises:
+        SpikeError: If ``nvidia-smi`` is absent, fails, times out or exits non-zero.
+    """
+    try:
+        result = subprocess.run(
+            ["nvidia-smi", f"--query-gpu={_GPU_QUERY}", "--format=csv,noheader,nounits"],
+            capture_output=True,
+            stdin=subprocess.DEVNULL,
+            timeout=10,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise SpikeError(f"nvidia-smi could not run: {exc}") from None
+    if result.returncode != 0:
+        raise SpikeError(f"nvidia-smi exited with status {result.returncode}")
+    text = result.stdout.decode("utf-8", errors="replace")
+    return [[part.strip() for part in line.split(",")] for line in text.splitlines()]
+
+
 @contextmanager
 def gpu_samples(record: dict[str, Any]) -> Iterator[None]:
-    """Sample ``nvidia-smi`` every 0.2 s while the ``with`` body runs.
+    """Sample ``nvidia-smi`` about every 0.1 s while the ``with`` body runs.
 
-    On exit, ``record`` receives ``gpu``: the GPU names seen, the sample count and the
-    highest encoder and decoder utilisation and NVENC session count, or
-    ``{"available": False}`` when ``nvidia-smi`` cannot run.
+    On exit, ``record`` receives ``gpu``: ``available`` (True only when at least one
+    sample succeeded and named a GPU), the GPU names seen, the sample count, the highest
+    encoder and decoder utilisation and NVENC session count, and the first sampling error
+    if any.
 
     Args:
         record: The dict that receives the ``gpu`` entry.
@@ -220,24 +244,18 @@ def gpu_samples(record: dict[str, Any]) -> Iterator[None]:
     """
     rows: list[list[str]] = []
     stop = threading.Event()
-    failed: list[str] = []
+    errors: list[str] = []
 
     def sample() -> None:
-        while not stop.is_set():
+        # At least one sample, however short the body.
+        while True:
             try:
-                result = subprocess.run(
-                    ["nvidia-smi", f"--query-gpu={_GPU_QUERY}", "--format=csv,noheader,nounits"],
-                    capture_output=True,
-                    stdin=subprocess.DEVNULL,
-                    timeout=10,
-                    check=False,
-                )
-            except (OSError, subprocess.TimeoutExpired) as exc:
-                failed.append(str(exc))
+                rows.extend(_gpu_query())
+            except SpikeError as exc:
+                errors.append(str(exc))
                 return
-            text = result.stdout.decode("utf-8", errors="replace")
-            rows.extend([part.strip() for part in line.split(",")] for line in text.splitlines())
-            stop.wait(_GPU_SAMPLE_SECONDS)
+            if stop.wait(_GPU_SAMPLE_SECONDS):
+                return
 
     worker = threading.Thread(target=sample, daemon=True)
     worker.start()
@@ -246,23 +264,21 @@ def gpu_samples(record: dict[str, Any]) -> Iterator[None]:
     finally:
         stop.set()
         worker.join(timeout=15)
-        usable = [row for row in rows if len(row) == 4]
-        if failed and not usable:
-            record["gpu"] = {"available": False, "error": failed[0]}
-        else:
+        usable = [row for row in rows if len(row) == 4 and row[0]]
 
-            def highest(column: int) -> int | None:
-                values = [int(row[column]) for row in usable if row[column].isdigit()]
-                return max(values) if values else None
+        def highest(column: int) -> int | None:
+            values = [int(row[column]) for row in usable if row[column].isdigit()]
+            return max(values) if values else None
 
-            record["gpu"] = {
-                "available": True,
-                "names": sorted({row[0] for row in usable}),
-                "samples": len(usable),
-                "max_encoder_utilisation_percent": highest(1),
-                "max_decoder_utilisation_percent": highest(2),
-                "max_nvenc_sessions": highest(3),
-            }
+        record["gpu"] = {
+            "available": bool(usable),
+            "names": sorted({row[0] for row in usable}),
+            "samples": len(usable),
+            "max_encoder_utilisation_percent": highest(1),
+            "max_decoder_utilisation_percent": highest(2),
+            "max_nvenc_sessions": highest(3),
+            "error": errors[0] if errors else None,
+        }
 
 
 # --- capability proofs (D74) ---------------------------------------------------------
@@ -305,7 +321,9 @@ def encode_proof(
     """Encode the synthetic clip and confirm the result with ``ffprobe``.
 
     The proof holds when FFmpeg exits 0 and ``ffprobe`` reads an HEVC stream of 60
-    frames with the expected profile and pixel format.
+    frames with the expected profile and pixel format; for ``hevc_nvenc`` it also needs
+    ``nvidia-smi`` to have named a GPU and counted at least one NVENC session during the
+    encode.
 
     Args:
         encoder: ``hevc_nvenc`` or ``libx265``.
@@ -343,11 +361,16 @@ def encode_proof(
     )
     stream = next((s for s in data.get("streams", []) if isinstance(s, dict)), {})
     record["ffprobe"] = stream
+    gpu = record["gpu"]
     record["proven"] = (
         stream.get("codec_name") == "hevc"
         and stream.get("profile") == expected_profile
         and stream.get("pix_fmt") == expected_pix_fmt
         and str(stream.get("nb_frames")) == "60"
+        and (
+            encoder != "hevc_nvenc"
+            or (bool(gpu["names"]) and (gpu["max_nvenc_sessions"] or 0) >= 1)
+        )
     )
     return record
 
@@ -388,6 +411,10 @@ def hardware_decode_command(chapter: Path) -> list[str]:
 def hardware_decode_proof(chapter: Path) -> dict[str, Any]:
     """Decode one chapter with ``-hwaccel cuda`` and check every frame was decoded.
 
+    The proof holds when FFmpeg exits 0, reports every container frame decoded with no
+    error, its filter graph received ``cuda`` frames, and ``nvidia-smi`` named a GPU
+    during the decode.
+
     Args:
         chapter: The chapter (an input only).
 
@@ -418,6 +445,7 @@ def hardware_decode_proof(chapter: Path) -> dict[str, Any]:
         and record["decode_errors"] == 0
         and record["graph_input_pixfmt_cuda"]
         and str(record["frames_decoded"]) == str(nb_frames)
+        and bool(record["gpu"]["names"])
     )
     return record
 
@@ -792,6 +820,14 @@ def reencode(
     """
     check_output_path(folder, allowed, footage)
     output = check_output_path(folder / output_name(source), allowed, footage)
+    run_path = folder / f"{output.stem}.run.json"
+    # Every file this run writes is checked before FFmpeg starts (and again when written).
+    for record_path in (
+        run_path,
+        folder / f"{output.stem}.compare.json",
+        folder / f"{output.stem}.compare.md",
+    ):
+        check_output_path(record_path, allowed, footage)
     folder.mkdir(parents=True, exist_ok=True)
     probe = run_ffprobe(["-show_format", "-show_streams", str(source)])
     command = reencode_command(source, output, probe, encoder)
@@ -806,13 +842,12 @@ def reencode(
         raise SpikeError(f"ffmpeg re-encode failed (status {status}): {tail}")
     source_facts, output_facts = gather(source), gather(output)
     record = build_record(source_facts, output_facts, compare_facts(source_facts, output_facts))
-    json_path, md_path = write_record(record, folder, output.stem)
+    json_path, md_path = write_record(record, folder, output.stem, allowed, footage)
     run["compare_json"] = str(json_path)
     run["compare_md"] = str(md_path)
     run["summary"] = record["summary"]
     run["psnr"] = identity_psnr(source, output)
-    run_path = folder / f"{output.stem}.run.json"
-    run_path.write_text(json.dumps(run, indent=1) + "\n", encoding="utf-8")
+    write_checked(json.dumps(run, indent=1) + "\n", run_path, allowed, footage)
     run["run_json"] = str(run_path)
     return run
 
@@ -829,11 +864,8 @@ def _chapter(footage: Path, name: str) -> Path:
 
 
 def _write_json(data: Mapping[str, Any], path: Path, allowed: Path, footage: Path) -> Path:
-    """Write ``data`` as JSON after checking the path."""
-    target = check_output_path(path, allowed, footage)
-    target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(json.dumps(data, indent=1) + "\n", encoding="utf-8")
-    return target
+    """Write ``data`` as JSON after checking the file's own resolved path."""
+    return write_checked(json.dumps(data, indent=1) + "\n", path, allowed, footage)
 
 
 def main(argv: list[str] | None = None) -> int:

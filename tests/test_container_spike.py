@@ -188,7 +188,7 @@ class TestMandatoryDifferences:
         for name in (
             "start offset: first video frame pts",
             "start offset: video and audio stream start_pts",
-            "start offset: container start_time (ffprobe, 1 us)",
+            "start offset: container start (earliest stream start, exact)",
         ):
             assert items[name]["status"] == DIFFERENT, name
             assert items[name]["class"] == MANDATORY
@@ -326,6 +326,38 @@ class TestOutputPathCheck:
         assert "| video per-frame pts (presentation, exact, full sequence) | MANDATORY |" in table
         assert "every MANDATORY item SAME: True" in capsys.readouterr().out
 
+    def test_a_record_file_linked_into_the_footage_folder_is_refused(
+        self, clips: dict[str, Path], tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        footage, spike_root = tmp_path / "footage", tmp_path / "work" / "wp1.5"
+        footage.mkdir()
+        spike_root.mkdir(parents=True)
+        config = tmp_path / "local.toml"
+        config.write_text(
+            f"footage_path = '{footage}'\nworking_path = '{tmp_path / 'work'}'\n", encoding="utf-8"
+        )
+        try:
+            (spike_root / "base.compare.json").symlink_to(footage / "planted.json")
+        except OSError:
+            pytest.skip("cannot create a file link here")
+        assert compare.main([str(clips["base"]), str(clips["base"]), "--config", str(config)]) == 2
+        assert "inside the footage folder" in capsys.readouterr().err
+        assert list(footage.iterdir()) == []
+
+    def test_reencode_refuses_a_run_record_linked_into_the_footage_folder(
+        self, clips: dict[str, Path], tmp_path: Path
+    ) -> None:
+        footage, spike_root = tmp_path / "footage", tmp_path / "work" / "wp1.5"
+        footage.mkdir()
+        (spike_root / "r").mkdir(parents=True)
+        try:
+            (spike_root / "r" / "base_corrected.run.json").symlink_to(footage / "planted.json")
+        except OSError:
+            pytest.skip("cannot create a file link here")
+        with pytest.raises(OutputPathError, match="inside the footage folder"):
+            spike.reencode(clips["base"], spike_root / "r", "libx265", spike_root, footage)
+        assert list(footage.iterdir()) == []
+
 
 class TestCapabilityListing:
     ENCODERS = """Encoders:
@@ -375,6 +407,45 @@ class TestEncodeProofs:
         return spike.encode_proof(
             encoder, pix_fmt, profile, allowed / "capability", allowed, footage
         )
+
+    @staticmethod
+    def _fake_nvenc_run(monkeypatch: pytest.MonkeyPatch, gpu_rows: list[list[str]] | None) -> None:
+        """An NVENC encode and ffprobe reading that succeed, with the given nvidia-smi rows."""
+        monkeypatch.setattr(spike, "run_tool", lambda *_, **__: (0, ""))
+        stream = {"codec_name": "hevc", "profile": "Main 10", "pix_fmt": "yuv420p10le"}
+        monkeypatch.setattr(
+            spike, "run_ffprobe", lambda _: {"streams": [{**stream, "nb_frames": "60"}]}
+        )
+
+        def query() -> list[list[str]]:
+            if gpu_rows is None:
+                raise spike.SpikeError("nvidia-smi exited with status 9")
+            return gpu_rows
+
+        monkeypatch.setattr(spike, "_gpu_query", query)
+
+    def test_nvenc_proof_needs_nvidia_smi(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        self._fake_nvenc_run(monkeypatch, None)
+        proof = self._prove(tmp_path, "hevc_nvenc", "p010le", "main10")
+        assert proof["gpu"]["available"] is False
+        assert proof["gpu"]["error"] == "nvidia-smi exited with status 9"
+        assert proof["proven"] is False
+
+    def test_nvenc_proof_needs_a_session(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        self._fake_nvenc_run(monkeypatch, [["NVIDIA GeForce", "0", "0", "0"]])
+        assert self._prove(tmp_path, "hevc_nvenc", "p010le", "main10")["proven"] is False
+
+    def test_nvenc_proof_holds_with_a_named_gpu_and_a_session(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        self._fake_nvenc_run(monkeypatch, [["NVIDIA GeForce", "35", "0", "1"]])
+        proof = self._prove(tmp_path, "hevc_nvenc", "p010le", "main10")
+        assert proof["gpu"]["names"] == ["NVIDIA GeForce"]
+        assert proof["proven"] is True
 
     def test_software_ten_bit_proof_holds(self, tmp_path: Path) -> None:
         proof = self._prove(tmp_path, "libx265", "yuv420p10le", "main10")
@@ -449,6 +520,18 @@ class TestReencodeCommand:
             spike.reencode_command(
                 Path("i.MP4"), Path("o.MP4"), self._probe("yuv422p10le"), "hevc_nvenc"
             )
+
+
+class TestCompositionOffsets:
+    def test_ctts_offsets_read_signed_as_ffmpeg_reads_them(self) -> None:
+        # A version-0 ctts with one run of offset -1001 (0xFFFFFC17), then two runs of 0.
+        payload = struct.pack(">I I II II", 0, 2, 1, (-1001) & 0xFFFFFFFF, 2, 0)
+        assert compare._runs(payload, (0, len(payload)), signed=True) == [(1, -1001), (2, 0)]
+
+    def test_earliest_composition_includes_negative_offsets(self) -> None:
+        assert compare._earliest_composition([(3, 1001)], [(1, -1001), (2, 0)]) == -1001
+        assert compare._earliest_composition([(3, 1001)], []) == 0
+        assert compare._earliest_composition([], []) is None
 
 
 class TestSmallParsers:

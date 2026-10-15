@@ -1027,13 +1027,24 @@ def compare_facts(source: Facts, output: Facts) -> list[Item]:
             stream_starts(output),
         )
     )
+
+    def container_start(facts: Facts) -> str | None:
+        # The exact form of ffprobe's container start_time: the earliest stream start.
+        starts = [
+            start
+            for s in facts.probe.get("streams", [])
+            if isinstance(s, dict)
+            and (start := _ticks(s.get("start_pts"), _time_base(s))) is not None
+        ]
+        return exact(min(starts)) if starts else None
+
     items.append(
         _item(
-            "start offset: container start_time (ffprobe, 1 us)",
+            "start offset: container start (earliest stream start, exact)",
             MANDATORY,
             "D94, D105, 7.5",
-            dict(source.probe.get("format") or {}).get("start_time"),
-            dict(output.probe.get("format") or {}).get("start_time"),
+            container_start(source),
+            container_start(output),
         )
     )
 
@@ -1517,24 +1528,57 @@ def check_output_path(path: Path, allowed_root: Path, footage_root: Path) -> Pat
     return path.resolve()
 
 
-def write_record(record: Mapping[str, Any], folder: Path, name: str) -> tuple[Path, Path]:
+def write_checked(text: str, path: Path, allowed_root: Path, footage_root: Path) -> Path:
+    """Write ``text`` to ``path`` after checking the file's own resolved path.
+
+    The file path itself is checked, not only its folder, so a link planted at the file
+    name cannot redirect the write.
+
+    Args:
+        text: The content (UTF-8).
+        path: The file.
+        allowed_root: The spike folder (see :func:`check_output_path`).
+        footage_root: The footage folder.
+
+    Returns:
+        The path written.
+
+    Raises:
+        OutputPathError: If the resolved path is refused.
+    """
+    target = check_output_path(path, allowed_root, footage_root)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(text, encoding="utf-8")
+    return path
+
+
+def write_record(
+    record: Mapping[str, Any], folder: Path, name: str, allowed_root: Path, footage_root: Path
+) -> tuple[Path, Path]:
     """Write ``<folder>/<name>.compare.json`` and ``<folder>/<name>.compare.md``.
 
-    The caller has already checked ``folder`` with :func:`check_output_path`.
+    Each file is checked with :func:`check_output_path` on its own resolved path before
+    it is written.
 
     Args:
         record: The record.
         folder: The output folder (created if absent).
         name: The file name stem.
+        allowed_root: The spike folder.
+        footage_root: The footage folder.
 
     Returns:
         The JSON and markdown paths.
+
+    Raises:
+        OutputPathError: If either path is refused (nothing is written then).
     """
-    folder.mkdir(parents=True, exist_ok=True)
     json_path = folder / f"{name}.compare.json"
     md_path = folder / f"{name}.compare.md"
-    json_path.write_text(json.dumps(record, indent=1) + "\n", encoding="utf-8")
-    md_path.write_text(markdown_table(record), encoding="utf-8")
+    for path in (json_path, md_path):
+        check_output_path(path, allowed_root, footage_root)
+    write_checked(json.dumps(record, indent=1) + "\n", json_path, allowed_root, footage_root)
+    write_checked(markdown_table(record), md_path, allowed_root, footage_root)
     return json_path, md_path
 
 
@@ -1559,7 +1603,9 @@ def main(argv: list[str] | None = None) -> int:
         spike_root = config.working_path / SPIKE_SUBDIR
         folder = check_output_path(args.out or spike_root, spike_root, config.footage_path)
         record = compare_files(args.source, args.output)
-        json_path, md_path = write_record(record, folder, args.output.stem)
+        json_path, md_path = write_record(
+            record, folder, args.output.stem, spike_root, config.footage_path
+        )
     except (LocalConfigError, OutputPathError, ProbeError, OSError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
