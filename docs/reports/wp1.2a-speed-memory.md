@@ -147,29 +147,34 @@ rejected it (option B) and banked the ill-conditioning of N{} on low-texture fra
   plugged in (`psutil.sensors_battery`: power plugged, battery 80-81 %), machine settings as
   found and not changed. Windows 11 has two layers: the power **scheme** (`powercfg
   /getactivescheme`) and the power-mode **overlay** set by the Settings slider. The scheme was
-  Balanced (381b4222-f694-41f0-9685-ff5bb260df2e) in both windows. The overlay was **not
+  Balanced (381b4222-f694-41f0-9685-ff5bb260df2e) in every window. The overlay was **not
   recorded in the first window** (the record held only the scheme, which the first version of
-  this report wrongly called the power mode); in the second window it was **Best performance**
-  (ded574b5-45a0-4f42-8737-46345c09c238), read through `powrprof` without changing anything.
-  From the second window on, `bench.py` also records the card's clocks, temperature, power
-  draw, P-state and clock-limit reasons just before and just after the timed loop (outside
-  it). A stray `python.exe` left by an earlier session (PID 33616) kept one of the 16 logical
-  CPUs busy in both windows (present at the GPU re-measurement too, `tasklist /FI "PID eq
-  33616"`); it was not this package's to stop, and every record's `ambient.note` says so.
+  this report wrongly called the power mode); in the second and third windows it was **Best
+  performance** (ded574b5-45a0-4f42-8737-46345c09c238), read through `powrprof` without
+  changing anything. From the second window on, `bench.py` also records the card's clocks,
+  temperature, power draw, P-state and clock-limit reasons just before and just after the
+  timed loop (outside it). **Stray process:** a `python.exe` left by an earlier session (PID
+  33616) kept one of the 16 logical CPUs busy during the first window (all CPU rows and the
+  first GPU records) and at the start of the second; it was stopped at about 05:20Z on the
+  owner's direction, during the second window. The third window, which gives the GPU rows,
+  ran with **no stray process** (`tasklist /FI "PID eq 33616"`: no such task, 05:29Z). Every
+  record's `ambient.note` says which.
 
 ## 5. Figures (claim 5)
 
 All rows **SYNTHETIC**. Records under `C:\Users\rwsmy\clearwater\work\wp1.2a\` (the working
-folder; not committed). Two exclusive windows on 2026-10-14 (local time, UTC-10):
+folder; not committed). Exclusive windows on 2026-10-14 (local time, UTC-10):
 
-- **CPU rows: head `d3d9555`**, 17:11-18:27. The timed path has not changed since: from
-  `d3d9555` to `f234dbf` the pipeline is untouched, `backend.py` changed only in
+- **CPU rows: head `d3d9555`**, 17:11-18:27 (first window). The timed path has not changed
+  since: from `d3d9555` to `72c19cc` the pipeline is untouched, `backend.py` changed only in
   `select_backend`'s probe (run before the loop) and `bench.py` only in ambient readings
-  taken outside the timed region. Ambient: scheme Balanced, overlay not recorded, PID 33616
-  present.
-- **GPU rows: head `f234dbf`**, 19:17-19:22, re-measured after Reviewer B's run did not
-  reproduce the first window's 3C cells within 10 %. Ambient: scheme Balanced, overlay Best
-  performance, PID 33616 present; GPU state per cell in the spread table below.
+  taken outside the timed region. Ambient: scheme Balanced, overlay not recorded, the stray
+  process PID 33616 present.
+- **GPU rows: head `72c19cc`**, 19:29-19:34 (third window), on a clean machine: **no stray
+  process**, scheme Balanced, overlay Best performance; GPU state per cell in the spread
+  table below. They replace the second window's (head `f234dbf`, 19:17-19:22, stray present
+  at its start), which re-measured the GPU after Reviewer B's run did not reproduce the
+  first window's 3C cells within 10 %.
 
 "Peak graphics memory" is the CuPy pool's reserved high-water mark, with the pool's peak
 used bytes in brackets; "Estimate / peak" is `memory_estimate_bytes` over that figure on the
@@ -180,60 +185,61 @@ first ten steady frames -> the median of the last ten.
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | CPU | 4k | ancuti2018 | 60 | 10.971 | 11.285 | 11.233 -> 11.008 (-2.0%) | 98.8x | 195.9x | 1647 | n/a | 1982 | RSS 1.20 | `d3d9555` | `bench-cpu-4k-ancuti2018-20261014-172225.json` |
 | CPU | 4k | c3 | 60 | 23.394 | 24.021 | 21.573 -> 23.701 (+9.9%) | 210.8x | 417.8x | 1646 | n/a | 1982 | RSS 1.20 | `d3d9555` | `bench-cpu-4k-c3-20261014-174552.json` |
-| GPU | 4k | ancuti2018 | 60 | 0.385 | 0.419 | 0.400 -> 0.401 (+0.2%) | 3.5x | 6.9x | 1673 | 1712 (used 1585) | 1982 | 1.16 (RSS 1.18) | `f234dbf` | `bench-gpu-4k-ancuti2018-20261014-191823.json` |
-| GPU | 4k | c3 | 60 | 0.626 | 0.658 | 0.630 -> 0.617 (-2.2%) | 5.6x | 11.2x | 1672 | 1712 (used 1585) | 1982 | 1.16 (RSS 1.19) | `f234dbf` | `bench-gpu-4k-c3-20261014-191937.json` |
+| GPU | 4k | ancuti2018 | 60 | 0.391 | 0.425 | 0.376 -> 0.409 (+9.0%) | 3.5x | 7.0x | 1663 | 1712 (used 1585) | 1982 | 1.16 (RSS 1.19) | `72c19cc` | `bench-gpu-4k-ancuti2018-20261014-193022.json` |
+| GPU | 4k | c3 | 60 | 0.652 | 0.703 | 0.652 -> 0.658 (+0.9%) | 5.9x | 11.6x | 1667 | 1712 (used 1585) | 1982 | 1.16 (RSS 1.19) | `72c19cc` | `bench-gpu-4k-c3-20261014-193138.json` |
 | CPU | 5.3k | ancuti2018 | 30 | 24.548 | 25.159 | 24.932 -> 24.477 (-1.8%) | 221.2x | 438.4x | 3090 | n/a | 3792 | RSS 1.23 | `d3d9555` | `bench-cpu-5.3k-ancuti2018-20261014-175817.json` |
 | CPU | 5.3k | c3 | 30 | 57.985 | 58.502 | 58.058 -> 58.147 (+0.2%) | 522.4x | 1035.4x | 3094 | n/a | 3792 | RSS 1.23 | `d3d9555` | `bench-cpu-5.3k-c3-20261014-182722.json` |
-| GPU | 5.3k | ancuti2018 | 30 | 0.835 | 0.870 | 0.831 -> 0.842 (+1.3%) | 7.5x | 14.9x | 2696 | 3275 (used 3032) | 3792 | 1.16 (RSS 1.41) | `f234dbf` | `bench-gpu-5.3k-ancuti2018-20261014-192027.json` |
-| GPU | 5.3k | c3 | 30 | 1.479 | 1.682 | 1.454 -> 1.499 (+3.1%) | 13.3x | 26.4x | 2687 | 3275 (used 3032) | 3792 | 1.16 (RSS 1.41) | `f234dbf` | `bench-gpu-5.3k-c3-20261014-192200.json` |
+| GPU | 5.3k | ancuti2018 | 30 | 0.836 | 0.907 | 0.831 -> 0.837 (+0.7%) | 7.5x | 14.9x | 2688 | 3275 (used 3032) | 3792 | 1.16 (RSS 1.41) | `72c19cc` | `bench-gpu-5.3k-ancuti2018-20261014-193229.json` |
+| GPU | 5.3k | c3 | 30 | 1.503 | 1.554 | 1.484 -> 1.542 (+3.9%) | 13.5x | 26.8x | 2696 | 3275 (used 3032) | 3792 | 1.16 (RSS 1.41) | `72c19cc` | `bench-gpu-5.3k-c3-20261014-193401.json` |
 
-**GPU spread between the two windows (a result in itself).** The first window's GPU records
-(head `d3d9555`, 17:06-17:11, overlay not recorded, no GPU state recorded) are kept beside
-the second's; the memory figures were identical to the byte. The 3C cells moved by more than
-10 %, the ancuti2018 cells by 7-8 %. 3C's sigma-108 Gaussian is compute-bound and the most
-clock-sensitive step. At the end of every second-window loop the card was in P0 at
-1995-2400 MHz, power-capped (reason 0x04) and, after 5.3K 3C, in software thermal slowdown
-(0x20) at 83 C; what clocks and overlay held in the first window is not known, so the
-spread is not attributed further. On a laptop, sustained GPU speed varies by this much
-between runs (spec 12).
+**GPU spread between the windows (a result in itself).** All three windows' GPU records are
+kept; the memory figures were identical to the byte in all three. Against the first window
+(head `d3d9555`, overlay and GPU state not recorded, stray present), the 3C cells came out
+10-18 % faster in both later windows (9.8-13.3 % at 4K, 16.8-18.1 % at 5.3K) and the
+ancuti2018 cells 6-8 % faster; the second and
+third windows agree within 4.2 %. 3C's sigma-108 Gaussian is compute-bound and the most
+clock-sensitive step. At the end of every third-window loop the card was in P0 at 2055-2445
+MHz, power-capped (reason 0x04) or, after 5.3K 3C, in software thermal slowdown (0x20); what
+clocks and overlay held in the first window is not known, so the spread is not attributed
+further. On a laptop, sustained GPU speed varies by this much between runs (spec 12).
 
-| Size | Method | Median, window 1 (s) | Median, window 2 (s) | Change | Device-resident 1 -> 2 (s) | GPU state at loop start | GPU state at loop end |
-|---|---|---|---|---|---|---|---|
-| 4k | ancuti2018 | 0.416 | 0.385 | -7.3% | 0.305 -> 0.274 | 1980 MHz, 57 C, 21 W, P0 | 2280 MHz, 70 C, 57 W, P0, reasons 0x04 |
-| 4k | c3 | 0.723 | 0.626 | -13.3% | 0.613 -> 0.506 | 1980 MHz, 67 C, 22 W, P0 | 2355 MHz, 86 C, 98 W, P0, reasons 0x04 |
-| 5.3k | ancuti2018 | 0.907 | 0.835 | -8.0% | 0.643 -> 0.574 | 1980 MHz, 74 C, 26 W, P0 | 2400 MHz, 83 C, 75 W, P0, reasons 0x04 |
-| 5.3k | c3 | 1.807 | 1.479 | -18.1% | 1.624 -> 1.263 | 1980 MHz, 75 C, 24 W, P0 | 1995 MHz, 83 C, 73 W, P0, reasons 0x20 |
+| Size | Method | Median, window 1 (s) | Window 2 (s) | Window 3 (s) | Window 3 vs 1 | Device-resident 1 / 2 / 3 (s) | GPU state at loop start (window 3) | GPU state at loop end (window 3) |
+|---|---|---|---|---|---|---|---|---|
+| 4k | ancuti2018 | 0.416 | 0.385 | 0.391 | -5.9% | 0.305 / 0.274 / 0.273 | 1980 MHz, 57 C, 21 W, P0 | 2340 MHz, 70 C, 58 W, P0, reasons 0x04 |
+| 4k | c3 | 0.723 | 0.626 | 0.652 | -9.8% | 0.613 / 0.506 / 0.512 | 1980 MHz, 68 C, 22 W, P0 | 2220 MHz, 83 C, 88 W, P0, reasons 0x04 |
+| 5.3k | ancuti2018 | 0.907 | 0.835 | 0.836 | -7.9% | 0.643 / 0.574 / 0.573 | 1980 MHz, 75 C, 24 W, P0 | 2055 MHz, 87 C, 86 W, P0, reasons 0x04 |
+| 5.3k | c3 | 1.807 | 1.479 | 1.503 | -16.8% | 1.624 / 1.263 / 1.289 | 1980 MHz, 75 C, 24 W, P0 | 2445 MHz, 81 C, 38 W, P0, reasons 0x20 |
 
-Supplementary (GPU, not the brief's figure, second window): the device-resident path, the
+Supplementary (GPU, not the brief's figure, third window): the device-resident path, the
 input copied in and only the output copied back, same frame and N, run after the main loop
 in the same process. The difference to the main table is the device-to-host copy of the other
 fifteen result arrays.
 
 | Size | Method | Device-resident median (s) | p95 (s) | Drift | Share of 0.111 s |
 |---|---|---|---|---|---|
-| 4k | ancuti2018 | 0.274 | 0.288 | +1.5% | 2.5x |
-| 4k | c3 | 0.506 | 0.538 | +3.4% | 4.6x |
-| 5.3k | ancuti2018 | 0.574 | 0.602 | -4.6% | 5.2x |
-| 5.3k | c3 | 1.263 | 1.378 | +1.9% | 11.4x |
+| 4k | ancuti2018 | 0.273 | 0.282 | -2.1% | 2.5x |
+| 4k | c3 | 0.512 | 0.543 | +1.8% | 4.6x |
+| 5.3k | ancuti2018 | 0.573 | 0.753 | +2.1% | 5.2x |
+| 5.3k | c3 | 1.289 | 1.361 | +3.4% | 11.6x |
 
-Graphics memory readings of the **main** timed loop (second window; they are taken before the
+Graphics memory readings of the **main** timed loop (third window; they are taken before the
 device-resident loop runs). The context column is the `nvidia-smi` growth over the run (after
 less before) less the pool's reserved bytes: the CUDA context and library workspaces.
 
 | Size | Method | `nvidia-smi` used before -> after (MiB) | Pool reserved (MiB) | Context and libraries (MiB) | CUDA used after context -> after loop (MiB) | Estimate (ratio to `nvidia-smi` growth) |
 |---|---|---|---|---|---|---|
-| 4k | ancuti2018 | 160 -> 2017 | 1712 | 145 | 1122 -> 2864 | 1982 (1.07) |
-| 4k | c3 | 219 -> 2037 | 1712 | 106 | 1122 -> 2864 | 1982 (1.09) |
-| 5.3k | ancuti2018 | 162 -> 3593 | 3275 | 156 | 1122 -> 4420 | 3792 (1.11) |
-| 5.3k | c3 | 178 -> 3672 | 3275 | 219 | 1122 -> 4424 | 3792 (1.09) |
+| 4k | ancuti2018 | 297 -> 2097 | 1712 | 88 | 1122 -> 2864 | 1982 (1.10) |
+| 4k | c3 | 214 -> 2071 | 1712 | 145 | 1122 -> 2864 | 1982 (1.07) |
+| 5.3k | ancuti2018 | 193 -> 3636 | 3275 | 168 | 1122 -> 4420 | 3792 (1.10) |
+| 5.3k | c3 | 196 -> 3613 | 3275 | 142 | 1122 -> 4424 | 3792 (1.11) |
 
-Readings. The `nvidia-smi` figure before a GPU run was 160-219 MiB; before some CPU runs it
+Readings. The `nvidia-smi` figure before a GPU run was 193-297 MiB; before some CPU runs it
 read 0 MiB (the discrete card idles). The highest graphics memory peak, 3275 MiB at 5.3K, is
 40 % of the card's 8188 MiB. Peak RSS stays under 3.1 GiB everywhere (N4 limit 16 GB).
-Warm-up (discarded) first frames: GPU 0.66-1.70 s (1.15 to 1.72 times the steady median);
-CPU 0.93 to 1.02 times the steady median (no compilation on the CPU). Drift is within
-+/-3.1 % on the GPU; on the CPU, 3C at 4K slowed by 9.9 % over the run (21.6 -> 23.7 s), the
-only cell with a drift above 3.1 %.
+Warm-up (discarded) first frames: GPU 0.74-1.77 s (1.18 to 1.89 times the steady median);
+CPU 0.93 to 1.02 times the steady median (no compilation on the CPU). Drift: GPU within
++3.9 % except 4K ancuti2018 at +9.0 % (third window; +0.2 % in the second); CPU within
++/-2.0 % except 3C at 4K, which slowed by 9.9 % over the run (21.6 -> 23.7 s).
 
 ## 6. Budget comparison (N6, D106)
 
@@ -241,11 +247,11 @@ N6 is end to end, decode and encode included, which Part A does not have; the sh
 core's per-frame median over the budget (0.111 s at 30 fps, 0.056 s at 60 fps), and whatever
 is left is what WP1.5's decode and encode path must fit in.
 
-- **GPU, 4K:** the core alone takes 3.5x (ancuti2018) and 5.6x (3C) of the 30 fps budget,
-  6.9x and 11.2x of the 60 fps budget (second window; 3.7x and 6.5x in the first). Nothing
+- **GPU, 4K:** the core alone takes 3.5x (ancuti2018) and 5.9x (3C) of the 30 fps budget,
+  7.0x and 11.6x of the 60 fps budget (third window; 3.7x and 6.5x in the first). Nothing
   is left for decode and encode; even the device-resident path (2.5x and 4.6x at 30 fps) is
   over the whole budget.
-- **GPU, 5.3K** (best effort per D106): 7.5x and 13.3x at 30 fps (8.2x and 16.3x in the
+- **GPU, 5.3K** (best effort per D106): 7.5x and 13.5x at 30 fps (8.2x and 16.3x in the
   first window).
 - **CPU:** 99x to 522x of the 30 fps budget (11.0 to 58.0 s per frame), as spec 12 expects.
 
@@ -253,7 +259,7 @@ This package does not declare Gate 1 passed or failed and does not optimise the 
 (CHARC). For WP2.1 and WP3.1, observed but not acted on: 3C's large Gaussian (sigma 0.05 of
 the short side, 108 px at 4K, 865 taps per axis as a direct convolution) took about 97 ms per
 4K channel on the GPU in a development measurement and is the main difference between the
-two methods; copying all intermediates back costs about 0.11-0.12 s per 4K frame (section 5,
+two methods; copying all intermediates back costs about 0.12-0.14 s per 4K frame (section 5,
 supplementary table); the fusion keeps the last input's pyramids referenced during the
 collapse (13 1/3 of the 50 1/12 peak planes, section 7).
 
@@ -270,15 +276,15 @@ of EXPAND temporaries. That is 50 1/12 planes; the measured peak used is 50.1 pl
 size from 128x72 to 5.3K. The estimate multiplies by 1.25 (pool rounding and fragmentation,
 measured at 8 %, and pyramids of odd sizes) and adds 1 MiB (constant arrays and the pool's
 512-byte rounding, which dominate only for tiny images). It excludes the CUDA context and
-library workspaces, 106-219 MiB here (the `nvidia-smi` growth over the run less the pool's
+library workspaces, 88-168 MiB here (the `nvidia-smi` growth over the run less the pool's
 reserved bytes, section 5; the spread is the `nvidia-smi` reading's own), because they exist
 before the decision is taken: compare the estimate with the device's free memory.
 
 Measured: the estimate is 1.16x the pool's reserved peak and 1.25x its used peak in every
-GPU row; it also covers the whole-card `nvidia-smi` growth (1.07-1.09x at 4K, 1.09-1.11x at
-5.3K) and the CPU rows' peak RSS (1.20x at 4K, 1.23x at 5.3K). A `gpu` test asserts
-estimate >= reserved >= used, and estimate <= 1.5x reserved, at 1024x1536 for both methods.
-The CPU rows' RSS includes the interpreter and libraries (156-242 MiB at start).
+GPU row; it also covers the whole-card `nvidia-smi` growth (1.07-1.11x) and the CPU rows' peak
+RSS (1.20x at 4K, 1.23x at 5.3K). A `gpu` test asserts estimate >= reserved >= used, and
+estimate <= 1.5x reserved, at 1024x1536 for both methods. The CPU rows' RSS includes the
+interpreter and libraries (156-242 MiB at start).
 
 ## 8. Proxy resolution and the whole-frame statistics (claim 6; D60, D109)
 
