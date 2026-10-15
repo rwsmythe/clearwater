@@ -97,6 +97,13 @@ Repository local + mirrored to private GitHub `rwsmythe/clearwater` (verify:
    local config copied into the worktree so the footage test runs; Reviewer B ordered.
    Orchestrator self-reported a harness-gate overlap with the GPU re-measure start; the
    overlapped cell is discarded and re-run.
+  **ACCEPTED 2026-10-15T05:56Z**: main f6d998a, record 7048fd7; A r1 0/0/3; B BLOCKING (c3
+  reproduction) -> re-measured clean -> B2 NO_BLOCKING (within 4.1%). CHARC QA at this seat:
+  all gates green. SYNTHETIC figures: GPU 4K 0.389 s (3.5x N6) / 0.652 s (5.9x); 5.3K 0.836
+  / 1.503 s; pool 1712 MiB 4K / 3275 MiB 5.3K; CPU 11-58 s. Card power-capped at loop end.
+  Proxies: means and WB gains hold; N{} bounds shrink 9-19%. CHARC rulings: `_windows_power()`
+  APPROVED instrument-only (N1 exception, bench.py only); [ctk] N13 list -> WP2.1; Gate 1
+  held for WP1.6. Exclusive window CLOSED; WP1.5 dispatched by the orchestrator.
 3. **Next harness acts:** QA the WP1.2 Part A accept when it lands (B2 reproduction
    pending); QA the WP1.5 accept; WP1.2 Part B after the footage is complete and WP1.5
    reports; WP1.3 and WP1.4 need CP1; WP1.6 gate report after all six results.

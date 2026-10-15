@@ -14,8 +14,8 @@ If the plan and the spec disagree, the spec wins; raise the disagreement to the 
 
 - **Harness bootstrapped (2026-10-14).** The repository is a live multi-agent harness instance (see "The harness" below) with the application defined in `APPLICATION.md`, three implementer cells under `.claude/agents/`, the review/gate fill in `docs/review-gate-clearwater.md`, and the uv project skeleton (`pyproject.toml`, Python 3.12, `src/clearwater/`, `tests/`, `tools/`).
 - **No product code yet.** `src/clearwater/__init__.py` is a stub. Prototype code (evidence, not product) lives under `tools/prototype/`.
-- **Done:** WP0.1 (local config, environment report, FFmpeg dev tools; accepted 2026-10-14), WP0.2 (footage inventory tool `tools/inventory.py`; accepted 2026-10-15), WP1.1 (reference pipeline prototype `tools/prototype/`, reports `docs/reports/wp1.1-*.md`; accepted 2026-10-15, main `9711faf`). Accept records in `docs/proofs/`; open debt in `docs/debt-register.md`.
-- **In flight:** WP1.2 Part A (CPU/GPU variant on synthetic frames, CuPy; brief `docs/briefs/wp1.2-brief.md`; exclusive). WP1.2 Part B, WP1.5, the real inventory run and CP1 wait on the footage download; WP1.3 and WP1.4 wait on CP1.
+- **Done:** WP0.1 (local config, environment report, FFmpeg dev tools; accepted 2026-10-14), WP0.2 (footage inventory tool `tools/inventory.py`; accepted 2026-10-15), WP1.1 (reference pipeline prototype `tools/prototype/`, reports `docs/reports/wp1.1-*.md`; accepted 2026-10-15, main `9711faf`), WP1.2 Part A (CuPy backend, `bench.py`, synthetic speed and memory report `docs/reports/wp1.2a-speed-memory.md`; accepted 2026-10-15, main `f6d998a`). Accept records in `docs/proofs/`; open debt in `docs/debt-register.md`.
+- **In flight:** WP1.5 container spike (brief `docs/briefs/wp1.5-brief.md`) on the four shallow GoPro chapters present. WP1.2 Part B, the real inventory run and CP1 wait on the complete footage download; WP1.3 and WP1.4 wait on CP1. Gate 1 (N6 speed) is decided at WP1.6 with Part B.
 
 ## Inputs the owner has supplied
 
