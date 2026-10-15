@@ -1,7 +1,8 @@
 """Tests of the WP1.4 temporal statistics module and the supplied-statistics hook.
 
 The numbered tests are the brief's (``docs/briefs/wp1.4-brief.md``, Tests row); test 2 is the
-existing prototype suite, unchanged.
+existing prototype suite, unchanged; test 7 (``footage``) runs ``tools/statistics_experiments.py``
+on 10 frames of ``GX011628.MP4``.
 """
 
 from __future__ import annotations
@@ -9,13 +10,18 @@ from __future__ import annotations
 import dataclasses
 import json
 import math
+import shutil
 from fractions import Fraction
+from pathlib import Path
 from typing import Any
 
 import numpy as np
 import pytest
 
 import prototype.pipeline as pipeline
+import statistics_experiments as runner
+from local_config import load_local_config
+from lookcheck.frames import OutputPathError, OutputRoots
 from prototype import temporal
 from prototype.backend import CPU, Backend, select_backend
 from prototype.params import Params
@@ -453,3 +459,68 @@ def test_flatten_and_unflatten_round_trip() -> None:
         unflatten({"gains.R": 1.0})
     with pytest.raises(ValueError, match="lacks"):
         unflatten({"white_balance_gains.R": 1.0})
+
+
+# --- the runner ---------------------------------------------------------------------------------
+
+
+def test_series_records_round_trip_with_their_pts() -> None:
+    series = stack([statistics_of(_scene(seed=s), Params()) for s in range(3)])
+    frames = [{"index": i, "pts_ticks": 1001 * i, "pts_seconds": i / 29.97} for i in range(3)]
+    record = runner.series_record(series, frames)
+    assert [entry["pts_ticks"] for entry in record] == [0, 1001, 2002]
+    restored = runner.series_from_record(json.loads(json.dumps(record)))
+    assert restored.keys() == series.keys()
+    for name in series:
+        np.testing.assert_array_equal(restored[name], series[name])
+
+
+def test_the_interior_frame_steps() -> None:
+    assert half_width(runner.INTERIOR_WINDOW_S, NTSC) == 59
+    assert runner._interior(180, NTSC) == slice(59, 120)
+    assert runner._interior(10, NTSC) is None
+
+
+def test_the_runner_writes_only_inside_its_folder(tmp_path: Path) -> None:
+    footage = tmp_path / "footage"
+    roots = OutputRoots(allowed=tmp_path / "work" / "wp1.4", footage=footage)
+    with pytest.raises(OutputPathError, match="footage"):
+        runner._save_array(roots, footage / "proxies.npy", np.zeros(3))
+    with pytest.raises(OutputPathError, match="outside"):
+        runner._write_json(roots, tmp_path / "work" / "results.json", {})
+    with pytest.raises(OutputPathError, match="outside"):
+        runner._write_png(roots, tmp_path / "x.png", np.zeros((2, 2, 3), dtype=np.float32))
+    assert not footage.exists()
+    assert list(tmp_path.iterdir()) == []
+
+
+@pytest.mark.footage
+@pytest.mark.skipif(
+    shutil.which("ffmpeg") is None or shutil.which("ffprobe") is None,
+    reason="ffmpeg/ffprobe not on PATH",
+)
+def test_7_the_runner_on_ten_frames_writes_its_record(tmp_path: Path) -> None:
+    config = load_local_config()
+    chapter = config.footage_path / "GX011628.MP4"
+    if not chapter.is_file():
+        pytest.skip("GX011628.MP4 is not in the footage folder")
+    roots = OutputRoots(allowed=tmp_path / "wp1.4", footage=config.footage_path)
+    spec = runner.ExcerptSpec("ten", "GX011628", 0.30, 10 / float(NTSC), False, False)
+    backend = select_backend("auto")
+    document = runner.extract_excerpt(spec, config.footage_path, roots, backend)
+    folder = roots.allowed / "ten"
+    assert document["frames_count"] == 10
+    assert document["tags"]["color_range"] == "pc" and document["tags"]["assumed"] == []
+    assert np.load(folder / "proxies.npy").shape == (10, 540, 960, 3)
+    assert len(list((folder / "frames").glob("*.png"))) == 3  # first, middle, last kept
+    runner.analyse_statistics(folder, roots, backend)
+    ticks = [entry["pts_ticks"] for entry in document["frames"]]
+    assert ticks == sorted(ticks) and len(set(ticks)) == 10
+    for kind in ("raw", "staged", "flat"):
+        record = json.loads((folder / f"statistics-{kind}.json").read_text(encoding="utf-8"))
+        methods = record["proxy"] if kind == "raw" else record["methods"]
+        assert set(methods) == {"ancuti2018", "c3"}
+        for method in methods.values():
+            assert [entry["pts_ticks"] for entry in method["frames"]] == ticks
+    staged = json.loads((folder / "statistics-staged.json").read_text(encoding="utf-8"))
+    assert list(staged["methods"]["c3"]["measured_per_stage"]) == ["white_balance", "fusion"]
