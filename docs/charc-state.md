@@ -77,7 +77,7 @@ Repository local + mirrored to private GitHub `rwsmythe/clearwater` (verify:
   routed back to the author (ambient record extended, GPU cells re-measured, B2). No CHARC
   ruling needed. STRAY PROCESS: PID 33616 `C:\Python314\python.exe -`, hung since
   2026-10-14 13:31 (WP0.1 Reviewer B orphan), one core; the orchestrator's classifier
-  blocked stopping it; CHARC verified and surfaced to the owner (owner stops it).
+  blocked stopping it; CHARC verified and surfaced to the owner; STOPPED ~05:20Z on the owner's direction (taskkill typed by the owner, run via PowerShell by CHARC); orchestrator told.
 - Debt register `docs/debt-register.md`: DR-1..DR-14 (DR-3, DR-4 closed).
 - No authority granted by `SendMessage` this generation (cues only).
 
