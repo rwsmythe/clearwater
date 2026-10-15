@@ -19,14 +19,9 @@
 
 ### Live cells
 
-- **wp11-cell** (implementer-opus-high, idle) -- WP1.1, worktree `.worktrees/wp1.1`, branch
-  `wp1.1`, base `46a10b9`, author head `8e149db` (verify: `git -C .worktrees/wp1.1 log -1`).
-  Reviewer A STRONG converged r3. Informal 4K run done (both methods exit 0, 8 levels, coarsest
-  17 px; ~14 s / ~26 s informal). Depth 267K at first return.
-- **wp11-reviewer-b** (implementer-opus-high, background) -- Reviewer B on `8e149db`, brief
-  `docs/briefs/wp1.1-review-brief.md`; evidence `clearwater-review-evidence\wp1.1\B\`.
-- Branches `wp0.1` and `wp0.2` are kept on purpose: they hold the reviewed pre-rebase SHAs the
-  accept records cite.
+- None (verify: `git worktree list` shows only main).
+- Branches `wp0.1`, `wp0.2` and `wp1.1` are kept on purpose: they hold the reviewed pre-rebase
+  SHAs the accept records cite.
 
 ### Workstreams
 
@@ -58,6 +53,10 @@
 
 ### Pending
 
-- WP1.1 CHARC rulings `ad686b8b65a71061`: Laplacian LoG form ACCEPTED; Q2/Q3 banked DR-11/DR-12;
-  the three report edits it required are in `8e149db`. Next: B return -> gate -> merge -> accept.
+- **WP1.1 -- ACCEPTED 2026-10-15**, main `9711faf`, record `docs/proofs/wp1.1-accept.md` (2e09203).
+  Return report posted to CHARC (raised: W_L near-inert at defaults, a WP1.3 calibration point);
+  operator fyi posted. Awaiting CHARC QA and the next commission.
+- Lesson carried forward: every Reviewer B brief's Codex prompt must NAME the withheld paths in
+  its own paragraph, plus a transcript `grep -a 'docs/proofs\|<wp>-ledger'` access assertion
+  (WP1.1 B pass 1 Codex read the ledger).
 - Inbox drained through msg `ad686b8b65a71061` (verify: `uv run python scripts/role_mail.py list --role orchestrator`).
