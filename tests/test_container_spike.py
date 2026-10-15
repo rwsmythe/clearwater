@@ -465,6 +465,58 @@ class TestOutputPathCheck:
             spike.reencode(clips["base"], spike_root / "r", "libx265", spike_root, footage)
         assert list(footage.iterdir()) == []
 
+    @staticmethod
+    def _hard_link(target: Path, link: Path) -> None:
+        try:
+            link.hardlink_to(target)
+        except OSError:
+            pytest.skip("cannot create a hard link here")
+
+    def test_a_hard_link_to_a_file_outside_is_refused(self, tmp_path: Path) -> None:
+        allowed, footage = tmp_path / "work" / "wp1.5", tmp_path / "footage"
+        allowed.mkdir(parents=True)
+        outside = tmp_path / "elsewhere.txt"
+        outside.write_text("outside", encoding="utf-8")
+        self._hard_link(outside, allowed / "x.json")
+        # The resolved path is inside the spike folder; only the link count gives it away.
+        with pytest.raises(OutputPathError, match="hard links"):
+            compare.check_output_path(allowed / "x.json", allowed, footage)
+        with pytest.raises(OutputPathError, match="hard links"):
+            compare.write_checked("planted", allowed / "x.json", allowed, footage)
+        assert outside.read_text(encoding="utf-8") == "outside"
+
+    def test_a_record_file_hard_linked_into_the_footage_folder_is_refused(
+        self, clips: dict[str, Path], tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        footage, spike_root = tmp_path / "footage", tmp_path / "work" / "wp1.5"
+        footage.mkdir()
+        spike_root.mkdir(parents=True)
+        config = tmp_path / "local.toml"
+        config.write_text(
+            f"footage_path = '{footage}'\nworking_path = '{tmp_path / 'work'}'\n", encoding="utf-8"
+        )
+        (footage / "camera.MP4").write_bytes(b"camera bytes")
+        self._hard_link(footage / "camera.MP4", spike_root / "base.compare.json")
+        assert compare.main([str(clips["base"]), str(clips["base"]), "--config", str(config)]) == 2
+        assert "hard links" in capsys.readouterr().err
+        assert (footage / "camera.MP4").read_bytes() == b"camera bytes"
+
+    def test_reencode_refuses_a_hard_linked_output_before_running_ffmpeg(
+        self, clips: dict[str, Path], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        def no_run(*_: object, **__: object) -> tuple[int, str]:
+            raise AssertionError("ffmpeg must not run")
+
+        monkeypatch.setattr(spike, "run_tool", no_run)
+        footage, spike_root = tmp_path / "footage", tmp_path / "work" / "wp1.5"
+        footage.mkdir()
+        (spike_root / "r").mkdir(parents=True)
+        (footage / "camera.MP4").write_bytes(b"camera bytes")
+        self._hard_link(footage / "camera.MP4", spike_root / "r" / "base_corrected.mp4")
+        with pytest.raises(OutputPathError, match="hard links"):
+            spike.reencode(clips["base"], spike_root / "r", "libx265", spike_root, footage)
+        assert (footage / "camera.MP4").read_bytes() == b"camera bytes"
+
 
 class TestCapabilityListing:
     ENCODERS = """Encoders:

@@ -1598,8 +1598,12 @@ def _normalised(path: Path) -> Path:
 def check_output_path(path: Path, allowed_root: Path, footage_root: Path) -> Path:
     """Refuse an output path outside the spike folder or inside the footage folder.
 
-    Both checks run on the resolved path (links followed), so a link that leads into the
-    footage folder is refused.
+    Both checks run on the resolved path (links followed), so a symbolic link or
+    junction that leads into the footage folder is refused. A hard link resolves to
+    itself, so an existing file with more than one link is refused as well: writing
+    to it would change every other name of the same file, wherever that name is.
+    The check is made once, before the write; a concurrent process that swaps a
+    checked path between the check and the write is outside what it guards against.
 
     Args:
         path: The intended output file or folder.
@@ -1610,8 +1614,9 @@ def check_output_path(path: Path, allowed_root: Path, footage_root: Path) -> Pat
         The resolved path.
 
     Raises:
-        OutputPathError: If the path is not inside ``allowed_root`` (or equal to it) or
-            is inside (or equal to) ``footage_root``.
+        OutputPathError: If the path is not inside ``allowed_root`` (or equal to it), is
+            inside (or equal to) ``footage_root``, or is an existing file with more than
+            one hard link.
     """
     resolved = _normalised(path)
     allowed = _normalised(allowed_root)
@@ -1620,7 +1625,10 @@ def check_output_path(path: Path, allowed_root: Path, footage_root: Path) -> Pat
         raise OutputPathError(f"output path {path} lies inside the footage folder")
     if resolved != allowed and allowed not in resolved.parents:
         raise OutputPathError(f"output path {path} lies outside the spike folder {allowed_root}")
-    return path.resolve()
+    target = path.resolve()
+    if target.exists() and not target.is_dir() and (links := target.stat().st_nlink) > 1:
+        raise OutputPathError(f"output path {path} exists with {links} hard links")
+    return target
 
 
 def write_checked(text: str, path: Path, allowed_root: Path, footage_root: Path) -> Path:
