@@ -27,9 +27,10 @@ It writes, in ``wp1.3/``: ``frames/`` (source PNGs and ``<frame>-<variant>.png``
 of the duration) at the defaults with ``ancuti2018``, UNSMOOTHED (each frame its own
 statistics), encodes the corrected frames and the untouched source frames to
 ``flicker/GX011627_unsmoothed.mp4`` and ``flicker/GX011627_source.mp4`` (HEVC NVENC 8-bit
-4:2:0 with the source's colour tags and frame rate), checks both encodes, writes
-``flicker/statistics.json`` and a plot, and removes all frame PNGs but the first, middle
-and last of each set.
+4:2:0 with the source's colour tags and frame rate) under temporary names, checks both
+(ffprobe, and every frame of each clip read back against its own PNG), renames them only
+when both pass, writes ``flicker/statistics.json`` and a plot, and removes all frame PNGs
+but the first, middle and last of each set.
 
 Exit status 0 on success; 2, with a one-line ``error: ...`` on standard error, on a
 configuration, probe, device, path or FFmpeg failure.
@@ -38,12 +39,12 @@ configuration, probe, device, path or FFmpeg failure.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import dataclasses
 import datetime
 import html
 import io
 import json
-import math
 import statistics
 import sys
 import time
@@ -64,6 +65,7 @@ if not __package__:
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import itertools
+import shutil
 
 from local_config import LocalConfigError, load_local_config
 from lookcheck.frames import (
@@ -72,6 +74,7 @@ from lookcheck.frames import (
     OutputRoots,
     StreamInfo,
     StreamTags,
+    colour_filter,
     excerpt,
     extract,
     probe_stream,
@@ -138,10 +141,22 @@ _NVENC_SETTINGS = (
     "-profile:v",
     "main",
 )
-# The source-versus-encode check on the first frame of the re-assembled source clip, in
-# 8-bit levels: a lossy encode differs a little; a range or matrix error differs a lot.
-_ENCODE_MAX_MEAN_ABS = 4.0
-_ENCODE_MAX_ABS_BIAS = 1.5
+# The read-back of every frame of an encoded clip against the PNG it was encoded from. Both
+# sides are reduced by the same factor with the same FFmpeg scaler, so the comparison is on
+# 1/8-size images; the differences are mean absolute differences in 8-bit levels.
+READBACK_FACTOR = 8
+READBACK_MAX_OWN = 3.0
+"""Largest mean difference of a clip frame to its own PNG: a lossy encode differs a little."""
+READBACK_MAX_CHANNEL_BIAS = 2.0
+"""Largest mean signed difference of any one channel over the clip: a range or matrix error
+shifts a channel by many levels."""
+READBACK_METHOD = (
+    "every frame of the encoded clip converted to 16-bit RGB at full size with the "
+    "extraction's colour conversion (lookcheck.frames.colour_filter, the clip's own tags) and "
+    "every PNG it was encoded from read through FFmpeg, both then reduced by 1/8 with the "
+    "same scale filter (flags=accurate_rnd); per frame the mean absolute difference to its "
+    "own PNG and to the PNG of the previous and the next frame, in 8-bit levels"
+)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -800,10 +815,12 @@ def run_flicker(
     Extracts every frame of the excerpt (``excerpt`` from 30 % of the duration, 6 s) as a
     numbered sequence, corrects each at the ``Params()`` defaults with ``ancuti2018``
     (blue off, its own statistics, no smoothing), encodes the corrected frames and the
-    source frames to two MP4s (:func:`encode_command`), checks both (:func:`verify_clip`
-    and the first source frame read back from the encoded source clip), writes
-    ``statistics.json`` and ``statistics.png`` and, only if every check held, deletes all
-    frame PNGs except the first, middle and last of each set.
+    source frames to two MP4s (:func:`encode_command`) under temporary names, checks both
+    (:func:`verify_clip` and the read-back of EVERY frame of both clips against its own
+    PNG, :func:`readback_clip`), and only when both pass gives them their names
+    (:func:`encode_verified_pair`). Then it writes ``statistics.json`` and
+    ``statistics.png`` and deletes all frame PNGs except the first, middle and last of each
+    set; no PNG is deleted before every check has held.
 
     Args:
         video: The source chapter.
@@ -815,8 +832,8 @@ def run_flicker(
         The statistics document that was written.
 
     Raises:
-        lookcheck.frames.ExtractError: A probe, decode or encode fails or an encode check
-            does not hold (the frame PNGs are then kept).
+        lookcheck.frames.ExtractError: A probe, decode or encode fails or a check does not
+            hold (the frame PNGs are then kept and no clip exists under its final name).
     """
     info = probe_stream(video)
     tags = info.tags
@@ -854,19 +871,7 @@ def run_flicker(
         ),
         "source": (source_dir / f"{stem}_f%04d.png", flicker_dir / f"{stem}_source.mp4"),
     }
-    checks: dict[str, Any] = {}
-    commands: dict[str, list[str]] = {}
-    for label, (pattern, output) in clips.items():
-        commands[label], checks[label] = encode_clip(
-            roots, pattern, output, info, len(frames), flicker_dir
-        )
-    checks["readback"] = _readback_check(
-        clips["source"][1], frames[0].path, tags, flicker_dir, roots
-    )
-    if not checks["readback"]["ok"]:
-        for _pattern, output in clips.values():
-            roots.remove(output)
-        raise ExtractError(f"read-back check failed; clips removed, frames kept: {checks}")
+    commands, checks = encode_verified_pair(roots, clips, info, len(frames), flicker_dir)
     series = {
         "red gain (white balance)": [e["statistics"]["red_gain"] for e in entries],
         "blue gain (white balance)": [e["statistics"]["blue_gain"] for e in entries],
@@ -921,44 +926,318 @@ def run_flicker(
     return document
 
 
-def _readback_check(
-    source_clip: Path, source_frame: Path, tags: StreamTags, flicker_dir: Path, roots: OutputRoots
-) -> dict[str, Any]:
-    """Compare the first frame of the encoded source clip with the PNG it was encoded from.
-
-    The clip frame is read back through :func:`lookcheck.frames.extract` (so with the clip's
-    own tags). A range or matrix error in the encode shows as a large mean difference or a
-    bias; a lossy encode only as a small difference (levels of 8 bits).
+def partial_name(output: Path) -> Path:
+    """Return the temporary name a clip is written under until both clips are verified.
 
     Args:
-        source_clip: The encoded source MP4.
-        source_frame: The PNG of the clip's first frame.
-        tags: The tags the clip should carry.
-        flicker_dir: Output folder for the temporary read-back frame (removed again).
+        output: The final clip name (``GX011627_source.mp4``).
+
+    Returns:
+        The same folder, ``GX011627_source.partial.mp4`` (FFmpeg picks the MP4 muxer from the
+        extension).
+    """
+    return output.with_name(f"{output.stem}.partial{output.suffix}")
+
+
+def encode_verified_pair(
+    roots: OutputRoots,
+    clips: Mapping[str, tuple[Path, Path]],
+    info: StreamInfo,
+    count: int,
+    flicker_dir: Path,
+) -> tuple[dict[str, list[str]], dict[str, Any]]:
+    """Encode the clips under temporary names, verify every one, then give them their names.
+
+    No clip exists under its final name unless every clip passed :func:`verify_clip` and
+    the full read-back (:func:`readback_clip`). A clip of an earlier run is removed first,
+    so a failed run leaves none. Each clip is written under :func:`partial_name`; on ANY
+    exception (an FFmpeg failure, a probe that raises, a failed check, a failed rename) all
+    the temporary and final names are removed again and the exception propagates. Only
+    when everything passed are the clips renamed. The frame PNGs are never touched here.
+
+    Args:
+        roots: The output safety roots.
+        clips: Label to ``(numbered PNG input path, final MP4 path)``.
+        info: The source stream (frame rate, size and tags the clips must carry).
+        count: The number of frames each clip must hold.
+        flicker_dir: The folder of the clips.
+
+    Returns:
+        The FFmpeg command per label (with the final clip name as its output) and the
+        checks: per label the :func:`verify_clip` record, and ``readback`` with one
+        :func:`readback_clip` record per label and ``ok``.
+
+    Raises:
+        lookcheck.frames.ExtractError: An encode, probe or check fails; the message names
+            the failing check (and, for the read-back, the failing frames).
+    """
+    finals = {label: output for label, (_pattern, output) in clips.items()}
+    partials = {label: partial_name(output) for label, output in finals.items()}
+    commands: dict[str, list[str]] = {}
+    checks: dict[str, Any] = {}
+    try:
+        for output in (*finals.values(), *partials.values()):
+            roots.remove(output)
+        for label, (pattern, _output) in clips.items():
+            commands[label], checks[label] = encode_clip(
+                roots, pattern, partials[label], info, count, flicker_dir
+            )
+            checks[label]["file"] = finals[label].name
+        readback: dict[str, Any] = {
+            label: readback_clip(partials[label], clips[label][0], count, info, flicker_dir, roots)
+            for label in clips
+        }
+        readback["ok"] = all(record["ok"] for record in readback.values())
+        checks["readback"] = readback
+        if not readback["ok"]:
+            failing = {
+                label: record["failed_frames"] or record["problems"]
+                for label, record in readback.items()
+                if label != "ok" and not record["ok"]
+            }
+            raise ExtractError(f"read-back check failed; no clip kept, frames kept: {failing}")
+        for label, command in commands.items():
+            command[-1] = str(finals[label])
+        for label in clips:
+            roots.rename(partials[label], finals[label])
+    except BaseException:
+        for output in (*finals.values(), *partials.values()):
+            roots.remove(output)
+        raise
+    return commands, checks
+
+
+def reduced_command(pattern: Path, count: int, size: tuple[int, int], output: Path) -> list[str]:
+    """Build the FFmpeg command that reduces a numbered PNG sequence to 16-bit RGB PNGs.
+
+    It uses the same ``scale`` flags as :func:`lookcheck.frames.colour_filter`, so the
+    reference frames of the read-back are reduced the way the clip's frames are.
+
+    Args:
+        pattern: The input path with a ``%04d`` counter, counting from 0.
+        count: The number of frames to read.
+        size: The output ``(width, height)``.
+        output: The output path with a ``%06d`` counter.
+
+    Returns:
+        The command and its arguments.
+    """
+    return [
+        "ffmpeg",
+        "-nostdin",
+        "-hide_banner",
+        "-nostats",
+        "-y",
+        "-start_number",
+        "0",
+        "-i",
+        str(pattern),
+        "-vf",
+        f"scale=w={size[0]}:h={size[1]}:flags=accurate_rnd,format=rgb48be",
+        "-frames:v",
+        str(count),
+        "-fps_mode",
+        "passthrough",
+        "-pred",
+        "none",
+        str(output),
+    ]
+
+
+def reduced_clip_command(
+    clip: Path, tags: StreamTags, count: int, size: tuple[int, int], output: Path
+) -> list[str]:
+    """Build the FFmpeg command that reduces the frames of an encoded clip to 16-bit RGB PNGs.
+
+    The YUV frames are first converted to RGB at full size with the extraction's own filter
+    (:func:`lookcheck.frames.colour_filter`) and only then reduced, with the flags
+    :func:`reduced_command` uses. (One ``scale`` that converts and resizes in a single step
+    is less accurate: it measured about 4 levels of error on saturated test frames, against
+    0.1 for this chain.) ``count`` frames are asked for; the caller asks for one more than
+    it expects so that a surplus frame shows.
+
+    Args:
+        clip: The encoded MP4.
+        tags: The clip's own tags.
+        count: The number of frames to write at most.
+        size: The output ``(width, height)``.
+        output: The output path with a ``%06d`` counter.
+
+    Returns:
+        The command and its arguments.
+    """
+    return [
+        "ffmpeg",
+        "-nostdin",
+        "-hide_banner",
+        "-nostats",
+        "-y",
+        "-i",
+        str(clip),
+        "-map",
+        "0:v:0",
+        "-an",
+        "-sn",
+        "-dn",
+        "-vf",
+        f"{colour_filter(tags)},scale=w={size[0]}:h={size[1]}:flags=accurate_rnd,format=rgb48be",
+        "-frames:v",
+        str(count),
+        "-fps_mode",
+        "passthrough",
+        "-pred",
+        "none",
+        str(output),
+    ]
+
+
+def _mean_abs(a: NDArray[np.float32], b: NDArray[np.float32]) -> float:
+    """The mean absolute difference of two float images in [0, 1], in 8-bit levels."""
+    return float(np.abs(a - b).mean(dtype=np.float64) * 255.0)
+
+
+def readback_clip(
+    clip: Path,
+    pattern: Path,
+    count: int,
+    info: StreamInfo,
+    flicker_dir: Path,
+    roots: OutputRoots,
+) -> dict[str, Any]:
+    """Read back EVERY frame of an encoded clip and match each to the PNG it came from.
+
+    The clip is converted with the extraction's colour conversion (its own tags) and the PNG
+    sequence ``pattern`` is read through FFmpeg, both reduced to 1/8 size
+    (:data:`READBACK_METHOD`). Frame ``i`` passes when its mean
+    absolute difference to its own PNG (``own``) is at most :data:`READBACK_MAX_OWN` AND is
+    smaller than its difference to the PNG of frame ``i - 1`` (``previous``) and of frame
+    ``i + 1`` (``next``): an encode that repeats, drops or swaps a frame fails by name.
+    ``margin`` is the smaller neighbour difference minus ``own``. The clip as a whole
+    also fails when its frame count differs, its range or matrix tag differs from ``info``,
+    or any one channel's mean signed difference exceeds :data:`READBACK_MAX_CHANNEL_BIAS`
+    (a range or matrix error).
+
+    Args:
+        clip: The encoded MP4.
+        pattern: The numbered PNG input it was encoded from (``%04d``, from 0).
+        count: The number of frames it must hold.
+        info: The source stream (size and tags).
+        flicker_dir: Folder for the temporary decoded frames (removed again).
         roots: The output safety roots.
 
     Returns:
-        ``mean_abs`` and ``mean_signed`` differences in 8-bit levels, the clip's tags and ``ok``.
+        The record: ``frames`` (per frame, in presentation order: ``index``, ``own``,
+        ``previous``, ``next``, ``margin``, ``bias`` per channel R, G, B, ``ok``),
+        ``failed_frames`` (index and reason), ``worst_own``, ``smallest_margin`` with its
+        frame, ``channel_bias``, ``problems`` (whole-clip failures), the thresholds, the
+        method and ``ok``.
+
+    Raises:
+        lookcheck.frames.ExtractError: The size is not a multiple of the factor, or an
+            FFmpeg run fails.
     """
-    scratch = flicker_dir / "readback"
-    (frame,) = extract(source_clip, [0.0], scratch, roots=roots)
-    difference = (read_png16(frame.path) - read_png16(source_frame)) * 255.0
-    roots.remove(frame.path)
-    roots.check(scratch).rmdir()
-    mean_abs = float(np.abs(difference).mean())
-    mean_signed = float(difference.mean())
-    return {
-        "mean_abs": mean_abs,
-        "mean_signed": mean_signed,
-        "clip_tags": frame.tags.record(),
-        "ok": bool(
-            mean_abs <= _ENCODE_MAX_MEAN_ABS
-            and abs(mean_signed) <= _ENCODE_MAX_ABS_BIAS
-            and frame.tags.color_range == tags.color_range
-            and frame.tags.color_space == tags.color_space
-            and math.isfinite(mean_abs)
-        ),
-    }
+    factor = READBACK_FACTOR
+    if info.width % factor or info.height % factor:
+        raise ExtractError(f"{info.width}x{info.height} is not a multiple of {factor}")
+    size = (info.width // factor, info.height // factor)
+    scratch = flicker_dir / "readback" / clip.stem
+    roots.mkdir(scratch)
+    try:
+        clip_tags = probe_stream(clip).tags
+        decoded_dir = roots.mkdir(scratch / "clip")
+        for index in range(1, count + 2):
+            roots.check(decoded_dir / f"c{index:06d}.png")
+        done = run_tool(
+            reduced_clip_command(clip, clip_tags, count + 1, size, decoded_dir / "c%06d.png")
+        )
+        if done.returncode != 0:
+            tail = done.stderr.decode("utf-8", errors="replace").strip().splitlines()[-1:]
+            raise ExtractError(f"ffmpeg failed reading back {clip.name}: {tail}")
+        decoded = sorted(decoded_dir.glob("c*.png"))
+        reference_dir = roots.mkdir(scratch / "reference")
+        for index in range(1, count + 1):
+            roots.check(reference_dir / f"r{index:06d}.png")
+        done = run_tool(reduced_command(pattern, count, size, reference_dir / "r%06d.png"))
+        if done.returncode != 0:
+            tail = done.stderr.decode("utf-8", errors="replace").strip().splitlines()[-1:]
+            raise ExtractError(f"ffmpeg failed reducing the frames of {clip.name}: {tail}")
+        problems: list[str] = []
+        if len(decoded) != count:
+            problems.append(f"the clip holds {len(decoded)} frames, expected {count}")
+        for name, got, wanted in (
+            ("color_range", clip_tags.color_range, info.tags.color_range),
+            ("color_space", clip_tags.color_space, info.tags.color_space),
+        ):
+            if got != wanted:
+                problems.append(f"{name} is {got}, expected {wanted}")
+        records: list[dict[str, Any]] = []
+        failed: list[dict[str, Any]] = []
+        bias_sum = np.zeros(3)
+        if len(decoded) == count:
+            references = [
+                read_png16(reference_dir / f"r{index:06d}.png") for index in range(1, count + 1)
+            ]
+            for index, frame in enumerate(decoded):
+                image = read_png16(frame)
+                own = _mean_abs(image, references[index])
+                previous = _mean_abs(image, references[index - 1]) if index > 0 else None
+                following = _mean_abs(image, references[index + 1]) if index + 1 < count else None
+                neighbours = [value for value in (previous, following) if value is not None]
+                margin = min(neighbours) - own if neighbours else None
+                bias = (image - references[index]).mean(axis=(0, 1), dtype=np.float64) * 255.0
+                bias_sum += bias
+                reasons = []
+                if not own <= READBACK_MAX_OWN:
+                    reasons.append(f"differs from its own PNG by {own:.3f} levels")
+                if margin is not None and not margin > 0:
+                    reasons.append(
+                        f"is no closer to its own PNG ({own:.3f}) than to a neighbour's "
+                        f"({min(neighbours):.3f})"
+                    )
+                records.append(
+                    {
+                        "index": index,
+                        "own": own,
+                        "previous": previous,
+                        "next": following,
+                        "margin": margin,
+                        "bias": [float(value) for value in bias],
+                        "ok": not reasons,
+                    }
+                )
+                if reasons:
+                    failed.append({"index": index, "reason": "; ".join(reasons)})
+        channel_bias = [float(value) for value in bias_sum / max(count, 1)]
+        if any(not abs(value) <= READBACK_MAX_CHANNEL_BIAS for value in channel_bias):
+            problems.append(f"a channel's mean bias {channel_bias} exceeds the limit")
+        margins = [(r["margin"], r["index"]) for r in records if r["margin"] is not None]
+        smallest = min(margins) if margins else (None, None)
+        return {
+            "label": clip.name,
+            "method": READBACK_METHOD,
+            "factor": factor,
+            "reduced_size": list(size),
+            "frames_expected": count,
+            "frames_read": len(decoded),
+            "thresholds": {
+                "max_own": READBACK_MAX_OWN,
+                "max_channel_bias": READBACK_MAX_CHANNEL_BIAS,
+                "margin": "own below both neighbours' differences",
+            },
+            "clip_tags": clip_tags.record(),
+            "worst_own": max((r["own"] for r in records), default=None),
+            "smallest_margin": smallest[0],
+            "smallest_margin_frame": smallest[1],
+            "channel_bias": channel_bias,
+            "problems": problems,
+            "failed_frames": failed,
+            "frames": records,
+            "ok": bool(records) and not problems and not failed,
+        }
+    finally:
+        shutil.rmtree(roots.check(scratch), ignore_errors=True)
+        with contextlib.suppress(OSError):  # other read-back folders there, or already gone
+            roots.check(scratch.parent).rmdir()
 
 
 # --- command line ----------------------------------------------------------------------------

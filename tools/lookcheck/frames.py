@@ -305,6 +305,25 @@ class OutputRoots:
         target = self.check(path)
         target.unlink(missing_ok=True)
 
+    def rename(self, source: Path, target: Path) -> Path:
+        """Move one file to a new name, replacing ``target``; both names are checked.
+
+        Args:
+            source: The existing file.
+            target: Its new name (an existing file of that name is replaced).
+
+        Returns:
+            ``target``.
+
+        Raises:
+            OutputPathError: Either path is refused.
+            OSError: The move fails.
+        """
+        moved = self.check(source)
+        self.check(target)
+        moved.replace(target)
+        return target
+
 
 # --- probing ----------------------------------------------------------------------------
 
