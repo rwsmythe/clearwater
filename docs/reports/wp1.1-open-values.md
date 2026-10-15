@@ -121,3 +121,29 @@ above it.
 | Colour | Embedded ICC profile ignored, with a note on standard error; values used as display-encoded RGB. | brief (no colour management). |
 | 16-bit RGB sources | Pillow 12.3 decodes 16-bit-per-channel RGB (48-bit PNG, 16-bit TIFF) to 8 bits; the run prints a warning and continues at 8-bit precision. | Pillow limitation within the granted dependencies; raised as an open question in the return report. |
 | Output | 16-bit RGB PNG written directly (Pillow cannot write 16-bit RGB), values clipped and rounded to 0..65535, no ICC, gamma or colour chunk; `--dump` intermediates the same, weight maps as 16-bit gray, raw weights divided by their own maximum (recorded in `<stem>-<method>-weights.json`). | WP1.1 choice. |
+
+## 6. Interpretation note: scalar reductions in float64 (spec 6.4, D39)
+
+Spec 6.4 / D39 ("internal processing in 32-bit float; quantization only at export") governs
+the image data and every per-pixel operation; its purpose is to forbid intermediate
+quantisation, not to cap the width of a scalar reduction. CHARC ruled (WP1.2R, retroactive
+Reviewer B finding M3, option a) that scalar reductions MAY accumulate in float64 provided
+(1) the result is cast to float32 before it touches image data or a parameter, (2) both
+backends use the same accumulator dtype, so that the CPU/GPU agreement rests on a stable
+reduction, and (3) the choice is stated in the docstring of each reduction and here. This is
+an interpretation, not a spec change.
+
+| Site | Accumulator | Cast point | Device path |
+|---|---|---|---|
+| Ancuti cap statistic `mean((1 - I_c) * I_g)` (`_cap_statistic`) | float64 | `float()`: a Python float, which scales the float32 image as a float32 scalar | `_accumulate_mean`, the same `xp`-generic call on both devices |
+| Channel means (`_channel_means`; compensation, white balance, `mean_added`) | float64 | `.tolist()` to Python floats; the white-balance gains are `xp.array(..., dtype=float32)` before they multiply the image | the same call |
+| Saliency mean Lab vector (`_lab_mean`) | float64 | `.astype(float32)` before it meets the float32 Lab image | the same call |
+| Stretch bounds (`_high_pass_and_bounds`; found by the sweep, not one of the three ruled sites) | `percentile` interpolates in float64 on both NumPy and CuPy | `float()`: Python floats, used as float32 scalars | `xp.percentile` on both devices |
+
+The sweep also classified the remaining `float64` and `dtype=` uses in `pipeline.py` and
+`run.py`: `RGB_TO_YCBCR` (a float64 constant, converted to float32 by `_constants` before
+any image sees it), `image.mean(axis=2, dtype=np.float32)` and `xp.mean(..., axis=2)` in the
+3C mask and the saturation weight (per-pixel means over three channels, float32), and
+`run.py` `read_image` (decoding Pillow bytes to float64 before the cast to float32; not a
+pipeline reduction). Tests: `test_scalar_reductions_accumulate_in_float64_on_the_cpu` and
+`..._on_the_gpu` (marker `gpu`) assert the accumulator dtype and the cast at each site.

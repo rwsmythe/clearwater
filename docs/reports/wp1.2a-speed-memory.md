@@ -135,7 +135,8 @@ rejected it (option B) and banked the ill-conditioning of N{} on low-texture fra
   the output copied back. It is not the brief's figure; it shows the cost of copying every
   intermediate back.
 - **Memory.** Peak RSS: `psutil` samples by a thread every 50 ms over the timed loop (the OS
-  peak working set is recorded beside it and agrees). Graphics memory: CuPy's default pool,
+  peak working set is recorded beside it; it is at or above the sample, see the note under
+  the table). Graphics memory: CuPy's default pool,
   its cache emptied before the loop, behind a counting allocator that records the pool's used
   bytes after every allocation (peak used); the pool's reserved bytes after the loop (it
   returns nothing during the run, so this is its high-water mark) is the **peak graphics
@@ -188,7 +189,7 @@ used bytes in brackets; "Estimate / peak" is `memory_estimate_bytes` over that f
 GPU (and over the peak RSS in brackets, and alone on the CPU). Drift is the median of the
 first ten steady frames -> the median of the last ten.
 
-| Device | Size | Method | N | Median (s) | p95 (s) | Drift | Share of 0.111 s | Share of 0.056 s | Peak RSS (MiB) | Peak graphics memory (MiB) | Estimate (MiB) | Estimate / peak | Head | Record |
+| Device | Size | Method | N | Median (s) | p95 (s) | Drift | Share of 0.111 s | Share of 0.056 s | Peak RSS (sampled at 50 ms) (MiB) | Peak graphics memory (MiB) | Estimate (MiB) | Estimate / peak | Head | Record |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | CPU | 4k | ancuti2018 | 60 | 10.971 | 11.285 | 11.233 -> 11.008 (-2.0%) | 98.8x | 195.9x | 1647 | n/a | 1982 | RSS 1.20 | `d3d9555` | `bench-cpu-4k-ancuti2018-20261014-172225.json` |
 | CPU | 4k | c3 | 60 | 23.394 | 24.021 | 21.573 -> 23.701 (+9.9%) | 210.8x | 417.8x | 1646 | n/a | 1982 | RSS 1.20 | `d3d9555` | `bench-cpu-4k-c3-20261014-174552.json` |
@@ -198,6 +199,12 @@ first ten steady frames -> the median of the last ten.
 | CPU | 5.3k | c3 | 30 | 57.985 | 58.502 | 58.058 -> 58.147 (+0.2%) | 522.4x | 1035.4x | 3094 | n/a | 3792 | RSS 1.23 | `d3d9555` | `bench-cpu-5.3k-c3-20261014-182722.json` |
 | GPU | 5.3k | ancuti2018 | 30 | 0.836 | 0.907 | 0.831 -> 0.837 (+0.7%) | 7.5x | 14.9x | 2688 | 3275 (used 3032) | 3792 | 1.16 (RSS 1.41) | `72c19cc` | `bench-gpu-5.3k-ancuti2018-20261014-193229.json` |
 | GPU | 5.3k | c3 | 30 | 1.503 | 1.554 | 1.484 -> 1.542 (+3.9%) | 13.5x | 26.8x | 2696 | 3275 (used 3032) | 3792 | 1.16 (RSS 1.41) | `72c19cc` | `bench-gpu-5.3k-c3-20261014-193401.json` |
+
+Peak RSS is a sampled figure: a sampler can miss a short peak. In every record the OS peak
+working set, recorded beside it, is at or above the sample; in three it is higher by 4 to 9
+MiB (4.2 MiB for CPU 5.3K ancuti2018, 5.4 MiB for GPU 4K c3, 9.4 MiB for GPU 5.3K
+ancuti2018), against the 16 GB limit (N4). The column is the sample; no figure in it is
+changed.
 
 **GPU spread between the windows (a result in itself).** All three windows' GPU records are
 kept; the memory figures were identical to the byte in all three. Against the first window
