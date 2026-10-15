@@ -7,8 +7,8 @@ Transport WSL, codex-cli 0.162.1, `-m gpt-5.6-sol -c model_reasoning_effort=high
 
 | Round | Result | Counts (crit/major/minor) | In envelope | NEW/REOPENED | Reverts | Fix kind |
 |---|---|---|---|---|---|---|
-| 1a | VOID (capture defect: stdout and stderr redirected to one file overwrote the banner, so assertion 1 could not be read) | 1/1/4 (findings adjudicated) | 5 in, 1 out (bytes tempdir) | NEW | 0 | product (conftest) + tests |
-| 1b (counted) | all assertions pass; `VERDICT: BLOCKING_FINDINGS` | 1/4/1 | 6 in, 1 minor conservative-by-design | NEW (all new; 1a's fixes held) | 0 | product + tests |
+| 1a | VOID (capture defect: stdout and stderr redirected to one file overwrote the banner, so assertion 1 could not be read) | 1/3/2 (findings adjudicated) | 5 in, 1 out (bytes tempdir) | NEW | 0 | product (conftest) + tests |
+| 1b (counted) | all assertions pass; `VERDICT: BLOCKING_FINDINGS` | 1/5/1 | 7 in | NEW (all new; 1a's fixes held) | 0 | product + tests |
 
 Round 1b assertions: banner `gpt-5.6-sol` / `high`; `^ERROR` and `ERROR codex_core`: 0 lines;
 `^tokens used` footer present (1); anchored VERDICT in the final message; 14 `^ succeeded in`;
