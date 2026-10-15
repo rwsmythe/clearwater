@@ -62,7 +62,15 @@ Repository local + mirrored to private GitHub `rwsmythe/clearwater` (verify:
   ORDERED after the author. CHARC 02:34Z: `cupy-cuda12x[ctk]` (uv-managed nvidia-* wheels
   in .venv) is within the grant; anything outside .venv stays a STOP. The real inventory
   pass is QUEUED behind the exclusive window. Verify: `git worktree list`.
-- Debt register `docs/debt-register.md`: DR-1..DR-13 (DR-3, DR-4 closed).
+  **STOP 03:01Z, RULED 03:02Z** (msg 7acff64e): install needs `[ctk]` (cuda-toolkit meta
+  + 8 nvidia-*-cu12 wheels, in .venv); CPU path bit-identical to WP1.1. F1: Option A --
+  float32 GPU filters kept, tolerance asserted on textured images, near-flat pair kept at
+  1e-4/1e-5 with the cause in the docstring; DR-14 (N{} ill-conditioned on low texture).
+  F2: run.py defaults to cpu. `correct(..., backend=None)` and `normalisation_bounds()`
+  accepted. EARLY GATE 1 SIGNAL (dev figures, not exclusive): GPU core ~0.40 s / 0.69 s
+  per 4K frame vs 0.111 s budget (3-6x over before decode/encode); raise to the owner at
+  WP1.6 with Part B (plan Gate 1 row: owner tunes target or approves optimisation).
+- Debt register `docs/debt-register.md`: DR-1..DR-14 (DR-3, DR-4 closed).
 - No authority granted by `SendMessage` this generation (cues only).
 
 ### Pending items
