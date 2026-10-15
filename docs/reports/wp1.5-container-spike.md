@@ -7,7 +7,9 @@ architect's; CHARC rules at WP1.6.
 
 Conditions: 2026-10-15 (UTC), Windows 11 laptop, NVIDIA GeForce RTX 4070 Laptop GPU, driver
 610.62; FFmpeg and ffprobe 9.0.2 (`9.0.2-full_build-www.gyan.dev`, the WP0.1 install); branch
-`wp1.5` (instrument at `b3e7869`, proof-folder fix `020c423`). Footage folder read only; every
+`wp1.5` (instrument `b3e7869`, fixes `020c423` and `21d418d`; the capability, camera and
+re-encode records below were produced on `21d418d`, except the camera record, on `020c423`,
+whose code path the fixes do not touch). Footage folder read only; every
 file written is under `C:\Users\rwsmy\clearwater\work\wp1.5\` (below, `work\wp1.5\`). No timing
 figure is a result here: elapsed times are informal.
 
@@ -25,10 +27,11 @@ figure is a result here: elapsed times are informal.
   two renderings are equal exactly when the values are. Sequences are compared in full and
   recorded as count, first, last, SHA-256 of the whole and (pts) the count of each step.
 - `tools/container_spike/spike.py` runs `capability`, `camera` and `reencode` (sections 2-4).
-  Before every FFmpeg run that writes a file, and before every record write, the resolved path
-  (links followed) is checked to lie inside `work\wp1.5\` and outside the footage folder
-  (`check_output_path`); `-y` is passed only for such a checked path. The other FFmpeg runs
-  (hardware decode, PSNR) write to the null muxer (`-f null -`), so nothing.
+  Before every FFmpeg run that writes a file, and before every record file is written, that
+  file's own resolved path (links followed) is checked to lie inside `work\wp1.5\` and outside
+  the footage folder (`check_output_path`, `write_checked`); a re-encode checks all of its
+  record paths before FFmpeg starts. `-y` is passed only for such a checked path. The other
+  FFmpeg runs (hardware decode, PSNR) write to the null muxer (`-f null -`), so nothing.
 
 **JSON record shape** (`<name>.compare.json`): `source`, `output` (paths), `ffprobe` (version
 line), `info.{source,output}` (`codec`, `profile`, `bit_rate`, `size_bytes`, `streams`; not
@@ -39,8 +42,8 @@ occurrence (`vide#0`, `soun#0`, `tmcd#0`, `meta#0` = GPMF), never by index, beca
 reorders the data tracks.
 
 **Classes.** `MANDATORY` (D94, D95, D105, 7.5): the per-frame pts sequence, frame count, video
-stream duration, start offset (first frame pts, each stream's `start_pts`, the container
-`start_time`), the edit lists of the video and audio tracks by presentation effect, audio
+stream duration, start offset (first frame pts, each stream's `start_pts`, the container start
+as the exact earliest stream start), the edit lists of the video and audio tracks by presentation effect, audio
 present, its packets passed through (pts, duration, size, MD5 per packet), audio sync (first
 audio pts minus first video pts), and display orientation (display matrix side data and the
 video `tkhd` matrix). `REQUIRED` (D55, D114, 8.2): colour primaries, transfer, matrix, range,
@@ -73,7 +76,7 @@ edit lists, and the container duration.
 
 ## 2. Capability record (D74)
 
-`spike.py capability`, 2026-10-15 06:18:15-06:18:21Z; record `work\wp1.5\capability.json`.
+`spike.py capability`, 2026-10-15 06:50:33-06:50:38Z; record `work\wp1.5\capability.json`.
 
 Listed by the build (`ffmpeg -encoders`, `-decoders`, `-hwaccels`): encoders `hevc_nvenc`,
 `libx265`, `av1_nvenc`, `libsvtav1`, `libaom-av1` all listed; decoders `hevc_cuvid`,
@@ -88,13 +91,16 @@ Listed by the build (`ffmpeg -encoders`, `-decoders`, `-hwaccels`): encoders `he
 | libx265 8-bit | same, `-c:v libx265 -pix_fmt yuv420p -profile:v main` | hevc, Main, yuv420p, 60 frames, `libx265` | NVENC sessions 0 | yes |
 | Hardware decode | `ffmpeg -nostdin -hide_banner -v verbose -hwaccel cuda -hwaccel_output_format cuda -i GX011627.MP4 -map 0:v:0 -f null -` | exit 0; FFmpeg: 681 frames decoded, 0 decode errors; container `nb_frames` 681; filter graph input `pixfmt:cuda` | decoder utilisation max 100 %, NVENC 0 | yes |
 
-`nvidia-smi` was sampled every 0.2 s during each run (name, encoder and decoder utilisation,
-`encoder.stats.sessionCount`); the GPU named in every sample is the RTX 4070 Laptop GPU. A proof
-holds only on an ffprobe reading that matches (codec, profile, pixel format, 60 frames) or, for
-the decode, exit 0 with every frame decoded, no error and CUDA frames in the graph
-(`-hwaccel_output_format cuda` forbids a silent CPU fallback). The first capability run, before
-`020c423`, failed all four encode proofs because the proof folder did not exist; the record
-caught it (`proven: false`, FFmpeg could not open the output) and the rerun above is the result.
+`nvidia-smi` was sampled about every 0.1 s during each run, at least once (name, encoder and
+decoder utilisation, `encoder.stats.sessionCount`); the GPU named in every sample is the RTX 4070
+Laptop GPU (3 samples per NVENC proof, 13 during the decode). An encode proof holds only on an
+ffprobe reading that matches (codec, profile, pixel format, 60 frames) and, for NVENC, a GPU
+named and at least one NVENC session counted during the encode. The decode proof holds only on
+exit 0 with every container frame decoded, no error, CUDA frames in the graph
+(`-hwaccel_output_format cuda` forbids a silent CPU fallback) and a GPU named during the decode.
+The first capability run, before `020c423`, failed all four encode proofs because the proof
+folder did not exist; the record caught it (`proven: false`, FFmpeg could not open the output).
+A run on `020c423` (06:18Z) gave the same readings as the one above.
 
 ## 3. Camera record (D54, D73)
 
@@ -132,8 +138,8 @@ only).
 
 ## 4. The simple re-encode (D104)
 
-`spike.py reencode GX011628.MP4` (06:18:25-06:18:58Z) and `spike.py reencode GX011627.MP4`
-(06:18:58-06:20:13Z), encoder `hevc_nvenc` (every NVENC proof held, so libx265 was not needed).
+`spike.py reencode GX011628.MP4` (06:50:38-06:51:12Z) and `spike.py reencode GX011627.MP4`
+(06:51:12-06:52:27Z), encoder `hevc_nvenc` (every NVENC proof held, so libx265 was not needed).
 The exact command for the primary chapter (from `work\wp1.5\reencode\GX011627_corrected.run.json`):
 
 ```
@@ -162,7 +168,7 @@ ffmpeg -nostdin -hide_banner -y -copyts -noautorotate
   `media_time` 0 and a player that ignores edit lists still starts video and audio together).
 - Quality settings are only what the spike used (`-preset p5 -tune hq -rc vbr -cq 20`); the
   quality-level mapping is D75, WP2.1's. NVENC's default without them is 2 Mb/s.
-- Informal: 8.7 s for the 22.7 s primary chapter, 5.6 s for the 14.5 s one (NVENC sessions 1,
+- Informal: 8.6 s for the 22.7 s primary chapter, 5.7 s for the 14.5 s one (NVENC sessions 1,
   encoder utilisation 100 %).
 
 **Identity sanity check (not a quality result).** FFmpeg's `psnr` filter over every frame:
@@ -183,7 +189,7 @@ Primary chapter, `work\wp1.5\reencode\GX011627_corrected.compare.json` (md
 | video stream duration | MANDATORY | D94, D95, D105, 7.5 | 22.722700 (227227/10000) | 22.722700 (227227/10000) | SAME |
 | start offset: first video frame pts | MANDATORY | D94, D105, 7.5 | 0.000000 (0/1) | 0.000000 (0/1) | SAME |
 | start offset: video and audio stream start_pts | MANDATORY | D94, D105, 7.5 | {"vide#0":"0.000000 (0/1)","soun#0":"0.000000 (0/1)"} | {"vide#0":"0.000000 (0/1)","soun#0":"0.000000 (0/1)"} | SAME |
-| start offset: container start_time (ffprobe, 1 us) | MANDATORY | D94, D105, 7.5 | 0.000000 | 0.000000 | SAME |
+| start offset: container start (earliest stream start, exact) | MANDATORY | D94, D105, 7.5 | 0.000000 (0/1) | 0.000000 (0/1) | SAME |
 | edit list, video and audio tracks (presentation effect) | MANDATORY | D94, 7.5 | {"vide#0":[{"duration":"22.722700 (227227/10000)","media_start":"0.000000 (0/1)","rate"... | {"vide#0":[{"duration":"22.722700 (227227/10000)","media_start":"0.000000 (0/1)","rate"... | SAME (media start is relative to the track's earliest composition time) |
 | audio streams present | MANDATORY | D105, 7.5 | {"soun#0":{"codec_name":"aac","profile":"LC","sample_rate":"48000","channels":2,"channe... | {"soun#0":{"codec_name":"aac","profile":"LC","sample_rate":"48000","channels":2,"channe... | SAME |
 | audio packets passed through (pts, duration, size, MD5) [soun#0] | MANDATORY | 7.5 | n=1064; first ['0.000000 (0/1)', '0.021333 (8/375)', 505, 'MD5:9363e1198bcbf5d4238b80e7... | n=1064; first ['0.000000 (0/1)', '0.021333 (8/375)', 505, 'MD5:9363e1198bcbf5d4238b80e7... | SAME |
@@ -227,7 +233,7 @@ the same result on every row (28 SAME, 8 DIFFERENT, all BEST-EFFORT).
 | video stream duration | MANDATORY | D94, D95, D105, 7.5 | 14.481133 (217217/15000) | 14.481133 (217217/15000) | SAME |
 | start offset: first video frame pts | MANDATORY | D94, D105, 7.5 | 0.000000 (0/1) | 0.000000 (0/1) | SAME |
 | start offset: video and audio stream start_pts | MANDATORY | D94, D105, 7.5 | {"vide#0":"0.000000 (0/1)","soun#0":"0.000000 (0/1)"} | {"vide#0":"0.000000 (0/1)","soun#0":"0.000000 (0/1)"} | SAME |
-| start offset: container start_time (ffprobe, 1 us) | MANDATORY | D94, D105, 7.5 | 0.000000 | 0.000000 | SAME |
+| start offset: container start (earliest stream start, exact) | MANDATORY | D94, D105, 7.5 | 0.000000 (0/1) | 0.000000 (0/1) | SAME |
 | edit list, video and audio tracks (presentation effect) | MANDATORY | D94, 7.5 | {"vide#0":[{"duration":"14.481133 (217217/15000)","media_start":"0.000000 (0/1)","rate"... | {"vide#0":[{"duration":"14.481133 (217217/15000)","media_start":"0.000000 (0/1)","rate"... | SAME (media start is relative to the track's earliest composition time) |
 | audio streams present | MANDATORY | D105, 7.5 | {"soun#0":{"codec_name":"aac","profile":"LC","sample_rate":"48000","channels":2,"channe... | {"soun#0":{"codec_name":"aac","profile":"LC","sample_rate":"48000","channels":2,"channe... | SAME |
 | audio packets passed through (pts, duration, size, MD5) [soun#0] | MANDATORY | 7.5 | n=678; first ['0.000000 (0/1)', '0.021333 (8/375)', 505, 'MD5:9363e1198bcbf5d4238b80e79... | n=678; first ['0.000000 (0/1)', '0.021333 (8/375)', 505, 'MD5:9363e1198bcbf5d4238b80e79... | SAME |
@@ -320,6 +326,11 @@ PyAV, or another binding) and whether these muxer options stay reachable from th
 WP2.1's question.
 
 ## 9. Not exercised (out of envelope or absent)
+
+The footage folder changed during the spike: from about 06:28Z a `SCUBA` subfolder was being
+downloaded into it (browser `.crswap` files growing). The spike reads only the four top-level
+chapters named in the brief, so no record above includes those files; the scuba clips are
+not exercised.
 
 iPhone video; HDR (HLG/PQ) sources; GP-Log; GoPro "HDR video" mode; 10-bit, H.264, 4:2:2 or
 rotated real sources (the synthetic tests cover 8-bit H.264 with a start offset and an edit list,
