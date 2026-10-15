@@ -41,7 +41,9 @@ spike's FFmpeg runs and record writers produce is under `C:\Users\rwsmy\clearwat
   passed only for such a checked path. The other FFmpeg runs (hardware decode, PSNR) write to
   the null muxer (`-f null -`), so nothing. Every FFmpeg and ffprobe process, the tests'
   included, gets the environment without `FFREPORT` (`tool_env`): that variable makes both
-  tools write a log file into their current folder, wherever it is.
+  tools write a log file into their current folder, wherever it is. The one exception is the
+  tests' positive control, which adds `FFREPORT` to that environment on purpose, in a pytest
+  temporary folder, to show that the variable would write a report.
 - **Not guarded: check-to-use races.** The checks run once, before the write. A concurrent
   process that swaps a checked folder for a junction, or plants a link, between the check and
   the write is outside this spike's threat model (no such process runs here); safe writing
@@ -174,7 +176,9 @@ while an encode runs; the NVENC encodes above still last only about a second
 `spike.py camera GX011625.MP4 GX011626.MP4 GX011627.MP4 GX011628.MP4` on `294c393` (every frame
 of all four chapters decoded by ffprobe; start and end in `work\wp1.5\logs\r4-records.log`);
 record `work\wp1.5\camera.json`, which holds every value below for each chapter. The four
-chapters are identical in every property below except length, so one column holds them all.
+chapters are identical in every property below except the per-chapter counts (frames, GPMF
+packets), the timecode and the creation time, which are listed in chapter order; so one column
+holds them all.
 
 | Property | GX011625, GX011626, GX011627, GX011628 |
 |---|---|
@@ -462,8 +466,8 @@ MANDATORY "video edit list as written" item is DIFFERENT while the presentation 
 **Untagged sources (D54 fallback NOT implemented).** For a source with no colour tags the
 spike passes no colour options at all (`reencode_command` copies only the tags the source
 has), and it gives no warning. So D54's fallback, assume BT.709 limited range and warn, is NOT
-implemented here; the encoder's defaults decide the output's tags (on the synthetic clip,
-libx265 writes a `tv` range into an output whose source had no range tag). The comparison then
+implemented here; the encoder's defaults decide the output's tags (informal, not recorded: on
+an untagged synthetic clip, libx265 wrote a `tv` range into the output). The comparison then
 reads an absent tag on both sides as SAME. This is a WP3.10 point: the product reads the tags,
 falls back to BT.709 limited with a warning when they are missing or unexpected, and sets the
 output tags explicitly.

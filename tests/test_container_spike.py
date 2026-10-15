@@ -60,8 +60,8 @@ def _synthetic(
 
     HEVC in MP4 is what spec 8.2 requires of an output, so a clip compared with itself
     is all SAME. The colour tags are set (BT.709, limited range, the D54 assumption):
-    an untagged source re-encoded by libx265 gains a ``tv`` range tag, which the spike
-    records separately. Without ``b_frames`` the clip has no B-frames (``-bf 0``), the
+    an untagged source re-encoded by libx265 gains a ``tv`` range tag (an informal
+    observation, report section 9). Without ``b_frames`` the clip has no B-frames (``-bf 0``), the
     GoPro chapters' shape, so its video edit list carries no reorder shift; with them
     (and ``codec="libx264"``), libx264 writes its reorder delay into the video edit
     list's media_time. ``timecode`` adds a ``tmcd`` data track, which starts at 0
