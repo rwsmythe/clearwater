@@ -86,10 +86,17 @@ Repository local + mirrored to private GitHub `rwsmythe/clearwater` (verify:
 1. **Owner decision request 2026-10-14T23:45Z** (spec text, measured CPU/GPU): APPROVED by
    the owner 2026-10-15 in chat ("approve the spec amendments as written"); applied as spec
    v0.5.1 (D117, section 12, 14.2 closed, 15.2 Q1; changelog line); DR-5 CLOSED. DONE.
-2. **Owner to report the footage download complete** -> CHARC tells the orchestrator to
-   dispatch the real-inventory pass -> CP1 (owner sorts categories; owner-reserved).
-3. **Next harness acts:** QA the WP1.2 Part A accept when it lands; then WP1.5 (container
-   spike) and WP1.2 Part B once the footage exists; WP1.3 and WP1.4 need CP1.
+2. **Footage PARTIAL (owner, 2026-10-15 ~05:25Z in chat):** four GoPro chapters
+   GX011625-GX011628.MP4 (406/1390/151/17 MB; all shallow snorkel; no .LRV/.THM) are in the
+   footage folder (it now exists). Still to come: deeper (~20 m) scuba clips and shallow still
+   photos. The real-inventory pass stays QUEUED until the owner says the download is
+   complete (DR-6) -> then CP1. **WP1.5 commissioned 2026-10-15T05:28Z** on the four
+   chapters (draft `docs/briefs/wp1.5-brief.md` a0c1a96; opus-high; STRONG; FFmpeg-as-
+   process only, PyAV not granted; identity re-encode; primary GX011627, fast GX011628);
+   dispatch sequenced AFTER WP1.2A returns.
+3. **Next harness acts:** QA the WP1.2 Part A accept when it lands (B2 reproduction
+   pending); QA the WP1.5 accept; WP1.2 Part B after the footage is complete and WP1.5
+   reports; WP1.3 and WP1.4 need CP1; WP1.6 gate report after all six results.
 4. Main is ~66 commits ahead of `origin/main`, unpushed; the owner has not asked for a push.
 
 ### Standing delegation (owner, 2026-10-14, chat to CHARC, verbatim)
