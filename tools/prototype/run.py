@@ -3,7 +3,7 @@
 Usage::
 
     uv run python tools/prototype/run.py --in FILE --out DIR [--method ancuti2018|c3]
-        [--blue] [--neutral] [--dump] [--set NAME=VALUE ...]
+        [--blue] [--neutral] [--dump] [--set NAME=VALUE ...] [--device auto|cpu|gpu]
 
 The image is read with Pillow into float32 RGB in [0, 1]. Colour management is out of
 scope: an embedded ICC profile is ignored (a note says so) and the values are used as
@@ -19,10 +19,15 @@ each ``--set NAME=VALUE`` overrides one :class:`Params` field (``none`` disables
 cap; booleans take ``true`` or ``false``), applied after ``--method``, ``--blue`` and
 ``--neutral``. ``--dump`` also writes every intermediate as a 16-bit PNG,
 ``<out>/<stem>-<method>-<stage>.png``, and the two info records as JSON. The raw weight
-maps are written divided by their own maximum, recorded in ``<stem>-<method>-weights.json``.
+maps are written divided by their own maximum, recorded in ``<stem>-<method>-weights.json``,
+which also names the backend the pipeline ran on.
+
+``--device`` chooses that backend (:func:`prototype.backend.select_backend`): ``auto`` (the
+default) uses the graphics card when CuPy and a CUDA device are usable and the CPU
+otherwise, with a note saying why; ``gpu`` without a usable device is an error.
 
 Exit status 0 on success; 2, with a one-line ``error: ...`` on standard error, on a bad
-argument, an unreadable image or an output that cannot be written.
+argument, an unusable device, an unreadable image or an output that cannot be written.
 """
 
 from __future__ import annotations
@@ -51,6 +56,7 @@ if not __package__:
 # These imports must follow the script-mode sys.path bootstrap above. No `noqa: E402` is
 # needed: ruff exempts imports that follow a `sys.path` modification (and flags an unused
 # suppression as RUF100).
+from prototype.backend import DEVICES, Backend, select_backend
 from prototype.params import METHODS, Params
 from prototype.pipeline import Result, correct
 
@@ -157,8 +163,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         argv: Command-line arguments; defaults to ``sys.argv[1:]``.
 
     Returns:
-        0 on success; 2 on a bad argument, an unreadable image or an unwritable output,
-        with a one-line error on standard error.
+        0 on success; 2 on a bad argument, an unusable device, an unreadable image or an
+        unwritable output, with a one-line error on standard error.
     """
     parser = _Parser(description="Run the WP1.1 reference correction pipeline on one image.")
     parser.add_argument("--in", dest="input", type=Path, required=True, help="image to correct")
@@ -170,12 +176,16 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument(
         "--set", dest="overrides", action="append", default=[], metavar="NAME=VALUE"
     )
+    parser.add_argument("--device", choices=DEVICES, default="auto", help="where to run")
     try:
         args = parser.parse_args(argv)
         params = _build_params(args)
-    except _UsageError as exc:
-        print(f"error: {exc}", file=sys.stderr)
+        backend = select_backend(args.device)
+    except (_UsageError, RuntimeError) as exc:
+        print(f"error: {_one_line(exc)}", file=sys.stderr)
         return 2
+    if backend.reason:
+        print(f"note: running on the CPU: {backend.reason}", file=sys.stderr)
 
     source: Path = args.input
     try:
@@ -186,7 +196,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     for note in notes:
         print(note, file=sys.stderr)
 
-    result = correct(image, params)
+    result = correct(image, params, backend)
     out_dir: Path = args.out
     stem = f"{source.stem}-{params.method}"
     try:
@@ -194,7 +204,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         output_path = out_dir / f"{stem}.png"
         write_png16(output_path, result.output)
         if args.dump:
-            _write_dump(out_dir, stem, result)
+            _write_dump(out_dir, stem, result, backend)
     except OSError as exc:
         print(f"error: cannot write to {out_dir}: {_one_line(exc)}", file=sys.stderr)
         return 2
@@ -253,7 +263,7 @@ def _parse_override(text: str) -> tuple[str, object]:
     return name, raw
 
 
-def _write_dump(out_dir: Path, stem: str, result: Result) -> None:
+def _write_dump(out_dir: Path, stem: str, result: Result, backend: Backend) -> None:
     """Write every intermediate of ``result`` as a 16-bit PNG plus the JSON records."""
     stages = {
         "compensated": result.compensated,
@@ -279,7 +289,11 @@ def _write_dump(out_dir: Path, stem: str, result: Result) -> None:
         write_png16(out_dir / f"{stem}-weight-normalised{index}.png", weight)
     _write_json(out_dir / f"{stem}-compensation.json", dataclasses.asdict(result.compensation))
     _write_json(out_dir / f"{stem}-white-balance.json", dataclasses.asdict(result.white_balance))
-    weights_record = {"scale_divided_by": scales, "params": dataclasses.asdict(result.params)}
+    weights_record = {
+        "scale_divided_by": scales,
+        "params": dataclasses.asdict(result.params),
+        "backend": backend.name,
+    }
     _write_json(out_dir / f"{stem}-weights.json", weights_record)
 
 
