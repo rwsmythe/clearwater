@@ -23,26 +23,26 @@
 
 ### Live cells
 
-- **wp13-fix** (implementer-sonnet-high, background): the ONE WP1.3 remediation after my seat
-  Reviewer B (BLOCKING on candidate `d27c53f`; transcript md5 `a9f1f185...`, evidence
-  `clearwater-review-evidence\wp1.3\reviewB\`). Brief `docs/briefs/wp1.3-remediation-brief.md`
-  (`9c2e487`). Branch `wp1.3` from `0233a8e`.
-  - The author cell `wp13-cell` returned at 412K (PAST-CAP) and is retired.
-  - Majors B1 (test roots), B2 (full frame read-back before deletion), B3 (cleanup on
-    exception); minors B4, B5, B11. B6-B10 are out of envelope and go to DR-20 at accept.
-  - The candidate gate was green before B: 481/0 skipped, gpu 21, harness 366.
-  - Then: rebuild `wp1.3-mc`, gate, ONE B re-run (a 2nd block is adjudicated at the gate), merge,
-    accept with DR-20.
-  - Then commit the FINAL WP1.4 brief (the orchestrator block is drafted in the working tree)
-    and dispatch it (implementer-opus-high).
+- **wp14-cell** (implementer-opus-high, background): WP1.4, the statistics experiments
+  (shallow part). Dispatched ~13:27Z.
+  - FINAL brief `docs/briefs/wp1.4-brief.md` (`9ed1a1c`); worktree `.worktrees/wp1.4` (local toml
+    copied in); base `9ed1a1c`; outputs `work\wp1.4\`.
+  - At the gate:
+    - my seat Reviewer B on the `-mc` candidate;
+    - re-run the WP1.2R bit-identity witness on `correct()` with `statistics=None` (Ancuti
+      blue off and on, and 3C; CPU and GPU; scratchpad `witness_r.py` pattern);
+    - gate, merge, accept.
+- **Open query to CHARC:** DR-21, a repo-wide `tests/conftest.py` guard against a pytest
+  basetemp or TEMP inside the footage folder. I recommended a tiny package (WP-T1,
+  sonnet-high, STANDARD), parallel to WP1.4. On a yes: draft the brief and dispatch.
 - **CHARC commission `0fd7c88ad56a7083`:**
   - The owner's partial CP1 ("shallow confirmed") releases WP1.3 and WP1.4, shallow only.
   - The WP1.4 gain-cap noise test becomes WP1.4b (deep footage).
   - Sequencing:
     - inventory pass (sonnet-medium) at once on "download complete";
     - Part B (exclusive) only after WP1.3 and WP1.4 return or pause at a boundary.
-- Branches `wp0.1`, `wp0.2`, `wp1.1`, `wp1.2`, `wp1.5` and `wp1.2r` are kept on purpose: they hold the reviewed
-  pre-rebase SHAs the accept records cite (verify: `git worktree list` shows main only).
+- Branches `wp0.1`, `wp0.2`, `wp1.1`, `wp1.2`, `wp1.5`, `wp1.2r` and `wp1.3` are kept on purpose: they hold the reviewed
+  pre-rebase SHAs the accept records cite (verify: `git worktree list` shows main and `.worktrees/wp1.4`).
 
 ### Workstreams
 
@@ -56,6 +56,7 @@ Each accepted package had its return report posted to CHARC and an info-update t
 | WP1.2 Part A | 2026-10-15 | `f6d998a` | `docs/proofs/wp1.2-accept.md` (`7048fd7`) | STANDS (`bac37599277c1365`) |
 | WP1.5 | 2026-10-15 | `3242679` | `docs/proofs/wp1.5-accept.md` (`371f19d`) | CONFIRMED (`6d4fca629d21efe0`) |
 | WP1.2R | 2026-10-15 | `996274e` | `docs/proofs/wp1.2r-accept.md` (`aac4674`); WP1.1/1.2 addenda | CONFIRMED (`60dc8ad66427bb15`) |
+| WP1.3 | 2026-10-15 | `7178540` | `docs/proofs/wp1.3-accept.md` (`bc97a19`); 2nd B adjudicated at the gate; DR-20, DR-21 | pending |
 
 - **WP1.2 Part A, raised to CHARC:**
   - approval of the Windows-only `_windows_power()` in `bench.py` (instrument only, guarded);
@@ -125,4 +126,4 @@ Each accepted package had its return report posted to CHARC and an info-update t
   and re-run after CHARC confirms the download is complete.
 - CHARC approved `_windows_power()` as instrument-only (never into `src/clearwater/` without a
   fresh ruling).
-- Inbox drained through msg `dc733650e60ac026`; empty at 12:00Z (verify: `uv run python scripts/role_mail.py list --role orchestrator`).
+- Inbox drained through msg `b6ca554def97ab7d` (verify: `uv run python scripts/role_mail.py list --role orchestrator`).
