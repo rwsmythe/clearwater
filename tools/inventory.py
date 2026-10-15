@@ -19,6 +19,7 @@ one file. With both ``--footage`` and ``--out`` given, the configuration file is
 from __future__ import annotations
 
 import argparse
+import contextlib
 import csv
 import dataclasses
 import io
@@ -26,14 +27,17 @@ import json
 import math
 import os
 import re
+import shutil
+import struct
 import subprocess
 import sys
+import tempfile
 from collections import Counter
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path, PurePath
-from typing import Any
+from typing import IO, Any
 
 import pillow_heif
 from PIL import Image, ImageCms
@@ -55,6 +59,8 @@ CATEGORY_REMINDER = (
 )
 _VFR_TOLERANCE = 0.005
 _ERROR_MAX_CHARS = 200
+_HEIF_META_MAX_BYTES = 64 * 1024 * 1024
+_DIMENSIONS_NOTE = "Dimensions are as stored; apply the orientation column for display."
 _EXIF_ORIENTATION = 0x0112
 _PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 _TIFF_BITS_PER_SAMPLE = 258
@@ -139,8 +145,8 @@ class VideoRecord:
         color_matrix: Matrix coefficients tag (``ffprobe`` calls it ``color_space``).
         color_range: ``tv`` or ``pc`` as tagged, or ``None``.
         duration_seconds: Duration of the video stream, else of the container.
-        rotation_degrees: Clockwise rotation (0, 90, 180 or 270) a player applies; ``None``
-            only when there is no video stream.
+        rotation_degrees: Clockwise rotation (0, 90, 180 or 270) a player applies: 0 when
+            absent (no rotation metadata); ``None`` only when there is no video stream.
         tracks: One ``"<index>:<type>:<codec>"`` entry per stream.
         gopro_recording: GoPro recording number from the file name, or ``None``.
         gopro_chapter: GoPro chapter number (first chapter is 1), or ``None``.
@@ -181,8 +187,9 @@ class PhotoRecord:
         path: Path of the file; relative to the footage root when produced by ``scan``.
         size_bytes: File size in bytes (0 when the file could not be examined).
         format: Pillow format name, for example ``HEIF``, ``JPEG`` or ``PNG``.
-        width: Stored pixel width, before the display rotation given by ``orientation``.
-        height: Stored pixel height, before the display rotation given by ``orientation``.
+        width: Stored pixel width, before the display rotation given by ``orientation``
+            (for HEIF, before the ``irot`` rotation the decoder applies).
+        height: Stored pixel height, likewise.
         bit_depth: Bits per sample, or ``None`` when it cannot be determined.
         color_profile: Description of the embedded ICC profile, or ``None``.
         orientation: EXIF orientation value 1 to 8, or ``None`` when absent.
@@ -227,7 +234,17 @@ class _ProbeError(Exception):
     """A probe could not produce its record; the message is a one-line reason."""
 
 
-def _one_line(text: str) -> str:
+def _one_line(text: str, path: Path | None = None) -> str:
+    """Make an error reason one line of at most ``_ERROR_MAX_CHARS`` characters.
+
+    Tools quote the full path of the file in their messages; the row already names the
+    file, so each quoted path is cut down to the file name and the room goes to the reason.
+    """
+    if path is not None:
+        full = str(path)
+        # Python reprs (Pillow messages) double the backslashes of a Windows path.
+        for quoted in (full.replace("\\", "\\\\"), full, path.as_posix()):
+            text = text.replace(quoted, path.name)
     collapsed = " ".join(text.split())
     if len(collapsed) > _ERROR_MAX_CHARS:
         return collapsed[: _ERROR_MAX_CHARS - 3] + "..."
@@ -490,7 +507,7 @@ def _failed_video(path: Path, size_bytes: int, error: str) -> VideoRecord:
         gopro_recording=recording,
         gopro_chapter=chapter,
         lrv_present=lrv_beside(path),
-        error=_one_line(error),
+        error=_one_line(error, path),
     )
 
 
@@ -560,6 +577,117 @@ def probe_video(path: Path) -> VideoRecord:
     return _video_from_ffprobe(path, size_bytes, data, lrv_beside(path))
 
 
+def _boxes(buf: bytes, start: int, end: int) -> list[tuple[bytes, int, int]]:
+    """List the ISO base media boxes in ``buf[start:end]`` as (type, payload start, end)."""
+    found = []
+    while start + 8 <= end:
+        size, kind = struct.unpack_from(">I4s", buf, start)
+        header = 8
+        if size == 1:
+            (size,) = struct.unpack_from(">Q", buf, start + 8)
+            header = 16
+        elif size == 0:
+            size = end - start
+        if size < header or start + size > end:
+            raise ValueError("box size out of range")
+        found.append((kind, start + header, start + size))
+        start += size
+    return found
+
+
+def _heif_meta_payload(path: Path) -> bytes:
+    """Return the payload of the top-level ``meta`` box of a HEIF file.
+
+    Raises:
+        ValueError: If there is no ``meta`` box in the file, or it is implausibly large.
+    """
+    with path.open("rb") as handle:
+        while head := handle.read(8):
+            if len(head) < 8:
+                break
+            size, kind = struct.unpack(">I4s", head)
+            header = 8
+            if size == 1:
+                (size,) = struct.unpack(">Q", handle.read(8))
+                header = 16
+            if kind == b"meta":
+                if not header <= size <= _HEIF_META_MAX_BYTES:
+                    raise ValueError("meta box size out of range")
+                return handle.read(size - header)
+            if size < header:
+                break
+            handle.seek(size - header, os.SEEK_CUR)
+    raise ValueError("no meta box")
+
+
+def _primary_item_properties(meta: bytes) -> list[tuple[bytes, int]]:
+    """Return the (type, payload start) of every property linked to the primary item.
+
+    Raises:
+        ValueError: If the boxes needed to find them are missing or malformed.
+    """
+    children = _boxes(meta, 4, len(meta))  # meta is a FullBox: skip its version and flags
+    primary = next((b for b in children if b[0] == b"pitm"), None)
+    properties = next((b for b in children if b[0] == b"iprp"), None)
+    if primary is None or properties is None:
+        raise ValueError("no pitm or iprp box")
+    item_format = ">H" if meta[primary[1]] == 0 else ">I"
+    (item_id,) = struct.unpack_from(item_format, meta, primary[1] + 4)
+    inside = _boxes(meta, properties[1], properties[2])
+    container = next((b for b in inside if b[0] == b"ipco"), None)
+    if container is None:
+        raise ValueError("no ipco box")
+    candidates = _boxes(meta, container[1], container[2])
+    indexes: set[int] = set()
+    for kind, begin, _end in inside:
+        if kind != b"ipma":
+            continue
+        entry_format = ">H" if meta[begin] == 0 else ">I"
+        entry_size = struct.calcsize(entry_format)
+        wide = bool(meta[begin + 3] & 1)
+        (count,) = struct.unpack_from(">I", meta, begin + 4)
+        position = begin + 8
+        for _ in range(count):
+            (entry,) = struct.unpack_from(entry_format, meta, position)
+            links = meta[position + entry_size]
+            position += entry_size + 1
+            for _ in range(links):
+                if wide:
+                    (link,) = struct.unpack_from(">H", meta, position)
+                    index = link & 0x7FFF
+                    position += 2
+                else:
+                    index = meta[position] & 0x7F
+                    position += 1
+                if entry == item_id:
+                    indexes.add(index)
+    return [(candidates[i - 1][0], candidates[i - 1][1]) for i in sorted(indexes) if i >= 1]
+
+
+def _heif_axes_swapped(path: Path) -> bool | None:
+    """Tell whether the primary image of a HEIF file carries a quarter-turn ``irot``.
+
+    The decoder applies that transformation, so the size it reports has width and height
+    exchanged relative to the stored image. The EXIF orientation is deliberately not used:
+    it can disagree with the container (a file may carry EXIF orientation 6 and no ``irot``).
+
+    Args:
+        path: The HEIF file.
+
+    Returns:
+        True when the primary image has an ``irot`` of 90 or 270 degrees, False when it has
+        none or a half turn, and None when the container could not be parsed.
+    """
+    try:
+        meta = _heif_meta_payload(path)
+        for kind, begin in _primary_item_properties(meta):
+            if kind == b"irot":
+                return meta[begin] & 3 in (1, 3)
+    except (OSError, ValueError, IndexError, struct.error):
+        return None
+    return False
+
+
 def _failed_photo(path: Path, size_bytes: int, error: str) -> PhotoRecord:
     return PhotoRecord(
         path=path,
@@ -570,7 +698,7 @@ def _failed_photo(path: Path, size_bytes: int, error: str) -> PhotoRecord:
         bit_depth=None,
         color_profile=None,
         orientation=None,
-        error=_one_line(error),
+        error=_one_line(error, path),
     )
 
 
@@ -612,10 +740,13 @@ def probe_photo(path: Path) -> PhotoRecord:
     """Read a photo's header with Pillow (and pillow-heif for HEIC); no pixels are decoded.
 
     Never raises: any failure yields a record whose ``error`` says why. ``width`` and
-    ``height`` are the stored dimensions: for HEIF, where the library applies the
-    container's rotation on load, they are swapped back when ``orientation`` is 5 to 8, so
-    all formats report the same convention. A missing bit depth (HEIC without
-    pillow-heif's figure) leaves ``bit_depth`` ``None`` with a reason in ``error``.
+    ``height`` are the stored dimensions, before the display rotation given by
+    ``orientation``. For HEIF the decoder has already applied the container's ``irot``
+    rotation, so width and height are swapped back exactly when the primary image has a
+    quarter-turn ``irot`` (read from the container, never inferred from EXIF); when the
+    container cannot be parsed they stay as decoded and ``error`` says so. A missing bit
+    depth (HEIC without pillow-heif's figure) leaves ``bit_depth`` ``None`` with a reason
+    in ``error``.
 
     Args:
         path: The photo file.
@@ -638,9 +769,16 @@ def probe_photo(path: Path) -> PhotoRecord:
             orientation = _as_int(raw_orientation)
             if orientation is not None and not 1 <= orientation <= 8:
                 orientation = None
-            if is_heif and orientation is not None and orientation >= 5:
-                width, height = height, width
+            problems = []
+            if is_heif:
+                swapped = _heif_axes_swapped(path)
+                if swapped:
+                    width, height = height, width
+                elif swapped is None:
+                    problems.append("HEIF rotation unreadable, width and height as decoded")
             bit_depth = _photo_bit_depth(image, path)
+            if bit_depth is None:
+                problems.append(f"bit depth unavailable ({image.mode})")
             record = PhotoRecord(
                 path=path,
                 size_bytes=size_bytes,
@@ -650,7 +788,7 @@ def probe_photo(path: Path) -> PhotoRecord:
                 bit_depth=bit_depth,
                 color_profile=_icc_description(image.info.get("icc_profile")),
                 orientation=orientation,
-                error=None if bit_depth is not None else f"bit depth unavailable ({image.mode})",
+                error="; ".join(problems) or None,
             )
     except Exception as exc:  # Pillow and pillow-heif raise many types on bad input.
         return _failed_photo(path, size_bytes, f"cannot read image: {type(exc).__name__}: {exc}")
@@ -796,6 +934,7 @@ def _summary_text(
     if footage_root is not None:
         lines.append(f"- Footage folder: {footage_root.as_posix()}")
     lines += [
+        f"- {_DIMENSIONS_NOTE}",
         "",
         "## Counts",
         "",
@@ -818,7 +957,7 @@ def _summary_text(
         "",
         "Stored width x height (files without errors).",
         "",
-        *_count_lines(Counter(f"{p.width}x{p.height}" for p in photos if p.width and p.height)),
+        *_count_lines(Counter(f"{p.width}x{p.height}" for p in photos if p.error is None)),
         "",
         "## Photo formats",
         "",
@@ -856,7 +995,8 @@ def write_inventory(
 
     The CSV is ``inventory-<stamp>.csv`` (UTF-8 with a byte-order mark so Excel opens it;
     one row per record; ``category`` empty) and the summary is ``inventory-<stamp>-summary.md``.
-    Files are created exclusively, so an existing report is never overwritten: when either
+    Each file is written to a temporary name first and only then given its final name, so a
+    failed write leaves no partial report. An existing report is never overwritten: when either
     name exists, both files take the same ``-N`` suffix (``inventory-<stamp>-1.csv``, ...).
 
     Args:
@@ -878,29 +1018,87 @@ def write_inventory(
     reports = working / "reports"
     reports.mkdir(parents=True, exist_ok=True)
     summary_text = _summary_text(records, stamp, footage_root, ignored, skipped, sidecars)
-    attempt = 0
-    while True:
-        suffix = f"-{attempt}" if attempt else ""
-        csv_path = reports / f"inventory-{stamp}{suffix}.csv"
-        summary_path = reports / f"inventory-{stamp}{suffix}-summary.md"
-        attempt += 1
-        try:
-            csv_handle = csv_path.open("x", encoding="utf-8-sig", newline="")
-        except FileExistsError:
-            continue
-        with csv_handle:
+
+    def write_csv(handle: IO[str]) -> None:
+        writer = csv.DictWriter(handle, fieldnames=CSV_COLUMNS)
+        writer.writeheader()
+        writer.writerows(_csv_row(record) for record in records)
+
+    staged: list[Path] = []
+    try:
+        csv_temp = _stage(reports, "utf-8-sig", "", write_csv)
+        staged.append(csv_temp)
+        summary_temp = _stage(reports, "utf-8", "\n", lambda handle: handle.write(summary_text))
+        staged.append(summary_temp)
+        attempt = 0
+        while True:
+            suffix = f"-{attempt}" if attempt else ""
+            csv_path = reports / f"inventory-{stamp}{suffix}.csv"
+            summary_path = reports / f"inventory-{stamp}{suffix}-summary.md"
+            attempt += 1
             try:
-                summary_handle = summary_path.open("x", encoding="utf-8", newline="\n")
+                _publish(csv_temp, csv_path)
             except FileExistsError:
-                summary_handle = None
-            if summary_handle is not None:
-                with summary_handle:
-                    summary_handle.write(summary_text)
-                writer = csv.DictWriter(csv_handle, fieldnames=CSV_COLUMNS)
-                writer.writeheader()
-                writer.writerows(_csv_row(record) for record in records)
-                return csv_path, summary_path
-        csv_path.unlink()  # The summary name was taken: give the CSV back and try the next suffix.
+                continue
+            try:
+                _publish(summary_temp, summary_path)
+            except FileExistsError:
+                csv_path.unlink()  # Give the CSV back and try the next suffix.
+                continue
+            except BaseException:
+                csv_path.unlink(missing_ok=True)
+                raise
+            return csv_path, summary_path
+    finally:
+        for temp in staged:
+            with contextlib.suppress(OSError):
+                temp.unlink(missing_ok=True)
+
+
+def _stage(reports: Path, encoding: str, newline: str, write: Callable[[IO[str]], object]) -> Path:
+    """Write a report to a new temporary file in ``reports`` and return its path.
+
+    The temporary file is removed again if writing fails.
+    """
+    descriptor, name = tempfile.mkstemp(dir=reports, prefix=".inventory-", suffix=".tmp")
+    temp = Path(name)
+    try:
+        with os.fdopen(descriptor, "w", encoding=encoding, newline=newline) as handle:
+            write(handle)
+    except BaseException:
+        temp.unlink(missing_ok=True)
+        raise
+    return temp
+
+
+def _publish(temp: Path, final: Path) -> None:
+    """Give a finished temporary file its final name without replacing any existing file.
+
+    The temporary file is kept (the caller removes it), so a published report can be
+    withdrawn and published again under another name. A hard link makes the final name
+    appear complete in one step; on a volume without hard links the content is copied
+    into an exclusively created file, which is removed again if the copy fails.
+
+    Raises:
+        FileExistsError: If ``final`` already exists; it is left untouched.
+        OSError: If the file cannot be written; no ``final`` is left behind.
+    """
+    try:
+        os.link(temp, final)
+    except FileExistsError:
+        raise
+    except OSError:
+        pass  # No hard links here: fall back to a copy.
+    else:
+        return
+    try:
+        with temp.open("rb") as source, final.open("xb") as target:
+            shutil.copyfileobj(source, target)
+    except FileExistsError:
+        raise
+    except BaseException:
+        final.unlink(missing_ok=True)
+        raise
 
 
 def _resolved(path: Path) -> Path:

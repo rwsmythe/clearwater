@@ -358,6 +358,47 @@ class TestProbeVideoFailures:
         assert (record.gopro_recording, record.gopro_chapter) == (9, 1)
         assert record.lrv_present is True
 
+    def test_error_keeps_the_reason_not_the_path(
+        self, monkeypatch: pytest.MonkeyPatch, clip: Path
+    ) -> None:
+        stderr = f"{clip}: Invalid data found when processing input".encode()
+        monkeypatch.setattr(
+            inventory.subprocess, "run", _FakeRun(_completed(stderr=stderr, code=1))
+        )
+        record = inventory.probe_video(clip)
+        assert record.error is not None
+        assert str(clip) not in record.error
+        assert "GX010009.MP4: Invalid data found when processing input" in record.error
+
+    def test_long_path_cannot_push_the_reason_out(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        deep = tmp_path.joinpath(*["a-rather-long-folder-name"] * 12)
+        deep.mkdir(parents=True)
+        clip = deep / "GX010009.MP4"
+        clip.write_bytes(b"12345")
+        assert len(str(clip)) > 250
+        stderr = f"{clip}: moov atom not found".encode()
+        monkeypatch.setattr(
+            inventory.subprocess, "run", _FakeRun(_completed(stderr=stderr, code=1))
+        )
+        record = inventory.probe_video(clip)
+        assert record.error is not None
+        assert "moov atom not found" in record.error
+        assert len(record.error) <= 200
+
+    def test_photo_error_drops_the_quoted_path(self, tmp_path: Path) -> None:
+        deep = tmp_path.joinpath(*["a-rather-long-folder-name"] * 12)
+        deep.mkdir(parents=True)
+        path = deep / "bad.jpg"
+        path.write_bytes(b"this is not an image" * 10)
+        record = inventory.probe_photo(path)
+        assert record.error is not None
+        assert str(path) not in record.error
+        assert str(path).replace("\\", "\\\\") not in record.error
+        assert "cannot identify image file" in record.error
+        assert "bad.jpg" in record.error
+
     def test_long_error_is_truncated(self, monkeypatch: pytest.MonkeyPatch, clip: Path) -> None:
         monkeypatch.setattr(
             inventory.subprocess, "run", _FakeRun(_completed(stderr=b"x" * 999, code=1))
@@ -431,6 +472,22 @@ def _save_with_exif(image: Image.Image, path: Path, orientation: int, **kwargs: 
     image.save(path, exif=exif.tobytes(), icc_profile=profile, **kwargs)
 
 
+def _heic_without_irot(path: Path, orientation: int) -> None:
+    """Write a 64x48 HEIC whose EXIF says ``orientation`` but whose container has no irot."""
+    low = Image.Exif()
+    low[0x0112] = 1
+    high = Image.Exif()
+    high[0x0112] = orientation
+    heif = pillow_heif.from_bytes("RGB", (64, 48), bytes(64 * 48 * 3))
+    heif.info["exif"] = low.tobytes()
+    heif.save(path)
+    data = path.read_bytes()
+    old, new = low.tobytes()[6:], high.tobytes()[6:]  # the TIFF part after "Exif\0\0"
+    assert data.count(old) == 1
+    assert b"irot" not in data
+    path.write_bytes(data.replace(old, new))
+
+
 class TestProbePhoto:
     def test_jpeg_with_orientation_and_profile(self, tmp_path: Path) -> None:
         path = tmp_path / "a.jpg"
@@ -486,6 +543,65 @@ class TestProbePhoto:
         record = inventory.probe_photo(path)
         assert record.orientation == 6
         assert (record.width, record.height) == (64, 48)  # same convention as JPEG
+
+    def test_heic_with_irot_is_swapped_back(self, tmp_path: Path) -> None:
+        path = tmp_path / "irot.heic"
+        _save_with_exif(Image.new("RGB", (64, 48)), path, 6, format="HEIF")
+        assert b"irot" in path.read_bytes()
+        assert inventory._heif_axes_swapped(path) is True
+        with Image.open(path) as decoded:
+            assert decoded.size == (48, 64)  # what the decoder reports after applying irot
+        assert (inventory.probe_photo(path).width, inventory.probe_photo(path).height) == (64, 48)
+
+    @pytest.mark.parametrize("orientation", [5, 6, 7, 8])
+    def test_heic_with_exif_orientation_but_no_irot_is_not_swapped(
+        self, tmp_path: Path, orientation: int
+    ) -> None:
+        path = tmp_path / "noirot.heic"
+        _heic_without_irot(path, orientation)
+        with Image.open(path) as decoded:
+            assert decoded.size == (64, 48)  # nothing was rotated by the decoder
+        assert inventory._heif_axes_swapped(path) is False
+        record = inventory.probe_photo(path)
+        assert (record.width, record.height) == (64, 48)
+        assert record.orientation == orientation
+        assert record.error is None
+
+    def test_heic_half_turn_is_not_swapped(self, tmp_path: Path) -> None:
+        path = tmp_path / "half.heic"
+        _save_with_exif(Image.new("RGB", (64, 48)), path, 3, format="HEIF")
+        assert b"irot" in path.read_bytes()
+        assert inventory._heif_axes_swapped(path) is False
+        assert (inventory.probe_photo(path).width, inventory.probe_photo(path).height) == (64, 48)
+
+    def test_unparsable_heif_container_leaves_dimensions_as_decoded(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        path = tmp_path / "irot.heic"
+        _save_with_exif(Image.new("RGB", (64, 48)), path, 6, format="HEIF")
+        monkeypatch.setattr(inventory, "_heif_axes_swapped", lambda p: None)
+        record = inventory.probe_photo(path)
+        assert (record.width, record.height) == (48, 64)
+        assert record.error is not None
+        assert "rotation unreadable" in record.error
+
+    def test_heif_parser_gives_none_for_other_files(self, tmp_path: Path) -> None:
+        jpeg = tmp_path / "a.jpg"
+        Image.new("RGB", (8, 8)).save(jpeg)
+        junk = tmp_path / "junk.heic"
+        junk.write_bytes(b"\x00\x00\x00\x10ftypheic" + b"\x00" * 40)
+        heic = tmp_path / "a.heic"
+        _save_with_exif(Image.new("RGB", (64, 48)), heic, 6, format="HEIF")
+        cut = tmp_path / "cut.heic"
+        cut.write_bytes(heic.read_bytes()[:60])
+        for path in (jpeg, junk, cut, tmp_path / "missing.heic"):
+            assert inventory._heif_axes_swapped(path) is None
+
+    def test_jpeg_orientation_never_swaps(self, tmp_path: Path) -> None:
+        path = tmp_path / "a.jpg"
+        _save_with_exif(Image.new("RGB", (64, 48)), path, 8)
+        record = inventory.probe_photo(path)
+        assert (record.width, record.height, record.orientation) == (64, 48, 8)
 
     def test_heic_ten_bit(self, tmp_path: Path) -> None:
         path = tmp_path / "ten.heic"
@@ -696,6 +812,7 @@ class TestWriteInventory:
         )
         assert summary == tmp_path / "reports" / "inventory-20261014T120000Z-summary.md"
         text = summary.read_text(encoding="utf-8")
+        assert "- Dimensions are as stored; apply the orientation column for display." in text
         assert "- Videos: 4" in text
         assert "- Photos: 1" in text
         assert "- Files with probe errors: 1" in text
@@ -710,6 +827,17 @@ class TestWriteInventory:
         assert "recording 0002" not in text
         assert "- Videos with an .LRV sidecar: 3 of 4" in text
         assert "- dive2/GX010003.MP4: ffprobe failed: bad" in text
+
+    def test_photo_sizes_count_only_photos_without_errors(self, tmp_path: Path) -> None:
+        good = _records()[0]
+        flawed = dataclasses.replace(
+            good, path=Path("IMG_0002.HEIC"), width=1000, height=500, error="bit depth unavailable"
+        )
+        _, summary = inventory.write_inventory([good, flawed], tmp_path, stamp="20261014T120000Z")
+        text = summary.read_text(encoding="utf-8")
+        assert "- 4032x3024: 1" in text
+        assert "1000x500" not in text
+        assert "- Files with probe errors: 1" in text
 
     def test_summary_with_nothing(self, tmp_path: Path) -> None:
         _, summary = inventory.write_inventory([], tmp_path, stamp="20261014T120000Z")
@@ -752,6 +880,73 @@ class TestWriteInventory:
         assert (csv_path.name, summary.name) == (
             "inventory-20261014T120000Z-1.csv",
             "inventory-20261014T120000Z-1-summary.md",
+        )
+
+    def test_failed_csv_write_leaves_nothing_behind(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        calls = 0
+        real = inventory._csv_row
+
+        def fail_on_second(record: inventory.Record) -> dict[str, str]:
+            nonlocal calls
+            calls += 1
+            if calls == 2:
+                raise OSError("disk full")
+            return real(record)
+
+        monkeypatch.setattr(inventory, "_csv_row", fail_on_second)
+        with pytest.raises(OSError, match="disk full"):
+            inventory.write_inventory(_records(), tmp_path, stamp="20261014T120000Z")
+        assert list((tmp_path / "reports").iterdir()) == []
+
+    def test_failure_publishing_the_summary_withdraws_the_csv(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        real = inventory._publish
+        names = []
+
+        def fail_on_summary(temp: Path, final: Path) -> None:
+            names.append(final.name)
+            if final.name.endswith("-summary.md"):
+                raise OSError("disk full")
+            real(temp, final)
+
+        monkeypatch.setattr(inventory, "_publish", fail_on_summary)
+        with pytest.raises(OSError, match="disk full"):
+            inventory.write_inventory(_records(), tmp_path, stamp="20261014T120000Z")
+        assert names == ["inventory-20261014T120000Z.csv", "inventory-20261014T120000Z-summary.md"]
+        assert list((tmp_path / "reports").iterdir()) == []
+
+    def test_final_names_appear_complete(self, tmp_path: Path) -> None:
+        csv_path, summary = inventory.write_inventory(
+            _records(), tmp_path, stamp="20261014T120000Z"
+        )
+        on_disk = sorted(p.name for p in (tmp_path / "reports").iterdir())
+        assert on_disk == sorted([csv_path.name, summary.name])
+        with csv_path.open(encoding="utf-8-sig", newline="") as handle:
+            assert len(list(csv.DictReader(handle))) == 5
+
+    def test_without_hard_links_the_copy_fallback_still_never_overwrites(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        def no_links(src: Any, dst: Any) -> None:
+            raise OSError("hard links not supported")
+
+        monkeypatch.setattr(inventory.os, "link", no_links)
+        stamp = "20261014T120000Z"
+        reports = tmp_path / "reports"
+        reports.mkdir()
+        (reports / f"inventory-{stamp}.csv").write_text("precious", encoding="utf-8")
+        csv_path, summary = inventory.write_inventory(_records(), tmp_path, stamp=stamp)
+        assert (csv_path.name, summary.name) == (
+            f"inventory-{stamp}-1.csv",
+            f"inventory-{stamp}-1-summary.md",
+        )
+        assert (reports / f"inventory-{stamp}.csv").read_text(encoding="utf-8") == "precious"
+        assert csv_path.read_bytes().startswith(b"\xef\xbb\xbf")
+        assert sorted(p.name for p in reports.iterdir()) == sorted(
+            [f"inventory-{stamp}.csv", csv_path.name, summary.name]
         )
 
     def test_default_stamp_is_utc_now(self, tmp_path: Path) -> None:
