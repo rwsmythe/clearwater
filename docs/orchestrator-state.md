@@ -26,7 +26,7 @@
 - **wp12-reviewer-b** (implementer-opus-high, background) -- Reviewer B on `9408d18`, brief
   `docs/briefs/wp1.2-review-brief.md`; bench re-run to `work/wp1.2a-B/`; evidence `...\wp1.2\B\`.
 - Stray `python.exe` PID 33616 (orphan `python -` from WP0.1 Reviewer B, spinning 1 core since
-  2026-10-14 13:31) -- auto-mode classifier DENIED my Stop-Process; raised to the user. Present
+  2026-10-14 13:31) -- auto-mode classifier DENIED my Stop-Process; the USER will stop it after Reviewer B completes (tell them when B returns). Present
   during the author's bench; B re-runs under the same condition.
 - Branches `wp0.1`, `wp0.2` and `wp1.1` are kept on purpose: they hold the reviewed pre-rebase
   SHAs the accept records cite.
