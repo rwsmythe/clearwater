@@ -7,6 +7,7 @@ Evidence: `C:\Users\rwsmy\clearwater-review-evidence\wp1.5\rN\` (prompt, diff, t
 | Round | Head reviewed | crit / major / minor | In / out envelope | NEW / REOPENED | Reverts | Fixes changed | Assertions | Verdict | Depth |
 |---|---|---|---|---|---|---|---|---|---|
 | 1 | 135ab46 | 0 / 2 / 2 | 2 in / 2 out | 4 NEW / 0 | 0 | product (spike.py, compare.py: per-file write checks, GPU evidence in proofs, exact container start) + tests; in 21d418d; report 1163ff1 | banner ok; ^ERROR 0; `ERROR codex_core` 2 = sandbox rejecting the reviewer's own `rm -f` probe, and a brief echo; footer 1; succeeded 4; withheld-path hits = prompt/brief echoes, exclusion globs, one incidental rg hit in docs/proofs/wp1.2-accept.md (wp1.5 ledger absent) | BLOCKING 1 2 | (dispatcher-read) |
+| 2 | 7d1db00 | 0 / 1 / 2 | 2 in / 1 out | 1 NEW (minor) / 2 REOPENED (the major and one minor) | 0 | cleanup only: tests (synthetic clips written under the test spike folder after the output-path check; ctts test comment) + one docstring + report wording; in b49ac9c | banner ok; ^ERROR 0; `ERROR codex_core` 1 = brief echo; footer 1; succeeded 14; withheld-path hits = prompt/brief echoes, exclusion globs, a WSL `git status --short` listing (no read) | BLOCKING 1 on a REOPENED finding = zero NEW in-envelope blocking: converged | (dispatcher-read) |
 
 ## Findings and adjudication
 
