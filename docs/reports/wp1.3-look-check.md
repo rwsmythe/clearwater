@@ -109,10 +109,13 @@ tests' own writes outside `roots.allowed` go through the same check
   refused; a `%` in a root path is expanded by FFmpeg; `verify_clip` accepts `yuvj420p` with `tv`
   and skips tags that are `unknown`; `v:0` is taken without checking for cover art.
 
-**Record shape for WP1.4** (`frames.FrameFile`, `record()`): `path`, `source`, `chapter`,
+**Record shape for WP1.4.** The object `frames.FrameFile` has `path`, `source`, `chapter`,
 `pts_ticks` (exact, int), `time_base` (`Fraction`), `pts` (exact `Fraction` of seconds), `width`,
 `height`, `tags` (`StreamTags`: `pix_fmt`, `color_range`, `color_space`, `color_transfer`,
-`color_primaries`, `assumed`), `command`. `extract(video, timestamps_s, out_dir, *,
+`color_primaries`, `assumed`), `command`. Its JSON form `record()` (the `frames.json` entries)
+has different keys and types: `file` (the PNG's name), `source`, `chapter`, `pts_ticks`,
+`time_base` and `pts_exact` (fractions as strings, e.g. `"1/30000"`), `pts_seconds` (float),
+`width`, `height`, `tags`, `command` [erratum at the gate, see section 8]. `extract(video, timestamps_s, out_dir, *,
 short_side=None, roots=None)` returns one per timestamp; `excerpt(video, start_s, duration_s,
 out_dir, *, short_side=None, roots=None, naming="pts")` returns every frame with pts in
 `[start, start + duration)` in order (`naming="index"` writes `<chapter>_f0000.png`... for an
@@ -170,7 +173,7 @@ mean, the quantity the D50/D52 cap limits to 2.0; the largest observed is 0.58. 
   never collapsed. At the defaults the shallow footage sits well inside the caps and the clamp.
   Whether 2.0 and 3.0 are right for deeper footage is for the deeper part and WP2.1.
 - **3C leaves almost nothing for the white balance to do** (gains 0.93 to 1.05): its channel
-  means after compensation are already near equal (`means` in `statistics.json`), unlike
+  means after compensation are already near equal (`white_balance.channel_means` in `statistics.json`), unlike
   `ancuti2018`, whose white balance gains reach 1.38 (red) and 0.80 (blue).
 - **Blue compensation moves little on these frames**: in the `ancuti2018-blue` variant the
   blue white-balance gain is within 0.07 of the plain variant's on every frame; the largest
@@ -217,8 +220,10 @@ Checks (`flicker\statistics.json` `checks`). Both clips are written as `*.partia
 and renamed to their names only when BOTH have passed everything below; any exception, including
 a probe that raises, a timeout or a failed read-back, removes every clip name again and leaves the
 frame PNGs (the removal is best effort, `discard`: one removal that fails does not stop the others
-or replace the error, it is attached to it as a note; a clip of an earlier run is removed first, so a
-failed run leaves none;
+or replace the error, it is attached to it as a note). A clip of an earlier run is removed when the encode step
+starts, not at the start of the run [erratum at the gate]: a run that fails earlier (probe,
+extraction, correction) leaves the earlier clips, and a failure writing the records after the
+rename leaves new clips beside old records; such a run exits non-zero (banked, DR-20);
 `test_a_raising_verification_leaves_no_clip`, `test_a_failing_second_encode_leaves_neither_clip`,
 `test_a_failed_readback_leaves_neither_clip_and_a_pass_names_both`,
 `test_a_failing_second_rename_and_a_failing_cleanup_leave_no_final_name_and_keep_the_error`).
@@ -242,8 +247,7 @@ failed run leaves none;
   `test_a_duplicated_frame_fails_the_readback_by_name`,
   `test_two_swapped_frames_fail_the_readback_by_name`); a dropped frame fails the clip on the count
   (`problems`, no per-frame record: `test_a_dropped_frame_fails_the_readback_on_the_count`). The
-  scratch folder `flicker
-eadback\<clip>` is cleared before use (a surplus frame left by a crashed
+  scratch folder `flicker\readback\<clip>` is cleared before use (a surplus frame left by a crashed
   run cannot change the count: `test_stale_read_back_scratch_does_not_count_as_clip_frames`) and
   removed after; a removal that fails prints a warning. The per-frame `own`, `previous`, `next`, `margin` and per-channel
   `bias` of all 180 frames of both clips are in the JSON.
@@ -330,6 +334,11 @@ record observations about them under the open-water row at CP2 is the owner's ca
 
 ## 8. Verification
 
+- **Errata at the gate (orchestrator, text only, after Reviewer B's re-run).** Four corrections
+  in this report, with no code or record changed: the record shape for WP1.4 (`record()`'s keys
+  and types differ from the `FrameFile` attributes); `white_balance.channel_means` for the 3C
+  means; a stray carriage return in the read-back scratch path; and the clean-up sentence in
+  section 5, which claimed that a failed run leaves no clip. See `docs/proofs/wp1.3-accept.md`.
 - Gates on the remediation head after Reviewer A's round 3 cleanup (the head named in the ledger),
   run with the WinGet `ffmpeg`/`ffprobe` folder on PATH: `uv run ruff check .` all checks passed;
   `uv run ruff format --check .` 74 files already formatted; `uv run mypy` no issues in 16 source
