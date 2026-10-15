@@ -829,6 +829,20 @@ class TestToolEnvironment:
         assert [p.name for p in built.iterdir()] == ["clip.mp4"]
 
 
+class TestCameraRecord:
+    def test_records_geometry_sample_aspect_ratio_and_udta_by_type_and_size(
+        self, clips: dict[str, Path]
+    ) -> None:
+        record = spike.camera_record(clips["base"])
+        assert (record["width"], record["height"], record["sample_aspect_ratio"]) == (
+            320,
+            240,
+            "1:1",
+        )
+        assert record["codec"] == "hevc"
+        assert all(len(atom) == 2 for atom in record["udta_atoms"])  # type and size, no MD5
+
+
 class TestCompositionOffsets:
     def test_ctts_offsets_read_signed_as_ffmpeg_reads_them(self) -> None:
         # A version-0 ctts whose first offset is 0xFFFFFC17. ISO/IEC 14496-12 reads a

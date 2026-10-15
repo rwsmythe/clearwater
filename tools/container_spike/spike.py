@@ -539,10 +539,10 @@ def camera_record(chapter: Path) -> dict[str, Any]:
         chapter: The chapter.
 
     Returns:
-        Codec, profile, pixel format, colour tags as written, frame rate and whether
-        the decoded frames step evenly, start offsets, edit lists, orientation, audio,
-        data streams, creation time, the ``moov/udta`` atom types and the GoPro
-        settings that bear on D73.
+        Codec, profile, pixel format, frame size and sample aspect ratio, colour tags
+        as written, frame rate and whether the decoded frames step evenly, start
+        offsets, edit lists, orientation, audio, data streams, creation time, the
+        ``moov/udta`` atom types and sizes and the GoPro settings that bear on D73.
     """
     facts = gather(chapter)
     movie = facts.movie
@@ -578,6 +578,7 @@ def camera_record(chapter: Path) -> dict[str, Any]:
         "bit_depth": depth,
         "width": video.get("width"),
         "height": video.get("height"),
+        "sample_aspect_ratio": video.get("sample_aspect_ratio"),
         "colour": {
             "primaries": video.get("color_primaries"),
             "transfer": transfer,
