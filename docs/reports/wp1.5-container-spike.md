@@ -7,9 +7,10 @@ architect's; CHARC rules at WP1.6.
 
 Conditions: 2026-10-15 (UTC), Windows 11 laptop, NVIDIA GeForce RTX 4070 Laptop GPU, driver
 610.62; FFmpeg and ffprobe 9.0.2 (`9.0.2-full_build-www.gyan.dev`, the WP0.1 install); branch
-`wp1.5` (instrument `b3e7869`, fixes `020c423` and `21d418d`; the capability, camera and
-re-encode records below were produced on `21d418d`, except the camera record, on `020c423`,
-whose code path the fixes do not touch). Footage folder read only; every
+`wp1.5` (instrument `b3e7869`; fixes `020c423`, `21d418d`, and `d072698` for CHARC's rulings
+and the verification findings). The capability and re-encode records below were produced on
+`d072698`; the camera record on `020c423`, whose code path the later fixes do not touch.
+Footage folder read only; every
 file written is under `C:\Users\rwsmy\clearwater\work\wp1.5\` (below, `work\wp1.5\`). No timing
 figure is a result here: elapsed times are informal.
 
@@ -32,41 +33,52 @@ figure is a result here: elapsed times are informal.
   the footage folder (`check_output_path`, `write_checked`); a re-encode checks all of its
   record paths before FFmpeg starts. `-y` is passed only for such a checked path. The other
   FFmpeg runs (hardware decode, PSNR) write to the null muxer (`-f null -`), so nothing.
+  Every FFmpeg and ffprobe process gets the environment without `FFREPORT` (`tool_env`):
+  that variable makes both tools write a log file into their current folder, wherever it is.
 
 **JSON record shape** (`<name>.compare.json`): `source`, `output` (paths), `ffprobe` (version
 line), `info.{source,output}` (`codec`, `profile`, `bit_rate`, `size_bytes`, `streams`; not
 compared), `items[]` with `name`, `class`, `clause`, `source`, `output`, `status` (`SAME` or
 `DIFFERENT`), `note`, and `summary` (`items`, `different` count per class, `different_items`
-names per class, `mandatory_all_same`). Streams are paired across files by handler type and
+names per class, `mandatory_all_same` for D105's class alone, and
+`mandatory_and_required_all_same`, the recommendation's test). Streams are paired across files by handler type and
 occurrence (`vide#0`, `soun#0`, `tmcd#0`, `meta#0` = GPMF), never by index, because FFmpeg
 reorders the data tracks.
 
 **Classes.** `MANDATORY` (D94, D95, D105, 7.5): the per-frame pts sequence, frame count, video
-stream duration, start offset (first frame pts, each stream's `start_pts`, the container start
-as the exact earliest stream start), the edit lists of the video and audio tracks by presentation effect, audio
-present, its packets passed through (pts, duration, size, MD5 per packet), audio sync (first
-audio pts minus first video pts), and display orientation (display matrix side data and the
-video `tkhd` matrix). `REQUIRED` (D55, D114, 8.2): colour primaries, transfer, matrix, range,
-decoded pixel format, chroma subsampling, bit depth, frame size and sample aspect ratio; these
-are set by encoder options in every approach, so they cannot separate the three approaches, and
-are kept apart from D105's two classes rather than folded into either. `BEST-EFFORT` (D105,
-8.2): creation time (container tag, `mvhd`, stream tags), the GPMF and timecode tracks, the
-timecode value, the camera atoms, brands, other container and stream tags, chroma location,
-track layout and flags, video sample entry boxes, the edit lists as written, the data tracks'
-edit lists, and the container duration.
+stream duration, start offset (first frame pts, each video and audio stream's `start_pts`, and
+the container start as the exact earliest start over the video and audio tracks), the video
+track's edit list as written, the edit lists of the video and audio tracks by presentation
+effect, audio present, its packets passed through (pts, duration, size, MD5 per packet), audio
+sync (first audio pts minus first video pts), and display orientation (display matrix side data
+and the video `tkhd` matrix). `REQUIRED (D55/D114)` (D55, D114, 8.2): colour primaries, transfer,
+matrix, range, decoded pixel format, chroma subsampling, bit depth, frame size and sample aspect
+ratio. These are spec "musts" outside D105's list, so the label shows it; they are set by
+encoder options in every approach, so they cannot separate the three approaches, but **a
+REQUIRED item DIFFERENT weighs as MANDATORY for the recommendation**
+(`mandatory_and_required_all_same`). `BEST-EFFORT` (D105, 8.2): creation time (container tag,
+`mvhd`, stream tags), the GPMF and timecode tracks, the timecode value, the camera atoms, brands,
+other container and stream tags, chroma location, track layout and flags, video sample entry
+boxes, the non-video tracks' edit lists as written, the data tracks' edit lists by effect, the
+container start over all tracks (data tracks included), and the container duration.
 
-**Two readings this rests on** (open to challenge):
+**Two readings this rests on:**
 
-1. *Edit list.* The MANDATORY item compares each video and audio track's edit list by its
-   presentation effect: an absent edit list is the implicit identity (the whole media from 0 at
-   rate 1), and each entry's media time is taken relative to the track's earliest composition
-   time. Reason: an edit list's `media_time` is coupled to the encoded stream's composition
-   offsets, so a raw copy is not meaningful across a re-encode. On the synthetic test clip the
-   libx264 source stores its B-frame delay as `media_time` 1/15 s with positive offsets and the
-   re-encode stores 0 with negative offsets; both present frame 0 at 0.5 s (the empty edit is
-   kept), and the per-frame pts agree exactly. A real trim of the media's head keeps its length
-   under this reading (unit test `test_head_trim_is_kept`). The raw form is still compared, as
-   the BEST-EFFORT item "edit lists as written".
+1. *Edit list* (CHARC's ruling on D94 and 7.5, "copied from the source, not recalculated").
+   MANDATORY: the **video track's edit list as written** matches (every entry's duration in
+   movie seconds, media time in media seconds, rate), AND the **presentation effect** of the
+   video and audio tracks' edit lists matches. The effect form takes an absent edit list as the
+   implicit identity (the whole media from 0 at rate 1) and each entry's media time relative to
+   the track's earliest composition time, so a real trim of the media's head keeps its length
+   (unit test `test_head_trim_is_kept`). BEST-EFFORT: the non-video tracks' edit lists as
+   written; the identity edits the MP4 muxer adds to audio and data tracks that had none have no
+   presentation effect (the effect item covers audio). On the GoPro chapters the video edit list
+   matches as written (section 5). Where a source stores a B-frame reorder delay in the video
+   edit list, the as-written item is DIFFERENT after a re-encode even though the presentation is
+   identical: a libx264 test clip with B-frames stores `media_time` 1/15 s and its libx265
+   re-encode stores 0, with the effect and every pts SAME (unit test
+   `test_b_frame_source_video_edit_list_differs_as_written_only`). That case is outside this spike's envelope (section 9) and banked
+   as DR-15.
 2. *Frame durations.* ffprobe's per-frame `duration` is the packet's decode delta (`stts`), which
    follows decode order and moves with the encoder's B-frame structure: on the variable-frame-rate
    synthetic clip, the source and re-encode attach the 0.2 s gap to different frames while every
@@ -76,24 +88,47 @@ edit lists, and the container duration.
 
 ## 2. Capability record (D74)
 
-`spike.py capability`, 2026-10-15 06:50:33-06:50:38Z; record `work\wp1.5\capability.json`.
+`spike.py capability`, 2026-10-15 07:41:21-07:41:27Z; record `work\wp1.5\capability.json`.
 
 Listed by the build (`ffmpeg -encoders`, `-decoders`, `-hwaccels`): encoders `hevc_nvenc`,
 `libx265`, `av1_nvenc`, `libsvtav1`, `libaom-av1` all listed; decoders `hevc_cuvid`,
 `h264_cuvid`, `av1_cuvid`, `hevc`, `h264` all listed; hardware acceleration `cuda`, `d3d11va`,
 `dxva2`, `d3d12va`, `vulkan` all listed. The listing is not the proof; the proofs follow.
 
-| Proof | Command (abridged; full in the record) | ffprobe reading of the output | GPU during the run | Proven |
-|---|---|---|---|---|
-| NVENC 10-bit | `ffmpeg -nostdin -hide_banner -y -f lavfi -i testsrc2=size=1920x1080:rate=30:duration=2 -c:v hevc_nvenc -pix_fmt p010le -profile:v main10 ...\capability\proof-hevc_nvenc-p010le.mp4` | hevc, Main 10, yuv420p10le, 1920x1080, 60 frames, encoder `Lavc63.1.102 hevc_nvenc` | RTX 4070 Laptop GPU, NVENC sessions max 1 | yes |
-| NVENC 8-bit | same, `-pix_fmt yuv420p -profile:v main` | hevc, Main, yuv420p, 60 frames, `hevc_nvenc` | RTX 4070 Laptop GPU, NVENC sessions max 1 | yes |
-| libx265 10-bit | same, `-c:v libx265 -pix_fmt yuv420p10le -profile:v main10` | hevc, Main 10, yuv420p10le, 60 frames, `libx265` | NVENC sessions 0 | yes |
-| libx265 8-bit | same, `-c:v libx265 -pix_fmt yuv420p -profile:v main` | hevc, Main, yuv420p, 60 frames, `libx265` | NVENC sessions 0 | yes |
-| Hardware decode | `ffmpeg -nostdin -hide_banner -v verbose -hwaccel cuda -hwaccel_output_format cuda -i GX011627.MP4 -map 0:v:0 -f null -` | exit 0; FFmpeg: 681 frames decoded, 0 decode errors; container `nb_frames` 681; filter graph input `pixfmt:cuda` | decoder utilisation max 100 %, NVENC 0 | yes |
+Each proof's full command line and the ffprobe reading of its output (or FFmpeg's own decode
+count), as recorded:
+
+```
+NVENC 10-bit  -- proven
+ffmpeg -nostdin -hide_banner -y -f lavfi -i testsrc2=size=1920x1080:rate=30:duration=2 -c:v hevc_nvenc -pix_fmt p010le -profile:v main10 C:\Users\rwsmy\clearwater\work\wp1.5\capability\proof-hevc_nvenc-p010le.mp4
+ffprobe: codec_name hevc, profile Main 10, 1920x1080, pix_fmt yuv420p10le, nb_frames 60, encoder Lavc63.1.102 hevc_nvenc
+nvidia-smi: NVIDIA GeForce RTX 4070 Laptop GPU, 3 samples, NVENC sessions max 1
+
+NVENC 8-bit  -- proven
+ffmpeg -nostdin -hide_banner -y -f lavfi -i testsrc2=size=1920x1080:rate=30:duration=2 -c:v hevc_nvenc -pix_fmt yuv420p -profile:v main C:\Users\rwsmy\clearwater\work\wp1.5\capability\proof-hevc_nvenc-yuv420p.mp4
+ffprobe: codec_name hevc, profile Main, 1920x1080, pix_fmt yuv420p, nb_frames 60, encoder Lavc63.1.102 hevc_nvenc
+nvidia-smi: NVIDIA GeForce RTX 4070 Laptop GPU, 3 samples, NVENC sessions max 1
+
+libx265 10-bit  -- proven
+ffmpeg -nostdin -hide_banner -y -f lavfi -i testsrc2=size=1920x1080:rate=30:duration=2 -c:v libx265 -pix_fmt yuv420p10le -profile:v main10 C:\Users\rwsmy\clearwater\work\wp1.5\capability\proof-libx265-yuv420p10le.mp4
+ffprobe: codec_name hevc, profile Main 10, 1920x1080, pix_fmt yuv420p10le, nb_frames 60, encoder Lavc63.1.102 libx265
+nvidia-smi: NVIDIA GeForce RTX 4070 Laptop GPU, 10 samples, NVENC sessions max 0
+
+libx265 8-bit  -- proven
+ffmpeg -nostdin -hide_banner -y -f lavfi -i testsrc2=size=1920x1080:rate=30:duration=2 -c:v libx265 -pix_fmt yuv420p -profile:v main C:\Users\rwsmy\clearwater\work\wp1.5\capability\proof-libx265-yuv420p.mp4
+ffprobe: codec_name hevc, profile Main, 1920x1080, pix_fmt yuv420p, nb_frames 60, encoder Lavc63.1.102 libx265
+nvidia-smi: NVIDIA GeForce RTX 4070 Laptop GPU, 8 samples, NVENC sessions max 0
+
+Hardware decode (NVDEC)  -- proven
+ffmpeg -nostdin -hide_banner -v verbose -hwaccel cuda -hwaccel_output_format cuda -i C:\Users\rwsmy\clearwater-footage\GX011627.MP4 -map 0:v:0 -f null -
+FFmpeg: exit 0; "681 frames decoded; 0 decode errors"; filter graph input pixfmt:cuda
+ffprobe (-select_streams v:0 -show_entries stream=nb_frames): nb_frames 681
+nvidia-smi: NVIDIA GeForce RTX 4070 Laptop GPU, 13 samples, decoder utilisation max 100 %, NVENC sessions 0
+```
 
 `nvidia-smi` was sampled about every 0.1 s during each run, at least once (name, encoder and
 decoder utilisation, `encoder.stats.sessionCount`); the GPU named in every sample is the RTX 4070
-Laptop GPU (3 samples per NVENC proof, 13 during the decode). An encode proof holds only on an
+Laptop GPU (sample counts above). An encode proof holds only on an
 ffprobe reading that matches (codec, profile, pixel format, 60 frames) and, for NVENC, a GPU
 named and at least one NVENC session counted during the encode. The decode proof holds only on
 exit 0 with every container frame decoded, no error, CUDA frames in the graph
@@ -138,8 +173,8 @@ only).
 
 ## 4. The simple re-encode (D104)
 
-`spike.py reencode GX011628.MP4` (06:50:38-06:51:12Z) and `spike.py reencode GX011627.MP4`
-(06:51:12-06:52:27Z), encoder `hevc_nvenc` (every NVENC proof held, so libx265 was not needed).
+`spike.py reencode GX011628.MP4` (07:41:27-07:42:03Z) and `spike.py reencode GX011627.MP4`
+(07:42:03-07:43:24Z), encoder `hevc_nvenc` (every NVENC proof held, so libx265 was not needed).
 The exact command for the primary chapter (from `work\wp1.5\reencode\GX011627_corrected.run.json`):
 
 ```
@@ -168,7 +203,7 @@ ffmpeg -nostdin -hide_banner -y -copyts -noautorotate
   `media_time` 0 and a player that ignores edit lists still starts video and audio together).
 - Quality settings are only what the spike used (`-preset p5 -tune hq -rc vbr -cq 20`); the
   quality-level mapping is D75, WP2.1's. NVENC's default without them is 2 Mb/s.
-- Informal: 8.6 s for the 22.7 s primary chapter, 5.7 s for the 14.5 s one (NVENC sessions 1,
+- Informal: 9.2 s for the 22.7 s primary chapter, 5.6 s for the 14.5 s one (NVENC sessions 1,
   encoder utilisation 100 %).
 
 **Identity sanity check (not a quality result).** FFmpeg's `psnr` filter over every frame:
@@ -192,21 +227,22 @@ re-running `compare.py` on the two files reproduces them.
 | video stream duration | MANDATORY | D94, D95, D105, 7.5 | 22.722700 (227227/10000) | 22.722700 (227227/10000) | SAME |
 | start offset: first video frame pts | MANDATORY | D94, D105, 7.5 | 0.000000 (0/1) | 0.000000 (0/1) | SAME |
 | start offset: video and audio stream start_pts | MANDATORY | D94, D105, 7.5 | {"vide#0":"0.000000 (0/1)","soun#0":"0.000000 (0/1)"} | {"vide#0":"0.000000 (0/1)","soun#0":"0.000000 (0/1)"} | SAME |
-| start offset: container start (earliest stream start, exact) | MANDATORY | D94, D105, 7.5 | 0.000000 (0/1) | 0.000000 (0/1) | SAME |
+| start offset: container start over video and audio (earliest start, exact) | MANDATORY | D94, D105, 7.5 | 0.000000 (0/1) | 0.000000 (0/1) | SAME |
+| edit list, video track, as written (media_time in media seconds) | MANDATORY | D94, 7.5 | {"vide#0":[{"duration":"22.722700 (227227/10000)","media_time":"0.000000 (0/1)","rate":... | {"vide#0":[{"duration":"22.722700 (227227/10000)","media_time":"0.000000 (0/1)","rate":... | SAME |
 | edit list, video and audio tracks (presentation effect) | MANDATORY | D94, 7.5 | {"vide#0":[{"duration":"22.722700 (227227/10000)","media_start":"0.000000 (0/1)","rate"... | {"vide#0":[{"duration":"22.722700 (227227/10000)","media_start":"0.000000 (0/1)","rate"... | SAME (media start is relative to the track's earliest composition time) |
 | audio streams present | MANDATORY | D105, 7.5 | {"soun#0":{"codec_name":"aac","profile":"LC","sample_rate":"48000","channels":2,"channe... | {"soun#0":{"codec_name":"aac","profile":"LC","sample_rate":"48000","channels":2,"channe... | SAME |
 | audio packets passed through (pts, duration, size, MD5) [soun#0] | MANDATORY | 7.5 | n=1064; first ['0.000000 (0/1)', '0.021333 (8/375)', 505, 'MD5:9363e1198bcbf5d4238b80e7... | n=1064; first ['0.000000 (0/1)', '0.021333 (8/375)', 505, 'MD5:9363e1198bcbf5d4238b80e7... | SAME |
 | audio sync: first audio pts minus first video pts | MANDATORY | D105, 7.5 | {"soun#0":"0.000000 (0/1)"} | {"soun#0":"0.000000 (0/1)"} | SAME |
 | display orientation: display matrix (ffprobe side data) | MANDATORY | D105, 8.2 | {"rotation":null,"displaymatrix":null} | {"rotation":null,"displaymatrix":null} | SAME |
 | display orientation: video tkhd matrix | MANDATORY | D105, 8.2 | [65536,0,0,0,65536,0,0,0,1073741824] | [65536,0,0,0,65536,0,0,0,1073741824] | SAME |
-| colour primaries | REQUIRED | D55, 6.5 | bt709 | bt709 | SAME |
-| colour transfer | REQUIRED | D55, 6.5 | bt709 | bt709 | SAME |
-| colour matrix | REQUIRED | D55, 6.5 | bt709 | bt709 | SAME |
-| colour range | REQUIRED | D55, 6.5 | pc | pc | SAME |
-| pixel format (decoded) | REQUIRED | D114, 6.5 | yuvj420p | yuvj420p | SAME |
-| chroma subsampling | REQUIRED | D114, 8.2 | 4:2:0 | 4:2:0 | SAME |
-| bit depth | REQUIRED | 8.2, D76 | 8 | 8 | SAME |
-| frame size and sample aspect ratio | REQUIRED | 8.2 (identity re-encode) | [3840,2160,"1:1"] | [3840,2160,"1:1"] | SAME |
+| colour primaries | REQUIRED (D55/D114) | D55, 6.5 | bt709 | bt709 | SAME |
+| colour transfer | REQUIRED (D55/D114) | D55, 6.5 | bt709 | bt709 | SAME |
+| colour matrix | REQUIRED (D55/D114) | D55, 6.5 | bt709 | bt709 | SAME |
+| colour range | REQUIRED (D55/D114) | D55, 6.5 | pc | pc | SAME |
+| pixel format (decoded) | REQUIRED (D55/D114) | D114, 6.5 | yuvj420p | yuvj420p | SAME |
+| chroma subsampling | REQUIRED (D55/D114) | D114, 8.2 | 4:2:0 | 4:2:0 | SAME |
+| bit depth | REQUIRED (D55/D114) | 8.2, D76 | 8 | 8 | SAME |
+| frame size and sample aspect ratio | REQUIRED (D55/D114) | 8.2 (identity re-encode) | [3840,2160,"1:1"] | [3840,2160,"1:1"] | SAME |
 | creation time: container tag | BEST-EFFORT | D105, 8.2 | 2026-10-10T06:31:28.000000Z | 2026-10-10T06:31:28.000000Z | SAME |
 | creation time: mvhd (seconds since 1904) | BEST-EFFORT | D105, 8.2 | 3874458688 | 3874458688 | SAME |
 | creation time: per-stream tags | BEST-EFFORT | D105, 8.2 | {"vide#0":"2026-10-10T06:31:28.000000Z","soun#0":"2026-10-10T06:31:28.000000Z","tmcd#0"... | {"vide#0":"2026-10-10T06:31:28.000000Z","soun#0":"2026-10-10T06:31:28.000000Z","meta#0"... | SAME |
@@ -220,14 +256,15 @@ re-running `compare.py` on the two files reproduces them.
 | chroma location | BEST-EFFORT | D105, 8.2 | left | left | SAME |
 | track layout (key:sample entry:tkhd flags) | BEST-EFFORT | D105, 8.2 | ["vide#0:hvc1:flags=0xf","soun#0:mp4a:flags=0xf","tmcd#0:tmcd:flags=0xf","meta#0:gpmd:f... | ["vide#0:hvc1:flags=0x3","soun#0:mp4a:flags=0x3","meta#0:gpmd:flags=0x3","tmcd#0:tmcd:f... | DIFFERENT |
 | video sample entry child boxes | BEST-EFFORT | D105, 8.2 | ["hvcC"] | ["hvcC","fiel","colr","pasp","btrt"] | DIFFERENT |
-| edit lists as written (all tracks; media_time in media seconds) | BEST-EFFORT | D105, 8.2 | {"vide#0":[{"duration":"22.722700 (227227/10000)","media_time":"0.000000 (0/1)","rate":... | {"vide#0":[{"duration":"22.722700 (227227/10000)","media_time":"0.000000 (0/1)","rate":... | DIFFERENT (media_time is tied to the encoded stream's composition offsets) |
+| edit lists as written, non-video tracks (media_time in media seconds) | BEST-EFFORT | D105, 8.2 | {"soun#0":null,"tmcd#0":null,"meta#0":null} | {"soun#0":[{"duration":"22.698667 (8512/375)","media_time":"0.000000 (0/1)","rate":"1"}... | DIFFERENT (differs: meta#0 edit list only in output, soun#0 edit list only in output, tmcd#0 edit ...) |
 | edit list, data tracks (presentation effect) | BEST-EFFORT | D105, 8.2 | {"tmcd#0":[{"duration":"22.722700 (227227/10000)","media_start":"0.000000 (0/1)","rate"... | {"meta#0":[{"duration":"22.722000 (11361/500)","media_start":"0.000000 (0/1)","rate":"1... | SAME |
+| start offset: container start over all tracks (earliest start, exact) | BEST-EFFORT | D105, 8.2 | 0.000000 (0/1) | 0.000000 (0/1) | SAME (includes data tracks; ffprobe's container start_time in exact form) |
 | container duration (ffprobe, 1 us) | BEST-EFFORT | D105, 8.2 | 22.722700 | 22.722700 | SAME (the longest track; follows the data tracks) |
 
-Items: 36. DIFFERENT by class: MANDATORY 0, REQUIRED 0, BEST-EFFORT 8. Every MANDATORY item SAME: True.
+Items: 38. DIFFERENT by class: MANDATORY 0, REQUIRED (D55/D114) 0, BEST-EFFORT 8. Every MANDATORY and REQUIRED item SAME (the recommendation's test): True (MANDATORY alone: True).
 
-Fast check, `work\wp1.5\reencode\GX011628_corrected.compare.json`: the same 36 items with
-the same result on every row (28 SAME, 8 DIFFERENT, all BEST-EFFORT).
+Fast check, `work\wp1.5\reencode\GX011628_corrected.compare.json`: the same 38 items with
+the same result on every row (30 SAME, 8 DIFFERENT, all BEST-EFFORT).
 
 | Item | Class | Clause | Source | Output | Result |
 |---|---|---|---|---|---|
@@ -236,21 +273,22 @@ the same result on every row (28 SAME, 8 DIFFERENT, all BEST-EFFORT).
 | video stream duration | MANDATORY | D94, D95, D105, 7.5 | 14.481133 (217217/15000) | 14.481133 (217217/15000) | SAME |
 | start offset: first video frame pts | MANDATORY | D94, D105, 7.5 | 0.000000 (0/1) | 0.000000 (0/1) | SAME |
 | start offset: video and audio stream start_pts | MANDATORY | D94, D105, 7.5 | {"vide#0":"0.000000 (0/1)","soun#0":"0.000000 (0/1)"} | {"vide#0":"0.000000 (0/1)","soun#0":"0.000000 (0/1)"} | SAME |
-| start offset: container start (earliest stream start, exact) | MANDATORY | D94, D105, 7.5 | 0.000000 (0/1) | 0.000000 (0/1) | SAME |
+| start offset: container start over video and audio (earliest start, exact) | MANDATORY | D94, D105, 7.5 | 0.000000 (0/1) | 0.000000 (0/1) | SAME |
+| edit list, video track, as written (media_time in media seconds) | MANDATORY | D94, 7.5 | {"vide#0":[{"duration":"14.481133 (217217/15000)","media_time":"0.000000 (0/1)","rate":... | {"vide#0":[{"duration":"14.481133 (217217/15000)","media_time":"0.000000 (0/1)","rate":... | SAME |
 | edit list, video and audio tracks (presentation effect) | MANDATORY | D94, 7.5 | {"vide#0":[{"duration":"14.481133 (217217/15000)","media_start":"0.000000 (0/1)","rate"... | {"vide#0":[{"duration":"14.481133 (217217/15000)","media_start":"0.000000 (0/1)","rate"... | SAME (media start is relative to the track's earliest composition time) |
 | audio streams present | MANDATORY | D105, 7.5 | {"soun#0":{"codec_name":"aac","profile":"LC","sample_rate":"48000","channels":2,"channe... | {"soun#0":{"codec_name":"aac","profile":"LC","sample_rate":"48000","channels":2,"channe... | SAME |
 | audio packets passed through (pts, duration, size, MD5) [soun#0] | MANDATORY | 7.5 | n=678; first ['0.000000 (0/1)', '0.021333 (8/375)', 505, 'MD5:9363e1198bcbf5d4238b80e79... | n=678; first ['0.000000 (0/1)', '0.021333 (8/375)', 505, 'MD5:9363e1198bcbf5d4238b80e79... | SAME |
 | audio sync: first audio pts minus first video pts | MANDATORY | D105, 7.5 | {"soun#0":"0.000000 (0/1)"} | {"soun#0":"0.000000 (0/1)"} | SAME |
 | display orientation: display matrix (ffprobe side data) | MANDATORY | D105, 8.2 | {"rotation":null,"displaymatrix":null} | {"rotation":null,"displaymatrix":null} | SAME |
 | display orientation: video tkhd matrix | MANDATORY | D105, 8.2 | [65536,0,0,0,65536,0,0,0,1073741824] | [65536,0,0,0,65536,0,0,0,1073741824] | SAME |
-| colour primaries | REQUIRED | D55, 6.5 | bt709 | bt709 | SAME |
-| colour transfer | REQUIRED | D55, 6.5 | bt709 | bt709 | SAME |
-| colour matrix | REQUIRED | D55, 6.5 | bt709 | bt709 | SAME |
-| colour range | REQUIRED | D55, 6.5 | pc | pc | SAME |
-| pixel format (decoded) | REQUIRED | D114, 6.5 | yuvj420p | yuvj420p | SAME |
-| chroma subsampling | REQUIRED | D114, 8.2 | 4:2:0 | 4:2:0 | SAME |
-| bit depth | REQUIRED | 8.2, D76 | 8 | 8 | SAME |
-| frame size and sample aspect ratio | REQUIRED | 8.2 (identity re-encode) | [3840,2160,"1:1"] | [3840,2160,"1:1"] | SAME |
+| colour primaries | REQUIRED (D55/D114) | D55, 6.5 | bt709 | bt709 | SAME |
+| colour transfer | REQUIRED (D55/D114) | D55, 6.5 | bt709 | bt709 | SAME |
+| colour matrix | REQUIRED (D55/D114) | D55, 6.5 | bt709 | bt709 | SAME |
+| colour range | REQUIRED (D55/D114) | D55, 6.5 | pc | pc | SAME |
+| pixel format (decoded) | REQUIRED (D55/D114) | D114, 6.5 | yuvj420p | yuvj420p | SAME |
+| chroma subsampling | REQUIRED (D55/D114) | D114, 8.2 | 4:2:0 | 4:2:0 | SAME |
+| bit depth | REQUIRED (D55/D114) | 8.2, D76 | 8 | 8 | SAME |
+| frame size and sample aspect ratio | REQUIRED (D55/D114) | 8.2 (identity re-encode) | [3840,2160,"1:1"] | [3840,2160,"1:1"] | SAME |
 | creation time: container tag | BEST-EFFORT | D105, 8.2 | 2026-10-10T06:33:27.000000Z | 2026-10-10T06:33:27.000000Z | SAME |
 | creation time: mvhd (seconds since 1904) | BEST-EFFORT | D105, 8.2 | 3874458807 | 3874458807 | SAME |
 | creation time: per-stream tags | BEST-EFFORT | D105, 8.2 | {"vide#0":"2026-10-10T06:33:27.000000Z","soun#0":"2026-10-10T06:33:27.000000Z","tmcd#0"... | {"vide#0":"2026-10-10T06:33:27.000000Z","soun#0":"2026-10-10T06:33:27.000000Z","meta#0"... | SAME |
@@ -264,13 +302,15 @@ the same result on every row (28 SAME, 8 DIFFERENT, all BEST-EFFORT).
 | chroma location | BEST-EFFORT | D105, 8.2 | left | left | SAME |
 | track layout (key:sample entry:tkhd flags) | BEST-EFFORT | D105, 8.2 | ["vide#0:hvc1:flags=0xf","soun#0:mp4a:flags=0xf","tmcd#0:tmcd:flags=0xf","meta#0:gpmd:f... | ["vide#0:hvc1:flags=0x3","soun#0:mp4a:flags=0x3","meta#0:gpmd:flags=0x3","tmcd#0:tmcd:f... | DIFFERENT |
 | video sample entry child boxes | BEST-EFFORT | D105, 8.2 | ["hvcC"] | ["hvcC","fiel","colr","pasp","btrt"] | DIFFERENT |
-| edit lists as written (all tracks; media_time in media seconds) | BEST-EFFORT | D105, 8.2 | {"vide#0":[{"duration":"14.481133 (217217/15000)","media_time":"0.000000 (0/1)","rate":... | {"vide#0":[{"duration":"14.481133 (217217/15000)","media_time":"0.000000 (0/1)","rate":... | DIFFERENT (media_time is tied to the encoded stream's composition offsets) |
+| edit lists as written, non-video tracks (media_time in media seconds) | BEST-EFFORT | D105, 8.2 | {"soun#0":null,"tmcd#0":null,"meta#0":null} | {"soun#0":[{"duration":"14.464000 (1808/125)","media_time":"0.000000 (0/1)","rate":"1"}... | DIFFERENT (differs: meta#0 edit list only in output, soun#0 edit list only in output, tmcd#0 edit ...) |
 | edit list, data tracks (presentation effect) | BEST-EFFORT | D105, 8.2 | {"tmcd#0":[{"duration":"14.481133 (217217/15000)","media_start":"0.000000 (0/1)","rate"... | {"meta#0":[{"duration":"14.480000 (362/25)","media_start":"0.000000 (0/1)","rate":"1"}]... | SAME |
+| start offset: container start over all tracks (earliest start, exact) | BEST-EFFORT | D105, 8.2 | 0.000000 (0/1) | 0.000000 (0/1) | SAME (includes data tracks; ffprobe's container start_time in exact form) |
 | container duration (ffprobe, 1 us) | BEST-EFFORT | D105, 8.2 | 14.481133 | 14.481133 | SAME (the longest track; follows the data tracks) |
 
 ## 6. Classification of each difference
 
-Every MANDATORY and REQUIRED item is SAME on both chapters. The eight DIFFERENT items, all
+Every MANDATORY and REQUIRED (D55/D114) item is SAME on both chapters
+(`mandatory_and_required_all_same` true in both records). The eight DIFFERENT items, all
 BEST-EFFORT (D105), with their cause:
 
 | Item | Source | Output | Cause | Cost to keep |
@@ -282,7 +322,7 @@ BEST-EFFORT (D105), with their cause:
 | stream tags | video `encoder GoPro H.265 encoder`; audio no language; tmcd handler `GoPro TCD` | `Lavc63.1.102 hevc_nvenc`; audio `und`; tmcd handler `GoPro H.265` | the encoder tag names the new encoder; the regenerated tmcd takes the video handler name | none needed |
 | track layout and flags | v, a, tmcd, gpmd; `tkhd` flags 0xf | v, a, gpmd, tmcd; flags 0x3 (tmcd 0x2) | the muxer orders data tracks and clears "in preview" | none needed |
 | video sample entry boxes | `hvcC` | `hvcC fiel colr pasp btrt` | the muxer adds a `colr` box (matching the stream's tags) and others | none needed |
-| edit lists as written | video identity edit; audio, tmcd, gpmd none | video identical (22.7227 s at `media_time` 0); audio, tmcd, gpmd get an identity edit | the muxer writes an edit list on every track | none needed: the presentation effect is SAME (MANDATORY row) |
+| edit lists as written, non-video tracks | audio, tmcd, gpmd: none | audio, tmcd, gpmd: one identity edit each | the muxer writes an edit list on every track | none needed: no presentation effect (the MANDATORY effect row is SAME; the video edit list matches as written, MANDATORY row) |
 
 Kept, as SAME: creation time (container tag, `mvhd`, every stream tag), the whole GPMF track (23
 packets on GX011627, each with the same pts, duration, size and MD5), the timecode track sample,
@@ -303,20 +343,22 @@ chroma location `left`, the container duration.
 **Simple.** One FFmpeg process (decode, encode, mux) with the flags in section 4 leaves every
 MANDATORY item SAME on the primary chapter and on the fast check: the full per-frame pts
 sequence (681 and 434 frames, exact), frame count, video stream duration, start offset in three
-forms, the video and audio edit lists by presentation effect (and the video's as written), the
-audio packets byte-for-byte with their timestamps, audio sync, and the display matrix and `tkhd`
-matrix; every REQUIRED colour and format item is SAME as well. No MANDATORY gap exists, so
-neither a repair pass nor a transplant was attempted (brief: attempt them only on a MANDATORY
-difference). What is lost is best-effort only: the camera's `udta` atoms (including GoPro's
+forms, **the video track's edit list as written** (GX011627: one entry, 22.722700 s
+(227227/10000) at `media_time` 0, rate 1, on both sides; GX011628: 14.481133 s (217217/15000) at
+0, rate 1, on both sides), the video and audio edit lists by presentation effect, the audio
+packets byte-for-byte with their timestamps, audio sync, and the display matrix and `tkhd`
+matrix. Every REQUIRED (D55/D114) colour and format item is SAME as well; a REQUIRED difference
+would weigh as a MANDATORY one, and the records' `mandatory_and_required_all_same` is true for
+both chapters. No MANDATORY or REQUIRED gap exists, so neither a repair pass nor a transplant
+was attempted (brief: attempt them only on a MANDATORY difference). What is lost is best-effort only: the camera's `udta` atoms (including GoPro's
 global GPMF settings block) and the `firmware` tag. The GPMF telemetry track, the timecode
 track and the creation time are kept. If CHARC wants the `udta` atoms, that is a cheap
 box-level second pass over the output (copy the atoms into its `moov/udta`), not a reason to
 change approach; it was not attempted here.
 
-The recommendation holds under the edit-list reading in section 1. If the edit list must match
-as written, the only gap on these chapters is the identity edit lists the muxer adds to the
-audio and data tracks (the video's matches exactly); closing it is a repair step (drop those
-`edts` boxes), which would make the result encode-then-repair. CHARC's call.
+The recommendation holds under CHARC's edit-list ruling (section 1, reading 1): the video edit
+list matches as written, and the identity edits the muxer adds to the audio and data tracks are
+best-effort differences with no presentation effect.
 
 **What the simple approach needed from the tool** (for the PyAV versus FFmpeg-as-a-process
 choice at WP2.1): an MP4 muxer that keeps source timestamps (`-copyts`, passthrough frame timing,
@@ -328,6 +370,22 @@ hands decoded frames to Python and back. How frames leave and re-enter the pipel
 PyAV, or another binding) and whether these muxer options stay reachable from that path is
 WP2.1's question.
 
+For WP2.1 and WP3.10, two further points:
+
+- **Full range end to end (D54, D55, 6.5).** These GoPro chapters are tagged BT.709 **full**
+  range (`pc`, decoded as `yuvj420p`). D54 governs missing or unexpected tags only; a full-range
+  tag is read and matched (D55), as this spike does. So the chroma and range path (decode to
+  RGB, correction, back to YUV, encode) must honour full range end to end; the 6.5
+  limited-range default is the fallback for an untagged stream only.
+- **B-frame sources and the video edit list as written (DR-15, CHARC's lean, not yet ruled).**
+  The as-written `media_time` is a function of the *encoder's* reorder delay. Copying it
+  verbatim onto an output with a different composition-offset convention would shift the
+  presentation, the opposite of what 7.5 wants. The probable WP2.1 ruling: where only the
+  composition-offset convention differs, "copied, not recalculated" is read by presentation
+  effect (pts, start offset, duration and first displayed frame exact), and WP3.10 proves it on
+  an iPhone clip. The spike's B-frame test clip shows the case: video edit list as written
+  DIFFERENT (`media_time` 1/15 s against 0), presentation effect and every pts SAME.
+
 ## 9. Not exercised (out of envelope or absent)
 
 The footage folder changed during the spike: from about 06:28Z a `SCUBA` subfolder was being
@@ -338,7 +396,10 @@ not exercised.
 iPhone video; HDR (HLG/PQ) sources; GP-Log; GoPro "HDR video" mode; 10-bit, H.264, 4:2:2 or
 rotated real sources (the synthetic tests cover 8-bit H.264 with a start offset and an edit list,
 a variable-frame-rate gap and a 90-degree display rotation through libx265); `.LRV` proxies;
-chapter concatenation; any correction; GX011626 beyond the camera record. Untagged sources: on
+chapter concatenation; any correction; GX011626 beyond the camera record. Sources with
+B-frames: their video edit list carries the encoder's reorder delay, so after the simple
+re-encode the MANDATORY "video edit list as written" item is DIFFERENT while the presentation is
+identical (synthetic test only; DR-15, section 8). Untagged sources: on
 the synthetic clip, libx265 writes a `tv` range into an output whose source had no range tag (a
 D54/D55 point for WP3.10: the product assumes BT.709 limited for such a source and should set
 the tags explicitly).
