@@ -78,7 +78,7 @@ Repository local + mirrored to private GitHub `rwsmythe/clearwater` (verify:
   ruling needed. STRAY PROCESS: PID 33616 `C:\Python314\python.exe -`, hung since
   2026-10-14 13:31 (WP0.1 Reviewer B orphan), one core; the orchestrator's classifier
   blocked stopping it; CHARC verified and surfaced to the owner; STOPPED ~05:20Z on the owner's direction (taskkill typed by the owner, run via PowerShell by CHARC); orchestrator told.
-- Debt register `docs/debt-register.md`: DR-1..DR-14 (DR-3, DR-4 closed).
+- Debt register `docs/debt-register.md`: DR-1..DR-15 (DR-3, DR-4, DR-5 closed).
 - No authority granted by `SendMessage` this generation (cues only).
 
 ### Pending items
@@ -113,7 +113,11 @@ Repository local + mirrored to private GitHub `rwsmythe/clearwater` (verify:
    record; cells may only do mechanical QA reproductions). Ruled 07:28Z: wp15-revb finishes
    as QA evidence, then the orchestrator runs B itself on the WP1.5 candidate; one
    retroactive B pass over tools/prototype (46a10b9..f6d998a) after the WP1.5 accept,
-   addenda to the WP1.1 and WP1.2A accept records. No more Reviewer B cells. FINAL issued 8ad93b8 (05:30Z);
+   addenda to the WP1.1 and WP1.2A accept records. No more Reviewer B cells.
+   07:31Z: pre-ruling 1 STANDS (video elst as written identical on the GoPro chapters;
+   SIMPLE holds). B-frame sources (iPhone) would be encode-then-repair under it -> DR-15,
+   trigger WP2.1, with CHARC's lean recorded (presentation-effect reading where only the
+   composition-offset convention differs). Roster plan accepted; GO after wp15-revb. FINAL issued 8ad93b8 (05:30Z);
    local config copied into the worktree so the footage test runs; Reviewer B ordered.
    Orchestrator self-reported a harness-gate overlap with the GPU re-measure start; the
    overlapped cell is discarded and re-run.
