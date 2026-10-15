@@ -209,6 +209,33 @@ def test_full_and_limited_range_clips_extract_to_the_same_known_rgb(tmp_path: Pa
         assert _quadrant_errors(frame.path) <= TOLERANCE, name
 
 
+def _planted_quadrants(roots: OutputRoots, name: str, row: int, column: int) -> Path:
+    """A 128 x 128 PNG that is exactly COLOURS, except that pixel (row, column) is 20 levels off."""
+    image = np.zeros((128, 128, 3), np.float32)
+    for index, colour in enumerate(COLOURS):
+        top, left = 64 * (index // 2), 64 * (index % 2)
+        image[top : top + 64, left : left + 64] = np.array(colour, np.float32) / 255.0
+    image[row, column] += 20.0 / 255.0
+    target = roots.allowed / f"{name}.png"
+    roots.check(target)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    pack.write_png16(target, image)
+    return target
+
+
+def test_the_range_control_compares_the_whole_quadrant_interior(tmp_path: Path) -> None:
+    """A wrong pixel anywhere inside a quadrant's interior fails; the blended border does not."""
+    roots = _roots(tmp_path)
+    exact = _planted_quadrants(roots, "exact", 0, 0)  # one pixel off in the corner margin
+    assert _quadrant_errors(exact) < 0.1, "the margin around the quadrant edges is not compared"
+    centre = _planted_quadrants(roots, "centre", 32, 32)
+    interior = _planted_quadrants(roots, "interior", 40, 100)  # not a centre pixel
+    inner_edge = _planted_quadrants(roots, "inner-edge", 64 + QUADRANT_MARGIN, 64 + QUADRANT_MARGIN)
+    for planted in (centre, interior, inner_edge):
+        assert _quadrant_errors(planted) > 19.0, planted.name
+    assert _quadrant_errors(_planted_quadrants(roots, "border", 63, 63)) < 0.1
+
+
 def test_a_range_tag_that_lies_makes_the_control_fail(tmp_path: Path) -> None:
     """Limited-range data tagged full: the extraction trusts the tag, so the check must fail."""
     roots = _roots(tmp_path)
@@ -375,7 +402,7 @@ def test_outputs_inside_the_footage_folder_or_outside_the_pack_are_refused(tmp_p
     roots = _roots(tmp_path)
     clip = _ramp_clip(roots)
     footage = tmp_path / "fabricated-footage"  # fabricated on purpose: it is checked for emptiness
-    footage.mkdir()
+    OutputRoots(allowed=tmp_path, footage=_footage(tmp_path)).mkdir(footage)
     roots = OutputRoots(allowed=roots.allowed, footage=footage)
     with pytest.raises(OutputPathError, match="footage"):
         frames.extract(clip, [0.0], roots.footage / "png", roots=roots)
@@ -1057,6 +1084,20 @@ def test_two_swapped_frames_fail_the_readback_by_name(tmp_path: Path) -> None:
     assert _failed(record) == [4, 5]
 
 
+def test_stale_read_back_scratch_does_not_count_as_clip_frames(tmp_path: Path) -> None:
+    roots = _roots(tmp_path)
+    pattern = _distinct_frames(roots, roots.allowed / "seq")
+    clip = _encode_sequence(roots, pattern, roots.allowed / "seq.mp4")
+    stale = roots.allowed / "flicker" / "readback" / "seq" / "clip" / "c000099.png"
+    roots.write_bytes(stale, b"left over from a crashed run")
+    info = frames.probe_stream(clip)
+    record = pack.readback_clip(
+        clip, pattern, READBACK_FRAMES, info, roots.allowed / "flicker", roots
+    )
+    assert record["ok"] is True and record["frames_read"] == READBACK_FRAMES
+    assert not (roots.allowed / "flicker" / "readback").exists()
+
+
 def test_a_dropped_frame_fails_the_readback_on_the_count(tmp_path: Path) -> None:
     roots = _roots(tmp_path)
     pattern = _distinct_frames(roots, roots.allowed / "seq")
@@ -1168,6 +1209,41 @@ def test_a_failing_second_encode_leaves_neither_clip(
     assert len(encoder.outputs) == 2, "control: the first clip was encoded and verified"
     assert all(".partial." in output.name for output in encoder.outputs)
     assert _no_clip_left(flicker_dir)
+
+
+def test_a_failing_second_rename_and_a_failing_cleanup_leave_no_final_name_and_keep_the_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    roots, clip, flicker_dir = _flicker_setup(tmp_path, monkeypatch)
+    monkeypatch.setattr(pack, "run_tool", _FakeEncoder([0, 0]))
+    monkeypatch.setattr(pack, "verify_clip", lambda *args, **kwargs: {"ok": True})
+    monkeypatch.setattr(
+        pack, "readback_clip", lambda *a, **k: {"ok": True, "failed_frames": [], "problems": []}
+    )
+    real_rename, real_remove = OutputRoots.rename, OutputRoots.remove
+    state = {"renames": 0, "failed": False}
+
+    def rename(self: OutputRoots, source: Path, target: Path) -> Path:
+        state["renames"] += 1
+        if state["renames"] == 2:  # the first clip has its final name by now
+            state["failed"] = True
+            raise OSError("rename boom")
+        return real_rename(self, source, target)
+
+    def remove(self: OutputRoots, path: Path) -> None:
+        if state["failed"] and path.name == "flick_unsmoothed.mp4":
+            raise PermissionError("locked")  # the cleanup of the first name fails
+        real_remove(self, path)
+
+    monkeypatch.setattr(OutputRoots, "rename", rename)
+    monkeypatch.setattr(OutputRoots, "remove", remove)
+    with pytest.raises(OSError, match="rename boom") as caught:
+        pack.run_flicker(clip, roots, CPU, flicker_dir)
+    assert state["renames"] == 2 and state["failed"]
+    # The failed removal neither replaced the error nor stopped the other names: only the one
+    # name that could not be removed is left, and the error says so.
+    assert sorted(path.name for path in flicker_dir.glob("*.mp4")) == ["flick_unsmoothed.mp4"]
+    assert any("flick_unsmoothed.mp4" in note for note in caught.value.__notes__)
 
 
 def test_a_failed_readback_leaves_neither_clip_and_a_pass_names_both(

@@ -939,6 +939,24 @@ def partial_name(output: Path) -> Path:
     return output.with_name(f"{output.stem}.partial{output.suffix}")
 
 
+def discard(roots: OutputRoots, paths: Sequence[Path], failure: BaseException) -> None:
+    """Remove every one of ``paths``, whatever happens to the others; never mask ``failure``.
+
+    A removal that raises (a locked file, a refused path) does not stop the loop: the other
+    names are still visited, and the problem is attached to ``failure`` as a note.
+
+    Args:
+        roots: The output safety roots.
+        paths: The files to remove (a missing file is not an error).
+        failure: The exception being handled; it is not raised or changed except for notes.
+    """
+    for path in paths:
+        try:
+            roots.remove(path)
+        except Exception as problem:  # cleanup is best effort by design
+            failure.add_note(f"could not remove {path}: {problem}")
+
+
 def encode_verified_pair(
     roots: OutputRoots,
     clips: Mapping[str, tuple[Path, Path]],
@@ -951,9 +969,10 @@ def encode_verified_pair(
     No clip exists under its final name unless every clip passed :func:`verify_clip` and
     the full read-back (:func:`readback_clip`). A clip of an earlier run is removed first,
     so a failed run leaves none. Each clip is written under :func:`partial_name`; on ANY
-    exception (an FFmpeg failure, a probe that raises, a failed check, a failed rename) all
-    the temporary and final names are removed again and the exception propagates. Only
-    when everything passed are the clips renamed. The frame PNGs are never touched here.
+    exception (an FFmpeg failure, a probe that raises, a failed check, a failed rename) every
+    temporary and final name is removed again (:func:`discard`, best effort: one removal that
+    fails does not stop the others or replace the exception) and the exception propagates.
+    Only when everything passed are the clips renamed. The frame PNGs are never touched here.
 
     Args:
         roots: The output safety roots.
@@ -1000,9 +1019,8 @@ def encode_verified_pair(
             command[-1] = str(finals[label])
         for label in clips:
             roots.rename(partials[label], finals[label])
-    except BaseException:
-        for output in (*finals.values(), *partials.values()):
-            roots.remove(output)
+    except BaseException as failure:
+        discard(roots, [*finals.values(), *partials.values()], failure)
         raise
     return commands, checks
 
@@ -1122,7 +1140,7 @@ def readback_clip(
         pattern: The numbered PNG input it was encoded from (``%04d``, from 0).
         count: The number of frames it must hold.
         info: The source stream (size and tags).
-        flicker_dir: Folder for the temporary decoded frames (removed again).
+        flicker_dir: Folder for the temporary decoded frames (cleared first, removed again).
         roots: The output safety roots.
 
     Returns:
@@ -1141,6 +1159,9 @@ def readback_clip(
         raise ExtractError(f"{info.width}x{info.height} is not a multiple of {factor}")
     size = (info.width // factor, info.height // factor)
     scratch = flicker_dir / "readback" / clip.stem
+    shutil.rmtree(roots.check(scratch), ignore_errors=True)  # nothing of an earlier run
+    if scratch.exists():
+        raise ExtractError(f"cannot clear the read-back folder {scratch}")
     roots.mkdir(scratch)
     try:
         clip_tags = probe_stream(clip).tags
@@ -1236,6 +1257,8 @@ def readback_clip(
         }
     finally:
         shutil.rmtree(roots.check(scratch), ignore_errors=True)
+        if scratch.exists():
+            print(f"warning: could not remove {scratch}", file=sys.stderr)
         with contextlib.suppress(OSError):  # other read-back folders there, or already gone
             roots.check(scratch.parent).rmdir()
 
