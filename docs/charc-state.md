@@ -31,7 +31,8 @@ unpushed, and the owner has not asked for a push (verify: `git status -sb`).
 | WP1.1 | 9711faf | wp1.1-accept.md (2e09203) | reference pipeline `tools/prototype/`; W_L ruling; DR-11..13 |
 | WP1.2A | f6d998a | wp1.2-accept.md (7048fd7) | CuPy backend + `bench.py`; synthetic GPU 4K 0.389/0.652 s (3.5x/5.9x N6); DR-14 |
 | WP1.2R | 996274e | wp1.2r-accept.md (aac4674) | prototype remediation after the retroactive seat-run B (M1 probe catch-all, M2 derived-value validation, M3 float64 accumulators ruled (a), m5, m7); 2nd-B major adjudicated NOT BLOCKING, upheld by CHARC -> DR-19; arithmetic bit-identical in 6 witness cases |
-| WP1.5 | 3242679 | wp1.5-accept.md (371f19d) | container spike: SIMPLE; MANDATORY+REQUIRED 0 DIFFERENT, 8 best-effort lost; NVENC/libx265 8/10-bit proven; HERO13 HEVC 8-bit BT.709 FULL range; no .LRV (D60 open); DR-15..17 |
+| WP1.5 | 3242679 | wp1.5-accept.md (371f19d) | container spike: SIMPLE; MANDATORY+REQUIRED 0 DIFFERENT, 8 best-effort lost; NVENC/libx265 8/10-bit proven; HERO13 HEVC 8-bit BT.709 FULL range; no .LRV (D60 closed v0.5.2); DR-15..17 |
+| WP1.3 (shallow) | 7178540 | wp1.3-accept.md (bc97a19) | look-check instrument `tools/lookcheck/`; pack `work/wp1.3/index.html` (24 stills x 3 variants, 180-frame unsmoothed flicker pair) READY FOR CP2; seat B pass 1 BLOCKING (3 introduced majors, ONE remediation `wp13-fix`), re-run BLOCKING again -> adjudicated at the gate (CRITICAL pytest basetemp exposure = DR-21, repo-wide; 2 majors instrument-only = DR-20); CHARC md5s verified, QA green at this seat 2026-10-15 13:3xZ |
 
 CHARC QA at this seat re-ran ruff/format/mypy/pytest green on every accept (pytest
 skips the ffprobe tests here because this seat's PATH lacks ffprobe; the
@@ -69,16 +70,20 @@ path, md5, five assertions and verdict, or there is no accept.
   ruling) goes to the owner there with measured options. Gate 6 is CHARC's at WP1.6.
 
 - **Partial CP1 (owner, 2026-10-15 ~10:50Z, verbatim: "shallow confirmed")** on the four
-  chapters: `docs/proofs/cp1-footage-sorting.md` (living record). **WP1.3 (shallow part)
-  COMMISSIONED** (draft `docs/briefs/wp1.3-brief.md`; sonnet-high; STRONG; `tools/lookcheck/`;
-  pack under `work/wp1.3/` with index.html, 24 frames x 3 variants, 6 s unsmoothed flicker
-  clip from GX011627) and **WP1.4 (shallow part) COMMISSIONED, dispatch AFTER WP1.3 merges**
-  (draft `docs/briefs/wp1.4-brief.md`; opus-high; STRONG; `tools/prototype/temporal.py` +
-  additive `correct(..., statistics=)` hook; staged vs flat D98, smoothing candidates, robust
-  N{} bounds; gain-cap noise test deferred to WP1.4b on the scuba footage). Neither is
-  exclusive; neither may overlap Part B's bench window. Verify: `git worktree list`.
-- Promised to the owner, CHARC's own next drafts: the WP1.2 Part B brief and the WP1.6 gate
-  report template (Gate 1 options framed).
+  chapters: `docs/proofs/cp1-footage-sorting.md` (living record). WP1.3 shallow part ACCEPTED
+  (table above); its pack awaits the owner's CP2 look (owner-reserved; CHARC proposes the owner
+  view it together with WP1.4's staged/flat renders). **WP1.4 (shallow part) DISPATCHED**
+  2026-10-15 ~13:28Z (FINAL `docs/briefs/wp1.4-brief.md` 9ed1a1c; `wp14-cell`, opus-high;
+  STRONG; `tools/prototype/temporal.py` + additive `correct(..., statistics=)` hook; reuses the
+  WP1.3 instrument with `roots`, no D54 re-implementation; staged vs flat D98, smoothing
+  candidates, robust N{} bounds; gain-cap noise test deferred to WP1.4b on the scuba footage).
+  **WP-T1 COMMISSIONED by CHARC** 2026-10-15 13:29Z (answer to the orchestrator's DR-21 query:
+  `tests/conftest.py` `pytest_configure` guard refusing a basetemp or derived temp root inside
+  the resolved footage folder; sonnet-high; STANDARD; inert without local config; `work/` must
+  pass). Neither is exclusive; neither may overlap Part B's bench window. Verify: `git worktree
+  list`, `docs/debt-register.md` DR-20/DR-21.
+- Drafted by CHARC on main: `docs/briefs/wp1.2b-brief.md` (Part B; three dispatch conditions)
+  and `docs/reports/wp1.6-gate-report.md` (template; Gate 1 options A/B/C framed).
 
 ### Footage (owner, read-only, never committed; verify `ls C:\Users\rwsmy\clearwater-footage`)
 
