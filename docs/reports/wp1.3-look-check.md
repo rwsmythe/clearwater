@@ -8,10 +8,11 @@ were and what bound, and ends with the sheet the owner fills. **No correction is
 
 Conditions: 2026-10-15 (UTC), Windows 11 laptop, RTX 4070 Laptop GPU (prototype
 `--device gpu`, CuPy), FFmpeg and ffprobe `9.0.2-full_build-www.gyan.dev`, branch `wp1.3`.
-The pack was produced by `5833dff` (the commands in section 2); `652b1fd` changed only an
-error path and two docstrings. Footage folder read only; every output is under
+The stills were produced by `4c37dc3` and the flicker clip by `c51b020` (the commands in
+section 2); a first pack built at `5833dff` was rebuilt after Reviewer A's round 1 (section 8),
+and every statistic in it came out identical to the digit. Footage folder read only; every output is under
 `C:\Users\rwsmy\clearwater\work\wp1.3\` (below, `work\wp1.3\`). The `SCUBA` subfolder was not
-touched. Elapsed times are informal, not results: stills 280 s (24 frames, 3 variants each,
+touched. Elapsed times are informal, not results: stills 233 s (24 frames, 3 variants each,
 GPU), flicker clip 453 s.
 
 ## 1. Where things are
@@ -47,7 +48,10 @@ ffmpeg -nostdin -hide_banner -nostats -y -noautorotate -copyts -ss <pts - half a
 
 The range and matrix are the stream's tags as `ffprobe` read them: **`yuvj420p`, BT.709 matrix,
 full range (`pc`), BT.709 primaries and transfer, on all four chapters, nothing assumed**
-(`frames.json` `tags.assumed` is empty on every frame). Chroma is upsampled by the scaler's
+(`frames.json` `tags.assumed` is empty on every frame). The PNGs carry no colour chunk:
+FFmpeg's `cICP`, `cHRM`, `gAMA` and `pHYs` chunks are stripped (pixels untouched), so that a
+source frame and its corrected twin, which the prototype writes with none, display the same
+way in a colour-managed viewer; the tags are in `frames.json`. Chroma is upsampled by the scaler's
 default method; `accurate_rnd` changes only rounding (without it limited-range YUV came out
 about 2 levels of 255 too dark in the control clip). The frame is the first at or after the
 requested time; its exact pts is listed by `ffprobe -show_frames` over a read interval
@@ -171,12 +175,17 @@ Every frame was extracted at full resolution (`excerpt`, `naming="index"`, comma
 neighbour (what the prototype does today). Both frame sets were encoded by one command shape
 (`encode_commands` in the JSON): 16-bit RGB frames, `scale=out_color_matrix=bt709:out_range=full,
 format=yuv420p`, `hevc_nvenc -preset p5 -tune hq -rc vbr -cq 20 -b:v 0 -pix_fmt yuv420p -profile:v
-main`, tagged `bt709`/`bt709`/`bt709`/`pc`, `hvc1`, `-framerate 30000/1001`, no audio. The
-"source" clip is the same decoded frames through the same encode, so the two clips differ only
-by the correction.
+main`, tagged `bt709`/`bt709`/`bt709`/`pc` (on the frames by `setparams`, because the encoder
+takes the colour description from the frames and `scale` sets only matrix and range, and by the
+encoder options), `hvc1`, `-framerate 30000/1001`, no audio. The
+"source" clip is the same decoded frames through the same command, so the two clips differ by
+the correction and by the content-dependent error of a lossy encode (the colour tags, the
+format and the timing are the same and are checked, below).
 
-Checks (`flicker\statistics.json` `checks`): both clips 180 frames, HEVC, `yuvj420p`, range `pc`,
-matrix `bt709`, first pts 0, every step 1001 ticks of 1/30000, no audio stream; and frame 0 of
+Checks (`flicker\statistics.json` `checks`): both clips one HEVC Main stream, `yuvj420p`,
+3840x2160, range `pc`, matrix, primaries and transfer `bt709`, 180 frames, first pts 0, every
+step 1001 ticks of 1/30000, no audio stream (`verify_clip`; it names each of those and a
+stubbed ffprobe with a 10-bit, wrongly sized or wrongly tagged stream fails it); and frame 0 of
 the encoded source clip, read back through `frames.extract`, differs from its PNG by 1.98 levels
 mean absolute (bias -0.54), which a range or matrix error would exceed. An ad hoc
 check (not recorded in the JSON) also read frames 90 and 179 back from each clip and compared
@@ -237,6 +246,13 @@ chapter is a sample; the flicker clip is the better place to look for moving cau
 Deeper footage, open blue water (gray-world on open water, spec 12), distance haze (spec 12),
 deep-water noise (spec 12), photos and the chaptered cases are not shown: the owner has not
 sorted that footage (CP1 partial, 2026-10-15). No shallow frame was used to fake one.
+
+One thing the owner may want to know when reading the open-water row: the six `GX011628`
+stills (a boat hull and snorkelers over open water) are mostly blue water, and so are the closing
+frames of the flicker clip. They are shallow-category frames (CP1), not the deep open-water
+case, and the brief keeps that case PENDING. Their numbers are in section 3 (`GX011628`: red
+gain 1.23 to 1.38, the highest of the pack, blue gain 0.80 to 0.85; nothing bound); whether to
+record observations about them under the open-water row at CP2 is the owner's call.
 
 ## 8. Verification
 
