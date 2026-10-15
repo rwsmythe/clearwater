@@ -92,8 +92,9 @@ distinguishes.
 **With the default `Params`** (`test_default_params_are_resolution_independent_at_2x`): a
 512 x 768 textured scene (the smooth scene modulated by a random texture of scale 0.01 of
 the short side) vs its 2x2 box downscale. **Stated tolerance: mean <= 0.0015, p99 <=
-0.005.** Measured: Ancuti 2018 mean 0.0004, p99 0.0022; 3C mean 0.0005, p99 0.0028. With
-pixel sigmas pinned to the large image's, mean 0.0021 / 0.0046 and p99 0.0079 / 0.0192.
+0.005.** Measured at the head after Reviewer B (scene with the bright disc below): Ancuti
+2018 mean 0.0005, p99 0.0023; 3C mean 0.0005, p99 0.0031. With pixel sigmas pinned to the
+large image's (512 px short side), mean 0.0051 / 0.0081 and p99 0.0215 / 0.0334.
 
 The scene includes a soft-edged bright disc (mean above 0.85, about 5 % of the pixels)
 so that the 3C mask and its smoothing are exercised; pinning only the mask sigma in pixels

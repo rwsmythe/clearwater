@@ -454,6 +454,27 @@ def test_fusion_inputs_follow_the_paper() -> None:
     assert stretched.max() == pytest.approx(1.0, abs=1e-5)
 
 
+def test_histogram_stretch_shares_one_shift_and_scale_across_channels() -> None:
+    # [A18]: N{} uses "a unique shifting and scaling factor" for all channels. Strong
+    # detail in red, weak detail in blue: a per-channel stretch would spread blue to [0, 1].
+    rng = np.random.default_rng(3)
+    detail = ndimage.gaussian_filter(rng.random((64, 96)), 1.0)
+    image = np.stack(
+        [0.2 + 0.6 * detail, _flat(64, 96, (0.5, 0.5, 0.5))[..., 1], 0.48 + 0.04 * detail], axis=2
+    )
+    image = image.astype(np.float32)
+    params = Params(normalisation_low=0.0, normalisation_high=100.0, sharpen_blur_fraction=0.05)
+    _, sharpened = fusion_inputs(image, params)
+    sigma = 0.05 * 64
+    high_pass = image - ndimage.gaussian_filter(
+        image, (sigma, sigma, 0), mode="reflect", truncate=4.0
+    )
+    expected = (high_pass - high_pass.min()) / (high_pass.max() - high_pass.min())
+    np.testing.assert_allclose(2 * sharpened - image, expected, atol=1e-5)
+    blue = (2 * sharpened - image)[..., 2]
+    assert blue.max() - blue.min() < 0.2  # shared scale: weak blue detail stays narrow
+
+
 def test_sharpening_of_a_flat_image_uses_the_midpoint() -> None:
     image = _flat(16, 16, (0.2, 0.4, 0.6))
     _, sharpened = fusion_inputs(image, Params())
