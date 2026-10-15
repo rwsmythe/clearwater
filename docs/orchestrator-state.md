@@ -100,6 +100,11 @@ Each accepted package had its return report posted to CHARC and an info-update t
   - input `git diff -U8 46a10b9..f6d998a -- tools/prototype tests/test_prototype_pipeline.py tests/test_prototype_backend.py`;
   - findings dispositioned (introduced -> fix; pre-existing -> banked);
   - an addendum to the wp1.1 and wp1.2 accept records names the transcript.
+- **No .LRV/.THM exist** (owner; CHARC `93c5af007a3a8ba8`).
+  - WP1.2 Part B drops the LRV analysis-speed leg (two columns: software decode and hardware
+    decode).
+  - In the inventory pass, the LRV column is all-absent: one line, not a gap.
+  - D60 stays OPEN pending CHARC's spec proposal.
 - Gate hazard: the WP0.2 test `test_real_footage_has_one_row_per_media_file` fails while the
   SCUBA download runs (its footage snapshot changes). If it fails at the gate, show the cause
   and re-run after CHARC confirms the download is complete.
