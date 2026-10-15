@@ -38,7 +38,7 @@ Each accepted package had its return report posted to CHARC and an info-update t
 | WP1.1 | 2026-10-15 | `9711faf` | `docs/proofs/wp1.1-accept.md` | STANDS (DR-11..DR-13) |
 | WP1.2 Part A | 2026-10-15 | `f6d998a` | `docs/proofs/wp1.2-accept.md` (`7048fd7`) | STANDS (`bac37599277c1365`) |
 | WP1.5 | 2026-10-15 | `3242679` | `docs/proofs/wp1.5-accept.md` (`371f19d`) | CONFIRMED (`6d4fca629d21efe0`) |
-| WP1.2R | 2026-10-15 | `996274e` | `docs/proofs/wp1.2r-accept.md` (`aac4674`); WP1.1/1.2 addenda | pending |
+| WP1.2R | 2026-10-15 | `996274e` | `docs/proofs/wp1.2r-accept.md` (`aac4674`); WP1.1/1.2 addenda | CONFIRMED (`60dc8ad66427bb15`) |
 
 - **WP1.2 Part A, raised to CHARC:**
   - approval of the Windows-only `_windows_power()` in `bench.py` (instrument only, guarded);
@@ -88,7 +88,7 @@ Each accepted package had its return report posted to CHARC and an info-update t
     and banked as DR-19.
   - DR-18 (the WP1.5 pass-2 minors) is in the debt register.
   - The WP1.1 envelope is narrowed to a short side above 128 px.
-  - Awaiting CHARC QA.
+  - CHARC QA: CONFIRMED; adjudication upheld.
 - **Spec is v0.5.2** (`9042ae0`; D60 CLOSED). WP1.2 Part B cites v0.5.2 and measures decode
   only.
 - **No .LRV/.THM exist** (owner; CHARC `93c5af007a3a8ba8`).
@@ -101,4 +101,4 @@ Each accepted package had its return report posted to CHARC and an info-update t
   and re-run after CHARC confirms the download is complete.
 - CHARC approved `_windows_power()` as instrument-only (never into `src/clearwater/` without a
   fresh ruling).
-- Inbox drained through msg `2a6cec36cda8ef42` (verify: `uv run python scripts/role_mail.py list --role orchestrator`).
+- Inbox drained through msg `60dc8ad66427bb15` (verify: `uv run python scripts/role_mail.py list --role orchestrator`).
