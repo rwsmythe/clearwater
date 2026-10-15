@@ -26,6 +26,12 @@ Every spatial parameter is a fraction of the short side and is turned into pixel
 :func:`spatial_sigma` only (spec 6.6, D56). Gaussian filters use symmetric borders
 (``scipy.ndimage`` mode ``"reflect"``: ``d c b a | a b c d``) and a support of 4 sigma.
 
+Precision (spec 6.4, D39): the image data and every per-pixel operation are float32. A
+scalar reduction over the image (the channel means, the Ancuti gain-cap statistic, the
+saliency Lab mean) accumulates in float64, on both devices through :func:`_accumulate_mean`,
+and its result becomes float32 before it touches image data or a parameter; see
+``docs/reports/wp1.1-open-values.md`` for the interpretation of D39.
+
 Backends (D30, D107): an array is a NumPy array (CPU) or a CuPy array (graphics card).
 Every function takes the array module and the filter module from its input with
 :func:`prototype.backend.of` and returns arrays of the same kind, so the one code path
@@ -48,7 +54,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from .backend import Backend, of
-from .params import Params
+from .params import FLOAT32_MAX, SPATIAL_FRACTIONS, Params
 
 Image = NDArray[np.float32]
 """A display-encoded RGB image, float32, shape ``(H, W, 3)``, values in [0, 1].
@@ -61,6 +67,7 @@ Map = NDArray[np.float32]
 """A single-channel map, float32, shape ``(H, W)`` (NumPy or CuPy, like :data:`Image`)."""
 
 _GAUSSIAN_TRUNCATE = 4.0
+_ACCUMULATOR_DTYPE = np.float64
 _EPS = 1e-6
 
 # ITU-R BT.709-6, Part 2 item 3.2-3.3: the luma coefficients K_R and K_B (K_G = 1 - K_R - K_B).
@@ -256,6 +263,38 @@ def spatial_sigma(image_shape: tuple[int, ...], fraction: float) -> float:
     return fraction * short_side
 
 
+def check_derived_values(image_shape: tuple[int, ...], params: Params) -> None:
+    """Check the values that :func:`correct` derives from ``params`` and the image size.
+
+    :class:`Params` validates every value that the field alone decides (including the
+    float32 range of the controls cast to float32); what it cannot see is a finite fraction
+    that overflows once multiplied by the short side. Every spatial sigma from
+    :func:`spatial_sigma` must be finite and positive, and the Laplacian weight's scale
+    ``sigma ** 2`` (cast to float32) must be within the float32 range.
+
+    Args:
+        image_shape: The image shape; the first two entries are height and width.
+        params: The parameter set.
+
+    Raises:
+        ValueError: A derived value is unusable; the message names the parameter.
+    """
+    for name in SPATIAL_FRACTIONS:
+        fraction = getattr(params, name)
+        sigma = spatial_sigma(image_shape, fraction)
+        if not (math.isfinite(sigma) and sigma > 0.0):
+            raise ValueError(
+                f"{name}={fraction!r} gives a sigma of {sigma} px at the short side "
+                f"{min(image_shape[0], image_shape[1])} px; it must be finite and positive"
+            )
+    laplacian_sigma = spatial_sigma(image_shape, params.laplacian_fraction)
+    if laplacian_sigma > math.sqrt(FLOAT32_MAX):
+        raise ValueError(
+            f"laplacian_fraction={params.laplacian_fraction!r} gives a sigma of "
+            f"{laplacian_sigma} px whose square is beyond the float32 range"
+        )
+
+
 def compensate_ancuti2018(image: Image, params: Params) -> tuple[Image, CompensationInfo]:
     """Compensate the red (and, when enabled, the blue) channel per [A18] (spec 6.3.1).
 
@@ -269,6 +308,12 @@ def compensate_ancuti2018(image: Image, params: Params) -> tuple[Image, Compensa
     reduces alpha per channel so that the mean added amount,
     ``alpha * (mean_g - mean_c) * mean((1 - I_c) * I_g)``, does not exceed
     ``cap * mean_c``. The result is clipped to [0, 1]; the green channel is unchanged.
+
+    The channel means and the cap statistic ``mean((1 - I_c) * I_g)`` are scalar reductions
+    accumulated in float64 (spec 6.4 / D39 read as governing image data and per-pixel
+    operations, not the width of a reduction; see :func:`_accumulate_mean`). They are
+    Python floats, which multiply the float32 image data as float32 scalars; the output is
+    float32.
 
     Args:
         image: The input image.
@@ -291,7 +336,7 @@ def compensate_ancuti2018(image: Image, params: Params) -> tuple[Image, Compensa
     for name, index, cap in channels:
         difference = means[1] - means[index]
         shape = (1.0 - image[..., index]) * green
-        added_per_alpha = difference * float(shape.mean(dtype=np.float64))
+        added_per_alpha = difference * _cap_statistic(shape)
         alpha = params.alpha
         if cap is not None and added_per_alpha > 0.0:
             alpha = min(alpha, cap * means[index] / added_per_alpha)
@@ -373,7 +418,9 @@ def white_balance(image: Image, params: Params) -> tuple[Image, WhiteBalanceInfo
     - applied gain ``min(requested, max_white_balance_gain)`` (D99).
 
     The output is ``clip(I_c * applied_c, 0, 1)``. A channel with a mean under 1e-6 is
-    treated as having mean 1e-6 (its gain then ends at the clamp).
+    treated as having mean 1e-6 (its gain then ends at the clamp). The channel means are
+    accumulated in float64 (:func:`_channel_means`); the gains are cast to float32 before
+    they multiply the image.
 
     Args:
         image: The compensated image.
@@ -584,8 +631,14 @@ def correct(image: Image, params: Params, backend: Backend | None = None) -> Res
 
     Returns:
         The output and every intermediate.
+
+    Raises:
+        ValueError: The image is not a float32 ``(H, W, 3)`` array in [0, 1], or a value
+            derived from ``params`` and the image size is unusable
+            (:func:`check_derived_values`).
     """
     _check_array(image)
+    check_derived_values(image.shape, params)
     caller = of(image)
     device = caller if backend is None else backend
     work = device.to_device(image)
@@ -803,7 +856,12 @@ def expand(image: NDArray[np.float32], shape: tuple[int, ...]) -> NDArray[np.flo
 
 
 def _high_pass_and_bounds(image: Image, params: Params) -> tuple[Image, tuple[float, float]]:
-    """The high-pass ``I - G*I`` of :func:`fusion_inputs` and the bounds of its stretch."""
+    """The high-pass ``I - G*I`` of :func:`fusion_inputs` and the bounds of its stretch.
+
+    The bounds are order statistics that ``percentile`` interpolates in float64 on both
+    devices (a scalar reduction, like :func:`_accumulate_mean`); they are returned as
+    Python floats, which meet the float32 image data only as float32 scalars.
+    """
     xp = of(image).xp
     high_pass = image - _gaussian(image, spatial_sigma(image.shape, params.sharpen_blur_fraction))
     bounds = xp.percentile(
@@ -825,10 +883,13 @@ def _laplacian_weight(image: Image, params: Params) -> Map:
 
 
 def _saliency_weight(image: Image, params: Params) -> Map:
-    """W_S of one input: ``||mean Lab - blurred Lab|| / 100`` (see :func:`weight_maps`)."""
+    """W_S of one input: ``||mean Lab - blurred Lab|| / 100`` (see :func:`weight_maps`).
+
+    The mean Lab vector is accumulated in float64 and cast to float32 (:func:`_lab_mean`).
+    """
     xp = of(image).xp
     lab = srgb_to_lab(image)
-    mean = lab.reshape(-1, 3).mean(axis=0, dtype=np.float64).astype(np.float32)
+    mean = _lab_mean(lab)
     blurred = _gaussian(lab, spatial_sigma(image.shape, params.saliency_blur_fraction))
     distance = xp.sqrt(xp.sum((blurred - mean) ** 2, axis=2))
     weight: Map = (distance / np.float32(100.0)).astype(np.float32, copy=False)
@@ -865,10 +926,57 @@ def _binomial_blur(array: NDArray[np.float32]) -> NDArray[np.float32]:
     return out
 
 
+def _accumulate_mean(array: NDArray[Any], axis: int | None = None) -> Any:
+    """Mean of ``array`` over ``axis`` (all axes if ``None``), accumulated in float64.
+
+    The single place where the pipeline's scalar reductions choose their accumulator, so
+    that the CPU and the GPU use the same dtype through the same call and agree on a stable
+    reduction. Spec 6.4 / D39 ("internal processing in 32-bit float; quantization only at
+    export") governs the image data and every per-pixel operation, and forbids intermediate
+    quantisation; it is read as not capping the width of a scalar reduction (interpretation
+    note in ``docs/reports/wp1.1-open-values.md``, section 6). The callers cast the result
+    to float32 or a Python float before it touches image data or a parameter.
+
+    Args:
+        array: A NumPy or CuPy array.
+        axis: The axis to reduce, or ``None`` for all.
+
+    Returns:
+        The float64 result, on the device of ``array``.
+    """
+    return array.mean(axis=axis, dtype=_ACCUMULATOR_DTYPE)
+
+
 def _channel_means(image: Image) -> tuple[float, float, float]:
-    """Mean of each RGB channel over the whole image, accumulated in float64."""
-    means = image.reshape(-1, 3).mean(axis=0, dtype=np.float64).tolist()
+    """Mean of each RGB channel over the whole image, accumulated in float64.
+
+    The result is three Python floats (not float32): they feed Python-float arithmetic
+    (the gains, the cap) whose products meet the float32 image data only as float32 scalars
+    (:func:`compensate_ancuti2018`) or after the cast of the gains to float32
+    (:func:`white_balance`).
+    """
+    means = _accumulate_mean(image.reshape(-1, 3), axis=0).tolist()
     return float(means[0]), float(means[1]), float(means[2])
+
+
+def _cap_statistic(shape: Map) -> float:
+    """Mean of the Ancuti gain-cap shape ``(1 - I_c) * I_g``, accumulated in float64.
+
+    Returns:
+        A Python float, which then scales float32 image data as a float32 scalar.
+    """
+    return float(_accumulate_mean(shape))
+
+
+def _lab_mean(lab: Image) -> Map:
+    """Mean Lab vector of an image (the saliency reference), accumulated in float64.
+
+    Returns:
+        The three means cast to float32, on the device of ``lab``, before they meet the
+        float32 Lab image.
+    """
+    mean: Map = _accumulate_mean(lab.reshape(-1, 3), axis=0).astype(np.float32)
+    return mean
 
 
 def _mean_added(before: Image, after: Image) -> dict[str, float]:

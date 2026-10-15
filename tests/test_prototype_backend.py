@@ -14,6 +14,7 @@ import numpy as np
 import pytest
 from scipy import ndimage
 
+import test_prototype_pipeline as pipeline_tests
 from prototype import bench, pipeline, run
 from prototype.backend import CPU, memory_estimate_bytes, of, select_backend
 from prototype.params import Params
@@ -609,3 +610,12 @@ def test_auto_falls_back_when_cupy_fails_to_initialise(
     assert backend.reason in caplog.text
     with pytest.raises(RuntimeError, match="DLL load failed"):
         select_backend("gpu")
+
+
+@pytest.mark.gpu
+@requires_gpu
+def test_scalar_reductions_accumulate_in_float64_on_the_gpu(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """WP1.2R M3: the GPU takes the same float64 accumulator through the same call."""
+    pipeline_tests.assert_scalar_reductions_use_float64(select_backend("gpu"), monkeypatch)

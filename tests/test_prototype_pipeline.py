@@ -1,18 +1,23 @@
 from __future__ import annotations
 
 import dataclasses
+import math
 import struct
 import subprocess
 import sys
 import zlib
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import pytest
 from PIL import Image
 from scipy import ndimage
 
+import prototype.params as params_module
+import prototype.pipeline as pipeline
 from prototype import run
+from prototype.backend import CPU, Backend, of
 from prototype.params import Params
 from prototype.pipeline import (
     compensate_ancuti2018,
@@ -767,3 +772,169 @@ def test_run_works_as_a_script(tmp_path: Path) -> None:
     )
     assert completed.returncode == 0, completed.stderr
     assert (tmp_path / "o" / "scene-ancuti2018.png").is_file()
+
+
+# --- WP1.2R: derived-value validation (M2) ----------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"gamma": 1e39},
+        {"alpha": 4e38},
+        {"max_white_balance_gain": 1e300},
+        {"white_balance_strength": 1e39},
+        {"weight_delta": 2e38},  # within float32, but 2 * delta (two inputs) is not
+        {"c3_strength": 1e20, "kappa": 1e20},
+        {"c3_strength": 1e20, "lambda_": 1e20},
+    ],
+)
+def test_params_reject_values_beyond_the_float32_range(changes: dict[str, float]) -> None:
+    with pytest.raises(ValueError, match="float32 range") as raised:
+        Params(**changes)  # type: ignore[arg-type]
+    assert any(name in str(raised.value) for name in changes)  # the message names the field
+
+
+def test_params_accept_large_values_inside_the_float32_range() -> None:
+    assert Params(gamma=1e30, alpha=1e30, red_gain_cap=1e300).gamma == 1e30
+
+
+@pytest.mark.parametrize("name", params_module.SPATIAL_FRACTIONS)
+def test_derived_sigma_that_overflows_is_rejected_naming_the_parameter(name: str) -> None:
+    params = Params(**{name: 1e308})  # a finite fraction: Params alone accepts it
+    assert spatial_sigma((64, 96), 1e308) == float("inf")
+    with pytest.raises(ValueError, match=name):
+        pipeline.check_derived_values((64, 96), params)
+    with pytest.raises(ValueError, match=name):
+        correct(_synthetic(64, 96), params)
+
+
+def test_laplacian_sigma_whose_square_overflows_float32_is_rejected() -> None:
+    params = Params(laplacian_fraction=1e300)  # sigma 6.4e301 is finite, its square is not
+    assert math.isfinite(spatial_sigma((64, 96), 1e300))
+    with pytest.raises(ValueError, match="laplacian_fraction"):
+        pipeline.check_derived_values((64, 96), params)
+
+
+@pytest.mark.parametrize("shape", [(1, 1, 3), (64, 96, 3), (2160, 3840, 3)])
+def test_default_params_have_valid_derived_values_at_any_size(shape: tuple[int, ...]) -> None:
+    pipeline.check_derived_values(shape, Params())
+    pipeline.check_derived_values(shape, Params.neutral())
+
+
+def test_run_reports_an_overflowing_derived_sigma_in_one_line(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    source = _write_input(tmp_path)
+    args = ["--in", str(source), "--out", str(tmp_path / "out")]
+    assert run.main([*args, "--set", "sharpen_blur_fraction=1e308"]) == 2
+    err = capsys.readouterr().err
+    assert err.startswith("error: ")
+    assert err.count("\n") == 1
+    assert "sharpen_blur_fraction" in err
+    assert not (tmp_path / "out").exists()
+    assert run.main([*args, "--set", "gamma=1e39"]) == 2  # the Params path, same one line
+    err = capsys.readouterr().err
+    assert err.count("\n") == 1
+    assert "gamma" in err
+
+
+# --- WP1.2R: the blue gain cap binds on its own (m7, D52) -------------------------------
+
+
+def test_blue_gain_cap_binds_independently_of_the_red_cap() -> None:
+    image = _flat(16, 16, (0.1, 0.6, 0.2))
+    red_mean, blue_mean, cap = 0.1, 0.2, 0.1
+    free = Params(blue_compensation=True, red_gain_cap=1000.0, blue_gain_cap=None)
+    capped = Params(blue_compensation=True, red_gain_cap=1000.0, blue_gain_cap=cap)
+    out_free, info_free = compensate_ancuti2018(image, free)
+    out, info = compensate_ancuti2018(image, capped)
+    assert info_free.effective == {"red": 1.0, "blue": 1.0}  # neither cap binds when free
+    assert info_free.mean_added["blue"] > cap * blue_mean  # the blue cap would bind
+    assert info.effective["red"] == 1.0  # the red cap (1000) does not bind
+    assert info.effective["blue"] < 1.0  # the blue cap does
+    assert info.mean_added["blue"] == pytest.approx(cap * blue_mean, rel=1e-4)
+    # The red channel does not see the blue cap at all.
+    np.testing.assert_array_equal(out[..., 0], out_free[..., 0])
+    assert info.mean_added["red"] == info_free.mean_added["red"]
+    # And the red cap does not stand in for the blue one.
+    swapped = Params(blue_compensation=True, red_gain_cap=cap, blue_gain_cap=1000.0)
+    _, info_swapped = compensate_ancuti2018(image, swapped)
+    assert info_swapped.effective["blue"] == 1.0
+    assert info_swapped.effective["red"] < 1.0
+    assert info_swapped.mean_added["red"] == pytest.approx(cap * red_mean, rel=1e-4)
+
+
+# --- WP1.2R: scalar reductions accumulate in float64 (M3, spec 6.4 / D39) ---------------
+
+
+def assert_scalar_reductions_use_float64(backend: Backend, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Check each scalar reduction of the pipeline on ``backend`` (CPU or GPU).
+
+    At each of the three sites of the CHARC ruling (the Ancuti cap statistic, the channel
+    means, the saliency Lab mean) the accumulator dtype is float64 and is requested through
+    the one shared call ``_accumulate_mean`` (so both devices use the same dtype), and the
+    result is a Python float or a float32 array before it meets image data. The spy wraps
+    ``_accumulate_mean``, the minimal no-behaviour hook; it calls the real function.
+    """
+    calls: list[tuple[str, Any, Any, tuple[int, ...], int | None]] = []
+    real = pipeline._accumulate_mean
+
+    def spy(array: Any, axis: int | None = None) -> Any:
+        result = real(array, axis=axis)
+        calls.append((of(array).name, array.dtype, result.dtype, tuple(array.shape), axis))
+        return result
+
+    monkeypatch.setattr(pipeline, "_accumulate_mean", spy)
+    image = backend.to_device(_synthetic(40, 24))
+    name = backend.name
+
+    # Site 1, the Ancuti cap statistic: float64 accumulator, a Python float afterwards.
+    shape_map = (1.0 - image[..., 0]) * image[..., 1]
+    statistic = pipeline._cap_statistic(shape_map)
+    assert type(statistic) is float
+    assert calls == [(name, np.float32, np.float64, (40, 24), None)]
+
+    # Site 2, the channel means: float64 accumulator, three Python floats afterwards.
+    calls.clear()
+    means = pipeline._channel_means(image)
+    assert [type(m) for m in means] == [float, float, float]
+    assert calls == [(name, np.float32, np.float64, (40 * 24, 3), 0)]
+
+    # Site 3, the saliency Lab mean: float64 accumulator, float32 afterwards.
+    calls.clear()
+    lab = pipeline.srgb_to_lab(image)
+    lab_mean = pipeline._lab_mean(lab)
+    assert calls == [(name, np.float32, np.float64, (40 * 24, 3), 0)]
+    assert lab_mean.dtype == np.float32
+    assert of(lab_mean).name == name
+
+    # The percentile bounds of the stretch are also scalars; they reach the image as floats.
+    low, high = pipeline.normalisation_bounds(image, Params())
+    assert type(low) is float
+    assert type(high) is float
+
+    # A Python float or a float32 array meets float32 image data as float32 (weak scalar),
+    # so no float64 reaches the image from these scalars.
+    assert (statistic * image).dtype == np.float32
+    assert (means[0] * image).dtype == np.float32
+    assert (image - lab_mean).dtype == np.float32
+
+    # Through the steps that use them: every reduction runs in float64 on this device, and
+    # the outputs stay float32.
+    calls.clear()
+    compensated, _ = compensate_ancuti2018(image, Params())
+    white_balanced, _ = white_balance(compensated, Params())
+    weights = weight_maps((white_balanced, white_balanced), Params())
+    assert len(calls) >= 6  # cap statistic, means, mean added (2), white balance, Lab means
+    assert {(c[0], c[1], c[2]) for c in calls} == {
+        (name, np.dtype(np.float32), np.dtype(np.float64))
+    }
+    for array in (compensated, white_balanced, weights.saliency[0]):
+        assert array.dtype == np.float32
+
+
+def test_scalar_reductions_accumulate_in_float64_on_the_cpu(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    assert_scalar_reductions_use_float64(CPU, monkeypatch)

@@ -21,13 +21,44 @@ from typing import Literal
 Method = Literal["ancuti2018", "c3"]
 METHODS: tuple[Method, ...] = ("ancuti2018", "c3")
 
+FLOAT32_MAX = 3.4028234663852886e38
+"""The largest finite float32 (``numpy.finfo(numpy.float32).max``)."""
+
+SPATIAL_FRACTIONS: tuple[str, ...] = (
+    "c3_kernel_fraction",
+    "c3_mask_smooth_fraction",
+    "sharpen_blur_fraction",
+    "laplacian_fraction",
+    "saliency_blur_fraction",
+)
+"""The fields that are fractions of the short side (spec 6.6, D56); each becomes a sigma."""
+
+# The controls that reach float32 image arithmetic as a scalar (the pipeline casts them with
+# np.float32, or multiplies a float32 array by the Python float, which NumPy and CuPy take
+# as float32): a value beyond the float32 range would become inf there.
+_FLOAT32_CONTROLS = (
+    "alpha",
+    "kappa",
+    "lambda_",
+    "c3_strength",
+    "white_balance_strength",
+    "max_white_balance_gain",
+    "gamma",
+    "sharpen_strength",
+    "weight_delta",
+)
+
 
 @dataclass(frozen=True)
 class Params:
     """All parameters of one run of the pipeline, with their defaults.
 
     The constructor validates every field and raises :class:`ValueError` on a value the
-    pipeline cannot use.
+    pipeline cannot use. That includes a control cast to float32 whose value lies beyond
+    the float32 range, and a product of controls the pipeline forms (the 3C strengths
+    ``c3_strength * kappa`` and ``c3_strength * lambda_``, the two-input weight normaliser
+    ``2 * weight_delta``) that does; each message names the field. A check that needs the
+    image size (the spatial sigmas) is :func:`prototype.pipeline.check_derived_values`.
 
     Attributes:
         method: Channel compensation method (spec 6.2 step 1, 6.7 Basic). Default
@@ -166,6 +197,23 @@ class Params:
         for name in positive:
             if getattr(self, name) <= 0.0:
                 raise ValueError(f"{name} must be > 0, got {getattr(self, name)}")
+        for name in _FLOAT32_CONTROLS:
+            if abs(getattr(self, name)) > FLOAT32_MAX:
+                raise ValueError(
+                    f"{name} must lie within the float32 range (at most {FLOAT32_MAX:.4g} in "
+                    f"magnitude), got {getattr(self, name)}"
+                )
+        products = (
+            ("c3_strength * kappa", self.c3_strength * self.kappa),
+            ("c3_strength * lambda_", self.c3_strength * self.lambda_),
+            ("2 * weight_delta (the two fusion inputs)", 2.0 * self.weight_delta),
+        )
+        for label, product in products:
+            if product > FLOAT32_MAX:
+                raise ValueError(
+                    f"{label} must lie within the float32 range (at most {FLOAT32_MAX:.4g}), "
+                    f"got {product}"
+                )
         if self.max_white_balance_gain < 1.0:
             # A maximum below 1 would lower every gain, so strength 0 would not be "none".
             raise ValueError(

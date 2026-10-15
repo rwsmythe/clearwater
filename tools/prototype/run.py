@@ -29,7 +29,9 @@ agrees with it only within float32 tolerance, which can move a 16-bit value by o
 CUDA device are usable and the CPU otherwise, with a note saying why.
 
 Exit status 0 on success; 2, with a one-line ``error: ...`` on standard error, on a bad
-argument, an unusable device, an unreadable image or an output that cannot be written.
+argument (including a value whose derived sigma overflows at the image's size, which names
+the parameter), an unusable device, an unreadable image or an output that cannot be
+written.
 """
 
 from __future__ import annotations
@@ -60,7 +62,7 @@ if not __package__:
 # suppression as RUF100).
 from prototype.backend import DEVICES, Backend, select_backend
 from prototype.params import METHODS, Params
-from prototype.pipeline import Result, correct
+from prototype.pipeline import Result, check_derived_values, correct
 
 _PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 _TRUE = frozenset({"true", "1", "yes", "on"})
@@ -202,6 +204,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 2
     for note in notes:
         print(note, file=sys.stderr)
+    try:
+        check_derived_values(image.shape, params)  # a finite fraction can overflow at this size
+    except ValueError as exc:
+        print(f"error: {_one_line(exc)}", file=sys.stderr)
+        return 2
 
     result = correct(image, params, backend)
     out_dir: Path = args.out
