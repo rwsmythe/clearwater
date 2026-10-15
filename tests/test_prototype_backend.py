@@ -228,8 +228,6 @@ def test_gpu_correct_returns_host_arrays_for_a_host_input() -> None:
     np.testing.assert_array_equal(image, _synthetic(64, 96))  # the input is not modified
 
 
-@pytest.mark.gpu
-@requires_gpu
 def _forbid_array_transfers(cupy: Any, monkeypatch: pytest.MonkeyPatch) -> None:
     """Make CuPy's Python transfer entry points raise when the pipeline moves an array.
 
@@ -258,6 +256,8 @@ def _forbid_array_transfers(cupy: Any, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(cupy, "array", guard(cupy.array, np.ndarray))
 
 
+@pytest.mark.gpu
+@requires_gpu
 def test_every_public_pipeline_function_keeps_cupy_arrays_on_the_device(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

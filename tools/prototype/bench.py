@@ -33,6 +33,10 @@ both are read again after the timed loop, while the pool still holds its memory.
 Windows' WDDM driver model). :func:`prototype.backend.memory_estimate_bytes` is recorded
 beside them.
 
+Ambient. The record also holds the power source, the Windows power scheme and power-mode
+overlay (read only; ``None`` off Windows), and the card's clocks, temperature, power draw,
+P-state and clock-limit reasons just before and just after the timed loop, outside it.
+
 ``--proxy S`` (repeatable) also computes the whole-frame statistics, the channel means, the
 white-balance gains and the normalisation bounds, on the frame box-downscaled to short side
 ``S`` and records them with their relative error against the full-size ones (D60, D109).
