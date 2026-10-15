@@ -396,6 +396,15 @@ def test_5_content_change_cancels_to_first_order() -> None:
     assert flicker(own, first).value > 0.0
 
 
+def test_the_linear_trend_is_the_drift_alone() -> None:
+    values = {
+        "white_balance_gains.R": 1.0 + 0.01 * np.arange(6.0) + np.array([0, 1, -1] * 2) * 1e-3
+    }
+    trend = temporal.linear_trend(values)["white_balance_gains.R"]
+    np.testing.assert_allclose(np.diff(trend), np.diff(trend)[0])
+    np.testing.assert_allclose(trend.mean(), values["white_balance_gains.R"].mean())
+
+
 # --- test 6: robust statistics --------------------------------------------------------------------
 
 

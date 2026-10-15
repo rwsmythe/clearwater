@@ -402,6 +402,26 @@ def frame_count(series: Mapping[str, NDArray[np.float64]]) -> int:
     return len(next(iter(series.values())))
 
 
+def linear_trend(series: Mapping[str, NDArray[np.float64]]) -> Series:
+    """Return each scalar's least-squares straight line over the frames (a pure drift).
+
+    Rendering with it gives the flicker measure's floor for a statistic that only follows
+    the excerpt's slow scene change, with no frame-to-frame jitter at all.
+
+    Args:
+        series: The series.
+
+    Returns:
+        The fitted series (same names and length).
+    """
+    out: Series = {}
+    for name, values in series.items():
+        index = np.arange(len(values), dtype=np.float64)
+        slope, intercept = np.polyfit(index, values, 1) if len(values) > 1 else (0.0, values[0])
+        out[name] = intercept + slope * index
+    return out
+
+
 def constant_statistics(series: Mapping[str, NDArray[np.float64]]) -> Statistics:
     """Return the record whose every scalar is the mean of that scalar over the series.
 

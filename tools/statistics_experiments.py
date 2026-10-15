@@ -515,6 +515,44 @@ def _signals(
     return np.array(out)
 
 
+def _render_difference(
+    proxies: NDArray[np.float32],
+    params: Params,
+    first: Mapping[str, NDArray[np.float64]],
+    second: Mapping[str, NDArray[np.float64]],
+    backend: Backend,
+) -> dict[str, Any]:
+    """Per frame, how far apart two renders of the same proxy are, in 8-bit levels.
+
+    Returns:
+        ``mean_abs`` (over pixels and channels) and ``max_abs`` (the largest single value)
+        per frame, and over the frames the mean of ``mean_abs``, the largest ``mean_abs``
+        and the largest ``max_abs`` with their frames.
+    """
+    mean_abs: list[float] = []
+    max_abs: list[float] = []
+    for index, image in enumerate(proxies):
+        a = temporal.render(image, params, temporal.at(first, index), backend)
+        b = temporal.render(image, params, temporal.at(second, index), backend)
+        difference = np.abs(a.astype(np.float64) - b) * 255.0
+        mean_abs.append(float(difference.mean()))
+        max_abs.append(float(difference.max()))
+    return _difference_summary(mean_abs, max_abs)
+
+
+def _difference_summary(mean_abs: Sequence[float], max_abs: Sequence[float]) -> dict[str, Any]:
+    """Summarise per-frame render differences (see :func:`_render_difference`)."""
+    return {
+        "mean_abs_levels": float(np.mean(mean_abs)),
+        "largest_mean_abs_levels": float(np.max(mean_abs)),
+        "largest_mean_abs_frame": int(np.argmax(mean_abs)),
+        "largest_max_abs_levels": float(np.max(max_abs)),
+        "largest_max_abs_frame": int(np.argmax(max_abs)),
+        "per_frame_mean_abs": [float(v) for v in mean_abs],
+        "per_frame_max_abs": [float(v) for v in max_abs],
+    }
+
+
 def _interior(count: int, frame_rate: Fraction) -> slice | None:
     """The frame steps between the interior frames (:data:`INTERIOR_WINDOW_S`), if any."""
     margin = temporal.half_width(INTERIOR_WINDOW_S, frame_rate)
@@ -555,6 +593,11 @@ def _mismatch_record(
     for values in report.values():
         values["pts_seconds"] = entries[int(values["frame"])]["pts_seconds"]
     return report
+
+
+def _relative_step(values: NDArray[np.float64]) -> float:
+    """Mean absolute frame-to-frame change of a bound over the mean absolute bound."""
+    return float(np.abs(np.diff(values)).mean() / np.abs(values).mean())
 
 
 def _near_flat_frame() -> NDArray[np.float32]:
@@ -615,6 +658,8 @@ def robust_study(loaded: Loaded, params: Params, backend: Backend) -> dict[str, 
             "cv_low": float(np.std(lows) / abs(np.mean(lows))),
             "cv_high": float(np.std(highs) / abs(np.mean(highs))),
             "cv_range": float(np.std(ranges) / abs(np.mean(ranges))),
+            "relative_step_low": _relative_step(lows),
+            "relative_step_high": _relative_step(highs),
             "mean_low": float(np.mean(lows)),
             "mean_high": float(np.mean(highs)),
             "clipped_mean": float(clipped.mean()),
@@ -709,12 +754,21 @@ def run_experiments(
             "reference": temporal.flatten(reference_statistics),
             "source_steps_mean_levels": float(np.abs(np.diff(source_signals, axis=0)).mean() * 255),
         }
-        for label, series in (("unsmoothed", None), ("staged", staged), ("flat", flat)):
+        trend = temporal.linear_trend(loaded.raw[name])
+        for label, series in (
+            ("unsmoothed", None),
+            ("staged", staged),
+            ("flat", flat),
+            ("linear_trend", trend),
+        ):
             signals = _signals(loaded.proxies, params, series, backend)
             method_flicker[label] = _flicker_record(signals, reference, interior, series=True)
             method_flicker[label]["source_referenced"] = temporal.source_referenced_flicker(
                 signals, source_signals
             )
+        method_flicker["staged_vs_flat_render"] = _render_difference(
+            loaded.proxies, params, staged, flat, backend
+        )
         document["flicker"][name] = method_flicker
         print(f"{folder.name}: {name} staged/flat done", file=sys.stderr)
     params = METHODS[RENDER_METHOD]
@@ -805,11 +859,17 @@ def render_clips(
     video = footage / f"{spec.chapter}.MP4"
     info = probe_stream(video)
     signals: dict[str, list[NDArray[np.float64]]] = {v: [] for v in (*VERSIONS, "reference")}
+    pairs = (("staged", "flat"), ("staged", "unsmoothed"), ("flat", "unsmoothed"))
+    differences: dict[str, tuple[list[float], list[float]]] = {
+        f"{a}_vs_{b}": ([], []) for a, b in pairs
+    }
     began = time.monotonic()
     for number, entry in enumerate(entries):
         image = read_png16(folder / "frames" / entry["file"])
+        outputs: dict[str, NDArray[np.float32]] = {}
         for version in VERSIONS:
             output = temporal.render(image, params, statistics[version][number], backend)
+            outputs[version] = output
             _write_png(
                 roots, folder / "renders" / version / f"{spec.chapter}_f{number:04d}.png", output
             )
@@ -817,6 +877,10 @@ def render_clips(
         signals["reference"].append(
             temporal.frame_signals(temporal.render(image, params, constant, backend))
         )
+        for a, b in pairs:
+            difference = np.abs(outputs[a].astype(np.float64) - outputs[b]) * 255.0
+            differences[f"{a}_vs_{b}"][0].append(float(difference.mean()))
+            differences[f"{a}_vs_{b}"][1].append(float(difference.max()))
         if number % 20 == 0:
             print(
                 f"rendered {number + 1}/{count} ({time.monotonic() - began:.0f} s)", file=sys.stderr
@@ -870,6 +934,9 @@ def render_clips(
         "encode_commands": commands,
         "checks": checks,
         "wp13_witness": witness_record,
+        "full_resolution_differences": {
+            label: _difference_summary(*values) for label, values in differences.items()
+        },
         "full_resolution_flicker": {
             version: _flicker_record(np.array(signals[version]), reference, interior)
             for version in VERSIONS
