@@ -47,14 +47,21 @@ def _synthetic(
     offset: str = "0.5",
     video_filter: str | None = None,
     rotation: str | None = None,
+    b_frames: bool = False,
+    timecode: bool = False,
 ) -> Path:
     """2 s testsrc2 + sine, 30 fps, yuv420p H.264 + AAC, start offset ``offset`` seconds.
 
     The colour tags are set (BT.709, limited range, the D54 assumption): an untagged
     source re-encoded by libx265 gains a ``tv`` range tag, which the spike records
-    separately.
+    separately. Without ``b_frames`` the clip has no B-frames (``-bf 0``), the GoPro
+    chapters' shape, so its video edit list carries no reorder shift; with them, libx264
+    writes its reorder delay into the video edit list's media_time. ``timecode`` adds a
+    ``tmcd`` data track, which starts at 0 whatever the offset.
     """
     filters = ["-vf", video_filter, "-fps_mode", "passthrough"] if video_filter else []
+    filters += [] if b_frames else ["-bf", "0"]
+    filters += ["-timecode", "01:00:00:00"] if timecode else []
     _ffmpeg(
         folders,
         path,
@@ -120,6 +127,9 @@ def clips(folders: tuple[Path, Path]) -> dict[str, Path]:
         # Frames 10-14 dropped with their timestamps kept: a variable-frame-rate gap.
         "vfr": _synthetic(folders, root / "vfr.mp4", video_filter="select='not(between(n,10,14))'"),
         "rotated": _synthetic(folders, root / "rot.mp4", rotation="90"),
+        "bframes": _synthetic(folders, root / "bframes.mp4", b_frames=True),
+        "timecode": _synthetic(folders, root / "tc.mp4", timecode=True),
+        "timecode_shifted": _synthetic(folders, root / "tc-shifted.mp4", "0.25", timecode=True),
     }
 
 
@@ -127,7 +137,7 @@ def clips(folders: tuple[Path, Path]) -> dict[str, Path]:
 def reencoded(clips: dict[str, Path], folders: tuple[Path, Path]) -> dict[str, dict[str, Any]]:
     spike_root, footage = folders
     runs = {}
-    for name in ("base", "vfr", "rotated"):
+    for name in ("base", "vfr", "rotated", "bframes"):
         run = spike.reencode(clips[name], spike_root / name, "libx265", spike_root, footage)
         runs[name] = compare.compare_files(clips[name], Path(run["output"])) | {"run": run}
     return runs
@@ -138,12 +148,16 @@ class TestSelfComparison:
         record = compare.compare_files(clips["base"], clips["base"])
         assert _different(record) == []
         assert record["summary"]["mandatory_all_same"] is True
+        assert record["summary"]["mandatory_and_required_all_same"] is True
+        item = _items(record)["edit list, video track, as written (media_time in media seconds)"]
+        assert (item["class"], item["status"]) == (MANDATORY, SAME)
 
     def test_synthetic_has_the_start_offset_and_an_edit_list(self, clips: dict[str, Path]) -> None:
         items = _items(compare.compare_files(clips["base"], clips["base"]))
         assert items["start offset: first video frame pts"]["source"].startswith("0.500000")
-        edits = items["edit lists as written (all tracks; media_time in media seconds)"]["source"]
+        edits = items["edit list, video track, as written (media_time in media seconds)"]["source"]
         assert edits["vide#0"][0]["media_time"] == "empty"  # the 0.5 s dwell
+        assert edits["vide#0"][1]["media_time"] == "0.000000 (0/1)"  # no reorder shift
 
 
 class TestReencodedSynthetic:
@@ -163,7 +177,28 @@ class TestReencodedSynthetic:
         assert items["video frame count"]["source"] == 60
         assert items["audio streams present"]["source"]  # an audio stream is there
         assert {item["class"] for item in _different(record)} <= {BEST_EFFORT}
+        assert record["summary"]["mandatory_and_required_all_same"] is True
         assert record["info"]["output"]["codec"] == "hevc"
+        assert (
+            items["edit list, video track, as written (media_time in media seconds)"]["status"]
+            == SAME
+        )
+        assert items["edit list, video and audio tracks (presentation effect)"]["status"] == SAME
+
+    def test_b_frame_source_video_edit_list_differs_as_written_only(
+        self, reencoded: dict[str, dict[str, Any]]
+    ) -> None:
+        # Same presentation, different edit list as written (CHARC's ruling, DR-15): the
+        # libx264 source stores its reorder delay as media_time 1/15 s, the re-encode 0.
+        items = _items(reencoded["bframes"])
+        written = items["edit list, video track, as written (media_time in media seconds)"]
+        assert (written["class"], written["status"]) == (MANDATORY, DIFFERENT)
+        assert written["source"]["vide#0"][1]["media_time"] == "0.066667 (1/15)"
+        assert written["output"]["vide#0"][1]["media_time"] == "0.000000 (0/1)"
+        assert written["note"] == "differs: vide#0 entry 1"
+        assert items["edit list, video and audio tracks (presentation effect)"]["status"] == SAME
+        assert items["video per-frame pts (presentation, exact, full sequence)"]["status"] == SAME
+        assert reencoded["bframes"]["summary"]["mandatory_all_same"] is False
 
     def test_variable_frame_rate_gap_is_kept(self, reencoded: dict[str, dict[str, Any]]) -> None:
         item = _items(reencoded["vfr"])["video per-frame pts (presentation, exact, full sequence)"]
@@ -199,11 +234,35 @@ class TestMandatoryDifferences:
         for name in (
             "start offset: first video frame pts",
             "start offset: video and audio stream start_pts",
-            "start offset: container start (earliest stream start, exact)",
+            "start offset: container start over video and audio (earliest start, exact)",
         ):
             assert items[name]["status"] == DIFFERENT, name
             assert items[name]["class"] == MANDATORY
         assert record["summary"]["mandatory_all_same"] is False
+
+    def test_shifted_start_with_a_data_track_at_zero_is_mandatory_different(
+        self, clips: dict[str, Path]
+    ) -> None:
+        items = _items(compare.compare_files(clips["timecode"], clips["timecode_shifted"]))
+        start = items["start offset: container start over video and audio (earliest start, exact)"]
+        assert (start["class"], start["status"]) == (MANDATORY, DIFFERENT)
+        # Over every track the earliest start is the tmcd track's 0 in both files.
+        everything = items["start offset: container start over all tracks (earliest start, exact)"]
+        assert (everything["class"], everything["status"]) == (BEST_EFFORT, SAME)
+        assert everything["source"] == "0.000000 (0/1)"
+
+    def test_a_required_difference_fails_the_combined_field_only(
+        self, clips: dict[str, Path]
+    ) -> None:
+        facts = compare.gather(clips["base"])
+        item = compare.Item("colour range", REQUIRED, "D55, 6.5", "tv", "pc", DIFFERENT)
+        summary = compare.build_record(facts, facts, [item])["summary"]
+        assert summary["mandatory_all_same"] is True
+        assert summary["mandatory_and_required_all_same"] is False
+        assert summary["different_items"][REQUIRED] == ["colour range"]
+        assert "Every MANDATORY and REQUIRED item SAME (the recommendation's test): False" in (
+            compare.markdown_table(compare.build_record(facts, facts, [item]))
+        )
 
     def test_dropped_frames_make_pts_different_and_mandatory(self, clips: dict[str, Path]) -> None:
         items = _items(compare.compare_files(clips["base"], clips["vfr"]))
@@ -335,7 +394,7 @@ class TestOutputPathCheck:
         assert written == ["base.compare.json", "base.compare.md"]
         table = (tmp_path / "work" / "wp1.5" / "base.compare.md").read_text(encoding="utf-8")
         assert "| video per-frame pts (presentation, exact, full sequence) | MANDATORY |" in table
-        assert "every MANDATORY item SAME: True" in capsys.readouterr().out
+        assert "every MANDATORY and REQUIRED item SAME: True" in capsys.readouterr().out
 
     def test_a_record_file_linked_into_the_footage_folder_is_refused(
         self, clips: dict[str, Path], tmp_path: Path, capsys: pytest.CaptureFixture[str]
@@ -531,6 +590,28 @@ class TestReencodeCommand:
             spike.reencode_command(
                 Path("i.MP4"), Path("o.MP4"), self._probe("yuv422p10le"), "hevc_nvenc"
             )
+
+
+class TestToolEnvironment:
+    def test_ffreport_never_reaches_ffmpeg_or_ffprobe(
+        self, clips: dict[str, Path], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setenv("FFREPORT", "file=ffreport-planted.log")
+        # Positive control: with FFREPORT passed on, ffprobe writes the file into the cwd.
+        subprocess.run(
+            ["ffprobe", "-v", "error", "-version"], capture_output=True, check=True, cwd=tmp_path
+        )
+        assert (tmp_path / "ffreport-planted.log").is_file()
+        (tmp_path / "ffreport-planted.log").unlink()
+        assert "FFREPORT" not in compare.tool_env()
+        compare.run_ffprobe(["-show_format", str(clips["base"])])
+        compare.compare_files(clips["base"], clips["base"])
+        spike._ffmpeg_output(["-encoders"])
+        spike.run_tool(
+            ["ffmpeg", "-nostdin", "-hide_banner", "-i", str(clips["base"]), "-f", "null", "-"]
+        )
+        assert list(tmp_path.iterdir()) == []
 
 
 class TestCompositionOffsets:

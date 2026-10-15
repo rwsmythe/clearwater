@@ -14,18 +14,23 @@ rational number of seconds (``Fraction``); no timestamp comparison is rounded or
 Each item carries a class:
 
 * ``MANDATORY`` (D94, D95, D105, section 7.5): the full sequence of per-frame
-  presentation timestamps, frame count, video stream duration, start offset, the edit
-  lists of the video and audio tracks judged by their presentation effect, audio
-  present, passed through and in sync, and display orientation. A frame's presentation
+  presentation timestamps, frame count, video stream duration, start offset (over the
+  video and audio tracks), the video track's edit list as written, the edit lists of
+  the video and audio tracks judged by their presentation effect, audio present, passed
+  through and in sync, and display orientation. A frame's presentation
   duration is the step to the next timestamp (the last frame ends at the stream
   duration); the per-frame ``duration`` that ``ffprobe`` prints is the packet's decode
   delta, which follows decode order and moves with the encoder's B-frame structure, so
   it is not compared.
-* ``REQUIRED`` (D55, D114, section 8.2): colour tags and range, pixel format, chroma
-  subsampling, bit depth and frame geometry. These are set by encoder options in every
-  approach, so they do not separate the three approaches.
+* ``REQUIRED (D55/D114)`` (D55, D114, section 8.2): colour tags and range, pixel
+  format, chroma subsampling, bit depth and frame geometry: a spec "must" outside D105's
+  list. These are set by encoder options in every approach, so they do not separate the
+  three approaches, but a REQUIRED item DIFFERENT weighs as MANDATORY: the summary's
+  ``mandatory_and_required_all_same`` is the field a recommendation reads, while
+  ``mandatory_all_same`` covers D105's class alone.
 * ``BEST-EFFORT`` (D105, section 8.2): creation time, the GPMF and timecode tracks, the
-  camera atoms, the edit lists as written, and other tags.
+  camera atoms, the non-video tracks' edit lists as written, the start over all tracks
+  including data, and other tags.
 
 The record is written as ``<DIR>/<output stem>.compare.json`` and a markdown table
 ``<DIR>/<output stem>.compare.md``. ``DIR`` defaults to the configured working folder's
@@ -62,7 +67,7 @@ if not __package__:
 from local_config import LocalConfigError, load_local_config
 
 MANDATORY = "MANDATORY"
-REQUIRED = "REQUIRED"
+REQUIRED = "REQUIRED (D55/D114)"
 BEST_EFFORT = "BEST-EFFORT"
 SAME = "SAME"
 DIFFERENT = "DIFFERENT"
@@ -204,7 +209,7 @@ class Item:
 
     Attributes:
         name: What is compared.
-        item_class: ``MANDATORY``, ``REQUIRED`` or ``BEST-EFFORT``.
+        item_class: ``MANDATORY``, ``REQUIRED (D55/D114)`` or ``BEST-EFFORT``.
         clause: The spec clause the class comes from.
         source: The source value (JSON-ready; a summary for long sequences).
         output: The output value, in the same form.
@@ -517,6 +522,19 @@ def read_movie(path: Path) -> Movie:
 # --- ffprobe ------------------------------------------------------------------------
 
 
+def tool_env() -> dict[str, str]:
+    """Return the environment for an FFmpeg or ffprobe process: this one without ``FFREPORT``.
+
+    ``FFREPORT`` makes both tools write a log file (by default into the current folder,
+    whatever it is), so it is never passed on. The ``AV_LOG_FORCE_*`` variables only change
+    console colouring and are kept.
+
+    Returns:
+        A copy of ``os.environ`` without ``FFREPORT``.
+    """
+    return {key: value for key, value in os.environ.items() if key.upper() != "FFREPORT"}
+
+
 def run_ffprobe(arguments: Sequence[str]) -> dict[str, Any]:
     """Run ``ffprobe -v error -print_format json`` with ``arguments``, without a shell.
 
@@ -535,6 +553,7 @@ def run_ffprobe(arguments: Sequence[str]) -> dict[str, Any]:
             command,
             capture_output=True,
             stdin=subprocess.DEVNULL,
+            env=tool_env(),
             timeout=FFPROBE_TIMEOUT_SECONDS,
             check=False,
         )
@@ -934,6 +953,59 @@ def _keyed_edits(
     return result
 
 
+def _edit_item(
+    name: str,
+    item_class: str,
+    clause: str,
+    source: Mapping[str, Any],
+    output: Mapping[str, Any],
+    note: str = "",
+) -> Item:
+    """Compare two {stream key: edit list} maps; a DIFFERENT note names where they differ."""
+    item = _item(name, item_class, clause, dict(source), dict(output), note)
+    if item.status == SAME:
+        return item
+    places = []
+    for key in sorted(set(source) | set(output)):
+        left, right = source.get(key), output.get(key)
+        if key not in source or key not in output:
+            places.append(f"{key} track only in {'output' if key not in source else 'source'}")
+        elif left == right:
+            continue
+        elif left is None or right is None:
+            places.append(f"{key} edit list only in {'output' if left is None else 'source'}")
+        elif len(left) != len(right):
+            places.append(f"{key} {len(left)} vs {len(right)} entries")
+        else:
+            entry = next(i for i, (a, b) in enumerate(zip(left, right, strict=True)) if a != b)
+            places.append(f"{key} entry {entry}")
+    where = "differs: " + ", ".join(places)
+    return Item(
+        name,
+        item_class,
+        clause,
+        item.source,
+        item.output,
+        DIFFERENT,
+        f"{where}; {note}" if note else where,
+    )
+
+
+def _container_start(facts: Facts, codec_types: Sequence[str]) -> str | None:
+    """Return the earliest start (``start_pts`` x time base) over the given stream types, exact.
+
+    Over every stream type this is ffprobe's container ``start_time`` in exact form.
+    """
+    starts = [
+        start
+        for s in facts.probe.get("streams", [])
+        if isinstance(s, dict)
+        and s.get("codec_type") in codec_types
+        and (start := _ticks(s.get("start_pts"), _time_base(s))) is not None
+    ]
+    return exact(min(starts)) if starts else None
+
+
 def _keyed_packet_items(
     source: Facts,
     output: Facts,
@@ -1028,35 +1100,35 @@ def compare_facts(source: Facts, output: Facts) -> list[Item]:
         )
     )
 
-    def container_start(facts: Facts) -> str | None:
-        # The exact form of ffprobe's container start_time: the earliest stream start.
-        starts = [
-            start
-            for s in facts.probe.get("streams", [])
-            if isinstance(s, dict)
-            and (start := _ticks(s.get("start_pts"), _time_base(s))) is not None
-        ]
-        return exact(min(starts)) if starts else None
-
     items.append(
         _item(
-            "start offset: container start (earliest stream start, exact)",
+            "start offset: container start over video and audio (earliest start, exact)",
             MANDATORY,
             "D94, D105, 7.5",
-            container_start(source),
-            container_start(output),
+            _container_start(source, ("video", "audio")),
+            _container_start(output, ("video", "audio")),
         )
     )
 
-    # MANDATORY: edit lists of the video and audio tracks, by presentation effect.
+    # MANDATORY: the video track's edit list as written, and the presentation effect of the
+    # video and audio tracks' edit lists.
     items.append(
-        _item(
+        _edit_item(
+            "edit list, video track, as written (media_time in media seconds)",
+            MANDATORY,
+            "D94, 7.5",
+            _keyed_edits(source, _edits_as_written, ("vide",)),
+            _keyed_edits(output, _edits_as_written, ("vide",)),
+        )
+    )
+    items.append(
+        _edit_item(
             "edit list, video and audio tracks (presentation effect)",
             MANDATORY,
             "D94, 7.5",
             _keyed_edits(source, edit_effect, ("vide", "soun")),
             _keyed_edits(output, edit_effect, ("vide", "soun")),
-            note="media start is relative to the track's earliest composition time",
+            "media start is relative to the track's earliest composition time",
         )
     )
 
@@ -1319,27 +1391,35 @@ def compare_facts(source: Facts, output: Facts) -> list[Item]:
             list(out_track.sample_entry_boxes) if out_track else None,
         )
     )
+    non_video = ("soun", "tmcd", "meta", "text", "subt")
     items.append(
-        _item(
-            "edit lists as written (all tracks; media_time in media seconds)",
+        _edit_item(
+            "edit lists as written, non-video tracks (media_time in media seconds)",
             BEST_EFFORT,
             best,
-            _keyed_edits(
-                source, _edits_as_written, ("vide", "soun", "tmcd", "meta", "text", "subt")
-            ),
-            _keyed_edits(
-                output, _edits_as_written, ("vide", "soun", "tmcd", "meta", "text", "subt")
-            ),
-            note="media_time is tied to the encoded stream's composition offsets",
+            _keyed_edits(source, _edits_as_written, non_video),
+            _keyed_edits(output, _edits_as_written, non_video),
+            "an identity edit the muxer adds where the source had none has no presentation "
+            "effect (the MANDATORY effect item covers audio)",
+        )
+    )
+    items.append(
+        _edit_item(
+            "edit list, data tracks (presentation effect)",
+            BEST_EFFORT,
+            best,
+            _keyed_edits(source, edit_effect, non_video[1:]),
+            _keyed_edits(output, edit_effect, non_video[1:]),
         )
     )
     items.append(
         _item(
-            "edit list, data tracks (presentation effect)",
+            "start offset: container start over all tracks (earliest start, exact)",
             BEST_EFFORT,
             best,
-            _keyed_edits(source, edit_effect, ("tmcd", "meta", "text", "subt")),
-            _keyed_edits(output, edit_effect, ("tmcd", "meta", "text", "subt")),
+            _container_start(source, ("video", "audio", "data")),
+            _container_start(output, ("video", "audio", "data")),
+            note="includes data tracks; ffprobe's container start_time in exact form",
         )
     )
     items.append(
@@ -1365,6 +1445,7 @@ def _tool_version() -> str:
             ["ffprobe", "-version"],
             capture_output=True,
             stdin=subprocess.DEVNULL,
+            env=tool_env(),
             timeout=60,
             check=False,
         )
@@ -1383,7 +1464,9 @@ def build_record(source: Facts, output: Facts, items: Sequence[Item]) -> dict[st
 
     Returns:
         The record: the two paths, the ``ffprobe`` version, informational codec fields,
-        every item, and a summary listing the DIFFERENT items per class.
+        every item, and a summary listing the DIFFERENT items per class, with
+        ``mandatory_all_same`` (D105's class) and ``mandatory_and_required_all_same`` (the
+        recommendation's test: a REQUIRED difference weighs as a MANDATORY one).
     """
 
     def info(facts: Facts) -> dict[str, Any]:
@@ -1426,6 +1509,7 @@ def build_record(source: Facts, output: Facts, items: Sequence[Item]) -> dict[st
             "different": {key: len(names) for key, names in different.items()},
             "different_items": different,
             "mandatory_all_same": not different[MANDATORY],
+            "mandatory_and_required_all_same": not different[MANDATORY] and not different[REQUIRED],
         },
     }
 
@@ -1493,7 +1577,9 @@ def markdown_table(record: Mapping[str, Any]) -> str:
         "",
         f"Items: {summary['items']}. DIFFERENT by class: "
         + ", ".join(f"{key} {count}" for key, count in summary["different"].items())
-        + f". Every MANDATORY item SAME: {summary['mandatory_all_same']}.",
+        + ". Every MANDATORY and REQUIRED item SAME (the recommendation's test): "
+        + f"{summary['mandatory_and_required_all_same']}"
+        + f" (MANDATORY alone: {summary['mandatory_all_same']}).",
     ]
     return "\n".join(lines) + "\n"
 
@@ -1617,7 +1703,8 @@ def main(argv: list[str] | None = None) -> int:
     summary = record["summary"]
     print(
         f"DIFFERENT by class: {summary['different']}; "
-        f"every MANDATORY item SAME: {summary['mandatory_all_same']}"
+        "every MANDATORY and REQUIRED item SAME: "
+        f"{summary['mandatory_and_required_all_same']}"
     )
     return 0
 

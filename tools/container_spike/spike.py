@@ -54,6 +54,7 @@ if not __package__:
 
 from container_spike.compare import (
     MANDATORY,
+    REQUIRED,
     SPIKE_SUBDIR,
     OutputPathError,
     ProbeError,
@@ -65,6 +66,7 @@ from container_spike.compare import (
     gather,
     pix_fmt_shape,
     run_ffprobe,
+    tool_env,
     udta_atom,
     write_checked,
     write_record,
@@ -106,7 +108,9 @@ class SpikeError(Exception):
 
 
 def run_tool(command: Sequence[str], timeout: float = FFMPEG_TIMEOUT_SECONDS) -> tuple[int, str]:
-    """Run a command without a shell and return (exit status, standard error text).
+    """Run an FFmpeg command without a shell and return (exit status, standard error text).
+
+    The process gets :func:`container_spike.compare.tool_env` (no ``FFREPORT``).
 
     Standard output is discarded unless the caller needs it (see :func:`_ffmpeg_output`).
 
@@ -126,6 +130,7 @@ def run_tool(command: Sequence[str], timeout: float = FFMPEG_TIMEOUT_SECONDS) ->
             stdout=subprocess.DEVNULL,
             stderr=subprocess.PIPE,
             stdin=subprocess.DEVNULL,
+            env=tool_env(),
             timeout=timeout,
             check=False,
         )
@@ -149,6 +154,7 @@ def _ffmpeg_output(arguments: Sequence[str]) -> str:
             ["ffmpeg", "-hide_banner", *arguments],
             capture_output=True,
             stdin=subprocess.DEVNULL,
+            env=tool_env(),
             timeout=60,
             check=False,
         )
@@ -926,7 +932,10 @@ def main(argv: list[str] | None = None) -> int:
                 run = reencode(source, allowed / "reencode", args.encoder, allowed, footage)
                 summary = run["summary"]
                 print(f"DIFFERENT by class: {summary['different']}")
-                print(f"every {MANDATORY} item SAME: {summary['mandatory_all_same']}")
+                print(
+                    f"every {MANDATORY} and {REQUIRED} item SAME: "
+                    f"{summary['mandatory_and_required_all_same']}"
+                )
                 print(f"PSNR: {run['psnr']}")
                 return Path(run["run_json"])
 
