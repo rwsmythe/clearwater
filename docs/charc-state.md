@@ -33,13 +33,13 @@ unpushed, and the owner has not asked for a push (verify: `git status -sb`).
 | WP1.2R | 996274e | wp1.2r-accept.md (aac4674) | prototype remediation after the retroactive seat-run B (M1 probe catch-all, M2 derived-value validation, M3 float64 accumulators ruled (a), m5, m7); 2nd-B major adjudicated NOT BLOCKING, upheld by CHARC -> DR-19; arithmetic bit-identical in 6 witness cases |
 | WP1.5 | 3242679 | wp1.5-accept.md (371f19d) | container spike: SIMPLE; MANDATORY+REQUIRED 0 DIFFERENT, 8 best-effort lost; NVENC/libx265 8/10-bit proven; HERO13 HEVC 8-bit BT.709 FULL range; no .LRV (D60 closed v0.5.2); DR-15..17 |
 | WP1.3 (shallow) | 7178540 | wp1.3-accept.md (bc97a19) | look-check instrument `tools/lookcheck/`; pack `work/wp1.3/index.html` (24 stills x 3 variants, 180-frame unsmoothed flicker pair) READY FOR CP2; seat B pass 1 BLOCKING (3 introduced majors, ONE remediation `wp13-fix`), re-run BLOCKING again -> adjudicated at the gate (CRITICAL pytest basetemp exposure = DR-21, repo-wide; 2 majors instrument-only = DR-20); CHARC md5s verified, QA green at this seat 2026-10-15 13:3xZ |
+| WP-T1 | f6a34a4 | wp-t1-accept.md (3f40a85) | pytest temp-root footage guard in `tests/conftest.py` (CHARC-commissioned, DR-21 CLOSED, DR-9 CLOSED); seat B pass 1 BLOCKING (C1 case, C3 fail-open, M4, M6; ONE remediation), re-run BLOCKING again -> adjudicated at the gate (4 crafted-state aliasing cases, DR-22(4)-(7)); DR-22 OPEN (9 limits incl. CHARC's accepted pre-conftest capture writes); CHARC md5s verified, QA at this seat 14:5xZ |
 
 CHARC QA at this seat re-ran ruff/format/mypy/pytest green on every accept (pytest
 skips the ffprobe tests here because this seat's PATH lacks ffprobe; the
 orchestrator's 398-pass run is the figure of record). Spec at v0.5.2 (D60 closed 2026-10-15,
-owner-approved; v0.5.1 073ca1f). Debt register `docs/debt-register.md`: DR-1, DR-2, DR-6..DR-17 OPEN;
-DR-3, DR-4, DR-5 CLOSED; DR-18 ordered 2026-10-15T09:5xZ (WP1.5 B pass-2 minors,
-owner WP3.10) -- verify it landed.
+owner-approved; v0.5.1 073ca1f). Debt register `docs/debt-register.md`: DR-1, DR-2, DR-6..DR-8, DR-10..DR-20, DR-22 OPEN;
+DR-3, DR-4, DR-5, DR-9, DR-21 CLOSED (verify `docs/debt-register.md`).
 
 ### Reviewer B form (owner catch 2026-10-15 07:25Z)
 
@@ -77,10 +77,8 @@ path, md5, five assertions and verdict, or there is no accept.
   STRONG; `tools/prototype/temporal.py` + additive `correct(..., statistics=)` hook; reuses the
   WP1.3 instrument with `roots`, no D54 re-implementation; staged vs flat D98, smoothing
   candidates, robust N{} bounds; gain-cap noise test deferred to WP1.4b on the scuba footage).
-  **WP-T1 COMMISSIONED by CHARC** 2026-10-15 13:29Z (answer to the orchestrator's DR-21 query:
-  `tests/conftest.py` `pytest_configure` guard refusing a basetemp or derived temp root inside
-  the resolved footage folder; sonnet-high; STRONG (fill has no STANDARD tier); dispatched 13:31Z, brief 34d2ccd, cell wpt1-cell; inert without local config; `work/` must
-  pass). Neither is exclusive; neither may overlap Part B's bench window. Verify: `git worktree
+  **WP-T1 ACCEPTED** (table above; the guard is live in `tests/conftest.py`; CLAUDE.md
+  Conventions line added). WP1.4 is not exclusive and may not overlap Part B's bench window. Verify: `git worktree
   list`, `docs/debt-register.md` DR-20/DR-21.
 - Drafted by CHARC on main: `docs/briefs/wp1.2b-brief.md` (Part B; three dispatch conditions)
   and `docs/reports/wp1.6-gate-report.md` (template; Gate 1 options A/B/C framed).
