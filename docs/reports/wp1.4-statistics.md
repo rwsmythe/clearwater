@@ -94,8 +94,8 @@ to 1. At 30000/1001 fps a 1.0 s window gives h = 14, 29 taps.
   single bad frame, then the `gaussian`.
 - Past the ends of an excerpt the end value is held (`nearest`). That is a property of a 6 s
   excerpt, not of the product, which smooths over the whole clip. It is why the flicker is also
-  reported over the INTERIOR frames: those at least 2.0 s from either end, where even a 4 s window
-  fits (61 steps on `GX011627`, 60 on `GX011625`).
+  reported over the INTERIOR frames: those at least 59 frames (1.97 s) from either end, where even
+  the 4 s window's kernel (59 frames each side) fits (61 steps on `GX011627`, 60 on `GX011625`).
 - The comparison of section 3 uses `gaussian` 1.0 s, as the brief fixes.
 
 **Flicker measure: an instrument of this package, NOT V3.** V3 (D112) is measured later, on a
@@ -201,10 +201,14 @@ Full resolution (`GX011627`, `render.json`):
 **Do I expect the difference to be visible? No.**
 - On both excerpts and both methods, the staged and flat renders differ by under a tenth of an 8-bit
   level on average (0.058 and 0.032 for Ancuti 2018; 0.003 and 0.001 for 3C).
-- At the single worst pixel of the worst frame they differ by under one level (0.68 and 0.90). The
-  clips are 8-bit, so a difference under one level changes a displayed pixel by at most one code.
-- Their residual flicker is the same to within 3 %: flat is the lower one, 0.130 against 0.134 and
-  0.064 against 0.067. Both are far below the unsmoothed render (0.236 and 0.151).
+- At the single worst pixel of the worst frame they differ by under one level (0.68 and 0.90 on
+  the proxies; 0.76 at full resolution). These are differences between the UNENCODED renders; the
+  clips were not decoded and compared with each other. Each clip's own encode error is larger: its
+  read-back differs from the frames it was encoded from by up to 2.93 levels per frame (mean over a
+  1/8-size frame, `render.json` `checks`), against a staged-versus-flat mean of 0.058.
+- Their residual flicker is the same to within about 4 %: flat is the lower one, 0.130 against
+  0.134 (3.0 %) and 0.064 against 0.067 (4.0 %). Both are far below the unsmoothed render (0.236
+  and 0.151).
 - The reason is in the mismatch table. The earlier stages change slowly (the red gain moves by 0.003
   per frame on average on `GX011627`), so the frame a later stage sees changes little whether or not
   the earlier stages were smoothed.
@@ -238,9 +242,10 @@ Reading:
 - The moving average's frequency response has side lobes. The 1 s average passes 3 % at 1 Hz AND at
   2 Hz; the 0.5 s average passes 64 % at 1 Hz and 0.1 % at 2 Hz. Which flicker frequencies survive
   depends on the window irregularly. The Gaussian's attenuation rises monotonically with frequency.
-- The median before the Gaussian costs nothing measurable here (the same flicker to the third
-  decimal) and removes a single-frame outlier entirely (outlier response 0, against 0.041 for the
-  2 s Gaussian).
+- The median before the Gaussian costs nothing here: its flicker is within 0.0015 of the
+  Gaussian's, lower in 30 of the 32 comparisons (windows x excerpts x schemes x all/interior) and
+  higher by 0.00002 in two; the largest gap is 0.158 against 0.159 at 0.5 s on `GX011627`. It
+  removes a single-frame outlier entirely (outlier response 0, against 0.041 for the 2 s Gaussian).
 - Flat and staged rank the candidates the same way.
 - Longer windows keep lowering the flicker, but less and less (staged Gaussian): from 1 s to 2 s by
   21 % and 20 %, from 2 s to 4 s by 23 % and 21 %, while the time to 90 % doubles each step
@@ -282,7 +287,8 @@ Reading:
 - Its lower CV over the excerpt is the scene drift, which every candidate follows. That is why the
   step, not the CV, is the stability figure here.
 - The three percentile pairs jitter alike and clip exactly their tails. The trimmed forms jitter
-  slightly more, clip a varying 3 to 7 %, and move the result by 2.6 to 6.1 levels on average.
+  slightly more on `GX011627` and on `GX011625`'s low bound (slightly less on its high bound), clip
+  a varying 3 to 7 %, and move the result by 2.6 to 6.1 levels on average.
 - **DR-14 on real footage.** The last frame of `GX011625` (hazy, almost featureless water) has a
   default N{} range of 0.0147, against 0.24 on the textured `GX011627` and 0.0132 on the synthetic
   near-flat frame. The stretch there multiplies the high-pass by about 68.
@@ -293,8 +299,10 @@ Reading:
 **Recommendation: keep the 0.5/99.5 percentiles (the default) and add a floor on the range (high
 minus low) far above 1e-6, its value to be set from open-water and deep frames (WP1.4b, CP2).**
 Grounds:
-1. The default has the smallest frame-to-frame step of every candidate on both excerpts and clips a
-   fixed 1 % by construction; no other candidate is more stable.
+1. The default has the smallest frame-to-frame step of every candidate on both bounds of `GX011627`
+   and on the low bound of `GX011625`, and clips a fixed 1 % by construction. Only on `GX011625`'s
+   high bound do the trimmed forms jitter less (0.0190 against 0.0218), at the price of clipping 5 to
+   7 % and changing the look by 5 to 6 levels on average.
 2. min/max is three to four times noisier; the trimmed forms are not more stable and change the
    look by several levels.
 3. No candidate addresses the near-flat case: every candidate but min/max has its smallest range on

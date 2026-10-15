@@ -105,8 +105,9 @@ VERSIONS = ("unsmoothed", "staged", "flat")
 """The three full-resolution renders of the first excerpt, for the owner at CP2."""
 
 INTERIOR_WINDOW_S = 4.0
-"""The flicker's second frame set: the frames at least half this window from either end,
-where every candidate's window fits inside the excerpt."""
+"""The flicker's second frame set: the frames at least ``half_width(INTERIOR_WINDOW_S)`` frames
+from either end (59 frames, 1.97 s, at 30000/1001 fps), where the widest candidate's kernel (the
+4 s window, 59 frames each side) fits inside the excerpt."""
 
 PROXY_METHOD = (
     "area average in NumPy from the full-resolution 16-bit frame: each 4x4 block of the "
