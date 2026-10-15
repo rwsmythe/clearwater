@@ -590,15 +590,22 @@ def test_auto_falls_back_when_cupyx_does_not_import(
         select_backend("gpu")
 
 
+@pytest.mark.parametrize(
+    "error",
+    [
+        OSError("DLL load failed while importing cuda"),
+        RuntimeError("CUDA driver version is insufficient for CUDA runtime version"),
+    ],
+)
 def test_auto_falls_back_when_cupy_fails_to_initialise(
-    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture, error: Exception
 ) -> None:
     """An installed CuPy whose import raises something other than ImportError (WP1.2R M1)."""
     real_import = importlib.import_module
 
     def import_module(name: str, *args: Any, **kwargs: Any) -> Any:
         if name == "cupy":
-            raise OSError("DLL load failed while importing cuda")
+            raise error
         return real_import(name, *args, **kwargs)
 
     monkeypatch.setattr(importlib, "import_module", import_module)
@@ -606,10 +613,11 @@ def test_auto_falls_back_when_cupy_fails_to_initialise(
         backend = select_backend("auto")
     assert backend.name == "cpu"
     assert backend.xp is np
-    assert "DLL load failed while importing cuda" in backend.reason
+    assert str(error) in backend.reason
     assert backend.reason in caplog.text
-    with pytest.raises(RuntimeError, match="DLL load failed"):
+    with pytest.raises(RuntimeError, match="no usable CUDA device") as raised:
         select_backend("gpu")
+    assert str(error) in str(raised.value)
 
 
 @pytest.mark.gpu

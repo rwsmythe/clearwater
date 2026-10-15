@@ -782,6 +782,7 @@ def test_run_works_as_a_script(tmp_path: Path) -> None:
     [
         {"gamma": 1e39},
         {"alpha": 4e38},
+        {"sharpen_strength": 1e39},
         {"max_white_balance_gain": 1e300},
         {"white_balance_strength": 1e39},
         {"weight_delta": 2e38},  # within float32, but 2 * delta (two inputs) is not
@@ -793,6 +794,13 @@ def test_params_reject_values_beyond_the_float32_range(changes: dict[str, float]
     with pytest.raises(ValueError, match="float32 range") as raised:
         Params(**changes)  # type: ignore[arg-type]
     assert any(name in str(raised.value) for name in changes)  # the message names the field
+
+
+def test_params_reject_an_integer_beyond_the_float_range_as_a_value_error() -> None:
+    with pytest.raises(ValueError, match="gamma must be finite"):
+        Params(gamma=10**400)
+    with pytest.raises(ValueError, match="red_gain_cap must be finite"):
+        Params(red_gain_cap=10**400)
 
 
 def test_params_accept_large_values_inside_the_float32_range() -> None:
@@ -809,11 +817,22 @@ def test_derived_sigma_that_overflows_is_rejected_naming_the_parameter(name: str
         correct(_synthetic(64, 96), params)
 
 
-def test_laplacian_sigma_whose_square_overflows_float32_is_rejected() -> None:
-    params = Params(laplacian_fraction=1e300)  # sigma 6.4e301 is finite, its square is not
-    assert math.isfinite(spatial_sigma((64, 96), 1e300))
-    with pytest.raises(ValueError, match="laplacian_fraction"):
-        pipeline.check_derived_values((64, 96), params)
+@pytest.mark.parametrize("fraction", [4e305, 1e300, 1e10, 1e6])
+@pytest.mark.parametrize("name", params_module.SPATIAL_FRACTIONS)
+def test_finite_sigma_beyond_any_filter_support_is_rejected(name: str, fraction: float) -> None:
+    # Finite sigmas (4e305 * 129 is about 5e307) that SciPy cannot turn into a kernel: its
+    # integer conversion of 4 sigma overflows, or the kernel would not fit in memory.
+    params = Params(**{name: fraction})
+    assert math.isfinite(spatial_sigma((129, 129), fraction))
+    with pytest.raises(ValueError, match=name):
+        pipeline.check_derived_values((129, 129), params)
+    with pytest.raises(ValueError, match=name):
+        correct(_synthetic(129, 129), params)
+
+
+def test_large_but_usable_sigma_is_accepted() -> None:
+    # 100 times the short side: absurd, but a kernel of 51 thousand taps is still allowed.
+    pipeline.check_derived_values((129, 129), Params(sharpen_blur_fraction=100.0))
 
 
 @pytest.mark.parametrize("shape", [(1, 1, 3), (64, 96, 3), (2160, 3840, 3)])
@@ -833,6 +852,10 @@ def test_run_reports_an_overflowing_derived_sigma_in_one_line(
     assert err.count("\n") == 1
     assert "sharpen_blur_fraction" in err
     assert not (tmp_path / "out").exists()
+    assert run.main([*args, "--set", "saliency_blur_fraction=4e305"]) == 2  # finite, too wide
+    err = capsys.readouterr().err
+    assert err.count("\n") == 1
+    assert "saliency_blur_fraction" in err
     assert run.main([*args, "--set", "gamma=1e39"]) == 2  # the Params path, same one line
     err = capsys.readouterr().err
     assert err.count("\n") == 1
@@ -927,6 +950,7 @@ def assert_scalar_reductions_use_float64(backend: Backend, monkeypatch: pytest.M
     white_balanced, _ = white_balance(compensated, Params())
     weights = weight_maps((white_balanced, white_balanced), Params())
     assert len(calls) >= 6  # cap statistic, means, mean added (2), white balance, Lab means
+    assert (name, np.float32, np.float64, (40, 24), None) in calls  # compensation's cap statistic
     assert {(c[0], c[1], c[2]) for c in calls} == {
         (name, np.dtype(np.float32), np.dtype(np.float64))
     }

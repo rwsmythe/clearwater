@@ -54,7 +54,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from .backend import Backend, of
-from .params import FLOAT32_MAX, SPATIAL_FRACTIONS, Params
+from .params import SPATIAL_FRACTIONS, Params
 
 Image = NDArray[np.float32]
 """A display-encoded RGB image, float32, shape ``(H, W, 3)``, values in [0, 1].
@@ -67,6 +67,11 @@ Map = NDArray[np.float32]
 """A single-channel map, float32, shape ``(H, W)`` (NumPy or CuPy, like :data:`Image`)."""
 
 _GAUSSIAN_TRUNCATE = 4.0
+# The widest Gaussian support check_derived_values accepts, as a radius in pixels: the
+# filters build a kernel of 2 * radius + 1 taps, so this is a kernel of about 2 ** 24 taps
+# (128 MiB of float64). A wider one is a sigma many times the image size, far beyond any
+# use, and would exhaust memory (or overflow SciPy's integer conversion) inside the filter.
+_MAX_KERNEL_RADIUS = 2.0**23
 _ACCUMULATOR_DTYPE = np.float64
 _EPS = 1e-6
 
@@ -268,9 +273,11 @@ def check_derived_values(image_shape: tuple[int, ...], params: Params) -> None:
 
     :class:`Params` validates every value that the field alone decides (including the
     float32 range of the controls cast to float32); what it cannot see is a finite fraction
-    that overflows once multiplied by the short side. Every spatial sigma from
-    :func:`spatial_sigma` must be finite and positive, and the Laplacian weight's scale
-    ``sigma ** 2`` (cast to float32) must be within the float32 range.
+    that becomes unusable once multiplied by the short side. Every spatial sigma from
+    :func:`spatial_sigma` must be finite and positive, and its Gaussian support (the
+    truncation of 4 sigma, a radius in pixels) may not exceed ``_MAX_KERNEL_RADIUS``
+    (2 ** 23 px, a kernel of about 2 ** 24 taps), which also keeps the Laplacian weight's
+    scale ``sigma ** 2`` far inside the float32 range.
 
     Args:
         image_shape: The image shape; the first two entries are height and width.
@@ -287,12 +294,12 @@ def check_derived_values(image_shape: tuple[int, ...], params: Params) -> None:
                 f"{name}={fraction!r} gives a sigma of {sigma} px at the short side "
                 f"{min(image_shape[0], image_shape[1])} px; it must be finite and positive"
             )
-    laplacian_sigma = spatial_sigma(image_shape, params.laplacian_fraction)
-    if laplacian_sigma > math.sqrt(FLOAT32_MAX):
-        raise ValueError(
-            f"laplacian_fraction={params.laplacian_fraction!r} gives a sigma of "
-            f"{laplacian_sigma} px whose square is beyond the float32 range"
-        )
+        if _GAUSSIAN_TRUNCATE * sigma > _MAX_KERNEL_RADIUS:
+            raise ValueError(
+                f"{name}={fraction!r} gives a sigma of {sigma:.6g} px at the short side "
+                f"{min(image_shape[0], image_shape[1])} px, a filter support beyond "
+                f"{_MAX_KERNEL_RADIUS:.0f} px"
+            )
 
 
 def compensate_ancuti2018(image: Image, params: Params) -> tuple[Image, CompensationInfo]:

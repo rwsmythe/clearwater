@@ -49,6 +49,14 @@ _FLOAT32_CONTROLS = (
 )
 
 
+def _is_finite(value: float) -> bool:
+    """Whether a real number is finite; an integer beyond the float range is not."""
+    try:
+        return math.isfinite(float(value))
+    except OverflowError:
+        return False
+
+
 @dataclass(frozen=True)
 class Params:
     """All parameters of one run of the pipeline, with their defaults.
@@ -168,8 +176,8 @@ class Params:
             raise ValueError(f"method must be one of {', '.join(METHODS)}, got {self.method!r}")
         for name, value in dataclasses.asdict(self).items():
             is_real = isinstance(value, numbers.Real) and not isinstance(value, bool)
-            if is_real and not math.isfinite(float(value)):
-                raise ValueError(f"{name} must be finite, got {value}")
+            if is_real and not _is_finite(value):
+                raise ValueError(f"{name} must be finite, got {str(value)[:40]}")
         non_negative = (
             "alpha",
             "kappa",
