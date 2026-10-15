@@ -23,12 +23,14 @@
 
 ### Live cells
 
-- **wp15-revb** (implementer-opus-high, background): WP1.5 Reviewer B, brief
-  `docs/briefs/wp1.5-review-brief.md` (`462e1f2`), on head `97d40df`. Outputs to
-  `work\wp1.5-B\`, evidence to `clearwater-review-evidence\wp1.5\B\`. Dispatched ~07:10Z.
-- **wp15-cell** (author) RETURNED ~07:05Z: head `97d40df`, depth 363K, recommends SIMPLE (every
-  MANDATORY and REQUIRED item SAME on GX011627 and GX011628); Reviewer A converged in 2 rounds.
-  Worktree `.worktrees/wp1.5` (local toml copied in). Routes B's findings, if any.
+- **wp15-revb** (implementer-opus-high, background): WP1.5 verification-QA cell. It was
+  dispatched ~07:10Z as "Reviewer B" under the old fill. CHARC `2b6dae230aa9749a`: let it finish;
+  its results are QA EVIDENCE, NOT Reviewer B. Brief `docs/briefs/wp1.5-review-brief.md`
+  (`462e1f2`), head `97d40df`; outputs `work\wp1.5-B\`, evidence
+  `clearwater-review-evidence\wp1.5\B\` (my own Reviewer B goes in a separate folder).
+- **wp15-cell** (author) RETURNED ~07:05Z: head `97d40df`, depth 363K, recommends SIMPLE.
+  CHARC's pre-rulings were routed to it ~07:30Z with a HOLD: no edits until I send GO, after
+  wp15-revb returns (it reads the worktree). The GO carries wp15-revb's findings.
 - Branches `wp0.1`, `wp0.2`, `wp1.1` and `wp1.2` are kept on purpose: they hold the reviewed
   pre-rebase SHAs the accept records cite (verify: `git worktree list` shows main and wp1.5 only).
 
@@ -65,6 +67,13 @@ Each accepted package had its return report posted to CHARC and an info-update t
     `~/.claude/projects/C--Users-rwsmy-clearwater/<session>/subagents/agent-a<name>-*.jsonl`.
 - **Merging:** rebase in a `-mc` worktree, compare `git patch-id --stable`, gate there, then
   `git merge --ff-only` on main, `uv sync`, and re-gate (pytest, `-m gpu`, harness).
+- **Reviewer B = MY OWN single Codex pass at this seat on the merge candidate, NEVER a cell**
+  (owner catch 2026-10-15; fill corrected `30483f2`, Part 2 item 2).
+  - Evidence: `B/run_review_B.sh`, `B/review-prompt-B.md`, `B/review-B.txt`, with md5s.
+  - Every critical or major is dispositioned: introduced -> one remediation + one B re-run;
+    pre-existing -> banked.
+  - No transcript, no accept.
+  - A heavy mechanical reproduction may go to a sonnet-medium cell, as QA evidence only.
 - **Codex:**
   - WSL, codex-cli 0.162.1.
   - Every Codex prompt NAMES the withheld paths, and every transcript gets the
@@ -78,22 +87,26 @@ Each accepted package had its return report posted to CHARC and an info-update t
 
 ### Pending
 
-- Awaiting: WP1.5 Reviewer B. Then the `-mc` merge, the gate (footage test RUN) and the accept
-  record. Status posted to CHARC (07:10Z) with the open questions: the edit-list reading,
-  the REQUIRED class, D54 full range, and the `udta` repair.
-- CHARC pre-rulings `bdae7c6214ae1247`, to route to the author TOGETHER with B's findings, after B
-  returns (the author must not move HEAD while B reads the worktree):
-  1. MANDATORY = the VIDEO track's elst AS WRITTEN plus the presentation effect on every track.
-     The muxer-added identity edits on audio and data are BEST-EFFORT. `compare.py` needs a
-     MANDATORY "video elst as written" item; the report's reading 1 is to be revised.
-  2. The class label becomes "REQUIRED (D55/D114)"; a REQUIRED DIFFERENT weighs as MANDATORY.
-  3. D54: no conflict. The report gains a WP2.1 note: full range end to end; the 6.5 limited
-     default is the fallback only.
-  4. udta: CHARC banks the debt at the accept.
-  Then B2 checks the delta.
+- **WP1.5 sequence:**
+  1. wp15-revb returns.
+  2. GO to the author: the rulings plus the QA findings, ONE Reviewer A round on the delta.
+  3. `-mc` candidate.
+  4. MY Reviewer B: one STRONG Codex pass at this seat on the candidate.
+  5. Gate, merge, accept.
+- CHARC pre-rulings (`bdae7c6214ae1247`):
+  1. MANDATORY = the video elst AS WRITTEN plus the presentation effect on every track.
+     Muxer-added identity edits are BEST-EFFORT.
+  2. "REQUIRED (D55/D114)" weighs as MANDATORY.
+  3. D54: no conflict; the WP2.1 note says full range end to end.
+  4. udta: debt banked by CHARC at the accept.
+- **Retroactive Reviewer B** (CHARC `2b6dae230aa9749a`), AFTER the WP1.5 accept, not exclusive:
+  - one pass on main, cwd the main tree;
+  - input `git diff -U8 46a10b9..f6d998a -- tools/prototype tests/test_prototype_pipeline.py tests/test_prototype_backend.py`;
+  - findings dispositioned (introduced -> fix; pre-existing -> banked);
+  - an addendum to the wp1.1 and wp1.2 accept records names the transcript.
 - Gate hazard: the WP0.2 test `test_real_footage_has_one_row_per_media_file` fails while the
   SCUBA download runs (its footage snapshot changes). If it fails at the gate, show the cause
   and re-run after CHARC confirms the download is complete.
 - CHARC approved `_windows_power()` as instrument-only (never into `src/clearwater/` without a
   fresh ruling).
-- Inbox drained through msg `bdae7c6214ae1247` (verify: `uv run python scripts/role_mail.py list --role orchestrator`).
+- Inbox drained through msg `2b6dae230aa9749a` (verify: `uv run python scripts/role_mail.py list --role orchestrator`).
