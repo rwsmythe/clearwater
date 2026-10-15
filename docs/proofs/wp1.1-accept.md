@@ -79,3 +79,32 @@ The same five gates were also green on the merge candidate before the fast-forwa
 | `run.py` has no `# noqa: E402` (brief asked for it) | Accepted: ruff exempts imports after a `sys.path` change and would flag the suppression (RUF100); a comment explains it |
 | Additive: EXIF orientation, alpha drop, 16-bit grayscale read, `Params` validation, extra `Result`/`Weights` fields, `weights.json` | Accepted; checked against the brief by B |
 | B pass 1 Codex leg saw the withheld ledger | Process gap in my review brief (the Codex prompt must name withheld paths); B2 re-ran it clean. Fix carried into future review briefs |
+
+## Addendum 2026-10-15 -- retroactive Reviewer B (orchestrator seat)
+
+WP1.1's Reviewer B ran in the old cell form (fill corrected `30483f2`, owner catch). CHARC
+ordered (`2b6dae230aa9749a`) one retroactive seat-run pass over the prototype both packages own.
+- **Pass:**
+  - On main, cwd the main tree.
+  - Input `git diff -U8 46a10b9..f6d998a -- tools/prototype tests/test_prototype_pipeline.py tests/test_prototype_backend.py`.
+  - STRONG (gpt-5.6-sol / high), WSL.
+  - Evidence `C:\Users\rwsmy\clearwater-review-evidence\prototype-retroB\`.
+- **Transcript** `review-B.txt`: md5 `dd65ac31e179c06d7bb4782964045515`.
+- **Assertions:**
+  - the banner holds;
+  - `^ERROR` 0, and the `ERROR codex_core` hits are echoes only;
+  - footer 1;
+  - 25 `succeeded in` lines;
+  - the only withheld-path command is an exclusion glob.
+- **VERDICT:** `NEW_CRITICAL_MAJOR_FOUND`.
+- **Findings touching WP1.1's code:**
+  - **M2:** a finite spatial fraction whose derived sigma overflows gave a traceback. Introduced; FIXED in WP1.2R.
+  - **M3:** float64 scalar accumulators against spec 6.4 / D39. RULED option (a) by CHARC (`2b3066dac88ed847`): permitted, with the cast and the documentation conditions, which were carried out in WP1.2R.
+  - **M4:** 2x scale matching fails at or below a 128 px short side. Pre-ruled by the stated floor above; see the envelope note below.
+  - **m7:** no test made the blue gain cap bind. FIXED in WP1.2R.
+- **Re-run** on the WP1.2R candidate: see `docs/proofs/wp1.2r-accept.md` (transcript md5
+  `f1cc6cf8ae3da62a1b3765573320e7b7`; second block adjudicated at the gate; DR-19 banked).
+- **Envelope, formally narrowed (CHARC, M4):** WP1.1's declared envelope is "one image at a
+  time, short side ABOVE 128 px at the default parameters, up to a 48-megapixel photo or a 5.3K
+  frame". At or below 128 px, resolution independence at the defaults is not claimed (the
+  open-values report's stated floor).

@@ -102,3 +102,31 @@ candidate before the fast-forward.
 | `--note` and `--seed` options on `bench.py`; a supplementary device-resident timing | Additive; labelled as not the brief's figure. |
 | Stray PID 33616 (a hung `python -` from WP0.1 Reviewer B) | It was present during the CPU rows and GPU windows 1–2. Stopped about 05:20Z on the owner's direction. The GPU rows come from the clean window 3; the CPU rows are labelled. |
 | Orchestrator harness run overlapped the window-3 GPU 4K ancuti2018 cell (05:29:30–05:30:15Z) | That record was discarded and kept as `DISCARDED-overlapped-harness-run-...json.txt`, then re-run (0.389 s against 0.391 s). CHARC: the harness gate counts as heavy inside a bench window. |
+
+## Addendum 2026-10-15 -- retroactive Reviewer B (orchestrator seat)
+
+WP1.2 Part A's Reviewer B ran in the old cell form (fill corrected `30483f2`, owner catch). One
+retroactive seat-run pass covers WP1.1 and WP1.2A, because WP1.2A rewrote WP1.1's files (CHARC
+`2b6dae230aa9749a`).
+- **Pass:**
+  - On main.
+  - Input `git diff -U8 46a10b9..f6d998a -- tools/prototype tests/test_prototype_pipeline.py tests/test_prototype_backend.py`.
+  - STRONG, WSL.
+  - Evidence `C:\Users\rwsmy\clearwater-review-evidence\prototype-retroB\`.
+- **Transcript** `review-B.txt`: md5 `dd65ac31e179c06d7bb4782964045515`.
+- **Assertions:**
+  - the banner holds;
+  - `^ERROR` 0;
+  - footer 1;
+  - 25 `succeeded in` lines;
+  - the pass is valid.
+- **VERDICT:** `NEW_CRITICAL_MAJOR_FOUND`.
+- **Findings touching WP1.2A's code:**
+  - **M1:** `select_backend("auto")` raised on a non-ImportError CuPy import failure. Introduced; FIXED in WP1.2R.
+  - **M3:** the backends' shared float64 reductions. RULED option (a); the "same accumulator dtype on both backends" condition is shown and tested in WP1.2R.
+  - **m5:** RSS "peak" is a 50 ms sample, 4-9 MiB under the OS peak. The report was reworded in WP1.2R; no figure changed.
+  - **m6:** the transfer guard cannot see `ndarray.get()`/`set()`. Already recorded above; no action.
+- **Also from the pass:** all eight bench rows, the budget divisions, the proxy tables and the estimate ratios match their JSON records.
+- **Re-run** on the WP1.2R candidate: `docs/proofs/wp1.2r-accept.md` (transcript md5
+  `f1cc6cf8ae3da62a1b3765573320e7b7`). The timed path and every figure are unchanged: the
+  bit-identity witness there covers both backends.
