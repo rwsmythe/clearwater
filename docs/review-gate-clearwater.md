@@ -72,15 +72,47 @@ identity arc may substitute independent verification with the reason stated in
 the brief.
 
 1. **Reviewer A** -- the cell's loop above, converged, with the ledger.
-2. **Reviewer B** -- the plan's **independent review** (section 4.5 item 7): an
-   implementer cell that did NOT write the package reviews it against the brief
-   and the spec clauses, never against the author's report, on the finished tree
-   (whole-artifact, repo-access, Codex at the same tier as its instrument). B
-   checks the artifact's own top-level claims FIRST, measured end to end against
-   the running code, before any code-level lens. B's prompt is built neutrally,
-   never from the author's "areas worth pointing it at". Findings go back through
-   the author's verification loop; B's transcript on the tree being merged is part
-   of the accept record.
+2. **Reviewer B** -- the plan's **independent review** (section 4.5 item 7):
+   **ONE Codex pass the ORCHESTRATOR RUNS ITSELF, at its own seat, on the merge
+   candidate** (`docs/orchestrator-context.md`, "Reviewer B -- YOUR single-pass
+   adversarial gate at YOUR seat"; the same shape as the coa-chess and
+   swing-trading harnesses). It is NOT an implementer cell. *(Corrected 2026-10-15
+   on the owner's catch: the first fill text made B a subagent cell; WP1.1, WP1.2A
+   and WP1.5's first B ran in that form. See the accept records for the
+   retroactive pass.)* Shape:
+   - **Tier:** the package's tier (STRONG for product-bearing results), the pinned
+     WSL transport, per-call flags, probe and the five mechanical assertions
+     exactly as Part 1; stdout and stderr split; a done marker written last. The
+     run script and prompt are kept in the evidence folder (`B/run_review_B.sh`,
+     `B/review-prompt-B.md`, `B/review-B.txt`).
+   - **Product:** whole-artifact. cwd = the worktree at the merge candidate (Codex
+     may read any file); appended input = `git diff -U8 <base>..<candidate> --
+     <owned paths> ':!uv.lock' ':!docs/proofs'`. The ledger and the author's report
+     are WITHHELD and named as withheld in the prompt, with the access assertion.
+   - **Prompt:** built by the orchestrator, neutrally, never from the author's
+     "areas worth pointing it at": the contract (the brief's claim list and the
+     spec clauses, by path), the envelope with the TAG request, lenses that ask
+     for every control that can fail and every sentence the code makes false, and
+     the EXECUTED/REASONED paragraph verbatim from `docs/codex-reviewer.md`.
+   - **Claims first:** the prompt lists the brief's REQUIRED END STATE and asks
+     Codex to check those claims against the running code before any code-level
+     lens (`CLAIMS_FIRST`).
+   - **Disposition:** B is not required to return clean. Every critical or major
+     is DISPOSITIONED: introduced by this package -> ONE bounded remediation
+     through the author's loop and ONE re-run of B; pre-existing or out of
+     envelope -> BANKED in `docs/debt-register.md` with file:line, mechanism and
+     reachability. A second blocking B is adjudicated by irreversibility at the
+     gate seat, never a third remediation in the same package.
+   - **Record:** B's transcript on THE TREE BEING MERGED (path, md5, the five
+     assertion results, verdict) is named in the accept record. No transcript, no
+     accept.
+
+   The orchestrator's own **verification QA** is the separate half of the gate
+   (`orchestrator-context.md`: "plus your verification QA"): the claims re-run at
+   its seat, the GATE_CHECKS below and the WITNESS. A heavy MECHANICAL reproduction
+   (a bench matrix, a real-footage compare) MAY be delegated to an
+   `implementer-sonnet-medium` cell as an instrument with a fixed recipe; that is
+   QA evidence, never Reviewer B.
 
 `GATE_CHECKS` (the orchestrator runs every one at its own seat, on the merge
 candidate rebased onto main, and records the actual output lines):
