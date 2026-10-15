@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import dataclasses
+import importlib
 import json
 import logging
 import subprocess
@@ -585,4 +586,26 @@ def test_auto_falls_back_when_cupyx_does_not_import(
     assert backend.name == "cpu"
     assert "cupyx.scipy.ndimage did not import" in backend.reason
     with pytest.raises(RuntimeError, match="cupyx"):
+        select_backend("gpu")
+
+
+def test_auto_falls_back_when_cupy_fails_to_initialise(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    """An installed CuPy whose import raises something other than ImportError (WP1.2R M1)."""
+    real_import = importlib.import_module
+
+    def import_module(name: str, *args: Any, **kwargs: Any) -> Any:
+        if name == "cupy":
+            raise OSError("DLL load failed while importing cuda")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(importlib, "import_module", import_module)
+    with caplog.at_level(logging.INFO, logger="prototype.backend"):
+        backend = select_backend("auto")
+    assert backend.name == "cpu"
+    assert backend.xp is np
+    assert "DLL load failed while importing cuda" in backend.reason
+    assert backend.reason in caplog.text
+    with pytest.raises(RuntimeError, match="DLL load failed"):
         select_backend("gpu")

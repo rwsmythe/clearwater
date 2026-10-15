@@ -199,6 +199,8 @@ def _probe_gpu() -> tuple[Backend | None, str]:
         cupy = importlib.import_module("cupy")
     except ImportError as exc:
         return None, f"cupy is not installed ({_one_line(exc)})"
+    except Exception as exc:  # an installed CuPy that fails to initialise (a DLL, a driver)
+        return None, f"cupy failed to import ({type(exc).__name__}: {_one_line(exc)})"
     try:
         count = int(cupy.cuda.runtime.getDeviceCount())
     except Exception as exc:  # any CUDA runtime failure means "not usable"
