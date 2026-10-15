@@ -66,4 +66,4 @@
 - Lesson carried forward: every Reviewer B brief's Codex prompt must NAME the withheld paths in
   its own paragraph, plus a transcript `grep -a 'docs/proofs\|<wp>-ledger'` access assertion
   (WP1.1 B pass 1 Codex read the ledger).
-- Inbox drained through msg `22f68342748b43f2` (ctk extra STANDS; report must say whether plain cupy sufficed -- relayed to cell, check on return) (verify: `uv run python scripts/role_mail.py list --role orchestrator`).
+- Inbox drained through msg `4db6db642c117b1e` (WP1.2A STOP ruled: F1 Option A + near-flat 1e-4/1e-5 test; F2 cpu default; deviations accepted; DR-14). Cell resumed.
