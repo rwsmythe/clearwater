@@ -58,7 +58,16 @@ path, md5, five assertions and verdict, or there is no accept.
   tests/test_prototype_pipeline.py tests/test_prototype_backend.py`; not exclusive;
   introduced crit/major -> a NAMED bounded remediation package (not folded into Part B),
   else banked; addenda to `docs/proofs/wp1.1-accept.md` AND `wp1.2-accept.md`.
-  Verify: the addenda exist; orchestrator inbox / charc inbox.
+  **Result 09:41Z: BLOCKING** (M1 `_probe_gpu` catches only ImportError; M2 derived sigma
+  overflow gives a traceback; M3 float64 scalar accumulators vs spec 6.4; M4 128 px floor
+  rejected as pre-ruled; m5-m7 minors). **CHARC RULED 09:42Z: M3 = option (a)** -- 6.4/D39
+  governs image data and per-pixel ops; scalar reductions may accumulate in float64 if cast
+  to float32 before use, same dtype on both backends, documented in open-values and
+  docstrings; interpretation note, not a spec change (read back to the owner).
+  **WP1.2R CONFIRMED** (prototype remediation; implementer-sonnet-high; STRONG; M1, M2, m5,
+  m7 + M3 record; one A round, one seat B; not exclusive; worktree `.worktrees/wp1.2r`).
+  Addenda (both transcripts), the M4 envelope note and DR-18 land in one commit after the
+  WP1.2R accept. Verify: `git worktree list`; `docs/proofs/wp1.2r-ledger.md`; the addenda.
 - **Real-inventory mechanical pass** (implementer-sonnet-medium, no code: `uv run python
   tools/inventory.py` with the main-tree local config; report counts, modes, chaptered
   recordings, LRV coverage, error rows, uncovered GoPro names): QUEUED; dispatch ONLY on
