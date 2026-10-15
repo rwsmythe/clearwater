@@ -54,19 +54,23 @@ def _synthetic(
     rotation: str | None = None,
     b_frames: bool = False,
     timecode: bool = False,
+    codec: str = "libx265",
 ) -> Path:
-    """2 s testsrc2 + sine, 30 fps, yuv420p H.264 + AAC, start offset ``offset`` seconds.
+    """2 s testsrc2 + sine, 30 fps, yuv420p HEVC (or ``codec``) + AAC, start ``offset`` s.
 
-    The colour tags are set (BT.709, limited range, the D54 assumption): an untagged
-    source re-encoded by libx265 gains a ``tv`` range tag, which the spike records
-    separately. Without ``b_frames`` the clip has no B-frames (``-bf 0``), the GoPro
-    chapters' shape, so its video edit list carries no reorder shift; with them, libx264
-    writes its reorder delay into the video edit list's media_time. ``timecode`` adds a
-    ``tmcd`` data track, which starts at 0 whatever the offset.
+    HEVC in MP4 is what spec 8.2 requires of an output, so a clip compared with itself
+    is all SAME. The colour tags are set (BT.709, limited range, the D54 assumption):
+    an untagged source re-encoded by libx265 gains a ``tv`` range tag, which the spike
+    records separately. Without ``b_frames`` the clip has no B-frames (``-bf 0``), the
+    GoPro chapters' shape, so its video edit list carries no reorder shift; with them
+    (and ``codec="libx264"``), libx264 writes its reorder delay into the video edit
+    list's media_time. ``timecode`` adds a ``tmcd`` data track, which starts at 0
+    whatever the offset.
     """
     filters = ["-vf", video_filter, "-fps_mode", "passthrough"] if video_filter else []
     filters += [] if b_frames else ["-bf", "0"]
     filters += ["-timecode", "01:00:00:00"] if timecode else []
+    filters += ["-x265-params", "log-level=error"] if codec == "libx265" else []
     _ffmpeg(
         folders,
         path,
@@ -80,7 +84,7 @@ def _synthetic(
         "sine=frequency=440:sample_rate=48000:duration=2",
         *filters,
         "-c:v",
-        "libx264",
+        codec,
         "-pix_fmt",
         "yuv420p",
         "-color_primaries",
@@ -101,6 +105,11 @@ def _synthetic(
         _ffmpeg(folders, rotated, "-display_rotation", rotation, "-i", str(path), "-c", "copy")
         return rotated
     return path
+
+
+CODEC_ITEM = "output video codec (8.2 requires HEVC)"
+CONTAINER_ITEM = "output container (8.2 requires MP4)"
+FORMAT_START_ITEM = "start offset: container start_time (ffprobe format, as printed)"
 
 
 def _items(record: dict[str, Any]) -> dict[str, dict[str, Any]]:
@@ -126,16 +135,22 @@ def clips(folders: tuple[Path, Path]) -> dict[str, Path]:
     """The synthetic sources, written under the test spike folder like every other output."""
     root = folders[0] / "clips"
     root.mkdir()
-    return {
+    clips = {
         "base": _synthetic(folders, root / "base.mp4"),
         "shifted": _synthetic(folders, root / "shifted.mp4", offset="0.25"),
         # Frames 10-14 dropped with their timestamps kept: a variable-frame-rate gap.
         "vfr": _synthetic(folders, root / "vfr.mp4", video_filter="select='not(between(n,10,14))'"),
         "rotated": _synthetic(folders, root / "rot.mp4", rotation="90"),
-        "bframes": _synthetic(folders, root / "bframes.mp4", b_frames=True),
+        "bframes": _synthetic(folders, root / "bframes.mp4", b_frames=True, codec="libx264"),
         "timecode": _synthetic(folders, root / "tc.mp4", timecode=True),
         "timecode_shifted": _synthetic(folders, root / "tc-shifted.mp4", "0.25", timecode=True),
+        # The base clip as H.264: every timing, colour and format item as the base.
+        "h264": _synthetic(folders, root / "h264.mp4", codec="libx264"),
     }
+    # The base clip's streams copied into a QuickTime container.
+    clips["mov"] = root / "base.mov"
+    _ffmpeg(folders, clips["mov"], "-i", str(clips["base"]), "-map", "0", "-c", "copy")
+    return clips
 
 
 @pytest.fixture(scope="module")
@@ -184,6 +199,12 @@ class TestReencodedSynthetic:
         assert {item["class"] for item in _different(record)} <= {BEST_EFFORT}
         assert record["summary"]["mandatory_and_required_all_same"] is True
         assert record["info"]["output"]["codec"] == "hevc"
+        for name in (CODEC_ITEM, CONTAINER_ITEM):
+            assert (items[name]["class"], items[name]["status"]) == (REQUIRED, SAME), name
+        assert (items[FORMAT_START_ITEM]["class"], items[FORMAT_START_ITEM]["status"]) == (
+            MANDATORY,
+            SAME,
+        )
         assert (
             items["edit list, video track, as written (media_time in media seconds)"]["status"]
             == SAME
@@ -240,10 +261,49 @@ class TestMandatoryDifferences:
             "start offset: first video frame pts",
             "start offset: video and audio stream start_pts",
             "start offset: container start over video and audio (earliest start, exact)",
+            FORMAT_START_ITEM,
         ):
             assert items[name]["status"] == DIFFERENT, name
             assert items[name]["class"] == MANDATORY
         assert record["summary"]["mandatory_all_same"] is False
+
+    def test_format_start_time_is_compared_as_ffprobe_prints_it(
+        self, clips: dict[str, Path]
+    ) -> None:
+        # Reviewer B's probe: the stream start_pts agree, the format start_time does not.
+        facts = compare.gather(clips["base"])
+        moved = dataclasses.replace(
+            facts, probe={**facts.probe, "format": {**facts.probe["format"], "start_time": "9.0"}}
+        )
+        items = _items(compare.build_record(facts, moved, compare.compare_facts(facts, moved)))
+        start = items[FORMAT_START_ITEM]
+        assert (start["class"], start["status"]) == (MANDATORY, DIFFERENT)
+        assert (start["source"], start["output"]) == (facts.probe["format"]["start_time"], "9.0")
+        derived = "start offset: container start over video and audio (earliest start, exact)"
+        assert items[derived]["status"] == SAME
+
+    def test_an_h264_output_is_required_different(self, clips: dict[str, Path]) -> None:
+        record = compare.compare_files(clips["base"], clips["h264"])
+        codec = _items(record)[CODEC_ITEM]
+        assert (codec["class"], codec["status"]) == (REQUIRED, DIFFERENT)
+        assert (codec["source"], codec["output"]) == ("hevc", "h264")
+        assert record["summary"]["different_items"][REQUIRED] == [CODEC_ITEM]
+        assert record["summary"]["different_items"][MANDATORY] == []
+        assert record["summary"]["mandatory_and_required_all_same"] is False
+
+    def test_an_hevc_output_from_an_h264_source_meets_the_codec_requirement(
+        self, clips: dict[str, Path]
+    ) -> None:
+        codec = _items(compare.compare_files(clips["h264"], clips["base"]))[CODEC_ITEM]
+        assert (codec["source"], codec["output"], codec["status"]) == ("h264", "hevc", SAME)
+
+    def test_a_quicktime_output_is_required_different(self, clips: dict[str, Path]) -> None:
+        record = compare.compare_files(clips["base"], clips["mov"])
+        container = _items(record)[CONTAINER_ITEM]
+        assert (container["class"], container["status"]) == (REQUIRED, DIFFERENT)
+        assert container["source"] == "MP4 (ISO BMFF)"
+        assert container["output"].startswith("QuickTime")
+        assert record["summary"]["mandatory_and_required_all_same"] is False
 
     def test_shifted_start_with_a_data_track_at_zero_is_mandatory_different(
         self, clips: dict[str, Path]

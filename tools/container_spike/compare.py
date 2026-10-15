@@ -8,26 +8,29 @@ Both files are read only. The facts come from two places: ``ffprobe`` (FFmpeg as
 separate process) for the streams, the decoded per-frame presentation timestamps and the
 per-packet data hashes; and an ISO base media box walker for what ``ffprobe`` does not
 show (the raw edit lists, the track header matrices, the ``mvhd`` creation time, the
-sample entry boxes and the camera's ``moov/udta`` atoms). Every timing value is an exact
-rational number of seconds (``Fraction``); no timestamp comparison is rounded or sampled.
+sample entry boxes and the camera's ``moov/udta`` atoms). Every timestamp the
+comparison derives from tick counts (pts, durations, starts, edit lists) is an exact
+rational number of seconds (``Fraction``), and no timestamp comparison is rounded or
+sampled; the two values ``ffprobe`` prints only as microsecond text (the format
+``start_time`` and ``duration``) are compared as printed.
 
 Each item carries a class:
 
 * ``MANDATORY`` (D94, D95, D105, section 7.5): the full sequence of per-frame
   presentation timestamps, frame count, video stream duration, start offset (over the
-  video and audio tracks), the video track's edit list as written, the edit lists of
-  the video and audio tracks judged by their presentation effect, audio present, passed
-  through and in sync, and display orientation. A frame's presentation
-  duration is the step to the next timestamp (the last frame ends at the stream
-  duration); the per-frame ``duration`` that ``ffprobe`` prints is the packet's decode
-  delta, which follows decode order and moves with the encoder's B-frame structure, so
-  it is not compared.
-* ``REQUIRED (D55/D114)`` (D55, D114, section 8.2): colour tags and range, pixel
-  format, chroma subsampling, bit depth and frame geometry: a spec "must" outside D105's
-  list. These are set by encoder options in every approach, so they do not separate the
-  three approaches, but a REQUIRED item DIFFERENT weighs as MANDATORY: the summary's
-  ``mandatory_and_required_all_same`` is the field a recommendation reads, while
-  ``mandatory_all_same`` covers D105's class alone.
+  video and audio tracks, and the format ``start_time``), the video track's edit list
+  as written, the edit lists of the video and audio tracks judged by their presentation
+  effect, audio present, passed through and in sync, and display orientation. A
+  frame's presentation duration is the step to the next timestamp (the last frame ends
+  at the stream duration); the per-frame ``duration`` that ``ffprobe`` prints is the
+  packet's decode delta, which follows decode order and moves with the encoder's
+  B-frame structure, so it is not compared.
+* ``REQUIRED (D55/D114)`` (D55, D114, section 8.2): the output format (the output's
+  video codec is HEVC and its container MP4, output requirements whose status does not
+  depend on the source), colour tags and range, pixel format, chroma subsampling, bit
+  depth and frame geometry: spec "musts" outside D105's list. A REQUIRED item DIFFERENT
+  weighs as MANDATORY: the summary's ``mandatory_and_required_all_same`` is the field a
+  recommendation reads, while ``mandatory_all_same`` covers D105's class alone.
 * ``BEST-EFFORT`` (D105, section 8.2): creation time, the GPMF and timecode tracks, the
   camera atoms, the non-video tracks' edit lists as written, the start over all tracks
   including data, and other tags.
@@ -73,8 +76,12 @@ SAME = "SAME"
 DIFFERENT = "DIFFERENT"
 SPIKE_SUBDIR = "wp1.5"
 FFPROBE_TIMEOUT_SECONDS = 3600.0
+MP4_CONTAINER = "MP4 (ISO BMFF)"
+OUTPUT_CODEC = "hevc"
 _MOOV_MAX_BYTES = 256 * 1024 * 1024
 _CELL_MAX_CHARS = 90
+# ftyp brands that declare ISO base media / MP4 conformance (ISO/IEC 14496-12, -14).
+_MP4_BRANDS = frozenset({"isom", *(f"iso{n}" for n in range(2, 10)), "mp41", "mp42"})
 # Box types whose payload is only child boxes (descended by the walker).
 _CONTAINER_BOXES = frozenset({"moov", "trak", "mdia", "minf", "stbl", "edts", "dinf"})
 # A VisualSampleEntry's fixed fields before its child boxes (ISO/IEC 14496-12 12.1.3).
@@ -999,8 +1006,9 @@ def _edit_item(
 def _container_start(facts: Facts, codec_types: Sequence[str] | None) -> str | None:
     """Return the earliest start (``start_pts`` x time base) over the given stream types, exact.
 
-    With ``codec_types`` None every stream counts: ffprobe's container ``start_time`` in
-    exact form.
+    With ``codec_types`` None every stream counts, data and subtitle streams included.
+    This is derived from the streams; the ``format.start_time`` that ``ffprobe`` prints
+    is not read here.
     """
     starts = [
         start
@@ -1010,6 +1018,40 @@ def _container_start(facts: Facts, codec_types: Sequence[str] | None) -> str | N
         and (start := _ticks(s.get("start_pts"), _time_base(s))) is not None
     ]
     return exact(min(starts)) if starts else None
+
+
+def container_kind(movie: Movie) -> str:
+    """Name the container from its ``ftyp`` brands: MP4, QuickTime or another ISO BMFF.
+
+    A file whose major brand is QuickTime's ``qt  `` is QuickTime. Otherwise a file
+    that declares an ISO base media or MP4 brand (``isom``, ``iso2``-``iso9``, ``mp41``,
+    ``mp42``) as its major or a compatible brand is MP4 (spec 8.2's output format).
+
+    Args:
+        movie: The box walker's reading (it has a ``moov`` box, so it is ISO BMFF).
+
+    Returns:
+        ``"MP4 (ISO BMFF)"``, ``"QuickTime (qt)"`` or a description naming the major
+        brand.
+    """
+    brands = {movie.major_brand, *movie.compatible_brands}
+    if movie.major_brand == "qt  ":
+        return "QuickTime (qt)"
+    if brands & _MP4_BRANDS:
+        return MP4_CONTAINER
+    return f"ISO BMFF, major brand {movie.major_brand or '(no ftyp)'!r}"
+
+
+def _requirement_item(
+    name: str, clause: str, source: Any, output: Any, required: Any, note: str
+) -> Item:
+    """An output requirement: the status compares the output with ``required``.
+
+    The source value is recorded beside it for reference only; the source may lawfully
+    differ (for example an H.264 source whose output must be HEVC).
+    """
+    status = SAME if output == required else DIFFERENT
+    return Item(name, REQUIRED, clause, source, output, status, note)
 
 
 def _keyed_packet_items(
@@ -1115,6 +1157,16 @@ def compare_facts(source: Facts, output: Facts) -> list[Item]:
             _container_start(output, ("video", "audio")),
         )
     )
+    items.append(
+        _item(
+            "start offset: container start_time (ffprobe format, as printed)",
+            MANDATORY,
+            "D94, D105, 7.5",
+            dict(source.probe.get("format") or {}).get("start_time"),
+            dict(output.probe.get("format") or {}).get("start_time"),
+            note="ffprobe prints it in microseconds; compared as text",
+        )
+    )
 
     # MANDATORY: the video track's edit list as written, and the presentation effect of the
     # video and audio tracks' edit lists.
@@ -1155,6 +1207,7 @@ def compare_facts(source: Facts, output: Facts) -> list[Item]:
             "D105, 7.5",
             audio_layout(source),
             audio_layout(output),
+            note="tests preservation: SAME also when neither file has audio",
         )
     )
     items.extend(
@@ -1215,7 +1268,27 @@ def compare_facts(source: Facts, output: Facts) -> list[Item]:
         )
     )
 
-    # REQUIRED: colour tags, pixel format, geometry.
+    # REQUIRED: the output format (8.2), then colour tags, pixel format, geometry.
+    items.append(
+        _requirement_item(
+            "output video codec (8.2 requires HEVC)",
+            "8.2",
+            src_video.get("codec_name"),
+            out_video.get("codec_name"),
+            OUTPUT_CODEC,
+            "output requirement: the output must be hevc; the source value is for reference",
+        )
+    )
+    items.append(
+        _requirement_item(
+            "output container (8.2 requires MP4)",
+            "8.2",
+            container_kind(source.movie),
+            container_kind(output.movie),
+            MP4_CONTAINER,
+            "output requirement, from the ftyp brands; the source value is for reference",
+        )
+    )
     for field, label, clause in (
         ("color_primaries", "colour primaries", "D55, 6.5"),
         ("color_transfer", "colour transfer", "D55, 6.5"),
@@ -1425,7 +1498,7 @@ def compare_facts(source: Facts, output: Facts) -> list[Item]:
             best,
             _container_start(source, None),
             _container_start(output, None),
-            note="includes data tracks; ffprobe's container start_time in exact form",
+            note="includes data tracks; derived from every stream's start_pts, exact",
         )
     )
     items.append(
