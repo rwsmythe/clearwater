@@ -1,7 +1,8 @@
-# WP1.4 — Noise and statistics experiments, shallow part (dispatch brief, DRAFT by CHARC)
+# WP1.4 — Noise and statistics experiments, shallow part (dispatch brief, FINAL)
 
-**Status:** DRAFT by CHARC 2026-10-15 for the orchestrator to finalise and dispatch AFTER
-WP1.3 merges (it imports WP1.3's `tools/lookcheck/frames.py`). Spec **v0.5.2**. Released on
+**Status:** FINAL, issued by the orchestrator 2026-10-15 from CHARC's draft (`03a6904`) on
+CHARC's commission `0fd7c88ad56a7083`, after WP1.3 merged (it imports WP1.3's
+`tools/lookcheck/frames.py`). Spec **v0.5.2**. Released on
 the owner's partial CP1 ("shallow confirmed", 2026-10-15; `docs/proofs/cp1-footage-sorting.md`).
 Cell: `implementer-opus-high` (the mismatch measure, the smoothing comparison and the
 robust-statistics study are reasoning-dense). Worktree `.worktrees/wp1.4`, branch `wp1.4`,
@@ -100,6 +101,60 @@ statistics for normalization bounds" and "Stage definitions per compensation met
 - **Outputs.** `work/wp1.4/` only; nothing large committed; the report cites paths.
 - **ffmpeg invocation** as WP1.3: inside `work/wp1.4/` only, with the output-path assertion.
 
+## Decisions fixed at issue (orchestrator)
+
+- **Local configuration in the worktree.**
+  - `tools/local_config.py` reads `<repo root>/clearwater.local.toml`. That file is
+    uncommitted and gitignored.
+  - The orchestrator copies it into the worktree root at creation. Its paths are absolute:
+    footage `C:\Users\rwsmy\clearwater-footage`, working `C:\Users\rwsmy\clearwater\work`.
+  - So the `footage` tests RUN in the worktree, and `work/wp1.4/` means the MAIN tree's
+    `C:\Users\rwsmy\clearwater\work\wp1.4\`.
+  - Never edit or commit that file.
+- **FFmpeg on PATH.** Prepend `/c/Users/rwsmy/AppData/Local/Microsoft/WinGet/Links` for every
+  ffmpeg, ffprobe and pytest run. Without it the module skip hides the tests, and a skip at the
+  gate fails claim 7.
+- **Reuse WP1.3's instrument as built; do not edit `tools/lookcheck/`.** It is WP1.3's, and
+  is not in this package's owned files. If it needs a change, STOP.
+  - **Output roots.** `frames.extract`/`frames.excerpt` default `roots` to `work/wp1.3/`. Pass
+    `roots=OutputRoots.from_config(subdir="wp1.4")` on EVERY call. Every write and delete in
+    the runner goes through `roots.check(...)` or an equivalent checked writer: the resolved
+    path is inside `work/wp1.4/` and outside the footage folder, and an existing target with
+    more than one hard link is refused. `FFREPORT` is stripped (`frames.tool_env()`).
+  - **The first excerpt** is WP1.3's: `GX011627.MP4`,
+    `frames.excerpt(video, 0.30 * duration, 6.0, ...)`. The duration is the probed stream
+    duration, 22.7227 s. That gives 180 frames, pts ticks 205205..384384 at 1/30000, step 1001.
+    Assert the ticks you get equal these; a mismatch is a STOP.
+  - **Record keys.** `excerpt` returns `FrameFile` objects (`path`, `pts_ticks`, `time_base`,
+    `pts` as a `Fraction`, `tags`, ...). Their JSON form `record()` uses different keys:
+    `file`, `pts_exact` and `time_base` as strings, and `pts_seconds`. The WP1.3 report's
+    section 2 is corrected to say so (erratum at the gate).
+  - **Reading frames.** Use `frames.read_png16` (Pillow reads 16-bit RGB at 8-bit).
+  - **Encoding and verification.** Use `tools.lookcheck.pack`'s `encode_command`, `encode_clip`
+    and `verify_clip` (NVENC, `setparams` for primaries and transfer, the WP1.3 checks), or
+    mirror them and say which. A clip reported as `yuvj420p` is the full-range 8-bit 4:2:0 the
+    brief means by `yuv420p` with `pc` tags.
+- **D54's fallback is NOT implemented in the extraction path, and is not yours to implement.**
+  WP1.3's `frames` takes an untagged `yuvj` stream as full range and gives direct callers no
+  warning. This is banked as DR-20, owned by WP3.5. The shallow chapters are fully tagged, so
+  record the tags you read and do not re-implement the fallback.
+- **The proxy is an AREA average computed in NumPy from the full-resolution 16-bit frame.**
+  - 3840x2160 to 960x540 is an exact 4x4 block mean.
+  - Do NOT use `frames.excerpt(short_side=...)` for the proxy: FFmpeg's scaler there uses its
+    default (bicubic) method, which is not the 7.3 area average.
+  - State the proxy construction in the report.
+- **Disk.** C: has about 164 GB free; WP1.3's pack holds 3.7 GB.
+  - The full-resolution PNG sets of both excerpts (source and every rendered version, about
+    25-50 MB per frame) MAY be deleted once the MP4s that use them are encoded and verified.
+  - Keep the first, middle and last frame of each set, and every statistics JSON.
+- **The `pipeline.py` hook.** WP1.2R's accepted `correct()` is on main. At the gate I re-run
+  WP1.2R's bit-identity witness (Ancuti blue off and on, and 3C; CPU and GPU) with
+  `statistics=None`, so any drift in the default path fails the accept.
+- **Spec version:** **v0.5.2** (`docs/underwater-correction-spec.md` on main).
+- **Never `git stash`** in the worktree: the stash stack is shared across sessions. Use a
+  temporary commit, or a copy in your scratchpad, for red/green checks.
+- **Commit footer:** `Co-Authored-By:` naming the model you actually run as.
+
 ## Declared operating envelope
 
 Windows 11, FFmpeg 9.0.2, the shallow HERO13 chapters (HEVC 8-bit, BT.709 full range,
@@ -112,7 +167,30 @@ and any default change are out of envelope.
 - Tier **STRONG** (touches `tools/prototype/pipeline.py`; the result decides D98 and the
   smoothing design). Transport, flags, probe, diff, prompt, per-round assertions, evidence
   `clearwater-review-evidence/wp1.4/rN/`, ledger `docs/proofs/wp1.4-ledger.md`, exactly as the
-  WP1.5 brief states them with `wp1.4` substituted.
+  WP1.5 brief states them with `wp1.4` substituted. Spelled out, so nothing hangs on that
+  cross-reference:
+  - **Transport and flags:** WSL, codex-cli 0.162.1. Per-call flags
+    `-m gpt-5.6-sol -c model_reasoning_effort=high -s read-only --skip-git-repo-check`.
+  - **Probe:** run one probe through the exact invocation before round 1.
+  - **Diff:** generated Windows-side with
+    `git -C <worktree> diff -U8 <base>..HEAD -- . ':!uv.lock' ':!docs/proofs'`; WSL never runs
+    git.
+  - **The prompt** includes the claim list, the envelope with a request to TAG
+    out-of-envelope findings, and the report. It carries the EXECUTED/REASONED paragraph
+    verbatim from `docs/codex-reviewer.md`, and its own paragraph: "Do NOT read
+    `docs/proofs/` or anything under `clearwater-review-evidence`; those are withheld. Never
+    read or list `/mnt/c/Users/rwsmy/clearwater-footage`." The records under
+    `/mnt/c/Users/rwsmy/clearwater/work/wp1.4/` MAY be read.
+  - **Assertions** (all `grep -a`):
+    - the banner reads gpt-5.6-sol / high;
+    - every `^ERROR` and `ERROR codex_core` line is classified by provenance;
+    - the `^tokens used` footer is present;
+    - an anchored VERDICT line;
+    - at least one `^ succeeded in`;
+    - `grep -a -n 'docs/proofs\|wp1.4-ledger'`, with every hit classified as an echo or an
+      access.
+  - **Convergence:** zero NEW in-envelope blocking findings. Minors are fixed once in that
+    round's cleanup. FIVE_ROUND_GATE.
 - WHAT TO EXAMINE: whether the hook is identity-preserving on both devices; whether STAGED
   really re-measures each stage on frames corrected with the SMOOTHED earlier stages (not the
   raw ones), and FLAT really measures everything on the raw frame; whether the filters are
