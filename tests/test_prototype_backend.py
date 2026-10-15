@@ -13,10 +13,10 @@ import numpy as np
 import pytest
 from scipy import ndimage
 
-from prototype import bench, pipeline
+from prototype import bench, pipeline, run
 from prototype.backend import CPU, memory_estimate_bytes, of, select_backend
 from prototype.params import Params
-from test_prototype_pipeline import _synthetic, _textured_scene
+from test_prototype_pipeline import _synthetic, _textured_scene, _write_input
 
 _AUTO = select_backend("auto")
 requires_gpu = pytest.mark.skipif(
@@ -26,6 +26,9 @@ requires_gpu = pytest.mark.skipif(
 # CPU versus GPU agreement of correct() outputs (brief, fixed at issue): float32.
 AGREEMENT_MAX_ABS = 2e-5
 AGREEMENT_MEAN_ABS = 2e-6
+# The near-flat WP1.1 `_synthetic` pair (CHARC ruling on finding 1): its own bound.
+NEAR_FLAT_MAX_ABS = 1e-4
+NEAR_FLAT_MEAN_ABS = 1e-5
 
 METHODS = ["ancuti2018", "c3"]
 
@@ -166,27 +169,45 @@ def test_memory_estimate_is_monotone_in_pixel_count_and_positive() -> None:
 # --- GPU --------------------------------------------------------------------------------
 
 
-def _agreement_images() -> list[tuple[str, np.ndarray]]:
-    return [
-        ("64x96", _synthetic(64, 96)),
-        ("97x65", _synthetic(97, 65)),
-        ("1024x1536", _textured_scene(1024, 1536)),
-    ]
+def _output_difference(image: np.ndarray, method: str) -> np.ndarray:
+    """|CPU output - GPU output| of correct() with the default Params of ``method``."""
+    params = Params(method=method)  # type: ignore[arg-type]
+    cpu_out = pipeline.correct(image, params).output
+    gpu_out = pipeline.correct(image, params, select_backend("gpu")).output
+    assert type(gpu_out) is np.ndarray
+    return np.abs(cpu_out.astype(np.float64) - gpu_out)
 
 
 @pytest.mark.gpu
 @requires_gpu
 @pytest.mark.parametrize("method", METHODS)
-def test_gpu_output_agrees_with_cpu(method: str) -> None:
-    gpu = select_backend("gpu")
-    params = Params(method=method)  # type: ignore[arg-type]
-    for name, image in _agreement_images():
-        cpu_out = pipeline.correct(image, params).output
-        gpu_out = pipeline.correct(image, params, gpu).output
-        assert type(gpu_out) is np.ndarray
-        difference = np.abs(cpu_out.astype(np.float64) - gpu_out)
-        assert difference.max() <= AGREEMENT_MAX_ABS, (name, float(difference.max()))
-        assert difference.mean() <= AGREEMENT_MEAN_ABS, (name, float(difference.mean()))
+@pytest.mark.parametrize("size", [(64, 96), (97, 65), (1024, 1536)])
+def test_gpu_output_agrees_with_cpu(size: tuple[int, int], method: str) -> None:
+    """The fixed tolerance, on WP1.1's textured scene at the two WP1.1 sizes and 1024 px."""
+    difference = _output_difference(_textured_scene(*size), method)
+    assert difference.max() <= AGREEMENT_MAX_ABS, float(difference.max())
+    assert difference.mean() <= AGREEMENT_MEAN_ABS, float(difference.mean())
+
+
+@pytest.mark.gpu
+@requires_gpu
+@pytest.mark.parametrize("method", METHODS)
+@pytest.mark.parametrize("size", [(64, 96), (97, 65)])
+def test_gpu_output_on_near_flat_images_within_its_own_bound(
+    size: tuple[int, int], method: str
+) -> None:
+    """WP1.1's near-flat ``_synthetic`` pair, under a wider documented bound (CHARC, F1).
+
+    Attributed cause: cupyx's Gaussian filters accumulate float32 input in float32 where
+    scipy accumulates in float64, so the high-pass ``I - G*I`` differs by about 1 ulp
+    (1.2e-7); on these near-flat images the stretch N{} spans only about 0.0018 (0.0021 at
+    97x65), so it amplifies that difference about 500-fold (measured max-abs 2.7e-5 to
+    3.6e-5, mean-abs 3.3e-6 to 4.6e-6, over the fixed 2e-5 / 2e-6). The bound below still
+    catches a regression of the GPU path here; the ill-conditioning is banked as DR-14.
+    """
+    difference = _output_difference(_synthetic(*size), method)
+    assert difference.max() <= NEAR_FLAT_MAX_ABS, float(difference.max())
+    assert difference.mean() <= NEAR_FLAT_MEAN_ABS, float(difference.mean())
 
 
 @pytest.mark.gpu
@@ -452,3 +473,47 @@ def test_bench_works_as_a_script(tmp_path: Path) -> None:
     )
     assert completed.returncode == 0, completed.stderr
     assert Path(completed.stdout.strip()).is_file()
+
+
+# --- run.py --device ---------------------------------------------------------------------
+
+
+def _run_backend(tmp_path: Path, *extra: str) -> str:
+    source = _write_input(tmp_path)
+    out = tmp_path / "out"
+    assert run.main(["--in", str(source), "--out", str(out), "--dump", *extra]) == 0
+    weights = json.loads((out / "scene-ancuti2018-weights.json").read_text(encoding="utf-8"))
+    return str(weights["backend"])
+
+
+def test_run_defaults_to_the_cpu_and_records_the_backend(tmp_path: Path) -> None:
+    assert _run_backend(tmp_path) == "cpu"
+
+
+def test_run_auto_without_cupy_notes_the_cpu_fallback(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setitem(sys.modules, "cupy", None)
+    assert _run_backend(tmp_path, "--device", "auto") == "cpu"
+    assert "note: running on the CPU: cupy is not installed" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("device", ["gpu", "tpu"])
+def test_run_bad_or_unusable_device_exits_2(
+    tmp_path: Path,
+    device: str,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setitem(sys.modules, "cupy", None)
+    source = _write_input(tmp_path)
+    assert run.main(["--in", str(source), "--out", str(tmp_path), "--device", device]) == 2
+    err = capsys.readouterr().err
+    assert err.startswith("error: ")
+    assert len(err.strip().splitlines()) == 1
+
+
+@pytest.mark.gpu
+@requires_gpu
+def test_run_on_the_gpu_records_the_backend(tmp_path: Path) -> None:
+    assert _run_backend(tmp_path, "--device", "gpu") == "gpu"
