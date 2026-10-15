@@ -8,12 +8,15 @@ were and what bound, and ends with the sheet the owner fills. **No correction is
 
 Conditions: 2026-10-15 (UTC), Windows 11 laptop, RTX 4070 Laptop GPU (prototype
 `--device gpu`, CuPy), FFmpeg and ffprobe `9.0.2-full_build-www.gyan.dev`, branch `wp1.3`.
-The stills were produced by `4c37dc3` and the flicker clip by `c51b020` (the commands in
-section 2); a first pack built at `5833dff` was rebuilt after Reviewer A's round 1 (section 8),
-and every statistic in it came out identical to the digit. Footage folder read only; every output is under
-`C:\Users\rwsmy\clearwater\work\wp1.3\` (below, `work\wp1.3\`). The `SCUBA` subfolder was not
-touched. Elapsed times are informal, not results: stills 233 s (24 frames, 3 variants each,
-GPU), flicker clip 453 s.
+The stills were produced by `4c37dc3`; the flicker clip was built by `c51b020` and re-run
+by the remediation after Reviewer B's round 1 (code `01784a9`, tests `7470ec8`; section 8), and
+every statistic in it came out identical to the digit both times (section 5). A first pack built
+at `5833dff` was rebuilt after Reviewer A's round 1, also identical. Footage folder read only;
+every file the package's FFmpeg runs and writers produce is under
+`C:\Users\rwsmy\clearwater\work\wp1.3\` (below, `work\wp1.3\`). (Python bytecode, the pytest
+cache and the CuPy kernel cache belong to the interpreter and the libraries and are not there.)
+The `SCUBA` subfolder was not touched. Elapsed times are informal, not results: stills 233 s
+(24 frames, 3 variants each, GPU), flicker clip 479 s (the re-run, with the full read-back).
 
 ## 1. Where things are
 
@@ -26,7 +29,7 @@ GPU), flicker clip 453 s.
 | `frames.json` | per source frame: exact pts (ticks, time base, exact fraction), size, colour tags, the FFmpeg command |
 | `statistics.json` | per frame and variant: the prototype's `CompensationInfo` and `WhiteBalanceInfo`, the `Params` it ran with, the N{} bounds, whether anything bound |
 | `flicker\GX011627_unsmoothed.mp4`, `GX011627_source.mp4` | the two 180-frame clips (section 5) |
-| `flicker\statistics.json`, `statistics.png` | all 180 frames' statistics, the encode checks, the commands; the plot |
+| `flicker\statistics.json`, `statistics.png` | all 180 frames' statistics, the encode checks, the per-frame read-back of both clips (`checks.readback`), the commands; the plot |
 | `flicker\source\`, `flicker\corrected\` | first, middle and last frame PNG of each set (the rest deleted after both MP4s were encoded and verified) |
 | `logs\` | run logs, gate logs |
 
@@ -64,7 +67,10 @@ tick count is in `frames.json`.
 quadrants hold four known RGB colours, stored as 8-bit BT.709 YUV in the full range and in the
 limited range (the clip's frames are flagged with the range they are tagged with, so FFmpeg
 converts nothing before the encoder), and extracts both: both match the known RGB within 1
-level of 255 (measured worst: full 0.88, limited 0.70 with `accurate_rnd`; 3.0 without it). The
+level of 255, compared over the WHOLE interior of each quadrant (8 pixels in from every
+quadrant edge, where chroma upsampling blends colours) and the worst error reported (measured
+worst: full 0.88, limited 0.70 with `accurate_rnd`; 3.0 without it, the interior worst equal to
+what one pixel per quadrant gave). The
 planted failures fail by name: limited-range data re-tagged full by a bitstream filter
 (`test_a_range_tag_that_lies_makes_the_control_fail`, error over 5 levels) and a correctly tagged
 limited clip decoded with a wrong range argument
@@ -79,7 +85,27 @@ the full-range result rests on the decoder, proven by the full-range clip, not o
 folder"), checked on the resolved path before every FFmpeg run (all scratch names, the output
 MP4), every PNG, JPEG, JSON and HTML write and every delete: inside `work\wp1.3\`, outside the
 footage folder, no existing target with more than one hard link. `FFREPORT` is removed from
-every FFmpeg and ffprobe environment.
+every FFmpeg and ffprobe environment. The tests use the REAL configured footage folder as the
+footage root of every `OutputRoots` they build (a never-created folder only when no local
+configuration loads), so the production check refuses a write there; an autouse guard fails a test
+at once if `tmp_path` (a `--basetemp`, `TMP` or `TEMP`) resolves inside that folder, and the
+tests' own writes outside `roots.allowed` go through the same check
+(`test_a_root_under_the_configured_footage_folder_is_refused`,
+`test_the_test_roots_use_the_configured_footage_folder`).
+
+**Limits of the instrument (not implemented; out of the declared envelope).**
+
+- **D54's fallback is not implemented** (Reviewer B finding B6; banked as DR-20). Spec 6.5 and D54
+  say a stream without colour tags is read as BT.709 limited range with a warning. Here: an
+  untagged `yuvj420p` stream is read as `pc` (full range), not limited; a missing primaries or
+  transfer stays `unknown`; an unexpected range or matrix is refused rather than assumed with a
+  warning; and the warning is printed only by `pack.py stills` (`_run_stills`), so a direct
+  `extract` or `excerpt` caller gets none (the record's `tags.assumed` lists what was assumed).
+  All four shallow chapters carry full tags, so nothing was assumed in this pack. **WP1.4 and
+  WP3.5 must not take this module for an implementation of D54.**
+- Banked, minor (B7 to B10; DR-20): duplicate or non-monotonic pts are de-duplicated rather than
+  refused; a `%` in a root path is expanded by FFmpeg; `verify_clip` accepts `yuvj420p` with `tv`
+  and skips tags that are `unknown`; `v:0` is taken without checking for cover art.
 
 **Record shape for WP1.4** (`frames.FrameFile`, `record()`): `path`, `source`, `chapter`,
 `pts_ticks` (exact, int), `time_base` (`Fraction`), `pts` (exact `Fraction` of seconds), `width`,
@@ -158,8 +184,11 @@ mean, the quantity the D50/D52 cap limits to 2.0; the largest observed is 0.58. 
   stills is 0.0165, about 9 times the 0.0018 near-flat synthetic of the debt entry and 16000
   times the 1e-6 flat floor; the smallest in the 180 flicker frames is 0.271. The floor never
   triggered.
-- **Rounding of the instrument itself**: the 8-bit YUV round trip of the encodes biases R and
-  B about -1 level of 255 and G +0.35 on a real frame (identical on both clips of section 5).
+- **Rounding of the instrument itself**: the encode's 8-bit YUV round trip biases the colours
+  slightly. Measured over all 180 frames of each clip at 1/8 size (`flicker\statistics.json`
+  `checks.readback.<clip>.channel_bias`, mean signed difference to the PNG in levels of 255, R, G,
+  B): unsmoothed clip -1.01, +0.34, -0.70; source clip -1.04, +0.36, -0.85. (The earlier figure
+  of "R and B about -1, G +0.35" came from one frame and was in no record.)
 
 ## 5. The flicker clip (also WP1.4's clip)
 
@@ -182,15 +211,50 @@ encoder options), `hvc1`, `-framerate 30000/1001`, no audio. The
 the correction and by the content-dependent error of a lossy encode (the colour tags, the
 format and the timing are the same and are checked, below).
 
-Checks (`flicker\statistics.json` `checks`): both clips one HEVC Main stream, `yuvj420p`,
-3840x2160, range `pc`, matrix, primaries and transfer `bt709`, 180 frames, first pts 0, every
-step 1001 ticks of 1/30000, no audio stream (`verify_clip`; it names each of those and a
-stubbed ffprobe with a 10-bit, wrongly sized or wrongly tagged stream fails it); and frame 0 of
-the encoded source clip, read back through `frames.extract`, differs from its PNG by 1.98 levels
-mean absolute (bias -0.54), which a range or matrix error would exceed. An ad hoc
-check (not recorded in the JSON) also read frames 90 and 179 back from each clip and compared
-them with the kept PNGs: mean absolute difference 1.9 to 4.8 levels (a lossy encode), frame
-order right.
+Checks (`flicker\statistics.json` `checks`). Both clips are written as `*.partial.mp4`, verified,
+and renamed to their names only when BOTH have passed everything below; any exception, including
+a probe that raises, a timeout or a failed read-back, removes every clip name again and leaves the
+frame PNGs (a clip of an earlier run is removed first, so a failed run leaves none;
+`test_a_raising_verification_leaves_no_clip`, `test_a_failing_second_encode_leaves_neither_clip`,
+`test_a_failed_readback_leaves_neither_clip_and_a_pass_names_both`).
+
+- `verify_clip`: both clips one HEVC Main stream, `yuvj420p`, 3840x2160, range `pc`, matrix,
+  primaries and transfer `bt709`, 180 frames, first pts 0, every step 1001 ticks of 1/30000, no
+  audio stream (it names each of those; a stubbed ffprobe with a 10-bit, wrongly sized or wrongly
+  tagged stream fails it).
+- **Full read-back of every frame of both clips** (`readback_clip`, run before any PNG is
+  deleted). Method (`checks.readback.<clip>.method`): each of the 180 frames of the encoded clip is
+  converted to 16-bit RGB at full size with the extraction's own colour conversion and the clip's
+  own tags, and each of the 180 PNGs it was encoded from is read through FFmpeg; both are then
+  reduced by 1/8 to 480x270 with the same `scale` filter (`flags=accurate_rnd`), and each clip frame
+  is compared with its own PNG and with the PNG of the previous and the next frame (mean absolute
+  difference in 8-bit levels). (Converting and resizing in one `scale` step was measured less
+  accurate, about 4 levels on saturated test frames against 0.1 for this chain, so the
+  conversion is done first.) A frame passes only if its difference to its own PNG is at most 3.0
+  levels AND is smaller than its difference to either neighbour; the clip also fails on a wrong
+  frame count, a range or matrix tag that differs from the source's, or a per-channel mean bias
+  over 2.0 levels. A duplicated, dropped or swapped frame fails by name (`failed_frames`;
+  `test_a_duplicated_frame_fails_the_readback_by_name`, `test_two_swapped_frames_...`,
+  `test_a_dropped_frame_...`). The per-frame `own`, `previous`, `next`, `margin` and per-channel
+  `bias` of all 180 frames of both clips are in the JSON.
+- Result on the delivered clips (2026-10-15 re-run): **all 180 frames of both clips pass.**
+  Unsmoothed clip: worst difference to its own PNG 2.85 levels (frame 65), mean 2.21; smallest
+  margin to a neighbour 7.60 levels (frame 173), mean margin 17.3. Source clip: worst 2.52 (frame
+  35), mean 1.84; smallest margin 6.41 (frame 173), mean 16.4. So on the real clip the frames are
+  far enough apart for the read-back to decide: the smallest margin is more than twice the
+  largest own difference. (The 3.0 bound on the own difference is a sanity bound with thin
+  headroom, 2.85 against 3.0, set before the run; it is the margin to the neighbours that tells
+  frames apart. The two MP4s of the re-run are byte-identical to those of the first run: same
+  md5.)
+- The old check (frame 0 of the source clip only, 1.98 levels, bias -0.54) and the ad hoc read of
+  frames 90 and 179 (1.9 to 4.8 levels at full size) are superseded by the record above; the
+  full-size figures of that ad hoc read are not in any record and are not relied on.
+
+The 180 frames' statistics of the re-run are identical to the digit to those of the first run
+(a copy of the first run's `statistics.json` is `logs\flicker-statistics-before-remediation.json`;
+`frames`, `summary`, `bound_counts` and `excerpt` compare equal after parsing, the excerpt ticks
+are 205205 to 384384). The stills were not re-run: the remediation changed nothing on their path
+(`frames.py` gained only `OutputRoots.rename`).
 
 **The flicker as numbers** (white-balance gains, effective alpha, N{} bounds against pts; the
 plot is `flicker\statistics.png`, all 180 rows in the JSON):
@@ -256,22 +320,31 @@ record observations about them under the open-water row at CP2 is the owner's ca
 
 ## 8. Verification
 
-- Gates on the final head (`f697f63`), run with the WinGet `ffmpeg`/`ffprobe` folder on PATH:
-  `uv run ruff check .` all checks passed; `uv run ruff format --check .` 73 files already
-  formatted; `uv run mypy` no issues in 16 source files; `uv run pytest` **481 passed, 0 skipped**
-  (the `footage` smoke test and the `gpu` flicker test ran; this package's tests are 38).
-  Logs: `work\wp1.3\logs\g2-*.log`.
+- Gates on the remediation head (the head named in the ledger), run with the WinGet
+  `ffmpeg`/`ffprobe` folder on PATH: `uv run ruff check .` all checks passed; `uv run ruff format
+  --check .` 74 files already formatted; `uv run mypy` no issues in 16 source files; `uv run pytest
+  -q -rs` **492 passed, 0 skipped** (the `footage` smoke test and the `gpu` flicker test ran; this
+  package's tests are 49); `uv run pytest -q -m gpu` 21 passed. Logs: `work\wp1.3\logs\g3-*.log`
+  (the first original gates, `g2-*.log`).
 - Controls with planted defects, each failing by name: limited-range data tagged full; a wrong
   range and a wrong matrix argument (full and limited clips); a seek one frame late; the two pair
   halves swapped; the unsmoothed clip encoded from the source frames; a 10-bit, wrongly sized,
   mis-tagged, mistimed, short or out-of-order clip against `verify_clip`; a faked FFmpeg that
-  leaves a partial file.
-- `verify_clip` of the final head re-run on the delivered clips: both `ok`, HEVC Main
-  `yuvj420p` 3840x2160, `pc`/`bt709`/`bt709`/`bt709`, 180 frames, step 1001.
+  leaves a partial file; (remediation) a clip with one frame duplicated, one with two frames
+  swapped, one with a dropped frame and one with a colour shift against the read-back; a
+  verification that raises, a second encode that fails and a failed read-back against the
+  naming; a `tmp_path` inside a monkeypatched footage folder against the guard.
 - Reviewer A (Codex, STRONG): two rounds; round 1 one major (rejected by the brief, mitigated in
   text) and five minors, all fixed; round 2 zero blocking, three minors fixed in the cleanup.
   Ledger `docs/proofs/wp1.3-ledger.md`; transcripts under
   `C:\Users\rwsmy\clearwater-review-evidence\wp1.3\`.
+- **Reviewer B (the orchestrator's seat pass), round 1: blocking.** Four majors and seven minors.
+  Closed in the remediation: B1 (tests could write into the footage folder), B2 (verification
+  checked metadata and timing, not frames), B3 (an exception left an unverified clip under its
+  final name), B4 (an unrecorded bias figure), B5 (the output-scope wording), B11 (the range
+  control read one pixel per quadrant). Not implemented and banked as out of envelope: B6 (D54's
+  fallback) and B7 to B10 (section 2, "Limits of the instrument"). Reviewer A's round 3 over the
+  remediation delta is recorded in the ledger.
 
 ## 9. CP2 sheet (the owner fills the last three columns)
 

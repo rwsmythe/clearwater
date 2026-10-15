@@ -743,7 +743,7 @@ def test_the_flicker_clip_is_built_checked_and_pruned(tmp_path: Path) -> None:
         record = readback[label]
         assert record["frames_read"] == record["frames_expected"] == count
         assert len(record["frames"]) == count and record["failed_frames"] == []
-        assert 0 < record["smallest_margin"] and record["worst_own"] <= pack.READBACK_MAX_OWN
+        assert record["smallest_margin"] > 0 and record["worst_own"] <= pack.READBACK_MAX_OWN
     assert not list(flicker_dir.glob("*.partial.mp4")) and not (flicker_dir / "readback").exists()
     assert len(document["frames"]) == count
     assert document["smoothing"].startswith("none")
