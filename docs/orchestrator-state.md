@@ -71,4 +71,12 @@
   its own paragraph, plus a transcript `grep -a 'docs/proofs\|<wp>-ledger'` access assertion
   (WP1.1 B pass 1 Codex read the ledger).
 - Spec is now **v0.5.1** (073ca1f, owner-approved; target machine recorded, DR-5 closed): cite v0.5.1 in every future brief.
-- Inbox drained through msg `9a4812a7f3379d6d`.
+- **WP1.5 container spike** commissioned (`9ea69283f746b163`); FINAL brief at `8ad93b8`. QUEUED:
+  dispatch only after WP1.2A closes (accept or STOP, B2 included). At dispatch: create the
+  worktree from main, COPY `clearwater.local.toml` into its root, name the base in the prompt.
+  Reviewer B ORDERED.
+- Real inventory pass: still QUEUED (download incomplete: 4 shallow chapters present, scuba
+  and photos still coming; CHARC will say).
+- Practice: NO harness/pytest runs at this seat while an exclusive bench window is open (my
+  05:29Z harness run overlapped the WP1.2 GPU re-measure; reported, cell told to re-run).
+- Inbox drained through msg `9ea69283f746b163`.
