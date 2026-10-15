@@ -1,4 +1,4 @@
-"""The reference correction pipeline (spec sections 6.2 and 6.3), on the CPU with NumPy.
+"""The reference correction pipeline (spec sections 6.2 and 6.3), on the CPU or the GPU.
 
 The pipeline runs five steps on one display-encoded RGB image (spec 6.2):
 
@@ -19,32 +19,46 @@ The two reference papers are authoritative over the spec's summaries (spec 6.1):
 - [3C] C. O. Ancuti, C. Ancuti, C. De Vleeschouwer, M. Sbert, "Color Channel Compensation
   (3C): A Fundamental Pre-Processing Step for Image Enhancement", IEEE TIP 29, 2020.
 
-Conventions: every image is a ``numpy`` float32 array of shape ``(H, W, 3)`` holding
+Conventions: every image is a float32 array of shape ``(H, W, 3)`` holding
 display-encoded RGB in [0, 1] (spec 6.4, 6.5); every single-channel map is float32 of shape
 ``(H, W)``. Every function is pure (it never modifies its arguments) and does no I/O.
 Every spatial parameter is a fraction of the short side and is turned into pixels by
 :func:`spatial_sigma` only (spec 6.6, D56). Gaussian filters use symmetric borders
 (``scipy.ndimage`` mode ``"reflect"``: ``d c b a | a b c d``) and a support of 4 sigma.
+
+Backends (D30, D107): an array is a NumPy array (CPU) or a CuPy array (graphics card).
+Every function takes the array module and the filter module from its input with
+:func:`prototype.backend.of` and returns arrays of the same kind, so the one code path
+runs on either device; :func:`correct` alone moves data, its input to the chosen device
+once and its results back once. The filter mode and truncation are passed explicitly on
+both devices.
 """
 
 from __future__ import annotations
 
+import dataclasses
+import functools
 import itertools
 import math
 from collections.abc import Sequence
 from dataclasses import dataclass
+from typing import Any
 
 import numpy as np
 from numpy.typing import NDArray
-from scipy import ndimage
 
+from .backend import Backend, of
 from .params import Params
 
 Image = NDArray[np.float32]
-"""A display-encoded RGB image, float32, shape ``(H, W, 3)``, values in [0, 1]."""
+"""A display-encoded RGB image, float32, shape ``(H, W, 3)``, values in [0, 1].
+
+A CuPy array of the same shape and dtype is accepted wherever an image is; the alias names
+the NumPy type for the static checker only.
+"""
 
 Map = NDArray[np.float32]
-"""A single-channel map, float32, shape ``(H, W)``."""
+"""A single-channel map, float32, shape ``(H, W)`` (NumPy or CuPy, like :data:`Image`)."""
 
 _GAUSSIAN_TRUNCATE = 4.0
 _EPS = 1e-6
@@ -93,6 +107,38 @@ _LAB_DELTA = 6.0 / 29.0
 
 # The Burt-Adelson 5-tap binomial kernel [1 4 6 4 1] / 16.
 _BINOMIAL_5 = np.array([1.0, 4.0, 6.0, 4.0, 1.0], dtype=np.float32) / np.float32(16.0)
+
+
+@dataclass(frozen=True)
+class _Constants:
+    """The constant arrays of the pipeline on one backend (see :func:`_constants`)."""
+
+    rgb_to_ycbcr_t: Any
+    ycbcr_to_rgb_t: Any
+    ycbcr_to_rgb: Any
+    luma: Any
+    srgb_to_xyz_t: Any
+    d65_white: Any
+    binomial_5: Any
+
+
+@functools.cache
+def _constants(xp: Any) -> _Constants:
+    """The pipeline's constant arrays in array module ``xp``, built once per module.
+
+    Each is formed from the NumPy constant exactly as WP1.1 formed it at the point of use,
+    then handed to ``xp.asarray``: on NumPy that returns the same array, so the CPU
+    arithmetic is unchanged; on CuPy it is one upload per process instead of one per call.
+    """
+    return _Constants(
+        rgb_to_ycbcr_t=xp.asarray(RGB_TO_YCBCR.T.astype(np.float32)),
+        ycbcr_to_rgb_t=xp.asarray(YCBCR_TO_RGB.T.astype(np.float32)),
+        ycbcr_to_rgb=xp.asarray(YCBCR_TO_RGB.astype(np.float32)),
+        luma=xp.asarray(RGB_TO_YCBCR[0].astype(np.float32)),
+        srgb_to_xyz_t=xp.asarray(_SRGB_TO_XYZ.T),
+        d65_white=xp.asarray(_D65_WHITE),
+        binomial_5=xp.asarray(_BINOMIAL_5),
+    )
 
 
 @dataclass(frozen=True)
@@ -233,6 +279,7 @@ def compensate_ancuti2018(image: Image, params: Params) -> tuple[Image, Compensa
         The compensated image and the step's record.
     """
     _check_image(image)
+    xp = of(image).xp
     means = _channel_means(image)
     green = image[..., 1]
     out = image.copy()
@@ -250,7 +297,7 @@ def compensate_ancuti2018(image: Image, params: Params) -> tuple[Image, Compensa
             alpha = min(alpha, cap * means[index] / added_per_alpha)
         requested[name] = params.alpha
         effective[name] = alpha
-        out[..., index] = np.clip(image[..., index] + (alpha * difference) * shape, 0.0, 1.0)
+        out[..., index] = xp.clip(image[..., index] + (alpha * difference) * shape, 0.0, 1.0)
     info = CompensationInfo(
         method="ancuti2018",
         channel_means=means,
@@ -289,20 +336,21 @@ def compensate_c3(image: Image, params: Params) -> tuple[Image, CompensationInfo
         The compensated image and the step's record.
     """
     _check_image(image)
+    xp = of(image).xp
     kappa = params.c3_strength * params.kappa
     lambda_ = params.c3_strength * params.lambda_
     ycbcr = rgb_to_ycbcr(image)
     bright = image.mean(axis=2, dtype=np.float32) > params.c3_mask_threshold
     mask = _gaussian(
-        np.where(bright, np.float32(0.0), np.float32(1.0)),
+        xp.where(bright, np.float32(0.0), np.float32(1.0)),
         spatial_sigma(image.shape, params.c3_mask_smooth_fraction),
     )
     sigma = spatial_sigma(image.shape, params.c3_kernel_fraction)
     delta_cb = -lambda_ * mask * _gaussian(ycbcr[..., 1], sigma)
     delta_cr = -kappa * mask * _gaussian(ycbcr[..., 2], sigma)
-    to_rgb = YCBCR_TO_RGB.astype(np.float32)
+    to_rgb = _constants(xp).ycbcr_to_rgb
     delta = delta_cb[..., None] * to_rgb[:, 1] + delta_cr[..., None] * to_rgb[:, 2]
-    out = np.clip(image + delta, 0.0, 1.0).astype(np.float32, copy=False)
+    out: Image = xp.clip(image + delta, 0.0, 1.0).astype(np.float32, copy=False)
     info = CompensationInfo(
         method="c3",
         channel_means=_channel_means(image),
@@ -340,8 +388,9 @@ def white_balance(image: Image, params: Params) -> tuple[Image, WhiteBalanceInfo
     gray_world = tuple(target / max(mean, _EPS) for mean in means)
     requested = tuple(1.0 + params.white_balance_strength * (g - 1.0) for g in gray_world)
     applied = tuple(min(g, params.max_white_balance_gain) for g in requested)
-    gains = np.array(applied, dtype=np.float32)
-    out = np.clip(image * gains, 0.0, 1.0).astype(np.float32, copy=False)
+    xp = of(image).xp
+    gains = xp.array(applied, dtype=np.float32)
+    out: Image = xp.clip(image * gains, 0.0, 1.0).astype(np.float32, copy=False)
     info = WhiteBalanceInfo(
         channel_means=means,
         target=target,
@@ -380,21 +429,37 @@ def fusion_inputs(image: Image, params: Params) -> tuple[Image, Image]:
         Input 1 (gamma) and input 2 (sharpened).
     """
     _check_image(image)
-    input1 = np.power(image, np.float32(params.gamma)).astype(np.float32, copy=False)
-    high_pass = image - _gaussian(image, spatial_sigma(image.shape, params.sharpen_blur_fraction))
-    low, high = (
-        float(v)
-        for v in np.percentile(
-            high_pass, [params.normalisation_low, params.normalisation_high], method="linear"
-        )
-    )
+    xp = of(image).xp
+    input1: Image = xp.power(image, np.float32(params.gamma)).astype(np.float32, copy=False)
+    high_pass, (low, high) = _high_pass_and_bounds(image, params)
     if high - low < _EPS:
-        stretched = np.full_like(image, 0.5)
+        stretched = xp.full_like(image, 0.5)
     else:
-        stretched = np.clip((high_pass - low) / (high - low), 0.0, 1.0)
+        stretched = xp.clip((high_pass - low) / (high - low), 0.0, 1.0)
     sharpened = (image + stretched) / 2.0
-    input2 = np.clip(image + params.sharpen_strength * (sharpened - image), 0.0, 1.0)
-    return input1, input2.astype(np.float32, copy=False)
+    input2 = xp.clip(image + params.sharpen_strength * (sharpened - image), 0.0, 1.0)
+    out2: Image = input2.astype(np.float32, copy=False)
+    return input1, out2
+
+
+def normalisation_bounds(image: Image, params: Params) -> tuple[float, float]:
+    """Return the bounds of the histogram stretch N{} that :func:`fusion_inputs` applies.
+
+    These are the ``normalisation_low`` and ``normalisation_high`` percentiles of the
+    high-pass ``I - G*I`` over all pixels and channels (see :func:`fusion_inputs`); they
+    are one of the whole-frame statistics a proxy-resolution analysis would compute
+    (spec 7.2, 12; D60, D109).
+
+    Args:
+        image: The white-balanced image.
+        params: Uses ``sharpen_blur_fraction``, ``normalisation_low`` and
+            ``normalisation_high``.
+
+    Returns:
+        The low and high bound.
+    """
+    _check_image(image)
+    return _high_pass_and_bounds(image, params)[1]
 
 
 def weight_maps(input_: Sequence[Image], params: Params) -> Weights:
@@ -450,7 +515,7 @@ def weight_maps(input_: Sequence[Image], params: Params) -> Weights:
         for lw, sw, tw in zip(laplacian, saliency, saturation, strict=True)
     )
     delta = params.weight_delta
-    denominator = np.full_like(aggregated[0], len(aggregated) * delta)
+    denominator = of(aggregated[0]).xp.full_like(aggregated[0], len(aggregated) * delta)
     for w in aggregated:
         denominator += w
     normalised = tuple(((w + delta) / denominator).astype(np.float32) for w in aggregated)
@@ -486,18 +551,20 @@ def multiscale_fusion(inputs: Sequence[Image], weights: Sequence[Map], params: P
         if image.shape != shape or weight.shape != shape[:2]:
             raise ValueError("fusion inputs and weights differ in shape")
     levels = pyramid_levels(shape, params.pyramid_min_level_size)
+    xp = of(inputs[0]).xp
     fused: list[NDArray[np.float32]] | None = None
     for image, weight in zip(inputs, weights, strict=True):
         image_pyramid = laplacian_pyramid(image, levels)
-        weight_pyramid = gaussian_pyramid(np.asarray(weight, dtype=np.float32), levels)
+        weight_pyramid = gaussian_pyramid(of(weight).xp.asarray(weight, dtype=np.float32), levels)
         pairs = zip(weight_pyramid, image_pyramid, strict=True)
         blended = [w[..., None] * band for w, band in pairs]
         fused = blended if fused is None else [f + b for f, b in zip(fused, blended, strict=True)]
     assert fused is not None
-    return np.clip(collapse_pyramid(fused), 0.0, 1.0).astype(np.float32, copy=False)
+    out: Image = xp.clip(collapse_pyramid(fused), 0.0, 1.0).astype(np.float32, copy=False)
+    return out
 
 
-def correct(image: Image, params: Params) -> Result:
+def correct(image: Image, params: Params, backend: Backend | None = None) -> Result:
     """Run the whole pipeline on one image and keep every intermediate.
 
     Steps (spec 6.2): compensation (``params.method``), white balance, fusion inputs,
@@ -505,25 +572,35 @@ def correct(image: Image, params: Params) -> Result:
     ``output = (1 - b) * fused + b * image`` with ``b = blend_with_original`` (0.0 =
     fully corrected, 1.0 = the original).
 
+    The steps run on ``backend``: the input is moved to its device once, and every array
+    of the result is moved back once, to the kind of the input (a NumPy input gives NumPy
+    results, whatever the backend).
+
     Args:
         image: The display-encoded RGB input, float32 in [0, 1], shape ``(H, W, 3)``.
         params: The parameter set.
+        backend: Where the steps run (:func:`prototype.backend.select_backend`); ``None``
+            runs them where the input is.
 
     Returns:
         The output and every intermediate.
     """
-    _check_image(image)
+    _check_array(image)
+    caller = of(image)
+    device = caller if backend is None else backend
+    work = device.to_device(image)
+    _check_image(work)
     if params.method == "c3":
-        compensated, compensation = compensate_c3(image, params)
+        compensated, compensation = compensate_c3(work, params)
     else:
-        compensated, compensation = compensate_ancuti2018(image, params)
+        compensated, compensation = compensate_ancuti2018(work, params)
     balanced, balance = white_balance(compensated, params)
     input1, input2 = fusion_inputs(balanced, params)
     weights = weight_maps((input1, input2), params)
     fused = multiscale_fusion((input1, input2), weights.normalised, params)
     blend = params.blend_with_original
-    output = ((1.0 - blend) * fused + blend * image).astype(np.float32, copy=False)
-    return Result(
+    output = ((1.0 - blend) * fused + blend * work).astype(np.float32, copy=False)
+    result = Result(
         output=output,
         fused=fused,
         compensated=compensated,
@@ -535,6 +612,9 @@ def correct(image: Image, params: Params) -> Result:
         white_balance=balance,
         params=params,
     )
+    if device.name == caller.name:
+        return result
+    return _move_result(result, caller)
 
 
 def rgb_to_ycbcr(image: Image) -> Image:
@@ -546,7 +626,8 @@ def rgb_to_ycbcr(image: Image) -> Image:
     Returns:
         Y in [0, 1] and Cb, Cr in [-0.5, 0.5], float32, shape ``(H, W, 3)``.
     """
-    return (image @ RGB_TO_YCBCR.T.astype(np.float32)).astype(np.float32, copy=False)
+    ycbcr: Image = (image @ _constants(of(image).xp).rgb_to_ycbcr_t).astype(np.float32, copy=False)
+    return ycbcr
 
 
 def ycbcr_to_rgb(ycbcr: Image) -> Image:
@@ -558,7 +639,8 @@ def ycbcr_to_rgb(ycbcr: Image) -> Image:
     Returns:
         RGB, float32, shape ``(H, W, 3)``.
     """
-    return (ycbcr @ YCBCR_TO_RGB.T.astype(np.float32)).astype(np.float32, copy=False)
+    rgb: Image = (ycbcr @ _constants(of(ycbcr).xp).ycbcr_to_rgb_t).astype(np.float32, copy=False)
+    return rgb
 
 
 def luminance(image: Image) -> Map:
@@ -570,7 +652,9 @@ def luminance(image: Image) -> Map:
     Returns:
         Y, float32, shape ``(H, W)``.
     """
-    return np.asarray(image @ RGB_TO_YCBCR[0].astype(np.float32), dtype=np.float32)
+    xp = of(image).xp
+    luma: Map = xp.asarray(image @ _constants(xp).luma, dtype=np.float32)
+    return luma
 
 
 def srgb_to_lab(image: Image) -> Image:
@@ -589,22 +673,25 @@ def srgb_to_lab(image: Image) -> Image:
     Returns:
         L*, a*, b* (L* in [0, 100]), float32, shape ``(H, W, 3)``.
     """
-    linear = np.where(
+    xp = of(image).xp
+    constants = _constants(xp)
+    linear = xp.where(
         image <= 0.04045,
         image / np.float32(12.92),
-        np.power((image + np.float32(0.055)) / np.float32(1.055), np.float32(2.4)),
+        xp.power((image + np.float32(0.055)) / np.float32(1.055), np.float32(2.4)),
     )
-    xyz = (linear @ _SRGB_TO_XYZ.T) / _D65_WHITE
-    f = np.where(
+    xyz = (linear @ constants.srgb_to_xyz_t) / constants.d65_white
+    f = xp.where(
         xyz > _LAB_DELTA**3,
-        np.cbrt(xyz),
+        xp.cbrt(xyz),
         xyz / np.float32(3.0 * _LAB_DELTA**2) + np.float32(4.0 / 29.0),
     )
-    lab = np.empty_like(f)
+    lab = xp.empty_like(f)
     lab[..., 0] = 116.0 * f[..., 1] - 16.0
     lab[..., 1] = 500.0 * (f[..., 0] - f[..., 1])
     lab[..., 2] = 200.0 * (f[..., 1] - f[..., 2])
-    return lab.astype(np.float32, copy=False)
+    out: Image = lab.astype(np.float32, copy=False)
+    return out
 
 
 def pyramid_levels(image_shape: tuple[int, ...], min_level_size: int) -> int:
@@ -703,9 +790,10 @@ def expand(image: NDArray[np.float32], shape: tuple[int, ...]) -> NDArray[np.flo
     Returns:
         The upsampled array, float32, of ``shape``.
     """
-    upsampled = np.zeros(shape, dtype=np.float32)
+    xp = of(image).xp
+    upsampled = xp.zeros(shape, dtype=np.float32)
     upsampled[::2, ::2] = image
-    indicator = np.zeros(shape[:2], dtype=np.float32)
+    indicator = xp.zeros(shape[:2], dtype=np.float32)
     indicator[::2, ::2] = 1.0
     norm = _binomial_blur(indicator)
     blurred = _binomial_blur(upsampled)
@@ -714,51 +802,72 @@ def expand(image: NDArray[np.float32], shape: tuple[int, ...]) -> NDArray[np.flo
     return (blurred / norm).astype(np.float32, copy=False)
 
 
+def _high_pass_and_bounds(image: Image, params: Params) -> tuple[Image, tuple[float, float]]:
+    """The high-pass ``I - G*I`` of :func:`fusion_inputs` and the bounds of its stretch."""
+    xp = of(image).xp
+    high_pass = image - _gaussian(image, spatial_sigma(image.shape, params.sharpen_blur_fraction))
+    bounds = xp.percentile(
+        high_pass, [params.normalisation_low, params.normalisation_high], method="linear"
+    ).tolist()
+    return high_pass, (float(bounds[0]), float(bounds[1]))
+
+
 def _laplacian_weight(image: Image, params: Params) -> Map:
     """W_L of one input: ``|sigma^2 * Lap(G_sigma * L)|`` (see :func:`weight_maps`)."""
     # The discrete Laplacian (zero-sum, so a flat image gives exactly 0) of the
     # Gaussian-smoothed luminance; scipy's sampled Gaussian second derivative is not
     # zero-sum at small sigma and would give a flat image a nonzero contrast weight.
+    backend = of(image)
     sigma = spatial_sigma(image.shape, params.laplacian_fraction)
-    log = ndimage.laplace(_gaussian(luminance(image), sigma), mode="reflect")
-    return np.abs(np.asarray(log, dtype=np.float32) * np.float32(sigma**2))
+    log = backend.ndimage.laplace(_gaussian(luminance(image), sigma), mode="reflect")
+    weight: Map = backend.xp.abs(backend.xp.asarray(log, dtype=np.float32) * np.float32(sigma**2))
+    return weight
 
 
 def _saliency_weight(image: Image, params: Params) -> Map:
     """W_S of one input: ``||mean Lab - blurred Lab|| / 100`` (see :func:`weight_maps`)."""
+    xp = of(image).xp
     lab = srgb_to_lab(image)
     mean = lab.reshape(-1, 3).mean(axis=0, dtype=np.float64).astype(np.float32)
     blurred = _gaussian(lab, spatial_sigma(image.shape, params.saliency_blur_fraction))
-    distance = np.sqrt(np.sum((blurred - mean) ** 2, axis=2))
-    return (distance / np.float32(100.0)).astype(np.float32, copy=False)
+    distance = xp.sqrt(xp.sum((blurred - mean) ** 2, axis=2))
+    weight: Map = (distance / np.float32(100.0)).astype(np.float32, copy=False)
+    return weight
 
 
 def _saturation_weight(image: Image) -> Map:
     """W_Sat of one input: the RMS deviation of R, G, B from the luma."""
+    xp = of(image).xp
     luma = luminance(image)
-    deviation = np.mean((image - luma[..., None]) ** 2, axis=2)
-    return np.sqrt(deviation).astype(np.float32, copy=False)
+    deviation = xp.mean((image - luma[..., None]) ** 2, axis=2)
+    weight: Map = xp.sqrt(deviation).astype(np.float32, copy=False)
+    return weight
 
 
 def _gaussian(array: NDArray[np.float32], sigma: float) -> NDArray[np.float32]:
     """Gaussian filter over the two spatial axes only (symmetric borders, 4 sigma)."""
+    backend = of(array)
     sigmas = (sigma, sigma) + (0.0,) * (array.ndim - 2)
-    filtered = ndimage.gaussian_filter(
+    filtered = backend.ndimage.gaussian_filter(
         array, sigma=sigmas, mode="reflect", truncate=_GAUSSIAN_TRUNCATE
     )
-    return np.asarray(filtered, dtype=np.float32)
+    out: NDArray[np.float32] = backend.xp.asarray(filtered, dtype=np.float32)
+    return out
 
 
 def _binomial_blur(array: NDArray[np.float32]) -> NDArray[np.float32]:
     """Separable 5-tap binomial filter over the two spatial axes (symmetric borders)."""
-    rows = ndimage.correlate1d(array, _BINOMIAL_5, axis=0, mode="reflect")
-    both = ndimage.correlate1d(rows, _BINOMIAL_5, axis=1, mode="reflect")
-    return np.asarray(both, dtype=np.float32)
+    backend = of(array)
+    kernel = _constants(backend.xp).binomial_5
+    rows = backend.ndimage.correlate1d(array, kernel, axis=0, mode="reflect")
+    both = backend.ndimage.correlate1d(rows, kernel, axis=1, mode="reflect")
+    out: NDArray[np.float32] = backend.xp.asarray(both, dtype=np.float32)
+    return out
 
 
 def _channel_means(image: Image) -> tuple[float, float, float]:
     """Mean of each RGB channel over the whole image, accumulated in float64."""
-    means = image.reshape(-1, 3).mean(axis=0, dtype=np.float64)
+    means = image.reshape(-1, 3).mean(axis=0, dtype=np.float64).tolist()
     return float(means[0]), float(means[1]), float(means[2])
 
 
@@ -774,12 +883,48 @@ def _triple(values: tuple[float, ...]) -> tuple[float, float, float]:
     return float(values[0]), float(values[1]), float(values[2])
 
 
-def _check_image(image: Image) -> None:
-    """Raise ValueError unless ``image`` is a float32 ``(H, W, 3)`` array in [0, 1]."""
-    if not isinstance(image, np.ndarray) or image.dtype != np.float32:
-        raise ValueError("image must be a float32 numpy array")
+def _move_result(result: Result, backend: Backend) -> Result:
+    """Return ``result`` with every array moved to ``backend`` (one transfer per array)."""
+    weights = result.weights
+    moved = Weights(
+        *(
+            tuple(backend.to_device(w) for w in group)
+            for group in (
+                weights.laplacian,
+                weights.saliency,
+                weights.saturation,
+                weights.aggregated,
+                weights.normalised,
+            )
+        )
+    )
+    return dataclasses.replace(
+        result,
+        output=backend.to_device(result.output),
+        fused=backend.to_device(result.fused),
+        compensated=backend.to_device(result.compensated),
+        white_balanced=backend.to_device(result.white_balanced),
+        input1=backend.to_device(result.input1),
+        input2=backend.to_device(result.input2),
+        weights=moved,
+    )
+
+
+def _check_array(image: Image) -> None:
+    """Raise ValueError unless ``image`` is a float32 ``(H, W, 3)`` NumPy or CuPy array."""
+    try:
+        of(image)
+    except TypeError:
+        raise ValueError("image must be a float32 numpy or cupy array") from None
+    if image.dtype != np.float32:
+        raise ValueError("image must be a float32 numpy or cupy array")
     if image.ndim != 3 or image.shape[2] != 3 or image.shape[0] < 1 or image.shape[1] < 1:
         raise ValueError(f"image must have shape (H, W, 3), got {image.shape}")
+
+
+def _check_image(image: Image) -> None:
+    """Raise ValueError unless ``image`` is a float32 ``(H, W, 3)`` array in [0, 1]."""
+    _check_array(image)
     low, high = float(image.min()), float(image.max())
     if not (low >= 0.0 and high <= 1.0):
         raise ValueError(f"image values must lie in [0, 1], got [{low}, {high}]")
