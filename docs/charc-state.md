@@ -42,7 +42,13 @@ Repository local + mirrored to private GitHub `rwsmythe/clearwater` (verify:
   decisions ruled accepted ~00:35Z (+ one informal 4K run in the return report).
   Verify: `git worktree list`, `docs/orchestrator-state.md`; that tree is OCCUPIED
   until the orchestrator records the cell's return.
-- Debt register `docs/debt-register.md`: DR-1..DR-10 (DR-3, DR-4 closed).
+  **Author return in 2026-10-15T01:40Z** (branch head a222301; Reviewer A converged r3
+  0/0/4; Reviewer B dispatched; informal 4K run re-engaged). CHARC RULED 01:41Z
+  (orchestrator inbox, msg ece409ee): Q1 W_L = |sigma^2 Lap(G_sigma L)| ACCEPTED as a
+  spec-driven (6.6/D56) departure from [A18], recorded in the open-values report;
+  Q2 -> DR-11, Q3 -> DR-12 (35c4e72). `weight_maps(both inputs)` deviation accepted
+  (no frozen interface before WP1.4). Awaiting the accept report.
+- Debt register `docs/debt-register.md`: DR-1..DR-12 (DR-3, DR-4 closed).
 - No authority granted by `SendMessage` this generation (cues only).
 
 ### Pending items
@@ -55,7 +61,7 @@ Repository local + mirrored to private GitHub `rwsmythe/clearwater` (verify:
 3. **Next harness acts:** QA the WP1.1 accept; then commission WP1.2 (CPU/GPU variant;
    `gpu`, exclusive; the GPU-library ruling is CHARC's at that brief) and WP1.5
    (container spike; needs footage). WP1.3 and WP1.4 need CP1.
-4. Main is ~54 commits ahead of `origin/main`, unpushed; the owner has not asked for a push.
+4. Main is ~58 commits ahead of `origin/main`, unpushed; the owner has not asked for a push.
 
 ### Standing delegation (owner, 2026-10-14, chat to CHARC, verbatim)
 
