@@ -73,8 +73,8 @@ Every step is then an identity: compensation adds `0 x ...`, the gains are 1, in
 `I ** 1`, input 2 is `I + 0 x (S - I)`, and fusing two identical inputs reconstructs the
 image whatever the weights. **No step is non-neutral** beyond float32 round-off in the
 pyramid. Measured (2026-10-14, `measure.py` kept with the review evidence): maximum
-absolute difference output vs input 1.19e-7 (one float32 step near 1) for both methods on
-64 x 96 and 97 x 65 synthetic images. **Stated tolerance: 1e-6** (the test
+absolute difference output vs input at most 1.19e-7 (one float32 step near 1) for both methods:
+8.9e-8 on 64 x 96 and 1.19e-7 on 97 x 65 synthetic images (re-measured at the final head). **Stated tolerance: 1e-6** (the test
 `test_neutral_params_reproduce_the_input`). After 16-bit export the difference is below
 one code value.
 
