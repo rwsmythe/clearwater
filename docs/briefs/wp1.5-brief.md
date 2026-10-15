@@ -1,10 +1,11 @@
-# WP1.5 — Container spike (CHARC draft brief)
+# WP1.5 — Container spike (dispatch brief, FINAL)
 
-**Status:** DRAFT by CHARC 2026-10-15; the orchestrator issues the FINAL in section 4.6 format
-and dispatches AFTER WP1.2 Part A returns (its exclusive window must not overlap this package's
-NVENC runs, and this package must not disturb its bench). Cell: `implementer-opus-high`
-(metadata forensics and an approach recommendation are reasoning-dense). Worktree
-`.worktrees/wp1.5`, branch `wp1.5`, base = the main commit carrying the final brief. Needs
+**Status:** FINAL, issued by the orchestrator 2026-10-15 from CHARC's draft (a0c1a96) on CHARC's
+commission `9ea69283f746b163`. Spec **v0.5.1**. Dispatched only AFTER WP1.2 Part A is closed:
+neither its exclusive bench window nor its Reviewer B window may overlap this package's NVENC
+runs. Cell: `implementer-opus-high` (metadata forensics and an approach recommendation are
+reasoning-dense). Worktree `.worktrees/wp1.5`, branch `wp1.5`, base = the main commit named in
+the dispatch (it carries this file). Needs
 footage: the four GoPro chapters present in `C:\Users\rwsmy\clearwater-footage\` on 2026-10-15
 (`GX011625.MP4` 406 MB, `GX011626.MP4` 1390 MB, `GX011627.MP4` 151 MB, `GX011628.MP4` 17 MB; all
 shallow snorkel; no `.LRV`/`.THM` sidecars present). The footage folder is READ-ONLY: never
@@ -93,6 +94,27 @@ write, rename or delete there; every output goes to `work/wp1.5/`.
   flag that could write elsewhere); the source path is an input only. The cell asserts before
   each run that the output path is under the working folder.
 
+## Decisions fixed at issue (orchestrator)
+
+- **Local configuration in the worktree.** `tools/local_config.py` reads
+  `<repo root>/clearwater.local.toml`, which is uncommitted and exists only in the main tree.
+  - The orchestrator copies it into the worktree root at creation. It is gitignored, so it
+    cannot be committed.
+  - Its paths are absolute: footage `C:\Users\rwsmy\clearwater-footage`, working
+    `C:\Users\rwsmy\clearwater\work`.
+  - So the `footage` test RUNS in the worktree, and `work/wp1.5/` above means the MAIN tree's
+    `C:\Users\rwsmy\clearwater\work\wp1.5\`.
+  - Never edit or commit that file.
+- **FFmpeg on PATH.** The WinGet links folder is not on the agents' default Bash PATH. Prepend
+  `/c/Users/rwsmy/AppData/Local/Microsoft/WinGet/Links` for every ffmpeg, ffprobe and pytest
+  run. Without it, the module skip hides the tests, and a skip at the gate fails claim 7.
+- **Output-path assertion.** Before each ffmpeg run, `spike.py` asserts two things about the
+  resolved output path (links resolved; the same refusal pattern as WP0.2's reports-folder
+  check):
+  - it is inside the configured working folder's `wp1.5` directory;
+  - it is NOT inside the footage folder.
+- **Spec version.** Read spec **v0.5.1** (`docs/underwater-correction-spec.md` on main).
+
 ## Test roster (`tests/test_container_spike.py`)
 
 - Skip module when `ffmpeg`/`ffprobe` are absent.
@@ -116,15 +138,49 @@ any correction are out of envelope; report them as not exercised.
 
 ## Review loop (Reviewer A) -- per `docs/review-gate-clearwater.md` Part 1
 
-- Tier **STRONG** (this result selects the product's video I/O approach). Transport, flags,
-  probe, assertions, convergence, evidence (`C:/Users/rwsmy/clearwater-review-evidence/wp1.5/rN/`)
-  and ledger (`docs/proofs/wp1.5-ledger.md`) as in the WP1.1 and WP1.2 briefs, worktree path
-  changed, withheld paths named in the prompt. WHAT TO EXAMINE: whether the comparison is
+- Tier **STRONG** (this result selects the product's video I/O approach).
+  - **Transport and flags:** WSL, pinned to codex-cli 0.162.1. Per-call flags, never `-p`:
+    `-m gpt-5.6-sol -c model_reasoning_effort=high -s read-only --skip-git-repo-check`. Banner
+    assertion: `gpt-5.6-sol` / `high`.
+  - **Diff:** generated Windows-side with
+    `git -C <worktree> diff -U8 <base>..HEAD -- . ':!uv.lock' ':!docs/proofs'` into a scratch
+    file; WSL never runs git.
+  - **Invocation**, with cwd the worktree:
+    `wsl.exe bash -ilc 'export PATH="$HOME/.local/node22/bin:$PATH"; cd /mnt/c/Users/rwsmy/clearwater/.worktrees/wp1.5 && cat <prompt> <diff> | codex exec -m gpt-5.6-sol -c model_reasoning_effort=high -s read-only --skip-git-repo-check - > <transcript> 2>&1'`
+  - **Probe:** one probe through this exact invocation before round 1, expecting one
+    `^ succeeded in` line.
+  - **Prompt:**
+    - the claim list;
+    - the envelope, with a request to TAG out-of-envelope findings;
+    - `CORRECTNESS REVIEW` / `WHAT TO EXAMINE` framing;
+    - "report every finding with a severity tag";
+    - the read-only-sandbox EXECUTED/REASONED paragraph verbatim from `docs/codex-reviewer.md`;
+    - its own paragraph: "Do NOT read `docs/proofs/` or anything under
+      `clearwater-review-evidence`".
+
+    Include the report in the diff. Never point Codex at the footage folder.
+  - **Per-round assertions** (all with `grep -a`):
+    - the banner;
+    - `^ERROR` and `ERROR codex_core` lines, each classified by provenance;
+    - the `^tokens used` footer;
+    - an anchored VERDICT line;
+    - at least one `^ succeeded in` line;
+    - `grep -a -n 'docs/proofs\|wp1.5-ledger'`, with each hit classified as an echo or an
+      access.
+  - **Convergence:** zero NEW in-envelope blocking findings. Minors are fixed once in that
+    round's cleanup. FIVE_ROUND_GATE: at round 5, yield with the ledger.
+  - **Evidence and ledger:** evidence in `C:/Users/rwsmy/clearwater-review-evidence/wp1.5/rN/`;
+    ledger `docs/proofs/wp1.5-ledger.md`, with the depth column left to the dispatcher. Delete
+    `.codex-*` staging files at teardown. WHAT TO EXAMINE: whether the comparison is
   complete against D105's list and exact on timestamps; whether the capability proofs are
   proofs (an ffprobe-confirmed output) rather than listings; whether the recommendation
   follows from the table; whether any ffmpeg flag could write outside the working folder.
-- Reviewer B: recommended (re-run `compare.py` on the cell's output files and confirm the
-  table reproduces; re-run the NVENC 10-bit proof); the orchestrator decides per the fill.
+- Reviewer B: ORDERED (orchestrator, per the fill). An independent implementer-opus-high cell
+  runs after your return:
+  - re-runs `compare.py` on your output files and confirms the table reproduces;
+  - re-runs the NVENC 10-bit proof;
+  - reviews the recommendation against the table;
+  - runs its own Codex pass.
 
 ## Notes for the cell
 
@@ -136,5 +192,12 @@ any correction are out of envelope; report them as not exercised.
 - STOP for: a mandatory item whose comparison you cannot make exact (say what ffprobe will
   not show); a real chapter ffmpeg cannot decode; any need to write outside `work/wp1.5/`;
   a dependency beyond the installed FFmpeg. Do not stop for a best-effort item lost: record it.
+- **Working rules:**
+  - Run `uv sync` in the worktree.
+  - Commit by pathspec with a conventional message (`feat(wp1.5): ...`) and the
+    `Co-Authored-By:` footer.
+  - Never use a bare `cd`.
+  - Never post to a mailbox.
+  - The footage folder is input-only.
 - The owner's note for context: these four clips are shallow snorkel; deeper (~20 m) scuba
   clips and shallow still photos arrive later. The spike's result does not depend on depth.
