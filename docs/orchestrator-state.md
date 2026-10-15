@@ -19,7 +19,10 @@
 
 ### Live cells
 
-- None (verify: `git worktree list` shows only main).
+- **wp12-cell** (implementer-opus-high, background) -- WP1.2 Part A, worktree `.worktrees/wp1.2`,
+  branch `wp1.2`, base `d27f909`; FINAL brief `docs/briefs/wp1.2-brief.md`. Dispatched
+  2026-10-15 ~02:33Z. **EXCLUSIVE**: schedule no other cell until it returns (inventory pass
+  queues behind it). Reviewer A STRONG; Reviewer B ORDERED, after the author returns.
 - Branches `wp0.1`, `wp0.2` and `wp1.1` are kept on purpose: they hold the reviewed pre-rebase
   SHAs the accept records cite.
 
@@ -55,8 +58,12 @@
 
 - **WP1.1 -- ACCEPTED 2026-10-15**, main `9711faf`, record `docs/proofs/wp1.1-accept.md` (2e09203).
   Return report posted to CHARC (raised: W_L near-inert at defaults, a WP1.3 calibration point);
-  operator fyi posted. Awaiting CHARC QA and the next commission.
+  operator fyi posted. CHARC QA'd: STANDS (`f1a60e57e0668069`); calibration point = DR-13.
+- **WP1.2 Part A** commissioned (`f1a60e57e0668069`), dispatched (see Live cells). Orchestrator
+  ctk-extra decision posted to CHARC for possible overrule. Accept report must carry the
+  figures table, the ledger, evidence folder and `docs/reports/wp1.2a-speed-memory.md`; gate
+  on main must RUN the gpu tests (`uv sync` on main first).
 - Lesson carried forward: every Reviewer B brief's Codex prompt must NAME the withheld paths in
   its own paragraph, plus a transcript `grep -a 'docs/proofs\|<wp>-ledger'` access assertion
   (WP1.1 B pass 1 Codex read the ledger).
-- Inbox drained through msg `ad686b8b65a71061` (verify: `uv run python scripts/role_mail.py list --role orchestrator`).
+- Inbox drained through msg `f1a60e57e0668069` (verify: `uv run python scripts/role_mail.py list --role orchestrator`).
