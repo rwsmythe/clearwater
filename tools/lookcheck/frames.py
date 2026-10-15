@@ -9,13 +9,17 @@ colour tags.
 **Colour.** The stream's pixel format, range and matrix are read with ``ffprobe`` and
 passed to FFmpeg's ``scale`` filter explicitly (``in_range``, ``in_color_matrix``,
 ``out_range=full``), so the conversion to RGB follows the tags and never an assumption.
+(For a ``yuvj`` pixel format, which is what FFmpeg's HEVC decoder reports for a full-range
+stream, the scaler takes the range from the pixel format and ignores ``in_range``; the
+decoder sets that format from the same tag, and a stream whose pixel format and range tag
+disagree is refused. The explicit range governs every other format.)
 Chroma is upsampled to full resolution by the scaler's default method. A stream with no
 range or matrix tag is read as BT.709 limited range and the record says it assumed that
 (spec D54, 6.5). The values are display-encoded RGB in the source's primaries, written as
-untagged 16-bit PNG (spec 6.5). A stream whose pixel format and range tag contradict each
-other, whose matrix this module does not map, or that carries a rotation is refused: it is
-outside the declared envelope. The conversion is proved by ``tests/test_lookcheck.py``
-against RGB values known in advance, for full-range and limited-range clips.
+untagged 16-bit PNG (spec 6.5). A stream whose matrix this module does not map, or that
+carries a rotation, is refused: it is outside the declared envelope. The conversion is
+proved by ``tests/test_lookcheck.py`` against RGB values known in advance, for full-range
+and limited-range clips.
 
 **Output safety.** Every file written, and every file FFmpeg is told to write, is first
 checked with :meth:`OutputRoots.check`: the resolved path lies inside the allowed folder
@@ -445,7 +449,9 @@ def probe_stream(video: Path) -> StreamInfo:
 
     Raises:
         ExtractError: The file has no video stream, the stream is rotated by a display
-            matrix, or its tags are outside the envelope (:func:`tags_from_stream`).
+            matrix, has no usable size, time base, frame rate or duration (a frame rate
+            of 0/0 is refused), or its tags are outside the envelope
+            (:func:`tags_from_stream`).
     """
     document = run_ffprobe(["-select_streams", "v:0", "-show_streams", "-show_format", str(video)])
     streams = document.get("streams") or []
@@ -463,14 +469,17 @@ def probe_stream(video: Path) -> StreamInfo:
         duration = document.get("format", {}).get("duration")
     if duration is None or duration == "N/A":
         raise ExtractError(f"{video.name} reports no duration")
-    return StreamInfo(
-        width=int(stream["width"]),
-        height=int(stream["height"]),
-        time_base=Fraction(stream["time_base"]),
-        frame_rate=Fraction(stream["avg_frame_rate"]),
-        duration_s=float(duration),
-        tags=tags_from_stream(stream),
-    )
+    try:
+        return StreamInfo(
+            width=int(stream["width"]),
+            height=int(stream["height"]),
+            time_base=Fraction(stream["time_base"]),
+            frame_rate=Fraction(stream["avg_frame_rate"]),
+            duration_s=float(duration),
+            tags=tags_from_stream(stream),
+        )
+    except (KeyError, ValueError, ZeroDivisionError) as exc:
+        raise ExtractError(f"{video.name}: unusable stream properties ({exc!r})") from None
 
 
 def frame_pts(video: Path, info: StreamInfo, start: Fraction, end: Fraction) -> list[int]:

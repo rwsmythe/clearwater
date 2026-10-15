@@ -192,6 +192,24 @@ def test_streams_outside_the_envelope_are_refused(stream: dict[str, str]) -> Non
         frames.tags_from_stream(stream)
 
 
+def test_a_stream_without_a_frame_rate_is_refused_not_a_traceback(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    stream = {
+        "width": 64,
+        "height": 64,
+        "time_base": "1/30000",
+        "avg_frame_rate": "0/0",
+        "duration": "1.0",
+        "pix_fmt": "yuv420p",
+        "color_range": "tv",
+        "color_space": "bt709",
+    }
+    monkeypatch.setattr(frames, "run_ffprobe", lambda _arguments: {"streams": [stream]})
+    with pytest.raises(ExtractError, match="unusable stream properties"):
+        frames.probe_stream(Path("x.mp4"))
+
+
 # --- test 2: pts fidelity ---------------------------------------------------------------------
 
 LEVELS = 12
