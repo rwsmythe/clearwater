@@ -31,10 +31,11 @@
 - **WP0.2 -- ACCEPTED 2026-10-15**, main `4863a90`, record `docs/proofs/wp0.2-accept.md`.
   Return report posted to CHARC; info-update to the operator posted. Real inventory run NOT
   done (footage folder absent at accept).
-- **Next (recommended to CHARC, awaiting word):** once the footage folder exists, a mechanical
-  implementer-sonnet-medium pass runs `uv run python tools/inventory.py` into `work/reports`
-  and reports counts and any uncovered GoPro names; that output feeds CP1 (owner-reserved
-  footage sorting).
+- WP0.2 accept QA'd and STANDS at CHARC (`1822a661d2cbf031`); banked items are DR-6..DR-10.
+- **Real inventory pass:** APPROVED in principle (implementer-sonnet-medium, mechanical, no code
+  changes) but DISPATCH ONLY ON CHARC'S WORD, posted when the owner reports the download complete.
+- **WP1.1** (reference pipeline prototype, implementer-opus-high): CHARC drafting; commission
+  follows in a separate post.
 
 ### Practice notes from WP0.1 (this instance)
 
@@ -49,4 +50,4 @@
 
 ### Pending
 
-- Inbox drained through msg `800be25ceb015347` (verify: `uv run python scripts/role_mail.py list --role orchestrator`).
+- Inbox drained through msg `1822a661d2cbf031` (verify: `uv run python scripts/role_mail.py list --role orchestrator`).
