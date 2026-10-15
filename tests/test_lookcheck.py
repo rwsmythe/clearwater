@@ -7,6 +7,7 @@ import re
 import shutil
 import struct
 import subprocess
+import sys
 import zlib
 from fractions import Fraction
 from pathlib import Path
@@ -17,7 +18,7 @@ import pytest
 from PIL import Image as PILImage
 
 import prototype.pipeline as pipeline
-from local_config import load_local_config
+from local_config import LocalConfigError, load_local_config
 from lookcheck import frames, pack
 from lookcheck.frames import ExtractError, OutputPathError, OutputRoots, StreamTags
 from prototype.backend import CPU, select_backend
@@ -75,10 +76,61 @@ def _quadrant_source(yuvs: list[tuple[int, int, int]]) -> str:
     )
 
 
+def _configured_footage() -> Path | None:
+    """The footage folder of the local configuration, or ``None`` when it does not load."""
+    try:
+        return load_local_config().footage_path
+    except LocalConfigError:
+        return None
+
+
+def _is_inside(path: Path, folder: Path) -> bool:
+    """Whether ``path`` equals ``folder`` or lies inside it (links resolved, case folded)."""
+    resolved = Path(os.path.normcase(path.resolve()))
+    root = Path(os.path.normcase(folder.resolve()))
+    return resolved == root or root in resolved.parents
+
+
+def _assert_outside_footage(path: Path) -> None:
+    """Fail the test at once when ``path`` lies inside the configured footage folder.
+
+    The synthetic tests write below pytest's temporary folder; a ``--basetemp``, ``TMP`` or
+    ``TEMP`` inside the real footage folder would make them write there.
+    """
+    footage = _configured_footage()
+    if footage is not None and _is_inside(path, footage):
+        pytest.fail(f"{path} lies inside the configured footage folder {footage}")
+
+
+@pytest.fixture(autouse=True)
+def _tmp_path_is_outside_the_footage_folder(tmp_path: Path) -> None:
+    _assert_outside_footage(tmp_path)
+
+
+def _footage(tmp_path: Path) -> Path:
+    """The footage root of the test roots: the REAL configured folder, so that the production
+    check refuses any write there; a folder that is never created when no local configuration
+    loads."""
+    return _configured_footage() or tmp_path / "footage"
+
+
 def _roots(tmp_path: Path) -> OutputRoots:
-    footage = tmp_path / "footage"
-    footage.mkdir(exist_ok=True)
-    return OutputRoots(allowed=tmp_path / "work" / "wp1.3", footage=footage)
+    _assert_outside_footage(tmp_path)
+    return OutputRoots(allowed=tmp_path / "work" / "wp1.3", footage=_footage(tmp_path))
+
+
+def _scratch_roots(roots: OutputRoots) -> OutputRoots:
+    """Roots whose allowed folder is ``roots.allowed.parent``: for a test's own inputs, which
+    still go through the production check."""
+    return OutputRoots(allowed=roots.allowed.parent, footage=roots.footage)
+
+
+def _checked(tmp_path: Path, name: str) -> Path:
+    """``tmp_path / name`` after the production check; its folder is created."""
+    path = tmp_path / name
+    OutputRoots(allowed=tmp_path, footage=_footage(tmp_path)).check(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    return path
 
 
 def _encode(roots: OutputRoots, output: Path, lavfi: str, *, tag_full: bool) -> Path:
@@ -109,14 +161,25 @@ def _encode(roots: OutputRoots, output: Path, lavfi: str, *, tag_full: bool) -> 
     return output
 
 
+QUADRANT_MARGIN = 8
+"""Pixels kept away from every quadrant edge: chroma upsampling blends the colours there."""
+
+
 def _quadrant_errors(png: Path) -> float:
-    """The largest difference, in 8-bit levels, between the PNG's quadrants and COLOURS."""
+    """The largest difference, in 8-bit levels, between the PNG and COLOURS over the whole
+    interior of each quadrant (``QUADRANT_MARGIN`` pixels in from the quadrant's edges)."""
     image = frames.read_png16(png) * 255.0
-    centres = ((32, 32), (32, 96), (96, 32), (96, 96))
-    return max(
-        float(np.abs(image[y, x] - np.array(colour)).max())
-        for (y, x), colour in zip(centres, COLOURS, strict=True)
-    )
+    half, margin = image.shape[0] // 2, QUADRANT_MARGIN
+    rows = ((margin, half - margin), (half + margin, image.shape[0] - margin))
+    columns = ((margin, half - margin), (half + margin, image.shape[1] - margin))
+    corners = ((0, 0), (0, 1), (1, 0), (1, 1))  # top left, top right, bottom left, bottom right
+    worst = 0.0
+    for (row, column), colour in zip(corners, COLOURS, strict=True):
+        (top, bottom), (left, right) = rows[row], columns[column]
+        interior = image[top:bottom, left:right]
+        assert interior.size, "the quadrant interior is empty"
+        worst = max(worst, float(np.abs(interior - np.array(colour)).max()))
+    return worst
 
 
 def _quadrant_clip(roots: OutputRoots, name: str, *, data_full: bool, tag_full: bool) -> Path:
@@ -311,6 +374,9 @@ def test_short_side_resizes_and_keeps_the_aspect_ratio(tmp_path: Path) -> None:
 def test_outputs_inside_the_footage_folder_or_outside_the_pack_are_refused(tmp_path: Path) -> None:
     roots = _roots(tmp_path)
     clip = _ramp_clip(roots)
+    footage = tmp_path / "fabricated-footage"  # fabricated on purpose: it is checked for emptiness
+    footage.mkdir()
+    roots = OutputRoots(allowed=roots.allowed, footage=footage)
     with pytest.raises(OutputPathError, match="footage"):
         frames.extract(clip, [0.0], roots.footage / "png", roots=roots)
     with pytest.raises(OutputPathError, match="outside"):
@@ -321,12 +387,9 @@ def test_outputs_inside_the_footage_folder_or_outside_the_pack_are_refused(tmp_p
 
 def test_a_file_with_more_than_one_hard_link_is_refused(tmp_path: Path) -> None:
     roots = _roots(tmp_path)
-    roots.allowed.mkdir(parents=True)
-    original = roots.allowed / "a.txt"
-    original.write_text("x")
-    roots.check(original)
+    original = roots.write_text(roots.allowed / "a.txt", "x")
     try:
-        os.link(original, roots.allowed / "b.txt")
+        os.link(original, roots.check(roots.allowed / "b.txt"))
     except OSError:
         pytest.skip("hard links are not available here")
     with pytest.raises(OutputPathError, match="hard links"):
@@ -429,18 +492,18 @@ def test_the_png_reader_unfilters_none_sub_and_up_rows(tmp_path: Path) -> None:
         else:
             filtered = row
         rows.append(bytes([kind]) + filtered.astype(np.uint8).tobytes())
-    path = tmp_path / "f.png"
+    path = _checked(tmp_path, "f.png")
     path.write_bytes(_png(width, height, rows))
     expected = values.astype(np.float32) / np.float32(65535.0)
     assert np.array_equal(frames.read_png16(path), expected)
 
 
 def test_the_png_reader_refuses_paeth_and_other_formats(tmp_path: Path) -> None:
-    path = tmp_path / "paeth.png"
+    path = _checked(tmp_path, "paeth.png")
     path.write_bytes(_png(1, 1, [bytes([4]) + bytes(6)]))
     with pytest.raises(ValueError, match="filter 4"):
         frames.read_png16(path)
-    eight_bit = tmp_path / "eight.png"
+    eight_bit = _checked(tmp_path, "eight.png")
     PILImage.new("RGB", (4, 4)).save(eight_bit)
     with pytest.raises(ValueError, match="16-bit RGB"):
         frames.read_png16(eight_bit)
@@ -448,7 +511,7 @@ def test_the_png_reader_refuses_paeth_and_other_formats(tmp_path: Path) -> None:
 
 def test_the_prototype_writer_and_the_reader_round_trip(tmp_path: Path) -> None:
     image = np.random.default_rng(1).random((6, 7, 3), dtype=np.float32)
-    path = tmp_path / "p.png"
+    path = _checked(tmp_path, "p.png")
     pack.write_png16(path, image)
     assert np.abs(frames.read_png16(path) - image).max() <= 0.5 / 65535 + 1e-7
 
@@ -461,8 +524,7 @@ def synthetic_pack(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Any]:
     """Build a pack from two frames of a synthetic clip, on the CPU."""
     root = tmp_path_factory.mktemp("pack")
     roots = _roots(root)
-    clip = roots.allowed.parent / "synth.mp4"
-    clip.parent.mkdir(parents=True, exist_ok=True)
+    clip = _checked(root, "work/synth.mp4")
     done = frames.run_tool(
         [
             *("ffmpeg", "-nostdin", "-hide_banner", "-y", "-loglevel", "error"),
@@ -653,7 +715,7 @@ def test_the_flicker_clip_is_built_checked_and_pruned(tmp_path: Path) -> None:
     except RuntimeError as exc:
         pytest.skip(f"no usable graphics card: {exc}")
     roots = _roots(tmp_path)
-    clip = roots.allowed.parent / "flick.mp4"
+    clip = _scratch_roots(roots).check(roots.allowed.parent / "flick.mp4")
     clip.parent.mkdir(parents=True, exist_ok=True)
     done = frames.run_tool(
         [
@@ -676,6 +738,13 @@ def test_the_flicker_clip_is_built_checked_and_pruned(tmp_path: Path) -> None:
     for label in ("unsmoothed", "source"):
         assert document["checks"][label]["color_primaries"] == "bt709", label
         assert document["checks"][label]["color_transfer"] == "bt709", label
+    readback = document["checks"]["readback"]
+    for label in ("unsmoothed", "source"):  # every frame of both clips was read back
+        record = readback[label]
+        assert record["frames_read"] == record["frames_expected"] == count
+        assert len(record["frames"]) == count and record["failed_frames"] == []
+        assert 0 < record["smallest_margin"] and record["worst_own"] <= pack.READBACK_MAX_OWN
+    assert not list(flicker_dir.glob("*.partial.mp4")) and not (flicker_dir / "readback").exists()
     assert len(document["frames"]) == count
     assert document["smoothing"].startswith("none")
     for name in ("flick_unsmoothed.mp4", "flick_source.mp4", "statistics.json", "statistics.png"):
@@ -712,7 +781,7 @@ def test_the_flicker_clip_is_built_checked_and_pruned(tmp_path: Path) -> None:
                 flicker_dir / clip_name,
                 [index * 1001 / 30000],
                 tmp_path / f"decoded-{clip_name}-{index}",
-                roots=OutputRoots(tmp_path, roots.footage),
+                roots=OutputRoots(tmp_path, roots.footage),  # the real footage folder
             )
             decoded = frames.to_uint8(frames.read_png16(got.path)).astype(np.float64)
             assert got.pts_ticks == index * 1001
@@ -825,6 +894,314 @@ def test_the_encode_command_carries_the_source_tags_and_rate() -> None:
     assert "setparams=range=tv:colorspace=bt709 " in bare
     assert "color_trc" not in bare.replace("-color_trc", "")
     assert command[:5] == ["ffmpeg", "-nostdin", "-hide_banner", "-nostats", "-y"]
+
+
+# --- the footage guard of these tests (B1) -----------------------------------------------------
+
+
+def test_the_test_roots_use_the_configured_footage_folder(tmp_path: Path) -> None:
+    configured = _configured_footage()
+    if configured is None:
+        pytest.skip("no local configuration: the test roots use a fabricated folder")
+    roots = _roots(tmp_path)
+    assert roots.footage == configured
+    with pytest.raises(OutputPathError, match="footage"):
+        roots.write_text(configured / "must-not-exist.txt", "no")
+    assert not (configured / "must-not-exist.txt").exists()
+
+
+def test_a_root_under_the_configured_footage_folder_is_refused(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fake = tmp_path / "configured-footage"
+    monkeypatch.setattr(sys.modules[__name__], "_configured_footage", lambda: fake)
+    with pytest.raises(pytest.fail.Exception, match="footage folder"):
+        _assert_outside_footage(fake / "pytest-of-user" / "test0")
+    with pytest.raises(pytest.fail.Exception, match="footage folder"):
+        _assert_outside_footage(fake)
+    with pytest.raises(pytest.fail.Exception, match="footage folder"):
+        _roots(fake / "tmp")
+    _assert_outside_footage(tmp_path / "elsewhere")  # a sibling folder is fine
+    # With roots built on that folder, the production check refuses every write below it,
+    # even when the allowed folder itself lies inside it.
+    roots = _roots(tmp_path / "elsewhere")
+    assert roots.footage == fake
+    for guarded in (
+        roots,
+        OutputRoots(allowed=fake / "work" / "wp1.3", footage=fake),
+    ):
+        with pytest.raises(OutputPathError, match="footage"):
+            guarded.write_text(fake / "work" / "wp1.3" / "f.txt", "no")
+    assert not fake.exists()
+
+
+# --- the read-back of every frame (B2) -----------------------------------------------------------
+
+READBACK_FRAMES = 8
+READBACK_SIZE = (128, 96)  # multiples of the read-back factor 8
+
+
+def _distinct_frames(roots: OutputRoots, directory: Path) -> Path:
+    """Eight 16-bit PNGs, numbered ``s_f0000.png``..., whose content differs a lot.
+
+    Each frame is a smooth random 4 x 4 colour field (linearly interpolated, so that 4:2:0
+    chroma loses little), far from every other frame at any reduction. Returns the numbered
+    pattern.
+    """
+    rng = np.random.default_rng(11)
+    width, height = READBACK_SIZE
+    for index in range(READBACK_FRAMES):
+        field = rng.random((4, 4, 3))
+        image = np.zeros((height, width, 3), np.float32)
+        for channel in range(3):
+            across = np.stack(
+                [
+                    np.interp(np.linspace(0, 3, width), range(4), field[row, :, channel])
+                    for row in range(4)
+                ]
+            )
+            image[:, :, channel] = np.stack(
+                [
+                    np.interp(np.linspace(0, 3, height), range(4), across[:, x])
+                    for x in range(width)
+                ],
+                axis=1,
+            )
+        target = directory / f"s_f{index:04d}.png"
+        roots.check(target)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        pack.write_png16(target, image)
+    return directory / "s_f%04d.png"
+
+
+def _reordered(roots: OutputRoots, pattern: Path, order: list[int], name: str) -> Path:
+    """Copies of the frames of ``pattern`` renumbered so that copy ``i`` is frame ``order[i]``."""
+    directory = pattern.parent / name
+    for index, source in enumerate(order):
+        target = directory / f"s_f{index:04d}.png"
+        roots.check(target)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(pattern.parent / f"s_f{source:04d}.png", target)
+    return directory / "s_f%04d.png"
+
+
+def _encode_sequence(roots: OutputRoots, pattern: Path, output: Path) -> Path:
+    """Encode a numbered PNG sequence as lossless HEVC 8-bit 4:2:0, limited range BT.709."""
+    roots.check(output)
+    done = frames.run_tool(
+        [
+            *("ffmpeg", "-nostdin", "-hide_banner", "-y", "-loglevel", "error"),
+            *("-framerate", "30000/1001", "-start_number", "0", "-i", str(pattern)),
+            *("-vf", "scale=out_color_matrix=bt709:out_range=limited,format=yuv420p"),
+            *("-c:v", "libx265", "-x265-params", "lossless=1:log-level=error"),
+            *("-color_range", "tv", "-colorspace", "bt709", "-color_primaries", "bt709"),
+            *("-color_trc", "bt709", "-video_track_timescale", "30000", str(output)),
+        ]
+    )
+    assert done.returncode == 0, done.stderr.decode(errors="replace")[-300:]
+    return output
+
+
+def _readback(
+    roots: OutputRoots, pattern: Path, encoded_from: Path, count: int = READBACK_FRAMES
+) -> dict[str, Any]:
+    """Encode the sequence ``encoded_from`` and read the clip back against ``pattern``."""
+    clip = _encode_sequence(roots, encoded_from, roots.allowed / f"{encoded_from.parent.name}.mp4")
+    info = frames.probe_stream(clip)
+    assert (info.width, info.height) == READBACK_SIZE
+    return pack.readback_clip(clip, pattern, count, info, roots.allowed / "flicker", roots)
+
+
+def _failed(record: dict[str, Any]) -> list[int]:
+    return [item["index"] for item in record["failed_frames"]]
+
+
+def test_distinct_frames_pass_the_full_readback_with_a_wide_margin(tmp_path: Path) -> None:
+    roots = _roots(tmp_path)
+    pattern = _distinct_frames(roots, roots.allowed / "seq")
+    record = _readback(roots, pattern, pattern)
+    assert record["ok"] is True and record["failed_frames"] == [] and record["problems"] == []
+    assert record["frames_read"] == record["frames_expected"] == READBACK_FRAMES
+    assert len(record["frames"]) == READBACK_FRAMES
+    assert record["reduced_size"] == [16, 12] and record["factor"] == 8
+    assert record["worst_own"] < pack.READBACK_MAX_OWN
+    assert record["smallest_margin"] > 10, "control: the synthetic frames must be far apart"
+    first, last = record["frames"][0], record["frames"][-1]
+    assert first["previous"] is None and last["next"] is None
+    for item in record["frames"]:
+        assert item["ok"] is True and len(item["bias"]) == 3
+        assert item["own"] < min(v for v in (item["previous"], item["next"]) if v is not None)
+    assert len(record["channel_bias"]) == 3
+    json.dumps(record, allow_nan=False)  # it goes into statistics.json
+    assert not (roots.allowed / "flicker" / "readback").exists(), "scratch frames left behind"
+
+
+def test_a_duplicated_frame_fails_the_readback_by_name(tmp_path: Path) -> None:
+    """Frame 3 replaced by frame 2 (correct pts, correct count): the old checks passed this."""
+    roots = _roots(tmp_path)
+    pattern = _distinct_frames(roots, roots.allowed / "seq")
+    order = [0, 1, 2, 2, 4, 5, 6, 7]
+    record = _readback(roots, pattern, _reordered(roots, pattern, order, "dup"))
+    assert record["ok"] is False
+    assert _failed(record) == [3]
+    assert "neighbour" in record["failed_frames"][0]["reason"]
+    assert record["frames"][3]["margin"] <= 0 < record["frames"][2]["margin"]
+
+
+def test_two_swapped_frames_fail_the_readback_by_name(tmp_path: Path) -> None:
+    roots = _roots(tmp_path)
+    pattern = _distinct_frames(roots, roots.allowed / "seq")
+    order = [0, 1, 2, 3, 5, 4, 6, 7]
+    record = _readback(roots, pattern, _reordered(roots, pattern, order, "swap"))
+    assert record["ok"] is False
+    assert _failed(record) == [4, 5]
+
+
+def test_a_dropped_frame_fails_the_readback_on_the_count(tmp_path: Path) -> None:
+    roots = _roots(tmp_path)
+    pattern = _distinct_frames(roots, roots.allowed / "seq")
+    order = [0, 1, 2, 4, 5, 6, 7]
+    shorter = _reordered(roots, pattern, order, "drop")
+    clip = _encode_sequence(roots, shorter, roots.allowed / "drop.mp4")
+    info = frames.probe_stream(clip)
+    record = pack.readback_clip(
+        clip, pattern, READBACK_FRAMES, info, roots.allowed / "flicker", roots
+    )
+    assert record["ok"] is False
+    assert any("7 frames, expected 8" in problem for problem in record["problems"])
+
+
+def test_a_colour_shift_fails_the_readback_on_the_channel_bias(tmp_path: Path) -> None:
+    """A clip encoded from brighter frames than the reference differs on every channel."""
+    roots = _roots(tmp_path)
+    pattern = _distinct_frames(roots, roots.allowed / "seq")
+    directory = roots.allowed / "bright"
+    for index in range(READBACK_FRAMES):
+        image = frames.read_png16(roots.allowed / "seq" / f"s_f{index:04d}.png")
+        target = directory / f"s_f{index:04d}.png"
+        roots.check(target)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        pack.write_png16(target, np.clip(image + 6.0 / 255.0, 0.0, 1.0))
+    record = _readback(roots, pattern, directory / "s_f%04d.png")
+    assert record["ok"] is False
+    assert any("bias" in problem for problem in record["problems"])
+
+
+# --- no clip under a final name unless both are verified (B3) -----------------------------------
+
+
+def _small_source(roots: OutputRoots) -> Path:
+    """A 3 s full-range test clip of 128 x 72, the source of the run_flicker tests."""
+    clip = _scratch_roots(roots).check(roots.allowed.parent / "flick.mp4")
+    clip.parent.mkdir(parents=True, exist_ok=True)
+    done = frames.run_tool(
+        [
+            *("ffmpeg", "-nostdin", "-hide_banner", "-y", "-loglevel", "error"),
+            *("-f", "lavfi", "-i", "testsrc2=size=128x72:rate=30000/1001:duration=3"),
+            *("-vf", f"format=yuv420p,setparams={_FULL_BT709}"),
+            *("-c:v", "libx265", "-crf", "14", "-x265-params", "log-level=error"),
+            *("-pix_fmt", "yuv420p", "-color_range", "pc", "-colorspace", "bt709"),
+            *("-color_primaries", "bt709", "-color_trc", "bt709", str(clip)),
+        ]
+    )
+    assert done.returncode == 0, done.stderr.decode(errors="replace")[-300:]
+    return clip
+
+
+class _FakeEncoder:
+    """Stands in for ``pack.run_tool`` (the FFmpeg encode): writes the output, returns a code."""
+
+    def __init__(self, codes: list[int]) -> None:
+        self.codes = codes
+        self.outputs: list[Path] = []
+
+    def __call__(self, command: list[str]) -> subprocess.CompletedProcess[bytes]:
+        self.outputs.append(Path(command[-1]))
+        Path(command[-1]).write_bytes(b"clip")
+        return subprocess.CompletedProcess(command, self.codes.pop(0), b"", b"boom")
+
+
+def _flicker_setup(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> tuple[OutputRoots, Path, Path]:
+    roots = _roots(tmp_path)
+    clip = _small_source(roots)
+    monkeypatch.setattr(pack, "FLICKER_SECONDS", 0.5)
+    flicker_dir = roots.allowed / "flicker"
+    for stale in ("flick_unsmoothed.mp4", "flick_source.mp4"):  # clips of an earlier run
+        roots.write_bytes(flicker_dir / stale, b"stale")
+    return roots, clip, flicker_dir
+
+
+def _no_clip_left(flicker_dir: Path) -> bool:
+    return not list(flicker_dir.glob("*.mp4"))
+
+
+@pytest.mark.parametrize("error", [ExtractError("ffprobe boom"), RuntimeError("unexpected")])
+def test_a_raising_verification_leaves_no_clip(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, error: Exception
+) -> None:
+    roots, clip, flicker_dir = _flicker_setup(tmp_path, monkeypatch)
+    encoder = _FakeEncoder([0, 0])
+    monkeypatch.setattr(pack, "run_tool", encoder)
+
+    def raising(*args: Any, **kwargs: Any) -> dict[str, Any]:
+        raise error
+
+    monkeypatch.setattr(pack, "verify_clip", raising)
+    with pytest.raises(type(error), match=str(error)):
+        pack.run_flicker(clip, roots, CPU, flicker_dir)
+    assert encoder.outputs, "control: the encode ran, so a clip existed before the failure"
+    assert _no_clip_left(flicker_dir)
+    assert list((flicker_dir / "source").glob("*.png")), "the frame PNGs are kept"
+
+
+def test_a_failing_second_encode_leaves_neither_clip(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    roots, clip, flicker_dir = _flicker_setup(tmp_path, monkeypatch)
+    encoder = _FakeEncoder([0, 1])
+    monkeypatch.setattr(pack, "run_tool", encoder)
+    monkeypatch.setattr(pack, "verify_clip", lambda *args, **kwargs: {"ok": True})
+    with pytest.raises(ExtractError, match="ffmpeg failed encoding"):
+        pack.run_flicker(clip, roots, CPU, flicker_dir)
+    assert len(encoder.outputs) == 2, "control: the first clip was encoded and verified"
+    assert all(".partial." in output.name for output in encoder.outputs)
+    assert _no_clip_left(flicker_dir)
+
+
+def test_a_failed_readback_leaves_neither_clip_and_a_pass_names_both(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    roots, clip, flicker_dir = _flicker_setup(tmp_path, monkeypatch)
+    encoder = _FakeEncoder([0, 0])
+    monkeypatch.setattr(pack, "run_tool", encoder)
+    monkeypatch.setattr(pack, "verify_clip", lambda *args, **kwargs: {"ok": True})
+    good: dict[str, Any] = {"ok": True, "failed_frames": [], "problems": []}
+    bad = {"ok": False, "failed_frames": [{"index": 4, "reason": "planted"}], "problems": []}
+    calls: list[str] = []
+
+    def fake_readback(*args: Any, **kwargs: Any) -> dict[str, Any]:
+        calls.append(args[0].name)
+        return bad if len(calls) == 2 else good  # the first clip passes, the second does not
+
+    monkeypatch.setattr(pack, "readback_clip", fake_readback)
+    with pytest.raises(ExtractError, match=r"read-back check failed.*planted"):
+        pack.run_flicker(clip, roots, CPU, flicker_dir)
+    assert _no_clip_left(flicker_dir)
+    assert list((flicker_dir / "source").glob("*.png")), "the frame PNGs are kept"
+    # A pass: both clips appear under their final names, and only then.
+    encoder.codes = [0, 0]
+    monkeypatch.setattr(
+        pack, "readback_clip", lambda *a, **k: {"ok": True, "failed_frames": [], "problems": []}
+    )
+    document = pack.run_flicker(clip, roots, CPU, flicker_dir)
+    assert sorted(path.name for path in flicker_dir.glob("*.mp4")) == [
+        "flick_source.mp4",
+        "flick_unsmoothed.mp4",
+    ]
+    assert document["checks"]["readback"]["ok"] is True
+    assert document["encode_commands"]["source"][-1].endswith("flick_source.mp4")
 
 
 # --- test 5: the footage smoke test --------------------------------------------------------------
