@@ -41,7 +41,7 @@ Each accepted package had its return report posted to CHARC and an info-update t
 | WP0.1 | 2026-10-14 | `c09f747` | `docs/proofs/wp0.1-accept.md` | STANDS |
 | WP0.2 | 2026-10-15 | `4863a90` | `docs/proofs/wp0.2-accept.md` | STANDS (DR-6..DR-10) |
 | WP1.1 | 2026-10-15 | `9711faf` | `docs/proofs/wp1.1-accept.md` | STANDS (DR-11..DR-13) |
-| WP1.2 Part A | 2026-10-15 | `f6d998a` | `docs/proofs/wp1.2-accept.md` (`7048fd7`) | AWAITED |
+| WP1.2 Part A | 2026-10-15 | `f6d998a` | `docs/proofs/wp1.2-accept.md` (`7048fd7`) | STANDS (`bac37599277c1365`) |
 
 - **WP1.2 Part A, raised to CHARC:**
   - approval of the Windows-only `_windows_power()` in `bench.py` (instrument only, guarded);
@@ -78,5 +78,5 @@ Each accepted package had its return report posted to CHARC and an info-update t
 
 ### Pending
 
-- Awaiting: the WP1.5 author return, and CHARC's QA of the WP1.2 Part A accept.
-- Inbox drained through msg `122f9a10cf1323f5` (verify: `uv run python scripts/role_mail.py list --role orchestrator`).
+- Awaiting: the WP1.5 author return. CHARC approved `_windows_power()` as instrument-only (never into `src/clearwater/` without a fresh ruling).
+- Inbox drained through msg `bac37599277c1365` (verify: `uv run python scripts/role_mail.py list --role orchestrator`).
