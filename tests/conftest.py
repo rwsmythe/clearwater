@@ -11,12 +11,14 @@ the footage folder and the offending root) when the temp root would be:
   (pytest removes the whole basetemp tree, which would take the footage with it);
 * otherwise the default temp root (``PYTEST_DEBUG_TEMPROOT`` if set, else the
   directory ``tempfile.gettempdir()`` would pick), inside or equal to the
-  footage folder.
+  footage folder, or when the footage folder lies in the ``pytest-of-<user>``
+  folder pytest makes under that root.
 
-Paths are compared fully resolved (symlinks and junctions followed) and, on
-Windows, case-insensitively. A legitimate basetemp, such as a folder under the
-working folder, passes. The guard is inert, and silent, when there is no valid
-local configuration: it never fails a run on a machine without footage.
+Paths are compared fully resolved (symlinks and junctions followed; a Windows
+extended-length prefix removed) and, on Windows, case-insensitively, then by file
+identity (``os.path.samefile``) for any existing ancestor. A legitimate basetemp,
+such as a folder under the working folder, passes. The guard is inert, and silent, when
+there is no valid local configuration: it never fails a run on a machine without footage.
 
 The guard only runs when this file is loaded, that is, when the pytest arguments
 (or ``testpaths``, when none are given) lie at or below ``tests/``. A run on a
@@ -44,19 +46,49 @@ def _canonical(path: str | os.PathLike[str]) -> Path:
 
     Returns:
         The path as ``os.path.abspath`` then ``Path.resolve`` leave it (pytest's own
-        order for ``--basetemp``), normalised for case on Windows.
+        order for ``--basetemp``), with any Windows extended-length prefix removed and
+        the case normalised on Windows.
 
     Raises:
         OSError: If the path cannot be resolved.
         RuntimeError: If resolving meets a symlink loop.
     """
-    resolved = Path(os.path.abspath(os.fspath(path))).resolve()
-    return Path(os.path.normcase(str(resolved)))
+    text = str(Path(os.path.abspath(os.fspath(path))).resolve())
+    if os.name == "nt":
+        # resolve() keeps an extended-length prefix that was in the input; strip it to compare.
+        if text.startswith("\\\\?\\UNC\\"):
+            text = "\\\\" + text[8:]
+        elif text.startswith("\\\\?\\"):
+            text = text[4:]
+    return Path(os.path.normcase(text))
 
 
 def _inside_or_equal(candidate: Path, folder: Path) -> bool:
-    """Report whether ``candidate`` equals ``folder`` or lies below it."""
-    return candidate == folder or folder in candidate.parents
+    """Report whether ``candidate`` equals ``folder`` or lies below it.
+
+    The canonical-path comparison is backed by file identity: an existing
+    ancestor of ``candidate`` (or ``candidate`` itself) that is the same file as
+    ``folder`` counts, which catches spellings the text comparison misses (8.3
+    short names, subst or mapped drives, bind mounts).
+    """
+    if candidate == folder or folder in candidate.parents:
+        return True
+    for ancestor in (candidate, *candidate.parents):
+        try:
+            if os.path.samefile(ancestor, folder):
+                return True
+        except OSError:
+            continue  # absent (a not-yet-existing tail) or unreadable
+    return False
+
+
+def _holds_pytest_of(root: Path, folder: Path) -> bool:
+    """Report whether ``folder`` lies inside ``root/pytest-of-*``, where pytest writes."""
+    try:
+        parts = folder.relative_to(root).parts
+    except ValueError:
+        return False
+    return bool(parts) and parts[0].startswith("pytest-of-")
 
 
 def _temp_root_candidates() -> list[str]:
@@ -72,8 +104,8 @@ def _temp_root_candidates() -> list[str]:
         The cached ``tempfile.tempdir`` alone if already chosen, else every
         candidate.
     """
-    if tempfile.tempdir:
-        return [tempfile.tempdir]
+    if tempfile.tempdir is not None:
+        return [os.fsdecode(tempfile.tempdir)]
     candidates = [value for name in ("TMPDIR", "TEMP", "TMP") if (value := os.getenv(name))]
     if os.name == "nt":
         candidates += [
@@ -117,10 +149,12 @@ def _offending_root(config: pytest.Config, footage: Path) -> str | None:
     else:
         origin, roots = (
             "the default temp root (TMPDIR/TEMP/TMP or a system default)",
-            (_temp_root_candidates()),
+            _temp_root_candidates(),
         )
     for root_text in roots:
-        if _inside_or_equal(_canonical(root_text), footage):
+        root = _canonical(root_text)
+        # pytest makes pytest-of-<user>/ under the root, so a footage folder there is hit too.
+        if _inside_or_equal(root, footage) or _holds_pytest_of(root, footage):
             return f"{origin} {root_text}"
     return None
 

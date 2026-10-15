@@ -18,8 +18,10 @@ the planted files; every refused case with the guard leaves the footage byte-ide
 ## The rule
 
 All paths: `os.path.abspath` then `Path.resolve()` (symlinks and junctions followed; `..`, relative
-paths, trailing separators and 8.3 names collapse), then `os.path.normcase` (case-insensitive on
-Windows). "Inside" = equal to the footage folder or having it as an ancestor.
+paths, trailing separators and 8.3 names collapse), a Windows extended-length prefix (`\?\`,
+which `resolve()` keeps when the input has it) stripped, then `os.path.normcase` (case-insensitive
+on Windows). "Inside" = equal to the footage folder or having it as an ancestor, OR any existing
+ancestor of the candidate is the same file (`os.path.samefile`) as the footage folder.
 
 * `--basetemp` given: refused if inside or equal to the footage folder, or an ANCESTOR of it
   (see Deviations).
@@ -27,7 +29,8 @@ Windows). "Inside" = equal to the footage folder or having it as an ancestor.
   Because `gettempdir()` probes by creating and deleting a file in each candidate (so calling it
   would write inside a footage folder named by `TMPDIR`), the guard mirrors its candidate list
   without touching disk and refuses if ANY candidate is inside or equal to the footage folder,
-  unless `tempfile.tempdir` is already cached (then only that value is checked).
+  unless `tempfile.tempdir` is already cached (then only that value is checked). A default root
+  is also refused when the footage folder lies in `<root>/pytest-of-*`, where pytest writes.
 
 ## Pytest lines mirrored (pytest 8.4.2, `.venv/Lib/site-packages/_pytest/`)
 
@@ -47,16 +50,17 @@ Windows). "Inside" = equal to the footage folder or having it as an ancestor.
   outside `tests/`, `--noconftest`, `--confcutdir` above `tests/`, or another rootdir does not
   load it. In scope: `uv run pytest`, `pytest tests/...`.
 * Out of envelope: other runners, plugins overriding `basetemp`, links changed mid-run.
-* A default root that is an ANCESTOR of the footage folder is not refused (pytest only touches
-  `pytest-of-<user>/` below it); a footage folder inside `pytest-of-<user>/` is not guarded.
+* A default root that is an ancestor of the footage folder is not refused unless the footage
+  folder lies in `<root>/pytest-of-*`; pytest touches nothing else below the root.
 * The guard needs the local configuration; without footage configured there is nothing to guard.
 
-## Tests (`tests/test_conftest_guard.py`, 24 cases, each in a subprocess on a miniature repository
+## Tests (`tests/test_conftest_guard.py`, 27 cases, each in a subprocess on a miniature repository
 under `tmp_path`; fake footage and working folders; no real path named)
 
 control without guard wipes the footage; `--basetemp` refused (equal, trailing separator, existing
 subfolder, missing subfolder, missing nested, `..` inside, relative inside, relative equal,
 ancestor); `TMPDIR`/`TEMP`/`TMP` inside and equal; `PYTEST_DEBUG_TEMPROOT` inside; case variant
-(Windows); symlink or junction (`--basetemp` and temp variables); passes: `--basetemp` and temp
+(Windows); extended-length prefix and 8.3 short name (Windows); default root whose
+`pytest-of-*` folder is the footage; symlink or junction (`--basetemp` and temp variables); passes: `--basetemp` and temp
 variables in the working folder, sibling `footage-other`; inert (no file, invalid TOML, relative
 path, no keys); DR-9 skip reasons (absent versus not configured).

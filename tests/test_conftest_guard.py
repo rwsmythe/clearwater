@@ -12,7 +12,7 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 import pytest
@@ -49,13 +49,19 @@ class Mini:
 def _assert_under(tmp_path: Path, *paths: Path | str) -> None:
     base = tmp_path.resolve()
     for path in paths:
-        resolved = Path(os.path.abspath(os.path.join(base, os.fspath(path)))).resolve()
+        text = os.fspath(path)
+        # An extended-length prefix (a deliberate test input) is the same place; drop it to compare.
+        text = text.removeprefix("\\\\?\\") if os.name == "nt" else text
+        resolved = Path(os.path.abspath(os.path.join(base, text))).resolve()
         assert resolved == base or base in resolved.parents, f"{path} escapes {tmp_path}"
 
 
 def _toml(footage: Path, work: Path) -> str:
-    # TOML literal strings keep Windows backslashes intact.
-    return f"footage_path = '{footage}'\nworking_path = '{work}'\n"
+    # TOML basic strings, escaped, so any legal Windows path (apostrophes, backslashes) survives.
+    def quote(path: Path) -> str:
+        return '"' + str(path).replace("\\", "\\\\").replace('"', '\\"') + '"'
+
+    return f"footage_path = {quote(footage)}\nworking_path = {quote(work)}\n"
 
 
 def _build(tmp_path: Path, *, config: str | None = "fake", guard: bool = True) -> Mini:
@@ -208,6 +214,44 @@ def test_basetemp_differing_only_in_case_is_refused(tmp_path: Path) -> None:
     before = _snapshot(mini.footage)
     for variant in (str(mini.footage).swapcase(), str(mini.footage / "sub").upper()):
         _assert_refused(_run(tmp_path, mini, f"--basetemp={variant}"), mini, before)
+
+
+@pytest.mark.skipif(os.name != "nt", reason="extended-length prefixes exist only on Windows")
+def test_basetemp_with_extended_length_prefix_is_refused(tmp_path: Path) -> None:
+    mini = _build(tmp_path)
+    before = _snapshot(mini.footage)
+    for tail in ("", "\\sub", "\\not-yet-there"):
+        variant = "\\\\?\\" + str(mini.footage) + tail
+        _assert_refused(_run(tmp_path, mini, f"--basetemp={variant}"), mini, before)
+
+
+@pytest.mark.skipif(os.name != "nt", reason="8.3 short names exist only on Windows")
+def test_basetemp_through_a_short_name_is_refused(tmp_path: Path) -> None:
+    import ctypes
+
+    mini = _build(tmp_path)
+    buffer = ctypes.create_unicode_buffer(1024)
+    ctypes.windll.kernel32.GetShortPathNameW(str(mini.footage / "sub"), buffer, 1024)  # type: ignore[attr-defined]
+    short = buffer.value
+    if not short or short.lower() == str(mini.footage / "sub").lower():
+        pytest.skip("this volume has no 8.3 short name for the fake footage path")
+    before = _snapshot(mini.footage)
+    _assert_refused(_run(tmp_path, mini, f"--basetemp={short}"), mini, before)
+
+
+def test_default_root_whose_pytest_of_folder_is_the_footage_is_refused(tmp_path: Path) -> None:
+    mini = _build(tmp_path)
+    root = tmp_path / "temproot"
+    footage = root / "pytest-of-someone"
+    (footage / "sub").mkdir(parents=True)
+    (footage / "keep.txt").write_bytes(b"keep")
+    (mini.root / "clearwater.local.toml").write_text(_toml(footage, mini.work), encoding="utf-8")
+    mini = replace(mini, footage=footage)
+    before = _snapshot(footage)
+    env = {"TEMP": str(root), "TMP": str(root), "TMPDIR": str(root)}
+    _assert_refused(_run(tmp_path, mini, env_extra=env), mini, before)
+    result = _run(tmp_path, mini, env_extra={"PYTEST_DEBUG_TEMPROOT": str(root)})
+    _assert_refused(result, mini, before)
 
 
 def _make_dir_link(link: Path, target: Path) -> None:
