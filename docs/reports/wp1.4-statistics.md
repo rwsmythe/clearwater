@@ -95,7 +95,7 @@ to 1. At 30000/1001 fps a 1.0 s window gives h = 14, 29 taps.
 - Past the ends of an excerpt the end value is held (`nearest`). That is a property of a 6 s
   excerpt, not of the product, which smooths over the whole clip. It is why the flicker is also
   reported over the INTERIOR frames: those at least 2.0 s from either end, where even a 4 s window
-  fits (61 steps).
+  fits (61 steps on `GX011627`, 60 on `GX011625`).
 - The comparison of section 3 uses `gaussian` 1.0 s, as the brief fixes.
 
 **Flicker measure: an instrument of this package, NOT V3.** V3 (D112) is measured later, on a
