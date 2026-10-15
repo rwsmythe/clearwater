@@ -202,7 +202,8 @@ first ten steady frames -> the median of the last ten.
 **GPU spread between the windows (a result in itself).** All three windows' GPU records are
 kept; the memory figures were identical to the byte in all three. Against the first window
 (head `d3d9555`, overlay and GPU state not recorded, stray present), the 3C cells came out
-13-18 % faster in both later windows and the ancuti2018 cells 6-8 % faster; the second and
+10-18 % faster in both later windows (9.8-13.3 % at 4K, 16.8-18.1 % at 5.3K) and the
+ancuti2018 cells 6-8 % faster; the second and
 third windows agree within 4.2 %. 3C's sigma-108 Gaussian is compute-bound and the most
 clock-sensitive step. At the end of every third-window loop the card was in P0 at 2055-2445
 MHz, power-capped (reason 0x04) or, after 5.3K 3C, in software thermal slowdown (0x20); what
