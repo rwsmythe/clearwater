@@ -70,6 +70,7 @@ from lookcheck.frames import (
     ExtractError,
     FrameFile,
     OutputRoots,
+    StreamInfo,
     StreamTags,
     excerpt,
     extract,
@@ -616,9 +617,9 @@ def verify_clip(
 
     The clip must be one HEVC Main 8-bit 4:2:0 video stream (``yuv420p``, or ``yuvj420p``
     which is how FFmpeg reports a full-range one) of ``size`` holding ``count`` frames with
-    first pts 0 and every pts step one frame period, carrying the colour range, matrix,
-    primaries and transfer of ``tags`` (a tag that is ``unknown`` is not compared), and no
-    audio stream.
+    first pts 0 and every pts step, taken in the order ``ffprobe`` lists the frames (not
+    sorted), one frame period, carrying the colour range, matrix, primaries and transfer of
+    ``tags`` (a tag that is ``unknown`` is not compared), and no audio stream.
 
     Args:
         video: The MP4.
@@ -646,7 +647,7 @@ def verify_clip(
             str(video),
         ]
     )
-    pts = sorted(int(frame["pts"]) for frame in listing.get("frames", []))
+    pts = [int(frame["pts"]) for frame in listing.get("frames", [])]
     steps = {b - a for a, b in itertools.pairwise(pts)}
     period = 1 / frame_rate / time_base
     record: dict[str, Any] = {
@@ -686,6 +687,50 @@ def verify_clip(
         and not audio_streams
     )
     return record
+
+
+def encode_clip(
+    roots: OutputRoots,
+    pattern: Path,
+    output: Path,
+    info: StreamInfo,
+    count: int,
+    flicker_dir: Path,
+) -> tuple[list[str], dict[str, Any]]:
+    """Encode one numbered PNG sequence to an MP4 and verify it; a bad clip is deleted.
+
+    Runs :func:`encode_command` on a checked output path and then :func:`verify_clip`. If
+    FFmpeg fails, or the clip fails its check, the output file is removed again (so that no
+    partial or unverified clip is left under its final name) and an error is raised; the
+    frame PNGs are never touched here.
+
+    Args:
+        roots: The output safety roots.
+        pattern: The numbered input PNG path.
+        output: The MP4 to write.
+        info: The source stream (frame rate, size and tags the clip must carry).
+        count: The number of frames the clip must hold.
+        flicker_dir: The folder of ``output`` (created if absent).
+
+    Returns:
+        The FFmpeg command and the :func:`verify_clip` record (``ok`` true).
+
+    Raises:
+        lookcheck.frames.ExtractError: FFmpeg fails or the clip fails its check.
+    """
+    roots.check(output)
+    roots.mkdir(flicker_dir)
+    command = encode_command(pattern, output, info.tags, info.frame_rate)
+    done = run_tool(command)
+    if done.returncode != 0:
+        roots.remove(output)
+        tail = done.stderr.decode("utf-8", errors="replace").strip().splitlines()[-1:]
+        raise ExtractError(f"ffmpeg failed encoding {output.name}: {tail}")
+    record = verify_clip(output, count, info.tags, info.frame_rate, (info.width, info.height))
+    if not record["ok"]:
+        roots.remove(output)
+        raise ExtractError(f"encode check failed for {output.name}: {record}")
+    return command, record
 
 
 def series_summary(values: Sequence[float]) -> dict[str, float]:
@@ -812,23 +857,16 @@ def run_flicker(
     checks: dict[str, Any] = {}
     commands: dict[str, list[str]] = {}
     for label, (pattern, output) in clips.items():
-        roots.check(output)
-        roots.mkdir(output.parent)
-        command = encode_command(pattern, output, tags, info.frame_rate)
-        commands[label] = command
-        done = run_tool(command)
-        if done.returncode != 0:
-            tail = done.stderr.decode("utf-8", errors="replace").strip().splitlines()[-1:]
-            raise ExtractError(f"ffmpeg failed encoding {output.name}: {tail}")
-        checks[label] = verify_clip(
-            output, len(frames), tags, info.frame_rate, (info.width, info.height)
+        commands[label], checks[label] = encode_clip(
+            roots, pattern, output, info, len(frames), flicker_dir
         )
     checks["readback"] = _readback_check(
         clips["source"][1], frames[0].path, tags, flicker_dir, roots
     )
-    failed = [name for name, check in checks.items() if not check["ok"]]
-    if failed:
-        raise ExtractError(f"encode checks failed ({', '.join(failed)}); frames kept: {checks}")
+    if not checks["readback"]["ok"]:
+        for _pattern, output in clips.values():
+            roots.remove(output)
+        raise ExtractError(f"read-back check failed; clips removed, frames kept: {checks}")
     series = {
         "red gain (white balance)": [e["statistics"]["red_gain"] for e in entries],
         "blue gain (white balance)": [e["statistics"]["blue_gain"] for e in entries],

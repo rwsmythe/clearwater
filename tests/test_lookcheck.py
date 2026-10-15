@@ -6,6 +6,7 @@ import os
 import re
 import shutil
 import struct
+import subprocess
 import zlib
 from fractions import Fraction
 from pathlib import Path
@@ -477,6 +478,11 @@ def synthetic_pack(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Any]:
     return {"roots": roots, "frames": got, "document": document, "clip": clip}
 
 
+def _distance(a: np.ndarray[Any, Any], b: np.ndarray[Any, Any]) -> float:
+    """Mean absolute difference of two 8-bit images, in levels."""
+    return float(np.abs(a - b).mean())
+
+
 def test_the_pack_has_its_layout_and_the_index_names_every_file(
     synthetic_pack: dict[str, Any],
 ) -> None:
@@ -494,6 +500,17 @@ def test_the_pack_has_its_layout_and_the_index_names_every_file(
             assert (root / "thumbs" / f"{stem}-{name}.jpg").is_file()
             with PILImage.open(root / "pairs" / f"{stem}-{name}.jpg") as pair:
                 assert pair.size == (512, 144)  # source left, corrected right, not enlarged
+                both = np.asarray(pair.convert("RGB")).astype(np.float64)
+            source8 = frames.to_uint8(frames.read_png16(frame.path)).astype(np.float64)
+            corrected8 = frames.to_uint8(
+                frames.read_png16(root / "frames" / f"{stem}-{name}.png")
+            ).astype(np.float64)
+            left, right = both[:, :256], both[:, 256:]
+            assert _distance(source8, corrected8) > 6, "control: source and corrected must differ"
+            assert _distance(left, source8) < _distance(left, corrected8), "left is not the source"
+            assert _distance(right, corrected8) < _distance(right, source8), (
+                "right is not corrected"
+            )
     for name in ("frames.json", "statistics.json", "index.html"):
         assert (root / name).is_file()
     page = (root / "index.html").read_text(encoding="utf-8")
@@ -674,12 +691,44 @@ def test_the_flicker_clip_is_built_checked_and_pruned(tmp_path: Path) -> None:
         for a, b in zip(reread["frames"], reread["frames"][1:], strict=False)
     }
     assert ticks == {1001}
+    # The encoded frames are the kept frames, in place (a shifted, repeated or swapped
+    # sequence would not match asymmetric indices 0, 90 and 179).
+    kept = {
+        index: (
+            frames.to_uint8(
+                frames.read_png16(flicker_dir / "source" / f"flick_f{index:04d}.png")
+            ).astype(np.float64),
+            frames.to_uint8(
+                frames.read_png16(flicker_dir / "corrected" / f"flick_f{index:04d}-ancuti2018.png")
+            ).astype(np.float64),
+        )
+        for index in (0, 90, 179)
+    }
+    assert _distance(kept[90][0], kept[90][1]) > 6, "control: the correction must change frames"
+    assert _distance(kept[0][0], kept[90][0]) > 6, "control: frames must differ with the index"
+    for clip_name, which in (("flick_source.mp4", 0), ("flick_unsmoothed.mp4", 1)):
+        for index, pair_of_frames in kept.items():
+            (got,) = frames.extract(
+                flicker_dir / clip_name,
+                [index * 1001 / 30000],
+                tmp_path / f"decoded-{clip_name}-{index}",
+                roots=OutputRoots(tmp_path, roots.footage),
+            )
+            decoded = frames.to_uint8(frames.read_png16(got.path)).astype(np.float64)
+            assert got.pts_ticks == index * 1001
+            nearest = min(kept, key=lambda other: _distance(decoded, kept[other][which]))
+            assert nearest == index, f"{clip_name} frame {index} matches kept frame {nearest}"
+            assert _distance(decoded, pair_of_frames[which]) < 8, (clip_name, index)
+            assert _distance(decoded, pair_of_frames[1 - which]) > 6, (clip_name, index)
 
 
-def _fake_probe(stream: dict[str, Any], steps: int = 1001, count: int = 5) -> Any:
+def _fake_probe(
+    stream: dict[str, Any], steps: int = 1001, count: int = 5, order: list[int] | None = None
+) -> Any:
     def run(arguments: Any) -> dict[str, Any]:
         if "-show_frames" in arguments:
-            return {"frames": [{"pts": k * steps} for k in range(count)]}
+            ticks = [k * steps for k in range(count)]
+            return {"frames": [{"pts": ticks[k]} for k in (order or range(count))]}
         return {"streams": [stream]}
 
     return run
@@ -706,7 +755,7 @@ def test_verify_clip_accepts_the_right_stream_and_names_each_planted_defect(
     tags = StreamTags("yuvj420p", "pc", "bt709", "bt709", "bt709")
     rate, size = Fraction(30000, 1001), (3840, 2160)
 
-    def verdict(stream: dict[str, Any], **kwargs: int) -> bool:
+    def verdict(stream: dict[str, Any], **kwargs: Any) -> bool:
         monkeypatch.setattr(pack, "run_ffprobe", _fake_probe(stream, **kwargs))
         return bool(pack.verify_clip(Path("x.mp4"), 5, tags, rate, size)["ok"])
 
@@ -725,6 +774,42 @@ def test_verify_clip_accepts_the_right_stream_and_names_each_planted_defect(
         assert verdict(stream) is False, name
     assert verdict(_GOOD_STREAM, steps=1000) is False, "timing"
     assert verdict(_GOOD_STREAM, count=4) is False, "frame count"
+    assert verdict(_GOOD_STREAM, order=[0, 2, 1, 3, 4]) is False, "presentation order"
+
+
+def test_a_failed_or_unverified_encode_leaves_no_clip_under_its_name(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    roots = _roots(tmp_path)
+    flicker_dir = roots.allowed / "flicker"
+    output = flicker_dir / "c.mp4"
+    tags = StreamTags("yuvj420p", "pc", "bt709", "bt709", "bt709")
+    info = frames.StreamInfo(3840, 2160, Fraction(1, 30000), Fraction(30000, 1001), 1.0, tags)
+
+    def writes_then(code: int) -> Any:
+        def run(command: list[str]) -> subprocess.CompletedProcess[bytes]:
+            Path(command[-1]).write_bytes(b"partial")
+            return subprocess.CompletedProcess(command, code, b"", b"boom")
+
+        return run
+
+    def encode() -> tuple[list[str], dict[str, Any]]:
+        return pack.encode_clip(roots, Path("in_f%04d.png"), output, info, 5, flicker_dir)
+
+    monkeypatch.setattr(pack, "run_tool", writes_then(1))
+    with pytest.raises(ExtractError, match="ffmpeg failed"):
+        encode()
+    assert not output.exists()
+    monkeypatch.setattr(pack, "run_tool", writes_then(0))
+    monkeypatch.setattr(
+        pack, "run_ffprobe", _fake_probe({**_GOOD_STREAM, "pix_fmt": "yuv420p10le"})
+    )
+    with pytest.raises(ExtractError, match="encode check failed"):
+        encode()
+    assert not output.exists()
+    monkeypatch.setattr(pack, "run_ffprobe", _fake_probe(_GOOD_STREAM))
+    command, record = encode()
+    assert output.exists() and record["ok"] is True and command[-1] == str(output)
 
 
 def test_the_encode_command_carries_the_source_tags_and_rate() -> None:
