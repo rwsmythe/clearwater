@@ -1,7 +1,8 @@
-# WP1.1 — Reference pipeline prototype (dispatch brief, DRAFT)
+# WP1.1 — Reference pipeline prototype (dispatch brief, FINAL)
 
-**Status:** draft by CHARC, 2026-10-15, commissioned to the orchestrator, which issues the
-FINAL brief in the plan's section 4.6 format. Needs no footage: it runs on one image, and the
+**Status:** FINAL, issued by the orchestrator 2026-10-15 from CHARC's draft (edee76d) on CHARC's
+commission `3f7c2f997b58c6d5`. Cell: `implementer-opus-high`. Worktree `.worktrees/wp1.1`,
+branch `wp1.1`, base = the main commit that carries this file. Needs no footage: it runs on one image, and the
 tests use synthetic images. Prototype code is evidence, not product (plan section 6, Phase 1):
 it lives under `tools/prototype/`; Phase 3 may reuse it only under the full definition of done.
 
@@ -81,6 +82,25 @@ and one `--set name=value` per parameter override. Reads with Pillow into float3
 (ignoring any embedded profile and saying so), writes `<out>/<stem>-<method>.png` as 16-bit RGB.
 Exit 0; 2 on a bad argument or unreadable image, with a one-line error.
 
+### Decisions fixed at issue (orchestrator)
+
+- **Import layout.** `tools/` is not a package; pytest has `pythonpath = ["tools"]` and mypy has
+  `files = ["src/clearwater", "tools"]` (WP0.1). So `tools/prototype/` is the package `prototype`:
+  tests import `prototype.pipeline`, and modules inside the package use relative imports
+  (`from .params import Params`). `run.py` must also work as a script
+  (`uv run python tools/prototype/run.py ...`, where `sys.path[0]` is `tools/prototype`). It does so
+  with one documented bootstrap at the top: when `__package__` is empty, insert the `tools`
+  directory (`Path(__file__).resolve().parent.parent`) at the front of `sys.path`, then import
+  `prototype.*`. Mark the following imports `# noqa: E402` with a comment saying why. No other
+  `sys.path` manipulation anywhere.
+- **Spec reading.** Read spec sections 6.1–6.7 (`docs/underwater-correction-spec.md` lines
+  ~232–300) and 14.1 (~534–557) in full; read nothing else of the spec unless a clause cited there
+  points to it.
+- **Memory.** `Result` keeps every intermediate by design. Tests stay at the small sizes in the
+  roster; no test or required run uses a large image. A memory figure is out of scope (WP1.2).
+- **mypy.** scipy may need the permitted override (no stub package: a stub package is a new
+  dependency and out of envelope).
+
 ## Required end state (the claim list)
 
 1. `uv run python tools/prototype/run.py --in <photo> --out <dir> --method ancuti2018` and
@@ -128,7 +148,47 @@ CPU only, Windows 11, Python 3.12 under uv, one image at a time up to a 48-megap
 treated as values in [0, 1] without colour management. Linear-light inputs, HDR transfer
 functions, video and the GPU are out of envelope.
 
+## Review loop (Reviewer A) -- per `docs/review-gate-clearwater.md` Part 1
+
+- Tier **STRONG** (CHARC: this is the reference the whole prototype gate builds on; treat it as
+  product code). Transport **WSL** (pinned; codex-cli 0.162.1). Per-call flags, never `-p`:
+  `-m gpt-5.6-sol -c model_reasoning_effort=high -s read-only --skip-git-repo-check`.
+  Banner assertion: `gpt-5.6-sol` / `high`.
+- Diff Windows-side: `git -C <worktree> diff -U8 <base>..HEAD -- . ':!uv.lock' ':!docs/proofs'`
+  into a scratch file; WSL never runs git. Invocation (cwd = the worktree):
+  `wsl.exe bash -ilc 'export PATH="$HOME/.local/node22/bin:$PATH"; cd /mnt/c/Users/rwsmy/clearwater/.worktrees/wp1.1 && cat <prompt> <diff> | codex exec -m gpt-5.6-sol -c model_reasoning_effort=high -s read-only --skip-git-repo-check - > <transcript> 2>&1'`
+  (WSL paths for the scratch files).
+- Before round 1: a one-command probe through this exact invocation (one `^ succeeded in` line).
+- Prompt per the fill: the claim list; the envelope, with a request to TAG out-of-envelope
+  findings; `CORRECTNESS REVIEW` / `WHAT TO EXAMINE` framing, where WHAT TO EXAMINE names
+  equation fidelity to the spec sections and the two papers; "report every finding with a
+  severity tag"; and the read-only-sandbox EXECUTED/REASONED paragraph verbatim from
+  `docs/codex-reviewer.md`. Include the two report documents in the diff.
+- Per-round assertions (all `grep -a`): banner; `^ERROR` and `ERROR codex_core` classified by
+  provenance; `^tokens used` footer; anchored VERDICT; `^ succeeded in` >= 1.
+- **Convergence:** zero NEW in-envelope blocking ends the loop; minors are fixed once in that
+  round's cleanup. FIVE_ROUND_GATE: at round 5, yield with the ledger.
+- **Evidence:** `C:/Users/rwsmy/clearwater-review-evidence/wp1.1/rN/` (prompt, diff, transcript,
+  adjudication, md5s). Ledger `docs/proofs/wp1.1-ledger.md`, with columns as in
+  `docs/proofs/wp0.2-ledger.md`; leave the depth column to the dispatcher. Commit it before you
+  return. Delete `.codex-*` staging at teardown.
+- **Codex disagreeing with you on an equation:** a disagreement between Codex and you on what
+  a paper says is a finding to ADJUDICATE with the paper's text as you know it. If you cannot
+  settle it, STOP and return both readings (CHARC rules).
+
 ## Notes for the cell
+
+- Return report = your FINAL message (you are a subagent; it reaches the orchestrator directly).
+  Keep it under about 70 lines. Contents per `docs/dispatch-recipe.md` section 4 and plan
+  section 4.5 item 6:
+  - the per-commit change list;
+  - validation lines read off the final head;
+  - the verification-loop record;
+  - review rounds, verdict, ledger and evidence paths;
+  - each lock, stated as honored;
+  - the open values set, each with its source (a summary table; the full list is in the report doc);
+  - the 3C correspondence result;
+  - deviations and open questions.
 
 - The reference papers are the authority (spec 6.1). The research notes
   (`docs/underwater-imagery-correction-research.md`) are background only and carry no formulas.
