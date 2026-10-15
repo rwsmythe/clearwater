@@ -23,11 +23,18 @@
 
 ### Live cells
 
-- **wp13-cell** (implementer-sonnet-high, background): WP1.3, the look check pack (shallow).
-  - FINAL brief `docs/briefs/wp1.3-brief.md` (`a1c073c`); worktree `.worktrees/wp1.3` (local
-    toml copied in); outputs `work\wp1.3\`. Dispatched ~10:45Z.
-  - Then: my Reviewer B at this seat on the `-mc` candidate, gate, merge, accept.
-  - Then finalise and dispatch WP1.4 (draft `docs/briefs/wp1.4-brief.md`, implementer-opus-high).
+- **wp13-fix** (implementer-sonnet-high, background): the ONE WP1.3 remediation after my seat
+  Reviewer B (BLOCKING on candidate `d27c53f`; transcript md5 `a9f1f185...`, evidence
+  `clearwater-review-evidence\wp1.3\reviewB\`). Brief `docs/briefs/wp1.3-remediation-brief.md`
+  (`9c2e487`). Branch `wp1.3` from `0233a8e`.
+  - The author cell `wp13-cell` returned at 412K (PAST-CAP) and is retired.
+  - Majors B1 (test roots), B2 (full frame read-back before deletion), B3 (cleanup on
+    exception); minors B4, B5, B11. B6-B10 are out of envelope and go to DR-20 at accept.
+  - The candidate gate was green before B: 481/0 skipped, gpu 21, harness 366.
+  - Then: rebuild `wp1.3-mc`, gate, ONE B re-run (a 2nd block is adjudicated at the gate), merge,
+    accept with DR-20.
+  - Then commit the FINAL WP1.4 brief (the orchestrator block is drafted in the working tree)
+    and dispatch it (implementer-opus-high).
 - **CHARC commission `0fd7c88ad56a7083`:**
   - The owner's partial CP1 ("shallow confirmed") releases WP1.3 and WP1.4, shallow only.
   - The WP1.4 gain-cap noise test becomes WP1.4b (deep footage).
@@ -118,4 +125,4 @@ Each accepted package had its return report posted to CHARC and an info-update t
   and re-run after CHARC confirms the download is complete.
 - CHARC approved `_windows_power()` as instrument-only (never into `src/clearwater/` without a
   fresh ruling).
-- Inbox drained through msg `dc733650e60ac026` (verify: `uv run python scripts/role_mail.py list --role orchestrator`).
+- Inbox drained through msg `dc733650e60ac026`; empty at 12:00Z (verify: `uv run python scripts/role_mail.py list --role orchestrator`).
