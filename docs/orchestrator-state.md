@@ -32,24 +32,14 @@
     - re-run the WP1.2R bit-identity witness on `correct()` with `statistics=None` (Ancuti
       blue off and on, and 3C; CPU and GPU; scratchpad `witness_r.py` pattern);
     - gate, merge, accept.
-- **wpt1-cell** (implementer-sonnet-high, background): WP-T1, the pytest temp-root footage
-  guard; closes DR-21. CHARC YES `5a9d76593e090e89`.
-  - FINAL brief `docs/briefs/wp-t1-brief.md` (`34d2ccd`); worktree `.worktrees/wp-t1`; base
-    `34d2ccd`. Dispatched ~13:31Z.
-  - Tier STRONG (the fill has no STANDARD); one Reviewer A round; then my seat B.
-  - At the gate:
-    - the harness gate runs (`tests/` changes);
-    - check that no test names the real footage folder.
-
-  CHARC adds the CLAUDE.md line at accept.
 - **CHARC commission `0fd7c88ad56a7083`:**
   - The owner's partial CP1 ("shallow confirmed") releases WP1.3 and WP1.4, shallow only.
   - The WP1.4 gain-cap noise test becomes WP1.4b (deep footage).
   - Sequencing:
     - inventory pass (sonnet-medium) at once on "download complete";
     - Part B (exclusive) only after WP1.3 and WP1.4 return or pause at a boundary.
-- Branches `wp0.1`, `wp0.2`, `wp1.1`, `wp1.2`, `wp1.5`, `wp1.2r` and `wp1.3` are kept on purpose: they hold the reviewed
-  pre-rebase SHAs the accept records cite (verify: `git worktree list` shows main, `.worktrees/wp1.4` and `.worktrees/wp-t1`).
+- Branches `wp0.1`, `wp0.2`, `wp1.1`, `wp1.2`, `wp1.5`, `wp1.2r`, `wp1.3` and `wp-t1` are kept on purpose: they hold the reviewed
+  pre-rebase SHAs the accept records cite (verify: `git worktree list` shows main and `.worktrees/wp1.4`).
 
 ### Workstreams
 
@@ -64,6 +54,7 @@ Each accepted package had its return report posted to CHARC and an info-update t
 | WP1.5 | 2026-10-15 | `3242679` | `docs/proofs/wp1.5-accept.md` (`371f19d`) | CONFIRMED (`6d4fca629d21efe0`) |
 | WP1.2R | 2026-10-15 | `996274e` | `docs/proofs/wp1.2r-accept.md` (`aac4674`); WP1.1/1.2 addenda | CONFIRMED (`60dc8ad66427bb15`) |
 | WP1.3 | 2026-10-15 | `7178540` | `docs/proofs/wp1.3-accept.md` (`bc97a19`); 2nd B adjudicated at the gate; DR-20, DR-21 | CONFIRMED (`09057ee4b3979fa4`) |
+| WP-T1 | 2026-10-15 | `f6a34a4` | `docs/proofs/wp-t1-accept.md` (`3f40a85`); 2nd B adjudicated at the gate; DR-9 and DR-21 closed, DR-22 opened | pending |
 
 - **WP1.2 Part A, raised to CHARC:**
   - approval of the Windows-only `_windows_power()` in `bench.py` (instrument only, guarded);
@@ -133,4 +124,4 @@ Each accepted package had its return report posted to CHARC and an info-update t
   and re-run after CHARC confirms the download is complete.
 - CHARC approved `_windows_power()` as instrument-only (never into `src/clearwater/` without a
   fresh ruling).
-- Inbox drained through msg `09057ee4b3979fa4` (verify: `uv run python scripts/role_mail.py list --role orchestrator`).
+- Inbox drained through msg `839cce617611bf08` (verify: `uv run python scripts/role_mail.py list --role orchestrator`).
