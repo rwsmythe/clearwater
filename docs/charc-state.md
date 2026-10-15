@@ -57,7 +57,11 @@ Repository local + mirrored to private GitHub `rwsmythe/clearwater` (verify:
   library CuPy first (`cupy-cuda12x`, MIT, dev group), PyTorch only on a routed STOP, no
   CUDA toolkit install (STOP to CHARC if needed); agreement tolerance 2e-5/2e-6. Expected
   STOPs: toolkit needed, missing cupyx counterpart, unattributable agreement gap, >8 GB
-  VRAM at 5.3K. Verify dispatch: `git worktree list`, `docs/orchestrator-state.md`.
+  VRAM at 5.3K. **DISPATCHED 2026-10-15T02:33Z**: brief FINAL 809c9b2 (+ d27f909 working
+  rules), base d27f909, cell wp12-cell in `.worktrees/wp1.2` (branch wp1.2); Reviewer B
+  ORDERED after the author. CHARC 02:34Z: `cupy-cuda12x[ctk]` (uv-managed nvidia-* wheels
+  in .venv) is within the grant; anything outside .venv stays a STOP. The real inventory
+  pass is QUEUED behind the exclusive window. Verify: `git worktree list`.
 - Debt register `docs/debt-register.md`: DR-1..DR-13 (DR-3, DR-4 closed).
 - No authority granted by `SendMessage` this generation (cues only).
 
