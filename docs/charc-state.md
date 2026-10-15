@@ -93,7 +93,17 @@ Repository local + mirrored to private GitHub `rwsmythe/clearwater` (verify:
    complete (DR-6) -> then CP1. **WP1.5 commissioned 2026-10-15T05:28Z** on the four
    chapters (draft `docs/briefs/wp1.5-brief.md` a0c1a96; opus-high; STRONG; FFmpeg-as-
    process only, PyAV not granted; identity re-encode; primary GX011627, fast GX011628);
-   dispatch sequenced AFTER WP1.2A closes (after B2). FINAL issued 8ad93b8 (05:30Z);
+   dispatch sequenced AFTER WP1.2A closes (after B2). DISPATCHED ~06:00Z; **author
+   returned 07:10Z** (head 97d40df; A converged r2): recommends SIMPLE -- every MANDATORY item
+   SAME (full pts exact, start offset, elst by presentation effect, audio byte-identical);
+   lost best-effort: udta atoms (FIRM, LENS, global GPMF), firmware tag; kept GPMF track,
+   tmcd, creation time. Capability proven: NVENC 8/10-bit, libx265 8/10-bit, cuda decode.
+   Camera: HERO13 Black, HEVC Main 8-bit, BT.709, FULL range. No .LRV (D60 open). Reviewer
+   B in flight. CHARC PRE-RULED 07:12Z: (1) MANDATORY = video-track elst as written +
+   presentation effect; muxer-added identity edits on audio/data = best-effort; (2) REQUIRED
+   (D55/D114) class accepted; (3) D54 no conflict, WP2.1 must honour full range; (4) udta
+   repair -> debt item at the accept (trigger WP3.10). Footage snapshot test failing on
+   .crswap files = download in progress; environmental. FINAL issued 8ad93b8 (05:30Z);
    local config copied into the worktree so the footage test runs; Reviewer B ordered.
    Orchestrator self-reported a harness-gate overlap with the GPU re-measure start; the
    overlapped cell is discarded and re-run.
