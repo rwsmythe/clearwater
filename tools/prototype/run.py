@@ -3,7 +3,7 @@
 Usage::
 
     uv run python tools/prototype/run.py --in FILE --out DIR [--method ancuti2018|c3]
-        [--blue] [--neutral] [--dump] [--set NAME=VALUE ...] [--device auto|cpu|gpu]
+        [--blue] [--neutral] [--dump] [--set NAME=VALUE ...] [--device cpu|gpu|auto]
 
 The image is read with Pillow into float32 RGB in [0, 1]. Colour management is out of
 scope: an embedded ICC profile is ignored (a note says so) and the values are used as
@@ -22,9 +22,11 @@ cap; booleans take ``true`` or ``false``), applied after ``--method``, ``--blue`
 maps are written divided by their own maximum, recorded in ``<stem>-<method>-weights.json``,
 which also names the backend the pipeline ran on.
 
-``--device`` chooses that backend (:func:`prototype.backend.select_backend`): ``auto`` (the
-default) uses the graphics card when CuPy and a CUDA device are usable and the CPU
-otherwise, with a note saying why; ``gpu`` without a usable device is an error.
+``--device`` chooses that backend (:func:`prototype.backend.select_backend`): ``cpu``, the
+default, so that the same image gives the same PNG on every machine (the GPU result
+agrees with it only within float32 tolerance, which can move a 16-bit value by one);
+``gpu``, an error without a usable device; or ``auto``, the graphics card when CuPy and a
+CUDA device are usable and the CPU otherwise, with a note saying why.
 
 Exit status 0 on success; 2, with a one-line ``error: ...`` on standard error, on a bad
 argument, an unusable device, an unreadable image or an output that cannot be written.
@@ -176,7 +178,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument(
         "--set", dest="overrides", action="append", default=[], metavar="NAME=VALUE"
     )
-    parser.add_argument("--device", choices=DEVICES, default="auto", help="where to run")
+    parser.add_argument(
+        "--device",
+        choices=DEVICES,
+        default="cpu",
+        help="where to run (default cpu, for the same result on every machine; gpu is opt-in)",
+    )
     try:
         args = parser.parse_args(argv)
         params = _build_params(args)
