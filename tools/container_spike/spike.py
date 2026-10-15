@@ -291,7 +291,7 @@ def gpu_samples(record: dict[str, Any]) -> Iterator[None]:
 
 
 def synthetic_encode_command(encoder: str, pix_fmt: str, profile: str, output: Path) -> list[str]:
-    """Return the FFmpeg command of a 2-second synthetic 1080p30 encode (a capability proof).
+    """Return the FFmpeg command of a 2-second synthetic 4K30 encode (a capability proof).
 
     Args:
         encoder: ``hevc_nvenc`` or ``libx265``.
@@ -310,7 +310,7 @@ def synthetic_encode_command(encoder: str, pix_fmt: str, profile: str, output: P
         "-f",
         "lavfi",
         "-i",
-        "testsrc2=size=1920x1080:rate=30:duration=2",
+        "testsrc2=size=3840x2160:rate=30:duration=2",
         "-c:v",
         encoder,
         "-pix_fmt",
@@ -328,8 +328,9 @@ def encode_proof(
 
     The proof holds when FFmpeg exits 0 and ``ffprobe`` reads an HEVC stream of 60
     frames with the expected profile and pixel format; for ``hevc_nvenc`` it also needs
-    ``nvidia-smi`` to have named a GPU and counted at least one NVENC session during the
-    encode.
+    ``nvidia-smi`` to have named a GPU and seen NVENC at work during the encode: an NVENC
+    session counted or encoder utilisation above 0 (the session counter alone misses some
+    sub-second encodes).
 
     Args:
         encoder: ``hevc_nvenc`` or ``libx265``.
@@ -375,7 +376,13 @@ def encode_proof(
         and str(stream.get("nb_frames")) == "60"
         and (
             encoder != "hevc_nvenc"
-            or (bool(gpu["names"]) and (gpu["max_nvenc_sessions"] or 0) >= 1)
+            or (
+                bool(gpu["names"])
+                and (
+                    (gpu["max_nvenc_sessions"] or 0) >= 1
+                    or (gpu["max_encoder_utilisation_percent"] or 0) > 0
+                )
+            )
         )
     )
     return record

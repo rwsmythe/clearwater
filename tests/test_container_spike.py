@@ -540,11 +540,19 @@ class TestEncodeProofs:
         assert proof["gpu"]["error"] == "nvidia-smi exited with status 9"
         assert proof["proven"] is False
 
-    def test_nvenc_proof_needs_a_session(
+    def test_nvenc_proof_needs_nvenc_activity(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         self._fake_nvenc_run(monkeypatch, [["NVIDIA GeForce", "0", "0", "0"]])
         assert self._prove(tmp_path, "hevc_nvenc", "p010le", "main10")["proven"] is False
+
+    def test_nvenc_proof_holds_on_encoder_utilisation_without_a_counted_session(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # Seen on the real card: sub-second encodes at 85-90 % encoder load with no session
+        # counted in any sample.
+        self._fake_nvenc_run(monkeypatch, [["NVIDIA GeForce", "90", "0", "0"]])
+        assert self._prove(tmp_path, "hevc_nvenc", "p010le", "main10")["proven"] is True
 
     def test_nvenc_proof_holds_with_a_named_gpu_and_a_session(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
