@@ -1,0 +1,454 @@
+from __future__ import annotations
+
+import dataclasses
+import json
+import logging
+import subprocess
+import sys
+import types
+from pathlib import Path
+from typing import Any
+
+import numpy as np
+import pytest
+from scipy import ndimage
+
+from prototype import bench, pipeline
+from prototype.backend import CPU, memory_estimate_bytes, of, select_backend
+from prototype.params import Params
+from test_prototype_pipeline import _synthetic, _textured_scene
+
+_AUTO = select_backend("auto")
+requires_gpu = pytest.mark.skipif(
+    _AUTO.name != "gpu", reason=f"no CUDA device usable: {_AUTO.reason}"
+)
+
+# CPU versus GPU agreement of correct() outputs (brief, fixed at issue): float32.
+AGREEMENT_MAX_ABS = 2e-5
+AGREEMENT_MEAN_ABS = 2e-6
+
+METHODS = ["ancuti2018", "c3"]
+
+
+def _fake_cupy(count: Any = 1, kernel_error: Exception | None = None) -> types.SimpleNamespace:
+    """A stand-in for the cupy module: a device count and a test kernel that may fail."""
+
+    def get_device_count() -> int:
+        if isinstance(count, Exception):
+            raise count
+        return int(count)
+
+    def arange(*args: Any, **kwargs: Any) -> Any:
+        if kernel_error is not None:
+            raise kernel_error
+        return np.arange(*args, **kwargs)
+
+    runtime = types.SimpleNamespace(getDeviceCount=get_device_count)
+    return types.SimpleNamespace(
+        cuda=types.SimpleNamespace(runtime=runtime), arange=arange, float32=np.float32
+    )
+
+
+# --- backend selection (CPU only) -------------------------------------------------------
+
+
+def test_select_cpu_is_numpy_and_scipy() -> None:
+    backend = select_backend("cpu")
+    assert backend is CPU
+    assert backend.name == "cpu"
+    assert backend.xp is np
+    assert backend.ndimage is ndimage
+    assert backend.reason == ""
+
+
+def test_auto_without_cupy_falls_back_to_cpu_with_a_logged_reason(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    monkeypatch.setitem(sys.modules, "cupy", None)  # import cupy now raises ImportError
+    with caplog.at_level(logging.INFO, logger="prototype.backend"):
+        backend = select_backend("auto")
+    assert backend.name == "cpu"
+    assert backend.xp is np
+    assert "cupy is not installed" in backend.reason
+    assert backend.reason in caplog.text
+
+
+@pytest.mark.parametrize(
+    ("fake", "reason"),
+    [
+        (_fake_cupy(count=0), "reports no device"),
+        (_fake_cupy(count=RuntimeError("cudaErrorNoDevice")), "did not answer"),
+        (_fake_cupy(kernel_error=RuntimeError("Failed to find CUDA headers")), "test kernel"),
+    ],
+)
+def test_auto_without_a_usable_device_falls_back_to_cpu(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+    fake: types.SimpleNamespace,
+    reason: str,
+) -> None:
+    monkeypatch.setitem(sys.modules, "cupy", fake)
+    with caplog.at_level(logging.INFO, logger="prototype.backend"):
+        backend = select_backend("auto")
+    assert backend.name == "cpu"
+    assert reason in backend.reason
+    assert reason in caplog.text
+
+
+def test_gpu_without_a_device_raises(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setitem(sys.modules, "cupy", _fake_cupy(count=0))
+    with pytest.raises(RuntimeError, match=r"no usable CUDA device: .*reports no device"):
+        select_backend("gpu")
+    monkeypatch.setitem(sys.modules, "cupy", None)
+    with pytest.raises(RuntimeError, match="cupy is not installed"):
+        select_backend("gpu")
+
+
+def test_select_rejects_an_unknown_device() -> None:
+    with pytest.raises(ValueError, match="device must be one of"):
+        select_backend("tpu")
+
+
+def test_of_numpy_is_cpu_and_round_trip_is_identity() -> None:
+    array = np.arange(12, dtype=np.float32).reshape(2, 2, 3)
+    assert of(array) is CPU
+    assert CPU.to_device(array) is array
+    assert CPU.to_host(array) is array
+    CPU.synchronize()
+    with pytest.raises(TypeError, match="numpy or cupy array"):
+        of([1.0, 2.0])
+
+
+def test_correct_with_the_cpu_backend_is_the_default_path() -> None:
+    image = _synthetic(64, 96)
+    for method in METHODS:
+        params = Params(method=method)  # type: ignore[arg-type]
+        implicit = pipeline.correct(image, params)
+        explicit = pipeline.correct(image, params, CPU)
+        np.testing.assert_array_equal(implicit.output, explicit.output)
+        np.testing.assert_array_equal(implicit.input2, explicit.input2)
+
+
+def test_pipeline_rejects_a_non_array() -> None:
+    with pytest.raises(ValueError, match="float32"):
+        pipeline.correct([[[0.5, 0.5, 0.5]]], Params())  # type: ignore[arg-type]
+
+
+def test_normalisation_bounds_are_the_ones_fusion_inputs_uses() -> None:
+    image = _textured_scene(64, 96)
+    params = Params()
+    low, high = pipeline.normalisation_bounds(image, params)
+    blurred = ndimage.gaussian_filter(
+        image, (0.005 * 64, 0.005 * 64, 0), mode="reflect", truncate=4.0
+    )
+    expected = np.percentile(image - blurred, [0.5, 99.5], method="linear")
+    np.testing.assert_allclose([low, high], expected, rtol=0, atol=1e-7)
+    assert low < 0.0 < high
+
+
+# --- memory estimate (CPU only) ---------------------------------------------------------
+
+
+def test_memory_estimate_is_monotone_in_pixel_count_and_positive() -> None:
+    params = Params()
+    assert memory_estimate_bytes((1, 1, 3), params) > 0
+    shapes = [(1, 1, 3), (2, 1, 3), (72, 128, 3), (1080, 1920, 3), (2160, 3840, 3)]
+    shapes += [(2988, 5312, 3), (6048, 8064, 3)]
+    estimates = [memory_estimate_bytes(shape, params) for shape in shapes]
+    assert estimates == sorted(estimates)
+    assert len(set(estimates)) == len(estimates)
+    # same pixel count, either orientation: same estimate
+    assert memory_estimate_bytes((2160, 3840, 3), params) == memory_estimate_bytes(
+        (3840, 2160, 3), params
+    )
+
+
+# --- GPU --------------------------------------------------------------------------------
+
+
+def _agreement_images() -> list[tuple[str, np.ndarray]]:
+    return [
+        ("64x96", _synthetic(64, 96)),
+        ("97x65", _synthetic(97, 65)),
+        ("1024x1536", _textured_scene(1024, 1536)),
+    ]
+
+
+@pytest.mark.gpu
+@requires_gpu
+@pytest.mark.parametrize("method", METHODS)
+def test_gpu_output_agrees_with_cpu(method: str) -> None:
+    gpu = select_backend("gpu")
+    params = Params(method=method)  # type: ignore[arg-type]
+    for name, image in _agreement_images():
+        cpu_out = pipeline.correct(image, params).output
+        gpu_out = pipeline.correct(image, params, gpu).output
+        assert type(gpu_out) is np.ndarray
+        difference = np.abs(cpu_out.astype(np.float64) - gpu_out)
+        assert difference.max() <= AGREEMENT_MAX_ABS, (name, float(difference.max()))
+        assert difference.mean() <= AGREEMENT_MEAN_ABS, (name, float(difference.mean()))
+
+
+@pytest.mark.gpu
+@requires_gpu
+def test_gpu_correct_returns_host_arrays_for_a_host_input() -> None:
+    gpu = select_backend("gpu")
+    image = _synthetic(64, 96)
+    result = pipeline.correct(image, Params(method="c3"), gpu)
+    arrays = [result.output, result.fused, result.compensated, result.white_balanced]
+    arrays += [result.input1, result.input2]
+    for group in dataclasses.astuple(result.weights):
+        arrays += list(group)
+    for array in arrays:
+        assert type(array) is np.ndarray
+        assert array.dtype == np.float32
+    np.testing.assert_array_equal(image, _synthetic(64, 96))  # the input is not modified
+
+
+@pytest.mark.gpu
+@requires_gpu
+def test_every_public_pipeline_function_keeps_cupy_arrays_on_the_device() -> None:
+    gpu = select_backend("gpu")
+    cupy = gpu.xp
+    params = Params()
+    image = gpu.to_device(_synthetic(64, 96))
+    weight = gpu.to_device(np.random.default_rng(3).random((64, 96), dtype=np.float32))
+    assert of(image) is gpu
+
+    def check(array: Any, shape: tuple[int, ...]) -> None:
+        assert isinstance(array, cupy.ndarray)  # no silent round trip to the host
+        assert array.shape == shape
+        assert array.dtype == np.float32
+
+    shape, map_shape = (64, 96, 3), (64, 96)
+    for step in (pipeline.compensate_ancuti2018, pipeline.compensate_c3, pipeline.white_balance):
+        out, _ = step(image, params)
+        check(out, shape)
+    for out in pipeline.fusion_inputs(image, params):
+        check(out, shape)
+    weights = pipeline.weight_maps((image, image), params)
+    for group in dataclasses.astuple(weights):
+        for out in group:
+            check(out, map_shape)
+    check(pipeline.multiscale_fusion((image, image), (weight, 1.0 - weight), params), shape)
+    for convert in (
+        pipeline.rgb_to_ycbcr,
+        pipeline.ycbcr_to_rgb,
+        pipeline.srgb_to_lab,
+    ):
+        check(convert(image), shape)
+    check(pipeline.luminance(image), map_shape)
+    levels = pipeline.pyramid_levels(shape, 4)
+    gaussian = pipeline.gaussian_pyramid(image, levels)
+    laplacian = pipeline.laplacian_pyramid(image, levels)
+    for level in [*gaussian, *laplacian]:
+        assert isinstance(level, cupy.ndarray)
+    check(pipeline.collapse_pyramid(laplacian), shape)
+    check(pipeline.expand(gaussian[1], shape), shape)
+    low, high = pipeline.normalisation_bounds(image, params)
+    assert isinstance(low, float)
+    assert isinstance(high, float)
+    result = pipeline.correct(image, params)
+    for array in [result.output, result.fused, result.compensated, result.white_balanced]:
+        check(array, shape)
+    check(result.weights.normalised[0], map_shape)
+
+
+@pytest.mark.gpu
+@requires_gpu
+def test_gpu_backend_round_trip_and_cpu_backend_on_a_device_input() -> None:
+    gpu = select_backend("gpu")
+    host = _synthetic(32, 48)
+    device = gpu.to_device(host)
+    assert of(device) is gpu
+    assert gpu.to_device(device) is device
+    np.testing.assert_array_equal(gpu.to_host(device), host)
+    assert CPU.to_device(device).__class__ is np.ndarray
+    gpu.synchronize()
+    # a device input with the CPU backend: computed on the host, returned on the device
+    result = pipeline.correct(device, Params(), CPU)
+    assert isinstance(result.output, gpu.xp.ndarray)
+    np.testing.assert_array_equal(
+        gpu.to_host(result.output), pipeline.correct(host, Params()).output
+    )
+
+
+@pytest.mark.gpu
+@requires_gpu
+def test_bench_gpu_records_graphics_memory(tmp_path: Path) -> None:
+    args = ["--device", "gpu", "--size", "128x72", "--frames", "2", "--method", "c3"]
+    assert bench.main([*args, "--out", str(tmp_path)]) == 0
+    (path,) = tmp_path.glob("bench-gpu-128x72-c3-*.json")
+    record = json.loads(path.read_text(encoding="utf-8"))
+    memory = record["memory"]
+    assert memory["gpu_pool_peak_used_mb"] > 0
+    assert memory["gpu_pool_reserved_mb"] >= memory["gpu_pool_peak_used_mb"]
+    assert record["device_resident"]["median_s"] is not None
+    assert record["versions"]["cupy"]
+    assert record["estimate"]["ratio_to_gpu_pool_reserved"] >= 1.0
+
+
+# --- bench (CPU) ------------------------------------------------------------------------
+
+BENCH_KEYS = {
+    "label",
+    "tool",
+    "created",
+    "device",
+    "backend",
+    "size",
+    "shape",
+    "method",
+    "frames",
+    "seed",
+    "generator",
+    "params",
+    "timing",
+    "device_resident",
+    "memory",
+    "estimate",
+    "proxy",
+    "versions",
+    "machine",
+    "ambient",
+}
+TIMING_KEYS = {
+    "method",
+    "per_frame_s",
+    "warmup_discarded",
+    "median_s",
+    "p95_s",
+    "first10_median_s",
+    "last10_median_s",
+    "drift",
+    "budget_share_30fps",
+    "budget_share_60fps",
+}
+
+
+def test_bench_writes_a_record_with_the_documented_keys(tmp_path: Path) -> None:
+    args = ["--device", "cpu", "--size", "128x72", "--frames", "3", "--method", "ancuti2018"]
+    out = tmp_path / "records"
+    assert bench.main([*args, "--out", str(out), "--proxy", "36", "--note", "test"]) == 0
+    (path,) = out.glob("bench-cpu-128x72-ancuti2018-*.json")
+    record = json.loads(path.read_text(encoding="utf-8"))
+    assert set(record) == BENCH_KEYS
+    assert record["label"] == "SYNTHETIC"
+    assert record["backend"] == "cpu"
+    assert record["shape"] == [72, 128, 3]
+    assert record["device_resident"] is None
+    timing = record["timing"]
+    assert set(timing) == TIMING_KEYS
+    assert len(timing["per_frame_s"]) == 3
+    assert timing["median_s"] == pytest.approx(float(np.median(timing["per_frame_s"][1:])))
+    assert timing["budget_share_30fps"] == pytest.approx(timing["median_s"] / 0.111)
+    assert record["memory"]["rss_peak_mb"] >= record["memory"]["rss_baseline_mb"] > 0
+    assert record["estimate"]["bytes"] == memory_estimate_bytes((72, 128, 3), Params())
+    full, proxy = record["proxy"]
+    assert full["short_side"] == 72
+    assert full["relative_error"]["input_means"] == [0.0, 0.0, 0.0]
+    assert proxy["short_side"] == 36
+    assert proxy["shape"] == [36, 64, 3]
+    assert set(proxy["relative_error"]) == {
+        "input_means",
+        "compensated_means",
+        "white_balance_gains",
+        "normalisation_bounds",
+    }
+    assert record["ambient"]["note"] == "test"
+
+
+def test_bench_one_frame_has_no_steady_statistics(tmp_path: Path) -> None:
+    args = ["--device", "cpu", "--size", "16x16", "--frames", "1", "--method", "c3"]
+    assert bench.main([*args, "--out", str(tmp_path)]) == 0
+    (path,) = tmp_path.glob("*.json")
+    timing = json.loads(path.read_text(encoding="utf-8"))["timing"]
+    assert len(timing["per_frame_s"]) == 1
+    assert timing["median_s"] is None
+
+
+def test_bench_timing_summary_discards_the_warm_up_frame() -> None:
+    times = [10.0, *(1.0 for _ in range(10)), *(2.0 for _ in range(10))]
+    record = bench._timing_record(times)
+    assert record["median_s"] == pytest.approx(1.5)
+    assert record["first10_median_s"] == pytest.approx(1.0)
+    assert record["last10_median_s"] == pytest.approx(2.0)
+    assert record["drift"] == pytest.approx(1.0)
+    assert record["p95_s"] == pytest.approx(2.0)
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"--device": "tpu"},
+        {"--size": "4kk"},
+        {"--size": "0x10"},
+        {"--frames": "0"},
+        {"--frames": "x"},
+        {"--method": "bogus"},
+        {"--proxy": "100"},
+        {"--proxy": "0"},
+        {"--out": None},
+    ],
+)
+def test_bench_bad_arguments_exit_2(
+    tmp_path: Path, change: dict[str, str | None], capsys: pytest.CaptureFixture[str]
+) -> None:
+    options: dict[str, str | None] = {
+        "--device": "cpu",
+        "--size": "128x72",
+        "--frames": "2",
+        "--method": "c3",
+        "--out": str(tmp_path),
+    }
+    options |= change
+    argv = [item for key, value in options.items() if value is not None for item in (key, value)]
+    assert bench.main(argv) == 2
+    err = capsys.readouterr().err
+    assert err.startswith("error: ")
+    assert len(err.strip().splitlines()) == 1
+    assert not list(tmp_path.glob("*.json"))
+
+
+def test_bench_unusable_gpu_exits_2(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setitem(sys.modules, "cupy", None)
+    args = ["--device", "gpu", "--size", "16x16", "--frames", "1", "--method", "c3"]
+    assert bench.main([*args, "--out", str(tmp_path)]) == 2
+    assert "no usable CUDA device" in capsys.readouterr().err
+
+
+def test_synthetic_frame_is_seeded_and_in_range() -> None:
+    frame = bench.synthetic_frame(72, 128, seed=4)
+    assert frame.shape == (72, 128, 3)
+    assert frame.dtype == np.float32
+    assert frame.min() >= 0.0
+    assert frame.max() <= 1.0
+    np.testing.assert_array_equal(frame, bench.synthetic_frame(72, 128, seed=4))
+    assert not np.array_equal(frame, bench.synthetic_frame(72, 128, seed=5))
+    means = frame.reshape(-1, 3).mean(axis=0)
+    assert means[0] < means[1] and means[0] < means[2]  # a blue-green cast
+
+
+def test_proxy_frame_area_averages_to_the_short_side() -> None:
+    frame = bench.synthetic_frame(72, 128)
+    proxy = bench.proxy_frame(frame, 36)
+    assert proxy.shape == (36, 64, 3)
+    expected = frame.reshape(36, 2, 64, 2, 3).mean(axis=(1, 3))
+    np.testing.assert_allclose(proxy, expected, rtol=0, atol=1e-6)
+    assert bench.proxy_frame(frame, 72) is frame
+
+
+def test_bench_works_as_a_script(tmp_path: Path) -> None:
+    script = Path(__file__).resolve().parent.parent / "tools" / "prototype" / "bench.py"
+    args = ["--device", "cpu", "--size", "32x24", "--frames", "2", "--method", "c3"]
+    completed = subprocess.run(
+        [sys.executable, str(script), *args, "--out", str(tmp_path)],
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=120,
+    )
+    assert completed.returncode == 0, completed.stderr
+    assert Path(completed.stdout.strip()).is_file()
