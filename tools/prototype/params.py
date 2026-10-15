@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import dataclasses
 import math
+import numbers
 from dataclasses import dataclass
 from typing import Literal
 
@@ -118,6 +119,20 @@ class Params:
         Raises:
             ValueError: A field is outside the range the pipeline accepts.
         """
+        for field in dataclasses.fields(self):
+            value = getattr(self, field.name)
+            if field.name == "method" or (field.name.endswith("_gain_cap") and value is None):
+                continue  # the method is checked against METHODS below; None disables a cap
+            default: object = field.default
+            expected = type(default)
+            if expected is bool:
+                valid = isinstance(value, bool)
+            elif expected is int:
+                valid = isinstance(value, numbers.Integral) and not isinstance(value, bool)
+            else:
+                valid = isinstance(value, numbers.Real) and not isinstance(value, bool)
+            if not valid:
+                raise ValueError(f"{field.name} must be of type {expected.__name__}, got {value!r}")
         if self.method not in METHODS:
             raise ValueError(f"method must be one of {', '.join(METHODS)}, got {self.method!r}")
         for name, value in dataclasses.asdict(self).items():
@@ -160,7 +175,7 @@ class Params:
                 "normalisation percentiles must satisfy 0 <= low < high <= 100, got "
                 f"{self.normalisation_low} and {self.normalisation_high}"
             )
-        if isinstance(self.pyramid_min_level_size, bool) or self.pyramid_min_level_size < 1:
+        if self.pyramid_min_level_size < 1:
             raise ValueError(
                 f"pyramid_min_level_size must be an integer >= 1, got {self.pyramid_min_level_size}"
             )

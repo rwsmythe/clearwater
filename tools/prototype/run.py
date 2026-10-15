@@ -41,7 +41,7 @@ from typing import Any, NoReturn
 import numpy as np
 from numpy.typing import NDArray
 from PIL import Image as PILImage
-from PIL import ImageOps, UnidentifiedImageError
+from PIL import ImageOps
 
 if not __package__:
     # Script mode (``python tools/prototype/run.py``): sys.path[0] is tools/prototype, so
@@ -96,7 +96,8 @@ def read_image(path: Path) -> tuple[NDArray[np.float32], list[str]]:
     Raises:
         OSError: The file cannot be opened or decoded (includes Pillow's
             ``UnidentifiedImageError``).
-        ValueError: Pillow rejects the image (for example a decompression-bomb size).
+        ValueError: Pillow cannot convert the image mode.
+        PIL.Image.DecompressionBombError: The image exceeds Pillow's pixel limit.
     """
     notes: list[str] = []
     with PILImage.open(path) as opened:
@@ -179,7 +180,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     source: Path = args.input
     try:
         image, notes = read_image(source)
-    except (OSError, UnidentifiedImageError, ValueError) as exc:
+    except (OSError, ValueError, PILImage.DecompressionBombError) as exc:
         print(f"error: cannot read image {source.name}: {_one_line(exc)}", file=sys.stderr)
         return 2
     for note in notes:

@@ -22,7 +22,7 @@ side (spec 6.6, D56), turned into pixels only by `spatial_sigma`.
 | `c3_strength` | 1.0 | spec 6.3.2 / D48 (one slider scaling kappa and lambda together); the rule `effective = c3_strength x kappa` (and x lambda) is the WP1.1 reading of "scales kappa and lambda together from the 1.0/0.7 ratio". |
 | `c3_kernel_fraction` | 0.05 (sigma of G{}) | WP1.1 choice. The paper asks for a Gaussian of large support; sigma = 5 % of the short side gives a 4-sigma support of +/-20 % of it (about 150 px sigma on a 3024 px iPhone short side). Larger kernels approach a global gray world and cost more on the CPU (separable filter, cost linear in sigma). |
 | `c3_mask_threshold` | 0.85 | spec 6.3.2. |
-| `c3_mask_smooth_fraction` | 0.01 | WP1.1 choice. Small enough that the protected bright regions keep their size, large enough to avoid a visible mask edge. |
+| `c3_mask_smooth_fraction` | 0.01 | WP1.1 choice, converting a pixel value. Reviewer A (round 2) cites [3C] pp. 2657-58 as giving a default kernel size of 20 for the mask's Gaussian; WP1.1 has not checked this against the PDF (none is in the repository). A size of 20 px is a sigma of roughly 3-4 px if it is the kernel width (about 6 sigma) or 20 px if it is the sigma; fixed in pixels it is not resolution independent, so it has to become a fraction of the short side, which needs the paper's image size. 0.01 (6 px sigma on a 600 px short side, 30 px on a 3024 px photo) keeps the protected regions their size without a visible mask edge; WP1.3 checks it against the paper's value. |
 | `white_balance_strength` | 1.0 | paper (full gray world). The interpolation is WP1.1's: requested gain `= 1 + s (g - 1)`, linear in the gain, so 0 is exactly no white balance. |
 | `max_white_balance_gain` | 3.0 (must be >= 1) | WP1.1 choice (D99 asks for a maximum; spec 14.1 lists the default as open). A maximum below 1 is rejected: it would lower every gain, so strength 0 would no longer be neutral. After compensation the red gain of an ordinary image should stay well under 3, so the clamp is meant to bind on deep frames, where D99 wants it to; WP1.4's deep-frame noise measurement is the check. |
 | `gamma` | 1.5 | WP1.1 choice; [A18] gives no value (spec 6.1 names exactly this gap). Input 1 is `I ** gamma`; [A18] motivates it by white-balanced images appearing too bright, so gamma > 1; 1.5 is a moderate darkening (0.5 -> 0.35). |
@@ -48,7 +48,7 @@ side (spec 6.6, D56), turned into pixels only by `spatial_sigma`.
 | 3C correspondence | kappa -> Cr, lambda -> Cb, confirmed. | See `docs/reports/wp1.1-3c-correspondence.md`. |
 | N{} (histogram stretch) | One shift and one scale for all three channels ([A18]: "a unique shifting and scaling factor"), bounds = the two percentiles above taken jointly over all pixels and channels of `I - G*I`, values outside clipped. A flat high-pass (bounds closer than 1e-6) maps to 0.5. | [A18] for the form; percentiles and the flat case are WP1.1's. |
 | Luminance for the weights | BT.709 luma `0.2126 R + 0.7152 G + 0.0722 B` on display-encoded values (the Y of the 3C matrix). | WP1.1 choice; [A18] says "luminance" without a definition. |
-| Laplacian contrast | `|sigma^2 x Lap(G_sigma * L)|`: the paper's 5-point discrete Laplacian on the Gaussian-smoothed luma, times sigma^2 (scale normalisation, so the weight keeps its size across resolutions). scipy's `gaussian_laplace` is not used: its sampled kernel is not zero-sum at small sigma and gave a flat image a nonzero weight (caught by `test_weight_maps_follow_their_definitions`). | WP1.1 choice. |
+| Laplacian contrast | **Adaptation of the paper's equation, required by spec 6.6 (D56) and the brief's `laplacian_fraction`.** [A18]: `W_L = |Lap(L)|`, the absolute Laplacian of the luminance at the pixel scale (no spatial parameter). Spec 6.6 lists the Laplacian among the spatial parameters expressed as a fraction of the short side. Implemented: `|sigma^2 x Lap(G_sigma * L)|`, the paper's 5-point discrete Laplacian on the Gaussian-smoothed luma, times sigma^2 (scale normalisation, so the weight keeps its size relative to W_S and W_Sat across resolutions); the paper's form is the sigma -> 0 limit up to the factor sigma^2. The form of the adaptation (prefilter and sigma^2) is the WP1.1 choice; the return report raises it for a ruling. scipy's `gaussian_laplace` is not used: its sampled kernel is not zero-sum at small sigma and gave a flat image a nonzero weight (caught by `test_weight_maps_follow_their_definitions`). | WP1.1 choice. |
 | Saliency conversion | sRGB EOTF and sRGB-to-XYZ matrix (IEC 61966-2-1:1999), CIELAB with the D65 white (CIE 15:2004); `W_S = ||mean Lab - blurred Lab|| / 100`. A Display P3 source is read as sRGB here (weight only; no colour management in scope). The /100 puts W_S on the same order as W_L and W_Sat (L\* spans [0, 1]) without a per-image normaliser, so it adds no flickering statistic; the mean Lab vector is the "saliency reference value" of spec 7.1. | Achanta et al. 2009 (form and Lab); scale and conversion standard are WP1.1's. |
 | Saturation | `sqrt(((R - L)^2 + (G - L)^2 + (B - L)^2) / 3)`. | paper ([A18]). |
 | Weight aggregation | `W_k = W_L + W_S + W_Sat` (sum), then `(W_k + delta) / (sum W_k + K delta)`. | paper ([A18]: the three maps are summed). |
@@ -93,6 +93,13 @@ distinguishes.
 the short side) vs its 2x2 box downscale. **Stated tolerance: mean <= 0.0015, p99 <=
 0.005.** Measured: Ancuti 2018 mean 0.0004, p99 0.0022; 3C mean 0.0005, p99 0.0028. With
 pixel sigmas pinned to the large image's, mean 0.0021 / 0.0046 and p99 0.0079 / 0.0192.
+
+The scene includes a soft-edged bright disc (mean above 0.85, about 5 % of the pixels)
+so that the 3C mask and its smoothing are exercised; pinning only the mask sigma in pixels
+raises the 3C p99 to 0.015. With a hard-edged disc instead, the p99 rises to 0.008 (Ancuti
+2018) and 0.012 (3C), with single edge pixels up to 0.31 apart: a box downscale of the
+output is not the output of the box-downscaled edge once the nonlinear steps (clipping, the
+N{} stretch) act on it.
 
 **Limit (disclosed, not a test):** the defaults are resolution independent only where
 their scales are resolved. On thumbnails (a 64 vs 128 px short side, smooth scene) the

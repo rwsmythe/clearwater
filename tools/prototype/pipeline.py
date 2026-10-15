@@ -400,11 +400,16 @@ def weight_maps(input_: Sequence[Image], params: Params) -> Weights:
     Per input k ([A18], weights of the fusion process), with ``L_k`` the BT.709
     luma of the input (:data:`RGB_TO_YCBCR` row Y):
 
-    - Laplacian contrast ``W_L = |sigma^2 * Laplacian(G_sigma * L_k)|``: the absolute
-      value of the paper's discrete Laplacian (the 5-point kernel, per pixel) applied to
-      the luminance smoothed by a Gaussian of sigma = ``laplacian_fraction`` of the short
-      side, times sigma squared (scale normalisation). The smoothing and the sigma^2
-      factor make the paper's per-pixel Laplacian resolution independent (spec 6.6).
+    - Laplacian contrast ``W_L = |sigma^2 * Laplacian(G_sigma * L_k)|``. [A18] defines
+      W_L as "the absolute value of a Laplacian filter applied on each input luminance
+      channel", ``|Laplacian(L_k)|`` at the pixel scale. Spec 6.6 (D56) lists the
+      Laplacian among the spatial parameters given as a fraction of the short side, so
+      this is a DELIBERATE ADAPTATION, not the paper's form: the same discrete 5-point
+      Laplacian applied to the luminance smoothed by a Gaussian of sigma =
+      ``laplacian_fraction`` of the short side, times sigma squared (scale normalisation,
+      so the weight keeps its size relative to W_S and W_Sat at every resolution). As
+      sigma goes to 0 the smoothing vanishes and the paper's map is recovered up to the
+      constant factor sigma^2.
     - Saliency ``W_S = ||I_mu - I_whc(x)|| / 100``, the frequency-tuned saliency of
       Achanta et al. (CVPR 2009): the Euclidean distance in CIELAB between the
       image's mean Lab vector ``I_mu`` and the Gaussian-blurred Lab image ``I_whc``

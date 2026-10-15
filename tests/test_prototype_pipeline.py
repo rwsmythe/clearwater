@@ -70,11 +70,19 @@ def _smooth_scene(height: int, width: int) -> np.ndarray:
 
 
 def _textured_scene(height: int, width: int) -> np.ndarray:
-    """The smooth scene modulated by a random texture of scale 0.01 of the short side."""
+    """The smooth scene modulated by a random texture of scale 0.01 of the short side.
+
+    A soft-edged bright disc (mean above 0.85) makes the 3C mask and its smoothing matter.
+    """
+    short = min(height, width)
     rng = np.random.default_rng(5)
-    field = ndimage.gaussian_filter(rng.random((height, width)), 0.01 * min(height, width))
+    field = ndimage.gaussian_filter(rng.random((height, width)), 0.01 * short)
     field = (field - field.min()) / (field.max() - field.min())
     textured = _smooth_scene(height, width) * (0.6 + 0.8 * field[..., None])
+    y, x = np.mgrid[0:height, 0:width]
+    disc = ((y - 0.39 * height) ** 2 + (x - 0.65 * width) ** 2 < (0.176 * short) ** 2) * 1.0
+    alpha = ndimage.gaussian_filter(disc, 0.02 * short)[..., None]
+    textured = textured * (1 - alpha) + np.array([0.88, 0.95, 0.97]) * alpha
     return np.clip(textured, 0.0, 1.0).astype(np.float32)
 
 
@@ -479,6 +487,7 @@ def test_output_is_resolution_independent_at_2x(method: str) -> None:
 @pytest.mark.parametrize("method", METHODS)
 def test_default_params_are_resolution_independent_at_2x(method: str) -> None:
     large = _textured_scene(512, 768)
+    assert (large.mean(axis=2) > 0.85).mean() > 0.02  # the 3C mask is active
     params = Params(method=method)  # type: ignore[arg-type]
     from_large = _box_down2(correct(large, params).output)
     from_small = correct(_box_down2(large), params).output
@@ -509,6 +518,12 @@ def test_spatial_sigma_is_a_fraction_of_the_short_side() -> None:
         {"blend_with_original": 1.5},
         {"laplacian_fraction": 0.0},
         {"max_white_balance_gain": 0.5},
+        {"pyramid_min_level_size": 1.5},
+        {"pyramid_min_level_size": "16"},
+        {"pyramid_min_level_size": True},
+        {"alpha": "1"},
+        {"blue_compensation": 1},
+        {"red_gain_cap": "2"},
         {"kappa": float("nan")},
     ],
 )
@@ -523,6 +538,12 @@ def test_white_balance_strength_zero_is_neutral_at_any_allowed_maximum() -> None
     out, info = white_balance(image, params)
     np.testing.assert_array_equal(out, image)
     assert info.applied_gains == (1.0, 1.0, 1.0)
+
+
+def test_params_accept_numpy_scalars_and_disabled_caps() -> None:
+    params = Params(alpha=np.float32(0.5), pyramid_min_level_size=np.int64(8))  # type: ignore[arg-type]
+    assert params.alpha == 0.5
+    assert Params(red_gain_cap=None, blue_gain_cap=None).red_gain_cap is None
 
 
 def test_neutral_params() -> None:
@@ -655,6 +676,19 @@ def test_run_unreadable_image_exits_2(
     assert run.main(["--in", str(source), "--out", str(tmp_path / "out")]) == 2
     err = capsys.readouterr().err
     assert err.startswith("error: cannot read image broken.png")
+    assert err.count("\n") == 1
+
+
+def test_run_oversized_image_exits_2(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    # A PNG header announcing 20000 x 20000 pixels trips Pillow's decompression-bomb error.
+    header = struct.pack(">IIBBBBB", 20000, 20000, 8, 2, 0, 0, 0)
+    chunk = struct.pack(">I", len(header)) + b"IHDR" + header
+    chunk += struct.pack(">I", zlib.crc32(b"IHDR" + header) & 0xFFFFFFFF)
+    source = tmp_path / "huge.png"
+    source.write_bytes(b"\x89PNG\r\n\x1a\n" + chunk)
+    assert run.main(["--in", str(source), "--out", str(tmp_path / "out")]) == 2
+    err = capsys.readouterr().err
+    assert err.startswith("error: cannot read image huge.png")
     assert err.count("\n") == 1
 
 
