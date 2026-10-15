@@ -101,6 +101,10 @@ there is still caught. Both are `gpu`-marked tests in `tests/test_prototype_back
 | near-flat `_synthetic` 97x65 | 2.24e-5 / 3.32e-6 | 2.36e-5 / 4.04e-6 | 1e-4 / 1e-5 |
 | bench frame 3840x2160 (not a test) | 1.67e-6 / 1.58e-7 | 4.41e-6 / 3.00e-7 | -- |
 
+The table's figures come from `agree.py` and `agree3.py` (the scripts and their logs are in
+`C:\Users\rwsmy\clearwater-review-evidence\wp1.2\analysis\`, beside the CPU hash comparison of
+section 2); the tests assert the same quantities.
+
 Cause of the near-flat figures (attributed and reproduced): `cupyx.scipy.ndimage` accumulates
 a float32 input in float32, `scipy.ndimage` in float64, so the high-pass `I - G*I` of the
 sharpened fusion input differs by about one float32 ulp (1.2e-7). The stretch N{} divides it
