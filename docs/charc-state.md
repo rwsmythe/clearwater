@@ -93,7 +93,10 @@ Repository local + mirrored to private GitHub `rwsmythe/clearwater` (verify:
    complete (DR-6) -> then CP1. **WP1.5 commissioned 2026-10-15T05:28Z** on the four
    chapters (draft `docs/briefs/wp1.5-brief.md` a0c1a96; opus-high; STRONG; FFmpeg-as-
    process only, PyAV not granted; identity re-encode; primary GX011627, fast GX011628);
-   dispatch sequenced AFTER WP1.2A returns.
+   dispatch sequenced AFTER WP1.2A closes (after B2). FINAL issued 8ad93b8 (05:30Z);
+   local config copied into the worktree so the footage test runs; Reviewer B ordered.
+   Orchestrator self-reported a harness-gate overlap with the GPU re-measure start; the
+   overlapped cell is discarded and re-run.
 3. **Next harness acts:** QA the WP1.2 Part A accept when it lands (B2 reproduction
    pending); QA the WP1.5 accept; WP1.2 Part B after the footage is complete and WP1.5
    reports; WP1.3 and WP1.4 need CP1; WP1.6 gate report after all six results.
