@@ -24,11 +24,14 @@ to the device, ``correct()`` on the device array, and only the output copied bac
 Memory. Peak RSS is the maximum of ``psutil`` samples taken by a thread every 50 ms during
 the timed loop. On the GPU, CuPy's default memory pool is wrapped by a counting allocator
 that records the pool's used bytes after every allocation (its high-water mark), and the
-pool's reserved bytes are read at the end (it never returns memory during the run, so that
-is its own high-water mark); ``nvidia-smi --query-gpu=memory.used`` and the CUDA runtime's
-free-memory figure are read before the backend starts and after the timed loop, while the
-pool still holds its memory, and the ``nvidia-smi`` per-process figure is recorded when the
-driver reports one. :func:`prototype.backend.memory_estimate_bytes` is recorded beside them.
+pool's reserved bytes are read after the timed loop (the pool's cache is emptied before the
+loop and the pool never returns memory during it, so that is its own high-water mark).
+``nvidia-smi --query-gpu=memory.used`` is read before the backend starts and the CUDA
+runtime's device-wide used memory just after it starts (the CUDA context then exists);
+both are read again after the timed loop, while the pool still holds its memory. The
+``nvidia-smi`` per-process figure is recorded as the driver reports it (``[N/A]`` under
+Windows' WDDM driver model). :func:`prototype.backend.memory_estimate_bytes` is recorded
+beside them.
 
 ``--proxy S`` (repeatable) also computes the whole-frame statistics, the channel means, the
 white-balance gains and the normalisation bounds, on the frame box-downscaled to short side
