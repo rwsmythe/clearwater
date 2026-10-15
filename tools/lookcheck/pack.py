@@ -107,7 +107,11 @@ STATISTICS_SCHEMA = 1
 
 PENDING_CASES: tuple[tuple[str, str], ...] = (
     ("Deeper footage (below the shallow range)", "not sorted by the owner yet (CP1 partial)"),
-    ("Open blue water: gray-world on open water (spec 12)", "no open-water footage sorted yet"),
+    (
+        "Open blue water: gray-world on open water (spec 12)",
+        "no dedicated open-water footage sorted yet (the water-dominant stills of GX011628 and "
+        "the closing frames of the flicker clip are shallow-category frames, not this case)",
+    ),
     ("Distance haze (spec 12)", "no distance-haze footage sorted yet"),
     ("Deep-water noise (spec 12)", "no deep footage sorted yet"),
     ("Photos (iPhone)", "none supplied for this part"),
@@ -582,14 +586,23 @@ def encode_command(
     return [*command, "-an", str(output)]
 
 
-def verify_clip(video: Path, count: int, tags: StreamTags, frame_rate: Fraction) -> dict[str, Any]:
-    """Check a re-assembled clip with ``ffprobe``: frame count, timing, tags, no audio.
+def verify_clip(
+    video: Path, count: int, tags: StreamTags, frame_rate: Fraction, size: tuple[int, int]
+) -> dict[str, Any]:
+    """Check a re-assembled clip with ``ffprobe``: format, size, timing, tags, no audio.
+
+    The clip must be one HEVC Main 8-bit 4:2:0 video stream (``yuv420p``, or ``yuvj420p``
+    which is how FFmpeg reports a full-range one) of ``size`` holding ``count`` frames with
+    first pts 0 and every pts step one frame period, carrying the colour range, matrix,
+    primaries and transfer of ``tags`` (a tag that is ``unknown`` is not compared), and no
+    audio stream.
 
     Args:
         video: The MP4.
         count: The number of frames it must hold.
         tags: The colour tags it must carry.
         frame_rate: The frame rate whose period every pts step must equal.
+        size: The ``(width, height)`` it must have.
 
     Returns:
         A record of what was read, with ``ok`` true when every check holds.
@@ -619,6 +632,10 @@ def verify_clip(video: Path, count: int, tags: StreamTags, frame_rate: Fraction)
         "pix_fmt": stream.get("pix_fmt"),
         "color_range": stream.get("color_range"),
         "color_space": stream.get("color_space"),
+        "color_primaries": stream.get("color_primaries"),
+        "color_transfer": stream.get("color_transfer"),
+        "profile": stream.get("profile"),
+        "size": [stream.get("width"), stream.get("height")],
         "frames": len(pts),
         "first_pts": pts[0] if pts else None,
         "pts_steps": sorted(steps),
@@ -628,6 +645,16 @@ def verify_clip(video: Path, count: int, tags: StreamTags, frame_rate: Fraction)
     record["ok"] = bool(
         len(video_streams) == 1
         and stream.get("codec_name") == "hevc"
+        and stream.get("profile") == "Main"
+        and stream.get("pix_fmt") in ("yuv420p", "yuvj420p")
+        and (stream.get("width"), stream.get("height")) == size
+        and all(
+            tag == "unknown" or stream.get(key) == tag
+            for key, tag in (
+                ("color_primaries", tags.color_primaries),
+                ("color_transfer", tags.color_transfer),
+            )
+        )
         and len(pts) == count
         and pts[0] == 0
         and steps == {period}
@@ -770,7 +797,9 @@ def run_flicker(
         if done.returncode != 0:
             tail = done.stderr.decode("utf-8", errors="replace").strip().splitlines()[-1:]
             raise ExtractError(f"ffmpeg failed encoding {output.name}: {tail}")
-        checks[label] = verify_clip(output, len(frames), tags, info.frame_rate)
+        checks[label] = verify_clip(
+            output, len(frames), tags, info.frame_rate, (info.width, info.height)
+        )
     checks["readback"] = _readback_check(
         clips["source"][1], frames[0].path, tags, flicker_dir, roots
     )

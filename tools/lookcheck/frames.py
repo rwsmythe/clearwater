@@ -16,10 +16,12 @@ disagree is refused. The explicit range governs every other format.)
 Chroma is upsampled to full resolution by the scaler's default method. A stream with no
 range or matrix tag is read as BT.709 limited range and the record says it assumed that
 (spec D54, 6.5). The values are display-encoded RGB in the source's primaries, written as
-untagged 16-bit PNG (spec 6.5). A stream whose matrix this module does not map, or that
-carries a rotation, is refused: it is outside the declared envelope. The conversion is
-proved by ``tests/test_lookcheck.py`` against RGB values known in advance, for full-range
-and limited-range clips.
+16-bit PNG with no colour chunk (spec 6.5): FFmpeg's ``cICP``, ``cHRM`` and ``gAMA`` chunks are
+stripped (:func:`strip_ancillary_chunks`) so that a source frame and its corrected twin, which
+the prototype writes untagged, display the same way. The tags are in the frame record. A
+stream whose matrix this module does not map, or that carries a rotation, is refused: it is
+outside the declared envelope. The conversion is proved by ``tests/test_lookcheck.py``
+against RGB values known in advance, for full-range and limited-range clips.
 
 **Output safety.** Every file written, and every file FFmpeg is told to write, is first
 checked with :meth:`OutputRoots.check`: the resolved path lies inside the allowed folder
@@ -603,6 +605,42 @@ def frame_stem(chapter: str, pts_seconds: float) -> str:
 # --- PNG reading ----------------------------------------------------------------------------
 
 
+def strip_ancillary_chunks(data: bytes) -> bytes:
+    """Return a PNG file's bytes with every chunk but IHDR, IDAT and IEND removed.
+
+    FFmpeg's PNG encoder copies the stream's colour description into ancillary chunks
+    (``cICP``, ``cHRM``, ``gAMA``, ``pHYs``); the prototype's corrected PNGs carry none. A
+    colour-managed viewer would then show a source frame and its corrected twin differently,
+    so the extracted frames are stripped to match: both sides are untagged display-encoded
+    RGB (spec 6.5). The colour tags stay in :class:`FrameFile` and ``frames.json``. The kept
+    chunks are copied byte for byte, so the pixels are untouched.
+
+    Args:
+        data: The PNG file content.
+
+    Returns:
+        The PNG with only the critical chunks.
+
+    Raises:
+        ValueError: ``data`` is not a PNG file or ends inside a chunk.
+    """
+    if data[:8] != PNG_SIGNATURE:
+        raise ValueError("not a PNG file")
+    kept = [PNG_SIGNATURE]
+    position = 8
+    while position < len(data):
+        if position + 12 > len(data):
+            raise ValueError("PNG ends inside a chunk")
+        (length,) = struct.unpack(">I", data[position : position + 4])
+        end = position + 12 + length
+        if end > len(data):
+            raise ValueError("PNG ends inside a chunk")
+        if data[position + 4 : position + 8] in (b"IHDR", b"IDAT", b"IEND"):
+            kept.append(data[position:end])
+        position = end
+    return b"".join(kept)
+
+
 def read_png16(path: Path) -> NDArray[np.float32]:
     """Read a non-interlaced 16-bit RGB PNG into float32 RGB in [0, 1].
 
@@ -849,7 +887,8 @@ def _decode(
             if any(frame.path == final for frame in frames):
                 raise ExtractError(f"two frames of {video.name} would be named {name}")
             roots.check(final)
-            os.replace(produced, final)
+            roots.write_bytes(final, strip_ancillary_chunks(produced.read_bytes()))
+            produced.unlink()
             frames.append(
                 FrameFile(
                     path=final,

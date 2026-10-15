@@ -98,8 +98,7 @@ def _encode(roots: OutputRoots, output: Path, lavfi: str, *, tag_full: bool) -> 
             *("-video_track_timescale", "30000", "-tag:v", "hvc1", str(output)),
         ]
     )
-    if done.returncode != 0:
-        pytest.skip(f"cannot encode the test clip: {done.stderr.decode(errors='replace')[-200:]}")
+    assert done.returncode == 0, f"cannot encode: {done.stderr.decode(errors='replace')[-300:]}"
     return output
 
 
@@ -165,6 +164,19 @@ def test_extraction_follows_the_tags_it_is_given(tmp_path: Path) -> None:
     right = frames._decode(clip, info, [0], roots.allowed / "right", None, roots)
     assert _quadrant_errors(right[0].path) <= TOLERANCE
     wrong_tags = dataclasses.replace(info.tags, color_range="pc")
+    wrong = frames._decode(clip, info, [0], roots.allowed / "wrong", None, roots, tags=wrong_tags)
+    assert _quadrant_errors(wrong[0].path) > 5 * TOLERANCE
+
+
+@pytest.mark.parametrize("data_full", [True, False])
+def test_decoding_with_the_wrong_matrix_fails_the_check(tmp_path: Path, data_full: bool) -> None:
+    """BT.601 coefficients on BT.709 data: the known-colour check must fail by a wide margin."""
+    roots = _roots(tmp_path)
+    clip = _quadrant_clip(roots, "m", data_full=data_full, tag_full=data_full)
+    info = frames.probe_stream(clip)
+    right = frames._decode(clip, info, [0], roots.allowed / "right", None, roots)
+    assert _quadrant_errors(right[0].path) <= TOLERANCE
+    wrong_tags = dataclasses.replace(info.tags, color_space="bt470bg")
     wrong = frames._decode(clip, info, [0], roots.allowed / "wrong", None, roots, tags=wrong_tags)
     assert _quadrant_errors(wrong[0].path) > 5 * TOLERANCE
 
@@ -317,6 +329,65 @@ def test_tool_env_drops_ffreport(monkeypatch: pytest.MonkeyPatch) -> None:
     assert "FFREPORT" not in frames.tool_env()
 
 
+# --- extracted PNGs carry no colour chunk -------------------------------------------------------
+
+
+def _chunk_kinds(data: bytes) -> list[str]:
+    kinds, position = [], 8
+    while position < len(data):
+        (length,) = struct.unpack(">I", data[position : position + 4])
+        kinds.append(data[position + 4 : position + 8].decode("ascii"))
+        position += 12 + length
+    return kinds
+
+
+def test_extracted_frames_are_stripped_to_the_critical_chunks(tmp_path: Path) -> None:
+    """FFmpeg writes cICP/cHRM/gAMA into its PNGs; the prototype writes none; both must match."""
+    roots = _roots(tmp_path)
+    clip = _quadrant_clip(roots, "chunks", data_full=True, tag_full=True)
+    raw = roots.allowed / "raw.png"
+    info = frames.probe_stream(clip)
+    command = frames.decode_command(clip, info.tags, Fraction(0), 1, raw)
+    assert frames.run_tool(command).returncode == 0
+    raw_kinds = _chunk_kinds(raw.read_bytes())
+    assert set(raw_kinds) - {"IHDR", "IDAT", "IEND"}, "control: FFmpeg's own PNG has extra chunks"
+    (frame,) = frames.extract(clip, [0.0], roots.allowed / "png", roots=roots)
+    kept = _chunk_kinds(frame.path.read_bytes())
+    assert kept[0] == "IHDR" and kept[-1] == "IEND" and set(kept) == {"IHDR", "IDAT", "IEND"}
+    assert np.array_equal(frames.read_png16(frame.path), frames.read_png16(raw))
+    prototype_png = roots.allowed / "proto.png"
+    pack.write_png16(prototype_png, np.zeros((4, 4, 3), np.float32))
+    assert set(_chunk_kinds(prototype_png.read_bytes())) == set(kept)
+
+
+def test_strip_ancillary_chunks_removes_the_colour_chunks_and_keeps_the_pixels() -> None:
+    def chunk(kind: bytes, data: bytes) -> bytes:
+        crc = zlib.crc32(kind + data) & 0xFFFFFFFF
+        return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", crc)
+
+    plain = _png(2, 1, [bytes([0]) + bytes(range(12))])
+    header_end = 8 + 12 + 13
+    extras = b"".join(
+        chunk(kind, bytes(body))
+        for kind, body in (
+            (b"cICP", [1, 1, 0, 1]),
+            (b"cHRM", [0] * 32),
+            (b"gAMA", [0, 0, 177, 143]),
+        )
+    )
+    tagged = plain[:header_end] + extras + plain[header_end:]
+    assert _chunk_kinds(tagged) == ["IHDR", "cICP", "cHRM", "gAMA", "IDAT", "IEND"]
+    assert frames.strip_ancillary_chunks(tagged) == plain
+
+
+def test_strip_ancillary_chunks_refuses_damaged_input() -> None:
+    with pytest.raises(ValueError, match="not a PNG"):
+        frames.strip_ancillary_chunks(b"nope")
+    good = _png(1, 1, [bytes([0]) + bytes(6)])
+    with pytest.raises(ValueError, match="ends inside"):
+        frames.strip_ancillary_chunks(good[:-5])
+
+
 # --- the PNG reader -----------------------------------------------------------------------------
 
 
@@ -391,8 +462,7 @@ def synthetic_pack(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Any]:
             *("-color_primaries", "bt709", "-color_trc", "bt709", str(clip)),
         ]
     )
-    if done.returncode != 0:
-        pytest.skip("cannot encode the synthetic clip")
+    assert done.returncode == 0, done.stderr.decode(errors="replace")[-300:]
     got = frames.extract(clip, [0.1, 0.6], roots.allowed / "frames", roots=roots)
     document = pack.build_pack(got, roots.allowed, roots, CPU)
     return {"roots": roots, "frames": got, "document": document, "clip": clip}
@@ -568,8 +638,7 @@ def test_the_flicker_clip_is_built_checked_and_pruned(tmp_path: Path) -> None:
             *("-color_primaries", "bt709", "-color_trc", "bt709", str(clip)),
         ]
     )
-    if done.returncode != 0:
-        pytest.skip("cannot encode the synthetic clip")
+    assert done.returncode == 0, done.stderr.decode(errors="replace")[-300:]
     flicker_dir = roots.allowed / "flicker"
     document = pack.run_flicker(clip, roots, backend, flicker_dir)
     count = document["excerpt"]["frames"]
@@ -590,6 +659,57 @@ def test_the_flicker_clip_is_built_checked_and_pruned(tmp_path: Path) -> None:
         for a, b in zip(reread["frames"], reread["frames"][1:], strict=False)
     }
     assert ticks == {1001}
+
+
+def _fake_probe(stream: dict[str, Any], steps: int = 1001, count: int = 5) -> Any:
+    def run(arguments: Any) -> dict[str, Any]:
+        if "-show_frames" in arguments:
+            return {"frames": [{"pts": k * steps} for k in range(count)]}
+        return {"streams": [stream]}
+
+    return run
+
+
+_GOOD_STREAM: dict[str, Any] = {
+    "codec_type": "video",
+    "codec_name": "hevc",
+    "profile": "Main",
+    "pix_fmt": "yuvj420p",
+    "width": 3840,
+    "height": 2160,
+    "time_base": "1/30000",
+    "color_range": "pc",
+    "color_space": "bt709",
+    "color_primaries": "bt709",
+    "color_transfer": "bt709",
+}
+
+
+def test_verify_clip_accepts_the_right_stream_and_names_each_planted_defect(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    tags = StreamTags("yuvj420p", "pc", "bt709", "bt709", "bt709")
+    rate, size = Fraction(30000, 1001), (3840, 2160)
+
+    def verdict(stream: dict[str, Any], **kwargs: int) -> bool:
+        monkeypatch.setattr(pack, "run_ffprobe", _fake_probe(stream, **kwargs))
+        return bool(pack.verify_clip(Path("x.mp4"), 5, tags, rate, size)["ok"])
+
+    assert verdict(_GOOD_STREAM) is True
+    defects: dict[str, dict[str, Any]] = {
+        "ten bit": {**_GOOD_STREAM, "pix_fmt": "yuv420p10le", "profile": "Main 10"},
+        "pixel format": {**_GOOD_STREAM, "pix_fmt": "yuv444p"},
+        "width": {**_GOOD_STREAM, "width": 1920},
+        "primaries": {**_GOOD_STREAM, "color_primaries": "bt470bg"},
+        "transfer": {**_GOOD_STREAM, "color_transfer": "smpte170m"},
+        "range": {**_GOOD_STREAM, "color_range": "tv"},
+        "matrix": {**_GOOD_STREAM, "color_space": "bt470bg"},
+        "codec": {**_GOOD_STREAM, "codec_name": "h264"},
+    }
+    for name, stream in defects.items():
+        assert verdict(stream) is False, name
+    assert verdict(_GOOD_STREAM, steps=1000) is False, "timing"
+    assert verdict(_GOOD_STREAM, count=4) is False, "frame count"
 
 
 def test_the_encode_command_carries_the_source_tags_and_rate() -> None:
