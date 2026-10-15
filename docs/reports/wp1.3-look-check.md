@@ -256,8 +256,22 @@ record observations about them under the open-water row at CP2 is the owner's ca
 
 ## 8. Verification
 
-(See the final report and `docs/proofs/wp1.3-ledger.md`; the gate lines are in the completion
-message.)
+- Gates on the final head (`f697f63`), run with the WinGet `ffmpeg`/`ffprobe` folder on PATH:
+  `uv run ruff check .` all checks passed; `uv run ruff format --check .` 73 files already
+  formatted; `uv run mypy` no issues in 16 source files; `uv run pytest` **481 passed, 0 skipped**
+  (the `footage` smoke test and the `gpu` flicker test ran; this package's tests are 38).
+  Logs: `work\wp1.3\logs\g2-*.log`.
+- Controls with planted defects, each failing by name: limited-range data tagged full; a wrong
+  range and a wrong matrix argument (full and limited clips); a seek one frame late; the two pair
+  halves swapped; the unsmoothed clip encoded from the source frames; a 10-bit, wrongly sized,
+  mis-tagged, mistimed, short or out-of-order clip against `verify_clip`; a faked FFmpeg that
+  leaves a partial file.
+- `verify_clip` of the final head re-run on the delivered clips: both `ok`, HEVC Main
+  `yuvj420p` 3840x2160, `pc`/`bt709`/`bt709`/`bt709`, 180 frames, step 1001.
+- Reviewer A (Codex, STRONG): two rounds; round 1 one major (rejected by the brief, mitigated in
+  text) and five minors, all fixed; round 2 zero blocking, three minors fixed in the cleanup.
+  Ledger `docs/proofs/wp1.3-ledger.md`; transcripts under
+  `C:\Users\rwsmy\clearwater-review-evidence\wp1.3\`.
 
 ## 9. CP2 sheet (the owner fills the last three columns)
 
