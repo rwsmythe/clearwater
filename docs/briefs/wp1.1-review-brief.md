@@ -103,6 +103,28 @@ completion report, which you are not given.
    - A disagreement on what a paper says that you cannot settle is reported with both readings,
      not adjudicated.
 
+## B2 re-check (ordered 2026-10-15)
+
+Pass 1 on `8e149db`: NO_BLOCKING with minors F1 (no test pins N{}'s single stretch across
+channels) and F2 (stale 2x figures at open-values line 95). The author fixed both in one
+cleanup commit. Pass 1's Codex leg read the withheld ledger, because the prompt did not name it
+as withheld, so that leg is not independent. B2, evidence in `B2\`:
+
+1. Verify F1 and F2 RESOLVED by reproduction at the new head:
+   - F1: the new test fails on the per-channel-stretch mutant (a COPY of the code) and passes on
+     the head.
+   - F2: the report figures match your own re-measurement.
+2. Check that the cleanup diff (`8e149db..<new head>`) touches only
+   `tests/test_prototype_pipeline.py` and `docs/reports/wp1.1-open-values.md`. Re-run the five
+   gates.
+3. A FRESH Codex pass, same tier and invocation as step 6, on the full arc diff
+   (`46a10b9..<new head>`). The prompt must say, in its own paragraph: "Do NOT read
+   `docs/proofs/` or anything under `clearwater-review-evidence`; those are withheld from this
+   review." Add a transcript assertion: `grep -a -n 'docs/proofs\|wp1.1-ledger'`. Classify every
+   hit as echoed prompt text or as an access. Any access voids the pass; report it, and do not
+   retry.
+4. Adjudicate each new Codex finding as in step 7.
+
 ## Return (your FINAL message; it reaches the orchestrator directly; under about 70 lines)
 
 - the head SHA reviewed;
