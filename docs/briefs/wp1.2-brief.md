@@ -239,3 +239,13 @@ vendors, and the product's fallback policy are out of envelope.
   need a second implementation of a pipeline step; an agreement failure you cannot attribute;
   a measured peak above 8 GB graphics memory at 5.3K (report it; do not change the pipeline to
   fit). Do not stop for a slow result: a slow result is a result.
+- **Working rules:**
+  - Run `uv sync` in the worktree.
+  - Commit by pathspec with a conventional message (`feat(wp1.2): ...`) and the
+    `Co-Authored-By:` footer.
+  - Never use a bare `cd`; use `git -C` and absolute paths.
+  - Do not post to any mailbox.
+  - Do not read the footage folder.
+- Also STOP and return on: any dependency beyond the grant and its `ctk` extra; a need to touch
+  a file outside the owned list (including `tests/conftest.py` and
+  `tests/test_prototype_pipeline.py`); a change to WP1.1 numerics beyond float32 reordering.
