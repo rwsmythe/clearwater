@@ -1,0 +1,16 @@
+# WP1.2 Part A -- cumulative review round ledger (Reviewer A)
+
+Tier strong; transport WSL; codex-cli 0.162.1; flags `-m gpt-5.6-sol -c model_reasoning_effort=high -s read-only --skip-git-repo-check`.
+Bring-up probe: one `^ succeeded in` line before round 1 (`probe/wp12-probe-transcript.txt`). Evidence: `C:\Users\rwsmy\clearwater-review-evidence\wp1.2\rN\` (prompt, diff, transcript, adjudication, md5s); analysis scripts behind the report's agreement, hash and mutation figures in `...\wp1.2\analysis\`. Staging files (`wp12-*`) lived in the session scratchpad, never in the worktree, and were deleted at teardown.
+
+Before round 1, two findings were stopped and routed (not review rounds): F1, CPU/GPU agreement over the fixed tolerance on WP1.1's near-flat `_synthetic` 64x96 / 97x65 images, attributed to cupyx's float32 accumulation amplified by N{}'s ~0.0018 span; F2, `run.py --device auto` as default breaks WP1.1's bit-exact CLI test. CHARC ruled (4db6db642c117b1e): F1 option A (fixed tolerance on the textured scene; the near-flat pair under max-abs 1e-4 / mean-abs 1e-5; float64 Gaussian rejected; DR-14 banked), F2 option a (`--device cpu` default). CHARC amendment 22f68342748b43f2: the report records the install footprint.
+
+| Round | Head reviewed | crit / major / minor | In / out envelope | NEW / REOPENED | Reverts | Fixes changed | Assertions | Verdict | Depth |
+|---|---|---|---|---|---|---|---|---|---|
+| 1 | 9274651 | 0 / 0 / 3 | 2 in / 1 out | 3 NEW / 0 | 0 | cleanup only: product (select_backend falls back when cupyx does not import) + 1 test + 3 private docstrings + report text (array count); in dd93979; timed path untouched | banner ok; ^ERROR 0; `ERROR codex_core` 2 = echoed brief text; footer 1; succeeded 15; withheld-path hits all echoes, exclusions or a `git status` listing | NO_NEW_CRITICAL_MAJOR (converged) | (dispatcher-read) |
+
+## Findings and adjudication
+
+Round 1 (converged): (1) minor, EXECUTED, the report counted seven result images and sixteen other arrays (six and fifteen) -- fixed. (2) minor, EXECUTED, three private bench helpers lacked one-line docstrings -- fixed. (3) minor, REASONED, out of envelope, `select_backend("auto")` could raise if `cupyx.scipy.ndimage` failed to import -- confirmed by a new test that fails without the fix; fixed anyway. The reviewer found no NumPy operation on a CuPy array in the mathematical path and confirmed `tests/test_prototype_pipeline.py` unchanged (SHA-256), the single granted dependency and the reported package versions; its sandbox could not run the Windows `.venv` (`UtilBindVsockAnyPort`), so ruff, mypy, pytest, agreement and bench figures were REASONED on its side and run here.
+
+Banked / raised (not loop-driving): DR-14 (N{} ill-conditioned on low-texture frames; CHARC); NVIDIA-proprietary licences of the `[ctk]` wheels (N13, for WP2.1); the core's speed against N6 (CHARC at WP1.6, no optimisation here).
