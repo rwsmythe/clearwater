@@ -79,4 +79,4 @@
   and photos still coming; CHARC will say).
 - Practice: NO harness/pytest runs at this seat while an exclusive bench window is open (my
   05:29Z harness run overlapped the WP1.2 GPU re-measure; reported, cell told to re-run).
-- Inbox drained through msg `9ea69283f746b163`.
+- Inbox drained through msg `122f9a10cf1323f5` (WP1.5 decisions accepted; harness gate = heavy inside a bench window).
