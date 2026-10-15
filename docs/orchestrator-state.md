@@ -23,15 +23,20 @@
 
 ### Live cells
 
-- **wp14-cell** (implementer-opus-high, background): WP1.4, the statistics experiments
-  (shallow part). Dispatched ~13:27Z.
-  - FINAL brief `docs/briefs/wp1.4-brief.md` (`9ed1a1c`); worktree `.worktrees/wp1.4` (local toml
-    copied in); base `9ed1a1c`; outputs `work\wp1.4\`.
-  - At the gate:
-    - my seat Reviewer B on the `-mc` candidate;
-    - re-run the WP1.2R bit-identity witness on `correct()` with `statistics=None` (Ancuti
-      blue off and on, and 3C; CPU and GPU; scratchpad `witness_r.py` pattern);
-    - gate, merge, accept.
+- **wp14-fix** (implementer-sonnet-high, background): the ONE WP1.4 remediation after my seat
+  Reviewer B (BLOCKING on candidate `af98ca8`; md5 `f53b2099...`; evidence
+  `clearwater-review-evidence\wp1.4\reviewB\`).
+  - Brief `docs/briefs/wp1.4-remediation-brief.md` (`179fab0`); branch `wp1.4` from `63d8422`.
+  - The author `wp14-cell` returned at 384K (near cap) and is retired.
+  - Findings: majors M1 (white-balance means), M2 (clipped pixels), M3 (`unflatten` suffixes),
+    M4 (pts alignment); minors 5-9; advisories 10-11. A12 (VFR) is out of envelope and goes to
+    DR-23 at accept.
+  - Before B: gate 584/0, gpu 24, harness 366; my witness was bit-identical in 6/6 (main
+    `0e774c6` against the candidate, `statistics=None`, scratchpad `witness_r.py`).
+  - Then: rebuild `wp1.4-mc`, gate, re-run the witness, ONE B re-run (a 2nd block is
+    adjudicated at the gate), merge, accept. Note: the cell's return quoted 0.76 for the
+    largest staged/flat pixel; the records give 0.68 (GX011627) and 0.90 (GX011625).
+  - **ROLLOVER after the WP1.4 accept** (context ~340K): no live cell at that boundary.
 - **CHARC commission `0fd7c88ad56a7083`:**
   - The owner's partial CP1 ("shallow confirmed") releases WP1.3 and WP1.4, shallow only.
   - The WP1.4 gain-cap noise test becomes WP1.4b (deep footage).
