@@ -83,9 +83,9 @@ Repository local + mirrored to private GitHub `rwsmythe/clearwater` (verify:
 
 ### Pending items
 
-1. **Owner decision request 2026-10-14T23:45Z** (`comms/operator/inbox/...-c4281ff7.md`):
-   spec text amendments recording the measured CPU/GPU (D117, section 12, 14.2, Q1).
-   Recommended: approve as written; CHARC applies. Debt register DR-5. Unanswered.
+1. **Owner decision request 2026-10-14T23:45Z** (spec text, measured CPU/GPU): APPROVED by
+   the owner 2026-10-15 in chat ("approve the spec amendments as written"); applied as spec
+   v0.5.1 (D117, section 12, 14.2 closed, 15.2 Q1; changelog line); DR-5 CLOSED. DONE.
 2. **Owner to report the footage download complete** -> CHARC tells the orchestrator to
    dispatch the real-inventory pass -> CP1 (owner sorts categories; owner-reserved).
 3. **Next harness acts:** QA the WP1.2 Part A accept when it lands; then WP1.5 (container
