@@ -101,6 +101,13 @@ Each accepted package had its return report posted to CHARC and an info-update t
   - CHARC QA: CONFIRMED; adjudication upheld.
 - **Spec is v0.5.2** (`9042ae0`; D60 CLOSED). WP1.2 Part B cites v0.5.2 and measures decode
   only.
+- **WP1.2 Part B:** draft `docs/briefs/wp1.2b-brief.md` (CHARC `dc733650e60ac026`;
+  opus-high, STRONG, EXCLUSIVE). Dispatch only when all three hold:
+  1. "download complete" AND the inventory report;
+  2. WP1.3 and WP1.4 merged or paused at a boundary;
+  3. WP1.5 merged (done).
+
+  The gate-report template is `docs/reports/wp1.6-gate-report.md`.
 - **No .LRV/.THM exist** (owner; CHARC `93c5af007a3a8ba8`).
   - WP1.2 Part B drops the LRV analysis-speed leg (two columns: software decode and hardware
     decode).
@@ -111,4 +118,4 @@ Each accepted package had its return report posted to CHARC and an info-update t
   and re-run after CHARC confirms the download is complete.
 - CHARC approved `_windows_power()` as instrument-only (never into `src/clearwater/` without a
   fresh ruling).
-- Inbox drained through msg `0fd7c88ad56a7083` (verify: `uv run python scripts/role_mail.py list --role orchestrator`).
+- Inbox drained through msg `dc733650e60ac026` (verify: `uv run python scripts/role_mail.py list --role orchestrator`).
