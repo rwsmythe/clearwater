@@ -356,16 +356,17 @@ def _rotation_degrees(stream: Mapping[str, Any]) -> int:
     """Return the clockwise display rotation (0, 90, 180 or 270) a stream asks for.
 
     The display-matrix side data reports counter-clockwise degrees and is negated; the
-    older ``rotate`` tag is already clockwise. No rotation metadata means 0.
+    older ``rotate`` tag is already clockwise. The result is snapped to the nearest quarter
+    turn. No rotation metadata means 0.
     """
     side_data = stream.get("side_data_list")
     if isinstance(side_data, list):
         for entry in side_data:
             rotation = _as_float(_as_dict(entry).get("rotation"))
             if rotation is not None:
-                return round(-rotation) % 360
+                return round(-rotation / 90) * 90 % 360
     rotate = _as_float(_as_dict(stream.get("tags")).get("rotate"))
-    return round(rotate) % 360 if rotate is not None else 0
+    return round(rotate / 90) * 90 % 360 if rotate is not None else 0
 
 
 def _video_from_ffprobe(

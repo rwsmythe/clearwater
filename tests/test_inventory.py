@@ -190,7 +190,18 @@ class TestVideoFromFfprobe:
 
     @pytest.mark.parametrize(
         ("side_data", "expected"),
-        [(-90, 90), (90, 270), (180, 180), (-180, 180), (0, 0), (-270, 270), (-89.6, 90)],
+        [
+            (-90, 90),
+            (90, 270),
+            (180, 180),
+            (-180, 180),
+            (0, 0),
+            (-270, 270),
+            (-89.6, 90),
+            (-100, 90),
+            (44, 0),
+            (-46, 90),
+        ],
     )
     def test_display_matrix_rotation(self, side_data: float, expected: int) -> None:
         extra = {"side_data_list": [{"side_data_type": "Display Matrix", "rotation": side_data}]}
@@ -733,8 +744,12 @@ class TestWriteInventory:
         reports.mkdir()
         existing = reports / "inventory-20261014T120000Z.csv"
         existing.write_text("precious", encoding="utf-8")
-        inventory.write_inventory([], tmp_path, stamp="20261014T120000Z")
+        csv_path, summary = inventory.write_inventory([], tmp_path, stamp="20261014T120000Z")
         assert existing.read_text(encoding="utf-8") == "precious"
+        assert (csv_path.name, summary.name) == (
+            "inventory-20261014T120000Z-1.csv",
+            "inventory-20261014T120000Z-1-summary.md",
+        )
 
     def test_default_stamp_is_utc_now(self, tmp_path: Path) -> None:
         before = datetime.now(UTC).replace(microsecond=0)
