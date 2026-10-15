@@ -23,14 +23,16 @@
 
 ### Live cells
 
-- **wp15-revb** (implementer-opus-high, background): WP1.5 verification-QA cell. It was
-  dispatched ~07:10Z as "Reviewer B" under the old fill. CHARC `2b6dae230aa9749a`: let it finish;
-  its results are QA EVIDENCE, NOT Reviewer B. Brief `docs/briefs/wp1.5-review-brief.md`
-  (`462e1f2`), head `97d40df`; outputs `work\wp1.5-B\`, evidence
-  `clearwater-review-evidence\wp1.5\B\` (my own Reviewer B goes in a separate folder).
-- **wp15-cell** (author) RETURNED ~07:05Z: head `97d40df`, depth 363K, recommends SIMPLE.
-  CHARC's pre-rulings were routed to it ~07:30Z with a HOLD: no edits until I send GO, after
-  wp15-revb returns (it reads the worktree). The GO carries wp15-revb's findings.
+- **wp15-cell** (author): GO sent ~07:40Z. The rework covers CHARC's rulings (`bdae7c6214ae1247`,
+  `9452fe94b5465abb`; DR-15 `83df3d1`) plus the QA findings F1-F5, then ONE Reviewer A round
+  on the delta. Depth 363K at GO.
+- **wp15-revb** RETURNED: verification QA, NO_BLOCKING (it is NOT Reviewer B).
+  - All claims reproduce; its re-encodes are byte-identical to the author's; compare matched
+    all 36 items.
+  - All 5 deliberate breaks were caught; the footage snapshot is unchanged.
+  - F1-F5 minor. Its Codex transcript md5 is `ceb5a673...`. Evidence in
+    `clearwater-review-evidence\wp1.5\B\`.
+  - Its depth: 160K.
 - Branches `wp0.1`, `wp0.2`, `wp1.1` and `wp1.2` are kept on purpose: they hold the reviewed
   pre-rebase SHAs the accept records cite (verify: `git worktree list` shows main and wp1.5 only).
 
@@ -88,8 +90,8 @@ Each accepted package had its return report posted to CHARC and an info-update t
 ### Pending
 
 - **WP1.5 sequence:**
-  1. wp15-revb returns.
-  2. GO to the author: the rulings plus the QA findings, ONE Reviewer A round on the delta.
+  1. wp15-revb returns. DONE.
+  2. GO to the author. SENT: the rulings plus the QA findings, ONE Reviewer A round on the delta.
   3. `-mc` candidate.
   4. MY Reviewer B: one STRONG Codex pass at this seat on the candidate.
   5. Gate, merge, accept.
@@ -109,4 +111,4 @@ Each accepted package had its return report posted to CHARC and an info-update t
   and re-run after CHARC confirms the download is complete.
 - CHARC approved `_windows_power()` as instrument-only (never into `src/clearwater/` without a
   fresh ruling).
-- Inbox drained through msg `2b6dae230aa9749a` (verify: `uv run python scripts/role_mail.py list --role orchestrator`).
+- Inbox drained through msg `9452fe94b5465abb` (verify: `uv run python scripts/role_mail.py list --role orchestrator`).
