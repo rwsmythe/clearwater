@@ -26,30 +26,34 @@ Repository local + mirrored to private GitHub `rwsmythe/clearwater` (verify:
 ### Live workstreams
 
 - **Orchestrator generation** `clearwater-orchestrator-20261014-1258` (opus/high/auto,
-  confirmed by the owner; verify: `comms/.launch-sessions.json`, `ListAgents`).
-- **WP0.1 ACCEPTED and merged** (main c09f747, accept record `docs/proofs/wp0.1-accept.md`,
-  ledger `docs/proofs/wp0.1-ledger.md`). CHARC QA 2026-10-14T23:45Z: four gates + harness
-  gate re-run green at this seat; `clearwater.local.toml` (uncommitted) loads with the two
-  owner paths; `footage_available()` False until the download lands. Branch `wp0.1` kept.
-- **WP0.2 commissioned** 2026-10-14T23:45Z (draft brief `docs/briefs/wp0.2-brief.md`,
-  main b415faf; cell `implementer-sonnet-high`; tripwire pass: dev-group grants Pillow +
-  pillow-heif). **DISPATCHED 2026-10-14T23:47Z**: cell `implementer-sonnet-high` in
-  `.worktrees/wp0.2` (branch `wp0.2`, base b0287a2); seven brief decisions ruled accepted
-  by CHARC at ~23:50Z. That worktree is OCCUPIED until the orchestrator records the
-  cell's return. Verify: `git worktree list`, `docs/orchestrator-state.md`.
-- Debt register opened: `docs/debt-register.md` (DR-1..DR-5).
+  owner-confirmed; verify: `comms/.launch-sessions.json`, `ListAgents`).
+- **WP0.1 ACCEPTED** (main c09f747; `docs/proofs/wp0.1-accept.md`). **WP0.2 ACCEPTED**
+  (main 4863a90; `docs/proofs/wp0.2-accept.md`); CHARC QA re-ran all gates green at
+  2d9c381 (pytest skips the ffprobe tests in THIS session because its PATH predates
+  the FFmpeg install; the orchestrator's 182-pass run is the figure of record).
+  Phase 0 code is complete; the REAL inventory run waits for the footage download.
+- **Real-inventory mechanical pass**: approved in principle (implementer-sonnet-medium,
+  no code); dispatch ONLY on CHARC's word after the owner reports the download
+  complete (a partial inventory would seed CP1 wrongly, DR-6).
+- **WP1.1 commissioned** 2026-10-15 ~00:35Z (draft `docs/briefs/wp1.1-brief.md`; cell
+  `implementer-opus-high`; gate tier STRONG; grants numpy + scipy dev group; new
+  `tools/prototype/` package). Orchestrator issues the final brief and dispatches.
+  Verify: `git worktree list`, `docs/orchestrator-state.md`; a `.worktrees/wp1.1`
+  tree is OCCUPIED until the orchestrator records the cell's return.
+- Debt register `docs/debt-register.md`: DR-1..DR-10 (DR-3, DR-4 closed).
 - No authority granted by `SendMessage` this generation (cues only).
 
 ### Pending items
 
 1. **Owner decision request 2026-10-14T23:45Z** (`comms/operator/inbox/...-c4281ff7.md`):
    spec text amendments recording the measured CPU/GPU (D117, section 12, 14.2, Q1).
-   Recommended: approve as written; CHARC applies as a docs(spec) commit. Debt register DR-5.
-2. **Next harness act:** QA the WP0.2 accept when it lands; then CP1 (owner sorts the
-   inventory into categories: owner-reserved, decision_request). Phase 1 commissions
-   follow CP1 (WP1.1 can start before CP1: it needs one image, not the inventory).
-3. Main is ~36 commits ahead of `origin/main`, unpushed; the owner has not asked for a push.
-4. Footage download in progress into `C:\Users\rwsmy\clearwater-footage\` (owner).
+   Recommended: approve as written; CHARC applies. Debt register DR-5. Unanswered.
+2. **Owner to report the footage download complete** -> CHARC tells the orchestrator to
+   dispatch the real-inventory pass -> CP1 (owner sorts categories; owner-reserved).
+3. **Next harness acts:** QA the WP1.1 accept; then commission WP1.2 (CPU/GPU variant;
+   `gpu`, exclusive; the GPU-library ruling is CHARC's at that brief) and WP1.5
+   (container spike; needs footage). WP1.3 and WP1.4 need CP1.
+4. Main is ~54 commits ahead of `origin/main`, unpushed; the owner has not asked for a push.
 
 ### Standing delegation (owner, 2026-10-14, chat to CHARC, verbatim)
 
