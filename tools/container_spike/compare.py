@@ -974,11 +974,16 @@ def _edit_item(
             continue
         elif left is None or right is None:
             places.append(f"{key} edit list only in {'output' if left is None else 'source'}")
-        elif len(left) != len(right):
-            places.append(f"{key} {len(left)} vs {len(right)} entries")
         else:
-            entry = next(i for i, (a, b) in enumerate(zip(left, right, strict=True)) if a != b)
-            places.append(f"{key} entry {entry}")
+            entry = next(
+                (i for i, (a, b) in enumerate(zip(left, right, strict=False)) if a != b),
+                min(len(left), len(right)),
+            )
+            if entry < min(len(left), len(right)):
+                places.append(f"{key} entry {entry}")
+            else:
+                longer = "output" if len(right) > len(left) else "source"
+                places.append(f"{key} entry {entry} only in {longer}")
     where = "differs: " + ", ".join(places)
     return Item(
         name,
@@ -991,16 +996,17 @@ def _edit_item(
     )
 
 
-def _container_start(facts: Facts, codec_types: Sequence[str]) -> str | None:
+def _container_start(facts: Facts, codec_types: Sequence[str] | None) -> str | None:
     """Return the earliest start (``start_pts`` x time base) over the given stream types, exact.
 
-    Over every stream type this is ffprobe's container ``start_time`` in exact form.
+    With ``codec_types`` None every stream counts: ffprobe's container ``start_time`` in
+    exact form.
     """
     starts = [
         start
         for s in facts.probe.get("streams", [])
         if isinstance(s, dict)
-        and s.get("codec_type") in codec_types
+        and (codec_types is None or s.get("codec_type") in codec_types)
         and (start := _ticks(s.get("start_pts"), _time_base(s))) is not None
     ]
     return exact(min(starts)) if starts else None
@@ -1417,8 +1423,8 @@ def compare_facts(source: Facts, output: Facts) -> list[Item]:
             "start offset: container start over all tracks (earliest start, exact)",
             BEST_EFFORT,
             best,
-            _container_start(source, ("video", "audio", "data")),
-            _container_start(output, ("video", "audio", "data")),
+            _container_start(source, None),
+            _container_start(output, None),
             note="includes data tracks; ffprobe's container start_time in exact form",
         )
     )

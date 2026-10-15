@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses
 import shutil
 import struct
 import subprocess
@@ -317,6 +318,42 @@ class TestEditEffect:
         effect = compare.edit_effect(self._movie(), track)
         assert effect[0]["media_start"] == "empty"
         assert effect[0]["duration"] == compare.exact(Fraction(1, 2))
+
+
+_E0 = {"duration": "1", "media_time": "0", "rate": "1"}
+_E1 = {"duration": "2", "media_time": "empty", "rate": "1"}
+
+
+class TestEditNotes:
+    def _note(self, source: dict[str, Any], output: dict[str, Any]) -> str:
+        return compare._edit_item("e", MANDATORY, "D94", source, output).note
+
+    def test_an_extra_entry_is_named(self) -> None:
+        note = self._note({"vide#0": [_E0]}, {"vide#0": [_E0, _E1]})
+        assert note == "differs: vide#0 entry 1 only in output"
+
+    def test_a_missing_entry_is_named(self) -> None:
+        note = self._note({"vide#0": [_E1, _E0]}, {"vide#0": [_E1]})
+        assert note == "differs: vide#0 entry 1 only in source"
+
+    def test_an_edit_list_absent_on_one_side_is_named(self) -> None:
+        note = self._note({"soun#0": None}, {"soun#0": [_E0]})
+        assert note == "differs: soun#0 edit list only in output"
+
+    def test_a_track_absent_on_one_side_is_named(self) -> None:
+        assert self._note({"vide#0": [_E0]}, {}) == "differs: vide#0 track only in source"
+
+
+class TestContainerStart:
+    def test_all_tracks_form_counts_every_stream_type(self, clips: dict[str, Path]) -> None:
+        facts = compare.gather(clips["base"])
+        subtitle = {"index": 9, "codec_type": "subtitle", "time_base": "1/1000", "start_pts": -5000}
+        probe = {**facts.probe, "streams": [*facts.probe["streams"], subtitle]}
+        with_subtitle = dataclasses.replace(facts, probe=probe)
+        assert compare._container_start(with_subtitle, None) == compare.exact(Fraction(-5))
+        assert compare._container_start(with_subtitle, ("video", "audio")) == compare.exact(
+            Fraction(1, 2) - Fraction(1024, 48000)
+        )
 
 
 class TestOutputPathCheck:
