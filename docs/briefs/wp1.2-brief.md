@@ -1,8 +1,8 @@
-# WP1.2 — CPU/GPU variant, speed and memory (CHARC draft brief, Part A)
+# WP1.2 — CPU/GPU variant, speed and memory (dispatch brief, Part A, FINAL)
 
-**Status:** DRAFT by CHARC 2026-10-15; the orchestrator issues the FINAL in section 4.6 format
-and dispatches. Cell: `implementer-opus-high`. Worktree `.worktrees/wp1.2`, branch `wp1.2`,
-base = the main commit carrying the final brief. **Exclusive** (plan section 4.3): no other cell
+**Status:** FINAL, issued by the orchestrator 2026-10-15 from CHARC's draft (b5c0979) on CHARC's
+commission `f1a60e57e0668069`. Cell: `implementer-opus-high`. Worktree `.worktrees/wp1.2`,
+branch `wp1.2`, base = the main commit that carries this file. **Exclusive** (plan section 4.3): no other cell
 runs while this package's timing or memory runs execute; the orchestrator schedules nothing in
 parallel from dispatch to return.
 
@@ -111,6 +111,39 @@ relaxed.
   Keep `mypy` green on the CPU path when `cupy` is absent (guard the import; the module is
   optional at import time).
 
+## Decisions fixed at issue (orchestrator)
+
+- **CUDA runtime libraries.** Plain `cupy-cuda12x` comes first. If importing it or running a
+  kernel fails for a missing CUDA runtime DLL (NVRTC, cuBLAS, cuFFT and the like), the grant
+  covers CuPy's own `ctk` extra: `cupy-cuda12x[ctk]`, which pulls NVIDIA's `nvidia-*-cu12`
+  wheels through uv. These are uv-managed wheels in `.venv`, not a system install, so they are
+  within the grant. They go in the dev group only, and the report lists each pulled package
+  with its license; product adoption is WP2.1's.
+  - Still a STOP to CHARC: anything outside uv/`.venv`, meaning a CUDA toolkit installer, a
+    driver change, or an environment variable set machine-wide (`CUDA_PATH` and the like).
+  - Setting such a variable inside one process, for one run, is allowed if documented in the
+    report. Product code may not depend on it.
+- **Where the GPU skip lives.** `tests/conftest.py` is not owned. The `gpu` skip ("no CUDA
+  device usable") is decided inside `tests/test_prototype_backend.py`, through a module-level
+  check or a fixture that calls `select_backend("auto")`. At the gate on this machine the
+  `gpu` tests must RUN; a skip there fails claim 8.
+- **Working folder.** `bench.py` records go to the main tree's working folder,
+  `C:\Users\rwsmy\clearwater\work\wp1.2a\` (owner-set; gitignored; never committed).
+  - The report cites them by that absolute path.
+  - The worktree's own `work/` is NOT used.
+  - Tests write only to pytest's `tmp_path`.
+- **Exclusive window, including the review loop.** Reviewer A's Codex runs (WSL) and `bench.py`
+  must not overlap.
+  - Run the full `bench.py` matrix only when no Codex process is running.
+  - Record the ambient beside the figures: `nvidia-smi` memory in use before the run, the power
+    source, and the Windows power mode. To read the power mode,
+    `powercfg /getactivescheme` from PowerShell works; Git Bash mangles the slash argument.
+  - If a review fix changes the timed code path, re-run the affected cells and replace the
+    figures. Never mix runs from two heads in one table, and give the head SHA the figures were
+    measured on.
+- **Machine reference.** RTX 4070 Laptop, 8188 MiB, driver 610.62 (read 2026-10-15 at this
+  seat); AMD Ryzen 9 7940HS, 32 GB RAM (the WP0.1 environment report).
+
 ## Required end state (the claim list)
 
 1. `uv sync` on a clean `.venv` installs `cupy-cuda12x` on this machine under Python 3.12 with
@@ -125,7 +158,8 @@ relaxed.
 5. The figures table in `docs/reports/wp1.2a-speed-memory.md`: for each of CPU/GPU x
    4K/5.3K x ancuti2018/c3: per-frame median and p95 (s), drift, peak RSS (MB), peak graphics
    memory (MB), the estimate (MB) and the estimate's ratio to the measured peak. Each row
-   SYNTHETIC-labelled, with the JSON record's path under `work/wp1.2a/` (the working folder).
+   SYNTHETIC-labelled, with the JSON record's path under
+  `C:\Users\rwsmy\clearwater\work\wp1.2a\` (the working folder) and the head SHA measured.
 6. Proxy effect: the whole-frame statistics (channel means, normalisation bounds) at short
    sides 2160 (full), 1080, 720, 540 and 360 on the synthetic frame, with the relative error of
    each against full size, in the report (D60/D109 input; Part B repeats it on real frames).
@@ -156,17 +190,41 @@ vendors, and the product's fallback policy are out of envelope.
 
 ## Review loop (Reviewer A) -- per `docs/review-gate-clearwater.md` Part 1
 
-- Tier **STRONG** (the mechanism this chooses becomes IF-2's basis). Transport, flags, probe,
-  per-round assertions, convergence, evidence (`C:/Users/rwsmy/clearwater-review-evidence/wp1.2/rN/`)
-  and ledger (`docs/proofs/wp1.2-ledger.md`) exactly as in the WP1.1 brief, with the worktree
-  path changed. WHAT TO EXAMINE: the backend mechanism (no hidden host round trips, no
+- Tier **STRONG** (the mechanism this chooses becomes IF-2's basis).
+  - **Transport and flags:** WSL, pinned to codex-cli 0.162.1. Per-call flags, never `-p`:
+    `-m gpt-5.6-sol -c model_reasoning_effort=high -s read-only --skip-git-repo-check`. Banner
+    assertion: `gpt-5.6-sol` / `high`.
+  - **Diff:** generated Windows-side with
+    `git -C <worktree> diff -U8 <base>..HEAD -- . ':!uv.lock' ':!docs/proofs'` into a scratch
+    file; WSL never runs git.
+  - **Invocation**, with cwd the worktree:
+    `wsl.exe bash -ilc 'export PATH="$HOME/.local/node22/bin:$PATH"; cd /mnt/c/Users/rwsmy/clearwater/.worktrees/wp1.2 && cat <prompt> <diff> | codex exec -m gpt-5.6-sol -c model_reasoning_effort=high -s read-only --skip-git-repo-check - > <transcript> 2>&1'`
+  - **Probe:** one probe through this exact invocation before round 1, expecting one
+    `^ succeeded in` line.
+  - **Per-round assertions** (all with `grep -a`):
+    - the banner;
+    - `^ERROR` and `ERROR codex_core` lines, each classified by provenance;
+    - the `^tokens used` footer;
+    - an anchored VERDICT line;
+    - at least one `^ succeeded in` line;
+    - the withheld-path assertion below.
+  - **Convergence:** zero NEW in-envelope blocking findings. Minors are fixed once in that
+    round's cleanup. FIVE_ROUND_GATE: at round 5, yield with the ledger.
+  - **Evidence and ledger:** evidence in `C:/Users/rwsmy/clearwater-review-evidence/wp1.2/rN/`;
+    ledger `docs/proofs/wp1.2-ledger.md`, with columns as in WP1.1's and the depth column left to
+    the dispatcher. Delete `.codex-*` staging files at teardown.
+  - **Withheld paths:** the prompt carries its own paragraph: "Do NOT read `docs/proofs/` or
+    anything under `clearwater-review-evidence`." Each round's transcript is checked with
+    `grep -a -n 'docs/proofs\|wp1.2-ledger'`; classify every hit as an echo or an access. WHAT TO EXAMINE: the backend mechanism (no hidden host round trips, no
   duplicated mathematics), the agreement test's strength, the timing method's soundness
   (synchronisation inside the timed region, warm-up discarded, transfers included), and the
   memory measurement's provenance. The report is in the diff. Withheld paths named in the
   prompt (the orchestrator's standing rule after WP1.1).
-- Reviewer B: recommended, as for WP1.1 (an independent cell re-runs `bench.py` once in the
-  exclusive window and checks the figures reproduce within 10%); the orchestrator decides per
-  the fill.
+- Reviewer B: ORDERED (orchestrator, per the fill). An independent implementer-opus-high cell
+  is dispatched after your return, never concurrently with you.
+  - It re-runs `bench.py` once in its own exclusive window and checks that the figures
+    reproduce within 10%.
+  - It re-runs the agreement tests and reviews the mechanism.
 
 ## Notes for the cell
 
