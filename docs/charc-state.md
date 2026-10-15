@@ -78,7 +78,7 @@ Repository local + mirrored to private GitHub `rwsmythe/clearwater` (verify:
   ruling needed. STRAY PROCESS: PID 33616 `C:\Python314\python.exe -`, hung since
   2026-10-14 13:31 (WP0.1 Reviewer B orphan), one core; the orchestrator's classifier
   blocked stopping it; CHARC verified and surfaced to the owner; STOPPED ~05:20Z on the owner's direction (taskkill typed by the owner, run via PowerShell by CHARC); orchestrator told.
-- Debt register `docs/debt-register.md`: DR-1..DR-15 (DR-3, DR-4, DR-5 closed).
+- Debt register `docs/debt-register.md`: DR-1..DR-17 (DR-3, DR-4, DR-5 closed).
 - No authority granted by `SendMessage` this generation (cues only).
 
 ### Pending items
@@ -117,7 +117,14 @@ Repository local + mirrored to private GitHub `rwsmythe/clearwater` (verify:
    07:31Z: pre-ruling 1 STANDS (video elst as written identical on the GoPro chapters;
    SIMPLE holds). B-frame sources (iPhone) would be encode-then-repair under it -> DR-15,
    trigger WP2.1, with CHARC's lean recorded (presentation-effect reading where only the
-   composition-offset convention differs). Roster plan accepted; GO after wp15-revb. FINAL issued 8ad93b8 (05:30Z);
+   composition-offset convention differs). Roster plan accepted; GO after wp15-revb.
+   **08:22Z: the orchestrator's OWN Reviewer B (first under the corrected fill) on candidate
+   7a490c7: NEW_CRITICAL_MAJOR_FOUND** (B1 hard-link/race containment, B2 FFREPORT leak, B3
+   an H.264 output passes as SAME -> REQUIRED HEVC/MP4 item, B4 collisions = product, B5 D54
+   untagged fallback, B6-B8 minors). Remediation cell wp15-fix (author at 478K cap) on
+   branch wp1.5, brief d2c2b9a: fix, re-run, one r4, then one B re-run. QA cell wp15-revb:
+   NO_BLOCKING, byte-identical re-encodes, 5/5 breaks caught. DR-16, DR-17 banked.
+   Footage snapshot test still failing on a growing SCUBA .crswap (download running). FINAL issued 8ad93b8 (05:30Z);
    local config copied into the worktree so the footage test runs; Reviewer B ordered.
    Orchestrator self-reported a harness-gate overlap with the GPU re-measure start; the
    overlapped cell is discarded and re-run.
