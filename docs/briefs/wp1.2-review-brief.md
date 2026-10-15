@@ -116,6 +116,49 @@ not given.
    - Adjudicate every Codex finding: adopt it with your own reproduction, or reject it with a
      cited ground.
 
+## B2 re-check (ordered 2026-10-15)
+
+Pass 1 on `9408d18` was BLOCKING on F1 (the GPU c3 cells were -14% and -16.6% against the
+author's first window), with minors F2–F4. The author's fixes, now at head `873ae6d`:
+- `41538bf`: `ambient` records the power-mode overlay and the GPU state (nvidia-smi clocks,
+  temperature, power, P-state, throttle reasons) at the start and end of each loop.
+- `f234dbf`: F3, a transfer guard in the device tests and a GPU check of the 2-D `expand`.
+- `72c19cc`: the `gpu` marks restored.
+- The report and ledger updated for F2 and F4.
+- The GPU cells were re-measured with no stray process (PID 33616 was stopped about 05:20Z on
+  the owner's direction). The first window is kept in a spread table.
+- One window-3 cell overlapped an orchestrator harness run, so it was discarded (renamed
+  `DISCARDED-...json.txt`) and re-run.
+
+B2 runs in an exclusive window. Evidence goes in `B2\`; bench records in
+`C:\Users\rwsmy\clearwater\work\wp1.2a-B2\`.
+
+1. **Reproduction.**
+   - Confirm PID 33616 is absent and that no Codex run or other cell is running.
+   - Re-run all four GPU cells at the brief's N on the head.
+   - Compare each median with the author's current report rows (the records the report cites).
+     PASS is within 10%.
+   - Record your ambient: the overlay and the GPU state, now in the record.
+   - The CPU cells are NOT re-run: pass 1 reproduced them, and the timed path is unchanged
+     (verify that `git -C <wt> diff 9408d18..HEAD -- tools/prototype/pipeline.py` is empty, and
+     that the `bench.py` changes sit outside the timed region).
+2. **F2–F4 RESOLVED, by reproduction.**
+   - F2: recompute the context-and-libraries figure from a record.
+   - F3: the guard catches the host-round-trip `white_balance` mutant (run on a COPY), and the
+     2-D `expand` is now exercised on the GPU.
+   - F4: the supplementary table's labels are correct.
+3. **The new report text** is consistent with the cited records:
+   - the scheme is distinguished from the overlay;
+   - the spread table is correct;
+   - the discard note names the cell, the renamed file and the replacement record;
+   - no figure from an overlapped or stray-present window is presented as clean.
+4. **Gates and markers.**
+   - Run the five gates once your bench runs have finished.
+   - `-m gpu` must run 17 tests with none skipped.
+   - Check that every GPU test carries its `gpu` mark; the author reported a slip there.
+5. **No new Codex pass**, unless a fix changed the pipeline mathematics (it should not). Say
+   whether one was needed.
+
 ## Return (your FINAL message; it reaches the orchestrator directly; under about 70 lines)
 
 - the head SHA reviewed;
