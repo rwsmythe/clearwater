@@ -23,27 +23,14 @@
 
 ### Live cells
 
-- **wp15-fix** (implementer-opus-high, background): the ONE remediation after my BLOCKING Reviewer B.
-  - Brief `docs/briefs/wp1.5-remediation-brief.md` (`d2c2b9a`), worktree `.worktrees/wp1.5` from
-    `82e5cfc`.
-  - Scope: fix B1-B8, re-run the records, gates, one Reviewer A round (r4).
-  - Then MY Reviewer B re-run, once. A second block is adjudicated at the gate; there is no
-    third remediation.
-- **wp15-cell** (author): PAST-CAP at 478K. Do not message it again. Head `82e5cfc`.
-- **My Reviewer B r1** on candidate `wp1.5-mc` `7a490c7`: NEW_CRITICAL_MAJOR_FOUND, valid.
-  - Evidence `clearwater-review-evidence\wp1.5\reviewB\` (transcript md5 `b4810683...`).
-  - Script `run_review_B.sh probe|review`. Re-run it by rebuilding `-mc` and regenerating
-    `review-diff-B.txt`. The prompt names B1-B10 as already addressed? NO: keep it neutral.
-    Only refresh the SHAs.
-- **wp15-revb** RETURNED: verification QA, NO_BLOCKING (it is NOT Reviewer B).
-  - All claims reproduce; its re-encodes are byte-identical to the author's; compare matched
-    all 36 items.
-  - All 5 deliberate breaks were caught; the footage snapshot is unchanged.
-  - F1-F5 minor. Its Codex transcript md5 is `ceb5a673...`. Evidence in
-    `clearwater-review-evidence\wp1.5\B\`.
-  - Its depth: 160K.
-- Branches `wp0.1`, `wp0.2`, `wp1.1` and `wp1.2` are kept on purpose: they hold the reviewed
-  pre-rebase SHAs the accept records cite (verify: `git worktree list` shows main and wp1.5 only).
+- None. My retroactive Reviewer B over `tools/prototype` (WP1.1 + WP1.2A) is running in the
+  background at this seat:
+  - evidence `clearwater-review-evidence\prototype-retroB\`;
+  - cwd the main tree; diff `46a10b9..f6d998a` over the prototype paths.
+  - Disposition: introduced -> one fix cell + one B re-run; pre-existing -> banked. Then an
+    addendum to `wp1.1-accept.md` and `wp1.2-accept.md` naming the transcript.
+- Branches `wp0.1`, `wp0.2`, `wp1.1`, `wp1.2` and `wp1.5` are kept on purpose: they hold the reviewed
+  pre-rebase SHAs the accept records cite (verify: `git worktree list` shows main only).
 
 ### Workstreams
 
@@ -55,6 +42,7 @@ Each accepted package had its return report posted to CHARC and an info-update t
 | WP0.2 | 2026-10-15 | `4863a90` | `docs/proofs/wp0.2-accept.md` | STANDS (DR-6..DR-10) |
 | WP1.1 | 2026-10-15 | `9711faf` | `docs/proofs/wp1.1-accept.md` | STANDS (DR-11..DR-13) |
 | WP1.2 Part A | 2026-10-15 | `f6d998a` | `docs/proofs/wp1.2-accept.md` (`7048fd7`) | STANDS (`bac37599277c1365`) |
+| WP1.5 | 2026-10-15 | `3242679` | `docs/proofs/wp1.5-accept.md` (`371f19d`) | pending |
 
 - **WP1.2 Part A, raised to CHARC:**
   - approval of the Windows-only `_windows_power()` in `bench.py` (instrument only, guarded);
@@ -98,18 +86,9 @@ Each accepted package had its return report posted to CHARC and an info-update t
 
 ### Pending
 
-- **WP1.5 sequence:**
-  1. wp15-revb returns. DONE.
-  2. GO to the author. SENT: the rulings plus the QA findings, ONE Reviewer A round on the delta.
-  3. `-mc` candidate.
-  4. MY Reviewer B: one STRONG Codex pass at this seat on the candidate.
-  5. Gate, merge, accept.
-- CHARC pre-rulings (`bdae7c6214ae1247`):
-  1. MANDATORY = the video elst AS WRITTEN plus the presentation effect on every track.
-     Muxer-added identity edits are BEST-EFFORT.
-  2. "REQUIRED (D55/D114)" weighs as MANDATORY.
-  3. D54: no conflict; the WP2.1 note says full range end to end.
-  4. udta: debt banked by CHARC at the accept.
+- **WP1.5 ACCEPTED** (main `3242679`, record `371f19d`). Return report and operator fyi posted
+  09:27Z. Reviewer B pass 1 BLOCKING (B1-B10, DR-16/17); pass 2 NO_NEW_CRITICAL_MAJOR. Pass-2
+  minors are recorded for WP3.10. Awaiting CHARC QA.
 - **Retroactive Reviewer B** (CHARC `2b6dae230aa9749a`), AFTER the WP1.5 accept, not exclusive:
   - one pass on main, cwd the main tree;
   - input `git diff -U8 46a10b9..f6d998a -- tools/prototype tests/test_prototype_pipeline.py tests/test_prototype_backend.py`;
