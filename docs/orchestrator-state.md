@@ -21,8 +21,13 @@
 
 - **wp12-cell** (implementer-opus-high, background) -- WP1.2 Part A, worktree `.worktrees/wp1.2`,
   branch `wp1.2`, base `d27f909`; FINAL brief `docs/briefs/wp1.2-brief.md`. Dispatched
-  2026-10-15 ~02:33Z. **EXCLUSIVE**: schedule no other cell until it returns (inventory pass
-  queues behind it). Reviewer A STRONG; Reviewer B ORDERED, after the author returns.
+  2026-10-15 ~02:33Z. Returned 04:41Z, head `9408d18` (figures measured on `d3d9555`), Reviewer A
+  converged r1; depth 319K. **EXCLUSIVE** window continues through Reviewer B.
+- **wp12-reviewer-b** (implementer-opus-high, background) -- Reviewer B on `9408d18`, brief
+  `docs/briefs/wp1.2-review-brief.md`; bench re-run to `work/wp1.2a-B/`; evidence `...\wp1.2\B\`.
+- Stray `python.exe` PID 33616 (orphan `python -` from WP0.1 Reviewer B, spinning 1 core since
+  2026-10-14 13:31) -- auto-mode classifier DENIED my Stop-Process; raised to the user. Present
+  during the author's bench; B re-runs under the same condition.
 - Branches `wp0.1`, `wp0.2` and `wp1.1` are kept on purpose: they hold the reviewed pre-rebase
   SHAs the accept records cite.
 
