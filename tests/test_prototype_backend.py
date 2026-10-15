@@ -29,6 +29,8 @@ AGREEMENT_MEAN_ABS = 2e-6
 # The near-flat WP1.1 `_synthetic` pair (CHARC ruling on finding 1): its own bound.
 NEAR_FLAT_MAX_ABS = 1e-4
 NEAR_FLAT_MEAN_ABS = 1e-5
+# The most values a pipeline function may move between host and device (scalar statistics).
+TRANSFER_LIMIT = 16
 
 METHODS = ["ancuti2018", "c3"]
 
@@ -228,13 +230,44 @@ def test_gpu_correct_returns_host_arrays_for_a_host_input() -> None:
 
 @pytest.mark.gpu
 @requires_gpu
-def test_every_public_pipeline_function_keeps_cupy_arrays_on_the_device() -> None:
+def _forbid_array_transfers(cupy: Any, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Make CuPy's Python transfer entry points raise when the pipeline moves an array.
+
+    ``cupy.asnumpy`` (device to host, also behind ``Backend.to_host``) and ``cupy.asarray``
+    / ``cupy.array`` given a NumPy array (host to device), called from
+    ``prototype.pipeline`` or ``prototype.backend`` with more than ``TRANSFER_LIMIT``
+    values, fail, so a step that computes on the host and returns a CuPy array fails
+    here. Scalar statistics (channel means, percentile bounds, the gains) and the cached
+    constants stay under the limit; cupyx's own uploads (its Gaussian kernel weights) are
+    not from those modules. Blind spot: the Cython methods ``ndarray.get``,
+    ``ndarray.set`` and ``ndarray.tolist`` cannot be patched.
+    """
+
+    def guard(original: Any, source: type) -> Any:
+        def guarded(array: Any, *args: Any, **kwargs: Any) -> Any:
+            caller = sys._getframe(1).f_globals.get("__name__", "")
+            from_pipeline = caller in ("prototype.pipeline", "prototype.backend")
+            if from_pipeline and isinstance(array, source) and array.size > TRANSFER_LIMIT:
+                raise AssertionError(f"{caller} moved an array of {array.size} values")
+            return original(array, *args, **kwargs)
+
+        return guarded
+
+    monkeypatch.setattr(cupy, "asnumpy", guard(cupy.asnumpy, cupy.ndarray))
+    monkeypatch.setattr(cupy, "asarray", guard(cupy.asarray, np.ndarray))
+    monkeypatch.setattr(cupy, "array", guard(cupy.array, np.ndarray))
+
+
+def test_every_public_pipeline_function_keeps_cupy_arrays_on_the_device(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     gpu = select_backend("gpu")
     cupy = gpu.xp
     params = Params()
     image = gpu.to_device(_synthetic(64, 96))
     weight = gpu.to_device(np.random.default_rng(3).random((64, 96), dtype=np.float32))
     assert of(image) is gpu
+    _forbid_array_transfers(cupy, monkeypatch)
 
     def check(array: Any, shape: tuple[int, ...]) -> None:
         assert isinstance(array, cupy.ndarray)  # no silent round trip to the host
@@ -266,6 +299,7 @@ def test_every_public_pipeline_function_keeps_cupy_arrays_on_the_device() -> Non
         assert isinstance(level, cupy.ndarray)
     check(pipeline.collapse_pyramid(laplacian), shape)
     check(pipeline.expand(gaussian[1], shape), shape)
+    check(pipeline.expand(pipeline.gaussian_pyramid(weight, levels)[1], map_shape), map_shape)
     low, high = pipeline.normalisation_bounds(image, params)
     assert isinstance(low, float)
     assert isinstance(high, float)
@@ -377,6 +411,8 @@ def test_bench_writes_a_record_with_the_documented_keys(tmp_path: Path) -> None:
         "normalisation_bounds",
     }
     assert record["ambient"]["note"] == "test"
+    assert {"power_scheme", "power_overlay", "power_overlay_name"} <= set(record["ambient"])
+    assert {"gpu_state_loop_start", "gpu_state_loop_end"} <= set(record["ambient"])
 
 
 def test_bench_one_frame_has_no_steady_statistics(tmp_path: Path) -> None:
