@@ -23,6 +23,15 @@
 
 ### Live cells
 
+- **INTERRUPTED 2026-10-15 ~15:29Z, at a session restart** (found on resume at 19:39Z).
+  - `wp14-fix` committed `5c6f340` (all code fixes across 4 files, +724/-93). It then died
+    1 frame into the analysis re-run (`work\wp1.4\logs\remediation\extract.err`).
+  - Not done yet: the re-run, the report, the ledger and the Reviewer A round 2.
+  - The original records are intact (`statistics-raw.json` mtime predates the remediation),
+    and copies are in `logs\before-remediation\` with `md5.txt`.
+  - No stray process: only the comms UI.
+  - Next: resume `wp14-fix` (SendMessage resumes it from its transcript; depth 188K) or
+    re-dispatch a fresh cell from `5c6f340`.
 - **wp14-fix** (implementer-sonnet-high, background): the ONE WP1.4 remediation after my seat
   Reviewer B (BLOCKING on candidate `af98ca8`; md5 `f53b2099...`; evidence
   `clearwater-review-evidence\wp1.4\reviewB\`).
