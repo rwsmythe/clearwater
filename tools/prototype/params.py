@@ -136,7 +136,8 @@ class Params:
         if self.method not in METHODS:
             raise ValueError(f"method must be one of {', '.join(METHODS)}, got {self.method!r}")
         for name, value in dataclasses.asdict(self).items():
-            if isinstance(value, float) and not math.isfinite(value):
+            is_real = isinstance(value, numbers.Real) and not isinstance(value, bool)
+            if is_real and not math.isfinite(float(value)):
                 raise ValueError(f"{name} must be finite, got {value}")
         non_negative = (
             "alpha",

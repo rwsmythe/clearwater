@@ -364,7 +364,8 @@ def fusion_inputs(image: Image, params: Params) -> tuple[Image, Image]:
     shifts and scales ALL pixel values of all three channels with ONE shift and ONE scale
     ([A18]: "a unique shifting and scaling factor") so that they cover [0, 1]. The bounds
     are the ``normalisation_low`` and ``normalisation_high`` percentiles of ``I - G*I``
-    over the whole image (spec 6.2, 14.1); values outside are clipped. When the two
+    over the whole image (spec 6.2, 14.1; linear interpolation between order
+    statistics, NumPy's ``method="linear"``); values outside are clipped. When the two
     bounds are closer than 1e-6 (a flat image) N{} is 0.5 everywhere, the stretched
     image of a zero high-pass. ``sharpen_strength`` s interpolates
     ``I + s * (S - I)``: 1 gives the paper's S, 0 gives ``I``. Both inputs are clipped to
@@ -383,7 +384,9 @@ def fusion_inputs(image: Image, params: Params) -> tuple[Image, Image]:
     high_pass = image - _gaussian(image, spatial_sigma(image.shape, params.sharpen_blur_fraction))
     low, high = (
         float(v)
-        for v in np.percentile(high_pass, [params.normalisation_low, params.normalisation_high])
+        for v in np.percentile(
+            high_pass, [params.normalisation_low, params.normalisation_high], method="linear"
+        )
     )
     if high - low < _EPS:
         stretched = np.full_like(image, 0.5)

@@ -18,7 +18,9 @@ from prototype.pipeline import (
     compensate_ancuti2018,
     compensate_c3,
     correct,
+    expand,
     fusion_inputs,
+    gaussian_pyramid,
     multiscale_fusion,
     pyramid_levels,
     rgb_to_ycbcr,
@@ -197,6 +199,21 @@ def test_fusion_blends_a_weight_seam_across_scales() -> None:
     assert (np.diff(row) >= -1e-6).all()  # a smooth, monotone transition
     assert fused.min() >= 0.2 - 1e-6
     assert fused.max() <= 0.8 + 1e-6
+
+
+def test_reduce_and_expand_match_the_binomial_kernel() -> None:
+    # Hand-computed with [1 4 6 4 1] / 16 and symmetric borders (d c b a | a b c d).
+    odd = np.array([[0, 1, 2, 3, 4]], dtype=np.float32)
+    np.testing.assert_allclose(gaussian_pyramid(odd, 2)[1], [[7 / 16, 2.0, 57 / 16]], atol=1e-6)
+    even = np.array([[0, 1, 2, 3]], dtype=np.float32)
+    np.testing.assert_allclose(gaussian_pyramid(even, 2)[1], [[7 / 16, 31 / 16]], atol=1e-6)
+    np.testing.assert_allclose(gaussian_pyramid(even.T, 2)[1], [[7 / 16], [31 / 16]], atol=1e-6)
+    # EXPAND of [1, 2] to 4 samples: filter of [1, 0, 2, 0] over the filtered indicator.
+    coarse = np.array([[1, 2]], dtype=np.float32)
+    np.testing.assert_allclose(expand(coarse, (1, 4)), [[12 / 11, 13 / 9, 13 / 7, 2.0]], atol=1e-6)
+    np.testing.assert_allclose(
+        expand(coarse.T, (4, 1)), [[12 / 11], [13 / 9], [13 / 7], [2.0]], atol=1e-6
+    )
 
 
 def test_pyramid_depth_follows_the_minimum_level_size() -> None:
@@ -524,6 +541,8 @@ def test_spatial_sigma_is_a_fraction_of_the_short_side() -> None:
         {"alpha": "1"},
         {"blue_compensation": 1},
         {"red_gain_cap": "2"},
+        {"alpha": np.float32("nan")},
+        {"laplacian_fraction": np.float64("inf")},
         {"kappa": float("nan")},
     ],
 )
@@ -606,7 +625,9 @@ def test_run_writes_a_16_bit_png(tmp_path: Path, method: str) -> None:
     assert run.main(["--in", str(source), "--out", str(out), "--method", method]) == 0
     written = out / f"scene-{method}.png"
     assert _png_header(written) == (56, 40, 16, 2)
-    assert _read_png16(written).shape == (40, 56, 3)
+    image, _ = run.read_image(source)
+    expected = np.round(correct(image, Params(method=method)).output * 65535).astype(np.uint16)  # type: ignore[arg-type]
+    np.testing.assert_array_equal(_read_png16(written), expected)
 
 
 def test_run_dump_writes_every_intermediate(tmp_path: Path) -> None:
