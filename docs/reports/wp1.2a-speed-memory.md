@@ -158,7 +158,13 @@ rejected it (option B) and banked the ill-conditioning of N{} on low-texture fra
   first GPU records) and at the start of the second; it was stopped at about 05:20Z on the
   owner's direction, during the second window. The third window, which gives the GPU rows,
   ran with **no stray process** (`tasklist /FI "PID eq 33616"`: no such task, 05:29Z). Every
-  record's `ambient.note` says which.
+  record's `ambient.note` says which. **Discarded cell:** in the third window the 4K
+  ancuti2018 cell (05:29:36-05:30:22Z) overlapped a harness test run at the orchestrator's
+  seat (05:29:30-05:30:15Z, about 42 s of CPU). Its record was discarded, kept renamed as
+  `DISCARDED-overlapped-harness-run-bench-gpu-4k-ancuti2018-20261014-193022.json.txt`, and the
+  cell was re-run at 05:37:13-05:37:59Z with nothing else heavy running; the replacement
+  record is `bench-gpu-4k-ancuti2018-20261014-193759.json`. No kept figure overlapped the
+  breach (the 4K 3C cell started at 05:30:22Z).
 
 ## 5. Figures (claim 5)
 
@@ -170,9 +176,10 @@ folder; not committed). Exclusive windows on 2026-10-14 (local time, UTC-10):
   `select_backend`'s probe (run before the loop) and `bench.py` only in ambient readings
   taken outside the timed region. Ambient: scheme Balanced, overlay not recorded, the stray
   process PID 33616 present.
-- **GPU rows: head `72c19cc`**, 19:29-19:34 (third window), on a clean machine: **no stray
-  process**, scheme Balanced, overlay Best performance; GPU state per cell in the spread
-  table below. They replace the second window's (head `f234dbf`, 19:17-19:22, stray present
+- **GPU rows: head `72c19cc`**, 19:29-19:34 (third window), and for the re-run 4K
+  ancuti2018 cell head `651146b` at 19:37 (same timed path; `651146b` changed only the
+  report and the ledger), on a clean machine: **no stray process**, scheme Balanced, overlay
+  Best performance; GPU state per cell in the spread table below. They replace the second window's (head `f234dbf`, 19:17-19:22, stray present
   at its start), which re-measured the GPU after Reviewer B's run did not reproduce the
   first window's 3C cells within 10 %.
 
@@ -185,7 +192,7 @@ first ten steady frames -> the median of the last ten.
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | CPU | 4k | ancuti2018 | 60 | 10.971 | 11.285 | 11.233 -> 11.008 (-2.0%) | 98.8x | 195.9x | 1647 | n/a | 1982 | RSS 1.20 | `d3d9555` | `bench-cpu-4k-ancuti2018-20261014-172225.json` |
 | CPU | 4k | c3 | 60 | 23.394 | 24.021 | 21.573 -> 23.701 (+9.9%) | 210.8x | 417.8x | 1646 | n/a | 1982 | RSS 1.20 | `d3d9555` | `bench-cpu-4k-c3-20261014-174552.json` |
-| GPU | 4k | ancuti2018 | 60 | 0.391 | 0.425 | 0.376 -> 0.409 (+9.0%) | 3.5x | 7.0x | 1663 | 1712 (used 1585) | 1982 | 1.16 (RSS 1.19) | `72c19cc` | `bench-gpu-4k-ancuti2018-20261014-193022.json` |
+| GPU | 4k | ancuti2018 | 60 | 0.389 | 0.417 | 0.379 -> 0.395 (+4.1%) | 3.5x | 6.9x | 1674 | 1712 (used 1585) | 1982 | 1.16 (RSS 1.18) | `651146b` | `bench-gpu-4k-ancuti2018-20261014-193759.json` |
 | GPU | 4k | c3 | 60 | 0.652 | 0.703 | 0.652 -> 0.658 (+0.9%) | 5.9x | 11.6x | 1667 | 1712 (used 1585) | 1982 | 1.16 (RSS 1.19) | `72c19cc` | `bench-gpu-4k-c3-20261014-193138.json` |
 | CPU | 5.3k | ancuti2018 | 30 | 24.548 | 25.159 | 24.932 -> 24.477 (-1.8%) | 221.2x | 438.4x | 3090 | n/a | 3792 | RSS 1.23 | `d3d9555` | `bench-cpu-5.3k-ancuti2018-20261014-175817.json` |
 | CPU | 5.3k | c3 | 30 | 57.985 | 58.502 | 58.058 -> 58.147 (+0.2%) | 522.4x | 1035.4x | 3094 | n/a | 3792 | RSS 1.23 | `d3d9555` | `bench-cpu-5.3k-c3-20261014-182722.json` |
@@ -195,8 +202,7 @@ first ten steady frames -> the median of the last ten.
 **GPU spread between the windows (a result in itself).** All three windows' GPU records are
 kept; the memory figures were identical to the byte in all three. Against the first window
 (head `d3d9555`, overlay and GPU state not recorded, stray present), the 3C cells came out
-10-18 % faster in both later windows (9.8-13.3 % at 4K, 16.8-18.1 % at 5.3K) and the
-ancuti2018 cells 6-8 % faster; the second and
+13-18 % faster in both later windows and the ancuti2018 cells 6-8 % faster; the second and
 third windows agree within 4.2 %. 3C's sigma-108 Gaussian is compute-bound and the most
 clock-sensitive step. At the end of every third-window loop the card was in P0 at 2055-2445
 MHz, power-capped (reason 0x04) or, after 5.3K 3C, in software thermal slowdown (0x20); what
@@ -205,7 +211,7 @@ further. On a laptop, sustained GPU speed varies by this much between runs (spec
 
 | Size | Method | Median, window 1 (s) | Window 2 (s) | Window 3 (s) | Window 3 vs 1 | Device-resident 1 / 2 / 3 (s) | GPU state at loop start (window 3) | GPU state at loop end (window 3) |
 |---|---|---|---|---|---|---|---|---|
-| 4k | ancuti2018 | 0.416 | 0.385 | 0.391 | -5.9% | 0.305 / 0.274 / 0.273 | 1980 MHz, 57 C, 21 W, P0 | 2340 MHz, 70 C, 58 W, P0, reasons 0x04 |
+| 4k | ancuti2018 | 0.416 | 0.385 | 0.389 | -6.4% | 0.305 / 0.274 / 0.275 | 1980 MHz, 58 C, 21 W, P0 | 2250 MHz, 74 C, 85 W, P0, reasons 0x04 |
 | 4k | c3 | 0.723 | 0.626 | 0.652 | -9.8% | 0.613 / 0.506 / 0.512 | 1980 MHz, 68 C, 22 W, P0 | 2220 MHz, 83 C, 88 W, P0, reasons 0x04 |
 | 5.3k | ancuti2018 | 0.907 | 0.835 | 0.836 | -7.9% | 0.643 / 0.574 / 0.573 | 1980 MHz, 75 C, 24 W, P0 | 2055 MHz, 87 C, 86 W, P0, reasons 0x04 |
 | 5.3k | c3 | 1.807 | 1.479 | 1.503 | -16.8% | 1.624 / 1.263 / 1.289 | 1980 MHz, 75 C, 24 W, P0 | 2445 MHz, 81 C, 38 W, P0, reasons 0x20 |
@@ -217,7 +223,7 @@ fifteen result arrays.
 
 | Size | Method | Device-resident median (s) | p95 (s) | Drift | Share of 0.111 s |
 |---|---|---|---|---|---|
-| 4k | ancuti2018 | 0.273 | 0.282 | -2.1% | 2.5x |
+| 4k | ancuti2018 | 0.275 | 0.283 | -0.2% | 2.5x |
 | 4k | c3 | 0.512 | 0.543 | +1.8% | 4.6x |
 | 5.3k | ancuti2018 | 0.573 | 0.753 | +2.1% | 5.2x |
 | 5.3k | c3 | 1.289 | 1.361 | +3.4% | 11.6x |
@@ -228,18 +234,18 @@ less before) less the pool's reserved bytes: the CUDA context and library worksp
 
 | Size | Method | `nvidia-smi` used before -> after (MiB) | Pool reserved (MiB) | Context and libraries (MiB) | CUDA used after context -> after loop (MiB) | Estimate (ratio to `nvidia-smi` growth) |
 |---|---|---|---|---|---|---|
-| 4k | ancuti2018 | 297 -> 2097 | 1712 | 88 | 1122 -> 2864 | 1982 (1.10) |
+| 4k | ancuti2018 | 152 -> 1990 | 1712 | 126 | 1122 -> 2864 | 1982 (1.08) |
 | 4k | c3 | 214 -> 2071 | 1712 | 145 | 1122 -> 2864 | 1982 (1.07) |
 | 5.3k | ancuti2018 | 193 -> 3636 | 3275 | 168 | 1122 -> 4420 | 3792 (1.10) |
 | 5.3k | c3 | 196 -> 3613 | 3275 | 142 | 1122 -> 4424 | 3792 (1.11) |
 
-Readings. The `nvidia-smi` figure before a GPU run was 193-297 MiB; before some CPU runs it
+Readings. The `nvidia-smi` figure before a GPU run was 152-214 MiB; before some CPU runs it
 read 0 MiB (the discrete card idles). The highest graphics memory peak, 3275 MiB at 5.3K, is
 40 % of the card's 8188 MiB. Peak RSS stays under 3.1 GiB everywhere (N4 limit 16 GB).
-Warm-up (discarded) first frames: GPU 0.74-1.77 s (1.18 to 1.89 times the steady median);
+Warm-up (discarded) first frames: GPU 0.66-1.77 s (1.18 to 1.70 times the steady median);
 CPU 0.93 to 1.02 times the steady median (no compilation on the CPU). Drift: GPU within
-+3.9 % except 4K ancuti2018 at +9.0 % (third window; +0.2 % in the second); CPU within
-+/-2.0 % except 3C at 4K, which slowed by 9.9 % over the run (21.6 -> 23.7 s).
++/-4.1 %; CPU within +/-2.0 % except 3C at 4K, which slowed by 9.9 % over the run
+(21.6 -> 23.7 s).
 
 ## 6. Budget comparison (N6, D106)
 
@@ -248,7 +254,7 @@ core's per-frame median over the budget (0.111 s at 30 fps, 0.056 s at 60 fps), 
 is left is what WP1.5's decode and encode path must fit in.
 
 - **GPU, 4K:** the core alone takes 3.5x (ancuti2018) and 5.9x (3C) of the 30 fps budget,
-  7.0x and 11.6x of the 60 fps budget (third window; 3.7x and 6.5x in the first). Nothing
+  6.9x and 11.6x of the 60 fps budget (third window; 3.7x and 6.5x in the first). Nothing
   is left for decode and encode; even the device-resident path (2.5x and 4.6x at 30 fps) is
   over the whole budget.
 - **GPU, 5.3K** (best effort per D106): 7.5x and 13.5x at 30 fps (8.2x and 16.3x in the
@@ -259,7 +265,7 @@ This package does not declare Gate 1 passed or failed and does not optimise the 
 (CHARC). For WP2.1 and WP3.1, observed but not acted on: 3C's large Gaussian (sigma 0.05 of
 the short side, 108 px at 4K, 865 taps per axis as a direct convolution) took about 97 ms per
 4K channel on the GPU in a development measurement and is the main difference between the
-two methods; copying all intermediates back costs about 0.12-0.14 s per 4K frame (section 5,
+two methods; copying all intermediates back costs about 0.11-0.14 s per 4K frame (section 5,
 supplementary table); the fusion keeps the last input's pyramids referenced during the
 collapse (13 1/3 of the 50 1/12 peak planes, section 7).
 
@@ -276,7 +282,7 @@ of EXPAND temporaries. That is 50 1/12 planes; the measured peak used is 50.1 pl
 size from 128x72 to 5.3K. The estimate multiplies by 1.25 (pool rounding and fragmentation,
 measured at 8 %, and pyramids of odd sizes) and adds 1 MiB (constant arrays and the pool's
 512-byte rounding, which dominate only for tiny images). It excludes the CUDA context and
-library workspaces, 88-168 MiB here (the `nvidia-smi` growth over the run less the pool's
+library workspaces, 126-168 MiB here (the `nvidia-smi` growth over the run less the pool's
 reserved bytes, section 5; the spread is the `nvidia-smi` reading's own), because they exist
 before the decision is taken: compare the estimate with the device's free memory.
 
