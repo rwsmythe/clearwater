@@ -97,7 +97,10 @@ Exit 0; 2 on a bad argument or unreadable image, with a one-line error.
   ~232–300) and 14.1 (~534–557) in full; read nothing else of the spec unless a clause cited there
   points to it.
 - **Memory.** `Result` keeps every intermediate by design. Tests stay at the small sizes in the
-  roster; no test or required run uses a large image. A memory figure is out of scope (WP1.2).
+  roster; no test uses a large image. A memory figure is out of scope (WP1.2). Amended
+  2026-10-15 on CHARC's ruling `b24ccecab030aad9`: ONE informal run of `run.py` per method on a
+  generated 3840x2160 synthetic image in a temp folder, reported in the return report
+  (completion, pyramid depth used, elapsed time labelled informal, never a result); no test.
 - **mypy.** scipy may need the permitted override (no stub package: a stub package is a new
   dependency and out of envelope).
 

@@ -55,4 +55,4 @@
 
 ### Pending
 
-- Inbox drained through msg `3f7c2f997b58c6d5` (verify: `uv run python scripts/role_mail.py list --role orchestrator`).
+- Inbox drained through msg `b24ccecab030aad9` (verify: `uv run python scripts/role_mail.py list --role orchestrator`).
