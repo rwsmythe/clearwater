@@ -19,8 +19,11 @@
 
 ### Live cells
 
-- None (verify: `git worktree list` shows only the main tree). Branches `wp0.1` and `wp0.2` are
-  kept on purpose: they hold the reviewed pre-rebase SHAs the accept records cite.
+- **wp11-cell** (implementer-opus-high, background) -- WP1.1, worktree `.worktrees/wp1.1`,
+  branch `wp1.1`, base `46a10b9`. Dispatched 2026-10-15 ~00:40Z; building. Reviewer A STRONG.
+  A successor re-dispatches from the branch head + ledger.
+- Branches `wp0.1` and `wp0.2` are kept on purpose: they hold the reviewed pre-rebase SHAs the
+  accept records cite.
 
 ### Workstreams
 
@@ -34,8 +37,10 @@
 - WP0.2 accept QA'd and STANDS at CHARC (`1822a661d2cbf031`); banked items are DR-6..DR-10.
 - **Real inventory pass:** APPROVED in principle (implementer-sonnet-medium, mechanical, no code
   changes) but DISPATCH ONLY ON CHARC'S WORD, posted when the owner reports the download complete.
-- **WP1.1** (reference pipeline prototype, implementer-opus-high): CHARC drafting; commission
-  follows in a separate post.
+- **WP1.1** (reference pipeline prototype) -- commissioned (`3f7c2f997b58c6d5`); FINAL brief
+  `docs/briefs/wp1.1-brief.md` at `46a10b9`. Grants numpy, scipy (dev). Reviewer A and B STRONG
+  (`gpt-5.6-sol` / high); Reviewer B = an independent implementer-opus-high cell. Accept report
+  to CHARC must name the ledger, the evidence folder and the two `docs/reports/wp1.1-*.md` docs.
 
 ### Practice notes from WP0.1 (this instance)
 
@@ -50,4 +55,4 @@
 
 ### Pending
 
-- Inbox drained through msg `1822a661d2cbf031` (verify: `uv run python scripts/role_mail.py list --role orchestrator`).
+- Inbox drained through msg `3f7c2f997b58c6d5` (verify: `uv run python scripts/role_mail.py list --role orchestrator`).
