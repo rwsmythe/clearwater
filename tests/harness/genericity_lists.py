@@ -214,6 +214,9 @@ INSTANCE_SURFACE_RELPATHS: tuple[str, ...] = (
     "CLAUDE.md",
     # the concrete seam-3 fill (also matches the review-gate-<app> pattern).
     "docs/review-gate-clearwater.md",
+    # the project's technical-debt register (charter section 4: the concrete
+    # register lives in the project's own docs, CHARC-maintained).
+    "docs/debt-register.md",
     # the orchestrator generation's read-me-first state pointer (also matches the
     # <role>-state pattern). Overwritten each generation (charter 5.1 convention).
     "docs/orchestrator-state.md",
