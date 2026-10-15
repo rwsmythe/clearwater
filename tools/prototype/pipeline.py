@@ -12,6 +12,11 @@ The pipeline runs five steps on one display-encoded RGB image (spec 6.2):
 and a final blend with the original. :func:`correct` runs them all and keeps every
 intermediate.
 
+Supplied statistics (WP1.4): ``correct(..., statistics=...)`` takes a :class:`Statistics`
+record whose values replace the whole-frame statistics the steps would otherwise measure
+on the image (spec 7.1, 7.2 step 3: render from smoothed statistics). With
+``statistics=None`` every step runs exactly as before the hook.
+
 The two reference papers are authoritative over the spec's summaries (spec 6.1):
 
 - [A18] C. O. Ancuti, C. Ancuti, C. De Vleeschouwer, P. Bekaert, "Color Balance and Fusion
@@ -46,7 +51,7 @@ import dataclasses
 import functools
 import itertools
 import math
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
@@ -151,6 +156,40 @@ def _constants(xp: Any) -> _Constants:
         d65_white=xp.asarray(_D65_WHITE),
         binomial_5=xp.asarray(_BINOMIAL_5),
     )
+
+
+@dataclass(frozen=True)
+class Statistics:
+    """Whole-frame statistics supplied to :func:`correct` in place of its own measurements.
+
+    These are the scalars of spec 7.1 that the pipeline measures over a whole image, in the
+    form each step consumes them. Every field is optional: ``None`` means the step measures
+    that statistic on its own input, as it does without the hook; a value is used as given.
+    A record whose every field holds the values the steps would measure gives the same
+    result, bit for bit, as no record (``prototype.temporal.statistics_of`` builds one).
+
+    Attributes:
+        compensation_means: Ancuti 2018 only: the R, G and B means that the compensation
+            equations use (``mean_g - mean_c`` and the gain cap), as Python floats.
+        compensation_alpha: Ancuti 2018 only: the effective alpha per compensated channel,
+            after the gain cap; the keys are exactly the compensated channels (``"red"``,
+            plus ``"blue"`` when blue compensation is on). When it is given, the gain cap is
+            not evaluated (the value already is the capped alpha).
+        white_balance_gains: The gray-world gains ``target / mean_c`` of R, G and B
+            (:attr:`WhiteBalanceInfo.gray_world_gains`), before ``white_balance_strength``
+            and before the D99 clamp, which both still apply to the supplied gains.
+        normalisation_bounds: The low and high bound of the histogram stretch N{} of fusion
+            input 2 (:func:`normalisation_bounds`).
+        saliency_means: The Lab mean vector (the saliency reference ``I_mu``) of each fusion
+            input, in input order (input 1, input 2), as Python floats; each is cast to
+            float32 where the pipeline would cast its own measurement.
+    """
+
+    compensation_means: tuple[float, float, float] | None = None
+    compensation_alpha: Mapping[str, float] | None = None
+    white_balance_gains: tuple[float, float, float] | None = None
+    normalisation_bounds: tuple[float, float] | None = None
+    saliency_means: tuple[tuple[float, float, float], ...] | None = None
 
 
 @dataclass(frozen=True)
@@ -302,7 +341,9 @@ def check_derived_values(image_shape: tuple[int, ...], params: Params) -> None:
             )
 
 
-def compensate_ancuti2018(image: Image, params: Params) -> tuple[Image, CompensationInfo]:
+def compensate_ancuti2018(
+    image: Image, params: Params, statistics: Statistics | None = None
+) -> tuple[Image, CompensationInfo]:
     """Compensate the red (and, when enabled, the blue) channel per [A18] (spec 6.3.1).
 
     [A18], white-balancing section (the red and blue compensation equations), on values
@@ -322,17 +363,28 @@ def compensate_ancuti2018(image: Image, params: Params) -> tuple[Image, Compensa
     Python floats, which multiply the float32 image data as float32 scalars; the output is
     float32.
 
+    Supplied statistics (:class:`Statistics`): ``compensation_means`` replaces the measured
+    channel means and ``compensation_alpha`` the capped alpha of each channel (the cap is
+    then not evaluated); the record reports the values used.
+
     Args:
         image: The input image.
         params: Uses ``alpha``, ``blue_compensation``, ``red_gain_cap``,
             ``blue_gain_cap``.
+        statistics: Values to use instead of measuring them; ``None`` measures everything.
 
     Returns:
         The compensated image and the step's record.
+
+    Raises:
+        ValueError: The supplied alpha does not name exactly the compensated channels.
     """
     _check_image(image)
     xp = of(image).xp
-    means = _channel_means(image)
+    if statistics is None or statistics.compensation_means is None:
+        means = _channel_means(image)
+    else:
+        means = _triple(statistics.compensation_means)
     green = image[..., 1]
     out = image.copy()
     requested: dict[str, float] = {}
@@ -340,13 +392,22 @@ def compensate_ancuti2018(image: Image, params: Params) -> tuple[Image, Compensa
     channels = [("red", 0, params.red_gain_cap)]
     if params.blue_compensation:
         channels.append(("blue", 2, params.blue_gain_cap))
+    supplied_alpha = None if statistics is None else statistics.compensation_alpha
+    if supplied_alpha is not None and set(supplied_alpha) != {name for name, _, _ in channels}:
+        raise ValueError(
+            f"supplied compensation_alpha names {sorted(supplied_alpha)}, the run compensates "
+            f"{[name for name, _, _ in channels]}"
+        )
     for name, index, cap in channels:
         difference = means[1] - means[index]
         shape = (1.0 - image[..., index]) * green
-        added_per_alpha = difference * _cap_statistic(shape)
-        alpha = params.alpha
-        if cap is not None and added_per_alpha > 0.0:
-            alpha = min(alpha, cap * means[index] / added_per_alpha)
+        if supplied_alpha is not None:
+            alpha = float(supplied_alpha[name])
+        else:
+            added_per_alpha = difference * _cap_statistic(shape)
+            alpha = params.alpha
+            if cap is not None and added_per_alpha > 0.0:
+                alpha = min(alpha, cap * means[index] / added_per_alpha)
         requested[name] = params.alpha
         effective[name] = alpha
         out[..., index] = xp.clip(image[..., index] + (alpha * difference) * shape, 0.0, 1.0)
@@ -413,7 +474,9 @@ def compensate_c3(image: Image, params: Params) -> tuple[Image, CompensationInfo
     return out, info
 
 
-def white_balance(image: Image, params: Params) -> tuple[Image, WhiteBalanceInfo]:
+def white_balance(
+    image: Image, params: Params, statistics: Statistics | None = None
+) -> tuple[Image, WhiteBalanceInfo]:
     """Gray-world white balance with the D99 gain clamp (spec 6.2 step 2).
 
     [A18]'s white-balancing section applies the Gray-World assumption after compensation. Per
@@ -429,9 +492,15 @@ def white_balance(image: Image, params: Params) -> tuple[Image, WhiteBalanceInfo
     accumulated in float64 (:func:`_channel_means`); the gains are cast to float32 before
     they multiply the image.
 
+    Supplied statistics (:class:`Statistics`): ``white_balance_gains`` replaces the
+    gray-world gains; the strength and the D99 clamp apply to them as to measured gains
+    (spec 6.2: the clamp limits the gains used for rendering, the smoothed ones for video).
+    The record's ``channel_means`` and ``target`` are still measured on ``image``.
+
     Args:
         image: The compensated image.
         params: Uses ``white_balance_strength`` and ``max_white_balance_gain``.
+        statistics: Values to use instead of measuring them; ``None`` measures everything.
 
     Returns:
         The white-balanced image and the step's record.
@@ -439,7 +508,10 @@ def white_balance(image: Image, params: Params) -> tuple[Image, WhiteBalanceInfo
     _check_image(image)
     means = _channel_means(image)
     target = sum(means) / 3.0
-    gray_world = tuple(target / max(mean, _EPS) for mean in means)
+    if statistics is None or statistics.white_balance_gains is None:
+        gray_world = tuple(target / max(mean, _EPS) for mean in means)
+    else:
+        gray_world = _triple(statistics.white_balance_gains)
     requested = tuple(1.0 + params.white_balance_strength * (g - 1.0) for g in gray_world)
     applied = tuple(min(g, params.max_white_balance_gain) for g in requested)
     xp = of(image).xp
@@ -456,7 +528,9 @@ def white_balance(image: Image, params: Params) -> tuple[Image, WhiteBalanceInfo
     return out, info
 
 
-def fusion_inputs(image: Image, params: Params) -> tuple[Image, Image]:
+def fusion_inputs(
+    image: Image, params: Params, statistics: Statistics | None = None
+) -> tuple[Image, Image]:
     """Derive the two fusion inputs from the white-balanced image (spec 6.2 step 3).
 
     Input 1 ([A18], fusion inputs: gamma correction): ``I ** gamma``.
@@ -474,10 +548,15 @@ def fusion_inputs(image: Image, params: Params) -> tuple[Image, Image]:
     ``I + s * (S - I)``: 1 gives the paper's S, 0 gives ``I``. Both inputs are clipped to
     [0, 1].
 
+    Supplied statistics (:class:`Statistics`): ``normalisation_bounds`` replaces the two
+    percentiles; the high-pass is still computed on ``image``, and the flat-image rule
+    applies to the supplied bounds.
+
     Args:
         image: The white-balanced image.
         params: Uses ``gamma``, ``sharpen_strength``, ``sharpen_blur_fraction``,
             ``normalisation_low`` and ``normalisation_high``.
+        statistics: Values to use instead of measuring them; ``None`` measures everything.
 
     Returns:
         Input 1 (gamma) and input 2 (sharpened).
@@ -485,7 +564,11 @@ def fusion_inputs(image: Image, params: Params) -> tuple[Image, Image]:
     _check_image(image)
     xp = of(image).xp
     input1: Image = xp.power(image, np.float32(params.gamma)).astype(np.float32, copy=False)
-    high_pass, (low, high) = _high_pass_and_bounds(image, params)
+    if statistics is None or statistics.normalisation_bounds is None:
+        high_pass, (low, high) = _high_pass_and_bounds(image, params)
+    else:
+        high_pass = high_pass_of(image, params)
+        low, high = (float(bound) for bound in statistics.normalisation_bounds)
     if high - low < _EPS:
         stretched = xp.full_like(image, 0.5)
     else:
@@ -516,7 +599,46 @@ def normalisation_bounds(image: Image, params: Params) -> tuple[float, float]:
     return _high_pass_and_bounds(image, params)[1]
 
 
-def weight_maps(input_: Sequence[Image], params: Params) -> Weights:
+def high_pass_of(image: Image, params: Params) -> Image:
+    """Return the high-pass ``I - G*I`` whose stretch N{} gives fusion input 2.
+
+    ``G*I`` is the Gaussian blur of sigma ``sharpen_blur_fraction`` of the short side (see
+    :func:`fusion_inputs`); :func:`normalisation_bounds` takes its percentiles.
+
+    Args:
+        image: The white-balanced image.
+        params: Uses ``sharpen_blur_fraction``.
+
+    Returns:
+        The high-pass, float32, shape ``(H, W, 3)`` (values in about [-1, 1]).
+    """
+    high_pass: Image = image - _gaussian(
+        image, spatial_sigma(image.shape, params.sharpen_blur_fraction)
+    )
+    return high_pass
+
+
+def saliency_reference(image: Image) -> tuple[float, float, float]:
+    """Return the saliency reference of one fusion input: its mean Lab vector ``I_mu``.
+
+    This is the whole-frame statistic of the saliency weight (:func:`weight_maps`), the same
+    float64-accumulated mean cast to float32 that the weight uses, returned as three Python
+    floats (exact copies of the float32 values).
+
+    Args:
+        image: A fusion input.
+
+    Returns:
+        The mean L*, a* and b*.
+    """
+    _check_image(image)
+    mean = _lab_mean(srgb_to_lab(image)).tolist()
+    return float(mean[0]), float(mean[1]), float(mean[2])
+
+
+def weight_maps(
+    input_: Sequence[Image], params: Params, statistics: Statistics | None = None
+) -> Weights:
     """Compute the three weight maps of each fusion input and normalise them (step 4).
 
     Per input k ([A18], weights of the fusion process), with ``L_k`` the BT.709
@@ -544,16 +666,21 @@ def weight_maps(input_: Sequence[Image], params: Params) -> Weights:
     ``Wbar_k = (W_k + delta) / (sum_k W_k + K * delta)`` with ``delta = weight_delta``
     (0.1) and K the number of inputs (2) ([A18], weight normalisation; spec 6.2 step 4).
 
+    Supplied statistics (:class:`Statistics`): ``saliency_means`` replaces each input's
+    measured mean Lab vector ``I_mu``.
+
     Args:
         input_: The fusion inputs, in order (input 1, input 2).
         params: Uses ``laplacian_fraction``, ``saliency_blur_fraction``,
             ``weight_delta``.
+        statistics: Values to use instead of measuring them; ``None`` measures everything.
 
     Returns:
         The raw, aggregated and normalised weight maps.
 
     Raises:
-        ValueError: ``input_`` is empty or its images differ in shape.
+        ValueError: ``input_`` is empty or its images differ in shape, or the supplied
+            saliency means are not one per input.
     """
     if not input_:
         raise ValueError("weight_maps needs at least one input")
@@ -562,7 +689,18 @@ def weight_maps(input_: Sequence[Image], params: Params) -> Weights:
         if image.shape != input_[0].shape:
             raise ValueError("fusion inputs differ in shape")
     laplacian = tuple(_laplacian_weight(image, params) for image in input_)
-    saliency = tuple(_saliency_weight(image, params) for image in input_)
+    if statistics is None or statistics.saliency_means is None:
+        saliency = tuple(_saliency_weight(image, params) for image in input_)
+    else:
+        if len(statistics.saliency_means) != len(input_):
+            raise ValueError(
+                f"{len(statistics.saliency_means)} saliency means supplied for "
+                f"{len(input_)} fusion inputs"
+            )
+        saliency = tuple(
+            _saliency_weight(image, params, reference)
+            for image, reference in zip(input_, statistics.saliency_means, strict=True)
+        )
     saturation = tuple(_saturation_weight(image) for image in input_)
     aggregated = tuple(
         (lw + sw + tw).astype(np.float32, copy=False)
@@ -618,7 +756,12 @@ def multiscale_fusion(inputs: Sequence[Image], weights: Sequence[Map], params: P
     return out
 
 
-def correct(image: Image, params: Params, backend: Backend | None = None) -> Result:
+def correct(
+    image: Image,
+    params: Params,
+    backend: Backend | None = None,
+    statistics: Statistics | None = None,
+) -> Result:
     """Run the whole pipeline on one image and keep every intermediate.
 
     Steps (spec 6.2): compensation (``params.method``), white balance, fusion inputs,
@@ -630,22 +773,35 @@ def correct(image: Image, params: Params, backend: Backend | None = None) -> Res
     of the result is moved back once, to the kind of the input (a NumPy input gives NumPy
     results, whatever the backend).
 
+    ``statistics`` (WP1.4) supplies whole-frame statistics that the steps use instead of
+    measuring them (:class:`Statistics`; spec 7.2 step 3, the render from smoothed
+    statistics). ``None``, the default, is the pipeline without the hook.
+
     Args:
         image: The display-encoded RGB input, float32 in [0, 1], shape ``(H, W, 3)``.
         params: The parameter set.
         backend: Where the steps run (:func:`prototype.backend.select_backend`); ``None``
             runs them where the input is.
+        statistics: Whole-frame statistics to use; ``None`` measures them all.
 
     Returns:
         The output and every intermediate.
 
     Raises:
-        ValueError: The image is not a float32 ``(H, W, 3)`` array in [0, 1], or a value
+        ValueError: The image is not a float32 ``(H, W, 3)`` array in [0, 1], a value
             derived from ``params`` and the image size is unusable
-            (:func:`check_derived_values`).
+            (:func:`check_derived_values`), or the supplied statistics do not fit the
+            method (compensation statistics for 3C, a wrong alpha channel set, a wrong
+            number of saliency means).
     """
     _check_array(image)
     check_derived_values(image.shape, params)
+    if (
+        statistics is not None
+        and params.method == "c3"
+        and (statistics.compensation_means, statistics.compensation_alpha) != (None, None)
+    ):
+        raise ValueError("3C uses no whole-frame compensation statistics; none may be supplied")
     caller = of(image)
     device = caller if backend is None else backend
     work = device.to_device(image)
@@ -653,10 +809,10 @@ def correct(image: Image, params: Params, backend: Backend | None = None) -> Res
     if params.method == "c3":
         compensated, compensation = compensate_c3(work, params)
     else:
-        compensated, compensation = compensate_ancuti2018(work, params)
-    balanced, balance = white_balance(compensated, params)
-    input1, input2 = fusion_inputs(balanced, params)
-    weights = weight_maps((input1, input2), params)
+        compensated, compensation = compensate_ancuti2018(work, params, statistics)
+    balanced, balance = white_balance(compensated, params, statistics)
+    input1, input2 = fusion_inputs(balanced, params, statistics)
+    weights = weight_maps((input1, input2), params, statistics)
     fused = multiscale_fusion((input1, input2), weights.normalised, params)
     blend = params.blend_with_original
     output = ((1.0 - blend) * fused + blend * work).astype(np.float32, copy=False)
@@ -870,7 +1026,7 @@ def _high_pass_and_bounds(image: Image, params: Params) -> tuple[Image, tuple[fl
     Python floats, which meet the float32 image data only as float32 scalars.
     """
     xp = of(image).xp
-    high_pass = image - _gaussian(image, spatial_sigma(image.shape, params.sharpen_blur_fraction))
+    high_pass = high_pass_of(image, params)
     bounds = xp.percentile(
         high_pass, [params.normalisation_low, params.normalisation_high], method="linear"
     ).tolist()
@@ -889,14 +1045,18 @@ def _laplacian_weight(image: Image, params: Params) -> Map:
     return weight
 
 
-def _saliency_weight(image: Image, params: Params) -> Map:
+def _saliency_weight(image: Image, params: Params, reference: Sequence[float] | None = None) -> Map:
     """W_S of one input: ``||mean Lab - blurred Lab|| / 100`` (see :func:`weight_maps`).
 
-    The mean Lab vector is accumulated in float64 and cast to float32 (:func:`_lab_mean`).
+    The mean Lab vector is accumulated in float64 and cast to float32 (:func:`_lab_mean`);
+    a supplied ``reference`` is cast to float32 in its place.
     """
     xp = of(image).xp
     lab = srgb_to_lab(image)
-    mean = _lab_mean(lab)
+    if reference is None:
+        mean = _lab_mean(lab)
+    else:
+        mean = xp.asarray([float(value) for value in reference], dtype=np.float32)
     blurred = _gaussian(lab, spatial_sigma(image.shape, params.saliency_blur_fraction))
     distance = xp.sqrt(xp.sum((blurred - mean) ** 2, axis=2))
     weight: Map = (distance / np.float32(100.0)).astype(np.float32, copy=False)
