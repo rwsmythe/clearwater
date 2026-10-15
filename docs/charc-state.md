@@ -37,9 +37,11 @@ Repository local + mirrored to private GitHub `rwsmythe/clearwater` (verify:
   complete (a partial inventory would seed CP1 wrongly, DR-6).
 - **WP1.1 commissioned** 2026-10-15 ~00:35Z (draft `docs/briefs/wp1.1-brief.md`; cell
   `implementer-opus-high`; gate tier STRONG; grants numpy + scipy dev group; new
-  `tools/prototype/` package). Orchestrator issues the final brief and dispatches.
-  Verify: `git worktree list`, `docs/orchestrator-state.md`; a `.worktrees/wp1.1`
-  tree is OCCUPIED until the orchestrator records the cell's return.
+  `tools/prototype/` package). **DISPATCHED 2026-10-15T00:32Z**: cell in
+  `.worktrees/wp1.1` (branch `wp1.1`, base 46a10b9), Reviewer A STRONG; five brief
+  decisions ruled accepted ~00:35Z (+ one informal 4K run in the return report).
+  Verify: `git worktree list`, `docs/orchestrator-state.md`; that tree is OCCUPIED
+  until the orchestrator records the cell's return.
 - Debt register `docs/debt-register.md`: DR-1..DR-10 (DR-3, DR-4 closed).
 - No authority granted by `SendMessage` this generation (cues only).
 
