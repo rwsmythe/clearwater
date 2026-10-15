@@ -79,7 +79,7 @@ path, md5, five assertions and verdict, or there is no accept.
   candidates, robust N{} bounds; gain-cap noise test deferred to WP1.4b on the scuba footage).
   **WP-T1 COMMISSIONED by CHARC** 2026-10-15 13:29Z (answer to the orchestrator's DR-21 query:
   `tests/conftest.py` `pytest_configure` guard refusing a basetemp or derived temp root inside
-  the resolved footage folder; sonnet-high; STANDARD; inert without local config; `work/` must
+  the resolved footage folder; sonnet-high; STRONG (fill has no STANDARD tier); dispatched 13:31Z, brief 34d2ccd, cell wpt1-cell; inert without local config; `work/` must
   pass). Neither is exclusive; neither may overlap Part B's bench window. Verify: `git worktree
   list`, `docs/debt-register.md` DR-20/DR-21.
 - Drafted by CHARC on main: `docs/briefs/wp1.2b-brief.md` (Part B; three dispatch conditions)
