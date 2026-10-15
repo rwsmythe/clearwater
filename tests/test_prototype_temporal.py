@@ -134,6 +134,25 @@ def _perturbed(supplied: Statistics, field: str) -> Statistics:
     return dataclasses.replace(Statistics(), **{field: getattr(unflatten(changed), field)})
 
 
+# Per supplied field: the first intermediate it must change (the step that consumes it); every
+# intermediate before that step must stay bit-identical. Order of the intermediates in correct().
+_INTERMEDIATES = ("compensated", "white_balanced", "input1", "input2", "saliency", "output")
+_CONSUMER = {
+    "compensation_means": "compensated",
+    "compensation_alpha": "compensated",
+    "white_balance_gains": "white_balanced",
+    "normalisation_bounds": "input2",
+    "saliency_means": "saliency",
+}
+
+
+def _intermediate(result: pipeline.Result, name: str) -> np.ndarray:
+    if name == "saliency":
+        return np.stack(result.weights.saliency)
+    array: np.ndarray = getattr(result, name)
+    return array
+
+
 @pytest.mark.parametrize(
     "field",
     [
@@ -145,22 +164,36 @@ def _perturbed(supplied: Statistics, field: str) -> Statistics:
     ],
 )
 def test_every_supplied_field_is_used(field: str) -> None:
-    """Positive control: a supplied value that differs from the frame's own changes the output,
-    and only the step it belongs to and later ones."""
+    """Positive control: a supplied value that differs from the frame's own changes the
+    intermediate of the step that consumes it, and leaves every earlier one (and the parts of
+    the same step it does not feed) bit-identical."""
     params = Params(alpha=0.8, red_gain_cap=None)
     image = _scene()
     own = correct(image, params)
     changed = correct(image, params, statistics=_perturbed(statistics_of(image, params), field))
+    consumer = _CONSUMER[field]
+    for name in _INTERMEDIATES[: _INTERMEDIATES.index(consumer)]:
+        if (field, name) == ("normalisation_bounds", "input1"):
+            continue  # input 1 is checked below; it is not on the bounds' path
+        assert np.array_equal(_intermediate(changed, name), _intermediate(own, name)), name
+    assert not np.array_equal(_intermediate(changed, consumer), _intermediate(own, consumer))
     assert not np.array_equal(changed.output, own.output)
-    if field.startswith("compensation"):
-        assert not np.array_equal(changed.compensated, own.compensated)
-    else:
-        assert np.array_equal(changed.compensated, own.compensated)
-    if field in ("normalisation_bounds", "saliency_means"):
-        assert np.array_equal(changed.white_balanced, own.white_balanced)
+    if field == "normalisation_bounds":
+        assert np.array_equal(changed.input1, own.input1)
     if field == "saliency_means":
-        assert np.array_equal(changed.input2, own.input2)
-        assert np.array_equal(changed.weights.laplacian[0], own.weights.laplacian[0])
+        assert np.array_equal(changed.weights.laplacian[1], own.weights.laplacian[1])
+        assert np.array_equal(changed.weights.saturation[1], own.weights.saturation[1])
+
+
+def test_malformed_supplied_triples_are_refused() -> None:
+    image = _scene()
+    for statistics in (
+        Statistics(compensation_means=(0.1, 0.2)),  # type: ignore[arg-type]
+        Statistics(white_balance_gains=(1.0, 1.0, 1.0, 1.0)),  # type: ignore[arg-type]
+        Statistics(saliency_means=((50.0, 0.0), (50.0, 0.0, 0.0))),  # type: ignore[arg-type]
+    ):
+        with pytest.raises(ValueError, match="needs 3 values"):
+            correct(image, Params(), statistics=statistics)
 
 
 def test_supplied_gains_still_meet_strength_and_clamp() -> None:

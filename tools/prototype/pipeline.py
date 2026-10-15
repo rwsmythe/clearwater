@@ -384,7 +384,7 @@ def compensate_ancuti2018(
     if statistics is None or statistics.compensation_means is None:
         means = _channel_means(image)
     else:
-        means = _triple(statistics.compensation_means)
+        means = _supplied_triple(statistics.compensation_means, "compensation_means")
     green = image[..., 1]
     out = image.copy()
     requested: dict[str, float] = {}
@@ -511,7 +511,7 @@ def white_balance(
     if statistics is None or statistics.white_balance_gains is None:
         gray_world = tuple(target / max(mean, _EPS) for mean in means)
     else:
-        gray_world = _triple(statistics.white_balance_gains)
+        gray_world = _supplied_triple(statistics.white_balance_gains, "white_balance_gains")
     requested = tuple(1.0 + params.white_balance_strength * (g - 1.0) for g in gray_world)
     applied = tuple(min(g, params.max_white_balance_gain) for g in requested)
     xp = of(image).xp
@@ -1056,7 +1056,7 @@ def _saliency_weight(image: Image, params: Params, reference: Sequence[float] | 
     if reference is None:
         mean = _lab_mean(lab)
     else:
-        mean = xp.asarray([float(value) for value in reference], dtype=np.float32)
+        mean = xp.asarray(_supplied_triple(reference, "saliency_means"), dtype=np.float32)
     blurred = _gaussian(lab, spatial_sigma(image.shape, params.saliency_blur_fraction))
     distance = xp.sqrt(xp.sum((blurred - mean) ** 2, axis=2))
     weight: Map = (distance / np.float32(100.0)).astype(np.float32, copy=False)
@@ -1155,6 +1155,17 @@ def _mean_added(before: Image, after: Image) -> dict[str, float]:
 
 def _triple(values: tuple[float, ...]) -> tuple[float, float, float]:
     """The first three values as a tuple of three Python floats."""
+    return float(values[0]), float(values[1]), float(values[2])
+
+
+def _supplied_triple(values: Sequence[float], name: str) -> tuple[float, float, float]:
+    """A supplied R, G, B (or L, a, b) triple as three Python floats; any other length is refused.
+
+    Raises:
+        ValueError: ``values`` does not hold exactly three values.
+    """
+    if len(values) != 3:
+        raise ValueError(f"supplied {name} needs 3 values, got {len(values)}")
     return float(values[0]), float(values[1]), float(values[2])
 
 
