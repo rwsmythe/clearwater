@@ -92,14 +92,17 @@ read-only listing 2026-10-18 ~23:40Z: `Snorkel/` 26 clips GX011603-GX011628 (HEV
 GX011601 (49 MB-8.9 GB); the 2026-10-15 zero-byte files and the `(1)` duplicate are GONE. NO
 photos, NO .LRV/.THM (owner 2026-10-15, verbatim: "There will be no .lrv or .thm files, those
 were apparently deleted off of the camera when the cloud upload was completed several days
-ago"; D60 closed v0.5.2). Owner asked 2026-10-18 whether still photos are still to come (OPEN).
+ago"; D60 closed v0.5.2). Photos: pending (owner 2026-10-18).
 One misnamed file `Snorkel/6aca1cf5db06c242d9d53130.json` (318 MB) is an MP4: H.264 1080p59.94,
 180 s, Lavf61.7.100, created 2026-10-10T11:12Z; owner (verbatim): "It looks like it is a
 compilation video. We can rename it and potentially use it as a stress test since it has
-transitions." Owner renames it (CHARC recommended `Edits/compilation-20261010-1080p60.mp4`);
-agents never rename in the footage folder. **Inventory pass commissioned** to the orchestrator
-2026-10-18T23:50Z (msg 2d809944) and put on HOLD (msg 114f9cea) until CHARC's "footage renamed,
-go" post after the rename. Then: inventory report -> CHARC -> owner for CP1 (categories,
+transitions." Owner renamed it 2026-10-18 (verbatim: "renamed to
+Edits\compilation-20261010-1080p60.mp4, no photos for now they are still pending, go.");
+CHARC verified `Edits/compilation-20261010-1080p60.mp4`, 35 files (Snorkel 26, SCUBA 8, Edits 1).
+Photos PENDING (owner adds stills later; photo-side checks stay queued). The compilation clip
+is kept as a smoothing stress case (hard transitions) for a later WP. **Inventory pass
+commissioned** (msg 2d809944), held (114f9cea), **RELEASED 2026-10-18T23:55Z (msg 858f79a4)**.
+Then: inventory report -> CHARC -> owner for CP1 (categories,
 owner-reserved) -> Part B (after WP1.4 lands or pauses).
 
 ### Standing delegation (owner, 2026-10-14, chat to CHARC, verbatim)
