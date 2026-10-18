@@ -85,16 +85,22 @@ path, md5, five assertions and verdict, or there is no accept.
 
 ### Footage (owner, read-only, never committed; verify `ls C:\Users\rwsmy\clearwater-footage`)
 
-Owner 2026-10-15 ~05:25Z in chat: four shallow snorkel chapters GX011625-GX011628.MP4
-(HERO13 Black; no .LRV/.THM); scuba (~20 m) clips and shallow still photos still to
-come. At 2026-10-15 ~09:45Z: `SCUBA/` holds six real files (GX011589-93, GX011601;
-49 MB-4.4 GB), one growing `.crswap`, and THREE zero-byte files (`GX011598.mp4`,
-`GX011600.mp4`, `GX011598 (1).mp4`) -- raise the zero-byte files with the owner before
-the inventory dispatch. **Owner 2026-10-15 (verbatim): "There will be no .lrv or .thm files,
-those were apparently deleted off of the camera when the cloud upload was completed several
-days ago"** -> D60 LRV leg untestable (Clearwater generates its own proxy, spec 7.3); Part B
-drops the LRV column; a one-line D60 closure proposed to the owner (spec change, owner-
-reserved; OPEN until approved). The download is NOT reported complete.
+**Download COMPLETE (owner 2026-10-18, chat to CHARC, verbatim: "The videos are downloaded. I
+placed snorkel videos in the snorkel folder and scuba videos in the scuba folder.")** CHARC's
+read-only listing 2026-10-18 ~23:40Z: `Snorkel/` 26 clips GX011603-GX011628 (HEVC 4K 29.97,
+3.6-498 s, shot 2026-10-10 05:21-06:33Z); `SCUBA/` 8 clips GX011589-93, GX011598, GX011600,
+GX011601 (49 MB-8.9 GB); the 2026-10-15 zero-byte files and the `(1)` duplicate are GONE. NO
+photos, NO .LRV/.THM (owner 2026-10-15, verbatim: "There will be no .lrv or .thm files, those
+were apparently deleted off of the camera when the cloud upload was completed several days
+ago"; D60 closed v0.5.2). Owner asked 2026-10-18 whether still photos are still to come (OPEN).
+One misnamed file `Snorkel/6aca1cf5db06c242d9d53130.json` (318 MB) is an MP4: H.264 1080p59.94,
+180 s, Lavf61.7.100, created 2026-10-10T11:12Z; owner (verbatim): "It looks like it is a
+compilation video. We can rename it and potentially use it as a stress test since it has
+transitions." Owner renames it (CHARC recommended `Edits/compilation-20261010-1080p60.mp4`);
+agents never rename in the footage folder. **Inventory pass commissioned** to the orchestrator
+2026-10-18T23:50Z (msg 2d809944) and put on HOLD (msg 114f9cea) until CHARC's "footage renamed,
+go" post after the rename. Then: inventory report -> CHARC -> owner for CP1 (categories,
+owner-reserved) -> Part B (after WP1.4 lands or pauses).
 
 ### Standing delegation (owner, 2026-10-14, chat to CHARC, verbatim)
 
