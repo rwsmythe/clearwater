@@ -20,7 +20,7 @@ which relays the owner's "download complete" word (2026-10-18). Spec **v0.5.2**.
 
 1. **Run:** the command, the tool commit, the UTC time, and the two output paths with the md5
    of each.
-2. **Counts per folder** (`Snorkel/`, `SCUBA/`): files, total size, and total duration.
+2. **Counts per folder** (`Snorkel/`, `SCUBA/`, `Edits/`): files, total size, and total duration.
 3. **Recording modes:** resolution, frame rate, codec, bit depth, colour tags and HDR or Log
    flags, each with its count per folder. Quote the tool's own summary tables; do not
    recompute them by hand.
@@ -28,17 +28,18 @@ which relays the owner's "download complete" word (2026-10-18). Spec **v0.5.2**.
    ...), per folder.
 5. **Error rows:** every row with `error` set, quoted, and skipped files.
 6. **Uncovered GoPro names:** any file whose name does not follow the GoPro scheme.
-7. **One line each:**
-   - **No photos and no `.LRV`/`.THM`:** both columns are all-absent, not gaps (the owner,
-     2026-10-15). CHARC is asking whether still photos are still to come.
-   - **One non-indexed file:**
-     - `Snorkel/6aca1cf5db06c242d9d53130.json` (318 MB) is not indexed, because the tool skips
-       the `.json` extension.
-     - CHARC probed it: an MP4 (ftyp isom), H.264 1920x1080 59.94, 180.08 s, encoder
-       Lavf61.7.100, created 2026-10-10T11:12Z.
-     - It is a cloud-made re-encode or highlight edit, not camera footage, and no original has
-       that duration.
-     - Do NOT probe or open it yourself; quote CHARC's finding.
+7. **One line each** (amended at the go word, CHARC `4114159083a3f639`):
+   - **No `.LRV`/`.THM`:** the column is all-absent, not a gap (the owner, 2026-10-15).
+   - **Photos are PENDING, not absent.** The owner will add stills later. The photo column is
+     empty today; the photo-side checks (the largest photo in Part B, the iPhone HEIC path)
+     stay queued, not dropped.
+   - **The Edits clip:** `Edits/compilation-20261010-1080p60.mp4` (318,648,117 bytes) is a
+     non-GoPro-named H.264 1920x1080 59.94 180 s compilation with hard scene transitions,
+     renamed by the owner from a misnamed `.json`. The owner keeps it on purpose as a
+     smoothing stress case, for a later WP and not Part B.
+   - **Folder totals:** the expected count is 35 files (`Snorkel` 26, `SCUBA` 8, `Edits` 1).
+     Report the tool's row for the Edits clip as it is, and say if the tool treats the
+     `Edits/` folder or the non-GoPro name differently.
 8. **The WP0.2 footage test:** run
    `uv run pytest -q -rs tests -k test_real_footage_has_one_row_per_media_file` once and quote
    the result line. It should now be stable, because the download is complete.
