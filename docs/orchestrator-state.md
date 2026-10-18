@@ -76,7 +76,7 @@ Each accepted package had its return report posted to CHARC and an info-update t
 
   WP1.2 Part B comes later (after footage and WP1.5); CHARC commissions it.
 - **WP1.5:** accepted (see the table). The recommendation is SIMPLE; Gate 6 is CHARC's at WP1.6.
-- **Real inventory pass: ON HOLD** for CHARC's one-line "footage renamed, go"
+- **Real inventory pass: DISPATCHED** 2026-10-18 ~23:59Z (`inventory-cell`; brief amended `cea7170`; CHARC go `4114159083a3f639`). Earlier hold:
   (`5edbaf287de9df1c`).
   - The download is COMPLETE (owner 2026-10-18; CHARC `1c889fc60c25c8ba`):
     - `Snorkel/`: 26 clips GX011603-28;
