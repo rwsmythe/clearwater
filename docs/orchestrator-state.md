@@ -30,8 +30,7 @@
   - The original records are intact (`statistics-raw.json` mtime predates the remediation),
     and copies are in `logs\before-remediation\` with `md5.txt`.
   - No stray process: only the comms UI.
-  - Next: resume `wp14-fix` (SendMessage resumes it from its transcript; depth 188K) or
-    re-dispatch a fresh cell from `5c6f340`.
+  - RESUMED 2026-10-18 ~23:14Z on the operator's word, by SendMessage to the raw id `awp14-fix-a7f2718c31740dc1` (the name `wp14-fix` was not reachable after the restart).
 - **wp14-fix** (implementer-sonnet-high, background): the ONE WP1.4 remediation after my seat
   Reviewer B (BLOCKING on candidate `af98ca8`; md5 `f53b2099...`; evidence
   `clearwater-review-evidence\wp1.4\reviewB\`).
