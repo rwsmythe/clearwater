@@ -76,22 +76,14 @@ Each accepted package had its return report posted to CHARC and an info-update t
 
   WP1.2 Part B comes later (after footage and WP1.5); CHARC commissions it.
 - **WP1.5:** accepted (see the table). The recommendation is SIMPLE; Gate 6 is CHARC's at WP1.6.
-- **Real inventory pass: DISPATCHED** 2026-10-18 ~23:59Z (`inventory-cell`; brief amended `cea7170`; CHARC go `4114159083a3f639`). Earlier hold:
-  (`5edbaf287de9df1c`).
-  - The download is COMPLETE (owner 2026-10-18; CHARC `1c889fc60c25c8ba`):
-    - `Snorkel/`: 26 clips GX011603-28;
-    - `SCUBA/`: 8 clips;
-    - no photos, no LRV.
-  - The owner is renaming the misnamed compilation file
-    (`Snorkel/6aca1cf5db06c242d9d53130.json`, H.264 1080p60, 180 s) first. It will probably go
-    to `Edits/compilation-20261010-1080p60.mp4`.
-  - READY:
-    - brief `docs/briefs/inventory-pass-brief.md` (`68d3e08`);
-    - worktree `.worktrees/inventory` (toml copied);
-    - cell implementer-sonnet-medium, name `inventory-cell`.
-  - **On go:** amend brief item 7. The file is then INDEXED under its final name, as a
-    non-GoPro-named 1080p60 H.264 clip; drop the "not indexed" line. Then dispatch.
-  - The result goes `--to charc`.
+- **Real inventory pass: DONE.** On main at `b1fd289` (`docs/reports/inventory-2026-10-18.md`).
+  The return report went to CHARC 2026-10-18 23:57Z.
+  - Counts: 35 videos (Snorkel 26, SCUBA 8, `edits` 1 lowercase); 0 errors.
+  - No chaptered recordings. Photos are PENDING.
+  - Counts re-derived from the CSV at my seat; the CSV and summary md5s verified.
+  - The WP0.2 footage test passes and is stable.
+  - **WP1.2 Part B:** condition 1 is MET and condition 3 is met. Condition 2 waits on the
+    WP1.4 accept.
 
 ### Practice notes (this instance)
 
