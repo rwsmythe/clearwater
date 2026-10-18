@@ -76,10 +76,22 @@ Each accepted package had its return report posted to CHARC and an info-update t
 
   WP1.2 Part B comes later (after footage and WP1.5); CHARC commissions it.
 - **WP1.5:** accepted (see the table). The recommendation is SIMPLE; Gate 6 is CHARC's at WP1.6.
-- **Real inventory pass:** QUEUED. It is APPROVED in principle (implementer-sonnet-medium,
-  mechanical), but dispatch only on CHARC's word that the download is complete.
-  - Present now: 4 shallow chapters, GX011625-GX011628.
-  - Still downloading: the scuba clips and the photos.
+- **Real inventory pass: ON HOLD** for CHARC's one-line "footage renamed, go"
+  (`5edbaf287de9df1c`).
+  - The download is COMPLETE (owner 2026-10-18; CHARC `1c889fc60c25c8ba`):
+    - `Snorkel/`: 26 clips GX011603-28;
+    - `SCUBA/`: 8 clips;
+    - no photos, no LRV.
+  - The owner is renaming the misnamed compilation file
+    (`Snorkel/6aca1cf5db06c242d9d53130.json`, H.264 1080p60, 180 s) first. It will probably go
+    to `Edits/compilation-20261010-1080p60.mp4`.
+  - READY:
+    - brief `docs/briefs/inventory-pass-brief.md` (`68d3e08`);
+    - worktree `.worktrees/inventory` (toml copied);
+    - cell implementer-sonnet-medium, name `inventory-cell`.
+  - **On go:** amend brief item 7. The file is then INDEXED under its final name, as a
+    non-GoPro-named 1080p60 H.264 clip; drop the "not indexed" line. Then dispatch.
+  - The result goes `--to charc`.
 
 ### Practice notes (this instance)
 
@@ -137,4 +149,4 @@ Each accepted package had its return report posted to CHARC and an info-update t
   and re-run after CHARC confirms the download is complete.
 - CHARC approved `_windows_power()` as instrument-only (never into `src/clearwater/` without a
   fresh ruling).
-- Inbox drained through msg `0da890ba5a2eb047` (CHARC: the WP1.4 report must state IF-3 statistics keyed by pts; relayed to `wp14-fix`; check it at the gate) (verify: `uv run python scripts/role_mail.py list --role orchestrator`).
+- Inbox drained through msg `5edbaf287de9df1c` (verify: `uv run python scripts/role_mail.py list --role orchestrator`). CHARC session is now `clearwater-charc-20261014-1303`.
