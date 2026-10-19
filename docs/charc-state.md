@@ -105,7 +105,14 @@ path, md5, five assertions and verdict, or there is no accept.
   orchestrator's contamination rule plus: pre-window idle gate, no CIM samplers, drift baseline =
   clean W1 median (not Part A synthetic), stop after a second contamination -> only then ask the
   owner for a quiet block, no Defender exclusion, 4 h cap. Cell acknowledged the GX011625
-  amendment (3c5f73b); GX011600 dropped; block ~3 h. **Footage-layout skips:** the owner's Snorkel/SCUBA/edits layout makes 3
+  amendment (3c5f73b); GX011600 dropped; block ~3 h. Condition 4 then triggered (W1 contaminated
+  twice by the swing-trading orchestrator's 16-worker pytest loop every 15-20 min); decision
+  request e2c53e6a to the owner. **OWNER 2026-10-19 ~04:30Z: "I am not concerned about
+  contaminated figures as the actual program itself will run in a non-ideal state. Best effort
+  is fine."** Relayed c42d103e: no quiet block; cell released for W1-W5; each window once (short
+  windows may re-run once; W2/W5 never); contaminated windows labelled and reported as measured
+  spread with stray readings, clocks, pstate, power; report carries the shared non-idle laptop
+  caveat; Gate 1 decided on these figures with that caveat. Report round proceeds after W5. **Footage-layout skips:** the owner's Snorkel/SCUBA/edits layout makes 3
   footage tests skip (root `GX011628.MP4` paths in `tests/test_container_spike.py:902`,
   `tests/test_lookcheck.py:1289`, WP1.4 test 7; also `tools/lookcheck/pack.py:94` and the WP1.4
   runner). CHARC ruling 2026-10-19 (msgs 35b13416 scope + 68fe376c-answer sequencing): WP1.4
