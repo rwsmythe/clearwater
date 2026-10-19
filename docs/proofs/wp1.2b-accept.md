@@ -216,3 +216,8 @@ Branches kept:
 - `wp1.2b-b1` (`6e538d7`, B #1's candidate).
 
 B #2's candidate `2dd06cf` is main.
+
+**Main re-gate (owed at accept) DONE.** At the CHARC seat on main `83fd9c4` (docs-only above `2dd06cf`,
+code unchanged), 2026-10-19 ~22:20Z, on the owner's word "Go ahead and run the pytest and gpu
+re-gates": pytest **690 passed, 0 skipped** (493 s); gpu **34 passed** (222 s); harness **366 OK,
+1 skipped**. Both counts match the candidate gate. The debt is cleared.
