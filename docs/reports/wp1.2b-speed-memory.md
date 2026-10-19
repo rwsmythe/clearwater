@@ -14,23 +14,37 @@ fine." The figures are therefore an UPPER BOUND on the cost on an idle machine. 
 whether it was contaminated, and contaminated figures are given as measured spread (min, median,
 max), not discarded. Gate 1 (N6) and Gate 2 (N4) are CHARC's at WP1.6, with this caveat.
 
+**Remediation after Reviewer B** (brief `docs/briefs/wp1.2b-remediation-brief.md`).
+- NO timed window was re-run, and no window record was rewritten.
+- Every change either corrects text against the existing records, adds an UNTIMED verification
+  on the existing outputs (the output witness, section 6), or changes code outside the timing
+  bracket: the export's temporary name, the record provenance checks, and `decode_frames`'
+  standard error.
+- The per-frame spreads come from the records by `work/wp1.2b/remediation/per_frame_spread.py`
+  (output `per_frame_spread.md` / `.json` beside it).
+
 ## 1. Results at a glance
 
 | What | Figure | Against |
 |---|---|---|
-| Export, GX011627 (22.7 s, 681 frames), production-shaped, stray-clean run | 0.4856 s/frame, **14.55 min/min** | N6 3.3 min/min (0.1101 s/frame at 29.97 fps): **4.41x** |
-| Export, GX011627, device-resident variant (supplementary; contaminated) | 0.3576 s/frame, 10.72 min/min | 3.25x |
-| Export, GX011625 (498.4 s, 14,938 frames), full clip (contaminated) | 0.8386 s/frame, **25.13 min/min**, 3.48 h | 7.62x |
+| Export, GX011627 (22.7 s, 681 frames), production-shaped; W4 contaminated, this row's stray checks clean | 0.4856 s/frame, **14.55 min/min** (per frame 0.378 / 0.466 / 1.064 s) | N6 3.3 min/min (0.1101 s/frame at 29.97 fps): **4.41x** |
+| Export, GX011627, device-resident variant (supplementary; contaminated) | 0.3576 s/frame, 10.72 min/min (per frame 0.246 / 0.324 / 1.173 s) | 3.25x |
+| Export, GX011625 (498.4 s, 14,938 frames), full clip (contaminated) | 0.8386 s/frame, **25.13 min/min**, 3.48 h (per frame 0.406 / 0.720 / 4.162 s) | 7.62x |
 | Core alone, 4K GPU ancuti2018, real frames (claim 2) | 0.395 s (run of record); spread 0.375-0.618 s over 22 runs (18 probes, 4 claim-2 runs) | 3.6x on its own |
-| Analysis pass, GX011625, software / `-hwaccel cuda` decode (contaminated) | 0.1190 / 0.1101 s/frame, 3.57 / 3.30 min/min | (no target; D109 is CHARC's call) |
-| Analysis pass, GX011627, stray-clean re-run | 0.0707 s/frame, 2.12 min/min | -- |
+| Analysis pass, GX011625, software / `-hwaccel cuda` decode (contaminated) | 0.1190 / 0.1101 s/frame, 3.57 / 3.30 min/min (per frame 0.053 / 0.105 / 1.363 and 0.039 / 0.099 / 0.891 s) | (no target; D109 is CHARC's call) |
+| Analysis pass, GX011627, re-run W3b (contaminated) | 0.0707 s/frame, 2.12 min/min (per frame 0.033 / 0.067 / 0.467 s) | -- |
 | Peak RAM, GX011625 export (the process tree, FFmpeg included) | 3,682 MiB (Python alone 1,996) | N4 16 GB |
 | Peak graphics memory, GX011625 export (device-wide, NVENC included) | 2,860 MiB (CuPy pool 1,709) | 8,188 MiB |
 | Container of every export | MANDATORY and REQUIRED all SAME (`compare.py`) | WP1.5 |
+| Output witness (untimed, after the exports): 24 frames per export against `correct(source i, statistics i)` | order correct on all 48 frames; GOP-start rule: GX011625 24 of 24, GX011627 23 of 24 (frame 503 at -3.35 dB); section 6 | -- |
 | Largest photo (claim 5, second half) | PENDING: no photo in the inventory | D102 |
 
 N6 is not met at 4K on this laptop under these conditions. That holds for the production-shaped
 loop, for the device-resident variant, and for the core alone.
+
+"Per frame" is the min / median / max of the row's per-frame time from its own record (the
+main loop's wait_output + wait_input + core per frame; the warm-up excluded in claim 2), beside
+the bracket figure, which stays the headline.
 
 ## 2. Instrument and method
 
@@ -66,9 +80,14 @@ and WP3.10.
 
 **Frames and timestamps.** Frames are carried in decode order. The sources are constant-rate
 from pts 0; that is checked, and a VFR or offset clip is refused. The frame boundaries are exact:
-a short read is `PartialFrameError` and a wrong count is `FrameCountError`. Every 30th frame's
-channel means, and the last frame's, are checked against the analysis record within 1e-8. That
-was 24 checks on GX011627 and 499 on GX011625, all passed.
+a short read is `PartialFrameError` and a wrong count is `FrameCountError`.
+
+**In-loop witness (decode side).** It covers that the render's INPUT matches the analysis's
+input: on every 30th frame and the last, the reader thread compares the decoded float frame's
+channel means with the analysis record's, within 1e-8. That was 24 checks on GX011627 and 499 on
+GX011625, all passed. It does NOT cover anything after the correction: the order of frames
+through the writer, the integer conversion, the encoder or the muxer. Those are covered after
+the export by the untimed output witness (section 6).
 
 **The pipe.** FFmpeg writes a raw pipe in 32 KB blocks, and a Windows anonymous pipe carries
 those slowly.
@@ -97,11 +116,22 @@ pipe was measured, not tuned (brief).
 - `StagedStream` is `temporal.analyse_staged` in streaming form, bit-identical in tests. It holds
   at most 61 proxies instead of the clip: GX011625 would be 93 GB of float32 proxies.
 - The render refuses a record from another file, frame count, pts list, parameter set, decode,
-  smoother or statistic set.
+  smoother or statistic set. Since the remediation (B5) it also refuses another time base, frame
+  rate, bit depth or full decode command. The records of both exports pass these checks: the
+  output witness runs `check_statistics_record` on them.
 
 **Timing bracket.** It runs from the moment the first decoded frame has been read whole to the
-moment the encoding FFmpeg process has exited (the muxer has closed the file). For an analysis
-it ends when the last statistic is computed. Minutes per minute = bracket / clip length
+moment BOTH FFmpeg child processes have been reaped. The decoder's exit status is collected
+first, then the encoder's; the encoder exits after its muxer has closed the file. Which child
+actually exited first, and the gap between them, was NOT recorded; the records hold only the
+tail (last frame queued -> both reaped), 0.33 s on the GX011627 export and 0.99 s on GX011625.
+For an analysis the bracket ends when the decoder has been reaped and the last statistic
+computed.
+
+**Export file (remediation B4).** Since the remediation the export writes `<stem>.partial.mp4`
+and renames it to the final name only after a successful pass, after the bracket has closed. It
+never overwrites an existing final file and removes the partial file on any failure. The timed
+runs predate this change. The rename lies outside the bracket, so no timed figure moves. Minutes per minute = bracket / clip length
 (frames x 1001/30000 s). The per-frame series, plus the tail after the last hand-off, close on
 the bracket within `residual_s`. For example, the GX011627 export had a 0.008 s residual on 330.7 s.
 
@@ -137,7 +167,7 @@ within 10 min. W2 and W5 are never re-run.
 | W1d | 20:55-21:11 | 21.2 % | 0.4515 / 0.5167 | contaminated throughout | none left |
 | W2 (claim 4) | 21:13-22:14 | 99.3 % | 0.6026 / 0.4554 | contaminated | never |
 | W3 | 22:16-22:20 | 74.4 % | 0.4241 / 0.6178 | contaminated | W3b |
-| **W3b** | 22:29-22:32 | 23.8 % | 0.3801 / 0.4073 | **clean** | -- |
+| W3b (re-run) | 22:29-22:32 | 23.8 % | 0.3801 / 0.4073 | contaminated: the closing probe's stray check after it shows `python.exe` PID 17192 at 53.0 % (no record ties that PID to the instrument; it appears in this record only) | none left |
 | W4 (claim 3 short + split) | 22:33-23:00 | 14.5 % | 0.3754 / 0.4853 | contaminated from 22:42; the production export row (22:34-22:40) stray-clean | gate failed twice in 10 min: none |
 | W5 (claim 3 long, claim 5) | 23:09-03:00 | 81.4 % | 0.5750 / 0.3857 | contaminated | never |
 
@@ -165,14 +195,14 @@ the first frame discarded. "Clean" means no non-system process at 25 % or more i
 stray checks. Spread = min / median / max over the four W1 attempts. Records:
 `work/wp1.2b/core/W1{a-contaminated,b-contaminated,c,d}/`.
 
-| Mode | Device | Method | N | Run of record W1c: median / p95 / drift | Spread over W1a-d (min / median / max) | Stray-clean medians | Part A synthetic | x 0.1101 s (W1c) |
+| Mode | Device | Method | N | Run of record W1c (contaminated window): median / p95 / drift; per frame min / median / max | Spread over W1a-d (min / median / max) | Stray-clean medians | Part A synthetic | x 0.1101 s (W1c) |
 |---|---|---|---|---|---|---|---|---|
-| 4K | GPU | ancuti2018 | 60 | 0.3948 / 0.4361 / +7.1 % (clean) | 0.3948 / 0.4371 / 0.4851 | 0.4183, 0.4558, 0.3948 | 0.389 | 3.6x |
-| 4K | GPU | c3 | 60 | 0.6391 / 0.6861 / +5.6 % (clean) | 0.6391 / 0.7777 / 0.8970 | 0.7077, 0.6391 | 0.652 | 5.8x |
-| 4K | CPU | ancuti2018 | 10 | 12.61 / 13.41 (strays after) | 8.81 / 11.30 / 16.36 | 8.81 | 10.97 | 115x |
-| 1080p60 | GPU | ancuti2018 | 60 | 0.0934 / 0.1090 / +0.4 % (strays) | 0.0934 / 0.0979 / 0.1396 | 0.1396, 0.0993 | -- | 1.7x of 0.0551 |
-| 1080p60 | GPU | c3 | 60 | 0.1267 / 0.1416 / -1.8 % (strays) | 0.1223 / 0.1257 / 0.1820 | 0.1223 | -- | 2.3x of 0.0551 |
-| 1080p60 | CPU | ancuti2018 | 10 | 2.489 / 4.455 (strays) | 1.956 / 2.263 / 5.480 | 2.037, 1.956 | -- | 45x of 0.0551 |
+| 4K | GPU | ancuti2018 | 60 | 0.3948 / 0.4361 / +7.1 % (row's strays clean); 0.3701 / 0.3948 / 0.4500 | 0.3948 / 0.4371 / 0.4851 | 0.4183, 0.4558, 0.3948 | 0.389 | 3.6x |
+| 4K | GPU | c3 | 60 | 0.6391 / 0.6861 / +5.6 % (row's strays clean); 0.6155 / 0.6391 / 0.6973 | 0.6391 / 0.7777 / 0.8970 | 0.7077, 0.6391 | 0.652 | 5.8x |
+| 4K | CPU | ancuti2018 | 10 | 12.61 / 13.41 (strays after); 12.34 / 12.61 / 13.64 | 8.81 / 11.30 / 16.36 | 8.81 | 10.97 | 115x |
+| 1080p60 | GPU | ancuti2018 | 60 | 0.0934 / 0.1090 / +0.4 % (strays); 0.0854 / 0.0934 / 0.1284 | 0.0934 / 0.0979 / 0.1396 | 0.1396, 0.0993 | -- | 1.7x of 0.0551 |
+| 1080p60 | GPU | c3 | 60 | 0.1267 / 0.1416 / -1.8 % (strays); 0.1157 / 0.1267 / 0.1562 | 0.1223 / 0.1257 / 0.1820 | 0.1223 | -- | 2.3x of 0.0551 |
+| 1080p60 | CPU | ancuti2018 | 10 | 2.489 / 4.455 (strays); 2.366 / 2.489 / 4.541 | 1.956 / 2.263 / 5.480 | 2.037, 1.956 | -- | 45x of 0.0551 |
 
 Device-resident (supplementary, same frames, W1c): 4K ancuti2018 0.2755 s, 4K c3 0.5135 s,
 1080p ancuti2018 0.0605 s, 1080p c3 0.1231 s. Memory per 4K GPU run: CuPy pool reserved 1,712 MiB
@@ -201,11 +231,11 @@ decode (`median_gaussian` 2 s, PROVISIONAL per DR-25(3)), software decode, NVENC
 
 The GX011625 run took 3.48 h, 1.7x its estimate (below).
 
-| Clip | Row | Frames | Bracket | s/frame | min/min | x N6 | In-loop core median / p95 | Window | Record |
+| Clip | Row | Frames | Bracket | s/frame | min/min | x N6 | Per frame min / median / max | Window | Record |
 |---|---|---|---|---|---|---|---|---|---|
-| GX011627 | production-shaped | 681 | 330.7 s | 0.4856 | 14.55 | 4.41 | 0.4664 / 0.6351 | W4, stray-clean (22:34-22:40) | `bench/W4/GX011627-end-to-end-ancuti2018-20261018-223431/` |
-| GX011627 | device-resident (supplementary) | 681 | 243.5 s | 0.3576 | 10.72 | 3.25 | 0.3146 / 0.4652 | W4, contaminated | `bench/W4/GX011627-end-to-end-ancuti2018-20261018-224228/` |
-| GX011625 | production-shaped (full clip) | 14,938 | 12,526.8 s (3 h 29 min) | 0.8386 | 25.13 | 7.62 | 0.7203 / 1.7474 | W5, contaminated | `bench/GX011625-end-to-end-ancuti2018-20261018-231103/` |
+| GX011627 | production-shaped | 681 | 330.7 s | 0.4856 | 14.55 | 4.41 | 0.378 / 0.466 / 1.064 | W4 (contaminated window; this row's stray checks clean, 22:34-22:40) | `bench/W4/GX011627-end-to-end-ancuti2018-20261018-223431/` |
+| GX011627 | device-resident (supplementary) | 681 | 243.5 s | 0.3576 | 10.72 | 3.25 | 0.246 / 0.324 / 1.173 | W4, contaminated | `bench/W4/GX011627-end-to-end-ancuti2018-20261018-224228/` |
+| GX011625 | production-shaped (full clip) | 14,938 | 12,526.8 s (3 h 29 min) | 0.8386 | 25.13 | 7.62 | 0.406 / 0.720 / 4.162 | W5, contaminated | `bench/GX011625-end-to-end-ancuti2018-20261018-231103/` |
 
 **Accounting** (GX011627 production row):
 - main loop: wait for an output slot 0.0 s, wait for input 0.2 s, core 330.1 s;
@@ -223,21 +253,27 @@ nearly every stray check:
 The full-clip figure is the sustained figure on this laptop as it was used that night. Spec 12
 expects "sustained speed under heat may be lower than a single-frame timing suggests".
 
-**In-loop core against claim 2** (0.4664 vs 0.3948 s, +18 %, both stray-clean). The cause is
-attributed to concurrency. In the loop, the decoder (several CPU cores), the encoder and the two
-conversion threads run beside `correct()` and compete for CPU, memory bandwidth and PCIe. The
-device-resident row moves the same way: 0.3146 vs 0.2755 s, +14 %.
+**In-loop core against claim 2** (0.4664 vs 0.3948 s, +18 %; both rows' own stray checks
+clean, both windows contaminated).
+
+HYPOTHESIS, not established: the difference comes from concurrency. In the loop, the decoder
+(several CPU cores), the encoder and the two conversion threads run beside `correct()` and
+compete for CPU, memory bandwidth and PCIe. What supports it: the device-resident row moves the
+same way, 0.3146 vs 0.2755 s, +14 %.
+
+The confirming run, not made here: the core timed inside the loop with the decoder and encoder
+replaced by in-memory frames (no concurrent processes), against claim 2 in the same window.
 
 **The split on GX011627** (W4). The three stages run concurrently in the export, so the export
 should fall between the largest stage and their sum. It does: 0.3948 <= **0.4856** <= 0.5205 s.
 The pass-through rows ran under the shared load, so their figures are an upper bound.
 
-| Pass | s/frame | min/min | Bracket | Notes |
+| Pass (all W4, contaminated) | s/frame | min/min | Bracket | Notes (per frame min / median / max) |
 |---|---|---|---|---|
-| decode-only (decoder -> pipe -> reader) | 0.0886 | 2.66 | 60.4 s | pipe-bound: the transport record gives 0.0936 through the pipe against 0.0162 to NUL |
-| encode-only (raw spool -> writer -> NVENC -> mux) | 0.0371 | 1.11 | 25.3 s | the 16.9 GB spool was decoded before the window and deleted after |
+| decode-only (decoder -> pipe -> reader) | 0.0886 | 2.66 | 60.4 s | 0.0003 / 0.0858 / 0.1986; | pipe-bound: the transport record gives 0.0936 through the pipe against 0.0162 to NUL |
+| encode-only (raw spool -> writer -> NVENC -> mux) | 0.0371 | 1.11 | 25.3 s | 0.0015 / 0.0343 / 0.8140; the 16.9 GB spool was decoded before the window and deleted after |
 | core alone (claim 2, W1c) | 0.3948 | -- | -- | |
-| passthrough (decode + encode together, no core; supplementary) | 0.0880 | 2.64 | 59.9 s | equals decode-only: the encoder is hidden behind the decode pipe |
+| passthrough (decode + encode together, no core; supplementary) | 0.0880 | 2.64 | 59.9 s | 0.0019 / 0.0845 / 1.3111; equals decode-only: the encoder is hidden behind the decode pipe |
 
 Every export's container was compared with its source (`compare.py`). All MANDATORY and REQUIRED
 (D55/D114) items are SAME for GX011627 production and resident, GX011625, encode-only and
@@ -246,6 +282,59 @@ camera `udta` atoms, `ftyp` brands, container and stream tags, track flags, samp
 boxes, and non-video edit lists as written. Compare records sit beside each output
 (`<stem>_corrected.compare.json/.md`).
 
+**Output witness** (remediation B3; untimed, run on the existing exports after the event;
+`clip.py witness`; records `output-witness.json` in each run folder).
+
+For 24 frame indices spread over each clip, the first and last included, the witness:
+- decodes output frame i;
+- recomputes the expected frame through the export's own conversions:
+  `correct(source frame i, params, statistics = the analysis record's smoothed statistics i)`;
+- scores own_i = PSNR(output i, expected i), whole-frame 8-bit RGB.
+
+It covers what the in-loop witness does not: the writer, the integer conversion, the encoder and
+the muxer.
+
+The pass criterion, and how it was reached, stated plainly:
+1. The first criterion was an absolute 28 dB floor, from WP1.5's identity re-encode of GX011627
+   (Y 32.27 dB at worst).
+   - It failed GX011627 frame 30 at 27.79 dB.
+   - A reproduction showed the encoder's own loss on that frame, encoding the expected frames
+     alone through the export's chain, is 28.76 dB
+     (`work/wp1.2b/remediation/frame30_repro.json`).
+   - The orchestrator replaced the criterion BEFORE re-scoring.
+2. The second criterion was relative per frame: own_i >= ref_i - 2.0 dB, with ref_i from the
+   expected frames i-1, i, i+1 encoded alone.
+   - It failed 18 of 24 frames on GX011627 and 13 of 24 on GX011625.
+   - Order was correct on every row.
+   - That reference was unrepresentative: the export has a 250-frame GOP (I-frames at 0, 250, 500
+     on GX011627) with B and P frames, and the 3-frame reference codes frame i next to a fresh
+     I-frame (`remediation/gx011627-out-pict-types.txt`, `gop_reference_repro.json`).
+   - The orchestrator replaced the reference BEFORE re-scoring.
+3. ADOPTED: ref_i from a GOP-start reference.
+   - The expected frames from the export's GOP start (the last I-frame at or before i, from the
+     OUTPUT's picture types read with ffprobe) through i+1 are encoded through the export's own
+     encode chain, then decoded; ref_i = PSNR(decoded expected i, expected i).
+   - Pass: own_i >= ref_i - 2.0 dB and own_i >= 20 dB (a sanity floor), and own_i strictly
+     above its PSNR against the expected frames i-1 and i+1 (order).
+   - The planted controls fail by name under it: a frame swap raises `OutputOrderError`; a
+     30-frame statistics shift raises `OutputMismatchError`.
+
+Each row of the records keeps all three verdicts (`first_floor_ok`, `relative3_ok`, `match_ok`
+with `ref_db`), so nothing is hidden. The first two records are kept too, as
+`output-witness-first-criterion-28dB.json` and `output-witness-relative-3frame-reference.json`.
+
+| Export | Frames | Order (strict) | GOP-start rule | own - ref (min .. max) | own_i | best neighbour | 28 dB criterion | 3-frame criterion |
+|---|---|---|---|---|---|---|---|---|
+| GX011627 (W4 production) | 24 | all correct | 23 of 24; frame 503 (a B-frame 3 after the I-frame at 500) at 35.39 dB against ref 38.74 (-3.35 dB) | -3.35 .. +0.05 dB | 27.79-39.67 dB | 28.3 dB (frame 680) | fails frame 30 | fails 18 |
+| GX011625 (W5) | 24 | all correct | **24 of 24** | -1.73 .. +0.31 dB | 29.67-42.68 dB | 34.2 dB | passes | fails 13 |
+
+GX011627 frame 503 is reported as measured, as the orchestrator ruled (no further stop on a
+witness frame with the order correct). The frame is in its right place (own 35.39 dB against
+22.3 dB for its best neighbour) and corrected with its own statistics. It scores 3.35 dB below a
+reference that encoded only frames 500-504 from a fresh start. That reference's encoder history
+differs from the export's, which had coded 500 frames before. That cause is a HYPOTHESIS, not
+established here.
+
 ## 7. Claim 4 -- analysis speed (spec 7.2 decode pass + staged statistics)
 
 GX011625, ancuti2018, 540-line proxy, STAGED, `median_gaussian` 2 s. W2, contaminated (Python
@@ -253,24 +342,37 @@ batches at 36-99 % before and after both runs), never re-run.
 
 | Clip | Decode | Frames | Bracket | s/frame | min/min | Reader pipe read median | Main-loop work median | Measure s per stage (1/2/3) | Record |
 |---|---|---|---|---|---|---|---|---|---|
-| GX011625 | software | 14,938 | 1,777.2 s | 0.1190 | 3.57 | 0.106 | 0.074 | 372 / 311 / 302 | `bench/GX011625-analysis-ancuti2018-20261018-211458/` |
-| GX011625 | `-hwaccel cuda` | 14,938 | 1,644.8 s | 0.1101 | 3.30 | 0.098 | 0.068 | 321 / 271 / 270 | `bench/GX011625-analysis-ancuti2018-20261018-214514/` |
+| GX011625 | software (W2, contaminated) | 14,938 | 1,777.2 s | 0.1190 | 3.57 | 0.106 | 0.074 | 372 / 311 / 302 | `bench/GX011625-analysis-ancuti2018-20261018-211458/` |
+| GX011625 | `-hwaccel cuda` (W2, contaminated) | 14,938 | 1,644.8 s | 0.1101 | 3.30 | 0.098 | 0.068 | 321 / 271 / 270 | `bench/GX011625-analysis-ancuti2018-20261018-214514/` |
 | GX011627 | software (W3, contaminated) | 681 | 98.8 s | 0.1451 | 4.35 | 0.107 | 0.124 | 29 / 21 / 18 | `bench/GX011627-analysis-ancuti2018-20261018-221704/` |
-| GX011627 | software (W3b, clean) | 681 | 48.2 s | 0.0707 | 2.12 | 0.067 | 0.050 | -- | `bench/GX011627-analysis-ancuti2018-20261018-222955/` |
+| GX011627 | software (W3b re-run, contaminated) | 681 | 48.2 s | 0.0707 | 2.12 | 0.067 | 0.050 | -- | `bench/GX011627-analysis-ancuti2018-20261018-222955/` |
 
 - Hardware decode saves 7 % here. The pass is bound by the raw pipe (the reader's read takes
   longer than the main loop's work), and `-hwaccel cuda` only speeds the decode behind the pipe.
 - At most 61 proxies are held: (stages - 1) x reach + 1 = (3 - 1) x 30 + 1.
 - Smoothing costs 52-61 s per clip.
 - Whether this is acceptable, and so whether D109 (sparse analysis) is named, is CHARC's call at
-  WP1.6. The GX011627 run clean under the contamination rule, 2.1 min/min, is the best short-run
-  indication here; it is not an idle-machine figure (its gate read 23.8 % total CPU and
-  WmiPrvSE ran at 86-88 % of a CPU).
+  WP1.6. No analysis row is clean under the contamination rule. The GX011627 re-run (W3b,
+  2.1 min/min) had the least load of them, but its window is contaminated (a 53 % `python.exe`
+  in its last stray check). It is not an idle-machine figure either: its gate read 23.8 % total
+  CPU, and WmiPrvSE ran at 86-88 % of a CPU.
+
+Per-frame spread (min / median / max, s, from each record):
+
+| Row | Per frame |
+|---|---|
+| GX011625 software | 0.053 / 0.105 / 1.363 |
+| GX011625 `-hwaccel cuda` | 0.039 / 0.099 / 0.891 |
+| GX011627 W3 | 0.039 / 0.129 / 1.458 |
+| GX011627 W3b | 0.033 / 0.067 / 0.467 |
 
 ## 8. Claim 5 -- memory (N4, V15)
 
 From the GX011625 export (W5, the largest video mode: 4K 29.97 HEVC; no 5.3K exists).
-RSS is sampled every 50 ms; device memory is CUDA `memGetInfo` every 50 ms.
+RSS and device memory (CUDA `memGetInfo`) are sampled by one thread. It waits 50 ms between
+samples, and each sample also lists the children and reads the device, so the actual mean
+interval was longer: 81 ms in this run (154,868 samples over 12,526.8 s), 62-81 ms across the
+whole-clip runs (`per_frame_spread.md`, last column). A peak shorter than that can be missed.
 
 | Figure | Value | Limit |
 |---|---|---|
@@ -346,12 +448,21 @@ From the split and the rows above. These are CHARC's options for Gate 1; none wa
 | 3 | 3C large Gaussian by FFT or a recursive (IIR) filter | c3's sigma-108 Gaussian, 865 taps per axis | Moderate (numerical agreement to re-verify, D107/V-tests). c3 minus ancuti2018 is 0.24 s/frame at 4K (0.639 vs 0.395); most of it is this filter (Part A: about 97 ms per channel). |
 | 4 | Pyramid memory (release the last input's pyramids during the collapse) | 13 1/3 of the 50 1/12 peak planes | Low. Memory only (up to -27 % of the peak, 1.7 -> 1.25 GiB at 4K); no speed. Matters for 5.3K and photos, not N6. |
 | 5 | Decode/encode overlap with the core through pipelining | host-device copies and conversions in series with the kernels | Moderate (CUDA streams: upload frame i+1 and download frame i-1 while frame i computes). The decoder and encoder are already hidden behind the core (wait_input 0.2 s on 681 frames); what is left is the H2D/D2H inside `correct()`, the same 0.1-0.13 s as #1. |
-| 6 | A raw transport with large writes (PyAV in-process decode/encode, or a pipe or socket written in 1 MB+ blocks) | the 32 KB pipe (decode-only 0.089-0.094 s/frame against 0.016 s decoding to NUL) | Low to moderate, WP2.1's transport choice (WP1.5 left PyAV against process-FFmpeg to WP2.1). The transport record gives 4.0-5.4 ms/frame for 1 MB+ blocks. It makes the analysis pass decode- and statistics-bound instead of pipe-bound (an estimated -20 to -30 % on analysis, from the clean GX011627 run: pipe read 0.067 s against 0.050 s of work per frame); little for export while the core dominates. |
+| 6 | A raw transport with large writes (PyAV in-process decode/encode, or a pipe or socket written in 1 MB+ blocks) | the 32 KB pipe (decode-only 0.089-0.094 s/frame against 0.016 s decoding to NUL) | Low to moderate, WP2.1's transport choice (WP1.5 left PyAV against process-FFmpeg to WP2.1). The transport record gives 4.0-5.4 ms/frame for 1 MB+ blocks. ESTIMATE: it would make the analysis pass decode- and statistics-bound instead of pipe-bound, about -20 to -30 % on analysis. That rests on the GX011627 W3b run (contaminated): pipe read 0.067 s against 0.050 s of work per frame. Little for export while the core dominates. |
 | 7 | Sustained-thermal margin (laptop) | 0x20 thermal slowdown seen in W5 | Not a code change: the owner's power and cooling. The GX011625 core median moved 0.56-0.93 s across the clip. |
 
-Even with #1, #3 and #5 together the 4K core stays near 0.2 s/frame (#1 alone gives 0.2755 s
-device-resident). That is about 2x N6's 0.1101 s. N6 at 4K needs the Gate 1 options, or a change to
-N6 (owner-reserved).
+ESTIMATE, not a measured combination. The candidates do not add:
+- #3 applies to c3 only. It does nothing for ancuti2018, the default.
+- #1 and #5 overlap: both remove the host-device copies, #1 by not making them, #5 by hiding
+  them.
+
+| Method | Measured, device-resident (#1) | Estimate with #5 on top | Estimate with #3 | N6 |
+|---|---|---|---|---|
+| ancuti2018 | 0.2755 s (W1c) | at most the part of 0.2755 that is copies (#5 hides what #1 did not remove: the input upload and the output download, about 0.02-0.03 s at PCIe 4.0 speeds); so about 0.25 s | -- | 0.1101 s; about 2.3x |
+| c3 | 0.5135 s | about 0.49 s | minus up to 0.24 s, about 0.25-0.29 s | about 2.3-2.6x |
+
+Confirming them needs the changes themselves (WP2.1/WP3.1). Either way, N6 at 4K needs the
+Gate 1 options or a change to N6 (owner-reserved).
 
 ## 11. Deviations and notes
 

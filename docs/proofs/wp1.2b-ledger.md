@@ -402,3 +402,34 @@ c131f6cdc0f68d5f3f9709a299cdee54 *bench/GX011625-end-to-end-ancuti2018-20261018-
 96e6f50897f78006b6a7bcbc3828e269 *remediation/gop_reference_repro.py
 ae81007a183cc9ce9de61453f5a92cfe *remediation/gx011627-out-pict-types.txt
 ```
+
+### Second floor ruling (orchestrator): the GOP-start reference adopted
+
+- Code `ff91f54`. ref_i comes from the expected frames from the export's GOP start (the last
+  I-frame at or before i, read from the OUTPUT's picture types with ffprobe) through i+1,
+  streamed through `encode_command`. The rule is unchanged: own >= ref - 2.0 dB, sanity 20 dB,
+  strict order. Each row keeps all three verdicts.
+- Planted controls under the GOP-start rule: both still fail BY NAME (swap ->
+  `OutputOrderError`; 30-frame statistics shift -> `OutputMismatchError`). Witness tests: 9 pass.
+- Re-score, untimed (`work/wp1.2b/remediation/witness_both.sh`, 04:32-05:54 HST, nothing timed
+  alongside):
+
+  | Export | Order | GOP-start rule | own - ref |
+  |---|---|---|---|
+  | GX011627 | correct on all 24 | 23 of 24; frame 503 (B) at 35.39 dB against ref 38.74 (-3.35 dB) | -3.35 .. +0.05 dB |
+  | GX011625 | correct on all 24 | PASSED 24 of 24 | -1.73 .. +0.31 dB |
+
+  Frame 503 is recorded as measured, per the ruling (no stop; the order is correct).
+- Text items B1, B2, B3a, B6, B8 and B9 are done in the report. Per-frame spreads come from
+  `work/wp1.2b/remediation/per_frame_spread.py` (output `.md` / `.json`). The sampler's actual
+  cadence was 62-81 ms (81 ms in W5).
+
+md5s:
+```
+c5a09dd35f13f829e39fa6f6870cd239 bench/W4/GX011627-end-to-end-ancuti2018-20261018-223431/output-witness.json
+b7b82c539f4ac376132498e8904efae0 bench/GX011625-end-to-end-ancuti2018-20261018-231103/output-witness.json
+e2c958860cbd3c4454d78a01b0f2d41a remediation/per_frame_spread.json
+c2bbde1c4f083688e1d66e301b44f750 remediation/per_frame_spread.md
+94f6bac296f7379f942719922d07596a remediation/per_frame_spread.py
+da6f116c9831d624afb9789e480f18eb remediation/witness_both.sh
+```
