@@ -24,27 +24,25 @@
 
 ### Live cells
 
-- **`wpt2-cell`** (implementer-sonnet-high), WP-T2, dispatched 2026-10-19 ~01:10Z in the
-  background. Worktree `.worktrees/wp-t2`, branch `wp-t2`, base `36535bf` (toml copied).
-  Agent id `awpt2-cell-37e14de42f7cc22f`. Depth at dispatch: fresh. If this generation rolls
-  before it returns, the successor re-dispatches from the branch head and the brief.
+**NONE** at the WP-T2 accept (2026-10-19 ~01:40Z; `wpt2-cell` returned, head `3567c56` unchanged
+at three readings across turns). Part B dispatches next; record its cell here.
 
 ### Handoff -- the successor starts HERE
 
-1. **WP1.4 ACCEPTED** 2026-10-19, main `91f5775` (record `docs/proofs/wp1.4-accept.md`).
-   - Second blocking B adjudicated at the gate; findings banked as DR-25; 4 report errata.
-   - DR-23 (VFR), DR-24 (layout skips, closer WP-T2), DR-26 (spike CLI root paths) opened.
-   - Return report to CHARC and the operator fyi: see the inbox history (posted at accept).
-   - Worktrees `.worktrees/wp1.4` and `.worktrees/wp1.4-mc` can be removed
-     (`git worktree remove --force`, copied toml); keep branch `wp1.4`.
-2. **WP-T2 (footage locator)** -- brief `docs/briefs/wp-t2-brief.md` (FINAL), CHARC `35b13416`
-   (scope), `e5505505` (sequence), `59860def` (relocate `VIDEO_EXTENSIONS` into
-   `tools/local_config.py`; `tools/inventory.py` one line). implementer-sonnet-high, tier FAST
-   (gpt-5.6-luna / medium), base = main at dispatch, worktree `.worktrees/wp-t2`. Gate: 0 skipped.
-3. **WP1.2 Part B** (EXCLUSIVE) follows WP-T2. Conditions 1-3 are now met except that CHARC put
-   WP-T2 first. Brief `docs/briefs/wp1.2b-brief.md`; the chapter-handling outcome of CP1 goes
-   into it (CHARC recommended DEFER to v2; no chaptered recordings exist).
-4. **CP1** is in the owner's hands (categories folder-wise, chapter handling).
+1. **WP-T2 ACCEPTED** 2026-10-19, main `8c9d780` (record `docs/proofs/wp-t2-accept.md`):
+   0 skipped restored; DR-24 CLOSED; DR-27 opened. B's major (linked root) REJECTED with cause.
+   Branches `wp-t2`, `wp-t2-b` kept. Worktrees `.worktrees/wp-t2`, `-mc` removable.
+2. **CP1 COMPLETE** (owner 2026-10-19, CHARC `99f6abaf9afd829e`): folder-wise categories
+   (Snorkel = shallow, SCUBA = deeper ~20 m, edits = stress case), chapter handling DEFERRED to
+   v2 (spec revision pending: briefs cite "chapter handling deferred (CP1 2026-10-19; spec
+   revision pending)").
+3. **WP1.2 Part B (EXCLUSIVE)** -- brief `docs/briefs/wp1.2b-brief.md` FINAL (CP1 notes, stems
+   via the locator, GX011600 as the largest full clip, 1080p59.94 compilation as a 2nd decode
+   mode, photo leg PENDING). implementer-opus-high, worktree `.worktrees/wp1.2b`. While it is
+   live: NO harness gate, NO pytest, NO Codex at this seat (CHARC `122f9a10cf1323f5`).
+4. **After Part B:** the deep parts (WP1.3 deep cases, WP1.4b gain-cap noise test) on SCUBA/;
+   order is the orchestrator's call (CHARC). Then WP1.6 (gate report; smoothing row "2 s
+   provisional").
 
 ### Workstreams
 
@@ -61,6 +59,7 @@ Each accepted package had its return report posted to CHARC and an info-update t
 | WP1.3 | 2026-10-15 | `7178540` | `docs/proofs/wp1.3-accept.md` (`bc97a19`); 2nd B adjudicated at the gate; DR-20, DR-21 | CONFIRMED (`09057ee4b3979fa4`) |
 | WP-T1 | 2026-10-15 | `f6a34a4` | `docs/proofs/wp-t1-accept.md` (`3f40a85`); 2nd B adjudicated at the gate; DR-9 and DR-21 closed, DR-22 opened | CONFIRMED (`3501648bc8844468`) |
 | WP1.4 | 2026-10-19 | `91f5775` | `docs/proofs/wp1.4-accept.md`; 2nd B adjudicated at the gate; DR-23..DR-26 | CONFIRMED (`6c5d88685e64a37c`; finding 3 upheld; DR-26 stays banked) |
+| WP-T2 | 2026-10-19 | `8c9d780` | `docs/proofs/wp-t2-accept.md`; DR-24 closed, DR-27 | pending |
 
 - **WP1.2 Part A, raised to CHARC:**
   - approval of the Windows-only `_windows_power()` in `bench.py` (instrument only, guarded);
