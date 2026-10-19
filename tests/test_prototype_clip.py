@@ -13,9 +13,11 @@ import json
 import shutil
 import subprocess
 import sys
+import threading
 import time
 from fractions import Fraction
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 import numpy as np
@@ -351,6 +353,37 @@ def test_an_error_in_the_core_stops_both_processes(
     assert not _children_alive()
 
 
+def test_at_most_two_frames_are_in_flight_after_the_core(
+    synthetic: Path, roots: OutputRoots, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A slow writer: frames whose core has started minus frames written never exceed two."""
+    source = clip.open_source(synthetic)
+    lock = threading.Lock()
+    state = {"started": 0, "written": 0, "most": 0}
+
+    def fast_core(image: Any, *args: Any, **kwargs: Any) -> Any:
+        with lock:
+            state["started"] += 1
+            state["most"] = max(state["most"], state["started"] - state["written"])
+        return SimpleNamespace(output=image.copy())
+
+    real_write = clip.write_frame
+
+    def slow_write(stream: Any, frame: Any) -> None:
+        time.sleep(0.02)
+        real_write(stream, frame)
+        with lock:
+            state["written"] += 1
+
+    monkeypatch.setattr(clip, "correct", fast_core)
+    monkeypatch.setattr(clip, "write_frame", slow_write)
+    folder = roots.allowed / "slots"
+    output, *logs = clip.output_paths(roots, folder, ["s_corrected.mp4", "d.log", "e.log"])
+    clip.export(source, output, Params(), None, select_backend("cpu"), (logs[0], logs[1]))
+    assert state["written"] == CLIP_FRAMES
+    assert state["most"] == clip.OUTPUT_FRAMES  # reached, never exceeded
+
+
 def test_open_source_refuses_non_square_pixels(roots: OutputRoots) -> None:
     clip_path = roots.allowed / "clips" / "anamorphic.mp4"
     _ffmpeg(
@@ -660,7 +693,7 @@ def test_bench_whole_clip_modes_record_their_pass(
     common = ["--device", "gpu", "--method", "ancuti2018", "--input", str(synthetic)]
     common += ["--config", str(config)]
     records = {}
-    for mode in ("analysis", "decode-only", "passthrough"):
+    for mode in ("analysis", "decode-only", "encode-only", "passthrough"):
         assert bench.main(["--mode", mode, *common]) == 0
         (path,) = (roots.allowed / "bench").glob(f"synthetic-{mode}-*/bench-*.json")
         records[mode] = json.loads(path.read_text(encoding="utf-8"))
@@ -674,9 +707,19 @@ def test_bench_whole_clip_modes_record_their_pass(
         assert record["n6"]["budget_seconds_per_frame"] == pytest.approx(3.3 * 1001 / 30000)
         assert record["memory"]["gpu_pool_reserved_mb"] >= 0, mode
         assert record["ambient"]["head"]["head"], mode
-        assert record["timing"]["main_loop_sum_s"] <= record["timing"]["bracket_s"], mode
-    for mode in ("passthrough", "end-to-end"):
+        timing = record["timing"]
+        assert timing["main_loop_sum_s"] <= timing["bracket_s"], mode
+        assert 0 <= timing["residual_s"] < 0.05 * timing["bracket_s"] + 0.05, mode
+        memory = record["memory"]
+        assert memory["cuda_device_used_peak_mb"] > memory["gpu_pool_reserved_mb"], mode
+        assert memory["rss_tree_peak_mb"] >= memory["rss_peak_mb"], mode
+    for mode in ("passthrough", "end-to-end", "encode-only"):
         assert records[mode]["compare"]["mandatory_and_required_all_same"], mode
+        assert records[mode]["memory"]["rss_children_peak_mb"] > 0, mode
+    spool = records["encode-only"]["spool"]
+    assert spool["bytes"] == CLIP_FRAMES * 960 * 540 * 3
+    assert not Path(spool["path"]).exists()
+    assert records["encode-only"]["run"]["decode_command"][0] == "(spool)"
     assert records["end-to-end"]["run"]["witness_frames_checked"] == 3
 
 
