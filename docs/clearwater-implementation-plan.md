@@ -1,9 +1,9 @@
 # Clearwater — Implementation Plan
 
-**Version:** 1.0 (draft)
+**Version:** 1.1 (draft) -- amended 2026-10-19 for spec v0.5.3 (chapter handling deferred to v2; 3C default)
 **Date:** 13 October 2026
 **Built on:** Specification v0.5 (`underwater-correction-spec.md`)
-**Status:** Ready for owner review. Two inputs are still open and are closed inside the plan: the laptop's CPU and graphics card (WP0.1) and chapter handling (CP1).
+**Status:** Ready for owner review. Both inputs the plan left open are CLOSED: the laptop's CPU and graphics card (WP0.1, 2026-10-14) and chapter handling (CP1, 2026-10-19: deferred to v2, spec v0.5.3).
 
 ---
 
@@ -288,14 +288,14 @@ All packages depend on WP2.2 (interfaces) and use WP2.3 (fixtures). The "Depends
 | WP3.5 | Video color handling and chroma resampling | M | WP3.1 | §6.5; D54, D55, D114 | V4, V9 |
 | WP3.6 | Photo input and output | M | — | §5.1, §8.1; D22, D53, D63, D91, D116 | V5, V6, V9 |
 | WP3.7 | Video probe and input validation | M | — | §5.2–5.4; D15, D54, D73, D86, D95 | V4, V6 |
-| WP3.8 | Chapter grouping *(conditional)* | S | WP3.7 | §5.5; D21, D33, D82, D83 | V12 |
+| WP3.8 | Chapter grouping -- REMOVED (CP1 2026-10-19: chapter handling deferred to v2, spec v0.5.3 §5.5) | -- | -- | -- | -- |
 | WP3.9 | Video decode | M | WP3.5, WP3.7 | §5.2, §7.5; D86, D94 | V4, V9 |
 | WP3.10 | Video encode, mux and timing | L | WP3.5, WP3.7 | §7.5, §8.2; D25, D26, D62, D74–D76, D91, D94, D105 | V4, V9 |
 
 - **WP3.5** converts between the stream's Y′CbCr and the working RGB using the stream's matrix and range, resamples chroma in both directions by the method fixed in WP2.1, and applies the BT.709/limited default with a warning when tags are missing.
 - **WP3.6** reads HEIC, JPEG, PNG and TIFF with the color profile honored and orientation applied to the pixels; writes 8- or 16-bit PNG with the matching profile, EXIF per D63, and provenance; refuses ProRAW/DNG with a clear message.
 - **WP3.7** reads stream information, timestamps and tracks; refuses HLG and PQ; applies best-effort GP-Log detection; reports truncated or unreadable files; and reports variable frame rate and rotation.
-- **WP3.8** is built only if chapter handling stays in v1 (CP1). It groups by GoPro naming, excludes sidecars, and detects non-consecutive groups.
+- **WP3.8** is NOT built: chapter handling is deferred to v2 (CP1 2026-10-19; spec v0.5.3). Sidecar exclusion from input (D83) stays in WP3.7's probe/validation. The number is kept so later references stay stable.
 - **WP3.9** yields frames (IF-1) with their exact source timestamps, by software or hardware decode, and stops cleanly at the readable end of a truncated file.
 - **WP3.10** is the highest-risk package. It encodes HEVC through NVENC or the software encoder at 8 or 10 bits and the named quality levels, matches the source's tags and chroma format, passes audio through unchanged, preserves per-frame timestamps, start offset, edit list and display orientation, carries best-effort metadata where cheap, and reports encoder capabilities. Its approach is the one chosen from WP1.5.
 
@@ -324,13 +324,13 @@ WP3.16 owns the main window and defines the places where the other packages atta
 | WP3.16 | Application shell and preview | L | — | G1, G2, G9, G10; D27, D41 | V7, V8 |
 | WP3.17 | Parameter panels and presets | M | WP3.16 | G3, G6; D17 | V13 |
 | WP3.18 | Timeline and analysis | M | WP3.16 | G4, G5; D70, D72, D108 | V7, V18 |
-| WP3.19 | Batch queue, chapter review and export progress | M | WP3.16 | G7, G8, G11 | V7, V11 |
+| WP3.19 | Batch queue and export progress | M | WP3.16 | G7, G8 | V7, V11 |
 | WP3.20 | Settings | S | WP3.16 | G12, G13; D74 | — |
 
 - **WP3.16:** file open, the split-view slider, zoom including 1:1, the screen-resolution preview worker running off the interface thread, and messages for unsupported, damaged or untagged inputs.
 - **WP3.17:** Basic and Advanced panels generated from the method's parameter schema, including controls that hide by method (D49); preset save, load, rename, delete, import and export.
 - **WP3.18:** the scrubber showing proxy frames while dragging and the full-resolution frame when stopped; analysis progress and cancel; the switch from provisional to smoothed preview.
-- **WP3.19:** the batch queue, the chapter grouping review with its non-consecutive warning, export progress and cancel, and the end-of-run report. The chapter review is omitted if WP3.8 is not built.
+- **WP3.19:** the batch queue, export progress and cancel, and the end-of-run report. The chapter grouping review (G11) is deferred to v2 with WP3.8.
 - **WP3.20:** the settings listed in G12, with unavailable encoder options shown disabled with a reason.
 
 ### Phase 4 — Integration
@@ -344,7 +344,7 @@ Run in order. Each is one implementer's package, working on the main branch afte
 | WP4.3 | Application wiring | L | WP4.2, WP3.16–WP3.20 | V7, V8, V18 |
 
 - **WP4.1** replaces stubs with real components for photos, and adds a headless runner under `tools/` so acceptance tests can drive an export without the interface. The runner is a test tool, not a product feature.
-- **WP4.2** joins probe, decode, analysis, cache, render and encode, including smoothing across chapters if WP3.8 was built.
+- **WP4.2** joins probe, decode, analysis, cache, render and encode; every input file is its own clip (no cross-chapter smoothing in v1).
 - **WP4.3** connects the interface to the engines, adds start-up work (encoder and graphics-card detection, leftover cleanup), and shows the user whether CPU or GPU is in use.
 
 ### Phase 5 — Verification and release
@@ -373,7 +373,7 @@ Every acceptance test in spec §11, with where it is built and where it is run t
 |---|---|---|---|
 | V1 | Stage correctness | WP3.1–WP3.4 | WP5.1 |
 | V2 | Visual review | WP5.3 | CP5 |
-| V3 | Temporal consistency, chapter seam | WP3.11, WP4.2 | WP5.1 |
+| V3 | Temporal consistency (the chapter-seam part is deferred to v2) | WP3.11, WP4.2 | WP5.1 |
 | V4 | Video I/O fidelity | WP3.9, WP3.10, WP4.2 | WP5.1 |
 | V5 | Photo I/O fidelity | WP3.6, WP4.1 | WP5.1 |
 | V6 | Unsupported inputs | WP3.6, WP3.7 | WP5.1 |
@@ -382,7 +382,7 @@ Every acceptance test in spec §11, with where it is built and where it is run t
 | V9 | Identity round trip | WP3.4, WP4.1, WP4.2 | WP5.1 |
 | V10 | Naming and non-overwrite | WP3.13, WP4.1 | WP5.1 |
 | V11 | Cancel and failure cleanup | WP3.13, WP3.14 | WP5.1 |
-| V12 | Chapter grouping | WP3.8, WP4.2 | WP5.1 |
+| V12 | Chapter grouping -- deferred to v2 with WP3.8 | -- | -- |
 | V13 | Preset round trip | WP3.15, WP3.17 | WP5.1 |
 | V14 | Prototype gate | WP1.2–WP1.5 | WP1.6 |
 | V15 | Memory | WP3.1, WP3.14 | WP5.2 |
@@ -390,7 +390,7 @@ Every acceptance test in spec §11, with where it is built and where it is run t
 | V17 | Cache | WP3.12, WP4.2 | WP5.1 |
 | V18 | Provisional preview | WP3.11, WP3.18, WP4.3 | WP5.1 |
 
-V12 and the chapter-seam part of V3 apply only if chapter handling stays in v1.
+V12 and the chapter-seam part of V3 are deferred to v2 (CP1 2026-10-19).
 
 **Requirements with no V test of their own:**
 
@@ -508,7 +508,7 @@ The gate can change the plan. These are the branches foreseen; anything else is 
 | 6 Container | Simple approach meets the mandatory items | WP3.10 as planned | Architect |
 | 6 Container | Gaps in mandatory items | Encode-then-repair; WP3.10 grows | Architect |
 | 6 Container | Repair cannot meet them | Transplant approach; WP3.10 is re-planned as several packages | Architect, reported at CP4 |
-| Inventory | No chaptered recordings | The owner decides whether chapter handling is deferred; if so WP3.8, the chapter review in WP3.19, V12 and the seam test are removed and the spec revised | Owner |
+| Inventory | No chaptered recordings (CLOSED 2026-10-19: none among 34 GoPro files) | Owner deferred chapter handling to v2; WP3.8, the chapter review in WP3.19, V12 and the seam test removed; spec revised as v0.5.3 | Owner |
 | Environment | Python 3.12 not supported by a chosen library | Architect selects the version | Architect |
 
 ---
@@ -545,7 +545,7 @@ WP3.9 and WP3.10 may move to the second group by building against a stub of WP3.
 | Item | Closed by |
 |---|---|
 | Laptop CPU and graphics card | WP0.1, read from the machine |
-| Chapter handling in v1 | CP1, from the inventory |
+| Chapter handling in v1 | CLOSED 2026-10-19: deferred to v2 (CP1; spec v0.5.3) |
 | Photo resolution and video recording modes | WP0.2 |
 | Gain caps kept or dropped | CP3 |
 | Staged or flat statistics | WP2.1, after CP2 |
