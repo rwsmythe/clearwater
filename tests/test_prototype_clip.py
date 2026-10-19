@@ -940,6 +940,11 @@ def test_gop_start_is_the_last_i_frame_at_or_before_the_frame() -> None:
     assert clip.gop_start(["P", "B"], 1) == 0
 
 
+def test_next_anchor_is_the_first_i_or_p_frame_after_the_frame() -> None:
+    types = ["I", "B", "B", "P", "B", "B", "P", "B"]
+    assert [clip.next_anchor(types, i) for i in range(8)] == [3, 3, 3, 6, 6, 6, 7, 7]
+
+
 def test_picture_types_read_one_type_per_frame(synthetic: Path) -> None:
     types = clip.picture_types(clip.open_source(synthetic))
     assert len(types) == CLIP_FRAMES and types[0] == "I"
@@ -998,12 +1003,18 @@ def test_the_output_witness_passes_a_correct_export(
     assert record["rows"][0]["index"] == 0 and record["rows"][-1]["index"] == CLIP_FRAMES - 1
     # NVENC's GOP (250) is longer than the clip: one I-frame, so every reference starts at 0.
     assert record["rows"][0]["picture_type"] == "I"
-    assert record["rows"][0]["reference_frames"] == [0, 1]
     assert record["rows"][-1]["reference_frames"] == [0, CLIP_FRAMES - 1]
+    assert record["reference_types_match"]  # NVENC codes B-frames: the reference keeps them
+    types = clip.picture_types(output)
+    assert "B" in types
     for row in record["rows"]:
+        anchor = clip.next_anchor(types, row["index"])
+        assert row["reference_frames"] == [0, anchor]
         assert row["own_db"] >= row["ref_db"] - clip.WITNESS_MARGIN_DB
-        fields = {"own_db", "ref_db", "ref3_db", "margin_db", "neighbours_db", "picture_type"}
-        assert fields | {"first_floor_ok", "relative3_ok", "gop_start"} <= set(row)
+        assert row["own_db"] - row["ref_db"] > -0.5  # the reference reproduces the coding
+        fields = {"own_db", "ref_db", "ref_i1_db", "ref3_db", "margin_db", "neighbours_db"}
+        flags = {"first_floor_ok", "relative3_ok", "match_i1_ok", "gop_start", "picture_type"}
+        assert fields | flags | {"reference_picture_type"} <= set(row)
     assert not reference.exists()  # the reference encode is removed
 
 

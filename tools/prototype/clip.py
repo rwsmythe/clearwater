@@ -2107,6 +2107,22 @@ def gop_start(types: Sequence[str], index: int) -> int:
     return next((j for j in range(index, -1, -1) if types[j] == "I"), 0)
 
 
+def next_anchor(types: Sequence[str], index: int) -> int:
+    """Return the first I- or P-frame after ``index`` (the clip's last frame when there is none).
+
+    A B-frame is predicted from the anchor after it, so a reference encode that stops before
+    that anchor does not code the frame as the export did.
+
+    Args:
+        types: The output's picture types (:func:`picture_types`).
+        index: A frame.
+
+    Returns:
+        The anchor's index, at least ``index``.
+    """
+    return next((j for j in range(index + 1, len(types)) if types[j] in ("I", "P")), len(types) - 1)
+
+
 def output_witness(
     source: Source,
     output: Source,
@@ -2125,11 +2141,13 @@ def output_witness(
       (:func:`to_float`, ``correct(..., statistics=statistics[j])``, :func:`to_integer`): the
       EXPECTED frames;
     - the REFERENCE: the expected frames from the export's GOP start (the last I-frame at or
-      before ``i`` in the OUTPUT's picture types, :func:`picture_types`) through ``i + 1``
-      are encoded through the export's own encode chain (:func:`encode_command`, streamed in
-      chunks so that only frames ``i - 1 .. i + 1`` are held) and decoded:
-      ``ref_i = PSNR(decoded expected i, expected i)``, the encoder's own loss on frame ``i``
-      in the frame's own coding position;
+      before ``i`` in the OUTPUT's picture types, :func:`picture_types`) through the next
+      anchor after ``i`` (:func:`next_anchor`, so a B-frame keeps the future frame it is
+      predicted from) are encoded through the export's own encode chain
+      (:func:`encode_command`, streamed in chunks so that only frames ``i - 1 .. i + 1`` are
+      held) and decoded: ``ref_i = PSNR(decoded expected i, expected i)``, the encoder's own
+      loss on frame ``i`` in its own coding position. The reference's picture type at ``i`` is
+      read back and recorded beside the output's;
     - ``own_i = PSNR(output i, expected i)``.
 
     Frame ``i`` passes when ``own_i >= ref_i - margin_db``, ``own_i >=``
@@ -2139,9 +2157,10 @@ def output_witness(
     statistics fails. This covers what the in-loop witness does not: the writer, the integer
     conversion, the encoder and the muxer.
 
-    Each row also keeps the two criteria this one replaced, for the record: the first
-    absolute floor (:data:`FIRST_FLOOR_DB`) and the 3-frame reference (the expected frames of
-    :func:`reference_frames` encoded alone, which codes ``i`` next to a fresh I-frame).
+    Each row also keeps the criteria this one replaced, for the record: the first absolute
+    floor (:data:`FIRST_FLOOR_DB`), the 3-frame reference (the expected frames of
+    :func:`reference_frames` encoded alone, which codes ``i`` next to a fresh I-frame), and the
+    GOP-start reference that stops at ``i + 1`` (which can cut a B-frame off its anchor).
 
     Args:
         source: The clip that was exported.
@@ -2181,10 +2200,18 @@ def output_witness(
     try:
         for index in indices:
             (exported,), _ = decode_frames(output, index, 1)
-            first, last = gop_start(types, index), min(index + 1, count - 1)
-            keep = _gop_reference(source, first, last, index, expect, reference_path)
-            (decoded,), _ = decode_frames(open_source(reference_path), index - first, 1)
+            first = gop_start(types, index)
+            ends = [next_anchor(types, index), min(index + 1, count - 1)]
+            short_path = reference_path.with_name(
+                f"{reference_path.stem}-i1{reference_path.suffix}"
+            )
+            keep = _gop_reference(source, first, ends, index, expect, [reference_path, short_path])
+            reference = open_source(reference_path)
+            (decoded,), _ = decode_frames(reference, index - first, 1)
             ref = psnr(decoded, keep[index])
+            reference_type = picture_types(reference)[index - first]
+            (decoded_short,), _ = decode_frames(open_source(short_path), index - first, 1)
+            ref_i1 = psnr(decoded_short, keep[index])
             three = reference_frames(index, count)
             for j in [*three, index - 1]:
                 if 0 <= j < count and j not in keep:
@@ -2199,8 +2226,9 @@ def output_witness(
                 {
                     "index": index,
                     "picture_type": types[index],
+                    "reference_picture_type": reference_type,
                     "gop_start": first,
-                    "reference_frames": [first, last],
+                    "reference_frames": [first, ends[0]],
                     "own_db": own,
                     "ref_db": ref,
                     "margin_db": margin_db,
@@ -2209,6 +2237,8 @@ def output_witness(
                     "match_ok": own >= threshold,
                     "order_ok": all(own > v for v in neighbours.values()),
                     "misplaced": any(v >= own and v >= threshold for v in neighbours.values()),
+                    "ref_i1_db": ref_i1,
+                    "match_i1_ok": own >= max(ref_i1 - margin_db, WITNESS_SANITY_DB),
                     "ref3_db": ref3,
                     "relative3_ok": own >= max(ref3 - margin_db, WITNESS_SANITY_DB),
                     "first_floor_ok": own >= FIRST_FLOOR_DB,
@@ -2216,6 +2246,9 @@ def output_witness(
             )
     finally:
         reference_path.unlink(missing_ok=True)
+        reference_path.with_name(f"{reference_path.stem}-i1{reference_path.suffix}").unlink(
+            missing_ok=True
+        )
     return {
         "check": (
             "own_i = PSNR(output i, expected i), expected = correct(source i, statistics i); "
@@ -2224,7 +2257,7 @@ def output_witness(
         "reference": (
             "ref_i = PSNR(decoded expected i, expected i), the expected frames from the export's "
             "GOP start (the last I-frame at or before i in the output's picture types) through "
-            "i + 1 encoded through the export's own encode chain"
+            "the next I or P anchor after i, encoded through the export's own encode chain"
         ),
         "picture_types_from": "ffprobe -select_streams v:0 -show_entries frame=pict_type <output>",
         "margin_db": margin_db,
@@ -2241,7 +2274,13 @@ def output_witness(
                 "next to a fresh I-frame, while the export has GOP 250 with B and P frames (row "
                 "fields ref3_db, relative3_ok)"
             ),
-            "sequence": "each was replaced before the next re-scoring, by orchestrator ruling",
+            "gop_start_through_i_plus_1": (
+                "the orchestrator's ruled reference (row fields ref_i1_db, match_i1_ok); it stops "
+                "a B-frame before its future anchor; extended to the anchor after Reviewer A "
+                "(remediation round 2), which reproduced GX011627 frame 30 bit for bit"
+            ),
+            "sequence": "each was replaced before the next re-scoring; the last change is for "
+            "the orchestrator to adjudicate at the gate",
         },
         "frames_checked": len(rows),
         "rows": rows,
@@ -2250,6 +2289,10 @@ def output_witness(
         "passed": all(row["match_ok"] and row["order_ok"] for row in rows),
         "order_passed": all(row["order_ok"] and not row["misplaced"] for row in rows),
         "relative3_passed": all(row["relative3_ok"] for row in rows),
+        "i_plus_1_passed": all(row["match_i1_ok"] for row in rows),
+        "reference_types_match": all(
+            row["reference_picture_type"] == row["picture_type"] for row in rows
+        ),
         "first_floor_passed": all(row["first_floor_ok"] for row in rows),
     }
 
@@ -2261,40 +2304,49 @@ WITNESS_CHUNK = 16
 def _gop_reference(
     source: Source,
     first: int,
-    last: int,
+    ends: Sequence[int],
     index: int,
     expect: Callable[[NDArray[Any], int], NDArray[Any]],
-    path: Path,
+    paths: Sequence[Path],
 ) -> dict[int, NDArray[Any]]:
-    """Encode the expected frames ``first..last`` through the export's chain into ``path``.
+    """Encode the expected frames ``first..ends[k]`` through the export's chain into ``paths[k]``.
 
-    The frames are decoded :data:`WITNESS_CHUNK` at a time, corrected (``expect``) and written
-    to the encoder's pipe one by one; only frames ``index - 1 .. index + 1`` are kept.
+    The frames are decoded :data:`WITNESS_CHUNK` at a time, corrected once (``expect``) and
+    written to every encoder whose end has not passed; only frames ``index - 1 .. index + 1``
+    are kept.
 
     Returns:
         The kept expected frames by index.
 
     Raises:
-        ClipError: The encoder fails.
+        ClipError: An encoder fails.
     """
     keep: dict[int, NDArray[Any]] = {}
-    command = encode_command(source, path, last - first + 1)
-    encoder = _spawn(command, subprocess.DEVNULL, subprocess.PIPE, None)
+    encoders = [
+        _spawn(
+            encode_command(source, path, end - first + 1), subprocess.DEVNULL, subprocess.PIPE, None
+        )
+        for path, end in zip(paths, ends, strict=True)
+    ]
+    last = max(ends)
     try:
         for chunk in range(first, last + 1, WITNESS_CHUNK):
             frames, _ = decode_frames(source, chunk, min(WITNESS_CHUNK, last + 1 - chunk))
             for offset, frame in enumerate(frames):
                 j = chunk + offset
                 expected = expect(frame, j)
-                write_frame(encoder.stdin, expected)
+                for encoder, end in zip(encoders, ends, strict=True):
+                    if j <= end:
+                        write_frame(encoder.stdin, expected)
+                        if j == end:
+                            encoder.stdin.close()
                 if index - 1 <= j <= index + 1:
                     keep[j] = expected
-        encoder.stdin.close()
-        status = _finish(encoder, "the reference encoder")
+        statuses = [_finish(encoder, "a reference encoder") for encoder in encoders]
     finally:
-        _stop(encoder)
-    if status != 0:
-        raise ClipError(f"the reference encode failed (status {status})")
+        _stop(*encoders)
+    if any(statuses):
+        raise ClipError(f"a reference encode failed (statuses {statuses})")
     return keep
 
 
@@ -2402,6 +2454,7 @@ def run_witness(
     output = open_source(output_path)
     statistics = per_frame_statistics(analysis)
     reference = roots.check(output_path.parent / "witness-reference.mp4")
+    roots.check(output_path.parent / "witness-reference-i1.mp4")  # the through-i+1 reference
     record = output_witness(
         source,
         output,
