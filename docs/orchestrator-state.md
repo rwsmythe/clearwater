@@ -28,10 +28,16 @@
 
 ### Live cells
 
-- **None.** `wp12b-cell` (WP1.2 Part B) is RETIRED. Depth at retirement: 931,878 over 428 turns,
-  PAST-CAP (`uv run python scripts/cell_depth.py wp12b-cell`). Do not reply to it. The full
-  Part B history (stops, rulings, the depth breach) is in `docs/proofs/wp1.2b-accept.md` and
-  `git log -- docs/orchestrator-state.md`.
+- **`wp13d-cell`** (implementer-sonnet-high), WP1.3D deep look-check pack, brief
+  `docs/briefs/wp1.3d-brief.md` (`c80725b`). Dispatched 2026-10-19 22:03Z in the background.
+  Worktree `.worktrees/wp1.3d`, branch `wp1.3d`, base `c80725b` (toml copied). Agent id
+  `awp13d-cell-018989ec33c05117`. Depth readings (`uv run python scripts/cell_depth.py
+  wp13d-cell`): at dispatch 18,857 (22:03Z).
+- **Next after WP1.3D merges:** WP1.4b (implementer-opus-high), brief
+  `docs/briefs/wp1.4b-brief.md` (`c80725b`): it reads `work/wp1.3d/deep-frames.json`; it flips
+  `Params()` to c3 as its first commit, alone (re-run the WP1.2R bit-identity witness with
+  explicit methods at the gate).
+- `wp12b-cell` (WP1.2 Part B) RETIRED at 931,878 / 428 turns, PAST-CAP. Do not reply to it.
 - **Depth rule (owner catch 2026-10-19):** read `cell_depth.py <cell>` at dispatch, at every
   yield, and before sending any ruling or remediation. Record each figure with its moment. Above
   ~250K: never order a multi-finding remediation; re-seat. At ~400K: STOP and re-dispatch fresh.
