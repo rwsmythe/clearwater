@@ -781,6 +781,7 @@ def _clip_pass(args: argparse.Namespace, spools: list[tuple[OutputRoots, Path]])
                 "spool.log",
             ],
         )[:5]
+        roots.check(clip.partial_name(output))  # the export writes here, then renames
         spool_path, spool_log = (
             folder / f"{source.path.stem}.{source.pipe_format}.raw",
             folder / "spool.log",

@@ -6,6 +6,7 @@ Usage::
         [--device gpu|cpu] [--hwaccel none|cuda] [--frames N] [--out DIR]
     uv run python tools/prototype/clip.py render CLIP --statistics FILE [--neutral]
         [--device gpu|cpu] [--resident] [--frames N] [--out DIR] [--no-compare]
+    uv run python tools/prototype/clip.py witness --run RUN_RECORD [--device gpu|cpu] [--count N]
 
 ``CLIP`` is a footage stem (``GX011627``), found anywhere under the footage folder with
 :func:`local_config.find_footage_file`, or the path of a video OUTSIDE the footage folder
@@ -53,8 +54,10 @@ file, another frame count or pts list, other parameters or another decode
 every 30th decoded frame and of the last, against the record while it runs.
 
 Timing (:class:`LoopTiming`) runs from the moment the first decoded frame has been read
-from the pipe to the moment the encoding FFmpeg process has exited, that is after the
-muxer has closed the file. ``prototype.bench --mode`` records the same functions with
+from the pipe to the moment both FFmpeg processes have been reaped (the decoder's status
+collected, then the encoder's, which exits after the muxer has closed the file). The export
+writes to a temporary name beside the final one and renames it only after that, so the
+rename lies outside the bracket. ``prototype.bench --mode`` records the same functions with
 memory and ambient readings; this command line is the runner without them.
 
 Exit status 0 on success; 2, with a one-line ``error: ...`` on standard error, on a
@@ -68,11 +71,11 @@ import contextlib
 import dataclasses
 import datetime
 import json
+import math
 import queue
 import re
 import subprocess
 import sys
-import tempfile
 import threading
 import time
 from collections.abc import Callable, Mapping, Sequence
@@ -158,6 +161,26 @@ PROVISIONAL_NOTE = (
     "the default is WP2.1's decision"
 )
 
+WITNESS_FRAMES = 24
+"""Frame indices the output witness checks, spread evenly over the clip, first and last included."""
+
+WITNESS_FLOOR_BASIS = (
+    "encoder loss only; WP1.5 identity re-encode of GX011627 at the same NVENC settings: "
+    "Y 35.83 dB mean, 32.27 dB min (Y only); about 4 dB left for the RGB comparison "
+    "with 4:2:0 chroma loss; "
+    "a one-frame shift: 18.47 dB (GX011627, WP1.5) and 23.7 dB (synthetic test clip)"
+)
+"""The basis of :data:`WITNESS_FLOOR_DB`, as recorded in each witness record."""
+
+WITNESS_FLOOR_DB = 28.0
+"""The output witness's PSNR floor (8-bit RGB, whole frame) of an output frame against its
+expected frame. Basis: the export's encoder loss is the only expected difference (the frames fed
+to NVENC are the expected frames exactly). WP1.5's identity re-encode of GX011627 at the same
+NVENC settings scored Y 35.83 dB on average and 32.27 dB at worst (Y only); this floor leaves
+about 4 dB for the RGB comparison, which also carries the 4:2:0 chroma loss that Y does not.
+A one-frame misalignment scored 18.47 dB on GX011627 (WP1.5, informal) and 23.7 dB on the
+synthetic test clip."""
+
 SHOWINFO_PATTERN = re.compile(r"showinfo.*\] n:\s*(\d+)\s+pts:\s*(-?\d+)\s+pts_time:")
 """A ``showinfo`` frame line: frame number and pts (the pattern of ``lookcheck.frames``)."""
 
@@ -191,6 +214,18 @@ class PartialFrameError(PipeError):
 
 class FrameCountError(PipeError):
     """A pipe carried another number of frames than the source has."""
+
+
+class OutputWitnessError(ClipError):
+    """The output witness found an exported frame that is not the corrected source frame."""
+
+
+class OutputMismatchError(OutputWitnessError):
+    """An output frame scored below the witness floor against its expected frame."""
+
+
+class OutputOrderError(OutputWitnessError):
+    """An output frame matched a neighbour's expected frame at least as well as its own."""
 
 
 class StatisticsMismatchError(ClipError):
@@ -631,8 +666,8 @@ def decode_frames(
     The decode seeks to frame ``first`` (:func:`decode_command` with ``seek_ticks`` and
     ``showinfo``) and reads exactly ``count`` frames from the pipe; the pts that
     ``showinfo`` printed for them must equal the source's ``pts_ticks[first:first + count]``,
-    else nothing is returned. FFmpeg's standard error goes to an anonymous temporary file
-    (it is read back and deleted), so no file is written anywhere a reader could see.
+    else nothing is returned. FFmpeg's standard error is read through a pipe by a thread
+    (it holds the ``showinfo`` lines), so the decode writes no file at all.
 
     Args:
         source: The clip.
@@ -651,24 +686,26 @@ def decode_frames(
         raise ClipError(f"frames {first}..{first + count - 1} are outside {source.path.name}")
     command = decode_command(source, hwaccel, count, seek_ticks=wanted[0], showinfo=True)
     frames: list[NDArray[Any]] = []
-    decoder = reader = None
-    with tempfile.TemporaryFile() as log:
-        try:
-            decoder = _spawn(command, log, None, subprocess.PIPE)
-            # One buffer per frame, kept, and one more on which the reader meets the end.
-            reader = _Reader(source, decoder.stdout, LoopTiming(), "raw", buffers=count + 1)
-            reader.start()
-            while (item := _take(reader.ready, "the decoder")) is not _SENTINEL:
-                frames.append(item[1])
-            _join(reader, "the reader")
-            if reader.error is not None:
-                raise reader.error
-            status = _finish(decoder, "the decoder")
-        finally:
-            _stop(decoder)
-            _release(reader, None)
-        log.seek(0)
-        stderr = log.read().decode("utf-8", errors="replace")
+    decoder = reader = drain = None
+    chunks: list[bytes] = []
+    try:
+        decoder = _spawn(command, subprocess.PIPE, None, subprocess.PIPE)
+        drain = threading.Thread(target=lambda: chunks.append(decoder.stderr.read()), daemon=True)
+        drain.start()
+        # One buffer per frame, kept, and one more on which the reader meets the end.
+        reader = _Reader(source, decoder.stdout, LoopTiming(), "raw", buffers=count + 1)
+        reader.start()
+        while (item := _take(reader.ready, "the decoder")) is not _SENTINEL:
+            frames.append(item[1])
+        _join(reader, "the reader")
+        if reader.error is not None:
+            raise reader.error
+        status = _finish(decoder, "the decoder")
+        _join(drain, "the stderr reader")
+    finally:
+        _stop(decoder)
+        _release(reader, None)
+    stderr = b"".join(chunks).decode("utf-8", errors="replace")
     if status != 0:
         raise ClipError(f"the decoder failed (status {status}): {stderr.strip()[-300:]}")
     seen = [int(match.group(2)) for match in SHOWINFO_PATTERN.finditer(stderr)][:count]
@@ -742,8 +779,10 @@ def frame_buffer(source: Source) -> NDArray[Any]:
     return buffer
 
 
-def _spawn(command: Sequence[str], log: IO[bytes], stdin: int | None, stdout: int | None) -> Any:
-    """Start an FFmpeg process with standard error to ``log`` and the tool environment."""
+def _spawn(
+    command: Sequence[str], log: IO[bytes] | int, stdin: int | None, stdout: int | None
+) -> Any:
+    """Start an FFmpeg process with standard error to ``log`` (a file or ``PIPE``)."""
     try:
         return subprocess.Popen(
             list(command),
@@ -858,9 +897,12 @@ class LoopTiming:
         spawned: When the first FFmpeg process was started.
         first_frame: When the first decoded frame had been read from the pipe whole.
         last_frame: When the main loop finished its last frame.
-        closed: When the pass ended: the encoder exited (muxer closed) for a render, a
-            pass-through or an encode-only pass; the decoder exited and the last statistics
-            were computed for an analysis; the decoder exited for a decode-only pass.
+        closed: When the pass ended: for a render, a pass-through or an encode-only pass,
+            when BOTH child processes had been reaped (the decoder's exit status is collected
+            first, then the encoder's, which exits after the muxer closes the file; which one
+            exited first and the gap are not recorded); for an analysis, when the decoder had
+            been reaped and the last statistics computed; for a decode-only pass, when the
+            decoder had been reaped.
         frames: Frames processed.
         wait_input: Per frame, the main loop's wait for the next decoded frame.
         core: Per frame, the main loop's work (the correction for a render; proxy and
@@ -1467,8 +1509,9 @@ def check_statistics_record(
 
     Raises:
         StatisticsMismatchError: The schema, the source identity (name, size,
-            modification time, frame count, colour tags), the pts list, the frame count
-            analysed, the parameters, the decode choice, the analysis (STAGED, the 540-line
+            modification time, frame count, size, colour tags, time base, frame rate, bit
+            depth), the pts list, the frame count analysed, the parameters, the full decode
+            command, the decode choice, the analysis (STAGED, the 540-line
             proxy, the smoother) or the set of smoothed statistics (exactly the names the
             method's chain measures, :func:`statistic_names`) differ.
     """
@@ -1476,7 +1519,8 @@ def check_statistics_record(
     if record.get("schema") != ANALYSIS_SCHEMA:
         raise StatisticsMismatchError(f"not an analysis record: schema {record.get('schema')!r}")
     theirs, ours = dict(record.get("source") or {}), source.identity()
-    for key in ("name", "size_bytes", "mtime_ns", "frames", "width", "height", "tags"):
+    keys = ("name", "size_bytes", "mtime_ns", "frames", "width", "height", "tags")
+    for key in (*keys, "time_base", "frame_rate", "bit_depth"):
         if theirs.get(key) != ours[key]:
             raise StatisticsMismatchError(
                 f"the record was made on another file: {key} {theirs.get(key)!r} != {ours[key]!r}"
@@ -1494,6 +1538,11 @@ def check_statistics_record(
         raise StatisticsMismatchError(
             f"the record was decoded with hwaccel {dict(record.get('decode') or {}).get('hwaccel')}"
             f", the render decodes with {hwaccel}: the frames would not be the same bytes"
+        )
+    if dict(record.get("decode") or {}).get("command") != decode_command(source, hwaccel, frames):
+        raise StatisticsMismatchError(
+            "the record's decode command differs from the render's: the frames would not be "
+            "the same bytes"
         )
     if not str(record.get("analysis", "")).startswith("STAGED"):
         raise StatisticsMismatchError(f"the record's analysis is {record.get('analysis')!r}")
@@ -1809,6 +1858,18 @@ def decode_only(
     return Export(timing, command, None, status, None, 0)
 
 
+def partial_name(output: Path) -> Path:
+    """Return the temporary name an export writes before it is complete.
+
+    Args:
+        output: The final output path.
+
+    Returns:
+        ``<stem>.partial<suffix>`` in the same folder (the suffix keeps the muxer's format).
+    """
+    return output.with_name(f"{output.stem}.partial{output.suffix}")
+
+
 def _run_pipeline(
     source: Source,
     output: Path,
@@ -1827,11 +1888,52 @@ def _run_pipeline(
     (``wait_input``), runs the core and queues the result (``core``). ``last_frame`` is the
     moment the last frame was queued, so the reader's end-of-stream, the threads' ends and
     the processes' exits fall into the tail.
+
+    The encoder writes :func:`partial_name` and the file is renamed to ``output`` only when
+    the pass has succeeded (both processes exited 0, every frame written), after the bracket
+    has closed. An existing ``output`` is never overwritten, and the partial file is removed
+    on every failure.
+
+    Raises:
+        ClipError: ``output`` already exists, or the pass failed (see :func:`export`).
     """
     expected = source.frame_count if frames is None else min(frames, source.frame_count)
+    if output.exists():
+        raise ClipError(f"{output.name} already exists; an export never overwrites a file")
+    partial = partial_name(output)
+    partial.unlink(missing_ok=True)  # a leftover of a killed run, under this pass's own name
     decode = decode_command(source, hwaccel, frames)
-    encode = encode_command(source, output, frames)
+    encode = encode_command(source, partial, frames)
     timing = LoopTiming()
+    done = False
+    try:
+        result = _run_stages(
+            source, logs, decode, encode, expected, mode, core, witness, progress, spool, timing
+        )
+        if output.exists():
+            raise ClipError(f"{output.name} appeared during the export; refusing to replace it")
+        partial.rename(output)
+        done = True
+        return result
+    finally:
+        if not done:
+            partial.unlink(missing_ok=True)
+
+
+def _run_stages(
+    source: Source,
+    logs: tuple[Path, Path],
+    decode: list[str],
+    encode: list[str],
+    expected: int,
+    mode: str,
+    core: Callable[[int, NDArray[np.float32]], NDArray[np.float32]] | None,
+    witness: Mapping[int, Sequence[float]] | None,
+    progress: Callable[[int], None] | None,
+    spool: Path | None,
+    timing: LoopTiming,
+) -> Export:
+    """The stages of :func:`_run_pipeline`: spawn, run the loop, reap, check."""
     decoder = encoder = reader = writer = None
     spooled = None
     with logs[0].open("wb") as decode_log, logs[1].open("wb") as encode_log:
@@ -1909,6 +2011,194 @@ def _run_pipeline(
         writer.frames,
         reader.witnessed,
     )
+
+
+def witness_indices(count: int, wanted: int = WITNESS_FRAMES) -> list[int]:
+    """Return up to ``wanted`` frame indices spread evenly over ``count`` frames, ends included.
+
+    Args:
+        count: Frames in the clip.
+        wanted: How many indices.
+
+    Returns:
+        Sorted distinct indices, ``0`` and ``count - 1`` among them.
+    """
+    return sorted({round(float(x)) for x in np.linspace(0, count - 1, min(wanted, count))})
+
+
+def psnr(first: NDArray[Any], second: NDArray[Any]) -> float:
+    """Return the PSNR of two integer images of the same type, in dB (``inf`` when equal).
+
+    Args:
+        first: An image, ``uint8`` or ``uint16``.
+        second: The other, same shape and type.
+
+    Returns:
+        ``10 log10(maximum^2 / MSE)`` over every sample.
+    """
+    maximum = float(np.iinfo(first.dtype).max)
+    error = float(np.mean((first.astype(np.float64) - second.astype(np.float64)) ** 2))
+    return math.inf if error == 0.0 else 10.0 * math.log10(maximum * maximum / error)
+
+
+def output_witness(
+    source: Source,
+    output: Source,
+    statistics: Sequence[Statistics],
+    params: Params,
+    backend: Backend,
+    indices: Sequence[int],
+    floor_db: float = WITNESS_FLOOR_DB,
+) -> dict[str, Any]:
+    """Check exported frames against the corrected source frames, after the export (untimed).
+
+    For each index ``i``: output frame ``i`` is decoded (:func:`decode_frames`, the export's
+    own conversion to RGB); source frames ``i - 1``, ``i`` and ``i + 1`` (those that exist)
+    are decoded and corrected exactly as the export corrects them
+    (:func:`to_float`, ``correct(..., statistics=statistics[j])``, :func:`to_integer`). The
+    output frame passes when its PSNR against expected frame ``i`` is at least ``floor_db``
+    and strictly higher than against each neighbour's expected frame, so a frame that is not
+    the corrected source frame, or sits at another position, or was corrected with another
+    frame's statistics, fails. This covers what the in-loop witness does not: the writer, the
+    integer conversion, the encoder and the muxer.
+
+    Args:
+        source: The clip that was exported.
+        output: The export, opened with :func:`open_source`.
+        statistics: The per-frame statistics the export applied.
+        params: The parameters the export used.
+        backend: Where to correct.
+        indices: The frame indices to check.
+        floor_db: The PSNR floor.
+
+    Returns:
+        The record: the floor and its basis, one row per index (the PSNR against expected
+        ``i`` and against each neighbour, and the verdicts) and ``passed``.
+
+    Raises:
+        ClipError: The output's frame count differs from the statistics', or a decode fails.
+    """
+    count = len(statistics)
+    if output.frame_count != count:
+        raise ClipError(f"the output has {output.frame_count} frames, the statistics {count}")
+    scratch = np.empty((source.info.height, source.info.width, 3), np.float32)
+    rows: list[dict[str, Any]] = []
+    for index in indices:
+        around = [j for j in (index - 1, index, index + 1) if 0 <= j < count]
+        sources, _ = decode_frames(source, around[0], len(around))
+        (exported,), _ = decode_frames(output, index, 1)
+        scores: dict[int, float] = {}
+        for j, frame in zip(around, sources, strict=True):
+            image = to_float(frame, np, source.bit_depth)
+            corrected = correct(image, params, backend, statistics=statistics[j]).output
+            expected = np.empty_like(frame)
+            to_integer(np.asarray(corrected, dtype=np.float32), expected, scratch)
+            scores[j] = psnr(exported, expected)
+        own = scores[index]
+        rows.append(
+            {
+                "index": index,
+                "psnr_db": own,
+                "neighbours_db": {str(j): v for j, v in scores.items() if j != index},
+                "floor_ok": own >= floor_db,
+                "order_ok": all(own > v for j, v in scores.items() if j != index),
+                "misplaced": any(
+                    v >= own and v >= floor_db for j, v in scores.items() if j != index
+                ),
+            }
+        )
+    return {
+        "check": "output frame i against correct(source frame i, statistics i), and against i +- 1",
+        "floor_db": floor_db,
+        "floor_basis": WITNESS_FLOOR_BASIS,
+        "frames_checked": len(rows),
+        "rows": rows,
+        "min_psnr_db": min(row["psnr_db"] for row in rows),
+        "passed": all(row["floor_ok"] and row["order_ok"] for row in rows),
+    }
+
+
+def require_witness(record: Mapping[str, Any]) -> None:
+    """Raise the named error for a failed output witness record.
+
+    Args:
+        record: An :func:`output_witness` record.
+
+    A frame that matches a neighbour's expected frame at the floor or better, and at least as
+    well as its own, is MISPLACED (a frame out of order): that is reported first. A frame
+    that matches no candidate at the floor is a MISMATCH (for example corrected with other
+    statistics). A frame above the floor that still scores no better than a neighbour is an
+    order failure too.
+
+    Raises:
+        OutputOrderError: A frame is misplaced, or scores no better than a neighbour.
+        OutputMismatchError: A frame scored below the floor against its expected frame.
+    """
+    misplaced = [row["index"] for row in record["rows"] if row["misplaced"]]
+    if misplaced:
+        raise OutputOrderError(f"output frames {misplaced} match a neighbour's expected frame")
+    low = [row["index"] for row in record["rows"] if not row["floor_ok"]]
+    if low:
+        raise OutputMismatchError(
+            f"output frames {low} score below {record['floor_db']} dB against the corrected source"
+        )
+    unordered = [row["index"] for row in record["rows"] if not row["order_ok"]]
+    if unordered:
+        raise OutputOrderError(f"output frames {unordered} score no better than a neighbour")
+
+
+def run_witness(
+    run_record: Path, roots: OutputRoots, backend: Backend, wanted: int = WITNESS_FRAMES
+) -> Path:
+    """Run the output witness on an existing export and write ``output-witness.json`` beside it.
+
+    The run record (a ``bench.py --mode end-to-end`` record or a ``clip.py render`` run
+    record) names the source, the analysis record and the output. The analysis record is
+    checked against the source (:func:`check_statistics_record`) and supplies the parameters
+    and the per-frame statistics. Untimed: it runs after the export, on its file.
+
+    Args:
+        run_record: The export's run record.
+        roots: The output roots (the record is written into the output's folder).
+        backend: Where to correct.
+        wanted: How many frame indices to check.
+
+    Returns:
+        The witness record's path.
+
+    Raises:
+        ClipError: A record does not fit, or a decode fails.
+        OutputWitnessError: The witness failed (the record is written first).
+    """
+    run = json.loads(run_record.read_text(encoding="utf-8"))
+    identity = run["source"]
+    recorded = Path(identity["path"])
+    footage = roots.footage.resolve()
+    inside = footage in recorded.resolve().parents
+    source = open_source(resolve_clip(identity["stem"] if inside else str(recorded), roots.footage))
+    analysis = json.loads(Path(run["statistics"]).read_text(encoding="utf-8"))
+    params = Params(**analysis["params"])
+    hwaccel = dict(analysis.get("decode") or {}).get("hwaccel", "none")
+    check_statistics_record(analysis, source, params, hwaccel, run.get("frames_limit"))
+    output_path = Path(run["output"])
+    output = open_source(output_path)
+    statistics = per_frame_statistics(analysis)
+    record = output_witness(
+        source, output, statistics, params, backend, witness_indices(len(statistics), wanted)
+    )
+    record |= {
+        "tool": "tools/prototype/clip.py witness (untimed, after the export)",
+        "written": datetime.datetime.now().astimezone().isoformat(timespec="seconds"),
+        "run_record": str(run_record),
+        "output": str(output_path),
+        "statistics": run["statistics"],
+        "source": source.identity(),
+        "backend": backend.name,
+    }
+    path = output_path.parent / "output-witness.json"
+    roots.write_text(path, json.dumps(record, indent=1) + "\n")
+    require_witness(record)
+    return path
 
 
 def compare_output(source: Path, output: Path, folder: Path, roots: OutputRoots) -> dict[str, Any]:
@@ -2037,12 +2327,24 @@ def main(argv: Sequence[str] | None = None) -> int:
         step.add_argument("--hwaccel", choices=HWACCELS, default="none")
         step.add_argument("--frames", type=int, help="only the first N frames")
         step.add_argument("--out", type=Path, help=f"output folder inside the {WORK_SUBDIR} folder")
+    witness_step = steps.add_parser("witness", help="untimed output witness of an export")
+    witness_step.add_argument("--run", type=Path, required=True, help="the export's run record")
+    witness_step.add_argument("--device", choices=("gpu", "cpu"), default="gpu")
+    witness_step.add_argument("--count", type=int, default=WITNESS_FRAMES, help="frames to check")
     render_step = steps.choices["render"]
     render_step.add_argument("--statistics", type=Path, required=True, help="analysis record")
     render_step.add_argument("--resident", action="store_true", help="device-resident core")
     render_step.add_argument("--no-compare", action="store_true", help="skip compare.py")
     args = parser.parse_args(argv)
     try:
+        if args.step == "witness":
+            if args.count < 2:
+                raise ClipError("--count must be at least 2 (the first and the last frame)")
+            path = run_witness(
+                args.run, work_roots(args.config), select_backend(args.device), args.count
+            )
+            print(path)
+            return 0
         if args.frames is not None and args.frames < temporal.MIN_FRAMES:
             raise ClipError(f"--frames must be at least {temporal.MIN_FRAMES}")
         roots = work_roots(args.config)
@@ -2155,6 +2457,7 @@ def run_render(
     folder = roots.allowed / "render" if out is None else out
     stem = f"{source.path.stem}_corrected"
     names = [f"{stem}.mp4", f"{stem}.decode.log", f"{stem}.encode.log", f"{stem}.run.json"]
+    roots.check(partial_name(folder / names[0]))
     output, decode_log, encode_log, run_path = output_paths(roots, folder, names)
     total = len(statistics)
     result = export(
