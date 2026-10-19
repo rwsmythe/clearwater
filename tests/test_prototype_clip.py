@@ -13,6 +13,7 @@ import json
 import shutil
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 from fractions import Fraction
@@ -834,3 +835,186 @@ def test_footage_smoke_gx011628(tmp_path: Path) -> None:
     assert required and all(item.status == compare.SAME for item in required), [
         item.name for item in required if item.status != compare.SAME
     ]
+
+
+# --- remediation after Reviewer B -------------------------------------------------------------
+
+
+def _python_writer(code: str) -> Any:
+    """An encode-command stand-in: a Python process given the output path as its last argument."""
+    return lambda source, output, frames=None: [sys.executable, "-c", code, str(output)]
+
+
+@pytest.mark.parametrize("failure", ["core", "encoder"])
+def test_a_failed_export_leaves_no_partial_and_no_final(
+    failure: str, synthetic: Path, roots: OutputRoots, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = clip.open_source(synthetic)
+    if failure == "core":
+
+        def broken(*args: Any, **kwargs: Any) -> Any:
+            raise RuntimeError("planted core failure")
+
+        monkeypatch.setattr(clip, "correct", broken)
+        expected: type[BaseException] = RuntimeError
+    else:
+        code = (
+            "import sys\nopen(sys.argv[-1], 'wb').write(b'partial')\n"
+            "sys.stdin.buffer.read()\nsys.exit(3)"
+        )
+        monkeypatch.setattr(clip, "encode_command", _python_writer(code))
+        expected = clip.ClipError
+    folder = roots.allowed / f"failed-{failure}"
+    output, *logs = clip.output_paths(roots, folder, ["s_corrected.mp4", "d.log", "e.log"])
+    with pytest.raises(expected):
+        clip.export(source, output, Params(), None, select_backend("cpu"), (logs[0], logs[1]))
+    assert not output.exists()
+    assert not clip.partial_name(output).exists()
+
+
+@pytest.mark.parametrize("failure", ["core", "encoder"])
+def test_an_export_never_overwrites_an_existing_final_file(
+    failure: str, synthetic: Path, roots: OutputRoots, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = clip.open_source(synthetic)
+    if failure == "core":
+        monkeypatch.setattr(clip, "correct", lambda *a, **k: (_ for _ in ()).throw(RuntimeError()))
+    else:
+        monkeypatch.setattr(clip, "encode_command", _python_writer("import sys; sys.exit(3)"))
+    folder = roots.allowed / f"prior-{failure}"
+    output, *logs = clip.output_paths(roots, folder, ["s_corrected.mp4", "d.log", "e.log"])
+    output.write_bytes(b"a prior good export")
+    with pytest.raises(clip.ClipError, match="already exists"):
+        clip.export(source, output, Params(), None, select_backend("cpu"), (logs[0], logs[1]))
+    assert output.read_bytes() == b"a prior good export"
+    assert not clip.partial_name(output).exists()
+
+
+@pytest.mark.parametrize(
+    ("key", "value"),
+    [("time_base", "1/60000"), ("frame_rate", "25/1"), ("bit_depth", 10)],
+)
+def test_a_record_with_another_time_base_rate_or_depth_is_refused(
+    key: str, value: Any, synthetic: Path, neutral_analysis: Path
+) -> None:
+    record = json.loads(neutral_analysis.read_text(encoding="utf-8"))
+    neutral = clip.make_params("ancuti2018", neutral=True)
+    record["source"][key] = value
+    with pytest.raises(clip.StatisticsMismatchError, match=f"another file: {key}"):
+        clip.check_statistics_record(record, clip.open_source(synthetic), neutral, "none", None)
+
+
+def test_a_record_with_another_decode_command_is_refused(
+    synthetic: Path, neutral_analysis: Path
+) -> None:
+    record = json.loads(neutral_analysis.read_text(encoding="utf-8"))
+    neutral = clip.make_params("ancuti2018", neutral=True)
+    command = list(record["decode"]["command"])
+    command[command.index("-vf") + 1] += ",null"  # any change to the decode
+    record["decode"]["command"] = command
+    with pytest.raises(clip.StatisticsMismatchError, match="decode command differs"):
+        clip.check_statistics_record(record, clip.open_source(synthetic), neutral, "none", None)
+
+
+def test_decode_frames_writes_no_temporary_file(
+    synthetic: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def refuse(*args: Any, **kwargs: Any) -> Any:
+        raise AssertionError("decode_frames must not create a temporary file")
+
+    monkeypatch.setattr(tempfile, "TemporaryFile", refuse)
+    monkeypatch.setattr(tempfile, "NamedTemporaryFile", refuse)
+    frames, _ = clip.decode_frames(clip.open_source(synthetic), 10, 3)
+    assert len(frames) == 3
+
+
+def test_witness_indices_span_the_clip() -> None:
+    assert clip.witness_indices(681)[:2] == [0, 30] and clip.witness_indices(681)[-1] == 680
+    assert len(clip.witness_indices(681)) == clip.WITNESS_FRAMES
+    assert clip.witness_indices(5) == [0, 1, 2, 3, 4]
+
+
+@pytest.fixture(scope="module")
+def planted_statistics(synthetic: Path, roots: OutputRoots) -> list[Any]:
+    """Default-parameter statistics of the synthetic clip with white-balance gains that differ
+    strongly per frame (R rises from 0.7 to 1.5 over the clip, B falls), so a frame corrected with
+    another frame's statistics differs visibly. (Planted N{} bounds alone moved the output by only
+    about 3 dB for a 30-frame shift on this clip.)"""
+    source = clip.open_source(synthetic)
+    record = json.loads(
+        clip.run_analyse(
+            source, Params(), GPU, roots, roots.allowed / "planted", "none", None
+        ).read_text(encoding="utf-8")
+    )
+    smoothed = record["smoothed"]
+    for index in range(CLIP_FRAMES):
+        step = 0.8 * index / CLIP_FRAMES  # far apart: frame i and i +- 30 differ by 0.4
+        smoothed["white_balance_gains.R"][index] = 0.7 + step
+        smoothed["white_balance_gains.B"][index] = 1.5 - step
+    return clip.per_frame_statistics(record)
+
+
+@pytest.fixture(scope="module")
+def planted_export(synthetic: Path, roots: OutputRoots, planted_statistics: list[Any]) -> Path:
+    """The synthetic clip exported at the defaults with the planted per-frame statistics."""
+    folder = roots.allowed / "witness-export"
+    output, *logs = clip.output_paths(roots, folder, ["s_corrected.mp4", "d.log", "e.log"])
+    clip.export(
+        clip.open_source(synthetic), output, Params(), planted_statistics, GPU, (logs[0], logs[1])
+    )
+    return output
+
+
+@pytest.mark.gpu
+@requires_gpu
+def test_the_output_witness_passes_a_correct_export(
+    synthetic: Path, planted_export: Path, planted_statistics: list[Any]
+) -> None:
+    source, output = clip.open_source(synthetic), clip.open_source(planted_export)
+    indices = clip.witness_indices(CLIP_FRAMES, 8)
+    record = clip.output_witness(source, output, planted_statistics, Params(), GPU, indices)
+    clip.require_witness(record)
+    assert record["passed"] and record["frames_checked"] == 8
+    assert record["rows"][0]["index"] == 0 and record["rows"][-1]["index"] == CLIP_FRAMES - 1
+    assert record["min_psnr_db"] >= clip.WITNESS_FLOOR_DB
+
+
+@pytest.mark.gpu
+@requires_gpu
+def test_the_output_witness_catches_a_frame_swap_by_name(
+    synthetic: Path, roots: OutputRoots, planted_export: Path, planted_statistics: list[Any]
+) -> None:
+    swapped = _ffmpeg(
+        roots.allowed / "witness-export" / "swapped.mp4",
+        "-i",
+        str(planted_export),
+        "-vf",
+        "shuffleframes=1 0",  # planted: every pair of frames swapped
+        "-c:v",
+        "libx265",
+        "-x265-params",
+        "log-level=error:lossless=1",
+        "-pix_fmt",
+        "yuvj420p",
+        "-color_range",
+        "pc",
+        "-colorspace",
+        "bt709",
+        "-an",
+    )
+    source, output = clip.open_source(synthetic), clip.open_source(swapped)
+    record = clip.output_witness(source, output, planted_statistics, Params(), GPU, [10, 20])
+    with pytest.raises(clip.OutputOrderError):
+        clip.require_witness(record)
+
+
+@pytest.mark.gpu
+@requires_gpu
+def test_the_output_witness_catches_a_wrong_statistics_index_by_name(
+    synthetic: Path, planted_export: Path, planted_statistics: list[Any]
+) -> None:
+    shifted = planted_statistics[30:] + planted_statistics[:30]  # planted: index off by 30
+    source, output = clip.open_source(synthetic), clip.open_source(planted_export)
+    record = clip.output_witness(source, output, shifted, Params(), GPU, [5, 10, 15])
+    with pytest.raises(clip.OutputMismatchError):
+        clip.require_witness(record)
