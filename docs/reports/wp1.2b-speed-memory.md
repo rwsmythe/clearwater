@@ -36,7 +36,7 @@ max), not discarded. Gate 1 (N6) and Gate 2 (N4) are CHARC's at WP1.6, with this
 | Peak RAM, GX011625 export (the process tree, FFmpeg included) | 3,682 MiB (Python alone 1,996) | N4 16 GB |
 | Peak graphics memory, GX011625 export (device-wide, NVENC included) | 2,860 MiB (CuPy pool 1,709) | 8,188 MiB |
 | Container of every export | MANDATORY and REQUIRED all SAME (`compare.py`) | WP1.5 |
-| Output witness (untimed, after the exports): 24 frames per export against `correct(source i, statistics i)` | order correct on all 48 frames; GOP-start rule: GX011625 24 of 24, GX011627 23 of 24 (frame 503 at -3.35 dB); section 6 | -- |
+| Output witness (untimed, after the exports): 24 frames per export against `correct(source i, statistics i)` | order correct on all 48 frames; adopted rule: GX011625 24 of 24, GX011627 23 of 24 (frame 503 at -3.35 dB); section 6 | -- |
 | Largest photo (claim 5, second half) | PENDING: no photo in the inventory | D102 |
 
 N6 is not met at 4K on this laptop under these conditions. That holds for the production-shaped
@@ -204,8 +204,16 @@ stray checks. Spread = min / median / max over the four W1 attempts. Records:
 | 1080p60 | GPU | c3 | 60 | 0.1267 / 0.1416 / -1.8 % (strays); 0.1157 / 0.1267 / 0.1562 | 0.1223 / 0.1257 / 0.1820 | 0.1223 | -- | 2.3x of 0.0551 |
 | 1080p60 | CPU | ancuti2018 | 10 | 2.489 / 4.455 (strays); 2.366 / 2.489 / 4.541 | 1.956 / 2.263 / 5.480 | 2.037, 1.956 | -- | 45x of 0.0551 |
 
-Device-resident (supplementary, same frames, W1c): 4K ancuti2018 0.2755 s, 4K c3 0.5135 s,
-1080p ancuti2018 0.0605 s, 1080p c3 0.1231 s. Memory per 4K GPU run: CuPy pool reserved 1,712 MiB
+Device-resident (supplementary, same frames, W1c, contaminated window; median, with per frame
+min / median / max from the record):
+
+| Mode | Method | Median | Per frame min / median / max |
+|---|---|---|---|
+| 4K | ancuti2018 | 0.2755 s | 0.2690 / 0.2755 / 0.2878 |
+| 4K | c3 | 0.5135 s | 0.4871 / 0.5135 / 1.4159 |
+| 1080p | ancuti2018 | 0.0605 s | 0.0582 / 0.0605 / 0.0686 |
+| 1080p | c3 | 0.1231 s | 0.1040 / 0.1231 / 0.2130 |
+ Memory per 4K GPU run: CuPy pool reserved 1,712 MiB
 (used 1,585), estimate 1,982 MiB (1.16x), Python RSS 3.0 GiB, of which 1.4 GiB is the 60 held
 frames. At the end of the GPU loops the card ran at 1,500-2,475 MHz SM, P0, 34-67 W, with reasons
 0x00 or 0x04 (power cap).
@@ -294,46 +302,71 @@ For 24 frame indices spread over each clip, the first and last included, the wit
 It covers what the in-loop witness does not: the writer, the integer conversion, the encoder and
 the muxer.
 
-The pass criterion, and how it was reached, stated plainly:
-1. The first criterion was an absolute 28 dB floor, from WP1.5's identity re-encode of GX011627
-   (Y 32.27 dB at worst).
+The pass criterion, and how it was reached, stated plainly. Each step replaced the previous one
+BEFORE the next re-scoring.
+1. **Absolute 28 dB floor**, from WP1.5's identity re-encode of GX011627 (Y 32.27 dB at worst).
    - It failed GX011627 frame 30 at 27.79 dB.
    - A reproduction showed the encoder's own loss on that frame, encoding the expected frames
-     alone through the export's chain, is 28.76 dB
-     (`work/wp1.2b/remediation/frame30_repro.json`).
-   - The orchestrator replaced the criterion BEFORE re-scoring.
-2. The second criterion was relative per frame: own_i >= ref_i - 2.0 dB, with ref_i from the
-   expected frames i-1, i, i+1 encoded alone.
-   - It failed 18 of 24 frames on GX011627 and 13 of 24 on GX011625.
-   - Order was correct on every row.
-   - That reference was unrepresentative: the export has a 250-frame GOP (I-frames at 0, 250, 500
-     on GX011627) with B and P frames, and the 3-frame reference codes frame i next to a fresh
+     alone through the export's chain, is 28.76 dB (`work/wp1.2b/remediation/frame30_repro.json`).
+   - Replaced by orchestrator ruling.
+2. **Relative to a 3-frame reference**: own_i >= ref_i - 2.0 dB, with ref_i from the expected
+   frames i-1, i, i+1 encoded alone.
+   - It failed 18 of 24 frames on GX011627 and 13 of 24 on GX011625, with the order correct on
+     every row.
+   - The reference was unrepresentative: the export has a 250-frame GOP (I-frames at 0, 250,
+     500 on GX011627) with B and P frames, and the 3-frame reference codes i next to a fresh
      I-frame (`remediation/gx011627-out-pict-types.txt`, `gop_reference_repro.json`).
-   - The orchestrator replaced the reference BEFORE re-scoring.
-3. ADOPTED: ref_i from a GOP-start reference.
-   - The expected frames from the export's GOP start (the last I-frame at or before i, from the
-     OUTPUT's picture types read with ffprobe) through i+1 are encoded through the export's own
-     encode chain, then decoded; ref_i = PSNR(decoded expected i, expected i).
-   - Pass: own_i >= ref_i - 2.0 dB and own_i >= 20 dB (a sanity floor), and own_i strictly
-     above its PSNR against the expected frames i-1 and i+1 (order).
+   - Replaced by orchestrator ruling.
+3. **GOP-start reference through i + 1** (the orchestrator's ruling): the expected frames from
+   the export's GOP start (the last I-frame at or before i, read from the OUTPUT's picture types
+   with ffprobe) through i+1, encoded through the export's own chain.
+   - Results: GX011627 23 of 24 (frame 503 at -3.35 dB); GX011625 24 of 24.
+   - Reviewer A (remediation round 2) showed the reference can stop a B-frame before the
+     future anchor it is predicted from (12 of GX011627's 24 rows).
+4. **ADOPTED: the GOP-start reference through the next I/P anchor after i.** It was extended
+   after Reviewer A; the orchestrator adjudicates this extension at the gate.
+   - Reproduction (`remediation/anchor_reference_repro.json`): with the reference through frame
+     32, GX011627's frame 30 in the reference is bit-identical to the export's (PSNR infinite).
+     Through frame 31 it was 0.30 dB away.
+   - The rule is unchanged: own_i >= ref_i - 2.0 dB, own_i >= 20 dB, and own_i strictly above
+     its PSNR against the expected frames i-1 and i+1.
+   - The reference's picture type at i is read back and matches the output's on every row.
    - The planted controls fail by name under it: a frame swap raises `OutputOrderError`; a
      30-frame statistics shift raises `OutputMismatchError`.
 
-Each row of the records keeps all three verdicts (`first_floor_ok`, `relative3_ok`, `match_ok`
-with `ref_db`), so nothing is hidden. The first two records are kept too, as
-`output-witness-first-criterion-28dB.json` and `output-witness-relative-3frame-reference.json`.
+Each row of `output-witness.json` keeps every verdict:
 
-| Export | Frames | Order (strict) | GOP-start rule | own - ref (min .. max) | own_i | best neighbour | 28 dB criterion | 3-frame criterion |
+| Criterion | Row fields |
+|---|---|
+| 1 | `first_floor_ok` |
+| 2 | `ref3_db`, `relative3_ok` |
+| 3 | `ref_i1_db`, `match_i1_ok` |
+| 4 | `ref_db`, `match_ok` |
+
+The earlier records are kept too: `output-witness-first-criterion-28dB.json`,
+`output-witness-relative-3frame-reference.json` and `output-witness-gop-start-through-i1.json`.
+
+| Export | Frames | Order (strict) | Adopted rule (4) | own - ref | Reference = export bit for bit | own_i | Best neighbour | Rules 1 / 2 / 3 |
 |---|---|---|---|---|---|---|---|---|
-| GX011627 (W4 production) | 24 | all correct | 23 of 24; frame 503 (a B-frame 3 after the I-frame at 500) at 35.39 dB against ref 38.74 (-3.35 dB) | -3.35 .. +0.05 dB | 27.79-39.67 dB | 28.3 dB (frame 680) | fails frame 30 | fails 18 |
-| GX011625 (W5) | 24 | all correct | **24 of 24** | -1.73 .. +0.31 dB | 29.67-42.68 dB | 34.2 dB | passes | fails 13 |
+| GX011627 (W4 production) | 24 | all correct | 23 of 24 (frame 503 at -3.35 dB) | -3.35 .. +0.06 dB | 9 rows: every checked frame of the first GOP (0-249) | 27.79-39.67 dB | 28.3 dB | fails frame 30 / fails 18 / 23 of 24 |
+| GX011625 (W5) | 24 | all correct | **24 of 24** | -0.77 .. +0.42 dB | 1 row (frame 0) | 29.67-42.68 dB | 34.2 dB | passes / fails 13 / 24 of 24 |
 
-GX011627 frame 503 is reported as measured, as the orchestrator ruled (no further stop on a
-witness frame with the order correct). The frame is in its right place (own 35.39 dB against
-22.3 dB for its best neighbour) and corrected with its own statistics. It scores 3.35 dB below a
-reference that encoded only frames 500-504 from a fresh start. That reference's encoder history
-differs from the export's, which had coded 500 frames before. That cause is a HYPOTHESIS, not
-established here.
+**GX011627 frame 503** is reported as measured, as the orchestrator ruled (no further stop on a
+witness frame with the order correct). What the record establishes:
+- its relative match FAILS: own 35.39 dB against a reference 38.74 dB;
+- it scores closest to its own-index expected frame among the checked neighbours (22.3 dB
+  against the best neighbour).
+
+It does not establish that the frame was corrected with its own statistics. The reference starts
+the encoder fresh at the GOP's I-frame (500), while the export's encoder had coded 500 frames
+before. In the first GOP, where both start fresh, the reference reproduced the export bit for
+bit; in later GOPs it was within 0.14 dB on 13 of 15 checked frames (all but 266 and 503). A cross-GOP encoder state
+(rate control) is therefore the likely cause. That is a HYPOTHESIS, not established here.
+
+The first witness runner logged "exit 0" for every run, because `$?` was read after a command
+substitution. The witness records themselves hold the true verdicts. The re-score runner logs
+the real status (`witness_both_2.log`: GX011627 exit 2, the frame-503 `OutputMismatchError`;
+GX011625 exit 0).
 
 ## 7. Claim 4 -- analysis speed (spec 7.2 decode pass + staged statistics)
 
@@ -434,7 +467,7 @@ From the split and the rows above. These are CHARC's options for Gate 1; none wa
 
 | # | Candidate | Targets | Cost / benefit estimate |
 |---|---|---|---|
-| 1 | Device-resident pipeline (copy back the output only) | the core's 15 D2H copies | Low cost (`correct()` returns device arrays; the render copies `output`). Measured -26 % end to end on GX011627 (0.4856 -> 0.3576 s/frame), -30 % on the core (0.3948 -> 0.2755). |
+| 1 | Device-resident pipeline (copy back the output only) | the core's 15 D2H copies | Low cost (`correct()` returns device arrays; the render copies `output`). Measured, in contaminated windows: -26 % end to end on GX011627 (0.4856 -> 0.3576 s/frame, W4) and -30 % on the core (0.3948 -> 0.2755 s, W1c; per frame 0.2690 / 0.2755 / 0.2878). |
 | 2 | Fewer intermediates materialised (no `Result` of 28 planes in the render) | allocations and copies inside the core | Moderate (a render-only path through the same functions, D107 keeps one code path). Bounded by #1's gain plus pool traffic; about 0.1 s/frame. |
 | 3 | 3C large Gaussian by FFT or a recursive (IIR) filter | c3's sigma-108 Gaussian, 865 taps per axis | Moderate (numerical agreement to re-verify, D107/V-tests). c3 minus ancuti2018 is 0.24 s/frame at 4K (0.639 vs 0.395); most of it is this filter (Part A: about 97 ms per channel). |
 | 4 | Pyramid memory (release the last input's pyramids during the collapse) | 13 1/3 of the 50 1/12 peak planes | Low. Memory only (up to -27 % of the peak, 1.7 -> 1.25 GiB at 4K); no speed. Matters for 5.3K and photos, not N6. |
@@ -449,8 +482,8 @@ ESTIMATE, not a measured combination. The candidates do not add:
 
 | Method | Measured, device-resident (#1) | Estimate with #5 on top | Estimate with #3 | N6 |
 |---|---|---|---|---|
-| ancuti2018 | 0.2755 s (W1c) | at most the part of 0.2755 that is copies (#5 hides what #1 did not remove: the input upload and the output download, about 0.02-0.03 s at PCIe 4.0 speeds); so about 0.25 s | -- | 0.1101 s; about 2.3x |
-| c3 | 0.5135 s | about 0.49 s | minus up to 0.24 s, about 0.25-0.29 s | about 2.3-2.6x |
+| ancuti2018 | 0.2755 s (W1c, contaminated; per frame 0.269-0.288) | at most the part of 0.2755 that is copies (#5 hides what #1 did not remove: the input upload and the output download, about 0.02-0.03 s at PCIe 4.0 speeds); so about 0.25 s | -- | 0.1101 s; about 2.3x |
+| c3 | 0.5135 s (W1c, contaminated; per frame 0.487-1.416) | about 0.49 s | minus up to 0.24 s, about 0.25-0.29 s | about 2.3-2.6x |
 
 Confirming them needs the changes themselves (WP2.1/WP3.1). Either way, N6 at 4K needs the
 Gate 1 options or a change to N6 (owner-reserved).

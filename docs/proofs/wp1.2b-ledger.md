@@ -433,3 +433,51 @@ c2bbde1c4f083688e1d66e301b44f750 remediation/per_frame_spread.md
 94f6bac296f7379f942719922d07596a remediation/per_frame_spread.py
 da6f116c9831d624afb9789e480f18eb remediation/witness_both.sh
 ```
+
+### Remediation Reviewer A
+
+**Round 1** (head `8dced82`, diff 1542 lines):
+- Assertions: banner ok; `^ERROR` 1, classified as a Codex TRANSPORT line ("ERROR: Reconnecting...
+  2/5"); `ERROR codex_core` 0; footer 1; succeeded 31. VERDICT NO_NEW_CRITICAL_MAJOR.
+- The round does NOT COUNT (a transport line disqualifies it); its 5 minors are fixed (`32a5088`,
+  `ebe6ee1`): the bracket string, the sampler wording, the analysis table's per-frame column, a
+  table cell, and the test count.
+
+**Round 2** (head `ebe6ee1`): assertions clean (`^ERROR` 0, `ERROR codex_core` 0, footer 1,
+succeeded 31); VERDICT NEW_CRITICAL_MAJOR_FOUND. Findings: 1 major, 3 minor in envelope, 2 minor
+out of envelope.
+
+| # | Severity | Finding | Verdict and fix |
+|---|---|---|---|
+| R2-1 | major | the through-i+1 reference stops a B-frame before its future anchor | VALID; reproduced (`remediation/anchor_reference_repro.json`): through the anchor, GX011627 frame 30's reference is bit-identical to the export (PSNR infinite). Fixed `8ef0c40`: the reference runs through the next I/P anchor; thresholds unchanged; each row keeps the ruled through-i+1 verdict; the reference's picture type is recorded. **This extends the orchestrator's ruled reference; it is flagged for the gate.** |
+| R2-2 | minor | device-resident figures without spreads | VALID; the spread script covers `device_resident`; spreads and contaminated labels added to the report |
+| R2-3 | minor | frame 503 "corrected with its own statistics" overstated | VALID; reworded |
+| R2-4 | minor | `witness_both.sh` logged false "exit 0" | VALID; the second runner logs the true status; the report says so |
+| R2-5 | minor, OUT | synthetic bench `--out` free | BANKED (R2-3 of the first loop, `fedb8c9`) |
+| R2-6 | minor, OUT | POSIX race between `exists()` and `rename()` | BANKED: Windows refuses an existing destination (the envelope); an atomic no-replace is for the product's export (WP3.10) |
+
+**Re-score with the anchor reference** (`remediation/witness_both_2.sh`, 06:20-09:43 HST,
+untimed, nothing timed alongside):
+
+| Export | Order | Adopted rule | own - ref | Reference = export bit for bit |
+|---|---|---|---|---|
+| GX011627 | 24 of 24 | 23 of 24; frame 503 -3.35 dB (recorded as measured) | -3.35 .. +0.06 dB | 9 rows, all of GOP 0 |
+| GX011625 | 24 of 24 | **24 of 24** | -0.77 .. +0.42 dB | -- |
+
+Reference types match on all 48 rows.
+
+md5s:
+```
+7919acebd02d218b0e8cb6ef8d76eebf bench/W4/GX011627-end-to-end-ancuti2018-20261018-223431/output-witness.json
+c5a09dd35f13f829e39fa6f6870cd239 bench/W4/GX011627-end-to-end-ancuti2018-20261018-223431/output-witness-gop-start-through-i1.json
+9dcd914708071c4910bab6a47b9102c7 bench/W4/GX011627-end-to-end-ancuti2018-20261018-223431/output-witness-relative-3frame-reference.json
+2bc525e5ab41c91fb455c44bc211c2a1 bench/W4/GX011627-end-to-end-ancuti2018-20261018-223431/output-witness-first-criterion-28dB.json
+e9a860f59e88d25855b47043d466d033 bench/GX011625-end-to-end-ancuti2018-20261018-231103/output-witness.json
+b7b82c539f4ac376132498e8904efae0 bench/GX011625-end-to-end-ancuti2018-20261018-231103/output-witness-gop-start-through-i1.json
+1ec0f82ceaf5a4887c76f8a4fee92141 bench/GX011625-end-to-end-ancuti2018-20261018-231103/output-witness-relative-3frame-reference.json
+c131f6cdc0f68d5f3f9709a299cdee54 bench/GX011625-end-to-end-ancuti2018-20261018-231103/output-witness-first-criterion-28dB.json
+24a476af31f7e21adf0e780253431b72 remediation/anchor_reference_repro.json
+d8052f0067f5d5e5baecd444e7875475 remediation/per_frame_spread.json
+ab6416158da6661ef2eac6306434f2c6 remediation/per_frame_spread.py
+c05294da32fa56df6847f5a49b459bf1 remediation/witness_both_2.log
+```
