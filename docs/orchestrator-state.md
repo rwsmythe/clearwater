@@ -29,6 +29,10 @@
   (toml copied). Agent id `awp12b-cell-3670d11b1750f84c`. Depth at dispatch: fresh. While it
   is live: no harness gate, pytest or Codex at this seat. If this generation rolls first, the
   successor re-dispatches from the branch head, the ledger and the brief.
+  AMENDED 01:35Z by SendMessage (CHARC `d40217a81696cc03`): long clip GX011625, not GX011600;
+  4 h cap per window. Check the return acknowledges it (a message may land only after return).
+- **CP2 in progress at CHARC's seat** (owner, step 2 of 5): early signal, both Ancuti variants
+  push too much red, c3 preferred. Input to the method default (14.1) and WP1.6; not Part B.
 
 ### Handoff -- the successor starts HERE
 
@@ -62,7 +66,7 @@ Each accepted package had its return report posted to CHARC and an info-update t
 | WP1.3 | 2026-10-15 | `7178540` | `docs/proofs/wp1.3-accept.md` (`bc97a19`); 2nd B adjudicated at the gate; DR-20, DR-21 | CONFIRMED (`09057ee4b3979fa4`) |
 | WP-T1 | 2026-10-15 | `f6a34a4` | `docs/proofs/wp-t1-accept.md` (`3f40a85`); 2nd B adjudicated at the gate; DR-9 and DR-21 closed, DR-22 opened | CONFIRMED (`3501648bc8844468`) |
 | WP1.4 | 2026-10-19 | `91f5775` | `docs/proofs/wp1.4-accept.md`; 2nd B adjudicated at the gate; DR-23..DR-26 | CONFIRMED (`6c5d88685e64a37c`; finding 3 upheld; DR-26 stays banked) |
-| WP-T2 | 2026-10-19 | `8c9d780` | `docs/proofs/wp-t2-accept.md`; DR-24 closed, DR-27 | pending |
+| WP-T2 | 2026-10-19 | `8c9d780` | `docs/proofs/wp-t2-accept.md`; DR-24 closed, DR-27 | CONFIRMED (`d40217a81696cc03`; B rejection upheld; suite re-run deferred past Part B) |
 
 - **WP1.2 Part A, raised to CHARC:**
   - approval of the Windows-only `_windows_power()` in `bench.py` (instrument only, guarded);

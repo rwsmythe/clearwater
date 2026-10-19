@@ -58,11 +58,12 @@ owner if the target is missed (plan section 10). The `.LRV` leg is gone (D60 clo
    DR-25(3), the default is WP2.1's decision; quote it so) applied from a prior analysis
    pass (so the
    loop is the product's render pass: decode → render with supplied statistics → encode):
-   chapter `GX011627` (`Snorkel/`, 681 frames, 22.7 s) and the LARGEST clip of the
-   inventory, `GX011600` (`SCUBA/`, 8.88 GB, 1046.5 s, about 31,360 frames; CHARC CP1 note:
-   the 2026-10-15 "largest" assumptions are superseded by the CSV), each timed from the
-   first decoded frame to the muxer's close. Before the `GX011600` window opens, record its
-   estimated length (claim 2's per-frame figure x frames) in the ledger and the return; report seconds per frame and
+   chapter `GX011627` (`Snorkel/`, 681 frames, 22.7 s) and chapter `GX011625` (`Snorkel/`,
+   about 14,938 frames, 498 s), each timed from the first decoded frame to the muxer's
+   close (AMENDED 2026-10-19, CHARC `d40217a81696cc03`: a full clip, not the largest file;
+   per-frame speed and memory are per-frame quantities of a streaming pipeline, so
+   `GX011600` adds no decision information and appears at most in claim 2's decode-mode
+   checks). `GX011625` also carries claim 4, one clip for both legs, said so in the report; report seconds per frame and
    minutes of processing per minute of footage against 3.3. Then the SPLIT on `GX011627`:
    decode-only pass-through (decode to the pipe, discard), encode-only (feed the decoded
    frames unchanged), and the core alone (claim 2), so the report shows where the time goes.
@@ -77,7 +78,7 @@ owner if the target is missed (plan section 10). The `.LRV` leg is gone (D60 clo
    number; CHARC judges acceptability at WP1.6).
 5. **Memory (N4, V15).** Peak RSS and peak graphics memory during claim 3 on the largest
    video mode in the inventory (4K 29.97 HEVC: no 5.3K exists, say so), during the
-   `GX011600` run;
+   `GX011625` run;
    and on the largest photo in the inventory through `run.py --device gpu`: the
    `memory_estimate_bytes` figure, the measured peak, whether the estimate exceeded the
    card's free memory, and whether the CPU fallback engaged (if it did not, force it once with
@@ -104,6 +105,9 @@ owner if the target is missed (plan section 10). The `.LRV` leg is gone (D60 clo
   tag and timestamp flags → mux with audio and data copied. Frame timestamps are carried by
   the decode order (CFR on these clips; a VFR clip gets `-fps_mode passthrough` and a
   per-frame pts list, stated). Bounded buffering: at most 2 frames in flight each side.
+- **4-hour cap per exclusive window (CHARC `d40217a81696cc03`):** before opening ANY timed
+  window, record its estimate in the ledger; if one run's estimate exceeds 4 hours, STOP and
+  report instead of opening it.
 - **Smoothing is applied, not computed, in the timed export loop:** the analysis pass is
   timed separately (claim 4), as the product separates them (7.2).
 - **Exclusivity and ambient record** as WP1.2A: power scheme and overlay, GPU state at loop
