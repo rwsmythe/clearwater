@@ -31,8 +31,12 @@
   successor re-dispatches from the branch head, the ledger and the brief.
   AMENDED 01:35Z by SendMessage (CHARC `d40217a81696cc03`): long clip GX011625, not GX011600;
   4 h cap per window. Check the return acknowledges it (a message may land only after return).
-- **CP2 in progress at CHARC's seat** (owner, step 2 of 5): early signal, both Ancuti variants
-  push too much red, c3 preferred. Input to the method default (14.1) and WP1.6; not Part B.
+- **Shallow CP2 COMPLETE** (owner 2026-10-19, CHARC `3bac4a724b1420aa`, record
+  `docs/proofs/cp2-look-check.md`): c3 default (both Ancuti variants over-red; kept as options);
+  no cast, halo, noise, clipping or flicker; staged vs flat no visible difference. Briefs cite
+  "c3 default per CP2 2026-10-19, spec revision pending"; prototype `Params()` default stays
+  ancuti2018 (not changed inside Part B). WP1.4b and the WP1.3 deep part render c3 primary with
+  ancuti2018 beside it. WP1.6: method-default row c3; row 5 input in.
 
 ### Handoff -- the successor starts HERE
 
