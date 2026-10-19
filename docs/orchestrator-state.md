@@ -28,94 +28,16 @@
 
 ### Live cells
 
-- **`wp12b-cell`** (implementer-opus-high), WP1.2 Part B, EXCLUSIVE, dispatched 2026-10-19
-  ~01:35Z in the background. Worktree `.worktrees/wp1.2b`, branch `wp1.2b`, base `f7e4cac`
-  (toml copied). Agent id `awp12b-cell-3670d11b1750f84c`. Depth at dispatch: fresh. While it
-  is live: no harness gate, pytest or Codex at this seat. If this generation rolls first, the
-  successor re-dispatches from the branch head, the ledger and the brief.
-  AMENDED 01:35Z by SendMessage (CHARC `d40217a81696cc03`): long clip GX011625, not GX011600;
-  4 h cap per window. Check the return acknowledges it (a message may land only after return).
-  **STOPPED 2026-10-19 03:3xZ at head `ac40c69`.** The code is built, Reviewer A converged at
-  R3, pytest 671/0 skipped. W1 was DISCARDED because sibling-harness load broke "machine
-  otherwise idle". The amendment was NOT taken in: the worktree has the brief at `f7e4cac` and
-  the plan still used GX011600. Query to CHARC `32513ec1` (owner pauses the siblings for one
-  block of ~3.5 h; contamination rule). The amendment was ACKNOWLEDGED after all (ledger
-  `3c5f73b`: GX011625 carries claims 3-5, GX011600 dropped, all windows under 4 h, block ~3 h;
-  fyi `44945334`). **RELEASED 03:4xZ** under CHARC `f2d35c83ac139a14`: PROCEED NOW for W1-W5
-  under the contamination rule plus six conditions:
-  - a pre-window idle gate (CPU < 25 %, GPU < 5 %);
-  - no CIM or WMI samplers;
-  - the drift baseline is the clean W1 median;
-  - W5 only if W1-W4 are clean;
-  - a second contamination means STOP, and CHARC then asks the owner;
-  - no Defender exclusion; the 4 h cap.
-  At QA, check that the ledger shows each of these. Exclusive: nothing at this seat until the
-  cell returns.
-  **STOPPED AGAIN ~04:20Z (condition 4), ledger `a14cfb8`.** W1 was contaminated twice by the
-  swing-trading orchestrator's periodic pytest loop (16 xdist workers every 15-20 min). WMI
-  samplers were removed in `2c2856a`. Query `7f13222c` to CHARC: the owner's quiet block is
-  ~3 h. The report round is DEFERRED to after the block (my call). On release, also ask the
-  cell to record per window the nvidia-smi clocks.sm, pstate and power.draw plus the power
-  scheme: clean 1080p runs varied 0.140 vs 0.099 s.
-  CHARC `329b66543e1412da`: the decision_request for the block went to the operator
-  (`e2c53e6a`), and the report round is deferred.
-  - Per window, record clocks.sm, pstate, power.draw, `clocks_throttle_reasons.active` and the
-    power scheme. Clock variation on clean runs is measured spread, not contamination.
-  - The cell is HELD until CHARC relays the owner's block start. Then send ONE message:
-    release, plus the clock and throttle recording.
-  **RELEASED ~06:40Z, BEST EFFORT.** Owner (via CHARC `d4188563639bc453`): "I am not
-  concerned about contaminated figures as the actual program itself will run in a non-ideal
-  state. Best effort is fine."
-  - There is no quiet block and condition 4 is withdrawn. Each window runs once; a short window
-    (W1, W3, W4) may re-run once if the gate opens within 10 min; W2 and W5 never re-run.
-  - Contaminated windows are labelled and reported as spread. The idle gate is advisory.
-  - The report must carry the "shared non-idle laptop, upper bound" caveat, which Gate 1 cites
-    at WP1.6.
-  - The report round runs after W5. At QA, check the per-window clocks and throttle records and
-    the caveat.
-  **RETURNED 2026-10-19 ~13:48Z at head `2fa0ac8`.** Two head reads (unchanged, clean). Reviewer
-  A converged at R5.
-  - Candidate `6e538d7` (rebased onto `d7a281e`), patch-id `342f070f` on both. Gates green:
-    pytest 672/0 skipped, gpu 30, harness 366.
-  - **Reviewer B #1 (STRONG) was BLOCKING:** 4 major, 5 minor, all valid. Evidence
-    `clearwater-review-evidence\wp1.2b\reviewB\`, transcript md5 `4f6ed9f6`. Withheld-access
-    grep clean: a WSL `git status` name listing only, and footage paths only inside record
-    contents.
-  - The B candidate is pinned as branch `wp1.2b-b1`, and the worktree is removed.
-  - **ONE remediation** dispatched by SendMessage, brief `docs/briefs/wp1.2b-remediation-brief.md`
-    (`f1d2be7`): no re-timing. It adds an untimed output witness on both exports, safe output
-    naming, the provenance fields, and text fixes: W3b re-labelled, spread on contaminated rows,
-    cadence, hypotheses.
-  - On return: a fresh `-mc`, then Reviewer B #2 (final). A second blocking B is adjudicated at
-    the gate.
-  - **Remediation STOP** (head `f5296b5`): the output witness's 28 dB absolute floor failed
-    GX011627 frame 30 at 27.79 dB.
-    - The encode-alone repro gave 28.76 dB, and the order was correct on every row.
-    - GX011625 passed.
-    - **My ruling:** a per-frame relative floor. own >= ref_i - 2 dB, where ref_i is a 3-frame
-      encode of the expected frames; a 20 dB absolute sanity floor; the strict order rule; the
-      planted controls must still fail by name.
-    - The report must state the floor change and keep the 28 dB results.
-    - W3b is confirmed CONTAMINATED (PID 17192 is unidentified).
-  - **Second witness STOP** (head `2b6cd59`): the 3-frame reference was unrepresentative.
-    - The export uses GOP 250 with B and P frames; the reference coded i next to a fresh
-      I-frame; own - ref reached -6 dB.
-    - Order was correct on every row.
-    - **Ruling:** ref_i is a GOP-START reference (from the output's last I-frame at or before
-      i, through i+1). The same rule: -2 dB, a 20 dB sanity floor, strict order. All three
-      verdicts are kept per row.
-    - **No further witness STOP:** a residual floor miss with correct order is recorded and
-      adjudicated at the gate; an order error is still a STOP.
-  - **DEPTH BREACH (owner catch 2026-10-19 16:06Z).** `cell_depth.py`: wp12b-cell
-    current=858,061, turns 364, PAST-CAP (read mid-work, after the second floor ruling).
-    - I never read its depth at the return, the STOPs or before the remediation.
-    - The 9-finding remediation should have gone to a fresh cell (the re-seat line is ~250K).
-    - At the cell's NEXT YIELD: read the depth (moment "at retirement"), do NOT reply, and retire
-      the cell.
-    - Any remaining remediation work (Reviewer A rounds, gates) goes to a FRESH cell dispatched
-      from the ledger, the remediation brief and the rulings.
-    - Head at the reading: `8dced82` (GOP-start witness and the text items committed; report
-      being edited).
+- **None.** `wp12b-cell` (WP1.2 Part B) is RETIRED. Depth at retirement: 931,878 over 428 turns,
+  PAST-CAP (`uv run python scripts/cell_depth.py wp12b-cell`). Do not reply to it. The full
+  Part B history (stops, rulings, the depth breach) is in `docs/proofs/wp1.2b-accept.md` and
+  `git log -- docs/orchestrator-state.md`.
+- **Depth rule (owner catch 2026-10-19):** read `cell_depth.py <cell>` at dispatch, at every
+  yield, and before sending any ruling or remediation. Record each figure with its moment. Above
+  ~250K: never order a multi-finding remediation; re-seat. At ~400K: STOP and re-dispatch fresh.
+
+### Gate inputs
+
 - **Shallow CP2 COMPLETE** (owner 2026-10-19, CHARC `3bac4a724b1420aa`, record
   `docs/proofs/cp2-look-check.md`): c3 default (both Ancuti variants over-red; kept as options);
   no cast, halo, noise, clipping or flicker; staged vs flat no visible difference. Briefs cite
@@ -132,13 +54,21 @@
    (Snorkel = shallow, SCUBA = deeper ~20 m, edits = stress case), chapter handling DEFERRED to
    v2 (spec revision pending: briefs cite "chapter handling deferred (CP1 2026-10-19; spec
    revision pending)").
-3. **WP1.2 Part B (EXCLUSIVE)** -- brief `docs/briefs/wp1.2b-brief.md` FINAL (CP1 notes, stems
-   via the locator, GX011600 as the largest full clip, 1080p59.94 compilation as a 2nd decode
-   mode, photo leg PENDING). implementer-opus-high, worktree `.worktrees/wp1.2b`. While it is
-   live: NO harness gate, NO pytest, NO Codex at this seat (CHARC `122f9a10cf1323f5`).
-4. **After Part B:** the deep parts (WP1.3 deep cases, WP1.4b gain-cap noise test) on SCUBA/;
-   order is the orchestrator's call (CHARC). Then WP1.6 (gate report; smoothing row "2 s
-   provisional").
+3. **WP1.2 Part B ACCEPTED** 2026-10-19, main `2dd06cf` (record `docs/proofs/wp1.2b-accept.md`;
+   patch-id `4781bbe0`). B #1 blocking -> one remediation; B #2 blocking, adjudicated at the
+   gate: findings 1/3/5/6/7 banked as DR-28, findings 2/4 fixed as report errata. Witness rule
+   (4) GOP-start through the next I/P anchor; frame 503 NOT BLOCKING. Branches `wp1.2b`,
+   `wp1.2b-b1` kept. CHARC QA PENDING (return report posted, see the Workstreams table).
+   **OWED: the full re-gate on main** (pytest, `-m gpu`, harness). Claude Code stopped the
+   background run for low system memory during pytest; ruff/format/mypy were green on main, and
+   the candidate (= the same commit) was fully green. Re-run it when the owner clears it or
+   before the next merge, whichever comes first.
+4. **Next:** the deep parts (WP1.3 deep cases, WP1.4b gain-cap noise test) on SCUBA/; the order
+   is mine (CHARC). Render c3 primary with ancuti2018 beside it. The first brief touching
+   `tools/prototype` flips `Params()` to c3 (one owned line plus its test); cite spec v0.5.3.
+   Then WP1.6 (gate report; smoothing row "2 s provisional, re-measure per DR-25(3)"; Gate 1
+   and Gate 2 rest on Part B's figures with the "shared non-idle laptop, upper bound" caveat;
+   N6 not met, about 2.3x combined; photo leg PENDING).
 
 ### Workstreams
 
@@ -156,6 +86,7 @@ Each accepted package had its return report posted to CHARC and an info-update t
 | WP-T1 | 2026-10-15 | `f6a34a4` | `docs/proofs/wp-t1-accept.md` (`3f40a85`); 2nd B adjudicated at the gate; DR-9 and DR-21 closed, DR-22 opened | CONFIRMED (`3501648bc8844468`) |
 | WP1.4 | 2026-10-19 | `91f5775` | `docs/proofs/wp1.4-accept.md`; 2nd B adjudicated at the gate; DR-23..DR-26 | CONFIRMED (`6c5d88685e64a37c`; finding 3 upheld; DR-26 stays banked) |
 | WP-T2 | 2026-10-19 | `8c9d780` | `docs/proofs/wp-t2-accept.md`; DR-24 closed, DR-27 | CONFIRMED (`d40217a81696cc03`; B rejection upheld; suite re-run deferred past Part B) |
+| WP1.2 Part B | 2026-10-19 | `2dd06cf` | `docs/proofs/wp1.2b-accept.md`; 2nd B adjudicated at the gate; DR-28; depth breach recorded | PENDING |
 
 - **WP1.2 Part A, raised to CHARC:**
   - approval of the Windows-only `_windows_power()` in `bench.py` (instrument only, guarded);
@@ -215,15 +146,7 @@ Each accepted package had its return report posted to CHARC and an info-update t
   - DR-18 (the WP1.5 pass-2 minors) is in the debt register.
   - The WP1.1 envelope is narrowed to a short side above 128 px.
   - CHARC QA: CONFIRMED; adjudication upheld.
-- **Spec is v0.5.2** (`9042ae0`; D60 CLOSED). WP1.2 Part B cites v0.5.2 and measures decode
-  only.
-- **WP1.2 Part B:** draft `docs/briefs/wp1.2b-brief.md` (CHARC `dc733650e60ac026`;
-  opus-high, STRONG, EXCLUSIVE). Dispatch only when all three hold:
-  1. "download complete" AND the inventory report;
-  2. WP1.3 and WP1.4 merged or paused at a boundary;
-  3. WP1.5 merged (done).
-
-  The gate-report template is `docs/reports/wp1.6-gate-report.md`.
+- Spec is v0.5.3 (see Standing operator rulings). WP1.2 Part B is DONE (Handoff item 3).
 - **No .LRV/.THM exist** (owner; CHARC `93c5af007a3a8ba8`).
   - WP1.2 Part B drops the LRV analysis-speed leg (two columns: software decode and hardware
     decode).

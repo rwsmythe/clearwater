@@ -351,6 +351,12 @@ The earlier records are kept too: `output-witness-first-criterion-28dB.json`,
 | GX011627 (W4 production) | 24 | all correct | 23 of 24 (frame 503 at -3.35 dB) | -3.35 .. +0.06 dB | 9 rows: every checked frame of the first GOP (0-249) | 27.79-39.67 dB | 28.3 dB | fails frame 30 / fails 18 / 23 of 24 |
 | GX011625 (W5) | 24 | all correct | **24 of 24** | -0.77 .. +0.42 dB | 1 row (frame 0) | 29.67-42.68 dB | 34.2 dB | passes / fails 13 / 24 of 24 |
 
+**Erratum at the gate (Reviewer B #2, finding 2).** The column "Reference = export bit for bit"
+counts rows where the reference and the export have equal PSNR against the source. Equal PSNR is
+not pixel equality. Pixel equality was checked for frame 30 only; the other rows show equal
+scores, not identical frames. The witness also covers the sampled indices only (24 per export),
+not every frame.
+
 **GX011627 frame 503** is reported as measured, as the orchestrator ruled (no further stop on a
 witness frame with the order correct). What the record establishes:
 - its relative match FAILS: own 35.39 dB against a reference 38.74 dB;
@@ -384,6 +390,10 @@ batches at 36-99 % before and after both runs), never re-run.
   longer than the main loop's work), and `-hwaccel cuda` only speeds the decode behind the pipe.
 - At most 61 proxies are held: (stages - 1) x reach + 1 = (3 - 1) x 30 + 1.
 - Smoothing costs 52-61 s per clip.
+- **Erratum at the gate (Reviewer B #2, finding 4).** "Hardware decode saves 7 % here" overstates
+  the evidence: the CUDA run was 7.4 % faster under its own run conditions (both runs
+  contaminated), and the cause is not isolated. "Smoothing costs 52-61 s per clip" holds for
+  GX011625 only; on GX011627 smoothing took 1.3-3.7 s.
 - Whether this is acceptable, and so whether D109 (sparse analysis) is named, is CHARC's call at
   WP1.6. No analysis row is clean under the contamination rule. The GX011627 re-run (W3b,
   2.1 min/min) had the least load of them, but its window is contaminated (a 53 % `python.exe`
