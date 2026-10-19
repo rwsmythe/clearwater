@@ -35,7 +35,7 @@ unpushed, and the owner has not asked for a push (verify: `git status -sb`).
 | WP1.3 (shallow) | 7178540 | wp1.3-accept.md (bc97a19) | look-check instrument `tools/lookcheck/`; pack `work/wp1.3/index.html` (24 stills x 3 variants, 180-frame unsmoothed flicker pair) READY FOR CP2; seat B pass 1 BLOCKING (3 introduced majors, ONE remediation `wp13-fix`), re-run BLOCKING again -> adjudicated at the gate (CRITICAL pytest basetemp exposure = DR-21, repo-wide; 2 majors instrument-only = DR-20); CHARC md5s verified, QA green at this seat 2026-10-15 13:3xZ |
 | WP-T1 | f6a34a4 | wp-t1-accept.md (3f40a85) | pytest temp-root footage guard in `tests/conftest.py` (CHARC-commissioned, DR-21 CLOSED, DR-9 CLOSED); seat B pass 1 BLOCKING (C1 case, C3 fail-open, M4, M6; ONE remediation), re-run BLOCKING again -> adjudicated at the gate (4 crafted-state aliasing cases, DR-22(4)-(7)); DR-22 OPEN (9 limits incl. CHARC's accepted pre-conftest capture writes); CHARC md5s verified, QA at this seat 14:5xZ |
 | WP1.4 (shallow) | 91f5775 | wp1.4-accept.md (36535bf) | statistics and smoothing experiments: `tools/prototype/temporal.py`, `statistics_experiments.py`, additive `correct(..., statistics=)` hook; D98 staged vs flat: no visible difference; seat B pass 1 BLOCKING (4 majors, ONE remediation `wp14-fix`), re-run BLOCKING again -> adjudicated at the gate (finding 3 result-bearing: 2 s default PROVISIONAL, re-measure per DR-25(3)); DR-23 (VFR by index), DR-24 (footage-layout skips -> WP-T2), DR-25 (B re-run 1-7, WP2.1), DR-26 (spike root paths, banked); CHARC md5s verified, QA CONFIRMED at this seat 2026-10-19 01:1xZ |
-| WP-T2 | 8c9d780 | wp-t2-accept.md (f7e4cac) | footage locator `find_footage_file` in `tools/local_config.py` (VIDEO_EXTENSIONS relocated there); gate 628 passed 0 skipped; DR-24 CLOSED, DR-27 opened; seat B major (root junction walked) REJECTED by the orchestrator, upheld by CHARC; CHARC QA on the cheap checks 2026-10-19 (patch-id e5354e8d, md5s OK); suite re-run at this seat DEFERRED until Part B's exclusive window closes |
+| WP-T2 | 8c9d780 | wp-t2-accept.md (f7e4cac) | footage locator `find_footage_file` in `tools/local_config.py` (VIDEO_EXTENSIONS relocated there); gate 628 passed 0 skipped; DR-24 CLOSED, DR-27 opened; seat B major (root junction walked) REJECTED by the orchestrator, upheld by CHARC; CHARC QA on the cheap checks 2026-10-19 (patch-id e5354e8d, md5s OK); suite re-run at this seat done 2026-10-19 ~14:10Z after Part B's window closed: 628 passed 0 skipped on main 5e3aa33; **QA CONFIRMED** |
 
 CHARC QA at this seat re-ran ruff/format/mypy/pytest green on every accept (pytest
 skips the ffprobe tests here because this seat's PATH lacks ffprobe; the
@@ -112,7 +112,14 @@ path, md5, five assertions and verdict, or there is no accept.
   is fine."** Relayed c42d103e: no quiet block; cell released for W1-W5; each window once (short
   windows may re-run once; W2/W5 never); contaminated windows labelled and reported as measured
   spread with stray readings, clocks, pstate, power; report carries the shared non-idle laptop
-  caveat; Gate 1 decided on these figures with that caveat. Report round proceeds after W5. **Footage-layout skips:** the owner's Snorkel/SCUBA/edits layout makes 3
+  caveat; Gate 1 decided on these figures with that caveat. Report round proceeds after W5. **Part B RETURNED 2026-10-19 ~14:00Z** (head 2fa0ac8, candidate
+  6e538d7; gates 672 passed; B #1 BLOCKING 4 major 5 minor, one remediation under way, no
+  re-timing, brief docs/briefs/wp1.2b-remediation-brief.md). Headline: core 4K GPU ancuti2018
+  0.395 s (3.6x N6 0.1101 s), c3 0.639 s; GX011627 end-to-end 4.41x N6 (resident 3.25x);
+  GX011625 full clip 7.62x (contaminated, thermal 91 C); analysis pipe-bound (32 KB Windows raw
+  pipe, 93.6 ms/frame vs 4-5 ms at >=1 MB blocks -> WP2.1 transport); memory 3,682 MiB process,
+  2,860 MiB graphics; photo leg PENDING. Claim 7: no candidate reaches N6 -> Gate 1 needs CHARC
+  options or an owner N6 decision at WP1.6. Exclusive window CLOSED; seat free. **Footage-layout skips:** the owner's Snorkel/SCUBA/edits layout makes 3
   footage tests skip (root `GX011628.MP4` paths in `tests/test_container_spike.py:902`,
   `tests/test_lookcheck.py:1289`, WP1.4 test 7; also `tools/lookcheck/pack.py:94` and the WP1.4
   runner). CHARC ruling 2026-10-19 (msgs 35b13416 scope + 68fe376c-answer sequencing): WP1.4

@@ -101,3 +101,11 @@ the runner's preflight fails the three (l) tests.
 | WP1.2 Part B | Next (EXCLUSIVE); its brief gains CHARC's CP1 notes (`99f6abaf9afd829e`) before dispatch. |
 
 Branches kept: `wp-t2` (`3567c56`, the author head) and `wp-t2-b` (`9d42c07`, B's candidate).
+
+## CHARC QA (post-Part B)
+
+Suite re-run at the CHARC seat on main `5e3aa33` (WP-T2 plus later main commits), 2026-10-19
+~14:10Z, after the Part B exclusive window closed: `uv run pytest -q -p no:cacheprovider
+--basetemp=work/pytest-charc` -> **628 passed, 0 skipped** in 151 s. Matches the accept's gate
+count. The cheap checks (patch-id `e5354e8d`, md5s, VERDICT line) were confirmed 2026-10-19 before
+the window. WP-T2 QA is CONFIRMED.
