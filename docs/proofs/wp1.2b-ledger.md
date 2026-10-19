@@ -144,3 +144,94 @@ Clearwater orchestrator's scheduling (W1, above), and `WmiPrvSE.exe` holds about
 The timed windows are halted; nothing after W1 has run. Fresh reading 17:35 HST (after the
 amendment): load 13-20 % of all CPUs, `MsMpEng.exe` 104-107 % of a CPU in three samples over
 30 s, `WmiPrvSE.exe` 20-87 %. Still stopped pending the ruling on machine load.
+
+## Ruling f2d35c83 (CHARC, received about 17:40 HST): proceed under conditions
+
+Adopted as written: an idle gate before each window; samplers without CIM or WMI; probes
+opening and closing each window; contaminated means probe drift > 5 % or a non-system process
+above 25 % of a logical CPU, sustained; one re-run; W5 only if W1-W4 close clean; a window
+contaminated twice is a STOP.
+
+**Samplers (condition 2), all without CIM/WMI.** Before W1 two record helpers DID reach WMI,
+once per record and after the timed loop (neither was a sampler):
+- `_cpu_brand` used py-cpuinfo, which runs `wmic` in a child Python on Windows;
+- `_machine` used `platform.platform()`, which is Python 3.12's `_wmi_query`.
+Both were replaced in `2c2856a` (`PROCESSOR_IDENTIFIER`, `sys.getwindowsversion()`).
+
+The samplers now are:
+- the stray check, `bench.stray_processes`: psutil `cpu_percent` over a 10 s sample. psutil uses
+  the native process APIs, not WMI. MsMpEng.exe and WmiPrvSE.exe are always listed.
+- the RSS sampler: psutil `memory_info` every 50 ms, children listed every 2 s.
+- device memory: the CUDA runtime's `memGetInfo`.
+- card state: `nvidia-smi` every 60 s.
+- the idle gate, `work/wp1.2b/gate/idle_gate.ps1`:
+  `Get-Counter '\Processor(_Total)\% Processor Time' -SampleInterval 10 -MaxSamples 1`, taken 6
+  times, plus `nvidia-smi --query-gpu=utilization.gpu`, plus two `Get-Process` snapshots. The
+  gate's records are in `work/wp1.2b/gate/gate.jsonl`.
+
+A Python 3.12 process on Windows may still issue one WMI query when a library first calls
+`platform.uname()` at import. That is a one-off per process, not a sampler. WmiPrvSE.exe
+(PID 14516) has run at 20-91 % of a CPU since 11:12, before this package's first run.
+
+**Idle gates:**
+
+| Start | Median CPU | GPU | Result |
+|---|---|---|---|
+| 17:41:00 | 77.7 % | 0 % | FAILED: a swing-trading pytest-xdist run, 16 workers at 29-50 % each |
+| 17:52:30 | 16.9 % | 0 % | OPEN, so W1a ran |
+| 18:08:24 | 18.6 % | 0 % | OPEN, so W1b ran |
+
+The 17:41 run was `python -m pytest -m "not slow" -q -p no:cacheprovider` in
+`C:\Users\rwsmy\swing-trading\.worktrees\d79-exec`, workers
+`python -u -c import sys;exec(eval(...))`, started 17:39:51 under claude.exe PID 9632, the
+`swing-orchestrator-20261018-1515` session.
+
+## W1 (claim 2) -- contaminated twice: STOP (condition 4)
+
+Window estimate (recorded above): about 8 min, under the cap. Head `2c2856a`, clean tree. The
+records are in `work/wp1.2b/core/W1a-contaminated/` and `W1b-contaminated/`.
+
+| | W1a 17:54-18:07 | W1b 18:10-18:21 |
+|---|---|---|
+| probe open (GX011627 GPU ancuti2018 N=12) | 0.4167 s | 0.4208 s |
+| 4K GPU ancuti2018 N=60 (the baseline) | 0.4183 s, p95 0.4434, drift +3.6 % | 0.4558 s, p95 0.5008, drift +6.9 % |
+| probe close | 0.4140 s (-1.0 %) | 0.4993 s (**+9.5 %**) |
+| 4K GPU c3 N=60 | 0.8477 s (**strays**: 15-17 python.exe at 44-77 % before and after) | 0.7077 s (clean strays) |
+| 4K CPU ancuti2018 N=10 | 9.992 s, p95 15.71 (**strays** before) | 8.808 s, p95 9.498 (clean) |
+| 1080p60 GPU ancuti2018 N=60 | 0.1396 s (clean) | 0.0993 s (clean) |
+| 1080p60 GPU c3 N=60 | 0.1223 s (clean) | 0.1247 s, drift -19.7 % (**strays** before: python.exe 93 %, 72 %) |
+| 1080p60 CPU ancuti2018 N=10 | 2.037 s (clean) | 1.956 s (clean) |
+| verdict | CONTAMINATED (stray checks) | CONTAMINATED (probe +9.5 %; stray checks) |
+
+Per-run conditions (all records): plugged in, battery 80 %, scheme Balanced, overlay Best
+performance, MsMpEng.exe 1-279 % of a CPU (about 100 % in most checks), WmiPrvSE.exe 3-91 %.
+The 4K frames were GX011627 frames 205-264, pts 205205..264264 at 1/30000, from 30 % of the
+clip. The 1080p frames were compilation frames 3236-3295, pts 3239236..3298295 at 1/60000.
+
+The swing-trading test batches are periodic: about 17:27, 17:39, 17:57 and 18:18, each lasting
+several minutes, about every 15-20 min. Every window of this block longer than about 10 min will
+meet one. Two runs the stray checks call clean still differ by 40 % (1080p GPU ancuti2018
+0.1396 vs 0.0993 s), so this machine's figures are not reproducible at present.
+
+STOP at 18:22 HST. W2-W5 have not run. GX011625's W5 estimate is not re-fixed, because there is
+no clean W1 median.
+
+Record md5s:
+```
+9ba1c4cb1f87e9525713d5fe05b177ce W1a/bench-cpu-GX011627-ancuti2018-20261018-180309.json
+20d9e7638e8b4177dfe5e155055e89a1 W1a/bench-cpu-compilation-...-ancuti2018-20261018-180636.json
+584d8bbe7c019d57fb1e59e90ede97ea W1a/bench-gpu-GX011627-ancuti2018-20261018-175511.json (probe open)
+36837388d74d337136e8534a18dce4f9 W1a/bench-gpu-GX011627-ancuti2018-20261018-175711.json
+1cce480a7307efd7b6097972a1ca62f3 W1a/bench-gpu-GX011627-ancuti2018-20261018-180740.json (probe close)
+c00c194cf4bfb99415962465f1e27cd9 W1a/bench-gpu-GX011627-c3-20261018-180025.json
+f8ef6f344be3520442ae62848900dccf W1a/bench-gpu-compilation-...-ancuti2018-20261018-180431.json
+6fc8af10bb93479aeffd44bf2678a504 W1a/bench-gpu-compilation-...-c3-20261018-180546.json
+445106afabce93511e2005b7bf72b616 W1b/bench-cpu-GX011627-ancuti2018-20261018-181713.json
+89fa000871bb15f053162379ac808d41 W1b/bench-cpu-compilation-...-ancuti2018-20261018-182016.json
+a083b062fb5c441e909511eac98897fa W1b/bench-gpu-GX011627-ancuti2018-20261018-181051.json (probe open)
+a683d37030733548b39c8b9456534dec W1b/bench-gpu-GX011627-ancuti2018-20261018-181243.json
+43f7e1d09f60f2359baa1fb440b74ab6 W1b/bench-gpu-GX011627-ancuti2018-20261018-182141.json (probe close)
+6a6ec7a59ff2d31d7a3db4f1455307c6 W1b/bench-gpu-GX011627-c3-20261018-181509.json
+4303f5e61dcc8c860ce9df6e0849f37f W1b/bench-gpu-compilation-...-ancuti2018-20261018-181819.json
+6aedf02ecb6c667e40420d0a0c2ceb8c W1b/bench-gpu-compilation-...-c3-20261018-181929.json
+```
