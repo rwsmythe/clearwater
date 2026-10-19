@@ -164,22 +164,32 @@ PROVISIONAL_NOTE = (
 WITNESS_FRAMES = 24
 """Frame indices the output witness checks, spread evenly over the clip, first and last included."""
 
-WITNESS_FLOOR_BASIS = (
-    "encoder loss only; WP1.5 identity re-encode of GX011627 at the same NVENC settings: "
-    "Y 35.83 dB mean, 32.27 dB min (Y only); about 4 dB left for the RGB comparison "
-    "with 4:2:0 chroma loss; "
-    "a one-frame shift: 18.47 dB (GX011627, WP1.5) and 23.7 dB (synthetic test clip)"
-)
-"""The basis of :data:`WITNESS_FLOOR_DB`, as recorded in each witness record."""
+WITNESS_MARGIN_DB = 2.0
+"""The output witness passes frame i when PSNR(output i, expected i) is at least the encoder's
+own loss on that frame less this margin. The encoder's own loss, ``ref_i``, is measured per
+frame: the expected frames around ``i`` are encoded as a 3-frame sequence through the export's
+own encode chain (:func:`encode_command`), decoded, and compared with themselves. The margin is
+the orchestrator's ruling. For scale: in the GX011627 reproduction
+(``work/wp1.2b/remediation/frame30_repro.json``) the export scored 0.97 dB (frame 30) and 2.45 dB
+(frame 31) below those frames encoded alone as P-frames, the difference between an encoder that
+saw the whole clip and one that saw three frames."""
 
-WITNESS_FLOOR_DB = 28.0
-"""The output witness's PSNR floor (8-bit RGB, whole frame) of an output frame against its
-expected frame. Basis: the export's encoder loss is the only expected difference (the frames fed
-to NVENC are the expected frames exactly). WP1.5's identity re-encode of GX011627 at the same
-NVENC settings scored Y 35.83 dB on average and 32.27 dB at worst (Y only); this floor leaves
-about 4 dB for the RGB comparison, which also carries the 4:2:0 chroma loss that Y does not.
-A one-frame misalignment scored 18.47 dB on GX011627 (WP1.5, informal) and 23.7 dB on the
-synthetic test clip."""
+WITNESS_MARGIN_BASIS = (
+    "orchestrator ruling: own_i >= ref_i - 2.0 dB, ref_i the encoder's own loss on the expected "
+    "frame (a 3-frame encode through the export's chain); GX011627 reproduction for scale: the "
+    "export 0.97 dB (frame 30) and 2.45 dB (frame 31) below the frames encoded alone"
+)
+"""The basis of :data:`WITNESS_MARGIN_DB`, as recorded in each witness record."""
+
+WITNESS_SANITY_DB = 20.0
+"""An absolute floor beneath the relative rule, which catches a gross failure even if the
+reference encode itself is broken."""
+
+FIRST_FLOOR_DB = 28.0
+"""The output witness's FIRST criterion (an absolute floor from WP1.5's identity re-encode of
+GX011627: Y 35.83 dB mean, 32.27 dB min), REPLACED before re-scoring: it failed GX011627 frame 30
+at 27.79 dB, whose encoder-alone loss is 28.76 dB. Each witness record keeps the frame's verdict
+under it (``first_floor_ok``) so that nothing is hidden."""
 
 SHOWINFO_PATTERN = re.compile(r"showinfo.*\] n:\s*(\d+)\s+pts:\s*(-?\d+)\s+pts_time:")
 """A ``showinfo`` frame line: frame number and pts (the pattern of ``lookcheck.frames``)."""
@@ -2041,6 +2051,23 @@ def psnr(first: NDArray[Any], second: NDArray[Any]) -> float:
     return math.inf if error == 0.0 else 10.0 * math.log10(maximum * maximum / error)
 
 
+def reference_frames(index: int, count: int) -> list[int]:
+    """Return the three frames whose expected images form frame ``index``'s reference encode.
+
+    ``index - 1, index, index + 1``, so that ``index`` is not the reference's I-frame; at the
+    clip's first frame ``0, 1, 2`` and at its last ``count - 3, count - 2, count - 1``.
+
+    Args:
+        index: The checked frame.
+        count: Frames in the clip (at least 3).
+
+    Returns:
+        The three indices, ascending.
+    """
+    first = min(max(index - 1, 0), count - 3)
+    return [first, first + 1, first + 2]
+
+
 def output_witness(
     source: Source,
     output: Source,
@@ -2048,19 +2075,28 @@ def output_witness(
     params: Params,
     backend: Backend,
     indices: Sequence[int],
-    floor_db: float = WITNESS_FLOOR_DB,
+    reference_path: Path,
+    margin_db: float = WITNESS_MARGIN_DB,
 ) -> dict[str, Any]:
     """Check exported frames against the corrected source frames, after the export (untimed).
 
-    For each index ``i``: output frame ``i`` is decoded (:func:`decode_frames`, the export's
-    own conversion to RGB); source frames ``i - 1``, ``i`` and ``i + 1`` (those that exist)
-    are decoded and corrected exactly as the export corrects them
-    (:func:`to_float`, ``correct(..., statistics=statistics[j])``, :func:`to_integer`). The
-    output frame passes when its PSNR against expected frame ``i`` is at least ``floor_db``
-    and strictly higher than against each neighbour's expected frame, so a frame that is not
-    the corrected source frame, or sits at another position, or was corrected with another
-    frame's statistics, fails. This covers what the in-loop witness does not: the writer, the
-    integer conversion, the encoder and the muxer.
+    For each index ``i``:
+    - output frame ``i`` is decoded (:func:`decode_frames`, the export's own conversion to RGB);
+    - the source frames of :func:`reference_frames` are decoded and corrected exactly as the
+      export corrects them (:func:`to_float`, ``correct(..., statistics=statistics[j])``,
+      :func:`to_integer`): the EXPECTED frames;
+    - the three expected frames are encoded as a 3-frame sequence through the export's own
+      encode chain (:func:`encode_command` into ``reference_path``) and decoded:
+      ``ref_i = PSNR(decoded expected i, expected i)``, the encoder's own loss on that frame;
+    - ``own_i = PSNR(output i, expected i)``.
+
+    Frame ``i`` passes when ``own_i >= ref_i - margin_db`` and ``own_i >=``
+    :data:`WITNESS_SANITY_DB`, and ``own_i`` is strictly higher than its PSNR against the
+    expected frames ``i - 1`` and ``i + 1`` (those that exist). So a frame that is not the
+    corrected source frame, sits at another position, or was corrected with another frame's
+    statistics fails. This covers what the in-loop witness does not: the writer, the integer
+    conversion, the encoder and the muxer. Each row also keeps the verdict under the first,
+    replaced criterion (:data:`FIRST_FLOOR_DB`).
 
     Args:
         source: The clip that was exported.
@@ -2069,11 +2105,13 @@ def output_witness(
         params: The parameters the export used.
         backend: Where to correct.
         indices: The frame indices to check.
-        floor_db: The PSNR floor.
+        reference_path: Where the reference encode is written (checked by the caller; it
+            is overwritten for each frame and removed at the end).
+        margin_db: The margin below the reference.
 
     Returns:
-        The record: the floor and its basis, one row per index (the PSNR against expected
-        ``i`` and against each neighbour, and the verdicts) and ``passed``.
+        The record: the rule, one row per index (``own_i``, ``ref_i``, the margin, the PSNR
+        against each neighbour, the verdicts, the first criterion's verdict) and ``passed``.
 
     Raises:
         ClipError: The output's frame count differs from the statistics', or a decode fails.
@@ -2081,41 +2119,102 @@ def output_witness(
     count = len(statistics)
     if output.frame_count != count:
         raise ClipError(f"the output has {output.frame_count} frames, the statistics {count}")
+    if count < 3:
+        raise ClipError("the output witness needs at least 3 frames")
     scratch = np.empty((source.info.height, source.info.width, 3), np.float32)
     rows: list[dict[str, Any]] = []
-    for index in indices:
-        around = [j for j in (index - 1, index, index + 1) if 0 <= j < count]
-        sources, _ = decode_frames(source, around[0], len(around))
-        (exported,), _ = decode_frames(output, index, 1)
-        scores: dict[int, float] = {}
-        for j, frame in zip(around, sources, strict=True):
-            image = to_float(frame, np, source.bit_depth)
-            corrected = correct(image, params, backend, statistics=statistics[j]).output
-            expected = np.empty_like(frame)
-            to_integer(np.asarray(corrected, dtype=np.float32), expected, scratch)
-            scores[j] = psnr(exported, expected)
-        own = scores[index]
-        rows.append(
-            {
-                "index": index,
-                "psnr_db": own,
-                "neighbours_db": {str(j): v for j, v in scores.items() if j != index},
-                "floor_ok": own >= floor_db,
-                "order_ok": all(own > v for j, v in scores.items() if j != index),
-                "misplaced": any(
-                    v >= own and v >= floor_db for j, v in scores.items() if j != index
-                ),
+    try:
+        for index in indices:
+            around = reference_frames(index, count)
+            sources, _ = decode_frames(source, around[0], 3)
+            (exported,), _ = decode_frames(output, index, 1)
+            expected: dict[int, NDArray[Any]] = {}
+            for j, frame in zip(around, sources, strict=True):
+                image = to_float(frame, np, source.bit_depth)
+                corrected = correct(image, params, backend, statistics=statistics[j]).output
+                expected[j] = np.empty_like(frame)
+                to_integer(np.asarray(corrected, dtype=np.float32), expected[j], scratch)
+            reference = _reference_encode(source, [expected[j] for j in around], reference_path)
+            ref = psnr(reference[around.index(index)], expected[index])
+            own = psnr(exported, expected[index])
+            neighbours = {
+                j: psnr(exported, expected[j]) for j in (index - 1, index + 1) if j in expected
             }
-        )
+            threshold = max(ref - margin_db, WITNESS_SANITY_DB)
+            rows.append(
+                {
+                    "index": index,
+                    "reference_frames": around,
+                    "own_db": own,
+                    "ref_db": ref,
+                    "margin_db": margin_db,
+                    "threshold_db": threshold,
+                    "neighbours_db": {str(j): v for j, v in neighbours.items()},
+                    "match_ok": own >= threshold,
+                    "order_ok": all(own > v for v in neighbours.values()),
+                    "misplaced": any(v >= own and v >= threshold for v in neighbours.values()),
+                    "first_floor_ok": own >= FIRST_FLOOR_DB,
+                }
+            )
+    finally:
+        reference_path.unlink(missing_ok=True)
     return {
-        "check": "output frame i against correct(source frame i, statistics i), and against i +- 1",
-        "floor_db": floor_db,
-        "floor_basis": WITNESS_FLOOR_BASIS,
+        "check": (
+            "own_i = PSNR(output i, expected i), expected = correct(source i, statistics i); "
+            "pass: own_i >= max(ref_i - margin, sanity) and own_i > PSNR against expected i +- 1"
+        ),
+        "reference": (
+            "ref_i = PSNR(decoded expected i, expected i), the expected frames i-1, i, i+1 (at "
+            "the first frame 0, 1, 2; at the last n-3, n-2, n-1) encoded as one 3-frame "
+            "sequence through the export's own encode chain"
+        ),
+        "margin_db": margin_db,
+        "margin_basis": WITNESS_MARGIN_BASIS,
+        "sanity_floor_db": WITNESS_SANITY_DB,
+        "first_floor_db": FIRST_FLOOR_DB,
+        "first_floor_note": (
+            "the first criterion, an absolute 28 dB floor from WP1.5's identity re-encode, failed "
+            "GX011627 frame 30 at 27.79 dB, whose encode-alone loss is 28.76 dB; it was replaced "
+            "by this relative rule before re-scoring; each row keeps its verdict"
+        ),
         "frames_checked": len(rows),
         "rows": rows,
-        "min_psnr_db": min(row["psnr_db"] for row in rows),
-        "passed": all(row["floor_ok"] and row["order_ok"] for row in rows),
+        "min_own_db": min(row["own_db"] for row in rows),
+        "min_own_minus_ref_db": min(row["own_db"] - row["ref_db"] for row in rows),
+        "passed": all(row["match_ok"] and row["order_ok"] for row in rows),
+        "first_floor_passed": all(row["first_floor_ok"] for row in rows),
     }
+
+
+def _reference_encode(
+    source: Source, frames: Sequence[NDArray[Any]], path: Path
+) -> list[NDArray[Any]]:
+    """Encode frames through the export's own encode chain and decode them back.
+
+    Args:
+        source: The clip (the chain's tags, size, rate and muxed streams come from it).
+        frames: The integer frames, in order.
+        path: The output file (checked by the caller; overwritten).
+
+    Returns:
+        The decoded frames, in order.
+
+    Raises:
+        ClipError: The encode fails or does not give the frames back.
+    """
+    command = encode_command(source, path, len(frames))
+    done = subprocess.run(
+        command,
+        input=b"".join(np.ascontiguousarray(frame).tobytes() for frame in frames),
+        capture_output=True,
+        env=tool_env(),
+        check=False,
+    )
+    if done.returncode != 0:
+        tail = done.stderr.decode("utf-8", errors="replace").strip()[-300:]
+        raise ClipError(f"the reference encode failed (status {done.returncode}): {tail}")
+    decoded, _ = decode_frames(open_source(path), 0, len(frames))
+    return decoded
 
 
 def require_witness(record: Mapping[str, Any]) -> None:
@@ -2124,23 +2223,24 @@ def require_witness(record: Mapping[str, Any]) -> None:
     Args:
         record: An :func:`output_witness` record.
 
-    A frame that matches a neighbour's expected frame at the floor or better, and at least as
-    well as its own, is MISPLACED (a frame out of order): that is reported first. A frame
-    that matches no candidate at the floor is a MISMATCH (for example corrected with other
-    statistics). A frame above the floor that still scores no better than a neighbour is an
-    order failure too.
+    A frame that matches a neighbour's expected frame at its threshold or better, and at
+    least as well as its own, is MISPLACED (a frame out of order): that is reported first. A
+    frame that matches its own expected frame below the threshold is a MISMATCH (for example
+    corrected with other statistics). A frame above the threshold that still scores no better
+    than a neighbour is an order failure too.
 
     Raises:
         OutputOrderError: A frame is misplaced, or scores no better than a neighbour.
-        OutputMismatchError: A frame scored below the floor against its expected frame.
+        OutputMismatchError: A frame scored below its threshold against its expected frame.
     """
     misplaced = [row["index"] for row in record["rows"] if row["misplaced"]]
     if misplaced:
         raise OutputOrderError(f"output frames {misplaced} match a neighbour's expected frame")
-    low = [row["index"] for row in record["rows"] if not row["floor_ok"]]
+    low = [row["index"] for row in record["rows"] if not row["match_ok"]]
     if low:
         raise OutputMismatchError(
-            f"output frames {low} score below {record['floor_db']} dB against the corrected source"
+            f"output frames {low} score below the encoder's own loss less "
+            f"{record['margin_db']} dB against the corrected source"
         )
     unordered = [row["index"] for row in record["rows"] if not row["order_ok"]]
     if unordered:
@@ -2189,8 +2289,15 @@ def run_witness(
         relocated, output_path = str(output_path), run_record.parent / output_path.name
     output = open_source(output_path)
     statistics = per_frame_statistics(analysis)
+    reference = roots.check(output_path.parent / "witness-reference.mp4")
     record = output_witness(
-        source, output, statistics, params, backend, witness_indices(len(statistics), wanted)
+        source,
+        output,
+        statistics,
+        params,
+        backend,
+        witness_indices(len(statistics), wanted),
+        reference,
     )
     record |= {
         "tool": "tools/prototype/clip.py witness (untimed, after the export)",

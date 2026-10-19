@@ -928,6 +928,12 @@ def test_decode_frames_writes_no_temporary_file(
     assert len(frames) == 3
 
 
+def test_reference_frames_keep_the_checked_frame_off_the_first_position() -> None:
+    assert clip.reference_frames(0, 60) == [0, 1, 2]
+    assert clip.reference_frames(30, 60) == [29, 30, 31]
+    assert clip.reference_frames(59, 60) == [57, 58, 59]
+
+
 def test_witness_indices_span_the_clip() -> None:
     assert clip.witness_indices(681)[:2] == [0, 30] and clip.witness_indices(681)[-1] == 680
     assert len(clip.witness_indices(681)) == clip.WITNESS_FRAMES
@@ -972,11 +978,19 @@ def test_the_output_witness_passes_a_correct_export(
 ) -> None:
     source, output = clip.open_source(synthetic), clip.open_source(planted_export)
     indices = clip.witness_indices(CLIP_FRAMES, 8)
-    record = clip.output_witness(source, output, planted_statistics, Params(), GPU, indices)
+    reference = planted_export.parent / "reference.mp4"
+    record = clip.output_witness(
+        source, output, planted_statistics, Params(), GPU, indices, reference
+    )
     clip.require_witness(record)
     assert record["passed"] and record["frames_checked"] == 8
     assert record["rows"][0]["index"] == 0 and record["rows"][-1]["index"] == CLIP_FRAMES - 1
-    assert record["min_psnr_db"] >= clip.WITNESS_FLOOR_DB
+    assert record["rows"][0]["reference_frames"] == [0, 1, 2]
+    assert record["rows"][-1]["reference_frames"] == [57, 58, 59]
+    for row in record["rows"]:
+        assert row["own_db"] >= row["ref_db"] - clip.WITNESS_MARGIN_DB
+        assert {"own_db", "ref_db", "margin_db", "neighbours_db", "first_floor_ok"} <= set(row)
+    assert not reference.exists()  # the reference encode is removed
 
 
 @pytest.mark.gpu
@@ -1003,7 +1017,10 @@ def test_the_output_witness_catches_a_frame_swap_by_name(
         "-an",
     )
     source, output = clip.open_source(synthetic), clip.open_source(swapped)
-    record = clip.output_witness(source, output, planted_statistics, Params(), GPU, [10, 20])
+    reference = swapped.parent / "reference.mp4"
+    record = clip.output_witness(
+        source, output, planted_statistics, Params(), GPU, [10, 20], reference
+    )
     with pytest.raises(clip.OutputOrderError):
         clip.require_witness(record)
 
@@ -1015,6 +1032,8 @@ def test_the_output_witness_catches_a_wrong_statistics_index_by_name(
 ) -> None:
     shifted = planted_statistics[30:] + planted_statistics[:30]  # planted: index off by 30
     source, output = clip.open_source(synthetic), clip.open_source(planted_export)
-    record = clip.output_witness(source, output, shifted, Params(), GPU, [5, 10, 15])
+    reference = planted_export.parent / "reference.mp4"
+    record = clip.output_witness(source, output, shifted, Params(), GPU, [5, 10, 15], reference)
+    assert not any(row["match_ok"] for row in record["rows"])
     with pytest.raises(clip.OutputMismatchError):
         clip.require_witness(record)
