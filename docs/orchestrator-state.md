@@ -20,7 +20,11 @@
     as "HOLD <item>": pause that item, continue the rest.
   - Info-updates to the operator continue.
   - No AskUserQuestion from this seat.
-- Spec is **v0.5.2** (`9042ae0`, D60 closed, owner-approved). Cite v0.5.2 in every brief.
+- Spec is **v0.5.3** (owner "approved as 0.5.3" 2026-10-19, main `b3fcd86`, CHARC
+  `d66e745b6a381bf3`): D16 3C default; chapter handling deferred to v2. Plan **v1.1** (WP3.8
+  removed). Cite v0.5.3 in every brief from now. The prototype `Params()` default flips to c3 in
+  the next brief touching `tools/prototype` (WP1.4b or the WP1.3 deep part), as a one-line owned
+  change with its test update; never inside Part B.
 
 ### Live cells
 
