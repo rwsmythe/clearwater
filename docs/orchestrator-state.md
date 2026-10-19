@@ -51,6 +51,12 @@
   - no Defender exclusion; the 4 h cap.
   At QA, check that the ledger shows each of these. Exclusive: nothing at this seat until the
   cell returns.
+  **STOPPED AGAIN ~04:20Z (condition 4), ledger `a14cfb8`.** W1 was contaminated twice by the
+  swing-trading orchestrator's periodic pytest loop (16 xdist workers every 15-20 min). WMI
+  samplers were removed in `2c2856a`. Query `7f13222c` to CHARC: the owner's quiet block is
+  ~3 h. The report round is DEFERRED to after the block (my call). On release, also ask the
+  cell to record per window the nvidia-smi clocks.sm, pstate and power.draw plus the power
+  scheme: clean 1080p runs varied 0.140 vs 0.099 s.
 - **Shallow CP2 COMPLETE** (owner 2026-10-19, CHARC `3bac4a724b1420aa`, record
   `docs/proofs/cp2-look-check.md`): c3 default (both Ancuti variants over-red; kept as options);
   no cast, halo, noise, clipping or flicker; staged vs flat no visible difference. Briefs cite
