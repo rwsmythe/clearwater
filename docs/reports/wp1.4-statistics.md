@@ -63,7 +63,9 @@ the step consumes it. Every field is optional (`None`: the step measures it).
 
 - `correct(image, params, backend=None, statistics=None)`: with `None` the code path is the
   accepted one. With a record, each supplied value replaces the measurement where the step would
-  make it.
+  make it, with one exception: when `white_balance_gains` is supplied, a supplied
+  `white_balance_means` is neither consumed nor checked for shape (only for finiteness).
+  *Erratum at the gate (Reviewer B re-run finding 2; DR-25).*
 - `temporal.statistics_of(frame, params)` returns the frame's own record. Feeding it back gives a
   bit-identical `Result` (every array and both step records) on the CPU and on the GPU, for Ancuti
   2018 blue off and on and for 3C, also after a JSON round trip (test 1).
@@ -72,6 +74,10 @@ the step consumes it. Every field is optional (`None`: the step measures it).
   repr round-trips exactly. `temporal.unflatten` refuses every name `flatten` cannot produce (an
   unknown field or a known field with an unknown suffix, such as `compensation_alpha.green`), so a
   supplied value is never silently dropped and replaced by the pipeline's own measurement.
+  *Erratum at the gate (Reviewer B re-run finding 1; DR-25):* the runner's record reader
+  (`series_from_record`) takes the scalar names from the FIRST entry only and does not call
+  `unflatten` per entry, so an unknown name present only on a later entry of a persisted
+  record is dropped silently. The records of this run carry one key set throughout.
 - The hook refuses a supplied number that is not finite, and N{} bounds with `low > high`, naming the
   field (`pipeline.check_statistics`, called by `correct()`, `temporal.measure` and each step).
 - A persisted series is applied to the frames by position, so the runner checks, before analysing or
@@ -293,6 +299,14 @@ window 2.0 s** (s = 0.33 s; 90 % of a step after 0.45 s; 10-90 % rise 0.87 s). G
    1 Hz and 0.1 % at 2 Hz, where 1.0 s passes 59 % and 11.5 %.
 2. It leaves 0.106 and 0.053 levels, against 0.236 and 0.151 unsmoothed (45 % and 35 %): about a
    fifth less than 1.0 s.
+   *Erratum at the gate (Reviewer B re-run finding 3; DR-25):* these are STAGED figures over
+   all steps. At 2 s the staged reach (3 x 30 = 90 frames) exceeds half of either 6 s
+   excerpt (180 and 179 frames), so no staged 2 s step is edge-free and the boundary bias of
+   these figures is unmeasured; the same holds for the staged 2 s and 4 s percentages in the
+   "Longer windows" reading above. The edge-free comparison is FLAT's interior
+   (`results.json`): 0.168 and 0.036 at 2 s against 0.183 and 0.048 at 1 s, 8 % and 25 % less.
+   Grounds 1, 3 and 4 are properties of the filter and do not depend on the excerpts; the size
+   of ground 2 is provisional until a staged run on an excerpt of at least 182 frames.
 3. A diver turning from sand to blue water in about a second is followed within half a second; 4.0 s
    lags 0.85 s and smears the turn over 1.7 s.
 4. The median makes a single corrupt or flash frame vanish, at no measured cost.
@@ -417,6 +431,12 @@ Proposed for IF-3 from these measurements. Every statistic measured was smoothed
   the encode verification still passed). In the product, `render` looks a frame's statistics up by
   its pts and refuses a frame with no entry; the stage cache and the smoothing window are both defined
   in time (D95).
+  *Erratum at the gate (Reviewer B re-run finding 4; DR-25):* the tick check refuses a record
+  whose ticks differ, not a stale record of the SAME excerpt: the render does not check a
+  record's `smoother`, `params` or schema, so a same-tick record made with another smoother
+  would render under the `staged`/`flat` label. For the records of this run, Reviewer B's
+  executed audit found the stored staged and flat series equal to the 1 s Gaussian smoothing
+  of the recorded series to 1.4e-14.
 
 ## 8. Limits, deviations, open questions
 

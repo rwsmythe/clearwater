@@ -24,93 +24,25 @@
 
 ### Live cells
 
-**NONE.** (Generation 2 reading at 2026-10-19 00:50Z.)
-
-### In progress at this seat (generation 2)
-
-- **WP1.4 gate.** Candidate `wp1.4-mc` @ `911d837` on main `6b5ea91`; worktree
-  `.worktrees/wp1.4-mc` (copied toml). Patch-id `5b5b3108` identical before/after rebase.
-  ruff, format, mypy clean. Witness 6/6 bit-identical (scratchpad `witness_r.py`).
-  Reviewer B re-run: `clearwater-review-evidence\wp1.4eviewBerun\` (probe READY 00:45Z).
-- **CHARC rulings 2026-10-19:** `35b13416` (WP-T2 locator scope: one additive
-  `find_footage_file(stem, root=None)` in `tools/local_config.py`, reuse the inventory's
-  VIDEO_EXTENSIONS, unique-or-`LocalConfigError`, read-only, fake-tree tests, 0 skipped) and
-  `e5505505` (sequence: WP1.4 merges FIRST as is, accept states the 3 skips verbatim with cause
-  and names WP-T2 as closer; then WP-T2 on main, sonnet-high, tier fast, owning the 2 tests,
-  `pack.py`, the WP1.4 runner and test 7; Part B follows WP-T2). Item 2 of `35b13416` WITHDRAWN.
+**NONE** at the WP1.4 accept (generation 2 reading, 2026-10-19 ~01:10Z). WP-T2 dispatches next
+(see Handoff 2); record its cell here at dispatch.
 
 ### Handoff -- the successor starts HERE
 
-1. **WP1.4 remediation RETURNED; the gate is yours.** It returned 2026-10-19 00:36Z.
-   - Branch `wp1.4` head `45fd95b`, base `9ed1a1c`; worktree `.worktrees/wp1.4`, clean. Its
-     toml is copied in.
-   - **History:**
-     - author `wp14-cell` (opus-high), 384K, retired;
-     - my seat B pass 1 on `af98ca8`: BLOCKING (M1-M4), md5 `f53b2099...`, evidence
-       `clearwater-review-evidence\wp1.4\reviewB\`;
-     - ONE remediation `wp14-fix` (sonnet-high), brief `docs/briefs/wp1.4-remediation-brief.md`
-       (`179fab0`). It was interrupted at the 10-15 restart and resumed 10-18 by raw id
-       `awp14-fix-a7f2718c31740dc1`.
-   - **The cell's return** (its full report never reached the seat; it was extracted from
-     `subagents/agent-awp14-fix-*.jsonl`):
-     - all 12 findings closed;
-     - Reviewer A r2 (`63d8422..865a054`): 2 majors (staged nested reach -> `staged_reach`; an
-       optional witness) and 3 minors, all fixed. The r2 fixes were NOT re-reviewed (one round
-       only);
-     - records re-run: every statistic, mismatch, flicker and render figure unchanged; the 3 CP2
-       clips have the same md5 (`53f8c671`, `84a0e488`, `77e6a1ac`);
-     - section 7 carries CHARC's pts-keying requirement (`0da890ba5a2eb047`), applied in
-       `45fd95b`.
-   - **Gates at the cell:** 551 passed, **3 skipped** (see item 2); gpu 24.
-   - **Your steps:**
-     1. Rebuild `wp1.4-mc` with the toml and `uv sync`, and compare patch-ids.
-     2. Gate it.
-     3. Re-run my witness: main against the candidate with `statistics=None`; scratchpad
-        `witness_r.py`; 6 cases, Ancuti blue off and on and 3C, CPU and GPU. It was
-        bit-identical 6/6 before the remediation.
-     4. ONE seat Reviewer B re-run. Prompt template:
-        `clearwater-review-evidence\wp1.4\reviewB\review-prompt-B.md` plus a "THIS IS THE
-        RE-RUN" section, as in `wp1.3\reviewB\rerun\`. A 2nd block is adjudicated at the
-        gate; never a third remediation.
-     5. Merge, re-gate on main, write the accept record, and bank **DR-23** (A12: VFR
-        smoothing by index is a prototype limit; CHARC says IF-3 is keyed by pts).
-   - **Records note:** the cell's first return quoted 0.76 for the largest staged/flat pixel;
-     the records give 0.68 (GX011627) and 0.90 (GX011625).
-2. **NEW BLOCKER for "0 skipped": the footage layout changed.**
-   - On 2026-10-18 the owner moved the chapters into `Snorkel\` and `SCUBA\` (lowercase
-     `.mp4`) and added `edits\`.
-   - Three footage tests open `<footage>\GX011628.MP4` at the root and now SKIP:
-     - `tests/test_container_spike.py`;
-     - `tests/test_lookcheck.py`;
-     - WP1.4 test 7.
-   - This affects main too. `tools/lookcheck/pack.py` stills and the WP1.4 runner name root
-     paths as well.
-   - **Proposal:** a small package (sonnet-high) with a shared footage-locator helper (find a
-     chapter by stem, case-insensitive, under the footage folder). Fix the tests to use it, then
-     re-gate to 0 skipped. Raise it with CHARC first: owned files span WP1.3, WP1.5 and WP1.4
-     tests.
-   - **Gating WP1.4 meanwhile:** the WP1.4 accept can either wait for this fix, or record the 3
-     skips as caused by the layout change and outside the package. Ask CHARC; I recommend
-     fixing first, because the fix is small.
-3. **Inventory DONE** (`b1fd289`): 35 videos (Snorkel 26, SCUBA 8, edits 1); no chapters;
-   photos PENDING. Reported to CHARC (return_report 23:57Z).
-4. **WP1.2 Part B:**
-   - condition 1 is MET (download complete and the inventory);
-   - condition 3 is met;
-   - condition 2 waits on the WP1.4 accept.
-
-   The brief is `docs/briefs/wp1.2b-brief.md` (EXCLUSIVE). Note: no chaptered recordings;
-   photos pending; the largest clips are in SCUBA.
-5. **CHARC's session is now `clearwater-charc-20261014-1303`** (`comms/.launch-sessions.json`).
-
-- **CHARC commission `0fd7c88ad56a7083`:**
-  - The owner's partial CP1 ("shallow confirmed") releases WP1.3 and WP1.4, shallow only.
-  - The WP1.4 gain-cap noise test becomes WP1.4b (deep footage).
-  - Sequencing:
-    - inventory pass (sonnet-medium) at once on "download complete";
-    - Part B (exclusive) only after WP1.3 and WP1.4 return or pause at a boundary.
-- Branches `wp0.1`, `wp0.2`, `wp1.1`, `wp1.2`, `wp1.5`, `wp1.2r`, `wp1.3` and `wp-t1` are kept on purpose: they hold the reviewed
-  pre-rebase SHAs the accept records cite (verify: `git worktree list` shows main and `.worktrees/wp1.4`); add `wp1.4` at its accept.
+1. **WP1.4 ACCEPTED** 2026-10-19, main `91f5775` (record `docs/proofs/wp1.4-accept.md`).
+   - Second blocking B adjudicated at the gate; findings banked as DR-25; 4 report errata.
+   - DR-23 (VFR), DR-24 (layout skips, closer WP-T2), DR-26 (spike CLI root paths) opened.
+   - Return report to CHARC and the operator fyi: see the inbox history (posted at accept).
+   - Worktrees `.worktrees/wp1.4` and `.worktrees/wp1.4-mc` can be removed
+     (`git worktree remove --force`, copied toml); keep branch `wp1.4`.
+2. **WP-T2 (footage locator)** -- brief `docs/briefs/wp-t2-brief.md` (FINAL), CHARC `35b13416`
+   (scope), `e5505505` (sequence), `59860def` (relocate `VIDEO_EXTENSIONS` into
+   `tools/local_config.py`; `tools/inventory.py` one line). implementer-sonnet-high, tier FAST
+   (gpt-5.6-luna / medium), base = main at dispatch, worktree `.worktrees/wp-t2`. Gate: 0 skipped.
+3. **WP1.2 Part B** (EXCLUSIVE) follows WP-T2. Conditions 1-3 are now met except that CHARC put
+   WP-T2 first. Brief `docs/briefs/wp1.2b-brief.md`; the chapter-handling outcome of CP1 goes
+   into it (CHARC recommended DEFER to v2; no chaptered recordings exist).
+4. **CP1** is in the owner's hands (categories folder-wise, chapter handling).
 
 ### Workstreams
 
@@ -126,6 +58,7 @@ Each accepted package had its return report posted to CHARC and an info-update t
 | WP1.2R | 2026-10-15 | `996274e` | `docs/proofs/wp1.2r-accept.md` (`aac4674`); WP1.1/1.2 addenda | CONFIRMED (`60dc8ad66427bb15`) |
 | WP1.3 | 2026-10-15 | `7178540` | `docs/proofs/wp1.3-accept.md` (`bc97a19`); 2nd B adjudicated at the gate; DR-20, DR-21 | CONFIRMED (`09057ee4b3979fa4`) |
 | WP-T1 | 2026-10-15 | `f6a34a4` | `docs/proofs/wp-t1-accept.md` (`3f40a85`); 2nd B adjudicated at the gate; DR-9 and DR-21 closed, DR-22 opened | CONFIRMED (`3501648bc8844468`) |
+| WP1.4 | 2026-10-19 | `91f5775` | `docs/proofs/wp1.4-accept.md`; 2nd B adjudicated at the gate; DR-23..DR-26 | pending |
 
 - **WP1.2 Part A, raised to CHARC:**
   - approval of the Windows-only `_windows_power()` in `bench.py` (instrument only, guarded);
@@ -145,6 +78,9 @@ Each accepted package had its return report posted to CHARC and an info-update t
 
 ### Practice notes (this instance)
 
+- **No commit on main while a B candidate is under review** (gen 2 slip, WP1.4): my state
+  commit moved main, so the merged head differed from the B-reviewed SHA by the state files
+  (recorded in the accept). Hold state edits uncommitted until the merge.
 - **Cell messages and reports:**
   - A SendMessage to a working cell may land only after it returns. Check that amendments
     landed, and re-engage the cell if not.
