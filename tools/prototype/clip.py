@@ -985,7 +985,11 @@ class _Reader(threading.Thread):
         limit: int | None = None,
         buffers: int = INPUT_BUFFERS,
     ) -> None:
-        """Prepare the reader; ``start()`` runs it."""
+        """Prepare the reader; ``start()`` runs it.
+
+        ``limit`` is the number of frames the pass reads (the witness checks the last of
+        them); ``None`` is the whole clip.
+        """
         super().__init__(daemon=True)
         self._source, self._stream, self._timing = source, stream, timing
         self._mode, self._witness, self._limit = mode, witness or {}, limit
@@ -1350,10 +1354,10 @@ def analyse(
                 started = _bracketed(started, timing)
                 _, raw = item
                 image = to_float(backend.to_device(raw), xp, source.bit_depth)
-                reader.free.put(raw)
                 means.append([float(v) for v in xp.mean(image, axis=(0, 1), dtype=xp.float64)])
                 stream.push(temporal.proxy(image))
                 backend.synchronize()
+                reader.free.put(raw)  # only once the device work on the frame has finished
                 done = time.perf_counter()
                 timing.wait_input.append(got - started)
                 timing.core.append(done - got)
@@ -1840,7 +1844,7 @@ def _run_pipeline(
             else:
                 spooled = stream = spool.open("rb", buffering=0)
             # A pass-through holds as many integer frames as the export holds frames in flight.
-            reader = _Reader(source, stream, timing, mode, witness, frames, PASSTHROUGH_BUFFERS)
+            reader = _Reader(source, stream, timing, mode, witness, expected, PASSTHROUGH_BUFFERS)
             writer = _Writer(source, encoder.stdin, timing, None if core else reader.free)
             reader.start()
             writer.start()

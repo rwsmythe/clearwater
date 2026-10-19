@@ -711,10 +711,26 @@ def _error_summary(values: list[float | None]) -> dict[str, float | None]:
 
 
 def _clip_mode(args: argparse.Namespace) -> int:
-    """Run one whole-clip mode (analysis, end-to-end, decode-only, passthrough) and record it.
+    """Run one whole-clip mode and record it; a raw spool never outlives the call.
+
+    Raises:
+        _UsageError: A missing or contradictory argument (caught by :func:`main`).
+    """
+    spools: list[tuple[OutputRoots, Path]] = []
+    try:
+        return _clip_pass(args, spools)
+    finally:
+        for roots, path in spools:
+            roots.remove(path)  # the split's spool is about 16 GiB for a 22 s 4K chapter
+
+
+def _clip_pass(args: argparse.Namespace, spools: list[tuple[OutputRoots, Path]]) -> int:
+    """Run one whole-clip mode (see the module docstring) and write its record.
 
     The memory samplers, the card-state samples and the stray-process checks bracket the
-    pass; the container comparison of an output runs after the pass has ended.
+    pass; the container comparison of an output runs after the pass has ended. A spool
+    the pass creates is appended to ``spools`` before it is written, for the caller to
+    remove.
 
     Raises:
         _UsageError: A missing or contradictory argument (caught by :func:`main`).
@@ -766,6 +782,7 @@ def _clip_mode(args: argparse.Namespace) -> int:
         spool_command = None
         if args.mode == "encode-only":
             # The encoder's input is decoded to a file first, outside the timed window.
+            spools.append((roots, spool_path))
             spool_command = clip.spool(source, spool_path, spool_log, args.hwaccel, args.frames)
         ambient_gpu = _nvidia_smi_gpu()
         backend = select_backend(args.device)
@@ -817,8 +834,6 @@ def _clip_mode(args: argparse.Namespace) -> int:
         gpu_end = _gpu_state()
     except (clip.ClipError, OSError) as exc:
         print(f"error: {_one_line(exc)}", file=sys.stderr)
-        if spool_command is not None:
-            roots.remove(spool_path)  # a raw spool is large; it never outlives its pass
         return 2
     finally:
         sampler.stop()
@@ -894,7 +909,6 @@ def _clip_mode(args: argparse.Namespace) -> int:
                 "bytes": spool_path.stat().st_size,
                 "decoded": "before the timed window; deleted after the comparison",
             }
-            roots.remove(spool_path)
         roots.write_text(record_path, json.dumps(record, indent=1) + "\n")
     except (OSError, clip.ClipError, ExtractError) as exc:
         print(f"error: {_one_line(exc)}", file=sys.stderr)
