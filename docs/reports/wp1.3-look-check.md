@@ -378,16 +378,20 @@ record observations about them under the open-water row at CP2 is the owner's ca
   remediation allows one round. Ledger `docs/proofs/wp1.3-ledger.md`; evidence
   `C:\Users\rwsmy\clearwater-review-evidence\wp1.3\r3\`.
 
-## 9. CP2 sheet (the owner fills the last three columns)
+## 9. CP2 sheet (filled by CHARC from the owner's words, 2026-10-19 ~01:35-01:55Z; record `docs/proofs/cp2-look-check.md`)
 
 | Case or artifact class | Observed (yes / no / pending) | Seriousness | Decision |
 |---|---|---|---|
-| Gray-world on open water (spec 12) | PENDING | | |
-| Distance haze (spec 12) | PENDING | | |
-| Deep-water noise (spec 12) | PENDING | | |
-| Colour cast remaining | | | |
-| Magenta push | | | |
-| Over-sharpening halo | | | |
-| Noise | | | |
-| Clipping | | | |
-| Flicker (the two clips in `work\wp1.3\flicker\`) | | | |
+| Gray-world on open water (spec 12) | PENDING (scuba look check) | | |
+| Distance haze (spec 12) | PENDING (scuba look check) | | |
+| Deep-water noise (spec 12) | PENDING (scuba look check) | | |
+| Colour cast remaining | no (all three variants: "the green/blue is corrected out") | | |
+| Magenta push (red over-correction) | yes on `ancuti2018` and `ancuti2018-blue` ("too much red in the scene", skin and the white boat); no on `c3` ("seems to match my recollection of the actual scene") | enough to change the default | `c3` becomes the default method; `ancuti2018` and `ancuti2018-blue` stay as options (spec revision pending) |
+| Over-sharpening halo | no | | |
+| Noise | no | | |
+| Clipping | no | | |
+| Flicker (the two clips in `work\wp1.3licker\`) | no ("no brightness or color pulsing"; a smooth scene-driven red ramp as open water fills the frame, "a smooth shift") | | |
+| Flicker, smoothed (WP1.4 staged and flat clips) | no | | |
+| Staged vs flat visibly different (WP1.4 clips, D98) | no ("I see no difference in either of those") | | architect's reading at WP1.6 (plan section 9 row 5) |
+
+Owner's confirmation of this sheet: "confirmed" (2026-10-19 ~01:55Z).

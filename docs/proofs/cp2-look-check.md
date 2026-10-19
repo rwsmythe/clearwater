@@ -1,4 +1,4 @@
-# CP2 -- Look check (owner checkpoint record, LIVING until the owner finishes the sheet)
+# CP2 -- Look check (owner checkpoint record, COMPLETE for the shallow part 2026-10-19)
 
 CP2 is the owner's visual review (plan section 5; spec D103: informal bar, no numeric
 threshold). CHARC records the owner's words with their time; the WP1.3 report's section 9 sheet
@@ -48,4 +48,9 @@ is the owner's observation plan section 9 row 5 names ("Statistics: no visible d
 method may declare one stage; IF-3 stays staged (D98); architect, using the owner's observation
 at CP2"). The architect's reading follows at WP1.6.
 
-## Step 5: the sheet (pending the owner's confirmation of the compiled sheet)
+## Step 5 -- the sheet (owner, 2026-10-19 ~01:55Z): "confirmed"
+
+The compiled sheet is in `docs/reports/wp1.3-look-check.md` section 9. Shallow CP2 is COMPLETE.
+Open: the three deep rows (open water, distance haze, deep-water noise) at the scuba look check
+(WP1.3 deep part, after Part B). Decisions carried forward: c3 default (spec revision, owner
+approves the text); D98 architect's reading at WP1.6 on "no visible difference".
