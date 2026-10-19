@@ -2153,7 +2153,9 @@ def run_witness(
     """Run the output witness on an existing export and write ``output-witness.json`` beside it.
 
     The run record (a ``bench.py --mode end-to-end`` record or a ``clip.py render`` run
-    record) names the source, the analysis record and the output. The analysis record is
+    record) names the source, the analysis record and the output (looked for beside the run
+    record when the recorded path is gone, as after a moved run folder; the record notes it).
+    The analysis record is
     checked against the source (:func:`check_statistics_record`) and supplies the parameters
     and the per-frame statistics. Untimed: it runs after the export, on its file.
 
@@ -2181,6 +2183,10 @@ def run_witness(
     hwaccel = dict(analysis.get("decode") or {}).get("hwaccel", "none")
     check_statistics_record(analysis, source, params, hwaccel, run.get("frames_limit"))
     output_path = Path(run["output"])
+    relocated = None
+    if not output_path.exists() and (run_record.parent / output_path.name).is_file():
+        # The run's folder was moved after the run (as W4's were); the output sits beside it.
+        relocated, output_path = str(output_path), run_record.parent / output_path.name
     output = open_source(output_path)
     statistics = per_frame_statistics(analysis)
     record = output_witness(
@@ -2191,6 +2197,7 @@ def run_witness(
         "written": datetime.datetime.now().astimezone().isoformat(timespec="seconds"),
         "run_record": str(run_record),
         "output": str(output_path),
+        "output_recorded_as": relocated,
         "statistics": run["statistics"],
         "source": source.identity(),
         "backend": backend.name,
