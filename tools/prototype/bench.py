@@ -53,7 +53,8 @@ Memory. Peak RSS is the maximum of ``psutil`` samples taken by a thread that wai
 between samples during the timed loop (a sample takes time too, so the actual interval is
 longer: the whole-clip records give it as duration / ``samples``). On the GPU, CuPy's
 default memory pool is wrapped by a counting allocator that records the pool's used bytes
-after every allocation (its high-water mark), and the pool's reserved bytes are read after the timed loop (the pool's cache is emptied before the
+after every allocation (its high-water mark), and the pool's reserved bytes are read after
+the timed loop (the pool's cache is emptied before the
 loop and the pool never returns memory during it, so that is its own high-water mark).
 ``nvidia-smi --query-gpu=memory.used`` is read before the backend starts and the CUDA
 runtime's device-wide used memory just after it starts (the CUDA context then exists);
