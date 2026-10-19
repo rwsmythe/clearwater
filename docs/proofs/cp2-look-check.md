@@ -19,6 +19,13 @@ the white boat = YES for `ancuti2018` and `ancuti2018-blue`, NO for `c3`. Prefer
 the Ancuti red push is consistent with the pack's gain table (red gains up to 1.38 against
 c3's 0.98-1.03). Seriousness and decision for the red push: owner's, pending.
 
-Rows still open from step 2: over-sharpening halo, noise, clipping.
+Owner, 2026-10-19 ~01:40Z (verbatim): "I saw no indications of halo, noise, or clipping. c3
+should be the default, we can keep the other two as options."
+
+Step-2 sheet rows (owner): colour cast remaining NO; magenta/red push YES on both Ancuti
+variants (skin, white boat), NO on c3, decision: **c3 becomes the default method, ancuti2018
+and ancuti2018-blue stay as selectable options**; over-sharpening halo NO; noise NO; clipping
+NO. The default-method change is a spec decision (14.1 / the method default); CHARC carries it
+into the spec revision bundle with the chapter deferral (owner approves the exact text).
 
 ## Steps 3-5: pending
