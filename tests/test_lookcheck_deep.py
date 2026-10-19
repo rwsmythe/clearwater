@@ -587,10 +587,12 @@ def test_the_deep_clip_is_staged_smoothed_encoded_checked_and_pruned(
 
     monkeypatch.setattr(temporal, "analyse_staged", spy)
     clip_dir = roots.allowed / "clip"
-    document = pack.run_deep_clip(clip, 3.8, roots, backend, clip_dir, seconds=1.0)
+    document = pack.run_deep_clip(clip, 3.95, roots, backend, clip_dir, seconds=0.4)
     count = document["excerpt"]["frames"]
-    assert 29 <= count <= 30
-    assert document["excerpt"]["start_s"] == pack.clip_window(3.8, 4.0, 1.0) == 3.0
+    assert 11 <= count <= 12  # 0.4 s at 30000/1001
+    duration = frames.probe_stream(clip).duration_s
+    start = document["excerpt"]["start_s"]  # centred on 3.95 s would run past the end: clamped
+    assert start == pack.clip_window(3.95, duration, 0.4) == pytest.approx(duration - 0.4)
     assert document["analysis"].startswith("STAGED")
     assert document["smoother"] == {"kind": "gaussian", "window_s": 2.0}
     assert all(check["ok"] for label, check in document["checks"].items() if label != "readback")
