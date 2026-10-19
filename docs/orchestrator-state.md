@@ -57,6 +57,12 @@
   ~3 h. The report round is DEFERRED to after the block (my call). On release, also ask the
   cell to record per window the nvidia-smi clocks.sm, pstate and power.draw plus the power
   scheme: clean 1080p runs varied 0.140 vs 0.099 s.
+  CHARC `329b66543e1412da`: the decision_request for the block went to the operator
+  (`e2c53e6a`), and the report round is deferred.
+  - Per window, record clocks.sm, pstate, power.draw, `clocks_throttle_reasons.active` and the
+    power scheme. Clock variation on clean runs is measured spread, not contamination.
+  - The cell is HELD until CHARC relays the owner's block start. Then send ONE message:
+    release, plus the clock and throttle recording.
 - **Shallow CP2 COMPLETE** (owner 2026-10-19, CHARC `3bac4a724b1420aa`, record
   `docs/proofs/cp2-look-check.md`): c3 default (both Ancuti variants over-red; kept as options);
   no cast, halo, noise, clipping or flicker; staged vs flat no visible difference. Briefs cite
