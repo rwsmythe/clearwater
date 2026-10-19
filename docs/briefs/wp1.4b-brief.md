@@ -35,7 +35,10 @@ Uses the GPU; records no timing or memory figure; NOT exclusive.
    default (`tools/statistics_experiments.py`, `tools/prototype/clip.py`, `bench.py`,
    `tools/lookcheck/pack.py`) pin `ancuti2018` where they relied on the default, so a re-run
    reproduces the report; the user-facing `tools/prototype/run.py` follows `Params()` (now c3)
-   and its help text says so. The report lists every site touched, with the reason. A site
+   and its help text says so. **Guards (CHARC `1cc08da6b265e2a6`):** (i) a new test asserts
+   `Params().method == "c3"`; (ii) no pinned site may be a product-facing default: `run.py` and
+   every CLI help text show c3 as the default and list `ancuti2018` / `ancuti2018-blue` as the
+   options, as spec 6.3 does. The report lists every site touched, with the reason. A site
    that needs more than naming the method is a STOP.
 2. **Frames.** The 8 deepest frames of `work/wp1.3d/deep-frames.json` (lowest `D = R̄/Ḡ`),
    re-extracted at FULL resolution as 16-bit PNG into `work/wp1.4b/frames/` through
