@@ -5,9 +5,10 @@
 
 ### Generation
 
-- First orchestrator generation, session `clearwater-orchestrator-20261014-1258`
-  (verify: `comms/.launch-sessions.json`). Brought up 2026-10-14.
-- Bash-launch gauge at bring-up: 30 ms (PowerShell `Measure-Command { & $env:CLAUDE_CODE_GIT_BASH_PATH -c true }`); under the 1 s flag line.
+- Generation 2, session `clearwater-orchestrator-20261018-1442` (verify:
+  `comms/.launch-sessions.json`). Brought up 2026-10-19 00:42Z. Generation 1 was
+  `clearwater-orchestrator-20261014-1258`.
+- Bash-launch gauge at bring-up: 40 ms (PowerShell `Measure-Command { & $env:CLAUDE_CODE_GIT_BASH_PATH -c true }`); under the 1 s flag line.
 
 ### Standing operator rulings
 
@@ -23,7 +24,20 @@
 
 ### Live cells
 
-**NONE.** Generation 1 rolled over 2026-10-19 ~00:45Z at this boundary (depth 411K).
+**NONE.** (Generation 2 reading at 2026-10-19 00:50Z.)
+
+### In progress at this seat (generation 2)
+
+- **WP1.4 gate.** Candidate `wp1.4-mc` @ `911d837` on main `6b5ea91`; worktree
+  `.worktrees/wp1.4-mc` (copied toml). Patch-id `5b5b3108` identical before/after rebase.
+  ruff, format, mypy clean. Witness 6/6 bit-identical (scratchpad `witness_r.py`).
+  Reviewer B re-run: `clearwater-review-evidence\wp1.4eviewBerun\` (probe READY 00:45Z).
+- **CHARC rulings 2026-10-19:** `35b13416` (WP-T2 locator scope: one additive
+  `find_footage_file(stem, root=None)` in `tools/local_config.py`, reuse the inventory's
+  VIDEO_EXTENSIONS, unique-or-`LocalConfigError`, read-only, fake-tree tests, 0 skipped) and
+  `e5505505` (sequence: WP1.4 merges FIRST as is, accept states the 3 skips verbatim with cause
+  and names WP-T2 as closer; then WP-T2 on main, sonnet-high, tier fast, owning the 2 tests,
+  `pack.py`, the WP1.4 runner and test 7; Part B follows WP-T2). Item 2 of `35b13416` WITHDRAWN.
 
 ### Handoff -- the successor starts HERE
 
