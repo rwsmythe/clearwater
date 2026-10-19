@@ -70,11 +70,24 @@ a short read is `PartialFrameError` and a wrong count is `FrameCountError`. Ever
 channel means, and the last frame's, are checked against the analysis record within 1e-8. That
 was 24 checks on GX011627 and 499 on GX011625, all passed.
 
-**The pipe.** FFmpeg writes a raw pipe in 32 KB blocks. A Windows anonymous pipe then carries
-about 430 MB/s, about 57 ms per 4K frame. Measured in development: decoding to NUL takes
-12.4 ms/frame. A writer using 1 MB / 25 MB blocks reaches 4.4 / 6.0 GB/s, that is 5.6 / 4.2 ms per
-frame. Python's 25 MB writes into the encoder's pipe take about 3-5 ms (`write`, below). The pipe
-was measured, not tuned (brief).
+**The pipe.** FFmpeg writes a raw pipe in 32 KB blocks, and a Windows anonymous pipe carries
+those slowly.
+
+Record `work/wp1.2b/transport/transport-20261019.json` (instrument `transport.py` beside it), on
+GX011627:
+- conditions: 2026-10-19 03:25:50-03:27:11, head `13a498f`, clean tree, Best performance;
+- stray checks: WmiPrvSE 60-73 % and, after, `vmmemWSL` 85 %;
+- card: P8 -> P3.
+
+| Measurement | Result |
+|---|---|
+| FFmpeg decoding with the export's conversion to NUL (no pipe) | 16.2 ms per frame |
+| The same decode through the raw pipe into Python | 93.6 ms per frame, 266 MB/s, 517,560 reads, none over 32,768 bytes |
+| A Python child writing 60 frames in 32 KB blocks | 91.9 ms per 4K frame |
+| The same, in 1 MB / 25 MB blocks | 5.4 / 4.0 ms per 4K frame (4.6 / 6.2 GB/s) |
+
+Python's 25 MB writes into the encoder's pipe take about 3-5 ms per frame (`write`, below). The
+pipe was measured, not tuned (brief).
 
 **The analysis pass** (spec 7.2 steps 1-2).
 - The same decode and pipe, then each frame is copied to the GPU and area-averaged to the
@@ -96,7 +109,7 @@ the bracket within `residual_s`. For example, the GX011627 export had a 0.008 s 
 - head SHA and changed files;
 - the window's local start and end;
 - the power scheme (Balanced, `381b4222-...`) and overlay (Best performance, in every record);
-- AC power, battery 80 %;
+- AC power, battery 80-82 % (per record);
 - the card's SM clock, P-state, power draw and clock-event reasons at the loop's start and end,
   and every 60 s during whole-clip passes;
 - a 10 s psutil stray-process check before and after each run, which always lists MsMpEng and
@@ -223,7 +236,7 @@ The pass-through rows ran under the shared load, so their figures are an upper b
 
 | Pass | s/frame | min/min | Bracket | Notes |
 |---|---|---|---|---|
-| decode-only (decoder -> pipe -> reader) | 0.0886 | 2.66 | 60.4 s | pipe-bound: development 0.057 s; FFmpeg to NUL 0.0124 s |
+| decode-only (decoder -> pipe -> reader) | 0.0886 | 2.66 | 60.4 s | pipe-bound: the transport record gives 0.0936 through the pipe against 0.0162 to NUL |
 | encode-only (raw spool -> writer -> NVENC -> mux) | 0.0371 | 1.11 | 25.3 s | the 16.9 GB spool was decoded before the window and deleted after |
 | core alone (claim 2, W1c) | 0.3948 | -- | -- | |
 | passthrough (decode + encode together, no core; supplementary) | 0.0880 | 2.64 | 59.9 s | equals decode-only: the encoder is hidden behind the decode pipe |
@@ -249,10 +262,12 @@ batches at 36-99 % before and after both runs), never re-run.
 
 - Hardware decode saves 7 % here. The pass is bound by the raw pipe (the reader's read takes
   longer than the main loop's work), and `-hwaccel cuda` only speeds the decode behind the pipe.
-- At most 61 proxies are held: 3 stages x 30 frames of reach, plus 1.
+- At most 61 proxies are held: (stages - 1) x reach + 1 = (3 - 1) x 30 + 1.
 - Smoothing costs 52-61 s per clip.
 - Whether this is acceptable, and so whether D109 (sparse analysis) is named, is CHARC's call at
-  WP1.6. The stray-clean GX011627 figure, 2.1 min/min, is the idle-machine indication.
+  WP1.6. The GX011627 run clean under the contamination rule, 2.1 min/min, is the best short-run
+  indication here; it is not an idle-machine figure (its gate read 23.8 % total CPU and
+  WmiPrvSE ran at 86-88 % of a CPU).
 
 ## 8. Claim 5 -- memory (N4, V15)
 
@@ -299,13 +314,19 @@ relative step (mean |frame-to-frame change| / mean |value|), at that size.
 | saliency input 1 L | 1.2e-4 | 4.4e-4 | 1.1e-3 | 0.0079-0.0080 |
 | saliency input 2 L | 3.3e-3 | 7.7e-3 | 7.2e-3 | 0.0030 |
 
-3C gives the same picture:
+The table above is a selection; the appendix at the end lists every statistic of both
+methods, with absolute differences beside the relative ones. 3C:
 - N{} low 4.5 / 13.9 / 28.5 %, high 3.3 / 11.3 / 26.7 % (means);
-- white-balance gains within 1.2e-3;
-- steps within 0.0001 of Ancuti 2018's.
+- white-balance gains within 1.2e-3.
 
 **Reading.**
-- Means and gains survive any proxy size (area means preserve means).
+- The RGB channel means, the white-balance means and the white-balance gains survive any proxy
+  size, within 1.2e-3 relative: area means preserve means.
+- The Lab saliency means move more in relative terms where a component lies near 0.
+  - Input 2's `b` at 540: Ancuti 2018 1.9e-1 mean, 1.2 max; 3C 1.1e-1 mean.
+  - Input 2's `a` at 540: 4.6e-2 and 7.4e-2.
+  - In absolute terms all are small on the Lab scale of 0-100 (the weight divides by 100): at
+    540, L 0.35-0.40, a 0.03-0.04, b 0.015-0.017 mean; at most 0.54 L and 0.10 a at 270.
 - The N{} bounds do not: on real frames the 540-line proxy's bounds are 11-14 % narrower than
   the full frame's (WP1.4 measured 14 %, WP1.2A's synthetic 16 %), and 27-29 % at 270.
 - Proxy bounds are steadier frame to frame (relative step 0.0117 at 540 against 0.0175 at full
@@ -324,7 +345,7 @@ From the split and the rows above. These are CHARC's options for Gate 1; none wa
 | 3 | 3C large Gaussian by FFT or a recursive (IIR) filter | c3's sigma-108 Gaussian, 865 taps per axis | Moderate (numerical agreement to re-verify, D107/V-tests). c3 minus ancuti2018 is 0.24 s/frame at 4K (0.639 vs 0.395); most of it is this filter (Part A: about 97 ms per channel). |
 | 4 | Pyramid memory (release the last input's pyramids during the collapse) | 13 1/3 of the 50 1/12 peak planes | Low. Memory only (up to -27 % of the peak, 1.7 -> 1.25 GiB at 4K); no speed. Matters for 5.3K and photos, not N6. |
 | 5 | Decode/encode overlap with the core through pipelining | host-device copies and conversions in series with the kernels | Moderate (CUDA streams: upload frame i+1 and download frame i-1 while frame i computes). The decoder and encoder are already hidden behind the core (wait_input 0.2 s on 681 frames); what is left is the H2D/D2H inside `correct()`, the same 0.1-0.13 s as #1. |
-| 6 | A raw transport with large writes (PyAV in-process decode/encode, or a pipe or socket written in 1 MB+ blocks) | the 32 KB pipe (decode-only 0.057-0.089 s/frame) | Low to moderate, WP2.1's transport choice (WP1.5 left PyAV against process-FFmpeg to WP2.1). Measured large-block pipe 4-6 ms/frame. It makes the analysis pass decode- and statistics-bound instead of pipe-bound (an estimated -20 to -30 % on analysis, from the clean GX011627 run: pipe read 0.067 s against 0.050 s of work per frame); little for export while the core dominates. |
+| 6 | A raw transport with large writes (PyAV in-process decode/encode, or a pipe or socket written in 1 MB+ blocks) | the 32 KB pipe (decode-only 0.089-0.094 s/frame against 0.016 s decoding to NUL) | Low to moderate, WP2.1's transport choice (WP1.5 left PyAV against process-FFmpeg to WP2.1). The transport record gives 4.0-5.4 ms/frame for 1 MB+ blocks. It makes the analysis pass decode- and statistics-bound instead of pipe-bound (an estimated -20 to -30 % on analysis, from the clean GX011627 run: pipe read 0.067 s against 0.050 s of work per frame); little for export while the core dominates. |
 | 7 | Sustained-thermal margin (laptop) | 0x20 thermal slowdown seen in W5 | Not a code change: the owner's power and cooling. The GX011625 core median moved 0.56-0.93 s across the clip. |
 
 Even with #1, #3 and #5 together the 4K core stays near 0.2 s/frame (#1 alone gives 0.2755 s
@@ -348,3 +369,52 @@ N6 (owner-reserved).
   W1a and W1b followed under the first ruling. All are kept in `work/wp1.2b/core/`.
 - **The synthetic `--out` freedom in `bench.py`** is banked: Part A behaviour from `fedb8c9`,
   which unowned Part A tests rely on. Part B wrote no synthetic record.
+
+### Appendix -- claim 6, every statistic (generated from the two records)
+
+Per cell: relative error mean / max over the 20 frames (|proxy - full| / |full|); the
+absolute difference mean / max in the statistic's own unit (Lab units for saliency means,
+whose a and b components lie near 0, so their relative errors are inflated); the relative step
+at that size. `full` is the 2160-line frame.
+
+**ancuti2018** (`proxy/bench-gpu-GX011627-ancuti2018-20261019-030141.json`)
+
+| Statistic | full: step | 1080: rel / abs / step | 540: rel / abs / step | 270: rel / abs / step |
+|---|---|---|---|---|
+| `compensation_means.R` | 0.0074 | 9.7e-11/1.4e-10 / 4.4e-11/6.2e-11 / 0.0074 | 4.1e-11/1.0e-10 / 1.8e-11/4.7e-11 / 0.0074 | 3.9e-11/1.0e-10 / 1.8e-11/4.6e-11 / 0.0074 |
+| `compensation_means.G` | 0.0047 | 2.1e-11/7.3e-11 / 1.2e-11/4.1e-11 / 0.0047 | 2.7e-11/7.3e-11 / 1.5e-11/4.2e-11 / 0.0047 | 4.5e-11/1.2e-10 / 2.6e-11/6.9e-11 / 0.0047 |
+| `compensation_means.B` | 0.0079 | 1.1e-10/1.6e-10 / 5.6e-11/8.4e-11 / 0.0079 | 5.5e-11/1.2e-10 / 2.7e-11/5.8e-11 / 0.0079 | 5.1e-11/1.5e-10 / 2.5e-11/7.0e-11 / 0.0079 |
+| `compensation_alpha.red` | 0.0000 | 0.0e+00/0.0e+00 / 0.0e+00/0.0e+00 / 0.0000 | 0.0e+00/0.0e+00 / 0.0e+00/0.0e+00 / 0.0000 | 0.0e+00/0.0e+00 / 0.0e+00/0.0e+00 / 0.0000 |
+| `white_balance_means.R` | 0.0048 | 1.1e-04/1.8e-04 / 5.2e-05/8.9e-05 / 0.0048 | 3.5e-04/5.5e-04 / 1.7e-04/2.7e-04 / 0.0048 | 7.7e-04/1.1e-03 / 3.8e-04/5.4e-04 / 0.0048 |
+| `white_balance_means.G` | 0.0047 | 2.1e-11/7.3e-11 / 1.2e-11/4.1e-11 / 0.0047 | 2.7e-11/7.3e-11 / 1.5e-11/4.2e-11 / 0.0047 | 4.5e-11/1.2e-10 / 2.6e-11/6.9e-11 / 0.0047 |
+| `white_balance_means.B` | 0.0079 | 1.1e-10/1.6e-10 / 5.6e-11/8.4e-11 / 0.0079 | 5.5e-11/1.2e-10 / 2.7e-11/5.8e-11 / 0.0079 | 5.1e-11/1.5e-10 / 2.5e-11/7.0e-11 / 0.0079 |
+| `white_balance_gains.R` | 0.0043 | 7.3e-05/1.2e-04 / 7.9e-05/1.3e-04 / 0.0043 | 2.4e-04/3.8e-04 / 2.6e-04/4.0e-04 / 0.0043 | 5.3e-04/7.5e-04 / 5.7e-04/8.0e-04 / 0.0043 |
+| `white_balance_gains.G` | 0.0005 | 3.3e-05/5.6e-05 / 3.0e-05/5.0e-05 / 0.0005 | 1.1e-04/1.7e-04 / 9.8e-05/1.5e-04 / 0.0005 | 2.4e-04/3.4e-04 / 2.2e-04/3.0e-04 / 0.0005 |
+| `white_balance_gains.B` | 0.0042 | 3.3e-05/5.6e-05 / 3.5e-05/5.8e-05 / 0.0042 | 1.1e-04/1.7e-04 / 1.1e-04/1.8e-04 / 0.0042 | 2.4e-04/3.4e-04 / 2.5e-04/3.5e-04 / 0.0042 |
+| `normalisation_bounds.low` | 0.0175 | 4.6e-02/6.2e-02 / 1.0e-02/1.5e-02 / 0.0152 | 1.4e-01/1.8e-01 / 3.0e-02/4.3e-02 / 0.0117 | 2.9e-01/3.3e-01 / 6.2e-02/8.1e-02 / 0.0102 |
+| `normalisation_bounds.high` | 0.0159 | 3.2e-02/4.4e-02 / 8.3e-03/1.2e-02 / 0.0143 | 1.1e-01/1.4e-01 / 2.9e-02/3.9e-02 / 0.0117 | 2.6e-01/3.0e-01 / 6.7e-02/8.3e-02 / 0.0090 |
+| `saliency_means.input1.L` | 0.0079 | 1.2e-04/2.0e-04 / 5.2e-03/7.7e-03 / 0.0080 | 4.4e-04/6.9e-04 / 1.8e-02/2.7e-02 / 0.0080 | 1.0e-03/1.6e-03 / 4.4e-02/6.5e-02 / 0.0080 |
+| `saliency_means.input1.a` | 0.0501 | 1.1e-03/2.0e-03 / 6.3e-03/1.3e-02 / 0.0502 | 3.5e-03/7.4e-03 / 1.9e-02/3.8e-02 / 0.0505 | 7.2e-03/2.0e-02 / 3.5e-02/6.5e-02 / 0.0511 |
+| `saliency_means.input1.b` | 0.0352 | 5.1e-03/8.8e-03 / 7.7e-03/1.5e-02 / 0.0349 | 1.3e-02/2.3e-02 / 2.0e-02/3.9e-02 / 0.0349 | 2.0e-02/3.5e-02 / 3.1e-02/5.9e-02 / 0.0353 |
+| `saliency_means.input2.L` | 0.0030 | 3.3e-03/4.5e-03 / 1.7e-01/2.4e-01 / 0.0030 | 7.7e-03/9.6e-03 / 4.0e-01/5.1e-01 / 0.0030 | 7.2e-03/1.0e-02 / 3.8e-01/5.4e-01 / 0.0031 |
+| `saliency_means.input2.a` | 0.0481 | 1.7e-02/2.7e-02 / 1.4e-02/2.4e-02 / 0.0473 | 4.6e-02/7.1e-02 / 3.9e-02/6.6e-02 / 0.0463 | 7.7e-02/1.3e-01 / 6.5e-02/1.0e-01 / 0.0457 |
+| `saliency_means.input2.b` | 0.0813 | 6.0e-02/3.9e-01 / 4.5e-03/6.2e-03 / 0.0843 | 1.9e-01/1.2e+00 / 1.5e-02/1.9e-02 / 0.0914 | 4.1e-01/2.6e+00 / 3.1e-02/4.1e-02 / 0.1032 |
+
+**c3** (`proxy/bench-gpu-GX011627-c3-20261019-030334.json`)
+
+| Statistic | full: step | 1080: rel / abs / step | 540: rel / abs / step | 270: rel / abs / step |
+|---|---|---|---|---|
+| `white_balance_means.R` | 0.0043 | 1.4e-04/2.2e-04 / 7.5e-05/1.2e-04 / 0.0043 | 4.5e-04/6.7e-04 / 2.5e-04/3.7e-04 / 0.0043 | 8.9e-04/1.2e-03 / 4.9e-04/6.7e-04 / 0.0043 |
+| `white_balance_means.G` | 0.0043 | 6.1e-05/1.1e-04 / 3.4e-05/5.9e-05 / 0.0043 | 2.1e-04/3.4e-04 / 1.2e-04/1.9e-04 / 0.0043 | 4.3e-04/6.0e-04 / 2.4e-04/3.4e-04 / 0.0043 |
+| `white_balance_means.B` | 0.0051 | 2.8e-04/5.3e-04 / 1.5e-04/2.9e-04 / 0.0051 | 1.0e-03/1.8e-03 / 5.3e-04/9.6e-04 / 0.0051 | 2.1e-03/3.3e-03 / 1.1e-03/1.8e-03 / 0.0051 |
+| `white_balance_gains.R` | 0.0005 | 2.3e-05/3.6e-05 / 2.3e-05/3.5e-05 / 0.0005 | 6.8e-05/1.1e-04 / 6.8e-05/1.1e-04 / 0.0005 | 1.3e-04/2.5e-04 / 1.3e-04/2.5e-04 / 0.0004 |
+| `white_balance_gains.G` | 0.0006 | 1.8e-04/3.2e-04 / 1.8e-04/3.1e-04 / 0.0006 | 6.2e-04/1.0e-03 / 6.1e-04/1.0e-03 / 0.0006 | 1.3e-03/1.9e-03 / 1.2e-03/1.8e-03 / 0.0006 |
+| `white_balance_gains.B` | 0.0011 | 1.6e-04/3.2e-04 / 1.7e-04/3.3e-04 / 0.0011 | 5.9e-04/1.1e-03 / 6.0e-04/1.1e-03 / 0.0011 | 1.2e-03/2.1e-03 / 1.3e-03/2.1e-03 / 0.0010 |
+| `normalisation_bounds.low` | 0.0176 | 4.5e-02/6.1e-02 / 9.8e-03/1.5e-02 / 0.0156 | 1.4e-01/1.8e-01 / 3.0e-02/4.3e-02 / 0.0117 | 2.9e-01/3.3e-01 / 6.1e-02/8.0e-02 / 0.0114 |
+| `normalisation_bounds.high` | 0.0154 | 3.3e-02/4.4e-02 / 8.5e-03/1.2e-02 / 0.0143 | 1.1e-01/1.4e-01 / 2.9e-02/4.0e-02 / 0.0114 | 2.7e-01/3.1e-01 / 6.9e-02/8.6e-02 / 0.0087 |
+| `saliency_means.input1.L` | 0.0064 | 6.5e-05/9.4e-05 / 2.8e-03/4.0e-03 / 0.0064 | 2.1e-04/2.9e-04 / 9.2e-03/1.2e-02 / 0.0064 | 6.4e-04/8.0e-04 / 2.8e-02/3.4e-02 / 0.0064 |
+| `saliency_means.input1.a` | 0.0400 | 2.8e-03/4.0e-03 / 1.6e-03/2.8e-03 / 0.0400 | 1.7e-02/2.6e-02 / 9.7e-03/1.5e-02 / 0.0403 | 5.3e-02/8.0e-02 / 3.0e-02/4.6e-02 / 0.0414 |
+| `saliency_means.input1.b` | 0.0098 | 2.7e-04/7.3e-04 / 1.3e-04/3.5e-04 / 0.0098 | 8.3e-03/1.2e-02 / 3.9e-03/5.3e-03 / 0.0099 | 4.0e-02/5.2e-02 / 1.9e-02/2.4e-02 / 0.0105 |
+| `saliency_means.input2.L` | 0.0027 | 2.9e-03/3.9e-03 / 1.6e-01/2.1e-01 / 0.0026 | 6.6e-03/8.8e-03 / 3.5e-01/4.7e-01 / 0.0026 | 5.2e-03/9.3e-03 / 2.7e-01/4.8e-01 / 0.0028 |
+| `saliency_means.input2.a` | 0.0157 | 2.8e-02/3.9e-02 / 9.8e-03/1.5e-02 / 0.0154 | 7.4e-02/1.1e-01 / 2.6e-02/4.1e-02 / 0.0167 | 1.2e-01/1.6e-01 / 4.2e-02/6.0e-02 / 0.0183 |
+| `saliency_means.input2.b` | 0.0143 | 3.7e-02/4.9e-02 / 5.6e-03/7.1e-03 / 0.0130 | 1.1e-01/1.5e-01 / 1.7e-02/2.2e-02 / 0.0111 | 2.1e-01/2.6e-01 / 3.2e-02/3.8e-02 / 0.0106 |

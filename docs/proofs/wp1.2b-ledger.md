@@ -262,3 +262,21 @@ W5 estimate, re-fixed before it opens (23:09 HST):
 
 W5 applies the GX011625 software-decode analysis of W2
 (`bench/GX011625-analysis-ancuti2018-20261018-211458/GX011625-ancuti2018-none-analysis.json`).
+
+## Reviewer A round 4 (code since round 3 + the report)
+
+Head `13a498f`, diff 4562 lines. Banner `gpt-5.6-sol` / `high` / `read-only`; `^ERROR` 0;
+`ERROR codex_core` 0; footer 1; `^ succeeded in` 33; VERDICT `NEW_CRITICAL_MAJOR_FOUND`.
+Proofs and footage hits: prompt and report echoes; it read only the permitted `work/wp1.2b`
+records. It confirmed the main timing, N6 arithmetic, memory, witness and container figures
+against the records. 3 major + 2 minor, all in envelope, NEW, VALID, fixed:
+
+| # | Severity | Finding | Fix |
+|---|---|---|---|
+| R4-1 | major | claim 6 omitted statistics; the saliency rows gave means only | complete appendix generated from the records, absolute differences beside relative; the reading distinguishes channel means and gains from Lab saliency |
+| R4-2 | major | transport figures had no record or conditions; battery shown as 80 % only | recorded measurement `work/wp1.2b/transport/transport-20261019.json` with conditions (decode to NUL 16.2 ms, through the pipe 93.6 ms, child blocks 91.9 / 5.4 / 4.0 ms); battery 80-82 % |
+| R4-3 | major | no test proved that the export applies per-frame statistics | test `test_the_export_applies_each_frame_its_own_statistics`; EXECUTED control: with `statistics=supplied` removed the test fails (`assert False`) |
+| R4-4 | minor | 61-proxy arithmetic | (3 - 1) x 30 + 1 |
+| R4-5 | minor | W3b called an idle indication | reworded: clean under the rule, not idle |
+
+Fixes: report and test (no product code changed in this round).
