@@ -73,6 +73,21 @@
     at WP1.6.
   - The report round runs after W5. At QA, check the per-window clocks and throttle records and
     the caveat.
+  **RETURNED 2026-10-19 ~13:48Z at head `2fa0ac8`.** Two head reads (unchanged, clean). Reviewer
+  A converged at R5.
+  - Candidate `6e538d7` (rebased onto `d7a281e`), patch-id `342f070f` on both. Gates green:
+    pytest 672/0 skipped, gpu 30, harness 366.
+  - **Reviewer B #1 (STRONG) was BLOCKING:** 4 major, 5 minor, all valid. Evidence
+    `clearwater-review-evidence\wp1.2b\reviewB\`, transcript md5 `4f6ed9f6`. Withheld-access
+    grep clean: a WSL `git status` name listing only, and footage paths only inside record
+    contents.
+  - The B candidate is pinned as branch `wp1.2b-b1`, and the worktree is removed.
+  - **ONE remediation** dispatched by SendMessage, brief `docs/briefs/wp1.2b-remediation-brief.md`
+    (`f1d2be7`): no re-timing. It adds an untimed output witness on both exports, safe output
+    naming, the provenance fields, and text fixes: W3b re-labelled, spread on contaminated rows,
+    cadence, hypotheses.
+  - On return: a fresh `-mc`, then Reviewer B #2 (final). A second blocking B is adjudicated at
+    the gate.
 - **Shallow CP2 COMPLETE** (owner 2026-10-19, CHARC `3bac4a724b1420aa`, record
   `docs/proofs/cp2-look-check.md`): c3 default (both Ancuti variants over-red; kept as options);
   no cast, halo, noise, clipping or flicker; staged vs flat no visible difference. Briefs cite
