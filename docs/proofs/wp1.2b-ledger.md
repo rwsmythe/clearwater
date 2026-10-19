@@ -357,3 +357,48 @@ c131f6cdc0f68d5f3f9709a299cdee54 *bench/GX011625-end-to-end-ancuti2018-20261018-
 03427eb01042b7be9ad160c67a2ce88e *remediation/frame30_repro.json
 140b8def6a9ec921c73e72a1076f74aa *remediation/frame30_repro.py
 ```
+
+### Floor ruling (orchestrator) and second witness STOP
+
+- The ruling replaced the absolute floor BEFORE re-scoring with a per-frame relative rule:
+  own_i >= ref_i - 2.0 dB, with ref_i the encoder's own loss on the expected frame from a
+  3-frame encode through the export's chain (i not the I-frame; at the ends 0-2 and n-3..n-1).
+  It also keeps a 20 dB sanity floor and the strict order rule. Code `d6774a9`.
+- Planted controls under the new rule still fail BY NAME (margin not tightened): the swap through
+  `OutputOrderError`, the 30-frame statistics shift through `OutputMismatchError`, with no
+  row matching.
+- **Re-score on the real exports: FAILED the relative rule. STOP (ruling item 6).**
+  - GX011627: 18 of 24 frames below ref - 2 dB. Own - ref runs from 0.0 (frame 0) to -5.7 dB.
+    Order is correct on every row. The first criterion fails only at frame 30.
+  - GX011625: 13 of 24 below. Own - ref runs from +0.3 / 0.0 to -6.0 dB. Order is correct on
+    every row. The first criterion PASSES on all 24.
+  - Records kept: `output-witness-first-criterion-28dB.json` and
+    `output-witness-relative-3frame-reference.json` in each run folder.
+- **Reproduction: the 3-frame reference cannot represent the export's coding.**
+  - The export's frame types (`work/wp1.2b/remediation/gx011627-out-pict-types.txt`): I-frames
+    at 0, 250 and 500 only (GOP 250); 507 B-frames, 171 P-frames.
+  - Most checked frames are B-frames deep in a GOP; the 3-frame reference codes frame i right
+    after a fresh I-frame. Own - ref is about 0 where the export's frame is at or near a GOP
+    start (frame 0; GX011625 frames 7144 and 11040), and down to -6 dB elsewhere.
+- **GOP-start reference test** (`remediation/gop_reference_repro.py` and `.json`): GX011627
+  frame 30, the expected frames 0-31 encoded through the export chain from the GOP's I-frame.
+
+  | Comparison against expected frame 30 | PSNR |
+  |---|---|
+  | GOP-start reference | 28.09 dB |
+  | 3-frame reference | 28.76 dB |
+  | The export | 27.79 dB |
+
+  The export sits within 0.30 dB of the GOP-start reference (export against reference:
+  31.79 dB; not bit-identical, as the encoder's rate-control history differs).
+
+md5s:
+```
+2bc525e5ab41c91fb455c44bc211c2a1 *bench/W4/GX011627-end-to-end-ancuti2018-20261018-223431/output-witness-first-criterion-28dB.json
+9dcd914708071c4910bab6a47b9102c7 *bench/W4/GX011627-end-to-end-ancuti2018-20261018-223431/output-witness-relative-3frame-reference.json
+c131f6cdc0f68d5f3f9709a299cdee54 *bench/GX011625-end-to-end-ancuti2018-20261018-231103/output-witness-first-criterion-28dB.json
+1ec0f82ceaf5a4887c76f8a4fee92141 *bench/GX011625-end-to-end-ancuti2018-20261018-231103/output-witness-relative-3frame-reference.json
+9a5fd7fef3cd86f7ccb1eee2de624ce4 *remediation/gop_reference_repro.json
+96e6f50897f78006b6a7bcbc3828e269 *remediation/gop_reference_repro.py
+ae81007a183cc9ce9de61453f5a92cfe *remediation/gx011627-out-pict-types.txt
+```
