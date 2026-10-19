@@ -24,8 +24,11 @@
 
 ### Live cells
 
-**NONE** at the WP-T2 accept (2026-10-19 ~01:40Z; `wpt2-cell` returned, head `3567c56` unchanged
-at three readings across turns). Part B dispatches next; record its cell here.
+- **`wp12b-cell`** (implementer-opus-high), WP1.2 Part B, EXCLUSIVE, dispatched 2026-10-19
+  ~01:35Z in the background. Worktree `.worktrees/wp1.2b`, branch `wp1.2b`, base `f7e4cac`
+  (toml copied). Agent id `awp12b-cell-3670d11b1750f84c`. Depth at dispatch: fresh. While it
+  is live: no harness gate, pytest or Codex at this seat. If this generation rolls first, the
+  successor re-dispatches from the branch head, the ledger and the brief.
 
 ### Handoff -- the successor starts HERE
 
