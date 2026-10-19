@@ -5,7 +5,7 @@ Desktop tool (Python, PySide6) that corrects color cast, contrast loss and haze 
 ## Read these first, in this order
 
 1. `docs/clearwater-implementation-plan.md` — how the work is organized: roles, working rules, work packages (WP0.1 onward), owner checkpoints, interfaces to freeze.
-2. `docs/underwater-correction-spec.md` — v0.5.2. The source of truth for what Clearwater does. Decisions are numbered D1–D117, tests V1–V18, GUI requirements G1–G13, non-functional requirements N1–N13.
+2. `docs/underwater-correction-spec.md` — v0.5.3. The source of truth for what Clearwater does. Decisions are numbered D1–D117, tests V1–V18, GUI requirements G1–G13, non-functional requirements N1–N13.
 3. `docs/underwater-imagery-correction-research.md` — background on the method family; not normative.
 
 If the plan and the spec disagree, the spec wins; raise the disagreement to the owner.

@@ -2,7 +2,7 @@
 
 ## Specification
 
-**Version:** 0.5.2 (draft)
+**Version:** 0.5.3 (draft)
 **Date:** 13 October 2026
 **Status:** Second review (10 concerns, 6 planning questions) worked through with the owner and incorporated. Requirements are stable for implementation planning. Items left to the design stage are listed in Section 14.1. Open decisions, including scope items that depend on test results, are listed in Section 14.2.
 
@@ -14,6 +14,7 @@
 - 0.5 — Incorporated review of v0.4 as decisions D97–D117. Added staged statistics, white-balance gain clamp, prototype gate (replacing the feasibility gate), footage inventory, container spike, export performance target, CPU/GPU-portable core, provisional preview, photo memory limits and CPU fallback, synthetic flicker test, cache versioning, output chroma format. Deferred ProRAW/DNG. Amended D14, D30, D31, D42, D46, D57, D61, D62, D64, D68, D69, D71. Withdrew D23, D77, D78, D79. Split Section 14 into design items and open decisions; added Section 15.2.
 - 0.5.1 — Text only (owner-approved 2026-10-15): recorded the measured target machine (WP0.1 environment report, 2026-10-14) in D117, Section 12, Section 14.2 (item closed) and Section 15.2 Q1. No decision changed.
 - 0.5.2 — Text only (owner-approved 2026-10-15): D60 closed — no GoPro `.LRV` proxies exist for this project (sidecars deleted at cloud upload); Clearwater generates its own proxy (Section 7.3). Section 14.1 item closed; the `.LRV` leg removed from the analysis-speed measurement (Section 7.3, Section 13.1). No decision changed in substance.
+- 0.5.3 — Owner decisions 2026-10-19 (CP1, CP2; owner-approved 2026-10-19: "approved as 0.5.3"). (a) D16 amended: 3C is the default channel-compensation method; Ancuti 2018 (red, optional blue) remains selectable. (b) Chapter handling deferred to v2: D21, D33, D80, D82 and the recording-group suffix of D83 marked deferred; Section 5.5 replaced; G11 and V12 deferred; the chapter clauses removed from G7, V3 (and D64's seam threshold), V4, Sections 8.2 and 8.3 and UC2/UC3; Section 14.2 item closed. Each file is one clip in v1.
 
 ---
 
@@ -46,12 +47,12 @@ Decisions marked *(amended)* were changed by a later decision; the body of the s
 | D13 | Presets (save/load named parameter sets) are in v1 |
 | D14 | *(amended by D116)* Photo inputs: HEIC, JPEG, PNG, TIFF |
 | D15 | Video inputs: standard GoPro color profiles only; GP-Log and HDR not supported in v1 (HDR defined by D73) |
-| D16 | Both channel-compensation methods (Ancuti 2018 and 3C) included, user-selectable |
+| D16 | *(amended 0.5.3)* Both channel-compensation methods (Ancuti 2018 and 3C) included, user-selectable; 3C is the default (owner, CP2 2026-10-19: Ancuti 2018 over-corrects red on skin and white objects in the shallow footage; 3C matched the scene) |
 | D17 | All parameters exposed; technical parameters in an Advanced panel |
 | D18 | Video flicker handled by two-pass approach: analyze, temporally smooth whole-frame statistics, render |
 | D19 | No scene-cut detection; inputs are raw, continuous camera clips |
 | D20 | Audio passed through unchanged; frame rate, resolution, and timing preserved exactly (see D94) |
-| D21 | GoPro chaptered recordings treated as one clip for smoothing; output as matching chapters |
+| D21 | *(deferred to v2, 0.5.3)* GoPro chaptered recordings treated as one clip for smoothing; output as matching chapters |
 | D22 | Photo output: PNG, user-selectable 8-bit or 16-bit |
 | D23 | *(withdrawn by D116)* ProRAW/DNG inputs: original left untouched, corrected PNG exported |
 | D24 | *(amended by D63)* EXIF metadata preserved, except fields made invalid by processing |
@@ -63,7 +64,7 @@ Decisions marked *(amended)* were changed by a later decision; the body of the s
 | D30 | *(amended by D107)* Core written once to run on CPU or GPU; GPU is the expected export path, CPU the fallback |
 | D31 | *(amended by D106)* Export performance target set by D106; no other hard performance targets for v1 (memory limits D68, D110) |
 | D32 | Project name: Clearwater |
-| D33 | Chapter grouping: automatic from GoPro file naming, shown to the user for review and adjustment |
+| D33 | *(deferred to v2, 0.5.3)* Chapter grouping: automatic from GoPro file naming, shown to the user for review and adjustment |
 | D34 | Output location: source folder by default; user setting to choose a different output folder |
 | D35 | Existing output files are never overwritten; a number is appended instead |
 | D36 | Output suffix defaults to `_corrected`, editable in settings |
@@ -94,7 +95,7 @@ Decisions marked *(amended)* were changed by a later decision; the body of the s
 | D61 | *(amended by D97)* Plug-in interface: ordered statistic stages, analyze per stage, smoothing declaration, parameter and stage dependencies, render, parameter schema |
 | D62 | *(amended by D105)* Video output fidelity: timing, audio sync and display orientation mandatory; creation date/time, GPMF telemetry, timecode and camera atoms best-effort |
 | D63 | Photo orientation: pixels rotated, Orientation tag reset; thumbnail dropped, dimensions updated, Software set, HEIC gain/depth maps dropped |
-| D64 | *(amended by D112)* V3 thresholds: flicker ≤ 25% of the unsmoothed baseline, measured on a synthetic clip; chapter seam ≤ 95th percentile of within-clip adjacent-frame difference |
+| D64 | *(amended by D112; amended 0.5.3)* V3 thresholds: flicker ≤ 25% of the unsmoothed baseline, measured on a synthetic clip (the chapter-seam threshold is deferred with chapter handling) |
 | D65 | V2 pass rule: corrected preferred on ≥ 80% of the test set and no obvious artifacts |
 | D66 | V7: UI responds within 100 ms during processing |
 | D67 | New tests: identity round trip, color tags/ICC, orientation, preview vs export, naming/non-overwrite, cancel cleanup, chapter grouping, preset round trip |
@@ -110,10 +111,10 @@ Decisions marked *(amended)* were changed by a later decision; the body of the s
 | D77 | *(withdrawn by D116)* DNG variants: whatever the raw library reads; others refused with a clear message |
 | D78 | *(withdrawn by D116)* Raw development output: Display P3, display-encoded |
 | D79 | *(withdrawn by D116)* Raw development look: generic first; closeness to Apple's rendering revisited after testing |
-| D80 | Batch: chapter grouping reviewed once up front, then runs unattended |
+| D80 | *(deferred to v2, 0.5.3)* Batch: chapter grouping reviewed once up front, then runs unattended |
 | D81 | Batch failure: skip the failed item, log it, continue, report at end |
-| D82 | Non-consecutive chapter groups: warn, then reset smoothing at each break |
-| D83 | .LRV/.THM sidecars excluded from grouping and input; one collision suffix per recording group |
+| D82 | *(deferred to v2, 0.5.3)* Non-consecutive chapter groups: warn, then reset smoothing at each break |
+| D83 | *(amended 0.5.3)* .LRV/.THM sidecars excluded from input (the grouping clause and the per-recording-group collision suffix are deferred with chapter handling) |
 | D84 | Photo name clashes across formats resolved by collision numbering |
 | D85 | Outputs written to a temporary name and renamed on success; leftovers cleaned on next start |
 | D86 | Truncated/corrupt video: process the readable portion and warn |
@@ -182,8 +183,8 @@ Decisions marked *(amended)* were changed by a later decision; the body of the s
 ## 4. Use cases
 
 - **UC1 — Single photo:** Load a photo, view before/after, adjust parameters, export.
-- **UC2 — Single video clip:** Load a clip (or chaptered recording), scrub and preview corrected frames, adjust parameters, export.
-- **UC3 — Batch:** Review chapter groupings once, apply one parameter set to multiple files, export all unattended.
+- **UC2 — Single video clip:** Load a clip, scrub and preview corrected frames, adjust parameters, export.
+- **UC3 — Batch:** Apply one parameter set to multiple files, export all unattended.
 - **UC4 — Presets:** Save, load, apply, import, and export named parameter sets; start from shipped starter presets.
 
 **Usage profile (D117):** clips are typically a few minutes or less; 4K is the expected maximum resolution, though the tool is not limited to it.
@@ -220,14 +221,8 @@ Decisions marked *(amended)* were changed by a later decision; the body of the s
 - Truncated or corrupt video sources (e.g., last chapter after a battery failure) are processed up to the readable portion, with a clear warning (D86).
 - Files that cannot be read at all are refused with a clear message.
 
-### 5.5 Chaptered recordings
-Whether chapter handling stays in v1 is an open decision pending the footage inventory (Section 14.2). Until that is decided, the requirements below stand.
-
-- Chapters are grouped automatically using GoPro's file naming (shared recording number, incrementing chapter number).
-- `.LRV` and `.THM` sidecar files are excluded from grouping and from input (D83).
-- The detected grouping is shown to the user, who can add, remove, or reorder files before processing.
-- If an edited group is no longer a consecutive run of chapters (a removed middle chapter or an added unrelated file), the user is warned and smoothing resets at each break (D82).
-- A consecutive group is processed as one continuous clip for temporal smoothing, so no color seam appears at chapter boundaries.
+### 5.5 Chaptered recordings (deferred to v2)
+The footage inventory of 2026-10-18 found no chaptered recording; the camera keeps a 17-minute take in one file. Chapter grouping, review and cross-chapter smoothing (D21, D33, D80, D82) are deferred to v2 (owner, CP1 2026-10-19). In v1 every input file is its own clip: smoothing starts and ends within the file. `.LRV` and `.THM` sidecars are still excluded from input (D83). Nothing in v1 prevents v2 from adding grouping on top.
 
 ---
 
@@ -251,6 +246,7 @@ The formulas in the reference papers are authoritative over the summaries below.
 5. **Multiscale fusion** — Laplacian pyramid of inputs blended with Gaussian pyramid of weights, then collapsed.
 
 ### 6.3 Channel compensation methods
+3C is the default method (D16, amended 0.5.3); Ancuti 2018 remains selectable.
 
 #### 6.3.1 Ancuti 2018 (red, optional blue)
 - **Red:** `Irc = Ir + α·(Ḡ − R̄)·(1 − Ir)·Ig` (additive; channel values in [0, 1]).
@@ -288,7 +284,7 @@ The formulas in the reference papers are authoritative over the summaries below.
 The parameter set is defined per method through the parameter schema (Section 10.1). For v1:
 
 **Basic panel**
-- Compensation method (Ancuti 2018 / 3C)
+- Compensation method (3C, the default / Ancuti 2018)
 - Compensation strength (α for Ancuti 2018; combined κ/λ for 3C)
 - Blue compensation on/off (Ancuti 2018 only)
 - White balance strength
@@ -378,13 +374,11 @@ Timing and audio sync are the mandatory part of video output fidelity (D105).
   - display orientation: the output plays in the same orientation as the source, by keeping the rotation flag or an equivalent.
 - **Best-effort metadata (D105):** creation date/time, GPMF telemetry track, timecode track and camera-settings atoms are kept where the chosen video I/O approach preserves them at low cost. Items that are not preserved are documented as a known limitation.
 - **Provenance:** Clearwater version and parameters embedded in metadata; on by default, can be turned off.
-- **Chaptered recordings:** one output file per input chapter.
 
 ### 8.3 Location and naming
 - **Location:** same folder as the source by default; a setting allows a different output folder.
 - **Naming:** source filename plus suffix, default `_corrected`, editable in settings. Photos change extension to `.png`. Examples: `GX010123.MP4` → `GX010123_corrected.MP4`; `IMG_1234.HEIC` → `IMG_1234_corrected.png`.
 - **Collisions:** existing files are never overwritten; a number is appended (`_corrected_2`, …). This also resolves cross-format photo clashes such as `IMG_1234.HEIC` and `IMG_1234.JPG` (D84).
-- **Recording groups:** all chapter outputs of one recording share the same collision suffix (D83).
 - Source files are never modified.
 
 ### 8.4 Safe writing
@@ -403,14 +397,14 @@ Timing and audio sync are the mandatory part of video output fidelity (D105).
 - **G4** Video: timeline scrubber. While dragging, proxy frames are shown; when stopped, the full-resolution corrected frame is shown (D72). Preview uses temporally smoothed statistics once analysis has produced them, and the provisional preview before that (D108).
 - **G5** Analysis runs in the background on clip open, shows progress and can be cancelled.
 - **G6** Presets: save, load, rename, delete, import from file, export to file. Starter presets included.
-- **G7** Batch queue: add multiple files; review all chapter groupings once up front; apply one parameter set or preset; run unattended; report per-item success, warnings and failures at the end. A failed item is skipped and logged, and the batch continues (D80, D81).
+- **G7** Batch queue: add multiple files; apply one parameter set or preset; run unattended; report per-item success, warnings and failures at the end. A failed item is skipped and logged, and the batch continues (D80, D81).
 - **G8** Export and batch show progress with a cancel control:
   - cancel deletes the in-progress temporary output;
   - completed files are kept;
   - in batch mode, cancel stops the whole remaining batch.
 - **G9** GUI stays responsive during analysis, export and batch processing (work runs off the UI thread).
 - **G10** Clear messages for unsupported, damaged, or untagged inputs (Sections 5.1, 5.3, 5.4, 6.5), including ProRAW/DNG.
-- **G11** Chapter grouping review: display detected groups, allow adjustment, warn on non-consecutive groups.
+- **G11** *(deferred to v2, 0.5.3)* Chapter grouping review: display detected groups, allow adjustment, warn on non-consecutive groups.
 - **G12** Settings: output folder, output suffix, PNG bit depth, video encoder, quality level, 10-bit-for-8-bit option, provenance on/off, cache size limit, clear cache.
 - **G13** Settings and last-used parameters persist between sessions (D89).
 
@@ -481,9 +475,8 @@ Standard underwater quality metrics (UIQM, UCIQE) are unreliable and are not use
   - pass if flicker with smoothing ≤ 25% of flicker with per-frame (unsmoothed) statistics.
   - Whole-frame means are not used: per-frame gray-world forces every frame's mean color to gray, which hides the flicker being tested.
   - Flicker on real footage is judged in V2. The same region-based measurement may be run on a real clip if a truly static one is available.
-  - **Chapter seam:** color difference between the last frame of one chapter and the first of the next ≤ the 95th percentile of within-clip adjacent-frame differences (D64).
 - **V4 Video I/O fidelity:**
-  - mandatory: output matches source frame count, per-frame timestamps, start offset, resolution, bit depth (or the selected 10-bit option), chroma format, audio and display orientation; color tags match the source; chapter outputs match input chapters;
+  - mandatory: output matches source frame count, per-frame timestamps, start offset, resolution, bit depth (or the selected 10-bit option), chroma format, audio and display orientation; color tags match the source;
   - best-effort: which of creation time, GPMF, timecode and camera atoms are present is recorded;
   - the test set includes one variable-frame-rate sample (D115).
 - **V5 Photo I/O fidelity:** EXIF preserved except D63 fields; orientation correct for rotated and portrait sources in multiple viewers; ICC profile present and matching; selected bit depth honored.
@@ -493,7 +486,7 @@ Standard underwater quality metrics (UIQM, UCIQE) are unreliable and are not use
 - **V9 Identity round trip:** with every stage set to its neutral value (compensation and white balance strength 0, sharpening 0, gamma 1, and blend fully toward the corrected result), each stage reduces to identity and the output matches the input within a small color-difference tolerance for photos and video. This exercises the full decode → process → encode path, including color tags and ICC handling.
 - **V10 Naming and non-overwrite:** collision numbering, shared suffix per recording group, cross-format photo clashes, and no source or existing output ever overwritten.
 - **V11 Cancel and failure cleanup:** cancel and simulated failures (crash, disk full) leave no partial outputs; leftover temporaries removed on next start.
-- **V12 Chapter grouping:** correct automatic grouping, sidecar exclusion, warning and smoothing reset for non-consecutive groups.
+- **V12** *(deferred to v2, 0.5.3)* **Chapter grouping:** correct automatic grouping, sidecar exclusion, warning and smoothing reset for non-consecutive groups.
 - **V13 Preset round trip:** export then import reproduces identical parameters, method and version.
 - **V14 Prototype gate:** all six N5 results recorded, each with the decision it led to.
 - **V15 Memory:** peak RAM ≤ 16 GB on a 5.3K 8:7 clip and on the largest supported photo; peak graphics memory recorded; the CPU fallback engages when an image does not fit in graphics memory.
@@ -564,7 +557,7 @@ Test material generated by the project, not supplied by the owner: the synthetic
 - **Minimum specification for other users.** Whether the owner's machine is the only target that must perform well, or a minimum (for example, no NVIDIA card) is stated. The second adds testing of the CPU-only path.
 
 **Decided by the footage inventory**
-- **Chapter handling in v1** (D21, D33, D80, D82, D83). Stays, or is deferred, depending on whether the owner has any chaptered recordings.
+- **Chapter handling in v1** (D21, D33, D80, D82, D83) — CLOSED 2026-10-19: DEFERRED to v2 (owner, CP1; the inventory of 2026-10-18 found no chaptered recording among 34 GoPro files). Section 5.5.
 - Photo resolution (24 MP or 48 MP) and the video recording modes in use.
 
 **Decided by the prototype gate**
