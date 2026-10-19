@@ -235,3 +235,30 @@ a683d37030733548b39c8b9456534dec W1b/bench-gpu-GX011627-ancuti2018-20261018-1812
 4303f5e61dcc8c860ce9df6e0849f37f W1b/bench-gpu-compilation-...-ancuti2018-20261018-181819.json
 6aedf02ecb6c667e40420d0a0c2ceb8c W1b/bench-gpu-compilation-...-c3-20261018-181929.json
 ```
+
+## Release, best effort (owner, decision request e2c53e6a, relayed by CHARC d4188563639bc453)
+
+The owner: "I am not concerned about contaminated figures as the actual program itself will run in
+a non-ideal state. Best effort is fine." Condition 4 is withdrawn. Each window runs once; a short
+window may be re-run once, if the next gate opens within 10 min. The idle gate is advisory.
+Contaminated figures are reported as measured spread.
+
+| Window | Gate (median CPU) | Probes (baseline 0.3948 s) | Verdict |
+|---|---|---|---|
+| W1c, 20:40-20:52 (run of record) | 16.6 % | open 0.3775 (-4.4 %), close 0.4242 (+7.4 %) | contaminated; strays from about 20:47 |
+| W1d, 20:55-21:11 (re-run) | 21.2 % | 0.4515 / 0.5167 | contaminated throughout |
+| W2, 21:13-22:14 (never re-run) | 99.3 % | in `core/W2-probes` | contaminated (strays before and after both runs) |
+| W3, 22:16-22:20 | 74.4 % | 0.4241 / 0.6178 | contaminated |
+| W3b, 22:29-22:32 (re-run) | 23.8 % | 0.3801 (-3.7 %) / 0.4073 (+3.2 %) | CLEAN |
+| W4, 22:33-23:00 | 14.5 % | 0.3754 / 0.4853 (+23 %) | contaminated from 22:42 on; the production export row (22:34-22:40) had clean strays |
+| W4 re-run | 78.9 % at 23:00, 72.3 % at 23:07 | -- | not run: the gate did not open within 10 min |
+
+W5 estimate, re-fixed before it opens (23:09 HST):
+- W1c's median times the frames: 0.3948 s x 14,938 = 5,898 s, 1.64 h (core alone).
+- W4's clean production export of GX011627: 0.4856 s per frame x 14,938 = 7,254 s, 2.02 h, plus
+  the compare (about 5 min).
+- Contaminated upper spread, +23 %: about 2.5 h.
+- Under the 4 h cap.
+
+W5 applies the GX011625 software-decode analysis of W2
+(`bench/GX011625-analysis-ancuti2018-20261018-211458/GX011625-ancuti2018-none-analysis.json`).
