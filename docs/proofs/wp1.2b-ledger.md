@@ -103,7 +103,33 @@ web`, and live Claude sessions of the swing-trading and coa-chess harnesses (orc
 directors). Pre-window check at 17:24-17:26: `WmiPrvSE.exe` 87-91 % of a CPU throughout (running
 since 11:12), transient `python.exe` up to 81 %.
 
-## GX011600 estimate (to be fixed before its window opens)
+## Brief amendment (orchestrator, CHARC ruling d40217a81696cc03), received 2026-10-18 ~17:34 HST
+
+Reached the cell while STOPPED after the discarded W1 (claim 2), before any re-run. Binding before
+claim 3: (1) the long full clip of claim 3 is GX011625 (Snorkel, 498.43 s, 14,938 frames), not
+GX011600; GX011627 stays the short clip; GX011625 also carries claim 4 (one clip, both legs, said
+in the report); claim 5's memory figures come from the GX011625 run; GX011600 only where file
+length does not matter, if at all. (2) 4-hour cap: every exclusive window's estimate is recorded
+here before it opens; a run estimated above 4 h is a STOP.
+
+## Window estimates (recorded before any window opens; provisional per-frame figures)
+
+Per-frame figures until the clean claim-2 re-run fixes them: core 0.389 s (Part A synthetic) to
+0.499 s (discarded W1); end to end about 0.50 s (GX011628 development run); analysis about
+0.065-0.070 s (development runs, pipe-bound).
+
+| Window | Runs | Estimate | Under the 4 h cap |
+|---|---|---|---|
+| W1 re-run (claim 2) | GX011627 GPU x2 (N=60), CPU (N=10); compilation GPU x2, CPU (N=10) | about 8 min | yes |
+| W2 (claim 4) | GX011625 analysis sw, then hw (14,938 frames each) | 14,938 x 0.07 s = 17 min each, 35 min | yes |
+| W3 | GX011627 analysis (681 frames) | under 1 min | yes |
+| W4 (claim 3 short + split) | GX011627 export, resident export, decode-only, encode-only (16 GB spool), passthrough | about 15 min | yes |
+| W5 (claim 3 long, claim 5) | GX011625 export | 14,938 x 0.389-0.50 s = 1.6-2.1 h, then compare about 5 min | yes |
+
+The GX011625 analysis of W2 (software decode) is the statistics record W5 applies. The W5 estimate
+is fixed again from the clean claim-2 median before W5 opens.
+
+## Superseded: GX011600 estimate (the amendment moves the long clip to GX011625)
 
 Not yet fixed: it needs claim 2's clean 4K GPU `ancuti2018` median. Provisional, for scheduling
 only: Part A synthetic 0.389 s x 31,364 frames = 3.39 h; the contaminated W1 0.499 s x 31,364 =
@@ -115,4 +141,6 @@ frame end to end, which would be 4.34 h.
 Premise mismatch: the declared envelope has "the machine otherwise idle", but sessions of the
 sibling harnesses on this laptop (swing-trading, coa-chess) run heavy batches outside the
 Clearwater orchestrator's scheduling (W1, above), and `WmiPrvSE.exe` holds about one logical CPU.
-The timed windows are halted; nothing after W1 has run.
+The timed windows are halted; nothing after W1 has run. Fresh reading 17:35 HST (after the
+amendment): load 13-20 % of all CPUs, `MsMpEng.exe` 104-107 % of a CPU in three samples over
+30 s, `WmiPrvSE.exe` 20-87 %. Still stopped pending the ruling on machine load.
