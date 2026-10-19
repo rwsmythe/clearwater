@@ -34,6 +34,7 @@ unpushed, and the owner has not asked for a push (verify: `git status -sb`).
 | WP1.5 | 3242679 | wp1.5-accept.md (371f19d) | container spike: SIMPLE; MANDATORY+REQUIRED 0 DIFFERENT, 8 best-effort lost; NVENC/libx265 8/10-bit proven; HERO13 HEVC 8-bit BT.709 FULL range; no .LRV (D60 closed v0.5.2); DR-15..17 |
 | WP1.3 (shallow) | 7178540 | wp1.3-accept.md (bc97a19) | look-check instrument `tools/lookcheck/`; pack `work/wp1.3/index.html` (24 stills x 3 variants, 180-frame unsmoothed flicker pair) READY FOR CP2; seat B pass 1 BLOCKING (3 introduced majors, ONE remediation `wp13-fix`), re-run BLOCKING again -> adjudicated at the gate (CRITICAL pytest basetemp exposure = DR-21, repo-wide; 2 majors instrument-only = DR-20); CHARC md5s verified, QA green at this seat 2026-10-15 13:3xZ |
 | WP-T1 | f6a34a4 | wp-t1-accept.md (3f40a85) | pytest temp-root footage guard in `tests/conftest.py` (CHARC-commissioned, DR-21 CLOSED, DR-9 CLOSED); seat B pass 1 BLOCKING (C1 case, C3 fail-open, M4, M6; ONE remediation), re-run BLOCKING again -> adjudicated at the gate (4 crafted-state aliasing cases, DR-22(4)-(7)); DR-22 OPEN (9 limits incl. CHARC's accepted pre-conftest capture writes); CHARC md5s verified, QA at this seat 14:5xZ |
+| WP1.4 (shallow) | 91f5775 | wp1.4-accept.md (36535bf) | statistics and smoothing experiments: `tools/prototype/temporal.py`, `statistics_experiments.py`, additive `correct(..., statistics=)` hook; D98 staged vs flat: no visible difference; seat B pass 1 BLOCKING (4 majors, ONE remediation `wp14-fix`), re-run BLOCKING again -> adjudicated at the gate (finding 3 result-bearing: 2 s default PROVISIONAL, re-measure per DR-25(3)); DR-23 (VFR by index), DR-24 (footage-layout skips -> WP-T2), DR-25 (B re-run 1-7, WP2.1), DR-26 (spike root paths, banked); CHARC md5s verified, QA CONFIRMED at this seat 2026-10-19 01:1xZ |
 
 CHARC QA at this seat re-ran ruff/format/mypy/pytest green on every accept (pytest
 skips the ffprobe tests here because this seat's PATH lacks ffprobe; the
@@ -81,9 +82,9 @@ path, md5, five assertions and verdict, or there is no accept.
   **WP-T1 ACCEPTED** (table above; the guard is live in `tests/conftest.py`; CLAUDE.md
   Conventions line added). WP1.4 is not exclusive and may not overlap Part B's bench window. Verify: `git worktree
   list`, `docs/debt-register.md` DR-20/DR-21.
-- **2026-10-19 live:** WP1.4 remediation RETURNED at `45fd95b` (branch wp1.4; all 12 B findings
-  closed); gen 2 runs the `-mc` candidate, gate, witness, ONE seat B re-run, merge, accept (DR-23
-  for the VFR advisory). **Footage-layout skips:** the owner's Snorkel/SCUBA/edits layout makes 3
+- **2026-10-19 live:** WP1.4 ACCEPTED (table above). **WP-T2 dispatching** (brief
+  `docs/briefs/wp-t2-brief.md` FINAL 36535bf; sonnet-high, fast tier; VIDEO_EXTENSIONS relocated to
+  local_config per 59860def). Then Part B (exclusive). **Footage-layout skips:** the owner's Snorkel/SCUBA/edits layout makes 3
   footage tests skip (root `GX011628.MP4` paths in `tests/test_container_spike.py:902`,
   `tests/test_lookcheck.py:1289`, WP1.4 test 7; also `tools/lookcheck/pack.py:94` and the WP1.4
   runner). CHARC ruling 2026-10-19 (msgs 35b13416 scope + 68fe376c-answer sequencing): WP1.4
