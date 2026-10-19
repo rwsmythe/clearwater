@@ -23,28 +23,72 @@
 
 ### Live cells
 
-- **INTERRUPTED 2026-10-15 ~15:29Z, at a session restart** (found on resume at 19:39Z).
-  - `wp14-fix` committed `5c6f340` (all code fixes across 4 files, +724/-93). It then died
-    1 frame into the analysis re-run (`work\wp1.4\logs\remediation\extract.err`).
-  - Not done yet: the re-run, the report, the ledger and the Reviewer A round 2.
-  - The original records are intact (`statistics-raw.json` mtime predates the remediation),
-    and copies are in `logs\before-remediation\` with `md5.txt`.
-  - No stray process: only the comms UI.
-  - RESUMED 2026-10-18 ~23:14Z on the operator's word, by SendMessage to the raw id `awp14-fix-a7f2718c31740dc1` (the name `wp14-fix` was not reachable after the restart).
-- **wp14-fix** (implementer-sonnet-high, background): the ONE WP1.4 remediation after my seat
-  Reviewer B (BLOCKING on candidate `af98ca8`; md5 `f53b2099...`; evidence
-  `clearwater-review-evidence\wp1.4\reviewB\`).
-  - Brief `docs/briefs/wp1.4-remediation-brief.md` (`179fab0`); branch `wp1.4` from `63d8422`.
-  - The author `wp14-cell` returned at 384K (near cap) and is retired.
-  - Findings: majors M1 (white-balance means), M2 (clipped pixels), M3 (`unflatten` suffixes),
-    M4 (pts alignment); minors 5-9; advisories 10-11. A12 (VFR) is out of envelope and goes to
-    DR-23 at accept.
-  - Before B: gate 584/0, gpu 24, harness 366; my witness was bit-identical in 6/6 (main
-    `0e774c6` against the candidate, `statistics=None`, scratchpad `witness_r.py`).
-  - Then: rebuild `wp1.4-mc`, gate, re-run the witness, ONE B re-run (a 2nd block is
-    adjudicated at the gate), merge, accept. Note: the cell's return quoted 0.76 for the
-    largest staged/flat pixel; the records give 0.68 (GX011627) and 0.90 (GX011625).
-  - **ROLLOVER after the WP1.4 accept** (context ~340K): no live cell at that boundary.
+**NONE.** Generation 1 rolled over 2026-10-19 ~00:45Z at this boundary (depth 411K).
+
+### Handoff -- the successor starts HERE
+
+1. **WP1.4 remediation RETURNED; the gate is yours.** It returned 2026-10-19 00:36Z.
+   - Branch `wp1.4` head `45fd95b`, base `9ed1a1c`; worktree `.worktrees/wp1.4`, clean. Its
+     toml is copied in.
+   - **History:**
+     - author `wp14-cell` (opus-high), 384K, retired;
+     - my seat B pass 1 on `af98ca8`: BLOCKING (M1-M4), md5 `f53b2099...`, evidence
+       `clearwater-review-evidence\wp1.4eviewB\`;
+     - ONE remediation `wp14-fix` (sonnet-high), brief `docs/briefs/wp1.4-remediation-brief.md`
+       (`179fab0`). It was interrupted at the 10-15 restart and resumed 10-18 by raw id
+       `awp14-fix-a7f2718c31740dc1`.
+   - **The cell's return** (its full report never reached the seat; it was extracted from
+     `subagents/agent-awp14-fix-*.jsonl`):
+     - all 12 findings closed;
+     - Reviewer A r2 (`63d8422..865a054`): 2 majors (staged nested reach -> `staged_reach`; an
+       optional witness) and 3 minors, all fixed. The r2 fixes were NOT re-reviewed (one round
+       only);
+     - records re-run: every statistic, mismatch, flicker and render figure unchanged; the 3 CP2
+       clips have the same md5 (`53f8c671`, `84a0e488`, `77e6a1ac`);
+     - section 7 carries CHARC's pts-keying requirement (`0da890ba5a2eb047`), applied in
+       `45fd95b`.
+   - **Gates at the cell:** 551 passed, **3 skipped** (see item 2); gpu 24.
+   - **Your steps:**
+     1. Rebuild `wp1.4-mc` with the toml and `uv sync`, and compare patch-ids.
+     2. Gate it.
+     3. Re-run my witness: main against the candidate with `statistics=None`; scratchpad
+        `witness_r.py`; 6 cases, Ancuti blue off and on and 3C, CPU and GPU. It was
+        bit-identical 6/6 before the remediation.
+     4. ONE seat Reviewer B re-run. Prompt template:
+        `clearwater-review-evidence\wp1.4eviewBeview-prompt-B.md` plus a "THIS IS THE
+        RE-RUN" section, as in `wp1.3eviewBerun\`. A 2nd block is adjudicated at the
+        gate; never a third remediation.
+     5. Merge, re-gate on main, write the accept record, and bank **DR-23** (A12: VFR
+        smoothing by index is a prototype limit; CHARC says IF-3 is keyed by pts).
+   - **Records note:** the cell's first return quoted 0.76 for the largest staged/flat pixel;
+     the records give 0.68 (GX011627) and 0.90 (GX011625).
+2. **NEW BLOCKER for "0 skipped": the footage layout changed.**
+   - On 2026-10-18 the owner moved the chapters into `Snorkel\` and `SCUBA\` (lowercase
+     `.mp4`) and added `edits\`.
+   - Three footage tests open `<footage>\GX011628.MP4` at the root and now SKIP:
+     - `tests/test_container_spike.py`;
+     - `tests/test_lookcheck.py`;
+     - WP1.4 test 7.
+   - This affects main too. `tools/lookcheck/pack.py` stills and the WP1.4 runner name root
+     paths as well.
+   - **Proposal:** a small package (sonnet-high) with a shared footage-locator helper (find a
+     chapter by stem, case-insensitive, under the footage folder). Fix the tests to use it, then
+     re-gate to 0 skipped. Raise it with CHARC first: owned files span WP1.3, WP1.5 and WP1.4
+     tests.
+   - **Gating WP1.4 meanwhile:** the WP1.4 accept can either wait for this fix, or record the 3
+     skips as caused by the layout change and outside the package. Ask CHARC; I recommend
+     fixing first, because the fix is small.
+3. **Inventory DONE** (`b1fd289`): 35 videos (Snorkel 26, SCUBA 8, edits 1); no chapters;
+   photos PENDING. Reported to CHARC (return_report 23:57Z).
+4. **WP1.2 Part B:**
+   - condition 1 is MET (download complete and the inventory);
+   - condition 3 is met;
+   - condition 2 waits on the WP1.4 accept.
+
+   The brief is `docs/briefs/wp1.2b-brief.md` (EXCLUSIVE). Note: no chaptered recordings;
+   photos pending; the largest clips are in SCUBA.
+5. **CHARC's session is now `clearwater-charc-20261014-1303`** (`comms/.launch-sessions.json`).
+
 - **CHARC commission `0fd7c88ad56a7083`:**
   - The owner's partial CP1 ("shallow confirmed") releases WP1.3 and WP1.4, shallow only.
   - The WP1.4 gain-cap noise test becomes WP1.4b (deep footage).
@@ -52,7 +96,7 @@
     - inventory pass (sonnet-medium) at once on "download complete";
     - Part B (exclusive) only after WP1.3 and WP1.4 return or pause at a boundary.
 - Branches `wp0.1`, `wp0.2`, `wp1.1`, `wp1.2`, `wp1.5`, `wp1.2r`, `wp1.3` and `wp-t1` are kept on purpose: they hold the reviewed
-  pre-rebase SHAs the accept records cite (verify: `git worktree list` shows main and `.worktrees/wp1.4`).
+  pre-rebase SHAs the accept records cite (verify: `git worktree list` shows main and `.worktrees/wp1.4`); add `wp1.4` at its accept.
 
 ### Workstreams
 
@@ -141,4 +185,4 @@ Each accepted package had its return report posted to CHARC and an info-update t
   and re-run after CHARC confirms the download is complete.
 - CHARC approved `_windows_power()` as instrument-only (never into `src/clearwater/` without a
   fresh ruling).
-- Inbox drained through msg `5edbaf287de9df1c` (verify: `uv run python scripts/role_mail.py list --role orchestrator`). CHARC session is now `clearwater-charc-20261014-1303`.
+- Inbox drained through msg `4114159083a3f639` (generation 1, at rollover). Generation 1 STOPPED DRAINING at the rollover announcement; the successor is the only drainer (verify: `uv run python scripts/role_mail.py list --role orchestrator`).
