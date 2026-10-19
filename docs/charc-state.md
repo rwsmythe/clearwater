@@ -52,8 +52,9 @@ path, md5, five assertions and verdict, or there is no accept.
 
 ### Live workstreams
 
-- **Orchestrator generation** `clearwater-orchestrator-20261014-1258` (opus/high/auto;
-  verify `comms/.launch-sessions.json`, `ListAgents`). All `wp1.5*` worktrees removed;
+- **Orchestrator generation 2** `clearwater-orchestrator-20261018-1442` (opus/high/auto; online
+  2026-10-19T00:42Z; gen 1 rolled at 411K with no live cell; verify `comms/.launch-sessions.json`,
+  `ListAgents`). All `wp1.5*` worktrees removed;
   branches `wp1.1`, `wp1.2`, `wp1.5` kept for the reviewed SHAs (`git worktree list`).
 - **Retroactive Reviewer B over tools/prototype: CLOSED** (addenda in `wp1.1-accept.md` and
   `wp1.2-accept.md`; WP1.1 envelope formally short side > 128 px; DR-18, DR-19). No cell is
@@ -80,6 +81,21 @@ path, md5, five assertions and verdict, or there is no accept.
   **WP-T1 ACCEPTED** (table above; the guard is live in `tests/conftest.py`; CLAUDE.md
   Conventions line added). WP1.4 is not exclusive and may not overlap Part B's bench window. Verify: `git worktree
   list`, `docs/debt-register.md` DR-20/DR-21.
+- **2026-10-19 live:** WP1.4 remediation RETURNED at `45fd95b` (branch wp1.4; all 12 B findings
+  closed); gen 2 runs the `-mc` candidate, gate, witness, ONE seat B re-run, merge, accept (DR-23
+  for the VFR advisory). **Footage-layout skips:** the owner's Snorkel/SCUBA/edits layout makes 3
+  footage tests skip (root `GX011628.MP4` paths in `tests/test_container_spike.py:902`,
+  `tests/test_lookcheck.py:1289`, WP1.4 test 7; also `tools/lookcheck/pack.py:94` and the WP1.4
+  runner). CHARC ruling 2026-10-19 (msgs 35b13416 scope + 68fe376c-answer sequencing): WP1.4
+  merges first with the skips recorded with cause in its accept; then **WP-T2** (sonnet-high,
+  fast tier) adds `find_footage_file(stem)` to `tools/local_config.py` (additive, case-insensitive,
+  recursive, unique-or-error, reuses inventory VIDEO_EXTENSIONS) and switches all five surfaces;
+  gate back to 0 skipped; then Part B (exclusive). **Inventory DONE** b1fd289
+  (`docs/reports/inventory-2026-10-18.md`): 35 videos 26/8/1, 0 errors, 0 chaptered, CHARC
+  re-derived counts from the CSV, match. **CP1 handed to the owner 2026-10-19 ~00:30Z:** categories
+  (recommended folder-wise: Snorkel=shallow, SCUBA=deeper, edits=stress case) and chapter handling
+  in v1 (CHARC recommends DEFER to v2: removes WP3.8, WP3.19 chapter review, V12, V3 seam; spec
+  5.5 + D21/D33/D80/D82/D83 revision to draft on the owner's word). OPEN until the owner's word.
 - Drafted by CHARC on main: `docs/briefs/wp1.2b-brief.md` (Part B; three dispatch conditions)
   and `docs/reports/wp1.6-gate-report.md` (template; Gate 1 options A/B/C framed).
 
