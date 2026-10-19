@@ -4,8 +4,9 @@ Usage::
 
     uv run python tools/lookcheck/pack.py stills [--config FILE] [--device gpu|cpu|auto]
     uv run python tools/lookcheck/pack.py flicker [--config FILE] [--device gpu|cpu|auto]
+    uv run python tools/lookcheck/pack.py deep [--part all|clip|stills] [--config FILE] [--device D]
 
-Both read the two folders from the local configuration. The footage folder is only ever an
+All read the two folders from the local configuration. The footage folder is only ever an
 input; every file written goes under ``<working folder>/wp1.3/`` and is checked first
 (:class:`lookcheck.frames.OutputRoots`). A chapter is named by its stem and found anywhere
 under the footage folder (:func:`local_config.find_footage_file`); a chapter that is missing
@@ -36,6 +37,14 @@ but the first, middle and last of each set.
 
 Exit status 0 on success; 2, with a one-line ``error: ...`` on standard error, on a
 configuration, probe, device, path or FFmpeg failure.
+
+``deep`` (WP1.3D, spec v0.5.3) builds the deep half of the pack under ``<working folder>/wp1.3d/``
+from the eight ``SCUBA/`` chapters and the scan's ``deep-frames.json`` (``lookcheck.scan``).
+Its variants are ``c3`` (the default method of v0.5.3), ``ancuti2018`` and ``ancuti2018-blue``,
+in that order, at the ``Params()`` defaults with only the method (and blue compensation) set.
+``--part clip`` builds the deep clip in motion (:func:`run_deep_clip`), ``--part stills`` the
+48 chapter stills, the 12 case candidates at full resolution and the page
+(:func:`build_deep_pack`); ``all`` (the default) does the clip first, so that the page links it.
 """
 
 from __future__ import annotations
@@ -50,7 +59,7 @@ import json
 import statistics
 import sys
 import time
-from collections.abc import Iterator, Mapping, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from fractions import Fraction
 from pathlib import Path
 from typing import Any
@@ -70,6 +79,7 @@ import itertools
 import shutil
 
 from local_config import LocalConfigError, find_footage_file, load_local_config
+from lookcheck import scan
 from lookcheck.frames import (
     ExtractError,
     FrameFile,
@@ -88,10 +98,12 @@ from lookcheck.frames import (
     to_uint8,
     tool_version,
 )
+from prototype import temporal
 from prototype.backend import DEVICES, Backend, select_backend
 from prototype.params import Params
 from prototype.pipeline import Result, correct, normalisation_bounds
 from prototype.run import write_png16
+from prototype.temporal import Smoother
 
 CHAPTERS = ("GX011625", "GX011626", "GX011627", "GX011628")
 """The four shallow chapters of the owner's footage (CP1, 2026-10-15)."""
@@ -375,6 +387,8 @@ def build_pack(
     roots: OutputRoots,
     backend: Backend,
     variants: Sequence[Variant] | None = None,
+    render_page: Callable[[Sequence[FrameFile], Sequence[Variant], Mapping[str, Any], Path], str]
+    | None = None,
 ) -> dict[str, Any]:
     """Correct the frames under each variant and write the pack around them.
 
@@ -391,6 +405,8 @@ def build_pack(
         roots: The output safety roots.
         backend: Where the pipeline runs.
         variants: The variants; defaults to :func:`default_variants`.
+        render_page: Writes ``index.html`` from the frames, variants, statistics document and
+            pack folder; ``None`` (the default) is :func:`render_index`, the shallow page.
 
     Returns:
         The statistics document that was written.
@@ -450,7 +466,8 @@ def build_pack(
         "frames": [frame.record() for frame in frames],
     }
     roots.write_text(pack_dir / "frames.json", _json_text(frames_document))
-    roots.write_text(pack_dir / "index.html", render_index(frames, chosen, document, pack_dir))
+    page = render_index if render_page is None else render_page
+    roots.write_text(pack_dir / "index.html", page(frames, chosen, document, pack_dir))
     return document
 
 
@@ -1265,6 +1282,617 @@ def readback_clip(
             roots.check(scratch.parent).rmdir()
 
 
+# --- the deep part (WP1.3D) -----------------------------------------------------------------------
+
+DEEP_VARIANT_ORDER = ("c3", "ancuti2018", "ancuti2018-blue")
+"""The deep pack's variants, c3 first (the default method of spec v0.5.3)."""
+
+DEEP_CLIP_VARIANTS = ("c3", "ancuti2018")
+"""The variants the deep clip is rendered with."""
+
+DEEP_SMOOTHER = Smoother("gaussian", 2.0)
+"""The deep clip's smoothing: the centred Gaussian at 2.0 s, the provisional default (DR-25(3))."""
+
+DEEP_CLIP_SECONDS = 6.0
+DEEP_PENDING: tuple[tuple[str, str], ...] = (
+    ("Photos (iPhone)", "none supplied for this part"),
+    (
+        "Chaptered recordings across a chapter boundary",
+        "none in the SCUBA/ set (inventory 2026-10-18)",
+    ),
+)
+"""Cases this part cannot show; they are named, never approximated."""
+
+
+def deep_variants(base: Params | None = None) -> tuple[Variant, ...]:
+    """Return the three variants of the deep pack: ``c3``, ``ancuti2018``, ``ancuti2018-blue``.
+
+    The same variants as :func:`default_variants`, in the order of :data:`DEEP_VARIANT_ORDER`
+    (the only presentation change from WP1.3: c3 is the default method of spec v0.5.3). Each sets
+    its method explicitly, so a later change of the ``Params()`` default method does not change
+    this pack.
+
+    Args:
+        base: The parameter set the variants change; defaults to ``Params()``.
+
+    Returns:
+        The variants.
+    """
+    by_name = {variant.name: variant for variant in default_variants(base)}
+    return tuple(by_name[name] for name in DEEP_VARIANT_ORDER)
+
+
+@dataclasses.dataclass(frozen=True)
+class DeepEntry:
+    """One frame on the deep page: the extracted frame and the caption under its source.
+
+    Attributes:
+        frame: The extracted full-resolution frame.
+        caption: Text for the line under the source thumbnail (the candidate's rank and
+            measures, or empty).
+    """
+
+    frame: FrameFile
+    caption: str = ""
+
+
+@dataclasses.dataclass(frozen=True)
+class DeepSection:
+    """A titled group of frames on the deep page.
+
+    Attributes:
+        group: The page heading the section belongs to (several sections may share one).
+        title: The section's own heading.
+        note: A line under the heading.
+        entries: The frames, in page order.
+    """
+
+    group: str
+    title: str
+    note: str
+    entries: tuple[DeepEntry, ...]
+
+
+def clip_window(centre_s: float, duration_s: float, seconds: float = DEEP_CLIP_SECONDS) -> float:
+    """Return the start of an excerpt of ``seconds`` centred on ``centre_s``, inside the chapter.
+
+    Args:
+        centre_s: The wanted centre in seconds.
+        duration_s: The chapter duration in seconds.
+        seconds: The excerpt length in seconds.
+
+    Returns:
+        ``centre_s - seconds / 2``, but not before 0 and not after ``duration_s - seconds`` (a
+        chapter shorter than the excerpt starts at 0).
+    """
+    return min(max(centre_s - seconds / 2.0, 0.0), max(duration_s - seconds, 0.0))
+
+
+def candidate_caption(case: scan.Case, entry: Mapping[str, Any]) -> str:
+    """Return the caption of a case candidate: rank, the rule, the measures, the other cases.
+
+    The wording is "candidate", never a claim that the frame shows the case.
+
+    Args:
+        case: The case.
+        entry: The candidate's entry of ``deep-frames.json``.
+
+    Returns:
+        The caption text.
+    """
+    text = (
+        f"{case.label}: {case.rule}, rank {entry['rank']}; "
+        f"D {entry['D']:.3f}, W {entry['W']:.3f}, H {entry['H']:.4f}"
+    )
+    others = [name for name in entry["serves_cases"] if name != case.name]
+    if others:
+        text += "; also a candidate for " + ", ".join(others)
+    return text
+
+
+def deep_sections(
+    stills: Sequence[FrameFile],
+    candidates: Mapping[str, Sequence[tuple[FrameFile, Mapping[str, Any]]]],
+) -> list[DeepSection]:
+    """Arrange the deep page: the chapter stills, then one section per case.
+
+    Args:
+        stills: The chapter stills in order (grouped by chapter).
+        candidates: Case name to its ranked ``(frame, deep-frames.json entry)`` pairs.
+
+    Returns:
+        The sections: one per chapter (group "Chapter stills"), then one per case in
+        :data:`lookcheck.scan.CASES` that has candidates (group "Case candidates").
+    """
+    sections: list[DeepSection] = []
+    for chapter in dict.fromkeys(frame.chapter for frame in stills):
+        sections.append(
+            DeepSection(
+                "Chapter stills",
+                chapter,
+                "six stills from 5 % to 95 % of the chapter",
+                tuple(DeepEntry(frame) for frame in stills if frame.chapter == chapter),
+            )
+        )
+    for case in scan.CASES:
+        found = candidates.get(case.name, ())
+        if found:
+            sections.append(
+                DeepSection(
+                    "Case candidates",
+                    case.label,
+                    f"{case.rule}. These are CANDIDATES proposed by the scan; the owner decides "
+                    "at CP2 whether each shows the case.",
+                    tuple(
+                        DeepEntry(frame, candidate_caption(case, entry)) for frame, entry in found
+                    ),
+                )
+            )
+    return sections
+
+
+def render_deep_index(
+    sections: Sequence[DeepSection],
+    variants: Sequence[Variant],
+    statistics_document: Mapping[str, Any],
+    pack_dir: Path,
+    clips: Sequence[Path] = (),
+) -> str:
+    """Render the deep ``index.html``: one static page, relative links only, no external resource.
+
+    The head lists the variants (with the method and blue compensation each runs with), every
+    ``Params`` default, the scan and candidate rules and the cases not shown. Then, per section,
+    one row per frame as in :func:`render_index`; the case sections come after the chapter
+    stills. Clip files, if any, are linked after the head.
+
+    Args:
+        sections: The page's sections (:func:`deep_sections`).
+        variants: The variants shown, in column order.
+        statistics_document: The document returned by :func:`build_pack`.
+        pack_dir: The pack folder (links are relative to it).
+        clips: The clip files of :func:`run_deep_clip`, if built.
+
+    Returns:
+        The page.
+    """
+    by_frame = {entry["frame"]: entry for entry in statistics_document["frames"]}
+
+    def link(path: Path) -> str:
+        return html.escape(path.relative_to(pack_dir).as_posix(), quote=True)
+
+    rules = scan.rules_record()
+    out: list[str] = [
+        "<!DOCTYPE html>",
+        '<html lang="en"><head><meta charset="utf-8">',
+        "<title>Clearwater WP1.3D look check pack (deep part)</title>",
+        f"<style>{_STYLE}</style></head><body>",
+        "<h1>Clearwater look check pack: deep footage (WP1.3D, spec v0.5.3)</h1>",
+        f"<p>Device: {html.escape(str(statistics_document['device']))}. Written "
+        f"{html.escape(str(statistics_document['written']))}. Full-size 16-bit PNGs are behind "
+        "every thumbnail; the pair links are side-by-side JPEGs (source left, corrected "
+        'right). Raw numbers: <a href="statistics.json">statistics.json</a>, '
+        '<a href="frames.json">frames.json</a> (exact pts and colour tags), '
+        '<a href="scan.json">scan.json</a> (every scanned frame) and '
+        '<a href="deep-frames.json">deep-frames.json</a> (the ranked candidates).</p>',
+        "<h2>Variants</h2><p>Every variant runs at the Params defaults below with only the "
+        "method (and blue compensation) set. The method is set explicitly in each variant, so a "
+        "later change of the Params() default method does not change this pack. Order: c3 (the "
+        "default method of v0.5.3) first.</p>",
+        "<table><tr><th>Name</th><th>Prototype flags</th><th>method</th>"
+        "<th>blue_compensation</th></tr>",
+    ]
+    out.extend(
+        f"<tr><td>{html.escape(v.name)}</td><td>{html.escape(v.flags)}</td>"
+        f"<td>{html.escape(v.params.method)}</td><td>{v.params.blue_compensation}</td></tr>"
+        for v in variants
+    )
+    out.append("</table><h2>Defaults used (Params)</h2><table>")
+    out.extend(
+        f"<tr><td>{html.escape(name)}</td><td>{html.escape(str(value))}</td></tr>"
+        for name, value in statistics_document["defaults"].items()
+    )
+    out.append("</table><h2>How the candidates were picked</h2><ul>")
+    scanned = rules["scan"]
+    water = rules["open_water"]
+    out.extend(
+        f"<li>{html.escape(text)}</li>"
+        for text in (
+            f"Scan: one frame every {scanned['step_s']:g} s from {scanned['start_s']:g} s to the "
+            f"end of each chapter, short side {scanned['short_side']} (FFmpeg scaler, for "
+            "ranking only).",
+            "D = mean R / mean G (lower = deeper). W = fraction of pixels whose luma local "
+            f"standard deviation over a {water['box']}x{water['box']} box is below "
+            f"{water['luma_local_std_below']:g} and whose blue or green exceeds red by at least "
+            f"{water['blue_or_green_exceeds_red_by_at_least']:g}. H = luma RMS contrast "
+            "(lower = hazier).",
+            "A frame whose luma mean is below "
+            f"{rules['exclusion']['luma_mean_below']:g} or above "
+            f"{rules['exclusion']['luma_mean_above']:g} is excluded from every ranking.",
+            *(f"{case.label}: {case.rule}." for case in scan.CASES),
+            f"{rules['candidates']['per_case']} candidates per case, at least "
+            f"{rules['candidates']['min_separation_s']:g} s apart within a chapter, at most "
+            f"{rules['candidates']['per_chapter_per_case']} per chapter per case; ties break by "
+            "chapter name, then pts. A frame may serve two cases (its caption says so).",
+            "These are CANDIDATES; the owner decides at CP2 what each frame shows.",
+        )
+    )
+    out.append("</ul><h2>Not in this part</h2><ul>")
+    out.extend(
+        f"<li>PENDING: {html.escape(name)} - {html.escape(why)}</li>" for name, why in DEEP_PENDING
+    )
+    out.append("</ul>")
+    if clips:
+        out.append(
+            "<h2>The deep clip in motion</h2><p>Six seconds centred on the deepest candidate, "
+            "statistics STAGED and smoothed with a centred Gaussian at 2.0 s (the provisional "
+            'default). Statistics: <a href="clip/statistics.json">clip/statistics.json</a>.'
+            "</p><ul>"
+        )
+        out.extend(
+            f'<li><a href="{link(clip)}">{html.escape(clip.name)}</a></li>' for clip in clips
+        )
+        out.append("</ul>")
+    current_group = ""
+    for section in sections:
+        if section.group != current_group:
+            current_group = section.group
+            out.append(f"<h2>{html.escape(current_group)}</h2>")
+        out.append(
+            f"<h3>{html.escape(section.title)}</h3><p>{html.escape(section.note)}</p>"
+            '<table class="grid"><tr><th>Source</th>'
+        )
+        out.extend(f"<th>{html.escape(v.name)}</th>" for v in variants)
+        out.append("</tr>")
+        for entry in section.entries:
+            frame = entry.frame
+            thumb = pack_dir / "thumbs" / f"{frame.path.stem}.jpg"
+            caption = f"<br>{html.escape(entry.caption)}" if entry.caption else ""
+            cells = [
+                f'<td><a href="{link(frame.path)}"><img src="{link(thumb)}" '
+                f'alt="{html.escape(frame.path.stem)}"></a>'
+                f'<div class="cap">{html.escape(frame.chapter)} at {float(frame.pts):.3f} s '
+                f"(pts {frame.pts_ticks} / {frame.time_base.denominator}){caption}</div></td>"
+            ]
+            for variant in variants:
+                stem = f"{frame.path.stem}-{variant.name}"
+                png = frame.path.with_name(f"{stem}.png")
+                record = by_frame[frame.path.stem]["variants"][variant.name]
+                thumb_link = link(pack_dir / "thumbs" / f"{stem}.jpg")
+                cells.append(
+                    f'<td><a href="{link(png)}"><img src="{thumb_link}"'
+                    f' alt="{html.escape(stem)}"></a><div class="cap">'
+                    f'<a href="{link(pack_dir / "pairs" / f"{stem}.jpg")}">pair</a> '
+                    f"{html.escape(summary_line(record))}</div></td>"
+                )
+            out.append("<tr>" + "".join(cells) + "</tr>")
+        out.append("</table>")
+    out.append("</body></html>")
+    return "\n".join(out) + "\n"
+
+
+def build_deep_pack(
+    stills: Sequence[FrameFile],
+    candidates: Mapping[str, Sequence[tuple[FrameFile, Mapping[str, Any]]]],
+    pack_dir: Path,
+    roots: OutputRoots,
+    backend: Backend,
+    clips: Sequence[Path] = (),
+) -> dict[str, Any]:
+    """Correct the deep frames under the three deep variants and write the pack and its page.
+
+    The frames are the chapter stills and the case candidates (a frame that is both, or serves
+    two cases, is corrected once); their source PNGs must already be in ``pack_dir/frames``.
+    The files are :func:`build_pack`'s, in the order c3, ancuti2018, ancuti2018-blue; the page
+    is :func:`render_deep_index`.
+
+    Args:
+        stills: The chapter stills in page order.
+        candidates: Case name to its ranked ``(frame, deep-frames.json entry)`` pairs.
+        pack_dir: The pack folder (``<working folder>/wp1.3d``).
+        roots: The output safety roots.
+        backend: Where the pipeline runs.
+        clips: The deep clip files to link on the page, if built.
+
+    Returns:
+        The statistics document that was written.
+
+    Raises:
+        lookcheck.frames.OutputPathError: An output path is refused.
+        ValueError: A frame's PNG is not a 16-bit RGB PNG.
+    """
+    chosen = deep_variants()
+    unique: dict[Path, FrameFile] = {}
+    for frame in [*stills, *(frame for found in candidates.values() for frame, _ in found)]:
+        unique.setdefault(frame.path, frame)
+    sections = deep_sections(stills, candidates)
+
+    def page(
+        _frames: Sequence[FrameFile],
+        variants: Sequence[Variant],
+        document: Mapping[str, Any],
+        folder: Path,
+    ) -> str:
+        return render_deep_index(sections, variants, document, folder, clips)
+
+    return build_pack(list(unique.values()), pack_dir, roots, backend, chosen, page)
+
+
+def _load_deep_frames(roots: OutputRoots) -> dict[str, Any]:
+    """Read the scan's ``deep-frames.json`` (an error when the scan has not been run)."""
+    path = roots.check(roots.allowed / "deep-frames.json")
+    if not path.is_file():
+        raise ExtractError(f"{path} does not exist; run tools/lookcheck/scan.py first")
+    document: dict[str, Any] = json.loads(path.read_text(encoding="utf-8"))
+    return document
+
+
+def run_deep_stills(
+    roots: OutputRoots, footage: Path, backend: Backend, clips: Sequence[Path] = ()
+) -> dict[str, Any]:
+    """Extract the deep stills and candidates at full resolution and build the pack.
+
+    Six stills per ``SCUBA/`` chapter at the WP1.3 positions (:data:`STILL_FRACTIONS`), and
+    each candidate of ``deep-frames.json`` re-extracted at its exact pts (an error if the frame
+    found is not the scan's).
+
+    Args:
+        roots: The output safety roots.
+        footage: The footage folder (read only).
+        backend: Where the pipeline runs.
+        clips: The deep clip files to link on the page, if built.
+
+    Returns:
+        The statistics document of :func:`build_deep_pack`.
+
+    Raises:
+        lookcheck.frames.ExtractError: A probe or decode fails, or a candidate is not the frame
+            the scan measured.
+    """
+    deep = _load_deep_frames(roots)
+    pack_dir = roots.allowed
+    stills: list[FrameFile] = []
+    videos: dict[str, Path] = {}
+    for chapter in scan.SCAN_CHAPTERS:
+        video = find_footage_file(chapter, footage)
+        videos[chapter] = video
+        info = probe_stream(video)
+        for note in info.tags.assumed:
+            print(f"warning: {chapter}: {note} missing, assumed (spec D54)", file=sys.stderr)
+        stills.extend(
+            extract(video, still_timestamps(info.duration_s), pack_dir / "frames", roots=roots)
+        )
+    candidates: dict[str, list[tuple[FrameFile, Mapping[str, Any]]]] = {}
+    for case in scan.CASES:
+        for entry in deep["cases"][case.name]["frames"]:
+            (frame,) = extract(
+                videos[entry["chapter"]],
+                [float(Fraction(entry["pts_ticks"]) * Fraction(entry["time_base"]))],
+                pack_dir / "frames",
+                roots=roots,
+            )
+            if frame.pts_ticks != entry["pts_ticks"] or frame.path.stem != entry["frame"]:
+                raise ExtractError(
+                    f"candidate {entry['frame']} (pts {entry['pts_ticks']}) was extracted as "
+                    f"{frame.path.stem} (pts {frame.pts_ticks}); refusing to label it"
+                )
+            candidates.setdefault(case.name, []).append((frame, entry))
+    return build_deep_pack(stills, candidates, pack_dir, roots, backend, clips)
+
+
+def run_deep_clip(
+    video: Path,
+    centre_s: float,
+    roots: OutputRoots,
+    backend: Backend,
+    clip_dir: Path,
+    *,
+    seconds: float = DEEP_CLIP_SECONDS,
+    smoother: Smoother = DEEP_SMOOTHER,
+) -> dict[str, Any]:
+    """Build the deep clip: a 6 s excerpt corrected with STAGED, smoothed statistics.
+
+    The excerpt (:func:`clip_window` around ``centre_s``) is extracted frame by frame at full
+    resolution. Statistics are measured on the 540-line proxy built in NumPy, an exact 4x4
+    area mean (:func:`prototype.temporal.proxy`, not FFmpeg's scaler), analysed STAGED (spec D97,
+    :func:`prototype.temporal.analyse_staged`) and smoothed with ``smoother`` (the centred
+    Gaussian at 2.0 s). Each frame is rendered from its smoothed statistics for ``c3`` and
+    ``ancuti2018`` (:data:`DEEP_CLIP_VARIANTS`; the same call as
+    :func:`prototype.temporal.render`, kept as a :class:`prototype.pipeline.Result` so that its
+    record is available). The two corrected sets and the untouched source frames are encoded
+    to ``<chapter>_c3.mp4``, ``<chapter>_ancuti2018.mp4`` and ``<chapter>_source.mp4`` by
+    :func:`encode_verified_pair` (the clip check and the read-back of every frame); only after
+    that are all frame PNGs but the first, middle and last of each set deleted.
+    ``statistics.json`` holds, per variant and frame, the raw (unsmoothed) and smoothed
+    statistics and the render's record; one plot per variant is written beside it.
+
+    Args:
+        video: The source chapter.
+        centre_s: The centre of the excerpt in seconds (the deepest candidate's pts).
+        roots: The output safety roots.
+        backend: Where the pipeline runs.
+        clip_dir: The output folder (``<working folder>/wp1.3d/clip``).
+        seconds: The excerpt length in seconds.
+        smoother: The statistics smoother.
+
+    Returns:
+        The statistics document that was written.
+
+    Raises:
+        lookcheck.frames.ExtractError: A probe, decode or encode fails or a check does not hold
+            (the frame PNGs are then kept and no clip exists under its final name).
+    """
+    info = probe_stream(video)
+    start = clip_window(centre_s, info.duration_s, seconds)
+    source_dir = clip_dir / "source"
+    began = time.monotonic()
+    got = excerpt(video, start, seconds, source_dir, roots=roots, naming="index")
+    print(f"extracted {len(got)} frames in {time.monotonic() - began:.0f} s", file=sys.stderr)
+    chosen = [variant for variant in deep_variants() if variant.name in DEEP_CLIP_VARIANTS]
+    proxies = [temporal.proxy(read_png16(frame.path)) for frame in got]
+    analyses = {
+        variant.name: temporal.analyse_staged(
+            proxies, variant.params, smoother, info.frame_rate, backend
+        )
+        for variant in chosen
+    }
+    del proxies
+    print(f"analysed {len(got)} frames in {time.monotonic() - began:.0f} s", file=sys.stderr)
+    entries: dict[str, list[dict[str, Any]]] = {variant.name: [] for variant in chosen}
+    corrected_paths: dict[str, list[Path]] = {variant.name: [] for variant in chosen}
+    for number, frame in enumerate(got):
+        image = read_png16(frame.path)
+        for variant in chosen:
+            smoothed, measured = analyses[variant.name]
+            result = correct(
+                image, variant.params, backend, statistics=temporal.at(smoothed, number)
+            )
+            target = (
+                clip_dir / f"corrected-{variant.name}" / f"{frame.path.stem}-{variant.name}.png"
+            )
+            _write_png(roots, target, result.output)
+            corrected_paths[variant.name].append(target)
+            record = statistics_record(result, backend)
+            del record["params"], record["backend"]
+            entries[variant.name].append(
+                {
+                    "index": number,
+                    "pts_ticks": frame.pts_ticks,
+                    "pts_seconds": float(frame.pts),
+                    "source_file": frame.path.name,
+                    "corrected_file": target.name,
+                    "raw": {
+                        name: float(values[number])
+                        for stage in measured.values()
+                        for name, values in stage.items()
+                    },
+                    "smoothed": {name: float(values[number]) for name, values in smoothed.items()},
+                    "rendered": record,
+                }
+            )
+        if number % 20 == 0:
+            print(f"rendered {number + 1}/{len(got)}", file=sys.stderr)
+    stem = video.stem
+    clips = {
+        **{
+            variant.name: (
+                clip_dir / f"corrected-{variant.name}" / f"{stem}_f%04d-{variant.name}.png",
+                clip_dir / f"{stem}_{variant.name}.mp4",
+            )
+            for variant in chosen
+        },
+        "source": (source_dir / f"{stem}_f%04d.png", clip_dir / f"{stem}_source.mp4"),
+    }
+    commands, checks = encode_verified_pair(roots, clips, info, len(got), clip_dir)
+    pts_seconds = [float(frame.pts) for frame in got]
+    variants_record: dict[str, Any] = {}
+    for variant in chosen:
+        rows = entries[variant.name]
+        series = {
+            "red gain, applied": [r["rendered"]["red_gain"] for r in rows],
+            "red gain, raw gray-world": [r["raw"]["white_balance_gains.R"] for r in rows],
+            "red gain, smoothed gray-world": [r["smoothed"]["white_balance_gains.R"] for r in rows],
+            "blue gain, applied": [r["rendered"]["blue_gain"] for r in rows],
+            "blue gain, raw gray-world": [r["raw"]["white_balance_gains.B"] for r in rows],
+            "blue gain, smoothed gray-world": [
+                r["smoothed"]["white_balance_gains.B"] for r in rows
+            ],
+        }
+        if variant.params.method == "ancuti2018":
+            series["effective alpha (red)"] = [
+                r["rendered"]["compensation"]["effective"]["red"] for r in rows
+            ]
+        roots.write_bytes(
+            clip_dir / f"statistics-{variant.name}.png", plot_series(series, pts_seconds)
+        )
+        variants_record[variant.name] = {
+            "flags": variant.flags,
+            "params": dataclasses.asdict(variant.params),
+            "summary": {name: series_summary(values) for name, values in series.items()},
+            "bound_counts": {
+                "red_gain_cap": sum(r["rendered"]["bound"]["red_gain_cap"] for r in rows),
+                "blue_gain_cap": sum(r["rendered"]["bound"]["blue_gain_cap"] for r in rows),
+                "white_balance_clamp_any": sum(
+                    any(r["rendered"]["bound"]["white_balance_clamp"]) for r in rows
+                ),
+                "normalisation_collapsed": sum(
+                    r["rendered"]["bound"]["normalisation_collapsed"] for r in rows
+                ),
+            },
+            "frames": rows,
+        }
+    document = {
+        "schema": STATISTICS_SCHEMA,
+        "written": _now(),
+        "spec": scan.SPEC_VERSION,
+        "source": str(video),
+        "chapter": stem,
+        "analysis": "STAGED (spec D97), prototype.temporal.analyse_staged",
+        "proxy": "exact area mean of the full-resolution frame in NumPy (prototype.temporal.proxy)",
+        "smoother": {"kind": smoother.kind, "window_s": smoother.window_s},
+        "centre_s": centre_s,
+        "device": backend.name,
+        "excerpt": {
+            "start_s": start,
+            "duration_s": seconds,
+            "frames": len(got),
+            "first_pts_ticks": got[0].pts_ticks,
+            "last_pts_ticks": got[-1].pts_ticks,
+            "time_base": f"{info.time_base.numerator}/{info.time_base.denominator}",
+            "frame_rate": f"{info.frame_rate.numerator}/{info.frame_rate.denominator}",
+            "first_pts_seconds": pts_seconds[0],
+            "last_pts_seconds": pts_seconds[-1],
+        },
+        "tags": info.tags.record(),
+        "ffmpeg": tool_version("ffmpeg"),
+        "extract_command": list(got[0].command),
+        "encode_commands": commands,
+        "checks": checks,
+        "variants": variants_record,
+    }
+    roots.write_text(clip_dir / "statistics.json", _json_text(document))
+    keep = {0, len(got) // 2, len(got) - 1}
+    for number, frame in enumerate(got):
+        if number not in keep:
+            roots.remove(frame.path)
+            for paths in corrected_paths.values():
+                roots.remove(paths[number])
+    return document
+
+
+def clip_files(roots: OutputRoots, clip_dir: Path) -> list[Path]:
+    """Return the deep clip's MP4s that exist (c3, ancuti2018, source), for the page.
+
+    Args:
+        roots: The output safety roots.
+        clip_dir: The clip folder.
+
+    Returns:
+        The existing clips, in a fixed order; empty if no clip was built.
+    """
+    found: list[Path] = []
+    statistics_path = roots.check(clip_dir / "statistics.json")
+    if statistics_path.is_file():
+        chapter = json.loads(statistics_path.read_text(encoding="utf-8"))["chapter"]
+        for label in (*DEEP_CLIP_VARIANTS, "source"):
+            path = clip_dir / f"{chapter}_{label}.mp4"
+            if roots.check(path).is_file():
+                found.append(path)
+    return found
+
+
+def _run_deep(roots: OutputRoots, footage: Path, backend: Backend, part: str) -> None:
+    """Run the deep part: the clip, the stills and page, or both (the clip first)."""
+    clip_dir = roots.allowed / "clip"
+    if part in ("all", "clip"):
+        deepest = _load_deep_frames(roots)["deepest"][0]
+        video = find_footage_file(deepest["chapter"], footage)
+        run_deep_clip(video, float(deepest["pts_seconds"]), roots, backend, clip_dir)
+        print(clip_dir)
+    if part in ("all", "stills"):
+        run_deep_stills(roots, footage, backend, clip_files(roots, clip_dir))
+        print(roots.allowed / "index.html")
+
+
 # --- command line ----------------------------------------------------------------------------
 
 
@@ -1285,7 +1913,7 @@ def _run_stills(roots: OutputRoots, footage: Path, backend: Backend) -> None:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    """Run ``stills`` or ``flicker`` (module docstring).
+    """Run ``stills``, ``flicker`` or ``deep`` (module docstring).
 
     Args:
         argv: Command-line arguments; defaults to ``sys.argv[1:]``.
@@ -1295,19 +1923,30 @@ def main(argv: Sequence[str] | None = None) -> int:
         device, path or FFmpeg failure.
     """
     parser = argparse.ArgumentParser(description="Build the WP1.3 look check pack.")
-    parser.add_argument("command", choices=("stills", "flicker"))
+    parser.add_argument("command", choices=("stills", "flicker", "deep"))
     parser.add_argument("--config", type=Path, help="local configuration file")
     parser.add_argument("--device", choices=DEVICES, default="gpu")
+    parser.add_argument(
+        "--part",
+        choices=("all", "clip", "stills"),
+        default="all",
+        help="deep only: the clip, the stills and page, or both (default)",
+    )
     args = parser.parse_args(argv)
     try:
         config = load_local_config(args.config)
-        roots = OutputRoots.from_config(config)
+        if args.command == "deep":
+            roots = OutputRoots.from_config(config, subdir=scan.WORK_SUBDIR)
+        else:
+            roots = OutputRoots.from_config(config)
         backend = select_backend(args.device)
         if backend.reason:
             print(f"note: running on the CPU: {backend.reason}", file=sys.stderr)
         began = time.monotonic()
         if args.command == "stills":
             _run_stills(roots, config.footage_path, backend)
+        elif args.command == "deep":
+            _run_deep(roots, config.footage_path, backend, args.part)
         else:
             video = find_footage_file(FLICKER_CHAPTER, config.footage_path)
             run_flicker(video, roots, backend, roots.allowed / "flicker")

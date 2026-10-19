@@ -3,6 +3,8 @@ command of ``lookcheck.pack``. Synthetic except where marked ``footage``."""
 
 from __future__ import annotations
 
+import dataclasses
+import itertools
 import json
 import shutil
 from fractions import Fraction
@@ -13,8 +15,10 @@ import numpy as np
 import pytest
 
 from local_config import FootageLookupError, find_footage_file, load_local_config
-from lookcheck import frames, scan
+from lookcheck import frames, pack, scan
 from lookcheck.frames import OutputRoots
+from prototype.backend import CPU
+from prototype.params import Params
 
 WIDTH, HEIGHT = 64, 48
 TIME_BASE = Fraction(1, 30000)
@@ -415,3 +419,215 @@ def test_an_interrupted_chapter_scan_resumes_and_matches_an_uninterrupted_one(
     resumed = scan.scan_chapter(clip, roots, scan_dir)
     assert resumed == whole
     assert not (scan_dir / "GXSYN.partial.json").exists()
+
+
+# --- test 5: the deep pack ------------------------------------------------------------------------
+
+
+def _deep_entry(rank: int, serves: list[str]) -> dict[str, Any]:
+    """A deep-frames.json entry with the keys the page reads."""
+    return {"rank": rank, "D": 0.4321, "W": 0.25, "H": 0.0789, "serves_cases": serves}
+
+
+def _deep_roots(root: Path) -> OutputRoots:
+    """Roots whose allowed folder is ``root/work/wp1.3d``, with the real footage folder."""
+    return OutputRoots(allowed=root / "work" / "wp1.3d", footage=load_local_config().footage_path)
+
+
+@pytest.fixture(scope="module")
+def deep_pack(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Any]:
+    """Build a deep pack from two frames of a synthetic clip on the CPU: one chapter still and
+    one candidate that serves two cases."""
+    root = tmp_path_factory.mktemp("deep")
+    roots = _deep_roots(root)
+    clip = roots.check(roots.allowed / "GXSYN.mp4")
+    _synthetic_clip(clip, 2)
+    still, candidate = frames.extract(clip, [0.1, 0.9], roots.allowed / "frames", roots=roots)
+    both = ["deep-water-noise", "open-blue-water"]
+    candidates = {
+        "deep-water-noise": [(candidate, _deep_entry(1, both))],
+        "open-blue-water": [(candidate, _deep_entry(1, both))],
+    }
+    link = roots.allowed / "clip" / "GXSYN_c3.mp4"
+    document = pack.build_deep_pack([still], candidates, roots.allowed, roots, CPU, [link])
+    return {"roots": roots, "still": still, "candidate": candidate, "document": document}
+
+
+def test_the_deep_variants_are_c3_then_ancuti2018_then_the_blue_one() -> None:
+    variants = pack.deep_variants()
+    assert [v.name for v in variants] == ["c3", "ancuti2018", "ancuti2018-blue"]
+    assert [(v.params.method, v.params.blue_compensation) for v in variants] == [
+        ("c3", False),
+        ("ancuti2018", False),
+        ("ancuti2018", True),
+    ]
+    assert variants[0].params == dataclasses.replace(Params(), method="c3")
+    # the shallow pack's order is unchanged
+    assert [v.name for v in pack.default_variants()] == ["ancuti2018", "ancuti2018-blue", "c3"]
+
+
+def test_the_deep_pack_has_its_layout_and_the_index_names_every_file(
+    deep_pack: dict[str, Any],
+) -> None:
+    roots: OutputRoots = deep_pack["roots"]
+    root = roots.allowed
+    names = ["c3", "ancuti2018", "ancuti2018-blue"]
+    document = deep_pack["document"]
+    assert list(document["variants"]) == names
+    # two frames: the candidate serving two cases is corrected once
+    assert [e["frame"] for e in document["frames"]] == [
+        deep_pack["still"].path.stem,
+        deep_pack["candidate"].path.stem,
+    ]
+    for frame in (deep_pack["still"], deep_pack["candidate"]):
+        stem = frame.path.stem
+        assert (root / "frames" / f"{stem}.png").is_file()
+        assert (root / "thumbs" / f"{stem}.jpg").is_file()
+        for name in names:
+            assert (root / "frames" / f"{stem}-{name}.png").is_file()
+            assert (root / "thumbs" / f"{stem}-{name}.jpg").is_file()
+            assert (root / "pairs" / f"{stem}-{name}.jpg").is_file()
+    for name in ("frames.json", "statistics.json", "index.html"):
+        assert (root / name).is_file()
+    page = (root / "index.html").read_text(encoding="utf-8")
+    pack_files = sorted(
+        path.relative_to(root).as_posix()
+        for folder in ("frames", "thumbs", "pairs")
+        for path in (root / folder).rglob("*")
+        if path.is_file()
+    )
+    assert pack_files
+    for name in [*pack_files, "frames.json", "statistics.json"]:
+        assert f'"{name}"' in page, f"{name} is not named in index.html"
+    assert "http://" not in page and "https://" not in page
+
+
+def test_the_deep_page_head_sections_and_wording(deep_pack: dict[str, Any]) -> None:
+    page = (deep_pack["roots"].allowed / "index.html").read_text(encoding="utf-8")
+    # variants in the stated order, as column headers
+    columns = [page.index(f"<th>{name}</th>") for name in ("c3", "ancuti2018", "ancuti2018-blue")]
+    assert columns == sorted(columns)
+    for field in dataclasses.fields(Params):
+        assert f"<td>{field.name}</td>" in page
+    for variant in pack.deep_variants():
+        assert variant.flags in page
+    # the rule of claim 2 is on the page, and candidates are called candidates
+    for case in scan.CASES:
+        assert case.rule in page and case.label in page
+    assert "CANDIDATES" in page and "30 s apart" in page and "ties break by chapter name" in page
+    assert "also a candidate for open-blue-water" in page  # on the deep-water-noise caption
+    assert "also a candidate for deep-water-noise" in page  # and on the other case's
+    assert "D 0.432, W 0.250, H 0.0789" in page
+    # the chapter stills come first, then the case sections in case order
+    assert page.index("Chapter stills") < page.index("Case candidates")
+    assert page.index(scan.CASES[0].label + "</h3>") < page.index(scan.CASES[1].label + "</h3>")
+    assert "Params() default method" in page  # the explicit-method note
+    assert "PENDING: Photos" in page
+    assert 'href="clip/GXSYN_c3.mp4"' in page
+
+
+def test_a_candidate_that_is_also_a_still_is_corrected_once(tmp_path: Path) -> None:
+    roots = _deep_roots(tmp_path)
+    clip = roots.check(roots.allowed / "GXSYN.mp4")
+    _synthetic_clip(clip, 2)
+    (frame,) = frames.extract(clip, [0.5], roots.allowed / "frames", roots=roots)
+    candidates = {"distance-haze": [(frame, _deep_entry(1, ["distance-haze"]))]}
+    document = pack.build_deep_pack([frame], candidates, roots.allowed, roots, CPU)
+    assert [e["frame"] for e in document["frames"]] == [frame.path.stem]
+
+
+def test_the_clip_window_is_centred_and_kept_inside_the_chapter() -> None:
+    assert pack.clip_window(50.0, 100.0) == 47.0
+    assert pack.clip_window(1.0, 100.0) == 0.0  # clamped to the start
+    assert pack.clip_window(99.0, 100.0) == 94.0  # clamped so the excerpt ends with the chapter
+    assert pack.clip_window(3.0, 6.4) == pytest.approx(0.0)  # a chapter hardly longer than 6 s
+    assert pack.clip_window(2.0, 4.0) == 0.0  # a chapter shorter than the excerpt
+
+
+def test_the_deep_smoother_is_the_provisional_centred_gaussian_at_two_seconds() -> None:
+    assert (pack.DEEP_SMOOTHER.kind, pack.DEEP_SMOOTHER.window_s) == ("gaussian", 2.0)
+    assert pack.DEEP_CLIP_SECONDS == 6.0 and pack.DEEP_CLIP_VARIANTS == ("c3", "ancuti2018")
+
+
+# --- the deep clip -------------------------------------------------------------------------------
+
+
+@pytest.mark.gpu
+@pytest.mark.slow
+def test_the_deep_clip_is_staged_smoothed_encoded_checked_and_pruned(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from prototype import temporal
+    from prototype.backend import select_backend
+
+    try:
+        backend = select_backend("gpu")
+    except RuntimeError as exc:
+        pytest.skip(f"no usable graphics card: {exc}")
+    roots = _deep_roots(tmp_path)
+    clip = roots.check(roots.allowed / "GXDEEP.mp4")
+    clip.parent.mkdir(parents=True, exist_ok=True)
+    done = frames.run_tool(
+        [
+            *("ffmpeg", "-nostdin", "-hide_banner", "-y", "-loglevel", "error"),
+            *("-f", "lavfi", "-i", "testsrc2=size=1920x1080:rate=30000/1001:duration=4"),
+            *("-vf", "format=yuv420p,setparams=range=full:colorspace=bt709"),
+            *("-c:v", "libx265", "-crf", "20", "-x265-params", "log-level=error"),
+            *("-pix_fmt", "yuv420p", "-color_range", "pc", "-colorspace", "bt709"),
+            *("-color_primaries", "bt709", "-color_trc", "bt709", str(clip)),
+        ]
+    )
+    assert done.returncode == 0, done.stderr.decode(errors="replace")[-300:]
+    calls: list[tuple[list[Any], str, Any]] = []
+    real = temporal.analyse_staged
+
+    def spy(images: Any, params: Any, smoother: Any, rate: Any, backend_: Any = None) -> Any:
+        calls.append((list(images), params.method, smoother))
+        return real(images, params, smoother, rate, backend_)
+
+    monkeypatch.setattr(temporal, "analyse_staged", spy)
+    clip_dir = roots.allowed / "clip"
+    document = pack.run_deep_clip(clip, 3.8, roots, backend, clip_dir, seconds=1.0)
+    count = document["excerpt"]["frames"]
+    assert 29 <= count <= 30
+    assert document["excerpt"]["start_s"] == pack.clip_window(3.8, 4.0, 1.0) == 3.0
+    assert document["analysis"].startswith("STAGED")
+    assert document["smoother"] == {"kind": "gaussian", "window_s": 2.0}
+    assert all(check["ok"] for label, check in document["checks"].items() if label != "readback")
+    assert document["checks"]["readback"]["ok"]
+    for name in ("GXDEEP_c3.mp4", "GXDEEP_ancuti2018.mp4", "GXDEEP_source.mp4", "statistics.json"):
+        assert (clip_dir / name).is_file()
+    assert [p.name for p in pack.clip_files(roots, clip_dir)] == [
+        "GXDEEP_c3.mp4",
+        "GXDEEP_ancuti2018.mp4",
+        "GXDEEP_source.mp4",
+    ]
+    assert not list(clip_dir.glob("*.partial.mp4"))
+    for folder in ("source", "corrected-c3", "corrected-ancuti2018"):
+        assert len(list((clip_dir / folder).glob("*.png"))) == 3  # first, middle, last
+    # the statistics came from the exact NumPy proxy, analysed STAGED, once per method
+    assert [(method, smoother.kind, smoother.window_s) for _, method, smoother in calls] == [
+        ("c3", "gaussian", 2.0),
+        ("ancuti2018", "gaussian", 2.0),
+    ]
+    middle = count // 2
+    source = frames.read_png16(clip_dir / "source" / f"GXDEEP_f{middle:04d}.png")
+    expected = source.reshape(540, 2, 960, 2, 3).mean(axis=(1, 3), dtype=np.float64)
+    for images, _method, _smoother in calls:
+        assert len(images) == count and images[middle].shape == (540, 960, 3)
+        assert np.array_equal(images[middle], expected.astype(np.float32))
+    reread = json.loads((clip_dir / "statistics.json").read_text(encoding="utf-8"))
+    assert list(reread["variants"]) == ["c3", "ancuti2018"]
+    for name, body in reread["variants"].items():
+        rows = body["frames"]
+        assert len(rows) == count
+        assert [r["index"] for r in rows] == list(range(count))
+        steps = {b["pts_ticks"] - a["pts_ticks"] for a, b in itertools.pairwise(rows)}
+        assert steps == {1001}
+        assert body["params"]["method"] == name
+        raw = [r["raw"]["white_balance_gains.R"] for r in rows]
+        smoothed = [r["smoothed"]["white_balance_gains.R"] for r in rows]
+        assert raw != smoothed, "control: smoothing must change the gain series"
+        assert set(rows[0]["rendered"]) >= {"red_gain", "blue_gain", "bound", "compensation"}
+    alpha = reread["variants"]["ancuti2018"]["frames"][0]["rendered"]["compensation"]["effective"]
+    assert "red" in alpha
