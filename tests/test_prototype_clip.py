@@ -30,7 +30,7 @@ from lookcheck.frames import OutputPathError, OutputRoots
 from prototype import bench, clip, temporal
 from prototype.backend import select_backend
 from prototype.params import Params
-from prototype.pipeline import correct
+from prototype.pipeline import Statistics, correct
 
 pytestmark = pytest.mark.skipif(
     shutil.which("ffmpeg") is None or shutil.which("ffprobe") is None,
@@ -388,6 +388,29 @@ def test_at_most_two_frames_are_in_flight_after_the_core(
     clip.export(source, output, Params(), None, select_backend("cpu"), (logs[0], logs[1]))
     assert state["written"] == CLIP_FRAMES
     assert state["most"] == clip.OUTPUT_FRAMES  # reached, never exceeded
+
+
+def test_the_export_applies_each_frame_its_own_statistics(
+    synthetic: Path, roots: OutputRoots, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Each frame's correct() call receives that frame's record, and only that record."""
+    source = clip.open_source(synthetic)
+    statistics = [
+        Statistics(normalisation_bounds=(-0.1 - index / 1000.0, 0.1 + index / 1000.0))
+        for index in range(CLIP_FRAMES)
+    ]
+    seen: list[Any] = []
+
+    def spy(image: Any, *args: Any, **kwargs: Any) -> Any:
+        seen.append(kwargs.get("statistics"))
+        return SimpleNamespace(output=image.copy())
+
+    monkeypatch.setattr(clip, "correct", spy)
+    folder = roots.allowed / "applied"
+    output, *logs = clip.output_paths(roots, folder, ["s_corrected.mp4", "d.log", "e.log"])
+    clip.export(source, output, Params(), statistics, select_backend("cpu"), (logs[0], logs[1]))
+    assert len(seen) == CLIP_FRAMES
+    assert all(record is statistics[index] for index, record in enumerate(seen))
 
 
 def test_open_source_refuses_non_square_pixels(roots: OutputRoots) -> None:
