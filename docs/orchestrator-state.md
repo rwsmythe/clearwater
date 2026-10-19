@@ -41,8 +41,16 @@
   the plan still used GX011600. Query to CHARC `32513ec1` (owner pauses the siblings for one
   block of ~3.5 h; contamination rule). The amendment was ACKNOWLEDGED after all (ledger
   `3c5f73b`: GX011625 carries claims 3-5, GX011600 dropped, all windows under 4 h, block ~3 h;
-  fyi `44945334`). On CHARC's ruling: one message to the cell with the ruling. Do not
-  message it before then.
+  fyi `44945334`). **RELEASED 03:4xZ** under CHARC `f2d35c83ac139a14`: PROCEED NOW for W1-W5
+  under the contamination rule plus six conditions:
+  - a pre-window idle gate (CPU < 25 %, GPU < 5 %);
+  - no CIM or WMI samplers;
+  - the drift baseline is the clean W1 median;
+  - W5 only if W1-W4 are clean;
+  - a second contamination means STOP, and CHARC then asks the owner;
+  - no Defender exclusion; the 4 h cap.
+  At QA, check that the ledger shows each of these. Exclusive: nothing at this seat until the
+  cell returns.
 - **Shallow CP2 COMPLETE** (owner 2026-10-19, CHARC `3bac4a724b1420aa`, record
   `docs/proofs/cp2-look-check.md`): c3 default (both Ancuti variants over-red; kept as options);
   no cast, halo, noise, clipping or flicker; staged vs flat no visible difference. Briefs cite
