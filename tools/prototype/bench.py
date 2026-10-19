@@ -148,6 +148,12 @@ GPU_SAMPLE_INTERVAL_S = 60.0
 STRAY_CPU_PERCENT = 10.0
 """A process using at least this share of one logical CPU is listed by the stray check."""
 
+STRAY_SAMPLE_S = 10.0
+"""The stray check's sampling interval (WP1.2B ruling: samplers at 10 s or more)."""
+
+WATCHED_PROCESSES = frozenset({"MsMpEng.exe", "WmiPrvSE.exe"})
+"""Processes the stray check always lists (Defender's engine and the WMI provider host)."""
+
 START_FRACTION = 0.3
 """Real video frames are read from this fraction of the clip's duration on (Part B claim 2)."""
 
@@ -1073,7 +1079,7 @@ def _versions(backend: Backend) -> dict[str, Any]:
 def _machine(gpu: dict[str, str] | None) -> dict[str, Any]:
     """The machine: operating system, processor, memory and graphics card."""
     return {
-        "platform": platform.platform(),
+        "platform": _platform_name(),
         "processor": _cpu_brand(),
         "logical_cpus": os.cpu_count(),
         "ram_total_mb": int(psutil.virtual_memory().total) / _MIB,
@@ -1291,20 +1297,23 @@ class _GpuSampler:
 
 
 def stray_processes(
-    threshold_percent: float = STRAY_CPU_PERCENT, interval_s: float = 0.5
+    threshold_percent: float = STRAY_CPU_PERCENT, interval_s: float | None = None
 ) -> list[dict[str, Any]]:
     """List the other processes busy right now: the stray-process check of a timed window.
 
-    Every process's CPU use is sampled over ``interval_s`` (``psutil``, where 100 is one
-    logical CPU fully used); this process and the idle process are left out.
+    Every process's CPU use is sampled over ``interval_s`` (``psutil``, the operating
+    system's process APIs, no WMI; 100 is one logical CPU fully used); this process and the
+    idle process are left out. The processes named in :data:`WATCHED_PROCESSES` are listed
+    whatever their use.
 
     Args:
         threshold_percent: The least use, in percent of one logical CPU, that is listed.
-        interval_s: The sampling interval.
+        interval_s: The sampling interval; ``None`` for :data:`STRAY_SAMPLE_S`.
 
     Returns:
-        ``{"pid", "name", "cpu_percent"}`` per busy process, busiest first.
+        ``{"pid", "name", "cpu_percent"}`` per listed process, busiest first.
     """
+    interval_s = STRAY_SAMPLE_S if interval_s is None else interval_s
     processes = []
     for process in psutil.process_iter(["pid", "name"]):
         try:
@@ -1319,7 +1328,8 @@ def stray_processes(
             used = float(process.cpu_percent(None))
         except psutil.Error:
             continue
-        if process.pid not in (0, os.getpid()) and used >= threshold_percent:
+        watched = str(process.info["name"]) in WATCHED_PROCESSES
+        if process.pid not in (0, os.getpid()) and (used >= threshold_percent or watched):
             busy.append({"pid": process.pid, "name": process.info["name"], "cpu_percent": used})
     return sorted(busy, key=lambda entry: -float(entry["cpu_percent"]))
 
@@ -1441,13 +1451,29 @@ def _nvidia_smi(arguments: list[str]) -> list[str] | None:
 
 
 def _cpu_brand() -> str:
-    """The processor's name (py-cpuinfo), or ``platform.processor()`` if that fails."""
+    """The processor's name, read without WMI.
+
+    On Windows py-cpuinfo runs ``wmic`` (in a child Python process) and Python 3.12's
+    ``platform.processor()`` queries WMI, so the processor is read from the
+    ``PROCESSOR_IDENTIFIER`` environment variable there (WP1.2B ruling: no sampler or record
+    of a timed window touches WMI). Elsewhere py-cpuinfo, or ``platform.processor()``.
+    """
+    if os.name == "nt":  # (not sys.platform: mypy would drop the other branch)
+        return os.environ.get("PROCESSOR_IDENTIFIER", "unknown")
     try:
         import cpuinfo
 
         return str(cpuinfo.get_cpu_info().get("brand_raw", "")) or platform.processor()
     except Exception:  # py-cpuinfo is best effort on an unusual system
         return platform.processor()
+
+
+def _platform_name() -> str:
+    """The operating system, read without WMI (``sys.getwindowsversion`` on Windows)."""
+    if os.name == "nt":  # (not sys.platform: mypy would drop the other branch)
+        version = sys.getwindowsversion()
+        return f"Windows {version.major}.{version.minor}.{version.build}"
+    return platform.platform()
 
 
 def _cuda_version(code: int) -> str:

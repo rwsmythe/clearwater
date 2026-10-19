@@ -54,6 +54,12 @@ CLIP_FRAMES = 60
 # --- fixtures ---------------------------------------------------------------------------------
 
 
+@pytest.fixture(autouse=True)
+def _short_stray_check(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The stray-process check samples 10 s in a timed window; 0.2 s is enough for a test."""
+    monkeypatch.setattr(bench, "STRAY_SAMPLE_S", 0.2)
+
+
 def _ffmpeg(output: Path, *arguments: str) -> Path:
     """Run FFmpeg writing ``output`` (inside the test tree only)."""
     subprocess.run(
