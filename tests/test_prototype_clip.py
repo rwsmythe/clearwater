@@ -1062,3 +1062,28 @@ def test_the_output_witness_catches_a_wrong_statistics_index_by_name(
     assert not any(row["match_ok"] for row in record["rows"])
     with pytest.raises(clip.OutputMismatchError):
         clip.require_witness(record)
+
+
+@pytest.mark.gpu
+@requires_gpu
+def test_a_failed_reference_encoder_start_leaves_no_process_and_no_file(
+    synthetic: Path,
+    planted_export: Path,
+    planted_statistics: list[Any],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    reference = planted_export.parent / "spawn-reference.mp4"
+    short = reference.with_name(f"{reference.stem}-i1{reference.suffix}")
+    real_spawn = clip._spawn
+
+    def spawn(command: list[str], *args: Any) -> Any:
+        if command[-1] == str(short):  # planted: the second reference encoder cannot start
+            raise clip.ClipError("planted spawn failure")
+        return real_spawn(command, *args)
+
+    monkeypatch.setattr(clip, "_spawn", spawn)
+    source, output = clip.open_source(synthetic), clip.open_source(planted_export)
+    with pytest.raises(clip.ClipError, match="planted spawn failure"):
+        clip.output_witness(source, output, planted_statistics, Params(), GPU, [10], reference)
+    assert not _children_alive()
+    assert not reference.exists() and not short.exists()

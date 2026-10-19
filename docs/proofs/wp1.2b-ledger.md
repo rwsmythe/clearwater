@@ -481,3 +481,22 @@ d8052f0067f5d5e5baecd444e7875475 remediation/per_frame_spread.json
 ab6416158da6661ef2eac6306434f2c6 remediation/per_frame_spread.py
 c05294da32fa56df6847f5a49b459bf1 remediation/witness_both_2.log
 ```
+
+**Round 3** (head `7ca5818`, diff 1759 lines): banner ok; `^ERROR` 0; `ERROR codex_core` 0; footer
+1; succeeded 24; VERDICT **NO_NEW_CRITICAL_MAJOR**. Zero new blocking findings, so the
+remediation loop CONVERGES. Its 4 minors are fixed in this cleanup:
+- the margin constant and its basis now state the anchor rule, and both witness records'
+  `margin_basis` is amended in place with the field as first written kept
+  (`margin_basis_as_written`, `amendment`); the witness was not re-run;
+- the reference encoders are spawned inside the protected block, with a new test: a planted
+  second-spawn failure leaves no live process and no reference file;
+- the chunk-memory wording (16 decoded frames, about 380 MiB at 4K; three expected frames kept);
+- the test count, now from collection: 62.
+
+Reverts in any remediation round: 0.
+
+Amended record md5s:
+```
+feb72a243e4d2b5c4687069f86e86165 bench/W4/GX011627-end-to-end-ancuti2018-20261018-223431/output-witness.json
+cedba6e60d002492fe1baf7acf18a5cf bench/GX011625-end-to-end-ancuti2018-20261018-231103/output-witness.json
+```

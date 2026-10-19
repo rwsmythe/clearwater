@@ -52,7 +52,7 @@ the bracket figure, which stays the headline.
 - `tools/prototype/clip.py` (new): the analysis pass and the export loop.
 - `tools/prototype/bench.py`: the real-frame source `--input`, the proxy study on real frames, and
   the whole-clip modes `analysis`, `end-to-end`, `decode-only`, `encode-only`, `passthrough`.
-- `tests/test_prototype_clip.py`: 60 tests.
+- `tests/test_prototype_clip.py`: 62 tests.
 - No change to `pipeline.py`, `params.py`, `backend.py` or `pyproject.toml`.
 
 **Clips** are named by stem and found with `find_footage_file`. The footage folder is input

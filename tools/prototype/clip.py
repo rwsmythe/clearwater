@@ -168,16 +168,16 @@ WITNESS_MARGIN_DB = 2.0
 """The output witness passes frame i when PSNR(output i, expected i) is at least the encoder's
 own loss on that frame less this margin. The encoder's own loss, ``ref_i``, is measured per
 frame: the expected frames from the export's GOP start (its last I-frame at or before ``i``)
-through ``i + 1`` are encoded through the export's own encode chain (:func:`encode_command`),
-decoded, and compared with themselves, so that frame ``i`` is coded in its own position. The
-margin is the orchestrator's ruling. For scale: such a reference of GX011627 frames 0-31 put
-frame 30 at 28.09 dB, the export at 27.79 dB (0.30 dB apart;
-``work/wp1.2b/remediation/gop_reference_repro.json``)."""
+through the next I/P anchor after ``i`` are encoded through the export's own encode chain
+(:func:`encode_command`), decoded, and compared with themselves, so that frame ``i`` is coded
+in its own position with the future frame it is predicted from. The margin is the
+orchestrator's ruling. For scale: such a reference of GX011627 frames 0-32 coded frame 30 bit
+for bit as the export did (``work/wp1.2b/remediation/anchor_reference_repro.json``)."""
 
 WITNESS_MARGIN_BASIS = (
     "orchestrator ruling: own_i >= ref_i - 2.0 dB, ref_i the encoder's own loss on the expected "
-    "frame i, encoded from the export's GOP start through i + 1 through the export's chain; for "
-    "scale, GX011627 frame 30: reference 28.09 dB, export 27.79 dB"
+    "frame i, encoded from the export's GOP start through the next I/P anchor after i through "
+    "the export's chain; for scale, GX011627 frame 30: reference identical to the export"
 )
 """The basis of :data:`WITNESS_MARGIN_DB`, as recorded in each witness record."""
 
@@ -2144,8 +2144,9 @@ def output_witness(
       before ``i`` in the OUTPUT's picture types, :func:`picture_types`) through the next
       anchor after ``i`` (:func:`next_anchor`, so a B-frame keeps the future frame it is
       predicted from) are encoded through the export's own encode chain
-      (:func:`encode_command`, streamed in chunks so that only frames ``i - 1 .. i + 1`` are
-      held) and decoded: ``ref_i = PSNR(decoded expected i, expected i)``, the encoder's own
+      (:func:`encode_command`; the source is decoded :data:`WITNESS_CHUNK` frames at a time,
+      about 380 MiB at 4K, and of the expected frames only ``i - 1 .. i + 1`` are kept) and
+      decoded: ``ref_i = PSNR(decoded expected i, expected i)``, the encoder's own
       loss on frame ``i`` in its own coding position. The reference's picture type at ``i`` is
       read back and recorded beside the output's;
     - ``own_i = PSNR(output i, expected i)``.
@@ -2322,14 +2323,12 @@ def _gop_reference(
         ClipError: An encoder fails.
     """
     keep: dict[int, NDArray[Any]] = {}
-    encoders = [
-        _spawn(
-            encode_command(source, path, end - first + 1), subprocess.DEVNULL, subprocess.PIPE, None
-        )
-        for path, end in zip(paths, ends, strict=True)
-    ]
+    encoders: list[Any] = []
     last = max(ends)
     try:
+        for path, end in zip(paths, ends, strict=True):
+            command = encode_command(source, path, end - first + 1)
+            encoders.append(_spawn(command, subprocess.DEVNULL, subprocess.PIPE, None))
         for chunk in range(first, last + 1, WITNESS_CHUNK):
             frames, _ = decode_frames(source, chunk, min(WITNESS_CHUNK, last + 1 - chunk))
             for offset, frame in enumerate(frames):
