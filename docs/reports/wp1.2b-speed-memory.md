@@ -220,8 +220,6 @@ nearly every stray check:
 - The card reported thermal slowdown (reasons 0x20 and 0x24), running at 750-2,460 MHz SM and
   71-91 °C in 205 samples.
 - The core's median by quarter of the clip was 0.93, 0.74, 0.56 and 0.69 s.
-- A snapshot during the run showed the GPU at 10 % utilisation at 2,460 MHz: the loop was waiting
-  on the host, not on the card.
 The full-clip figure is the sustained figure on this laptop as it was used that night. Spec 12
 expects "sustained speed under heat may be lower than a single-frame timing suggests".
 
@@ -317,11 +315,14 @@ relative step (mean |frame-to-frame change| / mean |value|), at that size.
 The table above is a selection; the appendix at the end lists every statistic of both
 methods, with absolute differences beside the relative ones. 3C:
 - N{} low 4.5 / 13.9 / 28.5 %, high 3.3 / 11.3 / 26.7 % (means);
-- white-balance gains within 1.2e-3.
+- white-balance means and gains within 5.3e-4 at 1080, 1.8e-3 at 540 and 3.3e-3 at 270 (largest:
+  the blue white-balance mean).
 
 **Reading.**
-- The RGB channel means, the white-balance means and the white-balance gains survive any proxy
-  size, within 1.2e-3 relative: area means preserve means.
+- The RGB channel means survive any proxy size (relative error 1e-10): area means preserve means.
+- The white-balance means and gains stay close (largest relative error over the 20 frames):
+  - Ancuti 2018: 1.8e-4 at 1080, 5.5e-4 at 540, 1.1e-3 at 270.
+  - 3C, whose local compensation is not linear: 5.3e-4, 1.8e-3, 3.3e-3.
 - The Lab saliency means move more in relative terms where a component lies near 0.
   - Input 2's `b` at 540: Ancuti 2018 1.9e-1 mean, 1.2 max; 3C 1.1e-1 mean.
   - Input 2's `a` at 540: 4.6e-2 and 7.4e-2.

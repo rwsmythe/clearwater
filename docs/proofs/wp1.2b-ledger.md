@@ -280,3 +280,31 @@ against the records. 3 major + 2 minor, all in envelope, NEW, VALID, fixed:
 | R4-5 | minor | W3b called an idle indication | reworded: clean under the rule, not idle |
 
 Fixes: report and test (no product code changed in this round).
+
+## Reviewer A round 5 (the revised report) -- terminating round
+
+Head `05d03a0` (diff 4655 lines).
+Banner `gpt-5.6-sol` / `high` / `read-only`; `^ERROR` 0; `ERROR codex_core` 0; footer 1;
+`^ succeeded in` 29; VERDICT `NEW_CRITICAL_MAJOR_FOUND`. Hits: prompt and report echoes; a footage
+path inside a record it read (an echo, no access).
+
+| # | Severity | Finding | Verdict |
+|---|---|---|---|
+| R5-1 | major | claim 6's proxy statistics lack their own ambient window | REJECTED with the cited constraint. The fill's GATE_CHECKS bind conditions to "a timing or memory figure (plan 4.3)"; the claim-6 values are deterministic statistics of fixed frames and parameters, not timings, and machine load cannot change them. The record still carries head, power and the core loop's conditions. |
+| R5-2 | minor | "10 % GPU utilisation" snapshot not in any record | VALID: the sentence is removed (it was a live `nvidia-smi` reading at 01:48, not recorded) |
+| R5-3 | minor | "within 1.2e-3" contradicted by 3C at 270 (3.3e-3) | VALID: the reading now gives the maxima per method and size |
+
+Zero valid new blocking findings: the loop terminates at round 5 (ROUND_TERMINATION), and the
+minors are fixed in this cleanup. FIVE_ROUND_GATE: round 5 is reached with the loop converged.
+Rounds 4 and 5 changed report text and tests only, no product code. Reverts in all rounds: 0.
+
+Evidence md5s, rounds 4 and 5:
+```
+bcd3f072d8ba57e4d737cc197e55d111 r4/control-statistics-dropped.txt
+efaec90301bb4f54b697ed310345cbbe r4/diff-r4.txt
+55d32405ca1a655ccf251ee8e80faece r4/review-prompt-r4.md
+453d569e5dec8cb925a38e33d805350a r4/review-r4.txt
+f0900dded95b3a8a8f642fb96ebaadc3 r5/diff-r5.txt
+b7812b58ddbc47a2e3948ed9e04f7c53 r5/review-prompt-r5.md
+02c6dc904d8dcff8b13cd4565fb88454 r5/review-r5.txt
+```
