@@ -39,4 +39,13 @@ as the field of view fills with water; frame-to-frame jitter ~1 %), on the Ancut
 Not flicker; a statistics-adaptation effect. Noted for the smoothing-window and method-default
 discussion (c3 adapts far less, red gain 0.98-1.03 on the same frames).
 
-## Steps 4-5: pending
+## Step 4 -- WP1.4 clips, staged vs flat (owner, 2026-10-19 ~01:50Z, verbatim)
+
+"I see no flicker in the staged or flat clips. I see no difference in either of those."
+
+Sheet rows: flicker (smoothed, 1 s Gaussian) = NO; staged vs flat visibly different = NO. This
+is the owner's observation plan section 9 row 5 names ("Statistics: no visible difference -> the
+method may declare one stage; IF-3 stays staged (D98); architect, using the owner's observation
+at CP2"). The architect's reading follows at WP1.6.
+
+## Step 5: the sheet (pending the owner's confirmation of the compiled sheet)
