@@ -88,6 +88,15 @@
     cadence, hypotheses.
   - On return: a fresh `-mc`, then Reviewer B #2 (final). A second blocking B is adjudicated at
     the gate.
+  - **Remediation STOP** (head `f5296b5`): the output witness's 28 dB absolute floor failed
+    GX011627 frame 30 at 27.79 dB.
+    - The encode-alone repro gave 28.76 dB, and the order was correct on every row.
+    - GX011625 passed.
+    - **My ruling:** a per-frame relative floor. own >= ref_i - 2 dB, where ref_i is a 3-frame
+      encode of the expected frames; a 20 dB absolute sanity floor; the strict order rule; the
+      planted controls must still fail by name.
+    - The report must state the floor change and keep the 28 dB results.
+    - W3b is confirmed CONTAMINATED (PID 17192 is unidentified).
 - **Shallow CP2 COMPLETE** (owner 2026-10-19, CHARC `3bac4a724b1420aa`, record
   `docs/proofs/cp2-look-check.md`): c3 default (both Ancuti variants over-red; kept as options);
   no cast, halo, noise, clipping or flicker; staged vs flat no visible difference. Briefs cite
