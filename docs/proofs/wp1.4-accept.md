@@ -137,4 +137,5 @@ records.
 | Gain-cap noise test (deep footage) | COMMISSIONED earlier as WP1.4b (CHARC `0fd7c88ad56a7083`); waits on the scuba look-check cases. |
 | CP2 | The owner's look check: `work/wp1.4/GX011627/` staged, flat and unsmoothed clips (1 s Gaussian), beside WP1.3's pack. |
 
-Branch `wp1.4` is kept (it holds the reviewed pre-rebase SHAs this record cites).
+Branches kept for the SHAs this record cites: `wp1.4` (`45fd95b`, the author head), `wp1.4-b-pass1`
+(`af98ca8`, B pass 1's candidate) and `wp1.4-b-rerun` (`911d837`, the B re-run's candidate).
