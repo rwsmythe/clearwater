@@ -308,3 +308,52 @@ f0900dded95b3a8a8f642fb96ebaadc3 r5/diff-r5.txt
 b7812b58ddbc47a2e3948ed9e04f7c53 r5/review-prompt-r5.md
 02c6dc904d8dcff8b13cd4565fb88454 r5/review-r5.txt
 ```
+
+## Remediation after Reviewer B (brief `docs/briefs/wp1.2b-remediation-brief.md`, f1d2be7)
+
+From `2fa0ac8`. No timed window is re-run, and no window record is rewritten.
+
+**Code and tests done:**
+- `a876046`: the output witness (B3b); export to `<stem>.partial.mp4` with rename-on-success, no
+  overwrite, the partial removed on failure (B4); provenance over time base, frame rate, bit depth
+  and the full decode command (B5); `decode_frames` stderr through a pipe, no temporary file (B7);
+  the bracket's end documented as both children reaped (B6, docstring).
+- `3b853a0`: tests, including the witness controls (a planted frame swap raises
+  `OutputOrderError`; a planted 30-frame statistics shift raises `OutputMismatchError`).
+- `f33853f`: the witness finds an output beside its moved run record (W4's folders were moved to
+  `bench/W4/` after the run).
+- Clip tests: 57 passed.
+- Finding 1: no record identifies PID 17192 (python.exe at 53.0 % in W3b's closing-probe stray
+  check) as the instrument's own tree; it appears in that one record only. W3b is therefore
+  CONTAMINATED (text to follow).
+
+**STOP (brief condition): the output witness FAILED on a real export.** Untimed, 2026-10-19.
+- GX011627 W4 production (`bench/W4/GX011627-end-to-end-ancuti2018-20261018-223431/output-witness.json`):
+  - 24 frames checked, floor 28.0 dB: 23 pass and frame 30 fails at 27.79 dB.
+  - Order is correct on every row (own 27.8-39.7 dB against neighbours 14.1-28.3 dB); no frame is
+    misplaced.
+  - Scores rise from 28-31 dB over the busy opening to 36-40 dB at the end.
+- GX011625 W5 (`bench/GX011625-end-to-end-ancuti2018-20261018-231103/output-witness.json`):
+  PASSED, 24 frames, minimum 29.67 dB; own above every neighbour.
+- Reproduction (`work/wp1.2b/remediation/frame30_repro.py` and `.json`): the expected frames
+  29-31 encoded ALONE through the export's own encode chain (same NVENC settings), then decoded,
+  against themselves:
+
+  | Frame | Encoded alone, RGB dB (luma dB) | The export, RGB dB (luma dB) |
+  |---|---|---|
+  | 29 (an I-frame there) | 35.49 (38.99) | 28.59 (30.23) |
+  | 30 | 28.76 (30.15) | 27.79 (29.26) |
+  | 31 | 30.81 (32.88) | 28.36 (30.00) |
+
+  The export's frame 30 is within 1.0 dB of the encoder's own loss on that frame. The failure is
+  the floor's calibration: 28 dB was set from WP1.5's identity re-encode (Y min 32.27 dB), which
+  is easier content than the corrected, sharpened frames. It is not a defect of the measured loop.
+- The floor is NOT changed by the cell. A ruling is requested.
+
+Record md5s:
+```
+2bc525e5ab41c91fb455c44bc211c2a1 *bench/W4/GX011627-end-to-end-ancuti2018-20261018-223431/output-witness.json
+c131f6cdc0f68d5f3f9709a299cdee54 *bench/GX011625-end-to-end-ancuti2018-20261018-231103/output-witness.json
+03427eb01042b7be9ad160c67a2ce88e *remediation/frame30_repro.json
+140b8def6a9ec921c73e72a1076f74aa *remediation/frame30_repro.py
+```
