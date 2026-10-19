@@ -18,7 +18,12 @@ import pytest
 from PIL import Image as PILImage
 
 import prototype.pipeline as pipeline
-from local_config import LocalConfigError, load_local_config
+from local_config import (
+    FootageLookupError,
+    LocalConfigError,
+    find_footage_file,
+    load_local_config,
+)
 from lookcheck import frames, pack
 from lookcheck.frames import ExtractError, OutputPathError, OutputRoots, StreamTags
 from prototype.backend import CPU, select_backend
@@ -1286,9 +1291,12 @@ def test_a_failed_readback_leaves_neither_clip_and_a_pass_names_both(
 @pytest.mark.footage
 def test_extract_runs_on_the_shortest_shallow_chapter(tmp_path: Path) -> None:
     config = load_local_config()
-    chapter = config.footage_path / "GX011628.MP4"
-    if not chapter.is_file():
-        pytest.skip("GX011628.MP4 is not in the footage folder")
+    try:
+        chapter = find_footage_file("GX011628", config.footage_path)
+    except FootageLookupError as exc:
+        if exc.matches:  # an ambiguous footage folder is a defect, never a skip
+            raise
+        pytest.skip("GX011628 is not in the footage folder")
     roots = OutputRoots(allowed=tmp_path / "wp1.3", footage=config.footage_path)
     (frame,) = frames.extract(chapter, [7.0], roots.allowed / "png", roots=roots)
     assert re.fullmatch(r"GX011628_\d{4}\.\d{3}\.png", frame.path.name)

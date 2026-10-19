@@ -22,7 +22,7 @@ from container_spike.compare import (
     OutputPathError,
     Track,
 )
-from local_config import load_local_config
+from local_config import FootageLookupError, find_footage_file
 
 pytestmark = pytest.mark.skipif(
     shutil.which("ffmpeg") is None or shutil.which("ffprobe") is None,
@@ -899,9 +899,12 @@ class TestSmallParsers:
 @pytest.mark.footage
 @pytest.mark.slow
 def test_footage_smallest_chapter_against_itself_is_all_same() -> None:
-    chapter = load_local_config().footage_path / "GX011628.MP4"
-    if not chapter.is_file():
-        pytest.skip("GX011628.MP4 is not in the footage folder")
+    try:
+        chapter = find_footage_file("GX011628")
+    except FootageLookupError as exc:
+        if exc.matches:  # an ambiguous footage folder is a defect, never a skip
+            raise
+        pytest.skip("GX011628 is not in the footage folder")
     record = compare.compare_files(chapter, chapter)
     assert _different(record) == []
     items = _items(record)

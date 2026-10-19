@@ -20,7 +20,7 @@ import pytest
 
 import prototype.pipeline as pipeline
 import statistics_experiments as runner
-from local_config import load_local_config
+from local_config import FootageLookupError, find_footage_file, load_local_config
 from lookcheck.frames import OutputPathError, OutputRoots
 from prototype import temporal
 from prototype.backend import CPU, Backend, select_backend
@@ -836,9 +836,12 @@ def test_the_runner_writes_only_inside_its_folder(tmp_path: Path) -> None:
 )
 def test_7_the_runner_on_ten_frames_writes_its_record(tmp_path: Path) -> None:
     config = load_local_config()
-    chapter = config.footage_path / "GX011628.MP4"
-    if not chapter.is_file():
-        pytest.skip("GX011628.MP4 is not in the footage folder")
+    try:
+        find_footage_file("GX011628", config.footage_path)
+    except FootageLookupError as exc:
+        if exc.matches:  # an ambiguous footage folder is a defect, never a skip
+            raise
+        pytest.skip("GX011628 is not in the footage folder")
     roots = OutputRoots(allowed=tmp_path / "wp1.4", footage=config.footage_path)
     spec = runner.ExcerptSpec("ten", "GX011628", 0.30, 10 / float(NTSC), False, False)
     backend = select_backend("auto")
