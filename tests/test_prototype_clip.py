@@ -934,6 +934,17 @@ def test_reference_frames_keep_the_checked_frame_off_the_first_position() -> Non
     assert clip.reference_frames(59, 60) == [57, 58, 59]
 
 
+def test_gop_start_is_the_last_i_frame_at_or_before_the_frame() -> None:
+    types = ["I", "B", "B", "P", "I", "B", "P"]
+    assert [clip.gop_start(types, i) for i in range(7)] == [0, 0, 0, 0, 4, 4, 4]
+    assert clip.gop_start(["P", "B"], 1) == 0
+
+
+def test_picture_types_read_one_type_per_frame(synthetic: Path) -> None:
+    types = clip.picture_types(clip.open_source(synthetic))
+    assert len(types) == CLIP_FRAMES and types[0] == "I"
+
+
 def test_witness_indices_span_the_clip() -> None:
     assert clip.witness_indices(681)[:2] == [0, 30] and clip.witness_indices(681)[-1] == 680
     assert len(clip.witness_indices(681)) == clip.WITNESS_FRAMES
@@ -985,11 +996,14 @@ def test_the_output_witness_passes_a_correct_export(
     clip.require_witness(record)
     assert record["passed"] and record["frames_checked"] == 8
     assert record["rows"][0]["index"] == 0 and record["rows"][-1]["index"] == CLIP_FRAMES - 1
-    assert record["rows"][0]["reference_frames"] == [0, 1, 2]
-    assert record["rows"][-1]["reference_frames"] == [57, 58, 59]
+    # NVENC's GOP (250) is longer than the clip: one I-frame, so every reference starts at 0.
+    assert record["rows"][0]["picture_type"] == "I"
+    assert record["rows"][0]["reference_frames"] == [0, 1]
+    assert record["rows"][-1]["reference_frames"] == [0, CLIP_FRAMES - 1]
     for row in record["rows"]:
         assert row["own_db"] >= row["ref_db"] - clip.WITNESS_MARGIN_DB
-        assert {"own_db", "ref_db", "margin_db", "neighbours_db", "first_floor_ok"} <= set(row)
+        fields = {"own_db", "ref_db", "ref3_db", "margin_db", "neighbours_db", "picture_type"}
+        assert fields | {"first_floor_ok", "relative3_ok", "gop_start"} <= set(row)
     assert not reference.exists()  # the reference encode is removed
 
 

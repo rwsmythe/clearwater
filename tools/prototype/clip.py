@@ -167,17 +167,17 @@ WITNESS_FRAMES = 24
 WITNESS_MARGIN_DB = 2.0
 """The output witness passes frame i when PSNR(output i, expected i) is at least the encoder's
 own loss on that frame less this margin. The encoder's own loss, ``ref_i``, is measured per
-frame: the expected frames around ``i`` are encoded as a 3-frame sequence through the export's
-own encode chain (:func:`encode_command`), decoded, and compared with themselves. The margin is
-the orchestrator's ruling. For scale: in the GX011627 reproduction
-(``work/wp1.2b/remediation/frame30_repro.json``) the export scored 0.97 dB (frame 30) and 2.45 dB
-(frame 31) below those frames encoded alone as P-frames, the difference between an encoder that
-saw the whole clip and one that saw three frames."""
+frame: the expected frames from the export's GOP start (its last I-frame at or before ``i``)
+through ``i + 1`` are encoded through the export's own encode chain (:func:`encode_command`),
+decoded, and compared with themselves, so that frame ``i`` is coded in its own position. The
+margin is the orchestrator's ruling. For scale: such a reference of GX011627 frames 0-31 put
+frame 30 at 28.09 dB, the export at 27.79 dB (0.30 dB apart;
+``work/wp1.2b/remediation/gop_reference_repro.json``)."""
 
 WITNESS_MARGIN_BASIS = (
     "orchestrator ruling: own_i >= ref_i - 2.0 dB, ref_i the encoder's own loss on the expected "
-    "frame (a 3-frame encode through the export's chain); GX011627 reproduction for scale: the "
-    "export 0.97 dB (frame 30) and 2.45 dB (frame 31) below the frames encoded alone"
+    "frame i, encoded from the export's GOP start through i + 1 through the export's chain; for "
+    "scale, GX011627 frame 30: reference 28.09 dB, export 27.79 dB"
 )
 """The basis of :data:`WITNESS_MARGIN_DB`, as recorded in each witness record."""
 
@@ -2068,6 +2068,45 @@ def reference_frames(index: int, count: int) -> list[int]:
     return [first, first + 1, first + 2]
 
 
+def picture_types(output: Source) -> list[str]:
+    """Return the output's picture type per frame, in presentation order (``I``, ``P``, ``B``).
+
+    Read with ``ffprobe -show_entries frame=pict_type`` on the output (it decodes the stream).
+
+    Args:
+        output: The export.
+
+    Returns:
+        One type per frame.
+
+    Raises:
+        ClipError: ``ffprobe`` fails or reports another number of frames.
+    """
+    try:
+        document = run_ffprobe(
+            ["-select_streams", "v:0", "-show_entries", "frame=pict_type", str(output.path)]
+        )
+    except Exception as exc:  # container_spike's ProbeError
+        raise ClipError(f"cannot read the picture types of {output.path.name}: {exc}") from None
+    types = [str(frame.get("pict_type", "?")) for frame in document.get("frames", [])]
+    if len(types) != output.frame_count:
+        raise ClipError(f"{len(types)} picture types for {output.frame_count} frames")
+    return types
+
+
+def gop_start(types: Sequence[str], index: int) -> int:
+    """Return the last I-frame at or before ``index`` (0 when there is none).
+
+    Args:
+        types: The output's picture types (:func:`picture_types`).
+        index: A frame.
+
+    Returns:
+        The index of the GOP's I-frame.
+    """
+    return next((j for j in range(index, -1, -1) if types[j] == "I"), 0)
+
+
 def output_witness(
     source: Source,
     output: Source,
@@ -2082,21 +2121,27 @@ def output_witness(
 
     For each index ``i``:
     - output frame ``i`` is decoded (:func:`decode_frames`, the export's own conversion to RGB);
-    - the source frames of :func:`reference_frames` are decoded and corrected exactly as the
-      export corrects them (:func:`to_float`, ``correct(..., statistics=statistics[j])``,
-      :func:`to_integer`): the EXPECTED frames;
-    - the three expected frames are encoded as a 3-frame sequence through the export's own
-      encode chain (:func:`encode_command` into ``reference_path``) and decoded:
-      ``ref_i = PSNR(decoded expected i, expected i)``, the encoder's own loss on that frame;
+    - the source frames are decoded and corrected exactly as the export corrects them
+      (:func:`to_float`, ``correct(..., statistics=statistics[j])``, :func:`to_integer`): the
+      EXPECTED frames;
+    - the REFERENCE: the expected frames from the export's GOP start (the last I-frame at or
+      before ``i`` in the OUTPUT's picture types, :func:`picture_types`) through ``i + 1``
+      are encoded through the export's own encode chain (:func:`encode_command`, streamed in
+      chunks so that only frames ``i - 1 .. i + 1`` are held) and decoded:
+      ``ref_i = PSNR(decoded expected i, expected i)``, the encoder's own loss on frame ``i``
+      in the frame's own coding position;
     - ``own_i = PSNR(output i, expected i)``.
 
-    Frame ``i`` passes when ``own_i >= ref_i - margin_db`` and ``own_i >=``
+    Frame ``i`` passes when ``own_i >= ref_i - margin_db``, ``own_i >=``
     :data:`WITNESS_SANITY_DB`, and ``own_i`` is strictly higher than its PSNR against the
     expected frames ``i - 1`` and ``i + 1`` (those that exist). So a frame that is not the
     corrected source frame, sits at another position, or was corrected with another frame's
     statistics fails. This covers what the in-loop witness does not: the writer, the integer
-    conversion, the encoder and the muxer. Each row also keeps the verdict under the first,
-    replaced criterion (:data:`FIRST_FLOOR_DB`).
+    conversion, the encoder and the muxer.
+
+    Each row also keeps the two criteria this one replaced, for the record: the first
+    absolute floor (:data:`FIRST_FLOOR_DB`) and the 3-frame reference (the expected frames of
+    :func:`reference_frames` encoded alone, which codes ``i`` next to a fresh I-frame).
 
     Args:
         source: The clip that was exported.
@@ -2105,16 +2150,16 @@ def output_witness(
         params: The parameters the export used.
         backend: Where to correct.
         indices: The frame indices to check.
-        reference_path: Where the reference encode is written (checked by the caller; it
-            is overwritten for each frame and removed at the end).
+        reference_path: Where the reference encodes are written (checked by the caller;
+            overwritten for each frame and removed at the end).
         margin_db: The margin below the reference.
 
     Returns:
-        The record: the rule, one row per index (``own_i``, ``ref_i``, the margin, the PSNR
-        against each neighbour, the verdicts, the first criterion's verdict) and ``passed``.
+        The record: the rule, one row per index and ``passed``.
 
     Raises:
-        ClipError: The output's frame count differs from the statistics', or a decode fails.
+        ClipError: The output's frame count differs from the statistics', or a decode or a
+            reference encode fails.
     """
     count = len(statistics)
     if output.frame_count != count:
@@ -2122,29 +2167,40 @@ def output_witness(
     if count < 3:
         raise ClipError("the output witness needs at least 3 frames")
     scratch = np.empty((source.info.height, source.info.width, 3), np.float32)
+
+    def expect(frame: NDArray[Any], j: int) -> NDArray[Any]:
+        corrected = correct(
+            to_float(frame, np, source.bit_depth), params, backend, statistics=statistics[j]
+        )
+        out = np.empty_like(frame)
+        to_integer(np.asarray(corrected.output, dtype=np.float32), out, scratch)
+        return out
+
+    types = picture_types(output)
     rows: list[dict[str, Any]] = []
     try:
         for index in indices:
-            around = reference_frames(index, count)
-            sources, _ = decode_frames(source, around[0], 3)
             (exported,), _ = decode_frames(output, index, 1)
-            expected: dict[int, NDArray[Any]] = {}
-            for j, frame in zip(around, sources, strict=True):
-                image = to_float(frame, np, source.bit_depth)
-                corrected = correct(image, params, backend, statistics=statistics[j]).output
-                expected[j] = np.empty_like(frame)
-                to_integer(np.asarray(corrected, dtype=np.float32), expected[j], scratch)
-            reference = _reference_encode(source, [expected[j] for j in around], reference_path)
-            ref = psnr(reference[around.index(index)], expected[index])
-            own = psnr(exported, expected[index])
-            neighbours = {
-                j: psnr(exported, expected[j]) for j in (index - 1, index + 1) if j in expected
-            }
+            first, last = gop_start(types, index), min(index + 1, count - 1)
+            keep = _gop_reference(source, first, last, index, expect, reference_path)
+            (decoded,), _ = decode_frames(open_source(reference_path), index - first, 1)
+            ref = psnr(decoded, keep[index])
+            three = reference_frames(index, count)
+            for j in [*three, index - 1]:
+                if 0 <= j < count and j not in keep:
+                    (frame,), _ = decode_frames(source, j, 1)
+                    keep[j] = expect(frame, j)
+            short = _reference_encode(source, [keep[j] for j in three], reference_path)
+            ref3 = psnr(short[three.index(index)], keep[index])
+            own = psnr(exported, keep[index])
+            neighbours = {j: psnr(exported, keep[j]) for j in (index - 1, index + 1) if j in keep}
             threshold = max(ref - margin_db, WITNESS_SANITY_DB)
             rows.append(
                 {
                     "index": index,
-                    "reference_frames": around,
+                    "picture_type": types[index],
+                    "gop_start": first,
+                    "reference_frames": [first, last],
                     "own_db": own,
                     "ref_db": ref,
                     "margin_db": margin_db,
@@ -2153,6 +2209,8 @@ def output_witness(
                     "match_ok": own >= threshold,
                     "order_ok": all(own > v for v in neighbours.values()),
                     "misplaced": any(v >= own and v >= threshold for v in neighbours.values()),
+                    "ref3_db": ref3,
+                    "relative3_ok": own >= max(ref3 - margin_db, WITNESS_SANITY_DB),
                     "first_floor_ok": own >= FIRST_FLOOR_DB,
                 }
             )
@@ -2164,26 +2222,80 @@ def output_witness(
             "pass: own_i >= max(ref_i - margin, sanity) and own_i > PSNR against expected i +- 1"
         ),
         "reference": (
-            "ref_i = PSNR(decoded expected i, expected i), the expected frames i-1, i, i+1 (at "
-            "the first frame 0, 1, 2; at the last n-3, n-2, n-1) encoded as one 3-frame "
-            "sequence through the export's own encode chain"
+            "ref_i = PSNR(decoded expected i, expected i), the expected frames from the export's "
+            "GOP start (the last I-frame at or before i in the output's picture types) through "
+            "i + 1 encoded through the export's own encode chain"
         ),
+        "picture_types_from": "ffprobe -select_streams v:0 -show_entries frame=pict_type <output>",
         "margin_db": margin_db,
         "margin_basis": WITNESS_MARGIN_BASIS,
         "sanity_floor_db": WITNESS_SANITY_DB,
-        "first_floor_db": FIRST_FLOOR_DB,
-        "first_floor_note": (
-            "the first criterion, an absolute 28 dB floor from WP1.5's identity re-encode, failed "
-            "GX011627 frame 30 at 27.79 dB, whose encode-alone loss is 28.76 dB; it was replaced "
-            "by this relative rule before re-scoring; each row keeps its verdict"
-        ),
+        "replaced_criteria": {
+            "first_floor_db": FIRST_FLOOR_DB,
+            "first_floor": (
+                "absolute 28 dB from WP1.5's identity re-encode; failed GX011627 frame 30 at "
+                "27.79 dB, whose encode-alone loss is 28.76 dB (row field first_floor_ok)"
+            ),
+            "three_frame_reference": (
+                "ref3_i from the expected i-1, i, i+1 encoded alone; unrepresentative: it codes i "
+                "next to a fresh I-frame, while the export has GOP 250 with B and P frames (row "
+                "fields ref3_db, relative3_ok)"
+            ),
+            "sequence": "each was replaced before the next re-scoring, by orchestrator ruling",
+        },
         "frames_checked": len(rows),
         "rows": rows,
         "min_own_db": min(row["own_db"] for row in rows),
         "min_own_minus_ref_db": min(row["own_db"] - row["ref_db"] for row in rows),
         "passed": all(row["match_ok"] and row["order_ok"] for row in rows),
+        "order_passed": all(row["order_ok"] and not row["misplaced"] for row in rows),
+        "relative3_passed": all(row["relative3_ok"] for row in rows),
         "first_floor_passed": all(row["first_floor_ok"] for row in rows),
     }
+
+
+WITNESS_CHUNK = 16
+"""Source frames decoded at a time while a GOP-start reference is streamed to the encoder."""
+
+
+def _gop_reference(
+    source: Source,
+    first: int,
+    last: int,
+    index: int,
+    expect: Callable[[NDArray[Any], int], NDArray[Any]],
+    path: Path,
+) -> dict[int, NDArray[Any]]:
+    """Encode the expected frames ``first..last`` through the export's chain into ``path``.
+
+    The frames are decoded :data:`WITNESS_CHUNK` at a time, corrected (``expect``) and written
+    to the encoder's pipe one by one; only frames ``index - 1 .. index + 1`` are kept.
+
+    Returns:
+        The kept expected frames by index.
+
+    Raises:
+        ClipError: The encoder fails.
+    """
+    keep: dict[int, NDArray[Any]] = {}
+    command = encode_command(source, path, last - first + 1)
+    encoder = _spawn(command, subprocess.DEVNULL, subprocess.PIPE, None)
+    try:
+        for chunk in range(first, last + 1, WITNESS_CHUNK):
+            frames, _ = decode_frames(source, chunk, min(WITNESS_CHUNK, last + 1 - chunk))
+            for offset, frame in enumerate(frames):
+                j = chunk + offset
+                expected = expect(frame, j)
+                write_frame(encoder.stdin, expected)
+                if index - 1 <= j <= index + 1:
+                    keep[j] = expected
+        encoder.stdin.close()
+        status = _finish(encoder, "the reference encoder")
+    finally:
+        _stop(encoder)
+    if status != 0:
+        raise ClipError(f"the reference encode failed (status {status})")
+    return keep
 
 
 def _reference_encode(
