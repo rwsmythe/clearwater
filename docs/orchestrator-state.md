@@ -24,8 +24,10 @@
 
 ### Live cells
 
-**NONE** at the WP1.4 accept (generation 2 reading, 2026-10-19 ~01:10Z). WP-T2 dispatches next
-(see Handoff 2); record its cell here at dispatch.
+- **`wpt2-cell`** (implementer-sonnet-high), WP-T2, dispatched 2026-10-19 ~01:10Z in the
+  background. Worktree `.worktrees/wp-t2`, branch `wp-t2`, base `36535bf` (toml copied).
+  Agent id `awpt2-cell-37e14de42f7cc22f`. Depth at dispatch: fresh. If this generation rolls
+  before it returns, the successor re-dispatches from the branch head and the brief.
 
 ### Handoff -- the successor starts HERE
 
