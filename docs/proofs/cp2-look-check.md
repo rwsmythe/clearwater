@@ -28,4 +28,15 @@ and ancuti2018-blue stay as selectable options**; over-sharpening halo NO; noise
 NO. The default-method change is a spec decision (14.1 / the method default); CHARC carries it
 into the spec revision bundle with the chapter deferral (owner approves the exact text).
 
-## Steps 3-5: pending
+## Step 3 -- flicker, WP1.3 pair (owner, 2026-10-19 ~01:45Z, verbatim)
+
+"I don'tsee any brightness or color pulsing. I do see a smooth ramp up in overall red tint of
+the coral as the camera shows more open water, but, as noted, it is a smooth shift."
+
+Sheet row: flicker (unsmoothed, worst case) = NO. The owner's "smooth ramp up in red tint" is the
+scene-driven gain drift the WP1.3 report measured on this clip (red gain 1.02 -> 1.32 over the 6 s
+as the field of view fills with water; frame-to-frame jitter ~1 %), on the Ancuti-rendered clip.
+Not flicker; a statistics-adaptation effect. Noted for the smoothing-window and method-default
+discussion (c3 adapts far less, red gain 0.98-1.03 on the same frames).
+
+## Steps 4-5: pending
