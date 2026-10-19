@@ -106,6 +106,16 @@
       verdicts are kept per row.
     - **No further witness STOP:** a residual floor miss with correct order is recorded and
       adjudicated at the gate; an order error is still a STOP.
+  - **DEPTH BREACH (owner catch 2026-10-19 16:06Z).** `cell_depth.py`: wp12b-cell
+    current=858,061, turns 364, PAST-CAP (read mid-work, after the second floor ruling).
+    - I never read its depth at the return, the STOPs or before the remediation.
+    - The 9-finding remediation should have gone to a fresh cell (the re-seat line is ~250K).
+    - At the cell's NEXT YIELD: read the depth (moment "at retirement"), do NOT reply, and retire
+      the cell.
+    - Any remaining remediation work (Reviewer A rounds, gates) goes to a FRESH cell dispatched
+      from the ledger, the remediation brief and the rulings.
+    - Head at the reading: `8dced82` (GOP-start witness and the text items committed; report
+      being edited).
 - **Shallow CP2 COMPLETE** (owner 2026-10-19, CHARC `3bac4a724b1420aa`, record
   `docs/proofs/cp2-look-check.md`): c3 default (both Ancuti variants over-red; kept as options);
   no cast, halo, noise, clipping or flicker; staged vs flat no visible difference. Briefs cite
