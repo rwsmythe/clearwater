@@ -407,13 +407,16 @@ Proposed for IF-3 from these measurements. Every statistic measured was smoothed
   it invalidates, within the smoothing window of the displayed frame (a 2.0 s window reaches 29
   frames each side at 29.97 fps).
 
-- **Recommendation: key the statistics by the frame's pts, not by list position.** Every entry of
-  every record carries the frame's exact `pts_ticks` (and `pts_seconds`). This prototype still
-  associates a series with frames by position, so the runner first checks that the record's `pts_ticks` are the excerpt's, in order, and refuses
+- **Requirement on IF-3's statistics record (CHARC): one row per frame keyed by pts; smoothing in
+  seconds over pts.** Persisted statistics are keyed by pts (time), never by list index, both for the
+  identity/alignment check and for the smoothing window. A constant-frame-rate series is the special
+  case where index and pts agree. Every entry of every record here carries the frame's exact
+  `pts_ticks` (and `pts_seconds`). This prototype still associates a series with frames by position,
+  so the runner first checks that each record's `pts_ticks` are the excerpt's, in order, and refuses
   otherwise (a reordered, truncated or stale record rendered the wrong statistics onto a frame, and
-  the encode verification still passed). IF-3's analysis record should key each statistic by pts (the
-  stage's cache and the smoothing window are both defined in time, D95), and `render` should look a
-  frame's statistics up by its pts and refuse a frame with no entry.
+  the encode verification still passed). In the product, `render` looks a frame's statistics up by
+  its pts and refuses a frame with no entry; the stage cache and the smoothing window are both defined
+  in time (D95).
 
 ## 8. Limits, deviations, open questions
 
@@ -424,8 +427,10 @@ Proposed for IF-3 from these measurements. Every statistic measured was smoothed
   analysis; for the nested staged stages only up to 1 s windows, section 2). The product smooths
   over the whole clip.
 - **Timing:** the smoothers treat frames as evenly spaced and take the window in seconds through the
-  nominal frame rate. The excerpts are constant frame rate; a variable-frame-rate clip would need the
-  window applied over the frames' pts (out of this part's envelope; banked by the orchestrator).
+  nominal frame rate. The excerpts are constant frame rate, where index and pts agree. Smoothing by
+  index on a variable-frame-rate clip is a limit of this PROTOTYPE, not of the product: the section 7
+  requirement is smoothing in seconds over pts (out of this part's envelope; banked by the
+  orchestrator).
 - **Unsmoothed clip against the smoothed ones:** the unsmoothed clip uses each frame's FULL-frame
   statistics (WP1.3's clip, the brief's definition); the staged and flat clips use PROXY statistics.
   So they differ by the smoothing AND by the proxy gap of section 6 (a stronger N{} stretch). Staged
