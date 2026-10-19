@@ -93,9 +93,19 @@ path, md5, five assertions and verdict, or there is no accept.
   (`docs/proofs/cp2-look-check.md`; sheet in the WP1.3 report section 9): no cast, halo, noise,
   clipping or flicker; Ancuti variants push red (skin, white boat); **owner: c3 default, Ancuti
   variants kept as options**; staged vs flat: no visible difference (D98 input). **Spec revision
-  v0.5.3 PROPOSED to the owner** (c3 default: D16 amended; chapter handling deferred: 5.5, D21,
-  D33, D80, D82, D83, D64 seam, G7, G11, V3 seam, V12, 8.3, 14.2) -- OPEN until the owner approves
-  the text; then the plan's WP3.8/WP3.19/V12 rows follow. **Footage-layout skips:** the owner's Snorkel/SCUBA/edits layout makes 3
+  v0.5.3 APPROVED by the owner** ("approved as 0.5.3", 2026-10-19) and applied b3fcd86 (c3 default:
+  D16 amended; chapter handling deferred to v2: 5.5, D21, D33, D80, D82, D83, D64 seam, G7, G11,
+  V3 seam, V12, 8.2/8.3, UC2/UC3, 14.2 closed); CLAUDE.md spec line bumped; **plan v1.1** 51da4b0
+  (WP3.8 removed, WP3.19 = batch queue + export progress, V12 deferred). Two cache sentences still
+  mention chapter groups (spec line ~339, V17); moot in v1, untouched. Orchestrator told to cite
+  v0.5.3 in every brief (17a0d287); prototype default flips to c3 in the next package touching
+  tools/prototype, not inside Part B. **Part B idle ruling 2026-10-19 ~03:38Z** (msg d69d8e1f):
+  cell's first window W1 discarded for sibling-harness load (16 python.exe, MsMpEng, WmiPrvSE);
+  CHARC measured the machine idle (CPU 10-21 %, GPU 0 %) and ruled PROCEED NOW W1-W5 under the
+  orchestrator's contamination rule plus: pre-window idle gate, no CIM samplers, drift baseline =
+  clean W1 median (not Part A synthetic), stop after a second contamination -> only then ask the
+  owner for a quiet block, no Defender exclusion, 4 h cap. Cell acknowledged the GX011625
+  amendment (3c5f73b); GX011600 dropped; block ~3 h. **Footage-layout skips:** the owner's Snorkel/SCUBA/edits layout makes 3
   footage tests skip (root `GX011628.MP4` paths in `tests/test_container_spike.py:902`,
   `tests/test_lookcheck.py:1289`, WP1.4 test 7; also `tools/lookcheck/pack.py:94` and the WP1.4
   runner). CHARC ruling 2026-10-19 (msgs 35b13416 scope + 68fe376c-answer sequencing): WP1.4
