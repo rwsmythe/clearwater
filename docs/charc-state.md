@@ -119,7 +119,16 @@ path, md5, five assertions and verdict, or there is no accept.
   GX011625 full clip 7.62x (contaminated, thermal 91 C); analysis pipe-bound (32 KB Windows raw
   pipe, 93.6 ms/frame vs 4-5 ms at >=1 MB blocks -> WP2.1 transport); memory 3,682 MiB process,
   2,860 MiB graphics; photo leg PENDING. Claim 7: no candidate reaches N6 -> Gate 1 needs CHARC
-  options or an owner N6 decision at WP1.6. Exclusive window CLOSED; seat free. **Footage-layout skips:** the owner's Snorkel/SCUBA/edits layout makes 3
+  options or an owner N6 decision at WP1.6. Exclusive window CLOSED; seat free. **Part B ACCEPTED
+  2026-10-19 main 2dd06cf** (bundle 7e14b19; record docs/proofs/wp1.2b-accept.md; B #2 6 minor +
+  1 advisory banked DR-28 + report errata; cell depth breach 932K recorded, orchestrator
+  corrective: depth read at dispatch/yield/ruling, no multi-finding remediation >250K, STOP at
+  ~400K). **CHARC QA CONFIRMED** (patch-id 3c25c656 on author head, candidate and main; accept
+  record's 4781bbe0 is an erratum; md5s and verdicts OK; errata present; harness 366 OK).
+  **Main pytest+gpu re-gate OWED**: both the orchestrator's and CHARC's runs were killed by the
+  host for low memory (sibling pytest workers resident); run before the next merge when memory
+  is free. Next: WP1.3-deep / WP1.4b brief on SCUBA/ (c3 primary, Params() flips to c3), then
+  WP1.6 gate report (Gate 1: core 3.6x, production export 4.4x over N6). **Footage-layout skips:** the owner's Snorkel/SCUBA/edits layout makes 3
   footage tests skip (root `GX011628.MP4` paths in `tests/test_container_spike.py:902`,
   `tests/test_lookcheck.py:1289`, WP1.4 test 7; also `tools/lookcheck/pack.py:94` and the WP1.4
   runner). CHARC ruling 2026-10-19 (msgs 35b13416 scope + 68fe376c-answer sequencing): WP1.4
