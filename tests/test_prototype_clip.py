@@ -635,6 +635,62 @@ def test_a_shifted_witness_stops_the_render(
         clip.export(source, output, Params.neutral(), statistics, GPU, (logs[0], logs[1]), shifted)
 
 
+@pytest.mark.gpu
+@requires_gpu
+def test_the_witness_checks_the_true_last_frame_when_the_limit_exceeds_the_clip(
+    synthetic: Path, roots: OutputRoots, neutral_analysis: Path
+) -> None:
+    record = json.loads(neutral_analysis.read_text(encoding="utf-8"))
+    source = clip.open_source(synthetic)
+    folder = roots.allowed / "limit"
+    output, *logs = clip.output_paths(roots, folder, ["s_corrected.mp4", "d.log", "e.log"])
+    result = clip.export(
+        source,
+        output,
+        Params.neutral(),
+        clip.per_frame_statistics(record),
+        GPU,
+        (logs[0], logs[1]),
+        record["frame_means"],
+        frames=CLIP_FRAMES + 1,
+    )
+    assert result.frames_written == CLIP_FRAMES
+    assert result.witnessed == 3  # frames 0, 30 and the clip's last, 59
+
+
+@pytest.mark.parametrize("failing", ["spool", "compare"])
+def test_the_spool_never_outlives_an_encode_only_pass(
+    failing: str,
+    synthetic: Path,
+    config: Path,
+    roots: OutputRoots,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    made: list[Path] = []
+    real_spool = clip.spool
+
+    def spool(source: Any, path: Path, *args: Any) -> Any:
+        made.append(path)
+        if failing == "spool":
+            path.write_bytes(b"partial")
+            raise clip.ClipError("planted spool failure")
+        return real_spool(source, path, *args)
+
+    def compare(*args: Any) -> Any:
+        raise clip.ClipError("planted compare failure")
+
+    monkeypatch.setattr(clip, "spool", spool)
+    if failing == "compare":
+        monkeypatch.setattr(clip, "compare_output", compare)
+    argv = ["--mode", "encode-only", "--device", "cpu", "--method", "ancuti2018"]
+    argv += ["--input", str(synthetic), "--config", str(config), "--frames", "4"]
+    assert bench.main(argv) == 2
+    assert f"planted {failing}" in capsys.readouterr().err
+    (path,) = made
+    assert not path.exists()
+
+
 def test_a_record_of_another_clip_or_other_settings_is_refused(
     synthetic: Path, other: Path, neutral_analysis: Path
 ) -> None:
