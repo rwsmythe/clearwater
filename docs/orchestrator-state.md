@@ -97,6 +97,15 @@
       planted controls must still fail by name.
     - The report must state the floor change and keep the 28 dB results.
     - W3b is confirmed CONTAMINATED (PID 17192 is unidentified).
+  - **Second witness STOP** (head `2b6cd59`): the 3-frame reference was unrepresentative.
+    - The export uses GOP 250 with B and P frames; the reference coded i next to a fresh
+      I-frame; own - ref reached -6 dB.
+    - Order was correct on every row.
+    - **Ruling:** ref_i is a GOP-START reference (from the output's last I-frame at or before
+      i, through i+1). The same rule: -2 dB, a 20 dB sanity floor, strict order. All three
+      verdicts are kept per row.
+    - **No further witness STOP:** a residual floor miss with correct order is recorded and
+      adjudicated at the gate; an order error is still a STOP.
 - **Shallow CP2 COMPLETE** (owner 2026-10-19, CHARC `3bac4a724b1420aa`, record
   `docs/proofs/cp2-look-check.md`): c3 default (both Ancuti variants over-red; kept as options);
   no cast, halo, noise, clipping or flicker; staged vs flat no visible difference. Briefs cite
