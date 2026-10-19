@@ -12,11 +12,14 @@ import io
 import json
 import shutil
 import subprocess
+import sys
+import time
 from fractions import Fraction
 from pathlib import Path
 from typing import Any
 
 import numpy as np
+import psutil
 import pytest
 
 from container_spike import compare, spike
@@ -255,6 +258,118 @@ def test_a_frame_count_other_than_the_source_is_refused(synthetic: Path, tmp_pat
     assert result.timing.frames == CLIP_FRAMES
 
 
+class _ShortWrites:
+    """A pipe that takes at most half of what each write offers (or nothing at all)."""
+
+    def __init__(self, accept_nothing: bool = False) -> None:
+        self.data = bytearray()
+        self.calls = 0
+        self._nothing = accept_nothing
+
+    def write(self, view: memoryview) -> int:
+        self.calls += 1
+        if self._nothing:
+            return 0
+        taken = max(1, len(view) // 2)
+        self.data += view[:taken]
+        return taken
+
+
+def test_write_frame_writes_the_whole_frame_through_short_writes() -> None:
+    frame = np.arange(2 * 4 * 3, dtype=np.uint8).reshape(2, 4, 3)
+    pipe = _ShortWrites()
+    clip.write_frame(pipe, frame)  # type: ignore[arg-type]
+    assert bytes(pipe.data) == frame.tobytes()
+    assert pipe.calls > 1  # a single write would have sent half the frame
+
+
+def test_write_frame_refuses_a_pipe_that_takes_nothing() -> None:
+    with pytest.raises(clip.PipeError, match="accepted 0 of the 24 bytes"):
+        clip.write_frame(_ShortWrites(accept_nothing=True), np.zeros((2, 4, 3), np.uint8))  # type: ignore[arg-type]
+
+
+def test_the_first_wait_counts_from_the_first_frame() -> None:
+    timing = clip.LoopTiming(spawned=1.0, first_frame=3.0)
+    assert clip._bracketed(1.5, timing) == 3.0  # the decoder's start is outside the bracket
+    timing.frames = 1
+    assert clip._bracketed(1.5, timing) == 1.5
+
+
+def _python(code: str) -> list[str]:
+    return [sys.executable, "-c", code]
+
+
+def _children_alive() -> list[psutil.Process]:
+    return [child for child in psutil.Process().children(recursive=True) if child.is_running()]
+
+
+def test_a_stalled_decoder_stops_the_pass(
+    synthetic: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = clip.open_source(synthetic)
+    monkeypatch.setattr(clip, "STALL_TIMEOUT_S", 1.0)
+    monkeypatch.setattr(
+        clip, "decode_command", lambda *a, **k: _python("import time; time.sleep(60)")
+    )
+    started = time.monotonic()
+    with pytest.raises(clip.ClipError, match="the decoder sent nothing for 1 s"):
+        clip.decode_only(source, tmp_path / "decode.log")
+    assert time.monotonic() - started < 30
+    assert not _children_alive()
+
+
+def test_a_stalled_encoder_stops_the_pass(
+    synthetic: Path, roots: OutputRoots, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = clip.open_source(synthetic)
+    monkeypatch.setattr(clip, "STALL_TIMEOUT_S", 1.0)
+    monkeypatch.setattr(
+        clip, "encode_command", lambda *a, **k: _python("import time; time.sleep(60)")
+    )
+    folder = roots.allowed / "stalled"
+    output, *logs = clip.output_paths(roots, folder, ["s_corrected.mp4", "d.log", "e.log"])
+    started = time.monotonic()
+    with pytest.raises(clip.ClipError, match="the encoder took nothing for 1 s"):
+        clip.passthrough(source, output, (logs[0], logs[1]))
+    assert time.monotonic() - started < 30
+    assert not _children_alive()
+
+
+def test_an_error_in_the_core_stops_both_processes(
+    synthetic: Path, roots: OutputRoots, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = clip.open_source(synthetic)
+
+    def broken(*args: Any, **kwargs: Any) -> Any:
+        raise RuntimeError("planted core failure")
+
+    monkeypatch.setattr(clip, "correct", broken)
+    folder = roots.allowed / "broken"
+    output, *logs = clip.output_paths(roots, folder, ["s_corrected.mp4", "d.log", "e.log"])
+    with pytest.raises(RuntimeError, match="planted core failure"):
+        clip.export(source, output, Params(), None, select_backend("cpu"), (logs[0], logs[1]))
+    assert not _children_alive()
+
+
+def test_open_source_refuses_non_square_pixels(roots: OutputRoots) -> None:
+    clip_path = roots.allowed / "clips" / "anamorphic.mp4"
+    _ffmpeg(
+        clip_path,
+        "-f",
+        "lavfi",
+        "-i",
+        "testsrc2=size=320x240:rate=30000/1001,trim=end_frame=4,setsar=4/3",
+        "-c:v",
+        "libx265",
+        "-x265-params",
+        "log-level=error",
+        "-bf",
+        "0",
+    )
+    with pytest.raises(clip.ClipError, match="sample aspect ratio 4:3"):
+        clip.open_source(clip_path)
+
+
 # --- the source and the commands -------------------------------------------------------------
 
 
@@ -345,12 +460,13 @@ def test_decode_frames_refuses_frames_past_the_end(synthetic: Path) -> None:
 
 
 def test_bench_core_mode_on_real_frames_records_the_input_and_proxies(
-    synthetic: Path, config: Path, tmp_path: Path
+    synthetic: Path, config: Path, roots: OutputRoots
 ) -> None:
+    out = roots.allowed / "core"
     argv = ["--device", "cpu", "--method", "ancuti2018", "--input", str(synthetic)]
     argv += ["--frames", "3", "--proxy", "270", "--proxy", "135", "--config", str(config)]
-    assert bench.main([*argv, "--out", str(tmp_path)]) == 0
-    (path,) = tmp_path.glob("bench-cpu-synthetic-ancuti2018-*.json")
+    assert bench.main([*argv, "--out", str(out)]) == 0
+    (path,) = out.glob("bench-cpu-synthetic-ancuti2018-*.json")
     record = json.loads(path.read_text(encoding="utf-8"))
     assert record["label"] == "REAL"
     assert record["shape"] == [540, 960, 3]
@@ -362,15 +478,28 @@ def test_bench_core_mode_on_real_frames_records_the_input_and_proxies(
     assert quarter["shape"] == [135, 240, 3]
     assert full["relative_error"]["normalisation_bounds.low"] == {"mean": 0.0, "max": 0.0}
     assert set(half["relative_step"]) == set(full["statistics"])
-    assert record["ambient"]["head"]["head"]
-    assert isinstance(record["ambient"]["stray_processes_before"], list)
+    ambient = record["ambient"]
+    assert ambient["head"]["head"]
+    assert isinstance(ambient["stray_processes_before"], list)
+    assert ambient["window_start_local"] <= ambient["window_end_local"]
+
+
+def test_bench_real_frame_records_stay_in_the_working_folder(
+    synthetic: Path, config: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    argv = ["--device", "cpu", "--method", "c3", "--input", str(synthetic), "--frames", "1"]
+    argv += ["--config", str(config), "--out", str(tmp_path / "elsewhere")]
+    assert bench.main(argv) == 2
+    assert "outside the output folder" in capsys.readouterr().err
+    assert not (tmp_path / "elsewhere").exists()
 
 
 def test_bench_refuses_a_proxy_that_is_not_a_whole_factor(
     synthetic: Path, config: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     argv = ["--device", "cpu", "--method", "c3", "--input", str(synthetic), "--frames", "1"]
-    argv += ["--proxy", "100", "--config", str(config), "--out", str(tmp_path)]
+    argv += ["--proxy", "100", "--config", str(config)]
+    argv += ["--out", str(config.parent / "work" / clip.WORK_SUBDIR / "core")]
     assert bench.main(argv) == 2
     assert "whole-factor" in capsys.readouterr().err
 
@@ -491,6 +620,36 @@ def test_a_record_of_another_clip_or_other_settings_is_refused(
     tampered = dict(record, pts_ticks=[0, *record["pts_ticks"][:-1]])
     with pytest.raises(clip.StatisticsMismatchError, match="pts list"):
         clip.check_statistics_record(tampered, source, neutral, "none", None)
+    other_smoother = temporal.Smoother("gaussian", 1.0)
+    with pytest.raises(clip.StatisticsMismatchError, match=r"smoothed with median_gaussian 2.0 s"):
+        clip.check_statistics_record(record, source, neutral, "none", None, other_smoother)
+    for key, value, message in (
+        ("analysis", "FLAT", "analysis is 'FLAT'"),
+        ("proxy", {"short_side": 270}, "proxy is"),
+        ("smoother", {"kind": "gaussian", "window_s": 2.0}, "smoothed with gaussian"),
+    ):
+        with pytest.raises(clip.StatisticsMismatchError, match=message):
+            clip.check_statistics_record(
+                dict(record, **{key: value}), source, neutral, "none", None
+            )
+    partial = dict(record["smoothed"])
+    del partial["normalisation_bounds.low"]
+    with pytest.raises(clip.StatisticsMismatchError, match="are not the ancuti2018 chain's"):
+        clip.check_statistics_record(dict(record, smoothed=partial), source, neutral, "none", None)
+
+
+def test_statistic_names_are_the_chains() -> None:
+    names = clip.statistic_names(Params())
+    assert names[:4] == (
+        "compensation_means.R",
+        "compensation_means.G",
+        "compensation_means.B",
+        "compensation_alpha.red",
+    )
+    assert "saliency_means.input2.b" in names
+    c3 = clip.statistic_names(clip.make_params("c3", neutral=False))
+    assert not any(name.startswith("compensation") for name in c3)
+    assert set(c3) < set(names)
 
 
 @pytest.mark.gpu
@@ -515,6 +674,7 @@ def test_bench_whole_clip_modes_record_their_pass(
         assert record["n6"]["budget_seconds_per_frame"] == pytest.approx(3.3 * 1001 / 30000)
         assert record["memory"]["gpu_pool_reserved_mb"] >= 0, mode
         assert record["ambient"]["head"]["head"], mode
+        assert record["timing"]["main_loop_sum_s"] <= record["timing"]["bracket_s"], mode
     for mode in ("passthrough", "end-to-end"):
         assert records[mode]["compare"]["mandatory_and_required_all_same"], mode
     assert records["end-to-end"]["run"]["witness_frames_checked"] == 3
