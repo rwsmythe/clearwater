@@ -401,23 +401,6 @@ def _spy_staged(
     return received, result
 
 
-def _spy_staged(
-    frames: list[np.ndarray], params: Params, smoother: Smoother, rate: Fraction
-) -> tuple[list[dict[str, float]], Any]:
-    """Run analyse_staged with a spy on measure(); return what each call was supplied with."""
-    received: list[dict[str, float]] = []
-    original = temporal.measure
-
-    def spy(image: Any, params: Params, supplied: Any = None, backend: Any = None) -> Statistics:
-        received.append({} if supplied is None else flatten(supplied))
-        return original(image, params, supplied, backend)
-
-    with pytest.MonkeyPatch.context() as patch:
-        patch.setattr(temporal, "measure", spy)
-        result = analyse_staged(frames, params, smoother, rate)
-    return received, result
-
-
 def test_staged_measures_each_stage_on_the_smoothed_earlier_ones() -> None:
     """A spy on measure(): stage k is called, frame by frame, with exactly the SMOOTHED values
     (not just the field names) of the stages before it."""
@@ -444,6 +427,30 @@ def test_staged_measures_each_stage_on_the_smoothed_earlier_ones() -> None:
     for name in ("compensation_means.R", "compensation_alpha.red"):
         np.testing.assert_array_equal(smoothed[name], smoother.apply(raw[name], rate))
         np.testing.assert_array_equal(smoothed[name], first[name])
+
+
+def test_the_staged_reach_is_the_number_of_stages_times_the_radius() -> None:
+    """Changing frame 0 moves the staged output up to stages x radius frames in, and no further.
+
+    This is why the interior margin (one filter's radius) is exact for the flat analysis only.
+    """
+    rate = Fraction(10)
+    smoother = Smoother("moving_average", 0.7)  # 3 frames each side at 10 fps
+    count = 36
+    frames = [_scene(12, 16, seed=3 + n % 5) for n in range(count)]
+    changed = [_scene(12, 16, seed=99), *frames[1:]]
+    for params in (Params(), Params(method="c3")):
+        reach = runner.staged_reach(params.method, smoother, rate)
+        assert reach == len(STAGES[params.method]) * 3
+        base, _ = analyse_staged(frames, params, smoother, rate)
+        moved, _ = analyse_staged(changed, params, smoother, rate)
+        touched = {
+            index
+            for name in base
+            for index in range(count)
+            if base[name][index] != moved[name][index]
+        }
+        assert max(touched) == reach  # reached, and not one frame further
 
 
 def test_staged_3c_fusion_receives_the_smoothed_white_balance() -> None:

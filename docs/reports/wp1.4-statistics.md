@@ -107,10 +107,16 @@ to 1. At 30000/1001 fps a 1.0 s window gives h = 14, 29 taps.
   candidate's whole filter chain reaches the edge rule. The widest chain is the 4 s `median_gaussian`:
   its Gaussian reaches 59 frames each side and its 3-frame median one more, 60 (`Smoother.radius`; a
   test perturbs the end frames and shows no smoothed value moves beyond a filter's reach). This is
-  59 interior steps on `GX011627` and 58 on `GX011625`. The staged analysis nests its stages (a later
-  stage is measured on frames corrected with the smoothed earlier ones), so its edge influence can
-  reach further than one filter's radius; the interior set is exactly edge-free for the flat analysis
-  and for stage 1, and a close approximation for the later staged stages.
+  59 interior steps on `GX011627` and 58 on `GX011625`. That margin is exact for the FLAT analysis
+  (each statistic is smoothed once). The STAGED analysis nests its stages: a later stage is measured
+  on frames corrected with the smoothed earlier ones and is then smoothed itself, so each stage adds
+  one radius (`staged_reach`: 3 x radius for Ancuti 2018, 2 x for 3C; a test moves frame 0 and finds
+  the staged output changed exactly that far in, no further). The 60-frame margin therefore clears
+  the staged reach only for windows up to 1 s (Ancuti 2018: 3 x 15 = 45 at 1 s; 3 x 30 = 90 at 2 s
+  and 3 x 60 = 180 at 4 s, the whole excerpt). Interior figures of a staged candidate at 2 s or 4 s
+  are marked `*` in section 4: they can still carry influence of the held end value, which reaches a
+  later stage through the corrected frames it is measured on; its size is not measured here. The comparison of section 3 (1 s) and
+  every flat figure are not affected.
 - The comparison of section 3 uses `gaussian` 1.0 s, as the brief fixes.
 
 **Flicker measure: an instrument of this package, NOT V3.** V3 (D112) is measured later, on a
@@ -245,16 +251,20 @@ Unsmoothed: 0.236 (`GX011627`) and 0.151 (`GX011625`); linear trend 0.090 and 0.
 |---|---|---|---|---|---|---|---|---|---|
 | moving_average 0.5 s | 15 | 0.22 | 0.40 | 0.067 | 0.901 / 0.637 / 0.001 | 0.136 / 0.132 | 0.188 | 0.070 / 0.067 | 0.052 |
 | moving_average 1 s | 29 | 0.42 | 0.80 | 0.034 | 0.657 / 0.033 / 0.033 | 0.110 / 0.106 | 0.175 | 0.057 / 0.054 | 0.040 |
-| moving_average 2 s | 59 | 0.82 | 1.60 | 0.017 | 0.016 / 0.016 / 0.016 | 0.084 / 0.081 | 0.148 | 0.045 / 0.043 | 0.033 |
-| moving_average 4 s | 119 | 1.62 | 3.20 | 0.008 | 0.007 / 0.007 / 0.007 | 0.079 / 0.078 | 0.091 | 0.034 / 0.032 | 0.029 |
+| moving_average 2 s | 59 | 0.82 | 1.60 | 0.017 | 0.016 / 0.016 / 0.016 | 0.084 / 0.081 | 0.148* | 0.045 / 0.043 | 0.033* |
+| moving_average 4 s | 119 | 1.62 | 3.20 | 0.008 | 0.007 / 0.007 / 0.007 | 0.079 / 0.078 | 0.091* | 0.034 / 0.032 | 0.029* |
 | gaussian 0.5 s | 15 | 0.12 | 0.20 | 0.162 | 0.968 / 0.877 / 0.589 | 0.159 / 0.156 | 0.197 | 0.085 / 0.082 | 0.067 |
 | gaussian 1 s | 29 | 0.22 | 0.40 | 0.081 | 0.878 / 0.590 / 0.115 | 0.134 / 0.130 | 0.185 | 0.067 / 0.064 | 0.049 |
-| gaussian 2 s | 59 | 0.45 | 0.87 | 0.041 | 0.589 / 0.115 / 0.001 | 0.106 / 0.102 | 0.169 | 0.053 / 0.050 | 0.037 |
-| gaussian 4 s | 119 | 0.85 | 1.67 | 0.020 | 0.116 / 0.001 / 0.001 | 0.081 / 0.080 | 0.142 | 0.042 / 0.041 | 0.031 |
+| gaussian 2 s | 59 | 0.45 | 0.87 | 0.041 | 0.589 / 0.115 / 0.001 | 0.106 / 0.102 | 0.169* | 0.053 / 0.050 | 0.037* |
+| gaussian 4 s | 119 | 0.85 | 1.67 | 0.020 | 0.116 / 0.001 / 0.001 | 0.081 / 0.080 | 0.142* | 0.042 / 0.041 | 0.031* |
 | median_gaussian 0.5 s | 15 | 0.12 | 0.20 | 0.000 | 0.968 / 0.876 / 0.582 | 0.158 / 0.155 | 0.196 | 0.084 / 0.081 | 0.066 |
 | median_gaussian 1 s | 29 | 0.22 | 0.40 | 0.000 | 0.878 / 0.589 / 0.114 | 0.133 / 0.129 | 0.185 | 0.067 / 0.064 | 0.049 |
-| median_gaussian 2 s | 59 | 0.45 | 0.87 | 0.000 | 0.589 / 0.115 / 0.001 | 0.106 / 0.101 | 0.169 | 0.053 / 0.050 | 0.037 |
-| median_gaussian 4 s | 119 | 0.85 | 1.67 | 0.000 | 0.116 / 0.001 / 0.000 | 0.081 / 0.080 | 0.142 | 0.042 / 0.041 | 0.031 |
+| median_gaussian 2 s | 59 | 0.45 | 0.87 | 0.000 | 0.589 / 0.115 / 0.001 | 0.106 / 0.101 | 0.169* | 0.053 / 0.050 | 0.037* |
+| median_gaussian 4 s | 119 | 0.85 | 1.67 | 0.000 | 0.116 / 0.001 / 0.000 | 0.081 / 0.080 | 0.142* | 0.042 / 0.041 | 0.031* |
+
+`*`: the staged interior figure of a 2 s or 4 s window is not strictly edge-free (section 2: the nested
+staged reach, 3 x radius, exceeds the 60-frame margin); the flat interior figures, in `results.json`,
+are.
 
 Reading:
 - At the same responsiveness, the moving average and the Gaussian leave the same flicker: the 0.5 s
@@ -390,14 +400,16 @@ Proposed for IF-3 from these measurements. Every statistic measured was smoothed
 - A fourth stage for the saliency references (input 2's Lab mean measured on input 2 built with the
   SMOOTHED N{} bounds) is not indicated. The whole staged-versus-flat difference, which contains this
   in-stage effect and every other, is under a tenth of an 8-bit level (section 3).
-- Live-preview recompute (7.3): stage 1's means are source-only and can be cached with the proxies.
+- Live-preview recompute (7.3): Ancuti 2018's stage 1 means are source-only and can be cached with
+  the proxies (3C has no whole-frame compensation statistic; its stage 1 is the white balance, which
+  depends on 3C's parameters).
   Every other statistic depends on parameters; a parameter change re-measures from the first stage
   it invalidates, within the smoothing window of the displayed frame (a 2.0 s window reaches 29
   frames each side at 29.97 fps).
 
-- **Statistics are keyed by the frame's pts, not by list position.** Every entry of every record
-  carries the frame's exact `pts_ticks` (and `pts_seconds`). The runner applies a series to frames by
-  position, so it first checks that the record's `pts_ticks` are the excerpt's, in order, and refuses
+- **Recommendation: key the statistics by the frame's pts, not by list position.** Every entry of
+  every record carries the frame's exact `pts_ticks` (and `pts_seconds`). This prototype still
+  associates a series with frames by position, so the runner first checks that the record's `pts_ticks` are the excerpt's, in order, and refuses
   otherwise (a reordered, truncated or stale record rendered the wrong statistics onto a frame, and
   the encode verification still passed). IF-3's analysis record should key each statistic by pts (the
   stage's cache and the smoothing window are both defined in time, D95), and `render` should look a
@@ -408,8 +420,9 @@ Proposed for IF-3 from these measurements. Every statistic measured was smoothed
 - **Flicker measure limits** (section 2): drift is counted with jitter; a second-order content
   residue remains; means only. Not V3.
 - **Excerpt edges:** 6 s excerpts with the end value held; the interior column is the edge-free
-  comparison (margin 60 frames, the reach of the widest filter chain; for the nested staged stages
-  it is a close approximation, section 2). The product smooths over the whole clip.
+  comparison (margin 60 frames, the reach of the widest single filter chain: exact for the flat
+  analysis; for the nested staged stages only up to 1 s windows, section 2). The product smooths
+  over the whole clip.
 - **Timing:** the smoothers treat frames as evenly spaced and take the window in seconds through the
   nominal frame rate. The excerpts are constant frame rate; a variable-frame-rate clip would need the
   window applied over the frames' pts (out of this part's envelope; banked by the orchestrator).
@@ -433,7 +446,7 @@ Proposed for IF-3 from these measurements. Every statistic measured was smoothed
 
 - Gates on the remediation head: `uv run ruff check .` all checks passed; `uv run ruff format
   --check .` 83 files already formatted; `uv run mypy` no issues in 18 source files; `uv run pytest
-  -q -rs` 550 passed, 3 skipped; `-m gpu` 24 passed. The 3 skips are tests that open
+  -q -rs` 551 passed, 3 skipped; `-m gpu` 24 passed. The 3 skips are tests that open
   `GX011628.MP4` at the root of the footage folder (`test_container_spike`, `test_lookcheck`, and
   test 7 of this package): the owner moved the chapters into `Snorkel\` and `SCUBA\` (and renamed
   them `.mp4`) while this remediation ran, after its extract and render had finished. Test 7's body,

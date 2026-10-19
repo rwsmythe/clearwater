@@ -122,9 +122,12 @@ def interior_margin(frame_rate: Fraction) -> int:
     """Return the flicker's interior margin in frames: the widest candidate's filter reach.
 
     The interior frame set holds the frames at least this far from either end of an excerpt,
-    where no smoothing candidate reaches the edge rule (:attr:`prototype.temporal.Smoother.radius`:
-    the 4 s ``median_gaussian`` reaches 60 frames, 2.00 s, at 30000/1001 fps: 59 for its Gaussian
-    and 1 for its median).
+    where no smoothing candidate's single filter chain reaches the edge rule
+    (:meth:`prototype.temporal.Smoother.radius`: the 4 s ``median_gaussian`` reaches 60 frames,
+    2.00 s, at 30000/1001 fps: 59 for its Gaussian and 1 for its median). That holds exactly for
+    the flat analysis. The staged analysis nests its stages, so its reach is the number of stages
+    times the radius (:func:`staged_reach`) and the interior is edge-free for it only where that
+    is within the margin.
 
     Args:
         frame_rate: Frames per second.
@@ -133,6 +136,23 @@ def interior_margin(frame_rate: Fraction) -> int:
         The largest :meth:`prototype.temporal.Smoother.radius` over the smoothing candidates.
     """
     return max(smoother.radius(frame_rate) for smoother in SMOOTHING_CANDIDATES)
+
+
+def staged_reach(method: str, smoother: Smoother, frame_rate: Fraction) -> int:
+    """Return the frames on each side that can influence one STAGED output value.
+
+    Stage ``k`` is measured on frames corrected with the smoothed stages before it and is then
+    smoothed itself, so each stage adds one filter radius: ``len(STAGES[method]) * radius``.
+
+    Args:
+        method: ``"ancuti2018"`` (3 stages) or ``"c3"`` (2 stages).
+        smoother: The filter.
+        frame_rate: Frames per second.
+
+    Returns:
+        The reach of the nested analysis in frames.
+    """
+    return len(temporal.STAGES[method]) * smoother.radius(frame_rate)
 
 
 FLICKER_DEFINITION = (
@@ -997,7 +1017,7 @@ def require_identical_witness(record: Mapping[str, Any], count: int, witness: Pa
 
 
 def render_clips(
-    spec: ExcerptSpec, footage: Path, roots: OutputRoots, backend: Backend, witness: Path | None
+    spec: ExcerptSpec, footage: Path, roots: OutputRoots, backend: Backend, witness: Path
 ) -> dict[str, Any]:
     """Render, encode and verify the three full-resolution clips (phase ``render``).
 
@@ -1017,7 +1037,7 @@ def render_clips(
         backend: Where the pipeline runs.
         witness: WP1.3's ``flicker/corrected`` folder, whose kept frames the unsmoothed
             render must equal (a missing or different frame fails the step before any
-            encode or removal); ``None`` skips the comparison.
+            encode or removal). It is required: there is no way to skip the comparison.
 
     Returns:
         The ``render.json`` document.
@@ -1071,12 +1091,11 @@ def render_clips(
             print(
                 f"rendered {number + 1}/{count} ({time.monotonic() - began:.0f} s)", file=sys.stderr
             )
-    witness_record: dict[str, Any] = {"folder": None if witness is None else str(witness)}
-    if witness is not None:
-        witness_record.update(
-            compare_witness(witness, folder / "renders" / "unsmoothed", spec.chapter, count)
-        )
-        require_identical_witness(witness_record, count, witness)
+    witness_record: dict[str, Any] = {"folder": str(witness)}
+    witness_record.update(
+        compare_witness(witness, folder / "renders" / "unsmoothed", spec.chapter, count)
+    )
+    require_identical_witness(witness_record, count, witness)
     clips_dir = folder / "clips"
     commands: dict[str, list[str]] = {}
     checks: dict[str, Any] = {}
