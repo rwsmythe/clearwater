@@ -56,6 +56,7 @@ the step consumes it. Every field is optional (`None`: the step measures it).
 |---|---|---|---|
 | `compensation_means` | compensation (Ancuti 2018 only) | R, G, B means of the input | the [A18] equations and the gain cap |
 | `compensation_alpha` | compensation (Ancuti 2018 only) | effective alpha per compensated channel, after the cap | the [A18] equations (the cap is then not re-evaluated) |
+| `white_balance_means` | white balance | R, G, B means of the compensated image that the gains derive from | recorded; consumed by `white_balance` only when no gains are supplied (gains `mean(means) / mean_c`); with gains supplied, the gains win |
 | `white_balance_gains` | white balance | gray-world gains `target / mean_c`, before strength and clamp | `white_balance`, which applies `white_balance_strength` and the D99 clamp to the supplied gains |
 | `normalisation_bounds` | fusion | N{} low and high | `fusion_inputs` (the flat-image rule applies to the supplied bounds) |
 | `saliency_means` | fusion | the Lab mean of fusion input 1 and of input 2 | the saliency weight |
@@ -68,7 +69,15 @@ the step consumes it. Every field is optional (`None`: the step measures it).
   2018 blue off and on and for 3C, also after a JSON round trip (test 1).
 - In JSON a record is flattened to named scalars (`white_balance_gains.R`,
   `normalisation_bounds.low`, `saliency_means.input2.b`, ...; `temporal.flatten`). Python's float
-  repr round-trips exactly.
+  repr round-trips exactly. `temporal.unflatten` refuses every name `flatten` cannot produce (an
+  unknown field or a known field with an unknown suffix, such as `compensation_alpha.green`), so a
+  supplied value is never silently dropped and replaced by the pipeline's own measurement.
+- The hook refuses a supplied number that is not finite, and N{} bounds with `low > high`, naming the
+  field (`pipeline.check_statistics`, called by `correct()`, `temporal.measure` and each step).
+- A persisted series is applied to the frames by position, so the runner checks, before analysing or
+  rendering, that each record's `pts_ticks` equal the excerpt's, in order (`check_ticks`), and refuses
+  on any difference. `proxies.npy` must hold one proxy per frame; fewer than 2 frames are refused
+  up front.
 
 **Staged and flat (D97, D98).**
 - RAW statistics of a frame: its own chain, every stage measured on the frame corrected with its OWN
@@ -94,8 +103,14 @@ to 1. At 30000/1001 fps a 1.0 s window gives h = 14, 29 taps.
   single bad frame, then the `gaussian`.
 - Past the ends of an excerpt the end value is held (`nearest`). That is a property of a 6 s
   excerpt, not of the product, which smooths over the whole clip. It is why the flicker is also
-  reported over the INTERIOR frames: those at least 59 frames (1.97 s) from either end, where even
-  the 4 s window's kernel (59 frames each side) fits (61 steps on `GX011627`, 60 on `GX011625`).
+  reported over the INTERIOR frames: those at least 60 frames (2.00 s) from either end, where no
+  candidate's whole filter chain reaches the edge rule. The widest chain is the 4 s `median_gaussian`:
+  its Gaussian reaches 59 frames each side and its 3-frame median one more, 60 (`Smoother.radius`; a
+  test perturbs the end frames and shows no smoothed value moves beyond a filter's reach). This is
+  59 interior steps on `GX011627` and 58 on `GX011625`. The staged analysis nests its stages (a later
+  stage is measured on frames corrected with the smoothed earlier ones), so its edge influence can
+  reach further than one filter's radius; the interior set is exactly edge-free for the flat analysis
+  and for stage 1, and a close approximation for the later staged stages.
 - The comparison of section 3 uses `gaussian` 1.0 s, as the brief fixes.
 
 **Flicker measure: an instrument of this package, NOT V3.** V3 (D112) is measured later, on a
@@ -117,7 +132,8 @@ footage only.
   its least-squares straight line over the excerpt: drift, no jitter) shows the size of that part.
   (c) Means only: a change that keeps the means (a local shimmer) is not seen.
 - The brief's suggested form (mean |step| of the rendered frames minus that of the source) is
-  recorded as `source_referenced` for every sequence. It is not the tabulated measure, because a
+  recorded as `source_referenced` for every sequence (the staged, flat, unsmoothed and linear-trend
+  sequences of each method, and each of the 24 smoothing-candidate sequences). It is not the tabulated measure, because a
   correction gain different from 1 scales the content change and leaves it in the difference: it is
   negative on every sequence here.
 
@@ -152,6 +168,8 @@ largest):
 
 | Statistic | GX011627 mean | max | frame | GX011625 mean | max | frame |
 |---|---|---|---|---|---|---|
+| `white_balance_means.R` | +0.00005 | 0.00134 | 0 (6.840 s) | +0.00002 | 0.00124 | 178 (255.188 s) |
+| `white_balance_means.G`, `.B` | 0 | 0 | -- | 0 | 0 | -- |
 | `white_balance_gains.R` | -0.00013 | 0.00191 | 0 (6.840 s) | -0.00005 | 0.00229 | 178 (255.188 s) |
 | `white_balance_gains.G` | +0.00002 | 0.00081 | 0 (6.840 s) | +0.00001 | 0.00064 | 178 (255.188 s) |
 | `white_balance_gains.B` | +0.00002 | 0.00100 | 0 (6.840 s) | +0.00001 | 0.00064 | 178 (255.188 s) |
@@ -166,7 +184,9 @@ largest):
 
 - Stage 1 (`compensation_means.*`, `compensation_alpha.red`): 0 on every frame of both excerpts.
   It is measured on the raw frame in both analyses; the gain cap never bound (alpha 1.00 throughout).
-- The white-balance gains differ by at most 0.0023 (0.2 % of a gain near 1.1).
+- The white-balance means differ only in R, the compensated channel (G and B are not compensated, so
+  their stage-2 means are the raw frame's in both analyses): by at most 0.0013 on a mean near 0.3.
+  The gains, which derive from them, differ by at most 0.0023 (0.2 % of a gain near 1.1).
 - The N{} bounds differ by at most 0.0002, on a spread of 0.33 (`GX011627`).
 - The saliency references differ by at most 0.65 on the Lab scale of 0..100 (the weight divides by 100).
 - 3C: the white balance is its first stage, so its gains do not differ at all; its fusion scalars
@@ -178,17 +198,17 @@ largest):
 
 | Excerpt | Method | unsmoothed | staged | flat | linear trend | staged vs flat render |
 |---|---|---|---|---|---|---|
-| GX011627 | ancuti2018 | 0.236 / 0.256 | 0.134 / 0.182 | 0.130 / 0.180 | 0.090 / 0.090 | 0.058 / 0.144 / 0.68 |
-| GX011627 | c3 | 0.077 / 0.078 | 0.034 / 0.048 | 0.034 / 0.047 | 0.024 / 0.025 | 0.003 / 0.007 / 0.11 |
-| GX011625 | ancuti2018 | 0.151 / 0.134 | 0.067 / 0.050 | 0.064 / 0.048 | 0.029 / 0.026 | 0.032 / 0.155 / 0.90 |
-| GX011625 | c3 | 0.123 / 0.095 | 0.045 / 0.022 | 0.045 / 0.022 | 0.018 / 0.015 | 0.001 / 0.005 / 0.05 |
+| GX011627 | ancuti2018 | 0.236 / 0.261 | 0.134 / 0.185 | 0.130 / 0.183 | 0.090 / 0.090 | 0.058 / 0.144 / 0.68 |
+| GX011627 | c3 | 0.077 / 0.079 | 0.034 / 0.048 | 0.034 / 0.048 | 0.024 / 0.025 | 0.003 / 0.007 / 0.11 |
+| GX011625 | ancuti2018 | 0.151 / 0.127 | 0.067 / 0.049 | 0.064 / 0.048 | 0.029 / 0.026 | 0.032 / 0.155 / 0.90 |
+| GX011625 | c3 | 0.123 / 0.097 | 0.045 / 0.022 | 0.045 / 0.022 | 0.018 / 0.015 | 0.001 / 0.005 / 0.05 |
 
 Full resolution (`GX011627`, `render.json`):
 - The staged and flat renders differ by 0.058 levels on average (largest frame mean 0.144, frame 0;
   largest single value 0.76) (`full_resolution_differences.staged_vs_flat`).
 - The flicker measure on the full-resolution renders (the same definition, the reference rendered
-  at full resolution) gives 0.235 / 0.133 / 0.129 for unsmoothed / staged / flat (interior 0.256 /
-  0.181 / 0.179), within 0.002 of the proxy figures (`full_resolution_flicker`).
+  at full resolution) gives 0.235 / 0.133 / 0.129 for unsmoothed / staged / flat (interior 0.261 /
+  0.184 / 0.182), within 0.002 of the proxy figures (`full_resolution_flicker`).
 - The unsmoothed render's frames 0, 90 and 179 are bit-identical to WP1.3's kept frames
   (`wp13_witness`, largest difference 0): the hook fed full-frame statistics reproduces WP1.3's clip.
 - Each of the three clips passes WP1.3's checks (`checks`): one HEVC Main stream, `yuvj420p`,
@@ -223,18 +243,18 @@ Unsmoothed: 0.236 (`GX011627`) and 0.151 (`GX011625`); linear trend 0.090 and 0.
 
 | Candidate | taps | t90 (s) | rise 10-90 (s) | outlier | gain 0.5 / 1 / 2 Hz | GX011627 staged / flat | interior staged | GX011625 staged / flat | interior staged |
 |---|---|---|---|---|---|---|---|---|---|
-| moving_average 0.5 s | 15 | 0.22 | 0.40 | 0.067 | 0.901 / 0.637 / 0.001 | 0.136 / 0.132 | 0.184 | 0.070 / 0.067 | 0.053 |
-| moving_average 1 s | 29 | 0.42 | 0.80 | 0.034 | 0.657 / 0.033 / 0.033 | 0.110 / 0.106 | 0.172 | 0.057 / 0.054 | 0.040 |
-| moving_average 2 s | 59 | 0.82 | 1.60 | 0.017 | 0.016 / 0.016 / 0.016 | 0.084 / 0.081 | 0.146 | 0.045 / 0.043 | 0.033 |
+| moving_average 0.5 s | 15 | 0.22 | 0.40 | 0.067 | 0.901 / 0.637 / 0.001 | 0.136 / 0.132 | 0.188 | 0.070 / 0.067 | 0.052 |
+| moving_average 1 s | 29 | 0.42 | 0.80 | 0.034 | 0.657 / 0.033 / 0.033 | 0.110 / 0.106 | 0.175 | 0.057 / 0.054 | 0.040 |
+| moving_average 2 s | 59 | 0.82 | 1.60 | 0.017 | 0.016 / 0.016 / 0.016 | 0.084 / 0.081 | 0.148 | 0.045 / 0.043 | 0.033 |
 | moving_average 4 s | 119 | 1.62 | 3.20 | 0.008 | 0.007 / 0.007 / 0.007 | 0.079 / 0.078 | 0.091 | 0.034 / 0.032 | 0.029 |
-| gaussian 0.5 s | 15 | 0.12 | 0.20 | 0.162 | 0.968 / 0.877 / 0.589 | 0.159 / 0.156 | 0.194 | 0.085 / 0.082 | 0.069 |
-| gaussian 1 s | 29 | 0.22 | 0.40 | 0.081 | 0.878 / 0.590 / 0.115 | 0.134 / 0.130 | 0.182 | 0.067 / 0.064 | 0.050 |
-| gaussian 2 s | 59 | 0.45 | 0.87 | 0.041 | 0.589 / 0.115 / 0.001 | 0.106 / 0.102 | 0.167 | 0.053 / 0.050 | 0.037 |
-| gaussian 4 s | 119 | 0.85 | 1.67 | 0.020 | 0.116 / 0.001 / 0.001 | 0.081 / 0.080 | 0.140 | 0.042 / 0.041 | 0.031 |
-| median_gaussian 0.5 s | 15 | 0.12 | 0.20 | 0.000 | 0.968 / 0.876 / 0.582 | 0.158 / 0.155 | 0.193 | 0.084 / 0.081 | 0.068 |
-| median_gaussian 1 s | 29 | 0.22 | 0.40 | 0.000 | 0.878 / 0.589 / 0.114 | 0.133 / 0.129 | 0.182 | 0.067 / 0.064 | 0.050 |
-| median_gaussian 2 s | 59 | 0.45 | 0.87 | 0.000 | 0.589 / 0.115 / 0.001 | 0.106 / 0.101 | 0.167 | 0.053 / 0.050 | 0.037 |
-| median_gaussian 4 s | 119 | 0.85 | 1.67 | 0.000 | 0.116 / 0.001 / 0.000 | 0.081 / 0.080 | 0.140 | 0.042 / 0.041 | 0.031 |
+| gaussian 0.5 s | 15 | 0.12 | 0.20 | 0.162 | 0.968 / 0.877 / 0.589 | 0.159 / 0.156 | 0.197 | 0.085 / 0.082 | 0.067 |
+| gaussian 1 s | 29 | 0.22 | 0.40 | 0.081 | 0.878 / 0.590 / 0.115 | 0.134 / 0.130 | 0.185 | 0.067 / 0.064 | 0.049 |
+| gaussian 2 s | 59 | 0.45 | 0.87 | 0.041 | 0.589 / 0.115 / 0.001 | 0.106 / 0.102 | 0.169 | 0.053 / 0.050 | 0.037 |
+| gaussian 4 s | 119 | 0.85 | 1.67 | 0.020 | 0.116 / 0.001 / 0.001 | 0.081 / 0.080 | 0.142 | 0.042 / 0.041 | 0.031 |
+| median_gaussian 0.5 s | 15 | 0.12 | 0.20 | 0.000 | 0.968 / 0.876 / 0.582 | 0.158 / 0.155 | 0.196 | 0.084 / 0.081 | 0.066 |
+| median_gaussian 1 s | 29 | 0.22 | 0.40 | 0.000 | 0.878 / 0.589 / 0.114 | 0.133 / 0.129 | 0.185 | 0.067 / 0.064 | 0.049 |
+| median_gaussian 2 s | 59 | 0.45 | 0.87 | 0.000 | 0.589 / 0.115 / 0.001 | 0.106 / 0.101 | 0.169 | 0.053 / 0.050 | 0.037 |
+| median_gaussian 4 s | 119 | 0.85 | 1.67 | 0.000 | 0.116 / 0.001 / 0.000 | 0.081 / 0.080 | 0.142 | 0.042 / 0.041 | 0.031 |
 
 Reading:
 - At the same responsiveness, the moving average and the Gaussian leave the same flicker: the 0.5 s
@@ -242,11 +262,17 @@ Reading:
 - The moving average's frequency response has side lobes. The 1 s average passes 3 % at 1 Hz AND at
   2 Hz; the 0.5 s average passes 64 % at 1 Hz and 0.1 % at 2 Hz. Which flicker frequencies survive
   depends on the window irregularly. The Gaussian's attenuation rises monotonically with frequency.
-- The median before the Gaussian costs nothing here: its flicker is within 0.0015 of the
-  Gaussian's, lower in 30 of the 32 comparisons (windows x excerpts x schemes x all/interior) and
-  higher by 0.00002 in two; the largest gap is 0.158 against 0.159 at 0.5 s on `GX011627`. It
-  removes a single-frame outlier entirely (outlier response 0, against 0.041 for the 2 s Gaussian).
-- Flat and staged rank the candidates the same way.
+- The median before the Gaussian costs nothing here: its flicker is within 0.0016 of the
+  Gaussian's, lower in 27 of the 32 comparisons (windows x excerpts x schemes x all/interior) and
+  higher in five, by at most 0.00003 (all on `GX011625`: 1 s staged and flat interior, 2 s staged
+  interior, 4 s staged all and interior). The largest gap is 0.1548 against 0.1563 (flat, all steps,
+  0.5 s, `GX011627`). It removes a single-frame outlier entirely (outlier response 0, against 0.041
+  for the 2 s Gaussian).
+- Flat leaves less flicker than staged for every candidate on both excerpts over all steps (12 of 12),
+  and over the interior steps on `GX011625` (12 of 12; 11 of 12 on `GX011627`). Flat and staged rank
+  the 12 candidates in the same order on `GX011627`. On `GX011625` they rank them the same except
+  that the Gaussian and the median_gaussian of equal window swap places where they tie to within
+  0.0001 (4 s over all steps; 2 s and 4 s over the interior).
 - Longer windows keep lowering the flicker, but less and less (staged Gaussian): from 1 s to 2 s by
   21 % and 20 %, from 2 s to 4 s by 23 % and 21 %, while the time to 90 % doubles each step
   (0.22, 0.45, 0.85 s). At 4 s much of what remains is the wanted drift (the linear-trend figure).
@@ -267,18 +293,20 @@ at CP2, not this recommendation. WP2.1 and CP2 decide.
 ## 5. Result: robust statistics for the N{} bounds (14.1, DR-14)
 
 Ancuti 2018 (blue off), proxies, before any smoothing (`results.json` `robust`). Relative step and
-CV are low / high bound; clipped is mean / max %; effect is mean / max levels; smallest range is
+CV are low / high bound; clipped pixels is mean / max % of the pixels the stretch clips (a pixel counts
+when any of its three channels is clipped; the share of channel samples is recorded beside it, as
+`clipped_samples_*`); effect is mean / max levels; smallest range is
 `GX011627` / `GX011625`; near-flat is the synthetic near-flat frame's range; floor counts the frames
 of both excerpts where the 1e-6 floor triggered.
 
-| Candidate | rel. step GX011627 | rel. step GX011625 | CV GX011627 | CV GX011625 | clipped GX011627 | clipped GX011625 | effect GX011627 | effect GX011625 | smallest range | near-flat | floor |
+| Candidate | rel. step GX011627 | rel. step GX011625 | CV GX011627 | CV GX011625 | clipped pixels GX011627 | clipped pixels GX011625 | effect GX011627 | effect GX011625 | smallest range | near-flat | floor |
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | min/max | 0.0477 / 0.0482 | 0.0636 / 0.0846 | 0.172 / 0.140 | 0.322 / 0.341 | 0.00 / 0.00 | 0.00 / 0.00 | 3.04 / 4.81 | 3.44 / 13.25 | 0.6010 / 0.1352 (frame 168) | 0.0279 | 0 |
-| p0.5/p99.5 (default) | 0.0120 / 0.0122 | 0.0185 / 0.0218 | 0.183 / 0.188 | 0.383 / 0.402 | 1.00 / 1.00 | 1.00 / 1.00 | 0.00 / 0.00 | 0.00 / 0.00 | 0.2405 / 0.0147 (frame 178) | 0.0132 | 0 |
-| p1/p99 | 0.0122 / 0.0127 | 0.0187 / 0.0219 | 0.192 / 0.200 | 0.397 / 0.418 | 2.00 / 2.00 | 2.00 / 2.00 | 0.81 / 1.03 | 1.48 / 3.45 | 0.2028 / 0.0110 (frame 178) | 0.0115 | 0 |
-| p2/p98 | 0.0127 / 0.0132 | 0.0193 / 0.0215 | 0.207 / 0.218 | 0.408 / 0.435 | 4.00 / 4.00 | 4.00 / 4.00 | 1.95 / 2.47 | 3.77 / 7.01 | 0.1638 / 0.0085 (frame 178) | 0.0097 | 0 |
-| trimmed mean +- 2.5 sd | 0.0141 / 0.0141 | 0.0192 / 0.0190 | 0.273 / 0.274 | 0.392 / 0.392 | 5.55 / 6.86 | 6.40 / 7.02 | 3.43 / 4.05 | 6.11 / 8.09 | 0.1381 / 0.0081 (frame 178) | 0.0100 | 0 |
-| trimmed mean +- 3 sd | 0.0141 / 0.0141 | 0.0192 / 0.0190 | 0.273 / 0.274 | 0.392 / 0.392 | 3.24 / 4.60 | 5.12 / 5.62 | 2.62 / 3.43 | 5.35 / 6.50 | 0.1657 / 0.0097 (frame 178) | 0.0120 | 0 |
+| p0.5/p99.5 (default) | 0.0120 / 0.0122 | 0.0185 / 0.0218 | 0.183 / 0.188 | 0.383 / 0.402 | 2.00 / 2.19 | 1.73 / 1.87 | 0.00 / 0.00 | 0.00 / 0.00 | 0.2405 / 0.0147 (frame 178) | 0.0132 | 0 |
+| p1/p99 | 0.0122 / 0.0127 | 0.0187 / 0.0219 | 0.192 / 0.200 | 0.397 / 0.418 | 3.74 / 4.07 | 3.20 / 3.92 | 0.81 / 1.03 | 1.48 / 3.45 | 0.2028 / 0.0110 (frame 178) | 0.0115 | 0 |
+| p2/p98 | 0.0127 / 0.0132 | 0.0193 / 0.0215 | 0.207 / 0.218 | 0.408 / 0.435 | 6.92 / 7.42 | 5.96 / 8.67 | 1.95 / 2.47 | 3.77 / 7.01 | 0.1638 / 0.0085 (frame 178) | 0.0097 | 0 |
+| trimmed mean +- 2.5 sd | 0.0141 / 0.0141 | 0.0192 / 0.0190 | 0.273 / 0.274 | 0.392 / 0.392 | 9.20 / 11.46 | 8.93 / 10.11 | 3.43 / 4.05 | 6.11 / 8.09 | 0.1381 / 0.0081 (frame 178) | 0.0100 | 0 |
+| trimmed mean +- 3 sd | 0.0141 / 0.0141 | 0.0192 / 0.0190 | 0.273 / 0.274 | 0.392 / 0.392 | 5.74 / 8.12 | 7.22 / 7.87 | 2.62 / 3.43 | 5.35 / 6.50 | 0.1657 / 0.0097 (frame 178) | 0.0120 | 0 |
 
 Reading:
 - min/max jitters three to four times as much from frame to frame as any other candidate: relative
@@ -286,9 +314,12 @@ Reading:
   follows single extreme pixels.
 - Its lower CV over the excerpt is the scene drift, which every candidate follows. That is why the
   step, not the CV, is the stability figure here.
-- The three percentile pairs jitter alike and clip exactly their tails. The trimmed forms jitter
-  slightly more on `GX011627` and on `GX011625`'s low bound (slightly less on its high bound), clip
-  a varying 3 to 7 %, and move the result by 2.6 to 6.1 levels on average.
+- The three percentile pairs jitter alike. Each clips exactly its tails as a share of channel samples
+  (1, 2 and 4 % of the samples), which is about 2.0, 3.7 and 6.9 % of the pixels on `GX011627` (1.7,
+  3.2 and 6.0 % on `GX011625`): a pixel is clipped when any of its channels is, so the pixel share is
+  above the sample share and below three times it. The trimmed forms jitter slightly more on
+  `GX011627` and on `GX011625`'s low bound (slightly less on its high bound), clip a varying 3 to 7 %
+  of the samples (5.7 to 9.2 % of the pixels), and move the result by 2.6 to 6.1 levels on average.
 - **DR-14 on real footage.** The last frame of `GX011625` (hazy, almost featureless water) has a
   default N{} range of 0.0147, against 0.24 on the textured `GX011627` and 0.0132 on the synthetic
   near-flat frame. The stretch there multiplies the high-pass by about 68.
@@ -300,9 +331,10 @@ Reading:
 minus low) far above 1e-6, its value to be set from open-water and deep frames (WP1.4b, CP2).**
 Grounds:
 1. The default has the smallest frame-to-frame step of every candidate on both bounds of `GX011627`
-   and on the low bound of `GX011625`, and clips a fixed 1 % by construction. Only on `GX011625`'s
-   high bound do the trimmed forms jitter less (0.0190 against 0.0218), at the price of clipping 5 to
-   7 % and changing the look by 5 to 6 levels on average.
+   and on the low bound of `GX011625`, and clips a fixed 1 % of the channel samples by construction
+   (2.0 % of the pixels on `GX011627`, 1.7 % on `GX011625`). Only on `GX011625`'s high bound do the
+   trimmed forms jitter less (0.0190 against 0.0218), at the price of clipping 5 to 7 % of the samples
+   (7 to 9 % of the pixels) and changing the look by 5 to 6 levels on average.
 2. min/max is three to four times noisier; the trimmed forms are not more stable and change the
    look by several levels.
 3. No candidate addresses the near-flat case: every candidate but min/max has its smallest range on
@@ -318,6 +350,9 @@ This part does not set the floor: no default change, and no open-water or deep f
 | Statistic | Ancuti 2018 mean | max | 3C mean | max |
 |---|---|---|---|---|
 | `compensation_means.R` | -0.00000 | 0.00000 | -- | -- |
+| `white_balance_means.R` | +0.00012 | 0.00028 | +0.00007 | 0.00040 |
+| `white_balance_means.G` | -0.00000 | 0.00000 | -0.00005 | 0.00020 |
+| `white_balance_means.B` | -0.00000 | 0.00000 | +0.00036 | 0.00100 |
 | `white_balance_gains.R` | -0.00020 | 0.00041 | +0.00010 | 0.00043 |
 | `white_balance_gains.G` | +0.00007 | 0.00016 | +0.00033 | 0.00106 |
 | `white_balance_gains.B` | +0.00008 | 0.00018 | -0.00045 | 0.00124 |
@@ -327,8 +362,10 @@ This part does not set the floor: no default change, and no open-water or deep f
 | `saliency_means.input2.L` | -0.39688 | 0.63730 | -0.34475 | 0.55734 |
 | `saliency_means.input2.a` | +0.03749 | 0.06972 | +0.02079 | 0.04124 |
 
-- The area average keeps the channel means exactly (differences at float rounding).
-- The white-balance gains agree to 0.0004 (Ancuti 2018) and 0.0012 (3C).
+- The area average keeps the channel means of the source exactly (differences at float rounding).
+- The white-balance means, those of the compensated image, agree to 0.0003 (Ancuti 2018: R only; G
+  and B are uncompensated and match at rounding) and 0.0010 (3C, whose local compensation is not
+  linear). The white-balance gains agree to 0.0004 (Ancuti 2018) and 0.0012 (3C).
 - **The N{} bounds do not.** The proxy's high-pass spread averages 0.328 against 0.381 on the full
   frame (14 % narrower; from `statistics-raw.json`). The full frame's high-pass holds detail and
   noise above the proxy's resolution, even though the blur scales with the short side.
@@ -345,9 +382,9 @@ Proposed for IF-3 from these measurements. Every statistic measured was smoothed
 | Method | Stage | Statistics (all smoothable) | Measured on | Invalidated by a change of |
 |---|---|---|---|---|
 | ancuti2018 | 1 compensation | R, G, B means; effective alpha per compensated channel | the source proxy | the means: nothing (source-only, cacheable, 7.3); alpha: `alpha`, the caps, `blue_compensation`, in closed form from the means and the source-only cap statistic `mean((1 - I_c) I_g)`, so no re-measure |
-| ancuti2018 | 2 white balance | gray-world gains R, G, B; strength and the D99 clamp applied after smoothing (closed form) | the proxy compensated with smoothed stage 1 | stage 1's parameters (`alpha`, caps, `blue_compensation`, `method`); NOT `white_balance_strength` or `max_white_balance_gain` (closed form) |
+| ancuti2018 | 2 white balance | channel means R, G, B of the compensated image (recorded) and the gray-world gains derived from them; strength and the D99 clamp applied after smoothing (closed form) | the proxy compensated with smoothed stage 1 | stage 1's parameters (`alpha`, caps, `blue_compensation`, `method`); NOT `white_balance_strength` or `max_white_balance_gain` (closed form) |
 | ancuti2018 | 3 fusion | N{} low and high; Lab mean of input 1 and of input 2 | the proxy corrected with smoothed stages 1 and 2 | everything above, plus `white_balance_strength` and `max_white_balance_gain` (the white-balanced image changes); N{} also by `sharpen_blur_fraction` and the two percentiles; input 1's Lab mean by `gamma`; input 2's by `sharpen_strength` and N{} |
-| c3 | 1 white balance | gray-world gains R, G, B | the proxy compensated by 3C (local means only, no whole-frame statistic) | `kappa`, `lambda_`, `c3_strength`, `c3_kernel_fraction`, `c3_mask_threshold`, `c3_mask_smooth_fraction` |
+| c3 | 1 white balance | channel means R, G, B and gray-world gains | the proxy compensated by 3C (local means only, no whole-frame statistic) | `kappa`, `lambda_`, `c3_strength`, `c3_kernel_fraction`, `c3_mask_threshold`, `c3_mask_smooth_fraction` |
 | c3 | 2 fusion | as Ancuti 2018 stage 3 | the proxy corrected with smoothed stage 1 | as Ancuti 2018 stage 3, with the 3C parameters in place of stage 1's |
 
 - A fourth stage for the saliency references (input 2's Lab mean measured on input 2 built with the
@@ -358,12 +395,24 @@ Proposed for IF-3 from these measurements. Every statistic measured was smoothed
   it invalidates, within the smoothing window of the displayed frame (a 2.0 s window reaches 29
   frames each side at 29.97 fps).
 
+- **Statistics are keyed by the frame's pts, not by list position.** Every entry of every record
+  carries the frame's exact `pts_ticks` (and `pts_seconds`). The runner applies a series to frames by
+  position, so it first checks that the record's `pts_ticks` are the excerpt's, in order, and refuses
+  otherwise (a reordered, truncated or stale record rendered the wrong statistics onto a frame, and
+  the encode verification still passed). IF-3's analysis record should key each statistic by pts (the
+  stage's cache and the smoothing window are both defined in time, D95), and `render` should look a
+  frame's statistics up by its pts and refuse a frame with no entry.
+
 ## 8. Limits, deviations, open questions
 
 - **Flicker measure limits** (section 2): drift is counted with jitter; a second-order content
   residue remains; means only. Not V3.
 - **Excerpt edges:** 6 s excerpts with the end value held; the interior column is the edge-free
-  comparison. The product smooths over the whole clip.
+  comparison (margin 60 frames, the reach of the widest filter chain; for the nested staged stages
+  it is a close approximation, section 2). The product smooths over the whole clip.
+- **Timing:** the smoothers treat frames as evenly spaced and take the window in seconds through the
+  nominal frame rate. The excerpts are constant frame rate; a variable-frame-rate clip would need the
+  window applied over the frames' pts (out of this part's envelope; banked by the orchestrator).
 - **Unsmoothed clip against the smoothed ones:** the unsmoothed clip uses each frame's FULL-frame
   statistics (WP1.3's clip, the brief's definition); the staged and flat clips use PROXY statistics.
   So they differ by the smoothing AND by the proxy gap of section 6 (a stronger N{} stretch). Staged
@@ -382,10 +431,26 @@ Proposed for IF-3 from these measurements. Every statistic measured was smoothed
 
 ## 9. Verification
 
-- Gates on the worktree head: `uv run ruff check .` all checks passed; `uv run ruff format --check .`
-  82 files already formatted; `uv run mypy` no issues in 18 source files; `uv run pytest -q -rs`
-  539 passed, 0 skipped (FFmpeg on PATH, footage configured, GPU present); `-m gpu` 24 passed;
-  `-m footage` 4 passed.
+- Gates on the remediation head: `uv run ruff check .` all checks passed; `uv run ruff format
+  --check .` 83 files already formatted; `uv run mypy` no issues in 18 source files; `uv run pytest
+  -q -rs` 550 passed, 3 skipped; `-m gpu` 24 passed. The 3 skips are tests that open
+  `GX011628.MP4` at the root of the footage folder (`test_container_spike`, `test_lookcheck`, and
+  test 7 of this package): the owner moved the chapters into `Snorkel\` and `SCUBA\` (and renamed
+  them `.mp4`) while this remediation ran, after its extract and render had finished. Test 7's body,
+  run against `Snorkel\GX011628.mp4`, passes on the GPU (`work\wp1.4\logs\remediation-run2\test7`).
+- Remediation records (Reviewer B round 1, findings 1, 2 and 7): `extract`, `analyse` and `render`
+  were re-run on both excerpts. Against the copies kept in `work\wp1.4\logs\before-remediation\`:
+  `proxies.npy` of both excerpts and the three kept full-resolution frames are byte-identical (the
+  decode is deterministic); the three CP2 clips have the same md5 as before (`GX011627_unsmoothed`
+  `53f8c671...`, `_staged` `84a0e488...`, `_flat` `77e6a1ac...`), as do the kept render PNGs; every
+  statistic in `statistics-raw.json` (proxy and full), `statistics-staged.json` and
+  `statistics-flat.json` is unchanged, the only difference being the added `white_balance_means.*`;
+  in `results.json` the mismatch, proxy-versus-full, flicker (all steps), step responses, render
+  differences and robust figures (but for the clipped fraction) are unchanged. What changed, by
+  intent: the `white_balance_means` rows; the robust `clipped_*` keys (now pixels, with
+  `clipped_samples_*` beside them); every `interior` flicker figure and `interior_steps` (margin 60,
+  not 59); `source_referenced` for the smoothing sequences; and `render.json`'s three interior
+  figures. `work\wp1.4\logs\remediation-run2\` holds the logs.
 - Tests of this package (`tests/test_prototype_temporal.py`, the brief's numbering): (1) identity on
   CPU and GPU for Ancuti 2018 blue off and on and 3C, also after a JSON round trip, with a positive
   control per supplied field; (3) the 3-frame sequence, flat minus staged equal to the hand formula
@@ -394,7 +459,9 @@ Proposed for IF-3 from these measurements. Every statistic measured was smoothed
   content-cancellation control; (6) the candidates on `arange(1001) / 1000` and on a flat array;
   (7) the runner on 10 frames of `GX011628.MP4` writes its records. (2): the existing prototype and
   look-check tests are unchanged (`git diff 9ed1a1c..HEAD` touches no existing test file).
-- Real-footage witness of the identity: section 3, `wp13_witness`.
+- Real-footage witness of the identity: section 3, `wp13_witness`. The render step now FAILS, before
+  anything is encoded or removed, if a kept frame is missing from WP1.3's folder or not identical
+  (`require_identical_witness`; a test covers a missing and a different frame).
 - No file under the footage folder was written: every write goes through `OutputRoots.check`
   (`test_the_runner_writes_only_inside_its_folder`), and the runner's only FFmpeg outputs are the
   checked frame scratch folders and clips.
