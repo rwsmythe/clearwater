@@ -63,6 +63,16 @@
     power scheme. Clock variation on clean runs is measured spread, not contamination.
   - The cell is HELD until CHARC relays the owner's block start. Then send ONE message:
     release, plus the clock and throttle recording.
+  **RELEASED ~06:40Z, BEST EFFORT.** Owner (via CHARC `d4188563639bc453`): "I am not
+  concerned about contaminated figures as the actual program itself will run in a non-ideal
+  state. Best effort is fine."
+  - There is no quiet block and condition 4 is withdrawn. Each window runs once; a short window
+    (W1, W3, W4) may re-run once if the gate opens within 10 min; W2 and W5 never re-run.
+  - Contaminated windows are labelled and reported as spread. The idle gate is advisory.
+  - The report must carry the "shared non-idle laptop, upper bound" caveat, which Gate 1 cites
+    at WP1.6.
+  - The report round runs after W5. At QA, check the per-window clocks and throttle records and
+    the caveat.
 - **Shallow CP2 COMPLETE** (owner 2026-10-19, CHARC `3bac4a724b1420aa`, record
   `docs/proofs/cp2-look-check.md`): c3 default (both Ancuti variants over-red; kept as options);
   no cast, halo, noise, clipping or flicker; staged vs flat no visible difference. Briefs cite
