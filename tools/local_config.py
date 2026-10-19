@@ -16,9 +16,31 @@ TEMPLATE_NAME = "clearwater.local.example.toml"
 CONFIG_NAME = "clearwater.local.toml"
 _KEYS = ("footage_path", "working_path")
 
+VIDEO_EXTENSIONS = frozenset({".mp4", ".mov", ".360"})
+"""Lower-case suffixes of the video files Clearwater reads (the one definition)."""
+
 
 class LocalConfigError(Exception):
     """The local configuration is missing or invalid; the message names the template."""
+
+
+class FootageLookupError(LocalConfigError):
+    """A footage file could not be found, or not uniquely, by its stem.
+
+    Attributes:
+        matches: Every matching file, sorted; empty when nothing matched (and when the
+            footage folder itself could not be searched).
+    """
+
+    def __init__(self, message: str, matches: tuple[Path, ...] = ()) -> None:
+        """Store the message and the matching paths.
+
+        Args:
+            message: The one-line description.
+            matches: The matching files; empty when none.
+        """
+        super().__init__(message)
+        self.matches = matches
 
 
 @dataclass(frozen=True)
@@ -111,3 +133,79 @@ def footage_available(path: Path | None = None) -> bool:
         return load_local_config(path).footage_path.is_dir()
     except (LocalConfigError, OSError):
         return False
+
+
+def _check_stem(stem: str) -> None:
+    """Refuse anything that is not a bare file stem (empty, a path, or carrying a video suffix)."""
+    separators = {"/", "\\", os.sep} | ({os.altsep} if os.altsep else set())
+    if not stem or any(sep in stem for sep in separators):
+        raise ValueError(f"footage stem must be a bare file stem, got {stem!r}")
+    if Path(stem).suffix.lower() in VIDEO_EXTENSIONS:
+        raise ValueError(f"footage stem must not carry a video suffix, got {stem!r}")
+
+
+def _raise_walk_error(error: OSError) -> None:
+    """Turn a directory the walk could not read into a lookup failure (never a silent skip)."""
+    raise FootageLookupError(f"cannot search the footage folder: {error}") from error
+
+
+def find_footage_file(stem: str, root: Path | None = None) -> Path:
+    """Find the one video file with the given stem anywhere under the footage folder.
+
+    The walk is recursive. A file matches when its stem equals ``stem`` case-insensitively
+    (``str.casefold`` on both) and its lower-cased suffix is in :data:`VIDEO_EXTENSIONS`,
+    so ``GX011628`` matches ``Snorkel/GX011628.mp4`` and ``GX011628.MP4`` but never a
+    ``.LRV``, ``.THM``, ``.json`` or ``.png`` of that stem, nor a longer stem. The walk
+    never leaves ``root``: it does not descend into a directory symlink or a Windows
+    junction, and it skips a matching file that is a symlink. It never writes, never
+    changes the working directory, and keeps no state between calls; the outcome does not
+    depend on the order the file system lists entries in.
+
+    Args:
+        stem: The bare file stem, e.g. ``"GX011628"``: not empty, no path separator, no
+            video suffix.
+        root: The folder to search; defaults to ``load_local_config().footage_path``.
+
+    Returns:
+        ``root / <relative path of the match>`` (not resolved).
+
+    Raises:
+        ValueError: ``stem`` is not a bare stem.
+        LocalConfigError: ``root`` was not given and the configuration does not load.
+        FootageLookupError: ``root`` is missing, not a directory or unreadable (``matches``
+            empty); no file matches (message contains "not in the footage folder",
+            ``matches`` empty); or two or more match (the message names every match
+            relative to ``root``, ``matches`` holds them sorted).
+    """
+    _check_stem(stem)
+    search = load_local_config().footage_path if root is None else root
+    if not search.is_dir():
+        raise FootageLookupError(f"footage folder {search} is missing or not a directory")
+    wanted = stem.casefold()
+    found: list[str] = []
+    for folder, dirnames, filenames in os.walk(search, onerror=_raise_walk_error):
+        # os.walk(followlinks=False) still descends into Windows junctions: prune them here.
+        dirnames[:] = [
+            name
+            for name in dirnames
+            if not os.path.islink(os.path.join(folder, name))
+            and not os.path.isjunction(os.path.join(folder, name))
+        ]
+        for name in filenames:
+            path = Path(folder, name)
+            if path.suffix.lower() not in VIDEO_EXTENSIONS or path.stem.casefold() != wanted:
+                continue
+            if path.is_symlink() or not path.is_file():
+                continue
+            found.append(path.relative_to(search).as_posix())
+    found.sort()
+    matches = tuple(search / relative for relative in found)
+    if not matches:
+        raise FootageLookupError(f"{stem} is not in the footage folder {search}")
+    if len(matches) > 1:
+        names = ", ".join(found)
+        raise FootageLookupError(
+            f"{stem} matches {len(matches)} files in the footage folder {search}: {names}",
+            matches,
+        )
+    return matches[0]

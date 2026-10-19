@@ -42,10 +42,9 @@ from typing import IO, Any
 import pillow_heif
 from PIL import Image, ImageCms
 
-from local_config import LocalConfigError, load_local_config
+from local_config import VIDEO_EXTENSIONS, LocalConfigError, load_local_config
 
 FFPROBE_TIMEOUT_SECONDS = 60.0
-VIDEO_EXTENSIONS = frozenset({".mp4", ".mov", ".360"})
 PHOTO_EXTENSIONS = frozenset({".heic", ".heif", ".jpg", ".jpeg", ".png", ".tif", ".tiff"})
 SIDECAR_EXTENSIONS = frozenset({".lrv", ".thm"})
 CATEGORY_REMINDER = (
