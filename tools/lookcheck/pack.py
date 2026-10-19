@@ -7,7 +7,9 @@ Usage::
 
 Both read the two folders from the local configuration. The footage folder is only ever an
 input; every file written goes under ``<working folder>/wp1.3/`` and is checked first
-(:class:`lookcheck.frames.OutputRoots`).
+(:class:`lookcheck.frames.OutputRoots`). A chapter is named by its stem and found anywhere
+under the footage folder (:func:`local_config.find_footage_file`); a chapter that is missing
+or ambiguous is a configuration error.
 
 ``stills`` extracts 6 frames from each of the four shallow chapters, at timestamps spaced
 evenly from 5 % to 95 % of the duration, as 16-bit RGB PNG (:mod:`lookcheck.frames`), and
@@ -23,7 +25,7 @@ It writes, in ``wp1.3/``: ``frames/`` (source PNGs and ``<frame>-<variant>.png``
 1080 px, JPEG quality 92), ``frames.json`` (exact pts and colour tags), ``statistics.json``
 (what the prototype measured on each frame under each variant) and ``index.html``.
 
-``flicker`` corrects every frame of a 6 s excerpt of ``GX011627.MP4`` (starting at 30 %
+``flicker`` corrects every frame of a 6 s excerpt of chapter ``GX011627`` (starting at 30 %
 of the duration) at the defaults with ``ancuti2018``, UNSMOOTHED (each frame its own
 statistics), encodes the corrected frames and the untouched source frames to
 ``flicker/GX011627_unsmoothed.mp4`` and ``flicker/GX011627_source.mp4`` (HEVC NVENC 8-bit
@@ -67,7 +69,7 @@ if not __package__:
 import itertools
 import shutil
 
-from local_config import LocalConfigError, load_local_config
+from local_config import LocalConfigError, find_footage_file, load_local_config
 from lookcheck.frames import (
     ExtractError,
     FrameFile,
@@ -1271,7 +1273,7 @@ def _run_stills(roots: OutputRoots, footage: Path, backend: Backend) -> None:
     pack_dir = roots.allowed
     frames: list[FrameFile] = []
     for chapter in CHAPTERS:
-        video = footage / f"{chapter}.MP4"
+        video = find_footage_file(chapter, footage)
         info = probe_stream(video)
         for note in info.tags.assumed:
             print(f"warning: {chapter}: {note} missing, assumed (spec D54)", file=sys.stderr)
@@ -1307,7 +1309,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.command == "stills":
             _run_stills(roots, config.footage_path, backend)
         else:
-            video = config.footage_path / f"{FLICKER_CHAPTER}.MP4"
+            video = find_footage_file(FLICKER_CHAPTER, config.footage_path)
             run_flicker(video, roots, backend, roots.allowed / "flicker")
             print(roots.allowed / "flicker")
         print(f"elapsed {time.monotonic() - began:.0f} s", file=sys.stderr)

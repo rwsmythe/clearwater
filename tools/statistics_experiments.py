@@ -9,7 +9,9 @@ Usage::
 The footage folder is only ever an input. Every file is written under
 ``<working folder>/wp1.4/`` after :class:`lookcheck.frames.OutputRoots` has checked it
 (inside that folder, outside the footage folder, no shared hard link); ``FFREPORT`` is
-stripped from every FFmpeg and ffprobe run (:func:`lookcheck.frames.tool_env`).
+stripped from every FFmpeg and ffprobe run (:func:`lookcheck.frames.tool_env`). A chapter is
+found by its stem anywhere under the footage folder (:func:`local_config.find_footage_file`);
+a missing or ambiguous chapter is refused before anything is written.
 
 Two excerpts (:data:`EXCERPTS`): ``GX011627`` (WP1.3's flicker excerpt, 6 s from 30 % of the
 duration; its pts ticks are asserted) and ``GX011625`` (6 s from 50 %). Each phase reads what
@@ -64,7 +66,7 @@ if not __package__:
     # local_config modules.
     sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from local_config import LocalConfigError, load_local_config
+from local_config import LocalConfigError, find_footage_file, load_local_config
 from lookcheck.frames import (
     ExtractError,
     OutputRoots,
@@ -363,11 +365,13 @@ def extract_excerpt(
 
     Raises:
         PremiseError: The excerpt's pts ticks differ from ``spec.expected_ticks``.
+        local_config.FootageLookupError: The chapter is not in the footage folder, or is in it
+            more than once (raised before anything is written).
         lookcheck.frames.ExtractError: A probe or decode fails.
         lookcheck.frames.OutputPathError: An output path is refused.
     """
+    video = find_footage_file(spec.chapter, footage)  # refused before any write
     folder = roots.allowed / spec.name
-    video = footage / f"{spec.chapter}.MP4"
     info = probe_stream(video)
     start = spec.start_fraction * info.duration_s
     began = time.monotonic()
@@ -1046,6 +1050,8 @@ def render_clips(
         PremiseError: The witness is missing or not identical, or the excerpt has fewer than
             :data:`prototype.temporal.MIN_FRAMES` frames.
         ValueError: A statistics record's ``pts_ticks`` are not the excerpt's, in order.
+        local_config.FootageLookupError: The chapter is not in the footage folder, or is in it
+            more than once.
         lookcheck.frames.ExtractError: A probe, encode or check fails (the PNGs are kept).
     """
     folder = roots.allowed / spec.name
@@ -1062,7 +1068,7 @@ def render_clips(
             raw["full"][RENDER_METHOD]["frames"], ticks, "statistics-raw.json full constant"
         )
     )
-    video = footage / f"{spec.chapter}.MP4"
+    video = find_footage_file(spec.chapter, footage)
     info = probe_stream(video)
     signals: dict[str, list[NDArray[np.float64]]] = {v: [] for v in (*VERSIONS, "reference")}
     pairs = (("staged", "flat"), ("staged", "unsmoothed"), ("flat", "unsmoothed"))
@@ -1174,6 +1180,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         backend = select_backend(args.device)
         if backend.reason:
             print(f"note: running on the CPU: {backend.reason}", file=sys.stderr)
+        if args.phase != "analyse":
+            # Every chapter the phase reads is looked up before the first write under wp1.4/.
+            for spec in EXCERPTS:
+                if args.phase == "extract" or spec.render:
+                    find_footage_file(spec.chapter, config.footage_path)
         began = time.monotonic()
         for spec in EXCERPTS:
             folder = roots.allowed / spec.name
