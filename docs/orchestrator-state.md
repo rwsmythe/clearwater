@@ -60,7 +60,7 @@ Each accepted package had its return report posted to CHARC and an info-update t
 | WP1.2R | 2026-10-15 | `996274e` | `docs/proofs/wp1.2r-accept.md` (`aac4674`); WP1.1/1.2 addenda | CONFIRMED (`60dc8ad66427bb15`) |
 | WP1.3 | 2026-10-15 | `7178540` | `docs/proofs/wp1.3-accept.md` (`bc97a19`); 2nd B adjudicated at the gate; DR-20, DR-21 | CONFIRMED (`09057ee4b3979fa4`) |
 | WP-T1 | 2026-10-15 | `f6a34a4` | `docs/proofs/wp-t1-accept.md` (`3f40a85`); 2nd B adjudicated at the gate; DR-9 and DR-21 closed, DR-22 opened | CONFIRMED (`3501648bc8844468`) |
-| WP1.4 | 2026-10-19 | `91f5775` | `docs/proofs/wp1.4-accept.md`; 2nd B adjudicated at the gate; DR-23..DR-26 | pending |
+| WP1.4 | 2026-10-19 | `91f5775` | `docs/proofs/wp1.4-accept.md`; 2nd B adjudicated at the gate; DR-23..DR-26 | CONFIRMED (`6c5d88685e64a37c`; finding 3 upheld; DR-26 stays banked) |
 
 - **WP1.2 Part A, raised to CHARC:**
   - approval of the Windows-only `_windows_power()` in `bench.py` (instrument only, guarded);
@@ -110,6 +110,8 @@ Each accepted package had its return report posted to CHARC and an info-update t
 
 ### Pending
 
+- **WP1.6 gate report** (CHARC `6c5d88685e64a37c`): the smoothing-default row reads "2 s
+  provisional, re-measure per DR-25(3)", never a settled 2 s.
 - **WP1.5 ACCEPTED and CONFIRMED.**
 - **Retroactive Reviewer B: CLOSED via WP1.2R** (accepted at 10:25Z, return report and operator
   fyi posted).
