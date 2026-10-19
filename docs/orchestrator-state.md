@@ -32,15 +32,15 @@
   `docs/briefs/wp1.3d-brief.md` (`c80725b`). Dispatched 2026-10-19 22:03Z in the background.
   Worktree `.worktrees/wp1.3d`, branch `wp1.3d`, base `c80725b` (toml copied). Agent id
   `awp13d-cell-018989ec33c05117`. Depth readings (`uv run python scripts/cell_depth.py
-  wp13d-cell`): at dispatch 18,857 (22:03Z); 85,761 at 8 turns (22:04Z, reading in).
+  wp13d-cell`): at dispatch 18,857 (22:03Z); 85,761 at 8 turns (22:04Z, reading in); 143,068 at 24 turns (22:13Z, no
+  commit yet). Fast climb: at its first yield, if above ~250K, re-seat rather than send more work.
 - **Next after WP1.3D merges:** WP1.4b (implementer-opus-high), brief
   `docs/briefs/wp1.4b-brief.md` (`c80725b`): it reads `work/wp1.3d/deep-frames.json`; it flips
   `Params()` to c3 as its first commit, alone (re-run the WP1.2R bit-identity witness with
   explicit methods at the gate). Pinning APPROVED by CHARC (`1cc08da6b265e2a6`) with two
   guards, written into the brief: a test for `Params().method == "c3"`; `run.py` and CLI help
   show c3 as the default with the Ancuti options.
-- **Main re-gate:** CHARC is running pytest and `-m gpu` on `2dd06cf` at its seat, on the owner's
-  word (~22:00Z). My WP1.3D merge-time gate is the second confirmation.
+- **Main re-gate:** DONE at CHARC's seat (see Handoff item 3).
 - `wp12b-cell` (WP1.2 Part B) RETIRED at 931,878 / 428 turns, PAST-CAP. Do not reply to it.
 - **Depth rule (owner catch 2026-10-19):** read `cell_depth.py <cell>` at dispatch, at every
   yield, and before sending any ruling or remediation. Record each figure with its moment. Above
@@ -70,10 +70,8 @@
    (4) GOP-start through the next I/P anchor; frame 503 NOT BLOCKING. Branches `wp1.2b`,
    `wp1.2b-b1` kept. CHARC QA CONFIRMED (`cb61a4e41f625d73`; patch-id erratum corrected; harness
    366 OK at CHARC's seat; CHARC's pytest re-gate was also killed for low memory).
-   **OWED: the full re-gate on main** (pytest, `-m gpu`, harness). Claude Code stopped the
-   background run for low system memory during pytest; ruff/format/mypy were green on main, and
-   the candidate (= the same commit) was fully green. Re-run it when the owner clears it or
-   before the next merge, whichever comes first.
+   Main re-gate DONE at CHARC's seat on `83fd9c4` (owner's word): 690 passed 0 skipped, gpu 34,
+   harness 366 OK (`1c0eb1905e89e005`, recorded in the accept at `a47e71a`). Debt cleared.
 4. **Next:** the deep parts (WP1.3 deep cases, WP1.4b gain-cap noise test) on SCUBA/; the order
    is mine (CHARC). Render c3 primary with ancuti2018 beside it. The first brief touching
    `tools/prototype` flips `Params()` to c3 (one owned line plus its test); cite spec v0.5.3.
