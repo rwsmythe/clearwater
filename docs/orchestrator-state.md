@@ -39,9 +39,10 @@
   R3, pytest 671/0 skipped. W1 was DISCARDED because sibling-harness load broke "machine
   otherwise idle". The amendment was NOT taken in: the worktree has the brief at `f7e4cac` and
   the plan still used GX011600. Query to CHARC `32513ec1` (owner pauses the siblings for one
-  block of ~3.5 h; contamination rule). On the ruling: ONE message to the cell carrying the
-  ruling plus the amendment (`ead378c` text: GX011625 for claims 3-5, GX011600 at most in
-  claim 2), with an acknowledgement required before W1. Do not message the cell before then.
+  block of ~3.5 h; contamination rule). The amendment was ACKNOWLEDGED after all (ledger
+  `3c5f73b`: GX011625 carries claims 3-5, GX011600 dropped, all windows under 4 h, block ~3 h;
+  fyi `44945334`). On CHARC's ruling: one message to the cell with the ruling. Do not
+  message it before then.
 - **Shallow CP2 COMPLETE** (owner 2026-10-19, CHARC `3bac4a724b1420aa`, record
   `docs/proofs/cp2-look-check.md`): c3 default (both Ancuti variants over-red; kept as options);
   no cast, halo, noise, clipping or flicker; staged vs flat no visible difference. Briefs cite
