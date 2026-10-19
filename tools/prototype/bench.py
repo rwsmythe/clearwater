@@ -290,7 +290,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         if not 0.0 <= args.start_fraction < 1.0:
             raise _UsageError(f"--start-fraction must lie in [0, 1), got {args.start_fraction}")
         real: RealFrames | None = None
+        roots: OutputRoots | None = None
         if args.input is not None:
+            # Real-frame records are Part B outputs: they go under <working folder>/wp1.2b.
+            roots = clip.work_roots(args.config)
+            roots.check(args.out)
             real = load_real_frames(args.input, args.frames, args.start_fraction, args.config)
             height, width = real.shape[0], real.shape[1]
         else:
@@ -319,8 +323,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     rss_baseline = int(process.memory_info().rss)
 
     sampler = _PeakRssSampler(process)
+    head = head_record()
     stray_before = stray_processes()
     gpu_start = _gpu_state()
+    window_start = _local_now()
     sampler.start()
     try:
         if real is None:
@@ -328,6 +334,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             times = _timed_loop(frame, params, backend, args.frames)
         else:
             times = _timed_real_loop(real, params, backend, args.frames)
+        window_end = _local_now()
         gpu_end = _gpu_state()
     finally:
         sampler.stop()
@@ -340,6 +347,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         memory |= tracker.record(ambient_gpu, cuda_before)
     resident = None
     if backend.name == "gpu":
+        # The supplementary loop's own window; the memory figures above are the main loop's.
+        resident_window: dict[str, Any] = {"start_local": _local_now()}
+        resident_window["gpu_state_start"] = _gpu_state()
         resident_times = (
             _resident_loop(frame, params, backend, args.frames)
             if frame is not None
@@ -347,7 +357,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             if real is not None
             else []
         )
-        resident = _timing_record(resident_times)
+        resident_window |= {"end_local": _local_now(), "gpu_state_end": _gpu_state()}
+        resident = _timing_record(resident_times) | {"window": resident_window}
     shape = (height, width, 3)
     estimate = memory_estimate_bytes(shape, params)
     if frame is not None:
@@ -384,7 +395,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             "gpu_state_loop_end": gpu_end,
             "stray_processes_before": stray_before,
             "stray_processes_after": stray_after,
-            "head": head_record(),
+            "window_start_local": window_start,
+            "window_end_local": window_end,
+            "head": head,
         },
     }
     label = args.size
@@ -394,14 +407,23 @@ def main(argv: Sequence[str] | None = None) -> int:
     stamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
     path = args.out / f"bench-{backend.name}-{label}-{args.method}-{stamp}.json"
     try:
-        _refuse_footage(args.out, args.config)
-        args.out.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
-    except (OSError, _UsageError) as exc:
+        if roots is not None:
+            roots.mkdir(args.out)
+            roots.write_text(path, json.dumps(record, indent=2) + "\n")
+        else:
+            _refuse_footage(args.out, args.config)
+            args.out.mkdir(parents=True, exist_ok=True)
+            path.write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
+    except (OSError, _UsageError, ExtractError) as exc:
         print(f"error: cannot write to {args.out}: {_one_line(exc)}", file=sys.stderr)
         return 2
     print(path)
     return 0
+
+
+def _local_now() -> str:
+    """The local time now, ISO 8601 with its offset, to the second."""
+    return datetime.datetime.now().astimezone().isoformat(timespec="seconds")
 
 
 def _parse(argv: Sequence[str] | None) -> argparse.Namespace:
@@ -737,7 +759,7 @@ def _clip_mode(args: argparse.Namespace) -> int:
     head = head_record()
     stray_before = stray_processes()
     gpu_start = _gpu_state()
-    window_start = datetime.datetime.now().astimezone().isoformat(timespec="seconds")
+    window_start = _local_now()
     sampler.start()
     card.start()
     result: clip.Export | None = None
@@ -774,7 +796,7 @@ def _clip_mode(args: argparse.Namespace) -> int:
         card.stop()
         if tracker is not None:
             tracker.close()
-    window_end = datetime.datetime.now().astimezone().isoformat(timespec="seconds")
+    window_end = _local_now()
     stray_after = stray_processes()
     memory = _memory_record(rss_baseline, sampler.peak, process)
     if tracker is not None:

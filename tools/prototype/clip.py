@@ -63,6 +63,7 @@ configuration, probe, path, pipe or FFmpeg failure.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import dataclasses
 import datetime
 import json
@@ -164,7 +165,13 @@ the per-frame budget is ``3.3 * 60 / (60 * r) = 3.3 / r`` seconds (0.1101 s at 2
 PROCESS_TIMEOUT_S = 600.0
 """Seconds to wait for an FFmpeg process to exit once its input has ended."""
 
+STALL_TIMEOUT_S = 300.0
+"""Seconds the main loop waits for a frame from the reader, or for room at the writer, or for
+a thread to end, before it calls the pass stalled (far above any frame time in the envelope:
+the CPU core takes about 11 s on a 4K frame)."""
+
 _SENTINEL: Any = object()
+_SQUARE_PIXELS = frozenset({"1:1", "0:1", "N/A", ""})  # ffprobe prints 0:1 for "unknown"
 
 
 class ClipError(Exception):
@@ -308,9 +315,13 @@ def open_source(path: Path) -> Source:
     Returns:
         The source.
 
+    A stream rotated by a display matrix is refused by :func:`lookcheck.frames.probe_stream`
+    and one with non-square pixels here: the raw pipe carries neither, so the output could
+    not keep them.
+
     Raises:
-        ClipError: The stream is not 8- or 10-bit 4:2:0, its frames are not at a constant
-            frame rate starting at pts 0, or a probe fails.
+        ClipError: The stream is not 8- or 10-bit 4:2:0, is rotated, has non-square pixels,
+            its frames are not at a constant frame rate starting at pts 0, or a probe fails.
     """
     try:
         info = probe_stream(path)
@@ -330,6 +341,11 @@ def open_source(path: Path) -> Source:
     )
     if video is None:
         raise ClipError(f"{path.name} has no video stream")
+    if str(video.get("sample_aspect_ratio", "1:1")) not in _SQUARE_PIXELS:
+        raise ClipError(
+            f"{path.name}: sample aspect ratio {video.get('sample_aspect_ratio')} is outside "
+            "the envelope (the raw pipe carries square pixels only)"
+        )
     chroma, depth = pix_fmt_shape(str(video.get("pix_fmt")))
     if chroma != "4:2:0" or depth not in PIPE_FORMATS:
         raise ClipError(
@@ -581,6 +597,29 @@ def read_frame(stream: IO[bytes], buffer: NDArray[Any]) -> bool:
     return True
 
 
+def write_frame(stream: IO[bytes], frame: NDArray[Any]) -> None:
+    """Write one whole frame to a raw pipe, in as many ``write`` calls as the pipe takes.
+
+    Args:
+        stream: The pipe (an unbuffered binary stream).
+        frame: The frame.
+
+    Raises:
+        PipeError: A write accepted no byte (or the stream would block): the frame did not
+            reach the encoder whole.
+    """
+    view = memoryview(np.ascontiguousarray(frame)).cast("B")
+    written = 0
+    while written < len(view):
+        count = stream.write(view[written:])
+        if not count:
+            raise PipeError(
+                f"the pipe accepted {written} of the {len(view)} bytes of a frame: "
+                "the frame boundaries are wrong"
+            )
+        written += count
+
+
 def decode_frames(
     source: Source, first: int, count: int, hwaccel: str = "none"
 ) -> tuple[list[NDArray[Any]], list[str]]:
@@ -609,17 +648,22 @@ def decode_frames(
         raise ClipError(f"frames {first}..{first + count - 1} are outside {source.path.name}")
     command = decode_command(source, hwaccel, count, seek_ticks=wanted[0], showinfo=True)
     frames: list[NDArray[Any]] = []
+    decoder = reader = None
     with tempfile.TemporaryFile() as log:
-        decoder = _spawn(command, log, None, subprocess.PIPE)
         try:
-            while True:
-                buffer = frame_buffer(source)
-                if not read_frame(decoder.stdout, buffer):
-                    break
-                frames.append(buffer)
+            decoder = _spawn(command, log, None, subprocess.PIPE)
+            # One buffer per frame, kept, and one more on which the reader meets the end.
+            reader = _Reader(source, decoder.stdout, LoopTiming(), "raw", buffers=count + 1)
+            reader.start()
+            while (item := _take(reader.ready, "the decoder")) is not _SENTINEL:
+                frames.append(item[1])
+            _join(reader, "the reader")
+            if reader.error is not None:
+                raise reader.error
             status = _finish(decoder, "the decoder")
         finally:
             _stop(decoder)
+            _release(reader, None)
         log.seek(0)
         stderr = log.read().decode("utf-8", errors="replace")
     if status != 0:
@@ -728,6 +772,59 @@ def _stop(*processes: Any) -> None:
             process.wait()
 
 
+def _take(source: queue.Queue[Any], what: str) -> Any:
+    """Take the next item from a thread's queue, or call the pass stalled.
+
+    Raises:
+        ClipError: Nothing arrived within :data:`STALL_TIMEOUT_S`.
+    """
+    try:
+        return source.get(timeout=STALL_TIMEOUT_S)
+    except queue.Empty:
+        raise ClipError(
+            f"{what} sent nothing for {STALL_TIMEOUT_S:g} s: the pass stalled"
+        ) from None
+
+
+def _give(target: queue.Queue[Any], item: Any, what: str) -> None:
+    """Hand an item to a thread's queue, or call the pass stalled.
+
+    Raises:
+        ClipError: No room appeared within :data:`STALL_TIMEOUT_S`.
+    """
+    try:
+        target.put(item, timeout=STALL_TIMEOUT_S)
+    except queue.Full:
+        raise ClipError(
+            f"{what} took nothing for {STALL_TIMEOUT_S:g} s: the pass stalled"
+        ) from None
+
+
+def _join(thread: threading.Thread | None, what: str) -> None:
+    """Wait for a thread to end, or call the pass stalled.
+
+    Raises:
+        ClipError: The thread is still running after :data:`STALL_TIMEOUT_S`.
+    """
+    if thread is None:
+        return
+    thread.join(timeout=STALL_TIMEOUT_S)
+    if thread.is_alive():
+        raise ClipError(f"{what} did not end within {STALL_TIMEOUT_S:g} s: the pass stalled")
+
+
+def _release(reader: _Reader | None, writer: _Writer | None) -> None:
+    """After a failure (the processes already stopped): let the threads end, briefly."""
+    if reader is not None:
+        reader.free.put(_SENTINEL)
+    if writer is not None:
+        with contextlib.suppress(queue.Full):
+            writer.queue.put(_SENTINEL, timeout=5.0)
+    for thread in (reader, writer):
+        if thread is not None:
+            thread.join(timeout=10.0)
+
+
 def _log_tail(path: Path) -> str:
     """The last three lines of an FFmpeg log, on one line."""
     try:
@@ -826,6 +923,17 @@ class LoopTiming:
                 if values
             },
         }
+
+
+def _bracketed(started: float, timing: LoopTiming) -> float:
+    """Clip the first frame's wait to the bracket.
+
+    The first wait counts from the first frame read whole, not from the decoder's start, so
+    the main loop's per-frame series add up inside the bracket.
+    """
+    if timing.frames == 0 and timing.first_frame is not None:
+        return max(started, timing.first_frame)
+    return started
 
 
 def _summary(values: Sequence[float]) -> dict[str, float]:
@@ -963,7 +1071,7 @@ class _Writer(threading.Thread):
                     self._timing.convert_out.append(converted - started)
                 else:
                     data, converted = item, started
-                self._stream.write(memoryview(np.ascontiguousarray(data)).cast("B"))
+                write_frame(self._stream, data)
                 self._timing.write.append(time.perf_counter() - converted)
                 self.frames += 1
                 if data is item and self._recycle is not None:
@@ -1205,18 +1313,20 @@ def analyse(
     timing = LoopTiming()
     xp = backend.xp
     means: list[list[float]] = []
+    decoder = reader = None
     with log_path.open("wb") as log:
-        timing.spawned = time.perf_counter()
-        decoder = _spawn(command, log, None, subprocess.PIPE)
-        reader = _Reader(source, decoder.stdout, timing, "raw")
         try:
+            timing.spawned = time.perf_counter()
+            decoder = _spawn(command, log, None, subprocess.PIPE)
+            reader = _Reader(source, decoder.stdout, timing, "raw")
             reader.start()
             while True:
                 started = time.perf_counter()
-                item = reader.ready.get()
+                item = _take(reader.ready, "the decoder")
                 got = time.perf_counter()
                 if item is _SENTINEL:
                     break
+                started = _bracketed(started, timing)
                 _, raw = item
                 image = to_float(backend.to_device(raw), xp, source.bit_depth)
                 reader.free.put(raw)
@@ -1231,7 +1341,7 @@ def analyse(
                     progress(timing.frames)
             timing.last_frame = time.perf_counter()
             reader.free.put(_SENTINEL)
-            reader.join()
+            _join(reader, "the reader")
             if reader.error is not None:
                 raise reader.error
             status = _finish(decoder, "the decoder")
@@ -1247,6 +1357,7 @@ def analyse(
             timing.closed = time.perf_counter()
         finally:
             _stop(decoder)
+            _release(reader, None)
     return Analysis(
         smoothed=smoothed,
         measured=measured,
@@ -1317,6 +1428,7 @@ def check_statistics_record(
     params: Params,
     hwaccel: str,
     frames: int | None,
+    smoother: Smoother = SMOOTHER,
 ) -> None:
     """Refuse an analysis record that was not made on this clip with these settings.
 
@@ -1326,11 +1438,14 @@ def check_statistics_record(
         params: The render's parameter set.
         hwaccel: The render's decode choice.
         frames: The render's frame limit (``None``: the whole clip).
+        smoother: The smoothing the render expects to apply (:data:`SMOOTHER`).
 
     Raises:
         StatisticsMismatchError: The schema, the source identity (name, size,
             modification time, frame count, colour tags), the pts list, the frame count
-            analysed, the parameters or the decode choice differ.
+            analysed, the parameters, the decode choice, the analysis (STAGED, the 540-line
+            proxy, the smoother) or the set of smoothed statistics (exactly the names the
+            method's chain measures, :func:`statistic_names`) differ.
     """
     expected = source.frame_count if frames is None else min(frames, source.frame_count)
     if record.get("schema") != ANALYSIS_SCHEMA:
@@ -1355,11 +1470,44 @@ def check_statistics_record(
             f"the record was decoded with hwaccel {dict(record.get('decode') or {}).get('hwaccel')}"
             f", the render decodes with {hwaccel}: the frames would not be the same bytes"
         )
+    if not str(record.get("analysis", "")).startswith("STAGED"):
+        raise StatisticsMismatchError(f"the record's analysis is {record.get('analysis')!r}")
+    if dict(record.get("proxy") or {}).get("short_side") != temporal.PROXY_SHORT_SIDE:
+        raise StatisticsMismatchError(f"the record's proxy is {record.get('proxy')!r}")
+    made = dict(record.get("smoother") or {})
+    if (made.get("kind"), made.get("window_s")) != (smoother.kind, smoother.window_s):
+        raise StatisticsMismatchError(
+            f"the record was smoothed with {made.get('kind')} {made.get('window_s')} s, "
+            f"the render applies {smoother.label}"
+        )
     smoothed = record.get("smoothed") or {}
-    if not smoothed or any(len(values) != expected for values in smoothed.values()):
+    if set(smoothed) != set(statistic_names(params)):
+        raise StatisticsMismatchError(
+            f"the record's smoothed statistics {sorted(smoothed)} are not the "
+            f"{params.method} chain's {sorted(statistic_names(params))}"
+        )
+    if any(len(values) != expected for values in smoothed.values()):
         raise StatisticsMismatchError("the record's smoothed series do not hold one value a frame")
     if len(record.get("frame_means") or []) != expected:
         raise StatisticsMismatchError("the record's frame means do not hold one entry a frame")
+
+
+def statistic_names(params: Params) -> tuple[str, ...]:
+    """Return the flattened names of every whole-frame statistic the method's chain uses.
+
+    They are read off :func:`prototype.temporal.statistics_of` on a small gradient image
+    (the names do not depend on the values): for Ancuti 2018 the compensation means and
+    alpha, then for both methods the white-balance means and gains, the N{} bounds and both
+    saliency means.
+
+    Args:
+        params: The parameter set (its method and blue compensation decide the names).
+
+    Returns:
+        The names, in :func:`prototype.temporal.flatten`'s order.
+    """
+    ramp = np.linspace(0.1, 0.9, 64 * 96 * 3, dtype=np.float32).reshape(64, 96, 3)
+    return tuple(temporal.flatten(temporal.statistics_of(ramp, params)))
 
 
 def per_frame_statistics(record: Mapping[str, Any]) -> list[Statistics]:
@@ -1525,27 +1673,35 @@ def decode_only(
     expected = source.frame_count if frames is None else min(frames, source.frame_count)
     command = decode_command(source, hwaccel, frames)
     timing = LoopTiming()
-    buffer = frame_buffer(source)
+    decoder = reader = None
     with log_path.open("wb") as log:
-        timing.spawned = time.perf_counter()
-        decoder = _spawn(command, log, None, subprocess.PIPE)
         try:
+            timing.spawned = time.perf_counter()
+            decoder = _spawn(command, log, None, subprocess.PIPE)
+            # The export's reader thread and buffer count; each frame's buffer goes straight back.
+            reader = _Reader(source, decoder.stdout, timing, "raw", buffers=PASSTHROUGH_BUFFERS)
+            reader.start()
             while True:
                 started = time.perf_counter()
-                if not read_frame(decoder.stdout, buffer):
+                item = _take(reader.ready, "the decoder")
+                got = time.perf_counter()
+                if item is _SENTINEL:
                     break
-                done = time.perf_counter()
-                if timing.first_frame is None:
-                    timing.first_frame = done
-                timing.read.append(done - started)
+                reader.free.put(item[1])
+                timing.wait_input.append(got - _bracketed(started, timing))
                 timing.frames += 1
                 if progress is not None:
                     progress(timing.frames)
             timing.last_frame = time.perf_counter()
+            reader.free.put(_SENTINEL)
+            _join(reader, "the reader")
+            if reader.error is not None:
+                raise reader.error
             status = _finish(decoder, "the decoder")
             timing.closed = time.perf_counter()
         finally:
             _stop(decoder)
+            _release(reader, None)
     if status != 0:
         raise ClipError(f"the decoder failed (status {status}): {_log_tail(log_path)}")
     if timing.frames != expected:
@@ -1571,7 +1727,7 @@ def _run_pipeline(
     decode = decode_command(source, hwaccel, frames)
     encode = encode_command(source, output, frames)
     timing = LoopTiming()
-    decoder = encoder = None
+    decoder = encoder = reader = writer = None
     with logs[0].open("wb") as decode_log, logs[1].open("wb") as encode_log:
         try:
             timing.spawned = time.perf_counter()
@@ -1586,16 +1742,17 @@ def _run_pipeline(
             writer.start()
             while True:
                 started = time.perf_counter()
-                item = reader.ready.get()
+                item = _take(reader.ready, "the decoder")
                 got = time.perf_counter()
                 if item is _SENTINEL:
                     break
+                started = _bracketed(started, timing)
                 index, image = item
                 out = image if core is None else core(index, image)
                 if core is not None:
                     reader.free.put(image)
                 computed = time.perf_counter()
-                writer.queue.put(out)
+                _give(writer.queue, out, "the encoder")
                 handed = time.perf_counter()
                 timing.wait_input.append(got - started)
                 timing.core.append(computed - got)
@@ -1607,9 +1764,9 @@ def _run_pipeline(
                     progress(timing.frames)
             timing.last_frame = time.perf_counter()
             reader.free.put(_SENTINEL)
-            writer.queue.put(_SENTINEL)
-            writer.join()
-            reader.join()
+            _give(writer.queue, _SENTINEL, "the encoder")
+            _join(writer, "the writer")
+            _join(reader, "the reader")
             for error in (reader.error, writer.error):
                 if isinstance(error, OSError):
                     raise ClipError(f"a pipe failed: {error}") from error
@@ -1620,6 +1777,7 @@ def _run_pipeline(
             timing.closed = time.perf_counter()
         finally:
             _stop(decoder, encoder)
+            _release(reader, writer)
     if decoder_status != 0:
         raise ClipError(f"the decoder failed (status {decoder_status}): {_log_tail(logs[0])}")
     if encoder_status != 0:
