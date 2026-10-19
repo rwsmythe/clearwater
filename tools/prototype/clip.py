@@ -40,8 +40,9 @@ and muxes it with the source's audio and data streams copied and its metadata, c
 and timestamps carried (:func:`encode_command`). Frame timestamps are carried by the decode
 order: the sources are constant frame rate with the first frame at 0 (checked; anything
 else is outside this prototype's envelope and refused). Buffering is bounded: two float
-input buffers (one being filled, one in the core) and an output queue of one frame (plus
-the one being written), so at most two frames are in flight on each side of the core.
+input buffers (one being filled, one in the core) and two output slots (a slot is taken
+before the core computes a frame and given back once the frame is written), so at most two
+frames are in flight on each side of the core.
 
 The frame boundaries of both pipes are exact: a frame is exactly
 ``width * height * 3 * bytes per sample`` bytes (:func:`frame_bytes`), a short read at the
@@ -132,13 +133,15 @@ ENCODER = "hevc_nvenc"
 HWACCELS = ("none", "cuda")
 """Decode choices: software, or ``-hwaccel cuda`` (frames downloaded to system memory)."""
 
-OUTPUT_QUEUE_DEPTH = 1
-"""Corrected frames queued for the writer (the one being written is the second in flight)."""
+OUTPUT_FRAMES = 2
+"""Frames alive at once on the output side: a slot is taken before the core computes a frame
+and given back when the writer has written it, so at most two frames are being computed,
+queued or written."""
 
 INPUT_BUFFERS = 2
 """Float input buffers: one being filled by the reader, one in the core."""
 
-PASSTHROUGH_BUFFERS = INPUT_BUFFERS + OUTPUT_QUEUE_DEPTH + 1
+PASSTHROUGH_BUFFERS = INPUT_BUFFERS + OUTPUT_FRAMES
 """Integer buffers of a pass-through: the frames an export holds in flight on both sides."""
 
 WITNESS_EVERY = 30
@@ -800,6 +803,16 @@ def _give(target: queue.Queue[Any], item: Any, what: str) -> None:
         ) from None
 
 
+def _slot(writer: _Writer, what: str) -> None:
+    """Take an output slot (:attr:`_Writer.slots`), or call the pass stalled.
+
+    Raises:
+        ClipError: No slot came free within :data:`STALL_TIMEOUT_S`.
+    """
+    if not writer.slots.acquire(timeout=STALL_TIMEOUT_S):
+        raise ClipError(f"{what} took nothing for {STALL_TIMEOUT_S:g} s: the pass stalled")
+
+
 def _join(thread: threading.Thread | None, what: str) -> None:
     """Wait for a thread to end, or call the pass stalled.
 
@@ -845,14 +858,14 @@ class LoopTiming:
         spawned: When the first FFmpeg process was started.
         first_frame: When the first decoded frame had been read from the pipe whole.
         last_frame: When the main loop finished its last frame.
-        closed: When the pass ended: the encoder exited (muxer closed) for a render or a
-            pass-through; the decoder exited and the last statistics were computed for an
-            analysis; the decoder exited for a decode-only pass.
+        closed: When the pass ended: the encoder exited (muxer closed) for a render, a
+            pass-through or an encode-only pass; the decoder exited and the last statistics
+            were computed for an analysis; the decoder exited for a decode-only pass.
         frames: Frames processed.
         wait_input: Per frame, the main loop's wait for the next decoded frame.
         core: Per frame, the main loop's work (the correction for a render; proxy and
             statistics for an analysis).
-        wait_output: Per frame, the main loop's wait to hand the frame on (writer full).
+        wait_output: Per frame, the main loop's wait for an output slot (the writer behind).
         read: Per frame, the reader thread's time to read the frame from the pipe.
         convert_in: Per frame, the reader thread's conversion to float (render).
         convert_out: Per frame, the writer thread's conversion to integers.
@@ -905,6 +918,7 @@ class LoopTiming:
             )
         }
         main_loop = sum(self.wait_input) + sum(self.core) + sum(self.wait_output)
+        tail = None if self.last_frame is None else self.closed - self.last_frame
         return {
             "bracket": "first decoded frame read whole -> end of pass (encoder exit: muxer closed)",
             "frames": self.frames,
@@ -913,9 +927,11 @@ class LoopTiming:
             "seconds_per_frame": bracket / self.frames if self.frames else None,
             "minutes_per_minute": bracket / float(footage_seconds),
             "startup_s": self.first_frame - self.spawned,
-            "tail_s": None if self.last_frame is None else self.closed - self.last_frame,
+            "tail_s": tail,
             "main_loop_sum_s": main_loop,
             "main_loop_share_of_bracket": main_loop / bracket if bracket else None,
+            "residual_s": None if tail is None else bracket - main_loop - tail,
+            "residual_note": "bracket - main loop - tail: bookkeeping between frames",
             "summary": {name: _summary(values) for name, values in series.items() if values},
             "per_frame_s": {
                 name: [round(value, 6) for value in values]
@@ -1036,7 +1052,9 @@ class _Writer(threading.Thread):
     """Takes frames from the main loop, converts float ones to integers, writes them out.
 
     An integer frame (a pass-through) is written as it is and then handed to ``recycle``,
-    the reader's free-buffer queue.
+    the reader's free-buffer queue. :attr:`slots` bounds the output side: the main loop takes
+    a slot before it computes (or forwards) a frame, and the writer gives it back once the
+    frame is written (:data:`OUTPUT_FRAMES`).
     """
 
     def __init__(
@@ -1052,7 +1070,8 @@ class _Writer(threading.Thread):
         shape = (source.info.height, source.info.width, 3)
         self._out = frame_buffer(source)
         self._scratch = np.empty(shape, np.float32)
-        self.queue: queue.Queue[Any] = queue.Queue(maxsize=OUTPUT_QUEUE_DEPTH)
+        self.queue: queue.Queue[Any] = queue.Queue(maxsize=OUTPUT_FRAMES + 1)
+        self.slots = threading.Semaphore(OUTPUT_FRAMES)
         self.frames = 0
         self.error: BaseException | None = None
 
@@ -1076,12 +1095,14 @@ class _Writer(threading.Thread):
                 self.frames += 1
                 if data is item and self._recycle is not None:
                     self._recycle.put(item)
+                self.slots.release()
         except BaseException as exc:  # handed to the main loop, which re-raises it
             self.error = exc
             # Let the main loop finish its puts (and keep the reader's buffers moving).
             while (item := self.queue.get()) is not _SENTINEL:
                 if item.dtype != np.float32 and self._recycle is not None:
                     self._recycle.put(item)
+                self.slots.release()
         finally:
             try:
                 self._stream.close()
@@ -1337,9 +1358,9 @@ def analyse(
                 timing.wait_input.append(got - started)
                 timing.core.append(done - got)
                 timing.frames += 1
+                timing.last_frame = done
                 if progress is not None:
                     progress(timing.frames)
-            timing.last_frame = time.perf_counter()
             reader.free.put(_SENTINEL)
             _join(reader, "the reader")
             if reader.error is not None:
@@ -1648,6 +1669,79 @@ def passthrough(
     return _run_pipeline(source, output, logs, hwaccel, frames, "raw", None, None, progress)
 
 
+def spool(
+    source: Source, path: Path, log_path: Path, hwaccel: str = "none", frames: int | None = None
+) -> list[str]:
+    """Decode the clip to a raw RGB file: the input of the split's encode-only pass (untimed).
+
+    The decode is :func:`decode_command`'s with the file ``path`` as output in place of the
+    pipe (``-y`` for a path the caller has checked); the file must then hold exactly the
+    clip's frames.
+
+    Args:
+        source: The clip.
+        path: The spool file (already checked by the caller).
+        log_path: The decoder's log file (already checked).
+        hwaccel: The decode choice.
+        frames: Only the first this many frames.
+
+    Returns:
+        The command.
+
+    Raises:
+        ClipError: FFmpeg failed or the file is not a whole number of the clip's frames
+            (:class:`PipeError`).
+    """
+    expected = source.frame_count if frames is None else min(frames, source.frame_count)
+    command = [*decode_command(source, hwaccel, frames)[:-1], "-y", str(path)]
+    with log_path.open("wb") as log:
+        process = _spawn(command, log, None, None)
+        try:
+            status = _finish(process, "the spool decoder")
+        finally:
+            _stop(process)
+    if status != 0:
+        raise ClipError(f"the spool decode failed (status {status}): {_log_tail(log_path)}")
+    size = path.stat().st_size
+    if size != expected * source.frame_bytes:
+        raise PipeError(
+            f"the spool holds {size} bytes, not {expected} frames of {source.frame_bytes}"
+        )
+    return command
+
+
+def encode_only(
+    source: Source,
+    spool_path: Path,
+    output: Path,
+    logs: tuple[Path, Path],
+    frames: int | None = None,
+    progress: Callable[[int], None] | None = None,
+) -> Export:
+    """Run the split's encode pass: frames read from a spool (:func:`spool`), fed unchanged.
+
+    The export's reader and writer threads, buffers and encoder, with the reader on the
+    spool file instead of a decoder, so no decode runs while the encoder is timed.
+
+    Args:
+        source: The clip.
+        spool_path: The spool file.
+        output: The output MP4 (already checked by the caller).
+        logs: An unused decoder log and the encoder's log file (already checked).
+        frames: Only the first this many frames (the spool must hold exactly those).
+        progress: Called with the frame count after each frame.
+
+    Returns:
+        The pass's result (``decode_command`` names the spool).
+
+    Raises:
+        ClipError: As :func:`export`.
+    """
+    return _run_pipeline(
+        source, output, logs, "none", frames, "raw", None, None, progress, spool_path
+    )
+
+
 def decode_only(
     source: Source,
     log_path: Path,
@@ -1690,9 +1784,9 @@ def decode_only(
                 reader.free.put(item[1])
                 timing.wait_input.append(got - _bracketed(started, timing))
                 timing.frames += 1
+                timing.last_frame = got
                 if progress is not None:
                     progress(timing.frames)
-            timing.last_frame = time.perf_counter()
             reader.free.put(_SENTINEL)
             _join(reader, "the reader")
             if reader.error is not None:
@@ -1721,48 +1815,61 @@ def _run_pipeline(
     core: Callable[[int, NDArray[np.float32]], NDArray[np.float32]] | None,
     witness: Mapping[int, Sequence[float]] | None,
     progress: Callable[[int], None] | None,
+    spool: Path | None = None,
 ) -> Export:
-    """Decoder -> reader thread -> main loop (``core``) -> writer thread -> encoder."""
+    """Decoder (or a spool file) -> reader thread -> main loop (``core``) -> writer -> encoder.
+
+    Per frame the main loop takes an output slot (``wait_output``), takes the next frame
+    (``wait_input``), runs the core and queues the result (``core``). ``last_frame`` is the
+    moment the last frame was queued, so the reader's end-of-stream, the threads' ends and
+    the processes' exits fall into the tail.
+    """
     expected = source.frame_count if frames is None else min(frames, source.frame_count)
     decode = decode_command(source, hwaccel, frames)
     encode = encode_command(source, output, frames)
     timing = LoopTiming()
     decoder = encoder = reader = writer = None
+    spooled = None
     with logs[0].open("wb") as decode_log, logs[1].open("wb") as encode_log:
         try:
             timing.spawned = time.perf_counter()
             encoder = _spawn(encode, encode_log, subprocess.PIPE, None)
-            decoder = _spawn(decode, decode_log, None, subprocess.PIPE)
+            if spool is None:
+                decoder = _spawn(decode, decode_log, None, subprocess.PIPE)
+                stream = decoder.stdout
+            else:
+                spooled = stream = spool.open("rb", buffering=0)
             # A pass-through holds as many integer frames as the export holds frames in flight.
-            reader = _Reader(
-                source, decoder.stdout, timing, mode, witness, frames, PASSTHROUGH_BUFFERS
-            )
+            reader = _Reader(source, stream, timing, mode, witness, frames, PASSTHROUGH_BUFFERS)
             writer = _Writer(source, encoder.stdin, timing, None if core else reader.free)
             reader.start()
             writer.start()
             while True:
                 started = time.perf_counter()
+                _slot(writer, "the encoder")
+                slotted = time.perf_counter()
                 item = _take(reader.ready, "the decoder")
                 got = time.perf_counter()
                 if item is _SENTINEL:
+                    writer.slots.release()
                     break
-                started = _bracketed(started, timing)
                 index, image = item
                 out = image if core is None else core(index, image)
                 if core is not None:
                     reader.free.put(image)
-                computed = time.perf_counter()
                 _give(writer.queue, out, "the encoder")
                 handed = time.perf_counter()
-                timing.wait_input.append(got - started)
-                timing.core.append(computed - got)
-                timing.wait_output.append(handed - computed)
+                begun = _bracketed(started, timing)  # the first frame counts from the bracket
+                slot_ready = max(slotted, begun)
+                timing.wait_output.append(slot_ready - begun)
+                timing.wait_input.append(got - slot_ready)
+                timing.core.append(handed - got)
                 timing.frames += 1
+                timing.last_frame = handed
                 if writer.error is not None:
                     break
                 if progress is not None:
                     progress(timing.frames)
-            timing.last_frame = time.perf_counter()
             reader.free.put(_SENTINEL)
             _give(writer.queue, _SENTINEL, "the encoder")
             _join(writer, "the writer")
@@ -1772,12 +1879,14 @@ def _run_pipeline(
                     raise ClipError(f"a pipe failed: {error}") from error
                 if error is not None:
                     raise error
-            decoder_status = _finish(decoder, "the decoder")
+            decoder_status = 0 if decoder is None else _finish(decoder, "the decoder")
             encoder_status = _finish(encoder, "the encoder")
             timing.closed = time.perf_counter()
         finally:
             _stop(decoder, encoder)
             _release(reader, writer)
+            if spooled is not None:
+                spooled.close()
     if decoder_status != 0:
         raise ClipError(f"the decoder failed (status {decoder_status}): {_log_tail(logs[0])}")
     if encoder_status != 0:
@@ -1788,7 +1897,13 @@ def _run_pipeline(
             f"{source.path.name} has {expected}"
         )
     return Export(
-        timing, decode, encode, decoder_status, encoder_status, writer.frames, reader.witnessed
+        timing,
+        decode if spool is None else ["(spool)", str(spool)],
+        encode,
+        decoder_status,
+        encoder_status,
+        writer.frames,
+        reader.witnessed,
     )
 
 
@@ -2086,7 +2201,7 @@ def export_record(
         "resident": result.resident,
         "buffering": {
             "input_float_buffers": INPUT_BUFFERS,
-            "output_queue_depth": OUTPUT_QUEUE_DEPTH,
+            "output_frames_in_flight": OUTPUT_FRAMES,
             "frame_bytes": source.frame_bytes,
             "pipe_format": source.pipe_format,
         },

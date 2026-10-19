@@ -32,9 +32,13 @@ runs the analysis pass (:func:`prototype.clip.analyse`) and also writes its anal
 record, the statistics a render reads; ``end-to-end`` runs the export loop
 (:func:`prototype.clip.export`) with ``--statistics`` (an analysis record of the same
 clip, parameters and decode), then compares the output with the source
-(``container_spike.compare``, after the timed bracket); ``decode-only`` and
-``passthrough`` are the split's decode and encode passes. ``--frames`` limits these modes
-to the first ``N`` frames.
+(``container_spike.compare``, after the timed bracket); ``decode-only`` is the split's
+decode pass; ``encode-only`` decodes the clip to a raw spool file first (outside the
+window; the file is deleted afterwards) and times the encoder fed from it, with no decode
+running; ``passthrough`` times decode and encode running together with no core
+(supplementary). ``--frames`` limits these modes to the first ``N`` frames. Their memory
+record also holds the peak RSS of the whole process tree (the FFmpeg children included)
+and the card's device-wide used memory, both sampled through the pass.
 
 Timing. Each frame's wall-clock time is ``time.perf_counter()`` around ``correct()`` on
 the NumPy frame followed by ``synchronize()`` of the backend, so the time includes the
@@ -92,7 +96,7 @@ import subprocess
 import sys
 import threading
 import time
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from fractions import Fraction
 from pathlib import Path
@@ -135,6 +139,9 @@ BUDGET_60FPS_S = 0.056
 RSS_SAMPLE_INTERVAL_S = 0.05
 """Interval of the peak-RSS sampling thread."""
 
+CHILDREN_REFRESH_S = 2.0
+"""How often the sampler lists the child processes again (their RSS is read every sample)."""
+
 GPU_SAMPLE_INTERVAL_S = 60.0
 """Interval of the card-state samples taken during a whole-clip mode."""
 
@@ -144,7 +151,7 @@ STRAY_CPU_PERCENT = 10.0
 START_FRACTION = 0.3
 """Real video frames are read from this fraction of the clip's duration on (Part B claim 2)."""
 
-MODES = ("core", "analysis", "end-to-end", "decode-only", "passthrough")
+MODES = ("core", "analysis", "end-to-end", "decode-only", "encode-only", "passthrough")
 """``core`` times ``correct()`` alone; the others time a whole clip through ``clip``."""
 
 IMAGE_SUFFIXES = frozenset({".png", ".jpg", ".jpeg", ".tif", ".tiff"})
@@ -348,7 +355,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     resident = None
     if backend.name == "gpu":
         # The supplementary loop's own window; the memory figures above are the main loop's.
-        resident_window: dict[str, Any] = {"start_local": _local_now()}
+        resident_window: dict[str, Any] = {
+            "stray_processes_before": stray_processes(),
+            "power": _windows_power(),
+            "start_local": _local_now(),
+        }
         resident_window["gpu_state_start"] = _gpu_state()
         resident_times = (
             _resident_loop(frame, params, backend, args.frames)
@@ -358,6 +369,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             else []
         )
         resident_window |= {"end_local": _local_now(), "gpu_state_end": _gpu_state()}
+        resident_window["stray_processes_after"] = stray_processes()
         resident = _timing_record(resident_times) | {"window": resident_window}
     shape = (height, width, 3)
     estimate = memory_estimate_bytes(shape, params)
@@ -743,8 +755,18 @@ def _clip_mode(args: argparse.Namespace) -> int:
                 "encode.log",
                 f"{source.path.stem}_corrected.mp4",
                 f"{source.path.stem}-{args.method}-{args.hwaccel}-analysis.json",
+                f"{source.path.stem}.{source.pipe_format}.raw",
+                "spool.log",
             ],
+        )[:5]
+        spool_path, spool_log = (
+            folder / f"{source.path.stem}.{source.pipe_format}.raw",
+            folder / "spool.log",
         )
+        spool_command = None
+        if args.mode == "encode-only":
+            # The encoder's input is decoded to a file first, outside the timed window.
+            spool_command = clip.spool(source, spool_path, spool_log, args.hwaccel, args.frames)
         ambient_gpu = _nvidia_smi_gpu()
         backend = select_backend(args.device)
     except (RuntimeError, clip.ClipError, ExtractError, LocalConfigError, OSError) as exc:
@@ -755,7 +777,9 @@ def _clip_mode(args: argparse.Namespace) -> int:
     cuda_before = None if tracker is None else tracker.cuda_used_bytes()
     process = psutil.Process()
     rss_baseline = int(process.memory_info().rss)
-    sampler, card = _PeakRssSampler(process), _GpuSampler()
+    device_used = None if tracker is None else tracker.cuda_used_bytes
+    sampler = _PeakRssSampler(process, children=True, device_used=device_used)
+    card = _GpuSampler()
     head = head_record()
     stray_before = stray_processes()
     gpu_start = _gpu_state()
@@ -785,11 +809,16 @@ def _clip_mode(args: argparse.Namespace) -> int:
         elif args.mode == "passthrough":
             logs = (decode_log, encode_log)
             result = clip.passthrough(source, output, logs, args.hwaccel, args.frames)
+        elif args.mode == "encode-only":
+            logs = (decode_log, encode_log)
+            result = clip.encode_only(source, spool_path, output, logs, args.frames)
         else:
             result = clip.decode_only(source, decode_log, args.hwaccel, args.frames)
         gpu_end = _gpu_state()
     except (clip.ClipError, OSError) as exc:
         print(f"error: {_one_line(exc)}", file=sys.stderr)
+        if spool_command is not None:
+            roots.remove(spool_path)  # a raw spool is large; it never outlives its pass
         return 2
     finally:
         sampler.stop()
@@ -798,7 +827,7 @@ def _clip_mode(args: argparse.Namespace) -> int:
             tracker.close()
     window_end = _local_now()
     stray_after = stray_processes()
-    memory = _memory_record(rss_baseline, sampler.peak, process)
+    memory = _memory_record(rss_baseline, sampler.peak, process) | sampler.record()
     if tracker is not None:
         memory |= tracker.record(ambient_gpu, cuda_before)
     timing = done.timing if done is not None else result.timing if result is not None else None
@@ -858,6 +887,14 @@ def _clip_mode(args: argparse.Namespace) -> int:
                 record["output"] = str(output)
                 record["output_bytes"] = output.stat().st_size
                 record["compare"] = clip.compare_output(source.path, output, folder, roots)
+        if spool_command is not None:
+            record["spool"] = {
+                "command": spool_command,
+                "path": str(spool_path),
+                "bytes": spool_path.stat().st_size,
+                "decoded": "before the timed window; deleted after the comparison",
+            }
+            roots.remove(spool_path)
         roots.write_text(record_path, json.dumps(record, indent=1) + "\n")
     except (OSError, clip.ClipError, ExtractError) as exc:
         print(f"error: {_one_line(exc)}", file=sys.stderr)
@@ -1113,14 +1150,33 @@ def _windows_power() -> dict[str, Any]:
 
 
 class _PeakRssSampler:
-    """A thread that samples the process's RSS every :data:`RSS_SAMPLE_INTERVAL_S`."""
+    """A thread that samples the process's RSS every :data:`RSS_SAMPLE_INTERVAL_S`.
 
-    def __init__(self, process: Any) -> None:
+    With ``children`` it also samples, at the same moments, the RSS of every child process
+    (the FFmpeg decoder and encoder; the list is refreshed every :data:`CHILDREN_REFRESH_S`)
+    and keeps the peak of the sum, the whole tree. With ``device_used`` (a callable giving
+    the card's used bytes, device-wide, so the encoder's memory too) it keeps that peak.
+    """
+
+    def __init__(
+        self,
+        process: Any,
+        children: bool = False,
+        device_used: Callable[[], int] | None = None,
+    ) -> None:
         """Prepare the sampler; :meth:`start` begins sampling."""
         self._process = process
+        self._children_wanted = children
+        self._children: list[Any] = []
+        self._refreshed = 0.0
+        self._device_used = device_used
         self._stop = threading.Event()
         self._thread = threading.Thread(target=self._run, daemon=True)
         self.peak = int(process.memory_info().rss)
+        self.tree_peak = self.peak
+        self.children_peak = 0
+        self.device_peak = 0 if device_used is None else int(device_used())
+        self.samples = 0
 
     def start(self) -> None:
         """Start sampling."""
@@ -1138,8 +1194,51 @@ class _PeakRssSampler:
             self._sample()
 
     def _sample(self) -> None:
-        """Take one RSS sample and keep the maximum."""
-        self.peak = max(self.peak, int(self._process.memory_info().rss))
+        """Take one sample of each figure and keep the maxima."""
+        own = int(self._process.memory_info().rss)
+        self.peak = max(self.peak, own)
+        self.samples += 1
+        if self._children_wanted:
+            now = time.perf_counter()
+            if now - self._refreshed >= CHILDREN_REFRESH_S:
+                try:
+                    self._children = self._process.children(recursive=True)
+                except psutil.Error:
+                    self._children = []
+                self._refreshed = now
+            children = 0
+            for child in self._children:
+                try:
+                    children += int(child.memory_info().rss)
+                except psutil.Error:
+                    continue
+            self.children_peak = max(self.children_peak, children)
+            self.tree_peak = max(self.tree_peak, own + children)
+        if self._device_used is not None:
+            self.device_peak = max(self.device_peak, int(self._device_used()))
+
+    def record(self) -> dict[str, Any]:
+        """The tree and device figures, in MiB (the process's own peak is ``rss_peak_mb``)."""
+        return {
+            "rss_tree_peak_mb": self.tree_peak / _MIB if self._children_wanted else None,
+            "rss_children_peak_mb": self.children_peak / _MIB if self._children_wanted else None,
+            "tree_sampling": (
+                "own RSS + every child's RSS at the same sample, children listed every "
+                f"{CHILDREN_REFRESH_S:g} s"
+                if self._children_wanted
+                else None
+            ),
+            "cuda_device_used_peak_mb": (
+                None if self._device_used is None else self.device_peak / _MIB
+            ),
+            "device_sampling": (
+                None
+                if self._device_used is None
+                else "CUDA runtime memGetInfo total - free, device-wide (all processes), "
+                f"every {RSS_SAMPLE_INTERVAL_S * 1000:.0f} ms"
+            ),
+            "samples": self.samples,
+        }
 
 
 class _GpuSampler:
@@ -1171,8 +1270,10 @@ class _GpuSampler:
         """Sample until :meth:`stop` is called."""
         while not self._stop.wait(self._interval):
             state = _gpu_state()
+            memory = _nvidia_smi_gpu()
             seconds = round(time.perf_counter() - self._started, 1)
-            self.samples.append({"seconds": seconds, **(state or {})})
+            used = None if memory is None else memory.get("memory.used")
+            self.samples.append({"seconds": seconds, **(state or {}), "memory.used": used})
 
 
 def stray_processes(
