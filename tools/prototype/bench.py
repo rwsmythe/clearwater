@@ -49,10 +49,11 @@ over the median of the first ten after the warm-up. On the GPU a second, supplem
 loop of ``N`` frames times the device-resident path a renderer would use: the input copied
 to the device, ``correct()`` on the device array, and only the output copied back.
 
-Memory. Peak RSS is the maximum of ``psutil`` samples taken by a thread every 50 ms during
-the timed loop. On the GPU, CuPy's default memory pool is wrapped by a counting allocator
-that records the pool's used bytes after every allocation (its high-water mark), and the
-pool's reserved bytes are read after the timed loop (the pool's cache is emptied before the
+Memory. Peak RSS is the maximum of ``psutil`` samples taken by a thread that waits 50 ms
+between samples during the timed loop (a sample takes time too, so the actual interval is
+longer: the whole-clip records give it as duration / ``samples``). On the GPU, CuPy's
+default memory pool is wrapped by a counting allocator that records the pool's used bytes
+after every allocation (its high-water mark), and the pool's reserved bytes are read after the timed loop (the pool's cache is emptied before the
 loop and the pool never returns memory during it, so that is its own high-water mark).
 ``nvidia-smi --query-gpu=memory.used`` is read before the backend starts and the CUDA
 runtime's device-wide used memory just after it starts (the CUDA context then exists);
@@ -1005,7 +1006,10 @@ def _memory_record(rss_baseline: int, rss_peak: int, process: Any) -> dict[str, 
     peak_wset = getattr(info, "peak_wset", None)  # reported by psutil on some systems only
     return {
         "unit": "MiB",
-        "rss_sampling": f"psutil RSS, thread sampling every {RSS_SAMPLE_INTERVAL_S * 1000:.0f} ms",
+        "rss_sampling": (
+            f"psutil RSS, a thread waiting {RSS_SAMPLE_INTERVAL_S * 1000:.0f} ms between samples "
+            "(the actual interval is longer: duration / samples)"
+        ),
         "rss_baseline_mb": rss_baseline / _MIB,
         "rss_peak_mb": rss_peak / _MIB,
         "os_peak_working_set_mb": None if peak_wset is None else int(peak_wset) / _MIB,
@@ -1171,7 +1175,7 @@ def _windows_power() -> dict[str, Any]:
 
 
 class _PeakRssSampler:
-    """A thread that samples the process's RSS every :data:`RSS_SAMPLE_INTERVAL_S`.
+    """A thread sampling the RSS, waiting :data:`RSS_SAMPLE_INTERVAL_S` between samples.
 
     With ``children`` it also samples, at the same moments, the RSS of every child process
     (the FFmpeg decoder and encoder; the list is refreshed every :data:`CHILDREN_REFRESH_S`)
@@ -1256,7 +1260,7 @@ class _PeakRssSampler:
                 None
                 if self._device_used is None
                 else "CUDA runtime memGetInfo total - free, device-wide (all processes), "
-                f"every {RSS_SAMPLE_INTERVAL_S * 1000:.0f} ms"
+                f"with the RSS, after each {RSS_SAMPLE_INTERVAL_S * 1000:.0f} ms wait"
             ),
             "samples": self.samples,
         }

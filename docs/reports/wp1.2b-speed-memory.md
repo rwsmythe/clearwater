@@ -52,7 +52,7 @@ the bracket figure, which stays the headline.
 - `tools/prototype/clip.py` (new): the analysis pass and the export loop.
 - `tools/prototype/bench.py`: the real-frame source `--input`, the proxy study on real frames, and
   the whole-clip modes `analysis`, `end-to-end`, `decode-only`, `encode-only`, `passthrough`.
-- `tests/test_prototype_clip.py`: 44 tests.
+- `tests/test_prototype_clip.py`: 60 tests.
 - No change to `pipeline.py`, `params.py`, `backend.py` or `pyproject.toml`.
 
 **Clips** are named by stem and found with `find_footage_file`. The footage folder is input
@@ -270,7 +270,7 @@ The pass-through rows ran under the shared load, so their figures are an upper b
 
 | Pass (all W4, contaminated) | s/frame | min/min | Bracket | Notes (per frame min / median / max) |
 |---|---|---|---|---|
-| decode-only (decoder -> pipe -> reader) | 0.0886 | 2.66 | 60.4 s | 0.0003 / 0.0858 / 0.1986; | pipe-bound: the transport record gives 0.0936 through the pipe against 0.0162 to NUL |
+| decode-only (decoder -> pipe -> reader) | 0.0886 | 2.66 | 60.4 s | 0.0003 / 0.0858 / 0.1986; pipe-bound: the transport record gives 0.0936 through the pipe against 0.0162 to NUL |
 | encode-only (raw spool -> writer -> NVENC -> mux) | 0.0371 | 1.11 | 25.3 s | 0.0015 / 0.0343 / 0.8140; the 16.9 GB spool was decoded before the window and deleted after |
 | core alone (claim 2, W1c) | 0.3948 | -- | -- | |
 | passthrough (decode + encode together, no core; supplementary) | 0.0880 | 2.64 | 59.9 s | 0.0019 / 0.0845 / 1.3111; equals decode-only: the encoder is hidden behind the decode pipe |
@@ -340,12 +340,12 @@ established here.
 GX011625, ancuti2018, 540-line proxy, STAGED, `median_gaussian` 2 s. W2, contaminated (Python
 batches at 36-99 % before and after both runs), never re-run.
 
-| Clip | Decode | Frames | Bracket | s/frame | min/min | Reader pipe read median | Main-loop work median | Measure s per stage (1/2/3) | Record |
-|---|---|---|---|---|---|---|---|---|---|
-| GX011625 | software (W2, contaminated) | 14,938 | 1,777.2 s | 0.1190 | 3.57 | 0.106 | 0.074 | 372 / 311 / 302 | `bench/GX011625-analysis-ancuti2018-20261018-211458/` |
-| GX011625 | `-hwaccel cuda` (W2, contaminated) | 14,938 | 1,644.8 s | 0.1101 | 3.30 | 0.098 | 0.068 | 321 / 271 / 270 | `bench/GX011625-analysis-ancuti2018-20261018-214514/` |
-| GX011627 | software (W3, contaminated) | 681 | 98.8 s | 0.1451 | 4.35 | 0.107 | 0.124 | 29 / 21 / 18 | `bench/GX011627-analysis-ancuti2018-20261018-221704/` |
-| GX011627 | software (W3b re-run, contaminated) | 681 | 48.2 s | 0.0707 | 2.12 | 0.067 | 0.050 | -- | `bench/GX011627-analysis-ancuti2018-20261018-222955/` |
+| Clip | Decode | Frames | Bracket | s/frame | min/min | Per frame min / median / max | Reader pipe read median | Main-loop work median | Measure s per stage (1/2/3) | Record |
+|---|---|---|---|---|---|---|---|---|---|---|
+| GX011625 | software (W2, contaminated) | 14,938 | 1,777.2 s | 0.1190 | 3.57 | 0.053 / 0.105 / 1.363 | 0.106 | 0.074 | 372 / 311 / 302 | `bench/GX011625-analysis-ancuti2018-20261018-211458/` |
+| GX011625 | `-hwaccel cuda` (W2, contaminated) | 14,938 | 1,644.8 s | 0.1101 | 3.30 | 0.039 / 0.099 / 0.891 | 0.098 | 0.068 | 321 / 271 / 270 | `bench/GX011625-analysis-ancuti2018-20261018-214514/` |
+| GX011627 | software (W3, contaminated) | 681 | 98.8 s | 0.1451 | 4.35 | 0.039 / 0.129 / 1.458 | 0.107 | 0.124 | 29 / 21 / 18 | `bench/GX011627-analysis-ancuti2018-20261018-221704/` |
+| GX011627 | software (W3b re-run, contaminated) | 681 | 48.2 s | 0.0707 | 2.12 | 0.033 / 0.067 / 0.467 | 0.067 | 0.050 | -- | `bench/GX011627-analysis-ancuti2018-20261018-222955/` |
 
 - Hardware decode saves 7 % here. The pass is bound by the raw pipe (the reader's read takes
   longer than the main loop's work), and `-hwaccel cuda` only speeds the decode behind the pipe.
@@ -356,15 +356,6 @@ batches at 36-99 % before and after both runs), never re-run.
   2.1 min/min) had the least load of them, but its window is contaminated (a 53 % `python.exe`
   in its last stray check). It is not an idle-machine figure either: its gate read 23.8 % total
   CPU, and WmiPrvSE ran at 86-88 % of a CPU.
-
-Per-frame spread (min / median / max, s, from each record):
-
-| Row | Per frame |
-|---|---|
-| GX011625 software | 0.053 / 0.105 / 1.363 |
-| GX011625 `-hwaccel cuda` | 0.039 / 0.099 / 0.891 |
-| GX011627 W3 | 0.039 / 0.129 / 1.458 |
-| GX011627 W3b | 0.033 / 0.067 / 0.467 |
 
 ## 8. Claim 5 -- memory (N4, V15)
 

@@ -972,7 +972,7 @@ class LoopTiming:
         main_loop = sum(self.wait_input) + sum(self.core) + sum(self.wait_output)
         tail = None if self.last_frame is None else self.closed - self.last_frame
         return {
-            "bracket": "first decoded frame read whole -> end of pass (encoder exit: muxer closed)",
+            "bracket": "first decoded frame read whole -> both children reaped",
             "frames": self.frames,
             "footage_s": float(footage_seconds),
             "bracket_s": bracket,
