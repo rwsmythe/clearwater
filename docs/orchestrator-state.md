@@ -33,7 +33,7 @@
    - **History:**
      - author `wp14-cell` (opus-high), 384K, retired;
      - my seat B pass 1 on `af98ca8`: BLOCKING (M1-M4), md5 `f53b2099...`, evidence
-       `clearwater-review-evidence\wp1.4eviewB\`;
+       `clearwater-review-evidence\wp1.4\reviewB\`;
      - ONE remediation `wp14-fix` (sonnet-high), brief `docs/briefs/wp1.4-remediation-brief.md`
        (`179fab0`). It was interrupted at the 10-15 restart and resumed 10-18 by raw id
        `awp14-fix-a7f2718c31740dc1`.
@@ -55,8 +55,8 @@
         `witness_r.py`; 6 cases, Ancuti blue off and on and 3C, CPU and GPU. It was
         bit-identical 6/6 before the remediation.
      4. ONE seat Reviewer B re-run. Prompt template:
-        `clearwater-review-evidence\wp1.4eviewBeview-prompt-B.md` plus a "THIS IS THE
-        RE-RUN" section, as in `wp1.3eviewBerun\`. A 2nd block is adjudicated at the
+        `clearwater-review-evidence\wp1.4\reviewB\review-prompt-B.md` plus a "THIS IS THE
+        RE-RUN" section, as in `wp1.3\reviewB\rerun\`. A 2nd block is adjudicated at the
         gate; never a third remediation.
      5. Merge, re-gate on main, write the accept record, and bank **DR-23** (A12: VFR
         smoothing by index is a prototype limit; CHARC says IF-3 is keyed by pts).
