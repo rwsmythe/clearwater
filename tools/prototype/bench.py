@@ -1,16 +1,40 @@
-"""Time one sustained run of the prototype pipeline on a synthetic frame and record its memory.
+"""Time sustained runs of the prototype pipeline and record their memory (WP1.2 A and B).
 
 Usage::
 
-    uv run python tools/prototype/bench.py --device {cpu,gpu} --size {4k,5.3k,WxH}
-        --frames N --method {ancuti2018,c3} --out DIR [--proxy S ...] [--seed N]
-        [--note TEXT]
+    uv run python tools/prototype/bench.py --device {cpu,gpu} --method {ancuti2018,c3}
+        --out DIR (--size {4k,5.3k,WxH} | --input CLIP) --frames N [--start-fraction F]
+        [--proxy S ...] [--seed N] [--note TEXT] [--config FILE]
+    uv run python tools/prototype/bench.py --mode {analysis,end-to-end,decode-only,passthrough}
+        --input CLIP --device {cpu,gpu} --method M [--statistics FILE] [--hwaccel none|cuda]
+        [--resident] [--frames N] [--out DIR] [--note TEXT] [--config FILE]
 
-The instrument of WP1.2 Part A. It builds ONE synthetic frame (:func:`synthetic_frame`),
-runs :func:`prototype.pipeline.correct` on it ``N`` times in sequence on the chosen
-device, and writes one JSON record, ``<out>/bench-<device>-<size>-<method>-<stamp>.json``,
-whose path it prints. The figures are SYNTHETIC: the record is labelled so, and they are
-not the prototype gate's result on real footage.
+The instrument of WP1.2. In the default ``core`` mode it times
+:func:`prototype.pipeline.correct` alone, ``N`` times in sequence on the chosen device,
+and writes one JSON record, ``<out>/bench-<device>-<size>-<method>-<stamp>.json``, whose
+path it prints. The frames are either ONE synthetic frame (``--size``,
+:func:`synthetic_frame`; Part A; the record is labelled ``SYNTHETIC``) or REAL frames
+(``--input``; Part B): ``CLIP`` is a footage stem found with
+:func:`local_config.find_footage_file` or a path outside the footage folder
+(:func:`prototype.clip.resolve_clip`); for a video, the ``N`` consecutive frames from the
+first frame at or after ``--start-fraction`` (default 0.3) of the clip are decoded first
+(:func:`prototype.clip.decode_frames`, which checks every frame's pts) and held as
+integers, and frame ``i`` of the run is frame ``i`` of them; an image (8-bit through
+Pillow, or a 16-bit PNG) is one frame used ``N`` times. Each frame is converted to float32
+before its timer starts. The record is labelled ``REAL`` and its ``input`` entry names the
+source, the frames' pts and the decode command.
+
+The other modes time a WHOLE clip through :mod:`prototype.clip` (Part B claims 3 and 4)
+with the memory and ambient readings below, and write
+``<out>/bench-<mode>-<stem>-<method>-<stamp>.json`` under ``<working folder>/wp1.2b``
+(``--out`` defaults to ``<working folder>/wp1.2b/bench`` and must lie inside it): ``analysis``
+runs the analysis pass (:func:`prototype.clip.analyse`) and also writes its analysis
+record, the statistics a render reads; ``end-to-end`` runs the export loop
+(:func:`prototype.clip.export`) with ``--statistics`` (an analysis record of the same
+clip, parameters and decode), then compares the output with the source
+(``container_spike.compare``, after the timed bracket); ``decode-only`` and
+``passthrough`` are the split's decode and encode passes. ``--frames`` limits these modes
+to the first ``N`` frames.
 
 Timing. Each frame's wall-clock time is ``time.perf_counter()`` around ``correct()`` on
 the NumPy frame followed by ``synchronize()`` of the backend, so the time includes the
@@ -35,11 +59,20 @@ beside them.
 
 Ambient. The record also holds the power source, the Windows power scheme and power-mode
 overlay (read only; ``None`` off Windows), and the card's clocks, temperature, power draw,
-P-state and clock-limit reasons just before and just after the timed loop, outside it.
+P-state and clock-limit reasons just before and just after the timed loop, outside it
+(and, in the whole-clip modes, every :data:`GPU_SAMPLE_INTERVAL_S` during it). The
+``ambient`` entry also holds the head commit of this tree and any tracked file changed in
+it (:func:`head_record`), and the processes using at least :data:`STRAY_CPU_PERCENT` % of
+one logical CPU just before and just after the timed loop (:func:`stray_processes`).
 
-``--proxy S`` (repeatable) also computes the whole-frame statistics, the channel means, the
-white-balance gains and the normalisation bounds, on the frame box-downscaled to short side
-``S`` and records them with their relative error against the full-size ones (D60, D109).
+``--proxy S`` (repeatable) also computes the whole-frame statistics on the frame
+downscaled to short side ``S`` and records them with their relative error against the
+full-size ones (D60, D109). On the synthetic frame: the channel means, the white-balance
+gains and the normalisation bounds, Pillow's BOX filter (Part A). On real frames: every
+statistic of :func:`prototype.temporal.statistics_of`, on each frame, with the analysis
+proxy's area mean (:func:`prototype.temporal.proxy`, a whole-factor block mean), the
+relative error's mean and largest over the frames, and WP1.4's stability figure, the
+relative step (:func:`relative_step`), of each statistic at each size.
 
 Exit status 0 on success; 2, with a one-line ``error: ...`` on standard error, on a bad
 argument, an unusable device or an output that cannot be written.
@@ -60,6 +93,8 @@ import sys
 import threading
 import time
 from collections.abc import Sequence
+from dataclasses import dataclass
+from fractions import Fraction
 from pathlib import Path
 from typing import Any, NoReturn
 
@@ -75,6 +110,9 @@ if not __package__:
     # put the tools directory first to make the ``prototype`` package importable.
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from local_config import LocalConfigError, load_local_config
+from lookcheck.frames import ExtractError, OutputRoots, read_png16
+from prototype import clip, temporal
 from prototype.backend import Backend, memory_estimate_bytes, select_backend
 from prototype.params import METHODS, Params
 from prototype.pipeline import (
@@ -96,6 +134,21 @@ BUDGET_60FPS_S = 0.056
 
 RSS_SAMPLE_INTERVAL_S = 0.05
 """Interval of the peak-RSS sampling thread."""
+
+GPU_SAMPLE_INTERVAL_S = 60.0
+"""Interval of the card-state samples taken during a whole-clip mode."""
+
+STRAY_CPU_PERCENT = 10.0
+"""A process using at least this share of one logical CPU is listed by the stray check."""
+
+START_FRACTION = 0.3
+"""Real video frames are read from this fraction of the clip's duration on (Part B claim 2)."""
+
+MODES = ("core", "analysis", "end-to-end", "decode-only", "passthrough")
+"""``core`` times ``correct()`` alone; the others time a whole clip through ``clip``."""
+
+IMAGE_SUFFIXES = frozenset({".png", ".jpg", ".jpeg", ".tif", ".tiff"})
+"""File suffixes ``--input`` reads as a still image."""
 
 _MIB = 1024 * 1024
 _SIZE_PATTERN = re.compile(r"^([1-9][0-9]*)x([1-9][0-9]*)$")
@@ -220,23 +273,40 @@ def main(argv: Sequence[str] | None = None) -> int:
         argv: Command-line arguments; defaults to ``sys.argv[1:]``.
 
     Returns:
-        0 on success; 2 on a bad argument, an unusable device or an unwritable output,
-        with a one-line error on standard error.
+        0 on success; 2 on a bad argument, an unusable device, an unreadable input, a
+        failed whole-clip pass or an unwritable output, with a one-line error on standard
+        error.
     """
     try:
         args = _parse(argv)
-        height, width = _parse_size(args.size)
-        if args.frames < 1:
+        if args.mode != "core":
+            return _clip_mode(args)
+        if (args.size is None) == (args.input is None):
+            raise _UsageError("give exactly one of --size and --input")
+        if args.out is None:
+            raise _UsageError("--out is required in the core mode")
+        if args.frames is None or args.frames < 1:
             raise _UsageError(f"--frames must be at least 1, got {args.frames}")
+        if not 0.0 <= args.start_fraction < 1.0:
+            raise _UsageError(f"--start-fraction must lie in [0, 1), got {args.start_fraction}")
+        real: RealFrames | None = None
+        if args.input is not None:
+            real = load_real_frames(args.input, args.frames, args.start_fraction, args.config)
+            height, width = real.shape[0], real.shape[1]
+        else:
+            height, width = _parse_size(args.size)
         for side in args.proxy:
             if not 1 <= side <= min(height, width):
                 raise _UsageError(
                     f"--proxy must lie in [1, {min(height, width)}] for this size, got {side}"
                 )
+            factor, remainder = divmod(min(height, width), side)
+            if real is not None and (remainder or height % factor or width % factor):
+                raise _UsageError(f"--proxy {side} is not a whole-factor area mean of this size")
         ambient_gpu = _nvidia_smi_gpu()
         cuda_before = None
         backend = select_backend(args.device)
-    except (_UsageError, RuntimeError) as exc:
+    except (_UsageError, RuntimeError, clip.ClipError, ExtractError, LocalConfigError) as exc:
         print(f"error: {_one_line(exc)}", file=sys.stderr)
         return 2
 
@@ -244,62 +314,90 @@ def main(argv: Sequence[str] | None = None) -> int:
     tracker = _PoolTracker(backend) if backend.name == "gpu" else None
     if tracker is not None:
         cuda_before = tracker.cuda_used_bytes()
-    frame = synthetic_frame(height, width, args.seed)
+    frame = synthetic_frame(height, width, args.seed) if real is None else None
     process = psutil.Process()
     rss_baseline = int(process.memory_info().rss)
 
     sampler = _PeakRssSampler(process)
+    stray_before = stray_processes()
     gpu_start = _gpu_state()
     sampler.start()
     try:
-        times = _timed_loop(frame, params, backend, args.frames)
+        if real is None:
+            assert frame is not None
+            times = _timed_loop(frame, params, backend, args.frames)
+        else:
+            times = _timed_real_loop(real, params, backend, args.frames)
         gpu_end = _gpu_state()
     finally:
         sampler.stop()
         if tracker is not None:
             tracker.close()
+    stray_after = stray_processes()
 
     memory = _memory_record(rss_baseline, sampler.peak, process)
     if tracker is not None:
         memory |= tracker.record(ambient_gpu, cuda_before)
-    resident = (
-        _timing_record(_resident_loop(frame, params, backend, args.frames))
-        if backend.name == "gpu"
-        else None
-    )
-    estimate = memory_estimate_bytes(frame.shape, params)
+    resident = None
+    if backend.name == "gpu":
+        resident_times = (
+            _resident_loop(frame, params, backend, args.frames)
+            if frame is not None
+            else _resident_real_loop(real, params, backend, args.frames)
+            if real is not None
+            else []
+        )
+        resident = _timing_record(resident_times)
+    shape = (height, width, 3)
+    estimate = memory_estimate_bytes(shape, params)
+    if frame is not None:
+        proxy = _proxy_record(frame, params, backend, args.proxy)
+    elif real is not None:
+        proxy = _real_proxy_record(real, params, backend, args.proxy)
     record: dict[str, Any] = {
-        "label": "SYNTHETIC",
+        "label": "SYNTHETIC" if real is None else "REAL",
         "tool": "tools/prototype/bench.py",
         "created": datetime.datetime.now().astimezone().isoformat(timespec="seconds"),
         "device": args.device,
         "backend": backend.name,
-        "size": args.size,
-        "shape": list(frame.shape),
+        "size": args.size if real is None else f"{width}x{height}",
+        "shape": list(shape),
         "method": args.method,
         "frames": args.frames,
-        "seed": args.seed,
-        "generator": "synthetic_frame(): blue-green cast, band-limited texture, pixel noise",
+        "seed": args.seed if real is None else None,
+        "generator": (
+            "synthetic_frame(): blue-green cast, band-limited texture, pixel noise"
+            if real is None
+            else None
+        ),
         "params": dataclasses.asdict(params),
         "timing": _timing_record(times),
         "device_resident": resident,
         "memory": memory,
         "estimate": _estimate_record(estimate, memory),
-        "proxy": _proxy_record(frame, params, backend, args.proxy),
+        "proxy": proxy,
         "versions": _versions(backend),
         "machine": _machine(ambient_gpu),
         "ambient": _ambient(ambient_gpu, args.note)
         | {
             "gpu_state_loop_start": gpu_start,
             "gpu_state_loop_end": gpu_end,
+            "stray_processes_before": stray_before,
+            "stray_processes_after": stray_after,
+            "head": head_record(),
         },
     }
+    label = args.size
+    if real is not None:
+        record["input"] = real.record
+        label = real.stem
     stamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-    path = args.out / f"bench-{backend.name}-{args.size}-{args.method}-{stamp}.json"
+    path = args.out / f"bench-{backend.name}-{label}-{args.method}-{stamp}.json"
     try:
+        _refuse_footage(args.out, args.config)
         args.out.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
-    except OSError as exc:
+    except (OSError, _UsageError) as exc:
         print(f"error: cannot write to {args.out}: {_one_line(exc)}", file=sys.stderr)
         return 2
     print(path)
@@ -312,18 +410,438 @@ def _parse(argv: Sequence[str] | None) -> argparse.Namespace:
     Raises:
         _UsageError: A missing or malformed argument.
     """
-    parser = _Parser(description="Time the WP1.1 pipeline on a synthetic frame (WP1.2 Part A).")
+    parser = _Parser(description="Time the prototype pipeline (WP1.2 Parts A and B).")
+    parser.add_argument("--mode", choices=MODES, default="core")
     parser.add_argument("--device", choices=("cpu", "gpu"), required=True)
-    parser.add_argument("--size", required=True, help="4k, 5.3k or WIDTHxHEIGHT")
-    parser.add_argument("--frames", type=int, required=True, help="frames in the timed run")
+    parser.add_argument("--size", help="4k, 5.3k or WIDTHxHEIGHT (synthetic frame)")
+    parser.add_argument("--input", help="footage stem, or a video or image path outside it")
+    parser.add_argument("--frames", type=int, help="frames in the timed run (a limit elsewhere)")
     parser.add_argument("--method", choices=METHODS, required=True)
-    parser.add_argument("--out", type=Path, required=True, help="folder for the JSON record")
+    parser.add_argument("--out", type=Path, help="folder for the JSON record")
     parser.add_argument(
         "--proxy", type=int, action="append", default=[], metavar="S", help="proxy short side"
     )
     parser.add_argument("--seed", type=int, default=0, help="seed of the synthetic frame")
+    parser.add_argument(
+        "--start-fraction", type=float, default=START_FRACTION, help="where real frames start"
+    )
+    parser.add_argument("--statistics", type=Path, help="analysis record (end-to-end mode)")
+    parser.add_argument("--hwaccel", choices=clip.HWACCELS, default="none")
+    parser.add_argument("--resident", action="store_true", help="device-resident export core")
+    parser.add_argument("--config", type=Path, help="local configuration file to read")
     parser.add_argument("--note", default="", help="free text stored with the ambient record")
     return parser.parse_args(argv)
+
+
+def _refuse_footage(folder: Path, config_path: Path | None) -> None:
+    """Refuse a core-mode output folder inside the configured footage folder (if any).
+
+    Raises:
+        _UsageError: The folder lies inside (or is) the footage folder.
+    """
+    try:
+        footage = load_local_config(config_path).footage_path.resolve()
+    except LocalConfigError:
+        return  # no configuration: no footage folder to protect
+    resolved = folder.resolve()
+    if resolved == footage or footage in resolved.parents:
+        raise _UsageError(f"{folder} lies inside the footage folder")
+
+
+# --- real frames ---------------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class RealFrames:
+    """Real frames held for a core-mode run, as integers (or float32 for a 16-bit PNG).
+
+    Attributes:
+        stem: The source's file stem (names the record).
+        frames: The frames, ``(H, W, 3)``; ``uint8``, ``uint16`` or float32.
+        bit_depth: 8 or 10 for video frames (:func:`prototype.clip.to_float`); ``None`` for
+            an image (``uint8`` is divided by 255; float32 is used as it is).
+        shape: ``(H, W, 3)``.
+        record: The record's ``input`` entry.
+    """
+
+    stem: str
+    frames: list[NDArray[Any]]
+    bit_depth: int | None
+    shape: tuple[int, int, int]
+    record: dict[str, Any]
+
+    def image(self, index: int) -> NDArray[np.float32]:
+        """Return frame ``index`` (modulo the number held) as float32 in [0, 1].
+
+        Args:
+            index: The run's frame number.
+
+        Returns:
+            A new float32 array.
+        """
+        frame = self.frames[index % len(self.frames)]
+        if frame.dtype == np.float32:
+            return frame.copy()
+        out: NDArray[np.float32] = clip.to_float(frame, np, self.bit_depth or 8)
+        return out
+
+
+def load_real_frames(
+    name: str, count: int, start_fraction: float, config_path: Path | None = None
+) -> RealFrames:
+    """Read the real frames of a core-mode run (``--input``).
+
+    A video: the ``count`` consecutive frames from the first whose pts is at or after
+    ``start_fraction`` of the clip's length, decoded with their pts checked
+    (:func:`prototype.clip.decode_frames`). An image: one frame.
+
+    Args:
+        name: A footage stem or a path outside the footage folder.
+        count: Frames of a video to read.
+        start_fraction: Where in the clip they start, in [0, 1).
+        config_path: The local configuration file; ``None`` for the default.
+
+    Returns:
+        The frames and their record.
+
+    Raises:
+        local_config.LocalConfigError: The configuration does not load, or the stem matches
+            no file or several.
+        prototype.clip.ClipError: The video cannot be probed or decoded, or has fewer frames
+            after the start than ``count``.
+        _UsageError: The image cannot be read.
+    """
+    footage = load_local_config(config_path).footage_path
+    path = clip.resolve_clip(name, footage)
+    if path.suffix.lower() in IMAGE_SUFFIXES:
+        return _image_frames(path)
+    source = clip.open_source(path)
+    start = Fraction(start_fraction).limit_denominator(1_000_000) * source.footage_seconds
+    first = next(
+        (i for i, ticks in enumerate(source.pts_ticks) if ticks * source.info.time_base >= start),
+        source.frame_count,
+    )
+    frames, command = clip.decode_frames(source, first, count)
+    ticks = list(source.pts_ticks[first : first + count])
+    held = sum(frame.nbytes for frame in frames) / _MIB
+    return RealFrames(
+        stem=path.stem,
+        frames=frames,
+        bit_depth=source.bit_depth,
+        shape=(source.info.height, source.info.width, 3),
+        record={
+            "kind": "video",
+            "source": source.identity(),
+            "start_fraction": start_fraction,
+            "first_index": first,
+            "pts_ticks": ticks,
+            "pts_seconds_first": float(ticks[0] * source.info.time_base),
+            "pts_seconds_last": float(ticks[-1] * source.info.time_base),
+            "decode_command": command,
+            "frames_held_mb": held,
+            "conversion": "integer / (2**bits - 1) as float32 (clip.to_float), before the timer",
+        },
+    )
+
+
+def _image_frames(path: Path) -> RealFrames:
+    """One still image as a :class:`RealFrames`: a 16-bit PNG, else 8-bit RGB via Pillow."""
+    data = path.read_bytes()
+    try:
+        if data[:8] == b"\x89PNG\r\n\x1a\n" and len(data) > 24 and data[24] == 16:
+            frame: NDArray[Any] = read_png16(path)
+            kind = "16-bit PNG (lookcheck.frames.read_png16)"
+        else:
+            with PILImage.open(path) as opened:
+                frame = np.asarray(opened.convert("RGB"), dtype=np.uint8)
+                kind = f"Pillow {opened.format} {opened.mode} -> 8-bit RGB"
+    except (OSError, ValueError, ExtractError) as exc:
+        raise _UsageError(f"cannot read the image {path.name}: {_one_line(exc)}") from None
+    height, width = frame.shape[0], frame.shape[1]
+    return RealFrames(
+        stem=path.stem,
+        frames=[frame],
+        bit_depth=None,
+        shape=(height, width, 3),
+        record={
+            "kind": "image",
+            "path": str(path),
+            "size_bytes": len(data),
+            "reader": kind,
+            "frames_held_mb": frame.nbytes / _MIB,
+        },
+    )
+
+
+def _timed_real_loop(
+    real: RealFrames, params: Params, backend: Backend, frames: int
+) -> list[float]:
+    """Run ``correct()`` on real frame ``i`` for ``i < frames``; return each frame's seconds.
+
+    Each frame is converted to float32 before its timer starts.
+    """
+    times: list[float] = []
+    for index in range(frames):
+        image = real.image(index)
+        start = time.perf_counter()
+        result = correct(image, params, backend)
+        backend.synchronize()
+        times.append(time.perf_counter() - start)
+        del result, image
+    return times
+
+
+def _resident_real_loop(
+    real: RealFrames, params: Params, backend: Backend, frames: int
+) -> list[float]:
+    """The device-resident loop (:func:`_resident_loop`) over the real frames."""
+    times: list[float] = []
+    for index in range(frames):
+        image = real.image(index)
+        start = time.perf_counter()
+        result = correct(backend.to_device(image), params)
+        output = backend.to_host(result.output)
+        backend.synchronize()
+        times.append(time.perf_counter() - start)
+        del result, output, image
+    return times
+
+
+def relative_step(values: NDArray[np.float64]) -> float | None:
+    """WP1.4's stability figure: the mean absolute frame-to-frame change over the mean value.
+
+    ``mean(|diff(values)|) / mean(|values|)``, as ``_relative_step`` of
+    ``tools/statistics_experiments.py``.
+
+    Args:
+        values: One value per frame, in order.
+
+    Returns:
+        The figure; ``None`` for fewer than two values or a zero mean.
+    """
+    if len(values) < 2 or not np.abs(values).mean():
+        return None
+    return float(np.abs(np.diff(values)).mean() / np.abs(values).mean())
+
+
+def _real_proxy_record(
+    real: RealFrames, params: Params, backend: Backend, sides: list[int]
+) -> list[dict[str, Any]]:
+    """Every whole-frame statistic on each real frame at each proxy size against full size."""
+    if not sides:
+        return []
+    full_side = min(real.shape[0], real.shape[1])
+    order = [full_side, *sorted(set(sides) - {full_side}, reverse=True)]
+    measured: dict[int, list[dict[str, float]]] = {side: [] for side in order}
+    for index in range(len(real.frames)):
+        image = real.image(index)
+        for side in order:
+            proxy = image if side == full_side else temporal.proxy(image, side)
+            measured[side].append(temporal.flatten(temporal.statistics_of(proxy, params, backend)))
+    full = measured[full_side]
+    names = list(full[0])
+    records = []
+    for side in order:
+        rows = measured[side]
+        factor = full_side // side
+        errors = {
+            name: [
+                _relative_error(row[name], ref[name]) for row, ref in zip(rows, full, strict=True)
+            ]
+            for name in names
+        }
+        records.append(
+            {
+                "short_side": side,
+                "shape": [real.shape[0] // factor, real.shape[1] // factor, 3],
+                "frames": len(rows),
+                "statistics": {name: [row[name] for row in rows] for name in names},
+                "relative_error": {name: _error_summary(values) for name, values in errors.items()},
+                "relative_step": {
+                    name: relative_step(np.array([row[name] for row in rows])) for name in names
+                },
+            }
+        )
+    return records
+
+
+def _error_summary(values: list[float | None]) -> dict[str, float | None]:
+    """Mean and largest of the defined relative errors."""
+    defined = [value for value in values if value is not None]
+    if not defined:
+        return {"mean": None, "max": None}
+    return {"mean": float(np.mean(defined)), "max": float(np.max(defined))}
+
+
+# --- whole-clip modes ----------------------------------------------------------------------------
+
+
+def _clip_mode(args: argparse.Namespace) -> int:
+    """Run one whole-clip mode (analysis, end-to-end, decode-only, passthrough) and record it.
+
+    The memory samplers, the card-state samples and the stray-process checks bracket the
+    pass; the container comparison of an output runs after the pass has ended.
+
+    Raises:
+        _UsageError: A missing or contradictory argument (caught by :func:`main`).
+    """
+    if args.input is None:
+        raise _UsageError(f"--mode {args.mode} needs --input")
+    if args.size is not None or args.proxy:
+        raise _UsageError("--size and --proxy belong to the core mode")
+    if args.frames is not None and args.frames < temporal.MIN_FRAMES:
+        raise _UsageError(f"--frames must be at least {temporal.MIN_FRAMES} in a whole-clip mode")
+    if (args.mode == "end-to-end") != (args.statistics is not None):
+        raise _UsageError("--statistics is required by, and only by, the end-to-end mode")
+    if args.resident and args.mode != "end-to-end":
+        raise _UsageError("--resident belongs to the end-to-end mode")
+    try:
+        config = load_local_config(args.config)
+        roots = OutputRoots(
+            allowed=config.working_path / clip.WORK_SUBDIR, footage=config.footage_path
+        )
+        source = clip.open_source(clip.resolve_clip(args.input, roots.footage))
+        params = Params(method=args.method)
+        statistics = None
+        frame_means: list[list[float]] | None = None
+        if args.mode == "end-to-end":
+            analysis = json.loads(args.statistics.read_text(encoding="utf-8"))
+            clip.check_statistics_record(analysis, source, params, args.hwaccel, args.frames)
+            statistics = clip.per_frame_statistics(analysis)
+            frame_means = analysis["frame_means"]
+        stamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+        base = f"{source.path.stem}-{args.mode}-{args.method}-{stamp}"
+        folder = (roots.allowed / "bench" if args.out is None else args.out) / base
+        record_path, decode_log, encode_log, output, analysis_path = clip.output_paths(
+            roots,
+            folder,
+            [
+                f"bench-{base}.json",
+                "decode.log",
+                "encode.log",
+                f"{source.path.stem}_corrected.mp4",
+                f"{source.path.stem}-{args.method}-{args.hwaccel}-analysis.json",
+            ],
+        )
+        ambient_gpu = _nvidia_smi_gpu()
+        backend = select_backend(args.device)
+    except (RuntimeError, clip.ClipError, ExtractError, LocalConfigError, OSError) as exc:
+        print(f"error: {_one_line(exc)}", file=sys.stderr)
+        return 2
+
+    tracker = _PoolTracker(backend) if backend.name == "gpu" else None
+    cuda_before = None if tracker is None else tracker.cuda_used_bytes()
+    process = psutil.Process()
+    rss_baseline = int(process.memory_info().rss)
+    sampler, card = _PeakRssSampler(process), _GpuSampler()
+    head = head_record()
+    stray_before = stray_processes()
+    gpu_start = _gpu_state()
+    window_start = datetime.datetime.now().astimezone().isoformat(timespec="seconds")
+    sampler.start()
+    card.start()
+    result: clip.Export | None = None
+    done: clip.Analysis | None = None
+    try:
+        if args.mode == "analysis":
+            done = clip.analyse(
+                source, params, backend, decode_log, args.hwaccel, frames=args.frames
+            )
+        elif args.mode == "end-to-end":
+            result = clip.export(
+                source,
+                output,
+                params,
+                statistics,
+                backend,
+                (decode_log, encode_log),
+                frame_means,
+                args.hwaccel,
+                args.resident,
+                args.frames,
+            )
+        elif args.mode == "passthrough":
+            logs = (decode_log, encode_log)
+            result = clip.passthrough(source, output, logs, args.hwaccel, args.frames)
+        else:
+            result = clip.decode_only(source, decode_log, args.hwaccel, args.frames)
+        gpu_end = _gpu_state()
+    except (clip.ClipError, OSError) as exc:
+        print(f"error: {_one_line(exc)}", file=sys.stderr)
+        return 2
+    finally:
+        sampler.stop()
+        card.stop()
+        if tracker is not None:
+            tracker.close()
+    window_end = datetime.datetime.now().astimezone().isoformat(timespec="seconds")
+    stray_after = stray_processes()
+    memory = _memory_record(rss_baseline, sampler.peak, process)
+    if tracker is not None:
+        memory |= tracker.record(ambient_gpu, cuda_before)
+    timing = done.timing if done is not None else result.timing if result is not None else None
+    assert timing is not None
+    footage = Fraction(timing.frames) / source.info.frame_rate
+    shape = (source.info.height, source.info.width, 3)
+    if args.mode == "analysis":
+        factor = min(shape[0], shape[1]) // temporal.PROXY_SHORT_SIDE
+        shape = (shape[0] // factor, shape[1] // factor, 3)
+    record: dict[str, Any] = {
+        "label": "REAL",
+        "tool": "tools/prototype/bench.py",
+        "mode": args.mode,
+        "created": datetime.datetime.now().astimezone().isoformat(timespec="seconds"),
+        "window": {"start_local": window_start, "end_local": window_end},
+        "device": args.device,
+        "backend": backend.name,
+        "method": args.method,
+        "params": dataclasses.asdict(params),
+        "source": source.identity(),
+        "frames": timing.frames,
+        "frames_limit": args.frames,
+        "hwaccel": args.hwaccel,
+        "resident": args.resident,
+        "statistics": None if args.statistics is None else str(args.statistics),
+        "timing": timing.record(footage),
+        "n6": clip.n6_record(timing, source),
+        "memory": memory,
+        "estimate": _estimate_record(memory_estimate_bytes(shape, params), memory)
+        | {"shape": list(shape)},
+        "versions": _versions(backend),
+        "machine": _machine(ambient_gpu),
+        "ambient": _ambient(ambient_gpu, args.note)
+        | {
+            "gpu_state_loop_start": gpu_start,
+            "gpu_state_loop_end": gpu_end,
+            "gpu_state_samples": card.samples,
+            "stray_processes_before": stray_before,
+            "stray_processes_after": stray_after,
+            "head": head,
+        },
+    }
+    try:
+        if done is not None:
+            document = clip.analysis_record(source, params, done, args.hwaccel, clip.SMOOTHER)
+            roots.write_text(analysis_path, json.dumps(document) + "\n")
+            record["analysis_record"] = str(analysis_path)
+            record["analysis"] = {
+                key: document[key]
+                for key in ("smoother", "peak_proxies_held", "measure_s_per_stage", "smooth_s")
+            }
+        if result is not None:
+            run = clip.export_record(source, result, args.statistics, None)
+            run.pop("timing")  # the same readings as record["timing"]
+            record["run"] = run
+            if result.encode_command is not None:
+                record["output"] = str(output)
+                record["output_bytes"] = output.stat().st_size
+                record["compare"] = clip.compare_output(source.path, output, folder, roots)
+        roots.write_text(record_path, json.dumps(record, indent=1) + "\n")
+    except (OSError, clip.ClipError, ExtractError) as exc:
+        print(f"error: {_one_line(exc)}", file=sys.stderr)
+        return 2
+    print(record_path)
+    return 0
 
 
 def _parse_size(text: str) -> tuple[int, int]:
@@ -600,6 +1118,106 @@ class _PeakRssSampler:
     def _sample(self) -> None:
         """Take one RSS sample and keep the maximum."""
         self.peak = max(self.peak, int(self._process.memory_info().rss))
+
+
+class _GpuSampler:
+    """A thread that reads the card's state (:func:`_gpu_state`) at a fixed interval.
+
+    Each sample is the state with ``seconds``, the time since :meth:`start`; the interval
+    is :data:`GPU_SAMPLE_INTERVAL_S` by default.
+    """
+
+    def __init__(self, interval_s: float = GPU_SAMPLE_INTERVAL_S) -> None:
+        """Prepare the sampler; :meth:`start` begins sampling."""
+        self._interval = interval_s
+        self._stop = threading.Event()
+        self._thread = threading.Thread(target=self._run, daemon=True)
+        self._started = 0.0
+        self.samples: list[dict[str, Any]] = []
+
+    def start(self) -> None:
+        """Start sampling (the first sample is one interval in)."""
+        self._started = time.perf_counter()
+        self._thread.start()
+
+    def stop(self) -> None:
+        """Stop sampling."""
+        self._stop.set()
+        self._thread.join()
+
+    def _run(self) -> None:
+        """Sample until :meth:`stop` is called."""
+        while not self._stop.wait(self._interval):
+            state = _gpu_state()
+            seconds = round(time.perf_counter() - self._started, 1)
+            self.samples.append({"seconds": seconds, **(state or {})})
+
+
+def stray_processes(
+    threshold_percent: float = STRAY_CPU_PERCENT, interval_s: float = 0.5
+) -> list[dict[str, Any]]:
+    """List the other processes busy right now: the stray-process check of a timed window.
+
+    Every process's CPU use is sampled over ``interval_s`` (``psutil``, where 100 is one
+    logical CPU fully used); this process and the idle process are left out.
+
+    Args:
+        threshold_percent: The least use, in percent of one logical CPU, that is listed.
+        interval_s: The sampling interval.
+
+    Returns:
+        ``{"pid", "name", "cpu_percent"}`` per busy process, busiest first.
+    """
+    processes = []
+    for process in psutil.process_iter(["pid", "name"]):
+        try:
+            process.cpu_percent(None)
+            processes.append(process)
+        except psutil.Error:
+            continue
+    time.sleep(interval_s)
+    busy = []
+    for process in processes:
+        try:
+            used = float(process.cpu_percent(None))
+        except psutil.Error:
+            continue
+        if process.pid not in (0, os.getpid()) and used >= threshold_percent:
+            busy.append({"pid": process.pid, "name": process.info["name"], "cpu_percent": used})
+    return sorted(busy, key=lambda entry: -float(entry["cpu_percent"]))
+
+
+def head_record() -> dict[str, Any]:
+    """The commit this tool runs from, and the tracked files changed in its tree.
+
+    Read with ``git`` from the repository that holds this file; the values are ``None``
+    when ``git`` cannot answer.
+
+    Returns:
+        ``{"head": <full SHA>, "changed": [<porcelain lines>]}``.
+    """
+    root = Path(__file__).resolve().parent.parent.parent
+    record: dict[str, Any] = {"head": None, "changed": None}
+    try:
+        head = subprocess.run(
+            ["git", "-C", str(root), "rev-parse", "HEAD"],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=True,
+        )
+        status = subprocess.run(
+            ["git", "-C", str(root), "status", "--porcelain", "--untracked-files=no"],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=True,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return record
+    record["head"] = head.stdout.strip()
+    record["changed"] = [line for line in status.stdout.splitlines() if line.strip()]
+    return record
 
 
 class _PoolTracker:
