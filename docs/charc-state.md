@@ -74,6 +74,12 @@ for a push (verify `git status -sb`).
   before tranche A, with `methods/__init__.py`). Other answers: WP3.5 re-sized S on sonnet-high;
   WP3.16 opus-high, `gui.contract` frozen at round 0; WP3.6P real-photo verification queued for
   the owner's photos. Spec 7.2 line 325 chapter-group remnant: owner's next-revision list.
+- **Wave 2 tranche A LIVE** (dispatched ~22:45Z from main 2c5540a; IF-7 amendment landed f4cd1e4,
+  verified at this seat against the ruling; architecture IF-7 block updated by CHARC): WP3.2
+  `wp32-cell` opus-high `.worktrees/wp3.2`; WP3.3 `wp33-cell` opus-high `.worktrees/wp3.3`; WP3.5
+  `wp35-cell` sonnet-high `.worktrees/wp3.5`; WP3.12 `wp312-cell` sonnet-high `.worktrees/wp3.12`
+  -- all OCCUPIED. WP3.12's exclusive read-cost window: the orchestrator posts OPEN/CLOSE; no suite
+  here while open. Tranche B (WP3.6, WP3.16) once two tranche-A cells return.
 - **Wave 2 COMMISSIONED** (CHARC ruling 1ebfba54, 2026-10-20 ~22:07Z): orchestrator gen 6 drafts
   all six briefs (WP3.2, WP3.3, WP3.5 opus-high; WP3.6, WP3.12, WP3.16 sonnet-high) against the
   Phase 3 frame, sends them as one set for CHARC approval; tranche A = WP3.2/3.3/3.5/3.12 on
