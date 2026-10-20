@@ -4,7 +4,7 @@ Every fact this module records comes from the installed packages or the FFmpeg e
 PATH, never from documentation:
 
 - each candidate distribution's metadata (``License-Expression`` or ``License``) and the
-  licence files its ``.dist-info`` ships;
+  names of the licence files its ``.dist-info`` ships (listed, not read);
 - pillow-heif's ``LICENSES_bundled.txt`` (the native libraries its wheel bundles);
 - PyAV's bundled FFmpeg: each library's ``configuration`` and ``license`` strings
   (``av._core.library_meta``), the build flags that decide its licence (``--enable-gpl``,
@@ -67,13 +67,17 @@ _LICENCE_WORDING = re.compile(
 
 
 def distribution(name: str) -> dict[str, Any]:
-    """Return a distribution's version, licence metadata and shipped licence files."""
+    """Return a distribution's version, licence metadata and the names of its licence files.
+
+    A licence file is a ``.dist-info`` file whose own name says LICENSE, LICENCE or COPYING;
+    the files are listed by name, not read.
+    """
     meta = importlib.metadata.metadata(name)
     files = importlib.metadata.files(name) or []
     licence_files = sorted(
         str(f)
         for f in files
-        if ".dist-info" in str(f) and re.search(r"LICEN[CS]E|COPYING", str(f), re.IGNORECASE)
+        if ".dist-info" in str(f) and re.search(r"LICEN[CS]E|COPYING", f.name, re.IGNORECASE)
     )
     licence = meta.get("License") or ""
     return {
