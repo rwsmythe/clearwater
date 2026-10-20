@@ -82,3 +82,10 @@ frame durations, not from this field." The probe takes the second form.
 - WP3.9: never use an open-ended `-read_intervals` interval for frame counts (ledger build notes).
 - `read_movie_boxes` ends its walk at `moov`: a later box that overruns the file is not an error.
 - `clearwater.io.video.find_tool(name)` is the shared locator for `ffmpeg` and `ffprobe`.
+
+## Erratum at the gate (orchestrator, 2026-10-20)
+
+- Claim 10: the `BoxError` guarantee for a top-level box that overruns the file covers boxes up to
+  `moov`; a box after `moov`, and a 1-7 byte zero tail, are not checked (Reviewer B minor d; DR-36 d).
+- "On all four video samples" reads "on all eight WP2.3 video samples": seven give
+  `360360/240000`, the VFR sample `320320/240000` (Reviewer B advisory g).
