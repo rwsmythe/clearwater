@@ -66,6 +66,14 @@ for a push (verify `git status -sb`).
   both ranges; B md5s and assertions; ruff/format/mypy; harness 366; full pytest 1844 passed,
   539 s). Worktrees released (msg wp31-qa). Speed row: GPU leg contaminated by CHARC's QA pytest
   (op-mix row only; whole-core row is WP3.4's). **WAVE 1 CLOSED.**
+- **Wave-2 briefs APPROVED** 2026-10-20 ~22:32Z (drafts ea6dee1; rulings msg 873ec3c8; decisions
+  amended 718da66: AD-4 floor by symmetric widening; AD-5 admits lossy intra proxy candidates under
+  the statistics criteria, G4 ground; AD-17 stdlib PNG16 decoder + `tifffile` for TIFF; AD-18
+  tifffile BSD-3 and pytest-qt dev grant; AD-20 IF-7 `source_statistics`, `mark_complete`,
+  `CacheEntry.complete`, IF-5 abort docstring D44/D85 -- applied by ONE orchestrator commit on main
+  before tranche A, with `methods/__init__.py`). Other answers: WP3.5 re-sized S on sonnet-high;
+  WP3.16 opus-high, `gui.contract` frozen at round 0; WP3.6P real-photo verification queued for
+  the owner's photos. Spec 7.2 line 325 chapter-group remnant: owner's next-revision list.
 - **Wave 2 COMMISSIONED** (CHARC ruling 1ebfba54, 2026-10-20 ~22:07Z): orchestrator gen 6 drafts
   all six briefs (WP3.2, WP3.3, WP3.5 opus-high; WP3.6, WP3.12, WP3.16 sonnet-high) against the
   Phase 3 frame, sends them as one set for CHARC approval; tranche A = WP3.2/3.3/3.5/3.12 on
