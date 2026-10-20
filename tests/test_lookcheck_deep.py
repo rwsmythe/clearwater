@@ -727,6 +727,25 @@ def test_a_smoothed_alpha_one_ulp_below_one_is_not_a_bound_cap_but_a_real_cap_is
     assert record(1.0, None) is False
 
 
+def test_statistics_record_takes_the_applied_normalisation_bounds_when_given() -> None:
+    """A clip frame records the N{} pair the render applied, not a recomputation on the frame;
+    without it the shallow behaviour (a recomputation) is unchanged."""
+    from prototype.pipeline import correct, normalisation_bounds
+
+    rng = np.random.default_rng(5)
+    image = (0.2 + 0.5 * rng.random((HEIGHT, WIDTH, 3))).astype(np.float32)
+    result = correct(image, Params(), CPU)
+    low, high = normalisation_bounds(CPU.to_device(result.white_balanced), result.params)
+    recomputed = pack.statistics_record(result, CPU)["normalisation"]
+    assert (recomputed["low"], recomputed["high"]) == (low, high)
+    applied = pack.statistics_record(result, CPU, applied_normalisation=(0.25, 0.75))
+    assert applied["normalisation"] == {"low": 0.25, "high": 0.75, "collapsed": False}
+    assert (low, high) != (0.25, 0.75)
+    flat = pack.statistics_record(result, CPU, applied_normalisation=(0.5, 0.5))
+    assert flat["normalisation"]["collapsed"] is True
+    assert flat["bound"]["normalisation_collapsed"] is True and flat["bound"]["any"] is True
+
+
 def test_the_flicker_path_keeps_the_shallow_readback_bound_of_three_levels() -> None:
     """Only the deep clip passes the wider own-PNG bound; the flicker defaults are unchanged."""
     import inspect
@@ -1045,5 +1064,14 @@ def test_the_deep_clip_is_staged_smoothed_encoded_checked_and_pruned(
         smoothed = [r["smoothed"]["white_balance_gains.R"] for r in rows]
         assert raw != smoothed, "control: smoothing must change the gain series"
         assert set(rows[0]["rendered"]) >= {"red_gain", "blue_gain", "bound", "compensation"}
+        for row in rows:  # the N{} bounds recorded are the smoothed proxy ones the render applied
+            assert (
+                row["rendered"]["normalisation"]["low"]
+                == row["smoothed"]["normalisation_bounds.low"]
+            )
+            assert (
+                row["rendered"]["normalisation"]["high"]
+                == row["smoothed"]["normalisation_bounds.high"]
+            )
     alpha = reread["variants"]["ancuti2018"]["frames"][0]["rendered"]["compensation"]["effective"]
     assert "red" in alpha

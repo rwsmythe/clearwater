@@ -238,7 +238,10 @@ def still_timestamps(duration_s: float) -> list[float]:
 
 
 def statistics_record(
-    result: Result, backend: Backend, cap_tolerance: float = 0.0
+    result: Result,
+    backend: Backend,
+    cap_tolerance: float = 0.0,
+    applied_normalisation: tuple[float, float] | None = None,
 ) -> dict[str, Any]:
     """Record what the prototype measured and did on one frame under one variant.
 
@@ -247,7 +250,9 @@ def statistics_record(
     (``result.params``). The N{} bounds are not part of :class:`prototype.pipeline.Result`:
     they are recomputed with the prototype's :func:`prototype.pipeline.normalisation_bounds`
     on ``result.white_balanced``, the image that :func:`prototype.pipeline.fusion_inputs`
-    measured them on, on the same device. ``bound`` says whether anything bound: a gain cap
+    measured them on, on the same device; when ``applied_normalisation`` is given (a clip frame
+    rendered from supplied, smoothed statistics) that pair is what the pipeline applied and it
+    is recorded instead of the recomputation. ``bound`` says whether anything bound: a gain cap
     (the effective alpha below the requested one), the white-balance clamp, or an N{} that
     collapsed (a spread under 1e-6, which makes N{} a constant 0.5). A gain cap counts as
     binding when the effective alpha is below the requested one by more than ``cap_tolerance``.
@@ -259,13 +264,19 @@ def statistics_record(
             default, the shallow pack's behaviour) is a strict comparison; the deep clip passes
             :data:`DEEP_CAP_TOLERANCE`, because a Gaussian-smoothed alpha of a constant 1.0 comes
             out as 0.9999999999999999 and would otherwise flag every frame.
+        applied_normalisation: The N{} ``(low, high)`` the pipeline applied, when it was supplied
+            rather than measured on the full-resolution frame (the deep clip); ``None`` (the
+            default, the shallow pack's behaviour) recomputes them on the white-balanced image.
 
     Returns:
         A JSON-ready dictionary.
     """
     compensation = dataclasses.asdict(result.compensation)
     balance = dataclasses.asdict(result.white_balance)
-    low, high = normalisation_bounds(backend.to_device(result.white_balanced), result.params)
+    if applied_normalisation is None:
+        low, high = normalisation_bounds(backend.to_device(result.white_balanced), result.params)
+    else:
+        low, high = applied_normalisation
     requested, effective = compensation["requested"], compensation["effective"]
     cap_bound = {
         channel: bool(effective[channel] < requested[channel] - cap_tolerance)
@@ -1323,7 +1334,7 @@ smoothed statistics (a smoothed constant 1.0 is 0.9999999999999999), not a cap."
 DEEP_READBACK_MAX_OWN = 5.0
 """The deep clip's read-back bound on a frame's difference to its own PNG, in 8-bit levels.
 
-The shallow clip's 3.0 (:data:`READBACK_MAX_OWN`) is too tight for the noisy deep footage: a
+The shallow clip's 3.0 (:data:`READBACK_MAX_OWN`) is too tight for the deep footage: a
 lossy encode of the first render measured 1.0 to 3.85 levels (mean 1.9) on the corrected frames and
 up to 3.03 on the source frames, with every frame still closer to its own PNG than to a
 neighbour's by at least 1.6 levels. The neighbour test and the channel-bias bound are unchanged.
@@ -1841,7 +1852,15 @@ def render_deep_clip(
                 clip_dir / f"corrected-{variant.name}" / f"{frame.path.stem}-{variant.name}.png"
             )
             _write_png(roots, target, result.output)
-            record = statistics_record(result, backend, DEEP_CAP_TOLERANCE)
+            record = statistics_record(
+                result,
+                backend,
+                DEEP_CAP_TOLERANCE,
+                applied_normalisation=(
+                    float(smoothed["normalisation_bounds.low"][number]),
+                    float(smoothed["normalisation_bounds.high"][number]),
+                ),
+            )
             del record["params"], record["backend"]
             entries[variant.name].append(
                 {
