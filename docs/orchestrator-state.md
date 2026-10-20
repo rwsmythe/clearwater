@@ -32,11 +32,22 @@
 
 ### Live cells
 
-- **`wp23-cell`** (implementer-sonnet-high, STRONG): WP2.3, worktree `.worktrees/wp2.3`, branch
-  `wp2.3`, base main `da074f4`, dispatched 2026-10-20 ~15:34Z. Depth 0 at dispatch. A cell dies
-  with its dispatcher: a successor re-dispatches from the branch head and the ledger
-  `docs/proofs/wp2.3-ledger.md`.
-- Retired (never message): `wp22-cell`, `wp21s-cell`, `wp21s-cell2`, `wp21s-cell3`, the gen-2
+- **`wp23-cell2`** (implementer-sonnet-high, STRONG): WP2.3 successor, R2 onward, worktree
+  `.worktrees/wp2.3`, branch `wp2.3`, from head `d495b57` (R1 closed, 11/11 fixed), dispatched
+  2026-10-20 ~16:37Z, depth 0 at dispatch. It applies CHARC's R1 ruling `ef7b272564ddeb9d`
+  (AD-14 centre track; the readable conditional conftest line; NEW `.gitattributes`
+  `tests/fixtures/** -text`) and yields at R2's verdict BEFORE remediating.
+- `wp23-cell` RETIRED at its R1 yield: 216,593/62 mid-build, 379,109/145 mid-remediation (it ran
+  R1 and remediated without yielding), 406,816/164 at the yield (PAST CAP); stood down 16:34Z.
+  The accept record must say so (CHARC: the corrective is an explicit R1 yield in the brief).
+- CHARC rolled to generation 2 (`clearwater-charc-20261020-0636`) at 16:36Z. Owner word
+  ~16:00Z: Gate 1 option C, caps kept, spec v0.5.4 approved (`9cf16c5`, `3eca7bd`;
+  architecture FINAL 1.0). Wave-1 briefs (WP3.1/3.7/3.13/3.15) APPROVED (`47b9738`); at FINAL
+  each cites v0.5.4 + architecture 1.0 (drop "proposed"), fills WP2.3 manifest ids (X3), and
+  WP3.1 gets the one-line Gate 1 section (IF-2 ops written so WP3.21 can keep arrays
+  device-resident; no implicit host copies). All four dispatch once WP2.3 merges; serialise
+  full-pytest gate windows (X5).
+- Retired (never message): `wp23-cell`, `wave1-drafter`, `wp22-cell`, `wp21s-cell`, `wp21s-cell2`, `wp21s-cell3`, the gen-2
   cells. The wp2.2 worktrees are removed; branches `wp2.2`, `wp2.2-mc`, `wp2.1s`, `wp2.1s-mc` are
   kept as evidence.
 
