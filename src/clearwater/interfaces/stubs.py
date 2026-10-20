@@ -60,7 +60,7 @@ C3_STAGES: tuple[Stage, ...] = (
         source_only=False,
     ),
 )
-"""The c3 method's stage list (PROPOSED, WP2.2 round 1), after AD-6 and WP1.4 section 7.
+"""The c3 method's stage list (WP2.2 round-1 ruling), after AD-6 and WP1.4 section 7.
 
 Stage 1, ``white_balance``: the channel means and gray-world gains of the proxy compensated by
 3C (3C has no whole-frame compensation statistic). Stage 2, ``fusion``: the N{} bounds and the
@@ -92,7 +92,8 @@ class StubCorrectionMethod:
     Attributes:
         id: ``"stub"``.
         label: ``"Stub"``.
-        parameters: Empty; the parameters are WP3.2's.
+        parameters: Empty; the schema is WP3.2's, and the stage dependency names below are c3's,
+            so they name parameters this stub does not declare.
         stages: :data:`C3_STAGES` (AD-6, WP1.4 section 7).
     """
 

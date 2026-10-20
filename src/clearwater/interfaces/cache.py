@@ -32,7 +32,7 @@ class CacheKey:
 
 @dataclass(frozen=True)
 class CacheEntry:
-    """What the cache holds for one key (IF-7). PROPOSED (WP2.2 round 1).
+    """What the cache holds for one key (IF-7).
 
     Attributes:
         key: The key the entry was looked up with.

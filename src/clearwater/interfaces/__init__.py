@@ -39,7 +39,14 @@ from .parameters import (
     validate_parameter_set,
 )
 from .photo import PhotoMetadata, PhotoSink, PhotoSource
-from .settings import DEFAULT_CACHE_LIMIT_BYTES, DEFAULT_OUTPUT_SUFFIX, Settings
+from .settings import (
+    DEFAULT_CACHE_LIMIT_BYTES,
+    DEFAULT_OUTPUT_SUFFIX,
+    DEFAULT_PNG_BIT_DEPTH,
+    DEFAULT_QUALITY_LEVEL,
+    DEFAULT_VIDEO_ENCODER,
+    Settings,
+)
 from .statistics import StatisticsStore
 from .video import (
     AudioStreamInfo,
@@ -59,6 +66,9 @@ from .video import (
 __all__ = [
     "DEFAULT_CACHE_LIMIT_BYTES",
     "DEFAULT_OUTPUT_SUFFIX",
+    "DEFAULT_PNG_BIT_DEPTH",
+    "DEFAULT_QUALITY_LEVEL",
+    "DEFAULT_VIDEO_ENCODER",
     "FORMAT_VERSION",
     "Array",
     "ArrayBackend",

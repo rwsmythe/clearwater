@@ -12,7 +12,7 @@ import json
 import math
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any, Literal, NoReturn
 
 from .method import Parameter, ParameterValue
@@ -87,7 +87,8 @@ class ParameterSet:
         method: The method id (IF-3), for example ``"c3"``.
         parameters: Parameter name -> value. Values are JSON-native (bool, int, float, str,
             None); a set may be partial.
-        created: When the set was created. Serialised as ISO-8601.
+        created: When the set was created: a timezone-aware datetime, written and read in UTC.
+            Serialised as ISO-8601.
         app_version: The Clearwater version that wrote the set.
         source: Provenance only: the source file's path, size, mtime and a probe summary, as
             JSON-native values; None for a preset.
@@ -103,12 +104,18 @@ class ParameterSet:
     settings: Mapping[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
-        """Return the AD-13 object (JSON-native values), with provenance keys when set."""
+        """Return the AD-13 object (JSON-native values), with provenance keys when set.
+
+        Raises:
+            ValueError: ``created`` is not timezone-aware.
+        """
+        if self.created.tzinfo is None:
+            raise ValueError("created must be timezone-aware")
         data: dict[str, Any] = {
             "format_version": FORMAT_VERSION,
             "method": self.method,
             "parameters": dict(self.parameters),
-            "created": self.created.isoformat(),
+            "created": self.created.astimezone(UTC).isoformat(),
             "app_version": self.app_version,
         }
         if self.source is not None:
@@ -158,6 +165,9 @@ class ParameterSet:
             created_at = datetime.fromisoformat(created)
         except ValueError as error:
             raise FormatError(f"created is not ISO-8601: {created!r}") from error
+        if created_at.tzinfo is None:
+            raise FormatError(f"created has no timezone: {created!r}")
+        created_at = created_at.astimezone(UTC)
         extras: dict[str, Mapping[str, Any] | None] = {}
         for key in _PROVENANCE_KEYS:
             value = data.get(key)
@@ -180,7 +190,7 @@ class ParameterSet:
             The JSON text.
 
         Raises:
-            ValueError: A value is a non-finite float.
+            ValueError: A value is a non-finite float, or ``created`` is not timezone-aware.
         """
         return json.dumps(self.to_dict(), indent=2, allow_nan=False)
 

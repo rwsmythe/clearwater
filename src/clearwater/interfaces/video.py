@@ -2,8 +2,8 @@
 
 A :class:`VideoSource` probes a file and yields exact-pts frames; a :class:`VideoSink`
 writes corrected frames to a container that keeps the source's timing (D94, D105, AD-22).
-The probe result types named but not defined by architecture section 3 are PROPOSED here
-(WP2.2 round 1) and marked so in their docstrings.
+The probe result types that architecture section 3 names but does not define were fixed by the
+WP2.2 round-1 ruling.
 """
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ from .image import ColorDescription, Frame
 
 @dataclass(frozen=True)
 class VideoStreamInfo:
-    """The video stream of a probed file (IF-5). PROPOSED (WP2.2 round 1).
+    """The video stream of a probed file (IF-5).
 
     Attributes:
         codec: The codec name, for example ``"hevc"``.
@@ -33,7 +33,8 @@ class VideoStreamInfo:
         frame_rate: The average frame rate in frames per second.
         time_base: The stream's time base.
         nb_frames: The container's frame count, or None when it does not say.
-        rotation: The display-matrix rotation in degrees (D105); 0 when there is none.
+        rotation: The display-matrix rotation in degrees (D105), FFmpeg convention (counter-
+            clockwise positive), normalised to 0, 90, 180 or 270; 0 when there is no matrix.
         vfr: True when the frame times are not constant (D95).
     """
 
@@ -53,7 +54,7 @@ class VideoStreamInfo:
 
 @dataclass(frozen=True)
 class AudioStreamInfo:
-    """One audio stream of a probed file (IF-5). PROPOSED (WP2.2 round 1).
+    """One audio stream of a probed file (IF-5).
 
     Attributes:
         index: The stream index in the container.
@@ -72,7 +73,7 @@ class AudioStreamInfo:
 
 @dataclass(frozen=True)
 class DataStreamInfo:
-    """One data stream (``gpmd``, ``tmcd``) of a probed file (IF-5). PROPOSED (WP2.2 round 1).
+    """One data stream (``gpmd``, ``tmcd``) of a probed file (IF-5).
 
     Attributes:
         index: The stream index in the container.
@@ -85,7 +86,7 @@ class DataStreamInfo:
 
 @dataclass(frozen=True)
 class EditEntry:
-    """One entry of the video track's edit list (IF-5; D94, AD-22). PROPOSED (WP2.2 round 1).
+    """One entry of the video track's edit list (IF-5; D94, AD-22).
 
     Attributes:
         segment_duration_s: The entry's duration in seconds.
@@ -106,7 +107,7 @@ type FaultKind = Literal[
 
 @dataclass(frozen=True)
 class Fault:
-    """One problem the probe found in a file (IF-5). PROPOSED (WP2.2 round 1).
+    """One problem the probe found in a file (IF-5).
 
     Attributes:
         kind: ``"truncated"`` or ``"unreadable_tail"`` (D86), ``"missing_tags"`` (assumed per
@@ -124,7 +125,7 @@ class Fault:
 
 @dataclass(frozen=True)
 class GoProInfo:
-    """GoPro settings read from the GPMF track (IF-5; AD-16). PROPOSED (WP2.2 round 1).
+    """GoPro settings read from the GPMF track (IF-5; AD-16).
 
     Attributes:
         firmware: The camera firmware string, or None when absent.
@@ -209,7 +210,7 @@ class EncoderCapability:
     """Whether one encoder option is available (IF-5; D74).
 
     Attributes:
-        name: The encoder name.
+        name: The encoder name; the resolved name, never ``"auto"``, goes into provenance.
         available: Whether the option can be used.
         reason: Why it is unavailable, or None when available.
         bit_depths: The bit depths the encoder supports.
@@ -225,7 +226,7 @@ class EncoderCapability:
 
 @dataclass(frozen=True)
 class SinkReport:
-    """What a sink reports on close (IF-5). PROPOSED (WP2.2 round 1).
+    """What a sink reports on close (IF-5).
 
     Attributes:
         frames_written: The number of frames written.

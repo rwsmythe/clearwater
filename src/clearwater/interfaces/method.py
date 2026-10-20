@@ -20,7 +20,7 @@ from .image import Image
 type ParameterValue = bool | int | float | str | None
 """The value of one method parameter: its default, its neutral value, or a user setting.
 
-PROPOSED (WP2.2 round 1): ``None`` appears only for a parameter that can be switched off
+``None`` appears only for a parameter that can be switched off
 (for example a gain cap, D100); enum values are ``str``.
 """
 

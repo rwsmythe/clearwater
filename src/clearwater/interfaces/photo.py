@@ -12,7 +12,7 @@ from .image import Image
 
 @dataclass(frozen=True)
 class PhotoMetadata:
-    """The metadata a photo carries from source to output (IF-6; D63). PROPOSED (WP2.2 round 1).
+    """The metadata a photo carries from source to output (IF-6; D63).
 
     Attributes:
         source_format: The source format, ``"heic"``, ``"jpeg"``, ``"png"`` or ``"tiff"``.

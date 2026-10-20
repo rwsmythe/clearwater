@@ -24,8 +24,17 @@ from .parameters import (
 DEFAULT_OUTPUT_SUFFIX = "_corrected"
 """The default output suffix (D36)."""
 
-DEFAULT_CACHE_LIMIT_BYTES = 20 * 1024**3
-"""The default proxy-cache limit: 20 GB (D71), read as 20 GiB. PROPOSED unit (WP2.2 round 1)."""
+DEFAULT_CACHE_LIMIT_BYTES = 20 * 10**9
+"""The default proxy-cache limit: 20 GB (D71), read as SI gigabytes."""
+
+DEFAULT_PNG_BIT_DEPTH = 16
+"""The default PNG bit depth (D22, D53): keeps the corrected precision; 8 is selectable."""
+
+DEFAULT_VIDEO_ENCODER = "auto"
+"""The default video encoder: NVENC HEVC when available (D74), else libx265."""
+
+DEFAULT_QUALITY_LEVEL = "standard"
+"""The default named quality level (D75, AD-12), stored lower-case."""
 
 _FIELDS = (
     "output_folder",
@@ -50,15 +59,16 @@ def _field_error(name: str, expected: str, value: object) -> FormatError:
 class Settings:
     """The application settings (IF-10; G12, AD-9).
 
-    A field with no default has no clause that states one (OPEN, WP2.2 round 1) and must be
-    given.
-
     Attributes:
         output_folder: Where outputs go; None means the source folder (D34).
         output_suffix: The output name suffix (D36).
         png_bit_depth: The PNG bit depth, 8 or 16 (D22).
-        video_encoder: The video encoder name (D26).
-        quality_level: The named video quality level (D75, AD-12).
+        video_encoder: The video encoder name (D26): ``"auto"`` (the default: NVENC HEVC when
+            the D74 capability report says available, else libx265) or an
+            :class:`~clearwater.interfaces.video.EncoderCapability` name. Provenance records the
+            resolved encoder, never ``"auto"``.
+        quality_level: The named video quality level (D75, AD-12): ``"high"``, ``"standard"``
+            or ``"draft"``, lower-case.
         ten_bit_for_eight_bit: Write 10-bit video from 8-bit sources (D76); off by default.
         provenance: Embed provenance in outputs (D91); on by default.
         cache_limit_bytes: The proxy-cache size limit in bytes (D71).
@@ -68,9 +78,9 @@ class Settings:
 
     output_folder: Path | None = None
     output_suffix: str = DEFAULT_OUTPUT_SUFFIX
-    png_bit_depth: int
-    video_encoder: str
-    quality_level: str
+    png_bit_depth: int = DEFAULT_PNG_BIT_DEPTH
+    video_encoder: str = DEFAULT_VIDEO_ENCODER
+    quality_level: str = DEFAULT_QUALITY_LEVEL
     ten_bit_for_eight_bit: bool = False
     provenance: bool = True
     cache_limit_bytes: int = DEFAULT_CACHE_LIMIT_BYTES

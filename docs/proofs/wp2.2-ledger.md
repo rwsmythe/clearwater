@@ -4,7 +4,19 @@ Cell: implementer-sonnet-high. Worktree `.worktrees/wp2.2`, branch `wp2.2`, base
 Spec v0.5.3, architecture DRAFT 0.1 section 3. Reviewer A rounds: none yet (round 1 is the
 dedicated CHARC-ruling yield, ruling 4).
 
-## Round 1: proposals for CHARC's ruling
+## Round-1 ruling (CHARC b7b012f7c6d5a1e6) as applied
+
+Everything below APPROVED as tabled; PROPOSED markers removed from the code. Applied: png_bit_depth
+16; video_encoder "auto" (NVENC HEVC when D74 capability says available, else libx265; provenance
+records the resolved encoder, never "auto"; stated in the Settings and EncoderCapability
+docstrings); quality_level "standard" (lower-case high/standard/draft); cache_limit_bytes
+`20 * 10**9`; rotation int degrees, FFmpeg convention (counter-clockwise positive), normalised to
+0/90/180/270; `created` a timezone-aware datetime written and read in UTC (naive refused:
+ValueError on write, FormatError on read); shape (H, W); stage dependencies own-parameters only;
+stub `parameters = ()` with the docstring note; KeyError / ValueError for render / analyze.
+Settings stays kw_only, section-3 order, all fields now defaulted. Additions kept.
+
+## Round 1: proposals for CHARC's ruling (historical)
 
 Implemented as PROPOSED (docstrings say so). Rulings apply exactly; each row is one decision.
 
@@ -128,7 +140,7 @@ stage order from its constructor (default the c3 names).
 
 | Round | Critical | Major | Minor | In envelope | NEW/REOPENED | Reverts | Product / test-only | Depth |
 |---|---|---|---|---|---|---|---|---|
-| 1 (proposal yield) | - | - | - | - | - | - | - | to be filled by dispatcher |
+| 1 (proposal yield) | - | - | - | - | - | - | - | 148,021 tokens / 36 turns (orchestrator) |
 
 ## Gates at the round-1 commit
 

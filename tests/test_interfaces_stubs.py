@@ -293,7 +293,7 @@ def test_proxy_cache_stub() -> None:
     cache = StubProxyCache()
     key = CacheKey(10, 20, 1)
     assert cache.lookup(key) is None
-    assert cache.limit_bytes() == 20 * 1024**3
+    assert cache.limit_bytes() == 20 * 10**9
     proxy = np.arange(6, dtype=np.uint8).reshape(1, 2, 3)
     cache.store_proxy(key, 2000, proxy)
     cache.store_proxy(key, 1000, proxy)

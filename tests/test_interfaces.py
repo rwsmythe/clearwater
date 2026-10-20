@@ -78,7 +78,7 @@ def assert_frozen(cls: type) -> None:
 def test_every_interface_dataclass_is_frozen() -> None:
     classes = _interface_dataclasses()
     names = {cls.__name__ for cls in classes}
-    # section 3 names, plus the nine PROPOSED types, plus the IF-9/IF-10 additions.
+    # section 3 names, plus the nine ruled types, plus the IF-9/IF-10 additions.
     assert {
         "ColorDescription",
         "Image",
@@ -305,14 +305,31 @@ def test_settings_defaults_come_from_their_clauses() -> None:
     assert s.output_suffix == "_corrected"  # D36
     assert s.ten_bit_for_eight_bit is False  # D76
     assert s.provenance is True  # D91
-    assert s.cache_limit_bytes == 20 * 1024**3  # D71
+    assert s.cache_limit_bytes == 20 * 10**9  # D71, SI gigabytes
     assert s.force_cpu is False  # AD-9
     assert s.last_parameters is None
 
 
-def test_settings_without_a_clause_default_must_be_given() -> None:
-    with pytest.raises(TypeError, match="png_bit_depth"):
-        Settings()  # type: ignore[call-arg]
+def test_settings_defaults_ruled_at_round_1() -> None:
+    s = Settings()
+    assert (s.png_bit_depth, s.video_encoder, s.quality_level) == (16, "auto", "standard")
+    with pytest.raises(TypeError):
+        Settings(16)  # type: ignore[misc]  # kw_only
+
+
+def test_created_is_timezone_aware_utc() -> None:
+    from datetime import timedelta, timezone
+
+    local = datetime(2026, 10, 20, 8, 0, tzinfo=timezone(timedelta(hours=-4)))
+    again = ParameterSet.from_json(_set({}).__class__("c3", {}, local, "v").to_json())
+    assert again.created == local and again.created.utcoffset() == timedelta(0)
+    assert '"created": "2026-10-20T12:00:00+00:00"' in ParameterSet("c3", {}, local, "v").to_json()
+    with pytest.raises(ValueError, match="timezone"):
+        ParameterSet("c3", {}, datetime(2026, 1, 1), "v").to_json()
+    data = _set({}).to_dict()
+    data["created"] = "2026-01-01T00:00:00"
+    with pytest.raises(FormatError, match="timezone"):
+        ParameterSet.from_dict(data)
 
 
 def test_settings_round_trip_exact() -> None:
