@@ -59,14 +59,22 @@ for a push (verify `git status -sb`).
   CHARC rulings this wave: round-0 tables upheld with three additions (msg 232646a5); IF-5
   `duration_s` = container duration, exact, docstring tightened 4174484; WP3.13 per-write token
   in the temporary name upheld.
-- **WP3.1 array backend: cell RETURNED** (author head 2bf0aff, code-final ea60356; Reviewer A
-  terminated at R2; exclusive speed row done 20:57-21:30Z). Reviewer B, gates and accept are gen
-  6's first act (`docs/orchestrator-state.md` item 2). Worktree `.worktrees/wp3.1` stays until
-  CHARC QA confirms the accept. On the accept: CHARC QA as above. Consumer notes for wave 2+ briefs are
-  in `docs/orchestrator-state.md` item 3 (WP3.3 percentile float32 + DR-14; WP3.9 bounded
-  `-read_intervals` + DR-36; WP3.10 FFmpeg `-y` on the temporary path, mvhd on edit lists;
-  WP3.12/3.16 config API; WP3.14 one `Reservations` + folder validation; WP4.3 clean-up before
-  jobs). Reviewer B prompt practice note: git is unavailable inside a worktree under WSL.
+- **WP3.1 array backend ACCEPTED** 2026-10-20, main c1fd6ce (code) / f4acbd0 (record
+  `docs/proofs/wp3.1-accept.md`); DR-37 banked (CuPy load-failure reason string, CoreBackend
+  typing of core.ops, nested footage-in-working-folder config, two advisories). Reviewer A R2 over
+  two cells (re-seat at 275K); B one pass clean. **CHARC QA CONFIRMED** (patch-id 392da34a1461
+  both ranges; B md5s and assertions; ruff/format/mypy; harness 366; full pytest 1844 passed,
+  539 s). Worktrees released (msg wp31-qa). Speed row: GPU leg contaminated by CHARC's QA pytest
+  (op-mix row only; whole-core row is WP3.4's). **WAVE 1 CLOSED.**
+- **Wave 2 COMMISSIONED** (CHARC ruling 1ebfba54, 2026-10-20 ~22:07Z): orchestrator gen 6 drafts
+  all six briefs (WP3.2, WP3.3, WP3.5 opus-high; WP3.6, WP3.12, WP3.16 sonnet-high) against the
+  Phase 3 frame, sends them as one set for CHARC approval; tranche A = WP3.2/3.3/3.5/3.12 on
+  approval, tranche B = WP3.6/3.16 once two tranche-A cells return. Per-package debt citations
+  ruled in that message (WP3.2 D100/DR-19; WP3.3 DR-14/DR-13/float32 percentile; WP3.5 DR-20(1)
+  D54 fallback + limited-range convention; WP3.6 AD-24, DR-33(c), DR-31(1), DR-6/7/11; WP3.12
+  stale chapter-group cache sentences read single-clip; WP3.16 DR-37(a)(b) status bar, G12,
+  AD-15). Consumer notes for wave 2+ are in `docs/orchestrator-state.md` item 3. Reviewer B
+  prompt practice note: git is unavailable inside a worktree under WSL.
 - **Then:** waves 2-4 per the Phase 3 frame (orchestrator drafts, CHARC approves each; WP3.21
   optimisation package drafted at wave 4, target 10 min/min, re-measure at WP5.2). CP5 shows the
   owner the starter preset values. Close DR items in the register as packages close them.
