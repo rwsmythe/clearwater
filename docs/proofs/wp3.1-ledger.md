@@ -145,4 +145,4 @@ No other IF-2 method or helper reads back to the host (Gate 1 tests).
 | Round | Depth (dispatcher) | Crit | Major | Minor | In/out envelope | NEW/REOPENED | Reverts | Fix kind | Transport / CLI | Verdict |
 |---|---|---|---|---|---|---|---|---|---|---|
 | 0 (table) | 108,729 (24 turns) at the round-0 yield | - | - | - | - | - | - | - | - | yield for ruling |
-| pre-review (build, CHARC additions) | 228,618 (74 turns) at the window-request yield | - | - | - | - | - | - | - | - | full-pytest window queued; round 1 to adjudicated verdict, then depth decision |
+| pre-review (build, CHARC additions) | 228,618 (74 turns) at the window-request yield; 237,795 (81 turns) at the queue yield | - | - | - | - | - | - | - | - | full-pytest window queued; round 1 to adjudicated verdict, then depth decision |
