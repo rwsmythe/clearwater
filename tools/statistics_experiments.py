@@ -1025,7 +1025,8 @@ def render_clips(
 ) -> dict[str, Any]:
     """Render, encode and verify the three full-resolution clips (phase ``render``).
 
-    Every frame is corrected at ``Params()`` defaults (``ancuti2018``, blue off) through the
+    Every frame is corrected with the method pinned to ``ancuti2018`` (blue off; the WP1.4
+    renders' method, not the ``Params()`` default, which is ``c3``) through the
     supplied-statistics hook three times: ``unsmoothed`` with its own full-frame statistics
     (identical to ``correct()`` without the hook, so to WP1.3's clip), ``staged`` and
     ``flat`` with the smoothed proxy statistics; and once more, unwritten, with constant

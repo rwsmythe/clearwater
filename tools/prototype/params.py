@@ -252,9 +252,9 @@ class Params:
         the same image, and fusing two identical inputs reconstructs that image whatever
         the weights. The blend stays at 0.0 (fully corrected), so the identity comes from
         the steps themselves, not from blending back to the original. The method stays
-        the default; ``dataclasses.replace(Params.neutral(), method="c3")`` is neutral
-        too. How close to identity the result is (floating-point round-off only) is
-        measured in the open-values report.
+        the default (``c3``); ``dataclasses.replace(Params.neutral(), method="ancuti2018")``
+        is neutral too. How close to identity the result is (floating-point round-off only)
+        is measured in the open-values report.
 
         Returns:
             The neutral parameter set (V9).

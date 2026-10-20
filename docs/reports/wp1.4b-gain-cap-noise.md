@@ -56,9 +56,9 @@ No tool needed pinning. `statistics_experiments.py` (the `METHODS` dict), `clip.
 default `"ancuti2018"`), `bench.py` (`--method` required) and `pack.py` (every variant) already
 name the method. New guards: `test_the_default_method_is_c3`,
 `test_run_without_a_method_follows_the_params_default`,
-`test_run_help_names_c3_as_the_default_and_lists_the_options`. Open item, not this package's to
-edit: the `Params.neutral()` docstring ("The method stays the default; `replace(..., method="c3")`
-is neutral too") is still true but now reads oddly.
+`test_run_help_names_c3_as_the_default_and_lists_the_options`. The `Params.neutral()`
+docstring and two help or docstring sentences elsewhere were corrected after the flip, as
+text-only edits the orchestrator authorised (Deviations, item 3).
 
 ## Claims 2 and 2a -- frames and camera state
 
@@ -432,20 +432,19 @@ Each caption gives `sigma_R` on both tile sets, the red gain, and what bound.
    - Open-water frames get no crops, as the brief defines (claim 6 names deep and shallow).
 2. **Extra camera-state context.** SHUT is shown as context. All six keys are read; YAVG and
    UNIF are in `frames.json` only.
-3. **Two docstrings in other packages' files are stale after the flip.** The brief's lock
-   allows only pinning edits there, so they are raised, not fixed:
-   - The `Params.neutral()` docstring reads oddly.
-   - `tools/statistics_experiments.py:1028` (`render_clips`) says the frames are corrected at
-     "``Params()`` defaults (``ancuti2018``, blue off)". The code pins Ancuti through
-     `METHODS[RENDER_METHOD]`, so only the sentence is stale (Reviewer A round 1, CR-04).
+3. **Three text-only edits outside the pin rule**, each authorised by the orchestrator's ruling
+   on Reviewer A round 2 CR-02. None changes behaviour or a default.
+   - `tools/prototype/clip.py` `--method`: the default stays `ancuti2018`. New help text: "default
+     ancuti2018, kept so the WP1.2B report reproduces; the Params() and product default is c3;
+     options c3, ancuti2018". A guard test covers both subcommands.
+   - `tools/statistics_experiments.py` `render_clips` docstring: it now says the method is pinned
+     to `ancuti2018` (blue off), the WP1.4 renders' method, not the `Params()` default.
+   - `tools/prototype/params.py` `Params.neutral()` docstring: "the method stays the default
+     (`c3`); `replace(..., method="ancuti2018")` is neutral too".
+   - A sweep of `tools/` for other "the default is ancuti2018" sentences found none that the
+     flip made false. The `pack.py` sentences name `ancuti2018` explicitly or call c3 the
+     default, which is accurate.
 4. **Claim 10b's widened excerpt** is a new 3 s extract at the 540 proxy. It is cached in
    `work/wp1.4b/clip/lead-in.npy`; the full-resolution PNGs were deleted once proxied.
-5. **Open question for the dispatcher: `tools/prototype/clip.py --method`** (Reviewer A round 2,
-   CR-02).
-   - The tool's `--method` defaults to `"ancuti2018"`, a pre-existing explicit default, and its
-     help does not name c3.
-   - Read literally, guard (ii) ("every CLI help text show c3 as the default") covers it. But
-     claim 1 names `clip.py` among the tools that pin `ancuti2018` so that a re-run reproduces
-     the reports.
-   - Changing its default or help text is more than naming the method in another package's
-     file, so it is left as it is, pending a ruling.
+5. **`tools/prototype/clip.py --method`** (Reviewer A round 2, CR-02): ruled by the orchestrator.
+   The default stays, and the help text says why (item 3).

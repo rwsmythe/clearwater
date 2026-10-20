@@ -19,7 +19,7 @@ import camera_state
 import noise_experiments
 from local_config import find_footage_file, load_local_config
 from lookcheck.frames import OutputRoots
-from prototype import run, temporal
+from prototype import clip, run, temporal
 from prototype.backend import select_backend
 from prototype.params import Params
 from prototype.pipeline import compensate_ancuti2018, correct
@@ -53,6 +53,18 @@ def test_run_help_names_c3_as_the_default_and_lists_the_options(
     assert "compensation method (default c3; ancuti2018, or ancuti2018 with --blue)" in text
     assert "(ancuti2018-blue)" in text
     assert "defaults to the :class:`Params` default, ``c3``" in (run.__doc__ or "")
+
+
+@pytest.mark.parametrize("step", ["analyse", "render"])
+def test_clip_help_names_its_reproduction_default_and_the_product_default(
+    step: str, capsys: pytest.CaptureFixture[str]
+) -> None:
+    # The orchestrator's ruling on Reviewer A r2 CR-02: the default stays, the help says why.
+    with pytest.raises(SystemExit):
+        clip.main([step, "--help"])
+    text = " ".join(capsys.readouterr().out.split())
+    assert "default ancuti2018, kept so the WP1.2B report reproduces" in text
+    assert "the Params() and product default is c3" in text
 
 
 def test_the_temporal_variant_registry_names_each_method_explicitly() -> None:

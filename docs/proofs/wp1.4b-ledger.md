@@ -175,13 +175,24 @@ about 9.5 minutes) after the void attempt.
 - Claim 10b: step at 0.90 s is genuine (edge effect <= 0.014 in any gain); reset and 0.5 s do not
   shrink the step and add flicker.
 
+## Orchestrator ruling on r2 CR-02 (08:21Z, depth 320,059 tokens over 140 turns)
+
+- Three text-only edits authorised outside the pin rule:
+  1. `clip.py --method` help; the default `ancuti2018` stays.
+  2. `statistics_experiments.py` `render_clips` docstring.
+  3. `Params.neutral()` docstring.
+- Same treatment for any other "the default is ancuti2018" sentence the flip made false. Sweep
+  of `tools/`: none other.
+- Applied in the commit after `8b194e4`, with the guard
+  `test_clip_help_names_its_reproduction_default_and_the_product_default`. Recorded in the
+  report's deviations, item 3.
+- ONE more round only. If it does not converge: no further round; fix small items, update NEXT
+  STEPS, yield. Stop at ~380K.
+- Note: round 3 had already run and converged when the ruling arrived. The one authorised round
+  is therefore run as round 4, the confirming round over the three edits.
+
 ## NEXT STEPS
 
-1. DONE: ruling, grid, summary, page, claims 10 and 10b, report; Reviewer A round 1.
-2. Round 3 converged. Waiting on the dispatcher's ruling on the clip.py default
-   (r2 CR-02 / r3 CR-01).
-   - If authorised: add the help text, or make the default c3 with explicit
-     `--method ancuti2018` in the reproduction commands, plus a guard; then one confirming round.
-   - Otherwise: nothing to do; it is disclosed in the report, Deviations item 5.
-3. Final: return report to the dispatcher; teardown of the `wp1.4b-codex-*` scratch files at
-   accept.
+1. Round 4 (the one authorised round): the round-3 prompt with the three edits in the claim list.
+2. If it converges: gate (suite), commit, return report. If not: fix small items, commit, update
+   this list, yield (no round 5).

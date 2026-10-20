@@ -2599,7 +2599,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     for name in ("analyse", "render"):
         step = steps.add_parser(name)
         step.add_argument("clip", help="footage stem, or a video path outside the footage")
-        step.add_argument("--method", choices=METHODS, default="ancuti2018")
+        step.add_argument(
+            "--method",
+            choices=METHODS,
+            default="ancuti2018",
+            help="compensation method (default ancuti2018, kept so the WP1.2B report reproduces;"
+            " the Params() and product default is c3; options c3, ancuti2018)",
+        )
         step.add_argument("--neutral", action="store_true", help="start from Params.neutral()")
         step.add_argument("--device", choices=("gpu", "cpu"), default="gpu")
         step.add_argument("--hwaccel", choices=HWACCELS, default="none")
