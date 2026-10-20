@@ -86,10 +86,8 @@ def test_rotates_at_the_size_limit_and_keeps_only_the_backup_count(tmp_path: Pat
     names = sorted(p.name for p in tmp_path.iterdir())
     assert names == ["clearwater.log", "clearwater.log.1", "clearwater.log.2", "clearwater.log.3"]
     for name in names:
-        data = (tmp_path / name).read_bytes()
-        # rollover happens before the limit; the handler counts characters, so a platform that
-        # writes two bytes per line end may be over by one byte per line
-        assert len(data) <= 2000 + data.count(b"\n")
+        # rollover happens before the limit; the last record adds at most its one CR byte
+        assert (tmp_path / name).stat().st_size <= 2000
     assert "record 0399" in path.read_text(encoding="utf-8")  # newest in the live file
     oldest = (tmp_path / "clearwater.log.3").read_text(encoding="utf-8")
     assert "record 0000" not in oldest  # the earliest records were dropped
@@ -130,3 +128,19 @@ def test_one_record_over_the_limit_is_written_whole_to_a_file_of_its_own(tmp_pat
     big = [name for name, size in sizes.items() if size > 1000]
     assert len(big) == 1  # the oversized record is whole, in one file, past the limit
     assert "y" * 5000 in (tmp_path / big[0]).read_text(encoding="utf-8")
+
+
+def test_multibyte_records_pass_the_limit_only_by_the_last_records_surplus(
+    tmp_path: Path,
+) -> None:
+    configure_logging(tmp_path, max_bytes=2000, backup_count=2)
+    log = logging.getLogger("clearwater.demo")
+    for index in range(200):
+        log.info("record %03d %s", index, "\u00e9" * 100)  # 2 bytes per character
+    shutdown_logging()
+    sizes = [p.stat().st_size for p in tmp_path.iterdir()]
+    assert len(sizes) <= 3
+    # the new record counts in characters (about 180) but is written as bytes (about 280), so
+    # a file may pass the limit by that one record's surplus (100 bytes of accents + a CR), no more
+    assert max(sizes) <= 2000 + 100 + 1
+    assert max(sizes) > 1000  # and the files are being filled, not rolled early

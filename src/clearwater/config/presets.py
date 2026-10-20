@@ -57,6 +57,14 @@ MAX_PRESET_BYTES = 1024 * 1024
 MAX_NAME_LENGTH = 100
 """The longest preset name, in characters."""
 
+MAX_NAME_BYTES = 255 - len(".json") - 13
+"""The longest preset name, in UTF-8 bytes.
+
+A file-name component is at most 255 bytes on common POSIX file systems. The limit leaves room for
+the ``.json`` suffix and for the 13 bytes ``atomic_write_text`` adds to its temporary sibling
+(``.`` + 8 random characters + ``.tmp``), so a name that passes can always be saved.
+"""
+
 _SUFFIX = ".json"
 _PROVENANCE_KEYS = ("source", "settings")
 _FORBIDDEN_CHARACTERS = frozenset('<>:"/\\|?*')
@@ -152,7 +160,9 @@ def validate_preset_name(name: str) -> str:
     The rule is the same everywhere: 1 to 100 characters; no leading or trailing whitespace; no
     ``< > : " / \\ | ? *`` and no control characters; no trailing dot; not ``.`` or ``..``; not
     a Windows reserved device name (``CON``, ``PRN``, ``AUX``, ``NUL``, ``COM0``-``COM9``,
-    ``LPT0``-``LPT9``, case-insensitive, also with an extension); encodable as UTF-8.
+    ``LPT0``-``LPT9``, case-insensitive, also with an extension); encodable as UTF-8 and at
+    most 237 UTF-8 bytes (a 255-byte file-name limit less the suffix and the temporary
+    file's tail).
 
     Args:
         name: The proposed name.
@@ -180,6 +190,11 @@ def validate_preset_name(name: str) -> str:
         name.encode("utf-8")
     except UnicodeEncodeError as error:
         raise PresetError("preset name is not valid text") from error
+    if len(name.encode("utf-8")) > MAX_NAME_BYTES:
+        raise PresetError(
+            f"preset name is {len(name.encode('utf-8'))} bytes in UTF-8; the limit is "
+            f"{MAX_NAME_BYTES}"
+        )
     if name.split(".", 1)[0].rstrip(" ").upper() in _RESERVED_DEVICE_NAMES:
         raise PresetError(f"{name!r} is a reserved device name on Windows")
     return name
@@ -232,6 +247,17 @@ def _is_preset_file(path: Path) -> bool:
     return path.suffix.lower() == _SUFFIX
 
 
+def _shortened(base: str, suffix: str) -> str:
+    """Return ``base`` cut so that ``base + suffix`` fits the character and byte limits.
+
+    Trailing spaces and dots are dropped from the cut so the result stays a valid name.
+    """
+    cut = base[: MAX_NAME_LENGTH - len(suffix)]
+    while len((cut + suffix).encode("utf-8")) > MAX_NAME_BYTES:
+        cut = cut[:-1]
+    return cut.rstrip(" .")
+
+
 def _name_key(name: str) -> str:
     """Return the key under which two names count as the same file on a lenient file system."""
     return unicodedata.normalize("NFC", name).casefold()
@@ -270,7 +296,8 @@ class PresetStore:
         """List every ``*.json`` file (any suffix case), sorted by name (case-insensitive).
 
         An unreadable file (bad JSON, newer version, wrong shape, too large) is listed with
-        ``error`` set and left untouched.
+        ``error`` set and left untouched. A symbolic link is skipped, as every other
+        operation refuses one.
 
         Returns:
             The entries; empty when the folder does not exist.
@@ -279,7 +306,7 @@ class PresetStore:
             return []
         entries = []
         for path in self._folder.iterdir():
-            if not _is_preset_file(path) or not path.is_file():
+            if not _is_preset_file(path) or path.is_symlink() or not path.is_file():
                 continue
             try:
                 parameter_set, _ = self._read(path)
@@ -357,7 +384,7 @@ class PresetStore:
         for other in self._matches(new):
             if other.name != source.name:
                 raise PresetError(f"a preset named {other.stem!r} already exists")
-        if source.name != target.name:  # Windows paths compare case-insensitively
+        if source.name != target.name:  # as strings: Windows Path equality ignores case
             os.rename(source, target)
         return target
 
@@ -429,8 +456,7 @@ class PresetStore:
         while self._find(chosen) is not None:
             counter += 1
             suffix = f" ({counter})"
-            room = MAX_NAME_LENGTH - len(suffix)
-            chosen = validate_preset_name(base[:room].rstrip(" .") + suffix)
+            chosen = validate_preset_name(_shortened(base, suffix) + suffix)
         path = self._path(chosen)
         self._write(path, parameter_set)
         return PresetImportResult(chosen, path, parameter_set, dropped)

@@ -4,10 +4,12 @@ One ``RotatingFileHandler`` on the ``clearwater`` logger, so every ``clearwater.
 logger writes to ``clearwater.log`` in the folder the caller passes (the log folder from
 :mod:`clearwater.config.paths`). The file is UTF-8, rotates at 1 MiB and keeps 5 backups, so the
 log occupies at most six files. The handler rolls over before a record that would take the
-file to the limit, so a file stays at the limit (a few bytes over on Windows, where each line
-ends in two bytes), except that one record larger than the limit is written whole to a file of
-its own (the bound is per rollover, not per record). The module is
-named ``log`` so it does not shadow the standard library's ``logging``.
+file to the limit: it adds the new record's length in CHARACTERS to the file's size in bytes. A
+file therefore stays at the limit, except that the record written last may add its surplus bytes
+(one per line end where lines end in two bytes, and the extra bytes of multibyte characters, up
+to three per character), and one record larger than the limit is written whole to a file of its
+own (the bound is per rollover, not per record). The module is named ``log`` so it does not
+shadow the standard library's ``logging``.
 """
 
 from __future__ import annotations

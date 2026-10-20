@@ -21,7 +21,7 @@ from clearwater.config import (
     starter_presets,
     validate_preset_name,
 )
-from clearwater.config.presets import MAX_PRESET_BYTES
+from clearwater.config.presets import MAX_NAME_BYTES, MAX_PRESET_BYTES
 from clearwater.interfaces import (
     FormatError,
     Parameter,
@@ -770,3 +770,64 @@ def test_truncation_does_not_leave_trailing_space_or_dot(tmp_path: Path) -> None
         again = store.import_preset(source, SCHEMAS, name=base).name
         assert again == "a" * 95 + " (2)"
         assert validate_preset_name(again) == again
+
+
+# --- terminating cleanup (round 2) --------------------------------------------------------------
+
+
+def test_name_byte_cap_leaves_room_for_the_suffix_and_the_temporary_file() -> None:
+    emoji = "\U0001f600"  # 4 bytes in UTF-8
+    assert MAX_NAME_BYTES == 237
+    assert validate_preset_name(emoji * 59 + "x")  # 237 bytes, 60 characters
+    for name in (emoji * 60, emoji * 59 + "xy", "\u30d7" * 80):  # 240, 238 and 240 bytes
+        with pytest.raises(PresetError, match="bytes"):
+            validate_preset_name(name)
+    assert validate_preset_name("\u00e9" * 100)  # 200 bytes, 100 characters: within both limits
+    with pytest.raises(PresetError, match="characters"):
+        validate_preset_name("a" * 101)
+
+
+def test_the_temporary_file_of_the_longest_name_fits_a_255_byte_component(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    seen: list[str] = []
+
+    def capture(source: Path, target: Path) -> None:
+        seen.append(Path(source).name)
+        raise OSError("stop before the replace")
+
+    monkeypatch.setattr("clearwater.config.atomic.os.replace", capture)
+    name = "\U0001f600" * 59 + "x"  # the longest allowed name: 237 bytes
+    assert len(name.encode("utf-8")) == MAX_NAME_BYTES
+    with pytest.raises(OSError, match="stop"):
+        _store(tmp_path).save(name, _set())
+    assert len(seen[0].encode("utf-8")) <= 255
+    assert len((name + ".json").encode("utf-8")) <= 255 - 13
+
+
+def test_numbering_respects_the_byte_cap_for_multibyte_names(tmp_path: Path) -> None:
+    store = _store(tmp_path)
+    source = _file(tmp_path, "src.json", _set().to_dict())
+    base = "\u00e9" * 100  # 200 bytes, within both limits
+    assert store.import_preset(source, SCHEMAS, name=base).name == base
+    second = store.import_preset(source, SCHEMAS, name=base).name
+    assert second == base[:96] + " (2)"
+    emoji_base = "\U0001f600" * 59 + "x"  # 237 bytes, 60 characters
+    assert store.import_preset(source, SCHEMAS, name=emoji_base).name == emoji_base
+    numbered = store.import_preset(source, SCHEMAS, name=emoji_base).name
+    assert numbered.endswith(" (2)") and len(numbered.encode("utf-8")) <= MAX_NAME_BYTES
+    assert numbered.startswith("\U0001f600" * 58)
+
+
+def test_list_skips_symbolic_links(tmp_path: Path) -> None:
+    store = _store(tmp_path)
+    store.save("real", _set())
+    outside = tmp_path / "outside.json"
+    outside.write_text(_set().to_json(), encoding="utf-8")
+    try:
+        (tmp_path / "presets" / "link.json").symlink_to(outside)
+    except OSError:
+        pytest.skip("symlinks are not available here")
+    assert [e.name for e in store.list_presets()] == ["real"]
+    with pytest.raises(PresetError):
+        store.load("link")

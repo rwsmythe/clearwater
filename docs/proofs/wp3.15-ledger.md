@@ -11,7 +11,7 @@ Cell: implementer-sonnet-high (tier STRONG). Worktree `.worktrees/wp3.15`, branc
 | 0 (design) | 2026-10-20 | n/a | n/a | n/a | n/a | n/a | n/a | 83,816 (dispatcher, 15 turns) |
 | build yield | 2026-10-20 | n/a | n/a | n/a | n/a | product + tests | n/a | 145,492 (dispatcher, 34 turns) |
 | 1 | 2026-10-20 | 2 major, 0 critical | 3 | all in | 5 NEW, 0 REOPENED | PRODUCT + tests (01591af) | WSL, codex-cli, gpt-5.6-sol high; head 703f7d9 | 176,725 (dispatcher, 57 turns) |
-| 2 | 2026-10-20 | 0 | 4 (3 in, 1 out) | 3 in, 1 out | 4 NEW (1 a refinement of round-1 #4), 0 REOPENED | cleanup pending (product + comment + tests) | WSL, codex-cli, gpt-5.6-sol high; head 01591af | 205,539 at the window queue yield (dispatcher, 75 turns); round-2 figure to be filled |
+| 2 | 2026-10-20 | 0 | 4 (3 in, 1 out) | 3 in, 1 out | 4 NEW (1 a refinement of round-1 #4), 0 REOPENED | cleanup (product + comment + tests), no further round | WSL, codex-cli, gpt-5.6-sol high; head 01591af | 217,080 (dispatcher, 87 turns) |
 
 ## Round 0: the design table (brief task 1)
 
@@ -236,3 +236,16 @@ were verified: no reopened findings.
 
 Convergence: zero NEW blocking findings, so the loop terminates. The four non-blocking findings are
 fixed once in the terminating cleanup (not yet applied; waiting on the dispatcher's go).
+
+## Terminating cleanup (dispatcher approved; no round opened)
+
+All four minors fixed in one commit, with tests. #2 (out of envelope, fixed not banked): a UTF-8 byte
+cap of 237 on the name, i.e. 255 less `.json` (5) less the 13-byte tail of the atomic temporary
+(`.` + 8 random + `.tmp`), so a name that passes can always be saved even by its temporary file; the
+dispatcher said 255 and the stricter figure is what makes the temporary fit (test captures the temporary
+name of the longest allowed name: 255 bytes); numbering truncation now also respects the byte cap.
+#1: investigating the probe showed the handler adds the new record's length in characters to the file's
+size in BYTES, so the overshoot is only the last record's surplus (multibyte extra bytes, one CR on
+Windows), not "four times" and not "one byte per line"; the `log.py` docstring says exactly that and
+two tests pin it (ASCII: size <= limit; accented text: size <= limit + that record's 101 surplus).
+#3: `list_presets` skips symlinks (test). #4: comment corrected.
