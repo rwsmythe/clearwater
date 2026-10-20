@@ -249,3 +249,6 @@ size in BYTES, so the overshoot is only the last record's surplus (multibyte ext
 Windows), not "four times" and not "one byte per line"; the `log.py` docstring says exactly that and
 two tests pin it (ASCII: size <= limit; accented text: size <= limit + that record's 101 surplus).
 #3: `list_presets` skips symlinks (test). #4: comment corrected.
+
+Dispatcher ruling on the figure: the 237-byte cap is ACCEPTED as the corrected figure of the "255"
+in the cleanup ruling (255 less `.json` less the 13-byte atomic-temporary tail).
