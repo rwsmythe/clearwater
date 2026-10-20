@@ -15,8 +15,9 @@ ICC + EXIF), and confirms or corrects AD-18 (licences). Brief `docs/briefs/wp2.1
   flag set, which is a bytes finding by design. Every pts side channel delivers 681/681 pts
   exactly as ffprobe lists them. That includes the five exploration knob forms, each checked
   through its own `+pts` identity row.
-- **The 32 KB writes are fixed in FFmpeg; the cure is on the reading side.** FFmpeg's own AVIO
-  statistics show 32,741-byte writes on average whatever the knob: `-avioflags direct`, the pipe
+- **FFmpeg's writes average 32 KB whatever the knob; the cure is on the reading side.**
+  FFmpeg's own AVIO statistics give only total bytes and the write count, so only the mean is
+  observed: 32,741 bytes per write whatever the knob: `-avioflags direct`, the pipe
   protocol's `-blocksize`, or both. That is 517,560 writes for the clip. What removes the
   bottleneck is the pipe's buffer. A 32 MiB anonymous pipe takes the decode from 55.9 to 16.1
   ms/frame, which is about FFmpeg's own decode-plus-conversion speed (13.5 ms to the null muxer).
@@ -175,6 +176,12 @@ mirrors `flags=accurate_rnd`.
 - `identity-<row>.json` hashes every frame of a row, compares frame count, hashes and pts with
   the reference, and records the AVIO write statistics at log level `verbose`.
 - A row whose bytes differ is re-decoded in lockstep with row a (`lockstep_difference`).
+- The pts side channel must be one-to-one with the frames. Every full-clip record, identity and
+  timed, shows `side_channel_extra_entries` 0, so its 681/681 is one-to-one. Since Reviewer A
+  round 6 the code counts an extra entry on a full-clip decode as a pts mismatch; a probe
+  (`--frames`, the window probes) still compares only the frames kept, since showinfo prints
+  one frame more there. The records were not re-run: with no extra entry, the verdict is the
+  same.
 
 **Windows** (`window` command, plan 4.3, owner's best-effort ruling).
 - Before each window: Part B's advisory idle gate (`work/wp2.1s/idle_gate.ps1`, md5
@@ -249,13 +256,14 @@ c-cuda-auto (frame 666; section 2).
   showinfo frame numbers ran 0..680 without a gap.
 - **Witness in the timed runs:** 24 frames per run matched the reference in every run of every
   row. The full per-frame identity is in `identity-<row>.json`.
-- **Block sizes, row b.** The brief asks for "1 MB+ blocks". What is observed is FFmpeg still
-  writing 32 KB, with the large pipe buffer letting it run ahead. Reads coalesce to a median of
+- **Block sizes, row b.** The brief asks for "1 MB+ blocks". What is observed is FFmpeg's writes
+  still averaging 32,741 bytes (the AVIO statistics give no per-write sizes), with the large
+  pipe buffer letting it run ahead. Reads coalesce to a median of
   128 KB and up to a whole frame, but only 4-6 % of bytes arrive in reads of 1 MiB or more. The
   speed comes from decoupling, not from large writes.
 - **Exploration (W1, one run each):** a-direct 54.71, a-blocksize 54.88, a-direct-blocksize
-  54.69, b-1m 16.54, b 17.22, b-direct-blocksize 17.45 ms/frame. Every one has 32,741-byte
-  writes (identity records). A 1 MiB pipe buffer is enough. Row a already reads with `readinto`
+  54.69, b-1m 16.54, b 17.22, b-direct-blocksize 17.45 ms/frame. Every one has a 32,741-byte
+  mean write (identity records; the mean is all the statistics give). A 1 MiB pipe buffer is enough. Row a already reads with `readinto`
   into a preallocated frame buffer, so "readinto alone" is row a.
 - **PyAV is not decode-bound.** c-cuda-auto runs no faster than c-auto. That is consistent with
   the per-frame `reformat` in this process being the limit. INFERENCE: the conversion was not
@@ -563,7 +571,7 @@ WP2.1, to be confirmed at WP5.5, and not legal advice. It assumes the FSF's read
 | libheif (in pillow-heif) | 1.23.6 | LGPLv3 (`LICENSES_bundled.txt`) | yes-if | LGPL-3: conveyed under GPL-3.0 | CONFIRMED |
 | libde265 (in pillow-heif) | 1.1.3 | LGPLv3 | yes-if | as libheif | CONFIRMED |
 | x265 (in pillow-heif) | 4.3+1 | GPLv2 ("or later" not stated in the file) | UNKNOWN | if GPL-2.0-only, it cannot be combined with LGPL-3 libheif under GPL-3.0; the file does not say which | CONFIRMED (as "GPL-2") |
-| MinGW-w64 runtime (listed by pillow-heif for Windows wheels) | -- | GPL-3.0-with-GCC-exception (libgcc, libstdc++), MIT and BSD (libwinpthread); shipped as separate DLLs (`libgcc_s_seh-1`, `libstdc++-6`, `libwinpthread-1`) | yes | the runtime exception covers linking | NEW |
+| MinGW-w64 runtime (listed by pillow-heif for Windows wheels) | UNKNOWN (not stated in `LICENSES_bundled.txt`; not read from the DLLs) | GPL-3.0-with-GCC-exception (libgcc, libstdc++), MIT and BSD (libwinpthread); shipped as separate DLLs (`libgcc_s_seh-1`, `libstdc++-6`, `libwinpthread-1`) | yes | the runtime exception covers linking | NEW |
 | Pillow | 12.3.0 | MIT-CMU | yes | permissive | CONFIRMED |
 | NumPy | 2.5.4 | BSD-3-Clause AND 0BSD AND MIT AND Zlib AND CC0-1.0 | yes | all permissive | CORRECTED (AD-18: BSD-3) |
 | SciPy | 1.18.1 | BSD 3-clause text in `License`; classifier "BSD License" | yes | permissive | CONFIRMED |
