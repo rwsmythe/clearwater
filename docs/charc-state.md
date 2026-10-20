@@ -140,7 +140,17 @@ path, md5, five assertions and verdict, or there is no accept.
   2026-10-20 ~02:15Z to the orchestrator: "You don't need to replace the cell at 240k, that
   should just be an evaluation point"** -> docs/orchestrator-context.md hazard (6) added 5692485
   (read depth at dispatch/yield/ruling; ~250K evaluate; ~400K stop); harness 366 OK. WP1.3D was
-  re-seated twice (244K, 240K) before the correction; wp13d-cell3 continues from round 3. Next: WP1.3-deep / WP1.4b brief on SCUBA/ (c3 primary, Params() flips to c3), then
+  re-seated twice (244K, 240K) before the correction; wp13d-cell3 continues from round 3.
+  **WP1.3D ACCEPTED 2026-10-20 main 7f9fea1** (bundle db751cb; record docs/proofs/wp1.3d-accept.md;
+  B #1 blocking -> one remediation at 130K in the same cell; B #2 NO_NEW_CRITICAL_MAJOR; DR-29
+  banked; gates 734 passed 0 skipped, gpu 35, harness 366). **CHARC QA CONFIRMED** (patch-id
+  039db285 on all three ranges; md5s; harness 366 at my seat). Deep CP2 pack: work/wp1.3d/
+  index.html (48 stills + 12 candidates in c3 / ancuti2018 / ancuti2018-blue; 6 s clip
+  GX011600 at the deepest candidate, 2 s staged smoothing). Candidates: noise GX011600_0665.031
+  (D 0.209) + 3; open water GX011593_0255.021 (W 0.954) + 3; haze GX011589_0005.005 (H 0.050) + 3.
+  c3 bound nothing; ancuti2018 red cap bound on one still and 104/179 clip frames. **Deep CP2
+  IN PROGRESS** with the owner (sheet = last section of docs/reports/wp1.3d-deep-look-check.md,
+  10 rows PENDING). WP1.4b dispatched (opus-high; flip guards + gpmd claim 2a). Next: WP1.3-deep / WP1.4b brief on SCUBA/ (c3 primary, Params() flips to c3), then
   WP1.6 gate report (Gate 1: core 3.6x, production export 4.4x over N6). **Footage-layout skips:** the owner's Snorkel/SCUBA/edits layout makes 3
   footage tests skip (root `GX011628.MP4` paths in `tests/test_container_spike.py:902`,
   `tests/test_lookcheck.py:1289`, WP1.4 test 7; also `tools/lookcheck/pack.py:94` and the WP1.4

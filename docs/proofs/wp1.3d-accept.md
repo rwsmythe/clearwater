@@ -124,3 +124,12 @@ already formatted"; mypy "Success: no issues found in 20 source files"; pytest 7
   `Params()` to c3 first.
 - **DR-29** (new, OPEN): the instrument's out-of-envelope limits and the `--part` minor.
 - Branches kept: `wp1.3d` (`5f5b90c`), `wp1.3d-b1` (`b3813b8`).
+
+## CHARC QA
+
+2026-10-20 ~06:05Z at the CHARC seat: `git patch-id --stable` = `039db285` on `c80725b..5f5b90c`,
+`9379c56..7f9fea1` and branch `wp1.3d` (match); review-B.txt md5s `8db4a20c` (B #1,
+NEW_CRITICAL_MAJOR_FOUND) and `2213251f` (B #2, NO_NEW_CRITICAL_MAJOR) match `md5s.txt`; DR-29
+present; pack `work/wp1.3d/index.html` carries 60 images (48 stills + 12 candidates) and the three
+clip renders; the CP2 deep sheet has its 10 rows PENDING; harness gate on main `db751cb`: 366 OK
+(1 skipped). **QA CONFIRMED.** The deep CP2 walkthrough with the owner follows.
