@@ -9,7 +9,7 @@ answers to open questions 1-6 bind).
 | Round | Critical | Major | Minor | In envelope / out | NEW / REOPENED | Reverts | Fix changed | Transport, CLI | Depth |
 |---|---|---|---|---|---|---|---|---|---|
 | 0 (design table) | - | - | - | - | - | - | none (no code) | - | 62,046 (dispatcher-read at the round-0 yield) |
-| 1 | 1 | 4 | 1 | 6 in / 0 out | 6 NEW / 0 REOPENED | 0 | none yet (remediation after the ruling) | WSL, codex-cli, gpt-5.6-sol high | 118,143 (dispatcher-read at the window grant) |
+| 1 | 1 | 4 | 1 | 6 in / 0 out | 6 NEW / 0 REOPENED | 0 | PRODUCT code (d92ea8d) | WSL, codex-cli, gpt-5.6-sol high | 118,143 (dispatcher-read at the window grant) |
 
 ## Round 0: design table (no product code yet)
 
@@ -220,3 +220,5 @@ limit (for the report): a user file deliberately named marker plus 12 hex digits
 
 Inner loop after remediation: 132 own tests passed, ruff check, ruff format --check, mypy clean. Full pytest
 not yet re-run (window requested at the round-1 remediation yield).
+
+Depth figures (dispatcher-read): round-1 yield 143,034; remediation yield 169,145. Window for round 2 queued behind WP3.7 and WP3.1.
