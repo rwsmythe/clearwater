@@ -135,3 +135,12 @@ Red-lit tiles, median over the 8 deep frames (context: ISOE 100 [100-793]; camer
   hold in general; the lighting step is a genuine scene change).
 - **DR-30** (new, OPEN): the Immerkær edge-case test; the GPMF reader's structural laxness.
 - Branches kept: `wp1.4b` (`8314247`).
+
+## CHARC QA
+
+2026-10-20 ~09:45Z at the CHARC seat: `git patch-id --stable` = `04bc9d18` on `db751cb..8314247`,
+`9b6093f..afaff0e` and branch `wp1.4b` (match); review-B.txt md5 `9e7e8e07`, `md5s.txt` verifies,
+VERDICT NO_NEW_CRITICAL_MAJOR; DR-30 present; flip verified in the tree (`params.py:131`
+`method: Method = "c3"`, guard test `tests/test_noise_experiments.py:34-35`); report carries KEEP,
+the sigma_R grid (0.736 / 0.736 / 0.783 / 0.938; c3 0.481) and the claim 10b "genuine, not an
+edge effect" finding; harness gate on main `5e1f3c3`: 366 OK (1 skipped). **QA CONFIRMED.**

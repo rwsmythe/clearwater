@@ -163,7 +163,20 @@ path, md5, five assertions and verdict, or there is no accept.
   floor" where both read ~0. Early one-frame signal: a tighter cap LOWERS red noise, against
   D100's expectation; if the grid confirms, it is spec-bearing -> owner at WP1.6 result 4. Camera
   WB red gain 4.85 on GX011600@665 s: report total red gain (camera x ours). Re-seated by
-  evaluation at 235K (wp14b-cell2, 06:45Z) with the grid, claims 7-10b and review ahead. WP1.4b dispatched (opus-high; flip guards + gpmd claim 2a). Next: WP1.3-deep / WP1.4b brief on SCUBA/ (c3 primary, Params() flips to c3), then
+  evaluation at 235K (wp14b-cell2, 06:45Z) with the grid, claims 7-10b and review ahead.
+  **WP1.4b ACCEPTED 2026-10-20 main afaff0e** (bundle 5e1f3c3; record docs/proofs/wp1.4b-accept.md;
+  A converged R4; B single pass NO_NEW_CRITICAL_MAJOR, 3 minor + 2 advisory -> errata + DR-30;
+  gates 771 passed 0 skipped (suite now ~8-15 min, past one 10-min call), gpu 36, harness 366;
+  cell2 retired at 388K). **CHARC QA CONFIRMED** (patch-id 04bc9d18 x3; md5; flip in tree;
+  harness 366). Results: **Gate result 4 KEEP the caps** (red-lit tiles median sigma_R: off 0.736,
+  cap 2.0 0.736, 1.0 0.783, 0.5 0.938; c3 0.481 lowest on every deep frame; default binds 1/8;
+  clamp 3.0 never binds; N{} floor 0.02 binds none; alpha smoothed as value). Anti-D100 signal did
+  NOT hold (only on crushed-red tiles below the quantisation floor; inference, not spec-bearing).
+  Claim 10b: GENUINE scene step at 0.90 s, not an excerpt edge; neither reset nor 0.5 s window
+  shrinks it, both add flicker; 2 s stays PROVISIONAL, evidence for the Phase 2 temporal design.
+  Total red gain camera x ours ~6x Ancuti default, ~4x c3. **PHASE 1 INPUTS COMPLETE. WP1.6 gate
+  report is CHARC's next task** (template docs/reports/wp1.6-gate-report.md); no package in
+  flight; Gate 1 options go to the owner. WP1.4b dispatched (opus-high; flip guards + gpmd claim 2a). Next: WP1.3-deep / WP1.4b brief on SCUBA/ (c3 primary, Params() flips to c3), then
   WP1.6 gate report (Gate 1: core 3.6x, production export 4.4x over N6). **Footage-layout skips:** the owner's Snorkel/SCUBA/edits layout makes 3
   footage tests skip (root `GX011628.MP4` paths in `tests/test_container_spike.py:902`,
   `tests/test_lookcheck.py:1289`, WP1.4 test 7; also `tools/lookcheck/pack.py:94` and the WP1.4
