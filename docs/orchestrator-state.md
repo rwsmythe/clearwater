@@ -31,13 +31,20 @@
 - **None live.** WP1.3D ACCEPTED 2026-10-20, main `7f9fea1` (record `docs/proofs/wp1.3d-accept.md`);
   its three cells are done (`wp13d-cell` 244,164; `wp13d-cell2` 239,534; `wp13d-cell3` 153,856 after
   the B #1 remediation). Do not reply to any of them.
-- **`wp14b-cell`** (implementer-opus-high), WP1.4b, brief `docs/briefs/wp1.4b-brief.md` (`c80725b`,
-  guards `d68039b`, claim 2a `f183a11`). Dispatched 2026-10-20 05:57Z in the background. Worktree
-  `.worktrees/wp1.4b`, branch `wp1.4b`, base `db751cb` (toml copied). Agent id
-  `awp14b-cell-a3e64c9961e782f1`. Depth at dispatch 32,865 (2 turns, 05:57Z); 68,199 at 17 turns (06:14Z), flip committed alone first
-  (`b23bad9`). AMENDED 06:15Z by SendMessage with claim 10b (brief `42662d2`; deep CP2 lighting step;
-  bounded, droppable to a DR). Check at return that it landed. At the gate: the WP1.2R bit-identity
-  witness with explicit methods; check the flip commit is alone and first; CHARC's two guards.
+- **`wp14b-cell2`** (implementer-opus-high), WP1.4b RE-SEAT, dispatched 2026-10-20 06:45Z from the
+  ledger at head `33bd8ba`, with the noise-measure ruling and claim 10b. Agent id
+  `awp14b-cell2-b20dc8ec1c19a19b`. Depth at dispatch 40,786 (3 turns, 06:45Z).
+- `wp14b-cell` RETIRED at its STOP (06:44Z): 235,202 / 94 turns, then 237,015 (read twice, head
+  `33bd8ba`). Evaluation (owner's rule, not reflex): the grid, claims 7-10b, the report and a full
+  STRONG review loop remained, an open-ended load, so a fresh cell. Claim 10b had NOT landed (not
+  in its ledger). Done: the flip alone `b23bad9`; 62 pins + guards `fddc4e3`; WIP estimator and
+  camera-state reader `33bd8ba`.
+  STOP: Donoho reads 0 on all 8 deep frames (63-99 % of HH1 exactly zero; 8-bit HEVC flattening),
+  evidence `work/wp1.4b/stop/` (md5 be6c2ce0, 3e3a008c). RULING: Immerkaer primary on the same
+  tiles, Donoho as the cross-check; compare absolute output sigma_R; the ratio only where the source
+  > 0; a second tile set with source red >= 16/255; a quantised-regime validation test; the limit
+  stated (compression artefact, not grain); report what the data show (the early signal is against
+  D100's expectation).
 - **Depth rule (owner 2026-10-19, corrected 2026-10-20):** read `cell_depth.py <cell>` at dispatch,
   at every yield, and before sending any ruling or remediation; record each figure with its
   moment. **~250K is an EVALUATION point, not an automatic re-seat** (owner 2026-10-20: "You don't
