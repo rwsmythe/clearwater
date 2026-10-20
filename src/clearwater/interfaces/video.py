@@ -292,5 +292,5 @@ class VideoSink(Protocol):
         ...
 
     def abort(self) -> None:
-        """Stop and remove the partial output (D84)."""
+        """Stop and remove the partial output (D44, D85)."""
         ...

@@ -366,8 +366,19 @@ def test_proxy_cache_stub() -> None:
     cache.store_source_statistics(key, "white_balance", 1000, {"means": np.zeros(3)})
     entry = cache.lookup(key)
     assert entry is not None
-    assert entry.pts_ticks == (1000, 2000) and entry.stages == ("white_balance",)
-    assert entry.size_bytes == 6 * 2 + 3 * 8
+    assert entry.pts_ticks == (1000, 2000)
+    assert entry.stages == ()  # statistics for one of two frames do not cover the clip (AD-20)
+    cache.store_source_statistics(key, "white_balance", 2000, {"means": np.ones(3)})
+    entry = cache.lookup(key)
+    assert entry is not None
+    assert entry.stages == ("white_balance",) and entry.complete is False
+    assert entry.size_bytes == 6 * 2 + 3 * 8 * 2
+    assert np.array_equal(cache.source_statistics(key, "white_balance", 2000)["means"], np.ones(3))
+    with pytest.raises(KeyError):
+        cache.source_statistics(key, "white_balance", 7)
+    cache.mark_complete(key)
+    entry = cache.lookup(key)
+    assert entry is not None and entry.complete is True
     assert np.array_equal(cache.proxy(key, 1000), proxy)
     with pytest.raises(KeyError):
         cache.proxy(key, 7)

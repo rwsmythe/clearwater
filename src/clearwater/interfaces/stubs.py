@@ -492,6 +492,7 @@ class StubProxyCache:
         self._limit = DEFAULT_CACHE_LIMIT_BYTES
         self._proxies: dict[CacheKey, dict[int, NDArray[np.uint8]]] = {}
         self._stats: dict[CacheKey, dict[tuple[str, int], dict[str, NDArray[Any]]]] = {}
+        self._complete: set[CacheKey] = set()
 
     def lookup(self, key: CacheKey) -> CacheEntry | None:
         """Return an entry describing what is stored for ``key``, or None."""
@@ -502,11 +503,18 @@ class StubProxyCache:
         size = sum(p.nbytes for p in proxies.values()) + sum(
             v.nbytes for s in stats.values() for v in s.values()
         )
+        pts = set(proxies)
+        covered = {
+            stage
+            for stage in {stage for stage, _ in stats}
+            if pts <= {tick for name, tick in stats if name == stage}
+        }
         return CacheEntry(
             key=key,
             pts_ticks=tuple(sorted(proxies)),
-            stages=tuple(sorted({stage for stage, _ in stats})),
+            stages=tuple(sorted(covered)),
             size_bytes=size,
+            complete=key in self._complete,
         )
 
     def store_proxy(self, key: CacheKey, pts_ticks: int, proxy: NDArray[np.uint8]) -> None:
@@ -525,6 +533,14 @@ class StubProxyCache:
             name: np.array(value) for name, value in stats.items()
         }
 
+    def source_statistics(self, key: CacheKey, stage: str, pts_ticks: int) -> Statistics:
+        """Return the statistics; raises KeyError if absent."""
+        return self._stats[key][stage, pts_ticks]
+
+    def mark_complete(self, key: CacheKey) -> None:
+        """Mark the entry complete."""
+        self._complete.add(key)
+
     def limit_bytes(self) -> int:
         """Return the stored limit."""
         return self._limit
@@ -537,6 +553,7 @@ class StubProxyCache:
         """Drop everything."""
         self._proxies.clear()
         self._stats.clear()
+        self._complete.clear()
 
 
 class StubProgress:
