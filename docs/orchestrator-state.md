@@ -28,31 +28,14 @@
 
 ### Live cells
 
-- **`wp13d-cell3`** (implementer-sonnet-high), WP1.3D SECOND RE-SEAT, dispatched 2026-10-20 02:07Z
-  from the ledger's NEXT STEPS at head `7a6c6e7`. Agent id `awp13d-cell3-6a29bf6e70d086e7`.
-  Depth at dispatch 19,551 (1 turn). Envelope ruling sent: one operator running the steps in order
-  on an untampered working folder; hand-edited or replaced records and out-of-order steps are OUT
-  of envelope (banked, never loop-driving); blocking = anything showing the owner the wrong thing
-  at CP2 or a write outside `work/wp1.3d/`. Two jobs from cell2 running at hand-over (CPU scan
-  re-run, GPU clip re-render).
-- `wp13d-cell2` RETIRED at its round-2 yield: 239,534 / 127 turns (02:06Z, read twice, head
-  `7a6c6e7`). Reviewer A R1 2 major + 3 minor, R2 3 major + 2 minor (all hardening of working-folder
-  record integrity), fixed; not converged. Gate at `8120b28`: 730 passed, none skipped. Real defect
-  it found and fixed: smoothed alpha 0.9999999999999999 read as "cap bound" (now 104 of 179 frames).
-  Deviation rulings at its dispatch: read-back own bound 5.0 (measured own max 3.85, neighbour
-  margin >= 1.6), spacing within a chapter, `correct(statistics=)` with a bit-identity test; all
-  ACCEPTED by CHARC (`462c52005bb99626`).
-- `wp13d-cell` RETIRED at its interim yield: 244,164 / 77 turns (00:08Z, read twice, head
-  `663cc64` both times). It asked to be read and re-seated; no reply sent. Scan done (289
-  frames; deepest GX011600 @ 665.031 s), deep command and 28 tests committed.
-- **Next after WP1.3D merges:** WP1.4b (implementer-opus-high), brief
-  `docs/briefs/wp1.4b-brief.md` (`c80725b`): it reads `work/wp1.3d/deep-frames.json`; it flips
-  `Params()` to c3 as its first commit, alone (re-run the WP1.2R bit-identity witness with
-  explicit methods at the gate). Pinning APPROVED by CHARC (`1cc08da6b265e2a6`) with two
-  guards, written into the brief: a test for `Params().method == "c3"`; `run.py` and CLI help
-  show c3 as the default with the Ancuti options.
-- **Main re-gate:** DONE at CHARC's seat (see Handoff item 3).
-- `wp12b-cell` (WP1.2 Part B) RETIRED at 931,878 / 428 turns, PAST-CAP. Do not reply to it.
+- **None live.** WP1.3D ACCEPTED 2026-10-20, main `7f9fea1` (record `docs/proofs/wp1.3d-accept.md`);
+  its three cells are done (`wp13d-cell` 244,164; `wp13d-cell2` 239,534; `wp13d-cell3` 153,856 after
+  the B #1 remediation). Do not reply to any of them.
+- **Next: WP1.4b** (implementer-opus-high), brief `docs/briefs/wp1.4b-brief.md` (`c80725b`, guards
+  `d68039b`, camera-state claim 2a `f183a11`). Reads `work/wp1.3d/deep-frames.json`; flips `Params()`
+  to c3 as its first commit, alone; re-run the WP1.2R bit-identity witness with explicit methods at
+  the gate. Pinning approved by CHARC (`1cc08da6b265e2a6`) with two guards (a test for
+  `Params().method == "c3"`; `run.py` and CLI help show c3 as the default with the Ancuti options).
 - **Depth rule (owner 2026-10-19, corrected 2026-10-20):** read `cell_depth.py <cell>` at dispatch,
   at every yield, and before sending any ruling or remediation; record each figure with its
   moment. **~250K is an EVALUATION point, not an automatic re-seat** (owner 2026-10-20: "You don't
@@ -111,6 +94,7 @@ Each accepted package had its return report posted to CHARC and an info-update t
 | WP1.4 | 2026-10-19 | `91f5775` | `docs/proofs/wp1.4-accept.md`; 2nd B adjudicated at the gate; DR-23..DR-26 | CONFIRMED (`6c5d88685e64a37c`; finding 3 upheld; DR-26 stays banked) |
 | WP-T2 | 2026-10-19 | `8c9d780` | `docs/proofs/wp-t2-accept.md`; DR-24 closed, DR-27 | CONFIRMED (`d40217a81696cc03`; B rejection upheld; suite re-run deferred past Part B) |
 | WP1.2 Part B | 2026-10-19 | `2dd06cf` | `docs/proofs/wp1.2b-accept.md`; B #2 non-blocking, banked; DR-28; depth breach recorded | CONFIRMED (`cb61a4e41f625d73`; patch-id erratum) |
+| WP1.3D | 2026-10-20 | `7f9fea1` | `docs/proofs/wp1.3d-accept.md`; B #1 blocking (candidate labels) -> one remediation; B #2 `NO_NEW_CRITICAL_MAJOR`; DR-29 | PENDING |
 
 - **WP1.2 Part A, raised to CHARC:**
   - approval of the Windows-only `_windows_power()` in `bench.py` (instrument only, guarded);
