@@ -9,8 +9,11 @@ PATH, never from documentation:
 - PyAV's bundled FFmpeg: each library's ``configuration`` and ``license`` strings
   (``av._core.library_meta``), the build flags that decide its licence (``--enable-gpl``,
   ``--enable-version3``, ``--enable-nonfree``), the codecs and hardware devices it carries,
-  the DLLs in ``av.libs``, and any licence wording found inside the bundled x264 and x265
-  DLLs;
+  the DLLs in ``av.libs`` and the wheel's ``DELVEWHEEL`` provenance file, and every licence
+  string found inside the bundled x264, x265, libavcodec and libavutil DLLs (libavcodec's
+  and libavutil's own licence strings are the scan's positive control);
+- whether PyAV can open and use the libx264, libx265 and NVENC encoders: a few synthetic frames
+  are encoded to memory, and the encoder's self-identification in the bitstream is recorded;
 - the FFmpeg CLI build in use: ``ffmpeg -version``'s configuration line and ``ffmpeg -L``.
 
 Run from the repository root: ``uv run python tools/spike_io/licences.py``; the record
@@ -22,17 +25,19 @@ from __future__ import annotations
 
 import argparse
 import importlib.metadata
+import io
 import json
 import re
 import subprocess
 import sys
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import av
 import av._core
 from av.codec.hwaccel import hwdevices_available
+from av.video.stream import VideoStream
 
 if not __package__:
     # Script mode: sys.path[0] is tools/spike_io; put tools first for the sibling packages.
@@ -62,8 +67,21 @@ CODECS = (
 """The codecs whose presence in PyAV's bundled FFmpeg is recorded."""
 
 _LICENCE_WORDING = re.compile(
-    rb"[ -~]{0,80}(?:GPL|General Public License|Copyleft|copyleft)[ -~]{0,80}"
+    rb"(?<=\x00)[ -~]{0,120}(?:GPL|General Public License|Copyleft|copyleft)[ -~]{0,120}(?=\x00)"
 )
+"""A licence word inside a NUL-terminated printable string (a C string constant). Requiring the
+NULs keeps out the bytes ``GPL`` that occur by chance inside machine code."""
+
+ENCODERS = ("libx264", "libx265", "h264_nvenc", "hevc_nvenc")
+"""The encoders :func:`pyav_encoders` opens and uses."""
+
+ENCODE_SIZE = (256, 192)
+"""Synthetic frame size for the encoder probe (NVENC refuses 64 x 48 with EINVAL)."""
+
+ENCODE_FRAMES = 5
+"""Frames encoded per encoder."""
+
+_ENCODER_ID = re.compile(rb"x26[45] [ -~]{0,160}")
 
 
 def distribution(name: str) -> dict[str, Any]:
@@ -126,13 +144,16 @@ def pyav_ffmpeg() -> dict[str, Any]:
     libs = Path(av.__file__).resolve().parent.parent / "av.libs"
     dlls = sorted(p.name for p in libs.glob("*.dll")) if libs.is_dir() else []
     wording: dict[str, list[str]] = {}
-    for prefix in ("libx264", "libx265"):
+    for prefix in ("libx264", "libx265", "avcodec", "avutil"):
         for dll in libs.glob(f"{prefix}*.dll"):
             found = {
                 m.group().decode("ascii").strip()
                 for m in _LICENCE_WORDING.finditer(dll.read_bytes())
             }
             wording[dll.name] = sorted(found)[:10]
+    delvewheel = Path(str(importlib.metadata.distribution("av").locate_file(""))) / (
+        f"av-{av.__version__}.dist-info/DELVEWHEEL"
+    )
     return {
         "av_version": av.__version__,
         "ffmpeg_version": av.ffmpeg_version_info,
@@ -152,7 +173,68 @@ def pyav_ffmpeg() -> dict[str, Any]:
         "bundled_dlls": dlls,
         "dll_licence_wording": wording,
         "dist_info_licence_files": distribution("av")["licence_files"],
+        "delvewheel": delvewheel.read_text(encoding="utf-8").splitlines()
+        if delvewheel.is_file()
+        else None,
+        "library_versions": {name: list(v) for name, v in av.library_versions.items()},
     }
+
+
+def pyav_encoders() -> dict[str, Any]:
+    """Open each of :data:`ENCODERS` in PyAV and encode a few synthetic frames to memory.
+
+    Returns:
+        Per encoder: ``opens`` (``av.codec.Codec(name, "w")``), ``packets`` and ``bytes``
+        written, the encoder's self-identification found in the bitstream (x264 and x265
+        write one), or the error.
+    """
+    import numpy as np
+
+    width, height = ENCODE_SIZE
+    out: dict[str, Any] = {}
+    for name in ENCODERS:
+        record: dict[str, Any] = {}
+        try:
+            record["opens"] = av.codec.Codec(name, "w").long_name
+        except Exception as error:  # the error is the finding
+            record["opens"] = f"{type(error).__name__}: {error}"
+            out[name] = record
+            continue
+        buffer = io.BytesIO()
+        try:
+            container = av.open(
+                buffer, "w", format="hevc" if "265" in name or "hevc" in name else "h264"
+            )
+            stream = cast(VideoStream, container.add_stream(name, rate=30))
+            stream.width, stream.height, stream.pix_fmt = width, height, "yuv420p"
+            packets = 0
+            for i in range(ENCODE_FRAMES):
+                frame = av.VideoFrame.from_ndarray(
+                    np.full((height, width, 3), i * 40, np.uint8), format="rgb24"
+                )
+                for packet in stream.encode(frame):
+                    container.mux(packet)
+                    packets += 1
+            for packet in stream.encode():
+                container.mux(packet)
+                packets += 1
+            container.close()
+        except Exception as error:  # the error is the finding
+            record["encode"] = f"{type(error).__name__}: {error}"
+            out[name] = record
+            continue
+        data = buffer.getvalue()
+        found = _ENCODER_ID.search(data)
+        record.update(
+            {
+                "encode": "ok",
+                "packets": packets,
+                "bytes": len(data),
+                "self_identification": found.group().decode("ascii") if found else None,
+            }
+        )
+        out[name] = record
+    return out
 
 
 def ffmpeg_cli() -> dict[str, Any]:
@@ -180,6 +262,7 @@ def collect() -> dict[str, Any]:
         "distributions": {name: distribution(name) for name in DISTRIBUTIONS},
         "pillow_heif_bundled": pillow_heif_bundled(),
         "pyav_ffmpeg": pyav_ffmpeg(),
+        "pyav_encoders": pyav_encoders(),
         "ffmpeg_cli": ffmpeg_cli(),
     }
 
