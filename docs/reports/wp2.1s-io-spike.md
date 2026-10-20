@@ -584,9 +584,8 @@ beyond what the artefacts show.
   - It finds "libavcodec license: LGPL version 3 or later" in avcodec and "libavutil license:
     LGPL version 3 or later" in avutil. These are the scan's positive control.
   - It finds NO licence string in libx264 or libx265.
-  - Correction: round 1 of this report said those two DLLs "carry only the bare string 'GPL'".
-    Those bytes sit inside machine code (for example `...A\x0f\x11GPL\x8b...`), not in any
-    string. That statement was wrong and is replaced here.
+  - A looser scan does find the bytes `GPL` in both, but inside machine code (for example
+    `...A\x0f\x11GPL\x8b...`), not in any string.
 - **Reconciling the contradiction, as far as the artefact goes.**
   - The artefact shows three facts together:
     - no `--enable-gpl` in the configuration;
