@@ -44,7 +44,7 @@ _PIX_FMT_DEPTH = {"yuv420p": 8, "yuvj420p": 8, "yuv420p10le": 10}
 _RGB_PIX_FMT = {8: "gbrp", 10: "gbrp10le"}
 _YUV_PIX_FMT = {8: "yuv420p", 10: "yuv420p10le"}
 _MATRIX_NAMES = {"bt709": "bt709", "bt601": "smpte170m", "identity": "gbr"}
-_PRIMARIES_NAMES = {"bt709": "bt709", "bt601": "smpte170m", "display-p3": "smpte432"}
+_PRIMARIES_NAMES = {"bt709": "bt709", "display-p3": "smpte432"}
 _TRANSFER_NAMES = {"bt709": "bt709", "srgb": "iec61966-2-1"}
 _RANGE_NAMES = {"limited": "tv", "full": "pc"}
 
@@ -81,20 +81,20 @@ def _check(stream: VideoStreamInfo) -> tuple[str, str, str]:
     color = stream.color
     if stream.pix_fmt not in SUPPORTED_PIX_FMTS:
         raise ColorError(
-            f"pixel format {stream.pix_fmt!r} is not supported; supported: "
+            f"pixel format {stream.pix_fmt!a} is not supported; supported: "
             + ", ".join(SUPPORTED_PIX_FMTS)
         )
     if _PIX_FMT_DEPTH[stream.pix_fmt] != stream.bit_depth or color.bit_depth != stream.bit_depth:
         raise ColorError(
-            f"bit depth disagrees: pixel format {stream.pix_fmt!r}, stream {stream.bit_depth}, "
+            f"bit depth disagrees: pixel format {stream.pix_fmt!a}, stream {stream.bit_depth}, "
             f"colour description {color.bit_depth}"
         )
     if color.matrix not in SUPPORTED_MATRICES:
         raise ColorError(
-            f"matrix {color.matrix!r} is not supported; supported: " + ", ".join(SUPPORTED_MATRICES)
+            f"matrix {color.matrix!a} is not supported; supported: " + ", ".join(SUPPORTED_MATRICES)
         )
     if color.range not in _RANGE_NAMES:
-        raise ColorError(f"range {color.range!r} is not supported; supported: full, limited")
+        raise ColorError(f"range {color.range!a} is not supported; supported: full, limited")
     if stream.pix_fmt == "yuvj420p" and color.range != "full":
         # swscale reads a yuvj format as full range whatever in_range says, so the decode would
         # silently disagree with the encode; refuse rather than guess which one is right.
@@ -102,7 +102,7 @@ def _check(stream: VideoStreamInfo) -> tuple[str, str, str]:
     siting = DEFAULT_SITING if stream.chroma_siting == "unknown" else stream.chroma_siting
     if siting not in _SITINGS:
         raise ColorError(
-            f"chroma siting {stream.chroma_siting!r} is not supported; supported: unknown, "
+            f"chroma siting {stream.chroma_siting!a} is not supported; supported: unknown, "
             + ", ".join(sorted(_SITINGS))
         )
     return _MATRIX_NAMES[color.matrix], _RANGE_NAMES[color.range], siting

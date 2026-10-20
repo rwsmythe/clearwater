@@ -38,8 +38,10 @@ def rgb_frame_bytes(width: int, height: int, bit_depth: int) -> int:
         ``3 * width * height`` samples of 1 byte (8-bit) or 2 bytes (10-bit).
 
     Raises:
-        ColorError: The bit depth is neither 8 nor 10.
+        ColorError: The bit depth is neither 8 nor 10, or the size is not positive.
     """
+    if width < 1 or height < 1:
+        raise ColorError(f"a frame must be at least 1x1, not {width}x{height}")
     return 3 * width * height * _dtype(bit_depth).itemsize
 
 
@@ -60,10 +62,13 @@ def planes_to_rgb(data: Buffer, *, width: int, height: int, bit_depth: int) -> A
         A new C-contiguous float32 array of shape ``(height, width, 3)``, channels R, G, B.
 
     Raises:
-        ColorError: The bit depth is unsupported, or ``data`` is not exactly one frame.
+        ColorError: The bit depth or size is unsupported, or ``data`` is not exactly one
+            contiguous frame.
     """
     dtype = _dtype(bit_depth)
     view = memoryview(data)
+    if not view.c_contiguous:
+        raise ColorError("the frame buffer must be contiguous")
     expected = rgb_frame_bytes(width, height, bit_depth)
     if view.nbytes != expected:
         raise ColorError(
@@ -92,12 +97,12 @@ def rgb_to_planes(a: Array, *, bit_depth: int) -> bytes:
         The frame as FFmpeg's ``gbrp`` (8-bit) or ``gbrp10le`` (10-bit) reads it.
 
     Raises:
-        ColorError: The bit depth is unsupported, the array is not float32 ``(H, W, 3)``, or it
-            holds a NaN.
+        ColorError: The bit depth is unsupported, the array is not a non-empty float32
+            ``(H, W, 3)``, or it holds a NaN.
     """
     dtype = _dtype(bit_depth)
-    if a.dtype != np.float32 or a.ndim != 3 or a.shape[2] != 3:
-        raise ColorError(f"expected a float32 (H, W, 3) array, got {a.dtype} {a.shape}")
+    if a.dtype != np.float32 or a.ndim != 3 or a.shape[2] != 3 or a.size == 0:
+        raise ColorError(f"expected a non-empty float32 (H, W, 3) array, got {a.dtype} {a.shape}")
     scaled = np.clip(a, np.float32(0), np.float32(1)) * np.float32(2**bit_depth - 1)
     if np.isnan(scaled.sum()):
         raise ColorError("the array holds a NaN; it cannot be quantised")
