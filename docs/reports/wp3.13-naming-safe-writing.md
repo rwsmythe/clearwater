@@ -109,3 +109,9 @@ Loop CONVERGED at round 3 by the dispatcher's ruling; every fix was product code
   `check_free_space`.
 - WP4.3: call `remove_leftovers` at start-up over the configured output folder plus the folders of in-flight
   writes (the journal is not built here), before any job runs.
+
+## Erratum at the gate (orchestrator, 2026-10-20)
+
+The rename table's "POSIX with links: no window" holds only while `os.link` succeeds. Any `OSError`
+from `os.link` (not only "links unsupported") takes the re-check-then-`os.rename` fallback, whose
+residual POSIX race stays under DR-16 (Reviewer B advisory 4; out of envelope).
