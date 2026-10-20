@@ -63,7 +63,8 @@ ICC + EXIF), and confirms or corrects AD-18 (licences). Brief `docs/briefs/wp2.1
   - PyAV 16.1.0 crashes the process when a PNG frame's ICC side data has been touched and the
     frame is freed.
 - **Licences (claim 3; section 9).** PyAV's bundled FFmpeg 8.0.1 reports "LGPL version 3 or later"
-  and is configured without `--enable-gpl`, yet bundles libx264 and libx265. The gyan FFmpeg CLI
+  and is configured without `--enable-gpl`, yet bundles libx264 and libx265, and both work as
+  encoders from PyAV, as does NVENC (section 9.1). No licence text ships for any bundled DLL. The gyan FFmpeg CLI
   is GPL version 3 or later, not 2 (CORRECTS AD-18). NumPy's expression is wider than BSD-3
   (CORRECTS AD-18). Pillow, pillow-heif and its bundled libraries, and CuPy CONFIRM AD-18.
 
@@ -510,8 +511,8 @@ WP2.1, to be confirmed at WP5.5, and not legal advice. It assumes the FSF's read
 | Name | Version | License (as read) | GPL-2.0-or-later compatibility | One-line reason | AD-18 |
 |---|---|---|---|---|---|
 | PyAV | 16.1.0 | BSD-3-Clause (`License-Expression`) | yes | permissive | NEW |
-| FFmpeg bundled in the PyAV wheel | 8.0.1 | every library reports "LGPL version 3 or later"; configuration has `--enable-version3`, NO `--enable-gpl`, NO `--enable-nonfree`; `--enable-libx264 --enable-libx265`, with `libx264-165` and `libx265` DLLs in `av.libs`; the wheel's only licence file is PyAV's own `LICENSE.txt`, so it ships no FFmpeg, x264 or x265 licence text | UNKNOWN | the libraries report LGPL-3, yet x264/x265 are linked in; their DLLs carry only the bare string "GPL", so neither their licence and version nor the licence of the combination can be read from the artefact | NEW |
-| Its codecs and devices | 8.0.1 | `hevc`, `h264` decoders; `hevc_nvenc`, `h264_nvenc`; `hevc_cuvid`, `h264_cuvid`; `--enable-nvenc --enable-nvdec`; hwdevices cuda, dxva2, qsv, d3d11va, d3d12va, amf | UNKNOWN | the NVENC/NVDEC headers' licence (AD-18: MIT) is not readable from this artefact | NEW |
+| FFmpeg bundled in the PyAV wheel | 8.0.1 | every library reports "LGPL version 3 or later"; configuration has `--enable-version3`, NO `--enable-gpl`, NO `--enable-nonfree`; `--enable-libx264 --enable-libx265`, with `libx264-165` and `libx265` DLLs in `av.libs`, and PyAV opens and uses both encoders (section 9.1); the wheel's only licence files are PyAV's own `LICENSE.txt` and `AUTHORS.rst`, so it ships no FFmpeg, x264 or x265 licence text | LGPL-3 libraries: yes (CHARC); the x264/x265 inside: UNKNOWN | the libraries report LGPL-3, yet x264 and x265 are compiled in and usable; their DLLs carry no licence string at all, so their licence cannot be read from the artefact, and neither can the licence of the build as a whole | NEW |
+| Its codecs and devices | 8.0.1 | `hevc`, `h264` decoders; `hevc_nvenc`, `h264_nvenc` (open and encode, section 9.1); `hevc_cuvid`, `h264_cuvid` decoders; `--enable-nvenc --enable-nvdec`; hwdevices cuda, dxva2, qsv, d3d11va, d3d12va, amf | UNKNOWN | the NVENC/NVDEC headers' licence (AD-18: MIT) is not readable from this artefact | NEW |
 | pillow-heif | 1.8.1 | source BSD-3-Clause; `LICENSES_bundled.txt`: "License for pillow-heif binary wheels: GPLv2, due to base library licenses" | UNKNOWN | the binary wheel bundles LGPLv3 libheif and libde265 with x265, and its "GPLv2" may or may not mean "or later" (row below) | CONFIRMED (BSD-3 source); the wheel-level GPLv2 is NEW |
 | libheif (in pillow-heif) | 1.23.6 | LGPLv3 (`LICENSES_bundled.txt`) | yes-if | LGPL-3: conveyed under GPL-3.0 | CONFIRMED |
 | libde265 (in pillow-heif) | 1.1.3 | LGPLv3 | yes-if | as libheif | CONFIRMED |
@@ -528,8 +529,81 @@ WP2.1, to be confirmed at WP5.5, and not legal advice. It assumes the FSF's read
   - Yet libx264 and libx265 are configured in and bundled as DLLs.
   - The build is not `nonfree`. It carries `hevc`, `h264`, `hevc_nvenc`, `h264_nvenc` and the
     `cuda` hwaccel.
-  - If PyAV ships, this build ships. It brings x264 and x265, whose licence the artefact states
-    only as the string "GPL", and no licence texts for them.
+  - If PyAV ships, this build ships. It brings x264 and x265 without any licence text, and their
+    DLLs state no licence (section 9.1).
 - **pillow-heif's wheel holds one native file, `libheif-*.dll`.** `LICENSES_bundled.txt` names
   separate `libde265`, `libx265` and MinGW runtime files that this Windows wheel does not have. INFERENCE: they
   are linked into the libheif DLL.
+
+### 9.1 PyAV's bundled FFmpeg: encoders, the configuration and the licence strings
+
+Asked by CHARC for AD-18 and AD-2. Everything here is read from the installed wheel or measured
+with it (`licences.py`, record `work/wp2.1s/licences.json`). The licence is not adjudicated
+beyond what the artefacts show.
+
+- **The configuration string, exactly as `av._core.library_meta` reports it.** It is identical
+  for all seven libraries:
+
+  ```
+  --disable-static --enable-shared --libdir=/c/cibw/vendor/lib --prefix=/c/cibw/vendor --disable-programs --disable-doc --disable-libxml2 --disable-lzma --disable-libtheora --disable-libfreetype --disable-libfontconfig --disable-libbluray --disable-libopenjpeg --enable-mediafoundation --enable-version3 --disable-alsa --disable-gnutls --enable-libaom --enable-libdav1d --enable-libmp3lame --enable-libopencore-amrnb --enable-libopencore-amrwb --enable-libopus --enable-libspeex --enable-libsvtav1 --enable-libvorbis --enable-libvpx --enable-libwebp --enable-libopenh264 --disable-libxcb --enable-zlib --enable-libx264 --enable-libx265 --enable-nvenc --enable-nvdec --enable-amf --enable-libvpl --disable-encoder='avui,dca,mlp,opus,s302m,sonic,sonic_ls,truehd,vorbis' --disable-decoder=sonic --disable-libjack --disable-indev=jack
+  ```
+
+- **The licence call** (`library_meta[...]["license"]`) returns "LGPL version 3 or later" for
+  libavutil, libavcodec, libavformat, libavdevice, libavfilter, libswscale and libswresample.
+- **`av.library_versions`:** libavutil 60.8.100, libavcodec 62.11.100, libavformat 62.3.100,
+  libavdevice 62.1.100, libavfilter 11.4.100, libswscale 9.1.100, libswresample 6.1.100. FFmpeg
+  is 8.0.1 (`av.ffmpeg_version_info`).
+- **NVENC and NVDEC (CHARC's question a): present and usable.**
+  - `hevc_nvenc` and `h264_nvenc` open (`av.codec.Codec(name, "w")`). Each encoded 5 synthetic
+    256 x 192 frames to memory: 5 packets, 364 and 481 bytes.
+  - At 64 x 48 both refused with `avcodec_open2` EINVAL, below NVENC's minimum size.
+  - The `hevc_cuvid` and `h264_cuvid` decoders open, and the `cuda` hwaccel is listed.
+  - Rows c-cuda and c-cuda-auto decoded the whole clip through it (section 4).
+- **libx264 and libx265 (CHARC's question b): present and usable as encoders from PyAV.**
+  - Both open for writing, and each encoded 5 synthetic 256 x 192 frames to memory: 5 packets,
+    1,212 and 2,575 bytes.
+  - Each encoder wrote its own identification into the bitstream:
+    - x264: "x264 - core 165 - H.264/MPEG-4 AVC codec - Copyleft 2003-2025 -
+      http://www.videolan.org/x264.html";
+    - x265: "x265 (build 215) - 4.1+1-1d117be:[Windows][GCC 15.2.0][64 bit]
+      8bit+10bit+12bit - H.265/HEVC codec - Copyright 2013-2018 (c) Multicoreware, Inc".
+  - This x265 is 4.1+1. pillow-heif's is 4.3+1, a separate copy.
+- **The bundled DLLs.** `av.libs` holds 31 DLLs and nothing else:
+  - FFmpeg's avcodec, avdevice, avfilter, avformat, avutil, swresample and swscale;
+  - libx264-165 and libx265;
+  - libaom, libdav1d, libSvtAv1Enc, libvpx, libwebp, libwebpmux, libsharpyuv, libopenh264,
+    libmp3lame, libopus, libvorbis, libvorbisenc, libogg, libspeex, libopencore-amrnb,
+    libopencore-amrwb, libvpl, libiconv and zlib1;
+  - the MinGW runtime: libgcc_s_seh-1, libstdc++-6 and libwinpthread-1.
+- **Where the DLLs came from:** the wheel's `DELVEWHEEL` file says delvewheel 1.11.2 repaired
+  the wheel with `--add-path C:\cibw\vendor\bin`, the configure `--prefix` above.
+- **Licence files shipped with the DLLs: none.** The wheel's licence files are PyAV's
+  `LICENSE.txt` (BSD-3-Clause) and `AUTHORS.rst`. Nothing covers FFmpeg or any of the 31 DLLs.
+- **Licence strings inside the DLLs.** The scan looks for a licence word in a NUL-terminated C
+  string.
+  - It finds "libavcodec license: LGPL version 3 or later" in avcodec and "libavutil license:
+    LGPL version 3 or later" in avutil. These are the scan's positive control.
+  - It finds NO licence string in libx264 or libx265.
+  - Correction: round 1 of this report said those two DLLs "carry only the bare string 'GPL'".
+    Those bytes sit inside machine code (for example `...A\x0f\x11GPL\x8b...`), not in any
+    string. That statement was wrong and is replaced here.
+- **Reconciling the contradiction, as far as the artefact goes.**
+  - The artefact shows three facts together:
+    - no `--enable-gpl` in the configuration;
+    - an "LGPL version 3 or later" licence string in every library;
+    - libx264 and libx265 compiled in, bundled and working as encoders.
+  - Not from the artefact (stated as background): FFmpeg's stock configure refuses
+    `--enable-libx264` and `--enable-libx265` without `--enable-gpl`, and it derives the
+    licence string from the flags.
+  - So either this build's configure was changed or its check bypassed. Which one cannot be
+    read from the wheel: UNKNOWN.
+  - Either way the "LGPL version 3 or later" string describes the configure flags, not the x264
+    and x265 code linked into this libavcodec.
+- **Bearing on AD-2 (finding only).**
+  - This wheel gives a PyAV encode path libx264, libx265 and NVENC.
+  - A PyAV FFmpeg build that is LGPL in fact, as its string claims, would lack libx264 and
+    libx265. It could keep NVENC: `--enable-nvenc` needs no `--enable-gpl` (background, not from
+    the artefact).
+  - A software HEVC or H.264 encode would then need the separate FFmpeg process.
+  - The decode-only candidates of claim 1 are unaffected: their encode side is the FFmpeg
+    process either way.
