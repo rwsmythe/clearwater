@@ -457,11 +457,18 @@ def _checked_bounds(bounds: Sequence[float]) -> tuple[float, float]:
 
 
 def _floored(low: float, high: float) -> tuple[float, float]:
-    """Widen bounds closer than the floor symmetrically about their midpoint (AD-4, DR-14)."""
+    """Widen bounds closer than the floor symmetrically about their midpoint (AD-4, DR-14).
+
+    Raises:
+        ValueError: The midpoint is so large (beyond about 1e14) that the widening is lost to
+            float64 rounding and the range stays 0; the message names ``bounds``.
+    """
     if high - low >= NORMALISATION_RANGE_FLOOR:
         return low, high
     mid = (low + high) / 2.0
     half = NORMALISATION_RANGE_FLOOR / 2.0
+    if not (mid + half) - (mid - half) > 0.0:
+        raise ValueError(f"bounds {[low, high]} are too large for the N{{}} floor to widen")
     return mid - half, mid + half
 
 
