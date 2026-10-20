@@ -192,7 +192,10 @@ path, md5, five assertions and verdict, or there is no accept.
   proxy; stages per WP1.4 s7; recompute scheme; defaults c3/caps 2.0/clamp 3.0; CPU/GPU status +
   Force CPU; swscale bicubic chroma; tolerances; quality cq 18/23/28; JSON presets; flicker clip;
   export disabled during analysis; GP-Log via PTCL; photo libs PENDING WP2.1S; licences; DR-15
-  reading). CLAUDE.md current-state refreshed. CP4 reviews this with spec v0.5.4. WP1.4b dispatched (opus-high; flip guards + gpmd claim 2a). Next: WP1.3-deep / WP1.4b brief on SCUBA/ (c3 primary, Params() flips to c3), then
+  reading). CLAUDE.md current-state refreshed. CP4 reviews this with spec v0.5.4. **WP2.1S brief APPROVED**
+  (07339bc; rulings: av granted dev-only; no pypng, stdlib chunk writer as the PNG alternative;
+  no exiftool; Part B best-effort ruling covers the exclusive transport leg; every transport row
+  reports exact per-frame pts). Dispatch is the orchestrator's; return closes AD-2, AD-17, AD-18. WP1.4b dispatched (opus-high; flip guards + gpmd claim 2a). Next: WP1.3-deep / WP1.4b brief on SCUBA/ (c3 primary, Params() flips to c3), then
   WP1.6 gate report (Gate 1: core 3.6x, production export 4.4x over N6). **Footage-layout skips:** the owner's Snorkel/SCUBA/edits layout makes 3
   footage tests skip (root `GX011628.MP4` paths in `tests/test_container_spike.py:902`,
   `tests/test_lookcheck.py:1289`, WP1.4 test 7; also `tools/lookcheck/pack.py:94` and the WP1.4
