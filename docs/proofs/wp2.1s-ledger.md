@@ -94,7 +94,46 @@ cumulative machine time ~60 min.
   0BSD AND MIT AND Zlib AND CC0-1.0. gyan 9.0.2 `--enable-gpl --enable-version3`, no nonfree.
 
 
+## Successor cell (gen-2), 2026-10-20
+
+- Took over at `c6a70f9`; worktree clean at that commit. Re-verified the handoff facts against the
+  artefacts before use (Pillow 16-bit refusal, pillow-heif `irot`/reset behaviour, licence strings).
+- Claim 2: `tools/spike_io/photo.py`, `tests/test_spike_io_photo.py` (`a1495d2`); record
+  `work/wp2.1s/photo/photo.json`. Stdlib PNG writer works (ruling 1b; no STOP). exiftool absent.
+- Claim 3: `tools/spike_io/licences.py` (`ada04ce`); record `work/wp2.1s/licences.json`.
+- Report sections 8-9 (`ccc23b8`).
+- Validation before round 1 (tree at `ccc23b8`, code = `ada04ce`): ruff check green; ruff format
+  green except `docs/architecture.md` (CHARC's file, not touched); mypy green (26 files); full
+  pytest 804 passed, 0 skipped, 1 warning (CuPy CUDA_PATH), 527.6 s
+  (`work/wp2.1s/logs/pytest-full.log`).
+- Machine time after the transport leg (no timed window opened):
+  - **INCIDENT 01:48:02-~01:50 (cell error):** while probing the new label validation through the
+    CLI, a loop passed the valid label `W7` and started `window W7 explore`. Stopped within ~2.5 min
+    by killing the cell's own process (`kill` of its uv/bash PIDs); its FFmpeg child ended with a
+    PartialFrameError. No `W7.json`, no gate record, nothing in `summary.json` from it. Its figures do
+    not exist and nothing reported rests on it. Validation is now probed by calling `window_label`
+    directly.
+  - Untimed identity, five knob `+pts` rows: 01:50:57-01:53:33 (2.6 min).
+  - `summary.json` regenerated from W2-W6 (as the report's rows of record; W1 is exploration); a
+    W1-W6 summary was briefly written first and replaced.
+  - Cumulative transport-leg machine time: ~60 + 2.5 + 2.6 = ~65 min of 120.
+
 ## Reviewer A rounds (cumulative)
 
 | Round | Transport / CLI | Critical | Major | Minor | In-envelope / out | NEW / REOPENED | Reverts | Fixes: product / test-only | Depth (dispatcher) | Evidence |
 |---|---|---|---|---|---|---|---|---|---|---|
+| r1 | WSL, codex-cli 0.162.1, gpt-5.6-sol/high | 0 | 4 | 4 | 7 / 1 (F8 out) | 8 NEW / 0 | 0 | product: transport.py, photo.py, licences.py, report; test: photo tests | (dispatcher) | `clearwater-review-evidence/wp2.1s/r1/` |
+
+Round 1 (diff `aa1f5f0..ccc23b8`; VERDICT NEW_CRITICAL_MAJOR_FOUND; assertions all pass, 30
+succeeded, 0 `^ERROR`, 0 `ERROR codex_core`, footer present; access hits are echoes). Findings and
+fixes (adjudication in the evidence folder):
+1. MAJOR window label path traversal -> `window_label` + resolved-parent check (`ef3c645`).
+2. MAJOR producer runs ahead during the excluded witness hash -> bracket stated as lower bound,
+   `wall_s_with_witness` as upper bound (0.35-0.58 ms/frame), from the records; no re-timing
+   (`ef3c645`, `ab30cf7`).
+3. MAJOR five knob forms lacked a pts check -> `+pts` identity rows, 681/681 exact (`ef3c645`).
+4. MAJOR licence `yes-if` beyond the artefact -> PyAV FFmpeg and pillow-heif wheel UNKNOWN (`ab30cf7`).
+5. MINOR bracket start definition -> stated in the report.
+6. MINOR licence-file regex on directory -> match on file name; "listed, not read" (`b4df044`).
+7. MINOR HEIC EXIF names only -> values on all 8 fixtures (`6bfc4fe`).
+8. MINOR OUT-OF-ENVELOPE `ipma` not read -> limit stated; banked.
