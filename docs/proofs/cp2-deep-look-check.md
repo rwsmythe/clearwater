@@ -20,4 +20,19 @@ step change in lighting; the step is present but less pronounced in the source. 
 smoothing (PROVISIONAL per DR-25(3)) does not hide a lighting step; the correction amplifies it.
 Routed to the temporal-smoothing design (see below), not a defect of the colour method.
 
-## Step 2 -- PENDING (noise in stills and clip; flicker; any remaining cast)
+## Step 2 (2026-10-20 ~06:25Z) -- noise, flicker, remaining cast
+
+> "No grain noted. No flicker noted. The cast is fairly well greyed"
+
+Reading: no visible noise in the deep stills or the c3 clip; no flicker in the 6 s clip apart from
+the lighting-step discontinuity of step 1; the residual cast in c3 is neutral ("fairly well
+greyed"), i.e. acceptable. The owner did not name single candidates per case; all four per case
+are recorded as confirmed representatives.
+
+## Outcome
+
+**Deep CP2 COMPLETE 2026-10-20.** c3 confirmed as the default on deep footage as on shallow;
+Ancuti variants stay selectable options. No halo, clipping, noise, flicker or residual cast. One
+finding routed: the 2 s smoothing does not hide a lighting step (clip at ~1 s); to WP1.4b's open
+smoothing question and the Phase 2 temporal design (step detection / window reset). The sheet in
+`docs/reports/wp1.3d-deep-look-check.md` is filled from these words.

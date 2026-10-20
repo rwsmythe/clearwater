@@ -344,13 +344,15 @@ Candidate files are under `work\wp1.3d\frames\` (`<frame>.png` source, `<frame>-
 
 | Case or artifact class | Observed (yes / no / pending) | Seriousness | Decision |
 |---|---|---|---|
-| Gray-world on open water (spec 12): candidates `GX011593_0255.021`, `GX011593_0105.005`, `GX011600_0845.011`, `GX011600_0735.001` | PENDING | | |
-| Distance haze (spec 12): candidates `GX011589_0005.005`, `GX011593_0025.025`, `GX011600_0885.017`, `GX011591_0055.022` | PENDING | | |
-| Deep-water noise (spec 12): candidates `GX011600_0665.031`, `GX011600_0965.031`, `GX011591_0095.028`, `GX011593_0065.032` | PENDING | | |
-| Colour cast remaining | PENDING | | |
-| Magenta / red push | PENDING | | |
-| Over-sharpening halo | PENDING | | |
-| Noise (stills) | PENDING | | |
-| Noise in motion (the clip) | PENDING | | |
-| Clipping | PENDING | | |
-| Flicker (the clip, smoothed at 2.0 s) | PENDING | | |
+| Gray-world on open water (spec 12): candidates `GX011593_0255.021`, `GX011593_0105.005`, `GX011600_0845.011`, `GX011600_0735.001` | yes (c3 handles it; all four candidates confirmed) | none | c3 default stands |
+| Distance haze (spec 12): candidates `GX011589_0005.005`, `GX011593_0025.025`, `GX011600_0885.017`, `GX011591_0055.022` | yes (c3 handles it; all four candidates confirmed) | none | c3 default stands |
+| Deep-water noise (spec 12): candidates `GX011600_0665.031`, `GX011600_0965.031`, `GX011591_0095.028`, `GX011593_0065.032` | yes (c3 handles it; all four candidates confirmed) | none | c3 default stands |
+| Colour cast remaining | no ("fairly well greyed") | none | accept |
+| Magenta / red push | no in c3; yes in ancuti2018 and ancuti2018-blue (as shallow) | low (options only) | c3 default; Ancuti selectable |
+| Over-sharpening halo | no | none | accept |
+| Noise (stills) | no | none | accept |
+| Noise in motion (the clip) | no | none | accept |
+| Clipping | no | none | accept |
+| Flicker (the clip, smoothed at 2.0 s) | no flicker; one discontinuity at ~1 s at a rock-to-open-water lighting step, less pronounced in the source | medium | routed to WP1.4b smoothing question and the Phase 2 temporal design (step detection / window reset); 2 s default stays PROVISIONAL |
+
+Filled by CHARC 2026-10-20 from the owner's words recorded in `docs/proofs/cp2-deep-look-check.md`.
