@@ -51,6 +51,6 @@ at CP2"). The architect's reading follows at WP1.6.
 ## Step 5 -- the sheet (owner, 2026-10-19 ~01:55Z): "confirmed"
 
 The compiled sheet is in `docs/reports/wp1.3-look-check.md` section 9. Shallow CP2 is COMPLETE.
-Open: the three deep rows (open water, distance haze, deep-water noise) at the scuba look check
+CLOSED 2026-10-20 by the deep CP2 (`cp2-deep-look-check.md`): the three deep rows (open water, distance haze, deep-water noise) at the scuba look check
 (WP1.3 deep part, after Part B). Decisions carried forward: c3 default (spec revision, owner
 approves the text); D98 architect's reading at WP1.6 on "no visible difference".

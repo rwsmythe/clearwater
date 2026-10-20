@@ -382,9 +382,9 @@ record observations about them under the open-water row at CP2 is the owner's ca
 
 | Case or artifact class | Observed (yes / no / pending) | Seriousness | Decision |
 |---|---|---|---|
-| Gray-world on open water (spec 12) | PENDING (scuba look check) | | |
-| Distance haze (spec 12) | PENDING (scuba look check) | | |
-| Deep-water noise (spec 12) | PENDING (scuba look check) | | |
+| Gray-world on open water (spec 12) | yes, handled by c3 (deep CP2 2026-10-20; see `docs/reports/wp1.3d-deep-look-check.md`) | none | c3 default stands |
+| Distance haze (spec 12) | yes, handled by c3 (deep CP2 2026-10-20; see `docs/reports/wp1.3d-deep-look-check.md`) | none | c3 default stands |
+| Deep-water noise (spec 12) | yes, handled by c3 (deep CP2 2026-10-20; see `docs/reports/wp1.3d-deep-look-check.md`) | none | c3 default stands |
 | Colour cast remaining | no (all three variants: "the green/blue is corrected out") | | |
 | Magenta push (red over-correction) | yes on `ancuti2018` and `ancuti2018-blue` ("too much red in the scene", skin and the white boat); no on `c3` ("seems to match my recollection of the actual scene") | enough to change the default | `c3` becomes the default method; `ancuti2018` and `ancuti2018-blue` stay as options (spec revision pending) |
 | Over-sharpening halo | no | | |

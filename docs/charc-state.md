@@ -149,8 +149,11 @@ path, md5, five assertions and verdict, or there is no accept.
   GX011600 at the deepest candidate, 2 s staged smoothing). Candidates: noise GX011600_0665.031
   (D 0.209) + 3; open water GX011593_0255.021 (W 0.954) + 3; haze GX011589_0005.005 (H 0.050) + 3.
   c3 bound nothing; ancuti2018 red cap bound on one still and 104/179 clip frames. **Deep CP2
-  IN PROGRESS** with the owner (sheet = last section of docs/reports/wp1.3d-deep-look-check.md,
-  10 rows PENDING). WP1.4b dispatched (opus-high; flip guards + gpmd claim 2a). Next: WP1.3-deep / WP1.4b brief on SCUBA/ (c3 primary, Params() flips to c3), then
+  COMPLETE 2026-10-20 ~06:25Z** (record docs/proofs/cp2-deep-look-check.md; sheet filled 169356f;
+  WP1.3 sheet deep rows closed): owner "c3 throughout showed the best performance ... No halo or
+  clipping ... No grain ... No flicker ... The cast is fairly well greyed"; c3 default CONFIRMED on
+  deep; FINDING: 2 s smoothing does not hide a rock-to-open-water lighting step (clip ~1 s), routed
+  to WP1.4b (msg de4dc755) and the Phase 2 temporal design; 2 s default stays PROVISIONAL. WP1.4b dispatched (opus-high; flip guards + gpmd claim 2a). Next: WP1.3-deep / WP1.4b brief on SCUBA/ (c3 primary, Params() flips to c3), then
   WP1.6 gate report (Gate 1: core 3.6x, production export 4.4x over N6). **Footage-layout skips:** the owner's Snorkel/SCUBA/edits layout makes 3
   footage tests skip (root `GX011628.MP4` paths in `tests/test_container_spike.py:902`,
   `tests/test_lookcheck.py:1289`, WP1.4 test 7; also `tools/lookcheck/pack.py:94` and the WP1.4
