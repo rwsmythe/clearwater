@@ -137,9 +137,43 @@ samples), SM clock 1,440-2,370 MHz, 62-79 C, 90-100 % utilisation, 51-63 W, tota
 during the CPU pass (11 samples), the GPU idle, total CPU 1-9 %; after, the GPU idle at 53 C.
 Busy processes above 25 % of one logical CPU: the run's own `python.exe` (pid 3928, every
 sample); `WmiPrvSE.exe` (6 samples, at most 45 %; likely the telemetry queries); a second `python.exe`
-(pid 36328, 2 samples); `MsMpEng.exe` (1 sample, 27 %); `System` (1 sample). No other suite was
-running (the dispatcher held the window). nvidia-smi answered every sample. Best effort on a shared
+(pid 36328, 2 samples); `MsMpEng.exe` (1 sample, 27 %); `System` (1 sample). The dispatcher held
+the window and started no other cell's suite, but CHARC's QA pytest overlapped it (below).
+nvidia-smi answered every sample. Best effort on a shared
 laptop (owner 2026-10-19): the clock spread is the laptop's boost behaviour, kept as spread.
+
+**Overlap (frame rule 7, kept as spread).** Inside the window, CHARC's QA ran a full pytest on
+main at its own seat, about 21:09-21:20Z (676 s, ending about 21:20Z; reported by the
+dispatcher). By time, that span covers GPU frames from about 350 to the end of the GPU pass
+(frame 680, ended about 21:19:25Z), about 330 of the 680 kept GPU frames. The CPU pass's kept
+frames (68 to 680, from 21:20:12Z) come after it, so the CPU medians are not affected; only
+its discarded warm-up frame 0 (about 21:19:25-21:20:12Z) touches the span's end. What the
+snapshots show:
+
+| GPU frames | Wall time per 100 frames | Snapshot at the start | Other busy process |
+|---|---|---|---|
+| 0-100 | 182 s | 20:57:46, total CPU 7 % | none |
+| 100-200 | 195 s | 21:00:48, 12 % | `python.exe` 36328 (46 %), `MsMpEng.exe` |
+| 200-300 | 191 s | 21:04:03, 6 % | none |
+| 300-400 | **212 s** | 21:07:14, 24 % | `python.exe` 36328 (86 %) |
+| 400-500 | 186 s | 21:10:46, 9 % | none |
+| 500-600 | 184 s | 21:13:52, 7 % | none |
+| 600-680 | about 149 s for 80 frames | 21:16:56, 2 % | none |
+
+Only frames 300-400 ran slower (+13 % wall time per frame, which also counts the decode and
+one snapshot), with a second `python.exe` busy at their start; that process was gone when
+checked after the run, so it is not identified, and it may be the start of the QA run. Inside
+the reported span (frames 400-680) the pace was normal, the snapshots show no other busy
+process and no second CUDA context (GPU memory 1,761 MiB, as in the clean samples).
+
+The record keeps per-pass summaries, not per-frame times, so the GPU medians **cannot be given
+with and without the overlapping frames** without a re-run. Bounds: if every overlapping frame
+were slower than every clean one, the clean median would lie between the observed 10th
+percentile and the observed median. That is 0.5015-0.5351 s (product c3) and 0.2295-0.2370 s
+(product ancuti2018) for the reported span (49 % of the frames), and the same range at worst for
+the slowed frames 300-400 alone (15 %). The product-against-prototype comparison is unaffected:
+both run on the same frame, in alternating order, so both see the same load. Judgement: the
+medians are still meaningful as an upper estimate; no re-run was made.
 
 Instrument `tools/core_speed.py GX011627`: the GPU pass covers all 681 frames. **Limit:**
 the CPU pass covers 10 frames spread over the clip (the WP1.2 Part B practice, confirmed by the
