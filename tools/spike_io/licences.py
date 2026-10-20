@@ -173,11 +173,43 @@ def pyav_ffmpeg() -> dict[str, Any]:
         "bundled_dlls": dlls,
         "dll_licence_wording": wording,
         "dist_info_licence_files": distribution("av")["licence_files"],
+        "text_files": wheel_text_files("av"),
         "delvewheel": delvewheel.read_text(encoding="utf-8").splitlines()
         if delvewheel.is_file()
         else None,
         "library_versions": {name: list(v) for name, v in av.library_versions.items()},
     }
+
+
+_CODE_SUFFIXES = (".py", ".pyi", ".pyx", ".pxd", ".pyd", ".pyc", ".dll", ".exe", ".c", ".h")
+_TERMS = ("FFmpeg", "LGPL", "GPL", "General Public License", "x264", "x265")
+
+
+def wheel_text_files(name: str) -> dict[str, Any]:
+    """Read every non-code file a distribution installed and count licence-relevant terms.
+
+    Args:
+        name: The distribution.
+
+    Returns:
+        Per file (by RECORD path): its first non-empty line and how often each of
+        ``FFmpeg``, ``LGPL``, ``GPL``, ``General Public License``, ``x264`` and ``x265`` occurs
+        (case-sensitive; ``GPL`` also counts inside ``LGPL``).
+    """
+    out: dict[str, Any] = {}
+    for entry in importlib.metadata.files(name) or []:
+        if str(entry).endswith(_CODE_SUFFIXES):
+            continue
+        path = Path(str(entry.locate()))
+        if not path.is_file():
+            continue
+        text = path.read_text(encoding="utf-8", errors="replace")
+        first = next((line.strip() for line in text.splitlines() if line.strip()), "")
+        out[str(entry).replace("\\", "/")] = {
+            "first_line": first[:120],
+            "terms": {term: text.count(term) for term in _TERMS},
+        }
+    return out
 
 
 def pyav_encoders() -> dict[str, Any]:
