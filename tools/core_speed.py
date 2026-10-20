@@ -231,7 +231,11 @@ def op_mix_prototype(image: Any, method: str, params: Params) -> None:
 
 
 def gpu_snapshot() -> dict[str, str]:
-    """Return one ``nvidia-smi`` reading of the fields in ``_GPU_QUERY`` (empty on failure)."""
+    """Return one ``nvidia-smi`` reading of the fields in ``_GPU_QUERY``.
+
+    When ``nvidia-smi`` cannot run, exits non-zero or prints nothing, the run goes on and the
+    reading is ``{"unavailable": <why>}``, so the record says that the telemetry is missing.
+    """
     try:
         result = subprocess.run(
             ["nvidia-smi", f"--query-gpu={_GPU_QUERY}", "--format=csv,noheader,nounits"],
@@ -240,9 +244,13 @@ def gpu_snapshot() -> dict[str, str]:
             check=False,
             timeout=20,
         )
-    except (OSError, subprocess.TimeoutExpired):
-        return {}
-    values = [value.strip() for value in result.stdout.strip().splitlines()[0].split(",")]
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        return {"unavailable": f"nvidia-smi did not run: {type(exc).__name__}"}
+    lines = result.stdout.strip().splitlines()
+    if result.returncode != 0 or not lines:
+        why = (result.stderr.strip() or result.stdout.strip() or "no output")[-200:]
+        return {"unavailable": f"nvidia-smi exit {result.returncode}: {why}"}
+    values = [value.strip() for value in lines[0].split(",")]
     return dict(zip(_GPU_QUERY.split(","), values, strict=False))
 
 
