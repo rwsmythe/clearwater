@@ -10,6 +10,7 @@ answers to open questions 1-6 bind).
 |---|---|---|---|---|---|---|---|---|---|
 | 0 (design table) | - | - | - | - | - | - | none (no code) | - | 62,046 (dispatcher-read at the round-0 yield) |
 | 1 | 1 | 4 | 1 | 6 in / 0 out | 6 NEW / 0 REOPENED | 0 | PRODUCT code (d92ea8d) | WSL, codex-cli, gpt-5.6-sol high | 118,143 (dispatcher-read at the window grant) |
+| 2 | 0 | 3 (1 banked, out of envelope) | 1 | 2 in + 1 out / 0 | 3 NEW / 0 REOPENED | 0 | pending (product code expected) | WSL, codex-cli, gpt-5.6-sol high | 169,145 at the window request |
 
 ## Round 0: design table (no product code yet)
 
@@ -222,3 +223,19 @@ Inner loop after remediation: 132 own tests passed, ruff check, ruff format --ch
 not yet re-run (window requested at the round-1 remediation yield).
 
 Depth figures (dispatcher-read): round-1 yield 143,034; remediation yield 169,145. Window for round 2 queued behind WP3.7 and WP3.1.
+
+## Round 2 (Reviewer A, strong; head 114b322; window: 1270 passed in 518.06s, exit 0)
+
+Evidence `C:\Users\rwsmy\clearwater-review-evidence\wp3.13\r2\` (prompt with a THIS IS ROUND 2 section, diff,
+`full-transcript.txt`, `review.txt`, `adjudication.md`, `md5s.txt`). Assertions met. VERDICT:
+NEW_CRITICAL_MAJOR_FOUND: 0 critical, 3 major, 1 minor, all EXECUTED except the minor, all NEW; none of
+round 1's six reopened. Adjudication in `adjudication.md`:
+
+1. MAJOR, BANKED OUT-OF-ENVELOPE: `import clearwater.jobs` needs NumPy via `clearwater.interfaces` (WP2.2,
+   `bf76136`; NumPy is a locked dependency). Cheap cleanup anyway: `Settings` under `TYPE_CHECKING`.
+2. MAJOR, in envelope: `begin()` sets `_created` after `os.close`, so a failing close strands the temporary.
+3. MAJOR, in envelope: `final_output_path` lexical guard misses an alias (junction) of the source folder; use
+   `is_same_path`.
+4. MINOR: `final_output_path` docstring contradiction.
+
+Remediation not yet applied (the round ends here).
