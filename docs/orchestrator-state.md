@@ -46,7 +46,8 @@ only in an exclusive window the orchestrator grants. Delivery by SendMessage to 
 | `wp315-cell` | WP3.15 | sonnet-high | `.worktrees/wp3.15` | `cde09a2` R0 ruled; building | 83,816 (R0 yield) |
 | `wp313-cell` | WP3.13 | sonnet-high | `.worktrees/wp3.13` | `4c24a33` R0 ruled; building | 62,046 (R0 yield) |
 | `wp37-cell` | WP3.7 | sonnet-high | `.worktrees/wp3.7` | `c31e050` R0 ruled; building | 90,520 (R0 yield) |
-| `wp31-cell` | WP3.1 | opus-high | `.worktrees/wp3.1` | `891460e` R0 ruled; building | 108,729 (R0 yield) |
+| `wp31-cell` | WP3.1 | opus-high | `.worktrees/wp3.1` | RETIRED at R1 yield (`c6314e9`; 7 findings > 250K line); stood down 19:18Z | 275,011 (R1 yield) |
+| `wp31-cell2` | WP3.1 | opus-high | `.worktrees/wp3.1` | successor: R1 remediation F1-F7 ruled, then window, R2 | 0 (dispatch 19:19Z) |
 
 Round-0 rulings sent to each cell and posted to CHARC as a query (thread wave1, 18:10Z); consumer notes for WP3.3/3.10/3.12/3.14/3.16 are in that post. A rolled generation's cells die with it: re-dispatch from each branch and ledger.
 CHARC UPHELD every round-0 ruling (`799b83d4fe11bed8`) with additions, relayed 18:14Z: WP3.1
