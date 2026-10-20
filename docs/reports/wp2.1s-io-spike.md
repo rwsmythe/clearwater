@@ -672,3 +672,32 @@ beyond what the artefacts show.
     read from this wheel.
   - The decode-only candidates of claim 1 are unaffected: their encode side is the FFmpeg
     process either way.
+
+## Erratum at the gate (orchestrator, Reviewer B, 2026-10-20)
+
+Reviewer B (the orchestrator's seat pass on merge candidate `104c005`; verdict
+NO_NEW_CRITICAL_MAJOR) found six non-gating items. The text corrections below take precedence
+over the sections they name. No figure changes.
+
+- **Section 2, timing (B4).** The bracket opens before the row's generator first runs, not
+  just before spawn or `av.open`. It therefore also includes building the command and, for the
+  pipe and socket rows, creating the large pipe or binding the socket. That is one set-up charge
+  per 681-frame run, inside the bracket.
+- **Section 4, IF-1 (B5).** "No row FAILS IF-1" covers the transport candidates and the
+  exploration knob forms, every one checked 681/681. It does not cover `a-ad10`, which is an
+  untimed bytes finding whose pts were not checked (`identity-a-ad10.json`: pts delivered 0).
+- **Section 4, AD-10 (B3).** Under ruling 3, the decision-bearing figures are the max (19) and
+  the mean (0.50). The differing-frame count and sample fraction are context, not part of the
+  ruling's evidence.
+- **Section 8, PyAV defect (B6).** The crash had no durable record on this branch. The
+  orchestrator reproduced it at the gate, untimed: PyAV 16.1.0 on an 8-bit RGB PNG carrying the
+  test-built Display P3 profile. Open it with `format="png_pipe"`, call `len(frame.side_data)`
+  (1 entry), then `del frame; gc.collect()`: the process exits 139 (segmentation fault). The
+  same steps without touching `side_data` exit 0. Records: `work/wp2.1s/gate-repro/`, with
+  `pyav_png_icc_repro2.py` (md5 `969ea92f...`), `repro2-touch.log` (`5c05f709...`) and
+  `repro2-control.log` (`04962237...`). One PNG was reproduced, not both.
+
+Banked, not text: the stdlib writer's `iCCP` profile-name check does not enforce PNG's
+control-character and space rules (B1). The timed-window command runs without an idle gate when
+`--gate` is omitted (B2). The brief made the gate advisory, so B2 is by design for this spike.
+Both are recorded in the debt register.
