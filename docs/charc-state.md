@@ -74,6 +74,15 @@ for a push (verify `git status -sb`).
   before tranche A, with `methods/__init__.py`). Other answers: WP3.5 re-sized S on sonnet-high;
   WP3.16 opus-high, `gui.contract` frozen at round 0; WP3.6P real-photo verification queued for
   the owner's photos. Spec 7.2 line 325 chapter-group remnant: owner's next-revision list.
+- **Tranche-A rulings so far:** WP3.5 R0 STOP: V9 binds RGB-side legs only, the 8-bit 4:2:0
+  swscale pair is a characterisation (AD-11 clarified 2ce4266; bounds final at 59e4281: footage
+  mean <= 1.0/255 and share over 2/255 <= 1 %, testsrc2 mean <= 2.5/255). WP3.12 STOP on AD-5: no
+  8-bit store meets the 1 % bounds criterion and no lossless store fits 10 GB; RULED option 1
+  (AD-5 amended a6ba740): the analysis proxy IS the stored JPEG q75 4:4:4 proxy (q80 4:2:0 only
+  on the read-cost row), measured at first analysis and reopen alike; codec identity in the cache
+  version; means/gains <= 1e-3 gate, bounds deviation <= 10 % of range reported; **owner sees the
+  proxy-bound effect at CP5** (AD-4 11-14 % + AD-5 ~8 % narrower = slightly stronger stretch);
+  Pillow becomes a product dependency at WP3.12; WP3.11 measures on the stored proxy only.
 - **Wave 2 tranche A LIVE** (dispatched ~22:45Z from main 2c5540a; IF-7 amendment landed f4cd1e4,
   verified at this seat against the ruling; architecture IF-7 block updated by CHARC): WP3.2
   `wp32-cell` opus-high `.worktrees/wp3.2`; WP3.3 `wp33-cell` opus-high `.worktrees/wp3.3`; WP3.5
