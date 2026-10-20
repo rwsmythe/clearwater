@@ -34,10 +34,13 @@
 
 ### Live cells
 
-- **`wp21s-cell`** (implementer-opus-high, STRONG): WP2.1S, worktree `.worktrees/wp2.1s`, branch
-  `wp2.1s`, base `aa1f5f0`; dispatched 2026-10-20 ~09:58Z. Depth at dispatch: 0 (no turn yet).
-  Transport leg EXCLUSIVE: no other cell, harness gate or Reviewer B run while its windows are
-  open. Verify: `git worktree list`; `uv run python scripts/cell_depth.py wp21s-cell`.
+- **`wp21s-cell2`** (implementer-opus-high, STRONG): WP2.1S successor, worktree `.worktrees/wp2.1s`,
+  branch `wp2.1s`, from handoff `c6a70f9`; dispatched 2026-10-20 ~11:19Z. Scope: photo leg (claim 2),
+  licences (claim 3), report sections 8-9, full suite, Reviewer A over the whole package. No timed
+  window (the transport leg is closed). Depth at dispatch: 0.
+- `wp21s-cell` RETIRED 2026-10-20 at 257K (95 turns) after closing the transport leg (6 clean
+  windows, ~60/120 machine min) and the CHARC rulings (`871d4f17e78c10b3`); stood down. Do not
+  message it again.
 - Every generation-2 cell is retired; do not message any of them (`wp12b-cell`, `wp13d-cell`,
   `wp13d-cell2`, `wp13d-cell3`, `wp14b-cell`, `wp14b-cell2`).
 
