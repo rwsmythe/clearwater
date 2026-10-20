@@ -32,6 +32,8 @@ from .naming import (
     Reservations,
     is_same_path,
     is_temporary_name,
+    new_token,
+    temporaries_of,
     temporary_path,
 )
 
@@ -141,7 +143,7 @@ class SafeWrite:
         """
         self.plan = plan
         self._reservations = reservations
-        self._temp = temporary_path(plan.path)
+        self._temp = temporary_path(plan.path, new_token())
         self._state = SafeWriteState.NEW
         self._created = False
         self._held = [plan.path]
@@ -176,9 +178,9 @@ class SafeWrite:
     def begin(self) -> Path:
         """Create the empty temporary in the destination folder and return its path.
 
-        The file is created exclusively, so a stale temporary at this name is an error here (it
-        is normally avoided at planning, where an existing temporary counts as a taken name). The
-        writer must open the path for writing with truncation.
+        The name carries this write's random token and the file is created exclusively, so no
+        other job or crash leftover can already hold it. The writer must open the path for
+        writing with truncation.
 
         Returns:
             The temporary path.
@@ -226,7 +228,12 @@ class SafeWrite:
                 claimed = True
             else:
                 claimed = not is_same_path(plan.path, plan.source) and self._claim(plan)
-            if claimed and not os.path.lexists(plan.path) and _install(self._temp, plan.path):
+            if (
+                claimed
+                and not os.path.lexists(plan.path)
+                and not self._foreign_temporary(plan.path)
+                and _install(self._temp, plan.path)
+            ):
                 break
             plan = plan.numbered(plan.number + 1)
         self.plan = plan
@@ -264,8 +271,16 @@ class SafeWrite:
         return gone
 
     def __enter__(self) -> Self:
-        """Begin the write and return self."""
-        self.begin()
+        """Begin the write and return self.
+
+        If ``begin()`` fails the write is aborted first (Python does not call ``__exit__`` when
+        ``__enter__`` raises), so the registry holds nothing for it.
+        """
+        try:
+            self.begin()
+        except BaseException:
+            self.abort()
+            raise
         return self
 
     def __exit__(
@@ -282,6 +297,11 @@ class SafeWrite:
         """Refuse a final path that is the source (mandatory, N8)."""
         if is_same_path(plan.path, plan.source):
             raise SafeWriteError(f"output path is the source file: {plan.path}")
+
+    def _foreign_temporary(self, final: Path) -> bool:
+        """Tell whether a temporary of another write exists for this final name."""
+        own = self._temp.name.casefold()
+        return any(t.name.casefold() != own for t in temporaries_of(final))
 
     def _claim(self, plan: OutputPlan) -> bool:
         """Reserve a bumped candidate; True if free to try (always True without a registry)."""

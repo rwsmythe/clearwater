@@ -23,7 +23,10 @@ from .naming import (
     Reservations,
     final_output_path,
     is_temporary_name,
+    new_token,
     plan_output,
+    scan_temporaries,
+    temporaries_of,
     temporary_path,
     validate_suffix,
 )
@@ -57,8 +60,11 @@ __all__ = [
     "final_output_path",
     "is_disk_full",
     "is_temporary_name",
+    "new_token",
     "plan_output",
     "remove_leftovers",
+    "scan_temporaries",
+    "temporaries_of",
     "temporary_path",
     "validate_suffix",
 ]

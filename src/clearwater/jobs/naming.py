@@ -18,6 +18,7 @@ from __future__ import annotations
 import enum
 import os
 import re
+import secrets
 import threading
 from dataclasses import dataclass, replace
 from pathlib import Path
@@ -31,7 +32,15 @@ PHOTO_EXTENSION = ".png"
 """The extension every photo output gets (spec 8.3)."""
 
 _FORBIDDEN_SUFFIX_CHARS = frozenset('/\\:*?"<>|')
-_TEMP_NAME = re.compile(re.escape(TEMP_MARKER) + r"(?:\.[^./\\]+)?\Z", re.IGNORECASE)
+TOKEN_HEX_DIGITS = 12
+"""Length of the per-write hexadecimal token in a temporary name."""
+
+_TEMP_NAME = re.compile(
+    r"(?P<base>.+)"
+    + re.escape(TEMP_MARKER)
+    + rf"-[0-9a-f]{{{TOKEN_HEX_DIGITS}}}(?P<ext>\.[^./\\]+)?",
+    re.IGNORECASE,
+)
 
 
 class MediaKind(enum.Enum):
@@ -66,12 +75,23 @@ def validate_suffix(suffix: str) -> None:
         raise ValueError(f"output suffix {suffix!r} must not contain {TEMP_MARKER!r}")
 
 
+def new_token() -> str:
+    """Return a fresh random token for one write's temporary name.
+
+    Returns:
+        ``TOKEN_HEX_DIGITS`` lower-case hexadecimal digits.
+    """
+    return secrets.token_hex(TOKEN_HEX_DIGITS // 2)
+
+
 def is_temporary_name(name: str) -> bool:
     """Tell whether a file name matches the temporary-name pattern.
 
-    The pattern is a non-empty base, then ``.clearwater-partial``, then nothing or exactly one
-    extension (``GX010123_corrected.clearwater-partial.MP4``), compared case-insensitively because
-    a case-insensitive volume may report the name in any case.
+    The pattern is a non-empty base, then ``.clearwater-partial-`` and a 12-digit hexadecimal
+    token, then nothing or exactly one extension
+    (``GX010123_corrected.clearwater-partial-0123456789ab.MP4``). It is compared
+    case-insensitively because a case-insensitive volume may report the name in any case. The
+    token is random per write, so a name only matches by being made on purpose.
 
     Args:
         name: A bare file name (no directory part).
@@ -79,23 +99,67 @@ def is_temporary_name(name: str) -> bool:
     Returns:
         True if the name is a Clearwater temporary output name.
     """
-    if not name or "/" in name or "\\" in name:
-        return False
-    match = _TEMP_NAME.search(name)
-    return match is not None and match.start() > 0
+    return _final_name_of_temporary(name) is not None
 
 
-def temporary_path(final: Path) -> Path:
-    """Return the temporary path belonging to a final output path.
+def _final_name_of_temporary(name: str) -> str | None:
+    """Return the case-folded final name a temporary name belongs to, or None."""
+    if "/" in name or "\\" in name:
+        return None
+    match = _TEMP_NAME.fullmatch(name)
+    if match is None:
+        return None
+    return (match.group("base") + (match.group("ext") or "")).casefold()
+
+
+def temporary_path(final: Path, token: str) -> Path:
+    """Return the temporary path belonging to a final output path and a write's token.
 
     Args:
         final: A final output path (numbered or not).
+        token: The write's token from :func:`new_token`.
 
     Returns:
-        The same folder and name with ``.clearwater-partial`` inserted before the extension, so
-        the writer still sees the right extension.
+        The same folder and name with ``.clearwater-partial-<token>`` inserted before the
+        extension, so the writer still sees the right extension.
     """
-    return final.with_name(final.stem + TEMP_MARKER + final.suffix)
+    return final.with_name(f"{final.stem}{TEMP_MARKER}-{token}{final.suffix}")
+
+
+def scan_temporaries(folder: Path) -> dict[str, list[Path]]:
+    """List the temporary files in a folder, grouped by the final name each belongs to.
+
+    The filesystem decides: the folder is listed and every entry (a file, a link, a folder) whose
+    name matches the temporary pattern counts. A missing or unreadable folder gives an empty result.
+
+    Args:
+        folder: The destination folder.
+
+    Returns:
+        A mapping from the case-folded final file name to the temporaries made for it.
+    """
+    found: dict[str, list[Path]] = {}
+    try:
+        with os.scandir(folder) as entries:
+            for entry in entries:
+                final_name = _final_name_of_temporary(entry.name)
+                if final_name is not None:
+                    found.setdefault(final_name, []).append(Path(entry.path))
+    except OSError:
+        return {}
+    return found
+
+
+def temporaries_of(final: Path) -> list[Path]:
+    """Return the temporaries on disk that belong to a final output path (any token).
+
+    Args:
+        final: A final output path.
+
+    Returns:
+        The temporary files in its folder made for that final name, case-insensitively.
+    """
+    return scan_temporaries(final.parent).get(final.name.casefold(), [])
 
 
 def _path_key(path: Path) -> str:
@@ -237,7 +301,8 @@ def final_output_path(source: Path, settings: Settings, kind: MediaKind) -> Path
     """Return the unnumbered final output path (spec 8.3), touching no filesystem.
 
     ``GX010123.MP4`` becomes ``GX010123_corrected.MP4``; ``IMG_1234.HEIC`` becomes
-    ``IMG_1234_corrected.png``.
+    ``IMG_1234_corrected.png``. The result is never the source path: an empty suffix in the
+    source folder gives the first numbered name (``GX010123_2.MP4``).
 
     Args:
         source: The source file path.
@@ -250,25 +315,33 @@ def final_output_path(source: Path, settings: Settings, kind: MediaKind) -> Path
     Raises:
         ValueError: If the suffix is not a portable name fragment.
     """
-    return _base_plan(source, settings, kind).path
+    plan = _base_plan(source, settings, kind)
+    if _path_key(plan.path) == _path_key(source):
+        plan = plan.numbered(2)
+    return plan.path
 
 
-def is_taken(plan: OutputPlan) -> bool:
+def is_taken(plan: OutputPlan, temporaries: dict[str, list[Path]] | None = None) -> bool:
     """Tell whether a planned name is unusable on disk right now.
 
-    A name is taken when the final name exists (including a dangling symlink), the matching
-    temporary name exists (another job's or a crash leftover), or the name is the source.
+    A name is taken when the final name exists (including a dangling symlink), a temporary made
+    for that final name exists (another job's or a crash leftover, any token), or the name is the
+    source.
 
     Args:
         plan: The candidate.
+        temporaries: A folder scan from :func:`scan_temporaries`, to avoid listing the folder
+            for every candidate; None lists it now.
 
     Returns:
         True if the candidate must not be used.
     """
     path = plan.path
+    if temporaries is None:
+        temporaries = scan_temporaries(path.parent)
     return (
         os.path.lexists(path)
-        or os.path.lexists(temporary_path(path))
+        or path.name.casefold() in temporaries
         or is_same_path(path, plan.source)
     )
 
@@ -299,9 +372,12 @@ def plan_output(
             temporary (a source literally named with the temporary marker and an empty suffix).
     """
     plan = _base_plan(source, settings, kind)
+    temporaries = scan_temporaries(plan.folder)
     while True:
         if is_temporary_name(plan.path.name):
             raise ValueError(f"output name {plan.path.name!r} matches the temporary-name pattern")
-        if not is_taken(plan) and (reservations is None or reservations.try_reserve(plan.path)):
+        if not is_taken(plan, temporaries) and (
+            reservations is None or reservations.try_reserve(plan.path)
+        ):
             return plan
         plan = plan.numbered(plan.number + 1)

@@ -52,10 +52,8 @@ class SpaceCheck:
             A one-line message naming the folder, the bytes needed and the bytes free.
         """
         verdict = "Enough" if self.ok else "Not enough"
-        return (
-            f"{verdict} free space in {self.folder}: "
-            f"need {self.needed:,} bytes, {self.free:,} free."
-        )
+        folder = str(self.folder).encode("ascii", "backslashreplace").decode("ascii")
+        return f"{verdict} free space in {folder}: need {self.needed:,} bytes, {self.free:,} free."
 
 
 def estimate_video_bytes(source_size: int, settings: Settings, source_bit_depth: int) -> int:

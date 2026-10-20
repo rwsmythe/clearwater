@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import subprocess
 import sys
 from collections.abc import Callable
@@ -17,7 +18,10 @@ from clearwater.jobs import (
     Reservations,
     final_output_path,
     is_temporary_name,
+    new_token,
     plan_output,
+    scan_temporaries,
+    temporaries_of,
     temporary_path,
     validate_suffix,
 )
@@ -227,7 +231,7 @@ def test_without_registry_nothing_is_reserved(tmp_path: Path) -> None:
 
 def test_other_jobs_temporary_counts_as_taken(tmp_path: Path) -> None:
     source = _touch(tmp_path / "GX010123.MP4")
-    stale = _touch(tmp_path / "GX010123_corrected.clearwater-partial.MP4")
+    stale = _touch(tmp_path / "GX010123_corrected.clearwater-partial-0123456789ab.MP4")
     plan = plan_output(source, Settings(), MediaKind.VIDEO)
     assert plan.path.name == "GX010123_corrected_2.MP4"
     assert stale.exists()
@@ -248,19 +252,27 @@ def test_dangling_symlink_counts_as_taken(tmp_path: Path) -> None:
 
 def test_temporary_path_pattern() -> None:
     final = Path("D:/out/GX010123_corrected.MP4")
-    assert temporary_path(final).name == "GX010123_corrected.clearwater-partial.MP4"
-    assert temporary_path(Path("IMG_1_corrected_2.png")).name == (
-        "IMG_1_corrected_2.clearwater-partial.png"
+    assert temporary_path(final, "0123456789ab").name == (
+        "GX010123_corrected.clearwater-partial-0123456789ab.MP4"
     )
+    assert temporary_path(Path("IMG_1_corrected_2.png"), "fedcba987654").name == (
+        "IMG_1_corrected_2.clearwater-partial-fedcba987654.png"
+    )
+
+
+def test_tokens_are_random_hex() -> None:
+    tokens = {new_token() for _ in range(50)}
+    assert len(tokens) == 50
+    assert all(re.fullmatch(r"[0-9a-f]{12}", t) for t in tokens)
 
 
 @pytest.mark.parametrize(
     "name",
     [
-        "GX010123_corrected.clearwater-partial.MP4",
-        "IMG_1_corrected.clearwater-partial.png",
-        "clip.CLEARWATER-PARTIAL.mp4",
-        "noext.clearwater-partial",
+        "GX010123_corrected.clearwater-partial-0123456789ab.MP4",
+        "IMG_1_corrected.clearwater-partial-0123456789ab.png",
+        "clip.CLEARWATER-PARTIAL-0123456789AB.mp4",
+        "noext.clearwater-partial-0123456789ab",
     ],
 )
 def test_temporary_names_match(name: str) -> None:
@@ -277,10 +289,15 @@ def test_temporary_names_match(name: str) -> None:
         "IMG_1234.HEIC",
         "IMG_1234_corrected.png",
         "IMG_1234_corrected_2.png",
-        ".clearwater-partial",
-        "a.clearwater-partial.b.MP4",
+        ".clearwater-partial-0123456789ab",
+        "a.clearwater-partial-0123456789ab.b.MP4",
         "a.clearwater-partial_corrected.MP4",
         "a.clearwater-partialx.MP4",
+        "holiday.clearwater-partial.png",
+        "holiday.clearwater-partial-.png",
+        "holiday.clearwater-partial-0123456789a.png",
+        "holiday.clearwater-partial-0123456789abc.png",
+        "holiday.clearwater-partial-0123456789ag.png",
         "",
     ],
 )
@@ -289,7 +306,7 @@ def test_other_names_do_not_match(name: str) -> None:
 
 
 def test_final_name_that_looks_temporary_is_refused(tmp_path: Path) -> None:
-    source = _touch(tmp_path / "x.clearwater-partial.HEIC")
+    source = _touch(tmp_path / "x.clearwater-partial-0123456789ab.HEIC")
     with pytest.raises(ValueError, match="temporary"):
         plan_output(source, Settings(output_suffix=""), MediaKind.PHOTO)
 
@@ -344,3 +361,49 @@ def test_importing_jobs_loads_no_gui_methods_or_heavy_libraries() -> None:
         [sys.executable, "-I", "-c", code, src], capture_output=True, text=True, check=True
     )
     assert result.stdout.strip() == "BAD []"
+
+
+# --- round 1 findings -------------------------------------------------------------------------
+
+
+def test_final_output_path_is_never_the_source_for_an_empty_suffix(tmp_path: Path) -> None:
+    source = tmp_path / "GX010123.MP4"
+    out = final_output_path(source, Settings(output_suffix=""), MediaKind.VIDEO)
+    assert out != source
+    assert out == tmp_path / "GX010123_2.MP4"
+    # The output folder spelled with different case is still the source's folder.
+    shouted = Settings(output_suffix="", output_folder=Path(str(tmp_path).upper()))
+    assert final_output_path(source, shouted, MediaKind.VIDEO) == shouted.output_folder / (
+        "GX010123_2.MP4"
+    )
+    elsewhere = Settings(output_suffix="", output_folder=tmp_path / "out")
+    assert (
+        final_output_path(source, elsewhere, MediaKind.VIDEO) == tmp_path / "out" / "GX010123.MP4"
+    )
+
+
+def test_user_file_with_the_old_marker_form_is_not_a_temporary(tmp_path: Path) -> None:
+    user = _touch(tmp_path / "holiday.clearwater-partial.png")
+    assert not is_temporary_name(user.name)
+    assert scan_temporaries(tmp_path) == {}
+
+
+def test_scan_groups_temporaries_by_final_name_case_insensitively(tmp_path: Path) -> None:
+    a = _touch(tmp_path / "IMG_1_corrected.clearwater-partial-0123456789ab.png")
+    b = _touch(tmp_path / "img_1_CORRECTED.clearwater-partial-FEDCBA987654.PNG")
+    c = _touch(tmp_path / "IMG_1_corrected_2.clearwater-partial-0123456789ab.png")
+    _touch(tmp_path / "IMG_1_corrected.png")
+    found = scan_temporaries(tmp_path)
+    assert sorted(found) == ["img_1_corrected.png", "img_1_corrected_2.png"]
+    assert sorted(found["img_1_corrected.png"]) == sorted([a, b])
+    assert temporaries_of(tmp_path / "IMG_1_corrected.png") == found["img_1_corrected.png"]
+    assert temporaries_of(tmp_path / "IMG_1_corrected_2.png") == [c]
+    assert temporaries_of(tmp_path / "IMG_1_corrected_3.png") == []
+    assert scan_temporaries(tmp_path / "missing") == {}
+
+
+def test_planning_skips_a_name_whatever_the_tokens_of_its_temporaries(tmp_path: Path) -> None:
+    source = _touch(tmp_path / "IMG_1.HEIC")
+    _touch(tmp_path / "IMG_1_corrected.clearwater-partial-aaaaaaaaaaaa.png")
+    _touch(tmp_path / "IMG_1_corrected_2.clearwater-partial-bbbbbbbbbbbb.png")
+    assert plan_output(source, Settings(), MediaKind.PHOTO).path.name == "IMG_1_corrected_3.png"

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import errno
 import os
+import re
 from collections.abc import Callable, Iterator
 from pathlib import Path
 
@@ -22,7 +23,7 @@ from clearwater.jobs import (
     is_disk_full,
     plan_output,
     remove_leftovers,
-    temporary_path,
+    temporaries_of,
 )
 from clearwater.jobs import safe_write as sw
 
@@ -59,7 +60,9 @@ def test_commit_renames_temporary_to_final(source: Path) -> None:
     plan = _plan(source)
     with SafeWrite(plan) as write:
         assert write.temp_path.parent == source.parent
-        assert write.temp_path.name == "GX010123_corrected.clearwater-partial.MP4"
+        assert re.fullmatch(
+            r"GX010123_corrected\.clearwater-partial-[0-9a-f]{12}\.MP4", write.temp_path.name
+        )
         assert write.temp_path.exists()
         write.temp_path.write_bytes(b"OUT")
         final = write.commit()
@@ -154,7 +157,7 @@ def test_abort_after_commit_never_touches_the_final(source: Path) -> None:
 
 def test_abort_before_begin_does_not_delete_a_foreign_temporary(source: Path) -> None:
     plan = _plan(source)
-    stale = source.parent / "GX010123_corrected.clearwater-partial.MP4"
+    stale = source.parent / "GX010123_corrected.clearwater-partial-0123456789ab.MP4"
     stale.write_bytes(b"someone else's")
     write = SafeWrite(plan)
     assert write.abort() is True
@@ -239,7 +242,7 @@ def test_commit_never_lands_on_the_source_name(source: Path) -> None:
 
 
 def test_stale_temporary_at_planned_number_gives_a_bump_not_a_failure(source: Path) -> None:
-    stale = source.parent / "GX010123_corrected.clearwater-partial.MP4"
+    stale = source.parent / "GX010123_corrected.clearwater-partial-0123456789ab.MP4"
     stale.write_bytes(b"crash leftover")
     plan = _plan(source)
     assert plan.number == 2
@@ -249,12 +252,18 @@ def test_stale_temporary_at_planned_number_gives_a_bump_not_a_failure(source: Pa
     assert stale.read_bytes() == b"crash leftover"
 
 
-def test_begin_on_a_real_race_raises_file_exists(source: Path) -> None:
+def test_two_writes_of_one_final_name_never_share_a_temporary(source: Path) -> None:
     plan = _plan(source)
-    temporary_path(plan.path).write_bytes(b"appeared after planning")
-    with pytest.raises(FileExistsError):
-        SafeWrite(plan).begin()
-    assert temporary_path(plan.path).read_bytes() == b"appeared after planning"
+    first, second = SafeWrite(plan), SafeWrite(plan)
+    assert first.temp_path != second.temp_path
+    first.begin()
+    second.begin()
+    first.temp_path.write_bytes(b"one")
+    second.temp_path.write_bytes(b"two")
+    assert first.abort() is True
+    assert second.temp_path.read_bytes() == b"two"  # the other write's temporary survives our abort
+    assert second.abort() is True
+    assert _names(source.parent) == ["GX010123.MP4"]
 
 
 def test_begin_twice_and_commit_out_of_order(source: Path) -> None:
@@ -411,8 +420,8 @@ def _scatter(folder: Path) -> dict[str, bytes]:
         "IMG_1234_corrected.png": b"png",
         "GX010123_corrected.MP4": b"out",
         "notes.txt": b"n",
-        ".clearwater-partial": b"no base",
-        "a.clearwater-partial.b.MP4": b"two dots",
+        ".clearwater-partial-0123456789ab": b"no base",
+        "a.clearwater-partial-0123456789ab.b.MP4": b"two dots",
     }
     for name, data in keep.items():
         (folder / name).write_bytes(data)
@@ -423,18 +432,18 @@ def check_cleanup(cleanup: Callable[[list[Path]], object], folder: Path) -> None
     """Shared check: only temporary files go; everything else stays byte-identical."""
     keep = _scatter(folder)
     temps = [
-        "GX020001_corrected.clearwater-partial.MP4",
-        "IMG_9_corrected.clearwater-partial.png",
-        "noext.CLEARWATER-PARTIAL",
+        "GX020001_corrected.clearwater-partial-0123456789ab.MP4",
+        "IMG_9_corrected.clearwater-partial-0123456789ab.png",
+        "noext.CLEARWATER-PARTIAL-0123456789AB",
     ]
     for name in temps:
         (folder / name).write_bytes(b"partial")
-    (folder / "dir_corrected.clearwater-partial.MP4").mkdir()
+    (folder / "dir_corrected.clearwater-partial-0123456789ab.MP4").mkdir()
     cleanup([folder])
     assert sorted(p.name for p in folder.iterdir() if p.is_file()) == sorted(keep)
     for name, data in keep.items():
         assert (folder / name).read_bytes() == data
-    assert (folder / "dir_corrected.clearwater-partial.MP4").is_dir()
+    assert (folder / "dir_corrected.clearwater-partial-0123456789ab.MP4").is_dir()
 
 
 def test_crash_leftover_is_removed_and_nothing_else(tmp_path: Path) -> None:
@@ -467,9 +476,9 @@ def test_planted_cleanup_deleting_a_non_temporary_fails_by_name(tmp_path: Path) 
 def test_cleanup_is_not_recursive_and_skips_missing_folders(tmp_path: Path) -> None:
     sub = tmp_path / "sub"
     sub.mkdir()
-    nested = sub / "x.clearwater-partial.MP4"
+    nested = sub / "x.clearwater-partial-0123456789ab.MP4"
     nested.write_bytes(b"nested")
-    top = tmp_path / "y.clearwater-partial.MP4"
+    top = tmp_path / "y.clearwater-partial-0123456789ab.MP4"
     top.write_bytes(b"top")
     report = remove_leftovers([tmp_path, tmp_path / "missing"])
     assert report.removed == (top,)
@@ -483,12 +492,12 @@ def test_cleanup_never_follows_a_symlink(tmp_path: Path) -> None:
     target.write_bytes(b"keep me")
     folder = tmp_path / "folder"
     folder.mkdir()
-    link = folder / "evil.clearwater-partial.MP4"
+    link = folder / "evil.clearwater-partial-0123456789ab.MP4"
     try:
         link.symlink_to(target)
     except (OSError, NotImplementedError):
         pytest.skip("symlinks not available")
-    dirlink = folder / "dir.clearwater-partial.MP4"
+    dirlink = folder / "dir.clearwater-partial-0123456789ab.MP4"
     try:
         dirlink.symlink_to(outside, target_is_directory=True)
     except (OSError, NotImplementedError):
@@ -503,16 +512,90 @@ def test_cleanup_never_follows_a_symlink(tmp_path: Path) -> None:
 def test_cleanup_records_a_failure_and_goes_on(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    (tmp_path / "a.clearwater-partial.MP4").write_bytes(b"1")
-    (tmp_path / "b.clearwater-partial.MP4").write_bytes(b"2")
+    (tmp_path / "a.clearwater-partial-0123456789ab.MP4").write_bytes(b"1")
+    (tmp_path / "b.clearwater-partial-0123456789ab.MP4").write_bytes(b"2")
     real_unlink = os.unlink
 
     def flaky(path: str | os.PathLike[str], *args: object, **kwargs: object) -> None:
-        if str(path).endswith("a.clearwater-partial.MP4"):
+        if str(path).endswith("a.clearwater-partial-0123456789ab.MP4"):
             raise PermissionError(errno.EACCES, "in use")
         real_unlink(path)
 
     monkeypatch.setattr(os, "unlink", flaky)
     report = remove_leftovers([tmp_path])
-    assert [p.name for p in report.removed] == ["b.clearwater-partial.MP4"]
-    assert [p.name for p, _ in report.failed] == ["a.clearwater-partial.MP4"]
+    assert [p.name for p in report.removed] == ["b.clearwater-partial-0123456789ab.MP4"]
+    assert [p.name for p, _ in report.failed] == ["a.clearwater-partial-0123456789ab.MP4"]
+
+
+# --- round 1 findings -------------------------------------------------------------------------
+
+
+def test_abort_keeps_a_temporary_another_job_created_under_its_own_token(source: Path) -> None:
+    write = SafeWrite(_plan(source))
+    write.begin()
+    write.temp_path.unlink()  # the sink removed ours ...
+    other = source.parent / "GX010123_corrected.clearwater-partial-ffffffffffff.MP4"
+    other.write_bytes(b"another job's")  # ... and another job made its own for the same name
+    assert write.abort() is True
+    assert other.read_bytes() == b"another job's"
+    assert temporaries_of(write.final_path) == [other]
+
+
+def test_failed_begin_inside_with_releases_the_reservation(source: Path, tmp_path: Path) -> None:
+    reservations = Reservations()
+    settings = Settings(output_folder=tmp_path / "unplugged")
+    plan = plan_output(source, settings, MediaKind.VIDEO, reservations)
+    assert len(reservations) == 1
+    write = SafeWrite(plan, reservations)
+    with pytest.raises(MissingFolderError), write:
+        pytest.fail("the block must not run")
+    assert len(reservations) == 0
+    assert write.state is SafeWriteState.ABORTED
+    # the name is plannable again
+    assert plan_output(source, settings, MediaKind.VIDEO, reservations).number == 1
+
+
+def test_source_guard_failure_inside_with_releases_the_reservation(source: Path) -> None:
+    reservations = Reservations()
+    plan = OutputPlan(source, source.parent, source.stem, source.suffix)
+    assert reservations.try_reserve(plan.path)
+    with pytest.raises(SafeWriteError, match="source"), SafeWrite(plan, reservations):
+        pytest.fail("the block must not run")
+    assert len(reservations) == 0
+
+
+def test_commit_bump_skips_a_bumped_name_that_has_a_temporary(source: Path) -> None:
+    plan = _plan(source)
+    foreign = source.parent / "GX010123_corrected_2.clearwater-partial-aaaaaaaaaaaa.MP4"
+    with SafeWrite(plan) as write:
+        plan.path.write_bytes(b"appeared after planning")
+        foreign.write_bytes(b"another job's work in progress")
+        write.temp_path.write_bytes(b"OUT")
+        assert write.commit().name == "GX010123_corrected_3.MP4"
+    assert foreign.read_bytes() == b"another job's work in progress"
+
+
+def test_commit_skips_the_planned_name_when_another_write_holds_a_temporary_for_it(
+    source: Path,
+) -> None:
+    plan = _plan(source)
+    foreign = source.parent / "GX010123_corrected.clearwater-partial-aaaaaaaaaaaa.MP4"
+    with SafeWrite(plan) as write:
+        foreign.write_bytes(b"another job's")
+        write.temp_path.write_bytes(b"OUT")
+        assert write.commit().name == "GX010123_corrected_2.MP4"
+    assert foreign.exists()
+
+
+def test_a_write_is_not_blocked_by_its_own_temporary(source: Path) -> None:
+    plan = _plan(source)
+    with SafeWrite(plan) as write:
+        write.temp_path.write_bytes(b"OUT")
+        assert write.commit() == plan.path
+
+
+def test_user_file_in_the_old_marker_form_survives_the_cleanup(tmp_path: Path) -> None:
+    user = tmp_path / "holiday.clearwater-partial.png"
+    user.write_bytes(b"my photo")
+    assert remove_leftovers([tmp_path]).removed == ()
+    assert user.read_bytes() == b"my photo"

@@ -199,3 +199,24 @@ destination folder for that final name's token form (the filesystem decides, cas
 deliberately named with marker plus 12 hex digits would be removed. Alternative if the dispatcher prefers no
 token: accept the literal-marker case as an out-of-practice input and bank it (not recommended: the brief's
 examine list names this invariant).
+
+## Round-1 ruling (dispatcher, depth 143,034 at the round-1 yield) as applied
+
+SUPERSEDES the round-0 temporary-name pattern: the temporary is now
+`<base>.clearwater-partial-<12 hex>[.ext]` with a fresh `secrets.token_hex(6)` per `SafeWrite`
+(`naming.new_token`, `naming.temporary_path(final, token)`); the clean-up regex requires the token, hex
+matched case-insensitively; planning and commit decide "a temporary of this final name exists" with one
+rule, `naming.scan_temporaries` / `temporaries_of` (any token, folder listing, case-insensitive). Residual
+limit (for the report): a user file deliberately named marker plus 12 hex digits would be removed.
+
+| Finding | Fix | Test that fails on the unfixed code (mutation-checked) |
+|---|---|---|
+| 1 CRITICAL | token pattern; user file `holiday.clearwater-partial.png` is not a temporary | `test_other_names_do_not_match[holiday.clearwater-partial*]`, `test_user_file_in_the_old_marker_form_survives_the_cleanup` (marker regex mutated to optional token: fails) |
+| 2 MAJOR | `final_output_path` lexical source guard, first numbered name `_2` | `test_final_output_path_is_never_the_source_for_an_empty_suffix` (guard removed: fails) |
+| 3 MAJOR | `__enter__` aborts (releases the reservations) when `begin()` raises | `test_failed_begin_inside_with_releases_the_reservation`, `test_source_guard_failure_inside_with_releases_the_reservation` (abort removed: fails) |
+| 4 MAJOR | commit skips a candidate with a temporary of another write (`_foreign_temporary`, same scan as planning) | `test_commit_bump_skips_a_bumped_name_that_has_a_temporary`, `test_commit_skips_the_planned_name_when_another_write_holds_a_temporary_for_it` (check removed: fails) |
+| 5 MAJOR | AMENDED by the dispatcher: closed by construction (the per-write token); NO st_dev/st_ino identity check (the file index is not dependable on exFAT under Windows) | `test_abort_keeps_a_temporary_another_job_created_under_its_own_token`, `test_two_writes_of_one_final_name_never_share_a_temporary` |
+| 6 MINOR | folder text escaped to ASCII (`backslashreplace`) | `test_message_is_ascii_for_a_unicode_folder` (escape removed: fails) |
+
+Inner loop after remediation: 132 own tests passed, ruff check, ruff format --check, mypy clean. Full pytest
+not yet re-run (window requested at the round-1 remediation yield).

@@ -82,6 +82,13 @@ def test_message_is_ascii_and_names_the_folder() -> None:
     assert "out" in message
 
 
+def test_message_is_ascii_for_a_unicode_folder() -> None:
+    message = SpaceCheck(Path("D:/输出"), 2000, 1000, False).message()
+    assert message.isascii()
+    assert "2,000" in message
+    assert "1,000" in message
+
+
 def test_sufficient_space(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(shutil, "disk_usage", _fake_usage(5000))
     assert check_free_space(tmp_path, 5000).ok
