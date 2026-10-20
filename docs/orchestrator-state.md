@@ -163,10 +163,8 @@ Each accepted package had its return report posted to CHARC and an info-update t
 - **GoPro IMU/GPS OUT OF SCOPE** (owner 2026-10-19 ~22:30Z via CHARC `01500d3574412e69`): no brief
   reads ACCL/GYRO/GRAV/CORI/IORI/GPS. WP1.4b claim 2a reads six camera-state keys only (brief
   `f183a11`); no gpmd extract is ever committed (it carries GPS).
-- **Kernel-doc touch owed (CHARC `cb61a4e41f625d73`):** put the depth thresholds (~250K an
-  evaluation point, not an automatic re-seat, per the owner 2026-10-20; STOP and re-dispatch at
-  ~400K; read depth at dispatch, every yield and before any ruling) into `docs/orchestrator-context.md` at the next kernel-doc
-  change, with the harness gate.
+- **Depth rule now in the kernel:** `docs/orchestrator-context.md` hazard (6), CHARC commit `5692485`
+  (owner's words verbatim: ~250K evaluation point, ~400K stop; harness gate 366 OK).
 - **WP1.6 gate report** (CHARC `6c5d88685e64a37c`): the smoothing-default row reads "2 s
   provisional, re-measure per DR-25(3)", never a settled 2 s.
 - **WP1.5 ACCEPTED and CONFIRMED.**
