@@ -94,6 +94,41 @@ grows with the zero fraction (-12 % at 57 % on a flat field, -24 % at 71 %, -42 
 second test pins only the ORDER of levels there. Outputs are float, so a pure gain scales
 Immerkaer exactly: amplifications are unaffected by this bias.
 
+## Hand-over and collision (orchestrator, 2026-10-20)
+
+- The predecessor cell (wp14b-cell) was woken after its STOP and worked until about 20:49 local.
+  It did not touch the re-seated cell's edits. `git status` checked at `7127fe1`: clean, and
+  every commit since `33bd8ba` is the re-seated cell's.
+- Its claim 10 outputs (`smoothing.json`, `smoothing-alpha.png`, `smoothing.log`,
+  `clip/proxies.npy`) were made by the code committed at `33bd8ba`.
+- **Reproducibility check: PASSED.** The re-seated cell re-ran `smoothing` at 20:58 with its own
+  head. `run_smoothing`, `analyse_staged_derived_alpha` and `capped_alpha` are unchanged since
+  `33bd8ba`. The records now on disk are that re-run (mtime 20:58:36), and they give the same
+  figures as the hand-over:
+  - 46/179 frames bound (25.7 %);
+  - alpha `|A-B|` mean 0.033, max 0.291;
+  - render mean 1.32, worst frame 11.9;
+  - flicker A 0.388, B 0.483.
+- The proxy cache (20:47) is checked against WP1.3D's pts on every load. Claim 10b's
+  recomputed 2 s series equals WP1.3D's recorded smoothed series exactly.
+- The predecessor's 10b draft (`wp14b_step_code.py.txt`) was not used. 10b was built
+  independently along the same plan (`99595d7`, `1bbcbca`).
+
+## CHARC report notes (msg 99fd817f74e4a428, upholding the STOP ruling; via the orchestrator)
+
+1. Immerkaer also reads about 0 on HEVC-flattened tiles. Where BOTH estimators read about 0 the
+   row says "below the quantisation floor", never "no noise", and the red-baseline set leads.
+   - Applied: `below_floor` (both below 0.05 code values) marks the crop page.
+   - The report states the floor in claim 4's Limits and marks every such figure in claims
+     7 and 8.
+2. The total red gain (camera WRGB red x our white-balance red gain) is a context column beside
+   our gain.
+   - Applied: `total_red_gain` per frame and as spreads in `summary.json`.
+   - In the claim 7 table: Ancuti 5.98-7.60 median, up to 13.75 (0665 at cap 0.5); c3 3.95.
+3. If the grid confirms the early signal against D100, that is spec-bearing.
+   - The grid does NOT confirm it as a general result. The report says so plainly, with the
+     crushed-red exception and its mechanism, for CHARC and WP1.6.
+
 ## Review rounds (Reviewer A) -- CUMULATIVE ROUND LEDGER
 
 Transport WSL, codex-cli 0.162.1, `-m gpt-5.6-sol -c model_reasoning_effort=high -s read-only

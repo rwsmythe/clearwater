@@ -1800,6 +1800,10 @@ TILE_SETS = ("flat", "red_lit")
 def summarise(frames: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     """Compute the tables of claims 4 and 7-9 from the grid records.
 
+    ``total_red_gain`` is the camera's applied white-balance red gain (WRGB red, already in the
+    8-bit source) times the pipeline's: the red gain the source's red has had in all, a context
+    column (``None`` when the camera state has no WRGB).
+
     Noise figures are Immerkaer's (the primary measure) on each tile set: the absolute output
     ``sigma_out_8bit``, and the ``amplification`` over the source where the source figure is
     above 0 (``None`` otherwise, left out of the spreads). A frame whose ``red_lit`` set has too
@@ -1819,12 +1823,15 @@ def summarise(frames: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
         entry = _render(frame, label)
         noise = entry["noise_red"][tile_set]
         camera = frame["camera"]["state"]
+        red_gain = entry["white_balance"]["applied_gains"][0]
+        camera_red = camera["WRGB"][0] if "WRGB" in camera else None
         return {
             "frame": frame["name"],
             "sigma_out_8bit": None if noise is None else noise["immerkaer_8bit"],
             "amplification": None if noise is None else noise["immerkaer_amplification"],
             "donoho_8bit": None if noise is None else noise["donoho_8bit"],
-            "red_gain": entry["white_balance"]["applied_gains"][0],
+            "red_gain": red_gain,
+            "total_red_gain": None if camera_red is None else camera_red * red_gain,
             "residual_RG": entry["residual_cast"]["R/G"],
             "residual_BG": entry["residual_cast"]["B/G"],
             "green_fraction": entry["green_fraction"],
@@ -1833,7 +1840,7 @@ def summarise(frames: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
             "cap_bound": entry["bound"]["red_gain_cap"],
             "clamp_bound": entry["bound"]["white_balance_clamp"],
             "ISOE": camera.get("ISOE"),
-            "WRGB_red": camera["WRGB"][0] if "WRGB" in camera else None,
+            "WRGB_red": camera_red,
         }
 
     def table(
@@ -1846,7 +1853,8 @@ def summarise(frames: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
                 "frames": len(rows),
                 "frames_without_set": sum(r["sigma_out_8bit"] is None for r in rows),
             }
-            for key in ("sigma_out_8bit", "amplification", "red_gain", "residual_RG",
+            for key in ("sigma_out_8bit", "amplification", "red_gain", "total_red_gain",
+                        "residual_RG",
                         "residual_BG", "effective_alpha", "green_fraction",
                         "stretch"):  # fmt: skip
                 values = [r[key] for r in rows if r[key] is not None]
@@ -1989,6 +1997,30 @@ def _fmt(value: float | None) -> str:
     return "n/a" if value is None else f"{value:.2f}"
 
 
+QUANTISATION_FLOOR_8BIT = 0.05
+"""Both estimators below this many code values (a twentieth of the 8-bit step) read as below
+the quantisation floor."""
+
+
+def below_floor(figures: Mapping[str, Any]) -> bool:
+    """Whether both estimators read about 0: the tiles sit below the quantisation floor.
+
+    HEVC flattens such tiles to a constant, so the reading means the measure cannot see the
+    noise there, never that there is none (CHARC's report note, 2026-10-20).
+
+    Args:
+        figures: :func:`sigma_figures` of one channel on one tile set.
+
+    Returns:
+        ``True`` when Immerkaer and Donoho both read below :data:`QUANTISATION_FLOOR_8BIT`
+        code values (on a float output, a flattened tile leaves residues near 1e-4, not 0).
+    """
+    return bool(
+        figures["immerkaer_8bit"] < QUANTISATION_FLOOR_8BIT
+        and figures["donoho_8bit"] < QUANTISATION_FLOOR_8BIT
+    )
+
+
 def _sigma_caption(noise: Mapping[str, Any], channel: str | None = None) -> str:
     """Return the ``sigma_R`` caption lines of a crop: Immerkaer per tile set, the amplification.
 
@@ -2007,12 +2039,13 @@ def _sigma_caption(noise: Mapping[str, Any], channel: str | None = None) -> str:
             lines.append(f"sigma_R {name} n/a (too few tiles)")
             continue
         if channel is not None:
-            lines.append(f"sigma_R {name} {figures[channel]['immerkaer_8bit']:.2f}")
-            continue
-        lines.append(
-            f"sigma_R {name} {figures['immerkaer_8bit']:.2f} "
-            f"(x{_fmt(figures['immerkaer_amplification'])})"
-        )
+            figures = figures[channel]
+        text = f"sigma_R {name} {figures['immerkaer_8bit']:.2f}"
+        if below_floor(figures):
+            text += " (below the quantisation floor)"
+        elif channel is None:
+            text += f" (x{_fmt(figures['immerkaer_amplification'])})"
+        lines.append(text)
     return "<br>".join(lines)
 
 

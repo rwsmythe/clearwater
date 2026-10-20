@@ -226,6 +226,17 @@ def test_immerkaer_keeps_the_order_of_quantised_noise_levels_that_donoho_cannot_
     assert donoho[0] == donoho[1] == 0.0
 
 
+def test_below_floor_needs_both_estimators_near_zero() -> None:
+    floor = noise_experiments.QUANTISATION_FLOOR_8BIT
+    assert noise_experiments.below_floor({"immerkaer_8bit": 0.0, "donoho_8bit": 0.0})
+    assert noise_experiments.below_floor({"immerkaer_8bit": 1e-4, "donoho_8bit": 5e-5})
+    assert not noise_experiments.below_floor({"immerkaer_8bit": floor, "donoho_8bit": 0.0})
+    assert not noise_experiments.below_floor({"immerkaer_8bit": 0.01, "donoho_8bit": 0.74})
+    image = np.full((128, 128, 3), 100.0 / 255.0, dtype=np.float32)  # flattened to a constant
+    tiles = noise_experiments.flat_tiles(image)
+    assert noise_experiments.below_floor(noise_experiments.sigma_figures(image[..., 0], tiles))
+
+
 # --- the settings grid and the render record (claims 3 and 5) ----------------------------------
 
 

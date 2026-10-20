@@ -14,7 +14,9 @@ from one of these records.
   Tighter caps RAISE red noise wherever the source red has a baseline (8 of 8 deep frames on the
   red-lit tiles), as the spec expects. They LOWER it only where the source red is crushed to a
   near-constant (4 of 8 frames on the flattest tiles), because there the output red noise is
-  green noise carried in by the compensation term, which the cap limits.
+  green noise carried in by the compensation term, which the cap limits. There the source red reads
+  below the quantisation floor; this is an exception to D100, not a contradiction of it. Totals
+  with the camera's own red gain: Ancuti 4.2-13.8x, c3 3.2-5.1x (claim 7).
 - **The clamp (D99):** 3.0 never binds on the deep frames under either method (1000 never binds
   either). Lowering it to 1.5 binds on 5 of 8 frames under Ancuti 2018, leaves a residual cast
   down to R/G 0.80, and cuts red noise by less than 1 % (median). Recommend keeping 3.0 for WP2.1.
@@ -132,6 +134,17 @@ ruled on the STOP (ledger):
 - The source is 8-bit HEVC. On deep frames the source red in the flattest tiles is often a
   single value per tile. Its Immerkaer figure is 0.000-0.031 code values on 4 frames, against
   0.12-0.20 for green.
+- **The quantisation floor.** Immerkaer, too, reads about 0 on a tile that HEVC has flattened to
+  a constant. Where BOTH estimators read below 0.05 code values (`QUANTISATION_FLOOR_8BIT`, a
+  twentieth of the 8-bit step), the reading means "below the quantisation floor", never "no
+  noise".
+  - This applies to the source red on the flat tiles of 0665, 0815, 0965 and 0975.
+  - It applies to the corrected red on those flat tiles under c3 and, on 0665, 0815 and 0965,
+    under Ancuti cap 0.5 at some clamp.
+  - It applies to nothing on the `red_lit` tiles.
+  - The crop page marks such readings. A 0.000 below is such a reading.
+- That is why the red-baseline set (`red_lit`, source red mean at least 16/255) leads every table
+  below: it is the set on which the grid is readable.
 - So what the measure reads in the corrected red there is mostly green-channel noise and
   compression structure carried into red, then stretched. It is not sensor grain.
 - The estimate is spatial, not temporal.
@@ -146,18 +159,23 @@ from the green term.
 
 **`red_lit` tiles** (a red baseline exists):
 
-| Setting | sigma_R out (8-bit) | amplification (n) | red WB gain | residual R/G | green fraction | cap bound | ISOE (context) | camera WRGB red (context) |
-|---|---|---|---|---|---|---|---|---|
-| cap off | 0.736 [0.539-0.993] | 2.43 [1.64-4.50] (8) | 1.52 [1.36-2.02] | 1.00 [0.94-1.04] | 0.46 [0.36-0.68] | 0/8 | 100 [100-793] | 3.73 [3.12-4.85] |
-| cap 2.0 (default) | 0.736 [0.553-0.993] | 2.43 [1.64-4.50] (8) | 1.54 [1.36-2.02] | 1.00 [0.94-1.04] | 0.46 [0.36-0.67] | 1/8 | 100 [100-793] | 3.73 [3.12-4.85] |
-| cap 1.0 | 0.783 [0.652-0.993] | 2.50 [1.64-4.50] (8) | 1.72 [1.36-2.21] | 1.01 [0.94-1.05] | 0.46 [0.36-0.50] | 3/8 | 100 [100-793] | 3.73 [3.12-4.85] |
-| cap 0.5 | 0.938 [0.717-1.035] | 2.84 [1.78-5.15] (8) | 1.97 [1.56-2.84] | 1.02 [0.93-1.08] | 0.33 [0.33-0.33] | 8/8 | 100 [100-793] | 3.73 [3.12-4.85] |
-| c3 | 0.481 [0.370-0.718] | 1.53 [1.15-3.25] (8) | 1.05 [1.02-1.07] | 1.00 [0.99-1.00] | n/a | n/a | 100 [100-793] | 3.73 [3.12-4.85] |
-| shallow, every Ancuti cap | 0.565 | 1.20 | 1.03 | 1.01 | 0.05 | 0/1 | 100 | 2.54 |
-| shallow, c3 | 0.549 | 1.16 | 0.99 | 1.00 | n/a | n/a | 100 | 2.54 |
+| Setting | sigma_R out (8-bit) | amplification (n) | red WB gain | total red gain (context) | residual R/G | green fraction | cap bound | ISOE (context) | camera WRGB red (context) |
+|---|---|---|---|---|---|---|---|---|---|
+| cap off | 0.736 [0.539-0.993] | 2.43 [1.64-4.50] (8) | 1.52 [1.36-2.02] | 5.98 [4.24-7.64] | 1.00 [0.94-1.04] | 0.46 [0.36-0.68] | 0/8 | 100 [100-793] | 3.73 [3.12-4.85] |
+| cap 2.0 (default) | 0.736 [0.553-0.993] | 2.43 [1.64-4.50] (8) | 1.54 [1.36-2.02] | 5.98 [4.24-7.68] | 1.00 [0.94-1.04] | 0.46 [0.36-0.67] | 1/8 | 100 [100-793] | 3.73 [3.12-4.85] |
+| cap 1.0 | 0.783 [0.652-0.993] | 2.50 [1.64-4.50] (8) | 1.72 [1.36-2.21] | 6.55 [4.24-10.72] | 1.01 [0.94-1.05] | 0.46 [0.36-0.50] | 3/8 | 100 [100-793] | 3.73 [3.12-4.85] |
+| cap 0.5 | 0.938 [0.717-1.035] | 2.84 [1.78-5.15] (8) | 1.97 [1.56-2.84] | 7.60 [4.87-13.75] | 1.02 [0.93-1.08] | 0.33 [0.33-0.33] | 8/8 | 100 [100-793] | 3.73 [3.12-4.85] |
+| c3 | 0.481 [0.370-0.718] | 1.53 [1.15-3.25] (8) | 1.05 [1.02-1.07] | 3.95 [3.20-5.10] | 1.00 [0.99-1.00] | n/a | n/a | 100 [100-793] | 3.73 [3.12-4.85] |
+| shallow, every Ancuti cap | 0.565 | 1.20 | 1.03 | 2.61 | 1.01 | 0.05 | 0/1 | 100 | 2.54 |
+| shallow, c3 | 0.549 | 1.16 | 0.99 | 2.50 | 1.00 | n/a | n/a | 100 | 2.54 |
 
-The context columns are the same 8 frames in every row; per frame they are in the claim 2a
-table.
+- The context columns are the same 8 frames in every row; per frame they are in the claim 2a
+  table.
+- **Total red gain** is the camera's applied white-balance red gain (WRGB red, already baked into
+  the 8-bit source) times our white-balance red gain, per frame (`summary.json`,
+  `total_red_gain`). It is the gain the eye and the artefacts see.
+- Every cap setting sits on top of the camera's 3.1-4.9x. At cap 0.5 the total reaches 13.75x on
+  GX011600_0665 (4.85 x 2.84).
 
 **`flat` tiles** (the brief's set):
 
@@ -170,8 +188,11 @@ table.
 | c3 | 0.127 [0.000-0.724] | 1.51 [1.16-3.27] (6) | 1.05 |
 | shallow, every Ancuti cap / c3 | 0.536 / 0.514 | 1.20 / 1.15 | 1.03 / 0.99 |
 
-The flat-set amplifications above 50 come from source figures of 0.002-0.03 code values. They
-are ratios over almost nothing; the absolute column is the comparison.
+- The c3 minimum of 0.000 is below the quantisation floor (Limits, claim 4), as is the cap-0.5
+  minimum of 0.043 (GX011600_0815).
+- The flat-set amplifications above 50 come from source figures of 0.002-0.03 code values, which
+  are below the quantisation floor. They are ratios over almost nothing; the absolute column is
+  the comparison.
 
 **Cap off against cap 0.5, per deep frame** (relative change of the output `sigma_R`):
 
@@ -192,8 +213,14 @@ white-balance gain on the noisy red, and so to raise noise.
 - **Yes, wherever the source red has a baseline:** 8 of 8 frames on the `red_lit` tiles (+1.7 %
   to +74.7 %).
 - **No, only where the source red is crushed:** on the `flat` tiles of the 4 frames whose source
-  red there reads 0.000-0.031 code values (0665, 0965, 0815, 0975), the tighter cap lowers the
-  output red noise by 27-58 %.
+  red there is below the quantisation floor (0665, 0965, 0815, 0975), the tighter cap lowers the
+  output red noise by 27-58 %. On 0815 the cap-0.5 output itself falls below the floor (0.043).
+- **Spec-bearing?** The grid does NOT confirm the early signal, a tighter cap lowering red noise,
+  as a general result. D100's expectation holds wherever red has a baseline. The opposite
+  direction is confined to crushed-red regions, where the source red reads below the
+  quantisation floor.
+  - This is reported for CHARC and the WP1.6 gate as an exception, with its mechanism. It does
+    not contradict D100.
 - **The mechanism the data support.** Ancuti's compensation adds `alpha (G-mean - R-mean)(1 - R) G`
   to red. Where the source red is a constant, the output red's noise is that term's green noise:
   - It scales with alpha. On 0665, alpha goes 0.94 -> 0.235 and `sigma_R` 0.195 -> 0.085, while
@@ -250,6 +277,8 @@ figure is above 0 (all 8 on `red_lit`, 6 on `flat`).
 | Ancuti cap 2, clamp 3 | 0/8 | 0.736 [0.553-0.993] | 2.43 [1.64-4.50] | 0.324 [0.084-0.999] | 3.77 [1.66-127.72] | 1.00 [0.94-1.04] | 1.00 [0.98-1.01] |
 | Ancuti cap 2, clamp 5 | 0/8 | 0.736 [0.553-0.993] | 2.43 [1.64-4.50] | 0.324 [0.084-0.999] | 3.77 [1.66-127.72] | 1.00 [0.94-1.04] | 1.00 [0.98-1.01] |
 | Ancuti cap 2, clamp 1000 | 0/8 | 0.736 [0.553-0.993] | 2.43 [1.64-4.50] | 0.324 [0.084-0.999] | 3.77 [1.66-127.72] | 1.00 [0.94-1.04] | 1.00 [0.98-1.01] |
+
+The `flat` minima of 0.000 (c3) are below the quantisation floor; the `red_lit` columns lead.
 
 - The clamp at 1000 never bound.
 - Under 3C the red white-balance gain stays at or below 1.07, and no clamp in the grid ever
