@@ -209,23 +209,25 @@ def read_movie_boxes(path: Path) -> MovieBoxes:
         pos = 0
         while pos < total:
             handle.seek(pos)
-            head = handle.read(_LARGE_HEADER)
+            head = handle.read(_HEADER)
             if len(head) < _HEADER:
                 raise BoxError("top-level box header is cut short")
             size, kind = struct.unpack_from(">I4s", head)
             header = _HEADER
             if size == 1:
-                if len(head) < _LARGE_HEADER:
+                extension = handle.read(_HEADER)
+                if len(extension) < _HEADER:
                     raise BoxError("64-bit top-level box header is cut short")
-                (size,) = struct.unpack_from(">Q", head, _HEADER)
+                (size,) = struct.unpack(">Q", extension)
                 header = _LARGE_HEADER
             elif size == 0:
                 size = total - pos
             if size < header:
                 raise BoxError("top-level box smaller than its header")
+            if pos + size > total and kind != b"mdat":
+                # A cut file legitimately ends inside its media data; no other box may overrun.
+                raise BoxError("box extends past the end of the file")
             if kind == b"moov":
-                if pos + size > total:
-                    raise BoxError("moov extends past the end of the file")
                 if size - header > MAX_MOOV_BYTES:
                     raise BoxError("moov is larger than the supported maximum")
                 handle.seek(pos + header)

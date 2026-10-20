@@ -39,7 +39,7 @@ from clearwater.interfaces.video import (
 )
 from clearwater.io.video.boxes import BoxError, MovieBoxes, read_movie_boxes
 from clearwater.io.video.gopro import GPMFError, parse_settings
-from clearwater.io.video.inputs import is_sidecar
+from clearwater.io.video.inputs import ascii_text, is_sidecar
 
 _log = logging.getLogger(__name__)
 
@@ -148,9 +148,14 @@ def _json(text: str, path: Path) -> dict[str, Any]:
     return data
 
 
+def _name(path: Path) -> str:
+    """Return the file name with non-ASCII characters escaped, for user messages."""
+    return ascii_text(path.name)
+
+
 def _unreadable(path: Path) -> str:
     """Return the message for a file that cannot be read at all (spec 5.4)."""
-    return f"{path.name} cannot be read as a video file; it may be damaged or not a video."
+    return f"{_name(path)} cannot be read as a video file; it may be damaged or not a video."
 
 
 def _fraction(text: object) -> Fraction | None:
@@ -186,7 +191,7 @@ def _bit_depth(pix_fmt: str, path: Path) -> int:
     if match is None or depth not in (8, 10):
         raise VideoProbeError(
             "unsupported",
-            f"{path.name} uses the pixel format {pix_fmt}; only 8-bit and 10-bit YUV video is "
+            f"{_name(path)} uses the pixel format {pix_fmt}; only 8-bit and 10-bit YUV video is "
             "supported.",
         )
     return depth
@@ -214,7 +219,8 @@ def _rotation(stream: Mapping[str, Any], path: Path) -> int:
             determinant = rows[0][0] * rows[1][1] - rows[0][1] * rows[1][0]
             if determinant < 0:
                 raise VideoProbeError(
-                    "unsupported", f"{path.name} is stored mirrored, which is not supported."
+                    "unsupported",
+                    f"{_name(path)} is stored mirrored, which is not supported.",
                 )
         try:
             angle = Fraction(str(item["rotation"])) % 360
@@ -223,7 +229,7 @@ def _rotation(stream: Mapping[str, Any], path: Path) -> int:
         if angle % 90 != 0:
             raise VideoProbeError(
                 "unsupported",
-                f"{path.name} is rotated by {item['rotation']} degrees; only multiples of 90 "
+                f"{_name(path)} is rotated by {item['rotation']} degrees; only multiples of 90 "
                 "degrees are supported.",
             )
         return int(angle)
@@ -347,14 +353,16 @@ def _tail_unreadable(
     """Decode only the last group of pictures and report whether its end is unreadable.
 
     The decode starts at the last keyframe, so its cost does not grow with the clip. The tail is
-    unreadable when ffprobe writes any error line, exits nonzero, or does not deliver the last
-    packet's frame. A stream whose packets carry no keyframe flag is not checked.
+    unreadable when ffprobe writes any error line, exits nonzero, or does not deliver a frame for
+    every packet from the last keyframe on (by pts, so B-frame order does not matter). A stream
+    whose packets carry no keyframe flag is not checked.
     """
     keyframes = [pts for pts, _, flags in packets if pts is not None and "K" in flags]
-    last = max((pts for pts, _, _ in packets if pts is not None), default=None)
-    if not keyframes or last is None:
+    if not keyframes:
         return False
-    start = _seek_string(max(keyframes) * time_base)
+    first = max(keyframes)
+    required = {pts for pts, _, _ in packets if pts is not None and pts >= first}
+    start = _seek_string(first * time_base)
     status, out, err = _run_ffprobe(
         [
             "-v",
@@ -375,7 +383,7 @@ def _tail_unreadable(
     except ValueError:
         return True
     delivered = {_int(item.get("pts")) for item in frames if isinstance(item, Mapping)}
-    return status != 0 or bool(err.strip()) or last not in delivered
+    return status != 0 or bool(err.strip()) or not required <= delivered
 
 
 def _edit_list(boxes: MovieBoxes) -> tuple[EditEntry, ...]:
@@ -448,7 +456,7 @@ def _gp_log_fault(gopro: GoProInfo | None, color: _Color) -> list[Fault]:
         return []
     profile = (gopro.color_profile or "").upper()
     if profile and profile not in _GP_LOG_PROFILES:
-        reason = f"colour profile {gopro.color_profile}"
+        reason = f"colour profile {ascii_text(gopro.color_profile or '')}"
     elif gopro.protune is True and color.transfer_missing:
         reason = "Protune is on and the video has no transfer tag"
     else:
@@ -469,8 +477,12 @@ def _tail_fault(
     nb_frames: int | None,
     stderr: str,
     time_base: Fraction,
+    decode_tail: bool,
 ) -> list[Fault]:
-    """Return the truncation or unreadable-tail warning, never both (D86)."""
+    """Return the truncation or unreadable-tail warning, never both (D86).
+
+    ``decode_tail`` is False for a refused (HLG or PQ) file, which is never decoded.
+    """
     corrupt_last = bool(packets) and "C" in packets[-1][2]
     readable = len(packets) - (1 if corrupt_last else 0)
     short = nb_frames is not None and len(packets) < nb_frames
@@ -480,16 +492,16 @@ def _tail_fault(
             Fault(
                 "truncated",
                 "warn",
-                f"{path.name} is cut short: only {readable}{of_total} frames can be read. "
+                f"{_name(path)} is cut short: only {readable}{of_total} frames can be read. "
                 "Clearwater will process up to the readable part.",
             )
         ]
-    if packets and _tail_unreadable(path, packets, time_base):
+    if decode_tail and packets and _tail_unreadable(path, packets, time_base):
         return [
             Fault(
                 "unreadable_tail",
                 "warn",
-                f"The end of {path.name} cannot be decoded. Clearwater will process up to the "
+                f"The end of {_name(path)} cannot be decoded. Clearwater will process up to the "
                 "last readable frame.",
             )
         ]
@@ -526,10 +538,11 @@ def probe(path: Path) -> ProbeResult:
     """
     if is_sidecar(path):
         raise VideoProbeError(
-            "sidecar", f"{path.name} is a camera proxy or thumbnail file, not a video to correct."
+            "sidecar",
+            f"{_name(path)} is a camera proxy or thumbnail file, not a video to correct.",
         )
     if not path.is_file():
-        raise VideoProbeError("unreadable", f"{path.name} was not found.")
+        raise VideoProbeError("unreadable", f"{_name(path)} was not found.")
     status, out, _ = _run_ffprobe(
         ["-v", "error", "-of", "json", "-show_entries", _STREAMS_ENTRIES, str(path)]
     )
@@ -540,16 +553,17 @@ def probe(path: Path) -> ProbeResult:
     streams = [s for s in data.get("streams") or [] if isinstance(s, Mapping)]
     video = next((s for s in streams if s.get("codec_type") == "video"), None)
     if video is None:
-        raise VideoProbeError("unsupported", f"{path.name} has no video stream.")
+        raise VideoProbeError("unsupported", f"{_name(path)} has no video stream.")
     if not ({"mov", "mp4"} & set(container.split(","))):
         raise VideoProbeError(
             "unsupported",
-            f"{path.name} is not an MP4 or MOV file (found {container or 'unknown'}).",
+            f"{_name(path)} is not an MP4 or MOV file (found {container or 'unknown'}).",
         )
     codec = str(video.get("codec_name", ""))
     if codec not in _ACCEPTED_CODECS:
         raise VideoProbeError(
-            "unsupported", f"{path.name} uses the codec {codec or 'unknown'}; H.265 and H.264 only."
+            "unsupported",
+            f"{_name(path)} uses the codec {codec or 'unknown'}; H.265 and H.264 only.",
         )
     pix_fmt = str(video.get("pix_fmt", ""))
     bit_depth = _bit_depth(pix_fmt, path)
@@ -593,14 +607,16 @@ def probe(path: Path) -> ProbeResult:
     if durations:
         duration = max(durations)
     elif pts:
-        duration = (max(pts) + (packets[-1][1] or 0)) * time_base
+        # The packet with the highest pts, not the last in file order (B-frames).
+        end = max(((p, d or 0) for p, d, _ in packets if p is not None))
+        duration = (end[0] + end[1]) * time_base
     else:
         duration = Fraction(0)
 
     faults = [
         *_colour_faults(color),
         *_gp_log_fault(gopro, color),
-        *_tail_fault(path, packets, nb_frames, packet_err, time_base),
+        *_tail_fault(path, packets, nb_frames, packet_err, time_base, color.hdr is None),
     ]
     chroma = _tag(video, "chroma_location")
     info = VideoStreamInfo(

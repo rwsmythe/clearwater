@@ -30,6 +30,18 @@ class InputSelection:
     excluded: tuple[tuple[Path, Fault], ...]
 
 
+def ascii_text(text: str) -> str:
+    """Return text with every non-ASCII character replaced by a backslash escape.
+
+    Args:
+        text: Any text, typically a file name.
+
+    Returns:
+        An ASCII-only string; ASCII input is returned unchanged.
+    """
+    return text.encode("ascii", "backslashreplace").decode("ascii")
+
+
 def is_sidecar(path: Path) -> bool:
     """Return whether a path names a camera sidecar (``.LRV`` or ``.THM``, any case).
 
@@ -55,7 +67,7 @@ def sidecar_fault(path: Path) -> Fault:
         kind="sidecar",
         severity="exclude",
         message=(
-            f"{path.name} is a camera proxy or thumbnail file, not a video to correct. "
+            f"{ascii_text(path.name)} is a camera proxy or thumbnail file, not a video to correct. "
             "It was left out of the inputs."
         ),
     )
