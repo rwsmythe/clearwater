@@ -343,6 +343,20 @@ def test_foreign_device_array_refused(gpu: CoreBackend) -> None:
         fusion.saturation_weight(gpu, noise())
 
 
+def test_non_arrays_refused_with_type_error() -> None:
+    """The array checks run before any shape is read (R1 F4): TypeError, not AttributeError."""
+    backend = NumpyBackend()
+    image = noise()
+    with pytest.raises(TypeError):
+        fusion.weight_maps(
+            backend, [object()], **weights_kw(DEFAULTS), saliency_means=[(50.0, 0.0, 0.0)]
+        )
+    with pytest.raises(TypeError):
+        fusion.multiscale_fusion(backend, [object()], [object()], pyramid_min_level_size=16)
+    with pytest.raises(TypeError):
+        fusion.multiscale_fusion(backend, [image], [object()], pyramid_min_level_size=16)
+
+
 def test_shape_mismatches_refused() -> None:
     backend = NumpyBackend()
     with pytest.raises(ValueError, match="at least one"):

@@ -321,9 +321,10 @@ def weight_maps(
     """
     if not inputs:
         raise ValueError("weight_maps needs at least one input")
+    for image in inputs:  # every input checked before any shape is read
+        _check_image(backend, image)
     shape = inputs[0].shape
     for image in inputs:
-        _check_image(backend, image)
         if image.shape != shape:
             raise ValueError(f"fusion inputs differ in shape: {image.shape} and {shape}")
     laplacian_sigma = _derived_sigma("laplacian_fraction", laplacian_fraction, shape)
@@ -380,10 +381,11 @@ def multiscale_fusion(
             f"and {len(weights)} weights"
         )
     core = _core(backend)
-    shape = inputs[0].shape
-    for image, weight in zip(inputs, weights, strict=True):
+    for image, weight in zip(inputs, weights, strict=True):  # checked before any shape is read
         core.check_rgb(image)
         core.check_spatial(weight)
+    shape = inputs[0].shape
+    for image, weight in zip(inputs, weights, strict=True):
         if image.shape != shape or weight.shape != shape[:2]:
             raise ValueError(
                 f"fusion inputs and weights differ in shape: {image.shape}, {weight.shape}"
