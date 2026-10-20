@@ -77,4 +77,35 @@ Re-seated cell (second) took over at head `663cc64`, 2026-10-20 00:08Z.
 
 ## Round ledger
 
-(no review round yet)
+Transport WSL, codex-cli 0.162.1, banner `gpt-5.6-sol` / `high` / `read-only` every round. Evidence
+`C:\Users\rwsmy\clearwater-review-evidence\wp1.3d\rN\` (prompt, diff, transcript, scripts, md5s). Depth column: filled by the dispatcher.
+
+| Round | Head reviewed | Findings (crit/major/minor) | In / out of envelope | NEW / REOPENED | Reverts | Fix kind | Assertions | Depth | Verdict |
+|---|---|---|---|---|---|---|---|---|---|
+| 1 | `3ca1cf5` | 0 / 2 / 3 | 2 major + 1 minor in; 2 minor out | 5 NEW / 0 | 0 | product code (scan.py, pack.py) + tests | banner ok; `^ERROR` 0; `ERROR codex_core` 2, both echoes of the brief text in the reviewer's file reads; footer; verdict anchored; 24 `^ succeeded in`; 13 `docs/proofs`/ledger hits, all echoes (the brief and prompt quote the words; no command opened them) | | NEW_CRITICAL_MAJOR_FOUND |
+| 2 | `8120b28` | 0 / 3 / 2 | 3 major in (hardening of the same two controls); 2 minor out | 3 NEW (CR2-01..03 deepen the round-1 controls: REOPENED in spirit, new in detail) / 0 strictly | 0 | product code (scan.py, pack.py) + tests | banner ok; `^ERROR` 0; `ERROR codex_core` 1, an echo of the brief text; footer; verdict anchored; 26 `^ succeeded in`; proofs/ledger hits are echoes | | NEW_CRITICAL_MAJOR_FOUND |
+
+Round 1 adjudication (fixed in `81187ee`, `018f3a8`, `2883592`):
+- F1 major (scan cache had no identity; `finish` could certify a stale or incomplete scan; `--rescan` kept a partial): ACCEPTED. A cache and a partial carry `rules` and
+  the declared `timestamps`; `cache_problem` refuses a stale, foreign, subset or incomplete one, `finish` raises, `--rescan` deletes both files. The scan was re-run in
+  full (the old caches were refused as unrecorded): 289 records identical value for value, `deep-frames.json` identical apart from `written`.
+- F2 major (encode and page trusted whatever PNGs and MP4s were on disk): ACCEPTED. `render_deep_clip` clears the clip folder first (`clear_clip`);
+  `encode_deep_clip` runs `clip_inputs_problem` before any tool; `clip_files` links only a clip whose statistics record ok checks and which is centred on the
+  current deepest frame.
+- F3 minor (usage docstring): fixed. F4 minor OUT-OF-ENVELOPE (zero-green frame excluded; D undefined): kept, a test pins it, stated in report section 2.
+  F5 minor OUT-OF-ENVELOPE (footage and gpu tests skip when their inputs are absent): the repository's convention; the gate records none skipped.
+
+Round 2 adjudication (fixed in `82343ad` and the commit after it):
+- CR2-01 major (cache lacks source and record identity): ACCEPTED in part, fixed. The cache records the footage file's name and size, `main` compares the size with the
+  file on disk, and every cached record is re-checked (`record_problem`: chapter, name from pts, pts not before the grid point, measures in range, exclusion equal to
+  `exclusion_reason`). NOT done, stated as a limit: a hand-edited record whose values are in range and self-consistent cannot be told from a measured one
+  (deliberate editing of the working folder; outside the envelope). Cost: every cache was refused as unrecorded and the scan was run a third time.
+- CR2-02 major (`deep-frames.json` not tied to `scan.json`): ACCEPTED, fixed. `_load_deep_frames` rebuilds the file from `scan.json` with
+  `deep_frames_document` and refuses any difference other than `written`.
+- CR2-03 major (clip frames, statistics and MP4s not bound): ACCEPTED in part, fixed. SHA-256 of every source and corrected PNG is recorded at render and re-checked
+  before the encode; the source video's size and the STAGED analysis are checked; `clip_files` requires all four check records (`c3`, `ancuti2018`, `source`,
+  `readback`) to be present and ok, and the three MP4s to equal the SHA-256 recorded when they were verified. Cost: the clip was rendered a fourth time.
+  NOT done, stated as a limit: the 6 s duration, proxy text and start are not re-derived from the source at encode time.
+- CR2-04 minor OUT-OF-ENVELOPE (a scan grid point in the last second is omitted): the 1 s end margin is `SCAN_END_MARGIN_S`, stated in the report; none of the eight
+  chapters has such a point. Banked.
+- CR2-05 minor OUT-OF-ENVELOPE (page prints a pts without the time-base numerator): fixed anyway (`tick_text`), the text for 1/30000 is unchanged.
