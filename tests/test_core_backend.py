@@ -272,6 +272,7 @@ IMAGE_METHODS: dict[str, Callable[[CoreBackend, Any], Any]] = {
     "rgb_to_ycbcr": lambda b, a: b.rgb_to_ycbcr(a, "bt709", "full"),
     "ycbcr_to_rgb": lambda b, a: b.ycbcr_to_rgb(a, "bt709", "full"),
     "percentile": lambda b, a: b.percentile(a, [50.0]),
+    "to_host": lambda b, a: b.to_host(a),  # round 1 F5: the way out checks float32 too
 }
 
 

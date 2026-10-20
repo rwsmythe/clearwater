@@ -254,19 +254,16 @@ class CoreBackend:
         """Return ``a`` as a NumPy array on the host (the explicit way out).
 
         Args:
-            a: An array of this backend.
+            a: A float32 array of this backend.
 
         Returns:
-            The NumPy array (``a`` itself on the CPU).
+            The NumPy array, float32 (``a`` itself on the CPU).
 
         Raises:
             TypeError: ``a`` is not an array of this backend.
+            ValueError: ``a`` is not float32.
         """
-        if not isinstance(a, self.xp.ndarray):
-            raise TypeError(
-                f"the {self.name} backend takes {self.xp.__name__} arrays, got "
-                f"{type(a).__module__}.{type(a).__name__}"
-            )
+        self.check(a)
         if self.xp is np:
             same: NDArray[Any] = a
             return same
