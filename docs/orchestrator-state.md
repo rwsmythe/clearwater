@@ -5,14 +5,12 @@
 
 ### Generation
 
-- **Generation 3** (`clearwater-orchestrator-20261019-2346`) ROLLED OVER 2026-10-20 ~15:25Z at its
-  400K cap, at a clean boundary: WP2.2 merged, no live cell. **Generation 4 starts here** (verify:
-  `comms/.launch-sessions.json`). Earlier: gen 2 `clearwater-orchestrator-20261018-1442`, gen 1
+- **Generation 4** (`clearwater-orchestrator-20261020-0524`) is LIVE since 2026-10-20 ~15:25Z
+  (verify: `comms/.launch-sessions.json`). Earlier: gen 3 `clearwater-orchestrator-20261019-2346`
+  (rolled at 400K), gen 2 `clearwater-orchestrator-20261018-1442`, gen 1
   `clearwater-orchestrator-20261014-1258`.
-- **Inbox:** gen 3 drained through CHARC `cda92ceb18e8451a` (0 unread, 74 read at its last list)
-  and STOPPED DRAINING at its rollover announcement. You are the sole drainer (verify:
-  `uv run python scripts/role_mail.py list --role orchestrator`).
-- Bash-launch gauge at gen-3 bring-up: 37 ms. Re-measure at yours.
+- **Inbox:** gen 4 is the sole drainer; drained through CHARC `4f11a18fc46c9fc4` (WP2.2 QA).
+- Bash-launch gauge at gen-4 bring-up: 34 ms.
 
 ### Standing operator rulings
 
@@ -34,12 +32,13 @@
 
 ### Live cells
 
-- **None.** `wp22-cell` returned (WP2.2 accepted, 217,013 / 80 turns at return); it is retired.
-  Do not message it or any earlier cell (`wp21s-cell`, `wp21s-cell2`, `wp21s-cell3`, and the gen-2
-  cells).
-- Worktrees still present (verify `git worktree list`): `.worktrees/wp2.2` and `.worktrees/wp2.2-mc`.
-  Remove them with `git worktree remove --force` after CHARC's QA confirms WP2.2. Keep the
-  branches `wp2.2`, `wp2.2-mc`, `wp2.1s`, `wp2.1s-mc` as evidence.
+- **`wp23-cell`** (implementer-sonnet-high, STRONG): WP2.3, worktree `.worktrees/wp2.3`, branch
+  `wp2.3`, base main `da074f4`, dispatched 2026-10-20 ~15:34Z. Depth 0 at dispatch. A cell dies
+  with its dispatcher: a successor re-dispatches from the branch head and the ledger
+  `docs/proofs/wp2.3-ledger.md`.
+- Retired (never message): `wp22-cell`, `wp21s-cell`, `wp21s-cell2`, `wp21s-cell3`, the gen-2
+  cells. The wp2.2 worktrees are removed; branches `wp2.2`, `wp2.2-mc`, `wp2.1s`, `wp2.1s-mc` are
+  kept as evidence.
 
 ### Where things stand -- the successor starts HERE
 
@@ -58,16 +57,8 @@
 4. **WP2.2 ACCEPTED 2026-10-20, main `b288533`** (record `docs/proofs/wp2.2-accept.md`; DR-32).
    IF-1 to IF-10 are FROZEN (AD-20). The return report went to CHARC (return_report, thread
    wp2.2, 15:23Z), with the hold on main released.
-   - **YOUR FIRST ACTS:**
-     (a) Run the FULL pytest on main `b288533` in the background (expect 892 passed). Gen 3
-         ran it on the candidate `2a7f092` (identical code; main adds docs only) but not on
-         main, because of the depth cap. Add the result as a "Gates on main" row in the accept
-         record, committed by pathspec.
-     (b) Drain the inbox for CHARC's WP2.2 QA. It covers the adjudication of B re-run's
-         mapping-KEY non-finite finding as NOT BLOCKING (DR-32).
-     (c) On CHARC's QA, remove the wp2.2 worktrees. Mark `docs/briefs/wp2.3-brief.md` FINAL:
-         title line and status; the rulings section is already in (`8d7880255daf7c79`). Then
-         dispatch WP2.3 to implementer-sonnet-high (STRONG) in `.worktrees/wp2.3` from main.
+   - DONE by gen 4: 892 passed on main (record row, `da074f4`); CHARC QA CONFIRMED; wp2.2
+     worktrees removed; WP2.3 brief FINAL and dispatched (see Live cells).
    - **WP2.3 notes:**
      - The manifest uses WP2.2's `Fault` kinds (`src/clearwater/interfaces/video.py`: seven
        kinds, severity refuse/warn/exclude).
@@ -100,7 +91,7 @@ Each accepted package had its return report posted to CHARC and an info-update t
 | WP1.3D | 2026-10-20 | `7f9fea1` | `docs/proofs/wp1.3d-accept.md`; DR-29 | CONFIRMED (`c6bda8a38146274f`) |
 | WP1.4b | 2026-10-20 | `afaff0e` | `docs/proofs/wp1.4b-accept.md`; Gate result 4 KEEP; DR-30; flip witness 6/6 | CONFIRMED (`2fe4e7e1dc9e0854`) |
 | WP2.1S | 2026-10-20 | `a866f06` | `docs/proofs/wp2.1s-accept.md`; DR-31; 2 depth re-seats; B errata at the gate | CONFIRMED (`9fb52c00bbb58a9b`) |
-| WP2.2 | 2026-10-20 | `b288533` | `docs/proofs/wp2.2-accept.md`; DR-32; B re-run major adjudicated at the gate; IF-1..IF-10 frozen | pending |
+| WP2.2 | 2026-10-20 | `b288533` | `docs/proofs/wp2.2-accept.md`; DR-32; B re-run major adjudicated at the gate; IF-1..IF-10 frozen; 892 passed on main | CONFIRMED (`4f11a18fc46c9fc4`) |
 
 Kept branches (evidence; do not delete unasked): `wp1.2b`, `wp1.2b-b1`, `wp1.3d`, `wp1.3d-b1`,
 `wp1.4b`, plus the earlier packages' (`git branch`).
