@@ -13,9 +13,7 @@ Conditions: 2026-10-19/20 (UTC), Windows 11 laptop, RTX 4070 Laptop GPU (prototy
 CuPy), FFmpeg and ffprobe `9.0.2-full_build-www.gyan.dev`, spec v0.5.3, branch `wp1.3d` (base
 `c80725b`). Footage folder read only; every file the package's FFmpeg runs and writers produce is under
 `C:\Users\rwsmy\clearwater\work\wp1.3d\` (below, `work\wp1.3d\`). (Python bytecode, the pytest cache and the
-CuPy kernel cache belong to the interpreter and the libraries and are not there.) Elapsed times are
-informal, not results: scan about 55 min (289 frames, CPU decode and measures), stills 776 s (60 frames,
-3 variants each, GPU), clip render and encode 1336 s.
+CuPy kernel cache belong to the interpreter and the libraries and are not there.)
 
 **Defaults, not tuning.** Every variant runs at the `Params()` defaults with only `method` (and
 `blue_compensation` for the third) set. `Params().method` still reads `ancuti2018` on main at this
@@ -27,7 +25,7 @@ change this pack.
 | Path under `work\wp1.3d\` | Content |
 |---|---|
 | `index.html` | the page to open: head (variants, the `Params` defaults, the candidate rule, pending items), the deep clip, the 48 chapter stills, then one section per case with its 4 candidates; thumbnails (960x540) link to the full 16-bit PNGs; under each variant the pair link and a one-line statistics summary |
-| `frames\` | 240 PNGs: 60 sources `GX0115xx_<pts>.png` and 180 corrected `<frame>-<variant>.png`, 16-bit RGB, 3840x2160 (9.2 GB) |
+| `frames\` | 240 PNGs: 60 sources `<chapter>_<pts>.png` and 180 corrected `<frame>-<variant>.png`, 16-bit RGB, 3840x2160 (9.2 GB) |
 | `pairs\` | 180 side-by-side JPEGs (source left, corrected right, each half 1920x1080, quality 92) |
 | `thumbs\` | 240 JPEGs (short side 540) |
 | `frames.json`, `statistics.json` | per source frame the exact pts, size, colour tags and the FFmpeg command; per frame and variant the prototype's compensation and white-balance records, the `Params` it ran with, the N{} bounds and whether anything bound |
@@ -83,7 +81,7 @@ Chapters (`GX011589` is a 6.4 s chapter and gives one scan frame, at 5 s):
 | GX011600 | 1046.5 | 105 |
 | GX011601 | 470.9 | 47 |
 
-The scan frames are on a 10 s grid, so a candidate's pts is the grid time plus the decoder's nearest frame
+The scan frames are on a 10 s grid, so a candidate's pts is the grid time plus the offset to the first decoded frame at or after the grid point
 (`pts_ticks` is exact). **Spacing** (30 s between two candidates of the same case, 10 s on the deepest list) is
 measured on the GRID and WITHIN one chapter: a pts-based measure would make "30 s" ambiguous by one frame
 period, and candidates of different chapters are different recordings and are not compared with each other.
@@ -95,7 +93,7 @@ lowest `H` among frames with `W` below 0.5 (so open water does not take the haze
 within a chapter, at most 2 per chapter per case, ties by chapter name then pts. Four were found for every case
 without lowering any bar. **The owner decides at CP2 whether each one shows the case.** Two things the numbers
 say and nothing else: the lowest-`D` frame (`GX011600_0665.031`, `D` = 0.209) is also a
-frame with a high `W` (0.708), so a dim open-water frame can be a deep-noise candidate; no frame
+frame with a high `W` (0.708), a measure value, not a description of the frame; no frame
 serves two cases.
 
 **Deep-water noise** -- candidate (lowest D)
@@ -269,11 +267,11 @@ c3 red gain has a largest step of 0.0443 and the raw ancuti2018 red gain
 0.1401.
 
 **What bound in the clip.** `c3`: gain cap on 0 / 0 frames (red / blue), white-balance clamp on
-0, N{} collapsed on 0; N{} spread 0.206 to 0.478 (below 0.02 on 0).
+0, N{} collapsed on 0; N{} spread 0.212 to 0.409 (below 0.02 on 0).
 `ancuti2018`: the D50 red cap lowered the smoothed alpha below 1.0 (by more than 1e-9) on 104 frames
 (alpha down to 0.673; frames 17 to 120 of 0 to 178), blue cap
 0, white-balance clamp on 0, N{} collapsed
-0; N{} spread 0.195 to 0.465 (below 0.02 on 0). A gain cap counts as
+0; N{} spread 0.206 to 0.396 (below 0.02 on 0). A gain cap counts as
 bound here when the smoothed alpha is below the requested 1.0 by more than 1e-9: a Gaussian-smoothed constant 1.0
 comes out as 0.9999999999999999 and an exact comparison flagged every frame (found on the first full render of
 this clip, fixed by `DEEP_CAP_TOLERANCE`, a test shows the strict shallow behaviour is unchanged).
@@ -281,7 +279,7 @@ this clip, fixed by `DEEP_CAP_TOLERANCE`, a test shows the strict shallow behavi
 **Encode and read-back (deviation, ruled).** The read-back checks that each encoded frame is the right frame in
 the right order, not fidelity: every frame of the encoded clip is converted back and compared at 1/8 size with its own
 PNG and with the PNGs of its neighbours. The shallow clip's bound on the difference to the own PNG is 3.0 levels
-(`READBACK_MAX_OWN`, still used by `flicker`). On the noisy deep footage a lossy NVENC CQ 20 encode exceeds it on
+(`READBACK_MAX_OWN`, still used by `flicker`). On the deep footage a lossy NVENC CQ 20 encode exceeds it on
 some frames, so the deep clip uses `DEEP_READBACK_MAX_OWN` = 5.0. Measured on this run (levels of 255):
 
 | Clip | own min / mean / max (levels) | frames over 3.0 | smallest neighbour margin (frame) | channel bias R, G, B | frames read |
@@ -300,14 +298,25 @@ tabulated), the channel bias is within the unchanged 2.0 bound, and the neighbou
 - Any default change, tuning, re-run at other parameters, the gain-cap noise measurement and the `Params()` flip: WP1.4b and WP2.1.
 - Timing: none recorded (the package is not exclusive).
 
+Known limits of the working-folder controls (banked, outside the declared envelope: one operator running the documented
+steps in order on an untampered working folder; none changes what the page or the clip show in that case):
+
+- A scan-cache or clip-render source is identified by the footage file's name and byte count only (SHA-256 of the
+  24 GB set was judged out of proportion); a different file of the same size would pass. The PNGs and MP4s of the clip
+  are bound by SHA-256 between render, encode and page.
+- A hand-edited scan record whose values are in range and self-consistent cannot be told from a measured one.
+- The 6 s duration, the proxy text and the start of the clip are not re-derived from the source at encode time, so a
+  render made programmatically with another duration would be linked as the deep clip (the page's own command always
+  renders 6 s).
+
 ## 8. Verification
 
 Gate on the head named in the ledger (full run, `footage` and `gpu` tests RUN, none skipped):
 
 - `uv run ruff check .`: all checks passed. `uv run ruff format --check .`: 110 files already formatted.
 - `uv run mypy`: success, no issues in 20 source files.
-- `uv run pytest -q --basetemp=work/pytest-wp1.3d`: **732 passed**, 1 warning (CuPy "CUDA path could not be detected"),
-  442.9 s. No test skipped. `tests/test_lookcheck.py` is unchanged and `tools/prototype/`,
+- `uv run pytest -q --basetemp=work/pytest-wp1.3d`: **733 passed**, 1 warning (CuPy "CUDA path could not be detected"),
+  470.7 s. No test skipped. `tests/test_lookcheck.py` is unchanged and `tools/prototype/`,
   `tools/lookcheck/frames.py`, `pyproject.toml` and `src/` are untouched (`git diff --stat c80725b..HEAD` lists
   `tools/lookcheck/scan.py`, `tools/lookcheck/pack.py`, `tests/test_lookcheck_deep.py`, this report and the ledger only).
 - Harness files (`scripts/`, `.claude/`, kernel docs, `tests/harness/`) untouched, so the harness gate is not re-run.
@@ -321,6 +330,8 @@ one round per row; evidence under `C:\Users\rwsmy\clearwater-review-evidence\wp1
 | Round | Findings (severity, in or out of envelope) | Fixed in | Verdict |
 |---|---|---|---|
 | 1 | 2 major in envelope (a scan cache without identity could certify a stale or incomplete scan; the clip's encode and page steps trusted whatever PNGs and MP4s were on disk); 3 minor (a usage docstring that named the wrong output folder; a zero-green frame is excluded by a rule the brief does not name, out of envelope; the footage and gpu tests skip when their inputs are absent, out of envelope) | `81187ee`, `018f3a8`, `2883592`; the zero-green rule is now stated in section 2; the skip behaviour is the repository's test convention, checked at the gate | NEW_CRITICAL_MAJOR_FOUND |
+| 2 | 3 major in envelope (the scan cache lacked source and record identity; `deep-frames.json` was not tied to `scan.json`; the clip's frames, statistics and MP4s were not bound to one render); 2 minor (a scan grid point in the last second omitted by the 1 s end margin, out of envelope; a page pts printed without the time-base numerator) | `82343ad` and the commit after it (cache source size and per-record checks; `deep-frames.json` rebuilt from `scan.json`; SHA-256 of every clip PNG and MP4) | NEW_CRITICAL_MAJOR_FOUND |
+| 3 | 2 major in envelope (a candidate described as "a dim open-water frame" and the footage as "noisy" in the report, against the rule that the scan proposes and the owner names; the clip's N{} ranges recorded from a recomputation on the full-resolution frame, not the smoothed proxy bounds the render applied); 3 minor in envelope (elapsed-time figures against "no timing recorded"; a file-name pattern naming `GX0115xx`; "nearest frame" where extraction takes the first frame at or after the grid point). 2 major OUT-OF-ENVELOPE (source identity is the byte count only; the 6 s duration is not re-checked at encode) | `37ff131` (clip records the applied N{} bounds, test) and the regenerated report (wording, timing sentence, file pattern, grid-point sentence; the two out-of-envelope majors are disclosed in section 7) | NEW_CRITICAL_MAJOR_FOUND |
 
 ## 9. CP2 deep sheet (to be filled from the owner's words)
 
