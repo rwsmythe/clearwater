@@ -255,3 +255,8 @@ Rulings: 1, 2a, 3, 4 accepted as planned; 2b RULED: `duration_s` is the CONTAINE
 | 6 | `ascii_text` (backslash escapes) on file names and the profile in every message | `test_messages_are_ascii_even_for_non_ascii_names` |
 
 Checks after the fixes: own tests 141 passed; ruff, ruff format --check, mypy strict clean; stash check: with the unfixed `probe.py`/`inputs.py` 5 new probe tests fail, with the unfixed `boxes.py` 3 new box tests fail; stress 160 probes clean; all 35 real clips again 0 faults 0 errors (52.1 s). Full pytest window requested for the head after this remediation.
+
+| Yield | Depth (dispatcher-read) |
+|---|---|
+| Round 1 verdict | 215,371 (86 turns) |
+| Round 1 remediation, window requested | 246,372 (111 turns) |
