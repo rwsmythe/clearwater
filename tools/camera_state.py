@@ -78,6 +78,8 @@ def items(data: bytes) -> Iterator[Item]:
             raise ValueError(f"GPMF item {key!r} at byte {offset} runs past the data")
         yield Item(key, chr(type_), size, repeat, data[offset + 8 : end])
         offset = end + (-length % 4)
+    if offset < len(data):
+        raise ValueError(f"GPMF data ends in a {len(data) - offset}-byte partial header")
 
 
 def decode(item: Item, scale: tuple[float, ...] = ()) -> list[tuple[float, ...]]:

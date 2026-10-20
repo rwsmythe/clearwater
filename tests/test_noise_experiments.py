@@ -508,6 +508,9 @@ def test_the_reader_decodes_the_six_keys_and_skips_every_other_undecoded() -> No
         camera_state.decode(next(camera_state.items(first[8:][16:])))  # ACCL, if it were decoded
     with pytest.raises(ValueError, match="runs past"):
         list(camera_state.items(data[:-4]))
+    for fragment in (1, 7):  # a trailing partial header (Reviewer A r4, CR-01)
+        with pytest.raises(ValueError, match="partial header"):
+            list(camera_state.items(data + b"\0" * fragment))
 
 
 def test_the_timing_rule_spreads_the_samples_over_the_stream() -> None:
