@@ -210,7 +210,7 @@ Criteria: means and gains <= 1e-3, bounds <= 1e-2, 60 minutes <= 10 GB. Read cos
    0.010-0.116 (median 0.033) on the deep clip's 540 proxy; the criterion therefore cannot be met by ANY 8-bit store, whatever its container.
    Means (2.7e-4) and gains (2.6e-5) pass.
 2. **No lossless candidate fits 10 GB**: best FFV1 447 KB/frame shallow (48 GB) and 119 KB deep (12.8 GB); 4.8:1 and 3.7:1 against the 16.8:1 needed.
-3. **Every lossy candidate that fits 10 GB on the worse clip deviates from the 8-bit proxy's bounds by 11-27 % of the range**
+3. **Every lossy candidate that fits 10 GB on the worse clip deviates from the 8-bit proxy's bounds by 11-15 % of the range (20-28 % per bound)**
    (x264rgb-crf22 14 %, mjpeg-q4 11 %, x264-444-crf14 13 %); the cheapest JPEG that is close to fitting (q85/444: 12.6 GB shallow) 8 %. Compression
    removes high-pass energy, so the N{} bounds narrow systematically. Means and gains stay near the limit (JPEG 7e-4 / 3e-4; x264/mjpeg 1.5e-3 to 2.4e-3 fail 1e-3).
 4. The deep clip compresses far better (13-31 KB/frame lossy) than the shallow one; the bound is set by sharp shallow footage.
