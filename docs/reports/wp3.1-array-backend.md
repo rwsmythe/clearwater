@@ -12,7 +12,7 @@ base `9735282`. Stack as locked: NumPy 2.5.4, SciPy 1.18.1, CuPy 14.2.0 (`cupy-c
 | `src/clearwater/core/memory.py` | `memory_estimate_bytes` (the AD-1 counted formula), `METHOD_IDS` |
 | `src/clearwater/core/ops.py` | `spatial_sigma`, `pyramid_levels`, `gaussian_pyramid`, `laplacian_pyramid`, `collapse_pyramid`, `luminance`, `rgb_to_lab`, `laplacian`, `channel_means`, `mean` (ruling 1, R0-2) |
 | `tools/core_speed.py` | the speed-row instrument (X1, ruling 4) |
-| `tests/test_core_{backend,ops,prototype,select,deps}.py` | 156 tests (with GPU) |
+| `tests/test_core_{backend,ops,prototype,select,deps,speed}.py` | 172 tests (with GPU) |
 | `pyproject.toml`, `uv.lock` | the frame section 4 grant lines (below) |
 
 ## Claims and evidence
@@ -50,8 +50,11 @@ base `9735282`. Stack as locked: NumPy 2.5.4, SciPy 1.18.1, CuPy 14.2.0 (`cupy-c
 8. **CuPy optional**: `import clearwater.core` loads no `cupy`, `cupyx`, `PIL`, `av`,
    `PySide6`, nor `clearwater.io/.jobs/.gui/.methods` (subprocess test); with `cupy` made
    unimportable the CPU path runs and `select_backend` answers `CPU: CuPy not installed`. A
-   static AST check over `src/clearwater` refuses any `cupy`/`cupyx` import and any `.xp` read
-   outside `clearwater.core`, and any import of `prototype`/`tools` (with a planted control).
+   static AST check over `src/clearwater` refuses any `cupy`/`cupyx` import (an `import` or
+   `from` statement, or `import_module` / `__import__` called bare or as an attribute with a
+   literal name) and any `xp` read (`.xp` or `getattr(x, "xp")`) outside `clearwater.core`, and
+   any import of `prototype`/`tools`, with a planted control for each spelling. A name built at
+   run time escapes any static check.
 
 ## Conventions fixed here
 
