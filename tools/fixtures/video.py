@@ -23,7 +23,7 @@ import re
 import shutil
 import subprocess
 import sys
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -154,7 +154,6 @@ class Spec:
     rotation: int = 0
     vfr: bool = False
     truncated: bool = False
-    extra: dict[str, Any] = field(default_factory=dict)
 
 
 SPECS = (

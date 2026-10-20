@@ -322,10 +322,10 @@ def measure(path: Path, expected_icc: bytes | None) -> dict[str, Any]:
 
 
 def red_max(path: Path) -> int:
-    """Return the largest red sample of a still in its own scale (0..255 or 0..65535).
+    """Return the largest red sample of a still: 0..65535 for a 16-bit PNG, else 0..255.
 
     The 16-bit PNG is decoded by PyAV's bundled FFmpeg decoder (Pillow would reduce it to 8
-    bits); the others by Pillow or pillow-heif.
+    bits); the others by Pillow or pillow-heif, which hand a 10-bit HEIC over as 8-bit RGB.
 
     Args:
         path: The still.

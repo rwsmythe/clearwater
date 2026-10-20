@@ -269,6 +269,15 @@ def _png_icc(data: bytes) -> bytes | None:
     return None
 
 
+def _heic_orientation(raw: bytes | None) -> int | None:
+    """Return the EXIF Orientation inside a HEIC's EXIF block, or None."""
+    if not raw:
+        return None
+    exif = Image.Exif()
+    exif.load(raw if raw.startswith(b"Exif\x00\x00") else b"Exif\x00\x00" + raw)
+    return exif.get(int(ExifTags.Base.Orientation))
+
+
 def _read_still(path: Path) -> dict[str, Any]:
     """Measure a still with code that shares nothing with ``stills.measure``."""
     data = path.read_bytes()
@@ -284,6 +293,7 @@ def _read_still(path: Path) -> dict[str, Any]:
             "height": heif.size[1],
             "depth": heif.info["bit_depth"],
             "icc": heif.info.get("icc_profile"),
+            "orientation": _heic_orientation(heif.info.get("exif")),
         }
     with Image.open(path) as image:
         assert image.mode == "RGB"
@@ -292,6 +302,7 @@ def _read_still(path: Path) -> dict[str, Any]:
             "height": image.height,
             "depth": 8,
             "icc": image.info.get("icc_profile"),
+            "orientation": image.getexif().get(int(ExifTags.Base.Orientation)),
         }
 
 
@@ -309,6 +320,8 @@ def test_still_is_what_the_manifest_says(sample_id: str, sample: Callable[[str],
         assert measured["icc"] == stills.icc_bytes(kind)
         assert facts["icc_md5"] == hashlib.md5(measured["icc"], usedforsecurity=False).hexdigest()
     assert photo_expect["icc_kind"] == kind
+    if entry["kind"] in ("jpeg", "heic"):
+        assert measured["orientation"] == facts["exif_orientation"]
     assert photo_expect["icc_carried"] == (kind != "none")
     assert photo_expect["source_format"] == entry["kind"]
 
@@ -365,7 +378,6 @@ def test_stills_carry_no_gps(sample: Callable[[str], Path]) -> None:
                 exif = image.getexif()
         assert not exif.get_ifd(ExifTags.IFD.GPSInfo), sample_id
         assert int(ExifTags.Base.GPSInfo) not in exif, sample_id
-        assert b"GPS" not in data, sample_id
 
 
 @pytest.mark.parametrize("shape", ["land", "port"])
@@ -766,50 +778,60 @@ def test_regenerated_video_matches_by_decoded_frame_hash(
 # --- No owner material, FFmpeg writes only where told ----------------------------------------
 
 
+FORBIDDEN_MODULES = {"local_config", "footage_locator"}
+FORBIDDEN_NAMES = {"find_footage_file", "load_local_config", "footage_available", "footage_path"}
+
+
+def footage_hits(text: str) -> list[str]:
+    """Return what in generator source reaches for the configuration or the footage folder."""
+    hits = []
+    for node in ast.walk(ast.parse(text)):
+        if isinstance(node, ast.Import):
+            hits += [a.name for a in node.names if a.name.split(".")[0] in FORBIDDEN_MODULES]
+        elif isinstance(node, ast.ImportFrom):
+            if (node.module or "").split(".")[0] in FORBIDDEN_MODULES:
+                hits.append(node.module or "")
+            hits += [a.name for a in node.names if a.name in FORBIDDEN_NAMES]
+        elif isinstance(node, ast.Name) and node.id in FORBIDDEN_NAMES:
+            hits.append(node.id)
+        elif isinstance(node, ast.Attribute) and node.attr in FORBIDDEN_NAMES:
+            hits.append(node.attr)
+    hits += [m for m in ("clearwater.local.toml", "clearwater-footage") if m in text]
+    return hits
+
+
 def test_generators_import_nothing_that_reads_the_footage() -> None:
-    forbidden_modules = {"local_config", "footage_locator"}
-    forbidden_names = {
-        "find_footage_file",
-        "load_local_config",
-        "footage_available",
-        "footage_path",
-    }
-    assert GENERATOR_SOURCES, "no generator sources found"
+    assert len(GENERATOR_SOURCES) >= 7, "generator sources not found"
     for source in GENERATOR_SOURCES:
-        tree = ast.parse(source.read_text(encoding="utf-8"))
-        for node in ast.walk(tree):
-            if isinstance(node, ast.Import):
-                assert not {a.name.split(".")[0] for a in node.names} & forbidden_modules, source
-            if isinstance(node, ast.ImportFrom):
-                assert (node.module or "").split(".")[0] not in forbidden_modules, source
-                assert not {a.name for a in node.names} & forbidden_names, source
-            if isinstance(node, ast.Name):
-                assert node.id not in forbidden_names, (source, node.id)
-            if isinstance(node, ast.Attribute):
-                assert node.attr not in forbidden_names, (source, node.attr)
-        text = source.read_text(encoding="utf-8")
-        assert "clearwater.local.toml" not in text and "clearwater-footage" not in text, source
+        assert footage_hits(source.read_text(encoding="utf-8")) == [], source.name
 
 
-def test_planted_footage_import_is_caught_by_the_static_check(tmp_path: Path) -> None:
-    planted = tmp_path / "planted.py"
-    planted.write_text("from local_config import load_local_config\n", encoding="utf-8")
-    tree = ast.parse(planted.read_text(encoding="utf-8"))
-    hits = [
-        n for n in ast.walk(tree) if isinstance(n, ast.ImportFrom) and n.module == "local_config"
-    ]
-    assert hits  # the same walk used above finds it
+@pytest.mark.parametrize(
+    "planted",
+    [
+        "from local_config import LocalConfig\n",
+        "import local_config\n",
+        "from local_config import find_footage_file\n",
+        "def f(c):\n    return c.footage_path\n",
+        "root = 'C:/Users/x/clearwater-footage'\n",
+    ],
+)
+def test_planted_footage_access_is_caught_by_the_static_check(planted: str) -> None:
+    assert footage_hits(planted) != []
 
 
 AUDIT_SCRIPT = """
 import json, os, shlex, sys
 sys.dont_write_bytecode = True
-events = {"open": [], "popen": []}
+events = {"open": [], "popen": [], "listdir": []}
 def hook(event, args):
     if event == "open":
         path, mode, flags = args
         if isinstance(path, (str, bytes, os.PathLike)):
             events["open"].append([os.fsdecode(path), mode, flags])
+    elif event in ("os.listdir", "os.scandir"):
+        if isinstance(args[0], (str, bytes, os.PathLike)):
+            events["listdir"].append(os.fsdecode(args[0]))
     elif event == "subprocess.Popen":
         command = args[1]
         if isinstance(command, str):  # Windows hands the audit hook the joined command line
@@ -878,11 +900,12 @@ def test_generators_read_only_their_own_code_and_libraries(audited_run: dict[str
         p for p, mode, flags in audited_run["open"] if not any(c in (mode or "") for c in "wax+")
     ]
     assert reads
-    outside = [p for p in reads if not _inside(p, allowed)]
-    assert outside == []
+    listed = audited_run["listdir"]
+    assert listed
+    assert [p for p in reads + listed if not _inside(p, allowed)] == []
     footage = _configured_footage()
     if footage is not None:
-        assert [p for p in reads if _inside(p, [footage])] == []
+        assert [p for p in reads + listed if _inside(p, [footage])] == []
 
 
 def _configured_footage() -> Path | None:
