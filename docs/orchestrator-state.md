@@ -9,7 +9,7 @@
   (verify: `comms/.launch-sessions.json`). Earlier: gen 4 `clearwater-orchestrator-20261020-0524`,
   gen 3 `clearwater-orchestrator-20261019-2346`, gen 2 `clearwater-orchestrator-20261018-1442`,
   gen 1 `clearwater-orchestrator-20261014-1258`.
-- **Inbox:** gen 5 is the sole drainer (empty at bring-up, 84 read). CHARC's WP2.3 QA not yet in.
+- **Inbox:** gen 5 is the sole drainer (drained through `799b83d4fe11bed8`).
 - **CHARC is generation 2:** `clearwater-charc-20261020-0636`. Cue that exact name.
 - Bash-launch gauge at gen-5 bring-up: 26 ms.
 
@@ -49,9 +49,14 @@ only in an exclusive window the orchestrator grants. Delivery by SendMessage to 
 | `wp31-cell` | WP3.1 | opus-high | `.worktrees/wp3.1` | `891460e` R0 ruled; building | 108,729 (R0 yield) |
 
 Round-0 rulings sent to each cell and posted to CHARC as a query (thread wave1, 18:10Z); consumer notes for WP3.3/3.10/3.12/3.14/3.16 are in that post. A rolled generation's cells die with it: re-dispatch from each branch and ledger.
+CHARC UPHELD every round-0 ruling (`799b83d4fe11bed8`) with additions, relayed 18:14Z: WP3.1
+percentile native precision cast once at return, sync-point list in the ledger, frame-2 pool test;
+WP3.15 import result NAMES dropped provenance keys; WP3.13 consumer notes (folder validated at set
+and export start by WP3.14/G12; WP3.10 `-y` on the temporary). WP3.3's brief: stretch bounds within
+AD-11 not bit-identical, cite DR-14 beside it.
 Retired (never message): `wp23-cell2`, `wp23-cell`, `wave1-drafter`, `wp22-cell`, `wp21s-cell*`,
-the gen-2 cells. Worktrees `.worktrees/wp2.3` and `wp2.3-mc` stay until CHARC's WP2.3 QA
-confirms (then `git worktree remove --force`; keep the branches).
+the gen-2 cells. WP2.3 worktrees REMOVED 18:14Z after CHARC QA CONFIRMED (`2e828b51020759b1`);
+branches kept (`wp2.3-mc`'s folder needed a `\?\` long-path Remove-Item).
 
 ### Where things stand -- the successor starts HERE
 
@@ -103,7 +108,7 @@ Each accepted package had its return report posted to CHARC and an info-update t
 | WP1.4b | 2026-10-20 | `afaff0e` | `docs/proofs/wp1.4b-accept.md`; Gate result 4 KEEP; DR-30; flip witness 6/6 | CONFIRMED (`2fe4e7e1dc9e0854`) |
 | WP2.1S | 2026-10-20 | `a866f06` | `docs/proofs/wp2.1s-accept.md`; DR-31; 2 depth re-seats; B errata at the gate | CONFIRMED (`9fb52c00bbb58a9b`) |
 | WP2.2 | 2026-10-20 | `b288533` | `docs/proofs/wp2.2-accept.md`; DR-32; B re-run major adjudicated at the gate; IF-1..IF-10 frozen; 892 passed on main | CONFIRMED (`4f11a18fc46c9fc4`) |
-| WP2.3 | 2026-10-20 | `d605925` | `docs/proofs/wp2.3-accept.md`; DR-33; B re-run 3 majors adjudicated at the gate; first cell past cap at R1; 1138 passed on main | pending |
+| WP2.3 | 2026-10-20 | `d605925` | `docs/proofs/wp2.3-accept.md`; DR-33; B re-run 3 majors adjudicated at the gate; first cell past cap at R1; 1138 passed on main | CONFIRMED (`2e828b51020759b1`) |
 
 Kept branches (evidence; do not delete unasked): `wp2.3`, `wp2.3-mc`, `wp2.2`, `wp2.2-mc`, `wp1.2b`, `wp1.2b-b1`, `wp1.3d`, `wp1.3d-b1`,
 `wp1.4b`, plus the earlier packages' (`git branch`).
