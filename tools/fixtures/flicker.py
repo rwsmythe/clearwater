@@ -254,6 +254,10 @@ def frames_sha256() -> str:
 def decode_sha256(path: Path) -> tuple[int, str]:
     """Decode a clip to ``rgb24`` with FFmpeg and hash it as :func:`frames_sha256` does.
 
+    Frames are taken as stored (``-fps_mode passthrough``): none is duplicated or dropped to
+    fit a rate, so the hash depends on the pixels alone and timing is checked separately
+    (:func:`probe_clip`).
+
     Args:
         path: The clip.
 
@@ -265,7 +269,7 @@ def decode_sha256(path: Path) -> tuple[int, str]:
     """
     command = [
         "ffmpeg", "-nostdin", "-hide_banner", "-v", "error", "-i", str(path),
-        "-map", "0:v:0", "-f", "rawvideo", "-pix_fmt", "rgb24", "-",
+        "-map", "0:v:0", "-fps_mode", "passthrough", "-f", "rawvideo", "-pix_fmt", "rgb24", "-",
     ]  # fmt: skip
     digest = hashlib.sha256()
     total = 0
@@ -319,6 +323,49 @@ def write_clip(guard: WriteGuard, path: Path) -> None:
         raise video.GenerationError(f"ffmpeg failed for {path.name}: {stderr.decode()[-400:]}")
 
 
+def probe_clip(path: Path) -> dict[str, Any]:
+    """Read a clip's container, codec, rate, time base and packet pts hash with ffprobe.
+
+    Args:
+        path: The clip.
+
+    Returns:
+        The stream identity: everything :func:`measure_clip` records except the decode.
+    """
+    data, errors = video.ffprobe_json(path, "-show_streams", "-show_format")
+    stream = next(s for s in data["streams"] if s["codec_type"] == "video")
+    packets, _ = video.ffprobe_json(path, "-select_streams", "v:0", "-show_entries", "packet=pts")
+    ticks = [int(p["pts"]) for p in packets["packets"]]
+    return {
+        "container": data["format"]["format_name"],
+        "codec": stream["codec_name"],
+        "pix_fmt": stream["pix_fmt"],
+        "width": stream["width"],
+        "height": stream["height"],
+        "r_frame_rate": stream["r_frame_rate"],
+        "avg_frame_rate": stream["avg_frame_rate"],
+        "time_base": stream["time_base"],
+        "packet_pts_count": len(ticks),
+        "packet_pts_sha256": hashlib.sha256(",".join(map(str, ticks)).encode("ascii")).hexdigest(),
+        "ffprobe_errors": errors,
+    }
+
+
+STREAM_IDENTITY = (
+    "container",
+    "codec",
+    "pix_fmt",
+    "width",
+    "height",
+    "r_frame_rate",
+    "avg_frame_rate",
+    "time_base",
+    "packet_pts_count",
+    "packet_pts_sha256",
+)
+"""The :func:`probe_clip` fields a clip must match the manifest on, besides its decoded frames."""
+
+
 def measure_clip(path: Path) -> dict[str, Any]:
     """Measure a written clip with ffprobe and a decode.
 
@@ -329,25 +376,13 @@ def measure_clip(path: Path) -> dict[str, Any]:
         ffprobe's stream fields, the decoded frame count and hash, and the packet pts list's hash
         (Matroska times are in milliseconds, so the 30000/1001 rate is the stream's declared one).
     """
-    data, errors = video.ffprobe_json(path, "-show_streams", "-show_format")
-    stream = next(s for s in data["streams"] if s["codec_type"] == "video")
-    packets, _ = video.ffprobe_json(path, "-select_streams", "v:0", "-show_entries", "packet=pts")
-    ticks = [int(p["pts"]) for p in packets["packets"]]
+    stream = probe_clip(path)
     count, digest = decode_sha256(path)
     return {
-        "container": data["format"]["format_name"],
-        "codec": stream["codec_name"],
-        "pix_fmt": stream["pix_fmt"],
-        "width": stream["width"],
-        "height": stream["height"],
-        "r_frame_rate": stream["r_frame_rate"],
-        "avg_frame_rate": stream["avg_frame_rate"],
-        "time_base": stream["time_base"],
+        **{k: v for k, v in stream.items() if k != "ffprobe_errors"},
         "decoded_frames": count,
         "decoded_rgb24_sha256": digest,
-        "packet_pts_count": len(ticks),
-        "packet_pts_sha256": hashlib.sha256(",".join(map(str, ticks)).encode("ascii")).hexdigest(),
-        "ffprobe_errors": errors,
+        "ffprobe_errors": stream["ffprobe_errors"],
     }
 
 

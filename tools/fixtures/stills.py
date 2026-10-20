@@ -283,11 +283,40 @@ def _exif_facts(exif: Image.Exif | None) -> dict[str, Any]:
     }
 
 
+def tiff_bits_per_sample(data: bytes) -> tuple[int, ...]:
+    """Read BitsPerSample (TIFF tag 258) from the first IFD of a TIFF's own bytes.
+
+    Args:
+        data: The whole TIFF file.
+
+    Returns:
+        The bits of each sample (``(8, 8, 8)`` for an 8-bit RGB TIFF).
+
+    Raises:
+        ValueError: Not a classic TIFF, or it has no BitsPerSample entry.
+    """
+    order = {b"II": "<", b"MM": ">"}.get(data[:2])
+    if order is None or struct.unpack(order + "H", data[2:4])[0] != 42:
+        raise ValueError("not a classic TIFF")
+    ifd = struct.unpack(order + "I", data[4:8])[0]
+    (count,) = struct.unpack(order + "H", data[ifd : ifd + 2])
+    for k in range(count):
+        at = ifd + 2 + 12 * k
+        tag, kind, n = struct.unpack(order + "HHI", data[at : at + 8])
+        if tag != 258:
+            continue
+        if kind != 3:
+            raise ValueError(f"BitsPerSample has TIFF type {kind}, not SHORT")
+        start = at + 8 if n * 2 <= 4 else struct.unpack(order + "I", data[at + 8 : at + 12])[0]
+        return struct.unpack(f"{order}{n}H", data[start : start + 2 * n])
+    raise ValueError("no BitsPerSample entry")
+
+
 def measure(path: Path, expected_icc: bytes | None) -> dict[str, Any]:
     """Measure a written still: format, size, depth, profile, Orientation, GPS.
 
-    Reads the file back with Pillow, pillow-heif and the stdlib PNG walker; nothing here comes
-    from how the file was written.
+    Reads the file back with Pillow, pillow-heif, the stdlib PNG walker and the TIFF
+    BitsPerSample tag; nothing here comes from how the file was written.
 
     Args:
         path: The still.
@@ -320,7 +349,13 @@ def measure(path: Path, expected_icc: bytes | None) -> dict[str, Any]:
         exif = photo.load_exif(raw) if raw else None
     else:
         with Image.open(path) as image:
-            facts.update(format=image.format, width=image.width, height=image.height, bit_depth=8)
+            depth = 8  # a JPEG's sample precision
+            if image.format == "TIFF":
+                bits = tiff_bits_per_sample(data)  # the file's own BitsPerSample
+                depth = bits[0] if len(set(bits)) == 1 else 0
+            facts.update(
+                format=image.format, width=image.width, height=image.height, bit_depth=depth
+            )
             embedded = image.info.get("icc_profile")
             exif = image.getexif()
     facts.update(_exif_facts(exif))

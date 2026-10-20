@@ -26,6 +26,7 @@ import re
 import shutil
 import subprocess
 import sys
+from collections.abc import Iterator
 from dataclasses import dataclass
 from fractions import Fraction
 from pathlib import Path
@@ -62,6 +63,13 @@ VFR_UNIT = 1001
 TIMESCALE = 30000
 """The video track timescale of the VFR sample (ticks per second)."""
 
+VFR_LAST_DURATION_BSF = rf"setts=duration=if(eq(N\,{VFR_FRAMES - 1})\,2\,DURATION)"
+"""The bitstream filter that gives the VFR sample's last frame the cycle's 2002-tick duration.
+
+``setts`` counts packets from 0 (``N``) and works in the encoder time base (1001/30000 s), so
+``2`` there is two frames, 2002 ticks of the track clock. Without it the MP4 muxer writes the last
+frame as one nominal frame (1001) and the track is 39039 ticks, not 40040.
+"""
 TRUNCATE_KEEP = 0.6
 """The fraction of the source file's bytes the truncated sample keeps."""
 
@@ -312,6 +320,91 @@ def vfr_ticks(count: int = VFR_FRAMES) -> list[int]:
     return [VFR_UNIT * (4 * (k // 3) + k % 3) for k in range(count)]
 
 
+def vfr_durations(count: int = VFR_FRAMES) -> list[int]:
+    """Return the intended duration of each frame of the VFR sample, in 30000 Hz ticks.
+
+    The cycle is 1001, 1001, 2002 and holds for every frame including the last, so the track
+    lasts ``sum(vfr_durations())`` ticks (40040 for 30 frames).
+
+    Args:
+        count: The number of frames.
+
+    Returns:
+        The duration of each frame.
+    """
+    return [VFR_UNIT * (2 if k % 3 == 2 else 1) for k in range(count)]
+
+
+def mp4_boxes(data: bytes, start: int, end: int) -> Iterator[tuple[bytes, int, int]]:
+    """Walk the ISO base-media boxes that lie side by side between two offsets.
+
+    Args:
+        data: The whole file.
+        start: The offset of the first box.
+        end: The offset after the last byte to read.
+
+    Yields:
+        ``(type, body_start, box_end)`` for each box; a box that runs past ``end`` is clipped, and
+        a malformed size ends the walk.
+    """
+    pos = start
+    while pos + 8 <= end:
+        size = int.from_bytes(data[pos : pos + 4], "big")
+        kind = data[pos + 4 : pos + 8]
+        header = 8
+        if size == 1:
+            size = int.from_bytes(data[pos + 8 : pos + 16], "big")
+            header = 16
+        elif size == 0:
+            size = end - pos
+        if size < header:
+            return
+        yield kind, pos + header, min(pos + size, end)
+        pos += size
+
+
+def stts_durations(path: Path) -> list[int]:
+    """Read the video track's per-sample durations from the MP4 ``stts`` box, in track ticks.
+
+    A stdlib walk of the boxes (``moov`` / ``trak`` / ``mdia`` / ``minf`` / ``stbl``), independent
+    of ffprobe: it sees the last sample's duration, which pts differences cannot.
+
+    Args:
+        path: The MP4 file.
+
+    Returns:
+        One duration per video sample, in order.
+
+    Raises:
+        GenerationError: The file has no video track with an ``stts`` box.
+    """
+    data = path.read_bytes()
+
+    def child(start: int, end: int, name: bytes) -> Iterator[tuple[int, int]]:
+        for kind, body, stop in mp4_boxes(data, start, end):
+            if kind == name:
+                yield body, stop
+
+    for moov, moov_end in child(0, len(data), b"moov"):
+        for trak, trak_end in child(moov, moov_end, b"trak"):
+            for mdia, mdia_end in child(trak, trak_end, b"mdia"):
+                handler = next(child(mdia, mdia_end, b"hdlr"), None)
+                if handler is None or data[handler[0] + 8 : handler[0] + 12] != b"vide":
+                    continue
+                for minf, minf_end in child(mdia, mdia_end, b"minf"):
+                    for stbl, stbl_end in child(minf, minf_end, b"stbl"):
+                        for body, _ in child(stbl, stbl_end, b"stts"):
+                            entries = int.from_bytes(data[body + 4 : body + 8], "big")
+                            out: list[int] = []
+                            for k in range(entries):
+                                at = body + 8 + 8 * k
+                                count = int.from_bytes(data[at : at + 4], "big")
+                                delta = int.from_bytes(data[at + 4 : at + 8], "big")
+                                out.extend([delta] * count)
+                            return out
+    raise GenerationError(f"{path.name}: no video track with an stts box")
+
+
 # --- Measuring ----------------------------------------------------------------------------
 
 
@@ -390,8 +483,19 @@ def decode_hashes(path: Path) -> dict[str, Any]:
     }
 
 
+def _stts_or_none(path: Path) -> list[int] | None:
+    """Return :func:`stts_durations`, or None when the file has no readable sample table."""
+    try:
+        return stts_durations(path)
+    except GenerationError:
+        return None
+
+
 def measure(path: Path) -> dict[str, Any]:
     """Measure a written video: ffprobe fields, VUI syntax, packet pts and decoded hashes.
+
+    The frame durations are read twice, from the ffprobe packets and from the MP4 ``stts`` box,
+    so that the last frame's duration (which pts differences cannot show) is measured.
 
     Args:
         path: The video file.
@@ -409,13 +513,16 @@ def measure(path: Path) -> dict[str, Any]:
         if side.get("side_data_type") == "Display Matrix":
             rotation = round(side["rotation"]) % 360
     packets, packet_errors = ffprobe_json(
-        path, "-select_streams", "v:0", "-show_entries", "packet=pts"
+        path, "-select_streams", "v:0", "-show_entries", "packet=pts,duration"
     )
     errors = sorted(set(errors + packet_errors))  # reading the packets finds a cut-off tail
     ticks_per_second = int(video["time_base"].split("/")[1]) // int(
         video["time_base"].split("/")[0]
     )
-    ticks = [int(p["pts"]) for p in packets.get("packets", []) if "pts" in p]
+    timed = sorted(
+        (int(p["pts"]), int(p.get("duration", 0))) for p in packets.get("packets", []) if "pts" in p
+    )
+    ticks = [pts for pts, _ in timed]
     durations = sorted({b - a for a, b in itertools.pairwise(ticks)})
     tag_text = json.dumps(
         [s.get("tags", {}) for s in streams] + [data.get("format", {}).get("tags", {})]
@@ -456,8 +563,11 @@ def measure(path: Path) -> dict[str, Any]:
             "ticks": ticks if len(ticks) <= 64 else None,
             "sha256": hashlib.sha256(",".join(map(str, ticks)).encode("ascii")).hexdigest(),
             "durations": durations,
+            "frame_durations": [duration for _, duration in timed],
+            "track_duration_ticks": video.get("duration_ts"),
             "variable": len(durations) > 1,
         },
+        "stts_durations": _stts_or_none(path),
         "decoded": decode_hashes(path),
         "ffprobe_errors": errors,
     }
@@ -470,11 +580,11 @@ def intended_frame_rate(spec: Spec) -> str:
     """Return the average frame rate ffprobe should report, as ``numerator/denominator``.
 
     A constant-rate clip is 30000/1001; the VFR clip's average is its frame count over its
-    duration (the last pts plus one nominal frame), reduced.
+    duration (the sum of its stated frame durations, last frame included), reduced.
     """
     if not spec.vfr:
         return FRAME_RATE
-    rate = Fraction(VFR_FRAMES * TIMESCALE, vfr_ticks()[-1] + VFR_UNIT)
+    rate = Fraction(VFR_FRAMES * TIMESCALE, sum(vfr_durations()))
     return f"{rate.numerator}/{rate.denominator}"
 
 
@@ -568,6 +678,9 @@ def mismatches(spec: Spec, facts: dict[str, Any]) -> list[str]:
         need("range", video["color_range"], spec.tags.range)
     if spec.vfr:
         need("pts ticks", facts["pts"]["ticks"], vfr_ticks())
+        need("frame durations (ffprobe packets)", facts["pts"]["frame_durations"], vfr_durations())
+        need("frame durations (stts box)", facts.get("stts_durations"), vfr_durations())
+        need("track duration ticks", facts["pts"]["track_duration_ticks"], sum(vfr_durations()))
         need("decoded frames", facts["decoded"]["frames"], VFR_FRAMES)
     elif spec.truncated:
         container = video["nb_frames"]
@@ -622,10 +735,12 @@ def build(guard: WriteGuard, out: Path) -> list[manifest.Entry]:
                     guard,
                     [*_lavfi_inputs(4), "-vf", setpts, "-fps_mode", "passthrough",
                      "-frames:v", str(VFR_FRAMES), "-video_track_timescale", str(TIMESCALE),
+                     "-bsf:v", VFR_LAST_DURATION_BSF,
                      *_encode_args(spec)],
                     target, scratch,
                 )  # fmt: skip
                 extra["pts_ticks_intended"] = vfr_ticks()
+                extra["frame_durations_intended"] = vfr_durations()
             elif spec.rotation:
                 run_ffmpeg(
                     guard,

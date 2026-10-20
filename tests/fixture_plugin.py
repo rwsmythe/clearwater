@@ -84,18 +84,34 @@ def writable_dir(path: Path) -> bool:
 
 
 def verify_generated(entry: dict[str, Any], path: Path) -> str | None:
-    """Hash a generated sample's decoded frames against the manifest.
+    """Check a generated sample's stream identity and decoded frames against the manifest.
+
+    The identity is the container, codec, pixel format, size, frame rates, time base and the hash
+    of the packet pts list (:data:`flicker.STREAM_IDENTITY`); the frames are the decoded frame
+    count and their SHA-256. The same frames remuxed at another rate fail the first check.
 
     Args:
         entry: The sample's manifest entry (the flicker clip).
         path: The file to check.
 
     Returns:
-        None when the decoded frames are the manifest's frames; otherwise what is wrong.
+        None when the clip is the manifest's clip; otherwise what is wrong.
     """
     if not path.is_file():
         return f"{path} does not exist"
     design = entry["facts"]["design"]
+    recorded = entry["facts"]["stream"]
+    try:
+        stream = flicker.probe_clip(path)
+    except (video.GenerationError, KeyError, StopIteration, ValueError) as error:
+        return f"{path.name}: cannot probe the stream ({error!r})"
+    differ = [
+        f"{name} is {stream.get(name)!r}, the manifest has {recorded[name]!r}"
+        for name in flicker.STREAM_IDENTITY
+        if stream.get(name) != recorded[name]
+    ]
+    if differ:
+        return f"{path.name}: " + "; ".join(differ)
     try:
         count, digest = flicker.decode_sha256(path)
     except video.GenerationError as error:
@@ -151,9 +167,9 @@ class SampleProvider:
     def path(self, sample_id: str) -> Path:
         """Return the file of a sample.
 
-        A committed sample is returned as it is. A generated sample is verified (its decoded
-        frames hashed against the manifest) and regenerated into the cache when absent or
-        stale.
+        A committed sample is returned as it is. A generated sample is verified on its first use
+        in the session, a cache hit included (stream identity and decoded frames against the
+        manifest), and regenerated into the cache when absent or stale.
 
         Args:
             sample_id: The manifest id.

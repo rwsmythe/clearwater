@@ -314,13 +314,40 @@ def _read_still(path: Path) -> dict[str, Any]:
         }
     with Image.open(path) as image:
         assert image.mode == "RGB"
+        bits = image.tag_v2[258] if image.format == "TIFF" else (8, 8, 8)  # BitsPerSample
+        assert len(set(bits)) == 1
         return {
             "width": image.width,
             "height": image.height,
-            "depth": 8,
+            "depth": bits[0],
             "icc": image.info.get("icc_profile"),
             "orientation": image.getexif().get(int(ExifTags.Base.Orientation)),
         }
+
+
+def test_tiff_bit_depth_is_read_from_the_file_not_assumed(
+    sample: Callable[[str], Path], tmp_path: Path
+) -> None:
+    """A tiff8 sample whose BitsPerSample says 16,16,16 is measured as 16, and so disagrees."""
+    source = sample("tiff8-gradient-none")
+    data = bytearray(source.read_bytes())
+    assert stills.tiff_bits_per_sample(bytes(data)) == (8, 8, 8)
+    order = "<" if data[:2] == b"II" else ">"
+    ifd = struct.unpack(order + "I", bytes(data[4:8]))[0]
+    for k in range(struct.unpack(order + "H", bytes(data[ifd : ifd + 2]))[0]):
+        at = ifd + 2 + 12 * k
+        if struct.unpack(order + "H", bytes(data[at : at + 2]))[0] == 258:
+            start = struct.unpack(order + "I", bytes(data[at + 8 : at + 12]))[0]
+            data[start : start + 6] = struct.pack(order + "3H", 16, 16, 16)
+    planted = tmp_path / "planted.tif"
+    planted.write_bytes(bytes(data))
+    claimed = ENTRIES["tiff8-gradient-none"]["facts"]["bit_depth"]
+    assert claimed == 8
+    assert stills.measure(planted, None)["bit_depth"] == 16 != claimed
+    assert _read_still(planted)["depth"] == 16 != claimed
+    for sample_id in STILL_IDS:
+        if sample_id.startswith("tiff8"):
+            assert stills.measure(sample(sample_id), None)["bit_depth"] == 8, sample_id
 
 
 @pytest.mark.parametrize("sample_id", STILL_IDS)
@@ -444,6 +471,112 @@ def test_stills_carry_no_gps(sample: Callable[[str], Path]) -> None:
                 exif = image.getexif()
         assert not exif.get_ifd(ExifTags.IFD.GPSInfo), sample_id
         assert int(ExifTags.Base.GPSInfo) not in exif, sample_id
+
+
+XMP_MARKERS = (b"<x:xmpmeta", b"<?xpacket", b"ns.adobe.com/xap", b"exif:GPS", b"GPSLatitude")
+"""Byte strings that mark an XMP packet or a GPS value in any container."""
+
+
+def _xmp_markers(data: bytes) -> list[bytes]:
+    """Return the XMP or GPS markers found anywhere in a file's raw bytes."""
+    return [marker for marker in XMP_MARKERS if marker in data]
+
+
+def _committed_files() -> list[Path]:
+    """Every committed fixture file except the manifest, including any the manifest omits."""
+    return sorted(p for p in FIXTURES_DIR.rglob("*") if p.is_file() and p.name != "manifest.json")
+
+
+def test_no_committed_file_carries_an_xmp_packet_or_gps_text() -> None:
+    """The raw bytes of every committed sample, whatever its container, hold no XMP or GPS."""
+    files = _committed_files()
+    assert len(files) >= 86
+    found = {p.name: _xmp_markers(p.read_bytes()) for p in files}
+    assert {name: marks for name, marks in found.items() if marks} == {}
+
+
+def test_planted_xmp_gps_packet_is_caught_by_name(sample: Callable[[str], Path]) -> None:
+    """A JPEG with an APP1 XMP packet holding GPS fails the scan, naming the markers."""
+    data = sample("jpeg-gradient-none").read_bytes()
+    packet = (
+        b"http://ns.adobe.com/xap/1.0/\x00<x:xmpmeta xmlns:x='adobe:ns:meta/'>"
+        b"<rdf:Description exif:GPSLatitude='21,18.5N'/></x:xmpmeta>"
+    )
+    segment = b"\xff\xe1" + struct.pack(">H", len(packet) + 2) + packet
+    planted = data[:2] + segment + data[2:]
+    assert _xmp_markers(data) == []
+    assert _xmp_markers(planted) == [
+        b"<x:xmpmeta",
+        b"ns.adobe.com/xap",
+        b"exif:GPS",
+        b"GPSLatitude",
+    ]
+    with Image.open(io.BytesIO(planted)) as image:  # still a readable JPEG, EXIF GPS untouched
+        assert not image.getexif().get_ifd(ExifTags.IFD.GPSInfo)
+
+
+def _udta_problems(data: bytes) -> list[str]:
+    """Return what an MP4's ``udta`` holds beyond the empty ``meta`` (``hdlr`` + empty ``ilst``)."""
+    problems = []
+    top = [kind for kind, _, _ in video.mp4_boxes(data, 0, len(data))]
+    if not set(top) <= {b"ftyp", b"moov", b"free", b"mdat"}:
+        problems.append(f"top-level boxes {top!r}")
+    for kind, body, end in video.mp4_boxes(data, 0, len(data)):
+        if kind != b"moov":
+            continue
+        inside = list(video.mp4_boxes(data, body, end))
+        if not {k for k, _, _ in inside} <= {b"mvhd", b"trak", b"udta"}:
+            problems.append(f"moov holds {[k for k, _, _ in inside]!r}")
+        for trak_kind, trak_body, trak_end in inside:
+            if trak_kind == b"trak" and any(
+                k == b"udta" for k, _, _ in video.mp4_boxes(data, trak_body, trak_end)
+            ):
+                problems.append("a trak holds a udta")
+        for udta_kind, udta_body, udta_end in inside:
+            if udta_kind != b"udta":
+                continue
+            children = list(video.mp4_boxes(data, udta_body, udta_end))
+            if [k for k, _, _ in children] != [b"meta"]:
+                problems.append(f"udta holds {[k for k, _, _ in children]!r}")
+                continue
+            _, meta_body, meta_end = children[0]
+            parts = list(video.mp4_boxes(data, meta_body + 4, meta_end))  # meta is a full box
+            if [k for k, _, _ in parts] != [b"hdlr", b"ilst"]:
+                problems.append(f"meta holds {[k for k, _, _ in parts]!r}")
+            elif parts[1][2] - parts[1][1] != 0:
+                problems.append(f"ilst holds {parts[1][2] - parts[1][1]} bytes")
+    return problems
+
+
+def test_mp4_user_data_holds_nothing_beyond_the_empty_meta(sample: Callable[[str], Path]) -> None:
+    """Every sample MP4 has a udta that is exactly an empty meta (hdlr and an empty ilst)."""
+    mp4s = [sample(i) for i in VIDEO_IDS]
+    assert len(mp4s) == 8
+    for path in mp4s:
+        data = path.read_bytes()
+        assert _udta_problems(data) == [], path.name
+        assert b"udta" in data, path.name  # the empty one is there, so the walk sees something
+
+
+def test_planted_udta_payload_is_caught_by_name(
+    sample: Callable[[str], Path], tmp_path: Path
+) -> None:
+    """A GoPro-style GPMF atom added inside udta makes the walk name the extra box."""
+    data = bytearray(sample("vid-hevc8-bt709-full").read_bytes())
+    moov = next((b, e) for k, b, e in video.mp4_boxes(bytes(data), 0, len(data)) if k == b"moov")
+    udta = next((b, e) for k, b, e in video.mp4_boxes(bytes(data), *moov) if k == b"udta")
+    extra = struct.pack(">I", 8 + 20) + b"GPMF" + b"DEVC".ljust(20, b"\x00")
+    assert udta[1] == moov[1]  # udta is the last box of moov, so appending keeps the walk valid
+    data[udta[1] : udta[1]] = extra
+    for start in (udta[0] - 8, moov[0] - 8):  # grow the udta and moov sizes
+        size = struct.unpack(">I", data[start : start + 4])[0] + len(extra)
+        data[start : start + 4] = struct.pack(">I", size)
+    problems = _udta_problems(bytes(data))
+    assert any("udta holds [b'meta', b'GPMF']" in p for p in problems), problems
+    assert _xmp_markers(bytes(data)) == []  # only the udta walk can see this one
+    planted = tmp_path / "planted-udta.mp4"
+    planted.write_bytes(bytes(data))
+    assert video.measure(planted)["has_location_tag"] is False  # the old tag check passes it
 
 
 @pytest.mark.parametrize("shape", ["land", "port"])
@@ -665,6 +798,27 @@ def test_vfr_is_really_variable(sample: Callable[[str], Path]) -> None:
 
 
 @needs_ffmpeg
+def test_vfr_frame_durations_are_the_stated_cycle_including_the_last(
+    sample: Callable[[str], Path],
+) -> None:
+    """Every one of the 30 durations is the 1001, 1001, 2002 cycle, the last frame included."""
+    path = sample("vid-vfr")
+    want = video.vfr_durations()
+    assert len(want) == 30
+    assert want[:6] == [1001, 1001, 2002, 1001, 1001, 2002]
+    assert want[-1] == 2002
+    measured = video.measure(path)
+    assert measured["pts"]["frame_durations"] == want  # ffprobe packet durations, last included
+    assert video.stts_durations(path) == want  # the MP4 sample table, read without ffprobe
+    assert measured["pts"]["track_duration_ticks"] == sum(want) == 40040
+    recorded = ENTRIES["vid-vfr"]["facts"]
+    assert recorded["pts"]["frame_durations"] == want
+    assert recorded["stts_durations"] == want
+    assert recorded["pts"]["track_duration_ticks"] == 40040
+    assert ENTRIES["vid-vfr"]["expect"]["probe"]["video"]["frame_rate"] == "22500/1001"
+
+
+@needs_ffmpeg
 def test_rotation_is_in_the_display_matrix(sample: Callable[[str], Path]) -> None:
     assert video.measure(sample("vid-rotated"))["video"]["rotation"] == 90
     for sample_id in VIDEO_IDS:
@@ -828,12 +982,64 @@ def test_planted_wrong_clip_fails_the_hash_check(
 ) -> None:
     entry = ENTRIES["ad14-flicker"]
     problem = verify_generated(entry, sample("vid-hevc8-bt709-full"))
-    assert problem is not None and "5 frames decode to" in problem
+    assert problem is not None and "codec is 'hevc'" in problem
     assert verify_generated(entry, tmp_path / "absent.mkv") is not None
     changed = copy.deepcopy(entry)
     changed["facts"]["design"]["frames_rgb24_sha256"] = "0" * 64
     problem = verify_generated(changed, sample("ad14-flicker"))
     assert problem is not None and "the manifest has 90 frames and " + "0" * 64 in problem
+
+
+@pytest.fixture(scope="module")
+def clip_at_25_fps(sample: Callable[[str], Path], tmp_path_factory: pytest.TempPathFactory) -> Path:
+    """The flicker clip's exact packets, stream-copied with timestamps scaled to about 25 fps."""
+    out = tmp_path_factory.mktemp("flicker-25")
+    target = out / "ad14-flicker-25fps.mkv"
+    video.run_ffmpeg(
+        _guard(out),
+        ["-itsscale", "1.1988", "-i", str(sample("ad14-flicker")), "-c", "copy", "-an"],
+        target,
+        out,
+    )  # fmt: skip
+    return target
+
+
+@needs_ffmpeg
+def test_planted_clip_at_another_rate_fails_by_name(
+    clip_at_25_fps: Path, sample: Callable[[str], Path]
+) -> None:
+    """The same 90 decoded frames at 25 fps pass a frame hash and fail the stream identity."""
+    entry = ENTRIES["ad14-flicker"]
+    count, digest = flicker.decode_sha256(clip_at_25_fps)
+    assert (count, digest) == (90, entry["facts"]["design"]["frames_rgb24_sha256"])
+    problem = verify_generated(entry, clip_at_25_fps)
+    assert problem is not None
+    assert (
+        "packet_pts_sha256 is" in problem
+    )  # the timing, by name (the stream still declares 30000/1001)
+    assert verify_generated(entry, sample("ad14-flicker")) is None
+
+
+@needs_ffmpeg
+def test_cache_hit_is_verified_before_it_is_handed_out(
+    clip_at_25_fps: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A wrong clip already in the cache is not handed out: the provider regenerates it."""
+    cache = tmp_path / "cache"
+    planted = cache / "flicker" / "ad14-flicker.mkv"
+    planted.parent.mkdir(parents=True)
+    shutil.copy2(clip_at_25_fps, planted)
+    calls: list[list[str]] = []
+
+    def record(out: Path, generated: Path, groups: list[str]) -> None:
+        calls.append(groups)
+        raise RuntimeError("regeneration requested")
+
+    monkeypatch.setattr(generate, "generate", record)
+    provider = SampleProvider(MANIFEST, FIXTURES_DIR, cache, lambda: tmp_path / "scratch")
+    with pytest.raises(RuntimeError, match="regeneration requested"):
+        provider.path("ad14-flicker")
+    assert calls == [["flicker"]]
 
 
 # --- Regeneration is deterministic ---------------------------------------------------------
