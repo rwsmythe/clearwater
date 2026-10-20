@@ -187,13 +187,11 @@ def test_a_red_lit_set_of_fewer_than_eight_tiles_is_reported_as_too_few() -> Non
 def _quantised(
     sigma_code: float, seed: int, ramp: bool = True
 ) -> tuple[NDArray[np.float32], float]:
-    """8-bit-quantised Gaussian noise of ``sigma_code`` code values on the gradient (or a flat
-    field at code 100); returns the image on [0, 1] and the true sigma of its total error."""
-    clean = _gradient().astype(np.float64) * 255.0 if ramp else np.full((512, 512, 3), 100.0)
-    noise = np.random.default_rng(seed).normal(0.0, sigma_code, clean.shape[:2])
-    quantised = np.round(clean + noise[..., None])
-    truth = float(np.std(quantised[..., 0] - clean[..., 0])) / 255.0
-    return (quantised / 255.0).astype(np.float32), truth
+    """The package's quantised scene (the same as its ``quantised-regime.json`` record)."""
+    image, truth = noise_experiments.quantised_scene(sigma_code, seed, ramp)
+    if ramp:  # the scene is the tests' gradient, quantised
+        np.testing.assert_allclose(image, _gradient(), atol=4.0 / 255.0)
+    return image, truth
 
 
 @pytest.mark.parametrize("seed", [0, 1, 2])
@@ -207,7 +205,7 @@ def test_immerkaer_holds_where_quantisation_collapses_the_donoho_median(seed: in
     assert noise_experiments.donoho_sigma(red, tiles) == 0.0
     # Immerkaer converts the mean absolute mask response with sqrt(pi / 2), exact for a
     # Gaussian response; mostly-zero quantised noise gives a heavier-tailed response, so it
-    # under-reads (about 9-11 % here over 20 seeds): 15 % bounds that bias with margin.
+    # under-reads (9-11 % here over 20 seeds, `quantised-regime.json`): 15 % bounds that bias.
     assert noise_experiments.immerkaer_sigma(red, tiles) == pytest.approx(truth, rel=0.15)
 
 

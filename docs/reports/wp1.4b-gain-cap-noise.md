@@ -4,7 +4,7 @@
 `42662d2`). **Branch:** `wp1.4b` (base `db751cb`). **Instrument:** `tools/noise_experiments.py`,
 `tools/camera_state.py`. **Records** (working folder, never committed): `work/wp1.4b/frames.json`,
 `grid/*.json`, `grid.json`, `summary.json`, `index.html` (the crop page), `smoothing.json`,
-`lighting-step.json`, `lighting-step-*.png`, `smoothing-alpha.png`. Every figure below is read
+`lighting-step.json`, `lighting-step-*.png`, `smoothing-alpha.png`, `quantised-regime.json`. Every figure below is read
 from one of these records.
 
 ## Summary
@@ -110,8 +110,8 @@ ruled on the STOP (ledger):
    within 15 % of the true sigma of the quantised error (3 seeds).
    - Why 15 %: Immerkaer's `sqrt(pi/2)` conversion is exact for a Gaussian mask response.
      Mostly-zero quantised noise gives a heavier-tailed response, so the estimator under-reads,
-     by 9-11 % here over 20 seeds.
-   - The bias grows with the zero fraction: -24 % at 71 % zeros and -42 % at 85 % on a flat
+     by 9-11 % here over 20 seeds (`quantised-regime.json`).
+   - The bias grows with the zero fraction: -22 to -25 % at 70-71 % zeros and -40 to -44 % at 84-85 % on a flat
      field. A second test therefore pins only the ORDER of five noise levels in that deepest
      regime. Immerkaer keeps the order there; Donoho reads only 0 or the quantisation level.
    - The renders are float, so a pure gain scales Immerkaer exactly. The bias therefore does

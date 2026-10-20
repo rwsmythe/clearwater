@@ -6,6 +6,7 @@ Usage::
     uv run python tools/noise_experiments.py grid [--frame STEM] [--limit N] [--device gpu|cpu]
     uv run python tools/noise_experiments.py smoothing [--device gpu|cpu]
     uv run python tools/noise_experiments.py lighting-step [--device gpu|cpu]
+    uv run python tools/noise_experiments.py quantised
     uv run python tools/noise_experiments.py summarise
 
 ``extract`` re-extracts, at full resolution as 16-bit PNG, the 8 deepest frames of WP1.3D's
@@ -18,6 +19,8 @@ statistics, and records per render the pipeline's own compensation and white-bal
 records, what bound, the N{} bounds, the noise figures and the residual cast; it writes the
 owner's crops (claim 6). ``smoothing`` runs claim 10 on the WP1.3D deep clip;
 ``lighting-step`` runs claim 10b on the same clip widened backwards (:func:`run_lighting_step`).
+``quantised`` writes the synthetic characterisation behind the quantised-regime tests'
+tolerance (:func:`quantised_regime`).
 ``summarise`` assembles ``grid.json``, the tables of claims 7-9 (``summary.json``) and the
 crop page ``index.html``.
 
@@ -1255,6 +1258,83 @@ def run_smoothing(
     return record
 
 
+# --- the quantised regime (the validation record behind the tests' tolerance) ------------------
+
+QUANTISED_LEVELS = (0.25, 0.3, 0.35)
+"""The noise sigmas, in 8-bit code values, of the quantised-regime characterisation."""
+
+QUANTISED_SEEDS = 20
+"""The seeds per level of the characterisation."""
+
+
+def quantised_scene(
+    sigma_code: float, seed: int, ramp: bool, size: int = 512
+) -> tuple[NDArray[np.float32], float]:
+    """Return Gaussian noise quantised to 8 bits on a smooth scene, and the true error sigma.
+
+    The scene is the tests' gradient (``0.3 + 0.4 x / W + 0.1 sin(pi y / H)``, grey) or a flat
+    field at code 100; noise of ``sigma_code`` code values is added and the sum rounded to
+    whole code values, the same in all three channels.
+
+    Args:
+        sigma_code: The noise sigma in code values.
+        seed: The random seed.
+        ramp: The gradient (``True``) or the flat field.
+        size: The side of the square scene.
+
+    Returns:
+        The image on [0, 1] and the standard deviation of ``quantised - clean`` on [0, 1].
+    """
+    y, x = np.mgrid[0:size, 0:size].astype(np.float64)
+    if ramp:
+        plane = 0.3 + 0.4 * x / size + 0.1 * np.sin(np.pi * y / size)
+        clean = plane.astype(np.float32).astype(np.float64) * 255.0
+    else:
+        clean = np.full((size, size), 100.0)
+    noise = np.random.default_rng(seed).normal(0.0, sigma_code, clean.shape)
+    quantised = np.round(clean + noise)
+    truth = float(np.std(quantised - clean)) / 255.0
+    image = np.repeat((quantised / 255.0)[..., None], 3, axis=2).astype(np.float32)
+    return image, truth
+
+
+def quantised_regime(log: Callable[[str], None] = print) -> dict[str, Any]:
+    """Characterise both estimators where 8-bit quantisation zeroes most HH1 coefficients.
+
+    For the gradient and the flat field at each of :data:`QUANTISED_LEVELS`, over
+    :data:`QUANTISED_SEEDS` seeds: the fraction of zero HH1 coefficients on the flat tiles,
+    Donoho's and Immerkaer's readings, and Immerkaer's relative error against the true sigma
+    of the quantisation-and-noise error.
+
+    Args:
+        log: Progress output.
+
+    Returns:
+        Per scene and level, the minimum and maximum of each figure over the seeds.
+    """
+    out: dict[str, Any] = {"seeds": QUANTISED_SEEDS, "levels_code": list(QUANTISED_LEVELS)}
+    for scene in ("ramp", "flat"):
+        rows: dict[str, Any] = {}
+        for level in QUANTISED_LEVELS:
+            zero, donoho, error = [], [], []
+            for seed in range(QUANTISED_SEEDS):
+                image, truth = quantised_scene(level, seed, ramp=scene == "ramp")
+                tiles = flat_tiles(image)
+                red = image[..., 0]
+                zero.append(hh1_zero_fraction(red, tiles))
+                donoho.append(donoho_sigma(red, tiles) * 255.0)
+                error.append(immerkaer_sigma(red, tiles) / truth - 1.0)
+            rows[f"{level:g}"] = {
+                "hh1_zero_fraction": [min(zero), max(zero)],
+                "donoho_8bit": [min(donoho), max(donoho)],
+                "immerkaer_relative_error": [min(error), max(error)],
+            }
+            log(f"{scene} {level:g}: zero {min(zero):.2f}-{max(zero):.2f}, "
+                f"error {min(error):+.3f}..{max(error):+.3f}")  # fmt: skip
+        out[scene] = rows
+    return out
+
+
 # --- claim 10b: the lighting step in the deep clip ------------------------------------------------
 
 WIDEN_S = 3.0
@@ -1994,7 +2074,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     """
     parser = argparse.ArgumentParser(description="WP1.4b gain-cap noise experiments.")
     parser.add_argument(
-        "phase", choices=("extract", "grid", "smoothing", "lighting-step", "summarise")
+        "phase",
+        choices=("extract", "grid", "smoothing", "lighting-step", "quantised", "summarise"),
     )
     parser.add_argument("--frame", help="grid: run this frame only (its frames.json name)")
     parser.add_argument("--limit", type=int, help="grid: stop after this many frames")
@@ -2010,6 +2091,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     elif args.phase == "smoothing":
         record = run_smoothing(config, roots, select_backend(args.device))
         print(f"cap binds on {record['cap_binding_fraction']:.1%} of the frames")
+    elif args.phase == "quantised":
+        roots.write_text(
+            roots.allowed / "quantised-regime.json", json.dumps(quantised_regime(), indent=1)
+        )
     elif args.phase == "lighting-step":
         record = run_lighting_step(config, roots, select_backend(args.device))
         print(f"step at {record['step']['seconds_into_excerpt']} s into the excerpt")
