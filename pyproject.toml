@@ -9,7 +9,16 @@ license-files = ["LICENSE"]
 authors = [{ name = "Robert Smythe" }]
 # Product dependencies are added only by the work package whose brief allows it,
 # and only after the architecture document names them (plan section 4.1, spec N13).
-dependencies = []
+dependencies = [
+    # WP3.1 (frame section 4 grant): the array backend (AD-1). SciPy kept on WP3.1's
+    # measurement (docs/reports/wp3.1-array-backend.md, "SciPy versus own kernels").
+    "numpy>=2.1,<3",
+    "scipy>=1.14,<2",
+]
+
+[project.optional-dependencies]
+# WP3.1 (frame section 4 grant, ruling 7): the GPU backend; CUDA files are never redistributed (AD-18).
+gpu = ["cupy-cuda12x[ctk]>=14.2,<15"]
 
 [dependency-groups]
 # The application toolchain (plan PD9).
@@ -21,9 +30,8 @@ dev = [
     "py-cpuinfo>=9,<10",
     "pillow>=11,<13",
     "pillow-heif>=0.20,<2",
-    "numpy>=2.1,<3",
-    "scipy>=1.14,<2",
-    # WP1.2 Part A GPU candidate (CHARC grant; MIT). Prototype only: product adoption is WP2.1's.
+    # WP1.2 Part A GPU candidate (CHARC grant; MIT). The product names it as the [gpu] extra (WP3.1);
+    # kept here so the developer environment has CuPy (WP3.1 ruling 7).
     "cupy-cuda12x[ctk]>=14.2,<15",
     # WP2.1S transport candidate (CHARC grant 5152ed4302874889). Spike and prototype only.
     "av>=15,<17",
