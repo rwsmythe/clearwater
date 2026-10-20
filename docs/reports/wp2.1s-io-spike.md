@@ -10,9 +10,11 @@ ICC + EXIF), and confirms or corrects AD-18 (licences). Brief `docs/briefs/wp2.1
 
 ## 1. Results at a glance
 
-- **Every row is the SAME WORK.** All 18 transport forms decode the same 681 frames to the same
-  bytes as row a: per-frame SHA-256 over the whole clip. Every pts side channel delivers 681/681
-  pts exactly as ffprobe lists them.
+- **Every row is the SAME WORK.** All 23 transport forms decode the same 681 frames to the same
+  bytes as row a: per-frame SHA-256 over the whole clip. The one exception is a-ad10, AD-10's
+  flag set, which is a bytes finding by design. Every pts side channel delivers 681/681 pts
+  exactly as ffprobe lists them. That includes the five exploration knob forms, each checked
+  through its own `+pts` identity row.
 - **The 32 KB writes are fixed in FFmpeg; the cure is on the reading side.** FFmpeg's own AVIO
   statistics show 32,741-byte writes on average whatever the knob: `-avioflags direct`, the pipe
   protocol's `-blocksize`, or both. That is 517,560 writes for the clip. What removes the
@@ -20,17 +22,19 @@ ICC + EXIF), and confirms or corrects AD-18 (licences). Brief `docs/briefs/wp2.1
   ms/frame, which is about FFmpeg's own decode-plus-conversion speed (13.5 ms to the null muxer).
   This buffer is a Windows platform tuning with an automatic, byte-identical fallback to the
   default pipe (section 6).
-- **Best rows (median s/frame, clean windows):**
+- **Best rows (median s/frame, clean windows).** The bracket leaves the witness hashes out while
+  the producer keeps working, so it is a lower bound. The wall time including the hashes is an
+  upper bound (section 2):
 
-  | Row | ms/frame |
-  |---|---|
-  | b-cuda (32 MiB pipe, `-hwaccel cuda`) | 13.0 |
-  | b (32 MiB pipe) | 16.1 |
-  | s (loopback TCP socket) | 24.3 |
-  | c-cuda-auto (PyAV, CUDA decode) | 42.4 |
-  | c-auto (PyAV, `thread_type="AUTO"`) | 43.0 |
-  | a (today's pipe) | 55.9 |
-  | c (PyAV default threading) | 76.0 |
+  | Row | ms/frame (bracket) | Upper bound (wall with hashes) |
+  |---|---|---|
+  | b-cuda (32 MiB pipe, `-hwaccel cuda`) | 13.0 | 13.5 |
+  | b (32 MiB pipe) | 16.1 | 16.7 |
+  | s (loopback TCP socket) | 24.3 | 24.8 |
+  | c-cuda-auto (PyAV, CUDA decode) | 42.4 | 42.8 |
+  | c-auto (PyAV, `thread_type="AUTO"`) | 43.0 | 43.3 |
+  | a (today's pipe) | 55.9 | 56.3 |
+  | c (PyAV default threading) | 76.0 | 76.3 |
 
   The side channel (`showinfo`) costs 0.6-1.0 ms/frame on the fast rows.
 - **Analysis-pass PROJECTION** with Part B's 0.050 s/frame of work (contaminated):
@@ -95,14 +99,39 @@ every frame. `interpolation` takes swscale's integer flags, so `SWS_ACCURATE_RND
 mirrors `flags=accurate_rnd`.
 
 **Timing.**
-- **The bracket** opens just before the FFmpeg process is spawned, or before `av.open`. It
-  closes when the last frame is whole in its C-contiguous `uint8` `(2160, 3840, 3)` array in
-  this process. Shape, dtype and contiguity are checked on every frame. s/frame = bracket / 681.
+- **The bracket** opens just before the FFmpeg process is spawned, or before `av.open`. So it
+  includes process start-up or container opening: this report reads the brief's "first byte
+  requested" as the request that starts the decoder. The bracket closes when the last frame is
+  whole in its C-contiguous `uint8` `(2160, 3840, 3)` array in this process. Shape, dtype and contiguity are checked on every frame. s/frame = bracket / 681.
 - **Each frame's interval** runs from the end of the previous frame's handling to its arrival.
 - **The witness** is a SHA-256 of every 30th frame and the last: 24 frames, compared with row a's
   reference hash. It is left out of the bracket, so the bracket is the sum of the intervals.
-  For pipe rows FFmpeg blocks on the full pipe while a frame is hashed. For PyAV rows the
-  decoder threads may run ahead during a hash: at most 24 x ~15 ms, under 0.6 ms/frame.
+- **The producer does not stop during a hash.**
+  - FFmpeg keeps writing into the pipe or socket buffer. The 32 MiB pipe holds more than one
+    24,883,200-byte frame.
+  - PyAV's decoder threads keep decoding.
+  - Work done during a hash therefore falls outside the bracket. The bracket is a LOWER bound
+    on the decode-to-NumPy time without hashing.
+  - The run's wall time including the hashes (`wall_s_with_witness`) is an UPPER bound.
+  - The two differ by the hashing time, 0.35-0.58 ms/frame (`summary.json`,
+    `wall_with_witness_s_per_frame`). Medians, bracket to upper bound, in ms/frame:
+
+    | Row | Bracket | Upper bound |
+    |---|---|---|
+    | b | 16.11 | 16.69 |
+    | b+pts | 17.06 | 17.62 |
+    | b-cuda | 12.99 | 13.48 |
+    | b-cuda+pts | 13.64 | 14.15 |
+    | s | 24.30 | 24.81 |
+    | s+pts | 25.07 | 25.57 |
+    | a | 55.87 | 56.30 |
+    | a+pts | 55.67 | 56.07 |
+    | c | 75.97 | 76.32 |
+    | c-auto | 42.97 | 43.34 |
+    | c-cuda | 47.73 | 48.09 |
+    | c-cuda-auto | 42.42 | 42.78 |
+
+  - The side-channel costs below compare brackets, so both sides carry the same bias.
 - **Pipe rows yield one reused buffer.** PyAV's `to_ndarray()` returns a fresh C-contiguous array
   that views PyAV's frame buffer.
 - **The per-frame maximum** in every row is the first frame: FFmpeg or PyAV start-up,
@@ -177,7 +206,12 @@ min / median / max interval. The max is the first frame's start-up.
 | n (calibration) | 0.01345 (0.01324-0.01393) | -- | no frames reach Python | -- | -- | -- | W2 |
 
 - **No row FAILS IF-1.** Every FFmpeg row delivers exact pts through `showinfo`, and
-  `-copyts` is not needed: GX011627 starts at pts 0. For a clip with a non-zero start time
+  `-copyts` is not needed: GX011627 starts at pts 0.
+  - The five exploration knob forms (a-direct, a-blocksize, a-direct-blocksize, b-1m,
+    b-direct-blocksize) were checked by untimed `+pts` identity rows
+    (`identity-<form>+pts.json`, 2026-10-20 01:51-01:54). Each gave the same 681 hashes and
+    681/681 pts exact.
+  - a-ad10 is an untimed bytes finding. Its pts were not checked. For a clip with a non-zero start time
   (out of envelope) `-copyts` would apply. Every PyAV row delivers `frame.pts` exactly. The
   showinfo frame numbers ran 0..680 without a gap.
 - **Witness in the timed runs:** 24 frames per run matched the reference in every run of every
@@ -229,6 +263,9 @@ Minutes per minute = s/frame x 29.97.
 - **Part B's measured analysis:** 0.0707 s/frame on GX011627, today's pipe, software decode
   (2.12 min/min). On GX011625 it was 0.1190 / 0.1101. The GX011627 figure lies between this
   spike's two bounds for row a (0.0559 overlapped, 0.1059 serial).
+- **The witness bias:** with the upper bounds of section 2, each serial PROJECTION rises by
+  0.35-0.58 ms/frame (b+pts 0.0676, b-cuda+pts 0.0641). The overlapped bounds of the
+  large-buffer rows stay at the 0.050 s/frame work figure.
 - **Overlap is shared CPU, not free.** PyAV's decode and conversion run in the same process as
   the work, and FFmpeg's in a child process. Both compete with the work for CPU.
 - **Export:** the core dominates (Part B section 10, #6), so the transport changes the export by
@@ -267,6 +304,8 @@ Minutes per minute = s/frame x 29.97.
   reading (`bench._windows_power`).
 - **AD-2 evidence:**
   - Every candidate delivers the same bytes and exact pts.
+  - The timed figures are brackets, which are lower bounds. Each upper bound is 0.35-0.58
+    ms/frame higher (section 2).
   - The fastest is the FFmpeg-process pipe with a large buffer: 16.1 ms software, 13.0 ms
     `-hwaccel cuda`, against 55.9 ms today. It is Windows-specific as built.
   - The TCP socket is portable at 24.3 ms.
@@ -293,7 +332,8 @@ Minutes per minute = s/frame x 29.97.
 - **Stray checks:** WmiPrvSE reached 56.9 % (W3 start) and System 23 %, both system processes. No
   non-system process reached 25 %. No re-run was needed.
 - **Records:** `work/wp2.1s/transport/`:
-  - `reference.json`, `identity-<row>.json` (18 rows);
+  - `reference.json`, `identity-<row>.json` (23 rows; the five knob `+pts` rows were added
+    after the windows, untimed);
   - `W1.json`-`W6.json` (every run's intervals and ambient);
   - `summary.json`, `attribution.json`;
   - `gate.jsonl`, plus logs in `work/wp2.1s/logs/`.
@@ -306,7 +346,7 @@ Minutes per minute = s/frame x 29.97.
 
 Instrument `tools/spike_io/photo.py`, run `uv run python tools/spike_io/photo.py run`. Record
 `work/wp2.1s/photo/photo.json`, with the fixtures beside it. Tests `tests/test_spike_io_photo.py`
-(33 cases). Every image is synthetic. No owner photo exists and none was downloaded.
+(40 cases). Every image is synthetic. No owner photo exists and none was downloaded.
 
 - **Libraries, as installed:**
   - Pillow 12.3.0;
@@ -357,9 +397,13 @@ Two read paths:
 | 10-bit public, o1 / o6 / o8 | none / 270 / 90 | 1 / 6 / 8 | yes / yes | upright | upright / **twice** / **twice** | 1 / None, 6, 8 | upright |
 
 - **ICC:** byte-identical on both paths, in every case.
-- **EXIF read:** every field written comes back through the plugin: IFD0 Make, Model, DateTime
-  and Orientation; Exif DateTimeOriginal, FNumber, PixelXDimension and PixelYDimension; GPS
-  LatitudeRef.
+- **EXIF read, every case:** every field written comes back, with its value: IFD0 Make, Model,
+  DateTime and Orientation; Exif DateTimeOriginal, FNumber, PixelXDimension and
+  PixelYDimension; GPS LatitudeRef.
+  - Through `open_heif`, every field and value equals what was written.
+  - Through the plugin, the only change is Orientation, reset to 1 where the tag was 6 or 8.
+  - Recorded as `exif_fields_raw_equal` and `exif_fields_plugin_mismatch`; tested on all eight
+    fixtures.
 - **Mechanism:** libheif applies the container's `irot`. It does not apply EXIF: the exif-only
   file comes back unrotated.
 - **Is the Orientation tag still there after the read?**
@@ -371,8 +415,10 @@ Two read paths:
 - **Recommendation for WP2.1 (REASONED, not measured on a real photo):**
   - Take rotation from the container transform as libheif applies it.
   - Never re-apply EXIF Orientation after a HEIC decode.
-  - Detect a tag without an `irot` (`heif_transforms` reads `irot`/`imir` from the file) and
-    decide that case explicitly.
+  - Detect a tag without an `irot` and decide that case explicitly. `heif_transforms` reads
+    `irot`/`imir` from `ipco` but does NOT read `ipma`, which assigns properties to items. It is
+    valid only for one-item files like these fixtures. A real iPhone HEIC (a grid, thumbnails,
+    auxiliary images) needs the primary item's `ipma` entries.
 - **Bit depth:**
   - A 10-bit file reports `bit_depth` 10.
   - `open_heif` returns 8-bit `RGB` by default (`convert_hdr_to_8bit=True`).
@@ -448,7 +494,8 @@ Two read paths:
 ## 9. Claim 3 -- licence positions
 
 Read by `tools/spike_io/licences.py` (record `work/wp2.1s/licences.json`) from:
-- the installed distributions' metadata and `.dist-info` licence files;
+- the installed distributions' metadata, and the names of their `.dist-info` licence files
+  (listed, not read; `LICENSES_bundled.txt` is the one licence file read);
 - pillow-heif's `LICENSES_bundled.txt`;
 - PyAV's `av._core.library_meta`, `av.codecs_available` and `hwdevices_available()`;
 - the DLLs in `av.libs`;
@@ -463,9 +510,9 @@ WP2.1, to be confirmed at WP5.5, and not legal advice. It assumes the FSF's read
 | Name | Version | License (as read) | GPL-2.0-or-later compatibility | One-line reason | AD-18 |
 |---|---|---|---|---|---|
 | PyAV | 16.1.0 | BSD-3-Clause (`License-Expression`) | yes | permissive | NEW |
-| FFmpeg bundled in the PyAV wheel | 8.0.1 | every library reports "LGPL version 3 or later"; configuration has `--enable-version3`, NO `--enable-gpl`, NO `--enable-nonfree`; `--enable-libx264 --enable-libx265`, with `libx264-165` and `libx265` DLLs in `av.libs`; the wheel ships no FFmpeg, x264 or x265 licence text (its licence files are `LICENSE.txt`, `AUTHORS.py` and `AUTHORS.rst`) | yes-if | the reported LGPL-3 is contradicted by the GPL x264/x265 linked in; the combination is GPL; it is compatible only if conveyed under GPL-3.0 and x264/x265 allow GPL-3.0; x264/x265's GPL version is UNKNOWN (their DLLs carry only the bare string "GPL") | NEW |
+| FFmpeg bundled in the PyAV wheel | 8.0.1 | every library reports "LGPL version 3 or later"; configuration has `--enable-version3`, NO `--enable-gpl`, NO `--enable-nonfree`; `--enable-libx264 --enable-libx265`, with `libx264-165` and `libx265` DLLs in `av.libs`; the wheel's only licence file is PyAV's own `LICENSE.txt`, so it ships no FFmpeg, x264 or x265 licence text | UNKNOWN | the libraries report LGPL-3, yet x264/x265 are linked in; their DLLs carry only the bare string "GPL", so neither their licence and version nor the licence of the combination can be read from the artefact | NEW |
 | Its codecs and devices | 8.0.1 | `hevc`, `h264` decoders; `hevc_nvenc`, `h264_nvenc`; `hevc_cuvid`, `h264_cuvid`; `--enable-nvenc --enable-nvdec`; hwdevices cuda, dxva2, qsv, d3d11va, d3d12va, amf | UNKNOWN | the NVENC/NVDEC headers' licence (AD-18: MIT) is not readable from this artefact | NEW |
-| pillow-heif | 1.8.1 | source BSD-3-Clause; `LICENSES_bundled.txt`: "License for pillow-heif binary wheels: GPLv2, due to base library licenses" | yes-if | the binary wheel is GPL; as for x265 below | CONFIRMED (BSD-3 source); the wheel-level GPLv2 is NEW |
+| pillow-heif | 1.8.1 | source BSD-3-Clause; `LICENSES_bundled.txt`: "License for pillow-heif binary wheels: GPLv2, due to base library licenses" | UNKNOWN | the binary wheel bundles LGPLv3 libheif and libde265 with x265, and its "GPLv2" may or may not mean "or later" (row below) | CONFIRMED (BSD-3 source); the wheel-level GPLv2 is NEW |
 | libheif (in pillow-heif) | 1.23.6 | LGPLv3 (`LICENSES_bundled.txt`) | yes-if | LGPL-3: conveyed under GPL-3.0 | CONFIRMED |
 | libde265 (in pillow-heif) | 1.1.3 | LGPLv3 | yes-if | as libheif | CONFIRMED |
 | x265 (in pillow-heif) | 4.3+1 | GPLv2 ("or later" not stated in the file) | UNKNOWN | if GPL-2.0-only, it cannot be combined with LGPL-3 libheif under GPL-3.0; the file does not say which | CONFIRMED (as "GPL-2") |
@@ -481,7 +528,8 @@ WP2.1, to be confirmed at WP5.5, and not legal advice. It assumes the FSF's read
   - Yet libx264 and libx265 are configured in and bundled as DLLs.
   - The build is not `nonfree`. It carries `hevc`, `h264`, `hevc_nvenc`, `h264_nvenc` and the
     `cuda` hwaccel.
-  - If PyAV ships, this build ships. It brings GPL encoders without their licence texts.
+  - If PyAV ships, this build ships. It brings x264 and x265, whose licence the artefact states
+    only as the string "GPL", and no licence texts for them.
 - **pillow-heif's wheel holds one native file, `libheif-*.dll`.** `LICENSES_bundled.txt` names
   separate `libde265`, `libx265` and MinGW runtime files that this Windows wheel does not have. INFERENCE: they
   are linked into the libheif DLL.
