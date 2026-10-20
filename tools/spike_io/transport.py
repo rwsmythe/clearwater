@@ -214,25 +214,13 @@ PLANS: dict[str, tuple[tuple[str, int], ...]] = {
         ("b", 1),
         ("b-direct-blocksize", 1),
     ),
-    "pipes": (
-        (NULL_ROW, 3),
-        ("a", 3),
-        ("a+pts", 3),
-        ("b", 3),
-        ("b+pts", 3),
-        ("b-cuda", 3),
-        ("b-cuda+pts", 3),
-    ),
-    "others": (
-        ("s", 3),
-        ("s+pts", 3),
-        ("c", 3),
-        ("c-auto", 3),
-        ("c-cuda", 3),
-        ("c-cuda-auto", 3),
-    ),
+    "pipes-a": ((NULL_ROW, 3), ("a", 3)),
+    "pipes-apts": (("a+pts", 3),),
+    "pipes-b": (("b", 3), ("b+pts", 3), ("b-cuda", 3), ("b-cuda+pts", 3)),
+    "others-s": (("s", 3), ("s+pts", 3), ("c", 3)),
+    "others-c": (("c-auto", 3), ("c-cuda", 3), ("c-cuda-auto", 3)),
 }
-"""The timed windows: (row, full-clip runs) in order."""
+"""The timed windows: (row, full-clip runs) in order; each fits in under 10 minutes."""
 
 
 # --- the transports -------------------------------------------------------------------------
