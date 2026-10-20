@@ -67,7 +67,8 @@ class Frame(Image):
     """A decoded video frame: an :class:`Image` with its exact presentation time (IF-1).
 
     Attributes:
-        pts: Exact source presentation time in seconds (``pts_ticks / time_base``).
+        pts: Exact source presentation time in seconds: ``pts_ticks * time_base`` (the time base
+            is seconds per tick).
         pts_ticks: The presentation time in stream ticks; the key statistics are stored under
             (D95).
         time_base: The stream's time base.

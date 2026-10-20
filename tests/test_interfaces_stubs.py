@@ -111,7 +111,11 @@ def signature_differences(obj: object, protocol: type) -> list[str]:
         have_params = list(have.parameters.values())
         pairs_ok = len(want_params) == len(have_params) and all(
             (w.name, w.kind, w.annotation) == (h.name, h.kind, h.annotation)
-            and (w.default is Ellipsis or w.default == h.default)
+            and (
+                h.default is not inspect.Parameter.empty
+                if w.default is Ellipsis
+                else w.default == h.default
+            )
             for w, h in zip(want_params, have_params, strict=True)
         )
         if not pairs_ok or want.return_annotation != have.return_annotation:
@@ -174,6 +178,12 @@ def test_planted_stub_missing_a_method_fails_by_name() -> None:
 
     assert signature_differences(WrongDefault([], _probe()), VideoSource) == ["frames"]
     assert signature_differences(WrongReturn(), ProxyCache) == ["limit_bytes"]
+
+    class RequiredDtype(StubArrayBackend):
+        def asarray(self, a: Any, dtype: Any) -> Any:  # type: ignore[override]
+            return a
+
+    assert signature_differences(RequiredDtype(), ArrayBackend) == ["asarray"]
     assert Broken.percentile is None
 
 

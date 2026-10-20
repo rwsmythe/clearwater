@@ -169,6 +169,8 @@ def test_null_is_legal_where_nullable_or_default_is_none() -> None:
     ok = _set({"red_gain_cap": None})
     assert validate_parameter_set(ok, "c3", (gain_cap,)) == []
     assert _kinds(validate_parameter_set(_set({"gamma": None}), "c3", (plain,))) == ["wrong_type"]
+    default_none = Parameter("cap", "float", None, 0.0, None, None, "advanced", "C", "h", None)
+    assert validate_parameter_set(_set({"cap": None}), "c3", (default_none,)) == []
     assert _kinds(validate_parameter_set(_set({"red_gain_cap": None}), "c3", (plain,))) == [
         "unknown_name"
     ]
@@ -252,6 +254,16 @@ def test_huge_integer_round_trips_and_validates_without_raising() -> None:
     assert _kinds(validate_parameter_set(_set({"strength": -(10**400)}), "c3", PARAMS)) == [
         "below_minimum"
     ]
+
+
+def test_created_must_be_iso_8601_with_a_t_separator() -> None:
+    data = _set({}).to_dict()
+    for bad in ("2026-10-20Q12:30:15+00:00", "2026-10-20", "x"):
+        data["created"] = bad
+        with pytest.raises(FormatError, match="ISO-8601"):
+            ParameterSet.from_dict(data)
+    data["created"] = "2026-10-20T12:30:15Z"
+    assert ParameterSet.from_dict(data).created == datetime(2026, 10, 20, 12, 30, 15, tzinfo=UTC)
 
 
 def test_non_finite_float_is_not_serialised() -> None:

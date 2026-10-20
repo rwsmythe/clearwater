@@ -142,6 +142,7 @@ stage order from its constructor (default the c3 names).
 |---|---|---|---|---|---|---|---|---|
 | 1 (proposal yield) | - | - | - | - | - | - | - | 148,021 tokens / 36 turns (orchestrator) |
 | R1 (Reviewer A) | 0 | 5 (3 fixed, 1 rejected as ruled, 1 raised) | 4 (3 fixed, 1 rejected, 1 raised) | all in | 9 NEW / 0 REOPENED | 0 | product (#2, #4, #5) and tests (#8, #9) | see dispatcher |
+| R2 (Reviewer A) | 0 | 1 (fixed) | 3 (fixed) | all in | 4 NEW / 0 REOPENED | 0 | product (#1 docstring, #2) and tests (#3, #4) | 190,481 (R1 yield, orchestrator) |
 
 Reviewer A round 1: codex-cli (WSL) gpt-5.6-sol/high, 131,404 tokens, 40 executed commands, verdict
 NEW_CRITICAL_MAJOR_FOUND. Transcript, prompt, diff and adjudication:
@@ -150,6 +151,21 @@ OverflowError), 5 (`1e400` read as inf), 8, 9 (test strength). Rejected: 1 (uint
 6 (int for float is documented). Raised to CHARC: 3 (a gain cap defaults to 2.0 and None disables it,
 which the ruled "None only where the default is None" rejects) and 7 (rotation sign: ruled CCW, but
 `tools/inventory.py` normalises clockwise). Full suite before the round: 881 passed.
+
+Reviewer A round 2 (after the CHARC follow-up cda92ceb: `Parameter.nullable`, rotation sentence):
+103,765 tokens, verdict NEW_CRITICAL_MAJOR_FOUND, evidence `...\clearwater-review-evidence\wp2.22\`.
+Full suite before the round: 885 passed. Findings: 1 MAJOR, `Frame.pts` docstring said
+`pts_ticks / time_base` (copied from the section-3 comment; the time base is seconds per tick, so
+it is `pts_ticks * time_base`): docstring fixed; the TYPO REMAINS IN docs/architecture.md section 3
+(a comment, no signature) for CHARC to correct. 2 MINOR, `created` accepted any separator
+character: now requires `T`. 3 MINOR and 4 MINOR, test gaps (the `default is None` half of
+nullable; a required `dtype` passing the signature oracle): tests added with planted defects.
+Protocol note: the reviewer's grep (`--glob '!proofs/**'`, which does not match `docs/proofs`)
+incidentally printed lines of `docs/proofs/wp2.2-ledger.md` (the c3 stage table, ledger lines
+123-129) and of other `docs/proofs/` files; none of round 1's findings appeared in the output.
+Treated as an incidental access, disclosed, not a disqualification. Tests in this worktree do not
+read `docs/architecture.md`, so the unrebased section-3 copy (lacking the `nullable` line) affects
+no test.
 
 ## Gates at the round-1 commit
 

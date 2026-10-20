@@ -170,6 +170,8 @@ class ParameterSet:
         if not isinstance(created, str):
             raise FormatError("created must be an ISO-8601 string")
         try:
+            if len(created) < 11 or created[10] != "T":  # fromisoformat takes any separator
+                raise ValueError(created)
             created_at = datetime.fromisoformat(created)
         except ValueError as error:
             raise FormatError(f"created is not ISO-8601: {created!r}") from error
