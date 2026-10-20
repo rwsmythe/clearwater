@@ -728,6 +728,7 @@ def verify_png8(path: Path, pixels: NDArray[np.uint8], icc: bytes, exif: bytes) 
         "chunk_order_stdlib": order,
         "iccp_before_idat": _before(order, "iCCP", "IDAT"),
         "exif_before_idat": _before(order, "eXIf", "IDAT"),
+        "bit_depth_8_stdlib": ihdr[8] == 8,
     }
 
 
@@ -736,20 +737,47 @@ def _before(order: Sequence[str], first: str, second: str) -> bool:
     return first in order and second in order and order.index(first) < order.index(second)
 
 
-VERIFIED = (
-    "values_exact_pyav",
-    "iccp_identical_pillow",
-    "iccp_identical_stdlib",
-    "exif_identical_pillow",
-    "exif_identical_stdlib",
-    "iccp_before_idat",
-)
-"""The verification properties that must hold; :func:`failures` names any that does not."""
+VERIFIED = {
+    "stdlib (encode_png16)": (
+        "values_exact_pyav",
+        "iccp_identical_pillow",
+        "exif_identical_pillow",
+        "pillow_finds_exif",
+        "iccp_before_idat",
+        "exif_before_idat",
+    ),
+    "Pillow": (
+        "bit_depth_8_stdlib",
+        "values_exact_pyav",
+        "iccp_identical_stdlib",
+        "exif_identical_stdlib",
+        "iccp_before_idat",
+        "exif_before_idat",
+    ),
+}
+"""The properties that must hold, per writer; :func:`failures` names any that does not."""
 
 
 def failures(record: Mapping[str, Any]) -> list[str]:
-    """Name every property of :data:`VERIFIED` present in ``record`` and not True."""
-    return [key for key in VERIFIED if key in record and record[key] is not True]
+    """Return the complete verdict of a PNG verification record: every failure by name.
+
+    A property of :data:`VERIFIED` for the record's writer fails when it is absent or not
+    True; an unknown writer fails as ``writer``; an ``exif_problems...`` entry fails when it
+    is not empty (it lists the D63 fields that are wrong).
+
+    Args:
+        record: A record of :func:`verify_png16` or :func:`verify_png8`.
+
+    Returns:
+        The failing names, in order; empty when every property holds.
+    """
+    required = VERIFIED.get(str(record.get("writer")))
+    if required is None:
+        return ["writer"]
+    named = [key for key in required if record.get(key) is not True]
+    return named + [
+        key for key, value in record.items() if key.startswith("exif_problems") and value
+    ]
 
 
 # --- HEIC -----------------------------------------------------------------------------------
@@ -954,6 +982,10 @@ def read_heic(
         "hdr_mode": hdr.mode,
         "hdr_dtype": str(hdr_pixels.dtype),
         "hdr_max": int(hdr_pixels.max()),
+        # 10 bits shifted left by 6: every sample's low six bits are zero.
+        "hdr_low_6_bits_zero": bool(not np.any(hdr_pixels & 0x3F))
+        if hdr_pixels.dtype == np.uint16
+        else None,
         "hdr_pose": pose(hdr_pixels, hdr_bits, upright, bits, orientation),
     }
 

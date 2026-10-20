@@ -25,7 +25,7 @@ standard error, parsed after the run); PyAV rows always carry the decoder's pts.
 Timing (:func:`timed_run`): the bracket opens just before the FFmpeg process is spawned
 (or the PyAV container is opened) and closes when the last frame is whole in its array;
 s/frame is the bracket divided by the frame count. Each frame's interval runs to its own
-arrival from the previous frame's arrival (so it includes that frame's shape, dtype and
+arrival from the previous frame's arrival (so it carries the previous frame's shape, dtype and
 contiguity check) or, after a witness frame, from the end of that frame's check and hash.
 The SHA-256 witness taken on every :data:`WITNESS_EVERY`-th frame and the last (compared
 with row ``a``'s reference) is thereby left out of the bracket: the bracket is the sum of the
@@ -937,9 +937,13 @@ def _ambient() -> dict[str, Any]:
 
 
 def idle_gate(script: Path, out: Path) -> dict[str, Any]:
-    """Run the advisory idle gate (Part B's PowerShell script) and return its verdict line."""
+    """Run the advisory idle gate (Part B's PowerShell script) and return its verdict line.
+
+    The record names the script and its md5, so the window record shows which gate ran.
+    """
     if sys.platform != "win32" or not script.is_file():
         return {"ran": False, "reason": "not Windows or no gate script"}
+    identity = {"script": str(script), "script_md5": hashlib.md5(script.read_bytes()).hexdigest()}
     result = subprocess.run(
         ["powershell", "-NoProfile", "-File", str(script), "-Out", str(out)],
         capture_output=True,
@@ -950,6 +954,7 @@ def idle_gate(script: Path, out: Path) -> dict[str, Any]:
     lines = [line for line in result.stdout.splitlines() if line.strip().startswith("{")]
     return {
         "ran": True,
+        **identity,
         "status": result.returncode,
         "record": json.loads(lines[-1]) if lines else None,
         "stderr_tail": result.stderr.strip()[-300:],
@@ -1223,7 +1228,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             _write(work / f"identity-{name}.json", record, guard)
         return 0
     if args.command == "window":
-        gate = None if args.gate is None else args.gate.resolve()
+        # The gate runs as given, so it must be the copy inside the guard's root (Part B's
+        # script, which writes only its -Out file); anything elsewhere is refused.
+        gate = None if args.gate is None else guard.check(args.gate).resolve()
         out = work / f"{args.label}.json"
         if out.resolve().parent != work.resolve():
             raise SpikeError(f"{out} is not inside {work}")

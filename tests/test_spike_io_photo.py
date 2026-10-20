@@ -272,6 +272,18 @@ def test_encode_png16_refuses_an_invalid_profile_name(icc: bytes, edited: bytes,
         photo.encode_png16(photo.upright_image(16), icc, edited, profile_name=name)
 
 
+def test_failures_is_the_complete_verdict() -> None:
+    whole = {"writer": "Pillow", **dict.fromkeys(photo.VERIFIED["Pillow"], True)}
+    assert photo.failures(whole) == []
+    absent = {key: value for key, value in whole.items() if key != "exif_before_idat"}
+    assert photo.failures(absent) == ["exif_before_idat"]
+    assert photo.failures({**whole, "bit_depth_8_stdlib": False}) == ["bit_depth_8_stdlib"]
+    assert photo.failures({**whole, "exif_problems_stdlib": ["Orientation"]}) == [
+        "exif_problems_stdlib"
+    ]
+    assert photo.failures({"writer": "another"}) == ["writer"]
+
+
 # --- The write guard (tools/spike_io/guard.py) ------------------------------------------------
 
 
@@ -453,6 +465,7 @@ def test_heic_bit_depth_returned(tmp_path: Path, guard: WriteGuard, icc: bytes, 
         assert case["hdr_mode"] == "RGB;16"
         assert case["hdr_dtype"] == "uint16"
         assert case["hdr_max"] == 1023 << 6  # 10-bit samples shifted left by 6
+        assert case["hdr_low_6_bits_zero"] is True  # on every sample
     else:
         assert case["hdr_mode"] == "RGB"
     assert case["hdr_pose"] == "upright"
