@@ -68,6 +68,9 @@ none of them. Spec 6.7 lists no control for it.
 """
 
 _FLOAT32_MAX = float(np.finfo(np.float32).max)
+# The largest supplied Lab mean component accepted: three squared float32 differences stay far
+# inside the float32 range (real means lie in L* 0-100, a* and b* about -130 to 130).
+_LAB_COMPONENT_LIMIT = 1e18
 
 
 def high_pass(backend: ArrayBackend, a: Array, *, sharpen_blur_fraction: float) -> Array:
@@ -254,7 +257,7 @@ def saliency_weight(
         TypeError: ``backend`` is not a core backend or ``a`` is not one of its arrays.
         ValueError: ``a`` is not a float32 ``(H, W, 3)`` array, the derived sigma is unusable
             (the message names ``saliency_blur_fraction``), or ``saliency_mean`` is not three
-            finite values.
+            finite values of magnitude at most 1e18.
     """
     _check_image(backend, a)
     sigma = _derived_sigma("saliency_blur_fraction", saliency_blur_fraction, a.shape)
@@ -317,7 +320,8 @@ def weight_maps(
         TypeError: ``backend`` is not a core backend or an input is not one of its arrays.
         ValueError: ``inputs`` is empty or differs in shape, an input is not a float32
             ``(H, W, 3)`` array, a derived sigma is unusable (the message names the parameter),
-            or ``saliency_means`` does not hold three finite values per input.
+            or ``saliency_means`` does not hold three finite values of magnitude at most 1e18
+            per input.
     """
     if not inputs:
         raise ValueError("weight_maps needs at least one input")
@@ -479,6 +483,11 @@ def _checked_triple(name: str, values: Sequence[float]) -> tuple[float, float, f
     triple = float(values[0]), float(values[1]), float(values[2])
     if not all(math.isfinite(value) for value in triple):
         raise ValueError(f"{name} is not finite: {list(triple)}")
+    if max(abs(value) for value in triple) > _LAB_COMPONENT_LIMIT:
+        raise ValueError(
+            f"{name} has a component beyond {_LAB_COMPONENT_LIMIT:g}, where the float32 "
+            f"squared distance overflows: {list(triple)}"
+        )
     return triple
 
 

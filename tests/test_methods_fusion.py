@@ -275,12 +275,30 @@ def test_saliency_means_guard(means: list[tuple[float, ...]], field: str) -> Non
     assert spy.calls == 0 and _Watched.calls == 0
 
 
-@pytest.mark.parametrize("mean", [(50.0, 0.0), (50.0, 0.0, 0.0, 1.0), (50.0, math.nan, 0.0)])
+@pytest.mark.parametrize(
+    "mean",
+    [
+        (50.0, 0.0),
+        (50.0, 0.0, 0.0, 1.0),
+        (50.0, math.nan, 0.0),
+        (1e20, 0.0, 0.0),  # finite, but its square overflows float32 (R2-1)
+        (50.0, 0.0, -1e19),
+    ],
+)
 def test_saliency_mean_guard(mean: tuple[float, ...]) -> None:
     spy, image = watched()
     with pytest.raises(ValueError, match="saliency_mean"):
         fusion.saliency_weight(spy, image, saliency_blur_fraction=0.003, saliency_mean=mean)
     assert spy.calls == 0 and _Watched.calls == 0
+
+
+@pytest.mark.filterwarnings("error::RuntimeWarning")
+def test_large_saliency_mean_accepted() -> None:
+    """A component at the limit (1e18) still gives a finite weight, without a float warning."""
+    weight = fusion.saliency_weight(
+        NumpyBackend(), noise(), saliency_blur_fraction=0.003, saliency_mean=(1e18, -1e18, 1e18)
+    )
+    assert np.isfinite(weight).all()
 
 
 # -- input checks ---------------------------------------------------------------------------
