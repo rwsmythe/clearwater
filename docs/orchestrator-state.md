@@ -34,7 +34,9 @@
 - **`wp14b-cell`** (implementer-opus-high), WP1.4b, brief `docs/briefs/wp1.4b-brief.md` (`c80725b`,
   guards `d68039b`, claim 2a `f183a11`). Dispatched 2026-10-20 05:57Z in the background. Worktree
   `.worktrees/wp1.4b`, branch `wp1.4b`, base `db751cb` (toml copied). Agent id
-  `awp14b-cell-a3e64c9961e782f1`. Depth at dispatch 32,865 (2 turns, 05:57Z). At the gate: the WP1.2R bit-identity
+  `awp14b-cell-a3e64c9961e782f1`. Depth at dispatch 32,865 (2 turns, 05:57Z); 68,199 at 17 turns (06:14Z), flip committed alone first
+  (`b23bad9`). AMENDED 06:15Z by SendMessage with claim 10b (brief `42662d2`; deep CP2 lighting step;
+  bounded, droppable to a DR). Check at return that it landed. At the gate: the WP1.2R bit-identity
   witness with explicit methods; check the flip commit is alone and first; CHARC's two guards.
 - **Depth rule (owner 2026-10-19, corrected 2026-10-20):** read `cell_depth.py <cell>` at dispatch,
   at every yield, and before sending any ruling or remediation; record each figure with its
@@ -144,6 +146,10 @@ Each accepted package had its return report posted to CHARC and an info-update t
 
 ### Pending
 
+- **Deep CP2 COMPLETE** (owner 2026-10-20, CHARC `1b7bc20ed511cdab`, record
+  `docs/proofs/cp2-deep-look-check.md`): c3 default confirmed on deep footage; no halo, clipping,
+  noise, flicker or residual cast; one finding (2 s smoothing does not hide a rock-to-open-water
+  lighting step) -> WP1.4b claim 10b. Next owner decision: Gate 1 at WP1.6.
 - **GoPro IMU/GPS OUT OF SCOPE** (owner 2026-10-19 ~22:30Z via CHARC `01500d3574412e69`): no brief
   reads ACCL/GYRO/GRAV/CORI/IORI/GPS. WP1.4b claim 2a reads six camera-state keys only (brief
   `f183a11`); no gpmd extract is ever committed (it carries GPS).
