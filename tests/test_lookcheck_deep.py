@@ -549,6 +549,43 @@ def test_the_deep_smoother_is_the_provisional_centred_gaussian_at_two_seconds() 
     assert pack.DEEP_CLIP_SECONDS == 6.0 and pack.DEEP_CLIP_VARIANTS == ("c3", "ancuti2018")
 
 
+@pytest.mark.parametrize("method", ["c3", "ancuti2018"])
+def test_correct_with_supplied_statistics_equals_temporal_render_bit_for_bit(method: str) -> None:
+    """The clip calls ``pipeline.correct(..., statistics=)`` to keep the Result; its image is the
+    same as ``temporal.render``'s for the same supplied statistics."""
+    from prototype import temporal
+    from prototype.pipeline import correct
+
+    rng = np.random.default_rng(7)
+    base = np.array([0.15, 0.45, 0.50], dtype=np.float32)
+    images = [
+        np.clip(base + 0.2 * rng.random((HEIGHT, WIDTH, 3), dtype=np.float32), 0, 1).astype(
+            np.float32
+        )
+        for _ in range(5)
+    ]
+    params = dataclasses.replace(Params(), method=method)
+    smoothed, _measured = temporal.analyse_staged(
+        images, params, pack.DEEP_SMOOTHER, Fraction(30000, 1001), CPU
+    )
+    for index, image in enumerate(images):
+        statistics = temporal.at(smoothed, index)
+        direct = correct(image, params, CPU, statistics=statistics)
+        assert np.array_equal(direct.output, temporal.render(image, params, statistics, CPU))
+
+
+def test_the_flicker_path_keeps_the_shallow_readback_bound_of_three_levels() -> None:
+    """Only the deep clip passes the wider own-PNG bound; the flicker defaults are unchanged."""
+    import inspect
+
+    assert pack.READBACK_MAX_OWN == 3.0 and pack.DEEP_READBACK_MAX_OWN == 5.0
+    for function in (pack.readback_clip, pack.encode_verified_pair):
+        assert inspect.signature(function).parameters["max_own"].default == 3.0
+    assert "max_own" not in inspect.getsource(pack.run_flicker)
+    deep = inspect.signature(pack.encode_deep_clip).parameters["max_own"]
+    assert deep.default == pack.DEEP_READBACK_MAX_OWN
+
+
 # --- the deep clip -------------------------------------------------------------------------------
 
 
