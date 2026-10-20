@@ -129,7 +129,12 @@ path, md5, five assertions and verdict, or there is no accept.
   and gpu re-gates", ~22:00Z): 690 passed 0 skipped, gpu 34, harness 366 OK; debt cleared.
   WP1.3D dispatched 22:03Z (deep look-check pack on SCUBA/; stills, case scan -> 4 candidates per
   section-12 case, 6 s deep clip, CP2 deep sheet); WP1.4b queued (noise test + Params() flip to
-  c3; explicit-method pinning approved with two guards, msg cf95afbc). Next: WP1.3-deep / WP1.4b brief on SCUBA/ (c3 primary, Params() flips to c3), then
+  c3; explicit-method pinning approved with two guards, msg cf95afbc). **Owner 2026-10-19 ~22:30Z:**
+  GoPro accelerometer/gyroscope analysis is "out of scope for this project" (parked as a separate
+  future project). The gpmd track on the owner's clips carries ACCL/GYRO ~200 Hz, GRAV/CORI/IORI
+  30 Hz, GPS9, and camera state WBAL/WRGB 10 Hz, SHUT/ISOE 30 Hz (probed GX011627 at the CHARC
+  seat); the camera-state streams are fair evidence inputs (ISO and WB gains per frame proposed
+  for WP1.4b), the IMU is not. Next: WP1.3-deep / WP1.4b brief on SCUBA/ (c3 primary, Params() flips to c3), then
   WP1.6 gate report (Gate 1: core 3.6x, production export 4.4x over N6). **Footage-layout skips:** the owner's Snorkel/SCUBA/edits layout makes 3
   footage tests skip (root `GX011628.MP4` paths in `tests/test_container_spike.py:902`,
   `tests/test_lookcheck.py:1289`, WP1.4 test 7; also `tools/lookcheck/pack.py:94` and the WP1.4
