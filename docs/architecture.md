@@ -112,6 +112,7 @@ class Parameter:
     name: str; type: Literal["float", "int", "bool", "enum"]; default: Any
     minimum: float | None; maximum: float | None; choices: tuple[str, ...] | None
     panel: Literal["basic", "advanced"]; label: str; help: str; neutral: Any   # neutral value for V9
+    nullable: bool = False            # None is a legal value (e.g. a disabled gain cap, D52); AD-20 amendment 2026-10-20
 
 @dataclass(frozen=True)
 class Stage:
