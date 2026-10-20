@@ -247,6 +247,12 @@ right before the speed row (it times that path).
 Inner loop at the cleanup head: `tests/test_core_*.py` 173 passed (GPU present); ruff check,
 ruff format --check (76 files), mypy (51 files) clean. Logs `work/r2c-*.log`.
 
+## Gate window 3 -- final head (granted by the dispatcher, held alone)
+
+Full pytest at `ea60356`: normal 1311 passed, 0 skipped, exit 0, 8:47 (`work/full5.log`);
+`cupy`/`cupyx` unimportable 1205 passed, 106 skipped, exit 0, 5:50 (`work/full6.log`); every skip
+carries a CuPy/CUDA reason.
+
 ## Successor handoff (if re-seated)
 
 State at round 1's yield: code at `f8bd077` plus this ledger commit; no remediation started.
