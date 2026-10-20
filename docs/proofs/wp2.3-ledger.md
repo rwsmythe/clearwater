@@ -98,3 +98,27 @@ No owner pixel is used; the still is procedural (`tools/fixtures/flicker.py`, se
    `work/fixtures/generated`), never committed.
 9. **HEIC.** Written with pillow-heif's private `misc.CtxEncode` as WP2.1S did (the public encoder
    cannot write the tag without the `irot` or the reverse).
+
+## Reviewer B (orchestrator's seat, candidate `a32e5fb` = `cea7a7e` rebased) and the one remediation
+
+B: `review-B.txt` in `C:\Users\rwsmy\clearwater-review-evidence\wp2.3\reviewB\`; verdict
+NEW_CRITICAL_MAJOR_FOUND: 4 MAJOR (B1 EXECUTED, B2-B4 REASONED) and 1 ADVISORY. Adjudication (orchestrator):
+B1 and B2 blocking; B3 and B4 strengthen; B5 banked. All four fixed in one commit (`1d0e04d`); each has a
+regression test that fails on the pre-fix code.
+
+| # | Finding | Fix | Regression test (pre-fix result) |
+|---|---|---|---|
+| B1 | `vid-vfr`'s stts ended 1001,1001,1001 (track 39039 ticks), not the stated 1001,1001,2002 cycle (40040); `measure()` used pts deltas only; the test checked the set | WENT THE PREFERRED WAY: FFmpeg writes the last frame as 2002. `-bsf:v setts=duration=if(eq(N\,29)\,2\,DURATION)` (`video.VFR_LAST_DURATION_BSF`; `setts` counts in the encoder time base, so 2 is 2002 track ticks). Deterministic: two regenerations gave a byte-identical `vfr.mp4`. `measure()` now records `pts.frame_durations` (ffprobe packet durations, last included), `pts.track_duration_ticks` and `stts_durations` (a stdlib walk of the MP4 sample table, `video.stts_durations`); `mismatches()` compares the exact 30-entry lists and the track duration; the intended average rate is 22500/1001 (30 frames over 40040 ticks) | `test_vfr_frame_durations_are_the_stated_cycle_including_the_last`: on the pre-fix `vfr.mp4` it FAILS (`At index 29 diff: 1001 != 2002`, `work/fixtures/runs/b1-prefix.txt`) |
+| B2 | TIFF bit depth hard-coded 8 in `stills.measure` and the test | `stills.tiff_bits_per_sample` reads tag 258 from the file bytes; `measure()` uses it for TIFF; the test's `_read_still` reads `tag_v2[258]` (Pillow, independent of the generator's reader) | `test_tiff_bit_depth_is_read_from_the_file_not_assumed`: a `tiff8-gradient-none` copy with tag 258 patched to 16,16,16 measures 16 in both and so disagrees with the manifest's 8. Pre-fix `measure()` on that file returns 8 (executed) and the test fails on the missing reader (`work/fixtures/runs/b2-prefix.txt`) |
+| B3 | `verify_generated` checked only decoded pixels and count | `flicker.probe_clip` (split out of `measure_clip`) and `flicker.STREAM_IDENTITY`: `verify_generated` checks container, codec, pix_fmt, size, `r_frame_rate`, `avg_frame_rate`, time base, packet pts count and hash, then the frame count and hash. `decode_sha256` now decodes with `-fps_mode passthrough`, so the frame hash is pixel-only and timing is the identity check's job (before, ffmpeg's CFR conversion duplicated frames when the rate changed, so the two checks overlapped). A cache hit WAS already verified on first use per session (`SampleProvider.path` calls `verify_generated` before it records the path); now stated in the docstring and tested | `test_planted_clip_at_another_rate_fails_by_name`: the clip's packets stream-copied with `-itsscale 1.1988` (about 25 fps) keep the 90 frames and hash and fail on `packet_pts_sha256` by name (the stream still declares 30000/1001, so `r_frame_rate` does not differ). `test_cache_hit_is_verified_before_it_is_handed_out`: that file in the cache makes the provider regenerate. Pre-fix both FAIL (`assert None is not None`; `DID NOT RAISE`, `b3-prefix.txt`) |
+| B4 | no XMP or `udta` check | `test_no_committed_file_carries_an_xmp_packet_or_gps_text` scans the RAW bytes of every committed file for `<x:xmpmeta`, `<?xpacket`, `ns.adobe.com/xap`, `exif:GPS`, `GPSLatitude`; `test_mp4_user_data_holds_nothing_beyond_the_empty_meta` walks each MP4 (`video.mp4_boxes`, shared with the stts walk): top-level boxes within ftyp/moov/free/mdat, moov within mvhd/trak/udta, no trak-level udta, udta exactly one meta of hdlr plus an empty ilst | `test_planted_xmp_gps_packet_is_caught_by_name` (a JPEG with an APP1 XMP GPS packet: the old EXIF-only GPS check passes it, asserted in the test; the new scan names all four markers) and `test_planted_udta_payload_is_caught_by_name` (a GoPro-style GPMF atom in udta: the old `has_location_tag` check passes it, asserted; the walk names `udta holds [b'meta', b'GPMF']`) |
+| B5 | ADVISORY, OUT-OF-ENVELOPE: video file sizes (encoder build) are serialised into the byte-identical manifest | BANKED, no change: another FFmpeg or libx264 build is outside the declared envelope; video is already stated non-byte-reproducible, and the regeneration test fails by name on the manifest bytes there. Trigger to revisit: supporting a second FFmpeg build. Nominal severity advisory | none |
+
+Committed files whose bytes changed, and why: `tests/fixtures/video/vfr.mp4` (41,268 -> 41,276 bytes; the
+last frame's duration is now 2002 and the track 40040 ticks) and `tests/fixtures/manifest.json` (the new
+duration and stts fields on every video entry, the vfr entry's size, md5 and 22500/1001 expectation, and the
+flicker stream facts re-ordered by the `measure_clip` split; no flicker value changed). Every other
+committed file regenerated byte-identically (`cmp` against a fresh `generate.py` run).
+Gates after the remediation: ruff check, ruff format --check, mypy pass; `tests/test_fixtures.py` +
+`tests/test_conftest_guard.py` 290 passed (70.5 s). No full pytest (the orchestrator runs it). Reviewer A
+was not re-run (instruction).
