@@ -20,6 +20,7 @@ Tier STRONG.
 | Merged head | `wp2.2-mc` = `70e554a` rebased onto main `597c2df` (`2a7f092`), plus this record and DR-32. Main fast-forwarded. |
 | Byte identity | `git patch-id --stable` = `6e17752afe8799d90f15df10cc54e72d986c79e2` on `d3bcdba..70e554a` and on the B re-run candidate `597c2df..2a7f092`. CHARC held main from B to the merge. |
 | Gates on the candidate | `ruff check` clean; `ruff format --check` 56 files; `mypy` strict 39 files clean; full pytest (see below); harness gate 366 OK. |
+| Gates on main | Full pytest on main `9a27dc4` (code identical to `b288533`), run by orchestrator generation 4 on 2026-10-20: 892 passed, 1 warning (CuPy "CUDA path could not be detected"), 469 s, exit 0. |
 | Reviewer A | gpt-5.6-sol / high, WSL. Converged at R3 (`NO_NEW_CRITICAL_MAJOR`). No reverts. Evidence `clearwater-review-evidence\wp2.2\r1`-`r3`. |
 | Reviewer B | Pass 1 on `7d31825`: `NEW_CRITICAL_MAJOR_FOUND` (1 major, 2 minor), with ONE remediation (`70e554a`). Re-run on `2a7f092`: `NEW_CRITICAL_MAJOR_FOUND` (1 major), adjudicated at the gate as NOT BLOCKING (below). |
 

@@ -1,9 +1,10 @@
-# WP2.3 — Shared test fixtures (dispatch brief, APPROVED; FINAL at dispatch after WP2.2 merges)
+# WP2.3 — Shared test fixtures (dispatch brief, FINAL)
 
-**Status:** APPROVED by CHARC with rulings (`8d7880255daf7c79`, section "Rulings"); draft
-`020ed86`. Written by the orchestrator (generation 3) on 2026-10-20 at CHARC's commission
-(`9fb52c00bbb58a9b`). **Marked FINAL and dispatched only after WP2.2 merges.** WP2.2 supplies
-the `Fault` / `ProbeResult` vocabulary the manifest uses. Owner decisions: none.
+**Status:** FINAL (2026-10-20, orchestrator generation 4), on WP2.2's merge (main `b288533`)
+and CHARC's QA of it (`4f11a18fc46c9fc4`; IF-1..IF-10 frozen). APPROVED by CHARC with rulings
+(`8d7880255daf7c79`, section "Rulings"); draft `020ed86`. Written by the orchestrator
+(generation 3) on 2026-10-20 at CHARC's commission (`9fb52c00bbb58a9b`). WP2.2 supplies the
+`Fault` / `ProbeResult` vocabulary the manifest uses. Owner decisions: none.
 - Spec **v0.5.3**. Architecture DRAFT 0.1 (`3591e80`): AD-14, AD-17, AD-24; IF-5 `Fault`,
   IF-6. Gate report `docs/reports/wp1.6-gate-report.md`.
 - Cell: `implementer-sonnet-high`. Tier **STRONG**.
