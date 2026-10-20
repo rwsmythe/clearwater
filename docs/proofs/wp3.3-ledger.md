@@ -115,4 +115,27 @@ No STOP item: no interface, core, dependency or tolerance change is needed.
 
 | Round | Critical | Major | Minor | Nit | In / out envelope | NEW / REOPENED | Reverts | Product / test-only fixes | Depth (dispatcher) |
 |---|---|---|---|---|---|---|---|---|---|
-| 0 (table) | - | - | - | - | - | - | - | - | - |
+| 0 (table) | - | - | - | - | - | - | - | - | 119,733 (dispatcher) |
+| 1 (head 8643ba1) | 0 | 1 | 3 | 0 | 3 in / 1 out (F4) | 4 NEW / 0 | 0 | planned: F1 test+report, F2 test, F3 product+test, F4 product+test | (dispatcher) |
+
+Round-0 ruling (orchestrator gen 6): table accepted as committed (c80393f); questions 1-5 as
+recommended.
+
+### Round 1 (Reviewer A, STRONG, gpt-5.6-sol high)
+
+Evidence `C:\Users\rwsmy\clearwater-review-evidence\wp3.3\r1\` (review-prompt.md, review-diff.txt,
+review.txt, review.stderr.txt, adjudication.md, tests-8643ba1.txt, md5sums.txt). Verdict
+NEW_CRITICAL_MAJOR_FOUND.
+
+- F1 MAJOR, CONFIRMED, NEW: the CPU/GPU test compares only input 1, input 2 and the fused image,
+  yet the report says it pins the per-function figures. Plan: compare every intermediate; report
+  wording exact.
+- F2 MINOR, CONFIRMED, NEW: the supplied-statistic guard tests do not show "before array work".
+  Plan: run them on the counting backend and array.
+- F3 MINOR, CONFIRMED (cell repro: bounds (1e308, 1e308) give NaN), NEW: finite bounds beyond the
+  float32 range overflow. Plan: the guard refuses a bound or range not finite in float32.
+- F4 MINOR, OUT-OF-ENVELOPE, CONFIRMED (cell repro: AttributeError), NEW: `weight_maps` /
+  `multiscale_fusion` read `.shape` before the array checks. Plan: check first.
+
+Pre-round incident: the first summary run (pytest -v, 232c17a) stalled in pytest's byte-wise
+diff of a planted failure; fixed in 8643ba1 (tests only), the head reviewed.
