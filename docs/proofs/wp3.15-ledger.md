@@ -10,7 +10,8 @@ Cell: implementer-sonnet-high (tier STRONG). Worktree `.worktrees/wp3.15`, branc
 |---|---|---|---|---|---|---|---|---|
 | 0 (design) | 2026-10-20 | n/a | n/a | n/a | n/a | n/a | n/a | 83,816 (dispatcher, 15 turns) |
 | build yield | 2026-10-20 | n/a | n/a | n/a | n/a | product + tests | n/a | 145,492 (dispatcher, 34 turns) |
-| 1 | 2026-10-20 | 2 major, 0 critical | 3 | all in | 5 NEW, 0 REOPENED | none yet (remediation after the yield) | WSL, codex-cli, gpt-5.6-sol high; head 703f7d9 | 176,725 (dispatcher, 57 turns) |
+| 1 | 2026-10-20 | 2 major, 0 critical | 3 | all in | 5 NEW, 0 REOPENED | PRODUCT + tests (01591af) | WSL, codex-cli, gpt-5.6-sol high; head 703f7d9 | 176,725 (dispatcher, 57 turns) |
+| 2 | 2026-10-20 | 0 | 4 (3 in, 1 out) | 3 in, 1 out | 4 NEW (1 a refinement of round-1 #4), 0 REOPENED | cleanup pending (product + comment + tests) | WSL, codex-cli, gpt-5.6-sol high; head 01591af | 205,539 at the window queue yield (dispatcher, 75 turns); round-2 figure to be filled |
 
 ## Round 0: the design table (brief task 1)
 
@@ -212,3 +213,26 @@ Regression tests written against the unfixed source (a scratch copy of HEAD with
 exception classes added so the file imports): 10 of the new tests FAIL there (4 `.JSON`, 3
 version-identity, 2 truncation, 1 float version) and pass on the fixed code. Inner loop: 198
 passed; ruff check, ruff format --check, mypy clean.
+
+## Full pytest (window 2) on head 01591af
+
+1336 passed, 1 warning (cupy CUDA path), 522 s, exit 0 (`work/pytest-full-2.txt`).
+
+## THIS IS ROUND 2 (Reviewer A, head 01591af, verdict NO_NEW_CRITICAL_MAJOR)
+
+Evidence: `C:/Users/rwsmy/clearwater-review-evidence/wp3.15/r2/` (prompt with the round-1 findings and
+rulings listed, diff, `full-transcript.txt`, `review.txt`, `adjudication.md`, md5s). The reviewer could
+not run uv but read the pre-run summaries in the worktree (`work/test-summary.txt`,
+`work/config-tests-verbose.txt`) and ran two probes itself (EXECUTED). Probe READY passed; gpt-5.6-sol
+high; footer present; 12 `^ succeeded in`; the reviewer opened no ledger file. Round 1's five fixes
+were verified: no reopened findings.
+
+| # | Sev | Tag | Where | Finding | Adjudication |
+|---|---|---|---|---|---|
+| 1 | MINOR | EXECUTED | log.py:46 | UTF-8 multibyte records can exceed the rotation threshold by more than a byte per line (the handler counts characters) | VALID refinement of round-1 #4, in-envelope; cleanup: say it in the docstring and pin with a test |
+| 2 | MINOR | EXECUTED, OUT-OF-ENVELOPE | presets.py:168 | name length counts code points; 100 CJK characters give a 305-byte file name, over the 255-byte POSIX component limit | VALID, banked (non-Windows, not run); cheap cleanup: also cap the UTF-8 byte length |
+| 3 | MINOR | REASONED | presets.py:282 | `list_presets` follows symlinks that `load/rename/delete/export` refuse | VALID, in-envelope; cleanup: list skips symlinks |
+| 4 | MINOR | REASONED | presets.py:360 | a comment says Windows paths compare case-insensitively but the code compares `.name` strings | VALID, comment wrong; cleanup: fix the comment |
+
+Convergence: zero NEW blocking findings, so the loop terminates. The four non-blocking findings are
+fixed once in the terminating cleanup (not yet applied; waiting on the dispatcher's go).
