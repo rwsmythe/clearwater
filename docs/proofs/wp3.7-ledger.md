@@ -176,4 +176,37 @@ with a `BoxError`, and the walk always advances.
 
 | Round | Counts (crit/major/minor) | In-env / out | NEW / REOPENED | Reverts | Fix type | Transport / CLI | Depth |
 |---|---|---|---|---|---|---|---|
-| 0 (mapping tables) | -- | -- | -- | -- | -- | -- | (dispatcher) |
+| 0 (mapping tables) | -- | -- | -- | -- | -- | -- | 90,520 (cell_depth.py, 17 turns) |
+
+### Round-0 rulings (orchestrator gen 5, applied)
+
+- Q1 AMENDED: a rotation that is not a multiple of 90, or a mirrored matrix, is refused
+  (`VideoProbeError` kind `"unsupported"`, message names the angle or says "mirrored"); no rounding.
+- Q2 ACCEPTED: a malformed GPMF atom gives `gopro=None` and one structural warning on the
+  `clearwater.io.video.probe` logger (no bytes, no values); no fault; GP-Log by `PTCL` is
+  unavailable for that file.
+- Q3 ACCEPTED as tabled. Q4 ACCEPTED, with: (i) without `nb_frames` only `partial file` and the
+  `C` flag apply; (ii) the no-false-positive proof covers every intact sample (done below).
+- Locator public: `clearwater.io.video.find_tool(name)`.
+
+### Build notes (differences from the round-0 text)
+
+- Command 1 names its fields (`-show_entries format=format_name:stream=<fields>:stream_side_data=
+  rotation,displaymatrix`) instead of `-show_format -show_streams`: container and stream tags
+  (identifiers, timecode, creation time) are never requested. Same JSON for every field used.
+- Command 3 uses `-read_intervals <t>%+86400`, not `<t>%`. MEASURED on ffprobe 9.0.2: an
+  open-ended interval returned a partial frame list with exit 0 and empty stderr about 1 run in
+  50 (hevc10: 19 of 400 at `0.000000%`, 14 of 500 at `0.5%`), so the first build reported
+  `unreadable_tail` on an intact sample once in 160 probes. With an explicit end: 0 of 500 on three
+  samples and 0 of 400 probes of four samples. Pinned by a test on the command.
+- `clearwater.io.video.probe` the function shadows the submodule attribute of the same name
+  (the IF-5 name and the brief's file name collide); callers use the function, tests fetch the
+  module with `importlib.import_module`.
+
+### Verification record (own pass, before Reviewer A)
+
+| Item | Status |
+|---|---|
+| Flaky `unreadable_tail` on an intact sample (open-ended read interval) | suspected by a once-failing test; confirmed by a 400-run loop; fixed (explicit end); stress 400 probes clean |
+| All 35 real clips of the footage folder (read only) probed | confirmed: 0 faults, 0 errors, all CFR, rotation 0, `yuvj420p` full; 34 carry GoPro settings, the edit has none; 54.8 s total, GX011625 (14,938 frames, 4K) 1.5 s |
+| Gates | ruff check, ruff format --check, mypy strict clean; own tests 131 passed (full pytest awaits a window) |
