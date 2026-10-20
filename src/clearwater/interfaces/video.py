@@ -35,6 +35,7 @@ class VideoStreamInfo:
         nb_frames: The container's frame count, or None when it does not say.
         rotation: The display-matrix rotation in degrees (D105), FFmpeg convention (counter-
             clockwise positive), normalised to 0, 90, 180 or 270; 0 when there is no matrix.
+            ``tools/inventory.py`` reports the opposite sign (clockwise) in its report column.
         vfr: True when the frame times are not constant (D95).
     """
 

@@ -21,7 +21,8 @@ type ParameterValue = bool | int | float | str | None
 """The value of one method parameter: its default, its neutral value, or a user setting.
 
 ``None`` appears only for a parameter that can be switched off
-(for example a gain cap, D100); enum values are ``str``.
+(``Parameter.nullable``, for example a gain cap) or whose default is ``None``; enum values are
+``str``.
 """
 
 type Statistics = Mapping[str, NDArray[Any]]
@@ -43,6 +44,9 @@ class Parameter:
         label: The GUI label.
         help: The GUI help text.
         neutral: The value that makes the method an identity (V9).
+        nullable: True when None is a legal value, for example a disabled gain cap (D52); added
+            by the AD-20 amendment of 2026-10-20 (defaulted and last, so every construction stays
+            valid).
     """
 
     name: str
@@ -55,6 +59,7 @@ class Parameter:
     label: str
     help: str
     neutral: ParameterValue
+    nullable: bool = False
 
 
 @dataclass(frozen=True)

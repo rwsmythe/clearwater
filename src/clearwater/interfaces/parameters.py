@@ -249,7 +249,7 @@ class ParameterProblem:
 def _type_problem(parameter: Parameter, value: ParameterValue) -> str | None:
     """Return why ``value`` is not of the parameter's declared type, or None when it is."""
     if value is None:
-        return None if parameter.default is None else "null is not allowed"
+        return None if parameter.nullable or parameter.default is None else "null is not allowed"
     if parameter.type == "bool":
         ok = isinstance(value, bool)
     elif parameter.type == "int":
@@ -269,8 +269,8 @@ def validate_parameter_set(
     Checks the method id, unknown names, each value's type, ``float``/``int`` minimum and
     maximum (inclusive), and ``enum`` choices. A ``float`` parameter accepts an ``int`` (a
     hand-written preset may say ``1``); a ``bool`` is never a number.
-    A parameter missing from the set is not a problem: sets may be partial and the method default
-    applies.
+    None is legal where the parameter is ``nullable`` or its default is None. A parameter
+    missing from the set is not a problem: sets may be partial and the method default applies.
 
     Args:
         parameter_set: The set to check.

@@ -155,6 +155,25 @@ PARAMS = (
 )
 
 
+def test_parameter_nullable_is_the_last_defaulted_field() -> None:
+    fields = dataclasses.fields(Parameter)
+    assert fields[-1].name == "nullable" and fields[-1].default is False
+    assert Parameter("a", "int", 1, 0, 2, None, "basic", "A", "h", 0).nullable is False
+
+
+def test_null_is_legal_where_nullable_or_default_is_none() -> None:
+    gain_cap = Parameter(
+        "red_gain_cap", "float", 2.0, 0.0, None, None, "advanced", "R", "h", 2.0, True
+    )
+    plain = Parameter("gamma", "float", 1.5, 0.0, None, None, "advanced", "G", "h", 1.0)
+    ok = _set({"red_gain_cap": None})
+    assert validate_parameter_set(ok, "c3", (gain_cap,)) == []
+    assert _kinds(validate_parameter_set(_set({"gamma": None}), "c3", (plain,))) == ["wrong_type"]
+    assert _kinds(validate_parameter_set(_set({"red_gain_cap": None}), "c3", (plain,))) == [
+        "unknown_name"
+    ]
+
+
 def _set(parameters: dict[str, Any], method: str = "c3") -> ParameterSet:
     return ParameterSet(method, parameters, CREATED, "0.1.0")
 
