@@ -94,7 +94,7 @@ Each accepted package had its return report posted to CHARC and an info-update t
 | WP1.4 | 2026-10-19 | `91f5775` | `docs/proofs/wp1.4-accept.md`; 2nd B adjudicated at the gate; DR-23..DR-26 | CONFIRMED (`6c5d88685e64a37c`; finding 3 upheld; DR-26 stays banked) |
 | WP-T2 | 2026-10-19 | `8c9d780` | `docs/proofs/wp-t2-accept.md`; DR-24 closed, DR-27 | CONFIRMED (`d40217a81696cc03`; B rejection upheld; suite re-run deferred past Part B) |
 | WP1.2 Part B | 2026-10-19 | `2dd06cf` | `docs/proofs/wp1.2b-accept.md`; B #2 non-blocking, banked; DR-28; depth breach recorded | CONFIRMED (`cb61a4e41f625d73`; patch-id erratum) |
-| WP1.3D | 2026-10-20 | `7f9fea1` | `docs/proofs/wp1.3d-accept.md`; B #1 blocking (candidate labels) -> one remediation; B #2 `NO_NEW_CRITICAL_MAJOR`; DR-29 | PENDING |
+| WP1.3D | 2026-10-20 | `7f9fea1` | `docs/proofs/wp1.3d-accept.md`; B #1 blocking (candidate labels) -> one remediation; B #2 `NO_NEW_CRITICAL_MAJOR`; DR-29 | CONFIRMED (`c6bda8a38146274f`) |
 
 - **WP1.2 Part A, raised to CHARC:**
   - approval of the Windows-only `_windows_power()` in `bench.py` (instrument only, guarded);
