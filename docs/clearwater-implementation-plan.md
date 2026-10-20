@@ -1,6 +1,6 @@
 # Clearwater — Implementation Plan
 
-**Version:** 1.1 (draft) -- amended 2026-10-19 for spec v0.5.3 (chapter handling deferred to v2; 3C default)
+**Version:** 1.2 (draft) -- amended 2026-10-20 for spec v0.5.4 (Gate 1 option C: WP3.21 optimisation package; recording-group suffix removed from WP3.13); 1.1 amended 2026-10-19 for spec v0.5.3 (chapter handling deferred to v2; 3C default)
 **Date:** 13 October 2026
 **Built on:** Specification v0.5 (`underwater-correction-spec.md`)
 **Status:** Ready for owner review. Both inputs the plan left open are CLOSED: the laptop's CPU and graphics card (WP0.1, 2026-10-14) and chapter handling (CP1, 2026-10-19: deferred to v2, spec v0.5.3).
@@ -308,10 +308,11 @@ All packages depend on WP2.2 (interfaces) and use WP2.3 (fixtures). The "Depends
 | WP3.13 | Output naming and safe writing | S | — | §8.3–8.4; D34–D36, D83–D85, D87 | V10, V11 |
 | WP3.14 | Export jobs and batch | L | WP3.13 | §8, G7, G8; D43–D45, D80, D81, D111 | V4, V11, V16 |
 | WP3.15 | Presets, settings and logging | M | — | D37, D38, D88–D90; N9, N11 | V13 |
+| WP3.21 | Optimisation package (Gate 1 option C, 2026-10-20): device-resident pipeline, upload/download overlap, FFT or recursive Gaussian for 3C; exclusive re-measure on GX011627 and GX011625; target about 10 min/min at 4K | M | WP3.4, WP3.9, WP3.10, WP3.14 | D106, N6; gate report Result 1 | V16 (re-run at WP5.2) |
 
 - **WP3.11** runs the decode pass that stores proxies; computes statistics stage by stage from the proxies, each stage using the smoothed results of earlier ones; applies the centered, time-based smoothing; limits recomputation after a parameter change to frames near the one displayed; supplies per-frame statistics for the provisional preview; and supports cancel. It is built and tested against a stub method and a stub frame source, so it does not wait for WP3.4 or WP3.9.
 - **WP3.12** stores and retrieves proxies keyed by file size, modification date and cache format version, evicts oldest-first at the size limit, and clears on request. It holds only results that depend on the source file alone.
-- **WP3.13** builds output paths with the suffix and collision numbering, shares one collision suffix across a recording group, writes to a temporary name and renames on success, removes leftovers at start, and estimates disk space.
+- **WP3.13** builds output paths with the suffix and collision numbering, writes to a temporary name and renames on success, removes leftovers at start, and estimates disk space.
 - **WP3.14** runs photo export, video export (decode, render, encode as a stream, within the memory limits of N4) and the batch queue, with progress, cancel, skip-and-log on failure, and an end-of-run report (IF-8).
 - **WP3.15** provides the preset store with method and format version, import and export, the starter presets, persistent settings and last-used parameters, and the rotating log.
 

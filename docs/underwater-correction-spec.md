@@ -2,8 +2,8 @@
 
 ## Specification
 
-**Version:** 0.5.3 (draft)
-**Date:** 13 October 2026
+**Version:** 0.5.4 (draft)
+**Date:** 20 October 2026
 **Status:** Second review (10 concerns, 6 planning questions) worked through with the owner and incorporated. Requirements are stable for implementation planning. Items left to the design stage are listed in Section 14.1. Open decisions, including scope items that depend on test results, are listed in Section 14.2.
 
 **Change log**
@@ -14,6 +14,7 @@
 - 0.5 — Incorporated review of v0.4 as decisions D97–D117. Added staged statistics, white-balance gain clamp, prototype gate (replacing the feasibility gate), footage inventory, container spike, export performance target, CPU/GPU-portable core, provisional preview, photo memory limits and CPU fallback, synthetic flicker test, cache versioning, output chroma format. Deferred ProRAW/DNG. Amended D14, D30, D31, D42, D46, D57, D61, D62, D64, D68, D69, D71. Withdrew D23, D77, D78, D79. Split Section 14 into design items and open decisions; added Section 15.2.
 - 0.5.1 — Text only (owner-approved 2026-10-15): recorded the measured target machine (WP0.1 environment report, 2026-10-14) in D117, Section 12, Section 14.2 (item closed) and Section 15.2 Q1. No decision changed.
 - 0.5.2 — Text only (owner-approved 2026-10-15): D60 closed — no GoPro `.LRV` proxies exist for this project (sidecars deleted at cloud upload); Clearwater generates its own proxy (Section 7.3). Section 14.1 item closed; the `.LRV` leg removed from the analysis-speed measurement (Section 7.3, Section 13.1). No decision changed in substance.
+- 0.5.4 — Prototype gate outcomes and WP2.1 design decisions recorded (owner-approved 2026-10-20 ~16:00Z: "Gate 1: Option C.  2. Keep.  3. approve 0.5.4"). D106 tuned to an interim 25 min/min with a named Phase 3 optimisation package (Gate 1, option C); D100 caps KEPT; D98 compared (no visible difference, one stage permitted); D94 reading by presentation effect (AD-22); G12 gains force-CPU and its first-run defaults; D75 names and provisional mapping; D63 HEIC rule (AD-24); N1 exception for the Windows pipe buffer (AD-23); Section 6 defaults, 7.2 smoothing default, Section 12 proxy-bounds measurement recorded; 14.1 items marked DECIDED with their AD numbers; chapter- and recording-group remnants removed from 7.3, V10 and V17. Design: `docs/architecture.md`, `docs/decisions.md`.
 - 0.5.3 — Owner decisions 2026-10-19 (CP1, CP2; owner-approved 2026-10-19: "approved as 0.5.3"). (a) D16 amended: 3C is the default channel-compensation method; Ancuti 2018 (red, optional blue) remains selectable. (b) Chapter handling deferred to v2: D21, D33, D80, D82 and the recording-group suffix of D83 marked deferred; Section 5.5 replaced; G11 and V12 deferred; the chapter clauses removed from G7, V3 (and D64's seam threshold), V4, Sections 8.2 and 8.3 and UC2/UC3; Section 14.2 item closed. Each file is one clip in v1.
 
 ---
@@ -94,7 +95,7 @@ Decisions marked *(amended)* were changed by a later decision; the body of the s
 | D60 | GoPro .LRV proxies not available for this project (sidecars deleted at cloud upload, owner 2026-10-15); Clearwater generates its own proxy (7.3). CLOSED. |
 | D61 | *(amended by D97)* Plug-in interface: ordered statistic stages, analyze per stage, smoothing declaration, parameter and stage dependencies, render, parameter schema |
 | D62 | *(amended by D105)* Video output fidelity: timing, audio sync and display orientation mandatory; creation date/time, GPMF telemetry, timecode and camera atoms best-effort |
-| D63 | Photo orientation: pixels rotated, Orientation tag reset; thumbnail dropped, dimensions updated, Software set, HEIC gain/depth maps dropped |
+| D63 | Photo orientation: pixels rotated, Orientation tag reset; thumbnail dropped, dimensions updated, Software set, HEIC gain/depth maps dropped. HEIC rule (0.5.4, AD-24, provisional until an owner photo is read): the file's `irot`/`imir` transforms are applied by the reader; the EXIF Orientation tag is applied additionally only when no `irot` transform is present |
 | D64 | *(amended by D112; amended 0.5.3)* V3 thresholds: flicker ≤ 25% of the unsmoothed baseline, measured on a synthetic clip (the chapter-seam threshold is deferred with chapter handling) |
 | D65 | V2 pass rule: corrected preferred on ≥ 80% of the test set and no obvious artifacts |
 | D66 | V7: UI responds within 100 ms during processing |
@@ -106,7 +107,7 @@ Decisions marked *(amended)* were changed by a later decision; the body of the s
 | D72 | Timeline scrubbing shows proxy frames while dragging, full-resolution corrected frame when stopped |
 | D73 | "Unsupported HDR" = HLG or PQ transfer tag; GoPro plain "HDR video" mode output verified with a test clip at design; GP-Log detection best-effort |
 | D74 | Unavailable encoder options shown disabled with a reason |
-| D75 | Video quality set by named levels, mapped per encoder |
+| D75 | Video quality set by named levels High / Standard / Draft, mapped per encoder (provisional mapping AD-12: NVENC HEVC cq 18 / 23 / 28, libx265 crf 18 / 23 / 28; verified at WP3.10) |
 | D76 | Optional 10-bit output for 8-bit sources, off by default |
 | D77 | *(withdrawn by D116)* DNG variants: whatever the raw library reads; others refused with a clear message |
 | D78 | *(withdrawn by D116)* Raw development output: Display P3, display-encoded |
@@ -125,19 +126,19 @@ Decisions marked *(amended)* were changed by a later decision; the body of the s
 | D91 | Clearwater version and parameters embedded in output metadata; on by default, can be turned off |
 | D92 | Reproducibility: same inputs and parameters give output identical within tolerance |
 | D93 | Distribution: free, open source, GPL-2.0-or-later; bundled library license compatibility confirmed at packaging |
-| D94 | Per-frame timestamps, start offset and edit list preserved and verified |
+| D94 | Per-frame timestamps, start offset and edit list preserved and verified. *(0.5.4 reading, AD-22)* Where only the encoder's composition-offset convention differs from the source's, "copied, not recalculated" is read by presentation effect: pts sequence, start offset, duration and first displayed frame exact; the as-written `media_time` may differ |
 | D95 | Variable-frame-rate input processed with timing preserved; smoothing window defined in time, not frames (tested per D115) |
 | D96 | Weight-map temporal smoothing is conditional: added to v1 if V3 fails or shimmer is seen in V2 |
 | D97 | Whole-frame statistics are analyzed in ordered stages; each stage is measured using the smoothed results of the stages before it. A method may declare a single stage |
-| D98 | Staged analysis is the v1 default; staged and flat (single-stage) results are compared in the prototype gate, and flat may be adopted if the difference is not visible |
+| D98 | Staged analysis is the v1 default; staged and flat (single-stage) results were compared in the prototype gate (owner, CP2 2026-10-19: no visible difference); a method may declare one stage; the plug-in interface stays staged |
 | D99 | White-balance gain clamp: a maximum per-channel white-balance gain, in the Advanced panel, applying with either compensation method |
-| D100 | Gain caps (D40, D50, D52) are a fidelity-versus-noise control, not a noise mitigation; kept for now, and kept or dropped according to a prototype noise test |
+| D100 | *(decided 0.5.4)* Gain caps (D40, D50, D52) are a fidelity-versus-noise control, not a noise mitigation; **KEPT** (WP1.4b noise test, owner 2026-10-20: a tighter cap raises red noise on the deep frames as expected; the default cap 2.0 binds on 1 of 8 deep frames; 3C is the lowest-noise setting on every deep frame) |
 | D101 | Prototype gate replaces the feasibility gate, with six recorded results: speed, peak memory, look check, gain-cap noise test, staged-versus-flat comparison, container spike |
 | D102 | Footage inventory precedes the prototype gate; gaps are filled by new footage or the dependent test is marked pending |
 | D103 | Look check uses an informal bar: the owner judges, with no numeric threshold; failure cases and the decision on each are recorded |
 | D104 | Container spike: one real chapter re-encoded with no correction; source and output compared; result selects the video I/O approach and library |
 | D105 | Video fidelity priorities: per-frame timing, start offset, audio sync and display orientation are mandatory; other video metadata is best-effort |
-| D106 | Export performance target: about 3.3 minutes of processing per minute of footage, end to end, measured at 4K in the owner's actual recording modes; tunable after measurement. 5.3K is supported but best-effort on speed |
+| D106 | *(tuned 0.5.4, Gate 1 option C)* Export performance target: **interim, about 25 minutes of processing per minute of 4K footage on the owner's laptop** (measured unoptimised 2026-10-19: core 0.395 s/frame Ancuti 2018, 0.639 s/frame 3C; production export 14.6 min/min Ancuti, about 22 estimated with 3C), end to end; a named Phase 3 optimisation package (device-resident pipeline, upload/download overlap, FFT or recursive Gaussian for 3C; the large-buffer transport is already in the build) targets about 10 min/min and the figure is re-set from the WP5.2 re-measure. The original intent of about 3.3 min/min is recorded as not reachable at 4K on this machine by any identified route. 5.3K is supported but best-effort on speed |
 | D107 | Core is written so the same code runs on CPU or GPU from the start |
 | D108 | Provisional preview: on clip open the current frame is shown at once using its own unsmoothed statistics while analysis runs in the background |
 | D109 | Sparse analysis (statistics from a subset of frames) is held in reserve, considered only if measured analysis speed is unacceptable |
@@ -237,7 +238,7 @@ The formulas in the reference papers are authoritative over the summaries below.
 ### 6.2 Pipeline (per image/frame)
 1. **Channel compensation** (user-selectable; Section 6.3).
 2. **White balance** — gray-world style balancing of the compensated image.
-   - **Gain clamp (D99):** each channel's white-balance gain is limited to a maximum, set in the Advanced panel. The clamp applies with either compensation method, and to the gains actually used for rendering (the smoothed gains for video).
+   - **Gain clamp (D99):** each channel's white-balance gain is limited to a maximum (default 3.0, 0.5.4), set in the Advanced panel. The clamp applies with either compensation method, and to the gains actually used for rendering (the smoothed gains for video).
    - When the clamp limits a gain, the frame keeps some color cast instead of gaining noise. This is the pipeline's control for deep-water noise.
 3. **Derive two fusion inputs** from the white-balanced image:
    - Input 1: gamma-corrected version.
@@ -252,7 +253,7 @@ The formulas in the reference papers are authoritative over the summaries below.
 - **Red:** `Irc = Ir + α·(Ḡ − R̄)·(1 − Ir)·Ig` (additive; channel values in [0, 1]).
 - **Blue (optional, off by default; for turbid or plankton-rich water):** `Ibc = Ib + α·(Ḡ − B̄)·(1 − Ib)·Ig`.
 - α is the compensation strength (paper default 1).
-- **Gain cap (global strength cap):** per image/frame, the effective strength is reduced so that the mean added amount does not exceed a set multiple of the channel's original mean. Red and blue have separate caps (D50, D52). Because the cap is computed from whole-frame statistics, it is smoothed over time along with them.
+- **Gain cap (global strength cap):** per image/frame, the effective strength is reduced so that the mean added amount does not exceed a set multiple of the channel's original mean. Red and blue have separate caps (D50, D52), default 2.0 each, disabled by an empty value (0.5.4, AD-8). Because the cap is computed from whole-frame statistics, it is smoothed over time along with them.
 - **What the cap is for (D100):** it limits how much of the compensated channel is derived from green, which preserves true detail in that channel. It does not reduce noise. Less compensation leaves the channel's mean lower, so the gray-world step applies a larger gain to the original, noisy channel. The cap therefore trades fidelity against noise and overlaps with α.
 - **Status:** the caps are kept for now. The prototype gate measures red-channel noise on a deep frame with the caps on and off, and the caps are kept or dropped from that result.
 
@@ -289,7 +290,7 @@ The parameter set is defined per method through the parameter schema (Section 10
 - Blue compensation on/off (Ancuti 2018 only)
 - White balance strength
 - Sharpening strength (fusion input 2)
-- Blend with original (0–100%)
+- Blend with original (0–100%; 0 = fully corrected, 100 = the original, 0.5.4 AD-8)
 
 **Advanced panel**
 - Red gain cap and blue gain cap (Ancuti 2018 only; subject to D100)
@@ -317,7 +318,7 @@ Each method declares its stages and statistics through the plug-in interface (Se
 1. **Decode pass:** every frame is decoded once and a low-resolution proxy of it is stored (Section 7.3). Runs in the background when a clip is opened, shows progress, and can be cancelled (cancel returns to an unloaded state).
 2. **Staged statistics (D97):** for each stage, in the method's declared order:
    - the stage's statistics are computed for every frame from the proxies, using the smoothed results of earlier stages;
-   - a centered (non-causal) temporal filter is applied to each statistic the method declares smoothable. The window is defined in time (seconds), not frames (D95).
+   - a centered (non-causal) temporal filter is applied to each statistic the method declares smoothable. The window is defined in time (seconds), not frames (D95). Default (0.5.4, AD-3, provisional): a 3-frame median followed by a Gaussian with a 2.0 s window. A genuine lighting step inside a clip is not hidden by the window (deep look check 2026-10-20); a step-aware variant is a design task for the analysis engine.
 3. **Render pass:** correct each frame using the smoothed statistics. Used for both preview and export.
 
 - A single-stage (flat) method is permitted. Staged and flat results are compared in the prototype gate (D98).
@@ -336,7 +337,7 @@ Each method declares its stages and statistics through the plug-in interface (Se
 - **Cache (D71, D113):**
   - Stored in app data, identified by source file size, modification date, and a cache format version. A version mismatch triggers re-analysis.
   - Holds only results that depend on the source file alone: the proxies, and any statistics that depend on neither parameters nor other frames.
-  - Smoothing, and statistics that depend on parameters or earlier stages, are always recomputed from the cache. Editing a chapter group therefore does not invalidate it.
+  - Smoothing, and statistics that depend on parameters or earlier stages, are always recomputed from the cache.
   - Reopening a clip skips the decode pass.
   - Default limit 20 GB, editable in settings; oldest entries removed first; a clear-cache button is provided.
 
@@ -405,7 +406,7 @@ Timing and audio sync are the mandatory part of video output fidelity (D105).
 - **G9** GUI stays responsive during analysis, export and batch processing (work runs off the UI thread).
 - **G10** Clear messages for unsupported, damaged, or untagged inputs (Sections 5.1, 5.3, 5.4, 6.5), including ProRAW/DNG.
 - **G11** *(deferred to v2, 0.5.3)* Chapter grouping review: display detected groups, allow adjustment, warn on non-consecutive groups.
-- **G12** Settings: output folder, output suffix, PNG bit depth, video encoder, quality level, 10-bit-for-8-bit option, provenance on/off, cache size limit, clear cache.
+- **G12** Settings: output folder, output suffix, PNG bit depth, video encoder, quality level, 10-bit-for-8-bit option, provenance on/off, cache size limit, clear cache, force CPU processing (Advanced; AD-9). First-run defaults (0.5.4): PNG 16-bit; encoder "auto" (NVENC when available, else the software encoder; provenance records the encoder actually used); quality Standard; cache 20 GB; provenance on; force CPU off.
 - **G13** Settings and last-used parameters persist between sessions (D89).
 
 Framework: PySide6.
@@ -432,7 +433,7 @@ The GUI, video and I/O layers depend only on this interface.
 
 ### 10.2 Resources and performance
 - **Target machine (D117):** the owner's laptop, 32 GB RAM. AMD Ryzen 9 7940HS (8C/16T), NVIDIA GeForce RTX 4070 Laptop GPU, 8 GB dedicated memory (confirmed 2026-10-14 by tools/environment_report.py).
-- **N1 Platform:** Windows 11 officially supported; no OS-specific code.
+- **N1 Platform:** Windows 11 officially supported; no OS-specific code without the architect's approval. Approved exception (0.5.4, AD-23): the enlarged anonymous-pipe buffer for frame transport on Windows, with an automatic portable fallback that yields identical frames and timestamps.
 - **N2 Language:** Python.
 - **N3 Compute (D107):** the core is written so the same code runs on CPU or GPU from the start. GPU is the expected path for export; CPU is the fallback.
 - **N4 Memory (D68, D110, D111):**
@@ -484,14 +485,14 @@ Standard underwater quality metrics (UIQM, UCIQE) are unreliable and are not use
 - **V7 Responsiveness:** UI responds within 100 ms during analysis, export and batch processing (D66).
 - **V8 Preview vs export:** screen-resolution preview vs downsampled full-resolution output differ by less than a threshold set at design; 1:1 view exact.
 - **V9 Identity round trip:** with every stage set to its neutral value (compensation and white balance strength 0, sharpening 0, gamma 1, and blend fully toward the corrected result), each stage reduces to identity and the output matches the input within a small color-difference tolerance for photos and video. This exercises the full decode → process → encode path, including color tags and ICC handling.
-- **V10 Naming and non-overwrite:** collision numbering, shared suffix per recording group, cross-format photo clashes, and no source or existing output ever overwritten.
+- **V10 Naming and non-overwrite:** collision numbering, cross-format photo clashes, and no source or existing output ever overwritten.
 - **V11 Cancel and failure cleanup:** cancel and simulated failures (crash, disk full) leave no partial outputs; leftover temporaries removed on next start.
 - **V12** *(deferred to v2, 0.5.3)* **Chapter grouping:** correct automatic grouping, sidecar exclusion, warning and smoothing reset for non-consecutive groups.
 - **V13 Preset round trip:** export then import reproduces identical parameters, method and version.
 - **V14 Prototype gate:** all six N5 results recorded, each with the decision it led to.
 - **V15 Memory:** peak RAM ≤ 16 GB on a 5.3K 8:7 clip and on the largest supported photo; peak graphics memory recorded; the CPU fallback engages when an image does not fit in graphics memory.
-- **V16 Performance (tunable):** export meets the N6 target at 4K in the owner's recording modes.
-- **V17 Cache:** reopening an unchanged clip skips the decode pass; a cache format version mismatch triggers re-analysis; editing a chapter group does not invalidate cached entries.
+- **V16 Performance (tunable):** export meets the N6 target at 4K in the owner's recording modes (interim 25 min/min per D106; re-set after the Phase 3 optimisation package at WP5.2).
+- **V17 Cache:** reopening an unchanged clip skips the decode pass; a cache format version mismatch triggers re-analysis.
 - **V18 Provisional preview:** on opening a clip, a corrected frame is shown before analysis completes, and it updates to the smoothed statistics afterwards.
 
 ---
@@ -505,7 +506,7 @@ Standard underwater quality metrics (UIQM, UCIQE) are unreliable and are not use
 - **Memory:** one full-color 32-bit float buffer is about 100 MB at 4K, 190 MB at 5.3K 16:9, 300 MB at 5.3K 8:7, 290 MB for a 24 MP photo and 580 MB for a 48 MP photo (exact pixel dimensions to be confirmed by the inventory). Fusion holds many such buffers, plausibly 2–4 GB per 5.3K frame and 6–12 GB for a 48 MP photo; these totals are extrapolations, not measurements. A large photo may not fit in graphics memory, hence the CPU fallback. If the largest photo exceeds 16 GB of RAM even on CPU, a size limit is revisited.
 - **Container fidelity:** FFmpeg-based muxing is believed to write its own edit list and timing tables and to drop data tracks and vendor atoms by default; unverified until the container spike. The spike decides whether D94 can be met as written with the simple approach or needs a repair pass.
 - **Staged recompute cost:** a parameter change invalidates all later stages; live preview depends on limiting the recompute to nearby frames.
-- **Statistics on downscaled frames:** normalization bounds computed on downscaled frames may differ from full-resolution extremes; robust statistics (e.g., percentiles) may be needed.
+- **Statistics on downscaled frames:** normalization bounds computed on downscaled frames differ from full-resolution extremes: measured 2026-10-19 on real 4K frames, the 540-line proxy's 0.5/99.5-percentile bounds are 11-14 % narrower than the full frame's and steadier frame to frame. Accepted as the method's defined behaviour (AD-4): statistics are measured on the proxy and used unchanged for preview and export, with a 0.02 floor on the range.
 - **HDR mode identification:** GoPro's plain "HDR video" mode output not yet verified (D73); GP-Log may be undetectable.
 - **PNG metadata support:** PNG stores EXIF in an `eXIf` chunk and color profiles in `iCCP`; viewer support varies.
 - **Encoder builds:** 10-bit software HEVC requires a high-bit-depth x265 build; NVENC 10-bit requires a supported GPU.
@@ -530,25 +531,27 @@ Test material generated by the project, not supplied by the owner: the synthetic
 
 ### 14.1 Deferred to design
 
-- Verification of GoPro plain "HDR video" mode output with a test clip.
-- GP-Log detection method and limitations.
+*(0.5.4: decided in WP2.1; the decision log is `docs/decisions.md`.)*
+
+- Verification of GoPro plain "HDR video" mode output with a test clip. — PENDING a clip (none in the inventory; AD-16).
+- GP-Log detection method and limitations. — DECIDED AD-16.
 - Feasibility of `.LRV` files as proxies (frame alignment) — CLOSED 2026-10-15: no `.LRV` files exist for this project's footage (D60).
-- Temporal smoothing filter type and default window (in seconds).
-- Proxy resolution and storage format.
-- Robust statistic choices for normalization bounds.
-- Confirmation of the κ→Cr, λ→Cb correspondence for 3C.
-- Direction of the "Blend with original" slider (which end is the original) and the neutral value of each parameter used by V9.
-- Default values where the papers leave them unspecified (e.g., gamma for input 1, kernel fractions, minimum pyramid level size, gain cap multiples) and the default maximum white-balance gain.
-- Mapping of named quality levels to each encoder's settings.
-- Reproducibility tolerance (N10), identity round-trip tolerance (V9), and preview-vs-export threshold (V8).
-- Preset file format and starter preset values.
-- Stage definitions for each compensation method, and the scheme for limiting recompute during live preview.
-- Mechanism for running the core on CPU or GPU, the GPU library, and how graphics memory need is estimated for the fallback.
-- How CPU or GPU use is reported to the user, and whether it can be overridden.
-- Video I/O library and approach, following the container spike, including how best-effort metadata is carried.
-- Chroma resampling method in each direction.
-- Design of the synthetic flicker clip (disturbance type, measured region).
-- Behavior of scrubbing, parameter changes and export while analysis is still running.
+- Temporal smoothing filter type and default window (in seconds). — DECIDED AD-3 (median then Gaussian, 2.0 s, provisional).
+- Proxy resolution and storage format. — DECIDED AD-5 (540-line proxy; store container by measured test in WP3.12).
+- Robust statistic choices for normalization bounds. — DECIDED AD-4.
+- Confirmation of the κ→Cr, λ→Cb correspondence for 3C. — CONFIRMED WP1.1.
+- Direction of the "Blend with original" slider (which end is the original) and the neutral value of each parameter used by V9. — DECIDED AD-8.
+- Default values where the papers leave them unspecified (e.g., gamma for input 1, kernel fractions, minimum pyramid level size, gain cap multiples) and the default maximum white-balance gain. — DECIDED AD-8.
+- Mapping of named quality levels to each encoder's settings. — DECIDED AD-12 (provisional).
+- Reproducibility tolerance (N10), identity round-trip tolerance (V9), and preview-vs-export threshold (V8). — DECIDED AD-11.
+- Preset file format and starter preset values. — DECIDED AD-13 (values shown at CP5).
+- Stage definitions for each compensation method, and the scheme for limiting recompute during live preview. — DECIDED AD-6, AD-7.
+- Mechanism for running the core on CPU or GPU, the GPU library, and how graphics memory need is estimated for the fallback. — DECIDED AD-1.
+- How CPU or GPU use is reported to the user, and whether it can be overridden. — DECIDED AD-9.
+- Video I/O library and approach, following the container spike, including how best-effort metadata is carried. — DECIDED AD-2, AD-23.
+- Chroma resampling method in each direction. — DECIDED AD-10.
+- Design of the synthetic flicker clip (disturbance type, measured region). — DECIDED AD-14.
+- Behavior of scrubbing, parameter changes and export while analysis is still running. — DECIDED AD-15.
 
 ### 14.2 Open decisions
 
@@ -561,7 +564,7 @@ Test material generated by the project, not supplied by the owner: the synthetic
 - Photo resolution (24 MP or 48 MP) and the video recording modes in use.
 
 **Decided by the prototype gate**
-- Gain caps kept or dropped (D100).
+- Gain caps kept or dropped (D100). — CLOSED 2026-10-20: KEPT (0.5.4).
 - Staged or flat statistics (D98).
 - Whether sparse analysis is needed (D109).
 
