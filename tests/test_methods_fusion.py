@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import inspect
 import json
+import logging
 import math
 import subprocess
 import sys
@@ -575,7 +576,14 @@ X4_PARAMETERS = ["sharpen_blur_fraction", "laplacian_fraction", "saliency_blur_f
 
 @pytest.mark.parametrize("parameter", X4_PARAMETERS)
 @pytest.mark.parametrize("value", [0.0, -0.01, math.nan, math.inf, 1e300])
-def test_x4_unusable_sigma_names_the_parameter(parameter: str, value: float) -> None:
+def test_x4_unusable_sigma_names_the_parameter(
+    parameter: str,
+    value: float,
+    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """One ValueError naming the parameter, its value and the short side; nothing before it."""
+    caplog.set_level(logging.DEBUG)
     for call in x4_calls(parameter, value):
         spy = _Spy()
         image = noise((40, 60, 3)).view(_Watched)
@@ -588,6 +596,8 @@ def test_x4_unusable_sigma_names_the_parameter(parameter: str, value: float) -> 
         assert isinstance(raised.value.__cause__, ValueError)
         assert str(raised.value.__cause__) in message  # check_sigma's reason, not restated
         assert spy.calls == 0 and _Watched.calls == 0  # nothing ran before the refusal
+    assert capsys.readouterr() == ("", "")
+    assert caplog.records == []
 
 
 @pytest.mark.parametrize("parameter", X4_PARAMETERS)
