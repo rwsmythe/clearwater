@@ -11,6 +11,7 @@ answers to open questions 1-6 bind).
 | 0 (design table) | - | - | - | - | - | - | none (no code) | - | 62,046 (dispatcher-read at the round-0 yield) |
 | 1 | 1 | 4 | 1 | 6 in / 0 out | 6 NEW / 0 REOPENED | 0 | PRODUCT code (d92ea8d) | WSL, codex-cli, gpt-5.6-sol high | 118,143 (dispatcher-read at the window grant) |
 | 2 | 0 | 3 (1 banked, out of envelope) | 1 | 2 in + 1 out / 0 | 3 NEW / 0 REOPENED | 0 | PRODUCT code (this commit) | WSL, codex-cli, gpt-5.6-sol high | 182,256 (dispatcher-read at the round-2 yield) |
+| 3 | 0 | 1 (cell proposes MINOR) | 0 | 1 in / 0 | 1 NEW / 0 REOPENED | 0 | pending | WSL, codex-cli, gpt-5.6-sol high | to be supplied |
 
 ## Round 0: design table (no product code yet)
 
@@ -260,3 +261,18 @@ Remediation not yet applied (the round ends here).
 Inner loop: 134 own tests passed, 0 skipped; ruff check, ruff format --check, mypy clean. Full pytest window
 to be requested; round 3 follows.
 Depth (dispatcher-read): round-2 remediation yield 189,425. Window for round 3 queued behind WP3.15, WP3.7, WP3.1.
+
+## Round 3 (Reviewer A, strong; head f4f14f8; window: 1272 passed in 511.21s, exit 0)
+
+Evidence `C:\Users\rwsmy\clearwater-review-evidence\wp3.13\r3\` (prompt with a THIS IS ROUND 3 section, diff,
+`full-transcript.txt`, `review.txt`, `adjudication.md`, `md5s.txt`). Assertions met. VERDICT:
+NEW_CRITICAL_MAJOR_FOUND: one finding, labelled MAJOR, EXECUTED, NEW; no round-1 or round-2 item reopened.
+
+1. A valid suffix combined with the source stem can make `final_output_path` return a name that matches the
+   temporary pattern (probe: source `holiday.clearwater.HEIC`, suffix `-partial-0123456789ab`); `plan_output`
+   raises ValueError for the same input. Confirmed. The cell proposes MINOR / non-blocking (a deliberately built
+   name, the ruled residual class; the write path is fail-closed) and the fix in the terminating cleanup: one
+   rule in both functions, a temporary-looking final name is treated as taken and numbering moves to `_2`
+   (replacing the ValueError). The severity downgrade is the cell's proposal and is open to the gate.
+
+Remediation not yet applied (the round ends here). Depth figure for this yield: dispatcher to supply.
