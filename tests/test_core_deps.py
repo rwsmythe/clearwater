@@ -60,8 +60,8 @@ def violations(source: str, in_core: bool) -> list[str]:
     """The dependency-rule violations of one module's source.
 
     Imports are ``import`` and ``from`` statements and calls of ``import_module`` or
-    ``__import__``, bare or as an attribute, with a string argument; reading ``xp`` is the
-    attribute ``.xp`` or ``getattr(x, "xp")``.
+    ``__import__``, bare or as an attribute, with a string argument (positional or keyword);
+    reading ``xp`` is the attribute ``.xp`` or ``getattr(x, "xp")``.
     """
     found = []
     for node in ast.walk(ast.parse(source)):
@@ -78,7 +78,13 @@ def violations(source: str, in_core: bool) -> list[str]:
                 for arg in node.args
             ]
             if called in IMPORT_CALLS:
-                names = [string for string in strings if string]
+                keywords = [
+                    keyword.value.value
+                    for keyword in node.keywords
+                    if isinstance(keyword.value, ast.Constant)
+                    and isinstance(keyword.value.value, str)
+                ]
+                names = [string for string in strings + keywords if string]
             elif called == "getattr" and strings[1:2] == ["xp"] and not in_core:
                 found.append(f"reads .xp at line {node.lineno}")
         for name in names:
@@ -119,12 +125,17 @@ def test_static_rule_catches_planted_violations() -> None:
         "p = importlib.__import__('cupyx')\n"
         "def g(backend):\n"
         "    return getattr(backend, 'xp').zeros(3)\n"
+        # Round 2 R2-2: the module name given by keyword.
+        "q = importlib.import_module(name='cupy')\n"
+        "r = __import__(name='cupyx')\n"
     )
     found = violations(planted, in_core=False)
     assert sorted(found) == [
         "imports cupy",
         "imports cupy",
         "imports cupy",
+        "imports cupy",
+        "imports cupyx",
         "imports cupyx",
         "imports cupyx.scipy",
         "imports cupyx.scipy.ndimage",

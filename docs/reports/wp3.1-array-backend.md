@@ -52,9 +52,9 @@ base `9735282`. Stack as locked: NumPy 2.5.4, SciPy 1.18.1, CuPy 14.2.0 (`cupy-c
    unimportable the CPU path runs and `select_backend` answers `CPU: CuPy not installed`. A
    static AST check over `src/clearwater` refuses any `cupy`/`cupyx` import (an `import` or
    `from` statement, or `import_module` / `__import__` called bare or as an attribute with a
-   literal name) and any `xp` read (`.xp` or `getattr(x, "xp")`) outside `clearwater.core`, and
-   any import of `prototype`/`tools`, with a planted control for each spelling. A name built at
-   run time escapes any static check.
+   literal name, positional or keyword) and any `xp` read (`.xp` or `getattr(x, "xp")`)
+   outside `clearwater.core`, and any import of `prototype`/`tools`, with a planted control for
+   each spelling. A name built at run time escapes any static check.
 
 ## Conventions fixed here
 
