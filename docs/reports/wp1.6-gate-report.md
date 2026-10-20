@@ -56,7 +56,7 @@ measured rows; it was not run.
 
 | # | Candidate | Effect | Cost |
 |---|---|---|---|
-| 6 | Raw transport with large writes (PyAV in-process, or a pipe/socket in 1 MB+ blocks) | removes most of the 0.089 s decode cost; also makes the analysis pass about 4-6x faster | low-moderate; WP2.1's transport choice |
+| 6 | Raw transport with large writes (PyAV in-process, or a pipe/socket in 1 MB+ blocks) | takes the decode stage from 0.089-0.094 s/frame toward the 0.016 s to-NUL figure (1 MB+ blocks: 4.0-5.4 ms/frame in the transport record); on the analysis pass the source estimates **-20 to -30 %** (it becomes decode- and statistics-bound); little for export while the core dominates | low-moderate; WP2.1's transport choice |
 | 1 | Device-resident pipeline, copy back the output only | measured -26 % end to end, -30 % core (0.395 -> 0.276 s ancuti2018; 0.639 -> 0.514 c3) | low |
 | 5 | Upload/download overlap on CUDA streams | about 0.02-0.03 s on top of #1 | moderate |
 | 3 | 3C large Gaussian by FFT or recursive filter | up to -0.24 s/frame for c3 only (its sigma-108, 865-tap Gaussian) | moderate; numerical agreement to re-verify |
@@ -92,9 +92,11 @@ Whichever option, N6's "about 3.3 min/min" sentence in D106 changes, which is a 
 (v0.5.4) and the owner's.
 
 **Sub-decisions (CHARC):**
-- **D109 sparse analysis: NOT named.** Analysis runs at 3.3-3.6 min/min pipe-bound, and the
-  pipe is what candidate #6 removes; the same pass measured 2.1 min/min in a lighter window. With
-  #6 the analysis pass is expected near 1 min/min. Sparse analysis stays in reserve.
+- **D109 sparse analysis: NOT named.** Analysis runs at 3.3-3.6 min/min pipe-bound (2.1 in the
+  least loaded window); with candidate #6 the source estimates -20 to -30 %, so about 2.3-2.9
+  min/min. That is acceptable: the analysis pass is one pass per clip beside an export of 15-25
+  min/min, so it is about a tenth of the processing time, and sparse analysis could save at most
+  that tenth while adding a statistics-accuracy risk. Sparse analysis stays in reserve.
 - The "no usable card / no 10-bit NVENC" row does not apply: NVENC 8/10-bit and CUDA decode
   are PROVEN (WP1.5).
 - Observation for the test plan: the full pytest suite now takes 8-15 minutes (771 tests), past
@@ -159,9 +161,9 @@ noise did NOT hold: it appears only on tiles whose source red is below the quant
 **Decision (OWNER at CP3, recommended KEEP):** the caps earn their place: a tighter cap raises
 noise as D100 expects, and the default cap neither hurts nor binds on most frames. KEEP means no
 change to WP3.2, the parameter schema, V1 or the spec. Sub-decisions for WP2.1 (CHARC, from the
-same evidence): clamp stays 3.0 (never binds; 1.5 leaves a cast to R/G 0.80 for <1 % noise
-gain); N{} range floor 0.02 (DR-14 closes at WP2.1; binds on no measured frame); the capped
-alpha is smoothed as a value, not derived from smoothed means (24 % less flicker).
+same evidence): clamp stays 3.0 (never binds; 1.5 binds on 5 of 8 frames, leaves a cast to R/G 0.80 and
+cuts red noise by less than 1 %); N{} range floor 0.02 (DR-14 closes at WP2.1; binds on no measured frame); the capped
+alpha is smoothed as a value, not derived from smoothed means (flicker 0.388 against 0.483, 20 % less).
 
 ## Result 5 — Staged versus flat statistics (D98; plan section 10 row 5) — ONE STAGE PERMITTED
 
