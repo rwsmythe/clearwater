@@ -18,7 +18,7 @@ import warnings
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
 import numpy as np
 import pytest
@@ -827,3 +827,102 @@ def test_overflowing_fraction_raises_the_x4_error(name: str) -> None:
     with pytest.raises(ValueError, match=rf"^{name}=1e\+308 gives a sigma of 1e\+308 px") as caught:
         compensate_c3(backend, a, **{**C3, name: 1e308})
     assert isinstance(caught.value.__cause__, OverflowError)
+
+
+class UfuncSpy(np.ndarray):
+    """A NumPy array that records every ufunc call made on it or on arrays derived from it.
+
+    Reductions (``mean``, ``sum``, ``max`` ...) reach ``__array_ufunc__`` as ``<ufunc>.reduce``
+    with ``axis`` normalised into the keywords, so a whole-frame measurement cannot hide from
+    it (R1-3); any arithmetic does too (R1-4). Arrays a third-party routine builds itself (the
+    SciPy filter's output) are plain arrays and not recorded.
+    """
+
+    log: ClassVar[list[tuple[str, str, int, Any]]] = []
+
+    def __array_ufunc__(self, ufunc: Any, method: str, *inputs: Any, **kwargs: Any) -> Any:
+        ndim = max(getattr(x, "ndim", 0) for x in inputs)
+        UfuncSpy.log.append((ufunc.__name__, method, ndim, kwargs.get("axis", 0)))
+        args = [x.view(np.ndarray) if isinstance(x, UfuncSpy) else x for x in inputs]
+        if "out" in kwargs:
+            kwargs["out"] = tuple(
+                o.view(np.ndarray) if isinstance(o, UfuncSpy) else o for o in kwargs["out"]
+            )
+        result = getattr(ufunc, method)(*args, **kwargs)
+        return result.view(UfuncSpy) if isinstance(result, np.ndarray) else result
+
+
+def spied(image: np.ndarray) -> np.ndarray:
+    UfuncSpy.log = []
+    return image.view(UfuncSpy)
+
+
+def spatial_reductions() -> list[tuple[str, str, int, Any]]:
+    """The recorded reductions over a spatial axis (anything but the channel axis of an image)."""
+    found = []
+    for entry in UfuncSpy.log:
+        _, method, ndim, axis = entry
+        if method not in ("reduce", "accumulate", "reduceat"):
+            continue
+        axes = range(ndim) if axis is None else np.atleast_1d(axis)
+        if not (ndim == 3 and {int(x) % 3 for x in axes} == {2}):
+            found.append(entry)
+    return found
+
+
+def check_render_never_measures(render: Callable[[CoreBackend, Any], Any]) -> None:
+    backend = NumpyBackend()
+    out = render(backend, spied(synthetic(0)))
+    assert isinstance(out, np.ndarray)
+    assert UfuncSpy.log, "the spy saw no ufunc call: the instrument is not live"
+    assert spatial_reductions() == []
+
+
+def ancuti_render(backend: CoreBackend, a: Any) -> Any:
+    return compensate_ancuti2018(
+        backend, a, means=(0.2, 0.5, 0.4), alphas={"red": 1.0, "blue": 0.5}
+    )
+
+
+def c3_render(backend: CoreBackend, a: Any) -> Any:
+    return compensate_c3(backend, a, **C3)
+
+
+def test_renders_never_measure_a_whole_frame_value() -> None:
+    """R1-3: no reduction over a spatial axis inside a render (AD-4's preview = export)."""
+    check_render_never_measures(ancuti_render)
+    check_render_never_measures(c3_render)
+    # the instrument sees the per-pixel mean over the channels that the 3C mask legitimately uses
+    assert ("add", "reduce", 3, 2) in UfuncSpy.log
+
+
+def test_planted_render_that_measures_is_caught() -> None:
+    def measuring(backend: CoreBackend, a: Any) -> Any:
+        means = tuple(float(m) for m in a.reshape(-1, 3).mean(axis=0, dtype=np.float64))
+        return compensate_ancuti2018(backend, a, means=means, alphas={"red": 1.0})
+
+    def frame_max(backend: CoreBackend, a: Any) -> Any:
+        a.max()
+        return c3_render(backend, a)
+
+    assert rejects(check_render_never_measures, measuring)
+    assert rejects(check_render_never_measures, frame_max)
+
+
+def check_validation_before_array_work(implementation: Callable[..., Any]) -> None:
+    backend = NumpyBackend()
+    a = spied(synthetic(0, (10, 12)))
+    with pytest.raises(ValueError, match=r"^c3_kernel_fraction=0\.0 gives a sigma"):
+        implementation(backend, a, **{**C3, "c3_kernel_fraction": 0.0})
+    assert UfuncSpy.log == []
+
+
+def test_x4_error_comes_before_any_array_work() -> None:
+    """R1-4: the X-4 failure is raised with no ufunc call made on the image."""
+    check_validation_before_array_work(compensate_c3)
+
+    def late(backend: CoreBackend, a: Any, **kwargs: float) -> Any:
+        backend.rgb_to_ycbcr(a, "bt709", "full")  # array work before the check
+        return compensate_c3(backend, a, **kwargs)
+
+    assert rejects(check_validation_before_array_work, late)

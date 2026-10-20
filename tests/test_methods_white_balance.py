@@ -13,7 +13,7 @@ import warnings
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
 import numpy as np
 import pytest
@@ -433,3 +433,47 @@ def test_gpu_render_stays_on_device_without_reading_back() -> None:
 def test_render_reads_no_whole_frame_value() -> None:
     """The module holds no reduction helper: the render cannot measure (AD-4, preview = export)."""
     assert {"channel_means", "mean"}.isdisjoint(vars(white_balance))
+
+
+class UfuncSpy(np.ndarray):
+    """A NumPy array that records every ufunc reduction made on it or on arrays derived from it
+    (``<ufunc>.reduce`` with ``axis`` normalised into the keywords; R1-3)."""
+
+    log: ClassVar[list[tuple[str, str, int, Any]]] = []
+
+    def __array_ufunc__(self, ufunc: Any, method: str, *inputs: Any, **kwargs: Any) -> Any:
+        ndim = max(getattr(x, "ndim", 0) for x in inputs)
+        UfuncSpy.log.append((ufunc.__name__, method, ndim, kwargs.get("axis", 0)))
+        args = [x.view(np.ndarray) if isinstance(x, UfuncSpy) else x for x in inputs]
+        if "out" in kwargs:
+            kwargs["out"] = tuple(
+                o.view(np.ndarray) if isinstance(o, UfuncSpy) else o for o in kwargs["out"]
+            )
+        result = getattr(ufunc, method)(*args, **kwargs)
+        return result.view(UfuncSpy) if isinstance(result, np.ndarray) else result
+
+
+def check_render_never_measures(render: Callable[[CoreBackend, Any, Any], Any]) -> None:
+    backend = NumpyBackend()
+    UfuncSpy.log = []
+    out = render(backend, synthetic(0).view(UfuncSpy), (1.4, 0.9, 1.1))
+    assert isinstance(out, np.ndarray)
+    assert UfuncSpy.log, "the spy saw no ufunc call: the instrument is not live"
+    assert [e for e in UfuncSpy.log if e[1] in ("reduce", "accumulate", "reduceat")] == []
+
+
+def test_render_never_measures_a_whole_frame_value() -> None:
+    """R1-3: the white-balance render makes no reduction at all."""
+    check_render_never_measures(apply_white_balance)
+
+    def measuring(backend: CoreBackend, a: Any, gains: Any) -> Any:
+        means = channel_means(backend, a)
+        return apply_white_balance(
+            backend,
+            a,
+            applied_gains(
+                gray_world_gains(means), white_balance_strength=1.0, max_white_balance_gain=3.0
+            )[0],
+        )
+
+    assert rejects(check_render_never_measures, measuring)
