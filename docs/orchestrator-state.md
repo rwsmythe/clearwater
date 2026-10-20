@@ -5,18 +5,15 @@
 
 ### Generation
 
-- **Generation 5** (`clearwater-orchestrator-20261020-0802`) ROLLED OVER 2026-10-20 at the depth
-  cap (~420K), at the first boundary with NO live cell: WP3.15, WP3.13 and WP3.7 merged; WP3.1's
-  cell (`wp31-cell2`) RETURNED after its speed row (see Live cells for what it left).
-  **Generation 6 starts here** (verify: `comms/.launch-sessions.json`). Earlier: gen 4
-  `clearwater-orchestrator-20261020-0524`, gen 3 `clearwater-orchestrator-20261019-2346`, gen 2
-  `clearwater-orchestrator-20261018-1442`, gen 1 `clearwater-orchestrator-20261014-1258`.
-- **Inbox:** gen 5 drained through CHARC `99e73cf967e2d559` (main hold) and STOPPED DRAINING at
-  its rollover announcement. You are the sole drainer (verify:
-  `uv run python scripts/role_mail.py list --role orchestrator`). CHARC's QA of the three wave-1
-  accept records may be waiting, and CHARC is HOLDING MAIN until a release post (see below).
+- **Generation 6** (`clearwater-orchestrator-20261020-1134`), online 2026-10-20 ~21:35Z, picked up
+  from gen 5's state 26b095d (gen 5 `clearwater-orchestrator-20261020-0802` rolled at ~420K with no
+  live cell). Earlier: gen 4 `clearwater-orchestrator-20261020-0524`, gen 3
+  `clearwater-orchestrator-20261019-2346`, gen 2 `clearwater-orchestrator-20261018-1442`, gen 1
+  `clearwater-orchestrator-20261014-1258`.
+- **Inbox:** gen 6 is the sole drainer (verify:
+  `uv run python scripts/role_mail.py list --role orchestrator`).
 - **CHARC is generation 2:** `clearwater-charc-20261020-0636`. Cue that exact name.
-- Bash-launch gauge at gen-5 bring-up: 26 ms. Re-measure at yours.
+- Bash-launch gauge at gen-6 bring-up: 39.6 ms. Re-measure at yours.
 
 ### Standing operator rulings
 
@@ -40,18 +37,10 @@
 
 ### Live cells
 
-- **None at rollover.** Retired (never message): `wp315-cell`, `wp313-cell`, `wp37-cell` (all
-  returned and merged), `wp31-cell` (stood down at its R1 yield, 275,011), `wp31-cell2` (returned
-  after the speed row; 252,301 / 136 turns at its final report), and every earlier cell.
-- **WP3.1 is NOT yet accepted.** Branch `wp3.1`, base `9735282`, author head `2bf0aff`
-  (code-final at `ea60356`; Reviewer A terminated at R2 with a cleanup; final full runs on
-  `ea60356`: 1311 passed / 0 skipped and, CuPy unimportable, 1205 passed / 106 skipped). Speed row:
-  DONE 20:57-21:30Z on code = `ea60356`, GX011627 4K; medians s/frame product / prototype: GPU (n=680) c3 0.5351 / 0.5355, ancuti2018 0.2370 / 0.2368, upload 0.0144; CPU (n=10, ruled subsample) c3 16.15 / 16.06, ancuti2018 6.58 / 6.63. CONTAMINATED: CHARC QA full pytest ~21:09-21:20Z overlapped GPU frames ~350-680 (frames 300-400 ran 13 % slow with an unidentified second python.exe); CPU kept frames clean; clean GPU median bounded 0.5015-0.5351 (c3) and 0.2295-0.2370 (ancuti2018); report `2bf0aff` names it. Ruled at gen 5: NO re-run (op-mix row; the whole-core row is WP3.4's). Ledger `.worktrees/wp3.1/docs/proofs/wp3.1-ledger.md`; report
-  `docs/reports/wp3.1-array-backend.md`; evidence `clearwater-review-evidence\wp3.1\r1`, `r2`.
-  Depths: first cell 108,729 (R0) / 228,618 (build) / 237,795 / 275,011 (R1, retired);
-  successor 182,305 (remediation) / 205,771 (R2 yield) / 252,301 / 136 turns at its final report (final).
-- Worktrees present: `.worktrees/wp3.1` only (keep until WP3.1 merges). The six merged wave-1
-  worktrees were REMOVED after CHARC's QA CONFIRMED (`3ee39aedcd59a4aa`); branches kept.
+- **None.** Retired (never message): `wp31-cell`, `wp31-cell2`, `wp315-cell`, `wp313-cell`,
+  `wp37-cell`, and every earlier cell.
+- Worktrees present: `.worktrees/wp3.1` and `.worktrees/wp3.1-mc` (keep until CHARC's QA of the
+  WP3.1 accept CONFIRMS; then remove per the practice note). Branches kept.
 
 ### Where things stand -- the successor starts HERE
 
@@ -62,17 +51,12 @@
    DR-36 (WP3.7) banked; DR-32 CLOSED at the config boundary. Return reports posted to CHARC and an
    info-update to the operator (thread wave1). CHARC QA CONFIRMED (`3ee39aedcd59a4aa`, every adjudication upheld incl. WP3.15's second B and
    DR-34). Main hold RELEASED (gen 5's return report, 20:58Z).
-2. **WP3.1 accept is YOURS.** The cell has returned (above). Its report also lists the open items (WP3.4 memory re-check and whole-core row; WP3.21 sync points; WP3.3 float32 percentile). Do: build `wp3.1-mc` from the author
-   head onto main (`git -c core.autocrlf=false`; copy `clearwater.local.toml`; `mkdir work`;
-   `uv sync` -- WP3.1 changes `pyproject.toml` and `uv.lock`: numpy and scipy to `[project]`
-   dependencies, `gpu = ["cupy-cuda12x[ctk]>=14.2,<15"]` extra, dev CuPy line kept); patch-id
-   check; static gates; the TWO full runs (normal and CuPy unimportable: a `python -c` wrapper
-   setting `sys.modules['cupy']` and `['cupyx']` to None then `pytest.main([...])`); Reviewer B
-   (template `clearwater-review-evidence\wp3.15\reviewB\run_review_B.sh` and the prompt shape of
-   `wp3.13\reviewB\review-prompt-B.md`; claims from the brief's task ladder and "Gate 1 section";
-   rulings R0-1..R0-10 plus CHARC's three additions, R1 F1-F7, R2 R2-1..R2-3 in the ledger; the
-   one `pyproject.toml` comment line the cell corrected outside the grant -- check it). Ask CHARC
-   to hold main from B to the merge. Accept record `docs/proofs/wp3.1-accept.md`.
+2. **WP3.1 ACCEPTED 2026-10-20 (gen 6)**: code + erratum/DR-37 `c1fd6ce`, record `f4acbd0`
+   (`docs/proofs/wp3.1-accept.md`). Patch-id `392da34a1461` author = candidate. Candidate
+   `1cf9564`: 1844 passed (618 s); CuPy unimportable 1738 passed / 106 skipped (361 s). Reviewer B
+   one pass NO_NEW_CRITICAL_MAJOR (4 minor, 2 advisory): B#4 report erratum at the gate; the rest
+   BANKED as DR-37 (a)-(e). Main gates on `c1fd6ce`: 1844 passed (538 s), harness 366. CHARC QA
+   pending. **WAVE 1 COMPLETE** (WP3.15, WP3.13, WP3.7, WP3.1).
 3. **Then:** wave-2 briefs (WP3.2, 3.3, 3.5, 3.6, 3.12, 3.16) at CHARC's commission
    (`docs/briefs/wp2.4-phase3-frame.md`). WP3.12 can go now (WP3.15 merged, X2). Carry these
    consumer notes into the briefs:
@@ -118,8 +102,9 @@ Each accepted package had its return report posted to CHARC and an info-update t
 | WP3.15 | 2026-10-20 | `da54a47` | `docs/proofs/wp3.15-accept.md`; DR-34; DR-32 closed; second blocking B adjudicated at the gate (B2#1 refuted by execution); stacked gate | CONFIRMED (`3ee39aedcd59a4aa`) |
 | WP3.13 | 2026-10-20 | `6dd5a00` | `docs/proofs/wp3.13-accept.md`; DR-35; A converged R3 (R1 critical fixed by tokened temporaries); B clean | CONFIRMED (`3ee39aedcd59a4aa`) |
 | WP3.7 | 2026-10-20 | `6e3417a` | `docs/proofs/wp3.7-accept.md`; DR-36; A terminated R2; B clean; main gates for the stack: 1671 passed | CONFIRMED (`3ee39aedcd59a4aa`) |
+| WP3.1 | 2026-10-20 | `f4acbd0` | `docs/proofs/wp3.1-accept.md`; DR-37; A terminated R2 (two cells, depth re-seat at R1); B clean (erratum at the gate); two full runs (CuPy and none); 1844 passed on main | pending |
 
-Kept branches (evidence; do not delete unasked): `wp3.15`, `wp3.15-mc`, `wp3.13`, `wp3.13-mc`, `wp3.7`, `wp3.7-mc`, `wp3.1` (unmerged), `wp2.3`, `wp2.3-mc`, `wp2.2`, `wp2.2-mc`, `wp1.2b`, `wp1.2b-b1`, `wp1.3d`, `wp1.3d-b1`,
+Kept branches (evidence; do not delete unasked): `wp3.15`, `wp3.15-mc`, `wp3.13`, `wp3.13-mc`, `wp3.7`, `wp3.7-mc`, `wp3.1`, `wp3.1-mc`, `wp2.3`, `wp2.3-mc`, `wp2.2`, `wp2.2-mc`, `wp1.2b`, `wp1.2b-b1`, `wp1.3d`, `wp1.3d-b1`,
 `wp1.4b`, plus the earlier packages' (`git branch`).
 
 ### Practice notes (this instance)
@@ -226,4 +211,4 @@ Kept branches (evidence; do not delete unasked): `wp3.15`, `wp3.15-mc`, `wp3.13`
   without a fresh ruling.
 - IF-5 `VideoSink.abort` docstring cites D84; it should be D44/D85 (CHARC: fix at the next
   interface touch, not before).
-- Open debt: DR-1, 2, 6, 7, 8, 10-20, 22, 23, 25-31, 33-36 (`docs/debt-register.md`; DR-32 CLOSED at the config boundary).
+- Open debt: DR-1, 2, 6, 7, 8, 10-20, 22, 23, 25-31, 33-37 (`docs/debt-register.md`; DR-32 CLOSED at the config boundary).
