@@ -213,9 +213,27 @@ def test_floor_bounds_dr14_amplification(backend: CoreBackend) -> None:
     [(math.nan, 0.1), (0.0, math.inf), (-math.inf, 0.0), (0.2, 0.1), (0.1,), (0.0, 0.1, 0.2)],
 )
 def test_bounds_guard(bounds: Sequence[float]) -> None:
-    backend = NumpyBackend()
+    check_bounds_guard(fusion.fusion_inputs, bounds)
+
+
+def check_bounds_guard(implementation: FusionInputs, bounds: Sequence[float]) -> None:
+    """Bad supplied bounds: one ValueError naming ``bounds``, before any array work."""
+    spy, image = watched()
     with pytest.raises(ValueError, match="bounds"):
-        fusion.fusion_inputs(backend, noise(), **inputs_kw(DEFAULTS), bounds=bounds)
+        implementation(spy, image, **inputs_kw(DEFAULTS), bounds=bounds)
+    assert spy.calls == 0 and _Watched.calls == 0
+
+
+def _late_guard(backend: CoreBackend, a: Any, **kw: Any) -> tuple[Any, Any]:
+    """Planted: the high-pass first, then the product (whose guard then refuses)."""
+    fusion.high_pass(backend, a, sharpen_blur_fraction=kw["sharpen_blur_fraction"])
+    return fusion.fusion_inputs(backend, a, **kw)
+
+
+def test_planted_guard_after_array_work() -> None:
+    check_bounds_guard(fusion.fusion_inputs, (0.2, 0.1))
+    with pytest.raises(AssertionError):
+        check_bounds_guard(_late_guard, (0.2, 0.1))
 
 
 def test_equal_bounds_accepted() -> None:
@@ -234,19 +252,18 @@ def test_equal_bounds_accepted() -> None:
     ],
 )
 def test_saliency_means_guard(means: list[tuple[float, ...]], field: str) -> None:
-    backend = NumpyBackend()
+    spy, image = watched()
     with pytest.raises(ValueError, match=field):
-        fusion.weight_maps(
-            backend, (noise(), noise(seed=1)), **weights_kw(DEFAULTS), saliency_means=means
-        )
+        fusion.weight_maps(spy, (image, image), **weights_kw(DEFAULTS), saliency_means=means)
+    assert spy.calls == 0 and _Watched.calls == 0
 
 
 @pytest.mark.parametrize("mean", [(50.0, 0.0), (50.0, 0.0, 0.0, 1.0), (50.0, math.nan, 0.0)])
 def test_saliency_mean_guard(mean: tuple[float, ...]) -> None:
+    spy, image = watched()
     with pytest.raises(ValueError, match="saliency_mean"):
-        fusion.saliency_weight(
-            NumpyBackend(), noise(), saliency_blur_fraction=0.003, saliency_mean=mean
-        )
+        fusion.saliency_weight(spy, image, saliency_blur_fraction=0.003, saliency_mean=mean)
+    assert spy.calls == 0 and _Watched.calls == 0
 
 
 # -- input checks ---------------------------------------------------------------------------
@@ -549,6 +566,12 @@ class _Spy(NumpyBackend):
     def asarray(self, a: Any, dtype: Any = np.float32) -> Any:
         self.calls += 1
         return super().asarray(a, dtype)
+
+
+def watched() -> tuple[_Spy, np.ndarray]:
+    """A fresh counting backend and a counted 40 x 60 image (counters at 0)."""
+    _Watched.calls = 0
+    return _Spy(), noise((40, 60, 3)).view(_Watched)
 
 
 def x4_calls(parameter: str, value: float) -> list[Callable[[Any, Any], Any]]:
