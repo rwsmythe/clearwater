@@ -104,3 +104,21 @@ No product code written; nothing outside the owned files changed.
   per-field rule; flagged for the report only.
 - `ColorDescription.bit_depth` and `VideoStreamInfo.bit_depth` are separate fields; the module
   reads the stream's and refuses a disagreement by name.
+
+## Build (after the round-0 ruling) and cumulative Reviewer A ledger
+
+Round-0 ruling (orchestrator, depth 90,237 / 23 turns): table accepted; STOP 1 is with CHARC;
+build everything except the numeric bounds of the swscale-pair assertion, which are module
+constants `PAIR_*` in `tests/test_color_roundtrip.py` marked pending the ruling. Built at
+`91f94f4` (module), `675ef84` and `aa9acd0` (tests), report `docs/reports/wp3.5-video-colour.md`.
+Decision taken in the build (new, flagged): `yuvj420p` with a limited range is refused by name,
+because swscale reads a `yuvj` format as full range whatever `in_range` says (measured: flat
+colours decode identically with `in_range=tv` and `pc`), so decode and encode would disagree.
+
+| Round | Head | Crit | Major | Minor | In / out of envelope | New / reopened | Reverts | Fix type | Transport | Depth |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | 3cadc37 | 0 | 0 | 7 | 3 in, 4 out | 7 new, 0 reopened | 0 | pending (cleanup: tests + 4 small product guards) | WSL codex, gpt-5.6-sol high, 141,016 tokens | (dispatcher fills) |
+
+Round 1 transcript and adjudication: `C:\Users\rwsmy\clearwater-review-evidence\wp3.5\r1\`
+(`review.txt`, `review.stderr.txt`, `adjudication.md`, `md5sums.txt`). Verdict
+NO_NEW_CRITICAL_MAJOR; the 7 minors are fixed once in the cleanup, which opens no round.
