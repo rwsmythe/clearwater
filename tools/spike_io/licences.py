@@ -44,9 +44,7 @@ if not __package__:
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from local_config import load_local_config
-
-WORK_SUBDIR = "wp2.1s"
-"""The folder inside the working folder that every output of this package goes to."""
+from spike_io.guard import WriteGuard
 
 DISTRIBUTIONS = ("av", "pillow", "pillow-heif", "numpy", "cupy-cuda12x", "scipy")
 """The Python distributions whose licence metadata is recorded."""
@@ -304,14 +302,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0] if __doc__ else None)
     parser.add_argument("--config", type=Path, default=None, help="local configuration file")
     arguments = parser.parse_args(argv)
-    config = load_local_config(arguments.config)
-    out = config.working_path / WORK_SUBDIR
-    footage = config.footage_path.resolve()
-    if out.resolve() == footage or footage in out.resolve().parents:
-        raise SystemExit(f"{out} is inside the footage folder")
-    out.mkdir(parents=True, exist_ok=True)
-    path = out / "licences.json"
-    path.write_text(json.dumps(collect(), indent=1) + "\n", encoding="utf-8")
+    guard = WriteGuard.for_config(load_local_config(arguments.config))
+    path = guard.root / "licences.json"
+    guard.check(path).write_text(json.dumps(collect(), indent=1) + "\n", encoding="utf-8")
     print(path)
     return 0
 

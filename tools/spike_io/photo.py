@@ -54,9 +54,7 @@ if not __package__:
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from local_config import load_local_config
-
-WORK_SUBDIR = "wp2.1s"
-"""The folder inside the working folder that every output of this package goes to."""
+from spike_io.guard import WriteGuard
 
 WIDTH = 64
 """Width of the upright synthetic image (not square, so a quarter turn changes the shape)."""
@@ -518,17 +516,24 @@ def encode_png16(
         The PNG file's bytes.
 
     Raises:
-        PhotoError: The array is not ``(h, w, 3)`` ``uint16``.
+        PhotoError: The array is not ``(h, w, 3)`` ``uint16``, or the profile name is not
+            1-79 Latin-1 bytes without NUL.
     """
     if pixels.dtype != np.uint16 or pixels.ndim != 3 or pixels.shape[2] != 3:
         raise PhotoError(f"need (h, w, 3) uint16, got {pixels.shape} {pixels.dtype}")
+    try:
+        name = profile_name.encode("latin-1")
+    except UnicodeEncodeError:
+        raise PhotoError(f"profile name {profile_name!r} is not Latin-1") from None
+    if not 1 <= len(name) <= 79 or b"\0" in name:
+        raise PhotoError(f"profile name {profile_name!r}: 1-79 bytes, no NUL")
     height, width = pixels.shape[:2]
     rows = np.zeros((height, 1 + width * 6), dtype=np.uint8)
     rows[:, 1:] = pixels.astype(">u2").view(np.uint8).reshape(height, width * 6)
     return (
         PNG_SIGNATURE
         + _chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 16, 2, 0, 0, 0))
-        + _chunk(b"iCCP", profile_name.encode("latin-1") + b"\0\0" + zlib.compress(icc))
+        + _chunk(b"iCCP", name + b"\0\0" + zlib.compress(icc))
         + _chunk(b"eXIf", exif.removeprefix(EXIF_PREFIX))
         + _chunk(b"IDAT", zlib.compress(rows.tobytes()))
         + _chunk(b"IEND", b"")
@@ -569,9 +574,19 @@ def pillow_png16_attempt(pixels: NDArray[np.uint16], icc: bytes, exif: bytes) ->
     return record
 
 
-def write_png8_pillow(path: Path, pixels: NDArray[np.uint8], icc: bytes, exif: bytes) -> None:
-    """Write an 8-bit RGB PNG with an ICC profile and EXIF through Pillow."""
-    Image.fromarray(pixels).save(path, "PNG", icc_profile=icc, exif=exif)
+def write_png8_pillow(
+    path: Path, pixels: NDArray[np.uint8], icc: bytes, exif: bytes, guard: WriteGuard
+) -> None:
+    """Write an 8-bit RGB PNG with an ICC profile and EXIF through Pillow.
+
+    Args:
+        path: The output file.
+        pixels: A ``(height, width, 3)`` ``uint8`` array.
+        icc: The ICC profile.
+        exif: EXIF bytes.
+        guard: The write guard; ``path`` is checked before the write.
+    """
+    Image.fromarray(pixels).save(guard.check(path), "PNG", icc_profile=icc, exif=exif)
 
 
 # --- PNG: readers ---------------------------------------------------------------------------
@@ -752,7 +767,13 @@ write one without the other.
 
 
 def write_heic(
-    path: Path, upright: NDArray[Any], bits: int, orientation: int, mode: str, icc: bytes
+    path: Path,
+    upright: NDArray[Any],
+    bits: int,
+    orientation: int,
+    mode: str,
+    icc: bytes,
+    guard: WriteGuard,
 ) -> bytes:
     """Write a HEIC fixture with pillow-heif's encoder (x265).
 
@@ -766,6 +787,7 @@ def write_heic(
         orientation: The orientation the file carries (1, 6 or 8).
         mode: One of :data:`HEIC_MODES`.
         icc: The ICC profile to embed (``prof`` type).
+        guard: The write guard; ``path`` is checked before the write.
 
     Returns:
         The EXIF bytes written (:func:`source_exif` of the stored size; Orientation 1 for
@@ -782,6 +804,7 @@ def write_heic(
         pixel_mode, data = "RGB;16", (stored.astype(np.uint16) << 6).tobytes()
     else:
         raise PhotoError(f"unsupported HEIC bit depth {bits}")
+    guard.check(path)
     tag = 1 if mode == "irot-only" else orientation
     exif = source_exif(tag, width, height)
     size = (width, height)
@@ -938,19 +961,20 @@ def read_heic(
 # --- The run --------------------------------------------------------------------------------
 
 
-def run(out: Path) -> dict[str, Any]:
+def run(out: Path, guard: WriteGuard) -> dict[str, Any]:
     """Write every fixture under ``out`` and return the record.
 
     Args:
         out: The output folder (created).
+        guard: The write guard; the folder and every file are checked before the write.
 
     Returns:
         The record: libraries, the profile check, the HEIC cases, the Pillow 16-bit attempt,
         the 16-bit stdlib PNG and the 8-bit Pillow PNG with their verifications.
     """
-    out.mkdir(parents=True, exist_ok=True)
+    guard.check(out).mkdir(parents=True, exist_ok=True)
     icc = display_p3_profile()
-    (out / "display-p3.icc").write_bytes(icc)
+    guard.check(out / "display-p3.icc").write_bytes(icc)
     profile = open_profile(icc)
     record: dict[str, Any] = {
         "libraries": {
@@ -975,7 +999,7 @@ def run(out: Path) -> dict[str, Any]:
             [("exif-only", 6), ("irot-only", 6)] if bits == 8 else []
         ):
             path = out / f"heic-{bits}bit-{mode}-o{orientation}.heic"
-            exif = write_heic(path, upright, bits, orientation, mode, icc)
+            exif = write_heic(path, upright, bits, orientation, mode, icc, guard)
             case = {"file": path.name, "bits": bits, "mode": mode, "orientation": orientation}
             case.update(read_heic(path, upright, bits, orientation, icc, exif))
             heic.append(case)
@@ -992,13 +1016,13 @@ def run(out: Path) -> dict[str, Any]:
     }
     record["pillow_png16"] = pillow_png16_attempt(pixels16, icc, edited)
     png16 = out / "rgb16-stdlib.png"
-    png16.write_bytes(encode_png16(pixels16, icc, edited))
+    guard.check(png16).write_bytes(encode_png16(pixels16, icc, edited))
     record["png16"] = {"file": png16.name, **verify_png16(png16, pixels16, icc, edited)}
     with Image.open(png16) as image:
         found = image.info.get("exif", b"")
     record["png16"]["exif_problems_pillow"] = exif_problems(found, source, WIDTH, HEIGHT)
     png8 = out / "rgb8-pillow.png"
-    write_png8_pillow(png8, pixels8, icc, edited)
+    write_png8_pillow(png8, pixels8, icc, edited, guard)
     record["png8"] = {"file": png8.name, **verify_png8(png8, pixels8, icc, edited)}
     found8 = dict(png_chunks(png8.read_bytes())).get("eXIf", b"")
     record["png8"]["exif_problems_stdlib"] = exif_problems(found8, source, WIDTH, HEIGHT)
@@ -1009,15 +1033,10 @@ def run(out: Path) -> dict[str, Any]:
     return record
 
 
-def _work_folder(config_path: Path | None) -> Path:
-    """Return ``<working folder>/wp2.1s/photo``, refusing a folder inside the footage folder."""
-    config = load_local_config(config_path)
-    out = config.working_path / WORK_SUBDIR / "photo"
-    footage = config.footage_path.resolve()
-    resolved = out.resolve()
-    if resolved == footage or footage in resolved.parents:
-        raise PhotoError(f"{out} is inside the footage folder")
-    return out
+def _work_folder(config_path: Path | None) -> tuple[WriteGuard, Path]:
+    """Return the write guard and ``<working folder>/wp2.1s/photo`` (created, checked)."""
+    guard = WriteGuard.for_config(load_local_config(config_path))
+    return guard, guard.folder("photo")
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -1026,10 +1045,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("command", choices=["run"])
     parser.add_argument("--config", type=Path, default=None, help="local configuration file")
     arguments = parser.parse_args(argv)
-    out = _work_folder(arguments.config)
-    record = run(out)
+    guard, out = _work_folder(arguments.config)
+    record = run(out, guard)
     path = out / "photo.json"
-    path.write_text(json.dumps(record, indent=1, default=str) + "\n", encoding="utf-8")
+    guard.check(path).write_text(json.dumps(record, indent=1, default=str) + "\n", encoding="utf-8")
     print(path)
     return 0
 

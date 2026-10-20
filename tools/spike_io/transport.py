@@ -86,12 +86,13 @@ if not __package__:
 from container_spike.compare import run_ffprobe, tool_env
 from local_config import find_footage_file, load_local_config
 from prototype import bench, clip
-
-WORK_SUBDIR = "wp2.1s"
-"""The folder inside the working folder that every output of this package goes to."""
+from spike_io.guard import WriteGuard
 
 CLIP_STEM = "GX011627"
 """The only clip of this spike (CHARC ``fa9d637063376263``)."""
+
+REFERENCE_KEYS = ("name", "size_bytes", "mtime_ns")
+"""What must match between the reference's clip and the clip opened now."""
 
 PROBE_FRAMES = 120
 """The window probe: row ``a`` on this many frames from the start."""
@@ -806,7 +807,8 @@ def identity_run(
 
     Returns:
         The record: every hash, the delivered pts and, against the reference, the
-        frame-count, hash and pts verdicts (and a lockstep difference if bytes differ).
+        frame-count, hash and pts verdicts (and a lockstep difference if bytes differ
+        while the frame counts match; a count mismatch is recorded without one).
 
     Raises:
         SpikeError: The decode failed.
@@ -831,7 +833,9 @@ def identity_run(
         }
         record["pts"] = pts_check(delivered[: len(hashes)], reference["pts_ffprobe"])
         record["side_channel_extra_entries"] = max(0, len(delivered) - len(hashes))
-        if not same:
+        # Frame by frame only on equal counts: lockstep pairs frames by index and would
+        # stop at the shorter stream, so a count mismatch is recorded as such instead.
+        if len(hashes) == len(want) and not same:
             record["difference"] = lockstep_difference(row, source)
     return record
 
@@ -955,6 +959,7 @@ def run_window(
     reference: Mapping[str, Any],
     out: Path,
     gate_script: Path | None,
+    guard: WriteGuard,
 ) -> dict[str, Any]:
     """Run one timed window and write its record to ``out`` after every step.
 
@@ -965,6 +970,8 @@ def run_window(
         reference: The reference record.
         out: The record file (rewritten after each step, so a crash keeps what ran).
         gate_script: Part B's idle-gate script (copied into the working folder), or None.
+        guard: The write guard; ``out`` and the gate's ``gate.jsonl`` are checked before
+            every write.
 
     Returns:
         The window record, with its contamination verdict.
@@ -985,7 +992,7 @@ def run_window(
     }
 
     def save() -> None:
-        out.write_text(json.dumps(record, indent=1) + "\n", encoding="utf-8")
+        guard.check(out).write_text(json.dumps(record, indent=1) + "\n", encoding="utf-8")
 
     def stray_check(after: str) -> None:
         check = bench.stray_processes()
@@ -995,7 +1002,7 @@ def run_window(
         save()
 
     if gate_script is not None:
-        record["idle_gate"] = idle_gate(gate_script, out.parent / "gate.jsonl")
+        record["idle_gate"] = idle_gate(gate_script, guard.check(out.parent / "gate.jsonl"))
     record["ambient_start"] = _ambient()
     started = time.perf_counter()
     stray_check("window start")
@@ -1090,16 +1097,11 @@ def summarise(windows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
 # --- command line -----------------------------------------------------------------------------
 
 
-def _work_folder(config_path: Path | None) -> tuple[Path, Path]:
-    """Return (the footage folder, ``<working folder>/wp2.1s/transport``), refusing overlap."""
+def _work_folder(config_path: Path | None) -> tuple[Path, WriteGuard, Path]:
+    """Return (the footage folder, the write guard, ``<working folder>/wp2.1s/transport``)."""
     config = load_local_config(config_path)
-    work = config.working_path / WORK_SUBDIR / "transport"
-    footage = config.footage_path.resolve()
-    resolved = work.resolve()
-    if resolved == footage or footage in resolved.parents:
-        raise SpikeError(f"{work} is inside the footage folder")
-    work.mkdir(parents=True, exist_ok=True)
-    return config.footage_path, work
+    guard = WriteGuard.for_config(config)
+    return config.footage_path, guard, guard.folder("transport")
 
 
 def _load(path: Path) -> dict[str, Any]:
@@ -1107,10 +1109,25 @@ def _load(path: Path) -> dict[str, Any]:
     return cast(dict[str, Any], json.loads(path.read_text(encoding="utf-8")))
 
 
-def _write(path: Path, record: Mapping[str, Any]) -> None:
-    """Write a JSON record and print its path."""
-    path.write_text(json.dumps(record, indent=1) + "\n", encoding="utf-8")
+def _write(path: Path, record: Mapping[str, Any], guard: WriteGuard) -> None:
+    """Write a JSON record, once ``guard`` allows the path, and print the path."""
+    guard.check(path).write_text(json.dumps(record, indent=1) + "\n", encoding="utf-8")
     print(path)
+
+
+def check_reference(reference: Mapping[str, Any], clip_now: Mapping[str, Any]) -> None:
+    """Refuse a reference built from another file than the clip opened now.
+
+    Args:
+        reference: The reference record (:func:`build_reference`).
+        clip_now: The clip's :meth:`clip.Source.identity` now.
+
+    Raises:
+        SpikeError: Any of :data:`REFERENCE_KEYS` differs (the message names them).
+    """
+    changed = [key for key in REFERENCE_KEYS if reference["clip"].get(key) != clip_now[key]]
+    if changed:
+        raise SpikeError(f"the reference belongs to another file ({', '.join(changed)} differ)")
 
 
 def window_label(text: str) -> str:
@@ -1131,6 +1148,27 @@ def window_label(text: str) -> str:
     if not text.isascii():
         raise argparse.ArgumentTypeError(f"label {text!r}: ASCII only")
     return text
+
+
+def positive_int(text: str) -> int:
+    """Accept a frame count only if it is a whole number of at least 1.
+
+    Args:
+        text: The value from the command line.
+
+    Returns:
+        The count.
+
+    Raises:
+        argparse.ArgumentTypeError: The value is not an integer, or is 0 or negative.
+    """
+    try:
+        value = int(text)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"{text!r} is not a whole number") from None
+    if value < 1:
+        raise argparse.ArgumentTypeError(f"{value} frames: at least 1")
+    return value
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -1158,40 +1196,39 @@ def main(argv: Sequence[str] | None = None) -> int:
     window.add_argument("--gate", type=Path, default=None, help="the idle-gate script")
     single = commands.add_parser("run", help="one timed run (development check)")
     single.add_argument("row", choices=sorted(ROWS))
-    single.add_argument("--frames", type=int, default=None)
+    single.add_argument("--frames", type=positive_int, default=None)
     summary_parser = commands.add_parser("summary", help="summarise window records")
     summary_parser.add_argument("windows", nargs="+", type=Path)
     args = parser.parse_args(argv)
 
-    footage, work = _work_folder(args.config)
+    footage, guard, work = _work_folder(args.config)
     if args.command == "summary":
-        _write(work / "summary.json", summarise([_load(path) for path in args.windows]))
+        _write(work / "summary.json", summarise([_load(path) for path in args.windows]), guard)
         return 0
     source = clip.open_source(find_footage_file(CLIP_STEM, footage))
     reference_path = work / "reference.json"
     if args.command == "reference":
-        _write(reference_path, build_reference(source))
+        _write(reference_path, build_reference(source), guard)
         return 0
     reference = _load(reference_path)
-    if reference["clip"]["size_bytes"] != source.size_bytes:
-        raise SpikeError("the reference belongs to another file")
+    check_reference(reference, source.identity())
     if args.command == "identity":
         for name in args.rows:
             record = identity_run(ROWS[name], source, reference)
             record["local"] = _local_now()
-            _write(work / f"identity-{name}.json", record)
+            _write(work / f"identity-{name}.json", record, guard)
         return 0
     if args.command == "window":
         gate = None if args.gate is None else args.gate.resolve()
         out = work / f"{args.label}.json"
         if out.resolve().parent != work.resolve():
             raise SpikeError(f"{out} is not inside {work}")
-        result = run_window(args.label, PLANS[args.plan], source, reference, out, gate)
+        result = run_window(args.label, PLANS[args.plan], source, reference, out, gate, guard)
         print(json.dumps(result["verdict"]))
         return 0
     run = timed_run(ROWS[args.row], source, reference, frames=args.frames)
     run.pop("intervals_s", None)
-    _write(work / f"dev-{args.row}.json", run)
+    _write(work / f"dev-{args.row}.json", run, guard)
     return 0
 
 

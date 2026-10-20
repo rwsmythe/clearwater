@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import struct
 import zlib
 from pathlib import Path
@@ -9,7 +10,9 @@ import numpy as np
 import pytest
 from PIL import Image, ImageOps
 
+from local_config import LocalConfig, LocalConfigError, load_local_config
 from spike_io import photo
+from spike_io.guard import OutputRefusedError, WriteGuard
 
 # --- An independent PNG reader for files Pillow wrote ---------------------------------------
 # Written for this test, separately from photo.py (it shares no code with the stdlib writer
@@ -61,6 +64,17 @@ def _test_decode_rgb8(data: bytes) -> np.ndarray[Any, Any]:
             out[x] = (line[x] + predictor) & 0xFF
         rows[y] = out
     return rows.astype(np.uint8).reshape(height, width, 3)
+
+
+@pytest.fixture(scope="session")
+def guard(tmp_path_factory: pytest.TempPathFactory) -> WriteGuard:
+    # Fixtures write only inside pytest's basetemp, and never into the configured footage.
+    try:
+        footage: Path | None = load_local_config().footage_path
+    except LocalConfigError:
+        footage = None
+    root = Path(os.path.realpath(tmp_path_factory.getbasetemp()))
+    return WriteGuard(root=root, footage=footage)
 
 
 @pytest.fixture(scope="module")
@@ -214,11 +228,11 @@ def test_planted_8bit_truncation_fails_by_name(tmp_path: Path, icc: bytes, edite
 
 
 def test_png8_pillow_write_verified_by_pyav_and_stdlib(
-    tmp_path: Path, icc: bytes, source: bytes, edited: bytes
+    tmp_path: Path, guard: WriteGuard, icc: bytes, source: bytes, edited: bytes
 ) -> None:
     pixels = photo.upright_image(8)
     path = tmp_path / "rgb8.png"
-    photo.write_png8_pillow(path, pixels, icc, edited)
+    photo.write_png8_pillow(path, pixels, icc, edited, guard)
     record = photo.verify_png8(path, pixels, icc, edited)
     assert photo.failures(record) == []
     assert record["chunk_order_stdlib"] == ["IHDR", "iCCP", "eXIf", "IDAT", "IEND"]
@@ -235,13 +249,13 @@ def test_png8_pillow_write_verified_by_pyav_and_stdlib(
 
 
 def test_planted_wrong_icc_byte_fails_by_name_png8(
-    tmp_path: Path, icc: bytes, edited: bytes
+    tmp_path: Path, guard: WriteGuard, icc: bytes, edited: bytes
 ) -> None:
     pixels = photo.upright_image(8)
     wrong = bytearray(icc)
     wrong[-3] ^= 0x10
     path = tmp_path / "wrong-icc8.png"
-    photo.write_png8_pillow(path, pixels, bytes(wrong), edited)
+    photo.write_png8_pillow(path, pixels, bytes(wrong), edited, guard)
     assert photo.failures(photo.verify_png8(path, pixels, icc, edited)) == ["iccp_identical_stdlib"]
 
 
@@ -250,22 +264,119 @@ def test_encode_png16_refuses_8bit_input(icc: bytes, edited: bytes) -> None:
         photo.encode_png16(photo.upright_image(8), icc, edited)  # type: ignore[arg-type]
 
 
+@pytest.mark.parametrize("name", ["", "x" * 80, "Display\0P3", "Display P3 \u2013 wide"])
+def test_encode_png16_refuses_an_invalid_profile_name(icc: bytes, edited: bytes, name: str) -> None:
+    with pytest.raises(photo.PhotoError, match="profile name"):
+        photo.encode_png16(photo.upright_image(16), icc, edited, profile_name=name)
+
+
+# --- The write guard (tools/spike_io/guard.py) ------------------------------------------------
+
+
+def _planted(tmp_path: Path) -> tuple[WriteGuard, Path, Path]:
+    # A root and a footage folder side by side, as the working and footage folders are.
+    base = Path(os.path.realpath(tmp_path))
+    root, footage = base / "work" / "wp2.1s", base / "footage"
+    root.mkdir(parents=True)
+    footage.mkdir()
+    (footage / "GX000000.mp4").write_bytes(b"footage")
+    return WriteGuard(root=root, footage=footage), root, footage
+
+
+def test_guard_allows_a_new_file_and_a_single_link_file_inside_the_root(tmp_path: Path) -> None:
+    guard, root, _ = _planted(tmp_path)
+    assert guard.check(root / "new.json") == root / "new.json"
+    (root / "kept.json").write_text("{}", encoding="utf-8")
+    assert guard.check(root / "kept.json") == root / "kept.json"
+    assert guard.folder("transport") == root / "transport"
+    assert (root / "transport").is_dir()
+
+
+def test_guard_refuses_a_dotdot_escape_by_name(tmp_path: Path) -> None:
+    guard, root, _ = _planted(tmp_path)
+    with pytest.raises(OutputRefusedError) as refused:
+        guard.check(root / ".." / "escape.json")
+    assert refused.value.reason == "outside"
+    with pytest.raises(OutputRefusedError) as refused:
+        guard.folder("..", "escape")
+    assert refused.value.reason == "outside"
+    assert not (root.parent / "escape").exists()
+
+
+def test_guard_refuses_an_absolute_path_elsewhere_by_name(tmp_path: Path) -> None:
+    guard, _, _ = _planted(tmp_path)
+    with pytest.raises(OutputRefusedError) as refused:
+        guard.check(Path(os.path.realpath(tmp_path)) / "elsewhere" / "record.json")
+    assert refused.value.reason == "outside"
+
+
+def test_guard_refuses_the_footage_folder_by_name(tmp_path: Path) -> None:
+    guard, root, footage = _planted(tmp_path)
+    for target in (root / ".." / ".." / "footage" / "GX000000.mp4", footage / "new.json"):
+        with pytest.raises(OutputRefusedError) as refused:
+            guard.check(target)
+        assert refused.value.reason == "footage"
+
+
+def test_guard_refuses_a_hard_link_by_name(tmp_path: Path) -> None:
+    guard, root, footage = _planted(tmp_path)
+    # A record name hard-linked to a footage file: writing it would truncate the footage.
+    os.link(footage / "GX000000.mp4", root / "reference.json")
+    with pytest.raises(OutputRefusedError) as refused:
+        guard.check(root / "reference.json")
+    assert refused.value.reason == "hard-link"
+    # Two names inside the root are refused just the same.
+    (root / "a.json").write_text("{}", encoding="utf-8")
+    os.link(root / "a.json", root / "b.json")
+    with pytest.raises(OutputRefusedError) as refused:
+        guard.check(root / "a.json")
+    assert refused.value.reason == "hard-link"
+    assert (footage / "GX000000.mp4").read_bytes() == b"footage"
+
+
+def test_guard_for_config_roots_at_working_wp21s(tmp_path: Path) -> None:
+    base = Path(os.path.realpath(tmp_path))
+    config = LocalConfig(footage_path=base / "footage", working_path=base / "work")
+    guard = WriteGuard.for_config(config)
+    assert guard.root == base / "work" / "wp2.1s"
+    assert guard.root.is_dir()
+    assert guard.footage == base / "footage"
+    with pytest.raises(OutputRefusedError) as refused:
+        guard.check(base / "work" / "other.json")
+    assert refused.value.reason == "outside"
+
+
+def test_photo_writers_refuse_before_writing(tmp_path: Path, icc: bytes, edited: bytes) -> None:
+    guard, root, _ = _planted(tmp_path)
+    outside = root.parent / "outside"
+    outside.mkdir()
+    with pytest.raises(OutputRefusedError):
+        photo.write_png8_pillow(outside / "a.png", photo.upright_image(8), icc, edited, guard)
+    with pytest.raises(OutputRefusedError):
+        photo.write_heic(outside / "a.heic", photo.upright_image(8), 8, 1, "public", icc, guard)
+    with pytest.raises(OutputRefusedError):
+        photo.run(outside / "photo", guard)
+    assert list(outside.iterdir()) == []
+
+
 # --- HEIC (pillow-heif) ---------------------------------------------------------------------
 
 
-def _heic(tmp_path: Path, icc: bytes, bits: int, orientation: int, mode: str) -> dict[str, Any]:
+def _heic(
+    tmp_path: Path, guard: WriteGuard, icc: bytes, bits: int, orientation: int, mode: str
+) -> dict[str, Any]:
     upright = photo.upright_image(bits)
     path = tmp_path / f"{bits}-{mode}-{orientation}.heic"
-    exif = photo.write_heic(path, upright, bits, orientation, mode, icc)
+    exif = photo.write_heic(path, upright, bits, orientation, mode, icc, guard)
     return photo.read_heic(path, upright, bits, orientation, icc, exif)
 
 
 @pytest.mark.parametrize("bits", [8, 10])
 @pytest.mark.parametrize(("orientation", "irot"), [(1, None), (6, 270), (8, 90)])
 def test_heic_public_save_writes_irot_and_keeps_the_tag(
-    tmp_path: Path, icc: bytes, bits: int, orientation: int, irot: int | None
+    tmp_path: Path, guard: WriteGuard, icc: bytes, bits: int, orientation: int, irot: int | None
 ) -> None:
-    case = _heic(tmp_path, icc, bits, orientation, "public")
+    case = _heic(tmp_path, guard, icc, bits, orientation, "public")
     assert case["container_transform"] == {"irot": irot, "imir": None}
     assert case["file_exif_orientation"] == orientation
     assert case["icc_identical_raw"] is True
@@ -282,9 +393,9 @@ def test_heic_public_save_writes_irot_and_keeps_the_tag(
 
 
 def test_heic_exif_only_is_not_rotated_and_the_plugin_drops_the_tag(
-    tmp_path: Path, icc: bytes
+    tmp_path: Path, guard: WriteGuard, icc: bytes
 ) -> None:
-    case = _heic(tmp_path, icc, 8, 6, "exif-only")
+    case = _heic(tmp_path, guard, icc, 8, 6, "exif-only")
     assert case["container_transform"] == {"irot": None, "imir": None}
     assert case["file_exif_orientation"] == 6
     assert case["raw_pose"] == "stored"  # libheif does not apply EXIF
@@ -294,8 +405,8 @@ def test_heic_exif_only_is_not_rotated_and_the_plugin_drops_the_tag(
     assert case["plugin_pose_after_exif"] == "stored"  # the rotation is lost
 
 
-def test_heic_irot_only_comes_back_upright(tmp_path: Path, icc: bytes) -> None:
-    case = _heic(tmp_path, icc, 8, 6, "irot-only")
+def test_heic_irot_only_comes_back_upright(tmp_path: Path, guard: WriteGuard, icc: bytes) -> None:
+    case = _heic(tmp_path, guard, icc, 8, 6, "irot-only")
     assert case["container_transform"] == {"irot": 270, "imir": None}
     assert case["file_exif_orientation"] == 1
     assert case["raw_pose"] == case["raw_pose_after_exif"] == "upright"
@@ -309,9 +420,9 @@ HEIC_CASES += [(8, 6, "exif-only"), (8, 6, "irot-only")]
 
 @pytest.mark.parametrize(("bits", "orientation", "mode"), HEIC_CASES)
 def test_heic_exif_fields_and_values_read(
-    tmp_path: Path, icc: bytes, bits: int, orientation: int, mode: str
+    tmp_path: Path, guard: WriteGuard, icc: bytes, bits: int, orientation: int, mode: str
 ) -> None:
-    case = _heic(tmp_path, icc, bits, orientation, mode)
+    case = _heic(tmp_path, guard, icc, bits, orientation, mode)
     assert case["exif_fields_plugin"] == sorted(
         [
             "IFD0.Make",
@@ -332,8 +443,8 @@ def test_heic_exif_fields_and_values_read(
 
 
 @pytest.mark.parametrize("bits", [8, 10])
-def test_heic_bit_depth_returned(tmp_path: Path, icc: bytes, bits: int) -> None:
-    case = _heic(tmp_path, icc, bits, 1, "public")
+def test_heic_bit_depth_returned(tmp_path: Path, guard: WriteGuard, icc: bytes, bits: int) -> None:
+    case = _heic(tmp_path, guard, icc, bits, 1, "public")
     assert case["file_bit_depth"] == bits
     assert case["default_mode"] == "RGB"  # convert_hdr_to_8bit=True (the default)
     if bits == 10:
