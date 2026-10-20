@@ -138,4 +138,26 @@ NEW_CRITICAL_MAJOR_FOUND.
   `multiscale_fusion` read `.shape` before the array checks. Plan: check first.
 
 Pre-round incident: the first summary run (pytest -v, 232c17a) stalled in pytest's byte-wise
-diff of a planted failure; fixed in 8643ba1 (tests only), the head reviewed.
+diff of a planted failure; fixed in 8643ba1 (tests only), the head reviewed. The stalled process
+(pid 37676) was not stopped (classifier denial at this seat; the dispatcher left it). Its
+background chain may later write a stale `r1/test-summary.txt` (232c17a, not reviewed); the
+reviewer read `r1/tests-8643ba1.txt`. md5s of the round-1 files as they stood at adjudication
+are in `r1/md5sums.txt` (tests-8643ba1.txt `18a7d7f8efec2450c1f28f3aa734e41e`, review.txt
+`84519aed9ed6b6482ddead299b3b67cd`).
+
+Round-1 ruling (orchestrator gen 6; depth 257,103 at the yield, the ~250K evaluation point):
+CONTINUE; F1-F4 accepted as planned; add the `check_sigma` OverflowError guard (WP3.2's
+finding); round 2 on the remediated head.
+
+Remediation, one commit each, each test failing on the unfixed code where a product change is
+made:
+- be0b145 F1 (test + report): every intermediate compared CPU/GPU and same-device.
+- aa5c003 F2 (test): guards on the counting backend/array; planted late guard fails.
+- d637dcc F3 (product + test): bounds and range beyond float32 refused (4 cases failed before).
+- 66220b0 F4 (product + test): arrays checked before `.shape` (AttributeError before).
+- 0f4121f X-4 OverflowError (product + test; dispatcher heads-up, WP3.2's wording): 3 failed
+  before.
+- ec5d2e5 NEW, found by the cell while fixing F3 (product + test): equal bounds near 3e38 passed
+  the float32 guard but the floor's widening rounded away and the stretch divided by zero;
+  now refused naming `bounds` (1 failed before). Recorded for round 2.
+- 25180d9 report updates.
