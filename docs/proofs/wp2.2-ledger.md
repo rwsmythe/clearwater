@@ -141,6 +141,15 @@ stage order from its constructor (default the c3 names).
 | Round | Critical | Major | Minor | In envelope | NEW/REOPENED | Reverts | Product / test-only | Depth |
 |---|---|---|---|---|---|---|---|---|
 | 1 (proposal yield) | - | - | - | - | - | - | - | 148,021 tokens / 36 turns (orchestrator) |
+| R1 (Reviewer A) | 0 | 5 (3 fixed, 1 rejected as ruled, 1 raised) | 4 (3 fixed, 1 rejected, 1 raised) | all in | 9 NEW / 0 REOPENED | 0 | product (#2, #4, #5) and tests (#8, #9) | see dispatcher |
+
+Reviewer A round 1: codex-cli (WSL) gpt-5.6-sol/high, 131,404 tokens, 40 executed commands, verdict
+NEW_CRITICAL_MAJOR_FOUND. Transcript, prompt, diff and adjudication:
+`C:\Users\rwsmy\clearwater-review-evidence\wp2.2\r1\`. Fixed: 2 (IF-4 member order), 4 (huge int
+OverflowError), 5 (`1e400` read as inf), 8, 9 (test strength). Rejected: 1 (uint8 proxies are ruled),
+6 (int for float is documented). Raised to CHARC: 3 (a gain cap defaults to 2.0 and None disables it,
+which the ruled "None only where the default is None" rejects) and 7 (rotation sign: ruled CCW, but
+`tools/inventory.py` normalises clockwise). Full suite before the round: 881 passed.
 
 ## Gates at the round-1 commit
 
