@@ -12,7 +12,8 @@ Brief: `docs/briefs/wp1.4b-brief.md` (FINAL). Base `db751cb`. Branch `wp1.4b`, w
 | `33bd8ba` | (WIP) Claims 2, 2a, 3-6, 10 code: `tools/noise_experiments.py`, `tools/camera_state.py`, tests; this ledger. |
 | `e5a7df3` | The STOP ruling applied: Immerkaer primary, Donoho cross-check with the HH1 zero fraction, the `red_lit` tile set (R3), the quantised-regime validation tests (R4); summary and page on both tile sets. Re-seated cell (Claude Opus 5.5). |
 | `99595d7` | Claim 10b: `lighting-step` phase (3 s lead-in by pts, edge-effect check, reset-at-step and 0.5 s options), tests. |
-| (next) | Report `docs/reports/wp1.4b-gain-cap-noise.md`; this ledger. |
+| `6560a8e` | Report `docs/reports/wp1.4b-gain-cap-noise.md`; this ledger. |
+| `2cd9f9c` | Reviewer A r1 fixes: 3 missed temporal pins + registry guard (CR-01); report corrections (CR-02, -03, -05). |
 
 ## Claim 1 -- the flip's site list
 
@@ -90,9 +91,22 @@ grows with the zero fraction (-12 % at 57 % on a flat field, -24 % at 71 %, -42 
 second test pins only the ORDER of levels there. Outputs are float, so a pure gain scales
 Immerkaer exactly: amplifications are unaffected by this bias.
 
-## Review rounds (Reviewer A)
+## Review rounds (Reviewer A) -- CUMULATIVE ROUND LEDGER
 
-None yet (the review runs on the finished package).
+Transport WSL, codex-cli 0.162.1, `-m gpt-5.6-sol -c model_reasoning_effort=high -s read-only
+--skip-git-repo-check`; bring-up probe 2026-10-20: banner OK, 1 `^ succeeded in`, VERDICT read.
+Evidence `C:/Users/rwsmy/clearwater-review-evidence/wp1.4b/rN/` (prompt, diff, transcript,
+adjudication, md5sums). Depth column: the dispatcher's figure.
+
+| Round | Head | Crit | Major | Minor | In/out env | NEW/REOPENED | Reverts | Fix kind | Assertions | Depth |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | `6560a8e` | 0 | 2 | 3 | 5/0 | 5 NEW | 0 | test-only (CR-01 pins + guard) and report text; no product code | all pass (succ 21, ^ERROR 0, codex_core 0, footer, VERDICT CRITICAL_MAJOR_FOUND; proofs hits 33 = echoes) | -- |
+
+Round 1 findings: CR-01 major (3 temporal pins missed by the flip) CONFIRMED, fixed; CR-02 major
+(10b conclusion vs record) CONFIRMED, fixed; CR-03 minor (two figures) fixed; CR-04 minor
+(stale docstring in `tools/statistics_experiments.py`) CONFIRMED, raised not fixed (lock);
+CR-05 minor (Gate 4 context columns) fixed. Suite on `2cd9f9c`: 121 + 226 + 420 = 767 passed,
+0 failed, 0 skipped (footage and gpu ran); ruff, format, mypy clean.
 
 ## Results at a glance (records under `work/wp1.4b/`)
 
@@ -105,7 +119,6 @@ None yet (the review runs on the finished package).
 
 ## NEXT STEPS
 
-1. DONE: ruling, grid, summary, page, claims 10 and 10b, report.
-2. Full suite in groups (foreground); then the Reviewer A loop (STRONG) per brief: probe,
-   diff `git diff -U8 db751cb..HEAD -- . ':!uv.lock' ':!docs/proofs'`, evidence
-   `clearwater-review-evidence/wp1.4b/rN/`.
+1. DONE: ruling, grid, summary, page, claims 10 and 10b, report; Reviewer A round 1.
+2. Reviewer A round 2 on the head after `2cd9f9c` (prompt = r1's, staged as
+   `wp1.4b-codex-*-r2` in the session scratchpad); converge on zero NEW blocking.
