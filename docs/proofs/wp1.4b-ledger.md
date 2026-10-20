@@ -17,6 +17,9 @@ Brief: `docs/briefs/wp1.4b-brief.md` (FINAL). Base `db751cb`. Branch `wp1.4b`, w
 | `325dc82` | Ledger: round 1. |
 | `09b8bf7` | `quantised` phase: the quantised-regime characterisation as a record (`quantised-regime.json`); tests share its scene (from the void round's content). |
 | `1bbcbca` | Reviewer A r2 fixes: 10b traces the recorded raw (CR-01); claim 8 table complete (CR-03); 0.015 (CR-04); clip.py question raised (CR-02). |
+| `7127fe1` | Ledger: round 2. |
+| `446ac77` | CHARC report notes: `below_floor` / quantisation-floor marking; `total_red_gain`; ledger hand-over. |
+| `09bff25` | Reviewer A r3 cleanup: Google docstrings on six helpers; staged reach (58 / 87 frames) stated for the lead-in. |
 
 ## Claim 1 -- the flip's site list
 
@@ -141,6 +144,12 @@ adjudication, md5sums). Depth column: the dispatcher's figure.
 | 1 | `6560a8e` | 0 | 2 | 3 | 5/0 | 5 NEW | 0 | test-only (CR-01 pins + guard) and report text; no product code | all pass (succ 21, ^ERROR 0, codex_core 0, footer, VERDICT CRITICAL_MAJOR_FOUND; proofs hits 33 = echoes) | -- |
 | 2a | `325dc82` | -- | -- | -- | -- | -- | -- | VOID: killed at the 598 s tool timeout (no footer, no VERDICT; succ 62). Not counted. Its partial content (report figures not from a record) fixed in `09b8bf7` | fails footer/VERDICT | -- |
 | 2 | `09b8bf7` | 0 | 3 | 2 | 5/0 | 4 NEW, 1 REOPENED (r1 CR-04 = r2 CR-05) | 0 | tool code (10b recorded raw) + tests + report; CR-02 CONTESTED (brief conflict, raised) | all pass (succ 26, ^ERROR 0, codex_core 0, footer, VERDICT CRITICAL_MAJOR_FOUND; proofs hits 8 = echoes) | -- |
+| 3 | `446ac77` | 0 | 1 | 2 | 3/0 | 2 NEW (minor), 1 REOPENED (r2 CR-02, clip.py, CONTESTED) | 0 | cleanup only: docstrings + report text | all pass (succ 27, ^ERROR 0, codex_core 0, footer, VERDICT CRITICAL_MAJOR_FOUND; proofs hits 3 = prompt lines and an exclude) | -- |
+
+**CONVERGED at round 3:** zero NEW in-envelope blocking findings. The only blocking item is the
+REOPENED, CONTESTED clip.py default (r2 CR-02 = r3 CR-01), which waits for the dispatcher's
+ruling. Suite on `446ac77`: 121 + 228 + 420 = 769 passed, 0 failed, 0 skipped. The cleanup
+`09bff25` is docstrings and report text only: module tests 35 passed; ruff, format and mypy clean.
 
 Round 1 findings: CR-01 major (3 temporal pins missed by the flip) CONFIRMED, fixed; CR-02 major
 (10b conclusion vs record) CONFIRMED, fixed; CR-03 minor (two figures) fixed; CR-04 minor
@@ -169,6 +178,10 @@ about 9.5 minutes) after the void attempt.
 ## NEXT STEPS
 
 1. DONE: ruling, grid, summary, page, claims 10 and 10b, report; Reviewer A round 1.
-2. YIELDED after round 2 for the dispatcher's ruling on CR-02 (clip.py) and the depth figure.
-3. Then Reviewer A round 3 on the head after `1bbcbca` (prompt = r2's, staged as
-   `wp1.4b-codex-*-r4` in the session scratchpad); converge on zero NEW blocking.
+2. Round 3 converged. Waiting on the dispatcher's ruling on the clip.py default
+   (r2 CR-02 / r3 CR-01).
+   - If authorised: add the help text, or make the default c3 with explicit
+     `--method ancuti2018` in the reproduction commands, plus a guard; then one confirming round.
+   - Otherwise: nothing to do; it is disclosed in the report, Deviations item 5.
+3. Final: return report to the dispatcher; teardown of the `wp1.4b-codex-*` scratch files at
+   accept.
