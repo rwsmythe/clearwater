@@ -78,7 +78,15 @@ at retirement) beside every depth figure you record; two figures for one cell re
 contradiction when neither says. (4) **Read the file back.** After any edit to a handoff or state
 file made while a cell is working, re-read the file at HEAD before relying on it: a cell that
 commits again makes your row stale in the act of writing it (the r7 cell caught its dispatcher's
-table four commits behind). (5) **The main tree has ONE git index and every role commits in it.**
+table four commits behind). (6) **Read the cell's depth at dispatch, at every yield and before any ruling or remediation
+(added 2026-10-20, CHARC; paid for by the WP1.2B cell retiring at 932K after a 9-finding
+remediation was sent to it unread).** Record each figure with its moment. **~250K is an
+EVALUATION point, not an automatic re-seat** (owner, 2026-10-20: "You don't need to replace the
+cell at 240k, that should just be an evaluation point"): a few bounded steps remaining (a review
+round, a gate, a report) mean the cell continues; a large or open-ended load, such as a
+multi-finding remediation, goes to a fresh cell from the ledger. **~400K is a STOP** at the round
+boundary and a fresh re-dispatch (unchanged; the cell-side rule is in the dispatch recipe section 5).
+(5) **The main tree has ONE git index and every role commits in it.**
 A bare `git commit` after `git add` sweeps whatever ANOTHER role has staged into your commit
 under your message (found 2026-09-08: an orchestrator state commit carried CHARC's two staged
 fill files). Commit your own files BY PATHSPEC -- `git commit -m "..." -- docs/orchestrator-state.md`
