@@ -12,7 +12,7 @@ base `9735282`. Stack as locked: NumPy 2.5.4, SciPy 1.18.1, CuPy 14.2.0 (`cupy-c
 | `src/clearwater/core/memory.py` | `memory_estimate_bytes` (the AD-1 counted formula), `METHOD_IDS` |
 | `src/clearwater/core/ops.py` | `spatial_sigma`, `pyramid_levels`, `gaussian_pyramid`, `laplacian_pyramid`, `collapse_pyramid`, `luminance`, `rgb_to_lab`, `laplacian`, `channel_means`, `mean` (ruling 1, R0-2) |
 | `tools/core_speed.py` | the speed-row instrument (X1, ruling 4) |
-| `tests/test_core_{backend,ops,prototype,select,deps,speed}.py` | 172 tests (with GPU) |
+| `tests/test_core_{backend,ops,prototype,select,deps,speed}.py` | 173 tests (with GPU) |
 | `pyproject.toml`, `uv.lock` | the frame section 4 grant lines (below) |
 
 ## Claims and evidence

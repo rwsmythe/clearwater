@@ -148,7 +148,7 @@ No other IF-2 method or helper reads back to the host (Gate 1 tests).
 | 0 (table) | 108,729 (24 turns) at the round-0 yield | - | - | - | - | - | - | - | - | yield for ruling |
 | pre-review (build, CHARC additions) | 228,618 (74 turns) at the window-request yield; 237,795 (81 turns) at the queue yield | - | - | - | - | - | - | - | - | full-pytest window queued; round 1 to adjudicated verdict, then depth decision |
 | 1 | first cell retired at 275K; successor 182,305 (68 turns) at the remediation / window-request yield | 0 | 3 | 4 | 7 in / 0 out | 7 NEW / 0 REOPENED | 0 | pending: product F1 F2 F3 F5, tool F4 F7, test-only F6 | WSL, codex-cli 0.162.1, gpt-5.6-sol high | NEW_CRITICAL_MAJOR_FOUND (adjudicated, not remediated) |
-| 2 | (dispatcher fills) | 0 | 1 | 2 | 3 in / 0 out | 1 NEW (minor) / 2 REOPENED (F4 major, F6 minor) | 0 | pending: tool+test+report R2-1, test-only R2-2, test+report R2-3 | WSL, codex-cli 0.162.1, gpt-5.6-sol high | NEW_CRITICAL_MAJOR_FOUND; zero NEW blocking (the major is a REOPENED F4 residual); adjudicated, not remediated |
+| 2 | 205,771 (88 turns) at the round-2 yield | 0 | 1 | 2 | 3 in / 0 out | 1 NEW (minor) / 2 REOPENED (F4 major, F6 minor) | 0 | pending: tool+test+report R2-1, test-only R2-2, test+report R2-3 | WSL, codex-cli 0.162.1, gpt-5.6-sol high | NEW_CRITICAL_MAJOR_FOUND; zero NEW blocking (the major is a REOPENED F4 residual); adjudicated, not remediated |
 
 ## Gate windows
 
@@ -230,6 +230,22 @@ F3, F5, F7 verified fixed.
 | R2-1 | MAJOR | `tools/core_speed.py` prototype path | host reads differ from `correct()`: percentile without `.tolist()` (correct has it), `_lab_mean(...).tolist()` twice (correct keeps it on device) | REOPENED (F4) | call `proto._high_pass_and_bounds`; `_lab_mean` without tolist; test counts it against `correct()`; docstring and report name each path's host reads |
 | R2-2 | MINOR | `tests/test_core_deps.py` | `import_module(name='cupy')`, `__import__(name=...)` missed (reviewer EXECUTED, cell reproduced) | REOPENED (F6) | keyword string arguments too; planted control |
 | R2-3 | MINOR | report claim 2 / `test_cpu_against_gpu_within_ad11` | the test pins the IF-2 methods at small sizes only; the helpers and the 4K figures are not pinned as claimed | NEW | add the helpers to `all_methods`; claim 2 says the 4K figures were measured once |
+
+## Round-2 ruling and terminating cleanup
+
+Ruling (orchestrator gen 5): the loop TERMINATES at round 2 -- zero NEW in-envelope blocking
+findings (R2-1 is a REOPENED F4 residual, in the instrument, not product code). R2-1..R2-3 fixed
+as the terminating round's cleanup, each red-first; the cleanup opens no round. R2-1 must be
+right before the speed row (it times that path).
+
+| # | Commit | Kind | Red on the code before the fix | Fix |
+|---|---|---|---|---|
+| R2-1 | `142566e` | tool + test + report | `test_op_mix_is_one_correct_call` [c3, ancuti2018]: prototype host reads 6 vs 5 / 7 vs 6, `_high_pass_and_bounds` 0 vs 1 | prototype path calls `proto._high_pass_and_bounds` (blur, percentiles, their read) and keeps `_lab_mean` on the device; the test counts host reads (`tolist` / `float` of every `_accumulate_mean` and percentile result) against a real `correct()`; docstring and report name each path's host reads |
+| R2-2 | `adcd922` | test only + report | planted control: the two keyword spellings not found | keyword string arguments read too |
+| R2-3 | `7293766` | test + report | `test_ad11_roster_covers_every_method_and_helper`: collapse_pyramid, gaussian/laplacian_pyramid, laplacian, luminance, rgb_to_lab missing | `all_methods` gains every array-returning helper (GPU comparison passes at all three sizes); claim 2 says the 4K figures were measured once |
+
+Inner loop at the cleanup head: `tests/test_core_*.py` 173 passed (GPU present); ruff check,
+ruff format --check (76 files), mypy (51 files) clean. Logs `work/r2c-*.log`.
 
 ## Successor handoff (if re-seated)
 
