@@ -118,6 +118,27 @@ Uses the GPU; records no timing or memory figure; NOT exclusive.
     cap binds on fewer than 10 % of the clip's frames, report that and stop this claim there (the
     question then stays open for WP2.1). Implement (B) in `tools/noise_experiments.py` from
     `temporal`'s public functions; if (B) needs a change in `temporal.py`, STOP.
+10b. **The lighting step in the deep clip (amendment 2026-10-20, deep CP2; CHARC
+    `1b7bc20ed511cdab`).** The owner saw, in both corrected renders of the WP1.3D deep clip
+    (GX011600 at the deepest candidate), a discontinuity at about 1 s where the scene shifts
+    from rock to open water. The source has the step too, but less pronounced. Owner, verbatim:
+    "Both clips had discontinuities at ~1 sec when the scene shifts from rock to open water with
+    a step change in scene lighting. The effect is less pronounced in the original." On THAT clip
+    only, from its recorded raw and smoothed statistics (`work/wp1.3d/clip/statistics.json`)
+    and proxy-only recomputation where needed:
+    - trace the per-frame and the 2 s smoothed statistics across the cut (white-balance gains,
+      N{} bounds, and for Ancuti the alpha); give the size of the step in the APPLIED values;
+    - **first tell apart two causes:** a genuine scene step that the centred window spreads
+      across about 1 s, and an edge effect of the 6 s excerpt (the centred window is truncated in
+      the first second). Re-analyse with the excerpt widened backwards (re-extract by pts at the
+      540 NumPy proxy) and say which it is;
+    - evaluate (a) step detection with a window reset at the detected step, and (b) a shorter
+      window (for example 0.5 s), reporting each one's step size and its flicker measure on the
+      clip.
+    No new full-resolution render or timing; this is evidence for the Phase 2 temporal design, and
+    the 2 s default stays PROVISIONAL per DR-25(3). **Bounded:** if it threatens your depth or a
+    STOP-free finish, record what you have, mark the rest PENDING, and the orchestrator banks it
+    as a DR with the clip reference.
 11. Docstrings complete; ruff, ruff format, mypy strict and pytest green with `footage` and
     `gpu` RUN.
 
