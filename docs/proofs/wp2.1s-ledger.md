@@ -131,6 +131,7 @@ cumulative machine time ~60 min.
 |---|---|---|---|---|---|---|---|---|---|---|
 | r1 | WSL, codex-cli 0.162.1, gpt-5.6-sol/high | 0 | 4 | 4 | 7 / 1 (F8 out) | 8 NEW / 0 | 0 | product: transport.py, photo.py, licences.py, report; test: photo tests | (dispatcher) | `clearwater-review-evidence/wp2.1s/r1/` |
 | r2 | WSL, codex-cli 0.162.1, gpt-5.6-sol/high | 0 | 2 | 3 | 4 / 1 (F5 out) | 5 NEW / 0 | 0 | product: transport.py, licences.py, report | (dispatcher) | `clearwater-review-evidence/wp2.1s/r2/` |
+| r3 | WSL, codex-cli 0.162.1, gpt-5.6-sol/high | 0 | 1 | 7 | 5 / 3 (F5, F7, F8 out) | 8 NEW / 0 | 0 | pending (yielded before the remediation, depth) | (dispatcher) | `clearwater-review-evidence/wp2.1s/r3/` |
 
 Round 1 (diff `aa1f5f0..ccc23b8`; VERDICT NEW_CRITICAL_MAJOR_FOUND; assertions all pass, 30
 succeeded, 0 `^ERROR`, 0 `ERROR codex_core`, footer present; access hits are echoes). Findings and
@@ -161,3 +162,10 @@ the sandbox could not run pytest). Findings and fixes:
 3. MINOR scan scope -> stated.
 4. MINOR wall bound omits the last hash -> wording; still an upper bound (`4d997c6`).
 5. MINOR OUT-OF-ENVELOPE silent F_SETPIPE_SZ failure -> raises and falls back (`4d997c6`).
+
+Round 3 (diff `aa1f5f0..00bec2c`; VERDICT NEW_CRITICAL_MAJOR_FOUND; assertions pass, 26 succeeded,
+0 `^ERROR`, 0 `ERROR codex_core`, footer present; access hits are echoes or excluding commands;
+one read of `clearwater.local.toml`). One MAJOR (output containment against junctions and hard
+links; transport writes without a check) and seven MINORs (three out of envelope). All accepted;
+remediation NOT started: the cell yielded first because it is past the ~250K re-seat line with a
+multi-finding remediation open (fill Part 1). Proposed fixes in the round's adjudication file.
