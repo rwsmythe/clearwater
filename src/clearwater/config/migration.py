@@ -73,7 +73,8 @@ def migrate(
     Raises:
         UnsupportedFormatVersionError: ``format_version`` is absent, not an integer, above the
             current version, or below it with no registered step to climb.
-        FormatError: A step did not set ``format_version`` to the integer ``n + 1``.
+        FormatError: A step did not return an object, or did not set ``format_version``
+            to the integer ``n + 1``.
     """
     steps = DEFAULT_MIGRATIONS if registry is None else registry
     version = data.get("format_version")
@@ -91,6 +92,11 @@ def migrate(
                 f"no migration for {kind} format_version {version} to {version + 1}"
             )
         current = step(copy.deepcopy(current))
+        if not isinstance(current, dict):
+            raise FormatError(
+                f"the {kind} migration from version {version} returned "
+                f"{type(current).__name__}, not an object"
+            )
         new_version = current.get("format_version")
         if (
             isinstance(new_version, bool)

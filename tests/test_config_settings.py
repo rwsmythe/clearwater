@@ -412,3 +412,32 @@ def test_a_step_must_return_the_integer_next_version(tmp_path: Path, bad_version
     _write(tmp_path, _document(format_version=0))
     assert load_settings(tmp_path, migrations=registry) == Settings()  # set aside as corrupt
     assert list(tmp_path.glob("settings.json.bad-*"))
+
+
+def test_a_huge_integer_or_deep_nesting_sets_the_file_aside(tmp_path: Path) -> None:
+    text = json.dumps(_document())
+    huge = text.replace('"cache_limit_bytes": 20000000000', '"cache_limit_bytes": ' + "9" * 5000)
+    assert "9" * 5000 in huge
+    (tmp_path / "settings.json").write_text(huge, encoding="utf-8")
+    assert load_settings(tmp_path) == Settings()
+    assert len(list(tmp_path.glob("settings.json.bad-*"))) == 1
+    nest = "[" * 100000 + "]" * 100000
+    deep = text.replace('"force_cpu": false', '"force_cpu": ' + nest)
+    (tmp_path / "settings.json").write_text(deep, encoding="utf-8")
+    assert load_settings(tmp_path) == Settings()
+    assert len(list(tmp_path.glob("settings.json.bad-*"))) == 2
+
+
+@pytest.mark.parametrize("bad_result", [None, [1], "x", 1])
+def test_a_step_returning_a_non_object_is_a_format_error_naming_the_step(
+    tmp_path: Path, bad_result: object
+) -> None:
+    from clearwater.config import migrate
+
+    registry = MigrationRegistry()
+    registry.register("settings", 0, lambda data: bad_result)  # type: ignore[arg-type,return-value]
+    with pytest.raises(FormatError, match="settings migration from version 0 returned"):
+        migrate("settings", {"format_version": 0}, registry)
+    _write(tmp_path, _document(format_version=0))
+    assert load_settings(tmp_path, migrations=registry) == Settings()  # set aside as corrupt
+    assert list(tmp_path.glob("settings.json.bad-*"))

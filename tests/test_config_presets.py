@@ -831,3 +831,89 @@ def test_list_skips_symbolic_links(tmp_path: Path) -> None:
     assert [e.name for e in store.list_presets()] == ["real"]
     with pytest.raises(PresetError):
         store.load("link")
+
+
+# --- Reviewer B remediation ---------------------------------------------------------------------
+
+
+def _big_set(approx_bytes: int) -> ParameterSet:
+    return ParameterSet("c3", {"note": "x" * approx_bytes}, CREATED, "1")
+
+
+def _fitting_note_size() -> int:
+    """The largest note length whose saved file is exactly MAX_PRESET_BYTES."""
+    overhead = len((_big_set(0).to_json() + "\n").encode("utf-8"))
+    return MAX_PRESET_BYTES - overhead
+
+
+def test_save_refuses_a_preset_it_could_not_read_back(tmp_path: Path) -> None:
+    store = _store(tmp_path)
+    fit = _fitting_note_size()
+    with pytest.raises(PresetError) as raised:
+        store.save("big", _big_set(fit + 1))
+    assert str(MAX_PRESET_BYTES + 1) in str(raised.value) and str(MAX_PRESET_BYTES) in str(
+        raised.value
+    )
+    assert not (tmp_path / "presets").exists()  # nothing was written
+
+
+def test_a_preset_exactly_at_the_cap_round_trips(tmp_path: Path) -> None:
+    store = _store(tmp_path)
+    fit = _fitting_note_size()
+    path = store.save("edge", _big_set(fit))
+    assert path.stat().st_size == MAX_PRESET_BYTES
+    assert store.load("edge") == _big_set(fit)
+    assert [e.error for e in store.list_presets()] == [None]
+
+
+def test_overwrite_with_an_over_cap_preset_keeps_the_old_file(tmp_path: Path) -> None:
+    store = _store(tmp_path)
+    path = store.save("p", _set())
+    before = path.read_bytes()
+    with pytest.raises(PresetError, match="cap"):
+        store.save("p", _big_set(MAX_PRESET_BYTES), overwrite=True)
+    assert path.read_bytes() == before
+    assert [p.name for p in path.parent.iterdir()] == ["p.json"]
+
+
+def test_export_to_a_dangling_symlink_counts_as_existing(tmp_path: Path) -> None:
+    store = _store(tmp_path)
+    store.save("p", _set())
+    link = tmp_path / "dangling.json"
+    try:
+        link.symlink_to(tmp_path / "nowhere.json")
+    except OSError:
+        pytest.skip("symlinks are not available here")
+    assert not link.exists() and link.is_symlink()
+    with pytest.raises(PresetError, match="already exists"):
+        store.export_preset("p", link)
+    assert not (tmp_path / "nowhere.json").exists()
+
+
+@pytest.mark.parametrize("name", ["a\x85b", "a\x9bb", "a\x80b", "a\x9fb", "\x90x"])
+def test_c1_control_characters_are_refused_in_names(name: str) -> None:
+    with pytest.raises(PresetError, match=r"cannot contain"):
+        validate_preset_name(name)
+
+
+def test_huge_integers_and_deep_nesting_are_unreadable_not_crashes(tmp_path: Path) -> None:
+    store = _store(tmp_path)
+    store.save("good", _set())
+    folder = tmp_path / "presets"
+    huge = _set().to_json().replace('"steps": 4', '"steps": ' + "9" * 5000)
+    assert '"steps": 99999' in huge
+    (folder / "huge.json").write_text(huge, encoding="utf-8")
+    deep = "[" * 100000 + "]" * 100000
+    (folder / "deep.json").write_text(
+        _set().to_json().replace('"steps": 4', '"steps": ' + deep), encoding="utf-8"
+    )
+    entries = {e.name: e for e in store.list_presets()}
+    assert entries["good"].error is None
+    assert entries["huge"].error and entries["huge"].parameter_set is None
+    assert entries["deep"].error and entries["deep"].parameter_set is None
+    for name in ("huge", "deep"):
+        with pytest.raises(PresetError):
+            store.load(name)
+        with pytest.raises(PresetImportError):
+            store.import_preset(folder / f"{name}.json", SCHEMAS)
+    assert (folder / "huge.json").read_text(encoding="utf-8") == huge  # untouched

@@ -68,6 +68,8 @@ def load_settings(folder: Path, *, migrations: MigrationRegistry | None = None) 
         raise
     except FormatError as error:
         return _set_aside(path, f"is not valid settings: {error}")
+    except (ValueError, RecursionError) as error:  # a number with too many digits, nesting too deep
+        return _set_aside(path, f"cannot be decoded: {error}")
     return _with_valid_values(settings)
 
 

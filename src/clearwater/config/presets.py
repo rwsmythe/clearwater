@@ -158,7 +158,8 @@ def validate_preset_name(name: str) -> str:
     r"""Check that a preset name is a safe file name on every operating system (N1).
 
     The rule is the same everywhere: 1 to 100 characters; no leading or trailing whitespace; no
-    ``< > : " / \\ | ? *`` and no control characters; no trailing dot; not ``.`` or ``..``; not
+    ``< > : " / \\ | ? *`` and no control characters (Unicode category Cc: C0, DEL, C1); no
+    trailing dot; not ``.`` or ``..``; not
     a Windows reserved device name (``CON``, ``PRN``, ``AUX``, ``NUL``, ``COM0``-``COM9``,
     ``LPT0``-``LPT9``, case-insensitive, also with an extension); encodable as UTF-8 and at
     most 237 UTF-8 bytes (a 255-byte file-name limit less the suffix and the temporary
@@ -184,7 +185,7 @@ def validate_preset_name(name: str) -> str:
     if name in (".", ".."):
         raise PresetError(f"{name!r} is not a usable preset name")
     for character in name:
-        if character in _FORBIDDEN_CHARACTERS or ord(character) < 32 or ord(character) == 127:
+        if character in _FORBIDDEN_CHARACTERS or unicodedata.category(character) == "Cc":
             raise PresetError(f"preset name cannot contain {character!r}")
     try:
         name.encode("utf-8")
@@ -261,6 +262,19 @@ def _shortened(base: str, suffix: str) -> str:
 def _name_key(name: str) -> str:
     """Return the key under which two names count as the same file on a lenient file system."""
     return unicodedata.normalize("NFC", name).casefold()
+
+
+def _serialise(parameter_set: ParameterSet) -> str:
+    """Return the preset file text, refusing one the store would later refuse to read.
+
+    Raises:
+        PresetError: The UTF-8 text is over :data:`MAX_PRESET_BYTES`; the message names both.
+    """
+    text = parameter_set.to_json() + "\n"
+    size = len(text.encode("utf-8"))
+    if size > MAX_PRESET_BYTES:
+        raise PresetError(f"preset is {size} bytes when saved; the cap is {MAX_PRESET_BYTES} bytes")
+    return text
 
 
 def _read_text(path: Path) -> str:
@@ -482,9 +496,9 @@ class PresetStore:
         check_parameter_set_keys(parameter_set, "preset")
         if destination.is_dir():
             raise PresetError(f"{destination} is a folder")
-        if destination.exists() and not overwrite:
+        if os.path.lexists(destination) and not overwrite:
             raise PresetError(f"{destination} already exists")
-        atomic_write_text(destination, parameter_set.to_json() + "\n")
+        atomic_write_text(destination, _serialise(parameter_set))
         return destination
 
     def install_starters(self, *, now: datetime | None = None) -> list[str]:
@@ -547,10 +561,24 @@ class PresetStore:
     def _write(self, path: Path, parameter_set: ParameterSet) -> None:
         """Write a preset file without provenance."""
         clean = dataclasses.replace(parameter_set, source=None, settings=None)
-        atomic_write_text(path, clean.to_json() + "\n")
+        atomic_write_text(path, _serialise(clean))
 
     def _read(self, path: Path) -> tuple[ParameterSet, tuple[str, ...]]:
-        """Read, migrate and parse a preset file; return it and the provenance keys dropped."""
+        """Read, migrate and parse a preset file; return it and the provenance keys dropped.
+
+        Raises:
+            FormatError: The file is not a valid preset, including a decoder failure such as a
+                number with too many digits or nesting too deep to parse.
+        """
+        try:
+            return self._parse(path)
+        except (FormatError, UnicodeDecodeError):
+            raise
+        except (ValueError, RecursionError) as error:
+            raise FormatError(f"cannot decode the file: {error}") from error
+
+    def _parse(self, path: Path) -> tuple[ParameterSet, tuple[str, ...]]:
+        """Do the work of :meth:`_read`."""
         data: dict[str, Any] = loads_object(_read_text(path))
         version = data.get("format_version")
         if isinstance(version, bool) or not isinstance(version, int):

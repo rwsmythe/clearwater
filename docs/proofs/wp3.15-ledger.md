@@ -252,3 +252,23 @@ two tests pin it (ASCII: size <= limit; accented text: size <= limit + that reco
 
 Dispatcher ruling on the figure: the 237-byte cap is ACCEPTED as the corrected figure of the "255"
 in the cleanup ruling (255 less `.json` less the 13-byte atomic-temporary tail).
+
+## Final-head run before Reviewer B
+
+Head 51c0e9e: 1341 passed, 1 warning, 517 s (`work/pytest-full-3.txt`).
+
+## Reviewer B (orchestrator seat, merge candidate b051c3d = 51c0e9e rebased on 4f122ec)
+
+Verdict NEW_CRITICAL_MAJOR_FOUND, all five findings EXECUTED. Evidence
+`C:/Users/rwsmy/clearwater-review-evidence/wp3.15/reviewB/review-B.txt`. Dispatcher depth when sent: 237,714.
+
+| # | Reviewer sev | Adjudicated | Finding | Fix |
+|---|---|---|---|---|
+| 2 | MAJOR | UPHELD, introduced, in envelope | `save` wrote presets above the 1 MiB read cap that every later read rejected, stranding them | one serialiser `_serialise` refuses text over `MAX_PRESET_BYTES` with `PresetError` naming size and cap, used by save, overwrite, import, starters and export; tests: over-cap refused with nothing written, exactly-at-cap round trips, over-cap overwrite keeps the old file |
+| 1 | MAJOR | DOWNGRADED to MINOR: export with `overwrite=True` to a caller-chosen path is the GUI's confirmed save-as (replacing it is intended, not a G6 breach); the real defect is the existence check | `os.path.lexists`, so a dangling symlink at the destination counts as existing when `overwrite=False`; test skips with a reason where symlinks cannot be made |
+| 3 | MINOR | VALID | decoder `ValueError` (5000-digit integer) and `RecursionError` (deep nesting) escaped the recovery paths | settings: set aside; preset `_read` wraps them as `FormatError` (so import is refused, list shows the file unreadable, load is a `PresetError`); one test per path |
+| 4 | MINOR | VALID | a migration step returning a non-object raised `AttributeError` | `FormatError` naming the kind and the from-version; test (4 values) |
+| 5 | MINOR | VALID | C1 controls U+0080-U+009F were accepted in names | name rule refuses Unicode category Cc (C0, DEL, C1); test (5 values) |
+
+Regression checks: with `src/` stashed (tests kept) 14 of the new tests FAIL; on the fixed code the
+inner loop is 218 passed, ruff check, ruff format --check and mypy clean. No Reviewer A round (dispatcher).

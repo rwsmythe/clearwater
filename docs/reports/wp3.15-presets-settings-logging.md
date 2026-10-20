@@ -45,10 +45,10 @@ WP3.12 takes `app_locations().cache_dir` and `Settings.cache_limit_bytes`. WP3.1
 
 ## Gates
 
-Own tests: 203 passed. `uv run ruff check .`, `ruff format --check .` and `mypy` clean. Full pytest:
+Own tests: 218 passed (after the Reviewer B remediation). `uv run ruff check .`, `ruff format --check .` and `mypy` clean. Full pytest:
 see the ledger (1336 passed on `01591af`; the final-head run is recorded there). Reviewer A: round 1
 (2 major, 3 minor, remediated), round 2 (no blocking, four minors fixed in the terminating cleanup).
-Reviewer B runs at the orchestrator's seat.
+Reviewer B ran at the orchestrator's seat on the merge candidate and found 2 major and 3 minor; remediated (ledger "Reviewer B").
 
 ## Limits and decisions (for the accept record)
 
@@ -68,6 +68,8 @@ Reviewer B runs at the orchestrator's seat.
   anyway.
 - macOS uses the XDG branch (ruling 15.1); the non-Windows branch is tested by injection, never run
   on another OS. No developer override of the app-data root exists (ruling answer 7).
+- A preset whose saved text would exceed the 1 MiB read cap is refused at save and export (one constant, `MAX_PRESET_BYTES`), so the store never writes a file it cannot read back.
+- Export to a caller-chosen path with `overwrite=True` replaces that file by design (the GUI's confirmed save-as); a dangling symlink at the destination counts as existing.
 - Provenance keys are dropped, not refused, on preset save and import (CHARC ruling), and named in
   `PresetImportResult.dropped_keys`. Every other unknown key is still refused.
 - The store method is `list_presets()` (a method named `list` would shadow the builtin).
