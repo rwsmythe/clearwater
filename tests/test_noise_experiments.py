@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import dataclasses
+import itertools
 import json
 import shutil
 import struct
@@ -135,6 +136,88 @@ def test_flat_tiles_takes_a_quarter_of_the_full_tiles_flattest_first() -> None:
     assert chosen.max() <= np.sort(energy, axis=None)[19]
 
 
+def _red_dark_left(columns: int) -> NDArray[np.float32]:
+    """A noisy gradient whose red is below 16/255 in every tile column but the last ones."""
+    image = _noisy(_gradient(), 0.01, seed=5)
+    image[:, : columns * noise_experiments.TILE, 0] *= np.float32(0.05)  # red mean < 0.045
+    return image
+
+
+def test_red_lit_tiles_takes_the_flattest_quarter_of_the_tiles_with_a_red_baseline() -> None:
+    image = _red_dark_left(columns=4)  # 8 x 8 tiles, 32 of them red-lit
+    tiles, eligible = noise_experiments.red_lit_tiles(image)
+    assert eligible == 32 and len(tiles) == 8
+    assert set(tiles[:, 1].tolist()) <= {4, 5, 6, 7}
+    energy = noise_experiments.gradient_energy(noise_experiments.luma(image))
+    chosen = energy[tiles[:, 0], tiles[:, 1]]
+    assert np.all(np.diff(chosen) >= 0.0)
+    assert chosen.max() <= np.sort(energy[:, 4:], axis=None)[7]
+    sets, record = noise_experiments.tile_sets(image)
+    assert sets["red_lit"] is not None and np.array_equal(sets["red_lit"], tiles)
+    assert record["red_lit"]["too_few"] is False and record["flat"]["count"] == 16
+
+
+def test_a_red_lit_set_of_fewer_than_eight_tiles_is_reported_as_too_few() -> None:
+    image = _red_dark_left(columns=6)  # 16 red-lit tiles: a quarter is 4
+    sets, record = noise_experiments.tile_sets(image)
+    assert sets["red_lit"] is None and sets["flat"] is not None
+    assert record["red_lit"] == {
+        "floor_8bit": 16.0,
+        "count": 4,
+        "chosen_from": 16,
+        "too_few": True,
+        "rows_cols": record["red_lit"]["rows_cols"],
+    }
+    source = noise_experiments.source_noise(image, sets)
+    assert source["red_lit"] is None and source["flat"] is not None
+    figures = noise_experiments.noise_figures(image[..., 0], sets, {"flat": None, "red_lit": None})
+    assert figures == {"flat": None, "red_lit": None}
+
+
+def _quantised(
+    sigma_code: float, seed: int, ramp: bool = True
+) -> tuple[NDArray[np.float32], float]:
+    """8-bit-quantised Gaussian noise of ``sigma_code`` code values on the gradient (or a flat
+    field at code 100); returns the image on [0, 1] and the true sigma of its total error."""
+    clean = _gradient().astype(np.float64) * 255.0 if ramp else np.full((512, 512, 3), 100.0)
+    noise = np.random.default_rng(seed).normal(0.0, sigma_code, clean.shape[:2])
+    quantised = np.round(clean + noise[..., None])
+    truth = float(np.std(quantised[..., 0] - clean[..., 0])) / 255.0
+    return (quantised / 255.0).astype(np.float32), truth
+
+
+@pytest.mark.parametrize("seed", [0, 1, 2])
+def test_immerkaer_holds_where_quantisation_collapses_the_donoho_median(seed: int) -> None:
+    # The regime that defeated Donoho on the deep frames: noise this weak, quantised to 8 bits,
+    # leaves more than half of the HH1 coefficients exactly 0, so their median is 0.
+    image, truth = _quantised(0.25, seed)
+    tiles = noise_experiments.flat_tiles(image)
+    red = image[..., 0]
+    assert noise_experiments.hh1_zero_fraction(red, tiles) > 0.5
+    assert noise_experiments.donoho_sigma(red, tiles) == 0.0
+    # Immerkaer converts the mean absolute mask response with sqrt(pi / 2), exact for a
+    # Gaussian response; mostly-zero quantised noise gives a heavier-tailed response, so it
+    # under-reads (about 9-11 % here over 20 seeds): 15 % bounds that bias with margin.
+    assert noise_experiments.immerkaer_sigma(red, tiles) == pytest.approx(truth, rel=0.15)
+
+
+def test_immerkaer_keeps_the_order_of_quantised_noise_levels_that_donoho_cannot_tell_apart() -> (
+    None
+):
+    levels = (0.2, 0.25, 0.3, 0.35, 0.5)
+    immerkaer, donoho = [], []
+    for sigma in levels:
+        image, _ = _quantised(sigma, seed=7, ramp=False)  # flat field: the deepest regime
+        tiles = noise_experiments.flat_tiles(image)
+        immerkaer.append(noise_experiments.immerkaer_sigma(image[..., 0], tiles))
+        donoho.append(noise_experiments.donoho_sigma(image[..., 0], tiles))
+    assert all(a < b for a, b in itertools.pairwise(immerkaer))
+    # Donoho only reads quantisation levels: 0, or half a code value over 0.6745.
+    half_step = 0.5 / 255.0 / noise_experiments.DONOHO_CONSTANT
+    assert {round(value / half_step, 6) for value in donoho} <= {0.0, 1.0}
+    assert donoho[0] == donoho[1] == 0.0
+
+
 # --- the settings grid and the render record (claims 3 and 5) ----------------------------------
 
 
@@ -164,14 +247,15 @@ def test_the_grid_is_the_brief_s_25_settings_each_labelled_from_its_params() -> 
 def test_a_render_record_reads_the_pipeline_s_own_flags() -> None:
     image = _noisy(_gradient(256, 256), 0.01)
     image[..., 0] *= np.float32(0.05)  # red-starved: the cap and the red clamp bind
-    tiles = noise_experiments.flat_tiles(image)
+    sets, _ = noise_experiments.tile_sets(image)
+    assert sets["red_lit"] is None  # no tile reaches a red mean of 16/255
     source = {
-        "donoho": noise_experiments.donoho_sigma(image[..., 0], tiles),
-        "immerkaer": noise_experiments.immerkaer_sigma(image[..., 0], tiles),
+        name: None if per is None else per["R"]
+        for name, per in noise_experiments.source_noise(image, sets).items()
     }
     params = Params(method="ancuti2018", red_gain_cap=0.5, max_white_balance_gain=1.5)
     result = correct(image, params, CPU)
-    entry = noise_experiments.render_record(result, CPU, tiles, source)
+    entry = noise_experiments.render_record(result, CPU, sets, source)
     assert entry["label"] == "ancuti2018 cap=0.5 clamp=1.5"
     assert entry["bound"]["red_gain_cap"] is (
         result.compensation.effective["red"] < result.compensation.requested["red"]
@@ -186,10 +270,19 @@ def test_a_render_record_reads_the_pipeline_s_own_flags() -> None:
     )
     means = result.output.reshape(-1, 3).mean(axis=0, dtype=np.float64)
     assert entry["residual_cast"]["R/G"] == pytest.approx(means[0] / means[1])
-    ratio = entry["noise_red"]["donoho"] / source["donoho"]
-    assert entry["noise_red"]["donoho_amplification"] == pytest.approx(ratio)
+    flat, reference = entry["noise_red"]["flat"], source["flat"]
+    assert flat is not None and reference is not None
+    assert entry["noise_red"]["red_lit"] is None
+    flat_tiles = sets["flat"]
+    assert flat_tiles is not None
+    output_red = result.output[..., 0]
+    assert flat["immerkaer"] == noise_experiments.immerkaer_sigma(output_red, flat_tiles)
+    assert flat["donoho"] == noise_experiments.donoho_sigma(output_red, flat_tiles)
+    ratio = flat["immerkaer"] / reference["immerkaer"]
+    assert flat["immerkaer_amplification"] == pytest.approx(ratio)
+    assert flat["immerkaer_8bit"] == pytest.approx(255.0 * flat["immerkaer"])
     c3 = noise_experiments.render_record(
-        correct(image, Params(method="c3"), CPU), CPU, tiles, source
+        correct(image, Params(method="c3"), CPU), CPU, sets, source
     )
     assert c3["green_fraction"] is None and c3["cap"] == {"red": None, "blue": None}
 
@@ -374,10 +467,15 @@ def test_the_runner_records_one_deep_frame_under_two_settings(tmp_path: Path) ->
     assert [entry["label"] for entry in written["renders"]] == [s.label for s in chosen]
     for entry, setting in zip(written["renders"], chosen, strict=True):
         assert entry["params"] == dataclasses.asdict(setting.params)
-        assert entry["noise_red"]["donoho_8bit"] >= 0.0 and entry["noise_red"]["immerkaer"] > 0.0
-        amplification = entry["noise_red"]["donoho_amplification"]
-        assert (amplification is None) is (written["source_noise_red"]["donoho"] == 0.0)
-    assert written["tiles"]["count"] == round(0.25 * 60 * 33)
+        for name in ("flat", "red_lit"):
+            figures, source = entry["noise_red"][name], written["source_noise"][name]
+            assert figures["immerkaer_8bit"] > 0.0 and figures["donoho_8bit"] >= 0.0
+            for kind in ("immerkaer", "donoho"):
+                amplification = figures[f"{kind}_amplification"]
+                assert (amplification is None) is (source["R"][kind] == 0.0)
+    assert written["tiles"]["flat"]["count"] == round(0.25 * 60 * 33)
+    lit = written["tiles"]["red_lit"]
+    assert lit["count"] == round(0.25 * lit["chosen_from"]) and not lit["too_few"]
     crops = roots.allowed / "crops" / "GX011600_0665.031"
     assert (crops / "flat-source-red.png").is_file()
     assert (crops / "textured-c3_clamp-3-rgb.png").is_file()

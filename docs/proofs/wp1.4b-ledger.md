@@ -9,7 +9,8 @@ Brief: `docs/briefs/wp1.4b-brief.md` (FINAL). Base `db751cb`. Branch `wp1.4b`, w
 |---|---|
 | `b23bad9` | Claim 1: `Params().method` defaults to `"c3"`; docstring sentence. `tools/prototype/params.py` only. |
 | `fddc4e3` | Claim 1: pins. 62 test sites name `method="ancuti2018"` (or `--method ancuti2018`); `run.py` help names c3 as the default; guard tests. |
-| (WIP) | Claims 2, 2a, 3-6, 10 code: `tools/noise_experiments.py`, `tools/camera_state.py`, tests; this ledger. |
+| `33bd8ba` | (WIP) Claims 2, 2a, 3-6, 10 code: `tools/noise_experiments.py`, `tools/camera_state.py`, tests; this ledger. |
+| (next) | The STOP ruling applied: Immerkaer primary, Donoho cross-check with the HH1 zero fraction, the `red_lit` tile set (R3), the quantised-regime validation tests (R4); summary and page on both tile sets. Re-seated cell (Claude Opus 5.5). |
 
 ## Claim 1 -- the flip's site list
 
@@ -57,15 +58,41 @@ non-zero and moves with the settings (frame 0665: output R 0.203 / 0.195 / 0.085
 code values for cap off / 2 / 0.5 / c3). The synthetic validation tests (1-4) all pass; the
 premise that fails is the data, not the code. Awaiting the dispatcher's ruling.
 
+## ORCHESTRATOR RULING on the STOP (2026-10-20, re-seat brief)
+
+Diagnosis accepted (the estimator is correct; the data defeat a median-based form).
+1. Primary measure = Immerkaer on the SAME fixed tile set; Donoho the reported cross-check,
+   its quantised/flattened regime documented (including the shallow reference's quantised 0.738).
+2. Settings compared on the ABSOLUTE output sigma_R in 8-bit code values; sigma_out / sigma_src
+   only where the source figure is above 0, otherwise n/a.
+3. R3: a second fixed tile set, the 25 % flattest of the tiles whose SOURCE red mean is at least
+   16/255; both sets side by side; fewer than 8 such tiles = say so for that frame.
+4. A validation test for the regime that defeated Donoho (quantised 8-bit Gaussian noise, most
+   HH1 zero): Immerkaer within a stated, justified tolerance; the test documents Donoho's collapse.
+5. The report states the limit: on deep 8-bit HEVC the measure is mostly compression artefact
+   carried into red, not sensor grain; the crops are the owner's direct evidence.
+6. Report what the data show; the predecessor's "tighter cap lowers red noise" is a hypothesis
+   until the grid confirms it.
+
+Applied: (1) `immerkaer_sigma` primary everywhere (records, summary, page), `donoho_sigma` and
+`hh1_zero_fraction` beside it. (2) `noise_figures` ratios `None` where the source is 0; the
+summary compares `sigma_out_8bit`. (3) `red_lit_tiles` / `tile_sets`: the bar of 8 is applied to
+the SELECTED set (`round(0.25 * eligible) >= 8`), the eligible count recorded beside it.
+(4) Tolerance 15 %: Immerkaer's sqrt(pi/2) conversion is exact for a Gaussian mask response;
+mostly-zero quantised noise is heavier-tailed and it under-reads by 9-11 % at sigma 0.25 code
+values on the test gradient (57 % zero HH1; 20 seeds, `work/wp1.4b/scratch/q2.py`); the bias
+grows with the zero fraction (-12 % at 57 % on a flat field, -24 % at 71 %, -42 % at 85 %), so a
+second test pins only the ORDER of levels there. Outputs are float, so a pure gain scales
+Immerkaer exactly: amplifications are unaffected by this bias.
+
 ## Review rounds (Reviewer A)
 
 None yet (the review runs on the finished package).
 
 ## NEXT STEPS
 
-1. Apply the dispatcher's ruling on the noise measure (the STOP above).
-2. `uv run python tools/noise_experiments.py grid` one frame per call (13 frames; frames
-   and `frames.json` already extracted in `work/wp1.4b/`).
-3. `... smoothing` (claim 10; the cap binds on 104/179 smoothed frames per WP1.3D).
-4. `... summarise`; write `docs/reports/wp1.4b-gain-cap-noise.md` from `summary.json`.
-5. Full suite in groups; Reviewer A loop (STRONG) per brief.
+1. DONE: ruling applied; grid run on all 13 frames (`work/wp1.4b/grid/*.json`, one process per
+   frame, GPU, about 30 s each); `summarise` written (`summary.json`, `index.html`).
+2. Claim 10 (`smoothing`) and claim 10b (edge-effect check first, then reset-on-step and 0.5 s).
+3. Report `docs/reports/wp1.4b-gain-cap-noise.md` from `summary.json` / `smoothing.json`.
+4. Full suite in groups (foreground); Reviewer A loop (STRONG) per brief.

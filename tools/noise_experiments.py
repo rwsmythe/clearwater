@@ -19,13 +19,19 @@ owner's crops (claim 6). ``smoothing`` runs claim 10 on the WP1.3D deep clip.
 ``summarise`` assembles ``grid.json``, the tables of claims 7-9 (``summary.json``) and the
 crop page ``index.html``.
 
-The noise measure (claim 4): ``sigma`` is the Donoho estimate ``median(|HH1|) / 0.6745`` of a
-channel, HH1 the finest diagonal detail of the orthonormal Haar transform
-(``(a - b - c + d) / 2`` on each 2x2 block), computed per 64x64 tile and taken as the median
-over a FIXED set of tiles: the quarter of the full tiles with the lowest gradient energy of
-the SOURCE frame's BT.709 luma (:func:`flat_tiles`). The same tiles serve every setting of a
-frame. Immerkaer's fast estimator on the same tiles is the cross-check
-(:func:`immerkaer_sigma`).
+The noise measure (claim 4, as ruled by the orchestrator on the 2026-10-19 STOP): the primary
+``sigma`` is Immerkaer's fast estimator (:func:`immerkaer_sigma`) per 64x64 tile, taken as the
+median over a FIXED set of tiles. The brief's Donoho estimate ``median(|HH1|) / 0.6745``
+(:func:`donoho_sigma`; HH1 the finest diagonal detail of the orthonormal Haar transform,
+``(a - b - c + d) / 2`` on each 2x2 block) is kept as the cross-check, with the fraction of
+exactly-zero HH1 coefficients recorded beside it: on the deep 8-bit HEVC frames most of those
+coefficients are 0 in the flat tiles, and the median collapses to 0. Two tile sets serve every
+setting of a frame (:func:`tile_sets`): ``flat``, the quarter of the full tiles with the lowest
+gradient energy of the SOURCE frame's BT.709 luma (:func:`flat_tiles`), and ``red_lit``, the
+quarter of the tiles whose SOURCE red mean is at least 16/255 with the lowest such energy
+(:func:`red_lit_tiles`), reported only when it holds at least :data:`MIN_TILES` tiles. Settings
+are compared on the absolute output sigma in 8-bit code values; the amplification over the
+source is recorded only where the source figure is above 0.
 
 Every output goes under ``<working folder>/wp1.4b`` through the checked writer of
 :class:`lookcheck.frames.OutputRoots`; the footage is only read.
@@ -97,6 +103,12 @@ TILE = 64
 
 FLAT_FRACTION = 0.25
 """The fraction of the full tiles, lowest source-luma gradient energy first, that is measured."""
+
+RED_FLOOR = 16.0 / 255.0
+"""The source red tile mean a ``red_lit`` tile needs, so that a red baseline exists."""
+
+MIN_TILES = 8
+"""The fewest tiles a ``red_lit`` set may hold; a frame with fewer reports none."""
 
 DONOHO_CONSTANT = 0.6745
 """The median of ``|N(0, 1)|``: ``median(|HH1|) / 0.6745`` estimates the noise sigma."""
@@ -282,6 +294,71 @@ def flat_tiles(
     return np.stack([rows, cols], axis=1).astype(np.int64)
 
 
+def red_lit_tiles(
+    image: NDArray[np.float32],
+    fraction: float = FLAT_FRACTION,
+    floor: float = RED_FLOOR,
+    size: int = TILE,
+) -> tuple[NDArray[np.int64], int]:
+    """Return the second fixed tile set: the flattest ``fraction`` of the red-lit tiles.
+
+    A tile is red-lit when its SOURCE red mean is at least ``floor``. Of those, the
+    ``round(fraction * eligible)`` tiles of lowest luma gradient energy are kept (ties by tile
+    order, row-major); there is no minimum of one, so a frame without red-lit tiles gets none.
+
+    Args:
+        image: The SOURCE frame, RGB ``(H, W, 3)``.
+        fraction: The fraction of the red-lit tiles kept.
+        floor: The red tile mean a tile needs.
+        size: The tile side.
+
+    Returns:
+        ``(k, 2)`` tile coordinates ``(row, col)``, flattest first, and the number of red-lit
+        tiles they were chosen from.
+    """
+    energy = gradient_energy(luma(image), size)
+    red = _tiles(image[..., 0], size).mean(axis=(2, 3))
+    eligible = red >= floor
+    count = round(fraction * int(eligible.sum()))
+    order = np.argsort(np.where(eligible, energy, np.inf), axis=None, kind="stable")[:count]
+    rows, cols = np.unravel_index(order, energy.shape)
+    return np.stack([rows, cols], axis=1).astype(np.int64), int(eligible.sum())
+
+
+TileSets = dict[str, NDArray[np.int64] | None]
+"""A frame's fixed tile sets by name; ``None`` marks a set with too few tiles."""
+
+
+def tile_sets(image: NDArray[np.float32]) -> tuple[TileSets, dict[str, Any]]:
+    """Return a SOURCE frame's two fixed tile sets and a record of how they were formed.
+
+    Args:
+        image: The SOURCE frame, RGB ``(H, W, 3)``.
+
+    Returns:
+        ``{"flat": ..., "red_lit": ...}`` (``red_lit`` is ``None`` when it holds fewer than
+        :data:`MIN_TILES` tiles), and per set its size, the tiles it was chosen from and its
+        coordinates.
+    """
+    flat = flat_tiles(image)
+    lit, eligible = red_lit_tiles(image)
+    sets: TileSets = {"flat": flat, "red_lit": lit if len(lit) >= MIN_TILES else None}
+    rows, cols = tile_grid(image.shape)
+    record = {
+        "size": TILE,
+        "fraction": FLAT_FRACTION,
+        "flat": {"count": len(flat), "chosen_from": rows * cols, "rows_cols": flat.tolist()},
+        "red_lit": {
+            "floor_8bit": RED_FLOOR * 255.0,
+            "count": len(lit),
+            "chosen_from": eligible,
+            "too_few": len(lit) < MIN_TILES,
+            "rows_cols": lit.tolist(),
+        },
+    }
+    return sets, record
+
+
 def _selected(channel: NDArray[Any], tiles: NDArray[np.int64], size: int) -> NDArray[np.float64]:
     """Return the selected tiles of a 2-D array, shape ``(k, size, size)``, float64."""
     out: NDArray[np.float64] = _tiles(channel, size)[tiles[:, 0], tiles[:, 1]]
@@ -310,7 +387,10 @@ def haar_hh1(blocks: NDArray[np.float64]) -> NDArray[np.float64]:
 
 
 def donoho_sigma(channel: NDArray[Any], tiles: NDArray[np.int64], size: int = TILE) -> float:
-    """The package's noise measure: the median over the tiles of ``median(|HH1|) / 0.6745``.
+    """The cross-check: the median over the tiles of ``median(|HH1|) / 0.6745`` (Donoho).
+
+    It reads 0 when more than half of a tile's HH1 coefficients are exactly 0, as in the flat
+    regions of 8-bit HEVC frames (:func:`hh1_zero_fraction`).
 
     Args:
         channel: A 2-D array, values in [0, 1] (one colour channel).
@@ -325,11 +405,27 @@ def donoho_sigma(channel: NDArray[Any], tiles: NDArray[np.int64], size: int = TI
     return float(np.median(per_tile))
 
 
+def hh1_zero_fraction(channel: NDArray[Any], tiles: NDArray[np.int64], size: int = TILE) -> float:
+    """Return the fraction of the tiles' HH1 coefficients that are exactly 0.
+
+    Above one half, the Donoho median of a tile is 0 (:func:`donoho_sigma`).
+
+    Args:
+        channel: A 2-D array.
+        tiles: The fixed tile set.
+        size: The tile side.
+
+    Returns:
+        The fraction, over every coefficient of every tile.
+    """
+    return float(np.mean(haar_hh1(_selected(channel, tiles, size)) == 0.0))
+
+
 _IMMERKAER = np.array([[1.0, -2.0, 1.0], [-2.0, 4.0, -2.0], [1.0, -2.0, 1.0]])
 
 
 def immerkaer_sigma(channel: NDArray[Any], tiles: NDArray[np.int64], size: int = TILE) -> float:
-    """The cross-check: Immerkaer's fast noise estimator per tile, median over the tiles.
+    """The primary noise measure: Immerkaer's fast estimator per tile, median over the tiles.
 
     Per tile, ``sqrt(pi / 2) / (6 (W - 2) (H - 2)) * sum |I * N|`` over the tile's interior,
     ``N = [[1, -2, 1], [-2, 4, -2], [1, -2, 1]]`` (J. Immerkaer, "Fast Noise Variance
@@ -406,29 +502,79 @@ def _ratio(value: float, reference: float) -> float | None:
     return value / reference if reference > 0.0 else None
 
 
+def sigma_figures(channel: NDArray[Any], tiles: NDArray[np.int64]) -> dict[str, float]:
+    """Return one channel's noise figures on one tile set.
+
+    Args:
+        channel: A 2-D array, values in [0, 1].
+        tiles: The fixed tile set.
+
+    Returns:
+        ``immerkaer`` (primary) and ``donoho`` (cross-check) on [0, 1], both x 255
+        (``*_8bit``), and ``hh1_zero_fraction``.
+    """
+    immerkaer = immerkaer_sigma(channel, tiles)
+    donoho = donoho_sigma(channel, tiles)
+    return {
+        "immerkaer": immerkaer,
+        "immerkaer_8bit": immerkaer * 255.0,
+        "donoho": donoho,
+        "donoho_8bit": donoho * 255.0,
+        "hh1_zero_fraction": hh1_zero_fraction(channel, tiles),
+    }
+
+
 def noise_figures(
-    channel: NDArray[Any], tiles: NDArray[np.int64], source_sigma: Mapping[str, float]
-) -> dict[str, float | None]:
-    """Return the noise figures of one channel on the fixed tiles, with the amplification.
+    channel: NDArray[Any],
+    sets: Mapping[str, NDArray[np.int64] | None],
+    source: Mapping[str, Mapping[str, float] | None],
+) -> dict[str, dict[str, float | None] | None]:
+    """Return an output channel's noise figures on each tile set, with the amplification.
 
     Args:
         channel: The output's channel.
-        tiles: The fixed tile set.
-        source_sigma: The source channel's ``donoho`` and ``immerkaer`` figures.
+        sets: The frame's fixed tile sets (:func:`tile_sets`).
+        source: Per set, the source channel's :func:`sigma_figures` (``None`` for a set with
+            too few tiles).
 
     Returns:
-        ``donoho``, ``immerkaer``, both x 255 (``*_8bit``) and both divided by the source's
-        (``*_amplification``; ``None`` when the source figure is 0).
+        Per set (``None`` for a set with too few tiles), :func:`sigma_figures` plus
+        ``immerkaer_amplification`` and ``donoho_amplification``: the output figure divided by
+        the source's, ``None`` when the source figure is 0.
     """
-    donoho = donoho_sigma(channel, tiles)
-    immerkaer = immerkaer_sigma(channel, tiles)
+    out: dict[str, dict[str, float | None] | None] = {}
+    for name, tiles in sets.items():
+        reference = source[name]
+        if tiles is None or reference is None:
+            out[name] = None
+            continue
+        figures: dict[str, float | None] = dict(sigma_figures(channel, tiles))
+        for kind in ("immerkaer", "donoho"):
+            value = figures[kind]
+            assert value is not None
+            figures[f"{kind}_amplification"] = _ratio(value, reference[kind])
+        out[name] = figures
+    return out
+
+
+def source_noise(
+    image: NDArray[np.float32], sets: Mapping[str, NDArray[np.int64] | None]
+) -> dict[str, dict[str, dict[str, float]] | None]:
+    """Return the SOURCE frame's noise figures per tile set and channel.
+
+    Args:
+        image: The source frame.
+        sets: Its fixed tile sets.
+
+    Returns:
+        Per set (``None`` for a set with too few tiles), per channel ``R``, ``G``, ``B``,
+        :func:`sigma_figures`.
+    """
     return {
-        "donoho": donoho,
-        "donoho_8bit": donoho * 255.0,
-        "donoho_amplification": _ratio(donoho, source_sigma["donoho"]),
-        "immerkaer": immerkaer,
-        "immerkaer_8bit": immerkaer * 255.0,
-        "immerkaer_amplification": _ratio(immerkaer, source_sigma["immerkaer"]),
+        name: None
+        if tiles is None
+        else {c: sigma_figures(image[..., k], tiles) for k, c in enumerate("RGB")}
+        for name, tiles in sets.items()
     }
 
 
@@ -453,8 +599,8 @@ def green_fraction(compensation: Mapping[str, Any]) -> float | None:
 def render_record(
     result: Result,
     backend: Backend,
-    tiles: NDArray[np.int64],
-    source_sigma: Mapping[str, float],
+    sets: Mapping[str, NDArray[np.int64] | None],
+    source_red: Mapping[str, Mapping[str, float] | None],
 ) -> dict[str, Any]:
     """Record one render (claims 3-5): what the pipeline did and bound, the noise, the cast.
 
@@ -465,8 +611,8 @@ def render_record(
     Args:
         result: The pipeline's result (host arrays).
         backend: The backend it ran on.
-        tiles: The source frame's fixed tile set.
-        source_sigma: The source red channel's noise figures.
+        sets: The source frame's fixed tile sets (:func:`tile_sets`).
+        source_red: Per set, the source red channel's :func:`sigma_figures`.
 
     Returns:
         A JSON-ready record.
@@ -505,7 +651,7 @@ def render_record(
             "stretch": (1.0 / (high - low)) if high > low else None,
             "collapsed": stats["normalisation"]["collapsed"],
         },
-        "noise_red": noise_figures(result.output[..., 0], tiles, source_sigma),
+        "noise_red": noise_figures(result.output[..., 0], sets, source_red),
         "residual_cast": {"R/G": means[0] / means[1], "B/G": means[2] / means[1]},
         "output_means": list(means),
     }
@@ -774,12 +920,12 @@ def run_frame(
     """
     path = roots.allowed / "frames" / record["frame"]["file"]
     image = read_png16(path)
-    tiles = flat_tiles(image)
-    source_sigma = {
-        "donoho": donoho_sigma(image[..., 0], tiles),
-        "immerkaer": immerkaer_sigma(image[..., 0], tiles),
-    }
-    windows = crop_windows(image, tiles)
+    sets, sets_record = tile_sets(image)
+    source = source_noise(image, sets)
+    source_red = {name: None if per is None else per["R"] for name, per in source.items()}
+    flat = sets["flat"]
+    assert flat is not None
+    windows = crop_windows(image, flat)
     crop_dir = roots.allowed / "crops" / record["name"].replace("@", "_")
     crops: dict[str, Any] = {}
     if record["role"] != "open-water":
@@ -788,7 +934,7 @@ def run_frame(
     for setting in settings:
         started = time.monotonic()
         result = correct(image, setting.params, backend)
-        entry = render_record(result, backend, tiles, source_sigma)
+        entry = render_record(result, backend, sets, source_red)
         if entry["label"] != setting.label:
             raise ValueError(f"render labelled {entry['label']}, setting {setting.label}")
         if setting.label in CROP_SETTINGS and record["role"] != "open-water":
@@ -798,8 +944,8 @@ def run_frame(
         renders.append(entry)
         del result
         free_device(backend)
-        log(f"  {setting.label}: sigma_R {entry['noise_red']['donoho_8bit']:.3f} (8-bit) "
-            f"({time.monotonic() - started:.1f} s)")  # fmt: skip
+        log(f"  {setting.label}: sigma_R {entry['noise_red']['flat']['immerkaer_8bit']:.3f} "
+            f"(8-bit) ({time.monotonic() - started:.1f} s)")  # fmt: skip
     frame_record = {
         "name": record["name"],
         "role": record["role"],
@@ -807,17 +953,8 @@ def run_frame(
         "listed": record["listed"],
         "camera": record["camera"],
         "backend": backend.name,
-        "tiles": {
-            "size": TILE,
-            "fraction": FLAT_FRACTION,
-            "count": len(tiles),
-            "rows_cols": tiles.tolist(),
-        },
-        "source_noise_red": {
-            **source_sigma,
-            "donoho_8bit": source_sigma["donoho"] * 255.0,
-            "immerkaer_8bit": source_sigma["immerkaer"] * 255.0,
-        },
+        "tiles": sets_record,
+        "source_noise": source,
         "source_means": list(channel_means(image)),
         "windows": {name: list(corner) for name, corner in windows.items()},
         "crops": crops,
@@ -1164,8 +1301,17 @@ def _render(frame: Mapping[str, Any], label: str) -> Mapping[str, Any]:
     raise KeyError(f"{frame['name']} has no render {label}")
 
 
+TILE_SETS = ("flat", "red_lit")
+"""The names of the two fixed tile sets, in report order."""
+
+
 def summarise(frames: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     """Compute the tables of claims 4 and 7-9 from the grid records.
+
+    Noise figures are Immerkaer's (the primary measure) on each tile set: the absolute output
+    ``sigma_out_8bit``, and the ``amplification`` over the source where the source figure is
+    above 0 (``None`` otherwise, left out of the spreads). A frame whose ``red_lit`` set has too
+    few tiles is left out of that set's spreads and counted in ``frames_without_set``.
 
     Args:
         frames: The per-frame grid records.
@@ -1177,33 +1323,43 @@ def summarise(frames: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     shallow = [frame for frame in frames if frame["role"] == "shallow"]
     water = [frame for frame in frames if frame["role"] == "open-water"]
 
-    def row(frame: Mapping[str, Any], label: str) -> dict[str, Any]:
+    def row(frame: Mapping[str, Any], label: str, tile_set: str) -> dict[str, Any]:
         entry = _render(frame, label)
+        noise = entry["noise_red"][tile_set]
         camera = frame["camera"]["state"]
         return {
-            "amplification": entry["noise_red"]["donoho_amplification"],
-            "immerkaer_amplification": entry["noise_red"]["immerkaer_amplification"],
-            "sigma_out_8bit": entry["noise_red"]["donoho_8bit"],
+            "frame": frame["name"],
+            "sigma_out_8bit": None if noise is None else noise["immerkaer_8bit"],
+            "amplification": None if noise is None else noise["immerkaer_amplification"],
+            "donoho_8bit": None if noise is None else noise["donoho_8bit"],
             "red_gain": entry["white_balance"]["applied_gains"][0],
             "residual_RG": entry["residual_cast"]["R/G"],
             "residual_BG": entry["residual_cast"]["B/G"],
             "green_fraction": entry["green_fraction"],
             "effective_alpha": entry["effective_alpha"],
+            "stretch": entry["normalisation"]["stretch"],
             "cap_bound": entry["bound"]["red_gain_cap"],
             "clamp_bound": entry["bound"]["white_balance_clamp"],
             "ISOE": camera.get("ISOE"),
             "WRGB_red": camera["WRGB"][0] if "WRGB" in camera else None,
         }
 
-    def table(labels: Sequence[str], group: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    def table(
+        labels: Sequence[str], group: Sequence[Mapping[str, Any]], tile_set: str
+    ) -> dict[str, Any]:
         out: dict[str, Any] = {}
         for label in labels:
-            rows = [row(frame, label) for frame in group]
-            cell: dict[str, Any] = {"frames": len(rows)}
-            for key in ("amplification", "red_gain", "residual_RG", "residual_BG",
-                        "sigma_out_8bit", "effective_alpha", "green_fraction"):  # fmt: skip
+            rows = [row(frame, label, tile_set) for frame in group]
+            cell: dict[str, Any] = {
+                "frames": len(rows),
+                "frames_without_set": sum(r["sigma_out_8bit"] is None for r in rows),
+            }
+            for key in ("sigma_out_8bit", "amplification", "red_gain", "residual_RG",
+                        "residual_BG", "effective_alpha", "green_fraction",
+                        "stretch"):  # fmt: skip
                 values = [r[key] for r in rows if r[key] is not None]
                 cell[key] = _spread(values) if values else None
+            cell["amplification_frames"] = sum(r["amplification"] is not None for r in rows)
             cell["cap_bound_frames"] = sum(bool(r["cap_bound"]) for r in rows)
             cell["clamp_bound_frames"] = sum(any(r["clamp_bound"]) for r in rows)
             cell["clamp_bound_red_frames"] = sum(bool(r["clamp_bound"][0]) for r in rows)
@@ -1215,33 +1371,76 @@ def summarise(frames: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     cap_labels = [
         f"ancuti2018 cap={'off' if cap is None else f'{cap:g}'} clamp={clamp}" for cap in RED_CAPS
     ] + [f"c3 clamp={clamp}"]
-    gate4 = {"deep": table(cap_labels, deep), "shallow": table(cap_labels, shallow)}
-    default_label = f"ancuti2018 cap={DEFAULT_CAP:g} clamp={clamp}"
-    tracking: dict[str, Any] = {}
-    for label in (default_label, f"ancuti2018 cap=off clamp={clamp}", f"c3 clamp={clamp}"):
-        rows = [row(frame, label) for frame in deep]
-        amplification = [r["amplification"] for r in rows]
-        tracking[label] = {
-            "vs_red_gain": rank_correlation(amplification, [r["red_gain"] for r in rows]),
-            "vs_ISOE": rank_correlation(amplification, [float(r["ISOE"] or 0) for r in rows]),
-            "vs_camera_WRGB_red": rank_correlation(
-                amplification, [float(r["WRGB_red"] or 0) for r in rows]
-            ),
-            "ISOE_values": sorted({r["ISOE"] for r in rows}),
+    gate4 = {
+        tile_set: {
+            "deep": table(cap_labels, deep, tile_set),
+            "shallow": table(cap_labels, shallow, tile_set),
         }
+        for tile_set in TILE_SETS
+    }
+    # Within each deep frame: does the tightest cap raise or lower the output red noise?
+    tightest = min(cap for cap in RED_CAPS if cap is not None)
+    loose_label, tight_label = cap_labels[0], f"ancuti2018 cap={tightest:g} clamp={clamp}"
+    direction: dict[str, Any] = {}
+    for tile_set in TILE_SETS:
+        counts = {"raises": 0, "lowers": 0, "equal": 0, "no_set": 0}
+        per_frame: dict[str, Any] = {}
+        for frame in deep:
+            loose, tight = row(frame, loose_label, tile_set), row(frame, tight_label, tile_set)
+            if loose["sigma_out_8bit"] is None:
+                counts["no_set"] += 1
+                continue
+            change = tight["sigma_out_8bit"] - loose["sigma_out_8bit"]
+            verdict = "equal" if change == 0.0 else "raises" if change > 0.0 else "lowers"
+            counts[verdict] += 1
+            per_frame[frame["name"]] = {
+                "sigma_cap_off_8bit": loose["sigma_out_8bit"],
+                "sigma_cap_tight_8bit": tight["sigma_out_8bit"],
+                "relative_change": _ratio(change, loose["sigma_out_8bit"]),
+                "red_gain_cap_off": loose["red_gain"],
+                "red_gain_cap_tight": tight["red_gain"],
+                "alpha_cap_tight": tight["effective_alpha"],
+                "verdict": verdict,
+            }
+        direction[tile_set] = {"tight": tight_label, "counts": counts, "per_frame": per_frame}
+    tracking: dict[str, Any] = {}
+    default_label = f"ancuti2018 cap={DEFAULT_CAP:g} clamp={clamp}"
+    for tile_set in TILE_SETS:
+        for label in (default_label, loose_label, f"c3 clamp={clamp}"):
+            rows = [r for r in (row(frame, label, tile_set) for frame in deep)
+                    if r["amplification"] is not None]  # fmt: skip
+            amplification = [r["amplification"] for r in rows]
+            tracking[f"{label} / {tile_set}"] = {
+                "frames": len(rows),
+                "vs_red_gain": rank_correlation(amplification, [r["red_gain"] for r in rows]),
+                "vs_stretch": rank_correlation(amplification, [r["stretch"] for r in rows]),
+                "vs_ISOE": rank_correlation(amplification, [float(r["ISOE"] or 0) for r in rows]),
+                "vs_camera_WRGB_red": rank_correlation(
+                    amplification, [float(r["WRGB_red"] or 0) for r in rows]
+                ),
+                "ISOE_values": sorted({r["ISOE"] for r in rows}),
+            }
     clamp_labels = [f"c3 clamp={value:g}" for value in CLAMPS] + [
         f"ancuti2018 cap={DEFAULT_CAP:g} clamp={value:g}" for value in CLAMPS
     ]
-    clamp_table = table(clamp_labels, deep)
+    clamp_table = {tile_set: table(clamp_labels, deep, tile_set) for tile_set in TILE_SETS}
     ranking: dict[str, Any] = {}
     for frame in deep + shallow:
-        donoho = [entry["noise_red"]["donoho"] for entry in frame["renders"]]
-        immerkaer = [entry["noise_red"]["immerkaer"] for entry in frame["renders"]]
-        pairs = len(donoho) * (len(donoho) - 1) // 2
+        flat = [entry["noise_red"]["flat"] for entry in frame["renders"]]
+        lit = [entry["noise_red"]["red_lit"] for entry in frame["renders"]]
+        immerkaer = [figures["immerkaer"] for figures in flat]
+        donoho = [figures["donoho"] for figures in flat]
+        count = len(flat)
         ranking[frame["name"]] = {
-            "discordant_pairs": discordant_pairs(donoho, immerkaer),
-            "pairs": pairs,
-            "same_order": discordant_pairs(donoho, immerkaer) == 0,
+            "pairs": count * (count - 1) // 2,
+            "donoho_vs_immerkaer_discordant": discordant_pairs(donoho, immerkaer),
+            "donoho_tied_pairs": sum(
+                donoho[i] == donoho[j] for i in range(count) for j in range(i + 1, count)
+            ),
+            "donoho_zero_renders": sum(value == 0.0 for value in donoho),
+            "flat_vs_red_lit_discordant": None
+            if any(figures is None for figures in lit)
+            else discordant_pairs(immerkaer, [figures["immerkaer"] for figures in lit]),
         }
     floor: dict[str, Any] = {}
     for label in DEFAULT_SETTINGS:
@@ -1251,20 +1450,32 @@ def summarise(frames: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
                 "range": _spread(ranges),
                 "stretch": _spread([1.0 / value for value in ranges]),
                 "per_frame": {
-                    frame["name"]: value for frame, value in zip(group, ranges, strict=True)
+                    frame["name"]: {
+                        "range": value,
+                        "sigma_out_flat_8bit": row(frame, label, "flat")["sigma_out_8bit"],
+                        "source_sigma_flat_8bit": frame["source_noise"]["flat"]["R"][
+                            "immerkaer_8bit"
+                        ],
+                    }
+                    for frame, value in zip(group, ranges, strict=True)
                 },
             }
     source = {
         frame["name"]: {
-            "sigma_8bit": frame["source_noise_red"]["donoho_8bit"],
-            "immerkaer_8bit": frame["source_noise_red"]["immerkaer_8bit"],
+            "noise": frame["source_noise"],
+            "tiles": {
+                tile_set: {key: frame["tiles"][tile_set][key] for key in ("count", "chosen_from")}
+                for tile_set in TILE_SETS
+            },
             "camera": frame["camera"]["state"],
             "D": frame["listed"].get("D"),
         }
         for frame in deep + shallow
     }
     return {
+        "measure": "immerkaer (primary), donoho (cross-check); 8-bit code values",
         "gate4": gate4,
+        "cap_direction": direction,
         "tracking": tracking,
         "clamp": clamp_table,
         "ranking": ranking,
@@ -1286,6 +1497,33 @@ def _fmt(value: float | None) -> str:
     return "n/a" if value is None else f"{value:.2f}"
 
 
+def _sigma_caption(noise: Mapping[str, Any], channel: str | None = None) -> str:
+    """Return the ``sigma_R`` caption lines of a crop: Immerkaer per tile set, the amplification.
+
+    Args:
+        noise: Per tile set, the figures (a render's ``noise_red``, or the source's
+            ``source_noise``, then per channel).
+        channel: The channel key of a source record; ``None`` for a render's.
+
+    Returns:
+        HTML with one line per tile set.
+    """
+    lines = []
+    for tile_set, name in (("flat", "flat"), ("red_lit", "lit")):
+        figures = noise[tile_set]
+        if figures is None:
+            lines.append(f"sigma_R {name} n/a (too few tiles)")
+            continue
+        if channel is not None:
+            lines.append(f"sigma_R {name} {figures[channel]['immerkaer_8bit']:.2f}")
+            continue
+        lines.append(
+            f"sigma_R {name} {figures['immerkaer_8bit']:.2f} "
+            f"(x{_fmt(figures['immerkaer_amplification'])})"
+        )
+    return "<br>".join(lines)
+
+
 def page(frames: Sequence[Mapping[str, Any]]) -> str:
     """Build the static crop page: per frame, the flat and the textured crop under 7 settings.
 
@@ -1302,9 +1540,12 @@ def page(frames: Sequence[Mapping[str, Any]]) -> str:
         "table{border-collapse:collapse}</style></head><body>",
         "<h1>WP1.4b: red-channel noise under the gain caps and the clamp</h1>",
         "<p>Each crop is 512x512 at 100 % shown at half size (open it for full size). Row one is "
-        "RGB, row two the red channel alone in grayscale. sigma_R is the Donoho estimate on the "
-        "frame's fixed flat tiles, in 8-bit code values; x is the amplification over the source."
-        "</p>",
+        "RGB, row two the red channel alone in grayscale. sigma_R is Immerkaer's estimate in "
+        "8-bit code values on the frame's two fixed tile sets: 'flat' (the flattest quarter of "
+        "the source tiles) and 'lit' (the flattest quarter of the tiles whose source red mean "
+        "is at least 16/255); x is the amplification over the source (n/a where the source "
+        "reads 0). On deep 8-bit HEVC frames much of what it measures is compression artefact "
+        "carried into red, not sensor grain: the crops are the direct evidence.</p>",
     ]
     for frame in frames:
         if not frame["crops"]:
@@ -1322,7 +1563,7 @@ def page(frames: Sequence[Mapping[str, Any]]) -> str:
             out.append(f"<h3>{window} crop at x={x}, y={y}</h3><table><tr>")
             for column in columns:
                 if column == "source":
-                    caption = f"source<br>sigma_R {frame['source_noise_red']['donoho_8bit']:.2f}"
+                    caption = "source<br>" + _sigma_caption(frame["source_noise"], "R")
                 else:
                     entry = _render(frame, column)
                     bound = entry["bound"]
@@ -1337,8 +1578,7 @@ def page(frames: Sequence[Mapping[str, Any]]) -> str:
                         if flag
                     ]
                     caption = (
-                        f"{_esc(column)}<br>sigma_R {entry['noise_red']['donoho_8bit']:.2f} "
-                        f"(x{_fmt(entry['noise_red']['donoho_amplification'])})<br>red gain "
+                        f"{_esc(column)}<br>{_sigma_caption(entry['noise_red'])}<br>red gain "
                         f"{entry['white_balance']['applied_gains'][0]:.2f}<br>bound: "
                         f"{_esc(', '.join(flags) or 'none')}"
                     )
