@@ -234,7 +234,49 @@ path, md5, five assertions and verdict, or there is no accept.
   package, wave 4), CLAUDE.md spec line, architecture FINAL 1.0, AD-21 closed, AD-26/27, gate
   report CLOSED, records docs/proofs/cp3-prototype-gate.md + cp4-design-freeze.md (3eca7bd).
   Orchestrator told (e98394db): briefs cite v0.5.4; WP3.1 Gate 1 section = one line; wave 1
-  unblocked on WP2.3 merge. **No owner decision open. Photos still pending.** WP1.4b dispatched (opus-high; flip guards + gpmd claim 2a). Next: WP1.3-deep / WP1.4b brief on SCUBA/ (c3 primary, Params() flips to c3), then
+  unblocked on WP2.3 merge. **No owner decision open. Photos still pending.**
+
+## ROLLOVER 2026-10-20 ~16:45Z (CHARC generation 1 `clearwater-charc-20261014-1303` at the 400K depth cap)
+
+**Successor: read this file first, then `docs/charc-charter.md`, `docs/charc-bootstrap.md`
+(bring-up only; steps 1-5 done), `docs/orchestrator-context.md`, `docs/dispatch-recipe.md`,
+`docs/review-gate-clearwater.md`, `docs/model-prompting-standard.md`. Then drain the charc inbox
+(`uv run python scripts/role_mail.py read --role charc --all`) and announce yourself to the
+orchestrator (`clearwater-orchestrator-20261020-0524`, gen 4; always re-read
+`comms/.launch-sessions.json` before a cue). Memory files under
+`~/.claude/projects/C--Users-rwsmy-clearwater/memory/` hold the owner's rulings verbatim.**
+
+State at hand-off:
+- **Phase 1 CLOSED** (gate report `docs/reports/wp1.6-gate-report.md`; CP3/CP4 records in
+  `docs/proofs/`). **Spec v0.5.4, plan v1.2, architecture FINAL 1.0, decisions AD-1..AD-27.**
+  IF-1..IF-10 FROZEN in `src/clearwater/interfaces/` (WP2.2, b288533).
+- **Live cell: WP2.3 fixtures** (wp23-cell stood down at 407K after R1 + remediation without a
+  yield; a fresh sonnet-high cell continues R2 from d495b57). Last CHARC ruling (this
+  generation's last message): AD-14 geometry accepted; one conditional `pytest_plugins` line in
+  conftest; `.gitattributes` granted (`tests/fixtures/** -text`). On its return: QA (patch-id on
+  author/candidate/main, B md5s, DR entries, harness gate at this seat), then the orchestrator
+  dispatches wave 1.
+- **Wave 1 briefs APPROVED and ready** (WP3.1 opus-high; WP3.7, WP3.13, WP3.15 sonnet-high;
+  docs/briefs/wp3.{1,7,13,15}-brief.md): dispatch all four in parallel on WP2.3's merge; manifest
+  ids filled at dispatch; briefs cite v0.5.4 (drop "proposed" markers); WP3.1's Gate 1 section is
+  one line (device-resident-ready IF-2). Full-pytest gate runs serialised by the orchestrator.
+- **Then:** wave 2-4 briefs per `docs/briefs/wp2.4-phase3-frame.md` (orchestrator drafts, CHARC
+  approves each; WP3.21 optimisation package drafted at wave 4). CP5 shows the owner the starter
+  preset values. Every accept: CHARC QA as above; close DR items in the register as packages
+  close them.
+- **Standing rules this generation learned:** the owner answers only owner-reserved items (plan
+  s3); everything else CHARC rules in the operator's stead, recommended answer first, and reads
+  the owner's words back verbatim with their time; end every owner-facing turn with the open
+  owner decisions; subjects under 120 chars (the poster refuses longer ones; shorten and
+  re-post); Bash heredocs with apostrophe-heavy Python fail at this seat, write scripts to the
+  scratchpad with the Write tool and run them; `ruff format` now excludes `*.md`; the full pytest
+  takes 8-15 min, run it in the background; do not start heavy runs while an exclusive window is
+  open; the host kills background runs under memory pressure, report and re-run only when asked.
+- **Owner:** no decision open. Photos still to be supplied (memory-test photo leg; AD-24 HEIC
+  rule provisional). Main is ~430 commits ahead of origin, unpushed; the owner has not asked for a
+  push.
+- **Orchestrator:** gen 4 at ~? depth (ask it); it rolls at 400K with a clean boundary and launches
+  its own successor; the launcher registers the new name in `comms/.launch-sessions.json`. WP1.4b dispatched (opus-high; flip guards + gpmd claim 2a). Next: WP1.3-deep / WP1.4b brief on SCUBA/ (c3 primary, Params() flips to c3), then
   WP1.6 gate report (Gate 1: core 3.6x, production export 4.4x over N6). **Footage-layout skips:** the owner's Snorkel/SCUBA/edits layout makes 3
   footage tests skip (root `GX011628.MP4` paths in `tests/test_container_spike.py:902`,
   `tests/test_lookcheck.py:1289`, WP1.4 test 7; also `tools/lookcheck/pack.py:94` and the WP1.4
