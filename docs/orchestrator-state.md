@@ -53,9 +53,13 @@
   show c3 as the default with the Ancuti options.
 - **Main re-gate:** DONE at CHARC's seat (see Handoff item 3).
 - `wp12b-cell` (WP1.2 Part B) RETIRED at 931,878 / 428 turns, PAST-CAP. Do not reply to it.
-- **Depth rule (owner catch 2026-10-19):** read `cell_depth.py <cell>` at dispatch, at every
-  yield, and before sending any ruling or remediation. Record each figure with its moment. Above
-  ~250K: never order a multi-finding remediation; re-seat. At ~400K: STOP and re-dispatch fresh.
+- **Depth rule (owner 2026-10-19, corrected 2026-10-20):** read `cell_depth.py <cell>` at dispatch,
+  at every yield, and before sending any ruling or remediation; record each figure with its
+  moment. **~250K is an EVALUATION point, not an automatic re-seat** (owner 2026-10-20: "You don't
+  need to replace the cell at 240k, that should just be an evaluation point"): weigh the remaining
+  work; a few bounded steps continue, a large or open-ended load (a multi-finding remediation) goes
+  to a fresh cell. At ~400K: STOP and re-dispatch fresh. (WP1.3D's two re-seats at 244K and 240K
+  were stricter than needed.)
 
 ### Gate inputs
 
@@ -159,9 +163,9 @@ Each accepted package had its return report posted to CHARC and an info-update t
 - **GoPro IMU/GPS OUT OF SCOPE** (owner 2026-10-19 ~22:30Z via CHARC `01500d3574412e69`): no brief
   reads ACCL/GYRO/GRAV/CORI/IORI/GPS. WP1.4b claim 2a reads six camera-state keys only (brief
   `f183a11`); no gpmd extract is ever committed (it carries GPS).
-- **Kernel-doc touch owed (CHARC `cb61a4e41f625d73`):** put the depth thresholds (no
-  multi-finding remediation above ~250K; STOP and re-dispatch at ~400K; read depth at dispatch,
-  every yield and before any ruling) into `docs/orchestrator-context.md` at the next kernel-doc
+- **Kernel-doc touch owed (CHARC `cb61a4e41f625d73`):** put the depth thresholds (~250K an
+  evaluation point, not an automatic re-seat, per the owner 2026-10-20; STOP and re-dispatch at
+  ~400K; read depth at dispatch, every yield and before any ruling) into `docs/orchestrator-context.md` at the next kernel-doc
   change, with the harness gate.
 - **WP1.6 gate report** (CHARC `6c5d88685e64a37c`): the smoothing-default row reads "2 s
   provisional, re-measure per DR-25(3)", never a settled 2 s.
