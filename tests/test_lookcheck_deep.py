@@ -587,8 +587,16 @@ def test_the_deep_clip_is_staged_smoothed_encoded_checked_and_pruned(
 
     monkeypatch.setattr(temporal, "analyse_staged", spy)
     clip_dir = roots.allowed / "clip"
-    document = pack.run_deep_clip(clip, 3.95, roots, backend, clip_dir, seconds=0.4)
-    count = document["excerpt"]["frames"]
+    rendered = pack.render_deep_clip(clip, 3.95, roots, backend, clip_dir, seconds=0.4)
+    # the statistics are on disk before any encode, and the PNG sets are complete
+    assert rendered["checks"] is None and rendered["encode_commands"] is None
+    on_disk = json.loads((clip_dir / "statistics.json").read_text(encoding="utf-8"))
+    assert on_disk["checks"] is None and list(on_disk["variants"]) == ["c3", "ancuti2018"]
+    assert not list(clip_dir.glob("*.mp4"))
+    count = rendered["excerpt"]["frames"]
+    for folder in ("source", "corrected-c3", "corrected-ancuti2018"):
+        assert len(list((clip_dir / folder).glob("*.png"))) == count
+    document = pack.encode_deep_clip(clip, roots, clip_dir)
     assert 11 <= count <= 12  # 0.4 s at 30000/1001
     duration = frames.probe_stream(clip).duration_s
     start = document["excerpt"]["start_s"]  # centred on 3.95 s would run past the end: clamped
@@ -597,6 +605,8 @@ def test_the_deep_clip_is_staged_smoothed_encoded_checked_and_pruned(
     assert document["smoother"] == {"kind": "gaussian", "window_s": 2.0}
     assert all(check["ok"] for label, check in document["checks"].items() if label != "readback")
     assert document["checks"]["readback"]["ok"]
+    for label in ("c3", "ancuti2018", "source"):  # the deep bound, not the shallow clip's
+        assert document["checks"]["readback"][label]["thresholds"]["max_own"] == 5.0
     for name in ("GXDEEP_c3.mp4", "GXDEEP_ancuti2018.mp4", "GXDEEP_source.mp4", "statistics.json"):
         assert (clip_dir / name).is_file()
     assert [p.name for p in pack.clip_files(roots, clip_dir)] == [

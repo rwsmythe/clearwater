@@ -42,9 +42,11 @@ configuration, probe, device, path or FFmpeg failure.
 from the eight ``SCUBA/`` chapters and the scan's ``deep-frames.json`` (``lookcheck.scan``).
 Its variants are ``c3`` (the default method of v0.5.3), ``ancuti2018`` and ``ancuti2018-blue``,
 in that order, at the ``Params()`` defaults with only the method (and blue compensation) set.
-``--part clip`` builds the deep clip in motion (:func:`run_deep_clip`), ``--part stills`` the
-48 chapter stills, the 12 case candidates at full resolution and the page
-(:func:`build_deep_pack`); ``all`` (the default) does the clip first, so that the page links it.
+``--part clip`` builds the deep clip in motion (:func:`render_deep_clip`, then
+:func:`encode_deep_clip`; ``render`` and ``encode`` run one step each, the encode from the
+rendered PNGs), ``--part stills`` the 48 chapter stills, the 12 case candidates at full
+resolution and the page (:func:`build_deep_pack`); ``all`` (the default) does the clip first, so
+that the page links it.
 """
 
 from __future__ import annotations
@@ -982,6 +984,7 @@ def encode_verified_pair(
     info: StreamInfo,
     count: int,
     flicker_dir: Path,
+    max_own: float = READBACK_MAX_OWN,
 ) -> tuple[dict[str, list[str]], dict[str, Any]]:
     """Encode the clips under temporary names, verify every one, then give them their names.
 
@@ -999,6 +1002,8 @@ def encode_verified_pair(
         info: The source stream (frame rate, size and tags the clips must carry).
         count: The number of frames each clip must hold.
         flicker_dir: The folder of the clips.
+        max_own: The read-back bound on a clip frame's difference to its own PNG
+            (:func:`readback_clip`; :data:`READBACK_MAX_OWN` by default).
 
     Returns:
         The FFmpeg command per label (with the final clip name as its output) and the
@@ -1022,7 +1027,9 @@ def encode_verified_pair(
             )
             checks[label]["file"] = finals[label].name
         readback: dict[str, Any] = {
-            label: readback_clip(partials[label], clips[label][0], count, info, flicker_dir, roots)
+            label: readback_clip(
+                partials[label], clips[label][0], count, info, flicker_dir, roots, max_own
+            )
             for label in clips
         }
         readback["ok"] = all(record["ok"] for record in readback.values())
@@ -1140,13 +1147,14 @@ def readback_clip(
     info: StreamInfo,
     flicker_dir: Path,
     roots: OutputRoots,
+    max_own: float = READBACK_MAX_OWN,
 ) -> dict[str, Any]:
     """Read back EVERY frame of an encoded clip and match each to the PNG it came from.
 
     The clip is converted with the extraction's colour conversion (its own tags) and the PNG
     sequence ``pattern`` is read through FFmpeg, both reduced to 1/8 size
     (:data:`READBACK_METHOD`). Frame ``i`` passes when its mean
-    absolute difference to its own PNG (``own``) is at most :data:`READBACK_MAX_OWN` AND is
+    absolute difference to its own PNG (``own``) is at most ``max_own`` AND is
     smaller than its difference to the PNG of frame ``i - 1`` (``previous``) and of frame
     ``i + 1`` (``next``): an encode that repeats, drops or swaps a frame fails by name.
     ``margin`` is the smaller neighbour difference minus ``own``. The clip as a whole
@@ -1161,6 +1169,7 @@ def readback_clip(
         info: The source stream (size and tags).
         flicker_dir: Folder for the temporary decoded frames (cleared first, removed again).
         roots: The output safety roots.
+        max_own: The bound on ``own`` in 8-bit levels (:data:`READBACK_MAX_OWN` by default).
 
     Returns:
         The record: ``frames`` (per frame, in presentation order: ``index``, ``own``,
@@ -1227,7 +1236,7 @@ def readback_clip(
                 bias = (image - references[index]).mean(axis=(0, 1), dtype=np.float64) * 255.0
                 bias_sum += bias
                 reasons = []
-                if not own <= READBACK_MAX_OWN:
+                if not own <= max_own:
                     reasons.append(f"differs from its own PNG by {own:.3f} levels")
                 if margin is not None and not margin > 0:
                     reasons.append(
@@ -1260,7 +1269,7 @@ def readback_clip(
             "frames_expected": count,
             "frames_read": len(decoded),
             "thresholds": {
-                "max_own": READBACK_MAX_OWN,
+                "max_own": max_own,
                 "max_channel_bias": READBACK_MAX_CHANNEL_BIAS,
                 "margin": "own below both neighbours' differences",
             },
@@ -1294,6 +1303,14 @@ DEEP_SMOOTHER = Smoother("gaussian", 2.0)
 """The deep clip's smoothing: the centred Gaussian at 2.0 s, the provisional default (DR-25(3))."""
 
 DEEP_CLIP_SECONDS = 6.0
+DEEP_READBACK_MAX_OWN = 5.0
+"""The deep clip's read-back bound on a frame's difference to its own PNG, in 8-bit levels.
+
+The shallow clip's 3.0 (:data:`READBACK_MAX_OWN`) is too tight for the noisy deep footage: a
+lossy encode of the first render measured 1.0 to 3.85 levels (mean 1.9) on the corrected frames and
+up to 3.03 on the source frames, with every frame still closer to its own PNG than to a
+neighbour's by at least 1.6 levels. The neighbour test and the channel-bias bound are unchanged.
+"""
 DEEP_PENDING: tuple[tuple[str, str], ...] = (
     ("Photos (iPhone)", "none supplied for this part"),
     (
@@ -1679,7 +1696,7 @@ def run_deep_stills(
     return build_deep_pack(stills, candidates, pack_dir, roots, backend, clips)
 
 
-def run_deep_clip(
+def render_deep_clip(
     video: Path,
     centre_s: float,
     roots: OutputRoots,
@@ -1689,7 +1706,7 @@ def run_deep_clip(
     seconds: float = DEEP_CLIP_SECONDS,
     smoother: Smoother = DEEP_SMOOTHER,
 ) -> dict[str, Any]:
-    """Build the deep clip: a 6 s excerpt corrected with STAGED, smoothed statistics.
+    """Render the deep clip's frames: a 6 s excerpt corrected with STAGED, smoothed statistics.
 
     The excerpt (:func:`clip_window` around ``centre_s``) is extracted frame by frame at full
     resolution. Statistics are measured on the 540-line proxy built in NumPy, an exact 4x4
@@ -1698,12 +1715,11 @@ def run_deep_clip(
     Gaussian at 2.0 s). Each frame is rendered from its smoothed statistics for ``c3`` and
     ``ancuti2018`` (:data:`DEEP_CLIP_VARIANTS`; the same call as
     :func:`prototype.temporal.render`, kept as a :class:`prototype.pipeline.Result` so that its
-    record is available). The two corrected sets and the untouched source frames are encoded
-    to ``<chapter>_c3.mp4``, ``<chapter>_ancuti2018.mp4`` and ``<chapter>_source.mp4`` by
-    :func:`encode_verified_pair` (the clip check and the read-back of every frame); only after
-    that are all frame PNGs but the first, middle and last of each set deleted.
-    ``statistics.json`` holds, per variant and frame, the raw (unsmoothed) and smoothed
-    statistics and the render's record; one plot per variant is written beside it.
+    record is available). The numbered PNG sets go to ``clip_dir/source`` and
+    ``clip_dir/corrected-<variant>``. ``statistics.json`` (per variant and frame: the raw
+    unsmoothed and the smoothed statistics and the render's record) and one plot per variant are
+    written BEFORE any encode, so that the slow part is never lost to a failing encode check;
+    ``encode_commands`` and ``checks`` in it are ``null`` until :func:`encode_deep_clip` runs.
 
     Args:
         video: The source chapter.
@@ -1718,8 +1734,7 @@ def run_deep_clip(
         The statistics document that was written.
 
     Raises:
-        lookcheck.frames.ExtractError: A probe, decode or encode fails or a check does not hold
-            (the frame PNGs are then kept and no clip exists under its final name).
+        lookcheck.frames.ExtractError: A probe or decode fails.
     """
     info = probe_stream(video)
     start = clip_window(centre_s, info.duration_s, seconds)
@@ -1738,7 +1753,6 @@ def run_deep_clip(
     del proxies
     print(f"analysed {len(got)} frames in {time.monotonic() - began:.0f} s", file=sys.stderr)
     entries: dict[str, list[dict[str, Any]]] = {variant.name: [] for variant in chosen}
-    corrected_paths: dict[str, list[Path]] = {variant.name: [] for variant in chosen}
     for number, frame in enumerate(got):
         image = read_png16(frame.path)
         for variant in chosen:
@@ -1750,7 +1764,6 @@ def run_deep_clip(
                 clip_dir / f"corrected-{variant.name}" / f"{frame.path.stem}-{variant.name}.png"
             )
             _write_png(roots, target, result.output)
-            corrected_paths[variant.name].append(target)
             record = statistics_record(result, backend)
             del record["params"], record["backend"]
             entries[variant.name].append(
@@ -1771,18 +1784,6 @@ def run_deep_clip(
             )
         if number % 20 == 0:
             print(f"rendered {number + 1}/{len(got)}", file=sys.stderr)
-    stem = video.stem
-    clips = {
-        **{
-            variant.name: (
-                clip_dir / f"corrected-{variant.name}" / f"{stem}_f%04d-{variant.name}.png",
-                clip_dir / f"{stem}_{variant.name}.mp4",
-            )
-            for variant in chosen
-        },
-        "source": (source_dir / f"{stem}_f%04d.png", clip_dir / f"{stem}_source.mp4"),
-    }
-    commands, checks = encode_verified_pair(roots, clips, info, len(got), clip_dir)
     pts_seconds = [float(frame.pts) for frame in got]
     variants_record: dict[str, Any] = {}
     for variant in chosen:
@@ -1825,7 +1826,7 @@ def run_deep_clip(
         "written": _now(),
         "spec": scan.SPEC_VERSION,
         "source": str(video),
-        "chapter": stem,
+        "chapter": video.stem,
         "analysis": "STAGED (spec D97), prototype.temporal.analyse_staged",
         "proxy": "exact area mean of the full-resolution frame in NumPy (prototype.temporal.proxy)",
         "smoother": {"kind": smoother.kind, "window_s": smoother.window_s},
@@ -1845,18 +1846,98 @@ def run_deep_clip(
         "tags": info.tags.record(),
         "ffmpeg": tool_version("ffmpeg"),
         "extract_command": list(got[0].command),
-        "encode_commands": commands,
-        "checks": checks,
+        "encode_commands": None,
+        "checks": None,
         "variants": variants_record,
     }
     roots.write_text(clip_dir / "statistics.json", _json_text(document))
-    keep = {0, len(got) // 2, len(got) - 1}
-    for number, frame in enumerate(got):
-        if number not in keep:
-            roots.remove(frame.path)
-            for paths in corrected_paths.values():
-                roots.remove(paths[number])
     return document
+
+
+def encode_deep_clip(
+    video: Path, roots: OutputRoots, clip_dir: Path, *, max_own: float = DEEP_READBACK_MAX_OWN
+) -> dict[str, Any]:
+    """Encode the rendered deep clip's PNG sets to MP4, check them, and prune the PNGs.
+
+    Reads ``clip_dir/statistics.json`` (:func:`render_deep_clip`), encodes the corrected sets
+    and the untouched source frames to ``<chapter>_c3.mp4``, ``<chapter>_ancuti2018.mp4`` and
+    ``<chapter>_source.mp4`` with :func:`encode_verified_pair` (the clip check of
+    :func:`verify_clip` and the read-back of every frame, whose own-PNG bound is ``max_own``),
+    records the commands and checks in ``statistics.json``, and only then deletes all frame
+    PNGs but the first, middle and last of each set.
+
+    Args:
+        video: The source chapter (probed for the frame rate, size and tags the clips carry).
+        roots: The output safety roots.
+        clip_dir: The clip folder.
+        max_own: The read-back bound on a clip frame's difference to its own PNG, in 8-bit
+            levels (:data:`DEEP_READBACK_MAX_OWN` by default).
+
+    Returns:
+        The updated statistics document.
+
+    Raises:
+        lookcheck.frames.ExtractError: A probe or encode fails or a check does not hold (the
+            frame PNGs are then kept and no clip exists under its final name).
+    """
+    path = roots.check(clip_dir / "statistics.json")
+    document: dict[str, Any] = json.loads(path.read_text(encoding="utf-8"))
+    info = probe_stream(video)
+    count = document["excerpt"]["frames"]
+    stem = video.stem
+    names = list(document["variants"])
+    clips = {
+        **{
+            name: (
+                clip_dir / f"corrected-{name}" / f"{stem}_f%04d-{name}.png",
+                clip_dir / f"{stem}_{name}.mp4",
+            )
+            for name in names
+        },
+        "source": (clip_dir / "source" / f"{stem}_f%04d.png", clip_dir / f"{stem}_source.mp4"),
+    }
+    commands, checks = encode_verified_pair(roots, clips, info, count, clip_dir, max_own)
+    document["encode_commands"] = commands
+    document["checks"] = checks
+    roots.write_text(path, _json_text(document))
+    keep = {0, count // 2, count - 1}
+    for number in range(count):
+        if number not in keep:
+            roots.remove(clip_dir / "source" / f"{stem}_f{number:04d}.png")
+            for name in names:
+                roots.remove(clip_dir / f"corrected-{name}" / f"{stem}_f{number:04d}-{name}.png")
+    return document
+
+
+def run_deep_clip(
+    video: Path,
+    centre_s: float,
+    roots: OutputRoots,
+    backend: Backend,
+    clip_dir: Path,
+    *,
+    seconds: float = DEEP_CLIP_SECONDS,
+    smoother: Smoother = DEEP_SMOOTHER,
+) -> dict[str, Any]:
+    """Build the deep clip: :func:`render_deep_clip`, then :func:`encode_deep_clip`.
+
+    Args:
+        video: The source chapter.
+        centre_s: The centre of the excerpt in seconds (the deepest candidate's pts).
+        roots: The output safety roots.
+        backend: Where the pipeline runs.
+        clip_dir: The output folder (``<working folder>/wp1.3d/clip``).
+        seconds: The excerpt length in seconds.
+        smoother: The statistics smoother.
+
+    Returns:
+        The statistics document, with the encode commands and checks.
+
+    Raises:
+        lookcheck.frames.ExtractError: A probe, decode or encode fails or a check does not hold.
+    """
+    render_deep_clip(video, centre_s, roots, backend, clip_dir, seconds=seconds, smoother=smoother)
+    return encode_deep_clip(video, roots, clip_dir)
 
 
 def clip_files(roots: OutputRoots, clip_dir: Path) -> list[Path]:
@@ -1881,12 +1962,16 @@ def clip_files(roots: OutputRoots, clip_dir: Path) -> list[Path]:
 
 
 def _run_deep(roots: OutputRoots, footage: Path, backend: Backend, part: str) -> None:
-    """Run the deep part: the clip, the stills and page, or both (the clip first)."""
+    """Run the deep part: the clip (or one of its steps), the stills and page, or all."""
     clip_dir = roots.allowed / "clip"
-    if part in ("all", "clip"):
+    if part in ("all", "clip", "render", "encode"):
         deepest = _load_deep_frames(roots)["deepest"][0]
         video = find_footage_file(deepest["chapter"], footage)
-        run_deep_clip(video, float(deepest["pts_seconds"]), roots, backend, clip_dir)
+        centre = float(deepest["pts_seconds"])
+        if part in ("all", "clip", "render"):
+            render_deep_clip(video, centre, roots, backend, clip_dir)
+        if part in ("all", "clip", "encode"):
+            encode_deep_clip(video, roots, clip_dir)
         print(clip_dir)
     if part in ("all", "stills"):
         run_deep_stills(roots, footage, backend, clip_files(roots, clip_dir))
@@ -1928,9 +2013,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--device", choices=DEVICES, default="gpu")
     parser.add_argument(
         "--part",
-        choices=("all", "clip", "stills"),
+        choices=("all", "clip", "render", "encode", "stills"),
         default="all",
-        help="deep only: the clip, the stills and page, or both (default)",
+        help="deep only: the clip (render, then encode), one of its two steps, the stills and "
+        "page, or everything (default)",
     )
     args = parser.parse_args(argv)
     try:
