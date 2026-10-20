@@ -64,8 +64,8 @@ ICC + EXIF), and confirms or corrects AD-18 (licences). Brief `docs/briefs/wp2.1
     frame is freed.
 - **Licences (claim 3; section 9).** PyAV's bundled FFmpeg 8.0.1 reports "LGPL version 3 or later"
   and is configured without `--enable-gpl`, yet bundles libx264 and libx265, and both work as
-  encoders from PyAV, as does NVENC (section 9.1). No licence text ships for any bundled DLL. The gyan FFmpeg CLI
-  is GPL version 3 or later, not 2 (CORRECTS AD-18). NumPy's expression is wider than BSD-3
+  encoders from PyAV, as does NVENC (section 9.1). No file in the wheel mentions LGPL or GPL.
+  The gyan FFmpeg CLI is GPL version 3 or later, not 2 (CORRECTS AD-18). NumPy's expression is wider than BSD-3
   (CORRECTS AD-18). Pillow, pillow-heif and its bundled libraries, and CuPy CONFIRM AD-18.
 
 ## 2. Instrument and method
@@ -113,8 +113,10 @@ mirrors `flags=accurate_rnd`.
   - PyAV's decoder threads keep decoding.
   - Work done during a hash therefore falls outside the bracket. The bracket is a LOWER bound
     on the decode-to-NumPy time without hashing.
-  - The run's wall time including the hashes (`wall_s_with_witness`) is an UPPER bound.
-  - The two differ by the hashing time, 0.35-0.58 ms/frame (`summary.json`,
+  - `wall_s_with_witness` is an UPPER bound. It is the wall time from the bracket's start to the
+    last frame's arrival. It includes 23 of the 24 witness hashes: the last frame is hashed
+    after it arrives, and that hash affects no arrival.
+  - The two differ by 0.35-0.58 ms/frame, about the hashing time (`summary.json`,
     `wall_with_witness_s_per_frame`). Medians, bracket to upper bound, in ms/frame:
 
     | Row | Bracket | Upper bound |
@@ -292,7 +294,10 @@ Minutes per minute = s/frame x 29.97.
     `EXPLORE_PIPE_BYTES`).
 - **Portable equivalent:** on Linux, `fcntl(F_SETPIPE_SZ)`, capped for unprivileged processes by
   `/proc/sys/fs/pipe-max-size` (1 MiB by default). The instrument does this off Windows, untested
-  here. Its speed is UNKNOWN (out of envelope). macOS has no pipe-size control: UNKNOWN.
+  here.
+  - If `F_SETPIPE_SZ` fails (for example a 32 MiB request above the unprivileged maximum), the
+    pipe is closed and the transport falls back to the default pipe, recording why.
+  - Its speed is UNKNOWN (out of envelope). macOS has no pipe-size control: UNKNOWN.
 - **Do the portable transports reach the same speed?** Not on this machine:
 
   | Transport | Decode (ms/frame) | Against b's 16.1 ms |
@@ -511,7 +516,7 @@ WP2.1, to be confirmed at WP5.5, and not legal advice. It assumes the FSF's read
 | Name | Version | License (as read) | GPL-2.0-or-later compatibility | One-line reason | AD-18 |
 |---|---|---|---|---|---|
 | PyAV | 16.1.0 | BSD-3-Clause (`License-Expression`) | yes | permissive | NEW |
-| FFmpeg bundled in the PyAV wheel | 8.0.1 | every library reports "LGPL version 3 or later"; configuration has `--enable-version3`, NO `--enable-gpl`, NO `--enable-nonfree`; `--enable-libx264 --enable-libx265`, with `libx264-165` and `libx265` DLLs in `av.libs`, and PyAV opens and uses both encoders (section 9.1); the wheel's only licence files are PyAV's own `LICENSE.txt` and `AUTHORS.rst`, so it ships no FFmpeg, x264 or x265 licence text | LGPL-3 libraries: yes (CHARC); the x264/x265 inside: UNKNOWN | the libraries report LGPL-3, yet x264 and x265 are compiled in and usable; their DLLs carry no licence string at all, so their licence cannot be read from the artefact, and neither can the licence of the build as a whole | NEW |
+| FFmpeg bundled in the PyAV wheel | 8.0.1 | every library reports "LGPL version 3 or later"; configuration has `--enable-version3`, NO `--enable-gpl`, NO `--enable-nonfree`; `--enable-libx264 --enable-libx265`, with `libx264-165` and `libx265` DLLs in `av.libs`, and PyAV opens and uses both encoders (section 9.1); every non-code file in the wheel was read: none mentions LGPL or GPL (PyAV's `LICENSE.txt` is BSD-3-Clause) | LGPL-3 libraries: yes (CHARC); the x264/x265 inside: UNKNOWN | the libraries report LGPL-3, yet x264 and x265 are compiled in and usable; the C-string scan finds no licence string in their DLLs, so their licence cannot be read from the artefact, and neither can the licence of the build as a whole | NEW |
 | Its codecs and devices | 8.0.1 | `hevc`, `h264` decoders; `hevc_nvenc`, `h264_nvenc` (open and encode, section 9.1); `hevc_cuvid`, `h264_cuvid` decoders; `--enable-nvenc --enable-nvdec`; hwdevices cuda, dxva2, qsv, d3d11va, d3d12va, amf | UNKNOWN | the NVENC/NVDEC headers' licence (AD-18: MIT) is not readable from this artefact | NEW |
 | pillow-heif | 1.8.1 | source BSD-3-Clause; `LICENSES_bundled.txt`: "License for pillow-heif binary wheels: GPLv2, due to base library licenses" | UNKNOWN | the binary wheel bundles LGPLv3 libheif and libde265 with x265, and its "GPLv2" may or may not mean "or later" (row below) | CONFIRMED (BSD-3 source); the wheel-level GPLv2 is NEW |
 | libheif (in pillow-heif) | 1.23.6 | LGPLv3 (`LICENSES_bundled.txt`) | yes-if | LGPL-3: conveyed under GPL-3.0 | CONFIRMED |
@@ -529,8 +534,8 @@ WP2.1, to be confirmed at WP5.5, and not legal advice. It assumes the FSF's read
   - Yet libx264 and libx265 are configured in and bundled as DLLs.
   - The build is not `nonfree`. It carries `hevc`, `h264`, `hevc_nvenc`, `h264_nvenc` and the
     `cuda` hwaccel.
-  - If PyAV ships, this build ships. It brings x264 and x265 without any licence text, and their
-    DLLs state no licence (section 9.1).
+  - If PyAV ships, this build ships. It brings x264 and x265. No file in the wheel mentions LGPL
+    or GPL, and the C-string scan finds no licence string in their DLLs (section 9.1).
 - **pillow-heif's wheel holds one native file, `libheif-*.dll`.** `LICENSES_bundled.txt` names
   separate `libde265`, `libx265` and MinGW runtime files that this Windows wheel does not have. INFERENCE: they
   are linked into the libheif DLL.
@@ -577,13 +582,22 @@ beyond what the artefacts show.
   - the MinGW runtime: libgcc_s_seh-1, libstdc++-6 and libwinpthread-1.
 - **Where the DLLs came from:** the wheel's `DELVEWHEEL` file says delvewheel 1.11.2 repaired
   the wheel with `--add-path C:\cibw\vendor\bin`, the configure `--prefix` above.
-- **Licence files shipped with the DLLs: none.** The wheel's licence files are PyAV's
-  `LICENSE.txt` (BSD-3-Clause) and `AUTHORS.rst`. Nothing covers FFmpeg or any of the 31 DLLs.
-- **Licence strings inside the DLLs.** The scan looks for a licence word in a NUL-terminated C
-  string.
+- **Licence files and texts in the wheel.** Every non-code file the wheel installed was read
+  (`wheel_text_files`): the `.dist-info` files (`METADATA`, `RECORD`, `WHEEL`, `DELVEWHEEL`,
+  `INSTALLER`, `REQUESTED`, `entry_points.txt`, `top_level.txt`), `licenses/LICENSE.txt`,
+  `licenses/AUTHORS.rst` and `av/py.typed`.
+  - `LICENSE.txt` is PyAV's BSD-3-Clause text.
+  - `AUTHORS.rst` lists contributors.
+  - No file contains "LGPL", "GPL" or "General Public License".
+  - "FFmpeg" appears only in `METADATA`'s description of PyAV, twice. "x264" and "x265" appear
+    only in `RECORD`, as the DLL file names.
+  - So no file in the wheel states a licence for FFmpeg or for any of the 31 DLLs.
+- **Licence strings inside the DLLs.** The scan looks for "GPL", "General Public License" or
+  "Copyleft" inside a NUL-terminated printable ASCII string of up to about 240 characters.
   - It finds "libavcodec license: LGPL version 3 or later" in avcodec and "libavutil license:
     LGPL version 3 or later" in avutil. These are the scan's positive control.
-  - It finds NO licence string in libx264 or libx265.
+  - It finds no string matching it in libx264 or libx265. UTF-16 strings, longer strings and
+    other licence wording are not searched.
   - A looser scan does find the bytes `GPL` in both, but inside machine code (for example
     `...A\x0f\x11GPL\x8b...`), not in any string.
 - **Reconciling the contradiction, as far as the artefact goes.**
@@ -591,18 +605,15 @@ beyond what the artefacts show.
     - no `--enable-gpl` in the configuration;
     - an "LGPL version 3 or later" licence string in every library;
     - libx264 and libx265 compiled in, bundled and working as encoders.
-  - Not from the artefact (stated as background): FFmpeg's stock configure refuses
-    `--enable-libx264` and `--enable-libx265` without `--enable-gpl`, and it derives the
-    licence string from the flags.
-  - So either this build's configure was changed or its check bypassed. Which one cannot be
-    read from the wheel: UNKNOWN.
-  - Either way the "LGPL version 3 or later" string describes the configure flags, not the x264
-    and x265 code linked into this libavcodec.
+  - Why they coexist cannot be read from the wheel: UNKNOWN.
+  - CHARC's note gives the premise that FFmpeg's configure normally refuses `--enable-libx264`
+    and `--enable-libx265` without `--enable-gpl`. The artefact neither confirms nor explains
+    that premise for this build.
 - **Bearing on AD-2 (finding only).**
-  - This wheel gives a PyAV encode path libx264, libx265 and NVENC.
-  - A PyAV FFmpeg build that is LGPL in fact, as its string claims, would lack libx264 and
-    libx265. It could keep NVENC: `--enable-nvenc` needs no `--enable-gpl` (background, not from
-    the artefact).
-  - A software HEVC or H.264 encode would then need the separate FFmpeg process.
+  - Measured: this wheel gives a PyAV encode path libx264, libx265, `h264_nvenc` and
+    `hevc_nvenc`.
+  - On CHARC's premise, a PyAV build without libx264 and libx265 would leave software HEVC and
+    H.264 encoding to the separate FFmpeg process. Whether such a build keeps NVENC cannot be
+    read from this wheel.
   - The decode-only candidates of claim 1 are unaffected: their encode side is the FFmpeg
     process either way.
