@@ -305,10 +305,36 @@ def test_other_names_do_not_match(name: str) -> None:
     assert not is_temporary_name(name)
 
 
-def test_final_name_that_looks_temporary_is_refused(tmp_path: Path) -> None:
+def test_final_name_that_looks_temporary_moves_to_the_next_number(tmp_path: Path) -> None:
     source = _touch(tmp_path / "x.clearwater-partial-0123456789ab.HEIC")
-    with pytest.raises(ValueError, match="temporary"):
-        plan_output(source, Settings(output_suffix=""), MediaKind.PHOTO)
+    plan = plan_output(source, Settings(output_suffix=""), MediaKind.PHOTO)
+    assert plan.path.name == "x.clearwater-partial-0123456789ab_2.png"
+    assert not is_temporary_name(plan.path.name)
+    out = final_output_path(source, Settings(output_suffix=""), MediaKind.PHOTO)
+    assert out == plan.path
+
+
+def test_stem_and_suffix_that_spell_a_temporary_are_never_returned(tmp_path: Path) -> None:
+    # Round 3: each part is valid alone; together they spell a temporary name.
+    source = _touch(tmp_path / "holiday.clearwater.HEIC")
+    settings = Settings(output_suffix="-partial-0123456789ab")
+    validate_suffix(settings.output_suffix)
+    assert is_temporary_name("holiday.clearwater-partial-0123456789ab.png")
+    expected = tmp_path / "holiday.clearwater-partial-0123456789ab_2.png"
+    out = final_output_path(source, settings, MediaKind.PHOTO)
+    assert out == expected
+    assert not is_temporary_name(out.name)
+    plan = plan_output(source, settings, MediaKind.PHOTO)
+    assert plan.path == expected
+    assert not is_temporary_name(plan.path.name)
+
+
+@pytest.mark.parametrize("number", range(2, 40))
+def test_numbered_names_never_match_the_temporary_pattern(number: int) -> None:
+    plan = OutputPlan(
+        Path("s.HEIC"), Path("."), "holiday.clearwater-partial-0123456789ab", ".png", number
+    )
+    assert not is_temporary_name(plan.path.name)
 
 
 @pytest.mark.parametrize(

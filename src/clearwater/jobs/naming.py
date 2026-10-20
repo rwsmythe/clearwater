@@ -301,12 +301,13 @@ def final_output_path(source: Path, settings: Settings, kind: MediaKind) -> Path
     """Return the final output path before collision numbering (spec 8.3).
 
     ``GX010123.MP4`` becomes ``GX010123_corrected.MP4``; ``IMG_1234.HEIC`` becomes
-    ``IMG_1234_corrected.png``. Nothing is created or written. The one exception to "no number" is
-    the source guard: the result is never the source path, so an empty suffix in the source folder
-    (or in an alias of it, such as a junction) gives the first numbered name
-    (``GX010123_2.MP4``). The guard asks the filesystem whether the two paths are the same file
-    (:func:`is_same_path`); it does not check whether the result is otherwise free (that is
-    :func:`plan_output`).
+    ``IMG_1234_corrected.png``. Nothing is created or written. The exceptions to "no number" are
+    two guards: the result is never the source path, so an empty suffix in the source folder (or
+    in an alias of it, such as a junction) gives the first numbered name (``GX010123_2.MP4``); and
+    it never looks like a temporary, so a stem and a suffix that happen to spell
+    ``.clearwater-partial-<12 hex>`` before the extension also move to ``_2``. The source guard
+    asks the filesystem whether the two paths are the same file (:func:`is_same_path`). Whether the
+    result is otherwise free is not checked here (that is :func:`plan_output`).
 
     Args:
         source: The source file path.
@@ -314,14 +315,15 @@ def final_output_path(source: Path, settings: Settings, kind: MediaKind) -> Path
         kind: Video keeps the source extension exactly; a photo gets ``.png``.
 
     Returns:
-        The unnumbered path, or the ``_2`` path when the unnumbered one is the source.
+        The unnumbered path, or the ``_2`` path when the unnumbered one is the source or looks
+        like a temporary.
 
     Raises:
         ValueError: If the suffix is not a portable name fragment.
     """
     plan = _base_plan(source, settings, kind)
-    if is_same_path(plan.path, source):
-        plan = plan.numbered(2)
+    while is_same_path(plan.path, source) or is_temporary_name(plan.path.name):
+        plan = plan.numbered(plan.number + 1)
     return plan.path
 
 
@@ -329,8 +331,8 @@ def is_taken(plan: OutputPlan, temporaries: dict[str, list[Path]] | None = None)
     """Tell whether a planned name is unusable on disk right now.
 
     A name is taken when the final name exists (including a dangling symlink), a temporary made
-    for that final name exists (another job's or a crash leftover, any token), or the name is the
-    source.
+    for that final name exists (another job's or a crash leftover, any token), the name is the
+    source, or the name itself matches the temporary pattern (the clean-up would delete it).
 
     Args:
         plan: The candidate.
@@ -347,6 +349,7 @@ def is_taken(plan: OutputPlan, temporaries: dict[str, list[Path]] | None = None)
         os.path.lexists(path)
         or path.name.casefold() in temporaries
         or is_same_path(path, plan.source)
+        or is_temporary_name(path.name)
     )
 
 
@@ -372,14 +375,11 @@ def plan_output(
         The plan; read ``plan.path`` for the final path.
 
     Raises:
-        ValueError: If the suffix is invalid or a candidate name would itself look like a
-            temporary (a source literally named with the temporary marker and an empty suffix).
+        ValueError: If the suffix is invalid.
     """
     plan = _base_plan(source, settings, kind)
     temporaries = scan_temporaries(plan.folder)
     while True:
-        if is_temporary_name(plan.path.name):
-            raise ValueError(f"output name {plan.path.name!r} matches the temporary-name pattern")
         if not is_taken(plan, temporaries) and (
             reservations is None or reservations.try_reserve(plan.path)
         ):

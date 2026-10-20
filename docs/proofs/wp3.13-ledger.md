@@ -11,7 +11,7 @@ answers to open questions 1-6 bind).
 | 0 (design table) | - | - | - | - | - | - | none (no code) | - | 62,046 (dispatcher-read at the round-0 yield) |
 | 1 | 1 | 4 | 1 | 6 in / 0 out | 6 NEW / 0 REOPENED | 0 | PRODUCT code (d92ea8d) | WSL, codex-cli, gpt-5.6-sol high | 118,143 (dispatcher-read at the window grant) |
 | 2 | 0 | 3 (1 banked, out of envelope) | 1 | 2 in + 1 out / 0 | 3 NEW / 0 REOPENED | 0 | PRODUCT code (this commit) | WSL, codex-cli, gpt-5.6-sol high | 182,256 (dispatcher-read at the round-2 yield) |
-| 3 | 0 | 1 (cell proposes MINOR) | 0 | 1 in / 0 | 1 NEW / 0 REOPENED | 0 | pending | WSL, codex-cli, gpt-5.6-sol high | to be supplied |
+| 3 | 0 | 0 (1 labelled MAJOR, ruled MINOR) | 1 | 1 in (deliberate input) / 0 | 1 NEW / 0 REOPENED | 0 | PRODUCT code in the terminating cleanup | WSL, codex-cli, gpt-5.6-sol high | 198,280 (dispatcher-read) |
 
 ## Round 0: design table (no product code yet)
 
@@ -275,4 +275,18 @@ NEW_CRITICAL_MAJOR_FOUND: one finding, labelled MAJOR, EXECUTED, NEW; no round-1
    rule in both functions, a temporary-looking final name is treated as taken and numbering moves to `_2`
    (replacing the ValueError). The severity downgrade is the cell's proposal and is open to the gate.
 
-Remediation not yet applied (the round ends here). Depth figure for this yield: dispatcher to supply.
+Remediation: see the round-3 ruling block below.
+
+## Round-3 ruling (dispatcher; depth 198,280 at the round-3 yield) as applied
+
+The loop CONVERGED at round 3: the one finding is classified MINOR, in envelope but deliberate-input only (a
+stem ending in `.clearwater` plus a suffix of exactly `-partial-<12 hex>`, the same class as the round-1
+residual; the write path was already fail-closed), non-blocking. Terminating cleanup (opens no round), in
+`naming.py`: a final name that matches the temporary pattern counts as taken in BOTH `final_output_path` and
+`plan_output` (`is_taken`), and numbering moves to `_2`; the `ValueError` in `plan_output` is gone. Tests:
+`test_final_name_that_looks_temporary_moves_to_the_next_number` (the old refusal test, updated),
+`test_stem_and_suffix_that_spell_a_temporary_are_never_returned` (the reviewer's probe, both functions),
+`test_numbered_names_never_match_the_temporary_pattern` (the `_N` names cannot match, N = 2..39). Mutation
+check: removing the guard fails the first two. Inner loop: 173 own tests passed; ruff check, ruff format
+--check, mypy clean. Report written: `docs/reports/wp3.13-naming-safe-writing.md` (both consumer notes). Final-head
+full-pytest window requested next.
