@@ -9,11 +9,47 @@ Reviewer A: codex-cli 0.162.1 in WSL, `gpt-5.6-sol` / `high`, `-s read-only`; ev
 | Round | Head reviewed | MAJOR | MINOR | In-envelope / out | NEW / REOPENED | Reverts | Fixes changed | Verdict | Tokens | Depth |
 |---|---|---|---|---|---|---|---|---|---|---|
 | 1 | `4ffc8b1` | 7 (4 EXECUTED, 3 REASONED) | 4 (2 E, 2 R) | 11 / 0 | 11 / 0 | 0 | product (generators, manifest schema, committed samples): 7 findings; tests and plugin: 4 | NEW_CRITICAL_MAJOR_FOUND | 178,521 | (dispatcher) |
+| 2 | `1e2d2f6` | 0 | 3 (3 E, 0 R) | 3 / 0 | 3 / 0 | 0 | none yet: all 3 are docstring/comment or test-only cleanup, pending (not remediated in the turn that ran the round) | NO_NEW_CRITICAL_MAJOR | 190,698 | (dispatcher) |
 
 Round 1 per-finding adjudication: `...\wp2.3\r1\adjudication.md` (md5s in `md5s.txt`). All 11
 findings were confirmed (finding 7 partly) and fixed at `b439f70` and `312773f`. The round's
 mechanical assertions all hold (banner, no ERROR lines, footer, anchored VERDICT, 27 `^ succeeded
 in`, the 13 `docs/proofs` hits are echoes).
+
+Round 2 per-finding adjudication: `...\wp2.3\r2\adjudication.md` (md5s in `md5s.txt`). The reviewer
+re-raised none of the 11 round-1 findings and none of the three rulings. Mechanical assertions hold
+(banner, no ERROR lines, footer, anchored VERDICT, 30 `^ succeeded in`, the 8 `docs/proofs` hits are
+echoes). The 3 minors (stale `pytest_plugins` quote in `tests/fixture_plugin.py:3`, the no-GPS test
+omitting the 3 DNG/TIFF dummies, `video.py:3` saying 45 frames for all clips though `vid-vfr` has 30)
+are CONFIRMED; per the fill they are fixed once in the terminating round's cleanup and open no round.
+
+## Gates (read off tool output)
+
+| Head | Gate | Result |
+|---|---|---|
+| `d495b57` (first cell's run, `work/fixtures/runs/full3.txt`) | full `uv run pytest -q -p no:cacheprovider` | 1130 passed, 1 warning, 503.43 s, EXIT 0 |
+| `1e2d2f6` | `ruff check .`, `ruff format --check .`, `mypy` (46 files) | all passed (`work/fixtures/runs/lint-r2b.txt`) |
+| `1e2d2f6` | `tests/test_fixtures.py` + `tests/test_conftest_guard.py` | 282 passed, 66.54 s |
+| `1e2d2f6` | full pytest (`work/fixtures/runs/full4.txt`) | 1130 passed, 1 warning, 478.55 s, EXIT 0 |
+
+## Rulings applied (CHARC `ef7b272564ddeb9d`, 2026-10-20)
+
+- **R1-1** (AD-14 geometry accepted): disc CENTRE track in the lower third; binding property is that
+  the measured upper half is never touched (existing test proves it). `flicker.py` module docstring,
+  the `DISC_CENTRE_ROW` docstring and the manifest `exercises` text say exactly this (`1e2d2f6`; the
+  manifest was regenerated: only that one string changed, every other committed file is
+  byte-identical).
+- **R1-2** (conftest): the line is the ruled conditional expression, but wrapped in parentheses by
+  `ruff format`. REPRODUCED: the literal one-line text is 102 columns, so `ruff check` reports E501 (limit
+  100) and `ruff format --check` wants to reformat it. The parenthesised form is the same statement
+  (`241b415`); tests/conftest.py is otherwise unchanged apart from that statement; the WP-T1 guard and
+  `tests/test_conftest_guard.py` untouched and green. DEVIATION for the orchestrator to note.
+- **R1-3** (`.gitattributes`): new repo-root file, single line `tests/fixtures/** -text` (`241b415`).
+  `git ls-files --eol tests/fixtures` after: all 87 files `attr/-text`; 78 binary files `i/-text w/-text`,
+  8 text placeholders `i/none w/none`, `manifest.json` `i/lf w/lf`. Before the attribute the manifest was
+  already `i/lf` in the blob and `w/lf` in the working tree here, so autocrlf had not converted it on
+  this checkout; the attribute makes that independent of `core.autocrlf`. The manifest byte test now
+  compares raw bytes on both sides; `_norm_newlines` is deleted (`241b415`).
 
 ## Statistics the AD-14 texture is tuned to (ruling 1)
 
@@ -42,15 +78,12 @@ No owner pixel is used; the still is procedural (`tools/fixtures/flicker.py`, se
    cut-off file maps to is the probe package's to rule; IF-5 gives no discriminator.
 5. **Untagged clip is H.264.** x265 always writes a video signal type (explicit limited range);
    x264 writes none.
-6. **Conftest line.** The one line is `pytest_plugins = ["fixture_plugin"] *
-   Path(__file__).with_name("fixture_plugin.py").is_file()`. The bare `["fixture_plugin"]` stops
+6. **Conftest line.** The ruled conditional expression (R1-2), as `ruff format` lays it out in
+   parentheses because the literal one-line text is 102 columns. A bare `["fixture_plugin"]` stops
    every WP-T1 guard test (`tests/test_conftest_guard.py` copies `conftest.py` alone into a
-   miniature repository): reproduced, 40+ failures at the first full run. The conftest diff is that
-   line and one blank line.
-7. **Git and line endings.** `core.autocrlf=true` here: `manifest.json` is text and a checkout may
-   turn its LF into CRLF (the tests normalise the committed side once); the text placeholders hold
-   no line break so git cannot change them; every other fixture is binary to git (`git ls-files
-   --eol`). A `.gitattributes` line for `tests/fixtures/manifest.json` would end it; not owned.
+   miniature repository): reproduced, 40+ failures at the first full run.
+7. **Git and line endings.** `core.autocrlf=true` here. `.gitattributes` (`tests/fixtures/** -text`,
+   R1-3) stops git converting any committed fixture; the manifest byte test compares raw bytes.
 8. **FFV1/MKV.** The clip is lossless FFV1 RGB in Matroska (ffprobe says `bgr0`); container time
    base 1 ms, so 30000/1001 is the declared rate (`r_frame_rate`). 86 MB, so generated (into
    `work/fixtures/generated`), never committed.
