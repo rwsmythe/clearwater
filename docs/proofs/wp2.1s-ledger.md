@@ -133,7 +133,7 @@ cumulative machine time ~60 min.
 | r2 | WSL, codex-cli 0.162.1, gpt-5.6-sol/high | 0 | 2 | 3 | 4 / 1 (F5 out) | 5 NEW / 0 | 0 | product: transport.py, licences.py, report | (dispatcher) | `clearwater-review-evidence/wp2.1s/r2/` |
 | r3 | WSL, codex-cli 0.162.1, gpt-5.6-sol/high | 0 | 1 | 7 | 5 / 3 (F5, F7, F8 out) | 8 NEW / 0 | 0 | product: guard.py (new), transport.py, photo.py, licences.py, report; test: guard and profile-name tests (gen-3 cell, `a5c5c00`, `5c998f6`) | (dispatcher) | `clearwater-review-evidence/wp2.1s/r3/` |
 | r4 | WSL, codex-cli 0.162.1, gpt-5.6-sol/high | 0 | 1 (F2 claimed MAJOR, adjudicated MINOR) | 6 | 6 / 1 (F6 out) | 6 NEW / 1 REOPENED (F4: r3 F3's text, in the module docstring) | 0 | product: licences.py, transport.py (docstring; F6), report, licences.json regenerated; test: PNG fixture writes guarded (`c12656c`, `5da289d`) | 181,719 (86 turns) | `clearwater-review-evidence/wp2.1s/r4/` |
-| r5 | WSL, codex-cli 0.162.1, gpt-5.6-sol/high | 0 | 1 (F1; F2 claimed MAJOR, adjudicated MINOR) | 5 | 6 / 0 | 4 NEW / 2 REOPENED (F2: r4 F2; F4: r4 F3) | 0 | product: transport.py (gate confined and identified; docstring), photo.py (verdict, 10-bit check), report, photo.json regenerated; test: verdict and 10-bit cases (`fb49e67`, `ea360fa`) | (dispatcher) | `clearwater-review-evidence/wp2.1s/r5/` |
+| r5 | WSL, codex-cli 0.162.1, gpt-5.6-sol/high | 0 | 1 (F1; F2 claimed MAJOR, adjudicated MINOR) | 5 | 6 / 0 | 4 NEW / 2 REOPENED (F2: r4 F2; F4: r4 F3) | 0 | product: transport.py (gate confined and identified; docstring), photo.py (verdict, 10-bit check), report, photo.json regenerated; test: verdict and 10-bit cases (`fb49e67`, `ea360fa`) | 219,047 (113 turns) | `clearwater-review-evidence/wp2.1s/r5/` |
 
 Round 1 (diff `aa1f5f0..ccc23b8`; VERDICT NEW_CRITICAL_MAJOR_FOUND; assertions all pass, 30
 succeeded, 0 `^ERROR`, 0 `ERROR codex_core`, footer present; access hits are echoes). Findings and
@@ -249,3 +249,7 @@ photo tests 52 passed. Full pytest on `78e956a` (round-4 code): 822 passed, 1 wa
 (`work/wp2.1s/logs/pytest-full-c3c.log`).
 Round 5 brought one NEW in-envelope MAJOR with a product-code fix: per the orchestrator's ruling
 the cell yields here before any round 6.
+Gate ruling (orchestrator, at depth 219,047): round 6 APPROVED; r5 F1 kept MAJOR agreed (the wp1.2b
+original is a plausible operator mistake); r5 F2 MINOR agreed; F2 and F4 REOPENED. Round 6
+classifies strictly by the declared envelope (crafted filesystem state or adversarial CLI
+arguments beyond a plausible mistake = OUT).
