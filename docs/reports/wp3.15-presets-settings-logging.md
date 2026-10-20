@@ -74,3 +74,9 @@ Reviewer B ran at the orchestrator's seat on the merge candidate and found 2 maj
   `PresetImportResult.dropped_keys`. Every other unknown key is still refused.
 - The store method is `list_presets()` (a method named `list` would shadow the builtin).
 - Starter values are empty (`ParameterSet("c3", {})`); explicit values wait for the owner at CP5.
+
+## Erratum at the gate (orchestrator, 2026-10-20)
+
+"The log therefore holds at most six files" holds per configuration. A second `configure_logging`
+call on the same folder updates only the level and keeps the first call's `max_bytes` and
+`backup_count` (Reviewer B re-run, minor 3; banked as DR-34 c).
