@@ -5,14 +5,14 @@
 
 ### Generation
 
-- **Generation 3 LIVE**, session `clearwater-orchestrator-20261019-2346` (verify:
-  `comms/.launch-sessions.json`); online at bring-up on main `fa6c41f`. Bash-launch gauge at
-  bring-up: 37 ms (under the 1 s flag; re-measure with PowerShell
-  `Measure-Command { & $env:CLAUDE_CODE_GIT_BASH_PATH -c true }`).
-- Generation 2 (`clearwater-orchestrator-20261018-1442`) rolled over 2026-10-20 ~09:55Z at its
-  400K cap, nothing in flight. Generation 1 was `clearwater-orchestrator-20261014-1258`.
-- **Inbox:** generation 3 is the sole drainer; at bring-up 0 unread, 64 read (generation 2 drained
-  through `257db38e6727db20`). Verify: `uv run python scripts/role_mail.py list --role orchestrator`.
+- **Generation 3** (`clearwater-orchestrator-20261019-2346`) ROLLED OVER 2026-10-20 ~15:25Z at its
+  400K cap, at a clean boundary: WP2.2 merged, no live cell. **Generation 4 starts here** (verify:
+  `comms/.launch-sessions.json`). Earlier: gen 2 `clearwater-orchestrator-20261018-1442`, gen 1
+  `clearwater-orchestrator-20261014-1258`.
+- **Inbox:** gen 3 drained through CHARC `cda92ceb18e8451a` (0 unread, 74 read at its last list)
+  and STOPPED DRAINING at its rollover announcement. You are the sole drainer (verify:
+  `uv run python scripts/role_mail.py list --role orchestrator`).
+- Bash-launch gauge at gen-3 bring-up: 37 ms. Re-measure at yours.
 
 ### Standing operator rulings
 
@@ -34,18 +34,12 @@
 
 ### Live cells
 
-- **`wp22-cell`** (implementer-sonnet-high, STRONG): WP2.2 interface module, worktree
-  `.worktrees/wp2.2`, branch `wp2.2`, base `d3bcdba`; dispatched 2026-10-20 ~14:02Z; depth 0 at
-  dispatch. Round 1 = a dedicated yield with the ledger table (nine unnamed types, annotation gaps,
-  Settings defaults, c3 stage list) -> post it to CHARC as a query, relay the ruling.
-- `wp21s-cell3` returned (WP2.1S accepted); WP2.1S worktrees removed, branches kept.
-- `wp21s-cell2` RETIRED 2026-10-20 at 342K (128 turns): photo leg, licences, Reviewer A r1-r3
-  (r1 0/4/4, r2 0/2/3, r3 0/1/7), W7 incident record corrected (`W7-ABORTED.json`); stood down.
-- `wp21s-cell` RETIRED 2026-10-20 at 257K (95 turns) after closing the transport leg (6 clean
-  windows, ~60/120 machine min) and the CHARC rulings (`871d4f17e78c10b3`); stood down. Do not
-  message it again.
-- Every generation-2 cell is retired; do not message any of them (`wp12b-cell`, `wp13d-cell`,
-  `wp13d-cell2`, `wp13d-cell3`, `wp14b-cell`, `wp14b-cell2`).
+- **None.** `wp22-cell` returned (WP2.2 accepted, 217,013 / 80 turns at return); it is retired.
+  Do not message it or any earlier cell (`wp21s-cell`, `wp21s-cell2`, `wp21s-cell3`, and the gen-2
+  cells).
+- Worktrees still present (verify `git worktree list`): `.worktrees/wp2.2` and `.worktrees/wp2.2-mc`.
+  Remove them with `git worktree remove --force` after CHARC's QA confirms WP2.2. Keep the
+  branches `wp2.2`, `wp2.2-mc`, `wp2.1s`, `wp2.1s-mc` as evidence.
 
 ### Where things stand -- the successor starts HERE
 
@@ -59,14 +53,30 @@
    choice at WP2.1, optimisation package in Phase 3, final tune at WP5.2). Gate result 4 (KEEP the
    caps) awaits the owner's confirmation at CP3. The gate record is final when the owner's word is
    recorded and the fact-check attached.
-3. **WP2.1S ACCEPTED** (main `a866f06`), CHARC QA CONFIRMED (`9fb52c00bbb58a9b`); AD-2/17/18
-   closed, AD-23/24 logged (`3591e80`). **WP2.2 DISPATCHED** (brief FINAL `d3bcdba`; rulings
-   `8d7880255daf7c79`). **WP2.3** brief APPROVED (same rulings), dispatch after WP2.2 merges:
-   mark FINAL then.
-4. **Next for this seat otherwise:** nothing until CHARC directs. After CP3: Phase 2. WP2.1 (architecture
-   document and decisions) is the architect's (CHARC); the orchestrator's likely next packages are
-   WP2.2 (interface module) and WP2.3 (shared test fixtures) after WP2.1, and WP2.4 briefs with CHARC.
-   Wait for CHARC's commission; do not start Phase 2 work unasked.
+3. **WP2.1S ACCEPTED** (main `a866f06`); CHARC QA CONFIRMED (`9fb52c00bbb58a9b`). AD-2/17/18 are
+   closed and AD-23/24 logged (`3591e80`).
+4. **WP2.2 ACCEPTED 2026-10-20, main `b288533`** (record `docs/proofs/wp2.2-accept.md`; DR-32).
+   IF-1 to IF-10 are FROZEN (AD-20). The return report went to CHARC (return_report, thread
+   wp2.2, 15:23Z), with the hold on main released.
+   - **YOUR FIRST ACTS:**
+     (a) Run the FULL pytest on main `b288533` in the background (expect 892 passed). Gen 3
+         ran it on the candidate `2a7f092` (identical code; main adds docs only) but not on
+         main, because of the depth cap. Add the result as a "Gates on main" row in the accept
+         record, committed by pathspec.
+     (b) Drain the inbox for CHARC's WP2.2 QA. It covers the adjudication of B re-run's
+         mapping-KEY non-finite finding as NOT BLOCKING (DR-32).
+     (c) On CHARC's QA, remove the wp2.2 worktrees. Mark `docs/briefs/wp2.3-brief.md` FINAL:
+         title line and status; the rulings section is already in (`8d7880255daf7c79`). Then
+         dispatch WP2.3 to implementer-sonnet-high (STRONG) in `.worktrees/wp2.3` from main.
+   - **WP2.3 notes:**
+     - The manifest uses WP2.2's `Fault` kinds (`src/clearwater/interfaces/video.py`: seven
+       kinds, severity refuse/warn/exclude).
+     - The brief allows ONE `pytest_plugins` line in `tests/conftest.py`.
+     - The flicker clip is procedural, 960x540 FFV1, generated into `work/`; its decoded-frame
+       hash is checked against the manifest.
+     - Size limits: no committed file over 2 MB; `tests/fixtures/` under 10 MB.
+   - Then WP2.4 (Phase 3-5 briefs and spec v0.5.4 for CP4) is CHARC's with this seat. Wait
+     for CHARC's commission.
 5. **Photos:** none supplied yet. Gate 2's largest-photo leg and the photo look check stay PENDING
    until the owner supplies photos.
 
@@ -90,6 +100,7 @@ Each accepted package had its return report posted to CHARC and an info-update t
 | WP1.3D | 2026-10-20 | `7f9fea1` | `docs/proofs/wp1.3d-accept.md`; DR-29 | CONFIRMED (`c6bda8a38146274f`) |
 | WP1.4b | 2026-10-20 | `afaff0e` | `docs/proofs/wp1.4b-accept.md`; Gate result 4 KEEP; DR-30; flip witness 6/6 | CONFIRMED (`2fe4e7e1dc9e0854`) |
 | WP2.1S | 2026-10-20 | `a866f06` | `docs/proofs/wp2.1s-accept.md`; DR-31; 2 depth re-seats; B errata at the gate | CONFIRMED (`9fb52c00bbb58a9b`) |
+| WP2.2 | 2026-10-20 | `b288533` | `docs/proofs/wp2.2-accept.md`; DR-32; B re-run major adjudicated at the gate; IF-1..IF-10 frozen | pending |
 
 Kept branches (evidence; do not delete unasked): `wp1.2b`, `wp1.2b-b1`, `wp1.3d`, `wp1.3d-b1`,
 `wp1.4b`, plus the earlier packages' (`git branch`).
@@ -129,6 +140,18 @@ Kept branches (evidence; do not delete unasked): `wp1.2b`, `wp1.2b-b1`, `wp1.3d`
 - **Worktrees** holding a copied `clearwater.local.toml` need `git worktree remove --force`.
 - **Process control:** the auto-mode classifier blocks `Stop-Process`; surface it, do not work
   around it. No Defender exclusion requests (the owner's setting).
+- **Reviewer B runner for later packages:** copy
+  `C:/Users/rwsmy/clearwater-review-evidence/wp2.2/reviewB/run_review_B.sh` and
+  `review-prompt-B.md` (sed `wp2.2` -> the new id). Reviewer prompts must exclude `docs/proofs`
+  with a glob that MATCHES (`--glob '!docs/proofs/**'`), and the assertion grep must check command
+  OUTPUT too: a non-matching glob leaked ledger lines in WP2.2 R2.
+- **Re-run of B after a remediation:** reset the `-mc` branch to the remediated author branch,
+  rebase, and add a "THIS IS THE RE-RUN" section to the prompt listing the pass-1 findings
+  (WP2.2 `reviewB2/`).
+- **QA catches this generation:** a cell's "no W7.json" claim was false (WP2.1S), and a cell's
+  "1 MB+ blocks" claim was really buffer depth. Check every negative claim against disk.
+- **The orchestrator's own depth cap:** the hook prints `[ctx]`. Roll over at the first clean
+  boundary after about 400K; never with a cell mid-round, since it dies with you.
 - **Memory pressure:** the host stopped background test runs on 2026-10-19 for low system memory;
   do not restart a killed run on your own; ask.
 
@@ -140,4 +163,4 @@ Kept branches (evidence; do not delete unasked): `wp1.2b`, `wp1.2b-b1`, `wp1.3d`
 - No `.LRV`/`.THM` exist (owner); D60 handled in v0.5.2.
 - `_windows_power()` in `bench.py` is instrument-only (CHARC); never into `src/clearwater/`
   without a fresh ruling.
-- Open debt: DR-1, 2, 6, 7, 8, 10-20, 22, 23, 25-31 (`docs/debt-register.md`).
+- Open debt: DR-1, 2, 6, 7, 8, 10-20, 22, 23, 25-32 (`docs/debt-register.md`).
