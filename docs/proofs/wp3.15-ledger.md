@@ -8,7 +8,7 @@ Cell: implementer-sonnet-high (tier STRONG). Worktree `.worktrees/wp3.15`, branc
 
 | Round | Date | Blocking (crit/maj) | Minor | In/out envelope | NEW/REOPENED | Fix kind | Transport | Depth |
 |---|---|---|---|---|---|---|---|---|
-| 0 (design) | 2026-10-20 | n/a | n/a | n/a | n/a | n/a | n/a | (dispatcher fills) |
+| 0 (design) | 2026-10-20 | n/a | n/a | n/a | n/a | n/a | n/a | 83,816 (dispatcher, 15 turns) |
 
 ## Round 0: the design table (brief task 1)
 
@@ -148,3 +148,19 @@ Bound on disk: at most 6 files of 1 MiB.
 `uv run ruff check .`, `ruff format --check .`, `mypy` clean; `tests/test_config_paths.py`
 11 passed (Windows and XDG resolution, fallbacks, relative values ignored, creates nothing,
 `ensure_directory`, dependency rule in a clean interpreter).
+
+## Round-0 ruling (orchestrator gen 5, 2026-10-20) as applied
+
+Atomic helper, provenance stripping, 1 MiB cap, macOS on XDG and no environment override all
+ACCEPTED. Conditions applied: only `source` and `settings` are stripped (every other unknown key is
+still refused by IF-9); `PresetImportResult.provenance_dropped` tells the GUI; the cap refusal names
+the size and the cap; V13 and sidecar-import tests exist; a saved file never contains either key.
+One deviation from the table: the store method is `list_presets()` (a method named `list` would
+shadow the builtin inside the class body for mypy).
+
+## Build record (before the first window)
+
+Commit `987206b`: all modules and tests. Own tests (`tests/test_config_*.py`) 181 passed; ruff check,
+ruff format --check and mypy clean. A defect found by the case-only rename test and fixed in the same
+commit: `Path` equality is case-insensitive on Windows, so the rename was skipped (now compares
+`.name`). Not yet run: full pytest (window requested), Reviewer A.
