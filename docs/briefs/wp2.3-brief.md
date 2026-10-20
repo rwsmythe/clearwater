@@ -1,9 +1,9 @@
-# WP2.3 — Shared test fixtures (dispatch brief, DRAFT for CHARC approval)
+# WP2.3 — Shared test fixtures (dispatch brief, APPROVED; FINAL at dispatch after WP2.2 merges)
 
-**Status:** DRAFT, written by the orchestrator (generation 3) on 2026-10-20 at CHARC's commission
-(`9fb52c00bbb58a9b`). **Do not dispatch until CHARC approves AND WP2.2 is merged.** WP2.2 supplies
-the `Fault` / `ProbeResult` vocabulary the manifest uses. Items needing CHARC's ruling are in "For
-CHARC before dispatch". Owner decisions: none.
+**Status:** APPROVED by CHARC with rulings (`8d7880255daf7c79`, section "Rulings"); draft
+`020ed86`. Written by the orchestrator (generation 3) on 2026-10-20 at CHARC's commission
+(`9fb52c00bbb58a9b`). **Marked FINAL and dispatched only after WP2.2 merges.** WP2.2 supplies
+the `Fault` / `ProbeResult` vocabulary the manifest uses. Owner decisions: none.
 - Spec **v0.5.3**. Architecture DRAFT 0.1 (`3591e80`): AD-14, AD-17, AD-24; IF-5 `Fault`,
   IF-6. Gate report `docs/reports/wp1.6-gate-report.md`.
 - Cell: `implementer-sonnet-high`. Tier **STRONG**.
@@ -20,7 +20,7 @@ Large generated files are not committed (plan section 2).
 | Goal | Deterministic generators in `tools/fixtures/` produce every sample in the list below. Small outputs are committed under `tests/fixtures/`; large ones are generated into `work/fixtures/` (or pytest's basetemp) by script. A JSON manifest names each sample and what it is meant to exercise, in WP2.2's `Fault` / `ProbeResult` vocabulary. A pytest plugin gives the samples to Phase 3 tests. |
 | Spec / decision clauses | V3 / D112 / AD-14 (flicker clip); V4 / D95 / D115 (VFR sample); V5 / D53 / D63 / AD-24 (photo profile and orientation); V9 (identity round trip: inputs only); D54 (untagged: BT.709 limited assumed); D83 (sidecars excluded); D86 (truncated: readable part processed); D116 / AD-17 (DNG refused by extension and by the DNG tag); HLG/PQ refusal (spec 6.5); IF-5 `Fault` kinds. Plan section 2 (generated test material), 4.4. |
 | Depends on | WP2.2 merged (`clearwater.interfaces` `Fault` kinds). WP2.1S's stdlib 16-bit PNG writer (`tools/spike_io/photo.py`), which the generator may IMPORT and not change. |
-| Files owned | `tools/fixtures/` (NEW: `__init__.py`, `stills.py`, `video.py`, `flicker.py`, `files.py` (sidecar and DNG dummies), `manifest.py`, `generate.py` (the CLI: `uv run python tools/fixtures/generate.py --out <dir>`, invoked like `tools/prototype/run.py`)); `tests/fixtures/` (NEW: the committed small outputs and `manifest.json`); `tests/fixture_plugin.py` (NEW: the pytest fixtures); `tests/test_fixtures.py`; `docs/proofs/wp2.3-ledger.md`. Conditional on CHARC item 3: ONE line in `tests/conftest.py`, `pytest_plugins = ["fixture_plugin"]`, nothing else in that file. NOT owned: `src/`, `tools/spike_io/`, `tools/prototype/`, `pyproject.toml` (no new dependency). |
+| Files owned | `tools/fixtures/` (NEW: `__init__.py`, `stills.py`, `video.py`, `flicker.py`, `files.py` (sidecar and DNG dummies), `manifest.py`, `generate.py` (the CLI: `uv run python tools/fixtures/generate.py --out <dir>`, invoked like `tools/prototype/run.py`)); `tests/fixtures/` (NEW: the committed small outputs and `manifest.json`); `tests/fixture_plugin.py` (NEW: the pytest fixtures); `tests/test_fixtures.py`; `docs/proofs/wp2.3-ledger.md`. Per ruling 3: ONE line in `tests/conftest.py`, `pytest_plugins = ["fixture_plugin"]`, nothing else in that file. NOT owned: `src/`, `tools/spike_io/`, `tools/prototype/`, `pyproject.toml` (no new dependency). |
 | Interfaces consumed | `clearwater.interfaces` (WP2.2: the `Fault` kinds, `ColorDescription` field values); `ffmpeg`/`ffprobe` 9.0.2 on PATH; Pillow, pillow-heif, NumPy as locked. |
 | Hardware flags | None timed. Video generation uses the FFmpeg CLI with software encoders only (libx265, libx264), so a machine without NVENC can regenerate. Tests that need FFmpeg are skipped with a reason when it is absent. |
 | Out of scope | Any owner footage, owner photo or derived content; any GPMF/`gpmd` track or GPS; real camera files downloaded from anywhere; product code; probe or validation logic (the manifest states intent; Phase 3 tests check it). |
@@ -40,11 +40,10 @@ Large generated files are not committed (plan section 2).
      the AD-24 cases: `irot` only, EXIF tag only, both, and neither.
    - Small sizes (for example 96 x 64), so everything is committed.
 2. **The AD-14 flicker clip** (`flicker.py`):
-   - Content: a still with a real-footage-like texture (item 1 below), repeated 90 frames at
+   - Content: a still with a real-footage-like texture (ruling 1), repeated 90 frames at
      30000/1001 fps, with a bright disc of 10 % frame area moving across the lower third.
    - A mask of the measured region (the upper half), with a test that the disc never enters it.
-   - Output: lossless (FFV1 in MKV, or a PNG sequence; the ledger says which) at the resolution
-     CHARC rules (item 2). Generated into `work/fixtures/`; only the mask and a manifest entry
+   - Output: lossless (FFV1 in MKV, or a PNG sequence; the ledger says which) at 960 x 540 (ruling 2). Generated into `work/fixtures/`; only the mask and a manifest entry
      are committed.
 3. **Video samples** (`video.py`, FFmpeg CLI). Each is a short clip (about 1-2 s) with a
    synthetic source (`testsrc2`/`smptehdbars` or the item-1 texture) and one AAC audio track
@@ -98,26 +97,18 @@ Large generated files are not committed (plan section 2).
    - a planted defect fails by name: a mis-tagged sample, an oversize file, a manifest kind
      WP2.2 does not define.
 
-## For CHARC before dispatch
+## Rulings (CHARC `8d7880255daf7c79`, 2026-10-20)
 
-1. **The AD-14 texture.** AD-14 says "a WP1.3 frame rendered to a synthetic texture, no owner
-   footage committed".
-   - Recommended: a fully PROCEDURAL texture. Use a blue-green depth gradient, low-frequency
-     caustic-like noise and a seeded fine-grain noise, with parameters chosen to resemble the
-     WP1.3 frames' statistics (whole-frame channel means and spread quoted in the ledger from
-     WP1.3's records). No owner pixel enters the generator. It regenerates on any machine
-     without the footage.
-   - Alternative: derive it from a WP1.3 frame. That needs the footage at generation time and
-     carries owner content into a committed or regenerable artefact.
-2. **Flicker clip resolution.** AD-14 does not fix it. Recommended: 960 x 540. That is large
-   enough for the 540 proxy (AD-5) to be identity, and a 90-frame FFV1 clip stays a few tens of
-   MB, generated rather than committed. Alternative: 3840 x 2160, generated (about 2 GB
-   lossless).
-3. **Plugin registration.** One `pytest_plugins` line in `tests/conftest.py` (WP-T1's guard
-   file; the guard logic is untouched). Alternative: Phase 3 tests import the fixtures
-   explicitly.
-4. **"Nothing over 2 MB committed."** Recommended reading: no single committed file over 2 MB,
-   AND the whole of `tests/fixtures/` under 10 MB, enforced by a test.
+1. **The AD-14 texture is fully procedural**, tuned to WP1.3's whole-frame statistics. The
+   ledger quotes those statistics with their report line. No owner pixel is used.
+2. **Flicker clip: 960 x 540, FFV1**, deterministic (seeded). The plugin generates it into
+   `work/` on demand. Only the mask and the manifest entry are committed. The V3 consumer
+   regenerates the clip when it is absent and verifies the decoded-frame hash against the
+   manifest before use. Provide that check in the plugin.
+3. **One `pytest_plugins = ["fixture_plugin"]` line in `tests/conftest.py`.** It is the only
+   conftest change allowed. The WP-T1 guard stays untouched and its tests stay green.
+4. **Size limits:** no committed file over 2 MB, and `tests/fixtures/` under 10 MB in total.
+   A test enforces both.
 
 ## Declared operating envelope
 

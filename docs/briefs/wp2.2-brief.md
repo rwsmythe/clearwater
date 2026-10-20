@@ -1,8 +1,8 @@
-# WP2.2 — Interface module (dispatch brief, DRAFT for CHARC approval)
+# WP2.2 — Interface module (dispatch brief, FINAL)
 
-**Status:** DRAFT, written by the orchestrator (generation 3) on 2026-10-20 at CHARC's commission
-(`9fb52c00bbb58a9b`). **Do not dispatch until CHARC approves.** Items needing CHARC's ruling are
-in "For CHARC before dispatch". Owner decisions: none.
+**Status:** FINAL, issued by the orchestrator (generation 3) on 2026-10-20. Commissioned by CHARC
+(`9fb52c00bbb58a9b`); draft `020ed86`; APPROVED with rulings (`8d7880255daf7c79`, section
+"Rulings"). Owner decisions: none.
 - Spec **v0.5.3**. Architecture **DRAFT 0.1** as updated at `3591e80` (`docs/architecture.md`
   section 3; `docs/decisions.md` AD-20). Gate report `docs/reports/wp1.6-gate-report.md`.
 - Cell: `implementer-sonnet-high`. Tier **STRONG**.
@@ -50,7 +50,7 @@ decision.
    the cited spec clause implies, and list each one in the same ledger table for the round-1
    ruling. `Settings` defaults come from G12, AD-8, AD-9 and AD-12 where those state one. A
    default no clause states is listed, not invented.
-4. **The `Array` alias.** Implement it per CHARC's ruling (item 1 below).
+4. **The `Array` alias.** Implement it per ruling 1.
 5. **IF-9 and IF-10 serialisation.**
    - `ParameterSet.to_json()` / `from_json()` in the AD-13 format, plus the provenance form
      (AD-13 with `source` and `settings`).
@@ -60,11 +60,11 @@ decision.
    - `Settings` gets `to_json()` / `from_json()` (a JSON string in and out). No file I/O.
    - Round trips are exact. `created` is ISO-8601.
 6. **Stubs** (`clearwater.interfaces.stubs`). One per protocol, named `Stub<Protocol>`, plus a
-   stub `select_backend`. Rules (decision fixed at issue; CHARC may overrule, item 3):
+   stub `select_backend`. Rules (ruling 3):
    - **In-memory, deterministic, no I/O, no GPU.**
    - **Trivial behaviour only.**
-     - `StubCorrectionMethod`: id `"stub"`, one stage, `analyze` returns zeros of the declared
-       statistic names, `render` returns the input image unchanged and refuses a missing stage
+     - `StubCorrectionMethod`: id `"stub"`, with the REAL c3 stage list of AD-6 (ruling 3);
+       `analyze` returns zeros of the declared statistic names; `render` returns the input image unchanged and refuses a missing stage
        as IF-3 says.
      - `StubStatisticsStore`: a dict keyed by pts ticks; `smooth` copies raw to smoothed.
      - `StubVideoSource`: serves `Frame`s from a list given at construction, with their exact
@@ -91,20 +91,23 @@ decision.
      a validation miss.
 8. **Docstrings** on every public module, class, function and field group (Google style).
 
-## For CHARC before dispatch
+## Rulings (CHARC `8d7880255daf7c79`, 2026-10-20)
 
-1. **`Array` alias.** Section 3 says `Array` is a NumPy or CuPy `ndarray`, always float32,
-   (H, W, 3). `interfaces` must not import CuPy, and mypy has no CuPy stubs. Recommended:
-   `Array: TypeAlias = numpy.typing.NDArray[numpy.float32]`. The docstring says a CuPy array is
-   accepted at run time, structurally, and that the backend owns the distinction. Alternative:
-   `Any`, which loses type checking on every pixel field.
-2. **IF-9 validation in WP2.2.** Recommended YES, because IF-9 names the step and it needs no
-   algorithm beyond comparisons. Alternative: the schema only, with validation in WP3.15.
-3. **Stub rules** as task 6: trivial in-memory behaviour, and `NotImplementedError` for anything
-   algorithmic. Recommended. Alternative: every stub method raises, which leaves Phase 3 nothing
-   to test against.
-4. **Round 1** = your ruling on the ledger table (task 2 types, task 3 annotations and
-   defaults). The cell YIELDS for it before its first Reviewer A round.
+1. **`Array` = `numpy.typing.NDArray[numpy.float32]`.** CuPy is accepted structurally at run
+   time; the docstring says so and names AD-1.
+2. **IF-9 schema validation lives in WP2.2** as a pure function over
+   `CorrectionMethod.parameters` (id, unknown names, type, range, choices) returning a problem
+   list. `Settings` gets `to_json` / `from_json` only, with no file I/O. WP3.15 owns the file
+   paths and `format_version` migration.
+3. **Stubs are trivial in-memory fakes** as task 6 lists them; algorithmic backend operations
+   raise `NotImplementedError` naming WP3.1. **Additionally: `StubCorrectionMethod.stages` is
+   the REAL c3 stage list of AD-6** (stage names, statistics, smoothed, parameter and stage
+   dependencies, `source_only`), even though `analyze` returns zeros. That way Phase 3
+   analysis code is exercised against the true shape. Cite AD-6 and WP1.4 section 7 in its
+   docstring. List the c3 stages you derive in the round-1 table, so CHARC confirms them.
+4. **Round 1 is a dedicated yield** for CHARC's ruling on the nine unnamed types, the
+   annotation gaps, the `Settings` defaults and the c3 stage list. The cell lists; it does not
+   invent.
 
 ## Declared operating envelope
 
