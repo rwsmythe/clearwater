@@ -94,7 +94,13 @@ on this harness's record 68% of all read tokens landed on turns above 400K. Rule
   rolling window, not a ceiling to stay under: a seat below 400K does not roll because its NEXT
   unit would cross it -- it starts the unit and rolls at the first stopping point after 400K is
   reached (the standing 09-23 word "do not stop work in flight for the 400k limit; let it continue
-  to a stopping point" already covers the overrun). The prompt hook prints the session's depth
+  to a stopping point" already covers the overrun). **One narrow exception (director ruling
+  2026-10-20, after an orchestrator generation rolled at ~300K rather than fan out four parallel
+  cells that would have died with it mid-round):** a seat about to DISPATCH cells whose expected
+  life exceeds the seat's remaining depth to the cap may roll BEFORE that dispatch, at that
+  boundary, with the arithmetic stated in its rollover post; the cost of one early spin-up is
+  below the cost of re-dispatching every cell from its ledger. It is a pre-dispatch exception only
+  and never applies mid-round. The prompt hook prints the session's depth
   every turn (`[ctx] NNNK of 1000K (NN%)`) and names the cap when it is reached; the rollover
   procedure is the state-pointer convention (charter 5.1).
 - **Cells too.** A cell past ~400K is re-dispatched from a fresh context with its round ledger, the
