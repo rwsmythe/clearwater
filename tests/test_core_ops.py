@@ -112,6 +112,27 @@ def test_helpers_refuse_bad_inputs(backend: CoreBackend, name: str) -> None:
         helper(backend, backend.xp.zeros((4, 4, 3), dtype=np.float64))
 
 
+def test_collapse_checks_every_band(backend: CoreBackend) -> None:
+    # Round 1 F1: the bands below the coarsest level are checked too (no broadcast, no
+    # float64 promotion, no array of the other device).
+    coarse = backend.asarray(np.ones((2, 2, 3), np.float32))
+    fine = backend.asarray(np.zeros((3, 3, 3), np.float32))
+    assert collapse_pyramid(backend, [fine, coarse]).shape == (3, 3, 3)
+    with pytest.raises(ValueError, match="does not fit"):
+        collapse_pyramid(backend, [backend.asarray(np.zeros((3, 3, 1), np.float32)), coarse])
+    with pytest.raises(ValueError, match="does not fit"):
+        collapse_pyramid(backend, [backend.asarray(np.zeros((3, 3), np.float32)), coarse])
+    with pytest.raises(ValueError, match="expand"):
+        collapse_pyramid(backend, [backend.asarray(np.zeros((5, 3, 3), np.float32)), coarse])
+    with pytest.raises(ValueError, match="float32"):
+        collapse_pyramid(backend, [backend.xp.zeros((3, 3, 3), dtype=np.float64), coarse])
+    with pytest.raises(ValueError, match="float32"):
+        collapse_pyramid(backend, [fine, backend.xp.ones((2, 2, 3), dtype=np.float64)])
+    if backend.name == "cupy":
+        with pytest.raises(TypeError, match="cupy arrays"):
+            collapse_pyramid(backend, [np.zeros((3, 3, 3), np.float32), coarse])
+
+
 def test_shape_refusals(backend: CoreBackend) -> None:
     four = backend.asarray(np.zeros((3, 3, 4), np.float32))
     for helper in (luminance, rgb_to_lab, channel_means):

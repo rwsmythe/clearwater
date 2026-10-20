@@ -147,7 +147,9 @@ def laplacian_pyramid(backend: ArrayBackend, a: Array, levels: int) -> list[Arra
 def collapse_pyramid(backend: ArrayBackend, pyramid: Sequence[Array]) -> Array:
     """Collapse a Laplacian pyramid: from the coarsest level, ``G_l = L_l + EXPAND(G_{l+1})``.
 
-    Mirrors ``pipeline.collapse_pyramid``.
+    Mirrors ``pipeline.collapse_pyramid``. Every level is checked before it is used: a band
+    must be a float32 array of this backend with the coarser level's channel layout and a size
+    that level expands to, so nothing broadcasts or promotes silently.
 
     Args:
         backend: The backend the levels live on.
@@ -164,8 +166,13 @@ def collapse_pyramid(backend: ArrayBackend, pyramid: Sequence[Array]) -> Array:
     if not pyramid:
         raise ValueError("collapse_pyramid needs at least one level")
     image = pyramid[-1]
-    core.check(image)
+    core.check_spatial(image)
     for band in reversed(pyramid[:-1]):
+        core.check_spatial(band)
+        if band.shape[2:] != image.shape[2:]:
+            raise ValueError(
+                f"a level of shape {band.shape} does not fit the coarser level {image.shape}"
+            )
         image = band + core.pyramid_expand(image, (band.shape[0], band.shape[1]))
     return image
 
