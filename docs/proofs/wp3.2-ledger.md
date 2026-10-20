@@ -128,7 +128,7 @@ are WP3.4's schema.
 | Round | Depth (dispatcher) | Critical | Major | Minor | Info | In / out envelope | New / reopened | Reverts | Product / test-only fixes | Transcript |
 |---|---|---|---|---|---|---|---|---|---|---|
 | 0 | 116,822 (R0 yield) | table only | | | | | | | | -- |
-| 1 | (dispatcher) | 0 | 0 | 4 | 0 | 3 in / 1 out | 4 new / 0 reopened | 0 | planned: 2 product (error paths), 2 test-only | `C:\Users\rwsmy\clearwater-review-evidence\wp3.2\r1\` (md5s in `md5sums.txt`) |
+| 1 | 218,176 (R1 yield) | 0 | 0 | 4 | 0 | 3 in / 1 out | 4 new / 0 reopened | 0 | 2 product (error paths), 2 test-only; TERMINATING | `C:\Users\rwsmy\clearwater-review-evidence\wp3.2\r1\` (md5s in `md5sums.txt`) |
 
 Round-0 ruling (orchestrator gen 6): table ACCEPTED as committed in 73b1fea; S-1 to S-4 as
 recommended; N-1 a WP3.21 consumer note (no `CoreBackend.constant`); N-3 private X-4 helper per
@@ -160,3 +160,24 @@ Transport WSL, codex-cli 0.162.1, gpt-5.6-sol / high; probe 1 `succeeded in`; re
    (same subclass, zero ufunc calls before the error, planted control).
 
 No new blocking finding: round 1 terminates the loop (if it counts); minors fixed once in cleanup.
+
+Round-1 ruling (orchestrator gen 6; depth 218,176 / 73 turns at the R1 yield): the round
+COUNTS. The line `ERROR: Reconnecting... 2/5` (review.stderr.txt line 1970, before the model's
+first output, followed by a normal run to the verdict) is classified a RECOVERED RETRY, not a
+disqualifying transport error (same adjudication as WP3.15's Reviewer B, upheld by CHARC).
+Verdict NO_NEW_CRITICAL_MAJOR: round 1 TERMINATES the loop. Findings 1-4 accepted as planned,
+fixed once as the terminating cleanup; finding 2's root (`core.check_sigma` overflowing
+`int(4 * sigma + 0.5)`) banked at accept as a core item for the next core touch.
+
+### Terminating cleanup
+
+| Finding | Commit | Kind | Test failing on the unfixed code |
+|---|---|---|---|
+| R1-1 mixed-type keys | da2693c | product (error message) | `test_mixed_type_keys_raise_the_value_error` (TypeError before the fix) |
+| R1-2 overflowing sigma | e4a0b55 | product (`_derived_sigma` catches OverflowError) | `test_overflowing_fraction_raises_the_x4_error` x2 (OverflowError before the fix) |
+| R1-3 render measures | 5da9a91 | test only (`UfuncSpy`) | planted controls `measuring`, `frame_max` (compensation) and `measuring` (white balance) are caught |
+| R1-4 X-4 before array work | 5da9a91 | test only (`UfuncSpy`) | planted control `late` (array work before the check) is caught |
+
+Report updated c6618a6. Gates after the cleanup: ruff check, ruff format --check, mypy strict
+clean; own tests 383 passed; 200 passed / 183 skipped with cupy unimportable. Note: the
+intermediate commit da2693c has one test-file formatting nit that e4a0b55 resolves (head clean).
