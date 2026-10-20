@@ -12,7 +12,7 @@ base `9735282`. Stack as locked: NumPy 2.5.4, SciPy 1.18.1, CuPy 14.2.0 (`cupy-c
 | `src/clearwater/core/memory.py` | `memory_estimate_bytes` (the AD-1 counted formula), `METHOD_IDS` |
 | `src/clearwater/core/ops.py` | `spatial_sigma`, `pyramid_levels`, `gaussian_pyramid`, `laplacian_pyramid`, `collapse_pyramid`, `luminance`, `rgb_to_lab`, `laplacian`, `channel_means`, `mean` (ruling 1, R0-2) |
 | `tools/core_speed.py` | the speed-row instrument (X1, ruling 4) |
-| `tests/test_core_{backend,ops,prototype,select,deps}.py` | 152 tests (with GPU) |
+| `tests/test_core_{backend,ops,prototype,select,deps}.py` | 156 tests (with GPU) |
 | `pyproject.toml`, `uv.lock` | the frame section 4 grant lines (below) |
 
 ## Claims and evidence
@@ -35,15 +35,19 @@ base `9735282`. Stack as locked: NumPy 2.5.4, SciPy 1.18.1, CuPy 14.2.0 (`cupy-c
    included; YCbCr rows against the published BT.709 / BT.601 values; percentile against R-7
    computed in the test.
 4. **Planted defects fail by name** (`test_core_backend.py`, bottom): a ceil radius rule, a
-   `wrap` border (blur and reduce), a float64 leak from `percentile`, an unnormalised EXPAND,
-   and swapped Cb/Cr matrix rows.
-5. **float32 throughout, no silent cast or upload** (R0-3): a float64 input raises ValueError
+   `wrap` border (blur and reduce), a float64 leak from `percentile`, a percentile interpolated
+   in float32 (the cast made early), an unnormalised EXPAND, and swapped Cb/Cr matrix rows;
+   in `test_core_select.py`, a driver-only `free_device_bytes` that flips frame 2 to the CPU.
+5. **Percentile cast point** (R0-8, CHARC): R-7 at the native precision (float64 on NumPy and
+   CuPy) and one cast to float32 at the return; `test_percentile_cast_point` pins
+   `percentile(a, q) == float32(xp.percentile(a, q))` bit for bit at 401 q values per device.
+6. **float32 throughout, no silent cast or upload** (R0-3): a float64 input raises ValueError
    and an array of the other device raises TypeError on every image method; `asarray` refuses
    any `dtype` but float32.
-6. **Gate 1 (device-resident)**: on the GPU every IF-2 method typed `-> Array` (the set is read
+7. **Gate 1 (device-resident)**: on the GPU every IF-2 method typed `-> Array` (the set is read
    from the protocol, so a new method fails the test until listed) and every array-returning
    helper returns a `cupy.ndarray`; `to_host` is the only device-to-host transfer of IF-2.
-7. **CuPy optional**: `import clearwater.core` loads no `cupy`, `cupyx`, `PIL`, `av`,
+8. **CuPy optional**: `import clearwater.core` loads no `cupy`, `cupyx`, `PIL`, `av`,
    `PySide6`, nor `clearwater.io/.jobs/.gui/.methods` (subprocess test); with `cupy` made
    unimportable the CPU path runs and `select_backend` answers `CPU: CuPy not installed`. A
    static AST check over `src/clearwater` refuses any `cupy`/`cupyx` import and any `.xp` read
@@ -87,7 +91,8 @@ kept** and becomes a product dependency under the frame section 4 grant.
 CuPy keeps freed blocks in its pool; the driver counts them as used, but CuPy serves the next
 frame's allocations from them first. With the driver figure alone, the second frame of a clip
 would see the first frame's working set as taken and fall back to the CPU (pinned by
-`test_second_frame_stays_on_gpu`). Fragmented pool blocks may not satisfy a large request; the
+`test_second_frame_stays_on_gpu`; the planted driver-only version flips that frame to the
+CPU, `test_planted_driver_only_free_flips_frame_two`). Fragmented pool blocks may not satisfy a large request; the
 estimate's 1.25 margin covers that (WP1.2: 8 % measured). The figure does not count the CUDA
 context, which already exists when the decision is taken.
 

@@ -121,6 +121,25 @@ The probe result is cached per process; free memory is read on every call.
   the c3 sigma (0.05 x 2160 = 108 px, radius 432, 865 taps) is a direct 865-tap correlation per
   axis (FFT is out of scope); identity with the prototype holds only if SciPy/cupyx is kept.
 
+## Round-0 rulings and CHARC additions
+
+All ten recommended answers adopted (orchestrator gen 5); CHARC upheld them
+(`799b83d4fe11bed8`) and added: R0-8 percentile computed at native precision (float64) and cast
+to float32 once, at the return, pinned by `test_percentile_cast_point` with the planted
+`EarlyCast` control; R0-7 planted frame-2 case (`test_planted_driver_only_free_flips_frame_two`);
+R0-2 the sync-point list below, carried to the WP3.21 brief (wave 4).
+
+### Device-to-host sync points (for WP3.21)
+
+| Where | What is read back | Why |
+|---|---|---|
+| `clearwater.core.ops.channel_means` | 3 float64 means as Python floats | prototype precision contract (`_channel_means`); WP3.2 white balance and compensation |
+| `clearwater.core.ops.mean` | 1 float64 mean as a Python float | prototype `_cap_statistic` (Ancuti gain cap) |
+| `clearwater.core.backend._probe_gpu` | 1 probe-kernel sum | once per process, at the first `select_backend` |
+| `CoreBackend.to_host` | the array | the IF-2 way out, by design |
+
+No other IF-2 method or helper reads back to the host (Gate 1 tests).
+
 ## Cumulative round ledger
 
 | Round | Depth (dispatcher) | Crit | Major | Minor | In/out envelope | NEW/REOPENED | Reverts | Fix kind | Transport / CLI | Verdict |
