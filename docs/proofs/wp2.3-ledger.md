@@ -9,7 +9,7 @@ Reviewer A: codex-cli 0.162.1 in WSL, `gpt-5.6-sol` / `high`, `-s read-only`; ev
 | Round | Head reviewed | MAJOR | MINOR | In-envelope / out | NEW / REOPENED | Reverts | Fixes changed | Verdict | Tokens | Depth |
 |---|---|---|---|---|---|---|---|---|---|---|
 | 1 | `4ffc8b1` | 7 (4 EXECUTED, 3 REASONED) | 4 (2 E, 2 R) | 11 / 0 | 11 / 0 | 0 | product (generators, manifest schema, committed samples): 7 findings; tests and plugin: 4 | NEW_CRITICAL_MAJOR_FOUND | 178,521 | (dispatcher) |
-| 2 | `1e2d2f6` | 0 | 3 (3 E, 0 R) | 3 / 0 | 3 / 0 | 0 | none yet: all 3 are docstring/comment or test-only cleanup, pending (not remediated in the turn that ran the round) | NO_NEW_CRITICAL_MAJOR | 190,698 | (dispatcher) |
+| 2 | `1e2d2f6` | 0 | 3 (3 E, 0 R) | 3 / 0 | 3 / 0 | 0 | none in the round; post-convergence cleanup of the 3 minors, docstring and test only (see below) | NO_NEW_CRITICAL_MAJOR | 190,698 | 96,313 tokens / 55 turns at the R2 yield |
 
 Round 1 per-finding adjudication: `...\wp2.3\r1\adjudication.md` (md5s in `md5s.txt`). All 11
 findings were confirmed (finding 7 partly) and fixed at `b439f70` and `312773f`. The round's
@@ -32,6 +32,14 @@ are CONFIRMED; per the fill they are fixed once in the terminating round's clean
 | `1e2d2f6` | `tests/test_fixtures.py` + `tests/test_conftest_guard.py` | 282 passed, 66.54 s |
 | `1e2d2f6` | full pytest (`work/fixtures/runs/full4.txt`) | 1130 passed, 1 warning, 478.55 s, EXIT 0 |
 
+## Post-convergence cleanup (after round 2; no round 3, docstring and test only)
+
+Commit after `7660b1f` fixes the 3 round-2 minors: `tests/fixture_plugin.py` docstring quotes the
+ruled conditional statement; `test_stills_carry_no_gps` also scans `dng-by-extension`, `dng-by-tag`
+and `dng-extension-only`; `tools/fixtures/video.py` overview names the 30-frame VFR clip. Gates on it:
+`ruff check`, `ruff format --check`, `mypy` pass; `tests/test_fixtures.py` + `tests/test_conftest_guard.py`
+282 passed. No full pytest (the orchestrator runs it on the merge candidate).
+
 ## Rulings applied (CHARC `ef7b272564ddeb9d`, 2026-10-20)
 
 - **R1-1** (AD-14 geometry accepted): disc CENTRE track in the lower third; binding property is that
@@ -39,8 +47,9 @@ are CONFIRMED; per the fill they are fixed once in the terminating round's clean
   the `DISC_CENTRE_ROW` docstring and the manifest `exercises` text say exactly this (`1e2d2f6`; the
   manifest was regenerated: only that one string changed, every other committed file is
   byte-identical).
-- **R1-2** (conftest): the line is the ruled conditional expression, but wrapped in parentheses by
-  `ruff format`. REPRODUCED: the literal one-line text is 102 columns, so `ruff check` reports E501 (limit
+- **R1-2** (conftest): ruling R1-2 applied as ruff's layout of the ruled statement (102 cols > 100);
+  accepted by the orchestrator at the R2 yield. The line is the ruled conditional expression, wrapped in
+  parentheses by `ruff format`. REPRODUCED: the literal one-line text is 102 columns, so `ruff check` reports E501 (limit
   100) and `ruff format --check` wants to reformat it. The parenthesised form is the same statement
   (`241b415`); tests/conftest.py is otherwise unchanged apart from that statement; the WP-T1 guard and
   `tests/test_conftest_guard.py` untouched and green. DEVIATION for the orchestrator to note.
