@@ -5,11 +5,12 @@ from __future__ import annotations
 import dataclasses
 import importlib
 import inspect
+import json
 import pkgutil
 import subprocess
 import sys
 from collections.abc import Callable
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta, tzinfo
 from fractions import Fraction
 from pathlib import Path
 from typing import Any
@@ -223,7 +224,6 @@ def test_provenance_round_trip() -> None:
 def test_format_version_other_than_one_is_refused_by_name() -> None:
     data = _set({}).to_dict()
     data["format_version"] = 2
-    import json
 
     with pytest.raises(UnsupportedFormatVersionError, match="format_version 2"):
         ParameterSet.from_json(json.dumps(data))
@@ -256,6 +256,72 @@ def test_huge_integer_round_trips_and_validates_without_raising() -> None:
     ]
 
 
+BAD_FLOATS = (float("nan"), float("inf"), float("-inf"))
+
+
+@pytest.mark.parametrize("bad", BAD_FLOATS, ids=repr)
+def test_non_finite_floats_are_refused_at_every_entry_point_and_depth(bad: float) -> None:
+    data = _set({}).to_dict()
+    # from_dict: parameters, provenance source / settings, nested at depth
+    for key, value in (
+        ("parameters", {"x": bad}),
+        ("source", {"probe": {"fps": bad}}),
+        ("source", {"list": [1, [bad]]}),
+        ("settings", {"quality_score": bad}),
+    ):
+        with pytest.raises(FormatError, match="non-finite"):
+            ParameterSet.from_dict({**data, key: value})
+    # to_dict and to_json: the same three places
+    for pset in (
+        _set({"x": bad}),
+        ParameterSet("c3", {}, CREATED, "v", source={"probe": {"fps": bad}}),
+        ParameterSet("c3", {}, CREATED, "v", settings={"a": [bad]}),
+    ):
+        with pytest.raises(FormatError, match="non-finite"):
+            pset.to_dict()
+        with pytest.raises(FormatError, match="non-finite"):
+            pset.to_json()
+    # Settings nests a ParameterSet
+    with pytest.raises(FormatError, match="non-finite"):
+        Settings(last_parameters=_set({"x": bad})).to_json()
+    text = Settings(last_parameters=_set({})).to_json()
+    document = json.loads(text)
+    document["last_parameters"]["source"] = {"probe": {"fps": bad}}
+    with pytest.raises(FormatError, match="non-finite"):
+        Settings.from_json(json.dumps(document))  # python writes NaN / Infinity
+    with pytest.raises(FormatError):
+        Settings.from_json(text.replace('"parameters": {}', '"parameters": {"x": NaN}'))
+
+
+def test_finite_values_pass_the_boundary_check() -> None:
+    pset = ParameterSet(
+        "c3", {"x": 1.5}, CREATED, "v", source={"a": [0.0, {"b": -1e300}]}, settings={}
+    )
+    assert ParameterSet.from_dict(pset.to_dict()) == pset
+
+
+class _NoOffset(tzinfo):
+    """A tzinfo whose utcoffset() is None: a datetime with it is still naive."""
+
+    def utcoffset(self, dt: datetime | None) -> timedelta | None:
+        return None
+
+    def dst(self, dt: datetime | None) -> timedelta | None:
+        return None
+
+    def tzname(self, dt: datetime | None) -> str | None:
+        return None
+
+
+def test_created_with_no_utc_offset_is_refused() -> None:
+    odd = datetime(2026, 10, 20, 12, 0, tzinfo=_NoOffset())
+    assert odd.tzinfo is not None and odd.utcoffset() is None
+    with pytest.raises(ValueError, match="timezone"):
+        ParameterSet("c3", {}, odd, "v").to_dict()
+    with pytest.raises(ValueError, match="timezone"):
+        ParameterSet("c3", {}, odd, "v").to_json()
+
+
 def test_created_must_be_iso_8601_with_a_t_separator() -> None:
     data = _set({}).to_dict()
     for bad in ("2026-10-20Q12:30:15+00:00", "2026-10-20", "x"):
@@ -267,7 +333,7 @@ def test_created_must_be_iso_8601_with_a_t_separator() -> None:
 
 
 def test_non_finite_float_is_not_serialised() -> None:
-    with pytest.raises(ValueError, match="Out of range"):
+    with pytest.raises(FormatError, match="non-finite"):
         _set({"a": float("nan")}).to_json()
 
 
@@ -404,7 +470,6 @@ def test_settings_round_trip_exact() -> None:
 
 
 def test_settings_format_version_and_shape_errors() -> None:
-    import json
 
     data = json.loads(Settings(png_bit_depth=16, video_encoder="e", quality_level="q").to_json())
     for broken, error in (

@@ -143,7 +143,7 @@ stage order from its constructor (default the c3 names).
 | 1 (proposal yield) | - | - | - | - | - | - | - | 148,021 tokens / 36 turns (orchestrator) |
 | R1 (Reviewer A) | 0 | 5 (3 fixed, 1 rejected as ruled, 1 raised) | 4 (3 fixed, 1 rejected, 1 raised) | all in | 9 NEW / 0 REOPENED | 0 | product (#2, #4, #5) and tests (#8, #9) | see dispatcher |
 | R2 (Reviewer A) | 0 | 1 (fixed) | 3 (fixed) | all in | 4 NEW / 0 REOPENED | 0 | product (#1 docstring, #2) and tests (#3, #4) | 206,440 (R2 yield, orchestrator) |
-| R3 (Reviewer A) | 0 | 0 | 1 (fixed) | in | 1 NEW / 0 REOPENED | 0 | tests only (#1) | to be read by dispatcher |
+| R3 (Reviewer A) | 0 | 0 | 1 (fixed) | in | 1 NEW / 0 REOPENED | 0 | tests only (#1) | 217,013 (return, orchestrator) |
 
 Reviewer A round 1: codex-cli (WSL) gpt-5.6-sol/high, 131,404 tokens, 40 executed commands, verdict
 NEW_CRITICAL_MAJOR_FOUND. Transcript, prompt, diff and adjudication:
@@ -177,6 +177,20 @@ says never to open, grep, list or print any file under `docs/proofs/`, and searc
 to named directories. One MINOR (REASONED): the c3 stage test compared the constant with itself;
 fixed with a literal-list test `test_c3_stages_equal_the_ruled_list`. Final head: ruff, ruff format
 --check, mypy clean; full pytest 887 passed; harness gate untouched.
+
+## Reviewer B remediation (orchestrator's seat pass on the merge candidate; no Reviewer A round)
+
+1. MAJOR (EXECUTED), non-finite floats accepted at the dict boundary: new `check_finite(value, where)`
+   (recursive over dict, list, tuple) used by `ParameterSet.from_dict` (parameters, `source`,
+   `settings`) and `ParameterSet.to_dict` / `to_json`; refusal is `FormatError` naming the path.
+   Settings is covered through its nested `last_parameters` (it has no float field of its own).
+   Tests: every entry point, NaN / +inf / -inf, nested dict and list, Settings in and out; they
+   fail on the pre-fix code (6 failures) and pass after.
+2. MINOR, `created` timezone check: `utcoffset() is None` now refuses (was `tzinfo is None`) in
+   `to_dict` and `from_dict`; test with a tzinfo whose `utcoffset()` is None.
+3. MINOR, `StubCorrectionMethod.closed_form("bogus", ...)`: now `ValueError` as `analyze`; test added.
+   The earlier test expecting `ValueError` from `to_json` on NaN now expects `FormatError` (a
+   subclass of `ValueError`, so callers catching `ValueError` still work).
 
 ## Gates at the round-1 commit
 

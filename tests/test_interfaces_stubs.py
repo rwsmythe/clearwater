@@ -238,6 +238,8 @@ def test_method_stub_has_real_c3_stages_and_zero_statistics() -> None:
     with pytest.raises(ValueError, match="compensation"):
         method.analyze("compensation", _image(), {}, {})
     assert method.closed_form("fusion", {}, {}, {}) is None
+    with pytest.raises(ValueError, match="bogus"):
+        method.closed_form("bogus", {}, {}, {})
 
 
 def test_method_stub_render_is_identity_and_refuses_a_missing_stage() -> None:

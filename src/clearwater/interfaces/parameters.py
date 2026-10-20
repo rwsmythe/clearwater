@@ -82,6 +82,27 @@ def check_format_version(data: Mapping[str, Any]) -> None:
         )
 
 
+def check_finite(value: object, where: str) -> None:
+    """Refuse a NaN or infinite float at any depth of a JSON-native value.
+
+    Args:
+        value: A bool, int, float, str, None, or a dict, list or tuple of those.
+        where: The location, used in the message (for example ``"parameters"``).
+
+    Raises:
+        FormatError: A float anywhere inside ``value`` is NaN, +inf or -inf.
+    """
+    if isinstance(value, float):
+        if not math.isfinite(value):
+            raise FormatError(f"non-finite number {value!r} at {where}")
+    elif isinstance(value, dict):
+        for key, item in value.items():
+            check_finite(item, f"{where}.{key}")
+    elif isinstance(value, list | tuple):
+        for index, item in enumerate(value):
+            check_finite(item, f"{where}[{index}]")
+
+
 def _is_value(value: object) -> bool:
     """Whether ``value`` is a legal :data:`ParameterValue`."""
     return value is None or isinstance(value, bool | int | float | str)
@@ -116,9 +137,15 @@ class ParameterSet:
 
         Raises:
             ValueError: ``created`` is not timezone-aware.
+            FormatError: A float in ``parameters``, ``source`` or ``settings`` is not finite.
         """
-        if self.created.tzinfo is None:
+        if self.created.utcoffset() is None:
             raise ValueError("created must be timezone-aware")
+        check_finite(dict(self.parameters), "parameters")
+        if self.source is not None:
+            check_finite(dict(self.source), "source")
+        if self.settings is not None:
+            check_finite(dict(self.settings), "settings")
         data: dict[str, Any] = {
             "format_version": FORMAT_VERSION,
             "method": self.method,
@@ -144,7 +171,8 @@ class ParameterSet:
 
         Raises:
             UnsupportedFormatVersionError: ``format_version`` is not 1.
-            FormatError: A key is missing, unknown, or has the wrong type.
+            FormatError: A key is missing, unknown, or has the wrong type, or a float anywhere
+                in ``parameters``, ``source`` or ``settings`` is not finite.
         """
         check_format_version(data)
         unknown = sorted(set(data) - set(_KEYS) - set(_PROVENANCE_KEYS))
@@ -167,6 +195,7 @@ class ParameterSet:
             isinstance(k, str) and _is_value(v) for k, v in parameters.items()
         ):
             raise FormatError("parameters must map names to bool, int, float, str or null")
+        check_finite(parameters, "parameters")
         if not isinstance(created, str):
             raise FormatError("created must be an ISO-8601 string")
         try:
@@ -175,7 +204,7 @@ class ParameterSet:
             created_at = datetime.fromisoformat(created)
         except ValueError as error:
             raise FormatError(f"created is not ISO-8601: {created!r}") from error
-        if created_at.tzinfo is None:
+        if created_at.utcoffset() is None:
             raise FormatError(f"created has no timezone: {created!r}")
         created_at = created_at.astimezone(UTC)
         extras: dict[str, Mapping[str, Any] | None] = {}
@@ -183,6 +212,7 @@ class ParameterSet:
             value = data.get(key)
             if value is not None and not isinstance(value, dict):
                 raise FormatError(f"{key} must be an object")
+            check_finite(value, key)
             extras[key] = value
         return cls(
             method=method,

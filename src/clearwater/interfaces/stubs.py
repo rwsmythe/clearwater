@@ -162,7 +162,22 @@ class StubCorrectionMethod:
         earlier: Mapping[str, Statistics],
         measured: Statistics,
     ) -> Statistics | None:
-        """Return None: the stub has no closed form for any stage."""
+        """Return None for a known stage: the stub has no closed form.
+
+        Args:
+            stage: The stage name.
+            params: Ignored.
+            earlier: Ignored.
+            measured: Ignored.
+
+        Returns:
+            None.
+
+        Raises:
+            ValueError: ``stage`` is not one of the stub's stages.
+        """
+        if all(known.name != stage for known in self.stages):
+            raise ValueError(f"unknown stage {stage!r}")
         return None
 
 
