@@ -147,7 +147,7 @@ No other IF-2 method or helper reads back to the host (Gate 1 tests).
 |---|---|---|---|---|---|---|---|---|---|---|
 | 0 (table) | 108,729 (24 turns) at the round-0 yield | - | - | - | - | - | - | - | - | yield for ruling |
 | pre-review (build, CHARC additions) | 228,618 (74 turns) at the window-request yield; 237,795 (81 turns) at the queue yield | - | - | - | - | - | - | - | - | full-pytest window queued; round 1 to adjudicated verdict, then depth decision |
-| 1 | (dispatcher fills) | 0 | 3 | 4 | 7 in / 0 out | 7 NEW / 0 REOPENED | 0 | pending: product F1 F2 F3 F5, tool F4 F7, test-only F6 | WSL, codex-cli 0.162.1, gpt-5.6-sol high | NEW_CRITICAL_MAJOR_FOUND (adjudicated, not remediated) |
+| 1 | first cell retired at 275K; successor 182,305 (68 turns) at the remediation / window-request yield | 0 | 3 | 4 | 7 in / 0 out | 7 NEW / 0 REOPENED | 0 | pending: product F1 F2 F3 F5, tool F4 F7, test-only F6 | WSL, codex-cli 0.162.1, gpt-5.6-sol high | NEW_CRITICAL_MAJOR_FOUND (adjudicated, not remediated) |
 
 ## Gate windows
 
