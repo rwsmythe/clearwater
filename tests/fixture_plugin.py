@@ -23,6 +23,7 @@ Nothing here reads the footage folder or any local configuration.
 from __future__ import annotations
 
 import json
+import tempfile
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -65,6 +66,21 @@ def load_manifest(root: Path = FIXTURES_DIR) -> dict[str, Any]:
         pytest.fail("fixtures manifest is invalid: " + "; ".join(problems), pytrace=False)
     result: dict[str, Any] = data
     return result
+
+
+def writable_dir(path: Path) -> bool:
+    """Return True when ``path`` exists (or can be made) and a file can be written in it.
+
+    ``mkdir(exist_ok=True)`` succeeds on a read-only folder, so a probe file is written and
+    removed as well.
+    """
+    try:
+        path.mkdir(parents=True, exist_ok=True)
+        with tempfile.NamedTemporaryFile(dir=path):
+            pass
+    except OSError:
+        return False
+    return True
 
 
 def verify_generated(entry: dict[str, Any], path: Path) -> str | None:
@@ -191,10 +207,8 @@ def sample_provider(
     fixture_manifest: dict[str, Any], tmp_path_factory: pytest.TempPathFactory
 ) -> SampleProvider:
     """The session's :class:`SampleProvider` (cache in ``work/``, basetemp if that fails)."""
-    try:
-        GENERATED_DIR.mkdir(parents=True, exist_ok=True)
-        cache = GENERATED_DIR
-    except OSError:
+    cache = GENERATED_DIR
+    if not writable_dir(cache):
         cache = tmp_path_factory.getbasetemp() / "fixtures-generated"
     return SampleProvider(
         fixture_manifest,

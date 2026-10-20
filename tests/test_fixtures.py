@@ -18,6 +18,7 @@ import shutil
 import struct
 import subprocess
 import sys
+import tempfile
 import zlib
 from collections.abc import Callable
 from pathlib import Path
@@ -35,6 +36,7 @@ from fixture_plugin import (
     SampleProvider,
     load_manifest,
     verify_generated,
+    writable_dir,
 )
 from fixtures import files, flicker, generate, manifest, stills, video
 from spike_io import photo
@@ -196,6 +198,26 @@ PLANTED_MANIFESTS = [
         lambda m: _sample(m, "png8-uniform-none").pop("serves"),
         "sample 'png8-uniform-none': lacks 'serves'",
     ),
+    (
+        lambda m: _sample(m, "png8-uniform-srgb")["expect"]["photo"]["image"]["color"].__setitem__(
+            "colour_space", "srgb"
+        ),
+        "photo.image.color key 'colour_space' is not a ColorDescription field",
+    ),
+    (
+        lambda m: _sample(m, "png8-uniform-srgb")["expect"]["photo"]["metadata"].__setitem__(
+            "bit_depth", 8
+        ),
+        "photo.metadata key 'bit_depth' is not a PhotoMetadata field",
+    ),
+    (
+        lambda m: _sample(m, "vid-vfr")["expect"]["probe"]["video"].__setitem__("tag_state", "x"),
+        "probe.video key 'tag_state' is not a VideoStreamInfo field",
+    ),
+    (
+        lambda m: _sample(m, "vid-vfr")["expect"]["probe"].__setitem__("frames", 30),
+        "probe key 'frames' is not a ProbeResult field",
+    ),
 ]
 
 
@@ -311,19 +333,70 @@ def test_still_is_what_the_manifest_says(sample_id: str, sample: Callable[[str],
     entry = ENTRIES[sample_id]
     measured = _read_still(sample(sample_id))
     facts, photo_expect = entry["facts"], entry["expect"]["photo"]
-    assert measured["depth"] == facts["bit_depth"] == photo_expect["bit_depth"]
+    metadata, color = photo_expect["metadata"], photo_expect["image"]["color"]
+    assert measured["depth"] == facts["bit_depth"] == color["bit_depth"]
     assert (measured["width"], measured["height"]) == (facts["width"], facts["height"])
     kind = facts.get("icc_kind", "none")
     if kind == "none":
         assert measured["icc"] is None
+        assert color["icc_profile"] is None
     else:
         assert measured["icc"] == stills.icc_bytes(kind)
         assert facts["icc_md5"] == hashlib.md5(measured["icc"], usedforsecurity=False).hexdigest()
-    assert photo_expect["icc_kind"] == kind
+        assert color["icc_profile"] == kind
+        assert color["primaries"] == ("display-p3" if kind == "display-p3" else "bt709")
     if entry["kind"] in ("jpeg", "heic"):
         assert measured["orientation"] == facts["exif_orientation"]
-    assert photo_expect["icc_carried"] == (kind != "none")
-    assert photo_expect["source_format"] == entry["kind"]
+    assert metadata["source_format"] == entry["kind"]
+    assert metadata["orientation"] == (measured.get("orientation") or 1)
+    assert photo_expect["image"]["orientation_applied"] is True
+
+
+def _unit_pixels(path: Path) -> np.ndarray[Any, Any]:
+    """Decode a still to float RGB in [0, 1] (16-bit PNG through PyAV, the rest through Pillow)."""
+    pillow_heif.register_heif_opener()
+    data = path.read_bytes()
+    if data.startswith(b"\x89PNG") and _png_header(data)[2] == 16:
+        pixels, _ = photo.pyav_png(path)
+        return pixels.astype(np.float64) / 65535
+    with Image.open(path) as image:
+        return np.asarray(image.convert("RGB"), dtype=np.float64) / 255
+
+
+@pytest.mark.parametrize(
+    "sample_id", [i for i in STILL_IDS if not i.startswith(("jpeg-o", "heic-a"))]
+)
+def test_still_pixels_are_the_named_content(sample_id: str, sample: Callable[[str], Path]) -> None:
+    """Uniform is uniform, the gradient rises along x only, low-red is blue-green, red <= 2/255."""
+    content = ENTRIES[sample_id]["facts"]["content"]
+    lossless = ENTRIES[sample_id]["facts"]["lossless"]
+    pixels = _unit_pixels(sample(sample_id))
+    tolerance = 0.5 / 255 if lossless else 3.0 / 255  # mean error against the generated content
+    if content == "uniform":
+        assert np.allclose(pixels.reshape(-1, 3).mean(axis=0), [0.25, 0.50, 0.60], atol=3 / 255)
+        if lossless:
+            assert np.ptp(pixels.reshape(-1, 3), axis=0).max() < 1.5 / 255  # one colour
+    elif content == "gradient":
+        columns = pixels.mean(axis=0)  # (width, 3)
+        assert columns[0].max() < 0.03 and columns[-1].min() > 0.97  # black to white
+        assert np.all(np.diff(columns[:, 1]) > -2 / 255)  # rises left to right
+        rows = pixels.mean(axis=1)  # (height, 3): nothing changes down the image
+        assert np.ptp(rows[:, 1]) < 3 / 255
+        assert np.abs(pixels[..., 0] - pixels[..., 1]).max() < 4 / 255  # grey: R = G = B
+    else:
+        assert content == "lowred"
+        assert pixels[..., 0].max() <= (2 + 0.5) / 255
+        assert pixels[..., 1].mean() > 0.4 and pixels[..., 2].mean() > 0.5  # a blue-green scene
+        assert pixels[:, -1, 1].mean() > pixels[:, 0, 1].mean() + 0.2  # green rises to the right
+        assert pixels[-1, :, 2].mean() > pixels[0, :, 2].mean() + 0.2  # blue rises downwards
+    reference = stills.unit_content(content, red_levels=2 if lossless else stills.LOSSY_RED_LEVELS)
+    bits = ENTRIES[sample_id]["expect"]["photo"]["image"]["color"]["bit_depth"]
+    scale = (1 << bits) - 1
+    if bits == 16:
+        expected_pixels = np.round(reference * scale) / scale
+    else:
+        expected_pixels = np.round(reference * 255) / 255
+    assert float(np.mean(np.abs(pixels - expected_pixels))) < tolerance, sample_id
 
 
 @pytest.mark.parametrize("sample_id", [i for i in STILL_IDS if i.startswith(("png8", "png16"))])
@@ -354,12 +427,8 @@ def test_low_red_content_keeps_red_at_or_below_two_levels(
     sample_id: str, sample: Callable[[str], Path]
 ) -> None:
     path = sample(sample_id)
-    lossless = sample_id.startswith(("png", "tiff"))
-    limit = 514 if sample_id.startswith("png16") else 2
-    if lossless:
-        assert stills.red_max(path) <= limit
-    else:
-        assert stills.red_max(path) <= 4  # chroma subsampling and the codec bleed one level
+    limit = 514 if sample_id.startswith("png16") else 2  # 2/255 in the file's own scale
+    assert stills.red_max(path) <= limit, sample_id  # JPEG and HEIC too, after the codec
     assert ENTRIES[sample_id]["facts"]["red_max"] == stills.red_max(path)
 
 
@@ -369,6 +438,8 @@ def test_stills_carry_no_gps(sample: Callable[[str], Path]) -> None:
         path = sample(sample_id)
         data = path.read_bytes()
         if data.startswith(b"\x89PNG"):
+            # Only pixels and profile: no eXIf, iTXt, tEXt or XMP chunk could hold a GPS block.
+            assert {k for k, _ in photo.png_chunks(data)} <= {"IHDR", "iCCP", "IDAT", "IEND"}
             continue
         if data[4:8] == b"ftyp":
             raw = pillow_heif.open_heif(str(path)).info.get("exif")
@@ -467,8 +538,13 @@ def test_dng_samples_carry_or_lack_the_tag(sample: Callable[[str], Path]) -> Non
     assert sample("dng-by-extension").suffix == ".dng"
     assert sample("dng-by-tag").suffix == ".tif"
     assert sample("dng-extension-only").suffix == ".dng"
-    # The tag is in the file's own bytes, not only in what Pillow reports.
-    assert (50706).to_bytes(2, "little") in sample("dng-by-tag").read_bytes()
+    # The tag is in the file's own bytes, not only in what Pillow reports: TIFF type BYTE (1),
+    # count 4, value 1 4 0 0 (DNGVersion as the DNG specification defines it).
+    for sample_id in ("dng-by-extension", "dng-by-tag"):
+        assert files.dng_entry(sample(sample_id)) == (1, 4, bytes((1, 4, 0, 0))), sample_id
+        assert ENTRIES[sample_id]["facts"]["dng_version_type"] == 1
+        assert ENTRIES[sample_id]["facts"]["dng_version_count"] == 4
+    assert files.dng_entry(sample("dng-extension-only")) is None
     for sample_id in STILL_IDS:
         if sample_id.startswith("tiff8"):
             with Image.open(sample(sample_id)) as image:
@@ -495,6 +571,54 @@ def test_gopro_placeholders(sample: Callable[[str], Path]) -> None:
 # --- Video, measured with ffprobe and a decode --------------------------------------------
 
 
+def _probe_view(facts: dict[str, Any]) -> dict[str, Any]:
+    """Derive the ``expect.probe`` shape from measured ffprobe facts, independently of the spec.
+
+    An HLG or PQ stream has no ``color`` (refused at probe); a stream whose bitstream has no video
+    signal type gets the D54 defaults and ``assumed``; the rest is ffprobe's words in WP2.2's.
+    """
+    v = facts["video"]
+    view: dict[str, Any] = {
+        "codec": v["codec"],
+        "width": v["width"],
+        "height": v["height"],
+        "bit_depth": 10 if "10" in v["pix_fmt"] else 8,
+        "frame_rate": v["avg_frame_rate"],
+        "time_base": v["time_base"],
+        "nb_frames": v["nb_frames"],
+        "rotation": v["rotation"],
+        "vfr": facts["pts"]["variable"],
+    }
+    bits = view["bit_depth"]
+    if v["vui"].get("video_signal_type_present_flag") == 0:
+        view["color"] = {
+            "primaries": "bt709",
+            "transfer": "bt709",
+            "matrix": "bt709",
+            "range": "limited",
+            "assumed": True,
+            "bit_depth": bits,
+        }
+    elif v["color_transfer"] not in ("arib-std-b67", "smpte2084"):
+        view["color"] = {
+            "primaries": v["color_primaries"],
+            "transfer": v["color_transfer"],
+            "matrix": v["color_space"],
+            "range": {"pc": "full", "tv": "limited"}[v["color_range"]],
+            "bit_depth": bits,
+            "assumed": False,
+        }
+    return {
+        "container": facts["container"],
+        "video": view,
+        "audio": [
+            {"codec": a["codec"], "sample_rate": a["sample_rate"], "channels": a["channels"]}
+            for a in facts["audio"]
+        ],
+        "data": facts["data_streams"],
+    }
+
+
 @needs_ffmpeg
 @pytest.mark.parametrize("sample_id", VIDEO_IDS)
 def test_video_is_what_the_manifest_says(sample_id: str, sample: Callable[[str], Path]) -> None:
@@ -505,6 +629,8 @@ def test_video_is_what_the_manifest_says(sample_id: str, sample: Callable[[str],
     spec = next(s for s in video.SPECS if s.sample_id == sample_id)
     assert video.mismatches(spec, facts) == []
     assert entry["expect"]["probe"] == video.expectation(spec)
+    # The expectation also equals what the measured file says, read through WP2.2's names.
+    assert entry["expect"]["probe"] == _probe_view(facts), sample_id
 
 
 @needs_ffmpeg
@@ -521,11 +647,15 @@ def test_video_tags_are_actually_in_the_streams(sample: Callable[[str], Path]) -
     assert seen["vid-hevc8-bt709-full"] == ("pc", "bt709", "bt709", "bt709")
     assert seen["vid-hlg"] == ("tv", "bt2020nc", "arib-std-b67", "bt2020")
     assert seen["vid-pq"] == ("tv", "bt2020nc", "smpte2084", "bt2020")
-    assert seen["vid-untagged"] == ("tv", "unknown", "unknown", "unknown")
-    untagged = video.measure(sample("vid-untagged"))["video"]["vui"]
-    assert (
-        untagged["colour_description_present_flag"] == 0
-    )  # no colour description in the bitstream
+    assert seen["vid-untagged"] == ("unknown", "unknown", "unknown", "unknown")
+    untagged = video.measure(sample("vid-untagged"))["video"]
+    assert untagged["vui"] == {"video_signal_type_present_flag": 0}  # no signal type at all
+    assert untagged["codec"] == "h264"
+    for sample_id in VIDEO_IDS:  # every other clip does carry the signal type it claims
+        flags = video.measure(sample(sample_id))["video"]["vui"]
+        if sample_id != "vid-untagged":
+            assert flags["video_signal_type_present_flag"] == 1, sample_id
+            assert flags["colour_description_present_flag"] == 1, sample_id
     assert video.measure(sample("vid-hevc10"))["video"]["bit_depth"] == 10
     assert video.measure(sample("vid-hevc8-bt709-full"))["video"]["bit_depth"] == 8
 
@@ -588,6 +718,16 @@ def test_planted_video_defects_are_caught_by_name(tmp_path: Path) -> None:
     constant = video.measure(target)
     assert any("variable frame rate" in w for w in video.mismatches(vfr, constant))
     assert any("partial file" in w for w in video.mismatches(truncated, constant))
+    # x265 with no tags still writes a video signal type: it is not an untagged sample.
+    plain = video.Spec("x", "yuv420p", video.UNTAGGED, (), "plain x265")
+    target = tmp_path / "plain.mp4"
+    video.run_ffmpeg(
+        guard, [*video._lavfi_inputs(video.DURATION_S), *video._encode_args(plain)], target, scratch
+    )
+    untagged = next(s for s in video.SPECS if s.sample_id == "vid-untagged")
+    wrong = video.mismatches(untagged, video.measure(target))
+    assert any("VUI video_signal_type_present_flag is 1, intended 0" in w for w in wrong), wrong
+    assert any("codec is 'hevc', intended 'h264'" in w for w in wrong), wrong
 
 
 # --- The AD-14 flicker clip ---------------------------------------------------------------
@@ -641,19 +781,17 @@ def test_flicker_design_facts_are_the_measured_ones() -> None:
 
 
 def test_flicker_texture_matches_wp1_3_whole_frame_statistics() -> None:
-    """Means within 0.005 of WP1.3's 180 flicker frames; N{} spread inside its 0.27 to 0.52."""
-    from prototype import pipeline
-    from prototype.params import Params
-
-    image = flicker.still().astype(np.float32) / 255
-    means = image.reshape(-1, 3).mean(axis=0)
+    """Channel means within 0.005 of WP1.3's 180 flicker frames; N{} spread near their mean 0.38."""
+    image = flicker.still()
+    means = image.reshape(-1, 3).mean(axis=0) / 255
     assert np.allclose(means, [0.426, 0.572, 0.546], atol=0.005), means
-    params = Params()
-    compensated, _ = pipeline.compensate_ancuti2018(image, params)
-    balanced, _ = pipeline.white_balance(compensated, params)
-    low, high = pipeline.normalisation_bounds(balanced, params)
-    assert 0.27 <= high - low <= 0.52, high - low
-    assert flicker.still().shape == (540, 960, 3)
+    spread = flicker.normalisation_spread(image)
+    assert 0.34 <= spread <= 0.42, spread  # WP1.3: 0.27 to 0.52, mean 0.38
+    design = ENTRIES["ad14-flicker"]["facts"]["design"]
+    assert design["texture_normalisation_spread"] == pytest.approx(spread, abs=0.0006)
+    assert design["texture_channel_means"] == pytest.approx(list(means), abs=0.0001)
+    assert design["wp1_3_reference"]["channel_means"] == [0.426, 0.572, 0.546]
+    assert image.shape == (540, 960, 3)
 
 
 @needs_ffmpeg
@@ -753,7 +891,10 @@ def test_regenerated_manifest_is_byte_identical(
     regenerated_full: tuple[dict[str, Any], Path, Path],
 ) -> None:
     _, out, generated = regenerated_full
-    fresh = _norm_newlines((out / "manifest.json").read_bytes())
+    fresh = (out / "manifest.json").read_bytes()
+    assert b"\r" not in fresh  # the generator writes LF only; nothing is normalised on this side
+    # The committed side is normalised once: git's CRLF conversion (core.autocrlf) may have turned
+    # the working-tree copy's LF into CRLF, while the committed blob is the LF bytes.
     assert fresh == _norm_newlines((FIXTURES_DIR / "manifest.json").read_bytes())
     assert [p.name for p in out.iterdir() if p.is_file()] == ["manifest.json"]
     assert not (out / video.SCRATCH).exists()  # intermediates are gone
@@ -976,6 +1117,24 @@ def test_plugin_reports_a_missing_committed_file(
     monkeypatch.setattr(video, "tools_available", lambda: True)
     with pytest.raises(pytest.fail.Exception, match="committed sample 'vid-hlg' is missing"):
         provider.path("vid-hlg")
+
+
+def test_cache_folder_must_really_be_writable(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An existing folder that refuses a file is not a cache (mkdir(exist_ok=True) would pass)."""
+    assert writable_dir(tmp_path / "fresh" / "deeper")
+    blocker = tmp_path / "blocker"
+    blocker.write_text("a file", encoding="ascii")
+    assert not writable_dir(blocker / "sub")  # cannot make the folder
+    existing = tmp_path / "existing"
+    existing.mkdir()
+
+    def refuse(*args: object, **kwargs: object) -> None:
+        raise PermissionError("read-only folder")
+
+    monkeypatch.setattr(tempfile, "NamedTemporaryFile", refuse)
+    assert not writable_dir(existing)  # exists, mkdir passes, a write is refused
 
 
 @needs_ffmpeg
