@@ -9,6 +9,7 @@ Cell: implementer-sonnet-high (tier STRONG). Worktree `.worktrees/wp3.15`, branc
 | Round | Date | Blocking (crit/maj) | Minor | In/out envelope | NEW/REOPENED | Fix kind | Transport | Depth |
 |---|---|---|---|---|---|---|---|---|
 | 0 (design) | 2026-10-20 | n/a | n/a | n/a | n/a | n/a | n/a | 83,816 (dispatcher, 15 turns) |
+| build yield | 2026-10-20 | n/a | n/a | n/a | n/a | product + tests | n/a | 145,492 (dispatcher, 34 turns) |
 
 ## Round 0: the design table (brief task 1)
 
@@ -164,3 +165,7 @@ Commit `987206b`: all modules and tests. Own tests (`tests/test_config_*.py`) 18
 ruff format --check and mypy clean. A defect found by the case-only rename test and fixed in the same
 commit: `Path` equality is case-insensitive on Windows, so the rename was skipped (now compares
 `.name`). Not yet run: full pytest (window requested), Reviewer A.
+
+CHARC addition applied (252e847): `PresetImportResult.dropped_keys` names the dropped provenance
+keys (`source`, `settings`); `provenance_dropped` is a derived bool. The `list_presets()` name was
+accepted by the dispatcher.
