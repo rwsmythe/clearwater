@@ -53,8 +53,16 @@ def test_core_works_with_cupy_unimportable() -> None:
     assert run_python(code) == "numpy|CPU: CuPy not installed"
 
 
+IMPORT_CALLS = {"import_module", "__import__"}
+
+
 def violations(source: str, in_core: bool) -> list[str]:
-    """The dependency-rule violations of one module's source."""
+    """The dependency-rule violations of one module's source.
+
+    Imports are ``import`` and ``from`` statements and calls of ``import_module`` or
+    ``__import__``, bare or as an attribute, with a string argument; reading ``xp`` is the
+    attribute ``.xp`` or ``getattr(x, "xp")``.
+    """
     found = []
     for node in ast.walk(ast.parse(source)):
         names: list[str] = []
@@ -62,8 +70,17 @@ def violations(source: str, in_core: bool) -> list[str]:
             names = [alias.name for alias in node.names]
         elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
             names = [node.module]
-        elif isinstance(node, ast.Call) and getattr(node.func, "attr", "") == "import_module":
-            names = [arg.value for arg in node.args if isinstance(arg, ast.Constant)]
+        elif isinstance(node, ast.Call):
+            func = node.func
+            called = func.id if isinstance(func, ast.Name) else getattr(func, "attr", "")
+            strings = [
+                arg.value if isinstance(arg, ast.Constant) and isinstance(arg.value, str) else ""
+                for arg in node.args
+            ]
+            if called in IMPORT_CALLS:
+                names = [string for string in strings if string]
+            elif called == "getattr" and strings[1:2] == ["xp"] and not in_core:
+                found.append(f"reads .xp at line {node.lineno}")
         for name in names:
             top = str(name).split(".")[0]
             if top in {"cupy", "cupyx"} and not in_core:
@@ -95,13 +112,24 @@ def test_static_rule_catches_planted_violations() -> None:
         "from prototype import pipeline\n"
         "def f(backend):\n"
         "    return backend.xp.zeros(3)\n"
+        # Round 1 F6: the bare and dunder import calls, and getattr by name.
+        "from importlib import import_module\n"
+        "n = import_module('cupyx.scipy.ndimage')\n"
+        "o = __import__('cupy')\n"
+        "p = importlib.__import__('cupyx')\n"
+        "def g(backend):\n"
+        "    return getattr(backend, 'xp').zeros(3)\n"
     )
     found = violations(planted, in_core=False)
     assert sorted(found) == [
         "imports cupy",
         "imports cupy",
+        "imports cupy",
+        "imports cupyx",
         "imports cupyx.scipy",
+        "imports cupyx.scipy.ndimage",
         "imports prototype",
+        "reads .xp at line 13",
         "reads .xp at line 7",
     ]
     assert violations(planted, in_core=True) == ["imports prototype"]
