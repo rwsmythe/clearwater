@@ -18,7 +18,7 @@
         "D64",
         "AD-14"
       ],
-      "exercises": "The V3 clip: 90 frames at 30000/1001 of one still with a 10 % bright disc sweeping the lower half; measure frame-to-frame flicker only inside ad14-mask.",
+      "exercises": "The V3 clip: 90 frames at 30000/1001 of one still with a 10 % bright disc whose centre moves across the lower third (the disc spans rows 277 to 532; the upper half is never touched); measure frame-to-frame flicker only inside ad14-mask.",
       "expect": {
         "faults": [],
         "refusal": null,

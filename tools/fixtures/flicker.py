@@ -11,10 +11,11 @@ noise tuned to the whole-frame statistics WP1.3 measured on the owner's shallow 
 report section 5 "The flicker as numbers"). No owner pixel is used.
 
 The disc is a 10 % disc, which is 257 pixels across at 960 x 540: it cannot fit inside the lower
-third (180 rows). Its centre row is therefore 405, the middle of the lower half, and it spans rows
-277 to 532. The lower third holds its centre; the upper half, the measured region, is never
-touched. The clip is lossless (FFV1 RGB in Matroska), so the decoded frames are exactly
-the frames rendered here and their hash is the manifest's identity check.
+third (180 rows). "Moving across the lower third" (AD-14) is therefore the track of the disc CENTRE:
+its centre row is 405, inside the lower third (rows 360 to 539), and the disc spans rows 277 to 532.
+The binding property is that the measured region, the upper half (rows 0 to 269), is never touched.
+The clip is lossless (FFV1 RGB in Matroska), so the decoded frames are exactly the frames rendered
+here and their hash is the manifest's identity check.
 """
 
 from __future__ import annotations
@@ -55,7 +56,7 @@ DISC_FRACTION = 0.10
 """The disc's area as a fraction of the frame (AD-14)."""
 
 DISC_CENTRE_ROW = 405
-"""The disc centre's row: the middle of the lower half, inside the lower third."""
+"""The disc centre's row: inside the lower third (the centre track of AD-14's disc)."""
 
 DISC_COLOUR = (250, 246, 232)
 """The disc's colour (a bright warm white)."""
@@ -514,7 +515,8 @@ def build_clip(guard: WriteGuard, out: Path) -> manifest.Entry:
         path=CLIP_PATH,
         serves=["V3", "D112", "D64", "AD-14"],
         exercises="The V3 clip: 90 frames at 30000/1001 of one still with a 10 % bright disc "
-        "sweeping the lower half; measure frame-to-frame flicker only inside ad14-mask.",
+        "whose centre moves across the lower third (the disc spans rows 277 to 532; the upper "
+        "half is never touched); measure frame-to-frame flicker only inside ad14-mask.",
         expected=manifest.expect(
             probe={
                 "container": "matroska,webm",
