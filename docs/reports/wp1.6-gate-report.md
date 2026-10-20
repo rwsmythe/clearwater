@@ -18,7 +18,7 @@ stray-clean export row is marked.
 | 1 Speed | WP1.2 Part A (synthetic) + Part B (real) | `wp1.2a-speed-memory.md`, `wp1.2b-speed-memory.md` | `f6d998a`; `2dd06cf` (record `wp1.2b-accept.md`) |
 | 2 Peak memory | WP1.2 Part A + Part B | same | same; photo leg PENDING (no photo supplied, D102) |
 | 3 Look check | WP1.3 shallow + WP1.3D deep, CP2 shallow + deep | `wp1.3-look-check.md`, `wp1.3d-deep-look-check.md` | `7178540`; `7f9fea1`; CP2 records `cp2-look-check.md`, `cp2-deep-look-check.md` |
-| 4 Gain-cap noise test | WP1.4b | `wp1.4b-noise.md` | `afaff0e` (record `wp1.4b-accept.md`) |
+| 4 Gain-cap noise test | WP1.4b | `wp1.4b-gain-cap-noise.md` | `afaff0e` (record `wp1.4b-accept.md`) |
 | 5 Staged versus flat | WP1.4 shallow, CP2 | `wp1.4-statistics.md` | `91f5775` |
 | 6 Container spike | WP1.5 | `wp1.5-container-spike.md` | `3242679` |
 
@@ -49,15 +49,14 @@ the pipe against 0.016 s decoding to NUL; 1 MB+ blocks reach 4-6 GB/s).
 
 **No measured export used c3.** The production export row is ancuti2018; c3 costs 0.244 s/frame
 more in the core (0.639 vs 0.395), so a c3 export on the same clip is estimated at about
-0.73 s/frame, **about 22 min/min (6.6x)** unoptimised. This estimate is CHARC's, from the two
-measured rows; it was not run.
+0.73 s/frame, **about 22 min/min (6.6x)** unoptimised. This estimate is CHARC's, from the two measured rows, assuming the core delta adds 1:1 to the export (the core dominates and decode and encode already overlap it); it was not run.
 
 **Optimisation candidates (Part B claim 7; none tried; estimates, not measurements):**
 
 | # | Candidate | Effect | Cost |
 |---|---|---|---|
 | 6 | Raw transport with large writes (PyAV in-process, or a pipe/socket in 1 MB+ blocks) | takes the decode stage from 0.089-0.094 s/frame toward the 0.016 s to-NUL figure (1 MB+ blocks: 4.0-5.4 ms/frame in the transport record); on the analysis pass the source estimates **-20 to -30 %** (it becomes decode- and statistics-bound); little for export while the core dominates | low-moderate; WP2.1's transport choice |
-| 1 | Device-resident pipeline, copy back the output only | measured -26 % end to end, -30 % core (0.395 -> 0.276 s ancuti2018; 0.639 -> 0.514 c3) | low |
+| 1 | Device-resident pipeline, copy back the output only | measured -26 % end to end; core -30 % for ancuti2018 (0.395 -> 0.276 s) and -20 % for c3 (0.639 -> 0.514 s); contaminated windows | low |
 | 5 | Upload/download overlap on CUDA streams | about 0.02-0.03 s on top of #1 | moderate |
 | 3 | 3C large Gaussian by FFT or recursive filter | up to -0.24 s/frame for c3 only (its sigma-108, 865-tap Gaussian) | moderate; numerical agreement to re-verify |
 | 2 | Fewer materialised intermediates in the render | about 0.1 s/frame, overlapping #1 | moderate |
@@ -77,8 +76,7 @@ it would need all of the above plus work not yet identified.
   GX011625 in about 3.5 hours. Lowest schedule risk; the product is slow.
 - **Option B — approve an optimisation package before the build.** Candidates #6, #1, #5, #3
   as one named package (WP3.1's scope grows), re-measured on GX011627 and GX011625 before
-  Phase 3 proceeds. Estimated reach about 0.25-0.29 s/frame core, export about **8-10 min/min**
-  (2.5-3x N6). Cost: one opus-high package plus an exclusive re-measure (about 4 h of machine
+  Phase 3 proceeds. Estimated reach about 0.25-0.29 s/frame core (the source's estimate); export about **8-10 min/min** (2.4-3x N6), CHARC's estimate adding decode, encode and the residual to that core. Cost: one opus-high package plus an exclusive re-measure (about 4 h of machine
   time); Phase 2 interface freezes wait for it only where the transport choice (#6) touches them.
 - **Option C (CHARC's recommendation) — both, in this order.** (1) Adopt now an **interim N6 of
   25 min/min at 4K** so Phase 2 can freeze interfaces and the V16 test has a number. (2) Make
@@ -120,7 +118,7 @@ supplied). Queued for the first photo, not dropped.
 
 **Decision (CHARC):** the 16 GB limit holds for video with a wide margin (23 % used at 4K,
 including FFmpeg). No photo size limit is proposed; the owner's row in plan section 10 ("largest
-photo exceeds 16 GB even on CPU") is not reached and is not expected to be at 24-48 MP.
+photo exceeds 16 GB even on CPU") is not reached and is not expected to be at iPhone sizes (assumed 24-48 MP; no photo is inventoried yet).
 
 ## Result 3 — Look check (D103; plan section 10 row 3) — CP2 COMPLETE, shallow and deep
 
@@ -182,10 +180,10 @@ with the 0.02 range floor from Result 4.
 **Measured (WP1.5, `3242679`):** one FFmpeg process with NVENC: all MANDATORY and REQUIRED
 container items SAME on two chapters; 8 best-effort differences (camera `udta` atoms, firmware
 tag, audio timecode tag, brands, encoder/handler tags, track order and flags, sample-entry boxes,
-muxer identity edits); GPMF, timecode and creation time kept. NVENC and libx265 8/10-bit and CUDA
+muxer identity edits); the GPMF track, timecode and creation time kept (the `udta` GPMF settings atom is among the best-effort differences). NVENC and libx265 8/10-bit and CUDA
 decode PROVEN. Camera HERO13 Black, HEVC Main 8-bit `yuvj420p`, BT.709 FULL range, CFR
 30000/1001. Part B's exports re-confirmed the MANDATORY/REQUIRED items SAME on every export
-(GX011627 production and resident, GX011625, encode-only).
+(GX011627 production and resident, GX011625, encode-only and passthrough).
 
 **Decision (CHARC): Gate 6 = SIMPLE; WP3.10 as planned**, with full range honoured end to end
 (D54 reading), the B-frame edit-list convention at WP2.1 (DR-15), `udta` repair best-effort in
@@ -209,8 +207,7 @@ For WP2.1: smoothing `median_gaussian` 2.0 s provisional, with a step-aware sche
 permitted, IF-3 staged (Result 5); clamp 3.0, alpha smoothed as a value (Result 4); CPU/GPU
 mechanism CuPy with `memory_estimate_bytes` as the fallback input (Result 2); video I/O SIMPLE,
 transport chosen at WP2.1 with large-block writes required (Results 1, 6); proxy resolution per
-Part A section 8 and Part B claim 6; defaults from WP1.1 plus CP2 (c3). Debt carried: DR-14
-(closes at WP2.1), DR-15, DR-18, DR-25, DR-26, DR-27, DR-28, DR-29, DR-30.
+Part A section 8 and Part B claim 6; defaults from WP1.1 plus CP2 (c3). Debt carried (selected from the register's open items; also open and relevant to Phase 2-3: DR-19 method-agnostic C3 validation, DR-20 D54 untagged-range fallback, DR-23): DR-14 (closes at WP2.1), DR-15, DR-18, DR-25, DR-26, DR-27, DR-28, DR-29, DR-30.
 
 ## V14 record
 
