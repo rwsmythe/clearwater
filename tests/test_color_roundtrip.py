@@ -40,16 +40,18 @@ from test_color_support import (
 
 pytestmark = pytest.mark.usefixtures("ffmpeg_tools")
 
-# --- the bounds of the swscale pair (CHARC ruling on WP3.5 STOP 1) ---------------------------
+# --- the bounds of the swscale pair (CHARC ruling on STOP 1, tightened by the orchestrator) ---
 # AD-11's V9 bound binds the RGB-side legs only (AD11_* below); the pair through 8-bit 4:2:0
 # Y'CbCr is a characterisation test with regression bounds taken from the measurement, in 1/255
-# units: GX011627 first 30 frames mean <= 1.0 and p99.9 <= 4; testsrc2 samples mean <= 3, max
-# reported (the Figures string) and not asserted. Measured on the day (FFmpeg 9.0.2, bitexact, so
-# deterministic): GX011627 30 frames mean 0.687, p99.9 3.0; testsrc2 45 frames mean 1.45 (10-bit)
-# to 2.02 (8-bit), D76 8 -> 10 bit 1.59, BT.601 1.82.
+# units: GX011627 first 30 frames mean <= 1.0 and share of samples over 2/255 <= 1 %; testsrc2
+# samples mean <= 2.5, max reported (the Figures string) and not asserted. They are tighter than
+# the ruling's example figures (synthetic mean 3, footage p99.9 4), which would let the dropped
+# accurate_rnd and the siting defects through. Measured on the day (FFmpeg 9.0.2, bitexact, so
+# deterministic): GX011627 30 frames mean 0.687, share over 2/255 0.72 %; testsrc2 45 frames mean
+# 1.45 (10-bit) to 2.02 (8-bit), D76 8 -> 10 bit 1.59, BT.601 1.82.
 PAIR_MEAN_REAL = 1.0
-PAIR_P999_REAL = 4.0
-PAIR_MEAN_SYNTHETIC = 3.0
+PAIR_SHARE_OVER_2_REAL = 0.01
+PAIR_MEAN_SYNTHETIC = 2.5
 # AD-11 itself:
 AD11_MAX = 2.0
 AD11_MEAN = 0.2
@@ -273,6 +275,23 @@ def test_planted_encode_matrix_is_caught(sample: Sample, sample_id: str) -> None
     assert figures.mean > PAIR_MEAN_SYNTHETIC, str(figures)  # measured 7.5 - 8.8
 
 
+@pytest.mark.parametrize("sample_id", ["vid-hevc8-bt709-full", "vid-untagged"])
+def test_planted_accurate_rnd_dropped_in_both_halves_is_caught(
+    sample: Sample, sample_id: str
+) -> None:
+    path = sample(sample_id)
+    stream = probe(path).video
+    figures = measure_roundtrip(
+        path,
+        stream,
+        frames=FRAMES,
+        decode_vf=decode_filter(stream).replace("+accurate_rnd", ""),
+        encode_vf=encode_filter(stream, bit_depth=8).replace("+accurate_rnd", ""),
+    )
+    assert figures.frames == FRAMES
+    assert figures.mean > PAIR_MEAN_SYNTHETIC, str(figures)  # measured 2.79 and 2.84 (margin 12 %)
+
+
 def test_planted_siting_mismatch_is_argument_level_only(sample: Sample) -> None:
     # A siting mismatch moves the mean by 1-20 % on test content (2.02 -> 2.45) and is hidden
     # in the bound; test_color_swscale plants it at argument level. Pinned here so a change shows.
@@ -296,8 +315,9 @@ def test_planted_siting_mismatch_is_argument_level_only(sample: Sample) -> None:
 def test_pair_round_trip_on_the_owners_main_case() -> None:
     """GX011627: 4K, 8-bit, BT.709 full range; read-only; untimed; the first 30 frames.
 
-    The planted defects must exceed the bounds on the mean or on p99.9 (the figures are in the
-    report beside each defect): the bound is the pass line, the defect's figure is its margin.
+    The planted defects must exceed the bounds on the mean or on the share over 2/255 (the
+    figures are in the report beside each defect): the bound is the pass line, the defect's
+    figure is its margin.
     """
     try:
         path = find_footage_file("GX011627")
@@ -310,34 +330,34 @@ def test_pair_round_trip_on_the_owners_main_case() -> None:
     figures = measure_roundtrip(path, stream, frames=FOOTAGE_FRAMES)
     assert figures.frames == FOOTAGE_FRAMES
     assert figures.mean <= PAIR_MEAN_REAL, str(figures)
-    assert figures.percentile(99.9) <= PAIR_P999_REAL, str(figures)  # measured 3.0
+    assert figures.share_over_2 <= PAIR_SHARE_OVER_2_REAL, str(figures)  # measured 0.72 %
     decode = decode_filter(stream)
     encode = encode_filter(stream, bit_depth=8)
     no_rnd = "+accurate_rnd"
     plants = {
-        "encode range": {"encode_vf": encode.replace("out_range=pc", "out_range=tv")},  # 5.32, 20
+        "encode range": {"encode_vf": encode.replace("out_range=pc", "out_range=tv")},  # 5.32, 73 %
         "encode matrix": {
             "encode_vf": encode.replace("out_color_matrix=bt709", "out_color_matrix=smpte170m")
-        },  # 2.98, 10
+        },  # 2.98, 57 %
         "accurate_rnd dropped in both halves": {
             "decode_vf": decode.replace(no_rnd, ""),
             "encode_vf": encode.replace(no_rnd, ""),
-        },  # 1.14, 5
+        },  # 1.14, 7.4 %
         "accurate_rnd dropped in the first decode": {
             "decode_vf": decode.replace(no_rnd, ""),
             "decode2_vf": decode,
-        },  # 0.80, 6
+        },  # 0.80, 4.1 %
         "siting center": {
             "encode_vf": encode.replace("out_chroma_loc=left", "out_chroma_loc=center")
-        },  # 0.71, 5
+        },  # 0.71, 1.67 %
         "siting topleft": {
             "encode_vf": encode.replace("out_chroma_loc=left", "out_chroma_loc=topleft")
-        },  # 0.74, 5
+        },  # 0.74, 2.11 %
     }
     for name, kwargs in plants.items():
         planted = measure_roundtrip(path, stream, frames=FOOTAGE_FRAMES, **kwargs)
         assert planted.frames == FOOTAGE_FRAMES
-        assert planted.mean > PAIR_MEAN_REAL or planted.percentile(99.9) > PAIR_P999_REAL, (
+        assert planted.mean > PAIR_MEAN_REAL or planted.share_over_2 > PAIR_SHARE_OVER_2_REAL, (
             name,
             str(planted),
         )
