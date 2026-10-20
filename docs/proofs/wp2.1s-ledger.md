@@ -132,7 +132,7 @@ cumulative machine time ~60 min.
 | r1 | WSL, codex-cli 0.162.1, gpt-5.6-sol/high | 0 | 4 | 4 | 7 / 1 (F8 out) | 8 NEW / 0 | 0 | product: transport.py, photo.py, licences.py, report; test: photo tests | (dispatcher) | `clearwater-review-evidence/wp2.1s/r1/` |
 | r2 | WSL, codex-cli 0.162.1, gpt-5.6-sol/high | 0 | 2 | 3 | 4 / 1 (F5 out) | 5 NEW / 0 | 0 | product: transport.py, licences.py, report | (dispatcher) | `clearwater-review-evidence/wp2.1s/r2/` |
 | r3 | WSL, codex-cli 0.162.1, gpt-5.6-sol/high | 0 | 1 | 7 | 5 / 3 (F5, F7, F8 out) | 8 NEW / 0 | 0 | product: guard.py (new), transport.py, photo.py, licences.py, report; test: guard and profile-name tests (gen-3 cell, `a5c5c00`, `5c998f6`) | (dispatcher) | `clearwater-review-evidence/wp2.1s/r3/` |
-| r4 | WSL, codex-cli 0.162.1, gpt-5.6-sol/high | 0 | 1 (F2 claimed MAJOR, adjudicated MINOR) | 6 | 6 / 1 (F6 out) | 6 NEW / 1 REOPENED (F4: r3 F3's text, in the module docstring) | 0 | product: licences.py, transport.py (docstring; F6), report, licences.json regenerated; test: PNG fixture writes guarded (`c12656c`, `5da289d`) | (dispatcher) | `clearwater-review-evidence/wp2.1s/r4/` |
+| r4 | WSL, codex-cli 0.162.1, gpt-5.6-sol/high | 0 | 1 (F2 claimed MAJOR, adjudicated MINOR) | 6 | 6 / 1 (F6 out) | 6 NEW / 1 REOPENED (F4: r3 F3's text, in the module docstring) | 0 | product: licences.py, transport.py (docstring; F6), report, licences.json regenerated; test: PNG fixture writes guarded (`c12656c`, `5da289d`) | 181,719 (86 turns) | `clearwater-review-evidence/wp2.1s/r4/` |
 
 Round 1 (diff `aa1f5f0..ccc23b8`; VERDICT NEW_CRITICAL_MAJOR_FOUND; assertions all pass, 30
 succeeded, 0 `^ERROR`, 0 `ERROR codex_core`, footer present; access hits are echoes). Findings and
@@ -203,7 +203,8 @@ Round 4 (gen-3 cell; diff `aa1f5f0..38eaf6e`, 3,920 lines; VERDICT NEW_CRITICAL_
 probe 1 succeeded-in; assertions pass: banner gpt-5.6-sol/high, 0 `^ERROR`, 0 `ERROR
 codex_core`, tokens 167,316, 21 succeeded-in; access hits are prompt echoes). A first launch
 wrote nothing (wsl.exe expands `$VARS` before bash; an evidence-path variable was empty); the
-relaunch used literal paths. Findings and fixes (adjudication in the evidence folder):
+relaunch used literal paths. Harness note (for the review fill): for the same reason the
+`.done` marker's `CODEX_EXIT=$?` is expanded early and is not evidence; the transcript assertions are. Findings and fixes (adjudication in the evidence folder):
 1. MAJOR, EXECUTED, NEW -- pillow-heif native files globbed `libheif*`; RECORD lists seven
    (libde265, libx265, MinGW runtime as separate DLLs). Collector reads RECORD; `licences.json`
    regenerated (only `pillow_heif_bundled` changed; prior copy
@@ -221,3 +222,4 @@ photo tests 51 passed. Full pytest on `38eaf6e` (round-3 fixes): 822 passed, 1 w
 FIVE_ROUND_GATE: round 5 is the approval gate. Round 4 brought one NEW in-envelope MAJOR whose fix
 changed product code (licences.py and the licence record), so by the fill the loop would
 continue; the cell yields here for the dispatcher's approval before round 5.
+Gate ruling (orchestrator, at depth 181,719): round 5 APPROVED; F2 as MINOR accepted; F4 REOPENED noted.
