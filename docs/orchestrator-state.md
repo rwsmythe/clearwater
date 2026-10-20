@@ -31,11 +31,11 @@
 - **None live.** WP1.3D ACCEPTED 2026-10-20, main `7f9fea1` (record `docs/proofs/wp1.3d-accept.md`);
   its three cells are done (`wp13d-cell` 244,164; `wp13d-cell2` 239,534; `wp13d-cell3` 153,856 after
   the B #1 remediation). Do not reply to any of them.
-- **Next: WP1.4b** (implementer-opus-high), brief `docs/briefs/wp1.4b-brief.md` (`c80725b`, guards
-  `d68039b`, camera-state claim 2a `f183a11`). Reads `work/wp1.3d/deep-frames.json`; flips `Params()`
-  to c3 as its first commit, alone; re-run the WP1.2R bit-identity witness with explicit methods at
-  the gate. Pinning approved by CHARC (`1cc08da6b265e2a6`) with two guards (a test for
-  `Params().method == "c3"`; `run.py` and CLI help show c3 as the default with the Ancuti options).
+- **`wp14b-cell`** (implementer-opus-high), WP1.4b, brief `docs/briefs/wp1.4b-brief.md` (`c80725b`,
+  guards `d68039b`, claim 2a `f183a11`). Dispatched 2026-10-20 05:57Z in the background. Worktree
+  `.worktrees/wp1.4b`, branch `wp1.4b`, base `db751cb` (toml copied). Agent id
+  `awp14b-cell-a3e64c9961e782f1`. Depth at dispatch 32,865 (2 turns, 05:57Z). At the gate: the WP1.2R bit-identity
+  witness with explicit methods; check the flip commit is alone and first; CHARC's two guards.
 - **Depth rule (owner 2026-10-19, corrected 2026-10-20):** read `cell_depth.py <cell>` at dispatch,
   at every yield, and before sending any ruling or remediation; record each figure with its
   moment. **~250K is an EVALUATION point, not an automatic re-seat** (owner 2026-10-20: "You don't
