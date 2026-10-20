@@ -34,10 +34,12 @@
 
 ### Live cells
 
-- **`wp21s-cell2`** (implementer-opus-high, STRONG): WP2.1S successor, worktree `.worktrees/wp2.1s`,
-  branch `wp2.1s`, from handoff `c6a70f9`; dispatched 2026-10-20 ~11:19Z. Scope: photo leg (claim 2),
-  licences (claim 3), report sections 8-9, full suite, Reviewer A over the whole package. No timed
-  window (the transport leg is closed). Depth at dispatch: 0.
+- **`wp21s-cell3`** (implementer-opus-high, STRONG): WP2.1S remediation of Reviewer A round 3
+  (1 major write guard F1, 7 minors; F5/F7/F8 out of envelope, fix if trivial else bank), round 4,
+  final suite, whole-package return report; from handoff `f18e043`; dispatched 2026-10-20 ~12:28Z.
+  No timed window. Depth at dispatch: 0.
+- `wp21s-cell2` RETIRED 2026-10-20 at 342K (128 turns): photo leg, licences, Reviewer A r1-r3
+  (r1 0/4/4, r2 0/2/3, r3 0/1/7), W7 incident record corrected (`W7-ABORTED.json`); stood down.
 - `wp21s-cell` RETIRED 2026-10-20 at 257K (95 turns) after closing the transport leg (6 clean
   windows, ~60/120 machine min) and the CHARC rulings (`871d4f17e78c10b3`); stood down. Do not
   message it again.
