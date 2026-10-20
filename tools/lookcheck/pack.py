@@ -230,7 +230,9 @@ def still_timestamps(duration_s: float) -> list[float]:
 # --- statistics --------------------------------------------------------------------------------
 
 
-def statistics_record(result: Result, backend: Backend) -> dict[str, Any]:
+def statistics_record(
+    result: Result, backend: Backend, cap_tolerance: float = 0.0
+) -> dict[str, Any]:
     """Record what the prototype measured and did on one frame under one variant.
 
     The compensation and white balance records are the prototype's own, unchanged
@@ -240,11 +242,16 @@ def statistics_record(result: Result, backend: Backend) -> dict[str, Any]:
     on ``result.white_balanced``, the image that :func:`prototype.pipeline.fusion_inputs`
     measured them on, on the same device. ``bound`` says whether anything bound: a gain cap
     (the effective alpha below the requested one), the white-balance clamp, or an N{} that
-    collapsed (a spread under 1e-6, which makes N{} a constant 0.5).
+    collapsed (a spread under 1e-6, which makes N{} a constant 0.5). A gain cap counts as
+    binding when the effective alpha is below the requested one by more than ``cap_tolerance``.
 
     Args:
         result: The prototype's result for the frame.
         backend: The backend ``result`` was computed on.
+        cap_tolerance: The alpha shortfall that still counts as "not bound". ``0.0`` (the
+            default, the shallow pack's behaviour) is a strict comparison; the deep clip passes
+            :data:`DEEP_CAP_TOLERANCE`, because a Gaussian-smoothed alpha of a constant 1.0 comes
+            out as 0.9999999999999999 and would otherwise flag every frame.
 
     Returns:
         A JSON-ready dictionary.
@@ -254,7 +261,7 @@ def statistics_record(result: Result, backend: Backend) -> dict[str, Any]:
     low, high = normalisation_bounds(backend.to_device(result.white_balanced), result.params)
     requested, effective = compensation["requested"], compensation["effective"]
     cap_bound = {
-        channel: bool(effective[channel] < requested[channel])
+        channel: bool(effective[channel] < requested[channel] - cap_tolerance)
         for channel in ("red", "blue")
         if channel in requested
     }
@@ -1303,6 +1310,9 @@ DEEP_SMOOTHER = Smoother("gaussian", 2.0)
 """The deep clip's smoothing: the centred Gaussian at 2.0 s, the provisional default (DR-25(3))."""
 
 DEEP_CLIP_SECONDS = 6.0
+DEEP_CAP_TOLERANCE = 1e-9
+"""The alpha shortfall below which the deep clip does not call a gain cap bound: rounding of the
+smoothed statistics (a smoothed constant 1.0 is 0.9999999999999999), not a cap."""
 DEEP_READBACK_MAX_OWN = 5.0
 """The deep clip's read-back bound on a frame's difference to its own PNG, in 8-bit levels.
 
@@ -1764,7 +1774,7 @@ def render_deep_clip(
                 clip_dir / f"corrected-{variant.name}" / f"{frame.path.stem}-{variant.name}.png"
             )
             _write_png(roots, target, result.output)
-            record = statistics_record(result, backend)
+            record = statistics_record(result, backend, DEEP_CAP_TOLERANCE)
             del record["params"], record["backend"]
             entries[variant.name].append(
                 {

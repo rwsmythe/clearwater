@@ -574,6 +574,37 @@ def test_correct_with_supplied_statistics_equals_temporal_render_bit_for_bit(met
         assert np.array_equal(direct.output, temporal.render(image, params, statistics, CPU))
 
 
+def test_a_smoothed_alpha_one_ulp_below_one_is_not_a_bound_cap_but_a_real_cap_is() -> None:
+    """A Gaussian-smoothed constant 1.0 is 0.9999999999999999: not a gain cap. The strict default
+    (the shallow pack's) is unchanged."""
+    from prototype import temporal
+    from prototype.pipeline import correct
+
+    rng = np.random.default_rng(3)
+    image = np.clip(
+        np.array([0.2, 0.5, 0.5], dtype=np.float32) + 0.1 * rng.random((HEIGHT, WIDTH, 3)), 0, 1
+    ).astype(np.float32)
+    params = dataclasses.replace(Params(), method="ancuti2018")
+    smoothed, _ = temporal.analyse_staged(
+        [image] * 3, params, pack.DEEP_SMOOTHER, Fraction(30000, 1001), CPU
+    )
+    base = temporal.at(smoothed, 1)
+
+    def record(alpha: float, tolerance: float | None) -> bool:
+        statistics = dataclasses.replace(base, compensation_alpha={"red": alpha})
+        result = correct(image, params, CPU, statistics=statistics)
+        if tolerance is None:
+            return bool(pack.statistics_record(result, CPU)["bound"]["red_gain_cap"])
+        return bool(pack.statistics_record(result, CPU, tolerance)["bound"]["red_gain_cap"])
+
+    one_ulp_below = 1.0 - 2.0**-53
+    assert one_ulp_below < 1.0
+    assert record(one_ulp_below, None) is True  # strict default: the shallow behaviour
+    assert record(one_ulp_below, pack.DEEP_CAP_TOLERANCE) is False
+    assert record(0.99, pack.DEEP_CAP_TOLERANCE) is True  # a real cap still counts
+    assert record(1.0, None) is False
+
+
 def test_the_flicker_path_keeps_the_shallow_readback_bound_of_three_levels() -> None:
     """Only the deep clip passes the wider own-PNG bound; the flicker defaults are unchanged."""
     import inspect
