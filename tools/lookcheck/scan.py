@@ -808,7 +808,7 @@ def record_problem(entry: Mapping[str, Any], chapter: str) -> str | None:
         0.0 <= measures.luma_mean <= 1.0
         and 0.0 <= measures.open_water <= 1.0
         and measures.haze >= 0.0
-        and (measures.depth_index is None or measures.depth_index > 0.0)
+        and (measures.depth_index is None or measures.depth_index >= 0.0)
     ):
         return f"{record.frame}: a measure is out of range"
     if record.excluded != exclusion_reason(measures):

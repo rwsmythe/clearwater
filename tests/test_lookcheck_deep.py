@@ -111,6 +111,13 @@ def test_the_scan_timestamps_run_every_ten_seconds_from_five_to_the_end() -> Non
 # --- test 2: the exclusion rule -----------------------------------------------------------------
 
 
+def test_a_record_with_a_zero_red_mean_passes_its_own_cache_validation() -> None:
+    """A uniform (0, 0.1, 0) frame is not excluded and has D = 0: a finished cache accepts it."""
+    record = scan.scan_record("GXZERO", 5.0, 150150, TIME_BASE, _flat((0.0, 0.1, 0.0)))
+    assert record.excluded is None and record.depth_index == 0.0
+    assert scan.record_problem(record.record(), "GXZERO") is None
+
+
 def test_a_near_black_frame_is_excluded_by_name_and_never_ranked() -> None:
     black = scan.scan_record("GXBLACK", 5.0, 150150, TIME_BASE, _flat((0.01, 0.02, 0.03)))
     bright = scan.scan_record("GXBRIGHT", 5.0, 150150, TIME_BASE, _flat((0.98, 0.99, 0.99)))

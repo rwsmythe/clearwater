@@ -1480,7 +1480,7 @@ def deep_sections(
             sections.append(
                 DeepSection(
                     "Case candidates",
-                    case.label,
+                    f"Candidates for: {case.label}",
                     f"{case.rule}. These are CANDIDATES proposed by the scan; the owner decides "
                     "at CP2 whether each shows the case.",
                     tuple(
