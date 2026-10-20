@@ -210,7 +210,19 @@ def test_floor_bounds_dr14_amplification(backend: CoreBackend) -> None:
 
 @pytest.mark.parametrize(
     "bounds",
-    [(math.nan, 0.1), (0.0, math.inf), (-math.inf, 0.0), (0.2, 0.1), (0.1,), (0.0, 0.1, 0.2)],
+    [
+        (math.nan, 0.1),
+        (0.0, math.inf),
+        (-math.inf, 0.0),
+        (0.2, 0.1),
+        (0.1,),
+        (0.0, 0.1, 0.2),
+        # finite, but not in float32, the precision they meet the data in (R1 F3)
+        (1e308, 1e308),
+        (-1e300, 1e300),
+        (1e39, 1e39),
+        (-3e38, 3e38),  # each bound in range, the range high - low not
+    ],
 )
 def test_bounds_guard(bounds: Sequence[float]) -> None:
     check_bounds_guard(fusion.fusion_inputs, bounds)
@@ -236,9 +248,12 @@ def test_planted_guard_after_array_work() -> None:
         check_bounds_guard(_late_guard, (0.2, 0.1))
 
 
-def test_equal_bounds_accepted() -> None:
+@pytest.mark.parametrize("bounds", [(0.1, 0.1), (-1e38, 1e38), (3e38, 3e38)])
+def test_extreme_float32_bounds_accepted(bounds: tuple[float, float]) -> None:
+    """Equal bounds, and bounds whose values and range are float32-finite, give finite inputs."""
     backend = NumpyBackend()
-    fusion.fusion_inputs(backend, noise(), **inputs_kw(DEFAULTS), bounds=(0.1, 0.1))
+    _, input2 = fusion.fusion_inputs(backend, noise(), **inputs_kw(DEFAULTS), bounds=bounds)
+    assert np.isfinite(input2).all()
 
 
 @pytest.mark.parametrize(

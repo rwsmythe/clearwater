@@ -67,6 +67,8 @@ Measured ranges on the analysis proxy are 0.028-0.64 (WP1.4b claim 9), so the fl
 none of them. Spec 6.7 lists no control for it.
 """
 
+_FLOAT32_MAX = float(np.finfo(np.float32).max)
+
 
 def high_pass(backend: ArrayBackend, a: Array, *, sharpen_blur_fraction: float) -> Array:
     """Return the high-pass ``I - G*I`` whose stretch N{} gives fusion input 2.
@@ -162,8 +164,8 @@ def fusion_inputs(
     Raises:
         TypeError: ``backend`` is not a core backend or ``a`` is not one of its arrays.
         ValueError: ``a`` is not a float32 ``(H, W, 3)`` array, the derived sigma is unusable,
-            or ``bounds`` is not two finite values with ``low <= high`` (the message names
-            ``bounds``).
+            or ``bounds`` is not two finite values with ``low <= high`` whose values and
+            range lie in the float32 range (the message names ``bounds``).
     """
     _check_image(backend, a)
     sigma = _derived_sigma("sharpen_blur_fraction", sharpen_blur_fraction, a.shape)
@@ -431,7 +433,12 @@ def _derived_sigma(name: str, fraction: float, shape: tuple[int, ...]) -> float:
 
 
 def _checked_bounds(bounds: Sequence[float]) -> tuple[float, float]:
-    """Return supplied N{} bounds as two Python floats, or raise ValueError naming ``bounds``."""
+    """Return supplied N{} bounds as two Python floats, or raise ValueError naming ``bounds``.
+
+    The bounds and their range ``high - low`` must be finite in float32, the precision they
+    meet the image data in (a finite float64 beyond it becomes infinite there); then the
+    floor's midpoint, formed in float64, cannot overflow either.
+    """
     if len(bounds) != 2:
         raise ValueError(f"bounds needs 2 values (low, high), got {len(bounds)}")
     low, high = float(bounds[0]), float(bounds[1])
@@ -439,6 +446,8 @@ def _checked_bounds(bounds: Sequence[float]) -> tuple[float, float]:
         raise ValueError(f"bounds is not finite: {[low, high]}")
     if low > high:
         raise ValueError(f"bounds has low {low} above high {high}")
+    if max(abs(low), abs(high), high - low) > _FLOAT32_MAX:
+        raise ValueError(f"bounds or their range exceed the float32 range: {[low, high]}")
     return low, high
 
 
