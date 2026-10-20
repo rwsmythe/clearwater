@@ -23,7 +23,7 @@ ICC + EXIF), and confirms or corrects AD-18 (licences). Brief `docs/briefs/wp2.1
   This buffer is a Windows platform tuning with an automatic, byte-identical fallback to the
   default pipe (section 6).
 - **Best rows (median s/frame, clean windows).** The bracket leaves the witness hashes out while
-  the producer keeps working, so it is a lower bound. The wall time including the hashes is an
+  a big-buffer producer keeps working, so it is a lower bound. The wall time including the hashes is an
   upper bound (section 2):
 
   | Row | ms/frame (bracket) | Upper bound (wall with hashes) |
@@ -64,7 +64,8 @@ ICC + EXIF), and confirms or corrects AD-18 (licences). Brief `docs/briefs/wp2.1
     frame is freed.
 - **Licences (claim 3; section 9).** PyAV's bundled FFmpeg 8.0.1 reports "LGPL version 3 or later"
   and is configured without `--enable-gpl`, yet bundles libx264 and libx265, and both work as
-  encoders from PyAV, as does NVENC (section 9.1). No file in the wheel mentions LGPL or GPL.
+  encoders from PyAV, as does NVENC (section 9.1). No non-code (text) file in the wheel mentions LGPL or GPL; the
+  LGPL strings are inside the avcodec and avutil DLLs.
   The gyan FFmpeg CLI is GPL version 3 or later, not 2 (CORRECTS AD-18). NumPy's expression is wider than BSD-3
   (CORRECTS AD-18). Pillow, pillow-heif and its bundled libraries, and CuPy CONFIRM AD-18.
 
@@ -76,6 +77,14 @@ merged: the tag-driven `scale` with `in_range`, `in_color_matrix`, `out_range=fu
 passthrough`. The only changes are those named in the row. Every FFmpeg command writes to
 `pipe:1` or a loopback socket and opens no output file. Calibration row n uses `-f null -`, which
 opens nothing.
+
+**Output containment.** Every file the three tools write (records, fixtures, `licences.json`)
+first passes one write guard, `WriteGuard.check` in `tools/spike_io/guard.py`. The target must
+resolve, links and junctions followed, inside `<working folder>/wp2.1s` (pytest's basetemp in the
+tests). It must not resolve inside the footage folder. An existing file with more than one hard
+link is refused. The guard was added after the windows (Reviewer A round 3). The records of
+record were written under the earlier check, which refused only an output folder inside the
+footage folder.
 
 | Row | Transport |
 |---|---|
@@ -107,12 +116,15 @@ mirrors `flags=accurate_rnd`.
 - **Each frame's interval** runs from the end of the previous frame's handling to its arrival.
 - **The witness** is a SHA-256 of every 30th frame and the last: 24 frames, compared with row a's
   reference hash. It is left out of the bracket, so the bracket is the sum of the intervals.
-- **The producer does not stop during a hash.**
-  - FFmpeg keeps writing into the pipe or socket buffer. The 32 MiB pipe holds more than one
-    24,883,200-byte frame.
+- **Whether the producer stops during a hash depends on the row's buffer.**
+  - With a big buffer FFmpeg keeps writing during a hash. The 32 MiB pipe holds more than one
+    24,883,200-byte frame; row s requests a 32 MiB socket receive buffer (SO_RCVBUF).
   - PyAV's decoder threads keep decoding.
-  - Work done during a hash therefore falls outside the bracket. The bracket is a LOWER bound
-    on the decode-to-NumPy time without hashing.
+  - Row a and the other default-pipe rows read at most 32,768 B at a time (section 4), so
+    FFmpeg fills the small pipe buffer and then blocks for nearly the whole hash. There the
+    bracket is close to a hash-free run; it is not inflated by the hash.
+  - Either way, work done during a hash falls outside the bracket, and none is added to it. The
+    bracket is a LOWER bound on the decode-to-NumPy time without hashing.
   - `wall_s_with_witness` is an UPPER bound. It is the wall time from the bracket's start to the
     last frame's arrival. It includes 23 of the 24 witness hashes: the last frame is hashed
     after it arrives, and that hash affects no arrival.
@@ -137,8 +149,9 @@ mirrors `flags=accurate_rnd`.
   - The side-channel costs below compare brackets, so both sides carry the same bias.
 - **Pipe rows yield one reused buffer.** PyAV's `to_ndarray()` returns a fresh C-contiguous array
   that views PyAV's frame buffer.
-- **The per-frame maximum** in every row is the first frame: FFmpeg or PyAV start-up,
-  115-356 ms.
+- **The per-frame maximum** is the first frame (FFmpeg or PyAV start-up, 115-356 ms) in every
+  row's run of record except c-cuda-auto's: its first frame takes 164.0 ms and its maximum is
+  frame 666 at 213.3 ms (`W6.json`).
 
 **Identity** (`identity` command, untimed, outside the windows).
 - `reference.json` holds ffprobe's per-frame pts (`-show_entries frame=pts`; equal to the packet
@@ -190,7 +203,8 @@ gate report on accept; this report does not edit it.
 ## 4. Claim 1 -- transport, decode to NumPy (GX011627, 681 frames, 3840x2160 `rgb24`)
 
 Rows of record from the planned windows. "Per frame" is the run of record's (the median run's)
-min / median / max interval. The max is the first frame's start-up.
+min / median / max interval. The max is the first frame's start-up in every row except
+c-cuda-auto (frame 666; section 2).
 
 | Row | s/frame median (min-max), 3 runs | Per frame min / median / max (ms) | Same work | Reads observed (FFmpeg writes) | pts exact (side channel; cost) | WP1.5 section 8 muxer options | Window |
 |---|---|---|---|---|---|---|---|
@@ -347,6 +361,13 @@ Minutes per minute = s/frame x 29.97.
   (exploration, reference, identity; 3.5 min of it for the fallback and AD-10 mean re-runs after
   the CHARC rulings), 39 min in windows (six windows, with their idle gates) and 1 min for
   attribution.
+- **After the transport leg closed, about 5 min more (total about 65 min).**
+  - 2.6 min untimed: identity for the five knob `+pts` rows.
+  - About 2.2 min: an UNPLANNED window, a cell error. A check of the label validation passed the
+    valid label `W7` and started `window W7 explore` without the idle gate. It was stopped by
+    hand after two completed runs.
+  - Its record is kept as `transport/W7-ABORTED.json`. It has no closing probe and no verdict,
+    and it is in neither `summary.json` nor `gate.jsonl`. No figure in this report rests on it.
 
 ## 8. Claim 2 -- photo I/O
 
@@ -534,8 +555,9 @@ WP2.1, to be confirmed at WP5.5, and not legal advice. It assumes the FSF's read
   - Yet libx264 and libx265 are configured in and bundled as DLLs.
   - The build is not `nonfree`. It carries `hevc`, `h264`, `hevc_nvenc`, `h264_nvenc` and the
     `cuda` hwaccel.
-  - If PyAV ships, this build ships. It brings x264 and x265. No file in the wheel mentions LGPL
-    or GPL, and the C-string scan finds no licence string in their DLLs (section 9.1).
+  - If PyAV ships, this build ships. It brings x264 and x265. No non-code (text) file in the
+    wheel mentions LGPL or GPL. The C-string scan finds the LGPL strings in the avcodec and avutil
+    DLLs and no licence string in the x264 or x265 DLLs (section 9.1).
 - **pillow-heif's wheel holds one native file, `libheif-*.dll`.** `LICENSES_bundled.txt` names
   separate `libde265`, `libx265` and MinGW runtime files that this Windows wheel does not have. INFERENCE: they
   are linked into the libheif DLL.
@@ -588,10 +610,11 @@ beyond what the artefacts show.
   `licenses/AUTHORS.rst` and `av/py.typed`.
   - `LICENSE.txt` is PyAV's BSD-3-Clause text.
   - `AUTHORS.rst` lists contributors.
-  - No file contains "LGPL", "GPL" or "General Public License".
+  - No non-code file contains "LGPL", "GPL" or "General Public License".
   - "FFmpeg" appears only in `METADATA`'s description of PyAV, twice. "x264" and "x265" appear
     only in `RECORD`, as the DLL file names.
-  - So no file in the wheel states a licence for FFmpeg or for any of the 31 DLLs.
+  - So no non-code file in the wheel states a licence for FFmpeg or for any of the 31 DLLs;
+    only the FFmpeg DLLs' own strings do (below).
 - **Licence strings inside the DLLs.** The scan looks for "GPL", "General Public License" or
   "Copyleft" inside a NUL-terminated printable ASCII string of up to about 240 characters.
   - It finds "libavcodec license: LGPL version 3 or later" in avcodec and "libavutil license:
