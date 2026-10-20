@@ -16,13 +16,13 @@ Uses the GPU; records no timing or memory figure; NOT exclusive.
 | Goal | (a) Flip the prototype's default method to c3, keeping every recorded result reproducible. (b) On real deep frames, measure red-channel noise of the corrected output with the Ancuti 2018 gain caps on and off and at several cap values, and with the white-balance clamp at several settings, with a documented and validated noise measure and crops the owner can check (D100, Gate result 4). (c) From the same frames, give the evidence for the default clamp on deep footage (D99) and for the N{} range floor (DR-14), and settle WP1.4's open question on how the capped alpha is smoothed. |
 | Spec clauses | D16 (amended v0.5.3: 3C default); 6.2 step 2 and D99 (clamp, "the pipeline's control for deep-water noise"); 6.3.1 and D40/D50/D52/D100 (the caps: "a fidelity-versus-noise control, not a noise mitigation ... kept or dropped according to a prototype noise test"); section 12 "Deep-water noise"; N5 result 4; 7.1-7.3 (smoothed statistics, proxies); 14.1 (default maximum white-balance gain; robust N{} bounds). Plan section 6 WP1.4 bullet 1; section 9 rows "Defaults the papers leave open; default maximum white-balance gain" and "Robust statistics for normalization bounds". |
 | Depends on | WP1.3D (merged: `deep-frames.json`, the deep clip's pts), WP1.4 (merged: `tools/prototype/temporal.py`), WP1.3 (`tools/lookcheck/frames.py`). |
-| Files owned | `tools/prototype/params.py` (the default flip and its docstring sentence ONLY); NEW `tools/noise_experiments.py` (the noise estimator, the runner, the crop page); NEW `tests/test_noise_experiments.py`; `docs/reports/wp1.4b-gain-cap-noise.md` (NEW); `docs/proofs/wp1.4b-ledger.md` (NEW). For the flip only (see decisions): the lines in existing tests and tools that relied on the old default, changed ONLY to name `method="ancuti2018"` explicitly. Nothing else under `tools/prototype/`, `tools/lookcheck/`; no `pyproject.toml` change; nothing under `src/`. |
+| Files owned | `tools/prototype/params.py` (the default flip and its docstring sentence ONLY); NEW `tools/noise_experiments.py` (the noise estimator, the runner, the crop page); NEW `tools/camera_state.py` (the minimal GPMF camera-state reader of claim 2a); NEW `tests/test_noise_experiments.py`; `docs/reports/wp1.4b-gain-cap-noise.md` (NEW); `docs/proofs/wp1.4b-ledger.md` (NEW). For the flip only (see decisions): the lines in existing tests and tools that relied on the old default, changed ONLY to name `method="ancuti2018"` explicitly. Nothing else under `tools/prototype/`, `tools/lookcheck/`; no `pyproject.toml` change; nothing under `src/`. |
 | Interfaces consumed | `tools.prototype.pipeline.correct` and its recorded `Result` (compensation info, white-balance info); `tools.prototype.temporal` (`measure`, `analyse_staged`, `smooth`, `render`, `proxy`, `flicker`); `tools.lookcheck.frames` (`extract`, `excerpt`, `read_png16`, `OutputRoots`, `tool_env`); `tools.local_config.find_footage_file`. |
 | Interfaces provided | `Params().method == "c3"`. The noise estimator is an instrument of this package (not V-series); WP2.1 may reuse it. None frozen. |
 | Dependencies | None new (NumPy/SciPy/CuPy granted). |
 | Tests | `tests/test_noise_experiments.py`: (1) the estimator recovers a known Gaussian sigma (0.002, 0.01, 0.03 on [0, 1]) added to a smooth synthetic gradient within 10 %; (2) on the noise-free gradient it returns below 0.0005; (3) a sharp noise-free edge does not inflate it (the flat-tile selection excludes the edge); (4) scaling a noisy image by g scales the estimate by g within 5 % (the estimator follows gain, which is what the test is about); (5) the settings grid is the one stated in claim 3, each setting labelled with the `Params` actually used; (6) `footage`: the runner on one deep frame and two settings writes its record. Plus the flip's own test: `Params().method == "c3"`. Every existing test passes, with only the explicit-method edits the decisions allow. |
 | Hardware flags | `footage`, `gpu`. Not exclusive. |
-| Out of scope | Any default change other than `method` (recommend; WP1.6/WP2.1 and, for a spec change, the owner decide); dropping the caps from the code; denoising; V3; the product's engine; timing. |
+| Out of scope | The GoPro IMU and GPS (ACCL, GYRO, GRAV, CORI, IORI, GPS5/GPS9): out of the project's scope (owner 2026-10-19 via CHARC `01500d3574412e69`), never read or decoded; a GPMF library dependency; any default change other than `method` (recommend; WP1.6/WP2.1 and, for a spec change, the owner decide); dropping the caps from the code; denoising; V3; the product's engine; timing. |
 | Done | Plan section 4.5; the four gates green with `footage` and `gpu` RUN; harness gate untouched; every record and the crop page under `work/wp1.4b/`; the report complete with Gate result 4 and the recommendations. |
 
 ## What the package does (claims)
@@ -45,6 +45,21 @@ Uses the GPU; records no timing or memory figure; NOT exclusive.
    `frames.extract` (range honoured), plus ONE shallow reference: `GX011627.MP4` at the WP1.3
    flicker excerpt's first pts (205205 ticks at 1/30000), so the same measure is shown where
    nothing binds.
+2a. **Camera state per frame (context only; CHARC `01500d3574412e69`).** From the `gpmd` data
+   track (handler "GoPro MET"; stream 3 on these files) of each source chapter, read SHUT
+   (shutter s), ISOE (sensor ISO), WBAL (white-balance temperature K), WRGB (the camera's applied
+   white-balance RGB gains), YAVG and UNIF, and attach the nearest-in-time value to each frame
+   of claim 2. Method: extract the track with `ffmpeg -map 0:<gpmd> -codec copy -f data` into
+   `work/wp1.4b/gpmd/` (it holds GPS too: never committed, never copied elsewhere); walk the KLV
+   (4-char key, 1-byte type, 1-byte size, 2-byte repeat, payload padded to 4 bytes; type 0 =
+   nested) and decode ONLY the six keys above; every other key is skipped by its length without
+   decoding. Time-index from the sample count and the stream duration (state the rule; 30 Hz
+   keys are one per frame). About 60 lines, no new dependency. Tests: a synthetic KLV blob built
+   in the test (nested container, padding, an unknown key and an IMU-named key both skipped
+   undecoded, a big-endian uint16 and float payload), and a `footage` test reading ISOE from one
+   `SCUBA/` chapter in place. NO extract of the owner's track is committed. **Droppable:** if the
+   parser threatens your depth or a STOP-free finish, drop it and mark the columns PENDING; the
+   noise test does not depend on it.
 3. **Settings grid.** Ancuti 2018, blue off, at the defaults except: `red_gain_cap` in
    {None (off), 0.5, 1.0, 2.0 (default)} x `max_white_balance_gain` in {1.5, 2.0, 3.0
    (default), 5.0, 1000 (effectively unclamped; record whether it ever bound)} = 20 settings;
@@ -79,7 +94,9 @@ Uses the GPU; records no timing or memory figure; NOT exclusive.
    look for.
 7. **Gate result 4 (D100).** A table: per cap setting at the default clamp, the median over the
    8 deep frames (and the range) of `sigma_R` amplification, the red white-balance gain, the
-   residual `R̄/Ḡ`, the green-derived fraction; the shallow reference beside it. Then a
+   residual `R̄/Ḡ`, the green-derived fraction, and the camera's ISOE and WRGB red gain (claim 2a)
+   as context columns; the shallow reference beside it. Say whether the noise amplification
+   tracks the camera's ISO or its own red gain. Then a
    recommendation: KEEP or DROP the caps, with grounds; the decision is the gate's at WP1.6
    (dropping them is a spec change, so the owner's). Say whether the result agrees with the
    spec's expectation (a tighter cap raises the white-balance gain on the noisy red and so
