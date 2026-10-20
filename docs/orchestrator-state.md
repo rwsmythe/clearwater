@@ -37,13 +37,22 @@
 
 ### Live cells
 
-- **None.** Retired (never message): `wp31-cell`, `wp31-cell2`, `wp315-cell`, `wp313-cell`,
-  `wp37-cell`, and every earlier cell.
-- Worktrees present: none (wp3.1, wp3.1-mc removed after CHARC's QA CONFIRMED `6cadc26e470cd8c6`;
-  wave 1 CLOSED). Branches kept.
-- Drafting helpers (in-process, uncommitted output): `wave2-drafter-a` (WP3.2, 3.3, 3.5),
-  `wave2-drafter-b` (WP3.6, 3.12, 3.16), commission `5a550699b8b58b10` (option 1: six briefs,
-  tranche A = 3.2/3.3/3.5/3.12, tranche B = 3.6/3.16 after two A cells return; debt citations).
+- **Tranche A of wave 2, dispatched 2026-10-20 ~22:45Z from main `2c5540a`** (IF-7 amendment
+  `f4cd1e4` + FINAL briefs `2c5540a`; CHARC approval `53b752a4d7fac4fc`). Each prompt is stored at
+  `C:\Users\rwsmy\clearwater-review-evidence\wp3.N\dispatch.md`:
+  - `wp32-cell` (implementer-opus-high), WP3.2, `.worktrees/wp3.2`, branch `wp3.2`.
+  - `wp33-cell` (implementer-opus-high), WP3.3, `.worktrees/wp3.3`, branch `wp3.3`.
+  - `wp35-cell` (implementer-sonnet-high), WP3.5 (re-sized S), `.worktrees/wp3.5`, branch `wp3.5`.
+  - `wp312-cell` (implementer-sonnet-high), WP3.12, `.worktrees/wp3.12`, branch `wp3.12`; has an
+    EXCLUSIVE read-cost window to grant (post open/close to CHARC).
+  Depth at dispatch: 0 each. All at round 0 (read and table, then yield). Full-pytest windows:
+  one at a time, granted by SendMessage (X5). They die with this generation: re-dispatch from
+  each ledger `docs/proofs/wp3.N-ledger.md` in its worktree.
+- **Tranche B** (WP3.6 sonnet-high, WP3.16 opus-high; briefs FINAL) dispatches once two tranche-A
+  cells have returned. WP3.6P (real-photo verification, sonnet-medium) is queued until photos.
+- Retired (never message): `wave2-drafter-a`, `wave2-drafter-b` (drafting helpers, done),
+  `wp31-cell`, `wp31-cell2`, `wp315-cell`, `wp313-cell`, `wp37-cell`, and every earlier cell.
+- Worktrees present: `.worktrees/wp3.2`, `wp3.3`, `wp3.5`, `wp3.12`.
 
 ### Where things stand -- the successor starts HERE
 
