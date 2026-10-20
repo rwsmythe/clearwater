@@ -204,8 +204,11 @@ path, md5, five assertions and verdict, or there is no accept.
   hazard -> AD-24; licences corrected (FFmpeg CLI GPL-3.0-or-later; PyAV wheel's LGPL label vs
   x264/x265 UNKNOWN, moot). AD-2/17/18 closed, AD-23 (N1 pipe buffer), AD-24 logged; gate report
   Result 1 supersession note added; CLAUDE.md refreshed. Mid-run rulings msg 75aacdfc; ruff Markdown
-  exclusion c6b63e3 (with a correction f17b1667 after a premature claim). **Next: commission WP2.2
-  (interface module) and WP2.3 (fixtures) briefs for CHARC approval; then WP2.4 + spec v0.5.4 -> CP4.** WP1.4b dispatched (opus-high; flip guards + gpmd claim 2a). Next: WP1.3-deep / WP1.4b brief on SCUBA/ (c3 primary, Params() flips to c3), then
+  exclusion c6b63e3 (with a correction f17b1667 after a premature claim). **WP2.2 and WP2.3 briefs APPROVED** (020ed86; all seven recommended rulings: Array =
+  NDArray[float32]; IF-9 schema validation pure in WP2.2; trivial fakes with the real c3 stage
+  list; procedural AD-14 texture; 540p FFV1 flicker clip in work/; one pytest_plugins line; 2 MB /
+  10 MB limits). WP2.2 dispatches now; WP2.3 after WP2.2 merges; CHARC rules at WP2.2's round-1
+  yield on the nine unnamed types. Then WP2.4 + spec v0.5.4 -> CP4. WP1.4b dispatched (opus-high; flip guards + gpmd claim 2a). Next: WP1.3-deep / WP1.4b brief on SCUBA/ (c3 primary, Params() flips to c3), then
   WP1.6 gate report (Gate 1: core 3.6x, production export 4.4x over N6). **Footage-layout skips:** the owner's Snorkel/SCUBA/edits layout makes 3
   footage tests skip (root `GX011628.MP4` paths in `tests/test_container_spike.py:902`,
   `tests/test_lookcheck.py:1289`, WP1.4 test 7; also `tools/lookcheck/pack.py:94` and the WP1.4
