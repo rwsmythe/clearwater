@@ -106,13 +106,20 @@ cumulative machine time ~60 min.
   green except `docs/architecture.md` (CHARC's file, not touched); mypy green (26 files); full
   pytest 804 passed, 0 skipped, 1 warning (CuPy CUDA_PATH), 527.6 s
   (`work/wp2.1s/logs/pytest-full.log`).
-- Machine time after the transport leg (no timed window opened):
-  - **INCIDENT 01:48:02-~01:50 (cell error):** while probing the new label validation through the
-    CLI, a loop passed the valid label `W7` and started `window W7 explore`. Stopped within ~2.5 min
-    by killing the cell's own process (`kill` of its uv/bash PIDs); its FFmpeg child ended with a
-    PartialFrameError. No `W7.json`, no gate record, nothing in `summary.json` from it. Its figures do
-    not exist and nothing reported rests on it. Validation is now probed by calling `window_label`
-    directly.
+- Machine time after the transport leg (no planned timed window opened):
+  - **INCIDENT 01:48:02-~01:50:15 (cell error):** while probing the new label validation through
+    the CLI, a loop passed the valid label `W7` and started `window W7 explore` (`--gate NUL`, so the
+    idle gate did not run: `idle_gate.ran = false`). Stopped by killing the cell's own process
+    (`kill` of its uv/bash PIDs); its FFmpeg child ended with a PartialFrameError in the third run.
+  - **Its record exists** (corrected on the orchestrator's check): `transport/W7.json`, written
+    01:50:12, head `ccc23b8` with `tools/spike_io/transport.py` modified. It holds `probe_open` and
+    two COMPLETED runs (a-direct 0.0512 s/frame, ended 01:49:13; a-blocksize 0.0496 s/frame, ended
+    01:49:59; status 0), with no closing probe, no ambient end and no verdict. Renamed to
+    `transport/W7-ABORTED.json` (md5 `6487d317c108973769605a6d9aa763fd`) and kept.
+  - It is in neither `summary.json` (0 occurrences) nor `gate.jsonl` (0). `transport.py summary`
+    reads only the window files named on its command line (W2-W6 for the rows of record), so it
+    cannot pick the file up. No reported figure rests on it. Validation is now probed by calling
+    `window_label` directly.
   - Untimed identity, five knob `+pts` rows: 01:50:57-01:53:33 (2.6 min).
   - `summary.json` regenerated from W2-W6 (as the report's rows of record; W1 is exploration); a
     W1-W6 summary was briefly written first and replaced.
