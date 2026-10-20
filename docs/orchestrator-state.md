@@ -28,12 +28,15 @@
 
 ### Live cells
 
-- **`wp13d-cell`** (implementer-sonnet-high), WP1.3D deep look-check pack, brief
-  `docs/briefs/wp1.3d-brief.md` (`c80725b`). Dispatched 2026-10-19 22:03Z in the background.
-  Worktree `.worktrees/wp1.3d`, branch `wp1.3d`, base `c80725b` (toml copied). Agent id
-  `awp13d-cell-018989ec33c05117`. Depth readings (`uv run python scripts/cell_depth.py
-  wp13d-cell`): at dispatch 18,857 (22:03Z); 85,761 at 8 turns (22:04Z, reading in); 143,068 at 24 turns (22:13Z, no
-  commit yet). Fast climb: at its first yield, if above ~250K, re-seat rather than send more work.
+- **`wp13d-cell2`** (implementer-sonnet-high), WP1.3D RE-SEAT, dispatched 2026-10-20 00:08Z
+  from the ledger at head `663cc64`. Agent id `awp13d-cell2-8c6e689bd0ee8c6b`. Rulings sent with
+  the dispatch: deep read-back own bound 5.0 ACCEPTED (report the measured figures; flicker keeps
+  3.0, tested); spacing within a chapter ACCEPTED; `correct(statistics=)` instead of
+  `temporal.render` ACCEPTED with a bit-identity test. A background clip render started by the
+  first cell may still be running (`work/wp1.3d/deep-clip-run2.log`). Depth at dispatch 38,943 (2 turns, 00:08Z).
+- `wp13d-cell` RETIRED at its interim yield: 244,164 / 77 turns (00:08Z, read twice, head
+  `663cc64` both times). It asked to be read and re-seated; no reply sent. Scan done (289
+  frames; deepest GX011600 @ 665.031 s), deep command and 28 tests committed.
 - **Next after WP1.3D merges:** WP1.4b (implementer-opus-high), brief
   `docs/briefs/wp1.4b-brief.md` (`c80725b`): it reads `work/wp1.3d/deep-frames.json`; it flips
   `Params()` to c3 as its first commit, alone (re-run the WP1.2R bit-identity witness with
