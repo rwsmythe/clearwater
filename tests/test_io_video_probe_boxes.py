@@ -160,9 +160,9 @@ def test_no_moov_gives_an_empty_result(tmp_path: Path) -> None:
 
 
 class _Counting:
-    """A file wrapper that records the size of every read."""
+    """A file wrapper that records the position and size of every read."""
 
-    def __init__(self, handle: BinaryIO, reads: list[int]) -> None:
+    def __init__(self, handle: BinaryIO, reads: list[tuple[int, int]]) -> None:
         self._handle, self._reads = handle, reads
 
     def __enter__(self) -> _Counting:
@@ -172,7 +172,7 @@ class _Counting:
         self._handle.close()
 
     def read(self, size: int = -1) -> bytes:
-        self._reads.append(size)
+        self._reads.append((self._handle.tell(), size))
         return self._handle.read(size)
 
     def seek(self, offset: int, whence: int = 0) -> int:
@@ -182,19 +182,39 @@ class _Counting:
         return self._handle.tell()
 
 
-def test_the_media_data_box_is_skipped_not_read(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    big = struct.pack(">I4sQ", 1, b"mdat", 16 + 5_000_000) + bytes(5_000_000)
-    path = write(tmp_path, FTYP, big, moov(header_box("mvhd", 1000)))
-    reads: list[int] = []
+def _reads_inside(path: Path, monkeypatch: pytest.MonkeyPatch) -> list[tuple[int, int]]:
+    """Run the reader and return the ``(position, size)`` of every read it made."""
+    reads: list[tuple[int, int]] = []
     monkeypatch.setattr(
         Path,
         "open",
         lambda self, mode="r": _Counting(open(self, mode), reads),  # noqa: SIM115
     )
     assert read_movie_boxes(path).movie_timescale == 1000
-    assert reads and max(reads) < 1000
+    return reads
+
+
+def test_the_reader_takes_exactly_the_header_bytes_of_the_media_data_box(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    mdat = box("mdat", b"PAYLOAD-" * 8)
+    path = write(tmp_path, FTYP, mdat, moov(header_box("mvhd", 1000)))
+    start = len(FTYP)
+    reads = _reads_inside(path, monkeypatch)
+    inside = [(pos, size) for pos, size in reads if start <= pos < start + len(mdat)]
+    assert inside == [(start, 8)]  # the 8-byte header and nothing of the payload
+    assert sum(size for pos, size in inside) == 8
+
+
+def test_a_64_bit_media_data_header_is_read_as_two_headers_and_no_payload(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    big = struct.pack(">I4sQ", 1, b"mdat", 16 + 5_000_000) + bytes(5_000_000)
+    path = write(tmp_path, FTYP, big, moov(header_box("mvhd", 1000)))
+    start = len(FTYP)
+    reads = _reads_inside(path, monkeypatch)
+    inside = [(pos, size) for pos, size in reads if start <= pos < start + len(big)]
+    assert inside == [(start, 8), (start + 8, 8)]
 
 
 # --- malformed boxes ----------------------------------------------------------------------------
@@ -374,3 +394,16 @@ def test_every_truncation_of_a_settings_atom_ends_without_a_hang() -> None:
     for cut in range(len(payload) + 1):
         with contextlib.suppress(gopro.GPMFError):
             gopro.parse_settings(payload[:cut])
+
+
+def test_a_box_other_than_media_data_that_overruns_the_file_raises(tmp_path: Path) -> None:
+    overrun = struct.pack(">I4s", 100, b"free")
+    with pytest.raises(BoxError):
+        read_movie_boxes(write(tmp_path, FTYP, overrun, moov(header_box("mvhd", 1000))))
+
+
+def test_media_data_that_overruns_a_cut_file_is_not_an_error(tmp_path: Path) -> None:
+    cut_mdat = struct.pack(">I4s", 10_000, b"mdat") + b"\xaa" * 20
+    assert read_movie_boxes(write(tmp_path, FTYP, cut_mdat)).movie_timescale is None
+    path = write(tmp_path, FTYP, moov(header_box("mvhd", 1000)), cut_mdat)
+    assert read_movie_boxes(path).movie_timescale == 1000

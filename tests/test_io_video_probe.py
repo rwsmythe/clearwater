@@ -49,6 +49,7 @@ class _Spy:
         self.calls: list[list[str]] = []
         self.edit_streams: Callable[[dict[str, Any]], None] | None = None
         self.edit_stderr: Callable[[str], str] | None = None
+        self.edit_packets: Callable[[list[dict[str, Any]]], None] | None = None
         self._real = probe_module._run_ffprobe
         monkeypatch.setattr(probe_module, "_run_ffprobe", self)
 
@@ -60,8 +61,13 @@ class _Spy:
                 data = json.loads(out)
                 self.edit_streams(data)
                 out = json.dumps(data)
-        elif self.edit_stderr is not None and "packet=pts,duration,flags" in args:
-            err = self.edit_stderr(err)
+        elif "packet=pts,duration,flags" in args:
+            if self.edit_stderr is not None:
+                err = self.edit_stderr(err)
+            if self.edit_packets is not None:
+                data = json.loads(out)
+                self.edit_packets(data["packets"])
+                out = json.dumps(data)
         return status, out, err
 
     def video(self, edit: Callable[[dict[str, Any]], None]) -> None:
@@ -669,3 +675,111 @@ def test_unreadable_movie_boxes_do_not_fail_the_probe(
 )
 def test_vfr_is_decided_on_sorted_presentation_times(pts: list[int], vfr: bool) -> None:
     assert probe_module._is_variable(pts) is vfr
+
+
+# --- round 1 remediation ------------------------------------------------------------------------
+
+
+def test_the_container_duration_is_the_longest_stream_and_exact(
+    sample: Sample, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    plain = probe(sample("vid-hevc8-bt709-full"))
+    video_s = Fraction(45045, 30000)
+    assert plain.duration_s == video_s  # equal on the video-only samples (audio is shorter)
+    spy = _Spy(monkeypatch)
+
+    def longer_audio(data: dict[str, Any]) -> None:
+        audio = next(s for s in data["streams"] if s["codec_type"] == "audio")
+        audio["duration_ts"] = 96000  # two seconds at 1/48000
+
+    spy.edit_streams = longer_audio
+    longer = probe(sample("vid-hevc8-bt709-full"))
+    assert longer.duration_s == 2 and type(longer.duration_s) is Fraction
+    assert video_s <= longer.duration_s  # the video track is never longer than the container
+
+
+def test_the_duration_fallback_uses_the_packet_with_the_highest_pts(
+    sample: Sample, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    spy = _Spy(monkeypatch)
+
+    def no_stream_durations(data: dict[str, Any]) -> None:
+        for stream in data["streams"]:
+            stream.pop("duration_ts", None)
+
+    def reorder(packets: list[dict[str, Any]]) -> None:
+        for packet in packets:
+            packet["duration"] = 1001
+        packets[-1]["duration"] = 1500  # the highest pts
+        packets[-2]["duration"] = 7777  # becomes the last in file order after the swap
+        packets[-2], packets[-1] = packets[-1], packets[-2]  # file order: ..., 44044, 43043
+        assert packets[-1]["pts"] == 43043 and packets[-2]["pts"] == 44044
+
+    spy.edit_streams = no_stream_durations
+    spy.edit_packets = reorder
+    result = probe(sample("vid-hevc8-bt709-full"))
+    assert result.duration_s == Fraction(44044 + 1500, 30000)
+
+
+@pytest.mark.parametrize("sample_id", ["vid-hlg", "vid-pq"])
+def test_a_refused_file_is_never_decoded_not_even_for_the_tail(
+    sample_id: str, sample: Sample, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    spy = _Spy(monkeypatch)
+    result = probe(sample(sample_id))
+    assert [f.severity for f in result.faults] == ["refuse"]
+    assert len(spy.calls) == 2
+    assert not any("-read_intervals" in call or "frame=pts" in call for call in spy.calls)
+
+
+def _frames_answer(delivered: list[int], error: str = "") -> Callable[[Sequence[str]], Any]:
+    def fake(args: Sequence[str]) -> tuple[int, str, str]:
+        assert "-read_intervals" in args
+        return 0, json.dumps({"frames": [{"pts": p} for p in delivered]}), error
+
+    return fake
+
+
+# File order of a B-frame stream: keyframe 0, then P at 2002, then the B at 1001 (decode order).
+REORDERED = [(0, 1001, "K__"), (2002, 1001, "___"), (1001, 1001, "___")]
+
+
+def test_a_dropped_last_packet_is_found_when_frames_are_reordered(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    tail = probe_module._tail_unreadable
+    base = Fraction(1, 30000)
+    path = Path("clip.mp4")
+    monkeypatch.setattr(probe_module, "_run_ffprobe", _frames_answer([0, 2002]))
+    assert tail(path, REORDERED, base) is True  # the last packet's frame (pts 1001) is missing
+    monkeypatch.setattr(probe_module, "_run_ffprobe", _frames_answer([0, 1001, 2002]))
+    assert tail(path, REORDERED, base) is False  # all delivered, in any order
+    monkeypatch.setattr(probe_module, "_run_ffprobe", _frames_answer([0, 1001, 2002], "boom"))
+    assert tail(path, REORDERED, base) is True  # any error line
+
+
+def test_frames_before_the_last_keyframe_are_not_required(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    packets = [(0, 1001, "K__"), (1001, 1001, "___"), (2002, 1001, "K__"), (3003, 1001, "___")]
+    monkeypatch.setattr(probe_module, "_run_ffprobe", _frames_answer([2002, 3003]))
+    assert probe_module._tail_unreadable(Path("clip.mp4"), packets, Fraction(1, 30000)) is False
+
+
+def test_messages_are_ascii_even_for_non_ascii_names(
+    sample: Sample, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    cut = tmp_path / "caf\u00e9 \u89c6\u9891.mp4"
+    shutil.copy(sample("vid-truncated"), cut)
+    fault = probe(cut).faults[0]
+    assert fault.kind == "truncated" and fault.message.isascii()
+    assert "caf\\xe9" in fault.message
+    for path in (tmp_path / "\u89c6\u9891.LRV", tmp_path / "\u89c6\u9891.mp4"):
+        with pytest.raises(VideoProbeError) as caught:
+            probe(path)
+        assert str(caught.value).isascii()
+    (side,) = filter_inputs([Path("caf\u00e9.THM")]).excluded
+    assert side[1].message.isascii()
+    _with_gpmf(monkeypatch, _atom(("PRTN", "c", b"Y"), ("PTCL", "c", b"\xe9LOG")))
+    (gp,) = probe(sample("vid-hevc8-bt709-full")).faults
+    assert gp.kind == "gp_log" and gp.message.isascii()
