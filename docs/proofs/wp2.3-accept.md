@@ -17,6 +17,7 @@ Tier STRONG.
 | Merged head | `wp2.3-mc` = `f56bec0` rebased onto main `ed6f6d9` (`137d5ca`), plus this record and DR-33. Main fast-forwarded. CHARC held main from B to the merge. |
 | Byte identity | `git patch-id --stable` = `6712360de3e5...` on `da074f4..f56bec0` and on `ed6f6d9..137d5ca`. (Pass-1 candidate `a32e5fb`: `6859c9e2b3b4...` on both its ranges.) |
 | Gates on the candidate `137d5ca` | `ruff check` clean; `ruff format --check` 65 files; `mypy` strict 46 files clean; harness gate 366 OK (1 skipped); **full pytest 1138 passed, 1 warning (CuPy CUDA_PATH), 527 s, exit 0.** Pass-1 candidate `a32e5fb`: 1130 passed, exit 0 (after the seat setup fix below). |
+| Gates on main | Main fast-forwarded to `d605925`; `uv sync`; `ruff check` clean; `mypy` 46 files clean; harness gate 366 OK (1 skipped); **full pytest 1138 passed, 1 warning, 506 s, exit 0**; `git ls-files --eol tests/fixtures` all `-text`, manifest i/lf w/lf. |
 | Reviewer A | gpt-5.6-sol / high, WSL. R1 on `4ffc8b1`: 7 major / 4 minor, all fixed. R2 on `1e2d2f6`: 0 major / 3 minor, `NO_NEW_CRITICAL_MAJOR`; the 3 minors fixed as post-convergence cleanup (`e5ea4f9`). No reverts. Evidence `clearwater-review-evidence\wp2.3\r1`, `r2`. |
 | Reviewer B | Pass 1 on `a32e5fb`: `NEW_CRITICAL_MAJOR_FOUND` (4 major, 1 advisory), ONE remediation (`1d0e04d`). Re-run on `137d5ca`: `NEW_CRITICAL_MAJOR_FOUND` (3 major, 1 minor), adjudicated at the gate NOT BLOCKING (below; DR-33). |
 

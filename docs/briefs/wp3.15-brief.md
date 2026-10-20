@@ -1,10 +1,11 @@
-# WP3.15 — Presets, settings and logging (dispatch brief, APPROVED)
+# WP3.15 — Presets, settings and logging (dispatch brief, FINAL)
 
 **Status:** APPROVED by CHARC `871a371855bb1630` with rulings (section "Rulings"); draft `6611b3d`, written by
 the orchestrator (generation 4) at CHARC's commission (`a05f065e53e696d7`). FINAL at dispatch,
 once WP2.3 has merged (ruling 15.9). Owner decisions: none inside
 the package (the starter presets' values are the owner's to see at CP5, AD-13).
-- Spec **v0.5.3**; v0.5.4 items cited as "proposed (v0.5.4, CP4)". Architecture DRAFT 0.1
+- FINAL 2026-10-20 at dispatch (orchestrator generation 4), on main after WP2.3 merged (`d605925`): cites spec **v0.5.4** (applied `9cf16c5`, owner-approved 2026-10-20) and architecture FINAL 1.0 (`3eca7bd`); every "v0.5.4" marker is now plain v0.5.4.
+- Spec **v0.5.4**. Architecture FINAL 1.0
   section 3 IF-9 and IF-10, section 7; AD-8, AD-9, AD-13, AD-20. Frame
   `docs/briefs/wp2.4-phase3-frame.md`. WP2.2 round-1 ruling (CHARC `b7b012f7c6d5a1e6`, ledger
   `docs/proofs/wp2.2-ledger.md`); WP2.2 accept `docs/proofs/wp2.2-accept.md` ("WP3.15 owns the
@@ -22,7 +23,7 @@ plan "Depends on ... WP3.15") all need the files this package keeps.
 |---|---|
 | ID and title | WP3.15 — Presets, settings and logging; plan Phase 3 row WP3.15 (size M); module `clearwater.config` (plan 8.1: "Presets, settings, logging") |
 | Goal | The app-data locations; a settings store that loads and saves IF-10 `Settings` (first run = the WP2.2 defaults) with `format_version` migration; a preset store (save, load, rename, delete, import, export, the two AD-13 starter presets) on IF-9 `ParameterSet`; DR-32's key check at the config boundary; and the rotating log (N9). |
-| Spec / decision clauses | D37 "Presets stored in the user's app-data folder; can be exported and imported as files"; D38 "Clearwater ships with starter presets"; D88 "Rotating log file in app data"; D89 "Settings and last-used parameters persist between sessions"; D90 "Preset files record their method and a format version"; N9 "rotating log file in app data (D88)"; N11 "preset files record their method and a format version (D90)"; G6 "Presets: save, load, rename, delete, import from file, export to file. Starter presets included." (the store side; the panel is WP3.17); G12 settings list; G13 "Settings and last-used parameters persist between sessions (D89)". Feeds V13 "export then import reproduces identical parameters, method and version". AD-13 (format; starter presets "Snorkel (shallow)" and "Scuba (deep)", "both the defaults of AD-8 in v1"); AD-9 (`force_cpu`); proposed (v0.5.4, CP4) item 6: G12 gains "force CPU processing (Advanced)" and "the first-run defaults: PNG 16-bit, encoder auto ..., quality Standard, cache 20 GB"; item 7 (D75 level names High / Standard / Draft). DR-32 (closes here). |
+| Spec / decision clauses | D37 "Presets stored in the user's app-data folder; can be exported and imported as files"; D38 "Clearwater ships with starter presets"; D88 "Rotating log file in app data"; D89 "Settings and last-used parameters persist between sessions"; D90 "Preset files record their method and a format version"; N9 "rotating log file in app data (D88)"; N11 "preset files record their method and a format version (D90)"; G6 "Presets: save, load, rename, delete, import from file, export to file. Starter presets included." (the store side; the panel is WP3.17); G12 settings list; G13 "Settings and last-used parameters persist between sessions (D89)". Feeds V13 "export then import reproduces identical parameters, method and version". AD-13 (format; starter presets "Snorkel (shallow)" and "Scuba (deep)", "both the defaults of AD-8 in v1"); AD-9 (`force_cpu`); v0.5.4 item 6: G12 gains "force CPU processing (Advanced)" and "the first-run defaults: PNG 16-bit, encoder auto ..., quality Standard, cache 20 GB"; item 7 (D75 level names High / Standard / Draft). DR-32 (closes here). |
 | Depends on | WP2.2 merged (IF-9, IF-10 frozen). WP2.3 merged (the frame's dispatch order); no WP2.3 sample is needed. |
 | Files owned | `src/clearwater/config/` (NEW: `__init__.py`, `paths.py` (app-data locations), `settings_store.py`, `presets.py` (store and starter presets), `migration.py`, `keys.py` (DR-32 check), `log.py` (named so it does not shadow stdlib `logging`)); `tests/test_config_*.py` (NEW); `docs/reports/wp3.15-presets-settings-logging.md`; `docs/proofs/wp3.15-ledger.md`. NOT owned: `src/clearwater/interfaces/` (frozen; `parameters.py` and `settings.py` are read, never changed), `pyproject.toml` (no dependency), `tools/local_config.py`, `tests/conftest.py`. |
 | Interfaces provided | No frozen interface; the stores' public names become WP3.17/WP3.20/WP3.14 inputs, so the round 0 yield tables them for CHARC (task 1). |
@@ -182,7 +183,7 @@ serialises full-pytest runs at gate windows; inner loops run only the cell's own
    any developer override of the app-data root is an environment variable read by `paths.py`,
    if CHARC wants one at all.
 8. **Value checks beyond types.** `Settings.from_json` checks types only. Recommended: on load,
-   `png_bit_depth` in {8, 16}, `quality_level` in {high, standard, draft} (proposed (v0.5.4, CP4)
+   `png_bit_depth` in {8, 16}, `quality_level` in {high, standard, draft} (v0.5.4
    item 7; spec 8.2 still says "Standard / High / Very High" as an example), `cache_limit_bytes`
    >= 0; an out-of-range value takes its default with a logged warning; encoder names are not
    checked here (D74, WP3.10).

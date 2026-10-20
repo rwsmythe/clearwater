@@ -1,11 +1,12 @@
-# WP3.1 — Array backend and image operations (dispatch brief, APPROVED)
+# WP3.1 — Array backend and image operations (dispatch brief, FINAL)
 
 **Status:** APPROVED by CHARC `871a371855bb1630` with rulings (section "Rulings"); draft `6611b3d`, written by
 the orchestrator (generation 4) at CHARC's commission (`a05f065e53e696d7`). FINAL at dispatch,
 once WP2.3 has merged (X4); if the owner's Gate 1 word is still pending then, it dispatches
 WITHOUT a Gate 1 section, which is added by amendment when the owner rules. Owner decisions: none
 inside the package.
-- Spec **v0.5.3**; v0.5.4 items cited as "proposed (v0.5.4, CP4)". Architecture DRAFT 0.1
+- FINAL 2026-10-20 at dispatch (orchestrator generation 4), on main after WP2.3 merged (`d605925`): cites spec **v0.5.4** (applied `9cf16c5`, owner-approved 2026-10-20) and architecture FINAL 1.0 (`3eca7bd`); every "v0.5.4" marker is now plain v0.5.4.
+- Spec **v0.5.4**. Architecture FINAL 1.0
   section 3 IF-2 and section 4; AD-1, AD-9, AD-11, AD-18, AD-20, AD-21. Frame
   `docs/briefs/wp2.4-phase3-frame.md` (sections 1-4). Gate report `docs/reports/wp1.6-gate-report.md`.
 - Cell: `implementer-opus-high`. Tier **STRONG**.
@@ -20,8 +21,8 @@ WP2.2 `StubArrayBackend` raises `NotImplementedError` for every image operation.
 |---|---|
 | ID and title | WP3.1 — Array backend and image operations; plan section 6 Phase 3 row WP3.1 (size L); module `clearwater.core` (plan 8.1) |
 | Goal | A NumPy backend and a CuPy backend that both satisfy IF-2 `ArrayBackend`, a working `select_backend`, and the memory estimate of AD-1, with tests that pin CPU against GPU (AD-11) and the product against the prototype's recorded numerics. |
-| Spec / decision clauses | D39 "Internal processing in 32-bit float; quantization only at export"; 6.4 "All processing in 32-bit floating point, normalized to [0, 1]"; D56 / 6.6 "All spatial parameters ... a fraction of the image's short side" and "Pyramid depth is set by a minimum coarsest-level size"; D107 / N3 "the same code runs on CPU or GPU from the start"; D111 "Automatic CPU fallback when an image or frame is estimated not to fit in graphics memory; no tiled processing in v1"; N4 "if an image or frame is estimated not to fit in graphics memory, it is processed on CPU automatically"; N10 / D92 reproducibility. Feeds V1 (primitives' unit tests, edge cases "uniform images, near-zero red channel, 10-bit input") and V15 ("the CPU fallback engages when an image does not fit in graphics memory"). AD-1 (backend, device rule, the estimate "1.16x the pool's reserved peak at 4K"); AD-9 ("Force CPU processing" overrides device selection; G12 force-CPU proposed (v0.5.4, CP4) item 6); AD-11 (tolerances); AD-18 (CUDA runtime files never redistributed); AD-21 (N6 PENDING; D106 proposed (v0.5.4, CP4) item 1). |
-| Depends on | WP2.2 merged (`b288533`, IF-2 frozen). WP2.3 merged for the stills used by the reference tests (group 1, "Stills": uniform, horizontal gradient, near-zero red, 8- and 16-bit), by their manifest ids. No other Phase 3 package. |
+| Spec / decision clauses | D39 "Internal processing in 32-bit float; quantization only at export"; 6.4 "All processing in 32-bit floating point, normalized to [0, 1]"; D56 / 6.6 "All spatial parameters ... a fraction of the image's short side" and "Pyramid depth is set by a minimum coarsest-level size"; D107 / N3 "the same code runs on CPU or GPU from the start"; D111 "Automatic CPU fallback when an image or frame is estimated not to fit in graphics memory; no tiled processing in v1"; N4 "if an image or frame is estimated not to fit in graphics memory, it is processed on CPU automatically"; N10 / D92 reproducibility. Feeds V1 (primitives' unit tests, edge cases "uniform images, near-zero red channel, 10-bit input") and V15 ("the CPU fallback engages when an image does not fit in graphics memory"). AD-1 (backend, device rule, the estimate "1.16x the pool's reserved peak at 4K"); AD-9 ("Force CPU processing" overrides device selection; G12 force-CPU v0.5.4 item 6); AD-11 (tolerances); AD-18 (CUDA runtime files never redistributed); AD-21 (CLOSED: owner chose Gate 1 option C; D106 interim N6 25 min/min at 4K; the optimisation work is WP3.21, not this package). |
+| Depends on | WP2.2 merged (`b288533`, IF-2 frozen). WP2.3 merged for the stills used by the reference tests (group 1, "Stills": uniform, horizontal gradient, near-zero red, 8- and 16-bit): manifest ids `png16-uniform-none`, `png16-gradient-none`, `png16-lowred-none`, `png8-uniform-none`, `png8-gradient-none`, `png8-lowred-none` (and their `-srgb` / `-display-p3` variants where a profile matters). No other Phase 3 package. |
 | Files owned | `src/clearwater/core/` (NEW: `__init__.py`, `backend.py` (the two backends and `select_backend`), `memory.py` (the estimate), plus any helper modules ruled under open question 1); `tests/test_core_*.py` (NEW); `docs/reports/wp3.1-array-backend.md`; `docs/proofs/wp3.1-ledger.md`. `pyproject.toml`: ONLY the two grant lines of frame section 4 (numpy to `[project] dependencies`; `cupy-cuda12x` as `[project.optional-dependencies] gpu`; SciPy as a product dependency only if task 3's evidence keeps it), and `uv.lock` as `uv lock` regenerates it. The speed-row instrument's home is open question 4. NOT owned: `src/clearwater/interfaces/`, `tools/prototype/` (read-only reference), `tests/conftest.py`, `tests/fixture_plugin.py`, every other module. |
 | Interfaces provided | IF-2: classes satisfying `clearwater.interfaces.backend.ArrayBackend` (`name`, `device`, `asarray`, `to_host`, `gaussian_blur`, `pyramid_reduce`, `pyramid_expand`, `rgb_to_ycbcr`, `ycbcr_to_rgb`, `percentile`, `memory_estimate_bytes`, `free_device_bytes`), and `clearwater.core.select_backend(settings: Settings, height: int, width: int, method_id: str) -> tuple[ArrayBackend, str]` with the interface's signature. The interface-level `clearwater.interfaces.backend.select_backend` stays as it is (it raises `NotImplementedError` naming WP3.1, and `tests/test_interfaces.py` pins that). |
 | Interfaces consumed | IF-1 `Array` (`NDArray[np.float32]`, `(H, W, 3)`, RGB, `[0, 1]`); IF-10 `Settings.force_cpu` (read only). |
@@ -85,6 +86,15 @@ WP2.2 `StubArrayBackend` raises `NotImplementedError` for every image operation.
      `clearwater.core` loads nothing from `clearwater.io`, `.jobs`, `.gui`, `.methods`, nor
      `PIL`, `av`, `PySide6`; and a static check that no module outside `clearwater.core`
      imports `cupy` or `cupyx`.
+
+## Gate 1 section (ruling 1.5 / X4; owner word 2026-10-20 ~16:00Z, Gate 1 option C)
+
+The IF-2 operations are written so that WP3.21 can keep arrays device-resident: no implicit
+host copies inside any CuPy method (`to_host` is the only device-to-host transfer), and results
+stay on the backend's device until the caller asks for them. Nothing more: the optimisation
+work itself (device-resident pipeline, upload/download overlap, FFT or recursive Gaussian) is
+WP3.21's. A test asserts that no CuPy-backend method typed `-> Array` (including `percentile`)
+returns a NumPy array.
 
 ## Declared operating envelope
 

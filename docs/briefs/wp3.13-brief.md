@@ -1,9 +1,10 @@
-# WP3.13 — Output naming and safe writing (dispatch brief, APPROVED)
+# WP3.13 — Output naming and safe writing (dispatch brief, FINAL)
 
 **Status:** APPROVED by CHARC `871a371855bb1630` with rulings (section "Rulings"); draft `6611b3d`, written by
 the orchestrator (generation 4) at CHARC's commission (`a05f065e53e696d7`). FINAL at dispatch,
 once WP2.3 has merged (no v0.5.4 item changes it). Owner decisions: none inside the package.
-- Spec **v0.5.3**. Architecture DRAFT 0.1 section 2 (export data flow: "jobs.naming / safe
+- FINAL 2026-10-20 at dispatch (orchestrator generation 4), on main after WP2.3 merged (`d605925`): cites spec **v0.5.4** (applied `9cf16c5`, owner-approved 2026-10-20) and architecture FINAL 1.0 (`3eca7bd`); every "v0.5.4" marker is now plain v0.5.4.
+- Spec **v0.5.4** (item 14 removes V10's recording-group suffix phrase, ruling 13.1). Architecture FINAL 1.0 section 2 (export data flow: "jobs.naming / safe
   write (D34-D36, D83-D85)") and section 7; AD-19, AD-23. Frame
   `docs/briefs/wp2.4-phase3-frame.md`. DR-16.
 - Cell: `implementer-sonnet-high`. Tier **STRONG**.
