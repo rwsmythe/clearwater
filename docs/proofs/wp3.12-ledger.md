@@ -160,6 +160,65 @@ order. A stage name is a non-empty `str` of at most 65,535 UTF-8 bytes.
 
 Stop-and-ask count: 0 blocking; A to D are for the dispatcher's ruling at this yield, each with a recommended answer.
 
+## Measured test (task 2) -- interim result, STOP raised 2026-10-20
+
+Instrument `tools/cache_store_test.py`; data and logs under `C:/Users/rwsmy/clearwater/work/wp3.12/` (`results.json`,
+`prepare.log`, `sizes*.log`; the working folder is the main tree's `work/`, gitignored). GX011627 all 681 frames; GX011625
+5 x 60 frames at 30/130/230/330/430 s. Statistics measured with `prototype.temporal.measure` (c3 `Params()`, CPU) on every 8th
+frame (86 + 38 frames); sizes on every frame (png-pillow-opt: the 124 statistics frames only). Reference = the FLOAT proxy
+(`block sum / 4080`, checked equal to `temporal.proxy` within 1e-6); the 8-bit proxy is `floor((block sum + 8) / 16)`.
+"max err" is against the 8-bit proxy on the statistics frames. Deviations are the maximum over frames and both clips.
+"bounds (value)" is relative to each bound; "bounds (range)" relative to the bounds' range (a bound near zero makes the first ill-defined).
+60-minute figure = worse clip's median bytes per frame x 107,892 frames (p95 figures in `results.json`).
+
+| candidate | shallow KB (median) | deep KB (median) | 60-min GB (worst median) | fits 10 GB | max err (levels) | means | gains | bounds (value) | bounds (range) | bounds vs 8-bit (range) |
+|---|---|---|---|---|---|---|---|---|---|---|
+| deflate-L1 | 748.7 | 261.4 | 80.8 | no | 0 | 2.7e-04 | 2.6e-05 | 6.0e-02 | 3.1e-02 | 0.0e+00 |
+| deflate-L6 | 695.0 | 195.1 | 75.0 | no | 0 | 2.7e-04 | 2.6e-05 | 6.0e-02 | 3.1e-02 | 0.0e+00 |
+| deflate-L9 | 682.3 | 178.1 | 73.6 | no | 0 | 2.7e-04 | 2.6e-05 | 6.0e-02 | 3.1e-02 | 0.0e+00 |
+| png-pillow-opt | 654.3 | 172.1 | 70.6 | no | 0 | 2.7e-04 | 2.6e-05 | 6.0e-02 | 3.1e-02 | 0.0e+00 |
+| ffv1-intra | 447.4 | 119.0 | 48.3 | no | 0 | 2.7e-04 | 2.6e-05 | 6.0e-02 | 3.1e-02 | 0.0e+00 |
+| utvideo-median | 550.1 | 237.6 | 59.4 | no | 0 | 2.7e-04 | 2.6e-05 | 6.0e-02 | 3.1e-02 | 0.0e+00 |
+| x264rgb-intra-crf0 | 690.2 | 206.5 | 74.5 | no | 0 | 2.7e-04 | 2.6e-05 | 6.0e-02 | 3.1e-02 | 0.0e+00 |
+| x264rgb-intra-crf10 | 290.8 | 121.8 | 31.4 | no | 33 | 6.6e-04 | 7.2e-05 | 6.9e-02 | 3.6e-02 | 8.2e-03 |
+| x264rgb-intra-crf14 | 202.5 | 73.2 | 21.8 | no | 41 | 9.6e-04 | 2.0e-04 | 6.9e-02 | 3.5e-02 | 1.6e-02 |
+| x264rgb-intra-crf18 | 134.3 | 42.0 | 14.5 | no | 61 | 1.3e-03 | 2.9e-04 | 7.6e-02 | 4.0e-02 | 5.7e-02 |
+| x264rgb-intra-crf22 | 88.6 | 22.3 | 9.6 | yes | 81 | 1.9e-03 | 6.5e-04 | 2.4e-01 | 1.3e-01 | 1.4e-01 |
+| x264-444-intra-crf6 | 163.4 | 80.3 | 17.6 | no | 36 | 2.4e-03 | 1.5e-03 | 2.8e-01 | 1.4e-01 | 1.1e-01 |
+| x264-444-intra-crf10 | 117.3 | 48.4 | 12.7 | no | 44 | 2.4e-03 | 1.6e-03 | 3.0e-01 | 1.5e-01 | 1.2e-01 |
+| x264-444-intra-crf14 | 81.2 | 28.9 | 8.8 | yes | 58 | 2.4e-03 | 1.6e-03 | 3.2e-01 | 1.6e-01 | 1.3e-01 |
+| x264-444-intra-crf18 | 53.7 | 17.3 | 5.8 | yes | 77 | 2.3e-03 | 1.5e-03 | 2.7e-01 | 1.4e-01 | 1.1e-01 |
+| mjpeg-444-q2 | 141.5 | 19.5 | 15.3 | no | 25 | 1.9e-03 | 1.7e-03 | 2.1e-01 | 1.1e-01 | 7.5e-02 |
+| mjpeg-444-q4 | 86.3 | 13.1 | 9.3 | yes | 43 | 1.9e-03 | 1.7e-03 | 1.9e-01 | 1.0e-01 | 1.1e-01 |
+| mjpeg-444-q8 | 50.7 | 11.1 | 5.5 | yes | 70 | 1.9e-03 | 1.7e-03 | 2.8e-01 | 1.5e-01 | 1.5e-01 |
+| jpeg-q85-444 | 116.6 | 22.9 | 12.6 | no | 45 | 7.1e-04 | 3.2e-04 | 2.2e-01 | 1.1e-01 | 8.0e-02 |
+| jpeg-q90-444 | 148.1 | 30.9 | 16.0 | no | 34 | 7.4e-04 | 2.7e-04 | 2.7e-01 | 1.3e-01 | 1.1e-01 |
+| jpeg-q95-444 | 212.5 | 50.3 | 22.9 | no | 26 | 7.2e-04 | 2.7e-04 | 1.9e-01 | 9.6e-02 | 6.6e-02 |
+| jpeg-q98-444 | 309.0 | 75.2 | 33.3 | no | 11 | 7.1e-04 | 2.7e-04 | 1.9e-01 | 9.9e-02 | 6.8e-02 |
+| jpeg-q90-420 | 119.4 | 25.6 | 12.9 | no | 70 | 7.2e-04 | 2.9e-04 | 1.7e-01 | 8.8e-02 | 5.8e-02 |
+| jpeg-q95-420 | 172.1 | 43.4 | 18.6 | no | 63 | 7.0e-04 | 2.9e-04 | 1.5e-01 | 7.6e-02 | 5.1e-02 |
+| qdeflate-drop1-L6 | 558.0 | 170.5 | 60.2 | no | 2 | 1.2e-02 | 6.1e-04 | 3.3e-01 | 1.6e-01 | 1.4e-01 |
+| qdeflate-drop2-L6 | 419.9 | 119.0 | 45.3 | no | 4 | 2.1e-02 | 1.0e-03 | 1.2e+00 | 6.0e-01 | 5.5e-01 |
+| qdeflate-drop3-L6 | 307.1 | 75.1 | 33.1 | no | 8 | 3.6e-02 | 2.0e-03 | 2.8e+00 | 1.4e+00 | 1.3e+00 |
+
+Criteria: means and gains <= 1e-3, bounds <= 1e-2, 60 minutes <= 10 GB. Read cost not yet measured (EXCLUSIVE window).
+
+**Findings.**
+1. **The lossless 8-bit proxy itself fails the bounds criterion.** Rows with max err 0 (every lossless candidate, which reproduce the 8-bit proxy
+   exactly) deviate from the FLOAT proxy by 6.0 % per bound (3.1 % of the range) on the deep clip and 1.3 % (0.55 %) on the shallow
+   one, p95 5.3 % / 0.5 %. The cause is the 8-bit rounding of the proxy (a step of 0.0039), against an N{} range that is only
+   0.010-0.116 (median 0.033) on the deep clip's 540 proxy; the criterion therefore cannot be met by ANY 8-bit store, whatever its container.
+   Means (2.7e-4) and gains (2.6e-5) pass.
+2. **No lossless candidate fits 10 GB**: best FFV1 447 KB/frame shallow (48 GB) and 119 KB deep (12.8 GB); 4.8:1 and 3.7:1 against the 16.8:1 needed.
+3. **Every lossy candidate that fits 10 GB on the worse clip deviates from the 8-bit proxy's bounds by 11-27 % of the range**
+   (x264rgb-crf22 14 %, mjpeg-q4 11 %, x264-444-crf14 13 %); the cheapest JPEG that is close to fitting (q85/444: 12.6 GB shallow) 8 %. Compression
+   removes high-pass energy, so the N{} bounds narrow systematically. Means and gains stay near the limit (JPEG 7e-4 / 3e-4; x264/mjpeg 1.5e-3 to 2.4e-3 fail 1e-3).
+4. The deep clip compresses far better (13-31 KB/frame lossy) than the shallow one; the bound is set by sharp shallow footage.
+5. The stdlib quantised-deflate candidate (question D) misses by a wide margin (means 1.2e-2 to 3.6e-2 from the bit-drop bias).
+
+**STOP (brief task 2).** No candidate meets both AD-5's statistics criteria and the 10 GB bound, and the bounds criterion is unattainable
+for the lossless 8-bit proxy itself. CHARC chooses (options in the dispatcher message).
+
 ## Ledger (cumulative rounds)
 
 | Round | Critical | Major | Minor | In-envelope vs out | NEW / REOPENED | Reverts | Product / test-only fixes | Depth |
