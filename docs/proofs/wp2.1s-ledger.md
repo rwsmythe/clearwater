@@ -52,6 +52,12 @@ baseline; the report states the discrepancy under its own heading (report sectio
 
 Transport leg CLOSED: all six windows clean, no re-run, ~56 min of the 120 min cap used.
 
+CHARC rulings `871d4f17e78c10b3` (relayed 2026-10-20) applied: `BIG_PIPE_BYTES` documented as the
+one constant with its measurement; automatic fallback to the default pipe added and demonstrated
+(row `b-fallback+pts`, identity: same 681 hashes, 681/681 pts exact); `lockstep_difference` now
+reports the mean absolute difference (a-ad10: max 19, mean 0.50). Untimed re-runs 3.5 min:
+cumulative machine time ~60 min.
+
 ## Successor handoff (state at the transport yield)
 
 - Committed: instrument `tools/spike_io/transport.py`; `av` 16.1.0 in the dev group; report

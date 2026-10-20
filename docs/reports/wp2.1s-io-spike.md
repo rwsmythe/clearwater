@@ -10,7 +10,7 @@ ICC + EXIF), and confirms or corrects AD-18 (licences). Brief `docs/briefs/wp2.1
 
 ## 1. Results at a glance (transport)
 
-- **Every row is the SAME WORK.** All 17 transport forms decode the same 681 frames to the same
+- **Every row is the SAME WORK.** All 18 transport forms decode the same 681 frames to the same
   bytes as row a: per-frame SHA-256 over the whole clip. Every pts side channel delivers 681/681
   pts exactly as ffprobe lists them.
 - **The 32 KB writes are fixed in FFmpeg; the cure is on the reading side.** FFmpeg's own AVIO
@@ -18,7 +18,8 @@ ICC + EXIF), and confirms or corrects AD-18 (licences). Brief `docs/briefs/wp2.1
   protocol's `-blocksize`, or both. That is 517,560 writes for the clip. What removes the
   bottleneck is the pipe's buffer. A 32 MiB anonymous pipe takes the decode from 55.9 to 16.1
   ms/frame, which is about FFmpeg's own decode-plus-conversion speed (13.5 ms to the null muxer).
-  This buffer is Windows-specific (section 6).
+  This buffer is a Windows platform tuning with an automatic, byte-identical fallback to the
+  default pipe (section 6).
 - **Best rows (median s/frame, clean windows):**
 
   | Row | ms/frame |
@@ -41,8 +42,8 @@ ICC + EXIF), and confirms or corrects AD-18 (licences). Brief `docs/briefs/wp2.1
   | today's pipe | 0.106 (3.17) | 0.056 (1.67) |
 
   Part B measured 0.0707 on this pipe (2.12 min/min).
-- **AD-10's flags change the bytes.** `accurate_rnd+full_chroma_int+bitexact` changes every frame:
-  the largest difference is 19 and 44.4 % of samples differ. This is a finding for WP3.5.
+- **AD-10's flag set against today's chain** (expected, not a defect; CHARC `871d4f17e78c10b3`):
+  max absolute difference 19, mean 0.50 per sample (section 4).
 - **Row a does not reproduce Part B's 93.6 ms/frame.** It measures 55.9 ms/frame here, in a clean
   window (section 3).
 
@@ -62,6 +63,7 @@ opens nothing.
 | b-1m, b | row a's command into an anonymous pipe created with a 1 MiB / 32 MiB buffer (`_winapi.CreatePipe(None, size)`), read the same way |
 | b-direct-blocksize | b plus both FFmpeg knobs |
 | b-cuda | b plus `-hwaccel cuda` (`decode_command(hwaccel="cuda")`) |
+| b-fallback+pts | b+pts with the large pipe forced to fail (`force_fallback`): the transport falls back to the default pipe automatically (identity only, untimed) |
 | s | row a's command with output `tcp://127.0.0.1:<port>`. This process listens (SO_RCVBUF 32 MiB requested) and reads with `clip.read_frame` on `socket.makefile("rb", buffering=0)` |
 | c, c-auto | PyAV 16.1.0 (bundled FFmpeg 8.0.1), software decode, PyAV's default threading (SLICE, 16 threads) / `thread_type="AUTO"`. Each frame is converted by `VideoFrame.reformat(format="rgb24", src_colorspace="itu709", dst_colorspace="itu601", src_color_range="JPEG", dst_color_range="JPEG", interpolation=SWS_ACCURATE_RND)`, then `to_ndarray()` |
 | c-cuda, c-cuda-auto | as c / c-auto with `HWAccel("cuda", allow_software_fallback=False)`; frames arrive as `nv12` in system memory |
@@ -134,7 +136,8 @@ faster.
 
 **Consequence for the gate report.** Part B's "decode-only 0.089-0.094 s/frame, pipe-bound" and
 its -20 to -30 % analysis estimate (candidate #6) rest on the contaminated 93.6 ms figure. The
-projection rows of section 5 replace that estimate. CHARC owns the gate-report text.
+projection rows of section 5 replace that estimate. CHARC adds the dated supersession note to the
+gate report on accept; this report does not edit it.
 
 ## 4. Claim 1 -- transport, decode to NumPy (GX011627, 681 frames, 3840x2160 `rgb24`)
 
@@ -177,12 +180,12 @@ min / median / max interval. The max is the first frame's start-up.
 - **c-cuda:** the wheel's FFmpeg build carries CUDA (`hwdevices_available()`: cuda, dxva2, qsv,
   d3d11va, d3d12va, amf). Its decoders include `hevc` and `hevc_cuvid`.
 
-**AD-10 swscale flags (untimed finding for WP3.5).** Row a-ad10 is row a with
-`flags=accurate_rnd+full_chroma_int+bitexact`. Its hashes differ on 681 of 681 frames. The
-largest absolute difference is 19, and 44.4 % of samples differ (`identity-a-ad10.json`, lockstep
-against row a). In the PyAV conversion check on 5 frames, adding `SWS_FULL_CHR_H_INT` alone moved
-62,280,210 samples, max 12. AD-10's flags are therefore not today's chain: WP3.5 must re-baseline
-any byte or tolerance reference.
+**AD-10 swscale flags (untimed evidence).** Row a-ad10 is row a with
+`flags=accurate_rnd+full_chroma_int+bitexact` (AD-10's set) in place of `flags=accurate_rnd`.
+Between the two sets, over the whole clip (`identity-a-ad10.json`, lockstep against row a): max
+absolute difference 19, mean absolute difference 0.50 per sample (681 of 681 frames differ, 44.4 %
+of samples). Per CHARC `871d4f17e78c10b3` the difference is expected: AD-10's set is the
+product's set.
 
 ## 5. Analysis-pass PROJECTION
 
@@ -217,9 +220,22 @@ Minutes per minute = s/frame x 29.97.
 
 ## 6. Portability (N1) and AD-2 evidence
 
-- **The 32 MiB pipe buffer is Windows-only.** It uses `_winapi.CreatePipe(None, nSize)`, a
+- **The 32 MiB pipe buffer is a Windows platform tuning** (acceptable under N1 on two conditions,
+  CHARC `871d4f17e78c10b3`; AD-23 on accept). It uses `_winapi.CreatePipe(None, nSize)`, a
   private CPython module, plus `msvcrt.open_osfhandle`. CPython's `subprocess.PIPE` passes 0,
   the system default.
+  - **(a) Automatic portable fallback, demonstrated.** When the large pipe cannot be created
+    (`_big_pipe` raises `OSError`), `Transport._ffmpeg_frames` falls back to CPython's default
+    pipe and records why (`pipe_fallback`). Row b-fallback+pts forces that failure. Its
+    identity run (`identity-b-fallback+pts.json`): `pipe_fallback` = "OSError: large pipe
+    creation forced to fail", reads at most 32,768 bytes (the default pipe), 681/681 frame
+    hashes equal to row a's, 681/681 pts exact against ffprobe. The fallback's speed is row a's
+    transport: a+pts 55.7 ms/frame (W3). PyAV is the other portable path (same bytes, exact pts,
+    42.4-76.0 ms/frame).
+  - **(b) One named constant.** `BIG_PIPE_BYTES` (`tools/spike_io/transport.py`), with its
+    measurement in its docstring: 16.11 ms/frame (W4) against 55.87 ms on the default pipe
+    (W2); 1 MiB gave 16.54 ms (W1, one run; the exploration row's own constant
+    `EXPLORE_PIPE_BYTES`).
 - **Portable equivalent:** on Linux, `fcntl(F_SETPIPE_SZ)`, capped for unprivileged processes by
   `/proc/sys/fs/pipe-max-size` (1 MiB by default). The instrument does this off Windows, untested
   here. Its speed is UNKNOWN (out of envelope). macOS has no pipe-size control: UNKNOWN.
@@ -261,12 +277,14 @@ Minutes per minute = s/frame x 29.97.
 - **Stray checks:** WmiPrvSE reached 56.9 % (W3 start) and System 23 %, both system processes. No
   non-system process reached 25 %. No re-run was needed.
 - **Records:** `work/wp2.1s/transport/`:
-  - `reference.json`, `identity-<row>.json` (17 rows);
+  - `reference.json`, `identity-<row>.json` (18 rows);
   - `W1.json`-`W6.json` (every run's intervals and ambient);
   - `summary.json`, `attribution.json`;
   - `gate.jsonl`, plus logs in `work/wp2.1s/logs/`.
-- **Machine time for the transport leg:** about 56 min of the 2 h cap. That is about 17 min
-  untimed (exploration, reference, identity), 39 min in windows (six windows, with their idle gates) and 1 min for attribution.
+- **Machine time for the transport leg:** about 60 min of the 2 h cap: about 20 min untimed
+  (exploration, reference, identity; 3.5 min of it for the fallback and AD-10 mean re-runs after
+  the CHARC rulings), 39 min in windows (six windows, with their idle gates) and 1 min for
+  attribution.
 
 ## 8. Claim 2 -- photo I/O
 

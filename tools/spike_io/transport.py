@@ -12,6 +12,8 @@ this process. The rows (:data:`ROWS`):
   protocol's ``-blocksize``, alone and combined;
 - ``b``: the same command into an anonymous pipe created with a 32 MiB buffer (``b-1m``:
   1 MiB), read the same way; ``b-cuda`` adds ``-hwaccel cuda``;
+- ``b-fallback+pts``: ``b+pts`` with the large pipe forced to fail, which falls back to
+  CPython's default pipe automatically (the portable path; CHARC ``871d4f17e78c10b3``);
 - ``s``: the same command writing to a loopback TCP socket that this process listens on;
 - ``c``: PyAV in-process decode, converted with ``VideoFrame.reformat`` to ``rgb24`` with
   the same matrix, range and swscale flag (PyAV's default threading; ``c-auto``:
@@ -30,7 +32,7 @@ out of the bracket: the bracket is the sum of the intervals.
 Identity (:func:`identity_run`, untimed): every frame's SHA-256 and the delivered pts are
 compared with the reference (row ``a``'s hashes and ffprobe's per-frame pts); a row whose
 bytes differ is re-decoded in lockstep with row ``a`` for the differing-frame count, the
-largest absolute difference and the fraction of differing samples.
+largest and mean absolute difference and the fraction of differing samples.
 
 Windows (:func:`run_window`): an advisory idle gate, an opening and a closing probe (row
 ``a`` on its first :data:`PROBE_FRAMES` frames), a 10 s psutil stray check between runs
@@ -118,7 +120,15 @@ SYSTEM_PROCESSES = frozenset(
 """Windows' own processes, not counted as strays (every listed process is still recorded)."""
 
 BIG_PIPE_BYTES = 1 << 25
-"""Row ``b``'s pipe buffer (32 MiB, larger than one 4K ``rgb24`` frame of 24,883,200 bytes)."""
+"""The large pipe buffer of the ``b`` rows: 32 MiB, more than one 4K ``rgb24`` frame
+(24,883,200 bytes). The one size the large-buffer transport uses (a Windows platform tuning,
+spec N1). Measured on GX011627 (W4, 2026-10-20, clean): row ``b`` 16.11 ms/frame (15.98-16.46),
+``b-cuda`` 12.99 ms, against 55.87 ms for row ``a`` (CPython's default pipe, W2); a 1 MiB
+buffer gave 16.54 ms (``b-1m``, W1, one run). When the buffer cannot be created the transport
+falls back to the default pipe (:meth:`Transport._ffmpeg_frames`; row ``b-fallback+pts``)."""
+
+EXPLORE_PIPE_BYTES = 1 << 20
+"""The 1 MiB buffer of the exploration row ``b-1m`` only."""
 
 SOCKET_RECEIVE_BYTES = 1 << 25
 """Row ``s``'s requested socket receive buffer."""
@@ -158,6 +168,8 @@ class Row:
         output_options: Extra FFmpeg output options, placed before ``-f rawvideo``.
         vf_flags: Replace the chain's ``flags=accurate_rnd`` with these flags.
         thread_type: PyAV rows: the decoder's ``thread_type``; ``None`` for PyAV's default.
+        force_fallback: Pipe rows with a buffer: make creating the large pipe fail, to show
+            the automatic fallback to the default pipe.
     """
 
     name: str
@@ -168,6 +180,7 @@ class Row:
     output_options: tuple[str, ...] = ()
     vf_flags: str | None = None
     thread_type: str | None = None
+    force_fallback: bool = False
 
 
 def _rows() -> dict[str, Row]:
@@ -181,12 +194,13 @@ def _rows() -> dict[str, Row]:
         Row("a-blocksize", "pipe", output_options=block),
         Row("a-direct-blocksize", "pipe", output_options=direct + block),
         Row("a-ad10", "pipe", vf_flags=AD10_FLAGS),
-        Row("b-1m", "pipe", pipe_buffer=1 << 20),
+        Row("b-1m", "pipe", pipe_buffer=EXPLORE_PIPE_BYTES),
         Row("b", "pipe", pipe_buffer=BIG_PIPE_BYTES),
         Row(
             "b-direct-blocksize", "pipe", pipe_buffer=BIG_PIPE_BYTES, output_options=direct + block
         ),
         Row("b+pts", "pipe", pts=True, pipe_buffer=BIG_PIPE_BYTES),
+        Row("b-fallback+pts", "pipe", pts=True, pipe_buffer=BIG_PIPE_BYTES, force_fallback=True),
         Row("b-cuda", "pipe", hwaccel="cuda", pipe_buffer=BIG_PIPE_BYTES),
         Row("b-cuda+pts", "pipe", hwaccel="cuda", pts=True, pipe_buffer=BIG_PIPE_BYTES),
         Row("s", "socket"),
@@ -323,13 +337,18 @@ def ffmpeg_command(row: Row, source: clip.Source, frames: int | None, verbose: b
     return command
 
 
-def _big_pipe(size: int) -> tuple[int, int]:
+def _big_pipe(size: int, force_failure: bool = False) -> tuple[int, int]:
     """Create an anonymous pipe with a ``size``-byte buffer; return (read fd, write fd).
 
     Windows: ``_winapi.CreatePipe`` with ``nSize`` (CPython's own pipe passes 0, the system
     default). Elsewhere a plain ``os.pipe``, enlarged with ``F_SETPIPE_SZ`` where Linux
     offers it.
+
+    Raises:
+        OSError: The pipe cannot be created (always, with ``force_failure``).
     """
+    if force_failure:
+        raise OSError("large pipe creation forced to fail (fallback demonstration)")
     if sys.platform == "win32":
         import _winapi
         import msvcrt
@@ -377,6 +396,8 @@ class Transport:
         self._counter: _CountingReader | None = None
         self._closers: list[Any] = []
         self._container: Any = None
+        self._pipe_fds: tuple[int, int] = (-1, -1)
+        self.pipe_fallback: str | None = None
 
     def __enter__(self) -> Transport:
         """Return the transport."""
@@ -448,15 +469,15 @@ class Transport:
             self._closers.append(connection)
             stream = connection.makefile("rb", buffering=0)
             self._closers.append(stream)
-        elif self.row.pipe_buffer:
-            read_fd, write_fd = _big_pipe(self.row.pipe_buffer)
+        elif self.row.pipe_buffer and self._open_big_pipe():
+            read_fd, write_fd = self._pipe_fds
             try:
                 self._spawn(command, write_fd)
             finally:
                 os.close(write_fd)  # the child holds its own copy
             stream = open(read_fd, "rb", buffering=0)  # noqa: SIM115 - closed in close()
             self._closers.append(stream)
-        else:
+        else:  # the default pipe; also the automatic fallback when the large one fails
             self._spawn(command, subprocess.PIPE)
             assert self._process is not None
             stream = self._process.stdout
@@ -466,6 +487,15 @@ class Transport:
         reader = cast(IO[bytes], self._counter)
         while clip.read_frame(reader, buffer):
             yield buffer
+
+    def _open_big_pipe(self) -> bool:
+        """Try to create the row's large pipe; on failure record why and return False."""
+        try:
+            self._pipe_fds = _big_pipe(self.row.pipe_buffer, self.row.force_fallback)
+        except OSError as exc:
+            self.pipe_fallback = f"{type(exc).__name__}: {exc}"
+            return False
+        return True
 
     def _pyav_frames(self) -> Iterator[NDArray[np.uint8]]:
         """Decode in-process with PyAV and convert each frame as the FFmpeg chain does."""
@@ -530,6 +560,8 @@ class Transport:
         record.update(
             {
                 "status": status,
+                "pipe_buffer_requested": self.row.pipe_buffer or None,
+                "pipe_fallback": self.pipe_fallback,
                 "pts_source": "showinfo on standard error" if self.row.pts else None,
                 "showinfo_numbers_contiguous": [n for n, _ in seen] == list(range(len(seen))),
                 "reads": read_sizes(self._counter.sizes if self._counter else []),
@@ -782,10 +814,10 @@ def lockstep_difference(row: Row, source: clip.Source) -> dict[str, Any]:
     """Decode ``row`` and row ``a`` side by side and measure how their frames differ.
 
     Returns:
-        Differing frames, the largest absolute sample difference and the fraction of
-        differing samples over the clip.
+        Differing frames, the largest and the mean absolute sample difference (over every
+        sample of the clip) and the fraction of differing samples.
     """
-    differing_frames = differing_samples = samples = largest = 0
+    differing_frames = differing_samples = samples = largest = total = 0
     with Transport(ROWS["a"], source) as reference, Transport(row, source) as candidate:
         pairs = zip(reference.frames(), candidate.frames(), strict=True)
         for want, got in pairs:
@@ -796,11 +828,13 @@ def lockstep_difference(row: Row, source: clip.Source) -> dict[str, Any]:
                 differing_samples += changed
                 diff = np.abs(want.astype(np.int16) - got.astype(np.int16))
                 largest = max(largest, int(diff.max()))
+                total += int(diff.sum(dtype=np.int64))
         reference.finish()
         candidate.finish()
     return {
         "differing_frames": differing_frames,
         "max_abs_difference": largest,
+        "mean_abs_difference": total / samples if samples else None,
         "fraction_differing_samples": differing_samples / samples if samples else None,
     }
 
