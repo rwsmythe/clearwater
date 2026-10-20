@@ -5,79 +5,55 @@
 
 ### Generation
 
-- Generation 2, session `clearwater-orchestrator-20261018-1442` (verify:
-  `comms/.launch-sessions.json`). Brought up 2026-10-19 00:42Z. Generation 1 was
-  `clearwater-orchestrator-20261014-1258`.
-- Bash-launch gauge at bring-up: 40 ms (PowerShell `Measure-Command { & $env:CLAUDE_CODE_GIT_BASH_PATH -c true }`); under the 1 s flag line.
+- Generation 2, session `clearwater-orchestrator-20261018-1442`, ROLLED OVER 2026-10-20 ~09:55Z at
+  its 400K depth cap, at a clean boundary (nothing in flight). Generation 3 starts here (verify:
+  `comms/.launch-sessions.json`). Generation 1 was `clearwater-orchestrator-20261014-1258`.
+- **Inbox:** generation 2 drained through msg `257db38e6727db20` (CHARC: "WP1.6 fact-check applied
+  in full") and STOPPED DRAINING at its rollover announcement. You are the sole drainer (verify:
+  `uv run python scripts/role_mail.py list --role orchestrator`).
 
 ### Standing operator rulings
 
-- Unattended operation (owner, 2026-10-14; standing per CHARC relay `132932a7b891bfa0`, in
-  CLAUDE.md "Roles"):
-  - Every operator-bound question goes `--to charc` (type query, recommended answer first, cue
-    after posting).
-  - CHARC answers in the operator's stead, except plan §3 owner-reserved items. Those come back
-    as "HOLD <item>": pause that item, continue the rest.
-  - Info-updates to the operator continue.
-  - No AskUserQuestion from this seat.
-- Spec is **v0.5.3** (owner "approved as 0.5.3" 2026-10-19, main `b3fcd86`, CHARC
-  `d66e745b6a381bf3`): D16 3C default; chapter handling deferred to v2. Plan **v1.1** (WP3.8
-  removed). Cite v0.5.3 in every brief from now. The prototype `Params()` default flips to c3 in
-  the next brief touching `tools/prototype` (WP1.4b or the WP1.3 deep part), as a one-line owned
-  change with its test update; never inside Part B.
+- **Unattended operation** (owner, 2026-10-14; CLAUDE.md "Roles"): every operator-bound question
+  goes `--to charc` (type query, recommended answer first, one cross-session cue after posting).
+  CHARC answers in the operator's stead except plan s.3 owner-reserved items ("HOLD <item>": pause
+  that item, continue the rest). Info-updates (`--type fyi`) to the operator after each accept. No
+  AskUserQuestion from this seat.
+- **Spec v0.5.3** (D16: 3C default; chapter handling deferred to v2). Plan v1.1. Cite v0.5.3.
+  The prototype `Params()` default IS c3 since WP1.4b (`b23bad9`).
+- **GoPro IMU and GPS are OUT OF SCOPE** (owner 2026-10-19 via CHARC `01500d3574412e69`): no brief
+  reads ACCL/GYRO/GRAV/CORI/IORI/GPS. Nothing from a `gpmd` track is ever committed (it carries the
+  owner's dive sites).
+- **Cell depth** (owner 2026-10-19/20; kernel: `docs/orchestrator-context.md` hazard (6), CHARC
+  `5692485`): read `uv run python scripts/cell_depth.py <cell>` at dispatch, at every yield and
+  before any ruling; record each figure with its moment; read depth AND head twice across a turn
+  boundary. **~250K is an EVALUATION point** (bounded remaining work continues; a large or
+  open-ended load goes to a fresh cell); **~400K STOP** and re-dispatch from the ledger.
 
 ### Live cells
 
-- **None live.** WP1.4b ACCEPTED 2026-10-20, main `afaff0e` (record `docs/proofs/wp1.4b-accept.md`):
-  Gate result 4 KEEP the caps; B `NO_NEW_CRITICAL_MAJOR` (errata at the gate, DR-30); bit-identity
-  witness 6/6. `wp14b-cell` stood down (06:50Z), `wp14b-cell2` retired at 387,919. Do not reply to
-  either. Branch `wp1.4b` (`8314247`) kept.
-- **Phase 1 inputs are now complete for WP1.6** (CHARC's, the architect's package; template
-  `docs/reports/wp1.6-gate-report.md`): results 1-2 (Part B, upper bound, shared laptop; photo leg
-  PENDING: no photos supplied), 3 (CP2 shallow and deep: c3 default), 4 (WP1.4b KEEP), 5 (WP1.4:
-  no visible difference), 6 (WP1.5 SIMPLE). Next owner decision: Gate 1 at WP1.6 (via CHARC).
-  CHARC is drafting WP1.6 now (2026-10-20 ~09:40Z); when the draft is committed it asks me for a
-  FACT-CHECK of every figure against its source (accept records, reports, `work/` records).
-- **Depth rule (owner 2026-10-19, corrected 2026-10-20):** read `cell_depth.py <cell>` at dispatch,
-  at every yield, and before sending any ruling or remediation; record each figure with its
-  moment. **~250K is an EVALUATION point, not an automatic re-seat** (owner 2026-10-20: "You don't
-  need to replace the cell at 240k, that should just be an evaluation point"): weigh the remaining
-  work; a few bounded steps continue, a large or open-ended load (a multi-finding remediation) goes
-  to a fresh cell. At ~400K: STOP and re-dispatch fresh. (WP1.3D's two re-seats at 244K and 240K
-  were stricter than needed.)
+- **None.** No worktree under `.worktrees/` (verify: `git worktree list`). Every generation-2 cell
+  is retired or stood down; do not message any of them (`wp12b-cell`, `wp13d-cell`, `wp13d-cell2`,
+  `wp13d-cell3`, `wp14b-cell`, `wp14b-cell2`).
 
-### Gate inputs
+### Where things stand -- the successor starts HERE
 
-- **Shallow CP2 COMPLETE** (owner 2026-10-19, CHARC `3bac4a724b1420aa`, record
-  `docs/proofs/cp2-look-check.md`): c3 default (both Ancuti variants over-red; kept as options);
-  no cast, halo, noise, clipping or flicker; staged vs flat no visible difference. Briefs cite
-  "c3 default per CP2 2026-10-19, spec revision pending"; prototype `Params()` default stays
-  ancuti2018 (not changed inside Part B). WP1.4b and the WP1.3 deep part render c3 primary with
-  ancuti2018 beside it. WP1.6: method-default row c3; row 5 input in.
-
-### Handoff -- the successor starts HERE
-
-1. **WP-T2 ACCEPTED** 2026-10-19, main `8c9d780` (record `docs/proofs/wp-t2-accept.md`):
-   0 skipped restored; DR-24 CLOSED; DR-27 opened. B's major (linked root) REJECTED with cause.
-   Branches `wp-t2`, `wp-t2-b` kept. Worktrees `.worktrees/wp-t2`, `-mc` removable.
-2. **CP1 COMPLETE** (owner 2026-10-19, CHARC `99f6abaf9afd829e`): folder-wise categories
-   (Snorkel = shallow, SCUBA = deeper ~20 m, edits = stress case), chapter handling DEFERRED to
-   v2 (spec revision pending: briefs cite "chapter handling deferred (CP1 2026-10-19; spec
-   revision pending)").
-3. **WP1.2 Part B ACCEPTED** 2026-10-19, main `2dd06cf` (record `docs/proofs/wp1.2b-accept.md`;
-   patch-id `3c25c656`). B #1 blocking -> one remediation; B #2 `NO_NEW_CRITICAL_MAJOR` (6 minor,
-   1 advisory), banked at the gate: findings 1/3/5/6/7 banked as DR-28, findings 2/4 fixed as report errata. Witness rule
-   (4) GOP-start through the next I/P anchor; frame 503 NOT BLOCKING. Branches `wp1.2b`,
-   `wp1.2b-b1` kept. CHARC QA CONFIRMED (`cb61a4e41f625d73`; patch-id erratum corrected; harness
-   366 OK at CHARC's seat; CHARC's pytest re-gate was also killed for low memory).
-   Main re-gate DONE at CHARC's seat on `83fd9c4` (owner's word): 690 passed 0 skipped, gpu 34,
-   harness 366 OK (`1c0eb1905e89e005`, recorded in the accept at `a47e71a`). Debt cleared.
-4. **Next:** the deep parts (WP1.3 deep cases, WP1.4b gain-cap noise test) on SCUBA/; the order
-   is mine (CHARC). Render c3 primary with ancuti2018 beside it. The first brief touching
-   `tools/prototype` flips `Params()` to c3 (one owned line plus its test); cite spec v0.5.3.
-   Then WP1.6 (gate report; smoothing row "2 s provisional, re-measure per DR-25(3)"; Gate 1
-   and Gate 2 rest on Part B's figures with the "shared non-idle laptop, upper bound" caveat;
-   N6 not met, about 2.3x combined; photo leg PENDING).
+1. **Phase 1 (prototype gate) is complete.** All six N5 results are in. CHARC wrote the WP1.6 gate
+   report (`docs/reports/wp1.6-gate-report.md`, draft `a0c87d2`); generation 2 fact-checked every
+   figure (4 mismatches, 4 imprecisions, 3 advisories) and CHARC applied all of them (`4d40f49`,
+   `b02ab34`; CHARC `257db38e6727db20`). D109 (sparse analysis) stays NOT named, on the corrected
+   2.3-2.9 min/min figure.
+2. **Gate 1 (N6 speed) is with the OWNER** as a decision request from CHARC: options A (tune N6 to
+   ~25 min/min), B (optimise first), C (both; CHARC recommends: interim N6 25 min/min, transport
+   choice at WP2.1, optimisation package in Phase 3, final tune at WP5.2). Gate result 4 (KEEP the
+   caps) awaits the owner's confirmation at CP3. The gate record is final when the owner's word is
+   recorded and the fact-check attached.
+3. **Next for this seat:** nothing until CHARC directs. After CP3: Phase 2. WP2.1 (architecture
+   document and decisions) is the architect's (CHARC); the orchestrator's likely next packages are
+   WP2.2 (interface module) and WP2.3 (shared test fixtures) after WP2.1, and WP2.4 briefs with CHARC.
+   Wait for CHARC's commission; do not start Phase 2 work unasked.
+4. **Photos:** none supplied yet. Gate 2's largest-photo leg and the photo look check stay PENDING
+   until the owner supplies photos.
 
 ### Workstreams
 
@@ -88,97 +64,64 @@ Each accepted package had its return report posted to CHARC and an info-update t
 | WP0.1 | 2026-10-14 | `c09f747` | `docs/proofs/wp0.1-accept.md` | STANDS |
 | WP0.2 | 2026-10-15 | `4863a90` | `docs/proofs/wp0.2-accept.md` | STANDS (DR-6..DR-10) |
 | WP1.1 | 2026-10-15 | `9711faf` | `docs/proofs/wp1.1-accept.md` | STANDS (DR-11..DR-13) |
-| WP1.2 Part A | 2026-10-15 | `f6d998a` | `docs/proofs/wp1.2-accept.md` (`7048fd7`) | STANDS (`bac37599277c1365`) |
-| WP1.5 | 2026-10-15 | `3242679` | `docs/proofs/wp1.5-accept.md` (`371f19d`) | CONFIRMED (`6d4fca629d21efe0`) |
-| WP1.2R | 2026-10-15 | `996274e` | `docs/proofs/wp1.2r-accept.md` (`aac4674`); WP1.1/1.2 addenda | CONFIRMED (`60dc8ad66427bb15`) |
-| WP1.3 | 2026-10-15 | `7178540` | `docs/proofs/wp1.3-accept.md` (`bc97a19`); 2nd B adjudicated at the gate; DR-20, DR-21 | CONFIRMED (`09057ee4b3979fa4`) |
-| WP-T1 | 2026-10-15 | `f6a34a4` | `docs/proofs/wp-t1-accept.md` (`3f40a85`); 2nd B adjudicated at the gate; DR-9 and DR-21 closed, DR-22 opened | CONFIRMED (`3501648bc8844468`) |
-| WP1.4 | 2026-10-19 | `91f5775` | `docs/proofs/wp1.4-accept.md`; 2nd B adjudicated at the gate; DR-23..DR-26 | CONFIRMED (`6c5d88685e64a37c`; finding 3 upheld; DR-26 stays banked) |
-| WP-T2 | 2026-10-19 | `8c9d780` | `docs/proofs/wp-t2-accept.md`; DR-24 closed, DR-27 | CONFIRMED (`d40217a81696cc03`; B rejection upheld; suite re-run deferred past Part B) |
-| WP1.2 Part B | 2026-10-19 | `2dd06cf` | `docs/proofs/wp1.2b-accept.md`; B #2 non-blocking, banked; DR-28; depth breach recorded | CONFIRMED (`cb61a4e41f625d73`; patch-id erratum) |
-| WP1.3D | 2026-10-20 | `7f9fea1` | `docs/proofs/wp1.3d-accept.md`; B #1 blocking (candidate labels) -> one remediation; B #2 `NO_NEW_CRITICAL_MAJOR`; DR-29 | CONFIRMED (`c6bda8a38146274f`) |
-| WP1.4b | 2026-10-20 | `afaff0e` | `docs/proofs/wp1.4b-accept.md`; Gate result 4 KEEP; B `NO_NEW_CRITICAL_MAJOR`, errata, DR-30; flip witness 6/6 | CONFIRMED |
+| WP1.2 Part A | 2026-10-15 | `f6d998a` | `docs/proofs/wp1.2-accept.md` | STANDS (`bac37599277c1365`) |
+| WP1.5 | 2026-10-15 | `3242679` | `docs/proofs/wp1.5-accept.md` | CONFIRMED (`6d4fca629d21efe0`) |
+| WP1.2R | 2026-10-15 | `996274e` | `docs/proofs/wp1.2r-accept.md` | CONFIRMED (`60dc8ad66427bb15`) |
+| WP1.3 | 2026-10-15 | `7178540` | `docs/proofs/wp1.3-accept.md`; DR-20, DR-21 | CONFIRMED (`09057ee4b3979fa4`) |
+| WP-T1 | 2026-10-15 | `f6a34a4` | `docs/proofs/wp-t1-accept.md`; DR-22 | CONFIRMED (`3501648bc8844468`) |
+| WP1.4 | 2026-10-19 | `91f5775` | `docs/proofs/wp1.4-accept.md`; DR-23..DR-26 | CONFIRMED (`6c5d88685e64a37c`) |
+| WP-T2 | 2026-10-19 | `8c9d780` | `docs/proofs/wp-t2-accept.md`; DR-27 | CONFIRMED (`d40217a81696cc03`) |
+| WP1.2 Part B | 2026-10-19 | `2dd06cf` | `docs/proofs/wp1.2b-accept.md`; DR-28; depth breach recorded | CONFIRMED (`cb61a4e41f625d73`) |
+| WP1.3D | 2026-10-20 | `7f9fea1` | `docs/proofs/wp1.3d-accept.md`; DR-29 | CONFIRMED (`c6bda8a38146274f`) |
+| WP1.4b | 2026-10-20 | `afaff0e` | `docs/proofs/wp1.4b-accept.md`; Gate result 4 KEEP; DR-30; flip witness 6/6 | CONFIRMED (`2fe4e7e1dc9e0854`) |
 
-- **WP1.2 Part A, raised to CHARC:**
-  - approval of the Windows-only `_windows_power()` in `bench.py` (instrument only, guarded);
-  - the NVIDIA wheel licences for WP2.1 (N13);
-  - the Gate 1 signal: the GPU core is 3.5-13.5x the N6 budget.
-
-  WP1.2 Part B comes later (after footage and WP1.5); CHARC commissions it.
-- **WP1.5:** accepted (see the table). The recommendation is SIMPLE; Gate 6 is CHARC's at WP1.6.
-- **Real inventory pass: DONE.** On main at `b1fd289` (`docs/reports/inventory-2026-10-18.md`).
-  The return report went to CHARC 2026-10-18 23:57Z.
-  - Counts: 35 videos (Snorkel 26, SCUBA 8, `edits` 1 lowercase); 0 errors.
-  - No chaptered recordings. Photos are PENDING.
-  - Counts re-derived from the CSV at my seat; the CSV and summary md5s verified.
-  - The WP0.2 footage test passes and is stable.
-  - **WP1.2 Part B:** condition 1 is MET and condition 3 is met. Condition 2 waits on the
-    WP1.4 accept.
+Kept branches (evidence; do not delete unasked): `wp1.2b`, `wp1.2b-b1`, `wp1.3d`, `wp1.3d-b1`,
+`wp1.4b`, plus the earlier packages' (`git branch`).
 
 ### Practice notes (this instance)
 
-- **No commit on main while a B candidate is under review** (gen 2 slip, WP1.4): my state
-  commit moved main, so the merged head differed from the B-reviewed SHA by the state files
-  (recorded in the accept). Hold state edits uncommitted until the merge.
-- **Cell messages and reports:**
-  - A SendMessage to a working cell may land only after it returns. Check that amendments
-    landed, and re-engage the cell if not.
-  - Truncated cell reports: extract the last assistant text from
-    `~/.claude/projects/C--Users-rwsmy-clearwater/<session>/subagents/agent-a<name>-*.jsonl`.
-- **Re-seat stand-down** (gen 2 slip, WP1.4b 2026-10-20): a message queued to a cell mid-work wakes
-  it after it yields. The claim 10b amendment woke `wp14b-cell` after its STOP and re-seat, and it
-  worked in the same worktree as `wp14b-cell2` for ~5 min (it noticed and halted; no damage). At any
-  re-seat, send the old cell an explicit STAND-DOWN first, and have the successor check `git status`.
-- **Merging:** rebase in a `-mc` worktree, compare `git patch-id --stable`, gate there, then
-  `git merge --ff-only` on main, `uv sync`, and re-gate (pytest, `-m gpu`, harness).
-- **Reviewer B = MY OWN single Codex pass at this seat on the merge candidate, NEVER a cell**
-  (owner catch 2026-10-15; fill corrected `30483f2`, Part 2 item 2).
-  - Evidence: `B/run_review_B.sh`, `B/review-prompt-B.md`, `B/review-B.txt`, with md5s.
-  - Every critical or major is dispositioned: introduced -> one remediation + one B re-run;
-    pre-existing -> banked.
-  - No transcript, no accept.
-  - A heavy mechanical reproduction may go to a sonnet-medium cell, as QA evidence only.
-- **Codex:**
-  - WSL, codex-cli 0.162.1.
-  - Every Codex prompt NAMES the withheld paths, and every transcript gets the
-    `grep -a 'docs/proofs\|<wp>-ledger'` access assertion (lesson from WP1.1 B pass 1).
-- **Exclusive bench windows:** the harness gate and pytest count as HEAVY. Run neither at this
-  seat while a bench window is open (CHARC `122f9a10cf1323f5`; my 05:29Z slip).
-- **Worktrees:** a `-mc` worktree holding a copied `clearwater.local.toml` needs
-  `git worktree remove --force` (the copied file is untracked).
-- **Process control:** the auto-mode classifier blocks `Stop-Process` at this seat. Surface such
-  a step to the user and do not work around it.
+- **Merging:** rebase in a `-mc` worktree; compare `git patch-id --stable` (author range vs
+  candidate vs main); gate there; Reviewer B; `git merge --ff-only`; `uv sync`; re-gate main. Ask
+  CHARC to hold main from B to the merge; no orchestrator commit on main in that window either.
+- **The full pytest now takes 8-15 minutes (771 tests)**, past one 10-minute tool call: run it in
+  the background with output to a scratchpad file, then `-m gpu` and the harness gate. Never two
+  GPU jobs at once (the bit-identity witness waits for pytest).
+- **Reviewer B = my own single Codex pass at this seat, never a cell.** WSL, codex-cli 0.162.1,
+  `-m gpt-5.6-sol -c model_reasoning_effort=high -s read-only --skip-git-repo-check`. Runner
+  template: `C:\Users\rwsmy\clearwater-review-evidence\wp1.4b\reviewB\run_review_B.sh` (probe |
+  review; invoke `MSYS_NO_PATHCONV=1 wsl.exe bash -ilc 'bash /mnt/c/.../run_review_B.sh <mode>'`).
+  Prompt template: `...\wp1.4b\reviewB\review-prompt-B.md`. Assertions: banner, `^ERROR` count,
+  `ERROR codex_core` classified, `tokens used` footer, `succeeded in` count, anchored VERDICT,
+  withheld-access grep on the `/bin/bash` command lines; md5s to `md5s.txt`. A blocking B on an
+  introduced major gets ONE remediation and one B re-run; a second blocking B is adjudicated at the
+  gate. Report overstatements B finds can be fixed as "Erratum at the gate" text in the report.
+- **Bit-identity witness for prototype default or hook changes:** generation 2's script is in its
+  session scratchpad (`witness_flip.py`; not in the repo). Spec: `correct()` with explicit
+  methods on a fixed synthetic 600x900 image, seed 12345, Ancuti blue off/on and 3C, CPU and GPU,
+  `np.array_equal`, run once per tree (each tree's own venv) and compared.
+- **Messages to cells:** a SendMessage to a working cell lands only when it yields, and a queued
+  message WAKES a cell that has gone idle. At any re-seat, send the old cell an explicit STAND-DOWN
+  before dispatching the successor, and have the successor check `git status` for foreign
+  changes. A ruling sent at a yield may arrive after the cell has moved on: if it matters, follow
+  up with a short superseding message.
+- **Post first, then cue.** Write mailbox bodies with the Write tool (a long bash heredoc once
+  failed to parse and the cue went out before the post); cue only after `posted ->` is shown.
+- **Bash `cd`:** a bare `cd` in a Bash call moves the session's working directory. Use absolute
+  paths, `git -C`, or `( cd ... && ... )` subshells.
+- **Truncated cell reports:** extract the last assistant text from
+  `~/.claude/projects/C--Users-rwsmy-clearwater/<session>/subagents/agent-a<name>-*.jsonl`.
+- **Worktrees** holding a copied `clearwater.local.toml` need `git worktree remove --force`.
+- **Process control:** the auto-mode classifier blocks `Stop-Process`; surface it, do not work
+  around it. No Defender exclusion requests (the owner's setting).
+- **Memory pressure:** the host stopped background test runs on 2026-10-19 for low system memory;
+  do not restart a killed run on your own; ask.
 
-### Pending
+### Pending (still valid)
 
-- **Deep CP2 COMPLETE** (owner 2026-10-20, CHARC `1b7bc20ed511cdab`, record
-  `docs/proofs/cp2-deep-look-check.md`): c3 default confirmed on deep footage; no halo, clipping,
-  noise, flicker or residual cast; one finding (2 s smoothing does not hide a rock-to-open-water
-  lighting step) -> WP1.4b claim 10b. Next owner decision: Gate 1 at WP1.6.
-- **GoPro IMU/GPS OUT OF SCOPE** (owner 2026-10-19 ~22:30Z via CHARC `01500d3574412e69`): no brief
-  reads ACCL/GYRO/GRAV/CORI/IORI/GPS. WP1.4b claim 2a reads six camera-state keys only (brief
-  `f183a11`); no gpmd extract is ever committed (it carries GPS).
-- **Depth rule now in the kernel:** `docs/orchestrator-context.md` hazard (6), CHARC commit `5692485`
-  (owner's words verbatim: ~250K evaluation point, ~400K stop; harness gate 366 OK).
-- **WP1.6 gate report** (CHARC `6c5d88685e64a37c`): the smoothing-default row reads "2 s
-  provisional, re-measure per DR-25(3)", never a settled 2 s.
-- **WP1.5 ACCEPTED and CONFIRMED.**
-- **Retroactive Reviewer B: CLOSED via WP1.2R** (accepted at 10:25Z, return report and operator
-  fyi posted).
-  - The 2nd-B major (method-agnostic C3 validation) was adjudicated NOT BLOCKING at the gate
-    and banked as DR-19.
-  - DR-18 (the WP1.5 pass-2 minors) is in the debt register.
-  - The WP1.1 envelope is narrowed to a short side above 128 px.
-  - CHARC QA: CONFIRMED; adjudication upheld.
-- Spec is v0.5.3 (see Standing operator rulings). WP1.2 Part B is DONE (Handoff item 3).
-- **No .LRV/.THM exist** (owner; CHARC `93c5af007a3a8ba8`).
-  - WP1.2 Part B drops the LRV analysis-speed leg (two columns: software decode and hardware
-    decode).
-  - In the inventory pass, the LRV column is all-absent: one line, not a gap.
-  - D60 stays OPEN pending CHARC's spec proposal.
-- Gate hazard: the WP0.2 test `test_real_footage_has_one_row_per_media_file` fails while the
-  SCUBA download runs (its footage snapshot changes). If it fails at the gate, show the cause
-  and re-run after CHARC confirms the download is complete.
-- CHARC approved `_windows_power()` as instrument-only (never into `src/clearwater/` without a
-  fresh ruling).
-- Inbox drained through msg `4114159083a3f639` (generation 1, at rollover). Generation 1 STOPPED DRAINING at the rollover announcement; the successor is the only drainer (verify: `uv run python scripts/role_mail.py list --role orchestrator`).
+- WP1.6: the smoothing row reads "2 s provisional, re-measure per DR-25(3)", never a settled 2 s;
+  the WP1.4b lighting-step finding (a genuine step at 0.90 s in GX011600) is input to a
+  step-aware temporal design in Phase 2.
+- No `.LRV`/`.THM` exist (owner); D60 handled in v0.5.2.
+- `_windows_power()` in `bench.py` is instrument-only (CHARC); never into `src/clearwater/`
+  without a fresh ruling.
+- Open debt: DR-1, 2, 6, 7, 8, 10-20, 22, 23, 25-30 (`docs/debt-register.md`).
