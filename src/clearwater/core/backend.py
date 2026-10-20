@@ -474,6 +474,7 @@ class CupyBackend(CoreBackend):
 
         Raises:
             ImportError: CuPy or ``cupyx.scipy.ndimage`` is not installed.
+            cupy.cuda.runtime.CUDARuntimeError: The current device cannot be bound.
         """
         cupy = importlib.import_module("cupy")
         ndimage = importlib.import_module("cupyx.scipy.ndimage")
@@ -525,6 +526,11 @@ def _probe_gpu() -> tuple[CupyBackend | None, str]:
         _LOG.info("CuPy failed to load: %s: %s", type(exc).__name__, exc)
         return None, "CPU: CuPy failed to load"
     try:
+        importlib.import_module("cupyx.scipy.ndimage")
+    except Exception as exc:  # an incomplete installation without cupyx
+        _LOG.info("cupyx failed to load: %s: %s", type(exc).__name__, exc)
+        return None, "CPU: CuPy failed to load"
+    try:
         count = int(cupy.cuda.runtime.getDeviceCount())
     except Exception as exc:  # no driver, or the runtime cannot reach one
         _LOG.info("the CUDA runtime did not answer: %s", exc)
@@ -532,10 +538,10 @@ def _probe_gpu() -> tuple[CupyBackend | None, str]:
     if count < 1:
         return None, "CPU: no CUDA device"
     try:
-        backend = CupyBackend()
-    except Exception as exc:  # an incomplete installation without cupyx
-        _LOG.info("cupyx failed to load: %s: %s", type(exc).__name__, exc)
-        return None, "CPU: CuPy failed to load"
+        backend = CupyBackend()  # both modules are loaded: what can fail is the device
+    except Exception as exc:  # the current device cannot be bound (unavailable, lost)
+        _LOG.info("the CUDA device could not be bound: %s: %s", type(exc).__name__, exc)
+        return None, "CPU: CUDA device unusable"
     try:
         probe = cupy.arange(4, dtype=cupy.float32) + cupy.float32(1.0)
         if float(probe.sum()) != 10.0:

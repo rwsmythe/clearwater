@@ -39,6 +39,7 @@ class FakeDevice:
         self.kernel_error: Exception | None = None
         self.memory_error: Exception | None = None
         self.pool_error: Exception | None = None
+        self.device_error: Exception | None = None
 
     def module(self) -> Any:
         device = self
@@ -53,13 +54,18 @@ class FakeDevice:
                 raise device.kernel_error
             return np.arange(*args, **kwargs)
 
+        def get_device() -> int:
+            if device.device_error is not None:
+                raise device.device_error
+            return 0
+
         def mem_get_info() -> tuple[int, int]:
             if device.memory_error is not None:
                 raise device.memory_error
             return device.free, 8 * 1024 * MIB
 
         runtime = types.SimpleNamespace(
-            getDeviceCount=get_device_count, getDevice=lambda: 0, memGetInfo=mem_get_info
+            getDeviceCount=get_device_count, getDevice=get_device, memGetInfo=mem_get_info
         )
         def pool_free_bytes() -> int:
             if device.pool_error is not None:
@@ -78,8 +84,16 @@ class FakeDevice:
         )
 
 
-def install(monkeypatch: pytest.MonkeyPatch, device: FakeDevice | None, error: Exception) -> None:
-    """Serve ``device`` as ``cupy``; with ``device=None`` importing ``cupy`` raises ``error``."""
+def install(
+    monkeypatch: pytest.MonkeyPatch,
+    device: FakeDevice | None,
+    error: Exception,
+    ndimage_error: Exception | None = None,
+) -> None:
+    """Serve ``device`` as ``cupy``; with ``device=None`` importing ``cupy`` raises ``error``.
+
+    ``ndimage_error``, when given, is raised by importing ``cupyx.scipy.ndimage``.
+    """
     from scipy import ndimage
 
     def import_module(name: str) -> Any:
@@ -88,6 +102,8 @@ def install(monkeypatch: pytest.MonkeyPatch, device: FakeDevice | None, error: E
         if name == "cupy":
             return device.module()
         if name == "cupyx.scipy.ndimage":
+            if ndimage_error is not None:
+                raise ndimage_error
             return ndimage
         raise ImportError(name)
 
@@ -123,6 +139,15 @@ def test_cupy_failed_to_load(monkeypatch: pytest.MonkeyPatch) -> None:
     assert choose()[1] == "CPU: CuPy failed to load"
 
 
+def test_cupyx_failed_to_load(monkeypatch: pytest.MonkeyPatch) -> None:
+    device = FakeDevice(free=8000 * MIB)
+    install(monkeypatch, device, ImportError(), ndimage_error=ImportError("cupyx"))
+    assert choose()[1] == "CPU: CuPy failed to load"
+    backend_module._probe_gpu.cache_clear()
+    install(monkeypatch, device, ImportError(), ndimage_error=OSError("nvrtc DLL"))
+    assert choose()[1] == "CPU: CuPy failed to load"
+
+
 def test_no_device(monkeypatch: pytest.MonkeyPatch) -> None:
     install(monkeypatch, FakeDevice(free=8000 * MIB, count=0), ImportError())
     assert choose()[1] == "CPU: no CUDA device"
@@ -138,6 +163,16 @@ def test_device_unusable(monkeypatch: pytest.MonkeyPatch) -> None:
     device.kernel_error = RuntimeError("nvrtc: cannot open source file")
     install(monkeypatch, device, ImportError())
     assert choose()[1] == "CPU: CUDA device unusable"
+
+
+def test_device_acquisition_fails(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Round 1 F3: CuPy and cupyx loaded and a device is counted, but the backend cannot bind
+    # the current device: that is an unusable device, not a CuPy that failed to load.
+    device = FakeDevice(free=8000 * MIB)
+    device.device_error = RuntimeError("cudaErrorDevicesUnavailable")
+    install(monkeypatch, device, ImportError())
+    backend, reason = choose()
+    assert reason == "CPU: CUDA device unusable" and isinstance(backend, NumpyBackend)
 
 
 def test_free_memory_failure_after_the_probe(monkeypatch: pytest.MonkeyPatch) -> None:

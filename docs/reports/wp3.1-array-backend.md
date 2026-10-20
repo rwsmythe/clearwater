@@ -100,8 +100,8 @@ context, which already exists when the decision is taken.
 
 `CPU: forced` (settings.force_cpu); `CPU: CuPy not installed` (ImportError); `CPU: CuPy failed
 to load` (any other import failure, or cupyx missing); `CPU: no CUDA device` (count 0 or a
-runtime error); `CPU: CUDA device unusable` (the probe kernel fails, or the free memory
-cannot be read on a later call); `CPU: estimate N MiB
+runtime error); `CPU: CUDA device unusable` (the current device cannot be bound, the probe
+kernel fails, or the free memory cannot be read on a later call); `CPU: estimate N MiB
 exceeds free M MiB` (estimate rounded up, free rounded down, thousands separators; GPU only
 when estimate < free, strictly); `GPU`. The probe runs once per process; free memory is read on
 every call. An unknown method id or a size under 1 raises ValueError (R0-5), even when forced.
