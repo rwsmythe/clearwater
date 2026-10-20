@@ -187,7 +187,7 @@ class VideoSink(Protocol):
              bit_depth: int, provenance: Mapping[str, Any] | None) -> None: ...
     def write(self, frame: Frame) -> None: ...        # in pts order; sink preserves pts, start offset, edit list (AD-22), audio, gpmd, tmcd, rotation
     def close(self) -> SinkReport: ...                # frames written, warnings, best-effort items not carried
-    def abort(self) -> None: ...                      # removes the partial (D84)
+    def abort(self) -> None: ...                      # removes the partial (D44, D85)
 ```
 
 ### IF-6 Photo source and sink

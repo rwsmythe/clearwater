@@ -20,7 +20,7 @@ Everything else is a recording of decisions already taken, not a new request.
 | 11 | **7.2** smoothing | window "defined in time (seconds)" | add "default 2.0 s, median then Gaussian (AD-3), provisional; a lighting step within a clip is not hidden by the window (deep CP2); a step-aware variant is a Phase 2/3 design task" | AD-3; CP2 deep |
 | 12 | **N1** portability | "nothing specific to one operating system without approval" | add the approved exception: "the enlarged anonymous-pipe buffer for frame transport on Windows (AD-23), with automatic portable fallback" | AD-23 |
 | 13 | **D63** photo orientation | as is | add the HEIC rule of AD-24 (apply EXIF Orientation only when no `irot` transform is present), provisional until an owner photo is read | AD-24 |
-| 14 | **5.5 / cache lines 339, V17** chapter-group remnants | two sentences still mention chapter groups | delete the two remnants (moot in v1 since v0.5.3) | CHARC note at v0.5.3 |
+| 14 | **5.5 / cache lines 339, V17, V10, plan WP3.13 row** chapter- and recording-group remnants | two sentences still mention chapter groups; V10 and the plan's WP3.13 row speak of one collision suffix shared across a recording group | delete the two remnants and the shared-group-suffix phrase (moot in v1 since v0.5.3: every input file is its own clip) | CHARC note at v0.5.3; WP3.13 brief ruling 13.1 |
 | 15 | Header | Version 0.5.3, date 13 October 2026 | Version 0.5.4, date of approval; change-log line "0.5.4 — Prototype gate outcomes and WP2.1 design decisions recorded (D100 kept, D98 compared, D106 tuned, D94 reading, G12 defaults and force-CPU, D75 names, 14.1 closed)" | -- |
 
 **What is NOT proposed:** no mandatory requirement is relaxed other than D106, which the spec
