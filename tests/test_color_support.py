@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import subprocess
 from collections.abc import Iterator
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from fractions import Fraction
 from pathlib import Path
 
@@ -33,6 +33,8 @@ from clearwater.interfaces.image import ColorDescription
 from clearwater.interfaces.video import VideoStreamInfo
 from clearwater.io.video import find_tool
 
+HIST_RES = 16  # histogram bins per 1/255
+HIST_TOP = 256
 COEFFICIENTS = {"bt709": (0.2126, 0.0722), "bt601": (0.299, 0.114)}
 
 
@@ -147,8 +149,10 @@ def decode_file_frames(
         while True:
             chunk = proc.stdout.read(size)
             if len(chunk) < size:
+                assert not chunk, f"a short final frame: {len(chunk)} of {size} bytes"
                 break
             yield chunk
+        assert proc.wait(timeout=60) == 0, f"ffmpeg exited with {proc.returncode}"
 
 
 @dataclass
@@ -160,6 +164,9 @@ class Figures:
     total: float = 0.0
     samples: int = 0
     over_2: int = 0
+    histogram: np.ndarray = field(
+        default_factory=lambda: np.zeros(HIST_TOP * HIST_RES + 1, np.int64)
+    )
 
     @property
     def mean(self) -> float:
@@ -179,12 +186,20 @@ class Figures:
         self.total += float(d.sum())
         self.samples += d.size
         self.over_2 += int((d > 2).sum())
+        bins = np.minimum((d * HIST_RES).astype(np.int64).ravel(), HIST_TOP * HIST_RES)
+        self.histogram += np.bincount(bins, minlength=HIST_TOP * HIST_RES + 1)
+
+    def percentile(self, q: float) -> float:
+        """Return the q-th percentile of the difference (1/255 units, bin upper edge)."""
+        cumulative = np.cumsum(self.histogram)
+        index = int(np.searchsorted(cumulative, q / 100 * self.samples))
+        return (index + 1) / HIST_RES
 
     def __str__(self) -> str:
         """Return the figures in 1/255 units."""
         return (
             f"{self.frames} frames: max {self.max:.2f}, mean {self.mean:.3f}, "
-            f">2: {100 * self.share_over_2:.2f} %"
+            f"p99.9 {self.percentile(99.9):.2f}, >2: {100 * self.share_over_2:.2f} %"
         )
 
 

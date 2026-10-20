@@ -313,6 +313,24 @@ def test_name_table_inverts_the_probes_tables() -> None:
             assert probe_tables[key][name] == value
 
 
+def test_primaries_name_table_has_only_if1_values() -> None:
+    # BT.601 is a matrix, not an IF-1 primaries value: no tag is guessed for it.
+    bad = ColorDescription("bt601", "bt709", "bt601", "limited", 8, False, None)
+    assert "color_primaries" not in ffmpeg_color_names(bad)
+
+
+def test_messages_are_ascii_even_for_non_ascii_values() -> None:
+    for stream in (
+        replace(make_stream(), pix_fmt="yuv420pé"),
+        make_stream(matrix="bt709é"),
+        make_stream(range_="fullé"),
+        make_stream(siting="lefté"),
+    ):
+        with pytest.raises(ColorError) as error:
+            decode_filter(stream)
+        assert str(error.value).isascii()
+
+
 def test_assumed_values_pass_through_the_name_table(sample: Callable[[str], Path]) -> None:
     stream = stream_of(sample, "vid-untagged")
     assert stream.color.assumed

@@ -109,3 +109,17 @@ def test_planted_defects_in_the_conversion_are_distinguishable() -> None:
     assert rgb[0, 0].tolist() == pytest.approx([900 / 1023, 100 / 1023, 500 / 1023], abs=1e-7)
     assert not np.allclose(rgb[0, 0], np.array([100, 500, 900]) / 1023)  # R, G, B order
     assert (np.array([100, 500, 900]) / 255).max() > 1  # scaled by 255: out of [0, 1]
+
+
+def test_non_positive_size_and_non_contiguous_buffer_are_refused() -> None:
+    for width, height in ((0, 2), (2, 0), (-1, 1), (1, -1)):
+        with pytest.raises(ColorError, match=r"at least 1x1"):
+            rgb_frame_bytes(width, height, 8)
+        with pytest.raises(ColorError, match=r"at least 1x1"):
+            planes_to_rgb(b"", width=width, height=height, bit_depth=8)
+    strided = memoryview(bytes(24))[::2]  # 12 bytes, not contiguous
+    assert strided.nbytes == 12
+    with pytest.raises(ColorError, match=r"contiguous"):
+        planes_to_rgb(strided, width=2, height=2, bit_depth=8)
+    with pytest.raises(ColorError, match=r"non-empty"):
+        rgb_to_planes(np.zeros((0, 2, 3), np.float32), bit_depth=8)
