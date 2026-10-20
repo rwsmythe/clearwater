@@ -84,3 +84,15 @@ Recorded in the ledger (`docs/proofs/wp2.2-ledger.md`) with their CHARC message 
   says so.
 - `ParameterSet` mappings are not deep-frozen (JSON-native values only).
 - `Image.__eq__` is unusable on arrays, which is inherent to section 3's frozen dataclass.
+
+## CHARC QA
+
+2026-10-20 ~15:35Z at the CHARC seat: `git patch-id --stable` = `6e17752a` on `d3bcdba..wp2.2`,
+`d3bcdba..70e554a` and `597c2df..2a7f092` (match; the main range differs only by the accept
+record); review-B.txt md5s `ad7439d7` (pass 1) and `2b217918` (re-run) verify against `md5s.txt`;
+DR-32 present; `Parameter.nullable` and the round-1 rulings are in the merged tree
+(`src/clearwater/interfaces/method.py:62`); harness gate on main `9a27dc4`: 366 OK (1 skipped).
+**DR-32 adjudication CONFIRMED**: a non-string mapping key under `Mapping[str, Any]` cannot come
+from any in-envelope producer, `to_json` still fails loudly, and WP3.15 owns the boundary; not
+blocking. **QA CONFIRMED.** IF-1 to IF-10 are FROZEN (AD-20) from this accept. The full pytest on
+main is generation 4's first act and is recorded by it above.

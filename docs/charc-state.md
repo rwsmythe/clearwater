@@ -208,7 +208,18 @@ path, md5, five assertions and verdict, or there is no accept.
   NDArray[float32]; IF-9 schema validation pure in WP2.2; trivial fakes with the real c3 stage
   list; procedural AD-14 texture; 540p FFV1 flicker clip in work/; one pytest_plugins line; 2 MB /
   10 MB limits). WP2.2 dispatches now; WP2.3 after WP2.2 merges; CHARC rules at WP2.2's round-1
-  yield on the nine unnamed types. Then WP2.4 + spec v0.5.4 -> CP4. WP1.4b dispatched (opus-high; flip guards + gpmd claim 2a). Next: WP1.3-deep / WP1.4b brief on SCUBA/ (c3 primary, Params() flips to c3), then
+  yield on the nine unnamed types. Then WP2.4 + spec v0.5.4 -> CP4. **WP2.2 round-1 rulings**
+  (msgs 6b5196fe, 3f5670eb): nine types approved; defaults png_bit_depth 16, video_encoder
+  "auto", quality_level "standard" (not owner-reserved; CP5 shows them); c3 stage list confirmed;
+  **AD-20 amended**: `Parameter.nullable` (gain caps None = disabled), rotation CCW positive
+  (2a43d3a); Frame.pts comment fixed (597c2df). **WP2.2 ACCEPTED 2026-10-20 main b288533**
+  (record docs/proofs/wp2.2-accept.md; A converged R3; B pass 1 one remediation; B re-run major
+  adjudicated NOT BLOCKING -> DR-32; candidate gates 892 passed). **CHARC QA CONFIRMED** (patch-id
+  6e17752a; md5s; harness 366; DR-32 adjudication upheld). **IF-1..IF-10 FROZEN.** Orchestrator
+  **gen 3 rolled over 15:24Z** at 400K (state 9a27dc4); **gen 4 = `clearwater-orchestrator-20261020-0524`**
+  online 15:30Z, running the main pytest as its first act, then removes the wp2.2 worktrees and
+  dispatches WP2.3 (brief approved). Next for CHARC: WP2.4 (Phase 3 briefs + spec v0.5.4 draft)
+  once WP2.3 is under way; Gate 1 still OPEN with the owner. WP1.4b dispatched (opus-high; flip guards + gpmd claim 2a). Next: WP1.3-deep / WP1.4b brief on SCUBA/ (c3 primary, Params() flips to c3), then
   WP1.6 gate report (Gate 1: core 3.6x, production export 4.4x over N6). **Footage-layout skips:** the owner's Snorkel/SCUBA/edits layout makes 3
   footage tests skip (root `GX011628.MP4` paths in `tests/test_container_spike.py:902`,
   `tests/test_lookcheck.py:1289`, WP1.4 test 7; also `tools/lookcheck/pack.py:94` and the WP1.4
