@@ -62,7 +62,8 @@ target-version = "py312"
 line-length = 100
 src = ["src", "tools", "tests"]
 # The harness core and its suite are upstream scaffold code, not product code.
-extend-exclude = ["scripts", ".claude", "tests/harness", ".worktrees"]
+# Markdown is prose; the fenced interface sketches in docs/ are not code ruff owns (CHARC, 2026-10-20).
+extend-exclude = ["scripts", ".claude", "tests/harness", ".worktrees", "*.md"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "N", "UP", "B", "D", "ANN", "RUF", "SIM"]
