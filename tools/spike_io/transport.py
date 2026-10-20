@@ -30,8 +30,10 @@ of the previous frame's handling to its own arrival, so the SHA-256 witness take
 out of the bracket: the bracket is the sum of the intervals. The producer is not stopped
 during a hash: FFmpeg keeps writing into a pipe or socket buffer (more than a whole frame for
 the 32 MiB pipe) and PyAV's decoder threads keep decoding, so work done during a hash is out
-of the bracket. The bracket is therefore a lower bound and the wall time including the
-hashes (``wall_s_with_witness``) an upper bound on the decode-to-NumPy time without hashing.
+of the bracket. The bracket is therefore a lower bound on the decode-to-NumPy time without
+hashing, and ``wall_s_with_witness`` an upper bound: the wall time from the bracket's start to
+the last frame's arrival, which includes every witness hash but the last one (the last frame
+is hashed after it has arrived).
 
 Identity (:func:`identity_run`, untimed): every frame's SHA-256 and the delivered pts are
 compared with the reference (row ``a``'s hashes and ffprobe's per-frame pts); a row whose
@@ -359,10 +361,13 @@ def _big_pipe(size: int, force_failure: bool = False) -> tuple[int, int]:
 
     Windows: ``_winapi.CreatePipe`` with ``nSize`` (CPython's own pipe passes 0, the system
     default). Elsewhere a plain ``os.pipe``, enlarged with ``F_SETPIPE_SZ`` where Linux
-    offers it.
+    offers it; if that call fails (for example above ``/proc/sys/fs/pipe-max-size`` without
+    privilege) the pipe is closed and the error raised, so the caller falls back to the default
+    pipe and records why. Without ``F_SETPIPE_SZ`` (macOS) the default-size pipe is returned.
+    Neither branch is exercised in this spike's envelope (Windows).
 
     Raises:
-        OSError: The pipe cannot be created (always, with ``force_failure``).
+        OSError: The pipe cannot be created or enlarged (always, with ``force_failure``).
     """
     if force_failure:
         raise OSError("large pipe creation forced to fail (fallback demonstration)")
@@ -381,8 +386,12 @@ def _big_pipe(size: int, force_failure: bool = False) -> tuple[int, int]:
         read_fd, write_fd = os.pipe()
         setter = getattr(fcntl, "F_SETPIPE_SZ", None)
         if setter is not None:
-            with contextlib.suppress(OSError):
+            try:
                 fcntl.fcntl(write_fd, setter, size)
+            except OSError:
+                os.close(read_fd)
+                os.close(write_fd)
+                raise
         return read_fd, write_fd
 
 
