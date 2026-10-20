@@ -744,10 +744,13 @@ def timed_run(
                 "mismatched": bad,
                 "same": not bad,
             },
+            # showinfo prints one frame more than -frames:v keeps on a partial decode, so a
+            # probe compares only the frames kept; a full-clip run compares every entry, and
+            # an extra one is a mismatch (the side channel must be one-to-one with frames).
             "pts": pts_check(
-                delivered[: len(intervals)], reference["pts_ffprobe"][: len(intervals)]
+                delivered if frames is None else delivered[: len(intervals)],
+                reference["pts_ffprobe"][: len(intervals)],
             ),
-            # showinfo prints one frame more than -frames:v keeps on a partial decode.
             "side_channel_extra_entries": max(0, len(delivered) - len(intervals)),
             "gpu_state_start": gpu_start,
             "gpu_state_end": bench._gpu_state(),
@@ -835,7 +838,8 @@ def identity_run(
             "first_differing": differing[:5],
             "same_work": same,
         }
-        record["pts"] = pts_check(delivered[: len(hashes)], reference["pts_ffprobe"])
+        # Every entry is compared: an extra side-channel entry is a mismatch, not dropped.
+        record["pts"] = pts_check(delivered, reference["pts_ffprobe"])
         record["side_channel_extra_entries"] = max(0, len(delivered) - len(hashes))
         # Frame by frame only on equal counts: lockstep pairs frames by index and would
         # stop at the shorter stream, so a count mismatch is recorded as such instead.
