@@ -260,3 +260,18 @@ Checks after the fixes: own tests 141 passed; ruff, ruff format --check, mypy st
 |---|---|
 | Round 1 verdict | 215,371 (86 turns) |
 | Round 1 remediation, window requested | 246,372 (111 turns) |
+
+### Round 2 (head beb37a9; diff 2455 lines, `src` and `tests`, cumulative)
+
+Evidence: `C:\Users\rwsmy\clearwater-review-evidence\wp3.7\r2\` (prompt with a "THIS IS ROUND 2" section, diff, `review.txt`, `full-transcript.txt`, `md5s.txt`). Green before review: full pytest on `beb37a9`, 1279 passed (525 s), exit 0; ruff, ruff format --check, mypy strict clean. Mechanical assertions: model gpt-5.6-sol and effort high, no `ERROR` line, one `tokens used` footer, VERDICT present, 12 `succeeded in` lines; the `docs/proofs` strings in the transcript are the prompt echo, the brief's text and the exclusion globs (no ledger line leaked). The sandbox had no `uv`, `pytest` or `ffprobe`; findings are on isolated pure-Python probes (EXECUTED).
+
+Verdict: `NEW_CRITICAL_MAJOR_FOUND`. Counts: critical 0, major 1 (DISPUTED, see 1), minor 3. All four NEW, none REOPENED; none of round 1's six findings was re-reported (all six fixes accepted by the reviewer).
+
+| # | Sev | Where | Finding | Adjudication |
+|---|---|---|---|---|
+| 1 | MAJOR | `boxes.py` / `probe.py` `duration_s` | `mvhd` duration is discarded; the probe always takes the longest stream duration; the reviewer reads IF-5 as "`mvhd` duration over its timescale, the longest stream only as the fallback" | DISPUTED, not upheld by the cell. IF-5 (CHARC `4174484`) and ruling 2b give the two forms as alternatives joined by "or": "`mvhd` duration over its timescale, OR the longest stream in integer ticks times its time base"; the cell takes the second form, exact. Measured on the four video samples: `mvhd` duration over timescale (360360/240000, 320320/240000) equals the stream maximum exactly, so the two forms agree on every sample. If CHARC wants the `mvhd` form as primary it is a small change (a `movie_duration` field in `MovieBoxes`, stream maximum as fallback) and the two duration tests change; the cell does NOT make it without a ruling |
+| 2 | MINOR | `boxes.py` | A non-`mdat` box that overruns the file AFTER `moov` is not rejected (the reader returns at `moov`) | Accept as documented behaviour: the reader's duty ends at `moov`; a later overrun is typically a cut `mdat`. Doc sentence in the terminating cleanup, no code change |
+| 3 | MINOR, OUT-OF-ENVELOPE | `gopro.py` | `MAX_DEPTH` 8 allows seven nested containers, not eight (root starts at depth 1) | Accept; fix in the terminating cleanup (start at 0, adjust the test) |
+| 4 | MINOR, OUT-OF-ENVELOPE | `probe.py` `_tail_unreadable` | Required and delivered pts are sets; repeated pts are not counted | Accept; fix in the terminating cleanup (multiset compare, test with a duplicate pts) |
+
+If finding 1 is not upheld, round 2 has ZERO new blocking findings and terminates the loop; findings 2-4 are then the terminating cleanup (non-blocking, fixed once, no further round). If CHARC upholds it, the fix is product code plus two tests and a round 3 follows. Reviewer B (the orchestrator's seat pass) follows the termination.
