@@ -66,6 +66,13 @@ cumulative machine time ~60 min.
   `identity-<row>.json` (17 rows), `W1.json`-`W6.json`, `summary.json` (made by
   `transport.py summary`), `attribution.json`, `gate.jsonl`; logs in `work\wp2.1s\logs\`;
   helpers (uncommitted) `work\wp2.1s\show.py`, `work\wp2.1s\attribution.py`.
+- DONE at retirement (gen-1 cell, depth 240K, 2026-10-20): claim 1 complete and committed;
+  CHARC rulings `871d4f17e78c10b3` applied (fallback row `b-fallback+pts`, `BIG_PIPE_BYTES`
+  docstring, AD-10 max 19 / mean 0.50); ruff, format, mypy green on the whole tree at `e030564`.
+  pytest NOT yet run on this branch (no new tests exist yet). No Reviewer A round run yet.
+- Do NOT redo: any timed window (transport leg closed, ~60 of 120 min used; a new timed window
+  needs a ruling), the reference or identity runs, the attribution probe, the licence-string
+  reads below (re-check only if challenged).
 - Remaining: claim 2 (photo leg: `tools/spike_io/photo.py`, `tests/test_spike_io_photo.py`),
   claim 3 (licences; evidence gathered so far below), then ruff/format/mypy/pytest on the
   whole tree, then Reviewer A (STRONG, WSL codex, evidence in
