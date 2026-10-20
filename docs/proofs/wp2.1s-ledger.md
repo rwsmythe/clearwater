@@ -123,6 +123,7 @@ cumulative machine time ~60 min.
 | Round | Transport / CLI | Critical | Major | Minor | In-envelope / out | NEW / REOPENED | Reverts | Fixes: product / test-only | Depth (dispatcher) | Evidence |
 |---|---|---|---|---|---|---|---|---|---|---|
 | r1 | WSL, codex-cli 0.162.1, gpt-5.6-sol/high | 0 | 4 | 4 | 7 / 1 (F8 out) | 8 NEW / 0 | 0 | product: transport.py, photo.py, licences.py, report; test: photo tests | (dispatcher) | `clearwater-review-evidence/wp2.1s/r1/` |
+| r2 | WSL, codex-cli 0.162.1, gpt-5.6-sol/high | 0 | 2 | 3 | 4 / 1 (F5 out) | 5 NEW / 0 | 0 | product: transport.py, licences.py, report | (dispatcher) | `clearwater-review-evidence/wp2.1s/r2/` |
 
 Round 1 (diff `aa1f5f0..ccc23b8`; VERDICT NEW_CRITICAL_MAJOR_FOUND; assertions all pass, 30
 succeeded, 0 `^ERROR`, 0 `ERROR codex_core`, footer present; access hits are echoes). Findings and
@@ -137,3 +138,19 @@ fixes (adjudication in the evidence folder):
 6. MINOR licence-file regex on directory -> match on file name; "listed, not read" (`b4df044`).
 7. MINOR HEIC EXIF names only -> values on all 8 fixtures (`6bfc4fe`).
 8. MINOR OUT-OF-ENVELOPE `ipma` not read -> limit stated; banked.
+
+Between rounds 1 and 2 -- CHARC licence note (relayed by the orchestrator): PyAV encoders probed
+(libx264, libx265, h264_nvenc, hevc_nvenc open and encode 5 synthetic 256x192 frames; NVENC refuses
+64x48 with EINVAL), configuration string and licence call quoted, `av.libs` DLLs and DELVEWHEEL
+provenance recorded, DLL licence scan tightened to NUL-terminated C strings with avcodec/avutil as
+the positive control (the earlier "bare GPL" bytes are machine code) (`227481b`, `75cc523`,
+`c5671e0`). Ruff: main fixed at c6b63e3; this branch is not rebased (orchestrator rebases at accept).
+
+Round 2 (diff `aa1f5f0..c5671e0`; VERDICT NEW_CRITICAL_MAJOR_FOUND; assertions pass, 11 succeeded,
+0 `^ERROR`, 0 `ERROR codex_core`, footer present; access hits are echoes; all findings REASONED,
+the sandbox could not run pytest). Findings and fixes:
+1. MAJOR "no licence text" from file names only -> every non-code wheel file read (`29c2985`).
+2. MAJOR reconciliation beyond the artefact -> cause UNKNOWN; CHARC's premise attributed (`7417796`).
+3. MINOR scan scope -> stated.
+4. MINOR wall bound omits the last hash -> wording; still an upper bound (`4d997c6`).
+5. MINOR OUT-OF-ENVELOPE silent F_SETPIPE_SZ failure -> raises and falls back (`4d997c6`).
