@@ -117,7 +117,7 @@ No STOP item: no interface, core, dependency or tolerance change is needed.
 |---|---|---|---|---|---|---|---|---|---|
 | 0 (table) | - | - | - | - | - | - | - | - | 119,733 (dispatcher) |
 | 1 (head 8643ba1) | 0 | 1 | 3 | 0 | 3 in / 1 out (F4) | 4 NEW / 0 | 0 | done: F1 test+report, F2 test, F3 product+test, F4 product+test (+ OverflowError guard, floor-collapse refusal: product+test) | 257,103 (dispatcher) |
-| 2 (head 77110f7) | 0 | 0 | 1 | 0 | 0 in / 1 out (R2-1) | 1 NEW / 0 | 0 | pending ruling: R2-1 product+test or bank | (dispatcher) |
+| 2 (head 77110f7) | 0 | 0 | 1 | 0 | 0 in / 1 out (R2-1) | 1 NEW / 0 | 0 | done: R2-1 product+test (4e2e836), the terminating cleanup | 304,760 (dispatcher) |
 
 Round-0 ruling (orchestrator gen 6): table accepted as committed (c80393f); questions 1-5 as
 recommended.
@@ -173,3 +173,8 @@ Verdict NO_NEW_CRITICAL_MAJOR. F1-F4 and the two additions verified.
   all inf and a NaN normalised map), NEW: a finite but huge supplied saliency mean overflows
   the float32 squared distance. Recommended: refuse a component above about 1e19 (the F3 rule's
   counterpart), ValueError naming the field, one test; alternative: bank (non-blocking).
+
+Round-2 ruling (orchestrator gen 6; depth 304,760 at the yield): CONVERGED, no round 3. R2-1
+fixed as the terminating cleanup (4e2e836: `_checked_triple` refuses a component beyond 1e18;
+2 tests failed before). ec5d2e5 (floor-collapse refusal) accepted, recorded as found at
+remediation. Window granted on the final head.
