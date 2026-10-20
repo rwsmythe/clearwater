@@ -701,6 +701,138 @@ def test_the_flicker_path_keeps_the_shallow_readback_bound_of_three_levels() -> 
     assert deep.default == pack.DEEP_READBACK_MAX_OWN
 
 
+# --- the clip's render, encode and page steps only accept what belongs together ------------------
+
+
+def _clip_document(stem: str = "GXFAKE", count: int = 3, **changes: Any) -> dict[str, Any]:
+    """A statistics document for a ``count``-frame clip of the deep variants, not yet encoded."""
+    variants = {}
+    for variant in pack.deep_variants():
+        if variant.name not in pack.DEEP_CLIP_VARIANTS:
+            continue
+        variants[variant.name] = {
+            "params": dataclasses.asdict(variant.params),
+            "frames": [
+                {
+                    "index": n,
+                    "pts_ticks": 1001 * n,
+                    "source_file": f"{stem}_f{n:04d}.png",
+                    "corrected_file": f"{stem}_f{n:04d}-{variant.name}.png",
+                }
+                for n in range(count)
+            ],
+        }
+    document: dict[str, Any] = {
+        "chapter": stem,
+        "centre_s": 3.95,
+        "checks": None,
+        "smoother": {"kind": pack.DEEP_SMOOTHER.kind, "window_s": pack.DEEP_SMOOTHER.window_s},
+        "excerpt": {"frames": count},
+        "variants": variants,
+    }
+    document.update(changes)
+    return document
+
+
+def _touch_sets(clip_dir: Path, document: dict[str, Any]) -> None:
+    """Create the empty PNG files the document names."""
+    for name, body in document["variants"].items():
+        for row in body["frames"]:
+            for folder, file in (
+                (f"corrected-{name}", row["corrected_file"]),
+                ("source", row["source_file"]),
+            ):
+                (clip_dir / folder).mkdir(parents=True, exist_ok=True)
+                (clip_dir / folder / file).write_bytes(b"")
+
+
+def test_clip_inputs_that_belong_together_have_no_problem_and_every_mismatch_is_named(
+    tmp_path: Path,
+) -> None:
+    document = _clip_document()
+    _touch_sets(tmp_path, document)
+    assert pack.clip_inputs_problem(document, "GXFAKE", tmp_path) is None
+    assert "chapter" in str(pack.clip_inputs_problem(document, "GXOTHER", tmp_path))
+    assert "already encoded" in str(
+        pack.clip_inputs_problem(dict(document, checks={"c3": {"ok": True}}), "GXFAKE", tmp_path)
+    )
+    wrong_smoother = dict(document, smoother={"kind": "gaussian", "window_s": 1.0})
+    assert "smoother" in str(pack.clip_inputs_problem(wrong_smoother, "GXFAKE", tmp_path))
+    extra = dict(document, variants={**document["variants"], "c3x": document["variants"]["c3"]})
+    assert "variants" in str(pack.clip_inputs_problem(extra, "GXFAKE", tmp_path))
+    params = _clip_document()
+    params["variants"]["c3"]["params"]["gamma"] = 9.0
+    assert "parameters" in str(pack.clip_inputs_problem(params, "GXFAKE", tmp_path))
+    shifted = _clip_document()
+    shifted["variants"]["ancuti2018"]["frames"][1]["pts_ticks"] = 7
+    assert "pts" in str(pack.clip_inputs_problem(shifted, "GXFAKE", tmp_path))
+    (tmp_path / "source" / "GXFAKE_f0001.png").unlink()
+    assert "source PNGs" in str(pack.clip_inputs_problem(document, "GXFAKE", tmp_path))
+    (tmp_path / "source" / "GXFAKE_f0001.png").write_bytes(b"")
+    (tmp_path / "corrected-c3" / "GXFAKE_f0009-c3.png").write_bytes(b"")  # a stale extra frame
+    assert "corrected-c3" in str(pack.clip_inputs_problem(document, "GXFAKE", tmp_path))
+
+
+def test_encode_deep_clip_refuses_stale_inputs_before_it_runs_any_tool(tmp_path: Path) -> None:
+    roots = _deep_roots(tmp_path)
+    clip_dir = roots.allowed / "clip"
+    video = tmp_path / "GXFAKE.mp4"  # never opened: the refusal comes first
+    with pytest.raises(frames.ExtractError, match="render the deep clip first"):
+        pack.encode_deep_clip(video, roots, clip_dir)
+    document = _clip_document(checks={"c3": {"ok": True}})
+    _touch_sets(clip_dir, document)
+    roots.write_text(clip_dir / "statistics.json", json.dumps(document))
+    with pytest.raises(frames.ExtractError, match="already encoded"):
+        pack.encode_deep_clip(video, roots, clip_dir)
+
+
+def test_clear_clip_removes_clips_statistics_and_frames_only(tmp_path: Path) -> None:
+    roots = _deep_roots(tmp_path)
+    clip_dir = roots.allowed / "clip"
+    document = _clip_document()
+    _touch_sets(clip_dir, document)
+    for name in ("GXFAKE_c3.mp4", "GXFAKE_source.mp4", "statistics.json", "statistics-c3.png"):
+        (clip_dir / name).write_bytes(b"x")
+    (clip_dir / "keep.txt").write_bytes(b"x")
+    pack.clear_clip(roots, clip_dir)
+    assert [p.name for p in clip_dir.rglob("*") if p.is_file()] == ["keep.txt"]
+    pack.clear_clip(roots, roots.allowed / "nowhere")  # a missing folder is fine
+
+
+def test_the_page_links_only_a_verified_clip_of_the_current_deepest_frame(tmp_path: Path) -> None:
+    roots = _deep_roots(tmp_path)
+    clip_dir = roots.allowed / "clip"
+    assert pack.clip_files(roots, clip_dir) == []  # no clip was ever rendered
+    deepest = {"chapter": "GXFAKE", "frame": "GXFAKE_3.950", "pts_seconds": 3.95}
+    roots.write_text(roots.allowed / "deep-frames.json", json.dumps({"deepest": [deepest]}))
+    ok = {label: {"ok": True} for label in ("c3", "ancuti2018", "source", "readback")}
+    clip_dir.mkdir(parents=True, exist_ok=True)
+    for name in ("GXFAKE_c3.mp4", "GXFAKE_ancuti2018.mp4", "GXFAKE_source.mp4"):
+        (clip_dir / name).write_bytes(b"x")
+
+    def write(**changes: Any) -> None:
+        roots.write_text(clip_dir / "statistics.json", json.dumps(_clip_document(**changes)))
+
+    write()  # rendered, not encoded
+    with pytest.raises(frames.ExtractError, match="not encoded"):
+        pack.clip_files(roots, clip_dir)
+    write(checks=dict(ok, readback={"ok": False}))
+    with pytest.raises(frames.ExtractError, match="did not hold"):
+        pack.clip_files(roots, clip_dir)
+    write(checks=ok, centre_s=1.0)  # cut around another frame than the current deepest
+    with pytest.raises(frames.ExtractError, match="render it again"):
+        pack.clip_files(roots, clip_dir)
+    write(checks=ok)
+    assert [p.name for p in pack.clip_files(roots, clip_dir)] == [
+        "GXFAKE_c3.mp4",
+        "GXFAKE_ancuti2018.mp4",
+        "GXFAKE_source.mp4",
+    ]
+    (clip_dir / "GXFAKE_source.mp4").unlink()
+    with pytest.raises(frames.ExtractError, match="is missing"):
+        pack.clip_files(roots, clip_dir)
+
+
 # --- the deep clip -------------------------------------------------------------------------------
 
 
@@ -761,6 +893,8 @@ def test_the_deep_clip_is_staged_smoothed_encoded_checked_and_pruned(
         assert document["checks"]["readback"][label]["thresholds"]["max_own"] == 5.0
     for name in ("GXDEEP_c3.mp4", "GXDEEP_ancuti2018.mp4", "GXDEEP_source.mp4", "statistics.json"):
         assert (clip_dir / name).is_file()
+    deepest = {"chapter": "GXDEEP", "frame": "GXDEEP_3.950", "pts_seconds": 3.95}
+    roots.write_text(roots.allowed / "deep-frames.json", json.dumps({"deepest": [deepest]}))
     assert [p.name for p in pack.clip_files(roots, clip_dir)] == [
         "GXDEEP_c3.mp4",
         "GXDEEP_ancuti2018.mp4",

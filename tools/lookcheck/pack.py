@@ -1,13 +1,15 @@
-"""Build the WP1.3 look check pack: stills under three variants and the flicker clip.
+"""Build the WP1.3 look check pack: stills under three variants, the flicker clip, the deep part.
 
 Usage::
 
     uv run python tools/lookcheck/pack.py stills [--config FILE] [--device gpu|cpu|auto]
     uv run python tools/lookcheck/pack.py flicker [--config FILE] [--device gpu|cpu|auto]
-    uv run python tools/lookcheck/pack.py deep [--part all|clip|stills] [--config FILE] [--device D]
+    uv run python tools/lookcheck/pack.py deep [--part all|clip|render|encode|stills] [--config FILE]
+        [--device D]
 
 All read the two folders from the local configuration. The footage folder is only ever an
-input; every file written goes under ``<working folder>/wp1.3/`` and is checked first
+input; every file written goes under ``<working folder>/wp1.3/`` (``stills`` and ``flicker``) or
+``<working folder>/wp1.3d/`` (``deep``) and is checked first
 (:class:`lookcheck.frames.OutputRoots`). A chapter is named by its stem and found anywhere
 under the footage folder (:func:`local_config.find_footage_file`); a chapter that is missing
 or ambiguous is a configuration error.
@@ -46,7 +48,11 @@ in that order, at the ``Params()`` defaults with only the method (and blue compe
 :func:`encode_deep_clip`; ``render`` and ``encode`` run one step each, the encode from the
 rendered PNGs), ``--part stills`` the 48 chapter stills, the 12 case candidates at full
 resolution and the page (:func:`build_deep_pack`); ``all`` (the default) does the clip first, so
-that the page links it.
+that the page links it. The page links the clip only when its statistics record that it was
+encoded, that every check held and that it is centred on the current deepest frame
+(:func:`clip_files`); :func:`render_deep_clip` first deletes what an earlier clip left
+(:func:`clear_clip`) and :func:`encode_deep_clip` refuses PNG sets that do not belong to the
+statistics (:func:`clip_inputs_problem`).
 """
 
 from __future__ import annotations
@@ -1706,6 +1712,25 @@ def run_deep_stills(
     return build_deep_pack(stills, candidates, pack_dir, roots, backend, clips)
 
 
+def clear_clip(roots: OutputRoots, clip_dir: Path) -> None:
+    """Delete what an earlier deep clip left in ``clip_dir``: MP4s, statistics, frame PNGs.
+
+    :func:`render_deep_clip` calls it before it writes anything, so that a render that fails
+    leaves neither a stale ``statistics.json`` nor stale frames or clips for
+    :func:`encode_deep_clip` or the page to pick up.
+
+    Args:
+        roots: The output safety roots.
+        clip_dir: The clip folder (a missing folder is fine).
+    """
+    for pattern in ("*.mp4", "statistics.json", "statistics-*.png"):
+        for path in sorted(clip_dir.glob(pattern)):
+            roots.remove(path)
+    for folder in [*sorted(clip_dir.glob("corrected-*")), clip_dir / "source"]:
+        for path in sorted(folder.glob("*.png")):
+            roots.remove(path)
+
+
 def render_deep_clip(
     video: Path,
     centre_s: float,
@@ -1749,6 +1774,7 @@ def render_deep_clip(
     info = probe_stream(video)
     start = clip_window(centre_s, info.duration_s, seconds)
     source_dir = clip_dir / "source"
+    clear_clip(roots, clip_dir)  # a failed render must leave nothing for an encode to pick up
     began = time.monotonic()
     got = excerpt(video, start, seconds, source_dir, roots=roots, naming="index")
     print(f"extracted {len(got)} frames in {time.monotonic() - began:.0f} s", file=sys.stderr)
@@ -1864,6 +1890,55 @@ def render_deep_clip(
     return document
 
 
+def clip_inputs_problem(document: Mapping[str, Any], stem: str, clip_dir: Path) -> str | None:
+    """Say why the PNG sets in ``clip_dir`` cannot be encoded under ``document``, or ``None``.
+
+    The statistics document and the frames must belong together: it is the document that
+    :func:`render_deep_clip` wrote for this chapter, not yet encoded (``checks`` is ``null``), for
+    the variants and parameters of this code, with the same frames and pts in every variant, and
+    the PNG sets on disk are exactly the files it names.
+
+    Args:
+        document: The parsed ``statistics.json``.
+        stem: The chapter stem of the source video.
+        clip_dir: The clip folder.
+
+    Returns:
+        A one-line reason, or ``None``.
+    """
+    if document.get("chapter") != stem:
+        return f"the statistics are for chapter {document.get('chapter')!r}, not {stem}"
+    if document.get("checks") is not None:
+        return "it is already encoded (its frames were pruned); render the clip again"
+    variants = document.get("variants", {})
+    if list(variants) != list(DEEP_CLIP_VARIANTS):
+        return f"variants {list(variants)} are not {list(DEEP_CLIP_VARIANTS)}"
+    smoother = document.get("smoother")
+    if smoother != {"kind": DEEP_SMOOTHER.kind, "window_s": DEEP_SMOOTHER.window_s}:
+        return f"smoother {smoother} is not the deep clip's"
+    count = document["excerpt"]["frames"]
+    expected = {variant.name: variant for variant in deep_variants()}
+    ticks: list[int] | None = None
+    for name, body in variants.items():
+        if body["params"] != dataclasses.asdict(expected[name].params):
+            return f"the {name} parameters differ from this code's"
+        rows = body["frames"]
+        if [row["index"] for row in rows] != list(range(count)):
+            return f"the {name} frames are not 0..{count - 1}"
+        row_ticks = [row["pts_ticks"] for row in rows]
+        if ticks is not None and row_ticks != ticks:
+            return f"the {name} frames have other pts than the first variant's"
+        ticks = row_ticks
+        if {path.name for path in (clip_dir / f"corrected-{name}").glob("*.png")} != {
+            row["corrected_file"] for row in rows
+        }:
+            return f"the corrected-{name} PNGs are not the {count} the statistics name"
+    sources = {row["source_file"] for body in variants.values() for row in body["frames"]}
+    if {path.name for path in (clip_dir / "source").glob("*.png")} != sources:
+        return f"the source PNGs are not the {count} the statistics name"
+    return None
+
+
 def encode_deep_clip(
     video: Path, roots: OutputRoots, clip_dir: Path, *, max_own: float = DEEP_READBACK_MAX_OWN
 ) -> dict[str, Any]:
@@ -1887,11 +1962,17 @@ def encode_deep_clip(
         The updated statistics document.
 
     Raises:
-        lookcheck.frames.ExtractError: A probe or encode fails or a check does not hold (the
+        lookcheck.frames.ExtractError: The statistics and the PNG sets do not belong together
+            (:func:`clip_inputs_problem`), a probe or encode fails or a check does not hold (the
             frame PNGs are then kept and no clip exists under its final name).
     """
     path = roots.check(clip_dir / "statistics.json")
+    if not path.is_file():
+        raise ExtractError(f"{path} does not exist; render the deep clip first")
     document: dict[str, Any] = json.loads(path.read_text(encoding="utf-8"))
+    problem = clip_inputs_problem(document, video.stem, clip_dir)
+    if problem is not None:
+        raise ExtractError(f"the deep clip cannot be encoded: {problem}")
     info = probe_stream(video)
     count = document["excerpt"]["frames"]
     stem = video.stem
@@ -1951,23 +2032,48 @@ def run_deep_clip(
 
 
 def clip_files(roots: OutputRoots, clip_dir: Path) -> list[Path]:
-    """Return the deep clip's MP4s that exist (c3, ancuti2018, source), for the page.
+    """Return the deep clip's MP4s (c3, ancuti2018, source) for the page, once they are verified.
+
+    The clips are returned only when ``clip_dir/statistics.json`` records that they were
+    encoded and that every check held, and when that clip was centred on the deepest frame of
+    the current ``deep-frames.json``; a half-built or stale clip is an error, never a link.
 
     Args:
         roots: The output safety roots.
         clip_dir: The clip folder.
 
     Returns:
-        The existing clips, in a fixed order; empty if no clip was built.
+        The clips, in a fixed order; empty if no clip was ever rendered.
+
+    Raises:
+        lookcheck.frames.ExtractError: The clip is rendered but not encoded and verified, a check
+            failed, it was cut around another frame than the current deepest one, or an MP4 is
+            missing.
     """
-    found: list[Path] = []
     statistics_path = roots.check(clip_dir / "statistics.json")
-    if statistics_path.is_file():
-        chapter = json.loads(statistics_path.read_text(encoding="utf-8"))["chapter"]
-        for label in (*DEEP_CLIP_VARIANTS, "source"):
-            path = clip_dir / f"{chapter}_{label}.mp4"
-            if roots.check(path).is_file():
-                found.append(path)
+    if not statistics_path.is_file():
+        return []
+    document = json.loads(statistics_path.read_text(encoding="utf-8"))
+    checks = document.get("checks")
+    if checks is None:
+        raise ExtractError("the deep clip is rendered but not encoded; run deep --part encode")
+    failed = [label for label, check in checks.items() if not check.get("ok")]
+    if failed:
+        raise ExtractError(f"the deep clip's checks did not hold: {failed}")
+    deepest = _load_deep_frames(roots)["deepest"][0]
+    if document["chapter"] != deepest["chapter"] or document["centre_s"] != float(
+        deepest["pts_seconds"]
+    ):
+        raise ExtractError(
+            f"the deep clip is centred on {document['chapter']} at {document['centre_s']} s, "
+            f"not the deepest frame {deepest['frame']}; render it again"
+        )
+    found: list[Path] = []
+    for label in (*DEEP_CLIP_VARIANTS, "source"):
+        path = roots.check(clip_dir / f"{document['chapter']}_{label}.mp4")
+        if not path.is_file():
+            raise ExtractError(f"{path.name} is missing; render and encode the deep clip again")
+        found.append(path)
     return found
 
 
