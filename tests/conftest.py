@@ -62,6 +62,8 @@ import pytest
 
 from local_config import LocalConfigError, footage_available, load_local_config
 
+pytest_plugins = ["fixture_plugin"]
+
 _PYTEST_OF = "pytest-of-"
 
 
