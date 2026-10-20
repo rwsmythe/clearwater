@@ -306,8 +306,8 @@ Gate on the head named in the ledger (full run, `footage` and `gpu` tests RUN, n
 
 - `uv run ruff check .`: all checks passed. `uv run ruff format --check .`: 110 files already formatted.
 - `uv run mypy`: success, no issues in 20 source files.
-- `uv run pytest -q --basetemp=work/pytest-wp1.3d`: **730 passed**, 1 warning (CuPy "CUDA path could not be detected"),
-  484.7 s. No test skipped. `tests/test_lookcheck.py` is unchanged and `tools/prototype/`,
+- `uv run pytest -q --basetemp=work/pytest-wp1.3d`: **732 passed**, 1 warning (CuPy "CUDA path could not be detected"),
+  442.9 s. No test skipped. `tests/test_lookcheck.py` is unchanged and `tools/prototype/`,
   `tools/lookcheck/frames.py`, `pyproject.toml` and `src/` are untouched (`git diff --stat c80725b..HEAD` lists
   `tools/lookcheck/scan.py`, `tools/lookcheck/pack.py`, `tests/test_lookcheck_deep.py`, this report and the ledger only).
 - Harness files (`scripts/`, `.claude/`, kernel docs, `tests/harness/`) untouched, so the harness gate is not re-run.

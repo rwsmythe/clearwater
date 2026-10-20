@@ -35,6 +35,18 @@ Re-seated cell (second) took over at head `663cc64`, 2026-10-20 00:08Z.
 6. Regenerate the report (round-record.md gets each round), commit the report and ledger, then send the return report (under about 70 lines, brief section 'Notes for the cell') with SendMessage to `team-lead` AND as the final message.
 7. Cleanup at the end: delete nothing under `work/wp1.3d/` except what the brief allows; the helper files in the scratchpad may go.
 
+## Orchestrator ruling on the envelope line (received at the third seat, 2026-10-20 02:06Z)
+
+- The envelope is ONE operator running the documented steps in order, on an untampered working folder. Findings needing a hand-edited,
+  self-consistent record, a deliberately replaced file, or steps run out of order are OUT OF ENVELOPE: banked, disclosed in the
+  report's limits, never loop-driving. The two remaining gaps of round 2 (hand-edited self-consistent cache record; duration/proxy
+  text not re-derived at encode) are out of envelope by this rule.
+- IN envelope and blocking: anything showing the owner the wrong thing at CP2 (wrong frame or pts, wrong variant label or
+  parameters, wrong colour range, a candidate presented as fact, statistics not from the frame shown, a clip that is not the
+  excerpt's frames in order, any write outside `work/wp1.3d/` or into the footage folder).
+- No further integrity machinery for out-of-envelope findings. A round whose majors are all out of envelope converges.
+- Round 5: yield for approval.
+
 ## How to resume
 
 1. `cd` is forbidden; use `git -C C:\Users\rwsmy\clearwater\.worktrees\wp1.3d`. PATH needs
