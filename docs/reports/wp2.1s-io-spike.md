@@ -2,13 +2,13 @@
 
 Evidence for WP2.1 (plan section 8.3): it closes AD-2 (frame transport) and AD-17 (16-bit PNG +
 ICC + EXIF), and confirms or corrects AD-18 (licences). Brief `docs/briefs/wp2.1s-brief.md`
-(FINAL, `aa1f5f0`). Instrument `tools/spike_io/transport.py`. Every record is under
+(FINAL, `aa1f5f0`). Instruments `tools/spike_io/transport.py` (claim 1), `tools/spike_io/photo.py`
+(claim 2) and `tools/spike_io/licences.py` (claim 3). Every record is under
 `C:\Users\rwsmy\clearwater\work\wp2.1s\` (not committed). The footage folder was input only.
 
-**Status of this text:** claim 1 (transport) is complete. Claim 2 (photo I/O) and claim 3
-(licences) are PENDING. They follow in a later commit.
+**Status of this text:** claims 1, 2 and 3 are complete.
 
-## 1. Results at a glance (transport)
+## 1. Results at a glance
 
 - **Every row is the SAME WORK.** All 18 transport forms decode the same 681 frames to the same
   bytes as row a: per-frame SHA-256 over the whole clip. Every pts side channel delivers 681/681
@@ -46,6 +46,22 @@ ICC + EXIF), and confirms or corrects AD-18 (licences). Brief `docs/briefs/wp2.1
   max absolute difference 19, mean 0.50 per sample (section 4).
 - **Row a does not reproduce Part B's 93.6 ms/frame.** It measures 55.9 ms/frame here, in a clean
   window (section 3).
+- **Photo (claim 2, synthetic only; section 8).**
+  - Pillow 12.3.0 cannot write a 16-bit RGB PNG: it writes 8 bits. The stdlib writer
+    (zlib + struct, EXIF built by Pillow's `Image.Exif`) does. PyAV re-reads every 16-bit sample
+    exactly; Pillow re-reads the `iCCP` and `eXIf` bytes identical. Pillow writes the 8-bit PNG
+    with ICC and EXIF correctly.
+  - HEIC: pillow-heif returns the ICC profile byte-identical and every EXIF field written. libheif
+    applies the container's `irot`, never EXIF. `open_heif` hands over the file's Orientation tag
+    unchanged, so honouring it rotates twice. The Pillow opener resets the tag to 1, which loses
+    the rotation of a file that has the tag but no `irot`. PROVISIONAL until an owner photo is
+    read.
+  - PyAV 16.1.0 crashes the process when a PNG frame's ICC side data has been touched and the
+    frame is freed.
+- **Licences (claim 3; section 9).** PyAV's bundled FFmpeg 8.0.1 reports "LGPL version 3 or later"
+  and is configured without `--enable-gpl`, yet bundles libx264 and libx265. The gyan FFmpeg CLI
+  is GPL version 3 or later, not 2 (CORRECTS AD-18). NumPy's expression is wider than BSD-3
+  (CORRECTS AD-18). Pillow, pillow-heif and its bundled libraries, and CuPy CONFIRM AD-18.
 
 ## 2. Instrument and method
 
@@ -288,8 +304,184 @@ Minutes per minute = s/frame x 29.97.
 
 ## 8. Claim 2 -- photo I/O
 
-PENDING.
+Instrument `tools/spike_io/photo.py`, run `uv run python tools/spike_io/photo.py run`. Record
+`work/wp2.1s/photo/photo.json`, with the fixtures beside it. Tests `tests/test_spike_io_photo.py`
+(33 cases). Every image is synthetic. No owner photo exists and none was downloaded.
+
+- **Libraries, as installed:**
+  - Pillow 12.3.0;
+  - pillow-heif 1.8.1, with libheif 1.23.6. Its HEIC encoder is x265 4.3+1 and its decoder is
+    libde265 1.1.3;
+  - PyAV 16.1.0, bundling FFmpeg 8.0.1.
+- **The profile** (`display_p3_profile`) is built in code. It is an ICC v4.3 matrix/TRC display
+  profile, 664 bytes: Display P3 primaries, the sRGB tone curve as a `para` curve, and Bradford
+  D65-to-D50 adaptation recorded in `chad`. It opens in `ImageCms` (LittleCMS) with its
+  description. The test undoes the `chad` matrix as LittleCMS reads it and recovers the P3
+  primaries to within 0.001. No profile file is committed.
+- **The fixture image** is 64 x 48, with ramps that tell all eight orientations apart. A HEIC
+  decode is lossy (quality 95), so its pose is the closest of three candidates, within a mean
+  error of 8/255:
+  - `upright`: rotated once, which is correct;
+  - `stored`: not rotated;
+  - `twice`: the rotation applied twice.
+
+### 8.1 HEIC read (pillow-heif)
+
+pillow-heif's own encoder wrote every fixture. Each fixture embeds the profile and an EXIF
+block with Make, Model, DateTime, Orientation, DateTimeOriginal, FNumber, the pixel dimensions
+and a GPS latitude reference.
+
+There are three layouts:
+- **public:** `pillow_heif.encode`. It writes an `irot` from the EXIF Orientation and keeps the
+  tag. This is the layout an iPhone writes (INFERENCE: no owner photo has been read).
+- **exif-only:** the tag, with no `irot`.
+- **irot-only:** `irot`, with the tag set to 1.
+
+The public API cannot write one without the other. exif-only and irot-only use pillow-heif's
+PRIVATE `misc.CtxEncode` (`image_orientation`).
+
+Two read paths:
+- **raw:** `pillow_heif.open_heif`.
+- **plugin:** `Image.open` through pillow-heif's Pillow opener.
+
+"Honour the tag" means a consumer then applies the Orientation it was handed:
+`apply_orientation` for raw, `ImageOps.exif_transpose` for the plugin.
+
+| Fixture | `irot` in `ipco` | EXIF tag in file | ICC identical (raw / plugin) | raw pixels | raw, tag honoured | plugin tag / `original_orientation` | plugin, tag honoured |
+|---|---|---|---|---|---|---|---|
+| 8-bit public, o1 | none | 1 | yes / yes | upright | upright | 1 / None | upright |
+| 8-bit public, o6 | 270 (anticlockwise) | 6 | yes / yes | upright | **twice** | 1 / 6 | upright |
+| 8-bit public, o8 | 90 | 8 | yes / yes | upright | **twice** | 1 / 8 | upright |
+| 8-bit exif-only, o6 | none | 6 | yes / yes | **stored** | upright | 1 / 6 | **stored (rotation lost)** |
+| 8-bit irot-only, o6 | 270 | 1 | yes / yes | upright | upright | 1 / None | upright |
+| 10-bit public, o1 / o6 / o8 | none / 270 / 90 | 1 / 6 / 8 | yes / yes | upright | upright / **twice** / **twice** | 1 / None, 6, 8 | upright |
+
+- **ICC:** byte-identical on both paths, in every case.
+- **EXIF read:** every field written comes back through the plugin: IFD0 Make, Model, DateTime
+  and Orientation; Exif DateTimeOriginal, FNumber, PixelXDimension and PixelYDimension; GPS
+  LatitudeRef.
+- **Mechanism:** libheif applies the container's `irot`. It does not apply EXIF: the exif-only
+  file comes back unrotated.
+- **Is the Orientation tag still there after the read?**
+  - `open_heif`: yes, unchanged (6 or 8), on pixels already rotated. Honouring it is the double
+    rotation D63 warns of.
+  - The Pillow opener: it resets the tag to 1 and keeps the old value in
+    `info["original_orientation"]`. Its rule assumes an `irot` always matches the tag. On the
+    exif-only file it resets the tag although nothing was rotated, so the rotation is lost.
+- **Recommendation for WP2.1 (REASONED, not measured on a real photo):**
+  - Take rotation from the container transform as libheif applies it.
+  - Never re-apply EXIF Orientation after a HEIC decode.
+  - Detect a tag without an `irot` (`heif_transforms` reads `irot`/`imir` from the file) and
+    decide that case explicitly.
+- **Bit depth:**
+  - A 10-bit file reports `bit_depth` 10.
+  - `open_heif` returns 8-bit `RGB` by default (`convert_hdr_to_8bit=True`).
+  - With `convert_hdr_to_8bit=False` it returns `RGB;16` `uint16`, with the 10-bit samples
+    shifted left by 6 (maximum 65472 = 1023 << 6).
+  - The option is `open_heif`'s `convert_hdr_to_8bit`.
+- **PROVISIONAL:** every HEIC verdict stands until an owner iPhone HEIC is read (out of
+  envelope).
+
+### 8.2 16-bit and 8-bit PNG write with ICC and EXIF
+
+- **Pillow cannot write a 16-bit RGB PNG** (`pillow_png16_attempt`, test
+  `test_pillow_cannot_write_16bit_rgb_png`).
+  - `Image.fromarray` on an `(h, w, 3)` `uint16` array raises `TypeError: Cannot handle this
+    data type: (1, 1, 3), <u2`.
+  - `Image.frombytes(..., "RGB;16B")` gives mode `RGB`. The PNG Pillow saves from it, with the
+    profile and EXIF, has `IHDR` bit depth 8.
+  - AD-17's Pillow path therefore fails for 16 bits.
+- **The ruling-1b alternative works.** `encode_png16` writes `IHDR` (16-bit, colour type 2),
+  `iCCP` (profile deflated), `eXIf`, `IDAT` and `IEND` with zlib and struct. The EXIF is
+  Pillow's `Image.Exif.tobytes()` without its `Exif\0\0` prefix. No piexif and no pypng.
+- **The EXIF written is the D63 set** (`edit_exif`). The source block carries:
+  - Orientation 6;
+  - an IFD1 with an 8 x 6 JPEG thumbnail, appended by `add_thumbnail`, since Pillow's writer
+    cannot write IFD1;
+  - pixel dimensions 48 x 64.
+
+  The edited block has Orientation 1, no IFD1, pixel dimensions 64 x 48 and Software
+  `Clearwater`. Make, Model, DateTime, DateTimeOriginal, FNumber and GPS LatitudeRef are kept.
+  Pillow's EXIF writer drops IFD1 by construction, because it cannot write it.
+
+**Verification by a reader other than the writer:**
+
+| Property | 16-bit PNG (stdlib writer) | Verified by | 8-bit PNG (Pillow writer) | Verified by |
+|---|---|---|---|---|
+| Samples exact | yes: 0 of 9,216 differ, `rgb48be` | PyAV (FFmpeg's PNG decoder, written separately from the writer) | yes: 0 differ, `rgb24` | PyAV; the test's own stdlib decoder (handles all five PNG filter types) |
+| `iCCP` bytes = source profile | yes | Pillow (`info["icc_profile"]`) | yes | stdlib walker `png_chunks`; the test's own walker |
+| `eXIf` as written, D63 checks pass | yes / yes | Pillow (`info["exif"]`, `getexif()`) | yes / yes | `png_chunks`; the test's own walker |
+| Chunk order | IHDR, iCCP, eXIf, IDAT, IEND | Pillow's `PngStream` | IHDR, iCCP, eXIf, IDAT, IEND | `png_chunks`; the test's own walker |
+| Pillow's own read of the samples | 8-bit `RGB`: truncated (top-right 255, 0, 51) | Pillow | -- | -- |
+
+- **Chunk placement:** `iCCP` comes before `IDAT` in both files. `eXIf` also comes before
+  `IDAT` in both: the stdlib writer puts it there, and Pillow writes it there itself. Pillow's
+  reader finds the `eXIf` in both.
+- **Planted defects fail by name** (`failures` / `exif_problems`):
+  - a wrong ICC byte gives `["iccp_identical_pillow"]` on the 16-bit file and
+    `["iccp_identical_stdlib"]` on the 8-bit file;
+  - 16-bit samples truncated to 8 bits give `["values_exact_pyav"]`;
+  - a stale Orientation gives `["Orientation"]`;
+  - unedited source EXIF gives `Orientation, IFD1, PixelXDimension, PixelYDimension, Software`.
+- **PyAV defect (found here; matters if WP2.1 adopts PyAV).**
+  - With PyAV 16.1.0, touching `frame.side_data` on a PNG frame that carries an ICC profile
+    makes the process crash when the frame is freed. Even `len(frame.side_data)` does it. The
+    crash is an access violation, exit 139.
+  - Reproduction: `av.open(<png>, format="png_pipe")`, take the first frame, call
+    `len(frame.side_data)`, then `del frame; gc.collect()`.
+  - It happens on both written PNGs.
+  - A synthetic H.264 MP4's DISPLAYMATRIX and SEI side data read and free cleanly (exit 0).
+  - So `pyav_png` reads samples only, and ICC is verified by Pillow and the stdlib walkers.
+- **exiftool is absent** (`which exiftool`: none on PATH, 2026-10-20). It was not installed
+  (ruling 2).
+- **N1:** the photo leg is pure Python on the installed wheels and has no Windows-only element.
+  The PyAV crash was seen on Windows; other systems are UNKNOWN.
+
+**AD-17 evidence:**
+- Pillow writes 8-bit PNG with ICC and EXIF, but cannot write 16-bit RGB PNG.
+- The stdlib zlib + struct writer with Pillow-built EXIF writes 16-bit RGB with `iCCP` and the
+  D63 `eXIf`. PyAV confirmed the samples exact, and Pillow confirmed the ICC, EXIF and order.
+- Pillow's EXIF writer covers the D63 subset, so piexif is not needed.
+- pillow-heif reads HEIC ICC and EXIF intact. Its two read paths treat orientation
+  differently, as above.
 
 ## 9. Claim 3 -- licence positions
 
-PENDING.
+Read by `tools/spike_io/licences.py` (record `work/wp2.1s/licences.json`) from:
+- the installed distributions' metadata and `.dist-info` licence files;
+- pillow-heif's `LICENSES_bundled.txt`;
+- PyAV's `av._core.library_meta`, `av.codecs_available` and `hwdevices_available()`;
+- the DLLs in `av.libs`;
+- `ffmpeg -version` and `ffmpeg -L`.
+
+The "GPL-2.0-or-later compatibility" column is REASONED from those strings. It is evidence for
+WP2.1, to be confirmed at WP5.5, and not legal advice. It assumes the FSF's reading:
+- LGPL-3.0 and GPL-3.0 code may be combined with Clearwater's GPL-2.0-or-later code only when
+  the combination is conveyed under GPL-3.0;
+- "or later" permits that.
+
+| Name | Version | License (as read) | GPL-2.0-or-later compatibility | One-line reason | AD-18 |
+|---|---|---|---|---|---|
+| PyAV | 16.1.0 | BSD-3-Clause (`License-Expression`) | yes | permissive | NEW |
+| FFmpeg bundled in the PyAV wheel | 8.0.1 | every library reports "LGPL version 3 or later"; configuration has `--enable-version3`, NO `--enable-gpl`, NO `--enable-nonfree`; `--enable-libx264 --enable-libx265`, with `libx264-165` and `libx265` DLLs in `av.libs`; the wheel ships no FFmpeg, x264 or x265 licence text (its licence files are `LICENSE.txt`, `AUTHORS.py` and `AUTHORS.rst`) | yes-if | the reported LGPL-3 is contradicted by the GPL x264/x265 linked in; the combination is GPL; it is compatible only if conveyed under GPL-3.0 and x264/x265 allow GPL-3.0; x264/x265's GPL version is UNKNOWN (their DLLs carry only the bare string "GPL") | NEW |
+| Its codecs and devices | 8.0.1 | `hevc`, `h264` decoders; `hevc_nvenc`, `h264_nvenc`; `hevc_cuvid`, `h264_cuvid`; `--enable-nvenc --enable-nvdec`; hwdevices cuda, dxva2, qsv, d3d11va, d3d12va, amf | UNKNOWN | the NVENC/NVDEC headers' licence (AD-18: MIT) is not readable from this artefact | NEW |
+| pillow-heif | 1.8.1 | source BSD-3-Clause; `LICENSES_bundled.txt`: "License for pillow-heif binary wheels: GPLv2, due to base library licenses" | yes-if | the binary wheel is GPL; as for x265 below | CONFIRMED (BSD-3 source); the wheel-level GPLv2 is NEW |
+| libheif (in pillow-heif) | 1.23.6 | LGPLv3 (`LICENSES_bundled.txt`) | yes-if | LGPL-3: conveyed under GPL-3.0 | CONFIRMED |
+| libde265 (in pillow-heif) | 1.1.3 | LGPLv3 | yes-if | as libheif | CONFIRMED |
+| x265 (in pillow-heif) | 4.3+1 | GPLv2 ("or later" not stated in the file) | UNKNOWN | if GPL-2.0-only, it cannot be combined with LGPL-3 libheif under GPL-3.0; the file does not say which | CONFIRMED (as "GPL-2") |
+| MinGW-w64 runtime (listed by pillow-heif for Windows wheels) | -- | GPL-3.0-with-GCC-exception (libgcc, libstdc++), MIT and BSD (libwinpthread); no separate runtime DLL is in this wheel | yes | the runtime exception covers linking | NEW |
+| Pillow | 12.3.0 | MIT-CMU | yes | permissive | CONFIRMED |
+| NumPy | 2.5.4 | BSD-3-Clause AND 0BSD AND MIT AND Zlib AND CC0-1.0 | yes | all permissive | CORRECTED (AD-18: BSD-3) |
+| SciPy | 1.18.1 | BSD 3-clause text in `License`; classifier "BSD License" | yes | permissive | CONFIRMED |
+| CuPy (`cupy-cuda12x`) | 14.2.0 | MIT | yes | permissive; the CUDA runtime files in `[ctk]` were not read here (UNKNOWN; AD-18's EULA rule is untouched) | CONFIRMED |
+| FFmpeg CLI (gyan 9.0.2 full) | 9.0.2 | `--enable-gpl --enable-version3`, no `--enable-nonfree`; libx264 and libx265 enabled; `ffmpeg -L`: "GNU General Public License ... either version 3 of the License, or (at your option) any later version" | yes-if | GPL-3.0-or-later: conveyed under GPL-3.0 (or run as a separate program the user installs) | CORRECTED (AD-18: GPL-2.0-or-later) |
+
+- **PyAV's bundled FFmpeg (ruling 1a), stated as read.**
+  - libavutil reports "LGPL version 3 or later", and the configuration carries no `--enable-gpl`.
+  - Yet libx264 and libx265 are configured in and bundled as DLLs.
+  - The build is not `nonfree`. It carries `hevc`, `h264`, `hevc_nvenc`, `h264_nvenc` and the
+    `cuda` hwaccel.
+  - If PyAV ships, this build ships. It brings GPL encoders without their licence texts.
+- **pillow-heif's wheel holds one native file, `libheif-*.dll`.** `LICENSES_bundled.txt` names
+  separate `libde265`, `libx265` and MinGW runtime files that this Windows wheel does not have. INFERENCE: they
+  are linked into the libheif DLL.
