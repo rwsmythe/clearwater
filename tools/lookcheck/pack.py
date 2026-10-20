@@ -4,8 +4,8 @@ Usage::
 
     uv run python tools/lookcheck/pack.py stills [--config FILE] [--device gpu|cpu|auto]
     uv run python tools/lookcheck/pack.py flicker [--config FILE] [--device gpu|cpu|auto]
-    uv run python tools/lookcheck/pack.py deep [--part all|clip|render|encode|stills] [--config FILE]
-        [--device D]
+    uv run python tools/lookcheck/pack.py deep [--part all|clip|render|encode|stills]
+        [--config FILE] [--device D]
 
 All read the two folders from the local configuration. The footage folder is only ever an
 input; every file written goes under ``<working folder>/wp1.3/`` (``stills`` and ``flicker``) or
