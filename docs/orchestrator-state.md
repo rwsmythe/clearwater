@@ -38,20 +38,43 @@
 ### Live cells
 
 - **Tranche A of wave 2, dispatched 2026-10-20 ~22:45Z from main `2c5540a`** (IF-7 amendment
-  `f4cd1e4` + FINAL briefs `2c5540a`; CHARC approval `53b752a4d7fac4fc`). Each prompt is stored at
-  `C:\Users\rwsmy\clearwater-review-evidence\wp3.N\dispatch.md`:
-  - `wp32-cell` (implementer-opus-high), WP3.2, `.worktrees/wp3.2`, branch `wp3.2`.
-  - `wp33-cell` (implementer-opus-high), WP3.3, `.worktrees/wp3.3`, branch `wp3.3`.
-  - `wp35-cell` (implementer-sonnet-high), WP3.5 (re-sized S), `.worktrees/wp3.5`, branch `wp3.5`.
-  - `wp312-cell` (implementer-sonnet-high), WP3.12, `.worktrees/wp3.12`, branch `wp3.12`; has an
-    EXCLUSIVE read-cost window to grant (post open/close to CHARC).
-  Depth at dispatch: 0 each. All at round 0 (read and table, then yield). Full-pytest windows:
-  one at a time, granted by SendMessage (X5). They die with this generation: re-dispatch from
-  each ledger `docs/proofs/wp3.N-ledger.md` in its worktree.
+  `f4cd1e4` + FINAL briefs `2c5540a`; CHARC approval `53b752a4d7fac4fc`). Prompts at
+  `C:\Users\rwsmy\clearwater-review-evidence\wp3.N\dispatch.md`. Cells die with this generation:
+  re-dispatch from each ledger `docs/proofs/wp3.N-ledger.md` in its worktree.
+  - `wp32-cell` (opus-high), WP3.2, `.worktrees/wp3.2`. R0 ruled (all as recommended); build
+    bit-identical to the prototype (54 rows); Reviewer A R1 NO_NEW_CRITICAL_MAJOR (4 minor; one
+    `Reconnecting... 2/5` before first output ruled a recovered retry), terminating cleanup at
+    `1fcb37d`; full runs on `1fcb37d` DONE (normal exit 0, 871 s; nocupy exit 0, 520 s; counts in
+    its `work/wp32-full-*.log`). Next: its return report, then the accept. Banked at accept: core
+    `check_sigma` OverflowError on inf (`int(4*sigma+0.5)`), next core touch. Depths: 116,822 (R0),
+    218,176 (R1), 241,447 (window).
+  - `wp33-cell` (opus-high), WP3.3, `.worktrees/wp3.3`. R0 ruled; R1 1 major (test/report) + 3
+    minor, remediated; R2 NO_NEW_CRITICAL_MAJOR (1 minor out of envelope, fixed as cleanup);
+    WINDOW GRANTED after the cleanup commit (both runs). Next: WINDOW RELEASED, return report.
+    A stale pytest (pid 37676, from 232c17a) was spinning; Stop-Process was refused by the
+    classifier at the cell's seat; NOT re-run at mine; surfaced to the owner. Depths: 119,733 (R0),
+    257,103 (R1, evaluated: continue), 304,760 (R2).
+  - `wp35-cell` (sonnet-high), WP3.5 (S), `.worktrees/wp3.5`. R0 STOP (V9 bound) ruled by CHARC
+    `229c326b43fb99f2` (option 1; AD-11 clarified `2ce4266`). Bounds FINAL = the TIGHTER set at
+    `abee706` (footage mean <= 1.0, share over 2/255 <= 1 %; testsrc2 mean <= 2.5; max reported);
+    messages crossed twice, final FYI to CHARC `be4b1e04`. R1 NO_NEW_CRITICAL_MAJOR (7 minor, fixed
+    as cleanup). Next: WINDOW (queued after WP3.3), return report. Depths: 90,237 (R0), 194,772 (R1),
+    240,808 (waiting).
+  - `wp312-cell` (sonnet-high), WP3.12, `.worktrees/wp3.12`. R0 ruled (Pillow: if JPEG wins the cell
+    moves the line, X-B3). Task 2 STOP on AD-5 (no store meets criteria + 10 GB; even lossless
+    8-bit misses the bounds criterion): query to CHARC `405648b0` (recommended: JPEG q75 4:4:4 or
+    q80 4:2:0, the analysis proxy = the stored decoded proxy, bounds deviation reported against a
+    10 %-of-range limit). Meanwhile building the codec-independent store with lossless deflate.
+    Pending: CHARC ruling -> codec -> EXCLUSIVE read-cost window (post OPEN/CLOSE to CHARC) ->
+    Reviewer A -> window. Depths: 87,058 (R0), 152,958 (STOP).
+  - Window queue (X5): WP3.3 (granted), then WP3.5, then WP3.12.
 - **Tranche B** (WP3.6 sonnet-high, WP3.16 opus-high; briefs FINAL) dispatches once two tranche-A
   cells have returned. WP3.6P (real-photo verification, sonnet-medium) is queued until photos.
-- Retired (never message): `wave2-drafter-a`, `wave2-drafter-b` (drafting helpers, done),
-  `wp31-cell`, `wp31-cell2`, `wp315-cell`, `wp313-cell`, `wp37-cell`, and every earlier cell.
+- Consumer notes for later briefs: WP3.11 measures on the STORED round-tripped proxy (WP3.12);
+  WP3.11 reads spec 7.2 line 325 (chapter remnant) as single-clip; WP3.10 cites DR-17 for
+  untagged-output tags; WP3.21 gets the per-call uploads of the 3C matrix and WB gains (WP3.2 N-1).
+- Retired (never message): `wave2-drafter-a`, `wave2-drafter-b`, `wp31-cell`, `wp31-cell2`,
+  `wp315-cell`, `wp313-cell`, `wp37-cell`, and every earlier cell.
 - Worktrees present: `.worktrees/wp3.2`, `wp3.3`, `wp3.5`, `wp3.12`.
 
 ### Where things stand -- the successor starts HERE
