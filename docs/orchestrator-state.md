@@ -33,7 +33,7 @@
   the dispatch: deep read-back own bound 5.0 ACCEPTED (report the measured figures; flicker keeps
   3.0, tested); spacing within a chapter ACCEPTED; `correct(statistics=)` instead of
   `temporal.render` ACCEPTED with a bit-identity test. A background clip render started by the
-  first cell may still be running (`work/wp1.3d/deep-clip-run2.log`). Depth at dispatch 38,943 (2 turns, 00:08Z).
+  first cell may still be running (`work/wp1.3d/deep-clip-run2.log`). Depth at dispatch 38,943 (2 turns, 00:08Z); 96,051 at 33 turns (00:38Z).
 - `wp13d-cell` RETIRED at its interim yield: 244,164 / 77 turns (00:08Z, read twice, head
   `663cc64` both times). It asked to be read and re-seated; no reply sent. Scan done (289
   frames; deepest GX011600 @ 665.031 s), deep command and 28 tests committed.
@@ -148,6 +148,9 @@ Each accepted package had its return report posted to CHARC and an info-update t
 
 ### Pending
 
+- **GoPro IMU/GPS OUT OF SCOPE** (owner 2026-10-19 ~22:30Z via CHARC `01500d3574412e69`): no brief
+  reads ACCL/GYRO/GRAV/CORI/IORI/GPS. WP1.4b claim 2a reads six camera-state keys only (brief
+  `f183a11`); no gpmd extract is ever committed (it carries GPS).
 - **Kernel-doc touch owed (CHARC `cb61a4e41f625d73`):** put the depth thresholds (no
   multi-finding remediation above ~250K; STOP and re-dispatch at ~400K; read depth at dispatch,
   every yield and before any ruling) into `docs/orchestrator-context.md` at the next kernel-doc
