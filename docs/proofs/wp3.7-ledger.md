@@ -275,3 +275,25 @@ Verdict: `NEW_CRITICAL_MAJOR_FOUND`. Counts: critical 0, major 1 (DISPUTED, see 
 | 4 | MINOR, OUT-OF-ENVELOPE | `probe.py` `_tail_unreadable` | Required and delivered pts are sets; repeated pts are not counted | Accept; fix in the terminating cleanup (multiset compare, test with a duplicate pts) |
 
 If finding 1 is not upheld, round 2 has ZERO new blocking findings and terminates the loop; findings 2-4 are then the terminating cleanup (non-blocking, fixed once, no further round). If CHARC upholds it, the fix is product code plus two tests and a round 3 follows. Reviewer B (the orchestrator's seat pass) follows the termination.
+
+### Round 2 adjudication (orchestrator, depth at the round-2 yield 259,729, 126 turns) and terminating cleanup
+
+Finding 1: NOT UPHELD as blocking; adjudicated IN-RULING. Ruling 2b and CHARC's IF-5 wording (main `4174484`) give "`mvhd` duration over its timescale, OR the longest stream in integer ticks times its time base". Evidence: on the four video samples `mvhd` duration over timescale equals the stream maximum exactly (hevc8, hevc10, untagged 360360/240000 = 3003/2000; vfr 320320/240000 = 1001/750). ADVISORY banked for WP3.10: on a source with a non-identity edit list the two forms may differ and the presentation form (`mvhd`) is what a player shows (report, consumer notes). No code change. The loop TERMINATES at round 2: zero new blocking findings; no round 3.
+
+Cleanup (non-blocking, never opens a round):
+
+| Finding | Change | Test (fails on the unfixed code) |
+|---|---|---|
+| 2 | doc sentence in `read_movie_boxes`: the walk ends at `moov` | none (documentation) |
+| 3 | GPMF depth starts at 0; exactly `MAX_DEPTH` nested containers allowed | `test_nesting_is_allowed_to_exactly_the_cap_and_refused_beyond_it` |
+| 4 | tail check compares pts as multisets | `test_a_repeated_pts_must_be_delivered_as_often_as_it_occurs` |
+
+Both new tests fail with the unfixed `gopro.py` / `probe.py` (checked by stash). Own tests 142 passed; ruff, ruff format --check, mypy strict clean.
+
+### Cumulative round ledger
+
+| Round | Critical / major / minor | In-env / out | NEW / REOPENED | Reverts | Fix type | Transport / CLI | Depth |
+|---|---|---|---|---|---|---|---|
+| 0 | -- | -- | -- | -- | -- | -- | 90,520 |
+| 1 | 0 / 4 / 2 | 6 / 0 | 6 / 0 | 0 | product (4 major + 2 minor) + tests | WSL, codex-cli 0.162.1, gpt-5.6-sol high | 215,371 |
+| 2 | 0 / 1 (not upheld) / 3 | 2 / 2 (findings 3, 4) | 4 / 0 | 0 | product (3 minor) + tests, post-termination cleanup | same | 259,729 |

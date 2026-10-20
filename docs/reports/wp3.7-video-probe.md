@@ -72,3 +72,13 @@ frame durations, not from this field." The probe takes the second form.
   the explicit end offset is load-bearing and pinned by a test.
 - `clearwater.io.video.probe` (function) shadows the submodule attribute of that name.
 - GoPro "HDR video" mode is not read (AD-16 PENDING a clip).
+
+## Consumer notes
+
+- WP3.10 (D94 edit-list reading): `duration_s` is the longest stream in integer ticks times its
+  time base. On a source with a non-identity edit list that figure and the `mvhd` duration over
+  its timescale may differ; if they do, the presentation form (`mvhd`) is the one a player shows.
+  On all four video samples the two are exactly equal (360360/240000, 320320/240000).
+- WP3.9: never use an open-ended `-read_intervals` interval for frame counts (ledger build notes).
+- `read_movie_boxes` ends its walk at `moov`: a later box that overruns the file is not an error.
+- `clearwater.io.video.find_tool(name)` is the shared locator for `ffmpeg` and `ffprobe`.
