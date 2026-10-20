@@ -33,7 +33,11 @@
   the B #1 remediation). Do not reply to any of them.
 - **`wp14b-cell2`** (implementer-opus-high), WP1.4b RE-SEAT, dispatched 2026-10-20 06:45Z from the
   ledger at head `33bd8ba`, with the noise-measure ruling and claim 10b. Agent id
-  `awp14b-cell2-b20dc8ec1c19a19b`. Depth at dispatch 40,786 (3 turns, 06:45Z).
+  `awp14b-cell2-b20dc8ec1c19a19b`. Depth at dispatch 40,786 (3 turns, 06:45Z); 76,653 at 6 turns (06:46Z).
+  CHARC upheld the ruling (`99fd817f74e4a428`); its two REPORT notes were sent to the cell 06:46Z (both
+  estimators ~0 -> "below the quantisation floor"; total red gain = camera WRGB x ours). Check at
+  return that they landed (ledger). If the grid confirms the anti-D100 signal: spec-bearing, owner
+  decision request at WP1.6 result 4 (via CHARC).
 - `wp14b-cell` RETIRED at its STOP (06:44Z): 235,202 / 94 turns, then 237,015 (read twice, head
   `33bd8ba`). Evaluation (owner's rule, not reflex): the grid, claims 7-10b, the report and a full
   STRONG review loop remained, an open-ended load, so a fresh cell. Claim 10b had NOT landed (not
