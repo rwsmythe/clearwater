@@ -195,6 +195,14 @@ about 9.5 minutes) after the void attempt.
 - Note: round 3 had already run and converged when the ruling arrived. The one authorised round
   is therefore run as round 4, the confirming round over the three edits.
 
+## Superseding ruling (orchestrator; arrived after round 4 had run)
+
+- The three text-only edits RESOLVE r2 CR-02 / r3 CR-01, which is no longer CONTESTED.
+- The superseding message said not to run another Reviewer A round. Round 4 had already run on
+  the earlier ruling, before this message arrived. Its output (NO_NEW_CRITICAL_MAJOR, one
+  out-of-envelope minor fixed in `44152a9`) is recorded above and not discarded; the
+  orchestrator decides whether to count it.
+
 ## NEXT STEPS
 
 1. DONE. Round 4, the one authorised round, returned NO_NEW_CRITICAL_MAJOR.
