@@ -115,8 +115,33 @@ The estimate at 4K is 1,982 MiB, equal to the prototype's for every size tested.
 
 ## Speed row (task 7)
 
-PENDING the dispatcher's exclusive window (after the Reviewer A loop, on the merge candidate's
-code). Instrument `tools/core_speed.py GX011627`: the GPU pass covers all 681 frames. **Limit:**
+Run in the dispatcher's EXCLUSIVE window after the Reviewer A loop, on the merge candidate
+`21e9fee`, 2026-10-20 20:57:39-21:30:32Z: `uv run python tools/core_speed.py GX011627` (4K,
+3840 x 2160, 681 frames; record `work/wp3.1/speed/core-speed-GX011627-20261020T205739Z.json`
+under the working folder). Seconds per frame, the first frame of each pass a warm-up and not kept:
+
+| Device | Op mix | n | Product median (p10-p90) | Prototype median (p10-p90) |
+|---|---|---|---|---|
+| GPU | c3 | 680 | 0.5351 (0.5015-0.5601) | 0.5355 (0.4985-0.5669) |
+| GPU | ancuti2018 | 680 | 0.2370 (0.2295-0.2466) | 0.2368 (0.2305-0.2480) |
+| GPU | frame upload (`asarray`) | 680 | 0.0144 (0.0124-0.0180) | - |
+| CPU | c3 | 10 | 16.15 (16.07-16.22) | 16.06 (15.97-16.25) |
+| CPU | ancuti2018 | 10 | 6.58 (6.54-6.70) | 6.63 (6.57-6.73) |
+
+Product and prototype are within 0.1 % on the GPU and within 1 % on the CPU: the product adds no
+measurable cost over the prototype's calls (their host reads differ as listed below). GPU maxima 1.06 s (c3) and 0.65 s (ancuti2018), isolated. These are
+op-mix figures, not the gate report's whole-core 0.639 s / 0.395 s.
+
+Conditions: before, the GPU idle (210 MHz SM, 56 C, 0 %, 384 MiB); during the GPU pass (7
+samples), SM clock 1,440-2,370 MHz, 62-79 C, 90-100 % utilisation, 51-63 W, total CPU 2-24 %;
+during the CPU pass (11 samples), the GPU idle, total CPU 1-9 %; after, the GPU idle at 53 C.
+Busy processes above 25 % of one logical CPU: the run's own `python.exe` (pid 3928, every
+sample); `WmiPrvSE.exe` (6 samples, at most 45 %; likely the telemetry queries); a second `python.exe`
+(pid 36328, 2 samples); `MsMpEng.exe` (1 sample, 27 %); `System` (1 sample). No other suite was
+running (the dispatcher held the window). nvidia-smi answered every sample. Best effort on a shared
+laptop (owner 2026-10-19): the clock spread is the laptop's boost behaviour, kept as spread.
+
+Instrument `tools/core_speed.py GX011627`: the GPU pass covers all 681 frames. **Limit:**
 the CPU pass covers 10 frames spread over the clip (the WP1.2 Part B practice, confirmed by the
 dispatcher), because the CPU route is the D111 fallback and is not held to N6, and a 4K CPU op
 mix takes tens of seconds per frame. It times the op mix: every call of a prototype array
