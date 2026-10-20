@@ -79,7 +79,8 @@ passthrough`. The only changes are those named in the row. Every FFmpeg command 
 opens nothing.
 
 **Output containment.** Every file the three tools write (records, fixtures, `licences.json`)
-first passes one write guard, `WriteGuard.check` in `tools/spike_io/guard.py`. The target must
+first passes one write guard, `WriteGuard.check` in `tools/spike_io/guard.py`; so does
+every fixture file the photo tests write. The target must
 resolve, links and junctions followed, inside `<working folder>/wp2.1s` (pytest's basetemp in the
 tests). It must not resolve inside the footage folder. An existing file with more than one hard
 link is refused. The guard was added after the windows (Reviewer A round 3). The records of
@@ -113,7 +114,9 @@ mirrors `flags=accurate_rnd`.
   includes process start-up or container opening: this report reads the brief's "first byte
   requested" as the request that starts the decoder. The bracket closes when the last frame is
   whole in its C-contiguous `uint8` `(2160, 3840, 3)` array in this process. Shape, dtype and contiguity are checked on every frame. s/frame = bracket / 681.
-- **Each frame's interval** runs from the end of the previous frame's handling to its arrival.
+- **Each frame's interval** runs to its arrival from the previous frame's arrival, so it
+  includes that frame's shape, dtype and contiguity check (a few array attribute reads). After
+  a witness frame it runs from the end of that frame's check and hash.
 - **The witness** is a SHA-256 of every 30th frame and the last: 24 frames, compared with row a's
   reference hash. It is left out of the bracket, so the bracket is the sum of the intervals.
 - **Whether the producer stops during a hash depends on the row's buffer.**
@@ -373,7 +376,7 @@ Minutes per minute = s/frame x 29.97.
 
 Instrument `tools/spike_io/photo.py`, run `uv run python tools/spike_io/photo.py run`. Record
 `work/wp2.1s/photo/photo.json`, with the fixtures beside it. Tests `tests/test_spike_io_photo.py`
-(40 cases). Every image is synthetic. No owner photo exists and none was downloaded.
+(51 cases, with the write-guard and profile-name cases). Every image is synthetic. No owner photo exists and none was downloaded.
 
 - **Libraries, as installed:**
   - Pillow 12.3.0;
@@ -543,7 +546,7 @@ WP2.1, to be confirmed at WP5.5, and not legal advice. It assumes the FSF's read
 | libheif (in pillow-heif) | 1.23.6 | LGPLv3 (`LICENSES_bundled.txt`) | yes-if | LGPL-3: conveyed under GPL-3.0 | CONFIRMED |
 | libde265 (in pillow-heif) | 1.1.3 | LGPLv3 | yes-if | as libheif | CONFIRMED |
 | x265 (in pillow-heif) | 4.3+1 | GPLv2 ("or later" not stated in the file) | UNKNOWN | if GPL-2.0-only, it cannot be combined with LGPL-3 libheif under GPL-3.0; the file does not say which | CONFIRMED (as "GPL-2") |
-| MinGW-w64 runtime (listed by pillow-heif for Windows wheels) | -- | GPL-3.0-with-GCC-exception (libgcc, libstdc++), MIT and BSD (libwinpthread); no separate runtime DLL is in this wheel | yes | the runtime exception covers linking | NEW |
+| MinGW-w64 runtime (listed by pillow-heif for Windows wheels) | -- | GPL-3.0-with-GCC-exception (libgcc, libstdc++), MIT and BSD (libwinpthread); shipped as separate DLLs (`libgcc_s_seh-1`, `libstdc++-6`, `libwinpthread-1`) | yes | the runtime exception covers linking | NEW |
 | Pillow | 12.3.0 | MIT-CMU | yes | permissive | CONFIRMED |
 | NumPy | 2.5.4 | BSD-3-Clause AND 0BSD AND MIT AND Zlib AND CC0-1.0 | yes | all permissive | CORRECTED (AD-18: BSD-3) |
 | SciPy | 1.18.1 | BSD 3-clause text in `License`; classifier "BSD License" | yes | permissive | CONFIRMED |
@@ -558,9 +561,11 @@ WP2.1, to be confirmed at WP5.5, and not legal advice. It assumes the FSF's read
   - If PyAV ships, this build ships. It brings x264 and x265. No non-code (text) file in the
     wheel mentions LGPL or GPL. The C-string scan finds the LGPL strings in the avcodec and avutil
     DLLs and no licence string in the x264 or x265 DLLs (section 9.1).
-- **pillow-heif's wheel holds one native file, `libheif-*.dll`.** `LICENSES_bundled.txt` names
-  separate `libde265`, `libx265` and MinGW runtime files that this Windows wheel does not have. INFERENCE: they
-  are linked into the libheif DLL.
+- **pillow-heif's wheel installs seven native files** (its `RECORD`, all present): the
+  extension `_pillow_heif.cp312-win_amd64.pyd` and six DLLs beside it in `site-packages`,
+  `libheif-*`, `libde265-0-*`, `libx265-217-*`, `libgcc_s_seh-1-*`, `libstdc++-6-*` and
+  `libwinpthread-1-*`. So libde265, x265 and the MinGW runtime that `LICENSES_bundled.txt` lists
+  are separate files in this wheel.
 
 ### 9.1 PyAV's bundled FFmpeg: encoders, the configuration and the licence strings
 
@@ -584,8 +589,10 @@ beyond what the artefacts show.
   - `hevc_nvenc` and `h264_nvenc` open (`av.codec.Codec(name, "w")`). Each encoded 5 synthetic
     256 x 192 frames to memory: 5 packets, 364 and 481 bytes.
   - At 64 x 48 both refused with `avcodec_open2` EINVAL, below NVENC's minimum size.
-  - The `hevc_cuvid` and `h264_cuvid` decoders open, and the `cuda` hwaccel is listed.
-  - Rows c-cuda and c-cuda-auto decoded the whole clip through it (section 4).
+  - The `hevc_cuvid` and `h264_cuvid` decoders are listed in `av.codecs_available`; the
+    licence instrument does not open them. The `cuda` hwaccel is listed.
+  - Rows c-cuda and c-cuda-auto decoded the whole clip with the `cuda` hwaccel (the `hevc`
+    decoder with hardware acceleration, not `hevc_cuvid`; section 4).
 - **libx264 and libx265 (CHARC's question b): present and usable as encoders from PyAV.**
   - Both open for writing, and each encoded 5 synthetic 256 x 192 frames to memory: 5 packets,
     1,212 and 2,575 bytes.
