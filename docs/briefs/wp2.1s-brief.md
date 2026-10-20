@@ -1,9 +1,14 @@
-# WP2.1S — Transport and photo I/O spike (dispatch brief, DRAFT for CHARC approval)
+# WP2.1S — Transport and photo I/O spike (dispatch brief, FINAL)
 
-**Status:** DRAFT, written by the orchestrator (generation 3) on 2026-10-20 at CHARC's commission
-(`d99b28e575726fbd`). **Do not dispatch until CHARC approves.** Three items need CHARC's ruling
-before dispatch (section "For CHARC before dispatch"). Owner decisions: none found (see that
-section). Spec **v0.5.3**. Cell: `implementer-opus-high`. Tier **STRONG**. Worktree
+**Status:** FINAL, issued by the orchestrator (generation 3) on 2026-10-20. Commissioned by CHARC
+(`d99b28e575726fbd`); draft `07339bc`, revised for CHARC's notes on architecture DRAFT 0.1
+(`fa9d637063376263`); APPROVED by CHARC with rulings (`5152ed4302874889`, section "Rulings").
+Owner decisions: none (agreed by CHARC).
+Spec **v0.5.3**. Architecture **DRAFT 0.1** (`docs/architecture.md`, `docs/decisions.md`,
+`a27a6f7`): this spike **closes AD-2** (the frame transport) and **AD-17** (the 16-bit PNG + ICC +
+EXIF path), and **confirms or corrects AD-18** (licences, including PyAV's wheel build flags).
+IF-1 (`Frame.pts` exact per frame) and IF-5 (`VideoSource.frames`) are the contracts the
+transport must be able to serve; the spike does not implement them. Cell: `implementer-opus-high`. Tier **STRONG**. Worktree
 `.worktrees/wp2.1s`, branch `wp2.1s`, base = the main commit named at dispatch. Footage READ-ONLY;
 outputs under `work/wp2.1s/` only.
 
@@ -24,20 +29,21 @@ That has never been verified, and no owner photo exists yet (D102).
 |---|---|
 | ID and title | WP2.1S — Transport and photo I/O spike; evidence for WP2.1 (plan section 8.3) |
 | Goal | (1) Decode-to-NumPy time per frame on GX011627, with byte-identity against today's pipe, for each candidate transport; plus an analysis-pass projection. (2) Proof, or disproof, that HEIC reads with ICC and orientation, and that a 16-bit RGB PNG writes with ICC and EXIF, each verified by a reader other than the writer. (3) A license position for every candidate (N13). |
-| Spec clauses | N6 / D106 (the budget the analysis projection is set against; the analysis pass itself has no target); 7.2 (decode pass, proxies); D14 / D116 (photo inputs); D53 and 8.1 (PNG 8/16-bit, ICC matching the source primaries); D24 / D63 (EXIF kept except invalidated fields; orientation applied and the tag reset; thumbnail dropped; dimensions updated; Software set); V5 (photo I/O fidelity), V9 (identity round trip: context only); N13 (licenses); N1 (portability: say what is Windows-only). Plan sections 4.3 (exclusive timing), 8.3 (library candidates). |
+| Spec clauses | Architecture DRAFT 0.1: AD-2, AD-10 (swscale in the transport), AD-17, AD-18; IF-1, IF-5. Spec: N6 / D106 (the budget the analysis projection is set against; the analysis pass itself has no target); 7.2 (decode pass, proxies); D14 / D116 (photo inputs); D53 and 8.1 (PNG 8/16-bit, ICC matching the source primaries); D24 / D63 (EXIF kept except invalidated fields; orientation applied and the tag reset; thumbnail dropped; dimensions updated; Software set); V5 (photo I/O fidelity), V9 (identity round trip: context only); N13 (licenses); N1 (portability: say what is Windows-only). Plan sections 4.3 (exclusive timing), 8.3 (library candidates). |
 | Depends on | WP1.2 Part B (merged, `2dd06cf`): `tools/prototype/clip.py` `decode_command`, its reader, and Part B's ambient and stray helpers. Consumed by import, NEVER modified. The WP1.6 gate report (final text `b02ab34`). |
-| Files owned | `tools/spike_io/` (NEW: `__init__.py`, `transport.py` (the timing instrument), `photo.py` (the photo leg), and helpers as needed); `tests/test_spike_io_photo.py` (synthetic photo leg ONLY: no timing tests, no footage tests); `docs/reports/wp2.1s-io-spike.md`; `docs/proofs/wp2.1s-ledger.md`. **CONDITIONAL on CHARC's grant (item 1 below):** `pyproject.toml`, only to add the granted packages to the `dev` group with a one-line provenance comment and any mypy override they need; and `uv.lock`. NOT owned: `tools/prototype/` (any change, even a hook, is a STOP); `src/clearwater/`; the harness. |
+| Files owned | `tools/spike_io/` (NEW: `__init__.py`, `transport.py` (the timing instrument), `photo.py` (the photo leg), and helpers as needed); `tests/test_spike_io_photo.py` (synthetic photo leg ONLY: no timing tests, no footage tests); `docs/reports/wp2.1s-io-spike.md`; `docs/proofs/wp2.1s-ledger.md`. `pyproject.toml`, ONLY to add `av` (PyAV) to the `dev` group with a one-line provenance comment (CHARC grant `5152ed4302874889`; spike and prototype only) and any mypy override it needs; and `uv.lock`. No other dependency (pypng and piexif are NOT granted). NOT owned: `tools/prototype/` (any change, even a hook, is a STOP); `src/clearwater/`; the harness. |
 | Interfaces consumed | `local_config.find_footage_file` (WP-T2): GX011627 is named by stem only; `tools.prototype.clip` (`Source`, `decode_command`, `read_frame`, `frame_buffer`, `decode_frames`) and `tools.prototype.bench` (`stray_processes`; the ambient helpers `_ambient`, `_gpu_state`, `_windows_power` may be imported or copied into `tools/spike_io/`, said which), all as merged; the advisory idle gate is Part B's uncommitted `work/wp1.2b/gate/idle_gate.ps1`: copy it into `work/wp2.1s/` and record its md5 (it is not a repository file); `ffmpeg`/`ffprobe` 9.0.2 (gyan full build) from PATH. |
 | Interfaces provided | None frozen. This is evidence; WP2.1 decides. |
 | Hardware flags | Transport leg: **exclusive** (plan 4.3) under the owner's best-effort ruling (the Part B release: contaminated figures are reported as spread, not discarded). Photo leg: not timed, not exclusive. |
-| Out of scope | Encode, export, mux; the core (`correct()`); any optimisation of the prototype; changing defaults; JPEG/PNG/TIFF *inputs* (D14) beyond HEIC; owner photos (none exist; never download a sample photo); viewer checks (V5's "multiple viewers" is a later, owner-visible check); NVIDIA runtime redistribution (WP5.5); installing any system tool (exiftool included, see item 2); `src/clearwater/`. |
+| Out of scope | Encode, export, mux; the core (`correct()`); any optimisation of the prototype; changing defaults; JPEG/PNG/TIFF *inputs* (D14) beyond HEIC; owner photos (none exist; never download a sample photo); viewer checks (V5's "multiple viewers" is a later, owner-visible check); NVIDIA runtime redistribution (WP5.5); installing any system tool (exiftool included, ruling 2); `src/clearwater/`. |
 | Done | Plan 4.5; ruff, format, mypy (strict, `tools`) and pytest green, with `footage` and `gpu` RUN where they apply; harness gate untouched; every timed figure in a JSON record under `work/wp2.1s/` with its ambient record; the report has the tables below; Reviewer A converged. |
 
 ## What the package delivers (claims)
 
 ### Claim 1 — Transport, decode to NumPy (GX011627, 681 frames, 3840x2160 `rgb24`)
 
-Every row decodes the SAME 681 frames to the SAME bytes as Part B: the decode chain of
+Every row decodes the SAME 681 frames to the SAME bytes as Part B (GX011627 is the ONLY clip;
+CHARC `fa9d637063376263`): the decode chain of
 `clip.decode_command` (tag-driven `scale` with `in_range`, `in_color_matrix`,
 `out_range=full`, `accurate_rnd`, then `rgb24`; `-noautorotate`; `-fps_mode passthrough`). Each
 frame ends as a C-contiguous `uint8` NumPy array of shape (2160, 3840, 3) in the consuming
@@ -59,6 +65,24 @@ s/frame is the bracket divided by 681 (first byte requested to last frame whole)
   the fraction of differing samples and the cause if found (PyAV's swscale flags are a likely
   one). Mark the row **NOT SAME WORK**. Do not tune the conversion until the hashes match
   unless it takes one documented flag change.
+- **Exact pts per candidate (IF-1; CHARC `fa9d637063376263`).** Raw video carries no
+  timestamps, so every row reports how it delivers each frame's exact pts in source ticks.
+  - The reference is ffprobe's per-frame pts list for the stream (`-show_entries frame=pts`),
+    captured once, outside the windows.
+  - PyAV: packet/frame pts from the demuxer.
+  - FFmpeg process: a side channel. Candidates are `showinfo` on standard error (Part B's
+    `showinfo=` option), a second output carrying timestamps, or ffprobe alignment by index;
+    with `-copyts` where it applies.
+  - Per row report: all 681 pts exact, yes or no (first mismatch if not); the side channel used;
+    its cost, timed with and without it on the row's best form. A row that cannot deliver exact
+    pts is marked **FAILS IF-1**, whatever its speed (ruling 4).
+  - Per row, also one line on whether the WP1.5 section 8 muxer options stay reachable with that
+    transport (AD-2). For a decode-only candidate (PyAV decode, FFmpeg-process encode) the
+    encode side is unchanged; say so.
+- **Swscale flags (AD-10).** Row a's chain uses `accurate_rnd`; AD-10 names
+  `accurate_rnd+full_chroma_int+bitexact` for the product. Byte identity is judged against
+  row a. Record once, untimed, whether row a's hashes change under AD-10's flags; that is a
+  finding for WP3.5, not a re-timing.
 - **Repetition:** 3 full-clip runs per row. Report median and min/max of s/frame, plus the
   per-frame min / median / max of the run of record.
 - **Analysis-pass projection (claim 1's headline):** for each SAME-WORK row, projected
@@ -88,10 +112,15 @@ s/frame is the bracket divided by 681 (first byte requested to last frame whole)
   - whether the Orientation tag is still present after the read. Applying the rotation twice
     is the failure to look for (D63);
   - the bit depth the 10-bit case returns, and the option that controls it.
-- **16-bit RGB PNG write with ICC and EXIF.**
-  - Try Pillow first (as locked: 12.3.0). Whether it can write 16-bit RGB is a FINDING; the
-    orchestrator expects it cannot, and the cell verifies that rather than assuming it.
-  - If Pillow cannot: ONE alternative, per CHARC's ruling on item 1.
+- **16-bit RGB PNG write with ICC and EXIF (AD-17's path, PENDING this spike).**
+  - AD-17 names Pillow (as locked: 12.3.0) for 16-bit PNG writing, Pillow ImageCms for profiles,
+    and Pillow's EXIF writer (AD-17's piexif fallback is NOT granted for this spike). Try that
+    path first. Whether Pillow can write 16-bit-per-channel RGB is a FINDING: the orchestrator
+    expects it cannot, and the cell verifies that rather than assuming it.
+  - If Pillow cannot write a 16-bit RGB PNG with both the ICC profile and the D63 EXIF subset:
+    the ONE alternative is a stdlib PNG writer in `tools/spike_io/` (zlib + struct; `IHDR`
+    16-bit RGB, `iCCP`, `eXIf`, `IDAT`, `IEND`), with the EXIF bytes built by Pillow's
+    `Image.Exif` (ruling 1b). If that also fails, STOP with the finding; no third attempt.
   - The EXIF written is the D63-edited set: Orientation 1, no thumbnail (IFD1 removed),
     PixelXDimension/PixelYDimension updated, Software `Clearwater`, the other source fields
     kept.
@@ -105,22 +134,29 @@ s/frame is the bracket divided by 681 (first byte requested to last frame whole)
     finds it.
 
   Name which reader verified which property. A small stdlib chunk/zlib decoder in the test
-  counts as an independent reader. exiftool is ABSENT on this machine (`which exiftool`,
-  2026-10-20): record that; do not install it (item 2).
+  counts as an independent reader, but not for a file the stdlib writer wrote (use Pillow,
+  and for exact 16-bit values a decoder written separately from the writer, said so).
+  exiftool is ABSENT on this machine (`which exiftool`, 2026-10-20): record its absence in the
+  report; do not install it (ruling 2).
 - **Tests:** `tests/test_spike_io_photo.py` covers each of the above as a pytest case on the
   synthetic fixtures. A planted defect must fail by name: a wrong ICC byte, a stale Orientation,
   a 16-bit value truncated to 8 bits.
 
-### Claim 3 — License positions (N13)
+### Claim 3 — License positions (N13; confirms or corrects AD-18)
 
-One row per candidate, one line each:
+One row per candidate, one line each. Each row also says whether it CONFIRMS or CORRECTS AD-18's
+entry (AD-18 records, for example, pillow-heif bundling libheif LGPL-3, libde265 LGPL-3 and
+x265 GPL-2, and the FFmpeg build as GPL-2.0-or-later when built with libx265). An entry AD-18
+lacks (PyAV and its bundled FFmpeg) is NEW. For the bundled FFmpeg, record LGPL or GPL, and
+which codecs, NVENC and NVDEC it carries: that build would ship with the product if PyAV wins
+(ruling 1a).
 
 | Name | Version | License | GPL-2.0-or-later compatibility (yes / yes-if / no / UNKNOWN) | One-line reason |
 |---|---|---|---|---|
 
 - **Rows:** PyAV, and the FFmpeg its wheel bundles; pillow-heif, and the native libraries its
   wheel bundles (libheif, libde265, x265, any others; read from the wheel's bundled license
-  files); Pillow; pypng or the chosen alternative; NumPy; CuPy (already granted, MIT); the
+  files); Pillow; NumPy; CuPy (already granted, MIT); the
   FFmpeg CLI build in use (gyan 9.0.2 full: from `ffmpeg -version`'s configuration line).
 - **PyAV's build flags:** the bundled FFmpeg's configuration string (`--enable-gpl`,
   `--enable-version3`, `--enable-nonfree` present or absent), its version, whether it carries
@@ -152,27 +188,21 @@ One row per candidate, one line each:
 - **GPMF/IMU/GPS out of scope** (owner 2026-10-19): `-map 0:v:0` only. Nothing from a `gpmd`
   track is read or committed.
 
-## For CHARC before dispatch
+## Rulings (CHARC `5152ed4302874889`, 2026-10-20)
 
-1. **Dependency grant (N13; CLAUDE.md "Conventions").** Neither package is in `pyproject.toml`
-   today.
-   - (a) **`av` (PyAV)** into the `dev` group, spike and prototype only, as the CuPy grant was.
-     Product adoption is WP2.1's. Its license (PyAV itself, and the FFmpeg build it bundles) is
-     claim 3's first row, measured after install.
-   - (b) **the PNG alternative.** Recommended: **pypng** (MIT, pure Python) in the `dev` group,
-     because it writes 16-bit RGB and arbitrary chunks. The fallback if you refuse it: a stdlib
-     PNG chunk writer inside `tools/spike_io/` (zlib + struct), no dependency.
+1. **(a) `av` (PyAV): GRANTED** into the `dev` group, spike and prototype only, as CuPy was.
+   Product adoption is WP2.1's. Claim 3 records the licence of the wheel's bundled FFmpeg build.
+   **(b) PNG alternative: NO new dependency.** pypng is not granted. The alternative is the
+   stdlib zlib + struct chunk writer; if it fails too, STOP with the finding.
+2. **exiftool: do not install.** Record its absence in the report.
+3. **Exclusivity:** the owner's Part B ruling ("Best effort is fine", 2026-10-19) covers this
+   transport leg; no new owner question. Nothing else runs at this seat during its windows (no
+   other cell, no harness gate, no Reviewer B of another package).
+4. **Exact pts (AD-2 / IF-1):** every transport row reports whether the exact per-frame pts
+   reaches Python, 681/681 against ffprobe. A transport that cannot deliver exact pts FAILS
+   IF-1 regardless of speed; say so in the row (claim 1).
 
-   Without (a), rows c and c-cuda drop and the spike compares FFmpeg-process forms only.
-2. **exiftool.** Absent. Recommended: do NOT install it. The independent-reader rule in claim 2
-   gives the verification. A grant would be a machine change and is not needed for WP2.1's
-   choice.
-3. **Exclusivity.** The transport leg is exclusive under the owner's best-effort ruling given
-   for Part B. Recommended: treat that ruling as covering this spike's transport leg, so no new
-   owner question is needed. Nothing else runs at this seat during its windows (no other cell,
-   no harness gate, no Reviewer B of another package).
-
-**Owner decisions:** none found. No owner-reserved item is touched: no footage category, look
+**Owner decisions:** none. No owner-reserved item is touched: no footage category, look
 check, mandatory-requirement relaxation or spec change. GX011627 is already in use as Part B's
 evidence clip.
 
@@ -196,6 +226,7 @@ the HEIC verdict is PROVISIONAL until an owner photo is read; say so), other ope
   - whether row a reproduces Part B, or the difference is explained;
   - whether the block size claimed for a row is the one actually observed;
   - whether a projection is labelled PROJECTION and its arithmetic is right;
+  - whether each row's pts claim is checked against ffprobe on all 681 frames;
   - whether the HEIC orientation finding distinguishes `irot` from EXIF and catches a double
     rotation;
   - whether the 16-bit PNG check reads exact values with a reader other than the writer;
@@ -209,7 +240,9 @@ the HEIC verdict is PROVISIONAL until an owner photo is read; say so), other ope
 - **Return report** = your FINAL message, under about 70 lines, per `docs/dispatch-recipe.md`
   section 4. Include:
   - the transport table: row, s/frame median and spread, SAME/NOT SAME WORK, observed block
-    size, contamination;
+    size, pts exact (side channel and its cost), muxer options reachable, contamination;
+  - the AD-2 and AD-17 evidence in one line each, and the AD-18 rows CONFIRMED / CORRECTED /
+    NEW;
   - the projection rows;
   - the photo results table;
   - the license table;
@@ -217,7 +250,8 @@ the HEIC verdict is PROVISIONAL until an owner photo is read; say so), other ope
   - record paths.
 - **STOP for:**
   - any need to change `tools/prototype`;
-  - a dependency beyond the grant;
+  - a dependency beyond the grant (`av` only);
+  - the stdlib PNG writer failing after Pillow (ruling 1b);
   - the 2 h cap;
   - row a more than 25 % off Part B's 93.6 ms/frame with no attributable cause (re-run once,
     then STOP);
