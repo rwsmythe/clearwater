@@ -75,6 +75,12 @@ def host(backend: CoreBackend, a: Any) -> np.ndarray:
     return np.asarray(backend.to_host(a))
 
 
+def identical(x: np.ndarray, y: np.ndarray) -> bool:
+    """Bit identity as a plain bool (pytest's rewrite of a failing bytes ``==`` runs a diff
+    over every byte, which on a planted defect under ``-v`` takes many minutes)."""
+    return x.dtype == y.dtype and x.shape == y.shape and x.tobytes() == y.tobytes()
+
+
 def inputs_kw(params: Params) -> dict[str, float]:
     return {
         "gamma": params.gamma,
@@ -159,7 +165,7 @@ def test_floor_leaves_wide_bounds_alone(backend: CoreBackend, bounds: tuple[floa
     a = backend.asarray(noise())
     _, input2 = fusion.fusion_inputs(backend, a, **inputs_kw(WIDE), bounds=bounds)
     _, reference = proto.fusion_inputs(a, WIDE, proto.Statistics(normalisation_bounds=bounds))
-    assert host(backend, input2).tobytes() == host(backend, reference).tobytes()
+    assert identical(host(backend, input2), host(backend, reference))
 
 
 def test_floor_bounds_dr14_amplification(backend: CoreBackend) -> None:
@@ -381,7 +387,7 @@ def test_input1_clip_is_a_no_op(backend: CoreBackend, gamma: float) -> None:
         backend, a, gamma=gamma, sharpen_strength=1.0, sharpen_blur_fraction=0.005, bounds=(0, 1)
     )
     unclipped = a ** np.float32(gamma)
-    assert host(backend, input1).tobytes() == host(backend, unclipped).tobytes()
+    assert identical(host(backend, input1), host(backend, unclipped))
 
 
 # -- V1 edge cases ---------------------------------------------------------------------------
@@ -431,7 +437,7 @@ def test_fusion_across_depth_changes_matches_prototype(
     weights = (weight, 1.0 - weight)
     fused = fusion.multiscale_fusion(backend, (a, b), weights, pyramid_min_level_size=16)
     reference = proto.multiscale_fusion((a, b), weights, DEFAULTS)
-    assert host(backend, fused).tobytes() == host(backend, reference).tobytes()
+    assert identical(host(backend, fused), host(backend, reference))
 
 
 # -- V9 neutrality ---------------------------------------------------------------------------
@@ -447,8 +453,8 @@ def test_v9_neutral_inputs_are_identity(backend: CoreBackend, bounds: tuple[floa
     input1, input2 = fusion.fusion_inputs(
         backend, a, gamma=1.0, sharpen_strength=0.0, sharpen_blur_fraction=0.005, bounds=bounds
     )
-    assert host(backend, input1).tobytes() == image.tobytes()
-    assert host(backend, input2).tobytes() == image.tobytes()
+    assert identical(host(backend, input1), image)
+    assert identical(host(backend, input2), image)
 
 
 @pytest.mark.parametrize("params", [DEFAULTS, WIDE], ids=["defaults", "wide"])
@@ -769,7 +775,7 @@ def check_fusion(implementation: Fusion, backend: CoreBackend) -> None:
         params = Params(pyramid_min_level_size=minimum)
         reference = proto.multiscale_fusion((a, b), weights, params)
         fused = implementation(backend, (a, b), weights, pyramid_min_level_size=minimum)
-        assert host(backend, fused).tobytes() == host(backend, reference).tobytes()
+        assert identical(host(backend, fused), host(backend, reference))
 
 
 def _full_resolution(
@@ -820,7 +826,7 @@ def check_saliency(implementation: Callable[..., Any], backend: CoreBackend) -> 
     mean = proto.saliency_reference(a)
     reference = proto._saliency_weight(a, WIDE, mean)
     weight = implementation(backend, a, saliency_blur_fraction=0.03, saliency_mean=mean)
-    assert host(backend, weight).tobytes() == host(backend, reference).tobytes()
+    assert identical(host(backend, weight), host(backend, reference))
 
 
 def test_planted_saliency_against_unblurred_lab(backend: CoreBackend) -> None:

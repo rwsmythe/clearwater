@@ -129,9 +129,8 @@ def same(product: Any, reference: Any, backend: CoreBackend, what: str) -> None:
     r = np.asarray(reference if isinstance(reference, np.ndarray) else backend.to_host(reference))
     assert p.dtype == r.dtype == np.float32, f"{what}: dtype {p.dtype} vs {r.dtype}"
     assert p.shape == r.shape, f"{what}: shape {p.shape} vs {r.shape}"
-    assert p.tobytes() == r.tobytes(), (
-        f"{what}: max {float(np.abs(p.astype(np.float64) - r).max()):.3g}"
-    )
+    equal = p.tobytes() == r.tobytes()  # a bool: no byte-wise diff in pytest's message
+    assert equal, f"{what}: max {float(np.abs(p.astype(np.float64) - r).max()):.3g}"
 
 
 def floored(bounds: tuple[float, float]) -> tuple[float, float]:
