@@ -175,8 +175,15 @@ path, md5, five assertions and verdict, or there is no accept.
   Claim 10b: GENUINE scene step at 0.90 s, not an excerpt edge; neither reset nor 0.5 s window
   shrinks it, both add flicker; 2 s stays PROVISIONAL, evidence for the Phase 2 temporal design.
   Total red gain camera x ours ~6x Ancuti default, ~4x c3. **PHASE 1 INPUTS COMPLETE. WP1.6 gate
-  report is CHARC's next task** (template docs/reports/wp1.6-gate-report.md); no package in
-  flight; Gate 1 options go to the owner. WP1.4b dispatched (opus-high; flip guards + gpmd claim 2a). Next: WP1.3-deep / WP1.4b brief on SCUBA/ (c3 primary, Params() flips to c3), then
+  report DRAFT written by CHARC a0c87d2** (docs/reports/wp1.6-gate-report.md; six results;
+  Result 1 MISSED: core 3.6x/5.8x, export 4.4x measured Ancuti, ~6.6x estimated c3, best
+  optimisation reach ~2.3-2.6x; D109 NOT named; Result 2 holds; 3 passed; 4 KEEP; 5 one stage
+  permitted, IF-3 staged; 6 SIMPLE). Orchestrator fact-check requested (7e5e170a). **OPEN OWNER
+  DECISION: Gate 1** (decision_request c45bc1ac): A tune N6 to ~25 min/min / B optimise first
+  (~8-10 min/min) / **C both (recommended)**: interim N6 25 min/min now, transport at WP2.1,
+  named Phase 3 optimisation package target 10 min/min, re-measure at WP5.2; any option = spec
+  v0.5.4. Also KEEP caps confirmation. Gate closes when the owner's word is recorded in the
+  report with its time and the fact-check is attached; then Phase 2 (WP2.1) briefs. WP1.4b dispatched (opus-high; flip guards + gpmd claim 2a). Next: WP1.3-deep / WP1.4b brief on SCUBA/ (c3 primary, Params() flips to c3), then
   WP1.6 gate report (Gate 1: core 3.6x, production export 4.4x over N6). **Footage-layout skips:** the owner's Snorkel/SCUBA/edits layout makes 3
   footage tests skip (root `GX011628.MP4` paths in `tests/test_container_spike.py:902`,
   `tests/test_lookcheck.py:1289`, WP1.4 test 7; also `tools/lookcheck/pack.py:94` and the WP1.4
