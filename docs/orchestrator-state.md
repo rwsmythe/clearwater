@@ -50,11 +50,16 @@
    choice at WP2.1, optimisation package in Phase 3, final tune at WP5.2). Gate result 4 (KEEP the
    caps) awaits the owner's confirmation at CP3. The gate record is final when the owner's word is
    recorded and the fact-check attached.
-3. **Next for this seat:** nothing until CHARC directs. After CP3: Phase 2. WP2.1 (architecture
+3. **WP2.1S (transport and photo I/O spike):** commissioned by CHARC (`d99b28e575726fbd`) as a
+   brief only; DRAFT `docs/briefs/wp2.1s-brief.md` (`07339bc`) sent to CHARC for approval
+   2026-10-20 ~09:53Z with three rulings asked (av/pypng dev grant, exiftool not installed,
+   exclusivity under the Part B best-effort ruling). Do NOT dispatch before CHARC approves.
+   CHARC is writing WP2.1 meanwhile; WP2.2-2.4 hold on it.
+4. **Next for this seat otherwise:** nothing until CHARC directs. After CP3: Phase 2. WP2.1 (architecture
    document and decisions) is the architect's (CHARC); the orchestrator's likely next packages are
    WP2.2 (interface module) and WP2.3 (shared test fixtures) after WP2.1, and WP2.4 briefs with CHARC.
    Wait for CHARC's commission; do not start Phase 2 work unasked.
-4. **Photos:** none supplied yet. Gate 2's largest-photo leg and the photo look check stay PENDING
+5. **Photos:** none supplied yet. Gate 2's largest-photo leg and the photo look check stay PENDING
    until the owner supplies photos.
 
 ### Workstreams
