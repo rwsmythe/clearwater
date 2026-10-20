@@ -134,7 +134,13 @@ path, md5, five assertions and verdict, or there is no accept.
   future project). The gpmd track on the owner's clips carries ACCL/GYRO ~200 Hz, GRAV/CORI/IORI
   30 Hz, GPS9, and camera state WBAL/WRGB 10 Hz, SHUT/ISOE 30 Hz (probed GX011627 at the CHARC
   seat); the camera-state streams are fair evidence inputs (ISO and WB gains per frame proposed
-  for WP1.4b), the IMU is not. Next: WP1.3-deep / WP1.4b brief on SCUBA/ (c3 primary, Params() flips to c3), then
+  for WP1.4b), the IMU is not. Owner ~22:45Z: "Camera state is fine"; the parked project is motion
+  reconstruction (depth/time curves, geoplots). WP1.4b brief f183a11 carries claim 2a (camera
+  state); synthetic KLV test, nothing from gpmd committed (GPS9 = dive sites). **Owner
+  2026-10-20 ~02:15Z to the orchestrator: "You don't need to replace the cell at 240k, that
+  should just be an evaluation point"** -> docs/orchestrator-context.md hazard (6) added 5692485
+  (read depth at dispatch/yield/ruling; ~250K evaluate; ~400K stop); harness 366 OK. WP1.3D was
+  re-seated twice (244K, 240K) before the correction; wp13d-cell3 continues from round 3. Next: WP1.3-deep / WP1.4b brief on SCUBA/ (c3 primary, Params() flips to c3), then
   WP1.6 gate report (Gate 1: core 3.6x, production export 4.4x over N6). **Footage-layout skips:** the owner's Snorkel/SCUBA/edits layout makes 3
   footage tests skip (root `GX011628.MP4` paths in `tests/test_container_spike.py:902`,
   `tests/test_lookcheck.py:1289`, WP1.4 test 7; also `tools/lookcheck/pack.py:94` and the WP1.4
