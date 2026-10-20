@@ -1,19 +1,30 @@
 """WP3.1 speed row: the IF-2 operations of the c3 and ancuti2018 paths, product vs prototype.
 
 WP3.1 has no correction method, so the whole-core figure waits for WP3.4 (brief ruling 4).
-This instrument times, per decoded frame, the array operations one ``correct()`` call makes
-through IF-2 and the ``clearwater.core`` helpers (the "op mix"), once through the product and
-once through the read-only prototype making the same calls, on the GPU and on the CPU:
+This instrument times, per decoded frame, the "op mix": every call of a prototype array
+operation that one ``pipeline.correct()`` call makes with the default parameters, made through
+IF-2 and the ``clearwater.core`` helpers by the product and through the read-only prototype's
+own functions, on the GPU and on the CPU (``tests/test_core_speed.py`` counts both against a
+real ``correct()``):
 
-- c3 only: ``rgb_to_ycbcr``; the bright-pixel mask blur (``c3_mask_smooth_fraction``); the Cb
-  and Cr blurs at the c3 kernel sigma (``c3_kernel_fraction``, AD-8);
-- both methods: the white-balance channel means; the sharpening blur and the N{} percentiles of
-  its high-pass; per fusion input (two), the luma, its blur at ``laplacian_fraction`` and its
-  Laplacian, the Lab image, its blur at ``saliency_blur_fraction`` and its means, the Laplacian
-  pyramid of the input and the Gaussian pyramid of a weight map; one pyramid collapse.
+- c3 compensation: ``rgb_to_ycbcr``; the bright-pixel mask blur (``c3_mask_smooth_fraction``);
+  the Cb and Cr blurs at the c3 kernel sigma (``c3_kernel_fraction``, AD-8); the channel means
+  of its record;
+- ancuti2018 compensation: the channel means; the gain-cap mean of ``(1 - I_c) * I_g`` per
+  compensated channel (red; blue too when ``blue_compensation`` is on);
+- both methods: the two channel-mean reads of the mean added; the white-balance channel means;
+  the sharpening blur and the N{} percentiles of its high-pass; per fusion input (two), the
+  luma, its blur at ``laplacian_fraction`` and its Laplacian, the Lab image, its means and its
+  blur at ``saliency_blur_fraction``, the saturation weight's luma, the Laplacian pyramid of
+  the input and the Gaussian pyramid of a weight map; one pyramid collapse.
 
-The per-pixel arithmetic between these calls (gains, clipping, the weight sums) is not timed:
-it belongs to WP3.2-3.4. The frame upload is timed apart from the op mix.
+Not timed: the per-pixel arithmetic between these calls (gains, clipping, the weight sums),
+which belongs to WP3.2-3.4, except the maps the calls take as input (the c3 mask, the
+high-pass, the gain-cap shape, the weight map's absolute value), which are timed with them;
+and the prototype's input validation (``_check_image`` reads the minimum and
+maximum of the image at every step). Every operation runs on the decoded frame itself, not on
+the intermediate images of a real correction (the same sizes, so the same work). The frame
+upload is timed apart from the op mix.
 
 Plan 4.3 / frame rule 7: an EXCLUSIVE run, one at a time, best effort on a shared laptop. GPU
 clocks, temperature, utilisation and the processes using a CPU are recorded before, during
@@ -159,6 +170,20 @@ def dark_mask(image: Any, params: Params) -> Any:
     return (image.mean(axis=2, dtype=np.float32) <= params.c3_mask_threshold).astype(np.float32)
 
 
+def compensated_channels(params: Params) -> tuple[int, ...]:
+    """Return the channels the Ancuti 2018 compensation evaluates a gain cap for.
+
+    Red always, blue when ``blue_compensation`` is on (``pipeline.compensate_ancuti2018``).
+
+    Args:
+        params: Uses ``blue_compensation``.
+
+    Returns:
+        The channel indices.
+    """
+    return (0, 2) if params.blue_compensation else (0,)
+
+
 def op_mix_product(backend: CoreBackend, image: Any, method: str, params: Params) -> None:
     """Run the op mix through the product (IF-2 and ``clearwater.core`` helpers).
 
@@ -176,7 +201,14 @@ def op_mix_product(backend: CoreBackend, image: Any, method: str, params: Params
         sigma = core.spatial_sigma(shape, params.c3_kernel_fraction)
         backend.gaussian_blur(ycbcr[..., 1], sigma)
         backend.gaussian_blur(ycbcr[..., 2], sigma)
-    core.channel_means(backend, image)
+        core.channel_means(backend, image)  # the compensation record
+    else:
+        core.channel_means(backend, image)  # the compensation means
+        for index in compensated_channels(params):
+            core.mean(backend, (1.0 - image[..., index]) * image[..., 1])  # the gain-cap mean
+    core.channel_means(backend, image)  # the mean added: after ...
+    core.channel_means(backend, image)  # ... and before
+    core.channel_means(backend, image)  # the white-balance means
     high_pass = image - backend.gaussian_blur(
         image, core.spatial_sigma(shape, params.sharpen_blur_fraction)
     )
@@ -190,6 +222,7 @@ def op_mix_product(backend: CoreBackend, image: Any, method: str, params: Params
         lab = core.rgb_to_lab(backend, image)
         core.channel_means(backend, lab)
         backend.gaussian_blur(lab, core.spatial_sigma(shape, params.saliency_blur_fraction))
+        core.luminance(backend, image)  # the saturation weight's own luma
         bands = core.laplacian_pyramid(backend, image, levels)
         core.gaussian_pyramid(backend, abs(weight), levels)
     core.collapse_pyramid(backend, bands)
@@ -212,6 +245,12 @@ def op_mix_prototype(image: Any, method: str, params: Params) -> None:
         sigma = proto.spatial_sigma(shape, params.c3_kernel_fraction)
         proto._gaussian(ycbcr[..., 1], sigma)
         proto._gaussian(ycbcr[..., 2], sigma)
+        proto._channel_means(image)
+    else:
+        proto._channel_means(image)
+        for index in compensated_channels(params):
+            proto._cap_statistic((1.0 - image[..., index]) * image[..., 1])
+    proto._mean_added(image, image)
     proto._channel_means(image)
     high_pass = proto.high_pass_of(image, params)
     bounds = [params.normalisation_low, params.normalisation_high]
@@ -225,6 +264,7 @@ def op_mix_prototype(image: Any, method: str, params: Params) -> None:
         lab = proto.srgb_to_lab(image)
         proto._lab_mean(lab).tolist()
         proto._gaussian(lab, proto.spatial_sigma(shape, params.saliency_blur_fraction))
+        proto.luminance(image)
         bands = proto.laplacian_pyramid(image, levels)
         proto.gaussian_pyramid(abs(weight), levels)
     proto.collapse_pyramid(bands)

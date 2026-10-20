@@ -113,9 +113,15 @@ PENDING the dispatcher's exclusive window (after the Reviewer A loop, on the mer
 code). Instrument `tools/core_speed.py GX011627`: the GPU pass covers all 681 frames. **Limit:**
 the CPU pass covers 10 frames spread over the clip (the WP1.2 Part B practice, confirmed by the
 dispatcher), because the CPU route is the D111 fallback and is not held to N6, and a 4K CPU op
-mix takes tens of seconds per frame. It times the op mix one `correct()` call makes
-through IF-2 (listed in the tool's docstring), product against prototype, both methods, with GPU
-clocks, temperature, utilisation and busy processes recorded before, during and after.
+mix takes tens of seconds per frame. It times the op mix: every call of a prototype array
+operation that one prototype `correct()` call makes with the default parameters (listed in the
+tool's docstring), made through IF-2 and the `clearwater.core` helpers for the product and
+through the prototype's own functions for the prototype, both methods, with GPU clocks,
+temperature, utilisation and busy processes recorded before, during and after.
+`tests/test_core_speed.py` counts the calls of both paths against a real `correct()`. Not
+timed: the per-pixel arithmetic between the calls (WP3.2-3.4) and the prototype's per-step
+input validation (a minimum and maximum read of the image), so the row is not a whole-core
+figure; that waits for WP3.4 (ruling 4).
 
 ## Consumer notes
 
