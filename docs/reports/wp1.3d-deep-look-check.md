@@ -42,7 +42,7 @@ with a chapter still), 3 variants, 180 corrected PNGs, 180 pairs, 179 clip frame
 
 ## 2. The case scan (claim 1)
 
-One frame every 10 s from 5 s to 1 s before the end of each chapter, short side 540, extracted with
+One frame every 10 s from 5 s to the end of each chapter (the last grid point at least 0.25 s before the end), short side 540, extracted with
 `frames.extract(..., short_side=540)`. **That 540 frame comes from FFmpeg's scaler: it is used for RANKING only
 and is never fed to the pipeline** (the pipeline and the clip statistics use the full-resolution frame and, for
 the clip, an exact 4x4 area mean in NumPy). Measures on the display-encoded RGB in [0, 1]:
@@ -51,22 +51,23 @@ the clip, an exact 4x4 area mean in NumPy). Measures on the display-encoded RGB 
 - `W` = fraction of pixels whose BT.709 luma local standard deviation over a 15x15 box (edges reflected) is below 0.01
   AND whose blue or green exceeds red by at least 0.05.
 - `H` = luma RMS contrast (standard deviation of luma over the frame; lower = hazier).
-- Exclusion: luma mean below 0.05 or above 0.95. **0 of the 289 frames were excluded** (`scan.json` `excluded` is empty).
+- Exclusion: luma mean below 0.05 or above 0.95. **0 of the 290 frames were excluded** (`scan.json` `excluded` is empty).
   (A frame with a zero green mean, for which `D` is undefined, is also excluded by name, as a division
   guard; none occurred.)
 
-**The scan was run twice** (the second time after the cache of each chapter was made to carry its rules and grid,
-review round 1): both runs gave the same 289 records, value for value, and the same `deep-frames.json` apart from its
-`written` time. The first run's files are kept in `work\wp1.3d\scan-before-cache-identity\`.
+**The scan was run several times** (after the cache of each chapter was made to carry its rules and grid, review round 1; and
+after the last grid point was allowed up to 0.25 s before the chapter end instead of 1 s, review round 4, which added the
+525 s frame of `GX011598`). The earlier runs' files are kept in `work\wp1.3d\scan-before-cache-identity\` and
+`work\wp1.3d\scan-before-end-margin\`. The last run added 1 frame(s) (GX011598_0525.024) and its other 289 records equal the previous run's value for value: True; `deep-frames.json` equals the previous run's apart from `written` and `rules.scan.end_margin_s` (1.0 then, 0.25 now): True, so the candidate lists and the eight deepest frames are unchanged.
 
-The thresholds are fixed by the brief. Over the 289 frames: `D` from 0.209 to 1.097
+The thresholds are fixed by the brief. Over the 290 frames: `D` from 0.209 to 1.097
 (median 0.638); `H` from 0.038 to 0.318
 (median 0.192); `W` from 0.000 to 0.954
-(median 0.098). The distribution of `W` (what the threshold picked):
+(median 0.101). The distribution of `W` (what the threshold picked):
 
 | W from | 0.0 | 0.1 | 0.2 | 0.3 | 0.4 | 0.5 | 0.6 | 0.7 | 0.8 | 0.9 |
 |---|---|---|---|---|---|---|---|---|---|---|
-| frames | 145 | 39 | 34 | 24 | 19 | 8 | 7 | 8 | 3 | 2 |
+| frames | 145 | 40 | 34 | 24 | 19 | 8 | 7 | 8 | 3 | 2 |
 
 Chapters (`GX011589` is a 6.4 s chapter and gives one scan frame, at 5 s):
 
@@ -77,7 +78,7 @@ Chapters (`GX011589` is a 6.4 s chapter and gives one scan frame, at 5 s):
 | GX011591 | 138.2 | 14 |
 | GX011592 | 42.3 | 4 |
 | GX011593 | 556.5 | 56 |
-| GX011598 | 525.3 | 52 |
+| GX011598 | 525.3 | 53 |
 | GX011600 | 1046.5 | 105 |
 | GX011601 | 470.9 | 47 |
 
@@ -296,7 +297,7 @@ tabulated), the channel bias is within the unchanged 2.0 bound, and the neighbou
 - Photos (iPhone): none supplied.
 - Chaptered recordings across a chapter boundary: none in the `SCUBA/` set (inventory 2026-10-18).
 - Any default change, tuning, re-run at other parameters, the gain-cap noise measurement and the `Params()` flip: WP1.4b and WP2.1.
-- Timing: none recorded (the package is not exclusive).
+- Timing: no timing or memory figure is reported as a result (the package is not exclusive; the commands print elapsed seconds on the console, which are not results).
 
 Known limits of the working-folder controls (banked, outside the declared envelope: one operator running the documented
 steps in order on an untampered working folder; none changes what the page or the clip show in that case):
@@ -316,7 +317,7 @@ Gate on the head named in the ledger (full run, `footage` and `gpu` tests RUN, n
 - `uv run ruff check .`: all checks passed. `uv run ruff format --check .`: 110 files already formatted.
 - `uv run mypy`: success, no issues in 20 source files.
 - `uv run pytest -q --basetemp=work/pytest-wp1.3d`: **733 passed**, 1 warning (CuPy "CUDA path could not be detected"),
-  470.7 s. No test skipped. `tests/test_lookcheck.py` is unchanged and `tools/prototype/`,
+  443.9 s. No test skipped. `tests/test_lookcheck.py` is unchanged and `tools/prototype/`,
   `tools/lookcheck/frames.py`, `pyproject.toml` and `src/` are untouched (`git diff --stat c80725b..HEAD` lists
   `tools/lookcheck/scan.py`, `tools/lookcheck/pack.py`, `tests/test_lookcheck_deep.py`, this report and the ledger only).
 - Harness files (`scripts/`, `.claude/`, kernel docs, `tests/harness/`) untouched, so the harness gate is not re-run.
@@ -332,6 +333,7 @@ one round per row; evidence under `C:\Users\rwsmy\clearwater-review-evidence\wp1
 | 1 | 2 major in envelope (a scan cache without identity could certify a stale or incomplete scan; the clip's encode and page steps trusted whatever PNGs and MP4s were on disk); 3 minor (a usage docstring that named the wrong output folder; a zero-green frame is excluded by a rule the brief does not name, out of envelope; the footage and gpu tests skip when their inputs are absent, out of envelope) | `81187ee`, `018f3a8`, `2883592`; the zero-green rule is now stated in section 2; the skip behaviour is the repository's test convention, checked at the gate | NEW_CRITICAL_MAJOR_FOUND |
 | 2 | 3 major in envelope (the scan cache lacked source and record identity; `deep-frames.json` was not tied to `scan.json`; the clip's frames, statistics and MP4s were not bound to one render); 2 minor (a scan grid point in the last second omitted by the 1 s end margin, out of envelope; a page pts printed without the time-base numerator) | `82343ad` and the commit after it (cache source size and per-record checks; `deep-frames.json` rebuilt from `scan.json`; SHA-256 of every clip PNG and MP4) | NEW_CRITICAL_MAJOR_FOUND |
 | 3 | 2 major in envelope (a candidate and the footage described in look terms in the report, against the rule that the scan proposes and the owner names; the clip's N{} ranges recorded from a recomputation on the full-resolution frame, not the smoothed proxy bounds the render applied); 3 minor in envelope (elapsed-time figures against "no timing recorded"; a file-name pattern naming `GX0115xx`; "nearest frame" where extraction takes the first frame at or after the grid point). 2 major OUT-OF-ENVELOPE (source identity is the byte count only; the 6 s duration is not re-checked at encode) | `37ff131` (clip records the applied N{} bounds, test) and the regenerated report (wording, timing sentence, file pattern, grid-point sentence; the two out-of-envelope majors are disclosed in section 7) | NEW_CRITICAL_MAJOR_FOUND |
+| 4 | 1 major in envelope (the scan grid stopped 1 s before a chapter end and so omitted the 525 s point of `GX011598`, 525.3248 s long; the earlier statement that no chapter had such a point was wrong); 2 minor in envelope (the "no timing recorded" sentence beside console elapsed prints; two docs-only commits without the `Co-Authored-By` footer, disclosed, history not rewritten) | `6d5ccab` (grid reaches 0.25 s before the end, test; the scan was re-run: 290 frames, the 289 earlier records equal, candidate lists and deepest list unchanged) and the regenerated report | NEW_CRITICAL_MAJOR_FOUND |
 
 ## 9. CP2 deep sheet (to be filled from the owner's words)
 

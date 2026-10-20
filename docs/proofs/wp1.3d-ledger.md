@@ -112,6 +112,7 @@ Transport WSL, codex-cli 0.162.1, banner `gpt-5.6-sol` / `high` / `read-only` ev
 | 1 | `3ca1cf5` | 0 / 2 / 3 | 2 major + 1 minor in; 2 minor out | 5 NEW / 0 | 0 | product code (scan.py, pack.py) + tests | banner ok; `^ERROR` 0; `ERROR codex_core` 2, both echoes of the brief text in the reviewer's file reads; footer; verdict anchored; 24 `^ succeeded in`; 13 `docs/proofs`/ledger hits, all echoes (the brief and prompt quote the words; no command opened them) | | NEW_CRITICAL_MAJOR_FOUND |
 | 2 | `8120b28` | 0 / 3 / 2 | 3 major in (hardening of the same two controls); 2 minor out | 3 NEW (CR2-01..03 deepen the round-1 controls: REOPENED in spirit, new in detail) / 0 strictly | 0 | product code (scan.py, pack.py) + tests | banner ok; `^ERROR` 0; `ERROR codex_core` 1, an echo of the brief text; footer; verdict anchored; 26 `^ succeeded in`; proofs/ledger hits are echoes | | NEW_CRITICAL_MAJOR_FOUND |
 | 3 | `3a38965` | 0 / 3 / 4 | R3-01, R3-02 major + R3-03..05 minor in; R3-06, R3-07 major OUT (ruling) | 7 NEW / 0 | 0 | product code (pack.py) + test; report wording | banner ok; `^ERROR` 0; no `ERROR codex_core` line (one echo of the prompt text); footer; verdict anchored; 30 `^ succeeded in`; proofs hits are the prompt/brief echoes and a `git status` name listing (no file under docs/proofs opened) | | NEW_CRITICAL_MAJOR_FOUND |
+| 4 | `6bf9752` | 0 / 1 / 2 | all in envelope | 3 NEW / 0 | 0 | product code (scan.py) + test; report text | banner ok; `^ERROR` 0; one `ERROR codex_core` hit, an echo of the prompt text; footer; verdict anchored; 38 `^ succeeded in`; no docs/proofs file opened | | NEW_CRITICAL_MAJOR_FOUND |
 
 Round 1 adjudication (fixed in `81187ee`, `018f3a8`, `2883592`):
 - F1 major (scan cache had no identity; `finish` could certify a stale or incomplete scan; `--rescan` kept a partial): ACCEPTED. A cache and a partial carry `rules` and
@@ -152,3 +153,13 @@ Round 3 adjudication (fixed in `37ff131` and the report text; evidence `r3/`):
 Round 3 state: both in-envelope majors fixed; the clip re-render (fifth) is running (GPU). NEXT: when `deep-clip-run5.log` ends with `elapsed N s`, check `clip/statistics.json`
 checks (four ok), rebuild the page (`deep --part stills`, 13 min), full gate (ruff, format, mypy, foreground pytest), regenerate the report (`report_gen.py`, reads
 `cell-scripts/gate-record.md` and `round-record.md`), commit, round 4 (`wp13d_build_prompt.py 4`, diff, `wp13d_run_review.sh 4`).
+
+Round 4 adjudication (fixed in `6d5ccab`; evidence `r4/`):
+- F1 major in envelope (the scan grid stopped 1 s before the end and omitted the 525 s point of GX011598, a 525.3248 s chapter; the round 2 note that "none of the eight
+  chapters has such a point" was WRONG): ACCEPTED. `SCAN_END_MARGIN_S` 1.0 -> 0.25 s; test pins 525.0 on that duration; the scan was re-run in full (every cache was refused as written
+  under other rules; 25 min, CPU): 290 frames, the 289 earlier records equal value for value, the new one is GX011598_0525.024 (D 0.768, W 0.185, H 0.261, ranked nowhere), and
+  `deep-frames.json` equals the earlier one apart from `written` and `rules.scan.end_margin_s`, so the candidates, the eight deepest and everything built from them (stills, page, clip)
+  are unchanged and were not re-run. Previous files: `work/wp1.3d/scan-before-end-margin/`.
+- F2 minor ("Timing: none recorded" beside printed elapsed seconds): the report now says no timing or memory figure is reported as a result and that the commands print elapsed seconds.
+- F3 minor (commits `b3a5fff` and `6bf9752`, docs-only, lack the `Co-Authored-By` footer): ACCEPTED as a disclosed deviation; history not rewritten (the hashes are quoted in the
+  records); every other and later commit carries the footer.
