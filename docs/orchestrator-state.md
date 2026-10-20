@@ -43,12 +43,12 @@ only in an exclusive window the orchestrator grants. Delivery by SendMessage to 
 
 | Cell | Package | Model | Worktree / branch | Round | Depth (moment) |
 |---|---|---|---|---|---|
-| `wp315-cell` | WP3.15 | sonnet-high | `.worktrees/wp3.15` | 0 | 0 (dispatch) |
-| `wp313-cell` | WP3.13 | sonnet-high | `.worktrees/wp3.13` | 0 | 0 (dispatch) |
-| `wp37-cell` | WP3.7 | sonnet-high | `.worktrees/wp3.7` | 0 | 0 (dispatch) |
-| `wp31-cell` | WP3.1 | opus-high | `.worktrees/wp3.1` | 0 | 0 (dispatch) |
+| `wp315-cell` | WP3.15 | sonnet-high | `.worktrees/wp3.15` | `cde09a2` R0 ruled; building | 83,816 (R0 yield) |
+| `wp313-cell` | WP3.13 | sonnet-high | `.worktrees/wp3.13` | `4c24a33` R0 ruled; building | 62,046 (R0 yield) |
+| `wp37-cell` | WP3.7 | sonnet-high | `.worktrees/wp3.7` | `c31e050` R0 ruled; building | 90,520 (R0 yield) |
+| `wp31-cell` | WP3.1 | opus-high | `.worktrees/wp3.1` | `891460e` R0 ruled; building | 108,729 (R0 yield) |
 
-A rolled generation's cells die with it: re-dispatch from each branch and ledger.
+Round-0 rulings sent to each cell and posted to CHARC as a query (thread wave1, 18:10Z); consumer notes for WP3.3/3.10/3.12/3.14/3.16 are in that post. A rolled generation's cells die with it: re-dispatch from each branch and ledger.
 Retired (never message): `wp23-cell2`, `wp23-cell`, `wave1-drafter`, `wp22-cell`, `wp21s-cell*`,
 the gen-2 cells. Worktrees `.worktrees/wp2.3` and `wp2.3-mc` stay until CHARC's WP2.3 QA
 confirms (then `git worktree remove --force`; keep the branches).
