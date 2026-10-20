@@ -340,6 +340,62 @@ def test_variant_b_matches_variant_a_without_smoothing_and_shares_its_means() ->
         noise_experiments.analyse_staged_derived_alpha(frames, Params(method="c3"), smoother, rate)
 
 
+# --- claim 10b: the lighting step -------------------------------------------------------------
+
+
+def test_detect_step_finds_the_largest_two_sided_mean_difference() -> None:
+    rate = Fraction(30)
+    signal = np.full(120, 0.2)
+    signal[50:] = 0.5
+    signal[90] = 0.9  # a one-frame outlier moves a 15-frame mean by less than the step
+    assert noise_experiments.detect_step(signal, rate) == (50, pytest.approx(0.3))
+    falling = 1.0 - signal
+    assert noise_experiments.detect_step(falling, rate) == (50, pytest.approx(-0.3))
+    with pytest.raises(ValueError, match="needs 30 frames"):
+        noise_experiments.detect_step(signal[:29], rate)
+
+
+def test_step_figures_measure_the_change_and_the_largest_jump_across_the_span() -> None:
+    values = np.concatenate([np.zeros(40), np.linspace(0.0, 1.0, 11)[1:], np.ones(40)])
+    figures = noise_experiments.step_figures(values, 45, Fraction(30))
+    assert figures["change"] == pytest.approx(1.0)  # values[75] - values[15]
+    assert figures["max_jump"] == pytest.approx(0.1)
+    assert 41 <= figures["max_jump_at"] <= 50
+    edge = noise_experiments.step_figures(values, 5, Fraction(30))  # clipped to the series
+    assert edge["change"] == pytest.approx(values[35] - values[0])
+
+
+def test_a_reset_at_a_cut_analyses_each_segment_on_its_own() -> None:
+    frames = _red_starved_sequence(16)
+    params = Params(method="ancuti2018", red_gain_cap=0.5)
+    rate, smoother = Fraction(30), Smoother("gaussian", 0.2)
+    joined = noise_experiments.analyse_segments(frames, params, smoother, rate, [7], CPU)
+    first, _ = temporal.analyse_staged(frames[:7], params, smoother, rate, CPU)
+    second, _ = temporal.analyse_staged(frames[7:], params, smoother, rate, CPU)
+    whole, _ = temporal.analyse_staged(frames, params, smoother, rate, CPU)
+    assert set(joined) == set(whole)
+    for name in whole:
+        np.testing.assert_array_equal(joined[name], np.concatenate([first[name], second[name]]))
+    assert any(not np.array_equal(joined[name], whole[name]) for name in whole)
+    traced = noise_experiments.traced(joined)
+    assert set(traced) == {*noise_experiments.STEP_KEYS, noise_experiments.STRETCH_KEY}
+    low, high = joined["normalisation_bounds.low"], joined["normalisation_bounds.high"]
+    np.testing.assert_array_equal(traced[noise_experiments.STRETCH_KEY], 1.0 / (high - low))
+
+
+def test_signal_steps_compare_each_rendered_signal_with_the_source() -> None:
+    source = np.zeros((90, 4))
+    source[45:] = [0.1, 0.2, 0.0, 0.15]
+    rendered = source * 2.0
+    steps = noise_experiments.signal_steps(rendered, source, 45, Fraction(30))
+    assert steps["R"]["change_8bit"] == pytest.approx(0.2 * 255.0)
+    assert steps["R"]["change_over_source"] == pytest.approx(2.0)
+    assert steps["luma"]["max_jump_over_source"] == pytest.approx(2.0)
+    assert steps["B"]["change_over_source"] is None  # the source's blue does not step
+    own = noise_experiments.signal_steps(source, None, 45, Fraction(30))
+    assert "change_over_source" not in own["G"]
+
+
 # --- the summary helpers ------------------------------------------------------------------------
 
 

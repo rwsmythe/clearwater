@@ -5,6 +5,7 @@ Usage::
     uv run python tools/noise_experiments.py extract
     uv run python tools/noise_experiments.py grid [--frame STEM] [--limit N] [--device gpu|cpu]
     uv run python tools/noise_experiments.py smoothing [--device gpu|cpu]
+    uv run python tools/noise_experiments.py lighting-step [--device gpu|cpu]
     uv run python tools/noise_experiments.py summarise
 
 ``extract`` re-extracts, at full resolution as 16-bit PNG, the 8 deepest frames of WP1.3D's
@@ -15,7 +16,8 @@ first pts), and attaches to each frame the camera state of its chapter's GPMF tr
 :func:`settings_grid` (claim 3), one frame per pass, with the frame's own unsmoothed
 statistics, and records per render the pipeline's own compensation and white-balance
 records, what bound, the N{} bounds, the noise figures and the residual cast; it writes the
-owner's crops (claim 6). ``smoothing`` runs claim 10 on the WP1.3D deep clip.
+owner's crops (claim 6). ``smoothing`` runs claim 10 on the WP1.3D deep clip;
+``lighting-step`` runs claim 10b on the same clip widened backwards (:func:`run_lighting_step`).
 ``summarise`` assembles ``grid.json``, the tables of claims 7-9 (``summary.json``) and the
 crop page ``index.html``.
 
@@ -43,6 +45,7 @@ import argparse
 import dataclasses
 import html
 import io
+import itertools
 import json
 import math
 import sys
@@ -1252,6 +1255,355 @@ def run_smoothing(
     return record
 
 
+# --- claim 10b: the lighting step in the deep clip ------------------------------------------------
+
+WIDEN_S = 3.0
+"""Claim 10b: how far the deep clip's excerpt is widened backwards. More than the 2 s window's
+reach (1 s each side), so the widened analysis holds no edge value anywhere in the original
+excerpt's first second."""
+
+SHORT_SMOOTHER = Smoother("gaussian", 0.5)
+"""Claim 10b option (b): the shorter centred Gaussian."""
+
+STEP_HALF_S = 0.5
+"""The step detector compares the mean of this many seconds after a frame with the mean before."""
+
+STEP_SPAN_S = 1.0
+"""The size of a step in a series is its change from this long before the step to this long
+after it; the step window for the peak figures is the same span on each side."""
+
+STEP_KEYS = (
+    "compensation_alpha.red",
+    "white_balance_gains.R",
+    "white_balance_gains.G",
+    "white_balance_gains.B",
+    "normalisation_bounds.low",
+    "normalisation_bounds.high",
+)
+"""The applied statistics traced across the step (alpha for Ancuti 2018 only)."""
+
+
+def lead_in_proxies(
+    config: LocalConfig, roots: OutputRoots, log: Callable[[str], None] = print
+) -> tuple[NDArray[np.float32], list[int]]:
+    """Extract the :data:`WIDEN_S` seconds before the deep clip's excerpt as 540 NumPy proxies.
+
+    The frames are the ones with pts in ``[start - WIDEN_S, start)``; their pts must run on
+    without a gap into the excerpt's first frame. The full-resolution PNGs are deleted once
+    proxied; the proxies are cached as ``clip/lead-in.npy`` with their pts.
+
+    Args:
+        config: The local configuration.
+        roots: The output roots.
+        log: Progress output.
+
+    Returns:
+        The proxies ``(frames, 540, 960, 3)`` and their pts ticks.
+
+    Raises:
+        ExtractError: The lead-in's pts are not contiguous with the excerpt's first frame.
+    """
+    record = json.loads((config.working_path / DEEP_CLIP_STATISTICS).read_text(encoding="utf-8"))
+    window = record["excerpt"]
+    first = int(window["first_pts_ticks"])
+    folder = roots.mkdir(roots.allowed / "clip")
+    cache = roots.check(folder / "lead-in.npy")
+    ticks_file = roots.check(folder / "lead-in-pts.json")
+    if cache.is_file() and ticks_file.is_file():
+        return np.load(cache), json.loads(ticks_file.read_text(encoding="utf-8"))
+    video = find_footage_file(record["chapter"], config.footage_path)
+    frames = excerpt(video, window["start_s"] - WIDEN_S, WIDEN_S, folder / "lead-in", roots=roots)
+    ticks = [frame.pts_ticks for frame in frames]
+    steps = set(np.diff([*ticks, first]).tolist())
+    if len(steps) != 1:
+        raise ExtractError(f"the lead-in's pts do not run on into the excerpt: steps {steps}")
+    stacked: list[NDArray[np.float32]] = []
+    for frame in frames:
+        stacked.append(temporal.proxy(read_png16(frame.path)))
+        roots.remove(frame.path)
+    proxies = np.stack(stacked)
+    log(f"proxied {len(frames)} lead-in frames")
+    buffer = io.BytesIO()
+    np.save(buffer, proxies)
+    roots.write_bytes(cache, buffer.getvalue())
+    roots.write_text(ticks_file, json.dumps(ticks))
+    return proxies, ticks
+
+
+def detect_step(signal: NDArray[np.float64], frame_rate: Fraction) -> tuple[int, float]:
+    """Locate the largest step of a source signal: the two-sided mean difference.
+
+    For each frame ``k`` with ``m = round(STEP_HALF_S * frame_rate)`` frames on each side,
+    ``d[k] = mean(signal[k : k + m]) - mean(signal[k - m : k])``; the step is at the ``k`` of
+    largest ``|d|`` (the first such ``k`` on a tie).
+
+    Args:
+        signal: One value per frame (a source-only signal, e.g. the frame's mean luma).
+        frame_rate: Frames per second.
+
+    Returns:
+        The index of the first frame after the step, and ``d`` there (signed).
+
+    Raises:
+        ValueError: The signal is shorter than two detector halves.
+    """
+    m = round(STEP_HALF_S * float(frame_rate))
+    if len(signal) < 2 * m:
+        raise ValueError(f"a step detector of {m} frames a side needs {2 * m} frames")
+    cumulative = np.concatenate([[0.0], np.cumsum(np.asarray(signal, dtype=np.float64))])
+    k = np.arange(m, len(signal) - m + 1)
+    difference = (cumulative[k + m] - cumulative[k]) / m - (cumulative[k] - cumulative[k - m]) / m
+    best = int(np.argmax(np.abs(difference)))
+    return int(k[best]), float(difference[best])
+
+
+def analyse_segments(
+    images: Sequence[NDArray[np.float32]],
+    params: Params,
+    smoother: Smoother,
+    frame_rate: Fraction,
+    cuts: Sequence[int],
+    backend: Backend | None = None,
+) -> Series:
+    """Option (a) of claim 10b: STAGED analysis with the window reset at each cut.
+
+    Each segment between cuts is analysed on its own by
+    :func:`prototype.temporal.analyse_staged`, so no smoothing window reaches across a cut
+    (inside a segment the edge rule holds the segment's end values); the series are joined.
+
+    Args:
+        images: The proxies, in presentation order.
+        params: The parameter set.
+        smoother: The filter.
+        frame_rate: Frames per second.
+        cuts: The indices of the first frame of each new segment, increasing.
+        backend: Where the steps run.
+
+    Returns:
+        The smoothed series over all the frames.
+    """
+    bounds = [0, *cuts, len(images)]
+    parts = [
+        temporal.analyse_staged(images[a:b], params, smoother, frame_rate, backend)[0]
+        for a, b in itertools.pairwise(bounds)
+    ]
+    return {name: np.concatenate([part[name] for part in parts]) for name in parts[0]}
+
+
+def step_figures(values: NDArray[np.float64], step: int, frame_rate: Fraction) -> dict[str, float]:
+    """Return the size of a series' step: its change across the step and its largest jump.
+
+    Args:
+        values: One value per frame.
+        step: The first frame after the step.
+        frame_rate: Frames per second.
+
+    Returns:
+        ``change``: the value :data:`STEP_SPAN_S` after the step minus the value as long before
+        it (indices clipped to the series); ``max_jump``: the largest frame-to-frame change
+        inside that span; ``max_jump_at``: the frame it lands on.
+    """
+    span = round(STEP_SPAN_S * float(frame_rate))
+    before, after = max(step - span, 0), min(step + span, len(values) - 1)
+    jumps = np.abs(np.diff(values[before : after + 1]))
+    at_jump = int(np.argmax(jumps))
+    return {
+        "change": float(values[after] - values[before]),
+        "max_jump": float(jumps[at_jump]),
+        "max_jump_at": before + at_jump + 1,
+    }
+
+
+STRETCH_KEY = "normalisation_stretch"
+"""The derived series ``1 / (high - low)`` of the N{} bounds, traced with :data:`STEP_KEYS`."""
+
+
+def traced(series: Mapping[str, NDArray[np.float64]]) -> Series:
+    """Return the :data:`STEP_KEYS` a series holds, plus the N{} stretch (:data:`STRETCH_KEY`).
+
+    Args:
+        series: A raw or smoothed statistics series.
+
+    Returns:
+        The traced series.
+    """
+    out: Series = {key: series[key] for key in STEP_KEYS if key in series}
+    out[STRETCH_KEY] = 1.0 / (
+        series["normalisation_bounds.high"] - series["normalisation_bounds.low"]
+    )
+    return out
+
+
+def signal_steps(
+    signals: NDArray[np.float64],
+    source: NDArray[np.float64] | None,
+    step: int,
+    frame_rate: Fraction,
+) -> dict[str, dict[str, float | int | None]]:
+    """Return the step of each frame signal (R, G, B, luma means) in 8-bit levels.
+
+    Args:
+        signals: :func:`prototype.temporal.frame_signals` per frame, shape ``(frames, 4)``.
+        source: The source frames' signals, the same shape; ``None`` for the source itself.
+        step: The first frame after the step.
+        frame_rate: Frames per second.
+
+    Returns:
+        Per signal name, :func:`step_figures` with ``change`` and ``max_jump`` in 8-bit levels
+        (``change_8bit``, ``max_jump_8bit``) and, against a source, ``change_over_source`` and
+        ``max_jump_over_source`` (``|change|`` ratios; ``None`` where the source's is 0).
+    """
+    out: dict[str, dict[str, float | int | None]] = {}
+    for k, name in enumerate(temporal.SIGNALS):
+        figures = step_figures(signals[:, k], step, frame_rate)
+        entry: dict[str, float | int | None] = {
+            "change_8bit": figures["change"] * 255.0,
+            "max_jump_8bit": figures["max_jump"] * 255.0,
+            "max_jump_at": figures["max_jump_at"],
+        }
+        if source is not None:
+            reference = step_figures(source[:, k], step, frame_rate)
+            entry["change_over_source"] = _ratio(abs(figures["change"]), abs(reference["change"]))
+            entry["max_jump_over_source"] = _ratio(figures["max_jump"], reference["max_jump"])
+        out[name] = entry
+    return out
+
+
+def run_lighting_step(
+    config: LocalConfig,
+    roots: OutputRoots,
+    backend: Backend,
+    log: Callable[[str], None] = print,
+) -> dict[str, Any]:
+    """Claim 10b: the lighting step in the deep clip, edge effect first, then two remedies.
+
+    On the 540 NumPy proxies of WP1.3D's deep clip, with the excerpt widened backwards by
+    :data:`WIDEN_S` (:func:`lead_in_proxies`), for 3C and Ancuti 2018 (blue off) at the
+    defaults, STAGED: the 2 s Gaussian on the original excerpt alone (``narrow``, what WP1.3D
+    rendered) and on the widened sequence (``wide``), then on the widened sequence the window
+    reset at the detected step (``reset``) and the 0.5 s Gaussian (``short``). Every option
+    is evaluated on the original excerpt's frames: the applied statistics' step
+    (:func:`step_figures`), the rendered frames' R, G, B and luma means across the step
+    against the source's (:func:`signal_steps`), and the flicker measure
+    (:func:`prototype.temporal.flicker`).
+
+    Args:
+        config: The local configuration.
+        roots: The output roots.
+        backend: Where the steps run.
+        log: Progress output.
+
+    Returns:
+        The record written to ``lighting-step.json``.
+    """
+    proxies, ticks, rate = clip_proxies(config, roots, log)
+    narrow = list(proxies)
+    lead, lead_ticks = lead_in_proxies(config, roots, log)
+    count = len(lead)
+    wide = [*lead, *narrow]
+    source = np.array([temporal.frame_signals(image) for image in wide])
+    step_wide, size = detect_step(source[:, 3], rate)
+    step = step_wide - count
+    pts = [tick / 30000 for tick in ticks]
+    record: dict[str, Any] = {
+        "frame_rate": f"{rate.numerator}/{rate.denominator}",
+        "excerpt_frames": len(narrow),
+        "lead_in_frames": count,
+        "lead_in_first_pts_ticks": lead_ticks[0],
+        "excerpt_pts_ticks": [ticks[0], ticks[-1]],
+        "detector": {"signal": "source mean luma", "half_s": STEP_HALF_S},
+        "step": {
+            "frame_in_excerpt": step,
+            "pts_s": pts[step] if 0 <= step < len(pts) else None,
+            "seconds_into_excerpt": pts[step] - pts[0] if 0 <= step < len(pts) else None,
+            "luma_difference_8bit": size * 255.0,
+        },
+        "source_signals_8bit": {
+            name: (source[count:, k] * 255.0).tolist() for k, name in enumerate(temporal.SIGNALS)
+        },
+        "source_step": signal_steps(source[count:], None, step, rate),
+        "methods": {},
+    }
+    for params in (Params(method="c3"), Params(method="ancuti2018", blue_compensation=False)):
+        log(f"{params.method}: analysing")
+        raw = temporal.stack([temporal.statistics_of(image, params, backend) for image in narrow])
+        reference = temporal.constant_statistics(raw)
+        options: dict[str, Series] = {
+            "narrow 2 s": temporal.analyse_staged(narrow, params, SMOOTHER, rate, backend)[0],
+        }
+        for name, series in (
+            ("wide 2 s", temporal.analyse_staged(wide, params, SMOOTHER, rate, backend)[0]),
+            (
+                "wide 2 s reset at step",
+                analyse_segments(wide, params, SMOOTHER, rate, [step_wide], backend),
+            ),
+            ("wide 0.5 s", temporal.analyse_staged(wide, params, SHORT_SMOOTHER, rate, backend)[0]),
+        ):
+            options[name] = {key: values[count:] for key, values in series.items()}
+        traces = {name: traced(series) for name, series in (("raw", raw), *options.items())}
+        keys = list(traces["raw"])
+        ref_signals = np.array(
+            [
+                temporal.frame_signals(temporal.render(image, params, reference, backend))
+                for image in narrow
+            ]
+        )
+        method: dict[str, Any] = {
+            "params": dataclasses.asdict(params),
+            "raw_step": {key: step_figures(traces["raw"][key], step, rate) for key in keys},
+            "raw": {key: traces["raw"][key].tolist() for key in keys},
+            "options": {},
+        }
+        for name, series in options.items():
+            log(f"  {name}: rendering")
+            signals = np.array(
+                [
+                    temporal.frame_signals(
+                        temporal.render(image, params, temporal.at(series, index), backend)
+                    )
+                    for index, image in enumerate(narrow)
+                ]
+            )
+            measured = temporal.flicker(signals, ref_signals)
+            method["options"][name] = {
+                "applied_step": {key: step_figures(traces[name][key], step, rate) for key in keys},
+                "applied": {key: traces[name][key].tolist() for key in keys},
+                "rendered_step": signal_steps(signals, source[count:], step, rate),
+                "rendered_signals_8bit": {
+                    signal: (signals[:, k] * 255.0).tolist()
+                    for k, signal in enumerate(temporal.SIGNALS)
+                },
+                "flicker": {"value": measured.value, "per_signal": measured.per_signal},
+                "flicker_peak_step_8bit": float(measured.per_step.max()),
+                "flicker_peak_at": int(np.argmax(measured.per_step.max(axis=1))) + 1,
+            }
+        edge: dict[str, Any] = {}
+        first_second = round(float(rate))
+        for key in keys:
+            gap = np.abs(traces["narrow 2 s"][key] - traces["wide 2 s"][key])
+            edge[key] = {
+                "max_abs_difference_first_second": float(gap[:first_second].max()),
+                "max_abs_difference_rest": float(gap[first_second:].max()),
+                "applied_change_narrow": method["options"]["narrow 2 s"]["applied_step"][key][
+                    "change"
+                ],
+                "applied_change_wide": method["options"]["wide 2 s"]["applied_step"][key]["change"],
+            }
+        method["edge_effect"] = edge
+        record["methods"][params.method] = method
+        plot = pack.plot_series(
+            {
+                f"{key} {name}": method["options"][name]["applied"][key]
+                for key in keys
+                for name in ("narrow 2 s", "wide 2 s")
+            },
+            pts,
+        )
+        roots.write_bytes(roots.allowed / f"lighting-step-{params.method}.png", plot)
+    roots.write_text(roots.allowed / "lighting-step.json", json.dumps(record, indent=1))
+    return record
+
+
 # --- the summary ----------------------------------------------------------------------------------
 
 
@@ -1641,7 +1993,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         0 on success.
     """
     parser = argparse.ArgumentParser(description="WP1.4b gain-cap noise experiments.")
-    parser.add_argument("phase", choices=("extract", "grid", "smoothing", "summarise"))
+    parser.add_argument(
+        "phase", choices=("extract", "grid", "smoothing", "lighting-step", "summarise")
+    )
     parser.add_argument("--frame", help="grid: run this frame only (its frames.json name)")
     parser.add_argument("--limit", type=int, help="grid: stop after this many frames")
     parser.add_argument("--device", choices=("gpu", "cpu"), default="gpu")
@@ -1656,6 +2010,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     elif args.phase == "smoothing":
         record = run_smoothing(config, roots, select_backend(args.device))
         print(f"cap binds on {record['cap_binding_fraction']:.1%} of the frames")
+    elif args.phase == "lighting-step":
+        record = run_lighting_step(config, roots, select_backend(args.device))
+        print(f"step at {record['step']['seconds_into_excerpt']} s into the excerpt")
     else:
         run_summary(roots)
     return 0
