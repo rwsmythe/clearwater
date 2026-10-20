@@ -218,8 +218,11 @@ path, md5, five assertions and verdict, or there is no accept.
   6e17752a; md5s; harness 366; DR-32 adjudication upheld). **IF-1..IF-10 FROZEN.** Orchestrator
   **gen 3 rolled over 15:24Z** at 400K (state 9a27dc4); **gen 4 = `clearwater-orchestrator-20261020-0524`**
   online 15:30Z, running the main pytest as its first act, then removes the wp2.2 worktrees and
-  dispatches WP2.3 (brief approved). Next for CHARC: WP2.4 (Phase 3 briefs + spec v0.5.4 draft)
-  once WP2.3 is under way; Gate 1 still OPEN with the owner. WP1.4b dispatched (opus-high; flip guards + gpmd claim 2a). Next: WP1.3-deep / WP1.4b brief on SCUBA/ (c3 primary, Params() flips to c3), then
+  dispatches WP2.3 (brief approved). **WP2.4 started by CHARC**: docs/reports/spec-v0.5.4-proposal.md (15 passages; item 1 = D106
+  waits on the owner's Gate 1 option; applied only on "approved as 0.5.4") and
+  docs/briefs/wp2.4-phase3-frame.md (common Phase 3 brief rules, wave order, dependency grants,
+  spec-to-package map). CP4 = owner reads architecture.md + decisions.md + the proposal in one
+  pass. Gate 1 still OPEN with the owner. WP1.4b dispatched (opus-high; flip guards + gpmd claim 2a). Next: WP1.3-deep / WP1.4b brief on SCUBA/ (c3 primary, Params() flips to c3), then
   WP1.6 gate report (Gate 1: core 3.6x, production export 4.4x over N6). **Footage-layout skips:** the owner's Snorkel/SCUBA/edits layout makes 3
   footage tests skip (root `GX011628.MP4` paths in `tests/test_container_spike.py:902`,
   `tests/test_lookcheck.py:1289`, WP1.4 test 7; also `tools/lookcheck/pack.py:94` and the WP1.4
