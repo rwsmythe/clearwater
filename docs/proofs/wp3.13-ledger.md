@@ -259,3 +259,4 @@ Remediation not yet applied (the round ends here).
 
 Inner loop: 134 own tests passed, 0 skipped; ruff check, ruff format --check, mypy clean. Full pytest window
 to be requested; round 3 follows.
+Depth (dispatcher-read): round-2 remediation yield 189,425. Window for round 3 queued behind WP3.15, WP3.7, WP3.1.
