@@ -43,6 +43,8 @@ stray checks (report section 2). Cause partly attributed only; yielded for a rul
 Ruling (orchestrator, 2026-10-20): CONTINUE; this spike's clean row a (W2, 55.9 ms) is the
 baseline; the report states the discrepancy under its own heading (report section 3).
 
+| Window | Local | Gate | Probes open / close (s/frame) | Drift | Strays | Verdict |
+|---|---|---|---|---|---|---|
 | W3 pipes-apts | 2026-10-20 00:40-00:44 | median CPU 9.4 %, GPU 0 %, open | 0.0579 / 0.0587 | +1.4 % | none (WmiPrvSE 56.9 % at start is system) | clean |
 | W4 pipes-b | 2026-10-20 00:45-00:50 | median CPU 4.25 %, GPU 0 %, open | 0.0573 / 0.0577 | +0.7 % | none | clean |
 | W5 others-s | 2026-10-20 00:52-00:59 | median CPU 4.4 %, GPU 0 %, open | 0.0550 / 0.0560 | +1.9 % | none | clean |
