@@ -243,8 +243,13 @@ def test_multiscale_fusion(backend: CoreBackend, image: np.ndarray, params: Para
     same(fused, proto.multiscale_fusion((input1, input2), weights, params), backend, "fused")
 
 
-def render(backend: CoreBackend, a: Any, params: Params) -> tuple[Any, Any, Any]:
-    """The product's measure-then-render chain over steps 3-5 on one image."""
+def render_all(backend: CoreBackend, a: Any, params: Params) -> dict[str, Any]:
+    """The product's measure-then-render chain over steps 3-5, keeping every intermediate.
+
+    Keys: ``"bounds"`` (two floats), ``"means"`` (two Lab triples), and the arrays
+    ``"high_pass"``, ``"input 1"``, ``"input 2"``, ``"W_L k"``, ``"W_S k"``, ``"W_Sat k"``,
+    ``"Wbar k"`` (k = 1, 2) and ``"fused"``.
+    """
     bounds = fusion.normalisation_bounds(
         backend,
         a,
@@ -252,15 +257,50 @@ def render(backend: CoreBackend, a: Any, params: Params) -> tuple[Any, Any, Any]
         normalisation_low=params.normalisation_low,
         normalisation_high=params.normalisation_high,
     )
-    input1, input2 = fusion.fusion_inputs(backend, a, **inputs_kw(params), bounds=bounds)
-    means = [fusion.saliency_reference(backend, x) for x in (input1, input2)]
-    weights = fusion.weight_maps(
-        backend, (input1, input2), **weights_kw(params), saliency_means=means
+    out: dict[str, Any] = {
+        "bounds": bounds,
+        "high_pass": fusion.high_pass(
+            backend, a, sharpen_blur_fraction=params.sharpen_blur_fraction
+        ),
+    }
+    inputs = fusion.fusion_inputs(backend, a, **inputs_kw(params), bounds=bounds)
+    means = [fusion.saliency_reference(backend, x) for x in inputs]
+    out["means"] = means
+    for k, (x, mean) in enumerate(zip(inputs, means, strict=True), start=1):
+        out[f"input {k}"] = x
+        out[f"W_L {k}"] = fusion.laplacian_weight(
+            backend, x, laplacian_fraction=params.laplacian_fraction
+        )
+        out[f"W_S {k}"] = fusion.saliency_weight(
+            backend, x, saliency_blur_fraction=params.saliency_blur_fraction, saliency_mean=mean
+        )
+        out[f"W_Sat {k}"] = fusion.saturation_weight(backend, x)
+    weights = fusion.weight_maps(backend, inputs, **weights_kw(params), saliency_means=means)
+    for k, w in enumerate(weights, start=1):
+        out[f"Wbar {k}"] = w
+    out["fused"] = fusion.multiscale_fusion(
+        backend, inputs, weights, pyramid_min_level_size=params.pyramid_min_level_size
     )
-    fused = fusion.multiscale_fusion(
-        backend, (input1, input2), weights, pyramid_min_level_size=params.pyramid_min_level_size
-    )
-    return input1, input2, fused
+    return out
+
+
+ARRAY_KEYS = [
+    "high_pass",
+    "input 1",
+    "input 2",
+    *(f"{name} {k}" for k in (1, 2) for name in ("W_L", "W_S", "W_Sat", "Wbar")),
+    "fused",
+]
+# CPU against GPU for the measured scalars (stated here; AD-11 is a bound on image values): the
+# N{} bounds in high-pass units, the saliency means in L*, a*, b* units (0-100 for L*).
+BOUNDS_TOLERANCE = 1e-5
+MEANS_TOLERANCE = 1e-3
+
+
+def render(backend: CoreBackend, a: Any, params: Params) -> tuple[Any, Any, Any]:
+    """Input 1, input 2 and the fused image of :func:`render_all`."""
+    out = render_all(backend, a, params)
+    return out["input 1"], out["input 2"], out["fused"]
 
 
 def proto_render(a: Any, params: Params) -> tuple[Any, Any, Any]:
@@ -275,7 +315,9 @@ def deviation(product: Any, reference: Any, backend: CoreBackend) -> tuple[float
     p = np.asarray(backend.to_host(product), dtype=np.float64)
     r = np.asarray(backend.to_host(reference), dtype=np.float64)
     difference = np.abs(p - r)
-    return float(difference.max()), float(difference.reshape(-1, 3).mean(axis=0).max())
+    if difference.ndim == 3:  # an image: the largest per-channel mean
+        return float(difference.max()), float(difference.reshape(-1, 3).mean(axis=0).max())
+    return float(difference.max()), float(difference.mean())
 
 
 def test_measured_path_within_ad11(backend: CoreBackend, params: Params) -> None:
@@ -300,21 +342,29 @@ def test_measured_path_within_ad11(backend: CoreBackend, params: Params) -> None
 
 
 @pytest.mark.gpu
-@pytest.mark.parametrize("name", ["synthetic-0", "synthetic-1", "scene", "near-flat"])
+@pytest.mark.parametrize("name", ["synthetic-0", "synthetic-1", "scene", "near-flat", "1x1", "odd"])
 def test_cpu_against_gpu_within_ad11(gpu: CoreBackend, name: str) -> None:
+    """Every intermediate of steps 3-5, each device measuring its own statistics."""
     host = {
         "synthetic-0": synthetic(0),
         "synthetic-1": synthetic(1),
         "scene": scene(),
         "near-flat": near_flat(),
+        "1x1": synthetic(0, (1, 1)),
+        "odd": synthetic(1, (37, 53)),
     }[name]
     cpu = NumpyBackend()
     for params in PARAMS.values():
-        on_cpu = render(cpu, cpu.asarray(host), params)
-        on_gpu = render(gpu, gpu.asarray(host), params)
-        for step, c, g in zip(("input 1", "input 2", "fused"), on_cpu, on_gpu, strict=True):
-            largest, mean = deviation(c, gpu.to_host(g), cpu)
-            assert largest <= AD11_MAX and mean <= AD11_MEAN, f"{step}: {largest:.3g}/{mean:.3g}"
+        on_cpu = render_all(cpu, cpu.asarray(host), params)
+        on_gpu = render_all(gpu, gpu.asarray(host), params)
+        assert set(on_cpu) == {"bounds", "means", *ARRAY_KEYS}
+        for key in ARRAY_KEYS:
+            largest, mean = deviation(on_cpu[key], gpu.to_host(on_gpu[key]), cpu)
+            assert largest <= AD11_MAX and mean <= AD11_MEAN, f"{key}: {largest:.3g}/{mean:.3g}"
+        gap = np.abs(np.subtract(on_cpu["bounds"], on_gpu["bounds"])).max()
+        assert gap <= BOUNDS_TOLERANCE, f"bounds: {gap:.3g}"
+        gap = np.abs(np.subtract(on_cpu["means"], on_gpu["means"])).max()
+        assert gap <= MEANS_TOLERANCE, f"saliency means: {gap:.3g}"
 
 
 def near_flat(shape: tuple[int, int] = (64, 96)) -> np.ndarray:
@@ -353,7 +403,8 @@ def test_floor_bounds_the_dr14_gap(gpu: CoreBackend) -> None:
 
 def test_same_device_twice_bit_identical(backend: CoreBackend, params: Params) -> None:
     a = backend.asarray(scene())
-    first = render(backend, a, params)
-    second = render(backend, a, params)
-    for x, y in zip(first, second, strict=True):
-        same(x, y, backend, "twice")
+    first = render_all(backend, a, params)
+    second = render_all(backend, a, params)
+    assert first["bounds"] == second["bounds"] and first["means"] == second["means"]
+    for key in ARRAY_KEYS:
+        same(first[key], second[key], backend, f"twice: {key}")

@@ -39,11 +39,16 @@ recommended. Branch `wp3.3`, base `2c5540a`. Stack as locked: NumPy 2.5.4, SciPy
    can change the stretch's divisor `high - low` by one float32 ulp (a probe with arbitrary
    bounds: 2.4e-7 on N{}); on that frame they did not.
 2. **CPU against GPU within AD-11**, 4K white-balanced synthetic, each device measuring its own
-   statistics (`measure.txt`): high-pass max 5.4e-7 / mean 5.4e-8; input 1 6.0e-8 / 1.8e-9;
-   input 2 3.0e-6 / 4.3e-7; W_L 4.5e-6 / 3.9e-7; W_S 2.7e-7 / 2.7e-8; W_Sat 8.2e-8 / 4.3e-9;
-   normalised weight 9.2e-6 / 8.7e-7; fused 1.7e-6 / 2.4e-7. The bounds differ by 6e-8 and
-   9e-8; the saliency means by at most 4e-5 (L*). Pinned by `test_cpu_against_gpu_within_ad11`
-   (noise, scene, near-flat; both parameter sets). Same device twice: bit-identical
+   statistics, measured once (`measure.txt`, not a test): high-pass max 5.4e-7 / mean 5.4e-8;
+   input 1 6.0e-8 / 1.8e-9; input 2 3.0e-6 / 4.3e-7; W_L, W_S, W_Sat of input 1 4.5e-6 /
+   3.9e-7, 2.7e-7 / 2.7e-8, 8.2e-8 / 4.3e-9; normalised weight of input 1 9.2e-6 / 8.7e-7;
+   fused 1.7e-6 / 2.4e-7. The bounds differ by 6e-8 and 9e-8; the saliency means by at most
+   4e-5 (L*). The test `test_cpu_against_gpu_within_ad11` pins, at small sizes (two 45 x 67
+   noise images, a 96 x 144 scene, the 64 x 96 near-flat image, 1 x 1 and 37 x 53) and both
+   parameter sets, every intermediate within AD-11: the high-pass, both inputs, W_L, W_S,
+   W_Sat and the normalised weight of each input, and the fused image; and the measured
+   scalars within stated tolerances, the bounds within 1e-5 and the saliency means within 1e-3
+   (Lab units). Same device twice: every intermediate bit-identical, the scalars equal
    (`test_same_device_twice_bit_identical`).
 3. **The floor (AD-4 as amended, ruling 3.1)**, in `fusion_inputs` on the supplied bounds:
    `high - low < 0.02` gives `mid -/+ 0.01`. Exactly flat input: 0.5, bit for bit on the CPU;
