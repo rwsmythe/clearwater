@@ -653,6 +653,11 @@ def test_a_candidate_that_is_also_a_still_is_corrected_once(tmp_path: Path) -> N
     assert [e["frame"] for e in document["frames"]] == [frame.path.stem]
 
 
+def test_a_pts_is_written_with_its_whole_time_base() -> None:
+    assert pack.tick_text(10010, Fraction(1, 30000)) == "10010 / 30000"
+    assert pack.tick_text(10010, Fraction(1001, 30000)) == "10010 x 1001 / 30000"
+
+
 def test_the_clip_window_is_centred_and_kept_inside_the_chapter() -> None:
     assert pack.clip_window(50.0, 100.0) == 47.0
     assert pack.clip_window(1.0, 100.0) == 0.0  # clamped to the start

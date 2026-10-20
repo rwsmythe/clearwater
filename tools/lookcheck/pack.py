@@ -1402,6 +1402,21 @@ def clip_window(centre_s: float, duration_s: float, seconds: float = DEEP_CLIP_S
     return min(max(centre_s - seconds / 2.0, 0.0), max(duration_s - seconds, 0.0))
 
 
+def tick_text(ticks: int, time_base: Fraction) -> str:
+    """Write a pts in ticks with its time base (``10010 / 30000`` for 1/30000).
+
+    Args:
+        ticks: The pts in ticks.
+        time_base: The stream time base in seconds per tick.
+
+    Returns:
+        The text.
+    """
+    if time_base.numerator == 1:
+        return f"{ticks} / {time_base.denominator}"
+    return f"{ticks} x {time_base.numerator} / {time_base.denominator}"
+
+
 def candidate_caption(case: scan.Case, entry: Mapping[str, Any]) -> str:
     """Return the caption of a case candidate: rank, the rule, the measures, the other cases.
 
@@ -1585,7 +1600,7 @@ def render_deep_index(
                 f'<td><a href="{link(frame.path)}"><img src="{link(thumb)}" '
                 f'alt="{html.escape(frame.path.stem)}"></a>'
                 f'<div class="cap">{html.escape(frame.chapter)} at {float(frame.pts):.3f} s '
-                f"(pts {frame.pts_ticks} / {frame.time_base.denominator}){caption}</div></td>"
+                f"(pts {tick_text(frame.pts_ticks, frame.time_base)}){caption}</div></td>"
             ]
             for variant in variants:
                 stem = f"{frame.path.stem}-{variant.name}"
