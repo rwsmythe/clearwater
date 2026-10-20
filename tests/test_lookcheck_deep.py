@@ -103,6 +103,9 @@ def test_the_scan_timestamps_run_every_ten_seconds_from_five_to_the_end() -> Non
     assert scan.scan_timestamps(4.0) == []
     assert scan.scan_timestamps(25.0) == [5.0, 15.0]
     assert scan.scan_timestamps(26.0) == [5.0, 15.0, 25.0]
+    # a grid point in the last second is kept (GX011598 is 525.3248 s long: 525.0 s is on the grid)
+    assert scan.scan_timestamps(525.3248)[-1] == 525.0
+    assert scan.scan_timestamps(25.1) == [5.0, 15.0]  # but not one with under a quarter second left
 
 
 # --- test 2: the exclusion rule -----------------------------------------------------------------

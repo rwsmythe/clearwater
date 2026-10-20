@@ -89,8 +89,9 @@ SCAN_CHAPTERS = (
 
 SCAN_START_S = 5.0
 SCAN_STEP_S = 10.0
-SCAN_END_MARGIN_S = 1.0
-"""The last scan timestamp is at most this many seconds before the end of the chapter."""
+SCAN_END_MARGIN_S = 0.25
+"""The last scan timestamp is at most this many seconds before the end of the chapter (so that
+several frames, at 30000/1001 about seven, exist at or after it)."""
 
 SCAN_SHORT_SIDE = 540
 LUMA_WEIGHTS = (0.2126, 0.7152, 0.0722)
@@ -297,7 +298,7 @@ def scan_timestamps(duration_s: float) -> list[float]:
 
     Returns:
         ``5, 15, 25, ...`` up to the last one that is at most :data:`SCAN_END_MARGIN_S` before
-        the end (so that a frame exists at or after it).
+        the end (so that frames exist at or after it).
     """
     out: list[float] = []
     moment = SCAN_START_S
