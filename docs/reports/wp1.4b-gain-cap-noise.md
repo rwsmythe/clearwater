@@ -10,7 +10,7 @@ from one of these records.
 ## Summary
 
 - **Gate result 4 (D100): KEEP the caps.** At the default cap 2.0 the red cap binds on 1 of 8 deep
-  frames and changes nothing measurable (output red noise within 0.014 code values of cap off).
+  frames and changes nothing measurable (output red noise within 0.015 code values of cap off).
   Tighter caps RAISE red noise wherever the source red has a baseline (8 of 8 deep frames on the
   red-lit tiles), as the spec expects. They LOWER it only where the source red is crushed to a
   near-constant (4 of 8 frames on the flattest tiles), because there the output red noise is
@@ -220,7 +220,7 @@ correlation over the deep frames, Ancuti default:
 change and the owner's).
 
 - At the default 2.0 they are nearly inert on deep footage: they bind on 1 of 8 frames, the noise
-  stays within 0.014 code values, and the cast is unchanged.
+  stays within 0.015 code values (largest 0.0147, `red_lit`), and the cast is unchanged.
 - They remain D100's only fidelity lever: tighter caps cap the green-derived share at 0.33.
 - Tightening them is NOT a noise control. On every region with a red baseline it raises red
   noise, as the spec expects.
@@ -235,12 +235,21 @@ means whatever the cap did. Only the clamp leaves a cast (claim 8).
 
 ## Claim 8 -- the clamp on deep footage (D99, 14.1)
 
-| Setting | clamp bound (red) | sigma_R `red_lit` | residual R/G |
-|---|---|---|---|
-| c3, clamp 1.5 / 2 / 3 / 5 / 1000 | 0/8 at every value | 0.481 [0.370-0.718] (identical) | 1.00 [0.99-1.00] |
-| Ancuti cap 2, clamp 1.5 | 5/8 | 0.731 [0.520-0.939] | 0.96 [0.80-1.01] |
-| Ancuti cap 2, clamp 2.0 | 1/8 | 0.736 [0.553-0.993] | 1.00 [0.93-1.04] |
-| Ancuti cap 2, clamp 3 / 5 / 1000 | 0/8 | 0.736 [0.553-0.993] | 1.00 [0.94-1.04] |
+Medians over the 8 deep frames with [min-max]; amplification over the frames whose source
+figure is above 0 (all 8 on `red_lit`, 6 on `flat`).
+
+| Setting | clamp bound (red) | sigma_R `red_lit` | amplification `red_lit` | sigma_R `flat` | amplification `flat` | residual R/G | residual B/G |
+|---|---|---|---|---|---|---|---|
+| c3, clamp 1.5 | 0/8 | 0.481 [0.370-0.718] | 1.53 [1.15-3.25] | 0.127 [0.000-0.724] | 1.51 [1.16-3.27] | 1.00 [0.99-1.00] | 1.00 [0.99-1.01] |
+| c3, clamp 2 | 0/8 | 0.481 [0.370-0.718] | 1.53 [1.15-3.25] | 0.127 [0.000-0.724] | 1.51 [1.16-3.27] | 1.00 [0.99-1.00] | 1.00 [0.99-1.01] |
+| c3, clamp 3 | 0/8 | 0.481 [0.370-0.718] | 1.53 [1.15-3.25] | 0.127 [0.000-0.724] | 1.51 [1.16-3.27] | 1.00 [0.99-1.00] | 1.00 [0.99-1.01] |
+| c3, clamp 5 | 0/8 | 0.481 [0.370-0.718] | 1.53 [1.15-3.25] | 0.127 [0.000-0.724] | 1.51 [1.16-3.27] | 1.00 [0.99-1.00] | 1.00 [0.99-1.01] |
+| c3, clamp 1000 | 0/8 | 0.481 [0.370-0.718] | 1.53 [1.15-3.25] | 0.127 [0.000-0.724] | 1.51 [1.16-3.27] | 1.00 [0.99-1.00] | 1.00 [0.99-1.01] |
+| Ancuti cap 2, clamp 1.5 | 5/8 | 0.731 [0.520-0.939] | 2.28 [1.64-4.26] | 0.279 [0.075-0.950] | 3.34 [1.66-119.77] | 0.96 [0.80-1.01] | 1.00 [0.98-1.01] |
+| Ancuti cap 2, clamp 2 | 1/8 | 0.736 [0.553-0.993] | 2.43 [1.64-4.50] | 0.322 [0.084-0.999] | 3.76 [1.66-127.72] | 1.00 [0.93-1.04] | 1.00 [0.98-1.01] |
+| Ancuti cap 2, clamp 3 | 0/8 | 0.736 [0.553-0.993] | 2.43 [1.64-4.50] | 0.324 [0.084-0.999] | 3.77 [1.66-127.72] | 1.00 [0.94-1.04] | 1.00 [0.98-1.01] |
+| Ancuti cap 2, clamp 5 | 0/8 | 0.736 [0.553-0.993] | 2.43 [1.64-4.50] | 0.324 [0.084-0.999] | 3.77 [1.66-127.72] | 1.00 [0.94-1.04] | 1.00 [0.98-1.01] |
+| Ancuti cap 2, clamp 1000 | 0/8 | 0.736 [0.553-0.993] | 2.43 [1.64-4.50] | 0.324 [0.084-0.999] | 3.77 [1.66-127.72] | 1.00 [0.94-1.04] | 1.00 [0.98-1.01] |
 
 - The clamp at 1000 never bound.
 - Under 3C the red white-balance gain stays at or below 1.07, and no clamp in the grid ever
@@ -281,10 +290,10 @@ centred Gaussian, staged, on the 540 NumPy proxy. The per-frame cap binds on **4
 |---|---|---|
 | frames with alpha below 0.999 | 93 | 33 |
 | minimum alpha | 0.673 | 0.712 |
+| flicker (8-bit levels) | **0.388** | 0.483 |
 
 The 0.999 threshold counts the frames where the cap acts. A's Gaussian also leaves the far
 frames within 1e-15 of 1, so a strict "below 1" counts all 179 frames.
-| flicker (8-bit levels) | **0.388** | 0.483 |
 
 - `|alpha_A - alpha_B|`: mean 0.033, max 0.291 (frame 53).
 - Rendered proxies `|A - B|`: mean 1.32 levels, the worst frame 11.9.
@@ -301,11 +310,15 @@ frames within 1e-15 of 1, so a strict "below 1" counts all 179 frames.
   the owner's "about 1 s".
 - **The source across the step** (+-1 s): luma +49.9 levels, R -37.6, G +70.2, B +106.0. The
   scene goes from reddish rock to blue water.
-- **Raw per-frame statistics across the step:**
-  - Ancuti: red white-balance gain +0.68 and alpha -0.49 (the cap starts binding about 0.6 s
-    after the luma step, at frame 46).
-  - c3: red gain +0.03 and blue gain -0.05.
+- **Raw statistics across the step**, from WP1.3D's recorded raw series (staged: each stage
+  measured with the smoothed earlier stages):
+  - Ancuti: red white-balance gain +0.51 and alpha -0.49 (the cap starts binding about 0.6 s
+    after the luma step, at frame 46). Measured with each frame's own alpha instead, the red
+    gain steps by +0.68.
+  - c3: red gain +0.03 and blue gain -0.05 (the same under both measurements).
   - Both: the N{} stretch rises by about 1.0, from 2.9 to 3.8.
+- The recomputed 2 s series equal WP1.3D's recorded smoothed series exactly (largest difference
+  0 for every traced statistic), so the applied figures below are the rendered clip's.
 
 **Edge effect or genuine step? GENUINE.** The excerpt was widened backwards by 3 s (90 frames
 re-extracted by pts, contiguous with the excerpt). That is more than the 2 s window's 1 s reach.
@@ -344,14 +357,15 @@ across +-1 s, 2 s window:
 
 - **(a) The reset** leaves the size of the step unchanged and concentrates the statistics'
   change into one jump at the step: c3's peak per-step flicker triples.
-- **(b) The 0.5 s window** follows the raw statistics more closely: Ancuti's red gain step grows
-  from +0.41 to +0.64, close to the raw +0.68. It adds 68 % (c3) and 23 % (Ancuti) flicker, and
-  Ancuti's peak per-step flicker is three times higher.
+- **(b) The 0.5 s window** smooths less: Ancuti's red gain step grows from +0.41 to +0.64.
+  That is above the recorded staged raw step (+0.51) and close to the own-statistics step
+  (+0.68), because the shorter window also smooths the alpha that the white balance is measured
+  after. It adds 68 % (c3) and 23 % (Ancuti) flicker, and Ancuti's peak per-step flicker is
+  three times higher.
 - **Neither remedy makes the step materially smaller.**
   - The reset changes no rendered ratio.
   - The 0.5 s window brings Ancuti's luma ratio from 1.07 to 1.00, and leaves c3's at 0.92.
-    It does so by following the raw statistics: Ancuti's red-gain step grows to +0.64 and its
-    flicker rises.
+    In exchange, Ancuti's red-gain step grows to +0.64 and its flicker rises.
   - c3's rendered luma step is smaller than the source's under every option (0.92x).
   - On this clip the 2 s window remains the better of the three: it has the lowest flicker and
     the lowest peak per-step flicker.
@@ -396,3 +410,12 @@ Each caption gives `sigma_R` on both tile sets, the red gain, and what bound.
      `METHODS[RENDER_METHOD]`, so only the sentence is stale (Reviewer A round 1, CR-04).
 4. **Claim 10b's widened excerpt** is a new 3 s extract at the 540 proxy. It is cached in
    `work/wp1.4b/clip/lead-in.npy`; the full-resolution PNGs were deleted once proxied.
+5. **Open question for the dispatcher: `tools/prototype/clip.py --method`** (Reviewer A round 2,
+   CR-02).
+   - The tool's `--method` defaults to `"ancuti2018"`, a pre-existing explicit default, and its
+     help does not name c3.
+   - Read literally, guard (ii) ("every CLI help text show c3 as the default") covers it. But
+     claim 1 names `clip.py` among the tools that pin `ancuti2018` so that a re-run reproduces
+     the reports.
+   - Changing its default or help text is more than naming the method in another package's
+     file, so it is left as it is, pending a ruling.

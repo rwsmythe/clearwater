@@ -391,6 +391,23 @@ def test_a_reset_at_a_cut_analyses_each_segment_on_its_own() -> None:
     np.testing.assert_array_equal(traced[noise_experiments.STRETCH_KEY], 1.0 / (high - low))
 
 
+def test_recorded_series_checks_the_parameters_and_the_pts() -> None:
+    params = Params(method="c3")
+    frames = [
+        {"pts_ticks": tick, "raw": {"a": 1.0 + k}, "smoothed": {"a": 2.0 + k}}
+        for k, tick in enumerate((1001, 2002, 3003))
+    ]
+    archived = {"variants": {"c3": {"params": dataclasses.asdict(params), "frames": frames}}}
+    raw, smoothed = noise_experiments.recorded_series(archived, params, [1001, 2002, 3003])
+    np.testing.assert_array_equal(raw["a"], [1.0, 2.0, 3.0])
+    np.testing.assert_array_equal(smoothed["a"], [2.0, 3.0, 4.0])
+    with pytest.raises(ValueError, match="pts differ"):
+        noise_experiments.recorded_series(archived, params, [1001, 2002, 4004])
+    other = Params(method="c3", max_white_balance_gain=2.0)
+    with pytest.raises(ValueError, match="parameters differ"):
+        noise_experiments.recorded_series(archived, other, [1001, 2002, 3003])
+
+
 def test_signal_steps_compare_each_rendered_signal_with_the_source() -> None:
     source = np.zeros((90, 4))
     source[45:] = [0.1, 0.2, 0.0, 0.15]

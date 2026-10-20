@@ -1549,6 +1549,38 @@ def signal_steps(
     return out
 
 
+def recorded_series(
+    archived: Mapping[str, Any], params: Params, ticks: Sequence[int]
+) -> tuple[Series, Series]:
+    """Return WP1.3D's recorded raw and smoothed series of one method on the deep clip.
+
+    Args:
+        archived: WP1.3D's ``clip/statistics.json``.
+        params: The parameter set; it must equal the variant's recorded ``params``.
+        ticks: The excerpt's pts, which must equal the variant's frames' pts.
+
+    Returns:
+        The raw and the smoothed series, every recorded statistic, one value per frame.
+
+    Raises:
+        ValueError: The record's parameters or pts differ.
+    """
+    variant = archived["variants"][params.method]
+    if variant["params"] != dataclasses.asdict(params):
+        raise ValueError(f"the recorded {params.method} parameters differ from {params}")
+    frames = variant["frames"]
+    if [int(frame["pts_ticks"]) for frame in frames] != list(ticks):
+        raise ValueError(f"the recorded {params.method} pts differ from the excerpt's")
+    series = [
+        {
+            key: np.array([frame[kind][key] for frame in frames], dtype=np.float64)
+            for key in frames[0][kind]
+        }
+        for kind in ("raw", "smoothed")
+    ]
+    return series[0], series[1]
+
+
 def run_lighting_step(
     config: LocalConfig,
     roots: OutputRoots,
@@ -1567,6 +1599,12 @@ def run_lighting_step(
     against the source's (:func:`signal_steps`), and the flicker measure
     (:func:`prototype.temporal.flicker`).
 
+    The raw trace is WP1.3D's RECORDED raw series (:func:`recorded_series`: each stage measured
+    with the smoothed earlier stages), checked against the excerpt's pts and the parameters;
+    each frame's own statistics (:func:`prototype.temporal.statistics_of`) are traced beside
+    it as ``own_raw``, and their mean is the flicker reference's constant statistics (as in
+    claim 10). The recomputed ``narrow 2 s`` series is compared with the recorded smoothed one.
+
     Args:
         config: The local configuration.
         roots: The output roots.
@@ -1576,6 +1614,7 @@ def run_lighting_step(
     Returns:
         The record written to ``lighting-step.json``.
     """
+    archived = json.loads((config.working_path / DEEP_CLIP_STATISTICS).read_text(encoding="utf-8"))
     proxies, ticks, rate = clip_proxies(config, roots, log)
     narrow = list(proxies)
     lead, lead_ticks = lead_in_proxies(config, roots, log)
@@ -1606,6 +1645,7 @@ def run_lighting_step(
     }
     for params in (Params(method="c3"), Params(method="ancuti2018", blue_compensation=False)):
         log(f"{params.method}: analysing")
+        recorded_raw, recorded_smoothed = recorded_series(archived, params, ticks)
         raw = temporal.stack([temporal.statistics_of(image, params, backend) for image in narrow])
         reference = temporal.constant_statistics(raw)
         options: dict[str, Series] = {
@@ -1620,7 +1660,15 @@ def run_lighting_step(
             ("wide 0.5 s", temporal.analyse_staged(wide, params, SHORT_SMOOTHER, rate, backend)[0]),
         ):
             options[name] = {key: values[count:] for key, values in series.items()}
-        traces = {name: traced(series) for name, series in (("raw", raw), *options.items())}
+        traces = {
+            name: traced(series)
+            for name, series in (
+                ("raw", recorded_raw),
+                ("own raw", raw),
+                ("recorded smoothed", recorded_smoothed),
+                *options.items(),
+            )
+        }
         keys = list(traces["raw"])
         ref_signals = np.array(
             [
@@ -1630,8 +1678,20 @@ def run_lighting_step(
         )
         method: dict[str, Any] = {
             "params": dataclasses.asdict(params),
+            "raw_source": "WP1.3D recorded raw (staged: each stage measured with the smoothed "
+            "earlier stages)",
             "raw_step": {key: step_figures(traces["raw"][key], step, rate) for key in keys},
             "raw": {key: traces["raw"][key].tolist() for key in keys},
+            "own_raw_source": "temporal.statistics_of: each frame's own statistics (the flicker "
+            "reference is their mean)",
+            "own_raw_step": {key: step_figures(traces["own raw"][key], step, rate) for key in keys},
+            "own_raw": {key: traces["own raw"][key].tolist() for key in keys},
+            "recorded_smoothed_max_abs_difference": {
+                key: float(
+                    np.max(np.abs(traces["narrow 2 s"][key] - traces["recorded smoothed"][key]))
+                )
+                for key in keys
+            },
             "options": {},
         }
         for name, series in options.items():
