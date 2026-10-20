@@ -125,12 +125,18 @@ def pillow_heif_bundled() -> dict[str, Any]:
         )
         if "Name" in fields:
             entries.append({k: fields.get(k) for k in ("Name", "License", "Files")})
-    package = Path(str(importlib.metadata.distribution("pillow-heif").locate_file("")))
+    # Every native file the wheel installed, by its RECORD (a name glob would miss some).
+    native = [
+        entry
+        for entry in importlib.metadata.files("pillow-heif") or []
+        if str(entry).lower().endswith((".dll", ".pyd", ".so", ".dylib"))
+    ]
     return {
         "file": str(path),
         "header": header,
         "entries": entries,
-        "native_files": sorted(p.name for p in package.glob("libheif*")),
+        "native_files": sorted(str(entry) for entry in native),
+        "native_files_present": all(Path(str(entry.locate())).is_file() for entry in native),
     }
 
 

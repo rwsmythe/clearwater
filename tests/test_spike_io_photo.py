@@ -181,12 +181,12 @@ def test_pillow_cannot_write_16bit_rgb_png(icc: bytes, edited: bytes) -> None:
 
 
 def test_png16_stdlib_write_verified_by_pillow_and_pyav(
-    tmp_path: Path, icc: bytes, source: bytes, edited: bytes
+    tmp_path: Path, guard: WriteGuard, icc: bytes, source: bytes, edited: bytes
 ) -> None:
     pixels = photo.upright_image(16)
     assert np.count_nonzero(pixels & 0xFF)  # low bytes in use: a truncation would show
     path = tmp_path / "rgb16.png"
-    path.write_bytes(photo.encode_png16(pixels, icc, edited))
+    guard.check(path).write_bytes(photo.encode_png16(pixels, icc, edited))
     record = photo.verify_png16(path, pixels, icc, edited)
     assert photo.failures(record) == []
     assert record["values_exact_pyav"] is True
@@ -202,23 +202,25 @@ def test_png16_stdlib_write_verified_by_pillow_and_pyav(
 
 
 def test_planted_wrong_icc_byte_fails_by_name_png16(
-    tmp_path: Path, icc: bytes, edited: bytes
+    tmp_path: Path, guard: WriteGuard, icc: bytes, edited: bytes
 ) -> None:
     pixels = photo.upright_image(16)
     wrong = bytearray(icc)
     wrong[200] ^= 0x01
     path = tmp_path / "wrong-icc.png"
-    path.write_bytes(photo.encode_png16(pixels, bytes(wrong), edited))
+    guard.check(path).write_bytes(photo.encode_png16(pixels, bytes(wrong), edited))
     assert photo.failures(photo.verify_png16(path, pixels, icc, edited)) == [
         "iccp_identical_pillow"
     ]
 
 
-def test_planted_8bit_truncation_fails_by_name(tmp_path: Path, icc: bytes, edited: bytes) -> None:
+def test_planted_8bit_truncation_fails_by_name(
+    tmp_path: Path, guard: WriteGuard, icc: bytes, edited: bytes
+) -> None:
     pixels = photo.upright_image(16)
     truncated = (pixels >> 8 << 8).astype(np.uint16)
     path = tmp_path / "truncated.png"
-    path.write_bytes(photo.encode_png16(truncated, icc, edited))
+    guard.check(path).write_bytes(photo.encode_png16(truncated, icc, edited))
     record = photo.verify_png16(path, pixels, icc, edited)
     assert photo.failures(record) == ["values_exact_pyav"]
     assert record["differing_samples_pyav"] > 0

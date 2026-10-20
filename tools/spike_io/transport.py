@@ -24,16 +24,18 @@ standard error, parsed after the run); PyAV rows always carry the decoder's pts.
 
 Timing (:func:`timed_run`): the bracket opens just before the FFmpeg process is spawned
 (or the PyAV container is opened) and closes when the last frame is whole in its array;
-s/frame is the bracket divided by the frame count. Each frame's interval runs from the end
-of the previous frame's handling to its own arrival, so the SHA-256 witness taken on every
-:data:`WITNESS_EVERY`-th frame and the last (compared with row ``a``'s reference) is left
-out of the bracket: the bracket is the sum of the intervals. The producer is not stopped
-during a hash: FFmpeg keeps writing into a pipe or socket buffer (more than a whole frame for
-the 32 MiB pipe) and PyAV's decoder threads keep decoding, so work done during a hash is out
-of the bracket. The bracket is therefore a lower bound on the decode-to-NumPy time without
-hashing, and ``wall_s_with_witness`` an upper bound: the wall time from the bracket's start to
-the last frame's arrival, which includes every witness hash but the last one (the last frame
-is hashed after it has arrived).
+s/frame is the bracket divided by the frame count. Each frame's interval runs to its own
+arrival from the previous frame's arrival (so it includes that frame's shape, dtype and
+contiguity check) or, after a witness frame, from the end of that frame's check and hash.
+The SHA-256 witness taken on every :data:`WITNESS_EVERY`-th frame and the last (compared
+with row ``a``'s reference) is thereby left out of the bracket: the bracket is the sum of the
+intervals. During a hash a big-buffer producer keeps working (the 32 MiB pipe holds more
+than a whole frame; PyAV's decoder threads keep decoding), while a default-pipe producer
+fills its small buffer and blocks. Either way work done during a hash is out of the bracket
+and none is added to it. The bracket is therefore a lower bound on the decode-to-NumPy time
+without hashing, and ``wall_s_with_witness`` an upper bound: the wall time from the bracket's
+start to the last frame's arrival, which includes every witness hash but the last one (the
+last frame is hashed after it has arrived).
 
 Identity (:func:`identity_run`, untimed): every frame's SHA-256 and the delivered pts are
 compared with the reference (row ``a``'s hashes and ffprobe's per-frame pts); a row whose
@@ -364,8 +366,9 @@ def _big_pipe(size: int, force_failure: bool = False) -> tuple[int, int]:
     default). Elsewhere a plain ``os.pipe``, enlarged with ``F_SETPIPE_SZ`` where Linux
     offers it; if that call fails (for example above ``/proc/sys/fs/pipe-max-size`` without
     privilege) the pipe is closed and the error raised, so the caller falls back to the default
-    pipe and records why. Without ``F_SETPIPE_SZ`` (macOS) the default-size pipe is returned.
-    Neither branch is exercised in this spike's envelope (Windows).
+    pipe and records why. Without ``F_SETPIPE_SZ`` (macOS) the pipe cannot be enlarged, so it
+    is closed and the error raised the same way. Neither branch is exercised in this spike's
+    envelope (Windows).
 
     Raises:
         OSError: The pipe cannot be created or enlarged (always, with ``force_failure``).
@@ -386,13 +389,14 @@ def _big_pipe(size: int, force_failure: bool = False) -> tuple[int, int]:
 
         read_fd, write_fd = os.pipe()
         setter = getattr(fcntl, "F_SETPIPE_SZ", None)
-        if setter is not None:
-            try:
-                fcntl.fcntl(write_fd, setter, size)
-            except OSError:
-                os.close(read_fd)
-                os.close(write_fd)
-                raise
+        try:
+            if setter is None:
+                raise OSError("F_SETPIPE_SZ is not available: the pipe cannot be enlarged")
+            fcntl.fcntl(write_fd, setter, size)
+        except OSError:
+            os.close(read_fd)
+            os.close(write_fd)
+            raise
         return read_fd, write_fd
 
 
