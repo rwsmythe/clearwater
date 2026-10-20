@@ -20,6 +20,9 @@ Brief: `docs/briefs/wp1.4b-brief.md` (FINAL). Base `db751cb`. Branch `wp1.4b`, w
 | `7127fe1` | Ledger: round 2. |
 | `446ac77` | CHARC report notes: `below_floor` / quantisation-floor marking; `total_red_gain`; ledger hand-over. |
 | `09bff25` | Reviewer A r3 cleanup: Google docstrings on six helpers; staged reach (58 / 87 frames) stated for the lead-in. |
+| `8b194e4` | Ledger: round 3. |
+| `2a01bbe` | The three authorised text-only edits (clip.py `--method` help, `render_clips` and `Params.neutral` docstrings) + clip help guard. |
+| `44152a9` | Reviewer A r4 cleanup: `camera_state.items` refuses a trailing partial header. |
 
 ## Claim 1 -- the flip's site list
 
@@ -145,6 +148,7 @@ adjudication, md5sums). Depth column: the dispatcher's figure.
 | 2a | `325dc82` | -- | -- | -- | -- | -- | -- | VOID: killed at the 598 s tool timeout (no footer, no VERDICT; succ 62). Not counted. Its partial content (report figures not from a record) fixed in `09b8bf7` | fails footer/VERDICT | -- |
 | 2 | `09b8bf7` | 0 | 3 | 2 | 5/0 | 4 NEW, 1 REOPENED (r1 CR-04 = r2 CR-05) | 0 | tool code (10b recorded raw) + tests + report; CR-02 CONTESTED (brief conflict, raised) | all pass (succ 26, ^ERROR 0, codex_core 0, footer, VERDICT CRITICAL_MAJOR_FOUND; proofs hits 8 = echoes) | -- |
 | 3 | `446ac77` | 0 | 1 | 2 | 3/0 | 2 NEW (minor), 1 REOPENED (r2 CR-02, clip.py, CONTESTED) | 0 | cleanup only: docstrings + report text | all pass (succ 27, ^ERROR 0, codex_core 0, footer, VERDICT CRITICAL_MAJOR_FOUND; proofs hits 3 = prompt lines and an exclude) | -- |
+| 4 | `2a01bbe` | 0 | 0 | 1 | 0/1 | 1 NEW (minor, out of envelope) | 0 | cleanup only: `camera_state.items` trailing-fragment check + test (`44152a9`) | all pass (succ 26, ^ERROR 0, codex_core 0, footer, VERDICT NO_NEW_CRITICAL_MAJOR; proofs hits 4 = prompt lines and excludes) | 320,059 at 08:21Z (dispatcher) |
 
 **CONVERGED at round 3:** zero NEW in-envelope blocking findings. The only blocking item is the
 REOPENED, CONTESTED clip.py default (r2 CR-02 = r3 CR-01), which waits for the dispatcher's
@@ -193,6 +197,10 @@ about 9.5 minutes) after the void attempt.
 
 ## NEXT STEPS
 
-1. Round 4 (the one authorised round): the round-3 prompt with the three edits in the claim list.
-2. If it converges: gate (suite), commit, return report. If not: fix small items, commit, update
-   this list, yield (no round 5).
+1. DONE. Round 4, the one authorised round, returned NO_NEW_CRITICAL_MAJOR.
+2. Gate on `44152a9`: 121 + 230 + 420 = 771 passed, 0 failed, 0 skipped (footage and gpu ran);
+   ruff, format and mypy clean.
+3. Return report sent. Remaining for the orchestrator:
+   - Reviewer B and the bit-identity witness.
+   - Merge.
+   - Teardown of the `wp1.4b-codex-*` scratch files in the cell's session scratchpad.
