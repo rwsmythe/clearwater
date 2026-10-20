@@ -10,7 +10,7 @@ answers to open questions 1-6 bind).
 |---|---|---|---|---|---|---|---|---|---|
 | 0 (design table) | - | - | - | - | - | - | none (no code) | - | 62,046 (dispatcher-read at the round-0 yield) |
 | 1 | 1 | 4 | 1 | 6 in / 0 out | 6 NEW / 0 REOPENED | 0 | PRODUCT code (d92ea8d) | WSL, codex-cli, gpt-5.6-sol high | 118,143 (dispatcher-read at the window grant) |
-| 2 | 0 | 3 (1 banked, out of envelope) | 1 | 2 in + 1 out / 0 | 3 NEW / 0 REOPENED | 0 | pending (product code expected) | WSL, codex-cli, gpt-5.6-sol high | 169,145 at the window request |
+| 2 | 0 | 3 (1 banked, out of envelope) | 1 | 2 in + 1 out / 0 | 3 NEW / 0 REOPENED | 0 | PRODUCT code (this commit) | WSL, codex-cli, gpt-5.6-sol high | 182,256 (dispatcher-read at the round-2 yield) |
 
 ## Round 0: design table (no product code yet)
 
@@ -239,3 +239,23 @@ round 1's six reopened. Adjudication in `adjudication.md`:
 4. MINOR: `final_output_path` docstring contradiction.
 
 Remediation not yet applied (the round ends here).
+
+## Round-2 ruling (dispatcher; depth 182,256 at the round-2 yield) as applied
+
+- Finding 1 BANKED, pre-existing and out of envelope; NO cleanup (the dispatcher amended: no `TYPE_CHECKING`
+  move, no "NumPy not loaded" assertion, because WP3.14 modules reach methods through IF-3, which imports
+  NumPy). Provenance: `git log -S"import numpy" --oneline -- src/clearwater/interfaces/image.py` gives
+  `bf76136 feat(wp2.2): interface module IF-1 to IF-10, stubs, tests and round-1 ledger`; NumPy is in the
+  locked `dev` group (`numpy>=2.1,<3`). Reachability: only an interpreter without NumPy. The dispatcher banks
+  it in the debt register at accept.
+- Finding 2 FIXED: `begin()` sets `_created` before `os.close`. Test
+  `test_failing_close_of_the_new_temporary_is_cleaned_up` (fails with the old order, checked).
+- Finding 3 FIXED: `final_output_path` uses `is_same_path` (samefile when both exist). Test
+  `test_final_output_path_is_never_the_source_through_a_folder_alias` (fails with the lexical guard, checked).
+  It RAN here: a directory symlink can be made on this machine (developer mode); I also confirmed by hand
+  that an NTFS junction (`mklink /J`) gives `GX_2.MP4`. The test skips with a reason where neither a symlink
+  nor a junction can be made.
+- Finding 4 FIXED: the `final_output_path` docstring now states the one exception to "no number".
+
+Inner loop: 134 own tests passed, 0 skipped; ruff check, ruff format --check, mypy clean. Full pytest window
+to be requested; round 3 follows.

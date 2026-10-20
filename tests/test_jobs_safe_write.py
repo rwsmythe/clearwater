@@ -599,3 +599,27 @@ def test_user_file_in_the_old_marker_form_survives_the_cleanup(tmp_path: Path) -
     user.write_bytes(b"my photo")
     assert remove_leftovers([tmp_path]).removed == ()
     assert user.read_bytes() == b"my photo"
+
+
+# --- round 2 findings -------------------------------------------------------------------------
+
+
+def test_failing_close_of_the_new_temporary_is_cleaned_up(
+    source: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    real_close = os.close
+
+    def failing_close(fd: int) -> None:
+        real_close(fd)
+        raise OSError(errno.ENOSPC, "No space left on device")
+
+    monkeypatch.setattr(os, "close", failing_close)
+    reservations = Reservations()
+    plan = _plan(source, reservations)
+    write = SafeWrite(plan, reservations)
+    with pytest.raises(OSError) as caught, write:
+        pytest.fail("the block must not run")
+    monkeypatch.undo()
+    assert is_disk_full(caught.value)
+    assert _names(source.parent) == ["GX010123.MP4"]
+    assert len(reservations) == 0

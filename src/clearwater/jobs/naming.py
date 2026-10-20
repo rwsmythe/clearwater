@@ -298,11 +298,15 @@ def _base_plan(source: Path, settings: Settings, kind: MediaKind) -> OutputPlan:
 
 
 def final_output_path(source: Path, settings: Settings, kind: MediaKind) -> Path:
-    """Return the unnumbered final output path (spec 8.3), touching no filesystem.
+    """Return the final output path before collision numbering (spec 8.3).
 
     ``GX010123.MP4`` becomes ``GX010123_corrected.MP4``; ``IMG_1234.HEIC`` becomes
-    ``IMG_1234_corrected.png``. The result is never the source path: an empty suffix in the
-    source folder gives the first numbered name (``GX010123_2.MP4``).
+    ``IMG_1234_corrected.png``. Nothing is created or written. The one exception to "no number" is
+    the source guard: the result is never the source path, so an empty suffix in the source folder
+    (or in an alias of it, such as a junction) gives the first numbered name
+    (``GX010123_2.MP4``). The guard asks the filesystem whether the two paths are the same file
+    (:func:`is_same_path`); it does not check whether the result is otherwise free (that is
+    :func:`plan_output`).
 
     Args:
         source: The source file path.
@@ -310,13 +314,13 @@ def final_output_path(source: Path, settings: Settings, kind: MediaKind) -> Path
         kind: Video keeps the source extension exactly; a photo gets ``.png``.
 
     Returns:
-        The path before any collision numbering.
+        The unnumbered path, or the ``_2`` path when the unnumbered one is the source.
 
     Raises:
         ValueError: If the suffix is not a portable name fragment.
     """
     plan = _base_plan(source, settings, kind)
-    if _path_key(plan.path) == _path_key(source):
+    if is_same_path(plan.path, source):
         plan = plan.numbered(2)
     return plan.path
 

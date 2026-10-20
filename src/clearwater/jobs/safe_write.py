@@ -197,8 +197,8 @@ class SafeWrite:
         if not folder.is_dir():
             raise MissingFolderError(f"output folder does not exist: {folder}")
         fd = os.open(self._temp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o666)
+        self._created = True  # before the close: a failing close must still be cleaned up
         os.close(fd)
-        self._created = True
         self._state = SafeWriteState.OPEN
         return self._temp
 

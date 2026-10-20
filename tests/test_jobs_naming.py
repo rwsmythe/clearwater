@@ -407,3 +407,32 @@ def test_planning_skips_a_name_whatever_the_tokens_of_its_temporaries(tmp_path: 
     _touch(tmp_path / "IMG_1_corrected.clearwater-partial-aaaaaaaaaaaa.png")
     _touch(tmp_path / "IMG_1_corrected_2.clearwater-partial-bbbbbbbbbbbb.png")
     assert plan_output(source, Settings(), MediaKind.PHOTO).path.name == "IMG_1_corrected_3.png"
+
+
+def _directory_alias(target: Path, alias: Path) -> bool:
+    """Make ``alias`` another name for the folder ``target``; False if the volume cannot."""
+    try:
+        alias.symlink_to(target, target_is_directory=True)
+        return True
+    except (OSError, NotImplementedError):
+        pass
+    if sys.platform == "win32":
+        result = subprocess.run(
+            ["cmd", "/c", "mklink", "/J", str(alias), str(target)], capture_output=True, check=False
+        )
+        return result.returncode == 0 and alias.exists()
+    return False
+
+
+def test_final_output_path_is_never_the_source_through_a_folder_alias(tmp_path: Path) -> None:
+    real = tmp_path / "real"
+    real.mkdir()
+    source = _touch(real / "GX010123.MP4", b"src")
+    alias = tmp_path / "alias"
+    if not _directory_alias(real, alias):
+        pytest.skip("this volume can make neither a directory symlink nor a junction")
+    settings = Settings(output_suffix="", output_folder=alias)
+    out = final_output_path(source, settings, MediaKind.VIDEO)
+    assert out == alias / "GX010123_2.MP4"
+    assert plan_output(source, settings, MediaKind.VIDEO).path == alias / "GX010123_2.MP4"
+    assert source.read_bytes() == b"src"
