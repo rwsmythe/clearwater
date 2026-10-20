@@ -134,6 +134,7 @@ cumulative machine time ~60 min.
 | r3 | WSL, codex-cli 0.162.1, gpt-5.6-sol/high | 0 | 1 | 7 | 5 / 3 (F5, F7, F8 out) | 8 NEW / 0 | 0 | product: guard.py (new), transport.py, photo.py, licences.py, report; test: guard and profile-name tests (gen-3 cell, `a5c5c00`, `5c998f6`) | (dispatcher) | `clearwater-review-evidence/wp2.1s/r3/` |
 | r4 | WSL, codex-cli 0.162.1, gpt-5.6-sol/high | 0 | 1 (F2 claimed MAJOR, adjudicated MINOR) | 6 | 6 / 1 (F6 out) | 6 NEW / 1 REOPENED (F4: r3 F3's text, in the module docstring) | 0 | product: licences.py, transport.py (docstring; F6), report, licences.json regenerated; test: PNG fixture writes guarded (`c12656c`, `5da289d`) | 181,719 (86 turns) | `clearwater-review-evidence/wp2.1s/r4/` |
 | r5 | WSL, codex-cli 0.162.1, gpt-5.6-sol/high | 0 | 1 (F1; F2 claimed MAJOR, adjudicated MINOR) | 5 | 6 / 0 | 4 NEW / 2 REOPENED (F2: r4 F2; F4: r4 F3) | 0 | product: transport.py (gate confined and identified; docstring), photo.py (verdict, 10-bit check), report, photo.json regenerated; test: verdict and 10-bit cases (`fb49e67`, `ea360fa`) | 219,047 (113 turns) | `clearwater-review-evidence/wp2.1s/r5/` |
+| r6 | WSL, codex-cli 0.162.1, gpt-5.6-sol/high | 0 | 0 | 3 | 3 / 0 | 3 NEW / 0 | 0 | product: transport.py (pts verdict), report (`a3fa7cd`, `7fd6c6a`) | (dispatcher) | `clearwater-review-evidence/wp2.1s/r6/` |
 
 Round 1 (diff `aa1f5f0..ccc23b8`; VERDICT NEW_CRITICAL_MAJOR_FOUND; assertions all pass, 30
 succeeded, 0 `^ERROR`, 0 `ERROR codex_core`, footer present; access hits are echoes). Findings and
@@ -253,3 +254,18 @@ Gate ruling (orchestrator, at depth 219,047): round 6 APPROVED; r5 F1 kept MAJOR
 original is a plausible operator mistake); r5 F2 MINOR agreed; F2 and F4 REOPENED. Round 6
 classifies strictly by the declared envelope (crafted filesystem state or adversarial CLI
 arguments beyond a plausible mistake = OUT).
+
+Round 6 (approved at the gate; diff `aa1f5f0..f8b2a1f`, 4,008 lines; VERDICT NO_NEW_CRITICAL_MAJOR;
+banner gpt-5.6-sol/high, 0 `^ERROR`, 1 `ERROR codex_core` = the sandbox rejecting the reviewer's
+own pytest command (not transport), tokens 163,743, 13 succeeded-in). TERMINATING round: zero new
+blocking. Minors fixed once in cleanup:
+1. Write sizes are a MEAN only (AVIO statistics): report text in three places.
+2. Full-clip pts verdict now counts an extra side-channel entry as a mismatch (probes keep the
+   slice); every record has 0 extras, so no verdict changes and nothing re-run.
+3. MinGW runtime version UNKNOWN (not read from the artefact).
+FINAL VERDICT: Reviewer A CONVERGED at round 6.
+Final validation on head `7fd6c6a` (code `a3fa7cd`): ruff check green; ruff format green except
+`docs/architecture.md` (CHARC's, excused, fixed on main); mypy green (27 files); full pytest 823
+passed, 1 warning (CuPy CUDA_PATH), 450.4 s (`work/wp2.1s/logs/pytest-full-c3d.log`). Harness
+files untouched (diff touches only `tools/spike_io/`, the photo test, the report, the ledger,
+`pyproject.toml`, `uv.lock`).
