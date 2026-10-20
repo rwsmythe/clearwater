@@ -217,3 +217,25 @@ with a `BoxError`, and the walk always advances.
 |---|---|
 | Round 0 | 90,520 (17 turns) |
 | Build complete, window requested | 189,350 (68 turns) |
+
+## Reviewer A
+
+Evidence: `C:\Users\rwsmy\clearwater-review-evidence\wp3.7\r1\` (prompt, diff, `review.txt`, `full-transcript.txt`, `md5s.txt`).
+Transport WSL, `codex-cli 0.162.1`, `gpt-5.6-sol` effort high, read-only sandbox. Green before review: full pytest on `c379284`, 1269 passed (602 s), ruff, ruff format --check, mypy strict.
+
+### Round 1 (head c379284; diff 2278 lines, `src` and `tests` only)
+
+Mechanical assertions: banner model and effort match STRONG; no `ERROR` line; `tokens used` footer present; VERDICT line present; 17 `succeeded in` lines; the only `docs/proofs` strings in the transcript are the prompt echo, the brief's own text and the exclusion globs in the reviewer's commands (no ledger line leaked). The sandbox had no `uv` or `ffprobe`, so findings are on in-memory files and stubbed JSON (EXECUTED) as tagged.
+
+Verdict: `NEW_CRITICAL_MAJOR_FOUND`. Counts: critical 0, major 4, minor 2; all NEW, none REOPENED; all in envelope.
+
+| # | Sev | Where | Finding | Adjudication |
+|---|---|---|---|---|
+| 1 | MAJOR | `boxes.py` `read_movie_boxes` | Reads 16 header bytes for every box: 8 bytes of an ordinary `mdat` payload are consumed; the regression test only used a 16-byte extended-size header with a loose bound | CONFIRMED real (my claim "never reads mdat" is false by 8 bytes). Fix: read 8, and 8 more only when size == 1; test with an 8-byte-header `mdat` and a read-recording check that no read reaches past the header. Product + test |
+| 2 | MAJOR | `probe.py` duration | `duration_s` = max over video and audio streams (ffprobe `format.duration` semantics), not the video track duration; the fallback uses the last packet in FILE order | SPLIT. Fallback defect CONFIRMED (B-frame order): fix to the packet with the highest pts. Choice of stream is a SPEC QUESTION for the dispatcher: IF-5 says "the duration in seconds" of the file; the manifest records the video track. Recommend keeping the container duration (it is what a player shows and what WP3.10 must reproduce), and say so in the report |
+| 3 | MAJOR | `probe.py` `_tail_fault` | The tail decode runs for HLG/PQ files, which ruling 7.6 says are "never decoded" | CONFIRMED. Fix: skip the tail check for a refused HDR file. Product + test (no third ffprobe call) |
+| 4 | MAJOR | `probe.py` `_tail_unreadable` | Compares only the maximum pts; with B-frames a dropped last packet's frame is not the maximum | CONFIRMED. Fix: every packet from the last keyframe on must have its pts delivered. Product + test with reordered pts and a stubbed decode |
+| 5 | MINOR | `boxes.py` | A non-`moov`, non-`mdat` top-level box past the file end is not rejected | Accept; fix in the terminating cleanup (a `mdat` past the end is normal for a cut file) |
+| 6 | MINOR | `inputs.py`, `probe.py` | Messages interpolate the file name, which can be non-ASCII | Accept; fix in the terminating cleanup (replace non-ASCII in the name) |
+
+Fixes pending: findings 1-4, all PRODUCT code; none applied yet (round boundary).
