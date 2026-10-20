@@ -13,6 +13,7 @@
 from __future__ import annotations
 
 import io
+import struct
 import sys
 from pathlib import Path
 
@@ -30,7 +31,7 @@ DNG_VERSION_TAG = 50706
 """The TIFF tag number of ``DNGVersion``."""
 
 DNG_VERSION = (1, 4, 0, 0)
-"""The ``DNGVersion`` value written (DNG 1.4.0.0)."""
+"""The ``DNGVersion`` value written (DNG 1.4.0.0): TIFF type BYTE (1), count 4."""
 
 GOPRO_NAMES = ("GX010001.MP4", "GX020001.MP4", "GL010001.LRV", "GX010001.THM")
 """The GoPro-style names; the lower-case variants are these lower-cased."""
@@ -59,17 +60,42 @@ def tiff_bytes(*, dng: bool) -> bytes:
     """
     directory = TiffImagePlugin.ImageFileDirectory_v2()
     if dng:
-        directory[DNG_VERSION_TAG] = DNG_VERSION
+        directory[DNG_VERSION_TAG] = bytes(
+            DNG_VERSION
+        )  # bytes make Pillow write type BYTE, count 4
     buffer = io.BytesIO()
     Image.fromarray(np.full((8, 8), 128, dtype=np.uint8)).save(buffer, "TIFF", tiffinfo=directory)
     return buffer.getvalue()
 
 
+def dng_entry(path: Path) -> tuple[int, int, bytes] | None:
+    """Read the ``DNGVersion`` entry of a TIFF's first directory from the file's own bytes.
+
+    Args:
+        path: The TIFF.
+
+    Returns:
+        The entry's TIFF type, count and (inline) value bytes, or None when the tag is absent.
+    """
+    data = path.read_bytes()
+    order = "<" if data[:2] == b"II" else ">"
+    (directory,) = struct.unpack(order + "I", data[4:8])
+    (count,) = struct.unpack(order + "H", data[directory : directory + 2])
+    for index in range(count):
+        at = directory + 2 + 12 * index
+        tag, kind, number, value = struct.unpack(order + "HHI4s", data[at : at + 12])
+        if tag == DNG_VERSION_TAG:
+            return kind, number, value
+    return None
+
+
 def dng_tag(path: Path) -> tuple[int, ...] | None:
-    """Return the ``DNGVersion`` tag of a TIFF read back with Pillow, or None."""
+    """Return the ``DNGVersion`` value of a TIFF read back with Pillow, or None."""
     with Image.open(path) as image:
         value = image.tag_v2.get(DNG_VERSION_TAG) if hasattr(image, "tag_v2") else None
-    return tuple(int(v) for v in value) if value is not None else None
+    if value is None:
+        return None
+    return tuple(value) if isinstance(value, bytes) else tuple(int(v) for v in value)
 
 
 def _write(guard: WriteGuard, out: Path, relative: str, data: bytes) -> Path:
@@ -134,6 +160,7 @@ def build(guard: WriteGuard, out: Path) -> list[manifest.Entry]:
     ):
         file = _write(guard, out, relative, tiff_bytes(dng=tagged))
         measured = dng_tag(file)
+        entry = dng_entry(file)
         entries.append(
             manifest.entry(
                 sample_id=sample_id,
@@ -156,6 +183,8 @@ def build(guard: WriteGuard, out: Path) -> list[manifest.Entry]:
                 facts={
                     "dng_version": list(measured) if measured is not None else None,
                     "dng_version_tag": DNG_VERSION_TAG,
+                    "dng_version_type": entry[0] if entry else None,
+                    "dng_version_count": entry[1] if entry else None,
                     "width": 8,
                     "height": 8,
                 },

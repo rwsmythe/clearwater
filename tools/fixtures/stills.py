@@ -48,8 +48,13 @@ CONTENTS = ("uniform", "gradient", "lowred")
 ICC_KINDS = ("none", "srgb", "display-p3")
 """The profiles a still may carry."""
 
-LOW_RED_MAX = 2 / 255
-"""The largest red value of the ``lowred`` content (as a fraction of full scale)."""
+LOW_RED_LEVELS = 2
+"""The largest red level (of 255) of the ``lowred`` content in a lossless sample."""
+
+LOSSY_RED_LEVELS = 0
+"""The red level of the ``lowred`` content before a lossy codec: JPEG and HEIC spread the other
+channels' energy into red (measured: up to 2 levels from a red of 0, 3 from a red of 1), so the
+source red is 0 and the decoded red still stays at or below 2/255."""
 
 LOW_RED_SEED = 20261020
 """The seed of the red-channel noise."""
@@ -116,18 +121,24 @@ def icc_bytes(kind: str) -> bytes | None:
     raise ValueError(f"unknown profile kind {kind!r}")
 
 
-def unit_content(name: str, width: int = WIDTH, height: int = HEIGHT) -> NDArray[np.float64]:
+def unit_content(
+    name: str,
+    width: int = WIDTH,
+    height: int = HEIGHT,
+    red_levels: int = LOW_RED_LEVELS,
+) -> NDArray[np.float64]:
     """Return a content as float64 RGB in [0, 1], shape ``(height, width, 3)``.
 
     - ``uniform``: one blue-green colour.
     - ``gradient``: a grey ramp, black at the left edge to white at the right.
     - ``lowred``: a blue-green scene (green rising to the right, blue rising downwards) whose
-      red channel is seeded noise no larger than 2/255.
+      red channel is seeded noise no larger than ``red_levels`` / 255.
 
     Args:
         name: One of :data:`CONTENTS`.
         width: Width in pixels.
         height: Height in pixels.
+        red_levels: The largest red level (of 255) of ``lowred``.
 
     Returns:
         The content.
@@ -142,7 +153,7 @@ def unit_content(name: str, width: int = WIDTH, height: int = HEIGHT) -> NDArray
     if name == "gradient":
         return np.stack([x, x, x], axis=-1)
     if name == "lowred":
-        red = np.random.default_rng(LOW_RED_SEED).random((height, width)) * LOW_RED_MAX
+        red = np.random.default_rng(LOW_RED_SEED).random((height, width)) * red_levels / 255
         return np.stack([red, 0.35 + 0.30 * x, 0.45 + 0.30 * y], axis=-1)
     raise ValueError(f"unknown content {name!r}")
 
@@ -377,21 +388,43 @@ def _record(
     )
 
 
-def _photo_expect(source_format: str, orientation: int, **more: Any) -> dict[str, Any]:
-    """Return the ``expect`` block of a readable photo (IF-6 ``PhotoMetadata`` names)."""
+def _color(icc_kind: str, bits: int) -> dict[str, Any]:
+    """Return the ``ColorDescription`` fields a reader should give a still.
+
+    The primaries and transfer are stated only for a file with a profile; the spec does not say
+    what a photo without one is read as.
+    """
+    color: dict[str, Any] = {
+        "matrix": "identity",
+        "range": "full",
+        "bit_depth": bits,
+        "icc_profile": None if icc_kind == "none" else icc_kind,
+    }
+    if icc_kind == "srgb":
+        color.update(primaries="bt709", transfer="srgb")
+    elif icc_kind == "display-p3":
+        color.update(primaries="display-p3", transfer="srgb")
+    return color
+
+
+def _photo_expect(
+    source_format: str, orientation: int, bits: int, icc_kind: str, *, exif: bool
+) -> dict[str, Any]:
+    """Return the ``expect`` block of a readable photo (IF-6 ``PhotoMetadata``, IF-1 ``Image``).
+
+    ``icc_profile`` names the profile whose bytes must come back unchanged; ``bit_depth`` is the
+    source bit depth (a 10-bit HEIC is 10, though its samples arrive as 16-bit, AD-17).
+    """
     return manifest.expect(
         photo={
-            "source_format": source_format,
-            "orientation": orientation,
-            "displayed_upright": True,
-            **more,
+            "metadata": {
+                "source_format": source_format,
+                "exif": "present" if exif else None,
+                "orientation": orientation,
+            },
+            "image": {"orientation_applied": True, "color": _color(icc_kind, bits)},
         }
     )
-
-
-def _icc_expectation(kind: str) -> dict[str, Any]:
-    """Return the ``icc`` part of a photo expectation."""
-    return {"icc_kind": kind, "icc_carried": kind != "none"}
 
 
 def build(guard: WriteGuard, out: Path) -> list[manifest.Entry]:
@@ -418,13 +451,15 @@ def build(guard: WriteGuard, out: Path) -> list[manifest.Entry]:
 
     for content in CONTENTS:
         unit = unit_content(content)
+        unit_lossy = unit_content(content, red_levels=LOSSY_RED_LEVELS)
         for icc_kind in ICC_KINDS:
             icc = icc_bytes(icc_kind)
             suffix = f"{content}-{icc_kind}"
-            meta = {"content": content, **_icc_expectation(icc_kind)}
+            meta = {"content": content, "icc_kind": icc_kind}
             serves = ["V5", "D53", "D63", "V9 (inputs)"]
 
             pixels8 = quantize(unit, 8)
+            lossy8 = quantize(unit_lossy, 8)
             relative = f"stills/png/png8-{suffix}.png"
             Image.fromarray(pixels8).save(target(relative), "PNG", icc_profile=icc)
             entries.append(
@@ -437,7 +472,7 @@ def build(guard: WriteGuard, out: Path) -> list[manifest.Entry]:
                     serves=serves,
                     exercises=f"8-bit PNG, {content} content, {icc_kind} profile: read, profile "
                     "kept, bit depth honoured.",
-                    expected=_photo_expect("png", 1, bit_depth=8, **_icc_expectation(icc_kind)),
+                    expected=_photo_expect("png", 1, 8, icc_kind, exif=False),
                     icc=icc,
                     extra={**meta, "lossless": True},
                 )
@@ -457,14 +492,14 @@ def build(guard: WriteGuard, out: Path) -> list[manifest.Entry]:
                     serves=serves,
                     exercises=f"16-bit PNG (stdlib writer), {content} content, {icc_kind} "
                     "profile: 16-bit samples survive the read; profile kept.",
-                    expected=_photo_expect("png", 1, bit_depth=16, **_icc_expectation(icc_kind)),
+                    expected=_photo_expect("png", 1, 16, icc_kind, exif=False),
                     icc=icc,
                     extra={**meta, "lossless": True},
                 )
             )
 
             relative = f"stills/jpeg/jpeg-{suffix}.jpg"
-            Image.fromarray(pixels8).save(
+            Image.fromarray(lossy8).save(
                 target(relative), "JPEG", quality=JPEG_QUALITY, subsampling=0, icc_profile=icc
             )
             entries.append(
@@ -477,7 +512,7 @@ def build(guard: WriteGuard, out: Path) -> list[manifest.Entry]:
                     serves=serves,
                     exercises=f"8-bit JPEG, {content} content, {icc_kind} profile (lossy, "
                     "4:4:4, quality 95).",
-                    expected=_photo_expect("jpeg", 1, bit_depth=8, **_icc_expectation(icc_kind)),
+                    expected=_photo_expect("jpeg", 1, 8, icc_kind, exif=False),
                     icc=icc,
                     extra={**meta, "lossless": False},
                 )
@@ -495,14 +530,14 @@ def build(guard: WriteGuard, out: Path) -> list[manifest.Entry]:
                     serves=[*serves, "D116 (control: a TIFF that is not a DNG)"],
                     exercises=f"8-bit TIFF, {content} content, {icc_kind} profile; also the "
                     "control for the DNG refusal (a TIFF without the DNG tag is read).",
-                    expected=_photo_expect("tiff", 1, bit_depth=8, **_icc_expectation(icc_kind)),
+                    expected=_photo_expect("tiff", 1, 8, icc_kind, exif=False),
                     icc=icc,
                     extra={**meta, "lossless": True},
                 )
             )
 
             for bits in (8, 10):
-                stored = quantize(unit, bits)
+                stored = quantize(unit_lossy, bits)
                 relative = f"stills/heic/heic{bits}-{suffix}.heic"
                 write_heic(target(relative), stored, bits, tag=1, transform=1, icc=icc, guard=guard)
                 entries.append(
@@ -514,10 +549,9 @@ def build(guard: WriteGuard, out: Path) -> list[manifest.Entry]:
                         kind="heic",
                         serves=[*serves, "AD-17"],
                         exercises=f"{bits}-bit HEIC, {content} content, {icc_kind} profile "
-                        "(lossy). A 10-bit file arrives as 16-bit samples (AD-17).",
-                        expected=_photo_expect(
-                            "heic", 1, bit_depth=bits, **_icc_expectation(icc_kind)
-                        ),
+                        "(lossy)."
+                        + (" Its samples arrive as 16-bit values (AD-17)." if bits == 10 else ""),
+                        expected=_photo_expect("heic", 1, bits, icc_kind, exif=True),
                         icc=icc,
                         extra={**meta, "lossless": False},
                     )
@@ -545,9 +579,7 @@ def build(guard: WriteGuard, out: Path) -> list[manifest.Entry]:
                     exercises=f"JPEG of a {'landscape' if shape == 'land' else 'portrait'} "
                     f"scene stored for EXIF Orientation {orientation}: after the read the "
                     "pixels are upright and the tag is applied once.",
-                    expected=_photo_expect(
-                        "jpeg", orientation, bit_depth=8, **_icc_expectation("none")
-                    ),
+                    expected=_photo_expect("jpeg", orientation, 8, "none", exif=True),
                     icc=None,
                     extra={
                         "content": "ramp",
@@ -582,7 +614,7 @@ def build(guard: WriteGuard, out: Path) -> list[manifest.Entry]:
                     "exif-only": "EXIF Orientation 6 and no irot; the tag must be applied.",
                     "neither": "no irot and Orientation 1; no rotation.",
                 }[case],
-                expected=_photo_expect("heic", tag, bit_depth=8, **_icc_expectation("none")),
+                expected=_photo_expect("heic", tag, 8, "none", exif=True),
                 icc=None,
                 extra={
                     "content": "ramp",

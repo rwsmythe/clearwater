@@ -22,8 +22,16 @@ One ``<entry>`` (every key is required)::
     exercises        one sentence: what a test uses it for
     expect           {"faults": [{"kind", "severity"}, ...],   WP2.2 Fault names
                       "refusal": null | {"clause", "by"},       photo refusals (no Fault kind)
-                      "photo": null | {...PhotoMetadata names...},
-                      "probe": null | {...VideoStreamInfo / ProbeResult names...}}
+                      "photo": null | {"metadata": {PhotoMetadata fields},
+                                       "image": {"orientation_applied", "color": {ColorDescription
+                                       fields}}},
+                      "probe": null | {ProbeResult fields: "container", "audio": [{AudioStreamInfo
+                                       fields}], "data", "video": {VideoStreamInfo fields, "color":
+                                       {ColorDescription fields}}}}
+                     Every key under "photo" and "probe" is a field name of the WP2.2 dataclass it
+                     describes; :func:`validate` refuses any other. Where a field holds bytes
+                     (``icc_profile``, ``exif``) the manifest names the profile ("srgb",
+                     "display-p3") or says "present"; a fraction is written "numerator/denominator".
     facts            what was measured from the written file (ffprobe, Pillow, bytes)
     size             bytes of the file as generated
     md5              hex digest when byte-reproducible, else null
@@ -32,6 +40,7 @@ One ``<entry>`` (every key is required)::
 
 from __future__ import annotations
 
+import dataclasses
 import hashlib
 import re
 import typing
@@ -39,7 +48,15 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path, PurePosixPath
 from typing import Any
 
-from clearwater.interfaces.video import Fault, FaultKind
+from clearwater.interfaces.image import ColorDescription, Image
+from clearwater.interfaces.photo import PhotoMetadata
+from clearwater.interfaces.video import (
+    AudioStreamInfo,
+    Fault,
+    FaultKind,
+    ProbeResult,
+    VideoStreamInfo,
+)
 
 SCHEMA = 1
 """The manifest schema version."""
@@ -226,6 +243,57 @@ def _bad_path(path: object) -> bool:
     return pure.is_absolute() or ".." in pure.parts or re.match(r"^[A-Za-z]:", path) is not None
 
 
+def _field_names(cls: type) -> set[str]:
+    """Return the field names of a WP2.2 dataclass."""
+    return {field.name for field in dataclasses.fields(cls)}
+
+
+def _unknown_keys(label: str, where: str, block: object, cls: type) -> list[str]:
+    """Return one problem per key of ``block`` that is not a field of ``cls``."""
+    if not isinstance(block, dict):
+        return [f"{label}: {where} is not an object"]
+    allowed = _field_names(cls)
+    return [
+        f"{label}: {where} key {key!r} is not a {cls.__name__} field ({', '.join(sorted(allowed))})"
+        for key in block
+        if key not in allowed
+    ]
+
+
+def _problems_of_names(label: str, block: dict[str, Any]) -> list[str]:
+    """Return the key-name problems of the ``photo`` and ``probe`` parts of an ``expect``."""
+    problems: list[str] = []
+    photo = block.get("photo")
+    if isinstance(photo, dict):
+        problems += [
+            f"{label}: photo key {key!r} is neither 'metadata' nor 'image'"
+            for key in photo
+            if key not in ("metadata", "image")
+        ]
+        problems += _unknown_keys(label, "photo.metadata", photo.get("metadata", {}), PhotoMetadata)
+        image = photo.get("image", {})
+        problems += _unknown_keys(label, "photo.image", image, Image)
+        if isinstance(image, dict) and "color" in image:
+            problems += _unknown_keys(label, "photo.image.color", image["color"], ColorDescription)
+    probe = block.get("probe")
+    if isinstance(probe, dict):
+        problems += _unknown_keys(label, "probe", probe, ProbeResult)
+        video = probe.get("video")
+        if video is not None:
+            problems += _unknown_keys(label, "probe.video", video, VideoStreamInfo)
+            if isinstance(video, dict) and "color" in video:
+                problems += _unknown_keys(
+                    label, "probe.video.color", video["color"], ColorDescription
+                )
+        audio = probe.get("audio", [])
+        if not isinstance(audio, list):
+            problems.append(f"{label}: probe.audio is not a list")
+        else:
+            for item in audio:
+                problems += _unknown_keys(label, "probe.audio[]", item, AudioStreamInfo)
+    return problems
+
+
 def _problems_of_expect(label: str, block: object) -> list[str]:
     """Return the problems of one ``expect`` block."""
     if not isinstance(block, dict):
@@ -254,7 +322,7 @@ def _problems_of_expect(label: str, block: object) -> list[str]:
     for key in ("refusal", "photo", "probe"):
         if block.get(key) is not None and not isinstance(block[key], dict):
             problems.append(f"{label}: expect.{key} is neither null nor an object")
-    return problems
+    return [*problems, *_problems_of_names(label, block)]
 
 
 def _problems_of_entry(item: object, position: int) -> list[str]:

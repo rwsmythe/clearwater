@@ -3,11 +3,13 @@
 Eight short clips (320 x 180, 45 frames at 30000/1001 fps, one AAC sine track, built from
 ``testsrc2``), each differing in the one thing it exercises: 8-bit BT.709 full range (the
 HERO13 tagging), 10-bit, HLG, PQ, untagged (D54), truncated (D86), variable frame rate (D95,
-D115) and rotated by a display matrix (D105). Software encoders only (libx265, AAC), so a machine
-without NVENC regenerates them. Every sample carries a measured fact record: the ffprobe stream
-fields, the HEVC VUI colour syntax read from the bitstream (``trace_headers``), the packet pts
-list, and the decoded-frame hashes. :func:`build_video` refuses to write a sample whose
-measurements differ from its intent.
+D115) and rotated by a display matrix (D105). Software encoders only (libx265 and libx264, AAC),
+so a machine without NVENC regenerates them. The untagged clip is H.264 because x265 always
+writes a video signal type (with an explicit limited-range flag) into the stream; x264 writes
+none. Every sample carries a measured fact record: the ffprobe stream fields, the video
+signal-type syntax read from the bitstream (``trace_headers``), the packet pts list, and the
+decoded-frame hashes. :func:`build` refuses to write a sample whose measurements differ from its
+intent.
 
 Encoder settings that make the clips repeatable: no B-frames, no x265 version SEI (``info=0``),
 FFmpeg ``bitexact`` flags, no metadata copied. Byte-reproducibility is not claimed for other
@@ -24,6 +26,7 @@ import shutil
 import subprocess
 import sys
 from dataclasses import dataclass
+from fractions import Fraction
 from pathlib import Path
 from typing import Any
 
@@ -93,14 +96,14 @@ class Tags:
         space: ``color_space`` (the matrix).
         transfer: ``color_transfer``.
         primaries: ``color_primaries``.
-        x265: The x265 parameters that write them (empty for untagged).
+        params: The encoder parameters that write them (empty for untagged).
     """
 
     range: str
     space: str
     transfer: str
     primaries: str
-    x265: str
+    params: str
 
 
 BT709_FULL = Tags(
@@ -123,10 +126,19 @@ PQ = Tags(
     "bt2020",
     "colorprim=bt2020:transfer=smpte2084:colormatrix=bt2020nc",
 )
-UNTAGGED = Tags("tv", "unknown", "unknown", "unknown", "")
+UNTAGGED = Tags("unknown", "unknown", "unknown", "unknown", "")
 
 _IF_RANGE = {"pc": "full", "tv": "limited"}
-_IF_NAMES = {"unknown": "unknown", "bt709": "bt709"}
+"""ffprobe's ``color_range`` words in the ``ColorDescription.range`` words."""
+
+D54_COLOR = {
+    "primaries": "bt709",
+    "transfer": "bt709",
+    "matrix": "bt709",
+    "range": "limited",
+    "assumed": True,
+}
+"""What a probe should make of a stream with no colour tags (D54: BT.709 limited, assumed)."""
 
 
 @dataclass(frozen=True)
@@ -143,6 +155,7 @@ class Spec:
         rotation: The display-matrix rotation in degrees.
         vfr: Variable frame rate.
         truncated: The file has its tail cut off.
+        codec: ``"hevc"`` (libx265) or ``"h264"`` (libx264).
     """
 
     sample_id: str
@@ -154,6 +167,7 @@ class Spec:
     rotation: int = 0
     vfr: bool = False
     truncated: bool = False
+    codec: str = "hevc"
 
 
 SPECS = (
@@ -192,9 +206,11 @@ SPECS = (
         "yuv420p",
         UNTAGGED,
         ("D54", "V4"),
-        "HEVC with no colour description in the stream or the container: BT.709 limited is "
-        "assumed and the user is warned.",
+        "H.264 with no video signal type in the stream and no colour box in the container: "
+        "BT.709 limited is assumed and the user is warned. (x265 always writes a signal type, "
+        "so this sample is H.264.)",
         faults=(("missing_tags", "warn"),),
+        codec="h264",
     ),
     Spec(
         "vid-truncated",
@@ -270,10 +286,13 @@ def _lavfi_inputs(seconds: float) -> list[str]:
 
 def _encode_args(spec: Spec) -> list[str]:
     """Return the encoder arguments of a sample."""
-    x265 = ":".join(part for part in (COMMON_X265, spec.tags.x265) if part)
+    if spec.codec == "h264":
+        video_args = ["-c:v", "libx264", "-pix_fmt", spec.pix_fmt, "-x264-params", "bframes=0"]
+    else:
+        params = ":".join(part for part in (COMMON_X265, spec.tags.params) if part)
+        video_args = ["-c:v", "libx265", "-pix_fmt", spec.pix_fmt, "-x265-params", params]
     return [
-        "-map", "0:v:0", "-map", "1:a:0",
-        "-c:v", "libx265", "-pix_fmt", spec.pix_fmt, "-x265-params", x265,
+        "-map", "0:v:0", "-map", "1:a:0", *video_args,
         "-c:a", "aac", "-b:a", "64k", *BITEXACT, "-map_metadata", "-1", "-movflags", "+faststart",
     ]  # fmt: skip
 
@@ -446,25 +465,53 @@ def measure(path: Path) -> dict[str, Any]:
 # --- Intent against measurement -----------------------------------------------------------
 
 
+def intended_frame_rate(spec: Spec) -> str:
+    """Return the average frame rate ffprobe should report, as ``numerator/denominator``.
+
+    A constant-rate clip is 30000/1001; the VFR clip's average is its frame count over its
+    duration (the last pts plus one nominal frame), reduced.
+    """
+    if not spec.vfr:
+        return FRAME_RATE
+    rate = Fraction(VFR_FRAMES * TIMESCALE, vfr_ticks()[-1] + VFR_UNIT)
+    return f"{rate.numerator}/{rate.denominator}"
+
+
 def expectation(spec: Spec) -> dict[str, Any]:
-    """Return the ``expect.probe`` block of a sample: VideoStreamInfo names, from its intent."""
-    color = {
-        "primaries": _IF_NAMES.get(spec.tags.primaries, spec.tags.primaries),
-        "transfer": _IF_NAMES.get(spec.tags.transfer, spec.tags.transfer),
-        "matrix": _IF_NAMES.get(spec.tags.space, spec.tags.space),
-        "range": _IF_RANGE[spec.tags.range],
-        "assumed": spec.tags is UNTAGGED,
-    }
-    return {
-        "codec": "hevc",
+    """Return the ``expect.probe`` block of a sample (``ProbeResult``, ``VideoStreamInfo`` names).
+
+    Built from the intent, never from the file. HLG and PQ streams get no ``color``: they are
+    refused at probe and never reach a ``ColorDescription``. An untagged stream is expected
+    to come out with the D54 defaults and ``assumed`` True.
+    """
+    bits = PIX_FMT_BITS[spec.pix_fmt]
+    video: dict[str, Any] = {
+        "codec": spec.codec,
         "width": WIDTH,
         "height": HEIGHT,
-        "bit_depth": PIX_FMT_BITS[spec.pix_fmt],
-        "color": color,
+        "bit_depth": bits,
+        "frame_rate": intended_frame_rate(spec),
+        "time_base": f"1/{TIMESCALE}",
+        "nb_frames": VFR_FRAMES if spec.vfr else FRAMES,
         "rotation": spec.rotation,
         "vfr": spec.vfr,
-        "tag_state": "untagged" if spec.tags is UNTAGGED else "tagged",
-        "truncated": spec.truncated,
+    }
+    if spec.tags is UNTAGGED:
+        video["color"] = {**D54_COLOR, "bit_depth": bits}
+    elif spec.tags in (BT709_FULL, BT709_LIMITED):
+        video["color"] = {
+            "primaries": spec.tags.primaries,
+            "transfer": spec.tags.transfer,
+            "matrix": spec.tags.space,
+            "range": _IF_RANGE[spec.tags.range],
+            "bit_depth": bits,
+            "assumed": False,
+        }
+    return {
+        "container": "mov,mp4,m4a,3gp,3g2,mj2",
+        "video": video,
+        "audio": [{"codec": "aac", "sample_rate": 48000, "channels": 1}],
+        "data": [],
     }
 
 
@@ -485,21 +532,33 @@ def mismatches(spec: Spec, facts: dict[str, Any]) -> list[str]:
         if got != want:
             wrong.append(f"{spec.sample_id}: {name} is {got!r}, intended {want!r}")
 
-    need("codec", video["codec"], "hevc")
+    need("codec", video["codec"], spec.codec)
+    need("container", facts["container"], "mov,mp4,m4a,3gp,3g2,mj2")
+    need("average frame rate", video["avg_frame_rate"], intended_frame_rate(spec))
+    need("time base", video["time_base"], f"1/{TIMESCALE}")
+    if not spec.truncated:
+        need("container frame count", video["nb_frames"], VFR_FRAMES if spec.vfr else FRAMES)
     need("size", (video["width"], video["height"]), (WIDTH, HEIGHT))
     need("bit depth", video["bit_depth"], PIX_FMT_BITS[spec.pix_fmt])
     need("color_space", video["color_space"], spec.tags.space)
     need("color_transfer", video["color_transfer"], spec.tags.transfer)
     need("color_primaries", video["color_primaries"], spec.tags.primaries)
     need("rotation", video["rotation"], spec.rotation)
-    need("audio", [(a["codec"], a["sample_rate"]) for a in facts["audio"]], [("aac", 48000)])
+    need(
+        "audio",
+        [(a["codec"], a["sample_rate"], a["channels"]) for a in facts["audio"]],
+        [("aac", 48000, 1)],
+    )
     need("variable frame rate", facts["pts"]["variable"], spec.vfr)
     need("GPS or location tag", facts["has_location_tag"], False)
     need("data streams", facts["data_streams"], [])
     vui = video["vui"]
     if spec.tags is UNTAGGED:
-        need("VUI colour_description_present_flag", vui.get("colour_description_present_flag"), 0)
-        need("VUI video_full_range_flag", vui.get("video_full_range_flag", 0), 0)
+        need("VUI video_signal_type_present_flag", vui.get("video_signal_type_present_flag"), 0)
+        need(
+            "VUI colour_description_present_flag", vui.get("colour_description_present_flag"), None
+        )
+        need("color_range", video["color_range"], "unknown")
     else:
         need("VUI colour_description_present_flag", vui.get("colour_description_present_flag"), 1)
         need(

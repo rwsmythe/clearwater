@@ -12,7 +12,7 @@ report section 5 "The flicker as numbers"). No owner pixel is used.
 
 The disc is a 10 % disc, which is 257 pixels across at 960 x 540: it cannot fit inside the lower
 third (180 rows). Its centre row is therefore 405, the middle of the lower half, and it spans rows
-276 to 533. The lower third holds its centre; the upper half, the measured region, is never
+277 to 532. The lower third holds its centre; the upper half, the measured region, is never
 touched. The clip is lossless (FFV1 RGB in Matroska), so the decoded frames are exactly
 the frames rendered here and their hash is the manifest's identity check.
 """
@@ -350,6 +350,40 @@ def measure_clip(path: Path) -> dict[str, Any]:
     }
 
 
+def normalisation_spread(image: NDArray[np.uint8]) -> float:
+    """Return the N{} spread of a still: WP1.3's whole-frame statistic, measured by the prototype.
+
+    The still is compensated (Ancuti 2018, red only) and white-balanced at the ``Params()``
+    defaults, and the spread is the high bound minus the low bound of the sharpening
+    normalisation (``prototype.pipeline.normalisation_bounds``), the quantity WP1.3 reports as
+    "N{} low..high" (report section 5).
+
+    Args:
+        image: A ``(height, width, 3)`` ``uint8`` RGB still.
+
+    Returns:
+        The spread, in fractions of full scale.
+    """
+    from prototype import pipeline
+    from prototype.params import Params
+
+    params = Params()
+    unit = (image / np.float32(255)).astype(np.float32)
+    compensated, _ = pipeline.compensate_ancuti2018(unit, params)
+    balanced, _ = pipeline.white_balance(compensated, params)
+    low, high = pipeline.normalisation_bounds(balanced, params)
+    return float(high - low)
+
+
+WP1_3_REFERENCE = {
+    "source": "docs/reports/wp1.3-look-check.md section 5 (flicker clip, 180 frames of GX011627)",
+    "channel_means": [0.426, 0.572, 0.546],
+    "normalisation_spread_range": [0.27, 0.52],
+    "normalisation_spread_mean": 0.38,
+}
+"""The WP1.3 statistics the texture is tuned to (quoted from the report, not measured here)."""
+
+
 def design_facts() -> dict[str, Any]:
     """Return the facts of the design, measured from the rendered pixels.
 
@@ -376,7 +410,8 @@ def design_facts() -> dict[str, Any]:
         "width": WIDTH,
         "height": HEIGHT,
         "texture_channel_means": means,
-        "wp1_3_channel_means": [0.426, 0.572, 0.546],
+        "texture_normalisation_spread": round(normalisation_spread(base), 3),
+        "wp1_3_reference": WP1_3_REFERENCE,
         "disc_radius_px": round(disc_radius(), 3),
         "disc_pixels_min": min(pixels),
         "disc_pixels_max": max(pixels),
@@ -482,11 +517,14 @@ def build_clip(guard: WriteGuard, out: Path) -> manifest.Entry:
         "sweeping the lower half; measure frame-to-frame flicker only inside ad14-mask.",
         expected=manifest.expect(
             probe={
-                "codec": "ffv1",
-                "width": WIDTH,
-                "height": HEIGHT,
-                "vfr": False,
-                "frames": FRAMES,
+                "container": "matroska,webm",
+                "video": {
+                    "codec": "ffv1",
+                    "width": WIDTH,
+                    "height": HEIGHT,
+                    "frame_rate": FRAME_RATE,
+                    "vfr": False,
+                },
             }
         ),
         facts={"design": design, "stream": measured},
