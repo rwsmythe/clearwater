@@ -39,8 +39,11 @@
 
 - **None.** Retired (never message): `wp31-cell`, `wp31-cell2`, `wp315-cell`, `wp313-cell`,
   `wp37-cell`, and every earlier cell.
-- Worktrees present: `.worktrees/wp3.1` and `.worktrees/wp3.1-mc` (keep until CHARC's QA of the
-  WP3.1 accept CONFIRMS; then remove per the practice note). Branches kept.
+- Worktrees present: none (wp3.1, wp3.1-mc removed after CHARC's QA CONFIRMED `6cadc26e470cd8c6`;
+  wave 1 CLOSED). Branches kept.
+- Drafting helpers (in-process, uncommitted output): `wave2-drafter-a` (WP3.2, 3.3, 3.5),
+  `wave2-drafter-b` (WP3.6, 3.12, 3.16), commission `5a550699b8b58b10` (option 1: six briefs,
+  tranche A = 3.2/3.3/3.5/3.12, tranche B = 3.6/3.16 after two A cells return; debt citations).
 
 ### Where things stand -- the successor starts HERE
 
@@ -56,7 +59,7 @@
    `1cf9564`: 1844 passed (618 s); CuPy unimportable 1738 passed / 106 skipped (361 s). Reviewer B
    one pass NO_NEW_CRITICAL_MAJOR (4 minor, 2 advisory): B#4 report erratum at the gate; the rest
    BANKED as DR-37 (a)-(e). Main gates on `c1fd6ce`: 1844 passed (538 s), harness 366. CHARC QA
-   pending. **WAVE 1 COMPLETE** (WP3.15, WP3.13, WP3.7, WP3.1).
+   CONFIRMED. **WAVE 1 CLOSED** (WP3.15, WP3.13, WP3.7, WP3.1).
 3. **Then:** wave-2 briefs (WP3.2, 3.3, 3.5, 3.6, 3.12, 3.16) at CHARC's commission
    (`docs/briefs/wp2.4-phase3-frame.md`). WP3.12 can go now (WP3.15 merged, X2). Carry these
    consumer notes into the briefs:
@@ -102,7 +105,7 @@ Each accepted package had its return report posted to CHARC and an info-update t
 | WP3.15 | 2026-10-20 | `da54a47` | `docs/proofs/wp3.15-accept.md`; DR-34; DR-32 closed; second blocking B adjudicated at the gate (B2#1 refuted by execution); stacked gate | CONFIRMED (`3ee39aedcd59a4aa`) |
 | WP3.13 | 2026-10-20 | `6dd5a00` | `docs/proofs/wp3.13-accept.md`; DR-35; A converged R3 (R1 critical fixed by tokened temporaries); B clean | CONFIRMED (`3ee39aedcd59a4aa`) |
 | WP3.7 | 2026-10-20 | `6e3417a` | `docs/proofs/wp3.7-accept.md`; DR-36; A terminated R2; B clean; main gates for the stack: 1671 passed | CONFIRMED (`3ee39aedcd59a4aa`) |
-| WP3.1 | 2026-10-20 | `f4acbd0` | `docs/proofs/wp3.1-accept.md`; DR-37; A terminated R2 (two cells, depth re-seat at R1); B clean (erratum at the gate); two full runs (CuPy and none); 1844 passed on main | pending |
+| WP3.1 | 2026-10-20 | `f4acbd0` | `docs/proofs/wp3.1-accept.md`; DR-37; A terminated R2 (two cells, depth re-seat at R1); B clean (erratum at the gate); two full runs (CuPy and none); 1844 passed on main | CONFIRMED (`6cadc26e470cd8c6`) |
 
 Kept branches (evidence; do not delete unasked): `wp3.15`, `wp3.15-mc`, `wp3.13`, `wp3.13-mc`, `wp3.7`, `wp3.7-mc`, `wp3.1`, `wp3.1-mc`, `wp2.3`, `wp2.3-mc`, `wp2.2`, `wp2.2-mc`, `wp1.2b`, `wp1.2b-b1`, `wp1.3d`, `wp1.3d-b1`,
 `wp1.4b`, plus the earlier packages' (`git branch`).
