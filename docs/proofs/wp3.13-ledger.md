@@ -9,6 +9,7 @@ answers to open questions 1-6 bind).
 | Round | Critical | Major | Minor | In envelope / out | NEW / REOPENED | Reverts | Fix changed | Transport, CLI | Depth |
 |---|---|---|---|---|---|---|---|---|---|
 | 0 (design table) | - | - | - | - | - | - | none (no code) | - | 62,046 (dispatcher-read at the round-0 yield) |
+| 1 | 1 | 4 | 1 | 6 in / 0 out | 6 NEW / 0 REOPENED | 0 | none yet (remediation after the ruling) | WSL, codex-cli, gpt-5.6-sol high | 118,143 (dispatcher-read at the window grant) |
 
 ## Round 0: design table (no product code yet)
 
@@ -169,3 +170,32 @@ Deviation from the round-0 table: `SpaceCheck` also carries `folder` (used by `m
 
 Own tests `tests/test_jobs_*.py`: 114 passed, 0 skipped (NTFS: the case-insensitive and symlink tests ran).
 ruff check, ruff format --check, mypy strict clean on the worktree.
+
+## Full-pytest window (granted by the dispatcher)
+
+Head c701a04: `1252 passed, 1 warning in 531.75s (0:08:51)`, exit 0; the warning is CuPy's "CUDA path could
+not be detected" (environment, not this package). Output `work/tmp/full.txt` in the worktree. The
+`SpaceCheck.folder` deviation was accepted by the dispatcher.
+
+## Round 1 (Reviewer A, strong: gpt-5.6-sol, effort high; head c701a04)
+
+Evidence `C:\Users\rwsmy\clearwater-review-evidence\wp3.13\r1\` (prompt, diff, `full-transcript.txt`,
+`review.txt`, `adjudication.md`, `md5s.txt`). Assertions all met (see adjudication.md). VERDICT:
+NEW_CRITICAL_MAJOR_FOUND. Six findings, all EXECUTED, all confirmed, all in envelope, all NEW:
+
+1. CRITICAL: `remove_leftovers` deletes a user file named like a temporary (pattern-only identity).
+2. MAJOR: `final_output_path` returns the source for an empty suffix in the source folder.
+3. MAJOR: `SafeWrite.__enter__` leaks reservations when `begin()` raises (missing folder).
+4. MAJOR: commit-time bump ignores the bumped name's temporary on disk.
+5. MAJOR: `abort()` can unlink another job's re-created temporary (identity not tracked).
+6. MINOR: `SpaceCheck.message()` is not ASCII for a Unicode folder.
+
+Proposed remediation (NOT yet applied; per the dispatcher the round ends here): findings 2-6 as in
+`adjudication.md`. Finding 1 changes the round-0 temporary-name pattern, so it needs a ruling: the proposal
+is `<base>.clearwater-partial-<12 hex>[.ext]` with a fresh `secrets.token_hex(6)` per `SafeWrite`; the
+cleanup regex requires the token; planning and commit decide "another job's temporary exists" by scanning the
+destination folder for that final name's token form (the filesystem decides, case-insensitively);
+`validate_suffix` and the final-name guard keep working. Residual accepted limitation: a user file
+deliberately named with marker plus 12 hex digits would be removed. Alternative if the dispatcher prefers no
+token: accept the literal-marker case as an out-of-practice input and bank it (not recommended: the brief's
+examine list names this invariant).
