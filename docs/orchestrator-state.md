@@ -38,7 +38,9 @@
   estimators ~0 -> "below the quantisation floor"; total red gain = camera WRGB x ours). Check at
   return that they landed (ledger). If the grid confirms the anti-D100 signal: spec-bearing, owner
   decision request at WP1.6 result 4 (via CHARC).
-- `wp14b-cell` RETIRED at its STOP (06:44Z): 235,202 / 94 turns, then 237,015 (read twice, head
+- `wp14b-cell` STOOD DOWN 06:50Z after a collision (woken by the queued 10b message, it ran claim 10
+  and began 10b in the shared worktree; it halted on seeing cell2's edits; outputs handed to cell2 with
+  a reproducibility check required). It was RETIRED at its STOP (06:44Z): 235,202 / 94 turns, then 237,015 (read twice, head
   `33bd8ba`). Evaluation (owner's rule, not reflex): the grid, claims 7-10b, the report and a full
   STRONG review loop remained, an open-ended load, so a fresh cell. Claim 10b had NOT landed (not
   in its ledger). Done: the flip alone `b23bad9`; 62 pins + guards `fddc4e3`; WIP estimator and
@@ -135,6 +137,10 @@ Each accepted package had its return report posted to CHARC and an info-update t
     landed, and re-engage the cell if not.
   - Truncated cell reports: extract the last assistant text from
     `~/.claude/projects/C--Users-rwsmy-clearwater/<session>/subagents/agent-a<name>-*.jsonl`.
+- **Re-seat stand-down** (gen 2 slip, WP1.4b 2026-10-20): a message queued to a cell mid-work wakes
+  it after it yields. The claim 10b amendment woke `wp14b-cell` after its STOP and re-seat, and it
+  worked in the same worktree as `wp14b-cell2` for ~5 min (it noticed and halted; no damage). At any
+  re-seat, send the old cell an explicit STAND-DOWN first, and have the successor check `git status`.
 - **Merging:** rebase in a `-mc` worktree, compare `git patch-id --stable`, gate there, then
   `git merge --ff-only` on main, `uv sync`, and re-gate (pytest, `-m gpu`, harness).
 - **Reviewer B = MY OWN single Codex pass at this seat on the merge candidate, NEVER a cell**
