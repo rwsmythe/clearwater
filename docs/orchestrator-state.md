@@ -5,12 +5,16 @@
 
 ### Generation
 
-- **Generation 4** (`clearwater-orchestrator-20261020-0524`) is LIVE since 2026-10-20 ~15:25Z
-  (verify: `comms/.launch-sessions.json`). Earlier: gen 3 `clearwater-orchestrator-20261019-2346`
-  (rolled at 400K), gen 2 `clearwater-orchestrator-20261018-1442`, gen 1
-  `clearwater-orchestrator-20261014-1258`.
-- **Inbox:** gen 4 is the sole drainer; drained through CHARC `4f11a18fc46c9fc4` (WP2.2 QA).
-- Bash-launch gauge at gen-4 bring-up: 34 ms.
+- **Generation 4** (`clearwater-orchestrator-20261020-0524`) ROLLED OVER 2026-10-20 ~18:05Z at a
+  clean boundary (~300K: below the cap, but four parallel wave-1 cells would have died with it
+  mid-round): WP2.3 merged, NO live cell. **Generation 5 starts here** (verify:
+  `comms/.launch-sessions.json`). Earlier: gen 3 `clearwater-orchestrator-20261019-2346`, gen 2
+  `clearwater-orchestrator-20261018-1442`, gen 1 `clearwater-orchestrator-20261014-1258`.
+- **Inbox:** gen 4 drained through CHARC `66315b22c1eeb03e`-era hold confirmations and STOPPED
+  DRAINING at its rollover announcement. You are the sole drainer (verify:
+  `uv run python scripts/role_mail.py list --role orchestrator`). CHARC's WP2.3 QA may be waiting.
+- **CHARC is generation 2:** `clearwater-charc-20261020-0636` (rolled 16:36Z). Cue that exact name.
+- Bash-launch gauge at gen-4 bring-up: 34 ms. Re-measure at yours.
 
 ### Standing operator rulings
 
@@ -19,68 +23,55 @@
   CHARC answers in the operator's stead except plan s.3 owner-reserved items ("HOLD <item>": pause
   that item, continue the rest). Info-updates (`--type fyi`) to the operator after each accept. No
   AskUserQuestion from this seat.
-- **Spec v0.5.3** (D16: 3C default; chapter handling deferred to v2). Plan v1.1. Cite v0.5.3.
-  The prototype `Params()` default IS c3 since WP1.4b (`b23bad9`).
+- **OWNER WORD 2026-10-20 ~16:00Z:** "Gate 1: Option C.  2. Keep.  3. approve 0.5.4". Spec
+  **v0.5.4** applied (`9cf16c5`); plan v1.2 adds **WP3.21** (optimisation package, drafted at
+  wave 4 with WP3.14); architecture **FINAL 1.0**; CP3 and CP4 records in `docs/proofs/`
+  (`3eca7bd`); interim N6 = 25 min/min at 4K (D106); gain caps KEPT (D100). AD-25 (platform
+  conventions that are not N1 exceptions), AD-26/27 logged. No owner decision is open. Cite v0.5.4.
 - **GoPro IMU and GPS are OUT OF SCOPE** (owner 2026-10-19 via CHARC `01500d3574412e69`): no brief
-  reads ACCL/GYRO/GRAV/CORI/IORI/GPS. Nothing from a `gpmd` track is ever committed (it carries the
-  owner's dive sites).
-- **Cell depth** (owner 2026-10-19/20; kernel: `docs/orchestrator-context.md` hazard (6), CHARC
-  `5692485`): read `uv run python scripts/cell_depth.py <cell>` at dispatch, at every yield and
-  before any ruling; record each figure with its moment; read depth AND head twice across a turn
-  boundary. **~250K is an EVALUATION point** (bounded remaining work continues; a large or
-  open-ended load goes to a fresh cell); **~400K STOP** and re-dispatch from the ledger.
+  reads ACCL/GYRO/GRAV/CORI/IORI/GPS. Nothing from a `gpmd` track is ever committed. GPMF
+  settings come only from the `moov/udta` GPMF atom, keys FMWR/PRTN/PTCL (AD-16 as corrected).
+- **Cell depth** (owner 2026-10-19/20; kernel `docs/orchestrator-context.md` hazard (6)): read
+  `uv run python scripts/cell_depth.py <cell>` at dispatch, every yield, before any ruling; record
+  each figure with its moment; read twice across a turn boundary to prove idle. **~250K is an
+  EVALUATION point**; **~400K STOP** and re-dispatch from the ledger.
 
 ### Live cells
 
-- **`wp23-cell2`** (implementer-sonnet-high, STRONG): WP2.3 successor, R2 onward, worktree
-  `.worktrees/wp2.3`, branch `wp2.3`, from head `d495b57` (R1 closed, 11/11 fixed), dispatched
-  2026-10-20 ~16:37Z, depth 0 at dispatch. It applies CHARC's R1 ruling `ef7b272564ddeb9d`
-  (AD-14 centre track; the readable conditional conftest line; NEW `.gitattributes`
-  `tests/fixtures/** -text`) and yields at R2's verdict BEFORE remediating.
-- `wp23-cell` RETIRED at its R1 yield: 216,593/62 mid-build, 379,109/145 mid-remediation (it ran
-  R1 and remediated without yielding), 406,816/164 at the yield (PAST CAP); stood down 16:34Z.
-  The accept record must say so (CHARC: the corrective is an explicit R1 yield in the brief).
-- CHARC rolled to generation 2 (`clearwater-charc-20261020-0636`) at 16:36Z. Owner word
-  ~16:00Z: Gate 1 option C, caps kept, spec v0.5.4 approved (`9cf16c5`, `3eca7bd`;
-  architecture FINAL 1.0). Wave-1 briefs (WP3.1/3.7/3.13/3.15) APPROVED (`47b9738`); at FINAL
-  each cites v0.5.4 + architecture 1.0 (drop "proposed"), fills WP2.3 manifest ids (X3), and
-  WP3.1 gets the one-line Gate 1 section (IF-2 ops written so WP3.21 can keep arrays
-  device-resident; no implicit host copies). All four dispatch once WP2.3 merges; serialise
-  full-pytest gate windows (X5).
-- Retired (never message): `wp23-cell`, `wave1-drafter`, `wp22-cell`, `wp21s-cell`, `wp21s-cell2`, `wp21s-cell3`, the gen-2
-  cells. The wp2.2 worktrees are removed; branches `wp2.2`, `wp2.2-mc`, `wp2.1s`, `wp2.1s-mc` are
-  kept as evidence.
+- **None.** Retired (never message): `wp23-cell2` (returned; 196,003 / 117 at its last yield),
+  `wp23-cell` (stood down past cap), `wave1-drafter`, `wp22-cell`, `wp21s-cell`, `wp21s-cell2`,
+  `wp21s-cell3`, the gen-2 cells.
+- Worktrees present (verify `git worktree list`): `.worktrees/wp2.3` and `.worktrees/wp2.3-mc`.
+  Remove both with `git worktree remove --force` after CHARC's WP2.3 QA confirms. Keep the
+  branches.
 
 ### Where things stand -- the successor starts HERE
 
-1. **Phase 1 (prototype gate) is complete.** All six N5 results are in. CHARC wrote the WP1.6 gate
-   report (`docs/reports/wp1.6-gate-report.md`, draft `a0c87d2`); generation 2 fact-checked every
-   figure (4 mismatches, 4 imprecisions, 3 advisories) and CHARC applied all of them (`4d40f49`,
-   `b02ab34`; CHARC `257db38e6727db20`). D109 (sparse analysis) stays NOT named, on the corrected
-   2.3-2.9 min/min figure.
-2. **Gate 1 (N6 speed) is with the OWNER** as a decision request from CHARC: options A (tune N6 to
-   ~25 min/min), B (optimise first), C (both; CHARC recommends: interim N6 25 min/min, transport
-   choice at WP2.1, optimisation package in Phase 3, final tune at WP5.2). Gate result 4 (KEEP the
-   caps) awaits the owner's confirmation at CP3. The gate record is final when the owner's word is
-   recorded and the fact-check attached.
-3. **WP2.1S ACCEPTED** (main `a866f06`); CHARC QA CONFIRMED (`9fb52c00bbb58a9b`). AD-2/17/18 are
-   closed and AD-23/24 logged (`3591e80`).
-4. **WP2.2 ACCEPTED 2026-10-20, main `b288533`** (record `docs/proofs/wp2.2-accept.md`; DR-32).
-   IF-1 to IF-10 are FROZEN (AD-20). The return report went to CHARC (return_report, thread
-   wp2.2, 15:23Z), with the hold on main released.
-   - DONE by gen 4: 892 passed on main (record row, `da074f4`); CHARC QA CONFIRMED; wp2.2
-     worktrees removed; WP2.3 brief FINAL and dispatched (see Live cells).
-   - **WP2.3 notes:**
-     - The manifest uses WP2.2's `Fault` kinds (`src/clearwater/interfaces/video.py`: seven
-       kinds, severity refuse/warn/exclude).
-     - The brief allows ONE `pytest_plugins` line in `tests/conftest.py`.
-     - The flicker clip is procedural, 960x540 FFV1, generated into `work/`; its decoded-frame
-       hash is checked against the manifest.
-     - Size limits: no committed file over 2 MB; `tests/fixtures/` under 10 MB.
-   - Then WP2.4 (Phase 3-5 briefs and spec v0.5.4 for CP4) is CHARC's with this seat. Wait
-     for CHARC's commission.
-5. **Photos:** none supplied yet. Gate 2's largest-photo leg and the photo look check stay PENDING
-   until the owner supplies photos.
+1. **WP2.3 ACCEPTED 2026-10-20, main `d605925`** (record `docs/proofs/wp2.3-accept.md`, with
+   the gates-on-main row at `e357e56`; DR-33). Return report posted to CHARC (return_report,
+   thread wp2.3, 18:00Z); hold on main RELEASED. Main full pytest 1138 passed. CHARC QA PENDING:
+   drain it first. If CHARC overturns the DR-33 adjudication, DR-33 lists the fixes.
+2. **WAVE 1 IS YOURS TO DISPATCH NOW** (CHARC approval `871a371855bb1630`; owner word above).
+   All four briefs are FINAL at `e357e56` (v0.5.4, architecture 1.0, manifest ids filled, the
+   WP3.1 Gate 1 section). Dispatch all four in parallel from the current main:
+   - **WP3.15** `implementer-sonnet-high`, `.worktrees/wp3.15`: first in any queue (its
+     `config.paths` at round 0 unblocks WP3.12, X2);
+   - **WP3.13** `implementer-sonnet-high`, `.worktrees/wp3.13`;
+   - **WP3.7** `implementer-sonnet-high`, `.worktrees/wp3.7` (ruling 7.3 AMENDED: an untagged
+     `yuvj` stream = FULL range);
+   - **WP3.1** `implementer-opus-high`, `.worktrees/wp3.1` (its exclusive speed row needs YOUR
+     grant of an exclusive window, with nothing else heavy running, plan 4.3).
+   For each: create the worktree from main, copy `clearwater.local.toml`, `mkdir work`. The
+   inline prompt follows gen 4's WP2.3 successor prompt shape: recipe + brief + review-gate
+   Part 1 + a Reviewer A runner to copy (`clearwater-review-evidence/wp2.3/r2/`); the EXPLICIT
+   yield schedule ("END YOUR TURN as soon as round N's verdict is adjudicated, BEFORE
+   remediating"); depth 0 at dispatch; the delivery path. **X5: you serialise full-pytest gate
+   windows**; cells run only their own tests in the inner loop and ask before a full run. Post
+   one dispatch fyi to CHARC and the operator.
+3. **Then:** wave-2 briefs (WP3.2, 3.3, 3.5, 3.6, 3.12, 3.16) at CHARC's commission, per
+   `docs/briefs/wp2.4-phase3-frame.md` (FINAL by the owner's word). WP3.12 depends on WP3.15
+   merged (X2). The frame's next touch adds X5 (CHARC's).
+4. **Photos:** none supplied yet. Gate 2's largest-photo leg and the photo look check stay PENDING.
 
 ### Workstreams
 
@@ -103,8 +94,9 @@ Each accepted package had its return report posted to CHARC and an info-update t
 | WP1.4b | 2026-10-20 | `afaff0e` | `docs/proofs/wp1.4b-accept.md`; Gate result 4 KEEP; DR-30; flip witness 6/6 | CONFIRMED (`2fe4e7e1dc9e0854`) |
 | WP2.1S | 2026-10-20 | `a866f06` | `docs/proofs/wp2.1s-accept.md`; DR-31; 2 depth re-seats; B errata at the gate | CONFIRMED (`9fb52c00bbb58a9b`) |
 | WP2.2 | 2026-10-20 | `b288533` | `docs/proofs/wp2.2-accept.md`; DR-32; B re-run major adjudicated at the gate; IF-1..IF-10 frozen; 892 passed on main | CONFIRMED (`4f11a18fc46c9fc4`) |
+| WP2.3 | 2026-10-20 | `d605925` | `docs/proofs/wp2.3-accept.md`; DR-33; B re-run 3 majors adjudicated at the gate; first cell past cap at R1; 1138 passed on main | pending |
 
-Kept branches (evidence; do not delete unasked): `wp1.2b`, `wp1.2b-b1`, `wp1.3d`, `wp1.3d-b1`,
+Kept branches (evidence; do not delete unasked): `wp2.3`, `wp2.3-mc`, `wp2.2`, `wp2.2-mc`, `wp1.2b`, `wp1.2b-b1`, `wp1.3d`, `wp1.3d-b1`,
 `wp1.4b`, plus the earlier packages' (`git branch`).
 
 ### Practice notes (this instance)
@@ -156,13 +148,36 @@ Kept branches (evidence; do not delete unasked): `wp1.2b`, `wp1.2b-b1`, `wp1.3d`
   boundary after about 400K; never with a cell mid-round, since it dies with you.
 - **Memory pressure:** the host stopped background test runs on 2026-10-19 for low system memory;
   do not restart a killed run on your own; ask.
+- **`-mc` worktree setup (gen 4, paid for at WP2.3):** after creating or rebuilding a `-mc`
+  worktree, copy `clearwater.local.toml` into it AND `mkdir -p <wt>/work` BEFORE the full
+  pytest (`--basetemp=work/...` needs its parent; without both, 107 errors / 11 failures that
+  are not the package's). Build and rebase it with `git -c core.autocrlf=false ...` (the system
+  gitconfig sets autocrlf true; a rebase across the commit that adds `.gitattributes` stopped on
+  the CRLF manifest). A bare `git -C <wt> config core.autocrlf false` writes the SHARED
+  `.git/config`: never do that.
+- **Bare `cd` (gen 4 did it three times):** every gate in a worktree runs in a `( cd ... && ... )`
+  subshell. The session's cwd moving under a live cell is hazard (1).
+- **Cell depth:** run `scripts/cell_depth.py <name>` from the repo root (from a worktree it
+  guesses the wrong project dir).
+- **Brief yield schedule:** name the R1 yield explicitly ("END YOUR TURN as soon as round N's
+  verdict is adjudicated, BEFORE remediating"). wp23-cell, without it, ran R1 and its
+  remediation in one turn to 407K; wp23-cell2, with it, yielded on time at 96K.
+- **Delayed idle notifications:** a cell's `idle_notification` can arrive AFTER its real report
+  and after your reply woke it; compare its timestamp with your last message before acting.
+  Never reply to a stale one (a reply wakes the cell).
+- **Drafting helper:** brief drafting can go to a `general-purpose` (opus) helper that writes
+  the drafts uncommitted; QA them against disk (grep every cited AD/IF/DR/clause) before the
+  query. `wave1-drafter` did WP3.1/3.7/3.13/3.15 this way.
+- **Long mailbox bodies and scripts:** write them with the Write tool; a long bash heredoc
+  failed to parse again in gen 4.
 
 ### Pending (still valid)
 
-- WP1.6: the smoothing row reads "2 s provisional, re-measure per DR-25(3)", never a settled 2 s;
-  the WP1.4b lighting-step finding (a genuine step at 0.90 s in GX011600) is input to a
-  step-aware temporal design in Phase 2.
+- The smoothing default is 2.0 s (v0.5.4 7.2), with the step-aware temporal task for WP3.11;
+  the WP1.4b lighting-step finding (a genuine step at 0.90 s in GX011600) is its input.
 - No `.LRV`/`.THM` exist (owner); D60 handled in v0.5.2.
 - `_windows_power()` in `bench.py` is instrument-only (CHARC); never into `src/clearwater/`
   without a fresh ruling.
-- Open debt: DR-1, 2, 6, 7, 8, 10-20, 22, 23, 25-32 (`docs/debt-register.md`).
+- IF-5 `VideoSink.abort` docstring cites D84; it should be D44/D85 (CHARC: fix at the next
+  interface touch, not before).
+- Open debt: DR-1, 2, 6, 7, 8, 10-20, 22, 23, 25-33 (`docs/debt-register.md`).
