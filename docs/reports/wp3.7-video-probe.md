@@ -8,7 +8,7 @@ tables, the rulings and the round record.
 ## Claims
 
 1. `probe(path) -> ProbeResult` fills IF-5 exactly as frozen. Every time is a `Fraction` from
-   integer ticks and a stream time base (`duration_s` = longest video or audio stream duration,
+   integer ticks and a stream time base (`duration_s` = the CONTAINER duration, the longest of the video and audio stream durations as `duration_ts x time_base`, ruled 2b: the video track's own duration is <= `duration_s` and equal on the video-only samples;
    `start_offset_s` and `AudioStreamInfo.start_s` from `start_pts`); `frame_rate` and `time_base`
    are `Fraction`s of ffprobe's rational strings. No decimal string is parsed into a time.
    Evidence: `test_every_video_sample_probes_to_its_manifest_facts` (8 samples against the
@@ -25,7 +25,7 @@ tables, the rulings and the round record.
    `nb_frames`, or the last packet carries the corrupt flag. Without `nb_frames` only the first
    and last signals apply. `unreadable_tail`: the file is not truncated and a decode of the last
    group of pictures only (`-read_intervals <last keyframe>%+86400`) writes an error, exits
-   nonzero, or does not deliver the last packet's frame. The two are exclusive. Every intact
+   nonzero, or does not deliver a frame (by pts) for every packet from the last keyframe on, B-frame order included. An HLG/PQ file is refused and never decoded, so it gets no tail decode. The two are exclusive. Every intact
    sample and all 35 real clips give neither; the cut sample gives `truncated` only; a copy with
    the last packet's payload overwritten gives `unreadable_tail` only.
 6. Edit list from `moov` (`boxes.py`; `elst` versions 0 and 1; the first `vide` track): segment
@@ -42,9 +42,10 @@ tables, the rulings and the round record.
    kind `"sidecar"` without running ffprobe.
 9. The owner's IMU/GPS ruling is honoured structurally: no `gpmd` data, packet or frame of a data
    stream is requested (the packet and tail calls select `v:0`; the stream call names fields and
-   asks for no tags), the box reader never reads `mdat`, and a static test forbids the sensor,
+   asks for no tags), the box reader reads exactly the 8 (or 16, for a 64-bit size) header bytes of `mdat` and none of its payload (byte-count test), and a static test forbids the sensor,
    location and telemetry tokens and `tools` imports under `src/clearwater/io/video` and `src/`.
-10. The locator `find_tool(name)` (PATH lookup, kind `"missing_tool"`) is public for WP3.9 and
+10. Messages are ASCII: a non-ASCII file name or profile is escaped with backslash escapes (`ascii_text`). A non-`mdat` top-level box that overruns the file is a `BoxError`.
+11. The locator `find_tool(name)` (PATH lookup, kind `"missing_tool"`) is public for WP3.9 and
     WP3.10.
 
 ## Evidence

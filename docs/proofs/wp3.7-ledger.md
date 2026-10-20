@@ -239,3 +239,19 @@ Verdict: `NEW_CRITICAL_MAJOR_FOUND`. Counts: critical 0, major 4, minor 2; all N
 | 6 | MINOR | `inputs.py`, `probe.py` | Messages interpolate the file name, which can be non-ASCII | Accept; fix in the terminating cleanup (replace non-ASCII in the name) |
 
 Fixes pending: findings 1-4, all PRODUCT code; none applied yet (round boundary).
+
+### Round 1 remediation (applied after the round-1 rulings; depth at round-1 yield 215,371, 86 turns)
+
+Rulings: 1, 2a, 3, 4 accepted as planned; 2b RULED: `duration_s` is the CONTAINER duration, exact (integer `duration_ts` x `time_base`, never ffprobe's decimal `format.duration`; the code already did this); 5 and 6 fixed now.
+
+| Finding | Product change | Test (fails on the unfixed code) |
+|---|---|---|
+| 1 | `read_movie_boxes` reads 8 header bytes, 8 more only for a 64-bit size | `test_the_reader_takes_exactly_the_header_bytes_of_the_media_data_box` (reads inside the `mdat` == `[(start, 8)]`), `test_a_64_bit_media_data_header_...` |
+| 2a | duration fallback uses the packet with the highest pts | `test_the_duration_fallback_uses_the_packet_with_the_highest_pts` |
+| 2b | no code change; documented | `test_the_container_duration_is_the_longest_stream_and_exact` (passes both ways by design: it pins the ruling) |
+| 3 | `_tail_fault(..., decode_tail=False)` for HLG/PQ | `test_a_refused_file_is_never_decoded_not_even_for_the_tail` (2 calls, no `-read_intervals`) |
+| 4 | tail requires a delivered frame for every packet pts >= last keyframe pts | `test_a_dropped_last_packet_is_found_when_frames_are_reordered`, `test_frames_before_the_last_keyframe_are_not_required` |
+| 5 | non-`mdat` top-level box overrunning the file raises `BoxError` | `test_a_box_other_than_media_data_that_overruns_the_file_raises`, `test_media_data_that_overruns_a_cut_file_is_not_an_error` |
+| 6 | `ascii_text` (backslash escapes) on file names and the profile in every message | `test_messages_are_ascii_even_for_non_ascii_names` |
+
+Checks after the fixes: own tests 141 passed; ruff, ruff format --check, mypy strict clean; stash check: with the unfixed `probe.py`/`inputs.py` 5 new probe tests fail, with the unfixed `boxes.py` 3 new box tests fail; stress 160 probes clean; all 35 real clips again 0 faults 0 errors (52.1 s). Full pytest window requested for the head after this remediation.
