@@ -1,8 +1,8 @@
-# Clearwater architecture (WP2.1, DRAFT 0.1, CHARC, 2026-10-20)
+# Clearwater architecture (WP2.1, FINAL 1.0, CHARC, 2026-10-20; CP4 approved)
 
-**Status:** DRAFT. Spec v0.5.3, plan v1.1. Decisions are logged in `docs/decisions.md` (AD-n);
-this document states the resulting design and freezes the interfaces (plan section 8.2). One
-item is PENDING: the N6 figure (owner, Gate 1, AD-21). The frame transport (AD-2, AD-23) and
+**Status:** FINAL 1.0 (CP4, owner 2026-10-20 ~16:00Z: "Gate 1: Option C.  2. Keep.  3. approve 0.5.4"). Spec v0.5.4, plan v1.2. Decisions are logged in `docs/decisions.md` (AD-n);
+this document states the resulting design and freezes the interfaces (plan section 8.2). No
+item is pending: the N6 figure is the interim 25 min/min of D106 (Gate 1 option C, AD-21), with WP3.21 as the optimisation package. The frame transport (AD-2, AD-23) and
 the photo-library verification (AD-17, AD-24) closed with WP2.1S on 2026-10-20. The owner reviews this
 document and the decision log at CP4 (design freeze) with the spec revision v0.5.4.
 
@@ -306,7 +306,7 @@ AD-18. Confirmed at WP5.5 with the final wheel set; CUDA runtime files are never
 
 | Item | Closed by |
 |---|---|
-| N6 figure for V16 and the optimisation package | Owner, Gate 1 (AD-21) |
+| N6 final figure | WP5.2 re-measure after WP3.21 (AD-21) |
 | HEIC orientation rule on a real owner photo | the first owner photo (AD-24) |
 | Proxy store container | WP3.12 brief's measured test (AD-5) |
 | Step-aware smoothing variant | WP3.11 design task (AD-3) |

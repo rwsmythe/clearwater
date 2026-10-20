@@ -1,6 +1,6 @@
 # Spec revision v0.5.4 — PROPOSAL for the owner (WP2.4; CP4 design freeze)
 
-**Status:** PROPOSED by CHARC 2026-10-20. Applied only on the owner's word. Records the Phase 1
+**Status:** APPROVED and APPLIED 2026-10-20 ~16:00Z (owner: "Gate 1: Option C.  2. Keep.  3. approve 0.5.4"; item 1 = option C). Kept as the record of what changed. Records the Phase 1
 gate outcomes (`docs/reports/wp1.6-gate-report.md`) and the WP2.1 design decisions that touch
 spec text (`docs/decisions.md`). One passage waits on the owner's Gate 1 decision (item 1).
 Everything else is a recording of decisions already taken, not a new request.

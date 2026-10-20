@@ -1,6 +1,6 @@
 # WP1.6 — Prototype gate report (CHARC, 2026-10-20)
 
-**Status:** DRAFT for CP3, all six N5 results in. Written by CHARC from the accept records and
+**Status:** CLOSED 2026-10-20 ~16:00Z. Owner's word at CP3, verbatim: "Gate 1: Option C.  2. Keep.  3. approve 0.5.4" (Gate 1 = option C; Result 4 = KEEP; spec v0.5.4 approved). Fact-checked by the orchestrator (msg da1efb92, all items applied). All six N5 results in. Written by CHARC from the accept records and
 reports named below; the orchestrator fact-checks every figure against its source before the
 record section is marked final. Spec **v0.5.3**; plan v1.1 sections 6 (WP1.6), 9, 10; N5, V14.
 Each result states the measurement, the decision it leads to, and who decides. Gate 1 (speed)
@@ -196,8 +196,8 @@ pipe, or PyAV in-process) is WP2.1's, now with Result 1's pipe measurement as it
 
 | Decision | Options | Evidence | Status |
 |---|---|---|---|
-| N6 target (Result 1) | A tune to 25 min/min / B optimise first / **C both (recommended)** | Part A, Part B | **OPEN: owner** |
-| Gain caps (Result 4) | **keep (recommended)** / drop | WP1.4b | OPEN: owner confirms |
+| N6 target (Result 1) | A tune to 25 min/min / B optimise first / **C both (recommended)** | Part A, Part B | **DECIDED 2026-10-20 ~16:00Z: C** (D106 v0.5.4; WP3.21) |
+| Gain caps (Result 4) | **keep (recommended)** / drop | WP1.4b | **DECIDED 2026-10-20 ~16:00Z: keep** |
 | Chapter handling in v1 | keep / defer | inventory b1fd289 | CLOSED 2026-10-19: deferred to v2, spec v0.5.3, plan v1.1 |
 | Anything relaxing a mandatory requirement | none proposed beyond N6 | -- | none |
 | Photo size limit (Result 2) | only if the largest photo exceeds 16 GB on CPU | Part B photo leg | PENDING photos; not expected |
@@ -215,12 +215,11 @@ Part A section 8 and Part B claim 6; defaults from WP1.1 plus CP2 (c3). Debt car
 
 | N5 result | Outcome | Decision | By |
 |---|---|---|---|
-| 1 Speed | MISSED at 4K: core 3.6x (ancuti2018) / 5.8x (c3); export 4.4x measured (ancuti2018), ~6.6x estimated (c3) | N6 tuned and/or optimisation package: **OPEN** | Owner |
+| 1 Speed | MISSED at 4K: core 3.6x (ancuti2018) / 5.8x (c3); export 4.4x measured (ancuti2018), ~6.6x estimated (c3) | Option C: interim N6 25 min/min; WP3.21 optimisation package; re-measure at WP5.2 | Owner (2026-10-20 ~16:00Z) |
 | 2 Memory | HOLDS: 3,682 MiB RSS, 2,860 MiB graphics at 4K; photo PENDING | no limit change | CHARC |
 | 3 Look | PASSED shallow and deep; c3 default; lighting-step finding to Phase 2 | spec v0.5.3 applied | Owner (CP2) |
-| 4 Noise | caps KEEP recommended; c3 lowest noise | keep | Owner (CP3) |
+| 4 Noise | caps KEEP recommended; c3 lowest noise | KEPT | Owner (2026-10-20 ~16:00Z) |
 | 5 Statistics | no visible difference | one stage permitted; IF-3 staged | CHARC |
 | 6 Container | SIMPLE meets all mandatory items | WP3.10 as planned | CHARC |
 
-The gate closes when the owner's word on Result 1 (and the KEEP confirmation on Result 4) is
-recorded here with its time, and the orchestrator's fact-check is attached.
+**Gate CLOSED 2026-10-20 ~16:00Z** on the owner's word above; the orchestrator's fact-check (da1efb92) is applied in full. Records: `docs/proofs/cp3-prototype-gate.md`, `docs/proofs/cp4-design-freeze.md`.
