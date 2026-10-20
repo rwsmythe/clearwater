@@ -67,6 +67,7 @@ class FakeDevice:
         runtime = types.SimpleNamespace(
             getDeviceCount=get_device_count, getDevice=get_device, memGetInfo=mem_get_info
         )
+
         def pool_free_bytes() -> int:
             if device.pool_error is not None:
                 raise device.pool_error
