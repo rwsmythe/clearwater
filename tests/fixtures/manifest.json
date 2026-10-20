@@ -1,0 +1,4725 @@
+{
+  "schema": 1,
+  "limits": {
+    "max_file_bytes": 2000000,
+    "max_total_bytes": 10000000
+  },
+  "samples": [
+    {
+      "id": "ad14-flicker",
+      "group": "flicker",
+      "kind": "mkv",
+      "storage": "generated",
+      "path": "flicker/ad14-flicker.mkv",
+      "command": "uv run python tools/fixtures/generate.py --group flicker --out work/fixtures/scratch --generated-out work/fixtures/generated",
+      "serves": [
+        "V3",
+        "D112",
+        "D64",
+        "AD-14"
+      ],
+      "exercises": "The V3 clip: 90 frames at 30000/1001 of one still with a 10 % bright disc sweeping the lower half; measure frame-to-frame flicker only inside ad14-mask.",
+      "expect": {
+        "faults": [],
+        "refusal": null,
+        "photo": null,
+        "probe": {
+          "codec": "ffv1",
+          "width": 960,
+          "height": 540,
+          "vfr": false,
+          "frames": 90
+        }
+      },
+      "facts": {
+        "design": {
+          "frames": 90,
+          "frame_rate": "30000/1001",
+          "width": 960,
+          "height": 540,
+          "texture_channel_means": [
+            0.4264,
+            0.5715,
+            0.5452
+          ],
+          "wp1_3_channel_means": [
+            0.426,
+            0.572,
+            0.546
+          ],
+          "disc_radius_px": 128.457,
+          "disc_pixels_min": 51812,
+          "disc_pixels_max": 51838,
+          "disc_area_fraction_min": 0.09995,
+          "disc_area_fraction_max": 0.1,
+          "disc_centre_row": 405,
+          "disc_first_row": 277,
+          "disc_last_row": 532,
+          "region_rows": [
+            0,
+            269
+          ],
+          "disc_pixels_in_region": 0,
+          "region_pixels_changed_between_frames": 0,
+          "lower_third_first_row": 360,
+          "frames_rgb24_sha256": "5f7edea09d88139c8ed27c8ebe3cffa0c518f774d108cf920cc8d326c37a9cd7"
+        },
+        "stream": {
+          "container": "matroska,webm",
+          "codec": "ffv1",
+          "pix_fmt": "bgr0",
+          "width": 960,
+          "height": 540,
+          "r_frame_rate": "30000/1001",
+          "avg_frame_rate": "30000/1001",
+          "time_base": "1/1000",
+          "decoded_frames": 90,
+          "decoded_rgb24_sha256": "5f7edea09d88139c8ed27c8ebe3cffa0c518f774d108cf920cc8d326c37a9cd7",
+          "packet_pts_count": 90,
+          "packet_pts_sha256": "4d28811feb69c5b023b5c985801a1d7b658f97f67941f5701791204b4b68ccc3",
+          "ffprobe_errors": []
+        }
+      },
+      "size": 89227437,
+      "md5": null,
+      "byte_reproducible": false
+    },
+    {
+      "id": "ad14-mask",
+      "group": "flicker",
+      "kind": "mask",
+      "storage": "committed",
+      "path": "flicker/ad14-mask.png",
+      "command": null,
+      "serves": [
+        "V3",
+        "D112",
+        "AD-14"
+      ],
+      "exercises": "The measured region of the flicker clip: 255 in the upper half, 0 elsewhere; the disc never enters it.",
+      "expect": {
+        "faults": [],
+        "refusal": null,
+        "photo": null,
+        "probe": null
+      },
+      "facts": {
+        "width": 960,
+        "height": 540,
+        "mode": "L",
+        "region_rows": [
+          0,
+          269
+        ],
+        "region_pixels": 259200,
+        "outside_pixels": 259200
+      },
+      "size": 1115,
+      "md5": "4d5a3991bc5837a6258a0f32453547f0",
+      "byte_reproducible": true
+    },
+    {
+      "id": "dng-by-extension",
+      "group": "files",
+      "kind": "dng",
+      "storage": "committed",
+      "path": "files/dng/dng-by-extension.dng",
+      "command": null,
+      "serves": [
+        "D116"
+      ],
+      "exercises": "A DNG refused by its extension: a .dng file whose content is a TIFF with the DNGVersion tag.",
+      "expect": {
+        "faults": [],
+        "refusal": {
+          "clause": "D116",
+          "by": "extension"
+        },
+        "photo": null,
+        "probe": null
+      },
+      "facts": {
+        "dng_version": [
+          1,
+          4,
+          0,
+          0
+        ],
+        "dng_version_tag": 50706,
+        "width": 8,
+        "height": 8
+      },
+      "size": 206,
+      "md5": "9cc4ddc3735731a6a0fbd9f80690fad2",
+      "byte_reproducible": true
+    },
+    {
+      "id": "dng-by-tag",
+      "group": "files",
+      "kind": "tiff",
+      "storage": "committed",
+      "path": "files/dng/dng-by-tag.tif",
+      "command": null,
+      "serves": [
+        "D116 (AD-17)"
+      ],
+      "exercises": "A DNG refused by its tag: a .tif file carrying the DNGVersion tag (50706).",
+      "expect": {
+        "faults": [],
+        "refusal": {
+          "clause": "D116",
+          "by": "tag"
+        },
+        "photo": null,
+        "probe": null
+      },
+      "facts": {
+        "dng_version": [
+          1,
+          4,
+          0,
+          0
+        ],
+        "dng_version_tag": 50706,
+        "width": 8,
+        "height": 8
+      },
+      "size": 206,
+      "md5": "9cc4ddc3735731a6a0fbd9f80690fad2",
+      "byte_reproducible": true
+    },
+    {
+      "id": "dng-extension-only",
+      "group": "files",
+      "kind": "dng",
+      "storage": "committed",
+      "path": "files/dng/dng-extension-only.dng",
+      "command": null,
+      "serves": [
+        "D116"
+      ],
+      "exercises": "A DNG refused by its extension alone: a .dng file with no DNGVersion tag.",
+      "expect": {
+        "faults": [],
+        "refusal": {
+          "clause": "D116",
+          "by": "extension"
+        },
+        "photo": null,
+        "probe": null
+      },
+      "facts": {
+        "dng_version": null,
+        "dng_version_tag": 50706,
+        "width": 8,
+        "height": 8
+      },
+      "size": 186,
+      "md5": "854f076fb458b74e6554c6b612889ecc",
+      "byte_reproducible": true
+    },
+    {
+      "id": "gopro-lower-gl010001-lrv",
+      "group": "files",
+      "kind": "placeholder",
+      "storage": "committed",
+      "path": "files/gopro-lower/gl010001.lrv",
+      "command": null,
+      "serves": [
+        "D83"
+      ],
+      "exercises": "The sidecar name gl010001.lrv: excluded from the input list.",
+      "expect": {
+        "faults": [
+          {
+            "kind": "sidecar",
+            "severity": "exclude"
+          }
+        ],
+        "refusal": null,
+        "photo": null,
+        "probe": null
+      },
+      "facts": {
+        "name": "gl010001.lrv",
+        "case": "lower",
+        "sidecar": true,
+        "is_video": false
+      },
+      "size": 58,
+      "md5": "99b5b201e23f9584e129d99ac471b483",
+      "byte_reproducible": true
+    },
+    {
+      "id": "gopro-lower-gx010001-mp4",
+      "group": "files",
+      "kind": "placeholder",
+      "storage": "committed",
+      "path": "files/gopro-lower/gx010001.mp4",
+      "command": null,
+      "serves": [
+        "D83"
+      ],
+      "exercises": "The input name gx010001.mp4: listed as an input (the file is a text placeholder, not a video; do not probe it).",
+      "expect": {
+        "faults": [],
+        "refusal": null,
+        "photo": null,
+        "probe": null
+      },
+      "facts": {
+        "name": "gx010001.mp4",
+        "case": "lower",
+        "sidecar": false,
+        "is_video": false
+      },
+      "size": 58,
+      "md5": "ee0933a6fcebbd47f890abd0d4488091",
+      "byte_reproducible": true
+    },
+    {
+      "id": "gopro-lower-gx010001-thm",
+      "group": "files",
+      "kind": "placeholder",
+      "storage": "committed",
+      "path": "files/gopro-lower/gx010001.thm",
+      "command": null,
+      "serves": [
+        "D83"
+      ],
+      "exercises": "The sidecar name gx010001.thm: excluded from the input list.",
+      "expect": {
+        "faults": [
+          {
+            "kind": "sidecar",
+            "severity": "exclude"
+          }
+        ],
+        "refusal": null,
+        "photo": null,
+        "probe": null
+      },
+      "facts": {
+        "name": "gx010001.thm",
+        "case": "lower",
+        "sidecar": true,
+        "is_video": false
+      },
+      "size": 58,
+      "md5": "b15bd15f6ce084355e1a1719355cf338",
+      "byte_reproducible": true
+    },
+    {
+      "id": "gopro-lower-gx020001-mp4",
+      "group": "files",
+      "kind": "placeholder",
+      "storage": "committed",
+      "path": "files/gopro-lower/gx020001.mp4",
+      "command": null,
+      "serves": [
+        "D83"
+      ],
+      "exercises": "The input name gx020001.mp4: listed as an input (the file is a text placeholder, not a video; do not probe it).",
+      "expect": {
+        "faults": [],
+        "refusal": null,
+        "photo": null,
+        "probe": null
+      },
+      "facts": {
+        "name": "gx020001.mp4",
+        "case": "lower",
+        "sidecar": false,
+        "is_video": false
+      },
+      "size": 58,
+      "md5": "bc1e6521c20f001985fef97fbd2f925c",
+      "byte_reproducible": true
+    },
+    {
+      "id": "gopro-upper-gl010001-lrv",
+      "group": "files",
+      "kind": "placeholder",
+      "storage": "committed",
+      "path": "files/gopro-upper/GL010001.LRV",
+      "command": null,
+      "serves": [
+        "D83"
+      ],
+      "exercises": "The sidecar name GL010001.LRV: excluded from the input list.",
+      "expect": {
+        "faults": [
+          {
+            "kind": "sidecar",
+            "severity": "exclude"
+          }
+        ],
+        "refusal": null,
+        "photo": null,
+        "probe": null
+      },
+      "facts": {
+        "name": "GL010001.LRV",
+        "case": "upper",
+        "sidecar": true,
+        "is_video": false
+      },
+      "size": 58,
+      "md5": "418790a859b7d8c93bd417cc39691819",
+      "byte_reproducible": true
+    },
+    {
+      "id": "gopro-upper-gx010001-mp4",
+      "group": "files",
+      "kind": "placeholder",
+      "storage": "committed",
+      "path": "files/gopro-upper/GX010001.MP4",
+      "command": null,
+      "serves": [
+        "D83"
+      ],
+      "exercises": "The input name GX010001.MP4: listed as an input (the file is a text placeholder, not a video; do not probe it).",
+      "expect": {
+        "faults": [],
+        "refusal": null,
+        "photo": null,
+        "probe": null
+      },
+      "facts": {
+        "name": "GX010001.MP4",
+        "case": "upper",
+        "sidecar": false,
+        "is_video": false
+      },
+      "size": 58,
+      "md5": "826dab11a86ade385f77e1e318eb2ff4",
+      "byte_reproducible": true
+    },
+    {
+      "id": "gopro-upper-gx010001-thm",
+      "group": "files",
+      "kind": "placeholder",
+      "storage": "committed",
+      "path": "files/gopro-upper/GX010001.THM",
+      "command": null,
+      "serves": [
+        "D83"
+      ],
+      "exercises": "The sidecar name GX010001.THM: excluded from the input list.",
+      "expect": {
+        "faults": [
+          {
+            "kind": "sidecar",
+            "severity": "exclude"
+          }
+        ],
+        "refusal": null,
+        "photo": null,
+        "probe": null
+      },
+      "facts": {
+        "name": "GX010001.THM",
+        "case": "upper",
+        "sidecar": true,
+        "is_video": false
+      },
+      "size": 58,
+      "md5": "c35d4f111ace6806e6413ee7ebb362bb",
+      "byte_reproducible": true
+    },
+    {
+      "id": "gopro-upper-gx020001-mp4",
+      "group": "files",
+      "kind": "placeholder",
+      "storage": "committed",
+      "path": "files/gopro-upper/GX020001.MP4",
+      "command": null,
+      "serves": [
+        "D83"
+      ],
+      "exercises": "The input name GX020001.MP4: listed as an input (the file is a text placeholder, not a video; do not probe it).",
+      "expect": {
+        "faults": [],
+        "refusal": null,
+        "photo": null,
+        "probe": null
+      },
+      "facts": {
+        "name": "GX020001.MP4",
+        "case": "upper",
+        "sidecar": false,
+        "is_video": false
+      },
+      "size": 58,
+      "md5": "f94f4f9e1e5a1ab40cab7428ead714da",
+      "byte_reproducible": true
+    },
+    {
+      "id": "heic-ad24-both",
+      "group": "stills",
+      "kind": "heic",
+      "storage": "committed",
+      "path": "stills/heic/heic-ad24-both.heic",
+      "command": null,
+      "serves": [
+        "AD-24",
+        "D63",
+        "V5"
+      ],
+      "exercises": "HEIC orientation rule: irot and EXIF Orientation 6 together (the iPhone layout); rotated once, not twice.",
+      "expect": {
+        "faults": [],
+        "refusal": null,
+        "photo": {
+          "source_format": "heic",
+          "orientation": 6,
+          "displayed_upright": true,
+          "bit_depth": 8,
+          "icc_kind": "none",
+          "icc_carried": false
+        },
+        "probe": null
+      },
+      "facts": {
+        "format": "HEIC",
+        "width": 96,
+        "height": 64,
+        "bit_depth": 8,
+        "irot": 270,
+        "imir": null,
+        "exif_orientation": 6,
+        "has_gps": false,
+        "icc": "none",
+        "content": "ramp",
+        "scene": "landscape",
+        "ad24_case": "both",
+        "intended_irot_orientation": 6,
+        "stored_width": 64,
+        "stored_height": 96,
+        "lossless": false
+      },
+      "size": 2023,
+      "md5": "49f97584e83402a98f627d114f647f86",
+      "byte_reproducible": true
+    },
+    {
+      "id": "heic-ad24-exif-only",
+      "group": "stills",
+      "kind": "heic",
+      "storage": "committed",
+      "path": "stills/heic/heic-ad24-exif-only.heic",
+      "command": null,
+      "serves": [
+        "AD-24",
+        "D63",
+        "V5"
+      ],
+      "exercises": "HEIC orientation rule: EXIF Orientation 6 and no irot; the tag must be applied.",
+      "expect": {
+        "faults": [],
+        "refusal": null,
+        "photo": {
+          "source_format": "heic",
+          "orientation": 6,
+          "displayed_upright": true,
+          "bit_depth": 8,
+          "icc_kind": "none",
+          "icc_carried": false
+        },
+        "probe": null
+      },
+      "facts": {
+        "format": "HEIC",
+        "width": 64,
+        "height": 96,
+        "bit_depth": 8,
+        "irot": null,
+        "imir": null,
+        "exif_orientation": 6,
+        "has_gps": false,
+        "icc": "none",
+        "content": "ramp",
+        "scene": "landscape",
+        "ad24_case": "exif-only",
+        "intended_irot_orientation": 1,
+        "stored_width": 64,
+        "stored_height": 96,
+        "lossless": false
+      },
+      "size": 2013,
+      "md5": "0c3f88f35a78db5bcf35137ef6b1e887",
+      "byte_reproducible": true
+    },
+    {
+      "id": "heic-ad24-irot-only",
+      "group": "stills",
+      "kind": "heic",
+      "storage": "committed",
+      "path": "stills/heic/heic-ad24-irot-only.heic",
+      "command": null,
+      "serves": [
+        "AD-24",
+        "D63",
+        "V5"
+      ],
+      "exercises": "HEIC orientation rule: irot only, EXIF Orientation 1; libheif rotates, nothing else.",
+      "expect": {
+        "faults": [],
+        "refusal": null,
+        "photo": {
+          "source_format": "heic",
+          "orientation": 1,
+          "displayed_upright": true,
+          "bit_depth": 8,
+          "icc_kind": "none",
+          "icc_carried": false
+        },
+        "probe": null
+      },
+      "facts": {
+        "format": "HEIC",
+        "width": 96,
+        "height": 64,
+        "bit_depth": 8,
+        "irot": 270,
+        "imir": null,
+        "exif_orientation": 1,
+        "has_gps": false,
+        "icc": "none",
+        "content": "ramp",
+        "scene": "landscape",
+        "ad24_case": "irot-only",
+        "intended_irot_orientation": 6,
+        "stored_width": 64,
+        "stored_height": 96,
+        "lossless": false
+      },
+      "size": 2023,
+      "md5": "4532714f4cc573194b6d5d6248936151",
+      "byte_reproducible": true
+    },
+    {
+      "id": "heic-ad24-neither",
+      "group": "stills",
+      "kind": "heic",
+      "storage": "committed",
+      "path": "stills/heic/heic-ad24-neither.heic",
+      "command": null,
+      "serves": [
+        "AD-24",
+        "D63",
+        "V5"
+      ],
+      "exercises": "HEIC orientation rule: no irot and Orientation 1; no rotation.",
+      "expect": {
+        "faults": [],
+        "refusal": null,
+        "photo": {
+          "source_format": "heic",
+          "orientation": 1,
+          "displayed_upright": true,
+          "bit_depth": 8,
+          "icc_kind": "none",
+          "icc_carried": false
+        },
+        "probe": null
+      },
+      "facts": {
+        "format": "HEIC",
+        "width": 96,
+        "height": 64,
+        "bit_depth": 8,
+        "irot": null,
+        "imir": null,
+        "exif_orientation": 1,
+        "has_gps": false,
+        "icc": "none",
+        "content": "ramp",
+        "scene": "landscape",
+        "ad24_case": "neither",
+        "intended_irot_orientation": 1,
+        "stored_width": 96,
+        "stored_height": 64,
+        "lossless": false
+      },
+      "size": 1954,
+      "md5": "dda8856d6cdd23fc6d0a210a36518fb0",
+      "byte_reproducible": true
+    },
+    {
+      "id": "heic10-gradient-display-p3",
+      "group": "stills",
+      "kind": "heic",
+      "storage": "committed",
+      "path": "stills/heic/heic10-gradient-display-p3.heic",
+      "command": null,
+      "serves": [
+        "V5",
+        "D53",
+        "D63",
+        "V9 (inputs)",
+        "AD-17"
+      ],
+      "exercises": "10-bit HEIC, gradient content, display-p3 profile (lossy). A 10-bit file arrives as 16-bit samples (AD-17).",
+      "expect": {
+        "faults": [],
+        "refusal": null,
+        "photo": {
+          "source_format": "heic",
+          "orientation": 1,
+          "displayed_upright": true,
+          "bit_depth": 10,
+          "icc_kind": "display-p3",
+          "icc_carried": true
+        },
+        "probe": null
+      },
+      "facts": {
+        "format": "HEIC",
+        "width": 96,
+        "height": 64,
+        "bit_depth": 10,
+        "irot": null,
+        "imir": null,
+        "exif_orientation": 1,
+        "has_gps": false,
+        "icc": "match",
+        "icc_md5": "84800e16f6285ece237561e6603cd8a5",
+        "content": "gradient",
+        "icc_kind": "display-p3",
+        "icc_carried": true,
+        "lossless": false
+      },
+      "size": 1378,
+      "md5": "392e38e2bc7d6ccf883156f14bae6ba7",
+      "byte_reproducible": true
+    },
+    {
+      "id": "heic10-gradient-none",
+      "group": "stills",
+      "kind": "heic",
+      "storage": "committed",
+      "path": "stills/heic/heic10-gradient-none.heic",
+      "command": null,
+      "serves": [
+        "V5",
+        "D53",
+        "D63",
+        "V9 (inputs)",
+        "AD-17"
+      ],
+      "exercises": "10-bit HEIC, gradient content, none profile (lossy). A 10-bit file arrives as 16-bit samples (AD-17).",
+      "expect": {
+        "faults": [],
+        "refusal": null,
+        "photo": {
+          "source_format": "heic",
+          "orientation": 1,
+          "displayed_upright": true,
+          "bit_depth": 10,
+          "icc_kind": "none",
+          "icc_carried": false
+        },
+        "probe": null
+      },
+      "facts": {
+        "format": "HEIC",
+        "width": 96,
+        "height": 64,
+        "bit_depth": 10,
+        "irot": null,
+        "imir": null,
+        "exif_orientation": 1,
+        "has_gps": false,
+        "icc": "none",
+        "content": "gradient",
+        "icc_kind": "none",
+        "icc_carried": false,
+        "lossless": false
+      },
+      "size": 721,
+      "md5": "465b485fa1a93e9298300363557d248a",
+      "byte_reproducible": true
+    },
+    {
+      "id": "heic10-gradient-srgb",
+      "group": "stills",
+      "kind": "heic",
+      "storage": "committed",
+      "path": "stills/heic/heic10-gradient-srgb.heic",
+      "command": null,
+      "serves": [
+        "V5",
+        "D53",
+        "D63",
+        "V9 (inputs)",
+        "AD-17"
+      ],
+      "exercises": "10-bit HEIC, gradient content, srgb profile (lossy). A 10-bit file arrives as 16-bit samples (AD-17).",
+      "expect": {
+        "faults": [],
+        "refusal": null,
+        "photo": {
+          "source_format": "heic",
+          "orientation": 1,
+          "displayed_upright": true,
+          "bit_depth": 10,
+          "icc_kind": "srgb",
+          "icc_carried": true
+        },
+        "probe": null
+      },
+      "facts": {
+        "format": "HEIC",
+        "width": 96,
+        "height": 64,
+        "bit_depth": 10,
+        "irot": null,
+        "imir": null,
+        "exif_orientation": 1,
+        "has_gps": false,
+        "icc": "match",
+        "icc_md5": "237fcf5044d6a7518c508d407887b818",
+        "content": "gradient",
+        "icc_kind": "srgb",
+        "icc_carried": true,
+        "lossless": false
+      },
+      "size": 1302,
+      "md5": "efdd3b2aab91f32eb0118cea71b93144",
+      "byte_reproducible": true
+    },
+    {
+      "id": "heic10-lowred-display-p3",
+      "group": "stills",
+      "kind": "heic",
+      "storage": "committed",
+      "path": "stills/heic/heic10-lowred-display-p3.heic",
+      "command": null,
+      "serves": [
+        "V5",
+        "D53",
+        "D63",
+        "V9 (inputs)",
+        "AD-17"
+      ],
+      "exercises": "10-bit HEIC, lowred content, display-p3 profile (lossy). A 10-bit file arrives as 16-bit samples (AD-17).",
+      "expect": {
+        "faults": [],
+        "refusal": null,
+        "photo": {
+          "source_format": "heic",
+          "orientation": 1,
+          "displayed_upright": true,
+          "bit_depth": 10,
+          "icc_kind": "display-p3",
+          "icc_carried": true
+        },
+        "probe": null
+      },
+      "facts": {
+        "format": "HEIC",
+        "width": 96,
+        "height": 64,
+        "bit_depth": 10,
+        "irot": null,
+        "imir": null,
+        "exif_orientation": 1,
+        "has_gps": false,
+        "icc": "match",
+        "icc_md5": "84800e16f6285ece237561e6603cd8a5",
+        "content": "lowred",
+        "icc_kind": "display-p3",
+        "icc_carried": true,
+        "lossless": false,
+        "red_max": 2
+      },
+      "size": 1743,
+      "md5": "0e8f9940c11bf9aeb88af85bca28b6dd",
+      "byte_reproducible": true
+    },
+    {
+      "id": "heic10-lowred-none",
+      "group": "stills",
+      "kind": "heic",
+      "storage": "committed",
+      "path": "stills/heic/heic10-lowred-none.heic",
+      "command": null,
+      "serves": [
+        "V5",
+        "D53",
+        "D63",
+        "V9 (inputs)",
+        "AD-17"
+      ],
+      "exercises": "10-bit HEIC, lowred content, none profile (lossy). A 10-bit file arrives as 16-bit samples (AD-17).",
+      "expect": {
+        "faults": [],
+        "refusal": null,
+        "photo": {
+          "source_format": "heic",
+          "orientation": 1,
+          "displayed_upright": true,
+          "bit_depth": 10,
+          "icc_kind": "none",
+          "icc_carried": false
+        },
+        "probe": null
+      },
+      "facts": {
+        "format": "HEIC",
+        "width": 96,
+        "height": 64,
+        "bit_depth": 10,
+        "irot": null,
+        "imir": null,
+        "exif_orientation": 1,
+        "has_gps": false,
+        "icc": "none",
+        "content": "lowred",
+        "icc_kind": "none",
+        "icc_carried": false,
+        "lossless": false,
+        "red_max": 2
+      },
+      "size": 1086,
+      "md5": "7bff2aefef338462eec0e36608b8f0ea",
+      "byte_reproducible": true
+    },
+    {
+      "id": "heic10-lowred-srgb",
+      "group": "stills",
+      "kind": "heic",
+      "storage": "committed",
+      "path": "stills/heic/heic10-lowred-srgb.heic",
+      "command": null,
+      "serves": [
+        "V5",
+        "D53",
+        "D63",
+        "V9 (inputs)",
+        "AD-17"
+      ],
+      "exercises": "10-bit HEIC, lowred content, srgb profile (lossy). A 10-bit file arrives as 16-bit samples (AD-17).",
+      "expect": {
+        "faults": [],
+        "refusal": null,
+        "photo": {
+          "source_format": "heic",
+          "orientation": 1,
+          "displayed_upright": true,
+          "bit_depth": 10,
+          "icc_kind": "srgb",
+          "icc_carried": true
+        },
+        "probe": null
+      },
+      "facts": {
+        "format": "HEIC",
+        "width": 96,
+        "height": 64,
+        "bit_depth": 10,
+        "irot": null,
+        "imir": null,
+        "exif_orientation": 1,
+        "has_gps": false,
+        "icc": "match",
+        "icc_md5": "237fcf5044d6a7518c508d407887b818",
+        "content": "lowred",
+        "icc_kind": "srgb",
+        "icc_carried": true,
+        "lossless": false,
+        "red_max": 2
+      },
+      "size": 1667,
+      "md5": "e4869badf9a3dc230557c3eed3982dca",
+      "byte_reproducible": true
+    },
+    {
+      "id": "heic10-uniform-display-p3",
+      "group": "stills",
+      "kind": "heic",
+      "storage": "committed",
+      "path": "stills/heic/heic10-uniform-display-p3.heic",
+      "command": null,
+      "serves": [
+        "V5",
+        "D53",
+        "D63",
+        "V9 (inputs)",
+        "AD-17"
+      ],
+      "exercises": "10-bit HEIC, uniform content, display-p3 profile (lossy). A 10-bit file arrives as 16-bit samples (AD-17).",
+      "expect": {
+        "faults": [],
+        "refusal": null,
+        "photo": {
+          "source_format": "heic",
+          "orientation": 1,
+          "displayed_upright": true,
+          "bit_depth": 10,
+          "icc_kind": "display-p3",
+          "icc_carried": true
+        },
+        "probe": null
+      },
+      "facts": {
+        "format": "HEIC",
+        "width": 96,
+        "height": 64,
+        "bit_depth": 10,
+        "irot": null,
+        "imir": null,
+        "exif_orientation": 1,
+        "has_gps": false,
+        "icc": "match",
+        "icc_md5": "84800e16f6285ece237561e6603cd8a5",
+        "content": "uniform",
+        "icc_kind": "display-p3",
+        "icc_carried": true,
+        "lossless": false
+      },
+      "size": 1251,
+      "md5": "04912f992442b45cdb205c4833b7a48e",
+      "byte_reproducible": true
+    },
+    {
+      "id": "heic10-uniform-none",
+      "group": "stills",
+      "kind": "heic",
+      "storage": "committed",
+      "path": "stills/heic/heic10-uniform-none.heic",
+      "command": null,
+      "serves": [
+        "V5",
+        "D53",
+        "D63",
+        "V9 (inputs)",
+        "AD-17"
+      ],
+      "exercises": "10-bit HEIC, uniform content, none profile (lossy). A 10-bit file arrives as 16-bit samples (AD-17).",
+      "expect": {
+        "faults": [],
+        "refusal": null,
+        "photo": {
+          "source_format": "heic",
+          "orientation": 1,
+          "displayed_upright": true,
+          "bit_depth": 10,
+          "icc_kind": "none",
+          "icc_carried": false
+        },
+        "probe": null
+      },
+      "facts": {
+        "format": "HEIC",
+        "width": 96,
+        "height": 64,
+        "bit_depth": 10,
+        "irot": null,
+        "imir": null,
+        "exif_orientation": 1,
+        "has_gps": false,
+        "icc": "none",
+        "content": "uniform",
+        "icc_kind": "none",
+        "icc_carried": false,
+        "lossless": false
+      },
+      "size": 594,
+      "md5": "398be59aaae9cc72950e7a37da0e9124",
+      "byte_reproducible": true
+    },
+    {
+      "id": "heic10-uniform-srgb",
+      "group": "stills",
+      "kind": "heic",
+      "storage": "committed",
+      "path": "stills/heic/heic10-uniform-srgb.heic",
+      "command": null,
+      "serves": [
+        "V5",
+        "D53",
+        "D63",
+        "V9 (inputs)",
+        "AD-17"
+      ],
+      "exercises": "10-bit HEIC, uniform content, srgb profile (lossy). A 10-bit file arrives as 16-bit samples (AD-17).",
+      "expect": {
+        "faults": [],
+        "refusal": null,
+        "photo": {
+          "source_format": "heic",
+          "orientation": 1,
+          "displayed_upright": true,
+          "bit_depth": 10,
+          "icc_kind": "srgb",
+          "icc_carried": true
+        },
+        "probe": null
+      },
+      "facts": {
+        "format": "HEIC",
+        "width": 96,
+        "height": 64,
+        "bit_depth": 10,
+        "irot": null,
+        "imir": null,
+        "exif_orientation": 1,
+        "has_gps": false,
+        "icc": "match",
+        "icc_md5": "237fcf5044d6a7518c508d407887b818",
+        "content": "uniform",
+        "icc_kind": "srgb",
+        "icc_carried": true,
+        "lossless": false
+      },
+      "size": 1175,
+      "md5": "85fde7085620aa582f91ec50aaa32dc0",
+      "byte_reproducible": true
+    },
+    {
+      "id": "heic8-gradient-display-p3",
+      "group": "stills",
+      "kind": "heic",
+      "storage": "committed",
+      "path": "stills/heic/heic8-gradient-display-p3.heic",
+      "command": null,
+      "serves": [
+        "V5",
+        "D53",
+        "D63",
+        "V9 (inputs)",
+        "AD-17"
+      ],
+      "exercises": "8-bit HEIC, gradient content, display-p3 profile (lossy). A 10-bit file arrives as 16-bit samples (AD-17).",
+      "expect": {
+        "faults": [],
+        "refusal": null,
+        "photo": {
+          "source_format": "heic",
+          "orientation": 1,
+          "displayed_upright": true,
+          "bit_depth": 8,
+          "icc_kind": "display-p3",
+          "icc_carried": true
+        },
+        "probe": null
+      },
+      "facts": {
+        "format": "HEIC",
+        "width": 96,
+        "height": 64,
+        "bit_depth": 8,
+        "irot": null,
+        "imir": null,
+        "exif_orientation": 1,
+        "has_gps": false,
+        "icc": "match",
+        "icc_md5": "84800e16f6285ece237561e6603cd8a5",
+        "content": "gradient",
+        "icc_kind": "display-p3",
+        "icc_carried": true,
+        "lossless": false
+      },
+      "size": 1405,
+      "md5": "0eb4b82f5b85b9f88863211d3b6dfed8",
+      "byte_reproducible": true
+    },
+    {
+      "id": "heic8-gradient-none",
+      "group": "stills",
+      "kind": "heic",
+      "storage": "committed",
+      "path": "stills/heic/heic8-gradient-none.heic",
+      "command": null,
+      "serves": [
+        "V5",
+        "D53",
+        "D63",
+        "V9 (inputs)",
+        "AD-17"
+      ],
+      "exercises": "8-bit HEIC, gradient content, none profile (lossy). A 10-bit file arrives as 16-bit samples (AD-17).",
+      "expect": {
+        "faults": [],
+        "refusal": null,
+        "photo": {
+          "source_format": "heic",
+          "orientation": 1,
+          "displayed_upright": true,
+          "bit_depth": 8,
+          "icc_kind": "none",
+          "icc_carried": false
+        },
+        "probe": null
+      },
+      "facts": {
+        "format": "HEIC",
+        "width": 96,
+        "height": 64,
+        "bit_depth": 8,
+        "irot": null,
+        "imir": null,
+        "exif_orientation": 1,
+        "has_gps": false,
+        "icc": "none",
+        "content": "gradient",
+        "icc_kind": "none",
+        "icc_carried": false,
+        "lossless": false
+      },
+      "size": 748,
+      "md5": "27050096709673b9c24819f5fbb3b17c",
+      "byte_reproducible": true
+    },
+    {
+      "id": "heic8-gradient-srgb",
+      "group": "stills",
+      "kind": "heic",
+      "storage": "committed",
+      "path": "stills/heic/heic8-gradient-srgb.heic",
+      "command": null,
+      "serves": [
+        "V5",
+        "D53",
+        "D63",
+        "V9 (inputs)",
+        "AD-17"
+      ],
+      "exercises": "8-bit HEIC, gradient content, srgb profile (lossy). A 10-bit file arrives as 16-bit samples (AD-17).",
+      "expect": {
+        "faults": [],
+        "refusal": null,
+        "photo": {
+          "source_format": "heic",
+          "orientation": 1,
+          "displayed_upright": true,
+          "bit_depth": 8,
+          "icc_kind": "srgb",
+          "icc_carried": true
+        },
+        "probe": null
+      },
+      "facts": {
+        "format": "HEIC",
+        "width": 96,
+        "height": 64,
+        "bit_depth": 8,
+        "irot": null,
+        "imir": null,
+        "exif_orientation": 1,
+        "has_gps": false,
+        "icc": "match",
+        "icc_md5": "237fcf5044d6a7518c508d407887b818",
+        "content": "gradient",
+        "icc_kind": "srgb",
+        "icc_carried": true,
+        "lossless": false
+      },
+      "size": 1329,
+      "md5": "5a1bc7aacb2f9b73a78c2b0d7e275106",
+      "byte_reproducible": true
+    },
+    {
+      "id": "heic8-lowred-display-p3",
+      "group": "stills",
+      "kind": "heic",
+      "storage": "committed",
+      "path": "stills/heic/heic8-lowred-display-p3.heic",
+      "command": null,
+      "serves": [
+        "V5",
+        "D53",
+        "D63",
+        "V9 (inputs)",
+        "AD-17"
+      ],
+      "exercises": "8-bit HEIC, lowred content, display-p3 profile (lossy). A 10-bit file arrives as 16-bit samples (AD-17).",
+      "expect": {
+        "faults": [],
+        "refusal": null,
+        "photo": {
+          "source_format": "heic",
+          "orientation": 1,
+          "displayed_upright": true,
+          "bit_depth": 8,
+          "icc_kind": "display-p3",
+          "icc_carried": true
+        },
+        "probe": null
+      },
+      "facts": {
+        "format": "HEIC",
+        "width": 96,
+        "height": 64,
+        "bit_depth": 8,
+        "irot": null,
+        "imir": null,
+        "exif_orientation": 1,
+        "has_gps": false,
+        "icc": "match",
+        "icc_md5": "84800e16f6285ece237561e6603cd8a5",
+        "content": "lowred",
+        "icc_kind": "display-p3",
+        "icc_carried": true,
+        "lossless": false,
+        "red_max": 3
+      },
+      "size": 3144,
+      "md5": "8828469e7e3d770553f54a78612e13cc",
+      "byte_reproducible": true
+    },
+    {
+      "id": "heic8-lowred-none",
+      "group": "stills",
+      "kind": "heic",
+      "storage": "committed",
+      "path": "stills/heic/heic8-lowred-none.heic",
+      "command": null,
+      "serves": [
+        "V5",
+        "D53",
+        "D63",
+        "V9 (inputs)",
+        "AD-17"
+      ],
+      "exercises": "8-bit HEIC, lowred content, none profile (lossy). A 10-bit file arrives as 16-bit samples (AD-17).",
+      "expect": {
+        "faults": [],
+        "refusal": null,
+        "photo": {
+          "source_format": "heic",
+          "orientation": 1,
+          "displayed_upright": true,
+          "bit_depth": 8,
+          "icc_kind": "none",
+          "icc_carried": false
+        },
+        "probe": null
+      },
+      "facts": {
+        "format": "HEIC",
+        "width": 96,
+        "height": 64,
+        "bit_depth": 8,
+        "irot": null,
+        "imir": null,
+        "exif_orientation": 1,
+        "has_gps": false,
+        "icc": "none",
+        "content": "lowred",
+        "icc_kind": "none",
+        "icc_carried": false,
+        "lossless": false,
+        "red_max": 3
+      },
+      "size": 2487,
+      "md5": "dd37f069ffac2a13ede16461488ff2d5",
+      "byte_reproducible": true
+    },
+    {
+      "id": "heic8-lowred-srgb",
+      "group": "stills",
+      "kind": "heic",
+      "storage": "committed",
+      "path": "stills/heic/heic8-lowred-srgb.heic",
+      "command": null,
+      "serves": [
+        "V5",
+        "D53",
+        "D63",
+        "V9 (inputs)",
+        "AD-17"
+      ],
+      "exercises": "8-bit HEIC, lowred content, srgb profile (lossy). A 10-bit file arrives as 16-bit samples (AD-17).",
+      "expect": {
+        "faults": [],
+        "refusal": null,
+        "photo": {
+          "source_format": "heic",
+          "orientation": 1,
+          "displayed_upright": true,
+          "bit_depth": 8,
+          "icc_kind": "srgb",
+          "icc_carried": true
+        },
+        "probe": null
+      },
+      "facts": {
+        "format": "HEIC",
+        "width": 96,
+        "height": 64,
+        "bit_depth": 8,
+        "irot": null,
+        "imir": null,
+        "exif_orientation": 1,
+        "has_gps": false,
+        "icc": "match",
+        "icc_md5": "237fcf5044d6a7518c508d407887b818",
+        "content": "lowred",
+        "icc_kind": "srgb",
+        "icc_carried": true,
+        "lossless": false,
+        "red_max": 3
+      },
+      "size": 3068,
+      "md5": "8fb97de430b44b49172cdf7ad90fd8f8",
+      "byte_reproducible": true
+    },
+    {
+      "id": "heic8-uniform-display-p3",
+      "group": "stills",
+      "kind": "heic",
+      "storage": "committed",
+      "path": "stills/heic/heic8-uniform-display-p3.heic",
+      "command": null,
+      "serves": [
+        "V5",
+        "D53",
+        "D63",
+        "V9 (inputs)",
+        "AD-17"
+      ],
+      "exercises": "8-bit HEIC, uniform content, display-p3 profile (lossy). A 10-bit file arrives as 16-bit samples (AD-17).",
+      "expect": {
+        "faults": [],
+        "refusal": null,
+        "photo": {
+          "source_format": "heic",
+          "orientation": 1,
+          "displayed_upright": true,
+          "bit_depth": 8,
+          "icc_kind": "display-p3",
+          "icc_carried": true
+        },
+        "probe": null
+      },
+      "facts": {
+        "format": "HEIC",
+        "width": 96,
+        "height": 64,
+        "bit_depth": 8,
+        "irot": null,
+        "imir": null,
+        "exif_orientation": 1,
+        "has_gps": false,
+        "icc": "match",
+        "icc_md5": "84800e16f6285ece237561e6603cd8a5",
+        "content": "uniform",
+        "icc_kind": "display-p3",
+        "icc_carried": true,
+        "lossless": false
+      },
+      "size": 1254,
+      "md5": "e037a13a3bd59375cd72e2554c26e270",
+      "byte_reproducible": true
+    },
+    {
+      "id": "heic8-uniform-none",
+      "group": "stills",
+      "kind": "heic",
+      "storage": "committed",
+      "path": "stills/heic/heic8-uniform-none.heic",
+      "command": null,
+      "serves": [
+        "V5",
+        "D53",
+        "D63",
+        "V9 (inputs)",
+        "AD-17"
+      ],
+      "exercises": "8-bit HEIC, uniform content, none profile (lossy). A 10-bit file arrives as 16-bit samples (AD-17).",
+      "expect": {
+        "faults": [],
+        "refusal": null,
+        "photo": {
+          "source_format": "heic",
+          "orientation": 1,
+          "displayed_upright": true,
+          "bit_depth": 8,
+          "icc_kind": "none",
+          "icc_carried": false
+        },
+        "probe": null
+      },
+      "facts": {
+        "format": "HEIC",
+        "width": 96,
+        "height": 64,
+        "bit_depth": 8,
+        "irot": null,
+        "imir": null,
+        "exif_orientation": 1,
+        "has_gps": false,
+        "icc": "none",
+        "content": "uniform",
+        "icc_kind": "none",
+        "icc_carried": false,
+        "lossless": false
+      },
+      "size": 597,
+      "md5": "4216380573e46bff6eca54fec6398f0f",
+      "byte_reproducible": true
+    },
+    {
+      "id": "heic8-uniform-srgb",
+      "group": "stills",
+      "kind": "heic",
+      "storage": "committed",
+      "path": "stills/heic/heic8-uniform-srgb.heic",
+      "command": null,
+      "serves": [
+        "V5",
+        "D53",
+        "D63",
+        "V9 (inputs)",
+        "AD-17"
+      ],
+      "exercises": "8-bit HEIC, uniform content, srgb profile (lossy). A 10-bit file arrives as 16-bit samples (AD-17).",
+      "expect": {
+        "faults": [],
+        "refusal": null,
+        "photo": {
+          "source_format": "heic",
+          "orientation": 1,
+          "displayed_upright": true,
+          "bit_depth": 8,
+          "icc_kind": "srgb",
+          "icc_carried": true
+        },
+        "probe": null
+      },
+      "facts": {
+        "format": "HEIC",
+        "width": 96,
+        "height": 64,
+        "bit_depth": 8,
+        "irot": null,
+        "imir": null,
+        "exif_orientation": 1,
+        "has_gps": false,
+        "icc": "match",
+        "icc_md5": "237fcf5044d6a7518c508d407887b818",
+        "content": "uniform",
+        "icc_kind": "srgb",
+        "icc_carried": true,
+        "lossless": false
+      },
+      "size": 1178,
+      "md5": "18750bb7b8309120f08e1e69180ddf9b",
+      "byte_reproducible": true
+    },
+    {
+      "id": "jpeg-gradient-display-p3",
+      "group": "stills",
+      "kind": "jpeg",
+      "storage": "committed",
+      "path": "stills/jpeg/jpeg-gradient-display-p3.jpg",
+      "command": null,
+      "serves": [
+        "V5",
+        "D53",
+        "D63",
+        "V9 (inputs)"
+      ],
+      "exercises": "8-bit JPEG, gradient content, display-p3 profile (lossy, 4:4:4, quality 95).",
+      "expect": {
+        "faults": [],
+        "refusal": null,
+        "photo": {
+          "source_format": "jpeg",
+          "orientation": 1,
+          "displayed_upright": true,
+          "bit_depth": 8,
+          "icc_kind": "display-p3",
+          "icc_carried": true
+        },
+        "probe": null
+      },
+      "facts": {
+        "format": "JPEG",
+        "width": 96,
+        "height": 64,
+        "bit_depth": 8,
+        "exif_orientation": null,
+        "has_gps": false,
+        "icc": "match",
+        "icc_md5": "84800e16f6285ece237561e6603cd8a5",
+        "content": "gradient",
+        "icc_kind": "display-p3",
+        "icc_carried": true,
+        "lossless": false
+      },
+      "size": 2023,
+      "md5": "a85d077864be2519e4dc793ae06fdc1b",
+      "byte_reproducible": true
+    },
+    {
+      "id": "jpeg-gradient-none",
+      "group": "stills",
+      "kind": "jpeg",
+      "storage": "committed",
+      "path": "stills/jpeg/jpeg-gradient-none.jpg",
+      "command": null,
+      "serves": [
+        "V5",
+        "D53",
+        "D63",
+        "V9 (inputs)"
+      ],
+      "exercises": "8-bit JPEG, gradient content, none profile (lossy, 4:4:4, quality 95).",
+      "expect": {
+        "faults": [],
+        "refusal": null,
+        "photo": {
+          "source_format": "jpeg",
+          "orientation": 1,
+          "displayed_upright": true,
+          "bit_depth": 8,
+          "icc_kind": "none",
+          "icc_carried": false
+        },
+        "probe": null
+      },
+      "facts": {
+        "format": "JPEG",
+        "width": 96,
+        "height": 64,
+        "bit_depth": 8,
+        "exif_orientation": null,
+        "has_gps": false,
+        "icc": "none",
+        "content": "gradient",
+        "icc_kind": "none",
+        "icc_carried": false,
+        "lossless": false
+      },
+      "size": 1341,
+      "md5": "186cff819bd4c830ec64dadaf5102eaf",
+      "byte_reproducible": true
+    },
+    {
+      "id": "jpeg-gradient-srgb",
+      "group": "stills",
+      "kind": "jpeg",
+      "storage": "committed",
+      "path": "stills/jpeg/jpeg-gradient-srgb.jpg",
+      "command": null,
+      "serves": [
+        "V5",
+        "D53",
+        "D63",
+        "V9 (inputs)"
+      ],
+      "exercises": "8-bit JPEG, gradient content, srgb profile (lossy, 4:4:4, quality 95).",
+      "expect": {
+        "faults": [],
+        "refusal": null,
+        "photo": {
+          "source_format": "jpeg",
+          "orientation": 1,
+          "displayed_upright": true,
+          "bit_depth": 8,
+          "icc_kind": "srgb",
+          "icc_carried": true
+        },
+        "probe": null
+      },
+      "facts": {
+        "format": "JPEG",
+        "width": 96,
+        "height": 64,
+        "bit_depth": 8,
+        "exif_orientation": null,
+        "has_gps": false,
+        "icc": "match",
+        "icc_md5": "237fcf5044d6a7518c508d407887b818",
+        "content": "gradient",
+        "icc_kind": "srgb",
+        "icc_carried": true,
+        "lossless": false
+      },
+      "size": 1947,
+      "md5": "b905e793ea9572b6c8c66933f0d6b642",
+      "byte_reproducible": true
+    },
+    {
+      "id": "jpeg-lowred-display-p3",
+      "group": "stills",
+      "kind": "jpeg",
+      "storage": "committed",
+      "path": "stills/jpeg/jpeg-lowred-display-p3.jpg",
+      "command": null,
+      "serves": [
+        "V5",
+        "D53",
+        "D63",
+        "V9 (inputs)"
+      ],
+      "exercises": "8-bit JPEG, lowred content, display-p3 profile (lossy, 4:4:4, quality 95).",
+      "expect": {
+        "faults": [],
+        "refusal": null,
+        "photo": {
+          "source_format": "jpeg",
+          "orientation": 1,
+          "displayed_upright": true,
+          "bit_depth": 8,
+          "icc_kind": "display-p3",
+          "icc_carried": true
+        },
+        "probe": null
+      },
+      "facts": {
+        "format": "JPEG",
+        "width": 96,
+        "height": 64,
+        "bit_depth": 8,
+        "exif_orientation": null,
+        "has_gps": false,
+        "icc": "match",
+        "icc_md5": "84800e16f6285ece237561e6603cd8a5",
+        "content": "lowred",
+        "icc_kind": "display-p3",
+        "icc_carried": true,
+        "lossless": false,
+        "red_max": 3
+      },
+      "size": 2255,
+      "md5": "f9f07aa488943fa2d3fc0622ed249cfd",
+      "byte_reproducible": true
+    },
+    {
+      "id": "jpeg-lowred-none",
+      "group": "stills",
+      "kind": "jpeg",
+      "storage": "committed",
+      "path": "stills/jpeg/jpeg-lowred-none.jpg",
+      "command": null,
+      "serves": [
+        "V5",
+        "D53",
+        "D63",
+        "V9 (inputs)"
+      ],
+      "exercises": "8-bit JPEG, lowred content, none profile (lossy, 4:4:4, quality 95).",
+      "expect": {
+        "faults": [],
+        "refusal": null,
+        "photo": {
+          "source_format": "jpeg",
+          "orientation": 1,
+          "displayed_upright": true,
+          "bit_depth": 8,
+          "icc_kind": "none",
+          "icc_carried": false
+        },
+        "probe": null
+      },
+      "facts": {
+        "format": "JPEG",
+        "width": 96,
+        "height": 64,
+        "bit_depth": 8,
+        "exif_orientation": null,
+        "has_gps": false,
+        "icc": "none",
+        "content": "lowred",
+        "icc_kind": "none",
+        "icc_carried": false,
+        "lossless": false,
+        "red_max": 3
+      },
+      "size": 1573,
+      "md5": "c10b24c6dc10469a4655d7562092e9c1",
+      "byte_reproducible": true
+    },
+    {
+      "id": "jpeg-lowred-srgb",
+      "group": "stills",
+      "kind": "jpeg",
+      "storage": "committed",
+      "path": "stills/jpeg/jpeg-lowred-srgb.jpg",
+      "command": null,
+      "serves": [
+        "V5",
+        "D53",
+        "D63",
+        "V9 (inputs)"
+      ],
+      "exercises": "8-bit JPEG, lowred content, srgb profile (lossy, 4:4:4, quality 95).",
+      "expect": {
+        "faults": [],
+        "refusal": null,
+        "photo": {
+          "source_format": "jpeg",
+          "orientation": 1,
+          "displayed_upright": true,
+          "bit_depth": 8,
+          "icc_kind": "srgb",
+          "icc_carried": true
+        },
+        "probe": null
+      },
+      "facts": {
+        "format": "JPEG",
+        "width": 96,
+        "height": 64,
+        "bit_depth": 8,
+        "exif_orientation": null,
+        "has_gps": false,
+        "icc": "match",
+        "icc_md5": "237fcf5044d6a7518c508d407887b818",
+        "content": "lowred",
+        "icc_kind": "srgb",
+        "icc_carried": true,
+        "lossless": false,
+        "red_max": 3
+      },
+      "size": 2179,
+      "md5": "8638f16290fb6689154eddda4b8d41ee",
+      "byte_reproducible": true
+    },
+    {
+      "id": "jpeg-orient-land-o1",
+      "group": "stills",
+      "kind": "jpeg",
+      "storage": "committed",
+      "path": "stills/jpeg/jpeg-orient-land-o1.jpg",
+      "command": null,
+      "serves": [
+        "V5",
+        "D63"
+      ],
+      "exercises": "JPEG of a landscape scene stored for EXIF Orientation 1: after the read the pixels are upright and the tag is applied once.",
+      "expect": {
+        "faults": [],
+        "refusal": null,
+        "photo": {
+          "source_format": "jpeg",
+          "orientation": 1,
+          "displayed_upright": true,
+          "bit_depth": 8,
+          "icc_kind": "none",
+          "icc_carried": false
+        },
+        "probe": null
+      },
+      "facts": {
+        "format": "JPEG",
+        "width": 96,
+        "height": 64,
+        "bit_depth": 8,
+        "exif_orientation": 1,
+        "has_gps": false,
+        "icc": "none",
+        "content": "ramp",
+        "scene": "landscape",
+        "stored_width": 96,
+        "stored_height": 64,
+        "lossless": false
+      },
+      "size": 2319,
+      "md5": "dc759c642d06be83ad7f7e27e9daeb52",
+      "byte_reproducible": true
+    },
+    {
+      "id": "jpeg-orient-land-o3",
+      "group": "stills",
+      "kind": "jpeg",
+      "storage": "committed",
+      "path": "stills/jpeg/jpeg-orient-land-o3.jpg",
+      "command": null,
+      "serves": [
+        "V5",
+        "D63"
+      ],
+      "exercises": "JPEG of a landscape scene stored for EXIF Orientation 3: after the read the pixels are upright and the tag is applied once.",
+      "expect": {
+        "faults": [],
+        "refusal": null,
+        "photo": {
+          "source_format": "jpeg",
+          "orientation": 3,
+          "displayed_upright": true,
+          "bit_depth": 8,
+          "icc_kind": "none",
+          "icc_carried": false
+        },
+        "probe": null
+      },
+      "facts": {
+        "format": "JPEG",
+        "width": 96,
+        "height": 64,
+        "bit_depth": 8,
+        "exif_orientation": 3,
+        "has_gps": false,
+        "icc": "none",
+        "content": "ramp",
+        "scene": "landscape",
+        "stored_width": 96,
+        "stored_height": 64,
+        "lossless": false
+      },
+      "size": 2328,
+      "md5": "f31ba40927897f38a81ff0b2ce558d20",
+      "byte_reproducible": true
+    },
+    {
+      "id": "jpeg-orient-land-o6",
+      "group": "stills",
+      "kind": "jpeg",
+      "storage": "committed",
+      "path": "stills/jpeg/jpeg-orient-land-o6.jpg",
+      "command": null,
+      "serves": [
+        "V5",
+        "D63"
+      ],
+      "exercises": "JPEG of a landscape scene stored for EXIF Orientation 6: after the read the pixels are upright and the tag is applied once.",
+      "expect": {
+        "faults": [],
+        "refusal": null,
+        "photo": {
+          "source_format": "jpeg",
+          "orientation": 6,
+          "displayed_upright": true,
+          "bit_depth": 8,
+          "icc_kind": "none",
+          "icc_carried": false
+        },
+        "probe": null
+      },
+      "facts": {
+        "format": "JPEG",
+        "width": 64,
+        "height": 96,
+        "bit_depth": 8,
+        "exif_orientation": 6,
+        "has_gps": false,
+        "icc": "none",
+        "content": "ramp",
+        "scene": "landscape",
+        "stored_width": 64,
+        "stored_height": 96,
+        "lossless": false
+      },
+      "size": 2348,
+      "md5": "58198d91a72cf79de9766a78157cb968",
+      "byte_reproducible": true
+    },
+    {
+      "id": "jpeg-orient-land-o8",
+      "group": "stills",
+      "kind": "jpeg",
+      "storage": "committed",
+      "path": "stills/jpeg/jpeg-orient-land-o8.jpg",
+      "command": null,
+      "serves": [
+        "V5",
+        "D63"
+      ],
+      "exercises": "JPEG of a landscape scene stored for EXIF Orientation 8: after the read the pixels are upright and the tag is applied once.",
+      "expect": {
+        "faults": [],
+        "refusal": null,
+        "photo": {
+          "source_format": "jpeg",
+          "orientation": 8,
+          "displayed_upright": true,
+          "bit_depth": 8,
+          "icc_kind": "none",
+          "icc_carried": false
+        },
+        "probe": null
+      },
+      "facts": {
+        "format": "JPEG",
+        "width": 64,
+        "height": 96,
+        "bit_depth": 8,
+        "exif_orientation": 8,
+        "has_gps": false,
+        "icc": "none",
+        "content": "ramp",
+        "scene": "landscape",
+        "stored_width": 64,
+        "stored_height": 96,
+        "lossless": false
+      },
+      "size": 2353,
+      "md5": "23c4fc47eb031726057ff0d57cc498f2",
+      "byte_reproducible": true
+    },
+    {
+      "id": "jpeg-orient-port-o1",
+      "group": "stills",
+      "kind": "jpeg",
+      "storage": "committed",
+      "path": "stills/jpeg/jpeg-orient-port-o1.jpg",
+      "command": null,
+      "serves": [
+        "V5",
+        "D63"
+      ],
+      "exercises": "JPEG of a portrait scene stored for EXIF Orientation 1: after the read the pixels are upright and the tag is applied once.",
+      "expect": {
+        "faults": [],
+        "refusal": null,
+        "photo": {
+          "source_format": "jpeg",
+          "orientation": 1,
+          "displayed_upright": true,
+          "bit_depth": 8,
+          "icc_kind": "none",
+          "icc_carried": false
+        },
+        "probe": null
+      },
+      "facts": {
+        "format": "JPEG",
+        "width": 64,
+        "height": 96,
+        "bit_depth": 8,
+        "exif_orientation": 1,
+        "has_gps": false,
+        "icc": "none",
+        "content": "ramp",
+        "scene": "portrait",
+        "stored_width": 64,
+        "stored_height": 96,
+        "lossless": false
+      },
+      "size": 2288,
+      "md5": "a46b314698ff5ae6fff12040c8eb5aa6",
+      "byte_reproducible": true
+    },
+    {
+      "id": "jpeg-orient-port-o3",
+      "group": "stills",
+      "kind": "jpeg",
+      "storage": "committed",
+      "path": "stills/jpeg/jpeg-orient-port-o3.jpg",
+      "command": null,
+      "serves": [
+        "V5",
+        "D63"
+      ],
+      "exercises": "JPEG of a portrait scene stored for EXIF Orientation 3: after the read the pixels are upright and the tag is applied once.",
+      "expect": {
+        "faults": [],
+        "refusal": null,
+        "photo": {
+          "source_format": "jpeg",
+          "orientation": 3,
+          "displayed_upright": true,
+          "bit_depth": 8,
+          "icc_kind": "none",
+          "icc_carried": false
+        },
+        "probe": null
+      },
+      "facts": {
+        "format": "JPEG",
+        "width": 64,
+        "height": 96,
+        "bit_depth": 8,
+        "exif_orientation": 3,
+        "has_gps": false,
+        "icc": "none",
+        "content": "ramp",
+        "scene": "portrait",
+        "stored_width": 64,
+        "stored_height": 96,
+        "lossless": false
+      },
+      "size": 2290,
+      "md5": "1108a92700b33d1eeee2cab74dd5b9dc",
+      "byte_reproducible": true
+    },
+    {
+      "id": "jpeg-orient-port-o6",
+      "group": "stills",
+      "kind": "jpeg",
+      "storage": "committed",
+      "path": "stills/jpeg/jpeg-orient-port-o6.jpg",
+      "command": null,
+      "serves": [
+        "V5",
+        "D63"
+      ],
+      "exercises": "JPEG of a portrait scene stored for EXIF Orientation 6: after the read the pixels are upright and the tag is applied once.",
+      "expect": {
+        "faults": [],
+        "refusal": null,
+        "photo": {
+          "source_format": "jpeg",
+          "orientation": 6,
+          "displayed_upright": true,
+          "bit_depth": 8,
+          "icc_kind": "none",
+          "icc_carried": false
+        },
+        "probe": null
+      },
+      "facts": {
+        "format": "JPEG",
+        "width": 96,
+        "height": 64,
+        "bit_depth": 8,
+        "exif_orientation": 6,
+        "has_gps": false,
+        "icc": "none",
+        "content": "ramp",
+        "scene": "portrait",
+        "stored_width": 96,
+        "stored_height": 64,
+        "lossless": false
+      },
+      "size": 2282,
+      "md5": "d5fa477ad250435de666ea494068485d",
+      "byte_reproducible": true
+    },
+    {
+      "id": "jpeg-orient-port-o8",
+      "group": "stills",
+      "kind": "jpeg",
+      "storage": "committed",
+      "path": "stills/jpeg/jpeg-orient-port-o8.jpg",
+      "command": null,
+      "serves": [
+        "V5",
+        "D63"
+      ],
+      "exercises": "JPEG of a portrait scene stored for EXIF Orientation 8: after the read the pixels are upright and the tag is applied once.",
+      "expect": {
+        "faults": [],
+        "refusal": null,
+        "photo": {
+          "source_format": "jpeg",
+          "orientation": 8,
+          "displayed_upright": true,
+          "bit_depth": 8,
+          "icc_kind": "none",
+          "icc_carried": false
+        },
+        "probe": null
+      },
+      "facts": {
+        "format": "JPEG",
+        "width": 96,
+        "height": 64,
+        "bit_depth": 8,
+        "exif_orientation": 8,
+        "has_gps": false,
+        "icc": "none",
+        "content": "ramp",
+        "scene": "portrait",
+        "stored_width": 96,
+        "stored_height": 64,
+        "lossless": false
+      },
+      "size": 2275,
+      "md5": "9f3e9548961b45e69bcd1d76c4767f57",
+      "byte_reproducible": true
+    },
+    {
+      "id": "jpeg-uniform-display-p3",
+      "group": "stills",
+      "kind": "jpeg",
+      "storage": "committed",
+      "path": "stills/jpeg/jpeg-uniform-display-p3.jpg",
+      "command": null,
+      "serves": [
+        "V5",
+        "D53",
+        "D63",
+        "V9 (inputs)"
+      ],
+      "exercises": "8-bit JPEG, uniform content, display-p3 profile (lossy, 4:4:4, quality 95).",
+      "expect": {
+        "faults": [],
+        "refusal": null,
+        "photo": {
+          "source_format": "jpeg",
+          "orientation": 1,
+          "displayed_upright": true,
+          "bit_depth": 8,
+          "icc_kind": "display-p3",
+          "icc_carried": true
+        },
+        "probe": null
+      },
+      "facts": {
+        "format": "JPEG",
+        "width": 96,
+        "height": 64,
+        "bit_depth": 8,
+        "exif_orientation": null,
+        "has_gps": false,
+        "icc": "match",
+        "icc_md5": "84800e16f6285ece237561e6603cd8a5",
+        "content": "uniform",
+        "icc_kind": "display-p3",
+        "icc_carried": true,
+        "lossless": false
+      },
+      "size": 1480,
+      "md5": "287a6dda429e84bbd8bfaf3a498d83db",
+      "byte_reproducible": true
+    },
+    {
+      "id": "jpeg-uniform-none",
+      "group": "stills",
+      "kind": "jpeg",
+      "storage": "committed",
+      "path": "stills/jpeg/jpeg-uniform-none.jpg",
+      "command": null,
+      "serves": [
+        "V5",
+        "D53",
+        "D63",
+        "V9 (inputs)"
+      ],
+      "exercises": "8-bit JPEG, uniform content, none profile (lossy, 4:4:4, quality 95).",
+      "expect": {
+        "faults": [],
+        "refusal": null,
+        "photo": {
+          "source_format": "jpeg",
+          "orientation": 1,
+          "displayed_upright": true,
+          "bit_depth": 8,
+          "icc_kind": "none",
+          "icc_carried": false
+        },
+        "probe": null
+      },
+      "facts": {
+        "format": "JPEG",
+        "width": 96,
+        "height": 64,
+        "bit_depth": 8,
+        "exif_orientation": null,
+        "has_gps": false,
+        "icc": "none",
+        "content": "uniform",
+        "icc_kind": "none",
+        "icc_carried": false,
+        "lossless": false
+      },
+      "size": 798,
+      "md5": "43ac190455e661e7052cc4fcaa22f620",
+      "byte_reproducible": true
+    },
+    {
+      "id": "jpeg-uniform-srgb",
+      "group": "stills",
+      "kind": "jpeg",
+      "storage": "committed",
+      "path": "stills/jpeg/jpeg-uniform-srgb.jpg",
+      "command": null,
+      "serves": [
+        "V5",
+        "D53",
+        "D63",
+        "V9 (inputs)"
+      ],
+      "exercises": "8-bit JPEG, uniform content, srgb profile (lossy, 4:4:4, quality 95).",
+      "expect": {
+        "faults": [],
+        "refusal": null,
+        "photo": {
+          "source_format": "jpeg",
+          "orientation": 1,
+          "displayed_upright": true,
+          "bit_depth": 8,
+          "icc_kind": "srgb",
+          "icc_carried": true
+        },
+        "probe": null
+      },
+      "facts": {
+        "format": "JPEG",
+        "width": 96,
+        "height": 64,
+        "bit_depth": 8,
+        "exif_orientation": null,
+        "has_gps": false,
+        "icc": "match",
+        "icc_md5": "237fcf5044d6a7518c508d407887b818",
+        "content": "uniform",
+        "icc_kind": "srgb",
+        "icc_carried": true,
+        "lossless": false
+      },
+      "size": 1404,
+      "md5": "23a67038c690316283788a0ad037a382",
+      "byte_reproducible": true
+    },
+    {
+      "id": "png16-gradient-display-p3",
+      "group": "stills",
+      "kind": "png",
+      "storage": "committed",
+      "path": "stills/png/png16-gradient-display-p3.png",
+      "command": null,
+      "serves": [
+        "V5",
+        "D53",
+        "D63",
+        "V9 (inputs)"
+      ],
+      "exercises": "16-bit PNG (stdlib writer), gradient content, display-p3 profile: 16-bit samples survive the read; profile kept.",
+      "expect": {
+        "faults": [],
+        "refusal": null,
+        "photo": {
+          "source_format": "png",
+          "orientation": 1,
+          "displayed_upright": true,
+          "bit_depth": 16,
+          "icc_kind": "display-p3",
+          "icc_carried": true
+        },
+        "probe": null
+      },
+      "facts": {
+        "format": "PNG",
+        "width": 96,
+        "height": 64,
+        "bit_depth": 16,
+        "chunks": [
+          "IHDR",
+          "iCCP",
+          "IDAT",
+          "IEND"
+        ],
+        "exif_orientation": null,
+        "has_gps": false,
+        "icc": "match",
+        "icc_md5": "84800e16f6285ece237561e6603cd8a5",
+        "content": "gradient",
+        "icc_kind": "display-p3",
+        "icc_carried": true,
+        "lossless": true
+      },
+      "size": 936,
+      "md5": "675a402e1feab6136bd3808a0a95b0bf",
+      "byte_reproducible": true
+    },
+    {
+      "id": "png16-gradient-none",
+      "group": "stills",
+      "kind": "png",
+      "storage": "committed",
+      "path": "stills/png/png16-gradient-none.png",
+      "command": null,
+      "serves": [
+        "V5",
+        "D53",
+        "D63",
+        "V9 (inputs)"
+      ],
+      "exercises": "16-bit PNG (stdlib writer), gradient content, none profile: 16-bit samples survive the read; profile kept.",
+      "expect": {
+        "faults": [],
+        "refusal": null,
+        "photo": {
+          "source_format": "png",
+          "orientation": 1,
+          "displayed_upright": true,
+          "bit_depth": 16,
+          "icc_kind": "none",
+          "icc_carried": false
+        },
+        "probe": null
+      },
+      "facts": {
+        "format": "PNG",
+        "width": 96,
+        "height": 64,
+        "bit_depth": 16,
+        "chunks": [
+          "IHDR",
+          "IDAT",
+          "IEND"
+        ],
+        "exif_orientation": null,
+        "has_gps": false,
+        "icc": "none",
+        "content": "gradient",
+        "icc_kind": "none",
+        "icc_carried": false,
+        "lossless": true
+      },
+      "size": 563,
+      "md5": "aacc2cace1aa997e63444f1abfb7a68e",
+      "byte_reproducible": true
+    },
+    {
+      "id": "png16-gradient-srgb",
+      "group": "stills",
+      "kind": "png",
+      "storage": "committed",
+      "path": "stills/png/png16-gradient-srgb.png",
+      "command": null,
+      "serves": [
+        "V5",
+        "D53",
+        "D63",
+        "V9 (inputs)"
+      ],
+      "exercises": "16-bit PNG (stdlib writer), gradient content, srgb profile: 16-bit samples survive the read; profile kept.",
+      "expect": {
+        "faults": [],
+        "refusal": null,
+        "photo": {
+          "source_format": "png",
+          "orientation": 1,
+          "displayed_upright": true,
+          "bit_depth": 16,
+          "icc_kind": "srgb",
+          "icc_carried": true
+        },
+        "probe": null
+      },
+      "facts": {
+        "format": "PNG",
+        "width": 96,
+        "height": 64,
+        "bit_depth": 16,
+        "chunks": [
+          "IHDR",
+          "iCCP",
+          "IDAT",
+          "IEND"
+        ],
+        "exif_orientation": null,
+        "has_gps": false,
+        "icc": "match",
+        "icc_md5": "237fcf5044d6a7518c508d407887b818",
+        "content": "gradient",
+        "icc_kind": "srgb",
+        "icc_carried": true,
+        "lossless": true
+      },
+      "size": 940,
+      "md5": "a59eb06959ccf172fa31d071ca290469",
+      "byte_reproducible": true
+    },
+    {
+      "id": "png16-lowred-display-p3",
+      "group": "stills",
+      "kind": "png",
+      "storage": "committed",
+      "path": "stills/png/png16-lowred-display-p3.png",
+      "command": null,
+      "serves": [
+        "V5",
+        "D53",
+        "D63",
+        "V9 (inputs)"
+      ],
+      "exercises": "16-bit PNG (stdlib writer), lowred content, display-p3 profile: 16-bit samples survive the read; profile kept.",
+      "expect": {
+        "faults": [],
+        "refusal": null,
+        "photo": {
+          "source_format": "png",
+          "orientation": 1,
+          "displayed_upright": true,
+          "bit_depth": 16,
+          "icc_kind": "display-p3",
+          "icc_carried": true
+        },
+        "probe": null
+      },
+      "facts": {
+        "format": "PNG",
+        "width": 96,
+        "height": 64,
+        "bit_depth": 16,
+        "chunks": [
+          "IHDR",
+          "iCCP",
+          "IDAT",
+          "IEND"
+        ],
+        "exif_orientation": null,
+        "has_gps": false,
+        "icc": "match",
+        "icc_md5": "84800e16f6285ece237561e6603cd8a5",
+        "content": "lowred",
+        "icc_kind": "display-p3",
+        "icc_carried": true,
+        "lossless": true,
+        "red_max": 514
+      },
+      "size": 24284,
+      "md5": "ff406877744c3c10b39728065f726bd3",
+      "byte_reproducible": true
+    },
+    {
+      "id": "png16-lowred-none",
+      "group": "stills",
+      "kind": "png",
+      "storage": "committed",
+      "path": "stills/png/png16-lowred-none.png",
+      "command": null,
+      "serves": [
+        "V5",
+        "D53",
+        "D63",
+        "V9 (inputs)"
+      ],
+      "exercises": "16-bit PNG (stdlib writer), lowred content, none profile: 16-bit samples survive the read; profile kept.",
+      "expect": {
+        "faults": [],
+        "refusal": null,
+        "photo": {
+          "source_format": "png",
+          "orientation": 1,
+          "displayed_upright": true,
+          "bit_depth": 16,
+          "icc_kind": "none",
+          "icc_carried": false
+        },
+        "probe": null
+      },
+      "facts": {
+        "format": "PNG",
+        "width": 96,
+        "height": 64,
+        "bit_depth": 16,
+        "chunks": [
+          "IHDR",
+          "IDAT",
+          "IEND"
+        ],
+        "exif_orientation": null,
+        "has_gps": false,
+        "icc": "none",
+        "content": "lowred",
+        "icc_kind": "none",
+        "icc_carried": false,
+        "lossless": true,
+        "red_max": 514
+      },
+      "size": 23911,
+      "md5": "206cadc0d2e53867c158a635174d7dc7",
+      "byte_reproducible": true
+    },
+    {
+      "id": "png16-lowred-srgb",
+      "group": "stills",
+      "kind": "png",
+      "storage": "committed",
+      "path": "stills/png/png16-lowred-srgb.png",
+      "command": null,
+      "serves": [
+        "V5",
+        "D53",
+        "D63",
+        "V9 (inputs)"
+      ],
+      "exercises": "16-bit PNG (stdlib writer), lowred content, srgb profile: 16-bit samples survive the read; profile kept.",
+      "expect": {
+        "faults": [],
+        "refusal": null,
+        "photo": {
+          "source_format": "png",
+          "orientation": 1,
+          "displayed_upright": true,
+          "bit_depth": 16,
+          "icc_kind": "srgb",
+          "icc_carried": true
+        },
+        "probe": null
+      },
+      "facts": {
+        "format": "PNG",
+        "width": 96,
+        "height": 64,
+        "bit_depth": 16,
+        "chunks": [
+          "IHDR",
+          "iCCP",
+          "IDAT",
+          "IEND"
+        ],
+        "exif_orientation": null,
+        "has_gps": false,
+        "icc": "match",
+        "icc_md5": "237fcf5044d6a7518c508d407887b818",
+        "content": "lowred",
+        "icc_kind": "srgb",
+        "icc_carried": true,
+        "lossless": true,
+        "red_max": 514
+      },
+      "size": 24288,
+      "md5": "84f6bb7dbe1049bd54d425f7c8fab137",
+      "byte_reproducible": true
+    },
+    {
+      "id": "png16-uniform-display-p3",
+      "group": "stills",
+      "kind": "png",
+      "storage": "committed",
+      "path": "stills/png/png16-uniform-display-p3.png",
+      "command": null,
+      "serves": [
+        "V5",
+        "D53",
+        "D63",
+        "V9 (inputs)"
+      ],
+      "exercises": "16-bit PNG (stdlib writer), uniform content, display-p3 profile: 16-bit samples survive the read; profile kept.",
+      "expect": {
+        "faults": [],
+        "refusal": null,
+        "photo": {
+          "source_format": "png",
+          "orientation": 1,
+          "displayed_upright": true,
+          "bit_depth": 16,
+          "icc_kind": "display-p3",
+          "icc_carried": true
+        },
+        "probe": null
+      },
+      "facts": {
+        "format": "PNG",
+        "width": 96,
+        "height": 64,
+        "bit_depth": 16,
+        "chunks": [
+          "IHDR",
+          "iCCP",
+          "IDAT",
+          "IEND"
+        ],
+        "exif_orientation": null,
+        "has_gps": false,
+        "icc": "match",
+        "icc_md5": "84800e16f6285ece237561e6603cd8a5",
+        "content": "uniform",
+        "icc_kind": "display-p3",
+        "icc_carried": true,
+        "lossless": true
+      },
+      "size": 604,
+      "md5": "7805fed8f4ea4a7de601d8ad82c04d48",
+      "byte_reproducible": true
+    },
+    {
+      "id": "png16-uniform-none",
+      "group": "stills",
+      "kind": "png",
+      "storage": "committed",
+      "path": "stills/png/png16-uniform-none.png",
+      "command": null,
+      "serves": [
+        "V5",
+        "D53",
+        "D63",
+        "V9 (inputs)"
+      ],
+      "exercises": "16-bit PNG (stdlib writer), uniform content, none profile: 16-bit samples survive the read; profile kept.",
+      "expect": {
+        "faults": [],
+        "refusal": null,
+        "photo": {
+          "source_format": "png",
+          "orientation": 1,
+          "displayed_upright": true,
+          "bit_depth": 16,
+          "icc_kind": "none",
+          "icc_carried": false
+        },
+        "probe": null
+      },
+      "facts": {
+        "format": "PNG",
+        "width": 96,
+        "height": 64,
+        "bit_depth": 16,
+        "chunks": [
+          "IHDR",
+          "IDAT",
+          "IEND"
+        ],
+        "exif_orientation": null,
+        "has_gps": false,
+        "icc": "none",
+        "content": "uniform",
+        "icc_kind": "none",
+        "icc_carried": false,
+        "lossless": true
+      },
+      "size": 231,
+      "md5": "dedc1a9df38de34bc78d0de86d22d0b6",
+      "byte_reproducible": true
+    },
+    {
+      "id": "png16-uniform-srgb",
+      "group": "stills",
+      "kind": "png",
+      "storage": "committed",
+      "path": "stills/png/png16-uniform-srgb.png",
+      "command": null,
+      "serves": [
+        "V5",
+        "D53",
+        "D63",
+        "V9 (inputs)"
+      ],
+      "exercises": "16-bit PNG (stdlib writer), uniform content, srgb profile: 16-bit samples survive the read; profile kept.",
+      "expect": {
+        "faults": [],
+        "refusal": null,
+        "photo": {
+          "source_format": "png",
+          "orientation": 1,
+          "displayed_upright": true,
+          "bit_depth": 16,
+          "icc_kind": "srgb",
+          "icc_carried": true
+        },
+        "probe": null
+      },
+      "facts": {
+        "format": "PNG",
+        "width": 96,
+        "height": 64,
+        "bit_depth": 16,
+        "chunks": [
+          "IHDR",
+          "iCCP",
+          "IDAT",
+          "IEND"
+        ],
+        "exif_orientation": null,
+        "has_gps": false,
+        "icc": "match",
+        "icc_md5": "237fcf5044d6a7518c508d407887b818",
+        "content": "uniform",
+        "icc_kind": "srgb",
+        "icc_carried": true,
+        "lossless": true
+      },
+      "size": 608,
+      "md5": "b1bdb60fa4b1924652ab5b63a54e1907",
+      "byte_reproducible": true
+    },
+    {
+      "id": "png8-gradient-display-p3",
+      "group": "stills",
+      "kind": "png",
+      "storage": "committed",
+      "path": "stills/png/png8-gradient-display-p3.png",
+      "command": null,
+      "serves": [
+        "V5",
+        "D53",
+        "D63",
+        "V9 (inputs)"
+      ],
+      "exercises": "8-bit PNG, gradient content, display-p3 profile: read, profile kept, bit depth honoured.",
+      "expect": {
+        "faults": [],
+        "refusal": null,
+        "photo": {
+          "source_format": "png",
+          "orientation": 1,
+          "displayed_upright": true,
+          "bit_depth": 8,
+          "icc_kind": "display-p3",
+          "icc_carried": true
+        },
+        "probe": null
+      },
+      "facts": {
+        "format": "PNG",
+        "width": 96,
+        "height": 64,
+        "bit_depth": 8,
+        "chunks": [
+          "IHDR",
+          "iCCP",
+          "IDAT",
+          "IEND"
+        ],
+        "exif_orientation": null,
+        "has_gps": false,
+        "icc": "match",
+        "icc_md5": "84800e16f6285ece237561e6603cd8a5",
+        "content": "gradient",
+        "icc_kind": "display-p3",
+        "icc_carried": true,
+        "lossless": true
+      },
+      "size": 595,
+      "md5": "01186fe0dd4c093fa6a1164058872237",
+      "byte_reproducible": true
+    },
+    {
+      "id": "png8-gradient-none",
+      "group": "stills",
+      "kind": "png",
+      "storage": "committed",
+      "path": "stills/png/png8-gradient-none.png",
+      "command": null,
+      "serves": [
+        "V5",
+        "D53",
+        "D63",
+        "V9 (inputs)"
+      ],
+      "exercises": "8-bit PNG, gradient content, none profile: read, profile kept, bit depth honoured.",
+      "expect": {
+        "faults": [],
+        "refusal": null,
+        "photo": {
+          "source_format": "png",
+          "orientation": 1,
+          "displayed_upright": true,
+          "bit_depth": 8,
+          "icc_kind": "none",
+          "icc_carried": false
+        },
+        "probe": null
+      },
+      "facts": {
+        "format": "PNG",
+        "width": 96,
+        "height": 64,
+        "bit_depth": 8,
+        "chunks": [
+          "IHDR",
+          "IDAT",
+          "IEND"
+        ],
+        "exif_orientation": null,
+        "has_gps": false,
+        "icc": "none",
+        "content": "gradient",
+        "icc_kind": "none",
+        "icc_carried": false,
+        "lossless": true
+      },
+      "size": 221,
+      "md5": "87607024dfe355470022e480c44b925d",
+      "byte_reproducible": true
+    },
+    {
+      "id": "png8-gradient-srgb",
+      "group": "stills",
+      "kind": "png",
+      "storage": "committed",
+      "path": "stills/png/png8-gradient-srgb.png",
+      "command": null,
+      "serves": [
+        "V5",
+        "D53",
+        "D63",
+        "V9 (inputs)"
+      ],
+      "exercises": "8-bit PNG, gradient content, srgb profile: read, profile kept, bit depth honoured.",
+      "expect": {
+        "faults": [],
+        "refusal": null,
+        "photo": {
+          "source_format": "png",
+          "orientation": 1,
+          "displayed_upright": true,
+          "bit_depth": 8,
+          "icc_kind": "srgb",
+          "icc_carried": true
+        },
+        "probe": null
+      },
+      "facts": {
+        "format": "PNG",
+        "width": 96,
+        "height": 64,
+        "bit_depth": 8,
+        "chunks": [
+          "IHDR",
+          "iCCP",
+          "IDAT",
+          "IEND"
+        ],
+        "exif_orientation": null,
+        "has_gps": false,
+        "icc": "match",
+        "icc_md5": "237fcf5044d6a7518c508d407887b818",
+        "content": "gradient",
+        "icc_kind": "srgb",
+        "icc_carried": true,
+        "lossless": true
+      },
+      "size": 605,
+      "md5": "26ab547af456f1c27d1f2daa2d4c9dff",
+      "byte_reproducible": true
+    },
+    {
+      "id": "png8-lowred-display-p3",
+      "group": "stills",
+      "kind": "png",
+      "storage": "committed",
+      "path": "stills/png/png8-lowred-display-p3.png",
+      "command": null,
+      "serves": [
+        "V5",
+        "D53",
+        "D63",
+        "V9 (inputs)"
+      ],
+      "exercises": "8-bit PNG, lowred content, display-p3 profile: read, profile kept, bit depth honoured.",
+      "expect": {
+        "faults": [],
+        "refusal": null,
+        "photo": {
+          "source_format": "png",
+          "orientation": 1,
+          "displayed_upright": true,
+          "bit_depth": 8,
+          "icc_kind": "display-p3",
+          "icc_carried": true
+        },
+        "probe": null
+      },
+      "facts": {
+        "format": "PNG",
+        "width": 96,
+        "height": 64,
+        "bit_depth": 8,
+        "chunks": [
+          "IHDR",
+          "iCCP",
+          "IDAT",
+          "IEND"
+        ],
+        "exif_orientation": null,
+        "has_gps": false,
+        "icc": "match",
+        "icc_md5": "84800e16f6285ece237561e6603cd8a5",
+        "content": "lowred",
+        "icc_kind": "display-p3",
+        "icc_carried": true,
+        "lossless": true,
+        "red_max": 2
+      },
+      "size": 3107,
+      "md5": "fcf7d78dec9d7f069185157152307f5a",
+      "byte_reproducible": true
+    },
+    {
+      "id": "png8-lowred-none",
+      "group": "stills",
+      "kind": "png",
+      "storage": "committed",
+      "path": "stills/png/png8-lowred-none.png",
+      "command": null,
+      "serves": [
+        "V5",
+        "D53",
+        "D63",
+        "V9 (inputs)"
+      ],
+      "exercises": "8-bit PNG, lowred content, none profile: read, profile kept, bit depth honoured.",
+      "expect": {
+        "faults": [],
+        "refusal": null,
+        "photo": {
+          "source_format": "png",
+          "orientation": 1,
+          "displayed_upright": true,
+          "bit_depth": 8,
+          "icc_kind": "none",
+          "icc_carried": false
+        },
+        "probe": null
+      },
+      "facts": {
+        "format": "PNG",
+        "width": 96,
+        "height": 64,
+        "bit_depth": 8,
+        "chunks": [
+          "IHDR",
+          "IDAT",
+          "IEND"
+        ],
+        "exif_orientation": null,
+        "has_gps": false,
+        "icc": "none",
+        "content": "lowred",
+        "icc_kind": "none",
+        "icc_carried": false,
+        "lossless": true,
+        "red_max": 2
+      },
+      "size": 2733,
+      "md5": "0afd260a5d61e954b7367475c6e8886f",
+      "byte_reproducible": true
+    },
+    {
+      "id": "png8-lowred-srgb",
+      "group": "stills",
+      "kind": "png",
+      "storage": "committed",
+      "path": "stills/png/png8-lowred-srgb.png",
+      "command": null,
+      "serves": [
+        "V5",
+        "D53",
+        "D63",
+        "V9 (inputs)"
+      ],
+      "exercises": "8-bit PNG, lowred content, srgb profile: read, profile kept, bit depth honoured.",
+      "expect": {
+        "faults": [],
+        "refusal": null,
+        "photo": {
+          "source_format": "png",
+          "orientation": 1,
+          "displayed_upright": true,
+          "bit_depth": 8,
+          "icc_kind": "srgb",
+          "icc_carried": true
+        },
+        "probe": null
+      },
+      "facts": {
+        "format": "PNG",
+        "width": 96,
+        "height": 64,
+        "bit_depth": 8,
+        "chunks": [
+          "IHDR",
+          "iCCP",
+          "IDAT",
+          "IEND"
+        ],
+        "exif_orientation": null,
+        "has_gps": false,
+        "icc": "match",
+        "icc_md5": "237fcf5044d6a7518c508d407887b818",
+        "content": "lowred",
+        "icc_kind": "srgb",
+        "icc_carried": true,
+        "lossless": true,
+        "red_max": 2
+      },
+      "size": 3117,
+      "md5": "5aac58480111263b2b7cf58e76875b14",
+      "byte_reproducible": true
+    },
+    {
+      "id": "png8-uniform-display-p3",
+      "group": "stills",
+      "kind": "png",
+      "storage": "committed",
+      "path": "stills/png/png8-uniform-display-p3.png",
+      "command": null,
+      "serves": [
+        "V5",
+        "D53",
+        "D63",
+        "V9 (inputs)"
+      ],
+      "exercises": "8-bit PNG, uniform content, display-p3 profile: read, profile kept, bit depth honoured.",
+      "expect": {
+        "faults": [],
+        "refusal": null,
+        "photo": {
+          "source_format": "png",
+          "orientation": 1,
+          "displayed_upright": true,
+          "bit_depth": 8,
+          "icc_kind": "display-p3",
+          "icc_carried": true
+        },
+        "probe": null
+      },
+      "facts": {
+        "format": "PNG",
+        "width": 96,
+        "height": 64,
+        "bit_depth": 8,
+        "chunks": [
+          "IHDR",
+          "iCCP",
+          "IDAT",
+          "IEND"
+        ],
+        "exif_orientation": null,
+        "has_gps": false,
+        "icc": "match",
+        "icc_md5": "84800e16f6285ece237561e6603cd8a5",
+        "content": "uniform",
+        "icc_kind": "display-p3",
+        "icc_carried": true,
+        "lossless": true
+      },
+      "size": 586,
+      "md5": "4cabf8601451159254f6674ed4a53d56",
+      "byte_reproducible": true
+    },
+    {
+      "id": "png8-uniform-none",
+      "group": "stills",
+      "kind": "png",
+      "storage": "committed",
+      "path": "stills/png/png8-uniform-none.png",
+      "command": null,
+      "serves": [
+        "V5",
+        "D53",
+        "D63",
+        "V9 (inputs)"
+      ],
+      "exercises": "8-bit PNG, uniform content, none profile: read, profile kept, bit depth honoured.",
+      "expect": {
+        "faults": [],
+        "refusal": null,
+        "photo": {
+          "source_format": "png",
+          "orientation": 1,
+          "displayed_upright": true,
+          "bit_depth": 8,
+          "icc_kind": "none",
+          "icc_carried": false
+        },
+        "probe": null
+      },
+      "facts": {
+        "format": "PNG",
+        "width": 96,
+        "height": 64,
+        "bit_depth": 8,
+        "chunks": [
+          "IHDR",
+          "IDAT",
+          "IEND"
+        ],
+        "exif_orientation": null,
+        "has_gps": false,
+        "icc": "none",
+        "content": "uniform",
+        "icc_kind": "none",
+        "icc_carried": false,
+        "lossless": true
+      },
+      "size": 212,
+      "md5": "410af0d00c80e8acc6da0ef2c6f48a14",
+      "byte_reproducible": true
+    },
+    {
+      "id": "png8-uniform-srgb",
+      "group": "stills",
+      "kind": "png",
+      "storage": "committed",
+      "path": "stills/png/png8-uniform-srgb.png",
+      "command": null,
+      "serves": [
+        "V5",
+        "D53",
+        "D63",
+        "V9 (inputs)"
+      ],
+      "exercises": "8-bit PNG, uniform content, srgb profile: read, profile kept, bit depth honoured.",
+      "expect": {
+        "faults": [],
+        "refusal": null,
+        "photo": {
+          "source_format": "png",
+          "orientation": 1,
+          "displayed_upright": true,
+          "bit_depth": 8,
+          "icc_kind": "srgb",
+          "icc_carried": true
+        },
+        "probe": null
+      },
+      "facts": {
+        "format": "PNG",
+        "width": 96,
+        "height": 64,
+        "bit_depth": 8,
+        "chunks": [
+          "IHDR",
+          "iCCP",
+          "IDAT",
+          "IEND"
+        ],
+        "exif_orientation": null,
+        "has_gps": false,
+        "icc": "match",
+        "icc_md5": "237fcf5044d6a7518c508d407887b818",
+        "content": "uniform",
+        "icc_kind": "srgb",
+        "icc_carried": true,
+        "lossless": true
+      },
+      "size": 596,
+      "md5": "f770210f563f4f2ae38019b204735a92",
+      "byte_reproducible": true
+    },
+    {
+      "id": "tiff8-gradient-display-p3",
+      "group": "stills",
+      "kind": "tiff",
+      "storage": "committed",
+      "path": "stills/tiff/tiff8-gradient-display-p3.tif",
+      "command": null,
+      "serves": [
+        "V5",
+        "D53",
+        "D63",
+        "V9 (inputs)",
+        "D116 (control: a TIFF that is not a DNG)"
+      ],
+      "exercises": "8-bit TIFF, gradient content, display-p3 profile; also the control for the DNG refusal (a TIFF without the DNG tag is read).",
+      "expect": {
+        "faults": [],
+        "refusal": null,
+        "photo": {
+          "source_format": "tiff",
+          "orientation": 1,
+          "displayed_upright": true,
+          "bit_depth": 8,
+          "icc_kind": "display-p3",
+          "icc_carried": true
+        },
+        "probe": null
+      },
+      "facts": {
+        "format": "TIFF",
+        "width": 96,
+        "height": 64,
+        "bit_depth": 8,
+        "exif_orientation": null,
+        "has_gps": false,
+        "icc": "match",
+        "icc_md5": "84800e16f6285ece237561e6603cd8a5",
+        "content": "gradient",
+        "icc_kind": "display-p3",
+        "icc_carried": true,
+        "lossless": true
+      },
+      "size": 19248,
+      "md5": "bf9e3d043ded0bf147aedd5c8e7881a8",
+      "byte_reproducible": true
+    },
+    {
+      "id": "tiff8-gradient-none",
+      "group": "stills",
+      "kind": "tiff",
+      "storage": "committed",
+      "path": "stills/tiff/tiff8-gradient-none.tif",
+      "command": null,
+      "serves": [
+        "V5",
+        "D53",
+        "D63",
+        "V9 (inputs)",
+        "D116 (control: a TIFF that is not a DNG)"
+      ],
+      "exercises": "8-bit TIFF, gradient content, none profile; also the control for the DNG refusal (a TIFF without the DNG tag is read).",
+      "expect": {
+        "faults": [],
+        "refusal": null,
+        "photo": {
+          "source_format": "tiff",
+          "orientation": 1,
+          "displayed_upright": true,
+          "bit_depth": 8,
+          "icc_kind": "none",
+          "icc_carried": false
+        },
+        "probe": null
+      },
+      "facts": {
+        "format": "TIFF",
+        "width": 96,
+        "height": 64,
+        "bit_depth": 8,
+        "exif_orientation": null,
+        "has_gps": false,
+        "icc": "none",
+        "content": "gradient",
+        "icc_kind": "none",
+        "icc_carried": false,
+        "lossless": true
+      },
+      "size": 18572,
+      "md5": "bf2e7b9977ceea6fd710e47c137e5f1d",
+      "byte_reproducible": true
+    },
+    {
+      "id": "tiff8-gradient-srgb",
+      "group": "stills",
+      "kind": "tiff",
+      "storage": "committed",
+      "path": "stills/tiff/tiff8-gradient-srgb.tif",
+      "command": null,
+      "serves": [
+        "V5",
+        "D53",
+        "D63",
+        "V9 (inputs)",
+        "D116 (control: a TIFF that is not a DNG)"
+      ],
+      "exercises": "8-bit TIFF, gradient content, srgb profile; also the control for the DNG refusal (a TIFF without the DNG tag is read).",
+      "expect": {
+        "faults": [],
+        "refusal": null,
+        "photo": {
+          "source_format": "tiff",
+          "orientation": 1,
+          "displayed_upright": true,
+          "bit_depth": 8,
+          "icc_kind": "srgb",
+          "icc_carried": true
+        },
+        "probe": null
+      },
+      "facts": {
+        "format": "TIFF",
+        "width": 96,
+        "height": 64,
+        "bit_depth": 8,
+        "exif_orientation": null,
+        "has_gps": false,
+        "icc": "match",
+        "icc_md5": "237fcf5044d6a7518c508d407887b818",
+        "content": "gradient",
+        "icc_kind": "srgb",
+        "icc_carried": true,
+        "lossless": true
+      },
+      "size": 19172,
+      "md5": "cfd82408b4c2d88d9f0c4fb60c16593f",
+      "byte_reproducible": true
+    },
+    {
+      "id": "tiff8-lowred-display-p3",
+      "group": "stills",
+      "kind": "tiff",
+      "storage": "committed",
+      "path": "stills/tiff/tiff8-lowred-display-p3.tif",
+      "command": null,
+      "serves": [
+        "V5",
+        "D53",
+        "D63",
+        "V9 (inputs)",
+        "D116 (control: a TIFF that is not a DNG)"
+      ],
+      "exercises": "8-bit TIFF, lowred content, display-p3 profile; also the control for the DNG refusal (a TIFF without the DNG tag is read).",
+      "expect": {
+        "faults": [],
+        "refusal": null,
+        "photo": {
+          "source_format": "tiff",
+          "orientation": 1,
+          "displayed_upright": true,
+          "bit_depth": 8,
+          "icc_kind": "display-p3",
+          "icc_carried": true
+        },
+        "probe": null
+      },
+      "facts": {
+        "format": "TIFF",
+        "width": 96,
+        "height": 64,
+        "bit_depth": 8,
+        "exif_orientation": null,
+        "has_gps": false,
+        "icc": "match",
+        "icc_md5": "84800e16f6285ece237561e6603cd8a5",
+        "content": "lowred",
+        "icc_kind": "display-p3",
+        "icc_carried": true,
+        "lossless": true,
+        "red_max": 2
+      },
+      "size": 19248,
+      "md5": "02713fe08a4749a700bfc3bafb146f75",
+      "byte_reproducible": true
+    },
+    {
+      "id": "tiff8-lowred-none",
+      "group": "stills",
+      "kind": "tiff",
+      "storage": "committed",
+      "path": "stills/tiff/tiff8-lowred-none.tif",
+      "command": null,
+      "serves": [
+        "V5",
+        "D53",
+        "D63",
+        "V9 (inputs)",
+        "D116 (control: a TIFF that is not a DNG)"
+      ],
+      "exercises": "8-bit TIFF, lowred content, none profile; also the control for the DNG refusal (a TIFF without the DNG tag is read).",
+      "expect": {
+        "faults": [],
+        "refusal": null,
+        "photo": {
+          "source_format": "tiff",
+          "orientation": 1,
+          "displayed_upright": true,
+          "bit_depth": 8,
+          "icc_kind": "none",
+          "icc_carried": false
+        },
+        "probe": null
+      },
+      "facts": {
+        "format": "TIFF",
+        "width": 96,
+        "height": 64,
+        "bit_depth": 8,
+        "exif_orientation": null,
+        "has_gps": false,
+        "icc": "none",
+        "content": "lowred",
+        "icc_kind": "none",
+        "icc_carried": false,
+        "lossless": true,
+        "red_max": 2
+      },
+      "size": 18572,
+      "md5": "0255c78af382e8520d6e1719d4339541",
+      "byte_reproducible": true
+    },
+    {
+      "id": "tiff8-lowred-srgb",
+      "group": "stills",
+      "kind": "tiff",
+      "storage": "committed",
+      "path": "stills/tiff/tiff8-lowred-srgb.tif",
+      "command": null,
+      "serves": [
+        "V5",
+        "D53",
+        "D63",
+        "V9 (inputs)",
+        "D116 (control: a TIFF that is not a DNG)"
+      ],
+      "exercises": "8-bit TIFF, lowred content, srgb profile; also the control for the DNG refusal (a TIFF without the DNG tag is read).",
+      "expect": {
+        "faults": [],
+        "refusal": null,
+        "photo": {
+          "source_format": "tiff",
+          "orientation": 1,
+          "displayed_upright": true,
+          "bit_depth": 8,
+          "icc_kind": "srgb",
+          "icc_carried": true
+        },
+        "probe": null
+      },
+      "facts": {
+        "format": "TIFF",
+        "width": 96,
+        "height": 64,
+        "bit_depth": 8,
+        "exif_orientation": null,
+        "has_gps": false,
+        "icc": "match",
+        "icc_md5": "237fcf5044d6a7518c508d407887b818",
+        "content": "lowred",
+        "icc_kind": "srgb",
+        "icc_carried": true,
+        "lossless": true,
+        "red_max": 2
+      },
+      "size": 19172,
+      "md5": "74bcaab270c64d69c606570f2727256e",
+      "byte_reproducible": true
+    },
+    {
+      "id": "tiff8-uniform-display-p3",
+      "group": "stills",
+      "kind": "tiff",
+      "storage": "committed",
+      "path": "stills/tiff/tiff8-uniform-display-p3.tif",
+      "command": null,
+      "serves": [
+        "V5",
+        "D53",
+        "D63",
+        "V9 (inputs)",
+        "D116 (control: a TIFF that is not a DNG)"
+      ],
+      "exercises": "8-bit TIFF, uniform content, display-p3 profile; also the control for the DNG refusal (a TIFF without the DNG tag is read).",
+      "expect": {
+        "faults": [],
+        "refusal": null,
+        "photo": {
+          "source_format": "tiff",
+          "orientation": 1,
+          "displayed_upright": true,
+          "bit_depth": 8,
+          "icc_kind": "display-p3",
+          "icc_carried": true
+        },
+        "probe": null
+      },
+      "facts": {
+        "format": "TIFF",
+        "width": 96,
+        "height": 64,
+        "bit_depth": 8,
+        "exif_orientation": null,
+        "has_gps": false,
+        "icc": "match",
+        "icc_md5": "84800e16f6285ece237561e6603cd8a5",
+        "content": "uniform",
+        "icc_kind": "display-p3",
+        "icc_carried": true,
+        "lossless": true
+      },
+      "size": 19248,
+      "md5": "8df58560b5368a1c238daf2b1b1f2631",
+      "byte_reproducible": true
+    },
+    {
+      "id": "tiff8-uniform-none",
+      "group": "stills",
+      "kind": "tiff",
+      "storage": "committed",
+      "path": "stills/tiff/tiff8-uniform-none.tif",
+      "command": null,
+      "serves": [
+        "V5",
+        "D53",
+        "D63",
+        "V9 (inputs)",
+        "D116 (control: a TIFF that is not a DNG)"
+      ],
+      "exercises": "8-bit TIFF, uniform content, none profile; also the control for the DNG refusal (a TIFF without the DNG tag is read).",
+      "expect": {
+        "faults": [],
+        "refusal": null,
+        "photo": {
+          "source_format": "tiff",
+          "orientation": 1,
+          "displayed_upright": true,
+          "bit_depth": 8,
+          "icc_kind": "none",
+          "icc_carried": false
+        },
+        "probe": null
+      },
+      "facts": {
+        "format": "TIFF",
+        "width": 96,
+        "height": 64,
+        "bit_depth": 8,
+        "exif_orientation": null,
+        "has_gps": false,
+        "icc": "none",
+        "content": "uniform",
+        "icc_kind": "none",
+        "icc_carried": false,
+        "lossless": true
+      },
+      "size": 18572,
+      "md5": "d24ade2bf2c25061a9b6584143029afe",
+      "byte_reproducible": true
+    },
+    {
+      "id": "tiff8-uniform-srgb",
+      "group": "stills",
+      "kind": "tiff",
+      "storage": "committed",
+      "path": "stills/tiff/tiff8-uniform-srgb.tif",
+      "command": null,
+      "serves": [
+        "V5",
+        "D53",
+        "D63",
+        "V9 (inputs)",
+        "D116 (control: a TIFF that is not a DNG)"
+      ],
+      "exercises": "8-bit TIFF, uniform content, srgb profile; also the control for the DNG refusal (a TIFF without the DNG tag is read).",
+      "expect": {
+        "faults": [],
+        "refusal": null,
+        "photo": {
+          "source_format": "tiff",
+          "orientation": 1,
+          "displayed_upright": true,
+          "bit_depth": 8,
+          "icc_kind": "srgb",
+          "icc_carried": true
+        },
+        "probe": null
+      },
+      "facts": {
+        "format": "TIFF",
+        "width": 96,
+        "height": 64,
+        "bit_depth": 8,
+        "exif_orientation": null,
+        "has_gps": false,
+        "icc": "match",
+        "icc_md5": "237fcf5044d6a7518c508d407887b818",
+        "content": "uniform",
+        "icc_kind": "srgb",
+        "icc_carried": true,
+        "lossless": true
+      },
+      "size": 19172,
+      "md5": "c3e6590d89f37096470352fb77ddf9ff",
+      "byte_reproducible": true
+    },
+    {
+      "id": "vid-hevc10",
+      "group": "video",
+      "kind": "mp4",
+      "storage": "committed",
+      "path": "video/hevc10.mp4",
+      "command": null,
+      "serves": [
+        "V4",
+        "D114",
+        "D55"
+      ],
+      "exercises": "10-bit HEVC 4:2:0 tagged BT.709 limited range: the 10-bit decode and output path.",
+      "expect": {
+        "faults": [],
+        "refusal": null,
+        "photo": null,
+        "probe": {
+          "codec": "hevc",
+          "width": 320,
+          "height": 180,
+          "bit_depth": 10,
+          "color": {
+            "primaries": "bt709",
+            "transfer": "bt709",
+            "matrix": "bt709",
+            "range": "limited",
+            "assumed": false
+          },
+          "rotation": 0,
+          "vfr": false,
+          "tag_state": "tagged",
+          "truncated": false
+        }
+      },
+      "facts": {
+        "container": "mov,mp4,m4a,3gp,3g2,mj2",
+        "video": {
+          "codec": "hevc",
+          "profile": "Main 10",
+          "pix_fmt": "yuv420p10le",
+          "bit_depth": 10,
+          "width": 320,
+          "height": 180,
+          "color_range": "tv",
+          "color_space": "bt709",
+          "color_transfer": "bt709",
+          "color_primaries": "bt709",
+          "r_frame_rate": "30000/1001",
+          "avg_frame_rate": "30000/1001",
+          "time_base": "1/30000",
+          "nb_frames": 45,
+          "rotation": 0,
+          "vui": {
+            "video_signal_type_present_flag": 1,
+            "video_full_range_flag": 0,
+            "colour_description_present_flag": 1,
+            "colour_primaries": 1,
+            "transfer_characteristics": 1,
+            "matrix_coefficients": 1
+          }
+        },
+        "audio": [
+          {
+            "codec": "aac",
+            "sample_rate": 48000,
+            "channels": 1
+          }
+        ],
+        "data_streams": [],
+        "has_location_tag": false,
+        "pts": {
+          "ticks_per_second": 30000,
+          "count": 45,
+          "ticks": [
+            0,
+            1001,
+            2002,
+            3003,
+            4004,
+            5005,
+            6006,
+            7007,
+            8008,
+            9009,
+            10010,
+            11011,
+            12012,
+            13013,
+            14014,
+            15015,
+            16016,
+            17017,
+            18018,
+            19019,
+            20020,
+            21021,
+            22022,
+            23023,
+            24024,
+            25025,
+            26026,
+            27027,
+            28028,
+            29029,
+            30030,
+            31031,
+            32032,
+            33033,
+            34034,
+            35035,
+            36036,
+            37037,
+            38038,
+            39039,
+            40040,
+            41041,
+            42042,
+            43043,
+            44044
+          ],
+          "sha256": "d3aabc13e90989c19635975bc4e0fbcd9ae8d130b4f0f2c877af7bc0ce46cfa8",
+          "durations": [
+            1001
+          ],
+          "variable": false
+        },
+        "decoded": {
+          "frames": 45,
+          "frames_sha256": "086c6b8414fdfc475dbd37955919cbb85ccebf3a7611be1b8a02e1cadc3909a5",
+          "pts_sha256": "0aed5749fc5d21fc9c72e5a6523b225663010c2b4389701b9696cb58004d5d92",
+          "time_base": "1001/30000"
+        },
+        "ffprobe_errors": []
+      },
+      "size": 56754,
+      "md5": null,
+      "byte_reproducible": false
+    },
+    {
+      "id": "vid-hevc8-bt709-full",
+      "group": "video",
+      "kind": "mp4",
+      "storage": "committed",
+      "path": "video/hevc8-bt709-full.mp4",
+      "command": null,
+      "serves": [
+        "V4",
+        "D54 (control: tagged)",
+        "D55",
+        "D105"
+      ],
+      "exercises": "8-bit HEVC 4:2:0 tagged BT.709 full range like the HERO13: a clean probe with no fault.",
+      "expect": {
+        "faults": [],
+        "refusal": null,
+        "photo": null,
+        "probe": {
+          "codec": "hevc",
+          "width": 320,
+          "height": 180,
+          "bit_depth": 8,
+          "color": {
+            "primaries": "bt709",
+            "transfer": "bt709",
+            "matrix": "bt709",
+            "range": "full",
+            "assumed": false
+          },
+          "rotation": 0,
+          "vfr": false,
+          "tag_state": "tagged",
+          "truncated": false
+        }
+      },
+      "facts": {
+        "container": "mov,mp4,m4a,3gp,3g2,mj2",
+        "video": {
+          "codec": "hevc",
+          "profile": "Main",
+          "pix_fmt": "yuvj420p",
+          "bit_depth": 8,
+          "width": 320,
+          "height": 180,
+          "color_range": "pc",
+          "color_space": "bt709",
+          "color_transfer": "bt709",
+          "color_primaries": "bt709",
+          "r_frame_rate": "30000/1001",
+          "avg_frame_rate": "30000/1001",
+          "time_base": "1/30000",
+          "nb_frames": 45,
+          "rotation": 0,
+          "vui": {
+            "video_signal_type_present_flag": 1,
+            "video_full_range_flag": 1,
+            "colour_description_present_flag": 1,
+            "colour_primaries": 1,
+            "transfer_characteristics": 1,
+            "matrix_coefficients": 1
+          }
+        },
+        "audio": [
+          {
+            "codec": "aac",
+            "sample_rate": 48000,
+            "channels": 1
+          }
+        ],
+        "data_streams": [],
+        "has_location_tag": false,
+        "pts": {
+          "ticks_per_second": 30000,
+          "count": 45,
+          "ticks": [
+            0,
+            1001,
+            2002,
+            3003,
+            4004,
+            5005,
+            6006,
+            7007,
+            8008,
+            9009,
+            10010,
+            11011,
+            12012,
+            13013,
+            14014,
+            15015,
+            16016,
+            17017,
+            18018,
+            19019,
+            20020,
+            21021,
+            22022,
+            23023,
+            24024,
+            25025,
+            26026,
+            27027,
+            28028,
+            29029,
+            30030,
+            31031,
+            32032,
+            33033,
+            34034,
+            35035,
+            36036,
+            37037,
+            38038,
+            39039,
+            40040,
+            41041,
+            42042,
+            43043,
+            44044
+          ],
+          "sha256": "d3aabc13e90989c19635975bc4e0fbcd9ae8d130b4f0f2c877af7bc0ce46cfa8",
+          "durations": [
+            1001
+          ],
+          "variable": false
+        },
+        "decoded": {
+          "frames": 45,
+          "frames_sha256": "8f7b9aa2a2556fa23a8a6eb37d02d8f6b26a09b9ee43ed53ed47af9eca860c3d",
+          "pts_sha256": "0aed5749fc5d21fc9c72e5a6523b225663010c2b4389701b9696cb58004d5d92",
+          "time_base": "1001/30000"
+        },
+        "ffprobe_errors": []
+      },
+      "size": 55776,
+      "md5": null,
+      "byte_reproducible": false
+    },
+    {
+      "id": "vid-hlg",
+      "group": "video",
+      "kind": "mp4",
+      "storage": "committed",
+      "path": "video/hlg.mp4",
+      "command": null,
+      "serves": [
+        "spec 6.5",
+        "G10"
+      ],
+      "exercises": "HLG-tagged (arib-std-b67, bt2020) 10-bit HEVC: refused at probe.",
+      "expect": {
+        "faults": [
+          {
+            "kind": "hlg",
+            "severity": "refuse"
+          }
+        ],
+        "refusal": null,
+        "photo": null,
+        "probe": {
+          "codec": "hevc",
+          "width": 320,
+          "height": 180,
+          "bit_depth": 10,
+          "color": {
+            "primaries": "bt2020",
+            "transfer": "arib-std-b67",
+            "matrix": "bt2020nc",
+            "range": "limited",
+            "assumed": false
+          },
+          "rotation": 0,
+          "vfr": false,
+          "tag_state": "tagged",
+          "truncated": false
+        }
+      },
+      "facts": {
+        "container": "mov,mp4,m4a,3gp,3g2,mj2",
+        "video": {
+          "codec": "hevc",
+          "profile": "Main 10",
+          "pix_fmt": "yuv420p10le",
+          "bit_depth": 10,
+          "width": 320,
+          "height": 180,
+          "color_range": "tv",
+          "color_space": "bt2020nc",
+          "color_transfer": "arib-std-b67",
+          "color_primaries": "bt2020",
+          "r_frame_rate": "30000/1001",
+          "avg_frame_rate": "30000/1001",
+          "time_base": "1/30000",
+          "nb_frames": 45,
+          "rotation": 0,
+          "vui": {
+            "video_signal_type_present_flag": 1,
+            "video_full_range_flag": 0,
+            "colour_description_present_flag": 1,
+            "colour_primaries": 9,
+            "transfer_characteristics": 18,
+            "matrix_coefficients": 9
+          }
+        },
+        "audio": [
+          {
+            "codec": "aac",
+            "sample_rate": 48000,
+            "channels": 1
+          }
+        ],
+        "data_streams": [],
+        "has_location_tag": false,
+        "pts": {
+          "ticks_per_second": 30000,
+          "count": 45,
+          "ticks": [
+            0,
+            1001,
+            2002,
+            3003,
+            4004,
+            5005,
+            6006,
+            7007,
+            8008,
+            9009,
+            10010,
+            11011,
+            12012,
+            13013,
+            14014,
+            15015,
+            16016,
+            17017,
+            18018,
+            19019,
+            20020,
+            21021,
+            22022,
+            23023,
+            24024,
+            25025,
+            26026,
+            27027,
+            28028,
+            29029,
+            30030,
+            31031,
+            32032,
+            33033,
+            34034,
+            35035,
+            36036,
+            37037,
+            38038,
+            39039,
+            40040,
+            41041,
+            42042,
+            43043,
+            44044
+          ],
+          "sha256": "d3aabc13e90989c19635975bc4e0fbcd9ae8d130b4f0f2c877af7bc0ce46cfa8",
+          "durations": [
+            1001
+          ],
+          "variable": false
+        },
+        "decoded": {
+          "frames": 45,
+          "frames_sha256": "086c6b8414fdfc475dbd37955919cbb85ccebf3a7611be1b8a02e1cadc3909a5",
+          "pts_sha256": "0aed5749fc5d21fc9c72e5a6523b225663010c2b4389701b9696cb58004d5d92",
+          "time_base": "1001/30000"
+        },
+        "ffprobe_errors": []
+      },
+      "size": 56754,
+      "md5": null,
+      "byte_reproducible": false
+    },
+    {
+      "id": "vid-pq",
+      "group": "video",
+      "kind": "mp4",
+      "storage": "committed",
+      "path": "video/pq.mp4",
+      "command": null,
+      "serves": [
+        "spec 6.5",
+        "G10"
+      ],
+      "exercises": "PQ-tagged (smpte2084, bt2020) 10-bit HEVC: refused at probe.",
+      "expect": {
+        "faults": [
+          {
+            "kind": "pq",
+            "severity": "refuse"
+          }
+        ],
+        "refusal": null,
+        "photo": null,
+        "probe": {
+          "codec": "hevc",
+          "width": 320,
+          "height": 180,
+          "bit_depth": 10,
+          "color": {
+            "primaries": "bt2020",
+            "transfer": "smpte2084",
+            "matrix": "bt2020nc",
+            "range": "limited",
+            "assumed": false
+          },
+          "rotation": 0,
+          "vfr": false,
+          "tag_state": "tagged",
+          "truncated": false
+        }
+      },
+      "facts": {
+        "container": "mov,mp4,m4a,3gp,3g2,mj2",
+        "video": {
+          "codec": "hevc",
+          "profile": "Main 10",
+          "pix_fmt": "yuv420p10le",
+          "bit_depth": 10,
+          "width": 320,
+          "height": 180,
+          "color_range": "tv",
+          "color_space": "bt2020nc",
+          "color_transfer": "smpte2084",
+          "color_primaries": "bt2020",
+          "r_frame_rate": "30000/1001",
+          "avg_frame_rate": "30000/1001",
+          "time_base": "1/30000",
+          "nb_frames": 45,
+          "rotation": 0,
+          "vui": {
+            "video_signal_type_present_flag": 1,
+            "video_full_range_flag": 0,
+            "colour_description_present_flag": 1,
+            "colour_primaries": 9,
+            "transfer_characteristics": 16,
+            "matrix_coefficients": 9
+          }
+        },
+        "audio": [
+          {
+            "codec": "aac",
+            "sample_rate": 48000,
+            "channels": 1
+          }
+        ],
+        "data_streams": [],
+        "has_location_tag": false,
+        "pts": {
+          "ticks_per_second": 30000,
+          "count": 45,
+          "ticks": [
+            0,
+            1001,
+            2002,
+            3003,
+            4004,
+            5005,
+            6006,
+            7007,
+            8008,
+            9009,
+            10010,
+            11011,
+            12012,
+            13013,
+            14014,
+            15015,
+            16016,
+            17017,
+            18018,
+            19019,
+            20020,
+            21021,
+            22022,
+            23023,
+            24024,
+            25025,
+            26026,
+            27027,
+            28028,
+            29029,
+            30030,
+            31031,
+            32032,
+            33033,
+            34034,
+            35035,
+            36036,
+            37037,
+            38038,
+            39039,
+            40040,
+            41041,
+            42042,
+            43043,
+            44044
+          ],
+          "sha256": "d3aabc13e90989c19635975bc4e0fbcd9ae8d130b4f0f2c877af7bc0ce46cfa8",
+          "durations": [
+            1001
+          ],
+          "variable": false
+        },
+        "decoded": {
+          "frames": 45,
+          "frames_sha256": "086c6b8414fdfc475dbd37955919cbb85ccebf3a7611be1b8a02e1cadc3909a5",
+          "pts_sha256": "0aed5749fc5d21fc9c72e5a6523b225663010c2b4389701b9696cb58004d5d92",
+          "time_base": "1001/30000"
+        },
+        "ffprobe_errors": []
+      },
+      "size": 56754,
+      "md5": null,
+      "byte_reproducible": false
+    },
+    {
+      "id": "vid-rotated",
+      "group": "video",
+      "kind": "mp4",
+      "storage": "committed",
+      "path": "video/rotated.mp4",
+      "command": null,
+      "serves": [
+        "V4",
+        "D105"
+      ],
+      "exercises": "A 90 degree display-matrix rotation on a landscape stream: the output keeps it.",
+      "expect": {
+        "faults": [],
+        "refusal": null,
+        "photo": null,
+        "probe": {
+          "codec": "hevc",
+          "width": 320,
+          "height": 180,
+          "bit_depth": 8,
+          "color": {
+            "primaries": "bt709",
+            "transfer": "bt709",
+            "matrix": "bt709",
+            "range": "full",
+            "assumed": false
+          },
+          "rotation": 90,
+          "vfr": false,
+          "tag_state": "tagged",
+          "truncated": false
+        }
+      },
+      "facts": {
+        "container": "mov,mp4,m4a,3gp,3g2,mj2",
+        "video": {
+          "codec": "hevc",
+          "profile": "Main",
+          "pix_fmt": "yuvj420p",
+          "bit_depth": 8,
+          "width": 320,
+          "height": 180,
+          "color_range": "pc",
+          "color_space": "bt709",
+          "color_transfer": "bt709",
+          "color_primaries": "bt709",
+          "r_frame_rate": "30000/1001",
+          "avg_frame_rate": "30000/1001",
+          "time_base": "1/30000",
+          "nb_frames": 45,
+          "rotation": 90,
+          "vui": {
+            "video_signal_type_present_flag": 1,
+            "video_full_range_flag": 1,
+            "colour_description_present_flag": 1,
+            "colour_primaries": 1,
+            "transfer_characteristics": 1,
+            "matrix_coefficients": 1
+          }
+        },
+        "audio": [
+          {
+            "codec": "aac",
+            "sample_rate": 48000,
+            "channels": 1
+          }
+        ],
+        "data_streams": [],
+        "has_location_tag": false,
+        "pts": {
+          "ticks_per_second": 30000,
+          "count": 45,
+          "ticks": [
+            0,
+            1001,
+            2002,
+            3003,
+            4004,
+            5005,
+            6006,
+            7007,
+            8008,
+            9009,
+            10010,
+            11011,
+            12012,
+            13013,
+            14014,
+            15015,
+            16016,
+            17017,
+            18018,
+            19019,
+            20020,
+            21021,
+            22022,
+            23023,
+            24024,
+            25025,
+            26026,
+            27027,
+            28028,
+            29029,
+            30030,
+            31031,
+            32032,
+            33033,
+            34034,
+            35035,
+            36036,
+            37037,
+            38038,
+            39039,
+            40040,
+            41041,
+            42042,
+            43043,
+            44044
+          ],
+          "sha256": "d3aabc13e90989c19635975bc4e0fbcd9ae8d130b4f0f2c877af7bc0ce46cfa8",
+          "durations": [
+            1001
+          ],
+          "variable": false
+        },
+        "decoded": {
+          "frames": 45,
+          "frames_sha256": "076e70369e25223043080eecdb92c3578c567c066f8061a42dd57f525d591189",
+          "pts_sha256": "0aed5749fc5d21fc9c72e5a6523b225663010c2b4389701b9696cb58004d5d92",
+          "time_base": "1001/30000"
+        },
+        "ffprobe_errors": []
+      },
+      "size": 55795,
+      "md5": null,
+      "byte_reproducible": false
+    },
+    {
+      "id": "vid-truncated",
+      "group": "video",
+      "kind": "mp4",
+      "storage": "committed",
+      "path": "video/truncated.mp4",
+      "command": null,
+      "serves": [
+        "D86",
+        "V4"
+      ],
+      "exercises": "A valid clip with its tail bytes cut: the readable frames decode, the stream ends early and ffprobe reports a partial file.",
+      "expect": {
+        "faults": [
+          {
+            "kind": "truncated",
+            "severity": "warn"
+          }
+        ],
+        "refusal": null,
+        "photo": null,
+        "probe": {
+          "codec": "hevc",
+          "width": 320,
+          "height": 180,
+          "bit_depth": 8,
+          "color": {
+            "primaries": "bt709",
+            "transfer": "bt709",
+            "matrix": "bt709",
+            "range": "full",
+            "assumed": false
+          },
+          "rotation": 0,
+          "vfr": false,
+          "tag_state": "tagged",
+          "truncated": true
+        }
+      },
+      "facts": {
+        "container": "mov,mp4,m4a,3gp,3g2,mj2",
+        "video": {
+          "codec": "hevc",
+          "profile": "Main",
+          "pix_fmt": "yuvj420p",
+          "bit_depth": 8,
+          "width": 320,
+          "height": 180,
+          "color_range": "pc",
+          "color_space": "bt709",
+          "color_transfer": "bt709",
+          "color_primaries": "bt709",
+          "r_frame_rate": "30000/1001",
+          "avg_frame_rate": "30000/1001",
+          "time_base": "1/30000",
+          "nb_frames": 45,
+          "rotation": 0,
+          "vui": {
+            "video_signal_type_present_flag": 1,
+            "video_full_range_flag": 1,
+            "colour_description_present_flag": 1,
+            "colour_primaries": 1,
+            "transfer_characteristics": 1,
+            "matrix_coefficients": 1
+          }
+        },
+        "audio": [
+          {
+            "codec": "aac",
+            "sample_rate": 48000,
+            "channels": 1
+          }
+        ],
+        "data_streams": [],
+        "has_location_tag": false,
+        "pts": {
+          "ticks_per_second": 30000,
+          "count": 25,
+          "ticks": [
+            0,
+            1001,
+            2002,
+            3003,
+            4004,
+            5005,
+            6006,
+            7007,
+            8008,
+            9009,
+            10010,
+            11011,
+            12012,
+            13013,
+            14014,
+            15015,
+            16016,
+            17017,
+            18018,
+            19019,
+            20020,
+            21021,
+            22022,
+            23023,
+            24024
+          ],
+          "sha256": "7cc60eaca035298684d437df752e90fde5bc67d99bac55dbe1ef392292a56ea7",
+          "durations": [
+            1001
+          ],
+          "variable": false
+        },
+        "decoded": {
+          "frames": 24,
+          "frames_sha256": "cd721f7a6586ac10a6242ef911656265d5aa3408a2d76e6e781daf916d525558",
+          "pts_sha256": "1285a2fd4be5bc1133bcdafcaa5a44b6f1e126b63e5dd2ad1a4a695a1d78f8d8",
+          "time_base": "1001/30000"
+        },
+        "ffprobe_errors": [
+          "stream 0, offset 0x86a1: partial file"
+        ],
+        "cut_source": "hevc8-bt709-full.mp4",
+        "source_bytes": 55776,
+        "kept_bytes": 33465,
+        "cut_bytes": 22311,
+        "kept_fraction": 0.6
+      },
+      "size": 33465,
+      "md5": null,
+      "byte_reproducible": false
+    },
+    {
+      "id": "vid-untagged",
+      "group": "video",
+      "kind": "mp4",
+      "storage": "committed",
+      "path": "video/untagged.mp4",
+      "command": null,
+      "serves": [
+        "D54",
+        "V4"
+      ],
+      "exercises": "HEVC with no colour description in the stream or the container: BT.709 limited is assumed and the user is warned.",
+      "expect": {
+        "faults": [
+          {
+            "kind": "missing_tags",
+            "severity": "warn"
+          }
+        ],
+        "refusal": null,
+        "photo": null,
+        "probe": {
+          "codec": "hevc",
+          "width": 320,
+          "height": 180,
+          "bit_depth": 8,
+          "color": {
+            "primaries": "unknown",
+            "transfer": "unknown",
+            "matrix": "unknown",
+            "range": "limited",
+            "assumed": true
+          },
+          "rotation": 0,
+          "vfr": false,
+          "tag_state": "untagged",
+          "truncated": false
+        }
+      },
+      "facts": {
+        "container": "mov,mp4,m4a,3gp,3g2,mj2",
+        "video": {
+          "codec": "hevc",
+          "profile": "Main",
+          "pix_fmt": "yuv420p",
+          "bit_depth": 8,
+          "width": 320,
+          "height": 180,
+          "color_range": "tv",
+          "color_space": "unknown",
+          "color_transfer": "unknown",
+          "color_primaries": "unknown",
+          "r_frame_rate": "30000/1001",
+          "avg_frame_rate": "30000/1001",
+          "time_base": "1/30000",
+          "nb_frames": 45,
+          "rotation": 0,
+          "vui": {
+            "video_signal_type_present_flag": 1,
+            "video_full_range_flag": 0,
+            "colour_description_present_flag": 0
+          }
+        },
+        "audio": [
+          {
+            "codec": "aac",
+            "sample_rate": 48000,
+            "channels": 1
+          }
+        ],
+        "data_streams": [],
+        "has_location_tag": false,
+        "pts": {
+          "ticks_per_second": 30000,
+          "count": 45,
+          "ticks": [
+            0,
+            1001,
+            2002,
+            3003,
+            4004,
+            5005,
+            6006,
+            7007,
+            8008,
+            9009,
+            10010,
+            11011,
+            12012,
+            13013,
+            14014,
+            15015,
+            16016,
+            17017,
+            18018,
+            19019,
+            20020,
+            21021,
+            22022,
+            23023,
+            24024,
+            25025,
+            26026,
+            27027,
+            28028,
+            29029,
+            30030,
+            31031,
+            32032,
+            33033,
+            34034,
+            35035,
+            36036,
+            37037,
+            38038,
+            39039,
+            40040,
+            41041,
+            42042,
+            43043,
+            44044
+          ],
+          "sha256": "d3aabc13e90989c19635975bc4e0fbcd9ae8d130b4f0f2c877af7bc0ce46cfa8",
+          "durations": [
+            1001
+          ],
+          "variable": false
+        },
+        "decoded": {
+          "frames": 45,
+          "frames_sha256": "8f7b9aa2a2556fa23a8a6eb37d02d8f6b26a09b9ee43ed53ed47af9eca860c3d",
+          "pts_sha256": "0aed5749fc5d21fc9c72e5a6523b225663010c2b4389701b9696cb58004d5d92",
+          "time_base": "1001/30000"
+        },
+        "ffprobe_errors": []
+      },
+      "size": 55773,
+      "md5": null,
+      "byte_reproducible": false
+    },
+    {
+      "id": "vid-vfr",
+      "group": "video",
+      "kind": "mp4",
+      "storage": "committed",
+      "path": "video/vfr.mp4",
+      "command": null,
+      "serves": [
+        "V4",
+        "D95",
+        "D115"
+      ],
+      "exercises": "Variable frame rate: 30 frames whose durations are 1001, 1001 and 2002 ticks of a 30000 Hz clock in turn.",
+      "expect": {
+        "faults": [],
+        "refusal": null,
+        "photo": null,
+        "probe": {
+          "codec": "hevc",
+          "width": 320,
+          "height": 180,
+          "bit_depth": 8,
+          "color": {
+            "primaries": "bt709",
+            "transfer": "bt709",
+            "matrix": "bt709",
+            "range": "full",
+            "assumed": false
+          },
+          "rotation": 0,
+          "vfr": true,
+          "tag_state": "tagged",
+          "truncated": false
+        }
+      },
+      "facts": {
+        "container": "mov,mp4,m4a,3gp,3g2,mj2",
+        "video": {
+          "codec": "hevc",
+          "profile": "Main",
+          "pix_fmt": "yuvj420p",
+          "bit_depth": 8,
+          "width": 320,
+          "height": 180,
+          "color_range": "pc",
+          "color_space": "bt709",
+          "color_transfer": "bt709",
+          "color_primaries": "bt709",
+          "r_frame_rate": "30000/1001",
+          "avg_frame_rate": "300000/13013",
+          "time_base": "1/30000",
+          "nb_frames": 30,
+          "rotation": 0,
+          "vui": {
+            "video_signal_type_present_flag": 1,
+            "video_full_range_flag": 1,
+            "colour_description_present_flag": 1,
+            "colour_primaries": 1,
+            "transfer_characteristics": 1,
+            "matrix_coefficients": 1
+          }
+        },
+        "audio": [
+          {
+            "codec": "aac",
+            "sample_rate": 48000,
+            "channels": 1
+          }
+        ],
+        "data_streams": [],
+        "has_location_tag": false,
+        "pts": {
+          "ticks_per_second": 30000,
+          "count": 30,
+          "ticks": [
+            0,
+            1001,
+            2002,
+            4004,
+            5005,
+            6006,
+            8008,
+            9009,
+            10010,
+            12012,
+            13013,
+            14014,
+            16016,
+            17017,
+            18018,
+            20020,
+            21021,
+            22022,
+            24024,
+            25025,
+            26026,
+            28028,
+            29029,
+            30030,
+            32032,
+            33033,
+            34034,
+            36036,
+            37037,
+            38038
+          ],
+          "sha256": "ee75ff25711c48d1cec5cd4e38de39223d566364632ec3dfbc5fe2fc8ca9b8a3",
+          "durations": [
+            1001,
+            2002
+          ],
+          "variable": true
+        },
+        "decoded": {
+          "frames": 30,
+          "frames_sha256": "ab7930e3e996f1e54ff7fae1fa829cab8a4b05a5b6c64fabd54c91f4088b2069",
+          "pts_sha256": "7ceea544f7981dfe18970502469520795c7f1e321cea9df4bb4f28519d609ec8",
+          "time_base": "1001/30000"
+        },
+        "ffprobe_errors": [],
+        "pts_ticks_intended": [
+          0,
+          1001,
+          2002,
+          4004,
+          5005,
+          6006,
+          8008,
+          9009,
+          10010,
+          12012,
+          13013,
+          14014,
+          16016,
+          17017,
+          18018,
+          20020,
+          21021,
+          22022,
+          24024,
+          25025,
+          26026,
+          28028,
+          29029,
+          30030,
+          32032,
+          33033,
+          34034,
+          36036,
+          37037,
+          38038
+        ]
+      },
+      "size": 41268,
+      "md5": null,
+      "byte_reproducible": false
+    }
+  ],
+  "omitted": [
+    {
+      "what": "tiff16-*: 16-bit RGB TIFF",
+      "reason": "Pillow 12.3.0 cannot write a 16-bit-per-channel RGB TIFF: Image.fromarray rejects uint16 RGB and Image.frombytes(RGB;16B) yields an 8-bit RGB image. Only the single-channel I;16 mode is written, which is not a colour photo."
+    }
+  ]
+}
