@@ -117,7 +117,7 @@ colours decode identically with `in_range=tv` and `pc`), so decode and encode wo
 
 | Round | Head | Crit | Major | Minor | In / out of envelope | New / reopened | Reverts | Fix type | Transport | Depth |
 |---|---|---|---|---|---|---|---|---|---|---|
-| 1 | 3cadc37 | 0 | 0 | 7 | 3 in, 4 out | 7 new, 0 reopened | 0 | product (4 small guards) + tests + report, cleanup `3f27cd8`..`aa54804` and the bound change below | WSL codex, gpt-5.6-sol high, 141,016 tokens | (dispatcher fills) |
+| 1 | 3cadc37 | 0 | 0 | 7 | 3 in, 4 out | 7 new, 0 reopened | 0 | product (4 small guards) + tests + report; DONE `3f27cd8`..final head | WSL codex, gpt-5.6-sol high, 141,016 tokens | (dispatcher fills) |
 
 Round 1 transcript and adjudication: `C:\Users\rwsmy\clearwater-review-evidence\wp3.5\r1\`
 (`review.txt`, `review.stderr.txt`, `adjudication.md`, `md5sums.txt`). Verdict
@@ -132,15 +132,14 @@ frames mean <= 1.0/255 and p99.9 <= 4/255; testsrc2 samples mean <= 3/255, max r
 asserted. The planted range, matrix, accurate_rnd and siting defects must exceed the bounds by a
 stated margin, and the report gives each defect's measured figure beside its bound. AD-11 is not
 loosened; its V9 row carries a one-line clarification on main (`2ce4266`, not in this base). The
-brief's task 4 wording is superseded by this ruling (no brief re-issue). Applied: constants
-first `PAIR_MEAN_REAL = 1.0`, `PAIR_P999_REAL = 4.0`, `PAIR_MEAN_SYNTHETIC = 3.0`; superseded
-the same day by the orchestrator's round-1 ruling with TIGHTER measured bounds, because a
-synthetic mean of 3 lets accurate_rnd through (2.79-2.84 on testsrc2) and p99.9 4 on the footage
-row catches the siting and accurate_rnd plants by only 1.25x (5 against 4): `PAIR_MEAN_REAL = 1.0`,
-`PAIR_SHARE_OVER_2_REAL = 0.01`, `PAIR_MEAN_SYNTHETIC = 2.5`
-(`tests/test_color_roundtrip.py`). The accurate_rnd defect also runs on the footage row (mean
-1.14, share 7.35 % both halves; 0.80 and 4.07 % decode only). Per-defect margins are in the
-report.
+brief's task 4 wording is superseded by this ruling (no brief re-issue). Applied exactly as ruled:
+`PAIR_MEAN_REAL = 1.0`, `PAIR_P999_REAL = 4.0`, `PAIR_MEAN_SYNTHETIC = 3.0`
+(`tests/test_color_roundtrip.py`). An intermediate orchestrator message proposed tighter bounds
+(share over 2/255 <= 1 %, synthetic mean 2.5) and a later one (on `aa54804`) restored CHARC's
+figures exactly; the constants are CHARC's (`0193b60` tightened them, the next commit restored
+them). With them, on testsrc2 only range and matrix are caught; accurate_rnd and siting rely on
+the footage row (p99.9 5-6 against 4, margin 1.25x-1.5x; skipped without footage), the flat-colour
+truth and the argument-level tests; the report says so and gives each defect's figure.
 
 ## Round-1 cleanup (all 7 minors, one pass, no new round)
 
