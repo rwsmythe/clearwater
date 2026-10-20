@@ -8,7 +8,7 @@ answers to open questions 1-6 bind).
 
 | Round | Critical | Major | Minor | In envelope / out | NEW / REOPENED | Reverts | Fix changed | Transport, CLI | Depth |
 |---|---|---|---|---|---|---|---|---|---|
-| 0 (design table) | - | - | - | - | - | - | none (no code) | - | 0 (dispatch) |
+| 0 (design table) | - | - | - | - | - | - | none (no code) | - | 62,046 (dispatcher-read at the round-0 yield) |
 
 ## Round 0: design table (no product code yet)
 
@@ -150,3 +150,22 @@ loads no `clearwater.gui`, `clearwater.methods`, `PySide6` or `cupy` (subprocess
 3. `plan_output` returns an `OutputPlan` (not a bare `Path`) so that `commit` can bump numbers; WP3.14
    reads `plan.path`. OK?
 4. The `source=` guard on `SafeWrite` is optional; WP3.14 should pass it. OK?
+
+## Round-0 ruling (orchestrator gen 5, relaying CHARC's brief rulings) as applied
+
+1. `begin()` creates the temporary empty and exclusively; WP3.10 passes `-y`. A stale temporary at
+   the planned number gives a bump at planning (test `test_stale_temporary_at_planned_number_gives_a_bump_not_a_failure`).
+2. AMENDED: `begin()` does not create a missing folder; it raises `MissingFolderError` (a
+   `SafeWriteError`) naming the folder and creates nothing (test `test_missing_output_folder_raises_and_creates_nothing`).
+3. `plan_output` returns the frozen `OutputPlan`.
+4. AMENDED: `OutputPlan.source` carries the source; the `source=` keyword is dropped; `SafeWrite`
+   always refuses a final path that is the source (`is_same_path`: `os.path.samefile` when both exist,
+   else absolute normcased case-folded comparison), at `begin` (raises) and at every bumped
+   candidate in `commit` (skipped). Planted-defect test `test_planted_missing_source_guard_fails_by_name`.
+
+Deviation from the round-0 table: `SpaceCheck` also carries `folder` (used by `message()`).
+
+## Build status (before the first full-pytest window)
+
+Own tests `tests/test_jobs_*.py`: 114 passed, 0 skipped (NTFS: the case-insensitive and symlink tests ran).
+ruff check, ruff format --check, mypy strict clean on the worktree.
