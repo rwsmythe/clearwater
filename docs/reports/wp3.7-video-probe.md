@@ -48,6 +48,11 @@ tables, the rulings and the round record.
 11. The locator `find_tool(name)` (PATH lookup, kind `"missing_tool"`) is public for WP3.9 and
     WP3.10.
 
+Duration (ruling 2b, upheld by CHARC; IF-5 wording on main at `4174484`, not yet on this branch):
+"duration_s: The CONTAINER duration in seconds, exact (`mvhd` duration over its timescale, or the
+longest stream in integer ticks times its time base); the video track's own end comes from pts and
+frame durations, not from this field." The probe takes the second form.
+
 ## Evidence
 
 - `uv run pytest tests/test_io_video_probe*.py`: 131 passed (the footage test included).
