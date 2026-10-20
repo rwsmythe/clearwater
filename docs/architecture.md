@@ -75,7 +75,7 @@ class Image:
 
 @dataclass(frozen=True)
 class Frame(Image):
-    pts: Fraction             # exact source presentation time in seconds (ticks / time_base)
+    pts: Fraction             # exact source presentation time in seconds (ticks * time_base; time_base is seconds per tick)
     pts_ticks: int
     time_base: Fraction
     index: int                # decode order position; informational only, never a key
