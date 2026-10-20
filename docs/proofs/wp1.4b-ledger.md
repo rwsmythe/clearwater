@@ -14,6 +14,9 @@ Brief: `docs/briefs/wp1.4b-brief.md` (FINAL). Base `db751cb`. Branch `wp1.4b`, w
 | `99595d7` | Claim 10b: `lighting-step` phase (3 s lead-in by pts, edge-effect check, reset-at-step and 0.5 s options), tests. |
 | `6560a8e` | Report `docs/reports/wp1.4b-gain-cap-noise.md`; this ledger. |
 | `2cd9f9c` | Reviewer A r1 fixes: 3 missed temporal pins + registry guard (CR-01); report corrections (CR-02, -03, -05). |
+| `325dc82` | Ledger: round 1. |
+| `09b8bf7` | `quantised` phase: the quantised-regime characterisation as a record (`quantised-regime.json`); tests share its scene (from the void round's content). |
+| `1bbcbca` | Reviewer A r2 fixes: 10b traces the recorded raw (CR-01); claim 8 table complete (CR-03); 0.015 (CR-04); clip.py question raised (CR-02). |
 
 ## Claim 1 -- the flip's site list
 
@@ -101,12 +104,23 @@ adjudication, md5sums). Depth column: the dispatcher's figure.
 | Round | Head | Crit | Major | Minor | In/out env | NEW/REOPENED | Reverts | Fix kind | Assertions | Depth |
 |---|---|---|---|---|---|---|---|---|---|---|
 | 1 | `6560a8e` | 0 | 2 | 3 | 5/0 | 5 NEW | 0 | test-only (CR-01 pins + guard) and report text; no product code | all pass (succ 21, ^ERROR 0, codex_core 0, footer, VERDICT CRITICAL_MAJOR_FOUND; proofs hits 33 = echoes) | -- |
+| 2a | `325dc82` | -- | -- | -- | -- | -- | -- | VOID: killed at the 598 s tool timeout (no footer, no VERDICT; succ 62). Not counted. Its partial content (report figures not from a record) fixed in `09b8bf7` | fails footer/VERDICT | -- |
+| 2 | `09b8bf7` | 0 | 3 | 2 | 5/0 | 4 NEW, 1 REOPENED (r1 CR-04 = r2 CR-05) | 0 | tool code (10b recorded raw) + tests + report; CR-02 CONTESTED (brief conflict, raised) | all pass (succ 26, ^ERROR 0, codex_core 0, footer, VERDICT CRITICAL_MAJOR_FOUND; proofs hits 8 = echoes) | -- |
 
 Round 1 findings: CR-01 major (3 temporal pins missed by the flip) CONFIRMED, fixed; CR-02 major
 (10b conclusion vs record) CONFIRMED, fixed; CR-03 minor (two figures) fixed; CR-04 minor
 (stale docstring in `tools/statistics_experiments.py`) CONFIRMED, raised not fixed (lock);
 CR-05 minor (Gate 4 context columns) fixed. Suite on `2cd9f9c`: 121 + 226 + 420 = 767 passed,
 0 failed, 0 skipped (footage and gpu ran); ruff, format, mypy clean.
+
+Round 2 findings: CR-01 major (10b raw trace recomputed, not the recorded raw) CONFIRMED,
+fixed; CR-02 major (`clip.py --method` defaults to ancuti2018; guard ii) CONTESTED, the brief
+names clip.py as a pin-for-reproduction tool and the lock forbids more than naming the method:
+QUESTION TO THE DISPATCHER; CR-03 major (claim 8 table incomplete) CONFIRMED, fixed; CR-04
+minor fixed; CR-05 minor REOPENED (stale statistics_experiments docstring), raised. Suite on
+`1bbcbca`: 121 + 227 + 420 = 768 passed, 0 failed, 0 skipped; ruff, format, mypy clean.
+The round-2 prompt adds an "environment facts" section (python3, the .git pointer, the stop at
+about 9.5 minutes) after the void attempt.
 
 ## Results at a glance (records under `work/wp1.4b/`)
 
@@ -120,5 +134,6 @@ CR-05 minor (Gate 4 context columns) fixed. Suite on `2cd9f9c`: 121 + 226 + 420 
 ## NEXT STEPS
 
 1. DONE: ruling, grid, summary, page, claims 10 and 10b, report; Reviewer A round 1.
-2. Reviewer A round 2 on the head after `2cd9f9c` (prompt = r1's, staged as
-   `wp1.4b-codex-*-r2` in the session scratchpad); converge on zero NEW blocking.
+2. YIELDED after round 2 for the dispatcher's ruling on CR-02 (clip.py) and the depth figure.
+3. Then Reviewer A round 3 on the head after `1bbcbca` (prompt = r2's, staged as
+   `wp1.4b-codex-*-r4` in the session scratchpad); converge on zero NEW blocking.
