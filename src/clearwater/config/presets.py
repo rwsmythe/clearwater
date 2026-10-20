@@ -113,14 +113,20 @@ class PresetImportResult:
         name: The name the preset was stored under (may carry a " (2)" style suffix).
         path: The stored file.
         parameter_set: The imported set, without provenance.
-        provenance_dropped: True when the source file carried ``source`` or ``settings`` keys
-            (a provenance sidecar) and they were not kept.
+        dropped_keys: The provenance keys the source file carried and that were not kept: any of
+            ``"source"`` and ``"settings"`` (a provenance sidecar), in that order; empty for a
+            plain preset.
     """
 
     name: str
     path: Path
     parameter_set: ParameterSet
-    provenance_dropped: bool
+    dropped_keys: tuple[str, ...] = ()
+
+    @property
+    def provenance_dropped(self) -> bool:
+        """Whether any provenance key was dropped."""
+        return bool(self.dropped_keys)
 
 
 def validate_preset_name(name: str) -> str:
@@ -476,15 +482,15 @@ class PresetStore:
         clean = dataclasses.replace(parameter_set, source=None, settings=None)
         atomic_write_text(path, clean.to_json() + "\n")
 
-    def _read(self, path: Path) -> tuple[ParameterSet, bool]:
-        """Read, migrate and parse a preset file; return it and whether provenance was dropped."""
+    def _read(self, path: Path) -> tuple[ParameterSet, tuple[str, ...]]:
+        """Read, migrate and parse a preset file; return it and the provenance keys dropped."""
         data: dict[str, Any] = loads_object(_read_text(path))
         version = data.get("format_version")
         if isinstance(version, bool) or not isinstance(version, int):
             raise FormatError(f"format_version {version!r} is missing or not an integer")
         data = migrate("preset", data, self._migrations)
         check_string_keys(data, "preset")
-        dropped = any(key in data for key in _PROVENANCE_KEYS)
+        dropped = tuple(key for key in _PROVENANCE_KEYS if key in data)
         kept = {key: value for key, value in data.items() if key not in _PROVENANCE_KEYS}
         return ParameterSet.from_dict(kept), dropped
 

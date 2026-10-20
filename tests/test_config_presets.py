@@ -147,6 +147,7 @@ def test_v13_export_then_import_reproduces_the_set(tmp_path: Path) -> None:
     assert result.parameter_set.created == CREATED
     assert result.parameter_set.app_version == "1.2.3"
     assert result.provenance_dropped is False
+    assert result.dropped_keys == ()
     assert other.load("Round") == original
     # the file carries the version, and equality compares the dict form including it
     assert other.load("Round").to_dict() == original.to_dict()
@@ -441,12 +442,23 @@ def test_sidecar_import_drops_provenance_and_says_so(tmp_path: Path) -> None:
     store = _store(tmp_path)
     result = store.import_preset(source, SCHEMAS)
     assert result.provenance_dropped is True
+    assert result.dropped_keys == ("source", "settings")
     assert result.parameter_set.source is None and result.parameter_set.settings is None
     assert result.parameter_set.method == sidecar.method
     assert result.parameter_set.parameters == sidecar.parameters
     assert result.parameter_set.to_dict()["format_version"] == 1
     stored = json.loads(result.path.read_text(encoding="utf-8"))
     assert "source" not in stored and "settings" not in stored
+
+
+def test_sidecar_with_only_source_names_only_source(tmp_path: Path) -> None:
+    source = _file(tmp_path, "s.json", _set(source={"path": "a.jpg"}).to_dict())
+    result = _store(tmp_path).import_preset(source, SCHEMAS)
+    assert result.dropped_keys == ("source",)
+    assert result.provenance_dropped is True
+    assert result.parameter_set.source is None and result.parameter_set.settings is None
+    only_settings = _file(tmp_path, "t.json", _set(settings={"encoder": "x"}).to_dict())
+    assert _store(tmp_path).import_preset(only_settings, SCHEMAS).dropped_keys == ("settings",)
 
 
 def test_other_unknown_keys_are_still_refused(tmp_path: Path) -> None:
