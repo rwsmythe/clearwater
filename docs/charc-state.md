@@ -183,7 +183,16 @@ path, md5, five assertions and verdict, or there is no accept.
   (~8-10 min/min) / **C both (recommended)**: interim N6 25 min/min now, transport at WP2.1,
   named Phase 3 optimisation package target 10 min/min, re-measure at WP5.2; any option = spec
   v0.5.4. Also KEEP caps confirmation. Gate closes when the owner's word is recorded in the
-  report with its time and the fact-check is attached; then Phase 2 (WP2.1) briefs. WP1.4b dispatched (opus-high; flip guards + gpmd claim 2a). Next: WP1.3-deep / WP1.4b brief on SCUBA/ (c3 primary, Params() flips to c3), then
+  report with its time and the fact-check is attached; then Phase 2 (WP2.1) briefs. **Orchestrator gen 3 online 09:47Z**, holding; commissioned to
+  draft the **WP2.1S transport + photo I/O spike brief** for CHARC approval (msg a754af34; transport
+  candidate #6 on GX011627, pillow-heif / 16-bit PNG + ICC + EXIF, licences). **WP2.1 DRAFT 0.1
+  written by CHARC**: docs/architecture.md (IF-1..IF-10 signatures frozen, data flow, pipeline)
+  and docs/decisions.md AD-1..AD-22 (backend CuPy; FFmpeg process SIMPLE, transport PENDING
+  WP2.1S; median_gaussian 2 s provisional + step-aware task; N{} 0.5/99.5 floor 0.02 on the 540
+  proxy; stages per WP1.4 s7; recompute scheme; defaults c3/caps 2.0/clamp 3.0; CPU/GPU status +
+  Force CPU; swscale bicubic chroma; tolerances; quality cq 18/23/28; JSON presets; flicker clip;
+  export disabled during analysis; GP-Log via PTCL; photo libs PENDING WP2.1S; licences; DR-15
+  reading). CLAUDE.md current-state refreshed. CP4 reviews this with spec v0.5.4. WP1.4b dispatched (opus-high; flip guards + gpmd claim 2a). Next: WP1.3-deep / WP1.4b brief on SCUBA/ (c3 primary, Params() flips to c3), then
   WP1.6 gate report (Gate 1: core 3.6x, production export 4.4x over N6). **Footage-layout skips:** the owner's Snorkel/SCUBA/edits layout makes 3
   footage tests skip (root `GX011628.MP4` paths in `tests/test_container_spike.py:902`,
   `tests/test_lookcheck.py:1289`, WP1.4 test 7; also `tools/lookcheck/pack.py:94` and the WP1.4
