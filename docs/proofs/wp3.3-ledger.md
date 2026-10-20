@@ -116,7 +116,8 @@ No STOP item: no interface, core, dependency or tolerance change is needed.
 | Round | Critical | Major | Minor | Nit | In / out envelope | NEW / REOPENED | Reverts | Product / test-only fixes | Depth (dispatcher) |
 |---|---|---|---|---|---|---|---|---|---|
 | 0 (table) | - | - | - | - | - | - | - | - | 119,733 (dispatcher) |
-| 1 (head 8643ba1) | 0 | 1 | 3 | 0 | 3 in / 1 out (F4) | 4 NEW / 0 | 0 | planned: F1 test+report, F2 test, F3 product+test, F4 product+test | (dispatcher) |
+| 1 (head 8643ba1) | 0 | 1 | 3 | 0 | 3 in / 1 out (F4) | 4 NEW / 0 | 0 | done: F1 test+report, F2 test, F3 product+test, F4 product+test (+ OverflowError guard, floor-collapse refusal: product+test) | 257,103 (dispatcher) |
+| 2 (head 77110f7) | 0 | 0 | 1 | 0 | 0 in / 1 out (R2-1) | 1 NEW / 0 | 0 | pending ruling: R2-1 product+test or bank | (dispatcher) |
 
 Round-0 ruling (orchestrator gen 6): table accepted as committed (c80393f); questions 1-5 as
 recommended.
@@ -161,3 +162,14 @@ made:
   the float32 guard but the floor's widening rounded away and the stretch divided by zero;
   now refused naming `bounds` (1 failed before). Recorded for round 2.
 - 25180d9 report updates.
+
+### Round 2 (Reviewer A, STRONG, gpt-5.6-sol high)
+
+Evidence `C:\Users\rwsmy\clearwater-review-evidence\wp3.3\r2\` (same file set; summary
+tests-77110f7.txt: 386 passed with the GPU; 217 passed / 169 skipped with CuPy unimportable).
+Verdict NO_NEW_CRITICAL_MAJOR. F1-F4 and the two additions verified.
+
+- R2-1 MINOR, OUT-OF-ENVELOPE, CONFIRMED (cell repro: `saliency_mean=(1e20, 0, 0)` gives W_S
+  all inf and a NaN normalised map), NEW: a finite but huge supplied saliency mean overflows
+  the float32 squared distance. Recommended: refuse a component above about 1e19 (the F3 rule's
+  counterpart), ValueError naming the field, one test; alternative: bank (non-blocking).
