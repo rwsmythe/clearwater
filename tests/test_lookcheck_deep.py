@@ -4,6 +4,7 @@ command of ``lookcheck.pack``. Synthetic except where marked ``footage``."""
 from __future__ import annotations
 
 import dataclasses
+import hashlib
 import itertools
 import json
 import shutil
@@ -424,17 +425,25 @@ def test_an_interrupted_chapter_scan_resumes_and_matches_an_uninterrupted_one(
 # --- the scan cache is never trusted blindly ---------------------------------------------------
 
 
+def _cache_frame(grid_s: float, **changes: Any) -> dict[str, Any]:
+    """A self-consistent cached frame record of chapter GXSYN, with ``changes`` applied."""
+    entry = _rec("GXSYN", grid_s).record()
+    entry.update(changes)
+    return entry
+
+
 def _cache_document(**changes: Any) -> dict[str, Any]:
     """A usable cache document for a 16 s chapter (grid 5 s and 15 s), with ``changes`` applied."""
     document: dict[str, Any] = {
         "schema": scan.SCAN_SCHEMA,
         "spec": scan.SPEC_VERSION,
         "chapter": "GXSYN",
+        "source": {"file": "GXSYN.mp4", "bytes": 1234},
         "duration_s": 16.0,
         "frame_rate": "10/1",
         "rules": scan.rules_record(),
         "timestamps": [5.0, 15.0],
-        "frames": [{"grid_s": 5.0}, {"grid_s": 15.0}],
+        "frames": [_cache_frame(5.0), _cache_frame(15.0)],
     }
     document.update(changes)
     return document
@@ -457,23 +466,47 @@ def test_a_usable_cache_loads_and_every_kind_of_unusable_one_is_refused(tmp_path
         "other rule set": _cache_document(rules=rules),
         "no rules recorded": {k: v for k, v in _cache_document().items() if k != "rules"},
         "another chapter": _cache_document(chapter="GXOTHER"),
-        "a frame missing": _cache_document(frames=[{"grid_s": 5.0}]),
-        "not the whole grid": _cache_document(timestamps=[5.0], frames=[{"grid_s": 5.0}]),
+        "a frame missing": _cache_document(frames=[_cache_frame(5.0)]),
+        "not the whole grid": _cache_document(timestamps=[5.0], frames=[_cache_frame(5.0)]),
         "other schema": _cache_document(schema=scan.SCAN_SCHEMA + 1),
+        "no source recorded": {k: v for k, v in _cache_document().items() if k != "source"},
+        "a record of another chapter": _cache_document(
+            frames=[_cache_frame(5.0, chapter="GXOTHER"), _cache_frame(15.0)]
+        ),
+        "a record whose name does not follow its pts": _cache_document(
+            frames=[_cache_frame(5.0, frame="GXSYN_0099.000"), _cache_frame(15.0)]
+        ),
+        "a record taken before its grid point": _cache_document(
+            frames=[_cache_frame(5.0, pts_ticks=1), _cache_frame(15.0)]
+        ),
+        "a measure out of range": _cache_document(
+            frames=[_cache_frame(5.0, W=1.5), _cache_frame(15.0)]
+        ),
+        "an exclusion that does not follow": _cache_document(
+            frames=[_cache_frame(5.0, excluded="luma mean 0.01"), _cache_frame(15.0)]
+        ),
+        "a record that cannot be read": _cache_document(
+            frames=[{"grid_s": 5.0}, _cache_frame(15.0)]
+        ),
     }
     for label, document in stale.items():
         roots, scan_dir = _write_cache(tmp_path / label.replace(" ", "-"), document)
         with pytest.raises(scan.ScanError, match="not usable"):
             scan.load_cache(roots, scan_dir, "GXSYN")
+    # the footage file must be the one the cache was made from
+    roots, scan_dir = _write_cache(tmp_path / "size", _cache_document())
+    assert scan.load_cache(roots, scan_dir, "GXSYN", source_bytes=1234) is not None
+    with pytest.raises(scan.ScanError, match="1234-byte file"):
+        scan.load_cache(roots, scan_dir, "GXSYN", source_bytes=999)
     # a deliberate subset (the test scans) loads only when the caller says so
     roots, scan_dir = _write_cache(
-        tmp_path / "subset", _cache_document(timestamps=[5.0], frames=[{"grid_s": 5.0}])
+        tmp_path / "subset", _cache_document(timestamps=[5.0], frames=[_cache_frame(5.0)])
     )
     assert scan.load_cache(roots, scan_dir, "GXSYN", whole=False) is not None
 
 
 def test_finish_refuses_a_stale_cache_instead_of_writing_scan_json(tmp_path: Path) -> None:
-    roots, scan_dir = _write_cache(tmp_path, _cache_document(frames=[{"grid_s": 5.0}]))
+    roots, scan_dir = _write_cache(tmp_path, _cache_document(frames=[_cache_frame(5.0)]))
     stale = scan_dir / f"{scan.SCAN_CHAPTERS[0]}.json"
     roots.write_text(stale, json.dumps(_cache_document(chapter=scan.SCAN_CHAPTERS[0], frames=[])))
     with pytest.raises(scan.ScanError, match="not usable"):
@@ -701,7 +734,45 @@ def test_the_flicker_path_keeps_the_shallow_readback_bound_of_three_levels() -> 
     assert deep.default == pack.DEEP_READBACK_MAX_OWN
 
 
+def test_deep_frames_must_agree_with_scan_json(tmp_path: Path) -> None:
+    roots = _deep_roots(tmp_path)
+    chapters = ("GXA", "GXB", "GXC", "GXD")
+    records = [
+        _rec(chapter, 5.0 + 10.0 * n, depth=0.3 + 0.01 * n + 0.001 * k, water=0.02 * n)
+        for k, chapter in enumerate(chapters)
+        for n in range(10)
+    ]
+    written = "2026-10-20T00:00:00+00:00"
+    document = scan.deep_frames_document(records, written)
+    roots.write_text(roots.allowed / "deep-frames.json", json.dumps(document))
+    with pytest.raises(frames.ExtractError, match="does not exist"):
+        pack._load_deep_frames(roots)  # scan.json missing
+    scanned = {"frames": [r.record() for r in records]}
+    roots.write_text(roots.allowed / "scan.json", json.dumps(scanned))
+    assert pack._load_deep_frames(roots)["deepest"][0]["frame"] == document["deepest"][0]["frame"]
+    altered = json.loads(json.dumps(document))
+    altered["cases"]["deep-water-noise"]["frames"][0]["D"] = 0.0001
+    roots.write_text(roots.allowed / "deep-frames.json", json.dumps(altered))
+    with pytest.raises(frames.ExtractError, match="does not match"):
+        pack._load_deep_frames(roots)
+    # a scan.json from other frames
+    roots.write_text(roots.allowed / "deep-frames.json", json.dumps(document))
+    other = {
+        "frames": [
+            _rec(chapter, 5.0 + 10.0 * n, depth=0.9 - 0.01 * n - 0.001 * k).record()
+            for k, chapter in enumerate(chapters)
+            for n in range(10)
+        ]
+    }
+    roots.write_text(roots.allowed / "scan.json", json.dumps(other))
+    with pytest.raises(frames.ExtractError, match="does not match"):
+        pack._load_deep_frames(roots)
+
+
 # --- the clip's render, encode and page steps only accept what belongs together ------------------
+
+
+EMPTY_SHA = hashlib.sha256(b"").hexdigest()
 
 
 def _clip_document(stem: str = "GXFAKE", count: int = 3, **changes: Any) -> dict[str, Any]:
@@ -717,7 +788,9 @@ def _clip_document(stem: str = "GXFAKE", count: int = 3, **changes: Any) -> dict
                     "index": n,
                     "pts_ticks": 1001 * n,
                     "source_file": f"{stem}_f{n:04d}.png",
+                    "source_sha256": EMPTY_SHA,
                     "corrected_file": f"{stem}_f{n:04d}-{variant.name}.png",
+                    "corrected_sha256": EMPTY_SHA,
                 }
                 for n in range(count)
             ],
@@ -725,6 +798,8 @@ def _clip_document(stem: str = "GXFAKE", count: int = 3, **changes: Any) -> dict
     document: dict[str, Any] = {
         "chapter": stem,
         "centre_s": 3.95,
+        "source_bytes": 77,
+        "analysis": "STAGED (spec D97)",
         "checks": None,
         "smoother": {"kind": pack.DEEP_SMOOTHER.kind, "window_s": pack.DEEP_SMOOTHER.window_s},
         "excerpt": {"frames": count},
@@ -766,6 +841,20 @@ def test_clip_inputs_that_belong_together_have_no_problem_and_every_mismatch_is_
     shifted = _clip_document()
     shifted["variants"]["ancuti2018"]["frames"][1]["pts_ticks"] = 7
     assert "pts" in str(pack.clip_inputs_problem(shifted, "GXFAKE", tmp_path))
+    assert pack.clip_inputs_problem(document, "GXFAKE", tmp_path, 77) is None
+    assert "rendered from" in str(pack.clip_inputs_problem(document, "GXFAKE", tmp_path, 78))
+    assert "STAGED" in str(
+        pack.clip_inputs_problem(dict(document, analysis="flat"), "GXFAKE", tmp_path)
+    )
+    (tmp_path / "source" / "GXFAKE_f0001.png").write_bytes(b"replaced")  # same name, other bytes
+    assert "not the file the render read" in str(
+        pack.clip_inputs_problem(document, "GXFAKE", tmp_path)
+    )
+    (tmp_path / "corrected-c3" / "GXFAKE_f0002-c3.png").write_bytes(b"replaced")
+    assert "not the file the render wrote" in str(
+        pack.clip_inputs_problem(document, "GXFAKE", tmp_path)
+    )
+    (tmp_path / "corrected-c3" / "GXFAKE_f0002-c3.png").write_bytes(b"")
     (tmp_path / "source" / "GXFAKE_f0001.png").unlink()
     assert "source PNGs" in str(pack.clip_inputs_problem(document, "GXFAKE", tmp_path))
     (tmp_path / "source" / "GXFAKE_f0001.png").write_bytes(b"")
@@ -779,10 +868,16 @@ def test_encode_deep_clip_refuses_stale_inputs_before_it_runs_any_tool(tmp_path:
     video = tmp_path / "GXFAKE.mp4"  # never opened: the refusal comes first
     with pytest.raises(frames.ExtractError, match="render the deep clip first"):
         pack.encode_deep_clip(video, roots, clip_dir)
+    video.write_bytes(b"x" * 77)  # a stand-in of the recorded size; never decoded
     document = _clip_document(checks={"c3": {"ok": True}})
     _touch_sets(clip_dir, document)
     roots.write_text(clip_dir / "statistics.json", json.dumps(document))
     with pytest.raises(frames.ExtractError, match="already encoded"):
+        pack.encode_deep_clip(video, roots, clip_dir)
+    document = _clip_document()
+    _touch_sets(clip_dir, document)
+    roots.write_text(clip_dir / "statistics.json", json.dumps(dict(document, source_bytes=5)))
+    with pytest.raises(frames.ExtractError, match="rendered from"):  # another source video
         pack.encode_deep_clip(video, roots, clip_dir)
 
 
@@ -799,12 +894,14 @@ def test_clear_clip_removes_clips_statistics_and_frames_only(tmp_path: Path) -> 
     pack.clear_clip(roots, roots.allowed / "nowhere")  # a missing folder is fine
 
 
-def test_the_page_links_only_a_verified_clip_of_the_current_deepest_frame(tmp_path: Path) -> None:
+def test_the_page_links_only_a_verified_clip_of_the_current_deepest_frame(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     roots = _deep_roots(tmp_path)
     clip_dir = roots.allowed / "clip"
     assert pack.clip_files(roots, clip_dir) == []  # no clip was ever rendered
     deepest = {"chapter": "GXFAKE", "frame": "GXFAKE_3.950", "pts_seconds": 3.95}
-    roots.write_text(roots.allowed / "deep-frames.json", json.dumps({"deepest": [deepest]}))
+    monkeypatch.setattr(pack, "_load_deep_frames", lambda _roots: {"deepest": [deepest]})
     ok = {label: {"ok": True} for label in ("c3", "ancuti2018", "source", "readback")}
     clip_dir.mkdir(parents=True, exist_ok=True)
     for name in ("GXFAKE_c3.mp4", "GXFAKE_ancuti2018.mp4", "GXFAKE_source.mp4"):
@@ -822,12 +919,28 @@ def test_the_page_links_only_a_verified_clip_of_the_current_deepest_frame(tmp_pa
     write(checks=ok, centre_s=1.0)  # cut around another frame than the current deepest
     with pytest.raises(frames.ExtractError, match="render it again"):
         pack.clip_files(roots, clip_dir)
-    write(checks=ok)
+    write(checks={"c3": {"ok": True}})  # a check record missing is not a pass
+    with pytest.raises(frames.ExtractError, match="missing or did not hold"):
+        pack.clip_files(roots, clip_dir)
+    write(checks={})
+    with pytest.raises(frames.ExtractError, match="missing or did not hold"):
+        pack.clip_files(roots, clip_dir)
+    write(checks=ok)  # checks fine, but the MP4s were never bound to them
+    with pytest.raises(frames.ExtractError, match="not the file that was verified"):
+        pack.clip_files(roots, clip_dir)
+    bound = {
+        label: {"sha256": hashlib.sha256(b"x").hexdigest()}
+        for label in ("c3", "ancuti2018", "source")
+    }
+    write(checks=ok, clips=bound)
     assert [p.name for p in pack.clip_files(roots, clip_dir)] == [
         "GXFAKE_c3.mp4",
         "GXFAKE_ancuti2018.mp4",
         "GXFAKE_source.mp4",
     ]
+    (clip_dir / "GXFAKE_source.mp4").write_bytes(b"swapped after the checks")
+    with pytest.raises(frames.ExtractError, match="not the file that was verified"):
+        pack.clip_files(roots, clip_dir)
     (clip_dir / "GXFAKE_source.mp4").unlink()
     with pytest.raises(frames.ExtractError, match="is missing"):
         pack.clip_files(roots, clip_dir)
@@ -894,7 +1007,7 @@ def test_the_deep_clip_is_staged_smoothed_encoded_checked_and_pruned(
     for name in ("GXDEEP_c3.mp4", "GXDEEP_ancuti2018.mp4", "GXDEEP_source.mp4", "statistics.json"):
         assert (clip_dir / name).is_file()
     deepest = {"chapter": "GXDEEP", "frame": "GXDEEP_3.950", "pts_seconds": 3.95}
-    roots.write_text(roots.allowed / "deep-frames.json", json.dumps({"deepest": [deepest]}))
+    monkeypatch.setattr(pack, "_load_deep_frames", lambda _roots: {"deepest": [deepest]})
     assert [p.name for p in pack.clip_files(roots, clip_dir)] == [
         "GXDEEP_c3.mp4",
         "GXDEEP_ancuti2018.mp4",

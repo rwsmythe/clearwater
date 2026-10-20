@@ -743,6 +743,7 @@ def scan_chapter(
             "schema": SCAN_SCHEMA,
             "spec": SPEC_VERSION,
             "chapter": video.stem,
+            "source": {"file": video.name, "bytes": video.stat().st_size},
             "duration_s": info.duration_s,
             "frame_rate": f"{info.frame_rate.numerator}/{info.frame_rate.denominator}",
             "rules": rules_record(),
@@ -779,8 +780,48 @@ def scan_chapter(
     return document
 
 
+def record_problem(entry: Mapping[str, Any], chapter: str) -> str | None:
+    """Say why one cached frame record is not self-consistent, or ``None``.
+
+    Checks that the record is for ``chapter``, that its name is the one its pts gives, that it
+    was taken at or after its grid point, that its measures are in range, and that its
+    exclusion is the one :func:`exclusion_reason` gives for its measures.
+
+    Args:
+        entry: One ``frames`` entry of a cache document.
+        chapter: The chapter stem.
+
+    Returns:
+        A one-line reason, or ``None``.
+    """
+    try:
+        record = ScanRecord.from_record(entry)
+    except (KeyError, ValueError, TypeError, ZeroDivisionError) as exc:
+        return f"a frame record cannot be read ({type(exc).__name__})"
+    if record.chapter != chapter or record.frame != frame_stem(chapter, float(record.pts)):
+        return f"frame record {record.frame!r} is not this chapter's {frame_stem(chapter, 0.0)!r}"
+    measures = record.measures
+    if float(record.pts) < record.grid_s:
+        return f"{record.frame}: pts is before its grid point"
+    if not (
+        0.0 <= measures.luma_mean <= 1.0
+        and 0.0 <= measures.open_water <= 1.0
+        and measures.haze >= 0.0
+        and (measures.depth_index is None or measures.depth_index > 0.0)
+    ):
+        return f"{record.frame}: a measure is out of range"
+    if record.excluded != exclusion_reason(measures):
+        return f"{record.frame}: its exclusion does not follow from its measures"
+    return None
+
+
 def cache_problem(
-    document: Mapping[str, Any], chapter: str, *, finished: bool, whole: bool
+    document: Mapping[str, Any],
+    chapter: str,
+    *,
+    finished: bool,
+    whole: bool,
+    source_bytes: int | None = None,
 ) -> str | None:
     """Say why a cache (or partial) document cannot be used, or ``None`` when it can.
 
@@ -795,6 +836,9 @@ def cache_problem(
             of it (an interrupted run's partial file).
         whole: Whether the declared grid must be the chapter's whole scan grid,
             :func:`scan_timestamps` of its duration (a subset written for a test is refused).
+        source_bytes: The size in bytes of the footage file now on disk; when given, the
+            document must have been made from a file of that size (a different recording under
+            the same name is refused). ``None`` skips the comparison.
 
     Returns:
         A one-line reason, or ``None``.
@@ -805,11 +849,20 @@ def cache_problem(
         return f"it is for chapter {document.get('chapter')!r}, not {chapter}"
     if document.get("rules") != rules_record():
         return "written under other scan rules (or none recorded)"
+    source = document.get("source")
+    if not isinstance(source, dict) or not isinstance(source.get("bytes"), int):
+        return "no source file recorded"
+    if source_bytes is not None and source["bytes"] != source_bytes:
+        return f"made from a {source['bytes']}-byte file, the footage file is {source_bytes} bytes"
     stamps = document.get("timestamps")
     if not isinstance(stamps, list):
         return "no declared grid"
     if whole and stamps != scan_timestamps(float(document["duration_s"])):
         return "its grid is not the chapter's whole scan grid"
+    for entry in document["frames"]:
+        problem = record_problem(entry, chapter)
+        if problem is not None:
+            return problem
     grid = [entry["grid_s"] for entry in document["frames"]]
     if finished and grid != stamps:
         return f"{len(grid)} frames do not match its {len(stamps)} declared grid points"
@@ -819,7 +872,12 @@ def cache_problem(
 
 
 def load_cache(
-    roots: OutputRoots, scan_dir: Path, chapter: str, *, whole: bool = True
+    roots: OutputRoots,
+    scan_dir: Path,
+    chapter: str,
+    *,
+    whole: bool = True,
+    source_bytes: int | None = None,
 ) -> dict[str, Any] | None:
     """Return a chapter's usable, complete cache document, or ``None`` when there is none.
 
@@ -829,6 +887,7 @@ def load_cache(
         chapter: The chapter stem.
         whole: Whether the cache must cover the chapter's whole scan grid (``False`` is for
             tests that scan a few timestamps).
+        source_bytes: The size of the footage file now on disk (:func:`cache_problem`).
 
     Returns:
         The document.
@@ -841,7 +900,9 @@ def load_cache(
     if not path.is_file():
         return None
     document: dict[str, Any] = json.loads(path.read_text(encoding="utf-8"))
-    problem = cache_problem(document, chapter, finished=True, whole=whole)
+    problem = cache_problem(
+        document, chapter, finished=True, whole=whole, source_bytes=source_bytes
+    )
     if problem is not None:
         raise ScanError(f"cache {path.name} is not usable: {problem}")
     return document
@@ -931,7 +992,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                 discard_cache(roots, scan_dir, chapter)
             else:
                 try:
-                    cached = load_cache(roots, scan_dir, chapter)
+                    size = find_footage_file(chapter, config.footage_path).stat().st_size
+                    cached = load_cache(roots, scan_dir, chapter, source_bytes=size)
                 except ScanError as exc:
                     print(f"{chapter}: {exc}; scanning it again", file=sys.stderr)
                     discard_cache(roots, scan_dir, chapter)

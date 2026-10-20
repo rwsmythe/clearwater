@@ -61,6 +61,7 @@ import argparse
 import contextlib
 import dataclasses
 import datetime
+import hashlib
 import html
 import io
 import json
@@ -1651,11 +1652,30 @@ def build_deep_pack(
 
 
 def _load_deep_frames(roots: OutputRoots) -> dict[str, Any]:
-    """Read the scan's ``deep-frames.json`` (an error when the scan has not been run)."""
+    """Read the scan's ``deep-frames.json`` and check it against ``scan.json``.
+
+    The candidates and the deepest list are rebuilt from the frames of ``scan.json`` with
+    :func:`lookcheck.scan.deep_frames_document`; a file that differs from the rebuilt one (other
+    than in its ``written`` time) is an error, so the page can only present the candidates the
+    scan's own records give.
+
+    Raises:
+        lookcheck.frames.ExtractError: Either file is missing, or they disagree.
+    """
     path = roots.check(roots.allowed / "deep-frames.json")
-    if not path.is_file():
-        raise ExtractError(f"{path} does not exist; run tools/lookcheck/scan.py first")
+    scan_path = roots.check(roots.allowed / "scan.json")
+    if not path.is_file() or not scan_path.is_file():
+        raise ExtractError(
+            f"{path} or {scan_path.name} does not exist; run tools/lookcheck/scan.py"
+        )
     document: dict[str, Any] = json.loads(path.read_text(encoding="utf-8"))
+    scanned = json.loads(scan_path.read_text(encoding="utf-8"))
+    records = [scan.ScanRecord.from_record(entry) for entry in scanned["frames"]]
+    rebuilt = json.loads(
+        _json_text(scan.deep_frames_document(records, document.get("written", "")))
+    )
+    if document != rebuilt:
+        raise ExtractError("deep-frames.json does not match the frames of scan.json; run the scan")
     return document
 
 
@@ -1710,6 +1730,11 @@ def run_deep_stills(
                 )
             candidates.setdefault(case.name, []).append((frame, entry))
     return build_deep_pack(stills, candidates, pack_dir, roots, backend, clips)
+
+
+def _sha256(path: Path) -> str:
+    """Return the SHA-256 of a file's bytes as hex."""
+    return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 def clear_clip(roots: OutputRoots, clip_dir: Path) -> None:
@@ -1791,6 +1816,7 @@ def render_deep_clip(
     entries: dict[str, list[dict[str, Any]]] = {variant.name: [] for variant in chosen}
     for number, frame in enumerate(got):
         image = read_png16(frame.path)
+        source_sha = _sha256(frame.path)
         for variant in chosen:
             smoothed, measured = analyses[variant.name]
             result = correct(
@@ -1808,7 +1834,9 @@ def render_deep_clip(
                     "pts_ticks": frame.pts_ticks,
                     "pts_seconds": float(frame.pts),
                     "source_file": frame.path.name,
+                    "source_sha256": source_sha,
                     "corrected_file": target.name,
+                    "corrected_sha256": _sha256(target),
                     "raw": {
                         name: float(values[number])
                         for stage in measured.values()
@@ -1862,6 +1890,7 @@ def render_deep_clip(
         "written": _now(),
         "spec": scan.SPEC_VERSION,
         "source": str(video),
+        "source_bytes": video.stat().st_size,
         "chapter": video.stem,
         "analysis": "STAGED (spec D97), prototype.temporal.analyse_staged",
         "proxy": "exact area mean of the full-resolution frame in NumPy (prototype.temporal.proxy)",
@@ -1890,18 +1919,23 @@ def render_deep_clip(
     return document
 
 
-def clip_inputs_problem(document: Mapping[str, Any], stem: str, clip_dir: Path) -> str | None:
+def clip_inputs_problem(
+    document: Mapping[str, Any], stem: str, clip_dir: Path, source_bytes: int | None = None
+) -> str | None:
     """Say why the PNG sets in ``clip_dir`` cannot be encoded under ``document``, or ``None``.
 
     The statistics document and the frames must belong together: it is the document that
     :func:`render_deep_clip` wrote for this chapter, not yet encoded (``checks`` is ``null``), for
     the variants and parameters of this code, with the same frames and pts in every variant, and
-    the PNG sets on disk are exactly the files it names.
+    the PNG sets on disk are exactly the files it names, byte for byte (the SHA-256 recorded
+    when each was written).
 
     Args:
         document: The parsed ``statistics.json``.
         stem: The chapter stem of the source video.
         clip_dir: The clip folder.
+        source_bytes: The size of the source video now on disk; when given it must be the size of
+            the file the clip was rendered from.
 
     Returns:
         A one-line reason, or ``None``.
@@ -1910,6 +1944,10 @@ def clip_inputs_problem(document: Mapping[str, Any], stem: str, clip_dir: Path) 
         return f"the statistics are for chapter {document.get('chapter')!r}, not {stem}"
     if document.get("checks") is not None:
         return "it is already encoded (its frames were pruned); render the clip again"
+    if not str(document.get("analysis", "")).startswith("STAGED"):
+        return "the statistics were not analysed STAGED"
+    if source_bytes is not None and document.get("source_bytes") != source_bytes:
+        return "the source video is not the file the clip was rendered from"
     variants = document.get("variants", {})
     if list(variants) != list(DEEP_CLIP_VARIANTS):
         return f"variants {list(variants)} are not {list(DEEP_CLIP_VARIANTS)}"
@@ -1933,9 +1971,19 @@ def clip_inputs_problem(document: Mapping[str, Any], stem: str, clip_dir: Path) 
             row["corrected_file"] for row in rows
         }:
             return f"the corrected-{name} PNGs are not the {count} the statistics name"
+        for row in rows:
+            if (
+                _sha256(clip_dir / f"corrected-{name}" / row["corrected_file"])
+                != row["corrected_sha256"]
+            ):
+                return f"{row['corrected_file']} is not the file the render wrote"
     sources = {row["source_file"] for body in variants.values() for row in body["frames"]}
     if {path.name for path in (clip_dir / "source").glob("*.png")} != sources:
         return f"the source PNGs are not the {count} the statistics name"
+    first = variants[next(iter(variants))]["frames"]
+    for row in first:
+        if _sha256(clip_dir / "source" / row["source_file"]) != row["source_sha256"]:
+            return f"{row['source_file']} is not the file the render read"
     return None
 
 
@@ -1970,7 +2018,7 @@ def encode_deep_clip(
     if not path.is_file():
         raise ExtractError(f"{path} does not exist; render the deep clip first")
     document: dict[str, Any] = json.loads(path.read_text(encoding="utf-8"))
-    problem = clip_inputs_problem(document, video.stem, clip_dir)
+    problem = clip_inputs_problem(document, video.stem, clip_dir, video.stat().st_size)
     if problem is not None:
         raise ExtractError(f"the deep clip cannot be encoded: {problem}")
     info = probe_stream(video)
@@ -1990,6 +2038,10 @@ def encode_deep_clip(
     commands, checks = encode_verified_pair(roots, clips, info, count, clip_dir, max_own)
     document["encode_commands"] = commands
     document["checks"] = checks
+    document["clips"] = {
+        label: {"file": target.name, "bytes": target.stat().st_size, "sha256": _sha256(target)}
+        for label, (_pattern, target) in clips.items()
+    }
     roots.write_text(path, _json_text(document))
     keep = {0, count // 2, count - 1}
     for number in range(count):
@@ -2057,9 +2109,10 @@ def clip_files(roots: OutputRoots, clip_dir: Path) -> list[Path]:
     checks = document.get("checks")
     if checks is None:
         raise ExtractError("the deep clip is rendered but not encoded; run deep --part encode")
-    failed = [label for label, check in checks.items() if not check.get("ok")]
+    wanted = (*DEEP_CLIP_VARIANTS, "source", "readback")
+    failed = [label for label in wanted if not (checks.get(label) or {}).get("ok")]
     if failed:
-        raise ExtractError(f"the deep clip's checks did not hold: {failed}")
+        raise ExtractError(f"the deep clip's checks are missing or did not hold: {failed}")
     deepest = _load_deep_frames(roots)["deepest"][0]
     if document["chapter"] != deepest["chapter"] or document["centre_s"] != float(
         deepest["pts_seconds"]
@@ -2073,6 +2126,9 @@ def clip_files(roots: OutputRoots, clip_dir: Path) -> list[Path]:
         path = roots.check(clip_dir / f"{document['chapter']}_{label}.mp4")
         if not path.is_file():
             raise ExtractError(f"{path.name} is missing; render and encode the deep clip again")
+        recorded = (document.get("clips") or {}).get(label)
+        if not recorded or recorded["sha256"] != _sha256(path):
+            raise ExtractError(f"{path.name} is not the file that was verified; encode it again")
         found.append(path)
     return found
 
