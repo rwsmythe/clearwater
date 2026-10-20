@@ -364,7 +364,7 @@ def test_the_scan_runs_on_one_deep_chapter_at_three_timestamps(tmp_path: Path) -
         assert 0.0 <= entry["W"] <= 1.0 and entry["H"] >= 0.0
         assert entry["D"] is None or entry["D"] > 0.0
         assert entry["excluded"] is None or isinstance(entry["excluded"], str)
-    cached = scan.load_cache(roots, roots.allowed / "scan", chapter.stem)
+    cached = scan.load_cache(roots, roots.allowed / "scan", chapter.stem, whole=False)
     assert cached == document
     leftover = list((roots.allowed / "scan" / "frames").rglob("*.png"))
     assert leftover == []  # the ranking frames are removed once measured
@@ -419,6 +419,90 @@ def test_an_interrupted_chapter_scan_resumes_and_matches_an_uninterrupted_one(
     resumed = scan.scan_chapter(clip, roots, scan_dir)
     assert resumed == whole
     assert not (scan_dir / "GXSYN.partial.json").exists()
+
+
+# --- the scan cache is never trusted blindly ---------------------------------------------------
+
+
+def _cache_document(**changes: Any) -> dict[str, Any]:
+    """A usable cache document for a 16 s chapter (grid 5 s and 15 s), with ``changes`` applied."""
+    document: dict[str, Any] = {
+        "schema": scan.SCAN_SCHEMA,
+        "spec": scan.SPEC_VERSION,
+        "chapter": "GXSYN",
+        "duration_s": 16.0,
+        "frame_rate": "10/1",
+        "rules": scan.rules_record(),
+        "timestamps": [5.0, 15.0],
+        "frames": [{"grid_s": 5.0}, {"grid_s": 15.0}],
+    }
+    document.update(changes)
+    return document
+
+
+def _write_cache(tmp_path: Path, document: dict[str, Any]) -> tuple[OutputRoots, Path]:
+    roots = OutputRoots(allowed=tmp_path / "wp1.3d", footage=load_local_config().footage_path)
+    scan_dir = roots.allowed / "scan"
+    roots.write_text(scan_dir / "GXSYN.json", json.dumps(document))
+    return roots, scan_dir
+
+
+def test_a_usable_cache_loads_and_every_kind_of_unusable_one_is_refused(tmp_path: Path) -> None:
+    roots, scan_dir = _write_cache(tmp_path, _cache_document())
+    assert scan.load_cache(roots, scan_dir, "GXSYN") is not None
+    assert scan.load_cache(roots, scan_dir, "GXNONE") is None
+    rules = scan.rules_record()
+    rules["open_water"]["luma_local_std_below"] = 0.5  # type: ignore[index]
+    stale = {
+        "other rule set": _cache_document(rules=rules),
+        "no rules recorded": {k: v for k, v in _cache_document().items() if k != "rules"},
+        "another chapter": _cache_document(chapter="GXOTHER"),
+        "a frame missing": _cache_document(frames=[{"grid_s": 5.0}]),
+        "not the whole grid": _cache_document(timestamps=[5.0], frames=[{"grid_s": 5.0}]),
+        "other schema": _cache_document(schema=scan.SCAN_SCHEMA + 1),
+    }
+    for label, document in stale.items():
+        roots, scan_dir = _write_cache(tmp_path / label.replace(" ", "-"), document)
+        with pytest.raises(scan.ScanError, match="not usable"):
+            scan.load_cache(roots, scan_dir, "GXSYN")
+    # a deliberate subset (the test scans) loads only when the caller says so
+    roots, scan_dir = _write_cache(
+        tmp_path / "subset", _cache_document(timestamps=[5.0], frames=[{"grid_s": 5.0}])
+    )
+    assert scan.load_cache(roots, scan_dir, "GXSYN", whole=False) is not None
+
+
+def test_finish_refuses_a_stale_cache_instead_of_writing_scan_json(tmp_path: Path) -> None:
+    roots, scan_dir = _write_cache(tmp_path, _cache_document(frames=[{"grid_s": 5.0}]))
+    stale = scan_dir / f"{scan.SCAN_CHAPTERS[0]}.json"
+    roots.write_text(stale, json.dumps(_cache_document(chapter=scan.SCAN_CHAPTERS[0], frames=[])))
+    with pytest.raises(scan.ScanError, match="not usable"):
+        scan.finish(roots, scan_dir)
+    assert not (roots.allowed / "scan.json").exists()
+    assert not (roots.allowed / "deep-frames.json").exists()
+
+
+def test_discard_cache_removes_the_cache_and_the_interrupted_run_file(tmp_path: Path) -> None:
+    roots, scan_dir = _write_cache(tmp_path, _cache_document())
+    roots.write_text(scan_dir / "GXSYN.partial.json", "{}")
+    scan.discard_cache(roots, scan_dir, "GXSYN")
+    assert not list(scan_dir.glob("GXSYN*.json"))
+    scan.discard_cache(roots, scan_dir, "GXSYN")  # a missing file is not an error
+
+
+@pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="ffmpeg not on PATH")
+def test_an_interrupted_run_file_from_other_rules_is_discarded_not_resumed(tmp_path: Path) -> None:
+    footage = load_local_config().footage_path
+    roots = OutputRoots(allowed=tmp_path / "wp1.3d", footage=footage)
+    clip = tmp_path / "wp1.3d" / "GXSYN.mp4"
+    _synthetic_clip(clip, 6)  # one scan timestamp, 5 s
+    clean = scan.scan_chapter(clip, roots, roots.allowed / "clean")
+    scan_dir = roots.allowed / "stale"
+    foreign = dict(clean, rules={}, frames=[dict(clean["frames"][0], D=9.9, W=0.0, H=9.9)])
+    roots.write_text(scan_dir / "GXSYN.partial.json", json.dumps(foreign))
+    resumed = scan.scan_chapter(clip, roots, scan_dir)
+    assert resumed == clean
+    assert resumed["frames"][0]["D"] != 9.9
 
 
 # --- test 5: the deep pack ------------------------------------------------------------------------

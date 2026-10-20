@@ -741,17 +741,24 @@ def scan_chapter(
     def document_of(records: Sequence[ScanRecord]) -> dict[str, Any]:
         return {
             "schema": SCAN_SCHEMA,
+            "spec": SPEC_VERSION,
             "chapter": video.stem,
             "duration_s": info.duration_s,
             "frame_rate": f"{info.frame_rate.numerator}/{info.frame_rate.denominator}",
+            "rules": rules_record(),
+            "timestamps": wanted,
             "frames": [r.record() for r in records],
         }
 
     records: list[ScanRecord] = []
     earlier = roots.check(partial)
-    if earlier.is_file():  # an interrupted run: keep the frames it finished
-        done = json.loads(earlier.read_text(encoding="utf-8"))["frames"]
-        records = [ScanRecord.from_record(entry) for entry in done]
+    if earlier.is_file():  # an interrupted run: keep the frames it finished, if they are ours
+        saved = json.loads(earlier.read_text(encoding="utf-8"))
+        problem = cache_problem(saved, video.stem, finished=False, whole=False)
+        if problem is None and saved["timestamps"] == wanted:
+            records = [ScanRecord.from_record(entry) for entry in saved["frames"]]
+        else:
+            roots.remove(partial)  # another chapter, rule set or grid: never mixed in
     finished = {record.grid_s for record in records}
     todo = [moment for moment in wanted if moment not in finished]
     for begin in range(0, len(todo), PARTIAL_BATCH):
@@ -772,22 +779,84 @@ def scan_chapter(
     return document
 
 
-def load_cache(roots: OutputRoots, scan_dir: Path, chapter: str) -> dict[str, Any] | None:
-    """Return a chapter's cache document, or ``None`` when there is none.
+def cache_problem(
+    document: Mapping[str, Any], chapter: str, *, finished: bool, whole: bool
+) -> str | None:
+    """Say why a cache (or partial) document cannot be used, or ``None`` when it can.
+
+    A document is usable when it is this schema, for this chapter, written under the current
+    :func:`rules_record` (thresholds, scan grid, ranking rules), and its frames lie on the grid
+    it declares (``timestamps``).
+
+    Args:
+        document: The parsed JSON document.
+        chapter: The chapter stem it must belong to.
+        finished: Whether the frames must be exactly the declared grid (a cache), not just part
+            of it (an interrupted run's partial file).
+        whole: Whether the declared grid must be the chapter's whole scan grid,
+            :func:`scan_timestamps` of its duration (a subset written for a test is refused).
+
+    Returns:
+        A one-line reason, or ``None``.
+    """
+    if document.get("schema") != SCAN_SCHEMA:
+        return f"schema {document.get('schema')!r}, not {SCAN_SCHEMA}"
+    if document.get("chapter") != chapter:
+        return f"it is for chapter {document.get('chapter')!r}, not {chapter}"
+    if document.get("rules") != rules_record():
+        return "written under other scan rules (or none recorded)"
+    stamps = document.get("timestamps")
+    if not isinstance(stamps, list):
+        return "no declared grid"
+    if whole and stamps != scan_timestamps(float(document["duration_s"])):
+        return "its grid is not the chapter's whole scan grid"
+    grid = [entry["grid_s"] for entry in document["frames"]]
+    if finished and grid != stamps:
+        return f"{len(grid)} frames do not match its {len(stamps)} declared grid points"
+    if not finished and not set(grid) <= set(stamps):
+        return "it holds frames outside its declared grid"
+    return None
+
+
+def load_cache(
+    roots: OutputRoots, scan_dir: Path, chapter: str, *, whole: bool = True
+) -> dict[str, Any] | None:
+    """Return a chapter's usable, complete cache document, or ``None`` when there is none.
 
     Args:
         roots: The output safety roots.
         scan_dir: The scan folder.
         chapter: The chapter stem.
+        whole: Whether the cache must cover the chapter's whole scan grid (``False`` is for
+            tests that scan a few timestamps).
 
     Returns:
         The document.
+
+    Raises:
+        ScanError: A cache file exists but :func:`cache_problem` refuses it (stale or
+            incomplete): it is never used silently.
     """
     path = roots.check(scan_dir / f"{chapter}.json")
     if not path.is_file():
         return None
     document: dict[str, Any] = json.loads(path.read_text(encoding="utf-8"))
+    problem = cache_problem(document, chapter, finished=True, whole=whole)
+    if problem is not None:
+        raise ScanError(f"cache {path.name} is not usable: {problem}")
     return document
+
+
+def discard_cache(roots: OutputRoots, scan_dir: Path, chapter: str) -> None:
+    """Delete a chapter's cache file and its interrupted-run partial file (missing is fine).
+
+    Args:
+        roots: The output safety roots.
+        scan_dir: The scan folder.
+        chapter: The chapter stem.
+    """
+    roots.remove(scan_dir / f"{chapter}.json")
+    roots.remove(scan_dir / f"{chapter}.partial.json")
 
 
 def finish(roots: OutputRoots, scan_dir: Path) -> bool:
@@ -801,7 +870,8 @@ def finish(roots: OutputRoots, scan_dir: Path) -> bool:
         ``True`` when both files were written, ``False`` when a chapter is still missing.
 
     Raises:
-        ScanError: A case or the deepest list cannot be filled.
+        ScanError: A case or the deepest list cannot be filled, or a cache file is stale or
+            incomplete (:func:`load_cache`).
     """
     caches = {chapter: load_cache(roots, scan_dir, chapter) for chapter in SCAN_CHAPTERS}
     if any(cache is None for cache in caches.values()):
@@ -845,7 +915,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         default=list(SCAN_CHAPTERS),
         help="chapters to (re)scan if they have no cache (default: all)",
     )
-    parser.add_argument("--rescan", action="store_true", help="scan even when a cache exists")
+    parser.add_argument(
+        "--rescan",
+        action="store_true",
+        help="scan even when a cache exists (the cache and any interrupted-run file are deleted)",
+    )
     args = parser.parse_args(argv)
     try:
         config = load_local_config(args.config)
@@ -853,9 +927,18 @@ def main(argv: Sequence[str] | None = None) -> int:
         scan_dir = roots.allowed / "scan"
         began = time.monotonic()
         for chapter in args.chapters:
-            if not args.rescan and load_cache(roots, scan_dir, chapter) is not None:
-                print(f"{chapter}: cached", file=sys.stderr)
-                continue
+            if args.rescan:
+                discard_cache(roots, scan_dir, chapter)
+            else:
+                try:
+                    cached = load_cache(roots, scan_dir, chapter)
+                except ScanError as exc:
+                    print(f"{chapter}: {exc}; scanning it again", file=sys.stderr)
+                    discard_cache(roots, scan_dir, chapter)
+                    cached = None
+                if cached is not None:
+                    print(f"{chapter}: cached", file=sys.stderr)
+                    continue
             video = find_footage_file(chapter, config.footage_path)
             document = scan_chapter(video, roots, scan_dir)
             print(
