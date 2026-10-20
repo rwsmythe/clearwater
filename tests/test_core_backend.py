@@ -174,6 +174,22 @@ def check_percentile_reference(backend: CoreBackend) -> None:
     np.testing.assert_array_equal(values, expected, err_msg="check_percentile_reference")
 
 
+def check_percentile_cast_point(backend: CoreBackend) -> None:
+    """R0-8 (CHARC): R-7 at the native precision, cast to float32 once, at the return.
+
+    The result must equal ``float32(xp.percentile(a, q))`` (float64 on NumPy and CuPy) bit for
+    bit at every q; an interpolation done in float32 rounds differently at some of them.
+    """
+    image = backend.asarray(rng_image((31, 29, 3), seed=12))
+    q = [float(value) for value in np.linspace(0.0, 100.0, 401)]
+    native = backend.xp.percentile(image, q, method="linear")
+    assert native.dtype == np.float64, f"check_percentile_cast_point: native {native.dtype}"
+    expected = host(backend, native.astype(np.float32))
+    got = host(backend, backend.percentile(image, q))
+    mismatches = int(np.count_nonzero(got != expected))
+    assert mismatches == 0, f"check_percentile_cast_point: {mismatches} of {len(q)} differ"
+
+
 def check_float32_out(backend: CoreBackend) -> None:
     """Every IF-2 image method returns float32."""
     image = backend.asarray(rng_image((9, 11, 3), seed=5))
@@ -211,6 +227,10 @@ def test_ycbcr_matrices(backend: CoreBackend) -> None:
 
 def test_percentile_matches_r7(backend: CoreBackend) -> None:
     check_percentile_reference(backend)
+
+
+def test_percentile_cast_point(backend: CoreBackend) -> None:
+    check_percentile_cast_point(backend)
 
 
 def test_float32_out(backend: CoreBackend) -> None:
@@ -517,6 +537,20 @@ class WrapReduce(NumpyBackend):
         return scipy_ndimage.correlate1d(rows, k, axis=1, mode="wrap")[::2, ::2]
 
 
+class EarlyCast(NumpyBackend):
+    """R-7 interpolated in float32: the cast made before the return, not at it."""
+
+    def percentile(self, a: Any, q: Any) -> Any:
+        values = np.sort(a.ravel())
+        out = []
+        for value in q:
+            h = np.float32(values.size - 1) * np.float32(value) / np.float32(100.0)
+            low = int(np.floor(h))
+            high = min(low + 1, values.size - 1)
+            out.append(values[low] + (h - np.float32(low)) * (values[high] - values[low]))
+        return np.array(out, dtype=np.float32)
+
+
 class Float64Leak(NumpyBackend):
     def percentile(self, a: Any, q: Any) -> Any:
         return np.percentile(a, list(q), method="linear")
@@ -539,6 +573,11 @@ def test_planted_wrap_border_fails() -> None:
         check_gaussian_reference(WrapBorder())
     with pytest.raises(AssertionError, match="check_reduce_reference"):
         check_reduce_reference(WrapReduce())
+
+
+def test_planted_early_cast_fails() -> None:
+    with pytest.raises(AssertionError, match="check_percentile_cast_point"):
+        check_percentile_cast_point(EarlyCast())
 
 
 def test_planted_float64_leak_fails() -> None:

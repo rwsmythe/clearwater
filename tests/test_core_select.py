@@ -166,6 +166,25 @@ def test_second_frame_stays_on_gpu(monkeypatch: pytest.MonkeyPatch) -> None:
     assert choose()[1].startswith("CPU: estimate")
 
 
+def test_planted_driver_only_free_flips_frame_two(monkeypatch: pytest.MonkeyPatch) -> None:
+    # R0-7 positive control: an implementation that ignores the pool's free blocks sends the
+    # second same-size frame to the CPU; the product's keeps it on the GPU.
+    estimate = memory_estimate_bytes(*FOUR_K, "c3")
+    device = FakeDevice(free=estimate + 300 * MIB)
+    install(monkeypatch, device, ImportError())
+    assert choose()[1] == "GPU"  # frame 1
+    device.free -= estimate  # frame 1's blocks are back in the pool, used for the driver
+    device.pool_free = estimate
+    assert choose()[1] == "GPU"  # frame 2, product
+
+    def driver_only(self: CupyBackend) -> int:
+        free, _total = self.xp.cuda.runtime.memGetInfo()
+        return int(free)
+
+    monkeypatch.setattr(CupyBackend, "free_device_bytes", driver_only)
+    assert choose()[1] == "CPU: estimate 1,982 MiB exceeds free 300 MiB"  # frame 2, planted
+
+
 def test_unknown_method_and_bad_size_refused(monkeypatch: pytest.MonkeyPatch) -> None:
     install(monkeypatch, FakeDevice(free=8000 * MIB), ImportError())
     with pytest.raises(ValueError, match="no memory estimate"):
