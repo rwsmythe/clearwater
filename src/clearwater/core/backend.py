@@ -553,9 +553,10 @@ def select_backend(
 
     The first matching rule wins: ``settings.force_cpu`` gives the CPU (``"CPU: forced"``);
     then CuPy must import, a CUDA device must exist and a test kernel must run (probed once per
-    process); then the GPU is chosen when the estimate is strictly below the free device
-    memory (read on every call), else the CPU with both figures in MiB, the estimate rounded
-    up and the free memory rounded down.
+    process); then the free device memory is read (on every call; a failure to read it gives
+    ``"CPU: CUDA device unusable"``); then the GPU is chosen when the estimate is strictly
+    below it, else the CPU with both figures in MiB, the estimate rounded up and the free
+    memory rounded down.
 
     Args:
         settings: The application settings (``force_cpu``).
@@ -577,7 +578,11 @@ def select_backend(
     gpu, reason = _probe_gpu()
     if gpu is None:
         return _NUMPY_BACKEND, reason
-    free = gpu.free_device_bytes()
+    try:
+        free = gpu.free_device_bytes()
+    except Exception as exc:  # the device was lost after the probe (a driver reset, a TDR)
+        _LOG.info("free device memory could not be read: %s: %s", type(exc).__name__, exc)
+        return _NUMPY_BACKEND, "CPU: CUDA device unusable"
     assert free is not None  # a CUDA backend always reports its free memory
     if estimate < free:
         return gpu, "GPU"

@@ -37,6 +37,8 @@ class FakeDevice:
         self.count = count
         self.count_error: Exception | None = None
         self.kernel_error: Exception | None = None
+        self.memory_error: Exception | None = None
+        self.pool_error: Exception | None = None
 
     def module(self) -> Any:
         device = self
@@ -51,12 +53,20 @@ class FakeDevice:
                 raise device.kernel_error
             return np.arange(*args, **kwargs)
 
+        def mem_get_info() -> tuple[int, int]:
+            if device.memory_error is not None:
+                raise device.memory_error
+            return device.free, 8 * 1024 * MIB
+
         runtime = types.SimpleNamespace(
-            getDeviceCount=get_device_count,
-            getDevice=lambda: 0,
-            memGetInfo=lambda: (device.free, 8 * 1024 * MIB),
+            getDeviceCount=get_device_count, getDevice=lambda: 0, memGetInfo=mem_get_info
         )
-        pool = types.SimpleNamespace(free_bytes=lambda: device.pool_free)
+        def pool_free_bytes() -> int:
+            if device.pool_error is not None:
+                raise device.pool_error
+            return device.pool_free
+
+        pool = types.SimpleNamespace(free_bytes=pool_free_bytes)
         return types.SimpleNamespace(
             __name__="cupy",
             ndarray=np.ndarray,
@@ -127,6 +137,27 @@ def test_device_unusable(monkeypatch: pytest.MonkeyPatch) -> None:
     device = FakeDevice(free=8000 * MIB)
     device.kernel_error = RuntimeError("nvrtc: cannot open source file")
     install(monkeypatch, device, ImportError())
+    assert choose()[1] == "CPU: CUDA device unusable"
+
+
+def test_free_memory_failure_after_the_probe(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Round 1 F2: the probe is cached, free memory is read on every call; a driver failure
+    # there (a TDR, a lost context) falls back to the CPU instead of escaping.
+    device = FakeDevice(free=4000 * MIB)
+    install(monkeypatch, device, ImportError())
+    assert choose()[1] == "GPU"
+    device.memory_error = RuntimeError("cudaErrorLaunchFailure")
+    backend, reason = choose()
+    assert reason == "CPU: CUDA device unusable" and isinstance(backend, NumpyBackend)
+    device.memory_error = None
+    assert choose()[1] == "GPU"  # read again on the next call
+
+
+def test_pool_failure_after_the_probe(monkeypatch: pytest.MonkeyPatch) -> None:
+    device = FakeDevice(free=4000 * MIB)
+    install(monkeypatch, device, ImportError())
+    assert choose()[1] == "GPU"
+    device.pool_error = RuntimeError("cudaErrorIllegalAddress")
     assert choose()[1] == "CPU: CUDA device unusable"
 
 
