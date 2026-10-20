@@ -429,7 +429,7 @@ def test_low_red_content_keeps_red_at_or_below_two_levels(
 
 def test_stills_carry_no_gps(sample: Callable[[str], Path]) -> None:
     pillow_heif.register_heif_opener()
-    for sample_id in STILL_IDS:
+    for sample_id in [*STILL_IDS, "dng-by-extension", "dng-by-tag", "dng-extension-only"]:
         path = sample(sample_id)
         data = path.read_bytes()
         if data.startswith(b"\x89PNG"):

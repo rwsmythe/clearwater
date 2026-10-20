@@ -1,9 +1,10 @@
 """Synthetic video fixtures made with the FFmpeg CLI (WP2.3 item 3).
 
-Eight short clips (320 x 180, 45 frames at 30000/1001 fps, one AAC sine track, built from
-``testsrc2``), each differing in the one thing it exercises: 8-bit BT.709 full range (the
-HERO13 tagging), 10-bit, HLG, PQ, untagged (D54), truncated (D86), variable frame rate (D95,
-D115) and rotated by a display matrix (D105). Software encoders only (libx265 and libx264, AAC),
+Eight short clips (320 x 180, 45 frames at 30000/1001 fps except the 30-frame variable-rate
+clip, one AAC sine track each, built from ``testsrc2``), each differing in the one thing it
+exercises: 8-bit BT.709 full range (the HERO13 tagging), 10-bit, HLG, PQ, untagged (D54),
+truncated (D86), variable frame rate (D95, D115) and rotated by a display matrix (D105). Software
+encoders only (libx265 and libx264, AAC),
 so a machine without NVENC regenerates them. The untagged clip is H.264 because x265 always
 writes a video signal type (with an explicit limited-range flag) into the stream; x264 writes
 none. Every sample carries a measured fact record: the ffprobe stream fields, the video

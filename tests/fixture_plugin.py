@@ -1,10 +1,10 @@
 """Pytest fixtures that give Phase 3 tests the shared samples (WP2.3 item 6).
 
-Loaded by the one ``pytest_plugins`` line in ``tests/conftest.py``. The line is
-``["fixture_plugin"] * Path(__file__).with_name("fixture_plugin.py").is_file()`` and not the bare
-list because the WP-T1 guard tests (``tests/test_conftest_guard.py``) copy ``conftest.py`` alone
-into a miniature repository, where a bare ``pytest_plugins = ["fixture_plugin"]`` makes pytest
-fail to start.
+Loaded by the one ``pytest_plugins`` statement in ``tests/conftest.py``. The statement is
+``["fixture_plugin"] if Path(__file__).with_name("fixture_plugin.py").is_file() else []`` and not
+the bare list because the WP-T1 guard tests (``tests/test_conftest_guard.py``) copy
+``conftest.py`` alone into a miniature repository, where a bare
+``pytest_plugins = ["fixture_plugin"]`` makes pytest fail to start.
 
 - ``fixture_manifest``: the parsed, validated ``tests/fixtures/manifest.json``.
 - ``sample``: a callable ``sample(sample_id) -> Path``. A committed sample is returned from
