@@ -222,7 +222,12 @@ path, md5, five assertions and verdict, or there is no accept.
   waits on the owner's Gate 1 option; applied only on "approved as 0.5.4") and
   docs/briefs/wp2.4-phase3-frame.md (common Phase 3 brief rules, wave order, dependency grants,
   spec-to-package map). CP4 = owner reads architecture.md + decisions.md + the proposal in one
-  pass. Gate 1 still OPEN with the owner. WP1.4b dispatched (opus-high; flip guards + gpmd claim 2a). Next: WP1.3-deep / WP1.4b brief on SCUBA/ (c3 primary, Params() flips to c3), then
+  pass. Gate 1 still OPEN with the owner. **WP2.3 dispatched** (wp23-cell, base da074f4; main
+  pytest on b288533: 892 passed). **Wave-1 Phase 3 briefs WP3.1/3.7/3.13/3.15 APPROVED** (6611b3d;
+  rulings msg 147041ff: 7.3 amended yuvj = full range; WP3.7 and WP3.1 (without its Gate 1
+  section) may dispatch with 3.13/3.15 once WP2.3 merges; AD-25 platform conventions; AD-16
+  wording fixed; v0.5.4 item 14 extended; 7926fd3). Full-pytest runs serialised across parallel
+  cells by the orchestrator. WP1.4b dispatched (opus-high; flip guards + gpmd claim 2a). Next: WP1.3-deep / WP1.4b brief on SCUBA/ (c3 primary, Params() flips to c3), then
   WP1.6 gate report (Gate 1: core 3.6x, production export 4.4x over N6). **Footage-layout skips:** the owner's Snorkel/SCUBA/edits layout makes 3
   footage tests skip (root `GX011628.MP4` paths in `tests/test_container_spike.py:902`,
   `tests/test_lookcheck.py:1289`, WP1.4 test 7; also `tools/lookcheck/pack.py:94` and the WP1.4
