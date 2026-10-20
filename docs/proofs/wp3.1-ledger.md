@@ -72,9 +72,10 @@ with thousands separators; GPU only when `estimate < free` (strictly).
 |---|---|---|
 | `settings.force_cpu` | numpy | `CPU: forced` |
 | `import cupy` raises ImportError | numpy | `CPU: CuPy not installed` |
-| `import cupy` raises anything else (a DLL, a driver) | numpy | `CPU: CuPy failed to load` (R0-6) |
+| `import cupy` raises anything else (a DLL, a driver), or `import cupyx.scipy.ndimage` raises anything | numpy | `CPU: CuPy failed to load` (R0-6) |
 | `getDeviceCount()` is 0 or raises a CUDA runtime error | numpy | `CPU: no CUDA device` |
-| a one-off probe kernel fails (missing NVRTC / headers) | numpy | `CPU: CUDA device unusable` (R0-6) |
+| `CupyBackend()` cannot bind the current device (`getDevice()` raises), or a one-off probe kernel fails (missing NVRTC / headers) | numpy | `CPU: CUDA device unusable` (R0-6; R1 F3) |
+| after the cached probe, reading free memory raises (driver reset, TDR) | numpy | `CPU: CUDA device unusable` (R1 F2) |
 | `estimate >= free` | numpy | `CPU: estimate 1,982 MiB exceeds free 1,200 MiB` |
 | otherwise | cupy | `GPU` |
 
@@ -173,6 +174,38 @@ reviewer (read-only FS, no uv in WSL); the cell reproduced F1, F2, F5 and confir
 | F5 | MINOR | `core/backend.py` `to_host` | accepts float64 (repro) | full `check()`; test |
 | F6 | MINOR | `tests/test_core_deps.py` | static rule misses bare `import_module`, `__import__`, `getattr(x, "xp")` | widen rule and planted control |
 | F7 | MINOR | `tools/core_speed.py` `gpu_snapshot` | ignores returncode; IndexError on empty stdout | return `{}` on failure |
+
+## Round-1 rulings (orchestrator gen 5, at the successor's dispatch)
+
+The first cell was retired at 275K depth after round 1's adjudication (before remediating);
+the successor cell (opus-high, fresh context) took the worktree at `c6314e9`, clean. Rulings,
+received as one packet: every planned fix ACCEPTED, one commit per logical change, each with a
+test that fails on the unfixed code. F1 MAJOR check every band (shape and float32). F2 MAJOR a
+`free_device_bytes()` exception after the cached probe gives `CPU: CUDA device unusable`. F3
+minor a `getDevice()` failure gives `CUDA device unusable`. F4 MAJOR (tool and report) complete
+the op mix per method; the report's sentence exactly true or narrowed. F5 minor `to_host`
+refuses non-float32. F6 minor (test only) the static rule catches `importlib.import_module`,
+`__import__`, `getattr(x, "xp")`. F7 minor (tool) `gpu_snapshot` degrades cleanly, the record
+says so. Full-pytest windows serialised by the dispatcher (X5).
+
+## Round-1 remediation (successor cell)
+
+Each test was run against the unfixed code first (red), then the fix (green). Logs in the
+worktree `work/r2-f*-{red,green}.log`.
+
+| # | Commit | Kind | Red on unfixed code | Fix |
+|---|---|---|---|---|
+| F1 | `312b31e` | product + test | `test_collapse_checks_every_band` [numpy, cupy]: DID NOT RAISE | `collapse_pyramid` runs `check_spatial` on every level and refuses a band whose channel layout differs from the coarser level's; the spatial fit stays `pyramid_expand`'s check |
+| F2 | `1f38687` | product + test + report | `test_free_memory_failure_after_the_probe`, `test_pool_failure_after_the_probe`: RuntimeError escaped | `select_backend` catches any exception from `free_device_bytes()` -> `CPU: CUDA device unusable`; the next call reads again |
+| F3 | `761bf51` | product + test + report | `test_device_acquisition_fails`: got `CPU: CuPy failed to load` | `_probe_gpu` imports `cupyx.scipy.ndimage` on its own (failure -> `CuPy failed to load`, regression test `test_cupyx_failed_to_load`), then a `CupyBackend()` failure -> `CUDA device unusable` |
+| F5 | `804d7db` | product + test | `test_methods_refuse_non_float32[*-to_host]`: DID NOT RAISE | `to_host` runs the full `check()` |
+| F6 | `e999076` | test only | planted control: 5 of 9 spellings found | AST rule: `import_module` / `__import__` bare or as an attribute (string arguments), `getattr(x, "xp")`; report claim 8 reworded (`7e29ece`) |
+| F7 | `00dfe98` | tool + test | `tests/test_core_speed.py` gpu_snapshot cases: IndexError / an error line taken for a reading | non-zero exit or no output -> `{"unavailable": "nvidia-smi exit N: <why>"}`; not run -> `{"unavailable": "nvidia-smi did not run: <Error>"}` |
+| F4 | `a46dac0` | tool + test + report | `test_op_mix_is_one_correct_call` [c3, ancuti2018]: `_channel_means` 1 vs 4, `luminance` 2 vs 4, `_cap_statistic` 0 vs 1 | op mix adds the compensation means, the two mean-added reads, the Ancuti cap mean per compensated channel, the saturation luma; the test counts the prototype path against a real `correct()` and maps the product path call for call; report sentence rewritten to what is timed and what is not (per-pixel arithmetic, the prototype's `_check_image` min/max) |
+| - | `fd173b5` | style | ruff format caught a missing blank line in the F2 fake device | formatted |
+
+Inner loop at `7e29ece`: `tests/test_core_*.py` 172 passed (GPU present); ruff check, ruff
+format --check (76 files), mypy (51 files) clean.
 
 ## Successor handoff (if re-seated)
 
