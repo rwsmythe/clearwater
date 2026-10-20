@@ -47,6 +47,11 @@
   3 text edits + round 3 (bounded) -> CONTINUE for one round; if it does not converge, yield for a
   re-seat; yield at ~380K. RULING: text-only edits authorised for the clip.py `--method` help,
   the statistics_experiments.py docstring and the Params.neutral() docstring (no default changes).
+  RETURN 08:43Z at head `8b194e4`: A converged at R3 (R1 2M/3m, R2a void at the 10-min limit, R2
+  3M/2m, R3 1M reopened = the clip.py item, 2m fixed). Suite 769/0/0. 65 pin sites (3 found by R1).
+  My 08:21Z ruling had NOT landed before the return; it then woke the cell (360,500 -> 363,411 /
+  168 turns, read twice). A SUPERSEDING message (08:44Z) limits it to the three text edits, module
+  tests and a commit; no Reviewer A round (B covers them). Then merge candidate, gate, Reviewer B.
 - `wp14b-cell` STOOD DOWN 06:50Z after a collision (woken by the queued 10b message, it ran claim 10
   and began 10b in the shared worktree; it halted on seeing cell2's edits; outputs handed to cell2 with
   a reproducibility check required). It was RETIRED at its STOP (06:44Z): 235,202 / 94 turns, then 237,015 (read twice, head
