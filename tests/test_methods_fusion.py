@@ -659,6 +659,22 @@ def test_x4_unusable_sigma_names_the_parameter(
 
 
 @pytest.mark.parametrize("parameter", X4_PARAMETERS)
+def test_x4_sigma_near_the_float_maximum(parameter: str) -> None:
+    """1e308 of a 1 px short side: a finite sigma whose ``4 * sigma`` overflows in the core's
+    radius rule (OverflowError there) is refused as the same X-4 ValueError (as WP3.2)."""
+    for call in x4_calls(parameter, 1e308):
+        spy, image = _Spy(), np.full((1, 1, 3), 0.5, np.float32).view(_Watched)
+        _Watched.calls = 0
+        with pytest.raises(ValueError) as raised:
+            call(spy, image)
+        message = str(raised.value)
+        assert message.startswith(f"{parameter}=1e+308 gives a sigma of 1e+308 px"), message
+        assert "at the short side 1 px; " in message, message
+        assert isinstance(raised.value.__cause__, OverflowError)
+        assert spy.calls == 0 and _Watched.calls == 0
+
+
+@pytest.mark.parametrize("parameter", X4_PARAMETERS)
 def test_x4_support_bound_depends_on_the_image_size(parameter: str) -> None:
     """350 of the short side: refused at 48 MP (radius over 2 ** 23 px), accepted at 1 x 1.
 
