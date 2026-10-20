@@ -213,3 +213,13 @@ figure; that waits for WP3.4 (ruling 4).
   identical).
 - `pyramid_levels` raises ValueError for `min_level_size < 1` (the prototype loops to 1 px).
 - Not run off the envelope: other GPUs, other operating systems, multi-GPU.
+
+## Erratum at the gate (orchestrator, Reviewer B)
+
+Claim 1 is too broad as written. Bit identity with the prototype is shown for the IF-2 methods
+and helpers that HAVE a prototype counterpart, on the inputs the tests use: YCbCr is compared in
+`bt709` full only (`bt709` limited and `bt601` full and limited have no prototype counterpart,
+R0-1), and `pyramid_levels` agrees with the prototype only for `min_level_size >= 1` (below
+that the product raises ValueError, as "Deviations and limits" says). `memory_estimate_bytes`
+equals the prototype's (`test_memory_estimate_equals_prototype`); `select_backend` and
+`free_device_bytes` have no prototype counterpart and are pinned by their own tests.
