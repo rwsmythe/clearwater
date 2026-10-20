@@ -34,9 +34,12 @@
 
 ### Live cells
 
-- **None.** No worktree under `.worktrees/` (verify: `git worktree list`). Every generation-2 cell
-  is retired or stood down; do not message any of them (`wp12b-cell`, `wp13d-cell`, `wp13d-cell2`,
-  `wp13d-cell3`, `wp14b-cell`, `wp14b-cell2`).
+- **`wp21s-cell`** (implementer-opus-high, STRONG): WP2.1S, worktree `.worktrees/wp2.1s`, branch
+  `wp2.1s`, base `aa1f5f0`; dispatched 2026-10-20 ~09:58Z. Depth at dispatch: 0 (no turn yet).
+  Transport leg EXCLUSIVE: no other cell, harness gate or Reviewer B run while its windows are
+  open. Verify: `git worktree list`; `uv run python scripts/cell_depth.py wp21s-cell`.
+- Every generation-2 cell is retired; do not message any of them (`wp12b-cell`, `wp13d-cell`,
+  `wp13d-cell2`, `wp13d-cell3`, `wp14b-cell`, `wp14b-cell2`).
 
 ### Where things stand -- the successor starts HERE
 
@@ -50,11 +53,12 @@
    choice at WP2.1, optimisation package in Phase 3, final tune at WP5.2). Gate result 4 (KEEP the
    caps) awaits the owner's confirmation at CP3. The gate record is final when the owner's word is
    recorded and the fact-check attached.
-3. **WP2.1S (transport and photo I/O spike):** commissioned by CHARC (`d99b28e575726fbd`) as a
-   brief only; DRAFT `docs/briefs/wp2.1s-brief.md` (`07339bc`) sent to CHARC for approval
-   2026-10-20 ~09:53Z with three rulings asked (av/pypng dev grant, exiftool not installed,
-   exclusivity under the Part B best-effort ruling). Do NOT dispatch before CHARC approves.
-   CHARC is writing WP2.1 meanwhile; WP2.2-2.4 hold on it.
+3. **WP2.1S (transport and photo I/O spike) DISPATCHED.** Brief FINAL `docs/briefs/wp2.1s-brief.md`
+   (`aa1f5f0`; draft `07339bc`; CHARC approval and rulings `5152ed4302874889`: `av` granted into
+   dev, no pypng (stdlib PNG writer, else STOP), no exiftool, Part B best-effort covers the
+   exclusive leg, exact pts per transport row). Closes AD-2 and AD-17, confirms AD-18
+   (architecture DRAFT 0.1, `a27a6f7`). On return: QA, Reviewer B at this seat, accept.
+   CHARC holds WP2.2-2.4 until WP2.1S returns (`fa9d637063376263`).
 4. **Next for this seat otherwise:** nothing until CHARC directs. After CP3: Phase 2. WP2.1 (architecture
    document and decisions) is the architect's (CHARC); the orchestrator's likely next packages are
    WP2.2 (interface module) and WP2.3 (shared test fixtures) after WP2.1, and WP2.4 briefs with CHARC.
