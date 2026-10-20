@@ -213,8 +213,15 @@ class ProxyCache(Protocol):
     def store_proxy(self, key: CacheKey, pts_ticks: int, proxy: numpy.ndarray) -> None: ...   # uint8 (540 short side) AD-5
     def proxy(self, key: CacheKey, pts_ticks: int) -> numpy.ndarray: ...
     def store_source_statistics(self, key: CacheKey, stage: str, pts_ticks: int, stats: Statistics) -> None: ...
+    def source_statistics(self, key: CacheKey, stage: str, pts_ticks: int) -> Statistics: ...   # KeyError if absent (AD-7)
+    def mark_complete(self, key: CacheKey) -> None: ...   # proxy pass for the whole clip stored (V17)
     def limit_bytes(self) -> int; def set_limit_bytes(self, n: int) -> None: ...   # default 20 GB, oldest first
     def clear(self) -> None: ...
+
+@dataclass(frozen=True)
+class CacheEntry:
+    key: CacheKey; pts_ticks: tuple[int, ...]; stages: tuple[str, ...]; size_bytes: int
+    complete: bool   # stages = those covering every pts; complete = mark_complete seen (AD-20 amendment 2026-10-20)
 ```
 
 ### IF-8 Jobs
