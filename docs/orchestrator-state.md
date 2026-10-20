@@ -28,12 +28,20 @@
 
 ### Live cells
 
-- **`wp13d-cell2`** (implementer-sonnet-high), WP1.3D RE-SEAT, dispatched 2026-10-20 00:08Z
-  from the ledger at head `663cc64`. Agent id `awp13d-cell2-8c6e689bd0ee8c6b`. Rulings sent with
-  the dispatch: deep read-back own bound 5.0 ACCEPTED (report the measured figures; flicker keeps
-  3.0, tested); spacing within a chapter ACCEPTED; `correct(statistics=)` instead of
-  `temporal.render` ACCEPTED with a bit-identity test. A background clip render started by the
-  first cell may still be running (`work/wp1.3d/deep-clip-run2.log`). Depth at dispatch 38,943 (2 turns, 00:08Z); 96,051 at 33 turns (00:38Z).
+- **`wp13d-cell3`** (implementer-sonnet-high), WP1.3D SECOND RE-SEAT, dispatched 2026-10-20 02:07Z
+  from the ledger's NEXT STEPS at head `7a6c6e7`. Agent id `awp13d-cell3-6a29bf6e70d086e7`.
+  Depth at dispatch 19,551 (1 turn). Envelope ruling sent: one operator running the steps in order
+  on an untampered working folder; hand-edited or replaced records and out-of-order steps are OUT
+  of envelope (banked, never loop-driving); blocking = anything showing the owner the wrong thing
+  at CP2 or a write outside `work/wp1.3d/`. Two jobs from cell2 running at hand-over (CPU scan
+  re-run, GPU clip re-render).
+- `wp13d-cell2` RETIRED at its round-2 yield: 239,534 / 127 turns (02:06Z, read twice, head
+  `7a6c6e7`). Reviewer A R1 2 major + 3 minor, R2 3 major + 2 minor (all hardening of working-folder
+  record integrity), fixed; not converged. Gate at `8120b28`: 730 passed, none skipped. Real defect
+  it found and fixed: smoothed alpha 0.9999999999999999 read as "cap bound" (now 104 of 179 frames).
+  Deviation rulings at its dispatch: read-back own bound 5.0 (measured own max 3.85, neighbour
+  margin >= 1.6), spacing within a chapter, `correct(statistics=)` with a bit-identity test; all
+  ACCEPTED by CHARC (`462c52005bb99626`).
 - `wp13d-cell` RETIRED at its interim yield: 244,164 / 77 turns (00:08Z, read twice, head
   `663cc64` both times). It asked to be read and re-seated; no reply sent. Scan done (289
   frames; deepest GX011600 @ 665.031 s), deep command and 28 tests committed.
