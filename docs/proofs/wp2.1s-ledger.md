@@ -131,7 +131,7 @@ cumulative machine time ~60 min.
 |---|---|---|---|---|---|---|---|---|---|---|
 | r1 | WSL, codex-cli 0.162.1, gpt-5.6-sol/high | 0 | 4 | 4 | 7 / 1 (F8 out) | 8 NEW / 0 | 0 | product: transport.py, photo.py, licences.py, report; test: photo tests | (dispatcher) | `clearwater-review-evidence/wp2.1s/r1/` |
 | r2 | WSL, codex-cli 0.162.1, gpt-5.6-sol/high | 0 | 2 | 3 | 4 / 1 (F5 out) | 5 NEW / 0 | 0 | product: transport.py, licences.py, report | (dispatcher) | `clearwater-review-evidence/wp2.1s/r2/` |
-| r3 | WSL, codex-cli 0.162.1, gpt-5.6-sol/high | 0 | 1 | 7 | 5 / 3 (F5, F7, F8 out) | 8 NEW / 0 | 0 | pending (yielded before the remediation, depth) | (dispatcher) | `clearwater-review-evidence/wp2.1s/r3/` |
+| r3 | WSL, codex-cli 0.162.1, gpt-5.6-sol/high | 0 | 1 | 7 | 5 / 3 (F5, F7, F8 out) | 8 NEW / 0 | 0 | product: guard.py (new), transport.py, photo.py, licences.py, report; test: guard and profile-name tests (gen-3 cell, `a5c5c00`, `5c998f6`) | (dispatcher) | `clearwater-review-evidence/wp2.1s/r3/` |
 
 Round 1 (diff `aa1f5f0..ccc23b8`; VERDICT NEW_CRITICAL_MAJOR_FOUND; assertions all pass, 30
 succeeded, 0 `^ERROR`, 0 `ERROR codex_core`, footer present; access hits are echoes). Findings and
@@ -169,3 +169,31 @@ one read of `clearwater.local.toml`). One MAJOR (output containment against junc
 links; transport writes without a check) and seven MINORs (three out of envelope). All accepted;
 remediation NOT started: the cell yielded first because it is past the ~250K re-seat line with a
 multi-finding remediation open (fill Part 1). Proposed fixes in the round's adjudication file.
+
+Round 3 remediation (gen-3 cell, from `f18e043`; orchestrator rulings: F1-F4 and F6 ACCEPT in
+envelope; F5, F7, F8 fix if a few lines, else bank). All eight FIXED; the three out-of-envelope
+minors were each a few lines, so none is banked. No timed window opened; no re-timing needed.
+1. MAJOR containment -> `tools/spike_io/guard.py` `WriteGuard.check` before every write in all
+   three tools (records, window record after each step, `gate.jsonl` target, fixtures,
+   `display-p3.icc`, `photo.json`, `licences.json`); root `<working>/wp2.1s` with the last name
+   unresolved (a junction there refuses everything), footage resolved, an existing regular file
+   with `st_nlink > 1` refused. Tests: `..` escape, absolute path elsewhere, footage, hard link to
+   a footage file and between two root names, each refused by reason; photo writers refuse with
+   nothing written. CLIs run against a scratch config: photo, licences, summary write through
+   the guard (`work/wp2.1s/logs/guard-cli-c3.log`). Limit stated in the module: no lock, a link
+   planted between check and write is not caught (`a5c5c00`).
+2. MINOR -> report: c-cuda-auto's maximum is frame 666, 213.3 ms (first 164.0 ms); verified on
+   W2-W6 runs of record, the only exception (`5c998f6`).
+3. MINOR -> report: default-pipe producer blocks during a hash; the bounds stand (`5c998f6`).
+4. MINOR -> report: "no non-code file" in three places; the DLL strings named (`5c998f6`).
+5. MINOR out -> `check_reference` on name, size_bytes, mtime_ns (`REFERENCE_KEYS`); each changed
+   key refused by name, the real clip accepted (`work/wp2.1s/logs/f5-f6-check-c3.log`).
+6. MINOR -> lockstep only on equal frame counts; a fake 3-of-5 transport records
+   `frame_count_equal: false` without calling lockstep (same log).
+7. MINOR out -> `positive_int` argparse type: `--frames 0` and `-3` exit 2 (guard-cli log).
+8. MINOR out -> `encode_png16` raises PhotoError on an empty, 80-byte, NUL-holding or
+   non-Latin-1 name (parametrised test).
+Also: report section 7 now carries the post-leg machine time (~65 min) and the W7 incident; the
+report states the guard came after the windows.
+Validation after remediation (code `a5c5c00`): ruff check green; ruff format green except
+`docs/architecture.md` (CHARC's, excused); mypy green (27 files); photo tests 51 passed.
