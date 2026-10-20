@@ -54,7 +54,7 @@ path, md5, five assertions and verdict, or there is no accept.
 
 ### Live workstreams
 
-- **Orchestrator generation 2** `clearwater-orchestrator-20261018-1442` (opus/high/auto; online
+- **Orchestrator generation 2** `clearwater-orchestrator-20261018-1442 (ROLLED OVER 2026-10-20 09:46Z at the 400K cap, clean boundary, state e975db5; **generation 3 = `clearwater-orchestrator-20261019-2346`**, launched 09:46:50Z, sole drainer)` (opus/high/auto; online
   2026-10-19T00:42Z; gen 1 rolled at 411K with no live cell; verify `comms/.launch-sessions.json`,
   `ListAgents`). All `wp1.5*` worktrees removed;
   branches `wp1.1`, `wp1.2`, `wp1.5` kept for the reviewed SHAs (`git worktree list`).
