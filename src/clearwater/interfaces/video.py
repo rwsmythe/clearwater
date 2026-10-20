@@ -146,7 +146,9 @@ class ProbeResult:
     Attributes:
         path: The probed file.
         container: The container format name.
-        duration_s: The duration in seconds.
+        duration_s: The CONTAINER duration in seconds, exact (``mvhd`` duration over its
+            timescale, or the longest stream in integer ticks times its time base); the video
+            track's own end comes from pts and frame durations, not from this field.
         start_offset_s: The container's start offset in seconds (D105).
         video: The video stream.
         audio: The audio streams.
