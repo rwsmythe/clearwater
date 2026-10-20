@@ -195,7 +195,17 @@ path, md5, five assertions and verdict, or there is no accept.
   reading). CLAUDE.md current-state refreshed. CP4 reviews this with spec v0.5.4. **WP2.1S brief APPROVED**
   (07339bc; rulings: av granted dev-only; no pypng, stdlib chunk writer as the PNG alternative;
   no exiftool; Part B best-effort ruling covers the exclusive transport leg; every transport row
-  reports exact per-frame pts). Dispatch is the orchestrator's; return closes AD-2, AD-17, AD-18. WP1.4b dispatched (opus-high; flip guards + gpmd claim 2a). Next: WP1.3-deep / WP1.4b brief on SCUBA/ (c3 primary, Params() flips to c3), then
+  reports exact per-frame pts). Dispatch is the orchestrator's; return closes AD-2, AD-17, AD-18. **WP2.1S ACCEPTED 2026-10-20
+  main a866f06** (record docs/proofs/wp2.1s-accept.md; A 6 rounds across 3 cells, re-seats 257K/342K;
+  B NO_NEW_CRITICAL_MAJOR, DR-31; gates 823 passed, harness 366). **CHARC QA CONFIRMED** (patch-id
+  a5e7951d; md5 486c317a; harness 366 at my seat). Findings: pipe 55.9 ms/frame clean (Part B's 93.6
+  was contaminated), 32 MiB pipe 16.1 / CUDA 13.0, floor 13.45; PyAV decode-only 43 ms, NOT adopted;
+  Pillow cannot write 16-bit PNG -> stdlib chunk writer; HEIC irot/Orientation double-rotation
+  hazard -> AD-24; licences corrected (FFmpeg CLI GPL-3.0-or-later; PyAV wheel's LGPL label vs
+  x264/x265 UNKNOWN, moot). AD-2/17/18 closed, AD-23 (N1 pipe buffer), AD-24 logged; gate report
+  Result 1 supersession note added; CLAUDE.md refreshed. Mid-run rulings msg 75aacdfc; ruff Markdown
+  exclusion c6b63e3 (with a correction f17b1667 after a premature claim). **Next: commission WP2.2
+  (interface module) and WP2.3 (fixtures) briefs for CHARC approval; then WP2.4 + spec v0.5.4 -> CP4.** WP1.4b dispatched (opus-high; flip guards + gpmd claim 2a). Next: WP1.3-deep / WP1.4b brief on SCUBA/ (c3 primary, Params() flips to c3), then
   WP1.6 gate report (Gate 1: core 3.6x, production export 4.4x over N6). **Footage-layout skips:** the owner's Snorkel/SCUBA/edits layout makes 3
   footage tests skip (root `GX011628.MP4` paths in `tests/test_container_spike.py:902`,
   `tests/test_lookcheck.py:1289`, WP1.4 test 7; also `tools/lookcheck/pack.py:94` and the WP1.4

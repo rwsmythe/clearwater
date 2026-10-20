@@ -1,9 +1,9 @@
 # Clearwater architecture (WP2.1, DRAFT 0.1, CHARC, 2026-10-20)
 
 **Status:** DRAFT. Spec v0.5.3, plan v1.1. Decisions are logged in `docs/decisions.md` (AD-n);
-this document states the resulting design and freezes the interfaces (plan section 8.2). Three
-items are PENDING named evidence: the N6 figure (owner, Gate 1, AD-21), the frame transport
-(WP2.1S, AD-2) and the photo-library verification (WP2.1S, AD-17). The owner reviews this
+this document states the resulting design and freezes the interfaces (plan section 8.2). One
+item is PENDING: the N6 figure (owner, Gate 1, AD-21). The frame transport (AD-2, AD-23) and
+the photo-library verification (AD-17, AD-24) closed with WP2.1S on 2026-10-20. The owner reviews this
 document and the decision log at CP4 (design freeze) with the spec revision v0.5.4.
 
 ## 1. Shape of the system
@@ -266,7 +266,7 @@ Gaussian for 3C (gate report Result 1).
 - **Probe** (WP3.7): ffprobe JSON plus a GPMF settings read; faults per IF-5; HLG/PQ refused;
   GP-Log warned (AD-16); sidecars excluded (D83); VFR reported (D95).
 - **Decode** (WP3.9): FFmpeg process, software or `-hwaccel cuda`, output planar RGB at source
-  bit depth, full or limited range honoured (AD-10, D54/D55); transport per WP2.1S (AD-2);
+  bit depth, full or limited range honoured (AD-10, D54/D55); transport: raw frames over a 32 MiB-buffered anonymous pipe with automatic default-pipe fallback (AD-2, AD-23; 16.1 ms/frame software, 13.0 CUDA);
   exact pts from `-copyts` and a timestamp side channel.
 - **Analysis** (WP3.11): proxy 540 (AD-5) to the cache (AD-5, IF-7); staged statistics (AD-6);
   smoothing (AD-3) with a step-aware variant as a design task; provisional preview (AD-15).
@@ -280,8 +280,7 @@ Gaussian for 3C (gate report Result 1).
 ## 6. Photos (WP3.6)
 
 pillow-heif / Pillow read with ICC and orientation; 16-bit PNG write with the profile and the
-D63 EXIF subset; provenance (D90); ProRAW/DNG refused (D116). Library verification PENDING
-WP2.1S (AD-17).
+D63 EXIF subset; provenance (D90); ProRAW/DNG refused (D116). Verified by WP2.1S (AD-17): the 16-bit PNG writer is a stdlib chunk writer; HEIC orientation per AD-24.
 
 ## 7. Jobs, config, GUI (WP3.13-3.20, WP4.x)
 
@@ -307,8 +306,7 @@ AD-18. Confirmed at WP5.5 with the final wheel set; CUDA runtime files are never
 | Item | Closed by |
 |---|---|
 | N6 figure for V16 and the optimisation package | Owner, Gate 1 (AD-21) |
-| Frame transport (pipe/socket blocks vs PyAV decode) | WP2.1S (AD-2) |
-| 16-bit PNG + ICC + EXIF write path | WP2.1S (AD-17) |
+| HEIC orientation rule on a real owner photo | the first owner photo (AD-24) |
 | Proxy store container | WP3.12 brief's measured test (AD-5) |
 | Step-aware smoothing variant | WP3.11 design task (AD-3) |
 | GoPro "HDR video" mode | a clip, if one is ever supplied (AD-16) |

@@ -142,3 +142,14 @@ No criticals and no reverts.
     `--enable-gpl`, yet carries working libx264 and libx265 and NVENC/NVDEC. Its compatibility
     is UNKNOWN from the artefacts.
   - pillow-heif ships 7 native files.
+
+## CHARC QA
+
+2026-10-20 ~12:30Z at the CHARC seat: `git patch-id --stable` = `a5e7951d` on `aa1f5f0..wp2.1s`,
+`aa1f5f0..36066ef` and `dbc62b7..104c005` (match; the main range `dbc62b7..a866f06` differs only by
+the declared text commits 92a5735 and a866f06); review-B.txt md5 `486c317a`, `md5s.txt` verifies,
+VERDICT NO_NEW_CRITICAL_MAJOR; DR-31 present; the report ends with the erratum at the gate; the
+headline rows (a 55.9, b 16.1, b-cuda 13.0 ms/frame; BIG_PIPE_BYTES; PyAV FFmpeg "LGPL version 3
+or later") are in the report; harness gate on main `75d6b7f`: 366 OK (1 skipped). **QA CONFIRMED.**
+AD-2, AD-17, AD-18 closed and AD-23/AD-24 logged in `docs/decisions.md`; gate report Result 1
+carries the supersession note.

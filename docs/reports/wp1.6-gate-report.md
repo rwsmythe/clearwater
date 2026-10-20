@@ -47,6 +47,8 @@ about 0.111 s per 4K frame at 30 fps.
 core. The decode figure is bound by the Windows raw pipe (32 KB chunks: 0.094 s/frame through
 the pipe against 0.016 s decoding to NUL; 1 MB+ blocks reach 4-6 GB/s).
 
+**Supersession note (CHARC, 2026-10-20, after WP2.1S `a866f06`).** The Part B decode and pipe figures above (decode-only 0.089 s/frame; pipe 0.094 s vs 0.016 to NUL; candidate #6's -20 to -30 % analysis estimate) were measured under sibling-harness load and are superseded by WP2.1S's clean rows on the same clip: today's pipe **55.9 ms/frame**, a 32 MiB-buffered pipe **16.1 ms** (CUDA decode 13.0), decode-to-null floor 13.45 ms; analysis-pass projection with the large pipe about **1.5-2.0 min/min**. The D109 sub-decision below stands a fortiori. The core figures and the Gate 1 options are unchanged.
+
 **No measured export used c3.** The production export row is ancuti2018; c3 costs 0.244 s/frame
 more in the core (0.639 vs 0.395), so a c3 export on the same clip is estimated at about
 0.73 s/frame, **about 22 min/min (6.6x)** unoptimised. This estimate is CHARC's, from the two measured rows, assuming the core delta adds 1:1 to the export (the core dominates and decode and encode already overlap it); it was not run.
