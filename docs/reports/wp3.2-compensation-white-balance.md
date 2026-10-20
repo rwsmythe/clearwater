@@ -66,13 +66,16 @@ IF-1 makes the range the producer's contract), `check_derived_values` (replaced 
 6. **Gate 1:** on the GPU the renders return `cupy.ndarray` float32 and run under
    `cupyx.allow_synchronize(False)` without a device synchronisation (the instrument is shown
    to fire on `cap_statistics`); call counts show `cap_statistics` reads one scalar per
-   channel through `clearwater.core.mean` and the renders call no reduction helper.
+   channel through `clearwater.core.mean` and the renders call no reduction helper. On the
+   CPU a recording `np.ndarray` subclass (`UfuncSpy`) shows that no render makes a reduction
+   over a spatial axis (only the 3C mask's per-pixel mean over the channels), with planted
+   controls (a render measuring its means, a frame max) caught (Reviewer A R1-3).
 7. **Dependency rule:** a subprocess import of both modules loads nothing from
    `clearwater.io`, `.jobs`, `.gui`, `.config`, nor `PIL`, `av`, `PySide6`, `cupy`, `cupyx`. The
    static test in `tests/test_core_deps.py` (no `xp`, no `cupy` outside `clearwater.core`)
    covers the new modules.
 8. **Gates** (on the branch head): ruff check clean, ruff format --check clean, mypy strict
-   clean; own tests 376 passed (CuPy importable), 193 passed / 183 skipped with `cupy` and
+   clean; own tests 383 passed (CuPy importable), 200 passed / 183 skipped with `cupy` and
    `cupyx` unimportable. Full suite: see the ledger (granted window).
 
 ## DR-19 rule
@@ -95,11 +98,14 @@ inherits the rule.
 In WP3.2 the rule applies to `compensate_c3` only (`c3_kernel_fraction`,
 `c3_mask_smooth_fraction`); the message is
 `f"{name}={fraction!r} gives a sigma of {sigma:.6g} px at the short side {n} px; {exc}"`, with
-`exc` the `check_sigma` error. The Ancuti and white-balance steps derive no spatial value and
+`exc` the `check_sigma` error (an OverflowError from it, a finite sigma whose `4 * sigma` is
+infinite, is reported the same way; Reviewer A R1-2). The Ancuti and white-balance steps derive no spatial value and
 validate none. Tests: `test_unusable_fraction_raises_one_error_naming_it` (0, negative, NaN,
 inf; no stdout, stderr or log record; `__cause__` is the core's error),
-`test_support_bound_depends_on_the_short_side`, `test_validation_is_method_scoped`. Supplied
-values (S-3): wrong length or keys, or non-finite, raise one ValueError naming the argument.
+`test_overflowing_fraction_raises_the_x4_error`, `test_support_bound_depends_on_the_short_side`,
+`test_x4_error_comes_before_any_array_work` (no ufunc call on the image before the error; a
+planted late check is caught), `test_validation_is_method_scoped`. Supplied values (S-3): wrong
+length or keys (of any type), or non-finite, raise one ValueError naming the argument.
 DR-19 stays OPEN until WP3.4's schema lands; WP3.2 discharges items (1) and (2) for its
 parameters and item (5) for its steps.
 
@@ -117,6 +123,9 @@ parameters and item (5) for its steps.
 
 ## Deviations and limits
 
+- **Banked core item (Reviewer A R1-2):** `clearwater.core.check_sigma` raises OverflowError,
+  not ValueError, for a finite sigma whose `4 * sigma` overflows (`int(inf)`); out of envelope,
+  guarded package-side in `_derived_sigma`; for the next core touch.
 - None from the brief. `_compensated_channels` is a private helper (not in the round-0 table).
 - `cupyx.allow_synchronize` is deprecated and "not reliable" by CuPy's own warning; the Gate 1
   test pairs it with call counts on the core reduction helpers.
