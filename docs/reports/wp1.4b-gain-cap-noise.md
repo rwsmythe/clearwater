@@ -228,6 +228,12 @@ white-balance gain on the noisy red, and so to raise noise.
   - The green fraction falls from 0.46-0.68 to 0.33.
 - **The earlier early signal** ("a tighter cap lowers output red noise") is confirmed only for
   crushed-red regions, not in general.
+- **Erratum at the gate (orchestrator Reviewer B, advisory 4).** The mechanism above ("the output
+  red's noise is that term's green noise") is an INFERENCE from the code and the records (alpha
+  0.94 -> 0.235 and flat `sigma_R` 0.195 -> 0.085 on 0665, against a source flat red sigma of
+  0.0015 and green 0.138), strongly supported but not directly measured: no record isolates the
+  noise of the compensation term, and `green_fraction` is a fraction of the mean signal, not of
+  the noise. "Not spec-bearing" stands as a reasoned reading of that inference.
 
 **Does the amplification track the camera's ISO or the pipeline's own red gain?** Spearman rank
 correlation over the deep frames, Ancuti default:
@@ -242,6 +248,16 @@ correlation over the deep frames, Ancuti default:
   to 3.03.
 - The camera's WRGB red gain also correlates, because it grows with red loss, just as the
   pipeline's red gain does. With 8 frames these are collinear and cannot be separated.
+- **Erratum at the gate (orchestrator Reviewer B, finding 1).** "It does not track the ISO" is
+  stronger than the records support. A rank correlation of 0.60 (n = 8, five frames tied at ISO
+  100) is a moderate positive association, and the absolute output `sigma_R` correlates 0.68 with
+  ISO against 0.57 with the red gain. Read instead: ISO does not by itself determine the
+  amplification; the pipeline's own gains, the N{} stretch most of all, correlate more strongly.
+- **Erratum at the gate (orchestrator Reviewer B, finding 2).** The amplification ratios are ratios
+  of the estimator's readings on a quantised source and a float output that has been mixed,
+  clipped, gamma-corrected, sharpened and fused, so the estimator's bias need not be the same on
+  both sides. They are operational ratios, not demonstrated unbiased noise gains. The KEEP
+  recommendation rests on the absolute output comparisons, which this does not affect.
 
 **Recommendation: KEEP the caps** (the decision is the gate's at WP1.6; dropping them is a spec
 change and the owner's).

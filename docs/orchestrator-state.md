@@ -28,43 +28,14 @@
 
 ### Live cells
 
-- **None live.** WP1.3D ACCEPTED 2026-10-20, main `7f9fea1` (record `docs/proofs/wp1.3d-accept.md`);
-  its three cells are done (`wp13d-cell` 244,164; `wp13d-cell2` 239,534; `wp13d-cell3` 153,856 after
-  the B #1 remediation). Do not reply to any of them.
-- **`wp14b-cell2`** (implementer-opus-high), WP1.4b RE-SEAT, dispatched 2026-10-20 06:45Z from the
-  ledger at head `33bd8ba`, with the noise-measure ruling and claim 10b. Agent id
-  `awp14b-cell2-b20dc8ec1c19a19b`. Depth at dispatch 40,786 (3 turns, 06:45Z); 76,653 at 6 turns (06:46Z).
-  CHARC upheld the ruling (`99fd817f74e4a428`); its two REPORT notes were sent to the cell 06:46Z (both
-  estimators ~0 -> "below the quantisation floor"; total red gain = camera WRGB x ours). Check at
-  return that they landed (ledger). If the grid confirms the anti-D100 signal: spec-bearing, owner
-  decision request at WP1.6 result 4 (via CHARC).
-  ROUND-2 YIELD 08:21Z, head `7127fe1`, depth 318,197 / 139 turns, then 320,059 (read twice). Results:
-  Gate result 4 KEEP the caps (on the red-lit tiles a tighter cap RAISES red noise on 8/8 frames, as
-  D100 expects; the early anti-D100 signal holds only on crushed-red tiles, where the red noise is
-  green noise carried in by compensation); clamp 3.0 never binds, keep; N{} floor proposed 0.02;
-  claim 10 keep (A); claim 10b step at 0.90 s GENUINE (not an edge effect), and neither the reset nor
-  the 0.5 s window helps. Suite 768/0. A: R1 2M/3m, R2 3M/2m, fixed. EVALUATION at 320K: remaining =
-  3 text edits + round 3 (bounded) -> CONTINUE for one round; if it does not converge, yield for a
-  re-seat; yield at ~380K. RULING: text-only edits authorised for the clip.py `--method` help,
-  the statistics_experiments.py docstring and the Params.neutral() docstring (no default changes).
-  RETURN 08:43Z at head `8b194e4`: A converged at R3 (R1 2M/3m, R2a void at the 10-min limit, R2
-  3M/2m, R3 1M reopened = the clip.py item, 2m fixed). Suite 769/0/0. 65 pin sites (3 found by R1).
-  My 08:21Z ruling had NOT landed before the return; it then woke the cell (360,500 -> 363,411 /
-  168 turns, read twice). A SUPERSEDING message (08:44Z) limits it to the three text edits, module
-  tests and a commit; no Reviewer A round (B covers them). Then merge candidate, gate, Reviewer B.
-- `wp14b-cell` STOOD DOWN 06:50Z after a collision (woken by the queued 10b message, it ran claim 10
-  and began 10b in the shared worktree; it halted on seeing cell2's edits; outputs handed to cell2 with
-  a reproducibility check required). It was RETIRED at its STOP (06:44Z): 235,202 / 94 turns, then 237,015 (read twice, head
-  `33bd8ba`). Evaluation (owner's rule, not reflex): the grid, claims 7-10b, the report and a full
-  STRONG review loop remained, an open-ended load, so a fresh cell. Claim 10b had NOT landed (not
-  in its ledger). Done: the flip alone `b23bad9`; 62 pins + guards `fddc4e3`; WIP estimator and
-  camera-state reader `33bd8ba`.
-  STOP: Donoho reads 0 on all 8 deep frames (63-99 % of HH1 exactly zero; 8-bit HEVC flattening),
-  evidence `work/wp1.4b/stop/` (md5 be6c2ce0, 3e3a008c). RULING: Immerkaer primary on the same
-  tiles, Donoho as the cross-check; compare absolute output sigma_R; the ratio only where the source
-  > 0; a second tile set with source red >= 16/255; a quantised-regime validation test; the limit
-  stated (compression artefact, not grain); report what the data show (the early signal is against
-  D100's expectation).
+- **None live.** WP1.4b ACCEPTED 2026-10-20, main `afaff0e` (record `docs/proofs/wp1.4b-accept.md`):
+  Gate result 4 KEEP the caps; B `NO_NEW_CRITICAL_MAJOR` (errata at the gate, DR-30); bit-identity
+  witness 6/6. `wp14b-cell` stood down (06:50Z), `wp14b-cell2` retired at 387,919. Do not reply to
+  either. Branch `wp1.4b` (`8314247`) kept.
+- **Phase 1 inputs are now complete for WP1.6** (CHARC's, the architect's package; template
+  `docs/reports/wp1.6-gate-report.md`): results 1-2 (Part B, upper bound, shared laptop; photo leg
+  PENDING: no photos supplied), 3 (CP2 shallow and deep: c3 default), 4 (WP1.4b KEEP), 5 (WP1.4:
+  no visible difference), 6 (WP1.5 SIMPLE). Next owner decision: Gate 1 at WP1.6 (via CHARC).
 - **Depth rule (owner 2026-10-19, corrected 2026-10-20):** read `cell_depth.py <cell>` at dispatch,
   at every yield, and before sending any ruling or remediation; record each figure with its
   moment. **~250K is an EVALUATION point, not an automatic re-seat** (owner 2026-10-20: "You don't
@@ -124,6 +95,7 @@ Each accepted package had its return report posted to CHARC and an info-update t
 | WP-T2 | 2026-10-19 | `8c9d780` | `docs/proofs/wp-t2-accept.md`; DR-24 closed, DR-27 | CONFIRMED (`d40217a81696cc03`; B rejection upheld; suite re-run deferred past Part B) |
 | WP1.2 Part B | 2026-10-19 | `2dd06cf` | `docs/proofs/wp1.2b-accept.md`; B #2 non-blocking, banked; DR-28; depth breach recorded | CONFIRMED (`cb61a4e41f625d73`; patch-id erratum) |
 | WP1.3D | 2026-10-20 | `7f9fea1` | `docs/proofs/wp1.3d-accept.md`; B #1 blocking (candidate labels) -> one remediation; B #2 `NO_NEW_CRITICAL_MAJOR`; DR-29 | CONFIRMED (`c6bda8a38146274f`) |
+| WP1.4b | 2026-10-20 | `afaff0e` | `docs/proofs/wp1.4b-accept.md`; Gate result 4 KEEP; B `NO_NEW_CRITICAL_MAJOR`, errata, DR-30; flip witness 6/6 | PENDING |
 
 - **WP1.2 Part A, raised to CHARC:**
   - approval of the Windows-only `_windows_power()` in `bench.py` (instrument only, guarded);
