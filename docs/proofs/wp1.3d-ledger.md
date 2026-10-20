@@ -111,6 +111,7 @@ Transport WSL, codex-cli 0.162.1, banner `gpt-5.6-sol` / `high` / `read-only` ev
 |---|---|---|---|---|---|---|---|---|---|
 | 1 | `3ca1cf5` | 0 / 2 / 3 | 2 major + 1 minor in; 2 minor out | 5 NEW / 0 | 0 | product code (scan.py, pack.py) + tests | banner ok; `^ERROR` 0; `ERROR codex_core` 2, both echoes of the brief text in the reviewer's file reads; footer; verdict anchored; 24 `^ succeeded in`; 13 `docs/proofs`/ledger hits, all echoes (the brief and prompt quote the words; no command opened them) | | NEW_CRITICAL_MAJOR_FOUND |
 | 2 | `8120b28` | 0 / 3 / 2 | 3 major in (hardening of the same two controls); 2 minor out | 3 NEW (CR2-01..03 deepen the round-1 controls: REOPENED in spirit, new in detail) / 0 strictly | 0 | product code (scan.py, pack.py) + tests | banner ok; `^ERROR` 0; `ERROR codex_core` 1, an echo of the brief text; footer; verdict anchored; 26 `^ succeeded in`; proofs/ledger hits are echoes | | NEW_CRITICAL_MAJOR_FOUND |
+| 3 | `3a38965` | 0 / 3 / 4 | R3-01, R3-02 major + R3-03..05 minor in; R3-06, R3-07 major OUT (ruling) | 7 NEW / 0 | 0 | product code (pack.py) + test; report wording | banner ok; `^ERROR` 0; no `ERROR codex_core` line (one echo of the prompt text); footer; verdict anchored; 30 `^ succeeded in`; proofs hits are the prompt/brief echoes and a `git status` name listing (no file under docs/proofs opened) | | NEW_CRITICAL_MAJOR_FOUND |
 
 Round 1 adjudication (fixed in `81187ee`, `018f3a8`, `2883592`):
 - F1 major (scan cache had no identity; `finish` could certify a stale or incomplete scan; `--rescan` kept a partial): ACCEPTED. A cache and a partial carry `rules` and
@@ -136,3 +137,18 @@ Round 2 adjudication (fixed in `82343ad` and the commit after it):
 - CR2-04 minor OUT-OF-ENVELOPE (a scan grid point in the last second is omitted): the 1 s end margin is `SCAN_END_MARGIN_S`, stated in the report; none of the eight
   chapters has such a point. Banked.
 - CR2-05 minor OUT-OF-ENVELOPE (page prints a pts without the time-base numerator): fixed anyway (`tick_text`), the text for 1/30000 is unchanged.
+
+Round 3 adjudication (fixed in `37ff131` and the report text; evidence `r3/`):
+- R3-01 major in envelope (report: "a dim open-water frame", "noisy deep footage": a candidate described as fact and a look judgement): ACCEPTED, text fixed
+  (report generator, and the DEEP_READBACK_MAX_OWN docstring in pack.py).
+- R3-02 major in envelope (the clip's `rendered.normalisation` was recomputed on the full-resolution white-balanced frame, not the smoothed proxy bounds the
+  render applied; c3 spread 0.2124-0.4088 applied against 0.2063-0.4783 reported): ACCEPTED, fixed: `statistics_record(..., applied_normalisation=)`, the
+  deep render passes the smoothed pair; shallow pack unchanged (default None); tests. Cost: the clip was rendered a fifth time (`deep-clip-run5.log`).
+- R3-03 minor (elapsed figures beside "timing: none recorded"): the elapsed sentence is removed. R3-04 minor (file-name pattern): fixed. R3-05 minor ("nearest
+  frame"): reworded to the first frame at or after the grid point.
+- R3-06 major REASONED, OUT OF ENVELOPE by the orchestrator's ruling (source identity is the byte count): banked, disclosed in report section 7.
+- R3-07 major REASONED, OUT OF ENVELOPE (the 6 s duration is not re-checked at encode; only a programmatic non-default render could be linked): banked, disclosed.
+
+Round 3 state: both in-envelope majors fixed; the clip re-render (fifth) is running (GPU). NEXT: when `deep-clip-run5.log` ends with `elapsed N s`, check `clip/statistics.json`
+checks (four ok), rebuild the page (`deep --part stills`, 13 min), full gate (ruff, format, mypy, foreground pytest), regenerate the report (`report_gen.py`, reads
+`cell-scripts/gate-record.md` and `round-record.md`), commit, round 4 (`wp13d_build_prompt.py 4`, diff, `wp13d_run_review.sh 4`).
