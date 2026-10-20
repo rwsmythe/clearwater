@@ -197,7 +197,9 @@ def read_movie_boxes(path: Path) -> MovieBoxes:
         path: The file (opened read only).
 
     Returns:
-        The movie boxes; empty (all None) when the file has no ``moov`` box.
+        The movie boxes; empty (all None) when the file has no ``moov`` box. The walk ends at
+        ``moov``: boxes after it are not examined, and a later box that overruns the file (a
+        cut ``mdat`` is the usual cause) is not an error.
 
     Raises:
         BoxError: If a top-level box or a box inside ``moov`` is malformed.

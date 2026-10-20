@@ -783,3 +783,14 @@ def test_messages_are_ascii_even_for_non_ascii_names(
     _with_gpmf(monkeypatch, _atom(("PRTN", "c", b"Y"), ("PTCL", "c", b"\xe9LOG")))
     (gp,) = probe(sample("vid-hevc8-bt709-full")).faults
     assert gp.kind == "gp_log" and gp.message.isascii()
+
+
+def test_a_repeated_pts_must_be_delivered_as_often_as_it_occurs(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    packets = [(0, 1001, "K__"), (1001, 1001, "___"), (1001, 1001, "___")]
+    base = Fraction(1, 30000)
+    monkeypatch.setattr(probe_module, "_run_ffprobe", _frames_answer([0, 1001]))
+    assert probe_module._tail_unreadable(Path("clip.mp4"), packets, base) is True
+    monkeypatch.setattr(probe_module, "_run_ffprobe", _frames_answer([0, 1001, 1001]))
+    assert probe_module._tail_unreadable(Path("clip.mp4"), packets, base) is False

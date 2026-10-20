@@ -21,6 +21,7 @@ import math
 import re
 import shutil
 import subprocess
+from collections import Counter
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from fractions import Fraction
@@ -354,14 +355,14 @@ def _tail_unreadable(
 
     The decode starts at the last keyframe, so its cost does not grow with the clip. The tail is
     unreadable when ffprobe writes any error line, exits nonzero, or does not deliver a frame for
-    every packet from the last keyframe on (by pts, so B-frame order does not matter). A stream
-    whose packets carry no keyframe flag is not checked.
+    every packet from the last keyframe on (by pts, counting repeats, so B-frame order does not
+    matter). A stream whose packets carry no keyframe flag is not checked.
     """
     keyframes = [pts for pts, _, flags in packets if pts is not None and "K" in flags]
     if not keyframes:
         return False
     first = max(keyframes)
-    required = {pts for pts, _, _ in packets if pts is not None and pts >= first}
+    required = Counter(pts for pts, _, _ in packets if pts is not None and pts >= first)
     start = _seek_string(first * time_base)
     status, out, err = _run_ffprobe(
         [
@@ -382,8 +383,13 @@ def _tail_unreadable(
         frames = json.loads(out).get("frames") or []
     except ValueError:
         return True
-    delivered = {_int(item.get("pts")) for item in frames if isinstance(item, Mapping)}
-    return status != 0 or bool(err.strip()) or not required <= delivered
+    delivered = Counter(
+        p
+        for item in frames
+        if isinstance(item, Mapping)
+        if (p := _int(item.get("pts"))) is not None
+    )
+    return status != 0 or bool(err.strip()) or bool(required - delivered)
 
 
 def _edit_list(boxes: MovieBoxes) -> tuple[EditEntry, ...]:

@@ -20,7 +20,7 @@ _TEXT_TYPE = ord("c")
 _NESTED_TYPE = 0
 _HEADER = 8
 MAX_DEPTH = 8
-"""The deepest container nesting that is entered."""
+"""The most containers that may be nested; the atom itself is level 0."""
 
 
 class GPMFError(ValueError):
@@ -80,7 +80,7 @@ def parse_settings(payload: bytes) -> GoProInfo:
         GPMFError: If the payload is not well-formed KLV (sizes, padding or nesting).
     """
     found: dict[bytes, str] = {}
-    _walk(payload, 0, len(payload), 1, found)
+    _walk(payload, 0, len(payload), 0, found)
     protune = found.get(_PROTUNE)
     return GoProInfo(
         firmware=found.get(_FIRMWARE) or None,

@@ -370,16 +370,16 @@ def test_malformed_klv_is_refused_with_a_structural_reason(payload: bytes, reaso
         gopro.parse_settings(payload)
 
 
-def test_nesting_deeper_than_the_cap_is_refused() -> None:
-    payload = klv("FMWR", "c", b"H1")
-    for _ in range(gopro.MAX_DEPTH):
-        payload = nested("DEVC", payload)
+def test_nesting_is_allowed_to_exactly_the_cap_and_refused_beyond_it() -> None:
+    def wrapped(levels: int) -> bytes:
+        payload = klv("FMWR", "c", b"H1")
+        for _ in range(levels):
+            payload = nested("DEVC", payload)
+        return payload
+
+    assert gopro.parse_settings(wrapped(gopro.MAX_DEPTH)).firmware == "H1"
     with pytest.raises(gopro.GPMFError, match="nested too deeply"):
-        gopro.parse_settings(payload)
-    inside = klv("FMWR", "c", b"H1")
-    for _ in range(gopro.MAX_DEPTH - 1):
-        inside = nested("DEVC", inside)
-    assert gopro.parse_settings(inside).firmware == "H1"
+        gopro.parse_settings(wrapped(gopro.MAX_DEPTH + 1))
 
 
 def test_the_error_message_carries_no_payload_bytes() -> None:
