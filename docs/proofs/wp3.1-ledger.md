@@ -125,4 +125,4 @@ The probe result is cached per process; free memory is read on every call.
 
 | Round | Depth (dispatcher) | Crit | Major | Minor | In/out envelope | NEW/REOPENED | Reverts | Fix kind | Transport / CLI | Verdict |
 |---|---|---|---|---|---|---|---|---|---|---|
-| 0 (table) | 0 at dispatch | - | - | - | - | - | - | - | - | yield for ruling |
+| 0 (table) | 108,729 (24 turns) at the round-0 yield | - | - | - | - | - | - | - | - | yield for ruling |
