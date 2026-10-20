@@ -27,7 +27,11 @@ Timing (:func:`timed_run`): the bracket opens just before the FFmpeg process is 
 s/frame is the bracket divided by the frame count. Each frame's interval runs from the end
 of the previous frame's handling to its own arrival, so the SHA-256 witness taken on every
 :data:`WITNESS_EVERY`-th frame and the last (compared with row ``a``'s reference) is left
-out of the bracket: the bracket is the sum of the intervals.
+out of the bracket: the bracket is the sum of the intervals. The producer is not stopped
+during a hash: FFmpeg keeps writing into a pipe or socket buffer (more than a whole frame for
+the 32 MiB pipe) and PyAV's decoder threads keep decoding, so work done during a hash is out
+of the bracket. The bracket is therefore a lower bound and the wall time including the
+hashes (``wall_s_with_witness``) an upper bound on the decode-to-NumPy time without hashing.
 
 Identity (:func:`identity_run`, untimed): every frame's SHA-256 and the delivered pts are
 compared with the reference (row ``a``'s hashes and ffprobe's per-frame pts); a row whose
@@ -193,11 +197,22 @@ def _rows() -> dict[str, Row]:
         Row("a-direct", "pipe", output_options=direct),
         Row("a-blocksize", "pipe", output_options=block),
         Row("a-direct-blocksize", "pipe", output_options=direct + block),
+        Row("a-direct+pts", "pipe", pts=True, output_options=direct),
+        Row("a-blocksize+pts", "pipe", pts=True, output_options=block),
+        Row("a-direct-blocksize+pts", "pipe", pts=True, output_options=direct + block),
         Row("a-ad10", "pipe", vf_flags=AD10_FLAGS),
         Row("b-1m", "pipe", pipe_buffer=EXPLORE_PIPE_BYTES),
+        Row("b-1m+pts", "pipe", pts=True, pipe_buffer=EXPLORE_PIPE_BYTES),
         Row("b", "pipe", pipe_buffer=BIG_PIPE_BYTES),
         Row(
             "b-direct-blocksize", "pipe", pipe_buffer=BIG_PIPE_BYTES, output_options=direct + block
+        ),
+        Row(
+            "b-direct-blocksize+pts",
+            "pipe",
+            pts=True,
+            pipe_buffer=BIG_PIPE_BYTES,
+            output_options=direct + block,
         ),
         Row("b+pts", "pipe", pts=True, pipe_buffer=BIG_PIPE_BYTES),
         Row("b-fallback+pts", "pipe", pts=True, pipe_buffer=BIG_PIPE_BYTES, force_fallback=True),
@@ -214,7 +229,9 @@ def _rows() -> dict[str, Row]:
 
 
 ROWS = _rows()
-"""Every row by name."""
+"""Every row by name. The ``+pts`` forms of the exploration rows (``a-direct``,
+``a-blocksize``, ``a-direct-blocksize``, ``b-1m``, ``b-direct-blocksize``) are identity
+rows only: they check the pts side channel under each knob, untimed."""
 
 NULL_ROW = "n"
 """The calibration row: decode and convert to FFmpeg's ``null`` muxer (:func:`null_run`)."""
@@ -1014,7 +1031,8 @@ def summarise(windows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     """Collect every timed run per row: median and spread of s/frame, the run of record.
 
     The run of record is the run with the median s/frame (the lower middle of an even
-    count). Each row carries the windows its runs came from and their verdicts.
+    count). Each row carries the windows its runs came from and their verdicts, and the
+    wall time including the witness hashes per frame (the upper bound, :func:`timed_run`).
 
     Args:
         windows: Window records.
@@ -1031,10 +1049,16 @@ def summarise(windows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
         ordered = sorted(entries, key=lambda entry: float(entry[1]["s_per_frame"]))
         window, record = ordered[(len(ordered) - 1) // 2]
         values = [float(run["s_per_frame"]) for _, run in entries]
+        walls = [
+            float(run["wall_s_with_witness"]) / int(run["frames"])
+            for _, run in entries
+            if "wall_s_with_witness" in run  # the null row has no frames, so no witness
+        ]
         rows[name] = {
             "runs": len(entries),
             "s_per_frame": summary(values),
             "values": values,
+            "wall_with_witness_s_per_frame": summary(walls) if walls else None,
             "run_of_record": {
                 "window": window["window"],
                 "attempt": record["attempt"],
@@ -1080,6 +1104,26 @@ def _write(path: Path, record: Mapping[str, Any]) -> None:
     print(path)
 
 
+def window_label(text: str) -> str:
+    """Accept a window label only if it names a file inside the records folder.
+
+    Args:
+        text: The label from the command line.
+
+    Returns:
+        The label.
+
+    Raises:
+        argparse.ArgumentTypeError: The label has anything but letters, digits, ``-`` and
+            ``_`` (so no path separator and no ``..``), or starts with neither.
+    """
+    if not text or not text[0].isalnum() or not all(c.isalnum() or c in "-_" for c in text):
+        raise argparse.ArgumentTypeError(f"label {text!r}: letters, digits, '-' and '_' only")
+    if not text.isascii():
+        raise argparse.ArgumentTypeError(f"label {text!r}: ASCII only")
+    return text
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Run the instrument.
 
@@ -1100,7 +1144,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     identity = commands.add_parser("identity", help="untimed identity runs")
     identity.add_argument("rows", nargs="+", choices=sorted(ROWS))
     window = commands.add_parser("window", help="one timed window")
-    window.add_argument("label")
+    window.add_argument("label", type=window_label)
     window.add_argument("plan", choices=sorted(PLANS))
     window.add_argument("--gate", type=Path, default=None, help="the idle-gate script")
     single = commands.add_parser("run", help="one timed run (development check)")
@@ -1130,9 +1174,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 0
     if args.command == "window":
         gate = None if args.gate is None else args.gate.resolve()
-        result = run_window(
-            args.label, PLANS[args.plan], source, reference, work / f"{args.label}.json", gate
-        )
+        out = work / f"{args.label}.json"
+        if out.resolve().parent != work.resolve():
+            raise SpikeError(f"{out} is not inside {work}")
+        result = run_window(args.label, PLANS[args.plan], source, reference, out, gate)
         print(json.dumps(result["verdict"]))
         return 0
     run = timed_run(ROWS[args.row], source, reference, frames=args.frames)
