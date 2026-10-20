@@ -48,18 +48,24 @@ for a push (verify `git status -sb`).
   **CHARC QA CONFIRMED** at this seat (patch-id 6712360de3e5 on both ranges; B md5s both passes;
   five assertions; 87 fixtures `-text`; ruff/format/mypy clean; harness 366; full pytest 1138
   passed, 526 s). Worktrees `.worktrees/wp2.3`, `wp2.3-mc` released for removal (msg 3f6e1943).
-- **Wave 1 LIVE** (dispatched ~18:05Z from main 9735282; four cells in parallel, each in its own
-  worktree, all OCCUPIED): WP3.1 array backend `wp31-cell` opus-high `.worktrees/wp3.1`; WP3.7
-  probe `wp37-cell`, WP3.13 naming/safe writing `wp313-cell`, WP3.15 presets/settings/logging
-  `wp315-cell`, sonnet-high, `.worktrees/wp3.{7,13,15}`. Round-0 design tables returned and the
-  orchestrator's rulings UPHELD by CHARC with three additions (msg 232646a5: IF-2 percentile is
-  typed Array = float32, so compute native and cast once at return, WP3.3 brief cites AD-11 +
-  DR-14; SafeWrite does not create a missing output folder, WP3.14/GUI validate the setting;
-  AD-13 provenance keys stripped on preset import are NAMED in the result). Consumer notes the
-  orchestrator carries: WP3.10 gives FFmpeg `-y` on the SafeWrite temporary path; WP3.14 reads
-  `OutputPlan.path`; WP3.12/3.16 use `clearwater.config.paths.app_locations`. Full-pytest gate
-  windows serialised; WP3.1 speed row only in an exclusive window. **On each accept:** CHARC QA
-  as for WP2.3.
+- **Wave 1: three of four ACCEPTED** 2026-10-20 as one stack on main 4f122ec: WP3.15 presets/
+  settings/logging (`clearwater.config`, da54a47, DR-34, DR-32 CLOSED at the config boundary),
+  WP3.13 naming/safe writing (`clearwater.jobs`, 6dd5a00, DR-35; tokened temporaries after an R1
+  critical), WP3.7 video probe (`clearwater.io.video`, 6e3417a, DR-36; all 35 owner clips probe
+  with 0 faults). Records `docs/proofs/wp3.{15,13,7}-accept.md`. **CHARC QA CONFIRMED** at this
+  seat (patch-ids on every named range; B md5s and assertions in four folders; the wp3.15 B2
+  "Reconnecting" ERROR line adjudicated a recovered retry, upheld; ruff/format/mypy; harness
+  366; full pytest 1671 passed, 676 s). Six worktrees released for removal (msg wave1-qa).
+  CHARC rulings this wave: round-0 tables upheld with three additions (msg 232646a5); IF-5
+  `duration_s` = container duration, exact, docstring tightened 4174484; WP3.13 per-write token
+  in the temporary name upheld.
+- **WP3.1 array backend `wp31-cell`** (opus-high, `.worktrees/wp3.1`, OCCUPIED) in its exclusive
+  speed row, the last step; its accept passes to orchestrator gen 6 (gen 5 rolls at the cap after
+  WP3.1's final report). On the accept: CHARC QA as above. Consumer notes for wave 2+ briefs are
+  in `docs/orchestrator-state.md` item 3 (WP3.3 percentile float32 + DR-14; WP3.9 bounded
+  `-read_intervals` + DR-36; WP3.10 FFmpeg `-y` on the temporary path, mvhd on edit lists;
+  WP3.12/3.16 config API; WP3.14 one `Reservations` + folder validation; WP4.3 clean-up before
+  jobs). Reviewer B prompt practice note: git is unavailable inside a worktree under WSL.
 - **Then:** waves 2-4 per the Phase 3 frame (orchestrator drafts, CHARC approves each; WP3.21
   optimisation package drafted at wave 4, target 10 min/min, re-measure at WP5.2). CP5 shows the
   owner the starter preset values. Close DR items in the register as packages close them.
