@@ -153,7 +153,17 @@ path, md5, five assertions and verdict, or there is no accept.
   WP1.3 sheet deep rows closed): owner "c3 throughout showed the best performance ... No halo or
   clipping ... No grain ... No flicker ... The cast is fairly well greyed"; c3 default CONFIRMED on
   deep; FINDING: 2 s smoothing does not hide a rock-to-open-water lighting step (clip ~1 s), routed
-  to WP1.4b (msg de4dc755) and the Phase 2 temporal design; 2 s default stays PROVISIONAL. WP1.4b dispatched (opus-high; flip guards + gpmd claim 2a). Next: WP1.3-deep / WP1.4b brief on SCUBA/ (c3 primary, Params() flips to c3), then
+  to WP1.4b (msg de4dc755) and the Phase 2 temporal design; 2 s default stays PROVISIONAL.
+  WP1.4b: claim 10b = that finding with an edge-effect check first (the clip is a 6 s excerpt;
+  the centred 2 s window is one-sided in its first second); Params() flip landed alone b23bad9,
+  62 test sites pinned + guards fddc4e3. **WP1.4b STOP 06:44Z**: Donoho reads 0 on all 8 deep
+  frames (8-bit HEVC flattens the flat tiles; 63-99 % zero HH1). Orchestrator ruling upheld by
+  CHARC: Immerkaer primary on the same tiles, Donoho cross-check, red-baseline tile set (source
+  red >= 16/255), absolute sigma_R, quantised-regime test, report says "below the quantisation
+  floor" where both read ~0. Early one-frame signal: a tighter cap LOWERS red noise, against
+  D100's expectation; if the grid confirms, it is spec-bearing -> owner at WP1.6 result 4. Camera
+  WB red gain 4.85 on GX011600@665 s: report total red gain (camera x ours). Re-seated by
+  evaluation at 235K (wp14b-cell2, 06:45Z) with the grid, claims 7-10b and review ahead. WP1.4b dispatched (opus-high; flip guards + gpmd claim 2a). Next: WP1.3-deep / WP1.4b brief on SCUBA/ (c3 primary, Params() flips to c3), then
   WP1.6 gate report (Gate 1: core 3.6x, production export 4.4x over N6). **Footage-layout skips:** the owner's Snorkel/SCUBA/edits layout makes 3
   footage tests skip (root `GX011628.MP4` paths in `tests/test_container_spike.py:902`,
   `tests/test_lookcheck.py:1289`, WP1.4 test 7; also `tools/lookcheck/pack.py:94` and the WP1.4
