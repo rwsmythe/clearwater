@@ -146,3 +146,41 @@ No other IF-2 method or helper reads back to the host (Gate 1 tests).
 |---|---|---|---|---|---|---|---|---|---|---|
 | 0 (table) | 108,729 (24 turns) at the round-0 yield | - | - | - | - | - | - | - | - | yield for ruling |
 | pre-review (build, CHARC additions) | 228,618 (74 turns) at the window-request yield; 237,795 (81 turns) at the queue yield | - | - | - | - | - | - | - | - | full-pytest window queued; round 1 to adjudicated verdict, then depth decision |
+| 1 | (dispatcher fills) | 0 | 3 | 4 | 7 in / 0 out | 7 NEW / 0 REOPENED | 0 | pending: product F1 F2 F3 F5, tool F4 F7, test-only F6 | WSL, codex-cli 0.162.1, gpt-5.6-sol high | NEW_CRITICAL_MAJOR_FOUND (adjudicated, not remediated) |
+
+## Gate windows
+
+- Full pytest at `f8bd077` (window granted by the dispatcher, held alone): normal run 1294 passed,
+  0 skipped, exit 0, 9:03; with `cupy`/`cupyx` unimportable 1191 passed, 103 skipped, exit 0, 6:15
+  (all 103 skips are CuPy/GPU: 69 WP3.1, 34 prototype/lookcheck/noise). No non-WP3.1 test assumes
+  CuPy. Logs: worktree `work/full1.log`, `work/full2.log`.
+
+## Round 1 (Reviewer A) -- summary
+
+Evidence `C:\Users\rwsmy\clearwater-review-evidence\wp3.1\r1\` (prompt, diff, transcript, probe,
+`adjudication.md`, `r1_repro.py`, `md5sums.txt`; transcript md5 `7501908fb9a3b4f112fbd68da5dc757e`,
+verdict file `ac341934a3d719383b3509b652f6007f`). Diff `9735282..f8bd077` minus `uv.lock` and
+`docs/proofs` (12 files, no ledger line). Assertions all pass; 2 ERROR lines of subprocess
+provenance (sandbox mktemp rejection; WSL interop on python.exe). Every finding REASONED by the
+reviewer (read-only FS, no uv in WSL); the cell reproduced F1, F2, F5 and confirmed the rest in code.
+
+| # | Sev | Where | Finding | Planned fix |
+|---|---|---|---|---|
+| F1 | MAJOR | `core/ops.py` `collapse_pyramid` | only the coarsest level is checked; a (3,3,1) band broadcasts, a float64 band promotes the result (repro) | check each band: backend, float32, shape equal to the expanded level; test |
+| F2 | MAJOR | `core/backend.py` `select_backend` | `free_device_bytes()` raising after a cached probe escapes (repro) | catch, return `CPU: CUDA device unusable`; test |
+| F3 | MINOR | `core/backend.py` `_probe_gpu` | `getDevice()` failure in `CupyBackend()` reported as `CuPy failed to load` | import cupyx separately; device acquisition -> `CPU: CUDA device unusable`; test |
+| F4 | MAJOR | `tools/core_speed.py` op mix + report | omits compensation means, `_mean_added` (2), white-balance means, Ancuti cap mean, the saturation luma | complete the op mix per method (pipeline.py 439/461/473/523/526/566/1112/1138) |
+| F5 | MINOR | `core/backend.py` `to_host` | accepts float64 (repro) | full `check()`; test |
+| F6 | MINOR | `tests/test_core_deps.py` | static rule misses bare `import_module`, `__import__`, `getattr(x, "xp")` | widen rule and planted control |
+| F7 | MINOR | `tools/core_speed.py` `gpu_snapshot` | ignores returncode; IndexError on empty stdout | return `{}` on failure |
+
+## Successor handoff (if re-seated)
+
+State at round 1's yield: code at `f8bd077` plus this ledger commit; no remediation started.
+Remediate F1-F7 above, one commit per logical change, re-run the inner loop
+(`tests/test_core_*.py`, ruff, format, mypy), request a full-pytest window (the two runs above),
+then run round 2 with `C:\Users\rwsmy\clearwater-review-evidence\wp3.1\r1\run_review.sh` and
+`review-prompt.md` copied to `r2` (round number updated; base `9735282`). After the loop: the
+exclusive speed row (`uv run python tools/core_speed.py GX011627`: GPU 681 frames, CPU 10
+frames; granted window only, merge-candidate code), its figures into the report, then the final
+return report (under about 70 lines).
