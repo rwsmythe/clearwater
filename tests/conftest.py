@@ -62,7 +62,9 @@ import pytest
 
 from local_config import LocalConfigError, footage_available, load_local_config
 
-pytest_plugins = ["fixture_plugin"] * Path(__file__).with_name("fixture_plugin.py").is_file()
+pytest_plugins = (
+    ["fixture_plugin"] if Path(__file__).with_name("fixture_plugin.py").is_file() else []
+)
 
 _PYTEST_OF = "pytest-of-"
 

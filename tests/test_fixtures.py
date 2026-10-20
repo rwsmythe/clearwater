@@ -57,11 +57,6 @@ def _guard(root: Path) -> WriteGuard:
     return WriteGuard(root=root.resolve())
 
 
-def _norm_newlines(data: bytes) -> bytes:
-    """Undo git's CRLF conversion on a text file."""
-    return data.replace(b"\r\n", b"\n")
-
-
 # --- The manifest -------------------------------------------------------------------------
 
 
@@ -78,7 +73,7 @@ def test_committed_manifest_is_valid() -> None:
 
 
 def test_manifest_file_is_ascii_json_with_sorted_ids() -> None:
-    raw = _norm_newlines((FIXTURES_DIR / "manifest.json").read_bytes())
+    raw = (FIXTURES_DIR / "manifest.json").read_bytes()
     raw.decode("ascii")
     ids = [item["id"] for item in MANIFEST["samples"]]
     assert ids == sorted(ids)
@@ -892,10 +887,9 @@ def test_regenerated_manifest_is_byte_identical(
 ) -> None:
     _, out, generated = regenerated_full
     fresh = (out / "manifest.json").read_bytes()
-    assert b"\r" not in fresh  # the generator writes LF only; nothing is normalised on this side
-    # The committed side is normalised once: git's CRLF conversion (core.autocrlf) may have turned
-    # the working-tree copy's LF into CRLF, while the committed blob is the LF bytes.
-    assert fresh == _norm_newlines((FIXTURES_DIR / "manifest.json").read_bytes())
+    # Raw bytes on both sides: `.gitattributes` marks tests/fixtures/** as `-text`, so git never
+    # converts line endings in the committed fixtures, whatever core.autocrlf says.
+    assert fresh == (FIXTURES_DIR / "manifest.json").read_bytes()
     assert [p.name for p in out.iterdir() if p.is_file()] == ["manifest.json"]
     assert not (out / video.SCRATCH).exists()  # intermediates are gone
     assert not (generated / "video").exists()
