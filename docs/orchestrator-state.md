@@ -5,16 +5,13 @@
 
 ### Generation
 
-- **Generation 4** (`clearwater-orchestrator-20261020-0524`) ROLLED OVER 2026-10-20 ~18:05Z at a
-  clean boundary (~300K: below the cap, but four parallel wave-1 cells would have died with it
-  mid-round): WP2.3 merged, NO live cell. **Generation 5 starts here** (verify:
-  `comms/.launch-sessions.json`). Earlier: gen 3 `clearwater-orchestrator-20261019-2346`, gen 2
-  `clearwater-orchestrator-20261018-1442`, gen 1 `clearwater-orchestrator-20261014-1258`.
-- **Inbox:** gen 4 drained through CHARC `66315b22c1eeb03e`-era hold confirmations and STOPPED
-  DRAINING at its rollover announcement. You are the sole drainer (verify:
-  `uv run python scripts/role_mail.py list --role orchestrator`). CHARC's WP2.3 QA may be waiting.
-- **CHARC is generation 2:** `clearwater-charc-20261020-0636` (rolled 16:36Z). Cue that exact name.
-- Bash-launch gauge at gen-4 bring-up: 34 ms. Re-measure at yours.
+- **Generation 5** (`clearwater-orchestrator-20261020-0802`) LIVE since 2026-10-20 ~18:03Z
+  (verify: `comms/.launch-sessions.json`). Earlier: gen 4 `clearwater-orchestrator-20261020-0524`,
+  gen 3 `clearwater-orchestrator-20261019-2346`, gen 2 `clearwater-orchestrator-20261018-1442`,
+  gen 1 `clearwater-orchestrator-20261014-1258`.
+- **Inbox:** gen 5 is the sole drainer (empty at bring-up, 84 read). CHARC's WP2.3 QA not yet in.
+- **CHARC is generation 2:** `clearwater-charc-20261020-0636`. Cue that exact name.
+- Bash-launch gauge at gen-5 bring-up: 26 ms.
 
 ### Standing operator rulings
 
@@ -38,12 +35,23 @@
 
 ### Live cells
 
-- **None.** Retired (never message): `wp23-cell2` (returned; 196,003 / 117 at its last yield),
-  `wp23-cell` (stood down past cap), `wave1-drafter`, `wp22-cell`, `wp21s-cell`, `wp21s-cell2`,
-  `wp21s-cell3`, the gen-2 cells.
-- Worktrees present (verify `git worktree list`): `.worktrees/wp2.3` and `.worktrees/wp2.3-mc`.
-  Remove both with `git worktree remove --force` after CHARC's WP2.3 QA confirms. Keep the
-  branches.
+Wave 1 dispatched 2026-10-20 ~18:04Z, all from main `9735282`, depth 0 at dispatch (fyi posted
+to CHARC and operator, thread wave1). Each prompt: round-0 yield with the design table before
+product code (WP3.15 also commits `config/paths.py`, X2); yield at every Reviewer A verdict
+BEFORE remediating; full-pytest windows serialised by the orchestrator (X5); WP3.1's speed row
+only in an exclusive window the orchestrator grants. Delivery by SendMessage to `team-lead`.
+
+| Cell | Package | Model | Worktree / branch | Round | Depth (moment) |
+|---|---|---|---|---|---|
+| `wp315-cell` | WP3.15 | sonnet-high | `.worktrees/wp3.15` | 0 | 0 (dispatch) |
+| `wp313-cell` | WP3.13 | sonnet-high | `.worktrees/wp3.13` | 0 | 0 (dispatch) |
+| `wp37-cell` | WP3.7 | sonnet-high | `.worktrees/wp3.7` | 0 | 0 (dispatch) |
+| `wp31-cell` | WP3.1 | opus-high | `.worktrees/wp3.1` | 0 | 0 (dispatch) |
+
+A rolled generation's cells die with it: re-dispatch from each branch and ledger.
+Retired (never message): `wp23-cell2`, `wp23-cell`, `wave1-drafter`, `wp22-cell`, `wp21s-cell*`,
+the gen-2 cells. Worktrees `.worktrees/wp2.3` and `wp2.3-mc` stay until CHARC's WP2.3 QA
+confirms (then `git worktree remove --force`; keep the branches).
 
 ### Where things stand -- the successor starts HERE
 
@@ -51,7 +59,8 @@
    the gates-on-main row at `e357e56`; DR-33). Return report posted to CHARC (return_report,
    thread wp2.3, 18:00Z); hold on main RELEASED. Main full pytest 1138 passed. CHARC QA PENDING:
    drain it first. If CHARC overturns the DR-33 adjudication, DR-33 lists the fixes.
-2. **WAVE 1 IS YOURS TO DISPATCH NOW** (CHARC approval `871a371855bb1630`; owner word above).
+2. **WAVE 1 DISPATCHED by gen 5 (see Live cells).** Original instructions kept for reference:
+   **WAVE 1 WAS TO BE DISPATCHED** (CHARC approval `871a371855bb1630`; owner word above).
    All four briefs are FINAL at `e357e56` (v0.5.4, architecture 1.0, manifest ids filled, the
    WP3.1 Gate 1 section). Dispatch all four in parallel from the current main:
    - **WP3.15** `implementer-sonnet-high`, `.worktrees/wp3.15`: first in any queue (its
