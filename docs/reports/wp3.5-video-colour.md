@@ -32,8 +32,12 @@ D39, D54, D55, D76, D114; AD-10, AD-11, AD-19. FFmpeg 9.0.2 (gyan build). Tests
    (the `samples.py` round trip and the decoded RGB before the encoder), which are exact. They
    are not attainable for the pair itself: with a 4:4:4 intermediate (no chroma resampling)
    GX011627 gives max 2 and mean 0.615/255, so quantisation alone sets the floor. The pair's
-   regression bounds are CHARC's: GX011627, first 30 frames: mean <= 1.0/255 and p99.9 <= 4/255;
-   the `testsrc2` samples: mean <= 3/255, max reported and not asserted. The ruling supersedes
+   regression bounds are GX011627, first 30 frames: mean <= 1.0/255 and share of samples over
+   2/255 <= 1 %; the `testsrc2` samples: mean <= 2.5/255, max reported and not asserted. These
+   are tighter than the ruling's example figures (synthetic mean 3, footage p99.9 4): a synthetic
+   mean of 3 lets the dropped `accurate_rnd` through (2.79-2.84), and on the footage row p99.9 4
+   catches the siting and `accurate_rnd` defects by only 1.25x (p99.9 5 against 4) where the share
+   bound catches them by 1.7x - 7.4x. The ruling supersedes
    the brief's task 4 wording on the bound (recorded in the ledger).
 
 ## Public API
@@ -53,12 +57,12 @@ disagree; measured: flat colours on a yuvj420p stream decode identically with `i
 
 | Row | Frames | Max | Mean | p99.9 | >2 | Bound asserted |
 |---|---|---|---|---|---|---|
-| GX011627 (4K, yuvj420p, BT.709 full) | 30 | 17 | 0.687 | 3.0 | 0.72 % | mean <= 1.0, p99.9 <= 4 |
-| vid-hevc8-bt709-full | 45 | 83 | 2.023 | - | 19.96 % | mean <= 3 |
-| vid-hevc10 | 45 | 76.3 | 1.455 | - | 13.53 % | mean <= 3 |
-| vid-untagged | 45 | 98 | 1.941 | - | 15.03 % | mean <= 3 |
-| generated BT.601 | 45 | 97 | 1.817 | - | 14.94 % | mean <= 3 |
-| D76: vid-hevc8-bt709-full, 10-bit out | 45 | 65.2 | 1.587 | - | 16.60 % | mean <= 3 |
+| GX011627 (4K, yuvj420p, BT.709 full) | 30 | 17 | 0.687 | 3.0 | 0.72 % | mean <= 1.0, share >2 <= 1 % |
+| vid-hevc8-bt709-full | 45 | 83 | 2.023 | - | 19.96 % | mean <= 2.5 |
+| vid-hevc10 | 45 | 76.3 | 1.455 | - | 13.53 % | mean <= 2.5 |
+| vid-untagged | 45 | 98 | 1.941 | - | 15.03 % | mean <= 2.5 |
+| generated BT.601 | 45 | 97 | 1.817 | - | 14.94 % | mean <= 2.5 |
+| D76: vid-hevc8-bt709-full, 10-bit out | 45 | 65.2 | 1.587 | - | 16.60 % | mean <= 2.5 |
 
 The synthetic samples are `testsrc2` (saturated bars and text), whose chroma edges set the max.
 The p99.9 figure is the upper edge of a 1/16 bin. The regression rows (rotated, vfr, truncated,
@@ -66,35 +70,34 @@ The p99.9 figure is the upper edge of a 1/16 bin. The regression rows (rotated, 
 
 ## Planted defects through the round trip (bound and measured figure per defect)
 
-**What catches what, plainly.** On the `testsrc2` samples only the range and matrix defects are
-caught by the bound. `accurate_rnd` dropped (2.79-2.84, under 3) and siting (2.3-2.45) are not.
-Those two rely on (a) the real-footage row below, which is `footage`-marked and so SKIPPED when
-the footage folder is absent, (b) the flat-colour decode truth (`accurate_rnd`, 2.0 against 1.0),
-and (c) the argument-level tests (siting, and `out_range`, which has no pixel effect for an RGB
-destination because swscale ignores it). The margins on the footage row are thin for those two:
-p99.9 5 to 6 against the bound of 4 (1.25x - 1.5x).
+A defect must exceed the bound on at least one of the mean or the share over 2/255; the margin
+is the ratio of its figure to the bound. Real footage row (GX011627, 30 frames; bounds mean 1.0,
+share over 2/255 1 %):
 
-Real footage row (GX011627, 30 frames; bounds mean 1.0, p99.9 4):
+| Defect | Mean | Share >2 | Margin |
+|---|---|---|---|
+| product (no defect) | 0.687 | 0.72 % | within both |
+| encode range written the wrong way | 5.32 | 72.98 % | mean 5.3x, share 73x |
+| encode matrix BT.601 for BT.709 | 2.98 | 57.09 % | mean 3.0x, share 57x |
+| `accurate_rnd` dropped in both halves | 1.14 | 7.35 % | mean 1.14x, share 7.4x |
+| `accurate_rnd` dropped in the first decode only | 0.80 | 4.07 % | share 4.1x |
+| siting `center` in the encode | 0.71 | 1.67 % | share 1.7x |
+| siting `topleft` in the encode | 0.74 | 2.11 % | share 2.1x |
 
-| Defect | Mean | p99.9 | Share >2 | Exceeds by |
-|---|---|---|---|---|
-| product (no defect) | 0.687 | 3.0 | 0.72 % | within both |
-| encode range written the wrong way | 5.32 | 20 | 72.98 % | mean 5.3x, p99.9 5x |
-| encode matrix BT.601 for BT.709 | 2.98 | 10 | 57.09 % | mean 3.0x, p99.9 2.5x |
-| `accurate_rnd` dropped in both halves | 1.14 | 5 | 7.35 % | mean 1.14x, p99.9 1.25x |
-| `accurate_rnd` dropped in the first decode only | 0.80 | 6 | 4.07 % | p99.9 1.5x |
-| siting `center` in the encode | 0.71 | 5 | 1.67 % | p99.9 1.25x |
-| siting `topleft` in the encode | 0.74 | 5 | 2.11 % | p99.9 1.25x |
+`testsrc2` rows (bound: mean 2.5):
 
-`testsrc2` rows (bound: mean 3):
-
-| Defect (encode side unless stated) | hevc8 | hevc10 | untagged | BT.601 clip | Caught |
+| Defect (encode side unless stated) | hevc8 | hevc10 | untagged | BT.601 clip | Margin |
 |---|---|---|---|---|---|
 | product | 2.02 | 1.46 | 1.94 | 1.82 | within |
-| range written the wrong way | 13.37 | 5.65 | 5.70 | - | yes, 1.9x - 4.5x |
-| matrix swapped | 8.76 | 7.46 | 7.85 | 7.85 (BT.709 for BT.601) | yes, 2.5x - 2.9x |
-| `accurate_rnd` dropped in both halves | 2.79 | 1.46 (no effect) | 2.84 | - | no |
-| siting `center` | 2.45 | 2.29 | 2.33 | - | no |
+| range written the wrong way | 13.37 | 5.65 | 5.70 | - | 2.3x - 5.3x |
+| matrix swapped | 8.76 | 7.46 | 7.85 | 7.85 (BT.709 for BT.601) | 3.0x - 3.5x |
+| `accurate_rnd` dropped in both halves | 2.79 | 1.46 (no effect) | 2.84 | - | 1.12x - 1.14x |
+| siting `center` | 2.45 | 2.29 | 2.33 | - | under the bound |
+
+The siting defect is not seen by the synthetic bound (and `accurate_rnd` has no effect on the
+10-bit sample); the real-footage row catches both, the flat-colour decode truth catches
+`accurate_rnd` (2.0 against 1.0), and the argument-level tests catch every plant including
+`out_range`, which has no pixel effect for an RGB destination (swscale ignores it).
 
 ## Deliberate skip
 
