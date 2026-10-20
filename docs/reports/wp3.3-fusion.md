@@ -27,7 +27,7 @@ recommended. Branch `wp3.3`, base `2c5540a`. Stack as locked: NumPy 2.5.4, SciPy
 
 ## Claims and evidence
 
-1. **Prototype agreement per function** (`tests/test_methods_fusion_prototype.py`, 193 tests
+1. **Prototype agreement per function** (`tests/test_methods_fusion_prototype.py`, 195 tests
    with the GPU): on two seeded noise images (one with near-zero red), a textured scene, the
    same scene white-balanced by the prototype's 3C and white balance, and the six WP2.3 stills
    (`png16-`/`png8-` `uniform`, `gradient`, `lowred` `-none`), at the AD-8 defaults and at a
@@ -93,6 +93,8 @@ recommended. Branch `wp3.3`, base `2c5540a`. Stack as locked: NumPy 2.5.4, SciPy
     record, no array work before the refusal, shown by a counting backend and array);
     `test_x4_support_bound_depends_on_the_image_size` (350 of the short side refused at 48 MP,
     a broadcast view, accepted at 1 x 1 and inside the bound at 5.3K);
+    `test_x4_sigma_near_the_float_maximum` (1e308 of a 1 px short side: the core's radius rule
+    raises OverflowError, re-raised as the same ValueError, as WP3.2 does);
     `test_signatures_are_x1_form` (no step takes a compensation parameter).
 11. **Dependency rule**: importing `clearwater.methods.fusion` loads no `clearwater.io`,
     `.jobs`, `.gui`, `.config`, `PIL`, `av`, `PySide6`, `cupy`, `cupyx` (subprocess test); the
@@ -111,7 +113,13 @@ recommended. Branch `wp3.3`, base `2c5540a`. Stack as locked: NumPy 2.5.4, SciPy
   within 1.5e-6 of the prototype's exact `(I + 0.5) / 2`.
 - **`weight_maps` returns the normalised maps only** (brief question 6); the raw maps stay
   testable through their public functions. Supplied saliency means are guarded like the bounds
-  (ruling 4); K is `len(inputs)` (ruling 5). `pyramid_min_level_size < 1` raises ValueError
+  (ruling 4); K is `len(inputs)` (ruling 5).
+- **The supplied-bounds guard** (brief question 2, Reviewer A round 1): two finite values,
+  `low <= high`, the values and the range `high - low` within the float32 range (finite
+  float64 bounds beyond it gave a NaN input 2), and a midpoint small enough that the floor's
+  widening survives float64 rounding (beyond about 1e14 it did not, and the stretch divided by
+  zero); every refusal is one ValueError naming `bounds`, before any array work
+  (`test_bounds_guard`, `test_extreme_float32_bounds_accepted`). `pyramid_min_level_size < 1` raises ValueError
   (the core's rule; the prototype loops to 1 px).
 - **W_L keeps the prototype's deliberate adaptation of [A18]**: the 5-point Laplacian of the
   luma smoothed at `laplacian_fraction` of the short side, times sigma squared (D56; [A18] uses
