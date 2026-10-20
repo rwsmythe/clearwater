@@ -253,6 +253,14 @@ Full pytest at `ea60356`: normal 1311 passed, 0 skipped, exit 0, 8:47 (`work/ful
 `cupy`/`cupyx` unimportable 1205 passed, 106 skipped, exit 0, 5:50 (`work/full6.log`); every skip
 carries a CuPy/CUDA reason.
 
+## Speed row (EXCLUSIVE window, granted by the dispatcher)
+
+At `21e9fee` (code = `ea60356`), 2026-10-20 20:57:39-21:30:32Z, exit 0, record
+`work/wp3.1/speed/core-speed-GX011627-20261020T205739Z.json` (main tree working folder). Medians
+(s/frame) product / prototype: GPU (n 680) c3 0.5351 / 0.5355, ancuti2018 0.2370 / 0.2368,
+upload 0.0144; CPU (n 10, frames 68..680 step 68 after the frame-0 warm-up) c3 16.15 / 16.06,
+ancuti2018 6.58 / 6.63. Conditions and strays in the report (`4364da9`).
+
 ## Successor handoff (if re-seated)
 
 State at round 1's yield: code at `f8bd077` plus this ledger commit; no remediation started.
