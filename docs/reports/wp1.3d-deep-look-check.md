@@ -25,7 +25,7 @@ change this pack.
 | Path under `work\wp1.3d\` | Content |
 |---|---|
 | `index.html` | the page to open: head (variants, the `Params` defaults, the candidate rule, pending items), the deep clip, the 48 chapter stills, then one section per case with its 4 candidates; thumbnails (960x540) link to the full 16-bit PNGs; under each variant the pair link and a one-line statistics summary |
-| `frames\` | 240 PNGs: 60 sources `<chapter>_<pts>.png` and 180 corrected `<frame>-<variant>.png`, 16-bit RGB, 3840x2160 (9.2 GB) |
+| `frames\` | 240 PNGs: 60 sources `<chapter>_<pts>.png` and 180 corrected `<frame>-<variant>.png`, 16-bit RGB, 3840x2160 (9,847,522,080 bytes, 9.85 GB) |
 | `pairs\` | 180 side-by-side JPEGs (source left, corrected right, each half 1920x1080, quality 92) |
 | `thumbs\` | 240 JPEGs (short side 540) |
 | `frames.json`, `statistics.json` | per source frame the exact pts, size, colour tags and the FFmpeg command; per frame and variant the prototype's compensation and white-balance records, the `Params` it ran with, the N{} bounds and whether anything bound |
@@ -97,7 +97,7 @@ say and nothing else: the lowest-`D` frame (`GX011600_0665.031`, `D` = 0.209) is
 frame with a high `W` (0.708), a measure value, not a description of the frame; no frame
 serves two cases.
 
-**Deep-water noise** -- candidate (lowest D)
+**Candidates for deep-water noise** -- candidate (lowest D)
 
 | Rank | Frame | pts (ticks at 1/30000) | D | W | H | also serves |
 |---|---|---|---|---|---|---|
@@ -106,7 +106,7 @@ serves two cases.
 | 3 | `GX011591_0095.028` | 2850848 | 0.296 | 0.325 | 0.204 | - |
 | 4 | `GX011593_0065.032` | 1950949 | 0.367 | 0.757 | 0.038 | - |
 
-**Open blue water** -- candidate (highest W)
+**Candidates for open blue water** -- candidate (highest W)
 
 | Rank | Frame | pts (ticks at 1/30000) | D | W | H | also serves |
 |---|---|---|---|---|---|---|
@@ -115,7 +115,7 @@ serves two cases.
 | 3 | `GX011600_0845.011` | 25350325 | 0.595 | 0.860 | 0.059 | - |
 | 4 | `GX011600_0735.001` | 22050028 | 0.427 | 0.749 | 0.083 | - |
 
-**Distance haze** -- candidate (lowest H among frames with W below 0.5)
+**Candidates for distance haze** -- candidate (lowest H among frames with W below 0.5)
 
 | Rank | Frame | pts (ticks at 1/30000) | D | W | H | also serves |
 |---|---|---|---|---|---|---|
@@ -127,15 +127,15 @@ serves two cases.
 The 8 deepest frames overall by `D` (10 s rule, no per-chapter limit; WP1.4b's input, `deep-frames.json`
 `deepest`):
 
-| Rank | Frame | pts (ticks at 1/30000) | D | W | H | in a case list |
+| Rank | Frame | pts (ticks at 1/30000) | D | W | H | in a candidate list |
 |---|---|---|---|---|---|---|
-| 1 | `GX011600_0665.031` | 19950931 | 0.209 | 0.708 | 0.047 | Deep-water noise |
-| 2 | `GX011600_0965.031` | 28950922 | 0.236 | 0.153 | 0.207 | Deep-water noise |
+| 1 | `GX011600_0665.031` | 19950931 | 0.209 | 0.708 | 0.047 | candidate: deep-water noise |
+| 2 | `GX011600_0965.031` | 28950922 | 0.236 | 0.153 | 0.207 | candidate: deep-water noise |
 | 3 | `GX011600_0815.014` | 24450426 | 0.258 | 0.387 | 0.137 | - |
-| 4 | `GX011591_0095.028` | 2850848 | 0.296 | 0.325 | 0.204 | Deep-water noise |
+| 4 | `GX011591_0095.028` | 2850848 | 0.296 | 0.325 | 0.204 | candidate: deep-water noise |
 | 5 | `GX011600_0975.007` | 29250221 | 0.362 | 0.328 | 0.074 | - |
 | 6 | `GX011600_0125.025` | 3750747 | 0.365 | 0.031 | 0.215 | - |
-| 7 | `GX011593_0065.032` | 1950949 | 0.367 | 0.757 | 0.038 | Deep-water noise |
+| 7 | `GX011593_0065.032` | 1950949 | 0.367 | 0.757 | 0.038 | candidate: deep-water noise |
 | 8 | `GX011600_0275.008` | 8250242 | 0.369 | 0.054 | 0.167 | - |
 
 ## 4. Variants, defaults, statistics (claim 3)
@@ -199,18 +199,18 @@ collapsed N{} (spread under 1e-6) bound. "R" and "B" are the white-balance appli
 | `GX011601_0277.878` | chapter still | 0.99 | 1.02 | 1.04 | 1.04 | 1.00 | 1.05 | 1.02 | 0.741 / 0.740 / 0.740 |
 | `GX011601_0362.629` | chapter still | 1.00 | 1.01 | 1.05 | 1.02 | 1.00 | 1.06 | 1.01 | 0.685 / 0.685 / 0.684 |
 | `GX011601_0447.414` | chapter still | 1.00 | 1.00 | 1.16 | 0.97 | 1.00 | 1.17 | 0.96 | 0.702 / 0.682 / 0.680 |
-| `GX011600_0665.031` | Deep-water noise #1 | 1.05 | 0.90 | 1.58 | 0.73 | 0.94 | 1.57 | 0.74 | 0.219 / 0.240 / 0.240 |
-| `GX011600_0965.031` | Deep-water noise #2 | 1.03 | 0.94 | 1.50 | 0.82 | 1.00 | 1.49 | 0.83 | 0.524 / 0.524 / 0.525 |
-| `GX011591_0095.028` | Deep-water noise #3 | 1.07 | 0.89 | 2.02 | 0.70 | 1.00 | 1.99 | 0.71 | 0.262 / 0.291 / 0.288 |
-| `GX011593_0065.032` | Deep-water noise #4 | 1.06 | 0.88 | 1.64 | 0.70 | 1.00 | 1.61 | 0.71 | 0.110 / 0.129 / 0.130 |
-| `GX011593_0255.021` | Open blue water #1 | 1.04 | 0.93 | 1.36 | 0.78 | 1.00 | 1.34 | 0.79 | 0.028 / 0.031 / 0.031 |
-| `GX011593_0105.005` | Open blue water #2 | 1.04 | 0.92 | 1.39 | 0.76 | 1.00 | 1.38 | 0.77 | 0.083 / 0.084 / 0.086 |
-| `GX011600_0845.011` | Open blue water #3 | 1.00 | 1.00 | 1.17 | 0.99 | 1.00 | 1.18 | 0.97 | 0.087 / 0.088 / 0.088 |
-| `GX011600_0735.001` | Open blue water #4 | 1.05 | 0.91 | 1.51 | 0.74 | 1.00 | 1.49 | 0.75 | 0.133 / 0.144 / 0.146 |
-| `GX011589_0005.005` | Distance haze #1 | 1.03 | 0.94 | 1.25 | 0.82 | 1.00 | 1.23 | 0.84 | 0.300 / 0.298 / 0.303 |
-| `GX011593_0025.025` | Distance haze #2 | 1.05 | 0.91 | 1.41 | 0.74 | 1.00 | 1.40 | 0.75 | 0.382 / 0.341 / 0.343 |
-| `GX011600_0885.017` | Distance haze #3 | 1.03 | 0.94 | 1.23 | 0.82 | 1.00 | 1.22 | 0.83 | 0.183 / 0.189 / 0.191 |
-| `GX011591_0055.022` | Distance haze #4 | 1.02 | 0.96 | 1.25 | 0.86 | 1.00 | 1.24 | 0.87 | 0.193 / 0.195 / 0.196 |
+| `GX011600_0665.031` | candidate: deep-water noise #1 | 1.05 | 0.90 | 1.58 | 0.73 | 0.94 | 1.57 | 0.74 | 0.219 / 0.240 / 0.240 |
+| `GX011600_0965.031` | candidate: deep-water noise #2 | 1.03 | 0.94 | 1.50 | 0.82 | 1.00 | 1.49 | 0.83 | 0.524 / 0.524 / 0.525 |
+| `GX011591_0095.028` | candidate: deep-water noise #3 | 1.07 | 0.89 | 2.02 | 0.70 | 1.00 | 1.99 | 0.71 | 0.262 / 0.291 / 0.288 |
+| `GX011593_0065.032` | candidate: deep-water noise #4 | 1.06 | 0.88 | 1.64 | 0.70 | 1.00 | 1.61 | 0.71 | 0.110 / 0.129 / 0.130 |
+| `GX011593_0255.021` | candidate: open blue water #1 | 1.04 | 0.93 | 1.36 | 0.78 | 1.00 | 1.34 | 0.79 | 0.028 / 0.031 / 0.031 |
+| `GX011593_0105.005` | candidate: open blue water #2 | 1.04 | 0.92 | 1.39 | 0.76 | 1.00 | 1.38 | 0.77 | 0.083 / 0.084 / 0.086 |
+| `GX011600_0845.011` | candidate: open blue water #3 | 1.00 | 1.00 | 1.17 | 0.99 | 1.00 | 1.18 | 0.97 | 0.087 / 0.088 / 0.088 |
+| `GX011600_0735.001` | candidate: open blue water #4 | 1.05 | 0.91 | 1.51 | 0.74 | 1.00 | 1.49 | 0.75 | 0.133 / 0.144 / 0.146 |
+| `GX011589_0005.005` | candidate: distance haze #1 | 1.03 | 0.94 | 1.25 | 0.82 | 1.00 | 1.23 | 0.84 | 0.300 / 0.298 / 0.303 |
+| `GX011593_0025.025` | candidate: distance haze #2 | 1.05 | 0.91 | 1.41 | 0.74 | 1.00 | 1.40 | 0.75 | 0.382 / 0.341 / 0.343 |
+| `GX011600_0885.017` | candidate: distance haze #3 | 1.03 | 0.94 | 1.23 | 0.82 | 1.00 | 1.22 | 0.83 | 0.183 / 0.189 / 0.191 |
+| `GX011591_0055.022` | candidate: distance haze #4 | 1.02 | 0.96 | 1.25 | 0.86 | 1.00 | 1.24 | 0.87 | 0.193 / 0.195 / 0.196 |
 
 ## 5. Observations (claim 7: statistics only, no judgement)
 
@@ -303,7 +303,7 @@ Known limits of the working-folder controls (banked, outside the declared envelo
 steps in order on an untampered working folder; none changes what the page or the clip show in that case):
 
 - A scan-cache or clip-render source is identified by the footage file's name and byte count only (SHA-256 of the
-  24 GB set was judged out of proportion); a different file of the same size would pass. An interrupted scan that is resumed after its source file was replaced keeps the rows already saved (a partial is not checked against the byte count; a finished cache is). The PNGs and MP4s of the clip
+  24.1 GB set, 24,122,034,711 bytes, was judged out of proportion); a different file of the same size would pass. An interrupted scan that is resumed after its source file was replaced keeps the rows already saved (a partial is not checked against the byte count; a finished cache is). The PNGs and MP4s of the clip
   are bound by SHA-256 between render, encode and page.
 - A hand-edited scan record whose values are in range and self-consistent cannot be told from a measured one.
 - The 6 s duration, the proxy text and the start of the clip are not re-derived from the source at encode time, so a
@@ -316,8 +316,8 @@ Gate on the head named in the ledger (full run, `footage` and `gpu` tests RUN, n
 
 - `uv run ruff check .`: all checks passed. `uv run ruff format --check .`: 110 files already formatted.
 - `uv run mypy`: success, no issues in 20 source files.
-- `uv run pytest -q --basetemp=work/pytest-wp1.3d`: **733 passed**, 1 warning (CuPy "CUDA path could not be detected"),
-  443.9 s. No test skipped. `tests/test_lookcheck.py` is unchanged and `tools/prototype/`,
+- `uv run pytest -q --basetemp=work/pytest-wp1.3d`: **734 passed**, 1 warning (CuPy "CUDA path could not be detected"),
+  447.6 s. No test skipped. `tests/test_lookcheck.py` is unchanged and `tools/prototype/`,
   `tools/lookcheck/frames.py`, `pyproject.toml` and `src/` are untouched (`git diff --stat c80725b..HEAD` lists
   `tools/lookcheck/scan.py`, `tools/lookcheck/pack.py`, `tests/test_lookcheck_deep.py`, this report and the ledger only).
 - Harness files (`scripts/`, `.claude/`, kernel docs, `tests/harness/`) untouched, so the harness gate is not re-run.

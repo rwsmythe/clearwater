@@ -168,3 +168,16 @@ Round 4 adjudication (fixed in `6d5ccab`; evidence `r4/`):
 Round 5 (evidence `r5/`): the reviewer reproduced all candidate lists, the stills, the page, the clip and the report tables with no in-envelope finding. Its one finding, R5-01 (an interrupted
 scan resumed after the source file was replaced keeps the saved rows; the partial is not checked against the byte count), needs a replaced file: OUT OF ENVELOPE by the orchestrator's
 ruling, banked and disclosed in report section 7. The round converges. Yielded with this ledger for the five-round approval.
+
+## Reviewer B #1 remediation (orchestrator seat, candidate b3813b8; approval to pass round 5 granted)
+
+- MAJOR (in envelope; "the scan proposes; the owner names"): the report presented candidates as case names. Labels changed in the report: the statistics table's role column
+  "Deep-water noise #1".."Distance haze #4" -> "candidate: deep-water noise #1" etc.; the deepest table's column "in a case list" -> "in a candidate list" with cells
+  "candidate: deep-water noise"; the candidate tables' "also serves" cells likewise; the three candidate-table headings "**Deep-water noise**" etc. -> "**Candidates for deep-water noise**" etc.
+  Page (`pack.py`): the three section headings "Deep-water noise" / "Open blue water: gray-world on open water" / "Distance haze" -> "Candidates for: ..." (the per-image captions
+  were already "candidate (...)"); the page was rebuilt with `deep --part stills` (661 s, no clip re-render). Sweep of the report and `index.html` for the case names: every remaining
+  occurrence is qualified (candidate), is the rule text, or is a CP2 sheet row naming the spec section 12 case beside "candidates".
+- MINOR: frames folder size now "9,847,522,080 bytes, 9.85 GB" (was "9.2 GB"); the footage set "24.1 GB, 24,122,034,711 bytes" (decimal, from the inventory). No other size figure in the report.
+- MINOR: `record_problem` accepts D >= 0 (a uniform (0, 0.1, 0) frame has D = 0 and is not excluded); test `test_a_record_with_a_zero_red_mean_passes_its_own_cache_validation`
+  fails with the old `> 0.0` check and passes now.
+- Gate on the code head: ruff, ruff format --check, mypy green; full foreground pytest 734 passed, 0 skipped.
