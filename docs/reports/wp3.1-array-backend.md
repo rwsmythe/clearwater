@@ -28,7 +28,10 @@ base `9735282`. Stack as locked: NumPy 2.5.4, SciPy 1.18.1, CuPy 14.2.0 (`cupy-c
    (108 px) max 1.31e-6 / mean 1.14e-7; at the sharpen sigma (10.8 px) 4.77e-7 / 3.95e-8;
    `pyramid_reduce` 1.19e-7; `pyramid_expand` 1.79e-7; Laplacian pyramid and collapse 1.19e-7;
    `laplacian` 1.85e-6; `rgb_to_lab` 1.22e-4 (in L* units, 0-100) / 6.58e-6; `percentile` and all
-   eight YCbCr conversions 0. Worst 1.22e-4. Pinned by `test_cpu_against_gpu_within_ad11`.
+   eight YCbCr conversions 0. Worst 1.22e-4. These 4K figures were measured once (the file
+   above), not by a test. `test_cpu_against_gpu_within_ad11` pins every array-returning IF-2
+   method and `clearwater.core` helper within AD-11 at 120 x 200, 37 x 53 and 1 x 1, and
+   `test_ad11_roster_covers_every_method_and_helper` keeps that roster complete.
    The same device run twice is bit-identical (`test_same_device_twice_is_bit_identical`).
 3. **Independent references**: Gaussian (radius `int(4 sigma + 0.5)`, symmetric borders),
    REDUCE, EXPAND (normalised) against float64 implementations in the test, odd sizes and 1 x 1

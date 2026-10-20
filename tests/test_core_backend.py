@@ -16,6 +16,7 @@ import pytest
 from scipy import ndimage as scipy_ndimage
 
 import clearwater.core.backend as backend_module
+import clearwater.core.ops as ops_module
 from clearwater.core import CoreBackend, NumpyBackend, memory_estimate_bytes
 from clearwater.core.backend import _probe_gpu
 from clearwater.interfaces.backend import ArrayBackend
@@ -466,7 +467,33 @@ def all_methods(backend: CoreBackend, image: np.ndarray) -> dict[str, np.ndarray
         for range_ in ("full", "limited"):
             out[f"rgb_to_ycbcr {matrix} {range_}"] = backend.rgb_to_ycbcr(a, matrix, range_)
             out[f"ycbcr_to_rgb {matrix} {range_}"] = backend.ycbcr_to_rgb(a, matrix, range_)
+    luma = ops_module.luminance(backend, a)
+    out["luminance"] = luma
+    out["rgb_to_lab"] = ops_module.rgb_to_lab(backend, a)
+    out["laplacian"] = ops_module.laplacian(backend, backend.gaussian_blur(luma, 2.0))
+    levels = ops_module.pyramid_levels(image.shape, 4)
+    for index, level in enumerate(ops_module.gaussian_pyramid(backend, a, levels)):
+        out[f"gaussian_pyramid level {index}"] = level
+    bands = ops_module.laplacian_pyramid(backend, a, levels)
+    for index, band in enumerate(bands):
+        out[f"laplacian_pyramid level {index}"] = band
+    out["collapse_pyramid"] = ops_module.collapse_pyramid(backend, bands)
     return {name: host(backend, value) for name, value in out.items()}
+
+
+def test_ad11_roster_covers_every_method_and_helper() -> None:
+    # Round 2 R2-3: the CPU-GPU comparison covers every array-returning IF-2 method and every
+    # array-returning clearwater.core helper, not only the IF-2 methods.
+    helpers = {
+        name
+        for name, member in inspect.getmembers(ops_module, inspect.isfunction)
+        if not name.startswith("_")
+        and member.__module__ == ops_module.__name__
+        and "Array" in str(member.__annotations__.get("return"))
+    }
+    expected = (array_returning_methods() - {"asarray"}) | helpers
+    covered = {key.split()[0] for key in all_methods(NumpyBackend(), rng_image((9, 11, 3)))}
+    assert expected - covered == set()
 
 
 @pytest.mark.gpu
