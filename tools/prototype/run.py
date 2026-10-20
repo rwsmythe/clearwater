@@ -2,8 +2,11 @@
 
 Usage::
 
-    uv run python tools/prototype/run.py --in FILE --out DIR [--method ancuti2018|c3]
+    uv run python tools/prototype/run.py --in FILE --out DIR [--method c3|ancuti2018]
         [--blue] [--neutral] [--dump] [--set NAME=VALUE ...] [--device cpu|gpu|auto]
+
+``--method`` defaults to the :class:`Params` default, ``c3`` (spec v0.5.3 D16); the
+options are ``c3``, ``ancuti2018``, and ``ancuti2018`` with ``--blue`` (ancuti2018-blue).
 
 The image is read with Pillow into float32 RGB in [0, 1]. Colour management is out of
 scope: an embedded ICC profile is ignored (a note says so) and the values are used as
@@ -173,8 +176,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser = _Parser(description="Run the WP1.1 reference correction pipeline on one image.")
     parser.add_argument("--in", dest="input", type=Path, required=True, help="image to correct")
     parser.add_argument("--out", type=Path, required=True, help="folder for the output")
-    parser.add_argument("--method", choices=METHODS, help="compensation method")
-    parser.add_argument("--blue", action="store_true", help="Ancuti 2018 blue compensation")
+    parser.add_argument(
+        "--method",
+        choices=METHODS,
+        help="compensation method (default c3; ancuti2018, or ancuti2018 with --blue)",
+    )
+    parser.add_argument(
+        "--blue", action="store_true", help="Ancuti 2018 blue compensation (ancuti2018-blue)"
+    )
     parser.add_argument("--neutral", action="store_true", help="start from Params.neutral()")
     parser.add_argument("--dump", action="store_true", help="write every intermediate")
     parser.add_argument(

@@ -138,7 +138,7 @@ def test_correct_with_the_cpu_backend_is_the_default_path() -> None:
 
 def test_pipeline_rejects_a_non_array() -> None:
     with pytest.raises(ValueError, match="float32"):
-        pipeline.correct([[[0.5, 0.5, 0.5]]], Params())  # type: ignore[arg-type]
+        pipeline.correct([[[0.5, 0.5, 0.5]]], Params(method="ancuti2018"))  # type: ignore[arg-type]
 
 
 def test_normalisation_bounds_are_the_ones_fusion_inputs_uses() -> None:
@@ -265,7 +265,7 @@ def test_every_public_pipeline_function_keeps_cupy_arrays_on_the_device(
 ) -> None:
     gpu = select_backend("gpu")
     cupy = gpu.xp
-    params = Params()
+    params = Params(method="ancuti2018")
     image = gpu.to_device(_synthetic(64, 96))
     weight = gpu.to_device(np.random.default_rng(3).random((64, 96), dtype=np.float32))
     assert of(image) is gpu
@@ -323,10 +323,10 @@ def test_gpu_backend_round_trip_and_cpu_backend_on_a_device_input() -> None:
     assert CPU.to_device(device).__class__ is np.ndarray
     gpu.synchronize()
     # a device input with the CPU backend: computed on the host, returned on the device
-    result = pipeline.correct(device, Params(), CPU)
+    result = pipeline.correct(device, Params(method="ancuti2018"), CPU)
     assert isinstance(result.output, gpu.xp.ndarray)
     np.testing.assert_array_equal(
-        gpu.to_host(result.output), pipeline.correct(host, Params()).output
+        gpu.to_host(result.output), pipeline.correct(host, Params(method="ancuti2018")).output
     )
 
 
@@ -519,7 +519,12 @@ def test_bench_works_as_a_script(tmp_path: Path) -> None:
 def _run_backend(tmp_path: Path, *extra: str) -> str:
     source = _write_input(tmp_path)
     out = tmp_path / "out"
-    assert run.main(["--in", str(source), "--out", str(out), "--dump", *extra]) == 0
+    assert (
+        run.main(
+            ["--in", str(source), "--out", str(out), "--method", "ancuti2018", "--dump", *extra]
+        )
+        == 0
+    )
     weights = json.loads((out / "scene-ancuti2018-weights.json").read_text(encoding="utf-8"))
     return str(weights["backend"])
 

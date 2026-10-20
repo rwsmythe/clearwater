@@ -706,7 +706,7 @@ def test_the_collapse_threshold_is_the_prototypes() -> None:
 def test_bound_flags_report_a_gain_cap_the_clamp_and_a_collapsed_normalisation() -> None:
     red_starved = np.full((64, 64, 3), 0.5, np.float32)
     red_starved[..., 0] = 0.02
-    result = pipeline.correct(red_starved, Params(), CPU)
+    result = pipeline.correct(red_starved, Params(method="ancuti2018"), CPU)
     record = pack.statistics_record(result, CPU)
     assert record["bound"]["red_gain_cap"] is True
     assert record["bound"]["blue_gain_cap"] is False
@@ -716,7 +716,7 @@ def test_bound_flags_report_a_gain_cap_the_clamp_and_a_collapsed_normalisation()
     assert "red cap" in pack.summary_line(record) and "N{} collapsed" in pack.summary_line(record)
     rng = np.random.default_rng(2)
     busy = (0.4 + 0.2 * rng.random((64, 64, 3))).astype(np.float32)
-    calm = pack.statistics_record(pipeline.correct(busy, Params(), CPU), CPU)
+    calm = pack.statistics_record(pipeline.correct(busy, Params(method="ancuti2018"), CPU), CPU)
     assert calm["bound"]["any"] is False
     assert pack.summary_line(calm).endswith("bound: none")
 

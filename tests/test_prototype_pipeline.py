@@ -153,11 +153,11 @@ def test_individual_steps_keep_shape_dtype_and_range(size: tuple[int, int]) -> N
 
 def test_steps_reject_bad_images() -> None:
     with pytest.raises(ValueError, match="float32"):
-        correct(_synthetic(8, 8).astype(np.float64), Params())  # type: ignore[arg-type]
+        correct(_synthetic(8, 8).astype(np.float64), Params(method="ancuti2018"))  # type: ignore[arg-type]
     with pytest.raises(ValueError, match="shape"):
-        correct(np.zeros((8, 8), dtype=np.float32), Params())
+        correct(np.zeros((8, 8), dtype=np.float32), Params(method="ancuti2018"))
     with pytest.raises(ValueError, match=r"\[0, 1\]"):
-        correct(_flat(8, 8, (0.5, 1.5, 0.5)), Params())
+        correct(_flat(8, 8, (0.5, 1.5, 0.5)), Params(method="ancuti2018"))
 
 
 # --- pyramid ----------------------------------------------------------------------------
@@ -500,9 +500,11 @@ def test_neutral_params_reproduce_the_input(size: tuple[int, int], method: str) 
 
 def test_blend_with_original_runs_from_corrected_to_original() -> None:
     image = _synthetic(64, 96)
-    corrected = correct(image, Params()).output
-    np.testing.assert_array_equal(correct(image, Params(blend_with_original=1.0)).output, image)
-    half = correct(image, Params(blend_with_original=0.5)).output
+    corrected = correct(image, Params(method="ancuti2018")).output
+    np.testing.assert_array_equal(
+        correct(image, Params(method="ancuti2018", blend_with_original=1.0)).output, image
+    )
+    half = correct(image, Params(method="ancuti2018", blend_with_original=0.5)).output
     np.testing.assert_allclose(half, (corrected + image) / 2, atol=1e-6)
 
 
@@ -661,7 +663,12 @@ def test_run_writes_a_16_bit_png(tmp_path: Path, method: str) -> None:
 def test_run_dump_writes_every_intermediate(tmp_path: Path) -> None:
     source = _write_input(tmp_path)
     out = tmp_path / "out"
-    assert run.main(["--in", str(source), "--out", str(out), "--dump", "--blue"]) == 0
+    assert (
+        run.main(
+            ["--in", str(source), "--out", str(out), "--method", "ancuti2018", "--dump", "--blue"]
+        )
+        == 0
+    )
     stem = "scene-ancuti2018"
     expected = {f"{stem}.png"}
     expected |= {
@@ -679,7 +686,17 @@ def test_run_dump_writes_every_intermediate(tmp_path: Path) -> None:
 def test_run_neutral_and_overrides(tmp_path: Path) -> None:
     source = _write_input(tmp_path)
     out = tmp_path / "out"
-    args = ["--in", str(source), "--out", str(out), "--neutral", "--set", "red_gain_cap=none"]
+    args = [
+        "--in",
+        str(source),
+        "--out",
+        str(out),
+        "--method",
+        "ancuti2018",
+        "--neutral",
+        "--set",
+        "red_gain_cap=none",
+    ]
     assert run.main([*args, "--set", "blue_compensation=true", "--set", "gamma=1"]) == 0
     written = _read_png16(out / "scene-ancuti2018.png").astype(np.float64) / 65535
     with Image.open(source) as opened:
@@ -764,7 +781,16 @@ def test_run_works_as_a_script(tmp_path: Path) -> None:
     source = _write_input(tmp_path, (24, 32))
     script = Path(__file__).resolve().parent.parent / "tools" / "prototype" / "run.py"
     completed = subprocess.run(
-        [sys.executable, str(script), "--in", str(source), "--out", str(tmp_path / "o")],
+        [
+            sys.executable,
+            str(script),
+            "--in",
+            str(source),
+            "--out",
+            str(tmp_path / "o"),
+            "--method",
+            "ancuti2018",
+        ],
         capture_output=True,
         text=True,
         check=False,

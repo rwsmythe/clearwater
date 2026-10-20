@@ -194,7 +194,7 @@ def test_staged_stream_equals_analyse_staged_bit_for_bit(
 
 def test_staged_stream_with_a_window_off_by_one_differs() -> None:
     """Positive control: the equality above sees a smoothing window one frame short."""
-    params = Params()
+    params = Params(method="ancuti2018")
     rate = Fraction(30000, 1001)
     smoother = temporal.Smoother("median_gaussian", 0.3)
     images = _frames(24)
@@ -209,7 +209,7 @@ def test_staged_stream_with_a_window_off_by_one_differs() -> None:
 
 def test_staged_stream_refuses_too_few_frames() -> None:
     stream = clip.StagedStream(
-        Params(), clip.SMOOTHER, Fraction(30000, 1001), select_backend("cpu")
+        Params(method="ancuti2018"), clip.SMOOTHER, Fraction(30000, 1001), select_backend("cpu")
     )
     stream.push(_frames(1)[0])
     with pytest.raises(ValueError, match="at least 2 frames"):
@@ -356,7 +356,14 @@ def test_an_error_in_the_core_stops_both_processes(
     folder = roots.allowed / "broken"
     output, *logs = clip.output_paths(roots, folder, ["s_corrected.mp4", "d.log", "e.log"])
     with pytest.raises(RuntimeError, match="planted core failure"):
-        clip.export(source, output, Params(), None, select_backend("cpu"), (logs[0], logs[1]))
+        clip.export(
+            source,
+            output,
+            Params(method="ancuti2018"),
+            None,
+            select_backend("cpu"),
+            (logs[0], logs[1]),
+        )
     assert not _children_alive()
 
 
@@ -386,7 +393,9 @@ def test_at_most_two_frames_are_in_flight_after_the_core(
     monkeypatch.setattr(clip, "write_frame", slow_write)
     folder = roots.allowed / "slots"
     output, *logs = clip.output_paths(roots, folder, ["s_corrected.mp4", "d.log", "e.log"])
-    clip.export(source, output, Params(), None, select_backend("cpu"), (logs[0], logs[1]))
+    clip.export(
+        source, output, Params(method="ancuti2018"), None, select_backend("cpu"), (logs[0], logs[1])
+    )
     assert state["written"] == CLIP_FRAMES
     assert state["most"] == clip.OUTPUT_FRAMES  # reached, never exceeded
 
@@ -409,7 +418,14 @@ def test_the_export_applies_each_frame_its_own_statistics(
     monkeypatch.setattr(clip, "correct", spy)
     folder = roots.allowed / "applied"
     output, *logs = clip.output_paths(roots, folder, ["s_corrected.mp4", "d.log", "e.log"])
-    clip.export(source, output, Params(), statistics, select_backend("cpu"), (logs[0], logs[1]))
+    clip.export(
+        source,
+        output,
+        Params(method="ancuti2018"),
+        statistics,
+        select_backend("cpu"),
+        (logs[0], logs[1]),
+    )
     assert len(seen) == CLIP_FRAMES
     assert all(record is statistics[index] for index, record in enumerate(seen))
 
@@ -490,7 +506,7 @@ def test_neutral_conversion_round_trips_every_8_bit_value() -> None:
     out = np.empty_like(values)
     clip.to_integer(image, out, np.empty(values.shape, np.float32))
     np.testing.assert_array_equal(out, values)
-    neutral = correct(image, Params.neutral()).output
+    neutral = correct(image, dataclasses.replace(Params.neutral(), method="ancuti2018")).output
     clip.to_integer(neutral, out, np.empty(values.shape, np.float32))
     np.testing.assert_array_equal(out, values)
 
@@ -642,7 +658,14 @@ def test_the_export_feeds_the_encoder_the_decoded_bytes_under_neutral_parameters
     monkeypatch.setattr(clip._Writer, "run", spy)
     folder = roots.allowed / "identity"
     output, *logs = clip.output_paths(roots, folder, ["s_corrected.mp4", "d.log", "e.log"])
-    clip.export(source, output, Params.neutral(), None, GPU, (logs[0], logs[1]))
+    clip.export(
+        source,
+        output,
+        dataclasses.replace(Params.neutral(), method="ancuti2018"),
+        None,
+        GPU,
+        (logs[0], logs[1]),
+    )
     assert len(written) == CLIP_FRAMES
     for index, frame in enumerate(decoded):
         assert written[index] == frame.tobytes(), f"frame {index}"
@@ -662,7 +685,15 @@ def test_a_shifted_witness_stops_the_render(
     output, *logs = clip.output_paths(roots, folder, ["s_corrected.mp4", "d.log", "e.log"])
     statistics = clip.per_frame_statistics(record)
     with pytest.raises(clip.StatisticsMismatchError, match="frame 0: channel means"):
-        clip.export(source, output, Params.neutral(), statistics, GPU, (logs[0], logs[1]), shifted)
+        clip.export(
+            source,
+            output,
+            dataclasses.replace(Params.neutral(), method="ancuti2018"),
+            statistics,
+            GPU,
+            (logs[0], logs[1]),
+            shifted,
+        )
 
 
 @pytest.mark.gpu
@@ -677,7 +708,7 @@ def test_the_witness_checks_the_true_last_frame_when_the_limit_exceeds_the_clip(
     result = clip.export(
         source,
         output,
-        Params.neutral(),
+        dataclasses.replace(Params.neutral(), method="ancuti2018"),
         clip.per_frame_statistics(record),
         GPU,
         (logs[0], logs[1]),
@@ -731,7 +762,7 @@ def test_a_record_of_another_clip_or_other_settings_is_refused(
     with pytest.raises(clip.StatisticsMismatchError, match="another file"):
         clip.check_statistics_record(record, clip.open_source(other), neutral, "none", None)
     with pytest.raises(clip.StatisticsMismatchError, match="other parameters"):
-        clip.check_statistics_record(record, source, Params(), "none", None)
+        clip.check_statistics_record(record, source, Params(method="ancuti2018"), "none", None)
     with pytest.raises(clip.StatisticsMismatchError, match="hwaccel"):
         clip.check_statistics_record(record, source, neutral, "cuda", None)
     with pytest.raises(clip.StatisticsMismatchError, match="analysed 60 frames"):
@@ -758,7 +789,7 @@ def test_a_record_of_another_clip_or_other_settings_is_refused(
 
 
 def test_statistic_names_are_the_chains() -> None:
-    names = clip.statistic_names(Params())
+    names = clip.statistic_names(Params(method="ancuti2018"))
     assert names[:4] == (
         "compensation_means.R",
         "compensation_means.G",
@@ -821,7 +852,7 @@ def test_footage_smoke_gx011628(tmp_path: Path) -> None:
     source = clip.open_source(find_footage_file("GX011628", footage))
     assert source.frame_count == 434
     roots = OutputRoots(allowed=tmp_path / "work" / clip.WORK_SUBDIR, footage=footage)
-    params = Params()
+    params = Params(method="ancuti2018")
     analysis = clip.run_analyse(source, params, GPU, roots, None, "none", 30)
     run_path = clip.run_render(source, params, GPU, roots, analysis, None, "none", False, 30, False)
     run = json.loads(run_path.read_text(encoding="utf-8"))
@@ -867,7 +898,14 @@ def test_a_failed_export_leaves_no_partial_and_no_final(
     folder = roots.allowed / f"failed-{failure}"
     output, *logs = clip.output_paths(roots, folder, ["s_corrected.mp4", "d.log", "e.log"])
     with pytest.raises(expected):
-        clip.export(source, output, Params(), None, select_backend("cpu"), (logs[0], logs[1]))
+        clip.export(
+            source,
+            output,
+            Params(method="ancuti2018"),
+            None,
+            select_backend("cpu"),
+            (logs[0], logs[1]),
+        )
     assert not output.exists()
     assert not clip.partial_name(output).exists()
 
@@ -885,7 +923,14 @@ def test_an_export_never_overwrites_an_existing_final_file(
     output, *logs = clip.output_paths(roots, folder, ["s_corrected.mp4", "d.log", "e.log"])
     output.write_bytes(b"a prior good export")
     with pytest.raises(clip.ClipError, match="already exists"):
-        clip.export(source, output, Params(), None, select_backend("cpu"), (logs[0], logs[1]))
+        clip.export(
+            source,
+            output,
+            Params(method="ancuti2018"),
+            None,
+            select_backend("cpu"),
+            (logs[0], logs[1]),
+        )
     assert output.read_bytes() == b"a prior good export"
     assert not clip.partial_name(output).exists()
 
@@ -965,7 +1010,7 @@ def planted_statistics(synthetic: Path, roots: OutputRoots) -> list[Any]:
     source = clip.open_source(synthetic)
     record = json.loads(
         clip.run_analyse(
-            source, Params(), GPU, roots, roots.allowed / "planted", "none", None
+            source, Params(method="ancuti2018"), GPU, roots, roots.allowed / "planted", "none", None
         ).read_text(encoding="utf-8")
     )
     smoothed = record["smoothed"]
@@ -982,7 +1027,12 @@ def planted_export(synthetic: Path, roots: OutputRoots, planted_statistics: list
     folder = roots.allowed / "witness-export"
     output, *logs = clip.output_paths(roots, folder, ["s_corrected.mp4", "d.log", "e.log"])
     clip.export(
-        clip.open_source(synthetic), output, Params(), planted_statistics, GPU, (logs[0], logs[1])
+        clip.open_source(synthetic),
+        output,
+        Params(method="ancuti2018"),
+        planted_statistics,
+        GPU,
+        (logs[0], logs[1]),
     )
     return output
 
@@ -996,7 +1046,7 @@ def test_the_output_witness_passes_a_correct_export(
     indices = clip.witness_indices(CLIP_FRAMES, 8)
     reference = planted_export.parent / "reference.mp4"
     record = clip.output_witness(
-        source, output, planted_statistics, Params(), GPU, indices, reference
+        source, output, planted_statistics, Params(method="ancuti2018"), GPU, indices, reference
     )
     clip.require_witness(record)
     assert record["passed"] and record["frames_checked"] == 8
@@ -1044,7 +1094,7 @@ def test_the_output_witness_catches_a_frame_swap_by_name(
     source, output = clip.open_source(synthetic), clip.open_source(swapped)
     reference = swapped.parent / "reference.mp4"
     record = clip.output_witness(
-        source, output, planted_statistics, Params(), GPU, [10, 20], reference
+        source, output, planted_statistics, Params(method="ancuti2018"), GPU, [10, 20], reference
     )
     with pytest.raises(clip.OutputOrderError):
         clip.require_witness(record)
@@ -1058,7 +1108,9 @@ def test_the_output_witness_catches_a_wrong_statistics_index_by_name(
     shifted = planted_statistics[30:] + planted_statistics[:30]  # planted: index off by 30
     source, output = clip.open_source(synthetic), clip.open_source(planted_export)
     reference = planted_export.parent / "reference.mp4"
-    record = clip.output_witness(source, output, shifted, Params(), GPU, [5, 10, 15], reference)
+    record = clip.output_witness(
+        source, output, shifted, Params(method="ancuti2018"), GPU, [5, 10, 15], reference
+    )
     assert not any(row["match_ok"] for row in record["rows"])
     with pytest.raises(clip.OutputMismatchError):
         clip.require_witness(record)
@@ -1084,6 +1136,8 @@ def test_a_failed_reference_encoder_start_leaves_no_process_and_no_file(
     monkeypatch.setattr(clip, "_spawn", spawn)
     source, output = clip.open_source(synthetic), clip.open_source(planted_export)
     with pytest.raises(clip.ClipError, match="planted spawn failure"):
-        clip.output_witness(source, output, planted_statistics, Params(), GPU, [10], reference)
+        clip.output_witness(
+            source, output, planted_statistics, Params(method="ancuti2018"), GPU, [10], reference
+        )
     assert not _children_alive()
     assert not reference.exists() and not short.exists()

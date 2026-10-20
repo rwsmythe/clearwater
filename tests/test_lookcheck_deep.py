@@ -744,7 +744,7 @@ def test_statistics_record_takes_the_applied_normalisation_bounds_when_given() -
 
     rng = np.random.default_rng(5)
     image = (0.2 + 0.5 * rng.random((HEIGHT, WIDTH, 3))).astype(np.float32)
-    result = correct(image, Params(), CPU)
+    result = correct(image, Params(method="ancuti2018"), CPU)
     low, high = normalisation_bounds(CPU.to_device(result.white_balanced), result.params)
     recomputed = pack.statistics_record(result, CPU)["normalisation"]
     assert (recomputed["low"], recomputed["high"]) == (low, high)

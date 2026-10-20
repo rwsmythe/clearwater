@@ -171,7 +171,7 @@ def test_every_supplied_field_is_used(field: str) -> None:
     """Positive control: a supplied value that differs from the frame's own changes the
     intermediate of the step that consumes it, and leaves every earlier one (and the parts of
     the same step it does not feed) bit-identical."""
-    params = Params(alpha=0.8, red_gain_cap=None)
+    params = Params(method="ancuti2018", alpha=0.8, red_gain_cap=None)
     image = _scene()
     own = correct(image, params)
     changed = correct(image, params, statistics=_perturbed(statistics_of(image, params), field))
@@ -198,12 +198,12 @@ def test_malformed_supplied_triples_are_refused() -> None:
         Statistics(saliency_means=((50.0, 0.0), (50.0, 0.0, 0.0))),  # type: ignore[arg-type]
     ):
         with pytest.raises(ValueError, match="needs 3 values"):
-            correct(image, Params(), statistics=statistics)
+            correct(image, Params(method="ancuti2018"), statistics=statistics)
 
 
 def test_supplied_gains_still_meet_strength_and_clamp() -> None:
     """D99: the clamp limits the gains used for rendering, also when they are supplied."""
-    params = Params(max_white_balance_gain=1.2, white_balance_strength=0.5)
+    params = Params(method="ancuti2018", max_white_balance_gain=1.2, white_balance_strength=0.5)
     image = _scene()
     result = correct(image, params, statistics=Statistics(white_balance_gains=(3.0, 1.0, 0.5)))
     assert result.white_balance.gray_world_gains == (3.0, 1.0, 0.5)
@@ -217,19 +217,27 @@ def test_supplied_statistics_that_do_not_fit_the_method_are_refused() -> None:
     with pytest.raises(ValueError, match="3C"):
         correct(image, Params(method="c3"), statistics=Statistics(compensation_means=(1, 1, 1)))
     with pytest.raises(ValueError, match="compensation_alpha"):
-        correct(image, Params(), statistics=Statistics(compensation_alpha={"blue": 1.0}))
+        correct(
+            image,
+            Params(method="ancuti2018"),
+            statistics=Statistics(compensation_alpha={"blue": 1.0}),
+        )
     with pytest.raises(ValueError, match="compensation_alpha"):
         correct(
             image,
-            Params(blue_compensation=True),
+            Params(method="ancuti2018", blue_compensation=True),
             statistics=Statistics(compensation_alpha={"red": 1.0}),
         )
     with pytest.raises(ValueError, match="saliency"):
-        correct(image, Params(), statistics=Statistics(saliency_means=((50.0, 0.0, 0.0),)))
+        correct(
+            image,
+            Params(method="ancuti2018"),
+            statistics=Statistics(saliency_means=((50.0, 0.0, 0.0),)),
+        )
 
 
 def test_measure_reports_the_supplied_values_and_measures_the_rest() -> None:
-    params = Params()
+    params = Params(method="ancuti2018")
     image = _scene()
     own = statistics_of(image, params)
     supplied = Statistics(white_balance_gains=(1.5, 1.0, 0.9))
@@ -249,13 +257,17 @@ def test_measure_records_the_white_balance_means() -> None:
         assert got.white_balance_means == pipeline._channel_means(result.compensated)
         assert got.white_balance_means == result.white_balance.channel_means
     supplied = Statistics(white_balance_means=(0.2, 0.3, 0.4))
-    assert measure(image, Params(), supplied).white_balance_means == (0.2, 0.3, 0.4)
+    assert measure(image, Params(method="ancuti2018"), supplied).white_balance_means == (
+        0.2,
+        0.3,
+        0.4,
+    )
 
 
 def test_supplied_white_balance_means_give_the_gray_world_gains() -> None:
     """Means alone derive the gains (identity on the frame's own means); gains given with
     them win, so a record that holds both is rendered with its gains."""
-    params = Params()
+    params = Params(method="ancuti2018")
     image = _scene()
     own = statistics_of(image, params)
     assert own.white_balance_means is not None and own.white_balance_gains is not None
@@ -274,7 +286,9 @@ def test_supplied_white_balance_means_give_the_gray_world_gains() -> None:
 def test_a_supplied_blue_alpha_is_used() -> None:
     """Positive control with blue compensation on: halving only the blue alpha changes the blue
     channel of the compensated image and leaves red and green alone."""
-    params = Params(blue_compensation=True, red_gain_cap=None, blue_gain_cap=None)
+    params = Params(
+        method="ancuti2018", blue_compensation=True, red_gain_cap=None, blue_gain_cap=None
+    )
     image = _scene()
     own = statistics_of(image, params)
     assert own.compensation_alpha is not None and set(own.compensation_alpha) == {"red", "blue"}
@@ -301,14 +315,20 @@ def test_non_finite_or_impossible_supplied_values_are_refused_naming_the_field()
     }
     for field, statistics in cases.items():
         with pytest.raises(ValueError, match=f"supplied {field}.*not finite"):
-            correct(image, Params(), statistics=statistics)
+            correct(image, Params(method="ancuti2018"), statistics=statistics)
         with pytest.raises(ValueError, match=f"supplied {field}.*not finite"):
-            measure(image, Params(), statistics)
+            measure(image, Params(method="ancuti2018"), statistics)
     for bounds in ((0.3, 0.1), (nan, 0.1), (-inf, inf)):
         with pytest.raises(ValueError, match="normalisation_bounds"):
-            correct(image, Params(), statistics=Statistics(normalisation_bounds=bounds))
+            correct(
+                image,
+                Params(method="ancuti2018"),
+                statistics=Statistics(normalisation_bounds=bounds),
+            )
     # equal bounds stay legal (the flat-image rule); steps called directly refuse too
-    correct(image, Params(), statistics=Statistics(normalisation_bounds=(0.2, 0.2)))
+    correct(
+        image, Params(method="ancuti2018"), statistics=Statistics(normalisation_bounds=(0.2, 0.2))
+    )
     with pytest.raises(ValueError, match="not finite"):
         pipeline.white_balance(image, Params(), Statistics(white_balance_gains=(nan, 1.0, 1.0)))
     with pytest.raises(ValueError, match=r"low .* above high"):
@@ -346,7 +366,7 @@ def test_3_staged_and_flat_differ_as_documented() -> None:
     smoothed red mean of the shifted frame is higher than its own, so it is compensated less
     and its red gain rises more than the unshifted frames' gains fall.
     """
-    params = Params(red_gain_cap=None)
+    params = Params(method="ancuti2018", red_gain_cap=None)
     red = (_f32(0.2), _f32(0.1), _f32(0.2))
     green, blue = _f32(0.6), _f32(0.5)
     frames = [_uniform((r, 0.6, 0.5)) for r in red]
@@ -407,7 +427,9 @@ def test_staged_measures_each_stage_on_the_smoothed_earlier_ones() -> None:
     frames = [_scene(seed=s) for s in range(4)]
     smoother = Smoother("gaussian", 2.0)
     rate = Fraction(2)
-    received, (smoothed, measured) = _spy_staged(frames, Params(), smoother, rate)
+    received, (smoothed, measured) = _spy_staged(
+        frames, Params(method="ancuti2018"), smoother, rate
+    )
 
     def smoothed_stage(stage: str) -> dict[str, np.ndarray]:
         return {name: smoother.apply(values, rate) for name, values in measured[stage].items()}
@@ -423,7 +445,7 @@ def test_staged_measures_each_stage_on_the_smoothed_earlier_ones() -> None:
     assert set(second) == {
         f"white_balance_{kind}.{c}" for kind in ("means", "gains") for c in "RGB"
     }
-    raw = stack([statistics_of(frame, Params()) for frame in frames])
+    raw = stack([statistics_of(frame, Params(method="ancuti2018")) for frame in frames])
     for name in ("compensation_means.R", "compensation_alpha.red"):
         np.testing.assert_array_equal(smoothed[name], smoother.apply(raw[name], rate))
         np.testing.assert_array_equal(smoothed[name], first[name])
@@ -545,7 +567,7 @@ def test_5_content_change_cancels_to_first_order() -> None:
     """Moving content: two renders with different CONSTANT statistics (gains 3 % apart) keep
     their content change, which the measure cancels down to the second-order term (about 3 %
     of it); the brief's source-referenced form keeps the whole gain-scaled difference."""
-    params = Params()
+    params = Params(method="ancuti2018")
     wide = _scene(96, 256)
     frames = [np.ascontiguousarray(wide[:, s : s + 128]) for s in range(0, 128, 24)]
     reference = statistics_of(frames[0], params)
@@ -594,9 +616,9 @@ def test_6_robust_candidates_on_a_known_array() -> None:
     assert temporal.clipped_sample_fraction(values, (0.01, 0.99)) == 20 / 1001
     # the default candidate is the pipeline's own N{} bound rule
     image = _scene()
-    high_pass = temporal.white_balanced_high_pass(image, Params())
+    high_pass = temporal.white_balanced_high_pass(image, Params(method="ancuti2018"))
     assert robust_bounds(high_pass, ROBUST_CANDIDATES[1]) == pipeline.normalisation_bounds(
-        correct(image, Params()).white_balanced, Params()
+        correct(image, Params(method="ancuti2018")).white_balanced, Params(method="ancuti2018")
     )
 
 
@@ -623,7 +645,9 @@ def test_6_the_flat_image_case() -> None:
     # the floor makes N{} 0.5 everywhere when the supplied bounds collapse
     image = _scene()
     result = correct(
-        image, Params(sharpen_strength=1.0), statistics=Statistics(normalisation_bounds=(0.1, 0.1))
+        image,
+        Params(method="ancuti2018", sharpen_strength=1.0),
+        statistics=Statistics(normalisation_bounds=(0.1, 0.1)),
     )
     np.testing.assert_allclose(
         result.input2, np.clip((result.white_balanced + 0.5) / 2, 0, 1), atol=1e-7
@@ -691,7 +715,7 @@ def test_unflatten_refuses_every_name_flatten_cannot_produce() -> None:
 
 
 def test_series_records_round_trip_with_their_pts() -> None:
-    series = stack([statistics_of(_scene(seed=s), Params()) for s in range(3)])
+    series = stack([statistics_of(_scene(seed=s), Params(method="ancuti2018")) for s in range(3)])
     frames = [{"index": i, "pts_ticks": 1001 * i, "pts_seconds": i / 29.97} for i in range(3)]
     record = runner.series_record(series, frames)
     assert [entry["pts_ticks"] for entry in record] == [0, 1001, 2002]
@@ -704,7 +728,7 @@ def test_series_records_round_trip_with_their_pts() -> None:
 
 def test_a_record_is_refused_unless_its_ticks_are_the_excerpts_in_order() -> None:
     """Series are applied by position, so a reordered, short or stale record must not load."""
-    series = stack([statistics_of(_scene(seed=s), Params()) for s in range(3)])
+    series = stack([statistics_of(_scene(seed=s), Params(method="ancuti2018")) for s in range(3)])
     frames = [{"index": i, "pts_ticks": 1001 * i, "pts_seconds": i / 29.97} for i in range(3)]
     record = runner.series_record(series, frames)
     ticks = [0, 1001, 2002]
@@ -719,7 +743,7 @@ def test_a_record_is_refused_unless_its_ticks_are_the_excerpts_in_order() -> Non
 def test_the_render_step_refuses_a_reordered_statistics_record(tmp_path: Path) -> None:
     ticks = [0, 1001, 2002]
     frames = [{"index": i, "pts_ticks": t, "pts_seconds": t / 30000} for i, t in enumerate(ticks)]
-    series = stack([statistics_of(_scene(seed=s), Params()) for s in range(3)])
+    series = stack([statistics_of(_scene(seed=s), Params(method="ancuti2018")) for s in range(3)])
     record = runner.series_record(series, frames)
 
     def write(staged: list[dict[str, Any]]) -> None:
@@ -773,7 +797,7 @@ def test_the_interior_is_free_of_the_edge_rule() -> None:
 
 def test_too_few_frames_are_refused_up_front() -> None:
     with pytest.raises(ValueError, match="at least 2 frames"):
-        analyse_staged([_scene()], Params(), Smoother("gaussian", 1.0), NTSC)
+        analyse_staged([_scene()], Params(method="ancuti2018"), Smoother("gaussian", 1.0), NTSC)
     with pytest.raises(runner.PremiseError, match="at least 2"):
         runner.require_frames("one", 1)
     runner.require_frames("two", 2)
