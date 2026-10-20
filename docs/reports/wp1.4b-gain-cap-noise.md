@@ -350,7 +350,8 @@ frames within 1e-15 of 1, so a strict "below 1" counts all 179 frames.
   0 for every traced statistic), so the applied figures below are the rendered clip's.
 
 **Edge effect or genuine step? GENUINE.** The excerpt was widened backwards by 3 s (90 frames
-re-extracted by pts, contiguous with the excerpt). That is more than the 2 s window's 1 s reach.
+re-extracted by pts, contiguous with the excerpt). That exceeds the staged 2 s analysis's
+reach: 29 frames per stage, so 58 frames for c3 and 87 (2.9 s) for Ancuti's three stages.
 The analysis was then re-run.
 
 - Over the excerpt's first second, the largest change in any applied value is: red gain 0.014,

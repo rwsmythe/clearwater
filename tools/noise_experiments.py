@@ -498,7 +498,14 @@ def crop_windows(
 
 
 def channel_means(image: NDArray[np.float32]) -> tuple[float, float, float]:
-    """Return the R, G, B means of an image, accumulated in float64."""
+    """Return the R, G, B means of an image, accumulated in float64.
+
+    Args:
+        image: RGB, shape ``(H, W, 3)``.
+
+    Returns:
+        The red, green and blue means.
+    """
     means = np.asarray(image).reshape(-1, 3).mean(axis=0, dtype=np.float64)
     return float(means[0]), float(means[1]), float(means[2])
 
@@ -856,13 +863,24 @@ def extract_frames(
 
 
 def free_device(backend: Backend) -> None:
-    """Release the GPU memory pool between full-resolution renders (no-op on the CPU)."""
+    """Release the GPU memory pool between full-resolution renders (no-op on the CPU).
+
+    Args:
+        backend: The backend the renders ran on.
+    """
     if backend.name == "gpu":
         backend.xp.get_default_memory_pool().free_all_blocks()
 
 
 def png8(array: NDArray[np.float32]) -> bytes:
-    """Encode an RGB or gray array in [0, 1] as an 8-bit PNG (for the page)."""
+    """Encode an RGB or gray array in [0, 1] as an 8-bit PNG (for the page).
+
+    Args:
+        array: ``(H, W, 3)`` or ``(H, W)``, values in [0, 1].
+
+    Returns:
+        The PNG file content.
+    """
     buffer = io.BytesIO()
     PILImage.fromarray(to_uint8(array)).save(buffer, format="PNG")
     return buffer.getvalue()
@@ -898,7 +916,14 @@ def write_crops(
 
 
 def slug(label: str) -> str:
-    """Return a file-name form of a setting label (``ancuti2018_cap-off_clamp-3``)."""
+    """Return a file-name form of a setting label.
+
+    Args:
+        label: A :func:`setting_label`, e.g. ``"ancuti2018 cap=off clamp=3"``.
+
+    Returns:
+        Spaces as ``_`` and ``=`` as ``-``: ``ancuti2018_cap-off_clamp-3``.
+    """
     return label.replace(" ", "_").replace("=", "-")
 
 
@@ -1338,9 +1363,10 @@ def quantised_regime(log: Callable[[str], None] = print) -> dict[str, Any]:
 # --- claim 10b: the lighting step in the deep clip ------------------------------------------------
 
 WIDEN_S = 3.0
-"""Claim 10b: how far the deep clip's excerpt is widened backwards. More than the 2 s window's
-reach (1 s each side), so the widened analysis holds no edge value anywhere in the original
-excerpt's first second."""
+"""Claim 10b: how far the deep clip's excerpt is widened backwards: 90 frames at 30000/1001.
+That exceeds the STAGED 2 s analysis's reach (29 frames per stage: 58 for 3C, 87 for Ancuti
+2018's three stages), so no value of the original excerpt sees the widened analysis's start
+edge."""
 
 SHORT_SMOOTHER = Smoother("gaussian", 0.5)
 """Claim 10b option (b): the shorter centred Gaussian."""
@@ -1757,7 +1783,15 @@ def _spread(values: Sequence[float]) -> dict[str, float]:
 
 
 def rank_correlation(x: Sequence[float], y: Sequence[float]) -> float | None:
-    """Spearman's rank correlation (average ranks for ties); ``None`` when a side is constant."""
+    """Return Spearman's rank correlation, with average ranks for ties.
+
+    Args:
+        x: One value per item.
+        y: One value per item, the same length.
+
+    Returns:
+        The correlation of the ranks, or ``None`` when either side is constant.
+    """
 
     def ranks(values: Sequence[float]) -> NDArray[np.float64]:
         array = np.asarray(values, dtype=np.float64)
@@ -1776,7 +1810,16 @@ def rank_correlation(x: Sequence[float], y: Sequence[float]) -> float | None:
 
 
 def discordant_pairs(first: Sequence[float], second: Sequence[float]) -> int:
-    """Count the pairs the two sequences order differently (a tie in either one agrees)."""
+    """Count the pairs the two sequences order differently.
+
+    Args:
+        first: One value per item.
+        second: One value per item, the same length.
+
+    Returns:
+        The number of pairs ``(i, j)`` ordered one way by ``first`` and the other by
+        ``second``; a tie in either one counts as agreement.
+    """
     count = 0
     for i in range(len(first)):
         for j in range(i + 1, len(first)):
