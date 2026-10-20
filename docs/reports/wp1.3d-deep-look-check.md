@@ -54,6 +54,12 @@ the clip, an exact 4x4 area mean in NumPy). Measures on the display-encoded RGB 
   AND whose blue or green exceeds red by at least 0.05.
 - `H` = luma RMS contrast (standard deviation of luma over the frame; lower = hazier).
 - Exclusion: luma mean below 0.05 or above 0.95. **0 of the 289 frames were excluded** (`scan.json` `excluded` is empty).
+  (A frame with a zero green mean, for which `D` is undefined, is also excluded by name, as a division
+  guard; none occurred.)
+
+**The scan was run twice** (the second time after the cache of each chapter was made to carry its rules and grid,
+review round 1): both runs gave the same 289 records, value for value, and the same `deep-frames.json` apart from its
+`written` time. The first run's files are kept in `work\wp1.3d\scan-before-cache-identity\`.
 
 The thresholds are fixed by the brief. Over the 289 frames: `D` from 0.209 to 1.097
 (median 0.638); `H` from 0.038 to 0.318
@@ -296,17 +302,25 @@ tabulated), the channel bias is within the unchanged 2.0 bound, and the neighbou
 
 ## 8. Verification
 
-Gate at the head named in the commit list (full run, `footage` and `gpu` tests RUN, none skipped):
+Gate on the head named in the ledger (full run, `footage` and `gpu` tests RUN, none skipped):
 
 - `uv run ruff check .`: all checks passed. `uv run ruff format --check .`: 110 files already formatted.
 - `uv run mypy`: success, no issues in 20 source files.
-- `uv run pytest -q --basetemp=work/pytest-wp1.3d`: **722 passed**, 1 warning (CuPy "CUDA path could not be detected"), 494.5 s.
-  No test skipped. `tests/test_lookcheck.py` is unchanged (`git diff c80725b..HEAD` lists no file other than
-  `tools/lookcheck/scan.py`, `tools/lookcheck/pack.py`, `tests/test_lookcheck_deep.py`, this report and the ledger).
+- `uv run pytest -q --basetemp=work/pytest-wp1.3d`: **730 passed**, 1 warning (CuPy "CUDA path could not be detected"),
+  484.7 s. No test skipped. `tests/test_lookcheck.py` is unchanged and `tools/prototype/`,
+  `tools/lookcheck/frames.py`, `pyproject.toml` and `src/` are untouched (`git diff --stat c80725b..HEAD` lists
+  `tools/lookcheck/scan.py`, `tools/lookcheck/pack.py`, `tests/test_lookcheck_deep.py`, this report and the ledger only).
 - Harness files (`scripts/`, `.claude/`, kernel docs, `tests/harness/`) untouched, so the harness gate is not re-run.
-- New tests: `tests/test_lookcheck_deep.py` (the brief's tests 1-5 and 7, the clip tests, the bit-identity test of
-  `correct(..., statistics=)` against `temporal.render`, the flicker 3.0 bound test, the cap-tolerance test).
+- Tests of this package: `tests/test_lookcheck_deep.py` (the brief's tests 1-5 and 7; the scan cache identity; the
+  clip steps' input checks; the bit-identity of `correct(..., statistics=)` against `temporal.render`; the flicker
+  3.0 bound; the cap tolerance).
 
+Review (Reviewer A, STRONG tier: WSL, codex-cli 0.162.1, `-m gpt-5.6-sol -c model_reasoning_effort=high -s read-only`),
+one round per row; evidence under `C:\Users\rwsmy\clearwater-review-evidence\wp1.3d\rN\`:
+
+| Round | Findings (severity, in or out of envelope) | Fixed in | Verdict |
+|---|---|---|---|
+| 1 | 2 major in envelope (a scan cache without identity could certify a stale or incomplete scan; the clip's encode and page steps trusted whatever PNGs and MP4s were on disk); 3 minor (a usage docstring that named the wrong output folder; a zero-green frame is excluded by a rule the brief does not name, out of envelope; the footage and gpu tests skip when their inputs are absent, out of envelope) | `81187ee`, `018f3a8`, `2883592`; the zero-green rule is now stated in section 2; the skip behaviour is the repository's test convention, checked at the gate | NEW_CRITICAL_MAJOR_FOUND |
 
 ## 9. CP2 deep sheet (to be filled from the owner's words)
 
