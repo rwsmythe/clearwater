@@ -36,6 +36,8 @@
   `docs/reports/wp1.6-gate-report.md`): results 1-2 (Part B, upper bound, shared laptop; photo leg
   PENDING: no photos supplied), 3 (CP2 shallow and deep: c3 default), 4 (WP1.4b KEEP), 5 (WP1.4:
   no visible difference), 6 (WP1.5 SIMPLE). Next owner decision: Gate 1 at WP1.6 (via CHARC).
+  CHARC is drafting WP1.6 now (2026-10-20 ~09:40Z); when the draft is committed it asks me for a
+  FACT-CHECK of every figure against its source (accept records, reports, `work/` records).
 - **Depth rule (owner 2026-10-19, corrected 2026-10-20):** read `cell_depth.py <cell>` at dispatch,
   at every yield, and before sending any ruling or remediation; record each figure with its
   moment. **~250K is an EVALUATION point, not an automatic re-seat** (owner 2026-10-20: "You don't
@@ -95,7 +97,7 @@ Each accepted package had its return report posted to CHARC and an info-update t
 | WP-T2 | 2026-10-19 | `8c9d780` | `docs/proofs/wp-t2-accept.md`; DR-24 closed, DR-27 | CONFIRMED (`d40217a81696cc03`; B rejection upheld; suite re-run deferred past Part B) |
 | WP1.2 Part B | 2026-10-19 | `2dd06cf` | `docs/proofs/wp1.2b-accept.md`; B #2 non-blocking, banked; DR-28; depth breach recorded | CONFIRMED (`cb61a4e41f625d73`; patch-id erratum) |
 | WP1.3D | 2026-10-20 | `7f9fea1` | `docs/proofs/wp1.3d-accept.md`; B #1 blocking (candidate labels) -> one remediation; B #2 `NO_NEW_CRITICAL_MAJOR`; DR-29 | CONFIRMED (`c6bda8a38146274f`) |
-| WP1.4b | 2026-10-20 | `afaff0e` | `docs/proofs/wp1.4b-accept.md`; Gate result 4 KEEP; B `NO_NEW_CRITICAL_MAJOR`, errata, DR-30; flip witness 6/6 | PENDING |
+| WP1.4b | 2026-10-20 | `afaff0e` | `docs/proofs/wp1.4b-accept.md`; Gate result 4 KEEP; B `NO_NEW_CRITICAL_MAJOR`, errata, DR-30; flip witness 6/6 | CONFIRMED |
 
 - **WP1.2 Part A, raised to CHARC:**
   - approval of the Windows-only `_windows_power()` in `bench.py` (instrument only, guarded);
