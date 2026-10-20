@@ -34,10 +34,9 @@
 
 ### Live cells
 
-- **`wp21s-cell3`** (implementer-opus-high, STRONG): WP2.1S remediation of Reviewer A round 3
-  (1 major write guard F1, 7 minors; F5/F7/F8 out of envelope, fix if trivial else bank), round 4,
-  final suite, whole-package return report; from handoff `f18e043`; dispatched 2026-10-20 ~12:28Z.
-  No timed window. Depth at dispatch: 0.
+- **None live.** `wp21s-cell3` returned at 242,826 / 132 turns (WP2.1S accepted); do not message it.
+  Worktrees `.worktrees/wp2.1s` and `.worktrees/wp2.1s-mc` remain until CHARC's QA (then
+  `git worktree remove --force`); branches `wp2.1s`, `wp2.1s-mc` kept as evidence.
 - `wp21s-cell2` RETIRED 2026-10-20 at 342K (128 turns): photo leg, licences, Reviewer A r1-r3
   (r1 0/4/4, r2 0/2/3, r3 0/1/7), W7 incident record corrected (`W7-ABORTED.json`); stood down.
 - `wp21s-cell` RETIRED 2026-10-20 at 257K (95 turns) after closing the transport leg (6 clean
@@ -58,12 +57,11 @@
    choice at WP2.1, optimisation package in Phase 3, final tune at WP5.2). Gate result 4 (KEEP the
    caps) awaits the owner's confirmation at CP3. The gate record is final when the owner's word is
    recorded and the fact-check attached.
-3. **WP2.1S (transport and photo I/O spike) DISPATCHED.** Brief FINAL `docs/briefs/wp2.1s-brief.md`
-   (`aa1f5f0`; draft `07339bc`; CHARC approval and rulings `5152ed4302874889`: `av` granted into
-   dev, no pypng (stdlib PNG writer, else STOP), no exiftool, Part B best-effort covers the
-   exclusive leg, exact pts per transport row). Closes AD-2 and AD-17, confirms AD-18
-   (architecture DRAFT 0.1, `a27a6f7`). On return: QA, Reviewer B at this seat, accept.
-   CHARC holds WP2.2-2.4 until WP2.1S returns (`fa9d637063376263`).
+3. **WP2.1S ACCEPTED 2026-10-20**, main `a866f06` (re-gate line `3d43b83`); record
+   `docs/proofs/wp2.1s-accept.md`; DR-31. Return report to CHARC (return_report, thread wp2.1s);
+   fyi to the operator. CHARC QA pending; CHARC then closes AD-2/AD-17/AD-18, logs AD-23 and adds
+   the gate-report Result 1 supersession note. Next: CHARC's commission for WP2.2/WP2.3 against
+   architecture DRAFT 0.1.
 4. **Next for this seat otherwise:** nothing until CHARC directs. After CP3: Phase 2. WP2.1 (architecture
    document and decisions) is the architect's (CHARC); the orchestrator's likely next packages are
    WP2.2 (interface module) and WP2.3 (shared test fixtures) after WP2.1, and WP2.4 briefs with CHARC.
@@ -90,6 +88,7 @@ Each accepted package had its return report posted to CHARC and an info-update t
 | WP1.2 Part B | 2026-10-19 | `2dd06cf` | `docs/proofs/wp1.2b-accept.md`; DR-28; depth breach recorded | CONFIRMED (`cb61a4e41f625d73`) |
 | WP1.3D | 2026-10-20 | `7f9fea1` | `docs/proofs/wp1.3d-accept.md`; DR-29 | CONFIRMED (`c6bda8a38146274f`) |
 | WP1.4b | 2026-10-20 | `afaff0e` | `docs/proofs/wp1.4b-accept.md`; Gate result 4 KEEP; DR-30; flip witness 6/6 | CONFIRMED (`2fe4e7e1dc9e0854`) |
+| WP2.1S | 2026-10-20 | `a866f06` | `docs/proofs/wp2.1s-accept.md`; DR-31; 2 depth re-seats; B errata at the gate | pending |
 
 Kept branches (evidence; do not delete unasked): `wp1.2b`, `wp1.2b-b1`, `wp1.3d`, `wp1.3d-b1`,
 `wp1.4b`, plus the earlier packages' (`git branch`).
@@ -140,4 +139,4 @@ Kept branches (evidence; do not delete unasked): `wp1.2b`, `wp1.2b-b1`, `wp1.3d`
 - No `.LRV`/`.THM` exist (owner); D60 handled in v0.5.2.
 - `_windows_power()` in `bench.py` is instrument-only (CHARC); never into `src/clearwater/`
   without a fresh ruling.
-- Open debt: DR-1, 2, 6, 7, 8, 10-20, 22, 23, 25-30 (`docs/debt-register.md`).
+- Open debt: DR-1, 2, 6, 7, 8, 10-20, 22, 23, 25-31 (`docs/debt-register.md`).
