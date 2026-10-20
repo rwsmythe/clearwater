@@ -399,3 +399,16 @@ def test_load_settings_refuses_keys_a_migration_step_introduces(
     # a refused key makes the file corrupt: set aside, never silently coerced by json.dumps
     assert load_settings(tmp_path, migrations=registry) == Settings()
     assert list(tmp_path.glob("settings.json.bad-*"))
+
+
+@pytest.mark.parametrize("bad_version", [1.0, True, "1", None])
+def test_a_step_must_return_the_integer_next_version(tmp_path: Path, bad_version: object) -> None:
+    from clearwater.config import migrate
+
+    registry = MigrationRegistry()
+    registry.register("settings", 0, lambda data: {**data, "format_version": bad_version})
+    with pytest.raises(FormatError, match="migration"):
+        migrate("settings", {"format_version": 0}, registry)
+    _write(tmp_path, _document(format_version=0))
+    assert load_settings(tmp_path, migrations=registry) == Settings()  # set aside as corrupt
+    assert list(tmp_path.glob("settings.json.bad-*"))

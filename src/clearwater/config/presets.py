@@ -30,6 +30,7 @@ from clearwater.interfaces import (
     ParameterProblem,
     ParameterSet,
     ParameterValue,
+    UnsupportedFormatVersionError,
     validate_parameter_set,
 )
 from clearwater.interfaces.parameters import loads_object
@@ -88,6 +89,19 @@ class PresetImportError(PresetError):
         self.problems = tuple(problems)
 
 
+class UnsupportedPresetVersionError(PresetError, UnsupportedFormatVersionError):
+    """A preset file carries a ``format_version`` this Clearwater cannot read.
+
+    Both a :class:`PresetError` and an
+    :class:`~clearwater.interfaces.UnsupportedFormatVersionError`, so a caller can tell a preset
+    from a newer Clearwater from an ordinary unreadable one. The file is left untouched.
+    """
+
+
+class UnsupportedPresetImportError(PresetImportError, UnsupportedPresetVersionError):
+    """An import refused because the file's ``format_version`` is not readable (no problems)."""
+
+
 @dataclass(frozen=True)
 class PresetEntry:
     """One file in the preset folder, as listed.
@@ -97,12 +111,15 @@ class PresetEntry:
         path: The file.
         parameter_set: The parsed preset, or None when the file is unreadable.
         error: Why the file is unreadable, or None. An unreadable file is left untouched.
+        unsupported_version: True when the file is unreadable because its ``format_version`` is
+            newer than this Clearwater reads (or older with no migration step).
     """
 
     name: str
     path: Path
     parameter_set: ParameterSet | None
     error: str | None
+    unsupported_version: bool = False
 
 
 @dataclass(frozen=True)
@@ -210,6 +227,11 @@ def starter_presets(now: datetime | None = None) -> dict[str, ParameterSet]:
     }
 
 
+def _is_preset_file(path: Path) -> bool:
+    """Whether a path's name makes it a preset file: ``<name>.json``, any suffix case."""
+    return path.suffix.lower() == _SUFFIX
+
+
 def _name_key(name: str) -> str:
     """Return the key under which two names count as the same file on a lenient file system."""
     return unicodedata.normalize("NFC", name).casefold()
@@ -245,7 +267,7 @@ class PresetStore:
         return self._folder
 
     def list_presets(self) -> list[PresetEntry]:
-        """List every ``*.json`` file in the folder, sorted by name (case-insensitive).
+        """List every ``*.json`` file (any suffix case), sorted by name (case-insensitive).
 
         An unreadable file (bad JSON, newer version, wrong shape, too large) is listed with
         ``error`` set and left untouched.
@@ -257,12 +279,13 @@ class PresetStore:
             return []
         entries = []
         for path in self._folder.iterdir():
-            if path.suffix != _SUFFIX or not path.is_file():
+            if not _is_preset_file(path) or not path.is_file():
                 continue
             try:
                 parameter_set, _ = self._read(path)
             except (FormatError, OSError, UnicodeDecodeError) as error:
-                entries.append(PresetEntry(path.stem, path, None, str(error)))
+                unsupported = isinstance(error, UnsupportedFormatVersionError)
+                entries.append(PresetEntry(path.stem, path, None, str(error), unsupported))
             else:
                 entries.append(PresetEntry(path.stem, path, parameter_set, None))
         return sorted(entries, key=lambda entry: (_name_key(entry.name), entry.name))
@@ -277,9 +300,10 @@ class PresetStore:
             The set, without provenance.
 
         Raises:
+            UnsupportedPresetVersionError: The file's ``format_version`` is not readable.
             PresetError: The name is not valid, or no readable preset has that name.
         """
-        return self._read_preset(self._path(name))
+        return self._read_preset(self._existing(name))
 
     def save(self, name: str, parameter_set: ParameterSet, *, overwrite: bool = False) -> Path:
         """Save a parameter set as a preset.
@@ -327,7 +351,7 @@ class PresetStore:
             PresetError: A name is not valid, ``old`` is not a readable preset, or ``new`` is
                 taken.
         """
-        source = self._path(old)
+        source = self._existing(old)
         target = self._path(new)
         self._read_preset(source)
         for other in self._matches(new):
@@ -346,7 +370,7 @@ class PresetStore:
         Raises:
             PresetError: The name is not valid or no readable preset has that name.
         """
-        path = self._path(name)
+        path = self._existing(name)
         self._read_preset(path)
         path.unlink()
 
@@ -379,6 +403,8 @@ class PresetStore:
         """
         try:
             parameter_set, dropped = self._read(source)
+        except UnsupportedFormatVersionError as error:
+            raise UnsupportedPresetImportError(f"cannot import {source.name}: {error}") from error
         except (FormatError, OSError, UnicodeDecodeError) as error:
             raise PresetImportError(f"cannot import {source.name}: {error}") from error
         schema = schemas.get(parameter_set.method)
@@ -402,7 +428,9 @@ class PresetStore:
         counter = 1
         while self._find(chosen) is not None:
             counter += 1
-            chosen = validate_preset_name(f"{base} ({counter})")
+            suffix = f" ({counter})"
+            room = MAX_NAME_LENGTH - len(suffix)
+            chosen = validate_preset_name(base[:room].rstrip(" .") + suffix)
         path = self._path(chosen)
         self._write(path, parameter_set)
         return PresetImportResult(chosen, path, parameter_set, dropped)
@@ -461,6 +489,19 @@ class PresetStore:
         """Return the file for a valid name; the name cannot leave the folder."""
         return self._folder / f"{validate_preset_name(name)}{_SUFFIX}"
 
+    def _existing(self, name: str) -> Path:
+        """Return the preset file whose stem is exactly ``name`` (any suffix case).
+
+        Raises:
+            PresetError: The name is not valid, or no such file exists.
+        """
+        validate_preset_name(name)
+        if self._folder.is_dir():
+            for path in self._folder.iterdir():
+                if _is_preset_file(path) and path.stem == name:
+                    return path
+        raise PresetError(f"no preset named {name!r}")
+
     def _matches(self, name: str) -> list[Path]:
         """Return the preset files whose name matches ``name`` case-insensitively."""
         if not self._folder.is_dir():
@@ -469,7 +510,7 @@ class PresetStore:
         return [
             path
             for path in self._folder.iterdir()
-            if path.suffix == _SUFFIX and _name_key(path.stem) == key
+            if _is_preset_file(path) and _name_key(path.stem) == key
         ]
 
     def _find(self, name: str) -> Path | None:
@@ -500,5 +541,9 @@ class PresetStore:
             raise PresetError(f"no preset named {path.stem!r}")
         try:
             return self._read(path)[0]
+        except UnsupportedFormatVersionError as error:
+            raise UnsupportedPresetVersionError(
+                f"{path.stem!r} is not a readable preset: {error}"
+            ) from error
         except (FormatError, OSError, UnicodeDecodeError) as error:
             raise PresetError(f"{path.stem!r} is not a readable preset: {error}") from error

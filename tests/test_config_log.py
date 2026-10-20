@@ -86,7 +86,10 @@ def test_rotates_at_the_size_limit_and_keeps_only_the_backup_count(tmp_path: Pat
     names = sorted(p.name for p in tmp_path.iterdir())
     assert names == ["clearwater.log", "clearwater.log.1", "clearwater.log.2", "clearwater.log.3"]
     for name in names:
-        assert (tmp_path / name).stat().st_size <= 2000 + 200  # one record may straddle
+        data = (tmp_path / name).read_bytes()
+        # rollover happens before the limit; the handler counts characters, so a platform that
+        # writes two bytes per line end may be over by one byte per line
+        assert len(data) <= 2000 + data.count(b"\n")
     assert "record 0399" in path.read_text(encoding="utf-8")  # newest in the live file
     oldest = (tmp_path / "clearwater.log.3").read_text(encoding="utf-8")
     assert "record 0000" not in oldest  # the earliest records were dropped
@@ -113,3 +116,17 @@ def test_shutdown_without_configuration_is_harmless() -> None:
     shutdown_logging()
     shutdown_logging()
     assert _handlers() == []
+
+
+def test_one_record_over_the_limit_is_written_whole_to_a_file_of_its_own(tmp_path: Path) -> None:
+    configure_logging(tmp_path, max_bytes=1000, backup_count=2)
+    log = logging.getLogger("clearwater.demo")
+    log.info("small before")
+    log.info("big %s", "y" * 5000)
+    log.info("small after")
+    shutdown_logging()
+    sizes = {p.name: p.stat().st_size for p in tmp_path.iterdir()}
+    assert len(sizes) <= 3  # the live file plus at most backup_count backups
+    big = [name for name, size in sizes.items() if size > 1000]
+    assert len(big) == 1  # the oversized record is whole, in one file, past the limit
+    assert "y" * 5000 in (tmp_path / big[0]).read_text(encoding="utf-8")

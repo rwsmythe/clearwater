@@ -14,13 +14,20 @@ from clearwater.config import (
     PresetError,
     PresetImportError,
     PresetStore,
+    UnsupportedPresetImportError,
+    UnsupportedPresetVersionError,
     check_string_keys,
     new_parameter_set,
     starter_presets,
     validate_preset_name,
 )
 from clearwater.config.presets import MAX_PRESET_BYTES
-from clearwater.interfaces import FormatError, Parameter, ParameterSet
+from clearwater.interfaces import (
+    FormatError,
+    Parameter,
+    ParameterSet,
+    UnsupportedFormatVersionError,
+)
 
 CREATED = datetime(2026, 10, 20, 12, 30, 15, 123456, tzinfo=UTC)
 
@@ -615,3 +622,151 @@ def test_migration_fake_step_is_applied_by_load_and_import(tmp_path: Path) -> No
 def test_public_check_helper_names_the_path() -> None:
     with pytest.raises(FormatError, match=r"provenance\.source\[0\]"):
         check_string_keys({"source": [{1: 2}]}, "provenance")
+
+
+# --- round 1 remediation ------------------------------------------------------------------------
+
+
+def _upper_suffix_preset(tmp_path: Path, name: str = "Foo", **params: Any) -> Path:
+    folder = tmp_path / "presets"
+    folder.mkdir(exist_ok=True)
+    path = folder / f"{name}.JSON"
+    path.write_text(ParameterSet("c3", params, CREATED, "1.2.3").to_json(), encoding="utf-8")
+    return path
+
+
+def test_upper_case_suffix_is_listed_and_loaded(tmp_path: Path) -> None:
+    path = _upper_suffix_preset(tmp_path, steps=1)
+    store = _store(tmp_path)
+    assert [(e.name, e.path.name, e.error) for e in store.list_presets()] == [
+        ("Foo", "Foo.JSON", None)
+    ]
+    assert store.load("Foo").parameters == {"steps": 1}
+    assert path.exists()
+
+
+def test_save_never_overwrites_an_upper_case_suffix_file_unless_told(tmp_path: Path) -> None:
+    path = _upper_suffix_preset(tmp_path, steps=1)
+    before = path.read_bytes()
+    store = _store(tmp_path)
+    with pytest.raises(PresetError, match="already exists"):
+        store.save("Foo", _set())
+    assert path.read_bytes() == before
+    written = store.save("foo", _set(), overwrite=True)
+    assert written.name == "Foo.JSON"  # the existing spelling is replaced in place
+    assert store.load("Foo") == _set()
+    assert sorted(p.name.casefold() for p in path.parent.iterdir()) == ["foo.json"]
+
+
+def test_import_never_overwrites_an_upper_case_suffix_file(tmp_path: Path) -> None:
+    path = _upper_suffix_preset(tmp_path, steps=1)
+    before = path.read_bytes()
+    source = _file(tmp_path, "Foo.json", _set().to_dict())
+    result = _store(tmp_path).import_preset(source, SCHEMAS)
+    assert result.name == "Foo (2)"
+    assert path.read_bytes() == before
+
+
+def test_starters_never_overwrite_an_upper_case_suffix_file(tmp_path: Path) -> None:
+    path = _upper_suffix_preset(tmp_path, "Snorkel (shallow)", steps=1)
+    before = path.read_bytes()
+    store = _store(tmp_path)
+    assert store.install_starters() == ["Scuba (deep)"]
+    assert path.read_bytes() == before
+
+
+def test_rename_delete_and_export_work_on_an_upper_case_suffix_file(tmp_path: Path) -> None:
+    _upper_suffix_preset(tmp_path, steps=1)
+    store = _store(tmp_path)
+    exported = store.export_preset("Foo", tmp_path / "out.json")
+    assert ParameterSet.from_json(exported.read_text(encoding="utf-8")).parameters == {"steps": 1}
+    store.rename("Foo", "Bar")
+    assert [e.name for e in store.list_presets()] == ["Bar"]
+    store.delete("Bar")
+    assert store.list_presets() == []
+
+
+def _future_preset(tmp_path: Path, name: str = "Fut") -> tuple[Path, bytes]:
+    folder = tmp_path / "presets"
+    folder.mkdir(exist_ok=True)
+    data = _set().to_dict()
+    data["format_version"] = 2
+    path = folder / f"{name}.json"
+    path.write_text(json.dumps(data), encoding="utf-8")
+    return path, path.read_bytes()
+
+
+def test_future_version_keeps_its_identity_on_every_store_operation(tmp_path: Path) -> None:
+    path, raw = _future_preset(tmp_path)
+    store = _store(tmp_path)
+    operations = [
+        lambda: store.load("Fut"),
+        lambda: store.rename("Fut", "Other"),
+        lambda: store.delete("Fut"),
+        lambda: store.save("Fut", _set(), overwrite=True),
+        lambda: store.export_preset("Fut", tmp_path / "out.json"),
+    ]
+    for operation in operations:
+        with pytest.raises(UnsupportedFormatVersionError) as raised:
+            operation()
+        assert isinstance(raised.value, UnsupportedPresetVersionError)
+        assert isinstance(raised.value, PresetError)
+        assert "format_version 2" in str(raised.value)
+    assert path.read_bytes() == raw
+    assert [p.name for p in path.parent.iterdir()] == ["Fut.json"]
+    assert not (tmp_path / "out.json").exists()
+
+
+def test_future_version_import_is_catchable_both_ways(tmp_path: Path) -> None:
+    future = _set().to_dict()
+    future["format_version"] = 2
+    source = _file(tmp_path, "f.json", future)
+    raw = source.read_bytes()
+    with pytest.raises(UnsupportedFormatVersionError) as raised:
+        _store(tmp_path).import_preset(source, SCHEMAS)
+    assert isinstance(raised.value, UnsupportedPresetImportError)
+    assert isinstance(raised.value, PresetImportError)
+    assert raised.value.problems == ()
+    assert source.read_bytes() == raw
+    assert not (tmp_path / "presets").exists()
+
+
+def test_list_flags_unsupported_versions_but_not_other_errors(tmp_path: Path) -> None:
+    _future_preset(tmp_path)
+    (tmp_path / "presets" / "bad.json").write_text("{nope", encoding="utf-8")
+    entries = {e.name: e for e in _store(tmp_path).list_presets()}
+    assert entries["Fut"].unsupported_version is True and entries["Fut"].error
+    assert entries["bad"].unsupported_version is False and entries["bad"].error
+
+
+def test_ordinary_corruption_is_not_an_unsupported_version(tmp_path: Path) -> None:
+    folder = tmp_path / "presets"
+    folder.mkdir()
+    (folder / "bad.json").write_text("{nope", encoding="utf-8")
+    with pytest.raises(PresetError) as raised:
+        _store(tmp_path).load("bad")
+    assert not isinstance(raised.value, UnsupportedFormatVersionError)
+
+
+def test_numbering_a_maximum_length_name_truncates_the_base(tmp_path: Path) -> None:
+    store = _store(tmp_path)
+    base = "x" * 100
+    source = _file(tmp_path, "src.json", _set().to_dict())
+    assert store.import_preset(source, SCHEMAS, name=base).name == base
+    second = store.import_preset(source, SCHEMAS, name=base).name
+    third = store.import_preset(source, SCHEMAS, name=base).name
+    assert second == "x" * 96 + " (2)" and len(second) == 100
+    assert third == "x" * 96 + " (3)"
+    assert validate_preset_name(second) == second
+
+
+def test_truncation_does_not_leave_trailing_space_or_dot(tmp_path: Path) -> None:
+    source = _file(tmp_path, "src.json", _set().to_dict())
+    for index, cut_character in enumerate((" ", ".")):
+        store = PresetStore(tmp_path / f"presets{index}")
+        base = "a" * 95 + cut_character + "bbbb"
+        assert len(base) == 100
+        store.import_preset(source, SCHEMAS, name=base)
+        again = store.import_preset(source, SCHEMAS, name=base).name
+        assert again == "a" * 95 + " (2)"
+        assert validate_preset_name(again) == again

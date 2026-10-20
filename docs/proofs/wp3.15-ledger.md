@@ -10,7 +10,7 @@ Cell: implementer-sonnet-high (tier STRONG). Worktree `.worktrees/wp3.15`, branc
 |---|---|---|---|---|---|---|---|---|
 | 0 (design) | 2026-10-20 | n/a | n/a | n/a | n/a | n/a | n/a | 83,816 (dispatcher, 15 turns) |
 | build yield | 2026-10-20 | n/a | n/a | n/a | n/a | product + tests | n/a | 145,492 (dispatcher, 34 turns) |
-| 1 | 2026-10-20 | 2 major, 0 critical | 3 | all in | 5 NEW, 0 REOPENED | none yet (remediation after the yield) | WSL, codex-cli, gpt-5.6-sol high; head 703f7d9 | (dispatcher fills) |
+| 1 | 2026-10-20 | 2 major, 0 critical | 3 | all in | 5 NEW, 0 REOPENED | none yet (remediation after the yield) | WSL, codex-cli, gpt-5.6-sol high; head 703f7d9 | 176,725 (dispatcher, 57 turns) |
 
 ## Round 0: the design table (brief task 1)
 
@@ -191,3 +191,24 @@ All findings REASONED (the reviewer could not run uv); each reproduced or confir
 | 5 | MINOR | migration.py | a step may return `1.0` as the new version | CONFIRMED by probe | require an `int` that is not bool, exactly n + 1; test |
 
 Fix kind of the coming remediation: PRODUCT code (1, 2, 3, 4 docstring, 5) plus tests.
+
+### Round 1 remediation (dispatcher rulings: all five ACCEPTED)
+
+PRODUCT code plus tests; interfaces untouched. (1) one helper `_is_preset_file` (suffix compared
+case-insensitively) used by list, find/collision, and a new `_existing(name)` used by load, rename,
+delete (and so export); a `.JSON` file is listed, collides on save/import/starters and is replaced
+in place only with `overwrite`. (2) `UnsupportedPresetVersionError(PresetError,
+UnsupportedFormatVersionError)` raised by load/rename/delete/save-overwrite/export, and
+`UnsupportedPresetImportError(PresetImportError, UnsupportedPresetVersionError)` by import;
+`PresetEntry.unsupported_version`; the file stays byte-unchanged. (3) numbering truncates the base to
+fit 100 characters, strips trailing space and dot, and re-validates the result. (4) `log.py`
+docstring: the bound is per rollover; one record over the limit is written whole to its own file; a
+test pins it. While pinning, a true detail surfaced: the handler counts characters, so on Windows a
+file may exceed the limit by one byte per line (CRLF); the docstring and the rotation test say so
+(the round-0 test had a 200-byte slack that hid this). (5) a migration step must return the integer
+n + 1 (not 1.0, not True).
+
+Regression tests written against the unfixed source (a scratch copy of HEAD with only the two
+exception classes added so the file imports): 10 of the new tests FAIL there (4 `.JSON`, 3
+version-identity, 2 truncation, 1 float version) and pass on the fixed code. Inner loop: 198
+passed; ruff check, ruff format --check, mypy clean.
