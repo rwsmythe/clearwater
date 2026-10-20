@@ -122,3 +122,27 @@ colours decode identically with `in_range=tv` and `pc`), so decode and encode wo
 Round 1 transcript and adjudication: `C:\Users\rwsmy\clearwater-review-evidence\wp3.5\r1\`
 (`review.txt`, `review.stderr.txt`, `adjudication.md`, `md5sums.txt`). Verdict
 NO_NEW_CRITICAL_MAJOR; the 7 minors are fixed once in the cleanup, which opens no round.
+
+## STOP 1 ruling (CHARC msg 229c326b43fb99f2, 2026-10-20 22:50Z, relayed by the orchestrator)
+
+Option 1. V9 (AD-11 2/255 max, 0.2/255 mean) binds only the RGB-side legs: the `samples.py`
+integer / float round trip and the decoded RGB before the encoder. The swscale pair through 8-bit
+4:2:0 is a CHARACTERISATION test with regression bounds from the measurement: GX011627 first 30
+frames mean <= 1.0/255 and p99.9 <= 4/255; testsrc2 samples mean <= 3/255, max reported, not
+asserted. The planted range, matrix, accurate_rnd and siting defects must exceed the bounds by a
+stated margin, and the report gives each defect's measured figure beside its bound. AD-11 is not
+loosened; its V9 row carries a one-line clarification on main (`2ce4266`, not in this base). The
+brief's task 4 wording is superseded by this ruling (no brief re-issue). Applied: constants
+`PAIR_MEAN_REAL = 1.0`, `PAIR_P999_REAL = 4.0`, `PAIR_MEAN_SYNTHETIC = 3.0`
+(`tests/test_color_roundtrip.py`); with the synthetic bound of 3 the accurate_rnd and siting
+plants no longer exceed it on testsrc2, so they are asserted on the footage row (and by the
+flat-colour truth and the argument-level tests); the margins are in the report.
+
+## Round-1 cleanup (all 7 minors, one pass, no new round)
+
+1 truth cases added (10-bit BT.709 full, 10-bit BT.601 limited and full, 8-bit BT.709 full;
+planted range misread now both ways); 2 `decode_file_frames` checks the FFmpeg exit status and a
+short final frame, frame counts asserted in every row; 3 report sentence; 4 non-positive sizes and
+empty arrays refused; 5 non-contiguous buffers refused; 6 `bt601` dropped from the primaries name
+table; 7 rejected values formatted with `!a`. Fix type: product (4 small guards in `samples.py`
+and `swscale.py`) plus tests and report.
