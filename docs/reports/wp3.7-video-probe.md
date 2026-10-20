@@ -62,7 +62,7 @@ tables, the rulings and the round record.
   walk, covered for every truncation of a synthetic file).
 - `unreadable_tail` is a one-GOP check: damage earlier in the file is not seen by the probe.
   A stream whose packets carry no keyframe flag is not tail-checked.
-- An open-ended `-read_intervals` drops frames at random on this ffprobe (ledger build notes);
+- An open-ended `-read_intervals` drops frames at random on this ffprobe (19 of 400 runs of `-read_intervals 0.000000%` on `hevc10` delivered a partial frame list with exit 0 and empty stderr; 0 of 500 runs on three samples and 0 of 400 probes of four samples after `%+86400`);
   the explicit end offset is load-bearing and pinned by a test.
 - `clearwater.io.video.probe` (function) shadows the submodule attribute of that name.
 - GoPro "HDR video" mode is not read (AD-16 PENDING a clip).

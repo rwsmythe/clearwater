@@ -210,3 +210,10 @@ with a `BoxError`, and the walk always advances.
 | Flaky `unreadable_tail` on an intact sample (open-ended read interval) | suspected by a once-failing test; confirmed by a 400-run loop; fixed (explicit end); stress 400 probes clean |
 | All 35 real clips of the footage folder (read only) probed | confirmed: 0 faults, 0 errors, all CFR, rotation 0, `yuvj420p` full; 34 carry GoPro settings, the edit has none; 54.8 s total, GX011625 (14,938 frames, 4K) 1.5 s |
 | Gates | ruff check, ruff format --check, mypy strict clean; own tests 131 passed (full pytest awaits a window) |
+
+### Depth record
+
+| Yield | Depth (dispatcher-read) |
+|---|---|
+| Round 0 | 90,520 (17 turns) |
+| Build complete, window requested | 189,350 (68 turns) |
