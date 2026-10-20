@@ -11,339 +11,93 @@
 
 ### Phase / state
 
-Phase 1 (prototype gate) of the implementation plan
-(`docs/clearwater-implementation-plan.md` section 6). Second CHARC generation,
-`clearwater-charc-20261014-1303` (fable/medium, launched through
-`scripts/launch_role.ps1`). Bootstrap steps 1-5 done. Repository local + mirrored to
-private GitHub `rwsmythe/clearwater`; main is ~150 commits ahead of `origin/main`,
-unpushed, and the owner has not asked for a push (verify: `git status -sb`).
+**Phase 2 (architecture and interfaces), closing; Phase 3 (build) about to open.**
+Plan `docs/clearwater-implementation-plan.md` v1.2. **CHARC generation 2**
+`clearwater-charc-20261020-0636` (fable/medium, `scripts/launch_role.ps1`), picked up
+2026-10-20 ~16:50Z from generation 1 (`clearwater-charc-20261014-1303`, rolled at the 400K cap,
+hand-off commit edd1e88; its narrative is in `git log -- docs/charc-state.md`). Bootstrap
+steps 1-5 were done by generation 1; this seat re-read the kernel docs, drained the inbox and
+announced itself. Main ~500 commits ahead of `origin/main`, unpushed; the owner has not asked
+for a push (verify `git status -sb`).
 
-**Bash-launch gauge (bootstrap step 2):** 47 ms for one `bash-cc.exe -c true`
-(2026-10-14; re-measure with PowerShell
+**Bash-launch gauge:** 35.5 ms (2026-10-20, this seat; PowerShell
 `Measure-Command { & $env:CLAUDE_CODE_GIT_BASH_PATH -c true }`). Under the 1 s flag.
 
-### Accepted (all on main; records in `docs/proofs/`)
+### Frozen inputs (verify each at its path)
 
-| WP | Main | Record | Note |
-|---|---|---|---|
-| WP0.1 | c09f747 | wp0.1-accept.md | local config, env report, FFmpeg dev tools |
-| WP0.2 | 4863a90 | wp0.2-accept.md | `tools/inventory.py` |
-| WP1.1 | 9711faf | wp1.1-accept.md (2e09203) | reference pipeline `tools/prototype/`; W_L ruling; DR-11..13 |
-| WP1.2A | f6d998a | wp1.2-accept.md (7048fd7) | CuPy backend + `bench.py`; synthetic GPU 4K 0.389/0.652 s (3.5x/5.9x N6); DR-14 |
-| WP1.2R | 996274e | wp1.2r-accept.md (aac4674) | prototype remediation after the retroactive seat-run B (M1 probe catch-all, M2 derived-value validation, M3 float64 accumulators ruled (a), m5, m7); 2nd-B major adjudicated NOT BLOCKING, upheld by CHARC -> DR-19; arithmetic bit-identical in 6 witness cases |
-| WP1.5 | 3242679 | wp1.5-accept.md (371f19d) | container spike: SIMPLE; MANDATORY+REQUIRED 0 DIFFERENT, 8 best-effort lost; NVENC/libx265 8/10-bit proven; HERO13 HEVC 8-bit BT.709 FULL range; no .LRV (D60 closed v0.5.2); DR-15..17 |
-| WP1.3 (shallow) | 7178540 | wp1.3-accept.md (bc97a19) | look-check instrument `tools/lookcheck/`; pack `work/wp1.3/index.html` (24 stills x 3 variants, 180-frame unsmoothed flicker pair) READY FOR CP2; seat B pass 1 BLOCKING (3 introduced majors, ONE remediation `wp13-fix`), re-run BLOCKING again -> adjudicated at the gate (CRITICAL pytest basetemp exposure = DR-21, repo-wide; 2 majors instrument-only = DR-20); CHARC md5s verified, QA green at this seat 2026-10-15 13:3xZ |
-| WP-T1 | f6a34a4 | wp-t1-accept.md (3f40a85) | pytest temp-root footage guard in `tests/conftest.py` (CHARC-commissioned, DR-21 CLOSED, DR-9 CLOSED); seat B pass 1 BLOCKING (C1 case, C3 fail-open, M4, M6; ONE remediation), re-run BLOCKING again -> adjudicated at the gate (4 crafted-state aliasing cases, DR-22(4)-(7)); DR-22 OPEN (9 limits incl. CHARC's accepted pre-conftest capture writes); CHARC md5s verified, QA at this seat 14:5xZ |
-| WP1.4 (shallow) | 91f5775 | wp1.4-accept.md (36535bf) | statistics and smoothing experiments: `tools/prototype/temporal.py`, `statistics_experiments.py`, additive `correct(..., statistics=)` hook; D98 staged vs flat: no visible difference; seat B pass 1 BLOCKING (4 majors, ONE remediation `wp14-fix`), re-run BLOCKING again -> adjudicated at the gate (finding 3 result-bearing: 2 s default PROVISIONAL, re-measure per DR-25(3)); DR-23 (VFR by index), DR-24 (footage-layout skips -> WP-T2), DR-25 (B re-run 1-7, WP2.1), DR-26 (spike root paths, banked); CHARC md5s verified, QA CONFIRMED at this seat 2026-10-19 01:1xZ |
-| WP-T2 | 8c9d780 | wp-t2-accept.md (f7e4cac) | footage locator `find_footage_file` in `tools/local_config.py` (VIDEO_EXTENSIONS relocated there); gate 628 passed 0 skipped; DR-24 CLOSED, DR-27 opened; seat B major (root junction walked) REJECTED by the orchestrator, upheld by CHARC; CHARC QA on the cheap checks 2026-10-19 (patch-id e5354e8d, md5s OK); suite re-run at this seat done 2026-10-19 ~14:10Z after Part B's window closed: 628 passed 0 skipped on main 5e3aa33; **QA CONFIRMED** |
+- Spec `docs/underwater-correction-spec.md` **v0.5.4** (owner-approved 2026-10-20 ~16:00Z,
+  verbatim "Gate 1: Option C.  2. Keep.  3. approve 0.5.4"; applied 9cf16c5). D106 interim N6
+  25 min/min; D100 caps KEPT; chapter handling deferred to v2 (v0.5.3).
+- Architecture `docs/architecture.md` **FINAL 1.0**; decisions `docs/decisions.md` AD-1..AD-27.
+- Interfaces **IF-1..IF-10 FROZEN** in `src/clearwater/interfaces/` (WP2.2, main b288533); any
+  change is a STOP to CHARC (AD-20).
+- Gate report `docs/reports/wp1.6-gate-report.md` CLOSED; records `docs/proofs/cp3-prototype-gate.md`,
+  `cp4-design-freeze.md`. Phase 3 frame `docs/briefs/wp2.4-phase3-frame.md` (waves 1-4, grants,
+  spec-to-package map).
+- Accept records for every closed WP in `docs/proofs/` (WP0.1 .. WP2.2); debt register
+  `docs/debt-register.md` DR-1..DR-32 (OPEN unless marked CLOSED; CLOSED: 3, 4, 5, 9, 21, 24).
 
-CHARC QA at this seat re-ran ruff/format/mypy/pytest green on every accept (pytest
-skips the ffprobe tests here because this seat's PATH lacks ffprobe; the
-orchestrator's 398-pass run is the figure of record). Spec at v0.5.2 (D60 closed 2026-10-15,
-owner-approved; v0.5.1 073ca1f). Debt register `docs/debt-register.md`: DR-1, DR-2, DR-6..DR-8, DR-10..DR-20, DR-22 OPEN;
-DR-3, DR-4, DR-5, DR-9, DR-21 CLOSED (verify `docs/debt-register.md`).
+### Live workstreams (verify `git worktree list`, `docs/orchestrator-state.md`, `ListAgents`)
 
-### Reviewer B form (owner catch 2026-10-15 07:25Z)
+- **Orchestrator generation 4** `clearwater-orchestrator-20261020-0524` (opus/high/auto; online
+  15:30Z; sole drainer). Always re-read `comms/.launch-sessions.json` before a cue.
+- **Live cell: WP2.3 fixtures, `wp23-cell2`** (sonnet-high) in `.worktrees/wp2.3`, branch
+  `wp2.3`, from d495b57 (R1 closed 11/11), dispatched ~16:37Z at depth 0. Applies CHARC ruling
+  ef7b272564ddeb9d (AD-14 centre track; one readable conditional `pytest_plugins` line in
+  conftest; `.gitattributes` `tests/fixtures/** -text` with raw-byte regeneration compare), then
+  Reviewer A R2; yields at R2's verdict BEFORE any remediation. The first cell (`wp23-cell`)
+  retired at 406,816 past the cap after remediating R1 without a yield; the accept record must
+  say so. **That worktree is OCCUPIED: do not touch it** (charter 5.1 incoming precondition).
+- **On WP2.3's return:** CHARC QA at this seat (git patch-id on author head, candidate and main;
+  B transcript md5s; the five assertions; DR entries; harness gate 366 at this seat). Then the
+  orchestrator dispatches **wave 1** in parallel: WP3.1 core (opus-high), WP3.7 probe, WP3.13
+  naming, WP3.15 presets/settings (sonnet-high); briefs `docs/briefs/wp3.{1,7,13,15}-brief.md`
+  APPROVED 47b9738. At FINAL each cites v0.5.4 and architecture 1.0 (no "proposed" markers),
+  fills WP2.3's manifest ids, and WP3.1 carries a one-line Gate 1 section (IF-2 ops
+  device-resident-ready, no implicit host copies). Full-pytest gate windows serialised across
+  parallel cells.
+- **Then:** waves 2-4 per the Phase 3 frame (orchestrator drafts, CHARC approves each; WP3.21
+  optimisation package drafted at wave 4, target 10 min/min, re-measure at WP5.2). CP5 shows the
+  owner the starter preset values. Close DR items in the register as packages close them.
 
-Reviewer B is ONE Codex pass the ORCHESTRATOR runs at its own seat on the merge
-candidate, never an implementer cell (`docs/review-gate-clearwater.md` Part 2 item 2,
-corrected at 30483f2; memory `clearwater-reviewer-b-form.md`). WP1.5 was the first
-accept in that form; its pass 1 caught B3 (an H.264 output passing as SAME) that
-neither Reviewer A nor the QA cell caught. Every accept record names the transcript
-path, md5, five assertions and verdict, or there is no accept.
+### Owner
 
-### Live workstreams
-
-- **Orchestrator generation 2** `clearwater-orchestrator-20261018-1442 (ROLLED OVER 2026-10-20 09:46Z at the 400K cap, clean boundary, state e975db5; **generation 3 = `clearwater-orchestrator-20261019-2346`**, launched 09:46:50Z, sole drainer)` (opus/high/auto; online
-  2026-10-19T00:42Z; gen 1 rolled at 411K with no live cell; verify `comms/.launch-sessions.json`,
-  `ListAgents`). All `wp1.5*` worktrees removed;
-  branches `wp1.1`, `wp1.2`, `wp1.5` kept for the reviewed SHAs (`git worktree list`).
-- **Retroactive Reviewer B over tools/prototype: CLOSED** (addenda in `wp1.1-accept.md` and
-  `wp1.2-accept.md`; WP1.1 envelope formally short side > 128 px; DR-18, DR-19). No cell is
-  live (verify `git worktree list`).
-- **Real-inventory mechanical pass** (implementer-sonnet-medium, no code: `uv run python
-  tools/inventory.py` with the main-tree local config; report counts, modes, chaptered
-  recordings, LRV coverage, error rows, uncovered GoPro names): QUEUED; dispatch ONLY on
-  CHARC's word after the owner reports the download complete (DR-6) -> CP1 (owner sorts
-  categories; owner-reserved).
-- **WP1.2 Part B** (real modes, full-clip end-to-end incl. decode/encode via the WP1.5
-  SIMPLE path, largest photo, analysis speed with decode/LRV; EXCLUSIVE) after the
-  inventory. WP1.3 and WP1.4 need CP1. **WP1.6** gate report after all six results;
-  Gate 1 (N6 speed: core 3.5-13.5x over budget before decode/encode, unoptimised by
-  ruling) goes to the owner there with measured options. Gate 6 is CHARC's at WP1.6.
-
-- **Partial CP1 (owner, 2026-10-15 ~10:50Z, verbatim: "shallow confirmed")** on the four
-  chapters: `docs/proofs/cp1-footage-sorting.md` (living record). WP1.3 shallow part ACCEPTED
-  (table above); its pack awaits the owner's CP2 look (owner-reserved; CHARC proposes the owner
-  view it together with WP1.4's staged/flat renders). **WP1.4 (shallow part) DISPATCHED**
-  2026-10-15 ~13:28Z (FINAL `docs/briefs/wp1.4-brief.md` 9ed1a1c; `wp14-cell`, opus-high;
-  STRONG; `tools/prototype/temporal.py` + additive `correct(..., statistics=)` hook; reuses the
-  WP1.3 instrument with `roots`, no D54 re-implementation; staged vs flat D98, smoothing
-  candidates, robust N{} bounds; gain-cap noise test deferred to WP1.4b on the scuba footage).
-  **WP-T1 ACCEPTED** (table above; the guard is live in `tests/conftest.py`; CLAUDE.md
-  Conventions line added). WP1.4 is not exclusive and may not overlap Part B's bench window. Verify: `git worktree
-  list`, `docs/debt-register.md` DR-20/DR-21.
-- **2026-10-19 live: WP1.2 Part B DISPATCHED (EXCLUSIVE)** -- `wp12b-cell`, brief
-  `docs/briefs/wp1.2b-brief.md` FINAL f7e4cac. CHARC ruling 748d2835: long full clip = GX011625
-  (not GX011600; 13 h buys nothing per-frame), GX011627 short clip, 4 h cap per exclusive window
-  (cell records the estimate first, stops and reports if over). NO pytest, harness gate or Codex at
-  this seat until Part B returns (plan 4.3). **CP1 COMPLETE** 2026-10-19 (`docs/proofs/
-  cp1-footage-sorting.md`: Snorkel=shallow, SCUBA=deeper, edits=stress case; no open-water or
-  static clips; chapter handling DEFERRED to v2). **Shallow CP2 COMPLETE** 2026-10-19
-  (`docs/proofs/cp2-look-check.md`; sheet in the WP1.3 report section 9): no cast, halo, noise,
-  clipping or flicker; Ancuti variants push red (skin, white boat); **owner: c3 default, Ancuti
-  variants kept as options**; staged vs flat: no visible difference (D98 input). **Spec revision
-  v0.5.3 APPROVED by the owner** ("approved as 0.5.3", 2026-10-19) and applied b3fcd86 (c3 default:
-  D16 amended; chapter handling deferred to v2: 5.5, D21, D33, D80, D82, D83, D64 seam, G7, G11,
-  V3 seam, V12, 8.2/8.3, UC2/UC3, 14.2 closed); CLAUDE.md spec line bumped; **plan v1.1** 51da4b0
-  (WP3.8 removed, WP3.19 = batch queue + export progress, V12 deferred). Two cache sentences still
-  mention chapter groups (spec line ~339, V17); moot in v1, untouched. Orchestrator told to cite
-  v0.5.3 in every brief (17a0d287); prototype default flips to c3 in the next package touching
-  tools/prototype, not inside Part B. **Part B idle ruling 2026-10-19 ~03:38Z** (msg d69d8e1f):
-  cell's first window W1 discarded for sibling-harness load (16 python.exe, MsMpEng, WmiPrvSE);
-  CHARC measured the machine idle (CPU 10-21 %, GPU 0 %) and ruled PROCEED NOW W1-W5 under the
-  orchestrator's contamination rule plus: pre-window idle gate, no CIM samplers, drift baseline =
-  clean W1 median (not Part A synthetic), stop after a second contamination -> only then ask the
-  owner for a quiet block, no Defender exclusion, 4 h cap. Cell acknowledged the GX011625
-  amendment (3c5f73b); GX011600 dropped; block ~3 h. Condition 4 then triggered (W1 contaminated
-  twice by the swing-trading orchestrator's 16-worker pytest loop every 15-20 min); decision
-  request e2c53e6a to the owner. **OWNER 2026-10-19 ~04:30Z: "I am not concerned about
-  contaminated figures as the actual program itself will run in a non-ideal state. Best effort
-  is fine."** Relayed c42d103e: no quiet block; cell released for W1-W5; each window once (short
-  windows may re-run once; W2/W5 never); contaminated windows labelled and reported as measured
-  spread with stray readings, clocks, pstate, power; report carries the shared non-idle laptop
-  caveat; Gate 1 decided on these figures with that caveat. Report round proceeds after W5. **Part B RETURNED 2026-10-19 ~14:00Z** (head 2fa0ac8, candidate
-  6e538d7; gates 672 passed; B #1 BLOCKING 4 major 5 minor, one remediation under way, no
-  re-timing, brief docs/briefs/wp1.2b-remediation-brief.md). Headline: core 4K GPU ancuti2018
-  0.395 s (3.6x N6 0.1101 s), c3 0.639 s; GX011627 end-to-end 4.41x N6 (resident 3.25x);
-  GX011625 full clip 7.62x (contaminated, thermal 91 C); analysis pipe-bound (32 KB Windows raw
-  pipe, 93.6 ms/frame vs 4-5 ms at >=1 MB blocks -> WP2.1 transport); memory 3,682 MiB process,
-  2,860 MiB graphics; photo leg PENDING. Claim 7: no candidate reaches N6 -> Gate 1 needs CHARC
-  options or an owner N6 decision at WP1.6. Exclusive window CLOSED; seat free. **Part B ACCEPTED
-  2026-10-19 main 2dd06cf** (bundle 7e14b19; record docs/proofs/wp1.2b-accept.md; B #2 6 minor +
-  1 advisory banked DR-28 + report errata; cell depth breach 932K recorded, orchestrator
-  corrective: depth read at dispatch/yield/ruling, no multi-finding remediation >250K, STOP at
-  ~400K). **CHARC QA CONFIRMED** (patch-id 3c25c656 on author head, candidate and main; accept
-  record's 4781bbe0 is an erratum; md5s and verdicts OK; errata present; harness 366 OK).
-  **Main re-gate DONE** at the CHARC seat on 83fd9c4 per the owner ("Go ahead and run the pytest
-  and gpu re-gates", ~22:00Z): 690 passed 0 skipped, gpu 34, harness 366 OK; debt cleared.
-  WP1.3D dispatched 22:03Z (deep look-check pack on SCUBA/; stills, case scan -> 4 candidates per
-  section-12 case, 6 s deep clip, CP2 deep sheet); WP1.4b queued (noise test + Params() flip to
-  c3; explicit-method pinning approved with two guards, msg cf95afbc). **Owner 2026-10-19 ~22:30Z:**
-  GoPro accelerometer/gyroscope analysis is "out of scope for this project" (parked as a separate
-  future project). The gpmd track on the owner's clips carries ACCL/GYRO ~200 Hz, GRAV/CORI/IORI
-  30 Hz, GPS9, and camera state WBAL/WRGB 10 Hz, SHUT/ISOE 30 Hz (probed GX011627 at the CHARC
-  seat); the camera-state streams are fair evidence inputs (ISO and WB gains per frame proposed
-  for WP1.4b), the IMU is not. Owner ~22:45Z: "Camera state is fine"; the parked project is motion
-  reconstruction (depth/time curves, geoplots). WP1.4b brief f183a11 carries claim 2a (camera
-  state); synthetic KLV test, nothing from gpmd committed (GPS9 = dive sites). **Owner
-  2026-10-20 ~02:15Z to the orchestrator: "You don't need to replace the cell at 240k, that
-  should just be an evaluation point"** -> docs/orchestrator-context.md hazard (6) added 5692485
-  (read depth at dispatch/yield/ruling; ~250K evaluate; ~400K stop); harness 366 OK. WP1.3D was
-  re-seated twice (244K, 240K) before the correction; wp13d-cell3 continues from round 3.
-  **WP1.3D ACCEPTED 2026-10-20 main 7f9fea1** (bundle db751cb; record docs/proofs/wp1.3d-accept.md;
-  B #1 blocking -> one remediation at 130K in the same cell; B #2 NO_NEW_CRITICAL_MAJOR; DR-29
-  banked; gates 734 passed 0 skipped, gpu 35, harness 366). **CHARC QA CONFIRMED** (patch-id
-  039db285 on all three ranges; md5s; harness 366 at my seat). Deep CP2 pack: work/wp1.3d/
-  index.html (48 stills + 12 candidates in c3 / ancuti2018 / ancuti2018-blue; 6 s clip
-  GX011600 at the deepest candidate, 2 s staged smoothing). Candidates: noise GX011600_0665.031
-  (D 0.209) + 3; open water GX011593_0255.021 (W 0.954) + 3; haze GX011589_0005.005 (H 0.050) + 3.
-  c3 bound nothing; ancuti2018 red cap bound on one still and 104/179 clip frames. **Deep CP2
-  COMPLETE 2026-10-20 ~06:25Z** (record docs/proofs/cp2-deep-look-check.md; sheet filled 169356f;
-  WP1.3 sheet deep rows closed): owner "c3 throughout showed the best performance ... No halo or
-  clipping ... No grain ... No flicker ... The cast is fairly well greyed"; c3 default CONFIRMED on
-  deep; FINDING: 2 s smoothing does not hide a rock-to-open-water lighting step (clip ~1 s), routed
-  to WP1.4b (msg de4dc755) and the Phase 2 temporal design; 2 s default stays PROVISIONAL.
-  WP1.4b: claim 10b = that finding with an edge-effect check first (the clip is a 6 s excerpt;
-  the centred 2 s window is one-sided in its first second); Params() flip landed alone b23bad9,
-  62 test sites pinned + guards fddc4e3. **WP1.4b STOP 06:44Z**: Donoho reads 0 on all 8 deep
-  frames (8-bit HEVC flattens the flat tiles; 63-99 % zero HH1). Orchestrator ruling upheld by
-  CHARC: Immerkaer primary on the same tiles, Donoho cross-check, red-baseline tile set (source
-  red >= 16/255), absolute sigma_R, quantised-regime test, report says "below the quantisation
-  floor" where both read ~0. Early one-frame signal: a tighter cap LOWERS red noise, against
-  D100's expectation; if the grid confirms, it is spec-bearing -> owner at WP1.6 result 4. Camera
-  WB red gain 4.85 on GX011600@665 s: report total red gain (camera x ours). Re-seated by
-  evaluation at 235K (wp14b-cell2, 06:45Z) with the grid, claims 7-10b and review ahead.
-  **WP1.4b ACCEPTED 2026-10-20 main afaff0e** (bundle 5e1f3c3; record docs/proofs/wp1.4b-accept.md;
-  A converged R4; B single pass NO_NEW_CRITICAL_MAJOR, 3 minor + 2 advisory -> errata + DR-30;
-  gates 771 passed 0 skipped (suite now ~8-15 min, past one 10-min call), gpu 36, harness 366;
-  cell2 retired at 388K). **CHARC QA CONFIRMED** (patch-id 04bc9d18 x3; md5; flip in tree;
-  harness 366). Results: **Gate result 4 KEEP the caps** (red-lit tiles median sigma_R: off 0.736,
-  cap 2.0 0.736, 1.0 0.783, 0.5 0.938; c3 0.481 lowest on every deep frame; default binds 1/8;
-  clamp 3.0 never binds; N{} floor 0.02 binds none; alpha smoothed as value). Anti-D100 signal did
-  NOT hold (only on crushed-red tiles below the quantisation floor; inference, not spec-bearing).
-  Claim 10b: GENUINE scene step at 0.90 s, not an excerpt edge; neither reset nor 0.5 s window
-  shrinks it, both add flicker; 2 s stays PROVISIONAL, evidence for the Phase 2 temporal design.
-  Total red gain camera x ours ~6x Ancuti default, ~4x c3. **PHASE 1 INPUTS COMPLETE. WP1.6 gate
-  report DRAFT written by CHARC a0c87d2** (docs/reports/wp1.6-gate-report.md; six results;
-  Result 1 MISSED: core 3.6x/5.8x, export 4.4x measured Ancuti, ~6.6x estimated c3, best
-  optimisation reach ~2.3-2.6x; D109 NOT named; Result 2 holds; 3 passed; 4 KEEP; 5 one stage
-  permitted, IF-3 staged; 6 SIMPLE). Orchestrator fact-check requested (7e5e170a). **OPEN OWNER
-  DECISION: Gate 1** (decision_request c45bc1ac): A tune N6 to ~25 min/min / B optimise first
-  (~8-10 min/min) / **C both (recommended)**: interim N6 25 min/min now, transport at WP2.1,
-  named Phase 3 optimisation package target 10 min/min, re-measure at WP5.2; any option = spec
-  v0.5.4. Also KEEP caps confirmation. Gate closes when the owner's word is recorded in the
-  report with its time and the fact-check is attached; then Phase 2 (WP2.1) briefs. **Orchestrator gen 3 online 09:47Z**, holding; commissioned to
-  draft the **WP2.1S transport + photo I/O spike brief** for CHARC approval (msg a754af34; transport
-  candidate #6 on GX011627, pillow-heif / 16-bit PNG + ICC + EXIF, licences). **WP2.1 DRAFT 0.1
-  written by CHARC**: docs/architecture.md (IF-1..IF-10 signatures frozen, data flow, pipeline)
-  and docs/decisions.md AD-1..AD-22 (backend CuPy; FFmpeg process SIMPLE, transport PENDING
-  WP2.1S; median_gaussian 2 s provisional + step-aware task; N{} 0.5/99.5 floor 0.02 on the 540
-  proxy; stages per WP1.4 s7; recompute scheme; defaults c3/caps 2.0/clamp 3.0; CPU/GPU status +
-  Force CPU; swscale bicubic chroma; tolerances; quality cq 18/23/28; JSON presets; flicker clip;
-  export disabled during analysis; GP-Log via PTCL; photo libs PENDING WP2.1S; licences; DR-15
-  reading). CLAUDE.md current-state refreshed. CP4 reviews this with spec v0.5.4. **WP2.1S brief APPROVED**
-  (07339bc; rulings: av granted dev-only; no pypng, stdlib chunk writer as the PNG alternative;
-  no exiftool; Part B best-effort ruling covers the exclusive transport leg; every transport row
-  reports exact per-frame pts). Dispatch is the orchestrator's; return closes AD-2, AD-17, AD-18. **WP2.1S ACCEPTED 2026-10-20
-  main a866f06** (record docs/proofs/wp2.1s-accept.md; A 6 rounds across 3 cells, re-seats 257K/342K;
-  B NO_NEW_CRITICAL_MAJOR, DR-31; gates 823 passed, harness 366). **CHARC QA CONFIRMED** (patch-id
-  a5e7951d; md5 486c317a; harness 366 at my seat). Findings: pipe 55.9 ms/frame clean (Part B's 93.6
-  was contaminated), 32 MiB pipe 16.1 / CUDA 13.0, floor 13.45; PyAV decode-only 43 ms, NOT adopted;
-  Pillow cannot write 16-bit PNG -> stdlib chunk writer; HEIC irot/Orientation double-rotation
-  hazard -> AD-24; licences corrected (FFmpeg CLI GPL-3.0-or-later; PyAV wheel's LGPL label vs
-  x264/x265 UNKNOWN, moot). AD-2/17/18 closed, AD-23 (N1 pipe buffer), AD-24 logged; gate report
-  Result 1 supersession note added; CLAUDE.md refreshed. Mid-run rulings msg 75aacdfc; ruff Markdown
-  exclusion c6b63e3 (with a correction f17b1667 after a premature claim). **WP2.2 and WP2.3 briefs APPROVED** (020ed86; all seven recommended rulings: Array =
-  NDArray[float32]; IF-9 schema validation pure in WP2.2; trivial fakes with the real c3 stage
-  list; procedural AD-14 texture; 540p FFV1 flicker clip in work/; one pytest_plugins line; 2 MB /
-  10 MB limits). WP2.2 dispatches now; WP2.3 after WP2.2 merges; CHARC rules at WP2.2's round-1
-  yield on the nine unnamed types. Then WP2.4 + spec v0.5.4 -> CP4. **WP2.2 round-1 rulings**
-  (msgs 6b5196fe, 3f5670eb): nine types approved; defaults png_bit_depth 16, video_encoder
-  "auto", quality_level "standard" (not owner-reserved; CP5 shows them); c3 stage list confirmed;
-  **AD-20 amended**: `Parameter.nullable` (gain caps None = disabled), rotation CCW positive
-  (2a43d3a); Frame.pts comment fixed (597c2df). **WP2.2 ACCEPTED 2026-10-20 main b288533**
-  (record docs/proofs/wp2.2-accept.md; A converged R3; B pass 1 one remediation; B re-run major
-  adjudicated NOT BLOCKING -> DR-32; candidate gates 892 passed). **CHARC QA CONFIRMED** (patch-id
-  6e17752a; md5s; harness 366; DR-32 adjudication upheld). **IF-1..IF-10 FROZEN.** Orchestrator
-  **gen 3 rolled over 15:24Z** at 400K (state 9a27dc4); **gen 4 = `clearwater-orchestrator-20261020-0524`**
-  online 15:30Z, running the main pytest as its first act, then removes the wp2.2 worktrees and
-  dispatches WP2.3 (brief approved). **WP2.4 started by CHARC**: docs/reports/spec-v0.5.4-proposal.md (15 passages; item 1 = D106
-  waits on the owner's Gate 1 option; applied only on "approved as 0.5.4") and
-  docs/briefs/wp2.4-phase3-frame.md (common Phase 3 brief rules, wave order, dependency grants,
-  spec-to-package map). CP4 = owner reads architecture.md + decisions.md + the proposal in one
-  pass. Gate 1 still OPEN with the owner. **WP2.3 dispatched** (wp23-cell, base da074f4; main
-  pytest on b288533: 892 passed). **Wave-1 Phase 3 briefs WP3.1/3.7/3.13/3.15 APPROVED** (6611b3d;
-  rulings msg 147041ff: 7.3 amended yuvj = full range; WP3.7 and WP3.1 (without its Gate 1
-  section) may dispatch with 3.13/3.15 once WP2.3 merges; AD-25 platform conventions; AD-16
-  wording fixed; v0.5.4 item 14 extended; 7926fd3). Full-pytest runs serialised across parallel
-  cells by the orchestrator. **OWNER 2026-10-20 ~16:00Z: "Gate 1: Option C.  2. Keep.  3. approve
-  0.5.4"** -> applied: spec v0.5.4 (9cf16c5; D106 interim 25 min/min, D100 KEPT, D98, D94 reading,
-  G12 force-CPU + defaults, D75 names, D63 HEIC rule, N1 exception, 6.x defaults, 7.2 smoothing,
-  12 proxy bounds, 14.1 DECIDED markers, remnants removed), plan v1.2 (WP3.21 optimisation
-  package, wave 4), CLAUDE.md spec line, architecture FINAL 1.0, AD-21 closed, AD-26/27, gate
-  report CLOSED, records docs/proofs/cp3-prototype-gate.md + cp4-design-freeze.md (3eca7bd).
-  Orchestrator told (e98394db): briefs cite v0.5.4; WP3.1 Gate 1 section = one line; wave 1
-  unblocked on WP2.3 merge. **No owner decision open. Photos still pending.**
-
-## ROLLOVER 2026-10-20 ~16:45Z (CHARC generation 1 `clearwater-charc-20261014-1303` at the 400K depth cap)
-
-**Successor: read this file first, then `docs/charc-charter.md`, `docs/charc-bootstrap.md`
-(bring-up only; steps 1-5 done), `docs/orchestrator-context.md`, `docs/dispatch-recipe.md`,
-`docs/review-gate-clearwater.md`, `docs/model-prompting-standard.md`. Then drain the charc inbox
-(`uv run python scripts/role_mail.py read --role charc --all`) and announce yourself to the
-orchestrator (`clearwater-orchestrator-20261020-0524`, gen 4; always re-read
-`comms/.launch-sessions.json` before a cue). Memory files under
-`~/.claude/projects/C--Users-rwsmy-clearwater/memory/` hold the owner's rulings verbatim.**
-
-State at hand-off:
-- **Phase 1 CLOSED** (gate report `docs/reports/wp1.6-gate-report.md`; CP3/CP4 records in
-  `docs/proofs/`). **Spec v0.5.4, plan v1.2, architecture FINAL 1.0, decisions AD-1..AD-27.**
-  IF-1..IF-10 FROZEN in `src/clearwater/interfaces/` (WP2.2, b288533).
-- **Live cell: WP2.3 fixtures** (wp23-cell stood down at 407K after R1 + remediation without a
-  yield; a fresh sonnet-high cell continues R2 from d495b57). Last CHARC ruling (this
-  generation's last message): AD-14 geometry accepted; one conditional `pytest_plugins` line in
-  conftest; `.gitattributes` granted (`tests/fixtures/** -text`). On its return: QA (patch-id on
-  author/candidate/main, B md5s, DR entries, harness gate at this seat), then the orchestrator
-  dispatches wave 1.
-- **Wave 1 briefs APPROVED and ready** (WP3.1 opus-high; WP3.7, WP3.13, WP3.15 sonnet-high;
-  docs/briefs/wp3.{1,7,13,15}-brief.md): dispatch all four in parallel on WP2.3's merge; manifest
-  ids filled at dispatch; briefs cite v0.5.4 (drop "proposed" markers); WP3.1's Gate 1 section is
-  one line (device-resident-ready IF-2). Full-pytest gate runs serialised by the orchestrator.
-- **Then:** wave 2-4 briefs per `docs/briefs/wp2.4-phase3-frame.md` (orchestrator drafts, CHARC
-  approves each; WP3.21 optimisation package drafted at wave 4). CP5 shows the owner the starter
-  preset values. Every accept: CHARC QA as above; close DR items in the register as packages
-  close them.
-- **Standing rules this generation learned:** the owner answers only owner-reserved items (plan
-  s3); everything else CHARC rules in the operator's stead, recommended answer first, and reads
-  the owner's words back verbatim with their time; end every owner-facing turn with the open
-  owner decisions; subjects under 120 chars (the poster refuses longer ones; shorten and
-  re-post); Bash heredocs with apostrophe-heavy Python fail at this seat, write scripts to the
-  scratchpad with the Write tool and run them; `ruff format` now excludes `*.md`; the full pytest
-  takes 8-15 min, run it in the background; do not start heavy runs while an exclusive window is
-  open; the host kills background runs under memory pressure, report and re-run only when asked.
-- **Owner:** no decision open. Photos still to be supplied (memory-test photo leg; AD-24 HEIC
-  rule provisional). Main is ~430 commits ahead of origin, unpushed; the owner has not asked for a
-  push.
-- **Orchestrator:** gen 4 at ~? depth (ask it); it rolls at 400K with a clean boundary and launches
-  its own successor; the launcher registers the new name in `comms/.launch-sessions.json`. WP1.4b dispatched (opus-high; flip guards + gpmd claim 2a). Next: WP1.3-deep / WP1.4b brief on SCUBA/ (c3 primary, Params() flips to c3), then
-  WP1.6 gate report (Gate 1: core 3.6x, production export 4.4x over N6). **Footage-layout skips:** the owner's Snorkel/SCUBA/edits layout makes 3
-  footage tests skip (root `GX011628.MP4` paths in `tests/test_container_spike.py:902`,
-  `tests/test_lookcheck.py:1289`, WP1.4 test 7; also `tools/lookcheck/pack.py:94` and the WP1.4
-  runner). CHARC ruling 2026-10-19 (msgs 35b13416 scope + 68fe376c-answer sequencing): WP1.4
-  merges first with the skips recorded with cause in its accept; then **WP-T2** (sonnet-high,
-  fast tier) adds `find_footage_file(stem)` to `tools/local_config.py` (additive, case-insensitive,
-  recursive, unique-or-error, reuses inventory VIDEO_EXTENSIONS) and switches all five surfaces;
-  gate back to 0 skipped; then Part B (exclusive). **Inventory DONE** b1fd289
-  (`docs/reports/inventory-2026-10-18.md`): 35 videos 26/8/1, 0 errors, 0 chaptered, CHARC
-  re-derived counts from the CSV, match. **CP1 handed to the owner 2026-10-19 ~00:30Z:** categories
-  (recommended folder-wise: Snorkel=shallow, SCUBA=deeper, edits=stress case) and chapter handling
-  in v1 (CHARC recommends DEFER to v2: removes WP3.8, WP3.19 chapter review, V12, V3 seam; spec
-  5.5 + D21/D33/D80/D82/D83 revision to draft on the owner's word). OPEN until the owner's word.
-- Drafted by CHARC on main: `docs/briefs/wp1.2b-brief.md` (Part B; three dispatch conditions)
-  and `docs/reports/wp1.6-gate-report.md` (template; Gate 1 options A/B/C framed).
+**No owner decision open.** Photos still pending (memory-test photo leg; AD-24 HEIC rule
+provisional until then). Owner-reserved items (plan s.3): footage categories, look check and V2
+visual review, anything relaxing a mandatory requirement, any spec change. Everything else CHARC
+rules in the operator's stead (standing direction 2026-10-14, verbatim in CLAUDE.md "Roles";
+memory `clearwater-unattended-rule.md`); read the owner's words back verbatim with their time;
+end every owner-facing turn with the open owner decisions.
 
 ### Footage (owner, read-only, never committed; verify `ls C:\Users\rwsmy\clearwater-footage`)
 
-**Download COMPLETE (owner 2026-10-18, chat to CHARC, verbatim: "The videos are downloaded. I
-placed snorkel videos in the snorkel folder and scuba videos in the scuba folder.")** CHARC's
-read-only listing 2026-10-18 ~23:40Z: `Snorkel/` 26 clips GX011603-GX011628 (HEVC 4K 29.97,
-3.6-498 s, shot 2026-10-10 05:21-06:33Z); `SCUBA/` 8 clips GX011589-93, GX011598, GX011600,
-GX011601 (49 MB-8.9 GB); the 2026-10-15 zero-byte files and the `(1)` duplicate are GONE. NO
-photos, NO .LRV/.THM (owner 2026-10-15, verbatim: "There will be no .lrv or .thm files, those
-were apparently deleted off of the camera when the cloud upload was completed several days
-ago"; D60 closed v0.5.2). Photos: pending (owner 2026-10-18).
-One misnamed file `Snorkel/6aca1cf5db06c242d9d53130.json` (318 MB) is an MP4: H.264 1080p59.94,
-180 s, Lavf61.7.100, created 2026-10-10T11:12Z; owner (verbatim): "It looks like it is a
-compilation video. We can rename it and potentially use it as a stress test since it has
-transitions." Owner renamed it 2026-10-18 (verbatim: "renamed to
-Edits\compilation-20261010-1080p60.mp4, no photos for now they are still pending, go.");
-CHARC verified `Edits/compilation-20261010-1080p60.mp4`, 35 files (Snorkel 26, SCUBA 8, Edits 1).
-Photos PENDING (owner adds stills later; photo-side checks stay queued). The compilation clip
-is kept as a smoothing stress case (hard transitions) for a later WP. **Inventory pass
-commissioned** (msg 2d809944), held (114f9cea), **RELEASED 2026-10-18T23:55Z (msg 858f79a4)**.
-Then: inventory report -> CHARC -> owner for CP1 (categories,
-owner-reserved) -> Part B (after WP1.4 lands or pauses).
+`Snorkel/` 26 clips GX011603-GX011628, `SCUBA/` 8 clips, `Edits/compilation-20261010-1080p60.mp4`
+(35 files; inventory `docs/reports/inventory-2026-10-18.md`). No `.LRV`/`.THM` (D60 closed). No
+photos yet. Categories per CP1 (`docs/proofs/cp1-footage-sorting.md`): Snorkel=shallow,
+SCUBA=deeper, Edits=stress case. GoPro IMU/GPS out of scope; nothing from a `gpmd` track is ever
+committed (dive sites); camera-state streams (WBAL/WRGB/ISO/SHUT) are fair evidence inputs.
 
-### Standing delegation (owner, 2026-10-14, chat to CHARC, verbatim)
+### Behavioral pointers (this seat)
 
-"intent is for this development to run as unattended as possible. orchestrator
-will send you operator related questions. Answer for operator unless the question
-truly requires my input." Standing, not day-scoped. Recorded in CLAUDE.md "Roles".
-CHARC answers in the operator's stead; the plan section 3 owner-reserved list is
-the only trigger for a `decision_request` (the orchestrator HOLDS that item,
-continues the rest). Read every answer back to the owner in the turn's recap.
-
-### Behavioral pointers
-
-- Port **8775** is Clearwater's comms-UI port; sibling harnesses use 8765. psmux
-  session `clearwater`; session names `clearwater-<role>-<stamp>` (read the live
-  name from `comms/.launch-sessions.json` before any cue). After every
-  `role_mail.py post`, one `SendMessage` cue. Subjects under 120 chars; bodies via
-  `--body-file`; re-list before posting.
-- Harness core is the coa-chess lineage (stdlib-only; `uv run python -m unittest
-  discover -s tests/harness`, 366 tests, run whenever `scripts/`, `.claude/`, kernel
-  docs or `tests/harness/` change; new tracked doc prefixes go into
-  `tests/harness/genericity_lists.py`). pytest excludes `tests/harness`.
-- Toolchain uv + Python 3.12; FFmpeg 9.0.2 installed (not on THIS seat's PATH);
-  CuPy `cupy-cuda12x[ctk]` in .venv (anything outside .venv is a STOP).
-- Review gate `docs/review-gate-clearwater.md` (Codex via WSL, codex-cli 0.162.1;
-  STRONG for product code, fast for docs/tools); evidence at
-  `C:\Users\rwsmy\clearwater-review-evidence\<wp>\`.
-- Working folder `work/` (gitignored); NEVER `git clean -x`. Commit by pathspec;
-  footer `Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>` only.
-- Plan 4.3 exclusivity: timing/memory packages run alone; the harness gate counts as
-  HEAVY inside an exclusive window.
-- Roll this seat only after the `[ctx]` hook names the 400K cap, at a boundary
-  (charter 5.1); commit this file by pathspec first; the outgoing seat stops
-  draining (peek only).
+- Port **8775** comms UI; psmux session `clearwater`; session names `clearwater-<role>-<stamp>`.
+  After every `role_mail.py post`, ONE `SendMessage` cue to the exact live session name.
+  Subjects under 120 chars (the poster refuses longer); bodies via `--body-file`; re-list before
+  posting.
+- Harness core is the coa-chess lineage (stdlib-only; `uv run python -m unittest discover -s
+  tests/harness`, 366 tests; run whenever `scripts/`, `.claude/`, kernel docs or `tests/harness/`
+  change; new tracked doc prefixes go into `tests/harness/genericity_lists.py`).
+- Toolchain uv + Python 3.12; FFmpeg 9.0.2 installed (NOT on this seat's PATH, so the ffprobe
+  tests skip here; the orchestrator's figure is the one of record); CuPy in .venv.
+- Review gate `docs/review-gate-clearwater.md` (Codex via WSL, codex-cli 0.162.1; STRONG for
+  product code, fast for docs/tools); evidence `C:\Users\rwsmy\clearwater-review-evidence\<wp>\`.
+  Reviewer B is ONE Codex pass the ORCHESTRATOR runs at its own seat, never a cell.
+- Working folder `work/` (gitignored); NEVER `git clean -x`. Commit by pathspec; footer
+  `Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>` only.
+- Full pytest takes 8-15 min: run it in the background; nothing heavy while an exclusive window
+  (plan 4.3) is open; the host kills background runs under memory pressure, re-run only when asked.
+- Bash heredocs with apostrophe-heavy Python fail at this seat: write scripts to the scratchpad
+  with the Write tool and run them. `ruff format` excludes `*.md`.
+- Cell depth: read at dispatch, every yield and before any ruling; ~250K is an evaluation point
+  (owner 2026-10-20), ~400K STOP. Roll this seat only after the `[ctx]` hook names the 400K cap,
+  at a boundary, with no cell in flight (charter 5.1); commit this file by pathspec first; the
+  outgoing seat stops draining (peek only).
