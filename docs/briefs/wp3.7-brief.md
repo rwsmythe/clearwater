@@ -1,8 +1,8 @@
-# WP3.7 — Video probe and input validation (dispatch brief, DRAFT)
+# WP3.7 — Video probe and input validation (dispatch brief, APPROVED)
 
-**Status:** DRAFT 2026-10-20 by the orchestrator (generation 4) at CHARC's commission
-(`a05f065e53e696d7`), for CHARC approval. Not dispatched before approval; dispatches after CP4
-(spec v0.5.4 approval). Owner decisions: none inside the package.
+**Status:** APPROVED by CHARC `871a371855bb1630` with rulings (section "Rulings"); draft `6611b3d`, written by
+the orchestrator (generation 4) at CHARC's commission (`a05f065e53e696d7`). FINAL at dispatch,
+once WP2.3 has merged (X4: no v0.5.4 item changes its clauses). Owner decisions: none inside the package.
 - Spec **v0.5.3**; v0.5.4 items cited as "proposed (v0.5.4, CP4)". Architecture DRAFT 0.1
   section 3 IF-5 and section 5 "Probe (WP3.7)"; AD-16, AD-19, AD-20, AD-22. Frame
   `docs/briefs/wp2.4-phase3-frame.md`. WP1.5 report `docs/reports/wp1.5-container-spike.md`
@@ -71,7 +71,8 @@ VFR reported (D95)."
    - Every WP2.3 video sample by manifest id: each `ProbeResult` field the manifest records
      (codec, pix_fmt, bit depth, tags, rotation, frame count, pts hash, VFR), the expected
      fault kinds and severities, and no unexpected fault on the clean samples.
-   - The D54 cases: untagged → BT.709 limited, `assumed=True`, one `missing_tags` warning.
+   - The D54 cases: untagged → BT.709 limited, `assumed=True`, one `missing_tags` warning; an
+     untagged `yuvj` stream → full range, no `missing_tags` for range (ruling 7.3).
    - Edit list and GPMF on synthetic boxes the test builds (identity edit, empty edit,
      version 1, malformed atom; a GPMF atom holding the three keys plus an unrelated key that
      must be skipped undecoded).
@@ -125,7 +126,27 @@ break the box reader (single owner; a malformed atom must still not crash or han
   paths, limits). Yield at every round boundary; the dispatcher reads your depth (~250K
   evaluation, ~400K stop).
 
-## Open questions for CHARC
+## Rulings (CHARC `871a371855bb1630`, 2026-10-20)
+
+The questions below were raised as drafted. **Every recommended answer is the ruling**
+unless a line here amends it. Cross-brief rulings: X1 (owned files outside the module path,
+below), X2 (WP3.15 ships `clearwater.config.paths` at its round-0 yield), X3 (manifest ids filled
+at dispatch from the merged WP2.3 manifest), X5 (parallel cells allowed; the dispatcher
+serialises full-pytest runs at gate windows; inner loops run only the cell's own tests).
+- **X1:** WP3.7 creates `src/clearwater/io/__init__.py` (docstring and exports only); later
+  packages add sibling modules and may append exports, nothing else.
+- **7.1:** AD-16's wording is corrected on main (`7926fd3`): the `moov/udta` GPMF settings atom,
+  keys `FMWR`/`PRTN`/`PTCL`; never the `gpmd` track.
+- **7.3 AMENDED:** a `yuvj` pixel format IS a full-range signal (ffprobe reports
+  `color_range=pc` for it; WP1.5's chapters are exactly this). An untagged `yuvj` stream is read
+  as FULL range and raises no `missing_tags` for range. D54's limited default applies only when
+  neither a range tag nor a j-format signals the range. The rest of 7.3 stands: per-field
+  defaults, one `missing_tags` warning naming the defaulted fields, and `bt2020` primaries with
+  an SDR transfer treated as unexpected (assumed BT.709, warned). Question 7.3's drafted
+  sentence on `yuvj` below is SUPERSEDED.
+
+### Questions as drafted (recommended answer = ruling unless amended above)
+
 
 1. **Where "GPMF settings" are read.** AD-16 says "the GoPro settings in the GPMF track";
    WP1.5 section 3 read `FMWR`/`PRTN`/`PTCL` from the `moov/udta` `GPMF` atom (spike.py

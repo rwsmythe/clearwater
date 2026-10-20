@@ -1,8 +1,9 @@
-# WP3.1 — Array backend and image operations (dispatch brief, DRAFT)
+# WP3.1 — Array backend and image operations (dispatch brief, APPROVED)
 
-**Status:** DRAFT 2026-10-20 by the orchestrator (generation 4) at CHARC's commission
-(`a05f065e53e696d7`), for CHARC approval. Not dispatched before approval; dispatches after CP4
-(spec v0.5.4 approval, which carries the owner's Gate 1 word, AD-21). Owner decisions: none
+**Status:** APPROVED by CHARC `871a371855bb1630` with rulings (section "Rulings"); draft `6611b3d`, written by
+the orchestrator (generation 4) at CHARC's commission (`a05f065e53e696d7`). FINAL at dispatch,
+once WP2.3 has merged (X4); if the owner's Gate 1 word is still pending then, it dispatches
+WITHOUT a Gate 1 section, which is added by amendment when the owner rules. Owner decisions: none
 inside the package.
 - Spec **v0.5.3**; v0.5.4 items cited as "proposed (v0.5.4, CP4)". Architecture DRAFT 0.1
   section 3 IF-2 and section 4; AD-1, AD-9, AD-11, AD-18, AD-20, AD-21. Frame
@@ -129,7 +130,22 @@ Result 1 row 7).
   Report `docs/reports/wp3.1-array-backend.md` (claims, evidence paths, limits). Yield at every
   round boundary; the dispatcher reads your depth (~250K evaluation, ~400K stop).
 
-## Open questions for CHARC
+## Rulings (CHARC `871a371855bb1630`, 2026-10-20)
+
+The questions below were raised as drafted. **Every recommended answer is the ruling**
+unless a line here amends it. Cross-brief rulings: X1 (owned files outside the module path,
+below), X2 (WP3.15 ships `clearwater.config.paths` at its round-0 yield), X3 (manifest ids filled
+at dispatch from the merged WP2.3 manifest), X5 (parallel cells allowed; the dispatcher
+serialises full-pytest runs at gate windows; inner loops run only the cell's own tests).
+- **X1:** WP3.1 owns `tools/core_speed.py` (the speed-row instrument).
+- **1.1 amended (addition):** an elementwise array-module accessor (`backend.xp`) is ALLOWED and
+  used ONLY inside `clearwater.core`; a dependency test fails if any module outside `core`
+  touches it or imports `cupy`/`cupyx`.
+- **1.5 / X4:** this brief is the base scope; any Gate 1 growth (owner option B or C, AD-21) is
+  added as a named section by amendment.
+
+### Questions as drafted (recommended answer = ruling unless amended above)
+
 
 1. **Operations the plan names beyond IF-2.** Plan WP3.1 lists "Gaussian and Laplacian
    pyramids with depth set by minimum level size", "the conversion saliency needs" (the

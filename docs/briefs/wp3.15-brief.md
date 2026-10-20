@@ -1,8 +1,8 @@
-# WP3.15 — Presets, settings and logging (dispatch brief, DRAFT)
+# WP3.15 — Presets, settings and logging (dispatch brief, APPROVED)
 
-**Status:** DRAFT 2026-10-20 by the orchestrator (generation 4) at CHARC's commission
-(`a05f065e53e696d7`), for CHARC approval. Not dispatched before approval; may dispatch once
-WP2.3 has merged (no v0.5.4 item changes it; see open question 9). Owner decisions: none inside
+**Status:** APPROVED by CHARC `871a371855bb1630` with rulings (section "Rulings"); draft `6611b3d`, written by
+the orchestrator (generation 4) at CHARC's commission (`a05f065e53e696d7`). FINAL at dispatch,
+once WP2.3 has merged (ruling 15.9). Owner decisions: none inside
 the package (the starter presets' values are the owner's to see at CP5, AD-13).
 - Spec **v0.5.3**; v0.5.4 items cited as "proposed (v0.5.4, CP4)". Architecture DRAFT 0.1
   section 3 IF-9 and IF-10, section 7; AD-8, AD-9, AD-13, AD-20. Frame
@@ -132,7 +132,23 @@ run there), preset files from an untrusted source beyond the validation of task 
   Report `docs/reports/wp3.15-presets-settings-logging.md` (claims, evidence paths, limits).
   Yield at every round boundary; the dispatcher reads your depth (~250K evaluation, ~400K stop).
 
-## Open questions for CHARC
+## Rulings (CHARC `871a371855bb1630`, 2026-10-20)
+
+The questions below were raised as drafted. **Every recommended answer is the ruling**
+unless a line here amends it. Cross-brief rulings: X1 (owned files outside the module path,
+below), X2 (WP3.15 ships `clearwater.config.paths` at its round-0 yield), X3 (manifest ids filled
+at dispatch from the merged WP2.3 manifest), X5 (parallel cells allowed; the dispatcher
+serialises full-pytest runs at gate windows; inner loops run only the cell's own tests).
+- **X2:** `clearwater.config.paths` is shipped (committed) at the round-0 yield; WP3.12's brief
+  depends on WP3.15 merged.
+- **15.1 RULED:** the per-OS app-data locations (Windows `%APPDATA%\Clearwater` and
+  `%LOCALAPPDATA%\Clearwater\cache`; XDG elsewhere with the home-folder fallbacks; one resolver
+  in `config/paths.py`) are REQUIRED portability behaviour, not an N1 exception; approved as
+  drafted and logged as AD-25. The task-1 and STOP lines' "open question 1" are settled by this.
+- **15.4:** both starter presets are `ParameterSet("c3", {})` now; values at CP5.
+
+### Questions as drafted (recommended answer = ruling unless amended above)
+
 
 1. **The app-data location is OS-specific.** Architecture IF-10 says "the platform app-data
    folder"; frame rule 11 makes "an OS-specific path not in AD-23" a STOP; no library is

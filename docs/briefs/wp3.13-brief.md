@@ -1,8 +1,8 @@
-# WP3.13 — Output naming and safe writing (dispatch brief, DRAFT)
+# WP3.13 — Output naming and safe writing (dispatch brief, APPROVED)
 
-**Status:** DRAFT 2026-10-20 by the orchestrator (generation 4) at CHARC's commission
-(`a05f065e53e696d7`), for CHARC approval. Not dispatched before approval; may dispatch once
-WP2.3 has merged (no v0.5.4 item changes it). Owner decisions: none inside the package.
+**Status:** APPROVED by CHARC `871a371855bb1630` with rulings (section "Rulings"); draft `6611b3d`, written by
+the orchestrator (generation 4) at CHARC's commission (`a05f065e53e696d7`). FINAL at dispatch,
+once WP2.3 has merged (no v0.5.4 item changes it). Owner decisions: none inside the package.
 - Spec **v0.5.3**. Architecture DRAFT 0.1 section 2 (export data flow: "jobs.naming / safe
   write (D34-D36, D83-D85)") and section 7; AD-19, AD-23. Frame
   `docs/briefs/wp2.4-phase3-frame.md`. DR-16.
@@ -124,7 +124,25 @@ second Clearwater instance writing the same folder.
   Report `docs/reports/wp3.13-naming-safe-writing.md` (claims, evidence paths, limits). Yield
   at every round boundary; the dispatcher reads your depth (~250K evaluation, ~400K stop).
 
-## Open questions for CHARC
+## Rulings (CHARC `871a371855bb1630`, 2026-10-20)
+
+The questions below were raised as drafted. **Every recommended answer is the ruling**
+unless a line here amends it. Cross-brief rulings: X1 (owned files outside the module path,
+below), X2 (WP3.15 ships `clearwater.config.paths` at its round-0 yield), X3 (manifest ids filled
+at dispatch from the merged WP2.3 manifest), X5 (parallel cells allowed; the dispatcher
+serialises full-pytest runs at gate windows; inner loops run only the cell's own tests).
+- **X1:** WP3.13 creates `src/clearwater/jobs/__init__.py` (docstring and exports only);
+  WP3.14 adds sibling modules and may append exports, nothing else.
+- **13.1:** v0.5.4 proposal item 14 is extended on main (`7926fd3`) with V10's group-suffix
+  phrase and the plan row.
+- **13.4 RULED:** the link-then-unlink / re-check-then-rename no-replace sequence is a portable
+  algorithm with a documented platform difference, NOT OS-specific code under N1 (AD-25). The
+  residual POSIX race stays documented under DR-16.
+- **13.6:** the architecture comment is corrected on main (`7926fd3`: abort = D44/D85); the
+  interfaces docstring follows at the next interface touch, not in this package.
+
+### Questions as drafted (recommended answer = ruling unless amended above)
+
 
 1. **The recording-group shared suffix.** Plan WP3.13 ("shares one collision suffix across a
    recording group") and V10 ("shared suffix per recording group") still name it; D83 amended
