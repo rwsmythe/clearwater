@@ -108,9 +108,11 @@ The estimate at 4K is 1,982 MiB, equal to the prototype's for every size tested.
 
 ## Speed row (task 7)
 
-PENDING the dispatcher's exclusive window. Instrument `tools/core_speed.py GX011627`: the GPU
-pass covers all 681 frames; the CPU pass covers 10 frames spread over the clip (the WP1.2 Part B
-practice; a 4K CPU op mix takes tens of seconds). It times the op mix one `correct()` call makes
+PENDING the dispatcher's exclusive window (after the Reviewer A loop, on the merge candidate's
+code). Instrument `tools/core_speed.py GX011627`: the GPU pass covers all 681 frames. **Limit:**
+the CPU pass covers 10 frames spread over the clip (the WP1.2 Part B practice, confirmed by the
+dispatcher), because the CPU route is the D111 fallback and is not held to N6, and a 4K CPU op
+mix takes tens of seconds per frame. It times the op mix one `correct()` call makes
 through IF-2 (listed in the tool's docstring), product against prototype, both methods, with GPU
 clocks, temperature, utilisation and busy processes recorded before, during and after.
 
