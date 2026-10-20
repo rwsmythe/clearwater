@@ -10,6 +10,7 @@ Cell: implementer-sonnet-high (tier STRONG). Worktree `.worktrees/wp3.15`, branc
 |---|---|---|---|---|---|---|---|---|
 | 0 (design) | 2026-10-20 | n/a | n/a | n/a | n/a | n/a | n/a | 83,816 (dispatcher, 15 turns) |
 | build yield | 2026-10-20 | n/a | n/a | n/a | n/a | product + tests | n/a | 145,492 (dispatcher, 34 turns) |
+| 1 | 2026-10-20 | 2 major, 0 critical | 3 | all in | 5 NEW, 0 REOPENED | none yet (remediation after the yield) | WSL, codex-cli, gpt-5.6-sol high; head 703f7d9 | (dispatcher fills) |
 
 ## Round 0: the design table (brief task 1)
 
@@ -169,3 +170,24 @@ commit: `Path` equality is case-insensitive on Windows, so the rename was skippe
 CHARC addition applied (252e847): `PresetImportResult.dropped_keys` names the dropped provenance
 keys (`source`, `settings`); `provenance_dropped` is a derived bool. The `list_presets()` name was
 accepted by the dispatcher.
+
+## Full pytest (window granted 18:30Z) on head 703f7d9
+
+1320 passed, 1 warning (cupy CUDA path), 582 s, exit 0 (`work/pytest-full.txt` in the worktree).
+
+## Round 1 (Reviewer A, head 703f7d9, verdict NEW_CRITICAL_MAJOR_FOUND)
+
+Evidence: `C:/Users/rwsmy/clearwater-review-evidence/wp3.15/r1/` (prompt, diff, `full-transcript.txt`,
+`review.txt`, `adjudication.md`, `adjudication-probe.py`, md5s). Probe `READY` passed first; model and
+effort match the STRONG tier; the only ERROR lines were a sandbox-rejected `rm -f` and WSL vsock noise.
+All findings REASONED (the reviewer could not run uv); each reproduced or confirmed by reading by the cell.
+
+| # | Sev | Where | Finding | Adjudication | Fix plan |
+|---|---|---|---|---|---|
+| 1 | MAJOR | presets.py `_matches`, `list_presets` | `.json` suffix compared case-sensitively; on Windows `Foo.JSON` is the same file as `Foo.json`, so save/import/starters overwrite it and list hides it | CONFIRMED by probe (listed `[]`, save replaced it); in-envelope; NEW | compare the suffix case-insensitively everywhere; a `.JSON` file is listed and collides; tests with `Foo.JSON` for list, save, import, starters |
+| 2 | MAJOR | presets.py `_read_preset`, import wrap, list | a future-version preset loses its `UnsupportedFormatVersionError` identity (only `__cause__`) | CONFIRMED by probe; in-envelope; NEW | `UnsupportedPresetVersionError(PresetError, UnsupportedFormatVersionError)` raised by load/rename/delete/save-overwrite and by import (as a `PresetImportError` subclass); `PresetEntry.unsupported_version` flag; tests |
+| 3 | MINOR | presets.py import numbering | a 100-character name cannot get " (2)" | CONFIRMED by reading | truncate the base to fit the 100-character limit; test |
+| 4 | MINOR | log.py docstring | "at most six files of 1 MiB" is false for one record over 1 MiB | CONFIRMED by reading | state the bound as six files of max_bytes plus the largest record; test with an oversized record documents it |
+| 5 | MINOR | migration.py | a step may return `1.0` as the new version | CONFIRMED by probe | require an `int` that is not bool, exactly n + 1; test |
+
+Fix kind of the coming remediation: PRODUCT code (1, 2, 3, 4 docstring, 5) plus tests.
