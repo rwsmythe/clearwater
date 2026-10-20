@@ -796,3 +796,24 @@ def test_import_loads_nothing_forbidden() -> None:
     )
     assert result.returncode == 0, result.stderr[-2000:]
     assert json.loads(result.stdout.strip().splitlines()[-1]) == []
+
+
+# -- Reviewer A round 1 cleanup --------------------------------------------------------------
+
+
+def test_mixed_type_keys_raise_the_value_error() -> None:
+    """R1-1: a non-string key gives the S-3 ValueError, not a TypeError from sorting."""
+    backend = NumpyBackend()
+    a = backend.asarray(synthetic(0, (4, 4)))
+    with pytest.raises(ValueError, match=r"^alphas must name"):
+        compensate_ancuti2018(backend, a, means=(0.1, 0.2, 0.3), alphas={"red": 1.0, 7: 1.0})
+    with pytest.raises(ValueError, match=r"^cap_statistics has no 'blue'"):
+        effective_alphas(
+            means=(0.1, 0.2, 0.3),
+            cap_statistics={"red": 0.1, 7: 0.2},
+            alpha=1.0,
+            blue_compensation=True,
+            red_gain_cap=2.0,
+            blue_gain_cap=2.0,
+        )
+

@@ -129,7 +129,7 @@ def effective_alphas(
     for name in _compensated_channels(blue_compensation=blue_compensation):
         if name not in cap_statistics:
             raise ValueError(
-                f"cap_statistics has no {name!r} value; it has {sorted(cap_statistics)}"
+                f"cap_statistics has no {name!r} value; it has {sorted(cap_statistics, key=repr)}"
             )
         statistic = _finite(cap_statistics[name], f"cap_statistics[{name!r}]")
         index = _CHANNEL_INDEX[name]
@@ -172,7 +172,9 @@ def compensate_ancuti2018(
     core.check_rgb(a)
     supplied = _triple(means, "means")
     if set(alphas) not in ({"red"}, {"red", "blue"}):
-        raise ValueError(f"alphas must name 'red' and optionally 'blue', got {sorted(alphas)}")
+        raise ValueError(
+            f"alphas must name 'red' and optionally 'blue', got {sorted(alphas, key=repr)}"
+        )
     strengths = {name: _finite(value, f"alphas[{name!r}]") for name, value in alphas.items()}
     green = a[..., 1]
     out = a.copy()
