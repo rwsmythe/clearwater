@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import inspect
+from collections.abc import Iterator
 from fractions import Fraction
 from pathlib import Path
 from typing import Any
@@ -109,11 +110,11 @@ def signature_differences(obj: object, protocol: type) -> list[str]:
         want_params = [p for p in want.parameters.values() if p.name != "self"]
         have_params = list(have.parameters.values())
         pairs_ok = len(want_params) == len(have_params) and all(
-            (w.name, w.kind, w.default is inspect.Parameter.empty)
-            == (h.name, h.kind, h.default is inspect.Parameter.empty)
+            (w.name, w.kind, w.annotation) == (h.name, h.kind, h.annotation)
+            and (w.default is Ellipsis or w.default == h.default)
             for w, h in zip(want_params, have_params, strict=True)
         )
-        if not pairs_ok:
+        if not pairs_ok or want.return_annotation != have.return_annotation:
             differences.append(name)
     return differences
 
@@ -155,6 +156,24 @@ def test_planted_stub_missing_a_method_fails_by_name() -> None:
         def put(self, ticks: int, stage: str, raw: Any) -> None: ...
 
     assert "put" in signature_differences(Renamed(), StatisticsStore)
+
+    class WrongDefault(StubVideoSource):
+        def frames(  # type: ignore[override]
+            self,
+            probe: ProbeResult,
+            *,
+            hw_decode: bool,
+            start_s: Fraction | None = Fraction(0),
+            end_s: Fraction | None = None,
+        ) -> Iterator[Frame]:
+            yield from ()
+
+    class WrongReturn(StubProxyCache):
+        def limit_bytes(self) -> str:  # type: ignore[override]
+            return "x"
+
+    assert signature_differences(WrongDefault([], _probe()), VideoSource) == ["frames"]
+    assert signature_differences(WrongReturn(), ProxyCache) == ["limit_bytes"]
     assert Broken.percentile is None
 
 

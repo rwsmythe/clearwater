@@ -166,8 +166,14 @@ def test_parameter_set_round_trip_exact() -> None:
     again = ParameterSet.from_json(original.to_json())
     assert again == original
     assert again.parameters["strength"] == 0.1 + 0.2
-    assert isinstance(again.parameters["levels"], int)
+    # == cannot tell True from 1 or 1 from 1.0: compare the exact types too.
+    assert {k: type(v) for k, v in again.parameters.items()} == {
+        k: type(v) for k, v in original.parameters.items()
+    }
+    assert type(again.parameters["on"]) is bool
+    assert type(again.parameters["levels"]) is int
     assert again.parameters["cap"] is None
+    assert type(_set({"x": 1.0}).from_json(_set({"x": 1.0}).to_json()).parameters["x"]) is float
     assert again.created == CREATED
     assert again.to_dict()["created"] == "2026-10-20T12:30:15.123456+00:00"
 
@@ -211,6 +217,22 @@ def test_format_version_other_than_one_is_refused_by_name() -> None:
 def test_malformed_parameter_json_is_a_format_error(text: str) -> None:
     with pytest.raises(FormatError):
         ParameterSet.from_json(text)
+
+
+def test_overflowing_float_spelling_is_refused_on_read() -> None:
+    text = _set({"a": 1.0}).to_json().replace("1.0", "1e400")
+    with pytest.raises(FormatError, match="1e400"):
+        ParameterSet.from_json(text)
+
+
+def test_huge_integer_round_trips_and_validates_without_raising() -> None:
+    huge = 10**400
+    again = ParameterSet.from_json(_set({"levels": huge}).to_json())
+    assert again.parameters["levels"] == huge
+    assert _kinds(validate_parameter_set(again, "c3", PARAMS)) == ["above_maximum"]
+    assert _kinds(validate_parameter_set(_set({"strength": -(10**400)}), "c3", PARAMS)) == [
+        "below_minimum"
+    ]
 
 
 def test_non_finite_float_is_not_serialised() -> None:

@@ -37,6 +37,14 @@ def _reject_constant(name: str) -> NoReturn:
     raise FormatError(f"non-finite number {name} is not valid JSON here")
 
 
+def _parse_float(text: str) -> float:
+    """Parse a JSON float, refusing one that overflows to infinity (for example ``1e400``)."""
+    value = float(text)
+    if not math.isfinite(value):
+        raise FormatError(f"non-finite number {text} is not valid JSON here")
+    return value
+
+
 def loads_object(text: str) -> dict[str, Any]:
     """Parse JSON text that must hold one object, refusing non-finite numbers.
 
@@ -50,7 +58,7 @@ def loads_object(text: str) -> dict[str, Any]:
         FormatError: The text is not valid JSON, holds non-finite numbers, or is not an object.
     """
     try:
-        data = json.loads(text, parse_constant=_reject_constant)
+        data = json.loads(text, parse_constant=_reject_constant, parse_float=_parse_float)
     except json.JSONDecodeError as error:
         raise FormatError(f"not valid JSON: {error}") from error
     if not isinstance(data, dict):
@@ -259,8 +267,10 @@ def validate_parameter_set(
     """Check a parameter set against a method's schema (IF-9 method-schema validation).
 
     Checks the method id, unknown names, each value's type, ``float``/``int`` minimum and
-    maximum (inclusive), and ``enum`` choices. A parameter missing from the set is not a
-    problem: sets may be partial and the method default applies.
+    maximum (inclusive), and ``enum`` choices. A ``float`` parameter accepts an ``int`` (a
+    hand-written preset may say ``1``); a ``bool`` is never a number.
+    A parameter missing from the set is not a problem: sets may be partial and the method default
+    applies.
 
     Args:
         parameter_set: The set to check.
@@ -293,7 +303,7 @@ def validate_parameter_set(
             continue
         if parameter.type in ("float", "int"):
             assert isinstance(value, int | float)  # narrowed by _type_problem
-            if not math.isfinite(value):
+            if isinstance(value, float) and not math.isfinite(value):
                 problems.append(ParameterProblem("not_finite", name, f"{name}: {value!r}"))
             elif parameter.minimum is not None and value < parameter.minimum:
                 problems.append(

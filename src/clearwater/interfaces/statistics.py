@@ -21,8 +21,6 @@ class StatisticsStore(Protocol):
             erratum), so a stale record is not rendered under another schema.
     """
 
-    schema_hash: str
-
     def put(self, pts_ticks: int, stage: str, raw: Statistics) -> None:
         """Store the raw statistics of one stage for one frame.
 
@@ -86,3 +84,5 @@ class StatisticsStore(Protocol):
     def all_pts(self) -> Sequence[int]:
         """Return every stored pts ticks value."""
         ...
+
+    schema_hash: str
