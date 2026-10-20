@@ -10,7 +10,9 @@ Brief: `docs/briefs/wp1.4b-brief.md` (FINAL). Base `db751cb`. Branch `wp1.4b`, w
 | `b23bad9` | Claim 1: `Params().method` defaults to `"c3"`; docstring sentence. `tools/prototype/params.py` only. |
 | `fddc4e3` | Claim 1: pins. 62 test sites name `method="ancuti2018"` (or `--method ancuti2018`); `run.py` help names c3 as the default; guard tests. |
 | `33bd8ba` | (WIP) Claims 2, 2a, 3-6, 10 code: `tools/noise_experiments.py`, `tools/camera_state.py`, tests; this ledger. |
-| (next) | The STOP ruling applied: Immerkaer primary, Donoho cross-check with the HH1 zero fraction, the `red_lit` tile set (R3), the quantised-regime validation tests (R4); summary and page on both tile sets. Re-seated cell (Claude Opus 5.5). |
+| `e5a7df3` | The STOP ruling applied: Immerkaer primary, Donoho cross-check with the HH1 zero fraction, the `red_lit` tile set (R3), the quantised-regime validation tests (R4); summary and page on both tile sets. Re-seated cell (Claude Opus 5.5). |
+| `99595d7` | Claim 10b: `lighting-step` phase (3 s lead-in by pts, edge-effect check, reset-at-step and 0.5 s options), tests. |
+| (next) | Report `docs/reports/wp1.4b-gain-cap-noise.md`; this ledger. |
 
 ## Claim 1 -- the flip's site list
 
@@ -45,6 +47,9 @@ suite exceeds one 10-minute call), 0 failed, 0 skipped.
 | 2 | Float pts could make `extract` pick the next frame | Possible (limit_denominator rounding) | Ask for `pts - 1e-4 s`; pts checked against the list |
 | 3 | Haar plane test exact zero on float plane | Rounding 1e-16 | Integer plane in the test |
 | 4 | Source sigma_R = 0 makes amplification divide by zero | Yes, on real deep frames | Ratio recorded as `None`; **STOP raised (below)** |
+| 5 | (re-seat) Adding the N{} stretch to a statistics series breaks `temporal.at` | Yes: `ValueError: unknown statistic` on the first 10b run | Traced series kept apart (`traced`) |
+| 6 | (re-seat) Report figures not read off a record | Yes, 3: ISO-100 amplification span (2.95 -> 3.03), alpha onset (frame 46, 0.6 s), backend pin count (1 argv line + 4 `correct`) | Corrected against `summary.json`, `lighting-step.json`, `git diff b23bad9 fddc4e3` |
+| 7 | (re-seat) The quantised-regime tolerance is fitted, not justified | Checked: bias measured over 20 seeds per regime (`scratch/q2.py`); 15 % bounds -9..-11 % at 57 % zeros; deeper regimes pinned by order only | Stated in the test comment and the report |
 
 ## STOP (2026-10-19): the defined noise measure reads 0 on every deep frame
 
@@ -89,10 +94,18 @@ Immerkaer exactly: amplifications are unaffected by this bias.
 
 None yet (the review runs on the finished package).
 
+## Results at a glance (records under `work/wp1.4b/`)
+
+- Grid: 13 frames x 25 settings (open water: 2), GPU, one process per frame; `summary.json`.
+- Gate 4: KEEP caps; tighter cap raises red noise on red-lit tiles 8/8, lowers it on crushed-red
+  flat tiles 4/8 (green carried in). Clamp 3.0 never binds; floor 0.02 proposed.
+- Claim 10: cap binds 46/179 raw; flicker A 0.388, B 0.483: keep A.
+- Claim 10b: step at 0.90 s is genuine (edge effect <= 0.014 in any gain); reset and 0.5 s do not
+  shrink the step and add flicker.
+
 ## NEXT STEPS
 
-1. DONE: ruling applied; grid run on all 13 frames (`work/wp1.4b/grid/*.json`, one process per
-   frame, GPU, about 30 s each); `summarise` written (`summary.json`, `index.html`).
-2. Claim 10 (`smoothing`) and claim 10b (edge-effect check first, then reset-on-step and 0.5 s).
-3. Report `docs/reports/wp1.4b-gain-cap-noise.md` from `summary.json` / `smoothing.json`.
-4. Full suite in groups (foreground); Reviewer A loop (STRONG) per brief.
+1. DONE: ruling, grid, summary, page, claims 10 and 10b, report.
+2. Full suite in groups (foreground); then the Reviewer A loop (STRONG) per brief: probe,
+   diff `git diff -U8 db751cb..HEAD -- . ':!uv.lock' ':!docs/proofs'`, evidence
+   `clearwater-review-evidence/wp1.4b/rN/`.
