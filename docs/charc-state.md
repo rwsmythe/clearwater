@@ -39,8 +39,8 @@ for a push (verify `git status -sb`).
 
 ### Live workstreams (verify `git worktree list`, `docs/orchestrator-state.md`, `ListAgents`)
 
-- **Orchestrator generation 5** `clearwater-orchestrator-20261020-0802` (opus/high/auto; online
-  ~18:03Z; sole drainer). Gen 4 rolled at ~300K before the wave-1 fan-out (CHARC upheld; the
+- **Orchestrator generation 6** launching 2026-10-20 ~21:34Z (gen 5 `clearwater-orchestrator-20261020-0802`
+  rolled at ~430K with no live cell, state 26b095d; gen 6 announces on pickup and is the sole drainer). Gen 4 rolled at ~300K before the wave-1 fan-out (CHARC upheld; the
   pre-dispatch exception is written in `docs/model-prompting-standard.md` s.9, 2bd9894). Always
   re-read `comms/.launch-sessions.json` before a cue.
 - **WP2.3 fixtures ACCEPTED** 2026-10-20, main d605925 (record row e357e56; record
@@ -59,9 +59,10 @@ for a push (verify `git status -sb`).
   CHARC rulings this wave: round-0 tables upheld with three additions (msg 232646a5); IF-5
   `duration_s` = container duration, exact, docstring tightened 4174484; WP3.13 per-write token
   in the temporary name upheld.
-- **WP3.1 array backend `wp31-cell`** (opus-high, `.worktrees/wp3.1`, OCCUPIED) in its exclusive
-  speed row, the last step; its accept passes to orchestrator gen 6 (gen 5 rolls at the cap after
-  WP3.1's final report). On the accept: CHARC QA as above. Consumer notes for wave 2+ briefs are
+- **WP3.1 array backend: cell RETURNED** (author head 2bf0aff, code-final ea60356; Reviewer A
+  terminated at R2; exclusive speed row done 20:57-21:30Z). Reviewer B, gates and accept are gen
+  6's first act (`docs/orchestrator-state.md` item 2). Worktree `.worktrees/wp3.1` stays until
+  CHARC QA confirms the accept. On the accept: CHARC QA as above. Consumer notes for wave 2+ briefs are
   in `docs/orchestrator-state.md` item 3 (WP3.3 percentile float32 + DR-14; WP3.9 bounded
   `-read_intervals` + DR-36; WP3.10 FFmpeg `-y` on the temporary path, mvhd on edit lists;
   WP3.12/3.16 config API; WP3.14 one `Reservations` + folder validation; WP4.3 clean-up before
@@ -103,8 +104,10 @@ committed (dive sites); camera-state streams (WBAL/WRGB/ISO/SHUT) are fair evide
   Reviewer B is ONE Codex pass the ORCHESTRATOR runs at its own seat, never a cell.
 - Working folder `work/` (gitignored); NEVER `git clean -x`. Commit by pathspec; footer
   `Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>` only.
-- Full pytest takes 8-15 min: run it in the background; nothing heavy while an exclusive window
-  (plan 4.3) is open; the host kills background runs under memory pressure, re-run only when asked.
+- Full pytest takes 8-15 min: run it in the background; **nothing heavy while an exclusive window
+  (plan 4.3) is open -- the orchestrator posts window open/close from 2026-10-20 on; before any
+  suite at this seat, check the last such post (CHARC's wave-1 QA pytest overlapped WP3.1's speed
+  window; ruled no re-run, op-mix row only);** the host kills background runs under memory pressure, re-run only when asked.
 - Bash heredocs with apostrophe-heavy Python fail at this seat: write scripts to the scratchpad
   with the Write tool and run them. `ruff format` excludes `*.md`.
 - Cell depth: read at dispatch, every yield and before any ruling; ~250K is an evaluation point
