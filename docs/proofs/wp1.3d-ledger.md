@@ -113,6 +113,7 @@ Transport WSL, codex-cli 0.162.1, banner `gpt-5.6-sol` / `high` / `read-only` ev
 | 2 | `8120b28` | 0 / 3 / 2 | 3 major in (hardening of the same two controls); 2 minor out | 3 NEW (CR2-01..03 deepen the round-1 controls: REOPENED in spirit, new in detail) / 0 strictly | 0 | product code (scan.py, pack.py) + tests | banner ok; `^ERROR` 0; `ERROR codex_core` 1, an echo of the brief text; footer; verdict anchored; 26 `^ succeeded in`; proofs/ledger hits are echoes | | NEW_CRITICAL_MAJOR_FOUND |
 | 3 | `3a38965` | 0 / 3 / 4 | R3-01, R3-02 major + R3-03..05 minor in; R3-06, R3-07 major OUT (ruling) | 7 NEW / 0 | 0 | product code (pack.py) + test; report wording | banner ok; `^ERROR` 0; no `ERROR codex_core` line (one echo of the prompt text); footer; verdict anchored; 30 `^ succeeded in`; proofs hits are the prompt/brief echoes and a `git status` name listing (no file under docs/proofs opened) | | NEW_CRITICAL_MAJOR_FOUND |
 | 4 | `6bf9752` | 0 / 1 / 2 | all in envelope | 3 NEW / 0 | 0 | product code (scan.py) + test; report text | banner ok; `^ERROR` 0; one `ERROR codex_core` hit, an echo of the prompt text; footer; verdict anchored; 38 `^ succeeded in`; no docs/proofs file opened | | NEW_CRITICAL_MAJOR_FOUND |
+| 5 | `f830589` | 0 / 1 / 0 | the one major OUT of envelope (ruling) | 1 NEW / 0 | 0 | none (disclosure only) | banner ok; `^ERROR` 0; one `ERROR codex_core` hit, an echo of the prompt text; footer; verdict line present; 38 `^ succeeded in`; no docs/proofs file opened | | converged (all majors out of envelope) |
 
 Round 1 adjudication (fixed in `81187ee`, `018f3a8`, `2883592`):
 - F1 major (scan cache had no identity; `finish` could certify a stale or incomplete scan; `--rescan` kept a partial): ACCEPTED. A cache and a partial carry `rules` and
@@ -163,3 +164,7 @@ Round 4 adjudication (fixed in `6d5ccab`; evidence `r4/`):
 - F2 minor ("Timing: none recorded" beside printed elapsed seconds): the report now says no timing or memory figure is reported as a result and that the commands print elapsed seconds.
 - F3 minor (commits `b3a5fff` and `6bf9752`, docs-only, lack the `Co-Authored-By` footer): ACCEPTED as a disclosed deviation; history not rewritten (the hashes are quoted in the
   records); every other and later commit carries the footer.
+
+Round 5 (evidence `r5/`): the reviewer reproduced all candidate lists, the stills, the page, the clip and the report tables with no in-envelope finding. Its one finding, R5-01 (an interrupted
+scan resumed after the source file was replaced keeps the saved rows; the partial is not checked against the byte count), needs a replaced file: OUT OF ENVELOPE by the orchestrator's
+ruling, banked and disclosed in report section 7. The round converges. Yielded with this ledger for the five-round approval.
