@@ -148,6 +148,7 @@ No other IF-2 method or helper reads back to the host (Gate 1 tests).
 | 0 (table) | 108,729 (24 turns) at the round-0 yield | - | - | - | - | - | - | - | - | yield for ruling |
 | pre-review (build, CHARC additions) | 228,618 (74 turns) at the window-request yield; 237,795 (81 turns) at the queue yield | - | - | - | - | - | - | - | - | full-pytest window queued; round 1 to adjudicated verdict, then depth decision |
 | 1 | first cell retired at 275K; successor 182,305 (68 turns) at the remediation / window-request yield | 0 | 3 | 4 | 7 in / 0 out | 7 NEW / 0 REOPENED | 0 | pending: product F1 F2 F3 F5, tool F4 F7, test-only F6 | WSL, codex-cli 0.162.1, gpt-5.6-sol high | NEW_CRITICAL_MAJOR_FOUND (adjudicated, not remediated) |
+| 2 | (dispatcher fills) | 0 | 1 | 2 | 3 in / 0 out | 1 NEW (minor) / 2 REOPENED (F4 major, F6 minor) | 0 | pending: tool+test+report R2-1, test-only R2-2, test+report R2-3 | WSL, codex-cli 0.162.1, gpt-5.6-sol high | NEW_CRITICAL_MAJOR_FOUND; zero NEW blocking (the major is a REOPENED F4 residual); adjudicated, not remediated |
 
 ## Gate windows
 
@@ -206,6 +207,29 @@ worktree `work/r2-f*-{red,green}.log`.
 
 Inner loop at `7e29ece`: `tests/test_core_*.py` 172 passed (GPU present); ruff check, ruff
 format --check (76 files), mypy (51 files) clean.
+
+## Gate window 2 (successor, granted by the dispatcher, held alone)
+
+Full pytest at `4e8d57a`: normal 1310 passed, 0 skipped, exit 0, 8:44 (`work/full3.log`);
+`cupy`/`cupyx` set to None in `sys.modules` (a `python -c` wrapper around `pytest.main`, the
+first cell's mechanism) 1204 passed, 106 skipped, exit 0, 5:48 (`work/full4.log`). Every skip
+carries a CuPy/CUDA reason (103 as before plus 3 new GPU cases from F1 and F5).
+
+## Round 2 (Reviewer A) -- summary
+
+Evidence `C:\Users\rwsmy\clearwater-review-evidence\wp3.1\r2\` (prompt with a THIS IS ROUND 2
+section, diff `9735282..4e8d57a` minus `uv.lock` and `docs/proofs`, the pre-run
+`test-summary.txt` the reviewer was allowed to read, transcript, `adjudication.md`,
+`md5sums.txt`; transcript md5 `befe56dbfc5fe2844fca568079f918b1`, verdict file
+`2b8dca98bc977170986edfc33845c721`). Assertions all pass; 1 ERROR line of subprocess provenance
+(WSL interop on python.exe). The reviewer still could not run pytest (read-only /tmp). F1, F2,
+F3, F5, F7 verified fixed.
+
+| # | Sev | Where | Finding | NEW/REOPENED | Planned fix |
+|---|---|---|---|---|---|
+| R2-1 | MAJOR | `tools/core_speed.py` prototype path | host reads differ from `correct()`: percentile without `.tolist()` (correct has it), `_lab_mean(...).tolist()` twice (correct keeps it on device) | REOPENED (F4) | call `proto._high_pass_and_bounds`; `_lab_mean` without tolist; test counts it against `correct()`; docstring and report name each path's host reads |
+| R2-2 | MINOR | `tests/test_core_deps.py` | `import_module(name='cupy')`, `__import__(name=...)` missed (reviewer EXECUTED, cell reproduced) | REOPENED (F6) | keyword string arguments too; planted control |
+| R2-3 | MINOR | report claim 2 / `test_cpu_against_gpu_within_ad11` | the test pins the IF-2 methods at small sizes only; the helpers and the 4K figures are not pinned as claimed | NEW | add the helpers to `all_methods`; claim 2 says the 4K figures were measured once |
 
 ## Successor handoff (if re-seated)
 
