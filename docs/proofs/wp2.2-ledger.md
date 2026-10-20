@@ -142,7 +142,8 @@ stage order from its constructor (default the c3 names).
 |---|---|---|---|---|---|---|---|---|
 | 1 (proposal yield) | - | - | - | - | - | - | - | 148,021 tokens / 36 turns (orchestrator) |
 | R1 (Reviewer A) | 0 | 5 (3 fixed, 1 rejected as ruled, 1 raised) | 4 (3 fixed, 1 rejected, 1 raised) | all in | 9 NEW / 0 REOPENED | 0 | product (#2, #4, #5) and tests (#8, #9) | see dispatcher |
-| R2 (Reviewer A) | 0 | 1 (fixed) | 3 (fixed) | all in | 4 NEW / 0 REOPENED | 0 | product (#1 docstring, #2) and tests (#3, #4) | 190,481 (R1 yield, orchestrator) |
+| R2 (Reviewer A) | 0 | 1 (fixed) | 3 (fixed) | all in | 4 NEW / 0 REOPENED | 0 | product (#1 docstring, #2) and tests (#3, #4) | 206,440 (R2 yield, orchestrator) |
+| R3 (Reviewer A) | 0 | 0 | 1 (fixed) | in | 1 NEW / 0 REOPENED | 0 | tests only (#1) | to be read by dispatcher |
 
 Reviewer A round 1: codex-cli (WSL) gpt-5.6-sol/high, 131,404 tokens, 40 executed commands, verdict
 NEW_CRITICAL_MAJOR_FOUND. Transcript, prompt, diff and adjudication:
@@ -153,7 +154,8 @@ which the ruled "None only where the default is None" rejects) and 7 (rotation s
 `tools/inventory.py` normalises clockwise). Full suite before the round: 881 passed.
 
 Reviewer A round 2 (after the CHARC follow-up cda92ceb: `Parameter.nullable`, rotation sentence):
-103,765 tokens, verdict NEW_CRITICAL_MAJOR_FOUND, evidence `...\clearwater-review-evidence\wp2.22\`.
+103,765 tokens, verdict NEW_CRITICAL_MAJOR_FOUND, evidence `...\clearwater-review-evidence\wp2.2
+2\`.
 Full suite before the round: 885 passed. Findings: 1 MAJOR, `Frame.pts` docstring said
 `pts_ticks / time_base` (copied from the section-3 comment; the time base is seconds per tick, so
 it is `pts_ticks * time_base`): docstring fixed; the TYPO REMAINS IN docs/architecture.md section 3
@@ -166,6 +168,15 @@ incidentally printed lines of `docs/proofs/wp2.2-ledger.md` (the c3 stage table,
 Treated as an incidental access, disclosed, not a disqualification. Tests in this worktree do not
 read `docs/architecture.md`, so the unrebased section-3 copy (lacking the `nullable` line) affects
 no test.
+
+Reviewer A round 3 (terminating): 89,519 tokens, VERDICT NO_NEW_CRITICAL_MAJOR, 8 executed
+commands, no ERROR lines, no `docs/proofs` path in any command output (hits are exclusion globs
+and echoes of the prompt/brief). Prompt fix applied per the orchestrator: the exclusion now reads
+`--glob '!docs/proofs/**'` (the round-2 glob `!proofs/**` did not match `docs/proofs`), the prose
+says never to open, grep, list or print any file under `docs/proofs/`, and searches are confined
+to named directories. One MINOR (REASONED): the c3 stage test compared the constant with itself;
+fixed with a literal-list test `test_c3_stages_equal_the_ruled_list`. Final head: ruff, ruff format
+--check, mypy clean; full pytest 887 passed; harness gate untouched.
 
 ## Gates at the round-1 commit
 

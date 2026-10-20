@@ -187,6 +187,41 @@ def test_planted_stub_missing_a_method_fails_by_name() -> None:
     assert Broken.percentile is None
 
 
+def test_c3_stages_equal_the_ruled_list() -> None:
+    """The literal AD-6 / WP1.4 section 7 list, as CHARC confirmed it in round 1."""
+    white_balance, fusion = C3_STAGES
+    assert (white_balance.name, white_balance.statistics, white_balance.smoothed) == (
+        "white_balance",
+        ("means", "gains"),
+        ("means", "gains"),
+    )
+    assert white_balance.depends_on_parameters == (
+        "kappa",
+        "lambda_",
+        "c3_strength",
+        "c3_kernel_fraction",
+        "c3_mask_threshold",
+        "c3_mask_smooth_fraction",
+    )
+    assert (white_balance.depends_on_stages, white_balance.source_only) == ((), False)
+    assert (fusion.name, fusion.statistics, fusion.smoothed) == (
+        "fusion",
+        ("bounds", "saliency_means"),
+        ("bounds", "saliency_means"),
+    )
+    assert fusion.depends_on_parameters == (
+        "white_balance_strength",
+        "max_white_balance_gain",
+        "sharpen_blur_fraction",
+        "normalisation_low",
+        "normalisation_high",
+        "gamma",
+        "sharpen_strength",
+    )
+    assert (fusion.depends_on_stages, fusion.source_only) == (("white_balance",), False)
+    assert len(C3_STAGES) == 2
+
+
 def test_method_stub_has_real_c3_stages_and_zero_statistics() -> None:
     method = StubCorrectionMethod()
     assert method.id == "stub"
