@@ -52,8 +52,8 @@ requires_gpu = pytest.mark.skipif(
 NTSC = Fraction(30000, 1001)
 
 VARIANTS = {
-    "ancuti2018": Params(),
-    "ancuti2018-blue": Params(blue_compensation=True),
+    "ancuti2018": Params(method="ancuti2018"),
+    "ancuti2018-blue": Params(method="ancuti2018", blue_compensation=True),
     "c3": Params(method="c3"),
 }
 
@@ -461,7 +461,7 @@ def test_the_staged_reach_is_the_number_of_stages_times_the_radius() -> None:
     count = 36
     frames = [_scene(12, 16, seed=3 + n % 5) for n in range(count)]
     changed = [_scene(12, 16, seed=99), *frames[1:]]
-    for params in (Params(), Params(method="c3")):
+    for params in (Params(method="ancuti2018"), Params(method="c3")):
         reach = runner.staged_reach(params.method, smoother, rate)
         assert reach == len(STAGES[params.method]) * 3
         base, _ = analyse_staged(frames, params, smoother, rate)

@@ -46,7 +46,7 @@ rule: a test site is pinned when its `Params` reaches a function that reads `par
 | `tests/test_prototype_backend.py` | 5 | 1 `run.py` argv line (its 3 parametrised cases failed); 4 reach `correct` |
 | `tests/test_prototype_pipeline.py` | 9 | 3 `run.py` argv (failed); 6 reach `correct` |
 | `tests/test_prototype_clip.py` | 20 | every clip-pipeline site (3 as `dataclasses.replace(Params.neutral(), method="ancuti2018")`) |
-| `tests/test_prototype_temporal.py` | 25 | staged and statistics sites (they would silently have run c3's 2-stage chain) |
+| `tests/test_prototype_temporal.py` | 28 | staged and statistics sites (they would silently have run c3's 2-stage chain); 3 of them (the `VARIANTS` registry's two Ancuti entries and the staged-reach loop) were found by Reviewer A round 1 (CR-01) and pinned in the round's fix, with a guard test |
 | `tests/test_lookcheck_deep.py` | 1 | reaches `correct` |
 | `tools/prototype/run.py` | help text | follows `Params()` (c3); the usage and `--method` / `--blue` help name c3 as the default and list ancuti2018 / ancuti2018-blue (guard ii) |
 
@@ -146,15 +146,18 @@ from the green term.
 
 **`red_lit` tiles** (a red baseline exists):
 
-| Setting | sigma_R out (8-bit) | amplification (n) | red WB gain | residual R/G | green fraction | cap bound |
-|---|---|---|---|---|---|---|
-| cap off | 0.736 [0.539-0.993] | 2.43 [1.64-4.50] (8) | 1.52 [1.36-2.02] | 1.00 [0.94-1.04] | 0.46 [0.36-0.68] | 0/8 |
-| cap 2.0 (default) | 0.736 [0.553-0.993] | 2.43 [1.64-4.50] (8) | 1.54 [1.36-2.02] | 1.00 [0.94-1.04] | 0.46 [0.36-0.67] | 1/8 |
-| cap 1.0 | 0.783 [0.652-0.993] | 2.50 [1.64-4.50] (8) | 1.72 [1.36-2.21] | 1.01 [0.94-1.05] | 0.46 [0.36-0.50] | 3/8 |
-| cap 0.5 | 0.938 [0.717-1.035] | 2.84 [1.78-5.15] (8) | 1.97 [1.56-2.84] | 1.02 [0.93-1.08] | 0.33 [0.33-0.33] | 8/8 |
-| c3 | 0.481 [0.370-0.718] | 1.53 [1.15-3.25] (8) | 1.05 [1.02-1.07] | 1.00 [0.99-1.00] | n/a | n/a |
-| shallow, every Ancuti cap | 0.565 | 1.20 | 1.03 | 1.01 | 0.05 | 0/1 |
-| shallow, c3 | 0.549 | 1.16 | 0.99 | 1.00 | n/a | n/a |
+| Setting | sigma_R out (8-bit) | amplification (n) | red WB gain | residual R/G | green fraction | cap bound | ISOE (context) | camera WRGB red (context) |
+|---|---|---|---|---|---|---|---|---|
+| cap off | 0.736 [0.539-0.993] | 2.43 [1.64-4.50] (8) | 1.52 [1.36-2.02] | 1.00 [0.94-1.04] | 0.46 [0.36-0.68] | 0/8 | 100 [100-793] | 3.73 [3.12-4.85] |
+| cap 2.0 (default) | 0.736 [0.553-0.993] | 2.43 [1.64-4.50] (8) | 1.54 [1.36-2.02] | 1.00 [0.94-1.04] | 0.46 [0.36-0.67] | 1/8 | 100 [100-793] | 3.73 [3.12-4.85] |
+| cap 1.0 | 0.783 [0.652-0.993] | 2.50 [1.64-4.50] (8) | 1.72 [1.36-2.21] | 1.01 [0.94-1.05] | 0.46 [0.36-0.50] | 3/8 | 100 [100-793] | 3.73 [3.12-4.85] |
+| cap 0.5 | 0.938 [0.717-1.035] | 2.84 [1.78-5.15] (8) | 1.97 [1.56-2.84] | 1.02 [0.93-1.08] | 0.33 [0.33-0.33] | 8/8 | 100 [100-793] | 3.73 [3.12-4.85] |
+| c3 | 0.481 [0.370-0.718] | 1.53 [1.15-3.25] (8) | 1.05 [1.02-1.07] | 1.00 [0.99-1.00] | n/a | n/a | 100 [100-793] | 3.73 [3.12-4.85] |
+| shallow, every Ancuti cap | 0.565 | 1.20 | 1.03 | 1.01 | 0.05 | 0/1 | 100 | 2.54 |
+| shallow, c3 | 0.549 | 1.16 | 0.99 | 1.00 | n/a | n/a | 100 | 2.54 |
+
+The context columns are the same 8 frames in every row; per frame they are in the claim 2a
+table.
 
 **`flat` tiles** (the brief's set):
 
@@ -276,8 +279,11 @@ centred Gaussian, staged, on the 540 NumPy proxy. The per-frame cap binds on **4
 
 | | (A) alpha smoothed as a value | (B) alpha derived from smoothed means and cap statistic |
 |---|---|---|
-| frames with alpha below 1 | 93 | 33 |
+| frames with alpha below 0.999 | 93 | 33 |
 | minimum alpha | 0.673 | 0.712 |
+
+The 0.999 threshold counts the frames where the cap acts. A's Gaussian also leaves the far
+frames within 1e-15 of 1, so a strict "below 1" counts all 179 frames.
 | flicker (8-bit levels) | **0.388** | 0.483 |
 
 - `|alpha_A - alpha_B|`: mean 0.033, max 0.291 (frame 53).
@@ -307,7 +313,8 @@ The analysis was then re-run.
 
 - Over the excerpt's first second, the largest change in any applied value is: red gain 0.014,
   other gains 0.005 or less, N{} bounds 0.0022 or less, stretch 0.031.
-- After the first second, the changes are 0.0001 or less.
+- After the first second, the changes are 0.0003 or less (the largest is the stretch's
+  0.00023, Ancuti).
 - The applied step across the cut is unchanged (Ancuti red gain +0.407 narrow, +0.393 wide).
 - The flicker is unchanged: 0.388 against 0.389 (Ancuti), 0.097 against 0.097 (c3).
 - So the truncated window at the excerpt's start is not what the owner saw. The step is the
@@ -340,8 +347,14 @@ across +-1 s, 2 s window:
 - **(b) The 0.5 s window** follows the raw statistics more closely: Ancuti's red gain step grows
   from +0.41 to +0.64, close to the raw +0.68. It adds 68 % (c3) and 23 % (Ancuti) flicker, and
   Ancuti's peak per-step flicker is three times higher.
-- **Neither makes the rendered step smaller than the source's.** On this clip the 2 s window
-  remains the better of the three.
+- **Neither remedy makes the step materially smaller.**
+  - The reset changes no rendered ratio.
+  - The 0.5 s window brings Ancuti's luma ratio from 1.07 to 1.00, and leaves c3's at 0.92.
+    It does so by following the raw statistics: Ancuti's red-gain step grows to +0.64 and its
+    flicker rises.
+  - c3's rendered luma step is smaller than the source's under every option (0.92x).
+  - On this clip the 2 s window remains the better of the three: it has the lowest flicker and
+    the lowest peak per-step flicker.
 - The visible difference from the source is in colour: red falls further, and the stretch rises.
   Softening that is a temporal-design question for Phase 2, not a smoothing-window one.
 - The 2 s default stays PROVISIONAL per DR-25(3).
@@ -375,6 +388,11 @@ Each caption gives `sigma_R` on both tile sets, the red gain, and what bound.
    - Open-water frames get no crops, as the brief defines (claim 6 names deep and shallow).
 2. **Extra camera-state context.** SHUT is shown as context. All six keys are read; YAVG and
    UNIF are in `frames.json` only.
-3. **The `Params.neutral()` docstring** reads oddly after the flip. Not this package's file.
+3. **Two docstrings in other packages' files are stale after the flip.** The brief's lock
+   allows only pinning edits there, so they are raised, not fixed:
+   - The `Params.neutral()` docstring reads oddly.
+   - `tools/statistics_experiments.py:1028` (`render_clips`) says the frames are corrected at
+     "``Params()`` defaults (``ancuti2018``, blue off)". The code pins Ancuti through
+     `METHODS[RENDER_METHOD]`, so only the sentence is stale (Reviewer A round 1, CR-04).
 4. **Claim 10b's widened excerpt** is a new 3 s extract at the 540 proxy. It is cached in
    `work/wp1.4b/clip/lead-in.npy`; the full-resolution PNGs were deleted once proxied.

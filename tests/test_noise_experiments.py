@@ -55,6 +55,16 @@ def test_run_help_names_c3_as_the_default_and_lists_the_options(
     assert "defaults to the :class:`Params` default, ``c3``" in (run.__doc__ or "")
 
 
+def test_the_temporal_variant_registry_names_each_method_explicitly() -> None:
+    # Guard for the flip's pins (Reviewer A round 1, CR-01): a registry entry that relied on
+    # the default would now run c3 under an ancuti2018 label.
+    import test_prototype_temporal
+
+    for name, params in test_prototype_temporal.VARIANTS.items():
+        assert params.method == name.removesuffix("-blue")
+        assert params.blue_compensation is name.endswith("-blue")
+
+
 # --- the noise estimator (claim 4) ---------------------------------------------------------------
 
 
