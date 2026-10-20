@@ -1,9 +1,10 @@
-# WP3.3 — Fusion inputs, weights and blending (dispatch brief, DRAFT)
+# WP3.3 — Fusion inputs, weights and blending (dispatch brief, FINAL)
 
-**Status:** DRAFT (orchestrator gen 6, drafting helper), for CHARC approval. Owner decisions:
-none inside the package (the N{} floor's form is CHARC's, question 1; a higher floor would be a
-look decision, WP1.4b claim 9).
-- Spec **v0.5.4**. Architecture FINAL 1.0 section 3 IF-2 and IF-3, section 4; AD-1, AD-4, AD-6,
+**Status:** FINAL 2026-10-20, approved by CHARC 53b752a4d7fac4fc with rulings; base = the pre-dispatch main commit named at dispatch. Drafted by the
+orchestrator (gen 6, drafting helper). Owner decisions: none inside the package (the N{} floor's
+form is ruled, AD-4 as amended 2026-10-20; a higher floor would be a look decision, WP1.4b claim
+9).
+- Spec **v0.5.4**. Architecture FINAL 1.0 section 3 IF-2 and IF-3, section 4; AD-1, AD-4 (as amended 2026-10-20), AD-6,
   AD-8, AD-11, AD-20. Frame `docs/briefs/wp2.4-phase3-frame.md` (sections 1-5; section 5 maps
   "6.3 defaults" to WP3.2, WP3.3, WP3.4). WP3.1 report `docs/reports/wp3.1-array-backend.md`
   ("Conventions fixed here", "Consumer notes"). DR-14 (closes), DR-13, DR-19, DR-37 (b) (row "Debt and decided items").
@@ -22,14 +23,14 @@ numerical reference (DR-19) and closes DR-14 with AD-4's floor.
 | ID and title | WP3.3 — Fusion inputs, weights and blending; plan Phase 3 row WP3.3 (size M); module `clearwater.methods` (plan 8.1, built by WP3.2–WP3.4) |
 | Goal | Step functions on an IF-2 backend for the gamma input, the sharpened input with its normalisation N{} (AD-4, with the 0.02 floor), the Laplacian, saliency and saturation weights with the paper's regularisation, and the multiscale Laplacian-pyramid blend; the two whole-frame statistics measured by their own functions and supplied to the render; bit-identical to the prototype on the same device or within AD-11, with the measured maximum reported. |
 | Spec / decision clauses | 6.2 step 3 "**Derive two fusion inputs** from the white-balanced image: Input 1: gamma-corrected version. Input 2: sharpened version, `S = (I + N{I − G∗I}) / 2`, where N{} is a linear normalization (histogram stretch) whose bounds are whole-frame statistics (Section 7)." Step 4 "**Compute weight maps** for each input: Laplacian contrast, saliency (Achanta et al.), and saturation. Normalize across inputs with the paper's regularization, `W̄k = (Wk + δ) / (ΣWk + K·δ)`, δ = 0.1, K = 2." Step 5 "**Multiscale fusion** — Laplacian pyramid of inputs blended with Gaussian pyramid of weights, then collapsed." 6.1 "The formulas in the reference papers are authoritative over the summaries below. Where a paper leaves a value unspecified (e.g., the gamma for fusion input 1), the chosen default is documented in the design." 6.6 "All spatial parameters (sharpening blur, Laplacian, saliency blur, 3C kernels and mask smoothing) are expressed as a fraction of the image's short side (D56)"; "Pyramid depth is set by a minimum coarsest-level size rather than a fixed count; the Advanced "pyramid" control adjusts that size." D39 "Internal processing in 32-bit float; quantization only at export"; D56 "All spatial parameters size-relative (fraction of short side); pyramid depth set by minimum level size"; D57 "*(amended by D97)* All whole-frame statistics (incl. sharpening normalization, saliency reference) are analyzed and smoothed, in dependency order"; D107 "Core is written so the same code runs on CPU or GPU from the start". Feeds V1 "unit tests for each stage (... normalization, weights, pyramid fusion ...), including edge cases: uniform images, near-zero red channel, 10-bit input" and V9 "with every stage set to its neutral value (... sharpening 0, gamma 1 ...) each stage reduces to identity". AD-4 "Normalisation bounds N{}: 0.5 and 99.5 percentiles of the high-pass, taken jointly over channels, with a floor of 0.02 on the range (collapse guard, DR-14)", "Measured on the analysis proxy (AD-5) and used unchanged for preview and export, so V8 (preview = export) holds by construction". AD-6 (last stage: "N{} bounds and the two saliency Lab means"). AD-8 defaults: gamma 1.5, sharpen blur 0.005, Laplacian 0.001, saliency blur 0.003, delta 0.1, pyramid min level 16 px, N{} floor 0.02. |
-| Depends on | WP3.1 merged (accept `f4acbd0`: `clearwater.core` on main; no stub needed). WP2.2 (IF-1, IF-2, IF-3 frozen, `b288533`). WP2.3 stills: `png16-uniform-none`, `png16-gradient-none`, `png16-lowred-none`, `png8-uniform-none`, `png8-gradient-none`, `png8-lowred-none`. Runs in parallel with WP3.2; its input is "the white-balanced image", which tests build with the prototype's `white_balance` or take as a still directly; no WP3.2 code is needed. Package file: X-2. |
-| Files owned | `src/clearwater/methods/fusion.py` (NEW); `tests/test_methods_fusion*.py` (NEW); `docs/reports/wp3.3-fusion.md`; `docs/proofs/wp3.3-ledger.md`. NOT owned: `src/clearwater/methods/__init__.py` (X-2), `compensation.py` and `white_balance.py` (WP3.2), `ancuti_fusion.py` (WP3.4), `src/clearwater/core/` (WP3.1; read only), `src/clearwater/interfaces/`, `tools/prototype/`, `pyproject.toml`, `tests/conftest.py`, `tests/fixture_plugin.py`. |
+| Depends on | WP3.1 merged (accept `f4acbd0`: `clearwater.core` on main; no stub needed). WP2.2 (IF-1, IF-2, IF-3 frozen, `b288533`). WP2.3 stills: `png16-uniform-none`, `png16-gradient-none`, `png16-lowred-none`, `png8-uniform-none`, `png8-gradient-none`, `png8-lowred-none`. Runs in parallel with WP3.2; its input is "the white-balanced image", which tests build with the prototype's `white_balance` or take as a still directly; no WP3.2 code is needed. `src/clearwater/methods/__init__.py` (docstring only) exists at the base (ruling X-2). |
+| Files owned | `src/clearwater/methods/fusion.py` (NEW); `tests/test_methods_fusion*.py` (NEW); `docs/reports/wp3.3-fusion.md`; `docs/proofs/wp3.3-ledger.md`. NOT owned: `src/clearwater/methods/__init__.py` (orchestrator, then WP3.4; ruling X-2), `compensation.py` and `white_balance.py` (WP3.2), `ancuti_fusion.py` (WP3.4), `src/clearwater/core/` (WP3.1; read only), `src/clearwater/interfaces/`, `tools/prototype/`, `pyproject.toml`, `tests/conftest.py`, `tests/fixture_plugin.py`. |
 | Interfaces provided | No frozen interface. The step functions of X-1 (names and signatures tabled at round 0 for CHARC; WP3.4 builds on them). |
 | Interfaces consumed | IF-1 `Array`; IF-2 `ArrayBackend` methods `asarray`, `to_host`, `gaussian_blur`, `percentile` (R-7, `q` in 0-100, over the whole array: AD-4's joint bounds); `clearwater.core` helpers `spatial_sigma`, `pyramid_levels`, `gaussian_pyramid`, `laplacian_pyramid`, `collapse_pyramid`, `luminance`, `rgb_to_lab`, `laplacian`, `channel_means`, `check_sigma`. The helpers require a `clearwater.core` backend (`CoreBackend`; DR-37 b): tests use `NumpyBackend` / `CupyBackend`, never a protocol-only double. `channel_means` returns Python floats (a sync point); `percentile` returns a float32 array on the device ("R-7 in float64, cast once", WP3.1 report claim 5), so reading the bounds as floats is a further sync point to list. `CoreBackend.xp` is NOT available outside `clearwater.core` (WP3.1 ruling 1.1). |
 | Consumers | WP3.4 (wave 3), which owns the `Parameter` schema and its range validation, the stage and statistic names (the frozen `stubs.C3_STAGES` names `"bounds"`, `"saliency_means"`), the order of measurement inside the fusion stage (the saliency mean of input 2 depends on that frame's N{} bounds), smoothing, "blend with original" (plan WP3.4), the method-level V9 test, the product memory-peak re-check and the whole-core speed row. WP3.3 owns the per-step numerics and the measure / render split. WP3.21 (optimisation; FFT or recursive Gaussian) later replaces kernels, not these functions' contracts. |
 | Hardware flags | `gpu` on every CuPy test. No footage, no timing. |
 | Out of scope | Compensation and white balance (WP3.2); the IF-3 method objects, schema, stages, smoothing and "blend with original" (WP3.4); any change to `clearwater.core` (X-3); a weight-map smoothing or caching scheme (spec 7.4 is conditional scope, not v1 here); any optimisation candidate of the gate report (WP3.21); importing `tools/prototype` from `src/`; GoPro IMU/GPS (owner: out of scope). |
-| Debt and decided items | **DR-14 (OPEN) — CLOSES:** the ill-conditioned N{} stretch gets AD-4's floor of 0.02 on the range (AD-4: bounds "Measured on the analysis proxy (AD-5)", the 540-line proxy; the value from WP1.4b claim 9, binding on none of the measured ranges 0.028-0.64), in the form question 1 settles; recorded CLOSED at the accept. **WP3.1 round-0 ruling R0-8 (percentile float32 out) — carried, not a defect:** `percentile` is computed at native precision (float64) and cast once to float32 (`docs/proofs/wp3.1-ledger.md` R0-8, "Consequence flagged for WP3.3"; WP3.1 report claim 5), so the bounds and input 2 agree with the prototype within AD-11, not bit for bit; the report states the measured maximum. **DR-13 (OPEN) — must not reopen, not closed here:** DR-13 reads "At `laplacian_fraction` 0.001 the Laplacian contrast weight is about 1% of the aggregated weight on textured content (saliency ~0.08, saturation ~0.19), so the contrast term is nearly inert at the defaults", with the trigger "calibrate `laplacian_fraction` or the weight normalisation on real footage". `laplacian_fraction` (default 0.001, AD-8) is that calibration knob and stays a parameter with that default and the scale-normalised form, the calibration knob the owner can see through the parameter set (whether it is exposed in a panel is WP3.4's schema; spec 6.7's Advanced list does not name it); no recalibration in this package; the report quotes DR-13 and the measured weight share on one still. **DR-19 (OPEN) — PARTLY DISCHARGES, for this package's parameters only:** items (1) and (2) under the shared rule X-4 (also carried by WP3.2), stated in the report; item (3) does not recur (`check_sigma` bounds the integer radius); item (4) is held by the core's input checks (R0-3) and R0-8; item (5) by the planted-defect tests that concern fusion. DR-19 stays OPEN until WP3.4's schema lands. **DR-37 (b) — must not reopen:** the core helpers take a `CoreBackend`; no protocol-only double. |
+| Debt and decided items | **DR-14 (OPEN) — CLOSES:** the ill-conditioned N{} stretch gets AD-4's floor of 0.02 on the range (AD-4: bounds "Measured on the analysis proxy (AD-5)", the 540-line proxy; the value from WP1.4b claim 9, binding on none of the measured ranges 0.028-0.64), applied by widening the bounds symmetrically about their midpoint to a range of 0.02, never by a plain max on the range, so a flat image keeps the prototype's 0.5 (AD-4 as amended 2026-10-20; ruling 3.1); DR-14 CLOSES on WP3.3's accept. **WP3.1 round-0 ruling R0-8 (percentile float32 out) — carried, not a defect:** `percentile` is computed at native precision (float64) and cast once to float32 (`docs/proofs/wp3.1-ledger.md` R0-8, "Consequence flagged for WP3.3"; WP3.1 report claim 5), so the bounds and input 2 agree with the prototype within AD-11, not bit for bit; the report states the measured maximum. **DR-13 (OPEN) — must not reopen, not closed here:** DR-13 reads "At `laplacian_fraction` 0.001 the Laplacian contrast weight is about 1% of the aggregated weight on textured content (saliency ~0.08, saturation ~0.19), so the contrast term is nearly inert at the defaults", with the trigger "calibrate `laplacian_fraction` or the weight normalisation on real footage". `laplacian_fraction` (default 0.001, AD-8) is that calibration knob and stays a parameter with that default and the scale-normalised form, the calibration knob the owner can see through the parameter set (whether it is exposed in a panel is WP3.4's schema; spec 6.7's Advanced list does not name it); no recalibration in this package; the report quotes DR-13 and the measured weight share on one still. **DR-19 (OPEN) — PARTLY DISCHARGES, for this package's parameters only:** items (1) and (2) under the shared rule X-4 (also carried by WP3.2), stated in the report; item (3) does not recur (`check_sigma` bounds the integer radius); item (4) is held by the core's input checks (R0-3) and R0-8; item (5) by the planted-defect tests that concern fusion. DR-19 stays OPEN until WP3.4's schema lands. **DR-37 (b) — must not reopen:** the core helpers take a `CoreBackend`; no protocol-only double. |
 | Done | Plan 4.5; frame section 2 rules 1-11; ruff check, ruff format --check, mypy strict, full pytest green with and without CuPy importable (in a granted window, X5); prototype agreement measured per function; DR-14's floor in and tested; V1 and V9 items covered; the X-4 rule stated in the report with its tests; Reviewer A converged. |
 
 ## Task ladder
@@ -40,12 +41,13 @@ numerical reference (DR-19) and closes DR-14 with AD-4's floor.
    `saliency_reference`, `weight_maps`, `_laplacian_weight`, `_saliency_weight`,
    `_saturation_weight`, `_lab_mean`, `multiscale_fusion`. Write in the ledger: each product
    function (X-1), its prototype counterpart, measure or render, every prototype `xp.` call and
-   its replacement (X-3), the floor's form (question 1), and whether bit identity is expected
+   its replacement (X-3), the floor as ruled (ruling 3.1), and whether bit identity is expected
    on each device. YIELD before product code. Anything the table cannot settle is a STOP.
 2. **Fusion inputs (step 3).** Input 1 `I ** gamma` (float32 exponent). Input 2: the high-pass
    `I - G*I` (`sharpen_blur_fraction` through `spatial_sigma`); the bounds are supplied, never
-   measured here; the stretch `clip((hp - low) / range, 0, 1)` with AD-4's floor on the range
-   in the form question 1 settles; `S = (I + stretched) / 2`; `sharpen_strength` s gives
+   measured here; when `high - low < 0.02` the bounds are widened symmetrically about their
+   midpoint to `mid -/+ 0.01` (AD-4 as amended; a module constant, applied to the supplied
+   bounds); the stretch `clip((hp - low) / (high - low), 0, 1)`; `S = (I + stretched) / 2`; `sharpen_strength` s gives
    `clip(I + s * (S - I), 0, 1)`. Both clipped to [0, 1].
 3. **Measured statistics.** N{} bounds: the `normalisation_low` / `normalisation_high`
    percentiles of the high-pass over all pixels and channels (AD-4) through IF-2 `percentile`.
@@ -70,7 +72,8 @@ numerical reference (DR-19) and closes DR-14 with AD-4's floor.
      expected within AD-11, not bit for bit: the bounds are float32 (WP3.1 consumer note) where
      the prototype carries float64 Python floats.
    - The floor: a near-flat input (range below 0.02) and an exactly flat input (range 0) give
-     the result question 1 rules; a range above 0.02 is untouched by the floor (equal to the
+     the ruled result (0.5 for the flat input, the midpoint-widened stretch for the near-flat one); a
+     range of 0.02 or more is untouched by the floor (equal to the
      prototype); DR-14's amplification case (WP1.2A F1, range 0.0018) stays bounded.
    - CPU against GPU within AD-11 (max 2e-3 absolute per channel, mean 2e-4); same device twice
      bit-identical (N10). Name the inputs where the stretch amplifies the CPU/GPU gap (DR-14) and
@@ -88,8 +91,8 @@ numerical reference (DR-19) and closes DR-14 with AD-4's floor.
      default `laplacian_fraction` on `png16-gradient-none` and a textured synthetic input, in
      the report beside DR-13's figure.
    - Planted wrong implementations fail by name: N{} per channel instead of joint; bounds
-     measured inside the render; no floor; the floor applied to the bounds rather than the
-     range; delta added to the numerator only; K fixed at 1; weights not pyramided (applied at
+     measured inside the render; no floor; the floor as a plain max on the range (a flat
+     image then gives 0, not 0.5); delta added to the numerator only; K fixed at 1; weights not pyramided (applied at
      full resolution only); a fixed pyramid depth; saliency against the unblurred Lab image; a
      float64 leak.
    - Gate 1 discipline (as WP3.1's Gate 1 section): on the GPU every function returning an
@@ -119,7 +122,8 @@ validation is WP3.4's schema, derived values are X-4's), non-NVIDIA devices, oth
 - **WHAT TO EXAMINE:**
   - each formula against spec 6.2 steps 3-5, [A18] where the spec defers to it (6.1), and the
     prototype;
-  - N{} joint over channels, from supplied bounds only, with the floor as ruled;
+  - N{} joint over channels, from supplied bounds only, with the floor widened about the
+    midpoint (AD-4 as amended);
   - the regularisation `(W_k + delta) / (sum W_k + K delta)` with K the input count;
   - pyramid depth from the minimum level size (6.6, D56); every spatial sigma through
     `spatial_sigma`;
@@ -157,11 +161,20 @@ validation is WP3.4's schema, derived values are X-4's), non-NVIDIA devices, oth
   (md5 `f1cc6cf8ae3da62a1b3765573320e7b7`, as recorded in `docs/proofs/wp1.2r-accept.md`): read its
   wrong-implementation list and cover the ones that touch your steps. GoPro IMU/GPS data is out of scope everywhere.
 
-## Rulings (CHARC, pending)
+## Rulings (CHARC `53b752a4d7fac4fc`, 2026-10-20)
 
-_Placeholder: CHARC's rulings on the questions below._
+CHARC `53b752a4d7fac4fc`, 2026-10-20: every recommended answer is the ruling unless amended here.
+- **3.1 (floor form):** widen the bounds symmetrically about their midpoint to a range of 0.02
+  (AD-4 as amended 2026-10-20); DR-14 CLOSES on WP3.3's accept.
+Cross-brief rulings:
+- **X-2:** the orchestrator commits a docstring-only `src/clearwater/methods/__init__.py` on main
+  before dispatch (it exists at the base); WP3.4 owns it afterwards; WP3.2 and WP3.3 do not edit
+  it.
+- **X-4 (DR-19 rule):** as drafted; DR-19 stays OPEN until WP3.4.
+- CHARC accepted the drafter's corrections to its debt list (`laplacian_fraction` panel placement
+  is WP3.4's schema; WP3.7 ruling 7.3 is the `yuvj` citation); no line here changes.
 
-### Questions as drafted (recommended answer first)
+### Questions as drafted (recommended answer = ruling unless amended above)
 
 1. **The form of AD-4's floor (DR-14).** AD-4 says "a floor of 0.02 on the range"; the prototype
    has none (its rule is `high - low < 1e-6` → N{} = 0.5 everywhere), and WP1.4b claim 9

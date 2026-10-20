@@ -1,6 +1,6 @@
-# WP3.16 — Application shell and preview (dispatch brief, DRAFT)
+# WP3.16 — Application shell and preview (dispatch brief, FINAL)
 
-**Status:** DRAFT (orchestrator gen 6, drafting helper), for CHARC approval. Owner decisions:
+**Status:** FINAL 2026-10-20, approved by CHARC 53b752a4d7fac4fc with rulings; base = the pre-dispatch main commit named at dispatch. Owner decisions:
 none inside the package (V2 visual review is the owner's at WP5.x, not here).
 - Spec **v0.5.4**. Architecture FINAL 1.0 section 1 ("The preview renders from the proxy with
   the same statistics, so preview and export agree (V8, AD-4)"), section 2 (video preview data
@@ -9,8 +9,7 @@ none inside the package (V2 visual review is the owner's at WP5.x, not here).
   AD-4, AD-9, AD-11, AD-15, AD-18, AD-20, AD-25 (a). Frame `docs/briefs/wp2.4-phase3-frame.md`
   (section 4 grants PySide6 here). WP3.15 report `docs/reports/wp3.15-presets-settings-logging.md`
   "Public API"; WP3.1 report `docs/reports/wp3.1-array-backend.md` "`select_backend` reasons".
-- Cell: `implementer-sonnet-high` per the frame; question 1 asks whether it should be
-  `implementer-opus-high`. Tier **STRONG**.
+- Cell: `implementer-opus-high` (ruling 1; the frame's sonnet-high is superseded). Tier **STRONG**.
 - Worktree `.worktrees/wp3.16`, branch `wp3.16`, base = the main commit named at dispatch.
 
 **Why.** Plan Phase 3: "WP3.16 owns the main window and defines the places where the other
@@ -25,8 +24,8 @@ thread) and V8 (preview against export) are first built.
 | Goal | The main window with file open, the split-view before/after preview with zoom including 1:1, a preview worker running off the interface thread, the G10 messages, the AD-9 status bar, start-up through the `clearwater.config` API, a Qt runner for IF-8 jobs, and an attachment contract precise enough that WP3.17-3.20 are written against it. |
 | Spec / decision clauses | Plan bullet "**WP3.16:** file open, the split-view slider, zoom including 1:1, the screen-resolution preview worker running off the interface thread, and messages for unsupported, damaged or untagged inputs." G1 "Open photos and videos via file dialog."; G2 "Before/after comparison via split-view slider."; G9 "GUI stays responsive during analysis, export and batch processing (work runs off the UI thread)."; G10 "Clear messages for unsupported, damaged, or untagged inputs (Sections 5.1, 5.3, 5.4, 6.5), including ProRAW/DNG."; D27 "GUI before/after: split-view slider only (no side-by-side, no drag-and-drop)"; D28 "GUI framework: PySide6"; D41 "*(amended by D56)* Live preview at screen resolution while adjusting; closely approximates export, exact at 1:1 zoom"; 6.6 "a screen-resolution preview closely approximates the full-resolution result, and a 1:1 view is exact (verified by V8)"; D66 "V7: UI responds within 100 ms during processing"; D108 "Provisional preview: on clip open the current frame is shown at once using its own unsmoothed statistics while analysis runs in the background" (the shell shows it; the switch to smoothed is WP3.18's); D111 (the CPU fallback whose reason the status bar shows). Feeds V7 "UI responds within 100 ms during analysis, export and batch processing (D66)" and V8 "screen-resolution preview vs downsampled full-resolution output differ by less than a threshold set at design; 1:1 view exact" (AD-11 V8: "same frame, export downscaled to the preview size by area average: mean abs ≤ 1/255, max ≤ 3/255"). AD-9 "CPU/GPU use is reported in the status bar ("GPU: RTX 4070 Laptop" / "CPU") ... with the reason when the fallback engaged"; G12 "force CPU processing (Advanced; AD-9)" (the status bar follows it). AD-25 (a) (app-data locations only through `clearwater.config.paths`). DR-37 (a) (the reason string may name a broken CuPy install "CPU: CuPy not installed"; the trigger names "WP3.16's status bar showing the reason"). |
 | Depends on | WP2.2 merged (IFs frozen). WP3.15 merged: `app_locations() -> Locations` (`config_dir`, `cache_dir`, `presets_dir`, `log_dir`), `load_settings(folder)`, `save_settings(folder, settings)`, `configure_logging(folder)`, `shutdown_logging()`, `PresetStore(folder).install_starters()`. WP3.1 merged: `clearwater.core.select_backend(settings, height, width, method_id) -> tuple[ArrayBackend, str]` and its reasons `"GPU"`, `"CPU: forced"`, `"CPU: CuPy not installed"`, `"CPU: CuPy failed to load"`, `"CPU: no CUDA device"`, `"CPU: CUDA device unusable"`, `"CPU: estimate 1,982 MiB exceeds free 1,200 MiB"`. WP3.7 merged: `clearwater.io.video.probe(path) -> ProbeResult` (faults with `severity` `refuse`/`warn`/`exclude` and a user-readable `message`) and `VideoProbeError(kind, message)` (`unreadable`, `unsupported`, `sidecar`, `missing_tool`). Stubs (unmerged engines): `stubs.StubPhotoSource` (WP3.6), `stubs.StubVideoSource` (frames, WP3.9), `stubs.StubCorrectionMethod` (id `"stub"`, the c3 stages, identity `render`; WP3.2-3.4), `stubs.StubProxyCache` (WP3.12), `stubs.StubVideoSink` (capabilities, WP3.10), `stubs.StubProgress`. WP3.6's read-error class arrives by X-B2 (committed at WP3.6's round 0). |
-| Files owned | `src/clearwater/gui/` (NEW: `__init__.py` (docstring and exports; WP3.17-3.20 add sibling modules and may append exports, nothing else, as X1 ruled for `jobs/__init__.py`), `contract.py` (the attachment contract, task 2), and modules the round-0 table names, for example `shell.py` (main window, start-up), `engines.py` (the injected engines and their stub defaults), `preview.py` (split view, zoom, pan), `render_worker.py`, `jobs.py` (the IF-8 runner), `messages.py` (G10), `imaging.py` (downscale, display conversion)); `tests/test_gui_*.py` (NEW) and, if needed, one helper `tests/gui_support.py` (owned); `docs/reports/wp3.16-shell-preview.md`; `docs/proofs/wp3.16-ledger.md`. `pyproject.toml`: ONLY the frame section 4 grant (`PySide6` in `[project] dependencies`) plus what question 3 rules for the dev group, and `uv.lock` as `uv lock` regenerates it. NOT owned: `src/clearwater/interfaces/`, `config/`, `core/`, `io/`, `jobs/`, `tests/conftest.py`, the widget modules of WP3.17-3.20, `clearwater.app` and any entry point (WP4.3). |
-| Interfaces provided | No frozen interface. `clearwater.gui.contract` (task 2) is the base WP3.17-3.20 build on; question 2 asks whether it is frozen at the round-0 yield. A Qt implementation of IF-8 `Progress` (`report`, `cancelled`) whose reports reach the main thread by signal. |
+| Files owned | `src/clearwater/gui/` (NEW: `__init__.py` (docstring and exports; WP3.17-3.20 add sibling modules and may append exports, nothing else, as X1 ruled for `jobs/__init__.py`), `contract.py` (the attachment contract, task 2), and modules the round-0 table names, for example `shell.py` (main window, start-up), `engines.py` (the injected engines and their stub defaults), `preview.py` (split view, zoom, pan), `render_worker.py`, `jobs.py` (the IF-8 runner), `messages.py` (G10), `imaging.py` (downscale, display conversion)); `tests/test_gui_*.py` (NEW) and, if needed, one helper `tests/gui_support.py` (owned); `docs/reports/wp3.16-shell-preview.md`; `docs/proofs/wp3.16-ledger.md`. `pyproject.toml`: ONLY the frame section 4 grant (`PySide6` in `[project] dependencies`) and `pytest-qt` in the `dev` group (ruling 3; MIT, AD-18), each with a bounded range from the locked version, and `uv.lock` as `uv lock` regenerates it. NOT owned: `src/clearwater/interfaces/`, `config/`, `core/`, `io/`, `jobs/`, `tests/conftest.py`, the widget modules of WP3.17-3.20, `clearwater.app` and any entry point (WP4.3). |
+| Interfaces provided | No frozen interface. `clearwater.gui.contract` (task 2) is the base WP3.17-3.20 build on; it is frozen at the round-0 yield, additive only until accept (ruling 2). A Qt implementation of IF-8 `Progress` (`report`, `cancelled`) whose reports reach the main thread by signal. |
 | Interfaces consumed | IF-1 `Image`, `ColorDescription` (`assumed` drives the untagged message; `icc_profile` the display conversion, question 8); IF-2 `ArrayBackend` (`asarray`, `to_host`, `device`) and `select_backend` as above; IF-3 `CorrectionMethod` (`id`, `label`, `parameters`, `stages`, `analyze`, `render`) and `Stage`; IF-5 `ProbeResult`, `Fault`, `VideoSource.frames`; IF-6 `PhotoSource.read`, `PhotoMetadata`; IF-7 `ProxyCache` (carried for WP3.18/3.20, not used here); IF-8 `Progress`, `JobResult`; IF-9 `ParameterSet`; IF-10 `Settings` (`force_cpu`, `last_parameters`). PySide6 (QtCore, QtGui, QtWidgets; QtTest in tests). |
 | Wave-2 consumers | None in wave 2 builds on it. Wave 3: WP3.17 (parameter panels and presets, G3/G6), WP3.18 (timeline and analysis, G4/G5, D72, D108), WP3.19 (batch queue and export progress, G7/G8, AD-15), WP3.20 (settings, G12/G13, D74), each against `clearwater.gui.contract`. Phase 4: WP4.3 (wiring the real engines; V7, V8, V18). |
 | Hardware flags | `gui` on every test that creates a Qt object; one `gpu` test runs the real `clearwater.core.select_backend` (skips without CUDA or CuPy). No `footage`. No timing FIGURE is recorded: V7's 100 ms is asserted as a bound (task 8); the observed maximum goes in the report as informational, not as a performance claim. |
@@ -39,7 +38,7 @@ thread) and V8 (preview against export) are first built.
 1. **Round 0 yield: read and table.** Before product code, write in the ledger:
    - the module list and each module's job;
    - the contract of task 2 as signatures with docstrings: COMMIT `contract.py` at this yield
-     if question 2 is ruled yes;
+     (ruling 2: frozen there, additive only until accept);
    - the threading model (which thread owns what, how a stale preview result is dropped,
      where `select_backend` runs);
    - the preview pipeline for a photo and for a video frame (downscale rule, statistics,
@@ -188,20 +187,28 @@ re-measures with the real engines), a colour-managed display pipeline beyond que
   the V7 bound and observed maximum, the V8 and 1:1 results, the pyproject diff, the gates, the
   Reviewer A rounds and verdict, open items.
 - **STOP for:** any change needed in `src/clearwater/interfaces/` (AD-20); a dependency beyond
-  PySide6 and what question 3 grants; any OS-specific code (`QSettings`'s registry backend
-  included); a contract change after the round-0 yield that renames or removes a name (if
-  question 2 freezes it); a test that cannot run headless; the round-0 table showing a choice
+  PySide6 and `pytest-qt` (ruling 3); any OS-specific code (`QSettings`'s registry backend
+  included); a contract change after the round-0 yield that renames or removes a name
+  (ruling 2); a test that cannot run headless; the round-0 table showing a choice
   the brief left open.
 - **Working rules:** `uv sync`. Commit by pathspec, `feat(wp3.16): ...` (conventional commits
-  carrying the WP id), with a `Co-Authored-By:` footer naming your model. Never a bare `cd`.
+  carrying the WP id), with a `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`
+  footer. Never a bare `cd`.
   Never post to a mailbox. Gates: ruff check, ruff format --check, mypy strict, full pytest (in
   a window); no harness gate. Report `docs/reports/wp3.16-shell-preview.md` (claims, evidence
   paths, limits, and a "Contract" section the wave-3 briefs cite). GoPro IMU/GPS data is out of
   scope everywhere.
 
-## Rulings (CHARC, pending)
+## Rulings (CHARC `53b752a4d7fac4fc`, 2026-10-20)
 
-_Placeholder: CHARC's rulings on the questions below._
+CHARC `53b752a4d7fac4fc`, 2026-10-20: every recommended answer is the ruling unless amended here.
+- **1:** cell `implementer-opus-high` (as recommended).
+- **2:** `clearwater.gui.contract` frozen at the round-0 yield, additive only until accept (as
+  recommended); the WP3.17-3.20 briefs are drafted against the round-0 commit.
+- **3:** `pytest-qt` GRANTED to the `dev` group (MIT, AD-18); headless set-up as recommended.
+- **X-B2, X-B3:** as drafted.
+- CHARC accepted the drafter's corrections to its debt list (DR-37 (a)/(b), G12 force CPU,
+  AD-15 as in the "Debt and decided items" row).
 
 ### Questions as drafted (recommended answer first)
 

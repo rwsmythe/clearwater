@@ -1,15 +1,15 @@
-# WP3.5 — Video colour handling and chroma resampling (dispatch brief, DRAFT)
+# WP3.5 — Video colour handling and chroma resampling (dispatch brief, FINAL)
 
-**Status:** DRAFT (orchestrator gen 6, drafting helper), for CHARC approval. Owner decisions:
-none inside the package, unless CHARC reads question 6 as touching D55 (then it is the
-owner's). The package's boundary is question 1: what plan WP3.5 describes is largely done by
-FFmpeg (AD-10) and by WP3.7's probe; this brief states what is left and asks CHARC to confirm
-it before dispatch.
+**Status:** FINAL 2026-10-20, approved by CHARC 53b752a4d7fac4fc with rulings; base = the pre-dispatch main commit named at dispatch. Drafted by the
+orchestrator (gen 6, drafting helper). Owner decisions: none inside the package (the output tags
+of an untagged source are decided by DR-17 and are WP3.10's). The package's boundary is ruled
+(ruling 5.1): what plan WP3.5 describes is largely done by FFmpeg (AD-10) and by WP3.7's probe;
+this brief states what is left, re-sized S.
 - Spec **v0.5.4**. Architecture FINAL 1.0 section 3 IF-1 and IF-5, section 5; AD-2, AD-10,
   AD-11, AD-19, AD-20. Frame `docs/briefs/wp2.4-phase3-frame.md` (sections 1-4). WP3.7 report
   `docs/reports/wp3.7-video-probe.md` (claim 2, D54 per field). DR-20 item (1) (closes),
-  WP3.1 R0-1, DR-36 (c) (row "Debt and decided items").
-- Cell: `implementer-opus-high` (frame section 3). Tier **STRONG**.
+  WP3.1 R0-1, DR-36 (c), DR-17 (row "Debt and decided items").
+- Cell: `implementer-sonnet-high` (ruling 5.1; the frame named opus-high). Tier **STRONG**.
 - Worktree `.worktrees/wp3.5`, branch `wp3.5`, base = the main commit named at dispatch.
 
 **Why.** WP3.9 (decode) and WP3.10 (encode) are wave 3 and run in parallel (plan "Depends on
@@ -34,7 +34,7 @@ chroma format"). The Y′CbCr conversion and chroma resampling themselves: FFmpe
 
 | Field | Content |
 |---|---|
-| ID and title | WP3.5 — Video colour handling and chroma resampling; plan Phase 3 row WP3.5 (size M; question 1 proposes S); module `clearwater.color` (plan 8.1 "Video color conversion and chroma resampling", AD-19) |
+| ID and title | WP3.5 — Video colour handling and chroma resampling; plan Phase 3 row WP3.5 (plan size M, re-sized S by ruling 5.1); module `clearwater.color` (plan 8.1 "Video color conversion and chroma resampling", AD-19) |
 | Goal | From a probed stream's `VideoStreamInfo` (its D54-resolved `ColorDescription`, `pix_fmt`, `bit_depth`, `chroma_siting`): the FFmpeg arguments that decode to planar RGB at the source bit depth and encode back to the source's Y′CbCr, matrix, range, chroma format and siting, by AD-10's swscale settings; the conversion of planar integer samples to IF-1 float32 RGB in [0, 1] and back (quantisation only there, D39); and the AD-10 tolerance test proving the pair is an identity within AD-11's V9 bound. |
 | Spec / decision clauses | 6.5 "**Working encoding:** the pipeline operates on display-encoded RGB in the source's primaries. Neither method requires linearization (3C uses YCbCr, a linear transform of the encoded values)." "**Video in:** matrix, range, primaries and transfer characteristics are read from the stream. If missing or unexpected, BT.709 with limited range is assumed and the user is warned (D54). Chroma upsampling to full resolution is performed before processing." "**Video out:** matrix, range, primaries and transfer tags match the source (D55). Chroma subsampling and pixel format also match the source, normally 4:2:0 for GoPro footage (D114). The resampling method in each direction is fixed at design, because it affects the identity round trip (V9)." 6.4 "All processing in 32-bit floating point, normalized to [0, 1]; quantization only at export." D39 "Internal processing in 32-bit float; quantization only at export"; D54 "Video color tags read from the stream; if missing or unexpected, assume BT.709, limited range, and warn"; D55 "Output video color tags and range match the source"; D76 "Optional 10-bit output for 8-bit sources, off by default"; D114 "Output video chroma subsampling and pixel format match the source". 5.2 "8-bit and 10-bit sources handled without truncating 10-bit data." Feeds V4 "output matches source ... bit depth (or the selected 10-bit option), chroma format ...; color tags match the source" (the colour half; the rest is WP3.10's) and V9 "the output matches the input within a small color-difference tolerance for photos and video. This exercises the full decode → process → encode path, including color tags" (the decoded-RGB half, per AD-10). AD-10 "Chroma resampling in both directions is done by FFmpeg's swscale inside the transport (decode to planar RGB at the source bit depth with `accurate_rnd+full_chroma_int+bitexact`; encode from the same), bicubic in both directions, honouring the stream's chroma siting." AD-11 "V9 identity round trip (neutral parameters, pre-encode): max abs diff **≤ 2/255**, mean ≤ 0.2/255"; "Looser (hides range/matrix errors, which show as ≥ 10/255)". |
 | Depends on | WP3.7 merged (`ProbeResult`, `VideoStreamInfo`, the D54 resolution, `clearwater.io.video.find_tool`). WP2.2 (IF-1, IF-5 frozen, `b288533`). WP2.3 video samples: `vid-hevc8-bt709-full` (8-bit, `yuvj420p`, `pc`, BT.709), `vid-hevc10` (10-bit `yuv420p10le`, `tv`, BT.709), `vid-untagged` (H.264 `yuv420p`, no tags: the D54 case), `vid-rotated`, `vid-vfr`, `vid-truncated` (8-bit full; regression rows), and `vid-hlg`, `vid-pq` (refused at probe, so never reach this module); all eight declare chroma location `left`. No BT.601 sample is committed: a test may generate one in `tmp_path` with FFmpeg (question 4). The plan's WP3.1 dependency is not load-bearing (WP3.1 is merged in any case; the backend's `rgb_to_ycbcr` may serve as an independent test reference, see Notes). No stub is needed. |
@@ -44,7 +44,7 @@ chroma format"). The Y′CbCr conversion and chroma resampling themselves: FFmpe
 | Consumers | WP3.9 (decode: the decode arguments, the planar-to-float conversion; yields IF-1 `Frame`s), WP3.10 (encode: the encode arguments, the float-to-planar quantisation, the name table for the output tags), WP4.2 (video path end to end, V9 through the encoder). WP3.21 may later move the sample conversion to the GPU; not here. |
 | Hardware flags | FFmpeg-using tests take the `ffmpeg_tools` fixture (they skip when FFmpeg is absent). No `gpu`. `footage` on one optional row (question 5), read-only through `tools/local_config.find_footage_file`, untimed, not exclusive. No timing figure (frame section 3: exclusive timing lives in WP3.1's and WP3.10's reports). |
 | Out of scope | Running FFmpeg in product code, pipes, transport, hardware decode selection (WP3.9, WP3.10; AD-2, AD-23); encoder options and output tag flags (WP3.10); re-resolving tags or re-implementing D54 (WP3.7 did it; consume `ColorDescription` as given); the warning UI (WP3.16); photo colour management (WP3.6, D53); any primaries, transfer or gamut conversion (6.5: source primaries kept, no linearisation); HLG/PQ (refused at probe); GP-Log conversion (AD-16: warn only); GPU sample conversion (WP3.21); GoPro IMU/GPS and the `gpmd` track (owner: out of scope; nothing here reads any data stream); chapters (v2). |
-| Debt and decided items | **DR-20 item (1) (OPEN, "WP3.5 (colour conversion) owns (1)") — CLOSES:** the D54 fallback the look-check instrument lacked is in the product as WP3.7's per-field resolution (WP3.7 report claim 2; `probe.py` `_resolve_color`): a missing or unexpected primaries, transfer or matrix takes BT.709, a missing range takes limited, `assumed=True`, one `missing_tags` fault naming the fields; an untagged `yuvj` stream is full range with no range warning (WP3.7 brief ruling 7.3, amended: "a `yuvj` pixel format IS a full-range signal"). WP3.5 CONSUMES that `ColorDescription` and those faults; it never re-probes, re-reads tags or re-resolves; task 6 is the closure evidence and the accept records DR-20 (1) CLOSED. DR-20 items (2)-(9) are WP3.10's and 8.4's (the register's trigger) and are not touched. **WP3.1 R0-1 — the one definition, must not fork:** any float representation of limited-range Y′CbCr inside `clearwater.color` or its tests uses R0-1's convention (`docs/proofs/wp3.1-ledger.md`: `Y' = 16/255 + (219/255) Y`, `Cb' = (224/255) Cb`, `Cr' = (224/255) Cr`, chroma centred on 0, exact inverse, unclipped; implemented by `clearwater.core` `rgb_to_ycbcr(..., "limited")`); FFmpeg's integer planes (chroma at 128 or 512) are converted to it explicitly, never given a second float convention. Relation to `samples.py`: the sample conversion handles RGB only (swscale delivers and takes full-range planar RGB, AD-10), so `/ (2**n - 1)` is the RGB normalisation of IF-1 and defines no Y′CbCr float form; R0-1 is needed only where a test builds a float Y′CbCr reference. If the round-0 table finds any product path that needs float Y′CbCr in another form, that is a question to CHARC, not a second definition. **DR-36 (c) — not relied on:** a partial-tag `missing_tags` message can say "limited range" when range is explicitly full; the resolved `ColorDescription` is right, so WP3.5 reads `ColorDescription.range`, never a fault message. |
+| Debt and decided items | **DR-20 item (1) (OPEN, "WP3.5 (colour conversion) owns (1)") — CLOSES:** the D54 fallback the look-check instrument lacked is in the product as WP3.7's per-field resolution (WP3.7 report claim 2; `probe.py` `_resolve_color`): a missing or unexpected primaries, transfer or matrix takes BT.709, a missing range takes limited, `assumed=True`, one `missing_tags` fault naming the fields; an untagged `yuvj` stream is full range with no range warning (WP3.7 brief ruling 7.3, amended: "a `yuvj` pixel format IS a full-range signal"). WP3.5 CONSUMES that `ColorDescription` and those faults; it never re-probes, re-reads tags or re-resolves; task 6 is the closure evidence and the accept records DR-20 (1) CLOSED. DR-20 items (2)-(9) are WP3.10's and 8.4's (the register's trigger) and are not touched. **WP3.1 R0-1 — the one definition, must not fork:** any float representation of limited-range Y′CbCr inside `clearwater.color` or its tests uses R0-1's convention (`docs/proofs/wp3.1-ledger.md`: `Y' = 16/255 + (219/255) Y`, `Cb' = (224/255) Cb`, `Cr' = (224/255) Cr`, chroma centred on 0, exact inverse, unclipped; implemented by `clearwater.core` `rgb_to_ycbcr(..., "limited")`); FFmpeg's integer planes (chroma at 128 or 512) are converted to it explicitly, never given a second float convention. Relation to `samples.py`: the sample conversion handles RGB only (swscale delivers and takes full-range planar RGB, AD-10), so `/ (2**n - 1)` is the RGB normalisation of IF-1 and defines no Y′CbCr float form; R0-1 is needed only where a test builds a float Y′CbCr reference. If the round-0 table finds any product path that needs float Y′CbCr in another form, that is a question to CHARC, not a second definition. **DR-36 (c) — not relied on:** a partial-tag `missing_tags` message can say "limited range" when range is explicitly full; the resolved `ColorDescription` is right, so WP3.5 reads `ColorDescription.range`, never a fault message. **DR-17 (OPEN) — not this package's, cited:** "WP3.10 (video I/O): implement and test the D54 fallback (assume BT.709 limited, warn, tag the output) on a synthetic untagged clip." The output tags of an untagged source are thereby decided (tag the output with the assumed values) and are WP3.10's; WP3.5's name table passes the assumed values through unchanged so WP3.10 can write them. |
 | Done | Plan 4.5; frame section 2 rules 1-11; ruff check, ruff format --check, mypy strict, full pytest green (in a granted window, X5); the AD-10 round trip within AD-11's V9 bound on every in-envelope sample, figures reported; DR-20 (1) closure evidence; Reviewer A converged. |
 
 ## Task ladder
@@ -149,18 +149,28 @@ are refused), other FFmpeg builds, other operating systems (portable, N1, not ru
   (do not loosen it); swscale settings other than AD-10's; any dependency (PyAV stays dev-only,
   AD-2); OS-specific code; the round-0 table showing a choice the brief left open.
 - **Working rules:** `uv sync`. Commit by pathspec, `feat(wp3.5): ...` (conventional commits
-  carrying the WP id), with a `Co-Authored-By:` footer naming your model. Never a bare `cd`.
+  carrying the WP id), with a `Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>` footer. Never a bare `cd`.
   Never post to a mailbox. Test outputs go under `tmp_path` (the WP-T1 guard keeps the temp
   root out of the footage folder); never write next to a fixture or into the footage folder.
   Gates: ruff check, ruff format --check, mypy strict, full pytest (in a window); no harness
   gate. Report `docs/reports/wp3.5-video-colour.md` (claims, evidence paths, limits). GoPro
   IMU/GPS data is out of scope everywhere.
 
-## Rulings (CHARC, pending)
+## Rulings (CHARC `53b752a4d7fac4fc`, 2026-10-20)
 
-_Placeholder: CHARC's rulings on the questions below._
+CHARC `53b752a4d7fac4fc`, 2026-10-20: every recommended answer is the ruling unless amended here.
+- **5.1 (boundary and size):** WP3.5 is the colour-arguments and sample-conversion module with the
+  AD-10 tolerance test, as recommended; re-sized **S**; cell **`implementer-sonnet-high`** (tier
+  STRONG, Reviewer A at the cell's seat and the yield schedule unchanged). Ground (CHARC): AD-10
+  and WP3.7's D54 resolution fix the contract; AD-11 catches a matrix or range error at >= 10/255.
+- **5.6 (siting and untagged output):** (a) unknown chroma siting is treated as `left` in both
+  directions, passed explicitly. (b) The output tags of an untagged source are DECIDED by DR-17
+  ("assume BT.709 limited, warn, tag the output"), and are WP3.10's matter; WP3.5 only cites
+  DR-17 and passes the assumed values through its name table.
+- CHARC accepted the drafter's corrections to its debt list: WP3.7 brief ruling 7.3 (amended) is
+  the citation for an untagged `yuvj` stream being full range; no line here changes.
 
-### Questions as drafted (recommended answer first)
+### Questions as drafted (recommended answer = ruling unless amended above)
 
 1. **The package boundary and its size (thin after AD-10 and WP3.7).** Plan WP3.5 says it
    "converts between the stream's Y′CbCr and the working RGB using the stream's matrix and
