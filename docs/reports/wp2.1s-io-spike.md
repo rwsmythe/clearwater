@@ -67,7 +67,9 @@ ICC + EXIF), and confirms or corrects AD-18 (licences). Brief `docs/briefs/wp2.1
   encoders from PyAV, as does NVENC (section 9.1). No non-code (text) file in the wheel mentions LGPL or GPL; the
   LGPL strings are inside the avcodec and avutil DLLs.
   The gyan FFmpeg CLI is GPL version 3 or later, not 2 (CORRECTS AD-18). NumPy's expression is wider than BSD-3
-  (CORRECTS AD-18). Pillow, pillow-heif and its bundled libraries, and CuPy CONFIRM AD-18.
+  (CORRECTS AD-18). Pillow, CuPy, pillow-heif's source licence and its bundled libheif,
+  libde265 and x265 CONFIRM AD-18. The pillow-heif wheel's own "GPLv2" statement and the MinGW
+  runtime it ships are NEW (section 9).
 
 ## 2. Instrument and method
 
@@ -79,13 +81,22 @@ passthrough`. The only changes are those named in the row. Every FFmpeg command 
 opens nothing.
 
 **Output containment.** Every file the three tools write (records, fixtures, `licences.json`)
-first passes one write guard, `WriteGuard.check` in `tools/spike_io/guard.py`; so does
-every fixture file the photo tests write. The target must
+first passes one write guard, `WriteGuard.check` in `tools/spike_io/guard.py`. So do the
+PNG and HEIC fixtures the photo tests write. The guard tests' own plants (folders, a stand-in
+footage file, hard links) are made directly, inside the test's fresh `tmp_path`, since they are
+what the guard must refuse. The target must
 resolve, links and junctions followed, inside `<working folder>/wp2.1s` (pytest's basetemp in the
 tests). It must not resolve inside the footage folder. An existing file with more than one hard
 link is refused. The guard was added after the windows (Reviewer A round 3). The records of
 record were written under the earlier check, which refused only an output folder inside the
 footage folder.
+
+**The idle-gate script** (`window --gate`) is run as given, so it must now lie inside the guard's
+root; its one write is its `-Out` file, which the guard checks (`Add-Content -Path $Out`, line 38
+of the copy). Window records now name the script and its md5. W1-W6 predate this and do not: the
+gate that ran there is identified by the ledger's md5 of the copy at copy time,
+`cf3a33c0ab7da54bf7a8a4386f632e90`, unchanged on 2026-10-20 after the review, and by the gate
+line each record holds.
 
 | Row | Transport |
 |---|---|
@@ -114,9 +125,11 @@ mirrors `flags=accurate_rnd`.
   includes process start-up or container opening: this report reads the brief's "first byte
   requested" as the request that starts the decoder. The bracket closes when the last frame is
   whole in its C-contiguous `uint8` `(2160, 3840, 3)` array in this process. Shape, dtype and contiguity are checked on every frame. s/frame = bracket / 681.
-- **Each frame's interval** runs to its arrival from the previous frame's arrival, so it
-  includes that frame's shape, dtype and contiguity check (a few array attribute reads). After
-  a witness frame it runs from the end of that frame's check and hash.
+- **Each frame's interval** is taken at its arrival, before its own check. It starts at the
+  previous frame's arrival, so it carries the PREVIOUS frame's shape, dtype and contiguity check
+  (a few array attribute reads). After a witness frame it starts at the end of that frame's
+  check and hash, so a witness frame's check is out of the bracket, with its hash. The last
+  frame's check is out of the bracket too.
 - **The witness** is a SHA-256 of every 30th frame and the last: 24 frames, compared with row a's
   reference hash. It is left out of the bracket, so the bracket is the sum of the intervals.
 - **Whether the producer stops during a hash depends on the row's buffer.**
@@ -376,7 +389,7 @@ Minutes per minute = s/frame x 29.97.
 
 Instrument `tools/spike_io/photo.py`, run `uv run python tools/spike_io/photo.py run`. Record
 `work/wp2.1s/photo/photo.json`, with the fixtures beside it. Tests `tests/test_spike_io_photo.py`
-(51 cases, with the write-guard and profile-name cases). Every image is synthetic. No owner photo exists and none was downloaded.
+(52 cases, with the write-guard and profile-name cases). Every image is synthetic. No owner photo exists and none was downloaded.
 
 - **Libraries, as installed:**
   - Pillow 12.3.0;
@@ -453,7 +466,8 @@ Two read paths:
   - A 10-bit file reports `bit_depth` 10.
   - `open_heif` returns 8-bit `RGB` by default (`convert_hdr_to_8bit=True`).
   - With `convert_hdr_to_8bit=False` it returns `RGB;16` `uint16`, with the 10-bit samples
-    shifted left by 6 (maximum 65472 = 1023 << 6).
+    shifted left by 6: the maximum is 65472 = 1023 << 6, and every sample's low six bits are
+    zero (`hdr_low_6_bits_zero`, all three 10-bit cases).
   - The option is `open_heif`'s `convert_hdr_to_8bit`.
 - **PROVISIONAL:** every HEIC verdict stands until an owner iPhone HEIC is read (out of
   envelope).
@@ -493,7 +507,9 @@ Two read paths:
 - **Chunk placement:** `iCCP` comes before `IDAT` in both files. `eXIf` also comes before
   `IDAT` in both: the stdlib writer puts it there, and Pillow writes it there itself. Pillow's
   reader finds the `eXIf` in both.
-- **Planted defects fail by name** (`failures` / `exif_problems`):
+- **Planted defects fail by name** (`failures` / `exif_problems`). `failures` is the complete
+  verdict per writer: every listed property absent or not True, and every non-empty
+  `exif_problems` entry (the record's `failures` is empty for both files):
   - a wrong ICC byte gives `["iccp_identical_pillow"]` on the 16-bit file and
     `["iccp_identical_stdlib"]` on the 8-bit file;
   - 16-bit samples truncated to 8 bits give `["values_exact_pyav"]`;
@@ -525,7 +541,8 @@ Two read paths:
 
 Read by `tools/spike_io/licences.py` (record `work/wp2.1s/licences.json`) from:
 - the installed distributions' metadata, and the names of their `.dist-info` licence files
-  (listed, not read; `LICENSES_bundled.txt` is the one licence file read);
+  (listed; read in full only for pillow-heif's `LICENSES_bundled.txt` and, in section 9.1, for
+  every non-code file of the PyAV wheel, its `licenses/LICENSE.txt` among them);
 - pillow-heif's `LICENSES_bundled.txt`;
 - PyAV's `av._core.library_meta`, `av.codecs_available` and `hwdevices_available()`;
 - the DLLs in `av.libs`;
