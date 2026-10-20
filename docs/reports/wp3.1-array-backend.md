@@ -121,7 +121,12 @@ operation that one prototype `correct()` call makes with the default parameters 
 tool's docstring), made through IF-2 and the `clearwater.core` helpers for the product and
 through the prototype's own functions for the prototype, both methods, with GPU clocks,
 temperature, utilisation and busy processes recorded before, during and after.
-`tests/test_core_speed.py` counts the calls of both paths against a real `correct()`. Not
+`tests/test_core_speed.py` counts the calls of both paths, and the prototype path's host
+reads, against a real `correct()`. Host reads per frame (GPU sync points): the prototype
+path makes `correct()`'s -- four channel-mean triples, the Ancuti gain-cap mean, the two N{}
+bounds -- and keeps the saliency Lab means on the device; the product path reads the same
+channel and gain-cap means plus the two Lab-mean triples (`channel_means` returns Python
+floats, R0-2), and its `percentile` stays on the device (WP3.3 reads the bounds). Not
 timed: the per-pixel arithmetic between the calls (WP3.2-3.4) and the prototype's per-step
 input validation (a minimum and maximum read of the image), so the row is not a whole-core
 figure; that waits for WP3.4 (ruling 4).

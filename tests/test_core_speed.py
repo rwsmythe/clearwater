@@ -30,6 +30,8 @@ PROTOTYPE_OPS = (
     "srgb_to_lab",
     "rgb_to_ycbcr",
     "ycbcr_to_rgb",
+    "_high_pass_and_bounds",
+    "high_pass_of",
 )
 PRODUCT_METHODS = (
     "gaussian_blur",
@@ -50,12 +52,41 @@ def counting(counts: Counter[str], name: str, function: Callable[..., Any]) -> A
     return wrapper
 
 
+def host_reads(counts: Counter[str], function: Callable[..., Any]) -> Any:
+    """Wrap ``function`` so that reading its result back to Python counts as a host read.
+
+    On the GPU, ``tolist()`` and ``float()`` of a statistic are device-to-host reads (sync
+    points); the CPU stand-in counts them. Arithmetic on the result gives plain arrays.
+    """
+
+    class HostRead(np.ndarray):
+        def tolist(self) -> Any:
+            counts["proto host read"] += 1
+            return np.asarray(self).tolist()
+
+        def __float__(self) -> float:
+            counts["proto host read"] += 1
+            return float(np.asarray(self))
+
+        def __array_ufunc__(self, ufunc: Any, method: str, *inputs: Any, **kwargs: Any) -> Any:
+            plain = tuple(np.asarray(x) if isinstance(x, HostRead) else x for x in inputs)
+            return getattr(ufunc, method)(*plain, **kwargs)
+
+    def wrapper(*args: Any, **kwargs: Any) -> Any:
+        return np.asarray(function(*args, **kwargs)).view(HostRead)
+
+    return wrapper
+
+
 @pytest.fixture
 def counts(monkeypatch: pytest.MonkeyPatch) -> Counter[str]:
     counted: Counter[str] = Counter()
     for name in PROTOTYPE_OPS:
         monkeypatch.setattr(proto, name, counting(counted, f"proto {name}", getattr(proto, name)))
-    monkeypatch.setattr(np, "percentile", counting(counted, "proto percentile", np.percentile))
+    # The prototype's statistics: every whole-frame mean, and the N{} percentiles.
+    monkeypatch.setattr(proto, "_accumulate_mean", host_reads(counted, proto._accumulate_mean))
+    percentile = host_reads(counted, np.percentile)
+    monkeypatch.setattr(np, "percentile", counting(counted, "proto percentile", percentile))
     laplace = scipy.ndimage.laplace
     monkeypatch.setattr(scipy.ndimage, "laplace", counting(counted, "proto laplace", laplace))
     for name in PRODUCT_METHODS:

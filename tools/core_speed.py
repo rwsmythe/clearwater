@@ -4,8 +4,8 @@ WP3.1 has no correction method, so the whole-core figure waits for WP3.4 (brief 
 This instrument times, per decoded frame, the "op mix": every call of a prototype array
 operation that one ``pipeline.correct()`` call makes with the default parameters, made through
 IF-2 and the ``clearwater.core`` helpers by the product and through the read-only prototype's
-own functions, on the GPU and on the CPU (``tests/test_core_speed.py`` counts both against a
-real ``correct()``):
+own functions, on the GPU and on the CPU (``tests/test_core_speed.py`` counts the calls of
+both, and the prototype path's host reads, against a real ``correct()``):
 
 - c3 compensation: ``rgb_to_ycbcr``; the bright-pixel mask blur (``c3_mask_smooth_fraction``);
   the Cb and Cr blurs at the c3 kernel sigma (``c3_kernel_fraction``, AD-8); the channel means
@@ -17,6 +17,14 @@ real ``correct()``):
   luma, its blur at ``laplacian_fraction`` and its Laplacian, the Lab image, its means and its
   blur at ``saliency_blur_fraction``, the saturation weight's luma, the Laplacian pyramid of
   the input and the Gaussian pyramid of a weight map; one pyramid collapse.
+
+Host reads (device-to-host transfers, each a synchronisation on the GPU) per frame and method:
+the prototype path makes the reads ``correct()`` makes -- four channel-mean triples, the
+gain-cap mean of each compensated channel (ancuti2018), and the two N{} bounds -- and keeps the
+saliency Lab means on the device. The product path reads what its helpers return to the host:
+the same channel means and gain-cap means, plus the two Lab-mean triples (``channel_means``
+returns Python floats, a ruled sync point, R0-2), while its ``percentile`` stays on the device
+(IF-2 returns an array; WP3.3 reads the bounds when it forms N{}).
 
 Not timed: the per-pixel arithmetic between these calls (gains, clipping, the weight sums),
 which belongs to WP3.2-3.4, except the maps the calls take as input (the c3 mask, the
@@ -252,9 +260,7 @@ def op_mix_prototype(image: Any, method: str, params: Params) -> None:
             proto._cap_statistic((1.0 - image[..., index]) * image[..., 1])
     proto._mean_added(image, image)
     proto._channel_means(image)
-    high_pass = proto.high_pass_of(image, params)
-    bounds = [params.normalisation_low, params.normalisation_high]
-    backend.xp.percentile(high_pass, bounds, method="linear")  # the prototype's namespace
+    proto._high_pass_and_bounds(image, params)  # the blur, the percentiles and their read
     levels = proto.pyramid_levels(shape, params.pyramid_min_level_size)
     bands: list[Any] = []
     for _ in range(2):
@@ -262,7 +268,7 @@ def op_mix_prototype(image: Any, method: str, params: Params) -> None:
         laplace_sigma = proto.spatial_sigma(shape, params.laplacian_fraction)
         weight = backend.ndimage.laplace(proto._gaussian(luma, laplace_sigma), mode="reflect")
         lab = proto.srgb_to_lab(image)
-        proto._lab_mean(lab).tolist()
+        proto._lab_mean(lab)  # kept on the device, as the saliency weight keeps it
         proto._gaussian(lab, proto.spatial_sigma(shape, params.saliency_blur_fraction))
         proto.luminance(image)
         bands = proto.laplacian_pyramid(image, levels)
