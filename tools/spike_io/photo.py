@@ -753,7 +753,7 @@ write one without the other.
 
 def write_heic(
     path: Path, upright: NDArray[Any], bits: int, orientation: int, mode: str, icc: bytes
-) -> None:
+) -> bytes:
     """Write a HEIC fixture with pillow-heif's encoder (x265).
 
     The stored pixels are ``upright`` turned so that ``orientation`` displays it upright.
@@ -766,6 +766,10 @@ def write_heic(
         orientation: The orientation the file carries (1, 6 or 8).
         mode: One of :data:`HEIC_MODES`.
         icc: The ICC profile to embed (``prof`` type).
+
+    Returns:
+        The EXIF bytes written (:func:`source_exif` of the stored size; Orientation 1 for
+        ``irot-only``).
 
     Raises:
         PhotoError: Unknown mode or bit depth.
@@ -785,7 +789,7 @@ def write_heic(
         pillow_heif.encode(
             pixel_mode, size, data, str(path), quality=HEIC_QUALITY, icc_profile=icc, exif=exif
         )
-        return
+        return exif
     if mode not in HEIC_MODES:
         raise PhotoError(f"unknown HEIC mode {mode!r}")
     transform = orientation if mode == "irot-only" else 1
@@ -800,6 +804,7 @@ def write_heic(
         exif=exif,
     )
     encoder.save(str(path))
+    return exif
 
 
 def _exif_orientation(exif: bytes | None) -> int | None:
@@ -818,8 +823,10 @@ def heif_transforms(data: bytes) -> dict[str, Any]:
 
     Returns:
         ``irot``: the rotation in degrees anticlockwise, or None when there is no ``irot``
-        box; ``imir``: the mirror axis (0 vertical, 1 horizontal), or None. The fixtures hold
-        one image item, so a property found belongs to it.
+        box; ``imir``: the mirror axis (0 vertical, 1 horizontal), or None. The ``ipma``
+        box that associates properties with items is NOT read, so this is valid only for a
+        file with one image item, as the fixtures are. A real camera HEIC (a grid of tiles,
+        thumbnails, auxiliary images) needs the primary item's ``ipma`` entries.
     """
 
     def boxes(start: int, end: int) -> list[tuple[str, int, int]]:
@@ -858,7 +865,7 @@ def heif_transforms(data: bytes) -> dict[str, Any]:
 
 
 def read_heic(
-    path: Path, upright: NDArray[Any], bits: int, orientation: int, icc: bytes
+    path: Path, upright: NDArray[Any], bits: int, orientation: int, icc: bytes, exif: bytes
 ) -> dict[str, Any]:
     """Read a HEIC fixture back two ways and report the D63-relevant facts.
 
@@ -877,10 +884,14 @@ def read_heic(
         bits: ``upright``'s bit depth (8 or 10).
         orientation: The orientation the fixture carries.
         icc: The profile embedded.
+        exif: The EXIF written (:func:`write_heic`'s return).
 
     Returns:
-        The per-case record.
+        The per-case record. ``exif_fields_raw_equal``: every field and value of the file's
+        EXIF equals what was written; ``exif_fields_plugin_mismatch``: the fields whose value
+        differs through the plugin (only Orientation is expected, after its reset).
     """
+    written = exif_fields(exif)
     raw = pillow_heif.open_heif(str(path))
     raw_pixels = np.asarray(raw)
     raw_tag = _exif_orientation(raw.info.get("exif"))
@@ -896,6 +907,7 @@ def read_heic(
         plugin_exif = image.info.get("exif")
         plugin_original = image.info.get("original_orientation")
         plugin_after = np.asarray(ImageOps.exif_transpose(image).convert("RGB"))
+    through_plugin = exif_fields(plugin_exif) if plugin_exif else {}
     return {
         "container_transform": heif_transforms(path.read_bytes()),
         "file_exif_orientation": raw_tag,
@@ -903,6 +915,12 @@ def read_heic(
         "icc_identical_raw": raw.info.get("icc_profile") == icc,
         "icc_identical_plugin": plugin_icc == icc,
         "exif_fields_plugin": sorted(exif_fields(plugin_exif)) if plugin_exif else [],
+        "exif_fields_raw_equal": exif_fields(raw.info.get("exif") or b"") == written,
+        "exif_fields_plugin_mismatch": sorted(
+            name
+            for name in set(written) | set(through_plugin)
+            if written.get(name) != through_plugin.get(name)
+        ),
         "raw_pose": pose(raw_pixels, 8, upright, bits, orientation),
         "raw_pose_after_exif": pose(raw_after, 8, upright, bits, orientation),
         "plugin_exif_orientation": _exif_orientation(plugin_exif),
@@ -957,9 +975,9 @@ def run(out: Path) -> dict[str, Any]:
             [("exif-only", 6), ("irot-only", 6)] if bits == 8 else []
         ):
             path = out / f"heic-{bits}bit-{mode}-o{orientation}.heic"
-            write_heic(path, upright, bits, orientation, mode, icc)
+            exif = write_heic(path, upright, bits, orientation, mode, icc)
             case = {"file": path.name, "bits": bits, "mode": mode, "orientation": orientation}
-            case.update(read_heic(path, upright, bits, orientation, icc))
+            case.update(read_heic(path, upright, bits, orientation, icc, exif))
             heic.append(case)
     record["heic"] = heic
     pixels16 = upright_image(16)

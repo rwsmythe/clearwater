@@ -256,8 +256,8 @@ def test_encode_png16_refuses_8bit_input(icc: bytes, edited: bytes) -> None:
 def _heic(tmp_path: Path, icc: bytes, bits: int, orientation: int, mode: str) -> dict[str, Any]:
     upright = photo.upright_image(bits)
     path = tmp_path / f"{bits}-{mode}-{orientation}.heic"
-    photo.write_heic(path, upright, bits, orientation, mode, icc)
-    return photo.read_heic(path, upright, bits, orientation, icc)
+    exif = photo.write_heic(path, upright, bits, orientation, mode, icc)
+    return photo.read_heic(path, upright, bits, orientation, icc, exif)
 
 
 @pytest.mark.parametrize("bits", [8, 10])
@@ -302,16 +302,33 @@ def test_heic_irot_only_comes_back_upright(tmp_path: Path, icc: bytes) -> None:
     assert case["plugin_pose"] == case["plugin_pose_after_exif"] == "upright"
 
 
-def test_heic_exif_fields_read(tmp_path: Path, icc: bytes) -> None:
-    case = _heic(tmp_path, icc, 8, 6, "public")
-    assert set(case["exif_fields_plugin"]) >= {
-        "IFD0.Make",
-        "IFD0.Model",
-        "IFD0.Orientation",
-        "Exif.DateTimeOriginal",
-        "Exif.ExifImageWidth",
-        "GPS.GPSLatitudeRef",
-    }
+HEIC_CASES = [(8, 1, "public"), (8, 6, "public"), (8, 8, "public")]
+HEIC_CASES += [(10, 1, "public"), (10, 6, "public"), (10, 8, "public")]
+HEIC_CASES += [(8, 6, "exif-only"), (8, 6, "irot-only")]
+
+
+@pytest.mark.parametrize(("bits", "orientation", "mode"), HEIC_CASES)
+def test_heic_exif_fields_and_values_read(
+    tmp_path: Path, icc: bytes, bits: int, orientation: int, mode: str
+) -> None:
+    case = _heic(tmp_path, icc, bits, orientation, mode)
+    assert case["exif_fields_plugin"] == sorted(
+        [
+            "IFD0.Make",
+            "IFD0.Model",
+            "IFD0.DateTime",
+            "IFD0.Orientation",
+            "Exif.DateTimeOriginal",
+            "Exif.FNumber",
+            "Exif.ExifImageWidth",
+            "Exif.ExifImageHeight",
+            "GPS.GPSLatitudeRef",
+        ]
+    )
+    assert case["exif_fields_raw_equal"] is True
+    # Only the plugin's Orientation reset changes a value, and only where the tag was not 1.
+    tag = 1 if mode == "irot-only" else orientation
+    assert case["exif_fields_plugin_mismatch"] == ([] if tag == 1 else ["IFD0.Orientation"])
 
 
 @pytest.mark.parametrize("bits", [8, 10])
