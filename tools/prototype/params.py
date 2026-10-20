@@ -70,7 +70,7 @@ class Params:
 
     Attributes:
         method: Channel compensation method (spec 6.2 step 1, 6.7 Basic). Default
-            ``"ancuti2018"``: WP1.1 choice, see open-values report.
+            ``"c3"``: spec v0.5.3 D16 (amended after CP2 2026-10-19).
         alpha: Ancuti 2018 compensation strength (spec 6.3.1). Paper value 1.0.
         blue_compensation: Ancuti 2018 blue compensation on/off (spec 6.3.1: off by
             default). Spec value False.
@@ -128,7 +128,7 @@ class Params:
             direction is a WP1.1 choice recorded for V9, see open-values report.
     """
 
-    method: Method = "ancuti2018"
+    method: Method = "c3"
     alpha: float = 1.0
     blue_compensation: bool = False
     red_gain_cap: float | None = 2.0
