@@ -5,12 +5,14 @@
 
 ### Generation
 
-- Generation 2, session `clearwater-orchestrator-20261018-1442`, ROLLED OVER 2026-10-20 ~09:55Z at
-  its 400K depth cap, at a clean boundary (nothing in flight). Generation 3 starts here (verify:
-  `comms/.launch-sessions.json`). Generation 1 was `clearwater-orchestrator-20261014-1258`.
-- **Inbox:** generation 2 drained through msg `257db38e6727db20` (CHARC: "WP1.6 fact-check applied
-  in full") and STOPPED DRAINING at its rollover announcement. You are the sole drainer (verify:
-  `uv run python scripts/role_mail.py list --role orchestrator`).
+- **Generation 3 LIVE**, session `clearwater-orchestrator-20261019-2346` (verify:
+  `comms/.launch-sessions.json`); online at bring-up on main `fa6c41f`. Bash-launch gauge at
+  bring-up: 37 ms (under the 1 s flag; re-measure with PowerShell
+  `Measure-Command { & $env:CLAUDE_CODE_GIT_BASH_PATH -c true }`).
+- Generation 2 (`clearwater-orchestrator-20261018-1442`) rolled over 2026-10-20 ~09:55Z at its
+  400K cap, nothing in flight. Generation 1 was `clearwater-orchestrator-20261014-1258`.
+- **Inbox:** generation 3 is the sole drainer; at bring-up 0 unread, 64 read (generation 2 drained
+  through `257db38e6727db20`). Verify: `uv run python scripts/role_mail.py list --role orchestrator`.
 
 ### Standing operator rulings
 
