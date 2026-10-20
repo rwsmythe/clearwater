@@ -127,4 +127,36 @@ are WP3.4's schema.
 
 | Round | Depth (dispatcher) | Critical | Major | Minor | Info | In / out envelope | New / reopened | Reverts | Product / test-only fixes | Transcript |
 |---|---|---|---|---|---|---|---|---|---|---|
-| 0 | -- | table only | | | | | | | | -- |
+| 0 | 116,822 (R0 yield) | table only | | | | | | | | -- |
+| 1 | (dispatcher) | 0 | 0 | 4 | 0 | 3 in / 1 out | 4 new / 0 reopened | 0 | planned: 2 product (error paths), 2 test-only | `C:\Users\rwsmy\clearwater-review-evidence\wp3.2\r1\` (md5s in `md5sums.txt`) |
+
+Round-0 ruling (orchestrator gen 6): table ACCEPTED as committed in 73b1fea; S-1 to S-4 as
+recommended; N-1 a WP3.21 consumer note (no `CoreBackend.constant`); N-3 private X-4 helper per
+module, wording identical to WP3.3's.
+
+## Build
+
+- e22709a compensation module and tests; 1b75b71 white balance module and tests; bda5397 report.
+- Prototype identity: 54 / 54 per-function rows max |diff| 0 on CPU and GPU; CPU vs GPU worst
+  3.58e-07 max / 6.44e-08 mean (3C); `work/wp3.2/ad11.txt`.
+- Own tests 376 passed; 193 passed / 183 skipped with cupy unimportable. Full suite: window
+  queued by the dispatcher (host busy), not yet run.
+
+## Round 1 (Reviewer A, head bda5397)
+
+Transport WSL, codex-cli 0.162.1, gpt-5.6-sol / high; probe 1 `succeeded in`; review 11
+`succeeded in`, tokens footer present, `VERDICT: NO_NEW_CRITICAL_MAJOR`. One `Reconnecting...
+2/5` before the model's first output (recovered; flagged). The reviewer could not run pytest
+(read-only sandbox): all REASONED. Adjudication: `r1\adjudication.md`.
+
+1. MINOR in-envelope, CONFIRMED: mixed-type keys in `alphas` / `cap_statistics` give a
+   TypeError from `sorted(...)` in the message, not the S-3 ValueError. Fix: product.
+2. MINOR OUT-OF-ENVELOPE, CONFIRMED: `c3_kernel_fraction=1e308` on 1 x 1 leaks OverflowError
+   from `clearwater.core.check_sigma`. Fix: product (`_derived_sigma` converts it); core root
+   flagged (not owned).
+3. MINOR in-envelope, CONFIRMED (test gap): a render calling `a.mean()` would pass. Fix: tests
+   (a reduction-recording ndarray subclass and a planted control).
+4. MINOR in-envelope, CONFIRMED (test gap): X-4 "before any array work" not guarded. Fix: tests
+   (same subclass, zero ufunc calls before the error, planted control).
+
+No new blocking finding: round 1 terminates the loop (if it counts); minors fixed once in cleanup.
