@@ -25,6 +25,8 @@ dev = [
     "scipy>=1.14,<2",
     # WP1.2 Part A GPU candidate (CHARC grant; MIT). Prototype only: product adoption is WP2.1's.
     "cupy-cuda12x[ctk]>=14.2,<15",
+    # WP2.1S transport candidate (CHARC grant 5152ed4302874889). Spike and prototype only.
+    "av>=15,<17",
 ]
 # The harness's optional mail UI (scripts/comms_ui.py). The comms CORE
 # (role_mail.py, the hooks, cell_depth.py) is stdlib-only and never imports it.
