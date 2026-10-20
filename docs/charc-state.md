@@ -39,23 +39,27 @@ for a push (verify `git status -sb`).
 
 ### Live workstreams (verify `git worktree list`, `docs/orchestrator-state.md`, `ListAgents`)
 
-- **Orchestrator generation 4** `clearwater-orchestrator-20261020-0524` (opus/high/auto; online
-  15:30Z; sole drainer). Always re-read `comms/.launch-sessions.json` before a cue.
-- **Live cell: WP2.3 fixtures, `wp23-cell2`** (sonnet-high) in `.worktrees/wp2.3`, branch
-  `wp2.3`, from d495b57 (R1 closed 11/11), dispatched ~16:37Z at depth 0. Applies CHARC ruling
-  ef7b272564ddeb9d (AD-14 centre track; one readable conditional `pytest_plugins` line in
-  conftest; `.gitattributes` `tests/fixtures/** -text` with raw-byte regeneration compare), then
-  Reviewer A R2; yields at R2's verdict BEFORE any remediation. The first cell (`wp23-cell`)
-  retired at 406,816 past the cap after remediating R1 without a yield; the accept record must
-  say so. **That worktree is OCCUPIED: do not touch it** (charter 5.1 incoming precondition).
-- **On WP2.3's return:** CHARC QA at this seat (git patch-id on author head, candidate and main;
-  B transcript md5s; the five assertions; DR entries; harness gate 366 at this seat). Then the
-  orchestrator dispatches **wave 1** in parallel: WP3.1 core (opus-high), WP3.7 probe, WP3.13
-  naming, WP3.15 presets/settings (sonnet-high); briefs `docs/briefs/wp3.{1,7,13,15}-brief.md`
-  APPROVED 47b9738. At FINAL each cites v0.5.4 and architecture 1.0 (no "proposed" markers),
-  fills WP2.3's manifest ids, and WP3.1 carries a one-line Gate 1 section (IF-2 ops
-  device-resident-ready, no implicit host copies). Full-pytest gate windows serialised across
-  parallel cells.
+- **Orchestrator generation 5** `clearwater-orchestrator-20261020-0802` (opus/high/auto; online
+  ~18:03Z; sole drainer). Gen 4 rolled at ~300K before the wave-1 fan-out (CHARC upheld; the
+  pre-dispatch exception is written in `docs/model-prompting-standard.md` s.9, 2bd9894). Always
+  re-read `comms/.launch-sessions.json` before a cue.
+- **WP2.3 fixtures ACCEPTED** 2026-10-20, main d605925 (record row e357e56; record
+  `docs/proofs/wp2.3-accept.md`; DR-33 banked, B re-run majors adjudicated NOT BLOCKING, upheld).
+  **CHARC QA CONFIRMED** at this seat (patch-id 6712360de3e5 on both ranges; B md5s both passes;
+  five assertions; 87 fixtures `-text`; ruff/format/mypy clean; harness 366; full pytest 1138
+  passed, 526 s). Worktrees `.worktrees/wp2.3`, `wp2.3-mc` released for removal (msg 3f6e1943).
+- **Wave 1 LIVE** (dispatched ~18:05Z from main 9735282; four cells in parallel, each in its own
+  worktree, all OCCUPIED): WP3.1 array backend `wp31-cell` opus-high `.worktrees/wp3.1`; WP3.7
+  probe `wp37-cell`, WP3.13 naming/safe writing `wp313-cell`, WP3.15 presets/settings/logging
+  `wp315-cell`, sonnet-high, `.worktrees/wp3.{7,13,15}`. Round-0 design tables returned and the
+  orchestrator's rulings UPHELD by CHARC with three additions (msg 232646a5: IF-2 percentile is
+  typed Array = float32, so compute native and cast once at return, WP3.3 brief cites AD-11 +
+  DR-14; SafeWrite does not create a missing output folder, WP3.14/GUI validate the setting;
+  AD-13 provenance keys stripped on preset import are NAMED in the result). Consumer notes the
+  orchestrator carries: WP3.10 gives FFmpeg `-y` on the SafeWrite temporary path; WP3.14 reads
+  `OutputPlan.path`; WP3.12/3.16 use `clearwater.config.paths.app_locations`. Full-pytest gate
+  windows serialised; WP3.1 speed row only in an exclusive window. **On each accept:** CHARC QA
+  as for WP2.3.
 - **Then:** waves 2-4 per the Phase 3 frame (orchestrator drafts, CHARC approves each; WP3.21
   optimisation package drafted at wave 4, target 10 min/min, re-measure at WP5.2). CP5 shows the
   owner the starter preset values. Close DR items in the register as packages close them.
