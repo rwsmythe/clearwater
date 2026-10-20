@@ -38,6 +38,15 @@
   estimators ~0 -> "below the quantisation floor"; total red gain = camera WRGB x ours). Check at
   return that they landed (ledger). If the grid confirms the anti-D100 signal: spec-bearing, owner
   decision request at WP1.6 result 4 (via CHARC).
+  ROUND-2 YIELD 08:21Z, head `7127fe1`, depth 318,197 / 139 turns, then 320,059 (read twice). Results:
+  Gate result 4 KEEP the caps (on the red-lit tiles a tighter cap RAISES red noise on 8/8 frames, as
+  D100 expects; the early anti-D100 signal holds only on crushed-red tiles, where the red noise is
+  green noise carried in by compensation); clamp 3.0 never binds, keep; N{} floor proposed 0.02;
+  claim 10 keep (A); claim 10b step at 0.90 s GENUINE (not an edge effect), and neither the reset nor
+  the 0.5 s window helps. Suite 768/0. A: R1 2M/3m, R2 3M/2m, fixed. EVALUATION at 320K: remaining =
+  3 text edits + round 3 (bounded) -> CONTINUE for one round; if it does not converge, yield for a
+  re-seat; yield at ~380K. RULING: text-only edits authorised for the clip.py `--method` help,
+  the statistics_experiments.py docstring and the Params.neutral() docstring (no default changes).
 - `wp14b-cell` STOOD DOWN 06:50Z after a collision (woken by the queued 10b message, it ran claim 10
   and began 10b in the shared worktree; it halted on seeing cell2's edits; outputs handed to cell2 with
   a reproducibility check required). It was RETIRED at its STOP (06:44Z): 235,202 / 94 turns, then 237,015 (read twice, head
