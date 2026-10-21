@@ -9,34 +9,55 @@ from __future__ import annotations
 
 import os
 import re
+import zlib
 from pathlib import Path
 
 from clearwater.interfaces.cache import CacheKey
 
+from .codec import DEFAULT_CODEC, ProxyCodec
+
 CACHE_FORMAT_VERSION = 1
-"""The cache format version (D113). Entries of any other version are removed when a cache opens."""
+"""The cache format number (D113). A key's version also carries the codec identity."""
 
 _NAME = re.compile(r"^e_(\d+)_(-?\d+)_(\d+)$")
 
 
-def cache_key(path: str | os.PathLike[str]) -> CacheKey:
-    """Return the cache key of a source file: its size, modification time and the format version.
+def codec_cache_version(codec: ProxyCodec = DEFAULT_CODEC) -> int:
+    """Return the cache version of entries written with ``codec`` (D113, AD-5 ruling).
+
+    The version folds the format number and the codec identity (the JPEG library versions, read
+    now), so a different decoder gives a different version and the old entries can never match:
+    ``format number << 24 | low 24 bits of the CRC-32 of the codec id and identity``.
+
+    Args:
+        codec: The store codec.
+
+    Returns:
+        A positive integer that fits the pack header.
+    """
+    identity = zlib.crc32(f"{codec.codec_id}:{codec.identity()}".encode()) & 0xFFFFFF
+    return (CACHE_FORMAT_VERSION << 24) | identity
+
+
+def cache_key(path: str | os.PathLike[str], codec: ProxyCodec = DEFAULT_CODEC) -> CacheKey:
+    """Return the cache key of a source file: its size, modification time and the cache version.
 
     The file is not opened; only its metadata is read. Two different files with the same size
     and modification time share a key (D71's definition; a stated limit of the cache).
 
     Args:
         path: The source file.
+        codec: The store codec whose version the key carries (the cache's default codec).
 
     Returns:
-        The key, with ``cache_version`` set to :data:`CACHE_FORMAT_VERSION`.
+        The key, with ``cache_version`` set to :func:`codec_cache_version`.
 
     Raises:
         OSError: The file cannot be examined.
     """
     info = os.stat(path)
     return CacheKey(
-        size=info.st_size, mtime_ns=info.st_mtime_ns, cache_version=CACHE_FORMAT_VERSION
+        size=info.st_size, mtime_ns=info.st_mtime_ns, cache_version=codec_cache_version(codec)
     )
 
 

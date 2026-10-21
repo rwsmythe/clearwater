@@ -14,6 +14,9 @@ dependencies = [
     # measurement (docs/reports/wp3.1-array-backend.md, "SciPy versus own kernels").
     "numpy>=2.1,<3",
     "scipy>=1.14,<2",
+    # WP3.12 (CHARC ruling on the AD-5 STOP, 2026-10-20): the proxy cache stores JPEG proxies; already
+    # the photo-I/O library of AD-17 (granted for the product). Moved from the dev group.
+    "pillow>=11,<13",
 ]
 
 [project.optional-dependencies]
@@ -28,7 +31,6 @@ dev = [
     "mypy>=1.11,<2",
     "psutil>=6,<8",
     "py-cpuinfo>=9,<10",
-    "pillow>=11,<13",
     "pillow-heif>=0.20,<2",
     # WP1.2 Part A GPU candidate (CHARC grant; MIT). The product names it as the [gpu] extra (WP3.1);
     # kept here so the developer environment has CuPy (WP3.1 ruling 7).

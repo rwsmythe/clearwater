@@ -8,8 +8,23 @@ Depends only on the standard library, NumPy, :mod:`clearwater.interfaces` and
 
 from __future__ import annotations
 
-from .codec import CODECS, DEFAULT_CODEC, DEFLATE, ProxyCodec
-from .keys import CACHE_FORMAT_VERSION, cache_key, entry_name, parse_entry_name
+from .codec import (
+    CODECS,
+    DEFAULT_CODEC,
+    DEFLATE,
+    JPEG_Q75_444,
+    JPEG_Q80_420,
+    ProxyCodec,
+    jpeg_identity,
+    round_trip,
+)
+from .keys import (
+    CACHE_FORMAT_VERSION,
+    cache_key,
+    codec_cache_version,
+    entry_name,
+    parse_entry_name,
+)
 from .store import DiskProxyCache
 
 __all__ = [
@@ -17,9 +32,14 @@ __all__ = [
     "CODECS",
     "DEFAULT_CODEC",
     "DEFLATE",
+    "JPEG_Q75_444",
+    "JPEG_Q80_420",
     "DiskProxyCache",
     "ProxyCodec",
     "cache_key",
+    "codec_cache_version",
     "entry_name",
+    "jpeg_identity",
     "parse_entry_name",
+    "round_trip",
 ]

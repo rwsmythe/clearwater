@@ -8,6 +8,7 @@ import logging
 import os
 from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import pytest
@@ -15,23 +16,33 @@ from numpy.typing import NDArray
 
 import clearwater.cache.store as store_module
 from clearwater.cache import (
-    CACHE_FORMAT_VERSION,
+    DEFAULT_CODEC,
     DEFLATE,
     DiskProxyCache,
     ProxyCodec,
     cache_key,
+    codec_cache_version,
     entry_name,
     parse_entry_name,
 )
 from clearwater.interfaces.cache import CacheEntry, CacheKey, ProxyCache
 from clearwater.interfaces.settings import DEFAULT_CACHE_LIMIT_BYTES
 
-KEY = CacheKey(1000, 1_700_000_000_000_000_000, CACHE_FORMAT_VERSION)
+VERSION = codec_cache_version(DEFLATE)
+KEY = CacheKey(1000, 1_700_000_000_000_000_000, VERSION)
+
+
+def lossless_cache(
+    folder: Path, limit: int = DEFAULT_CACHE_LIMIT_BYTES, **kw: Any
+) -> DiskProxyCache:
+    """Open a cache with the lossless codec (the store tests assume bit-identical proxies)."""
+    kw.setdefault("codec", DEFLATE)
+    return DiskProxyCache(folder, limit, **kw)
 
 
 def other_key(n: int) -> CacheKey:
     """Return a distinct current-version key."""
-    return CacheKey(1000 + n, 1_700_000_000_000_000_000 + n, CACHE_FORMAT_VERSION)
+    return CacheKey(1000 + n, 1_700_000_000_000_000_000 + n, VERSION)
 
 
 def pixels(seed: int, shape: tuple[int, int, int] = (12, 16, 3)) -> NDArray[np.uint8]:
@@ -67,11 +78,11 @@ def disk_bytes(folder: Path) -> int:
 
 def check_key_identity(folder: Path) -> None:
     """A key differing in any field finds nothing, also after a reopen (names, not memory)."""
-    first = DiskProxyCache(folder)
+    first = lossless_cache(folder)
     first.store_proxy(KEY, 0, pixels(1))
     first.store_source_statistics(KEY, "s", 0, {"a": np.zeros(2)})
     first.close()
-    cache = DiskProxyCache(folder)
+    cache = lossless_cache(folder)
     assert cache.lookup(KEY) is not None
     variants = [
         CacheKey(KEY.size + 1, KEY.mtime_ns, KEY.cache_version),
@@ -129,7 +140,7 @@ def check_torn_entry_not_complete(cache: DiskProxyCache, folder: Path) -> None:
     cache.close()
     pack = folder / entry_name(KEY) / "data.pack"
     pack.write_bytes(pack.read_bytes()[:-40])
-    found = DiskProxyCache(folder).lookup(KEY)
+    found = lossless_cache(folder).lookup(KEY)
     assert found is not None
     assert not found.complete
 
@@ -151,19 +162,19 @@ def check_stages_cover(cache: DiskProxyCache) -> None:
 
 
 def test_conforms_to_the_protocol(tmp_path: Path) -> None:
-    cache: ProxyCache = DiskProxyCache(tmp_path / "c")
+    cache: ProxyCache = lossless_cache(tmp_path / "c")
     assert isinstance(cache, ProxyCache)
 
 
 def test_default_limit_is_the_settings_default(tmp_path: Path) -> None:
-    cache = DiskProxyCache(tmp_path / "c")
+    cache = lossless_cache(tmp_path / "c")
     assert cache.limit_bytes() == DEFAULT_CACHE_LIMIT_BYTES
 
 
 def test_limit_setters_refuse_negative(tmp_path: Path) -> None:
     with pytest.raises(ValueError):
-        DiskProxyCache(tmp_path / "c", -1)
-    cache = DiskProxyCache(tmp_path / "c")
+        lossless_cache(tmp_path / "c", -1)
+    cache = lossless_cache(tmp_path / "c")
     with pytest.raises(ValueError):
         cache.set_limit_bytes(-5)
     cache.set_limit_bytes(123)
@@ -184,7 +195,7 @@ def test_nothing_resolves_the_app_data_folder(
 
     monkeypatch.setattr(clearwater.config.paths, "app_locations", spy)
     monkeypatch.setattr(clearwater.config, "app_locations", spy)
-    with DiskProxyCache(tmp_path / "c") as cache:
+    with lossless_cache(tmp_path / "c") as cache:
         fill(cache, KEY)
         cache.mark_complete(KEY)
         assert cache.lookup(KEY) is not None
@@ -194,10 +205,10 @@ def test_nothing_resolves_the_app_data_folder(
 
 def test_v17_reopen_finds_the_complete_entry(tmp_path: Path) -> None:
     folder = tmp_path / "c"
-    with DiskProxyCache(folder) as first:
+    with lossless_cache(folder) as first:
         fill(first, KEY, frames=5)
         first.mark_complete(KEY)
-    second = DiskProxyCache(folder)
+    second = lossless_cache(folder)
     found = second.lookup(KEY)
     assert isinstance(found, CacheEntry)
     assert found.complete is True
@@ -213,12 +224,12 @@ def test_v17_reopen_finds_the_complete_entry(tmp_path: Path) -> None:
 
 def test_v17_without_mark_complete_the_entry_is_not_complete(tmp_path: Path) -> None:
     folder = tmp_path / "c"
-    first = DiskProxyCache(folder)
+    first = lossless_cache(folder)
     fill(first, KEY, frames=3)
     before = first.lookup(KEY)
     assert before is not None and before.complete is False
     first.close()
-    found = DiskProxyCache(folder).lookup(KEY)
+    found = lossless_cache(folder).lookup(KEY)
     assert found is not None
     assert found.complete is False
     assert found.pts_ticks == (0, 100, 200)
@@ -233,7 +244,8 @@ def test_cache_key_follows_the_file(tmp_path: Path) -> None:
     source.write_bytes(b"x" * 100)
     first = cache_key(source)
     assert first.size == 100
-    assert first.cache_version == CACHE_FORMAT_VERSION
+    assert first.cache_version == codec_cache_version(DEFAULT_CODEC)
+    assert cache_key(source, DEFLATE).cache_version == VERSION
     assert cache_key(source) == first
     stat = source.stat()
     os.utime(source, ns=(stat.st_atime_ns, stat.st_mtime_ns + 2_000_000_000))
@@ -254,11 +266,11 @@ def test_entry_names_hold_every_field() -> None:
 
 
 def test_proxy_round_trip_is_bit_identical(tmp_path: Path) -> None:
-    check_round_trip(DiskProxyCache(tmp_path / "c"))
+    check_round_trip(lossless_cache(tmp_path / "c"))
 
 
 def test_proxy_edge_shapes_round_trip(tmp_path: Path) -> None:
-    cache = DiskProxyCache(tmp_path / "c")
+    cache = lossless_cache(tmp_path / "c")
     flat = np.zeros((1, 1, 3), dtype=np.uint8)
     cache.store_proxy(KEY, 0, flat)
     assert cache.proxy(KEY, 0).tobytes() == flat.tobytes()
@@ -270,7 +282,7 @@ def test_proxy_edge_shapes_round_trip(tmp_path: Path) -> None:
 
 
 def test_store_proxy_refuses_wrong_input(tmp_path: Path) -> None:
-    cache = DiskProxyCache(tmp_path / "c")
+    cache = lossless_cache(tmp_path / "c")
     cache.store_proxy(KEY, 0, pixels(1))
     with pytest.raises(ValueError):
         cache.store_proxy(KEY, 1, pixels(1).astype(np.float32))  # type: ignore[arg-type]
@@ -283,15 +295,15 @@ def test_store_proxy_refuses_wrong_input(tmp_path: Path) -> None:
     with pytest.raises(TypeError):
         cache.store_proxy(KEY, 1, [[1]])  # type: ignore[arg-type]
     with pytest.raises(ValueError):
-        cache.store_proxy(CacheKey(1, 1, CACHE_FORMAT_VERSION + 1), 0, pixels(1))
+        cache.store_proxy(CacheKey(1, 1, VERSION + 1), 0, pixels(1))
     with pytest.raises(ValueError):
-        cache.store_proxy(CacheKey(-1, 1, CACHE_FORMAT_VERSION), 0, pixels(1))
+        cache.store_proxy(CacheKey(-1, 1, VERSION), 0, pixels(1))
     found = cache.lookup(KEY)
     assert found is not None and found.pts_ticks == (0,)
 
 
 def test_absent_proxy_and_statistics_raise_key_error(tmp_path: Path) -> None:
-    cache = DiskProxyCache(tmp_path / "c")
+    cache = lossless_cache(tmp_path / "c")
     with pytest.raises(KeyError):
         cache.proxy(KEY, 0)
     fill(cache, KEY, frames=2)
@@ -305,7 +317,7 @@ def test_absent_proxy_and_statistics_raise_key_error(tmp_path: Path) -> None:
 
 
 def test_statistics_round_trip_exactly(tmp_path: Path) -> None:
-    cache = DiskProxyCache(tmp_path / "c")
+    cache = lossless_cache(tmp_path / "c")
     stats = {
         "zeta": np.array([0.1, -0.0, np.nan, np.inf, 5e-324]),
         "alpha": np.arange(6, dtype=np.int32).reshape(2, 3),
@@ -328,7 +340,7 @@ def test_statistics_round_trip_exactly(tmp_path: Path) -> None:
 
 
 def test_statistics_refuse_unstorable_values(tmp_path: Path) -> None:
-    cache = DiskProxyCache(tmp_path / "c")
+    cache = lossless_cache(tmp_path / "c")
     with pytest.raises(ValueError):
         cache.store_source_statistics(KEY, "s", 0, {"o": np.array(["x"], dtype=object)})
     with pytest.raises(ValueError):
@@ -340,11 +352,11 @@ def test_statistics_refuse_unstorable_values(tmp_path: Path) -> None:
 
 
 def test_stages_cover_every_pts(tmp_path: Path) -> None:
-    check_stages_cover(DiskProxyCache(tmp_path / "c"))
+    check_stages_cover(lossless_cache(tmp_path / "c"))
 
 
 def test_stages_are_sorted_and_pts_ascending(tmp_path: Path) -> None:
-    cache = DiskProxyCache(tmp_path / "c")
+    cache = lossless_cache(tmp_path / "c")
     for pts in (30, 10, 20):
         cache.store_proxy(KEY, pts, pixels(pts))
     for stage in ("b", "a"):
@@ -357,14 +369,14 @@ def test_stages_are_sorted_and_pts_ascending(tmp_path: Path) -> None:
 
 def test_mark_complete_of_unknown_key_is_a_key_error(tmp_path: Path) -> None:
     with pytest.raises(KeyError):
-        DiskProxyCache(tmp_path / "c").mark_complete(KEY)
+        lossless_cache(tmp_path / "c").mark_complete(KEY)
 
 
 def test_a_new_proxy_makes_a_complete_entry_incomplete_but_statistics_do_not(
     tmp_path: Path,
 ) -> None:
     folder = tmp_path / "c"
-    cache = DiskProxyCache(folder)
+    cache = lossless_cache(folder)
     fill(cache, KEY, frames=2)
     cache.mark_complete(KEY)
     cache.store_source_statistics(KEY, "late", 0, {"a": np.zeros(1)})
@@ -375,13 +387,13 @@ def test_a_new_proxy_makes_a_complete_entry_incomplete_but_statistics_do_not(
     found = cache.lookup(KEY)
     assert found is not None and not found.complete
     cache.close()
-    reopened = DiskProxyCache(folder).lookup(KEY)
+    reopened = lossless_cache(folder).lookup(KEY)
     assert reopened is not None and not reopened.complete
     assert not (folder / entry_name(KEY) / "complete").exists()
 
 
 def test_restoring_the_same_frame_adds_nothing_and_a_changed_one_replaces(tmp_path: Path) -> None:
-    cache = DiskProxyCache(tmp_path / "c")
+    cache = lossless_cache(tmp_path / "c")
     cache.store_proxy(KEY, 0, pixels(1))
     size = cache.lookup(KEY).size_bytes  # type: ignore[union-attr]
     cache.store_proxy(KEY, 0, pixels(1))
@@ -392,10 +404,10 @@ def test_restoring_the_same_frame_adds_nothing_and_a_changed_one_replaces(tmp_pa
 
 
 def test_a_stored_proxy_is_readable_before_the_entry_completes(tmp_path: Path) -> None:
-    cache = DiskProxyCache(tmp_path / "c")
+    cache = lossless_cache(tmp_path / "c")
     cache.store_proxy(KEY, 0, pixels(1))
     assert cache.proxy(KEY, 0).tobytes() == pixels(1).tobytes()
-    other = DiskProxyCache(tmp_path / "c")
+    other = lossless_cache(tmp_path / "c")
     assert other.proxy(KEY, 0).tobytes() == pixels(1).tobytes()
 
 
@@ -404,7 +416,7 @@ def test_a_stored_proxy_is_readable_before_the_entry_completes(tmp_path: Path) -
 
 def make_with_clock(tmp_path: Path) -> Callable[[], DiskProxyCache]:
     clock = Clock()
-    return lambda: DiskProxyCache(tmp_path / "c", clock=clock)
+    return lambda: lossless_cache(tmp_path / "c", clock=clock)
 
 
 def test_eviction_removes_the_oldest_last_use_first(tmp_path: Path) -> None:
@@ -412,7 +424,7 @@ def test_eviction_removes_the_oldest_last_use_first(tmp_path: Path) -> None:
 
 
 def test_a_lookup_hit_refreshes_the_stamp(tmp_path: Path) -> None:
-    cache = DiskProxyCache(tmp_path / "c", clock=Clock())
+    cache = lossless_cache(tmp_path / "c", clock=Clock())
     keys = [other_key(n) for n in range(3)]
     for key in keys:
         cache.store_proxy(key, 0, pixels(1))
@@ -426,7 +438,7 @@ def test_a_lookup_hit_refreshes_the_stamp(tmp_path: Path) -> None:
 
 
 def test_a_store_evicts_older_entries_but_never_the_one_written(tmp_path: Path) -> None:
-    cache = DiskProxyCache(tmp_path / "c", clock=Clock())
+    cache = lossless_cache(tmp_path / "c", clock=Clock())
     first, second = other_key(1), other_key(2)
     cache.store_proxy(first, 0, pixels(1))
     one = disk_bytes(tmp_path / "c")
@@ -438,7 +450,7 @@ def test_a_store_evicts_older_entries_but_never_the_one_written(tmp_path: Path) 
 
 
 def test_the_total_stays_under_the_limit_across_many_stores(tmp_path: Path) -> None:
-    cache = DiskProxyCache(tmp_path / "c", clock=Clock())
+    cache = lossless_cache(tmp_path / "c", clock=Clock())
     cache.store_proxy(other_key(0), 0, pixels(0))
     limit = disk_bytes(tmp_path / "c") * 3
     cache.set_limit_bytes(limit)
@@ -450,7 +462,7 @@ def test_the_total_stays_under_the_limit_across_many_stores(tmp_path: Path) -> N
 def test_one_entry_over_the_limit_is_kept_with_a_warning(
     tmp_path: Path, caplog: pytest.LogCaptureFixture
 ) -> None:
-    cache = DiskProxyCache(tmp_path / "c", clock=Clock())
+    cache = lossless_cache(tmp_path / "c", clock=Clock())
     cache.store_proxy(other_key(1), 0, pixels(1))
     with caplog.at_level(logging.WARNING, logger="clearwater.cache"):
         cache.set_limit_bytes(10)
@@ -466,10 +478,10 @@ def test_one_entry_over_the_limit_is_kept_with_a_warning(
 
 def test_opening_applies_the_limit(tmp_path: Path) -> None:
     folder = tmp_path / "c"
-    with DiskProxyCache(folder, clock=Clock()) as first:
+    with lossless_cache(folder, clock=Clock()) as first:
         for n in range(3):
             first.store_proxy(other_key(n), 0, pixels(n))
-    small = DiskProxyCache(folder, 1, clock=Clock())
+    small = lossless_cache(folder, 1, clock=Clock())
     assert [small.lookup(other_key(n)) is not None for n in range(3)].count(True) == 0
 
 
@@ -478,7 +490,7 @@ def test_opening_applies_the_limit(tmp_path: Path) -> None:
 
 def test_clear_removes_every_entry_and_spares_foreign_files(tmp_path: Path) -> None:
     folder = tmp_path / "c"
-    cache = DiskProxyCache(folder)
+    cache = lossless_cache(folder)
     for n in range(3):
         fill(cache, other_key(n), frames=2)
     (folder / "readme.txt").write_text("foreign", encoding="utf-8")
@@ -506,7 +518,7 @@ def test_clear_never_follows_a_link(tmp_path: Path) -> None:
         os.symlink(outside, link, target_is_directory=True)
     except (OSError, NotImplementedError):
         pytest.skip("symbolic links are not available here")
-    cache = DiskProxyCache(folder)
+    cache = lossless_cache(folder)
     fill(cache, KEY, frames=2)
     # a symlink named like a cache file inside a real entry folder
     victim = tmp_path / "victim.txt"
@@ -522,9 +534,9 @@ def test_clear_never_follows_a_link(tmp_path: Path) -> None:
 
 def test_other_versions_and_unreadable_entries_are_removed_when_opening(tmp_path: Path) -> None:
     folder = tmp_path / "c"
-    with DiskProxyCache(folder) as first:
+    with lossless_cache(folder) as first:
         fill(first, KEY, frames=2)
-    old = folder / entry_name(CacheKey(5, 5, CACHE_FORMAT_VERSION + 7))
+    old = folder / entry_name(CacheKey(5, 5, VERSION + 7))
     old.mkdir()
     (old / "data.pack").write_bytes(b"old format")
     (old / "keep.txt").write_text("foreign", encoding="utf-8")
@@ -535,22 +547,22 @@ def test_other_versions_and_unreadable_entries_are_removed_when_opening(tmp_path
     empty.mkdir()
     (folder / "scratch").mkdir()
     (folder / "scratch" / "data.pack").write_bytes(b"not ours")
-    reopened = DiskProxyCache(folder)
+    reopened = lossless_cache(folder)
     assert not (old / "data.pack").exists()
     assert (old / "keep.txt").exists()
     assert not garbage.exists() and not empty.exists()
     assert (folder / "scratch" / "data.pack").read_bytes() == b"not ours"
     assert reopened.lookup(KEY) is not None
-    assert reopened.lookup(CacheKey(5, 5, CACHE_FORMAT_VERSION + 7)) is None
+    assert reopened.lookup(CacheKey(5, 5, VERSION + 7)) is None
 
 
 def test_a_pack_that_belongs_to_another_key_is_never_served(tmp_path: Path) -> None:
     folder = tmp_path / "c"
-    with DiskProxyCache(folder) as first:
+    with lossless_cache(folder) as first:
         fill(first, KEY, frames=1)
     moved = folder / entry_name(other_key(1))
     (folder / entry_name(KEY)).rename(moved)
-    reopened = DiskProxyCache(folder)
+    reopened = lossless_cache(folder)
     assert reopened.lookup(other_key(1)) is None
     assert reopened.lookup(KEY) is None
 
@@ -593,7 +605,7 @@ def test_planted_lossy_round_trip_is_caught(
     )
     monkeypatch.setattr(store_module, "CODECS", {lossy.codec_id: lossy})
     with pytest.raises(AssertionError):
-        check_round_trip(DiskProxyCache(tmp_path / "c", codec=lossy))
+        check_round_trip(lossless_cache(tmp_path / "c", codec=lossy))
 
 
 def test_planted_clear_that_deletes_foreign_files_is_caught(
@@ -602,7 +614,7 @@ def test_planted_clear_that_deletes_foreign_files_is_caught(
     monkeypatch.setattr(store_module, "_is_cache_file", lambda name: True)
     folder = tmp_path / "c"
     with pytest.raises((AssertionError, FileNotFoundError)):
-        check_clear_spares_foreign(DiskProxyCache(folder), folder)
+        check_clear_spares_foreign(lossless_cache(folder), folder)
 
 
 def test_planted_marker_that_is_always_believed_is_caught(
@@ -610,7 +622,7 @@ def test_planted_marker_that_is_always_believed_is_caught(
 ) -> None:
     monkeypatch.setattr(store_module, "marker_valid", lambda *a, **k: True)
     with pytest.raises(AssertionError):
-        check_torn_entry_not_complete(DiskProxyCache(tmp_path / "c"), tmp_path / "c")
+        check_torn_entry_not_complete(lossless_cache(tmp_path / "c"), tmp_path / "c")
 
 
 def test_planted_partial_stage_listing_is_caught(
@@ -618,9 +630,9 @@ def test_planted_partial_stage_listing_is_caught(
 ) -> None:
     monkeypatch.setattr(store_module, "_stage_covers", lambda proxy_pts, stage_pts: True)
     with pytest.raises(AssertionError):
-        check_stages_cover(DiskProxyCache(tmp_path / "c"))
+        check_stages_cover(lossless_cache(tmp_path / "c"))
 
 
 def test_the_oracles_pass_on_the_real_implementation(tmp_path: Path) -> None:
     folder = tmp_path / "torn"
-    check_torn_entry_not_complete(DiskProxyCache(folder), folder)
+    check_torn_entry_not_complete(lossless_cache(folder), folder)

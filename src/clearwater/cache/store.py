@@ -45,7 +45,7 @@ from clearwater.interfaces.method import Statistics
 from clearwater.interfaces.settings import DEFAULT_CACHE_LIMIT_BYTES
 
 from .codec import CODECS, DEFAULT_CODEC, ProxyCodec
-from .keys import CACHE_FORMAT_VERSION, entry_name, parse_entry_name
+from .keys import codec_cache_version, entry_name, parse_entry_name
 from .layout import (
     CACHE_FILE_NAMES,
     KIND_PROXY,
@@ -200,6 +200,7 @@ class DiskProxyCache:
         self._folder = folder
         self._limit = limit_bytes
         self._codec = codec
+        self._version = codec_cache_version(codec)
         self._clock = clock
         self._lock = threading.RLock()
         self._entries: dict[CacheKey, _Entry] = {}
@@ -435,6 +436,16 @@ class DiskProxyCache:
 
     # --- extras -----------------------------------------------------------------------------
 
+    @property
+    def cache_version(self) -> int:
+        """The cache version of this instance: format number and codec identity (D113)."""
+        return self._version
+
+    def key_for(self, path: str | os.PathLike[str]) -> CacheKey:
+        """Return the key of a source file for this instance's codec (see ``cache_key``)."""
+        info = os.stat(path)
+        return CacheKey(info.st_size, info.st_mtime_ns, self._version)
+
     def close(self) -> None:
         """Close the append handle (the cache stays usable; the next store reopens it)."""
         with self._lock:
@@ -453,10 +464,9 @@ class DiskProxyCache:
     def _check_key(self, key: CacheKey) -> None:
         """Refuse a key that cannot be stored (negative fields, or another cache version)."""
         entry_name(key)
-        if key.cache_version != CACHE_FORMAT_VERSION:
+        if key.cache_version != self._version:
             raise ValueError(
-                f"cache version {key.cache_version} cannot be stored (current is "
-                f"{CACHE_FORMAT_VERSION})"
+                f"cache version {key.cache_version} cannot be stored (current is {self._version})"
             )
 
     @contextlib.contextmanager
@@ -489,7 +499,7 @@ class DiskProxyCache:
             if key is None or key in self._entries:
                 continue
             folder = Path(item.path)
-            if purge or key.cache_version != CACHE_FORMAT_VERSION:
+            if purge or key.cache_version != self._version:
                 _remove_files(folder)
                 continue
             self._register(key, folder)

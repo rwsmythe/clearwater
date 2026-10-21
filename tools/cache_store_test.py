@@ -64,6 +64,8 @@ WINDOW_STARTS_S = (30.0, 130.0, 230.0, 330.0, 430.0)
 """GX011625 sample: five 60-frame windows spread over the 498 s clip."""
 CLIPS: dict[str, tuple[float, ...] | None] = {"GX011627": None, "GX011625": WINDOW_STARTS_S}
 """Clip stem -> window start times in seconds; None = the whole clip."""
+READ_ROUNDS = 8
+"""How many times each stored proxy is read back in the product read-cost row."""
 CRITERIA = {"means": 1e-3, "gains": 1e-3, "bounds": 1e-2}
 
 Frames = NDArray[np.uint8]
@@ -791,6 +793,62 @@ def readcost_mode(only: list[str]) -> None:
     path.write_text(json.dumps(previous, indent=1), encoding="utf-8")
 
 
+def readcost_product_mode() -> None:
+    """Time ``DiskProxyCache.proxy`` (file read, checksum, decode) per product codec.
+
+    The 25 evenly spaced proxies of GX011627 are stored with each codec in a cache folder under
+    the working folder, then each is read back ``READ_ROUNDS`` times; run in an EXCLUSIVE window.
+    """
+    from clearwater.cache import DEFLATE, JPEG_Q75_444, JPEG_Q80_420, DiskProxyCache
+    from clearwater.interfaces.cache import CacheKey
+
+    out = out_dir()
+    clip = load_clip("GX011627")
+    picks = [int(i) for i in np.linspace(0, clip.frames.shape[0] - 1, 25)]
+    found: dict[str, dict[str, Any]] = {}
+    for codec in (DEFLATE, JPEG_Q75_444, JPEG_Q80_420):
+        folder = out / f"readcost-cache-{codec.name}"
+        with DiskProxyCache(folder, codec=codec) as cache:
+            cache.clear()
+            key = CacheKey(1, 1, cache.cache_version)
+            sizes = []
+            for i in picks:
+                cache.store_proxy(key, i, np.asarray(clip.frames[i]))
+            entry = cache.lookup(key)
+            assert entry is not None
+            sizes.append(entry.size_bytes / len(picks))
+            times: list[float] = []
+            for _ in range(READ_ROUNDS):
+                for i in picks:
+                    t0 = time.perf_counter()
+                    cache.proxy(key, i)
+                    times.append(time.perf_counter() - t0)
+            cache.clear()
+        found[f"product-{codec.name}"] = {
+            "median_ms": statistics.median(times) * 1000,
+            "p95_ms": float(np.percentile(times, 95)) * 1000,
+            "max_ms": max(times) * 1000,
+            "reads": len(times),
+            "bytes_per_frame": sizes[0],
+        }
+        row = found[f"product-{codec.name}"]
+        print(
+            f"{codec.name:14s} median {row['median_ms']:6.2f} ms  p95 {row['p95_ms']:6.2f} ms  "
+            f"max {row['max_ms']:6.2f} ms  {row['bytes_per_frame'] / 1000:.1f} KB/frame"
+        )
+    path = out / "readcost.json"
+    previous = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+    previous.update(found)
+    previous["_product_conditions"] = {
+        "at": time.strftime("%Y-%m-%dT%H:%M:%S"),
+        "clip": "GX011627",
+        "frames": len(picks),
+        "rounds": READ_ROUNDS,
+        "note": "proxy(): read + CRC + decode, file in the OS cache",
+    }
+    path.write_text(json.dumps(previous, indent=1), encoding="utf-8")
+
+
 # --- report ---------------------------------------------------------------------------------------
 
 
@@ -847,6 +905,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     p_sizes.add_argument("--workers", type=int, default=4)
     p_read = sub.add_parser("readcost")
     p_read.add_argument("--only", nargs="*", default=[])
+    sub.add_parser("readcost-product")
     sub.add_parser("report")
     args = parser.parse_args(argv)
     if args.mode == "prepare":
@@ -855,6 +914,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         sizes_mode(args.only, args.workers)
     elif args.mode == "readcost":
         readcost_mode(args.only)
+    elif args.mode == "readcost-product":
+        readcost_product_mode()
     else:
         report_mode()
     return 0
