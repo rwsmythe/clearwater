@@ -334,6 +334,16 @@ pack: reproduced, tracked 641 vs 45 bytes on disk). Minors: R5-5 argument errors
 R5-7 the instrument imports `find_tool` from `.probe` instead of `clearwater.io.video` (trivial), R5-8 the report says 77 tests (92 now). NEW, in-envelope, non-reopened critical/major: none. Recommendation at the gate:
 CONVERGE; optionally one terminating cleanup of R5-1, R5-3, R5-4 (product code, small, each with a test failing on the old code), R5-6/7/8, with R5-2 and R5-5 banked. Per-finding table: `r5/adjudication.md`.
 
+**Terminating cleanup after the R5 gate (no further Reviewer A round; Reviewer B at the orchestrator's seat covers it).** Orchestrator ruling at the gate (FINAL, depth 191,195 / 68 turns at 02:21Z): CONVERGE
+(all four R5 majors were REOPENED families); fix R5-3, R5-4, R5-1 (if small) and the minors R5-6/7/8; bank R5-2 and R5-5 as report limits. Done in one commit (tests written and run on the unfixed code
+first: 3 failures, output `r5c-before.txt`; no stash): R5-3 `_surviving_shape` rereads the shape from the first surviving proxy when a record is forgotten (was: the dead first record's shape stayed);
+R5-4 `_mark_for_removal` re-stats `pack_size` (0 when the pack is gone) so a deleted pack is not counted; R5-1 `_remove_entry` returns without touching files when `self._entries.get(key) is not entry`
+after the reader wait (small and local, so FIXED, not banked; the test replaces the condition by a stand-in whose `wait` runs the reader's end and a same-key store, since the thread order cannot be
+forced; on Windows the unfixed code also left a `removing` mark in the NEW entry's folder when the open append handle stopped the delete, asserted too); R5-6 the symlink test plants `meta.json.ab12cd34.tmp`
+(a name `_TEMP_NAME` owns), no longer under `suppress`, asserts the link is left (mutation check: with `follow symlinks` restored in `_remove_files` it fails); R5-7 `from clearwater.io.video import find_tool`;
+R5-8 the report counts 95. R5-2 and R5-5 and the unchecked-first-record shape residue are named in the report's Limits. Own tests 95 pass; `ruff check .`, `ruff format --check .`, `mypy` green. No full
+pytest run (window pending). The R5 row below stands as adjudicated.
+
 ## Ledger (cumulative rounds)
 
 | Round | Critical | Major | Minor | In-envelope vs out | NEW / REOPENED | Reverts | Product / test-only fixes | Depth |
