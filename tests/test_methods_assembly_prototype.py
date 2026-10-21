@@ -4,8 +4,10 @@ The references are computed here by calling ``tools/prototype`` (WP3.1 ruling 6 
 is committed. On one device the product matches the prototype bit for bit, with two known,
 ruled differences: each N{} bound is the prototype's float64 bound rounded to float32 (IF-2
 ``percentile``, WP3.3), and the N{} floor (AD-4, DR-14) widens bounds closer than 0.02 where the
-prototype stretches only bounds closer than 1e-6. Where the floor binds (the uniform stills)
-the comparison is AD-11's; elsewhere it is exact.
+prototype stretches only bounds closer than 1e-6. Where the floor binds (every still at the
+defaults: their sharpening sigma is a third of a pixel) the prototype is given the floored
+bounds, as WP3.3 compares input 2, and the match is exact again; the raw difference from the
+unfloored prototype is the report's figure, not a test bound.
 """
 
 from __future__ import annotations
@@ -22,7 +24,7 @@ from PIL import Image as PILImage
 from clearwater.core import CoreBackend, NumpyBackend
 from clearwater.core.backend import _probe_gpu
 from clearwater.interfaces.method import CorrectionMethod, Statistics
-from clearwater.methods.fusion import NORMALISATION_RANGE_FLOOR
+from clearwater.methods.fusion import NORMALISATION_RANGE_FLOOR, _floored
 from lookcheck.frames import read_png16
 from prototype import pipeline as proto
 from prototype import temporal
@@ -105,11 +107,17 @@ def load(sample: Callable[[str], Path]) -> Callable[[str], np.ndarray]:
 IMAGES = ["scene", "scene-large", *STILLS]
 
 
+def floored(bounds: Any) -> tuple[float, float]:
+    """The bounds the product's ``fusion_inputs`` stretches over (AD-4's floor applied)."""
+    return _floored(float(bounds[0]), float(bounds[1]))
+
+
 def hook(m: CorrectionMethod, records: Mapping[str, Statistics], blue: bool) -> Any:
+    """The product's records as the prototype's ``Statistics`` hook, the bounds floored."""
     fusion = records["fusion"]
     fields: dict[str, Any] = {
         "white_balance_gains": tuple(float(g) for g in records["white_balance"]["gains"]),
-        "normalisation_bounds": tuple(float(b) for b in fusion["bounds"]),
+        "normalisation_bounds": floored(fusion["bounds"]),
         "saliency_means": tuple(tuple(map(float, row)) for row in fusion["saliency_means"]),
     }
     if m.id == "ancuti2018":
@@ -154,16 +162,12 @@ def test_analyze_against_statistics_of(
     assert fusion["bounds"].tolist() == [
         float(np.float32(b)) for b in reference.normalisation_bounds
     ]
-    # the saliency means: the prototype's chain given the product's (float32) bounds
+    # the saliency means: the prototype's chain given the bounds the product stretches over
     given = dataclasses.replace(
-        reference, normalisation_bounds=tuple(fusion["bounds"].tolist()), saliency_means=None
+        reference, normalisation_bounds=floored(fusion["bounds"]), saliency_means=None
     )
     again = temporal.measure(pixels, p, given)
-    if floor_binds(records):
-        difference = np.abs(fusion["saliency_means"] - np.asarray(again.saliency_means))
-        assert float(difference.max()) < 50.0  # the floor's stretch changes input 2's Lab mean
-    else:
-        assert fusion["saliency_means"].tolist() == [list(v) for v in again.saliency_means]
+    assert fusion["saliency_means"].tolist() == [list(v) for v in again.saliency_means]
 
 
 # -- render against pipeline.correct with the same Statistics record -------------------------------
@@ -183,11 +187,7 @@ def test_render_against_correct_with_the_same_record(
     p = prototype_params(m, params)
     got = host(m.render(image, params, records).pixels)
     expected = proto.correct(pixels, p, statistics=hook(m, records, p.blue_compensation)).output
-    if floor_binds(records):
-        difference = np.abs(got.astype(np.float64) - expected)
-        assert float(difference.max()) <= 1.0, image_name  # reported, not bit-exact (P-5)
-    else:
-        assert got.tobytes() == expected.tobytes(), image_name
+    assert got.tobytes() == expected.tobytes(), (image_name, floor_binds(records))
 
 
 @pytest.mark.parametrize("method_id", METHOD_IDS)
