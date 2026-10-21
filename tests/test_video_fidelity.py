@@ -8,6 +8,9 @@ roster invariant, the missing-pts count, the telemetry redaction, the NVENC proo
 from __future__ import annotations
 
 import json
+import subprocess
+import threading
+import time
 from dataclasses import replace
 from fractions import Fraction
 from pathlib import Path
@@ -133,18 +136,28 @@ def test_the_telemetry_track_keeps_only_packet_counts() -> None:
     assert vf._redact(other) is other
 
 
-def _run(
-    encoder: str, rows: list[tuple[float, str, int, str]], error: str | None = None
-) -> vf.EncodeRun:
+Row = tuple[float, float, str, int, str]
+
+
+def _run(encoder: str, rows: list[Row], error: str | None = None) -> vf.EncodeRun:
     gpu = vf.GpuSamples({"0": "GPU-1234"}, rows, error)
-    return vf.EncodeRun(SinkReport(1, (), ()), encoder, 8, 4242, 100.0, 110.0, gpu)
+    return vf.EncodeRun(SinkReport(1, (), ()), encoder, 8, 4242, 5000.0, 5010.0, gpu)
 
 
 def test_the_nvenc_proof_ties_the_pid_gpu_and_window() -> None:
-    tied = vf.nvenc_proof(_run("hevc_nvenc", [(1.0, "0", 4242, "37"), (2.0, "0", 999, "50")]))
+    inside: Row = (5001.0, 5002.0, "0", 4242, "37")
+    tied = vf.nvenc_proof(_run("hevc_nvenc", [inside, (5002.0, 5003.0, "0", 999, "50")]))
     assert tied["tied"] and tied["gpu_uuid"] == ["GPU-1234"] and tied["pid"] == 4242
-    assert tied["pid_samples_with_encoder_load"] == [[1.0, "0", 4242, "37"]]
-    for rows in ([(1.0, "0", 999, "50")], [(1.0, "0", 4242, "-")], [(11.0, "0", 4242, "40")]):
+    assert tied["pid_samples_with_encoder_load"] == [[1.0, 2.0, "0", 4242, "37"]]
+    overlapping: Row = (4999.5, 5000.5, "0", 4242, "12")  # the call ran across the start
+    assert vf.nvenc_proof(_run("hevc_nvenc", [overlapping]))["tied"]
+    for rows in (
+        [(5001.0, 5002.0, "0", 999, "50")],
+        [(5001.0, 5002.0, "0", 4242, "-")],
+        [(5011.0, 5012.0, "0", 4242, "40")],  # after the window
+        [(4990.0, 4999.0, "0", 4242, "40")],  # before it
+        [(1.0, 2.0, "0", 4242, "40")],  # a time on another clock (round-1 finding 7)
+    ):
         proof = vf.nvenc_proof(_run("hevc_nvenc", rows))
         assert not proof["tied"] and "no sample" in proof["reason"]
     assert vf.nvenc_proof(_run("hevc_nvenc", [], "nvidia-smi is not available")) == {
@@ -152,6 +165,62 @@ def test_the_nvenc_proof_ties_the_pid_gpu_and_window() -> None:
         "reason": "nvidia-smi is not available",
     }
     assert not vf.nvenc_proof(_run("libx265", []))["tied"]
+
+
+def test_the_sampler_and_the_encode_window_share_one_clock(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Round-1 finding 7: samples were timed from the sampler's start, the window by wall clock,
+    # so an encode that began after the sampler was judged against the wrong origin.
+    running = threading.Event()
+
+    def fake_smi(arguments: Any) -> str:
+        if arguments[0] == "pmon":
+            seen = "    0 4242 C 10 5 37 0 ffmpeg" + chr(10) if running.is_set() else ""
+            return "# gpu pid type sm mem enc dec" + chr(10) + seen
+        return "0, GPU-1234" + chr(10)
+
+    monkeypatch.setattr(vf, "_nvidia_smi", fake_smi)
+    monkeypatch.setattr(vf, "_PMON_PERIOD_S", 0.01)
+    monkeypatch.setattr(FFmpegVideoSink, "_start", lambda self, command: running.set())
+    sink = vf._RecordingSink()
+    sampler = vf._Sampler()
+    sampler.start()
+    time.sleep(0.3)  # the encode window opens well after the sampler
+    sink._start([])
+    give_up = time.monotonic() + 10
+    while time.monotonic() < give_up and len(sampler.samples.rows) < 3:
+        time.sleep(0.01)
+    sink.ended = vf._clock()
+    samples = sampler.stop()
+    run = vf.EncodeRun(
+        SinkReport(1, (), ()), "hevc_nvenc", 8, 4242, sink.started, sink.ended, samples
+    )
+    proof = vf.nvenc_proof(run)
+    assert proof["tied"] and proof["gpu_uuid"] == ["GPU-1234"], proof
+
+
+def test_location_values_never_reach_the_record(tmp_path: Path) -> None:
+    # Round-1 finding 2: tag items carried every tag value, a location included.
+    clip = tmp_path / "located.mp4"
+    subprocess.run(
+        ["ffmpeg", "-nostdin", "-v", "error", "-y", "-f", "lavfi",
+         "-i", "testsrc2=size=64x48:rate=30:duration=0.3", "-c:v", "libx264", "-bf", "0",
+         "-metadata", "location=+27.9881+086.9250/", str(clip)],
+        check=True, capture_output=True,
+    )  # fmt: skip
+    positive = json.dumps(compare.compare_files(clip, clip))
+    assert "27.9881" in positive  # the plant reaches WP1.5's record (the positive control)
+    record = vf.fidelity_record(clip, clip)
+    text = json.dumps(record)
+    assert "27.9881" not in text and "086.9250" not in text
+    items = {item["name"]: item for item in record["items"]}
+    tags = items["container tags other than creation_time"]
+    assert tags["source"]["location"] == vf.LOCATION_WITHHELD and tags["status"] == "SAME"
+    atoms = items["camera atoms: moov/udta children (type, bytes, MD5)"]["source"]
+    assert any(atom[2] == vf.LOCATION_WITHHELD for atom in atoms)  # the xyz atom's digest
+    assert vf.location_like("com.apple.quicktime.location.ISO6709")
+    assert vf.location_like("\u00a9xyz") and not vf.location_like("encoder")
 
 
 def test_the_cli_compares_into_the_working_folder_only(sample: Any, tmp_path: Path) -> None:

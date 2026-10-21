@@ -24,14 +24,19 @@ product's readings applied:
   output list is SAME with a NOTE (AD-22 extended, Q-C) -- never a silent pass: every such note
   is listed in the summary's ``notes``;
 * the presentation-effect item models an absent edit list as the identity from media time 0;
-* a cut-short source (D86) is compared on its readable part: the expected video duration and
-  edit list end at the readable end, the audio and data packets at the copied part;
+* the movie duration (``mvhd`` over its timescale, the presentation form, WP3.7's note) is a
+  MANDATORY item of its own, compared exactly;
+* a cut-short source (D86) is compared on its readable part: the video ends at the readable end
+  and, for a truncated file, each copied track at the end of its last packet before it. The
+  expected video duration, the video edit list (its ``media_time`` and rate kept, AD-22's
+  reading applied), the video and audio presentation effect, the movie duration and the copied
+  packets are all taken from the source cut there;
 
 and with the DR-18 points closed:
 
 1. an NVENC encode is tied to the encode window, the GPU UUID and the FFmpeg PID by
-   ``nvidia-smi pmon`` samples taken while it runs (``encode`` only; the record says when no
-   sample saw the encoder);
+   ``nvidia-smi pmon`` samples taken while it runs, every time on one monotonic clock
+   (``encode`` only; the record says when no sample saw the encoder);
 2. the AAC decoder configuration (profile, initial padding, extradata size and MD5), the
    priming (discard-flagged packets) and every packet's side data are compared, MANDATORY;
 3. a roster invariant: every expected item must be present, else a MANDATORY ``item roster``
@@ -40,7 +45,10 @@ and with the DR-18 points closed:
 
 The telemetry data track is compared packet for packet in memory (pts, duration, size and the
 payload MD5 that ffprobe computes); the record keeps only its packet counts and the status, no
-payload, digest or decoded value, and no location value is read from any tag.
+payload, digest or decoded value. Every location-like tag value (and the digest of a
+location-like ``udta`` atom) is replaced by :data:`LOCATION_WITHHELD` as soon as the file's facts
+are read, before any comparison, so only its presence is compared and no location value reaches
+an item or a record.
 
 Exit status 0 when the comparison ran; 1 when an encode failed; 2 on a usage, configuration,
 probe or output-path error.
@@ -81,6 +89,7 @@ TELEMETRY_ITEM = "GPMF track gpmd"
 VIDEO_EDIT_AS_WRITTEN = "edit list, video track, as written (media_time in media seconds)"
 EDIT_EFFECT = "edit list, video and audio tracks (presentation effect)"
 VIDEO_DURATION = "video stream duration"
+MOVIE_DURATION = "movie duration: mvhd (presentation form, exact)"
 AUDIO_PACKETS = "audio packets passed through (pts, duration, size, MD5)"
 COLOUR_ITEMS = {
     "colour primaries": "color_primaries",
@@ -94,6 +103,7 @@ ROSTER = (
     "video frame count",
     "video per-frame pts (presentation, exact, full sequence)",
     VIDEO_DURATION,
+    MOVIE_DURATION,
     "start offset: first video frame pts",
     "start offset: video and audio stream start_pts",
     "start offset: container start over video and audio (earliest start, exact)",
@@ -137,6 +147,19 @@ ROSTER = (
 
 _ROSTER_ITEM = "item roster (every expected item present, DR-18 (3))"
 _PMON_PERIOD_S = 0.5
+
+LOCATION_WITHHELD = "(present; a location value, not read)"
+"""What a location-like tag value or atom digest is replaced with: only its presence compares."""
+
+_LOCATION_WORDS = ("location", "iso6709", "gps", "coordinate", "latitude", "longitude", "loci")
+"""Fragments of a tag key or atom type that can carry a location (ISO 6709 text, GPS)."""
+
+_clock = time.monotonic
+"""The one clock of the encode window and the graphics-card samples (DR-18 (1))."""
+
+Entry = tuple[Fraction, Fraction | None, Fraction]
+"""One edit-list entry: duration in movie seconds, media time in media seconds (None for an
+empty edit), rate."""
 
 
 # --- decode and encode ---------------------------------------------------------------------
@@ -213,12 +236,14 @@ class GpuSamples:
 
     Attributes:
         gpus: ``index -> UUID`` of every graphics card ``nvidia-smi`` lists.
-        rows: ``(seconds since the window opened, gpu index, pid, enc %)`` per sampled process.
+        rows: ``(call start, call end, gpu index, pid, enc %)`` per sampled process, the times
+            on :data:`_clock` (the clock of the encode window): the sample describes the
+            interval its ``nvidia-smi`` call ran in.
         error: Why sampling did not run, or None.
     """
 
     gpus: dict[str, str] = field(default_factory=dict)
-    rows: list[tuple[float, str, int, str]] = field(default_factory=list)
+    rows: list[tuple[float, float, str, int, str]] = field(default_factory=list)
     error: str | None = None
 
 
@@ -246,7 +271,6 @@ class _Sampler:
         self.samples = GpuSamples()
         self._stop = threading.Event()
         self._thread = threading.Thread(target=self._run, daemon=True)
-        self._opened = 0.0
 
     def start(self) -> None:
         listing = _nvidia_smi(["--query-gpu=index,uuid", "--format=csv,noheader"])
@@ -257,17 +281,18 @@ class _Sampler:
             index, _, uuid = line.partition(",")
             if uuid.strip():
                 self.samples.gpus[index.strip()] = uuid.strip()
-        self._opened = time.monotonic()
         self._thread.start()
 
     def _run(self) -> None:
         while not self._stop.is_set():
+            called = _clock()
             text = _nvidia_smi(["pmon", "-c", "1", "-s", "u"])
-            at = time.monotonic() - self._opened
+            returned = _clock()
             for line in (text or "").splitlines():
                 parts = line.split()
                 if len(parts) >= 6 and not line.startswith("#") and parts[1].isdigit():
-                    self.samples.rows.append((round(at, 2), parts[0], int(parts[1]), parts[5]))
+                    row = (called, returned, parts[0], int(parts[1]), parts[5])
+                    self.samples.rows.append(row)
             self._stop.wait(_PMON_PERIOD_S)
 
     def stop(self) -> GpuSamples:
@@ -287,7 +312,7 @@ class _RecordingSink(FFmpegVideoSink):
         self.ended = 0.0
 
     def _start(self, command: list[str]) -> None:
-        self.started = time.time()
+        self.started = _clock()
         super()._start(command)
         process = self._process
         self.pid = process.pid if process is not None else None
@@ -302,8 +327,8 @@ class EncodeRun:
         encoder: The encoder used.
         bit_depth: The output bit depth.
         pid: The FFmpeg process id.
-        started: Wall-clock start of the encode window (seconds since the epoch).
-        ended: Wall-clock end of the window.
+        started: Start of the encode window (FFmpeg about to start), on :data:`_clock`.
+        ended: End of the window (the sink closed or aborted), on the same clock.
         gpu: The graphics-card samples taken during the window (NVENC only), or None.
     """
 
@@ -357,7 +382,7 @@ def encode_file(
         sink.abort()
         raise
     finally:
-        sink.ended = time.time()
+        sink.ended = _clock()
         samples = sampler.stop() if sampler is not None else None
     return EncodeRun(report, encoder, depth, sink.pid, sink.started, sink.ended, samples)
 
@@ -369,9 +394,10 @@ def nvenc_proof(run: EncodeRun) -> dict[str, Any]:
         run: An encode run.
 
     Returns:
-        ``tied`` True when at least one sample inside the window shows the FFmpeg PID with a
-        non-zero encoder load, with the GPU UUID, the PID and the matching samples; otherwise
-        ``tied`` False and the reason.
+        ``tied`` True when at least one sample whose ``nvidia-smi`` call overlaps the window
+        shows the FFmpeg PID with a non-zero encoder load, with the GPU UUID, the PID and the
+        matching samples (their times in seconds from the window's start); otherwise ``tied``
+        False and the reason.
     """
     if run.encoder != "hevc_nvenc":
         return {"tied": False, "reason": f"not an NVENC encode ({run.encoder})"}
@@ -381,14 +407,20 @@ def nvenc_proof(run: EncodeRun) -> dict[str, Any]:
     hits = [
         row
         for row in gpu.rows
-        if row[2] == run.pid and row[3] not in ("-", "0") and row[0] <= run.ended - run.started
+        if row[3] == run.pid
+        and row[4] not in ("-", "0")
+        and row[0] <= run.ended
+        and row[1] >= run.started
     ]
     proof: dict[str, Any] = {
         "pid": run.pid,
         "window_s": round(run.ended - run.started, 2),
         "samples": len(gpu.rows),
-        "pid_samples_with_encoder_load": [list(row) for row in hits],
-        "gpu_uuid": sorted({gpu.gpus.get(row[1], "?") for row in hits}),
+        "pid_samples_with_encoder_load": [
+            [round(called - run.started, 2), round(returned - run.started, 2), index, pid, load]
+            for called, returned, index, pid, load in hits
+        ],
+        "gpu_uuid": sorted({gpu.gpus.get(row[2], "?") for row in hits}),
     }
     proof["tied"] = bool(hits)
     if not hits:
@@ -468,11 +500,90 @@ def _movie_tolerant(path: Path) -> compare.Movie:
     )
 
 
+def location_like(key: str) -> bool:
+    """Return whether a tag key or ``udta`` atom type can carry a location.
+
+    Args:
+        key: For example ``"location"``, ``"com.apple.quicktime.location.ISO6709"`` or the
+            QuickTime ``udta`` atom type of a copyright sign then ``xyz``.
+
+    Returns:
+        True for a key that names a location, GPS coordinates or the QuickTime ``xyz`` atom.
+    """
+    name = key.lower()
+    return any(word in name for word in _LOCATION_WORDS) or name.endswith("xyz")
+
+
+def _withheld_tags(tags: Any) -> Any:
+    """Return a tag mapping with every location-like value replaced (presence only)."""
+    if not isinstance(tags, Mapping):
+        return tags
+    return {k: LOCATION_WITHHELD if location_like(str(k)) else v for k, v in tags.items()}
+
+
+def without_locations(facts: compare.Facts) -> compare.Facts:
+    """Return the facts with every location value replaced by :data:`LOCATION_WITHHELD`.
+
+    The container and stream tags of the ``ffprobe`` document and the digest of each
+    location-like ``moov/udta`` atom are replaced, so only their presence is compared and no
+    location value reaches an item or a record.
+
+    Args:
+        facts: The facts as read.
+
+    Returns:
+        A copy with the values replaced; the input is not changed.
+    """
+    document = dict(facts.probe)
+    if isinstance(document.get("format"), Mapping):
+        container = dict(document["format"])
+        if "tags" in container:
+            container["tags"] = _withheld_tags(container["tags"])
+        document["format"] = container
+    document["streams"] = [
+        {**s, "tags": _withheld_tags(s["tags"])} if isinstance(s, Mapping) and "tags" in s else s
+        for s in document.get("streams") or []
+    ]
+    udta = tuple(
+        (kind, size, LOCATION_WITHHELD if location_like(kind) else digest)
+        for kind, size, digest in facts.movie.udta
+    )
+    return replace(facts, probe=document, movie=replace(facts.movie, udta=udta))
+
+
+def movie_duration(path: Path) -> Fraction:
+    """Return the movie duration, ``mvhd`` duration over its timescale, exact (presentation form).
+
+    Args:
+        path: The file (read only); a cut-short file is read as far as its ``moov`` allows.
+
+    Returns:
+        The duration in seconds.
+
+    Raises:
+        compare.ProbeError: When there is no readable ``moov``, no ``mvhd`` or a zero timescale.
+    """
+    try:
+        _, _, moov = compare._top_level(path)
+    except compare.ProbeError:
+        _, _, moov = _top_level_tolerant(path)
+    head = compare._moov_header_size(moov)
+    span = compare._child(moov, head, len(moov), "mvhd")
+    if span is None:
+        raise compare.ProbeError(f"moov without mvhd in {path}")
+    layout = ">QQIQ" if moov[span[0]] == 1 else ">IIII"  # version 1: 64-bit times and duration
+    _, _, timescale, duration = struct.unpack_from(layout, moov, span[0] + 4)
+    if timescale == 0:
+        raise compare.ProbeError(f"mvhd timescale 0 in {path}")
+    return Fraction(duration, timescale)
+
+
 def gather(path: Path) -> compare.Facts:
     """Read every fact the comparison needs from one file, a cut-short one included.
 
     WP1.5's reader refuses a cut-short file (round-0 P5); this one reads it as far as its
-    ``moov`` allows.
+    ``moov`` allows. Location values are withheld before the facts are returned
+    (:func:`without_locations`).
 
     Args:
         path: The file (read only).
@@ -480,6 +591,11 @@ def gather(path: Path) -> compare.Facts:
     Returns:
         The facts.
     """
+    return without_locations(_gather(path))
+
+
+def _gather(path: Path) -> compare.Facts:
+    """Read the facts of one file as they are (see :func:`gather`)."""
     try:
         return compare.gather(path)
     except compare.ProbeError:
@@ -574,6 +690,66 @@ def _earliest_seconds(track: compare.Track) -> Fraction:
     return Fraction(track.earliest_composition or 0, track.media_timescale)
 
 
+def _written_entries(movie: compare.Movie, track: compare.Track) -> list[Entry] | None:
+    """Return a track's edit list as written, in seconds, or None when it has none."""
+    if track.edits is None:
+        return None
+    return [
+        (
+            Fraction(e.segment_duration, movie.timescale),
+            None if e.media_time == -1 else Fraction(e.media_time, track.media_timescale),
+            Fraction(e.rate),
+        )
+        for e in track.edits
+    ]
+
+
+def _effect_entries(movie: compare.Movie, track: compare.Track) -> list[Entry]:
+    """Return a track's edit list by presentation effect; absent = identity from media time 0.
+
+    Each media time is taken relative to the track's earliest composition time (WP1.5's
+    ``edit_effect``). An absent edit list presents media time ``t`` at movie time ``t`` (AD-22
+    extended): with an earliest composition time ``C`` above 0, an empty dwell of ``C`` and then
+    the whole media from ``C``.
+    """
+    earliest = _earliest_seconds(track)
+    written = _written_entries(movie, track)
+    if written is not None:
+        return [(d, None if m is None else m - earliest, r) for d, m, r in written]
+    media = Fraction(track.media_duration, track.media_timescale)
+    rows: list[Entry] = [(earliest, None, Fraction(1))] if earliest > 0 else []
+    return [*rows, (media, Fraction(0), Fraction(1))]
+
+
+def _render(entries: Sequence[Entry], key: str) -> list[dict[str, Any]]:
+    """Render entries as WP1.5's items do (exact seconds; ``key`` names the media time)."""
+    return [
+        {
+            "duration": compare.exact(d),
+            key: "empty" if m is None else compare.exact(m),
+            "rate": str(r),
+        }
+        for d, m, r in entries
+    ]
+
+
+def _cut(entries: Sequence[Entry], end: Fraction) -> list[Entry] | None:
+    """Return a presentation that stops at ``end`` (seconds), or None when it cannot be cut.
+
+    Cut: empty edits, then ONE media entry at rate 1 (the forms the sink reproduces), whose
+    duration becomes the time from its presentation start to ``end``, never longer than it was.
+    """
+    if not entries or entries[-1][1] is None or any(m is not None for _, m, _ in entries[:-1]):
+        return None
+    if any(r != 1 for _, _, r in entries):
+        return None
+    start = sum((d for d, _, _ in entries[:-1]), Fraction(0))
+    duration, media, rate = entries[-1]
+    if end <= start:
+        return None
+    return [*entries[:-1], (min(duration, end - start), media, rate)]
+
+
 def effect(movie: compare.Movie, track: compare.Track) -> list[dict[str, Any]]:
     """Render a track's edit list by its presentation effect; absent = identity from media 0.
 
@@ -589,16 +765,7 @@ def effect(movie: compare.Movie, track: compare.Track) -> list[dict[str, Any]]:
     Returns:
         One dict per entry, as :func:`compare.edit_effect`.
     """
-    if track.edits is not None:
-        return compare.edit_effect(movie, track)
-    earliest = _earliest_seconds(track)
-    media = Fraction(track.media_duration, track.media_timescale)
-    rows: list[dict[str, Any]] = []
-    if earliest > 0:
-        rows.append({"duration": compare.exact(earliest), "media_start": "empty", "rate": "1"})
-    zero = compare.exact(Fraction(0))
-    rows.append({"duration": compare.exact(media), "media_start": zero, "rate": "1"})
-    return rows
+    return _render(_effect_entries(movie, track), "media_start")
 
 
 def _video_track(facts: compare.Facts) -> compare.Track | None:
@@ -606,23 +773,27 @@ def _video_track(facts: compare.Facts) -> compare.Track | None:
     return compare._track_of(facts, facts.video_index)
 
 
-def _edits_seconds(movie: compare.Movie, track: compare.Track) -> list[tuple[Fraction, bool]]:
-    """Return a track's edits as ``(duration seconds, empty)``; rates are checked by the caller."""
-    return [
-        (Fraction(e.segment_duration, movie.timescale), e.media_time == -1)
-        for e in track.edits or ()
-    ]
-
-
 def video_edit_reading(
-    source: compare.Facts, output: compare.Facts, item: compare.Item
+    source: compare.Facts,
+    output: compare.Facts,
+    item: compare.Item,
+    *,
+    end: Fraction | None = None,
 ) -> tuple[compare.Item, str | None]:
     """Apply AD-22 (and its Q-C extension) to the video edit list "as written" item.
+
+    AD-22 reads a DIFFERENT "as written" item as SAME only where the media times differ by the
+    composition-offset convention alone: the same entries (durations, empty or media, rate 1),
+    one media entry each, and each media time equal to its own track's earliest composition
+    time. An absent source list (Q-C) is SAME when the output's list is conventional and the
+    presentation effect is the same. For a cut-short source the source's list is first cut at
+    the readable end ``end``.
 
     Args:
         source: The source's facts.
         output: The output's facts.
-        item: WP1.5's "as written" item.
+        item: The "as written" item (WP1.5's, or the cut-short one).
+        end: The readable video end in seconds for a cut-short source, else None.
 
     Returns:
         The item (SAME with a note where AD-22 reads it so) and the note for the summary, or
@@ -631,31 +802,39 @@ def video_edit_reading(
     if item.status == compare.SAME:
         return item, None
     src, out = _video_track(source), _video_track(output)
-    if src is None or out is None or out.edits is None:
+    if src is None or out is None:
         return item, None
-    if any(e.rate != 1 for e in out.edits) or (
-        src.edits is not None and any(e.rate != 1 for e in src.edits)
-    ):
+    out_entries = _written_entries(output.movie, out)
+    if out_entries is None or any(r != 1 for _, _, r in out_entries):
         return item, None
-    out_media = [e for e in out.edits if e.media_time != -1]
+    out_media = [m for _, m, _ in out_entries if m is not None]
     if len(out_media) != 1:
         return item, None
-    out_conventional = Fraction(out_media[0].media_time, out.media_timescale) == _earliest_seconds(
-        out
-    )
-    if src.edits is None:
-        if out_conventional and effect(source.movie, src) == effect(output.movie, out):
+    out_conventional = out_media[0] == _earliest_seconds(out)
+    src_entries = _written_entries(source.movie, src)
+    if src_entries is None:
+        src_effect: list[Entry] | None = _effect_entries(source.movie, src)
+        if end is not None and src_effect is not None:
+            src_effect = _cut(src_effect, end)
+        if out_conventional and src_effect == _effect_entries(output.movie, out):
             note = (
                 "AD-22 extended (Q-C): the source has no edit list (identity from media time 0); "
                 "the output writes the identity list explicitly -- same presentation"
             )
             return replace(item, status=compare.SAME, note=note), note
         return item, None
-    src_media = [e for e in src.edits if e.media_time != -1]
-    same_shape = _edits_seconds(source.movie, src) == _edits_seconds(output.movie, out)
-    src_conventional = len(src_media) == 1 and Fraction(
-        src_media[0].media_time, src.media_timescale
-    ) == _earliest_seconds(src)
+    if end is not None:
+        cut = _cut(src_entries, end)
+        if cut is None:
+            return item, None
+        src_entries = cut
+    if any(r != 1 for _, _, r in src_entries):
+        return item, None
+    src_media = [m for _, m, _ in src_entries if m is not None]
+    same_shape = [(d, m is None) for d, m, _ in src_entries] == [
+        (d, m is None) for d, m, _ in out_entries
+    ]
+    src_conventional = len(src_media) == 1 and src_media[0] == _earliest_seconds(src)
     if same_shape and src_conventional and out_conventional:
         src_at, out_at = (
             compare.exact(_earliest_seconds(src)),
@@ -681,6 +860,61 @@ def _readable_end(source: Path, info: ProbeResult, facts: compare.Facts) -> Frac
     return frame_end(info, table, int(last)) * info.video.time_base
 
 
+def _kept_end(facts: compare.Facts, index: int, end: Fraction) -> Fraction | None:
+    """Return the end of the last packet of a stream before ``end`` (the copied part), or None."""
+    ends = [
+        p.pts + (p.duration or Fraction(0))
+        for p in facts.packets.get(index, [])
+        if p.pts is not None and p.pts < end
+    ]
+    return max(ends, default=None)
+
+
+def readable_tracks(
+    facts: compare.Facts, end: Fraction, cut: bool
+) -> dict[str, tuple[str, list[Entry] | str]]:
+    """Return each track's presentation (by effect) on the readable part of a cut-short source.
+
+    The video ends at ``end``. With ``cut`` (a truncated file, whose copied tracks the sink cuts
+    there too) every other track except the timecode track (regenerated by the muxer from the
+    video) ends at the end of its last packet before ``end``; without it they are whole.
+
+    Args:
+        facts: The source's facts.
+        end: The readable video end in seconds.
+        cut: Whether the copied tracks are cut.
+
+    Returns:
+        ``stream key -> (handler, entries)``, or ``(handler, reason)`` where the presentation
+        cannot be cut (a form the sink does not reproduce, or no packet before ``end``).
+    """
+    result: dict[str, tuple[str, list[Entry] | str]] = {}
+    for index, key in facts.keys.items():
+        track = compare._track_of(facts, index)
+        if track is None:
+            continue
+        entries = _effect_entries(facts.movie, track)
+        if index == facts.video_index:
+            stop = end
+        elif cut and track.handler != "tmcd":
+            kept_end = _kept_end(facts, index, end)
+            if kept_end is None:
+                result[key] = (track.handler, "no packet before the readable end")
+                continue
+            stop = kept_end
+        else:
+            result[key] = (track.handler, entries)
+            continue
+        shortened = _cut(entries, stop)
+        result[key] = (
+            track.handler,
+            shortened
+            if shortened is not None
+            else f"cannot be cut at {compare.exact(stop)}: not one media entry, last, at rate 1",
+        )
+    return result
+
+
 def _cut_items(
     items: list[compare.Item],
     source: compare.Facts,
@@ -688,12 +922,16 @@ def _cut_items(
     end: Fraction,
     cut: bool,
 ) -> list[compare.Item]:
-    """Compare the duration, edit list and copied packets of a cut-short source (D86).
+    """Compare the duration, edit lists and copied packets of a cut-short source (D86).
 
-    The comparison is with the readable part: the video ends at ``end``; with ``cut`` the audio
-    and data tracks stop there too.
+    The comparison is with the readable part (:func:`readable_tracks`): the video ends at
+    ``end``; with ``cut`` the audio and data tracks stop there too. The video edit list keeps
+    the source's media time and rate (AD-22's reading is applied afterwards), and the video
+    and audio presentation effect is the source's cut there.
     """
     first = next((p for p in source.pts if p is not None), Fraction(0))
+    tracks = readable_tracks(source, end, cut)
+    video_key = source.keys.get(source.video_index) if source.video_index is not None else None
     result = []
     for item in items:
         name = item.name
@@ -710,18 +948,38 @@ def _cut_items(
                 compare.SAME if got == want else compare.DIFFERENT,
                 "D86: compared with the readable part of a cut-short source",
             )
-        elif name in (VIDEO_EDIT_AS_WRITTEN, EDIT_EFFECT):
-            track = _video_track(output)
-            want_edits = ([(first, True)] if first > 0 else []) + [(end - first, False)]
-            got_edits = _edits_seconds(output.movie, track) if track is not None else []
-            item = compare.Item(
+        elif name == VIDEO_EDIT_AS_WRITTEN:
+            src_track = _video_track(source)
+            written = _written_entries(source.movie, src_track) if src_track else None
+            shortened = _cut(written, end) if written is not None else None
+            want_rows: Any = (
+                None
+                if written is None
+                else _render(shortened, "media_time")
+                if shortened is not None
+                else f"cannot be cut at {compare.exact(end)}"
+            )
+            item = compare._edit_item(
                 name,
                 item.item_class,
                 item.clause,
-                {"readable part": [[compare.exact(d), e] for d, e in want_edits]},
-                [[compare.exact(d), e] for d, e in got_edits],
-                compare.SAME if got_edits == want_edits else compare.DIFFERENT,
-                "D86: the video edit list of a cut-short source ends at its readable end",
+                {video_key: want_rows} if video_key is not None else {},
+                compare._keyed_edits(output, compare._edits_as_written, ("vide",)),
+                "D86: the source's video edit list cut at the readable end",
+            )
+        elif name == EDIT_EFFECT:
+            item = compare._edit_item(
+                name,
+                item.item_class,
+                item.clause,
+                {
+                    key: _render(entries, "media_start") if isinstance(entries, list) else entries
+                    for key, (handler, entries) in tracks.items()
+                    if handler in ("vide", "soun")
+                },
+                compare._keyed_edits(output, effect, ("vide", "soun")),
+                "D86: the source's presentation cut at the readable end (each copied track at "
+                "its last packet before it)",
             )
         elif cut and name.startswith((AUDIO_PACKETS, TELEMETRY_ITEM)):
             key = name.partition(" [")[2].rstrip("]")
@@ -730,18 +988,70 @@ def _cut_items(
             whole = source.packets.get(index, []) if index is not None else []
             kept = [p for p in whole if p.pts is None or p.pts < end]
             got_packets = output.packets.get(out_index, []) if out_index is not None else []
-            want_rows, got_rows = compare._packet_rows(kept), compare._packet_rows(got_packets)
+            want_packets, got_rows = compare._packet_rows(kept), compare._packet_rows(got_packets)
             item = compare.Item(
                 name,
                 item.item_class,
                 item.clause,
-                compare._packets_summary(want_rows),
+                compare._packets_summary(want_packets),
                 compare._packets_summary(got_rows),
-                compare.SAME if want_rows == got_rows else compare.DIFFERENT,
+                compare.SAME if want_packets == got_rows else compare.DIFFERENT,
                 "D86: the source's packets before the readable video end",
             )
         result.append(item)
     return result
+
+
+def movie_duration_item(
+    source: compare.Facts, output: compare.Facts, *, end: Fraction | None, cut: bool
+) -> compare.Item:
+    """Compare the movie durations (``mvhd``, the presentation form), exactly (D94, WP3.7 note).
+
+    For a cut-short source the expected duration is the longest readable track presentation
+    (:func:`readable_tracks`; the timecode track is left out, the muxer regenerates it from the
+    video); a track whose presentation cannot be cut makes the item DIFFERENT, never skipped.
+
+    Args:
+        source: The source's facts.
+        output: The output's facts.
+        end: The readable video end in seconds for a cut-short source, else None.
+        cut: Whether the copied tracks are cut at it.
+
+    Returns:
+        A MANDATORY item.
+    """
+    whole = compare.exact(movie_duration(source.path))
+    got = movie_duration(output.path)
+    if end is None:
+        return compare._item(
+            MOVIE_DURATION, compare.MANDATORY, "D94, 7.5", whole, compare.exact(got)
+        )
+    tracks = [
+        (key, entries)
+        for key, (handler, entries) in readable_tracks(source, end, cut).items()
+        if handler != "tmcd"
+    ]
+    lost = [f"{key}: {entries}" for key, entries in tracks if isinstance(entries, str)]
+    want = None
+    if not lost:
+        want = max(
+            (
+                sum((d for d, _, _ in entries), Fraction(0))
+                for _, entries in tracks
+                if isinstance(entries, list)
+            ),
+            default=None,
+        )
+    return compare.Item(
+        MOVIE_DURATION,
+        compare.MANDATORY,
+        "D94, 7.5",
+        {"readable part": compare.exact(want) if want is not None else lost, "whole file": whole},
+        compare.exact(got),
+        compare.SAME if want is not None and got == want else compare.DIFFERENT,
+        "D86: the longest track presentation of the readable part (the timecode track follows "
+        "the video)",
+    )
 
 
 def _colour_items(items: list[compare.Item], info: ProbeResult) -> list[compare.Item]:
@@ -868,13 +1178,19 @@ def fidelity_items(
     """
     items = compare.compare_facts(source, output)
     notes: list[str] = []
+    end = _readable_end(source.path, info, source)
+    cut = end is not None and any(f.kind == "truncated" for f in info.faults)
+    if end is not None:
+        items = _cut_items(items, source, output, end, cut)
+        notes.append(f"D86: compared on the readable part, video end {compare.exact(end)}")
     src_video, out_video = _video_track(source), _video_track(output)
+    duration_at = len(items)
     for position, item in enumerate(items):
         if item.name == VIDEO_EDIT_AS_WRITTEN:
-            items[position], note = video_edit_reading(source, output, item)
+            items[position], note = video_edit_reading(source, output, item, end=end)
             if note is not None:
                 notes.append(note)
-        elif item.name == EDIT_EFFECT and src_video is not None and out_video is not None:
+        elif item.name == EDIT_EFFECT and end is None and src_video and out_video:
             items[position] = compare._edit_item(
                 item.name,
                 item.item_class,
@@ -883,11 +1199,9 @@ def fidelity_items(
                 compare._keyed_edits(output, effect, ("vide", "soun")),
                 "an absent edit list is the identity from media time 0 (AD-22 extended)",
             )
-    end = _readable_end(source.path, info, source)
-    if end is not None:
-        cut = any(f.kind == "truncated" for f in info.faults)
-        items = _cut_items(items, source, output, end, cut)
-        notes.append(f"D86: compared on the readable part, video end {compare.exact(end)}")
+        elif item.name == VIDEO_DURATION:
+            duration_at = position + 1
+    items.insert(duration_at, movie_duration_item(source, output, end=end, cut=cut))
     items = _colour_items(items, info)
     items = _depth_items(items, info, bit_depth)
     items.append(
@@ -900,7 +1214,7 @@ def fidelity_items(
         )
     )
     src_side, out_side = audio_side_data(source), audio_side_data(output)
-    if end is not None and any(f.kind == "truncated" for f in info.faults):
+    if cut:
         notes.append("D86: audio side data compared on the source packets kept")
         out_counts = {k: len(v) for k, v in out_side.items()}
         src_side = {k: v[: out_counts.get(k, 0)] for k, v in src_side.items()}
