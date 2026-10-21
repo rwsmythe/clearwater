@@ -39,13 +39,9 @@ for a push (verify `git status -sb`).
 
 ### Live workstreams (verify `git worktree list`, `docs/orchestrator-state.md`, `ListAgents`)
 
-- **Orchestrator generation 8** `clearwater-orchestrator-20261020-1556` online 2026-10-21 ~01:57Z, sole drainer (gen 7 `clearwater-orchestrator-20261020-1419`
-  rolled at ~397K, state 7230551, every cell at a clean stop with its state committed; gen 8
-  announces on pickup and is the sole drainer; read `comms/.launch-sessions.json` before any cue).
-  Gen 8's first acts: fresh cells for WP3.12 (R4 fixes from the ledger, then round 5), WP3.6 (apply
-  the 01:32Z ICC conditions, window, Reviewer A) and WP3.16 (PySide6-Essentials line + uv lock,
-  window, Reviewer A); the 01:32Z rulings are relayed in those re-dispatch prompts; windows one at
-  a time. Checkpoints: wp3.12 2b486a0, wp3.6 9662282, wp3.16 a702a4d (all OCCUPIED).
+- **Orchestrator generation 9** `clearwater-orchestrator-20261020-1959` online 2026-10-21 ~06:00Z, sole
+  drainer (gen 8 rolled at ~400K at a clean boundary, state 9364f8f; read
+  `comms/.launch-sessions.json` before any cue).
 - **WP2.3 fixtures ACCEPTED** 2026-10-20, main d605925 (record row e357e56; record
   `docs/proofs/wp2.3-accept.md`; DR-33 banked, B re-run majors adjudicated NOT BLOCKING, upheld).
   **CHARC QA CONFIRMED** at this seat (patch-id 6712360de3e5 on both ranges; B md5s both passes;
@@ -103,12 +99,22 @@ for a push (verify `git status -sb`).
   codec identity in the cache version, two yield breaches and git stash use recorded. WP3.6
   facts: built-in P3/sRGB ICC in the WRITER for HEIC nclx sources only; untagged keeps no iCCP;
   stdlib PNG16 decoder; tifffile; WP3.6P queued for the owner's photos.
-- **WP3.16 GUI shell** (`.worktrees/wp3.16`, OCCUPIED): rebased onto main 6a65145 (Essentials
-  kept, re-locked); a FRESH opus-high cell does the R4 cleanup and the by-name PhotoReadError
-  catch, no further A round; then Reviewer B and its own gate (main's venv needs
-  `uv sync --reinstall-package pyside6-essentials --reinstall-package shiboken6` at that merge).
-  Then wave 2 is complete and wave 3 briefs (WP3.4, 3.9, 3.10, 3.11, 3.17-3.20) are drafted for
-  CHARC approval.
+- **WP3.16 GUI shell ACCEPTED** 2026-10-21, main 0c41615 (record `docs/proofs/wp3.16-accept.md`;
+  DR-43 reader-side G10 signal gap, DR-44 (a) decode-completion pairing, (b) message owner, (c)
+  late job callbacks; B pass 2 adjudicated at the gate, upheld). Gates 3559 passed /
+  cupy-unimportable 3040 + 521 skipped. **CHARC QA CONFIRMED** (patch-id set 7f42009d both
+  ranges; B md5s both passes; static gates; harness 366; full pytest 3559 passed here, 838 s; GUI
+  witness 41 passed on clean main after the orchestrator's uncommitted-edit slip, now kernel
+  hazard (7) ca3eaea). Worktrees released. PySide6-Essentials on main without a reinstall.
+  **WAVE 2 CLOSED: 12 of 15 Phase 3 build packages on main.**
+- **Wave 3 COMMISSIONED** (CHARC msg a10045b6, 2026-10-21 ~06:01Z): eight briefs drafted by gen 9's
+  helpers for CHARC approval; tranche A = WP3.4 assembly, WP3.9 decode, WP3.10 encode/mux, WP3.11
+  analysis (opus-high); tranche B = WP3.17-3.20 GUI panels (sonnet-high) after two tranche-A
+  returns. Pre-dispatch commit (f4cd1e4 form, in `.worktrees/dr44`, both nets): additive
+  `gui.contract` members for DR-44 (b) message owner and (a) decode-completion signal. Per-package
+  debt citations ruled in that message (WP3.4 closes DR-19, exclusive whole-core speed row and
+  memory peak; WP3.10 DR-15/17/18 and the exclusive export row; WP3.11 DR-23/25, stored proxy
+  only, 2 s PROVISIONAL + step-aware task; WP3.20 settings_refusal, G12, D75).
 - **Wave 2 COMMISSIONED** (CHARC ruling 1ebfba54, 2026-10-20 ~22:07Z): orchestrator gen 6 drafts
   all six briefs (WP3.2, WP3.3, WP3.5 opus-high; WP3.6, WP3.12, WP3.16 sonnet-high) against the
   Phase 3 frame, sends them as one set for CHARC approval; tranche A = WP3.2/3.3/3.5/3.12 on
