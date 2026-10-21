@@ -87,7 +87,7 @@ truncated JPEG, PNG, 16-bit PNG, HEIC and TIFF, a missing, empty, unknown and di
 - Dependency rule: importing `clearwater.io.photo` in a fresh interpreter loads nothing from
   `clearwater.gui/.jobs/.methods/.core`, `PySide6`, `cupy`, `av` (subprocess test), and no module names
   them (AST test).
-- `uv run ruff check .`, `ruff format --check .`, `mypy` (strict) clean; photo tests 402 passed, 1
+- `uv run ruff check .`, `ruff format --check .`, `mypy` (strict) clean; photo tests 404 passed, 1
   skipped (the footage leg). Full-suite result: see the ledger's gate section (run in the
   dispatcher's window).
 - 48 MP informational figures (a 8000 x 6000 16-bit RGB PNG with filters 0-4 cycling by row, built
@@ -106,32 +106,32 @@ merge, never a hand merge.
 - ICC classification is read by a stdlib tag reader, with `ImageCms` only opening the profile (Q4 said
   "through `ImageCms`": it exposes colorants but no tone curve). Same labels.
 - nclx colour data (HEIC without an ICC profile, the form of every `*-none` HEIC fixture) is read as
-  equivalent colour data (6.5). Built-in profiles (CHARC ruling `d06ed7c969d6249f`, clarified by
-  `aa1219fb3145208b`): a HEIC with nclx colour data and NO ICC profile gets a built-in profile in
-  `ColorDescription.icc_profile` at read time, so the PNG states its colour space (D53): nclx Display
-  P3 + sRGB curve -> built-in Display P3 (`p3_profile.py`, isolated commit `23fdfd9`), nclx BT.709 +
-  sRGB curve -> built-in sRGB (`srgb_profile.py`, its own later commit). A source ICC profile is always
-  copied byte-identical and never replaced. Each profile's bytes are pinned by md5 (Display P3
+  equivalent colour data (6.5) with `icc_profile=None` (IF-1: the file carries none; the WP2.3
+  manifest agrees). Built-in profiles (CHARC ruling `d06ed7c969d6249f`, clarified by
+  `aa1219fb3145208b`, applied in the WRITER by the dispatcher's ruling): `writer.built_in_profile`
+  embeds a built-in profile when the source has no ICC profile, `assumed` is False and
+  (primaries, transfer) is Display P3 + sRGB curve (built-in Display P3, `p3_profile.py`, isolated
+  commit `23fdfd9`) or BT.709 + sRGB curve (built-in sRGB, `srgb_profile.py`, its own commit); the
+  writer records `"profile": "built-in <name>"` in the provenance chunk. Reverting either leg means
+  removing one entry from the writer's `_BUILT_IN_PROFILES` table (the builder module may stay or go).
+  A source ICC profile is copied byte-identical and provenance says nothing about a profile (a
+  Clearwater PNG read back included). Each profile's bytes are pinned by md5 (Display P3
   `ee27975c71b9ed10be950a696f6fe6f4`, 620 bytes; sRGB `ca34a0279325928fc9fd3fc7eff99eb9`, 608 bytes).
-  The writer records `"profile": "built-in <name>"` (`built-in Display P3`, `built-in sRGB`) in the
-  provenance chunk when one is embedded; with provenance off (D91) nothing is recorded, the profile is
-  still embedded; a caller's provenance that already has a `profile` key is refused (`ValueError`).
-  Four classes are tested (`tests/test_io_photo_srgb.py`): source ICC (byte-identical), nclx P3, nclx
-  sRGB, and untagged JPEG/PNG/TIFF (`bt709`/`srgb`, `assumed=True`, question 3 as ruled) or an nclx
-  source outside the set (BT.2020; HLG/PQ; or any curve other than sRGB) -> NO `iCCP`, description
-  carried. Interpretation for the dispatcher: "BT.709/sRGB" and "Display P3" are read as the
-  (primaries, transfer) pair, so the built-in profiles (whose tone curve is the sRGB curve) are
-  not given to, for example, nclx BT.709 primaries with the BT.709 curve (transfer code 1 or 6); that
-  one gets no `iCCP`. Say so if the set should be wider.
-- **Premise mismatch (WP2.3 manifest):** the manifest's `expect.photo.image.color.icc_profile` is
-  `null` for every nclx-only HEIC sample (`heic8-*-none`, `heic10-*-none`, `heic-ad24-*`), recording the
-  file. Under ruling (b) the reader now returns the built-in sRGB profile for those, so
-  `tests/test_io_photo_read.py` expects `srgb_profile()` for a HEIC whose manifest says `null` (a named
-  exception in the manifest-comparison test; the manifest and the fixtures are not owned and
-  unchanged).
-- The built-in label is by byte equality with the builder's output (`color.built_in_profile_name`): the
-  frozen `ColorDescription` has no field for "built-in"; a Clearwater PNG that carries a built-in
-  profile and is read again as a source is therefore labelled built-in in a second-generation output.
+  With provenance off (D91) the profile is still embedded and nothing is recorded; a caller's
+  provenance that already has a `profile` key is refused (`ValueError`) when a built-in is embedded.
+  Four classes are tested on the WRITTEN PNG (`tests/test_io_photo_srgb.py`): source ICC
+  (byte-identical), nclx P3, nclx sRGB, and untagged JPEG/PNG/TIFF (`bt709`/`srgb`, `assumed=True`,
+  question 3 as ruled) or an nclx source outside the set (BT.2020; HLG/PQ; any non-sRGB curve) -> NO
+  `iCCP`, description carried; plus reader tests that nclx gives `icc_profile=None`.
+- Reading of the set (accepted): only the sRGB curve gets a built-in profile, since both profiles
+  carry the sRGB tone curve; nclx BT.709 primaries with the BT.709 curve (transfer codes 1 and 6) get
+  no `iCCP`.
+- **Found while checking the dispatcher's premise** (`assumed=False` with no ICC can only come from
+  nclx): it also arises from a PNG `sRGB` chunk without `iCCP` (explicit sRGB, round-0 note N-2). By
+  the rule as stated that PNG now gets the built-in sRGB profile on write (it states the colour space
+  the chunk declares); a test pins it. `ColorDescription` has no field to tell the two apart. Say so
+  if such a PNG should be written without `iCCP`: add a check on the source, which the writer does not
+  see, or accept.
 - LZW and JPEG-in-TIFF are refused by name (no `imagecodecs`); Zstd is refused by name before decode.
 
 ## Limits

@@ -25,6 +25,7 @@ from clearwater.interfaces.settings import Settings
 from clearwater.io.photo import PhotoWriter, read_photo, write_photo
 from clearwater.io.photo import exif as exif_tools
 from clearwater.io.photo import png as png_tools
+from clearwater.io.photo.writer import built_in_profile
 from clearwater.io.video import find_tool
 from clearwater.jobs import MediaKind, SafeWrite, plan_output
 from fixture_plugin import load_manifest
@@ -34,7 +35,8 @@ STILL_IDS = [e["id"] for e in load_manifest()["samples"] if e["group"] == "still
 
 
 def _color(icc: bytes | None = None, depth: int = 16) -> ColorDescription:
-    return ColorDescription("bt709", "srgb", "identity", "full", depth, False, icc)
+    # no profile means an untagged source (assumed), which the writer leaves without an iCCP
+    return ColorDescription("bt709", "srgb", "identity", "full", depth, icc is None, icc)
 
 
 def _image(pixels: np.ndarray, icc: bytes | None = None, device: str = "cpu") -> Image:
@@ -352,7 +354,8 @@ def test_read_write_16_bit_read_is_within_v9_for_every_sample(
     assert diff.max() <= 0.5 / 65535 + 1e-7, "the only loss is the 16-bit quantisation"
     if image.color.bit_depth in (8, 16):
         assert np.array_equal(again.pixels, image.pixels), "an 8- or 16-bit source is exact"
-    assert again.color.icc_profile == image.color.icc_profile
+    chosen = built_in_profile(image.color)  # a tagged source with no ICC gets a built-in (D53)
+    assert again.color.icc_profile == (image.color.icc_profile if chosen is None else chosen[1])
     assert (again.color.primaries, again.color.transfer) == (
         image.color.primaries,
         image.color.transfer,

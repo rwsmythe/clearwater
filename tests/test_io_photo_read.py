@@ -28,7 +28,6 @@ from clearwater.io.photo import exif as exif_tools
 from clearwater.io.photo import png as png_tools
 from clearwater.io.photo import reader as reader_module
 from clearwater.io.photo.orientation import apply_orientation
-from clearwater.io.photo.srgb_profile import srgb_profile
 from fixture_plugin import load_manifest
 from fixtures import stills
 from spike_io import photo as spike
@@ -95,11 +94,7 @@ def test_every_still_meets_its_manifest_expectation(
     for key in ("primaries", "transfer"):
         if key in want["color"]:
             assert getattr(color, key) == want["color"][key]
-    if want["color"]["icc_profile"] is None and meta.source_format == "heic":
-        # The manifest records the file (no ICC profile, an nclx box). By the CHARC ruling of
-        # 2026-10-20 the reader gives such a BT.709/sRGB file the built-in sRGB profile (D53).
-        assert color.icc_profile == srgb_profile()
-    elif want["color"]["icc_profile"] is None:
+    if want["color"]["icc_profile"] is None:
         assert color.icc_profile is None
     else:
         assert color.icc_profile is not None
@@ -497,10 +492,7 @@ def test_a_heic_with_nclx_colour_data_is_tagged_not_assumed(
 ) -> None:
     image, _ = read_photo(sample("heic8-uniform-none"))
     assert (image.color.primaries, image.color.transfer) == ("bt709", "srgb")
-    assert image.color.assumed is False
-    assert (
-        image.color.icc_profile == srgb_profile()
-    )  # the built-in profile, CHARC ruling 2026-10-20
+    assert image.color.assumed is False and image.color.icc_profile is None
 
 
 def test_a_profile_is_carried_byte_identical_and_never_applied(

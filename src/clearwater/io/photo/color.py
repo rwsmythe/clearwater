@@ -8,50 +8,16 @@ HEIC, its ``nclx`` box). Untagged photos are read as sRGB and flagged ``assumed`
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable, Mapping
+from collections.abc import Mapping
 from typing import Any
 
 from clearwater.interfaces.image import ColorDescription
 from clearwater.io.photo import icc as icc_tools
-from clearwater.io.photo.p3_profile import display_p3_profile
-from clearwater.io.photo.srgb_profile import srgb_profile
 
 _log = logging.getLogger(__name__)
 
 _NCLX_PRIMARIES = {1: "bt709", 12: "display-p3"}
 _NCLX_TRANSFER = {13: "srgb", 1: "bt709", 6: "bt709"}
-
-_BUILT_IN_PROFILES: tuple[tuple[str, Callable[[], bytes]], ...] = (
-    ("Display P3", display_p3_profile),
-    ("sRGB", srgb_profile),
-)
-"""The built-in profiles as (name, builder); the name is what provenance records."""
-
-_NCLX_BUILT_IN: dict[tuple[str, str], Callable[[], bytes]] = {
-    ("display-p3", "srgb"): display_p3_profile,
-    ("bt709", "srgb"): srgb_profile,
-}
-"""The (primaries, transfer) of an nclx-only photo that gets a built-in profile."""
-
-
-def built_in_profile_name(icc: bytes | None) -> str | None:
-    """Name the built-in profile that ``icc`` is, if it is one.
-
-    A profile the reader took from the file is never a built-in; the one exception is a file
-    that was itself written by Clearwater and carries the same bytes.
-
-    Args:
-        icc: A profile as carried in ``ColorDescription.icc_profile``, or None.
-
-    Returns:
-        The name (``"Display P3"`` or ``"sRGB"``), or None when ``icc`` is None or not a built-in.
-    """
-    if icc is None:
-        return None
-    for name, build in _BUILT_IN_PROFILES:
-        if icc == build():
-            return name
-    return None
 
 
 def _build(
@@ -90,7 +56,8 @@ def describe_color(
         name: The file name for log messages.
 
     Returns:
-        The description; ``icc_profile`` is the profile as embedded, or None.
+        The description; ``icc_profile`` is the profile as embedded in the file, or None (the
+        writer's built-in profiles are never put here).
     """
     if icc is not None:
         if not icc_tools.read_tags(icc):
@@ -104,17 +71,15 @@ def describe_color(
                 _log.warning("%s: the embedded colour profile does not open cleanly", name)
             found = icc_tools.classify(icc)
             return _build(found.primaries, found.transfer, depth, False, icc)
+    # An ``assumed=False`` description with no ICC profile comes only from the next two branches
+    # (a PNG ``sRGB`` chunk, a HEIC ``nclx`` box). The writer (D53) gives the sRGB and Display P3
+    # forms of it a built-in profile (for the ``sRGB`` chunk, the sRGB profile it declares); the
+    # IF-1 ``icc_profile`` stays None, as the file has none.
     if srgb_chunk:
         return _build("bt709", "srgb", depth, False, None)
     if nclx is not None and int(nclx.get("color_primaries", 2)) != 2:
         primaries = _NCLX_PRIMARIES.get(int(nclx["color_primaries"]), "unknown")
         transfer = _NCLX_TRANSFER.get(int(nclx.get("transfer_characteristics", 2)), "unknown")
-        # D53: an nclx-only photo with the sRGB curve and Display P3 or BT.709 primaries gets the
-        # matching built-in profile, so the PNG output states its colour space. Anything else
-        # (BT.2020, HLG/PQ, another curve), and every source that carries an ICC profile, keeps
-        # the profile it has: none here.
-        builder = _NCLX_BUILT_IN.get((primaries, transfer))
-        profile = builder() if builder is not None else None
-        return _build(primaries, transfer, depth, False, profile)
+        return _build(primaries, transfer, depth, False, None)
     _log.info("%s: no colour profile; read as sRGB", name)
     return _build("bt709", "srgb", depth, True, None)

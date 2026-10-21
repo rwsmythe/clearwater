@@ -1,11 +1,11 @@
-"""A built-in sRGB ICC profile for HEIC files that carry only ``nclx`` BT.709/sRGB colour data.
+"""A built-in sRGB ICC profile for photos that carry only ``nclx`` BT.709/sRGB colour data.
 
 The sibling of :mod:`clearwater.io.photo.p3_profile`, built by the same routine with the BT.709
-(sRGB) primaries. It is given to a HEIC whose ``nclx`` box says BT.709 primaries and the sRGB
-curve and which has no ICC profile, so the PNG output states its colour space instead of being
-read as whatever a viewer assumes (D53). The only caller is
-:mod:`clearwater.io.photo.color`; removing this module and its entry there restores "no profile"
-for such a file.
+(sRGB) primaries. The writer embeds it for a tagged source (a HEIC ``nclx`` box saying BT.709
+primaries and the sRGB curve, or a PNG ``sRGB`` chunk) that has no ICC profile, so the PNG output
+states its colour space instead of being read as whatever a viewer assumes (D53). The only caller
+is the table in :mod:`clearwater.io.photo.writer`; removing that entry restores "no profile" for
+such a source.
 """
 
 from __future__ import annotations

@@ -56,7 +56,7 @@ def test_an_nclx_only_display_p3_heic_carries_the_profile_to_the_png(tmp_path: P
     image, meta = read_photo(source)
     assert (image.color.primaries, image.color.transfer) == ("display-p3", "srgb")
     assert image.color.assumed is False
-    assert image.color.icc_profile == display_p3_profile()
+    assert image.color.icc_profile is None, "IF-1: the file has no profile; the writer adds one"
     out = tmp_path / "out.png"
     write_photo(image, meta, out, bit_depth=16)
     assert png_tools.scan_png(out.read_bytes(), "out.png").icc == display_p3_profile()
@@ -96,6 +96,18 @@ def test_provenance_off_records_nothing_and_the_profile_is_still_embedded(tmp_pa
     write_photo(image, meta, out, bit_depth=8, provenance=None)
     assert _provenance(out) is None
     assert png_tools.scan_png(out.read_bytes(), "out.png").icc == display_p3_profile()
+
+
+def test_a_clearwater_png_read_back_copies_its_profile_and_records_none(tmp_path: Path) -> None:
+    first = tmp_path / "first.png"
+    image, meta = read_photo(_nclx_heic(tmp_path / "p3.heic", 12))
+    write_photo(image, meta, first, bit_depth=16, provenance={"a": 1})
+    again, again_meta = read_photo(first)
+    assert again.color.icc_profile == display_p3_profile()
+    second = tmp_path / "second.png"
+    write_photo(again, again_meta, second, bit_depth=16, provenance={"a": 2})
+    assert png_tools.scan_png(second.read_bytes(), "second.png").icc == display_p3_profile()
+    assert json.loads(str(_provenance(second))) == {"a": 2}
 
 
 def test_a_source_profile_is_copied_and_not_called_built_in(

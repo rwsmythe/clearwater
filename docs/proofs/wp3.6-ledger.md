@@ -288,18 +288,23 @@ found nothing new.
 
 ## Item 2 ruling applied (cell, orchestrator gen 8; CHARC `d06ed7c969d6249f` read as clarified by `aa1219fb3145208b`)
 
-- Built-in profiles only when the source carries no ICC profile (a source ICC stays byte-identical).
-  Set: nclx Display P3 + sRGB curve -> built-in Display P3; nclx BT.709 + sRGB curve -> built-in sRGB.
-  Untagged JPEG/PNG/TIFF (question 3: `bt709`/`srgb`, `assumed=True`) and nclx outside the set
-  (BT.2020, HLG/PQ, any non-sRGB curve) -> NO `iCCP`, description carried.
-- Commits after `9662282`: `7d1b5e2` (P3 leg: sRGB-curve scope, md5 pin, writer records
-  `profile: built-in <name>` in provenance via `color.built_in_profile_name`); the sRGB leg follows in its
-  own commit (`srgb_profile.py`, `build_rgb_profile` shared builder in `p3_profile.py`, bytes of the
-  Display P3 profile unchanged and pinned before the refactor, new `tests/test_io_photo_srgb.py` with the
-  four classes, the report). md5: Display P3 `ee27975c...` (620 bytes), sRGB `ca34a027...` (608 bytes).
-- Premise mismatch disclosed in the report: the WP2.3 manifest says `icc_profile: null` for nclx-only HEIC
-  samples; the manifest-comparison test now expects the built-in sRGB profile for a HEIC with `null`.
-- Interpretation flagged to the dispatcher: the pair (primaries, transfer) defines the set, so nclx BT.709
-  primaries with the BT.709 curve get no `iCCP`.
-- Gates at this point: ruff check, ruff format --check, mypy strict clean; own tests 402 passed, 1 skipped.
+- Built-in profiles only when the source carries no ICC profile (a source ICC stays byte-identical,
+  provenance silent). Set: (primaries, transfer) = Display P3 + sRGB curve -> built-in Display P3;
+  BT.709 + sRGB curve -> built-in sRGB. Untagged JPEG/PNG/TIFF (question 3: `bt709`/`srgb`,
+  `assumed=True`) and nclx outside the set (BT.2020, HLG/PQ, any non-sRGB curve, including BT.709
+  primaries with the BT.709 curve) -> NO `iCCP`, description carried.
+- Dispatcher ruling 02:06Z: the profile is chosen in the WRITER (`writer.built_in_profile`), not the
+  reader: the reader returns `icc_profile=None` for nclx (IF-1; manifest agrees); the manifest test is
+  back to its original form. Reverting either leg now means removing one entry from
+  `writer._BUILT_IN_PROFILES`.
+- Commits after `9662282`: `7d1b5e2` (first P3 form: reader-side, md5 pin, provenance record);
+  `2061c27` (first sRGB form); `1d0edc5` (docs); `chore` LF restore (four files my earlier commits had
+  stored as CRLF); then the move commit (reader back to None, writer table, tests on the written PNG,
+  `tools/photo_check.py` round trip expects the writer's choice). The branch's net diff against the
+  base holds only the final form.
+- Disclosed: a PNG with an `sRGB` chunk and no `iCCP` is also `assumed=False` with no ICC, so it also
+  gets the built-in sRGB on write (premise check of the ruling; test and report say so).
+- md5: Display P3 `ee27975c71b9ed10be950a696f6fe6f4` (620 bytes), sRGB `ca34a0279325928fc9fd3fc7eff99eb9`
+  (608 bytes), pinned by tests.
+- Gates: ruff check, ruff format --check, mypy strict clean; own tests 404 passed, 1 skipped.
   Full suite: NOT run (window pending).

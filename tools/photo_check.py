@@ -37,6 +37,7 @@ from clearwater.io.photo import exif as exif_tools
 from clearwater.io.photo import icc as icc_tools
 from clearwater.io.photo.heif_boxes import HeifLayoutError, read_layout
 from clearwater.io.photo.reader import detect_format, has_dng_tag
+from clearwater.io.photo.writer import built_in_profile
 from local_config import LocalConfig, load_local_config
 from spike_io.guard import OutputRefusedError, WriteGuard
 
@@ -144,7 +145,9 @@ def round_trip(image: Image, meta: PhotoMetadata, out_png: Path) -> dict[str, An
     limit = 0.0 if exact else 0.5 / 65535 + 1e-7
     if diff.max() > limit:
         problems.append(f"samples differ by up to {diff.max():.3g} (allowed {limit:.3g})")
-    if again.color.icc_profile != image.color.icc_profile:
+    chosen = built_in_profile(image.color)
+    expected_icc = image.color.icc_profile if chosen is None else chosen[1]
+    if again.color.icc_profile != expected_icc:
         problems.append("ICC profile bytes changed")
     if (again.color.primaries, again.color.transfer) != (
         image.color.primaries,

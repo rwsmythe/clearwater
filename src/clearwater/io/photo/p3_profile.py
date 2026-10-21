@@ -1,13 +1,13 @@
-"""A built-in Display P3 ICC profile for HEIC files that carry only ``nclx`` colour data.
+"""A built-in Display P3 ICC profile for photos that carry only ``nclx`` colour data.
 
 A HEIC may describe its colour by an ``nclx`` box and no ICC profile. When that box says Display
-P3 (primaries code 12), a PNG written without an ``iCCP`` would be read as sRGB by every viewer,
-which breaks D53 ("Photos keep source primaries end to end"). The reader therefore carries this
-profile in ``ColorDescription.icc_profile`` for that one case, so the writer needs no special
-case. The build is a stdlib port of the synthetic-fixture builder of WP2.1S (reference reading
-only; ``src/`` never imports ``tools/``). This module is isolated so it can be removed cleanly:
-the only callers are :mod:`clearwater.io.photo.color` and the sRGB sibling, which reuses
-:func:`build_rgb_profile`.
+P3 (primaries code 12) and the sRGB curve, a PNG written without an ``iCCP`` would be read as sRGB
+by every viewer, which breaks D53 ("Photos keep source primaries end to end"). The writer
+(:mod:`clearwater.io.photo.writer`) therefore embeds this profile for that one case; the reader
+returns ``icc_profile=None`` because the file has none (IF-1). The build is a stdlib port of the
+synthetic-fixture builder of WP2.1S (reference reading only; ``src/`` never imports ``tools/``).
+This module is isolated so it can be removed cleanly: the only callers are the writer's table and
+the sRGB sibling, which reuses :func:`build_rgb_profile`.
 """
 
 from __future__ import annotations

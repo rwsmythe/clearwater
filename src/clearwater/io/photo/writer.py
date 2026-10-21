@@ -8,30 +8,61 @@ and commit afterwards (X-B1, N8).
 from __future__ import annotations
 
 import json
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import Any
 
 from clearwater.config import check_string_keys
-from clearwater.interfaces.image import Image
+from clearwater.interfaces.image import ColorDescription, Image
 from clearwater.interfaces.photo import PhotoMetadata
 from clearwater.io.photo import exif as exif_tools
 from clearwater.io.photo import png as png_tools
-from clearwater.io.photo.color import built_in_profile_name
+from clearwater.io.photo.p3_profile import display_p3_profile
+from clearwater.io.photo.srgb_profile import srgb_profile
 
 PROFILE_KEY = "profile"
 """The provenance key that records a built-in ICC profile (``built-in <name>``)."""
 
+_BUILT_IN_PROFILES: dict[tuple[str, str], tuple[str, Callable[[], bytes]]] = {
+    ("display-p3", "srgb"): ("Display P3", display_p3_profile),
+    ("bt709", "srgb"): ("sRGB", srgb_profile),
+}
+"""The (primaries, transfer) that get a built-in profile when the source had none: name, builder.
 
-def provenance_text(provenance: Mapping[str, Any], icc: bytes | None = None) -> str:
+Each leg is one entry; removing it makes such a source write no ``iCCP``.
+"""
+
+
+def built_in_profile(color: ColorDescription) -> tuple[str, bytes] | None:
+    """Choose the built-in profile the writer embeds for a source with no ICC profile (D53).
+
+    Only a description that is tagged (``assumed`` False: a HEIC ``nclx`` box or a PNG ``sRGB``
+    chunk, see :func:`clearwater.io.photo.color.describe_color`), carries no profile, and is
+    BT.709 or Display P3 primaries with the sRGB curve gets one. An untagged source, any other
+    nclx description (BT.2020, HLG/PQ, another curve) and every source with an ICC profile
+    (copied byte-identical) get none.
+
+    Args:
+        color: The image's colour description.
+
+    Returns:
+        The profile's name and bytes, or None.
+    """
+    if color.icc_profile is not None or color.assumed:
+        return None
+    entry = _BUILT_IN_PROFILES.get((color.primaries, color.transfer))
+    return None if entry is None else (entry[0], entry[1]())
+
+
+def provenance_text(provenance: Mapping[str, Any], built_in: str | None = None) -> str:
     """Serialise a provenance mapping as the JSON the ``iTXt`` chunk holds (D91).
 
-    When ``icc`` is one of the built-in profiles (given to a source that carried no profile of
-    its own, D53), the text also records ``"profile": "built-in <name>"``.
+    When a built-in profile is embedded (``built_in`` is its name), the text also records
+    ``"profile": "built-in <name>"``.
 
     Args:
         provenance: The provenance mapping.
-        icc: The profile that is embedded in the PNG, or None.
+        built_in: The name of the built-in profile embedded in the PNG, or None.
 
     Returns:
         JSON text with sorted keys and no NaN.
@@ -42,7 +73,6 @@ def provenance_text(provenance: Mapping[str, Any], icc: bytes | None = None) -> 
             already has a ``profile`` key while a built-in profile is embedded.
     """
     check_string_keys(provenance, "provenance")
-    built_in = built_in_profile_name(icc)
     if built_in is not None:
         if PROFILE_KEY in provenance:
             raise ValueError(f"provenance already has a {PROFILE_KEY!r} key")
@@ -67,11 +97,13 @@ class PhotoWriter:
     ) -> None:
         """Write a PNG, 8 or 16 bit, with the ICC profile embedded and EXIF per D63.
 
-        The profile is embedded byte-identical when the image has one (none otherwise, so the
-        output reads as the untagged source did). EXIF follows D63: Orientation 1, thumbnail
-        dropped, pixel dimensions updated, Software ``Clearwater``, every other field kept.
-        Provenance (D91) goes into one ``iTXt`` chunk when given; a built-in profile (a source
-        with nclx colour data and no ICC profile, D53) is recorded in it as ``profile``.
+        The profile is embedded byte-identical when the image has one; a tagged source with none
+        (nclx or an sRGB chunk) gets the built-in sRGB or Display P3 profile (D53); an untagged
+        source gets none, so the output reads as the source did. EXIF follows D63: Orientation 1,
+        thumbnail dropped, pixel dimensions updated, Software ``Clearwater``, every other field
+        kept.
+        Provenance (D91) goes into one ``iTXt`` chunk when given; a built-in profile is recorded
+        in it as ``profile``.
 
         Args:
             image: The corrected image: float32 ``(H, W, 3)`` in [0, 1] on the CPU.
@@ -90,8 +122,11 @@ class PhotoWriter:
                 f"the photo writer needs a host image, got device {image.device!r}; "
                 "copy it to the host first"
             )
+        chosen = built_in_profile(image.color)
         text = (
-            provenance_text(provenance, image.color.icc_profile) if provenance is not None else None
+            provenance_text(provenance, None if chosen is None else chosen[0])
+            if provenance is not None
+            else None
         )
         height, width = image.pixels.shape[:2]
         block = exif_tools.edit(meta.exif, width, height)
@@ -99,7 +134,7 @@ class PhotoWriter:
             Path(out_path),
             image.pixels,
             bit_depth=bit_depth,
-            icc=image.color.icc_profile,
+            icc=image.color.icc_profile if chosen is None else chosen[1],
             exif=block,
             provenance_json=text,
         )
