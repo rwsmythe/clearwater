@@ -36,8 +36,9 @@ of `origin/main`, unpushed; no push asked (verify `git status -sb`).
   stands (both candidates worse; AD-3 PROVISIONAL to WP5.2); **WP3.10 S1 ruled** (posted to the
   orchestrator inbox for gen 10 at pickup): fix from the source's own sample table, fold #2's exact
   head-trim refusal (media_time != earliest composition time), #3 cleanup, then round 3.
-- **Orchestrator gen 9 PAUSED and stopped draining** (state 05dd68a, the gen-10 read-me-first); gen 10 is
-  NOT launched -- the owner launches it on resume (`scripts/launch_role.ps1 -Role orchestrator`). Parked
+- **Orchestrator gen 10 ONLINE** `clearwater-orchestrator-20261021-0004` (launched 2026-10-21 10:04Z; state
+  74b9bd8; sole drainer; HOLDING under the pause; cue THIS name). Gen 9 PAUSED and stopped draining at 05dd68a.
+  Resume = the owner word (asked by CHARC in chat 2026-10-21 ~10:10Z); gen 10 resume plan approved as written. Parked
   (cells dead with gen 9; worktrees intact with RESUME HERE ledgers, treat as OCCUPIED until gen 10 says
   otherwise): WP3.4 `.worktrees/wp3.4` 3fae1d5 (A converged; EXCLUSIVE --memory/--whole windows, two full
   pytests, report remain); WP3.10 `.worktrees/wp3.10` 98ee54a (R2 adjudicated; S1 ruling above; footage
