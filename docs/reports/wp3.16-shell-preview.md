@@ -59,7 +59,9 @@ analysis state, statistics, position and backend reason when a source opens.
 | 10 | The contract: a dummy panel in each `Area` gets a `ShellContext`, sees `parameters_changed`, drives `set_parameters`; the settings dialog opens from `actions.settings`. | `tests/test_gui_contract.py` |
 | 11 | Dependency rule: no `clearwater.gui` module imports `clearwater.methods`, `cupy`, `cupyx` or touches `.xp`; `clearwater.core`, `.config`, `.jobs`, `.io` load no PySide6. | `tests/test_gui_deps.py` |
 
-GUI tests: 90 passed in about 14 s, headless (`offscreen`). Full-suite figures: see the ledger.
+GUI tests: 90 passed in about 14 s, headless (`offscreen`). Full suite at `0e4412c`: 1 failed,
+2993 passed, 1 skipped (normal); 1 failed, 2474 passed, 520 skipped (CuPy unimportable); the
+failure is `test_conftest_guard.py` `[no-capture-plugin]` under pytest-qt (Reviewer A F1, open).
 
 ## Decisions and deviations
 

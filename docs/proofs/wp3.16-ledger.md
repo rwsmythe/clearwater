@@ -9,6 +9,7 @@ Cell: implementer-opus-high (tier STRONG; ruling 1). Worktree `.worktrees/wp3.16
 | Round | Date | Blocking (crit/maj) | Minor | In/out envelope | NEW/REOPENED | Reverts | Fix kind | Transport | Depth |
 |---|---|---|---|---|---|---|---|---|---|
 | 0 (design) | 2026-10-21 | n/a | n/a | n/a | n/a | n/a | n/a | n/a | 152,774 (dispatcher, 35 turns, 01:27:10Z) |
+| 1 | 2026-10-21 | 0/2 (F1 full suite red by pytest-qt; F2 1:1 re-render) | 4 confirmed (F3, F4, F5; F7 out) + 1 rejected (F6) | 6 in / 1 out (F7) | 7 NEW / 0 REOPENED | 0 | planned: product (F2-F5, F7) + a ruled line outside the files owned (F1) | WSL, codex-cli 0.162.1, gpt-5.6-sol high | (dispatcher) |
 
 ## Round 0: the design table (brief task 1)
 
@@ -315,4 +316,39 @@ the gen-8 dispatch:
 
 Gates at `9c6efcb` (+ the RULED docstring): GUI tests 90 passed (14.4 s, offscreen; the `gpu`
 test ran, not skipped), ruff check (repo) 0, ruff format --check 0 (140 files), mypy strict 0
-(87 files). Full pytest: pending a window.
+(87 files). Full pytest: run in the gen-8 window, see "Round 1" below.
+
+## Full-suite window (gen 8, granted 02:02Z) and Reviewer A round 1
+
+**Full pytest at `0e4412c`** (the two runs one after the other, output under the worktree's
+`work/`):
+
+- Normal (`work/full-pytest.txt`, 02:02:05Z-02:17:20Z): `1 failed, 2993 passed, 1 skipped,
+  1 warning in 913.39s`, exit 1.
+- CuPy unimportable (`work/pytest_nocupy.py`, `sys.modules["cupy"] = sys.modules["cupyx"] =
+  None`; `work/full-nocupy.txt`, 02:18:16Z-02:28:27Z): `1 failed, 2474 passed, 520 skipped in
+  609.45s`, exit 1; skips without a CuPy/CUDA reason: 1 (`test_color_roundtrip.py:121`, swscale).
+- The one failure in both runs is
+  `tests/test_conftest_guard.py::test_uncached_tempdir_checks_the_one_root_cpython_would_pick[no-capture-plugin]`:
+  INTERNALERROR in `pytestqt/plugin.py` `pytest_configure`, `ValueError: no option named
+  'capture'` (pytest-qt 4.5.0 with `-p no:capture`). Reproduced outside the suite (exit 3);
+  `-p no:pytest-qt` or `--no-qt-log` cures it (exit 0). It is Reviewer A's F1.
+
+**Reviewer A round 1** (STRONG, at the cell's seat). Evidence
+`C:\Users\rwsmy\clearwater-review-evidence\wp3.16\r1\` (probe, prompt, diff, review.txt,
+review.stderr.txt, adjudication.md, test-summary.txt, md5sums.txt). Probe READY with one
+`succeeded in`. Assertions passed (banner gpt-5.6-sol/high, 12 `succeeded in`, tokens 142,748,
+VERDICT at column 0, ERROR matches all echoed content); withheld paths respected. Verdict
+`NEW_CRITICAL_MAJOR_FOUND`.
+
+| # | Sev | Verdict | In env | Planned fix |
+|---|---|---|---|---|
+| F1 | MAJOR | CONFIRMED (reproduced) | yes | RULING NEEDED, outside the files owned: one line in WP-T1's `tests/test_conftest_guard.py` `_run` adding `-p no:pytest-qt` (recommended) or the same in `_MINI_PYPROJECT` addopts |
+| F2 | MAJOR | CONFIRMED (read) | yes | memoise the corrected display image per state and factor; a re-entered 1:1 shows it without `render`; render-count test + planted no-memo |
+| F3 | MINOR | CONFIRMED (read) | yes | clear "Rendering full resolution" when a k > 1 request or result supersedes the full render; test |
+| F4 | MINOR | CONFIRMED (read) | yes | a refusal names the file when its text does not (real `missing_tool` / timeout texts); test |
+| F5 | MINOR | CONFIRMED (read) | yes | a failed render still reports the reasons it obtained to the status bar; test |
+| F6 | MINOR | REJECTED | -- | brief binds `gui` only on tests creating a Qt object; `test_gui_deps.py` creates none (prompt paraphrase corrected next round) |
+| F7 | MINOR | CONFIRMED (read) | OUT | tag the untagged display copy as sRGB (cleanup, non-blocking) |
+
+Remediation NOT started (yield at the round boundary).
