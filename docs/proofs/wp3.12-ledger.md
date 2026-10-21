@@ -219,6 +219,32 @@ Criteria: means and gains <= 1e-3, bounds <= 1e-2, 60 minutes <= 10 GB. Read cos
 **STOP (brief task 2).** No candidate meets both AD-5's statistics criteria and the 10 GB bound, and the bounds criterion is unattainable
 for the lossless 8-bit proxy itself. CHARC chooses (options in the dispatcher message).
 
+## State at the orchestrator rollover (2026-10-20) -- resume here
+
+**AD-5 ruled by CHARC (AD-5 amended on main a6ba740, option 1): the analysis proxy IS the stored decoded JPEG proxy.** The four conditions as applied:
+1. Codec: JPEG q75 4:4:4 is `DEFAULT_CODEC` (id 2); q80 4:2:0 (id 3) exists; the dispatcher picks q80 only if the EXCLUSIVE read-cost row shows it > 30 % faster
+   per `proxy()` call (a NON-official smoke run on a shared laptop gave q75 5.4 ms, q80 4.5 ms, deflate 9.5 ms).
+2. Determinism: `codec_cache_version(codec)` = format number << 24 | CRC-24 of `codec_id:identity`; JPEG identity = Pillow + libjpeg + libjpeg-turbo versions read at
+   runtime (`codec.jpeg_identity`). A cache opened with another identity removes the old entries; stores under the old key are refused. Test:
+   `tests/test_cache_jpeg.py::test_a_different_decoder_identity_invalidates_the_cache`.
+3. Criteria: means and gains <= 1e-3 against the float proxy (met: JPEG q75 4:4:4 means 9.0e-4, gains 6.6e-4 worst clip); bounds deviation beyond the 8-bit floor
+   bounded at 10 % of the range (met: 8.3 % q75 4:4:4, 7.8 % q80 4:2:0). The report must carry the per-clip table (`results.json` in the main tree's `work/wp3.12/`) and
+   the CP5 line "proxy bounds are X % narrower than full-frame float bounds (AD-4 11-14 % + AD-5 ~8 %)".
+4. Pillow moved from the dev group to `[project] dependencies` and `uv.lock` re-locked (commit a21a738); X-B3: whichever of WP3.6 / WP3.12 merges second re-locks.
+Consumer note for WP3.11 (put it in the report): at first analysis the proxy is encoded and decoded in memory (`clearwater.cache.round_trip`, or `store_proxy` then
+`proxy`) BEFORE any statistic is measured; the float proxy is never a statistics source. DR-14: JPEG narrows the high-pass range, so the AD-4 floor binds slightly more
+often (intended direction).
+
+**Done (commits on branch wp3.12):** round-0 table; instrument `tools/cache_store_test.py` (modes prepare, sizes, readcost, readcost-product, report) and the measured figures;
+the store (`src/clearwater/cache/`: keys, codec, layout, store), 60 tests (`tests/test_cache_store.py`, `test_cache_robust.py`, `test_cache_jpeg.py`; planted defects; crash
+child process; threads; dependency rule); ruff check, ruff format --check and mypy green on the whole repo at a21a738.
+**Next:** (1) EXCLUSIVE window (dispatcher grants): `uv run python tools/cache_store_test.py readcost-product` -> `work/wp3.12/readcost.json`; dispatcher decides q75 vs q80;
+(2) report `docs/reports/wp3.12-proxy-cache.md` (public API, layout, AD-5 table per clip, choice, eviction rule, the CP5 line, stub-vs-product `mark_complete` difference
+(stub accepts an unknown key, product raises KeyError), the WP3.11 consumer notes: measure on the stored proxy; a new or changed proxy un-completes an entry; a second
+concurrent store on a key, statistics included, is a RuntimeError); (3) full-pytest window ("WINDOW REQUEST"); (4) Reviewer A at the cell's seat (runner/prompt shape from
+`C:/Users/rwsmy/clearwater-review-evidence/wp3.1/r2/`, evidence in `.../wp3.12/rN/`), STRONG tier, yield at each adjudicated verdict.
+Deviations from the brief: store refuses a key whose version is not the instance's (ValueError); `close()`, context manager, `key_for`, `round_trip` and `codec_cache_version` are extras.
+
 ## Ledger (cumulative rounds)
 
 | Round | Critical | Major | Minor | In-envelope vs out | NEW / REOPENED | Reverts | Product / test-only fixes | Depth |
