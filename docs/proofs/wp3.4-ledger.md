@@ -247,45 +247,44 @@ or slightly worse; the maximum sits inside): the difference is content (fine det
 preview cannot sharpen), not edge handling. (On the synthetic smooth texture of R0-7 the
 maxima were at the border; real footage behaves differently.)
 
-## RESUME HERE (for the fresh cell)
+## RESUME HERE (for the fresh cell, cell 3)
 
-**Status at hand-off:** round 0 complete and ruled; NO product code written. Branch `wp3.4`
-(worktree `C:\Users\rwsmy\clearwater\.worktrees\wp3.4`), base `de206e2`. Read the brief
-(`docs/briefs/wp3.4-brief.md`, incl. its Rulings), this ledger's R0-1..R0-7 and the rulings
-above; together they are the design. Do not re-derive them.
+**Status at hand-off (cell 2, 2026-10-21, depth 346,044 per the dispatcher):** the build is
+COMPLETE and every ruling is applied; NO full pytest and NO Reviewer A round has run yet.
+Branch `wp3.4` (worktree `C:\Users\rwsmy\clearwater\.worktrees\wp3.4`), base `de206e2`, head =
+the commit carrying this section. Design: the brief (incl. its Rulings), R0-1..R0-7 and the
+round-0 rulings above, the cell-2 rulings in "Build" below (B-1, B-2 option A, V8). Do not
+re-derive them; do not re-run round 0 or the probes.
 
-**Decided (build to these):** stage tables R0-1 (c3 equal to `stubs.C3_STAGES`; Ancuti
-compensation record means (3,), cap_statistics (2,), alpha (2,) with blue 0.0 when off;
-transitive dependencies); chains and host-read counts R0-2 (ancuti2018 7, c3 4, render 0);
-schema R0-3 (ranges APPROVED; one cross check); R0-Q1 (method resolves params: defaults for
-missing, ValueError for unknown, `validate_parameter_set`, then the cross check); R0-Q2 (unknown
-stage ValueError, missing stage KeyError, record content ValueError naming stage and statistic);
-R0-Q3 (`dataclasses.replace(image, pixels=...)`); R0-Q4 (`methods/schema.py` split); R0-Q5
-(prototype blend form, no clip, test pins [0, 1]); Y-1/Y-2 and Q2-Q8 as R0-5; P-2 detecting
-test form; P-4 `cast` in `fusion.py` only.
+**Done (commits `937d842`..this one):** core fixes + `backend_for` (DR-37 a, b; DR-38 c, d);
+`methods/schema.py`, `methods/ancuti_fusion.py`, `methods/__init__.py` (`available_methods`);
+`tools/core_speed.py --whole / --memory` (DR-37 d, e; smoke-run on the 320 x 180 fixture clip
+only); tests `test_core_wp34.py`, `test_methods_assembly.py` (76), `test_methods_assembly_
+prototype.py` (169), `test_methods_assembly_v8.py` (9; reads the MAIN tree's working folder
+`wp1.3/frames` through the local config, skips when absent -- reachable without the footage
+folder, so not marked `footage`), `test_core_speed.py` (21); the granted edits outside the owned
+list (`test_core_select.py` one token; the two `__cause__` lines in `test_methods_compensation.py`
+and `test_methods_fusion.py`); report draft `docs/reports/wp3.4-method-assembly.md` (stage and
+schema tables, Y-1 verbatim, DR-19 rule, claims 1-14, V8 table, consumer notes, debt). Static
+gates green (ruff check, ruff format --check, mypy strict 109 files). Targeted tests green on
+CPU and GPU, incl. the core and WP3.2/WP3.3 files (571 + 565).
 
-**Held:** the V8 method-level test (P-1, with CHARC); build the rest. When CHARC rules, write
-the V8 test to the ruled bound and images (the figures above are its baseline).
-
-**Files to create or change (all owned):**
-- NEW `src/clearwater/methods/schema.py` (the two parameter tuples, the resolver and cross
-  check), NEW `src/clearwater/methods/ancuti_fusion.py` (stages, the method class, two
-  instances), `src/clearwater/methods/__init__.py` (exports, `available_methods()`, c3 first).
-- `src/clearwater/core/backend.py` (`backend_for`; DR-37 (a) `ModuleNotFoundError` with
-  `name == "cupy"`; DR-38 (c) `check_rgb` refuses H or W < 1; DR-38 (d) `check_sigma`
-  ValueError on overflow), `src/clearwater/core/__init__.py` (export `backend_for`),
-  `src/clearwater/core/ops.py` (helpers annotated `CoreBackend`).
-- `src/clearwater/methods/fusion.py`: ONLY `cast(CoreBackend, backend)` at the four call sites
-  (+ the `cast` import). No other line in `compensation.py`, `white_balance.py`, `fusion.py`.
-- `tools/core_speed.py` (`--whole`, `--memory`, outputs `work/wp3.4/`; DR-37 (d) SpeedError,
-  (e) row by PCI bus id).
-- Tests `tests/test_methods_assembly*.py`, `tests/test_core_wp34*.py`, extension of
-  `tests/test_core_speed.py`. Report `docs/reports/wp3.4-method-assembly.md`. This ledger.
-
-**First task:** the core fixes and `backend_for` (task 7 + Q2) with their tests (they are
-small and unblock the method code), then `schema.py` + its tests, then `ancuti_fusion.py`
-(tasks 2-4, 6) with the task-9 roster. The EXCLUSIVE speed/memory windows (task 8) only when
-the code is final and only on the dispatcher's grant; full pytest only in a granted window.
+**Remaining, in order:**
+1. **Full pytest** in a window the dispatcher grants (`QT_QPA_PLATFORM=offscreen`,
+   `--basetemp=work/<name>`, background, output to a file; grep the summary; send
+   `WINDOW RELEASED: <summary>`). "With and without CuPy importable" per the brief's Done line.
+2. **Reviewer A from round 1** (STRONG, `docs/review-gate-clearwater.md` Part 1; runner and
+   prompt shape from `C:\Users\rwsmy\clearwater-review-evidence\wp3.1\r2\`; evidence to
+   `C:\Users\rwsmy\clearwater-review-evidence\wp3.4\rN\`; `--glob '!docs/proofs/**'`; diff
+   `de206e2..HEAD`). Yield at every verdict BEFORE remediating; commit the ledger row per round.
+3. **EXCLUSIVE windows**, each on the dispatcher's grant, one at a time, when the code is
+   final: first `uv run python tools/core_speed.py GX011627 --memory`, then
+   `uv run python tools/core_speed.py GX011627 --whole --cpu-frames 10` (outputs under the
+   working folder's `wp3.4/`; grep the `MEMORY`, `ROW`, `BAR`, `RECORD` lines). STOP with the
+   figures if a pool reserved peak exceeds `memory_estimate_bytes` or a core median exceeds
+   D106's 0.834 s/frame.
+4. **Report**: fill the speed and memory sections (and DR-40 b's upload count/timing from the
+   record), remove "DRAFT", update the status line; final return report per the recipe.
 
 ## Build (cell 2, 2026-10-21)
 
@@ -328,3 +327,4 @@ Probe-derived figures for the report: `C:\Users\rwsmy\clearwater-review-evidence
 | round | depth (dispatcher) | critical | major | minor | in / out envelope | NEW / REOPENED | reverts | fixes: product / test-only | transport, CLI |
 |---|---|---|---|---|---|---|---|---|---|
 | 0 (design) | 192,064 | -- | -- | -- | -- | -- | -- | -- | -- (no review round; design table + rulings) |
+| build (cell 2) | 346,044 | -- | -- | -- | -- | -- | -- | -- | -- (no review round; build + rulings applied; re-seat) |
