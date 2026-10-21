@@ -154,6 +154,7 @@ def from_tiff(data: bytes) -> bytes | None:
         with Image.open(io.BytesIO(data)) as image:
             source = image.getexif()
             built = Image.Exif()
+            built.endian = source.endian  # Pillow writes big-endian when unset
             for tag, value in source.items():
                 if int(tag) not in _TIFF_STRUCTURE and int(tag) not in IFD_POINTERS:
                     built[tag] = value

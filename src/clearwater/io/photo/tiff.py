@@ -59,8 +59,9 @@ def _refuse(name: str, why: str) -> PhotoReadError:
 def read_tiff(data: bytes, name: str, max_pixels: int) -> TiffPicture:
     """Decode the first page of a TIFF to RGB samples at the file's own bit depth.
 
-    Grey and palette pages are expanded to RGB and an alpha channel is dropped (a warning is
-    logged); a palette's 16-bit colour map is reduced to 8 bits.
+    Grey pages (WhiteIsZero ones are inverted) and palette pages are expanded to RGB and an
+    alpha channel is dropped (a warning is logged); a palette's 16-bit colour map is reduced to
+    8 bits.
 
     Args:
         data: The file's bytes.
@@ -96,11 +97,13 @@ def read_tiff(data: bytes, name: str, max_pixels: int) -> TiffPicture:
             if dtype not in (np.dtype(np.uint8), np.dtype(np.uint16)):
                 raise _refuse(name, f"TIFF samples of type {dtype} are not read")
             kinds = tifffile.PHOTOMETRIC
-            if photometric not in (kinds.RGB, kinds.MINISBLACK, kinds.PALETTE):
+            if photometric not in (kinds.RGB, kinds.MINISBLACK, kinds.MINISWHITE, kinds.PALETTE):
                 raise _refuse(name, f"TIFF colour space {getattr(photometric, 'name', '?')}")
             if page.bitspersample not in (8, 16) and photometric != kinds.PALETTE:
                 raise _refuse(name, f"TIFF samples of {page.bitspersample} bits are not read")
             array = page.asarray()
+            if photometric == kinds.MINISWHITE:  # WhiteIsZero: stored inverted
+                array = np.iinfo(array.dtype).max - array
             if page.axes.startswith("S") and array.ndim == 3:
                 array = np.moveaxis(array, 0, -1)
             colormap = page.colormap if photometric == kinds.PALETTE else None

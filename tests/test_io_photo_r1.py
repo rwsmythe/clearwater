@@ -14,6 +14,7 @@ from pathlib import Path
 import numpy as np
 import pillow_heif
 import pytest
+import tifffile
 from PIL import Image
 
 from clearwater.io.photo import PhotoReadError, read_photo
@@ -247,3 +248,43 @@ def test_a_16_bit_png_without_alpha_does_not_warn(
     with caplog.at_level("WARNING", logger="clearwater.io.photo.reader"):
         read_photo(sample("png16-gradient-srgb"))
     assert "alpha" not in caplog.text
+
+
+# --- R2 #1: a WhiteIsZero grey TIFF is read, inverted ------------------------------------------
+
+
+@pytest.mark.parametrize("dtype", [np.uint8, np.uint16])
+def test_a_white_is_zero_grey_tiff_is_inverted_to_the_same_picture(
+    tmp_path: Path, dtype: type[np.unsignedinteger]
+) -> None:
+    top = int(np.iinfo(dtype).max)
+    grey = np.array([[0, top // 4, top // 2, top]] * 4, dtype=dtype)  # what the viewer shows
+    black_is_zero, white_is_zero = tmp_path / "bz.tif", tmp_path / "wz.tif"
+    tifffile.imwrite(black_is_zero, grey, photometric="minisblack")
+    tifffile.imwrite(white_is_zero, top - grey, photometric="miniswhite")  # stored inverted
+    want, _ = read_photo(black_is_zero)
+    got, _ = read_photo(white_is_zero)
+    assert got.color.bit_depth == (16 if dtype is np.uint16 else 8)
+    assert np.array_equal(got.pixels, want.pixels)
+    assert float(got.pixels[0, 0, 0]) == 0.0 and float(got.pixels[0, 3, 0]) == 1.0
+
+
+# --- R2 #4: the byte order of a TIFF source's EXIF block is the source's -------------------------
+
+
+@pytest.mark.parametrize(("order", "head"), [("<", b"II*"), (">", b"MM")])
+def test_a_tiff_exif_block_keeps_the_source_byte_order(
+    tmp_path: Path, order: str, head: bytes
+) -> None:
+    path = tmp_path / "order.tif"
+    tifffile.imwrite(
+        path,
+        np.zeros((4, 4, 3), dtype=np.uint8),
+        photometric="rgb",
+        byteorder=order,
+        extratags=[(271, "s", 0, "Maker", True), (272, "s", 0, "Model", True)],
+    )
+    _, meta = read_photo(path)
+    assert meta.exif is not None and meta.exif.startswith(head)
+    assert exif_tools.edit(meta.exif, 4, 4).startswith(head)
+    assert exif_tools.describe(meta.exif)["IFD0.Make"] == "Maker"
