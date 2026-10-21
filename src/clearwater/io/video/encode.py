@@ -205,8 +205,8 @@ def encode_command(
         quality: ``"high"``, ``"standard"`` or ``"draft"``.
         bit_depth: The output bit depth (the source's, or 10 for an 8-bit source, D76).
         comment: The provenance JSON, or the empty string.
-        cut_at: Where to stop reading the source's audio and data tracks (seconds), or None to
-            copy them whole.
+        cut_at: Where to stop reading the source's audio and data tracks, as FFmpeg's input
+            ``-to`` reads it (seconds after the input's start), or None to copy them whole.
 
     Returns:
         The command.
@@ -573,10 +573,16 @@ class FFmpegVideoSink:
 
         A truncated file: the tracks are cut where its readable video ends. An unreadable tail:
         the tracks are copied whole, and a warning says they run past the last video frame.
+
+        Returns:
+            The ``-to`` value for the source input, or None. FFmpeg (9.0.2) applies an input
+            ``-to`` under ``-copyts`` relative to the input's start time (the earliest start of
+            any of its streams), so the value is the video end minus that start.
         """
         kinds = {fault.kind for fault in probe.faults}
         if "truncated" in kinds:
-            readable = sorted(p for p in source.video_pts if p not in set(source.video_corrupt_pts))
+            corrupt = set(source.video_corrupt_pts)
+            readable = sorted(p for p in source.video_pts if p not in corrupt)
             if not readable:
                 raise VideoEncodeError("refused", "The video has no readable frame.")
             self._audio_cut = True
@@ -585,7 +591,12 @@ class FFmpegVideoSink:
                 "The source is cut short; the output ends at its last readable frame, and the "
                 "audio and other tracks are cut at the same point."
             )
-            return end * probe.video.time_base
+            starts = [
+                s.start_pts * s.time_base
+                for s in source.streams
+                if s.start_pts is not None and s.time_base is not None
+            ]
+            return end * probe.video.time_base - min(starts, default=Fraction(0))
         if "unreadable_tail" in kinds:
             self._warnings.append(
                 "The end of the source cannot be decoded; the output's video stops at the last "
