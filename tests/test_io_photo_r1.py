@@ -12,14 +12,15 @@ from pathlib import Path
 
 import numpy as np
 import pillow_heif
+import pytest
 from PIL import Image
 
+from clearwater.io.photo import PhotoReadError, read_photo
 from clearwater.io.photo import exif as exif_tools
-from clearwater.io.photo import read_photo
 
 
 def _patched(source: Path, out: Path, old: bytes, new: bytes) -> Path:
-    """Copy ``source`` to ``out`` with one occurrence of ``old`` replaced by ``new`` (same length)."""
+    """Copy ``source`` to ``out`` with ``old`` replaced by the same-length ``new``."""
     data = source.read_bytes()
     assert len(old) == len(new)
     at = data.find(old)
@@ -138,3 +139,19 @@ def test_an_unreadable_tiff_interop_pointer_is_dropped_not_left_dangling(
     exif_ifd, interop = _interop_view(meta.exif)
     assert _INTEROP_POINTER not in exif_ifd and interop == {}
     assert exif_ifd[36864] == b"0230", "the rest of the Exif IFD is kept"
+
+
+# --- #3: a primary item with no ispe is refused ---------------------------------------------------
+
+
+def test_a_heic_primary_without_ispe_is_refused_as_unreadable(
+    sample: Callable[[str], Path], tmp_path: Path
+) -> None:
+    source = sample("heic8-uniform-none")  # libheif itself still decodes this one without ispe
+    read_photo(source)
+    patched = tmp_path / "noispe.heic"
+    patched.write_bytes(source.read_bytes().replace(b"ispe", b"xspe"))
+    with pytest.raises(PhotoReadError) as caught:
+        read_photo(patched)
+    assert caught.value.kind == "unreadable"
+    assert "noispe.heic" in str(caught.value) and "ispe" in str(caught.value)

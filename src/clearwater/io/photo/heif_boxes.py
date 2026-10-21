@@ -48,11 +48,15 @@ class HeifLayout:
         return self.item_type == "grid"
 
     def expected_size(self) -> tuple[int, int] | None:
-        """Return the size libheif should decode: ``ispe`` (or ``clap``), turned by ``irot``.
+        """Return the size libheif should decode (``clap`` else ``ispe``), turned by ``irot``.
+
+        ``clap`` takes precedence on purpose: libheif crops to the clean aperture, so the decoded
+        size is the ``clap`` size and comparing it with ``ispe`` would refuse every cropped photo
+        (``test_imir_and_clap_are_read_for_the_primary``).
 
         Returns:
-            ``(width, height)`` after the transforms, or None when the primary item has no
-            ``ispe``.
+            ``(width, height)`` after the transforms, or None when the primary item has neither
+            ``clap`` nor ``ispe``.
         """
         size = self.clap or self.ispe
         if size is None:

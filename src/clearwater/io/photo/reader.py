@@ -196,7 +196,10 @@ def _read_heic(data: bytes, name: str) -> _Decoded:
         layout = read_layout(data)
     except HeifLayoutError as error:
         raise _unreadable(name, f"the HEIC layout cannot be established ({error})") from error
-    if layout.ispe is not None and layout.ispe[0] * layout.ispe[1] > MAX_PIXELS:
+    if layout.ispe is None:
+        # ``ispe`` is mandatory for an image item (ISO 23008-12); AD-24's size check needs it.
+        raise _unreadable(name, "the primary image has no size property (ispe) in the HEIC")
+    if layout.ispe[0] * layout.ispe[1] > MAX_PIXELS:
         raise PhotoReadError("unsupported", f"{name} is not supported: too many pixels.")
     try:
         heif = pillow_heif.open_heif(io.BytesIO(data), convert_hdr_to_8bit=False)
@@ -215,8 +218,8 @@ def _read_heic(data: bytes, name: str) -> _Decoded:
     elif not mode.startswith("RGB"):
         raise PhotoReadError("unsupported", f"{name} is not supported: HEIC mode {mode}.")
     samples = array[:, :, :3]
-    expected = layout.expected_size()
-    if expected is not None and (samples.shape[1], samples.shape[0]) != expected:
+    expected = layout.expected_size() or layout.ispe  # ispe is present: checked above
+    if (samples.shape[1], samples.shape[0]) != expected:
         raise _unreadable(
             name,
             f"the decoded size {samples.shape[1]}x{samples.shape[0]} does not match the "
