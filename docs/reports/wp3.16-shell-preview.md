@@ -62,8 +62,8 @@ analysis state, statistics, position and backend reason when a source opens.
 | 10 | The contract: a dummy panel in each `Area` gets a `ShellContext`, sees `parameters_changed`, drives `set_parameters`; the settings dialog opens from `actions.settings`. | `tests/test_gui_contract.py` |
 | 11 | Dependency rule: no `clearwater.gui` module imports `clearwater.methods`, `cupy`, `cupyx` or touches `.xp`; `clearwater.core`, `.config`, `.jobs`, `.io` load no PySide6. | `tests/test_gui_deps.py` |
 
-GUI tests: 102 passed in about 37 s, headless (`offscreen`; the planted unbounded `view_factor`
-waits out its 10 s child-process timeout); with `tests/test_conftest_guard.py` 146 passed. Full suite at `0e4412c` (before round 1): 1 failed, 2993 passed, 1 skipped (normal);
+GUI tests: 107 passed in about 28 s, headless (`offscreen`; the planted unbounded `view_factor`
+waits out its 10 s child-process timeout); with `tests/test_conftest_guard.py` 151 passed. Full suite at `0e4412c` (before round 1): 1 failed, 2993 passed, 1 skipped (normal);
 1 failed, 2474 passed, 520 skipped (CuPy unimportable); the failure was Reviewer A F1, fixed in
 `fa99105`. Full suite on the final head: run by the orchestrator on the candidate.
 
@@ -109,12 +109,29 @@ waits out its 10 s child-process timeout); with `tests/test_conftest_guard.py` 1
 - A user running `pytest -p no:capture` must also pass `-p no:pytest-qt`: pytest-qt 4.5.0's
   `pytest_configure` raises `ValueError: no option named 'capture'` without the capture plugin.
 - A refusal whose text does not contain the file name is shown as `"<name>: <text>"`.
+- Photo statistics measured by the preview are not exposed by the contract (round-3 R3-1,
+  banked): `Session.statistics()` returns only supplied statistics. See the consumer note.
 - `imaging.view_factor` is at most `max(H, W)`: a displayed size of one device pixel or less on
   both axes is covered by every factor, and the 1 x 1 image is shown.
+- The supplied-statistics render memo is keyed by the session's statistics revision (every
+  `set_statistics`, `set_position(..., statistics=)`, open and `preview.show` bumps it), so a
+  mapping changed in place and set again renders again.
 - A frame-decode error banner clears at the next decoded frame; as with the preview's, the
   clear removes every `error` banner.
 - A preview render that fails after the backend selections still updates the status bar (AD-9);
   a selection that itself raises does not (the real `select_backend` never raises).
+
+## Consumer note for WP3.14 and WP4.1 (photo statistics, question 5)
+
+When the session holds no supplied statistics (a photo; a video frame before WP3.18 supplies
+smoothed ones), the preview measures them with
+`clearwater.gui.imaging.measure_statistics(method, backend, image, params)`, which downscales
+the full-resolution image by `clearwater.gui.imaging.downscale(pixels,
+clearwater.gui.imaging.statistics_factor(H, W))` and runs each stage of `method.stages` in
+order with the earlier results. The values are kept private to the preview (round-3 R3-1,
+banked; the contract is frozen). An export re-measures with the same call on the same image
+and parameters and gets identical values on the same backend (within AD-11 between CPU and
+GPU), so V8's preview-against-export agreement holds.
 
 ## Dependencies (X-B3)
 

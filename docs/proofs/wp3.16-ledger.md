@@ -455,3 +455,28 @@ Round-2 fixes verified.
 | R3-4 | MINOR | CONFIRMED (read) | yes | REOPENED (F4) | the name must stand alone; `assert_refused` checks the full name; test |
 
 Remediation NOT started (yield at the round boundary).
+
+## Round-3 rulings (orchestrator gen 8, FINAL, 03:22Z) and remediation
+
+Rulings: one bounded step (this remediation and round 4, then yield; any later remediation to a
+fresh cell). R3-1 MINOR, BANKED, no contract change: a consumer note for WP3.14/WP4.1 in the
+report and a Limits line. R3-2 MAJOR remediate (statistics revision in the request and the memo
+key; test + planted identity-only memo). R3-3, R3-4 remediate. R3-2 counts as REOPENED from F2's
+family.
+
+Commit `211ec88` (R3-2, R3-3, R3-4; shared `preview.py` and test hunks):
+- R3-2: `ShellSession.statistics_revision()` (shell-internal, not contract) bumped by
+  `_set_statistics` from `set_statistics`, `set_position`, `_open`, `_show`;
+  `RenderRequest.statistics_revision`; `AfterKey` gains it.
+- R3-3: `request` sets the indicator to `k == 1 and an image is shown` (so a change at 1:1 shows
+  it, a k > 1 request clears it); `_on_position` clears it when it invalidates the renderer.
+- R3-4: `messages.refusal` accepts the name only standing alone
+  (`(?<![\w.-])name(?![\w-])`); `assert_refused` checks the full escaped name.
+
+Red/green: against the four product files restored from `09a7e77`, 5 failed (the in-place
+statistics test; the planted identity-only test (no `statistics_revision` to plant on old code);
+the indicator-at-1:1 test; the position-change indicator test; the standalone-name test). On the
+fixed code the planted identity-only memo shows the stale 51 where 204 is required.
+
+Gates at `211ec88`: GUI tests 107 passed (28 s), with `tests/test_conftest_guard.py` 151 passed
+(58 s); ruff check (repo) 0; ruff format --check 0 (140 files); mypy strict 0 (87 files).
