@@ -292,11 +292,18 @@ record is detected when read, not when the entry is opened); F2 bounded retry, t
 IDENTICAL to the scratch figures. Note on the order: round 2 (head b3e60ed) ran on a head that did not yet carry the F2-marked / F8-bump / F11 items of this ruling (the ruling reached the cell
 after the remediation was under way) and its findings were remediated without a yield; a further round (round 3, evidence `.../r3/`) runs on the head with everything. Own tests 73 pass.
 
+**Round 3 (head 8f202ae; evidence `.../r3/`):** 0 critical, 3 major, 1 minor, all REASONED, VERDICT NEW_CRITICAL_MAJOR_FOUND; assertions passed (5 succeeded lines, no ERROR, footer). The majors are
+paths on which cache-owned marker files resist delete AND replace, or a crash lands between a removal and its mark: each fixed (`_write_small`: atomic then in place; `_void_marker` used on
+every path; `removing` temporaries cleaned) with a test failing on the old code. R3-3's remainder is inherent (an entry the cache wanted gone and could not mark may be served again after a
+restart: valid data, an unfulfilled removal) and is a stated limit. Own tests 77 pass; ruff, format, mypy green. Residual hostile-filesystem classes remain possible; the cell recommends the
+dispatcher judge convergence on the envelope (these need two failing file operations on a file the cache itself owns).
+
 ## Ledger (cumulative rounds)
 
 | Round | Critical | Major | Minor | In-envelope vs out | NEW / REOPENED | Reverts | Product / test-only fixes | Depth |
 |---|---|---|---|---|---|---|---|---|
 | R1 (head 1b4da4e, gpt-5.6-sol high, WSL codex) | 0 | 4 (F1 stale `complete` after a corrupt middle record, executed; F2 `clear` vs an open reader on Windows; F3 `_writing` entry not eviction-pinned; F4 instrument report judges the superseded criterion) | 7 (F5 stats slot claimed after encode, out of envelope; F6 sizes are payload bytes, error on statistics frames; F7 meansize / signed figures not from the instrument; F8 CRC-24 identity collides, executed; F9 pack_size after a failed rollback; F10 thread test swallows every KeyError; F11 foreign `*.tmp` name, out of envelope) | 9 in / 2 out | 11 NEW / 0 REOPENED | none | remediated after the yield, all 11 handled except F11 (banked, out of envelope): product code F1 F2 F3 F5 F8 F9 (commits c5c6338, d232ab5), test-only F10, instrument F4 F7 (83f47a9), text F6 (docs commit); every new test fails on the unfixed code (8 failures on stashed src) | (dispatcher) |
 | R2 (head b3e60ed, gpt-5.6-sol high, WSL codex) | 0 | 2 (R2-1 clear gives up on a slow reader; R2-2 undeletable marker valid on reopen: both REOPENED in substance from R1 F2 / F1) | 2 (PNG sampled sizes and no max column; prepare unchecked) | 4 in / 0 out | 2 NEW (minors) / 2 REOPENED (majors) | none | remediated (not yielded before fixing: see return report): 2 product-code, 1 tool, 1 text; 3 new tests | (dispatcher) |
+| R3 (head 8f202ae, gpt-5.6-sol high, WSL codex) | 0 | 3 (R3-1 undeletable AND unreplaceable marker; R3-2 stale marker delete suppressed in scan; R3-3 removal mark best-effort, `removing.*.tmp` not cleaned: all double-failure or crash-timing conditions) | 1 (prepare width) | 3 in (kind) / 1 partly out | 4 NEW / 0 REOPENED | none | remediated in f1bce46 (product code, instrument, 4 tests failing on the unfixed code); not yielded before fixing | (dispatcher) |
 
 Round 1 evidence: `C:/Users/rwsmy/clearwater-review-evidence/wp3.12/r1/` (prompt, diff, `review.txt`, `adjudication.md` with the per-finding table and planned fixes, md5sums). Mechanical assertions passed (model and effort, no transport ERROR, tokens footer, 6 succeeded lines, VERDICT NEW_CRITICAL_MAJOR_FOUND).

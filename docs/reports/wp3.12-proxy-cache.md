@@ -164,7 +164,9 @@ up to 5 s for readers that already hold its pack open (`store._reading`; Windows
 open file), then retries a refused delete briefly; an entry that still cannot be removed stays whole, is
 logged, is no longer served, is the first to go at the next eviction or `clear`, and carries a
 `removing` mark file so the next open removes it too (never a silent keep). A store into such an
-entry removes it first or raises `OSError`. Cleanup of leftovers deletes only files shaped like the
+entry removes it first or raises `OSError`. The mark is written atomically, or in place when the
+replace is refused; if even that fails the entry, left intact, can be served again after a restart (valid
+data, an unfulfilled removal). Cleanup of leftovers deletes only files shaped like the
 temporaries `atomic_write_text` makes (`<name>.<8 random characters>.tmp`); a foreign file of that
 exact shape inside an entry folder is still deleted (out of envelope).
 The default limit is `DEFAULT_CACHE_LIMIT_BYTES` (imported, not restated).
@@ -212,7 +214,7 @@ The default limit is `DEFAULT_CACHE_LIMIT_BYTES` (imported, not restated).
 
 ## Verification
 
-Own tests: 73 pass (`tests/test_cache_*.py`, 2.6 s; `work/wp3.12/own-tests.log`), including V17 on the
+Own tests: 77 pass (`tests/test_cache_*.py`, 2.6 s; `work/wp3.12/own-tests.log`), including V17 on the
 cache side, planted defects (newest-first eviction, a key ignoring `mtime_ns`, a lossy round trip
 presented as lossless, `clear` deleting a foreign file, a marker always believed, a partly covered
 stage listed), a child process killed mid-entry, a writer thread against reader threads, `clear` with a
@@ -228,6 +230,7 @@ definition) are outside the declared envelope. No compaction: a re-stored change
 bytes in the pack until the entry is evicted. The 10 GB figure is an extrapolation from two clips (see
 finding 3). `complete` records that every record was whole when the proxy pass ended; a damaged
 proxy is found only when it is read, and from then on the entry is incomplete (the marker is
-removed, or overwritten with one that vouches for nothing if it cannot be removed); opening an entry does not re-check every checksum (the per-read CRC is the control, a
+removed, or overwritten atomically or in place with one that vouches for nothing if it cannot be
+removed); opening an entry does not re-check every checksum (the per-read CRC is the control, a
 full-pack check at open would read about 10 GB per hour of footage): a corrupt record is detected when
 it is read, not when the entry is opened.
