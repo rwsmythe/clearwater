@@ -5,12 +5,12 @@
 
 ### Generation
 
-- **Generation 6** (`clearwater-orchestrator-20261020-1134`), online 2026-10-20 ~21:35Z, picked up
-  from gen 5's state 26b095d (gen 5 `clearwater-orchestrator-20261020-0802` rolled at ~420K with no
-  live cell). Earlier: gen 4 `clearwater-orchestrator-20261020-0524`, gen 3
-  `clearwater-orchestrator-20261019-2346`, gen 2 `clearwater-orchestrator-20261018-1442`, gen 1
-  `clearwater-orchestrator-20261014-1258`.
-- **Inbox:** gen 6 is the sole drainer (verify:
+- **Generation 6** (`clearwater-orchestrator-20261020-1134`) ROLLED OVER 2026-10-21 at the depth
+  cap (~400K). **Generation 7 starts here** (verify: `comms/.launch-sessions.json`). Earlier: gen 5
+  `clearwater-orchestrator-20261020-0802`, gen 4 `-20261020-0524`, gen 3 `-20261019-2346`, gen 2
+  `-20261018-1442`, gen 1 `-20261014-1258`.
+- **Inbox:** gen 6 drained through CHARC's AD-5 ruling (~23:58Z) and STOPPED DRAINING at its
+  rollover announcement. You are the sole drainer (verify:
   `uv run python scripts/role_mail.py list --role orchestrator`).
 - **CHARC is generation 2:** `clearwater-charc-20261020-0636`. Cue that exact name.
 - Bash-launch gauge at gen-6 bring-up: 39.6 ms. Re-measure at yours.
@@ -35,82 +35,49 @@
   each figure with its moment; read twice across a turn boundary to prove idle. **~250K is an
   EVALUATION point**; **~400K STOP** and re-dispatch from the ledger.
 
-### Live cells
+### Live cells (ALL died with gen 6; re-dispatch from the ledgers)
 
-- **Tranche A of wave 2, dispatched 2026-10-20 ~22:45Z from main `2c5540a`** (IF-7 amendment
-  `f4cd1e4` + FINAL briefs `2c5540a`; CHARC approval `53b752a4d7fac4fc`). Prompts at
-  `C:\Users\rwsmy\clearwater-review-evidence\wp3.N\dispatch.md`. Cells die with this generation:
-  re-dispatch from each ledger `docs/proofs/wp3.N-ledger.md` in its worktree.
-  - `wp32-cell` (opus-high), WP3.2, `.worktrees/wp3.2`. R0 ruled (all as recommended); build
-    bit-identical to the prototype (54 rows); Reviewer A R1 NO_NEW_CRITICAL_MAJOR (4 minor; one
-    `Reconnecting... 2/5` before first output ruled a recovered retry), terminating cleanup at
-    `1fcb37d`; full runs on `1fcb37d` DONE (normal exit 0, 871 s; nocupy exit 0, 520 s; counts in
-    its `work/wp32-full-*.log`). Next: its return report, then the accept. Banked at accept: core
-    `check_sigma` OverflowError on inf (`int(4*sigma+0.5)`), next core touch. Depths: 116,822 (R0),
-    218,176 (R1), 241,447 (window).
-  - `wp33-cell` (opus-high), WP3.3, `.worktrees/wp3.3`. R0 ruled; R1 1 major (test/report) + 3
-    minor, remediated; R2 NO_NEW_CRITICAL_MAJOR (1 minor out of envelope, fixed as cleanup);
-    WINDOW GRANTED after the cleanup commit (both runs). Next: WINDOW RELEASED, return report.
-    A stale pytest (pid 37676, from 232c17a) was spinning; Stop-Process was refused by the
-    classifier at the cell's seat; NOT re-run at mine; surfaced to the owner. Depths: 119,733 (R0),
-    257,103 (R1, evaluated: continue), 304,760 (R2).
-  - `wp35-cell` (sonnet-high), WP3.5 (S), `.worktrees/wp3.5`. R0 STOP (V9 bound) ruled by CHARC
-    `229c326b43fb99f2` (option 1; AD-11 clarified `2ce4266`). Bounds FINAL = the TIGHTER set at
-    `abee706` (footage mean <= 1.0, share over 2/255 <= 1 %; testsrc2 mean <= 2.5; max reported);
-    messages crossed twice, final FYI to CHARC `be4b1e04`. R1 NO_NEW_CRITICAL_MAJOR (7 minor, fixed
-    as cleanup). Next: WINDOW (queued after WP3.3), return report. Depths: 90,237 (R0), 194,772 (R1),
-    240,808 (waiting).
-  - `wp312-cell` (sonnet-high), WP3.12, `.worktrees/wp3.12`. R0 ruled (Pillow: if JPEG wins the cell
-    moves the line, X-B3). Task 2 STOP on AD-5 (no store meets criteria + 10 GB; even lossless
-    8-bit misses the bounds criterion): query to CHARC `405648b0` (recommended: JPEG q75 4:4:4 or
-    q80 4:2:0, the analysis proxy = the stored decoded proxy, bounds deviation reported against a
-    10 %-of-range limit). Meanwhile building the codec-independent store with lossless deflate.
-    Pending: CHARC ruling -> codec -> EXCLUSIVE read-cost window (post OPEN/CLOSE to CHARC) ->
-    Reviewer A -> window. Depths: 87,058 (R0), 152,958 (STOP).
-  - Window queue (X5): WP3.3 (granted), then WP3.5, then WP3.12.
-- **Tranche B** (WP3.6 sonnet-high, WP3.16 opus-high; briefs FINAL) dispatches once two tranche-A
-  cells have returned. WP3.6P (real-photo verification, sonnet-medium) is queued until photos.
-- Consumer notes for later briefs: WP3.11 measures on the STORED round-tripped proxy (WP3.12);
-  WP3.11 reads spec 7.2 line 325 (chapter remnant) as single-clip; WP3.10 cites DR-17 for
-  untagged-output tags; WP3.21 gets the per-call uploads of the 3C matrix and WB gains (WP3.2 N-1).
-- Retired (never message): `wave2-drafter-a`, `wave2-drafter-b`, `wp31-cell`, `wp31-cell2`,
-  `wp315-cell`, `wp313-cell`, `wp37-cell`, and every earlier cell.
-- Worktrees present: `.worktrees/wp3.2`, `wp3.3`, `wp3.5`, `wp3.12`.
+Tranche A of wave 2 was dispatched 2026-10-20 ~22:45Z from main `2c5540a` (IF-7 amendment
+`f4cd1e4` + FINAL briefs; CHARC approval `53b752a4d7fac4fc`). Prompts at
+`C:\Users\rwsmy\clearwater-review-evidence\wp3.N\dispatch.md`.
+
+| Cell | Package | State at rollover | Your action |
+|---|---|---|---|
+| `wp32-cell` (opus-high) | WP3.2 | **RETURNED.** Head `dfe65d5` (code `1fcb37d`), base `2c5540a`. R1 NO_NEW_CRITICAL_MAJOR (4 minor fixed as cleanup; a `Reconnecting... 2/5` before first output ruled a recovered retry). Full: 2227 passed (868 s); nocupy 1938 / 289 skipped (517 s). 54/54 rows bit-identical to the prototype. Depths 116,822 (R0) / 218,176 (R1) / 241,447 (window). | ACCEPT (stack with WP3.3) |
+| `wp33-cell` (opus-high) | WP3.3 | **RETURNED.** Head `b6c47db` (code `d8532dd`). R1 1 major (test/report) + 3 minor fixed; R2 NO_NEW_CRITICAL_MAJOR (1 minor out of envelope, cleanup `4e2e836`). Full: 2233 passed (663 s); nocupy 1958 / 275 skipped (389 s). DR-14 CLOSES on accept. Depths 119,733 / 257,103 (evaluated: continue) / 304,760 (R2). | ACCEPT (stack on WP3.2) |
+| `wp35-cell` (sonnet-high) | WP3.5 | See the gen-6 announcement post for whether it returned before the rollover. Bounds FINAL = the tighter set (footage mean <= 1.0, share over 2/255 <= 1 %; testsrc2 mean <= 2.5; max reported) at `abee706`; R1 NO_NEW_CRITICAL_MAJOR (7 minor, cleanup). Its window was GRANTED ~00:05Z. Depths 90,237 / 194,772 / 240,808. | If it returned: accept. If not: run the full pytest yourself on its head (the window was its last step) and write the report from the ledger, or dispatch a sonnet-medium cell for that. |
+| `wp312-cell` (sonnet-high) | WP3.12 | Mid-build. Codec-independent store committed `b3ac336` (49 own tests green). CHARC ruled AD-5 (amended on main `a6ba740`): JPEG q75 4:4:4 default, q80 4:2:0 only if > 30 % faster per scrub step; codec identity in the cache version (test plants a different identity); means/gains <= 1e-3 gate, bounds deviation <= 10 % of range beyond the 8-bit floor; Pillow to `[project]` dependencies (X-B3: WP3.6 re-locks). Pending: JPEG codec + figures, EXCLUSIVE read-cost row (post OPEN/CLOSE to CHARC), report, Reviewer A, window. Depths 87,058 / 152,958. | RE-DISPATCH a fresh sonnet-high cell from its ledger + the AD-5 ruling (CHARC msg ~23:58Z), on the existing branch. |
+
+Window queue (X5): nobody holds a window after WP3.5. Tranche B (WP3.6 sonnet-high, WP3.16 opus-high;
+briefs FINAL at `2c5540a`) may dispatch NOW: two tranche-A cells have returned (CHARC's condition).
+Before dispatching WP3.6, note WP3.12 also moves Pillow (X-B3). WP3.6P is queued until photos.
 
 ### Where things stand -- the successor starts HERE
 
-1. **WAVE 1: three of four MERGED 2026-10-20** as one stacked gate (CHARC accepted the form,
-   `99e73cf967e2d559`): WP3.15 (`6a3ba24` + record `da54a47`), WP3.13 (`4a570f5` + record
-   `6dd5a00`), WP3.7 (`9157b62` + record `6e3417a`). Stack-top full pytest 1671 passed (599 s);
-   main gates at the final head in `docs/proofs/wp3.7-accept.md`. DR-34 (WP3.15), DR-35 (WP3.13),
-   DR-36 (WP3.7) banked; DR-32 CLOSED at the config boundary. Return reports posted to CHARC and an
-   info-update to the operator (thread wave1). CHARC QA CONFIRMED (`3ee39aedcd59a4aa`, every adjudication upheld incl. WP3.15's second B and
-   DR-34). Main hold RELEASED (gen 5's return report, 20:58Z).
-2. **WP3.1 ACCEPTED 2026-10-20 (gen 6)**: code + erratum/DR-37 `c1fd6ce`, record `f4acbd0`
-   (`docs/proofs/wp3.1-accept.md`). Patch-id `392da34a1461` author = candidate. Candidate
-   `1cf9564`: 1844 passed (618 s); CuPy unimportable 1738 passed / 106 skipped (361 s). Reviewer B
-   one pass NO_NEW_CRITICAL_MAJOR (4 minor, 2 advisory): B#4 report erratum at the gate; the rest
-   BANKED as DR-37 (a)-(e). Main gates on `c1fd6ce`: 1844 passed (538 s), harness 366. CHARC QA
-   CONFIRMED. **WAVE 1 CLOSED** (WP3.15, WP3.13, WP3.7, WP3.1).
-3. **Then:** wave-2 briefs (WP3.2, 3.3, 3.5, 3.6, 3.12, 3.16) at CHARC's commission
-   (`docs/briefs/wp2.4-phase3-frame.md`). WP3.12 can go now (WP3.15 merged, X2). Carry these
-   consumer notes into the briefs:
-   - WP3.3: `percentile` returns float32 (native precision, one cast at the return); the
-     high-low stretch bounds are within AD-11, not bit-identical to the prototype; cite DR-14.
-   - WP3.9: never an open-ended `-read_intervals` for frame counts (19 partial lists in 400 runs
-     on ffprobe 9.0.2); DR-36 (a), (b) are its to close (ascii in two warnings; the pts sha256
-     manifest check).
-   - WP3.10: FFmpeg gets the SafeWrite TEMPORARY path with `-y`, never the final path; on a
-     non-identity edit list `mvhd` and the longest-stream duration may differ (`mvhd` = the
-     presentation form, D94).
-   - WP3.12 / WP3.16: the `clearwater.config` API table in `docs/reports/wp3.15-...md`
-     (`app_locations().cache_dir`; shell start: `load_settings`, `configure_logging`,
-     `PresetStore(...).install_starters()`).
-   - WP3.14: one `Reservations` to both `plan_output` and `SafeWrite`; validate the output folder
-     and suffix at export start (`MissingFolderError` is the last net); DR-35.
-   - WP3.21: the device-to-host sync-point list in the WP3.1 ledger.
-   - WP4.3: start-up `remove_leftovers` before any job starts (DR-35 c).
-4. **Photos:** none supplied yet. Gate 2's largest-photo leg and the photo look check stay PENDING.
+1. **Accept WP3.2 + WP3.3 as one stacked gate** (practice note "Stacked merge gate"): `wp3.2-mc` from
+   `dfe65d5` onto main, `wp3.3-mc` from `b6c47db` onto `wp3.2-mc`; files are disjoint (both add
+   modules under `src/clearwater/methods/`). Patch-id per range; static gates; full pytest normal AND
+   cupy-unimportable on the stack top; Reviewer B per package (template
+   `clearwater-review-evidence\wp3.1\reviewB\` -- runner + prompt; say git is unavailable in WSL).
+   Check at the gate: (a) the "DR-19 rule" sections of the two reports are word for word the same;
+   (b) the X-4 message format is identical in both modules; (c) the `_derived_sigma` OverflowError
+   guard in both. Bank at accept: core `check_sigma` OverflowError on inf (next core touch); DR-14
+   CLOSED (WP3.3); DR-19 stays OPEN (WP3.4). Ask CHARC to HOLD main first; post the release.
+2. **WP3.5** and **WP3.12** per the table.
+3. **Tranche B** dispatch (WP3.6, WP3.16), worktrees from main after the WP3.2/3.3 merge.
+4. **Consumer notes for later briefs:** WP3.11 measures on the STORED round-tripped proxy (the
+   proxy is encoded and decoded in memory before any statistic; the float proxy is never a
+   statistics source); WP3.11's statistics stores on a key collide with a concurrent proxy store
+   (WP3.12 "second writer is a RuntimeError" covers both); WP3.11 reads spec 7.2 line 325 as
+   single-clip; WP3.10 cites DR-17 for untagged-output tags and WP3.5's `ffmpeg_color_names`;
+   WP3.21 gets WP3.2's per-call uploads (3C inverse, WB gains) and WP3.3's double high-pass on the
+   measure path; WP3.7's owner: BT.601 `smpte170m` primaries resolve as "unexpected" (WP3.5).
+   Earlier notes (WP3.9 bounded `-read_intervals`, WP3.10 `-y` on the temporary path, WP3.14 one
+   `Reservations`, WP4.3 `remove_leftovers` first) still stand.
+5. **Photos:** none supplied yet. Gate 2's largest-photo leg, the photo look check and WP3.6P wait.
+6. A stale pytest (pid 37676, wp33-cell's) spun for ~30 min; Stop-Process was refused by the
+   classifier at the cell's seat and NOT re-run at this seat; it finished on its own. If it recurs,
+   surface to the owner.
 
 ### Workstreams
 
@@ -237,6 +204,27 @@ Kept branches (evidence; do not delete unasked): `wp3.15`, `wp3.15-mc`, `wp3.13`
   - **Idle notifications:** nearly every cell message was followed by an idle notification
     summarising it; most predate the reply they cross. Check the timestamp, never reply to one.
 
+- **Gen-6 practice (wave 2):**
+  - **Never send a cell a ruling that changes work it may already be doing** without a numbered
+    FINAL line: WP3.5's bounds flipped three times when two of my messages crossed its round. Send
+    ONE ruling per question, mark it FINAL, and if a correction is needed say "supersedes my
+    message of HH:MM" in its first line.
+  - **Heavy non-exclusive measurements** (WP3.12's 4K decode) and full-pytest windows can share
+    the host if free memory stays above ~5 GB (check `Win32_OperatingSystem.FreePhysicalMemory`);
+    runs strictly sequential inside a window; a run that dies without a summary is reported, not
+    restarted.
+  - **A cell idle after a background run** may not wake on its completion: check its status file
+    and nudge it (WP3.2's runs finished ~20 min before it reported).
+  - **Drafting wave briefs:** two `general-purpose` helpers in parallel (numeric / I/O halves) with
+    one common commission file; a citation-check script (ids defined, quotes verbatim, paths) run
+    at this seat before the CHARC query. The script was in the gen-6 scratchpad
+    (`cite_check.py`); rewrite it if needed (about 70 lines).
+  - **Interface amendments** CHARC rules are ONE orchestrator commit on main before the tranche
+    branches (`f4cd1e4`), gated by the full pytest; `docs/architecture.md` section 3 is CHARC's and
+    may lag the code (AD-20 records the amendment).
+  - **Permission laundering:** a cell asked this seat to `Stop-Process` a pid the classifier
+    refused at its seat; refused here too and surfaced to the owner.
+
 ### Pending (still valid)
 
 - The smoothing default is 2.0 s (v0.5.4 7.2), with the step-aware temporal task for WP3.11;
@@ -246,4 +234,4 @@ Kept branches (evidence; do not delete unasked): `wp3.15`, `wp3.15-mc`, `wp3.13`
   without a fresh ruling.
 - IF-5 `VideoSink.abort` docstring cites D84; it should be D44/D85 (CHARC: fix at the next
   interface touch, not before).
-- Open debt: DR-1, 2, 6, 7, 8, 10-20, 22, 23, 25-31, 33-37 (`docs/debt-register.md`; DR-32 CLOSED at the config boundary).
+- Open debt: DR-1, 2, 6, 7, 8, 10-20, 22, 23, 25-31, 33-37 (DR-14 closes at WP3.3's accept) (`docs/debt-register.md`; DR-32 CLOSED at the config boundary).
