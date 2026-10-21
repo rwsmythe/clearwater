@@ -4,8 +4,10 @@ Brief `docs/briefs/wp3.4-brief.md` (FINAL, CHARC rulings `53d1d906e47fe2c9`); ro
 rulings in `docs/proofs/wp3.4-ledger.md` (orchestrator, generation 9). Branch `wp3.4`, base
 `de206e2`. Stack as locked: NumPy, SciPy and CuPy 14.x per `uv.lock`.
 
-**Status: DRAFT for Reviewer A round 1.** Open: the EXCLUSIVE speed row and memory re-check
-(task 8, windows not yet granted) and full pytest (in a window).
+**Status: DRAFT.** Reviewer A converged at round 1 (no critical or major finding; its three
+minors fixed). Full pytest with CuPy importable green at `84ad0ef` (3868 passed, 2 skipped).
+Open: the EXCLUSIVE speed row and memory re-check (task 8) and full pytest without CuPy
+importable and again on the final head (windows).
 
 ## What was built
 
@@ -21,7 +23,7 @@ rulings in `docs/proofs/wp3.4-ledger.md` (orchestrator, generation 9). Branch `w
 | `tests/test_methods_assembly_prototype.py` | analyze and render against the prototype; CPU against GPU; N10; V9 |
 | `tests/test_methods_assembly_v8.py` | V8 at method level (AD-11 as amended 2026-10-21) |
 | `tests/test_core_wp34.py`; `tests/test_core_speed.py` (extended) | the core fixes and `backend_for`; the instrument |
-| GRANTED outside the owned list (orchestrator rulings 2026-10-21) | `tests/test_core_select.py`: `name="cupy"` in `test_cupy_not_installed`'s fixture (DR-37 a); `tests/test_methods_compensation.py` and `tests/test_methods_fusion.py`: the two `__cause__` assertion lines and the docstring line beside each, OverflowError -> ValueError (DR-38 d, option A) |
+| GRANTED outside the owned list (orchestrator rulings 2026-10-21) | `tests/test_core_select.py`: `name="cupy"` in `test_cupy_not_installed`'s fixture (DR-37 a); `tests/test_methods_compensation.py` and `tests/test_methods_fusion.py`: the two `__cause__` assertion lines and the docstring line beside each, OverflowError -> ValueError (DR-38 d, option A); `src/clearwater/methods/compensation.py` and `methods/fusion.py`: the `_derived_sigma` docstring sentence on `check_sigma`'s OverflowError, reworded (DR-38 d; Reviewer A R1 F2, docstring-only grant) |
 
 Public API: `clearwater.methods.available_methods() -> dict[str, CorrectionMethod]`
 (`{"c3": ..., "ancuti2018": ...}`, new instances per call); `AncutiFusionMethod("c3" |
