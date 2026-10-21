@@ -151,8 +151,19 @@ by WP3.5's `_check` by design, so it cannot carry the test.
   `CREATE_NO_WINDOW` (a console may flash under a windowed GUI on Windows); that would be
   OS-specific code beyond AD-23, so it is not added here.
 
+### 9. Round-0 rulings (orchestrator, FINAL, 2026-10-21)
+
+Table APPROVED as written, the seek correction included. A: Q8 premise corrected at round 0,
+reproduced; ruled the cached CUDA check (no retry path), test with `CUDA_VISIBLE_DEVICES=-1`.
+B: ruled as recommended (one WARNING, no raise; Limits says reasoned, not reproduced). C: the
+footage and gpu legs run only in a granted window. CREATE_NO_WINDOW: banked by the orchestrator
+for WP4.3; one Limits line. Raised during the build (message to the dispatcher, ruling pending):
+WP3.7's `tests/test_io_video_probe_rules.py::test_the_package_exists_and_has_the_expected_modules`
+pins the module set of `io/video` and fails with `decode.py` and `pipes.py` (requested: a
+two-line grant).
+
 ## Round ledger
 
 | Round | Crit | Major | Minor | In-env | Out-env | NEW | REOPENED | Reverts | Fix kind | Depth |
 |---|---|---|---|---|---|---|---|---|---|---|
-| 0 (design) | - | - | - | - | - | - | - | - | - | (dispatcher) |
+| 0 (design) | - | - | - | - | - | - | - | - | - | 139,790 |
