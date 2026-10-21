@@ -29,7 +29,15 @@ from lookcheck.frames import read_png16
 from prototype import pipeline as proto
 from prototype import temporal
 from prototype.params import Params
-from test_methods_assembly import WIDE, analyze_all, as_image, host, method, scene
+from test_methods_assembly import (
+    WIDE,
+    analyze_all,
+    as_image,
+    assert_same_bits,
+    host,
+    method,
+    scene,
+)
 
 METHOD_IDS = ("c3", "ancuti2018")
 STILLS = [
@@ -187,7 +195,7 @@ def test_render_against_correct_with_the_same_record(
     p = prototype_params(m, params)
     got = host(m.render(image, params, records).pixels)
     expected = proto.correct(pixels, p, statistics=hook(m, records, p.blue_compensation)).output
-    assert got.tobytes() == expected.tobytes(), (image_name, floor_binds(records))
+    assert_same_bits(got, expected, (image_name, floor_binds(records)))
 
 
 @pytest.mark.parametrize("method_id", METHOD_IDS)
@@ -205,7 +213,7 @@ def test_render_from_a_smoothed_record_against_correct(method_id: str) -> None:
     got = host(m.render(as_image(pixels), params, records).pixels)
     expected = proto.correct(pixels, p, statistics=hook(m, records, p.blue_compensation)).output
     assert not floor_binds(records)
-    assert got.tobytes() == expected.tobytes()
+    assert_same_bits(got, expected)
 
 
 # -- CPU against GPU (AD-11) and the same device twice (N10) ---------------------------------------
@@ -258,8 +266,8 @@ def test_same_device_twice_is_bit_identical(method_id: str, device: str) -> None
     for stage in m.stages:
         for name in stage.statistics:
             a, b = first_records[stage.name][name], second_records[stage.name][name]
-            assert np.asarray(a).tobytes() == np.asarray(b).tobytes()
-    assert first_out.tobytes() == second_out.tobytes()
+            assert_same_bits(np.asarray(a), np.asarray(b))
+    assert_same_bits(first_out, second_out)
 
 
 # -- V9 at method level ----------------------------------------------------------------------------
@@ -298,7 +306,7 @@ def test_v9_neutral_parameters_give_the_input(
     image = as_image(pixels, backend)
     records = analyze_all(m, image, {})
     original = host(m.render(image, {"blend_with_original": 100.0}, records).pixels)
-    assert original.tobytes() == pixels.tobytes()
+    assert_same_bits(original, pixels)
 
 
 def test_v9_planted_non_neutral_fails(load: Callable[[str], np.ndarray]) -> None:

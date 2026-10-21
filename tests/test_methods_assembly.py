@@ -104,6 +104,33 @@ def host(a: Any) -> np.ndarray:
     return a.get() if hasattr(a, "get") else np.asarray(a)
 
 
+def assert_same_bits(a: Any, b: Any, context: object = None) -> None:
+    """Assert two host arrays are bit-identical (dtype, shape, bytes), failing with a short message.
+
+    A bare ``assert a.tobytes() == b.tobytes()`` makes pytest diff the full byte strings at
+    ``-v``, which on a scene-sized array takes minutes whenever a planted test expects the
+    failure.
+    """
+    x, y = np.asarray(a), np.asarray(b)
+    if x.dtype == y.dtype and x.shape == y.shape and x.tobytes() == y.tobytes():
+        return
+    if x.dtype != y.dtype or x.shape != y.shape:
+        detail = f"{x.dtype}{x.shape} against {y.dtype}{y.shape}"
+    else:
+        width = x.dtype.itemsize
+        bits_differ = (x.reshape(-1).view(np.uint8) != y.reshape(-1).view(np.uint8)).reshape(
+            -1, width
+        )
+        difference = np.abs(x.astype(np.float64) - y.astype(np.float64))
+        detail = (
+            f"{int(bits_differ.any(axis=1).sum())} of {x.size} elements differ, "
+            f"max abs difference {float(np.nanmax(difference)) if difference.size else 0.0:.6g}"
+        )
+    raise AssertionError(
+        f"not bit-identical: {detail}" + ("" if context is None else f" ({context})")
+    )
+
+
 def values_of(m: CorrectionMethod, **overrides: Any) -> dict[str, Any]:
     values = {p.name: p.default for p in m.parameters}
     values.update(overrides)
@@ -429,7 +456,7 @@ def test_records_accept_lists_and_float32_arrays() -> None:
     own = analyze_all(m, image, {})
     as_lists = {s: {k: np.asarray(v).tolist() for k, v in r.items()} for s, r in own.items()}
     reference = host(m.render(image, {}, own).pixels)
-    assert host(m.render(image, {}, as_lists).pixels).tobytes() == reference.tobytes()
+    assert_same_bits(host(m.render(image, {}, as_lists).pixels), reference)
 
 
 # -- closed form (AD-7, Y-1 d) ---------------------------------------------------------------------
@@ -595,7 +622,7 @@ def check_render_from_supplied_records(m: CorrectionMethod) -> None:
         records = smoothed_like(m, analyze_all(m, image, params))
         got = host(m.render(image, params, records).pixels)
         expected = composed_render(m, pixels, params, records)
-        assert got.tobytes() == expected.tobytes(), params
+        assert_same_bits(got, expected, params)
 
 
 @pytest.mark.parametrize("method_id", METHOD_IDS)
@@ -627,7 +654,7 @@ def test_render_output_type_device_and_range(method_id: str, backend: CoreBacken
     )
     rendered = m.render(frame, WIDE, records)
     assert type(rendered) is Frame and rendered.pts_ticks == 1001
-    assert host(rendered.pixels).tobytes() == pixels.tobytes()
+    assert_same_bits(host(rendered.pixels), pixels)
 
 
 def check_blend_direction(m: CorrectionMethod) -> None:
@@ -637,10 +664,10 @@ def check_blend_direction(m: CorrectionMethod) -> None:
     fused = host(m.render(image, {**WIDE, "blend_with_original": 0.0}, records).pixels)
     original = host(m.render(image, {**WIDE, "blend_with_original": 100.0}, records).pixels)
     half = host(m.render(image, {**WIDE, "blend_with_original": 50}, records).pixels)
-    assert original.tobytes() == pixels.tobytes(), "100 % is the original"
+    assert_same_bits(original, pixels, "100 % is the original")
     assert not np.array_equal(fused, pixels), "0 % is the corrected image"
     expected_half = (0.5 * fused + 0.5 * pixels).astype(np.float32)
-    assert half.tobytes() == expected_half.tobytes()
+    assert_same_bits(half, expected_half)
 
 
 @pytest.mark.parametrize("method_id", METHOD_IDS)
@@ -923,7 +950,7 @@ def test_types_and_unknown_names_refused(method_id: str) -> None:
     for p in m.parameters:
         if p.type == "float" and float(p.default).is_integer():  # type: ignore[arg-type]
             as_int = host(m.render(image, {p.name: int(p.default)}, records).pixels)  # type: ignore[call-overload]
-            assert as_int.tobytes() == reference.tobytes(), p.name
+            assert_same_bits(as_int, reference, p.name)
         wrong: list[Any] = ["1", [1.0]]
         wrong += [1.5] if p.type == "int" else []
         wrong += [1] if p.type == "bool" else [True]
