@@ -269,22 +269,38 @@ appear). Mechanical assertions: banner gpt-5.6-sol / high; ERROR lines not trans
 present; 15 `succeeded in`; VERDICT anchored. Reviewer ran nothing (read-only sandbox): all REASONED; the cell
 reproduced #1, #3, #4, #5, #9 with probes.
 
-| # | Adjudicated | Finding | Planned fix |
+| # | Adjudicated | Finding | Fix (R1 remediation) |
 |---|---|---|---|
-| 1 | MAJOR, in env | HEIC `rICC` profile discarded (reader accepts only `prof`) | accept `rICC`; test by patching a fixture's colr box |
-| 2 | MAJOR, out of env | only the first `ipma` box read | iterate every `ipma`; two-box test |
-| 3 | MINOR (reviewer MAJOR), out | `clap` over `ispe` is deliberate; a missing `ispe` unchecked | refuse a primary with no `ispe`; document the clap precedence |
-| 4 | MINOR (reviewer MAJOR), marginal | nclx primaries 2 with a specified transfer read as untagged | primaries `unknown`, transfer from the code, `assumed False` |
-| 5 | MAJOR, in env | TIFF source: Interop IFD lost, dangling 40965 pointer | materialise the Interop IFD in `from_tiff`; hand-built TIFF test; report sentence |
-| 6 | MINOR (reviewer MAJOR), out | pixel limit not applied to 16-bit PNG | check IHDR size before decoding |
-| 7 | MINOR (reviewer MAJOR), out | DNG tag walk skips BigTIFF | walk BigTIFF IFD0 |
-| 8 | MINOR (reviewer MAJOR), out | 16-bit palette colour map reduced to 8 bits | keep 16 bits when the map needs it |
-| 9 | MINOR | non-ASCII file name makes a non-ASCII message | backslashreplace in `PhotoReadError.__init__` |
-| 10 | MINOR | no alpha warning on the 16-bit PNG path | add the warning |
-| 11 | MINOR | `photo_check` stored size only for HEIC | record for every format |
-| 12 | MINOR | stale `srgb_profile.py` docstring | fix |
+| 1 | MAJOR, in env | HEIC `rICC` profile discarded (reader accepts only `prof`) | FIXED c5aa8fe (reader accepts `rICC`; fail-before: icc None, assumed True) |
+| 2 | MAJOR, out of env | only the first `ipma` box read | BANKED (named limit in the report; no code) |
+| 3 | MINOR (reviewer MAJOR), out | `clap` over `ispe` is deliberate; a missing `ispe` unchecked | FIXED c6cd2fd, 25c702c (primary with no `ispe` refused `unreadable`; clap precedence documented in `expected_size`) |
+| 4 | MINOR (reviewer MAJOR), marginal | nclx primaries 2 with a specified transfer read as untagged | FIXED e31e5cb (nclx codes read one at a time; (2,1) and (2,13) give primaries unknown, assumed False) |
+| 5 | MAJOR, in env | TIFF source: Interop IFD lost, dangling 40965 pointer | FIXED fbde32c (`from_tiff` carries the Interop IFD; unreadable pointer dropped; report sentence made true) |
+| 6 | MINOR (reviewer MAJOR), out | pixel limit not applied to 16-bit PNG | BANKED (named limit; exact-length check already refuses mismatched data) |
+| 7 | MINOR (reviewer MAJOR), out | DNG tag walk skips BigTIFF | BANKED (named limit: BigTIFF DNG recognised by extension only) |
+| 8 | MINOR (reviewer MAJOR), out | 16-bit palette colour map reduced to 8 bits | BANKED (named limit: palette colour map to 8 bits, documented in round 0) |
+| 9 | MINOR | non-ASCII file name makes a non-ASCII message | FIXED e79562c (backslashreplace in `PhotoReadError.__init__`) |
+| 10 | MINOR | no alpha warning on the 16-bit PNG path | FIXED 6945d13 (warning in `_read_png16` for colour types 4 and 6) |
+| 11 | MINOR | `photo_check` stored size only for HEIC | FIXED 0a45d2a (`_stored_size`: ispe for HEIC, else decoded size un-turned for tags 5-8) |
+| 12 | MINOR | stale `srgb_profile.py` docstring | FIXED 69ebae5 (docstring) |
 
-Remediation NOT started: this turn made no product-code change (yield at the round boundary).
+### R1 remediation (cell, orchestrator gen 8; head after remediation `25c702c`, report/ledger commit follows)
+
+Rulings applied as dispatched: remediate #1, #5 (blocking), #3, #4, #9-#12; bank #2, #6, #7, #8 as named
+limits (report "Limits"), no code. Each fix has a test in `tests/test_io_photo_r1.py` (14 cases) that
+failed on `983bff1` before the fix (run by restoring the old file from git into the working tree, never
+`git stash`): #1 the Display P3 fixture with `colrprof` patched to `colrrICC` read `icc_profile None,
+assumed True`; #5 a hand-built TIFF with an Exif IFD pointing to an Interop IFD gave an empty Interop IFD
+and a dangling pointer, and an unreadable pointer was kept; #3 `heic8-uniform-none` with every `ispe`
+renamed read (libheif still decodes it; `heic-ad24-both` is already refused by libheif itself, so the
+test uses the first); #4 nclx (2,1) and (2,13) read as `bt709`/`srgb`, assumed True; #9 the message for a
+non-ASCII name was not ASCII; #10 no `alpha channel dropped` record on 16-bit colour types 4 and 6; #11
+`stored_size` was None for non-HEIC (asserted in `tests/test_photo_check.py`); #12 docstring only.
+Side effects found and handled: the planted `ispe`-unchecked test patched `expected_size`, which the new
+no-`ispe` guard made insufficient; the check is now `reader._check_decoded_size` and the planted test
+patches that (commit `25c702c`). Own tests `tests/test_io_photo_*.py` + `tests/test_photo_check.py`: 418
+passed, 1 skipped; ruff check, ruff format --check, mypy clean. Full suite not run (the orchestrator runs it
+on the candidate). LF blobs verified (no CR in any changed blob).
 
 ## State at the orchestrator gen-7 rollover -- resume here
 

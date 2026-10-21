@@ -25,10 +25,15 @@ D116.
 
    HEIC (AD-24): libheif applies `irot`/`imir`; `heif_boxes.py` reads `pitm` -> `ipma` -> `ipco` for the
    primary item; the EXIF tag is applied additionally only when the primary has no `irot`; the primary's
-   `ispe` (or `clap`), turned by a 90/270 `irot`, must equal the decoded size or the file is refused as
-   unreadable. `PhotoMetadata.orientation` is the source tag. Auxiliary images and thumbnails are never
+   `ispe` (or `clap`, which wins on purpose: libheif crops to it, so the decoded size is the `clap`
+   size), turned by a 90/270 `irot`, must equal the decoded size or the file is refused as unreadable; a
+   primary item with no `ispe` at all (non-conformant) is refused as unreadable, by name. A HEIC colour
+   box of type `prof` or `rICC` is the embedded ICC profile; nclx primaries and transfer codes are read
+   one at a time (code 2 "unspecified" gives `unknown` for that label, the photo is untagged only when
+   both are unspecified). `PhotoMetadata.orientation` is the source tag. Auxiliary images and thumbnails are never
    read. DNG is refused before any decode (extension `.dng`, or DNGVersion 50706 in IFD0 of any classic
    TIFF-structured file); unknown formats are refused; format is detected by content.
+   `PhotoReadError` messages are ASCII: a non-ASCII file name is written as backslash escapes.
 3. **Writer**: one stdlib writer for 8 and 16 bit (`png.py`): `IHDR`, `iCCP` (source profile
    byte-identical, name the profile's own description when it obeys the PNG keyword rule else
    `ICC profile`), `eXIf`, the provenance `iTXt` (`clearwater-provenance`, UTF-8 JSON, `allow_nan=False`,
@@ -45,7 +50,7 @@ D116.
    | IFD1 (thumbnail) | removed |
    | Exif IFD PixelXDimension / PixelYDimension | written size |
    | IFD0 Software | `Clearwater` (the version is in the provenance chunk) |
-   | every other IFD0, Exif, Interop, GPS field | kept (test: Make, Model, DateTime, DateTimeOriginal, FNumber, GPS ref) |
+   | every other IFD0, Exif, Interop, GPS field | kept (tests: Make, Model, DateTime, DateTimeOriginal, FNumber, GPS ref; the Interop IFD of a JPEG/PNG/HEIC block survives `edit`; a TIFF source's Interop IFD is carried as an IFD by `from_tiff`, an unreadable Interop pointer is dropped rather than left dangling) |
    | source without EXIF | minimal block: Orientation 1, dimensions, Software |
    | HEIC auxiliary images | dropped by construction (a PNG holds one image) |
 5. **DR-31 (1) closes**: the full PNG keyword rule (1-79 Latin-1 bytes, none in 0-31 or 127-160, no
@@ -87,9 +92,11 @@ truncated JPEG, PNG, 16-bit PNG, HEIC and TIFF, a missing, empty, unknown and di
 - Dependency rule: importing `clearwater.io.photo` in a fresh interpreter loads nothing from
   `clearwater.gui/.jobs/.methods/.core`, `PySide6`, `cupy`, `av` (subprocess test), and no module names
   them (AST test).
-- `uv run ruff check .`, `ruff format --check .`, `mypy` (strict) clean; photo tests 404 passed, 1
-  skipped (the footage leg). Full suite at `983bff1` (dispatcher's window, 2026-10-21 02:5xZ): normal 3308 passed,
-  2 skipped, 0 failed; with `cupy` unimportable 2790 passed, 520 skipped, 0 failed.
+- `uv run ruff check .`, `ruff format --check .`, `mypy` (strict) clean; photo tests 418 passed, 1
+  skipped (the footage leg) after the Reviewer A round-1 remediation (`tests/test_io_photo_r1.py`: 14 new
+  cases, each failing on `983bff1`). Full suite at `983bff1` (dispatcher's window, 2026-10-21 02:5xZ):
+  normal 3308 passed, 2 skipped, 0 failed; with `cupy` unimportable 2790 passed, 520 skipped, 0 failed.
+  The full suite on the remediated head is run by the orchestrator on the merge candidate.
 - 48 MP informational figures (a 8000 x 6000 16-bit RGB PNG with filters 0-4 cycling by row, built
   in scratch, not a product test; shared laptop, untimed by the hardware rule): read 10.6 s,
   process peak 1.67 GiB (result float32 549 MiB); write 11.1 s with no peak increase.
@@ -140,6 +147,17 @@ merge, never a hand merge.
 - Orientation for a HEIC with `imir` and no `irot` follows AD-24 literally (the tag is applied when
   `irot` is absent).
 - The 16-bit PNG reader holds the whole file and two decoded copies (about 1.7 GiB at 48 MP).
+- Banked after Reviewer A round 1 (out of the declared envelope, no code):
+  - Only the first `ipma` box of a HEIC is read; a file whose primary item's associations are split
+    over several `ipma` boxes (non-Apple encoders; an iPhone file carries one) would read as having none
+    of the later ones (round-1 #2, nominal major).
+  - The pixel limit (`MAX_PIXELS`, 150 MP) is not applied to the 16-bit PNG path; a PNG whose data does
+    not match its header is already refused by the exact-length check, so this is a resource limit only
+    (#6).
+  - The DNG tag walk (`has_dng_tag`) reads classic TIFF only; a BigTIFF (`II+`/`MM+`) DNG is not
+    recognised by tag (its `.dng` extension is) and goes on to the TIFF reader (#7).
+  - A palette TIFF's 16-bit colour map is reduced to 8 bits (palette images are 8-bit indices; documented
+    in the round-0 table) (#8).
 
 ## Waits for real photos (WP3.6P, question 11)
 
