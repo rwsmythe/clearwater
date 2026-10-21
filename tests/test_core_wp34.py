@@ -67,7 +67,7 @@ def pre_fix_reason(error: Exception) -> str:
     return "CPU: CuPy failed to load"
 
 
-# -- DR-37 (a) ------------------------------------------------------------------------------------
+# -- DR-37 (a) -------------------------------------------------------------------------------------
 
 
 @pytest.mark.parametrize(
@@ -109,7 +109,7 @@ def test_dr37a_cupy_blocked_in_sys_modules_is_not_installed(
     assert reason() == "CPU: CuPy not installed"
 
 
-# -- DR-38 (c): check_rgb refuses an empty spatial size ---------------------------------------------
+# -- DR-38 (c): check_rgb refuses an empty spatial size --------------------------------------------
 
 
 @pytest.mark.parametrize("shape", [(0, 1, 3), (1, 0, 3), (0, 0, 3)])
@@ -144,7 +144,7 @@ def test_dr38c_channel_means_refuses_empty() -> None:
         core.channel_means(NumpyBackend(), np.zeros((0, 4, 3), dtype=np.float32))
 
 
-# -- DR-38 (d): check_sigma raises ValueError, never OverflowError -------------------------------------
+# -- DR-38 (d): check_sigma raises ValueError, never OverflowError ---------------------------------
 
 
 @pytest.mark.parametrize("sigma", [1e308, sys.float_info.max, 4.5e307])
@@ -165,7 +165,7 @@ def test_dr38d_bound_and_messages_unchanged() -> None:
             check_sigma(bad)
 
 
-# -- question 2: backend_for ------------------------------------------------------------------------
+# -- question 2: backend_for -----------------------------------------------------------------------
 
 
 def test_backend_for_cpu_is_the_process_numpy_backend() -> None:

@@ -287,6 +287,28 @@ small and unblock the method code), then `schema.py` + its tests, then `ancuti_f
 (tasks 2-4, 6) with the task-9 roster. The EXCLUSIVE speed/memory windows (task 8) only when
 the code is final and only on the dispatcher's grant; full pytest only in a granted window.
 
+## Build (cell 2, 2026-10-21)
+
+Commits `937d842`..`e5e2a93` on `wp3.4` (DR-37 b; core fixes + `backend_for`; the WP3.1
+fixture line; methods + schema + registry; prototype/CPU-GPU/N10/V9 tests; `core_speed`
+`--whole`/`--memory`; report draft). Static gates green (ruff check, ruff format --check, mypy
+strict, 109 files). Targeted tests green: `test_methods_assembly.py` 76, `..._prototype.py` 169,
+`test_core_speed.py` 21, core + WP3.2/WP3.3 files 571 + 899 (CPU and GPU).
+
+Raised to the dispatcher in chat (answers arrive at the next yield):
+
+- **B-1 (DR-37 a):** `tests/test_core_select.py::test_cupy_not_installed` raises a nameless
+  `ModuleNotFoundError`; under the DR-37 (a) rule it reads "failed to load". Fixed by
+  `name="cupy"` in that fixture (commit `ce8a436`, droppable); a WP3.1 test file outside the
+  owned list.
+- **B-2 (DR-38 d, FINDING):** five WP3.2/WP3.3 tests assert `__cause__` is OverflowError
+  (`test_methods_compensation.py:839`, `test_methods_fusion.py:693`); with `check_sigma`
+  raising ValueError they fail (messages unchanged). Options: (A) amend the two assertion lines
+  (recommended), (B) a dual-class exception, (C) re-bank (d). The fix is in `c99debb`.
+
+Probe-derived figures for the report: `C:\Users\rwsmy\clearwater-review-evidence\wp3.4\figures\`
+(`figures.py`, `figures.txt`).
+
 ## Cumulative round ledger
 
 | round | depth (dispatcher) | critical | major | minor | in / out envelope | NEW / REOPENED | reverts | fixes: product / test-only | transport, CLI |
