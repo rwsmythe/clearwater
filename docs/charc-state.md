@@ -39,10 +39,9 @@ for a push (verify `git status -sb`).
 
 ### Live workstreams (verify `git worktree list`, `docs/orchestrator-state.md`, `ListAgents`)
 
-- **Orchestrator generation 6** launching 2026-10-20 ~21:34Z (gen 5 `clearwater-orchestrator-20261020-0802`
-  rolled at ~430K with no live cell, state 26b095d; gen 6 announces on pickup and is the sole drainer). Gen 4 rolled at ~300K before the wave-1 fan-out (CHARC upheld; the
-  pre-dispatch exception is written in `docs/model-prompting-standard.md` s.9, 2bd9894). Always
-  re-read `comms/.launch-sessions.json` before a cue.
+- **Orchestrator generation 7** launching 2026-10-21 ~00:19Z (gen 6 `clearwater-orchestrator-20261020-1134`
+  rolled at ~415K, state 9aae379, every cell at a clean stop; gen 7 announces on pickup and is the
+  sole drainer; read `comms/.launch-sessions.json` before any cue).
 - **WP2.3 fixtures ACCEPTED** 2026-10-20, main d605925 (record row e357e56; record
   `docs/proofs/wp2.3-accept.md`; DR-33 banked, B re-run majors adjudicated NOT BLOCKING, upheld).
   **CHARC QA CONFIRMED** at this seat (patch-id 6712360de3e5 on both ranges; B md5s both passes;
@@ -83,12 +82,15 @@ for a push (verify `git status -sb`).
   version; means/gains <= 1e-3 gate, bounds deviation <= 10 % of range reported; **owner sees the
   proxy-bound effect at CP5** (AD-4 11-14 % + AD-5 ~8 % narrower = slightly stronger stretch);
   Pillow becomes a product dependency at WP3.12; WP3.11 measures on the stored proxy only.
-- **Wave 2 tranche A LIVE** (dispatched ~22:45Z from main 2c5540a; IF-7 amendment landed f4cd1e4,
-  verified at this seat against the ruling; architecture IF-7 block updated by CHARC): WP3.2
-  `wp32-cell` opus-high `.worktrees/wp3.2`; WP3.3 `wp33-cell` opus-high `.worktrees/wp3.3`; WP3.5
-  `wp35-cell` sonnet-high `.worktrees/wp3.5`; WP3.12 `wp312-cell` sonnet-high `.worktrees/wp3.12`
-  -- all OCCUPIED. WP3.12's exclusive read-cost window: the orchestrator posts OPEN/CLOSE; no suite
-  here while open. Tranche B (WP3.6, WP3.16) once two tranche-A cells return.
+- **Wave 2 tranche A at clean stops** (2026-10-21 00:19Z): WP3.2 RETURNED head dfe65d5 (R1
+  converged); WP3.3 RETURNED head b6c47db (R2 converged; DR-14 closes); gen 7 accepts both as one
+  stacked gate under `methods/` (HOLD main request coming). WP3.5 RETURNED head abee706 (R1
+  converged). WP3.12 at its EXCLUSIVE-REQUEST yield, head 82a5dbb (JPEG codecs per AD-5, Pillow
+  moved); gen 7 grants the read-cost window (OPEN/CLOSE posted; no suite here while open) and
+  re-dispatches a fresh cell from the ledger; smoke: q80 4:2:0 ~15 % faster, under the 30 %
+  threshold, so q75 4:4:4 stands unless the official row differs. Worktrees `.worktrees/wp3.{2,3,5,12}`
+  OCCUPIED until each accept is QA-confirmed here. Tranche B (WP3.6, WP3.16) dispatches after the
+  WP3.2/3.3 merge.
 - **Wave 2 COMMISSIONED** (CHARC ruling 1ebfba54, 2026-10-20 ~22:07Z): orchestrator gen 6 drafts
   all six briefs (WP3.2, WP3.3, WP3.5 opus-high; WP3.6, WP3.12, WP3.16 sonnet-high) against the
   Phase 3 frame, sends them as one set for CHARC approval; tranche A = WP3.2/3.3/3.5/3.12 on
