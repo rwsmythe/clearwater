@@ -262,3 +262,28 @@ passed. Consequence: the one-line product change `spatial_sigma(shape, float(fra
 
 Gates: ruff check, ruff format --check, mypy clean; own two test files 527 passed with CuPy, 284 passed
 and 243 skipped with `cupy` / `cupyx` = None.
+
+### Reviewer B remediation, pass 1, addendum (orchestrator ruling)
+
+Ruling: the audit's items 1 and 2 are the same defect class as B-1 (a NumPy scalar parameter changes the
+result against the Python-float call); fix 1, 2 and 3 in the owned files, with tests for `np.float64`,
+`np.float32` and Python `int`, each equal to the Python-float call.
+
+| Item | Commit | Change |
+|---|---|---|
+| CHARC int case for all six `compensate_c3` parameters; audit 1 (fractions) | 97ff0c3 | `_derived_sigma`: `spatial_sigma(shape, float(fraction))`; tests described in the section above |
+| audit 2 `applied_gains`; audit 3 `effective_alphas` | dd47065 | `float(...)` on `white_balance_strength`, `max_white_balance_gain`, `alpha` and each non-None cap (the gray-world gains were already converted by `_triple`) |
+
+Failing before dd47065 (the new tests against the source at `97ff0c3`, 5 failed, 19 passed; the stash
+run is `before3.txt` in the scratchpad):
+
+- `test_applied_gains_scalar_parameters_equal_python_floats[float32-white_balance_strength]` and
+  `[float32-all]`: the gains differ (float32 scalar arithmetic).
+- `test_effective_alphas_scalar_parameters_equal_python_floats[float32-red_gain_cap]`,
+  `[float32-blue_gain_cap]` and `[float32-all]`: the capped alpha differs.
+- REGRESSION CASES (already passing before): every `np.float64` and `int` case, `np.float32` `alpha`,
+  `np.float32` `max_white_balance_gain` and `np.float32` gray-world gains (the last through `_triple`;
+  the clamp value goes through `float(...)` at the end, so the result coincided).
+
+Gates on dd47065: ruff check, ruff format --check, mypy clean; the two own test files 551 passed with
+CuPy; 308 passed, 243 skipped with `cupy` / `cupyx` = None. Full suite not run (dispatcher's).
