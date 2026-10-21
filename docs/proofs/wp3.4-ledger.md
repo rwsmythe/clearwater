@@ -333,3 +333,19 @@ Probe-derived figures for the report: `C:\Users\rwsmy\clearwater-review-evidence
 | 0 (design) | 192,064 | -- | -- | -- | -- | -- | -- | -- | -- (no review round; design table + rulings) |
 | build (cell 2) | 346,044 | -- | -- | -- | -- | -- | -- | -- | -- (no review round; build + rulings applied; re-seat) |
 | full pytest (cell 2) | 368,709 | -- | -- | -- | -- | -- | -- | -- | -- (3868 passed, 2 skipped; hand-off to cell 3) |
+| 1 (cell 3) | (dispatcher) | 0 | 0 | 3 | 2 in / 1 out (F1) | 3 NEW / 0 | 0 | pending: F1 product (owned), F3 report; F2 needs a grant | WSL, codex-cli 0.162.1, gpt-5.6-sol high; 17 succeeded; VERDICT NO_NEW_CRITICAL_MAJOR -> TERMINATES |
+
+### Round 1 (cell 3, 2026-10-21) -- verdict NO_NEW_CRITICAL_MAJOR (ROUND_TERMINATION)
+
+Head `dd8bfa4`; evidence `C:\Users\rwsmy\clearwater-review-evidence\wp3.4\r1\` (prompt, diff,
+transcript, `adjudication.md`, `md5sums.txt`). One echoed `ERROR` (the sandbox could not launch the
+Windows venv), not transport. Findings (all MINOR, all CONFIRMED):
+
+- **F1** (OUT of envelope): `_checked_record` lets OverflowError escape for a huge Python int
+  (reproduced: `[10**400, .5, .5]` -> OverflowError). Cleanup: catch it as the Y-2 ValueError + test.
+- **F2**: the WP3.2/WP3.3 `_derived_sigma` docstrings (`compensation.py:271`, `fusion.py:428`)
+  still describe an OverflowError from `check_sigma`, false since DR-38 (d). Outside the granted
+  lines: recommend a docstring-only grant; else bank.
+- **F3**: the report's status line is stale (full pytest ran green). Cleanup.
+
+No change made in the adjudicating turn.
