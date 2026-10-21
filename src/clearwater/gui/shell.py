@@ -151,7 +151,9 @@ def start_up(locations: Locations, engines: Engines) -> StartUp:
         settings = Settings()
         path = locations.settings_file
         text = SETTINGS_FORMAT_TEXT.format(path=path, error=error)
-        settings_refusal = messages.refusal(path, text)
+        settings_refusal = dataclasses.replace(
+            messages.refusal(path, text), owner=messages.OWNER_START
+        )
         problems.append(settings_refusal)
     presets = PresetStore(locations.presets_dir)
     try:
@@ -443,7 +445,8 @@ class MainWindow(ShellWindow):
             for message in result.messages:
                 self.presenter.present(message)
             return
-        self.presenter.clear()
+        for owner in messages.SHELL_OWNERS:  # the shell's own; a panel's messages are its own
+            self.presenter.clear(owner=owner)
         self.session._open(result.source)
         for message in result.messages:
             self.presenter.present(message)

@@ -210,8 +210,8 @@ class Session(QObject):
     - ``frame_decoded(object)``: a :class:`FrameOutcome`, once the decode started by the latest
       :meth:`set_position` has ended: the frame became :meth:`current_image` (emitted after it
       did), or the decode failed. Not emitted for a request superseded by a later
-      ``set_position`` or by ``preview.show``, nor after the source changed. Added after the
-      WP3.16 accept (additive, DR-44 (a)).
+      ``set_position`` or by ``preview.show``, nor after the source changed, nor once the
+      window has begun to close. Added after the WP3.16 accept (additive, DR-44 (a)).
     """
 
     source_changed = Signal(object)
@@ -476,7 +476,9 @@ class MessagePresenter(Protocol):
         """Remove banner messages.
 
         A panel passes its own ``owner``, so that its success clears only its own messages
-        (``owner`` added after the WP3.16 accept, additive, DR-44 (b)).
+        (``owner`` added after the WP3.16 accept, additive, DR-44 (b)). The shell clears only
+        its own banners (owners ``"shell.*"``) when a new source opens; a panel clears its own,
+        for example on ``source_changed``.
 
         Args:
             severity: Only messages of this severity, or None for any severity.

@@ -14,11 +14,13 @@ import math
 import os
 import subprocess
 import sys
+import threading
 from pathlib import Path
 
 import numpy as np
 import pytest
 from PySide6.QtGui import QColorSpace, QImage
+from PySide6.QtWidgets import QWidget
 
 import gui_support
 from clearwater.config import new_parameter_set
@@ -33,7 +35,7 @@ from clearwater.gui.imaging import (
     to_display_uint8,
     view_factor,
 )
-from clearwater.gui.messages import BannerWidget
+from clearwater.gui.messages import BannerWidget, DialogPresenter
 from clearwater.gui.session import ShellSession
 from clearwater.interfaces import ColorDescription, Image
 from clearwater.interfaces.stubs import StubArrayBackend, StubCorrectionMethod
@@ -574,6 +576,96 @@ def test_a_shell_success_clears_only_its_own_error(make_window, qtbot) -> None:
     assert [m.text for m in presenter.of("error")] == ["preset not saved"]
     presenter.clear("error", owner="presets")
     assert presenter.of("error") == []
+
+
+class _GatedFrames:
+    """Wraps a stub ``frames``: once armed, the next call blocks until released."""
+
+    def __init__(self, original) -> None:
+        self.original = original
+        self.armed = False
+        self.entered = threading.Event()
+        self.release = threading.Event()
+
+    def __call__(self, *args, **kwargs):
+        if self.armed:
+            self.armed = False
+            self.entered.set()
+            assert self.release.wait(10)
+        return self.original(*args, **kwargs)
+
+
+def _gated_window(make_window, qtbot):
+    engines = video_engines([frame(48, 64, ticks=0), frame(48, 64, ticks=9000)])
+    gate = _GatedFrames(engines.video_source.frames)
+    object.__setattr__(engines.video_source, "frames", gate)
+    window = make_window(engines)
+    open_and_wait(qtbot, window, Path("clip.mp4"))
+    outcomes: list[object] = []
+    window.session.frame_decoded.connect(outcomes.append)
+    return window, gate, outcomes
+
+
+def test_frame_decoded_is_not_emitted_for_a_request_superseded_in_flight(make_window, qtbot):
+    window, gate, outcomes = _gated_window(make_window, qtbot)
+    gate.armed = True
+    window.session.set_position(0)
+    assert gate.entered.wait(10)  # the first decode is running
+    window.session.set_position(9000)
+    gate.release.set()
+    wait_idle(qtbot, window)
+    assert outcomes == [FrameOutcome(9000, 9000, None)]
+
+
+def test_frame_decoded_is_not_emitted_after_preview_show_or_a_source_change(make_window, qtbot):
+    window, gate, outcomes = _gated_window(make_window, qtbot)
+    gate.armed = True
+    window.session.set_position(9000)
+    assert gate.entered.wait(10)
+    window.preview.show(image(48, 64))
+    gate.release.set()
+    wait_idle(qtbot, window)
+    assert outcomes == []
+    gate.armed, gate.entered, gate.release = True, threading.Event(), threading.Event()
+    window.session.set_position(9000)
+    assert gate.entered.wait(10)
+    window.open_path(Path("other.mp4"))
+    gate.release.set()
+    qtbot.waitUntil(lambda: not window.opening(), timeout=10000)
+    wait_idle(qtbot, window)
+    assert outcomes == []
+
+
+def test_frame_decoded_reports_a_position_with_no_frame(make_window, qtbot) -> None:
+    window, _, outcomes = _gated_window(make_window, qtbot)
+    window.session.set_position(20000)  # after the last frame
+    wait_idle(qtbot, window)
+    assert len(outcomes) == 1 and outcomes[0].requested == 20000 and outcomes[0].pts is None
+    assert outcomes[0].error and presenter_of(window).of("error")[0].owner == "shell.frame"
+
+
+def test_a_newly_opened_source_clears_only_the_shells_banners(make_window, qtbot) -> None:
+    # Reviewer B #1 (DR-44 (b)): opening a file clears the shell's own banners, not a panel's.
+    window, _, _ = _gated_window(make_window, qtbot)
+    presenter = presenter_of(window)
+    presenter.present(Message("error", "preset not saved", owner="presets"))
+    window.session.set_position(20000)
+    wait_idle(qtbot, window)
+    assert len(presenter.of("error")) == 2
+    open_and_wait(qtbot, window, Path("other.mp4"))
+    assert [m.text for m in presenter.of("error")] == ["preset not saved"]
+
+
+def test_the_product_presenter_forwards_the_owner(qtbot) -> None:
+    # Reviewer B #5: DialogPresenter.clear passes the owner to the banner.
+    parent = QWidget()
+    qtbot.addWidget(parent)
+    banner = BannerWidget(parent)
+    presenter = DialogPresenter(parent, banner)
+    presenter.present(Message("error", "a", owner="presets"))
+    presenter.present(Message("error", "b", owner="settings"))
+    presenter.clear("error", owner="presets")
+    assert banner.texts() == ["b"]
 
 
 def test_the_banner_clears_by_owner(qtbot) -> None:

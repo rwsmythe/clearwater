@@ -32,6 +32,8 @@ OWNER_PREVIEW = "shell.preview"
 """The owner of a failed preview render's error; the next good render clears it."""
 OWNER_FRAME = "shell.frame"
 """The owner of a failed frame decode's error; the next decoded frame clears it."""
+SHELL_OWNERS = (OWNER_START, OWNER_OPEN, OWNER_PREVIEW, OWNER_FRAME)
+"""Every owner of the shell's own messages; a newly opened source clears their banners."""
 
 
 def ascii_text(text: str) -> str:
