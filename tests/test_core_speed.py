@@ -1,4 +1,4 @@
-"""WP3.1: the speed-row instrument ``tools/core_speed.py`` without footage or a GPU."""
+"""WP3.1 and WP3.4: the speed-row instrument ``tools/core_speed.py`` without footage or a GPU."""
 
 from __future__ import annotations
 
@@ -169,3 +169,130 @@ def test_gpu_snapshot_without_nvidia_smi(monkeypatch: pytest.MonkeyPatch) -> Non
 
     monkeypatch.setattr(core_speed.subprocess, "run", missing)
     assert core_speed.gpu_snapshot() == {"unavailable": "nvidia-smi did not run: FileNotFoundError"}
+
+
+# -- WP3.4: the whole-core row, the memory leg, DR-37 (d) and (e) -------------------------------
+
+
+@pytest.mark.parametrize(
+    "stdout",
+    ['{"streams": []}', "{}", '{"streams": [{"width": 3840}]}', "not json", '{"streams": null}'],
+)
+def test_probe_clip_without_a_video_stream_is_a_speed_error(
+    monkeypatch: pytest.MonkeyPatch, stdout: str
+) -> None:
+    # DR-37 (d): an IndexError / KeyError there was not a SpeedError
+    monkeypatch.setattr(core_speed.subprocess, "run", fake_run(0, stdout))
+    with pytest.raises(core_speed.SpeedError, match="no usable video stream"):
+        core_speed.probe_clip(core_speed.Path("clip.mp4"))
+
+
+def test_probe_clip_reads_the_stream(monkeypatch: pytest.MonkeyPatch) -> None:
+    stdout = '{"streams": [{"width": 3840, "height": 2160, "nb_read_packets": "12"}]}'
+    monkeypatch.setattr(core_speed.subprocess, "run", fake_run(0, stdout))
+    clip = core_speed.probe_clip(core_speed.Path("clip.mp4"))
+    assert (clip.width, clip.height, clip.frames) == (3840, 2160, 12)
+
+
+def test_pci_key_compares_cupy_and_nvidia_smi_spellings() -> None:
+    assert core_speed.pci_key("0000:01:00.0") == core_speed.pci_key("00000000:01:00.0")
+    assert core_speed.pci_key("0000:01:00.0") != core_speed.pci_key("00000000:02:00.0")
+    assert core_speed.pci_key("GPU-1234") is None
+
+
+def test_gpu_snapshot_reads_the_cupy_device_row(monkeypatch: pytest.MonkeyPatch) -> None:
+    # DR-37 (e): the row of the CuPy device's bus, not the first row
+    rows = (
+        "00000000:01:00.0, 1000, 1, 40, 5, 100, 10\n00000000:02:00.0, 2100, 2, 61, 97, 3100, 80\n"
+    )
+    monkeypatch.setattr(core_speed.subprocess, "run", fake_run(0, rows))
+    snapshot = core_speed.gpu_snapshot("0000:02:00.0")
+    assert snapshot["clocks.sm"] == "2100" and snapshot["pci.bus_id"] == "00000000:02:00.0"
+    assert core_speed.gpu_snapshot("0000:01:00.0")["clocks.sm"] == "1000"
+    missing = core_speed.gpu_snapshot("0000:03:00.0")
+    assert missing == {"unavailable": "nvidia-smi has no row for PCI bus 0000:03:00.0"}
+
+
+def test_proxy_is_the_s3_block_mean() -> None:
+    from clearwater.gui.imaging import downscale, statistics_factor
+
+    for shape in ((1080, 1920), (1081, 1923), (500, 700)):
+        frame = np.random.default_rng(1).random((*shape, 3), dtype=np.float32)
+        expected = downscale(frame, statistics_factor(*shape))
+        assert core_speed.proxy_of(frame).tobytes() == expected.tobytes()
+    assert core_speed.proxy_of(np.zeros((2160, 3840, 3), np.float32)).shape == (540, 960, 3)
+
+
+def test_the_bar_is_d106_at_29_97_fps() -> None:
+    assert abs(core_speed.D106_SECONDS_PER_FRAME - 0.834) < 0.001
+    assert core_speed.minutes_per_minute(core_speed.D106_SECONDS_PER_FRAME) == pytest.approx(25.0)
+    assert core_speed.minutes_per_minute(1.0) == pytest.approx(30000 / 1001)
+
+
+def test_render_uploads_counted_and_the_backend_restored() -> None:
+    from clearwater.methods import available_methods
+
+    backend = clearwater.core.backend_for("cpu")
+    frame = np.random.default_rng(2).random((40, 60, 3), dtype=np.float32)
+    image = core_speed.as_image(backend, backend.asarray(frame))
+    counts = {}
+    for method_id, method in available_methods().items():
+        records, seconds = core_speed.analyze_timed(method, image, lambda: None)
+        assert list(seconds) == [stage.name for stage in method.stages]
+        counts[method_id] = core_speed.count_render_uploads(method, image, records)
+    # white-balance gains 1, saliency references 2, and c3's YCbCr inverse 1 (DR-40 b)
+    assert counts == {"c3": 4, "ancuti2018": 3}
+    assert "asarray" not in vars(backend)
+
+
+def test_run_whole_keys_and_record(monkeypatch: pytest.MonkeyPatch) -> None:
+    frames = [np.random.default_rng(i).random((60, 90, 3), dtype=np.float32) for i in range(3)]
+
+    def decode(clip: Any, wanted: Any) -> Any:
+        yield from ((index, frames[index]) for index in wanted)
+
+    monkeypatch.setattr(core_speed, "decode", decode)
+    monkeypatch.setattr(core_speed, "conditions", lambda moment, bus_id=None: {"moment": moment})
+    clip = core_speed.ClipInfo(core_speed.Path("clip.mp4"), 90, 60, 3)
+    record: dict[str, Any] = {"during": []}
+    times = core_speed.run_whole(
+        clip, clearwater.core.backend_for("cpu"), [0, 1, 2], 1, record, None
+    )
+    for method in core_speed.METHODS:
+        for part in ("analyze", "render", "core", "prototype correct"):
+            assert len(times[f"{method} {part}"]) == 2, (method, part)  # the warm-up dropped
+        core_row = times[f"{method} core"]
+        both = zip(times[f"{method} analyze"], times[f"{method} render"], strict=True)
+        assert core_row == [a + r for a, r in both]
+    assert len(times["c3 analyze fusion"]) == 2 and "c3 analyze compensation" not in times
+    assert len(times["ancuti2018 analyze compensation"]) == 2
+    assert record["render_uploads"] == {"cpu": {"c3": 4, "ancuti2018": 3}}
+    assert record["three_value_upload"]["cpu"]["n"] == 200
+    assert len(record["during"]) == 3
+
+
+def test_fit_frame_pads_by_reflection() -> None:
+    frame = np.arange(4 * 6 * 3, dtype=np.float32).reshape(4, 6, 3)
+    out = core_speed.fit_frame(frame, 6, 8)
+    assert out.shape == (6, 8, 3) and out.flags.c_contiguous
+    assert np.array_equal(out[:4, :6], frame)
+    assert np.array_equal(out[4, :6], frame[2]) and np.array_equal(out[:4, 6], frame[:, 4])
+    assert core_speed.fit_frame(frame, 2, 3).shape == (2, 3, 3)
+
+
+@pytest.mark.gpu
+def test_pool_tracker_sees_an_allocation() -> None:
+    from clearwater.core.backend import _probe_gpu
+
+    gpu, reason = _probe_gpu()
+    if gpu is None:
+        pytest.skip(reason)
+    import cupy
+
+    tracker = core_speed.PoolTracker(cupy)
+    try:
+        block = cupy.zeros(1 << 20, dtype=cupy.float32)  # 4 MiB
+        del block
+    finally:
+        tracker.close()
+    assert tracker.peak_used >= 4 << 20 and tracker.peak_reserved >= tracker.peak_used
