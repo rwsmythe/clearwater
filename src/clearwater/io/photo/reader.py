@@ -193,14 +193,30 @@ def heic_tag_to_apply(tag: int, layout: HeifLayout) -> int:
     return tag if layout.irot is None else 1
 
 
+_NO_ISPE = "the primary image has no size property (ispe) in the HEIC"
+"""``ispe`` is mandatory for an image item (ISO 23008-12); AD-24's size check needs it."""
+
+
+def _check_decoded_size(name: str, samples: NDArray[Any], layout: HeifLayout) -> None:
+    """Refuse a HEIC whose decoded size is not the primary item's size (AD-24, DR-33 (c))."""
+    expected = layout.expected_size()
+    if expected is None:
+        raise _unreadable(name, _NO_ISPE)
+    if (samples.shape[1], samples.shape[0]) != expected:
+        raise _unreadable(
+            name,
+            f"the decoded size {samples.shape[1]}x{samples.shape[0]} does not match the "
+            f"primary image size {expected[0]}x{expected[1]}",
+        )
+
+
 def _read_heic(data: bytes, name: str) -> _Decoded:
     try:
         layout = read_layout(data)
     except HeifLayoutError as error:
         raise _unreadable(name, f"the HEIC layout cannot be established ({error})") from error
     if layout.ispe is None:
-        # ``ispe`` is mandatory for an image item (ISO 23008-12); AD-24's size check needs it.
-        raise _unreadable(name, "the primary image has no size property (ispe) in the HEIC")
+        raise _unreadable(name, _NO_ISPE)
     if layout.ispe[0] * layout.ispe[1] > MAX_PIXELS:
         raise PhotoReadError("unsupported", f"{name} is not supported: too many pixels.")
     try:
@@ -220,13 +236,7 @@ def _read_heic(data: bytes, name: str) -> _Decoded:
     elif not mode.startswith("RGB"):
         raise PhotoReadError("unsupported", f"{name} is not supported: HEIC mode {mode}.")
     samples = array[:, :, :3]
-    expected = layout.expected_size() or layout.ispe  # ispe is present: checked above
-    if (samples.shape[1], samples.shape[0]) != expected:
-        raise _unreadable(
-            name,
-            f"the decoded size {samples.shape[1]}x{samples.shape[0]} does not match the "
-            f"primary image size {expected[0]}x{expected[1]}",
-        )
+    _check_decoded_size(name, samples, layout)
     raw_exif = info.get("exif")
     block = exif_tools.strip_prefix(raw_exif) if isinstance(raw_exif, bytes) and raw_exif else None
     tag = exif_tools.orientation_of(block)

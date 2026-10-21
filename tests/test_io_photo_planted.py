@@ -56,7 +56,7 @@ def test_ispe_not_checked_is_caught(
 ) -> None:
     read_tests.test_a_primary_size_that_disagrees_with_ispe_is_refused(sample, monkeypatch)
     monkeypatch.undo()
-    monkeypatch.setattr(heif_boxes.HeifLayout, "expected_size", lambda self: None)
+    monkeypatch.setattr(reader, "_check_decoded_size", lambda name, samples, layout: None)
     with pytest.raises(FAILS):
         read_tests.test_a_primary_size_that_disagrees_with_ispe_is_refused(sample, monkeypatch)
 
