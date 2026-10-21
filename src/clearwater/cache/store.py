@@ -45,7 +45,7 @@ from clearwater.interfaces.cache import CacheEntry, CacheKey
 from clearwater.interfaces.method import Statistics
 from clearwater.interfaces.settings import DEFAULT_CACHE_LIMIT_BYTES
 
-from .codec import CODECS, DEFAULT_CODEC, ProxyCodec
+from .codec import CODECS, DEFAULT_CODEC, SHAPE_PREFIX_BYTES, ProxyCodec
 from .keys import codec_cache_version, entry_name, parse_entry_name
 from .layout import (
     CACHE_FILE_NAMES,
@@ -55,6 +55,7 @@ from .layout import (
     META_NAME,
     PACK_HEADER_SIZE,
     PACK_NAME,
+    RECORD_HEADER_SIZE,
     REMOVING_NAME,
     TEMP_SUFFIX,
     PackError,
@@ -859,9 +860,30 @@ class DiskProxyCache:
             if table.get(pts) == rec:
                 del table[pts]
                 if kind == KIND_PROXY:
-                    if not entry.index.proxies:
-                        entry.index.shape = None  # no proxy is left to bind the shape of the next
+                    entry.index.shape = self._surviving_shape(entry)
                     self._lose_completeness(entry)
+
+    @staticmethod
+    def _surviving_shape(entry: _Entry) -> tuple[int, int, int] | None:
+        """Return the shape the entry's remaining proxies have (None when it has none).
+
+        The shape of a scanned entry comes from its first proxy record, whose prefix is not
+        checked; once a record is forgotten the shape is read again from the first proxy that
+        still reads, so that a damaged first record does not bind the shape of the next store.
+        """
+        for rec in sorted(entry.index.proxies.values(), key=lambda found: found.offset):
+            codec = CODECS.get(rec.codec_id)
+            if codec is None:
+                continue
+            try:
+                with entry.pack.open("rb") as handle:
+                    handle.seek(rec.offset + RECORD_HEADER_SIZE)  # a proxy has no stage name
+                    return codec.shape(handle.read(SHAPE_PREFIX_BYTES))
+            except OSError:
+                return None
+            except ValueError:
+                continue
+        return None
 
     def _total(self) -> int:
         """Return the bytes all entries occupy."""
@@ -878,6 +900,8 @@ class DiskProxyCache:
             if left <= 0:
                 break
             self._idle.wait(left)
+        if self._entries.get(entry.key) is not entry:
+            return True  # the wait let go of the lock: another call removed or replaced the entry
         if not _remove_files(entry.folder):
             self._mark_for_removal(entry)
             return False
@@ -891,6 +915,12 @@ class DiskProxyCache:
         a marker file in its folder makes the next open remove it too.
         """
         entry.closing = True
+        try:
+            entry.pack_size = entry.pack.stat().st_size
+        except FileNotFoundError:
+            entry.pack_size = 0  # the pack went and a small file stayed: do not count the pack
+        except OSError:
+            pass
         _LOG.warning(
             "cache entry %s could not be removed; it is marked for removal", entry.folder.name
         )

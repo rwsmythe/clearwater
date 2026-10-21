@@ -72,7 +72,7 @@ from numpy.typing import NDArray
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from clearwater.io.video.probe import find_tool
+from clearwater.io.video import find_tool
 from local_config import find_footage_file, load_local_config
 from prototype import temporal
 from prototype.backend import select_backend

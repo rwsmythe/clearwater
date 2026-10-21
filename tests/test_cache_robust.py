@@ -891,3 +891,85 @@ def test_a_codec_that_only_encodes_differently_is_accepted(tmp_path: Path) -> No
     with DiskProxyCache(tmp_path / "c", codec=variant) as cache:
         cache.store_proxy(KEY, 0, pixels(0))
         assert cache.proxy(KEY, 0).tobytes() == pixels(0).tobytes()
+
+
+# --- terminating cleanup after the round 5 gate ----------------------------------------------
+
+
+def test_the_shape_follows_a_surviving_proxy_when_the_first_record_is_found_damaged(
+    tmp_path: Path,
+) -> None:
+    folder = tmp_path / "c"
+    with lossless_cache(folder) as first:
+        first.store_proxy(KEY, 0, pixels(0))
+        first.store_proxy(KEY, 1, pixels(1))
+    pack = pack_of(folder)
+    raw = bytearray(pack.read_bytes())
+    raw[32 + RECORD_HEADER_SIZE + 3] ^= 0x01  # inside the shape prefix of the FIRST record
+    pack.write_bytes(bytes(raw))
+    cache = lossless_cache(folder)  # the scan takes its shape from that unchecked prefix
+    with pytest.raises(KeyError):
+        cache.proxy(KEY, 0)  # the record is forgotten, and with it the shape it gave
+    cache.store_proxy(KEY, 2, pixels(2))  # the shape is the survivor's, so this one fits
+    assert cache.proxy(KEY, 2).tobytes() == pixels(2).tobytes()
+
+
+def test_a_partly_removed_entry_does_not_count_the_pack_it_no_longer_has(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    folder = tmp_path / "c"
+    ticks = iter(range(1, 1000))
+    cache = lossless_cache(folder, clock=lambda: next(ticks))
+    keys = [CacheKey(KEY.size + n, KEY.mtime_ns, cache.cache_version) for n in range(3)]
+    for n, key in enumerate(keys):
+        for pts in range(3):
+            cache.store_proxy(key, pts, pixels(10 * n + pts))
+
+    def on_disk(key: CacheKey) -> int:
+        return sum(p.stat().st_size for p in (folder / entry_name(key)).iterdir())
+
+    real_unlink = os.unlink
+
+    def unlink(path: Any, *args: Any, **kwargs: Any) -> None:
+        if entry_name(keys[0]) in str(path) and str(path).endswith("meta.json"):
+            raise PermissionError("locked")  # the pack goes, the small file stays
+        real_unlink(path, *args, **kwargs)
+
+    monkeypatch.setattr(store_module, "_UNLINK_PAUSE", 0.0)
+    monkeypatch.setattr(store_module.os, "unlink", unlink)
+    # room for the two newer entries and the small files left of the oldest, not for its pack
+    cache.set_limit_bytes(on_disk(keys[1]) + on_disk(keys[2]) + 200)
+    assert not (folder / entry_name(keys[0]) / "data.pack").exists()
+    assert (
+        cache.lookup(keys[1]) is not None
+    )  # healthy entries are not evicted for bytes that are gone
+
+
+def test_a_remover_that_finds_its_entry_replaced_while_waiting_leaves_the_new_one(
+    tmp_path: Path,
+) -> None:
+    class Waiter:
+        """Stands in for the condition: while the remover waits, a reader ends and a store runs."""
+
+        def __init__(self, cache: DiskProxyCache) -> None:
+            self.cache = cache
+
+        def wait(self, timeout: float | None = None) -> bool:
+            self.cache._active_reads.clear()  # the reader that held the entry is done
+            self.cache.store_proxy(KEY, 1, pixels(1))  # a writer replaces the closing entry
+            self.cache.close()  # its append handle is closed again, as between two store calls
+            return True
+
+        def notify_all(self) -> None:
+            return None
+
+    folder = tmp_path / "c"
+    cache = lossless_cache(folder)
+    cache.store_proxy(KEY, 0, pixels(0))
+    cache._active_reads[KEY] = 1  # a reader is in the middle of its read
+    cache._idle = Waiter(cache)  # type: ignore[assignment]
+    cache.clear()
+    found = cache.lookup(KEY)
+    assert found is not None and found.pts_ticks == (1,)  # the new entry was not removed
+    assert cache.proxy(KEY, 1).tobytes() == pixels(1).tobytes()
+    assert not (folder / entry_name(KEY) / "removing").exists()  # nor condemned for the next open

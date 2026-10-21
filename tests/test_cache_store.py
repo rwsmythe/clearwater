@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import contextlib
 import itertools
 import logging
 import os
@@ -523,12 +522,12 @@ def test_clear_never_follows_a_link(tmp_path: Path) -> None:
     # a symlink named like a cache file inside a real entry folder
     victim = tmp_path / "victim.txt"
     victim.write_text("precious", encoding="utf-8")
-    with contextlib.suppress(OSError, NotImplementedError):
-        os.symlink(victim, folder / entry_name(KEY) / "meta.json.1.tmp")
+    os.symlink(victim, folder / entry_name(KEY) / "meta.json.ab12cd34.tmp")  # a name cleanup owns
     cache.clear()
     assert (outside / "data.pack").read_bytes() == b"precious"
     assert (outside / "keep.txt").read_bytes() == b"precious"
     assert victim.read_text(encoding="utf-8") == "precious"
+    assert (folder / entry_name(KEY) / "meta.json.ab12cd34.tmp").is_symlink()  # left alone
     assert link.is_symlink()
 
 

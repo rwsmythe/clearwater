@@ -223,7 +223,7 @@ The default limit is `DEFAULT_CACHE_LIMIT_BYTES` (imported, not restated).
 
 ## Verification
 
-Own tests: 77 pass (`tests/test_cache_*.py`, 2.6 s; `work/wp3.12/own-tests.log`), including V17 on the
+Own tests: 95 pass (`tests/test_cache_*.py`), including V17 on the
 cache side, planted defects (newest-first eviction, a key ignoring `mtime_ns`, a lossy round trip
 presented as lossless, `clear` deleting a foreign file, a marker always believed, a partly covered
 stage listed), a child process killed mid-entry, a writer thread against reader threads, `clear` with a
@@ -243,3 +243,14 @@ removed, or overwritten atomically or in place with one that vouches for nothing
 removed); opening an entry does not re-check every checksum (the per-read CRC is the control, a
 full-pack check at open would read about 10 GB per hour of footage): a corrupt record is detected when
 it is read, not when the entry is opened.
+
+Stated limits from the last review round (Reviewer A closed at round 5; the points below were
+adjudicated and banked, not fixed): a read that fails with an `OSError` (a lock held by a scanner,
+a disk fault) raises `KeyError` for that call but does not drop the record, so a transient failure
+costs nothing; a persistent one makes the next open of the entry fail its scan and remove it, and
+until then `complete` is not revised. The shape of an entry comes from its first proxy record's
+prefix, which the scan does not check: a first record damaged in those eight bytes can make a store
+of the right shape fail with `ValueError` until that record is read (it is then forgotten and the
+shape is read again from a surviving proxy) or the cache is cleared. Argument validation of a store
+call precedes the overlap check, so an overlapping call with an invalid argument raises that
+argument's error rather than `RuntimeError`.
