@@ -178,3 +178,11 @@ Round-2 ruling (orchestrator gen 6; depth 304,760 at the yield): CONVERGED, no r
 fixed as the terminating cleanup (4e2e836: `_checked_triple` refuses a component beyond 1e18;
 2 tests failed before). ec5d2e5 (floor-collapse refusal) accepted, recorded as found at
 remediation. Window granted on the final head.
+
+## Final gates (head d8532dd)
+
+ruff check clean; ruff format --check 109 files; mypy strict 71 files clean. Full pytest (granted
+window, sequential): normal **2233 passed, 1 warning (CuPy CUDA_PATH), 663 s, exit 0**
+(basetemp `work/pt-full-normal`); cupy/cupyx unimportable **1958 passed, 275 skipped, 389 s,
+exit 0** (basetemp `work/pt-full-nocupy`). 2233 = main's 1844 + WP3.3's 389. The stale chain of
+pid 37676 completed on its own during the window.
