@@ -18,7 +18,7 @@ import pytest
 import video_fidelity as vf
 from clearwater.interfaces.video import SinkReport
 from clearwater.io.video import FFmpegVideoSink, VideoEncodeError, nut, probe
-from container_spike import compare
+from container_spike import compare, spike
 
 pytestmark = pytest.mark.usefixtures("ffmpeg_tools")
 
@@ -185,3 +185,22 @@ def test_an_effect_of_an_absent_edit_list_is_the_identity_from_zero() -> None:
     ]
     at_zero = replace(track, earliest_composition=0)
     assert len(vf.effect(compare.Movie((), "isom", (), 1000, 0, (at_zero,), ()), at_zero)) == 1
+
+
+# --- DR-26: the WP1.5 spike finds chapters in subfolders --------------------------------------
+
+
+def test_the_spike_resolves_chapters_through_the_footage_locator(tmp_path: Path) -> None:
+    footage = tmp_path / "footage"
+    (footage / "Snorkel").mkdir(parents=True)
+    (footage / "Snorkel" / "GX000001.MP4").write_bytes(b"x")
+    (footage / "SCUBA").mkdir()
+    (footage / "SCUBA" / "GX000002.mp4").write_bytes(b"x")
+    (footage / "SCUBA" / "GX000002.LRV").write_bytes(b"x")
+    expected = footage / "Snorkel" / "GX000001.MP4"
+    assert spike._chapter(footage, "GX000001.MP4") == expected
+    assert spike._chapter(footage, "GX000001") == expected
+    assert spike._default_chapters(footage) == ["GX000001", "GX000002"]
+    for bad in ("GX000009.MP4", "Snorkel/GX000001.MP4", "..", "GX000001.MOV"):
+        with pytest.raises(spike.SpikeError):
+            spike._chapter(footage, bad)

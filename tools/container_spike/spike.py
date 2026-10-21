@@ -71,7 +71,7 @@ from container_spike.compare import (
     write_checked,
     write_record,
 )
-from local_config import LocalConfigError, load_local_config
+from local_config import FootageLookupError, LocalConfigError, find_footage_file, load_local_config
 
 FFMPEG_TIMEOUT_SECONDS = 7200.0
 OUTPUT_SUFFIX = "_corrected"
@@ -876,11 +876,27 @@ def reencode(
 
 
 def _chapter(footage: Path, name: str) -> Path:
-    """Return a chapter path inside the footage folder, refusing anything else."""
-    path = footage / name
-    if Path(name).name != name or not path.is_file():
-        raise SpikeError(f"no file named {name} in the footage folder")
+    """Return the one chapter with this name anywhere under the footage folder (DR-26).
+
+    ``name`` is a bare file name (``GX011627.MP4``) or stem (``GX011627``); it is resolved
+    through ``find_footage_file``, so a chapter in a subfolder (the owner's 2026-10-18 layout)
+    is found, and a name with a folder in it, a missing chapter or an ambiguous one is refused.
+    """
+    stem = Path(name).stem if Path(name).suffix.lower() == ".mp4" else name
+    try:
+        path = find_footage_file(stem, footage)
+    except (FootageLookupError, ValueError) as error:
+        raise SpikeError(f"no single chapter named {name} in the footage folder: {error}") from None
+    if stem != name and path.name.casefold() != name.casefold():
+        raise SpikeError(f"no file named {name} in the footage folder (found {path.name})")
     return path
+
+
+def _default_chapters(footage: Path) -> list[str]:
+    """Return the stems of every ``.MP4`` under the footage folder, sorted (DR-26)."""
+    return sorted(
+        {p.stem for p in footage.rglob("*") if p.suffix.lower() == ".mp4" and p.is_file()}
+    )
 
 
 def _write_json(data: Mapping[str, Any], path: Path, allowed: Path, footage: Path) -> Path:
@@ -927,9 +943,7 @@ def main(argv: list[str] | None = None) -> int:
                 return _write_json(record, allowed / "capability.json", allowed, footage)
 
         elif args.step == "camera":
-            names = args.names or sorted(
-                p.name for p in footage.iterdir() if p.is_file() and p.suffix.lower() == ".mp4"
-            )
+            names = args.names or _default_chapters(footage)
             chapters = [_chapter(footage, name) for name in names]
 
             def step() -> Path:
