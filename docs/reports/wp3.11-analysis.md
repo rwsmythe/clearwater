@@ -65,8 +65,35 @@ Candidates (`smoothing.STEP_AWARE_KINDS`, thresholds fixed before the run): `med
 (Gaussian weights cut across a step: a 0.5 s before/after mean difference that is a local maximum
 and exceeds 6 robust noise units, the noise 1.4826 x the MAD of the frame-to-frame differences)
 and `median_bilateral` (the Gaussian times a range kernel of width 3 noise units on the
-median-filtered values). Table PENDING the windowed footage run. The default stays
-`median_gaussian` 2.0 s (spec 7.2; a change is the owner's at CP5 / WP5.2).
+median-filtered values). The default stays `median_gaussian` 2.0 s (spec 7.2; a change is the
+owner's at CP5 / WP5.2).
+
+Run 2026-10-21 in a dispatcher window (`uv run python tools/step_aware_eval.py`, GPU, record
+`work/wp3.11/step-aware/step-aware.json`): GX011600, 359 frames (11.95 s: WP1.3D's 6 s excerpt
+from 662.031 s widened by 3 s each side), proxies FFmpeg's 540-line resize quantised to uint8;
+figures on the excerpt's 179 frames; the step at excerpt frame 27 (pts 662.962 s, luma +23.1
+levels over +-0.5 s); edge-free frames (beyond the staged reach from both span ends, DR-25 (3)):
+179 of 179 for c3 (reach 60), 177 of 179 for ancuti2018 (reach 90); "away from the step" = the
+121 frame steps more than 1 s from it. Flicker and peak step in 8-bit levels (WP1.4b's measure);
+the step columns are the rendered change across +-1 s over the source's.
+
+| Method | Kind | Flicker away from step | Flicker all | Peak step | R / source | G / source | B / source | luma / source |
+|---|---|---|---|---|---|---|---|---|
+| c3 | median_gaussian | 0.076 | 0.094 | 0.74 | 1.24x | 0.64x | 0.44x | 0.91x |
+| c3 | median_gaussian_cut | 0.407 | 0.418 | 8.03 | 1.21x | 0.65x | 0.42x | 0.91x |
+| c3 | median_bilateral | 0.215 | 0.252 | 6.24 | 1.23x | 0.65x | 0.43x | 0.92x |
+| ancuti2018 | median_gaussian | 0.317 | 0.388 | 3.80 | 1.11x | 0.80x | 0.55x | 1.07x |
+| ancuti2018 | median_gaussian_cut | 0.639 | 0.773 | 49.01 | 1.24x | 0.77x | 0.51x | 1.05x |
+| ancuti2018 | median_bilateral | 0.529 | 0.620 | 20.63 | 1.22x | 0.71x | 0.48x | 0.99x |
+
+- The default reproduces WP1.4b claim 10b's "2 s (as rendered)" row (c3 flicker 0.094 vs
+  0.097, peak 0.74 vs 0.75; Ancuti 0.388 vs 0.388, peak 3.80 vs 3.78; luma 0.91x / 1.07x vs
+  0.92x / 1.07x), so the instrument measures what WP1.4b measured.
+- Neither candidate makes the rendered step smaller (every ratio within 0.13 of the default's),
+  and both raise the flicker away from the step 2-5x and the peak frame step 5-13x: the cut and
+  the range kernel fire on the statistics' own frame-to-frame variation, not only on the scene
+  step. On this evidence the step-aware variants are not better than `median_gaussian`; WP1.4b's
+  conclusion stands (the step is the scene's and the correction follows it).
 
 ## Y-1 (the statistics contract; one text identical to WP3.4's report)
 
