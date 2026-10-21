@@ -155,3 +155,36 @@ def test_a_heic_primary_without_ispe_is_refused_as_unreadable(
         read_photo(patched)
     assert caught.value.kind == "unreadable"
     assert "noispe.heic" in str(caught.value) and "ispe" in str(caught.value)
+
+
+# --- #4: nclx primaries "unspecified" with a specified transfer ---------------------------
+
+
+def _nclx_heic(path: Path, primaries: int, transfer: int) -> Path:
+    pixels = np.full((16, 16, 3), 128, dtype=np.uint8)
+    nclx = {
+        "color_primaries": primaries,
+        "transfer_characteristics": transfer,
+        "matrix_coefficients": 6,
+        "full_range_flag": 1,
+    }
+    pillow_heif.encode("RGB", (16, 16), pixels.tobytes(), str(path), quality=90, nclx_profile=nclx)
+    return path
+
+
+@pytest.mark.parametrize(
+    ("primaries", "transfer", "expected"),
+    [
+        (2, 1, ("unknown", "bt709", False)),
+        (2, 13, ("unknown", "srgb", False)),
+        (1, 2, ("bt709", "unknown", False)),
+        (2, 2, ("bt709", "srgb", True)),
+    ],
+)
+def test_nclx_codes_are_read_one_at_a_time(
+    tmp_path: Path, primaries: int, transfer: int, expected: tuple[str, str, bool]
+) -> None:
+    image, _ = read_photo(_nclx_heic(tmp_path / "n.heic", primaries, transfer))
+    color = image.color
+    assert (color.primaries, color.transfer, color.assumed) == expected
+    assert color.icc_profile is None

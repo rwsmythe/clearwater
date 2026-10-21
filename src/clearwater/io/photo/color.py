@@ -44,8 +44,9 @@ def describe_color(
 ) -> ColorDescription:
     """Build the :class:`ColorDescription` of a decoded photo.
 
-    Order of evidence: an RGB ICC profile; a PNG ``sRGB`` chunk; a HEIC ``nclx`` box; otherwise
-    the photo is untagged and read as BT.709 primaries with the sRGB curve, ``assumed=True``.
+    Order of evidence: an RGB ICC profile; a PNG ``sRGB`` chunk; a HEIC ``nclx`` box naming a
+    primaries or a transfer code (a code left unspecified reads as ``unknown``); otherwise the
+    photo is untagged and read as BT.709 primaries with the sRGB curve, ``assumed=True``.
 
     Args:
         depth: The source bit depth (8, 10 or 16).
@@ -77,9 +78,13 @@ def describe_color(
     # stays None, as the file has none.
     if srgb_chunk:
         return _build("bt709", "srgb", depth, False, None)
-    if nclx is not None and int(nclx.get("color_primaries", 2)) != 2:
-        primaries = _NCLX_PRIMARIES.get(int(nclx["color_primaries"]), "unknown")
-        transfer = _NCLX_TRANSFER.get(int(nclx.get("transfer_characteristics", 2)), "unknown")
-        return _build(primaries, transfer, depth, False, None)
+    if nclx is not None:
+        # nclx code 2 is "unspecified"; the photo is untagged only when both codes are.
+        primaries_code = int(nclx.get("color_primaries", 2))
+        transfer_code = int(nclx.get("transfer_characteristics", 2))
+        if (primaries_code, transfer_code) != (2, 2):
+            primaries = _NCLX_PRIMARIES.get(primaries_code, "unknown")
+            transfer = _NCLX_TRANSFER.get(transfer_code, "unknown")
+            return _build(primaries, transfer, depth, False, None)
     _log.info("%s: no colour profile; read as sRGB", name)
     return _build("bt709", "srgb", depth, True, None)
