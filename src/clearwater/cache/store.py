@@ -74,7 +74,7 @@ from .layout import (
 
 _LOG = logging.getLogger("clearwater.cache")
 _INT64 = 1 << 63
-_TEMP_NAME = re.compile(r"^(?:data\.pack|complete|meta\.json)\.[a-z0-9_]{8}\.tmp$")
+_TEMP_NAME = re.compile(r"^(?:data\.pack|complete|meta\.json|removing)\.[a-z0-9_]{8}\.tmp$")
 """The shape of a temporary of ``atomic_write_text`` (``tempfile`` names: 8 random characters)."""
 _UNLINK_TRIES = 6
 _UNLINK_PAUSE = 0.01
@@ -147,6 +147,28 @@ def _unlink(path: str) -> bool:
         else:
             return True
     return False
+
+
+def _write_small(path: Path, text: str) -> bool:
+    """Write a tiny file atomically, or in place when the replace is refused.
+
+    Args:
+        path: The file.
+        text: Its text.
+
+    Returns:
+        False when neither way worked.
+    """
+    try:
+        atomic_write_text(path, text)
+        return True
+    except OSError:
+        pass
+    try:
+        path.write_text(text, encoding="utf-8")
+        return True
+    except OSError:
+        return False
 
 
 def _remove_files(folder: Path) -> bool:
@@ -592,9 +614,7 @@ class DiskProxyCache:
             marker, index.valid_length, index.records_before_marker
         )
         if marker is not None and not entry.complete:
-            with contextlib.suppress(OSError):
-                (entry.folder / MARKER_NAME).unlink()
-            entry.aux_size = self._aux_size(entry.folder)
+            self._void_marker(entry)
         entry.scanned = True
         return True
 
@@ -642,12 +662,18 @@ class DiskProxyCache:
         still incomplete in this instance.
         """
         entry.complete = False
+        self._void_marker(entry)
+
+    def _void_marker(self, entry: _Entry) -> None:
+        """Make the entry's completeness marker useless: delete it, else overwrite it with ``{}``.
+
+        Overwriting is tried atomically and then in place (a lock that refuses the delete may
+        refuse the replace too). If all three fail a warning is logged and a new instance would
+        believe the marker if the pack still matches it.
+        """
         marker = entry.folder / MARKER_NAME
-        if not _unlink(str(marker)):
-            try:
-                atomic_write_text(marker, "{}")
-            except OSError as error:
-                _LOG.warning("cache marker of %s not removed: %s", entry.folder.name, error)
+        if not _unlink(str(marker)) and not _write_small(marker, "{}"):
+            _LOG.warning("cache marker of %s could not be voided", entry.folder.name)
         entry.aux_size = self._aux_size(entry.folder)
 
     def _already_stored(
@@ -823,10 +849,8 @@ class DiskProxyCache:
         _LOG.warning(
             "cache entry %s could not be removed; it is marked for removal", entry.folder.name
         )
-        try:
-            atomic_write_text(entry.folder / REMOVING_NAME, "removing")
-        except OSError as error:
-            _LOG.warning("removal mark of %s not written: %s", entry.folder.name, error)
+        if not _write_small(entry.folder / REMOVING_NAME, "removing"):
+            _LOG.warning("removal mark of %s not written", entry.folder.name)
         entry.aux_size = self._aux_size(entry.folder)
 
     def _evict(self, protected: set[CacheKey]) -> None:

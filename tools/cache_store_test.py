@@ -247,7 +247,7 @@ def prepare(stride: int) -> None:
     for stem, starts in CLIPS.items():
         path = find_footage_file(stem)
         width, height = _probe_size(path)
-        if height != PROXY_SHORT_SIDE * FACTOR:
+        if (width, height) != (960 * FACTOR, PROXY_SHORT_SIDE * FACTOR):
             raise SystemExit(f"{stem}: {width}x{height} is not a 4x4 block of 960x540")
         raw_path = out / f"proxy-{stem}.u8"
         reference: dict[int, Stats] = {}

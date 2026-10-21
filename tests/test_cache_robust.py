@@ -646,3 +646,103 @@ def test_cleanup_deletes_only_temporaries_of_the_shape_atomic_write_text_makes(
     lossless_cache(folder)  # opening removes the cache's own leftovers
     assert not ours.exists()
     assert foreign.read_text(encoding="utf-8") == "keep me"
+
+
+# --- round 3 of Reviewer A -----------------------------------------------------------------
+
+
+def _undeletable_unreplaceable(monkeypatch: pytest.MonkeyPatch, tail: str) -> None:
+    """Make deleting AND atomically replacing any file whose name ends with ``tail`` fail."""
+    real_unlink = os.unlink
+    real_replace = os.replace
+
+    def unlink(path: Any, *args: Any, **kwargs: Any) -> None:
+        if str(path).endswith(tail):
+            raise PermissionError("locked")
+        real_unlink(path, *args, **kwargs)
+
+    def replace(src: Any, dst: Any, *args: Any, **kwargs: Any) -> None:
+        if str(dst).endswith(tail):
+            raise PermissionError("locked")
+        real_replace(src, dst, *args, **kwargs)
+
+    monkeypatch.setattr(store_module, "_UNLINK_PAUSE", 0.0)
+    monkeypatch.setattr(store_module.os, "unlink", unlink)
+    monkeypatch.setattr(store_module.os, "replace", replace)
+
+
+def test_a_marker_that_can_be_neither_deleted_nor_replaced_is_still_voided(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    folder = tmp_path / "c"
+    with lossless_cache(folder) as first:
+        for n in range(3):
+            first.store_proxy(KEY, n, pixels(n))
+        first.mark_complete(KEY)
+    pack = pack_of(folder)
+    raw = bytearray(pack.read_bytes())
+    raw[32 + (len(raw) - 32) // 2] ^= 0xFF  # inside the middle record
+    pack.write_bytes(bytes(raw))
+    cache = lossless_cache(folder)
+    _undeletable_unreplaceable(monkeypatch, "complete")
+    assert sum(_raises_key_error(cache, n) for n in range(3)) == 1
+    cache.close()
+    reopened = lossless_cache(folder).lookup(KEY)
+    assert reopened is not None and reopened.complete is False  # voided in place
+
+
+def test_a_stale_marker_found_when_scanning_is_voided_even_when_it_cannot_be_deleted(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    folder = tmp_path / "c"
+    with lossless_cache(folder) as first:
+        for n in range(3):
+            first.store_proxy(KEY, n, pixels(n))
+        first.mark_complete(KEY)
+    marker = folder / entry_name(KEY) / "complete"
+    data = json.loads(marker.read_text(encoding="utf-8"))
+    marker.write_text(json.dumps({**data, "records": data["records"] + 1}), encoding="utf-8")
+    _undeletable_unreplaceable(monkeypatch, "complete")
+    found = lossless_cache(folder).lookup(KEY)
+    assert found is not None and found.complete is False
+    assert json.loads(marker.read_text(encoding="utf-8")) == {}  # it can no longer vouch
+
+
+def test_the_removal_mark_is_written_in_place_when_the_replace_is_refused(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    folder = tmp_path / "c"
+    cache = lossless_cache(folder)
+    cache.store_proxy(KEY, 0, pixels(0))
+    real_unlink = os.unlink
+    real_replace = os.replace
+    monkeypatch.setattr(store_module, "_UNLINK_PAUSE", 0.0)
+    monkeypatch.setattr(store_module, "_READER_WAIT", 0.0)
+
+    def unlink(path: Any, *args: Any, **kwargs: Any) -> None:
+        if str(path).endswith("data.pack"):
+            raise PermissionError("open elsewhere")
+        real_unlink(path, *args, **kwargs)
+
+    def replace(src: Any, dst: Any, *args: Any, **kwargs: Any) -> None:
+        if str(dst).endswith("removing"):
+            raise PermissionError("locked")
+        real_replace(src, dst, *args, **kwargs)
+
+    monkeypatch.setattr(store_module.os, "unlink", unlink)
+    monkeypatch.setattr(store_module.os, "replace", replace)
+    cache.clear()
+    assert (folder / entry_name(KEY) / "removing").exists()
+    monkeypatch.undo()
+    lossless_cache(folder)
+    assert not (folder / entry_name(KEY)).exists()
+
+
+def test_a_leftover_temporary_of_the_removal_mark_is_cleaned_when_opening(tmp_path: Path) -> None:
+    folder = tmp_path / "c"
+    with lossless_cache(folder) as first:
+        first.store_proxy(KEY, 0, pixels(0))
+    leftover = folder / entry_name(KEY) / "removing.ab12_xy9.tmp"
+    leftover.write_text("x", encoding="utf-8")
+    lossless_cache(folder)
+    assert not leftover.exists()
