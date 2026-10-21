@@ -320,3 +320,19 @@ cannot take the frame-to-frame change below about half. WP1.4's real-footage fig
 above 25 % (0.053/0.151 = 0.35 to 0.106/0.236 = 0.45, AD-14's row). AD-14's absolute bound is
 met by two orders of magnitude. The two V3-ratio tests are `xfail(strict=True)` pending a ruling.
 Reproduction: `uv run pytest tests/test_analysis_v3.py -s` (about 45 s; FFmpeg needed).
+
+**V3-1 premise corrected (orchestrator, 2026-10-21): the metric was AD-14's, not V3's.** V3
+(spec 15, line 472ff) measures, in the untouched region of the output, the per-frame mean L*,
+a*, b* and a contrast measure, and takes flicker = the standard deviation of the frame-to-frame
+differences of each measure. `tests/test_analysis_v3.py` now measures that (CIELAB D65 from the
+output read as sRGB; contrast = the standard deviation of L* over the region) alongside AD-14's
+figure. Re-measured (`work/t-v3b.log`; 2 passed, 2 xfailed):
+
+| Double | Measure | Per-frame | Smoothed | Ratio |
+|---|---|---|---|---|
+| Gray-world gains | L* / a* / b* / contrast | 0.002234 / 0.005461 / 0.010578 / 0.000645 | 0.001061 / 0.002444 / 0.005165 / 0.000307 | 0.475 / 0.447 / 0.488 / 0.476 |
+| Gains + stretch | L* / a* / b* / contrast | 0.053445 / 0.007161 / 0.008942 / 0.032053 | 0.020678 / 0.003453 / 0.004067 / 0.012821 | 0.387 / 0.482 / 0.455 / 0.400 |
+
+The standard deviation removes the sweep's constant part but not its curvature; V3's 25 % is
+still not met (0.39-0.49). V3-1 STANDS with these figures. The test file changed while Reviewer
+A round 1 was running (its diff predates the change).

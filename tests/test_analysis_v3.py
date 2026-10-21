@@ -100,30 +100,63 @@ class GainsStretch(GrayWorld):
         return Image(out, image.device, image.color, image.orientation_applied)
 
 
+MEASURES = ("L*", "a*", "b*", "contrast")
+"""V3's per-frame measures of the untouched region: mean L*, a*, b* and a contrast measure (the
+standard deviation of L* over the region)."""
+
+_SRGB_TO_XYZ = np.array(
+    [[0.4124564, 0.3575761, 0.1804375], [0.2126729, 0.7151522, 0.0721750],
+     [0.0193339, 0.1191920, 0.9503041]]
+)  # fmt: skip
+_WHITE = np.array([0.95047, 1.0, 1.08883])
+
+
+def lab(rgb: NDArray[np.float64]) -> NDArray[np.float64]:
+    """CIELAB (D65) of display-encoded RGB in [0, 1], read with the sRGB transfer, ``(N, 3)``."""
+    linear = np.where(rgb <= 0.04045, rgb / 12.92, ((rgb + 0.055) / 1.055) ** 2.4)
+    xyz = (linear @ _SRGB_TO_XYZ.T) / _WHITE
+    f = np.where(xyz > (6 / 29) ** 3, np.cbrt(xyz), xyz / (3 * (6 / 29) ** 2) + 4 / 29)
+    return np.stack(
+        [116 * f[:, 1] - 16, 500 * (f[:, 0] - f[:, 1]), 200 * (f[:, 1] - f[:, 2])], axis=1
+    )
+
+
 def flicker(
     path: Path,
     mask: NDArray[np.bool_],
     method: GrayWorld,
     params: Mapping[str, Any],
     statistics: Callable[[int], Mapping[str, Statistics] | None],
-) -> float:
-    """Mean absolute frame-to-frame difference (in /255) of the rendered output inside ``mask``."""
+) -> tuple[float, NDArray[np.float64]]:
+    """Render the clip and measure the untouched region (``mask``) of the output.
+
+    Returns:
+        AD-14's figure (the mean absolute frame-to-frame pixel difference, in /255) and V3's
+        flicker per measure of :data:`MEASURES` (the standard deviation of the frame-to-frame
+        differences of each per-frame measure).
+    """
     previous: NDArray[np.float64] | None = None
     differences = []
+    measures = []
     for index, rgb in enumerate(decoded(path)):
         frame = make_frame(rgb.astype(np.float32) / 255.0, index, TIME_BASE, index)
         record = statistics(index)
         assert record is not None
         out = np.asarray(method.render(frame, params, record).pixels, dtype=np.float64)
-        region = out[mask] * 255.0
+        region = out[mask]
         if previous is not None:
-            differences.append(float(np.mean(np.abs(region - previous))))
+            differences.append(float(np.mean(np.abs(region - previous))) * 255.0)
         previous = region
-    return float(np.mean(differences))
+        values = lab(region)
+        measures.append([*values.mean(axis=0), float(np.std(values[:, 0]))])
+    v3 = np.std(np.diff(np.array(measures), axis=0), axis=0)
+    return float(np.mean(differences)), v3
 
 
-def _measure(sample: Callable[[str], Path], method: GrayWorld) -> tuple[float, float]:
-    """Analyse the clip; return (unsmoothed, smoothed) flicker inside the mask."""
+def _measure(
+    sample: Callable[[str], Path], method: GrayWorld
+) -> tuple[float, float, NDArray[np.float64], NDArray[np.float64]]:
+    """Analyse the clip; return AD-14's (unsmoothed, smoothed) and V3's per-measure flicker."""
     clip = sample("ad14-flicker")
     with PILImage.open(sample("ad14-mask")) as image:
         mask = np.asarray(image.convert("L")) > 127
@@ -136,13 +169,15 @@ def _measure(sample: Callable[[str], Path], method: GrayWorld) -> tuple[float, f
     assert result.ok, result.failure
     assert len(engine.store.axis()) == 90
     params = engine.parameters
-    smoothed = flicker(clip, mask, method, params, engine.smoothed_record)
-    unsmoothed = flicker(clip, mask, method, params, engine.provisional_record)
+    smoothed, v3_smoothed = flicker(clip, mask, method, params, engine.smoothed_record)
+    unsmoothed, v3_unsmoothed = flicker(clip, mask, method, params, engine.provisional_record)
     print(
-        f"{method.__class__.__name__}: flicker /255 unsmoothed {unsmoothed:.4f}, "
-        f"smoothed {smoothed:.4f}"
+        f"{method.__class__.__name__}: AD-14 /255 unsmoothed {unsmoothed:.4f}, "
+        f"smoothed {smoothed:.4f}; V3 per measure {MEASURES}: unsmoothed "
+        f"{np.round(v3_unsmoothed, 6).tolist()}, smoothed {np.round(v3_smoothed, 6).tolist()}, "
+        f"ratio {np.round(v3_smoothed / v3_unsmoothed, 3).tolist()}"
     )
-    return unsmoothed, smoothed
+    return unsmoothed, smoothed, v3_unsmoothed, v3_smoothed
 
 
 @pytest.mark.parametrize("make_method", [GrayWorld, GainsStretch])
@@ -150,7 +185,7 @@ def test_ad14_smoothed_flicker_stays_under_half_a_level(
     sample: Callable[[str], Path], make_method: Callable[[], GrayWorld]
 ) -> None:
     """AD-14: under 0.5/255 after smoothing; smoothing reduces the per-frame flicker."""
-    unsmoothed, smoothed = _measure(sample, make_method())
+    unsmoothed, smoothed, _, _ = _measure(sample, make_method())
     assert 0.0 < smoothed < unsmoothed
     assert smoothed < 0.5
 
@@ -163,9 +198,10 @@ def test_ad14_smoothed_flicker_stays_under_half_a_level(
 def test_v3_ratio_on_the_ad14_clip(
     sample: Callable[[str], Path], make_method: Callable[[], GrayWorld]
 ) -> None:
-    """V3's ratio: smoothed flicker <= 25 % of the per-frame flicker."""
-    unsmoothed, smoothed = _measure(sample, make_method())
-    assert smoothed <= 0.25 * unsmoothed
+    """V3: per measure, the smoothed flicker <= 25 % of the per-frame flicker."""
+    _, _, unsmoothed, smoothed = _measure(sample, make_method())
+    assert np.all(unsmoothed > 0)
+    assert np.all(smoothed <= 0.25 * unsmoothed)
 
 
 class _Progress:
