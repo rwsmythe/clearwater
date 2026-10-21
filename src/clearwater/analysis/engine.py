@@ -243,10 +243,12 @@ class AnalysisEngine:
                 ),
                 None,
             )
-            self._params = new
             if first is None:
+                self._params = new
                 return None
-            self._hash = schema_hash(self._method, new, self._kind, self._window_s)
+            new_hash = schema_hash(self._method, new, self._kind, self._window_s)
+            self._params = new
+            self._hash = new_hash
             self._generation += 1
             self._first_invalid = (
                 first if self._first_invalid is None else min(first, self._first_invalid)
