@@ -770,7 +770,7 @@ def test_provenance_is_embedded_and_parseable(sample: Sample, tmp_path: Path) ->
         "format_version": 1,
         "app_version": "0.1.0",
         "settings": {"video_encoder": "libx265", "quality_level": "standard"},
-        "note": 'café "quoted" back\\slash',
+        "note": 'caf\u00e9 "quoted" back\\slash',
     }
     out = tmp_path / "out.mp4"
     _write_all(FFmpegVideoSink(), sample("vid-vfr"), out, provenance=provenance)

@@ -302,9 +302,9 @@ def test_resolve_encoder_is_the_one_auto_rule() -> None:
 
 
 def test_provenance_is_compact_ascii_json() -> None:
-    text = provenance_comment({"app_version": "1.0", "name": 'café "x" \\ \n'})
+    text = provenance_comment({"app_version": "1.0", "name": 'caf\u00e9 "x" \\ \n'})
     assert text.isascii()
-    assert json.loads(text) == {"app_version": "1.0", "name": 'café "x" \\ \n'}
+    assert json.loads(text) == {"app_version": "1.0", "name": 'caf\u00e9 "x" \\ \n'}
     assert provenance_comment(None) == ""
 
 
