@@ -49,7 +49,7 @@ the instrument only). Clips: GX011627 (shallow, all 681 frames, 4K, 30000/1001) 
 300 frames: 5 windows of 60 at 30, 130, 230, 330 and 430 s), each reduced to a 960 x 540 proxy by
 the exact 4 x 4 block mean; the float proxy is `block sum / 4080` and the 8-bit proxy is
 `floor((block sum + 8) / 16)`. Statistics (`prototype.temporal.measure`, c3 `Params()`, CPU) on
-every 8th frame (86 and 38 frames); sizes on every frame. A size is the bytes of the stored
+every 8th frame (86 and 38 frames); sizes on every frame (the PNG candidate in the full table only on the statistics frames). A size is the bytes of the stored
 payload of one frame (the product adds a 24-byte record header and an 8-byte codec header per
 frame; the stream candidates count packet payloads without container overhead). 60-minute figure
 = frames per hour at 29.97 fps (107,892) times the frame size, shown for the median and the 95th
@@ -61,28 +61,28 @@ deviation against the 8-bit proxy. "max err" is the maximum absolute pixel error
 proxy, in levels, over the statistics frames only (86 and 38), not over every sized frame. Full table (all 32 candidates and sweeps): `results.json` and the instrument's
 `report` mode.
 
-| candidate | clip | KB per frame, median / p95 | 60 min GB, median / p95 | max err | means | gains | bounds vs float | bounds vs 8-bit |
+| candidate | clip | KB per frame, median / p95 / max | 60 min GB, median / p95 | max err | means | gains | bounds vs float | bounds vs 8-bit |
 |---|---|---|---|---|---|---|---|---|
-| deflate-L1 (lossless) | GX011627 | 748.7 / 1119.7 | 80.8 / 120.8 | 0 | 2.7e-04 | 2.6e-05 | 1.3 % (0.5 %) | 0.0 % |
-| deflate-L1 (lossless) | GX011625 | 261.4 / 457.8 | 28.2 / 49.4 | 0 | 1.9e-04 | 2.4e-06 | 6.0 % (3.1 %) | 0.0 % |
-| ffv1-intra (lossless) | GX011627 | 447.4 / 758.2 | 48.3 / 81.8 | 0 | 2.7e-04 | 2.6e-05 | 1.3 % (0.5 %) | 0.0 % |
-| ffv1-intra (lossless) | GX011625 | 119.0 / 228.6 | 12.8 / 24.7 | 0 | 1.9e-04 | 2.4e-06 | 6.0 % (3.1 %) | 0.0 % |
-| utvideo-median (lossless) | GX011627 | 550.1 / 820.7 | 59.4 / 88.5 | 0 | 2.7e-04 | 2.6e-05 | 1.3 % (0.5 %) | 0.0 % |
-| utvideo-median (lossless) | GX011625 | 237.6 / 328.5 | 25.6 / 35.4 | 0 | 1.9e-04 | 2.4e-06 | 6.0 % (3.1 %) | 0.0 % |
-| x264rgb-intra-crf22 | GX011627 | 88.6 / 156.8 | 9.6 / 16.9 | 81 | 1.9e-03 | 6.5e-04 | 15.0 % (8.9 %) | 8.7 % |
-| x264rgb-intra-crf22 | GX011625 | 22.3 / 45.8 | 2.4 / 4.9 | 35 | 4.6e-04 | 4.2e-05 | 24.3 % (12.7 %) | 14.1 % |
-| mjpeg-444-q4 | GX011627 | 86.3 / 175.2 | 9.3 / 18.9 | 43 | 1.9e-03 | 1.7e-03 | 11.2 % (6.6 %) | 6.4 % |
-| mjpeg-444-q4 | GX011625 | 13.1 / 30.2 | 1.4 / 3.3 | 36 | 1.8e-03 | 1.6e-03 | 18.7 % (10.1 %) | 10.5 % |
-| jpeg-q85-444 | GX011627 | 116.6 / 216.2 | 12.6 / 23.3 | 45 | 6.9e-04 | 1.9e-04 | 12.4 % (5.1 %) | 4.5 % |
-| jpeg-q85-444 | GX011625 | 22.9 / 48.7 | 2.5 / 5.3 | 25 | 7.1e-04 | 3.2e-04 | 21.5 % (11.1 %) | 8.0 % |
-| jpeg-q80-444 | GX011627 | 97.4 / 181.9 | 10.5 / 19.6 | 52 | 8.8e-04 | 1.9e-04 | 14.0 % (5.7 %) | 5.2 % |
-| jpeg-q80-444 | GX011625 | 18.3 / 39.5 | 2.0 / 4.3 | 39 | 8.7e-04 | 3.1e-04 | 20.7 % (10.0 %) | 7.6 % |
-| **jpeg-q80-420** | GX011627 | 78.2 / 148.6 | 8.4 / 16.0 | 89 | 8.2e-04 | 2.8e-04 | 11.9 % (4.9 %) | 4.5 % |
-| **jpeg-q80-420** | GX011625 | 14.4 / 33.6 | 1.6 / 3.6 | 40 | 9.5e-04 | 4.1e-04 | 20.8 % (10.3 %) | 7.8 % |
-| **jpeg-q75-444 (default)** | GX011627 | 83.8 / 157.2 | 9.0 / 17.0 | 61 | 9.0e-04 | 3.6e-04 | 16.1 % (6.5 %) | 6.0 % |
-| **jpeg-q75-444 (default)** | GX011625 | 15.1 / 33.1 | 1.6 / 3.6 | 36 | 8.8e-04 | 6.6e-04 | 22.3 % (10.5 %) | 8.3 % |
-| jpeg-q70-444 | GX011627 | 75.1 / 140.9 | 8.1 / 15.2 | 66 | 1.4e-03 | 5.1e-04 | 18.6 % (7.7 %) | 7.2 % |
-| jpeg-q70-444 | GX011625 | 13.4 / 29.4 | 1.4 / 3.2 | 40 | 1.9e-03 | 8.7e-04 | 31.6 % (15.6 %) | 12.9 % |
+| deflate-L1 (lossless) | GX011627 | 748.7 / 1119.7 / 1133.5 | 80.8 / 120.8 | 0 | 2.7e-04 | 2.6e-05 | 1.3 % (0.5 %) | 0.0 % |
+| deflate-L1 (lossless) | GX011625 | 261.4 / 457.8 / 471.6 | 28.2 / 49.4 | 0 | 1.9e-04 | 2.4e-06 | 6.0 % (3.1 %) | 0.0 % |
+| ffv1-intra (lossless) | GX011627 | 447.4 / 758.2 / 774.2 | 48.3 / 81.8 | 0 | 2.7e-04 | 2.6e-05 | 1.3 % (0.5 %) | 0.0 % |
+| ffv1-intra (lossless) | GX011625 | 119.0 / 228.6 / 235.7 | 12.8 / 24.7 | 0 | 1.9e-04 | 2.4e-06 | 6.0 % (3.1 %) | 0.0 % |
+| utvideo-median (lossless) | GX011627 | 550.1 / 820.7 / 835.3 | 59.4 / 88.5 | 0 | 2.7e-04 | 2.6e-05 | 1.3 % (0.5 %) | 0.0 % |
+| utvideo-median (lossless) | GX011625 | 237.6 / 328.5 / 333.0 | 25.6 / 35.4 | 0 | 1.9e-04 | 2.4e-06 | 6.0 % (3.1 %) | 0.0 % |
+| x264rgb-intra-crf22 | GX011627 | 88.6 / 156.8 / 436.5 | 9.6 / 16.9 | 81 | 1.9e-03 | 6.5e-04 | 15.0 % (8.9 %) | 8.7 % |
+| x264rgb-intra-crf22 | GX011625 | 22.3 / 45.8 / 64.4 | 2.4 / 4.9 | 35 | 4.6e-04 | 4.2e-05 | 24.3 % (12.7 %) | 14.1 % |
+| mjpeg-444-q4 | GX011627 | 86.3 / 175.2 / 181.8 | 9.3 / 18.9 | 43 | 1.9e-03 | 1.7e-03 | 11.2 % (6.6 %) | 6.4 % |
+| mjpeg-444-q4 | GX011625 | 13.1 / 30.2 / 31.0 | 1.4 / 3.3 | 36 | 1.8e-03 | 1.6e-03 | 18.7 % (10.1 %) | 10.5 % |
+| jpeg-q85-444 | GX011627 | 116.6 / 216.2 / 222.5 | 12.6 / 23.3 | 45 | 6.9e-04 | 1.9e-04 | 12.4 % (5.1 %) | 4.5 % |
+| jpeg-q85-444 | GX011625 | 22.9 / 48.7 / 49.8 | 2.5 / 5.3 | 25 | 7.1e-04 | 3.2e-04 | 21.5 % (11.1 %) | 8.0 % |
+| jpeg-q80-444 | GX011627 | 97.4 / 181.9 / 187.7 | 10.5 / 19.6 | 52 | 8.8e-04 | 1.9e-04 | 14.0 % (5.7 %) | 5.2 % |
+| jpeg-q80-444 | GX011625 | 18.3 / 39.5 / 40.3 | 2.0 / 4.3 | 39 | 8.7e-04 | 3.1e-04 | 20.7 % (10.0 %) | 7.6 % |
+| **jpeg-q80-420** | GX011627 | 78.2 / 148.6 / 153.1 | 8.4 / 16.0 | 89 | 8.2e-04 | 2.8e-04 | 11.9 % (4.9 %) | 4.5 % |
+| **jpeg-q80-420** | GX011625 | 14.4 / 33.6 / 34.3 | 1.6 / 3.6 | 40 | 9.5e-04 | 4.1e-04 | 20.8 % (10.3 %) | 7.8 % |
+| **jpeg-q75-444 (default)** | GX011627 | 83.8 / 157.2 / 162.0 | 9.0 / 17.0 | 61 | 9.0e-04 | 3.6e-04 | 16.1 % (6.5 %) | 6.0 % |
+| **jpeg-q75-444 (default)** | GX011625 | 15.1 / 33.1 / 33.8 | 1.6 / 3.6 | 36 | 8.8e-04 | 6.6e-04 | 22.3 % (10.5 %) | 8.3 % |
+| jpeg-q70-444 | GX011627 | 75.1 / 140.9 / 145.3 | 8.1 / 15.2 | 66 | 1.4e-03 | 5.1e-04 | 18.6 % (7.7 %) | 7.2 % |
+| jpeg-q70-444 | GX011625 | 13.4 / 29.4 / 29.9 | 1.4 / 3.2 | 40 | 1.9e-03 | 8.7e-04 | 31.6 % (15.6 %) | 12.9 % |
 
 What the figures say, as measured:
 
@@ -158,7 +158,11 @@ call in progress, the entry stored to last and the entry last found by `lookup`;
 exceed the limit the cache keeps them, evicts everything else, logs one warning on
 `logging.getLogger("clearwater.cache")` per transition into that state, and storing continues. A
 negative limit is refused. Deletion removes only files the cache names, only as regular files, never
-following a link or junction (`store._remove_files`); a foreign file keeps its folder in place.
+following a link or junction (`store._remove_files`: the pack first, and nothing else if the pack
+stays); a foreign file keeps its folder in place. Removal first stops new reads of the entry and waits
+up to 5 s for readers that already hold its pack open (`store._reading`; Windows refuses to delete an
+open file), then retries a refused delete briefly; an entry that still cannot be removed stays whole
+and a warning is logged.
 The default limit is `DEFAULT_CACHE_LIMIT_BYTES` (imported, not restated).
 
 ## Differences between the stub and the product (WP3.11 consumer notes)
@@ -203,7 +207,7 @@ The default limit is `DEFAULT_CACHE_LIMIT_BYTES` (imported, not restated).
 
 ## Verification
 
-Own tests: 67 pass (`tests/test_cache_*.py`, 2.6 s; `work/wp3.12/own-tests.log`), including V17 on the
+Own tests: 70 pass (`tests/test_cache_*.py`, 2.6 s; `work/wp3.12/own-tests.log`), including V17 on the
 cache side, planted defects (newest-first eviction, a key ignoring `mtime_ns`, a lossy round trip
 presented as lossless, `clear` deleting a foreign file, a marker always believed, a partly covered
 stage listed), a child process killed mid-entry, a writer thread against reader threads, `clear` with a
@@ -219,4 +223,4 @@ definition) are outside the declared envelope. No compaction: a re-stored change
 bytes in the pack until the entry is evicted. The 10 GB figure is an extrapolation from two clips (see
 finding 3). `complete` records that every record was whole when the proxy pass ended; a damaged
 proxy is found only when it is read, and from then on the entry is incomplete (the marker is
-removed); opening an entry does not re-check every checksum.
+removed, or overwritten with one that vouches for nothing if it cannot be removed); opening an entry does not re-check every checksum.

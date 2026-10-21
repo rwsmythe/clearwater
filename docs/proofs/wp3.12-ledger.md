@@ -276,6 +276,15 @@ proxy `KeyError`; F4 instrument `report` judges the ruled criteria (original 1 %
 runs); F6 report text. F11 BANKED (out of envelope: a foreign file named `<cache file>.*.tmp` inside an entry folder is deleted when the cache opens or the entry is evicted).
 Own tests 67 pass; ruff check, ruff format --check, mypy green at the fix head.
 
+**Round 2 (head b3e60ed, gpt-5.6-sol high; evidence `.../wp3.12/r2/`):** 0 critical, 2 major, 2 minor, all REASONED (the sandbox could not run pytest: read-only /tmp), VERDICT
+NEW_CRITICAL_MAJOR_FOUND; mechanical assertions passed (14 succeeded lines, no ERROR, tokens footer). R2-1 MAJOR `clear()` gives up after the 50 ms retry of F2 (accepted: a reader can hold the
+pack longer; the F2 test asserted the nonconforming result); R2-2 MAJOR if the marker cannot be deleted the F1 fix leaves it valid on reopen (accepted); R2-3 MINOR PNG sized on statistics
+frames only, `bytes_max` not in the report (accepted, text + column); R2-4 MINOR `prepare` does not check the ffmpeg exit code or frame counts (accepted; the check is NOT executed, `prepare`
+is a footage decode I did not re-run, mypy and ruff only). Fixes (commits 28d6fab store, then the instrument and report): removal sets `closing` (new reads miss), waits up to 5 s on a
+Condition for the entry's readers (`_reading`), pack removed first and nothing else touched if it stays, a marker that cannot be deleted is overwritten with `{}`; instrument refuses a short
+read, a non-zero exit and a wrong frame count (681 and 300), shows max size; report table has max KB. Three new tests, each failing on the pre-fix store (verified with a stash).
+Own tests 70 pass.
+
 ## Ledger (cumulative rounds)
 
 | Round | Critical | Major | Minor | In-envelope vs out | NEW / REOPENED | Reverts | Product / test-only fixes | Depth |
