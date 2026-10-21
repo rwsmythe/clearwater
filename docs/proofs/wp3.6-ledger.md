@@ -302,8 +302,9 @@ found nothing new.
   stored as CRLF); then the move commit (reader back to None, writer table, tests on the written PNG,
   `tools/photo_check.py` round trip expects the writer's choice). The branch's net diff against the
   base holds only the final form.
-- Disclosed: a PNG with an `sRGB` chunk and no `iCCP` is also `assumed=False` with no ICC, so it also
-  gets the built-in sRGB on write (premise check of the ruling; test and report say so).
+- Dispatcher ruling 02:09Z: a PNG with an `sRGB` chunk is also `assumed=False` with no ICC, so the
+  writer's condition adds `meta.source_format == "heic"` (nclx exists only in HEIC); that PNG is written
+  without `iCCP` (N-2), pinned by a test. Applied in the commit after `1c718c9`.
 - md5: Display P3 `ee27975c71b9ed10be950a696f6fe6f4` (620 bytes), sRGB `ca34a0279325928fc9fd3fc7eff99eb9`
   (608 bytes), pinned by tests.
 - Gates: ruff check, ruff format --check, mypy strict clean; own tests 404 passed, 1 skipped.

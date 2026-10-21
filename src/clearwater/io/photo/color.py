@@ -73,8 +73,8 @@ def describe_color(
             return _build(found.primaries, found.transfer, depth, False, icc)
     # An ``assumed=False`` description with no ICC profile comes only from the next two branches
     # (a PNG ``sRGB`` chunk, a HEIC ``nclx`` box). The writer (D53) gives the sRGB and Display P3
-    # forms of it a built-in profile (for the ``sRGB`` chunk, the sRGB profile it declares); the
-    # IF-1 ``icc_profile`` stays None, as the file has none.
+    # forms of the HEIC case a built-in profile (never the PNG, N-2); the IF-1 ``icc_profile``
+    # stays None, as the file has none.
     if srgb_chunk:
         return _build("bt709", "srgb", depth, False, None)
     if nclx is not None and int(nclx.get("color_primaries", 2)) != 2:

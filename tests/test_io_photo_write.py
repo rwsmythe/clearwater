@@ -354,7 +354,9 @@ def test_read_write_16_bit_read_is_within_v9_for_every_sample(
     assert diff.max() <= 0.5 / 65535 + 1e-7, "the only loss is the 16-bit quantisation"
     if image.color.bit_depth in (8, 16):
         assert np.array_equal(again.pixels, image.pixels), "an 8- or 16-bit source is exact"
-    chosen = built_in_profile(image.color)  # a tagged source with no ICC gets a built-in (D53)
+    chosen = built_in_profile(
+        image.color, meta.source_format
+    )  # a tagged source with no ICC gets a built-in (D53)
     assert again.color.icc_profile == (image.color.icc_profile if chosen is None else chosen[1])
     assert (again.color.primaries, again.color.transfer) == (
         image.color.primaries,

@@ -109,7 +109,7 @@ merge, never a hand merge.
   equivalent colour data (6.5) with `icc_profile=None` (IF-1: the file carries none; the WP2.3
   manifest agrees). Built-in profiles (CHARC ruling `d06ed7c969d6249f`, clarified by
   `aa1219fb3145208b`, applied in the WRITER by the dispatcher's ruling): `writer.built_in_profile`
-  embeds a built-in profile when the source has no ICC profile, `assumed` is False and
+  embeds a built-in profile when the source is a HEIC with no ICC profile, `assumed` is False and
   (primaries, transfer) is Display P3 + sRGB curve (built-in Display P3, `p3_profile.py`, isolated
   commit `23fdfd9`) or BT.709 + sRGB curve (built-in sRGB, `srgb_profile.py`, its own commit); the
   writer records `"profile": "built-in <name>"` in the provenance chunk. Reverting either leg means
@@ -126,12 +126,10 @@ merge, never a hand merge.
 - Reading of the set (accepted): only the sRGB curve gets a built-in profile, since both profiles
   carry the sRGB tone curve; nclx BT.709 primaries with the BT.709 curve (transfer codes 1 and 6) get
   no `iCCP`.
-- **Found while checking the dispatcher's premise** (`assumed=False` with no ICC can only come from
-  nclx): it also arises from a PNG `sRGB` chunk without `iCCP` (explicit sRGB, round-0 note N-2). By
-  the rule as stated that PNG now gets the built-in sRGB profile on write (it states the colour space
-  the chunk declares); a test pins it. `ColorDescription` has no field to tell the two apart. Say so
-  if such a PNG should be written without `iCCP`: add a check on the source, which the writer does not
-  see, or accept.
+- A PNG with an `sRGB` chunk and no `iCCP` (explicit sRGB, round-0 note N-2) is also `assumed=False`
+  with no ICC profile, like an nclx HEIC. Built-in profiles are for nclx sources only, so the writer's
+  condition includes `meta.source_format == "heic"` (nclx exists only in HEIC) and that PNG is written
+  without `iCCP`, as N-2 ruled; a test pins it.
 - LZW and JPEG-in-TIFF are refused by name (no `imagecodecs`); Zstd is refused by name before decode.
 
 ## Limits

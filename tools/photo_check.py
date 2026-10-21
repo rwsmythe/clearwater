@@ -145,7 +145,7 @@ def round_trip(image: Image, meta: PhotoMetadata, out_png: Path) -> dict[str, An
     limit = 0.0 if exact else 0.5 / 65535 + 1e-7
     if diff.max() > limit:
         problems.append(f"samples differ by up to {diff.max():.3g} (allowed {limit:.3g})")
-    chosen = built_in_profile(image.color)
+    chosen = built_in_profile(image.color, meta.source_format)
     expected_icc = image.color.icc_profile if chosen is None else chosen[1]
     if again.color.icc_profile != expected_icc:
         problems.append("ICC profile bytes changed")

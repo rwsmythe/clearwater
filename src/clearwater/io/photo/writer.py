@@ -33,22 +33,24 @@ Each leg is one entry; removing it makes such a source write no ``iCCP``.
 """
 
 
-def built_in_profile(color: ColorDescription) -> tuple[str, bytes] | None:
+def built_in_profile(color: ColorDescription, source_format: str) -> tuple[str, bytes] | None:
     """Choose the built-in profile the writer embeds for a source with no ICC profile (D53).
 
-    Only a description that is tagged (``assumed`` False: a HEIC ``nclx`` box or a PNG ``sRGB``
-    chunk, see :func:`clearwater.io.photo.color.describe_color`), carries no profile, and is
-    BT.709 or Display P3 primaries with the sRGB curve gets one. An untagged source, any other
-    nclx description (BT.2020, HLG/PQ, another curve) and every source with an ICC profile
-    (copied byte-identical) get none.
+    Only a HEIC (the one format with ``nclx`` colour data) whose description is tagged
+    (``assumed`` False), carries no profile, and is BT.709 or Display P3 primaries with the sRGB
+    curve gets one. An untagged source, an explicit-sRGB PNG (its ``sRGB`` chunk is also tagged
+    with no profile, see :func:`clearwater.io.photo.color.describe_color`), any other nclx
+    description (BT.2020, HLG/PQ, another curve) and every source with an ICC profile (copied
+    byte-identical) get none.
 
     Args:
         color: The image's colour description.
+        source_format: ``PhotoMetadata.source_format`` of the source.
 
     Returns:
         The profile's name and bytes, or None.
     """
-    if color.icc_profile is not None or color.assumed:
+    if source_format != "heic" or color.icc_profile is not None or color.assumed:
         return None
     entry = _BUILT_IN_PROFILES.get((color.primaries, color.transfer))
     return None if entry is None else (entry[0], entry[1]())
@@ -97,8 +99,8 @@ class PhotoWriter:
     ) -> None:
         """Write a PNG, 8 or 16 bit, with the ICC profile embedded and EXIF per D63.
 
-        The profile is embedded byte-identical when the image has one; a tagged source with none
-        (nclx or an sRGB chunk) gets the built-in sRGB or Display P3 profile (D53); an untagged
+        The profile is embedded byte-identical when the image has one; a HEIC with nclx colour
+        data and no profile gets the built-in sRGB or Display P3 profile (D53); an untagged
         source gets none, so the output reads as the source did. EXIF follows D63: Orientation 1,
         thumbnail dropped, pixel dimensions updated, Software ``Clearwater``, every other field
         kept.
@@ -122,7 +124,7 @@ class PhotoWriter:
                 f"the photo writer needs a host image, got device {image.device!r}; "
                 "copy it to the host first"
             )
-        chosen = built_in_profile(image.color)
+        chosen = built_in_profile(image.color, meta.source_format)
         text = (
             provenance_text(provenance, None if chosen is None else chosen[0])
             if provenance is not None

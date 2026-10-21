@@ -76,14 +76,16 @@ def test_the_writers_table_chooses_by_description() -> None:
     ) -> ColorDescription:
         return ColorDescription(primaries, transfer, "identity", "full", 8, assumed, icc)
 
-    chosen = built_in_profile(color("bt709", "srgb", assumed=False, icc=None))
+    chosen = built_in_profile(color("bt709", "srgb", assumed=False, icc=None), "heic")
     assert chosen == ("sRGB", srgb_profile())
-    chosen = built_in_profile(color("display-p3", "srgb", assumed=False, icc=None))
+    chosen = built_in_profile(color("display-p3", "srgb", assumed=False, icc=None), "heic")
     assert chosen == ("Display P3", display_p3_profile())
-    assert built_in_profile(color("bt709", "srgb", assumed=True, icc=None)) is None
-    assert built_in_profile(color("bt709", "srgb", assumed=False, icc=b"x")) is None
-    assert built_in_profile(color("display-p3", "bt709", assumed=False, icc=None)) is None
-    assert built_in_profile(color("unknown", "srgb", assumed=False, icc=None)) is None
+    assert built_in_profile(color("bt709", "srgb", assumed=True, icc=None), "heic") is None
+    for other in ("png", "jpeg", "tiff"):
+        assert built_in_profile(color("bt709", "srgb", assumed=False, icc=None), other) is None
+    assert built_in_profile(color("bt709", "srgb", assumed=False, icc=b"x"), "heic") is None
+    assert built_in_profile(color("display-p3", "bt709", assumed=False, icc=None), "heic") is None
+    assert built_in_profile(color("unknown", "srgb", assumed=False, icc=None), "heic") is None
 
 
 # --- the four classes -----------------------------------------------------------------------
@@ -129,9 +131,9 @@ def test_class_nclx_srgb_gets_the_built_in_srgb(
         assert (again.color.primaries, again.color.transfer) == ("bt709", "srgb")
 
 
-def test_a_png_with_an_srgb_chunk_gets_the_built_in_srgb(tmp_path: Path) -> None:
-    # Not an nclx source: the chunk is explicit sRGB (assumed False, no ICC), so the writer
-    # states the colour space it declares. Disclosed in the report.
+def test_a_png_with_an_srgb_chunk_is_written_without_iccp(tmp_path: Path) -> None:
+    # Round-0 note N-2: the chunk is explicit sRGB (assumed False, no ICC) but not nclx, so the
+    # built-in profile (nclx sources only) is not given; the output is read as the source was.
     pixels = np.full((4, 4, 3), 100, dtype=np.uint8)
     buffer = io.BytesIO()
     PILImage.fromarray(pixels).save(buffer, format="PNG", optimize=False)
@@ -142,8 +144,8 @@ def test_a_png_with_an_srgb_chunk_gets_the_built_in_srgb(tmp_path: Path) -> None
     image, _ = read_photo(source)
     assert (image.color.assumed, image.color.icc_profile) == (False, None)
     out = tmp_path / "out.png"
-    assert png_tools.scan_png(_written(source, out, {"a": 1}), "out.png").icc == srgb_profile()
-    assert _provenance(out) == {"a": 1, "profile": "built-in sRGB"}
+    assert png_tools.scan_png(_written(source, out, {"a": 1}), "out.png").icc is None
+    assert _provenance(out) == {"a": 1}
 
 
 @pytest.mark.parametrize(
