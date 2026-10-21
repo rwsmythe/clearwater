@@ -233,6 +233,27 @@ def export_reason(source: OpenedSource | None, state: AnalysisState) -> str | No
     return NEEDS_ANALYSIS_REASON
 
 
+def _open_task(
+    path: Path, kind: sources.SourceKind, engines: Engines
+) -> tuple[Path, sources.OpenOutcome]:
+    """Open a routed path on the loader worker; an exception escaping it refuses the file.
+
+    Args:
+        path: The file.
+        kind: What :func:`sources.route` returned.
+        engines: The engines.
+
+    Returns:
+        ``(path, outcome)``; the outcome is a refusal naming the file when opening raised.
+    """
+    try:
+        return path, sources.open_source(path, kind, engines)
+    except Exception as error:  # the per-kind catches missed it: still a refusal (round-4 R4-1)
+        detail = str(error) or type(error).__name__
+        text = f"{messages.file_name(path)} could not be opened: {detail}"
+        return path, sources.OpenOutcome(None, (messages.refusal(path, text),))
+
+
 def _choose_file(parent: QWidget) -> Path | None:
     """The product file chooser (G1): a file dialog filtered to photos and videos."""
     name, _ = QFileDialog.getOpenFileName(parent, "Open", "", sources.file_filter())
@@ -383,7 +404,7 @@ class MainWindow(ShellWindow):
             return
         engines = self._engines
         self.statusBar().showMessage(f"Opening {messages.file_name(path)}...", 3000)
-        self._opener.submit(lambda check: (path, sources.open_source(path, kind, engines)))
+        self._opener.submit(lambda check: _open_task(path, kind, engines))
 
     def opening(self) -> bool:
         """Return True while a file is being opened."""
@@ -391,7 +412,7 @@ class MainWindow(ShellWindow):
 
     def _on_opened(self, outcome: Outcome) -> None:
         """Main thread: show the opened source and its warnings, or the refusal."""
-        if outcome.error is not None:
+        if outcome.error is not None:  # not reached: _open_task turns an exception into a refusal
             text = messages.ascii_text(f"The file could not be opened: {outcome.error}")
             self.presenter.present(Message("refusal", text))
             return

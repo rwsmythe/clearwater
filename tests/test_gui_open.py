@@ -277,6 +277,25 @@ def test_refusals_whose_text_omits_the_file_name_it(
     assert assert_refused(window, clip, previous) == "clip.mp4: HLG video is not supported."
 
 
+def test_an_exception_escaping_the_open_task_is_a_refusal_naming_the_file(
+    make_window, qtbot, monkeypatch
+) -> None:
+    # Round-4 R4-1: an open that raises past the per-kind catches still names the file.
+    good = Path("good.png")
+    window = make_window(photo_engines({good: image(20, 20)}))
+    open_and_wait(qtbot, window, good)
+    previous = window.session.source()
+
+    def explode(path: Path, engines):
+        raise RuntimeError("engine fault")
+
+    monkeypatch.setattr(sources, "open_photo", explode)
+    bad = Path("odd.jpg")
+    open_and_wait(qtbot, window, bad)
+    assert assert_refused(window, bad, previous) == "odd.jpg could not be opened: engine fault"
+    assert presenter_of(window).of("warning") == []
+
+
 def test_a_refusal_names_the_file_only_when_the_name_stands_alone() -> None:
     # Round-3 R3-4: "a.mp4" inside "data.mp4" does not name a.mp4.
     path = Path("a.mp4")
