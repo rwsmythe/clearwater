@@ -410,9 +410,11 @@ def render_preview(request: RenderRequest, memo: PreviewMemo, check: Check) -> R
             corrected = render_host(
                 request.method, backend, small, image.color, request.params, statistics
             )
-            check()
+            # Memoised before the check: a render superseded while it ran is not thrown away,
+            # so a return to this state shows it without rendering again (question 6).
             after = display_image(to_display_uint8(corrected), image.color.icc_profile)
             memo.put_after(after_key, request.method, request.statistics, after)
+            check()
         before = _before_image(memo, request, pixels, small)
     except Superseded:
         raise

@@ -134,6 +134,7 @@ class PreviewWidget(QWidget):
         """
         self._before, self._after = before, after
         self._k = self._image_scale(after, 1.0)
+        self._pending_full = False  # the proxy supersedes any full render on its way
         self.update()
 
     def set_pending_full(self, pending: bool) -> None:
@@ -403,6 +404,7 @@ class PreviewController(QObject):
         self._frame_pending = False
         self._submitted_k: int | None = None
         self._error_shown = False
+        self._frame_error_shown = False
         self._frame_source: object = None
         session.parameters_changed.connect(self.request)
         session.settings_changed.connect(self.request)
@@ -532,6 +534,7 @@ class PreviewController(QObject):
         if outcome.error is not None:
             self._frame_pending = False
             self._presenter.present(messages.frame_failure(outcome.error))
+            self._frame_error_shown = True
             return
         value = outcome.value
         assert isinstance(value, tuple)
@@ -541,7 +544,11 @@ class PreviewController(QObject):
         self._frame_pending = False
         if not isinstance(frame, Frame):
             self._presenter.present(Message("error", "No frame could be read at this position."))
+            self._frame_error_shown = True
             return
+        if self._frame_error_shown:  # the next success of that action clears its banner
+            self._presenter.clear("error")
+            self._frame_error_shown = False
         self._session._set_image(frame)
 
     def _on_render(self, outcome: Outcome) -> None:

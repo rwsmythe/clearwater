@@ -101,16 +101,20 @@ def view_factor(height: int, width: int, shown_height: float, shown_width: float
         shown_width: The displayed width in device pixels.
 
     Returns:
-        The factor, 1 when the image is shown at 1:1 or larger.
+        The factor, 1 when the image is shown at 1:1 or larger or the displayed size is empty;
+        at most ``max(height, width)``, beyond which every factor gives the same 1 x 1 image (a
+        displayed size of one device pixel or less on both axes is covered by every factor).
     """
     if shown_height <= 0 or shown_width <= 0:
         return 1
-    k = max(1, math.floor(min(height / shown_height, width / shown_width)))
-    while True:
+    limit = max(1, height, width)
+    k = min(limit, max(1, math.floor(min(height / shown_height, width / shown_width))))
+    while k < limit:
         h, w = downscaled_size(height, width, k + 1)
         if h < shown_height or w < shown_width:
             return k
         k += 1
+    return k
 
 
 def statistics_factor(height: int, width: int) -> int:

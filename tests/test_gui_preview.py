@@ -11,6 +11,8 @@ from __future__ import annotations
 
 import dataclasses
 import math
+import subprocess
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -34,11 +36,13 @@ from clearwater.interfaces import ColorDescription, Image
 from clearwater.interfaces.stubs import StubArrayBackend, StubCorrectionMethod
 from gui_support import (
     LevelMethod,
+    frame,
     image,
     make_window,
     open_and_wait,
     photo_engines,
     presenter_of,
+    video_engines,
     wait_idle,
 )
 
@@ -107,6 +111,68 @@ def test_view_factor_is_the_largest_that_still_covers_the_view() -> None:
 
 
 # The V8 harness and the display conversion.
+
+
+# view_factor at the boundaries (round-2 R2-2). Run in a child process with a timeout, so an
+# unbounded loop fails the test instead of hanging the suite.
+
+_VIEW_FACTOR_PROBE = """
+import itertools, sys
+from clearwater.gui import imaging
+{plant}
+images = [(1, 1), (1, 7), (16, 16), (4000, 6000), (6048, 8064)]
+shown = (0.0, 0.5, 1.0, 2.0)
+for (h, w), sh, sw in itertools.product(images, shown, shown):
+    print(h, w, sh, sw, imaging.view_factor(h, w, sh, sw))
+"""
+
+_UNBOUNDED = """
+import math
+def unbounded(height, width, shown_height, shown_width):
+    if shown_height <= 0 or shown_width <= 0:
+        return 1
+    k = max(1, math.floor(min(height / shown_height, width / shown_width)))
+    while True:
+        h, w = imaging.downscaled_size(height, width, k + 1)
+        if h < shown_height or w < shown_width:
+            return k
+        k += 1
+imaging.view_factor = unbounded
+"""
+
+
+def _view_factor_table(plant: str = "") -> list[list[str]]:
+    code = _VIEW_FACTOR_PROBE.format(plant=plant)
+    done = subprocess.run(
+        [sys.executable, "-c", code], capture_output=True, text=True, timeout=10, check=False
+    )
+    assert done.returncode == 0, done.stderr
+    return [line.split() for line in done.stdout.splitlines()]
+
+
+def _expected_factor(height: int, width: int, shown_h: float, shown_w: float) -> int:
+    if shown_h <= 0 or shown_w <= 0:
+        return 1
+
+    def covers(k: int) -> bool:
+        h, w = downscaled_size(height, width, k)
+        return h >= shown_h and w >= shown_w
+
+    return max((k for k in range(1, max(1, height, width) + 1) if covers(k)), default=1)
+
+
+def test_view_factor_terminates_and_is_the_largest_covering_factor_at_the_boundaries() -> None:
+    rows = _view_factor_table()
+    assert len(rows) == 5 * 4 * 4
+    for h, w, sh, sw, k in rows:
+        assert int(k) == _expected_factor(int(h), int(w), float(sh), float(sw)), (h, w, sh, sw)
+    assert view_factor(4000, 6000, 1.0, 1.0) == 6000  # one device pixel: the 1 x 1 image
+    assert view_factor(0, 0, 1.0, 1.0) == 1  # a degenerate image
+
+
+def test_planted_unbounded_view_factor_fails() -> None:
+    with pytest.raises(subprocess.TimeoutExpired):
+        _view_factor_table(_UNBOUNDED)
 
 
 def test_v8_harness_with_the_identity_stub_is_exact() -> None:
@@ -284,6 +350,67 @@ def test_full_resolution_is_rendered_once_per_parameter_state(make_window, qtbot
     wait_idle(qtbot, window)
     assert len(method.rendered) == 3
     assert image_bytes(window.preview_widget.after_image())[0, 0, 0] == round(0.25 * 255)
+
+
+def test_a_full_render_superseded_while_it_runs_is_not_rendered_again(make_window, qtbot) -> None:
+    # Round-2 R2-1: the render that finished after the user left 1:1 is memoised anyway.
+    method = LevelMethod()
+    window = _open_photo(
+        make_window, qtbot, image(400, 600, seed=3), method=method, size=(300, 250)
+    )
+    widget = window.preview_widget
+    started = len(method.threads)
+    method.delay_s = 0.4
+    window.view_actions["one_to_one"].trigger()
+    qtbot.waitUntil(lambda: len(method.threads) > started, timeout=5000)
+    method.delay_s = 0.0
+    widget.fit()
+    wait_idle(qtbot, window)
+    assert len(method.rendered) == 2  # the fit render and the superseded full one
+    window.view_actions["one_to_one"].trigger()
+    wait_idle(qtbot, window)
+    assert len(method.rendered) == 2 and widget.shown_factor() == 1.0
+    assert image_bytes(widget.after_image()).shape[:2] == (400, 600)
+
+
+def test_show_proxy_clears_the_full_resolution_indicator(make_window, qtbot) -> None:
+    # Round-2 R2-4: a scrub proxy supersedes the full render, so the indicator goes.
+    method = LevelMethod()
+    window = _open_photo(
+        make_window, qtbot, image(400, 600, seed=3), method=method, size=(300, 250)
+    )
+    method.delay_s = 0.4
+    window.view_actions["one_to_one"].trigger()
+    assert window.preview_widget.pending_full()
+    window.preview.show_proxy(np.zeros((90, 135, 3), dtype=np.uint8))
+    assert not window.preview_widget.pending_full()
+    wait_idle(qtbot, window)
+    assert not window.preview_widget.pending_full()
+
+
+def test_a_frame_error_banner_clears_at_the_next_decoded_frame(make_window, qtbot) -> None:
+    # Round-2 R2-3: "a banner until ... the next success of that action" (Message).
+    engines = video_engines([frame(48, 64, ticks=0), frame(48, 64, ticks=9000)])
+    original = engines.video_source.frames
+    failing = {"on": False}
+
+    def frames(*args, **kwargs):
+        if failing["on"]:
+            raise RuntimeError("decode failed")
+        return original(*args, **kwargs)
+
+    object.__setattr__(engines.video_source, "frames", frames)
+    window = make_window(engines)
+    open_and_wait(qtbot, window, Path("clip.mp4"))
+    failing["on"] = True
+    window.session.set_position(9000)
+    wait_idle(qtbot, window)
+    assert len(presenter_of(window).of("error")) == 1
+    failing["on"] = False
+    window.session.set_position(9000)
+    wait_idle(qtbot, window)
+    assert presenter_of(window).of("error") == []
+    assert window.session.current_image().pts_ticks == 9000
 
 
 def test_planted_preview_without_the_render_memo_fails(make_window, qtbot, monkeypatch) -> None:
