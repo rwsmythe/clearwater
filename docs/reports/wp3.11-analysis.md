@@ -90,7 +90,7 @@ the step columns are the rendered change across +-1 s over the source's.
   0.097, peak 0.74 vs 0.75; Ancuti 0.388 vs 0.388, peak 3.80 vs 3.78; luma 0.91x / 1.07x vs
   0.92x / 1.07x), so the instrument measures what WP1.4b measured.
 - Neither candidate makes the rendered step smaller (every ratio within 0.13 of the default's),
-  and both raise the flicker away from the step 2-5x and the peak frame step 5-13x: the cut and
+  and both raise the flicker away from the step 1.7-5.4x and the peak frame step 5-13x: the cut and
   the range kernel fire on the statistics' own frame-to-frame variation, not only on the scene
   step. On this evidence the step-aware variants are not better than `median_gaussian`; WP1.4b's
   conclusion stands (the step is the scene's and the correction follows it).
