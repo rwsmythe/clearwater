@@ -310,6 +310,21 @@ Pillow/libjpeg identity) in the instrument's baseline and results with a refusal
 
 **Orchestrator ruling on round 4 and stand-down (FINAL, gen 7, 2026-10-21):** the R4 adjudication is accepted as committed (3c7c457); the planned fixes above are the brief for a FRESH cell dispatched from this ledger; this cell's work in the package is done (depth 283,367 / 108 turns at the R4 yield, 01:23:11Z).
 
+## wp312-cell3 (fresh cell, resumed 2026-10-21 at `2b486a0`, tree clean)
+
+**R4 remediation (commits 8bcb39a product, 052c8e3 instrument; no `git stash` used: each test was run on the unfixed code BEFORE the fix was written, output kept in the scratchpad `r4-before.txt`).**
+R4-1: `_discover` and `_register` route a failed removal (another cache version, unreadable pack) through `_remove_or_retain`: the entry is kept as a `closing` entry with the `removing`
+mark, counted in the total, never served, first to be evicted and retried; `_entry_for_write` calls `_void_stale_marks` when it creates a pack (deletes a leftover `removing`, refusing the write
+with `OSError` if it cannot; voids a leftover `complete`). Tests: `test_a_removal_that_fails_while_opening_is_marked_counted_and_retried` (2 params), `test_a_new_pack_is_not_made_valid_or_condemned_by_a_stale_marker_file`
+(3 params), `test_a_stale_removal_mark_that_cannot_be_deleted_refuses_the_new_pack`: 6 failures on the unfixed code (no `removing` mark; `complete` True on a pack that was never completed; entry removed by
+a stale `removing`; no OSError). The report's "never a silent keep" now holds for discovery too (stated in the report). R4-2: `index.shape` cleared in `_drop_last` and in `_forget` when no proxy remains; two tests
+(torn tail, damaged on read) failed with `ValueError: proxy shape ... differs from the entry's`. R4-4: the constructor requires `CODECS[codec_id]` with the same `decode`, `shape` and `identity` (ValueError); a
+codec that differs only in `encode` (the hook codecs of the existing tests) is accepted; two failing params plus one accepting control. R4-3: instrument `run_identity` (jpeg identity; per clip stride, frames,
+proxy SHA-256), `require_identity`, `read_results`/`write_results`, new file forms `{"identity", "statistics"}` and `{"identity", "rows"}`; `sizes` refuses a file of another identity or of none; `report` only prints the
+identity (a legacy `results.json` prints "no run identity"). The committed figures come from legacy files; a re-run of `sizes` needs them deleted. The stale reuse was reproduced on the old tool (scratch probe: the
+baseline of proxy A returned for proxy B, True). `tests/test_cache_instrument.py`: 4 tests. Own tests 92 pass (88 cache + 4 instrument); `ruff check .`, `ruff format --check .`, `mypy` green at 052c8e3. Edited files were
+converted to LF (the index is LF; the worktree files had been checked out CRLF) so the commits carry no line-ending noise. No full pytest was run (no window granted).
+
 ## Ledger (cumulative rounds)
 
 | Round | Critical | Major | Minor | In-envelope vs out | NEW / REOPENED | Reverts | Product / test-only fixes | Depth |
