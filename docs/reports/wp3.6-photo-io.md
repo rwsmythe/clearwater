@@ -176,3 +176,17 @@ PROVISIONAL), MakerNote and GPS survival through Pillow's EXIF writer, the Displ
 Apple's own profile, the largest photo for the Result 2 photo leg and V15, and the photo look check.
 The instrument writes its records under `<working>/wp3.6/photo-check/<run>/` and never writes beside a
 source; its real-photo test skips while the footage folder has no photos.
+
+## Erratum at the gate (orchestrator, Reviewer B pass 2)
+
+- **Truncated files:** a file cut within a known signature is refused as "unreadable" ("cut short")
+  for JPEG, PNG and TIFF from two bytes on. A HEIC cut before its first eight bytes (before the
+  whole `ftyp` word) is still refused, but as "unsupported". From eight bytes on it is "unreadable".
+- **Damaged EXIF:** a wholly unparseable EXIF block is dropped as stated, but it logs TWO warnings:
+  one from the orientation read, one from the drop.
+- **Limits, added:** a grey PNG or TIFF with a GRAY ICC profile is warned and its profile is not
+  carried; the photo is read as `bt709`/`srgb`, `assumed=True` (question 8 as ruled).
+- **Limits, added:** a TIFF that is BOTH WhiteIsZero and grey with associated (premultiplied) alpha
+  is decoded wrongly: the inversion is applied to the alpha samples too, before un-premultiplication,
+  so a half-transparent black reads white. This is an exotic combination (question 8), banked as
+  DR-42 (c). The fix is to invert only the colour samples, at the next touch of `tiff.py` (WP3.6P).
