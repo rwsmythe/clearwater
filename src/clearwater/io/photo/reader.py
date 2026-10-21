@@ -163,6 +163,8 @@ def _read_pillow(data: bytes, name: str, kind: str) -> _Decoded:
 
 def _read_png16(scan: png_tools.PngScan, name: str) -> _Decoded:
     samples = png_tools.read_png16(scan, name)
+    if scan.color_type in (4, 6):
+        _log.warning("%s: alpha channel dropped", name)
     block = exif_tools.strip_prefix(scan.exif) if scan.exif else None
     tag = exif_tools.orientation_of(block)
     return _Decoded("png", samples, 16, block, scan.icc, tag, tag, srgb_chunk=scan.srgb)

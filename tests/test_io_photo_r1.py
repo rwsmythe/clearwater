@@ -7,6 +7,7 @@ ledger) and passes on the remediated code.
 from __future__ import annotations
 
 import struct
+import zlib
 from collections.abc import Callable
 from pathlib import Path
 
@@ -17,6 +18,7 @@ from PIL import Image
 
 from clearwater.io.photo import PhotoReadError, read_photo
 from clearwater.io.photo import exif as exif_tools
+from clearwater.io.photo import png as png_tools
 
 
 def _patched(source: Path, out: Path, old: bytes, new: bytes) -> Path:
@@ -207,3 +209,41 @@ def test_an_ascii_message_is_unchanged() -> None:
     assert (
         str(PhotoReadError("unsupported", "a.dng is not supported.")) == "a.dng is not supported."
     )
+
+
+# --- #10: the 16-bit PNG path warns when it drops an alpha channel --------------------------------
+
+
+def _png16_with_alpha(color_type: int) -> bytes:
+    """A 4x4 16-bit PNG of colour type 6 (RGBA) or 4 (grey+alpha), non-interlaced."""
+    channels = 4 if color_type == 6 else 2
+    samples = np.arange(4 * 4 * channels, dtype=">u2").reshape(4, 4 * channels) * 1000
+    rows = np.zeros((4, 1 + 4 * channels * 2), dtype=np.uint8)
+    rows[:, 1:] = samples.view(np.uint8).reshape(4, -1)
+    header = struct.pack(">IIBBBBB", 4, 4, 16, color_type, 0, 0, 0)
+    return (
+        png_tools.SIGNATURE
+        + png_tools.chunk(b"IHDR", header)
+        + png_tools.chunk(b"IDAT", zlib.compress(rows.tobytes()))
+        + png_tools.chunk(b"IEND", b"")
+    )
+
+
+@pytest.mark.parametrize("color_type", [6, 4])
+def test_a_16_bit_png_with_alpha_warns_that_alpha_is_dropped(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture, color_type: int
+) -> None:
+    path = tmp_path / "alpha16.png"
+    path.write_bytes(_png16_with_alpha(color_type))
+    with caplog.at_level("WARNING", logger="clearwater.io.photo.reader"):
+        image, _ = read_photo(path)
+    assert image.pixels.shape == (4, 4, 3)
+    assert "alpha16.png: alpha channel dropped" in caplog.text
+
+
+def test_a_16_bit_png_without_alpha_does_not_warn(
+    sample: Callable[[str], Path], caplog: pytest.LogCaptureFixture
+) -> None:
+    with caplog.at_level("WARNING", logger="clearwater.io.photo.reader"):
+        read_photo(sample("png16-gradient-srgb"))
+    assert "alpha" not in caplog.text
