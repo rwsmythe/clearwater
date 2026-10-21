@@ -130,7 +130,6 @@ for (h, w), sh, sw in itertools.product(images, shown, shown):
 
 _UNBOUNDED = """
 import math
-import os
 def unbounded(height, width, shown_height, shown_width):
     if shown_height <= 0 or shown_width <= 0:
         return 1
