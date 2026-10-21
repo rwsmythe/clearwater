@@ -21,6 +21,8 @@ dependencies = [
     "pillow-heif>=0.20,<2",
     # WP3.6 (CHARC ruling 1, AD-17/AD-18 amended; BSD-3): TIFF at every depth.
     "tifffile>=2025.1,<2027",
+    # WP3.16 (frame section 4 grant): the GUI (D28, AD-18 LGPL-3).
+    "pyside6>=6.12,<7",
 ]
 
 [project.optional-dependencies]
@@ -40,6 +42,8 @@ dev = [
     "cupy-cuda12x[ctk]>=14.2,<15",
     # WP2.1S transport candidate (CHARC grant 5152ed4302874889). Spike and prototype only.
     "av>=15,<17",
+    # WP3.16 ruling 3 (CHARC grant; MIT, AD-18): Qt test fixtures for the headless GUI tests.
+    "pytest-qt>=4.5,<5",
 ]
 # The harness's optional mail UI (scripts/comms_ui.py). The comms CORE
 # (role_mail.py, the hooks, cell_depth.py) is stdlib-only and never imports it.
