@@ -128,3 +128,10 @@ planted variants). The module does not read primaries or transfer for the argume
 - WP3.7's owner: a BT.601 stream tagged `smpte170m` for primaries resolves primaries as
   "unexpected" (`_PRIMARIES` knows bt709 and smpte432), so `assumed=True` and a `missing_tags`
   warning appear although the matrix is understood. Consumer note only; `io/video` untouched.
+
+## Erratum at the gate
+
+Added at the accept (orchestrator Reviewer B, `docs/proofs/wp3.5-accept.md`). Claim 5: "which
+are exact" covers the `samples.py` integer / float round trip at the source depth. The D76 path
+(8-bit decoded RGB to 10-bit planes) is not exact: by calculation it is within AD-11 (max
+0.123/255, mean 0.062/255) and it is not separately asserted against AD-11 (DR-39 (a)).
