@@ -5,7 +5,7 @@
 
 ### Generation
 
-- **Generation 8** (`clearwater-orchestrator-20261020-1556`) ROLLED OVER 2026-10-21 ~06:05Z at ~400K,
+- **Generation 8** (`clearwater-orchestrator-20261020-1556`) ROLLED OVER 2026-10-21 ~06:01Z at ~400K,
   at a clean boundary (no cell live, main released). **Generation 9 starts here** (verify:
   `comms/.launch-sessions.json`). Earlier: gen 7 `clearwater-orchestrator-20261020-1419`, gen 6
   `-20261020-1134`, gen 5 `-20261020-0802`, gen 4 `-20261020-0524`, gen 3 `-20261019-2346`, gen 2
@@ -47,7 +47,7 @@ NONE. Every gen-8 cell returned and was stood down: `wp312-cell3` (246,012), `wp
 1. **Wave 2 is fully accepted.** Gen 8 accepted WP3.12 (`3aaf395`) and WP3.6 (`d0f00ee` + `4ec835d`
    main gates) as a stacked gate, then WP3.16 (`a2685cb` + `0c41615` main gates). Main `0c41615`:
    harness 366 OK, static clean, full pytest 3559 passed / 2 skipped (offscreen), 810 s. CHARC QA CONFIRMED WP3.12 + WP3.6 (`28160f360239ca35`); WP3.16's QA is pending
-   (the release post went at ~06:0xZ). Records `docs/proofs/wp3.{12,6,16}-accept.md`. NEW debt
+   (the release post went at 05:59:18Z). Records `docs/proofs/wp3.{12,6,16}-accept.md`. NEW debt
    DR-41..DR-44.
 2. **Every Reviewer B of gen 8 blocked twice** (pass 1 -> one remediation -> pass 2 adjudicated at
    the gate). The gate adjudications are in each record and in
