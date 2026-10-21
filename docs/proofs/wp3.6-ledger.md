@@ -7,7 +7,7 @@ base main `4b4da9b`. Brief `docs/briefs/wp3.6-brief.md` (FINAL, CHARC rulings `5
 
 | Round | Depth (dispatcher fills) | Critical / Major / Minor | In envelope vs out | NEW vs REOPENED | Reverts | Product vs test-only fixes |
 |---|---|---|---|---|---|---|
-| 0 (design table, no product code) | | n/a | n/a | n/a | 0 | n/a |
+| 0 (design table, no product code) | 96,178 / 18 turns (dispatcher, 01:21:43Z) | n/a | n/a | n/a | 0 | n/a |
 
 ## Round 0: the design table (task 1)
 
@@ -235,6 +235,25 @@ the report; if it is unacceptable it is raised, not hidden.
 - `ColorDescription.bit_depth` for a grey/paletted 1-4 bit source is 8 (the converted samples).
 - Environment: `tifffile` is not installed in the worktree's `.venv` yet (I add it to
   `pyproject.toml` and run `uv lock` + `uv sync` as the first build step after the ruling).
+
+## Round 0 ruling (dispatcher, orchestrator gen 7) and build record
+
+Table accepted as committed. Item 1 YES (the error class shipped first, commit `748ac75`). Item 2
+PROVISIONALLY the recommendation (built-in Display P3 profile for nclx-only Display P3 input), isolated
+in commit `23fdfd9` with its own test file `tests/test_io_photo_p3.py`, revertable cleanly if CHARC
+rules "no iCCP" (revert that commit; `color.py` carries a one-line marker comment). Notes stand.
+
+Build commits on branch `wp3.6` (base `4b4da9b`): `748ac75` error class; `207a753` dependencies
+(`pillow`, `pillow-heif` moved, `tifffile` added; `uv lock`); `1a5c722` helpers; `65dc3cc` reader,
+writer, TIFF, tests; `23fdfd9` P3 profile; `0dc359c` photo_check; the report
+`docs/reports/wp3.6-photo-io.md` follows. Own verification loop before Reviewer A, suspected /
+confirmed / rejected / fixed: pass 1 suspected 6 (MPO JPEG orientation, HEIC alpha, 12-bit HEIC,
+`Exif.tobytes` inventing a GPS IFD, a `file`-less TIFF structural-tag leak, the unfilter memory at
+48 MP), confirmed 1 (the GPS IFD: an empty IFD would have been written for a source that had none;
+fixed before commit by not materialising it, test `test_d63_edit_does_not_invent_a_gps_ifd`), rejected
+5 as false positives after a probe or a new test (MPO, alpha, 12-bit now have tests; TIFF structure
+tags are filtered and tested; 48 MP read measured at 10.6 s, 1.67 GiB peak, recorded in the report).
+Pass 2 found nothing new.
 
 ## Rounds
 

@@ -629,3 +629,33 @@ def test_a_heic_whose_layout_cannot_be_established_is_unreadable(tmp_path: Path)
     with pytest.raises(PhotoReadError) as caught:
         read_photo(path)
     assert caught.value.kind == "unreadable" and "bare.heic" in str(caught.value)
+
+
+def test_a_multi_picture_jpeg_reads_its_first_image_as_jpeg(tmp_path: Path) -> None:
+    first, second = Image.new("RGB", (32, 24), (10, 200, 30)), Image.new("RGB", (16, 12))
+    exif = Image.Exif()
+    exif[274] = 6
+    path = tmp_path / "mpo.jpg"
+    first.save(path, format="MPO", save_all=True, append_images=[second], exif=exif.tobytes())
+    image, meta = read_photo(path)
+    assert meta.source_format == "jpeg" and meta.orientation == 6
+    assert image.pixels.shape == (32, 24, 3)
+
+
+def test_a_heic_with_alpha_drops_it(tmp_path: Path) -> None:
+    rgba = np.zeros((16, 16, 4), dtype=np.uint8)
+    rgba[..., 0], rgba[..., 3] = 200, 100
+    path = tmp_path / "alpha.heic"
+    pillow_heif.encode("RGBA", (16, 16), rgba.tobytes(), str(path), quality=90)
+    image, _ = read_photo(path)
+    assert image.pixels.shape == (16, 16, 3)
+    assert abs(float(image.pixels[0, 0, 0]) * 255 - 200) < 3
+
+
+def test_a_twelve_bit_heic_is_refused_as_unsupported(tmp_path: Path) -> None:
+    samples = np.full((16, 16, 3), 4095, dtype=np.uint16) << 4
+    path = tmp_path / "twelve.heic"
+    pillow_heif.encode("RGB;16", (16, 16), samples.tobytes(), str(path), quality=-1, bit_depth=12)
+    with pytest.raises(PhotoReadError) as caught:
+        read_photo(path)
+    assert caught.value.kind == "unsupported" and "12-bit" in str(caught.value)
