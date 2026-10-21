@@ -182,3 +182,11 @@ saliency reference), at the proxy size only.
 - The 4K figures were measured once (`measure.py`, `measure.txt` in the evidence folder), not by
   a test; tests pin the same quantities at small sizes. No timing (not an exclusive package).
 - Not run off the envelope: other GPUs, other operating systems, multi-GPU.
+
+## Erratum at the gate
+
+Added at the accept (orchestrator Reviewer B, `docs/proofs/wp3.3-accept.md`). Claim 6: the
+V9 bit identity of inputs 1 and 2 is of values; a `-0.0` input may return `+0.0`
+(`a + 0.0 * (S - a)`), as in the prototype. Claim 9: "two reads in all" reads "one bounds read
+and one `channel_means` read per input, three on the two-input measure path"; the test checks
+where the reads happen, not their count per frame (DR-38 (a)).
