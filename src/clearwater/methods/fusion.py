@@ -425,8 +425,9 @@ def _check_image(backend: ArrayBackend, a: object) -> None:
 def _derived_sigma(name: str, fraction: float, shape: tuple[int, ...]) -> float:
     """Return the sigma in pixels of a spatial parameter, or raise X-4's ValueError.
 
-    An OverflowError from :func:`clearwater.core.check_sigma` (a finite sigma near the float
-    maximum, whose ``4 * sigma`` is infinite) is reported the same way (as WP3.2 does).
+    A finite sigma near the float maximum, whose ``4 * sigma`` is infinite, is refused by
+    :func:`clearwater.core.check_sigma` with ValueError (DR-38 (d)); OverflowError stays caught
+    as a defence (as WP3.2 does).
 
     Raises:
         ValueError: :func:`clearwater.core.check_sigma` refuses the sigma; the message names
