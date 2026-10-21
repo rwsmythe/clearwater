@@ -1,4 +1,4 @@
-"""Shared helpers for the WP3.16 GUI tests: headless Qt, images, test methods, a capturing presenter.
+"""Helpers for the WP3.16 GUI tests: headless Qt, images, test methods, a capturing presenter.
 
 Importing this module sets ``QT_QPA_PLATFORM=offscreen`` (unless the developer set another
 platform) before any PySide6 import, so every GUI test runs headless (WP3.16 ruling 3). Every
@@ -11,20 +11,20 @@ import os
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-import threading  # noqa: E402
-import time  # noqa: E402
-from collections.abc import Callable, Mapping, Sequence  # noqa: E402
-from fractions import Fraction  # noqa: E402
-from pathlib import Path  # noqa: E402
-from typing import Any  # noqa: E402
+import threading
+import time
+from collections.abc import Callable, Mapping, Sequence
+from fractions import Fraction
+from pathlib import Path
+from typing import Any
 
-import numpy as np  # noqa: E402
-import pytest  # noqa: E402
+import numpy as np
+import pytest
 
-from clearwater.config import Locations  # noqa: E402
-from clearwater.gui import Engines, Message, stub_engines  # noqa: E402
-from clearwater.gui.shell import MainWindow  # noqa: E402
-from clearwater.interfaces import (  # noqa: E402
+from clearwater.config import Locations
+from clearwater.gui import Engines, Message, stub_engines
+from clearwater.gui.shell import MainWindow
+from clearwater.interfaces import (
     ColorDescription,
     Frame,
     Image,
@@ -211,7 +211,9 @@ def photo_engines(
     photos: Mapping[Path, Image], methods: Mapping[str, Any] | None = None, **kwargs: Any
 ) -> Engines:
     """Stub engines serving these photos."""
-    return stub_engines(photos={p: (img, META) for p, img in photos.items()}, methods=methods, **kwargs)
+    return stub_engines(
+        photos={p: (img, META) for p, img in photos.items()}, methods=methods, **kwargs
+    )
 
 
 def video_engines(frames: Sequence[Frame], **kwargs: Any) -> Engines:
