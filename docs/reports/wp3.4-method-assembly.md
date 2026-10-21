@@ -4,9 +4,8 @@ Brief `docs/briefs/wp3.4-brief.md` (FINAL, CHARC rulings `53d1d906e47fe2c9`); ro
 rulings in `docs/proofs/wp3.4-ledger.md` (orchestrator, generation 9). Branch `wp3.4`, base
 `de206e2`. Stack as locked: NumPy, SciPy and CuPy 14.x per `uv.lock`.
 
-**Status: DRAFT for Reviewer A round 1.** Open: V8 at method level (held, P-1, with CHARC),
-the EXCLUSIVE speed row and memory re-check (task 8, windows not yet granted), full pytest (in a
-window), DR-38 (d) versus five WP3.2/WP3.3 tests (raised to the dispatcher).
+**Status: DRAFT for Reviewer A round 1.** Open: the EXCLUSIVE speed row and memory re-check
+(task 8, windows not yet granted) and full pytest (in a window).
 
 ## What was built
 
@@ -20,7 +19,9 @@ window), DR-38 (d) versus five WP3.2/WP3.3 tests (raised to the dispatcher).
 | `tools/core_speed.py` | `--whole` and `--memory` legs (question 7); DR-37 (d), (e) |
 | `tests/test_methods_assembly.py` | contract: IF-3, stages, dependencies, V1, Y-2, closed form, render, D99, blend, DR-38 (a), (b), DR-40 (a), schema, DR-19, planted wrong implementations, dependency rule |
 | `tests/test_methods_assembly_prototype.py` | analyze and render against the prototype; CPU against GPU; N10; V9 |
-| `tests/test_core_wp34.py`; `tests/test_core_speed.py` (extended); `tests/test_core_select.py` (one fixture line) | the core fixes and `backend_for`; the instrument |
+| `tests/test_methods_assembly_v8.py` | V8 at method level (AD-11 as amended 2026-10-21) |
+| `tests/test_core_wp34.py`; `tests/test_core_speed.py` (extended) | the core fixes and `backend_for`; the instrument |
+| GRANTED outside the owned list (orchestrator rulings 2026-10-21) | `tests/test_core_select.py`: `name="cupy"` in `test_cupy_not_installed`'s fixture (DR-37 a); `tests/test_methods_compensation.py` and `tests/test_methods_fusion.py`: the two `__cause__` assertion lines and the docstring line beside each, OverflowError -> ValueError (DR-38 d, option A) |
 
 Public API: `clearwater.methods.available_methods() -> dict[str, CorrectionMethod]`
 (`{"c3": ..., "ancuti2018": ...}`, new instances per call); `AncutiFusionMethod("c3" |
@@ -202,13 +203,41 @@ from a record with capped blue alpha). DR-19 closes at this accept.
     new reason string. DR-38 (c): `check_rgb` refuses an empty spatial size. DR-38 (d):
     `check_sigma` raises ValueError for a radius that overflows. DR-37 (b): helpers typed
     `CoreBackend`.
-13. **Dependency rule**: importing `clearwater.methods` and building the methods loads nothing
+13. **V8** (section below): k = 1 exact; k = 2, 4 within the amended AD-11 on both crops.
+14. **Dependency rule**: importing `clearwater.methods` and building the methods loads nothing
     from `clearwater.io`, `.jobs`, `.gui`, `.config`, `.analysis`, nor PIL, av, PySide6, cupy.
 
-## V8 at method level -- HELD
+## V8 at method level
 
-Round-0 P-1 (figures in the ledger): on real content the mean bound holds with margin and the
-max bound (3/255) misses at every k > 1. The test waits for CHARC's ruling on the bound.
+AD-11 as amended 2026-10-21 (CHARC, main `df21ab0`): k = 1 EXACT; for k > 1 on real-sized
+content, mean abs within 1/255 and p99 within 2/255 at k = 2, 4/255 at k = 4; p99.9 and max
+are characterisation. `tests/test_methods_assembly_v8.py` asserts both k on both crops (the
+centre 1080 x 1920 crops of the GX011625 look-check frames at 24.925 s and 114.648 s, from the
+working folder's `wp1.3/frames`; skipped when absent), both methods, CPU and GPU, through
+`gui.imaging`'s `downscale` and `render_host` with the crop's own records for both renders; the
+GUI's `preview_export_difference` gives the same figures; a planted limited-range preview
+fails. Product, CPU, values in /255
+(`C:\Users\rwsmy\clearwater-review-evidence\wp3.4\figures\v8.txt`):
+
+| crop | method | k | mean | p99 | p99.9 | max | bound (mean / p99) |
+|---|---|---|---|---|---|---|---|
+| 0024.925 | c3 | 1 | 0 | 0 | 0 | 0 | exact |
+| 0024.925 | c3 | 2 | 0.086 | 0.929 | 8.411 | 29.426 | 1 / 2 |
+| 0024.925 | c3 | 4 | 0.246 | 3.253 | 12.176 | 25.964 | 1 / 4 |
+| 0024.925 | ancuti2018 | 1 | 0 | 0 | 0 | 0 | exact |
+| 0024.925 | ancuti2018 | 2 | 0.086 | 0.892 | 7.737 | 28.930 | 1 / 2 |
+| 0024.925 | ancuti2018 | 4 | 0.250 | 2.883 | 11.306 | 24.733 | 1 / 4 |
+| 0114.648 | c3 | 1 | 0 | 0 | 0 | 0 | exact |
+| 0114.648 | c3 | 2 | 0.085 | 0.471 | 2.781 | 29.376 | 1 / 2 |
+| 0114.648 | c3 | 4 | 0.292 | 1.363 | 4.438 | 22.642 | 1 / 4 |
+| 0114.648 | ancuti2018 | 1 | 0 | 0 | 0 | 0 | exact |
+| 0114.648 | ancuti2018 | 2 | 0.091 | 0.505 | 2.732 | 27.437 | 1 / 2 |
+| 0114.648 | ancuti2018 | 4 | 0.305 | 1.359 | 4.166 | 23.576 | 1 / 4 |
+
+The 0024.925 rows equal round-0's prototype figures. The 0114.648 rows differ from them because
+the AD-4 floor binds on that crop at full resolution (N{} range 0.0165 < 0.02; the round-0 probe
+ran the unfloored prototype); the product's rows are the V8 figures. The tightest margin is
+p99 3.25/255 against 4/255 (0024.925, c3, k = 4).
 
 ## Speed row and memory re-check -- PENDING (EXCLUSIVE windows)
 
@@ -238,8 +267,9 @@ the whole export; the row reports the core's share.
 ## Debt dispositions
 
 DR-19 CLOSES (above). DR-37 (a), (b) CLOSE; (d), (e) CLOSE (`tools/core_speed.py`); (c) not
-this package's. DR-38 (a), (b) ADDRESSED by tests; (c) CLOSES; (d) CLOSES subject to the
-dispatcher's ruling on the five WP3.2/WP3.3 tests that pin the OverflowError cause. DR-40 (a)
+this package's. DR-38 (a), (b) ADDRESSED by tests; (c) CLOSES; (d) CLOSES -- the WP3.2/WP3.3
+tests pinned the root cause the fix removes (two `__cause__` assertions expected the
+OverflowError); they now expect the core's ValueError (granted, option A). DR-40 (a)
 CLOSES by `test_dr40a_np_float_alpha_reaches_the_result` (`compensation.py` unchanged); (b)
 recorded by the speed row (pending), the fix stays WP3.21's. DR-13 placement only, stays OPEN.
 
@@ -247,6 +277,6 @@ recorded by the speed row (pending), the fix stays WP3.21's. DR-13 placement onl
 
 - Product against prototype is shown on 64 x 96 stills and synthetic scenes up to 180 x 270;
   the 4K agreement of the steps is WP3.2's and WP3.3's (their evidence).
-- The memory and speed figures are pending; V8 is held.
-- `tests/test_core_select.py` carries a one-line fixture change for DR-37 (a) (outside the
-  owned list; raised to the dispatcher).
+- The memory and speed figures are pending.
+- V8 is shown on two 1080 x 1920 crops of one clip (the ruled content); the frames live in the
+  working folder, so the test skips on a machine without them.

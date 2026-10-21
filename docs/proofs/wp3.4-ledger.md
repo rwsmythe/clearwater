@@ -306,6 +306,20 @@ Raised to the dispatcher in chat (answers arrive at the next yield):
   raising ValueError they fail (messages unchanged). Options: (A) amend the two assertion lines
   (recommended), (B) a dual-class exception, (C) re-bank (d). The fix is in `c99debb`.
 
+Rulings received (orchestrator, FINAL, 2026-10-21):
+
+- **B-1 GRANTED:** the `name="cupy"` fixture token (commit `ce8a436`); the `exc.name is None`
+  alternative declined.
+- **B-2 OPTION A:** exactly the two `__cause__` lines (+ the docstring line beside each) to
+  ValueError, one commit (`495a26b`); B and C declined.
+- **V8 RELEASED (CHARC; AD-11 amended on main `df21ab0`):** k = 1 EXACT; k > 1 on real-sized
+  content (>= 1080p): mean abs <= 1/255; p99 <= 2/255 at k = 2, <= 4/255 at k = 4; p99.9 and
+  max recorded, never asserted; small stills and synthetic noise outside V8's domain; both k,
+  both crops (GX011625 24.925 s and 114.648 s), both methods. Test `6102c6c`
+  (`tests/test_methods_assembly_v8.py`), table in the report (tightest: p99 3.25/255 at k = 4,
+  0024.925, c3). Note: on the 114.648 crop the AD-4 floor binds at full resolution (range
+  0.0165), so its product rows differ from round-0's unfloored prototype rows.
+
 Probe-derived figures for the report: `C:\Users\rwsmy\clearwater-review-evidence\wp3.4\figures\`
 (`figures.py`, `figures.txt`).
 
