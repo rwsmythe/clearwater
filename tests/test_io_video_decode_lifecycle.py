@@ -153,6 +153,33 @@ def test_a_close_landing_during_the_start_leaves_no_process(
     assert len(outcome) < 45
 
 
+def test_two_concurrent_shutdowns_both_return_after_the_cleanup(
+    sample: Callable[[str], Path], monkeypatch: pytest.MonkeyPatch, force_default_pipe: None
+) -> None:
+    # Reviewer A r3 #1: the second caller must not return while the first is still cleaning up.
+    stream = SOURCE.frames(probe(sample("vid-hevc8-bt709-full")), hw_decode=False)
+    assert isinstance(stream, decode_module.FrameStream)
+    next(stream)
+    state = stream._process
+    real_stop = decode_module._Process._stop
+    first_inside = threading.Event()
+
+    def slow_stop(self: Any) -> None:
+        first_inside.set()
+        time.sleep(0.3)
+        real_stop(self)
+
+    monkeypatch.setattr(decode_module._Process, "_stop", slow_stop)
+    first = threading.Thread(target=state.shutdown)
+    first.start()
+    assert first_inside.wait(timeout=BOUND_S)
+    state.shutdown()  # the second call: returns only once the cleanup is done
+    process, thread = state.process, state.thread
+    assert process is not None and process.poll() is not None
+    assert thread is not None and not thread.is_alive()
+    first.join(timeout=BOUND_S)
+
+
 def test_a_close_before_the_start_starts_nothing(
     sample: Callable[[str], Path], monkeypatch: pytest.MonkeyPatch
 ) -> None:

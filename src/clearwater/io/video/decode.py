@@ -346,11 +346,19 @@ class _Process:
         return status
 
     def shutdown(self) -> None:
-        """Stop FFmpeg if it still runs, close the pipes and join the thread (idempotent)."""
+        """Stop FFmpeg if it still runs, close the pipes and join the thread (idempotent).
+
+        The whole shutdown runs under the lock, so a concurrent second call returns only after
+        the first has finished its cleanup.
+        """
         with self._lock:
             if self._closed:
                 return
             self._closed = True
+            self._stop()
+
+    def _stop(self) -> None:
+        """Kill and reap FFmpeg, close the pipes and join the thread (the caller holds the lock)."""
         process = self.process
         if process is not None:
             if process.poll() is None:
