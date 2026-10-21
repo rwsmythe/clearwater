@@ -1,10 +1,13 @@
 """The Qt runner for IF-8 jobs (G9): worker threads, coalesced reports, main-thread callbacks.
 
-Each :meth:`QtJobRunner.run` starts one daemon thread. The job's :class:`QtProgress` stores the
-latest report under a lock and posts at most one queued delivery at a time, so a job reporting
-at any rate costs the interface thread one event per delivery, never a backlog (V7). The last
-report is always delivered before ``on_done``. The job runs on its thread and must not touch a
-Qt object.
+Each :meth:`QtJobRunner.run` starts one daemon thread. The job's :class:`QtProgress` only stores
+the latest report under a lock; the job thread never posts an event per report. A main-thread
+``QTimer`` polls the running jobs every :data:`PROGRESS_INTERVAL_MS` and hands each job's latest
+undelivered report to its callback, so a job reporting at any rate costs the interface thread a
+bounded amount of work (V7; measured: posting one queued event per delivery let a tight
+reporting loop hold the interface thread 62 ms, because every delivery needs the GIL back). The
+last report is always delivered before ``on_done``, which arrives by one queued signal. The job
+runs on its thread and must not touch a Qt object.
 """
 
 from __future__ import annotations
@@ -15,35 +18,32 @@ import threading
 import time
 from collections.abc import Callable
 
-from PySide6.QtCore import QObject, Qt, Signal
+from PySide6.QtCore import QObject, Qt, QTimer, Signal
 
 from clearwater.interfaces import JobResult, Progress
 
 _LOG = logging.getLogger(__name__)
+
+PROGRESS_INTERVAL_MS = 50
+"""How often the interface thread delivers progress reports: 20 per second at most per job."""
 
 type ProgressCallback = Callable[[int, int | None, str], None]
 """Receives ``(done, total, message)`` on the main thread."""
 
 
 class QtProgress:
-    """IF-8 ``Progress`` for one job: reports coalesced to the main thread, a cancel flag."""
+    """IF-8 ``Progress`` for one job: the latest report kept for the main thread, a cancel flag."""
 
-    def __init__(self, post: Callable[[], None]) -> None:
-        """Create the progress object.
-
-        Args:
-            post: Posts one queued delivery to the main thread (called from the job thread).
-        """
-        self._post = post
+    def __init__(self) -> None:
+        """Create a progress object with no report and not cancelled."""
         self._lock = threading.Lock()
         self._latest: tuple[int, int | None, str] | None = None
         self._sequence = 0
         self._delivered = 0
-        self._posted = False
         self._cancel = threading.Event()
 
     def report(self, done: int, total: int | None, message: str) -> None:
-        """Record a report; post a delivery unless one is already waiting.
+        """Record a report (job thread); it replaces any report not yet delivered.
 
         Args:
             done: Units completed so far.
@@ -53,10 +53,6 @@ class QtProgress:
         with self._lock:
             self._latest = (done, total, message)
             self._sequence += 1
-            if self._posted:
-                return
-            self._posted = True
-        self._post()
 
     def cancelled(self) -> bool:
         """Return True once the job has been cancelled."""
@@ -67,9 +63,8 @@ class QtProgress:
         self._cancel.set()
 
     def take(self) -> tuple[int, int | None, str] | None:
-        """Main thread: return the latest undelivered report, or None; re-arm posting."""
+        """Main thread: return the latest undelivered report, or None."""
         with self._lock:
-            self._posted = False
             if self._latest is None or self._delivered == self._sequence:
                 return None
             self._delivered = self._sequence
@@ -112,9 +107,8 @@ class QtJobHandle:
 
 
 class _Bridge(QObject):
-    """Lives on the main thread; carries job events by queued connections."""
+    """Lives on the main thread; carries a job's completion by a queued connection."""
 
-    progressed = Signal(object)
     finished = Signal(object, object)
 
 
@@ -124,8 +118,10 @@ class QtJobRunner:
     def __init__(self) -> None:
         """Create the runner (main thread)."""
         self._bridge = _Bridge()
-        self._bridge.progressed.connect(self._on_progressed, Qt.ConnectionType.QueuedConnection)
         self._bridge.finished.connect(self._on_finished, Qt.ConnectionType.QueuedConnection)
+        self._timer = QTimer(self._bridge)
+        self._timer.setInterval(PROGRESS_INTERVAL_MS)
+        self._timer.timeout.connect(self._poll)
         self._handles: list[QtJobHandle] = []
         self._closed = False
 
@@ -151,15 +147,14 @@ class QtJobRunner:
         """
         if self._closed:
             raise RuntimeError("the job runner is closed")
-        holder: list[QtJobHandle] = []
-        progress = QtProgress(lambda: self._emit_progress(holder[0]))
-        handle = QtJobHandle(progress, on_done, on_progress)
-        holder.append(handle)
+        handle = QtJobHandle(QtProgress(), on_done, on_progress)
         thread = threading.Thread(
             target=self._work, args=(handle, job), name="clearwater-job", daemon=True
         )
         handle.thread = thread
         self._handles.append(handle)
+        if not self._timer.isActive():
+            self._timer.start()
         thread.start()
         return handle
 
@@ -198,12 +193,9 @@ class QtJobRunner:
         """
         self._closed = True
         self.cancel()
-        return self.wait(timeout_s)
-
-    def _emit_progress(self, handle: QtJobHandle) -> None:
-        """Job thread: post one progress delivery."""
-        with contextlib.suppress(RuntimeError):  # the bridge was deleted at shutdown
-            self._bridge.progressed.emit(handle)
+        ended = self.wait(timeout_s)
+        self._timer.stop()
+        return ended
 
     def _work(self, handle: QtJobHandle, job: Callable[[Progress], JobResult]) -> None:
         """Job thread: run the job and post its result."""
@@ -223,12 +215,12 @@ class QtJobRunner:
         with contextlib.suppress(RuntimeError):  # the bridge was deleted at shutdown
             self._bridge.finished.emit(handle, result)
 
-    def _on_progressed(self, handle: object) -> None:
-        """Main thread: deliver the latest report of a job."""
-        assert isinstance(handle, QtJobHandle)
-        if not handle.is_running():
-            return
-        self._flush(handle)
+    def _poll(self) -> None:
+        """Main thread: deliver each running job's latest report."""
+        for handle in list(self._handles):
+            self._flush(handle)
+        if not self._handles:
+            self._timer.stop()
 
     def _flush(self, handle: QtJobHandle) -> None:
         """Main thread: hand the latest undelivered report to the callback."""

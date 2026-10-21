@@ -377,11 +377,11 @@ class JobRunner(Protocol):
     ) -> JobHandle:
         """Start ``job`` on its own worker thread.
 
-        Reports are coalesced: ``on_progress`` receives the latest report, at most one queued
-        delivery per job at a time, and the last report before completion always arrives
-        before ``on_done``. An exception in ``job`` becomes a failed ``JobResult`` (``ok``
-        False, ``failure`` the exception text). Both callbacks run on the main thread;
-        ``on_done`` runs exactly once.
+        Reports are coalesced: ``on_progress`` receives the latest undelivered report, at most
+        once per job per delivery interval (the shell's runner: 50 ms), and the last report
+        before completion always arrives before ``on_done``. An exception in ``job`` becomes a
+        failed ``JobResult`` (``ok`` False, ``failure`` the exception text). Both callbacks run
+        on the main thread; ``on_done`` runs exactly once.
 
         Args:
             job: The job; it must not touch a Qt object.
