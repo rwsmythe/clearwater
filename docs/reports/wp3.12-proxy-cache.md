@@ -16,7 +16,7 @@ All names are exported from `clearwater.cache`.
 |---|---|
 | The store (IF-7) | `DiskProxyCache(folder, limit_bytes=DEFAULT_CACHE_LIMIT_BYTES, *, codec=DEFAULT_CODEC, clock=time.time_ns)`; it satisfies `clearwater.interfaces.cache.ProxyCache` exactly: `lookup`, `store_proxy`, `proxy`, `store_source_statistics`, `source_statistics`, `mark_complete`, `limit_bytes`, `set_limit_bytes`, `clear` |
 | Extras (not in IF-7) | `DiskProxyCache.cache_version` (property), `.key_for(path)`, `.close()`, context-manager use |
-| Keys | `cache_key(path, codec=DEFAULT_CODEC) -> CacheKey`, `CACHE_FORMAT_VERSION = 1`, `codec_cache_version(codec)`, `entry_name(key)`, `parse_entry_name(name)` |
+| Keys | `cache_key(path, codec=DEFAULT_CODEC) -> CacheKey`, `CACHE_FORMAT_VERSION = 2`, `codec_cache_version(codec)`, `entry_name(key)`, `parse_entry_name(name)` |
 | Codecs | `ProxyCodec`, `DEFLATE` (lossless), `JPEG_Q75_444` (id 2, the default), `JPEG_Q80_420` (id 3), `CODECS`, `DEFAULT_CODEC`, `jpeg_identity()`, `round_trip(proxy, codec)` |
 
 The class takes its folder and limit as arguments and never resolves the app-data folder (a test
@@ -161,8 +161,12 @@ negative limit is refused. Deletion removes only files the cache names, only as 
 following a link or junction (`store._remove_files`: the pack first, and nothing else if the pack
 stays); a foreign file keeps its folder in place. Removal first stops new reads of the entry and waits
 up to 5 s for readers that already hold its pack open (`store._reading`; Windows refuses to delete an
-open file), then retries a refused delete briefly; an entry that still cannot be removed stays whole
-and a warning is logged.
+open file), then retries a refused delete briefly; an entry that still cannot be removed stays whole, is
+logged, is no longer served, is the first to go at the next eviction or `clear`, and carries a
+`removing` mark file so the next open removes it too (never a silent keep). A store into such an
+entry removes it first or raises `OSError`. Cleanup of leftovers deletes only files shaped like the
+temporaries `atomic_write_text` makes (`<name>.<8 random characters>.tmp`); a foreign file of that
+exact shape inside an entry folder is still deleted (out of envelope).
 The default limit is `DEFAULT_CACHE_LIMIT_BYTES` (imported, not restated).
 
 ## Differences between the stub and the product (WP3.11 consumer notes)
@@ -193,7 +197,8 @@ The default limit is `DEFAULT_CACHE_LIMIT_BYTES` (imported, not restated).
 
 - `cache_key(path)` returns a `cache_version` that is NOT `CACHE_FORMAT_VERSION`: it is
   `codec_cache_version`, the format number combined with the codec identity (AD-5 ruling, condition 2).
-  `CACHE_FORMAT_VERSION = 1` is still exported.
+  `CACHE_FORMAT_VERSION = 2` (bumped from 1 when the identity widened to 48 bits, so older caches are removed
+  when the cache opens) is still exported.
 - The proxy store is lossy by default, so the brief's "bit-identical" promise holds for the lossless
   `DEFLATE` codec only; for the default the promise is that the decoded proxy is the analysis proxy and
   is the same every time it is read (`test_the_stored_proxy_is_the_decoded_proxy_and_is_stable`).
@@ -207,7 +212,7 @@ The default limit is `DEFAULT_CACHE_LIMIT_BYTES` (imported, not restated).
 
 ## Verification
 
-Own tests: 70 pass (`tests/test_cache_*.py`, 2.6 s; `work/wp3.12/own-tests.log`), including V17 on the
+Own tests: 73 pass (`tests/test_cache_*.py`, 2.6 s; `work/wp3.12/own-tests.log`), including V17 on the
 cache side, planted defects (newest-first eviction, a key ignoring `mtime_ns`, a lossy round trip
 presented as lossless, `clear` deleting a foreign file, a marker always believed, a partly covered
 stage listed), a child process killed mid-entry, a writer thread against reader threads, `clear` with a
@@ -223,4 +228,6 @@ definition) are outside the declared envelope. No compaction: a re-stored change
 bytes in the pack until the entry is evicted. The 10 GB figure is an extrapolation from two clips (see
 finding 3). `complete` records that every record was whole when the proxy pass ended; a damaged
 proxy is found only when it is read, and from then on the entry is incomplete (the marker is
-removed, or overwritten with one that vouches for nothing if it cannot be removed); opening an entry does not re-check every checksum.
+removed, or overwritten with one that vouches for nothing if it cannot be removed); opening an entry does not re-check every checksum (the per-read CRC is the control, a
+full-pack check at open would read about 10 GB per hour of footage): a corrupt record is detected when
+it is read, not when the entry is opened.
