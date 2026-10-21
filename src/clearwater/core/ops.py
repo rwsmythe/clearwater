@@ -20,7 +20,6 @@ from collections.abc import Sequence
 
 import numpy as np
 
-from clearwater.interfaces.backend import ArrayBackend
 from clearwater.interfaces.image import Array
 
 from .backend import CoreBackend, rgb_to_ycbcr_matrix
@@ -40,8 +39,8 @@ _LAB_DELTA = 6.0 / 29.0
 _LUMA_709 = rgb_to_ycbcr_matrix("bt709")[0].astype(np.float32)
 
 
-def _core(backend: ArrayBackend) -> CoreBackend:
-    """Return ``backend`` as a :class:`CoreBackend`, or raise TypeError."""
+def _core(backend: object) -> CoreBackend:
+    """Return ``backend`` as a :class:`CoreBackend`, or raise TypeError (the run-time check)."""
     if not isinstance(backend, CoreBackend):
         raise TypeError(f"expected a clearwater.core backend, got {type(backend).__name__}")
     return backend
@@ -89,7 +88,7 @@ def pyramid_levels(shape: tuple[int, ...], min_level_size: int) -> int:
     return levels
 
 
-def gaussian_pyramid(backend: ArrayBackend, a: Array, levels: int) -> list[Array]:
+def gaussian_pyramid(backend: CoreBackend, a: Array, levels: int) -> list[Array]:
     """Build a Gaussian pyramid of ``levels`` levels, finest first (level 0 is ``a``).
 
     Mirrors ``pipeline.gaussian_pyramid`` through :meth:`CoreBackend.pyramid_reduce`.
@@ -116,7 +115,7 @@ def gaussian_pyramid(backend: ArrayBackend, a: Array, levels: int) -> list[Array
     return pyramid
 
 
-def laplacian_pyramid(backend: ArrayBackend, a: Array, levels: int) -> list[Array]:
+def laplacian_pyramid(backend: CoreBackend, a: Array, levels: int) -> list[Array]:
     """Build a Laplacian pyramid: ``L_l = G_l - EXPAND(G_{l+1})``, the last level ``G_top``.
 
     Mirrors ``pipeline.laplacian_pyramid``; :func:`collapse_pyramid` inverts it up to float
@@ -144,7 +143,7 @@ def laplacian_pyramid(backend: ArrayBackend, a: Array, levels: int) -> list[Arra
     return bands
 
 
-def collapse_pyramid(backend: ArrayBackend, pyramid: Sequence[Array]) -> Array:
+def collapse_pyramid(backend: CoreBackend, pyramid: Sequence[Array]) -> Array:
     """Collapse a Laplacian pyramid: from the coarsest level, ``G_l = L_l + EXPAND(G_{l+1})``.
 
     Mirrors ``pipeline.collapse_pyramid``. Every level is checked before it is used: a band
@@ -177,7 +176,7 @@ def collapse_pyramid(backend: ArrayBackend, pyramid: Sequence[Array]) -> Array:
     return image
 
 
-def luminance(backend: ArrayBackend, a: Array) -> Array:
+def luminance(backend: CoreBackend, a: Array) -> Array:
     """Return the BT.709 luma ``Y = 0.2126 R + 0.7152 G + 0.0722 B`` (``pipeline.luminance``).
 
     Args:
@@ -197,7 +196,7 @@ def luminance(backend: ArrayBackend, a: Array) -> Array:
     return out
 
 
-def rgb_to_lab(backend: ArrayBackend, a: Array) -> Array:
+def rgb_to_lab(backend: CoreBackend, a: Array) -> Array:
     """Convert display-encoded RGB, read as sRGB, to CIELAB (D65) (``pipeline.srgb_to_lab``).
 
     The sRGB transfer function and matrix (IEC 61966-2-1:1999), then CIELAB with the D65
@@ -238,7 +237,7 @@ def rgb_to_lab(backend: ArrayBackend, a: Array) -> Array:
     return out
 
 
-def laplacian(backend: ArrayBackend, a: Array) -> Array:
+def laplacian(backend: CoreBackend, a: Array) -> Array:
     """Return the discrete 5-point Laplacian of a map, symmetric borders (``ndimage.laplace``).
 
     Zero-sum, so a flat map gives exactly 0 (the prototype's W_L uses it on the smoothed luma).
@@ -262,7 +261,7 @@ def laplacian(backend: ArrayBackend, a: Array) -> Array:
     return out
 
 
-def channel_means(backend: ArrayBackend, a: Array) -> tuple[float, float, float]:
+def channel_means(backend: CoreBackend, a: Array) -> tuple[float, float, float]:
     """Return the mean of each channel over the whole image, accumulated in float64.
 
     Mirrors ``pipeline._channel_means``. A device-to-host SYNC POINT: three scalars are read
@@ -285,7 +284,7 @@ def channel_means(backend: ArrayBackend, a: Array) -> tuple[float, float, float]
     return float(means[0]), float(means[1]), float(means[2])
 
 
-def mean(backend: ArrayBackend, a: Array) -> float:
+def mean(backend: CoreBackend, a: Array) -> float:
     """Return the mean of every element, accumulated in float64 (``pipeline._cap_statistic``).
 
     A device-to-host SYNC POINT: one scalar is read back to the host as a Python float.

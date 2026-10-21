@@ -41,6 +41,7 @@ from __future__ import annotations
 
 import math
 from collections.abc import Sequence
+from typing import cast
 
 import numpy as np
 
@@ -199,7 +200,8 @@ def saliency_reference(backend: ArrayBackend, a: Array) -> tuple[float, float, f
         ValueError: ``a`` is not a float32 ``(H, W, 3)`` array.
     """
     _check_image(backend, a)
-    means = channel_means(backend, rgb_to_lab(backend, a))
+    core = cast(CoreBackend, backend)  # checked above; the cast is type-only (DR-37 b)
+    means = channel_means(core, rgb_to_lab(core, a))
     return float(np.float32(means[0])), float(np.float32(means[1])), float(np.float32(means[2]))
 
 
@@ -283,7 +285,7 @@ def saturation_weight(backend: ArrayBackend, a: Array) -> Array:
         ValueError: ``a`` is not a float32 ``(H, W, 3)`` array.
     """
     _check_image(backend, a)
-    luma = luminance(backend, a)
+    luma = luminance(cast(CoreBackend, backend), a)
     out: Array = (((a - luma[..., None]) ** 2).mean(axis=2)) ** 0.5
     return out
 
@@ -500,7 +502,8 @@ def _high_pass(backend: ArrayBackend, a: Array, sigma: float) -> Array:
 def _laplacian_weight(backend: ArrayBackend, a: Array, sigma: float) -> Array:
     """W_L of one input (see :func:`laplacian_weight`; sigma already validated)."""
     # The zero-sum discrete Laplacian of the smoothed luma, so a flat image gives exactly 0.
-    log = laplacian(backend, backend.gaussian_blur(luminance(backend, a), sigma))
+    core = cast(CoreBackend, backend)  # checked by the caller; type-only (DR-37 b)
+    log = laplacian(core, core.gaussian_blur(luminance(core, a), sigma))
     out: Array = abs(log * np.float32(sigma**2))
     return out
 
@@ -509,7 +512,7 @@ def _saliency_weight(
     backend: ArrayBackend, a: Array, sigma: float, mean: tuple[float, float, float]
 ) -> Array:
     """W_S of one input (see :func:`saliency_weight`; sigma and mean already validated)."""
-    lab = rgb_to_lab(backend, a)
+    lab = rgb_to_lab(cast(CoreBackend, backend), a)
     reference = backend.asarray(list(mean))
     blurred = backend.gaussian_blur(lab, sigma)
     out: Array = (((blurred - reference) ** 2).sum(axis=2)) ** 0.5 / np.float32(100.0)
