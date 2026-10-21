@@ -1,6 +1,7 @@
 # WP3.10 -- Video encode, mux and timing (report)
 
-**Status:** DRAFT (seat 2), branch `wp3.10` from main `de206e2`. The synthetic and fixture legs are
+**Status:** DRAFT (seat 3, after the Reviewer A round-1 remediation), branch `wp3.10` from main
+`de206e2`. The synthetic and fixture legs are
 complete; the footage legs (the GX011627 product leg through WP3.9's decoder, the AD-12 quality
 table, the export FLOOR speed row) wait for WP3.9 on main (brief question 12) and are marked
 PENDING below. Round 0 (the pts-carrier spike, the design table, the rulings) is recorded in
@@ -11,9 +12,9 @@ PENDING below. Round 0 (the pts-carrier spike, the design table, the rulings) is
 | File | What it is |
 |---|---|
 | `src/clearwater/io/video/nut.py` | The pts carrier on the encode pipe: a stdlib NUT framer (main, stream and INFO packets; per frame a syncpoint and a checksummed frame header with the full pts), the one-byte END SENTINEL and the input bitstream filter `setts=duration=...,noise=drop=lt(size,2)`. Invariant: a real frame is never under 2 bytes (`frame_header` refuses it), so the drop removes the sentinel only. |
-| `src/clearwater/io/video/capability.py` | D74: `detect_capabilities()` (the `-encoders` listing plus one one-frame test encode per encoder and bit depth to the null muxer, run in parallel, cached per process) and `resolve_encoder(setting, capabilities)`, the ONE `"auto"` rule (NVENC when available, else libx265). |
+| `src/clearwater/io/video/capability.py` | D74: `detect_capabilities()` (the `-encoders` listing plus one one-frame test encode per encoder and bit depth to the null muxer, run in parallel, cached per process) and `resolve_encoder(setting, capabilities)`, the ONE `"auto"` rule (NVENC when available, else libx265); `tool_env()`, the environment of every FFmpeg and ffprobe process the detection and the sink start (`FFREPORT` removed, so no tool writes a report file of its own). |
 | `src/clearwater/io/video/encode.py` | IF-5 `VideoSink`: `FFmpegVideoSink`; `VideoEncodeError(kind, message)`; `encode_command`; `provenance_comment`; `QUALITY_LEVELS` / `QUALITY_VALUE` (AD-12). |
-| `src/clearwater/io/video/verify.py` | The packet table (one ffprobe packet listing, no decode) read from the source at `open` and from the output at `close`; `check_output` (D94 "verified"); `not_carried` (D105). |
+| `src/clearwater/io/video/verify.py` | The packet table (three ffprobe listings, no decode: the stream list, the video stream's packets, the audio streams' packets; a data track's packets are never listed) read from the source at `open` (tolerant of a cut-short file) and from the output at `close` (a non-zero ffprobe exit fails); `check_output` (D94 "verified"); `not_carried` (D105). |
 | `src/clearwater/io/video/__init__.py` | Appended exports (X-V2): `FFmpegVideoSink`, `VideoEncodeError`, `QUALITY_LEVELS`, `detect_capabilities`, `resolve_encoder`; the module docstring's last sentence updated. |
 | `tools/video_fidelity.py` | The V4 instrument (DR-18): `compare` and `encode` subcommands, reusing WP1.5's `compare.py` by import. |
 | `tools/container_spike/spike.py` | DR-26 only (Q15): `_chapter` and the camera default resolve through `find_footage_file`. |
@@ -44,6 +45,9 @@ ffmpeg -nostdin -hide_banner -nostats -loglevel error -y          # -y: SafeWrit
   -movflags +negative_cts_offsets -f mp4 <out_path, absolute>
 ```
 
+The process runs with `tool_env()` (no `FFREPORT`), as do the test encodes and the ffprobe
+listings.
+
 The truncation `-to` is relative to the input's earliest stream start: FFmpeg 9.0.2 applies an
 input `-to` under `-copyts` from that start (measured: `-to 1.0` on a file starting at 0.4787 s
 kept audio packets with dts below 1.4787 s).
@@ -60,9 +64,12 @@ kept audio packets with dts below 1.4787 s).
   non-square sample aspect ratio (**P8, RULED by CHARC: refused at open, by name**; a ratio that
   cannot be seen is treated as 1:1; `VideoStreamInfo` gains no field; read from the sink's own
   ffprobe listing; GoPro and iPhone sources are square); an edit list other than the reproduced
-  forms. Reproduced forms: absent; one media segment (identity or the reorder delay); an empty
-  edit then one media segment; every rate 1; no head trim (first pts = the empty edit's dwell);
-  no tail trim. Anything else is refused by name.
+  forms; a video pts below 0 (legal ISO without an edit list; NUT pts are unsigned). Reproduced
+  forms: absent; one media segment (identity or the reorder delay); an empty edit then one media
+  segment; every rate 1; no head trim (first pts = the empty edit's dwell); no tail trim.
+  Anything else is refused by name. The NUT stream header is built before FFmpeg starts (a
+  header that cannot be built is a refusal, nothing running), and `out_path` is recorded first,
+  so `abort` after a refused `open` deletes it.
 - **`write`** checks, by name: `device == "cpu"` (Q14), the source time base, an integer pts that
   is a pts of the source and later than the previous one, a float32 NumPy array of the source's
   `(height, width, 3)`, no NaN (`rgb_to_planes`); quantises at the OUTPUT depth from a
@@ -72,10 +79,13 @@ kept audio packets with dts below 1.4787 s).
   presentation end: the edit list's segment sum, or `start_pts + duration_ts` without one),
   closes stdin, waits with polling (`POLL_S` 0.2 s; backstop 1800 s), checks the exit status, then
   reads the output back and checks: frame count and every pts against the pts written, the video
-  start, the video edit list against the written start and end (media time free, AD-22), the
-  display rotation, each audio stream's packet count and start. A mismatch is
-  `verify_failed`. Returns `SinkReport(frames_written, warnings, not_carried)`.
-- **Failure** anywhere in `open` (after FFmpeg starts), `write` or `close`: FFmpeg is killed, its
+  start, the video edit list against the written start and end (its `media_time` is checked
+  through its effect: the demuxer applies it to every pts compared, so a wrong one fails the pts
+  check), the display rotation, and every audio stream's packet pts against the source's -- all
+  of them, or for a truncated source exactly the source's packets before the cut (a packet within
+  2 us of the cut may go either way: FFmpeg reads `-to` and the input start in microseconds).
+  A mismatch is `verify_failed`. Returns `SinkReport(frames_written, warnings, not_carried)`.
+- **Failure** anywhere in `open` after FFmpeg starts (sending the header), `write` or `close`: FFmpeg is killed, its
   pipes closed, `out_path` deleted, the ORIGINAL error raised; a cleanup error is attached as a
   note (`add_note`), never in its place (DR-20 (6)). Every failure is final. **`abort`** is
   idempotent, never raises, deletes `out_path` and nothing else.
@@ -85,24 +95,36 @@ kept audio packets with dts below 1.4787 s).
 - **Warnings:** D54 assumed tags (with the values written); a truncated source (tracks cut at the
   readable end); an unreadable tail (the tracks kept whole and running longer than the video;
   Q-B, reaches `SinkReport`). **`not_carried`:** creation date and time, the camera firmware tag,
-  the timecode track, each non-timecode data track (or a packet-count shortfall), and the camera
-  settings atoms (`moov/udta`) whenever the source has GoPro settings (Q10: not attempted).
+  the timecode track, each non-timecode data track (or a sample-count shortfall, from the stream
+  list's `nb_frames`; the track's packets are never listed), and the camera settings atoms
+  (`moov/udta`) whenever the source has GoPro settings (Q10: not attempted).
 
 ## 4. The fidelity instrument (`tools/video_fidelity.py`, V4, DR-18)
 
-WP1.5's 41 items plus four (the AAC decoder configuration; priming and packet side data; frames
-with no pts; the roster), with the product readings: colour rows against the D54-resolved
+WP1.5's 41 items plus five (the movie duration, `mvhd` over its timescale, the presentation form,
+MANDATORY and exact; the AAC decoder configuration; priming and packet side data; frames with no
+pts; the roster), with the product readings: colour rows against the D54-resolved
 description, the raw tag beside it (Q-E); pixel format and bit depth against the selected depth
 (D76); the video edit list "as written" SAME with a note where only the composition-offset
 convention differs (AD-22) or where an absent source list became an identity list (AD-22
 extended, Q-C) -- every note is listed in `summary.notes`, never silent; the effect item models an
 absent list as the identity from media time 0; a cut-short source is compared on its readable
-part (D86). DR-18: (1) NVENC proof from `nvidia-smi pmon` samples tied to the FFmpeg PID, the GPU
-UUID and the encode window (or the reason it is not tied, for example an encode shorter than the
-sampling period); (2) AAC configuration, priming and side data compared, MANDATORY; (3) a roster
+part (D86): the video ends at the readable end and, for a truncated file, each copied track at
+the end of its last packet before it; the video duration, the video edit list as written (the
+source's `media_time` and rate kept, AD-22's reading applied to the cut list), the video and
+audio presentation effect, the movie duration and the copied packets are all the source's cut
+there. DR-18: (1) NVENC proof from `nvidia-smi pmon` samples tied to the FFmpeg PID, the GPU
+UUID and the encode window, the samples and the window on ONE monotonic clock (a sample counts
+when its `nvidia-smi` call overlaps the window), or the reason it is not tied (for example an
+encode shorter than the sampling period); (2) AAC configuration, priming and side data compared, MANDATORY; (3) a roster
 invariant -- a missing or unexpected item makes a MANDATORY item DIFFERENT; (4) decoded frames with
 no pts counted in both files. The telemetry data track's values are reduced to packet counts in
-the record; no payload, digest or decoded value is kept, and no location tag is read.
+the record; no payload, digest or decoded value is kept. Every location-like tag value (keys
+naming a location, ISO 6709, GPS, coordinates, latitude or longitude, or the QuickTime `xyz`
+atom) and the digest of a location-like `udta` atom are replaced by a fixed marker as soon as
+the facts are read, before any comparison: only their presence is compared, and no location
+value reaches an item or a record (tested with a planted `location` tag; WP1.5's own record
+carries it, the instrument's does not).
 
 ## 5. V4 per sample (libx265 always; NVENC on this laptop) -- every MANDATORY and REQUIRED item SAME
 
@@ -126,16 +148,23 @@ the record; no payload, digest or decoded value is kept, and no location tag is 
 
 ## 6. Tests
 
-`tests/test_io_video_encode_units.py` 49, `tests/test_io_video_encode.py` 83 (+1 `footage`),
-`tests/test_video_fidelity.py` 10 -- all passing on the branch (targeted runs; the full suite
-waits for a window). They include eight planted wrong implementations that fail by name (CFR on
+`tests/test_io_video_encode_units.py` 53, `tests/test_io_video_encode.py` 92 (+1 `footage`),
+`tests/test_video_fidelity.py` 12 -- all passing on the branch (targeted runs, `-m "not
+footage"`; the full suite waits for a window). They include eight planted wrong implementations that fail by name (CFR on
 `vid-vfr`, start offset zeroed, `media_time` copied verbatim, colour tags omitted, `tv` on a `pc`
 source, rotation dropped, audio re-encoded, 8-bit for a 10-bit source), the sentinel positive
 control (a one-byte real frame is caught by the sink's check and by the instrument), the
 transport through a capture seam (the bytes FFmpeg receives equal `rgb_to_planes` of the frames,
 the pts and durations exact), DR-39 (a) asserted on the RGB side against AD-11 (max at most
 0.13/255), the safe-write composition (no partial and no final on failure; the source
-byte-identical with its mtime unchanged), and refusals before FFmpeg starts.
+byte-identical with its mtime unchanged), and refusals before FFmpeg starts. The round-1
+remediation added a test per accepted finding, each failing on the pre-remediation code: no
+data-track packet listed; a location value never in the record; the `mvhd` row catching a planted
+duration; the cut-short reading catching a planted video `media_time`, video rate, audio duration
+and audio `media_time`; a cut audio stream accepting exactly the source's packets before the cut;
+one clock for the NVENC proof; negative pts refused at `open`; no `FFREPORT` file from the
+detection, the encoder or the listings; the header built before FFmpeg starts; a failed output
+listing an error; `abort` after a refused `open` deleting `out_path`.
 
 ## 7. AD-12 quality table and the speed row -- PENDING (WP3.9)
 
@@ -172,5 +201,13 @@ byte-identical with its mtime unchanged), and refusals before FFmpeg starts.
 - **Out of envelope, not refused:** data tracks other than the HERO13 set (for example an iPhone
   `mebx` track) and audio codecs MP4 cannot hold are passed to the muxer, which fails
   (`encoder_failed`, with FFmpeg's message).
+- **`FFREPORT` and the probe (banked, not this package's):** WP3.7's `probe.py` `_run_ffprobe`
+  (`cc28699`) still inherits `FFREPORT`, so a probe run with it set writes an ffprobe report file
+  into the working folder; the sink's own processes do not. The fix (`env=` from a shared helper)
+  is WP3.7's file.
+- **Movie duration on a coarse movie timescale:** the `mvhd` row is exact. A source whose movie
+  timescale cannot represent its presentation exactly (iPhone's 600 is the likely case) would read
+  DIFFERENT against an output whose timescale can; untested (no iPhone clip; DR-15's iPhone leg).
+  GoPro (movie timescale 30000) and every synthetic and fixture sample compare exactly.
 - Only whole-clip exports are verified for the start offset: the sink copies audio and data whole,
   so an export that starts after the source's first frame is outside this package.
