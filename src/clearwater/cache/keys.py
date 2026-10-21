@@ -7,9 +7,9 @@ modification time or another version can never be found by a lookup.
 
 from __future__ import annotations
 
+import hashlib
 import os
 import re
-import zlib
 from pathlib import Path
 
 from clearwater.interfaces.cache import CacheKey
@@ -27,7 +27,7 @@ def codec_cache_version(codec: ProxyCodec = DEFAULT_CODEC) -> int:
 
     The version folds the format number and the codec identity (the JPEG library versions, read
     now), so a different decoder gives a different version and the old entries can never match:
-    ``format number << 24 | low 24 bits of the CRC-32 of the codec id and identity``.
+    ``format number << 48 | the first 48 bits of the SHA-256 of the codec id and identity``.
 
     Args:
         codec: The store codec.
@@ -35,8 +35,8 @@ def codec_cache_version(codec: ProxyCodec = DEFAULT_CODEC) -> int:
     Returns:
         A positive integer that fits the pack header.
     """
-    identity = zlib.crc32(f"{codec.codec_id}:{codec.identity()}".encode()) & 0xFFFFFF
-    return (CACHE_FORMAT_VERSION << 24) | identity
+    digest = hashlib.sha256(f"{codec.codec_id}:{codec.identity()}".encode()).digest()
+    return (CACHE_FORMAT_VERSION << 48) | int.from_bytes(digest[:6], "big")
 
 
 def cache_key(path: str | os.PathLike[str], codec: ProxyCodec = DEFAULT_CODEC) -> CacheKey:

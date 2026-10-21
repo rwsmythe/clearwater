@@ -32,12 +32,12 @@ CACHE_FILE_NAMES = frozenset({PACK_NAME, MARKER_NAME, META_NAME})
 """The file names the cache writes into an entry folder (plus ``*.tmp`` temporaries)."""
 
 PACK_MAGIC = b"CWPK"
-PACK_FORMAT = 1
+PACK_FORMAT = 2
 KIND_PROXY = 1
 KIND_STATS = 2
 RECORD_MAGIC = b"CR"
 
-_PACK_HEADER = struct.Struct("<4sH2xqqi4x")
+_PACK_HEADER = struct.Struct("<4sH2xqqq")
 _RECORD = struct.Struct("<2sBBH2xqII")
 PACK_HEADER_SIZE = _PACK_HEADER.size
 RECORD_HEADER_SIZE = _RECORD.size

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 from pathlib import Path
 
 import numpy as np
@@ -10,6 +11,7 @@ from numpy.typing import NDArray
 
 import clearwater.cache.codec as codec_module
 from clearwater.cache import (
+    CACHE_FORMAT_VERSION,
     CODECS,
     DEFAULT_CODEC,
     DEFLATE,
@@ -121,4 +123,15 @@ def test_a_different_decoder_identity_invalidates_the_cache(
 def test_the_default_version_depends_on_the_codec_not_only_the_format() -> None:
     versions = {codec_cache_version(c) for c in (DEFLATE, JPEG_Q75_444, JPEG_Q80_420)}
     assert len(versions) == 3
-    assert all(0 < v < 2**31 for v in versions)
+    assert all(CACHE_FORMAT_VERSION << 48 < v < (CACHE_FORMAT_VERSION + 1) << 48 for v in versions)
+
+
+def test_identities_that_collide_in_24_bits_still_give_different_versions() -> None:
+    # these two collided when the identity was folded in through the low 24 bits of a CRC-32
+    first = "pillow=11.49.5;libjpeg=6.0;turbo=3.1.56.1"
+    second = "pillow=11.64.37;libjpeg=6.0;turbo=3.1.75.10"
+    one = dataclasses.replace(JPEG_Q75_444, identity=lambda: first)
+    two = dataclasses.replace(JPEG_Q75_444, identity=lambda: second)
+    assert codec_cache_version(one) != codec_cache_version(two)
+    assert codec_cache_version(one) == codec_cache_version(one)
+    assert entry_name(key_of(codec_cache_version(one)))  # the version is storable in a name
