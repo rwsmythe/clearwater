@@ -146,3 +146,23 @@ def test_the_real_photo_leg_reads_and_round_trips_the_owners_photos() -> None:
         assert record["verdict"]["ok"] or record["verdict"]["kind"] in ("unsupported", "unreadable")
         if record["verdict"]["ok"]:
             assert record["round_trip"]["problems"] == [], record["file"]
+
+
+def test_the_summary_keys_problems_by_full_path_so_same_named_photos_both_show(
+    tmp_path: Path, sample: Callable[[str], Path], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    config, footage, work = _config(tmp_path)
+    for folder in ("a", "b"):
+        (footage / folder).mkdir()
+        shutil.copy2(sample("png8-uniform-none"), footage / folder / "same.png")
+    monkeypatch.setattr(
+        photo_check, "round_trip", lambda image, meta, out: {"problems": [f"problem in {out.name}"]}
+    )
+    assert photo_check.main(["--config", str(config), "--name", "t"]) == 1
+    summary = json.loads((work / "wp3.6" / "photo-check" / "t" / "summary.json").read_text("utf-8"))
+    problems = summary["round_trip_problems"]
+    assert sorted(problems) == sorted(str(footage / f / "same.png") for f in ("a", "b"))
+    assert sorted(v[0] for v in problems.values()) == [
+        "problem in 0000-same.png",
+        "problem in 0001-same.png",
+    ]

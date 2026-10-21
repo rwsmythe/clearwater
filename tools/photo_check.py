@@ -280,12 +280,16 @@ def run(
         "photos": len(records),
         "read_ok": sum(1 for r in records if r["verdict"]["ok"]),
         "refused": [
-            {"file": r["file"], **{k: r["verdict"][k] for k in ("kind", "message")}}
+            {
+                "file": r["file"],
+                "path": r["path"],
+                **{k: r["verdict"][k] for k in ("kind", "message")},
+            }
             for r in records
             if not r["verdict"]["ok"]
         ],
         "round_trip_problems": {
-            r["file"]: r["round_trip"]["problems"]
+            r["path"]: r["round_trip"]["problems"]
             for r in records
             if r.get("round_trip", {}).get("problems")
         },
@@ -324,7 +328,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(error)
         return 3
     print(out)
-    failed = [r["file"] for r in records if r.get("round_trip", {}).get("problems")]
+    failed = [r["path"] for r in records if r.get("round_trip", {}).get("problems")]
     return 1 if failed else 0
 
 
