@@ -6,6 +6,9 @@ Usage::
     uv run python tools/cache_store_test.py sizes [--only NAME ...] [--workers N]
     uv run python tools/cache_store_test.py readcost [--only NAME ...]
     uv run python tools/cache_store_test.py report
+    uv run python tools/cache_store_test.py readcost-product
+    uv run python tools/cache_store_test.py meansize
+    uv run python tools/cache_store_test.py signed
 
 ``prepare`` decodes the footage through the FFmpeg command line to 3840x2160 ``rgb24``, takes the
 exact 4x4 block mean (the analysis proxy of AD-5, 960x540) and keeps two things per clip under
@@ -17,7 +20,22 @@ reference, as AD-5 requires: the channel means and white-balance gains within 1e
 N{} bounds within 1 % (relative to each bound, and, since a bound near zero makes that ill-defined,
 also relative to the bounds' range). ``readcost`` times the decode of one stored proxy per
 candidate; it is the only timing here and is meant for an EXCLUSIVE window (nothing else heavy
-running). ``report`` prints the markdown table from the recorded results.
+running). ``report`` prints the markdown table from the recorded results and judges each
+candidate by the criteria of AD-5 as ruled 2026-10-20 (means and gains within 1e-3 of the float
+proxy; the N{} bounds deviation beyond the 8-bit floor within 10 % of the range) and, as
+information, by the original 1 % bounds criterion. ``readcost-product`` times
+``DiskProxyCache.proxy`` per product codec (EXCLUSIVE window). ``meansize`` encodes every frame
+of both clips with the product JPEG codecs and writes the whole-clip mean, median and 95th
+percentile sizes and the 60-minute extrapolations to ``meansize.txt`` (sizes only, no timing);
+``signed`` writes to ``signed-bounds.txt`` the SIGNED change of the N{} bounds range of the
+decoded default proxy against the float proxy and against the 8-bit proxy alone (every second
+statistics frame).
+
+Sizes are the bytes of the stored payload per frame (the product adds a 24-byte record header
+and a small codec header per frame; stream candidates count the packet payloads, without
+container overhead); the maximum and mean pixel error are taken over the statistics frames
+only. ``meansize.txt`` and ``readcost-product`` use the product codecs through the product
+store and carry the exact product sizes.
 
 Footage is only ever read, through :func:`local_config.find_footage_file`; every file written is
 under the working folder. The 4K decode and the candidates are the instrument's own; the
@@ -67,6 +85,9 @@ CLIPS: dict[str, tuple[float, ...] | None] = {"GX011627": None, "GX011625": WIND
 READ_ROUNDS = 8
 """How many times each stored proxy is read back in the product read-cost row."""
 CRITERIA = {"means": 1e-3, "gains": 1e-3, "bounds": 1e-2}
+"""AD-5 as first written: means, gains and N{} bounds (per bound) against the float proxy."""
+RULED_BOUNDS_RANGE = 0.10
+"""AD-5 as ruled 2026-10-20: bounds deviation beyond the 8-bit floor, relative to the range."""
 
 Frames = NDArray[np.uint8]
 Stats = dict[str, NDArray[np.float64]]
@@ -863,7 +884,7 @@ def report_mode() -> None:
         "| candidate | median KB/frame (worst clip) | p95 KB | 60-min GB (median) "
         "| 60-min GB (p95) | fits 10 GB | max err | mean err | means | gains | bounds (value) "
         "| bounds (range) | vs 8-bit: means | gains | bounds (value) | bounds (range) "
-        "| verdict | read ms |"
+        "| verdict (ruled criteria; original 1 % bounds shown for information) | read ms |"
     )
     print("|" + "---|" * 18)
     for name in names:
@@ -873,12 +894,13 @@ def report_mode() -> None:
         gb_median = median * SIXTY_MINUTES_FRAMES / 1e9
         gb_p95 = p95 * SIXTY_MINUTES_FRAMES / 1e9
         dev = {k: max(r["dev_max"][k] for r in rows) for k in rows[0]["dev_max"]}
+        dev8 = {k: max(r["dev8_max"][k] for r in rows) for k in rows[0]["dev8_max"]}
         ok_stats = (
             dev["means"] <= CRITERIA["means"]
             and dev["gains"] <= CRITERIA["gains"]
-            and dev["bounds"] <= CRITERIA["bounds"]
+            and dev8["bounds_range"] <= RULED_BOUNDS_RANGE
         )
-        dev8 = {k: max(r["dev8_max"][k] for r in rows) for k in rows[0]["dev8_max"]}
+        original_bounds = dev["bounds"] <= CRITERIA["bounds"]
         fits = median * SIXTY_MINUTES_FRAMES <= BOUND_BYTES
         read = cost.get(name, {}).get("median_ms")
         print(
@@ -889,9 +911,84 @@ def report_mode() -> None:
             f"| {dev['bounds']:.1e} | {dev['bounds_range']:.1e} "
             f"| {dev8['means']:.1e} | {dev8['gains']:.1e} | {dev8['bounds']:.1e} "
             f"| {dev8['bounds_range']:.1e} "
-            f"| {'stats ok' if ok_stats else 'stats FAIL'}{' + fits' if ok_stats and fits else ''} "
+            f"| {'ruled criteria ok' if ok_stats else 'ruled criteria FAIL'}"
+            f"{' + fits' if ok_stats and fits else ''}"
+            f" (original 1 % bounds: {'met' if original_bounds else 'not met'}) "
             f"| {'' if read is None else f'{read:.1f}'} |"
         )
+
+
+def meansize_mode() -> None:
+    """Write the whole-clip sizes of the product JPEG codecs to ``meansize.txt`` (no timing)."""
+    from clearwater.cache import JPEG_Q75_444, JPEG_Q80_420
+
+    out = out_dir()
+    lines = [
+        "# product-codec (clearwater.cache.codec) payload sizes over whole clips; "
+        f"written {time.strftime('%Y-%m-%d')} by tools/cache_store_test.py meansize "
+        "(sizes only, no timing); 60min = 107892 frames"
+    ]
+    for codec in (JPEG_Q75_444, JPEG_Q80_420):
+        for stem in CLIPS:
+            clip = load_clip(stem)
+            sizes = np.array(
+                [
+                    len(codec.encode(np.asarray(clip.frames[i])))
+                    for i in range(clip.frames.shape[0])
+                ],
+                dtype=np.float64,
+            )
+            lines.append(
+                f"{codec.name} {stem} frames={len(sizes)} mean={sizes.mean() / 1000:.1f}KB "
+                f"median={np.median(sizes) / 1000:.1f}KB "
+                f"p95={np.percentile(sizes, 95) / 1000:.1f}KB "
+                f"max={sizes.max() / 1000:.1f}KB  "
+                f"60min(mean)={sizes.mean() * SIXTY_MINUTES_FRAMES / 1e9:.1f}GB "
+                f"60min(median)={np.median(sizes) * SIXTY_MINUTES_FRAMES / 1e9:.1f}GB"
+            )
+    (out / "meansize.txt").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    print("\n".join(lines))
+
+
+def signed_mode() -> None:
+    """Write the signed change of the default proxy's N{} bounds range to ``signed-bounds.txt``.
+
+    For every second statistics frame the range of the bounds measured on the decoded default
+    proxy, and on the 8-bit proxy alone, is compared with the range measured on the float proxy
+    (c3 ``Params()``, CPU): ``(range - float range) / float range``.
+    """
+    from clearwater.cache import round_trip
+
+    out = out_dir()
+    lines = [
+        "# signed change of the N{} bounds RANGE (high-pass 0.5/99.5 percentile span) against the "
+        "float proxy, c3 Params(), CPU, every 2nd statistics frame; written "
+        f"{time.strftime('%Y-%m-%d')} by tools/cache_store_test.py signed"
+    ]
+
+    def summary(values: list[float]) -> str:
+        a = np.asarray(values)
+        return (
+            f"min {a.min():+.3f} med {np.median(a):+.3f} max {a.max():+.3f}  "
+            f"neg {int((a < 0).sum())}/{len(a)}"
+        )
+
+    for stem in CLIPS:
+        clip = load_clip(stem)
+        indices = clip.stat_indices[::2]
+        plain: list[float] = []
+        jpeg: list[float] = []
+        for i in indices:
+            frame = np.asarray(clip.frames[i])
+            reference = clip.reference[i]["bounds"]
+            span = float(reference[1] - reference[0])
+            for target, picture in ((plain, frame), (jpeg, round_trip(frame))):
+                bounds = frame_stats(picture.astype(np.float32) / 255.0)["bounds"]
+                target.append((float(bounds[1] - bounds[0]) - span) / span)
+        lines.append(f"{stem} {len(indices)} 8-bit only  range change: {summary(plain)}")
+        lines.append(f"{stem} {len(indices)} jpeg q75    range change: {summary(jpeg)}")
+    (out / "signed-bounds.txt").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    print("\n".join(lines))
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -906,6 +1003,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     p_read = sub.add_parser("readcost")
     p_read.add_argument("--only", nargs="*", default=[])
     sub.add_parser("readcost-product")
+    sub.add_parser("meansize")
+    sub.add_parser("signed")
     sub.add_parser("report")
     args = parser.parse_args(argv)
     if args.mode == "prepare":
@@ -916,6 +1015,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         readcost_mode(args.only)
     elif args.mode == "readcost-product":
         readcost_product_mode()
+    elif args.mode == "meansize":
+        meansize_mode()
+    elif args.mode == "signed":
+        signed_mode()
     else:
         report_mode()
     return 0
