@@ -200,8 +200,7 @@ here on `dfe65d5` (cell wp32-rem; depth figure not given to this cell).
 | B-2 V9 sentence "bit for bit on every input" false for a signed zero | MINOR, in envelope | CONFIRMED (reasoned); no product change (prototype does the same) | 03a0527 | report text only |
 | B-3 no 10-bit-grid input in the V1 matrix | ADVISORY, in envelope | accepted | e580582 | test only |
 
-**B-1 failing on `dfe65d5`** (new tests run against the unfixed `compensation.py`, 6 failed / 8 passed;
-copy of the run at the scratchpad `before.txt`):
+**B-1 failing on `dfe65d5`** (new tests run against the unfixed `compensation.py`: 6 failed, 8 passed, 230 deselected):
 
 - `test_c3_numpy_scalar_parameters_make_no_float64_array[float64-arithmetic]` and `[float64-threshold]`:
   `AssertionError: a float64 array was made on the way` (`UfuncSpy.result_dtypes` holds `float64`).
@@ -241,6 +240,6 @@ floats); no change made.
 
 Gates on `e580582` (own tests, no full suite, no Reviewer A round, per the dispatch): `ruff check`,
 `ruff format --check`, `mypy` clean; `tests/test_methods_compensation.py` + `tests/test_methods_white_balance.py`
-with CuPy 431 passed (was 383 before B-1/B-3 plus the B-3 grid cases: +14 B-1 cases, +2 grid-fixture
-test counts per module as parametrised); with `cupy` / `cupyx` = None in `sys.modules` 226 passed,
-205 skipped.
+with CuPy 431 passed (383 at the
+round-1 cleanup; the B-1 matrix and the B-3 grid case account for the rest); with `cupy` / `cupyx` = None
+in `sys.modules` 226 passed, 205 skipped.
