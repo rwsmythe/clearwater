@@ -179,14 +179,16 @@ def test_the_real_readers_photo_read_error_is_refused_naming_the_file(
 
 def test_only_a_photo_read_error_by_name_is_shown_with_its_own_text(make_window, qtbot) -> None:
     # X-B2: an exception that merely carries a ``kind`` is not the reader's error.
-    class LookAlike(Exception):
+    class LookAlikeError(Exception):
         kind = "unreadable"
 
     good, bad = Path("good.png"), Path("broken.heic")
     window = make_window(photo_engines({good: image(20, 20)}))
     open_and_wait(qtbot, window, good)
     previous = window.session.source()
-    _with_photo_source(window._engines, RaisingPhotoSource(LookAlike("broken.heic is damaged")))
+    _with_photo_source(
+        window._engines, RaisingPhotoSource(LookAlikeError("broken.heic is damaged"))
+    )
     open_and_wait(qtbot, window, bad)
     text = assert_refused(window, bad, previous)
     assert text == "broken.heic could not be read: broken.heic is damaged"
