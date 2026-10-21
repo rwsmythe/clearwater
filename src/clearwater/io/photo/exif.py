@@ -25,7 +25,9 @@ PIXEL_X = int(ExifTags.Base.ExifImageWidth)  # PixelXDimension
 PIXEL_Y = int(ExifTags.Base.ExifImageHeight)  # PixelYDimension
 EXIF_IFD = ExifTags.IFD.Exif
 GPS_IFD = ExifTags.IFD.GPSInfo
-IFD_POINTERS = frozenset({int(ExifTags.IFD.Exif), int(ExifTags.IFD.GPSInfo), 40965, 330})
+INTEROP_IFD = ExifTags.IFD.Interop
+INTEROP_POINTER = int(ExifTags.IFD.Interop)  # 40965, a tag of the Exif IFD
+IFD_POINTERS = frozenset({int(ExifTags.IFD.Exif), int(ExifTags.IFD.GPSInfo), INTEROP_POINTER, 330})
 """IFD0 tags that point to other IFDs (Exif, GPS, Interop, SubIFDs); never copied as values."""
 
 # TIFF structure and embedded blobs that are not EXIF fields: dropped when an EXIF block is
@@ -113,11 +115,32 @@ def edit(source: bytes | None, width: int, height: int) -> bytes:
     return strip_prefix(exif.tobytes())
 
 
+def _materialise_interop(source: Image.Exif, fields: dict[int, object]) -> None:
+    """Replace the Exif IFD's Interop pointer in ``fields`` by the Interop IFD it points to.
+
+    The pointer is a file offset into the TIFF, meaningless in the block built from it, so the
+    IFD itself is carried (Pillow writes a dict value as a nested IFD). A pointer to an IFD
+    that is empty or unreadable is dropped rather than left dangling.
+    """
+    if INTEROP_POINTER not in fields:
+        return
+    try:
+        interop = dict(source.get_ifd(INTEROP_IFD))
+    except Exception as error:  # Pillow raises assorted types on a bad offset
+        _log.warning("TIFF Interop IFD cannot be read (%s); dropped", error)
+        interop = {}
+    if interop:
+        fields[INTEROP_POINTER] = interop
+    else:
+        del fields[INTEROP_POINTER]
+
+
 def from_tiff(data: bytes) -> bytes | None:
     """Build the EXIF block of a TIFF source from its IFD0, Exif IFD and GPS IFD.
 
     Pillow opens the file lazily for its tags only, never for pixels. Structural tags, the
-    embedded profile and the XMP, IPTC and Photoshop blobs are left out.
+    embedded profile and the XMP, IPTC and Photoshop blobs are left out. The Exif IFD's Interop
+    IFD is carried as an IFD, not as the file offset the TIFF stores.
 
     Args:
         data: The TIFF file's bytes.
@@ -137,6 +160,8 @@ def from_tiff(data: bytes) -> bytes | None:
                     found = True
             for pointer in (EXIF_IFD, GPS_IFD):
                 fields = dict(source.get_ifd(pointer))
+                if pointer == EXIF_IFD:
+                    _materialise_interop(source, fields)
                 if fields:
                     built.get_ifd(pointer).update(fields)
                     found = True
