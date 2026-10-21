@@ -16,7 +16,11 @@ dependencies = [
     "scipy>=1.14,<2",
     # WP3.12 (CHARC ruling on the AD-5 STOP, 2026-10-20): the proxy cache stores JPEG proxies; already
     # the photo-I/O library of AD-17 (granted for the product). Moved from the dev group.
+    # WP3.6 (frame section 4 grant; ruling 1): photo input. Moved from the dev group (X-B3).
     "pillow>=11,<13",
+    "pillow-heif>=0.20,<2",
+    # WP3.6 (CHARC ruling 1, AD-17/AD-18 amended; BSD-3): TIFF at every depth.
+    "tifffile>=2025.1,<2027",
 ]
 
 [project.optional-dependencies]
@@ -31,7 +35,6 @@ dev = [
     "mypy>=1.11,<2",
     "psutil>=6,<8",
     "py-cpuinfo>=9,<10",
-    "pillow-heif>=0.20,<2",
     # WP1.2 Part A GPU candidate (CHARC grant; MIT). The product names it as the [gpu] extra (WP3.1);
     # kept here so the developer environment has CuPy (WP3.1 ruling 7).
     "cupy-cuda12x[ctk]>=14.2,<15",
