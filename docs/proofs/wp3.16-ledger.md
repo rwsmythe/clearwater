@@ -409,3 +409,29 @@ Withheld paths respected. The reviewer could not execute Python; all findings RE
 | R2-5 | MINOR | CONFIRMED (read) | yes | NEW | add `sidecar` to the `VideoProbeError` test loop (claim 6 then true) |
 
 Remediation NOT started (yield at the round boundary).
+
+## Round-2 rulings (orchestrator gen 8, FINAL, 03:00Z) and remediation
+
+Rulings: R2-2 MAJOR remediate (bounded loop; boundary tests at 0, 1 and 2 device pixels per axis
+and a degenerate image; a timeout-guarded planted unbounded version must fail). R2-1 remediate,
+the downgrade to MINOR ACCEPTED (a re-render, not a wrong result). R2-3, R2-4, R2-5 as planned.
+
+Commits: `93a3f25` R2-5 (test only: `sidecar` added to the `VideoProbeError` loop); `df0da40`
+R2-1..R2-4 (shared hunks in `preview.py` and `tests/test_gui_preview.py`).
+
+- R2-2: `view_factor` caps k at `max(1, H, W)`. Boundary test: five images (1x1, 1x7, 16x16,
+  4000x6000, 6048x8064) by shown sizes {0, 0.5, 1, 2} on each axis (80 cases) in a child process
+  with a 10 s timeout, each equal to a brute-force largest covering factor (1 for an empty
+  displayed size); `view_factor(0, 0, 1, 1) == 1`. The planted unbounded version (the round-1
+  code) raises `TimeoutExpired`.
+- R2-1: the corrected image is converted and memoised before the post-render `check()`.
+- R2-3: `_frame_error_shown` set on a frame failure; the next decoded frame clears `error`.
+- R2-4: `PreviewWidget.set_proxy` clears the indicator.
+
+Red/green: against the three product files restored from `4ab99e2`, 4 failed (the boundary
+test, the superseded-render test, the show_proxy test, the frame-banner test); the planted
+unbounded test and the sidecar loop pass both ways (the first plants its own code; the second
+guards a path the round-1 code already handled, it makes claim 6 true).
+
+Gates at `df0da40`: GUI tests 102 passed (37.5 s), with `tests/test_conftest_guard.py` 146
+passed (64.1 s); ruff check (repo) 0; ruff format --check 0 (140 files); mypy strict 0 (87 files).
