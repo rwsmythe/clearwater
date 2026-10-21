@@ -521,3 +521,28 @@ round.
   `uv sync --reinstall-package pyside6-essentials --reinstall-package shiboken6` after the
   Essentials switch; `tests/test_conftest_guard.py` is changed outside the owned set under the
   round-1 F1 grant.
+
+## Terminating cleanup after R4 (fresh cell, orchestrator gen 8, 2026-10-21)
+
+No further Reviewer A round; Reviewer B at the orchestrator's seat covers it. Started at
+`6a65145` (the dispatcher's rebase onto main after WP3.12 and WP3.6; merge base `d0f00ee`, which
+differs from main `4ec835d` only in `docs/proofs/wp3.6-accept.md`). `uv sync` clean; Qt 6.12.0
+imported without the reinstall.
+
+| Item | Commit | Fail before (test run on the old code) | After |
+|---|---|---|---|
+| X-B2 by-name catch: `messages.photo_read_failure` catches `PhotoReadError`; `PHOTO_READ_ERROR_KINDS` (the S2 adapter) removed; tests use the real class | `92cf05d` (+ `125b1ac`, ruff N818 rename in the test) | `test_only_a_photo_read_error_by_name_is_shown_with_its_own_text` FAILED (look-alike shown as its own text); the real-reader truncated-JPEG test passed before too (expected: kind matched) | `tests/test_gui_open.py` 28 passed |
+| R4-1: `shell._open_task` catches an escaping exception, refusal "<name> could not be opened: <text>" | `7f137f6` | `test_an_exception_escaping_the_open_task_is_a_refusal_naming_the_file` FAILED ("The file could not be opened: engine fault", no name) | passed |
+| R4-2: neutral `SETTINGS_FORMAT_TEXT` (was `NEWER_SETTINGS_TEXT`); version-99 test asserts the error's "newer" | `f79b8bb` | `test_an_older_settings_file_without_a_migration_is_not_called_newer` FAILED ("from a newer Clearwater (no migration ... version 0 to 1)") | `tests/test_gui_startup.py` 10 passed |
+| R4-3: child process at `QT_SCALE_FACTOR=2`: DPR 2, grab in device pixels, 1:1 corrected pixels exact; planted `devicePixelRatioF -> 1.0` | `2f85c9a` | test only; the planted widget gives EXACT True at DPR 1 (the old test cannot see it) and EXACT False at DPR 2 | both new tests passed |
+
+Gates at `2f85c9a`: `tests/test_gui_*.py` 113 passed (32 s, offscreen); with
+`tests/test_conftest_guard.py` 157 passed; `tests/test_io_photo_*.py` 433 passed (1 PIL
+corrupt-EXIF warning from WP3.6's own fixtures); ruff check 0; ruff format --check 0 (174
+files); mypy strict 0 (107 files). Full suite: run by the orchestrator on the candidate.
+Locks on disk against main: nothing under `interfaces/`, `config/`, `core/`, `io/`, `jobs/`,
+`tests/conftest.py` changed; `contract.py` touched only by `ca9d7c6` (round 0) and `ecf3085`
+(the `JobRunner.run` docstring); `pyproject.toml` adds only `pyside6-essentials>=6.12,<7` and
+`pytest-qt>=4.5,<5`; `tests/test_conftest_guard.py` changed only under the round-1 F1 grant.
+Not done (scope "nothing else"): `default_engines()` still uses `StubPhotoSource`; WP4.3 wires
+WP3.6's `PhotoReader`.
