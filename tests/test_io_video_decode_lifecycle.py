@@ -129,6 +129,41 @@ def test_a_planted_ffmpeg_death_mid_stream_raises_and_never_hangs(
     assert stream._process.thread is not None and not stream._process.thread.is_alive()
 
 
+def test_a_close_landing_during_the_start_leaves_no_process(
+    sample: Callable[[str], Path], monkeypatch: pytest.MonkeyPatch, force_default_pipe: None
+) -> None:
+    # Reviewer A r2 #1: close() from another thread while FFmpeg is being started.
+    stream = SOURCE.frames(probe(sample("vid-hevc8-bt709-full")), hw_decode=False)
+    assert isinstance(stream, decode_module.FrameStream)
+    closer = threading.Thread(target=stream.close)
+    real_start = decode_module._Process._start
+
+    def start_with_a_close_racing(self: Any, command: list[str]) -> None:
+        closer.start()  # blocks on the shutdown lock until the start is complete
+        time.sleep(0.2)
+        real_start(self, command)
+
+    monkeypatch.setattr(decode_module._Process, "_start", start_with_a_close_racing)
+    outcome = [frame.pts_ticks for frame in stream]
+    closer.join(timeout=BOUND_S)
+    assert not closer.is_alive()
+    process, thread = stream._process.process, stream._process.thread
+    assert process is not None and process.poll() is not None
+    assert thread is not None and not thread.is_alive()
+    assert len(outcome) < 45
+
+
+def test_a_close_before_the_start_starts_nothing(
+    sample: Callable[[str], Path], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    stream = SOURCE.frames(probe(sample("vid-vfr")), hw_decode=False)
+    assert isinstance(stream, decode_module.FrameStream)
+    stream._process.shutdown()  # the shutdown wins the race: it runs before the start
+    with pytest.raises(StopIteration):
+        next(stream)
+    assert stream._process.process is None and stream._process.thread is None
+
+
 def test_a_close_landing_between_read_and_return_returns_no_frame(
     sample: Callable[[str], Path], monkeypatch: pytest.MonkeyPatch
 ) -> None:

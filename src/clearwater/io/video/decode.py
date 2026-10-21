@@ -271,12 +271,26 @@ class _Process:
         self._lock = threading.Lock()
         self._closed = False
 
-    def start(self, command: list[str]) -> None:
+    def start(self, command: list[str]) -> bool:
         """Start FFmpeg with its output on the frame pipe and its standard error drained.
+
+        Runs under the shutdown lock, so a :meth:`shutdown` from another thread either waits for
+        the start and then stops the new process, or comes first and nothing is started.
+
+        Returns:
+            True when started; False when this was already shut down (nothing is started).
 
         Raises:
             OSError: FFmpeg cannot be started.
         """
+        with self._lock:
+            if self._closed:
+                return False
+            self._start(command)
+            return True
+
+    def _start(self, command: list[str]) -> None:
+        """Start the process and the thread (the caller holds the lock)."""
         fds = open_frame_pipe()
         if fds is not None:
             read_fd, write_fd = fds
@@ -418,11 +432,13 @@ class FrameStream(Iterator[Frame]):
             if not self._started:
                 self._started = True
                 try:
-                    self._process.start(self._command)
+                    started = self._process.start(self._command)
                 except OSError as error:
                     raise VideoDecodeError(
                         "unreadable", ascii_text(f"ffmpeg could not be run: {error}")
                     ) from error
+                if not started:  # closed from another thread before FFmpeg started
+                    raise StopIteration
             while True:
                 pts = self._read_frame()
                 if pts is None:

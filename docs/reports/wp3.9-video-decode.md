@@ -92,6 +92,17 @@ ffmpeg -nostdin -hide_banner -nostats -loglevel repeat+level+info [-hwaccel cuda
   cover-art first stream stays out of envelope (DR-20 (5) open for the probe side).
 - DR-28 (4) PARTLY (decode side): a dead FFmpeg surfaces at the next `next()`.
 
+## Review adjudications
+
+- Reviewer A r1 #1 (MAJOR as raised; rejected on behaviour, confirmed by the orchestrator): a short
+  read on a probe-flagged file raises `"unreadable"`. D86's clean stop at the readable end is FFmpeg
+  exiting 0 at a frame boundary on a truncated input (executed on `vid-truncated`: 24 frames,
+  exit 0); a short read means FFmpeg died inside a frame write, and every complete frame has been
+  delivered before the raise.
+- Reviewer A r2 #1 (MAJOR, confirmed and fixed): a `close()` from another thread during the lazy
+  FFmpeg start could leave the process and thread running; the start now runs under the shutdown
+  lock and starts nothing once closed.
+
 ## Limits
 
 - `[error]` lines with exit 0 on a clean file are logged, not raised: reasoned (decoders log
