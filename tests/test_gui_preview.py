@@ -1,0 +1,347 @@
+"""WP3.16 preview: the downscale rule, V8 harness, 1:1 exactness, latest wins, display colour.
+
+Covers brief task 5, 6 and the task-8 rows "latest wins", "V8 harness", "1:1 exact" and the
+planted "a stale render displayed" and "1:1 showing scaled pixels".
+"""
+
+from __future__ import annotations
+
+import gui_support  # noqa: F401  (sets the offscreen platform first)
+
+import dataclasses
+import math
+from pathlib import Path
+
+import numpy as np
+import pytest
+from gui_support import (
+    LevelMethod,
+    image,
+    make_window,  # noqa: F401
+    open_and_wait,
+    photo_engines,
+    presenter_of,
+    wait_idle,
+)
+from PySide6.QtGui import QColorSpace, QImage
+
+from clearwater.config import new_parameter_set
+from clearwater.gui import imaging, render_worker
+from clearwater.gui.imaging import (
+    display_image,
+    downscale,
+    downscaled_size,
+    image_bytes,
+    preview_export_difference,
+    statistics_factor,
+    to_display_uint8,
+    view_factor,
+)
+from clearwater.interfaces import ColorDescription, Image
+from clearwater.interfaces.stubs import StubArrayBackend, StubCorrectionMethod
+
+pytestmark = pytest.mark.gui
+
+
+# The downscale rule (S3).
+
+
+def test_downscale_divisible_is_the_block_mean() -> None:
+    data = np.arange(4 * 6 * 3, dtype=np.float32).reshape(4, 6, 3)
+    out = downscale(data, 2)
+    assert out.shape == (2, 3, 3)
+    assert out.dtype == np.float32
+    expected = data.reshape(2, 2, 3, 2, 3).mean(axis=(1, 3))
+    np.testing.assert_allclose(out, expected, rtol=0, atol=1e-6)
+
+
+def test_downscale_edge_blocks_average_only_their_pixels() -> None:
+    data = np.arange(5 * 7 * 3, dtype=np.float32).reshape(5, 7, 3)
+    out = downscale(data, 3)
+    assert out.shape == (2, 3, 3)
+    np.testing.assert_allclose(out[1, 2], data[3:5, 6:7].mean(axis=(0, 1)), atol=1e-5)
+    np.testing.assert_allclose(out[0, 2], data[0:3, 6:7].mean(axis=(0, 1)), atol=1e-5)
+    np.testing.assert_allclose(out[1, 0], data[3:5, 0:3].mean(axis=(0, 1)), atol=1e-5)
+
+
+def test_downscale_factor_one_is_the_input_and_zero_is_refused() -> None:
+    data = np.zeros((3, 3, 3), dtype=np.float32)
+    assert downscale(data, 1) is data
+    with pytest.raises(ValueError, match="at least 1"):
+        downscale(data, 0)
+
+
+@pytest.mark.parametrize(
+    ("height", "width", "k", "size"),
+    [
+        (2160, 3840, 4, (540, 960)),
+        (2988, 5312, 5, (598, 1063)),
+        (3024, 4032, 5, (605, 807)),
+        (6048, 8064, 11, (550, 734)),
+        (300, 400, 1, (300, 400)),
+    ],
+)
+def test_statistics_proxy_figures(height: int, width: int, k: int, size: tuple[int, int]) -> None:
+    assert statistics_factor(height, width) == k
+    assert downscaled_size(height, width, k) == size
+
+
+def test_view_factor_is_the_largest_that_still_covers_the_view() -> None:
+    for height, width, shown_h, shown_w in [
+        (3024, 4032, 600, 800),
+        (2160, 3840, 540, 960),
+        (2160, 3840, 541, 961.5),
+        (1000, 1000, 333.3, 333.3),
+        (100, 100, 100, 100),
+        (100, 100, 250, 250),
+    ]:
+        k = view_factor(height, width, shown_h, shown_w)
+        h, w = downscaled_size(height, width, k)
+        assert k == 1 or (h >= shown_h and w >= shown_w)
+        h2, w2 = downscaled_size(height, width, k + 1)
+        assert h2 < shown_h or w2 < shown_w
+    assert view_factor(2160, 3840, 540, 960) == 4
+    assert view_factor(100, 100, 250, 250) == 1
+
+
+# The V8 harness and the display conversion.
+
+
+def test_v8_harness_with_the_identity_stub_is_exact() -> None:
+    src = image(301, 457, seed=3)
+    method = StubCorrectionMethod()
+    backend = StubArrayBackend()
+    stats = imaging.measure_statistics(method, backend, src, {})
+    for k in (1, 2, 3, 7):
+        diff = preview_export_difference(method, backend, src, {}, stats, k)
+        assert (diff.mean_abs, diff.max_abs) == (0.0, 0.0)
+
+
+def test_v8_harness_detects_a_resolution_dependent_method() -> None:
+    class Sharpen(StubCorrectionMethod):
+        def render(self, image: Image, params: object, statistics: object) -> Image:  # type: ignore[override]
+            px = np.asarray(image.pixels)
+            out = np.clip(2 * px - np.roll(px, 1, axis=1), 0, 1).astype(np.float32)
+            return dataclasses.replace(image, pixels=out)
+
+    src = image(120, 160, seed=5)
+    diff = preview_export_difference(Sharpen(), StubArrayBackend(), src, {}, {}, 4)
+    assert diff.max_abs > 3 / 255
+
+
+def test_display_quantisation_and_owned_qimage() -> None:
+    data = np.array([[[0.0, 0.5, 1.0], [-0.2, 1.4, 0.25]]], dtype=np.float32)
+    rgb = to_display_uint8(data)
+    assert rgb.tolist() == [[[0, 128, 255], [0, 255, 64]]]
+    shown = display_image(rgb, None)
+    del rgb
+    assert image_bytes(shown).tolist() == [[[0, 128, 255], [0, 255, 64]]]
+
+
+def test_display_converts_an_icc_tagged_copy_to_srgb() -> None:
+    p3 = bytes(QColorSpace(QColorSpace.NamedColorSpace.DisplayP3).iccProfile().data())
+    rgb = np.zeros((1, 1, 3), dtype=np.uint8)
+    rgb[0, 0] = (255, 0, 0)
+    original = rgb.copy()
+    converted = image_bytes(display_image(rgb, p3))
+    assert converted[0, 0, 0] == 255 and converted[0, 0, 1] < 60  # P3 red is outside sRGB: clipped
+    np.testing.assert_array_equal(rgb, original)  # the data is never changed
+    assert image_bytes(display_image(rgb, b"not an icc profile")).tolist() == original.tolist()
+    green = np.full((1, 1, 3), (40, 200, 60), dtype=np.uint8)
+    assert image_bytes(display_image(green, p3)).tolist() != green.tolist()
+
+
+# The preview in the window.
+
+
+def _open_photo(make_window, qtbot, src: Image, method=None, size=(800, 600)):  # noqa: ANN001, ANN202
+    path = Path("photo.png")
+    methods = None if method is None else {method.id: method}
+    window = make_window(photo_engines({path: src}, methods=methods), size=size)
+    open_and_wait(qtbot, window, path)
+    return window
+
+
+def _corrected_region(window, expected: np.ndarray) -> tuple[np.ndarray, np.ndarray]:  # noqa: ANN001
+    """The grabbed device pixels right of the divider over the image, and the same image pixels."""
+    widget = window.preview_widget
+    grabbed = image_bytes(widget.grab().toImage())
+    ox, oy = (int(v) for v in widget.image_origin())
+    x0 = int(math.ceil(widget.divider_x())) + 2
+    gh, gw = grabbed.shape[0], grabbed.shape[1]
+    eh, ew = expected.shape[0], expected.shape[1]
+    ys, ye = max(0, oy), min(gh, oy + eh)
+    xs, xe = max(x0, ox), min(gw, ox + ew)
+    assert ye - ys > 50 and xe - xs > 50
+    return grabbed[ys:ye, xs:xe], expected[ys - oy : ye - oy, xs - ox : xe - ox]
+
+
+def test_one_to_one_corrected_pixels_equal_the_full_resolution_render(make_window, qtbot) -> None:  # noqa: ANN001, F811
+    src = image(600, 1800, seed=11)
+    window = _open_photo(make_window, qtbot, src, size=(600, 400))
+    widget = window.preview_widget
+    assert widget.needed_factor() > 1
+    window.view_actions["one_to_one"].trigger()
+    wait_idle(qtbot, window)
+    assert widget.shown_factor() == 1.0 and not widget.pending_full()
+    region, crop = _corrected_region(window, to_display_uint8(np.asarray(src.pixels)))
+    np.testing.assert_array_equal(region, crop)
+
+
+def test_planted_one_to_one_with_scaled_pixels_fails(make_window, qtbot, monkeypatch) -> None:  # noqa: ANN001, F811
+    src = image(600, 1800, seed=11)
+    window = _open_photo(make_window, qtbot, src, size=(600, 400))
+    monkeypatch.setattr(type(window.preview_widget), "needed_factor", lambda self: 2)
+    window.view_actions["one_to_one"].trigger()
+    window.controller.request()
+    wait_idle(qtbot, window)
+    region, crop = _corrected_region(window, to_display_uint8(np.asarray(src.pixels)))
+    assert not np.array_equal(region, crop)
+
+
+def test_preview_equals_the_export_downscaled_by_the_same_rule(make_window, qtbot) -> None:  # noqa: ANN001, F811
+    src = image(1200, 1600, seed=2)
+    window = _open_photo(make_window, qtbot, src, size=(500, 400))
+    widget = window.preview_widget
+    k = widget.needed_factor()
+    assert k > 1 and widget.shown_factor() == pytest.approx(1600 / math.ceil(1600 / k))
+    export = to_display_uint8(downscale(np.asarray(src.pixels), k))
+    np.testing.assert_array_equal(image_bytes(widget.after_image()), export)
+    np.testing.assert_array_equal(image_bytes(widget.before_image()), export)
+
+
+def test_one_to_one_shows_the_scaled_result_with_an_indicator_until_full_arrives(
+    make_window,  # noqa: ANN001, F811
+    qtbot,  # noqa: ANN001
+) -> None:
+    method = LevelMethod(delay_s=0.0)
+    src = image(400, 600, seed=1)
+    window = _open_photo(make_window, qtbot, src, method=method, size=(300, 250))
+    widget = window.preview_widget
+    method.delay_s = 0.5
+    window.view_actions["one_to_one"].trigger()
+    assert widget.pending_full()
+    assert widget.after_image() is not None and widget.shown_factor() > 1
+    wait_idle(qtbot, window)
+    assert not widget.pending_full() and widget.shown_factor() == 1.0
+
+
+def test_latest_wins_three_quick_changes_show_only_the_last(make_window, qtbot) -> None:  # noqa: ANN001, F811
+    method = LevelMethod(delay_s=0.3)
+    window = _open_photo(make_window, qtbot, image(60, 80), method=method)
+    shown: list[float] = []
+    window.controller.rendered.connect(
+        lambda result: shown.append(image_bytes(result.after)[0, 0, 0] / 255)
+    )
+    for level in (0.1, 0.2, 0.9):
+        window.session.set_parameters(new_parameter_set("level", {"level": level}))
+    wait_idle(qtbot, window)
+    assert shown == [pytest.approx(0.9, abs=1 / 255)]
+    assert image_bytes(window.preview_widget.after_image())[0, 0, 0] == round(0.9 * 255)
+
+
+def test_planted_stale_result_displayed_fails(make_window, qtbot, monkeypatch) -> None:  # noqa: ANN001, F811
+    method = LevelMethod(delay_s=0.3)
+    window = _open_photo(make_window, qtbot, image(60, 80), method=method)
+    shown: list[int] = []
+    window.controller.rendered.connect(lambda r: shown.append(int(image_bytes(r.after)[0, 0, 0])))
+
+    def no_drop(self, outcome) -> None:  # noqa: ANN001
+        self._on_result(outcome)
+
+    def run_all(self) -> None:  # noqa: ANN001 -- a worker that never checks the generation
+        while True:
+            with self._lock:
+                while self._pending is None and not self._stopping:
+                    self._lock.wait()
+                if self._stopping:
+                    return
+                generation, task = self._pending
+                self._pending = None
+                self._busy = True
+            value = task(lambda: None)
+            with self._lock:
+                self._busy = False
+            self._bridge.delivered.emit(render_worker.Outcome(generation, value, None))
+
+    monkeypatch.setattr(render_worker.LatestWorker, "_deliver", no_drop)
+    window.controller._renderer.stop(5)
+    monkeypatch.setattr(render_worker.LatestWorker, "_run", run_all)
+    window.controller._renderer = render_worker.LatestWorker(
+        "planted", window.controller._on_render
+    )
+    for level in (0.1, 0.2, 0.9):
+        window.session.set_parameters(new_parameter_set("level", {"level": level}))
+        qtbot.wait(50)
+    wait_idle(qtbot, window)
+    assert shown != [round(0.9 * 255)]  # the latest-wins test above would fail on this
+
+
+def test_statistics_measured_once_per_parameter_state_and_supplied_ones_used(
+    make_window,  # noqa: ANN001, F811
+    qtbot,  # noqa: ANN001
+) -> None:
+    method = LevelMethod()
+    window = _open_photo(make_window, qtbot, image(1200, 1600), method=method, size=(500, 400))
+    measured = method.analysed
+    assert measured == 1
+    window.preview_widget.zoom_in()
+    wait_idle(qtbot, window)
+    window.preview_widget.fit()
+    wait_idle(qtbot, window)
+    assert method.analysed == measured  # zoom never re-measures
+    window.session.set_statistics({"only": {"mean": np.zeros(3)}})
+    wait_idle(qtbot, window)
+    assert method.analysed == measured
+
+
+def test_render_error_becomes_a_message_and_the_last_preview_stays(make_window, qtbot) -> None:  # noqa: ANN001, F811
+    method = LevelMethod()
+    window = _open_photo(make_window, qtbot, image(60, 80), method=method)
+    before = image_bytes(window.preview_widget.after_image())
+
+    def explode() -> None:
+        raise RuntimeError("boom")
+
+    method.busy = explode
+    window.session.set_parameters(new_parameter_set("level", {"level": 0.9}))
+    wait_idle(qtbot, window)
+    errors = presenter_of(window).of("error")
+    assert len(errors) == 1 and "boom" in errors[0].text
+    np.testing.assert_array_equal(image_bytes(window.preview_widget.after_image()), before)
+    method.busy = None
+    window.session.set_parameters(new_parameter_set("level", {"level": 0.2}))
+    wait_idle(qtbot, window)
+    assert presenter_of(window).of("error") == []
+
+
+def test_icc_tagged_source_shows_a_converted_copy(make_window, qtbot) -> None:  # noqa: ANN001, F811
+    p3 = bytes(QColorSpace(QColorSpace.NamedColorSpace.DisplayP3).iccProfile().data())
+    color = ColorDescription("display-p3", "srgb", "identity", "full", 8, False, p3)
+    data = np.zeros((40, 40, 3), dtype=np.float32)
+    data[..., 1] = 0.8
+    src = Image(data, "cpu", color, True)
+    window = _open_photo(make_window, qtbot, src, size=(200, 200))
+    shown = image_bytes(window.preview_widget.before_image())
+    assert shown[0, 0].tolist() != [0, 204, 0]
+    assert np.asarray(window.session.current_image().pixels)[0, 0].tolist() == pytest.approx(
+        [0.0, 0.8, 0.0]
+    )
+
+
+def test_split_divider_and_zoom_controls(make_window, qtbot) -> None:  # noqa: ANN001, F811
+    window = _open_photo(make_window, qtbot, image(300, 400), size=(400, 300))
+    widget = window.preview_widget
+    assert widget.is_fit() and widget.zoom_text().startswith("Fit (")
+    widget.set_split(0.25)
+    assert widget.split() == 0.25
+    window.view_actions["reset_split"].trigger()
+    assert widget.split() == 0.5
+    window.view_actions["zoom_in"].trigger()
+    assert not widget.is_fit()
+    window.view_actions["zoom_out"].trigger()
+    window.view_actions["fit"].trigger()
+    assert widget.is_fit()
+    window.view_actions["one_to_one"].trigger()
+    assert widget.zoom_text() == "100%"
+    assert isinstance(widget.grab().toImage(), QImage)
