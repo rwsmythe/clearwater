@@ -333,7 +333,7 @@ Probe-derived figures for the report: `C:\Users\rwsmy\clearwater-review-evidence
 | 0 (design) | 192,064 | -- | -- | -- | -- | -- | -- | -- | -- (no review round; design table + rulings) |
 | build (cell 2) | 346,044 | -- | -- | -- | -- | -- | -- | -- | -- (no review round; build + rulings applied; re-seat) |
 | full pytest (cell 2) | 368,709 | -- | -- | -- | -- | -- | -- | -- | -- (3868 passed, 2 skipped; hand-off to cell 3) |
-| 1 (cell 3) | (dispatcher) | 0 | 0 | 3 | 2 in / 1 out (F1) | 3 NEW / 0 | 0 | pending: F1 product (owned), F3 report; F2 needs a grant | WSL, codex-cli 0.162.1, gpt-5.6-sol high; 17 succeeded; VERDICT NO_NEW_CRITICAL_MAJOR -> TERMINATES |
+| 1 (cell 3) | (dispatcher) | 0 | 0 | 3 | 2 in / 1 out (F1) | 3 NEW / 0 | 0 | F1 product + test `c21ae64`; F2 docstring-only (granted) `7089198`; F3 report `fdc9f94` | WSL, codex-cli 0.162.1, gpt-5.6-sol high; 17 succeeded; VERDICT NO_NEW_CRITICAL_MAJOR -> TERMINATES |
 
 ### Round 1 (cell 3, 2026-10-21) -- verdict NO_NEW_CRITICAL_MAJOR (ROUND_TERMINATION)
 
@@ -349,3 +349,9 @@ Windows venv), not transport. Findings (all MINOR, all CONFIRMED):
 - **F3**: the report's status line is stale (full pytest ran green). Cleanup.
 
 No change made in the adjudicating turn.
+
+Rulings (orchestrator, FINAL): convergence at round 1 CONFIRMED; F1 and F3 fixed as proposed; F2
+GRANTED docstring-only. Cleanup commits `c21ae64` (F1; the Y-2 test fails on the unfixed code with
+the OverflowError, passes after), `7089198` (F2), `fdc9f94` (F3). Static gates green (ruff check,
+ruff format --check, mypy 109 files); `test_methods_assembly.py` 76 passed; the step files'
+`-k "overflow or sigma"` 20 passed.
