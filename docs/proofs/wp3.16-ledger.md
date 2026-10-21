@@ -271,3 +271,27 @@ tests 90 passed (about 14 s, offscreen), run three times. Full pytest: pending a
 | V-5 | Device label keeps the previous file's reason until the first render | confirmed | reset to `-` on open (`d8eb6f4`) |
 | V-6 | Tab-ified docks report empty before events are processed | confirmed (scratch) | test waits for the layout |
 | V-7 | Real `select_backend` with the stub id | handled by S1 adapter; `gpu` test ran (not skipped): `Device: GPU` | - |
+
+## State at the orchestrator gen-7 rollover -- resume here
+
+- **Head:** `614fc5d` on `wp3.16` (before this section's commit), working tree clean, nothing WIP.
+- **Done commits (base `4b4da9b`):**
+  - `d754a98` build: deps.
+  - `795e57f` contract, frozen at round 0.
+  - `3de47f8` and `a655769`: round-0 ledger and ruling.
+  - `5fa8648` preview pipeline.
+  - `f2cccbe` window, session, sources, messages, jobs, engines.
+  - `fda06b7` 50 ms polled job progress.
+  - `93b0e54` and `82a8697` tests.
+  - `d8eb6f4` idle/undelivered fix and backend reset.
+  - `614fc5d` report and ledger build section.
+- **Own tests at that head:** `tests/test_gui_*.py`, 90 passed (about 14 s, offscreen, run three times). ruff check (repo), ruff format --check and mypy strict all clean.
+- **Next:**
+  1. The full pytest run. It was requested (WINDOW REQUEST sent), but no window was granted and none was run.
+  2. Then Reviewer A round 1, STRONG tier, at the cell's seat. Runner and prompt come from `C:\Users\rwsmy\clearwater-review-evidence\wp3.1\r2\`. Evidence goes to `C:\Users\rwsmy\clearwater-review-evidence\wp3.16\r1\`. Exclude `docs/proofs` and supply the diff and HEAD sha in the prompt.
+  3. Yield after adjudicating the round, before remediating.
+- **Open questions:**
+  - S3 (the downscale rule) is provisional and with CHARC; it is a one-place change in `imaging.downscale` and `imaging.statistics_factor`.
+  - `PySide6-Essentials` instead of `PySide6` is with CHARC; change it only on the dispatcher's relay.
+  - X-B2: the by-name `PhotoReadError` catch lands at the rebase onto WP3.6.
+  - Report items to carry: the `fda06b7` subject's "(V7)" overstates its effect (report corrected), and the GIL-starvation observation (216-796 ms) goes to WP4.3.
