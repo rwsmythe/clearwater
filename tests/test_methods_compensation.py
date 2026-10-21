@@ -831,12 +831,12 @@ def test_mixed_type_keys_raise_the_value_error() -> None:
 @pytest.mark.parametrize("name", ["c3_kernel_fraction", "c3_mask_smooth_fraction"])
 def test_overflowing_fraction_raises_the_x4_error(name: str) -> None:
     """R1-2: a finite sigma whose radius overflows ``int`` in the core's check is still X-4's
-    one ValueError naming the parameter (the core's OverflowError is the cause)."""
+    one ValueError naming the parameter (the core's ValueError is the cause since DR-38 d)."""
     backend = NumpyBackend()
     a = backend.asarray(synthetic(0, (1, 1)))
     with pytest.raises(ValueError, match=rf"^{name}=1e\+308 gives a sigma of 1e\+308 px") as caught:
         compensate_c3(backend, a, **{**C3, name: 1e308})
-    assert isinstance(caught.value.__cause__, OverflowError)
+    assert isinstance(caught.value.__cause__, ValueError)
 
 
 class UfuncSpy(np.ndarray):
