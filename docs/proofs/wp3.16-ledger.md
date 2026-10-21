@@ -10,6 +10,7 @@ Cell: implementer-opus-high (tier STRONG; ruling 1). Worktree `.worktrees/wp3.16
 |---|---|---|---|---|---|---|---|---|---|
 | 0 (design) | 2026-10-21 | n/a | n/a | n/a | n/a | n/a | n/a | n/a | 152,774 (dispatcher, 35 turns, 01:27:10Z) |
 | 1 | 2026-10-21 | 0/2 (F1 full suite red by pytest-qt; F2 1:1 re-render) | 4 confirmed (F3, F4, F5; F7 out) + 1 rejected (F6) | 6 in / 1 out (F7) | 7 NEW / 0 REOPENED | 0 | planned: product (F2-F5, F7) + a ruled line outside the files owned (F1) | WSL, codex-cli 0.162.1, gpt-5.6-sol high | (dispatcher) |
+| 2 | 2026-10-21 | 0/1 (R2-2 `view_factor` hang, reproduced) | 4 (R2-1 proposed down from MAJOR, R2-3, R2-4, R2-5) | 5 in / 0 out | 3 NEW (R2-2, R2-3, R2-5) / 2 REOPENED (R2-1 of F2, R2-4 of F3) | 0 | round-1 fixes: product (F2-F5, F7) + granted test line (F1); planned: product (R2-1..R2-4) + test/report (R2-5) | WSL, codex-cli 0.162.1, gpt-5.6-sol high | (dispatcher) |
 
 ## Round 0: the design table (brief task 1)
 
@@ -388,3 +389,23 @@ test sees 3 renders where the once-per-state test requires 2.
 
 Gates at `9afa115`: GUI tests 97 passed (15.5 s), with `tests/test_conftest_guard.py` 141 passed
 (53.7 s); ruff check (repo) 0; ruff format --check 0 (140 files); mypy strict 0 (87 files).
+
+## Reviewer A round 2
+
+Head reviewed `32314d8`. Evidence `C:\Users\rwsmy\clearwater-review-evidence\wp3.16\r2\`
+(probe, prompt with "THIS IS ROUND 2" and the corrected item-11 paraphrase, diff, review.txt,
+review.stderr.txt, adjudication.md, test-summary.txt, md5sums.txt). Probe READY. Assertions
+passed (banner gpt-5.6-sol/high, 15 `succeeded in`, tokens 405,414, VERDICT at column 0; the one
+non-echo ERROR is the reviewer's WSL attempt to start the Windows python, subprocess provenance).
+Withheld paths respected. The reviewer could not execute Python; all findings REASONED. Verdict
+`NEW_CRITICAL_MAJOR_FOUND`. Round-1 F1, F4, F5, F7 verified; F6 rejection not contested.
+
+| # | Sev | Verdict | In env | NEW/REOPENED | Planned fix |
+|---|---|---|---|---|---|
+| R2-1 | MINOR (reviewer MAJOR; proposed down: a superseded render is the latest-wins cancellation the question-6 ruling sanctions) | CONFIRMED (read) | yes | REOPENED (F2) | memoise the converted render before the post-render `check()`; test; report claim 5 exact |
+| R2-2 | MAJOR | CONFIRMED, REPRODUCED (three `view_factor` calls with both shown sizes <= 1 px run until `timeout` kills them, exit 124) | yes | NEW | bound `view_factor`; boundary tests; timeout-guarded planted unbounded version |
+| R2-3 | MINOR | CONFIRMED (read) | yes | NEW | clear the frame-decode error banner on the next decoded frame; test |
+| R2-4 | MINOR | CONFIRMED (read) | yes | REOPENED (F3) | `show_proxy` clears the full-resolution indicator; test |
+| R2-5 | MINOR | CONFIRMED (read) | yes | NEW | add `sidecar` to the `VideoProbeError` test loop (claim 6 then true) |
+
+Remediation NOT started (yield at the round boundary).
