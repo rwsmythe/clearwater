@@ -88,8 +88,8 @@ truncated JPEG, PNG, 16-bit PNG, HEIC and TIFF, a missing, empty, unknown and di
   `clearwater.gui/.jobs/.methods/.core`, `PySide6`, `cupy`, `av` (subprocess test), and no module names
   them (AST test).
 - `uv run ruff check .`, `ruff format --check .`, `mypy` (strict) clean; photo tests 404 passed, 1
-  skipped (the footage leg). Full-suite result: see the ledger's gate section (run in the
-  dispatcher's window).
+  skipped (the footage leg). Full suite at `983bff1` (dispatcher's window, 2026-10-21 02:5xZ): normal 3308 passed,
+  2 skipped, 0 failed; with `cupy` unimportable 2790 passed, 520 skipped, 0 failed.
 - 48 MP informational figures (a 8000 x 6000 16-bit RGB PNG with filters 0-4 cycling by row, built
   in scratch, not a product test; shared laptop, untimed by the hardware rule): read 10.6 s,
   process peak 1.67 GiB (result float32 549 MiB); write 11.1 s with no peak increase.
