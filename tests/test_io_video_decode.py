@@ -380,9 +380,9 @@ def test_a_non_left_chroma_siting_decodes_with_that_siting(tmp_path: Path) -> No
 def test_a_path_with_percent_and_non_ascii_characters_decodes_identically(
     sample: Callable[[str], Path], tmp_path: Path
 ) -> None:
-    folder = tmp_path / "a%d b%05d é水"
+    folder = tmp_path / "a%d b%05d \u00e9\u6c34"
     folder.mkdir()
-    copy = folder / "clip%03d é.mp4"
+    copy = folder / "clip%03d \u00e9.mp4"
     shutil.copyfile(sample("vid-vfr"), copy)
     original = decode_all(probe(sample("vid-vfr")))
     moved = decode_all(probe(copy))

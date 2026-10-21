@@ -115,7 +115,7 @@ def test_the_probe_names_a_non_ascii_file_ascii_safe_when_its_boxes_fail(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     probe_module = importlib.import_module("clearwater.io.video.probe")
-    copy = tmp_path / "é水.mp4"
+    copy = tmp_path / "\u00e9\u6c34.mp4"
     shutil.copyfile(sample("vid-hevc8-bt709-full"), copy)
 
     def broken(path: Path) -> object:
@@ -136,7 +136,7 @@ def test_the_probe_names_a_non_ascii_file_ascii_safe_when_its_gpmf_fails(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     probe_module = importlib.import_module("clearwater.io.video.probe")
-    copy = tmp_path / "é水.mp4"
+    copy = tmp_path / "\u00e9\u6c34.mp4"
     shutil.copyfile(sample("vid-hevc8-bt709-full"), copy)
     boxes = probe_module.MovieBoxes(
         movie_timescale=None, video_timescale=None, edits=(), gpmf=b"planted"
