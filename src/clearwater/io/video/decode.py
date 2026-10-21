@@ -80,8 +80,9 @@ class VideoDecodeError(Exception):
 
     Attributes:
         kind: ``"refused"`` (the probe carries a ``"refuse"`` fault, for example HLG or PQ;
-            FFmpeg is never started), ``"unreadable"`` (FFmpeg failed on a file the probe found
-            clean, or a frame arrived incomplete; raised after the last good frame) or ``"pts"``
+            FFmpeg is never started), ``"unreadable"`` (FFmpeg could not be run, failed on a file
+            the probe found clean, or a frame arrived incomplete; raised after the last good
+            frame) or ``"pts"``
             (a frame's pts is missing, repeated or decreasing, or a pts has no frame).
     """
 
@@ -407,18 +408,25 @@ class FrameStream(Iterator[Frame]):
 
         Raises:
             StopIteration: At the readable end, at ``end_s``, or after :meth:`close`.
-            VideoDecodeError: The decode failed (see the class docstring of the error).
-            OSError: FFmpeg could not be started.
+            VideoDecodeError: The decode failed (see the class docstring of the error); FFmpeg
+                could not be started (``"unreadable"``).
         """
         if self._done:
             raise StopIteration
         try:
             if not self._started:
                 self._started = True
-                self._process.start(self._command)
+                try:
+                    self._process.start(self._command)
+                except OSError as error:
+                    raise VideoDecodeError(
+                        "unreadable", ascii_text(f"ffmpeg could not be run: {error}")
+                    ) from error
             while True:
                 pts = self._read_frame()
                 if pts is None:
+                    if self._done:  # closed from another thread while reading
+                        raise StopIteration
                     self._end()
                     raise StopIteration
                 time = pts * self._time_base
@@ -429,7 +437,12 @@ class FrameStream(Iterator[Frame]):
                 frame = self._frame(pts)
                 self._index += 1
                 return frame
+        except StopIteration:
+            self.close()
+            raise
         except BaseException:
+            if self._done:  # closed from another thread: what failed was the shutdown
+                raise StopIteration from None
             self.close()
             raise
 

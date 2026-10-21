@@ -417,3 +417,31 @@ def test_a_seek_does_not_start_before_the_given_time(sample: Callable[[str], Pat
     assert isinstance(stream, decode_module.FrameStream)
     assert "-ss" in stream._command
     assert all(frame.pts >= 1 for frame in stream)
+
+
+def test_an_ffmpeg_that_cannot_be_run_is_unreadable(sample: Callable[[str], Path]) -> None:
+    result = probe(sample("vid-vfr"))
+    stream = decode_module.FrameStream(
+        result, ["no-such-ffmpeg-program-wp39"], start_s=None, end_s=None
+    )
+    with pytest.raises(VideoDecodeError) as caught:
+        next(stream)
+    assert caught.value.kind == "unreadable" and str(caught.value).isascii()
+    with pytest.raises(StopIteration):
+        next(stream)
+
+
+def test_close_from_another_thread_ends_the_reader_without_an_error(
+    sample: Callable[[str], Path], force_default_pipe: None
+) -> None:
+    stream = SOURCE.frames(probe(sample("vid-hevc8-bt709-full")), hw_decode=False)
+    assert isinstance(stream, decode_module.FrameStream)
+    next(stream)
+    closer = threading.Timer(0.2, stream.close)
+    closer.start()
+    count = 0
+    for _ in stream:
+        count += 1
+        time.sleep(0.05)
+    closer.join()
+    assert count < 44
