@@ -185,26 +185,35 @@ main, stream and info packets of an FFmpeg-written file).
   presentation-effect proof. Audio: identity edit at 0.
 - WINDOW RELEASED at the end of this round.
 
-## RESUME HERE (for the fresh cell)
+## RESUME HERE (current; seat 3 paused by the orchestrator at `b18d7cc` + this ledger commit)
 
-- Decided: everything in "Round-0 rulings" + the design above + P7's INFO packet. Do not re-spike
-  the carrier.
-- Held / open: P8 (SAR) to settle at build; Q-C may be overruled by CHARC (ask the orchestrator);
-  the footage legs beyond the carrier (AD-12 quality table, the export FLOOR speed row in an
-  EXCLUSIVE window, the `footage` test through WP3.9's `frames`) wait for WP3.9 on main (Q12).
-- The verified framing code is `r0\scripts\nut.py` in the evidence folder (and
-  `work\wp3.10\spike\nut.py` in this worktree): carry it into `src/clearwater/io/video/nut.py`
-  (typed, documented, two-write frame API, INFO packet always) -- do not rewrite it from the NUT
-  spec. `scripts/tx.py` is the template for the transport test (framemd5 of the decoded pipe);
-  `scripts/spike.py` `encode_cmd` is the command template; `scripts/footage_leg.py` shows the
-  streamed decode -> encode loop (never buffer a whole clip: 681 4K frames = 17 GB).
-- Synthetic clip recipes: `spike.py` `synthetic()` (testsrc2 + sine, `-output_ts_offset`,
-  `-bf 0` unless B-frames, `-timecode`), plus `-use_editlist 0` (absent list) and
-  `-timecode "16:31:28;19" -video_track_timescale 30000` at 30000/1001 (drop-frame tmcd). Build
-  them under `tmp_path` in tests.
-- First task: task 2 (capabilities) and the `nut.py` carrier with its transport test, then `open`
-  / `write` / `close` / `abort` with the synthetic legs; tasks 8 and 10 and the GX011627 `footage`
-  test after WP3.9 merges.
+- **Round 1: fully remediated.** All accepted findings (1-4, 6-9, 11-13) and the finding-5 report
+  text are fixed and tested (`9785956` instrument, `7035be6` sink, `8fe963f` report); 5 and 10
+  stay rejected with their reproductions. Nothing of round 1 remains.
+- **Round 2 HAS RUN and is ADJUDICATED** (on `8fe963f`, before the pause reached this seat;
+  evidence `r2\`, section "Round 2" below). Pending the dispatcher's ruling, NO remediation
+  started:
+  - **S1** (self-found MAJOR, in envelope, blocking): a truncated source cut at a packet
+    boundary (no corrupt-flagged packet) has no "next pts" after its last readable frame;
+    `verify.frame_end` falls back to the whole file's presentation end, so the last frame and the
+    audio cut run to it. Proposed fix: the next pts from the source's own video sample table
+    (`stts` + `ctts` in the intact `moov`, mapped through the edit list), used by the sink's
+    `_plan_tracks`/`frame_end` and the instrument's `_readable_end`; a regression test on a
+    moov-first file cut at 60 % (`r2\repro\repro_f1b.py`), failing on the current code.
+  - **#2** (REOPENED r1 #10, out of envelope, banked): a keyframe-aligned head trim passes `open`.
+    Proposed with S1: refuse a media segment whose `media_time` is not the track's earliest
+    composition time (the same sample-table read); test from `r2\repro\repro_f2.py`.
+  - **#3** (MINOR cleanup): `nvenc_proof` must not say `tied` without a resolved GPU UUID.
+  - Then Reviewer A round 3 on that remediation (recommended: product-code change), then a
+    full-pytest WINDOW request.
+- Still waiting for WP3.9 on main: the GX011627 product leg, the AD-12 quality table, the export
+  FLOOR speed row (`tools/video_io_bench.py`, EXCLUSIVE window), the report's PENDING sections.
+- Decided and not to be redone: round 0 (NUT + end sentinel + setts/noise BSF, INFO packet), the
+  round-0 rulings, CHARC's Q-A/Q-B/Q-C/Q-D notes, P8 (stated non-square SAR refused; an unseen
+  SAR is 1:1, `01d1578`).
+- Working notes: targeted runs use `-m "not footage"`; the e2e module takes about 3.5 min, the
+  unit, fidelity and probe modules about 35 s. Scratch scripts are under `work\wp3.10\r2\`
+  (gitignored). Test-file edits with non-ASCII must use escapes.
 
 ## Seat 2 (`wp310-cell2`) -- build and round 1
 
