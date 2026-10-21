@@ -507,7 +507,12 @@ class PreviewController(QObject):
         self.request()
 
     def _on_source(self, source: object) -> None:
-        """A new source: drop any frame decode for the old one, reset the view, render."""
+        """A new source: drop any frame decode and the memo of the old one, reset, render.
+
+        The memo is replaced, not cleared, so a job still running for the old source writes
+        into the discarded one; nothing of the old source stays resident.
+        """
+        self._memo = PreviewMemo()
         self._framer.invalidate()
         self._frame_pending = False
         self._frame_source = source

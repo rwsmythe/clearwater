@@ -273,9 +273,10 @@ display image is of."""
 class PreviewMemo:
     """Small caches the preview worker keeps.
 
-    Statistics per parameter state, originals per factor, and corrected display images per
-    parameter state and factor, so a factor already rendered for the current state (a return to
-    1:1 above all, question 6: "once per parameter state") is shown without ``render``. At most
+    Statistics per parameter state and device, originals per factor, and corrected display
+    images per parameter state and factor, so a factor already rendered for the current state (a
+    return to 1:1 above all, question 6: "once per parameter state") is shown without
+    ``render``. At most
     one full-resolution (``k == 1``) corrected image is kept. Used from the preview worker thread;
     guarded by a lock so the main thread may clear it.
     """
@@ -401,7 +402,9 @@ def render_preview(request: RenderRequest, memo: PreviewMemo, check: Check) -> R
         if after is None:
             statistics = request.statistics
             if statistics is None:
-                key = (request.token, method_id, request.params_key)
+                # The device is in the key: statistics measured on one backend are not reused
+                # on another (a force_cpu change measures again, as export would).
+                key = (request.token, method_id, request.params_key, backend.device, preview_reason)
                 statistics = memo.statistics(key)
                 if statistics is None:
                     measured = measure_statistics(

@@ -676,6 +676,60 @@ def test_statistics_measured_once_per_parameter_state_and_supplied_ones_used(
     assert method.analysed == measured
 
 
+class DeviceStatisticsMethod(LevelMethod):
+    """Measures a backend-dependent statistic and renders it as the level."""
+
+    def analyze(self, stage, image, params, earlier):  # type: ignore[override]
+        super().analyze(stage, image, params, earlier)
+        return {"mean": np.full(3, 0.2 if image.device == "cpu" else 0.8, dtype=np.float32)}
+
+    def render(self, image, params, statistics):  # type: ignore[override]
+        level = float(np.asarray(statistics["only"]["mean"])[0])
+        out = np.full_like(np.asarray(image.pixels), level, dtype=np.float32)
+        return Image(out, image.device, image.color, image.orientation_applied)
+
+
+def test_a_force_cpu_change_measures_the_statistics_again(make_window, qtbot) -> None:
+    # Reviewer B #6: statistics measured on one device are not reused on another.
+    class GpuBackend(StubArrayBackend):
+        device = "cuda:0"
+
+    gpu, cpu = GpuBackend(), StubArrayBackend()
+
+    def select(settings, height, width, method_id):
+        return (cpu, "CPU: forced") if settings.force_cpu else (gpu, "GPU")
+
+    method = DeviceStatisticsMethod()
+    path = Path("photo.png")
+    engines = photo_engines(
+        {path: image(60, 80)}, methods={method.id: method}, select_backend=select
+    )
+    window = make_window(engines, size=(300, 250))
+    open_and_wait(qtbot, window, path)
+    after = window.preview_widget.after_image()
+    assert after is not None and image_bytes(after)[0, 0, 0] == round(0.8 * 255)
+    measured = method.analysed
+    window.session.set_settings(dataclasses.replace(window.session.settings(), force_cpu=True))
+    wait_idle(qtbot, window)
+    assert method.analysed == measured + 1
+    after = window.preview_widget.after_image()
+    assert after is not None and image_bytes(after)[0, 0, 0] == round(0.2 * 255)
+
+
+def test_a_new_source_drops_the_previous_sources_memo(make_window, qtbot) -> None:
+    # Reviewer B #7: no statistics, originals or corrected images kept across opens.
+    first, second = Path("a.png"), Path("b.png")
+    window = make_window(photo_engines({first: image(60, 80), second: image(50, 70, seed=4)}))
+    open_and_wait(qtbot, window, first)
+    window.view_actions["one_to_one"].trigger()
+    wait_idle(qtbot, window)
+    open_and_wait(qtbot, window, second)
+    token = window.session.image_token()
+    memo = window.controller._memo
+    kept = [key[0] for key in (*memo._statistics, *memo._before, *memo._after)]
+    assert kept and set(kept) == {token}
+
+
 def test_render_error_becomes_a_message_and_the_last_preview_stays(make_window, qtbot) -> None:
     method = LevelMethod()
     window = _open_photo(make_window, qtbot, image(60, 80), method=method)
