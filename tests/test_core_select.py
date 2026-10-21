@@ -124,7 +124,7 @@ def test_forced(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_cupy_not_installed(monkeypatch: pytest.MonkeyPatch) -> None:
-    install(monkeypatch, None, ModuleNotFoundError("No module named 'cupy'"))
+    install(monkeypatch, None, ModuleNotFoundError("No module named 'cupy'", name="cupy"))
     backend, reason = choose()
     assert reason == "CPU: CuPy not installed" and isinstance(backend, NumpyBackend)
 
