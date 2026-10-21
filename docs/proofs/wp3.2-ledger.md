@@ -243,3 +243,22 @@ Gates on `e580582` (own tests, no full suite, no Reviewer A round, per the dispa
 with CuPy 431 passed (383 at the
 round-1 cleanup; the B-1 matrix and the B-3 grid case account for the rest); with `cupy` / `cupyx` = None
 in `sys.modules` 226 passed, 205 skipped.
+
+### Addition to B-1's test (CHARC, relayed by the orchestrator)
+
+Required: for EACH scalar parameter of `compensate_c3`, `np.float64`, `np.float32` and a Python `int`,
+each bit-identical to the Python-float call and creating no float64 array. Done in one further
+`test(wp3.2)` commit (the commit after `736c581`): `SCALAR_PARAMS` is now all six AD-8 names; the spy
+test runs all names together per type (arithmetic and threshold forms) and each name alone; the
+device test runs each name and "all" per type on both devices. An int parameter is rounded up to 1
+(a whole, positive value; a fraction of 1 is a 45 px sigma on the test image).
+
+Failing before the commit's product line (head `e580582` + the new tests, 12 failed, 98 passed): only
+the `np.float32` `c3_kernel_fraction` / `c3_mask_smooth_fraction` cases, on numpy and cupy (the
+audit's item 1: a float32 sigma, up to 3e-8). The `int` cases and the other `np.float32` cases
+passed. Consequence: the one-line product change `spatial_sigma(shape, float(fraction))` in
+`compensation._derived_sigma` (error messages still print the fraction as given). Audit items 2 and 3
+(white balance strength, `effective_alphas`) are unchanged and still not in scope.
+
+Gates: ruff check, ruff format --check, mypy clean; own two test files 527 passed with CuPy, 284 passed
+and 243 skipped with `cupy` / `cupyx` = None.
