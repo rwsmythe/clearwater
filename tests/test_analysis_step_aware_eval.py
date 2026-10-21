@@ -12,8 +12,9 @@ from typing import Any
 
 import numpy as np
 import pytest
-import step_aware_eval as tool
 from numpy.typing import NDArray
+
+import step_aware_eval as tool
 
 
 def _clip() -> tuple[NDArray[np.uint8], NDArray[np.int64], Fraction]:
