@@ -4,6 +4,9 @@ Covers brief task 5, 6 and the task-8 rows "latest wins", "V8 harness", "1:1 exa
 planted "a stale render displayed" and "1:1 showing scaled pixels".
 """
 
+# The shared fixture ``make_window`` is imported from gui_support and used as a parameter.
+# ruff: noqa: F401, F811
+
 from __future__ import annotations
 
 import dataclasses
@@ -14,7 +17,7 @@ import numpy as np
 import pytest
 from PySide6.QtGui import QColorSpace, QImage
 
-import gui_support  # noqa: F401  (sets the offscreen platform first)
+import gui_support
 from clearwater.config import new_parameter_set
 from clearwater.gui import imaging, render_worker
 from clearwater.gui.imaging import (
@@ -32,7 +35,7 @@ from clearwater.interfaces.stubs import StubArrayBackend, StubCorrectionMethod
 from gui_support import (
     LevelMethod,
     image,
-    make_window,  # noqa: F401
+    make_window,
     open_and_wait,
     photo_engines,
     presenter_of,
@@ -175,7 +178,7 @@ def _corrected_region(window, expected: np.ndarray) -> tuple[np.ndarray, np.ndar
     return grabbed[ys:ye, xs:xe], expected[ys - oy : ye - oy, xs - ox : xe - ox]
 
 
-def test_one_to_one_corrected_pixels_equal_the_full_resolution_render(make_window, qtbot) -> None:  # noqa: F811
+def test_one_to_one_corrected_pixels_equal_the_full_resolution_render(make_window, qtbot) -> None:
     src = image(600, 1800, seed=11)
     window = _open_photo(make_window, qtbot, src, size=(600, 400))
     widget = window.preview_widget
@@ -187,7 +190,7 @@ def test_one_to_one_corrected_pixels_equal_the_full_resolution_render(make_windo
     np.testing.assert_array_equal(region, crop)
 
 
-def test_planted_one_to_one_with_scaled_pixels_fails(make_window, qtbot, monkeypatch) -> None:  # noqa: F811
+def test_planted_one_to_one_with_scaled_pixels_fails(make_window, qtbot, monkeypatch) -> None:
     src = image(600, 1800, seed=11)
     window = _open_photo(make_window, qtbot, src, size=(600, 400))
     monkeypatch.setattr(type(window.preview_widget), "needed_factor", lambda self: 2)
@@ -198,7 +201,7 @@ def test_planted_one_to_one_with_scaled_pixels_fails(make_window, qtbot, monkeyp
     assert not np.array_equal(region, crop)
 
 
-def test_preview_equals_the_export_downscaled_by_the_same_rule(make_window, qtbot) -> None:  # noqa: F811
+def test_preview_equals_the_export_downscaled_by_the_same_rule(make_window, qtbot) -> None:
     src = image(1200, 1600, seed=2)
     window = _open_photo(make_window, qtbot, src, size=(500, 400))
     widget = window.preview_widget
@@ -210,7 +213,7 @@ def test_preview_equals_the_export_downscaled_by_the_same_rule(make_window, qtbo
 
 
 def test_one_to_one_shows_the_scaled_result_with_an_indicator_until_full_arrives(
-    make_window,  # noqa: F811
+    make_window,
     qtbot,
 ) -> None:
     method = LevelMethod(delay_s=0.0)
@@ -225,7 +228,7 @@ def test_one_to_one_shows_the_scaled_result_with_an_indicator_until_full_arrives
     assert not widget.pending_full() and widget.shown_factor() == 1.0
 
 
-def test_latest_wins_three_quick_changes_show_only_the_last(make_window, qtbot) -> None:  # noqa: F811
+def test_latest_wins_three_quick_changes_show_only_the_last(make_window, qtbot) -> None:
     method = LevelMethod(delay_s=0.3)
     window = _open_photo(make_window, qtbot, image(60, 80), method=method)
     shown: list[float] = []
@@ -239,7 +242,7 @@ def test_latest_wins_three_quick_changes_show_only_the_last(make_window, qtbot) 
     assert image_bytes(window.preview_widget.after_image())[0, 0, 0] == round(0.9 * 255)
 
 
-def test_planted_stale_result_displayed_fails(make_window, qtbot, monkeypatch) -> None:  # noqa: F811
+def test_planted_stale_result_displayed_fails(make_window, qtbot, monkeypatch) -> None:
     method = LevelMethod(delay_s=0.3)
     window = _open_photo(make_window, qtbot, image(60, 80), method=method)
     shown: list[int] = []
@@ -277,7 +280,7 @@ def test_planted_stale_result_displayed_fails(make_window, qtbot, monkeypatch) -
 
 
 def test_statistics_measured_once_per_parameter_state_and_supplied_ones_used(
-    make_window,  # noqa: F811
+    make_window,
     qtbot,
 ) -> None:
     method = LevelMethod()
@@ -294,7 +297,7 @@ def test_statistics_measured_once_per_parameter_state_and_supplied_ones_used(
     assert method.analysed == measured
 
 
-def test_render_error_becomes_a_message_and_the_last_preview_stays(make_window, qtbot) -> None:  # noqa: F811
+def test_render_error_becomes_a_message_and_the_last_preview_stays(make_window, qtbot) -> None:
     method = LevelMethod()
     window = _open_photo(make_window, qtbot, image(60, 80), method=method)
     before = image_bytes(window.preview_widget.after_image())
@@ -314,7 +317,7 @@ def test_render_error_becomes_a_message_and_the_last_preview_stays(make_window, 
     assert presenter_of(window).of("error") == []
 
 
-def test_icc_tagged_source_shows_a_converted_copy(make_window, qtbot) -> None:  # noqa: F811
+def test_icc_tagged_source_shows_a_converted_copy(make_window, qtbot) -> None:
     p3 = bytes(QColorSpace(QColorSpace.NamedColorSpace.DisplayP3).iccProfile().data())
     color = ColorDescription("display-p3", "srgb", "identity", "full", 8, False, p3)
     data = np.zeros((40, 40, 3), dtype=np.float32)
@@ -328,7 +331,7 @@ def test_icc_tagged_source_shows_a_converted_copy(make_window, qtbot) -> None:  
     )
 
 
-def test_split_divider_and_zoom_controls(make_window, qtbot) -> None:  # noqa: F811
+def test_split_divider_and_zoom_controls(make_window, qtbot) -> None:
     window = _open_photo(make_window, qtbot, image(300, 400), size=(400, 300))
     widget = window.preview_widget
     assert widget.is_fit() and widget.zoom_text().startswith("Fit (")

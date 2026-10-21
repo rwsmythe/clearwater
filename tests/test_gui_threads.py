@@ -4,6 +4,9 @@ Covers brief task 8 rows "V7 bound", "AD-15 on the stub" and the planted "a rend
 interface thread"; plus no heavy call on the interface thread and close with work in flight.
 """
 
+# The shared fixture ``make_window`` is imported from gui_support and used as a parameter.
+# ruff: noqa: F401, F811
+
 from __future__ import annotations
 
 import threading
@@ -13,7 +16,7 @@ from pathlib import Path
 import pytest
 from PySide6.QtCore import QElapsedTimer, QTimer
 
-import gui_support  # noqa: F401  (sets the offscreen platform first)
+import gui_support
 from clearwater.config import new_parameter_set
 from clearwater.gui import AnalysisState, render_worker
 from clearwater.gui.jobs import QtJobRunner
@@ -24,7 +27,7 @@ from gui_support import (
     busy_numpy,
     frame,
     image,
-    make_window,  # noqa: F401
+    make_window,
     open_and_wait,
     photo_engines,
     video_engines,
@@ -107,14 +110,14 @@ def _v7_run(build, qtbot) -> tuple[float, LevelMethod]:
     return worst, method
 
 
-def test_v7_interface_never_waits_more_than_100_ms(make_window, qtbot) -> None:  # noqa: F811
+def test_v7_interface_never_waits_more_than_100_ms(make_window, qtbot) -> None:
     worst, method = _v7_run(make_window, qtbot)
     print(f"V7 observed maximum main-thread gap: {worst:.0f} ms")  # informational (brief row 8)
     assert worst <= V7_BOUND_MS
     assert threading.main_thread() not in method.threads
 
 
-def test_planted_render_on_the_interface_thread_fails_v7(make_window, qtbot, monkeypatch) -> None:  # noqa: F811
+def test_planted_render_on_the_interface_thread_fails_v7(make_window, qtbot, monkeypatch) -> None:
     def inline_submit(self, task):
         with self._lock:
             self._generation += 1
@@ -129,7 +132,7 @@ def test_planted_render_on_the_interface_thread_fails_v7(make_window, qtbot, mon
     assert threading.main_thread() in method.threads
 
 
-def test_open_and_frame_decode_run_off_the_interface_thread(make_window, qtbot) -> None:  # noqa: F811
+def test_open_and_frame_decode_run_off_the_interface_thread(make_window, qtbot) -> None:
     threads: list[threading.Thread] = []
     frames = [frame(48, 64, ticks=t * 3000, seed=t) for t in range(5)]
     engines = video_engines(frames)
@@ -227,7 +230,7 @@ def test_jobs_run_on_worker_threads(qtbot) -> None:
 # AD-15 on a stub analysis job.
 
 
-def test_ad15_stub_analysis_disables_export_with_reason_and_progress(make_window, qtbot) -> None:  # noqa: F811
+def test_ad15_stub_analysis_disables_export_with_reason_and_progress(make_window, qtbot) -> None:
     frames = [frame(48, 64, ticks=0)]
     window = make_window(video_engines(frames))
     export = window.shell_actions.export
@@ -270,7 +273,7 @@ def test_ad15_stub_analysis_disables_export_with_reason_and_progress(make_window
 
 
 def test_ad15_photo_needs_no_analysis_and_failed_analysis_says_why(
-    make_window,  # noqa: F811
+    make_window,
     qtbot,
     tmp_path: Path,
 ) -> None:
@@ -295,7 +298,7 @@ def test_ad15_photo_needs_no_analysis_and_failed_analysis_says_why(
 # Shutdown.
 
 
-def test_close_with_a_render_and_a_job_in_flight_is_prompt(make_window, qtbot) -> None:  # noqa: F811
+def test_close_with_a_render_and_a_job_in_flight_is_prompt(make_window, qtbot) -> None:
     method = LevelMethod()
     path = Path("p.png")
     window = make_window(photo_engines({path: image(200, 300)}, methods={"level": method}))
