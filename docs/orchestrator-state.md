@@ -21,7 +21,19 @@
   Re-dispatched ~02:00Z (the gen-7 table below is the PRE-dispatch record): `wp312-cell3`
   (sonnet-high; R4 fixes then R5, yield at the five-round gate), `wp36-cell2` (sonnet-high; ICC
   rulings, then WINDOW REQUEST, then A R1), `wp316-cell2` (opus-high; Essentials + S3 RULED, then
-  WINDOW REQUEST, then A R1). No window granted yet.
+  WINDOW REQUEST, then A R1).
+- **GEN 8 PROGRESS (2026-10-21 ~04:42Z):** WP3.12 and WP3.6 ACCEPTED (stacked gate; main `4ec835d`,
+  3440 passed; records `docs/proofs/wp3.{12,6}-accept.md`; DR-41, DR-42; both Reviewer Bs
+  adjudicated at the gate on pass 2). Return report + MAIN RELEASED posted to CHARC (04:40Z);
+  operator FYI posted. The first stack run was memory-REAPED (~03:50Z); CHARC approved a restart one
+  job at a time (`2e6feaf538c411f4`); a second reap means STOP and ask the owner for a quiet block.
+  `wp3.16` REBASED onto main (`6a65145`; old head `wp3.16-pre-rebase` `b8fa742`); Reviewer A
+  CONVERGED at R4; fresh cell `wp316-cell3` (opus-high, dispatched ~04:42Z) doing the R4-1..3
+  cleanup + by-name `PhotoReadError` catch, no A round; then Reviewer B at this seat and its own gate
+  (main's venv: `uv sync --reinstall-package pyside6-essentials --reinstall-package shiboken6` after
+  the merge). Retired: `wp312-cell3` (246,012), `wp36-cell2` (222,405), `wp36-cell3` (236,865),
+  `wp316-cell2` (266,869). Worktrees `wp3.12`, `wp3.12-mc`, `wp3.6`, `wp3.6-mc`, `wp3.6-mc2` to
+  remove after CHARC QA.
 
 ### Standing operator rulings
 
