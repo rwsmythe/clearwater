@@ -33,9 +33,11 @@ from clearwater.io.video.encode import (
     encode_command,
     provenance_comment,
 )
+from clearwater.io.video.probe import VideoProbeError
 from clearwater.io.video.verify import PacketTable, StreamRow
 
 TB = Fraction(1, 30000)
+AUDIO_PTS: tuple[int | None, ...] = tuple(range(0, 7 * 1024, 1024))
 
 
 def _color(**changes: Any) -> ColorDescription:
@@ -94,6 +96,7 @@ def _table(
         video_missing_pts=0,
         video_corrupt_pts=corrupt,
         tags={},
+        audio_pts={1: AUDIO_PTS},
     )
 
 
@@ -488,55 +491,65 @@ def test_frame_end_is_the_next_source_pts_else_the_presentation_end() -> None:
 
 
 def _out_table(
-    pts: tuple[int, ...], audio_packets: int = 7, rotation: Fraction | None = None
+    pts: tuple[int, ...],
+    audio: tuple[int | None, ...] = AUDIO_PTS,
+    rotation: Fraction | None = None,
 ) -> PacketTable:
     table = _table(pts)
     video = replace(table.streams[0], rotation=rotation)
-    audio = replace(table.streams[1], packets=audio_packets)
-    return replace(table, streams=(video, audio))
+    stream = replace(table.streams[1], packets=len(audio))
+    return replace(table, streams=(video, stream), audio_pts={1: audio})
+
+
+def _check(output: PacketTable, audio_end: Fraction | None = None) -> list[str]:
+    return verify.check_output(
+        Path("o"),
+        output,
+        probe=_probe(),
+        source=_table((0, 1001, 2002, 3003)),
+        written=[0, 1001, 2002, 3003],
+        end_pts=4004,
+        audio_end=audio_end,
+    )
 
 
 def test_check_output_names_each_mismatch(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(verify, "_edit_problems", lambda path, first, end: [])
-    probe, source = _probe(), _table((0, 1001, 2002, 3003))
-    written = [0, 1001, 2002, 3003]
-    good = verify.check_output(
-        Path("o"),
-        _out_table((0, 2002, 1001, 3003)),
-        probe=probe,
-        source=source,
-        written=written,
-        end_pts=4004,
-        audio_cut=False,
-    )
-    assert good == []
+    assert _check(_out_table((0, 2002, 1001, 3003))) == []
     cases = {
         "3 video frames": _out_table((0, 1001, 2002)),
         "video pts 1002": _out_table((0, 1002, 2002, 3003)),
         "display rotation 90": _out_table((0, 1001, 2002, 3003), rotation=Fraction(90)),
-        "audio stream 0: 6 packets": _out_table((0, 1001, 2002, 3003), audio_packets=6),
+        "audio stream 0: 6 packets in the output where 7": _out_table(
+            (0, 1001, 2002, 3003), AUDIO_PTS[:6]
+        ),
+        "audio stream 0: packet 2 at": _out_table(
+            (0, 1001, 2002, 3003), (*AUDIO_PTS[:2], 2049, *AUDIO_PTS[3:])
+        ),
     }
     for expected, output in cases.items():
-        problems = verify.check_output(
-            Path("o"),
-            output,
-            probe=probe,
-            source=source,
-            written=written,
-            end_pts=4004,
-            audio_cut=False,
-        )
+        problems = _check(output)
         assert any(expected in p for p in problems), (expected, problems)
-    cut = verify.check_output(
-        Path("o"),
-        _out_table((0, 1001, 2002, 3003), audio_packets=6),
-        probe=probe,
-        source=source,
-        written=written,
-        end_pts=4004,
-        audio_cut=True,
-    )
-    assert cut == []
+
+
+def test_a_cut_audio_stream_must_be_the_source_packets_before_the_cut(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Round-1 finding 6: a cut stream used to pass with ANY non-empty subset of the packets.
+    monkeypatch.setattr(verify, "_edit_problems", lambda path, first, end: [])
+    video = (0, 1001, 2002, 3003)
+    between = Fraction(3500, 48000)  # packets 0, 1024, 2048 and 3072 lie before it
+    assert _check(_out_table(video, AUDIO_PTS[:4]), between) == []
+    for wrong in (AUDIO_PTS[:3], AUDIO_PTS[:5], AUDIO_PTS[:6]):
+        problems = _check(_out_table(video, wrong), between)
+        assert any("where 4 of the source's 7 were to be copied" in p for p in problems), problems
+    skipped = (*AUDIO_PTS[:2], AUDIO_PTS[3], AUDIO_PTS[4])  # four packets, not the first four
+    assert any("packet 2 at" in p for p in _check(_out_table(video, skipped), between))
+    on_a_packet = Fraction(4096, 48000)  # a packet AT the cut may go either way (microseconds)
+    assert _check(_out_table(video, AUDIO_PTS[:4]), on_a_packet) == []
+    assert _check(_out_table(video, AUDIO_PTS[:5]), on_a_packet) == []
+    problems = _check(_out_table(video, AUDIO_PTS[:3]), on_a_packet)
+    assert any("where 4 to 5 of" in p for p in problems), problems
 
 
 def test_not_carried_lists_best_effort_items() -> None:
@@ -545,8 +558,8 @@ def test_not_carried_lists_best_effort_items() -> None:
         _table((0,)),
         streams=(
             *_table((0,)).streams,
-            StreamRow(2, "data", "tmcd", Fraction(1, 30000), 0, 1, None, None, 1),
-            StreamRow(3, "data", "meta", Fraction(1, 1000), 0, 1, None, None, 5),
+            StreamRow(2, "data", "tmcd", Fraction(1, 30000), 0, 1, None, None, None, 1),
+            StreamRow(3, "data", "meta", Fraction(1, 1000), 0, 1, None, None, None, 5),
         ),
         tags={"creation_time": "2026-01-01T00:00:00.000000Z", "firmware": "X"},
     )
@@ -558,5 +571,85 @@ def test_not_carried_lists_best_effort_items() -> None:
         "data track meta",
     ]
     assert verify.not_carried(probe, source, source) == []
+    fewer = replace(source.streams[3], frames=3)
+    partial = replace(source, streams=(*source.streams[:3], fewer))
+    assert verify.not_carried(probe, source, partial) == [
+        "data track meta (3 samples where the source has 5)"
+    ]
     gopro = replace(probe, gopro=GoProInfo("F", True, "NATURAL"))
     assert verify.not_carried(gopro, source, source) == ["camera settings atoms (moov/udta)"]
+
+
+# --- the listings: no data-track packet, no FFREPORT, a failed read-back ----------------------
+
+
+@pytest.mark.usefixtures("ffmpeg_tools")
+def test_the_listings_never_list_a_data_track_packet(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Round-1 finding 1: one listing used to ask for the packets of EVERY stream.
+    clip = tmp_path / "tc.mp4"
+    subprocess.run(
+        ["ffmpeg", "-nostdin", "-v", "error", "-y", "-f", "lavfi",
+         "-i", "testsrc2=size=64x48:rate=30:duration=0.5", "-f", "lavfi",
+         "-i", "sine=duration=0.5", "-c:v", "libx264", "-bf", "0", "-c:a", "aac",
+         "-timecode", "01:00:00:00", str(clip)],
+        check=True, capture_output=True,
+    )  # fmt: skip
+    commands: list[list[str]] = []
+    real_run = subprocess.run
+
+    def recording(command: list[str], **kwargs: Any) -> Any:
+        commands.append(list(command))
+        return real_run(command, **kwargs)
+
+    monkeypatch.setattr(verify.subprocess, "run", recording)
+    table = verify.read_packet_table(clip)
+    data = table.of_type("data")
+    assert [s.codec_tag for s in data] == ["tmcd"] and data[0].packets is None
+    assert data[0].frames == 1  # the sample count from the stream list
+    assert table.video.packets == 15 and table.of_type("audio")[0].packets
+    listings = [c for c in commands if any("packet=" in a for a in c)]
+    assert len(listings) == 2 and len(commands) == 3
+    for command in listings:
+        selected = command[command.index("-select_streams") + 1]
+        assert selected in (str(table.video_index), "a"), command
+    data_index = str(data[0].index)
+    assert all(data_index != c[c.index("-select_streams") + 1] for c in listings)
+
+
+def test_every_product_tool_process_runs_without_ffreport(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Round-1 finding 9: FFREPORT makes FFmpeg and ffprobe write a report file of their own.
+    monkeypatch.setenv("FFREPORT", "file=report.log")
+    monkeypatch.setenv("ffreport", "file=report.log")
+    assert all(key.upper() != "FFREPORT" for key in capability.tool_env())
+    seen: list[dict[str, str] | None] = []
+
+    def fake_run(command: list[str], **kwargs: Any) -> Any:
+        seen.append(kwargs.get("env"))
+        return subprocess.CompletedProcess(command, 0, b"{}", b"")
+
+    monkeypatch.setattr(capability.subprocess, "run", fake_run)
+    capability._run(["ffmpeg", "-version"])
+    with pytest.raises(VideoProbeError, match="no video stream"):
+        verify.read_packet_table(Path("x.mp4"))
+    assert len(seen) == 2
+    for env in seen:
+        assert env is not None and all(key.upper() != "FFREPORT" for key in env)
+
+
+def test_a_failed_output_listing_is_an_error_a_source_listing_is_not(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Round-1 finding 12: the read-back accepted the JSON of an ffprobe run that had failed.
+    document = {"streams": [{"index": 0, "codec_type": "video"}], "packets": []}
+
+    def failing(command: list[str], **kwargs: Any) -> Any:
+        return subprocess.CompletedProcess(command, 1, json.dumps(document).encode(), b"")
+
+    monkeypatch.setattr(verify.subprocess, "run", failing)
+    assert verify.read_packet_table(Path("cut.mp4")).video_index == 0  # cut short: tolerated
+    with pytest.raises(VideoProbeError, match="exit status 1"):
+        verify.read_packet_table(Path("out.mp4"), strict=True)

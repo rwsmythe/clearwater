@@ -58,6 +58,7 @@ from clearwater.io.video.capability import (
     ENCODERS,
     HARDWARE_ENCODER,
     detect_capabilities,
+    tool_env,
 )
 from clearwater.io.video.inputs import ascii_text
 from clearwater.io.video.probe import VideoProbeError, find_tool
@@ -351,7 +352,7 @@ class FFmpegVideoSink:
         self._shape = (0, 0, 3)
         self._written: list[int] = []
         self._warnings: list[str] = []
-        self._audio_cut = False
+        self._audio_end: Fraction | None = None
 
     # --- IF-5 -------------------------------------------------------------------------------
 
@@ -381,7 +382,8 @@ class FFmpegVideoSink:
         encoder; a bit depth that is not the source's own or 10 for an 8-bit source (D76), or
         that the encoder cannot write; an unknown quality level; a provenance object JSON cannot
         hold; a stated non-square pixel aspect ratio (CHARC P8; a ratio that cannot be seen is
-        treated as 1:1); an edit list the sink cannot reproduce.
+        treated as 1:1); an edit list the sink cannot reproduce; a frame with a negative pts.
+        ``out_path`` is recorded first, so :meth:`abort` after a refusal still deletes it.
 
         Args:
             probe: The source's probe result.
@@ -401,8 +403,9 @@ class FFmpegVideoSink:
             raise VideoEncodeError(
                 "state", f"A video output cannot be opened twice ({self._phase})."
             )
+        self._out_path = out_path  # first: abort() deletes it even after a refusal below
         self._warnings = []
-        self._audio_cut = False
+        self._audio_end = None
         for fault in probe.faults:
             if fault.severity == "refuse":
                 raise VideoEncodeError("refused", fault.message)
@@ -426,7 +429,7 @@ class FFmpegVideoSink:
             raise VideoEncodeError(kind, str(error)) from error
         self._check_source(probe, source)
         cut_at = self._plan_tracks(probe, source)
-        self._probe, self._source, self._out_path = probe, source, out_path
+        self._probe, self._source = probe, source
         self._source_pts = frozenset(source.video_pts)
         self._bit_depth = bit_depth
         self._shape = (probe.video.height, probe.video.width, 3)
@@ -447,14 +450,19 @@ class FFmpegVideoSink:
             comment=comment,
             cut_at=cut_at,
         )
+        try:  # built before FFmpeg starts, so a failure here leaves nothing running
+            header = nut.stream_header(
+                width=probe.video.width,
+                height=probe.video.height,
+                bit_depth=bit_depth,
+                time_base=probe.video.time_base,
+                frame_rate=probe.video.frame_rate,
+            )
+        except ValueError as error:
+            raise VideoEncodeError(
+                "refused", f"This video cannot be written: {ascii_text(str(error))}"
+            ) from error
         self._start(self._command(command))
-        header = nut.stream_header(
-            width=probe.video.width,
-            height=probe.video.height,
-            bit_depth=bit_depth,
-            time_base=probe.video.time_base,
-            frame_rate=probe.video.frame_rate,
-        )
         try:
             self._send(header)
         except BaseException as error:
@@ -555,7 +563,7 @@ class FFmpegVideoSink:
             )
 
     def _check_source(self, probe: ProbeResult, source: PacketTable) -> None:
-        """Refuse a source whose pixels are not square or whose edit list cannot be reproduced."""
+        """Refuse non-square pixels, an edit list the sink cannot reproduce, or a negative pts."""
         ratio = source.video.sample_aspect_ratio
         if not square_pixels(ratio):
             raise VideoEncodeError(
@@ -568,6 +576,13 @@ class FFmpegVideoSink:
         refusal = _edit_list_refusal(probe, source)
         if refusal is not None:
             raise VideoEncodeError("refused", f"The video has {refusal}, which is not supported.")
+        first = min(source.video_pts)
+        if first < 0:  # legal ISO (no edit list, negative composition times); NUT pts are unsigned
+            raise VideoEncodeError(
+                "refused",
+                f"The video has frames with negative timestamps (from {first} ticks), which is "
+                "not supported.",
+            )
 
     def _plan_tracks(self, probe: ProbeResult, source: PacketTable) -> Fraction | None:
         """Decide how the audio and data tracks end for a cut-short source (D86, Q-B).
@@ -586,7 +601,6 @@ class FFmpegVideoSink:
             readable = sorted(p for p in source.video_pts if first_bad is None or p < first_bad)
             if not readable:
                 raise VideoEncodeError("refused", "The video has no readable frame.")
-            self._audio_cut = True
             end = frame_end(probe, source, readable[-1])
             self._warnings.append(
                 "The source is cut short; the output ends at its last readable frame, and the "
@@ -597,7 +611,8 @@ class FFmpegVideoSink:
                 for s in source.streams
                 if s.start_pts is not None and s.time_base is not None
             ]
-            return end * probe.video.time_base - min(starts, default=Fraction(0))
+            self._audio_end = end * probe.video.time_base
+            return self._audio_end - min(starts, default=Fraction(0))
         if "unreadable_tail" in kinds:
             self._warnings.append(
                 "The end of the source cannot be decoded; the output's video stops at the last "
@@ -617,6 +632,7 @@ class FFmpegVideoSink:
                 stdin=subprocess.PIPE,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.PIPE,
+                env=tool_env(),  # no FFREPORT: FFmpeg writes out_path and nothing else
             )
         except OSError as error:
             raise VideoEncodeError(
@@ -762,7 +778,7 @@ class FFmpegVideoSink:
         probe, source, out_path = self._probe, self._source, self._out_path
         assert probe is not None and source is not None and out_path is not None
         try:
-            output = read_packet_table(out_path)
+            output = read_packet_table(out_path, strict=True)
         except VideoProbeError as error:
             raise VideoEncodeError(
                 "verify_failed", f"The finished video cannot be read back: {error}"
@@ -774,7 +790,7 @@ class FFmpegVideoSink:
             source=source,
             written=self._written,
             end_pts=end,
-            audio_cut=self._audio_cut,
+            audio_end=self._audio_end,
         )
         if problems:
             raise VideoEncodeError(

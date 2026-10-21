@@ -403,7 +403,7 @@ def test_a_truncated_source_cuts_audio_at_the_readable_end(
     monkeypatch.setattr(
         encode_module,
         "read_packet_table",
-        lambda p: planted if p == source else read_packet_table(p),
+        lambda p, **k: planted if p == source else read_packet_table(p, **k),
     )
     fault = Fault("truncated", "warn", "cut short")
     info = replace(info, faults=(*info.faults, fault))
@@ -418,6 +418,85 @@ def test_a_truncated_source_cuts_audio_at_the_readable_end(
     kept = [p for p in source_audio if p.pts is not None and p.pts < end]
     assert [(p.pts, p.md5) for p in output_audio] == [(p.pts, p.md5) for p in kept]
     assert len(kept) < len(source_audio)
+
+
+def _patch_mvhd_duration(path: Path, change: int) -> None:
+    """Add ``change`` ticks to the movie header's duration."""
+    data = bytearray(path.read_bytes())
+    at = data.rfind(b"mvhd")
+    width, offset = (8, 28) if data[at + 4] == 1 else (4, 20)
+    value = int.from_bytes(data[at + offset : at + offset + width], "big") + change
+    data[at + offset : at + offset + width] = value.to_bytes(width, "big")
+    path.write_bytes(bytes(data))
+
+
+def _patch_media_edit(
+    path: Path, occurrence: int, change: Callable[[int, int, int], tuple[int, int, int]]
+) -> None:
+    """Rewrite the media entries of the ``occurrence``-th ``elst`` box (0 = the video track)."""
+    data = bytearray(path.read_bytes())
+    at = data.rfind(b"moov")
+    for _ in range(occurrence + 1):
+        at = data.index(b"elst", at + 1)
+    width = 8 if data[at + 4] == 1 else 4
+    count = int.from_bytes(data[at + 8 : at + 12], "big")
+    entry = at + 12
+    for _ in range(count):
+        fields = (entry, entry + width, entry + 2 * width)
+        segment = int.from_bytes(data[fields[0] : fields[1]], "big")
+        media = int.from_bytes(data[fields[1] : fields[2]], "big", signed=True)
+        rate = int.from_bytes(data[fields[2] : fields[2] + 2], "big", signed=True)
+        if media != -1:
+            segment, media, rate = change(segment, media, rate)
+            data[fields[0] : fields[1]] = segment.to_bytes(width, "big")
+            data[fields[1] : fields[2]] = media.to_bytes(width, "big", signed=True)
+            data[fields[2] : fields[2] + 2] = rate.to_bytes(2, "big", signed=True)
+        entry += 2 * width + 4
+    path.write_bytes(bytes(data))
+
+
+def test_a_planted_movie_duration_is_caught(sample: Sample, runs: Runs, tmp_path: Path) -> None:
+    # Round-1 finding 3: there was no mvhd row.
+    source = sample("vid-vfr")
+    out, _, record = runs.get(source, "libx265", 8)
+    assert _items(record)[vf.MOVIE_DURATION]["status"] == "SAME"
+    planted = tmp_path / "mvhd.mp4"
+    shutil.copyfile(out, planted)
+    _patch_mvhd_duration(planted, 1)
+    items = _items(vf.fidelity_record(source, planted))
+    assert items[vf.MOVIE_DURATION]["status"] == "DIFFERENT"
+    assert items[vf.MOVIE_DURATION]["class"] == compare.MANDATORY
+
+
+@pytest.mark.parametrize(
+    ("occurrence", "change", "item"),
+    [
+        (0, lambda s, m, r: (s, m + 1001, r), vf.VIDEO_EDIT_AS_WRITTEN),
+        (0, lambda s, m, r: (s, m, 2), vf.VIDEO_EDIT_AS_WRITTEN),
+        (1, lambda s, m, r: (s - 1024, m, r), vf.EDIT_EFFECT),
+        (1, lambda s, m, r: (s, m + 1024, r), vf.EDIT_EFFECT),
+    ],
+    ids=["video-media-time", "video-rate", "audio-duration", "audio-media-time"],
+)
+def test_the_cut_short_reading_keeps_media_time_rate_and_the_audio_effect(
+    sample: Sample,
+    runs: Runs,
+    tmp_path: Path,
+    occurrence: int,
+    change: Callable[[int, int, int], tuple[int, int, int]],
+    item: str,
+) -> None:
+    # Round-1 finding 4: a cut-short source compared the edit lists by (duration, empty) only.
+    source = sample("vid-truncated")
+    out, _, record = runs.get(source, "libx265", 8)
+    for name in (vf.VIDEO_EDIT_AS_WRITTEN, vf.EDIT_EFFECT, vf.MOVIE_DURATION):
+        assert _items(record)[name]["status"] == "SAME", name
+    planted = tmp_path / "planted.mp4"
+    shutil.copyfile(out, planted)
+    _patch_media_edit(planted, occurrence, change)
+    items = _items(vf.fidelity_record(source, planted))
+    assert items[item]["status"] == "DIFFERENT", items[item]
+    assert not items[item]["note"].startswith("AD-22")
 
 
 # --- the transport ----------------------------------------------------------------------------
@@ -535,6 +614,83 @@ def test_open_refuses_by_name(
         _open(sample("vid-vfr"), out, **changes)
     assert caught.value.kind == kind and words in str(caught.value)
     assert out.stat().st_size == 0
+
+
+@pytest.mark.usefixtures("no_ffmpeg_start")
+def test_open_refuses_negative_timestamps_by_name(
+    clips: Clips, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Round-1 finding 8: legal ISO (no edit list, negative composition times), and NUT pts are
+    # unsigned; the carrier used to raise a raw ValueError at the first such frame.
+    source = clips.make(
+        "noedit-False", codec="libx264", bframes=False, offset="0",
+        out_options=("-use_editlist", "0"),
+    )  # fmt: skip
+    table = read_packet_table(source)
+    planted = replace(table, video_pts=tuple(p - 1024 for p in table.video_pts))
+    monkeypatch.setattr(
+        encode_module, "read_packet_table", lambda p, **k: planted if p == source else None
+    )
+    with pytest.raises(VideoEncodeError) as caught:
+        _open(source, tmp_path / "out.mp4")
+    assert caught.value.kind == "refused" and "negative timestamps" in str(caught.value)
+
+
+@pytest.mark.usefixtures("no_ffmpeg_start")
+def test_a_stream_header_that_cannot_be_built_is_refused_before_ffmpeg_starts(
+    sample: Sample, tmp_path: Path
+) -> None:
+    # Round-1 finding 11: the header used to be built after FFmpeg had started.
+    info = probe(sample("vid-vfr"))
+    bad = replace(info, video=replace(info.video, frame_rate=Fraction(0)))
+    out = tmp_path / "out.mp4"
+    out.write_bytes(b"")
+    with pytest.raises(VideoEncodeError) as caught:
+        FFmpegVideoSink().open(
+            bad, out, encoder="libx265", quality="draft", bit_depth=8, provenance=None
+        )
+    assert caught.value.kind == "refused" and "frame rate 0" in str(caught.value)
+
+
+def test_abort_after_a_refused_open_deletes_out_path(sample: Sample, tmp_path: Path) -> None:
+    # Round-1 finding 13: out_path used to be recorded only after every check had passed.
+    out = tmp_path / "out.mp4"
+    out.write_bytes(b"")
+    sink = FFmpegVideoSink()
+    with pytest.raises(VideoEncodeError):
+        sink.open(
+            probe(sample("vid-vfr")), out, encoder="libx265", quality="best", bit_depth=8,
+            provenance=None,
+        )  # fmt: skip
+    assert out.exists()
+    sink.abort()
+    assert not out.exists()
+
+
+def test_no_tool_process_writes_an_ffreport_file(
+    sample: Sample, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Round-1 finding 9: FFREPORT makes FFmpeg and ffprobe write a report file of their own.
+    source = sample("vid-vfr")
+    info = probe(source)
+    frames = list(vf.decode_frames(source, info))
+    folder = tmp_path / "cwd"
+    folder.mkdir()
+    monkeypatch.chdir(folder)  # FFREPORT names a file relative to the tool's working folder
+    monkeypatch.setenv("FFREPORT", "file=report-%p-%t.log:level=32")
+    subprocess.run(
+        ["ffmpeg", "-hide_banner", "-v", "error", "-f", "lavfi", "-i",
+         "color=c=black:s=64x48:d=0.04", "-f", "null", "-"],
+        check=True, capture_output=True,
+    )  # fmt: skip
+    planted = list(folder.iterdir())
+    assert len(planted) == 1 and planted[0].name.startswith("report-ffmpeg")  # positive control
+    planted[0].unlink()
+    detect_capabilities(refresh=True)
+    out = tmp_path / "out.mp4"
+    report = _write_all(FFmpegVideoSink(), source, out, info=info, frames=iter(frames))
+    assert report.frames_written == len(frames)
+    assert list(folder.iterdir()) == []
 
 
 @pytest.mark.usefixtures("no_ffmpeg_start")

@@ -2,16 +2,20 @@
 
 D94 says per-frame timestamps, start offset and edit list are "preserved and verified". The sink
 reads one :class:`PacketTable` of the source when it opens (the per-frame pts the probe result
-does not carry, the packet count of every stream, the sample aspect ratio) and one of the output
-when it closes, and :func:`check_output` compares the MANDATORY items it can see without decoding:
-the frame count and every pts against the pts written, the video start, the video track's edit
-list against the written start and end, the display rotation, and the packet count of every
-audio stream. The full item-by-item comparison is the fidelity instrument's
-(``tools/video_fidelity.py``); this check is what every export runs.
+does not carry, the audio packets, the sample aspect ratio) and one of the output when it
+closes, and :func:`check_output` compares the MANDATORY items it can see without decoding: the
+frame count and every pts against the pts written, the video start, the video track's edit list
+against the written start and end (its ``media_time`` is checked through its effect: the
+demuxer applies it to every pts compared), the display rotation, and every audio packet's pts.
+The full item-by-item comparison is the fidelity instrument's (``tools/video_fidelity.py``);
+this check is what every export runs.
 
-Each read is one ``ffprobe`` packet listing (no decode); it names the fields it wants, and the
-only tags it asks for are ``creation_time`` and ``firmware`` (so the best-effort report can say
-whether they were carried), never a location tag.
+Each table is three ``ffprobe`` listings (no decode): the stream list with the few container
+tags asked for by name (``creation_time`` and ``firmware``, so the best-effort report can say
+whether they were carried; never a location tag), then the packets of the video stream, then
+the packets of the audio streams. The packets of a data track (the camera's telemetry, the
+timecode) are never listed: the listings select the video and audio streams only, and a data
+track is judged from the stream list (its sample count) alone.
 """
 
 from __future__ import annotations
@@ -20,13 +24,14 @@ import json
 import re
 import subprocess
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from fractions import Fraction
 from pathlib import Path
 from typing import Any
 
 from clearwater.interfaces.video import ProbeResult
 from clearwater.io.video.boxes import BoxError, read_movie_boxes
+from clearwater.io.video.capability import tool_env
 from clearwater.io.video.inputs import ascii_text
 from clearwater.io.video.probe import VideoProbeError, find_tool
 
@@ -36,11 +41,16 @@ READ_TIMEOUT_S = 600
 TIMECODE_TAG = "tmcd"
 """The codec tag of a timecode track; the MP4 muxer regenerates it rather than copying it."""
 
-_ENTRIES = (
-    "stream=index,codec_type,codec_tag_string,time_base,start_pts,duration_ts,"
+CUT_SLACK_S = Fraction(2, 1_000_000)
+"""How near an audio packet may lie to a cut and still go either way, in seconds: FFmpeg reads
+the input ``-to`` and the input's start time in microseconds, so a packet within this of the cut
+point may be kept or dropped."""
+
+_STREAM_ENTRIES = (
+    "stream=index,codec_type,codec_tag_string,time_base,start_pts,duration_ts,nb_frames,"
     "sample_aspect_ratio:stream_side_data=rotation:format_tags=creation_time,firmware"
-    ":packet=stream_index,pts,flags"
 )
+_PACKET_ENTRIES = "packet=stream_index,pts,flags"
 _RATIO = re.compile(r"^(\d+):(\d+)$")
 
 
@@ -57,7 +67,10 @@ class StreamRow:
         duration_ts: The stream's duration in ticks, or None.
         sample_aspect_ratio: The ratio as ffprobe prints it (``"1:1"``), or None.
         rotation: The display-matrix rotation as ffprobe prints it, or None without a matrix.
-        packets: The number of packets of the stream.
+        packets: The number of packets listed: video and audio streams only; None for a stream
+            whose packets are never listed (a data track).
+        frames: The sample count the stream list gives (``nb_frames``, from the container's
+            sample table, no packet read), or None.
     """
 
     index: int
@@ -68,7 +81,8 @@ class StreamRow:
     duration_ts: int | None
     sample_aspect_ratio: str | None
     rotation: Fraction | None
-    packets: int
+    packets: int | None
+    frames: int | None = None
 
 
 @dataclass(frozen=True)
@@ -83,6 +97,8 @@ class PacketTable:
         video_missing_pts: The number of video packets without a pts.
         video_corrupt_pts: The pts of the video packets flagged corrupt (``C``).
         tags: The ``creation_time`` and ``firmware`` container tags that are present.
+        audio_pts: Per audio stream index, its packets' pts in file order (None for a packet
+            without one).
     """
 
     streams: tuple[StreamRow, ...]
@@ -91,6 +107,7 @@ class PacketTable:
     video_missing_pts: int
     video_corrupt_pts: tuple[int, ...]
     tags: Mapping[str, str]
+    audio_pts: Mapping[int, tuple[int | None, ...]] = field(default_factory=dict)
 
     @property
     def video(self) -> StreamRow:
@@ -136,22 +153,16 @@ def _rotation(stream: Mapping[str, Any]) -> Fraction | None:
     return None
 
 
-def read_packet_table(path: Path) -> PacketTable:
-    """List the packets and stream facts of one file with one ``ffprobe`` call (no decode).
-
-    Args:
-        path: The file; opened read only.
-
-    Returns:
-        The table.
+def _listing(path: Path, arguments: Sequence[str], *, strict: bool) -> dict[str, Any]:
+    """Run one ``ffprobe`` JSON listing of ``path`` and return the parsed document.
 
     Raises:
-        VideoProbeError: ``"missing_tool"`` without ffprobe; ``"unreadable"`` when the listing
-            fails or the file has no video stream.
+        VideoProbeError: ``"missing_tool"`` without ffprobe; ``"unreadable"`` when it cannot run,
+            its output is not a JSON object, or (``strict``) it exits with a non-zero status.
     """
     name = ascii_text(path.name)
-    command = [str(find_tool("ffprobe")), "-v", "error", "-of", "json"]
-    command += ["-show_entries", _ENTRIES, str(path)]
+    command = [str(find_tool("ffprobe")), "-v", "error", "-of", "json", *arguments]
+    command.append(str(path.absolute()))  # absolute: a relative name could read as an option
     try:
         done = subprocess.run(
             command,
@@ -159,34 +170,68 @@ def read_packet_table(path: Path) -> PacketTable:
             capture_output=True,
             timeout=READ_TIMEOUT_S,
             check=False,
+            env=tool_env(),
         )
     except (OSError, subprocess.TimeoutExpired) as error:
         raise VideoProbeError("unreadable", f"{name} could not be listed: {error}") from error
+    if strict and done.returncode != 0:
+        raise VideoProbeError(
+            "unreadable", f"{name} could not be listed (ffprobe exit status {done.returncode})."
+        )
     try:
         data = json.loads(done.stdout.decode("utf-8", errors="replace"))
     except ValueError as error:
         raise VideoProbeError("unreadable", f"{name} could not be listed.") from error
     if not isinstance(data, dict):
         raise VideoProbeError("unreadable", f"{name} could not be listed.")
-    counts: dict[int, int] = {}
-    video_pts: list[int] = []
-    corrupt: list[int] = []
-    missing = 0
-    raw_streams = [s for s in data.get("streams") or [] if isinstance(s, Mapping)]
+    return data
+
+
+def _packets(document: Mapping[str, Any]) -> list[Mapping[str, Any]]:
+    """Return the packet entries of a listing."""
+    return [p for p in document.get("packets") or [] if isinstance(p, Mapping)]
+
+
+def read_packet_table(path: Path, *, strict: bool = False) -> PacketTable:
+    """List the stream facts and the video and audio packets of one file (no decode).
+
+    Three ``ffprobe`` calls: the stream list, the video stream's packets, the audio streams'
+    packets (skipped without audio). A data track's packets are never listed.
+
+    Args:
+        path: The file; opened read only.
+        strict: Fail when ffprobe exits with a non-zero status (the output read-back). Without
+            it, a listing that ffprobe ends with an error still counts as far as it got (a
+            cut-short source lists its readable part).
+
+    Returns:
+        The table.
+
+    Raises:
+        VideoProbeError: ``"missing_tool"`` without ffprobe; ``"unreadable"`` when a listing
+            fails or the file has no video stream.
+    """
+    document = _listing(path, ["-show_entries", _STREAM_ENTRIES], strict=strict)
+    raw_streams = [s for s in document.get("streams") or [] if isinstance(s, Mapping)]
     video_index = next(
         (_int(s.get("index")) for s in raw_streams if s.get("codec_type") == "video"), None
     )
     if video_index is None:
-        raise VideoProbeError("unreadable", f"{name} has no video stream.")
-    for packet in data.get("packets") or []:
-        if not isinstance(packet, Mapping):
+        raise VideoProbeError("unreadable", f"{ascii_text(path.name)} has no video stream.")
+    audio_pts: dict[int, list[int | None]] = {
+        index: []
+        for s in raw_streams
+        if s.get("codec_type") == "audio" and (index := _int(s.get("index"))) is not None
+    }
+    counts: dict[int, int] = {video_index: 0}
+    video_pts: list[int] = []
+    corrupt: list[int] = []
+    missing = 0
+    selected = ["-select_streams", str(video_index), "-show_entries", _PACKET_ENTRIES]
+    for packet in _packets(_listing(path, selected, strict=strict)):
+        if _int(packet.get("stream_index")) != video_index:
             continue
-        index = _int(packet.get("stream_index"))
-        if index is None:
-            continue
-        counts[index] = counts.get(index, 0) + 1
-        if index != video_index:
-            continue
+        counts[video_index] += 1
         pts = _int(packet.get("pts"))
         if pts is None:
             missing += 1
@@ -194,6 +239,13 @@ def read_packet_table(path: Path) -> PacketTable:
         video_pts.append(pts)
         if "C" in str(packet.get("flags", "")):
             corrupt.append(pts)
+    if audio_pts:
+        selected = ["-select_streams", "a", "-show_entries", _PACKET_ENTRIES]
+        for packet in _packets(_listing(path, selected, strict=strict)):
+            index = _int(packet.get("stream_index"))
+            if index is not None and index in audio_pts:
+                audio_pts[index].append(_int(packet.get("pts")))
+    counts.update({index: len(listed) for index, listed in audio_pts.items()})
     streams = tuple(
         StreamRow(
             index=index,
@@ -206,12 +258,13 @@ def read_packet_table(path: Path) -> PacketTable:
             if s.get("sample_aspect_ratio") is not None
             else None,
             rotation=_rotation(s),
-            packets=counts.get(index, 0),
+            packets=counts.get(index),
+            frames=_int(s.get("nb_frames")),
         )
         for s in raw_streams
         if (index := _int(s.get("index"))) is not None
     )
-    tags = (data.get("format") or {}).get("tags") or {}
+    tags = (document.get("format") or {}).get("tags") or {}
     return PacketTable(
         streams=streams,
         video_index=video_index,
@@ -223,6 +276,7 @@ def read_packet_table(path: Path) -> PacketTable:
             for key in ("creation_time", "firmware")
             if isinstance(tags, Mapping) and key in tags
         },
+        audio_pts={index: tuple(listed) for index, listed in audio_pts.items()},
     )
 
 
@@ -325,9 +379,13 @@ def check_output(
     source: PacketTable,
     written: Sequence[int],
     end_pts: int,
-    audio_cut: bool,
+    audio_end: Fraction | None,
 ) -> list[str]:
     """Compare a finished output with the source and the frames written (D94).
+
+    Every audio stream's packets must have the source's pts, in order: all of them, or with
+    ``audio_end`` the source's packets before that point (a packet within
+    :data:`CUT_SLACK_S` of it may go either way), never another subset.
 
     Args:
         out_path: The output file (its edit list is read from its boxes).
@@ -336,8 +394,8 @@ def check_output(
         source: The source's packet table.
         written: The pts of every frame written, in ticks, in order.
         end_pts: The end sentinel's pts (the end of the last frame).
-        audio_cut: Whether the audio was cut at the video end (a truncated source), so the
-            output may hold fewer audio packets than the source.
+        audio_end: Where the audio was cut, in seconds (a truncated source: the readable video
+            end), or None when it was copied whole.
 
     Returns:
         One line per MANDATORY mismatch; empty when the output matches.
@@ -369,24 +427,54 @@ def check_output(
             f"{len(source_audio)}"
         )
     for number, (src, out) in enumerate(zip(source_audio, output_audio, strict=False)):
-        if audio_cut:  # cut at the video end: fewer packets than the source, never none
-            wrong = out.packets == 0 or out.packets > src.packets
-        else:
-            wrong = out.packets != src.packets
-        if wrong:
-            problems.append(
-                f"audio stream {number}: {out.packets} packets in the output where the source "
-                f"has {src.packets}"
-            )
-        if not audio_cut and out.start_pts != src.start_pts:
-            problems.append(
-                f"audio stream {number}: start {out.start_pts} where the source has {src.start_pts}"
-            )
+        problems += _audio_problems(
+            number,
+            _seconds(source.audio_pts.get(src.index, ()), src.time_base),
+            _seconds(output.audio_pts.get(out.index, ()), out.time_base),
+            audio_end,
+        )
     return problems
+
+
+def _seconds(pts: Sequence[int | None], time_base: Fraction | None) -> list[Fraction | None]:
+    """Convert packet pts to seconds (ticks unchanged when the stream has no time base)."""
+    scale = time_base if time_base is not None else Fraction(1)
+    return [None if p is None else p * scale for p in pts]
+
+
+def _audio_problems(
+    number: int,
+    source: Sequence[Fraction | None],
+    output: Sequence[Fraction | None],
+    end: Fraction | None,
+) -> list[str]:
+    """Check one audio stream's packet pts (seconds) against the source's, whole or cut."""
+    if end is None:
+        low = high = len(source)
+    else:
+        timed = [p for p in source if p is not None]
+        low = sum(1 for p in timed if p < end - CUT_SLACK_S)
+        high = sum(1 for p in timed if p < end + CUT_SLACK_S)
+    wanted = str(low) if low == high else f"{low} to {high}"
+    if not low <= len(output) <= high:
+        return [
+            f"audio stream {number}: {len(output)} packets in the output where {wanted} of the "
+            f"source's {len(source)} were to be copied"
+        ]
+    if list(output) != list(source[: len(output)]):
+        at = next(i for i, (a, b) in enumerate(zip(output, source, strict=False)) if a != b)
+        return [
+            f"audio stream {number}: packet {at} at {output[at]} s where the source has "
+            f"{source[at]} s"
+        ]
+    return []
 
 
 def not_carried(probe: ProbeResult, source: PacketTable, output: PacketTable) -> list[str]:
     """List the best-effort items of the source that the output does not carry (D105).
+
+    A data track is compared by its codec tag and its sample count from the stream list; its
+    packets are never listed.
 
     Args:
         probe: The source's probe result.
@@ -412,10 +500,10 @@ def not_carried(probe: ProbeResult, source: PacketTable, output: PacketTable) ->
         out = output_data[number] if number < len(output_data) else None
         if out is None or out.codec_tag != src.codec_tag:
             missing.append(f"data track {ascii_text(src.codec_tag)}")
-        elif out.packets != src.packets:
+        elif out.frames != src.frames:
             missing.append(
-                f"data track {ascii_text(src.codec_tag)} (only {out.packets} of {src.packets} "
-                "packets)"
+                f"data track {ascii_text(src.codec_tag)} ({out.frames} samples where the source "
+                f"has {src.frames})"
             )
     if probe.gopro is not None:
         missing.append("camera settings atoms (moov/udta)")

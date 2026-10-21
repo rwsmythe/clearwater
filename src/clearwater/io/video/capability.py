@@ -11,10 +11,14 @@ cached for the process.
 :func:`resolve_encoder` is the single rule for the ``"auto"`` setting (G12: "NVENC when
 available, else the software encoder"); the settings dialog and the export call it, and the
 sink only ever receives the resolved name, which is what provenance records.
+
+:func:`tool_env` is the environment of every FFmpeg and ffprobe process the detection and the sink
+start (the encoder, the test encodes and the packet listings of :mod:`.verify`).
 """
 
 from __future__ import annotations
 
+import os
 import subprocess
 import threading
 from collections.abc import Sequence
@@ -66,6 +70,19 @@ _cache: dict[str, tuple[EncoderCapability, ...]] = {}
 _lock = threading.Lock()
 
 
+def tool_env() -> dict[str, str]:
+    """Return the environment for an FFmpeg or ffprobe process: this one without ``FFREPORT``.
+
+    ``FFREPORT`` makes both tools write a log file of their own (by default into the current
+    folder), which would be a file written beside ``out_path``; the sink writes ``out_path``
+    only.
+
+    Returns:
+        A copy of ``os.environ`` without ``FFREPORT`` (in any letter case).
+    """
+    return {key: value for key, value in os.environ.items() if key.upper() != "FFREPORT"}
+
+
 def _run(command: Sequence[str]) -> tuple[int, str]:
     """Run a short FFmpeg command and return its exit status and its output (stdout + stderr)."""
     try:
@@ -75,6 +92,7 @@ def _run(command: Sequence[str]) -> tuple[int, str]:
             capture_output=True,
             timeout=TEST_TIMEOUT_S,
             check=False,
+            env=tool_env(),
         )
     except subprocess.TimeoutExpired:
         return -1, f"timed out after {TEST_TIMEOUT_S} s"
