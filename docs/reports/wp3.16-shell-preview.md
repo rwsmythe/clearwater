@@ -14,7 +14,7 @@ invocations also pass `-p no:pytest-qt`. Rulings: brief CHARC `53b752a4d7fac4fc`
 ## Contract (`clearwater.gui.contract`; the names the WP3.17-3.20 briefs cite)
 
 Frozen at the round-0 commit `795e57f`, additive only until accept (ruling 2). Exported from
-`clearwater.gui`.
+`clearwater.gui`. One ADDITION since round 0 (Reviewer B #5): `Session.settings_refusal()`.
 
 | Name | What it is |
 |---|---|
@@ -24,7 +24,7 @@ Frozen at the round-0 commit `795e57f`, additive only until accept (ruling 2). E
 | `ShellWindow(QMainWindow)` | `preview` (property), `attach(area, factory, *, title) -> QWidget`, `set_settings_dialog(factory)` (opened with `QDialog.open()`, window-modal) |
 | `ShellActions` | frozen: `open`, `export` (`ReasonAction`), `settings`, `quit` |
 | `ReasonAction(QAction)` | `set_unavailable(reason or None)`, `unavailable_reason()`; export starts with "Export is not available yet." (WP3.19 clears it); the shell adds its own reason (nothing open; a video whose analysis is not complete, with `done/total`) |
-| `Session(QObject)` | signals `source_changed(object)`, `parameters_changed(object)`, `settings_changed(object)`, `position_changed(object)` (an int; see deviations), `statistics_changed()`, `backend_changed(str)`, `analysis_changed(object)`; getters `source`, `parameters`, `settings`, `method`, `analysis`, `statistics`, `position`, `backend`, `current_image`; setters `set_parameters` (ValueError for an unknown method), `set_settings`, `set_position(pts_ticks, *, statistics=None)`, `set_analysis`, `set_statistics` |
+| `Session(QObject)` | signals `source_changed(object)`, `parameters_changed(object)`, `settings_changed(object)`, `position_changed(object)` (an int; see deviations), `statistics_changed()`, `backend_changed(str)`, `analysis_changed(object)`; getters `source`, `parameters`, `settings`, `method`, `analysis`, `statistics`, `position`, `backend`, `current_image`, `settings_refusal` (ADDED after round 0: a `Message` when start-up refused the settings file, None when it may be written this session; a panel, WP3.20's dialog above all, must not save the settings while it is not None); setters `set_parameters` (ValueError for an unknown method), `set_settings`, `set_position(pts_ticks, *, statistics=None)`, `set_analysis`, `set_statistics` |
 | `AnalysisState`, `AnalysisPhase` | frozen `(phase, done, total, message)`; phases `none`, `running`, `complete`, `cancelled`, `failed` |
 | `OpenedSource` | frozen `(path, kind, image, metadata, probe, warnings)`, one per open |
 | `Engines`, `SelectBackend` | frozen `(photo_source, video_probe, video_source, video_sink, cache, methods, select_backend)`; `methods` first entry = default |
@@ -51,7 +51,7 @@ analysis state, statistics, position and backend reason when a source opens.
 
 | # | Claim | Evidence |
 |---|---|---|
-| 1 | Nothing heavy on the interface thread: open/probe/decode on the open and frame workers; `select_backend`, downscale, analyze, render, `to_host`, display conversion on the preview worker; jobs on their own threads. | `test_open_and_frame_decode_run_off_the_interface_thread`, `test_v7_...` (method threads exclude the main thread), `test_preview_reason_goes_to_the_tooltip_when_it_differs` (selection threads) |
+| 1 | Nothing heavy on the interface thread: open/probe/decode on the open and frame workers; `select_backend`, downscale, analyze, render, `to_host`, display conversion of rendered results on the preview worker; jobs on their own threads. Exception: `preview.show_proxy` (WP3.18's scrubber) makes its one or two owned `QImage` copies and any ICC conversion of the given 540-line proxy on the interface thread (Reviewer B #9; no V7 claim either way for it). | `test_open_and_frame_decode_run_off_the_interface_thread`, `test_v7_...` (method threads exclude the main thread), `test_preview_reason_goes_to_the_tooltip_when_it_differs` (selection threads) |
 | 2 | V7 bound: a 10 ms `QTimer` probe never waits > 100 ms while a ~2 s NumPy render runs and a job reports at a high rate (> 1000 reports). Observed maximum **11-12 ms** (2026-10-21, three runs; informational, not a performance figure). | `test_v7_interface_never_waits_more_than_100_ms`; planted inline render fails it: `test_planted_render_on_the_interface_thread_fails_v7` |
 | 3 | Latest wins: three quick parameter changes display only the last; a superseded result is dropped on the main thread by generation. | `test_latest_wins_three_quick_changes_show_only_the_last`; planted no-drop worker: `test_planted_stale_result_displayed_fails` |
 | 4 | V8 harness: with the identity stub the preview equals the full-resolution render downscaled by the same rule, exactly (mean 0, max 0 at k = 1, 2, 3, 7, and in the window); the harness takes any method and detects a resolution-dependent one. | `test_v8_harness_with_the_identity_stub_is_exact`, `test_preview_equals_the_export_downscaled_by_the_same_rule`, `test_v8_harness_detects_a_resolution_dependent_method` |
@@ -63,9 +63,9 @@ analysis state, statistics, position and backend reason when a source opens.
 | 10 | The contract: a dummy panel in each `Area` gets a `ShellContext`, sees `parameters_changed`, drives `set_parameters`; the settings dialog opens from `actions.settings`. | `tests/test_gui_contract.py` |
 | 11 | Dependency rule: no `clearwater.gui` module imports `clearwater.methods`, `cupy`, `cupyx` or touches `.xp`; `clearwater.core`, `.config`, `.jobs`, `.io` load no PySide6. | `tests/test_gui_deps.py` |
 
-GUI tests on the final head: 113 passed in about 32 s, headless (`offscreen`; the planted
+GUI tests on the final head: 119 passed in about 32 s, headless (`offscreen`; the planted
 unbounded `view_factor` waits out its 10 s child-process timeout); with
-`tests/test_conftest_guard.py` 157 passed; WP3.6's `tests/test_io_photo_*.py` 433 passed. Full suite at `0e4412c` (before round 1): 1 failed, 2993 passed, 1 skipped (normal);
+`tests/test_conftest_guard.py` 163 passed; WP3.6's `tests/test_io_photo_*.py` 433 passed. Full suite at `0e4412c` (before round 1): 1 failed, 2993 passed, 1 skipped (normal);
 1 failed, 2474 passed, 520 skipped (CuPy unimportable); the failure was Reviewer A F1, fixed in
 `fa99105`. Full suite on the final head: run by the orchestrator on the candidate.
 
@@ -102,6 +102,9 @@ unbounded `view_factor` waits out its 10 s child-process timeout); with
 
 ## Limits
 
+- A photo whose damaged EXIF block WP3.6's reader drops opens with no G10 warning: the reader
+  only logs it, so the shell has no signal (Reviewer B #4, banked by the orchestrator as DR-43;
+  a reader-side signal is needed, outside this package's files).
 - `default_engines()` refuses every photo and every video frame (stubs hold none) until WP4.3.
   WP3.6's `PhotoReader` is merged but not wired there: the post-round-4 cleanup was scoped to the
   by-name catch only; WP4.3 wires the real engines.
@@ -138,6 +141,29 @@ for a refused settings format version is neutral (`shell.SETTINGS_FORMAT_TEXT`, 
 `NEWER_SETTINGS_TEXT`), the error it carries says "newer" when it is; R4-3 the 1:1 exactness
 test at `devicePixelRatio` 2. Each new test failed on the code before its fix (R4-3: the planted
 ratio-ignoring widget passes at ratio 1 and fails at 2).
+
+## Reviewer B remediation (orchestrator's seat, candidate `wp3.16-mc`)
+
+Reviewer B returned `NEW_CRITICAL_MAJOR_FOUND`; one remediation, each fix with a test that failed
+on the code before it:
+
+- #1 (MAJOR) a refusal at routing invalidates the open in flight, so the earlier file is never
+  shown: `test_a_routed_refusal_invalidates_the_open_in_flight`.
+- #2 (MAJOR) shutdown stops every worker even when one overruns its timeout:
+  `test_shutdown_stops_every_worker_when_one_overruns_its_timeout`.
+- #3 (MINOR) close DELIVERS the ended jobs' `on_done` before the settings write
+  (`QtJobRunner.close`; the queued duplicate is ignored; `shutdown()` documents the order):
+  `test_a_cancelled_jobs_completion_is_delivered_before_the_settings_write`.
+- #5 (MAJOR) `Session.settings_refusal()` added to the contract (additive):
+  `test_the_session_says_whether_settings_may_be_written` (version-99 start-up).
+- #6 (MAJOR) the statistics memo key carries the backend device and reason, so a `force_cpu`
+  change measures again: `test_a_force_cpu_change_measures_the_statistics_again`.
+- #7 (MINOR) a new source replaces the preview memo:
+  `test_a_new_source_drops_the_previous_sources_memo`.
+- #8 (MINOR) the settings refusal names the file and its path through `messages.refusal`
+  (same test as #5).
+- #9 (ADVISORY) the claim about the display conversion corrected (claim 1).
+- #4 banked as DR-43 (Limits).
 
 ## Consumer note for WP3.14 and WP4.1 (photo statistics, question 5)
 

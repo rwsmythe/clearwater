@@ -546,3 +546,32 @@ Locks on disk against main: nothing under `interfaces/`, `config/`, `core/`, `io
 `pytest-qt>=4.5,<5`; `tests/test_conftest_guard.py` changed only under the round-1 F1 grant.
 Not done (scope "nothing else"): `default_engines()` still uses `StubPhotoSource`; WP4.3 wires
 WP3.6's `PhotoReader`.
+
+## Reviewer B remediation (orchestrator gen 8, 2026-10-21)
+
+Reviewer B at the orchestrator's seat on `wp3.16-mc` (`475cf12` rebased onto main):
+`NEW_CRITICAL_MAJOR_FOUND`. Evidence and adjudication:
+`C:\Users\rwsmy\clearwater-review-evidence\wp3.16\reviewB\` (`review-B.txt`, `adjudication-B.md`).
+One remediation; no Reviewer A round. Cell depth at the yield: 138,571 / 55 turns (dispatcher).
+
+| # | Adjudicated | Fix | Commit | Fail before |
+|---|---|---|---|---|
+| 1 | MAJOR | `open_path` invalidates the opener on a routed refusal | `bf0ae2c` | slow A shown after B's refusal |
+| 2 | MAJOR | `shutdown` stops both workers, then checks (no short-circuit) | `bf0ae2c` | open worker alive after a 0.05 s preview overrun |
+| 3 | MINOR | DELIVER: `QtJobRunner.close` calls `on_done` of every ended job before returning (handle keeps `result`; the queued duplicate is ignored); order documented in `shutdown()` | `bf0ae2c` | `on_done` not called before the save (`assert 0 == 1`) |
+| 5 | MAJOR | `Session.settings_refusal() -> Message or None` ADDED to the contract (additive, ruling 2); `ShellSession` and `StartUp` carry it | `bf0ae2c` | `AttributeError` (no member) |
+| 6 | MAJOR | statistics memo key + `backend.device` + preview reason | `3d0d800` | `analysed` 1, not 2, after `force_cpu` |
+| 7 | MINOR | `_on_source` replaces `PreviewMemo` | `3d0d800` | memo held the previous token |
+| 8 | MINOR | settings refusal via `messages.refusal(settings_file, ...)`, text carries the path | `bf0ae2c` | (with #5's test) |
+| 9 | ADVISORY | report claim 1 corrected (`show_proxy` converts on the interface thread) | report | - |
+| 4 | banked DR-43 | Limits line only | report | - |
+
+Also `232f813`: a stray `import os` that `2f85c9a`'s sed put into the planted `_UNBOUNDED`
+child string is removed (no behaviour change). The fixes are grouped in two commits because
+`shell.py` carries five of them (no interactive staging here).
+
+Gates at the remediation head: `tests/test_gui_*.py` 119 passed (offscreen); with
+`tests/test_conftest_guard.py` 163 passed; `tests/test_io_photo_*.py` 433 passed; ruff check 0;
+ruff format --check 0 (174 files); mypy strict 0 (107 files). Full suite: the orchestrator's,
+on the candidate. `contract.py` diff is the one added method (docstring + `raise
+NotImplementedError`).
