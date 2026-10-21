@@ -41,7 +41,7 @@ video preview:
 
 video export (jobs):
         io.video.frames -> method.render(frame, params, StatisticsStore.smoothed(pts)) -> io.video.sink (NVENC/libx265, copyts, audio+gpmd copy)
-        -> jobs.naming / safe write (D34-D36, D83-D85) -> provenance sidecar (D90, IF-9)
+        -> jobs.naming / safe write (D34-D36, D83-D85) -> provenance EMBEDDED in the output (D91; the IF-9 JSON object as payload: MP4 `comment` tag, PNG per IF-1 `provenance`; corrected 2026-10-21, WP3.10 Q5)
 ```
 
 Parameter change (AD-7): closed-form statistics update directly; others re-measure from the
