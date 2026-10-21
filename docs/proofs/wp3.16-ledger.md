@@ -11,6 +11,7 @@ Cell: implementer-opus-high (tier STRONG; ruling 1). Worktree `.worktrees/wp3.16
 | 0 (design) | 2026-10-21 | n/a | n/a | n/a | n/a | n/a | n/a | n/a | 152,774 (dispatcher, 35 turns, 01:27:10Z) |
 | 1 | 2026-10-21 | 0/2 (F1 full suite red by pytest-qt; F2 1:1 re-render) | 4 confirmed (F3, F4, F5; F7 out) + 1 rejected (F6) | 6 in / 1 out (F7) | 7 NEW / 0 REOPENED | 0 | planned: product (F2-F5, F7) + a ruled line outside the files owned (F1) | WSL, codex-cli 0.162.1, gpt-5.6-sol high | (dispatcher) |
 | 2 | 2026-10-21 | 0/1 (R2-2 `view_factor` hang, reproduced) | 4 (R2-1 proposed down from MAJOR, R2-3, R2-4, R2-5) | 5 in / 0 out | 3 NEW (R2-2, R2-3, R2-5) / 2 REOPENED (R2-1 of F2, R2-4 of F3) | 0 | round-1 fixes: product (F2-F5, F7) + granted test line (F1); planned: product (R2-1..R2-4) + test/report (R2-5) | WSL, codex-cli 0.162.1, gpt-5.6-sol high | (dispatcher) |
+| 3 | 2026-10-21 | 0/1 (R3-2 stale memoised render after an in-place statistics update) | 3 (R3-1 proposed down from MAJOR, R3-3, R3-4) | 4 in / 0 out | 2 NEW (R3-1, R3-2 major, in a round-1 fix) / 2 REOPENED (R3-3 of F3, R3-4 of F4) | 0 | round-2 fixes: product (R2-1..R2-4) + test (R2-5); planned: product (R3-2..R3-4) + an additive contract getter (R3-1, to rule) | WSL, codex-cli 0.162.1, gpt-5.6-sol high | (dispatcher) |
 
 ## Round 0: the design table (brief task 1)
 
@@ -435,3 +436,22 @@ guards a path the round-1 code already handled, it makes claim 6 true).
 
 Gates at `df0da40`: GUI tests 102 passed (37.5 s), with `tests/test_conftest_guard.py` 146
 passed (64.1 s); ruff check (repo) 0; ruff format --check 0 (140 files); mypy strict 0 (87 files).
+
+## Reviewer A round 3
+
+Head reviewed `a6d838d` (product code as `df0da40`). Evidence
+`C:\Users\rwsmy\clearwater-review-evidence\wp3.16\r3\` (probe, prompt with "THIS IS ROUND 3"
+listing R1 and R2 with their fixes, diff, review.txt, review.stderr.txt, adjudication.md,
+test-summary.txt, md5sums.txt). Probe READY. Assertions passed (banner gpt-5.6-sol/high, 20
+`succeeded in`, tokens 220,598, VERDICT at column 0, ERROR matches all echo). Withheld paths
+respected. No execution (WSL has no Python); all REASONED. Verdict `NEW_CRITICAL_MAJOR_FOUND`.
+Round-2 fixes verified.
+
+| # | Sev | Verdict | In env | NEW/REOPENED | Planned fix |
+|---|---|---|---|---|---|
+| R3-1 | MINOR (reviewer MAJOR; proposed down: a re-measure by the same public function gives identical values, nothing wrong at run time) | CONFIRMED (read) as a contract gap | yes | NEW | ADDITIVE contract getter `Session.effective_statistics()` + `RenderResult.statistics`, if the dispatcher agrees |
+| R3-2 | MAJOR | CONFIRMED (read) | yes | NEW (in the F2 fix) | a session statistics revision in the request and the memo key; test + planted identity-only memo |
+| R3-3 | MINOR | CONFIRMED (read) | yes | REOPENED (F3) | the indicator tracks a k = 1 render in flight on every path; tests |
+| R3-4 | MINOR | CONFIRMED (read) | yes | REOPENED (F4) | the name must stand alone; `assert_refused` checks the full name; test |
+
+Remediation NOT started (yield at the round boundary).
