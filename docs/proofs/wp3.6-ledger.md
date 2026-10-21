@@ -279,10 +279,27 @@ found nothing new.
   `C:\Users\rwsmy\clearwater-review-evidence\wp3.1\r2\`; evidence in `...\wp3.6\rN\`; `--glob '!docs/proofs/**'`;
   supply diff and HEAD sha in the prompt; yield after each round's adjudication, before remediating).
   (3) Return report (<= ~70 lines) as the final message to the dispatcher.
-- **Open questions:** CHARC's ruling on item 2 (nclx-only Display P3: built-in profile in `23fdfd9`, or no
-  `iCCP`; if "no", revert `23fdfd9`, whose only coupling is one marked line in `color.py`). Nothing else.
+- **Open questions:** none (item 2 RULED YES by CHARC; applied in the section below).
 - **Rulings standing:** round-0 table accepted; error class shipped first; LZW/JPEG-in-TIFF refused by
   name; sRGB chunk = explicit sRGB; content-based detection; 12-bit HEIC refused; ICC classified by the
   stdlib tag reader (report that deviation from question 4's wording, done in the report).
 - **Gotcha for the next cell:** do not type backslash-zero escapes inside heredoc Python in this shell
   tool; they arrive as real NUL bytes. Use the Write/Edit tools or `chr(92)`.
+
+## Item 2 ruling applied (cell, orchestrator gen 8; CHARC `d06ed7c969d6249f` read as clarified by `aa1219fb3145208b`)
+
+- Built-in profiles only when the source carries no ICC profile (a source ICC stays byte-identical).
+  Set: nclx Display P3 + sRGB curve -> built-in Display P3; nclx BT.709 + sRGB curve -> built-in sRGB.
+  Untagged JPEG/PNG/TIFF (question 3: `bt709`/`srgb`, `assumed=True`) and nclx outside the set
+  (BT.2020, HLG/PQ, any non-sRGB curve) -> NO `iCCP`, description carried.
+- Commits after `9662282`: `7d1b5e2` (P3 leg: sRGB-curve scope, md5 pin, writer records
+  `profile: built-in <name>` in provenance via `color.built_in_profile_name`); the sRGB leg follows in its
+  own commit (`srgb_profile.py`, `build_rgb_profile` shared builder in `p3_profile.py`, bytes of the
+  Display P3 profile unchanged and pinned before the refactor, new `tests/test_io_photo_srgb.py` with the
+  four classes, the report). md5: Display P3 `ee27975c...` (620 bytes), sRGB `ca34a027...` (608 bytes).
+- Premise mismatch disclosed in the report: the WP2.3 manifest says `icc_profile: null` for nclx-only HEIC
+  samples; the manifest-comparison test now expects the built-in sRGB profile for a HEIC with `null`.
+- Interpretation flagged to the dispatcher: the pair (primaries, transfer) defines the set, so nclx BT.709
+  primaries with the BT.709 curve get no `iCCP`.
+- Gates at this point: ruff check, ruff format --check, mypy strict clean; own tests 402 passed, 1 skipped.
+  Full suite: NOT run (window pending).
