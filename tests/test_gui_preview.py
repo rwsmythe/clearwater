@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import dataclasses
 import math
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -129,6 +130,7 @@ for (h, w), sh, sw in itertools.product(images, shown, shown):
 
 _UNBOUNDED = """
 import math
+import os
 def unbounded(height, width, shown_height, shown_width):
     if shown_height <= 0 or shown_width <= 0:
         return 1
@@ -278,6 +280,97 @@ def test_planted_one_to_one_with_scaled_pixels_fails(make_window, qtbot, monkeyp
     wait_idle(qtbot, window)
     region, crop = _corrected_region(window, to_display_uint8(np.asarray(src.pixels)))
     assert not np.array_equal(region, crop)
+
+
+# 1:1 at devicePixelRatio 2 (round-4 R4-3). The ratio is fixed when the QApplication starts, so
+# the check runs in a child process started with QT_SCALE_FACTOR=2 on the offscreen platform.
+
+_DPR_PROBE = """
+import math, sys, time
+from pathlib import Path
+sys.path.insert(0, sys.argv[2])
+import gui_support
+import numpy as np
+from PySide6.QtTest import QTest
+from PySide6.QtWidgets import QApplication
+from clearwater.gui.imaging import image_bytes, to_display_uint8
+from clearwater.gui.preview import PreviewWidget
+from clearwater.gui.shell import MainWindow
+PLANT
+app = QApplication([])
+
+def wait(done):
+    end = time.monotonic() + 20
+    while not done():
+        assert time.monotonic() < end, "timed out"
+        QTest.qWait(10)
+
+path = Path("photo.png")
+src = gui_support.image(600, 1800, seed=11)
+window = MainWindow(
+    gui_support.photo_engines({path: src}),
+    gui_support.locations(Path(sys.argv[1])),
+    presenter=gui_support.CapturingPresenter(),
+)
+window.resize(600, 400)
+window.show()
+QTest.qWaitForWindowExposed(window)
+window.open_path(path)
+wait(lambda: not window.opening())
+wait(window.controller.idle)
+widget = window.preview_widget
+window.view_actions["one_to_one"].trigger()
+wait(window.controller.idle)
+QTest.qWait(30)
+grab = widget.grab()
+dpr = grab.devicePixelRatio()
+grabbed = image_bytes(grab.toImage())
+ox, oy = (int(v) for v in widget.image_origin())
+x0 = math.ceil(widget.divider_x() * dpr) + 2
+expected = to_display_uint8(np.asarray(src.pixels))
+ys, ye = max(0, oy), min(grabbed.shape[0], oy + expected.shape[0])
+xs, xe = max(x0, ox), min(grabbed.shape[1], ox + expected.shape[1])
+region = grabbed[ys:ye, xs:xe]
+crop = expected[ys - oy : ye - oy, xs - ox : xe - ox]
+print("DPR", dpr)
+print("DEVICE", grabbed.shape[1] == round(widget.width() * dpr))
+print("FACTOR", widget.shown_factor(), widget.pending_full())
+print("REGION", ye - ys, xe - xs)
+print("EXACT", region.shape == crop.shape and bool(np.array_equal(region, crop)))
+window.close()
+"""
+
+_DPR_IGNORED = "PreviewWidget.devicePixelRatioF = lambda self: 1.0"
+
+
+def _one_to_one_at_dpr_two(tmp_path: Path, plant: str = "") -> dict[str, list[str]]:
+    env = dict(os.environ, QT_SCALE_FACTOR="2", QT_QPA_PLATFORM="offscreen")
+    code = _DPR_PROBE.replace("PLANT", plant)
+    tests_dir = str(Path(__file__).resolve().parent)
+    done = subprocess.run(
+        [sys.executable, "-c", code, str(tmp_path), tests_dir],
+        capture_output=True,
+        text=True,
+        timeout=120,
+        env=env,
+        check=False,
+    )
+    assert done.returncode == 0, done.stderr
+    return {line.split()[0]: line.split()[1:] for line in done.stdout.splitlines() if line}
+
+
+def test_one_to_one_is_exact_in_device_pixels_at_device_pixel_ratio_two(tmp_path: Path) -> None:
+    seen = _one_to_one_at_dpr_two(tmp_path)
+    assert seen["DPR"] == ["2.0"] and seen["DEVICE"] == ["True"]
+    assert seen["FACTOR"] == ["1.0", "False"]
+    assert int(seen["REGION"][0]) > 50 and int(seen["REGION"][1]) > 50
+    assert seen["EXACT"] == ["True"]
+
+
+def test_planted_one_to_one_ignoring_the_device_pixel_ratio_fails(tmp_path: Path) -> None:
+    seen = _one_to_one_at_dpr_two(tmp_path, _DPR_IGNORED)
+    assert seen["DPR"] == ["2.0"]
+    assert seen["EXACT"] == ["False"]
 
 
 def test_preview_equals_the_export_downscaled_by_the_same_rule(make_window, qtbot) -> None:
