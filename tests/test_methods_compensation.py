@@ -75,6 +75,14 @@ def synthetic(seed: int, shape: tuple[int, int] = (45, 67)) -> np.ndarray:
     return image
 
 
+def grid10(seed: int, shape: tuple[int, int] = (45, 67)) -> np.ndarray:
+    """A float32 image on the 10-bit ``n / 1023`` grid (V1's 10-bit input), red kept low."""
+    rng = np.random.default_rng(seed)
+    codes = rng.integers(0, 1024, (*shape, 3))
+    codes[..., 0] = rng.integers(0, 410, shape)
+    return codes.astype(np.float32) / np.float32(1023.0)
+
+
 def read_still(path: Path) -> np.ndarray:
     if "png16" in path.name:
         return read_png16(path)
@@ -82,11 +90,13 @@ def read_still(path: Path) -> np.ndarray:
         return (np.asarray(opened.convert("RGB"), dtype=np.float32) / np.float32(255.0)).copy()
 
 
-@pytest.fixture(params=["synthetic-0", "synthetic-1", *STILLS_16, *STILLS_8])
+@pytest.fixture(params=["synthetic-0", "synthetic-1", "grid10-0", *STILLS_16, *STILLS_8])
 def image(request: pytest.FixtureRequest, sample: Callable[[str], Path]) -> np.ndarray:
     name = request.param
     if name.startswith("synthetic"):
         return synthetic(int(name[-1]))
+    if name.startswith("grid10"):
+        return grid10(int(name[-1]))
     return read_still(sample(name))
 
 
