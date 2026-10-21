@@ -84,8 +84,8 @@ NEEDS_ANALYSIS_REASON = "Export needs the clip's analysis."
 """The shell's reason for a video whose analysis has not run or was cancelled (AD-15)."""
 
 SETTINGS_FORMAT_TEXT = (
-    "The settings file is in a format this Clearwater does not read ({error}). Defaults are "
-    "used for this session and the file is left as it is."
+    "The settings file {path} is in a format this Clearwater does not read ({error}). Defaults "
+    "are used for this session and the file is left as it is."
 )
 """The start-up message for a settings file whose ``format_version`` is refused (S4, R4-2).
 
@@ -106,14 +106,20 @@ class StartUp:
         parameters: The parameter set to begin with.
         presets: The preset store over ``locations.presets_dir``.
         problems: Messages to show once the window exists.
-        save_at_close: False when the settings file must be left untouched (S4).
+        settings_refusal: The refusal of the settings file, or None when it may be written this
+            session (S4; ``Session.settings_refusal``).
     """
 
     settings: Settings
     parameters: ParameterSet
     presets: PresetStore
     problems: tuple[Message, ...]
-    save_at_close: bool
+    settings_refusal: Message | None
+
+    @property
+    def save_at_close(self) -> bool:
+        """False when the settings file must be left untouched (S4)."""
+        return self.settings_refusal is None
 
 
 def start_up(locations: Locations, engines: Engines) -> StartUp:
@@ -136,15 +142,16 @@ def start_up(locations: Locations, engines: Engines) -> StartUp:
         configure_logging(locations.log_dir)
     except OSError as error:
         problems.append(Message("warning", messages.ascii_text(f"No log file: {error}")))
-    save_at_close = True
+    settings_refusal: Message | None = None
     try:
         settings = load_settings(locations.config_dir)
     except UnsupportedFormatVersionError as error:
         _LOG.warning("settings refused: %s", error)
         settings = Settings()
-        save_at_close = False
-        text = messages.ascii_text(SETTINGS_FORMAT_TEXT.format(error=error))
-        problems.append(Message("refusal", text, locations.settings_file))
+        path = locations.settings_file
+        text = SETTINGS_FORMAT_TEXT.format(path=path, error=error)
+        settings_refusal = messages.refusal(path, text)
+        problems.append(settings_refusal)
     presets = PresetStore(locations.presets_dir)
     try:
         installed = presets.install_starters()
@@ -165,7 +172,7 @@ def start_up(locations: Locations, engines: Engines) -> StartUp:
                 default_id,
             )
         parameters = new_parameter_set(default_id, {})
-    return StartUp(settings, parameters, presets, tuple(problems), save_at_close)
+    return StartUp(settings, parameters, presets, tuple(problems), settings_refusal)
 
 
 class ExportAction(ReasonAction):
@@ -292,7 +299,13 @@ class MainWindow(ShellWindow):
         self._save_at_close = startup.save_at_close
         self._choose = choose_file or _choose_file
         self._closed = False
-        self.session = ShellSession(engines, startup.settings, startup.parameters, self)
+        self.session = ShellSession(
+            engines,
+            startup.settings,
+            startup.parameters,
+            self,
+            settings_refusal=startup.settings_refusal,
+        )
 
         central = QWidget(self)
         layout = QVBoxLayout(central)
@@ -404,6 +417,7 @@ class MainWindow(ShellWindow):
         """
         kind = sources.route(path)
         if isinstance(kind, Message):
+            self._opener.invalidate()  # an earlier open still in flight is never shown
             self.presenter.present(kind)
             return
         engines = self._engines
@@ -537,6 +551,11 @@ class MainWindow(ShellWindow):
     def shutdown(self) -> None:
         """Stop every worker, save the settings with the last parameters once, close the log.
 
+        The order: the jobs are cancelled and joined, and the ``on_done`` of every job that
+        ended is DELIVERED here, before the settings write, so a change it makes is saved (a job
+        still running after the timeout delivers nothing before the write). Then every worker
+        is stopped, each even when another overran its timeout. Then the save.
+
         Idempotent. A save error is logged, never raised; after a settings file was refused at
         start-up (a format version this Clearwater does not read) nothing is saved (S4).
         """
@@ -545,9 +564,11 @@ class MainWindow(ShellWindow):
         self._closed = True
         if not self.jobs.close(SHUTDOWN_TIMEOUT_S):
             _LOG.warning("a job was still running at close")
-        if not self.controller.stop(SHUTDOWN_TIMEOUT_S) or not self._opener.stop(
-            SHUTDOWN_TIMEOUT_S
-        ):
+        stopped = [
+            self.controller.stop(SHUTDOWN_TIMEOUT_S),
+            self._opener.stop(SHUTDOWN_TIMEOUT_S),
+        ]
+        if not all(stopped):
             _LOG.warning("a preview or open worker was still running at close")
         if self._save_at_close:
             settings = dataclasses.replace(

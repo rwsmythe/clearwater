@@ -9,7 +9,9 @@ app-data folder is never resolved: every window gets ``Locations`` under ``tmp_p
 
 from __future__ import annotations
 
+import dataclasses
 import logging
+import time
 from pathlib import Path
 
 import pytest
@@ -23,7 +25,7 @@ from clearwater.config import (
     save_settings,
 )
 from clearwater.gui import shell
-from clearwater.interfaces import Settings
+from clearwater.interfaces import JobResult, Progress, Settings
 from gui_support import (
     LevelMethod,
     image,
@@ -123,6 +125,66 @@ def test_an_older_settings_file_without_a_migration_is_not_called_newer(
     assert window.session.settings() == Settings()
     window.close()
     assert locs.settings_file.read_text(encoding="utf-8") == text
+
+
+def test_the_session_says_whether_settings_may_be_written(make_window, qtbot, tmp_path) -> None:
+    # Reviewer B #5 and #8: the refusal is on the contract (WP3.20 must not save while it is
+    # set) and names the settings file.
+    assert make_window(where=tmp_path / "fresh").session.settings_refusal() is None
+    locs = locations(tmp_path)
+    locs.config_dir.mkdir(parents=True)
+    locs.settings_file.write_text('{"format_version": 99}\n', encoding="utf-8")
+    window = make_window()
+    refusal = window.session.settings_refusal()
+    assert refusal is not None and refusal.severity == "refusal"
+    assert refusal == presenter_of(window).of("refusal")[0]
+    assert refusal.path == locs.settings_file
+    assert str(locs.settings_file) in refusal.text
+
+
+def test_shutdown_stops_every_worker_when_one_overruns_its_timeout(
+    make_window, qtbot, monkeypatch
+) -> None:
+    # Reviewer B #2: the preview worker overruns; the open worker is still stopped.
+    method = LevelMethod()
+    path = Path("p.png")
+    window = make_window(photo_engines({path: image(40, 40)}, methods={"level": method}))
+    open_and_wait(qtbot, window, path)
+    method.delay_s = 1.0
+    started = len(method.threads)
+    window.session.set_parameters(new_parameter_set("level", {"level": 0.75}))
+    qtbot.waitUntil(lambda: len(method.threads) > started, timeout=5000)
+    monkeypatch.setattr(shell, "SHUTDOWN_TIMEOUT_S", 0.05)
+    window.close()
+    assert window.controller._renderer._thread.is_alive()  # the overrun really happened
+    assert not window._opener._thread.is_alive()
+    assert not window.controller._framer._thread.is_alive()
+
+
+def test_a_cancelled_jobs_completion_is_delivered_before_the_settings_write(
+    make_window, qtbot, tmp_path
+) -> None:
+    # Reviewer B #3: close delivers the cancelled job's on_done, then saves the settings.
+    locs = locations(tmp_path)
+    window = make_window()
+    done: list[JobResult] = []
+
+    def job(progress: Progress) -> JobResult:
+        while not progress.cancelled():
+            time.sleep(0.005)
+        return JobResult(False, (), (), "cancelled", "cpu", 0.0)
+
+    def on_done(result: JobResult) -> None:
+        done.append(result)
+        settings = dataclasses.replace(window.session.settings(), output_suffix="_done")
+        window.session.set_settings(settings)
+
+    window.jobs.run(job, on_done=on_done)
+    window.close()
+    assert len(done) == 1
+    assert load_settings(locs.config_dir).output_suffix == "_done"
+    qtbot.wait(100)  # the queued completion arrives later and is not delivered twice
+    assert len(done) == 1
 
 
 def test_a_failing_save_at_close_is_logged_not_raised(

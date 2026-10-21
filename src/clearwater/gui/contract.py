@@ -227,6 +227,18 @@ class Session(QObject):
         """
         raise NotImplementedError
 
+    def settings_refusal(self) -> Message | None:
+        """Return why the settings file may not be written this session, or None when it may.
+
+        Added after the round-0 freeze (additive, CHARC ruling 2; Reviewer B #5). Not None when
+        start-up refused the settings file (a ``format_version`` this Clearwater does not read,
+        S4): the refusal shown at start-up, naming the file. The file is then left as it is for
+        the whole session: the shell does not save at close, and a panel (WP3.20's settings
+        dialog) must not save the settings while this is not None; it may say why with this
+        message. Fixed for the session.
+        """
+        raise NotImplementedError
+
     def set_parameters(self, parameters: ParameterSet) -> None:
         """Replace the parameter set; the preview re-renders (latest wins).
 

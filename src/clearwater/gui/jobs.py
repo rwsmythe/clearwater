@@ -91,6 +91,7 @@ class QtJobHandle:
         self.on_done = on_done
         self.on_progress = on_progress
         self.thread: threading.Thread | None = None
+        self.result: JobResult | None = None
         self._running = True
 
     def cancel(self) -> None:
@@ -185,6 +186,11 @@ class QtJobRunner:
     def close(self, timeout_s: float) -> bool:
         """Cancel every job, wait for the threads, and refuse further jobs (shell close).
 
+        The ``on_done`` of every job whose thread ended is delivered here, on the main thread,
+        before this returns (its queued completion is then ignored), so the caller's next step
+        (the shell's settings write) sees what the callbacks did. A job still running after the
+        timeout delivers nothing here.
+
         Args:
             timeout_s: The longest wait.
 
@@ -195,6 +201,9 @@ class QtJobRunner:
         self.cancel()
         ended = self.wait(timeout_s)
         self._timer.stop()
+        for handle in list(self._handles):
+            if handle.result is not None:
+                self._on_finished(handle, handle.result)
         return ended
 
     def _work(self, handle: QtJobHandle, job: Callable[[Progress], JobResult]) -> None:
@@ -212,6 +221,7 @@ class QtJobRunner:
                 device="unknown",
                 elapsed_s=time.perf_counter() - start,
             )
+        handle.result = result  # read by close() after the join
         with contextlib.suppress(RuntimeError):  # the bridge was deleted at shutdown
             self._bridge.finished.emit(handle, result)
 
@@ -232,6 +242,8 @@ class QtJobRunner:
         """Main thread: deliver the last report, then the result."""
         assert isinstance(handle, QtJobHandle)
         assert isinstance(result, JobResult)
+        if not handle.is_running():  # already delivered by close()
+            return
         self._flush(handle)
         handle.finish()
         if handle in self._handles:

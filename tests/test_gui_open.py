@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import importlib
 import subprocess
+import time
 from pathlib import Path
 
 import pytest
@@ -296,6 +297,35 @@ def test_an_exception_escaping_the_open_task_is_a_refusal_naming_the_file(
     open_and_wait(qtbot, window, bad)
     assert assert_refused(window, bad, previous) == "odd.jpg could not be opened: engine fault"
     assert presenter_of(window).of("warning") == []
+
+
+class SlowPhotoSource:
+    """Serves one photo after a delay (an open still in flight when the next file is chosen)."""
+
+    def __init__(self, path: Path, delay_s: float) -> None:
+        self.path = path
+        self.delay_s = delay_s
+
+    def read(self, path: Path):
+        time.sleep(self.delay_s)
+        return image(20, 20, seed=9), gui_support.META
+
+
+def test_a_routed_refusal_invalidates_the_open_in_flight(make_window, qtbot) -> None:
+    # Reviewer B #1: A is still opening when B is refused at routing; A must never be shown.
+    good, slow = Path("good.png"), Path("slow.jpg")
+    window = make_window(photo_engines({good: image(20, 20)}))
+    open_and_wait(qtbot, window, good)
+    previous = window.session.source()
+    _with_photo_source(window._engines, SlowPhotoSource(slow, 0.4))
+    window.open_path(slow)
+    qtbot.wait(50)
+    refused = Path("notes.txt")
+    window.open_path(refused)
+    assert "not a supported photo or video" in assert_refused(window, refused, previous)
+    qtbot.waitUntil(lambda: not window.opening(), timeout=5000)
+    qtbot.wait(600)
+    assert window.session.source() is previous
 
 
 def test_a_refusal_names_the_file_only_when_the_name_stands_alone() -> None:

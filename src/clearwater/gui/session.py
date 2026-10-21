@@ -13,7 +13,7 @@ from PySide6.QtCore import QObject, Signal
 
 from clearwater.interfaces import CorrectionMethod, Image, ParameterSet, Settings, Statistics
 
-from .contract import AnalysisState, Engines, OpenedSource, Session
+from .contract import AnalysisState, Engines, Message, OpenedSource, Session
 
 
 class ShellSession(Session):
@@ -27,6 +27,7 @@ class ShellSession(Session):
         settings: The settings loaded at start-up.
         parameters: The parameter set chosen at start-up; its method is in ``engines.methods``.
         parent: The Qt parent.
+        settings_refusal: The start-up refusal of the settings file, or None (S4).
     """
 
     image_changed = Signal()
@@ -37,6 +38,8 @@ class ShellSession(Session):
         settings: Settings,
         parameters: ParameterSet,
         parent: QObject | None = None,
+        *,
+        settings_refusal: Message | None = None,
     ) -> None:
         """Create the session."""
         super().__init__(parent)
@@ -54,12 +57,17 @@ class ShellSession(Session):
         self._image: Image | None = None
         self._image_token = 0
         self._statistics_revision = 0
+        self._settings_refusal = settings_refusal
 
     # The contract's getters.
 
     def source(self) -> OpenedSource | None:
         """Return the open source, or None."""
         return self._source
+
+    def settings_refusal(self) -> Message | None:
+        """Return the start-up refusal of the settings file, or None when it may be written."""
+        return self._settings_refusal
 
     def parameters(self) -> ParameterSet:
         """Return the current parameter set (IF-9)."""
