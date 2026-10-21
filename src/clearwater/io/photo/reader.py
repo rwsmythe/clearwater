@@ -158,7 +158,9 @@ def _read_pillow(data: bytes, name: str, kind: str) -> _Decoded:
         block, icc, srgb = (raw if isinstance(raw, bytes) else None), info.get("icc_profile"), False
     block = exif_tools.strip_prefix(block) if block else None
     tag = exif_tools.orientation_of(block)
-    return _Decoded(kind, samples, 8, block, icc, tag, tag, srgb_chunk=srgb)
+    return _Decoded(
+        kind, samples, 8, exif_tools.sanitise(block, name), icc, tag, tag, srgb_chunk=srgb
+    )
 
 
 def _read_png16(scan: png_tools.PngScan, name: str) -> _Decoded:
@@ -167,12 +169,21 @@ def _read_png16(scan: png_tools.PngScan, name: str) -> _Decoded:
         _log.warning("%s: alpha channel dropped", name)
     block = exif_tools.strip_prefix(scan.exif) if scan.exif else None
     tag = exif_tools.orientation_of(block)
-    return _Decoded("png", samples, 16, block, scan.icc, tag, tag, srgb_chunk=scan.srgb)
+    return _Decoded(
+        "png",
+        samples,
+        16,
+        exif_tools.sanitise(block, name),
+        scan.icc,
+        tag,
+        tag,
+        srgb_chunk=scan.srgb,
+    )
 
 
 def _read_tiff(data: bytes, name: str) -> _Decoded:
     picture = tiff_tools.read_tiff(data, name, MAX_PIXELS)
-    block = exif_tools.from_tiff(data)
+    block = exif_tools.sanitise(exif_tools.from_tiff(data), name)
     stored = picture.orientation_tag
     tag = stored if stored is not None and 1 <= stored <= 8 else 1
     if stored is not None and tag != stored:
@@ -245,7 +256,14 @@ def _read_heic(data: bytes, name: str) -> _Decoded:
     icc = info.get("icc_profile") if profile_type in ("prof", "rICC") else None
     nclx = info.get("nclx_profile") if icc is None else None
     return _Decoded(
-        "heic", samples, depth, block, icc, tag, heic_tag_to_apply(tag, layout), nclx=nclx
+        "heic",
+        samples,
+        depth,
+        exif_tools.sanitise(block, name),
+        icc,
+        tag,
+        heic_tag_to_apply(tag, layout),
+        nclx=nclx,
     )
 
 

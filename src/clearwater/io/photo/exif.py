@@ -89,6 +89,30 @@ def orientation_of(block: bytes | None) -> int:
     return 1
 
 
+def sanitise(block: bytes | None, name: str) -> bytes | None:
+    """Return ``block`` if the D63 edit can process it, else None with a logged warning.
+
+    A damaged block (a CRC-valid ``eXIf`` chunk or a JPEG APP1 segment holding bytes that are not
+    a TIFF structure) is dropped at read, so :func:`edit` never meets it in the writer; the written
+    file then carries the minimal block. The check runs the same edit the writer will run.
+
+    Args:
+        block: The bare EXIF block of the source, or None.
+        name: The file name for the log message.
+
+    Returns:
+        The block unchanged when it is usable, otherwise None.
+    """
+    if not block:
+        return None
+    try:
+        edit(block, 1, 1)
+    except Exception as error:  # Pillow raises assorted types on malformed blocks
+        _log.warning("%s: the EXIF block is damaged (%s); it is not carried", name, error)
+        return None
+    return block
+
+
 def edit(source: bytes | None, width: int, height: int) -> bytes:
     r"""Return the D63-edited EXIF block a written image carries.
 
@@ -140,7 +164,8 @@ def from_tiff(data: bytes) -> bytes | None:
 
     Pillow opens the file lazily for its tags only, never for pixels. Structural tags, the
     embedded profile and the XMP, IPTC and Photoshop blobs are left out. The Exif IFD's Interop
-    IFD is carried as an IFD, not as the file offset the TIFF stores.
+    IFD is carried as an IFD, not as the file offset the TIFF stores. An IFD that cannot be read
+    is dropped alone (a warning is logged); the others are kept.
 
     Args:
         data: The TIFF file's bytes.
@@ -155,23 +180,29 @@ def from_tiff(data: bytes) -> bytes | None:
             source = image.getexif()
             built = Image.Exif()
             built.endian = source.endian  # Pillow writes big-endian when unset
-            for tag, value in source.items():
-                if int(tag) not in _TIFF_STRUCTURE and int(tag) not in IFD_POINTERS:
-                    built[tag] = value
-                    found = True
-            for pointer in (EXIF_IFD, GPS_IFD):
-                fields = dict(source.get_ifd(pointer))
-                if pointer == EXIF_IFD:
-                    _materialise_interop(source, fields)
-                if fields:
-                    built.get_ifd(pointer).update(fields)
-                    found = True
+            try:
+                for tag, value in source.items():
+                    if int(tag) not in _TIFF_STRUCTURE and int(tag) not in IFD_POINTERS:
+                        built[tag] = value
+                        found = True
+            except Exception as error:  # a bad IFD0 entry drops IFD0's fields only
+                _log.warning("TIFF IFD0 fields cannot be read for EXIF (%s); dropped", error)
+            for pointer, label in ((EXIF_IFD, "Exif"), (GPS_IFD, "GPS")):
+                try:
+                    fields = dict(source.get_ifd(pointer))
+                    if pointer == EXIF_IFD:
+                        _materialise_interop(source, fields)
+                    if fields:
+                        built.get_ifd(pointer).update(fields)
+                        found = True
+                except Exception as error:  # a bad pointer drops that IFD only
+                    _log.warning("TIFF %s IFD cannot be read for EXIF (%s); dropped", label, error)
+        if not found:
+            return None
+        return strip_prefix(built.tobytes())
     except Exception as error:  # Pillow raises assorted types on odd TIFF tags
         _log.warning("TIFF tags cannot be read for EXIF (%s); no EXIF carried", error)
         return None
-    if not found:
-        return None
-    return strip_prefix(built.tobytes())
 
 
 def describe(block: bytes | None) -> dict[str, str]:

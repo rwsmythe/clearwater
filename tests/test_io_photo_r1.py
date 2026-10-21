@@ -6,6 +6,7 @@ ledger) and passes on the remediated code.
 
 from __future__ import annotations
 
+import io
 import struct
 import zlib
 from collections.abc import Callable
@@ -17,7 +18,7 @@ import pytest
 import tifffile
 from PIL import Image
 
-from clearwater.io.photo import PhotoReadError, read_photo
+from clearwater.io.photo import PhotoReadError, read_photo, write_photo
 from clearwater.io.photo import exif as exif_tools
 from clearwater.io.photo import png as png_tools
 
@@ -320,3 +321,94 @@ def test_a_premultiplied_grey_alpha_tiff_is_un_premultiplied(tmp_path: Path) -> 
     tifffile.imwrite(path, grey_alpha, photometric="minisblack", extrasamples=["assocalpha"])
     image, _ = read_photo(path)
     assert round(float(image.pixels[0, 0, 1]) * 255) in (127, 128), "64 * 255 / 128 = 127.5"
+
+
+# --- Reviewer B B3: a damaged EXIF block is dropped at read, never met by the writer -----------
+
+_GARBAGE_EXIF = b"this is not an exif block"
+
+
+def _png8_with_exif(garbage: bytes) -> bytes:
+    buffer = io.BytesIO()
+    Image.new("RGB", (8, 8), (10, 20, 30)).save(buffer, format="PNG")
+    data = buffer.getvalue()
+    split = 8 + 25  # signature, then the 25-byte IHDR chunk
+    return data[:split] + png_tools.chunk(b"eXIf", garbage) + data[split:]
+
+
+def _damaged_exif_files(tmp_path: Path) -> dict[str, Path]:
+    files = {}
+    files["png16"] = tmp_path / "bad16.png"
+    files["png16"].write_bytes(
+        png_tools.SIGNATURE
+        + png_tools.chunk(b"IHDR", struct.pack(">IIBBBBB", 2, 2, 16, 2, 0, 0, 0))
+        + png_tools.chunk(b"eXIf", _GARBAGE_EXIF)
+        + png_tools.chunk(b"IDAT", zlib.compress(bytes(2 * (1 + 12))))
+        + png_tools.chunk(b"IEND", b"")
+    )
+    files["png8"] = tmp_path / "bad8.png"
+    files["png8"].write_bytes(_png8_with_exif(_GARBAGE_EXIF))
+    files["jpeg"] = tmp_path / "bad.jpg"
+    Image.new("RGB", (8, 8), (10, 20, 30)).save(
+        files["jpeg"], exif=b"Exif" + bytes(2) + _GARBAGE_EXIF
+    )
+    files["heic"] = tmp_path / "bad.heic"
+    pixels = np.full((16, 16, 3), 128, dtype=np.uint8)
+    pillow_heif.encode(
+        "RGB",
+        (16, 16),
+        pixels.tobytes(),
+        str(files["heic"]),
+        quality=90,
+        exif=b"Exif" + bytes(2) + _GARBAGE_EXIF,
+    )
+    return files
+
+
+@pytest.mark.parametrize("kind", ["png16", "png8", "jpeg", "heic"])
+def test_a_damaged_exif_block_is_dropped_with_a_warning_and_the_write_succeeds(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture, kind: str
+) -> None:
+    path = _damaged_exif_files(tmp_path)[kind]
+    with caplog.at_level("WARNING", logger="clearwater.io.photo"):
+        image, meta = read_photo(path)
+    assert meta.exif is None and meta.orientation == 1
+    assert f"{path.name}: the EXIF block is damaged" in caplog.text
+    out = tmp_path / "out.png"
+    write_photo(image, meta, out, bit_depth=16)
+    written = png_tools.scan_png(out.read_bytes(), "out.png").exif
+    assert written is not None
+    assert exif_tools.describe(written)["IFD0.Software"] == "Clearwater"
+
+
+def test_a_usable_exif_block_is_still_carried(sample: Callable[[str], Path]) -> None:
+    _, meta = read_photo(sample("heic-ad24-both"))
+    assert meta.exif is not None
+
+
+def test_a_tiff_with_an_unreadable_gps_ifd_keeps_its_other_fields(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    # Pillow reads every malformed GPS IFD this test could build as an empty one, so the failure
+    # is injected: the GPS IFD raises, Make must survive.
+    path = tmp_path / "gps.tif"
+    tifffile.imwrite(
+        path,
+        np.zeros((4, 4, 3), dtype=np.uint8),
+        photometric="rgb",
+        extratags=[(271, "s", 0, "Maker", True)],
+    )
+    real = Image.Exif.get_ifd
+
+    def get_ifd(self: Image.Exif, tag: int) -> dict[int, object]:
+        if tag == exif_tools.GPS_IFD and getattr(self, "fp", None) is not None:  # the source
+            raise ValueError("planted GPS failure")
+        return real(self, tag)
+
+    monkeypatch.setattr(Image.Exif, "get_ifd", get_ifd)
+    with caplog.at_level("WARNING", logger="clearwater.io.photo.exif"):
+        _, meta = read_photo(path)
+    monkeypatch.undo()
+    assert "GPS IFD cannot be read" in caplog.text
+    assert meta.exif is not None
+    assert exif_tools.describe(meta.exif)["IFD0.Make"] == "Maker"
