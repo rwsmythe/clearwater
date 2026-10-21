@@ -14,6 +14,14 @@
   `uv run python scripts/role_mail.py list --role orchestrator`).
 - **CHARC is generation 2:** `clearwater-charc-20261020-0636`. Cue that exact name.
 - Bash-launch gauge at gen-7 bring-up: 36.7 ms. Re-measure at yours.
+- **GEN 8 LIVE (`clearwater-orchestrator-20261020-1556`, picked up 2026-10-21 ~01:56Z; gauge 37.0 ms;
+  host 9.5 GB free of 31.2).** Online posted to CHARC (acked `fda55fee1cbb0cf4`). CHARC ruled the
+  WP3.6 ICC scope (`aa1219fb3145208b`, 01:58Z): built-in profiles for nclx sRGB/P3 sources only;
+  untagged keeps Q3 (no `iCCP`); out-of-set nclx no `iCCP`; "no output ever lacks iCCP" WITHDRAWN.
+  Re-dispatched ~02:00Z (the gen-7 table below is the PRE-dispatch record): `wp312-cell3`
+  (sonnet-high; R4 fixes then R5, yield at the five-round gate), `wp36-cell2` (sonnet-high; ICC
+  rulings, then WINDOW REQUEST, then A R1), `wp316-cell2` (opus-high; Essentials + S3 RULED, then
+  WINDOW REQUEST, then A R1). No window granted yet.
 
 ### Standing operator rulings
 
