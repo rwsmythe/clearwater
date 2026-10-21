@@ -366,8 +366,11 @@ def check_output(
             f"{len(source_audio)}"
         )
     for number, (src, out) in enumerate(zip(source_audio, output_audio, strict=False)):
-        short = out.packets < src.packets if audio_cut else out.packets != src.packets
-        if out.packets == 0 or short or out.packets > src.packets:
+        if audio_cut:  # cut at the video end: fewer packets than the source, never none
+            wrong = out.packets == 0 or out.packets > src.packets
+        else:
+            wrong = out.packets != src.packets
+        if wrong:
             problems.append(
                 f"audio stream {number}: {out.packets} packets in the output where the source "
                 f"has {src.packets}"

@@ -725,9 +725,13 @@ class FFmpegVideoSink:
 
     def _finish(self) -> SinkReport:
         """Send the end sentinel, wait for FFmpeg with polling, then verify the output."""
-        probe, source, out_path = self._probe, self._source, self._out_path
+        return self._verify(self._end_stream())
+
+    def _end_stream(self) -> int:
+        """Send the end sentinel, close stdin and wait for FFmpeg; return the sentinel's pts."""
+        probe, source = self._probe, self._source
         process, stdin = self._process, self._stdin
-        assert probe is not None and source is not None and out_path is not None
+        assert probe is not None and source is not None
         assert process is not None and stdin is not None
         end = frame_end(probe, source, self._written[-1])
         self._send(nut.sentinel(end))
@@ -750,6 +754,12 @@ class FFmpegVideoSink:
             raise self._encoder_failed(status)
         if self._stderr_thread is not None:
             self._stderr_thread.join(timeout=5)
+        return end
+
+    def _verify(self, end: int) -> SinkReport:
+        """Read the finished output back, check it (D94) and build the report."""
+        probe, source, out_path = self._probe, self._source, self._out_path
+        assert probe is not None and source is not None and out_path is not None
         try:
             output = read_packet_table(out_path)
         except VideoProbeError as error:
