@@ -303,6 +303,17 @@ class ClipData:
     baseline: dict[int, Stats] = field(default_factory=dict)
     sha256: str | None = field(default=None, repr=False)
 
+    def reference_sha256(self) -> str:
+        """Return the SHA-256 of the float-reference statistics the stored proxy is judged by."""
+        digest = hashlib.sha256()
+        for index in sorted(self.reference):
+            for name in sorted(self.reference[index]):
+                digest.update(f"{index}:{name}:".encode())
+                digest.update(
+                    np.ascontiguousarray(self.reference[index][name], np.float64).tobytes()
+                )
+        return digest.hexdigest()
+
     def proxy_sha256(self) -> str:
         """Return the SHA-256 of the proxy file, read once (it identifies the prepared proxies)."""
         if self.sha256 is None:
@@ -333,14 +344,17 @@ def load_clip(stem: str) -> ClipData:
 
 
 def run_identity(clips: Sequence[ClipData]) -> dict[str, Any]:
-    """Return what a baseline or results file was measured on (stride, proxies, JPEG library).
+    """Return what a baseline or results file was measured on.
+
+    That is the stride, the 8-bit proxies, the float-reference statistics and the JPEG library.
 
     Args:
         clips: The prepared clips of the run.
 
     Returns:
         A JSON-ready mapping: the Pillow/libjpeg identity of the product codecs, and for every
-        clip its stride, frame count and the SHA-256 of its proxy file.
+        clip its stride, frame count, the SHA-256 of its proxy file and of its float-reference
+        statistics.
     """
     from clearwater.cache.codec import jpeg_identity
 
@@ -351,6 +365,7 @@ def run_identity(clips: Sequence[ClipData]) -> dict[str, Any]:
                 "stride": c.stride,
                 "frames": int(c.frames.shape[0]),
                 "proxy_sha256": c.proxy_sha256(),
+                "reference_sha256": c.reference_sha256(),
             }
             for c in clips
         },

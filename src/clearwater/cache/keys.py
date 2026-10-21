@@ -14,7 +14,7 @@ from pathlib import Path
 
 from clearwater.interfaces.cache import CacheKey
 
-from .codec import DEFAULT_CODEC, ProxyCodec
+from .codec import CODECS, DEFAULT_CODEC, ProxyCodec
 
 CACHE_FORMAT_VERSION = 2
 """The cache format number (D113). A key's version also carries the codec identity."""
@@ -29,13 +29,21 @@ def codec_cache_version(codec: ProxyCodec = DEFAULT_CODEC) -> int:
     now), so a different decoder gives a different version and the old entries can never match:
     ``format number << 48 | the first 48 bits of the SHA-256 of the codec id and identity``.
 
+    A codec whose encoder is not the registered one for its id (a test hook, a variant) gets a
+    version of its own, bound to this process: whatever it writes can never be served to the
+    registered codec, nor to another process.
+
     Args:
         codec: The store codec.
 
     Returns:
         A positive integer that fits the pack header.
     """
-    digest = hashlib.sha256(f"{codec.codec_id}:{codec.identity()}".encode()).digest()
+    text = f"{codec.codec_id}:{codec.identity()}"
+    registered = CODECS.get(codec.codec_id)
+    if registered is None or registered.encode is not codec.encode:
+        text += f":own-encoder:{os.getpid()}:{id(codec.encode):x}"
+    digest = hashlib.sha256(text.encode()).digest()
     return (CACHE_FORMAT_VERSION << 48) | int.from_bytes(digest[:6], "big")
 
 

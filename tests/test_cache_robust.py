@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import json
 import os
 import subprocess
@@ -15,8 +16,10 @@ import pytest
 
 import clearwater.cache.store as store_module
 from clearwater.cache import (
+    DEFAULT_CODEC,
     DEFLATE,
     JPEG_Q75_444,
+    JPEG_Q80_420,
     DiskProxyCache,
     ProxyCodec,
     codec_cache_version,
@@ -325,19 +328,20 @@ def test_a_second_store_on_a_key_that_is_still_being_stored_is_a_runtime_error(
 
     slow = ProxyCodec(DEFLATE.codec_id, "slow", True, slow_encode, DEFLATE.decode, DEFLATE.shape)
     cache = lossless_cache(tmp_path / "c", codec=slow)
-    first = threading.Thread(target=lambda: cache.store_proxy(KEY, 0, pixels(0)))
+    key = CacheKey(KEY.size, KEY.mtime_ns, cache.cache_version)  # an own encoder, its own version
+    first = threading.Thread(target=lambda: cache.store_proxy(key, 0, pixels(0)))
     first.start()
     assert entered.wait(30)
     with pytest.raises(RuntimeError):
-        cache.store_proxy(KEY, 1, pixels(1))
+        cache.store_proxy(key, 1, pixels(1))
     with pytest.raises(RuntimeError):
-        cache.store_source_statistics(KEY, "s", 1, {"a": np.zeros(1)})
+        cache.store_source_statistics(key, "s", 1, {"a": np.zeros(1)})
     with pytest.raises(RuntimeError):
-        cache.mark_complete(KEY)
+        cache.mark_complete(key)
     release.set()
     first.join(timeout=30)
-    cache.store_proxy(KEY, 1, pixels(1))  # the slot is free again
-    found = cache.lookup(KEY)
+    cache.store_proxy(key, 1, pixels(1))  # the slot is free again
+    found = cache.lookup(key)
     assert found is not None and found.pts_ticks == (0, 1)
 
 
@@ -973,3 +977,38 @@ def test_a_remover_that_finds_its_entry_replaced_while_waiting_leaves_the_new_on
     assert found is not None and found.pts_ticks == (1,)  # the new entry was not removed
     assert cache.proxy(KEY, 1).tobytes() == pixels(1).tobytes()
     assert not (folder / entry_name(KEY) / "removing").exists()  # nor condemned for the next open
+
+
+# --- Reviewer B remediation ----------------------------------------------------------------
+
+
+def test_an_entry_with_only_statistics_cannot_be_marked_complete(tmp_path: Path) -> None:
+    folder = tmp_path / "c"
+    with lossless_cache(folder) as cache:
+        cache.store_source_statistics(KEY, "s", 0, {"x": np.zeros(2)})
+        with pytest.raises(KeyError):
+            cache.mark_complete(KEY)  # no proxy pass was stored
+    found = lossless_cache(folder).lookup(KEY)
+    assert found is None or (found.complete is False and found.pts_ticks == ())
+    with lossless_cache(folder) as cache:
+        cache.store_proxy(KEY, 0, pixels(0))
+        cache.mark_complete(KEY)  # with a proxy it works
+        found = cache.lookup(KEY)
+        assert found is not None and found.complete is True
+
+
+def test_a_codec_with_another_encoder_never_writes_under_the_registered_version(
+    tmp_path: Path,
+) -> None:
+    odd = dataclasses.replace(JPEG_Q75_444, encode=JPEG_Q80_420.encode)
+    assert codec_cache_version(odd) != codec_cache_version(JPEG_Q75_444)
+    assert codec_cache_version(JPEG_Q75_444) == codec_cache_version(DEFAULT_CODEC)
+    folder = tmp_path / "c"
+    with DiskProxyCache(folder, codec=odd) as cache:
+        key = CacheKey(9, 9, cache.cache_version)
+        cache.store_proxy(key, 0, pixels(0))
+        cache.mark_complete(key)
+        assert cache.lookup(key) is not None
+    default = DiskProxyCache(folder, codec=JPEG_Q75_444)
+    assert default.lookup(CacheKey(9, 9, default.cache_version)) is None  # never served
+    assert default.lookup(key) is None

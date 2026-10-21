@@ -14,13 +14,16 @@ import cache_store_test as instrument
 import clearwater.cache.codec as codec_module
 
 
-def make_clip(folder: Path, *, stride: int = 8, seed: int = 0) -> instrument.ClipData:
+def make_clip(
+    folder: Path, *, stride: int = 8, seed: int = 0, reference: float = 0.5
+) -> instrument.ClipData:
     """Return a tiny prepared clip: three 4 x 6 frames in a proxy file under ``folder``."""
     raw = np.random.default_rng(seed).integers(0, 256, (3, 4, 6, 3), dtype=np.uint8)
     path = folder / "proxy-TINY.u8"
     path.write_bytes(raw.tobytes())
     frames = np.fromfile(path, dtype=np.uint8).reshape(3, 4, 6, 3)
-    return instrument.ClipData("TINY", frames, [0, 2], {}, stride, path)
+    refs = {0: {"means": np.asarray([reference, 0.25])}, 2: {"means": np.asarray([reference])}}
+    return instrument.ClipData("TINY", frames, [0, 2], refs, stride, path)
 
 
 @pytest.fixture
@@ -49,6 +52,8 @@ def test_the_identity_names_the_stride_the_proxies_and_the_jpeg_library(
     assert same == instrument.run_identity([make_clip(tmp_path)])
     assert same != instrument.run_identity([make_clip(tmp_path, stride=4)])
     assert same != instrument.run_identity([make_clip(tmp_path, seed=1)])
+    # the float-reference statistics are part of it: same 8-bit proxies, other reference
+    assert same != instrument.run_identity([make_clip(tmp_path, reference=0.75)])
     monkeypatch.setattr(codec_module, "jpeg_identity", lambda: "pillow=0;libjpeg=0;turbo=0")
     assert same != instrument.run_identity([make_clip(tmp_path)])
 

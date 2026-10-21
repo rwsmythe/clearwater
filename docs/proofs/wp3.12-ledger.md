@@ -347,6 +347,17 @@ pytest run (window pending). The R5 row below stands as adjudicated.
 **Full-pytest window (granted 03:06Z, head `afde3ff`):** normal `uv run pytest --basetemp=work/pt -q -p no:cacheprovider`: 1939 passed, 1 warning in 657.86 s; cupy-unimportable form (`sys.modules["cupy"] = None`,
 `"cupyx" = None`): 1833 passed, 106 skipped in 396.02 s. Neither run died; outputs `work/full-normal.txt` and `work/full-nocupy.txt` in the worktree (gitignored). Depth at the window grant: 216,373 / 82 turns.
 
+**Reviewer B remediation (orchestrator ruling, depth 221,553 / 88 turns at 03:23Z; one remediation, then B is re-run at the orchestrator's seat; no Reviewer A round, no full suite).** B1 `mark_complete` requires a
+PROXY record (`not entry.index.proxies`, was `records == 0`, which counted statistics): KeyError "no proxy is stored", docstring updated; test statistics-only then `mark_complete` raises and a reopened lookup never shows
+`complete` with no pts. B2 ROUTE TAKEN: its own cache version, not a refusal. `codec_cache_version` appends `own-encoder:<pid>:<id of the encode function>` to the hashed text when the codec's `encode` is not the
+registered one for its id; so `dataclasses.replace(JPEG_Q75_444, encode=JPEG_Q80_420.encode)` gets a different version, a default instance on the same folder removes its entry at open and never serves it, and the hook
+and slow test codecs keep working (one test, `slow`, now takes its key from the instance's own `cache_version`). Why not refuse: the existing codecs of the tests (and any variant) differ only in `encode`, refusing would
+have rewritten them; a process-bound version is stale-safe (such a cache is never reopened by another process) and a registered codec's version is unchanged. Report Public API line made exact. B3 the instrument's run
+identity now includes the SHA-256 of the float-reference statistics (`ClipData.reference_sha256`); test: same proxies, other reference gives another identity. B4 the app-data guard runs in a fresh interpreter with the
+spy installed BEFORE `clearwater.cache` is imported (mutation check: an import-time `app_locations()` call in `cache/__init__.py` makes it fail; restored). B5 report: "Author base `2c5540a`; the package is rebased onto
+main at the merge". Tests written and run on the unfixed code first (3 failures: B1, B2, B3; B4 passes on current code by design, mutation-checked; no stash). Own tests 97 pass; `ruff check .`, `ruff format --check .`,
+`mypy` green.
+
 ## Ledger (cumulative rounds)
 
 | Round | Critical | Major | Minor | In-envelope vs out | NEW / REOPENED | Reverts | Product / test-only fixes | Depth |

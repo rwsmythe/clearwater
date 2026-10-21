@@ -446,7 +446,8 @@ class DiskProxyCache:
             key: The source file's cache key.
 
         Raises:
-            KeyError: Nothing is stored for this key.
+            KeyError: No proxy is stored for this key (statistics alone do not make a proxy
+                pass), or the entry is being removed.
             RuntimeError: A store call on this key is still running.
             OSError: The pack cannot be synced or the marker cannot be written.
         """
@@ -456,9 +457,9 @@ class DiskProxyCache:
                 entry is None
                 or entry.closing
                 or not self._ensure_scanned(entry)
-                or entry.index.records == 0
+                or not entry.index.proxies
             ):
-                raise KeyError(f"nothing is stored for {key}")
+                raise KeyError(f"no proxy is stored for {key}")
             if self._wentry is entry and self._wfile is not None:
                 self._wfile.flush()
                 os.fsync(self._wfile.fileno())

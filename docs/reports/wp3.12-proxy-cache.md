@@ -3,7 +3,7 @@
 Package `clearwater.cache` (`src/clearwater/cache/`), tests `tests/test_cache_store.py`,
 `tests/test_cache_robust.py`, `tests/test_cache_jpeg.py`, instrument `tools/cache_store_test.py`.
 Spec v0.5.4 (7.3, D59, D71, D95, D113; G12; V17), architecture FINAL 1.0 (IF-7, AD-5 as ruled
-2026-10-20, AD-7, AD-15, AD-20, AD-25). Base `2c5540a`. Nothing under `src/clearwater/interfaces/`
+2026-10-20, AD-7, AD-15, AD-20, AD-25). Author base `2c5540a`; the package is rebased onto main at the merge. Nothing under `src/clearwater/interfaces/`
 was changed. The review ledger is `docs/proofs/wp3.12-ledger.md`. Figures are on disk under the
 main tree's `work/wp3.12/` (gitignored): `results.json`, `readcost.json`, and `meansize.txt` and
 `signed-bounds.txt`, which the instrument's `meansize` and `signed` modes write. The instrument
@@ -19,7 +19,7 @@ All names are exported from `clearwater.cache`.
 
 | Area | Names |
 |---|---|
-| The store (IF-7) | `DiskProxyCache(folder, limit_bytes=DEFAULT_CACHE_LIMIT_BYTES, *, codec=DEFAULT_CODEC, clock=time.time_ns)` (`codec` must be the registered codec of its id in `CODECS`, else `ValueError`); it satisfies `clearwater.interfaces.cache.ProxyCache` exactly: `lookup`, `store_proxy`, `proxy`, `store_source_statistics`, `source_statistics`, `mark_complete`, `limit_bytes`, `set_limit_bytes`, `clear` |
+| The store (IF-7) | `DiskProxyCache(folder, limit_bytes=DEFAULT_CACHE_LIMIT_BYTES, *, codec=DEFAULT_CODEC, clock=time.time_ns)` (`codec` must have the `decode`, `shape` and `identity` of the registered codec of its id in `CODECS`, else `ValueError`; a codec whose `encode` is not the registered one is accepted but gets a cache version of its own, bound to the process, so it never writes under, or is served from, the registered codec's version); it satisfies `clearwater.interfaces.cache.ProxyCache` exactly: `lookup`, `store_proxy`, `proxy`, `store_source_statistics`, `source_statistics`, `mark_complete`, `limit_bytes`, `set_limit_bytes`, `clear` |
 | Extras (not in IF-7) | `DiskProxyCache.cache_version` (property), `.key_for(path)`, `.close()`, context-manager use |
 | Keys | `cache_key(path, codec=DEFAULT_CODEC) -> CacheKey`, `CACHE_FORMAT_VERSION = 2`, `codec_cache_version(codec)`, `entry_name(key)`, `parse_entry_name(name)` |
 | Codecs | `ProxyCodec`, `DEFLATE` (lossless), `JPEG_Q75_444` (id 2, the default), `JPEG_Q80_420` (id 3), `CODECS`, `DEFAULT_CODEC`, `jpeg_identity()`, `round_trip(proxy, codec)` |
@@ -182,8 +182,8 @@ The default limit is `DEFAULT_CACHE_LIMIT_BYTES` (imported, not restated).
 
 ## Differences between the stub and the product (WP3.11 consumer notes)
 
-- `mark_complete` on a key with nothing stored: the stub accepts it silently, the product raises
-  `KeyError`.
+- `mark_complete` on a key with nothing stored, or with statistics but no proxy: the stub accepts it
+  silently, the product raises `KeyError`.
 - Measure statistics on the proxy AS STORED, on the first pass and on reopen alike: at first analysis
   call `clearwater.cache.round_trip(proxy)` (or `store_proxy` then `proxy`) BEFORE any statistic is
   measured; the float proxy is never a statistics source (AD-5 ruling). A re-store of byte-identical

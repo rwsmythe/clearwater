@@ -5,6 +5,8 @@ from __future__ import annotations
 import itertools
 import logging
 import os
+import subprocess
+import sys
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -180,26 +182,50 @@ def test_limit_setters_refuse_negative(tmp_path: Path) -> None:
     assert cache.limit_bytes() == 123
 
 
-def test_nothing_resolves_the_app_data_folder(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    calls: list[str] = []
+GUARD_CHILD = """
+import sys
+from pathlib import Path
 
-    def spy(*_: object, **__: object) -> object:
-        calls.append("called")
-        raise AssertionError("the cache must not resolve the app-data folder")
+import numpy as np
 
-    import clearwater.config
-    import clearwater.config.paths
+import clearwater.config
+import clearwater.config.paths
 
-    monkeypatch.setattr(clearwater.config.paths, "app_locations", spy)
-    monkeypatch.setattr(clearwater.config, "app_locations", spy)
-    with lossless_cache(tmp_path / "c") as cache:
-        fill(cache, KEY)
-        cache.mark_complete(KEY)
-        assert cache.lookup(KEY) is not None
-        cache.clear()
-    assert calls == []
+calls = []
+
+
+def spy(*_, **__):
+    calls.append("called")
+    raise AssertionError("the cache must not resolve the app-data folder")
+
+
+clearwater.config.paths.app_locations = spy
+clearwater.config.app_locations = spy
+assert "clearwater.cache" not in sys.modules  # the spy is in place BEFORE the package loads
+from clearwater.cache import DEFLATE, DiskProxyCache
+from clearwater.interfaces.cache import CacheKey
+
+with DiskProxyCache(Path(sys.argv[1]), codec=DEFLATE) as cache:
+    key = CacheKey(1, 2, cache.cache_version)
+    cache.store_proxy(key, 0, np.zeros((4, 4, 3), dtype=np.uint8))
+    cache.mark_complete(key)
+    assert cache.lookup(key) is not None
+    cache.clear()
+assert calls == []
+print("GUARD-OK")
+"""
+
+
+def test_nothing_resolves_the_app_data_folder(tmp_path: Path) -> None:
+    # a fresh interpreter, so that an import-time resolution would meet the spy too
+    done = subprocess.run(
+        [sys.executable, "-I", "-c", GUARD_CHILD, str(tmp_path / "c")],
+        capture_output=True,
+        text=True,
+        timeout=120,
+        check=False,
+    )
+    assert "GUARD-OK" in done.stdout, done.stderr
 
 
 def test_v17_reopen_finds_the_complete_entry(tmp_path: Path) -> None:
