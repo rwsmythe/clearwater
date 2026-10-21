@@ -13,6 +13,7 @@ from typing import Any
 
 from clearwater.interfaces.image import ColorDescription
 from clearwater.io.photo import icc as icc_tools
+from clearwater.io.photo.p3_profile import display_p3_profile
 
 _log = logging.getLogger(__name__)
 
@@ -75,6 +76,9 @@ def describe_color(
     if nclx is not None and int(nclx.get("color_primaries", 2)) != 2:
         primaries = _NCLX_PRIMARIES.get(int(nclx["color_primaries"]), "unknown")
         transfer = _NCLX_TRANSFER.get(int(nclx.get("transfer_characteristics", 2)), "unknown")
-        return _build(primaries, transfer, depth, False, None)
+        # D53: an nclx-only Display P3 photo gets the built-in profile, so the PNG output is
+        # not read as sRGB. Remove this line (and p3_profile.py) to write no profile instead.
+        profile = display_p3_profile() if primaries == "display-p3" else None
+        return _build(primaries, transfer, depth, False, profile)
     _log.info("%s: no colour profile; read as sRGB", name)
     return _build("bt709", "srgb", depth, True, None)
