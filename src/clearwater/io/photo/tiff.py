@@ -52,6 +52,24 @@ class TiffPicture:
     pages: int
 
 
+def _straight(array: NDArray[Any], associated: bool) -> NDArray[Any]:
+    """Return ``array`` with its colour samples un-premultiplied when its alpha is associated.
+
+    TIFF ``ExtraSamples`` 1 means the colour was multiplied by alpha when stored, so dropping the
+    alpha alone would darken every partly transparent pixel. Where alpha is 0 the colour stays 0.
+    The alpha channel is the last one and is kept for the caller to drop.
+    """
+    if not associated:
+        return array
+    top = np.iinfo(array.dtype).max
+    alpha = array[:, :, -1:].astype(np.float64)
+    colour = array[:, :, :-1].astype(np.float64)
+    scaled = np.where(alpha > 0, colour * top / np.maximum(alpha, 1), 0)
+    out = array.copy()
+    out[:, :, :-1] = np.clip(np.rint(scaled), 0, top).astype(array.dtype)
+    return out
+
+
 def _refuse(name: str, why: str) -> PhotoReadError:
     return PhotoReadError("unsupported", f"{name} is not supported: {why}.")
 
@@ -60,8 +78,8 @@ def read_tiff(data: bytes, name: str, max_pixels: int) -> TiffPicture:
     """Decode the first page of a TIFF to RGB samples at the file's own bit depth.
 
     Grey pages (WhiteIsZero ones are inverted) and palette pages are expanded to RGB and an
-    alpha channel is dropped (a warning is logged); a palette's 16-bit colour map is reduced to
-    8 bits.
+    alpha channel is dropped (a warning is logged; associated alpha is first undone); a
+    palette's 16-bit colour map is reduced to 8 bits.
 
     Args:
         data: The file's bytes.
@@ -106,6 +124,7 @@ def read_tiff(data: bytes, name: str, max_pixels: int) -> TiffPicture:
                 array = np.iinfo(array.dtype).max - array
             if page.axes.startswith("S") and array.ndim == 3:
                 array = np.moveaxis(array, 0, -1)
+            associated = tifffile.EXTRASAMPLE.ASSOCALPHA in page.extrasamples
             colormap = page.colormap if photometric == kinds.PALETTE else None
             orientation = page.tags.get(_ORIENTATION_TAG)
             profile = page.tags.get(_ICC_TAG)
@@ -127,10 +146,10 @@ def read_tiff(data: bytes, name: str, max_pixels: int) -> TiffPicture:
         array = np.repeat(array[:, :, None], 3, axis=2)
     elif array.shape[2] == 2:
         _log.warning("%s has an alpha channel; it is dropped", name)
-        array = np.repeat(array[:, :, :1], 3, axis=2)
+        array = np.repeat(_straight(array, associated)[:, :, :1], 3, axis=2)
     elif array.shape[2] == 4:
         _log.warning("%s has an alpha channel; it is dropped", name)
-        array = array[:, :, :3]
+        array = _straight(array, associated)[:, :, :3]
     elif array.shape[2] != 3:
         raise _refuse(name, f"TIFF with {array.shape[2]} samples per pixel")
     return TiffPicture(

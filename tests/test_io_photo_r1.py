@@ -288,3 +288,35 @@ def test_a_tiff_exif_block_keeps_the_source_byte_order(
     assert meta.exif is not None and meta.exif.startswith(head)
     assert exif_tools.edit(meta.exif, 4, 4).startswith(head)
     assert exif_tools.describe(meta.exif)["IFD0.Make"] == "Maker"
+
+
+# --- Reviewer B B2: associated (premultiplied) alpha is undone before it is dropped ---------------
+
+
+def test_a_premultiplied_rgba_tiff_is_un_premultiplied(tmp_path: Path) -> None:
+    half_red = np.zeros((2, 2, 4), dtype=np.uint16)
+    half_red[..., 0], half_red[..., 3] = 32768, 32768  # full red, premultiplied by alpha 0.5
+    half_red[1, 1] = (0, 0, 0, 0)  # alpha 0: colour stays 0, no division by zero
+    path = tmp_path / "premul.tif"
+    tifffile.imwrite(path, half_red, photometric="rgb", extrasamples=["assocalpha"])
+    image, _ = read_photo(path)
+    assert image.pixels[0, 0].tolist() == [1.0, 0.0, 0.0]
+    assert image.pixels[1, 1].tolist() == [0.0, 0.0, 0.0]
+
+
+def test_an_unassociated_alpha_tiff_keeps_its_colour_untouched(tmp_path: Path) -> None:
+    rgba = np.zeros((2, 2, 4), dtype=np.uint8)
+    rgba[..., 0], rgba[..., 3] = 128, 128
+    path = tmp_path / "straight.tif"
+    tifffile.imwrite(path, rgba, photometric="rgb", extrasamples=["unassalpha"])
+    image, _ = read_photo(path)
+    assert round(float(image.pixels[0, 0, 0]) * 255) == 128
+
+
+def test_a_premultiplied_grey_alpha_tiff_is_un_premultiplied(tmp_path: Path) -> None:
+    grey_alpha = np.zeros((2, 2, 2), dtype=np.uint8)
+    grey_alpha[..., 0], grey_alpha[..., 1] = 64, 128  # grey 128 at alpha 128/255, premultiplied
+    path = tmp_path / "premul-grey.tif"
+    tifffile.imwrite(path, grey_alpha, photometric="minisblack", extrasamples=["assocalpha"])
+    image, _ = read_photo(path)
+    assert round(float(image.pixels[0, 0, 1]) * 255) in (127, 128), "64 * 255 / 128 = 127.5"
