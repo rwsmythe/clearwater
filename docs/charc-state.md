@@ -12,23 +12,23 @@
 ### Phase / state
 
 **Phase 3 (build), wave 3 tranche A in flight.** Plan `docs/clearwater-implementation-plan.md`
-v1.2. **CHARC generation 3 picks up here** from generation 2 (`clearwater-charc-20261020-0636`,
-fable/medium, picked up 2026-10-20 ~16:50Z, ROLLED 2026-10-21 ~07:20Z at the 400K depth cap, at
-a clean boundary: no owner item open, no ruling pending, every tranche-A cell is the
-orchestrator's and working in its own worktree). Generation 2's narrative is in
-`git log -- docs/charc-state.md`. Main ~600 commits ahead of `origin/main`, unpushed; the owner
-has not asked for a push (verify `git status -sb`).
+v1.2. **CHARC generation 3** = `clearwater-charc-20261020-2115` (fable/medium), picked up
+2026-10-21 ~07:30Z from generation 2's hand-off at 6533d8f (gen 2 `clearwater-charc-20261020-0636`
+rolled at the 400K cap at a clean boundary and is inert; cue THIS name). Bash gauge at pickup:
+44 ms. Charc inbox at pickup: 0 unread. Main ~810 commits ahead of `origin/main`, unpushed; the
+owner has not asked for a push (verify `git status -sb`). Generation 2's narrative is in
+`git log -- docs/charc-state.md`.
 
-## ROLLOVER 2026-10-21 ~07:20Z (CHARC generation 2 at the 400K cap)
+## Hand-off record (generation 2 -> 3, 2026-10-21 ~07:20Z; kept as the pickup method)
 
-**Successor: read this file first, then `docs/charc-charter.md`, `docs/charc-bootstrap.md`
+**A successor: read this file first, then `docs/charc-charter.md`, `docs/charc-bootstrap.md`
 (bring-up only; steps 1-5 done), `docs/orchestrator-context.md` (hazards 1-7),
 `docs/dispatch-recipe.md`, `docs/review-gate-clearwater.md`, `docs/model-prompting-standard.md`
 (section 9 carries the pre-dispatch rollover exception). Then measure the bash gauge, drain the
 charc inbox (`uv run python scripts/role_mail.py read --role charc --all`), announce yourself to
 the orchestrator (`--to orchestrator`, then ONE SendMessage cue to the exact name in
-`comms/.launch-sessions.json`; gen 9 = `clearwater-orchestrator-20261020-1959` at hand-off),
-overwrite this block with your own generation line and commit by pathspec.** Memory files under
+`comms/.launch-sessions.json`; gen 9 = `clearwater-orchestrator-20261020-1959` at the gen-3 pickup),
+rewrite the Phase / state block with your own generation line and commit by pathspec.** Memory files under
 `~/.claude/projects/C--Users-rwsmy-clearwater/memory/` hold the owner's rulings verbatim.
 
 What generation 2 did (2026-10-20 16:50Z to 2026-10-21 07:20Z): QA-confirmed WP2.3, wave 1
