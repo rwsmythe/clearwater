@@ -246,3 +246,28 @@ ruling is a one-place change). Exact rule: output `ceil(H/k) x ceil(W/k)`, each 
 the pixels it covers; statistics k = `max(1, min(H, W) // 540)`; figures in S3 above (12 MP is
 807x605). S4-S7 RECOMMENDED. `pyside6>=6.12,<7` kept as granted; a possible switch to
 `PySide6-Essentials` is with CHARC, made only on the dispatcher's relay.
+
+## Build (tasks 2-8), 2026-10-21
+
+Commits: `5fa8648` preview pipeline; `f2cccbe` window, session, sources, messages, job runner,
+engines; `fda06b7` job progress by a 50 ms main-thread poll (+ `JobRunner.run` docstring
+clarified, no name changed); `93b0e54`, `82a8697` tests; `d8eb6f4` idle counts undelivered
+outcomes, backend reason reset on open. Report `docs/reports/wp3.16-shell-preview.md`.
+
+Contract additions since round 0: none (names). Docstring change: `JobRunner.run` coalescing
+sentence ("at most once per job per delivery interval (the shell's runner: 50 ms)").
+
+Gates at `d8eb6f4`: ruff check (repo) 0, ruff format --check 0, mypy strict 0 (87 files); GUI
+tests 90 passed (about 14 s, offscreen), run three times. Full pytest: pending a window.
+
+### Verification loop record (own loop, before Reviewer A)
+
+| # | Suspected | Confirmed / rejected | Fix |
+|---|---|---|---|
+| V-1 | V7 probe started after the planted inline render had already run, so the planted check saw nothing | confirmed (planted test got 10 ms) | probe now triggers the load from its own event loop (`_probe_max_gap_ms(start=...)`) |
+| V-2 | V7 worst gap 55-87 ms near the bound | confirmed; cause measured: a pure-Python spinning stub job starves the GIL (scratch probe: 28 ms raw spin; 55-62 ms in the window with either runner) | stub job yields the GIL each report (real jobs spend time in NumPy/FFmpeg); now 11-12 ms. Polling runner kept as a bounded-work design, not as the V7 fix (report corrected) |
+| V-3 | Lock contention between the reporting job and the main thread | rejected (lock-free variant measured the same, 66-79 ms) | reverted |
+| V-4 | `idle()` true while an outcome is queued but undelivered (test races under load) | confirmed by reading `LatestWorker` | `_undelivered` counter (`d8eb6f4`) |
+| V-5 | Device label keeps the previous file's reason until the first render | confirmed | reset to `-` on open (`d8eb6f4`) |
+| V-6 | Tab-ified docks report empty before events are processed | confirmed (scratch) | test waits for the layout |
+| V-7 | Real `select_backend` with the stub id | handled by S1 adapter; `gpu` test ran (not skipped): `Device: GPU` | - |
