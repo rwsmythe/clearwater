@@ -459,7 +459,9 @@ def _load_guard() -> ModuleType:
     [
         [],
         ["-s"],
-        ["-p", "no:capture"],
+        # pytest-qt 4.5.0's pytest_configure raises "ValueError: no option named 'capture'"
+        # without the capture plugin, so the child also disables pytest-qt (WP3.16 F1 grant).
+        ["-p", "no:capture", "-p", "no:pytest-qt"],
         ["--collect-only"],
         ["--setup-plan"],
     ],
@@ -487,8 +489,12 @@ def test_cache_clear_with_the_cache_provider_enabled_is_refused_unchanged(tmp_pa
     assert _snapshot(mini.footage) == before
 
 
+# "-p no:pytest-qt": pytest-qt 4.5.0's pytest_configure raises "ValueError: no option named
+# 'capture'" without the capture plugin (WP3.16 F1 grant).
 @pytest.mark.parametrize(
-    "extra", [["-s"], ["-p", "no:capture"]], ids=["no-capture-s", "no-capture-plugin"]
+    "extra",
+    [["-s"], ["-p", "no:capture", "-p", "no:pytest-qt"]],
+    ids=["no-capture-s", "no-capture-plugin"],
 )
 def test_uncached_tempdir_checks_the_one_root_cpython_would_pick(
     tmp_path: Path, extra: list[str]
