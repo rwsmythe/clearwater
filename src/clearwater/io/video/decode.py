@@ -540,13 +540,18 @@ class FrameStream(Iterator[Frame]):
         return VideoDecodeError("pts", f"The frame timing of {self._name} is wrong: {detail}.")
 
     def _end(self) -> None:
-        """Handle the end of the output: check for orphan pts, then the exit status (D86).
+        """Handle the end of the output: the exit status, then any orphan pts (D86).
+
+        A pts line without a frame is an error only when FFmpeg finished normally: a process
+        that died had frames in flight between the filter and the pipe, and its death is the
+        failure to report.
 
         Raises:
-            VideoDecodeError: An orphan pts (``"pts"``), or FFmpeg failed on a file the probe
-                found clean (``"unreadable"``).
+            VideoDecodeError: FFmpeg failed on a file the probe found clean (``"unreadable"``),
+                or it finished normally with a pts line left over (``"pts"``).
         """
         status = self._process.finish()
+        orphans = 0
         while not self._stderr_ended:
             try:
                 item = self._process.items.get_nowait()
@@ -555,8 +560,10 @@ class FrameStream(Iterator[Frame]):
             if item is None:
                 self._stderr_ended = True
             elif item[0] == "frame":
-                raise self._pts_error(f"timestamp line {item[1]} has no frame")
+                orphans += 1
         if status == 0:
+            if orphans:
+                raise self._pts_error(f"{orphans} timestamp lines have no frame")
             if self._process.diagnostics.error_lines:
                 level = logging.INFO if self._flagged else logging.WARNING
                 self._log_tail("reported errors but finished", level=level)
