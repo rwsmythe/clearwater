@@ -76,6 +76,19 @@ ffmpeg -nostdin -hide_banner -nostats -loglevel repeat+level+info [-hwaccel cuda
 | Command maps `0:v:0` only, no other stream; no ffprobe; imports; OS-specific code only in `pipes.py`; DR-36 (a) | `test_io_video_decode_rules.py` |
 | `gpu`: CUDA bytes and pts equal software on every sample; `footage`: GX011627 681 frames, pts `k x 1001`, per-frame hashes equal an independent run, also through the forced default pipe and CUDA | `test_io_video_decode_hw.py` |
 
+## Gates (2026-10-21, Windows 11, FFmpeg 9.0.2, RTX 4070 Laptop GPU)
+
+| Run | Head | Result |
+|---|---|---|
+| Full pytest, offscreen, `--basetemp=work/full` (granted window) | `d40f46b` | 3669 passed, 1 failed, 2 skipped, 1570.5 s: the failure was test-only (the forced-fallback test counted every logger's records; an earlier test lowers the root log level), fixed in `29d2253`, reproduced and verified with `--log-level=DEBUG` (old fails, new passes; the decode test files 87 passed) |
+| Footage and gpu legs (`-m "footage or gpu"`, granted window) | `29d2253` | 9 passed, 0 skipped, 443.9 s: 6 CUDA sample rows; GX011627 software, forced default pipe, CUDA (681 frames each, pts `k x 1001`, per-frame hashes equal an independent run) |
+| Own tests `-m "not footage"` | `d40f46b` | 110 passed, 4 deselected |
+| ruff check, ruff format --check, mypy strict | `29d2253` | clean |
+
+Reviewer A (STRONG, codex-cli 0.162.1 over WSL, gpt-5.6-sol high): round 1 0/1/3, round 2 0/1/0,
+round 3 0/0/1 (critical/major/minor, adjudicated), converged at round 3; 0 reopened, 0 reverts.
+Evidence `C:\Users\rwsmy\clearwater-review-evidence\wp3.9\r1..r3\`.
+
 ## Files outside the package
 
 - `src/clearwater/io/video/probe.py`: only the two DR-36 (a) log lines (Q9 grant).
