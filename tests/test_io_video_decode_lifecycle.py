@@ -471,7 +471,9 @@ def test_the_forced_fallback_gives_the_same_bytes_and_pts_on_every_sample(
         }
     assert default == large
     assert [len(record) for record in default.values()] == [45, 45, 45, 24, 30, 45]
-    assert [r.getMessage() for r in caplog.records] == [
+    # Only the pipe module's records: other loggers (the decoder's INFO line on the truncated
+    # sample) reach caplog when an earlier test has lowered the root level.
+    assert [r.getMessage() for r in caplog.records if r.name == pipes.__name__] == [
         "using the default frame pipe: OSError: forced failure"
     ]
 
