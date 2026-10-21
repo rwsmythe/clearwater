@@ -74,6 +74,7 @@ _LOG = logging.getLogger("clearwater.cache")
 _INT64 = 1 << 63
 _UNLINK_TRIES = 6
 _UNLINK_PAUSE = 0.01
+_READER_WAIT = 5.0
 
 
 @dataclass
@@ -86,6 +87,7 @@ class _Entry:
     aux_size: int = 0
     stamp: int = 0
     scanned: bool = False
+    closing: bool = False
     complete: bool = False
     index: PackIndex = field(default_factory=PackIndex)
 
@@ -149,7 +151,8 @@ def _remove_files(folder: Path) -> bool:
     """Delete the files of the cache's own names in ``folder``, then the folder if it is empty.
 
     Only regular files are removed: a link, a directory or any file the cache did not name is
-    left alone (and keeps the folder in place).
+    left alone (and keeps the folder in place). The pack goes first; if it cannot be removed
+    nothing else is touched.
 
     Args:
         folder: An entry folder.
@@ -164,13 +167,15 @@ def _remove_files(folder: Path) -> bool:
     except OSError:
         return False
     removed = True
-    for item in items:
+    for item in sorted(items, key=lambda found: found.name != PACK_NAME):
         if not _is_cache_file(item.name):
             continue
         if item.is_symlink() or not item.is_file(follow_symlinks=False):
             continue
         if not _unlink(item.path):
             removed = False
+            if item.name == PACK_NAME:
+                break  # an entry whose pack stays is left whole, not half removed
     if removed:
         with contextlib.suppress(OSError):
             os.rmdir(folder)
@@ -230,6 +235,8 @@ class DiskProxyCache:
         self._lock = threading.RLock()
         self._entries: dict[CacheKey, _Entry] = {}
         self._writing: set[CacheKey] = set()
+        self._active_reads: dict[CacheKey, int] = {}
+        self._idle = threading.Condition(self._lock)
         self._wentry: _Entry | None = None
         self._wfile: BinaryIO | None = None
         self._last_lookup: CacheKey | None = None
@@ -327,8 +334,8 @@ class DiskProxyCache:
                 fails its checksum, which is then forgotten).
         """
         pts = _int64(pts_ticks, "pts")
-        path, rec = self._find(key, KIND_PROXY, "", pts)
-        _, codec_id, _, _, payload = self._read(key, path, rec, KIND_PROXY, "", pts)
+        with self._reading(key, KIND_PROXY, "", pts) as (path, rec):
+            _, codec_id, _, _, payload = self._read(key, path, rec, KIND_PROXY, "", pts)
         try:
             return CODECS[codec_id].decode(payload)
         except (ValueError, KeyError, zlib.error, struct.error):
@@ -383,8 +390,8 @@ class DiskProxyCache:
             KeyError: Nothing valid is stored for this key, stage and pts.
         """
         pts = _int64(pts_ticks, "pts")
-        path, rec = self._find(key, KIND_STATS, stage, pts)
-        _, _, _, _, payload = self._read(key, path, rec, KIND_STATS, stage, pts)
+        with self._reading(key, KIND_STATS, stage, pts) as (path, rec):
+            _, _, _, _, payload = self._read(key, path, rec, KIND_STATS, stage, pts)
         try:
             return decode_statistics(payload)
         except (ValueError, TypeError, struct.error):
@@ -617,15 +624,18 @@ class DiskProxyCache:
     def _lose_completeness(self, entry: _Entry) -> None:
         """Make a complete entry incomplete because one of its proxies turned out to be damaged.
 
-        The marker is removed so that a new instance does not believe it either. If the marker
-        cannot be removed the entry is still incomplete in this instance and the next scan
-        checks the marker against the pack.
+        The marker is removed so that a new instance does not believe it either; if it cannot be
+        removed it is overwritten with one that vouches for nothing. If both fail the entry is
+        still incomplete in this instance.
         """
-        try:
-            self._unmark(entry)
-        except OSError as error:
-            entry.complete = False
-            _LOG.warning("cache marker of %s not removed: %s", entry.folder.name, error)
+        entry.complete = False
+        marker = entry.folder / MARKER_NAME
+        if not _unlink(str(marker)):
+            try:
+                atomic_write_text(marker, "{}")
+            except OSError as error:
+                _LOG.warning("cache marker of %s not removed: %s", entry.folder.name, error)
+        entry.aux_size = self._aux_size(entry.folder)
 
     def _already_stored(
         self, entry: _Entry, kind: int, stage: str, pts: int, payload: bytes
@@ -701,10 +711,35 @@ class DiskProxyCache:
         self._last_store = key
         self._evict({key})
 
+    @contextlib.contextmanager
+    def _reading(
+        self, key: CacheKey, kind: int, stage: str, pts: int
+    ) -> Iterator[tuple[Path, Rec]]:
+        """Yield the pack path and record of a frame, counting the caller as a reader of its entry.
+
+        Removing the entry (eviction, ``clear``) waits for its readers, so a file that is open for
+        one seek and read is never what makes a removal fail. Raises KeyError as :meth:`_find`.
+        """
+        with self._lock:
+            found = self._find(key, kind, stage, pts)
+            self._active_reads[key] = self._active_reads.get(key, 0) + 1
+        try:
+            yield found
+        finally:
+            with self._lock:
+                left = self._active_reads[key] - 1
+                if left:
+                    self._active_reads[key] = left
+                else:
+                    del self._active_reads[key]
+                    self._idle.notify_all()
+
     def _find(self, key: CacheKey, kind: int, stage: str, pts: int) -> tuple[Path, Rec]:
         """Return the pack path and record of a frame, or raise KeyError."""
         with self._lock:
             entry = self._entries.get(key)
+            if entry is not None and entry.closing:
+                raise KeyError(f"the cache entry of {key} is being removed")
             if entry is None or not self._ensure_scanned(entry):
                 raise KeyError(f"nothing is cached for {key}")
             rec = (
@@ -752,7 +787,15 @@ class DiskProxyCache:
         """Delete an entry's files and forget it; False when it could not be removed."""
         if self._wentry is entry:
             self._close_writer()
+        entry.closing = True  # no new reader starts; readers already reading finish their read
+        deadline = time.monotonic() + _READER_WAIT
+        while self._active_reads.get(entry.key, 0) > 0:
+            left = deadline - time.monotonic()
+            if left <= 0:
+                break
+            self._idle.wait(left)
         if not _remove_files(entry.folder):
+            entry.closing = False
             return False
         self._entries.pop(entry.key, None)
         return True

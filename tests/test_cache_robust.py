@@ -515,3 +515,92 @@ def test_a_failed_append_whose_rollback_also_fails_still_counts_the_bytes(tmp_pa
     assert found is not None and found.pts_ticks == (0,)
     on_disk = sum(p.stat().st_size for p in (folder / entry_name(KEY)).iterdir())
     assert found.size_bytes == on_disk
+
+
+# --- round 2 of Reviewer A -----------------------------------------------------------------
+
+
+def test_clear_waits_for_a_reader_that_holds_the_pack_open_for_longer_than_any_retry(
+    tmp_path: Path,
+) -> None:
+    folder = tmp_path / "c"
+    cache = lossless_cache(folder)
+    cache.store_proxy(KEY, 0, pixels(0))
+    holding = threading.Event()
+    release = threading.Event()
+
+    def reader() -> None:
+        # as proxy() does around its read, with the pack open
+        with cache._reading(KEY, 1, "", 0) as (path, _), path.open("rb"):
+            holding.set()
+            release.wait(timeout=30)
+
+    held = threading.Thread(target=reader)
+    held.start()
+    assert holding.wait(timeout=30)
+    cleared = threading.Thread(target=cache.clear)
+    cleared.start()
+    cleared.join(timeout=0.5)
+    assert cleared.is_alive()  # clear() is waiting for the reader, not giving up
+    with pytest.raises(KeyError):
+        cache.proxy(KEY, 0)  # and a new read of the entry being removed is a miss
+    release.set()
+    held.join(timeout=30)
+    cleared.join(timeout=30)
+    assert not cleared.is_alive()
+    assert cache.lookup(KEY) is None
+    assert not (folder / entry_name(KEY)).exists()
+
+
+def test_an_entry_whose_pack_cannot_be_removed_keeps_its_marker_and_stamp(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    folder = tmp_path / "c"
+    with lossless_cache(folder) as cache:
+        cache.store_proxy(KEY, 0, pixels(0))
+        cache.mark_complete(KEY)
+        entry = folder / entry_name(KEY)
+        real_unlink = os.unlink
+
+        def unlink(path: Any, *args: Any, **kwargs: Any) -> None:
+            if str(path).endswith("data.pack"):
+                raise PermissionError("open elsewhere")
+            real_unlink(path, *args, **kwargs)
+
+        monkeypatch.setattr(store_module, "_UNLINK_PAUSE", 0.0)
+        monkeypatch.setattr(store_module, "_READER_WAIT", 0.0)
+        monkeypatch.setattr(store_module.os, "unlink", unlink)
+        cache.clear()
+        assert sorted(p.name for p in entry.iterdir()) == ["complete", "data.pack", "meta.json"]
+        found = cache.lookup(KEY)
+        assert found is not None and found.complete  # still whole and still complete
+
+
+def test_a_marker_that_cannot_be_deleted_is_overwritten_so_a_reopen_is_not_complete(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    folder = tmp_path / "c"
+    with lossless_cache(folder) as first:
+        for n in range(3):
+            first.store_proxy(KEY, n, pixels(n))
+        first.mark_complete(KEY)
+    pack = pack_of(folder)
+    raw = bytearray(pack.read_bytes())
+    raw[32 + (len(raw) - 32) // 2] ^= 0xFF  # inside the middle record
+    pack.write_bytes(bytes(raw))
+    cache = lossless_cache(folder)
+    real_unlink = os.unlink
+
+    def unlink(path: Any, *args: Any, **kwargs: Any) -> None:
+        if str(path).endswith("complete"):
+            raise PermissionError("the marker cannot be deleted")
+        real_unlink(path, *args, **kwargs)
+
+    monkeypatch.setattr(store_module, "_UNLINK_PAUSE", 0.0)
+    monkeypatch.setattr(store_module.os, "unlink", unlink)
+    assert sum(_raises_key_error(cache, n) for n in range(3)) == 1
+    found = cache.lookup(KEY)
+    assert found is not None and found.complete is False
+    cache.close()
+    reopened = lossless_cache(folder).lookup(KEY)
+    assert reopened is not None and reopened.complete is False
