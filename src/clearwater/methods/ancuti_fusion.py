@@ -475,7 +475,7 @@ def _checked_record(stage: Stage, record: Statistics) -> _Record:
     for name in stage.statistics:
         try:
             value = np.array(record[name], dtype=np.float64)
-        except (TypeError, ValueError) as exc:
+        except (TypeError, ValueError, OverflowError) as exc:
             raise ValueError(
                 f"stage {stage.name!r}: statistic {name!r} is not a host array of numbers ({exc})"
             ) from exc

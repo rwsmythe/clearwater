@@ -388,6 +388,9 @@ def broken_records(record: Mapping[str, Any], names: tuple[str, ...]) -> Iterato
         bad.flat[-1] = math.inf
         yield name, {**record, name: bad}
         yield name, {**record, name: "not numbers"}
+        too_large = value.astype(np.float64).astype(object)
+        too_large.flat[0] = 10**400  # no float holds it: OverflowError inside np.array (R1 F1)
+        yield name, {**record, name: too_large.tolist()}
 
 
 @pytest.mark.parametrize("method_id", METHOD_IDS)
