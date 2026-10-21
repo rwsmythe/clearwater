@@ -21,8 +21,8 @@ dependencies = [
     "pillow-heif>=0.20,<2",
     # WP3.6 (CHARC ruling 1, AD-17/AD-18 amended; BSD-3): TIFF at every depth.
     "tifffile>=2025.1,<2027",
-    # WP3.16 (frame section 4 grant): the GUI (D28, AD-18 LGPL-3).
-    "pyside6>=6.12,<7",
+    # WP3.16 (frame section 4 grant): the GUI (D28, AD-18 LGPL-3); Essentials only (CHARC d06ed7c9).
+    "pyside6-essentials>=6.12,<7",
 ]
 
 [project.optional-dependencies]
