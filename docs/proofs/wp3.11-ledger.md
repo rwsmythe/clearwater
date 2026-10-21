@@ -7,7 +7,7 @@ Tier STRONG. Brief `docs/briefs/wp3.11-brief.md` (FINAL; CHARC rulings `53d1d906
 
 | Round | Depth (dispatcher) | Critical | Major | Minor | In / out of envelope | NEW / REOPENED | Reverts | Fixes: product / test-only | Transport, CLI | Verdict |
 |---|---|---|---|---|---|---|---|---|---|---|
-| 0 (design table) | (dispatcher) | - | - | - | - | - | - | - | - | yielded for ruling |
+| 0 (design table) | 143,868 | - | - | - | - | - | - | - | - | APPROVED as written (orchestrator round-0 rulings: P1, P2, choices 1-10) |
 
 ## Round 0 -- design table (no product code yet)
 
