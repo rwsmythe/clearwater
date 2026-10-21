@@ -124,7 +124,11 @@ def effective_alphas(
             compensated channel or holds a non-finite value; the message names the argument.
     """
     supplied = _triple(means, "means")
-    caps = {"red": red_gain_cap, "blue": blue_gain_cap}
+    strength = float(alpha)  # Python floats throughout: a NumPy scalar must not change the result
+    caps = {
+        "red": None if red_gain_cap is None else float(red_gain_cap),
+        "blue": None if blue_gain_cap is None else float(blue_gain_cap),
+    }
     alphas: dict[str, float] = {}
     for name in _compensated_channels(blue_compensation=blue_compensation):
         if name not in cap_statistics:
@@ -134,7 +138,7 @@ def effective_alphas(
         statistic = _finite(cap_statistics[name], f"cap_statistics[{name!r}]")
         index = _CHANNEL_INDEX[name]
         added_per_alpha = (supplied[1] - supplied[index]) * statistic
-        effective = alpha
+        effective = strength
         cap = caps[name]
         if cap is not None and added_per_alpha > 0.0:
             effective = min(effective, cap * supplied[index] / added_per_alpha)

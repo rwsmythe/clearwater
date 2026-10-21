@@ -1041,3 +1041,27 @@ def test_c3_numpy_scalar_parameters_on_the_backend(
     expected = host(backend, compensate_c3(backend, a, **plain))
     out = host(backend, compensate_c3(backend, a, **typed))
     assert_identical(out, expected)
+
+
+# -- NumPy-scalar and int parameters of the closed form (the audit's item 3) ------------------
+
+ALPHA_PARAMS = ("alpha", "red_gain_cap", "blue_gain_cap")
+
+
+@pytest.mark.parametrize("name", [*ALPHA_PARAMS, "all"])
+@pytest.mark.parametrize("scalar", SCALAR_TYPES)
+def test_effective_alphas_scalar_parameters_equal_python_floats(scalar: type, name: str) -> None:
+    """``alpha`` and the caps as ``np.float64``, ``np.float32`` or int act as the Python floats."""
+    base = {"alpha": 0.9, "red_gain_cap": 0.13, "blue_gain_cap": 0.043}
+    names = ALPHA_PARAMS if name == "all" else (name,)
+    typed = {k: as_scalar(scalar, v) if k in names else v for k, v in base.items()}
+    plain = {k: float(v) for k, v in typed.items()}
+    common: dict[str, Any] = {
+        "means": (0.2, 0.5, 0.4),
+        "cap_statistics": {"red": 0.1, "blue": 0.2},
+        "blue_compensation": True,
+    }
+    expected = effective_alphas(**common, **plain)
+    actual = effective_alphas(**common, **typed)
+    assert actual == expected
+    assert all(type(v) is float for v in actual.values())

@@ -487,3 +487,36 @@ def test_render_never_measures_a_whole_frame_value() -> None:
         )
 
     assert rejects(check_render_never_measures, measuring)
+
+
+# -- NumPy-scalar and int parameters of the closed form (the audit's item 2) ------------------
+
+GAIN_PARAMS = ("white_balance_strength", "max_white_balance_gain", "gray_world")
+
+
+@pytest.mark.parametrize("name", [*GAIN_PARAMS, "all"])
+@pytest.mark.parametrize("scalar", [np.float64, np.float32, int])
+def test_applied_gains_scalar_parameters_equal_python_floats(scalar: type, name: str) -> None:
+    """The strength, the clamp and the gains as np.float64, np.float32 or int act as floats."""
+
+    def as_scalar(value: float) -> Any:
+        return max(1, round(value)) if scalar is int else scalar(value)
+
+    names = GAIN_PARAMS if name == "all" else (name,)
+    base: dict[str, Any] = {
+        "white_balance_strength": 0.93,
+        "max_white_balance_gain": 2.3,
+        "gray_world": (1.3, 0.9, 3.4),
+    }
+    typed = {
+        k: (tuple(as_scalar(g) for g in v) if k == "gray_world" else as_scalar(v))
+        if k in names
+        else v
+        for k, v in base.items()
+    }
+    gray_world = typed.pop("gray_world")
+    plain = {k: float(v) for k, v in typed.items()}
+    expected = applied_gains(tuple(float(g) for g in gray_world), **plain)
+    actual = applied_gains(gray_world, **typed)
+    assert actual == expected
+    assert all(type(g) is float for g in actual[0])

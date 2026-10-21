@@ -78,8 +78,10 @@ def applied_gains(
         ValueError: ``gray_world`` is not three finite numbers.
     """
     supplied = _triple(gray_world, "gray_world")
-    requested = tuple(1.0 + white_balance_strength * (g - 1.0) for g in supplied)
-    applied = tuple(float(min(g, max_white_balance_gain)) for g in requested)
+    strength = float(white_balance_strength)  # Python floats: a NumPy scalar must not change the
+    maximum = float(max_white_balance_gain)  # arithmetic (a float32 one would round in float32)
+    requested = tuple(1.0 + strength * (g - 1.0) for g in supplied)
+    applied = tuple(min(g, maximum) for g in requested)
     return (
         (applied[0], applied[1], applied[2]),
         (requested[0] > applied[0], requested[1] > applied[1], requested[2] > applied[2]),
