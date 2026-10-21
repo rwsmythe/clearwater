@@ -171,7 +171,7 @@ def test_video_probe_errors_and_faults(make_window, qtbot) -> None:
     previous = window.session.source()
     clip = Path("clip.mp4")
 
-    for kind in ("unreadable", "unsupported", "missing_tool"):
+    for kind in ("unreadable", "unsupported", "sidecar", "missing_tool"):
 
         def raising(path: Path, kind: str = kind):
             raise VideoProbeError(kind, f"clip.mp4 {kind} text")
