@@ -1,0 +1,235 @@
+# WP3.16 ledger (application shell and preview)
+
+Cell: implementer-opus-high (tier STRONG; ruling 1). Worktree `.worktrees/wp3.16`, branch
+`wp3.16`, base `4b4da9b`. Spec v0.5.4, architecture FINAL 1.0. Brief `docs/briefs/wp3.16-brief.md`
+(FINAL, CHARC rulings `53b752a4d7fac4fc`: every recommended answer is the ruling).
+
+## Cumulative round ledger
+
+| Round | Date | Blocking (crit/maj) | Minor | In/out envelope | NEW/REOPENED | Reverts | Fix kind | Transport | Depth |
+|---|---|---|---|---|---|---|---|---|---|
+| 0 (design) | 2026-10-21 | n/a | n/a | n/a | n/a | n/a | n/a | n/a | (dispatcher) |
+
+## Round 0: the design table (brief task 1)
+
+Shipped with this yield: `pyproject.toml` (the two granted lines), `uv.lock` (`uv lock`),
+`src/clearwater/gui/__init__.py`, `src/clearwater/gui/contract.py` (ruling 2: frozen here,
+additive only until accept). No other product code before the ruling.
+
+### 1. Anchors re-grounded at `4b4da9b`
+
+All brief anchors hold except the two STOP items S1 and S2 below. Checked: IF-1..IF-10 as quoted;
+`clearwater.config` exports `app_locations`, `Locations` (`config_dir`, `cache_dir`; properties
+`presets_dir`, `log_dir`, `settings_file`, `log_file`), `load_settings(folder)`,
+`save_settings(folder, settings)`, `configure_logging(folder)`, `shutdown_logging()`,
+`PresetStore(folder).install_starters()`, `new_parameter_set`; `clearwater.core.select_backend`
+and its seven reason strings (`core/backend.py:552`); `clearwater.io.video` exports `probe`,
+`VideoProbeError(kind, message)` with kinds `unreadable`/`unsupported`/`sidecar`/`missing_tool`,
+`is_sidecar`, `sidecar_fault`; the stubs of `interfaces/stubs.py` (note: the stub
+`select_backend` reason is `"CPU: stub"`, or `"CPU: forced"`). `load_settings` also RAISES
+`UnsupportedFormatVersionError` for a newer file (S4).
+
+### 2. Modules
+
+| Module | Job |
+|---|---|
+| `__init__.py` | Docstring; exports the contract names and `run`. WP3.17-3.20 append only. |
+| `contract.py` | The attachment contract (section 3). Types and signatures, no behaviour. |
+| `engines.py` | `stub_engines(...)` for tests; `default_engines()` (real `probe`, real `select_backend` per S1, stubs for the rest). |
+| `session.py` | `ShellSession(Session)`: the state, setters emit synchronously. |
+| `sources.py` | Routing by extension; open a photo or a video into an `OpenedSource` plus G10 messages; decode a frame at a position. Pure, run on a worker. |
+| `imaging.py` | Block-mean downscale, view factor, statistics proxy, display conversion (float -> uint8 -> `QImage`, ICC -> sRGB), the V8 difference harness. |
+| `render_worker.py` | `LatestWorker`: one worker thread, latest-wins requests with a generation number; the preview render job. |
+| `preview.py` | `PreviewWidget`: split view, divider, zoom (fit, steps, 1:1), pan, "rendering full resolution" indicator; implements `PreviewSurface`. |
+| `jobs.py` | `QtJobRunner`, `QtProgress`, `QtJobHandle` (IF-8 on worker threads, coalesced reports). |
+| `messages.py` | G10 classification (exception or fault -> `Message`); `DialogPresenter` (modal `QMessageBox` + banner widget). |
+| `shell.py` | `MainWindow(ShellWindow)`, `ExportAction(ReasonAction)`, start-up and close, menus, status bar, `run(engines=None, locations=None) -> int` (question 12). |
+
+Tests: `tests/gui_support.py` (sets `QT_QPA_PLATFORM` before any PySide6 import; fixtures),
+`tests/test_gui_contract.py`, `test_gui_startup.py`, `test_gui_open.py`, `test_gui_preview.py`
+(V8, 1:1, latest wins, downscale rule), `test_gui_threads.py` (V7, jobs runner, shutdown),
+`test_gui_status.py`, `test_gui_deps.py`.
+
+### 3. The contract (`clearwater.gui.contract`, committed at this yield)
+
+- `Area` (enum): `PARAMETERS` (right dock, tabbed in attach order), `TIMELINE` (below the preview,
+  stacked, shown only while a video is open), `JOBS` (bottom dock, tabbed).
+- `AnalysisState(phase="none", done=0, total=None, message="")`, frozen; `AnalysisPhase` =
+  `"none" | "running" | "complete" | "cancelled" | "failed"` (S6: `failed` added).
+- `Message(severity, text, path=None)`, frozen; `MessageSeverity` = `"refusal" | "warning" | "error"`.
+- `OpenedSource(path, kind, image, metadata, probe, warnings)`, frozen; one per open, unchanged
+  while open (the frame at the position is `Session.current_image()`).
+- `Engines(photo_source, video_probe, video_source, video_sink, cache, methods, select_backend)`,
+  frozen; `methods` first entry = default; `SelectBackend` alias = IF-2's signature.
+- `Session(QObject)`. Signals: `source_changed(object)`, `parameters_changed(object)`,
+  `settings_changed(object)`, `position_changed(object)` (an `int`, declared `object` because pts
+  ticks can exceed a C `int`; brief said `(int)`), `statistics_changed()`, `backend_changed(str)`,
+  `analysis_changed(object)`. Getters: `source()`, `parameters()`, `settings()`, `method()`,
+  `analysis()`, plus (added) `statistics()`, `position()`, `backend()`, `current_image()`.
+  Setters: `set_parameters(ps)` (ValueError for a method not in `Engines.methods`),
+  `set_settings(s)`, `set_position(pts_ticks, *, statistics=None)` (S5), `set_analysis(state)`,
+  `set_statistics(stats | None)`. Every setter emits synchronously, also for an equal value.
+- `ReasonAction(QAction)`: `set_unavailable(reason | None)`, `unavailable_reason()`. Export is
+  enabled only when no reason holds: the shell's (no source; a video whose analysis is not
+  complete, with the progress) and the caller's (initially "Export is not available yet";
+  WP3.19 clears it).
+- `ShellActions(open, export, settings, quit)`, frozen.
+- `PreviewSurface` (Protocol): `show(image, statistics=None)` (image becomes the current image),
+  `show_proxy(proxy, corrected=None)` (uint8, shown at once, scaled, until the next result).
+- `JobHandle` (Protocol): `cancel()`, `is_running()`. `JobRunner` (Protocol):
+  `run(job, *, on_done, on_progress=None) -> JobHandle`, `cancel()`, `active()`, `wait(timeout_s)`.
+- `MessagePresenter` (Protocol): `present(message)`, `clear(severity=None)`.
+- `ShellWindow(QMainWindow)`: property `preview`; `attach(area, factory, *, title) -> QWidget`;
+  `set_settings_dialog(factory)` (opened window-modally with `QDialog.open()`, never a blocking
+  `exec`). The actions are on `ShellContext.actions`, not on the window (`QWidget.actions()` is
+  Qt's own method).
+- `ShellContext(window, session, engines, locations, presets, jobs, messages, actions)`, frozen.
+- `PanelFactory = Callable[[ShellContext], QWidget]`; `SettingsDialogFactory =
+  Callable[[ShellContext], QDialog]`.
+
+Brief task 2 named every one of these; the additions beyond its list are the four `Session`
+getters, the keyword `statistics` of `set_position`, `corrected` of `show_proxy`, the `failed`
+phase, `Message`/`MessageSeverity`, `JobHandle`, `JobRunner.active`/`wait`, and the type aliases.
+No name the brief lists is renamed, except `position_changed`'s declared type (above).
+
+### 4. Threading model
+
+- **Main thread:** every `QObject`/`QWidget`/`QPixmap`, the `Session`, the menus, the dialogs, the
+  painting, the status bar. It never calls `read`, `probe`, `frames`, `select_backend`, a
+  downscale, `analyze`, `render` or a colour conversion.
+- **Loader worker** (one thread, `LatestWorker`): file open (`photo_source.read` or
+  `video_probe` + the first frame of `video_source.frames`) and the frame at a position.
+- **Preview worker** (one thread, `LatestWorker`): per request `select_backend` twice (full size:
+  the status-bar reason, what export uses; preview size: the backend it renders on), the
+  downscale, the statistics, `render`, `to_host`, conversion to a display `QImage` (a value class
+  Qt documents as usable outside the GUI thread; no `QObject` is touched).
+- **Job threads** (one per `JobRunner.run`): the IF-8 jobs of WP3.18/3.19.
+- **Latest wins:** each request carries a generation number taken on the main thread; a new
+  parameter, settings, source, statistics, position or zoom-factor change bumps it. The worker
+  keeps only the newest pending request, checks the generation between stages and abandons a
+  superseded one; a result is delivered by a queued signal to a main-thread bridge object and
+  DROPPED there when its generation is not current, so a stale result is never shown. An
+  exception in a request becomes a message; the last good preview stays.
+- **Reports:** a job's `report` stores the latest triple under a lock and posts at most one
+  queued delivery; the main thread takes the latest.
+- **Close:** cancel all jobs, bump the generations, stop both workers, wait up to 5 s each; the
+  threads are daemon threads, and emission from a worker into a deleted bridge is guarded, so a
+  render that cannot be interrupted mid-NumPy call does not hang or crash the exit.
+
+### 5. Preview pipeline
+
+- **Photo:** loader reads `(Image, PhotoMetadata)` (host, float32). Preview request: (a)
+  statistics: the supplied ones, else measured once per (source, parameter state) on the
+  statistics proxy (question 5: block mean to a short side near 540, S3), each stage of
+  `method.stages` in order with the earlier results; (b) view factor k (question 7, S3): the
+  largest integer k whose block-mean size still covers the displayed size in device pixels
+  (`view size x devicePixelRatio`); k = 1 at 1:1 or larger; (c) `asarray` the k-downscaled image
+  on the preview backend, `render` with the statistics, `to_host`; (d) display: clip to [0, 1],
+  `round(x * 255)` to uint8, `QImage` RGB888, tagged with `QColorSpace.fromIccProfile` when the
+  source has an ICC profile and converted to sRGB (question 8; untagged shown as sRGB); the
+  "before" side is the same k-downscaled input through the same conversion. Qt scales the last
+  step for display only.
+- **1:1 (question 6):** k = 1: the whole image is rendered at full resolution once per parameter
+  state; until it arrives the screen-resolution result is shown scaled with a "Rendering full
+  resolution" indicator; kept while panning. The widget draws it with
+  `QImage.setDevicePixelRatio(dpr)` so one image pixel is one device pixel.
+- **Video frame:** loader probes, refuses on a `refuse` fault, decodes the first frame
+  (`frames(probe, hw_decode=False)`, S7); then as a photo, with the frame's own unsmoothed
+  statistics (D108) until WP3.18 supplies smoothed ones. `set_position` decodes the first frame
+  at or after the pts on the loader worker (S5).
+- **V8 harness:** `imaging.preview_export_difference(method, backend, image, params, statistics,
+  k)` -> mean and max absolute difference between `render(downscale(image, k))` and
+  `downscale(render(image), k)`; the preview calls the same `downscale`. With the identity stub
+  both are 0 exactly; WP4.x re-runs it with WP3.4's method against AD-11.
+
+### 6. G10 message table (question 10)
+
+| Source | Severity | Presentation |
+|---|---|---|
+| Unknown extension (not a photo or `.mp4` one) | refusal | modal, "<name> is not a supported photo or video file"; previous source kept |
+| Sidecar (`is_sidecar`) | refusal | modal, `sidecar_fault(path).message` |
+| `VideoProbeError` (any kind, incl. `missing_tool`) | refusal | modal, its message |
+| `ProbeResult.faults` with severity `refuse` (HLG, PQ) or `exclude` | refusal | modal, the fault message |
+| `ProbeResult.faults` with severity `warn` (truncated, unreadable tail, missing tags, GP-Log) | warning | banner while open, one per fault |
+| No frame decodable from a probed video | refusal | modal, "<name>: no frame could be read" |
+| WP3.6 read error, kind `unsupported` (incl. DNG/ProRAW, D116) or `unreadable` | refusal | modal, its message (S2) |
+| Any other exception from `photo_source.read` | refusal | modal, "<name> could not be read: <text>" |
+| `ColorDescription.assumed` (photo) | warning | banner, "<name> has no colour description; sRGB is assumed" |
+| `ColorDescription.assumed` (video frame) | warning | banner only when the probe gave no `missing_tags` fault (one warning, not two) |
+| Preview job exception | error | banner "Preview failed: ..."; cleared at the next good preview; last good preview stays |
+| `load_settings` raising `UnsupportedFormatVersionError` | refusal-style modal at start-up | S4 |
+
+All texts pass through `ascii_text`-style escaping of file names (ASCII-safe console rule).
+
+### 7. Headless set-up (question 3, ruling 3)
+
+`tests/gui_support.py` runs `os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")` at import;
+every `test_gui_*.py` imports it before PySide6; `pytest-qt`'s `qtbot`/`qapp` fixtures drive the
+event loop; dialogs are injected (file chooser callable, capturing presenter), never a blocking
+`exec`. **Record (2026-10-21, this machine):** `QT_QPA_PLATFORM=offscreen` ->
+`QApplication.platformName() == "offscreen"`, `devicePixelRatio 1.0`, PySide6 6.12.0, Qt 6.12.0.
+`pytest-qt` 4.5.0 loads as a plugin in every pytest run; `tests/test_interfaces.py` and
+`tests/test_core_select.py` pass with it installed (65 passed). Existing PySide6-absence tests
+are subprocess-based and unaffected.
+
+### 8. Versions locked
+
+`pyproject.toml` lines (mine, X-B3): `"pyside6>=6.12,<7",` in `[project] dependencies` and
+`"pytest-qt>=4.5,<5",` in `dev`, each with a one-line grant comment. `uv lock` added pyside6
+6.12.0, pyside6-essentials 6.12.0, pyside6-addons 6.12.0, shiboken6 6.12.0, pyside6-pdf and
+pyside6-webengine 6.12.0.140 (pulled by the `PySide6` meta-package; question 11's note on the
+large wheel set stands), pytest-qt 4.5.0.
+
+### 9. Answers to the other questions (rulings applied)
+
+Q4 status bar: `Device: <reason verbatim>` for the full-resolution selection, the preview-size
+reason in the tool tip when it differs, `Device: -` before a file is open; then the file name,
+`W x H` and the zoom. Q5/Q7: as section 5, with S3. Q6: as section 5. Q8: as section 5. Q9: one
+`save_settings(locs.config_dir, replace(settings, last_parameters=session.parameters()))` at
+close, then `shutdown_logging()`; a save error is logged, never raised. Q10: section 6. Q12:
+`run(engines=None, locations=None) -> int`, no entry point. Start-up `last_parameters`: used when
+its method is in `engines.methods`; else `new_parameter_set(<default id>, {})` with a logged
+WARNING (unknown method) or nothing logged (None, first run).
+
+### 10. STOP items (recommended answer first)
+
+- **S1 (with reproduction). The real `select_backend` refuses the stub method id.**
+  `clearwater.core.select_backend(Settings(), 100, 100, "stub")` raises `ValueError: no memory
+  estimate for method 'stub'; known: c3, ancuti2018` (`core/memory.py:51`), and no real IF-3
+  method is merged (WP3.4). So `default_engines()` (real selection + stub method) and the brief's
+  "one `gpu` test with the real selection" cannot work as written. Recommended: `default_engines()`
+  wraps `clearwater.core.select_backend` so a method id outside `clearwater.core.METHOD_IDS` is
+  estimated as the default method `"c3"` (D16), one documented adapter removed at WP4.3 when real
+  methods register; the `gpu` test uses it. Alternative A: a stub subclass with `id = "c3"`
+  (also makes the starter presets and `last_parameters` resolve, but a stub masquerades as c3).
+  Alternative B: `default_engines()` keeps the stub selection; the `gpu` test calls the real
+  selection with `"c3"` directly.
+- **S2. X-B2's `PhotoReadError` is not on the base.** WP3.6's branch has no commit yet, so the
+  class cannot be imported by name. Recommended: classify a photo-read exception by its `kind`
+  attribute (`unsupported`/`unreadable`) and its message, with any other exception shown as
+  unreadable with its text (brief task 4); the `except PhotoReadError` by name lands when the
+  dispatcher rebases this branch on WP3.6 (or in WP4.3). Tests use a local stand-in class with
+  `kind`.
+- **S3. The downscale rule for sizes the factor does not divide (questions 5 and 7).** A 12 MP
+  iPhone photo is 4032x3024 (3024/540 = 5.6); 5.3K video is 5312x2988. Recommended: one
+  `downscale(image, k)` block mean where the last row and column of blocks average only the
+  pixels they cover (output `ceil(H/k) x ceil(W/k)`), used by the preview, the 1:1 path (k = 1)
+  and V8; the statistics proxy uses k = max(1, short_side // 540) (short side 540..1079; exactly
+  540 for 4K video, 604 for a 12 MP photo). Alternative: an exact fractional area resample to a
+  540 short side (NumPy, separable), for the statistics proxy only. This binds WP3.14 and WP4.1
+  as question 5 says.
+- **S4. Start-up with a settings file from a newer Clearwater.** `load_settings` raises
+  `UnsupportedFormatVersionError` and leaves the file untouched. Recommended: a modal message
+  ("settings are from a newer Clearwater; defaults are used for this session and the file is
+  left as it is"), run on `Settings()`, and do NOT save at close in that session.
+- **S5. Who decodes the frame at a position.** Recommended: the shell, on `set_position`
+  (loader worker, latest wins), with the frame's statistics passed atomically in
+  `set_position(..., statistics=...)` so a new frame is never rendered with the previous frame's
+  smoothed statistics; WP3.18 then never decodes for display (it may still call
+  `preview.show(frame, statistics)` with a frame it holds).
+- **S6. The AD-15 states.** Recommended: add `"failed"` to the brief's four phases (export stays
+  unavailable with the failure text); read "cancel returns to unloaded" as: after `cancelled`
+  export is unavailable exactly as before the analysis ("Export needs the clip's analysis").
+- **S7. `hw_decode` for preview frames.** No setting carries it. Recommended: `hw_decode=False`
+  for the single frames the shell decodes (open and position); WP3.18's analysis pass chooses
+  its own.
