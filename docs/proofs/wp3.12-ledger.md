@@ -267,4 +267,6 @@ Deviations from the brief: store refuses a key whose version is not the instance
 
 | Round | Critical | Major | Minor | In-envelope vs out | NEW / REOPENED | Reverts | Product / test-only fixes | Depth |
 |---|---|---|---|---|---|---|---|---|
-| (no review round yet) | | | | | | | | |
+| R1 (head 1b4da4e, gpt-5.6-sol high, WSL codex) | 0 | 4 (F1 stale `complete` after a corrupt middle record, executed; F2 `clear` vs an open reader on Windows; F3 `_writing` entry not eviction-pinned; F4 instrument report judges the superseded criterion) | 7 (F5 stats slot claimed after encode, out of envelope; F6 sizes are payload bytes, error on statistics frames; F7 meansize / signed figures not from the instrument; F8 CRC-24 identity collides, executed; F9 pack_size after a failed rollback; F10 thread test swallows every KeyError; F11 foreign `*.tmp` name, out of envelope) | 9 in / 2 out | 11 NEW / 0 REOPENED | none | not yet remediated (yield before fixes); planned: 6 product-code, 1 test-only (F10), 1 tool (F4, F7), 1 text (F6) | (dispatcher) |
+
+Round 1 evidence: `C:/Users/rwsmy/clearwater-review-evidence/wp3.12/r1/` (prompt, diff, `review.txt`, `adjudication.md` with the per-finding table and planned fixes, md5sums). Mechanical assertions passed (model and effort, no transport ERROR, tokens footer, 6 succeeded lines, VERDICT NEW_CRITICAL_MAJOR_FOUND).
