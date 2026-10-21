@@ -10,7 +10,8 @@ Evidence root: `C:\Users\rwsmy\clearwater-review-evidence\wp3.10\` (`r0\` = this
 | Round | Kind | Critical | Major | Minor | In / out of envelope | NEW / REOPENED | Reverts | Product vs test-only fixes | Transport, CLI | Depth (dispatcher) |
 |---|---|---|---|---|---|---|---|---|---|---|
 | 0 | design table + pts-carrier spike (no review, no product code) | -- | -- | -- | -- | -- | 0 | none (no product code) | -- | 219,455 at the round-0 yield |
-| 1 | Reviewer A (seat 2) on `fd6e52d` | 0 | 11 | 2 | MAJOR: 9 in, 2 out (reviewer-tagged); MINOR: 2 in | 13 NEW, 0 REOPENED | 0 | pending (adjudication turn: no change) | WSL, codex-cli gpt-5.6-sol high; 12 `succeeded in`; 171,804 tokens | (dispatcher) |
+| 1 | Reviewer A (seat 2) on `fd6e52d` | 0 | 11 | 2 | MAJOR: 9 in, 2 out (reviewer-tagged); MINOR: 2 in | 13 NEW, 0 REOPENED | 0 | PRODUCT and instrument (seat 3: `9785956`, `7035be6`, report `8fe963f`) | WSL, codex-cli gpt-5.6-sol high; 12 `succeeded in`; 171,804 tokens | (dispatcher) |
+| 2 | Reviewer A (seat 3) on `8fe963f` | 0 | 2 + 1 self-found | 1 | reviewer MAJOR: 1 in (REJECTED with reproduction), 1 out (reviewer-tagged); MINOR: 1 out; self-found MAJOR S1: in | reviewer 2 NEW, 1 REOPENED (r1 #10); S1 NEW | 0 | pending (adjudication turn: no change) | WSL, codex-cli gpt-5.6-sol high; 20 `succeeded in`; 217,008 tokens; 1 echoed `ERROR` (sandbox subprocess, not transport) | (dispatcher) |
 
 Seat 1 stops after round 0 by the orchestrator's instruction (219K before product code; the build
 is the largest in the wave). A fresh cell builds from "RESUME HERE" below.
@@ -224,3 +225,35 @@ clocks), 8 (negative pts raw `ValueError`), 9 (`FFREPORT` inherited) -- in-envel
 (header built after FFmpeg starts; out of envelope, non-blocking), 12, 13 (MINOR). Rejected with
 reproduction: 5 (a wrong `media_time` fails `close` through the pts check, F5), 10 (a head trim is
 refused at `open`, F10; out of envelope). Remediation follows the dispatcher's reply.
+
+## Seat 3 (fresh seat) -- round-1 remediation and round 2
+
+- Branch found at `01d1578` (seat 2's P8 commit, one minute after `eae4380`; consistent with the
+  P8 ruling). Remediated round-1 findings 1-4, 6-9, 11-13 and the finding-5 report text, as the
+  dispatcher confirmed: instrument `9785956` (2 location values withheld before any comparison,
+  presence only; 3 the MANDATORY `mvhd` row, exact, readable-part aware; 4 the cut-short reading
+  keeps media_time, rate and the audio effect; 7 one monotonic clock, a sample counts when its
+  call overlaps the window), sink `7035be6` (1 three listings, video and audio only, data tracks
+  from the stream list's sample count; 6 every audio pts checked, a cut stream exactly the
+  source's packets before the cut with 2 us slack; 8 negative pts refused at open; 9 `tool_env()`
+  strips `FFREPORT` from every sink and detection process; 11 header built before FFmpeg starts;
+  12 strict read-back; 13 `out_path` recorded first), report `8fe963f`. Every new test fails on
+  the pre-remediation code (18 failed, run on `git archive eae4380` with the new tests), and the
+  F3/F4 plants read SAME by the old instrument and DIFFERENT by the new
+  (`work/wp3.10/r2/oldnew.py`).
+- Targeted runs at `8fe963f` (`-m "not footage"`): `test_io_video_encode.py` 92 passed; units,
+  fidelity and probe modules 214 passed; ruff, format and mypy clean. Full suite not run (window).
+- Banked (not this package's file): WP3.7's `probe.py` `_run_ffprobe` (`cc28699`) inherits
+  `FFREPORT`.
+
+### Round 2 (evidence `C:\Users\rwsmy\clearwater-review-evidence\wp3.10\r2\`, `adjudication.md` there)
+
+Rejected with reproduction: 1 (ffprobe exits 0 on moov-first cut files at three cut points and
+the instrument gathers them, `repro/repro_f1.*`). Non-blocking by rule: 2 (REOPENED r1 #10,
+reviewer-tagged out of envelope; reproduced for a keyframe-aligned head trim, which `open`
+accepts and the instrument flags DIFFERENT, `repro/repro_f2.*`; BANKED, a cheap exact refusal
+proposed with S1), 3 MINOR (cleanup: `tied` needs a resolved GPU UUID). SELF-FOUND S1 (MAJOR,
+in-envelope, NEW): a truncated source whose cut leaves no corrupt-flagged packet gets its last
+frame extended to the whole file's presentation end (`repro/repro_f1b.*`, cut at 60 %: the
+output's video edit list says 2.0 s over 1.1 s of media; caught by the instrument's
+video-duration row, not by `close`). Remediation follows the dispatcher's reply.
