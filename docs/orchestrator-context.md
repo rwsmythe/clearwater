@@ -86,6 +86,7 @@ cell at 240k, that should just be an evaluation point"): a few bounded steps rem
 round, a gate, a report) mean the cell continues; a large or open-ended load, such as a
 multi-finding remediation, goes to a fresh cell from the ledger. **~400K is a STOP** at the round
 boundary and a fresh re-dispatch (unchanged; the cell-side rule is in the dispatch recipe section 5).
+(7) **Never carry an uncommitted edit in the MAIN tree's working copy** (added 2026-10-21, CHARC; paid for when a contract amendment sat uncommitted on main for five minutes while another seat's QA suite ran there -- child-process tests import whatever is on disk at that moment). Every edit, however small, is made in a worktree on its own branch; the main tree is only ever checked out at a committed head.
 (5) **The main tree has ONE git index and every role commits in it.**
 A bare `git commit` after `git add` sweeps whatever ANOTHER role has staged into your commit
 under your message (found 2026-09-08: an orchestrator state commit carried CHARC's two staged
