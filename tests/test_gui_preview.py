@@ -630,8 +630,9 @@ def test_frame_decoded_is_not_emitted_after_preview_show_or_a_source_change(make
     window.session.set_position(9000)
     assert gate.entered.wait(10)
     window.open_path(Path("other.mp4"))
+    # Reviewer B pass 2 #1: release the old decode only once the new source is open.
+    qtbot.waitUntil(lambda: window.session.source().path == Path("other.mp4"), timeout=10000)
     gate.release.set()
-    qtbot.waitUntil(lambda: not window.opening(), timeout=10000)
     wait_idle(qtbot, window)
     assert outcomes == []
 
@@ -904,6 +905,26 @@ def test_a_new_source_drops_the_previous_sources_memo(make_window, qtbot) -> Non
     memo = window.controller._memo
     kept = [key[0] for key in (*memo._statistics, *memo._before, *memo._after)]
     assert kept and set(kept) == {token}
+
+
+def test_a_preview_success_keeps_a_panels_error(make_window, qtbot) -> None:
+    # Reviewer B pass 2 #3 (DR-44 (b)): a good render clears only the preview's own error.
+    method = LevelMethod()
+    window = _open_photo(make_window, qtbot, image(60, 80), method=method)
+    presenter = presenter_of(window)
+    presenter.present(Message("error", "preset not saved", owner="presets"))
+
+    def explode() -> None:
+        raise RuntimeError("boom")
+
+    method.busy = explode
+    window.session.set_parameters(new_parameter_set("level", {"level": 0.9}))
+    wait_idle(qtbot, window)
+    assert len(presenter.of("error")) == 2
+    method.busy = None
+    window.session.set_parameters(new_parameter_set("level", {"level": 0.2}))
+    wait_idle(qtbot, window)
+    assert [m.text for m in presenter.of("error")] == ["preset not saved"]
 
 
 def test_render_error_becomes_a_message_and_the_last_preview_stays(make_window, qtbot) -> None:
