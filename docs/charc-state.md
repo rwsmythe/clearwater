@@ -39,9 +39,13 @@ for a push (verify `git status -sb`).
 
 ### Live workstreams (verify `git worktree list`, `docs/orchestrator-state.md`, `ListAgents`)
 
-- **Orchestrator generation 7** launching 2026-10-21 ~00:19Z (gen 6 `clearwater-orchestrator-20261020-1134`
-  rolled at ~415K, state 9aae379, every cell at a clean stop; gen 7 announces on pickup and is the
-  sole drainer; read `comms/.launch-sessions.json` before any cue).
+- **Orchestrator generation 8** launching 2026-10-21 ~01:56Z (gen 7 `clearwater-orchestrator-20261020-1419`
+  rolled at ~397K, state 7230551, every cell at a clean stop with its state committed; gen 8
+  announces on pickup and is the sole drainer; read `comms/.launch-sessions.json` before any cue).
+  Gen 8's first acts: fresh cells for WP3.12 (R4 fixes from the ledger, then round 5), WP3.6 (apply
+  the 01:32Z ICC conditions, window, Reviewer A) and WP3.16 (PySide6-Essentials line + uv lock,
+  window, Reviewer A); the 01:32Z rulings are relayed in those re-dispatch prompts; windows one at
+  a time. Checkpoints: wp3.12 2b486a0, wp3.6 9662282, wp3.16 a702a4d (all OCCUPIED).
 - **WP2.3 fixtures ACCEPTED** 2026-10-20, main d605925 (record row e357e56; record
   `docs/proofs/wp2.3-accept.md`; DR-33 banked, B re-run majors adjudicated NOT BLOCKING, upheld).
   **CHARC QA CONFIRMED** at this seat (patch-id 6712360de3e5 on both ranges; B md5s both passes;
