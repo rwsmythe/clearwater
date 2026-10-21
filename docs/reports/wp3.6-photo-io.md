@@ -20,7 +20,7 @@ D116.
    | JPEG (and MPO, first image) | Pillow, full `load()` | 8 | EXIF tag, once |
    | PNG 8-bit and below | Pillow, full `load()`; chunks by the stdlib scanner (CRCs, `iCCP`, `eXIf`, `sRGB`) | 8 | EXIF `eXIf` tag, once |
    | PNG 16-bit | stdlib decoder (`png.py`): five filters by an anti-diagonal wavefront, colour types 0, 2, 4, 6; Adam7 refused by name | 16 | `eXIf` tag, once |
-   | TIFF 8/16-bit | `tifffile` (none, Deflate, PackBits, LZMA; striped or tiled; chunky or planar; predictor 1 or 2) | 8 / 16 | IFD0 tag 274, once |
+   | TIFF 8/16-bit (RGB, grey incl. WhiteIsZero inverted, palette) | `tifffile` (none, Deflate, PackBits, LZMA; striped or tiled; chunky or planar; predictor 1 or 2) | 8 / 16 | IFD0 tag 274, once |
    | HEIC 8/10-bit | `pillow_heif.open_heif(convert_hdr_to_8bit=False)`; 10-bit normalised `(v >> 6) / 1023` | 8 / 10 | AD-24, below |
 
    HEIC (AD-24): libheif applies `irot`/`imir`; `heif_boxes.py` reads `pitm` -> `ipma` -> `ipco` for the
@@ -92,11 +92,14 @@ truncated JPEG, PNG, 16-bit PNG, HEIC and TIFF, a missing, empty, unknown and di
 - Dependency rule: importing `clearwater.io.photo` in a fresh interpreter loads nothing from
   `clearwater.gui/.jobs/.methods/.core`, `PySide6`, `cupy`, `av` (subprocess test), and no module names
   them (AST test).
-- `uv run ruff check .`, `ruff format --check .`, `mypy` (strict) clean; photo tests 418 passed, 1
-  skipped (the footage leg) after the Reviewer A round-1 remediation (`tests/test_io_photo_r1.py`: 14 new
-  cases, each failing on `983bff1`). Full suite at `983bff1` (dispatcher's window, 2026-10-21 02:5xZ):
+- `uv run ruff check .`, `ruff format --check .`, `mypy` (strict) clean; photo tests 422 passed, 1
+  skipped (the footage leg) after the Reviewer A round-1 remediation and the round-2 terminating cleanup
+  (`tests/test_io_photo_r1.py`: 18 new cases; each fix has at least one that fails without it). Full suite at `983bff1` (dispatcher's window, 2026-10-21 02:5xZ):
   normal 3308 passed, 2 skipped, 0 failed; with `cupy` unimportable 2790 passed, 520 skipped, 0 failed.
   The full suite on the remediated head is run by the orchestrator on the merge candidate.
+  Reviewer A converged at round 2 (0 new blocking); a terminating cleanup after R2 (WhiteIsZero grey TIFF
+  read inverted; a TIFF source's byte order kept in its EXIF block) followed with no further Reviewer A
+  round; Reviewer B at the orchestrator's seat covers it.
 - 48 MP informational figures (a 8000 x 6000 16-bit RGB PNG with filters 0-4 cycling by row, built
   in scratch, not a product test; shared laptop, untimed by the hardware rule): read 10.6 s,
   process peak 1.67 GiB (result float32 549 MiB); write 11.1 s with no peak increase.
