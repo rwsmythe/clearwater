@@ -51,16 +51,18 @@ def file_name(path: Path) -> str:
 
 
 def refusal(path: Path, text: str) -> Message:
-    """Build a refusal for ``path``.
+    """Build a refusal for ``path``; the text always names the file (question 10).
 
     Args:
         path: The refused file.
-        text: The message text.
+        text: The message text; ``"<name>: "`` is put in front when it does not name the file
+            (a ``VideoProbeError`` for a missing tool or a timeout, a fault text).
 
     Returns:
         The message, ASCII-safe.
     """
-    return Message("refusal", ascii_text(text), path)
+    safe, name = ascii_text(text), file_name(path)
+    return Message("refusal", safe if name in safe else f"{name}: {safe}", path)
 
 
 def warning(path: Path, text: str) -> Message:

@@ -8,6 +8,8 @@ Covers brief task 4 and the task-8 rows "open" and the planted "a refusal shown 
 
 from __future__ import annotations
 
+import importlib
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -208,6 +210,41 @@ def test_video_probe_errors_and_faults(make_window, qtbot) -> None:
     texts = [m.text for m in presenter_of(window).of("warning")]
     assert texts == [f.message for f in warn]  # no second untagged warning (missing_tags said it)
     assert source.warnings == tuple(texts)
+
+
+def test_refusals_whose_text_omits_the_file_name_it(
+    make_window, qtbot, monkeypatch, tmp_path: Path
+) -> None:
+    """Round-1 F4: the real probe's missing-tool and timeout texts carry no file name."""
+    probe_module = importlib.import_module("clearwater.io.video.probe")
+    good = Path("good.png")
+    window = make_window(photo_engines({good: image(20, 20)}, frames=[frame(48, 64, ticks=0)]))
+    open_and_wait(qtbot, window, good)
+    previous = window.session.source()
+    clip = tmp_path / "clip.mp4"
+    clip.write_bytes(b"not a video")
+    object.__setattr__(window._engines, "video_probe", probe_module.probe)
+
+    monkeypatch.setattr(probe_module.shutil, "which", lambda name: None)
+    open_and_wait(qtbot, window, clip)
+    text = assert_refused(window, clip, previous)
+    assert text.startswith("clip.mp4: ffprobe was not found on the PATH.")
+
+    def too_slow(*args, **kwargs):
+        raise subprocess.TimeoutExpired("ffprobe", 1.0)
+
+    monkeypatch.setattr(probe_module.shutil, "which", lambda name: "ffprobe")
+    monkeypatch.setattr(probe_module.subprocess, "run", too_slow)
+    open_and_wait(qtbot, window, clip)
+    text = assert_refused(window, clip, previous)
+    assert text == "clip.mp4: The file took too long to read and was given up on."
+
+    fault = Fault("hlg", "refuse", "HLG video is not supported.")
+    object.__setattr__(
+        window._engines, "video_probe", lambda path: stub_probe(path, faults=(fault,))
+    )
+    open_and_wait(qtbot, window, clip)
+    assert assert_refused(window, clip, previous) == "clip.mp4: HLG video is not supported."
 
 
 def test_untagged_photo_and_untagged_video_frame_warn_once(make_window, qtbot) -> None:
