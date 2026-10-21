@@ -420,14 +420,16 @@ def _movie(path: Path) -> tuple[tuple[EditEntry, ...], GoProInfo | None]:
         boxes = read_movie_boxes(path)
         edits = _edit_list(boxes)
     except (BoxError, OSError) as error:
-        _log.warning("movie boxes of %s not read: %s", path.name, error)
+        _log.warning("movie boxes of %s not read: %s", _name(path), error)
         return (), None
     if boxes.gpmf is None:
         return edits, None
     try:
         return edits, parse_settings(boxes.gpmf)
     except GPMFError as error:
-        _log.warning("GPMF atom malformed: %s; colour profile unavailable for %s", error, path.name)
+        _log.warning(
+            "GPMF atom malformed: %s; colour profile unavailable for %s", error, _name(path)
+        )
         return edits, None
 
 
