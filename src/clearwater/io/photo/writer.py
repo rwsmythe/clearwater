@@ -17,22 +17,36 @@ from clearwater.interfaces.image import Image
 from clearwater.interfaces.photo import PhotoMetadata
 from clearwater.io.photo import exif as exif_tools
 from clearwater.io.photo import png as png_tools
+from clearwater.io.photo.color import built_in_profile_name
+
+PROFILE_KEY = "profile"
+"""The provenance key that records a built-in ICC profile (``built-in <name>``)."""
 
 
-def provenance_text(provenance: Mapping[str, Any]) -> str:
+def provenance_text(provenance: Mapping[str, Any], icc: bytes | None = None) -> str:
     """Serialise a provenance mapping as the JSON the ``iTXt`` chunk holds (D91).
+
+    When ``icc`` is one of the built-in profiles (given to a source that carried no profile of
+    its own, D53), the text also records ``"profile": "built-in <name>"``.
 
     Args:
         provenance: The provenance mapping.
+        icc: The profile that is embedded in the PNG, or None.
 
     Returns:
         JSON text with sorted keys and no NaN.
 
     Raises:
         clearwater.interfaces.FormatError: A mapping key is not a string.
-        ValueError: A value is not JSON-serialisable or is NaN or infinite.
+        ValueError: A value is not JSON-serialisable or is NaN or infinite, or the mapping
+            already has a ``profile`` key while a built-in profile is embedded.
     """
     check_string_keys(provenance, "provenance")
+    built_in = built_in_profile_name(icc)
+    if built_in is not None:
+        if PROFILE_KEY in provenance:
+            raise ValueError(f"provenance already has a {PROFILE_KEY!r} key")
+        provenance = {**provenance, PROFILE_KEY: f"built-in {built_in}"}
     try:
         return json.dumps(provenance, allow_nan=False, sort_keys=True)
     except TypeError as error:
@@ -56,7 +70,8 @@ class PhotoWriter:
         The profile is embedded byte-identical when the image has one (none otherwise, so the
         output reads as the untagged source did). EXIF follows D63: Orientation 1, thumbnail
         dropped, pixel dimensions updated, Software ``Clearwater``, every other field kept.
-        Provenance (D91) goes into one ``iTXt`` chunk when given.
+        Provenance (D91) goes into one ``iTXt`` chunk when given; a built-in profile (a source
+        with nclx colour data and no ICC profile, D53) is recorded in it as ``profile``.
 
         Args:
             image: The corrected image: float32 ``(H, W, 3)`` in [0, 1] on the CPU.
@@ -75,7 +90,9 @@ class PhotoWriter:
                 f"the photo writer needs a host image, got device {image.device!r}; "
                 "copy it to the host first"
             )
-        text = provenance_text(provenance) if provenance is not None else None
+        text = (
+            provenance_text(provenance, image.color.icc_profile) if provenance is not None else None
+        )
         height, width = image.pixels.shape[:2]
         block = exif_tools.edit(meta.exif, width, height)
         png_tools.write_png(
