@@ -33,9 +33,10 @@ statistics frame).
 
 Sizes are the bytes of the stored payload per frame (the product adds a 24-byte record header
 and a small codec header per frame; stream candidates count the packet payloads, without
-container overhead); the maximum and mean pixel error are taken over the statistics frames
-only. ``meansize.txt`` and ``readcost-product`` use the product codecs through the product
-store and carry the exact product sizes.
+container overhead); the png-pillow-opt candidate is sized on the statistics frames only
+(``sample_only``), every other candidate on every frame; the maximum and mean pixel error are
+taken over the statistics frames only. ``meansize.txt`` and ``readcost-product`` use the product
+codecs and carry the product sizes.
 
 Footage is only ever read, through :func:`local_config.find_footage_file`; every file written is
 under the working folder. The 4K decode and the candidates are the instrument's own; the
@@ -81,6 +82,8 @@ WINDOW_FRAMES = 60
 WINDOW_STARTS_S = (30.0, 130.0, 230.0, 330.0, 430.0)
 """GX011625 sample: five 60-frame windows spread over the 498 s clip."""
 CLIPS: dict[str, tuple[float, ...] | None] = {"GX011627": None, "GX011625": WINDOW_STARTS_S}
+EXPECTED_FRAMES = {"GX011627": 681, "GX011625": WINDOW_FRAMES * len(WINDOW_STARTS_S)}
+"""The frames each clip must yield; ``prepare`` refuses a truncated decode."""
 """Clip stem -> window start times in seconds; None = the whole clip."""
 READ_ROUNDS = 8
 """How many times each stored proxy is read back in the product read-cost row."""
@@ -228,9 +231,14 @@ def _decode_segments(path: Path, starts: tuple[float, ...] | None, width: int, h
             assert proc.stdout is not None
             while True:
                 raw = proc.stdout.read(size)
-                if len(raw) < size:
+                if not raw:
                     break
+                if len(raw) < size:
+                    raise RuntimeError(f"{path.name}: a decoded frame was cut short")
                 yield np.frombuffer(raw, dtype=np.uint8).reshape(height, width, 3)
+            code = proc.wait()
+        if code != 0:
+            raise RuntimeError(f"ffmpeg exited with {code} decoding {path.name}")
 
 
 def prepare(stride: int) -> None:
@@ -256,6 +264,8 @@ def prepare(stride: int) -> None:
                 if index % stride == 0:
                     reference[index] = frame_stats(flt)
                 count = index + 1
+        if count != EXPECTED_FRAMES[stem]:
+            raise SystemExit(f"{stem}: decoded {count} frames, expected {EXPECTED_FRAMES[stem]}")
         meta = {
             "stem": stem,
             "frames": count,
@@ -881,16 +891,17 @@ def report_mode() -> None:
     cost = json.loads(cost_path.read_text(encoding="utf-8")) if cost_path.exists() else {}
     names = list(dict.fromkeys(r["candidate"] for r in results))
     print(
-        "| candidate | median KB/frame (worst clip) | p95 KB | 60-min GB (median) "
+        "| candidate | median KB/frame (worst clip) | p95 KB | max KB | 60-min GB (median) "
         "| 60-min GB (p95) | fits 10 GB | max err | mean err | means | gains | bounds (value) "
         "| bounds (range) | vs 8-bit: means | gains | bounds (value) | bounds (range) "
         "| verdict (ruled criteria; original 1 % bounds shown for information) | read ms |"
     )
-    print("|" + "---|" * 18)
+    print("|" + "---|" * 19)
     for name in names:
         rows = [r for r in results if r["candidate"] == name]
         median = max(r["bytes_median"] for r in rows)
         p95 = max(r["bytes_p95"] for r in rows)
+        top = max(r["bytes_max"] for r in rows)
         gb_median = median * SIXTY_MINUTES_FRAMES / 1e9
         gb_p95 = p95 * SIXTY_MINUTES_FRAMES / 1e9
         dev = {k: max(r["dev_max"][k] for r in rows) for k in rows[0]["dev_max"]}
@@ -904,7 +915,8 @@ def report_mode() -> None:
         fits = median * SIXTY_MINUTES_FRAMES <= BOUND_BYTES
         read = cost.get(name, {}).get("median_ms")
         print(
-            f"| {name} | {median / 1000:.1f} | {p95 / 1000:.1f} | {gb_median:.1f} | {gb_p95:.1f} "
+            f"| {name} | {median / 1000:.1f} | {p95 / 1000:.1f} | {top / 1000:.1f} "
+            f"| {gb_median:.1f} | {gb_p95:.1f} "
             f"| {'yes' if fits else 'no'} | {max(r['max_abs_error'] for r in rows)} "
             f"| {max(r['mean_abs_error'] for r in rows):.3f} | {dev['means']:.1e} "
             f"| {dev['gains']:.1e} "
