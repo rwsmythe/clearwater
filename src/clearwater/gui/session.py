@@ -168,10 +168,11 @@ class ShellSession(Session):
         return self._preview_backend
 
     def _open(self, source: OpenedSource | None) -> None:
-        """Make ``source`` the open source; reset the analysis, statistics and position."""
+        """Make ``source`` the open source; reset analysis, statistics, position and backend."""
         self._source = source
         self._analysis = AnalysisState()
         self._statistics = None
+        self._backend = self._preview_backend = "-"
         frame_ticks = getattr(source.image, "pts_ticks", None) if source is not None else None
         self._position = frame_ticks if isinstance(frame_ticks, int) else None
         self._set_image(None if source is None else source.image)

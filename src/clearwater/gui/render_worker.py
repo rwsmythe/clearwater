@@ -79,6 +79,7 @@ class LatestWorker:
         self._pending: tuple[int, Callable[[Check], object]] | None = None
         self._stopping = False
         self._busy = False
+        self._undelivered = 0
         self._bridge = _Bridge()
         self._bridge.delivered.connect(self._deliver, Qt.ConnectionType.QueuedConnection)
         self._thread = threading.Thread(target=self._run, name=name, daemon=True)
@@ -112,9 +113,9 @@ class LatestWorker:
             self._pending = None
 
     def idle(self) -> bool:
-        """Return True when no task waits or runs."""
+        """Return True when no task waits or runs and no outcome is still on its way."""
         with self._lock:
-            return self._pending is None and not self._busy
+            return self._pending is None and not self._busy and self._undelivered == 0
 
     def stop(self, timeout_s: float) -> bool:
         """Stop the thread: supersede everything and wait for it to end.
@@ -165,6 +166,7 @@ class LatestWorker:
                 self._busy = False
                 if generation != self._generation or self._stopping:
                     continue
+                self._undelivered += 1
             try:
                 self._bridge.delivered.emit(Outcome(generation, value, error))
             except RuntimeError:  # the bridge was deleted at shutdown
@@ -173,9 +175,11 @@ class LatestWorker:
     def _deliver(self, outcome: object) -> None:
         """Main thread: pass on an outcome of the current generation, drop a stale one."""
         assert isinstance(outcome, Outcome)
-        if outcome.generation != self.generation:
-            return
-        self._on_result(outcome)
+        with self._lock:
+            self._undelivered -= 1
+            current = outcome.generation == self._generation
+        if current:
+            self._on_result(outcome)
 
 
 @dataclass(frozen=True)
