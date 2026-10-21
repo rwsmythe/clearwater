@@ -35,4 +35,4 @@ other threads -> DR-45 (a).
 
 ## Main gates
 
-See the addendum line added after the merge.
+Main `09ab408` after the ff merge: harness 366 OK; ruff clean; 180 formatted; mypy 109 clean; full pytest 3670 passed, 2 skipped, 1562 s, exit 0 (offscreen).
