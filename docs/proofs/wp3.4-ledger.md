@@ -333,7 +333,7 @@ Probe-derived figures for the report: `C:\Users\rwsmy\clearwater-review-evidence
 | 0 (design) | 192,064 | -- | -- | -- | -- | -- | -- | -- | -- (no review round; design table + rulings) |
 | build (cell 2) | 346,044 | -- | -- | -- | -- | -- | -- | -- | -- (no review round; build + rulings applied; re-seat) |
 | full pytest (cell 2) | 368,709 | -- | -- | -- | -- | -- | -- | -- | -- (3868 passed, 2 skipped; hand-off to cell 3) |
-| 1 (cell 3) | (dispatcher) | 0 | 0 | 3 | 2 in / 1 out (F1) | 3 NEW / 0 | 0 | F1 product + test `c21ae64`; F2 docstring-only (granted) `7089198`; F3 report `fdc9f94` | WSL, codex-cli 0.162.1, gpt-5.6-sol high; 17 succeeded; VERDICT NO_NEW_CRITICAL_MAJOR -> TERMINATES |
+| 1 (cell 3) | 98,061 | 0 | 0 | 3 | 2 in / 1 out (F1) | 3 NEW / 0 | 0 | F1 product + test `c21ae64`; F2 docstring-only (granted) `7089198`; F3 report `fdc9f94` | WSL, codex-cli 0.162.1, gpt-5.6-sol high; 17 succeeded; VERDICT NO_NEW_CRITICAL_MAJOR -> TERMINATES |
 
 ### Round 1 (cell 3, 2026-10-21) -- verdict NO_NEW_CRITICAL_MAJOR (ROUND_TERMINATION)
 
@@ -355,3 +355,9 @@ GRANTED docstring-only. Cleanup commits `c21ae64` (F1; the Y-2 test fails on the
 the OverflowError, passes after), `7089198` (F2), `fdc9f94` (F3). Static gates green (ruff check,
 ruff format --check, mypy 109 files); `test_methods_assembly.py` 76 passed; the step files'
 `-k "overflow or sigma"` 20 passed.
+
+Self-found (test-only, ruled FINAL by the orchestrator): 12 `assert a.tobytes() == b.tobytes()`
+made pytest diff ~580 KB byte strings at `-v` whenever a planted test expected the failure (one
+test > 100 s at `-v`, 2 s at `-q`; the six package files 35 min at `-v`). Replaced by
+`assert_same_bits` (dtype, shape, bytes; short message with the count of differing elements and
+the max abs difference): the six files at `-v` now 323 passed in 93 s.
