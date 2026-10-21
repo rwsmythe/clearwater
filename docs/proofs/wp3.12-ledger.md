@@ -245,6 +245,24 @@ concurrent store on a key, statistics included, is a RuntimeError); (3) full-pyt
 `C:/Users/rwsmy/clearwater-review-evidence/wp3.1/r2/`, evidence in `.../wp3.12/rN/`), STRONG tier, yield at each adjudicated verdict.
 Deviations from the brief: store refuses a key whose version is not the instance's (ValueError); `close()`, context manager, `key_for`, `round_trip` and `codec_cache_version` are extras.
 
+## wp312-cell2 (resumed 2026-10-21 at `82a5dbb`, tree clean)
+
+**Read-cost row (EXCLUSIVE, run by the orchestrator; closes step (1)).** `readcost-product` at `82a5dbb`, 2026-10-21 00:20:39-00:20:45Z (file stamp
+`2026-10-20T14:20:44` local), clip GX011627, 25 frames x 8 rounds = 200 reads of `proxy()` (read + CRC + decode, file in the OS cache), output
+`work/wp3.12/readcost.json`: deflate median 8.47 / p95 10.26 / max 15.80 ms, 797.3 KB per frame; JPEG q75 4:4:4 3.39 / 4.27 / 10.22 ms, 94.0 KB; JPEG q80 4:2:0
+3.08 / 4.47 / 9.90 ms, 88.9 KB. q80 is 9.0 % faster at the median, under CHARC's 30 % threshold: q75 4:4:4 STAYS `DEFAULT_CODEC` (FINAL). Not re-run.
+
+**Two findings from the report work (non-timing, CPU, sizes and statistics only), for the dispatcher and CHARC:**
+1. Whole-clip MEAN size (`work/wp3.12/meansize.txt`, product codecs, all 681 frames of GX011627): q75 4:4:4 mean 94.9 KB = 10.2 GB per 60 minutes (the ruling
+   used the median, 9.0 GB); q80 4:2:0 mean 89.7 KB = 9.7 GB. So by the mean the default is 2 % over AD-5's 10 GB bound on the sharp shallow clip; the deep
+   clip is 2.0 GB. Disclosed in the report (finding 3); no code change made.
+2. Signed bounds change (`work/wp3.12/signed-bounds.txt`): the decoded q75 4:4:4 proxy's N{} range against the float proxy has mixed sign, median +0.9 % shallow
+   and +2.9 % deep (max +7.6 % / +19.8 %), not "narrower" as AD-5's ruling text and ledger finding 3 above say; the AD-4 floor would bind slightly less, not
+   more. Disclosed in the report (finding 4) and the CP5 line is worded from the measured figures.
+
+**Done this window:** report `docs/reports/wp3.12-proxy-cache.md`; `codec.py` constant docstring made true to the figures; own tests 60 pass; ruff check, ruff format
+--check and mypy green on the whole repo. **Next:** WINDOW REQUEST (full pytest, normal and cupy-unimportable forms), then Reviewer A.
+
 ## Ledger (cumulative rounds)
 
 | Round | Critical | Major | Minor | In-envelope vs out | NEW / REOPENED | Reverts | Product / test-only fixes | Depth |

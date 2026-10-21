@@ -182,7 +182,11 @@ def _jpeg_decode(blob: bytes) -> Proxy:
 JPEG_Q75_444 = ProxyCodec(
     2, "jpeg-q75-444", False, _jpeg_encoder(75, 0), _jpeg_decode, _jpeg_shape, _jpeg_identity
 )
-"""The default: JPEG quality 75, 4:4:4 (WP3.12 measured test: about 9.0 GB per 60 minutes)."""
+"""The default: JPEG quality 75, 4:4:4.
+
+WP3.12 measured test, shallow clip GX011627, 60 minutes at 29.97 fps: 9.0 GB at the median
+frame size, 10.2 GB at the mean (docs/reports/wp3.12-proxy-cache.md).
+"""
 
 JPEG_Q80_420 = ProxyCodec(
     3, "jpeg-q80-420", False, _jpeg_encoder(80, 2), _jpeg_decode, _jpeg_shape, _jpeg_identity
