@@ -247,10 +247,23 @@ class DiskProxyCache:
             clock: Returns the current time in nanoseconds; tests control the eviction order.
 
         Raises:
-            ValueError: ``limit_bytes`` is negative.
+            ValueError: ``limit_bytes`` is negative, or ``codec`` is not the registered codec
+                of its id (an unregistered id, or another decoder, shape reader or identity:
+                records are read back through :data:`CODECS`, so a codec that differs there
+                would store what it cannot return).
         """
         if limit_bytes < 0:
             raise ValueError("the cache limit is not negative")
+        registered = CODECS.get(codec.codec_id)
+        if (
+            registered is None
+            or registered.decode is not codec.decode
+            or registered.shape is not codec.shape
+            or registered.identity is not codec.identity
+        ):
+            raise ValueError(
+                f"codec {codec.name!r} is not the registered codec of id {codec.codec_id}"
+            )
         self._folder = folder
         self._limit = limit_bytes
         self._codec = codec
@@ -562,9 +575,25 @@ class DiskProxyCache:
                 continue
             folder = Path(item.path)
             if purge or key.cache_version != self._version:
-                _remove_files(folder)
+                self._remove_or_retain(key, folder)
                 continue
             self._register(key, folder)
+
+    def _remove_or_retain(self, key: CacheKey, folder: Path) -> None:
+        """Remove an entry folder found on disk, or keep it marked for removal if that fails.
+
+        A kept entry is counted, never served, the first to be evicted and retried like any
+        other failed removal; its ``removing`` file makes the next open try again.
+        """
+        if _remove_files(folder):
+            return
+        try:
+            size = (folder / PACK_NAME).stat().st_size
+        except OSError:
+            size = 0
+        entry = _Entry(key, folder, size)
+        self._entries[key] = entry
+        self._mark_for_removal(entry)
 
     def _register(self, key: CacheKey, folder: Path) -> None:
         """Add a found entry folder to the table, or remove it when its pack is unreadable."""
@@ -579,7 +608,7 @@ class DiskProxyCache:
                 check_pack_header(handle.read(PACK_HEADER_SIZE), key)
             size = pack.stat().st_size
         except (PackError, OSError):
-            _remove_files(folder)
+            self._remove_or_retain(key, folder)
             return
         marked = (folder / REMOVING_NAME).exists()
         if marked and _remove_files(folder):
@@ -628,14 +657,28 @@ class DiskProxyCache:
             return entry
         folder = self._folder / entry_name(key)
         folder.mkdir(parents=True, exist_ok=True)
+        entry = _Entry(key, folder, PACK_HEADER_SIZE, scanned=True)
+        self._void_stale_marks(entry)
         pack = folder / PACK_NAME
         with pack.open("wb") as handle:
             handle.write(pack_header(key))
             handle.flush()
-        entry = _Entry(key, folder, PACK_HEADER_SIZE, scanned=True)
         self._entries[key] = entry
         self._touch(entry)
         return entry
+
+    def _void_stale_marks(self, entry: _Entry) -> None:
+        """Void the marker files an earlier entry of this key left, before a new pack is made.
+
+        A leftover ``removing`` file would get the new pack removed at the next open, and a
+        leftover ``complete`` file could vouch for a pack that is not the one it described.
+
+        Raises:
+            OSError: A removal mark cannot be deleted (no pack is made under it).
+        """
+        if not _unlink(str(entry.folder / REMOVING_NAME)):
+            raise OSError(f"the removal mark of {entry.folder.name} cannot be deleted")
+        self._void_marker(entry)
 
     def _touch(self, entry: _Entry) -> None:
         """Refresh the entry's last-use stamp, in memory and in ``meta.json``."""
@@ -816,6 +859,8 @@ class DiskProxyCache:
             if table.get(pts) == rec:
                 del table[pts]
                 if kind == KIND_PROXY:
+                    if not entry.index.proxies:
+                        entry.index.shape = None  # no proxy is left to bind the shape of the next
                     self._lose_completeness(entry)
 
     def _total(self) -> int:

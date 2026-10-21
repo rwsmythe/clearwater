@@ -16,11 +16,13 @@ import pytest
 import clearwater.cache.store as store_module
 from clearwater.cache import (
     DEFLATE,
+    JPEG_Q75_444,
     DiskProxyCache,
     ProxyCodec,
     codec_cache_version,
     entry_name,
 )
+from clearwater.cache.layout import RECORD_HEADER_SIZE
 from clearwater.interfaces.cache import CacheKey
 
 VERSION = codec_cache_version(DEFLATE)
@@ -746,3 +748,146 @@ def test_a_leftover_temporary_of_the_removal_mark_is_cleaned_when_opening(tmp_pa
     leftover.write_text("x", encoding="utf-8")
     lossless_cache(folder)
     assert not leftover.exists()
+
+
+# --- round 4 of Reviewer A -----------------------------------------------------------------
+
+
+def _refuse_pack_delete(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Make deleting any ``data.pack`` fail, as if another program held it open."""
+    real_unlink = os.unlink
+
+    def unlink(path: Any, *args: Any, **kwargs: Any) -> None:
+        if str(path).endswith("data.pack"):
+            raise PermissionError("open elsewhere")
+        real_unlink(path, *args, **kwargs)
+
+    monkeypatch.setattr(store_module, "_UNLINK_PAUSE", 0.0)
+    monkeypatch.setattr(store_module.os, "unlink", unlink)
+
+
+@pytest.mark.parametrize("fault", ["another version", "unreadable pack"])
+def test_a_removal_that_fails_while_opening_is_marked_counted_and_retried(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, fault: str
+) -> None:
+    folder = tmp_path / "c"
+    with lossless_cache(folder) as first:
+        first.store_proxy(KEY, 0, pixels(0))
+    entry = folder / entry_name(KEY)
+    if fault == "unreadable pack":
+        entry.joinpath("data.pack").write_bytes(b"not a pack")
+    _refuse_pack_delete(monkeypatch)
+    # another version: the entry is of the deflate version, this instance is JPEG
+    codec = JPEG_Q75_444 if fault == "another version" else DEFLATE
+    cache = DiskProxyCache(folder, codec=codec)
+    assert (entry / "removing").exists()  # the failed removal is marked, as every other
+    assert cache.lookup(KEY) is None  # and never served
+    monkeypatch.undo()
+    cache.set_limit_bytes(0)  # the limit counts its bytes and evicts it: the removal is retried
+    assert not entry.exists()
+
+
+@pytest.mark.parametrize("stale", ["complete", "removing", "both"])
+def test_a_new_pack_is_not_made_valid_or_condemned_by_a_stale_marker_file(
+    tmp_path: Path, stale: str
+) -> None:
+    donor = tmp_path / "donor"
+    with lossless_cache(donor) as first:
+        first.store_proxy(KEY, 0, pixels(0))
+        first.mark_complete(KEY)
+    marker_text = (donor / entry_name(KEY) / "complete").read_text(encoding="utf-8")
+    folder = tmp_path / "c"
+    cache = lossless_cache(folder)
+    entry = folder / entry_name(KEY)
+    entry.mkdir(parents=True)  # leftovers of an earlier entry of this key, no pack
+    if stale in ("complete", "both"):
+        (entry / "complete").write_text(marker_text, encoding="utf-8")
+    if stale in ("removing", "both"):
+        (entry / "removing").write_text("removing", encoding="utf-8")
+    cache.store_proxy(KEY, 0, pixels(0))  # the same record the marker describes; never completed
+    cache.close()
+    found = lossless_cache(folder).lookup(KEY)
+    assert found is not None  # not removed by a mark that belonged to the old entry
+    assert found.pts_ticks == (0,)
+    assert found.complete is False  # and not believed complete by a marker that is not its own
+
+
+def test_a_stale_removal_mark_that_cannot_be_deleted_refuses_the_new_pack(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    folder = tmp_path / "c"
+    cache = lossless_cache(folder)
+    entry = folder / entry_name(KEY)
+    entry.mkdir(parents=True)
+    (entry / "removing").write_text("removing", encoding="utf-8")
+    real_unlink = os.unlink
+
+    def unlink(path: Any, *args: Any, **kwargs: Any) -> None:
+        if str(path).endswith("removing"):
+            raise PermissionError("locked")
+        real_unlink(path, *args, **kwargs)
+
+    monkeypatch.setattr(store_module, "_UNLINK_PAUSE", 0.0)
+    monkeypatch.setattr(store_module.os, "unlink", unlink)
+    with pytest.raises(OSError):
+        cache.store_proxy(KEY, 0, pixels(0))  # a pack under a removal mark would be removed
+    assert not (entry / "data.pack").exists()
+
+
+def _damage_first_proxy(pack: Path) -> None:
+    """Flip a byte inside the payload of the pack's first record."""
+    raw = bytearray(pack.read_bytes())
+    raw[32 + RECORD_HEADER_SIZE + 12] ^= 0xFF
+    pack.write_bytes(bytes(raw))
+
+
+def test_the_shape_is_forgotten_when_the_only_proxy_is_torn_off_the_tail(tmp_path: Path) -> None:
+    folder = tmp_path / "c"
+    with lossless_cache(folder) as first:
+        first.store_proxy(KEY, 0, pixels(0))
+    _damage_first_proxy(pack_of(folder))  # the only record, so the last: cut off when scanned
+    cache = lossless_cache(folder)
+    assert cache.lookup(KEY) is None
+    other = np.zeros((10, 12, 3), dtype=np.uint8)
+    cache.store_proxy(KEY, 1, other)  # no proxy is left, so no shape binds the next one
+    assert cache.proxy(KEY, 1).shape == other.shape
+
+
+def test_the_shape_is_forgotten_when_the_only_proxy_is_found_damaged_on_read(
+    tmp_path: Path,
+) -> None:
+    folder = tmp_path / "c"
+    with lossless_cache(folder) as first:
+        first.store_proxy(KEY, 0, pixels(0))
+        first.store_source_statistics(KEY, "s", 0, {"x": np.zeros(2)})  # the proxy is not last
+    _damage_first_proxy(pack_of(folder))
+    cache = lossless_cache(folder)
+    with pytest.raises(KeyError):
+        cache.proxy(KEY, 0)
+    other = np.zeros((10, 12, 3), dtype=np.uint8)
+    cache.store_proxy(KEY, 1, other)
+    assert cache.proxy(KEY, 1).shape == other.shape
+
+
+def _other_decode(blob: bytes) -> Any:
+    """Return a decoder that is not the registered one."""
+    return DEFLATE.decode(blob)
+
+
+@pytest.mark.parametrize("fault", ["unregistered id", "different decoder"])
+def test_a_codec_that_is_not_the_registered_one_for_its_id_is_refused(
+    tmp_path: Path, fault: str
+) -> None:
+    codec_id = 99 if fault == "unregistered id" else DEFLATE.codec_id
+    stranger = ProxyCodec(codec_id, "stranger", True, DEFLATE.encode, _other_decode, DEFLATE.shape)
+    with pytest.raises(ValueError, match="codec"):
+        DiskProxyCache(tmp_path / "c", codec=stranger)
+
+
+def test_a_codec_that_only_encodes_differently_is_accepted(tmp_path: Path) -> None:
+    variant = ProxyCodec(
+        DEFLATE.codec_id, "variant", True, DEFLATE.encode, DEFLATE.decode, DEFLATE.shape
+    )
+    with DiskProxyCache(tmp_path / "c", codec=variant) as cache:
+        cache.store_proxy(KEY, 0, pixels(0))
+        assert cache.proxy(KEY, 0).tobytes() == pixels(0).tobytes()

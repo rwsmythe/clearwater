@@ -14,7 +14,7 @@ All names are exported from `clearwater.cache`.
 
 | Area | Names |
 |---|---|
-| The store (IF-7) | `DiskProxyCache(folder, limit_bytes=DEFAULT_CACHE_LIMIT_BYTES, *, codec=DEFAULT_CODEC, clock=time.time_ns)`; it satisfies `clearwater.interfaces.cache.ProxyCache` exactly: `lookup`, `store_proxy`, `proxy`, `store_source_statistics`, `source_statistics`, `mark_complete`, `limit_bytes`, `set_limit_bytes`, `clear` |
+| The store (IF-7) | `DiskProxyCache(folder, limit_bytes=DEFAULT_CACHE_LIMIT_BYTES, *, codec=DEFAULT_CODEC, clock=time.time_ns)` (`codec` must be the registered codec of its id in `CODECS`, else `ValueError`); it satisfies `clearwater.interfaces.cache.ProxyCache` exactly: `lookup`, `store_proxy`, `proxy`, `store_source_statistics`, `source_statistics`, `mark_complete`, `limit_bytes`, `set_limit_bytes`, `clear` |
 | Extras (not in IF-7) | `DiskProxyCache.cache_version` (property), `.key_for(path)`, `.close()`, context-manager use |
 | Keys | `cache_key(path, codec=DEFAULT_CODEC) -> CacheKey`, `CACHE_FORMAT_VERSION = 2`, `codec_cache_version(codec)`, `entry_name(key)`, `parse_entry_name(name)` |
 | Codecs | `ProxyCodec`, `DEFLATE` (lossless), `JPEG_Q75_444` (id 2, the default), `JPEG_Q80_420` (id 3), `CODECS`, `DEFAULT_CODEC`, `jpeg_identity()`, `round_trip(proxy, codec)` |
@@ -163,8 +163,12 @@ stays); a foreign file keeps its folder in place. Removal first stops new reads 
 up to 5 s for readers that already hold its pack open (`store._reading`; Windows refuses to delete an
 open file), then retries a refused delete briefly; an entry that still cannot be removed stays whole, is
 logged, is no longer served, is the first to go at the next eviction or `clear`, and carries a
-`removing` mark file so the next open removes it too (never a silent keep). A store into such an
-entry removes it first or raises `OSError`. The mark is written atomically, or in place when the
+`removing` mark file so the next open removes it too (never a silent keep). This holds for every
+removal, including the ones made when the cache opens (an entry of another cache version or with an
+unreadable pack that cannot be removed is kept the same way: counted in the total, never served,
+evicted first). A store into such an entry removes it first or raises `OSError`, and a new pack made
+in a folder that holds a leftover `complete` or `removing` file voids it first (and is refused if the
+removal mark cannot be deleted). The mark is written atomically, or in place when the
 replace is refused; if even that fails the entry, left intact, can be served again after a restart (valid
 data, an unfulfilled removal). Cleanup of leftovers deletes only files shaped like the
 temporaries `atomic_write_text` makes (`<name>.<8 random characters>.tmp`); a foreign file of that

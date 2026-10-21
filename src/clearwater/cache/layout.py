@@ -271,6 +271,8 @@ def _drop_last(index: PackIndex, rec: Rec, stage: str, marker_length: int) -> No
     for pts, found in list(index.proxies.items()):
         if found == rec:
             del index.proxies[pts]
+    if not index.proxies:
+        index.shape = None  # no proxy is left to bind the shape of the next
     for pts, found in list(index.stats.get(stage, {}).items()):
         if found == rec:
             del index.stats[stage][pts]
