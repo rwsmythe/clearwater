@@ -153,6 +153,18 @@ def test_display_converts_an_icc_tagged_copy_to_srgb() -> None:
     assert image_bytes(display_image(green, p3)).tolist() != green.tolist()
 
 
+def test_every_display_copy_is_tagged_srgb() -> None:
+    # Round-1 F7: an untagged source or an unparseable profile is tagged sRGB, not left invalid.
+    srgb = QColorSpace(QColorSpace.NamedColorSpace.SRgb)
+    p3 = bytes(QColorSpace(QColorSpace.NamedColorSpace.DisplayP3).iccProfile().data())
+    rgb = np.full((2, 3, 3), (40, 200, 60), dtype=np.uint8)
+    for icc in (None, b"", b"not an icc profile", p3):
+        shown = display_image(rgb, icc)
+        assert shown.colorSpace() == srgb, icc
+        assert shown.format() == QImage.Format.Format_RGB888
+    assert image_bytes(display_image(rgb, None)).tolist() == rgb.tolist()
+
+
 # The preview in the window.
 
 
@@ -226,6 +238,75 @@ def test_one_to_one_shows_the_scaled_result_with_an_indicator_until_full_arrives
     assert widget.after_image() is not None and widget.shown_factor() > 1
     wait_idle(qtbot, window)
     assert not widget.pending_full() and widget.shown_factor() == 1.0
+
+
+def test_leaving_one_to_one_before_the_full_render_clears_the_indicator(make_window, qtbot) -> None:
+    # Round-1 F3: the superseded full render never arrives, so the k > 1 request clears it.
+    method = LevelMethod(delay_s=0.0)
+    window = _open_photo(
+        make_window, qtbot, image(400, 600, seed=1), method=method, size=(300, 250)
+    )
+    widget = window.preview_widget
+    method.delay_s = 0.5
+    window.view_actions["one_to_one"].trigger()
+    assert widget.pending_full()
+    method.delay_s = 0.0
+    widget.fit()
+    wait_idle(qtbot, window)
+    assert widget.shown_factor() > 1 and not widget.pending_full()
+
+
+def _zoom_round_trip(window, qtbot) -> None:
+    widget = window.preview_widget
+    for _ in range(2):
+        window.view_actions["one_to_one"].trigger()
+        wait_idle(qtbot, window)
+        assert widget.shown_factor() == 1.0
+        widget.fit()
+        wait_idle(qtbot, window)
+        assert widget.shown_factor() > 1
+    window.view_actions["one_to_one"].trigger()
+    wait_idle(qtbot, window)
+
+
+def test_full_resolution_is_rendered_once_per_parameter_state(make_window, qtbot) -> None:
+    # Round-1 F2 (question 6): returning to 1:1 or to fit with unchanged parameters shows the
+    # memoised render; a parameter change renders again.
+    method = LevelMethod()
+    src = image(400, 600, seed=3)
+    window = _open_photo(make_window, qtbot, src, method=method, size=(300, 250))
+    assert len(method.rendered) == 1  # the fit render
+    _zoom_round_trip(window, qtbot)
+    assert len(method.rendered) == 2  # plus exactly one full-resolution render
+    assert window.preview_widget.shown_factor() == 1.0 and not window.preview_widget.pending_full()
+    assert image_bytes(window.preview_widget.after_image()).shape[:2] == (400, 600)
+    window.session.set_parameters(new_parameter_set("level", {"level": 0.25}))
+    wait_idle(qtbot, window)
+    assert len(method.rendered) == 3
+    assert image_bytes(window.preview_widget.after_image())[0, 0, 0] == round(0.25 * 255)
+
+
+def test_planted_preview_without_the_render_memo_fails(make_window, qtbot, monkeypatch) -> None:
+    monkeypatch.setattr(render_worker.PreviewMemo, "after", lambda self, *args: None)
+    method = LevelMethod()
+    window = _open_photo(
+        make_window, qtbot, image(400, 600, seed=3), method=method, size=(300, 250)
+    )
+    _zoom_round_trip(window, qtbot)
+    assert len(method.rendered) != 2  # the once-per-state test above would fail on this
+
+
+def test_supplied_statistics_are_not_served_another_states_render(make_window, qtbot) -> None:
+    method = LevelMethod()
+    window = _open_photo(
+        make_window, qtbot, image(400, 600, seed=3), method=method, size=(300, 250)
+    )
+    count = len(method.rendered)
+    window.session.set_statistics({"only": {"mean": np.zeros(3)}})
+    wait_idle(qtbot, window)
+    window.session.set_statistics({"only": {"mean": np.ones(3)}})
+    wait_idle(qtbot, window)
+    assert len(method.rendered) == count + 2  # new statistics objects are new states
 
 
 def test_latest_wins_three_quick_changes_show_only_the_last(make_window, qtbot) -> None:

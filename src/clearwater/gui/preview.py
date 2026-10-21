@@ -38,6 +38,7 @@ from .render_worker import (
     LatestWorker,
     Outcome,
     PreviewMemo,
+    RenderError,
     RenderRequest,
     RenderResult,
     render_preview,
@@ -465,6 +466,8 @@ class PreviewController(QObject):
         self._submitted_k = k
         if k == 1 and self._widget.after_image() is not None and self._widget.shown_factor() > 1:
             self._widget.set_pending_full(True)
+        elif k != 1:
+            self._widget.set_pending_full(False)  # a superseded full render never arrives
         self._renderer.submit(lambda check: render_preview(snapshot, memo, check))
 
     def idle(self) -> bool:
@@ -544,9 +547,14 @@ class PreviewController(QObject):
     def _on_render(self, outcome: Outcome) -> None:
         """Main thread: show the latest result, or the error with the last good preview kept."""
         if outcome.error is not None:
-            _LOG.warning("preview failed: %s", outcome.error)
+            error = outcome.error
+            if isinstance(error, RenderError):
+                if error.token == self._session.image_token():
+                    self._session._set_backend(error.full_reason, error.preview_reason)
+                error = error.cause
+            _LOG.warning("preview failed: %s", error)
             self._widget.set_pending_full(False)
-            self._presenter.present(messages.preview_failure(outcome.error))
+            self._presenter.present(messages.preview_failure(error))
             self._error_shown = True
             return
         result = outcome.value

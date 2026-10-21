@@ -19,6 +19,7 @@ from dataclasses import dataclass
 from typing import Any
 
 import numpy as np
+from numpy.typing import NDArray
 from PySide6.QtCore import QObject, Qt, Signal
 from PySide6.QtGui import QImage
 
@@ -40,6 +41,35 @@ _LOG = logging.getLogger(__name__)
 
 class Superseded(Exception):  # noqa: N818 -- a control-flow signal, not an error
     """Raised by a task's ``check`` when a newer task has been submitted."""
+
+
+class RenderError(Exception):
+    """A preview render that failed after both backend selections succeeded.
+
+    Carries the reasons so the status bar still follows the selection (AD-9) when the render
+    itself fails.
+
+    Attributes:
+        cause: What the render raised.
+        token: The image token of the request.
+        full_reason: The AD-9 reason of the full-resolution selection.
+        preview_reason: The reason of the preview-size selection.
+    """
+
+    def __init__(self, cause: Exception, token: int, full_reason: str, preview_reason: str) -> None:
+        """Wrap ``cause`` with the selection reasons.
+
+        Args:
+            cause: What the render raised.
+            token: The image token of the request.
+            full_reason: The full-resolution reason.
+            preview_reason: The preview-size reason.
+        """
+        super().__init__(str(cause))
+        self.cause = cause
+        self.token = token
+        self.full_reason = full_reason
+        self.preview_reason = preview_reason
 
 
 @dataclass(frozen=True)
@@ -232,10 +262,18 @@ class RenderResult:
     elapsed_s: float
 
 
-class PreviewMemo:
-    """Small caches the preview worker keeps: statistics per parameter state, originals per k.
+AfterKey = tuple[int, int, str, tuple[tuple[str, Any], ...], str]
+"""``(token, k, method id, params_key, preview reason)``: what a corrected display image is of."""
 
-    Used from the preview worker thread; guarded by a lock so the main thread may clear it.
+
+class PreviewMemo:
+    """Small caches the preview worker keeps.
+
+    Statistics per parameter state, originals per factor, and corrected display images per
+    parameter state and factor, so a factor already rendered for the current state (a return to
+    1:1 above all, question 6: "once per parameter state") is shown without ``render``. At most
+    one full-resolution (``k == 1``) corrected image is kept. Used from the preview worker thread;
+    guarded by a lock so the main thread may clear it.
     """
 
     _SIZE = 8
@@ -245,6 +283,7 @@ class PreviewMemo:
         self._lock = threading.Lock()
         self._statistics: OrderedDict[tuple[Any, ...], dict[str, Statistics]] = OrderedDict()
         self._before: OrderedDict[tuple[int, int], QImage] = OrderedDict()
+        self._after: OrderedDict[AfterKey, tuple[object, object, QImage]] = OrderedDict()
 
     def statistics(self, key: tuple[Any, ...]) -> dict[str, Statistics] | None:
         """Return the memoised statistics for a key, or None."""
@@ -270,11 +309,54 @@ class PreviewMemo:
             while len(self._before) > self._SIZE:
                 self._before.popitem(last=False)
 
+    def after(
+        self, key: AfterKey, method: object, statistics: Mapping[str, Statistics] | None
+    ) -> QImage | None:
+        """Return the memoised corrected display image, or None.
+
+        Args:
+            key: What the image is of.
+            method: The method object; a hit needs the same object.
+            statistics: The supplied statistics (None = measured); a hit needs the same object.
+
+        Returns:
+            The image, or None.
+        """
+        with self._lock:
+            entry = self._after.get(key)
+        if entry is None or entry[0] is not method or entry[1] is not statistics:
+            return None
+        return entry[2]
+
+    def put_after(
+        self,
+        key: AfterKey,
+        method: object,
+        statistics: Mapping[str, Statistics] | None,
+        image: QImage,
+    ) -> None:
+        """Memoise a corrected display image, keeping the newest few and one full resolution.
+
+        Args:
+            key: What the image is of.
+            method: The method object it was rendered with.
+            statistics: The supplied statistics it was rendered with (None = measured).
+            image: The image.
+        """
+        with self._lock:
+            if key[1] == 1:
+                for old in [old for old in self._after if old[1] == 1]:
+                    del self._after[old]
+            self._after[key] = (method, statistics, image)
+            while len(self._after) > self._SIZE:
+                self._after.popitem(last=False)
+
     def clear(self) -> None:
         """Drop everything."""
         with self._lock:
             self._statistics.clear()
             self._before.clear()
+            self._after.clear()
 
 
 def render_preview(request: RenderRequest, memo: PreviewMemo, check: Check) -> RenderResult:
@@ -301,25 +383,41 @@ def render_preview(request: RenderRequest, memo: PreviewMemo, check: Check) -> R
     small_h, small_w = downscaled_size(height, width, request.k)
     backend, preview_reason = request.select_backend(request.settings, small_h, small_w, method_id)
     check()
-    statistics = request.statistics
-    if statistics is None:
-        key = (request.token, method_id, request.params_key)
-        statistics = memo.statistics(key)
-        if statistics is None:
-            measured = measure_statistics(request.method, backend, image, request.params, check)
-            memo.put_statistics(key, measured)
-            statistics = measured
-    check()
-    small = downscale(pixels, request.k)
-    check()
-    corrected = render_host(request.method, backend, small, image.color, request.params, statistics)
-    check()
-    icc = image.color.icc_profile
-    after = display_image(to_display_uint8(corrected), icc)
-    before = memo.before(request.token, request.k)
-    if before is None:
-        before = display_image(to_display_uint8(small), icc)
-        memo.put_before(request.token, request.k, before)
+    try:
+        after_key: AfterKey = (
+            request.token,
+            request.k,
+            method_id,
+            request.params_key,
+            preview_reason,
+        )
+        after = memo.after(after_key, request.method, request.statistics)
+        small = None
+        if after is None:
+            statistics = request.statistics
+            if statistics is None:
+                key = (request.token, method_id, request.params_key)
+                statistics = memo.statistics(key)
+                if statistics is None:
+                    measured = measure_statistics(
+                        request.method, backend, image, request.params, check
+                    )
+                    memo.put_statistics(key, measured)
+                    statistics = measured
+            check()
+            small = downscale(pixels, request.k)
+            check()
+            corrected = render_host(
+                request.method, backend, small, image.color, request.params, statistics
+            )
+            check()
+            after = display_image(to_display_uint8(corrected), image.color.icc_profile)
+            memo.put_after(after_key, request.method, request.statistics, after)
+        before = _before_image(memo, request, pixels, small)
+    except Superseded:
+        raise
+    except Exception as exc:
+        raise RenderError(exc, request.token, full_reason, preview_reason) from exc
     return RenderResult(
         token=request.token,
         k=request.k,
@@ -329,3 +427,16 @@ def render_preview(request: RenderRequest, memo: PreviewMemo, check: Check) -> R
         preview_reason=preview_reason,
         elapsed_s=time.perf_counter() - start,
     )
+
+
+def _before_image(
+    memo: PreviewMemo, request: RenderRequest, pixels: NDArray[np.float32], small: Any
+) -> QImage:
+    """Return the display original at the request's factor, memoised per image and factor."""
+    before = memo.before(request.token, request.k)
+    if before is None:
+        if small is None:
+            small = downscale(pixels, request.k)
+        before = display_image(to_display_uint8(small), request.image.color.icc_profile)
+        memo.put_before(request.token, request.k, before)
+    return before

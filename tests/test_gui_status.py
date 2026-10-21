@@ -19,10 +19,12 @@ from clearwater.gui.engines import STUB_ERA_METHOD_ID, default_engines, stub_era
 from clearwater.interfaces import Settings
 from clearwater.interfaces.stubs import StubArrayBackend
 from gui_support import (
+    LevelMethod,
     image,
     make_window,
     open_and_wait,
     photo_engines,
+    presenter_of,
     wait_idle,
 )
 
@@ -52,6 +54,26 @@ def _fixed(full: str, preview: str | None = None, calls: list | None = None):
 def test_device_is_a_dash_before_a_file_is_open(make_window) -> None:
     window = make_window()
     assert window.device_label.text() == "Device: -"
+
+
+def test_a_failed_render_still_reports_the_device(make_window, qtbot) -> None:
+    # Round-1 F5: the selection succeeded, the render failed; the status bar follows the selection.
+    path = Path("p.png")
+    method = LevelMethod()
+
+    def explode() -> None:
+        raise RuntimeError("boom")
+
+    method.busy = explode
+    engines = photo_engines({path: image(40, 60)}, methods={method.id: method})
+    window = make_window(engines)
+    open_and_wait(qtbot, window, path)
+    wait_idle(qtbot, window)
+    assert presenter_of(window).of("error")
+    assert window.device_label.text() == "Device: CPU: stub"
+    window.session.set_settings(Settings(force_cpu=True))
+    wait_idle(qtbot, window)
+    assert window.device_label.text() == "Device: CPU: forced"
 
 
 @pytest.mark.parametrize("reason", REASONS)

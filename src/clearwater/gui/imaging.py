@@ -225,7 +225,8 @@ def display_image(rgb: NDArray[np.uint8], icc_profile: bytes | None) -> QImage:
     """Build the display copy of an 8-bit RGB array, converted to sRGB (question 8).
 
     The data is never changed: only this display copy is tagged with the source ICC profile and
-    converted to sRGB. An untagged source, or a profile Qt cannot parse, is shown as sRGB.
+    converted to sRGB. An untagged source, or a profile Qt cannot parse, is tagged as sRGB
+    unchanged; the result is always tagged sRGB.
 
     Args:
         rgb: uint8 ``(H, W, 3)``.
@@ -237,13 +238,15 @@ def display_image(rgb: NDArray[np.uint8], icc_profile: bytes | None) -> QImage:
     data = np.ascontiguousarray(rgb)
     height, width = data.shape[0], data.shape[1]
     image = QImage(data.data, width, height, 3 * width, QImage.Format.Format_RGB888).copy()
-    if icc_profile:
-        space = QColorSpace.fromIccProfile(QByteArray(icc_profile))
-        if space.isValid():
-            image.setColorSpace(space)
-            image = image.convertedToColorSpace(QColorSpace(QColorSpace.NamedColorSpace.SRgb))
-            if image.format() != QImage.Format.Format_RGB888:
-                image = image.convertToFormat(QImage.Format.Format_RGB888)
+    srgb = QColorSpace(QColorSpace.NamedColorSpace.SRgb)
+    space = QColorSpace.fromIccProfile(QByteArray(icc_profile)) if icc_profile else QColorSpace()
+    if not space.isValid():
+        image.setColorSpace(srgb)
+        return image
+    image.setColorSpace(space)
+    image = image.convertedToColorSpace(srgb)
+    if image.format() != QImage.Format.Format_RGB888:
+        image = image.convertToFormat(QImage.Format.Format_RGB888)
     return image
 
 
