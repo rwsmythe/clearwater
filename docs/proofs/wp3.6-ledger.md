@@ -259,3 +259,30 @@ found nothing new.
 ## Rounds
 
 (Reviewer A rounds are recorded here, one section per round, from round 1.)
+
+## State at the orchestrator gen-7 rollover -- resume here
+
+- **Branch `wp3.6`**, base `4b4da9b`. Working tree clean at the head below; no WIP commit needed.
+- **Done commits:** `748ac75` PhotoReadError; `207a753` dependencies (`uv lock` done); `1a5c722` helpers
+  (orientation, icc, exif, png, heif_boxes) with `tests/test_io_photo_units.py`; `65dc3cc` reader, writer,
+  tiff, color, `__init__`, tests (read, write, rules, planted); `23fdfd9` built-in Display P3 profile
+  (isolated, revertable); `0dc359c` `tools/photo_check.py` and `tests/test_photo_check.py`; `4389cff`
+  report `docs/reports/wp3.6-photo-io.md` and extra read tests (MPO, HEIC alpha, 12-bit); `5636ed0` ledger
+  verification-loop record. Head at this checkpoint: the commit that adds this section.
+- **Own-test count at this head:** `tests/test_io_photo_*.py` and `tests/test_photo_check.py`:
+  376 passed, 1 skipped (the footage-marked real-photo leg). ruff check, ruff format --check and mypy
+  strict clean at `5636ed0`.
+- **Next:** (1) WINDOW REQUEST was sent: the full pytest suite has NOT been run yet; it needs a
+  dispatcher window (background, output under `work/`, then `WINDOW RELEASED: ...` to `main`); record the
+  result in the report's gates line and in a ledger "gates" note. (2) Reviewer A at the cell's seat,
+  STRONG tier, per the brief's "Review loop" (runner and prompt shape from
+  `C:\Users\rwsmy\clearwater-review-evidence\wp3.1\r2\`; evidence in `...\wp3.6\rN\`; `--glob '!docs/proofs/**'`;
+  supply diff and HEAD sha in the prompt; yield after each round's adjudication, before remediating).
+  (3) Return report (<= ~70 lines) as the final message to the dispatcher.
+- **Open questions:** CHARC's ruling on item 2 (nclx-only Display P3: built-in profile in `23fdfd9`, or no
+  `iCCP`; if "no", revert `23fdfd9`, whose only coupling is one marked line in `color.py`). Nothing else.
+- **Rulings standing:** round-0 table accepted; error class shipped first; LZW/JPEG-in-TIFF refused by
+  name; sRGB chunk = explicit sRGB; content-based detection; 12-bit HEIC refused; ICC classified by the
+  stdlib tag reader (report that deviation from question 4's wording, done in the report).
+- **Gotcha for the next cell:** do not type backslash-zero escapes inside heredoc Python in this shell
+  tool; they arrive as real NUL bytes. Use the Write/Edit tools or `chr(92)`.
