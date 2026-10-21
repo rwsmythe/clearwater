@@ -52,7 +52,9 @@ IF-1 makes the range the producer's contract), `check_derived_values` (replaced 
    mean_c`; blue on and off (green, and blue when off, bit-unchanged); the 3C mask below, at
    (not bright) and above (bit-identical pixel) the threshold.
 4. **V9 neutrality:** `alpha = 0`, `c3_strength = 0`, `white_balance_strength = 0` each return
-   the input bit for bit on every input, both devices.
+   an array equal in value to the input (`np.array_equal`) on the test images, both devices. This
+   is value equality, not bit identity: a `-0.0` input may come back as `+0.0` (`-0.0 + 0.0` at
+   `alpha = 0`), as in the prototype.
 5. **Planted wrong implementations fail by name** (each check also passes the product): one
    cap shared by red and blue; the cap applied to 3C; the clamp before the strength; the gains
    clamped below 1 (floor at 1 and a symmetric `[1/max, max]` clamp); BT.601 in 3C; the mask
