@@ -97,7 +97,7 @@ class AnalysisEngine:
 - **PREMISE (Q3) -- reproduced:** quantising the float32 result of `gui.imaging.downscale` in
   float64 does NOT reproduce WP3.12's `floor((block sum + 8) / 16)` on 8-bit data: on 200
   random 64x64x3 8-bit frames at k = 4, 4,707 of the 9,558 exact-tie cells differ by one level;
-  on the float64 mean, 0 differ (scratch `q3.py`, rerunnable in seconds). So the rule binds to
+  on the float64 mean, 0 differ (`C:SERSWSMYEARWATER-REVIEW-EVIDENCEWP3.110Q3_QUANTISATION_REPRO.PY`, SECONDS). So the rule binds to
   the float64 mean; a test asserts equality with the integer rule on 8-bit-derived frames.
 - Host side: `pixels = backend.to_host(frame.pixels)` when `frame.device != "cpu"`, else
   `np.asarray`. The proxy Image: `backend.asarray(proxy_readback / 255, float32)` with the
