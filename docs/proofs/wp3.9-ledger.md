@@ -168,7 +168,8 @@ two-line grant).
 |---|---|---|---|---|---|---|---|---|---|---|
 | 0 (design) | - | - | - | - | - | - | - | - | - | 139,790 |
 | 1 (e9d1a81) | 0 | 1 | 3 | 4 | 0 | 4 | 0 | 0 | product + test (#3, #4, ebcb19f); report text (#1); granted test lines (#2, 66f9e02) | 253,896 |
-| 2 (7508d46) | 0 | 1 | 0 | 1 | 0 | 1 | 0 | 0 | pending: product + test | (dispatcher) |
+| 2 (7508d46) | 0 | 1 | 0 | 1 | 0 | 1 | 0 | 0 | product + test (6eda406) | (dispatcher) |
+| 3 (6ccc9f2) | 0 | 0 | 1 | 1 | 0 | 1 | 0 | 0 | pending cleanup: product + test | (dispatcher) |
 
 ### Round 1 (2026-10-21T07:29Z, codex-cli 0.162.1 over WSL, gpt-5.6-sol high)
 
@@ -198,3 +199,11 @@ subprocess; tokens footer; 7 succeeded-in lines; VERDICT at column 0).
 Round-2 remediation: start under the shutdown lock (product + test). Orchestrator R1 rulings
 received after round 2 (FINAL): the grant repeated; r1 #1 adjudication CONFIRMED (in the report);
 #3, #4 as proposed; depth 253,896 at the round-1 yield, continue in seat.
+
+### Round 3 (2026-10-21T07:46Z, codex-cli 0.162.1 over WSL, gpt-5.6-sol high) -- TERMINATING
+
+Verdict NO_NEW_CRITICAL_MAJOR (0 / 0 / 1). #1 MINOR CONFIRMED (reasoned): a second concurrent
+shutdown returns before the first finishes its cleanup. Fixed once in the cleanup (whole shutdown
+under the lock), no new round. Evidence `C:\Users\rwsmy\clearwater-review-evidence\wp3.9\r3\`.
+Assertions passed (echoed-source ERROR lines only, tokens footer, 19 succeeded-in lines, VERDICT at
+column 0). Reviewer A CONVERGED at round 3.
