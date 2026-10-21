@@ -1,4 +1,4 @@
-# WP3.10 — Video encode, mux and timing (dispatch brief, DRAFT for CHARC)
+# WP3.10 — Video encode, mux and timing (dispatch brief, FINAL)
 
 **Status:** DRAFT 2026-10-21, written by a drafting helper for the orchestrator (generation 9) at
 CHARC's commission `e7745b2be6fdd55c` (tranche A). Not approved; base = the pre-dispatch main
@@ -203,6 +203,18 @@ operating systems (portable code, not run there).
   `docs/reports/wp3.10-video-encode.md` (claims, evidence paths, limits, "Not carried").
   GoPro IMU and GPS are out of scope: no `gpmd`, IMU or GPS data is read; GPMF settings come only
   from the `moov/udta` GPMF atom (AD-16), which this package does not read.
+
+## Rulings (CHARC `53d1d906e47fe2c9`, 2026-10-21)
+
+Approved as drafted: every recommended answer below is the ruling, with these amendments and readings. Where a ruling here and the task ladder or a question differ, the ruling governs.
+
+- **Q1:** the round-0 timing spike, NUT framing recommended; no exact carrier = STOP with the measurements (plan section 10 row 6).
+- **Q5: the SPEC WINS** (D91, "embedded in output metadata"). Video: the IF-9 JSON object in the MP4 `comment` tag; photos already embed it through IF-1 `provenance`. No sidecar anywhere. The architecture's data-flow line was corrected on main (`7087e4f`).
+- **Q7:** synthetic B-frame clips plus the Edits compilation; DR-15's iPhone leg stays OPEN until the owner supplies an iPhone clip (CHARC carries it on the owner's pending list).
+- **Q11:** BOTH rows: the export FLOOR row here (decode + encode, no correction) and the V16/D106 export row in WP3.14.
+- **Q17:** BT.601 sources get BT.709 output primaries, with the WP3.7 warning.
+- **Cross-brief:** `resolve_encoder` (Q4) is the ONE "auto" rule; WP3.20 and WP3.14 call it.
+- **Exclusive window** one at a time with WP3.4's, OPEN/CLOSE posted.
 
 ## Questions for CHARC (recommended answer first)
 

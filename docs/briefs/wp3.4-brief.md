@@ -1,4 +1,4 @@
-# WP3.4 — Method assembly: stages and parameter schema (dispatch brief, DRAFT for CHARC)
+# WP3.4 — Method assembly: stages and parameter schema (dispatch brief, FINAL)
 
 **Status:** DRAFT 2026-10-21 for CHARC (commission `e7745b2be6fdd55c`, tranche A); drafted by a
 drafting helper of the orchestrator (gen 9). Owner decisions: none inside the package (the
@@ -73,7 +73,7 @@ WP3.1 deferred to it (WP3.1 brief questions 3 and 4; WP3.1 accept "Follow-ons").
    (Ancuti) or `compensate_c3`; `applied_gains` on the supplied gray-world gains (the D99
    clamp on "the gains actually used for rendering"); `fusion_inputs` with the supplied bounds;
    `weight_maps` with the supplied saliency means; `multiscale_fusion`; then
-   `(1 - b) * fused + b * input` with `b = blend_with_original` (AD-8). Output float32 in
+   `(1 - b) * fused + b * input` with `b = blend_with_original / 100` (AD-8; the schema value is 0..100 per the rulings). Output float32 in
    [0, 1], same device and colour description; refuses a missing stage (IF-3).
 5. **Schema and validation (6.7, D17, D49, question 4).** One schema per method; c3 has no
    cap, `alpha` or `blue_compensation`; ancuti2018 has no `kappa`, `lambda_`, `c3_*`. Basic per
@@ -111,7 +111,7 @@ WP3.1 deferred to it (WP3.1 brief questions 3 and 4; WP3.1 accept "Follow-ons").
      round-0 table says so, else AD-11 with the maximum reported. CPU against GPU within AD-11;
      same device twice bit-identical (N10).
    - V9 at method level: `Params.neutral()` values give the input within AD-11 V9 for both
-     methods on every listed still (maximum and mean reported); blend 1.0 returns the input.
+     methods on every listed still (maximum and mean reported); blend 100 returns the input.
    - V8 at method level: `clearwater.gui.imaging.preview_export_difference` at k = 1, 2, 4 on
      the stills and on a synthetic 4K-sized texture: k = 1 exact; mean ≤ 1/255, max ≤ 3/255
      (a miss is a STOP with the figures).
@@ -194,6 +194,18 @@ multi-GPU (DR-2). The speed and memory figures are best effort on a shared lapto
   and WP3.21). Outputs of the instrument under `work/wp3.4/`. The footage folder is read only.
   No `gpmd`, IMU or GPS data.
 
+## Rulings (CHARC `53d1d906e47fe2c9`, 2026-10-21)
+
+Approved as drafted: every recommended answer below is the ruling, with these amendments and readings. Where a ruling here and the task ladder or a question differ, the ruling governs.
+
+- **Q1 (Y-1) RULED as recommended**, and it is an IF-3 READING, not an amendment: `closed_form` is non-None only for the `source_only` compensation stage; WB `gains` are pre-strength/pre-clamp, applied in `render` after smoothing; Ancuti `alpha` is capped per frame and smoothed as a value. The report states it in ONE text identical to WP3.11's report.
+- **Q2 granted:** `clearwater.core.backend_for(device)`, one additive public function; WP3.4 owns that one addition to `clearwater.core`, and WP3.1's tests are extended for it.
+- **Q4:** DR-19 closes in WP3.4. **Q5 granted, type-only:** DR-37 (b) call-site edits in the WP3.2/WP3.3 modules.
+- **Q6 per the register:** DR-38 (a)(b)(c) in WP3.4; DR-40 (b) to WP3.4's whole-core row or WP3.21.
+- **Q7:** `tools/core_speed.py --whole --memory`, in an EXCLUSIVE window (OPEN/CLOSE posted; one at a time with WP3.10's). The bar is D106's interim figure; the real target is WP3.21's.
+- **Q8:** DR-13 placement only.
+- **Blend with original (WP3.4 and WP3.17):** the spec defines the control as 0-100 %. The SCHEMA value is the user-facing value: WP3.4 defines `blend_with_original` as a float 0..100, label "Blend with original (%)", neutral 0 (AD-8), and the method converts to 0-1 internally; presets store 0-100. No IF-3 unit field. WP3.17 shows the schema value with the label; nothing is special-cased.
+
 ## Questions for CHARC (recommended answer first)
 
 1. **Y-1 (cross-brief, WP3.4 and WP3.11): the statistics contract.** IF-3 fixes the signatures,
@@ -231,7 +243,7 @@ multi-GPU (DR-2). The speed and memory figures are best effort on a shared lapto
    and WP3.17's sliders need finite ones. Recommended: every float and int parameter gets a
    finite minimum and maximum, proposed in the round-0 table and ruled by the dispatcher (a
    positive minimum where the prototype requires `> 0`; `max_white_balance_gain` minimum 1.0;
-   caps `nullable`, minimum 0; `blend_with_original` 0.0 to 1.0 per AD-8, the percent display
+   caps `nullable`, minimum 0; `blend_with_original` 0 to 100 (AMENDED by the rulings; the method converts to 0-1), the percent display
    being WP3.17's); what bounds cannot express (`normalisation_low < normalisation_high`, the
    float32-range products the prototype checks) is checked by the method at the start of
    `analyze` and `render`, one ValueError naming the parameter in the X-4 form. The rule text of

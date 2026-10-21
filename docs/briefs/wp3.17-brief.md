@@ -1,4 +1,4 @@
-# WP3.17 — Parameter panels and presets (dispatch brief, DRAFT for CHARC)
+# WP3.17 — Parameter panels and presets (dispatch brief, FINAL)
 
 **Status:** DRAFT 2026-10-21 for CHARC (orchestrator generation 9, wave 3 tranche B; drafted
 against main `9364f8f` plus the DR-44 pre-dispatch contract members); base = the pre-dispatch
@@ -185,6 +185,13 @@ windows; screen readers and accessibility (not in the spec); other operating sys
   `docs/reports/wp3.17-parameter-panels-presets.md` (claims, evidence paths, limits, and a
   "Consumer notes" section for WP3.4 and WP4.3). The footage folder is not used; outputs only
   under `tmp_path` or `work/`. GoPro data is out of scope: no `gpmd`, IMU or GPS data.
+
+## Rulings (CHARC `53d1d906e47fe2c9`, 2026-10-21)
+
+Approved as drafted: every recommended answer below is the ruling, with these amendments and readings. Where a ruling here and the task ladder or a question differ, the ruling governs.
+
+- **Blend with original (WP3.4 and WP3.17):** the spec defines the control as 0-100 %. The SCHEMA value is the user-facing value: WP3.4 defines `blend_with_original` as a float 0..100, label "Blend with original (%)", neutral 0 (AD-8), and the method converts to 0-1 internally; presets store 0-100. No IF-3 unit field. WP3.17 shows the schema value with the label; nothing is special-cased.
+- **DR-44 members** as landed on main (the pre-dispatch commit); the four GUI briefs are written against those names.
 
 ## Questions for CHARC (recommended answer first)
 

@@ -1,4 +1,4 @@
-# WP3.11 — Analysis engine (dispatch brief, DRAFT for CHARC)
+# WP3.11 — Analysis engine (dispatch brief, FINAL)
 
 **Status:** DRAFT 2026-10-21 for CHARC (commission `e7745b2be6fdd55c`, tranche A); drafted by a
 drafting helper of the orchestrator (gen 9). Owner decisions: none inside the package. The 2.0 s
@@ -184,6 +184,15 @@ other operating systems (portable, N1, not run there).
   for WP3.14, WP3.18 and WP4.2, and the step-aware table). Instrument outputs under
   `work/wp3.11/`. Footage read only through `tools/local_config.find_footage_file`. No `gpmd`,
   IMU or GPS data.
+
+## Rulings (CHARC `53d1d906e47fe2c9`, 2026-10-21)
+
+Approved as drafted: every recommended answer below is the ruling, with these amendments and readings. Where a ruling here and the task ladder or a question differ, the ruling governs.
+
+- **Q1 (Y-1) RULED as recommended**, an IF-3 READING, not an amendment (see WP3.4's brief); the report states it in ONE text identical to WP3.4's report.
+- **Q3:** the twin proxy rule in `clearwater.analysis` with an equality test against `gui.imaging` (one function would need a `gui` -> `analysis` import direction, which is forbidden).
+- **Q6:** step-aware kinds evaluated by the owned tool; the default is unchanged (a default change is spec 7.2, owner-reserved).
+- **Q7:** V3 with a test-local method double; the product-method V3 is WP4.2's.
 
 ## Questions for CHARC (recommended answer first)
 

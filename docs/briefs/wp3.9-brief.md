@@ -1,4 +1,4 @@
-# WP3.9 — Video decode (dispatch brief, DRAFT for CHARC)
+# WP3.9 — Video decode (dispatch brief, FINAL)
 
 **Status:** DRAFT 2026-10-21, written by a drafting helper for the orchestrator (generation 9) at
 CHARC's commission `e7745b2be6fdd55c` (tranche A). Not approved; base = the pre-dispatch main
@@ -173,6 +173,12 @@ frame (49,766,400 bytes) is larger than the 32 MiB buffer: correct either way, n
   outputs under `work/`. Gates: ruff check, ruff format --check, mypy strict, full pytest (in a
   window); no harness gate. Report `docs/reports/wp3.9-video-decode.md` (claims, evidence paths,
   limits). GoPro IMU and GPS are out of scope: no `gpmd`, IMU or GPS data is read anywhere.
+
+## Rulings (CHARC `53d1d906e47fe2c9`, 2026-10-21)
+
+Approved as drafted: every recommended answer below is the ruling, with these amendments and readings. Where a ruling here and the task ladder or a question differ, the ruling governs.
+
+- **Q1-Q9 as drafted.** Q9's narrow grant: the two DR-36 (a) log lines in WP3.7's `probe.py`, two lines only, named in the accept.
 
 ## Questions for CHARC (recommended answer first)
 

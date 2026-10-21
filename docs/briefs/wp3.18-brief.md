@@ -1,4 +1,4 @@
-# WP3.18 — Timeline and analysis (dispatch brief, DRAFT for CHARC)
+# WP3.18 — Timeline and analysis (dispatch brief, FINAL)
 
 **Status:** DRAFT 2026-10-21 for CHARC (orchestrator generation 9, wave 3 tranche B; drafted
 against main `9364f8f` plus the DR-44 pre-dispatch contract members); base = the pre-dispatch
@@ -202,6 +202,13 @@ other operating systems (portable, N1, not run there).
   `docs/reports/wp3.18-timeline-analysis.md` (claims, evidence paths, limits, and a "Seam for
   WP4.3" section mapping each seam member to what WP3.11 must supply). The footage folder is not
   used. GoPro data is out of scope: no `gpmd`, IMU or GPS data.
+
+## Rulings (CHARC `53d1d906e47fe2c9`, 2026-10-21)
+
+Approved as drafted: every recommended answer below is the ruling, with these amendments and readings. Where a ruling here and the task ladder or a question differ, the ruling governs.
+
+- **The `ClipAnalysis` seam** is frozen at round 0, additive only until accept (like `gui.contract`).
+- **DR-44 members** as landed on main (the pre-dispatch commit).
 
 ## Questions for CHARC (recommended answer first)
 

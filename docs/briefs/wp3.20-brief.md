@@ -1,4 +1,4 @@
-# WP3.20 — Settings (dispatch brief, DRAFT for CHARC)
+# WP3.20 — Settings (dispatch brief, FINAL)
 
 **Status:** DRAFT 2026-10-21 for CHARC (orchestrator generation 9, wave 3 tranche B; drafted
 against main `9364f8f` plus the DR-44 pre-dispatch contract members); base = the pre-dispatch
@@ -179,6 +179,14 @@ envelope: a settings folder on a slow network share; a real sink whose `capabili
   (claims, evidence paths, limits, and "Consumer notes" for WP3.14 and WP4.3: the "auto"
   resolution rule the dialog assumes). The footage folder is never used. GoPro data is out of
   scope: no `gpmd`, IMU or GPS data.
+
+## Rulings (CHARC `53d1d906e47fe2c9`, 2026-10-21)
+
+Approved as drafted: every recommended answer below is the ruling, with these amendments and readings. Where a ruling here and the task ladder or a question differ, the ruling governs.
+
+- **Q3 AMENDED:** WP3.10's `resolve_encoder` is the ONE "auto" rule. This dialog calls it (a stub with the same signature until WP3.10 is on main) and does not restate the rule; the remainder of Q3 (list order, disabled unavailable encoders with the reason, a stored encoder no longer reported kept and shown unavailable) stands.
+- **Q5:** D75's names govern over the 8.2 example. **Q1:** OK while the settings file is refused is session-only. **Q4:** Clear cache is disabled while analysis runs.
+- **DR-44 members** as landed on main (the pre-dispatch commit).
 
 ## Questions for CHARC (recommended answer first)
 

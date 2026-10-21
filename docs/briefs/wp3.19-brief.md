@@ -1,4 +1,4 @@
-# WP3.19 — Batch queue and export progress (dispatch brief, DRAFT for CHARC)
+# WP3.19 — Batch queue and export progress (dispatch brief, FINAL)
 
 **Status:** DRAFT 2026-10-21 for CHARC (orchestrator generation 9, wave 3 tranche B; drafted
 against main `9364f8f` plus the DR-44 pre-dispatch contract members); base = the pre-dispatch
@@ -180,6 +180,13 @@ not run there).
   `docs/reports/wp3.19-batch-export.md` (claims, evidence paths, limits, and a "Seam for WP3.14
   and WP4.3" section). The footage folder is never used. GoPro data is out of scope: no
   `gpmd`, IMU or GPS data.
+
+## Rulings (CHARC `53d1d906e47fe2c9`, 2026-10-21)
+
+Approved as drafted: every recommended answer below is the ruling, with these amendments and readings. Where a ruling here and the task ladder or a question differ, the ruling governs.
+
+- **The `ExportJobs` seam** is frozen at round 0, additive only until accept; WP3.14's brief cites it.
+- **DR-44 members** as landed on main (the pre-dispatch commit).
 
 ## Questions for CHARC (recommended answer first)
 
