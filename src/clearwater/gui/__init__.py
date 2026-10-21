@@ -30,6 +30,8 @@ from .contract import (
     ShellContext,
     ShellWindow,
 )
+from .engines import default_engines, stub_engines
+from .shell import MainWindow, run
 
 __all__ = [
     "AnalysisPhase",
@@ -38,6 +40,7 @@ __all__ = [
     "Engines",
     "JobHandle",
     "JobRunner",
+    "MainWindow",
     "Message",
     "MessagePresenter",
     "MessageSeverity",
@@ -51,4 +54,7 @@ __all__ = [
     "ShellActions",
     "ShellContext",
     "ShellWindow",
+    "default_engines",
+    "run",
+    "stub_engines",
 ]
