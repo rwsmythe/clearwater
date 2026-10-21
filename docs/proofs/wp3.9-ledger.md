@@ -167,7 +167,8 @@ two-line grant).
 | Round | Crit | Major | Minor | In-env | Out-env | NEW | REOPENED | Reverts | Fix kind | Depth |
 |---|---|---|---|---|---|---|---|---|---|---|
 | 0 (design) | - | - | - | - | - | - | - | - | - | 139,790 |
-| 1 (e9d1a81) | 0 | 1 | 3 | 4 | 0 | 4 | 0 | 0 | pending: #3, #4 product + test; #1 report text; #2 test outside owned files (grant) | (dispatcher) |
+| 1 (e9d1a81) | 0 | 1 | 3 | 4 | 0 | 4 | 0 | 0 | product + test (#3, #4, ebcb19f); report text (#1); granted test lines (#2, 66f9e02) | (dispatcher, not given) |
+| 2 (7508d46) | 0 | 1 | 0 | 1 | 0 | 1 | 0 | 0 | pending: product + test | (dispatcher) |
 
 ### Round 1 (2026-10-21T07:29Z, codex-cli 0.162.1 over WSL, gpt-5.6-sol high)
 
@@ -179,3 +180,17 @@ CONFIRMED (a frame can be returned after a concurrent `close()` returned). Evide
 per-finding table: `C:\Users\rwsmy\clearwater-review-evidence\wp3.9\r1\` (`adjudication.md`,
 `md5sums.txt`). Mechanical assertions passed (banner, 3 echoed-source ERROR lines, tokens footer,
 7 succeeded-in lines, VERDICT at column 0).
+
+Round-1 remediation (after the orchestrator's grant of the two module names, 2026-10-21): #2
+`66f9e02` (test, granted lines); #3 and #4 and #1's text `ebcb19f` (product + test + report);
+`7508d46` test sources made ASCII-only. #1's behaviour kept per the round-0 table (no ruling
+received to the contrary).
+
+### Round 2 (2026-10-21T07:38Z, codex-cli 0.162.1 over WSL, gpt-5.6-sol high)
+
+Reviewer verdict NEW_CRITICAL_MAJOR_FOUND (0 / 1 / 0). #1 MAJOR CONFIRMED, EXECUTED by the cell
+(`probe_r2_1.py`: a close() landing during the lazy FFmpeg start leaves a live child and thread,
+still alive after a second close()). New with r1 #4's cross-thread claim. Fix pending: start under
+the shutdown lock. Evidence: `C:\Users\rwsmy\clearwater-review-evidence\wp3.9\r2\`. Mechanical
+assertions passed (5 echoed-source ERROR lines and 1 WSL interop line from the reviewer's own
+subprocess; tokens footer; 7 succeeded-in lines; VERDICT at column 0).
