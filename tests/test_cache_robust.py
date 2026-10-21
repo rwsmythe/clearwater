@@ -290,10 +290,13 @@ def test_readers_see_whole_records_while_one_writer_stores(tmp_path: Path) -> No
                 if found is None:
                     continue
                 for pts in found.pts_ticks[-5:]:
+                    # a published proxy must always be readable: a KeyError here is a failure
                     assert cache.proxy(KEY, pts).tobytes() == pixels(pts).tobytes()
-                    assert float(cache.source_statistics(KEY, "s", pts)["x"][0]) == float(pts)
-        except KeyError:
-            pass  # a statistics record not yet stored for the newest proxy is a miss
+                    try:
+                        stats = cache.source_statistics(KEY, "s", pts)
+                    except KeyError:
+                        continue  # the statistics of the newest proxy may not be stored yet
+                    assert float(stats["x"][0]) == float(pts)
         except BaseException as error:
             errors.append(error)
 
@@ -355,3 +358,160 @@ def test_importing_the_cache_loads_nothing_forbidden() -> None:
     )
     assert result.returncode == 0, result.stderr[-2000:]
     assert json.loads(result.stdout.strip().splitlines()[-1]) == []
+
+
+# --- round 1 of Reviewer A -----------------------------------------------------------------
+
+
+def test_a_damaged_proxy_found_on_read_makes_a_complete_entry_incomplete(tmp_path: Path) -> None:
+    folder = tmp_path / "c"
+    with lossless_cache(folder) as first:
+        for n in range(3):
+            first.store_proxy(KEY, n, pixels(n))
+        first.mark_complete(KEY)
+    pack = pack_of(folder)
+    raw = bytearray(pack.read_bytes())
+    raw[32 + (len(raw) - 32) // 2] ^= 0xFF  # inside the middle record
+    pack.write_bytes(bytes(raw))
+    cache = lossless_cache(folder)
+    assert sum(_raises_key_error(cache, n) for n in range(3)) == 1
+    found = cache.lookup(KEY)
+    assert found is not None and len(found.pts_ticks) == 2
+    assert found.complete is False  # an entry with a missing proxy is not complete
+    cache.close()
+    reopened = lossless_cache(folder).lookup(KEY)
+    assert reopened is not None and reopened.complete is False  # nor after a reopen
+
+
+def test_clear_waits_for_a_reader_that_still_has_the_file_open(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    folder = tmp_path / "c"
+    cache = lossless_cache(folder)
+    cache.store_proxy(KEY, 0, pixels(0))
+    monkeypatch.setattr(store_module, "_UNLINK_PAUSE", 0.0)
+    real_unlink = os.unlink
+    refused = {"count": 0}
+
+    def unlink(path: Any, *args: Any, **kwargs: Any) -> None:
+        if str(path).endswith("data.pack") and refused["count"] < 2:
+            refused["count"] += 1
+            raise PermissionError("the file is open in another handle")
+        real_unlink(path, *args, **kwargs)
+
+    monkeypatch.setattr(store_module.os, "unlink", unlink)
+    cache.clear()
+    assert refused["count"] == 2
+    assert cache.lookup(KEY) is None
+    assert not (folder / entry_name(KEY)).exists()
+
+
+def test_clear_that_cannot_remove_an_open_file_keeps_the_entry_and_does_not_raise(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    folder = tmp_path / "c"
+    cache = lossless_cache(folder)
+    cache.store_proxy(KEY, 0, pixels(0))
+    monkeypatch.setattr(store_module, "_UNLINK_PAUSE", 0.0)
+    real_unlink = os.unlink
+
+    def unlink(path: Any, *args: Any, **kwargs: Any) -> None:
+        raise PermissionError("always open")
+
+    monkeypatch.setattr(store_module.os, "unlink", unlink)
+    cache.clear()
+    assert cache.lookup(KEY) is not None
+    monkeypatch.setattr(store_module.os, "unlink", real_unlink)
+    cache.clear()
+    assert cache.lookup(KEY) is None
+
+
+def _hooked_codec(hook: Any) -> ProxyCodec:
+    """Return the lossless codec with a hook run at the start of every encode (lock not held)."""
+
+    def encode(proxy: Any) -> bytes:
+        hook()
+        return DEFLATE.encode(proxy)
+
+    return ProxyCodec(DEFLATE.codec_id, "hooked", True, encode, DEFLATE.decode, DEFLATE.shape)
+
+
+def test_the_entry_being_written_is_not_evicted_while_a_store_call_runs(tmp_path: Path) -> None:
+    folder = tmp_path / "c"
+    armed: list[bool] = []
+    holder: list[DiskProxyCache] = []
+
+    def hook() -> None:
+        if armed:
+            holder[0].set_limit_bytes(1)  # another thread lowers the limit mid-store
+
+    cache = DiskProxyCache(folder, codec=_hooked_codec(hook))
+    holder.append(cache)
+    version = cache.cache_version
+    older = CacheKey(KEY.size + 1, KEY.mtime_ns, version)
+    newer = CacheKey(KEY.size + 2, KEY.mtime_ns, version)
+    key = CacheKey(KEY.size, KEY.mtime_ns, version)
+    cache.store_proxy(key, 0, pixels(0))
+    cache.store_proxy(older, 0, pixels(1))
+    cache.store_proxy(newer, 0, pixels(2))  # the last store is another entry
+    armed.append(True)
+    cache.store_proxy(key, 1, pixels(1))
+    found = cache.lookup(key)
+    assert found is not None and found.pts_ticks == (0, 1)  # the earlier record survived
+
+
+def test_two_overlapping_statistics_stores_on_one_key_are_refused(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    cache = lossless_cache(tmp_path / "c")
+    cache.store_proxy(KEY, 0, pixels(0))
+    errors: list[BaseException] = []
+    real_encode = store_module.encode_statistics
+
+    def encode(stats: Any) -> bytes:
+        # the first call is encoding; a second store call on the key starts now
+        if not errors:
+            try:
+                cache.store_source_statistics(KEY, "s", 1, {"x": np.zeros(1)})
+            except RuntimeError as error:
+                errors.append(error)
+        return real_encode(stats)
+
+    monkeypatch.setattr(store_module, "encode_statistics", encode)
+    cache.store_source_statistics(KEY, "s", 0, {"x": np.zeros(1)})
+    assert len(errors) == 1
+
+
+def test_a_failed_append_whose_rollback_also_fails_still_counts_the_bytes(tmp_path: Path) -> None:
+    folder = tmp_path / "c"
+    cache = lossless_cache(folder)
+    cache.store_proxy(KEY, 0, pixels(0))
+    real = pack_of(folder).open("r+b")
+
+    class Broken:
+        """A file whose write stops half way and whose truncate fails."""
+
+        def seek(self, *args: Any) -> int:
+            return real.seek(*args)
+
+        def write(self, data: bytes) -> int:
+            real.write(data[:9])
+            real.flush()
+            raise OSError("disk full")
+
+        def truncate(self, *args: Any) -> int:
+            raise OSError("cannot truncate")
+
+        def flush(self) -> None:
+            real.flush()
+
+        def close(self) -> None:
+            real.close()
+
+    cache._writer = lambda entry: Broken()  # type: ignore[method-assign,assignment,return-value]
+    with pytest.raises(OSError):
+        cache.store_proxy(KEY, 1, pixels(1))
+    found = cache.lookup(KEY)
+    assert found is not None and found.pts_ticks == (0,)
+    on_disk = sum(p.stat().st_size for p in (folder / entry_name(KEY)).iterdir())
+    assert found.size_bytes == on_disk

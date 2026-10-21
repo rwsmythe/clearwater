@@ -72,6 +72,8 @@ from .layout import (
 
 _LOG = logging.getLogger("clearwater.cache")
 _INT64 = 1 << 63
+_UNLINK_TRIES = 6
+_UNLINK_PAUSE = 0.01
 
 
 @dataclass
@@ -116,6 +118,33 @@ def _stage_covers(proxy_pts: set[int], stage_pts: dict[int, Rec]) -> bool:
     return proxy_pts <= stage_pts.keys()
 
 
+def _unlink(path: str) -> bool:
+    """Delete one file, trying again briefly when it is open elsewhere.
+
+    A reader holds a pack open only for the instant of one seek and read, but Windows refuses to
+    delete a file while it is open; a few short pauses let that read finish.
+
+    Args:
+        path: The file.
+
+    Returns:
+        True when the file is gone (or was already), False when it could not be removed.
+    """
+    for attempt in range(_UNLINK_TRIES):
+        try:
+            os.unlink(path)
+        except FileNotFoundError:
+            return True
+        except PermissionError:
+            if attempt + 1 < _UNLINK_TRIES:
+                time.sleep(_UNLINK_PAUSE)
+        except OSError:
+            return False
+        else:
+            return True
+    return False
+
+
 def _remove_files(folder: Path) -> bool:
     """Delete the files of the cache's own names in ``folder``, then the folder if it is empty.
 
@@ -140,11 +169,7 @@ def _remove_files(folder: Path) -> bool:
             continue
         if item.is_symlink() or not item.is_file(follow_symlinks=False):
             continue
-        try:
-            os.unlink(item.path)
-        except FileNotFoundError:
-            pass
-        except OSError:
+        if not _unlink(item.path):
             removed = False
     if removed:
         with contextlib.suppress(OSError):
@@ -334,13 +359,14 @@ class DiskProxyCache:
         self._check_key(key)
         if not isinstance(stage, str) or not stage:
             raise ValueError("a stage name is a non-empty string")
-        payload = encode_statistics(stats)
-        with self._write_slot(key), self._lock:
-            entry = self._entry_for_write(key)
-            if self._already_stored(entry, KIND_STATS, stage, pts, payload):
-                return
-            self._append(entry, KIND_STATS, 0, stage, pts, payload)
-            self._after_store(key)
+        with self._write_slot(key):
+            payload = encode_statistics(stats)
+            with self._lock:
+                entry = self._entry_for_write(key)
+                if self._already_stored(entry, KIND_STATS, stage, pts, payload):
+                    return
+                self._append(entry, KIND_STATS, 0, stage, pts, payload)
+                self._after_store(key)
 
     def source_statistics(self, key: CacheKey, stage: str, pts_ticks: int) -> Statistics:
         """Return one frame's stored source-only statistics, dtype, shape and bytes exactly.
@@ -588,6 +614,19 @@ class DiskProxyCache:
         entry.complete = False
         entry.aux_size = self._aux_size(entry.folder)
 
+    def _lose_completeness(self, entry: _Entry) -> None:
+        """Make a complete entry incomplete because one of its proxies turned out to be damaged.
+
+        The marker is removed so that a new instance does not believe it either. If the marker
+        cannot be removed the entry is still incomplete in this instance and the next scan
+        checks the marker against the pack.
+        """
+        try:
+            self._unmark(entry)
+        except OSError as error:
+            entry.complete = False
+            _LOG.warning("cache marker of %s not removed: %s", entry.folder.name, error)
+
     def _already_stored(
         self, entry: _Entry, kind: int, stage: str, pts: int, payload: bytes
     ) -> bool:
@@ -645,6 +684,8 @@ class DiskProxyCache:
                 handle.seek(offset)
                 handle.truncate()
             self._close_writer()
+            with contextlib.suppress(OSError):
+                entry.pack_size = entry.pack.stat().st_size  # a tail that stayed is counted
             raise
         rec = Rec(offset, len(record), codec_id)
         if kind == KIND_PROXY:
@@ -700,6 +741,8 @@ class DiskProxyCache:
             table = entry.index.proxies if kind == KIND_PROXY else entry.index.stats.get(stage, {})
             if table.get(pts) == rec:
                 del table[pts]
+                if kind == KIND_PROXY:
+                    self._lose_completeness(entry)
 
     def _total(self) -> int:
         """Return the bytes all entries occupy."""
@@ -716,7 +759,7 @@ class DiskProxyCache:
 
     def _evict(self, protected: set[CacheKey]) -> None:
         """Evict oldest-first until the total fits the limit or only pinned entries remain."""
-        pinned = set(protected)
+        pinned = set(protected) | self._writing
         for key in (self._last_lookup, self._last_store):
             if key is not None:
                 pinned.add(key)
