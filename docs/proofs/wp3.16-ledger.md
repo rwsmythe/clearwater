@@ -12,6 +12,7 @@ Cell: implementer-opus-high (tier STRONG; ruling 1). Worktree `.worktrees/wp3.16
 | 1 | 2026-10-21 | 0/2 (F1 full suite red by pytest-qt; F2 1:1 re-render) | 4 confirmed (F3, F4, F5; F7 out) + 1 rejected (F6) | 6 in / 1 out (F7) | 7 NEW / 0 REOPENED | 0 | planned: product (F2-F5, F7) + a ruled line outside the files owned (F1) | WSL, codex-cli 0.162.1, gpt-5.6-sol high | (dispatcher) |
 | 2 | 2026-10-21 | 0/1 (R2-2 `view_factor` hang, reproduced) | 4 (R2-1 proposed down from MAJOR, R2-3, R2-4, R2-5) | 5 in / 0 out | 3 NEW (R2-2, R2-3, R2-5) / 2 REOPENED (R2-1 of F2, R2-4 of F3) | 0 | round-1 fixes: product (F2-F5, F7) + granted test line (F1); planned: product (R2-1..R2-4) + test/report (R2-5) | WSL, codex-cli 0.162.1, gpt-5.6-sol high | (dispatcher) |
 | 3 | 2026-10-21 | 0/1 (R3-2 stale memoised render after an in-place statistics update) | 3 (R3-1 proposed down from MAJOR, R3-3, R3-4) | 4 in / 0 out | 2 NEW (R3-1, R3-2 major, in a round-1 fix) / 2 REOPENED (R3-3 of F3, R3-4 of F4) | 0 | round-2 fixes: product (R2-1..R2-4) + test (R2-5); planned: product (R3-2..R3-4) + an additive contract getter (R3-1, to rule) | WSL, codex-cli 0.162.1, gpt-5.6-sol high | (dispatcher) |
+| 4 | 2026-10-21 | 0/0 | 3 (R4-1, R4-2, R4-3) | 3 in / 0 out | 2 NEW (R4-2, R4-3) / 1 REOPENED (R4-1 of F4) | 0 | round-3 fixes: product (R3-2..R3-4), R3-1 banked; planned cleanup: product (R4-1, R4-2) + test (R4-3) | WSL, codex-cli 0.162.1, gpt-5.6-sol high | (dispatcher) |
 
 ## Round 0: the design table (brief task 1)
 
@@ -480,3 +481,43 @@ fixed code the planted identity-only memo shows the stale 51 where 204 is requir
 
 Gates at `211ec88`: GUI tests 107 passed (28 s), with `tests/test_conftest_guard.py` 151 passed
 (58 s); ruff check (repo) 0; ruff format --check 0 (140 files); mypy strict 0 (87 files).
+
+## Reviewer A round 4 -- CONVERGED
+
+Head reviewed `f04694b` (product code as `211ec88`). Evidence
+`C:\Users\rwsmy\clearwater-review-evidence\wp3.16\r4\` (probe, prompt with "THIS IS ROUND 4"
+listing R1-R3 with fixes and the banked R3-1, diff, review.txt, review.stderr.txt,
+adjudication.md, test-summary.txt, md5sums.txt). Probe READY. Assertions passed (banner
+gpt-5.6-sol/high, 15 `succeeded in`, tokens 196,551, VERDICT at column 0, ERROR matches all
+echo). Withheld paths respected. All REASONED. Verdict **`NO_NEW_CRITICAL_MAJOR`**: zero new
+blocking, so the loop terminates at round 4. Round-3 fixes verified.
+
+| # | Sev | Verdict | In env | NEW/REOPENED | Planned cleanup fix |
+|---|---|---|---|---|---|
+| R4-1 | MINOR | CONFIRMED (read): an exception escaping `sources.open_source` becomes a refusal with no file name (`shell.py` `_on_opened`) | yes | REOPENED (F4) | the open task catches and returns `(path, messages.refusal(path, ...))`; test |
+| R4-2 | MINOR | CONFIRMED (read): every `UnsupportedFormatVersionError` is called "from a newer Clearwater", but `config/migration.py` raises it also for an older version with no migration | yes | NEW | neutral text (or "newer" only when it is); test with a version-0 file |
+| R4-3 | MINOR | CONFIRMED (read): the 1:1 exactness test runs only at DPR 1 | yes | NEW | test only: a child process with `QT_SCALE_FACTOR=2` asserting DPR 2 and exact 1:1 device pixels; planted DPR-ignoring draw fails |
+
+Per the fill, these minors are fixed once in the terminating round's cleanup and open no further
+round.
+
+## State for a successor (written at the round-4 yield, 2026-10-21)
+
+- **Head:** the commit of this section on `wp3.16` (on top of `f04694b`); tree clean, nothing WIP.
+  Base `4b4da9b`. Product code as `211ec88`.
+- **Review:** Reviewer A CONVERGED at round 4 (`NO_NEW_CRITICAL_MAJOR`). Round ledger above.
+  Banked: R3-1 MINOR (measured photo statistics not exposed; consumer note in the report), F7
+  out of envelope (fixed anyway).
+- **Open (cleanup, no further round):** R4-1, R4-2, R4-3 as in the table above, with the planned
+  fixes. Files: `src/clearwater/gui/shell.py` (R4-1, R4-2), `tests/test_gui_startup.py` (R4-2),
+  `tests/test_gui_open.py` (R4-1), `tests/test_gui_preview.py` or a new child-process helper in
+  `tests/gui_support.py` (R4-3). Each with a test failing on the current code.
+- **Gates at `211ec88`:** GUI tests 107 passed; with `tests/test_conftest_guard.py` 151 passed;
+  ruff, format, mypy clean. Full suite: run by the orchestrator on the merge candidate (the last
+  full run was at `0e4412c`, before round 1, with F1's failure since fixed in `fa99105`).
+- **Carried to the accept report:** the `fda06b7` subject's "(V7)" overstates (report
+  corrected); the GIL-starvation observation (216-796 ms) goes to WP4.3; the by-name
+  `PhotoReadError` catch lands at the rebase onto WP3.6; main's venv needs
+  `uv sync --reinstall-package pyside6-essentials --reinstall-package shiboken6` after the
+  Essentials switch; `tests/test_conftest_guard.py` is changed outside the owned set under the
+  round-1 F1 grant.
