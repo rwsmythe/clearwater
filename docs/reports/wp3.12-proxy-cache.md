@@ -255,3 +255,18 @@ of the right shape fail with `ValueError` until that record is read (it is then 
 shape is read again from a surviving proxy) or the cache is cleared. Argument validation of a store
 call precedes the overlap check, so an overlapping call with an invalid argument raises that
 argument's error rather than `RuntimeError`.
+
+## Erratum at the gate (orchestrator, Reviewer B pass 2)
+
+- **Limits, the last sentence** ("Argument validation of a store call precedes the overlap check ...")
+  reads: the checks on the array itself (a numpy array, uint8 `(H, W, 3)`, non-empty) and on the key
+  precede the overlap check; the check against the entry's existing shape runs inside the write
+  slot, so an overlapping `store_proxy` with a valid array of another shape raises `RuntimeError`,
+  not the shape `ValueError`. Documentation only; no data is affected.
+- **Verification:** the cache suite has 97 tests (95 before the Reviewer B remediation), not 95.
+- **Limits, added:** a codec whose `encode` is not the registered one for its id gets a cache
+  version bound to the process and to the encoder object's `id()`. Python can reuse an object's
+  `id()` after it is freed, so two DIFFERENT custom encoders created one after the other in one
+  process, on one cache folder, can share a version. Only test-hook codecs reach this: production
+  passes registered codecs (`CODECS`, `DEFAULT_CODEC`), whose versions do not depend on the process.
+  Banked as DR-41.
