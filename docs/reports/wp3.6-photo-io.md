@@ -156,8 +156,9 @@ merge, never a hand merge.
     (#6).
   - The DNG tag walk (`has_dng_tag`) reads classic TIFF only; a BigTIFF (`II+`/`MM+`) DNG is not
     recognised by tag (its `.dng` extension is) and goes on to the TIFF reader (#7).
-  - A palette TIFF's 16-bit colour map is reduced to 8 bits (palette images are 8-bit indices; documented
-    in the round-0 table) (#8).
+  - A palette TIFF's 16-bit colour map is reduced to 8 bits by truncation (palette images are 8-bit
+    indices; documented in the round-0 table; the error is below 1/255, inside AD-11 V9's 2/255, and a map
+    authored from 8-bit values reads exact) (#8, challenged again in round 2 and kept banked).
 
 ## Waits for real photos (WP3.6P, question 11)
 

@@ -8,7 +8,8 @@ base main `4b4da9b`. Brief `docs/briefs/wp3.6-brief.md` (FINAL, CHARC rulings `5
 | Round | Depth (dispatcher fills) | Critical / Major / Minor | In envelope vs out | NEW vs REOPENED | Reverts | Product vs test-only fixes |
 |---|---|---|---|---|---|---|
 | 0 (design table, no product code) | 96,178 / 18 turns (dispatcher, 01:21:43Z) | n/a | n/a | n/a | 0 | n/a |
-| 1 (STRONG, gpt-5.6-sol high, WSL codex-cli; head 983bff1) | (dispatcher) | 0 / 3 / 9 adjudicated (reviewer's own 0 / 8 / 4) | 6 in envelope (#1, #5, #9-#12), 6 out or marginal (#2-#4, #6-#8) | 12 NEW, 0 REOPENED | 0 | remediation not started (planned: all product code plus tests, #12 a docstring) |
+| 1 (STRONG, gpt-5.6-sol high, WSL codex-cli; head 983bff1) | (dispatcher) | 0 / 3 / 9 adjudicated (reviewer's own 0 / 8 / 4) | 6 in envelope (#1, #5, #9-#12), 6 out or marginal (#2-#4, #6-#8) | 12 NEW, 0 REOPENED | 0 | remediated: product code plus tests (8 fixes, #12 a docstring), 4 banked |
+| 2 (STRONG, gpt-5.6-sol high, WSL codex-cli; head 171332b) | (dispatcher) | 0 / 0 / 3 adjudicated, 1 not a finding (reviewer's own 0 / 4 / 0) | 1 in envelope (#4), 1 marginal (#1), 1 banked (#2), 1 contradicts ruling (#3) | 3 NEW (#1, #3 as a report, #4), 1 REOPENED (#2 = R1 #8) | 0 | cleanup fixes proposed, NOT started: #1 and #4, product code plus tests |
 
 ## Round 0: the design table (task 1)
 
@@ -351,3 +352,24 @@ on the candidate). LF blobs verified (no CR in any changed blob).
   (608 bytes), pinned by tests.
 - Gates: ruff check, ruff format --check, mypy strict clean; own tests 404 passed, 1 skipped.
   Full suite: NOT run (window pending).
+
+### Round 2 (Reviewer A, head 171332b)
+
+Evidence `C:/Users/rwsmy/clearwater-review-evidence/wp3.6/r2/` (prompt with a "THIS IS ROUND 2" section,
+whole-package diff, `review.txt`, `review.stderr.txt` full transcript, `adjudication.md`, `probes/probe_r2.py`,
+`md5sums.txt`). Pre-run: own tests 418 passed, 1 skipped; ruff check, ruff format --check, mypy clean; the
+full suite was NOT run at this head (the orchestrator runs it on the candidate). Mechanical assertions:
+banner gpt-5.6-sol / high; the one `ERROR` line is a WSL vsock line from a subprocess; `tokens used` footer
+present; 13 `succeeded in` lines; VERDICT anchored. The reviewer ran nothing: all REASONED; the cell
+reproduced #1, #2, #4.
+
+| # | Adjudicated | Finding | Planned cleanup |
+|---|---|---|---|
+| 1 | MINOR (reviewer MAJOR), marginal, NEW | WhiteIsZero grey TIFF refused as unsupported (`tiff.py:99`) | accept MINISWHITE, invert by the sample maximum; test at 8 and 16 bits |
+| 2 | MINOR (reviewer MAJOR), BANKED, REOPENED (R1 #8) | palette TIFF 16-bit colour map reduced to 8 bits | none: bank (limit text gains the <= 1/255 figure) |
+| 3 | not a finding (reviewer MAJOR) | a grey ICC profile is not carried | none: brief question 8, ruled |
+| 4 | MINOR (reviewer MAJOR), in env, NEW | `from_tiff` drops the source byte order (a little-endian TIFF gives a big-endian block) | carry `source.endian`; test the block's byte order |
+
+Totals: 0 critical, 0 major, 3 minor, 1 not a finding. New blocking: none; the gate's convergence criterion
+is met. Remediation NOT started (yield at the round boundary): the cleanup (#1, #4) is for the dispatcher to
+order.
