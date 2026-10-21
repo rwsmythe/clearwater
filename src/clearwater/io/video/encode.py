@@ -581,8 +581,8 @@ class FFmpegVideoSink:
         """
         kinds = {fault.kind for fault in probe.faults}
         if "truncated" in kinds:
-            corrupt = set(source.video_corrupt_pts)
-            readable = sorted(p for p in source.video_pts if p not in corrupt)
+            first_bad = min(source.video_corrupt_pts, default=None)
+            readable = sorted(p for p in source.video_pts if first_bad is None or p < first_bad)
             if not readable:
                 raise VideoEncodeError("refused", "The video has no readable frame.")
             self._audio_cut = True
