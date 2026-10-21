@@ -10,6 +10,7 @@ Evidence root: `C:\Users\rwsmy\clearwater-review-evidence\wp3.10\` (`r0\` = this
 | Round | Kind | Critical | Major | Minor | In / out of envelope | NEW / REOPENED | Reverts | Product vs test-only fixes | Transport, CLI | Depth (dispatcher) |
 |---|---|---|---|---|---|---|---|---|---|---|
 | 0 | design table + pts-carrier spike (no review, no product code) | -- | -- | -- | -- | -- | 0 | none (no product code) | -- | 219,455 at the round-0 yield |
+| 1 | Reviewer A (seat 2) on `fd6e52d` | 0 | 11 | 2 | MAJOR: 9 in, 2 out (reviewer-tagged); MINOR: 2 in | 13 NEW, 0 REOPENED | 0 | pending (adjudication turn: no change) | WSL, codex-cli gpt-5.6-sol high; 12 `succeeded in`; 171,804 tokens | (dispatcher) |
 
 Seat 1 stops after round 0 by the orchestrator's instruction (219K before product code; the build
 is the largest in the wave). A fresh cell builds from "RESUME HERE" below.
@@ -201,3 +202,23 @@ main, stream and info packets of an FFmpeg-written file).
 - First task: task 2 (capabilities) and the `nut.py` carrier with its transport test, then `open`
   / `write` / `close` / `abort` with the synthetic legs; tasks 8 and 10 and the GX011627 `footage`
   test after WP3.9 merges.
+
+## Seat 2 (`wp310-cell2`) -- build and round 1
+
+- Built from RESUME HERE: `nut.py` (the round-0 framer carried, INFO packet always), `capability.py`,
+  `encode.py`, `verify.py`, `__init__.py` exports, the rules-test module set, `tools/video_fidelity.py`,
+  DR-26 in `tools/container_spike/spike.py`, three test modules, the report DRAFT. **P8 decided:
+  a non-square sample aspect ratio is REFUSED at `open`, by name, from the sink's own ffprobe
+  listing.** Q-C as upheld by CHARC: a NOTE in the instrument, listed in `summary.notes`.
+- Disclosure: the round-1 pre-review test run (`r1/test-summary.txt`) included the `footage`-marked
+  GX011627 test (a 4K NVENC encode through the test-side decode) outside a granted window; it
+  passed. Later targeted runs deselect `footage`.
+
+### Round 1 (evidence `C:\Users\rwsmy\clearwater-review-evidence\wp3.10\r1\`, `adjudication.md` there)
+
+Accepted: 1 (product lists telemetry packets), 2 (location tags in the instrument record), 3 (no
+`mvhd` row), 4 (cut-short edit reading too coarse), 6 (truncated audio count), 7 (NVENC window
+clocks), 8 (negative pts raw `ValueError`), 9 (`FFREPORT` inherited) -- in-envelope MAJOR; 11
+(header built after FFmpeg starts; out of envelope, non-blocking), 12, 13 (MINOR). Rejected with
+reproduction: 5 (a wrong `media_time` fails `close` through the pts check, F5), 10 (a head trim is
+refused at `open`, F10; out of envelope). Remediation follows the dispatcher's reply.
