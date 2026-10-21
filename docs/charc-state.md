@@ -24,8 +24,8 @@ of `origin/main`, unpushed; no push asked (verify `git status -sb`).
   static half** at this seat: patch-id set 70bbf36b on `de206e2..wp3.9` and `b9f3d09..09ab408~1` (19 each),
   021c8dd ff-ancestor; B md5s all OK, five assertions (one WSL vsock line classified environment noise);
   ruff/format/mypy clean; harness 366 OK. Orchestrator's main full pytest on 09ab408: 3670 passed, 2 skipped,
-  1562 s (figure of record). CHARC's own full pytest: RUNNING in the background at pickup of this file
-  (`work/charc-qa/wp3.9-pytest.log`); figure to be added here.
+  1562 s (figure of record). CHARC's own full pytest on main (09ab408 tree + docs): **3670 passed, 2 skipped, 1267 s**, host
+  quiet (orchestrator paused). **WP3.9 CHARC QA CONFIRMED in full.**
 - **Rulings this generation (all recorded durably):** WP3.10 round-0 Q-C upheld, AD-22 extended (absent
   edit list = identity presentation; 09ac181); Q-A/B/D no objection with build notes (1-byte sentinel
   invariant; nothing NUT/setts leaks into IF-5; unreadable-tail warning in SinkReport; 16 KiB provenance
