@@ -250,7 +250,7 @@ maxima were at the border; real footage behaves differently.)
 ## RESUME HERE (for the fresh cell, cell 3)
 
 **Status at hand-off (cell 2, 2026-10-21, depth 346,044 per the dispatcher):** the build is
-COMPLETE and every ruling is applied; NO full pytest and NO Reviewer A round has run yet.
+COMPLETE and every ruling is applied; full pytest GREEN (below); NO Reviewer A round has run.
 Branch `wp3.4` (worktree `C:\Users\rwsmy\clearwater\.worktrees\wp3.4`), base `de206e2`, head =
 the commit carrying this section. Design: the brief (incl. its Rulings), R0-1..R0-7 and the
 round-0 rulings above, the cell-2 rulings in "Build" below (B-1, B-2 option A, V8). Do not
@@ -269,20 +269,24 @@ schema tables, Y-1 verbatim, DR-19 rule, claims 1-14, V8 table, consumer notes, 
 gates green (ruff check, ruff format --check, mypy strict 109 files). Targeted tests green on
 CPU and GPU, incl. the core and WP3.2/WP3.3 files (571 + 565).
 
+**Full pytest (window granted 2026-10-21, cell 2, depth 368,709):** at `84ad0ef` (code
+identical to `79661c1`; only the ledger differs), CuPy importable, `QT_QPA_PLATFORM=offscreen`,
+`--basetemp=work/pt-full`: **3868 passed, 2 skipped, 2 warnings in 975.80s (0:16:15)**, exit 0,
+no FAILED or ERROR line (`work/full-pytest.txt` in the worktree).
+
 **Remaining, in order:**
-1. **Full pytest** in a window the dispatcher grants (`QT_QPA_PLATFORM=offscreen`,
-   `--basetemp=work/<name>`, background, output to a file; grep the summary; send
-   `WINDOW RELEASED: <summary>`). "With and without CuPy importable" per the brief's Done line.
-2. **Reviewer A from round 1** (STRONG, `docs/review-gate-clearwater.md` Part 1; runner and
+1. **Reviewer A from round 1** (STRONG, `docs/review-gate-clearwater.md` Part 1; runner and
    prompt shape from `C:\Users\rwsmy\clearwater-review-evidence\wp3.1\r2\`; evidence to
    `C:\Users\rwsmy\clearwater-review-evidence\wp3.4\rN\`; `--glob '!docs/proofs/**'`; diff
    `de206e2..HEAD`). Yield at every verdict BEFORE remediating; commit the ledger row per round.
-3. **EXCLUSIVE windows**, each on the dispatcher's grant, one at a time, when the code is
+2. **EXCLUSIVE windows**, each on the dispatcher's grant, one at a time, when the code is
    final: first `uv run python tools/core_speed.py GX011627 --memory`, then
    `uv run python tools/core_speed.py GX011627 --whole --cpu-frames 10` (outputs under the
    working folder's `wp3.4/`; grep the `MEMORY`, `ROW`, `BAR`, `RECORD` lines). STOP with the
    figures if a pool reserved peak exceeds `memory_estimate_bytes` or a core median exceeds
    D106's 0.834 s/frame.
+3. **Full pytest without CuPy importable** (the brief's Done line; one more window), and the
+   with-CuPy run again on the final head after any Reviewer A fix.
 4. **Report**: fill the speed and memory sections (and DR-40 b's upload count/timing from the
    record), remove "DRAFT", update the status line; final return report per the recipe.
 
@@ -328,3 +332,4 @@ Probe-derived figures for the report: `C:\Users\rwsmy\clearwater-review-evidence
 |---|---|---|---|---|---|---|---|---|---|
 | 0 (design) | 192,064 | -- | -- | -- | -- | -- | -- | -- | -- (no review round; design table + rulings) |
 | build (cell 2) | 346,044 | -- | -- | -- | -- | -- | -- | -- | -- (no review round; build + rulings applied; re-seat) |
+| full pytest (cell 2) | 368,709 | -- | -- | -- | -- | -- | -- | -- | -- (3868 passed, 2 skipped; hand-off to cell 3) |
