@@ -64,11 +64,10 @@ def test_an_nclx_only_display_p3_heic_carries_the_profile_to_the_png(tmp_path: P
     assert again.color.primaries == "display-p3"
 
 
-@pytest.mark.parametrize("primaries", [1, 9])
-def test_other_nclx_primaries_get_no_built_in_profile(tmp_path: Path, primaries: int) -> None:
-    image, _ = read_photo(_nclx_heic(tmp_path / "x.heic", primaries))
+def test_other_nclx_primaries_get_no_built_in_profile(tmp_path: Path) -> None:
+    image, _ = read_photo(_nclx_heic(tmp_path / "x.heic", 9))
     assert image.color.icc_profile is None
-    assert image.color.primaries == ("bt709" if primaries == 1 else "unknown")
+    assert image.color.primaries == "unknown"
     assert image.color.assumed is False
 
 

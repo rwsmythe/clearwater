@@ -6,7 +6,8 @@ which breaks D53 ("Photos keep source primaries end to end"). The reader therefo
 profile in ``ColorDescription.icc_profile`` for that one case, so the writer needs no special
 case. The build is a stdlib port of the synthetic-fixture builder of WP2.1S (reference reading
 only; ``src/`` never imports ``tools/``). This module is isolated so it can be removed cleanly:
-the only caller is the ``nclx`` branch of :func:`clearwater.io.photo.color.describe_color`.
+the only callers are :mod:`clearwater.io.photo.color` and the sRGB sibling, which reuses
+:func:`build_rgb_profile`.
 """
 
 from __future__ import annotations
@@ -24,6 +25,7 @@ _BRADFORD = (
     (-0.7502, 1.7135, 0.0367),
     (0.0389, -0.0685, 1.0296),
 )
+Primaries = tuple[tuple[float, float], tuple[float, float], tuple[float, float]]
 Matrix = tuple[tuple[float, float, float], tuple[float, float, float], tuple[float, float, float]]
 Vector = tuple[float, float, float]
 
@@ -60,9 +62,9 @@ def _xyz(xy: tuple[float, float]) -> Vector:
     return (x / y, 1.0, (1.0 - x - y) / y)
 
 
-def _colorants() -> tuple[Vector, Vector, Vector, Matrix]:
-    """Return the Display P3 colorants adapted to D50 (Bradford) and the adaptation matrix."""
-    primaries = [_xyz(p) for p in _DISPLAY_P3]
+def _colorants(chromaticities: Primaries) -> tuple[Vector, Vector, Vector, Matrix]:
+    """Return the colorants of D65 primaries adapted to D50 (Bradford) and the adaptation matrix."""
+    primaries = [_xyz(p) for p in chromaticities]
     columns: Matrix = (
         (primaries[0][0], primaries[1][0], primaries[2][0]),
         (primaries[0][1], primaries[1][1], primaries[2][1]),
@@ -101,21 +103,25 @@ def _text_tag(text: str) -> bytes:
     )
 
 
-def display_p3_profile() -> bytes:
-    """Build an ICC v4.3 display profile with Display P3 primaries and the sRGB tone curve.
+def build_rgb_profile(description: str, chromaticities: Primaries) -> bytes:
+    """Build an ICC v4.3 display profile with D65 primaries and the sRGB tone curve.
 
     The colorants are the primaries adapted from D65 to the D50 connection space with the
     Bradford matrix, which the ``chad`` tag records; the profile ID is left zero (not computed).
 
+    Args:
+        description: The ``desc`` text.
+        chromaticities: The red, green and blue CIE xy chromaticities.
+
     Returns:
-        The profile's bytes.
+        The profile's bytes; the same arguments always give the same bytes.
     """
-    red, green, blue, adapt = _colorants()
+    red, green, blue, adapt = _colorants(chromaticities)
     parameters = (2.4, 1 / 1.055, 0.055 / 1.055, 1 / 12.92, 0.04045)
     curve = b"para\x00\x00\x00\x00" + struct.pack(">HH", 3, 0) + b"".join(map(_s15, parameters))
     chad = b"sf32\x00\x00\x00\x00" + b"".join(_s15(v) for row in adapt for v in row)
     tags = [
-        (b"desc", _text_tag(DESCRIPTION)),
+        (b"desc", _text_tag(description)),
         (b"cprt", _text_tag("No copyright; built in")),
         (b"wtpt", _xyz_tag(_D50)),
         (b"chad", chad),
@@ -143,3 +149,12 @@ def display_p3_profile() -> bytes:
         + b"\x00" * 48
     )
     return header + table + data
+
+
+def display_p3_profile() -> bytes:
+    """Build the built-in Display P3 profile (Display P3 primaries, sRGB tone curve).
+
+    Returns:
+        The profile's bytes (620; their md5 is pinned by a test).
+    """
+    return build_rgb_profile(DESCRIPTION, _DISPLAY_P3)
