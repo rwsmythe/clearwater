@@ -167,7 +167,7 @@ two-line grant).
 | Round | Crit | Major | Minor | In-env | Out-env | NEW | REOPENED | Reverts | Fix kind | Depth |
 |---|---|---|---|---|---|---|---|---|---|---|
 | 0 (design) | - | - | - | - | - | - | - | - | - | 139,790 |
-| 1 (e9d1a81) | 0 | 1 | 3 | 4 | 0 | 4 | 0 | 0 | product + test (#3, #4, ebcb19f); report text (#1); granted test lines (#2, 66f9e02) | (dispatcher, not given) |
+| 1 (e9d1a81) | 0 | 1 | 3 | 4 | 0 | 4 | 0 | 0 | product + test (#3, #4, ebcb19f); report text (#1); granted test lines (#2, 66f9e02) | 253,896 |
 | 2 (7508d46) | 0 | 1 | 0 | 1 | 0 | 1 | 0 | 0 | pending: product + test | (dispatcher) |
 
 ### Round 1 (2026-10-21T07:29Z, codex-cli 0.162.1 over WSL, gpt-5.6-sol high)
@@ -194,3 +194,7 @@ still alive after a second close()). New with r1 #4's cross-thread claim. Fix pe
 the shutdown lock. Evidence: `C:\Users\rwsmy\clearwater-review-evidence\wp3.9\r2\`. Mechanical
 assertions passed (5 echoed-source ERROR lines and 1 WSL interop line from the reviewer's own
 subprocess; tokens footer; 7 succeeded-in lines; VERDICT at column 0).
+
+Round-2 remediation: start under the shutdown lock (product + test). Orchestrator R1 rulings
+received after round 2 (FINAL): the grant repeated; r1 #1 adjudication CONFIRMED (in the report);
+#3, #4 as proposed; depth 253,896 at the round-1 yield, continue in seat.
