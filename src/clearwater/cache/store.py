@@ -27,6 +27,7 @@ import json
 import logging
 import operator
 import os
+import re
 import struct
 import threading
 import time
@@ -54,6 +55,7 @@ from .layout import (
     META_NAME,
     PACK_HEADER_SIZE,
     PACK_NAME,
+    REMOVING_NAME,
     TEMP_SUFFIX,
     PackError,
     PackIndex,
@@ -72,6 +74,8 @@ from .layout import (
 
 _LOG = logging.getLogger("clearwater.cache")
 _INT64 = 1 << 63
+_TEMP_NAME = re.compile(r"^(?:data\.pack|complete|meta\.json)\.[a-z0-9_]{8}\.tmp$")
+"""The shape of a temporary of ``atomic_write_text`` (``tempfile`` names: 8 random characters)."""
 _UNLINK_TRIES = 6
 _UNLINK_PAUSE = 0.01
 _READER_WAIT = 5.0
@@ -104,15 +108,13 @@ class _Entry:
 
 def _is_cache_file(name: str) -> bool:
     """Return whether a file name in an entry folder is one the cache writes (or a temporary)."""
-    if name in CACHE_FILE_NAMES:
-        return True
-    return name.endswith(TEMP_SUFFIX) and any(name.startswith(f"{n}.") for n in CACHE_FILE_NAMES)
+    return name in CACHE_FILE_NAMES or _TEMP_NAME.match(name) is not None
 
 
-def _eviction_key(entry: _Entry) -> tuple[int, tuple[int, int, int]]:
-    """Return the sort key of eviction: the oldest last use first, ties by the key."""
+def _eviction_key(entry: _Entry) -> tuple[bool, int, tuple[int, int, int]]:
+    """Return the sort key of eviction: entries marked for removal, then the oldest last use."""
     key = entry.key
-    return entry.stamp, (key.size, key.mtime_ns, key.cache_version)
+    return not entry.closing, entry.stamp, (key.size, key.mtime_ns, key.cache_version)
 
 
 def _stage_covers(proxy_pts: set[int], stage_pts: dict[int, Rec]) -> bool:
@@ -263,7 +265,7 @@ class DiskProxyCache:
         """
         with self._lock:
             entry = self._entries.get(key)
-            if entry is None or not self._ensure_scanned(entry):
+            if entry is None or entry.closing or not self._ensure_scanned(entry):
                 return None
             index = entry.index
             if not index.proxies and not index.stats:
@@ -414,7 +416,12 @@ class DiskProxyCache:
         """
         with self._write_slot(key), self._lock:
             entry = self._entries.get(key)
-            if entry is None or not self._ensure_scanned(entry) or entry.index.records == 0:
+            if (
+                entry is None
+                or entry.closing
+                or not self._ensure_scanned(entry)
+                or entry.index.records == 0
+            ):
                 raise KeyError(f"nothing is stored for {key}")
             if self._wentry is entry and self._wfile is not None:
                 self._wfile.flush()
@@ -552,7 +559,10 @@ class DiskProxyCache:
         except (PackError, OSError):
             _remove_files(folder)
             return
-        entry = _Entry(key, folder, size, stamp=read_stamp(folder / META_NAME))
+        marked = (folder / REMOVING_NAME).exists()
+        if marked and _remove_files(folder):
+            return
+        entry = _Entry(key, folder, size, stamp=read_stamp(folder / META_NAME), closing=marked)
         entry.aux_size = self._aux_size(folder)
         self._entries[key] = entry
 
@@ -560,7 +570,7 @@ class DiskProxyCache:
     def _aux_size(folder: Path) -> int:
         """Return the bytes of an entry's marker and meta files."""
         total = 0
-        for name in (MARKER_NAME, META_NAME):
+        for name in (MARKER_NAME, META_NAME, REMOVING_NAME):
             with contextlib.suppress(OSError):
                 total += (folder / name).stat().st_size
         return total
@@ -590,6 +600,9 @@ class DiskProxyCache:
 
     def _entry_for_write(self, key: CacheKey) -> _Entry:
         """Return the entry of ``key`` ready for appending, creating it if there is none."""
+        entry = self._entries.get(key)
+        if entry is not None and entry.closing and not self._remove_entry(entry):
+            raise OSError(f"the cache entry of {key} is marked for removal and cannot be replaced")
         entry = self._entries.get(key)
         if entry is not None and self._ensure_scanned(entry):
             return entry
@@ -795,10 +808,26 @@ class DiskProxyCache:
                 break
             self._idle.wait(left)
         if not _remove_files(entry.folder):
-            entry.closing = False
+            self._mark_for_removal(entry)
             return False
         self._entries.pop(entry.key, None)
         return True
+
+    def _mark_for_removal(self, entry: _Entry) -> None:
+        """Leave an entry that could not be removed marked for removal: logged, never silently kept.
+
+        The entry is not served any more and is the first to go at the next eviction or ``clear``;
+        a marker file in its folder makes the next open remove it too.
+        """
+        entry.closing = True
+        _LOG.warning(
+            "cache entry %s could not be removed; it is marked for removal", entry.folder.name
+        )
+        try:
+            atomic_write_text(entry.folder / REMOVING_NAME, "removing")
+        except OSError as error:
+            _LOG.warning("removal mark of %s not written: %s", entry.folder.name, error)
+        entry.aux_size = self._aux_size(entry.folder)
 
     def _evict(self, protected: set[CacheKey]) -> None:
         """Evict oldest-first until the total fits the limit or only pinned entries remain."""

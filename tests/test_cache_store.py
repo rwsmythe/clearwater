@@ -583,9 +583,9 @@ def test_planted_newest_first_eviction_is_caught(
 ) -> None:
     original = store_module._eviction_key
 
-    def newest_first(entry: object) -> tuple[int, tuple[int, int, int]]:
-        stamp, key = original(entry)  # type: ignore[arg-type]
-        return -stamp, key
+    def newest_first(entry: object) -> tuple[bool, int, tuple[int, int, int]]:
+        marked, stamp, key = original(entry)  # type: ignore[arg-type]
+        return marked, -stamp, key
 
     monkeypatch.setattr(store_module, "_eviction_key", newest_first)
     with pytest.raises(AssertionError):

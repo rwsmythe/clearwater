@@ -406,7 +406,7 @@ def test_clear_waits_for_a_reader_that_still_has_the_file_open(
     assert not (folder / entry_name(KEY)).exists()
 
 
-def test_clear_that_cannot_remove_an_open_file_keeps_the_entry_and_does_not_raise(
+def test_clear_that_cannot_remove_an_open_file_marks_the_entry_for_removal_and_logs(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     folder = tmp_path / "c"
@@ -419,11 +419,14 @@ def test_clear_that_cannot_remove_an_open_file_keeps_the_entry_and_does_not_rais
         raise PermissionError("always open")
 
     monkeypatch.setattr(store_module.os, "unlink", unlink)
-    cache.clear()
-    assert cache.lookup(KEY) is not None
+    cache.clear()  # does not raise, and does not keep the entry silently
+    assert cache.lookup(KEY) is None  # it is not served any more ...
+    entry = folder / entry_name(KEY)
+    assert (entry / "removing").exists()  # ... and it is marked for removal on disk
     monkeypatch.setattr(store_module.os, "unlink", real_unlink)
-    cache.clear()
-    assert cache.lookup(KEY) is None
+    again = lossless_cache(folder)  # the next open removes it
+    assert not entry.exists()
+    assert again.lookup(KEY) is None
 
 
 def _hooked_codec(hook: Any) -> ProxyCodec:
@@ -552,7 +555,7 @@ def test_clear_waits_for_a_reader_that_holds_the_pack_open_for_longer_than_any_r
     assert not (folder / entry_name(KEY)).exists()
 
 
-def test_an_entry_whose_pack_cannot_be_removed_keeps_its_marker_and_stamp(
+def test_an_entry_whose_pack_cannot_be_removed_is_not_half_removed(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     folder = tmp_path / "c"
@@ -571,9 +574,9 @@ def test_an_entry_whose_pack_cannot_be_removed_keeps_its_marker_and_stamp(
         monkeypatch.setattr(store_module, "_READER_WAIT", 0.0)
         monkeypatch.setattr(store_module.os, "unlink", unlink)
         cache.clear()
-        assert sorted(p.name for p in entry.iterdir()) == ["complete", "data.pack", "meta.json"]
-        found = cache.lookup(KEY)
-        assert found is not None and found.complete  # still whole and still complete
+        names = sorted(p.name for p in entry.iterdir())
+        assert names == ["complete", "data.pack", "meta.json", "removing"]  # the pack stayed whole
+        assert cache.lookup(KEY) is None  # but the entry is marked for removal, not served
 
 
 def test_a_marker_that_cannot_be_deleted_is_overwritten_so_a_reopen_is_not_complete(
@@ -604,3 +607,42 @@ def test_a_marker_that_cannot_be_deleted_is_overwritten_so_a_reopen_is_not_compl
     cache.close()
     reopened = lossless_cache(folder).lookup(KEY)
     assert reopened is not None and reopened.complete is False
+
+
+def test_a_store_into_an_entry_marked_for_removal_replaces_it_or_refuses(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    folder = tmp_path / "c"
+    cache = lossless_cache(folder)
+    cache.store_proxy(KEY, 0, pixels(0))
+    real_unlink = os.unlink
+    monkeypatch.setattr(store_module, "_UNLINK_PAUSE", 0.0)
+    monkeypatch.setattr(store_module, "_READER_WAIT", 0.0)
+
+    def unlink(path: Any, *args: Any, **kwargs: Any) -> None:
+        raise PermissionError("open elsewhere")
+
+    monkeypatch.setattr(store_module.os, "unlink", unlink)
+    cache.clear()
+    with pytest.raises(OSError):
+        cache.store_proxy(KEY, 1, pixels(1))  # cannot replace an entry that cannot be removed
+    monkeypatch.setattr(store_module.os, "unlink", real_unlink)
+    cache.store_proxy(KEY, 1, pixels(1))  # now the old entry goes and a fresh one starts
+    found = cache.lookup(KEY)
+    assert found is not None and found.pts_ticks == (1,)
+
+
+def test_cleanup_deletes_only_temporaries_of_the_shape_atomic_write_text_makes(
+    tmp_path: Path,
+) -> None:
+    folder = tmp_path / "c"
+    with lossless_cache(folder) as first:
+        first.store_proxy(KEY, 0, pixels(0))
+    entry = folder / entry_name(KEY)
+    ours = entry / "meta.json.ab12_xy9.tmp"
+    foreign = entry / "meta.json.backup.tmp"
+    ours.write_text("x", encoding="utf-8")
+    foreign.write_text("keep me", encoding="utf-8")
+    lossless_cache(folder)  # opening removes the cache's own leftovers
+    assert not ours.exists()
+    assert foreign.read_text(encoding="utf-8") == "keep me"

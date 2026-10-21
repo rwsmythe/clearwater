@@ -27,8 +27,9 @@ from .codec import CODECS, SHAPE_PREFIX_BYTES
 PACK_NAME = "data.pack"
 MARKER_NAME = "complete"
 META_NAME = "meta.json"
+REMOVING_NAME = "removing"
 TEMP_SUFFIX = ".tmp"
-CACHE_FILE_NAMES = frozenset({PACK_NAME, MARKER_NAME, META_NAME})
+CACHE_FILE_NAMES = frozenset({PACK_NAME, MARKER_NAME, META_NAME, REMOVING_NAME})
 """The file names the cache writes into an entry folder (plus ``*.tmp`` temporaries)."""
 
 PACK_MAGIC = b"CWPK"
