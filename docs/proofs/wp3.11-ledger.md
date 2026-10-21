@@ -299,3 +299,24 @@ smoothed is signalled by `smoothed_record(p)` succeeding (near phase) and by the
 8. `earlier` = the smoothed records of ALL earlier stages (R0-6).
 9. The store's hash checks as keyword-only extensions of `put`/`raw`/`smoothed` (R0-4).
 10. `all_pts` = pts holding at least one raw record; the axis survives `invalidate_from` (R0-4).
+
+## Build findings (before Reviewer A)
+
+### V3-1 -- V3's 25 % ratio is not met on the AD-14 clip by a centred smoother (STOP, reproduced)
+
+`tests/test_analysis_v3.py` runs the engine on `ad14-flicker` (90 frames, decoded by FFmpeg) with
+two test-local methods holding real whole-frame statistics, and measures the AD-14 metric (mean
+absolute frame-to-frame difference of the corrected output inside `ad14-mask`, in /255):
+
+| Double | Per-frame (provisional) | Smoothed (2.0 s median_gaussian) | Ratio | AD-14 (< 0.5) |
+|---|---|---|---|---|
+| Gray-world gains | 0.0076 | 0.0042 | 0.55 | met |
+| Gains + 0.5/99.5 % luma stretch (c3's two kinds of statistic) | 0.0835 | 0.0533 | 0.64 | met |
+
+Cause: the disc's centre sweeps LINEARLY across the frame (`tools/fixtures/flicker.py`
+`disc_centre_x`), so the whole-frame statistics drift smoothly (red gain first differences grow
+steadily, e.g. 2e-5 to 9e-5 over 20 frames); a centred filter preserves a smooth trend, so it
+cannot take the frame-to-frame change below about half. WP1.4's real-footage figures are also
+above 25 % (0.053/0.151 = 0.35 to 0.106/0.236 = 0.45, AD-14's row). AD-14's absolute bound is
+met by two orders of magnitude. The two V3-ratio tests are `xfail(strict=True)` pending a ruling.
+Reproduction: `uv run pytest tests/test_analysis_v3.py -s` (about 45 s; FFmpeg needed).
