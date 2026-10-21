@@ -135,3 +135,17 @@ def test_identities_that_collide_in_24_bits_still_give_different_versions() -> N
     assert codec_cache_version(one) != codec_cache_version(two)
     assert codec_cache_version(one) == codec_cache_version(one)
     assert entry_name(key_of(codec_cache_version(one)))  # the version is storable in a name
+
+
+def test_the_format_number_was_bumped_and_a_format_1_entry_is_removed_when_opening(
+    tmp_path: Path,
+) -> None:
+    assert CACHE_FORMAT_VERSION == 2
+    folder = tmp_path / "c"
+    old_style = folder / f"e_100_200_{(1 << 48) | 5}"  # a format-1 version number
+    older = folder / f"e_100_200_{(1 << 24) | 5}"  # and one from before the 48-bit identity
+    for entry in (old_style, older):
+        entry.mkdir(parents=True)
+        (entry / "data.pack").write_bytes(b"CWPK" + b"\x00" * 28)
+    DiskProxyCache(folder)
+    assert not old_style.exists() and not older.exists()

@@ -16,7 +16,7 @@ from clearwater.interfaces.cache import CacheKey
 
 from .codec import DEFAULT_CODEC, ProxyCodec
 
-CACHE_FORMAT_VERSION = 1
+CACHE_FORMAT_VERSION = 2
 """The cache format number (D113). A key's version also carries the codec identity."""
 
 _NAME = re.compile(r"^e_(\d+)_(-?\d+)_(\d+)$")
