@@ -32,7 +32,7 @@ from PySide6.QtWidgets import QWidget
 from clearwater.interfaces import Frame, Image, Statistics
 
 from . import messages, sources
-from .contract import Engines, Message, MessagePresenter
+from .contract import Engines, FrameOutcome, Message, MessagePresenter
 from .imaging import display_image, effective_parameters, view_factor
 from .render_worker import (
     LatestWorker,
@@ -402,6 +402,7 @@ class PreviewController(QObject):
         self._renderer = LatestWorker("clearwater-preview", self._on_render)
         self._framer = LatestWorker("clearwater-frame", self._on_frame)
         self._frame_pending = False
+        self._frame_requested = 0
         self._submitted_k: int | None = None
         self._error_shown = False
         self._frame_error_shown = False
@@ -530,6 +531,7 @@ class PreviewController(QObject):
         probe = source.probe
         engines = self._engines
         self._frame_pending = True
+        self._frame_requested = pts_ticks
         self._frame_source = source
         self._renderer.invalidate()
         self._widget.set_pending_full(False)  # the invalidated render never arrives
@@ -539,8 +541,12 @@ class PreviewController(QObject):
         """Main thread: show a decoded frame, or say why there is none."""
         if outcome.error is not None:
             self._frame_pending = False
-            self._presenter.present(messages.frame_failure(outcome.error))
+            message = messages.frame_failure(outcome.error)
+            self._presenter.present(message)
             self._frame_error_shown = True
+            self._session.frame_decoded.emit(
+                FrameOutcome(self._frame_requested, None, message.text)
+            )
             return
         value = outcome.value
         assert isinstance(value, tuple)
@@ -549,13 +555,16 @@ class PreviewController(QObject):
             return
         self._frame_pending = False
         if not isinstance(frame, Frame):
-            self._presenter.present(Message("error", "No frame could be read at this position."))
+            text = "No frame could be read at this position."
+            self._presenter.present(Message("error", text, owner=messages.OWNER_FRAME))
             self._frame_error_shown = True
+            self._session.frame_decoded.emit(FrameOutcome(self._frame_requested, None, text))
             return
         if self._frame_error_shown:  # the next success of that action clears its banner
-            self._presenter.clear("error")
+            self._presenter.clear("error", owner=messages.OWNER_FRAME)
             self._frame_error_shown = False
         self._session._set_image(frame)
+        self._session.frame_decoded.emit(FrameOutcome(self._frame_requested, frame.pts_ticks))
 
     def _on_render(self, outcome: Outcome) -> None:
         """Main thread: show the latest result, or the error with the last good preview kept."""
@@ -577,6 +586,6 @@ class PreviewController(QObject):
         self._widget.set_result(result.before, result.after, result.k)
         self._session._set_backend(result.full_reason, result.preview_reason)
         if self._error_shown:
-            self._presenter.clear("error")
+            self._presenter.clear("error", owner=messages.OWNER_PREVIEW)
             self._error_shown = False
         self.rendered.emit(result)

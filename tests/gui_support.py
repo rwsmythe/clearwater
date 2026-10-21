@@ -74,12 +74,14 @@ class CapturingPresenter:
     def present(self, message: Message) -> None:
         self.messages.append(message)
 
-    def clear(self, severity: str | None = None) -> None:
+    def clear(self, severity: str | None = None, *, owner: str | None = None) -> None:
         self.cleared.append(severity)
         self.messages = [
             m
             for m in self.messages
-            if m.severity == "refusal" or (severity is not None and m.severity != severity)
+            if m.severity == "refusal"
+            or (severity is not None and m.severity != severity)
+            or (owner is not None and m.owner != owner)
         ]
 
     def of(self, severity: str) -> list[Message]:

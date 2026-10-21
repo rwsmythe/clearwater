@@ -50,6 +50,7 @@ CONTRACT_NAMES = {
     "AnalysisState",
     "Area",
     "Engines",
+    "FrameOutcome",
     "JobHandle",
     "JobRunner",
     "Message",
@@ -79,9 +80,19 @@ def test_the_contract_names_are_exported() -> None:
         "statistics_changed",
         "backend_changed",
         "analysis_changed",
+        "frame_decoded",
     )
     for name in signals:
         assert hasattr(Session, name)
+
+
+def test_the_dr44_members_are_additive() -> None:
+    # DR-44 (a)(b): the owner defaults to None, so every earlier Message(...) still builds.
+    assert gui.Message("error", "x") == gui.Message("error", "x", None, None)
+    assert gui.Message("error", "x", owner="presets").owner == "presets"
+    outcome = gui.FrameOutcome(9000, None, "decode failed")
+    assert (outcome.requested, outcome.pts, outcome.error) == (9000, None, "decode failed")
+    assert gui.FrameOutcome(10, 12).error is None
 
 
 class DummyPanel(QLabel):

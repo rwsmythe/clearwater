@@ -24,6 +24,15 @@ from .contract import Message, MessageSeverity
 
 _LOG = logging.getLogger(__name__)
 
+OWNER_START = "shell.start"
+"""The owner (:attr:`Message.owner`) of the shell's start-up messages."""
+OWNER_OPEN = "shell.open"
+"""The owner of the messages about opening a file (refusals and warnings)."""
+OWNER_PREVIEW = "shell.preview"
+"""The owner of a failed preview render's error; the next good render clears it."""
+OWNER_FRAME = "shell.frame"
+"""The owner of a failed frame decode's error; the next decoded frame clears it."""
+
 
 def ascii_text(text: str) -> str:
     """Return ``text`` with every non-ASCII character backslash-escaped.
@@ -63,7 +72,7 @@ def refusal(path: Path, text: str) -> Message:
     """
     safe, name = ascii_text(text), file_name(path)
     named = re.search(rf"(?<![\w.-]){re.escape(name)}(?![\w-])", safe) is not None
-    return Message("refusal", safe if named else f"{name}: {safe}", path)
+    return Message("refusal", safe if named else f"{name}: {safe}", path, OWNER_OPEN)
 
 
 def warning(path: Path, text: str) -> Message:
@@ -76,7 +85,7 @@ def warning(path: Path, text: str) -> Message:
     Returns:
         The message, ASCII-safe.
     """
-    return Message("warning", ascii_text(text), path)
+    return Message("warning", ascii_text(text), path, OWNER_OPEN)
 
 
 def unsupported_extension(path: Path) -> Message:
@@ -170,7 +179,8 @@ def preview_failure(error: BaseException) -> Message:
     Returns:
         The error; the last good preview stays on screen.
     """
-    return Message("error", ascii_text(f"Preview failed: {type(error).__name__}: {error}"))
+    text = ascii_text(f"Preview failed: {type(error).__name__}: {error}")
+    return Message("error", text, owner=OWNER_PREVIEW)
 
 
 def frame_failure(error: BaseException) -> Message:
@@ -182,7 +192,7 @@ def frame_failure(error: BaseException) -> Message:
     Returns:
         The error.
     """
-    return Message("error", ascii_text(f"The frame could not be read: {error}"))
+    return Message("error", ascii_text(f"The frame could not be read: {error}"), owner=OWNER_FRAME)
 
 
 class BannerWidget(QWidget):
@@ -197,7 +207,7 @@ class BannerWidget(QWidget):
         super().__init__(parent)
         self._layout = QVBoxLayout(self)
         self._layout.setContentsMargins(4, 2, 4, 2)
-        self._labels: list[tuple[MessageSeverity, QLabel]] = []
+        self._labels: list[tuple[MessageSeverity, str | None, QLabel]] = []
         self.setVisible(False)
 
     def add(self, message: Message) -> None:
@@ -211,28 +221,29 @@ class BannerWidget(QWidget):
         colour = "#7a5a00" if message.severity == "warning" else "#8b0000"
         label.setStyleSheet(f"color: {colour};")
         self._layout.addWidget(label)
-        self._labels.append((message.severity, label))
+        self._labels.append((message.severity, message.owner, label))
         self.setVisible(True)
 
-    def clear(self, severity: MessageSeverity | None = None) -> None:
+    def clear(self, severity: MessageSeverity | None = None, *, owner: str | None = None) -> None:
         """Remove messages.
 
         Args:
-            severity: Only messages of this severity, or None for all.
+            severity: Only messages of this severity, or None for any severity.
+            owner: Only messages presented with this owner, or None for any owner.
         """
-        kept: list[tuple[MessageSeverity, QLabel]] = []
-        for kind, label in self._labels:
-            if severity is None or kind == severity:
+        kept: list[tuple[MessageSeverity, str | None, QLabel]] = []
+        for kind, who, label in self._labels:
+            if (severity is None or kind == severity) and (owner is None or who == owner):
                 self._layout.removeWidget(label)
                 label.deleteLater()
             else:
-                kept.append((kind, label))
+                kept.append((kind, who, label))
         self._labels = kept
         self.setVisible(bool(kept))
 
     def texts(self) -> list[str]:
         """Return the texts shown, in order."""
-        return [label.text() for _, label in self._labels]
+        return [label.text() for _, _, label in self._labels]
 
 
 class DialogPresenter:
@@ -270,13 +281,14 @@ class DialogPresenter:
         self._boxes.append(box)
         box.open()
 
-    def clear(self, severity: MessageSeverity | None = None) -> None:
+    def clear(self, severity: MessageSeverity | None = None, *, owner: str | None = None) -> None:
         """Remove banner messages.
 
         Args:
-            severity: Only messages of this severity, or None for all.
+            severity: Only messages of this severity, or None for any severity.
+            owner: Only messages presented with this owner, or None for any owner.
         """
-        self._banner.clear(severity)
+        self._banner.clear(severity, owner=owner)
 
     def _closed(self, box: QMessageBox) -> None:
         """Forget a closed message box."""

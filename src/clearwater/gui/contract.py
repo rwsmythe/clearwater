@@ -6,6 +6,8 @@ shell's state only through them. Types and signatures only: :class:`Session`,
 :class:`ReasonAction` and :class:`ShellWindow` are Qt classes whose methods the shell implements
 (``clearwater.gui.shell``); the protocols are implemented by the shell's own modules. Frozen at
 the WP3.16 round-0 yield; additive only until the WP3.16 accept, then a change is a CHARC ruling.
+Amended once since by CHARC's ruling (additive, DR-44): :attr:`Message.owner`, the ``owner`` of
+:meth:`MessagePresenter.clear`, :class:`FrameOutcome` and ``Session.frame_decoded``.
 
 Threading: every name here is used on the interface (main) thread only, except
 :class:`Engines` members, which the shell calls from its worker threads, and the job callables a
@@ -102,11 +104,39 @@ class Message:
             it is cleared or the next success of that action).
         text: The message, ASCII-safe, naming the file where there is one.
         path: The file concerned, or None.
+        owner: Who presented the message, so that :meth:`MessagePresenter.clear` removes only
+            that owner's messages: a panel's own constant key (for example ``"presets"``), or
+            None. Keys starting with ``"shell."`` are the shell's own (``"shell.start"``,
+            ``"shell.open"``, ``"shell.preview"``, ``"shell.frame"``). Added after the WP3.16
+            accept (additive, DR-44 (b)).
     """
 
     severity: MessageSeverity
     text: str
     path: Path | None = None
+    owner: str | None = None
+
+
+@dataclass(frozen=True)
+class FrameOutcome:
+    """How the decode started by the latest :meth:`Session.set_position` ended.
+
+    Carried by ``Session.frame_decoded``. Added after the WP3.16 accept (additive, DR-44 (a)):
+    :meth:`Session.position` and the supplied statistics change when ``set_position`` is called,
+    before the frame is decoded; this tells a panel which frame is actually shown, so it can pair
+    the shown frame with that frame's statistics.
+
+    Attributes:
+        requested: The pts ticks passed to ``set_position``.
+        pts: The exact pts ticks of the frame now :meth:`Session.current_image` (the first frame
+            at or after ``requested``), or None when the decode failed.
+        error: The failure text when the decode failed (the current image is then unchanged and
+            an error is presented), or None.
+    """
+
+    requested: int
+    pts: int | None
+    error: str | None = None
 
 
 @dataclass(frozen=True)
@@ -177,6 +207,11 @@ class Session(QObject):
     - ``statistics_changed()``: the supplied statistics were set or cleared.
     - ``backend_changed(str)``: the AD-9 reason of the latest full-resolution selection.
     - ``analysis_changed(object)``: the new :class:`AnalysisState`.
+    - ``frame_decoded(object)``: a :class:`FrameOutcome`, once the decode started by the latest
+      :meth:`set_position` has ended: the frame became :meth:`current_image` (emitted after it
+      did), or the decode failed. Not emitted for a request superseded by a later
+      ``set_position`` or by ``preview.show``, nor after the source changed. Added after the
+      WP3.16 accept (additive, DR-44 (a)).
     """
 
     source_changed = Signal(object)
@@ -186,6 +221,7 @@ class Session(QObject):
     statistics_changed = Signal()
     backend_changed = Signal(str)
     analysis_changed = Signal(object)
+    frame_decoded = Signal(object)
 
     def source(self) -> OpenedSource | None:
         """Return the open source, or None."""
@@ -436,11 +472,15 @@ class MessagePresenter(Protocol):
         """
         ...
 
-    def clear(self, severity: MessageSeverity | None = None) -> None:
+    def clear(self, severity: MessageSeverity | None = None, *, owner: str | None = None) -> None:
         """Remove banner messages.
 
+        A panel passes its own ``owner``, so that its success clears only its own messages
+        (``owner`` added after the WP3.16 accept, additive, DR-44 (b)).
+
         Args:
-            severity: Only messages of this severity, or None for all.
+            severity: Only messages of this severity, or None for any severity.
+            owner: Only messages whose :attr:`Message.owner` is this, or None for any owner.
         """
         ...
 

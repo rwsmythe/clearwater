@@ -22,7 +22,7 @@ from PySide6.QtGui import QColorSpace, QImage
 
 import gui_support
 from clearwater.config import new_parameter_set
-from clearwater.gui import imaging, render_worker
+from clearwater.gui import FrameOutcome, Message, imaging, render_worker
 from clearwater.gui.imaging import (
     display_image,
     downscale,
@@ -33,6 +33,7 @@ from clearwater.gui.imaging import (
     to_display_uint8,
     view_factor,
 )
+from clearwater.gui.messages import BannerWidget
 from clearwater.gui.session import ShellSession
 from clearwater.interfaces import ColorDescription, Image
 from clearwater.interfaces.stubs import StubArrayBackend, StubCorrectionMethod
@@ -504,6 +505,89 @@ def test_a_frame_error_banner_clears_at_the_next_decoded_frame(make_window, qtbo
     wait_idle(qtbot, window)
     assert presenter_of(window).of("error") == []
     assert window.session.current_image().pts_ticks == 9000
+
+
+def test_frame_decoded_names_the_shown_frame_or_the_failure(make_window, qtbot) -> None:
+    # DR-44 (a): a panel learns which frame is shown (the first at or after the request).
+    engines = video_engines([frame(48, 64, ticks=0), frame(48, 64, ticks=9000)])
+    original = engines.video_source.frames
+    failing = {"on": False}
+
+    def frames(*args, **kwargs):
+        if failing["on"]:
+            raise RuntimeError("decode failed")
+        return original(*args, **kwargs)
+
+    object.__setattr__(engines.video_source, "frames", frames)
+    window = make_window(engines)
+    open_and_wait(qtbot, window, Path("clip.mp4"))
+    outcomes: list[object] = []
+    window.session.frame_decoded.connect(outcomes.append)
+    window.session.set_position(4000)
+    wait_idle(qtbot, window)
+    assert outcomes == [FrameOutcome(4000, 9000, None)]
+    assert window.session.current_image().pts_ticks == 9000
+    failing["on"] = True
+    window.session.set_position(0)
+    wait_idle(qtbot, window)
+    assert len(outcomes) == 2 and outcomes[1].requested == 0 and outcomes[1].pts is None
+    assert "decode failed" in outcomes[1].error
+    assert window.session.current_image().pts_ticks == 9000  # unchanged after the failure
+
+
+def test_frame_decoded_is_not_emitted_for_a_superseded_request(make_window, qtbot) -> None:
+    engines = video_engines([frame(48, 64, ticks=0), frame(48, 64, ticks=9000)])
+    window = make_window(engines)
+    open_and_wait(qtbot, window, Path("clip.mp4"))
+    outcomes: list[object] = []
+    window.session.frame_decoded.connect(outcomes.append)
+    window.session.set_position(0)
+    window.session.set_position(9000)  # supersedes the first before it is delivered
+    wait_idle(qtbot, window)
+    assert outcomes[-1] == FrameOutcome(9000, 9000, None)
+    assert all(o.requested == 9000 for o in outcomes)
+
+
+def test_a_shell_success_clears_only_its_own_error(make_window, qtbot) -> None:
+    # DR-44 (b): the next decoded frame clears the frame error, never a panel's error.
+    engines = video_engines([frame(48, 64, ticks=0), frame(48, 64, ticks=9000)])
+    original = engines.video_source.frames
+    failing = {"on": False}
+
+    def frames(*args, **kwargs):
+        if failing["on"]:
+            raise RuntimeError("decode failed")
+        return original(*args, **kwargs)
+
+    object.__setattr__(engines.video_source, "frames", frames)
+    window = make_window(engines)
+    open_and_wait(qtbot, window, Path("clip.mp4"))
+    presenter = presenter_of(window)
+    presenter.present(Message("error", "preset not saved", owner="presets"))
+    failing["on"] = True
+    window.session.set_position(9000)
+    wait_idle(qtbot, window)
+    assert len(presenter.of("error")) == 2
+    failing["on"] = False
+    window.session.set_position(9000)
+    wait_idle(qtbot, window)
+    assert [m.text for m in presenter.of("error")] == ["preset not saved"]
+    presenter.clear("error", owner="presets")
+    assert presenter.of("error") == []
+
+
+def test_the_banner_clears_by_owner(qtbot) -> None:
+    banner = BannerWidget()
+    qtbot.addWidget(banner)
+    banner.add(Message("error", "a", owner="presets"))
+    banner.add(Message("error", "b", owner="settings"))
+    banner.add(Message("warning", "c", owner="presets"))
+    banner.clear("error", owner="presets")
+    assert banner.texts() == ["b", "c"]
+    banner.clear(owner="presets")
+    assert banner.texts() == ["b"]
+    banner.clear("error")
+    assert banner.texts() == []
 
 
 class _StatisticsLevel(LevelMethod):

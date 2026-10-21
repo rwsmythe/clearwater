@@ -141,7 +141,8 @@ def start_up(locations: Locations, engines: Engines) -> StartUp:
     try:
         configure_logging(locations.log_dir)
     except OSError as error:
-        problems.append(Message("warning", messages.ascii_text(f"No log file: {error}")))
+        text = messages.ascii_text(f"No log file: {error}")
+        problems.append(Message("warning", text, owner=messages.OWNER_START))
     settings_refusal: Message | None = None
     try:
         settings = load_settings(locations.config_dir)
@@ -432,7 +433,7 @@ class MainWindow(ShellWindow):
         """Main thread: show the opened source and its warnings, or the refusal."""
         if outcome.error is not None:  # not reached: _open_task turns an exception into a refusal
             text = messages.ascii_text(f"The file could not be opened: {outcome.error}")
-            self.presenter.present(Message("refusal", text))
+            self.presenter.present(Message("refusal", text, owner=messages.OWNER_OPEN))
             return
         value = outcome.value
         assert isinstance(value, tuple)
