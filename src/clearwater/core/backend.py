@@ -206,19 +206,20 @@ class CoreBackend:
             raise ValueError(f"expected an (H, W) or (H, W, C) array, got shape {a.shape}")
 
     def check_rgb(self, a: object) -> None:
-        """Raise unless ``a`` is a float32 ``(H, W, 3)`` array.
+        """Raise unless ``a`` is a float32 ``(H, W, 3)`` array with H, W >= 1.
 
         Args:
             a: The candidate array.
 
         Raises:
             TypeError: ``a`` is not an array of this backend.
-            ValueError: ``a`` is not float32 or has another shape.
+            ValueError: ``a`` is not float32 or has another shape (an empty spatial size
+                included, DR-38 c).
         """
         self.check(a)
         assert isinstance(a, self.xp.ndarray)
-        if a.ndim != 3 or a.shape[2] != 3:
-            raise ValueError(f"expected an (H, W, 3) array, got shape {a.shape}")
+        if a.ndim != 3 or a.shape[2] != 3 or a.shape[0] < 1 or a.shape[1] < 1:
+            raise ValueError(f"expected an (H, W, 3) array with H, W >= 1, got shape {a.shape}")
 
     # -- IF-2 -----------------------------------------------------------------------------
 
@@ -498,11 +499,14 @@ def check_sigma(sigma_px: float) -> None:
 
     Raises:
         ValueError: ``sigma_px`` is not finite, not positive, or its radius
-            ``int(4 * sigma_px + 0.5)`` exceeds :data:`MAX_KERNEL_RADIUS`.
+            ``int(4 * sigma_px + 0.5)`` exceeds :data:`MAX_KERNEL_RADIUS` (a finite sigma whose
+            ``4 * sigma_px`` overflows to infinity included: ValueError, never OverflowError,
+            DR-38 d).
     """
     if not (math.isfinite(sigma_px) and sigma_px > 0.0):
         raise ValueError(f"sigma must be finite and positive, got {sigma_px!r} px")
-    if int(GAUSSIAN_TRUNCATE * sigma_px + 0.5) > MAX_KERNEL_RADIUS:
+    reach = GAUSSIAN_TRUNCATE * sigma_px + 0.5
+    if not math.isfinite(reach) or int(reach) > MAX_KERNEL_RADIUS:
         raise ValueError(
             f"sigma {sigma_px:.6g} px gives a filter radius beyond {MAX_KERNEL_RADIUS} px"
         )
@@ -516,10 +520,13 @@ def _probe_gpu() -> tuple[CupyBackend | None, str]:
     """Return the GPU backend, or None and the CPU reason; probed once per process."""
     try:
         cupy = importlib.import_module("cupy")
-    except ImportError as exc:
-        _LOG.info("CuPy not installed: %s", exc)
-        return None, "CPU: CuPy not installed"
-    except Exception as exc:  # an installed CuPy that fails to initialise (a DLL, a driver)
+    except Exception as exc:
+        # Only a ModuleNotFoundError naming cupy itself means it is not installed (DR-37 a);
+        # any other failure, an ImportError of a DLL or of a module inside or beside CuPy
+        # included, is an installed CuPy that fails to load.
+        if isinstance(exc, ModuleNotFoundError) and exc.name == "cupy":
+            _LOG.info("CuPy not installed: %s", exc)
+            return None, "CPU: CuPy not installed"
         _LOG.info("CuPy failed to load: %s: %s", type(exc).__name__, exc)
         return None, "CPU: CuPy failed to load"
     try:
@@ -547,6 +554,34 @@ def _probe_gpu() -> tuple[CupyBackend | None, str]:
         _LOG.info("a test kernel failed on the CUDA device: %s", exc)
         return None, "CPU: CUDA device unusable"
     return backend, "GPU"
+
+
+def backend_for(device: str) -> CoreBackend:
+    """Return the core backend whose arrays live on ``device`` (IF-1 ``Image.device``).
+
+    ``"cpu"`` gives the process's :class:`NumpyBackend` (the one :func:`select_backend`
+    returns, without importing CuPy); the GPU's own ``"cuda:<n>"`` gives the probed
+    :class:`CupyBackend` (probed once per process, as :func:`select_backend` does). So a method
+    given an image recovers the backend its pixels belong to.
+
+    Args:
+        device: The device name, ``"cpu"`` or ``"cuda:<n>"``.
+
+    Returns:
+        The backend of that device.
+
+    Raises:
+        ValueError: No backend of this process lives on ``device`` (an unknown name, a CUDA
+            device that is not the probed one, or no usable GPU); the message names the
+            device and the GPU probe's reason.
+    """
+    if device == "cpu":
+        return _NUMPY_BACKEND
+    gpu, reason = _probe_gpu()
+    if gpu is not None and device == gpu.device:
+        return gpu
+    available = "cpu" if gpu is None else f"cpu, {gpu.device}"
+    raise ValueError(f"no backend for device {device!r}; available: {available} ({reason})")
 
 
 def select_backend(
