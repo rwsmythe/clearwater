@@ -346,7 +346,7 @@ def _after(command: list[str], option: str) -> str:
 
 def test_the_command_keeps_timing_and_writes_only_out_path() -> None:
     command = _command(_probe())
-    assert command[-3:] == ["-f", "mp4", "out.tmp"] and "-y" in command
+    assert command[-3:] == ["-f", "mp4", str(Path("out.tmp").absolute())] and "-y" in command
     for flag in ("-copyts", "-noautorotate", "-nostdin"):
         assert flag in command
     assert _after(command, "-fps_mode") == "passthrough"
@@ -412,7 +412,8 @@ def test_provenance_and_the_truncation_cut_are_placed() -> None:
     command = _command(_probe(), comment='{"a":1}', cut_at=Fraction(1001, 1250))
     assert _after(command, "-metadata") == 'comment={"a":1}'
     at = command.index("-to")
-    assert command[at + 1] == "0.800800" and command[at + 2 : at + 4] == ["-i", "src.mp4"]
+    source = str(Path("src.mp4").absolute())
+    assert command[at + 1] == "0.800800" and command[at + 2 : at + 4] == ["-i", source]
     assert _after(_command(_probe()), "-metadata") == "comment="
 
 

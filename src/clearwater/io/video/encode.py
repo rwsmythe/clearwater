@@ -254,7 +254,7 @@ def encode_command(
         "pipe:0",
         *cut,
         "-i",
-        str(probe.path),
+        str(probe.path.absolute()),  # absolute: a relative name could read as an option
         *maps,
         "-vf",
         vf,
@@ -284,7 +284,7 @@ def encode_command(
         "+negative_cts_offsets",
         "-f",
         "mp4",
-        str(out_path),
+        str(out_path.absolute()),
     ]
 
 
