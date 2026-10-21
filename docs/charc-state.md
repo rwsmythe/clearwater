@@ -116,6 +116,16 @@ for a push (verify `git status -sb`).
   `resolve_encoder` in WP3.10 is the one "auto" rule; `ClipAnalysis` and `ExportJobs` seams frozen
   at round 0. DR-44 contract commit (branch `dr44` 5e95e0c, both nets at the orchestrator's seat)
   lands on main before tranche A dispatches.
+- **DR-44 contract commit LANDED** on main (701055d members, 7bee620 B remediation, de206e2 B
+  pass-2 minors; both nets at the orchestrator's seat; B pass 1 caught the shell's open path
+  clearing panels' messages; shell clears only `shell.*` banners on a new source, panels clear
+  theirs on `source_changed`). Briefs FINAL on main 0f51822. **Wave 3 tranche A LIVE** (dispatched
+  ~07:05Z from de206e2; four opus-high cells, all OCCUPIED): WP3.4 `wp34-cell1` `.worktrees/wp3.4`,
+  WP3.9 `wp39-cell1` `.worktrees/wp3.9`, WP3.10 `wp310-cell1` `.worktrees/wp3.10` (round 0 =
+  timing spike, STOP if no exact pts carrier), WP3.11 `wp311-cell1` `.worktrees/wp3.11`. Exclusive
+  windows (WP3.4 whole-core + memory, WP3.10 export floor) posted OPEN/CLOSE, one at a time; no
+  suite here while any window or the orchestrator's gate run is open. Tranche B (WP3.17-3.20)
+  after two tranche-A returns. On each accept: CHARC QA as before.
 - **Wave 3 COMMISSIONED** (CHARC msg a10045b6, 2026-10-21 ~06:01Z): eight briefs drafted by gen 9's
   helpers for CHARC approval; tranche A = WP3.4 assembly, WP3.9 decode, WP3.10 encode/mux, WP3.11
   analysis (opus-high); tranche B = WP3.17-3.20 GUI panels (sonnet-high) after two tranche-A
