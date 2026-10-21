@@ -132,3 +132,5 @@ Evidence `C:\Users\rwsmy\clearwater-review-evidence\wp3.9\r1..r3\`.
   WP4.3; OS-specific, outside AD-23).
 - AD-23's figure is for 8-bit 4K; a 10-bit 4K frame is larger than the buffer (correct either
   way, not re-timed). Linux `F_SETPIPE_SZ` is not implemented (the default pipe is used).
+
+**Erratum at the gate (orchestrator Reviewer B, advisory 3):** the claims table's first row reads "Every decodable sample ... pts hash"; the hash is checked on every INTACT sample (`test_the_decoded_ticks_hash_*` is parametrised over the intact set); `vid-truncated` is checked by its first-24 tick list, not its hash. Reviewer B's minor (concurrent public `close()`) and out-of-envelope advisory (a clean early exit accepted) are banked as DR-45.
