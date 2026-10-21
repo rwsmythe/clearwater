@@ -181,3 +181,9 @@ fixed once as the terminating cleanup; finding 2's root (`core.check_sigma` over
 Report updated c6618a6. Gates after the cleanup: ruff check, ruff format --check, mypy strict
 clean; own tests 383 passed; 200 passed / 183 skipped with cupy unimportable. Note: the
 intermediate commit da2693c has one test-file formatting nit that e4a0b55 resolves (head clean).
+
+## Full suite (granted window, head 1fcb37d)
+
+- Normal: 2227 passed, 1 warning (CuPy CUDA_PATH), 868 s, exit 0 (`work/wp32-full-normal.log`).
+- `cupy` / `cupyx` = None in `sys.modules`: 1938 passed, 289 skipped, 517 s, exit 0
+  (`work/wp32-full-nocupy.log`).
