@@ -82,15 +82,25 @@ for a push (verify `git status -sb`).
   version; means/gains <= 1e-3 gate, bounds deviation <= 10 % of range reported; **owner sees the
   proxy-bound effect at CP5** (AD-4 11-14 % + AD-5 ~8 % narrower = slightly stronger stretch);
   Pillow becomes a product dependency at WP3.12; WP3.11 measures on the stored proxy only.
-- **Wave 2 tranche A at clean stops** (2026-10-21 00:19Z): WP3.2 RETURNED head dfe65d5 (R1
-  converged); WP3.3 RETURNED head b6c47db (R2 converged; DR-14 closes); gen 7 accepts both as one
-  stacked gate under `methods/` (HOLD main request coming). WP3.5 RETURNED head abee706 (R1
-  converged). WP3.12 at its EXCLUSIVE-REQUEST yield, head 82a5dbb (JPEG codecs per AD-5, Pillow
-  moved); gen 7 grants the read-cost window (OPEN/CLOSE posted; no suite here while open) and
-  re-dispatches a fresh cell from the ledger; smoke: q80 4:2:0 ~15 % faster, under the 30 %
-  threshold, so q75 4:4:4 stands unless the official row differs. Worktrees `.worktrees/wp3.{2,3,5,12}`
-  OCCUPIED until each accept is QA-confirmed here. Tranche B (WP3.6, WP3.16) dispatches after the
-  WP3.2/3.3 merge.
+- **Tranche A: WP3.3, WP3.5, WP3.2 ACCEPTED** 2026-10-21 as one stacked gate, main 68a8d93
+  (records `docs/proofs/wp3.{3,5,2}-accept.md`; DR-38/39/40 banked; DR-14 CLOSED, DR-20(1)
+  CLOSED; WP3.2 took ONE B remediation: float64 leak from NumPy-scalar parameters). Candidate
+  gates 2904 passed / cupy-unimportable 2386 + 519 skipped; main 2904 passed. **CHARC QA
+  CONFIRMED** (patch-ids on every named range; B md5s and assertions in four folders; static
+  gates and harness 366 here; my own full pytest was host-killed at ~39 % for memory pressure and
+  NOT re-run; the orchestrator's main run is the figure of record). Nine worktrees released.
+- **WP3.12 proxy cache** (`wp3.12` branch, OCCUPIED): report 1b4da4e; Reviewer A R1-R3 fixed, R4
+  review-only at 269K (3 major adjudicated, not remediated; two yield breaches and four `git stash`
+  uses recorded, stash now forbidden); a FRESH sonnet-high cell remediates R4 from the ledger,
+  then round 5 (five-round gate), then its first full-pytest window. Read-cost row done (q75
+  3.39 ms median; q80 only 9 % faster): q75 4:4:4 stands. AD-5 wording corrected d971ee7 (either
+  sign, median basis).
+- **Tranche B LIVE** from main 4b4da9b: WP3.6 photo I/O `wp36-cell` sonnet-high `.worktrees/wp3.6`;
+  WP3.16 GUI shell `wp316-cell` opus-high `.worktrees/wp3.16` (both OCCUPIED). Round-0 rulings
+  (msg 9cf9b7b0): built-in Display P3 / sRGB ICC when the source has none (pinned bytes,
+  provenance note); block-mean downscale k = max(1, short // 540) with partial edge blocks, one
+  function for proxy and V8; PySide6-Essentials replaces pyside6 (AD-18). Orchestrator gen 7 is
+  near its rollover line.
 - **Wave 2 COMMISSIONED** (CHARC ruling 1ebfba54, 2026-10-20 ~22:07Z): orchestrator gen 6 drafts
   all six briefs (WP3.2, WP3.3, WP3.5 opus-high; WP3.6, WP3.12, WP3.16 sonnet-high) against the
   Phase 3 frame, sends them as one set for CHARC approval; tranche A = WP3.2/3.3/3.5/3.12 on
