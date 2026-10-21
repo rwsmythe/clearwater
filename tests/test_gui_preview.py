@@ -32,6 +32,7 @@ from clearwater.gui.imaging import (
     to_display_uint8,
     view_factor,
 )
+from clearwater.gui.session import ShellSession
 from clearwater.interfaces import ColorDescription, Image
 from clearwater.interfaces.stubs import StubArrayBackend, StubCorrectionMethod
 from gui_support import (
@@ -411,6 +412,84 @@ def test_a_frame_error_banner_clears_at_the_next_decoded_frame(make_window, qtbo
     wait_idle(qtbot, window)
     assert presenter_of(window).of("error") == []
     assert window.session.current_image().pts_ticks == 9000
+
+
+class _StatisticsLevel(LevelMethod):
+    """Renders the level its supplied statistics carry, so a statistics change is visible."""
+
+    def render(self, image, params, statistics):
+        out = super().render(image, params, statistics)
+        level = float(statistics["only"].get("level", params["level"]))
+        return dataclasses.replace(out, pixels=np.full_like(np.asarray(out.pixels), level))
+
+
+def _mutate_statistics_in_place(make_window, qtbot) -> int:
+    method = _StatisticsLevel()
+    window = _open_photo(make_window, qtbot, image(60, 80), method=method)
+    stats = {"only": {"mean": np.zeros(3), "level": 0.2}}
+    window.session.set_statistics(stats)
+    wait_idle(qtbot, window)
+    assert image_bytes(window.preview_widget.after_image())[0, 0, 0] == round(0.2 * 255)
+    stats["only"]["level"] = 0.8  # the same mapping, changed in place, set again
+    window.session.set_statistics(stats)
+    wait_idle(qtbot, window)
+    return int(image_bytes(window.preview_widget.after_image())[0, 0, 0])
+
+
+def test_statistics_changed_in_place_and_set_again_render_again(make_window, qtbot) -> None:
+    # Round-3 R3-2: the memo key carries the session's statistics revision, not their identity.
+    assert _mutate_statistics_in_place(make_window, qtbot) == round(0.8 * 255)
+
+
+def test_planted_identity_only_render_memo_fails(make_window, qtbot, monkeypatch) -> None:
+    monkeypatch.setattr(ShellSession, "statistics_revision", lambda self: 0)
+    assert _mutate_statistics_in_place(make_window, qtbot) != round(0.8 * 255)
+
+
+def test_the_indicator_shows_for_a_change_at_one_to_one(make_window, qtbot) -> None:
+    # Round-3 R3-3: at 1:1 a parameter change renders the full resolution: the indicator is on.
+    method = LevelMethod()
+    window = _open_photo(
+        make_window, qtbot, image(400, 600, seed=3), method=method, size=(300, 250)
+    )
+    window.view_actions["one_to_one"].trigger()
+    wait_idle(qtbot, window)
+    assert not window.preview_widget.pending_full()
+    method.delay_s = 0.3
+    window.session.set_parameters(new_parameter_set("level", {"level": 0.7}))
+    assert window.preview_widget.pending_full()
+    wait_idle(qtbot, window)
+    assert not window.preview_widget.pending_full()
+
+
+def test_a_position_change_clears_the_indicator_even_when_the_frame_fails(
+    make_window, qtbot
+) -> None:
+    # Round-3 R3-3: the position change invalidates the full render; a decode failure follows.
+    method = LevelMethod()
+    engines = video_engines(
+        [frame(400, 600, ticks=0), frame(400, 600, ticks=9000)], methods={method.id: method}
+    )
+    original = engines.video_source.frames
+    failing = {"on": False}
+
+    def frames(*args, **kwargs):
+        if failing["on"]:
+            raise RuntimeError("decode failed")
+        return original(*args, **kwargs)
+
+    object.__setattr__(engines.video_source, "frames", frames)
+    window = make_window(engines, size=(300, 250))
+    open_and_wait(qtbot, window, Path("clip.mp4"))
+    method.delay_s = 0.4
+    window.view_actions["one_to_one"].trigger()
+    assert window.preview_widget.pending_full()
+    failing["on"] = True
+    window.session.set_position(9000)
+    assert not window.preview_widget.pending_full()
+    wait_idle(qtbot, window)
+    assert not window.preview_widget.pending_full()
+    assert len(presenter_of(window).of("error")) == 1
 
 
 def test_planted_preview_without_the_render_memo_fails(make_window, qtbot, monkeypatch) -> None:

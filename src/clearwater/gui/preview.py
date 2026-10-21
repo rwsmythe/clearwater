@@ -461,15 +461,15 @@ class PreviewController(QObject):
             params_key=tuple(sorted(params.items())),
             settings=self._session.settings(),
             statistics=self._session.statistics(),
+            statistics_revision=self._session.statistics_revision(),
             k=k,
             select_backend=self._engines.select_backend,
         )
         memo = self._memo
         self._submitted_k = k
-        if k == 1 and self._widget.after_image() is not None and self._widget.shown_factor() > 1:
-            self._widget.set_pending_full(True)
-        elif k != 1:
-            self._widget.set_pending_full(False)  # a superseded full render never arrives
+        # The indicator means "a full-resolution render replacing what is shown is in flight";
+        # a k > 1 request supersedes any full render, which then never arrives.
+        self._widget.set_pending_full(k == 1 and self._widget.after_image() is not None)
         self._renderer.submit(lambda check: render_preview(snapshot, memo, check))
 
     def idle(self) -> bool:
@@ -527,6 +527,7 @@ class PreviewController(QObject):
         self._frame_pending = True
         self._frame_source = source
         self._renderer.invalidate()
+        self._widget.set_pending_full(False)  # the invalidated render never arrives
         self._framer.submit(lambda check: (source, sources.frame_at(engines, probe, pts_ticks)))
 
     def _on_frame(self, outcome: Outcome) -> None:

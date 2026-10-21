@@ -11,6 +11,7 @@ the user is told) is a non-modal banner above the preview while the file stays o
 from __future__ import annotations
 
 import logging
+import re
 from collections.abc import Iterable
 from pathlib import Path
 
@@ -56,13 +57,15 @@ def refusal(path: Path, text: str) -> Message:
     Args:
         path: The refused file.
         text: The message text; ``"<name>: "`` is put in front when it does not name the file
-            (a ``VideoProbeError`` for a missing tool or a timeout, a fault text).
+            (a ``VideoProbeError`` for a missing tool or a timeout, a fault text). The name
+            counts only standing alone, not inside a longer name (``a.mp4`` in ``data.mp4``).
 
     Returns:
         The message, ASCII-safe.
     """
     safe, name = ascii_text(text), file_name(path)
-    return Message("refusal", safe if name in safe else f"{name}: {safe}", path)
+    named = re.search(rf"(?<![\w.-]){re.escape(name)}(?![\w-])", safe) is not None
+    return Message("refusal", safe if named else f"{name}: {safe}", path)
 
 
 def warning(path: Path, text: str) -> Message:

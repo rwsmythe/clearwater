@@ -224,6 +224,8 @@ class RenderRequest:
         params_key: A hashable form of ``params`` for the statistics memo.
         settings: The settings (``force_cpu``).
         statistics: The supplied statistics, or None to measure the image's own (D108).
+        statistics_revision: The session's statistics revision (bumped by every update, also to
+            the same object), part of the render memo's key.
         k: The preview downscale factor.
         select_backend: IF-2 selection.
     """
@@ -235,6 +237,7 @@ class RenderRequest:
     params_key: tuple[tuple[str, Any], ...]
     settings: Settings
     statistics: Mapping[str, Statistics] | None
+    statistics_revision: int
     k: int
     select_backend: SelectBackend
 
@@ -262,8 +265,9 @@ class RenderResult:
     elapsed_s: float
 
 
-AfterKey = tuple[int, int, str, tuple[tuple[str, Any], ...], str]
-"""``(token, k, method id, params_key, preview reason)``: what a corrected display image is of."""
+AfterKey = tuple[int, int, str, tuple[tuple[str, Any], ...], str, int]
+"""``(token, k, method id, params_key, preview reason, statistics revision)``: what a corrected
+display image is of."""
 
 
 class PreviewMemo:
@@ -390,6 +394,7 @@ def render_preview(request: RenderRequest, memo: PreviewMemo, check: Check) -> R
             method_id,
             request.params_key,
             preview_reason,
+            request.statistics_revision,
         )
         after = memo.after(after_key, request.method, request.statistics)
         small = None

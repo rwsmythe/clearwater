@@ -53,6 +53,7 @@ class ShellSession(Session):
         self._preview_backend = "-"
         self._image: Image | None = None
         self._image_token = 0
+        self._statistics_revision = 0
 
     # The contract's getters.
 
@@ -135,7 +136,7 @@ class ShellSession(Session):
         if self._source is None or self._source.kind != "video":
             raise RuntimeError("set_position needs an open video")
         self._position = int(pts_ticks)
-        self._statistics = statistics
+        self._set_statistics(statistics)
         self.position_changed.emit(self._position)
         self.statistics_changed.emit()
 
@@ -154,7 +155,7 @@ class ShellSession(Session):
         Args:
             statistics: Stage name -> statistics, or None for the image's own (D108).
         """
-        self._statistics = statistics
+        self._set_statistics(statistics)
         self.statistics_changed.emit()
 
     # The shell's own.
@@ -162,6 +163,19 @@ class ShellSession(Session):
     def image_token(self) -> int:
         """Return a number that changes with every new current image."""
         return self._image_token
+
+    def statistics_revision(self) -> int:
+        """Return a number that changes with every statistics update, also to the same object.
+
+        A caller may change a mapping in place and set it again; the revision, not the object's
+        identity, tells the preview's render memo that the statistics changed.
+        """
+        return self._statistics_revision
+
+    def _set_statistics(self, statistics: Mapping[str, Statistics] | None) -> None:
+        """Record supplied statistics and bump the revision (no signal)."""
+        self._statistics = statistics
+        self._statistics_revision += 1
 
     def preview_backend(self) -> str:
         """Return the reason of the latest preview-size selection; ``"-"`` before any."""
@@ -171,7 +185,7 @@ class ShellSession(Session):
         """Make ``source`` the open source; reset analysis, statistics, position and backend."""
         self._source = source
         self._analysis = AnalysisState()
-        self._statistics = None
+        self._set_statistics(None)
         self._backend = self._preview_backend = "-"
         frame_ticks = getattr(source.image, "pts_ticks", None) if source is not None else None
         self._position = frame_ticks if isinstance(frame_ticks, int) else None
@@ -188,7 +202,7 @@ class ShellSession(Session):
 
     def _show(self, image: Image, statistics: Mapping[str, Statistics] | None) -> None:
         """Set the current image and its statistics together (``preview.show``)."""
-        self._statistics = statistics
+        self._set_statistics(statistics)
         self._set_image(image)
         self.statistics_changed.emit()
 

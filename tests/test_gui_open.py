@@ -15,7 +15,7 @@ from pathlib import Path
 import pytest
 
 import gui_support
-from clearwater.gui import sources
+from clearwater.gui import messages, sources
 from clearwater.gui.engines import stub_probe
 from clearwater.interfaces import ColorDescription, Fault
 from clearwater.io.video import VideoProbeError
@@ -61,7 +61,7 @@ def assert_refused(window, path: Path, previous) -> str:
     presenter = presenter_of(window)
     refusals = presenter.of("refusal")
     assert refusals, f"no refusal for {path}: {presenter.messages}"
-    assert refusals[-1].text and path.name.split(".")[0] in refusals[-1].text
+    assert refusals[-1].text and messages.file_name(path) in refusals[-1].text
     assert window.session.source() is previous
     return refusals[-1].text
 
@@ -245,6 +245,15 @@ def test_refusals_whose_text_omits_the_file_name_it(
     )
     open_and_wait(qtbot, window, clip)
     assert assert_refused(window, clip, previous) == "clip.mp4: HLG video is not supported."
+
+
+def test_a_refusal_names_the_file_only_when_the_name_stands_alone() -> None:
+    # Round-3 R3-4: "a.mp4" inside "data.mp4" does not name a.mp4.
+    path = Path("a.mp4")
+    assert messages.refusal(path, "data.mp4 is damaged.").text == "a.mp4: data.mp4 is damaged."
+    assert messages.refusal(path, "a.mp4 is damaged.").text == "a.mp4 is damaged."
+    assert messages.refusal(path, "Cannot read a.mp4.").text == "Cannot read a.mp4."
+    assert messages.refusal(path, "x-a.mp4 is damaged.").text == "a.mp4: x-a.mp4 is damaged."
 
 
 def test_untagged_photo_and_untagged_video_frame_warn_once(make_window, qtbot) -> None:
