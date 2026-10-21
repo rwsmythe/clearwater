@@ -290,8 +290,29 @@ tests 90 passed (about 14 s, offscreen), run three times. Full pytest: pending a
   1. The full pytest run. It was requested (WINDOW REQUEST sent), but no window was granted and none was run.
   2. Then Reviewer A round 1, STRONG tier, at the cell's seat. Runner and prompt come from `C:\Users\rwsmy\clearwater-review-evidence\wp3.1\r2\`. Evidence goes to `C:\Users\rwsmy\clearwater-review-evidence\wp3.16\r1\`. Exclude `docs/proofs` and supply the diff and HEAD sha in the prompt.
   3. Yield after adjudicating the round, before remediating.
-- **Open questions:**
-  - S3 (the downscale rule) is provisional and with CHARC; it is a one-place change in `imaging.downscale` and `imaging.statistics_factor`.
-  - `PySide6-Essentials` instead of `PySide6` is with CHARC; change it only on the dispatcher's relay.
+- **Open questions:** (S3 and the Essentials switch were ruled after this rollover; see the next section.)
   - X-B2: the by-name `PhotoReadError` catch lands at the rebase onto WP3.6.
   - Report items to carry: the `fda06b7` subject's "(V7)" overstates its effect (report corrected), and the GIL-starvation observation (216-796 ms) goes to WP4.3.
+
+## CHARC rulings applied (orchestrator gen 8, 2026-10-21)
+
+CHARC `d06ed7c969d6249f` (FINAL, 2026-10-21 01:32Z; AD-18 amended on main `d971ee7`), relayed by
+the gen-8 dispatch:
+
+- **PySide6-Essentials replaces the `pyside6` meta-package.** `pyproject.toml` now carries
+  `"pyside6-essentials>=6.12,<7",`; `uv lock` removed pyside6, pyside6-addons, pyside6-pdf and
+  pyside6-webengine (59 packages resolved). Everything the shell imports (QtCore, QtGui,
+  QtWidgets; QtTest in tests) is in Essentials. Environment note: `uv sync` uninstalling the
+  meta-package from this venv removed files Essentials shares (`ImportError: DLL load failed
+  while importing QtCore`); `uv sync --reinstall-package pyside6-essentials --reinstall-package
+  shiboken6` repaired it. Any venv that had the meta-package (main's) needs the same at merge.
+  Commit `9c6efcb`.
+- **S3 RULED** (no longer provisional): integer block mean, k = max(1, short // 540), the last
+  row and column averaging only the pixels they cover, output ceil(H/k) x ceil(W/k); 540 at 4K,
+  605 at 12 MP, 598 at 5.3K. One function, one owner (`imaging.downscale`); WP3.14/WP4.1 cite it
+  and V8's area average uses it. The `imaging` module docstring and the report say RULED.
+- S1, S2, S4-S7 and `position_changed = Signal(object)` upheld as ruled.
+
+Gates at `9c6efcb` (+ the RULED docstring): GUI tests 90 passed (14.4 s, offscreen; the `gpu`
+test ran, not skipped), ruff check (repo) 0, ruff format --check 0 (140 files), mypy strict 0
+(87 files). Full pytest: pending a window.

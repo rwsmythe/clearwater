@@ -4,12 +4,13 @@ Pure functions on host NumPy arrays plus the conversion to a display ``QImage``.
 ``QColorSpace`` are value classes Qt documents as usable outside the GUI thread, so the preview
 worker calls everything here; nothing here touches a ``QObject``.
 
-The downscale rule (round-0 ruling S3, provisional with CHARC): :func:`downscale` is a block mean
+The downscale rule (S3, RULED by CHARC 2026-10-21): :func:`downscale` is a block mean
 by an integer factor ``k`` whose output is ``ceil(H / k) x ceil(W / k)``; each output pixel is
 the mean of the source pixels its block covers, so the last row and column of blocks average
 fewer pixels when ``k`` does not divide the size. The preview, the 1:1 path (``k == 1``) and
 the V8 harness all use it, and the statistics proxy (question 5) is the same block mean with
-:func:`statistics_factor`. A different ruling changes these two functions only.
+:func:`statistics_factor`. This is the one owner of the rule: WP3.14 and WP4.1 cite it,
+and V8's area average is this function.
 """
 
 from __future__ import annotations
