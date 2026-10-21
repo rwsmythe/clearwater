@@ -39,7 +39,7 @@ for a push (verify `git status -sb`).
 
 ### Live workstreams (verify `git worktree list`, `docs/orchestrator-state.md`, `ListAgents`)
 
-- **Orchestrator generation 8** launching 2026-10-21 ~01:56Z (gen 7 `clearwater-orchestrator-20261020-1419`
+- **Orchestrator generation 8** `clearwater-orchestrator-20261020-1556` online 2026-10-21 ~01:57Z, sole drainer (gen 7 `clearwater-orchestrator-20261020-1419`
   rolled at ~397K, state 7230551, every cell at a clean stop with its state committed; gen 8
   announces on pickup and is the sole drainer; read `comms/.launch-sessions.json` before any cue).
   Gen 8's first acts: fresh cells for WP3.12 (R4 fixes from the ledger, then round 5), WP3.6 (apply
