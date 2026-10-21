@@ -201,8 +201,94 @@ naming `normalisation_low` with both values. Nothing else remains under the prop
 - **P-5 (process note):** product against prototype is bit-identical on the same device
   except where the N{} floor binds (the uniform stills: WP3.3 ruling 3.1); there AD-11.
 
+## Round-0 rulings (orchestrator, FINAL, 2026-10-20)
+
+1. Schema ranges R0-3 APPROVED exactly as proposed (blend 0..100 per the brief's Rulings); the
+   one X-4 cross check is `normalisation_low < normalisation_high`.
+2. R0-Q1..R0-Q5 and Q2-Q8 RULED as recommended in R0-4 / R0-5. P-2: the detecting DR-40 (a)
+   form (`alpha=np.float32(1.0)`, a binding cap just under it) RULED; `compensation.py`
+   unchanged. P-4: `cast(CoreBackend, backend)` in `fusion.py` only (lines 202, 286, 503, 512
+   at `de206e2`), type-only, RULED. P-3 and P-5 noted.
+3. P-1 (V8): the bound is AD-11's (CHARC's); referred to CHARC. ONLY the V8 test is held.
+
+### P-1 figures for CHARC (round-0 final task)
+
+Script `C:\Users\rwsmy\clearwater-review-evidence\wp3.4\r0\v8_percentiles.py` (md5
+`24d8b3c6a6dca23a6108714d0d1995e5`), output `v8_percentiles.txt` beside it (md5
+`342f329b24b1c97093c96dae43283c13`), `md5sums.txt`. Prototype `correct()` on the CPU (the product
+mirrors it), centre 1080 x 1920 crops of two real GX011625 look-check frames, the crop's own
+statistics supplied to both renders; preview = `correct(downscale(I, k))`, export =
+`downscale(correct(I), k)` (`gui.imaging.downscale`). Values in /255; "inner-B" excludes a
+border of B preview pixels. k = 1 is exactly 0 in every row (all methods, both crops).
+
+| crop | method | k | region | mean | p99 | p99.5 | p99.9 | max | frac > 3/255 |
+|---|---|---|---|---|---|---|---|---|---|
+| 0024.925 | c3 | 2 | all | 0.086 | 0.929 | 2.705 | 8.411 | 29.426 | 0.456 % |
+| 0024.925 | c3 | 2 | inner-4 / inner-16 | 0.087 / 0.091 | 0.960 / 1.057 | 2.764 / 2.956 | 8.514 / 8.731 | 29.426 | 0.465 / 0.493 % |
+| 0024.925 | c3 | 4 | all | 0.246 | 3.253 | 5.991 | 12.175 | 25.964 | 1.069 % |
+| 0024.925 | c3 | 4 | inner-4 / inner-16 | 0.251 / 0.266 | 3.392 / 3.789 | 6.143 / 6.600 | 12.357 / 12.835 | 25.964 | 1.113 / 1.239 % |
+| 0024.925 | ancuti2018 | 2 | all | 0.086 | 0.892 | 2.455 | 7.737 | 28.930 | 0.411 % |
+| 0024.925 | ancuti2018 | 2 | inner-4 / inner-16 | 0.087 / 0.091 | 0.916 / 0.994 | 2.506 / 2.676 | 7.844 / 8.059 | 28.930 | 0.418 / 0.444 % |
+| 0024.925 | ancuti2018 | 4 | all | 0.250 | 2.883 | 5.416 | 11.306 | 24.733 | 0.968 % |
+| 0024.925 | ancuti2018 | 4 | inner-4 / inner-16 | 0.255 / 0.270 | 3.029 / 3.409 | 5.574 / 5.987 | 11.495 / 11.936 | 24.733 | 1.009 / 1.123 % |
+| 0114.648 | c3 | 2 | all | 0.116 | 0.896 | 2.079 | 4.439 | 32.783 | 0.273 % |
+| 0114.648 | c3 | 2 | inner-4 / inner-16 | 0.116 / 0.118 | 0.910 / 0.969 | 2.104 / 2.183 | 4.450 / 4.500 | 32.783 | 0.276 / 0.289 % |
+| 0114.648 | c3 | 4 | all | 0.359 | 2.055 | 3.282 | 6.545 | 27.108 | 0.578 % |
+| 0114.648 | c3 | 4 | inner-4 / inner-16 | 0.362 / 0.374 | 2.080 / 2.225 | 3.327 / 3.599 | 6.574 / 6.916 | 27.108 | 0.591 / 0.662 % |
+| 0114.648 | ancuti2018 | 2 | all | 0.122 | 0.886 | 1.960 | 4.327 | 30.975 | 0.255 % |
+| 0114.648 | ancuti2018 | 2 | inner-4 / inner-16 | 0.122 / 0.124 | 0.893 / 0.940 | 1.977 / 2.053 | 4.333 / 4.403 | 30.975 | 0.257 / 0.268 % |
+| 0114.648 | ancuti2018 | 4 | all | 0.372 | 1.995 | 3.125 | 6.279 | 26.547 | 0.531 % |
+| 0114.648 | ancuti2018 | 4 | inner-4 / inner-16 | 0.374 / 0.387 | 2.012 / 2.135 | 3.172 / 3.399 | 6.340 / 6.544 | 26.547 | 0.544 / 0.608 % |
+
+Reading: on real content the mean bound (1/255) holds with 2.7-12x margin; p99 is at most
+1.06/255 at k = 2 and up to 3.8/255 at k = 4; the max (25-33/255) and p99.9 (4.3-12.8/255)
+miss 3/255 at every k > 1. Excluding the border does NOT help (every interior figure is equal
+or slightly worse; the maximum sits inside): the difference is content (fine detail the
+preview cannot sharpen), not edge handling. (On the synthetic smooth texture of R0-7 the
+maxima were at the border; real footage behaves differently.)
+
+## RESUME HERE (for the fresh cell)
+
+**Status at hand-off:** round 0 complete and ruled; NO product code written. Branch `wp3.4`
+(worktree `C:\Users\rwsmy\clearwater\.worktrees\wp3.4`), base `de206e2`. Read the brief
+(`docs/briefs/wp3.4-brief.md`, incl. its Rulings), this ledger's R0-1..R0-7 and the rulings
+above; together they are the design. Do not re-derive them.
+
+**Decided (build to these):** stage tables R0-1 (c3 equal to `stubs.C3_STAGES`; Ancuti
+compensation record means (3,), cap_statistics (2,), alpha (2,) with blue 0.0 when off;
+transitive dependencies); chains and host-read counts R0-2 (ancuti2018 7, c3 4, render 0);
+schema R0-3 (ranges APPROVED; one cross check); R0-Q1 (method resolves params: defaults for
+missing, ValueError for unknown, `validate_parameter_set`, then the cross check); R0-Q2 (unknown
+stage ValueError, missing stage KeyError, record content ValueError naming stage and statistic);
+R0-Q3 (`dataclasses.replace(image, pixels=...)`); R0-Q4 (`methods/schema.py` split); R0-Q5
+(prototype blend form, no clip, test pins [0, 1]); Y-1/Y-2 and Q2-Q8 as R0-5; P-2 detecting
+test form; P-4 `cast` in `fusion.py` only.
+
+**Held:** the V8 method-level test (P-1, with CHARC); build the rest. When CHARC rules, write
+the V8 test to the ruled bound and images (the figures above are its baseline).
+
+**Files to create or change (all owned):**
+- NEW `src/clearwater/methods/schema.py` (the two parameter tuples, the resolver and cross
+  check), NEW `src/clearwater/methods/ancuti_fusion.py` (stages, the method class, two
+  instances), `src/clearwater/methods/__init__.py` (exports, `available_methods()`, c3 first).
+- `src/clearwater/core/backend.py` (`backend_for`; DR-37 (a) `ModuleNotFoundError` with
+  `name == "cupy"`; DR-38 (c) `check_rgb` refuses H or W < 1; DR-38 (d) `check_sigma`
+  ValueError on overflow), `src/clearwater/core/__init__.py` (export `backend_for`),
+  `src/clearwater/core/ops.py` (helpers annotated `CoreBackend`).
+- `src/clearwater/methods/fusion.py`: ONLY `cast(CoreBackend, backend)` at the four call sites
+  (+ the `cast` import). No other line in `compensation.py`, `white_balance.py`, `fusion.py`.
+- `tools/core_speed.py` (`--whole`, `--memory`, outputs `work/wp3.4/`; DR-37 (d) SpeedError,
+  (e) row by PCI bus id).
+- Tests `tests/test_methods_assembly*.py`, `tests/test_core_wp34*.py`, extension of
+  `tests/test_core_speed.py`. Report `docs/reports/wp3.4-method-assembly.md`. This ledger.
+
+**First task:** the core fixes and `backend_for` (task 7 + Q2) with their tests (they are
+small and unblock the method code), then `schema.py` + its tests, then `ancuti_fusion.py`
+(tasks 2-4, 6) with the task-9 roster. The EXCLUSIVE speed/memory windows (task 8) only when
+the code is final and only on the dispatcher's grant; full pytest only in a granted window.
+
 ## Cumulative round ledger
 
 | round | depth (dispatcher) | critical | major | minor | in / out envelope | NEW / REOPENED | reverts | fixes: product / test-only | transport, CLI |
 |---|---|---|---|---|---|---|---|---|---|
-| 0 (design) | -- | -- | -- | -- | -- | -- | -- | -- | -- |
+| 0 (design) | 192,064 | -- | -- | -- | -- | -- | -- | -- | -- (no review round; design table + rulings) |
