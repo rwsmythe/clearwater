@@ -194,3 +194,16 @@ dispatcher re-locks at the second of the WP3.6/WP3.12/WP3.16 merges.
 DR-37 (a) stays OPEN (the status bar shows the string WP3.1 gives). DR-37 (b), DR-34, DR-35 not
 reopened. G12 force CPU surfaced (status bar), its toggle is WP3.20's. AD-11 V8 bound: harness
 built, the bound is met with WP3.4's method at WP4.x.
+
+## Erratum at the gate (orchestrator, Reviewer B pass 2)
+
+- **Close ordering:** `QtJobRunner.close` delivers `on_done` for the jobs it finds ended when it
+  samples them, once. A job that ends while another job's `on_done` runs is delivered later through
+  the queue (after the settings write). A job still running when `close()` times out keeps its
+  callbacks. Banked as DR-44 (c); trigger WP4.3.
+- **Refusal names:** the stand-alone-name check accepts a following dot, so `a.mp4` inside
+  `a.mp4.bak` counts as naming the file.
+- **Limits, added:** `set_position` commits the position and supplied statistics before the decode
+  succeeds (DR-44 (a), for WP3.18). Clearing a message clears every message of its severity,
+  whichever panel raised it (DR-44 (b), before the WP3.17-3.20 briefs freeze). Both are stated in
+  the Limits above in part; DR-44 is their record.
