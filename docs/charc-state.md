@@ -11,13 +11,41 @@
 
 ### Phase / state
 
-**Phase 3 (build), wave 3 tranche A in flight.** Plan `docs/clearwater-implementation-plan.md`
-v1.2. **CHARC generation 3** = `clearwater-charc-20261020-2115` (fable/medium), picked up
-2026-10-21 ~07:30Z from generation 2's hand-off at 6533d8f (gen 2 `clearwater-charc-20261020-0636`
-rolled at the 400K cap at a clean boundary and is inert; cue THIS name). Bash gauge at pickup:
-44 ms. Charc inbox at pickup: 0 unread. Main ~810 commits ahead of `origin/main`, unpushed; the
-owner has not asked for a push (verify `git status -sb`). Generation 2's narrative is in
-`git log -- docs/charc-state.md`.
+**Phase 3 (build), wave 3 tranche A -- PAUSED at the owner's word (2026-10-21 ~09:15Z in the
+orchestrator's chat: "Let's pause at the end of this portion of the work").** Plan
+`docs/clearwater-implementation-plan.md` v1.2. **CHARC generation 3** = `clearwater-charc-20261020-2115`
+(fable/medium), picked up 2026-10-21 ~07:30Z from 6533d8f; bash gauge 44 ms. Main ~815 commits ahead
+of `origin/main`, unpushed; no push asked (verify `git status -sb`).
+
+### Generation 3 so far (2026-10-21 07:30Z onward)
+
+- **WP3.9 video decode ACCEPTED** by orchestrator gen 9, main 09ab408 (record `docs/proofs/wp3.9-accept.md`;
+  B clean NO_NEW_CRITICAL_MAJOR; DR-45 NEW; DR-36 (a)(b) CLOSED by CHARC 1d1ead6). **CHARC QA CONFIRMED,
+  static half** at this seat: patch-id set 70bbf36b on `de206e2..wp3.9` and `b9f3d09..09ab408~1` (19 each),
+  021c8dd ff-ancestor; B md5s all OK, five assertions (one WSL vsock line classified environment noise);
+  ruff/format/mypy clean; harness 366 OK. Orchestrator's main full pytest on 09ab408: 3670 passed, 2 skipped,
+  1562 s (figure of record). CHARC's own full pytest: RUNNING in the background at pickup of this file
+  (`work/charc-qa/wp3.9-pytest.log`); figure to be added here.
+- **Rulings this generation (all recorded durably):** WP3.10 round-0 Q-C upheld, AD-22 extended (absent
+  edit list = identity presentation; 09ac181); Q-A/B/D no objection with build notes (1-byte sentinel
+  invariant; nothing NUT/setts leaks into IF-5; unreadable-tail warning in SinkReport; 16 KiB provenance
+  limit in IF-9 docstring); P8 non-square SAR refused at open by name, no IF change (msg 39ff5f6a); WP3.11
+  V3-1 ruled: AD-14 clip tests the absolute bound only, V3's 25 % ratio asserted on a test-local
+  jittering-patch clip, xfails become recorded-figure tests, ratios (ad14 0.39-0.49; WP1.4 real 0.35-0.45)
+  go to the owner as INFORMATION at CP5 under V3 "tunable" (AD-14 extended b9f3d09); step-aware default
+  stands (both candidates worse; AD-3 PROVISIONAL to WP5.2); **WP3.10 S1 ruled** (posted to the
+  orchestrator inbox for gen 10 at pickup): fix from the source's own sample table, fold #2's exact
+  head-trim refusal (media_time != earliest composition time), #3 cleanup, then round 3.
+- **Orchestrator gen 9 PAUSED and stopped draining** (state 05dd68a, the gen-10 read-me-first); gen 10 is
+  NOT launched -- the owner launches it on resume (`scripts/launch_role.ps1 -Role orchestrator`). Parked
+  (cells dead with gen 9; worktrees intact with RESUME HERE ledgers, treat as OCCUPIED until gen 10 says
+  otherwise): WP3.4 `.worktrees/wp3.4` 3fae1d5 (A converged; EXCLUSIVE --memory/--whole windows, two full
+  pytests, report remain); WP3.10 `.worktrees/wp3.10` 98ee54a (R2 adjudicated; S1 ruling above; footage
+  legs unblocked by WP3.9); WP3.11 `.worktrees/wp3.11` e82aa2b (R1 adjudicated 0/3/5; V3-1 ruling in its
+  ledger). Tranche B (WP3.17-3.20) still waits for two tranche-A returns (one so far: WP3.9).
+- **On resume:** the owner launches orchestrator gen 10; it drains the S1 ruling, re-dispatches the three
+  parked cells from their ledgers (depth read at dispatch), and WP3.10's exclusive windows resume one at
+  a time. CHARC QA on each accept as the standing rules below.
 
 ## Hand-off record (generation 2 -> 3, 2026-10-21 ~07:20Z; kept as the pickup method)
 
