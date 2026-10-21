@@ -5,15 +5,15 @@
 
 ### Generation
 
-- **Generation 9** (`clearwater-orchestrator-20261020-1959`) ROLLED OVER 2026-10-21 ~09:40Z at ~470K (the
-  hook's 400K cap), at the WP3.9 accept boundary. **Generation 10 starts here** (verify:
-  `comms/.launch-sessions.json`). Earlier: gen 8 `clearwater-orchestrator-20261020-1556`, gen 7 `-1419`, gen 6
+- **Generation 10** (`clearwater-orchestrator-20261021-0004`) picked up 2026-10-21 ~10:05Z, under the owner's
+  PAUSE (verify: `comms/.launch-sessions.json`). Gen 9 (`clearwater-orchestrator-20261020-1959`) rolled over
+  ~09:40Z at ~470K at the WP3.9 accept boundary. Earlier: gen 8 `clearwater-orchestrator-20261020-1556`, gen 7 `-1419`, gen 6
   `-1134`, gen 5 `-0802`, gen 4 `-0524`, gen 3 `-20261019-2346`, gen 2 `-20261018-1442`, gen 1 `-20261014-1258`.
-- **Inbox:** gen 9 drained through CHARC's WP3.9 QA note (`f1ee3ebf03b1d591`) and STOPPED DRAINING at its rollover announcement. You are the
+- **Inbox:** gen 10 drained at pickup through CHARC's WP3.9 full-QA note (`bfe4b56072240ecf`). Gen 10 is the
   sole drainer (verify: `uv run python scripts/role_mail.py list --role orchestrator`).
 - **CHARC is generation 3:** `clearwater-charc-20261020-2115`. Cue that exact name (re-read
   `comms/.launch-sessions.json` before each cue; CHARC rolls over too).
-- Bash-launch gauge at gen-9 bring-up: 40.0 ms. Re-measure at yours.
+- Bash-launch gauge at gen-10 bring-up: 43.6 ms (gen 9: 40.0 ms). Free memory at pickup 11.7 GB.
 
 ### Standing operator rulings
 
@@ -43,7 +43,7 @@ then re-dispatch each package from its ledger's RESUME HERE (each worktree is in
 | Package | Branch / head (worktree `.worktrees/<branch>`) | Seats so far | State at park | Next step on resume |
 |---|---|---|---|---|
 | WP3.4 method assembly | `wp3.4` `3fae1d5` | 3 (cell 3 at 133K) | Built; Reviewer A CONVERGED R1 (0/0/3, minors fixed); V8 test per amended AD-11; full pytest 3868 passed at `84ad0ef` (product code changed since: F1 fix, F2 docstrings) | Fresh cell from RESUME HERE: EXCLUSIVE `--memory` then `--whole --cpu-frames 10` windows (one at a time, post OPEN/CLOSE to CHARC), full pytest CuPy-unimportable then with CuPy, finish the report. Then my gate. |
-| WP3.10 video encode | `wp3.10` `98ee54a` | 3 (cell 3 at 361K) | R1 remediated (3 commits); R2 adjudicated: #1 rejected (repro), #2 out-of-envelope REOPENED and banked, #3 minor cleanup, **S1 self-found in-envelope MAJOR** (a truncated source cut at a packet boundary: the last frame is stretched to the whole file's presentation end) | **Ruling owed (gen-9 recommendation: YES to all):** fix S1 by taking the next pts from the source's own sample table; fold #2's exact head-trim refusal (media_time == earliest composition time) into the same read; #3 cleanup; then Reviewer A round 3, then a full-pytest window. The footage legs (AD-12 quality, the product GX011627 leg, the export FLOOR row EXCLUSIVE) can now run: WP3.9 is on main (rebase `wp3.10` onto main first). Banked: WP3.7's `probe.py` `_run_ffprobe` still inherits FFREPORT. |
+| WP3.10 video encode | `wp3.10` `98ee54a` | 3 (cell 3 at 361K) | R1 remediated (3 commits); R2 adjudicated: #1 rejected (repro), #2 out-of-envelope REOPENED and banked, #3 minor cleanup, **S1 self-found in-envelope MAJOR** (a truncated source cut at a packet boundary: the last frame is stretched to the whole file's presentation end) | **RULED by CHARC (`26c54f1567f948e1`, YES to all; the cell may start without another stop; `probe.py` NOT edited, frozen interfaces untouched; tests from `r2/repro/repro_f1b.py` and `repro_f2.py`; record #2's refusal in the round-0 table):** fix S1 by taking the next pts from the source's own sample table; fold #2's exact head-trim refusal (media_time == earliest composition time) into the same read; #3 cleanup; then Reviewer A round 3, then a full-pytest window. The footage legs (AD-12 quality, the product GX011627 leg, the export FLOOR row EXCLUSIVE) can now run: WP3.9 is on main (rebase `wp3.10` onto main first). Banked: WP3.7's `probe.py` `_run_ffprobe` still inherits FFREPORT. |
 | WP3.11 analysis engine | `wp3.11` `e82aa2b` | 1 (cell 1 at 359K) | Built; step-aware eval run (default stands); R1 adjudicated 0/3/5 (F1, F2 cancel-path MAJORs; F5 V3 metric, superseded); CHARC's V3-1 ruling copied into the ledger | Fresh cell from RESUME HERE: fix F1-F4, F6-F8 failing-first (F7 needs a window to re-run the eval), implement the V3-1 ruling (seeded jittering-patch clip asserted at 25 % on all four measures, ad14 tests record), Reviewer A R2, full pytest window, report. The Y-1 text is reconciled with WP3.4's at the gate. |
 | WP3.9 video decode | ACCEPTED, main `09ab408` | 1 | -- | -- (DR-45 banked) |
 
@@ -107,7 +107,7 @@ Each accepted package had its return report posted to CHARC and an info-update t
 | WP3.12 | 2026-10-21 | `3aaf395` | `docs/proofs/wp3.12-accept.md`; DR-41; A converged at the R5 gate; B pass 1 blocking -> ONE remediation -> pass 2 adjudicated at the gate; stacked with WP3.6; main 3440 passed | CONFIRMED (`28160f360239ca35`) |
 | WP3.6 | 2026-10-21 | `d0f00ee` (+ `4ec835d` main gates) | `docs/proofs/wp3.6-accept.md`; DR-42; built-in ICC moved reader -> writer (IF-1); B blocked twice, pass 2 adjudicated at the gate; main 3440 passed | CONFIRMED (`28160f360239ca35`) |
 | WP3.16 | 2026-10-21 | `a2685cb` (+ `0c41615` main gates) | `docs/proofs/wp3.16-accept.md`; DR-43, DR-44; A converged R4; rebased onto WP3.6 by the orchestrator; one additive contract member; B blocked twice, pass 2 adjudicated at the gate; main 3559 passed | CONFIRMED (`6d15bf1f653b5038`) |
-| WP3.9 | 2026-10-21 | `09ab408` | `docs/proofs/wp3.9-accept.md`; DR-45; A converged R3; candidate 3670 passed; B clean (1 minor + 1 advisory banked, 1 erratum) | pending |
+| WP3.9 | 2026-10-21 | `09ab408` | `docs/proofs/wp3.9-accept.md`; DR-45; A converged R3; candidate 3670 passed; B clean (1 minor + 1 advisory banked, 1 erratum) | CONFIRMED in full (`bfe4b56072240ecf`; 3670 passed at CHARC's seat; worktrees `wp3.9`, `wp3.9-mc` released for removal) |
 | DR-44 amendment | 2026-10-21 | `de206e2` | `docs/proofs/dr44-contract-amendment.md`; B pass 1 blocked, remediated, pass 2 clean; main 3570 passed | checked (`00b7f7a8baa5ae3b`) |
 
 Kept branches (evidence; do not delete unasked): `wp3.9`, `wp3.9-mc`, `dr44`, `dr44-record`, `wave3-briefs`, `wp3.12`, `wp3.12-mc`, `wp3.6`, `wp3.6-mc`, `wp3.6-mc2`, `wp3.16`, `wp3.16-mc`, `wp3.16-pre-rebase`, `wp3.2`, `wp3.2-mc`, `wp3.2-mc2`, `wp3.3`, `wp3.3-mc`, `wp3.3-mc2`, `wp3.5`, `wp3.5-mc`, `wp3.5-mc2`, `wp3.15`, `wp3.15-mc`, `wp3.13`, `wp3.13-mc`, `wp3.7`, `wp3.7-mc`, `wp3.1`, `wp3.1-mc`, `wp2.3`, `wp2.3-mc`, `wp2.2`, `wp2.2-mc`, `wp1.2b`, `wp1.2b-b1`, `wp1.3d`, `wp1.3d-b1`,
