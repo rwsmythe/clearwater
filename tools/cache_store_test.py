@@ -31,6 +31,12 @@ percentile sizes and the 60-minute extrapolations to ``meansize.txt`` (sizes onl
 decoded default proxy against the float proxy and against the 8-bit proxy alone (every second
 statistics frame).
 
+Run identity: ``baseline-<clip>.json`` and ``results.json`` carry what they were measured on (per
+clip the stride, frame count and SHA-256 of the proxy file, and the Pillow/libjpeg identity of the
+product codecs); ``sizes`` stops instead of reusing a file of another identity or of none (a file
+written before identities existed: delete it to measure again). ``report`` only prints the
+identity.
+
 Sizes are the bytes of the stored payload per frame (the product adds a 24-byte record header
 and a small codec header per frame; stream candidates count the packet payloads, without
 container overhead); the png-pillow-opt candidate is sized on the statistics frames only
@@ -47,6 +53,7 @@ from __future__ import annotations
 
 import argparse
 import concurrent.futures
+import hashlib
 import io
 import json
 import statistics
@@ -291,7 +298,20 @@ class ClipData:
     frames: Frames
     stat_indices: list[int]
     reference: dict[int, Stats]
+    stride: int
+    proxy_path: Path
     baseline: dict[int, Stats] = field(default_factory=dict)
+    sha256: str | None = field(default=None, repr=False)
+
+    def proxy_sha256(self) -> str:
+        """Return the SHA-256 of the proxy file, read once (it identifies the prepared proxies)."""
+        if self.sha256 is None:
+            digest = hashlib.sha256()
+            with self.proxy_path.open("rb") as handle:
+                while block := handle.read(1 << 24):
+                    digest.update(block)
+            self.sha256 = digest.hexdigest()
+        return self.sha256
 
 
 def load_clip(stem: str) -> ClipData:
@@ -299,14 +319,87 @@ def load_clip(stem: str) -> ClipData:
     out = out_dir()
     meta = json.loads((out / f"proxy-{stem}.json").read_text(encoding="utf-8"))
     count = int(meta["frames"])
-    frames = np.memmap(out / f"proxy-{stem}.u8", dtype=np.uint8, mode="r").reshape(
+    proxy_path = out / f"proxy-{stem}.u8"
+    frames = np.memmap(proxy_path, dtype=np.uint8, mode="r").reshape(
         count, PROXY_SHORT_SIDE, 960, 3
     )
     reference = {
         int(i): {k: np.asarray(v, dtype=np.float64) for k, v in s.items()}
         for i, s in meta["reference"].items()
     }
-    return ClipData(stem, frames, list(meta["stat_indices"]), reference)
+    return ClipData(
+        stem, frames, list(meta["stat_indices"]), reference, int(meta["stride"]), proxy_path
+    )
+
+
+def run_identity(clips: Sequence[ClipData]) -> dict[str, Any]:
+    """Return what a baseline or results file was measured on (stride, proxies, JPEG library).
+
+    Args:
+        clips: The prepared clips of the run.
+
+    Returns:
+        A JSON-ready mapping: the Pillow/libjpeg identity of the product codecs, and for every
+        clip its stride, frame count and the SHA-256 of its proxy file.
+    """
+    from clearwater.cache.codec import jpeg_identity
+
+    return {
+        "jpeg": jpeg_identity(),
+        "clips": {
+            c.stem: {
+                "stride": c.stride,
+                "frames": int(c.frames.shape[0]),
+                "proxy_sha256": c.proxy_sha256(),
+            }
+            for c in clips
+        },
+    }
+
+
+def require_identity(path: Path, found: object, expected: dict[str, Any]) -> None:
+    """Refuse a file measured on another run.
+
+    Args:
+        path: The file, for the message.
+        found: The identity the file carries (None for a file written before identities).
+        expected: The identity of the current run.
+
+    Raises:
+        SystemExit: The identities differ.
+    """
+    if found != expected:
+        raise SystemExit(
+            f"{path.name} was measured on another run (or carries no run identity): the stride, "
+            f"the prepared proxies or the JPEG library differ. Delete {path.name} to measure again."
+        )
+
+
+def read_results(path: Path, identity: dict[str, Any]) -> list[dict[str, Any]]:
+    """Return the rows of ``results.json`` (none if absent), refusing a file of another run.
+
+    Args:
+        path: The results file.
+        identity: The identity of the current run (:func:`run_identity`).
+
+    Returns:
+        The recorded rows.
+
+    Raises:
+        SystemExit: The file carries another identity, or none.
+    """
+    if not path.exists():
+        return []
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    found = raw.get("identity") if isinstance(raw, dict) else None
+    require_identity(path, found, identity)
+    rows: list[dict[str, Any]] = raw["rows"]
+    return rows
+
+
+def write_results(path: Path, identity: dict[str, Any], rows: list[dict[str, Any]]) -> None:
+    """Write ``results.json`` with the run identity beside the rows."""
+    path.write_text(json.dumps({"identity": identity, "rows": rows}, indent=1), encoding="utf-8")
 
 
 # --- candidates -----------------------------------------------------------------------------------
@@ -694,15 +787,30 @@ def run_candidate(
 def baseline_stats(
     clip: ClipData, out: Path, pool: concurrent.futures.Executor
 ) -> dict[int, Stats]:
-    """Return the statistics of the stored 8-bit proxies themselves (the lossless baseline)."""
+    """Return the statistics of the stored 8-bit proxies themselves (the lossless baseline).
+
+    A baseline file is reused only if it carries the identity of this run (:func:`run_identity`
+    of the clip); otherwise the run stops (:func:`require_identity`).
+    """
     path = out / f"baseline-{clip.stem}.json"
+    identity = run_identity([clip])
     if path.exists():
         raw = json.loads(path.read_text(encoding="utf-8"))
-        return {int(i): {k: np.asarray(v) for k, v in s.items()} for i, s in raw.items()}
+        require_identity(path, raw.get("identity") if isinstance(raw, dict) else None, identity)
+        return {
+            int(i): {k: np.asarray(v) for k, v in s.items()} for i, s in raw["statistics"].items()
+        }
     frames = [np.asarray(clip.frames[i]) for i in clip.stat_indices]
     found = dict(zip(clip.stat_indices, pool.map(_stats_job, frames), strict=True))
     path.write_text(
-        json.dumps({str(i): {k: v.tolist() for k, v in s.items()} for i, s in found.items()}),
+        json.dumps(
+            {
+                "identity": identity,
+                "statistics": {
+                    str(i): {k: v.tolist() for k, v in s.items()} for i, s in found.items()
+                },
+            }
+        ),
         encoding="utf-8",
     )
     return found
@@ -713,9 +821,8 @@ def sizes_mode(only: list[str], workers: int) -> None:
     out = out_dir()
     clips = [load_clip(stem) for stem in CLIPS]
     results_path = out / "results.json"
-    results: list[dict[str, Any]] = (
-        json.loads(results_path.read_text(encoding="utf-8")) if results_path.exists() else []
-    )
+    identity = run_identity(clips)
+    results = read_results(results_path, identity)
     chosen = [c for c in candidates() if not only or c.name in only]
     with concurrent.futures.ProcessPoolExecutor(max_workers=workers) as pool:
         for clip in clips:
@@ -728,7 +835,7 @@ def sizes_mode(only: list[str], workers: int) -> None:
                     r for r in results if (r["candidate"], r["clip"]) != (row.candidate, row.clip)
                 ]
                 results.append(asdict(row))
-                results_path.write_text(json.dumps(results, indent=1), encoding="utf-8")
+                write_results(results_path, identity, results)
                 print(
                     f"{cand.name:26s} {clip.stem}: median {row.bytes_median / 1000:8.1f} KB  "
                     f"err max {row.max_abs_error:3d}  means {row.dev_max['means']:.1e}  "
@@ -886,7 +993,14 @@ def readcost_product_mode() -> None:
 def report_mode() -> None:
     """Print the results as a markdown table, worse clip per column."""
     out = out_dir()
-    results = json.loads((out / "results.json").read_text(encoding="utf-8"))
+    raw = json.loads((out / "results.json").read_text(encoding="utf-8"))
+    results: list[dict[str, Any]] = raw["rows"] if isinstance(raw, dict) else raw
+    note = (
+        "no run identity recorded (written before the check existed)"
+        if isinstance(raw, list)
+        else f"run identity {json.dumps(raw['identity'], sort_keys=True)}"
+    )
+    print(f"<!-- results.json: {note} -->")
     cost_path = out / "readcost.json"
     cost = json.loads(cost_path.read_text(encoding="utf-8")) if cost_path.exists() else {}
     names = list(dict.fromkeys(r["candidate"] for r in results))

@@ -6,7 +6,12 @@ Spec v0.5.4 (7.3, D59, D71, D95, D113; G12; V17), architecture FINAL 1.0 (IF-7, 
 2026-10-20, AD-7, AD-15, AD-20, AD-25). Base `2c5540a`. Nothing under `src/clearwater/interfaces/`
 was changed. The review ledger is `docs/proofs/wp3.12-ledger.md`. Figures are on disk under the
 main tree's `work/wp3.12/` (gitignored): `results.json`, `readcost.json`, and `meansize.txt` and
-`signed-bounds.txt`, which the instrument's `meansize` and `signed` modes write.
+`signed-bounds.txt`, which the instrument's `meansize` and `signed` modes write. The instrument
+(tests: `tests/test_cache_instrument.py`) now writes a run identity (stride, proxy SHA-256, Pillow and
+libjpeg identity) into `baseline-<clip>.json` and `results.json` and stops instead of reusing a file
+of another identity; the committed figures above come from files written before that check existed
+(one sequence: proxies, then baselines, then results), so a re-run of `sizes` needs those files
+deleted first.
 
 ## Public API (what WP3.11, WP3.18, WP3.20, WP4.2 and WP4.3 consume)
 
