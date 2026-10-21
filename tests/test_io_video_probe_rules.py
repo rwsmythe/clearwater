@@ -31,8 +31,10 @@ def test_the_package_exists_and_has_the_expected_modules() -> None:
     assert {p.name for p in PACKAGE.glob("*.py")} == {
         "__init__.py",
         "boxes.py",
+        "decode.py",
         "gopro.py",
         "inputs.py",
+        "pipes.py",
         "probe.py",
     }
 
