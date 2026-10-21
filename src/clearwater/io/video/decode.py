@@ -392,6 +392,7 @@ class FrameStream(Iterator[Frame]):
         self._name = ascii_text(probe.path.name)
         self._process = _Process()
         self._close = weakref.finalize(self, self._process.shutdown)
+        self._return_lock = threading.Lock()
         self._started = False
         self._done = start_s is not None and end_s is not None and end_s <= start_s
         self._stderr_ended = False
@@ -435,20 +436,31 @@ class FrameStream(Iterator[Frame]):
                 if self._end_s is not None and time >= self._end_s:
                     raise StopIteration
                 frame = self._frame(pts)
-                self._index += 1
-                return frame
+                with self._return_lock:
+                    # close() sets _done under this lock, so no frame is returned once close()
+                    # has returned, even when it is called from another thread.
+                    if self._done:
+                        raise StopIteration
+                    self._index += 1
+                    return frame
         except StopIteration:
             self.close()
             raise
-        except BaseException:
+        except BaseException as error:
             if self._done:  # closed from another thread: what failed was the shutdown
                 raise StopIteration from None
             self.close()
+            if isinstance(error, VideoDecodeError) and error.kind == "pts":
+                self._log_tail("gave wrong frame timing")
             raise
 
     def close(self) -> None:
-        """Stop FFmpeg and release the pipes and the thread; later calls do nothing."""
-        self._done = True
+        """Stop FFmpeg and release the pipes and the thread; later calls do nothing.
+
+        Safe to call from another thread: no frame is returned after it has returned.
+        """
+        with self._return_lock:
+            self._done = True
         self._close()
 
     def _frame(self, pts: int) -> Frame:
@@ -593,7 +605,11 @@ class FrameStream(Iterator[Frame]):
 
     def _log_tail(self, what: str, level: int = logging.WARNING) -> None:
         """Log FFmpeg's last warning and error lines, ASCII-safe."""
-        tail = " | ".join(self._process.diagnostics.tail) or "(no message)"
+        try:
+            lines = list(self._process.diagnostics.tail)
+        except RuntimeError:  # the thread outlived its join and appended meanwhile
+            lines = ["(the message tail was still being written)"]
+        tail = " | ".join(lines) or "(no message)"
         _log.log(level, "ffmpeg %s on %s: %s", what, self._name, ascii_text(tail))
 
 

@@ -129,6 +129,26 @@ def test_a_planted_ffmpeg_death_mid_stream_raises_and_never_hangs(
     assert stream._process.thread is not None and not stream._process.thread.is_alive()
 
 
+def test_a_close_landing_between_read_and_return_returns_no_frame(
+    sample: Callable[[str], Path], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Stands in for close() called from another thread after a frame was read but before
+    # next() returned it: next() must end, not hand the frame out after close() returned.
+    stream = SOURCE.frames(probe(sample("vid-vfr")), hw_decode=False)
+    assert isinstance(stream, decode_module.FrameStream)
+    next(stream)
+    build = stream._frame
+
+    def build_then_close(pts: int) -> Frame:
+        frame = build(pts)
+        stream.close()
+        return frame
+
+    monkeypatch.setattr(stream, "_frame", build_then_close)
+    with pytest.raises(StopIteration):
+        next(stream)
+
+
 # --- planted side channels: a stand-in FFmpeg ----------------------------------------------------
 
 FAKE_FFMPEG = """
@@ -232,8 +252,15 @@ def test_a_frame_without_a_pts_line_is_an_error(planted: Callable[..., Any]) -> 
     assert isinstance(error, VideoDecodeError) and error.kind == "pts"
 
 
-def test_an_orphan_pts_line_is_an_error(planted: Callable[..., Any]) -> None:
-    got, error = frames_then(planted([*three_frames(), info(3, 3003)]))
+def test_an_orphan_pts_line_is_an_error_with_the_tail_logged(
+    planted: Callable[..., Any], caplog: pytest.LogCaptureFixture
+) -> None:
+    actions = [*three_frames(), ["line", "[hevc @ 0000] [error] late \u00e9 noise"], info(3, 3003)]
+    with caplog.at_level(logging.WARNING, logger=decode_module.__name__):
+        got, error = frames_then(planted(actions))
+    messages = [record.getMessage() for record in caplog.records]
+    assert any("late \\xe9 noise" in message for message in messages)
+    assert all(message.isascii() for message in messages)
     assert got == [0, 1001, 2002]
     assert isinstance(error, VideoDecodeError) and error.kind == "pts"
     assert "1 timestamp lines have no frame" in str(error)
@@ -267,7 +294,7 @@ def test_a_short_read_is_unreadable_even_on_a_flagged_file(
 def test_a_failure_on_a_clean_file_raises_after_the_last_good_frame(
     planted: Callable[..., Any], caplog: pytest.LogCaptureFixture
 ) -> None:
-    actions = [*three_frames(), ["line", "[hevc @ 0000] [error] broken é data"]]
+    actions = [*three_frames(), ["line", "[hevc @ 0000] [error] broken \u00e9 data"]]
     with caplog.at_level(logging.WARNING, logger=decode_module.__name__):
         got, error = frames_then(planted(actions, exit=1))
     assert got == [0, 1001, 2002]
@@ -286,7 +313,7 @@ def test_a_failure_on_a_flagged_file_ends_cleanly(planted: Callable[..., Any]) -
 def test_errors_with_a_clean_exit_are_logged_once_not_raised(
     planted: Callable[..., Any], caplog: pytest.LogCaptureFixture
 ) -> None:
-    actions = [*three_frames(), ["line", "[hevc @ 0000] [error] concealed é error"]]
+    actions = [*three_frames(), ["line", "[hevc @ 0000] [error] concealed \u00e9 error"]]
     with caplog.at_level(logging.WARNING, logger=decode_module.__name__):
         got, error = frames_then(planted(actions))
     assert (got, error) == ([0, 1001, 2002], None)

@@ -49,11 +49,12 @@ ffmpeg -nostdin -hide_banner -nostats -loglevel repeat+level+info [-hwaccel cuda
   with an ASCII-safe tail). Nonzero exit: on a file the probe flagged `truncated` or
   `unreadable_tail` the iterator ends (logged at INFO); on a clean file `VideoDecodeError
   ("unreadable")` after the last good frame, with the tail logged. A frame cut short is
-  `"unreadable"` on any file. FFmpeg that cannot be started is `"unreadable"`.
+  `"unreadable"` on any file. FFmpeg that cannot be started is `"unreadable"`. Every `"pts"`
+  error logs FFmpeg's ASCII-safe tail too.
 - **Lifecycle and bound (N4).** `close()` kills FFmpeg, reaps it, closes the pipe and joins the
   thread (bounded waits); `weakref.finalize` does the same for an iterator dropped without
   `close()` (the thread holds no reference to the iterator). A close from another thread ends
-  the reader with `StopIteration`. Per iterator, Python holds one raw frame buffer and the frame
+  the reader with `StopIteration`; no frame is returned after `close()` has returned. Per iterator, Python holds one raw frame buffer and the frame
   being built; FFmpeg is held back by the pipe.
 
 ## Evidence
@@ -75,6 +76,12 @@ ffmpeg -nostdin -hide_banner -nostats -loglevel repeat+level+info [-hwaccel cuda
 | Command maps `0:v:0` only, no other stream; no ffprobe; imports; OS-specific code only in `pipes.py`; DR-36 (a) | `test_io_video_decode_rules.py` |
 | `gpu`: CUDA bytes and pts equal software on every sample; `footage`: GX011627 681 frames, pts `k x 1001`, per-frame hashes equal an independent run, also through the forced default pipe and CUDA | `test_io_video_decode_hw.py` |
 
+## Files outside the package
+
+- `src/clearwater/io/video/probe.py`: only the two DR-36 (a) log lines (Q9 grant).
+- `tests/test_io_video_probe_rules.py`: only `"decode.py"` and `"pipes.py"` added to the expected
+  module set (orchestrator grant, 2026-10-21; WP3.10 adds its own names the same way).
+
 ## Debt
 
 - DR-36 (a) CLOSED: `probe.py` `_movie`'s two warnings name the file through `_name(path)`
@@ -92,8 +99,10 @@ ffmpeg -nostdin -hide_banner -nostats -loglevel repeat+level+info [-hwaccel cuda
 - The seek offset assumes FFmpeg's container start is not later than the probe's
   `start_offset_s` (the earliest audio or video start): reasoned from libavformat; executed on a
   file starting at 2 s; every in-envelope file starts at 0.
-- On a probe-flagged file, a nonzero FFmpeg exit ends the iterator; frames FFmpeg had decoded
-  but not yet written when it failed are not recovered.
+- On a probe-flagged file, a nonzero FFmpeg exit at a frame boundary ends the iterator; frames
+  FFmpeg had decoded but not yet written when it failed are not recovered. A frame cut short is
+  `"unreadable"` on every file, flagged or not (FFmpeg died inside a write; it ends a truncated
+  input at a frame boundary with exit 0), after every complete frame has been delivered.
 - The FFmpeg child is started without `CREATE_NO_WINDOW`, as WP3.7's ffprobe calls are; a
   console window may flash under a windowed GUI on Windows (banked by the orchestrator for
   WP4.3; OS-specific, outside AD-23).
