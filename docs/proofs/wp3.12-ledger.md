@@ -273,7 +273,7 @@ above where they say "over the bound" and "not narrower".
 open item for the dispatcher); F2 `store._unlink` retries a refused delete (6 tries, 10 ms); F3 `_evict` pins every key in `_writing`; F5 statistics store claims the key slot before encoding;
 F8 `codec_cache_version` = format << 48 | first 48 bits of SHA-256 (pack header field int64, `PACK_FORMAT` 2); F9 `pack_size` re-read after a failed rollback; F10 thread test fails on any
 proxy `KeyError`; F4 instrument `report` judges the ruled criteria (original 1 % shown as information); F7 `meansize` and `signed` modes added and re-run (identical figures to the scratch
-runs); F6 report text. F11 BANKED (out of envelope: a foreign file named `<cache file>.*.tmp` inside an entry folder is deleted when the cache opens or the entry is evicted).
+runs); F6 report text. F11 first banked, then FIXED under the orchestrator's ruling below (temporary-name pattern tightened).
 Own tests 67 pass; ruff check, ruff format --check, mypy green at the fix head.
 
 **Round 2 (head b3e60ed, gpt-5.6-sol high; evidence `.../wp3.12/r2/`):** 0 critical, 2 major, 2 minor, all REASONED (the sandbox could not run pytest: read-only /tmp), VERDICT
