@@ -8,6 +8,7 @@ Tier STRONG. Brief `docs/briefs/wp3.11-brief.md` (FINAL; CHARC rulings `53d1d906
 | Round | Depth (dispatcher) | Critical | Major | Minor | In / out of envelope | NEW / REOPENED | Reverts | Fixes: product / test-only | Transport, CLI | Verdict |
 |---|---|---|---|---|---|---|---|---|---|---|
 | 0 (design table) | 143,868 | - | - | - | - | - | - | - | - | APPROVED as written (orchestrator round-0 rulings: P1, P2, choices 1-10) |
+| 1 (head 00b248b) | 316,506 (at the window yield; the R1 yield's figure is the dispatcher's) | 0 | 3 (F1, F2, F5) | 5 (F3, F4, F6, F7, F8) | 8 in / 0 out | 8 NEW / 0 REOPENED | 0 | F5 test-only, fixed out of band at 9c53134; F1-F4, F6 product; F7, F8 tool -- NOT yet fixed | WSL, gpt-5.6-sol high, 19 exec lines, all findings REASONED | NEW_CRITICAL_MAJOR_FOUND; adjudicated (F3, F4 downgraded to MINOR), next round needed |
 
 ## Round 0 -- design table (no product code yet)
 
@@ -336,3 +337,63 @@ figure. Re-measured (`work/t-v3b.log`; 2 passed, 2 xfailed):
 The standard deviation removes the sweep's constant part but not its curvature; V3's 25 % is
 still not met (0.39-0.49). V3-1 STANDS with these figures. The test file changed while Reviewer
 A round 1 was running (its diff predates the change).
+
+## Round 1 (Reviewer A) -- adjudicated, NOT remediated
+
+Evidence `C:\Users\rwsmy\clearwater-review-evidence\wp3.11\r1\` (prompt, diff, transcript
+`review.txt` + `review.stderr.txt`, `test-summary.txt`, `probe.txt`, `adjudication.md`,
+`md5sums.txt`). Per-finding adjudication with the fix kind for each: `adjudication.md` there.
+Summary: F1 MAJOR (cancel not checked during/after smoothing; "complete" published without a final
+cancel check), F2 MAJOR (a cancel raised by the last decode report still reaches `mark_complete`),
+F5 MAJOR (V3 metric; fixed at 9c53134, now superseded by the V3-1 ruling); MINOR: F3 (frame-shape
+change with an equal proxy shape not refused; message wording), F4 (stale tail proxies of an
+incomplete entry marked complete; narrow: needs a non-deterministic re-decode), F6 (reopen
+progress double count), F7 (eval flicker reference not the raw mean; result-bearing), F8 (eval
+edge-free count per kind).
+
+## CHARC ruling on V3-1 (binding for the next seat; copied verbatim, not yet implemented)
+
+**V3-1 RULED: the RECOMMENDED reading, with four conditions. No spec change; the 25 % threshold is untouched.**
+
+Ground. V3's own text asks for "a moving disturbance (e.g., a colored patch or a brightness ripple)" and defines flicker as the standard deviation of frame-to-frame differences. A steadily swept disc changes the whole-frame statistics along a smooth curve; the differences are nearly constant, their standard deviation is curvature, and a centred smoother is REQUIRED to keep a smooth trend (that is the whole case for 2 s over 0.5 s in WP1.4). So the AD-14 clip measures a trend, not flicker, and failing V3's ratio on it says nothing about smoothing. The clip was designed for AD-14's absolute bound and does that job. Your premise check (metric first) was the right order.
+
+Conditions:
+1. **The test-local clip's disturbance must be frequency-agnostic.** A patch whose POSITION is re-drawn at random each frame (uniform within a band in the lower third, fixed size and brightness, seeded) -- white-noise-like in the statistics, so the ratio cannot be tuned to pass by choosing a tone the Gaussian happens to kill (at sigma 0.33 s a 1 Hz tone passes at ~0.12 and a 0.5 Hz tone fails at ~0.58; a single ripple frequency is therefore not sufficient on its own). A ripple MAY be added as a second case; the jittering patch is the asserted one. The measured region is the upper half and a test proves the patch never touches it (the AD-14 mask pattern).
+2. **The two V3-ratio tests stop being xfail.** The ad14-flicker tests assert AD-14's bound and RECORD V3's four ratios without asserting them (an xfail that unexpectedly passes is noise, not evidence). The jitter-clip test asserts the 25 % ratio on all four measures (L*, a*, b*, contrast) with V3's metric, for both test-local methods.
+3. **Recorded for the owner, not asked now.** The report and the accept record carry the ad14-flicker ratios (0.39-0.49) and the WP1.4 real-footage ratios (0.35-0.45) under one heading, with the cause stated as above. They go on the owner-pending list for CP5 / WP4.2 as INFORMATION under V3's "tunable" clause; V3 on real footage stays V2's (D112). No `decision_request` from this.
+4. **Recorded durably:** AD-14 extended by one clause on main (`docs/decisions.md`, main b9f3d09).
+
+Step-aware: read. Default `median_gaussian` 2.0 s stands; both candidates lose on flicker (1.7-5.4x) and the peak step (5-13x) with no gain on the rendered step, which is decisive evidence for WP5.2's table. AD-3 stays PROVISIONAL until then; a change would be spec 7.2 and the owner's. Window CLOSED acknowledged (~07:40Z).
+
+## RESUME HERE (for the fresh cell; written by cell 1 at the R1 yield, 2026-10-21)
+
+**State.** Branch `wp3.11`, base `de206e2`. Built and committed: `src/clearwater/analysis/`
+(`proxy.py`, `smoothing.py`, `store.py`, `engine.py`, `__init__.py`), tests
+`tests/test_analysis_{support,proxy,smoothing,store,engine,recompute,deps,v3,step_aware_eval}.py`
+(`test_analysis_support.py` holds the helpers and test-local methods, no tests),
+`tools/step_aware_eval.py`, report DRAFT `docs/reports/wp3.11-analysis.md`. Gates at the last
+commit: ruff check, ruff format --check, mypy strict green; analysis tests 206 passed (fast),
+V3 file 2 passed + 2 xfailed (about 100 s, FFmpeg), instrument 2 passed. The round-0 design table
+above (R0-1..R0-13) is APPROVED and is the design; read it, not the code history.
+
+**Do next, in order.**
+1. Remediate R1 (one commit per finding, each with a test that fails on the unfixed code):
+   F1, F2 (product, MAJOR); F3, F4, F6 (product, MINOR); F7, F8 (tool; F7 changes the report's
+   step-aware figures -> needs a WINDOW for the re-run; ask with "WINDOW REQUEST").
+2. Implement the V3-1 ruling (above): a seeded jitter-position patch clip built in the test (no
+   new committed fixture; the patch re-drawn uniformly in a lower-third band each frame; a test
+   proves it never touches the upper half), asserting V3's 25 % on L*, a*, b*, contrast for both
+   test-local methods (`GrayWorld`, `GainsStretch`); the ad14-flicker tests assert AD-14 and
+   RECORD the four V3 ratios (no xfail); the report gets one heading with the ad14 ratios
+   (0.39-0.49) and WP1.4's real-footage ratios (0.35-0.45) and the cause, as information for
+   CP5 / WP4.2.
+3. Reviewer A round 2 (runner/prompt shape in `C:\Users\rwsmy\clearwater-review-evidence\wp3.11\r1\`;
+   new folder r2; the prompt lists R1's findings to verify as fixed).
+4. Full pytest in a dispatcher WINDOW; then the final return report.
+
+**Held / open.**
+- Y-1: the report carries cell 1's DRAFT text; the dispatcher reconciles it with WP3.4's at the
+  gate (do not change it unless told).
+- Step-aware: evaluated (table in the report, `work/wp3.11/step-aware/step-aware.json`); default
+  unchanged; F7 will move the flicker figures slightly.
+- The report still says "DRAFT" and "V3 ... PENDING"; finish both.
