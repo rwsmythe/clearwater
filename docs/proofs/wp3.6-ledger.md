@@ -8,6 +8,7 @@ base main `4b4da9b`. Brief `docs/briefs/wp3.6-brief.md` (FINAL, CHARC rulings `5
 | Round | Depth (dispatcher fills) | Critical / Major / Minor | In envelope vs out | NEW vs REOPENED | Reverts | Product vs test-only fixes |
 |---|---|---|---|---|---|---|
 | 0 (design table, no product code) | 96,178 / 18 turns (dispatcher, 01:21:43Z) | n/a | n/a | n/a | 0 | n/a |
+| 1 (STRONG, gpt-5.6-sol high, WSL codex-cli; head 983bff1) | (dispatcher) | 0 / 3 / 9 adjudicated (reviewer's own 0 / 8 / 4) | 6 in envelope (#1, #5, #9-#12), 6 out or marginal (#2-#4, #6-#8) | 12 NEW, 0 REOPENED | 0 | remediation not started (planned: all product code plus tests, #12 a docstring) |
 
 ## Round 0: the design table (task 1)
 
@@ -258,7 +259,32 @@ found nothing new.
 
 ## Rounds
 
-(Reviewer A rounds are recorded here, one section per round, from round 1.)
+### Round 1 (Reviewer A, head 983bff1)
+
+Evidence `C:\Users\rwsmy\clearwater-review-evidence\wp3.6\r1\` (prompt, diff, `review.txt`,
+`review.stderr.txt` full transcript, `adjudication.md`, `probes/`, `md5sums.txt`). Gates before the round:
+ruff check, ruff format --check, mypy clean; full pytest in the dispatcher's window: normal 3308 passed, 2
+skipped, 0 failed; cupy-unimportable 2790 passed, 520 skipped, 0 failed (the pytest-qt guard failure did not
+appear). Mechanical assertions: banner gpt-5.6-sol / high; ERROR lines not transport; tokens footer
+present; 15 `succeeded in`; VERDICT anchored. Reviewer ran nothing (read-only sandbox): all REASONED; the cell
+reproduced #1, #3, #4, #5, #9 with probes.
+
+| # | Adjudicated | Finding | Planned fix |
+|---|---|---|---|
+| 1 | MAJOR, in env | HEIC `rICC` profile discarded (reader accepts only `prof`) | accept `rICC`; test by patching a fixture's colr box |
+| 2 | MAJOR, out of env | only the first `ipma` box read | iterate every `ipma`; two-box test |
+| 3 | MINOR (reviewer MAJOR), out | `clap` over `ispe` is deliberate; a missing `ispe` unchecked | refuse a primary with no `ispe`; document the clap precedence |
+| 4 | MINOR (reviewer MAJOR), marginal | nclx primaries 2 with a specified transfer read as untagged | primaries `unknown`, transfer from the code, `assumed False` |
+| 5 | MAJOR, in env | TIFF source: Interop IFD lost, dangling 40965 pointer | materialise the Interop IFD in `from_tiff`; hand-built TIFF test; report sentence |
+| 6 | MINOR (reviewer MAJOR), out | pixel limit not applied to 16-bit PNG | check IHDR size before decoding |
+| 7 | MINOR (reviewer MAJOR), out | DNG tag walk skips BigTIFF | walk BigTIFF IFD0 |
+| 8 | MINOR (reviewer MAJOR), out | 16-bit palette colour map reduced to 8 bits | keep 16 bits when the map needs it |
+| 9 | MINOR | non-ASCII file name makes a non-ASCII message | backslashreplace in `PhotoReadError.__init__` |
+| 10 | MINOR | no alpha warning on the 16-bit PNG path | add the warning |
+| 11 | MINOR | `photo_check` stored size only for HEIC | record for every format |
+| 12 | MINOR | stale `srgb_profile.py` docstring | fix |
+
+Remediation NOT started: this turn made no product-code change (yield at the round boundary).
 
 ## State at the orchestrator gen-7 rollover -- resume here
 
