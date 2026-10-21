@@ -236,11 +236,14 @@ def compensate_c3(
     core.check_rgb(a)
     kernel_sigma = _derived_sigma(a.shape, "c3_kernel_fraction", c3_kernel_fraction)
     mask_sigma = _derived_sigma(a.shape, "c3_mask_smooth_fraction", c3_mask_smooth_fraction)
-    kappa_effective = c3_strength * kappa
-    lambda_effective = c3_strength * lambda_
+    # Python floats, so a NumPy-scalar parameter cannot widen the float32 image arithmetic (D39)
+    strength = float(c3_strength)
+    kappa_effective = strength * float(kappa)
+    lambda_effective = strength * float(lambda_)
+    threshold = float(c3_mask_threshold)
     to_rgb = core.asarray(_YCBCR_TO_RGB_709)
     ycbcr = core.rgb_to_ycbcr(a, "bt709", "full")
-    bright = a.mean(axis=2, dtype=np.float32) > c3_mask_threshold
+    bright = a.mean(axis=2, dtype=np.float32) > threshold
     mask = core.gaussian_blur((~bright).astype(np.float32), mask_sigma)
     delta_cb = -lambda_effective * mask * core.gaussian_blur(ycbcr[..., 1], kernel_sigma)
     delta_cr = -kappa_effective * mask * core.gaussian_blur(ycbcr[..., 2], kernel_sigma)

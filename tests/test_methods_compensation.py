@@ -839,6 +839,7 @@ class UfuncSpy(np.ndarray):
     """
 
     log: ClassVar[list[tuple[str, str, int, Any]]] = []
+    result_dtypes: ClassVar[list[Any]] = []
 
     def __array_ufunc__(self, ufunc: Any, method: str, *inputs: Any, **kwargs: Any) -> Any:
         ndim = max(getattr(x, "ndim", 0) for x in inputs)
@@ -849,11 +850,13 @@ class UfuncSpy(np.ndarray):
                 o.view(np.ndarray) if isinstance(o, UfuncSpy) else o for o in kwargs["out"]
             )
         result = getattr(ufunc, method)(*args, **kwargs)
+        UfuncSpy.result_dtypes.append(getattr(result, "dtype", None))
         return result.view(UfuncSpy) if isinstance(result, np.ndarray) else result
 
 
 def spied(image: np.ndarray) -> np.ndarray:
     UfuncSpy.log = []
+    UfuncSpy.result_dtypes = []
     return image.view(UfuncSpy)
 
 
@@ -926,3 +929,85 @@ def test_x4_error_comes_before_any_array_work() -> None:
         return compensate_c3(backend, a, **kwargs)
 
     assert rejects(check_validation_before_array_work, late)
+
+
+# -- NumPy-scalar parameters of the 3C render (B-1) -------------------------------------------
+
+SCALAR_PARAMS = ("kappa", "lambda_", "c3_strength", "c3_mask_threshold")
+"""The 3C parameters that reach array arithmetic or an array comparison as plain scalars."""
+
+
+class SpyingNumpyBackend(NumpyBackend):
+    """A CPU backend whose filter output is a :class:`UfuncSpy` too.
+
+    The SciPy filter builds its output itself (a plain array), so everything after the first
+    blur would escape the spy; wrapping the output keeps every later operation recorded.
+    """
+
+    def gaussian_blur(self, a: Any, sigma_px: float) -> Any:
+        return super().gaussian_blur(a, sigma_px).view(UfuncSpy)
+
+
+def scalar_params(
+    scalar: type, a: np.ndarray, *, edge: bool
+) -> tuple[dict[str, float], dict[str, Any]]:
+    """The 3C parameters as Python floats and as ``scalar`` (carrying the same values).
+
+    With ``edge`` the mask threshold sits 1e-9 below the float32 mean of pixel (0, 0): a float64
+    comparison protects that pixel, the weak-scalar float32 comparison does not. Without it the
+    threshold is the default and only the arithmetic on the strengths can differ.
+    """
+    mean_00 = float(a.mean(axis=2, dtype=np.float32)[0, 0])
+    plain = {
+        **C3,
+        "kappa": 1.3,
+        "lambda_": 0.45,
+        "c3_strength": 0.6,
+        "c3_mask_threshold": mean_00 - 1e-9 if edge else C3["c3_mask_threshold"],
+    }
+    typed = {k: scalar(v) if k in SCALAR_PARAMS else v for k, v in plain.items()}
+    return {k: float(v) for k, v in typed.items()}, typed
+
+
+def check_c3_numpy_scalars(
+    implementation: Callable[..., Any], scalar: type, *, edge: bool = False
+) -> None:
+    """NumPy-scalar parameters give the Python-float result, bit for bit, with no float64 array."""
+    backend = SpyingNumpyBackend()
+    image = synthetic(0)
+    plain, typed = scalar_params(scalar, image, edge=edge)
+    expected = implementation(backend, backend.asarray(image), **plain)
+    out = implementation(backend, spied(image), **typed)
+    assert UfuncSpy.log, "the spy saw no ufunc call: the instrument is not live"
+    assert np.float64 not in UfuncSpy.result_dtypes, "a float64 array was made on the way"
+    assert_identical(np.asarray(out), np.asarray(expected))
+
+
+EDGE = pytest.mark.parametrize("edge", [False, True], ids=["arithmetic", "threshold"])
+
+
+@EDGE
+@pytest.mark.parametrize("scalar", [np.float64, np.float32])
+def test_c3_numpy_scalar_parameters_make_no_float64_array(scalar: type, edge: bool) -> None:
+    """B-1: ``np.float64`` and ``np.float32`` parameters are the Python-float arithmetic (D39)."""
+    check_c3_numpy_scalars(compensate_c3, scalar, edge=edge)
+
+
+@EDGE
+def test_planted_unconverted_scalar_parameters_in_c3(edge: bool) -> None:
+    """The test-side 3C multiplies the parameters as given, as the round-1 product did."""
+    assert rejects(lambda impl: check_c3_numpy_scalars(impl, np.float64, edge=edge), c3_reference)
+
+
+@EDGE
+@pytest.mark.parametrize("scalar", [np.float64, np.float32])
+def test_c3_numpy_scalar_parameters_on_the_backend(
+    backend: CoreBackend, scalar: type, edge: bool
+) -> None:
+    """B-1 on the parametrised device (CuPy under ``gpu``): float32 out, bit-identical."""
+    image = synthetic(0)
+    plain, typed = scalar_params(scalar, image, edge=edge)
+    a = backend.asarray(image)
+    expected = host(backend, compensate_c3(backend, a, **plain))
+    out = host(backend, compensate_c3(backend, a, **typed))
+    assert_identical(out, expected)
