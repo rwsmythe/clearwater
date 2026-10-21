@@ -352,3 +352,39 @@ VERDICT at column 0, ERROR matches all echoed content); withheld paths respected
 | F7 | MINOR | CONFIRMED (read) | OUT | tag the untagged display copy as sRGB (cleanup, non-blocking) |
 
 Remediation NOT started (yield at the round boundary).
+
+## Round-1 rulings (orchestrator gen 8, FINAL, 02:39Z) and remediation
+
+Rulings: F1 GRANTED as a cross-file, test-only edit in `tests/test_conftest_guard.py` (WP-T1,
+closed; outside the owned set): `-p no:pytest-qt` in the two `-p no:capture` child invocations,
+with a comment, nothing else; no global `addopts` or `conftest.py` change. F2-F5 as planned (F2's
+planted no-cache version must fail). F6 rejection upheld. F7 fixed now. No second full-suite
+window: the orchestrator runs the full suite on the rebased candidate.
+
+Commits: `fa99105` F1 (test only, the granted file); `f334ee2` F4; `9afa115` F2, F3, F5, F7 (one
+commit: the four share `preview.py`, `render_worker.py` and `tests/test_gui_preview.py` hunks that
+pathspec commits cannot split).
+
+F1 proof:
+- With pytest-qt installed, `tests/test_conftest_guard.py` 44 passed; both `[no-capture-plugin]`
+  cases PASSED (`-k no-capture-plugin`: 2 passed). Before the edit the uncached case failed
+  with the INTERNALERROR (full-suite runs above).
+- The case still runs without the capture plugin: `pytest --trace-config` with no flags registers
+  `_pytest.capture` and `CaptureManager` (1 and 1 lines) and pytest-qt (2); with
+  `-p no:capture -p no:pytest-qt` it registers neither (0 capture lines, 0 pytestqt lines). The
+  refusal case (`test_refused_before_any_fixture_or_mode_touches_a_temp_folder[no-capture-plugin]`)
+  passes before and after; the uncached case's refusal sub-checks (TMPDIR or a later candidate
+  naming the footage) still refuse.
+
+Red/green (the new tests run against the four product files restored from `fa99105`, then put
+back): 6 failed (F4 `test_refusals_whose_text_omits_the_file_name_it`; F7
+`test_every_display_copy_is_tagged_srgb`; F3
+`test_leaving_one_to_one_before_the_full_render_clears_the_indicator`; F2
+`test_full_resolution_is_rendered_once_per_parameter_state` and the planted
+`test_planted_preview_without_the_render_memo_fails` (no `after` to plant on old code); F5
+`test_a_failed_render_still_reports_the_device`); `test_supplied_statistics_are_not_served_another_states_render`
+passes both ways (it guards the memo key, not the defect). On the fixed code the planted no-memo
+test sees 3 renders where the once-per-state test requires 2.
+
+Gates at `9afa115`: GUI tests 97 passed (15.5 s), with `tests/test_conftest_guard.py` 141 passed
+(53.7 s); ruff check (repo) 0; ruff format --check 0 (140 files); mypy strict 0 (87 files).

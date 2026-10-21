@@ -4,8 +4,11 @@ Package `clearwater.gui` (`src/clearwater/gui/`), tests `tests/test_gui_*.py` an
 `tests/gui_support.py`. Spec v0.5.4 (G1, G2, G9, G10; D27, D28, D41, D66, D108, D111; 6.6; V7, V8),
 architecture FINAL 1.0 (IF-1..IF-3, IF-5, IF-6, IF-8, IF-10; AD-4, AD-9, AD-11, AD-15, AD-18, AD-25 (a)).
 Base `4b4da9b`. Nothing under `src/clearwater/interfaces/`, `config/`, `core/`, `io/` or `jobs/`
-was changed. Rulings: brief CHARC `53b752a4d7fac4fc`; round-0 ruling (orchestrator gen 7) on
-S1-S7. Ledger: `docs/proofs/wp3.16-ledger.md`.
+was changed. One file outside the owned set was changed under a dispatcher grant (round-1
+F1, test only): `tests/test_conftest_guard.py` (WP-T1), whose two `-p no:capture` child
+invocations also pass `-p no:pytest-qt`. Rulings: brief CHARC `53b752a4d7fac4fc`; round-0 ruling
+(orchestrator gen 7) on S1-S7; round-1 rulings (orchestrator gen 8). Ledger:
+`docs/proofs/wp3.16-ledger.md`.
 
 ## Contract (`clearwater.gui.contract`; the names the WP3.17-3.20 briefs cite)
 
@@ -51,7 +54,7 @@ analysis state, statistics, position and backend reason when a source opens.
 | 2 | V7 bound: a 10 ms `QTimer` probe never waits > 100 ms while a ~2 s NumPy render runs and a job reports at a high rate (> 1000 reports). Observed maximum **11-12 ms** (2026-10-21, three runs; informational, not a performance figure). | `test_v7_interface_never_waits_more_than_100_ms`; planted inline render fails it: `test_planted_render_on_the_interface_thread_fails_v7` |
 | 3 | Latest wins: three quick parameter changes display only the last; a superseded result is dropped on the main thread by generation. | `test_latest_wins_three_quick_changes_show_only_the_last`; planted no-drop worker: `test_planted_stale_result_displayed_fails` |
 | 4 | V8 harness: with the identity stub the preview equals the full-resolution render downscaled by the same rule, exactly (mean 0, max 0 at k = 1, 2, 3, 7, and in the window); the harness takes any method and detects a resolution-dependent one. | `test_v8_harness_with_the_identity_stub_is_exact`, `test_preview_equals_the_export_downscaled_by_the_same_rule`, `test_v8_harness_detects_a_resolution_dependent_method` |
-| 5 | 1:1 exact: the grabbed device pixels right of the divider equal the full-resolution render bit for bit; the scaled result shows with "Rendering full resolution" until it arrives. | `test_one_to_one_corrected_pixels_equal_the_full_resolution_render`, `test_one_to_one_shows_the_scaled_result_with_an_indicator_until_full_arrives`; planted k = 2 at 1:1 fails: `test_planted_one_to_one_with_scaled_pixels_fails` |
+| 5 | 1:1 exact: the grabbed device pixels right of the divider equal the full-resolution render bit for bit; the scaled result shows with "Rendering full resolution" until it arrives (cleared when a k > 1 view supersedes it); the full resolution is rendered once per parameter state: a corrected display image is memoised per image, factor, method, parameters, preview device and supplied statistics (at most one full resolution), so a return to 1:1 or to fit shows it without `render`. | `test_one_to_one_corrected_pixels_equal_the_full_resolution_render`, `test_one_to_one_shows_the_scaled_result_with_an_indicator_until_full_arrives`, `test_leaving_one_to_one_before_the_full_render_clears_the_indicator`, `test_full_resolution_is_rendered_once_per_parameter_state`; planted k = 2 at 1:1 fails: `test_planted_one_to_one_with_scaled_pixels_fails`; planted no-memo fails: `test_planted_preview_without_the_render_memo_fails` |
 | 6 | Every G10 path of the round-0 table, refusal versus warning, a refusal keeps the previous source. | `tests/test_gui_open.py` (unknown extension, sidecar, DNG via the reader's `unsupported` kind, `unreadable` kind, other exception, each `VideoProbeError` kind, `refuse`/`exclude` faults, no frame, each `warn` fault, untagged photo and video once); planted refusal-as-warning fails |
 | 7 | Start-up and close through the `clearwater.config` API only; nothing written outside the injected `Locations`; no `QSettings`; one `save_settings` at close with `last_parameters`; a newer settings file refused and left untouched (S4). | `tests/test_gui_startup.py`; planted `app_locations()` start-up writes under the sentinel: `test_planted_write_to_the_real_app_data_folder_fails`; AST scan `test_no_gui_module_uses_qsettings_or_resolves_app_data_itself` |
 | 8 | AD-9 status bar: every `select_backend` reason verbatim as `Device: <reason>`, `Device: -` before a file, the preview reason in the tool tip when it differs, `CPU: forced` after `force_cpu`; the real selection shows `GPU` on this laptop. | `tests/test_gui_status.py` (7 reasons; `gpu` test ran, not skipped) |
@@ -59,9 +62,10 @@ analysis state, statistics, position and backend reason when a source opens.
 | 10 | The contract: a dummy panel in each `Area` gets a `ShellContext`, sees `parameters_changed`, drives `set_parameters`; the settings dialog opens from `actions.settings`. | `tests/test_gui_contract.py` |
 | 11 | Dependency rule: no `clearwater.gui` module imports `clearwater.methods`, `cupy`, `cupyx` or touches `.xp`; `clearwater.core`, `.config`, `.jobs`, `.io` load no PySide6. | `tests/test_gui_deps.py` |
 
-GUI tests: 90 passed in about 14 s, headless (`offscreen`). Full suite at `0e4412c`: 1 failed,
-2993 passed, 1 skipped (normal); 1 failed, 2474 passed, 520 skipped (CuPy unimportable); the
-failure is `test_conftest_guard.py` `[no-capture-plugin]` under pytest-qt (Reviewer A F1, open).
+GUI tests: 97 passed in about 15 s, headless (`offscreen`); with `tests/test_conftest_guard.py`
+141 passed. Full suite at `0e4412c` (before round 1): 1 failed, 2993 passed, 1 skipped (normal);
+1 failed, 2474 passed, 520 skipped (CuPy unimportable); the failure was Reviewer A F1, fixed in
+`fa99105`. Full suite on the final head: run by the orchestrator on the candidate.
 
 ## Decisions and deviations
 
@@ -102,6 +106,11 @@ failure is `test_conftest_guard.py` `[no-capture-plugin]` under pytest-qt (Revie
   preview's.
 - Close waits at most 5 s per worker; the threads are daemons, so an uninterruptible render cannot
   hang the exit.
+- A user running `pytest -p no:capture` must also pass `-p no:pytest-qt`: pytest-qt 4.5.0's
+  `pytest_configure` raises `ValueError: no option named 'capture'` without the capture plugin.
+- A refusal whose text does not contain the file name is shown as `"<name>: <text>"`.
+- A preview render that fails after the backend selections still updates the status bar (AD-9);
+  a selection that itself raises does not (the real `select_backend` never raises).
 
 ## Dependencies (X-B3)
 
