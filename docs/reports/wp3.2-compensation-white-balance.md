@@ -132,3 +132,10 @@ parameters and item (5) for its steps.
 - `cupyx.allow_synchronize` is deprecated and "not reliable" by CuPy's own warning; the Gate 1
   test pairs it with call counts on the core reduction helpers.
 - Not run off the envelope: other GPUs, other operating systems, multi-GPU.
+
+## Erratum at the gate
+
+Added at the accept (orchestrator Reviewer B re-run, `docs/proofs/wp3.2-accept.md`). After the
+Reviewer B remediation (`4b87fd8`) the own tests are 551 passed with CuPy importable and 308
+passed / 243 skipped with `cupy` and `cupyx` unimportable; the "383 passed, 200 passed / 183
+skipped" line above describes `1fcb37d`, before the remediation.
