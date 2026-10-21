@@ -50,7 +50,7 @@ D116.
    | IFD1 (thumbnail) | removed |
    | Exif IFD PixelXDimension / PixelYDimension | written size |
    | IFD0 Software | `Clearwater` (the version is in the provenance chunk) |
-   | every other IFD0, Exif, Interop, GPS field | kept (tests: Make, Model, DateTime, DateTimeOriginal, FNumber, GPS ref; the Interop IFD of a JPEG/PNG/HEIC block survives `edit`; a TIFF source's Interop IFD is carried as an IFD by `from_tiff`, an unreadable Interop pointer is dropped rather than left dangling) |
+   | every other IFD0, Exif, Interop, GPS field of a PARSEABLE block | kept (a block the D63 edit cannot process is dropped at read with a logged warning and the written file carries the minimal block; a TIFF source is read per IFD, so an unreadable GPS or Exif IFD drops that IFD alone; tests: Make, Model, DateTime, DateTimeOriginal, FNumber, GPS ref; the Interop IFD of a JPEG/PNG/HEIC block survives `edit`; a TIFF source's Interop IFD is carried as an IFD by `from_tiff`, an unreadable Interop pointer is dropped rather than left dangling) |
    | source without EXIF | minimal block: Orientation 1, dimensions, Software |
    | HEIC auxiliary images | dropped by construction (a PNG holds one image) |
 5. **DR-31 (1) closes**: the full PNG keyword rule (1-79 Latin-1 bytes, none in 0-31 or 127-160, no
@@ -92,9 +92,9 @@ truncated JPEG, PNG, 16-bit PNG, HEIC and TIFF, a missing, empty, unknown and di
 - Dependency rule: importing `clearwater.io.photo` in a fresh interpreter loads nothing from
   `clearwater.gui/.jobs/.methods/.core`, `PySide6`, `cupy`, `av` (subprocess test), and no module names
   them (AST test).
-- `uv run ruff check .`, `ruff format --check .`, `mypy` (strict) clean; photo tests 422 passed, 1
-  skipped (the footage leg) after the Reviewer A round-1 remediation and the round-2 terminating cleanup
-  (`tests/test_io_photo_r1.py`: 18 new cases; each fix has at least one that fails without it). Full suite at `983bff1` (dispatcher's window, 2026-10-21 02:5xZ):
+- `uv run ruff check .`, `ruff format --check .`, `mypy` (strict) clean; photo tests 439 passed, 1
+  skipped (the footage leg) after the Reviewer A round-1 remediation, the round-2 terminating cleanup
+  and the Reviewer B remediation (`tests/test_io_photo_r1.py`: 34 new cases; each fix has at least one that fails without it). Full suite at `983bff1` (dispatcher's window, 2026-10-21 02:5xZ):
   normal 3308 passed, 2 skipped, 0 failed; with `cupy` unimportable 2790 passed, 520 skipped, 0 failed.
   The full suite on the remediated head is run by the orchestrator on the merge candidate.
   Reviewer A converged at round 2 (0 new blocking); a terminating cleanup after R2 (WhiteIsZero grey TIFF
@@ -150,6 +150,11 @@ merge, never a hand merge.
 - Orientation for a HEIC with `imir` and no `irot` follows AD-24 literally (the tag is applied when
   `irot` is absent).
 - The 16-bit PNG reader holds the whole file and two decoded copies (about 1.7 GiB at 48 MP).
+- Banked after Reviewer B (DR-42, no code): a PNG `cICP`, `cHRM` or `gAMA` chunk and TIFF colorimetry
+  tags (`PrimaryChromaticities`, `TransferFunction`) are not read; such a photo with no ICC profile is
+  read as untagged (`bt709`/`srgb`, `assumed=True`, the shell's G10 warning) and written without `iCCP`,
+  as question 3 rules (B1). The PNG IHDR compression and filter method fields are not validated by the
+  16-bit decoder; a deliberately malformed file only, out of envelope (B5).
 - Banked after Reviewer A round 1 (out of the declared envelope, no code):
   - Only the first `ipma` box of a HEIC is read; a file whose primary item's associations are split
     over several `ipma` boxes (non-Apple encoders; an iPhone file carries one) would read as having none

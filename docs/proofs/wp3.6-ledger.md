@@ -379,3 +379,24 @@ fixed in one commit (`src/clearwater/io/photo/tiff.py`, `exif.py`, tests in `tes
 cases, 3 failing before: WhiteIsZero 8 and 16 bit refused; a little-endian TIFF gave an `MM` block). Own tests
 422 passed, 1 skipped; ruff check, ruff format --check and mypy strict clean; no CR in any changed blob. Full
 suite not run by the cell (the orchestrator runs it on the candidate).
+
+### Reviewer B remediation (cell, orchestrator gen 8; Reviewer B at the orchestrator's seat on the candidate)
+
+Reviewer B returned NEW_CRITICAL_MAJOR_FOUND (adjudicated: B2, B3 major in envelope; B4, B6 minor; B1 and B5
+banked as DR-42). One remediation, no Reviewer A round, no full suite (the orchestrator runs it). Each fix
+has tests in `tests/test_io_photo_r1.py` or `tests/test_photo_check.py` that failed on `c491c61`:
+- B2 `1823b20`: un-premultiply associated alpha (`ExtraSamples` 1) before dropping alpha, RGBA and grey+alpha,
+  8 and 16 bit (chosen over refusing because an RGBA TIFF is an accepted mode; alpha 0 leaves colour 0). Before:
+  premultiplied half-alpha red read as 0.5 red.
+- B3 `9a32de8`: `exif.sanitise` runs the writer's own D63 edit on the source block at read (PNG 8/16, JPEG,
+  HEIC, TIFF); a block it cannot process is dropped with a warning (`<name>: the EXIF block is damaged`), the
+  orientation tag still comes from the raw block (1 when unparseable), and the written file carries the
+  minimal block. `from_tiff` reads IFD0, Exif and GPS separately. Note: Pillow reads every malformed GPS IFD
+  I could build as an empty one, so that test injects the failure (a patched `get_ifd` on the source only).
+  Before: a CRC-valid garbage `eXIf` or APP1 block was kept and `write_photo` raised.
+- B4 `ace7fe7`: a file of two bytes or more that is a proper start of a JPEG, PNG, TIFF or HEIC signature is
+  `unreadable` (truncated), not `unsupported`; one byte and other short junk stay unsupported.
+- B6 `60abc05`: `photo_check` summary keys `round_trip_problems` by the full path (and the refused list
+  gains `path`).
+- Report: "every other field kept" narrowed to a parseable block; Limits gain B1 and B5 (DR-42).
+Own tests 439 passed, 1 skipped; ruff check, ruff format --check and mypy strict clean; no CR in any changed blob.
