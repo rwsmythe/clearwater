@@ -208,11 +208,10 @@ def inspect(path: Path, out_png: Path) -> dict[str, Any]:
         record["verdict"] = {"ok": False, "kind": error.kind, "message": str(error)}
         return record
     height, width = image.pixels.shape[:2]
-    stored = record.get("heic", {}).get("ispe")
     record.update(
         verdict={"ok": True},
         decoded_size=[width, height],
-        stored_size=list(stored) if stored else None,
+        stored_size=_stored_size(record, meta.orientation, width, height),
         source_format=meta.source_format,
         orientation_tag=meta.orientation,
         color=_color_record(image),
@@ -223,6 +222,18 @@ def inspect(path: Path, out_png: Path) -> dict[str, Any]:
     except Exception as error:  # the record says what failed
         record["round_trip"] = {"problems": [f"{type(error).__name__}: {error}"]}
     return record
+
+
+def _stored_size(record: dict[str, Any], orientation: int, width: int, height: int) -> list[int]:
+    """Return the size of the file's pixels as stored, before the orientation was applied.
+
+    A HEIC states it (``ispe`` of the primary item, before ``irot``); for the other formats it
+    is the decoded size turned back: the width and height swap for EXIF Orientation 5 to 8.
+    """
+    ispe = record.get("heic", {}).get("ispe")
+    if ispe:
+        return list(ispe)
+    return [height, width] if orientation in (5, 6, 7, 8) else [width, height]
 
 
 def make_guard(config: LocalConfig) -> WriteGuard:

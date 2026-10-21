@@ -75,6 +75,10 @@ def test_the_records_hold_what_the_ledger_promises(
     assert p3["round_trip"]["max_abs_sample_difference"] == 0.0
     jpeg = records["jpeg-orient-port-o6.jpg"]
     assert jpeg["orientation_tag"] == 6 and "IFD0.Orientation" in jpeg["exif_fields"]
+    assert jpeg["decoded_size"] == jpeg["stored_size"][::-1], "stored size is un-turned"
+    tiff = records["tiff8-lowred-none.tif"]
+    assert tiff["stored_size"] == tiff["decoded_size"] and tiff["stored_size"] is not None
+    assert p3["stored_size"] == p3["decoded_size"]
     assert jpeg["round_trip"]["problems"] == []
     dng = records["dng-by-extension.dng"]
     assert dng["dng"] is True
