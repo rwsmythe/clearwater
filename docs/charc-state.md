@@ -11,17 +11,45 @@
 
 ### Phase / state
 
-**Phase 2 (architecture and interfaces), closing; Phase 3 (build) about to open.**
-Plan `docs/clearwater-implementation-plan.md` v1.2. **CHARC generation 2**
-`clearwater-charc-20261020-0636` (fable/medium, `scripts/launch_role.ps1`), picked up
-2026-10-20 ~16:50Z from generation 1 (`clearwater-charc-20261014-1303`, rolled at the 400K cap,
-hand-off commit edd1e88; its narrative is in `git log -- docs/charc-state.md`). Bootstrap
-steps 1-5 were done by generation 1; this seat re-read the kernel docs, drained the inbox and
-announced itself. Main ~500 commits ahead of `origin/main`, unpushed; the owner has not asked
-for a push (verify `git status -sb`).
+**Phase 3 (build), wave 3 tranche A in flight.** Plan `docs/clearwater-implementation-plan.md`
+v1.2. **CHARC generation 3 picks up here** from generation 2 (`clearwater-charc-20261020-0636`,
+fable/medium, picked up 2026-10-20 ~16:50Z, ROLLED 2026-10-21 ~07:20Z at the 400K depth cap, at
+a clean boundary: no owner item open, no ruling pending, every tranche-A cell is the
+orchestrator's and working in its own worktree). Generation 2's narrative is in
+`git log -- docs/charc-state.md`. Main ~600 commits ahead of `origin/main`, unpushed; the owner
+has not asked for a push (verify `git status -sb`).
 
-**Bash-launch gauge:** 35.5 ms (2026-10-20, this seat; PowerShell
-`Measure-Command { & $env:CLAUDE_CODE_GIT_BASH_PATH -c true }`). Under the 1 s flag.
+## ROLLOVER 2026-10-21 ~07:20Z (CHARC generation 2 at the 400K cap)
+
+**Successor: read this file first, then `docs/charc-charter.md`, `docs/charc-bootstrap.md`
+(bring-up only; steps 1-5 done), `docs/orchestrator-context.md` (hazards 1-7),
+`docs/dispatch-recipe.md`, `docs/review-gate-clearwater.md`, `docs/model-prompting-standard.md`
+(section 9 carries the pre-dispatch rollover exception). Then measure the bash gauge, drain the
+charc inbox (`uv run python scripts/role_mail.py read --role charc --all`), announce yourself to
+the orchestrator (`--to orchestrator`, then ONE SendMessage cue to the exact name in
+`comms/.launch-sessions.json`; gen 9 = `clearwater-orchestrator-20261020-1959` at hand-off),
+overwrite this block with your own generation line and commit by pathspec.** Memory files under
+`~/.claude/projects/C--Users-rwsmy-clearwater/memory/` hold the owner's rulings verbatim.
+
+What generation 2 did (2026-10-20 16:50Z to 2026-10-21 07:20Z): QA-confirmed WP2.3, wave 1
+(WP3.1/3.7/3.13/3.15), wave 2 (WP3.2/3.3/3.5/3.6/3.12/3.16) = 12 of 15 Phase 3 packages on main,
+3559 tests; approved the wave-2 and wave-3 briefs; ruled the IF-7 amendment (AD-20), AD-5
+stored-JPEG proxy, AD-11 V9 reading and V8 k > 1 bound, AD-17 16-bit readers + tifffile, AD-18
+PySide6-Essentials + pytest-qt, AD-23 CREATE_NO_WINDOW extension, the pre-dispatch rollover
+exception, kernel hazard (7); corrected the architecture (IF-7 block, provenance embedded).
+
+**Standing rules this generation learned (add to the predecessor's list):** every CHARC QA =
+patch-id (or sorted patch-id set when the record says so) on every range the accept record names,
+Reviewer B md5s recomputed against md5s.txt with the five assertions (banner in stderr; "succeeded
+in" lines are in the stderr file; a "Reconnecting" ERROR line BEFORE the first `codex` line is a
+recovered retry), DR entries present, ruff/format/mypy/harness at this seat, ONE full pytest in
+the background with nothing else heavy (the host reaps under memory pressure; a reaped run is
+reported, not restarted, and the orchestrator's main run is the figure of record); never a suite
+while an exclusive or heavy window is posted OPEN; Bash heredocs lose non-ASCII (U+2264) -- write
+Python edit scripts to the scratchpad with the Write tool and run `python -X utf8`; apostrophe-heavy
+heredocs also fail; the orchestrator rolls at ~400K every 3-4 accepts (gen 9 live at hand-off);
+subjects under 120 chars; hold main when asked and commit nothing (including this file) until the
+release post.
 
 ### Frozen inputs (verify each at its path)
 
