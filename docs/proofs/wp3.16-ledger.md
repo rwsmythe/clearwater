@@ -8,7 +8,7 @@ Cell: implementer-opus-high (tier STRONG; ruling 1). Worktree `.worktrees/wp3.16
 
 | Round | Date | Blocking (crit/maj) | Minor | In/out envelope | NEW/REOPENED | Reverts | Fix kind | Transport | Depth |
 |---|---|---|---|---|---|---|---|---|---|
-| 0 (design) | 2026-10-21 | n/a | n/a | n/a | n/a | n/a | n/a | n/a | (dispatcher) |
+| 0 (design) | 2026-10-21 | n/a | n/a | n/a | n/a | n/a | n/a | n/a | 152,774 (dispatcher, 35 turns, 01:27:10Z) |
 
 ## Round 0: the design table (brief task 1)
 
@@ -214,8 +214,9 @@ WARNING (unknown method) or nothing logged (None, first run).
   iPhone photo is 4032x3024 (3024/540 = 5.6); 5.3K video is 5312x2988. Recommended: one
   `downscale(image, k)` block mean where the last row and column of blocks average only the
   pixels they cover (output `ceil(H/k) x ceil(W/k)`), used by the preview, the 1:1 path (k = 1)
-  and V8; the statistics proxy uses k = max(1, short_side // 540) (short side 540..1079; exactly
-  540 for 4K video, 604 for a 12 MP photo). Alternative: an exact fractional area resample to a
+  and V8; the statistics proxy uses k = max(1, short_side // 540) (short side 540..1079;
+  ERRATUM at the ruling: the figures are 4K 3840x2160 k=4 -> 960x540; 5.3K 5312x2988 k=5 ->
+  1063x598; 12 MP 4032x3024 k=5 -> 807x605 (not 604); 48 MP 8064x6048 k=11 -> 734x550). Alternative: an exact fractional area resample to a
   540 short side (NumPy, separable), for the statistics proxy only. This binds WP3.14 and WP4.1
   as question 5 says.
 - **S4. Start-up with a settings file from a newer Clearwater.** `load_settings` raises
@@ -233,3 +234,15 @@ WARNING (unknown method) or nothing logged (None, first run).
 - **S7. `hw_decode` for preview frames.** No setting carries it. Recommended: `hw_decode=False`
   for the single frames the shell decodes (open and position); WP3.18's analysis pass chooses
   its own.
+
+## Round-0 ruling (orchestrator gen 7, 2026-10-21)
+
+Table and the frozen contract ACCEPTED as committed (`795e57f`), including the
+`position_changed = Signal(object)` deviation (stated in the report). S1 RECOMMENDED: a stub-era
+adapter in `default_engines` estimates an id outside `core.METHOD_IDS` as `"c3"` (D16), WP4.3
+removes it; `clearwater.core` is never changed. S2 RECOMMENDED. S3 RECOMMENDED PROVISIONALLY
+(goes to CHARC; kept in one function, `imaging.statistics_factor`/`downscale`, so a different
+ruling is a one-place change). Exact rule: output `ceil(H/k) x ceil(W/k)`, each block the mean of
+the pixels it covers; statistics k = `max(1, min(H, W) // 540)`; figures in S3 above (12 MP is
+807x605). S4-S7 RECOMMENDED. `pyside6>=6.12,<7` kept as granted; a possible switch to
+`PySide6-Essentials` is with CHARC, made only on the dispatcher's relay.
