@@ -83,11 +83,15 @@ NO_SOURCE_REASON = "Open a photo or video to export."
 NEEDS_ANALYSIS_REASON = "Export needs the clip's analysis."
 """The shell's reason for a video whose analysis has not run or was cancelled (AD-15)."""
 
-NEWER_SETTINGS_TEXT = (
-    "The settings file is from a newer Clearwater ({error}). Defaults are used for this session "
-    "and the file is left as it is."
+SETTINGS_FORMAT_TEXT = (
+    "The settings file is in a format this Clearwater does not read ({error}). Defaults are "
+    "used for this session and the file is left as it is."
 )
-"""The start-up message for a newer settings file (round-0 ruling S4)."""
+"""The start-up message for a settings file whose ``format_version`` is refused (S4, R4-2).
+
+Neutral on purpose: ``UnsupportedFormatVersionError`` is raised for a newer version and for an
+older one with no migration step; the error text in the braces says which.
+"""
 
 type FileChooser = Callable[[QWidget], Path | None]
 """Asks the user for a file to open; returns None when cancelled."""
@@ -139,7 +143,7 @@ def start_up(locations: Locations, engines: Engines) -> StartUp:
         _LOG.warning("settings refused: %s", error)
         settings = Settings()
         save_at_close = False
-        text = messages.ascii_text(NEWER_SETTINGS_TEXT.format(error=error))
+        text = messages.ascii_text(SETTINGS_FORMAT_TEXT.format(error=error))
         problems.append(Message("refusal", text, locations.settings_file))
     presets = PresetStore(locations.presets_dir)
     try:
@@ -533,8 +537,8 @@ class MainWindow(ShellWindow):
     def shutdown(self) -> None:
         """Stop every worker, save the settings with the last parameters once, close the log.
 
-        Idempotent. A save error is logged, never raised; after a newer settings file was
-        refused at start-up nothing is saved (S4).
+        Idempotent. A save error is logged, never raised; after a settings file was refused at
+        start-up (a format version this Clearwater does not read) nothing is saved (S4).
         """
         if self._closed:
             return

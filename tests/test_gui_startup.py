@@ -102,7 +102,24 @@ def test_a_newer_settings_file_is_refused_and_left_untouched(make_window, qtbot,
     locs.settings_file.write_text(text, encoding="utf-8")
     window = make_window()
     refusals = presenter_of(window).of("refusal")
-    assert len(refusals) == 1 and "newer Clearwater" in refusals[0].text
+    assert len(refusals) == 1 and "format_version 99 is newer" in refusals[0].text
+    assert window.session.settings() == Settings()
+    window.close()
+    assert locs.settings_file.read_text(encoding="utf-8") == text
+
+
+def test_an_older_settings_file_without_a_migration_is_not_called_newer(
+    make_window, qtbot, tmp_path
+) -> None:
+    # Round-4 R4-2: version 0 has no migration step; the message must not say "newer".
+    locs = locations(tmp_path)
+    locs.config_dir.mkdir(parents=True)
+    text = '{"format_version": 0, "anything": true}\n'
+    locs.settings_file.write_text(text, encoding="utf-8")
+    window = make_window()
+    refusals = presenter_of(window).of("refusal")
+    assert len(refusals) == 1 and "newer" not in refusals[0].text
+    assert "format_version 0" in refusals[0].text and "left as it is" in refusals[0].text
     assert window.session.settings() == Settings()
     window.close()
     assert locs.settings_file.read_text(encoding="utf-8") == text
