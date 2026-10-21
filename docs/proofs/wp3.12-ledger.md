@@ -344,6 +344,9 @@ forced; on Windows the unfixed code also left a `removing` mark in the NEW entry
 R5-8 the report counts 95. R5-2 and R5-5 and the unchecked-first-record shape residue are named in the report's Limits. Own tests 95 pass; `ruff check .`, `ruff format --check .`, `mypy` green. No full
 pytest run (window pending). The R5 row below stands as adjudicated.
 
+**Full-pytest window (granted 03:06Z, head `afde3ff`):** normal `uv run pytest --basetemp=work/pt -q -p no:cacheprovider`: 1939 passed, 1 warning in 657.86 s; cupy-unimportable form (`sys.modules["cupy"] = None`,
+`"cupyx" = None`): 1833 passed, 106 skipped in 396.02 s. Neither run died; outputs `work/full-normal.txt` and `work/full-nocupy.txt` in the worktree (gitignored). Depth at the window grant: 216,373 / 82 turns.
+
 ## Ledger (cumulative rounds)
 
 | Round | Critical | Major | Minor | In-envelope vs out | NEW / REOPENED | Reverts | Product / test-only fixes | Depth |

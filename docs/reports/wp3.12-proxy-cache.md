@@ -228,8 +228,9 @@ cache side, planted defects (newest-first eviction, a key ignoring `mtime_ns`, a
 presented as lossless, `clear` deleting a foreign file, a marker always believed, a partly covered
 stage listed), a child process killed mid-entry, a writer thread against reader threads, `clear` with a
 foreign file and a symlink planted, and the dependency rule (importing `clearwater.cache` loads nothing
-from `gui`, `jobs`, `methods`, `io`, `core`, nor PySide6, cupy or PIL). Full pytest, ruff, mypy and the
-Reviewer A record: see the ledger and the return report.
+from `gui`, `jobs`, `methods`, `io`, `core`, nor PySide6, cupy or PIL). Gates at head `afde3ff`: full pytest 1939 passed, 1 warning (657.86 s); full pytest with
+`cupy` and `cupyx` unimportable 1833 passed, 106 skipped (396.02 s); `ruff check .`, `ruff format
+--check .` and `mypy` green. Reviewer A record: see the ledger and the return report.
 
 ## Limits
 
