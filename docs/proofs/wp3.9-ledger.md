@@ -167,3 +167,15 @@ two-line grant).
 | Round | Crit | Major | Minor | In-env | Out-env | NEW | REOPENED | Reverts | Fix kind | Depth |
 |---|---|---|---|---|---|---|---|---|---|---|
 | 0 (design) | - | - | - | - | - | - | - | - | - | 139,790 |
+| 1 (e9d1a81) | 0 | 1 | 3 | 4 | 0 | 4 | 0 | 0 | pending: #3, #4 product + test; #1 report text; #2 test outside owned files (grant) | (dispatcher) |
+
+### Round 1 (2026-10-21T07:29Z, codex-cli 0.162.1 over WSL, gpt-5.6-sol high)
+
+Reviewer verdict NEW_CRITICAL_MAJOR_FOUND (reviewer tally 0 / 2 / 2). Adjudicated: #1 MAJOR ->
+REJECTED on behaviour (the approved round-0 table makes a short read `"unreadable"` on any file),
+text MINOR (report Limits omits the short-read case); #2 MAJOR CONFIRMED (WP3.7's module-set test,
+fix needs the requested grant); #3 MINOR CONFIRMED (orphan `"pts"` raise logs no tail); #4 MINOR
+CONFIRMED (a frame can be returned after a concurrent `close()` returned). Evidence and the
+per-finding table: `C:\Users\rwsmy\clearwater-review-evidence\wp3.9\r1\` (`adjudication.md`,
+`md5sums.txt`). Mechanical assertions passed (banner, 3 echoed-source ERROR lines, tokens footer,
+7 succeeded-in lines, VERDICT at column 0).
