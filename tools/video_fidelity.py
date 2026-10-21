@@ -745,7 +745,11 @@ def _cut_items(
 
 
 def _colour_items(items: list[compare.Item], info: ProbeResult) -> list[compare.Item]:
-    """Compare the colour tags with the D54-resolved description (Q-E), raw tag beside it."""
+    """Compare the colour tags with the D54-resolved description (Q-E), raw tag beside it.
+
+    A field the description leaves ``unknown`` is DIFFERENT, never skipped (DR-20 (4)); with the
+    pixel-format row this also refuses a full-range ``yuvj420p`` output tagged ``tv``.
+    """
     names = ffmpeg_color_names(info.video.color)
     result = []
     for item in items:
@@ -758,9 +762,10 @@ def _colour_items(items: list[compare.Item], info: ProbeResult) -> list[compare.
                 item.clause,
                 {"resolved (D54)": want, "source tag": item.source},
                 item.output,
-                compare.SAME if item.output == want else compare.DIFFERENT,
+                compare.SAME if want is not None and item.output == want else compare.DIFFERENT,
                 "compared with the source's resolved description"
-                + (" (assumed per D54)" if info.video.color.assumed else ""),
+                + (" (assumed per D54)" if info.video.color.assumed else "")
+                + ("; the description has no value here, never skipped" if want is None else ""),
             )
         result.append(item)
     return result

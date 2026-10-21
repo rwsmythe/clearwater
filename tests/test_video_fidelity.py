@@ -204,3 +204,32 @@ def test_the_spike_resolves_chapters_through_the_footage_locator(tmp_path: Path)
     for bad in ("GX000009.MP4", "Snorkel/GX000001.MP4", "..", "GX000001.MOV"):
         with pytest.raises(spike.SpikeError):
             spike._chapter(footage, bad)
+
+
+def test_colour_rows_compare_with_the_resolved_description_and_never_skip() -> None:
+    from clearwater.interfaces.image import ColorDescription
+
+    full = ColorDescription("bt709", "bt709", "bt709", "full", 8, False, None)
+    info = replace(_probe_like(full))
+    rows = [
+        compare.Item("colour range", compare.REQUIRED, "x", "pc", "tv", compare.SAME),
+        compare.Item("colour primaries", compare.REQUIRED, "x", None, "bt709", compare.DIFFERENT),
+        compare.Item("colour matrix", compare.REQUIRED, "x", "bt709", "bt709", compare.SAME),
+    ]
+    out = {i.name: i for i in vf._colour_items(rows, info)}
+    assert out["colour range"].status == compare.DIFFERENT  # yuvj420p source, tv output
+    assert out["colour primaries"].status == compare.SAME  # raw tag absent, resolved bt709
+    assert out["colour primaries"].source == {"resolved (D54)": "bt709", "source tag": None}
+    unknown = replace(info, video=replace(info.video, color=replace(full, matrix="unknown")))
+    skipped = {i.name: i for i in vf._colour_items(rows, unknown)}
+    assert skipped["colour matrix"].status == compare.DIFFERENT
+    assert "never skipped" in skipped["colour matrix"].note
+
+
+def _probe_like(color: Any) -> Any:
+    from clearwater.interfaces.video import ProbeResult, VideoStreamInfo
+
+    video = VideoStreamInfo(
+        "hevc", 16, 16, 8, "yuvj420p", "left", color, Fraction(30), Fraction(1, 30), 1, 0, False
+    )
+    return ProbeResult(Path("s"), "mp4", Fraction(1), Fraction(0), video, (), (), (), (), None)
