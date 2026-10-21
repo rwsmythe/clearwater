@@ -79,6 +79,21 @@ def detect_format(data: bytes) -> str | None:
     return None
 
 
+def _is_cut_signature(data: bytes) -> bool:
+    """Return True when ``data`` is a proper start (two bytes or more) of a known photo signature.
+
+    Such a file is a truncated photo, not an unknown format: a JPEG cut to ``FF D8``, a PNG cut
+    inside its eight-byte signature, a TIFF cut inside its four-byte header, a HEIC cut inside
+    its first ``ftyp`` box.
+    """
+    if len(data) < 2:
+        return False
+    signatures = (_JPEG, png_tools.SIGNATURE, b"II*\x00", b"MM\x00*", b"II+\x00", b"MM\x00+")
+    if any(len(data) < len(sig) and sig.startswith(data) for sig in signatures):
+        return True
+    return len(data) < 12 and data[4:8] == b"ftyp"
+
+
 def has_dng_tag(data: bytes) -> bool:
     """Return True when IFD0 of a classic TIFF-structured file carries DNGVersion (50706).
 
@@ -308,6 +323,8 @@ class PhotoReader:
                 "export a JPEG, HEIC or TIFF from the camera app instead.",
             )
         kind = detect_format(data)
+        if kind is None and _is_cut_signature(data):
+            raise _unreadable(name, "the file is cut short (truncated)")
         if kind is None:
             raise PhotoReadError(
                 "unsupported",

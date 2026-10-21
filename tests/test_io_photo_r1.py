@@ -412,3 +412,36 @@ def test_a_tiff_with_an_unreadable_gps_ifd_keeps_its_other_fields(
     assert "GPS IFD cannot be read" in caplog.text
     assert meta.exif is not None
     assert exif_tools.describe(meta.exif)["IFD0.Make"] == "Maker"
+
+
+# --- Reviewer B B4: a file cut inside a known signature is unreadable, not an unknown format ------
+
+
+@pytest.mark.parametrize(
+    ("name", "data"),
+    [
+        ("cut.jpg", b"\xff\xd8"),
+        ("cut.png", png_tools.SIGNATURE[:7]),
+        ("cut.tif", b"II*"),
+        ("cut.heic", struct.pack(">I", 24) + b"ftyp"),
+    ],
+)
+def test_a_file_cut_inside_a_known_signature_is_unreadable(
+    tmp_path: Path, name: str, data: bytes
+) -> None:
+    path = tmp_path / name
+    path.write_bytes(data)
+    with pytest.raises(PhotoReadError) as caught:
+        read_photo(path)
+    assert caught.value.kind == "unreadable" and name in str(caught.value)
+
+
+@pytest.mark.parametrize("data", [b"\xff", b"zz", b"hello world, not a photo"])
+def test_other_short_or_unknown_files_stay_unsupported_or_unreadable_as_before(
+    tmp_path: Path, data: bytes
+) -> None:
+    path = tmp_path / "x.bin"
+    path.write_bytes(data)
+    with pytest.raises(PhotoReadError) as caught:
+        read_photo(path)
+    assert caught.value.kind == "unsupported"
