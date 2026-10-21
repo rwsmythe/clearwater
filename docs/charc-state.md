@@ -93,18 +93,22 @@ for a push (verify `git status -sb`).
   CONFIRMED** (patch-ids on every named range; B md5s and assertions in four folders; static
   gates and harness 366 here; my own full pytest was host-killed at ~39 % for memory pressure and
   NOT re-run; the orchestrator's main run is the figure of record). Nine worktrees released.
-- **WP3.12 proxy cache** (`wp3.12` branch, OCCUPIED): report 1b4da4e; Reviewer A R1-R3 fixed, R4
-  review-only at 269K (3 major adjudicated, not remediated; two yield breaches and four `git stash`
-  uses recorded, stash now forbidden); a FRESH sonnet-high cell remediates R4 from the ledger,
-  then round 5 (five-round gate), then its first full-pytest window. Read-cost row done (q75
-  3.39 ms median; q80 only 9 % faster): q75 4:4:4 stands. AD-5 wording corrected d971ee7 (either
-  sign, median basis).
-- **Tranche B LIVE** from main 4b4da9b: WP3.6 photo I/O `wp36-cell` sonnet-high `.worktrees/wp3.6`;
-  WP3.16 GUI shell `wp316-cell` opus-high `.worktrees/wp3.16` (both OCCUPIED). Round-0 rulings
-  (msg 9cf9b7b0): built-in Display P3 / sRGB ICC when the source has none (pinned bytes,
-  provenance note); block-mean downscale k = max(1, short // 540) with partial edge blocks, one
-  function for proxy and V8; PySide6-Essentials replaces pyside6 (AD-18). Orchestrator gen 7 is
-  near its rollover line.
+- **WP3.12 proxy cache and WP3.6 photo I/O ACCEPTED** 2026-10-21 as one stacked gate, main
+  4ec835d (records `docs/proofs/wp3.12-accept.md` 3aaf395, `wp3.6-accept.md` d0f00ee; DR-41,
+  DR-42 banked; both packages: B pass 1 blocking, one remediation, pass 2 blocking adjudicated at
+  the gate, upheld). Gates 3440 passed / cupy-unimportable 2922 + 520 skipped; the first stack
+  run was host-reaped at ~91 % and restarted one job at a time on CHARC's word. **CHARC QA
+  CONFIRMED** (identity sets, B md5s in four folders, static gates, harness 366, full pytest
+  3440 passed at this seat, 798 s). Five worktrees released. WP3.12 facts: JPEG q75 4:4:4 store,
+  codec identity in the cache version, two yield breaches and git stash use recorded. WP3.6
+  facts: built-in P3/sRGB ICC in the WRITER for HEIC nclx sources only; untagged keeps no iCCP;
+  stdlib PNG16 decoder; tifffile; WP3.6P queued for the owner's photos.
+- **WP3.16 GUI shell** (`.worktrees/wp3.16`, OCCUPIED): rebased onto main 6a65145 (Essentials
+  kept, re-locked); a FRESH opus-high cell does the R4 cleanup and the by-name PhotoReadError
+  catch, no further A round; then Reviewer B and its own gate (main's venv needs
+  `uv sync --reinstall-package pyside6-essentials --reinstall-package shiboken6` at that merge).
+  Then wave 2 is complete and wave 3 briefs (WP3.4, 3.9, 3.10, 3.11, 3.17-3.20) are drafted for
+  CHARC approval.
 - **Wave 2 COMMISSIONED** (CHARC ruling 1ebfba54, 2026-10-20 ~22:07Z): orchestrator gen 6 drafts
   all six briefs (WP3.2, WP3.3, WP3.5 opus-high; WP3.6, WP3.12, WP3.16 sonnet-high) against the
   Phase 3 frame, sends them as one set for CHARC approval; tranche A = WP3.2/3.3/3.5/3.12 on
