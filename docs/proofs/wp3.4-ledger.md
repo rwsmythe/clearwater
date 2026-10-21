@@ -247,7 +247,31 @@ or slightly worse; the maximum sits inside): the difference is content (fine det
 preview cannot sharpen), not edge handling. (On the synthetic smooth texture of R0-7 the
 maxima were at the border; real footage behaves differently.)
 
-## RESUME HERE (for the fresh cell, cell 3)
+## RESUME HERE (paused 2026-10-21 by the orchestrator on the owner's word; cell 3, depth 98,061 at R1)
+
+**Status at the pause:** build COMPLETE; Reviewer A CONVERGED at round 1 (NO_NEW_CRITICAL_MAJOR,
+3 minors fixed: `c21ae64` F1, `7089198` F2 granted docstring-only, `fdc9f94` F3; then the ruled
+test-only `assert_same_bits` `75e04fa`). Static gates green; the six package test files 323
+passed at `-v`. No review round remains. Product code changed after the last full pytest
+(`84ad0ef`): F1 (`ancuti_fusion.py` `_checked_record`) and F2 (docstrings).
+
+**Remaining, in order (each window on the dispatcher's grant, one at a time, nothing unasked):**
+1. EXCLUSIVE `uv run python tools/core_speed.py GX011627 --memory` (ask: "WINDOW REQUEST:
+   exclusive: core_speed --memory"); grep the `MEMORY` lines; STOP with the figures if a pool
+   reserved peak exceeds `memory_estimate_bytes`.
+2. EXCLUSIVE `uv run python tools/core_speed.py GX011627 --whole --cpu-frames 10`; grep `ROW`,
+   `BAR`, `RECORD`; STOP if a core median exceeds D106's 0.834 s/frame.
+3. Full pytest WITHOUT CuPy importable (scratch script: `sys.modules["cupy"] = None`,
+   `sys.modules["cupyx"] = None`, then `sys.exit(pytest.main(sys.argv[1:]))`), and full pytest
+   WITH CuPy on the final head (F1 changed product code); each in a granted window,
+   `QT_QPA_PLATFORM=offscreen`, `--basetemp=work/<name>`, output to a file.
+4. Report: fill the speed and memory sections (DR-40 (b) upload count and timing from the
+   record), remove DRAFT, update the status line and Limits; then the final return report
+   (recipe section 4) by message to the dispatcher.
+
+Round-1 evidence: `C:\Users\rwsmy\clearwater-review-evidence\wp3.4\r1\`.
+
+### Earlier hand-off (cell 2 -> cell 3), kept for its record
 
 **Status at hand-off (cell 2, 2026-10-21, depth 346,044 per the dispatcher):** the build is
 COMPLETE and every ruling is applied; full pytest GREEN (below); NO Reviewer A round has run.
