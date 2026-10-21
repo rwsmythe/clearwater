@@ -187,3 +187,60 @@ intermediate commit da2693c has one test-file formatting nit that e4a0b55 resolv
 - Normal: 2227 passed, 1 warning (CuPy CUDA_PATH), 868 s, exit 0 (`work/wp32-full-normal.log`).
 - `cupy` / `cupyx` = None in `sys.modules`: 1938 passed, 289 skipped, 517 s, exit 0
   (`work/wp32-full-nocupy.log`).
+
+## Reviewer B remediation (pass 1)
+
+Reviewer B (orchestrator seat, transcript `C:\Users\rwsmy\clearwater-review-evidence\wp3.2\reviewB\review-B.txt`)
+returned NEW_CRITICAL_MAJOR_FOUND with three findings, adjudicated by the orchestrator (gen 7) and fixed
+here on `dfe65d5` (cell wp32-rem; depth figure not given to this cell).
+
+| Finding | Severity | Adjudication | Commit | Kind |
+|---|---|---|---|---|
+| B-1 `compensate_c3` does not convert `kappa`, `lambda_`, `c3_strength`, `c3_mask_threshold` | MAJOR, in envelope | CONFIRMED by execution (dispatcher's seat; reproduced here, below) | 2a1e3eb | product (4 `float(...)`) + tests |
+| B-2 V9 sentence "bit for bit on every input" false for a signed zero | MINOR, in envelope | CONFIRMED (reasoned); no product change (prototype does the same) | 03a0527 | report text only |
+| B-3 no 10-bit-grid input in the V1 matrix | ADVISORY, in envelope | accepted | e580582 | test only |
+
+**B-1 failing on `dfe65d5`** (new tests run against the unfixed `compensation.py`, 6 failed / 8 passed;
+copy of the run at the scratchpad `before.txt`):
+
+- `test_c3_numpy_scalar_parameters_make_no_float64_array[float64-arithmetic]` and `[float64-threshold]`:
+  `AssertionError: a float64 array was made on the way` (`UfuncSpy.result_dtypes` holds `float64`).
+- `test_c3_numpy_scalar_parameters_on_the_backend[numpy-float64-arithmetic]`, and the same on `cupy`:
+  `AssertionError: max abs diff 5.960464477539063e-08` (the dispatcher's figure).
+- `...[numpy-float64-threshold]` and `[cupy-float64-threshold]`: `max abs diff 0.128`. A second
+  consequence the finding did not name: `c3_mask_threshold` as `np.float64` compares in float64, so a
+  pixel whose float32 mean equals `float32(threshold)` is protected, where the Python float (a weak
+  scalar, cast to float32) does not protect it. The test sets the threshold 1e-9 below the pixel mean.
+- The `np.float32` cases passed before the fix (float32 products happen to round as the double ones
+  on this seed); they stay as regression cases.
+- After the fix: 244 passed in `tests/test_methods_compensation.py`.
+
+Test instrument: `UfuncSpy` gained `result_dtypes` (reset by `spied`); `SpyingNumpyBackend` wraps the
+SciPy filter output in the spy so every operation after the first blur is recorded;
+`check_c3_numpy_scalars` compares a typed-parameter call with the Python-float call (the same values)
+bit for bit and requires no float64 result. Planted control: `c3_reference` (parameters used as given)
+is rejected by the same check in both the arithmetic and threshold forms. The device test runs on the
+parametrised backend, so on CuPy under `gpu` it asserts the float32 result and bit identity (no spy).
+
+**Audit (two modules, scalar parameters reaching array arithmetic or an array comparison): the four
+parameters above were the only ones.** Probed, not fixed (not the same class: scalar-only code, or a
+filter sigma, never an image-array operation; each is outside the adjudicated fix):
+
+1. `c3_kernel_fraction` / `c3_mask_smooth_fraction` as `np.float32`: `core.spatial_sigma` returns
+   `fraction * min(h, w)`, an `np.float32` sigma, so the filter differs from the Python-float call by
+   up to 2.98e-8 on a 45 x 67 image (float64: 0.0). The fix would be `float(...)` in
+   `compensation._derived_sigma` (or in `core.spatial_sigma`, a core file).
+2. `white_balance.applied_gains` with `white_balance_strength=np.float32(0.37)`: `1.0 + s * (g - 1.0)`
+   is float32 scalar arithmetic, so the gains differ from the Python-float call (`float64`: equal).
+   The returned gains are Python floats (`float(min(...))`); no array is involved.
+3. `compensation.effective_alphas` with `np.float32` `alpha` / cap: arithmetic can run in float32; the
+   probe case was equal; the result is `float(...)`.
+
+Raised for the orchestrator to rule (WP3.4's schema is the producer of these scalars and passes Python
+floats); no change made.
+
+Gates on `e580582` (own tests, no full suite, no Reviewer A round, per the dispatch): `ruff check`,
+`ruff format --check`, `mypy` clean; `tests/test_methods_compensation.py` + `tests/test_methods_white_balance.py`
+with CuPy 431 passed (was 383 before B-1/B-3 plus the B-3 grid cases: +14 B-1 cases, +2 grid-fixture
+test counts per module as parametrised); with `cupy` / `cupyx` = None in `sys.modules` 226 passed,
+205 skipped.
