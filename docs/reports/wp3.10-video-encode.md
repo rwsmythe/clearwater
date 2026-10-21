@@ -126,7 +126,7 @@ the record; no payload, digest or decoded value is kept, and no location tag is 
 ## 6. Tests
 
 `tests/test_io_video_encode_units.py` 49, `tests/test_io_video_encode.py` 83 (+1 `footage`),
-`tests/test_video_fidelity.py` 11 -- all passing on the branch (targeted runs; the full suite
+`tests/test_video_fidelity.py` 10 -- all passing on the branch (targeted runs; the full suite
 waits for a window). They include eight planted wrong implementations that fail by name (CFR on
 `vid-vfr`, start offset zeroed, `media_time` copied verbatim, colour tags omitted, `tv` on a `pc`
 source, rotation dropped, audio re-encoded, 8-bit for a 10-bit source), the sentinel positive
