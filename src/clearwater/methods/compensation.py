@@ -267,7 +267,7 @@ def _derived_sigma(shape: tuple[int, ...], name: str, fraction: float) -> float:
     the short side. An OverflowError from it (a finite sigma near the float maximum, whose
     ``4 * sigma`` is infinite) is reported the same way.
     """
-    sigma = spatial_sigma(shape, fraction)
+    sigma = spatial_sigma(shape, float(fraction))  # a float32 fraction would give a float32 sigma
     try:
         check_sigma(sigma)
     except (ValueError, OverflowError) as exc:

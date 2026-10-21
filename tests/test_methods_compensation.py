@@ -943,8 +943,10 @@ def test_x4_error_comes_before_any_array_work() -> None:
 
 # -- NumPy-scalar parameters of the 3C render (B-1) -------------------------------------------
 
-SCALAR_PARAMS = ("kappa", "lambda_", "c3_strength", "c3_mask_threshold")
-"""The 3C parameters that reach array arithmetic or an array comparison as plain scalars."""
+SCALAR_PARAMS = tuple(C3)
+"""Every scalar parameter of ``compensate_c3`` (the six AD-8 names)."""
+SCALAR_TYPES = [np.float64, np.float32, int]
+"""The numeric types a caller may hand over besides a Python float."""
 
 
 class SpyingNumpyBackend(NumpyBackend):
@@ -958,10 +960,15 @@ class SpyingNumpyBackend(NumpyBackend):
         return super().gaussian_blur(a, sigma_px).view(UfuncSpy)
 
 
+def as_scalar(scalar: type, value: float) -> Any:
+    """``value`` as ``scalar``; an int must be whole and positive, so it is rounded up to 1."""
+    return max(1, round(value)) if scalar is int else scalar(value)
+
+
 def scalar_params(
-    scalar: type, a: np.ndarray, *, edge: bool
+    scalar: type, a: np.ndarray, *, edge: bool, names: tuple[str, ...] = SCALAR_PARAMS
 ) -> tuple[dict[str, float], dict[str, Any]]:
-    """The 3C parameters as Python floats and as ``scalar`` (carrying the same values).
+    """The 3C parameters as Python floats and as ``scalar`` for ``names`` (the same values).
 
     With ``edge`` the mask threshold sits 1e-9 below the float32 mean of pixel (0, 0): a float64
     comparison protects that pixel, the weak-scalar float32 comparison does not. Without it the
@@ -975,17 +982,21 @@ def scalar_params(
         "c3_strength": 0.6,
         "c3_mask_threshold": mean_00 - 1e-9 if edge else C3["c3_mask_threshold"],
     }
-    typed = {k: scalar(v) if k in SCALAR_PARAMS else v for k, v in plain.items()}
+    typed = {k: as_scalar(scalar, v) if k in names else v for k, v in plain.items()}
     return {k: float(v) for k, v in typed.items()}, typed
 
 
 def check_c3_numpy_scalars(
-    implementation: Callable[..., Any], scalar: type, *, edge: bool = False
+    implementation: Callable[..., Any],
+    scalar: type,
+    *,
+    edge: bool = False,
+    names: tuple[str, ...] = SCALAR_PARAMS,
 ) -> None:
-    """NumPy-scalar parameters give the Python-float result, bit for bit, with no float64 array."""
+    """Scalar parameters of another type give the Python-float result bit for bit, no float64."""
     backend = SpyingNumpyBackend()
     image = synthetic(0)
-    plain, typed = scalar_params(scalar, image, edge=edge)
+    plain, typed = scalar_params(scalar, image, edge=edge, names=names)
     expected = implementation(backend, backend.asarray(image), **plain)
     out = implementation(backend, spied(image), **typed)
     assert UfuncSpy.log, "the spy saw no ufunc call: the instrument is not live"
@@ -997,10 +1008,17 @@ EDGE = pytest.mark.parametrize("edge", [False, True], ids=["arithmetic", "thresh
 
 
 @EDGE
-@pytest.mark.parametrize("scalar", [np.float64, np.float32])
+@pytest.mark.parametrize("scalar", SCALAR_TYPES)
 def test_c3_numpy_scalar_parameters_make_no_float64_array(scalar: type, edge: bool) -> None:
-    """B-1: ``np.float64`` and ``np.float32`` parameters are the Python-float arithmetic (D39)."""
+    """B-1: ``np.float64``, ``np.float32`` and int parameters act as the Python floats (D39)."""
     check_c3_numpy_scalars(compensate_c3, scalar, edge=edge)
+
+
+@pytest.mark.parametrize("name", SCALAR_PARAMS)
+@pytest.mark.parametrize("scalar", SCALAR_TYPES)
+def test_c3_each_scalar_parameter_alone(scalar: type, name: str) -> None:
+    """B-1: each of the six parameters, passed alone as another numeric type, is converted."""
+    check_c3_numpy_scalars(compensate_c3, scalar, names=(name,))
 
 
 @EDGE
@@ -1009,14 +1027,16 @@ def test_planted_unconverted_scalar_parameters_in_c3(edge: bool) -> None:
     assert rejects(lambda impl: check_c3_numpy_scalars(impl, np.float64, edge=edge), c3_reference)
 
 
-@EDGE
-@pytest.mark.parametrize("scalar", [np.float64, np.float32])
+@pytest.mark.parametrize("name", [*SCALAR_PARAMS, "all"])
+@pytest.mark.parametrize("scalar", SCALAR_TYPES)
+@pytest.mark.parametrize("edge", [False, True], ids=["arithmetic", "threshold"])
 def test_c3_numpy_scalar_parameters_on_the_backend(
-    backend: CoreBackend, scalar: type, edge: bool
+    backend: CoreBackend, scalar: type, edge: bool, name: str
 ) -> None:
     """B-1 on the parametrised device (CuPy under ``gpu``): float32 out, bit-identical."""
     image = synthetic(0)
-    plain, typed = scalar_params(scalar, image, edge=edge)
+    names = SCALAR_PARAMS if name == "all" else (name,)
+    plain, typed = scalar_params(scalar, image, edge=edge, names=names)
     a = backend.asarray(image)
     expected = host(backend, compensate_c3(backend, a, **plain))
     out = host(backend, compensate_c3(backend, a, **typed))
