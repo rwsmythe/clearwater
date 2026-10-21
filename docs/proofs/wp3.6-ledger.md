@@ -246,14 +246,15 @@ rules "no iCCP" (revert that commit; `color.py` carries a one-line marker commen
 Build commits on branch `wp3.6` (base `4b4da9b`): `748ac75` error class; `207a753` dependencies
 (`pillow`, `pillow-heif` moved, `tifffile` added; `uv lock`); `1a5c722` helpers; `65dc3cc` reader,
 writer, TIFF, tests; `23fdfd9` P3 profile; `0dc359c` photo_check; the report
-`docs/reports/wp3.6-photo-io.md` follows. Own verification loop before Reviewer A, suspected /
-confirmed / rejected / fixed: pass 1 suspected 6 (MPO JPEG orientation, HEIC alpha, 12-bit HEIC,
-`Exif.tobytes` inventing a GPS IFD, a `file`-less TIFF structural-tag leak, the unfilter memory at
-48 MP), confirmed 1 (the GPS IFD: an empty IFD would have been written for a source that had none;
-fixed before commit by not materialising it, test `test_d63_edit_does_not_invent_a_gps_ifd`), rejected
-5 as false positives after a probe or a new test (MPO, alpha, 12-bit now have tests; TIFF structure
-tags are filtered and tested; 48 MP read measured at 10.6 s, 1.67 GiB peak, recorded in the report).
-Pass 2 found nothing new.
+`docs/reports/wp3.6-photo-io.md` follows. Own verification loop before Reviewer A (suspect -> confirm independently -> fix): pass 1 suspected
+six things. (1) MPO JPEG source format or orientation, (2) HEIC alpha, (3) 12-bit HEIC: each probed
+and found correct, rejected as false positives, regression tests added. (4) Pillow's `Exif.tobytes`
+materialising an empty GPS IFD for a source that had none (read from Pillow's source, the spike's
+`get_ifd(GPS)` call would have done it): confirmed, avoided in `exif.edit`, test
+`test_d63_edit_does_not_invent_a_gps_ifd`. (5) TIFF structure tags leaking into the EXIF block
+(Pillow lists them in `getexif()`): confirmed by probe, filtered in `exif.from_tiff`, tested.
+(6) 48 MP decode time and memory: measured (10.6 s, 1.67 GiB peak), recorded in the report. Pass 2
+found nothing new.
 
 ## Rounds
 
