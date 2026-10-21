@@ -18,6 +18,7 @@ import gui_support
 from clearwater.gui import messages, sources
 from clearwater.gui.engines import stub_probe
 from clearwater.interfaces import ColorDescription, Fault
+from clearwater.io.photo import PhotoReader, PhotoReadError
 from clearwater.io.video import VideoProbeError
 from gui_support import (
     UNTAGGED,
@@ -33,14 +34,6 @@ from gui_support import (
 pytestmark = pytest.mark.gui
 
 VIDEO_UNTAGGED = ColorDescription("bt709", "bt709", "bt709", "limited", 8, True, None)
-
-
-class FakePhotoReadError(Exception):
-    """Stands in for WP3.6's PhotoReadError (X-B2) until it can be imported (ruling S2)."""
-
-    def __init__(self, kind: str, message: str) -> None:
-        super().__init__(message)
-        self.kind = kind
 
 
 class RaisingPhotoSource:
@@ -143,7 +136,7 @@ def test_every_g10_source_once(make_window, qtbot) -> None:
     dng = Path("IMG_0001.DNG")
     _with_photo_source(
         window._engines,
-        RaisingPhotoSource(FakePhotoReadError("unsupported", "IMG_0001.DNG is ProRAW/DNG")),
+        RaisingPhotoSource(PhotoReadError("unsupported", "IMG_0001.DNG is ProRAW/DNG")),
     )
     open_and_wait(qtbot, window, dng)
     assert assert_refused(window, dng, previous) == "IMG_0001.DNG is ProRAW/DNG"
@@ -152,7 +145,7 @@ def test_every_g10_source_once(make_window, qtbot) -> None:
     bad = Path("broken.heic")
     _with_photo_source(
         window._engines,
-        RaisingPhotoSource(FakePhotoReadError("unreadable", "broken.heic is damaged")),
+        RaisingPhotoSource(PhotoReadError("unreadable", "broken.heic is damaged")),
     )
     open_and_wait(qtbot, window, bad)
     assert assert_refused(window, bad, previous) == "broken.heic is damaged"
@@ -160,6 +153,43 @@ def test_every_g10_source_once(make_window, qtbot) -> None:
     open_and_wait(qtbot, window, bad)
     assert assert_refused(window, bad, previous) == "broken.heic could not be read: bad marker"
     assert len(presenter.of("warning")) == 0
+
+
+def test_the_real_readers_photo_read_error_is_refused_naming_the_file(
+    make_window, qtbot, tmp_path: Path
+) -> None:
+    # X-B2: a truncated JPEG through WP3.6's real reader reaches the refusal by name.
+    from PIL import Image as PILImage
+
+    whole = tmp_path / "whole.jpg"
+    PILImage.new("RGB", (64, 48), (20, 120, 200)).save(whole, quality=90)
+    cut = tmp_path / "cut.jpg"
+    cut.write_bytes(whole.read_bytes()[: whole.stat().st_size // 2])
+    with pytest.raises(PhotoReadError) as raised:
+        PhotoReader().read(cut)
+    good = Path("good.png")
+    window = make_window(photo_engines({good: image(20, 20)}))
+    open_and_wait(qtbot, window, good)
+    previous = window.session.source()
+    _with_photo_source(window._engines, PhotoReader())
+    open_and_wait(qtbot, window, cut)
+    assert assert_refused(window, cut, previous) == str(raised.value)
+    assert presenter_of(window).of("warning") == []
+
+
+def test_only_a_photo_read_error_by_name_is_shown_with_its_own_text(make_window, qtbot) -> None:
+    # X-B2: an exception that merely carries a ``kind`` is not the reader's error.
+    class LookAlike(Exception):
+        kind = "unreadable"
+
+    good, bad = Path("good.png"), Path("broken.heic")
+    window = make_window(photo_engines({good: image(20, 20)}))
+    open_and_wait(qtbot, window, good)
+    previous = window.session.source()
+    _with_photo_source(window._engines, RaisingPhotoSource(LookAlike("broken.heic is damaged")))
+    open_and_wait(qtbot, window, bad)
+    text = assert_refused(window, bad, previous)
+    assert text == "broken.heic could not be read: broken.heic is damaged"
 
 
 def test_video_probe_errors_and_faults(make_window, qtbot) -> None:

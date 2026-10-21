@@ -18,13 +18,11 @@ from pathlib import Path
 from PySide6.QtWidgets import QLabel, QMessageBox, QVBoxLayout, QWidget
 
 from clearwater.interfaces import Fault
+from clearwater.io.photo import PhotoReadError
 
 from .contract import Message, MessageSeverity
 
 _LOG = logging.getLogger(__name__)
-
-PHOTO_READ_ERROR_KINDS = frozenset({"unsupported", "unreadable"})
-"""The ``kind`` values of WP3.6's photo read error (X-B2) that are shown with their own text."""
 
 
 def ascii_text(text: str) -> str:
@@ -96,10 +94,9 @@ def unsupported_extension(path: Path) -> Message:
 def photo_read_failure(path: Path, error: BaseException) -> Message:
     """The refusal for a photo the reader could not read (spec 5.1, 5.4, D116).
 
-    WP3.6's read error (X-B2) carries ``kind`` ``unsupported`` (DNG and ProRAW included) or
-    ``unreadable`` and a user-readable message, shown as it is; it is recognised by that
-    attribute until the class can be imported by name (round-0 ruling S2). Any other exception
-    is shown as unreadable with its text.
+    WP3.6's :class:`~clearwater.io.photo.PhotoReadError` (X-B2), of ``kind`` ``unsupported``
+    (DNG and ProRAW included) or ``unreadable``, carries a user-readable message naming the file,
+    shown as it is. Any other exception is shown as unreadable with its text.
 
     Args:
         path: The photo.
@@ -108,7 +105,7 @@ def photo_read_failure(path: Path, error: BaseException) -> Message:
     Returns:
         The refusal.
     """
-    if getattr(error, "kind", None) in PHOTO_READ_ERROR_KINDS and str(error):
+    if isinstance(error, PhotoReadError) and str(error):
         return refusal(path, str(error))
     detail = str(error) or type(error).__name__
     return refusal(path, f"{file_name(path)} could not be read: {detail}")
