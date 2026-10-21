@@ -5,8 +5,8 @@ Package `clearwater.cache` (`src/clearwater/cache/`), tests `tests/test_cache_st
 Spec v0.5.4 (7.3, D59, D71, D95, D113; G12; V17), architecture FINAL 1.0 (IF-7, AD-5 as ruled
 2026-10-20, AD-7, AD-15, AD-20, AD-25). Base `2c5540a`. Nothing under `src/clearwater/interfaces/`
 was changed. The review ledger is `docs/proofs/wp3.12-ledger.md`. Figures are on disk under the
-main tree's `work/wp3.12/` (gitignored): `results.json`, `readcost.json`, `meansize.txt`,
-`signed-bounds.txt`.
+main tree's `work/wp3.12/` (gitignored): `results.json`, `readcost.json`, and `meansize.txt` and
+`signed-bounds.txt`, which the instrument's `meansize` and `signed` modes write.
 
 ## Public API (what WP3.11, WP3.18, WP3.20, WP4.2 and WP4.3 consume)
 
@@ -49,13 +49,16 @@ the instrument only). Clips: GX011627 (shallow, all 681 frames, 4K, 30000/1001) 
 300 frames: 5 windows of 60 at 30, 130, 230, 330 and 430 s), each reduced to a 960 x 540 proxy by
 the exact 4 x 4 block mean; the float proxy is `block sum / 4080` and the 8-bit proxy is
 `floor((block sum + 8) / 16)`. Statistics (`prototype.temporal.measure`, c3 `Params()`, CPU) on
-every 8th frame (86 and 38 frames); sizes on every frame. 60-minute figure = frames per hour at
-29.97 fps (107,892) times the frame size, shown for the median and the 95th percentile.
+every 8th frame (86 and 38 frames); sizes on every frame. A size is the bytes of the stored
+payload of one frame (the product adds a 24-byte record header and an 8-byte codec header per
+frame; the stream candidates count packet payloads without container overhead). 60-minute figure
+= frames per hour at 29.97 fps (107,892) times the frame size, shown for the median and the 95th
+percentile.
 "bounds" is the maximum over frames of the N{} bound deviation relative to each bound, with the
 deviation relative to the bounds' range in brackets (a bound near zero makes the first ill-defined;
 the deep clip's range is 0.010-0.116, median 0.033). "vs 8-bit" is the same range-relative
 deviation against the 8-bit proxy. "max err" is the maximum absolute pixel error against the 8-bit
-proxy, in levels. Full table (all 32 candidates and sweeps): `results.json` and the instrument's
+proxy, in levels, over the statistics frames only (86 and 38), not over every sized frame. Full table (all 32 candidates and sweeps): `results.json` and the instrument's
 `report` mode.
 
 | candidate | clip | KB per frame, median / p95 | 60 min GB, median / p95 | max err | means | gains | bounds vs float | bounds vs 8-bit |
@@ -91,23 +94,23 @@ What the figures say, as measured:
    reported). Against those: jpeg-q75-444 means 9.0e-04 and gains 6.6e-04 (met); the range-relative
    bounds deviation beyond the 8-bit floor is 6.0 % (shallow) and 8.3 % (deep) (under the ruled
    10 %). q80-420: 4.5 % and 7.8 %.
-3. **Size against the 10 GB bound (the bound AD-5 states is per 60-minute clip).** At the median frame
-   size the shallow clip gives 9.0 GB (q75-444) and 8.4 GB (q80-420). The median is not the total: the
-   shallow clip's frame sizes are skewed, so the whole-clip MEAN, computed with the product codecs
-   over all 681 frames (`meansize.txt`), gives **10.2 GB for q75-444 (over the bound by 2 %) and 9.7 GB
-   for q80-420 (under)**; at the 95th percentile the shallow clip is 17.0 and 16.0 GB. The deep clip
-   gives 2.0 and 1.9 GB by the mean. The shallow clip is 22.7 s of one dive site, so this is a
-   sample, not a proof about an hour of footage; the instrument's brief method (median) is what the
-   ruling used. Disclosed here so the owner and CHARC see both.
-4. **The direction of the bounds change is not "narrower" in this sample.** AD-5 as ruled says the
-   stored proxy's N{} bounds are narrower than the float proxy's, in the direction AD-4 accepts. The
-   figures above are absolute deviations. A signed spot check (`signed-bounds.txt`, every 2nd statistics
-   frame: 43 shallow, 19 deep, c3, CPU) of the bounds RANGE of the decoded q75-444 proxy against the
-   float proxy shows: shallow median +0.9 %, min -0.9 %, max +7.6 % (7 of 43 negative); deep median
-   +2.9 %, min -3.5 %, max +19.8 % (9 of 19 negative). The 8-bit proxy alone moves the range by at most
-   +0.4 % (shallow) and +5.6 % (deep). So JPEG blocking mostly WIDENS the high-pass range slightly, and
-   the AD-4 floor (DR-14) would bind slightly LESS often, not more. This is information for CP5 and
-   for AD-5's wording; nothing in the code depends on the direction.
+3. **Size against the 10 GB figure.** CHARC ruled (2026-10-21) that the 10 GB figure is a cache
+   sizing target read on the MEDIAN frame size: 9.0 GB per hour for q75-444 and 8.4 GB for q80-420
+   on the shallow clip. The whole-clip MEAN, computed with the product codecs over all 681 frames
+   (`meansize.txt`), is 10.2 GB for q75-444 and 9.7 GB for q80-420; at the 95th percentile the
+   shallow clip is 17.0 and 16.0 GB, and the deep clip gives 2.0 and 1.9 GB by the mean. These are
+   recorded, not a failure: the user-facing limit is D71's 20 GB with oldest-first eviction. The
+   shallow clip is 22.7 s of one dive site, so all of this is a sample, not a statement about an
+   hour of footage.
+4. **The bounds change has either sign.** AD-5's ruling text says the stored proxy's N{} bounds
+   are narrower than the float proxy's. A signed check (`signed-bounds.txt`, every 2nd statistics
+   frame: 43 shallow, 19 deep, c3, CPU) of the bounds RANGE of the decoded q75-444 proxy against
+   the float proxy shows: shallow median +0.9 %, min -0.9 %, max +7.6 % (7 of 43 negative); deep
+   median +2.9 %, min -3.5 %, max +19.8 % (9 of 19 negative). The 8-bit proxy alone moves the range
+   by at most +0.4 % (shallow) and +5.6 % (deep). CHARC ruled (2026-10-21): the range differs by
+   up to 10 % of the range beyond the 8-bit floor, of either sign, the median slightly wider, so
+   the AD-4 floor (DR-14) binds slightly less often; AD-5's wording is to be amended on main. The
+   figures are information for CP5; nothing in the code depends on the direction.
 
 **The CP5 line** (to be shown to the owner, as AD-5 requires): "the stored analysis proxy's
 normalisation bounds differ from the float proxy's by up to 6.5 % of the range on shallow footage and
@@ -137,7 +140,7 @@ q80-420 is 9.0 % faster at the median than q75-444, under CHARC's 30 % threshold
 
 `DEFAULT_CODEC = JPEG_Q75_444`: 540 short side, 8-bit, quality 75, 4:4:4, baseline with optimised
 Huffman tables (`codec.py`). The four conditions as met on disk: (1) the codec as above; (2) determinism:
-`codec_cache_version` = format number `<< 24` | the low 24 bits of the CRC-32 of the codec id and
+`codec_cache_version` = format number `<< 48` | the first 48 bits of the SHA-256 of the codec id and
 identity, where the JPEG identity is the Pillow, libjpeg and libjpeg-turbo versions read at runtime
 (`codec.jpeg_identity`), so a different decoder gives a different key and the old entries are
 removed when the cache opens (`tests/test_cache_jpeg.py::test_a_different_decoder_identity_invalidates_the_cache`);
@@ -200,7 +203,7 @@ The default limit is `DEFAULT_CACHE_LIMIT_BYTES` (imported, not restated).
 
 ## Verification
 
-Own tests: 60 pass (`tests/test_cache_*.py`, 2.6 s; `work/wp3.12/own-tests.log`), including V17 on the
+Own tests: 67 pass (`tests/test_cache_*.py`, 2.6 s; `work/wp3.12/own-tests.log`), including V17 on the
 cache side, planted defects (newest-first eviction, a key ignoring `mtime_ns`, a lossy round trip
 presented as lossless, `clear` deleting a foreign file, a marker always believed, a partly covered
 stage listed), a child process killed mid-entry, a writer thread against reader threads, `clear` with a
@@ -214,4 +217,6 @@ Two processes sharing one cache folder, a roaming or network profile, hand-edite
 entries, and two different files with equal size and modification time (they share a key by D71's
 definition) are outside the declared envelope. No compaction: a re-stored changed proxy leaves dead
 bytes in the pack until the entry is evicted. The 10 GB figure is an extrapolation from two clips (see
-finding 3).
+finding 3). `complete` records that every record was whole when the proxy pass ended; a damaged
+proxy is found only when it is read, and from then on the entry is incomplete (the marker is
+removed); opening an entry does not re-check every checksum.

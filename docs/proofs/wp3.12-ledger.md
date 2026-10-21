@@ -263,10 +263,23 @@ Deviations from the brief: store refuses a key whose version is not the instance
 **Done this window:** report `docs/reports/wp3.12-proxy-cache.md`; `codec.py` constant docstring made true to the figures; own tests 60 pass; ruff check, ruff format
 --check and mypy green on the whole repo. **Next:** WINDOW REQUEST (full pytest, normal and cupy-unimportable forms), then Reviewer A.
 
+**CHARC rulings relayed 2026-10-21 (FINAL, no code change).** Q1: q75 4:4:4 stays; the 10 GB figure is a cache sizing target read on the MEDIAN frame size (9.0 GB/h); the mean-basis
+10.2 GB/h on the sharpest shallow footage is recorded, not a failure (D71's 20 GB with oldest-first eviction is the user-facing limit). Q2: the stored proxy's N{} range differs from the
+float proxy's by up to 10 % of the range beyond the 8-bit floor, of EITHER sign, median slightly wider, the AD-4 floor binds slightly less often; the CP5 line carries the measured
+figures; CHARC amends AD-5 on main later. The report's findings 3 and 4 were reworded to this (one docs commit after the round-1 yield). This supersedes the two "finding" paragraphs
+above where they say "over the bound" and "not narrower".
+
+**Round 1 remediation (this window).** F1 `_forget` of a damaged proxy makes the entry incomplete (marker unlinked; a corrupt record is still found only on read, no checksum pass at open:
+open item for the dispatcher); F2 `store._unlink` retries a refused delete (6 tries, 10 ms); F3 `_evict` pins every key in `_writing`; F5 statistics store claims the key slot before encoding;
+F8 `codec_cache_version` = format << 48 | first 48 bits of SHA-256 (pack header field int64, `PACK_FORMAT` 2); F9 `pack_size` re-read after a failed rollback; F10 thread test fails on any
+proxy `KeyError`; F4 instrument `report` judges the ruled criteria (original 1 % shown as information); F7 `meansize` and `signed` modes added and re-run (identical figures to the scratch
+runs); F6 report text. F11 BANKED (out of envelope: a foreign file named `<cache file>.*.tmp` inside an entry folder is deleted when the cache opens or the entry is evicted).
+Own tests 67 pass; ruff check, ruff format --check, mypy green at the fix head.
+
 ## Ledger (cumulative rounds)
 
 | Round | Critical | Major | Minor | In-envelope vs out | NEW / REOPENED | Reverts | Product / test-only fixes | Depth |
 |---|---|---|---|---|---|---|---|---|
-| R1 (head 1b4da4e, gpt-5.6-sol high, WSL codex) | 0 | 4 (F1 stale `complete` after a corrupt middle record, executed; F2 `clear` vs an open reader on Windows; F3 `_writing` entry not eviction-pinned; F4 instrument report judges the superseded criterion) | 7 (F5 stats slot claimed after encode, out of envelope; F6 sizes are payload bytes, error on statistics frames; F7 meansize / signed figures not from the instrument; F8 CRC-24 identity collides, executed; F9 pack_size after a failed rollback; F10 thread test swallows every KeyError; F11 foreign `*.tmp` name, out of envelope) | 9 in / 2 out | 11 NEW / 0 REOPENED | none | not yet remediated (yield before fixes); planned: 6 product-code, 1 test-only (F10), 1 tool (F4, F7), 1 text (F6) | (dispatcher) |
+| R1 (head 1b4da4e, gpt-5.6-sol high, WSL codex) | 0 | 4 (F1 stale `complete` after a corrupt middle record, executed; F2 `clear` vs an open reader on Windows; F3 `_writing` entry not eviction-pinned; F4 instrument report judges the superseded criterion) | 7 (F5 stats slot claimed after encode, out of envelope; F6 sizes are payload bytes, error on statistics frames; F7 meansize / signed figures not from the instrument; F8 CRC-24 identity collides, executed; F9 pack_size after a failed rollback; F10 thread test swallows every KeyError; F11 foreign `*.tmp` name, out of envelope) | 9 in / 2 out | 11 NEW / 0 REOPENED | none | remediated after the yield, all 11 handled except F11 (banked, out of envelope): product code F1 F2 F3 F5 F8 F9 (commits c5c6338, d232ab5), test-only F10, instrument F4 F7 (83f47a9), text F6 (docs commit); every new test fails on the unfixed code (8 failures on stashed src) | (dispatcher) |
 
 Round 1 evidence: `C:/Users/rwsmy/clearwater-review-evidence/wp3.12/r1/` (prompt, diff, `review.txt`, `adjudication.md` with the per-finding table and planned fixes, md5sums). Mechanical assertions passed (model and effort, no transport ERROR, tokens footer, 6 succeeded lines, VERDICT NEW_CRITICAL_MAJOR_FOUND).
