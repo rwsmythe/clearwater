@@ -90,6 +90,8 @@ main, stream and info packets of an FFmpeg-written file).
   no SAR field. Square pixels hold for GoPro and iPhone; the instrument's REQUIRED "frame size
   and sample aspect ratio" row would catch a non-square source. Decide at build: refuse a
   non-square source at `open` (read SAR in the sink's own packet/stream ffprobe call) or carry it.
+  **RULED by CHARC (relayed by the orchestrator, seat 2): REFUSED at `open`, by name, from the
+  sink's own ffprobe call; a SAR that cannot be seen is treated as 1:1 (docstring); no IF field.**
 
 ### Design (stands as drafted; orchestrator ruling)
 

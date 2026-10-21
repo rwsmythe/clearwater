@@ -227,19 +227,22 @@ def read_packet_table(path: Path) -> PacketTable:
 
 
 def square_pixels(ratio: str | None) -> bool:
-    """Return whether a sample aspect ratio is square (``1:1``) or unspecified (``0:1``, none).
+    """Return whether a sample aspect ratio is square, or cannot be seen (CHARC P8 ruling).
+
+    A ratio that cannot be seen at all -- absent, unspecified (``0:1``) or not a ratio (``N/A``)
+    -- is treated as 1:1, so only a stated non-square ratio such as ``4:3`` is refused.
 
     Args:
         ratio: The ratio as ffprobe prints it, or None.
 
     Returns:
-        True for square or unspecified pixels.
+        True for square pixels or a ratio that cannot be seen.
     """
     if ratio is None:
         return True
     match = _RATIO.match(ratio)
     if match is None:
-        return False
+        return True  # not a ratio at all: cannot be seen, treated as 1:1
     numerator, denominator = int(match.group(1)), int(match.group(2))
     return numerator == 0 or numerator == denominator
 

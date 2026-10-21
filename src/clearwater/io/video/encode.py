@@ -380,7 +380,8 @@ class FFmpegVideoSink:
         :func:`~clearwater.io.video.capability.resolve_encoder`) or an unknown or unavailable
         encoder; a bit depth that is not the source's own or 10 for an 8-bit source (D76), or
         that the encoder cannot write; an unknown quality level; a provenance object JSON cannot
-        hold; a non-square pixel aspect ratio; an edit list the sink cannot reproduce.
+        hold; a stated non-square pixel aspect ratio (CHARC P8; a ratio that cannot be seen is
+        treated as 1:1); an edit list the sink cannot reproduce.
 
         Args:
             probe: The source's probe result.

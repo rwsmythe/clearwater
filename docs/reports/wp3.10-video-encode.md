@@ -57,7 +57,8 @@ kept audio packets with dts below 1.4787 s).
   D76 (`encode_pix_fmt`), or not available for the encoder; a quality not in
   `high`/`standard`/`draft`; a provenance object with a non-string key (`check_string_keys`), a
   value JSON cannot hold (NaN and infinity included), or JSON over 16 KiB; a time base not 1/N; a
-  non-square sample aspect ratio (**P8 decided: refused at open**, read from the sink's own
+  non-square sample aspect ratio (**P8, RULED by CHARC: refused at open, by name**; a ratio that
+  cannot be seen is treated as 1:1; `VideoStreamInfo` gains no field; read from the sink's own
   ffprobe listing; GoPro and iPhone sources are square); an edit list other than the reproduced
   forms. Reproduced forms: absent; one media segment (identity or the reorder delay); an empty
   edit then one media segment; every rate 1; no head trim (first pts = the empty edit's dwell);

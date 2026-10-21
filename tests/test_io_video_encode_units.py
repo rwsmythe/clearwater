@@ -470,7 +470,7 @@ def test_edit_list_forms(
 
 @pytest.mark.parametrize(
     ("ratio", "square"),
-    [(None, True), ("1:1", True), ("0:1", True), ("4:3", False), ("2:1", False), ("N/A", False)],
+    [(None, True), ("1:1", True), ("0:1", True), ("4:3", False), ("2:1", False), ("N/A", True)],
 )
 def test_square_pixels(ratio: str | None, square: bool) -> None:
     assert verify.square_pixels(ratio) is square
