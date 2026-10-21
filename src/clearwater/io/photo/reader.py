@@ -225,7 +225,9 @@ def _read_heic(data: bytes, name: str) -> _Decoded:
     raw_exif = info.get("exif")
     block = exif_tools.strip_prefix(raw_exif) if isinstance(raw_exif, bytes) and raw_exif else None
     tag = exif_tools.orientation_of(block)
-    icc = info.get("icc_profile") if info.get("icc_profile_type") == "prof" else None
+    # ``prof`` is an ICC profile; ``rICC`` is the restricted form (ISO 14496-12), the same bytes.
+    profile_type = info.get("icc_profile_type")
+    icc = info.get("icc_profile") if profile_type in ("prof", "rICC") else None
     nclx = info.get("nclx_profile") if icc is None else None
     return _Decoded(
         "heic", samples, depth, block, icc, tag, heic_tag_to_apply(tag, layout), nclx=nclx
