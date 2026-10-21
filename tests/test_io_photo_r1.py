@@ -188,3 +188,22 @@ def test_nclx_codes_are_read_one_at_a_time(
     color = image.color
     assert (color.primaries, color.transfer, color.assumed) == expected
     assert color.icc_profile is None
+
+
+# --- #9: a message naming a non-ASCII file is still ASCII ----------------------------------------
+
+
+def test_a_non_ascii_file_name_gives_an_ascii_message(tmp_path: Path) -> None:
+    missing = tmp_path / ("caf" + chr(0xE9) + " " + chr(0x6F5C) + chr(0x6C34) + ".jpg")
+    with pytest.raises(PhotoReadError) as caught:
+        read_photo(missing)
+    message = str(caught.value)
+    assert message.isascii()
+    assert "caf\\xe9" in message and "\\u6f5c" in message, "the name is escaped"
+    assert caught.value.kind == "unreadable"
+
+
+def test_an_ascii_message_is_unchanged() -> None:
+    assert (
+        str(PhotoReadError("unsupported", "a.dng is not supported.")) == "a.dng is not supported."
+    )

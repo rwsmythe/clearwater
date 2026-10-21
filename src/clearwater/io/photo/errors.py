@@ -23,7 +23,9 @@ class PhotoReadError(Exception):
 
         Args:
             kind: The reason class.
-            message: A message the GUI can show (G10); ASCII, naming the file.
+            message: A message the GUI can show (G10), naming the file. Characters outside ASCII
+                (a file name in another script) are written as backslash escapes so the message
+                is safe on the Windows console.
         """
-        super().__init__(message)
+        super().__init__(message.encode("ascii", "backslashreplace").decode("ascii"))
         self.kind: PhotoErrorKind = kind
