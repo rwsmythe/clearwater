@@ -107,6 +107,15 @@ for a push (verify `git status -sb`).
   witness 41 passed on clean main after the orchestrator's uncommitted-edit slip, now kernel
   hazard (7) ca3eaea). Worktrees released. PySide6-Essentials on main without a reinstall.
   **WAVE 2 CLOSED: 12 of 15 Phase 3 build packages on main.**
+- **Wave-3 briefs APPROVED** 2026-10-21 ~06:21Z (drafts on branch `wave3-briefs` 5d37ddb; rulings
+  msg e78b0175): provenance EMBEDDED per D91 (architecture line corrected 7087e4f; MP4 `comment`
+  tag carries the IF-9 JSON); WP3.10 round-0 timing spike (NUT framing), STOP if no exact carrier;
+  DR-15's iPhone leg waits on an owner iPhone clip (owner-pending list); Y-1 statistics contract
+  is an IF-3 READING written identically in WP3.4 and WP3.11; `core.backend_for` granted; DR-19
+  closes in WP3.4; blend is a 0-100 schema value with a percent label (no IF-3 unit field);
+  `resolve_encoder` in WP3.10 is the one "auto" rule; `ClipAnalysis` and `ExportJobs` seams frozen
+  at round 0. DR-44 contract commit (branch `dr44` 5e95e0c, both nets at the orchestrator's seat)
+  lands on main before tranche A dispatches.
 - **Wave 3 COMMISSIONED** (CHARC msg a10045b6, 2026-10-21 ~06:01Z): eight briefs drafted by gen 9's
   helpers for CHARC approval; tranche A = WP3.4 assembly, WP3.9 decode, WP3.10 encode/mux, WP3.11
   analysis (opus-high); tranche B = WP3.17-3.20 GUI panels (sonnet-high) after two tranche-A
@@ -130,8 +139,8 @@ for a push (verify `git status -sb`).
 
 ### Owner
 
-**No owner decision open.** Photos still pending (memory-test photo leg; AD-24 HEIC rule
-provisional until then). Owner-reserved items (plan s.3): footage categories, look check and V2
+**No owner decision open.** Owner-pending inputs: photos (memory-test photo leg; AD-24 HEIC rule
+provisional until then; WP3.6P runs on them) and an iPhone video clip (DR-15 B-frame edit-list leg). Owner-reserved items (plan s.3): footage categories, look check and V2
 visual review, anything relaxing a mandatory requirement, any spec change. Everything else CHARC
 rules in the operator's stead (standing direction 2026-10-14, verbatim in CLAUDE.md "Roles";
 memory `clearwater-unattended-rule.md`); read the owner's words back verbatim with their time;
