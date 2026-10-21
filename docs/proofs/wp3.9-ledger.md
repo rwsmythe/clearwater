@@ -168,8 +168,8 @@ two-line grant).
 |---|---|---|---|---|---|---|---|---|---|---|
 | 0 (design) | - | - | - | - | - | - | - | - | - | 139,790 |
 | 1 (e9d1a81) | 0 | 1 | 3 | 4 | 0 | 4 | 0 | 0 | product + test (#3, #4, ebcb19f); report text (#1); granted test lines (#2, 66f9e02) | 253,896 |
-| 2 (7508d46) | 0 | 1 | 0 | 1 | 0 | 1 | 0 | 0 | product + test (6eda406) | (dispatcher) |
-| 3 (6ccc9f2) | 0 | 0 | 1 | 1 | 0 | 1 | 0 | 0 | pending cleanup: product + test | (dispatcher) |
+| 2 (7508d46) | 0 | 1 | 0 | 1 | 0 | 1 | 0 | 0 | product + test (6eda406) | 278,336 |
+| 3 (6ccc9f2) | 0 | 0 | 1 | 1 | 0 | 1 | 0 | 0 | cleanup, product + test (see below) | (dispatcher) |
 
 ### Round 1 (2026-10-21T07:29Z, codex-cli 0.162.1 over WSL, gpt-5.6-sol high)
 
@@ -207,3 +207,7 @@ shutdown returns before the first finishes its cleanup. Fixed once in the cleanu
 under the lock), no new round. Evidence `C:\Users\rwsmy\clearwater-review-evidence\wp3.9\r3\`.
 Assertions passed (echoed-source ERROR lines only, tokens footer, 19 succeeded-in lines, VERDICT at
 column 0). Reviewer A CONVERGED at round 3.
+
+Round-3 cleanup (orchestrator R3: convergence CONFIRMED, no new round): the whole shutdown runs
+under the lock; test `test_two_concurrent_shutdowns_both_return_after_the_cleanup`. Own tests 110
+passed, 4 footage deselected; static gates clean. Full pytest and footage/gpu legs: window queued.
