@@ -5,14 +5,16 @@
 
 ### Generation
 
-- **Generation 11** (`clearwater-orchestrator-20261026-0844`) LIVE since 2026-10-26 ~18:45Z (verify:
-  `comms/.launch-sessions.json`). Earlier: gen 10 `clearwater-orchestrator-20261021-0004`, gen 9 `-20261020-1959`,
-  gen 8 `-1556`, gen 7 `-1419`, gen 6 `-1134`, gen 5 `-0802`, gen 4 `-0524`, gen 3 `-20261019-2346`, gen 2
-  `-20261018-1442`, gen 1 `-20261014-1258`.
-- **Inbox:** gen 11 is the sole drainer (verify: `uv run python scripts/role_mail.py list --role orchestrator`).
-- **CHARC is generation 3:** `clearwater-charc-20261020-2115`. Cue that exact name (re-read
-  `comms/.launch-sessions.json` before each cue; CHARC rolls over too).
-- Bash-launch gauge at gen-11 bring-up: 122.9 ms.
+- **Generation 11** (`clearwater-orchestrator-20261026-0844`) ROLLED OVER 2026-10-26 ~22:30Z at ~415K (depth cap), at a
+  boundary with no cell mid-round (verify: `comms/.launch-sessions.json`). **Generation 12 starts here.** Earlier: gen 10
+  `clearwater-orchestrator-20261021-0004`, gen 9 `-20261020-1959`, gen 8 `-1556`, gen 7 `-1419`, gen 6 `-1134`, gen 5
+  `-0802`, gen 4 `-0524`, gen 3 `-20261019-2346`, gen 2 `-20261018-1442`, gen 1 `-20261014-1258`.
+- **Inbox:** gen 11 drained through CHARC's launcher FYI (`fd3e79167cc76899`) and STOPPED DRAINING at its rollover
+  announcement. You are the sole drainer.
+- **CHARC is generation 3:** `clearwater-charc-20261020-2115`. Cue that exact name (re-read `comms/.launch-sessions.json`).
+- **Your session runs WITHOUT the background-shell reaper** (launcher `60b2642`, owner-directed): a full suite can run as a
+  plain background job again; one heavy job at a time is still the rule.
+- Bash-launch gauge at gen-11 bring-up: 122.9 ms. Re-measure at yours.
 
 ### Standing operator rulings
 
@@ -62,7 +64,53 @@ Ask CHARC to HOLD main first. **Run every long suite as ONE background process w
 (CHARC `b4f1c9c8fee81d83`): an idle session gets its background shells reaped (two reaps today at 92-94 %, in
 `tests/test_prototype_backend.py`/`test_prototype_clip.py`); chunks only as the fallback after one more reap.
 
-### Where things stand -- the successor starts HERE
+### Where things stand -- the successor starts HERE (gen 12)
+
+Every cell of gen 11 died with it. Nothing is mid-round. In order:
+
+1. **WP3.18 Reviewer B pass 1 BLOCKED** (`wp3.18-mc` `44ef658`; evidence `...\wp3.18\reviewB\`, md5s): ONE in-envelope MAJOR
+   -- an A->B->A burst in the run-returned-to-`on_done` window: WP3.11 hands the adapter a recompute job for B (kept, per
+   CHARC point 5), the reversion to A skips `retarget` because A == `run.target`, `on_done` declares complete, and the
+   engine is left holding the B job (export enabled on the wrong statistics). Fix (panel side): once ANY `retarget`
+   returned False during a run, a follow-up `run(latest)` ALWAYS starts at done-ok; test with a stub that models the
+   retained job. Minors: #2 `_on_progress` drops the reported text (show it); #3 the report's `statistics ->
+   smoothed_record` mapping must say the adapter returns None until a full run completes (WP3.11 serves near-phase records
+   early); #4 runner close after a superseded run leaves phase "running" (set a terminal phase when `_start_run` hits a
+   closed runner). **Dispatch a FRESH seat 3** (sonnet-high; seat 2 was at 274K; CHARC's rule: a B remediation past 250K goes
+   to a fresh seat) from the ledger + `reviewB\review-B.txt`; ONE remediation, then ONE B re-run (template:
+   `mk_rerun.py` + a `rerun-section.md`); a second blocking B is adjudicated at the gate.
+2. **WP3.10:** seat 7 (`wp310-cell7`) finished the full suite (4434 passed / 2 skipped = the candidate-gate run) and the
+   FOOTAGE window (legs a, b, c; figures in its ledger's RESUME HERE and `work/wp3.10/s7-footage/`, e.g. `legb-table.txt`).
+   Footage results: (a) GX011627 MANDATORY/REQUIRED all SAME, `tied True` -> **DR-18 (1) CLOSES**; (c) the Edits
+   compilation `open` accepts 3003/60000; 2 MANDATORY DIFFERENT = the accepted "rounded UP" coarse-movie-timescale limit
+   (0.79 ms < one 1 ms tick). **(b) FINDING, a product defect:** on busy 4K, NVENC's High/Standard/Draft are the SAME encode
+   (~20 Mb/s, flat PSNR): `-rc vbr -b:v 0 -cq N` with no `-maxrate` makes NVENC pick HEVC level 5.0, whose cap overrides
+   cq (`nvcap.txt`: cq 18 21.68 vs cq 28 21.76 Mb/s; with `-maxrate 300M -bufsize 600M` 131.5 vs 37.3). **My recommended
+   ruling for you to confirm:** approve the one-line fix in `encode.py` `_video_options` (maxrate/bufsize or an explicit
+   level) + a test that the levels differ, as Reviewer A ROUND 9 scoped to the change; re-run leg (b) NVENC; propose the
+   AD-12 mappings to CHARC on the fixed figures (libx265 measured H 1.54 / S 0.80 / D 0.34 of camera on busy footage ->
+   estimate crf ~21/26/30). Disk-estimate risk for WP3.13/WP3.14: on a calm low-bit-rate clip outputs are 1.2-3.4x the
+   source (NVENC), QUALITY_RATIO 1.0 x MARGIN 1.25 under-estimates High by up to ~2.7x -> to CHARC.
+   Next: **seat 8** (opus-high) from the ledger's "RESUME HERE for seat 8" (`wp3.10` head `e7668e1`; note: the worktree's
+   `clearwater.local.toml` points at the MAIN tree's `work\`, pass `--config` with the worktree's path): round 9 (if you approve), the (b) NVENC re-run,
+   then the EXCLUSIVE floor row LAST and alone on the final code (OPEN/CLOSE to CHARC), the report, the return report. Then
+   my Reviewer B on WP3.10 (none run yet; the product converged at R4, the bench at R8).
+3. **WP3.17, WP3.19, WP3.20: B DONE** (each pass 2 adjudicated at the gate, fixes verified by execution at my seat; see the
+   Live-cells table). Ready for the stacked gate.
+4. **The stacked gate** (CHARC agreed): ask CHARC to HOLD main; build ONE stack on main of WP3.10 + 3.17 + 3.18 + 3.19 +
+   3.20 (disjoint files; any order; patch-id per package against its author branch); ONE full suite on the stack top
+   (CuPy as installed; plain background run now that the reaper is off); then ff + accept record per package (stack
+   order), then the main gates (full suite + harness gate) once; the CR blob check on every changed file; post the release
+   + return reports to CHARC; info-update to the operator.
+5. **Owed to CHARC in the release post:** WP3.17 debt row ("a float span or bounds 15 decimals cannot resolve"; trigger: a
+   method declaring one); WP3.19's line for WP3.14's brief ("an ok JobResult names at least one output") and its limit (V7
+   unmeasured at a few hundred items); WP3.20's interim `resolve_encoder` stub (WP4.3 swaps in WP3.10's); WP3.18's WP4.3
+   notes (adapter keeps its own pts list, F-2; keeps a returned job, point 5) and its R3 procedural breach (disclosed, not
+   voided); the three gate adjudications (WP3.17/3.19/3.20 B pass 2) for CHARC to look at.
+6. **Host:** one heavy job at a time. Small GUI targeted runs (<1 min, no FFmpeg/GPU) may overlap a suite or footage leg.
+
+### (older) Where things stood at the gen-10 handover
+
 
 1. **Gen 10 did, in order:** picked up under the pause; RESUME (`064e23c84876bdfd`); rebased `wp3.10` onto main
    (union conflicts in the probe-rules module set and `io/video/__init__.py`); WP3.4 seat 4 first with its EXCLUSIVE
