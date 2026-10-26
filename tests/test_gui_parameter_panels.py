@@ -669,3 +669,19 @@ def test_the_slider_ends_map_exactly_to_the_bounds(make_window) -> None:
     row.slider.setValue(pp.SLIDER_STEPS)
     row.slider.setValue(0)
     assert [p.parameters["odd"] for p in seen] == [hi, lo]
+
+
+def test_a_successful_edit_in_the_other_panel_clears_the_shared_owners_error(
+    make_window, monkeypatch
+) -> None:
+    window, basic, advanced = build(make_window)
+    presenter = presenter_of(window)
+    real = window.session.set_parameters
+    monkeypatch.setattr(
+        window.session, "set_parameters", lambda ps: (_ for _ in ()).throw(ValueError("no"))
+    )
+    basic.controls()["gain"].spin.setValue(0.1)
+    assert [m.owner for m in presenter.messages] == ["parameters"]
+    monkeypatch.setattr(window.session, "set_parameters", real)
+    advanced.controls()["free_f"].spin.setValue(4.0)
+    assert presenter.messages == []

@@ -475,7 +475,6 @@ class _ParameterForm(QWidget):
         self._panel = panel
         self._method_id: str | None = None
         self._rows: dict[str, ParameterRow] = {}
-        self._presented = False
         self._layout = QVBoxLayout(self)
         self._header = QVBoxLayout()
         self._layout.addLayout(self._header)
@@ -547,7 +546,6 @@ class _ParameterForm(QWidget):
         try:
             self._session.set_parameters(parameters)
         except ValueError as error:
-            self._presented = True
             self._context.messages.present(
                 Message(
                     "error",
@@ -557,9 +555,8 @@ class _ParameterForm(QWidget):
             )
             self._restore()
         else:
-            if self._presented:
-                self._presented = False
-                self._context.messages.clear("error", owner=OWNER_PARAMETERS)
+            # Any success of either panel clears the shared owner's errors.
+            self._context.messages.clear("error", owner=OWNER_PARAMETERS)
 
 
 class BasicPanel(_ParameterForm):
