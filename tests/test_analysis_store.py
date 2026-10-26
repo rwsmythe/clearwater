@@ -230,6 +230,8 @@ def test_schema_hash_canonicalises_numbers_but_not_bools() -> None:
         return schema_hash(method, {"strength": strength, "gamma": 1.0}, "median_gaussian", 2.0)
 
     assert digest(1) == digest(1.0)
+    assert digest(0.0) == digest(-0.0) == digest(0) and digest([-0.0]) == digest([0.0])
+    assert same_value(0.0, -0.0)  # the change test and the hash agree on signed zero
     assert digest(0) == digest(0.0)
     assert digest(2) != digest(1.0)
     assert digest(True) != digest(1) and digest(False) != digest(0)

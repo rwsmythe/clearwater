@@ -274,6 +274,18 @@ def test_a_bool_for_a_number_is_a_change_and_an_equal_number_is_not() -> None:
     assert engine.smoothed_record(frames[5].pts_ticks, schema_hash=helper)
 
 
+def test_a_signed_zero_is_no_change_and_keeps_the_helper_hash() -> None:
+    """``0.0`` -> ``-0.0`` is no change, and the helper's hash still reads the statistics."""
+    frames = synthetic_frames(20)
+    method = GrayWorld()
+    engine, _, _ = make_engine(method, frames, params={"strength": 0.0})
+    assert run(engine).ok
+    assert engine.set_parameters({**engine.parameters, "strength": -0.0}, None) is None
+    helper = schema_hash(method, engine.parameters, "median_gaussian", 2.0)
+    assert helper == engine.schema_hash
+    assert engine.smoothed_record(frames[5].pts_ticks, schema_hash=helper)
+
+
 def test_a_change_before_any_analysis_is_used_by_the_next_job() -> None:
     """Phase none: no job is returned; the analysis then runs under the new values."""
     frames = synthetic_frames(20)

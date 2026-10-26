@@ -54,10 +54,10 @@ SHA-256 hex of canonical JSON (`sort_keys`, compact separators, floats by `repr`
 "window_s": str(Fraction(str(window_s)))}}` over the sorted union of every stage's
 `depends_on_parameters`. A parameter no stage depends on leaves it unchanged; a missing name and
 `None` differ. Every number (`int` or `float`, at any depth, never a `bool`) is hashed as its
-`float` value, so equal values hash equal whatever their Python type (`1` and `1.0`, as a preset
-read from JSON may give: `set_parameters` treats them as no change), while `True` and `1` differ
-(a change, recomputed under a new hash: `set_parameters` decides "changed" with `same_value`, the
-hash's canonical form compared with its types).
+`float` value (`-0.0` as `0.0`), so equal values hash equal whatever their Python type (`1` and
+`1.0`, as a preset read from JSON may give: `set_parameters` treats them as no change), while
+`True` and `1` differ (a change, recomputed under a new hash: `set_parameters` decides "changed"
+with `same_value`, the hash's canonical form compared with its types).
 
 ## V3 (engine side, ruling Q7 and CHARC ruling V3-1)
 

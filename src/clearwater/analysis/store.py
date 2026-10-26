@@ -51,7 +51,8 @@ def shaping_parameters(method: CorrectionMethod) -> tuple[str, ...]:
 def _canonical(value: Any) -> Any:
     """Return ``value`` with every ``int`` or ``float`` (never a ``bool``) as its ``float``.
 
-    Lists, tuples and dicts are walked; anything else is returned unchanged.
+    ``+ 0.0`` turns ``-0.0`` into ``0.0`` (they compare equal, so they must hash equal). Lists,
+    tuples and dicts are walked; anything else is returned unchanged.
 
     Raises:
         OverflowError: An ``int`` too large for a ``float``.
@@ -59,7 +60,7 @@ def _canonical(value: Any) -> Any:
     if isinstance(value, bool):
         return value
     if isinstance(value, int | float):
-        return float(value)
+        return float(value) + 0.0
     if isinstance(value, list | tuple):
         return [_canonical(item) for item in value]
     if isinstance(value, dict):
@@ -116,7 +117,8 @@ def schema_hash(
     as an exact decimal. A parameter no stage depends on does not change it. Every number (an
     ``int`` or a ``float``, at any depth, never a ``bool``) is hashed as its ``float`` value, so
     values that compare equal hash equal whatever their Python type (``1`` and ``1.0``, as a
-    preset read from JSON may give), while ``True`` stays distinct from ``1``.
+    preset read from JSON may give; ``-0.0`` is hashed as ``0.0``), while ``True`` stays
+    distinct from ``1``.
 
     Args:
         method: The correction method.
