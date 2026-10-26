@@ -11,7 +11,7 @@ Tier STRONG. Brief `docs/briefs/wp3.11-brief.md` (FINAL; CHARC rulings `53d1d906
 | 1 (head 00b248b) | 316,506 (at the window yield; the R1 yield's figure is the dispatcher's) | 0 | 3 (F1, F2, F5) | 5 (F3, F4, F6, F7, F8) | 8 in / 0 out | 8 NEW / 0 REOPENED | 0 | F5 test-only, fixed out of band at 9c53134; F1-F4, F6 product; F7, F8 tool -- NOT yet fixed | WSL, gpt-5.6-sol high, 19 exec lines, all findings REASONED | NEW_CRITICAL_MAJOR_FOUND; adjudicated (F3, F4 downgraded to MINOR), next round needed |
 | R1 remediation (cell 2, head e327954) | 171,115 (dispatcher, at the remediation yield) | - | - | - | - | - | 0 | F1-F4, F6 product; F7, F8 tool; V3-1 test-only | - | remediated; step-aware re-run in a window |
 | 2 (head 7c8e6ed) | 202,325 | 0 | 1 NEW (A1) + 1 REOPENED (A2, F1's "during" half; MINOR recommended) | 0 (A2 if downgraded) | 2 in / 0 out | 1 NEW / 1 REOPENED | 0 | none yet (both product) | WSL, gpt-5.6-sol high, 14 exec lines, both REASONED by the reviewer, both reproduced by the cell | NEW_CRITICAL_MAJOR_FOUND; adjudicated, next round needed |
-| 3 (head 7f9dff8) | dispatcher's figure at this yield | 0 | 0 | 1 (B1, docstring) | 1 in / 0 out | 1 NEW / 0 REOPENED | 0 | R2 fixes: A1, A2 product (f139ef5, 7f9dff8); B1 not yet (docstring) | WSL, gpt-5.6-sol high, 17 exec lines, REASONED | NO_NEW_CRITICAL_MAJOR: CONVERGED (zero new blocking) |
+| 3 (head 7f9dff8) | 237,310 | 0 | 0 | 1 (B1, docstring) | 1 in / 0 out | 1 NEW / 0 REOPENED | 0 | R2 fixes: A1, A2 product (f139ef5, 7f9dff8); B1 not yet (docstring) | WSL, gpt-5.6-sol high, 17 exec lines, REASONED | NO_NEW_CRITICAL_MAJOR: CONVERGED (zero new blocking) |
 
 ## Round 0 -- design table (no product code yet)
 
@@ -435,8 +435,8 @@ MemoryError in run A while another package's full pytest ran, cleared on the re-
 **State.** Head = this ledger commit (code as at 7f9dff8). Reviewer A CONVERGED at round 3.
 
 **Do next, in order.**
-1. Cleanup: B1, the `AnalysisStore.axis` docstring (the clip's frames, put by `put` or
-   `ensure_axis`); one commit; no new round.
+1. DONE: B1 cleanup (8b8a9ac, docstring only, no new round); Y-1 reconciled with WP3.4's text
+   byte for byte (dispatcher, 478ecab; report commit after 8b8a9ac), report status final.
 2. Full pytest in a dispatcher WINDOW (`QT_QPA_PLATFORM=offscreen`, `--basetemp=work/<name>`,
    output to a file; grep the summary); `WINDOW RELEASED: <summary>`.
 3. The final return report (recipe section 4; brief "Return report").
