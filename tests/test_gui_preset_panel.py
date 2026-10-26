@@ -256,28 +256,46 @@ def test_save_as_offers_the_selected_name(make_window) -> None:
     assert setup.dialogs.asked == [("Save preset", "Scuba (deep)")]
 
 
-def _assert_save_over_needs_confirmation(make_window) -> None:
+SAME_NAME = [("Mine", "MINE"), ("Straße", "STRASSE"), ("Café", "Café")]
+"""Existing and typed names that are one preset for the store (NFC, then casefold)."""
+
+
+def _assert_save_over_needs_confirmation(
+    make_window, existing: str = "Mine", typed: str = "MINE"
+) -> None:
     setup = build(make_window)
-    put(setup, "Mine", gain=0.1)
-    original = file_for(setup, "Mine").read_bytes()
+    put(setup, existing, gain=0.1)
+    original = file_for(setup, existing).read_bytes()
     setup.window.session.set_parameters(new_parameter_set("c3", {"gain": 1.9}))
     # Declined (the name matches case-insensitively): nothing is replaced.
-    setup.dialogs.names.append("MINE")
+    setup.dialogs.names.append(typed)
     setup.dialogs.answers.append(False)
     setup.panel.save_as()
     assert len(setup.dialogs.confirms()) == 1, "the panel replaced a preset without asking"
-    assert file_for(setup, "Mine").read_bytes() == original
+    assert file_for(setup, existing).read_bytes() == original
     # Confirmed: replaced, and still one file.
-    setup.dialogs.names.append("MINE")
+    setup.dialogs.names.append(typed)
     setup.dialogs.answers.append(True)
     setup.panel.save_as()
     assert len(setup.dialogs.confirms()) == 2
-    assert dict(setup.store.load("Mine").parameters) == {"gain": 1.9}
-    assert [e.name for e in setup.store.list_presets() if e.name.lower() == "mine"] == ["Mine"]
+    assert dict(setup.store.load(existing).parameters) == {"gain": 1.9}
+    key = pp._name_key(existing)
+    assert [e.name for e in setup.store.list_presets() if pp._name_key(e.name) == key] == [existing]
 
 
-def test_save_over_an_existing_name_asks_and_replaces_only_when_confirmed(make_window) -> None:
-    _assert_save_over_needs_confirmation(make_window)
+@pytest.mark.parametrize(("existing", "typed"), SAME_NAME)
+def test_save_over_an_existing_name_asks_and_replaces_only_when_confirmed(
+    make_window, existing, typed
+) -> None:
+    _assert_save_over_needs_confirmation(make_window, existing, typed)
+
+
+@pytest.mark.parametrize(("existing", "typed"), SAME_NAME[1:])
+def test_planted_lower_case_name_key_fails(make_window, monkeypatch, existing, typed) -> None:
+    # str.lower() neither folds the sharp s nor composes a decomposed accent.
+    monkeypatch.setattr(pp, "_name_key", lambda name: name.lower())
+    with pytest.raises(AssertionError):
+        _assert_save_over_needs_confirmation(make_window, existing, typed)
 
 
 def test_planted_save_that_overwrites_without_asking_fails(make_window, monkeypatch) -> None:
