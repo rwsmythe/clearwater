@@ -466,8 +466,12 @@ def scenario_decode_failure(env: Env, ms: int = 4000) -> None:
 
 def scenario_run_thread(env: Env, ms: int = 4000) -> None:
     """Nothing heavy on the interface thread: run, proxy and statistics run on workers."""
+    main = threading.main_thread()
     env.open()
     env.wait(lambda: len(env.analysis.runs) > 0, ms)
+    # asserted before anything waits for the completion, so a run on the interface thread
+    # fails here, by this message, and not as a timeout further on
+    assert main not in env.analysis.threads["run"], "run ran on the interface thread"
     env.analysis.release(0)
     env.phase_is("complete", ms)
     env.wait(lambda: env.slider().maximum() == len(PTS) - 1, ms)
@@ -475,10 +479,9 @@ def scenario_run_thread(env: Env, ms: int = 4000) -> None:
     env.wait(lambda: bool(env.shown), ms)
     release(env)
     env.wait(lambda: any(p == PTS[2] for p, _ in env.positions), ms)
-    main = threading.main_thread()
     for member in ("run", "proxy", "statistics"):
         assert env.analysis.threads[member], member
-        assert main not in env.analysis.threads[member], member
+        assert main not in env.analysis.threads[member], f"{member} ran on the interface thread"
 
 
 def scenario_drag(env: Env, ms: int = 4000) -> None:
@@ -720,7 +723,7 @@ def test_run_proxy_and_statistics_run_off_the_interface_thread(make_env) -> None
 
 def test_planted_analysis_run_on_the_interface_thread_fails(make_env) -> None:
     env = make_env(panel_class=InlineRunPanel, gated=())
-    with pytest.raises(AssertionError):
+    with pytest.raises(AssertionError, match="ran on the interface thread"):
         scenario_run_thread(env, ms=700)
 
 
