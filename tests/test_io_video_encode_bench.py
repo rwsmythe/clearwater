@@ -195,6 +195,70 @@ def test_telemetry_samples_in_a_thread_and_starts_no_process() -> None:
     assert "strays" not in record  # the strays are read in the frame loop (round 7, option B)
 
 
+def _slow_reading(seconds: float) -> Any:
+    def reading() -> dict[str, str]:
+        time.sleep(seconds)
+        return {"memory.used": "100"}
+
+    return reading
+
+
+def test_each_sampler_keeps_its_own_schedule_and_every_sample_its_time(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(bench, "gpu_reading", _slow_reading(0.3))  # slower than its period
+    telemetry = bench.Telemetry(memory_every=0.05, gpu_every=0.1)
+    telemetry.start()
+    time.sleep(2.0)
+    record = telemetry.stop()
+    assert record["errors"] == []
+    assert record["periods_s"] == {"memory": 0.05, "gpu": 0.1}
+    times = [t for t, _ in record["rss"]]
+    assert len(times) == record["rss_samples"] > 10 and times == sorted(times)
+    assert [r["t_s"] for r in record["gpu"]] == sorted(r["t_s"] for r in record["gpu"])
+    gaps = record["gaps_s"]
+    assert gaps["memory"]["n"] == len(times) - 1
+    assert gaps["memory"]["median"] < 0.1  # round 7 #2: a slow nvidia-smi does not stall RSS
+    assert gaps["gpu"]["median"] >= 0.29  # the actual gap is recorded, not the nominal 0.1 s
+    assert record["peak_gpu_memory_used_mib"] == 100.0
+
+
+def test_a_sampler_that_ends_early_is_recorded(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls = []
+    real = bench.tree_rss
+
+    def tree_rss() -> Any:
+        calls.append(1)
+        if len(calls) > 3:
+            raise RuntimeError("planted")
+        return real()
+
+    monkeypatch.setattr(bench, "tree_rss", tree_rss)
+    monkeypatch.setattr(bench, "gpu_reading", _slow_reading(0.0))
+    telemetry = bench.Telemetry(memory_every=0.02, gpu_every=0.05)
+    telemetry.start()
+    time.sleep(1.0)
+    record = telemetry.stop()
+    assert record["rss_samples"] == 3 and len(record["gpu"]) > 5  # the other sampler goes on
+    stopped, ended = record["errors"]
+    assert stopped.startswith("the memory sampler stopped at ")
+    assert stopped.endswith(" s: RuntimeError: planted")
+    assert ended == "the memory sampler had ended before the stop"
+
+
+def test_a_sampler_that_does_not_stop_in_time_is_recorded(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(bench, "_SAMPLER_JOIN_S", 0.3)
+    monkeypatch.setattr(bench, "gpu_reading", _slow_reading(2.0))
+    telemetry = bench.Telemetry(memory_every=0.05, gpu_every=1.0)
+    telemetry.start()
+    time.sleep(0.2)
+    began = time.monotonic()
+    record = telemetry.stop()
+    assert time.monotonic() - began < 1.0
+    assert record["errors"] == ["the gpu sampler did not stop within 0.3 s"]
+    assert record["rss_samples"] > 0 and record["gpu"] == []
+
+
 # --- one run ---------------------------------------------------------------------------------
 
 
@@ -247,6 +311,7 @@ def test_run_once_records_the_row_and_deletes_the_output(sample: Any, tmp_path: 
     telemetry = record["telemetry"]
     assert telemetry["errors"] == []
     assert telemetry["periods_s"] == {"memory": 0.02, "gpu": 0.5}
+    assert telemetry["gaps_s"]["memory"]["n"] == telemetry["rss_samples"] - 1
     names = [m["name"] for m in telemetry["peak_tree_rss_members"]]
     assert any("ffmpeg" in name for name in names)
     assert telemetry["peak_tree_rss_bytes"] > 0

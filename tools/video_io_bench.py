@@ -14,8 +14,9 @@ microseconds). The first frame's interval also holds the decoder's start (its FF
 the first frame asked for) and the encoder's first frame; the encoder's FFmpeg starts inside
 ``open`` and is timed there. The first interval is kept apart from the summaries.
 
-Plan 4.3 / frame rule 7: an EXCLUSIVE run, best effort on a shared laptop. A telemetry thread
-records, without stopping the frame loop:
+Plan 4.3 / frame rule 7: an EXCLUSIVE run, best effort on a shared laptop. Two telemetry
+threads (:class:`Telemetry`) record, each on its own schedule and without stopping the frame
+loop, every sample with its time and the actual gaps beside the nominal periods:
 
 - the resident memory of the process tree (this Python process and its FFmpeg children; the
   ``nvidia-smi`` processes the instrument itself starts are listed apart and not counted),
@@ -61,6 +62,7 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import itertools
 import json
 import math
 import os
@@ -70,7 +72,7 @@ import subprocess
 import sys
 import threading
 import time
-from collections.abc import Collection, Iterator, Sequence
+from collections.abc import Callable, Collection, Iterator, Sequence
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from fractions import Fraction
@@ -106,6 +108,8 @@ _GPU_QUERY = (
     "utilization.decoder,memory.used,power.draw,clocks_event_reasons.active"
 )
 _SAMPLER_NAMES = frozenset({"nvidia-smi", "nvidia-smi.exe"})
+_SAMPLER_JOIN_S = 30.0
+"""How long a stop waits for the samplers (above ``nvidia-smi``'s own 20 s timeout)."""
 
 
 class BenchError(RuntimeError):
@@ -335,7 +339,13 @@ def conditions(moment: str) -> dict[str, Any]:
 
 
 class Telemetry:
-    """Samples the process tree's memory and the graphics card in a thread."""
+    """Samples the process tree's memory and the graphics card, each in a thread of its own.
+
+    Each thread keeps its own schedule: a sample is due every period from the start, and one
+    that takes longer than its period is followed at once by the next (no burst to catch up),
+    so a slow ``nvidia-smi`` never delays the memory readings. Every sample carries its time,
+    and the record holds the gaps between samples beside the nominal periods.
+    """
 
     def __init__(self, *, memory_every: float, gpu_every: float) -> None:
         """Set the sampling periods in seconds.
@@ -351,62 +361,98 @@ class Telemetry:
             raise ValueError("every telemetry period must be a positive number of seconds")
         self._periods = (memory_every, gpu_every)
         self._stop = threading.Event()
-        self._thread = threading.Thread(target=self._run, daemon=True)
+        self._threads = {
+            "memory": threading.Thread(
+                target=self._loop, args=("memory", memory_every, self._sample_rss), daemon=True
+            ),
+            "gpu": threading.Thread(
+                target=self._loop, args=("gpu", gpu_every, self._sample_gpu), daemon=True
+            ),
+        }
         self._started = 0.0
         self.peak_rss = 0
         self.peak_members: list[dict[str, Any]] = []
         self.peak_at_s = 0.0
-        self.rss_samples = 0
+        self.rss: list[tuple[float, int]] = []
         self.gpu: list[dict[str, Any]] = []
         self.errors: list[str] = []
 
     def start(self) -> None:
-        """Start sampling."""
+        """Start both samplers."""
         self._started = time.monotonic()
-        self._thread.start()
+        for thread in self._threads.values():
+            thread.start()
 
-    def _run(self) -> None:
-        memory_every, gpu_every = self._periods
-        next_gpu = 0.0
+    def _elapsed(self) -> float:
+        return time.monotonic() - self._started
+
+    def _loop(self, name: str, every: float, sample: Callable[[float], None]) -> None:
+        due = 0.0
         try:
             while True:
-                elapsed = time.monotonic() - self._started
-                self._sample_rss(elapsed)
-                if elapsed >= next_gpu:
-                    self.gpu.append({"t_s": round(elapsed, 2), **gpu_reading()})
-                    next_gpu = elapsed + gpu_every
-                if self._stop.wait(memory_every):
+                sample(round(self._elapsed(), 3))
+                due = max(due + every, self._elapsed())
+                if self._stop.wait(max(due - self._elapsed(), 0.0)):
                     break
         except Exception as exc:  # telemetry never ends the run; the record says it stopped
-            self.errors.append(f"sampling stopped: {type(exc).__name__}: {exc}")
+            self.errors.append(
+                f"the {name} sampler stopped at {self._elapsed():.2f} s: "
+                f"{type(exc).__name__}: {exc}"
+            )
 
     def _sample_rss(self, elapsed: float) -> None:
         total, members = tree_rss()
-        self.rss_samples += 1
+        self.rss.append((elapsed, total))
         if total > self.peak_rss:
             self.peak_rss, self.peak_members, self.peak_at_s = total, members, elapsed
 
+    def _sample_gpu(self, elapsed: float) -> None:
+        self.gpu.append({"t_s": elapsed, **gpu_reading()})
+
     def stop(self) -> dict[str, Any]:
-        """Stop sampling and return what was recorded.
+        """Stop both samplers and return what was recorded.
+
+        A sampler that had ended before the stop, or that does not stop within
+        :data:`_SAMPLER_JOIN_S`, is recorded in the errors (it is not waited for longer).
 
         Returns:
-            The sampling periods, the memory peak (bytes, its members, when), the graphics-card
-            readings and their memory peak, and the errors that stopped the sampling, if any.
+            The nominal periods and the actual gaps between samples (summarised), the memory
+            samples (seconds, bytes) and peak (bytes, its members, when), the graphics-card
+            readings and their memory peak, and the errors, if any.
         """
+        for name, thread in self._threads.items():
+            if thread.ident is not None and not thread.is_alive():
+                self.errors.append(f"the {name} sampler had ended before the stop")
         self._stop.set()
-        if self._thread.is_alive():
-            self._thread.join(timeout=60)
-        used = [m for m in (memory_used_mib(r) for r in self.gpu) if m is not None]
+        deadline = time.monotonic() + _SAMPLER_JOIN_S
+        for name, thread in self._threads.items():
+            if thread.ident is None:
+                continue
+            thread.join(timeout=max(deadline - time.monotonic(), 0.0))
+            if thread.is_alive():
+                self.errors.append(f"the {name} sampler did not stop within {_SAMPLER_JOIN_S:g} s")
+        rss, gpu = list(self.rss), list(self.gpu)  # a sampler that did not stop may still add
+        used = [m for m in (memory_used_mib(r) for r in gpu) if m is not None]
         return {
             "periods_s": dict(zip(("memory", "gpu"), self._periods, strict=True)),
+            "gaps_s": {
+                "memory": _gaps([t for t, _ in rss]),
+                "gpu": _gaps([float(r["t_s"]) for r in gpu]),
+            },
             "peak_tree_rss_bytes": self.peak_rss,
             "peak_tree_rss_members": self.peak_members,
             "peak_tree_rss_at_s": round(self.peak_at_s, 2),
-            "rss_samples": self.rss_samples,
+            "rss_samples": len(rss),
+            "rss": rss,
             "peak_gpu_memory_used_mib": max(used) if used else None,
-            "gpu": self.gpu,
-            "errors": self.errors,
+            "gpu": gpu,
+            "errors": list(self.errors),
         }
+
+
+def _gaps(times: Sequence[float]) -> dict[str, float] | None:
+    """Summarise the gaps between successive sample times (None under two samples)."""
+    return summarise([b - a for a, b in itertools.pairwise(times)])
 
 
 # --- one run -------------------------------------------------------------------------------
