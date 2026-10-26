@@ -338,6 +338,7 @@ class PresetPanel(QWidget):
 
         ok, replaces = self._attempt(exists, what)
         if not ok:
+            self.refresh()
             return
         if replaces and not self._dialogs.confirm(
             f"A preset named {name!r} already exists. Replace it?"

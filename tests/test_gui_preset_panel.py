@@ -749,3 +749,12 @@ def test_a_case_only_save_over_selects_the_stored_preset(make_window) -> None:
     setup.dialogs.answers.append(True)
     setup.panel.save_as()
     assert setup.panel.selected() == "Mine"
+
+
+def test_a_failed_save_as_still_refreshes_the_list(make_window) -> None:
+    setup = build(make_window)
+    setup.store.save("Added outside", new_parameter_set("c3", {}))
+    assert "Added outside" not in setup.names()
+    setup.dialogs.names.append("a/b")
+    setup.panel.save_as()
+    assert len(setup.own()) == 1 and "Added outside" in setup.names()
