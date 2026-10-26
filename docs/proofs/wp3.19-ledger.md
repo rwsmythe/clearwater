@@ -287,3 +287,10 @@ F4 test (request construction raising), F5 test (outputs of a non-ok result kept
   (`work/t1-r2c.txt`, run with -s to read); no full suite run yet.
 - Notes for the report: tests were written after the product code (disclosed); mutation checks in
   `work/mut.py`; equivalent mutant on `start()`'s second gate guard; stub `warn_on_failure` option.
+
+## Round-2 rulings and cleanup
+
+- Dispatcher: round 2 UPHELD, Reviewer A terminates at round 2; minors 1 and 2 are test-only (commits `e887043`,
+  `d853ff7`, targeted runs after the WP3.10 suite); no own full pytest (stacked gate on the merge candidate).
+- Minor 3 RULED by CHARC `efc95f5d4e7b8456`: seam wording "on a non-ok result, `outputs` lists any file committed
+  before the stop (normally none)" applied in `export_seam.py` (wording only). Depth at the round-2 yield: 261,443.

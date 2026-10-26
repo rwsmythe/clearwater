@@ -73,9 +73,11 @@ class ExportJobs(Protocol):
         - for a video, includes the analysis the export needs (AD-15), so a batch item needs no
           prior analysis;
         - returns a :class:`~clearwater.interfaces.JobResult`: ``ok`` True with ``outputs`` (the
-          committed files) and ``warnings``; or ``ok`` False with ``outputs`` empty and
-          ``failure`` the user-readable reason; on a cancel ``ok`` False and ``failure`` equal to
-          :data:`CANCELLED`. An exception it lets escape becomes a failed result in the runner.
+          committed files) and ``warnings``; or ``ok`` False with ``failure`` the user-readable
+          reason; on a cancel ``ok`` False and ``failure`` equal to :data:`CANCELLED`. On a non-ok
+          result, ``outputs`` lists any file committed before the stop (normally none), and
+          ``warnings`` any warning raised before it. An exception it lets escape becomes a
+          failed result in the runner.
           :data:`CANCELLED` is reserved: a genuine failure text never equals it, and an engine
           returns the constant itself, not a copy of the string.
 

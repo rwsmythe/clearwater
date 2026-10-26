@@ -32,16 +32,16 @@ Nothing under `src/clearwater/interfaces/`, `config/`, `core/`, `io/` was change
 3. It writes through safe writing: a cancel or failure leaves no partial output and no temporary; a committed output is
    never removed (G8, D44, V11).
 4. A video's analysis (AD-15) is inside the job, so a batch item needs no prior analysis.
-5. Success `ok` True with `outputs` and `warnings`; failure `ok` False with the readable `failure`; cancel `ok` False with
-   `failure == CANCELLED` (the constant itself; reserved: no genuine failure text equals it). Cancel and failure are told
+5. Success `ok` True with `outputs` and `warnings`; failure `ok` False with the readable `failure` (`outputs` lists any file
+   committed before the stop, normally none); cancel `ok` False with `failure == CANCELLED` (the constant itself; reserved: no genuine failure text equals it). Cancel and failure are told
    apart only by that string.
 6. One job per source with a fresh `Reservations`: output-name collisions across batch items are caught by the
    filesystem scan at each plan (D34-D36), not by shared state.
 
-Minor 3 of Reviewer A round 2 (wording of item 5 for `outputs` on a non-ok result): PENDING the dispatcher's relay of
-CHARC's answer; recommended wording: "on a non-ok result `outputs` lists any file committed before the stop (normally
-none)". Until then `export_seam.py` still says non-ok means empty `outputs`, while the panel keeps whatever `outputs` a
-result carries.
+Minor 3 of Reviewer A round 2 (wording of item 5 for `outputs` on a non-ok result): RULED by CHARC `efc95f5d4e7b8456`,
+applied in `export_seam.py`: "on a non-ok result, `outputs` lists any file committed before the stop (normally none)"
+(and `warnings` any warning raised before it), consistent with "an output already committed is never removed". Wording
+only; no name or signature changed. The panel keeps whatever `outputs` and `warnings` a result carries.
 
 ## State tables
 
