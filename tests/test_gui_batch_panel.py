@@ -646,6 +646,36 @@ def test_refused_files_are_warned_about_and_duplicates_are_not_queued(rig: Rig) 
     assert [batch.queue.item(i).text() for i in range(batch.queue.count())] == ["ok.mp4 - queued"]
 
 
+ONE, TWO = Path("/card-one/GX010001.MP4"), Path("/card-two/GX010001.MP4")
+
+
+def test_files_that_share_a_name_are_told_apart_by_their_folder(rig: Rig) -> None:
+    """Reviewer B pass 2: GoPro cards repeat names; the queue and the report show the folder."""
+    batch = started(rig, [ONE, A, TWO])
+    first, second = f"GX010001.MP4 ({ONE.parent})", f"GX010001.MP4 ({TWO.parent})"
+    texts = [batch.queue.item(i).text() for i in range(batch.queue.count())]
+    assert texts == [f"{first} - queued", "a.jpg - queued", f"{second} - queued"]
+    items = batch.items()
+    items[0].state, items[1].state, items[2].state = (
+        ItemState.DONE,
+        ItemState.DONE,
+        ItemState.FAILED,
+    )
+    items[2].failure = "bad"
+    lines = format_report(items, cancelled=False).splitlines()
+    assert f"1. {first} - done" in lines and "2. a.jpg - done" in lines
+    assert f"3. {second} - FAILED" in lines
+
+
+def test_planted_labels_that_show_only_the_file_name_are_detected(
+    rig: Rig, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(batch_module, "item_labels", lambda items: [i.path.name for i in items])
+    batch = started(rig, [ONE, TWO])
+    # The test above fails on this implementation: the two rows read the same.
+    assert batch.queue.item(0).text() == batch.queue.item(1).text()
+
+
 def test_the_add_remove_and_clear_buttons(rig: Rig) -> None:
     batch = batch_of(rig)
     batch._choose_files = lambda parent: [A, B, C]

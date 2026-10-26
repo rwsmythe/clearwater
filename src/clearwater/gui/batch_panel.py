@@ -12,6 +12,7 @@ from __future__ import annotations
 import enum
 import logging
 import os
+from collections import Counter
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -93,6 +94,24 @@ def _key(path: Path) -> str:
     return os.path.normcase(os.path.abspath(path))
 
 
+def item_labels(items: list[BatchItem]) -> list[str]:
+    """Return the label of each item: its file name, plus its folder when a name repeats.
+
+    Args:
+        items: The queue.
+
+    Returns:
+        One label per item, in order: ``name``, or ``name (parent folder)`` for every item whose
+        file name (compared as the filesystem does, see :func:`_key`) is shared by another.
+    """
+    names = [os.path.normcase(item.path.name) for item in items]
+    counts = Counter(names)
+    return [
+        f"{item.path.name} ({item.path.parent})" if counts[name] > 1 else item.path.name
+        for item, name in zip(items, names, strict=True)
+    ]
+
+
 def format_report(items: list[BatchItem], *, cancelled: bool) -> str:
     """Return the end-of-run report (G7).
 
@@ -115,9 +134,9 @@ def format_report(items: list[BatchItem], *, cancelled: bool) -> str:
         f"failed {count(ItemState.FAILED)}, cancelled {count(ItemState.CANCELLED)}, "
         f"not run {count(ItemState.NOT_RUN, ItemState.QUEUED, ItemState.RUNNING)}.",
     ]
-    for number, item in enumerate(items, start=1):
+    for number, (item, label) in enumerate(zip(items, item_labels(items), strict=True), start=1):
         state = "FAILED" if item.state is ItemState.FAILED else item.state.value
-        lines.append(f"{number}. {item.path.name} - {state}")
+        lines.append(f"{number}. {label} - {state}")
         lines.extend(f"   output: {output}" for output in item.outputs)
         lines.extend(f"   warning: {text}" for text in item.warnings)
         if item.failure:
@@ -414,7 +433,8 @@ class BatchPanel(QWidget):
             self._current = item
             total = len(self._items)
             number = self._items.index(item) + 1
-            self.overall.setText(f"Item {number} of {total}: {messages.ascii_text(item.path.name)}")
+            label = item_labels(self._items)[number - 1]
+            self.overall.setText(f"Item {number} of {total}: {messages.ascii_text(label)}")
             self.bar.setRange(0, 0)
             self._refresh_rows()
             assert self._request_template is not None
@@ -533,8 +553,8 @@ class BatchPanel(QWidget):
         """Rebuild the list from the items, keeping the selection by row."""
         selected = {index.row() for index in self.queue.selectedIndexes()}
         self.queue.clear()
-        for item in self._items:
-            self.queue.addItem(f"{item.path.name} - {item.state.value}")
+        for item, label in zip(self._items, item_labels(self._items), strict=True):
+            self.queue.addItem(f"{label} - {item.state.value}")
         for row in selected:
             if row < self.queue.count():
                 self.queue.item(row).setSelected(True)
