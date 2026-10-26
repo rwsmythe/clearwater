@@ -294,3 +294,10 @@ F4 test (request construction raising), F5 test (outputs of a non-ok result kept
   `d853ff7`, targeted runs after the WP3.10 suite); no own full pytest (stacked gate on the merge candidate).
 - Minor 3 RULED by CHARC `efc95f5d4e7b8456`: seam wording "on a non-ok result, `outputs` lists any file committed
   before the stop (normally none)" applied in `export_seam.py` (wording only). Depth at the round-2 yield: 261,443.
+
+## Final targeted run (2026-10-26 20:21Z)
+
+61 passed (own modules + test_gui_deps, headless, `work/t1-final.txt`); V7 observed maxima 13 ms (export), 11 ms
+(batch). The minor-1/minor-2 tests and their planted versions pass; the first run showed two teardown errors in the
+minor-1 helper (a patched `session.parameters` used by the window's close), fixed in the test helper. Full pytest: run by
+the orchestrator on the merge candidate (stacked gate). Reviewer A terminated at round 2.

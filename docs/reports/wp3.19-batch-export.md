@@ -117,12 +117,15 @@ the G8 cleanup legs (no temporary, no final file after a cancel) run through the
 ## V7 (D66)
 
 The bound (a 10 ms `QTimer` probe never waits more than 100 ms) is asserted while a ~2 s NumPy export, and while a batch of
-two ~1 s NumPy items, run. Observed maxima (informational, not a performance figure): FILL after the final targeted run.
+two ~1 s NumPy items, run. Observed maxima (informational, not a performance figure; one run on the shared laptop, 2026-10-26 20:21Z, nothing
+else heavy running): 13 ms during the export, 11 ms during the batch.
 
 ## Gates
 
 - ruff check, ruff format --check, mypy strict: green on the final head (see the ledger for the commands' last lines).
-- Own modules plus `tests/test_gui_deps.py`: FILL (count) passed, headless.
+- Own modules plus `tests/test_gui_deps.py`, headless (`QT_QPA_PLATFORM=offscreen`), final head: 61 passed in 10 s
+  (`work/t1-final.txt`). The two round-2 cleanup tests first errored at teardown (the window's close saves
+  `session.parameters`, which the test had left patched); fixed in the test helper, then green.
 - full pytest: run by the orchestrator on the merge candidate (stacked gate).
 - Mutation checks of the new tests (`work/mut.py`, each mutation reverted): the batch stopping at the first failure, a
   cancelled result not stopping the rest, an export clearing every owner's errors, no gate release in the export result,
