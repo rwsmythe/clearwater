@@ -1,35 +1,40 @@
-"""The export seam of the GUI (WP3.19, IF-8) and the one-activity gate of the export panels.
+"""The GUI side of the export seam: re-exports it and holds the one-activity gate (WP3.19).
 
-WP3.14 (wave 4) builds the export and batch engine; the panels of this package are written
-against :class:`ExportJobs`, and ``unavailable_exports`` is the product default until WP4.3 wires
-the engine. Frozen at the WP3.19 round-0 yield; additive only until the WP3.19 accept, then a
-change is a CHARC ruling. The seam is :class:`ExportRequest`, :class:`ExportJobs`,
-:data:`CANCELLED`, :data:`UNAVAILABLE_TEXT` and :func:`unavailable_exports`.
-:class:`ActivityGate` and its constants are the GUI side (not part of what WP3.14 implements).
-
-This module imports no Qt class and no ``clearwater.gui`` module, so a headless runner can share
-the seam types (importing the ``clearwater.gui`` package still loads PySide6 through its
-``__init__``; the round-0 report names that for WP3.14's brief).
+The seam itself (:class:`ExportRequest`, :class:`ExportJobs`, :data:`CANCELLED`,
+:data:`UNAVAILABLE_TEXT`, :func:`unavailable_exports`) lives in the Qt-free
+:mod:`clearwater.jobs.export_seam` and is re-exported here. :class:`ActivityGate`,
+:class:`SharedGate` and the two reason strings are the GUI side; WP3.14 does not implement them.
+This module imports no Qt class.
 """
 
 from __future__ import annotations
 
 import logging
-import time
 from collections.abc import Callable
-from dataclasses import dataclass
-from pathlib import Path
-from typing import Literal, Protocol
+from typing import Literal
 
-from clearwater.interfaces import JobResult, ParameterSet, Progress, Settings
+from clearwater.jobs.export_seam import (
+    CANCELLED,
+    UNAVAILABLE_TEXT,
+    ExportJobs,
+    ExportRequest,
+    unavailable_exports,
+)
+
+__all__ = [
+    "CANCELLED",
+    "RUNNING_BATCH_REASON",
+    "RUNNING_EXPORT_REASON",
+    "UNAVAILABLE_TEXT",
+    "Activity",
+    "ActivityGate",
+    "ExportJobs",
+    "ExportRequest",
+    "SharedGate",
+    "unavailable_exports",
+]
 
 _LOG = logging.getLogger(__name__)
-
-CANCELLED = "cancelled"
-"""The ``JobResult.failure`` of a job that stopped because ``Progress.cancelled()`` was True."""
-
-UNAVAILABLE_TEXT = "Export is not available in this build."
-"""The failure text of every job of :func:`unavailable_exports`."""
 
 RUNNING_EXPORT_REASON = "An export is running."
 """The reason on ``actions.export`` while the open source's export runs."""
@@ -39,96 +44,6 @@ RUNNING_BATCH_REASON = "A batch is running."
 
 type Activity = Literal["export", "batch"]
 """The one thing that may run at a time: the open source's export, or a batch."""
-
-
-@dataclass(frozen=True)
-class ExportRequest:
-    """What one export job is asked to do: one source file, one parameter set, the settings.
-
-    A snapshot taken on the interface thread: later changes to the open source, the parameters
-    or the settings do not reach a request already made.
-
-    Attributes:
-        source: The file to export. A batch item need not be the open source; the job reads it
-            itself.
-        kind: ``"photo"`` or ``"video"`` (what ``clearwater.gui.sources.route`` decided).
-        parameters: The parameter set to render with (IF-9).
-        settings: The settings at the time of the request (IF-10): output folder, suffix,
-            encoder, quality, provenance, force CPU.
-    """
-
-    source: Path
-    kind: Literal["photo", "video"]
-    parameters: ParameterSet
-    settings: Settings
-
-
-class ExportJobs(Protocol):
-    """The export engine as the panels use it (implemented by WP3.14; stub until WP4.3)."""
-
-    def job(self, request: ExportRequest) -> Callable[[Progress], JobResult]:
-        """Return the IF-8 job that exports ``request``.
-
-        This method is called on the interface thread: it only builds the callable (no file
-        access, no decode) and may raise ``ValueError`` for a request it can never run. The
-        returned callable is what ``JobRunner.run`` runs on a worker thread. It:
-
-        - touches no Qt object;
-        - reports through ``progress.report(done, total, message)`` and checks
-          ``progress.cancelled()`` at least between units of work;
-        - writes through safe writing (``clearwater.jobs.SafeWrite``): a cancel or a failure
-          leaves no partial output and no temporary file (G8, D44, V11), and an output already
-          committed is never removed;
-        - for a video, includes the analysis the export needs (AD-15), so a batch item needs no
-          prior analysis;
-        - returns a :class:`~clearwater.interfaces.JobResult`: ``ok`` True with ``outputs`` (the
-          committed files) and ``warnings``; or ``ok`` False with ``outputs`` empty and
-          ``failure`` the user-readable reason; on a cancel ``ok`` False and ``failure`` equal to
-          :data:`CANCELLED`. An exception it lets escape becomes a failed result in the runner.
-
-        Args:
-            request: What to export.
-
-        Returns:
-            The job.
-        """
-        ...
-
-
-class _UnavailableExports:
-    """The product default: every job fails with :data:`UNAVAILABLE_TEXT` and writes nothing."""
-
-    def job(self, request: ExportRequest) -> Callable[[Progress], JobResult]:
-        """Return a job that fails at once.
-
-        Args:
-            request: Ignored.
-
-        Returns:
-            A job returning ``ok`` False with :data:`UNAVAILABLE_TEXT`; it opens no file.
-        """
-
-        def run(progress: Progress) -> JobResult:
-            start = time.perf_counter()
-            return JobResult(
-                ok=False,
-                outputs=(),
-                warnings=(),
-                failure=UNAVAILABLE_TEXT,
-                device="none",
-                elapsed_s=time.perf_counter() - start,
-            )
-
-        return run
-
-
-def unavailable_exports() -> ExportJobs:
-    """Return the export engine of a build without one (until WP4.3 wires WP3.14's).
-
-    Returns:
-        An :class:`ExportJobs` whose jobs fail with :data:`UNAVAILABLE_TEXT` and write nothing.
-    """
-    return _UnavailableExports()
 
 
 class ActivityGate:
@@ -206,3 +121,30 @@ class ActivityGate:
                 callback(self._current)
             except Exception:  # a panel's refresh must never leave the reason set
                 _LOG.exception("an activity subscriber failed")
+
+
+class SharedGate:
+    """Creates the one :class:`ActivityGate` of a window when the first panel needs it.
+
+    ``install_export_panels`` gives the same instance to the export and the batch panel
+    factories; only the shell context (which holds ``actions.export``) is missing until a
+    factory runs.
+    """
+
+    def __init__(self) -> None:
+        """Create the holder with no gate."""
+        self._gate: ActivityGate | None = None
+
+    def get(self, apply: Callable[[str | None], None]) -> ActivityGate:
+        """Return the gate, creating it with ``apply`` on the first call.
+
+        Args:
+            apply: Sets or clears the caller's reason on ``actions.export``; used by the first
+                call only.
+
+        Returns:
+            The window's gate.
+        """
+        if self._gate is None:
+            self._gate = ActivityGate(apply)
+        return self._gate

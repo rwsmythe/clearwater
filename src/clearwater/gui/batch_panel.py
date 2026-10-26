@@ -1,0 +1,537 @@
+"""The Batch panel (WP3.19, G7, G8, G9, D43-D45, D81, D83): a queue run one item after another.
+
+The panel sequences the batch itself (CHARC ruling Q1): one IF-8 job per file from
+:class:`~clearwater.gui.export_service.ExportJobs`, run through ``context.jobs`` on a worker
+thread, one at a time. A failed item is marked, logged on ``clearwater.gui.batch`` and skipped
+(D81); a cancel stops the whole remaining batch (D45); outputs already completed are never
+touched (G8). When the run ends a report lists every item (G7). Main thread only.
+"""
+
+from __future__ import annotations
+
+import enum
+import logging
+import os
+from collections.abc import Callable
+from dataclasses import dataclass, field
+from pathlib import Path
+
+from PySide6.QtGui import QShowEvent
+from PySide6.QtWidgets import (
+    QAbstractItemView,
+    QComboBox,
+    QFileDialog,
+    QHBoxLayout,
+    QLabel,
+    QListWidget,
+    QPlainTextEdit,
+    QProgressBar,
+    QPushButton,
+    QVBoxLayout,
+    QWidget,
+)
+
+from clearwater.interfaces import JobResult, ParameterSet, Settings, validate_parameter_set
+
+from . import messages, sources
+from .contract import JobHandle, Message, PanelFactory, ShellContext
+from .export_service import CANCELLED, ActivityGate, ExportJobs, ExportRequest, SharedGate
+
+OWNER = "batch"
+"""The ``Message.owner`` of this panel's messages (DR-44 (b))."""
+
+CURRENT_PARAMETERS = "Current parameters"
+"""The first entry of the parameter combo: the session's parameters at Start."""
+
+_LOG = logging.getLogger("clearwater.gui.batch")
+
+
+class ItemState(enum.Enum):
+    """Where a queued file is in a batch run."""
+
+    QUEUED = "queued"
+    RUNNING = "running"
+    DONE = "done"
+    DONE_WITH_WARNINGS = "done with warnings"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+    NOT_RUN = "not run"
+
+
+@dataclass
+class BatchItem:
+    """One file of the queue and what happened to it in the latest run.
+
+    Attributes:
+        path: The file.
+        kind: ``"photo"`` or ``"video"``.
+        state: Where the item is.
+        outputs: The files the item produced.
+        warnings: The warnings its job returned.
+        failure: The failure text of a failed item, or None.
+        key: The normalised path two spellings of one file share (duplicate detection).
+    """
+
+    path: Path
+    kind: sources.SourceKind
+    state: ItemState = ItemState.QUEUED
+    outputs: tuple[Path, ...] = ()
+    warnings: tuple[str, ...] = ()
+    failure: str | None = None
+    key: str = field(default="", repr=False)
+
+
+def _key(path: Path) -> str:
+    """Return the key two spellings of one path share (no filesystem access)."""
+    return os.path.normcase(os.path.abspath(path))
+
+
+def format_report(items: list[BatchItem], *, cancelled: bool) -> str:
+    """Return the end-of-run report (G7).
+
+    Args:
+        items: The queue after the run.
+        cancelled: True when the run was cancelled (the header says so).
+
+    Returns:
+        The text: a header, the five counts (which partition the items), and per item its
+        state, outputs, each warning and the failure text.
+    """
+
+    def count(*states: ItemState) -> int:
+        return sum(1 for item in items if item.state in states)
+
+    word = "cancelled" if cancelled else "finished"
+    lines = [
+        f"Batch {word}: {len(items)} items.",
+        f"Succeeded {count(ItemState.DONE)}, with warnings {count(ItemState.DONE_WITH_WARNINGS)}, "
+        f"failed {count(ItemState.FAILED)}, cancelled {count(ItemState.CANCELLED)}, "
+        f"not run {count(ItemState.NOT_RUN, ItemState.QUEUED, ItemState.RUNNING)}.",
+    ]
+    for number, item in enumerate(items, start=1):
+        state = "FAILED" if item.state is ItemState.FAILED else item.state.value
+        lines.append(f"{number}. {item.path.name} - {state}")
+        lines.extend(f"   output: {output}" for output in item.outputs)
+        lines.extend(f"   warning: {text}" for text in item.warnings)
+        if item.failure:
+            lines.append(f"   failure: {item.failure}")
+    return "\n".join(lines)
+
+
+def _choose_files(parent: QWidget) -> list[Path]:
+    """The product file chooser: a multi-select open dialog filtered to photos and videos."""
+    names, _ = QFileDialog.getOpenFileNames(parent, "Add files", "", sources.file_filter())
+    return [Path(name) for name in names]
+
+
+class BatchPanel(QWidget):
+    """The batch queue with its parameter choice, progress, cancel and end-of-run report.
+
+    Attributes:
+        queue: The list of files with their states.
+        parameter_combo: "Current parameters" and every readable preset.
+        start_button: Starts the run (disabled while the queue is empty or an activity runs).
+        cancel_button: Cancels the running item and the rest of the batch.
+        overall: The "Item i of n" line.
+        bar: The current item's progress bar.
+        report: The read-only end-of-run report.
+    """
+
+    def __init__(
+        self,
+        context: ShellContext,
+        exports: ExportJobs,
+        gate: ActivityGate,
+        *,
+        choose_files: Callable[[QWidget], list[Path]] | None = None,
+    ) -> None:
+        """Create the panel.
+
+        Args:
+            context: The shell context.
+            exports: The export engine.
+            gate: The window's one-activity gate.
+            choose_files: The multi-select file dialog; None for the product's.
+        """
+        super().__init__()
+        self._context = context
+        self._exports = exports
+        self._gate = gate
+        self._choose_files = choose_files or _choose_files
+        self._items: list[BatchItem] = []
+        self._running = False
+        self._cancel_requested = False
+        self._handle: JobHandle | None = None
+        self._current: BatchItem | None = None
+        self._request_template: tuple[ParameterSet, Settings] | None = None
+        self.queue = QListWidget()
+        self.queue.setObjectName("batch-queue")
+        self.queue.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
+        self.add_button = QPushButton("Add files...")
+        self.remove_button = QPushButton("Remove selected")
+        self.clear_button = QPushButton("Clear")
+        self.parameter_combo = QComboBox()
+        self.parameter_combo.setObjectName("batch-parameters")
+        self.start_button = QPushButton("Start")
+        self.cancel_button = QPushButton("Cancel")
+        self.overall = QLabel("")
+        self.overall.setObjectName("batch-overall")
+        self.bar = QProgressBar()
+        self.bar.setObjectName("batch-bar")
+        self.bar.setRange(0, 1)
+        self.bar.setValue(0)
+        self.report = QPlainTextEdit()
+        self.report.setObjectName("batch-report")
+        self.report.setReadOnly(True)
+        for button, name in (
+            (self.add_button, "add"),
+            (self.remove_button, "remove"),
+            (self.clear_button, "clear"),
+            (self.start_button, "start"),
+            (self.cancel_button, "cancel"),
+        ):
+            button.setObjectName(f"batch-{name}")
+        edit_row = QHBoxLayout()
+        for widget in (self.add_button, self.remove_button, self.clear_button):
+            edit_row.addWidget(widget)
+        edit_row.addStretch(1)
+        run_row = QHBoxLayout()
+        run_row.addWidget(QLabel("Parameters:"))
+        run_row.addWidget(self.parameter_combo, 1)
+        run_row.addWidget(self.start_button)
+        run_row.addWidget(self.cancel_button)
+        left = QVBoxLayout()
+        left.addLayout(edit_row)
+        left.addWidget(self.queue, 1)
+        right = QVBoxLayout()
+        right.addLayout(run_row)
+        right.addWidget(self.overall)
+        right.addWidget(self.bar)
+        right.addWidget(self.report, 1)
+        layout = QHBoxLayout(self)
+        layout.addLayout(left, 1)
+        layout.addLayout(right, 2)
+        self.add_button.clicked.connect(self._on_add)
+        self.remove_button.clicked.connect(self.remove_selected)
+        self.clear_button.clicked.connect(self.clear_queue)
+        self.start_button.clicked.connect(self.start)
+        self.cancel_button.clicked.connect(self.cancel)
+        self.queue.itemSelectionChanged.connect(self._update_buttons)
+        gate.subscribe(lambda _current: self._update_buttons())
+        self.refresh_presets()
+        self._update_buttons()
+
+    # --- queue editing -------------------------------------------------------------------
+
+    def items(self) -> list[BatchItem]:
+        """Return a copy of the queue (the items themselves are shared)."""
+        return list(self._items)
+
+    def is_running(self) -> bool:
+        """Return True from Start until the report is shown."""
+        return self._running
+
+    def add_paths(self, paths: list[Path]) -> None:
+        """Queue files (the Add dialog's result); refused ones are told, not queued (D83).
+
+        Each path goes through ``sources.route``: a refusal (a sidecar, an unsupported
+        extension) is presented as a warning with owner ``"batch"`` and the file is not queued;
+        a path already queued is not queued twice. Ignored while a batch runs.
+
+        Args:
+            paths: The chosen files.
+        """
+        if self._running:
+            return
+        known = {item.key for item in self._items}
+        for path in paths:
+            kind = sources.route(path)
+            if isinstance(kind, Message):
+                self._context.messages.present(Message("warning", kind.text, path, OWNER))
+                continue
+            key = _key(path)
+            if key in known:
+                continue
+            known.add(key)
+            self._items.append(BatchItem(path, kind, key=key))
+        self._refresh_rows()
+
+    def remove_selected(self) -> None:
+        """Remove the selected rows from the queue (not while a batch runs)."""
+        if self._running:
+            return
+        rows = {index.row() for index in self.queue.selectedIndexes()}
+        self._items = [item for row, item in enumerate(self._items) if row not in rows]
+        self._refresh_rows()
+
+    def clear_queue(self) -> None:
+        """Empty the queue and clear this panel's messages (not while a batch runs)."""
+        if self._running:
+            return
+        self._items = []
+        self._context.messages.clear(owner=OWNER)
+        self._refresh_rows()
+
+    def refresh_presets(self) -> None:
+        """Reload the parameter combo from the preset store, keeping the choice if it exists."""
+        chosen = self.parameter_combo.currentData()
+        self.parameter_combo.clear()
+        self.parameter_combo.addItem(CURRENT_PARAMETERS, None)
+        for entry in self._context.presets.list_presets():
+            if entry.parameter_set is not None:
+                self.parameter_combo.addItem(entry.name, entry.name)
+        index = self.parameter_combo.findData(chosen) if chosen is not None else 0
+        self.parameter_combo.setCurrentIndex(max(0, index))
+
+    def showEvent(self, event: QShowEvent) -> None:  # noqa: N802 (Qt override)
+        """Refresh the preset list when the panel is shown (not while a batch runs)."""
+        super().showEvent(event)
+        if not self._running:
+            self.refresh_presets()
+
+    # --- the run -------------------------------------------------------------------------
+
+    def start(self) -> None:
+        """Start the batch: resolve the parameters once, then run the items one at a time.
+
+        Refused with an error (owner ``"batch"``) when the chosen preset's method is not
+        available or the set fails validation. The settings are ``session.settings()`` now;
+        later changes do not reach the run. Every row is reset to queued, so a previous run is
+        run again in full; the previous report is cleared.
+        """
+        if self._running or not self._items or self._gate.current is not None:
+            return
+        self._context.messages.clear(owner=OWNER)
+        chosen = self.parameter_combo.currentData()
+        self.refresh_presets()
+        resolved = self._resolve_parameters(chosen)
+        if isinstance(resolved, str):
+            self._context.messages.present(
+                Message("error", messages.ascii_text(resolved), None, OWNER)
+            )
+            return
+        if not self._gate.try_start("batch"):
+            return
+        self._request_template = (resolved, self._context.session.settings())
+        self._running = True
+        self._cancel_requested = False
+        self._handle = None
+        for item in self._items:
+            item.state = ItemState.QUEUED
+            item.outputs = ()
+            item.warnings = ()
+            item.failure = None
+        self.report.clear()
+        self._refresh_rows()
+        self._advance_safely()
+
+    def cancel(self) -> None:
+        """Cancel the running item; the rest of the batch will not run (D45)."""
+        if not self._running or self._cancel_requested:
+            return
+        self._cancel_requested = True
+        handle = self._handle
+        if handle is not None:
+            handle.cancel()
+        self._update_buttons()
+
+    def _resolve_parameters(self, name: str | None) -> ParameterSet | str:
+        """Return the parameter set the run uses, or why the run cannot start.
+
+        Args:
+            name: The chosen preset, or None for the current parameters.
+        """
+        session = self._context.session
+        if name is None:
+            chosen = session.parameters()
+            label = "The current parameters"
+        else:
+            entry = next((e for e in self._context.presets.list_presets() if e.name == name), None)
+            if entry is None:
+                return f"Preset {name!r} is no longer available."
+            if entry.parameter_set is None:
+                return f"Preset {name!r} cannot be read: {entry.error}"
+            chosen = entry.parameter_set
+            label = f"Preset {name!r}"
+        method = self._context.engines.methods.get(chosen.method)
+        if method is None:
+            return f"{label} use method {chosen.method!r}, which is not available."
+        problems = validate_parameter_set(chosen, method.id, method.parameters)
+        if problems:
+            return f"{label} are not valid for {method.label}: {problems[0].message}"
+        return chosen
+
+    def _advance(self) -> None:
+        """Start the next queued item, or end the run when none is left (main thread)."""
+        while self._running:
+            item = next((i for i in self._items if i.state is ItemState.QUEUED), None)
+            if item is None:
+                self._end_run()
+                return
+            if self._cancel_requested:
+                self._mark_remaining_not_run()
+                continue
+            item.state = ItemState.RUNNING
+            self._current = item
+            total = len(self._items)
+            number = self._items.index(item) + 1
+            self.overall.setText(f"Item {number} of {total}: {messages.ascii_text(item.path.name)}")
+            self.bar.setRange(0, 0)
+            self._refresh_rows()
+            assert self._request_template is not None
+            parameters, settings = self._request_template
+            request = ExportRequest(item.path, item.kind, parameters, settings)
+
+            try:
+                job = self._exports.job(request)
+                handle = self._context.jobs.run(
+                    job, on_done=self._done_for(item), on_progress=self._progress
+                )
+            except Exception as error:  # a job that cannot start fails its item, not the batch
+                detail = str(error) or type(error).__name__
+                self._record(item, JobResult(False, (), (), detail, "none", 0.0))
+                continue
+            if item.state is ItemState.RUNNING:  # a runner that completes synchronously is done
+                self._handle = handle
+            return
+
+    def _done_for(self, item: BatchItem) -> Callable[[JobResult], None]:
+        """Return the completion callback of ``item``'s job."""
+
+        def done(result: JobResult) -> None:
+            self._item_done(item, result)
+
+        return done
+
+    def _progress(self, done: int, total: int | None, message: str) -> None:
+        """Show the running item's progress (main thread)."""
+        if not self._running:
+            return
+        if total is None or total <= 0:
+            self.bar.setRange(0, 0)
+        else:
+            self.bar.setRange(0, total)
+            self.bar.setValue(max(0, min(done, total)))
+
+    def _item_done(self, item: BatchItem, result: JobResult) -> None:
+        """An item's job ended: record it and go on, or stop (main thread)."""
+        if not self._running or item is not self._current:
+            return
+        self._handle = None
+        try:
+            self._record(item, result)
+        except Exception as error:  # an internal fault fails this item, not the batch
+            _LOG.exception("recording a batch item failed")
+            item.state = ItemState.FAILED
+            item.failure = f"internal error: {type(error).__name__}: {error}"
+        self._advance_safely()
+
+    def _advance_safely(self) -> None:
+        """Run :meth:`_advance`; if it fails, end the run so the gate is never left held."""
+        try:
+            self._advance()
+        except Exception:
+            _LOG.exception("the batch loop failed; the run is ended")
+            self._mark_remaining_not_run()
+            if self._running:
+                self._end_run()
+
+    def _record(self, item: BatchItem, result: JobResult) -> None:
+        """Set the item's final state from its result (D81); a cancel stops the rest (D45)."""
+        item.outputs = tuple(result.outputs) if result.ok else ()
+        item.warnings = tuple(result.warnings) if result.ok else ()
+        if result.ok:
+            item.failure = None
+            item.state = ItemState.DONE_WITH_WARNINGS if result.warnings else ItemState.DONE
+        elif result.failure == CANCELLED:
+            item.failure = None
+            item.state = ItemState.CANCELLED
+            self._cancel_requested = True
+        else:
+            item.failure = result.failure or "the export failed"
+            item.state = ItemState.FAILED
+            _LOG.warning(
+                "batch item failed: %s: %s",
+                messages.ascii_text(str(item.path)),
+                messages.ascii_text(item.failure),
+            )
+        self._refresh_rows()
+
+    def _mark_remaining_not_run(self) -> None:
+        """Mark every item that has not run as "not run" (D45)."""
+        for item in self._items:
+            if item.state in (ItemState.QUEUED, ItemState.RUNNING):
+                item.state = ItemState.NOT_RUN
+        self._refresh_rows()
+
+    def _end_run(self) -> None:
+        """Release the gate, then show and log the report (main thread)."""
+        cancelled = any(
+            item.state in (ItemState.CANCELLED, ItemState.NOT_RUN) for item in self._items
+        )
+        self._running = False
+        self._handle = None
+        self._current = None
+        self._cancel_requested = False
+        self.bar.setRange(0, 1)
+        self.bar.setValue(0)
+        self._gate.finish("batch")
+        text = format_report(self._items, cancelled=cancelled)
+        self.report.setPlainText(text)
+        self.overall.setText(text.splitlines()[0])
+        _LOG.info("%s", messages.ascii_text(text))
+        self._update_buttons()
+
+    # --- widgets -------------------------------------------------------------------------
+
+    def _on_add(self) -> None:
+        """The Add button: choose files and queue them."""
+        self.add_paths(self._choose_files(self))
+
+    def _refresh_rows(self) -> None:
+        """Rebuild the list from the items, keeping the selection by row."""
+        selected = {index.row() for index in self.queue.selectedIndexes()}
+        self.queue.clear()
+        for item in self._items:
+            self.queue.addItem(f"{item.path.name} - {item.state.value}")
+        for row in selected:
+            if row < self.queue.count():
+                self.queue.item(row).setSelected(True)
+        if not self._running and not self._items:
+            self.overall.setText("")
+        self._update_buttons()
+
+    def _update_buttons(self) -> None:
+        """Enable each control for the current state (queue editing is locked while running)."""
+        idle = not self._running
+        for widget in (self.add_button, self.clear_button, self.parameter_combo):
+            widget.setEnabled(idle)
+        self.remove_button.setEnabled(idle and bool(self.queue.selectedIndexes()))
+        blocked = self._gate.reason()
+        self.start_button.setEnabled(idle and bool(self._items) and blocked is None)
+        self.start_button.setToolTip(blocked or "")
+        self.cancel_button.setEnabled(self._running and not self._cancel_requested)
+
+
+def batch_panel_factory(
+    exports: ExportJobs,
+    gates: SharedGate,
+    *,
+    choose_files: Callable[[QWidget], list[Path]] | None = None,
+) -> PanelFactory:
+    """Return the factory of the Batch panel.
+
+    Args:
+        exports: The export engine.
+        gates: The window's shared gate holder.
+        choose_files: The multi-select file dialog (tests inject one), or None.
+
+    Returns:
+        A ``PanelFactory`` for ``ShellWindow.attach``.
+    """
+
+    def build(context: ShellContext) -> QWidget:
+        gate = gates.get(context.actions.export.set_unavailable)
+        return BatchPanel(context, exports, gate, choose_files=choose_files)
+
+    return build
