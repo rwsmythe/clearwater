@@ -203,6 +203,41 @@ def test_pts_and_statistics_never_wait_for_a_run_in_flight(tmp_path: Path) -> No
     assert method.threads == {worker}
 
 
+def test_pts_and_retarget_never_wait_for_the_file_system(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    entered = threading.Event()
+    release = threading.Event()
+
+    def slow_cache_key(path: Path) -> Any:
+        entered.set()
+        release.wait(5)
+        return cache_key(path)
+
+    monkeypatch.setattr("clearwater.gui.analysis_service.cache_key", slow_cache_key)
+    method = ParamMethod()
+    source, engines, _ = _setup(tmp_path, method)
+    analysis = stub_analysis_factory(source, method, engines)
+    progress = StubProgress()
+    worker = threading.Thread(target=analysis.run, args=(_params(), progress))
+    worker.start()
+    try:
+        assert entered.wait(5)  # the run is inside the stat of the file
+        answers: list[Any] = []
+        caller = threading.Thread(
+            target=lambda: answers.extend([analysis.pts(), analysis.retarget(_params(0.5))])
+        )
+        caller.start()
+        caller.join(1.0)  # the main-thread members: bounded, not the stat's time
+        assert not caller.is_alive(), "pts or retarget waited for the stat of the file"
+        assert answers == [(), False]  # nothing stored yet; not absorbing by default
+    finally:
+        release.set()
+        worker.join(10)
+    assert not worker.is_alive()
+    assert analysis.pts() == VFR
+
+
 def test_retarget_false_leaves_the_run_under_the_old_parameters(tmp_path: Path) -> None:
     gate = threading.Event()
     method = ParamMethod(gate)

@@ -299,11 +299,20 @@ class StubClipAnalysis:
             return None
 
     def _cache_key(self) -> CacheKey:
-        """Take the file's cache key once (``os.stat``: on the job thread, never the main one)."""
+        """Take the file's cache key once (``os.stat``: on the job thread, never the main one).
+
+        The stat runs outside the lock, so ``pts`` and ``retarget`` (main thread, they take the
+        lock) never wait for the file system.
+        """
         with self._lock:
-            if self._key is None:
-                self._key = cache_key(self._source.path)
-            return self._key
+            key = self._key
+        if key is None:
+            key = cache_key(self._source.path)
+            with self._lock:
+                if self._key is None:
+                    self._key = key
+                key = self._key
+        return key
 
     def _decode(self, progress: Progress, key: CacheKey) -> bool:
         """Store a proxy per frame; return False when cancelled before the end."""
