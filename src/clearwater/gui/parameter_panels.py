@@ -388,7 +388,7 @@ class ParameterRow(QWidget):
                 if index >= 0:
                     self.combo.setCurrentIndex(index)
 
-    def show_value(self, value: ParameterValue) -> None:
+    def show_value(self, value: ParameterValue, *, force: bool = False) -> None:
         """Show ``value`` without committing it (a change that came from outside the panel).
 
         Does nothing when ``value`` is already what the row shows, so the value a user just
@@ -396,8 +396,9 @@ class ParameterRow(QWidget):
 
         Args:
             value: The value (None = off, for a nullable parameter).
+            force: Show it even when the row believes it already does (after a refused edit).
         """
-        if type(value) is type(self._shown) and value == self._shown:
+        if not force and type(value) is type(self._shown) and value == self._shown:
             return
         self._shown = value
         if self.on_box is not None:
@@ -488,6 +489,13 @@ class _ParameterForm(QWidget):
         current = self._session.parameters()
         self._apply(dataclasses.replace(current, parameters={**current.parameters, name: value}))
 
+    def _restore(self) -> None:
+        """Show the session's values again, after the session refused an edit."""
+        parameters = self._session.parameters()
+        self._update_header(parameters)
+        for name, row in self._rows.items():
+            row.show_value(parameters.parameters.get(name, row.parameter.default), force=True)
+
     def _apply(self, parameters: ParameterSet) -> None:
         """Give the session ``parameters``; a refusal becomes an error message."""
         try:
@@ -501,6 +509,7 @@ class _ParameterForm(QWidget):
                     owner=OWNER_PARAMETERS,
                 )
             )
+            self._restore()
         else:
             if self._presented:
                 self._presented = False
