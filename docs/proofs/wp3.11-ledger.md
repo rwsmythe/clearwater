@@ -437,6 +437,10 @@ MemoryError in run A while another package's full pytest ran, cleared on the re-
 **Do next, in order.**
 1. DONE: B1 cleanup (8b8a9ac, docstring only, no new round); Y-1 reconciled with WP3.4's text
    byte for byte (dispatcher, 478ecab; report commit after 8b8a9ac), report status final.
-2. Full pytest in a dispatcher WINDOW (`QT_QPA_PLATFORM=offscreen`, `--basetemp=work/<name>`,
+2. DONE (window granted, d3e3c36, 2026-10-26 16:52-17:15Z): full pytest 3789 passed, 2 skipped,
+   1 failed -- `tests/test_gui_startup.py::test_shutdown_stops_every_worker_when_one_overruns_its_timeout`
+   (WP3.16's timing test, untouched by this branch: its precondition `_thread.is_alive()` after a
+   0.05 s shutdown timeout failed under host load); the file re-run 13 passed and the test alone
+   5 of 5 passed (`work/t-full.log`, `work/t-gui.log`). Was: Full pytest in a dispatcher WINDOW (`QT_QPA_PLATFORM=offscreen`, `--basetemp=work/<name>`,
    output to a file; grep the summary); `WINDOW RELEASED: <summary>`.
 3. The final return report (recipe section 4; brief "Return report").
