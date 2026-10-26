@@ -81,6 +81,10 @@ QUALITY_VALUE = {"high": 18, "standard": 23, "draft": 28}
 """The constant-quality value per level: NVENC ``-cq`` and libx265 ``-crf`` (AD-12,
 PROVISIONAL until WP3.10's quality check is ruled on)."""
 
+NVENC_MAXRATE_FLOOR = 20_000_000
+"""The lowest NVENC rate ceiling, in bits per second, for a low-rate source or one whose bit
+rate is not known (CHARC ruling d329e80e351c3dcc)."""
+
 PROVENANCE_TAG = "comment"
 """The MP4 container tag that carries the provenance JSON (D91; written without
 ``use_metadata_tags``)."""
@@ -164,12 +168,36 @@ def provenance_comment(provenance: Mapping[str, Any] | None) -> str:
     return text
 
 
-def _encoder_options(encoder: str, quality: str, bit_depth: int) -> list[str]:
+def nvenc_rate_ceiling(source_bit_rate: int | None) -> tuple[int, int]:
+    """Return NVENC's ``-maxrate`` and ``-bufsize`` for a source, in bits per second and bits.
+
+    Without a ceiling NVENC picks the lowest level the picture size allows and caps the rate
+    below that level's limit, so High, Standard and Draft all come out at about the same rate
+    on busy 4K. The ceiling is twice the source's video bit rate, at least
+    :data:`NVENC_MAXRATE_FLOOR`; the buffer is twice the ceiling (CHARC ruling
+    d329e80e351c3dcc). ``-cq`` still sets the quality below the ceiling.
+
+    Args:
+        source_bit_rate: The source's video bit rate as ffprobe lists it, or None when the
+            listing gives none (then the floor is used).
+
+    Returns:
+        ``(maxrate, bufsize)``.
+    """
+    known = source_bit_rate if source_bit_rate is not None and source_bit_rate > 0 else 0
+    maxrate = max(2 * known, NVENC_MAXRATE_FLOOR)
+    return maxrate, 2 * maxrate
+
+
+def _encoder_options(
+    encoder: str, quality: str, bit_depth: int, source_bit_rate: int | None
+) -> list[str]:
     """Return the encoder, rate control, pixel format and profile options (AD-12)."""
     value = str(QUALITY_VALUE[quality])
     if encoder == HARDWARE_ENCODER:
+        maxrate, bufsize = nvenc_rate_ceiling(source_bit_rate)
         options = ["-c:v", encoder, "-preset", "p5", "-tune", "hq", "-rc", "vbr", "-b:v", "0"]
-        options += ["-cq", value]
+        options += ["-cq", value, "-maxrate", str(maxrate), "-bufsize", str(bufsize)]
         pix_fmt = "p010le" if bit_depth == 10 else "yuv420p"
     else:
         options = ["-c:v", encoder, "-preset", "medium", "-crf", value]
@@ -194,6 +222,7 @@ def encode_command(
     bit_depth: int,
     comment: str,
     cut_at: Fraction | None,
+    source_bit_rate: int | None = None,
 ) -> list[str]:
     """Return the one FFmpeg command that encodes the piped frames and muxes the source's tracks.
 
@@ -209,6 +238,8 @@ def encode_command(
         comment: The provenance JSON, or the empty string.
         cut_at: Where to stop reading the source's audio and data tracks, as FFmpeg's input
             ``-to`` reads it (seconds after the input's start), or None to copy them whole.
+        source_bit_rate: The source's video bit rate in bits per second, for NVENC's rate
+            ceiling (:func:`nvenc_rate_ceiling`), or None when it is not known.
 
     Returns:
         The command.
@@ -260,7 +291,7 @@ def encode_command(
         *maps,
         "-vf",
         vf,
-        *_encoder_options(encoder, quality, bit_depth),
+        *_encoder_options(encoder, quality, bit_depth, source_bit_rate),
         *tags,
         "-tag:v",
         "hvc1",
@@ -362,6 +393,9 @@ class FFmpegVideoSink:
         self._written: list[int] = []
         self._warnings: list[str] = []
         self._audio_end: Fraction | None = None
+        self.rate_ceiling: tuple[int, int] | None = None
+        """NVENC's ``(maxrate, bufsize)`` chosen at ``open`` (:func:`nvenc_rate_ceiling`); None
+        for libx265 or before ``open``. ``SinkReport`` (IF-5, frozen) has no field for it."""
 
     # --- IF-5 -------------------------------------------------------------------------------
 
@@ -488,7 +522,10 @@ class FFmpegVideoSink:
             bit_depth=bit_depth,
             comment=comment,
             cut_at=cut_at,
+            source_bit_rate=source.video.bit_rate,
         )
+        if encoder == HARDWARE_ENCODER:
+            self.rate_ceiling = nvenc_rate_ceiling(source.video.bit_rate)
         try:  # built before FFmpeg starts, so a failure here leaves nothing running
             header = nut.stream_header(
                 width=probe.video.width,

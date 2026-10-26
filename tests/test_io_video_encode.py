@@ -668,6 +668,51 @@ def test_open_refuses_by_name(
     assert out.stat().st_size == 0
 
 
+@pytest.mark.gpu
+def test_open_derives_the_nvenc_ceiling_from_the_source_listing(
+    sample: Sample, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _need("hevc_nvenc")
+    source = sample("vid-vfr")
+    entries = ["-select_streams", "v:0", "-show_entries", "stream=bit_rate", "-of", "csv=p=0"]
+    listed = subprocess.run(
+        ["ffprobe", "-v", "error", *entries, str(source)],
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.strip()
+    assert read_packet_table(source).video.bit_rate == int(listed)
+    real = encode_module.read_packet_table
+
+    def busy(path: Path, *, strict: bool = False) -> Any:  # the source listed at 33 Mb/s
+        table = real(path, strict=strict)
+        rows = tuple(
+            replace(s, bit_rate=33_000_000) if s.index == table.video_index else s
+            for s in table.streams
+        )
+        return replace(table, streams=rows)
+
+    started: list[list[str]] = []
+
+    def capture(self: FFmpegVideoSink, command: list[str]) -> None:
+        started.append(command)
+        raise RuntimeError("captured")
+
+    monkeypatch.setattr(encode_module, "read_packet_table", busy)
+    monkeypatch.setattr(FFmpegVideoSink, "_start", capture)
+    sink = FFmpegVideoSink()
+    out = tmp_path / "out.mp4"
+    out.write_bytes(b"")
+    with pytest.raises(RuntimeError, match="captured"):
+        sink.open(
+            probe(source), out, encoder="hevc_nvenc", quality="high", bit_depth=8, provenance=None
+        )
+    command = started[0]
+    assert command[command.index("-maxrate") + 1] == "66000000"
+    assert command[command.index("-bufsize") + 1] == "132000000"
+    assert sink.rate_ceiling == (66_000_000, 132_000_000)
+
+
 @pytest.mark.usefixtures("no_ffmpeg_start")
 def test_open_refuses_negative_timestamps_by_name(
     clips: Clips, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -1315,3 +1360,28 @@ def test_gx011627_through_the_sink_keeps_every_mandatory_and_required_item(
     _assert_v4(record)
     assert run.report.frames_written == 681
     os.remove(out)
+
+
+@pytest.mark.footage
+@pytest.mark.gpu
+@pytest.mark.slow
+def test_gx011627_nvenc_levels_give_distinct_sizes(tmp_path: Path) -> None:
+    from local_config import FootageLookupError, find_footage_file, load_local_config
+
+    if not _nvenc_ready():
+        pytest.skip("NVENC is not available on this machine")
+    config = load_local_config()
+    try:
+        source = find_footage_file("GX011627", config.footage_path)
+    except FootageLookupError as error:
+        if error.matches:
+            raise
+        pytest.skip("GX011627 is not in the footage folder")
+    sizes: dict[str, int] = {}
+    for quality in ("high", "standard", "draft"):
+        out = tmp_path / f"GX011627-{quality}.mp4"
+        vf.encode_file(source, out, encoder="hevc_nvenc", quality=quality, bit_depth=8)
+        sizes[quality] = out.stat().st_size
+        os.remove(out)
+    # Without a rate ceiling the three came within 5 % of each other on this busy clip.
+    assert sizes["high"] > 1.25 * sizes["standard"] > 1.25 * 1.25 * sizes["draft"], sizes

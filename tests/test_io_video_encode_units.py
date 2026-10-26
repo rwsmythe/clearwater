@@ -400,6 +400,33 @@ def test_quality_levels_follow_ad12(
         assert _after(command, "-preset") == "medium"
 
 
+@pytest.mark.parametrize(
+    ("source_bit_rate", "maxrate"),
+    [
+        (55_530_681, 111_061_362),  # GX011627: twice the source's video bit rate
+        (12_000_000, 24_000_000),
+        (5_154_342, 20_000_000),  # a calm low-rate clip: the floor
+        (0, 20_000_000),
+        (None, 20_000_000),  # not listed: the floor
+    ],
+)
+@pytest.mark.parametrize("quality", ["high", "standard", "draft"])
+def test_nvenc_rate_ceiling_is_derived_from_the_source_bit_rate(
+    source_bit_rate: int | None, maxrate: int, quality: str
+) -> None:
+    command = _command(
+        _probe(), encoder="hevc_nvenc", quality=quality, source_bit_rate=source_bit_rate
+    )
+    assert _after(command, "-maxrate") == str(maxrate)
+    assert _after(command, "-bufsize") == str(2 * maxrate)
+    assert encode.nvenc_rate_ceiling(source_bit_rate) == (maxrate, 2 * maxrate)
+
+
+def test_libx265_has_no_rate_ceiling() -> None:
+    command = _command(_probe(), encoder="libx265", source_bit_rate=55_530_681)
+    assert "-maxrate" not in command and "-bufsize" not in command
+
+
 def test_colour_tags_go_on_the_stream_and_the_frames() -> None:
     command = _command(_probe(color=_color(range="full"), pix_fmt="yuvj420p"))
     assert _after(command, "-color_primaries") == "bt709"

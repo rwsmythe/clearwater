@@ -55,7 +55,7 @@ point may be kept or dropped."""
 
 _STREAM_ENTRIES = (
     "stream=index,codec_type,codec_tag_string,time_base,start_pts,duration_ts,nb_frames,"
-    "sample_aspect_ratio:stream_side_data=rotation:format_tags=creation_time,firmware"
+    "bit_rate,sample_aspect_ratio:stream_side_data=rotation:format_tags=creation_time,firmware"
 )
 MAX_SAMPLES = 10_000_000
 """The most video samples a sample table may describe (46 hours at 60 fps); more is malformed."""
@@ -103,6 +103,8 @@ class StreamRow:
             whose packets are never listed (a data track).
         frames: The sample count the stream list gives (``nb_frames``, from the container's
             sample table, no packet read), or None.
+        bit_rate: The stream's bit rate in bits per second as the stream list gives it (for
+            MP4, the track's sample sizes over its duration), or None when it gives none.
     """
 
     index: int
@@ -115,6 +117,7 @@ class StreamRow:
     rotation: Fraction | None
     packets: int | None
     frames: int | None = None
+    bit_rate: int | None = None
 
 
 @dataclass(frozen=True)
@@ -472,6 +475,7 @@ def read_packet_table(path: Path, *, strict: bool = False) -> PacketTable:
             rotation=_rotation(s),
             packets=counts.get(index),
             frames=_int(s.get("nb_frames")),
+            bit_rate=_int(s.get("bit_rate")),
         )
         for s in raw_streams
         if (index := _int(s.get("index"))) is not None
