@@ -39,19 +39,28 @@
 
 Dispatch prompts: gen 11 scratchpad
 `C:\Users\rwsmy\AppData\Local\Temp\claude\C--Users-rwsmy-clearwater\5f10a032-edb3-44be-ab01-d21d2702ef2f\scratchpad\`
-(`prompt-wp3.10-seat7.md`, `prompt-trancheB-common.md` + `mk.py` -> `prompt-wp3.1N.md`). All worktrees from main `718324b`.
+(`prompt-wp3.10-seat7.md`, `prompt-trancheB-common.md` + `mk.py`, `prompt-wp3.18-seat2.md`, `prompt-wp3.19-seat2.md`,
+`mk_rerun.py` = builds a Reviewer B re-run prompt from pass 1 + a `rerun-section.md`). All branches from main `718324b`;
+main is now `7fff7be`+ (docs only since).
 
-| Package | Cell | Branch / head at writing | State | Next |
-|---|---|---|---|---|
-| WP3.10 | `wp310-cell7` (opus-high) | `wp3.10` `5727842` (rebased by gen 11 onto `718324b`; `wp3.10-pre-rebase2` = `d389269`; range-diff 53/53 identical) | static gates green at 50K | full pytest window 19:38Z (also the candidate gate run); then footage legs; then EXCLUSIVE floor row last, alone (OPEN/CLOSE to CHARC); report; return |
-| WP3.17 | `wp317-cell1` (sonnet-high) | `wp3.17` (R1 at `b2822d3`) | round-0 STOPs ruled at my seat (normalisation low<high limit; dialogs kw; status label; warning clear; real-schema test import); R1 7 findings, downgrades UPHELD, loop TERMINATED at R1, cleanup in progress; 222,661 at R1 | report; return (full pytest = my stacked gate) |
-| WP3.18 | `wp318-cell1` (sonnet-high) | `wp3.18` `44cec16` | seam APPROVED by CHARC (`bdbd8323ceace897`, AD-7 amended `8c67a6d`): additive `retarget(parameters, *, focus_pts=None) -> bool`, (B) fallback, never cancel on a parameter change; my build ruling: cancel detected by the panel's own job checking `progress.cancelled()` after `run` (no window event filter); 177,692 at round 0 | targeted tests, Reviewer A |
-| WP3.19 | `wp319-cell1` (sonnet-high) | `wp3.19` (R1 at `8639afb`) | C1 GRANTED by CHARC (`0e6962c39f216c86`, arch note `42f8d70`): ONE new file `src/clearwater/jobs/export_seam.py`, gui re-exports; R1 2 major + 1 minor upheld, remediation; 236,905 at R1 | remediation, R2 (re-seat from RESUME HERE if R2 is not small) |
-| WP3.20 | `wp320-cell1` (sonnet-high) | `wp3.20` `76076d7` | RETURNED. S1 (capabilities job at first open), S2 (kw-only injection) ruled at my seat; A terminated R1 (1 minor, cleaned up); 187,529 at R1 | my gate: stacked; swap `interim_resolve_encoder` for WP3.10's real one by whichever lands second (or WP4.3) |
+| Package | Branch head / my candidate | State | Next |
+|---|---|---|---|
+| WP3.10 | `wp3.10` `5727842` (rebased by gen 11; `wp3.10-pre-rebase2` = `d389269`) | seat 7 (`wp310-cell7`): **full suite 4434 passed / 2 skipped, 2034 s, on `5727842` = my candidate-gate run** (one background process + foreground poll-waits; log `work/wp3.10/s7-full2.log`); FOOTAGE window granted ~21:10Z (legs a, b, c) | EXCLUSIVE floor row LAST and alone (OPEN/CLOSE to CHARC); report; return; then my Reviewer B (none run yet) and the stacked gate |
+| WP3.17 | `wp3.17` `f819ef3` / `wp3.17-mc` `0f7b5cd` | RETURNED. A terminated R1. **B pass 1 BLOCKED** (float decimals cap 6) -> ONE remediation -> **B pass 2 BLOCKED, ADJUDICATED AT THE GATE**: 5 fixes (`14b448e` extreme spans no slider, `72356f8` slider ends exact, `c161353` shared owner clear, `7b7b6af` save-as refresh on failure, `f819ef3` docs) VERIFIED BY EXECUTION at my seat (5 failed on `f6b40a9`; 86 passed on the candidate); #1 (spans 15 decimals cannot resolve) = a LIMIT -> **bank DR** (trigger: a method declaring such a float) | stacked gate; accept record; DR row |
+| WP3.18 | `wp3.18` (seat 2 `wp318-cell2`) | seat 1 retired at 342K after R1; seat 2: R2-R5; R3 procedural breach (fixes in the adjudicating turn; not voided); design guard after R4 -> lane restructured to ONE latest-intent invariant (`b1f9783`) + 200-seed interleaving test (`fa0fa7d`); **R5 = five-round gate: finding 1 adjudicated MINOR, loop TERMINATED**; cleanup (option S strict proxy) + report in progress | its return; my Reviewer B pass 1 (none yet) |
+| WP3.19 | `wp3.19` `071cb1f` / `wp3.19-mc` `1be0a99` | seat 1 RETURNED (A converged R2; seam wording `efc95f5d4e7b8456`), retired at 261K; **B pass 1 BLOCKED** (2 majors) -> seat 2 (`wp319-cell2`) remediation -> **B pass 2 BLOCKED, ADJUDICATED AT THE GATE**: 4 fixes VERIFIED BY EXECUTION at my seat (5 failed on `9eefd83`; 85 passed on the candidate); #1 (ok with empty outputs) downgraded, defensive text in the panel, and **for CHARC/WP3.14's brief: "an ok JobResult names at least one output"**; #5 V7 at a few hundred items = LIMIT | stacked gate; accept record; tell CHARC the WP3.14 line |
+| WP3.20 | `wp3.20` `1e0aae8` / `wp3.20-mc` `e47c8d2` | RETURNED. A terminated R1. **B pass 1 BLOCKED** (Clear-cache TOCTOU across the modal confirm) -> ONE remediation -> **B pass 2 BLOCKED (cache-limit job ordering), ADJUDICATED AT THE GATE**: `CacheLimiter` fix VERIFIED BY EXECUTION at my seat (failed on `34075f2`; 64 passed on the candidate). Interim `resolve_encoder` stub stays until WP4.3 swaps in WP3.10's (brief: "whichever lands second (or WP4.3)") | stacked gate; accept record |
 
-**Gate plan:** one stacked full suite (CuPy) on the top of the tranche-B stack (+ WP3.10) replaces each GUI cell's own
-full pytest (cells told "run by the orchestrator on the merge candidate"); main's owed figure for `47235b6` = the
-`f1c1bd8` run by code identity (CHARC `73a2991aae7b877b`; its own run was reaped at 93 %).
+**Reviewer B evidence:** `C:\Users\rwsmy\clearwater-review-evidence\wp3.{17,19,20}\reviewB\` (pass 1) and `reviewB2\` (pass 2), each
+with `md5sums.txt`; all passes gpt-5.6-sol high, 0 `^ERROR`, footer present, VERDICT anchored, no withheld read in the
+command lines (the hits are prompt/diff echoes). Runner: `run_review_B.sh` per folder; run it in the FOREGROUND
+(`MSYS_NO_PATHCONV=1 timeout 590 wsl.exe bash -ilc 'bash /mnt/c/.../run_review_B.sh review'`, Bash timeout 600000).
+
+**Gate plan (CHARC agreed):** ONE stacked full suite on main + WP3.10 + WP3.17 + WP3.18 + WP3.19 + WP3.20 (disjoint
+files; order free) replaces each GUI cell's own full pytest; then ff + accept record per package; then main gates.
+Ask CHARC to HOLD main first. **Run every long suite as ONE background process with FOREGROUND poll-wait calls**
+(CHARC `b4f1c9c8fee81d83`): an idle session gets its background shells reaped (two reaps today at 92-94 %, in
+`tests/test_prototype_backend.py`/`test_prototype_clip.py`); chunks only as the fallback after one more reap.
 
 ### Where things stand -- the successor starts HERE
 
