@@ -568,6 +568,48 @@ def test_planted_done_that_drops_outputs_and_warnings_of_a_non_ok_result_is_dete
     assert presenter_of(rig.window).of("warning") == []
 
 
+def _close_the_runner(rig: Rig) -> None:
+    """Close the window's job runner, as the shell does at close: ``run`` then raises."""
+    assert rig.window.context.jobs.close(5.0)  # type: ignore[attr-defined]
+
+
+def test_a_closed_runner_fails_the_export_and_releases_the_gate(
+    make_window: Any, qtbot: Any, tmp_path: Path
+) -> None:
+    """Reviewer B pass 1 minor: ``QtJobRunner.run`` raises once the runner is closed."""
+    rig = build_rig(make_window, qtbot, tmp_path)
+    _close_the_runner(rig)
+    rig.action.trigger()
+    assert not rig.panel.is_running()
+    (error,) = presenter_of(rig.window).of("error")
+    assert error.owner == "export" and "the job runner is closed" in error.text
+    assert rig.panel.status.text().startswith("Export of photo.jpg failed.")
+    assert rig.panel._gate.current is None
+    assert rig.action.unavailable_reason() is None and rig.action.isEnabled()
+    assert not rig.panel.cancel_button.isEnabled()
+
+
+def test_planted_gate_leak_on_a_closed_runner_is_detected(
+    make_window: Any, qtbot: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    original = ActivityGate.finish
+
+    def leaking(self: ActivityGate, activity: Any) -> None:
+        if rig.window.context.jobs._closed:  # type: ignore[attr-defined]
+            return  # the leak: a closed runner's failure never releases the gate
+        original(self, activity)
+
+    rig = build_rig(make_window, qtbot, tmp_path)
+    _close_the_runner(rig)
+    monkeypatch.setattr(ActivityGate, "finish", leaking)
+    rig.action.trigger()
+    # The test above fails on this implementation: the gate still holds "export".
+    assert rig.panel._gate.current == "export"
+    assert not rig.panel.is_running()
+    monkeypatch.undo()
+    rig.panel._gate.finish("export")  # let the fixture teardown see a free gate
+
+
 def test_the_open_source_changing_does_not_cancel_the_export(
     make_window: Any, qtbot: Any, tmp_path: Path
 ) -> None:

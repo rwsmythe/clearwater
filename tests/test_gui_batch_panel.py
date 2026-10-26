@@ -28,7 +28,11 @@ from clearwater.gui.batch_panel import (
     format_report,
 )
 from clearwater.gui.export_panel import ExportPanel
-from clearwater.gui.export_service import RUNNING_BATCH_REASON, RUNNING_EXPORT_REASON
+from clearwater.gui.export_service import (
+    RUNNING_BATCH_REASON,
+    RUNNING_EXPORT_REASON,
+    ActivityGate,
+)
 from clearwater.gui.shell import NO_SOURCE_REASON
 from clearwater.interfaces import JobResult
 from clearwater.jobs.export_seam import CANCELLED
@@ -332,6 +336,40 @@ def test_planted_start_without_a_guard_after_the_gate_holds_it(
     # The test above fails on this implementation: the gate stays held with nothing running.
     assert batch._gate.current == "batch"
     assert not batch.is_running()
+
+
+def test_a_closed_runner_fails_every_item_and_releases_the_gate(rig: Rig) -> None:
+    """Reviewer B pass 1 minor: ``QtJobRunner.run`` raises once the runner is closed."""
+    assert rig.window.context.jobs.close(5.0)  # type: ignore[attr-defined]
+    batch = started(rig, [A, C])
+    batch.start()
+    assert not batch.is_running()
+    assert states(batch) == [ItemState.FAILED, ItemState.FAILED]
+    assert all("the job runner is closed" in (i.failure or "") for i in batch.items())
+    assert "Succeeded 0, with warnings 0, failed 2" in batch.report.toPlainText()
+    assert batch._gate.current is None and rig.action.unavailable_reason() == NO_SOURCE_REASON
+    assert batch.add_button.isEnabled() and batch.start_button.isEnabled()
+    assert rig.stub.run_threads == []  # the jobs were built, but none ever ran
+
+
+def test_planted_gate_leak_on_a_closed_runner_is_detected(
+    rig: Rig, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    original = ActivityGate.finish
+
+    def leaking(self: ActivityGate, activity: Any) -> None:
+        if rig.window.context.jobs._closed:  # type: ignore[attr-defined]
+            return  # the leak: a closed runner's failure never releases the gate
+        original(self, activity)
+
+    assert rig.window.context.jobs.close(5.0)  # type: ignore[attr-defined]
+    monkeypatch.setattr(ActivityGate, "finish", leaking)
+    batch = started(rig, [A])
+    batch.start()
+    # The test above fails on this implementation: the gate still holds "batch".
+    assert batch._gate.current == "batch" and not batch.is_running()
+    monkeypatch.undo()
+    batch._gate.finish("batch")  # let the fixture teardown see a free gate
 
 
 # One parameter set or preset for every item; snapshot at Start.
