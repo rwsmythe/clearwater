@@ -92,6 +92,30 @@ of `origin/main`, unpushed; no push asked (verify `git status -sb`).
   orchestrator's own rulings (WP3.19 C2-C7; WP3.18 Q-B/D/E; WP3.20 capability job at first dialog open; WP3.17
   `normalisation_low < high` as a limit with an AD-20 consumer note) stand. Window queue agreed: (1) WP3.10 seat 7
   full pytest, (2) WP3.10 footage legs, (3) tranche B suites one at a time, (4) WP3.10 EXCLUSIVE floor row last.
+- **Tranche B GUI packages WP3.17, WP3.18, WP3.19, WP3.20 ACCEPTED** by orchestrator gen 12 2026-10-26, main d31dd0f
+  (one ff of `stackB-acc` = ccaecd7 + the four cherry-picked ranges, 101 commits; records `docs/proofs/wp3.1{7,8,9,20}-accept.md`;
+  B-reviewed candidates kept as branches `wp3.17-mc1/mc2`, `wp3.18-mc1`, `wp3.19-mc1/mc2`, `wp3.20-mc1/mc2`). **CHARC
+  QA CONFIRMED, static half:** per package, `git diff <mc> d31dd0f -- <owned files>` = 0 lines and the whole-diff
+  patch-id of `base..mc` equals that of `ccaecd7..d31dd0f` restricted to the package's files (wp3.17 d4f1d179,
+  wp3.18 b5055c32, wp3.19 4fba55dc, wp3.20 39f8b137); footprint = owned files only (interfaces, contract, gui/__init__,
+  jobs/__init__, pyproject, uv.lock untouched; file sets disjoint); every changed blob LF (cat-file, 0 CR); all eight B
+  passes: md5sums.txt OK, five assertions OK (gpt-5.6-sol/high; 0 ^ERROR; strict "succeeded in" 16/24, 14/16, 17/19,
+  18/19; tokens footers; VERDICT anchored), every review-diff regenerates byte-identical from its prompt's range;
+  ruff/format/mypy clean (217 formatted, 126 files); harness 366 OK. Full pytest: orchestrator's stack-top d71d994 run
+  4501 passed / 2 skipped / 1579 s is main's figure by code identity (main differs in the four records only; verified
+  here); CHARC ran no suite (WP3.10's footage window holds the host). Second blocking B adjudicated at the gate for
+  WP3.17/19/20 (UPHELD earlier); WP3.18 B pass 2 CLEAN. Register: DR-49 (WP3.17 15-decimal limit), DR-50 (WP3.19 V7 at
+  batch size), DR-51 (WP3.18 test-only limits), DR-52 (WP3.20 interim resolve_encoder stand-in) NEW. **For WP3.14's
+  brief (wave 4):** an ok `JobResult` names at least one output; per-item D87 check (no batch-wide); DR-48 estimate
+  floor; `CANCELLED` returned as the constant; non-ok outputs list files committed before the stop. **For WP4.3:**
+  WP3.18 adapter mapping (kept job takes priority; own pts list; live Settings closure), DR-50/51/52 swaps, V7
+  re-measure. WP3.18's R3 procedural breach: disclosed, not voided (accepted). WP3.20 B "succeeded in" strict counts
+  18/19 (raw 20/21 include prompt echoes) -- the strict pattern `^\s*succeeded in [0-9]` is the standing count.
+- **WP3.10 (seat 8, 252K at R10):** R10 at the five-round gate 0/0/2, termination accepted; O3 remediation 5cc94e4 as
+  ruled (0.24 bpp; explicit `-tier main -level L`; min() edge; hvcC source level; SinkReport warning); orchestrator's
+  out-of-envelope choices ACCEPTED by CHARC: a ceiling above every Main-tier cap is cut to 6.2's 240 Mb/s, a picture no
+  level holds is refused at `open`. Footage window GRANTED (leg b NVENC re-run, leg a M+R). Then the AD-12 proposal
+  (cq, 0.24 constant, libx265 crf) to CHARC; EXCLUSIVE floor row LAST (seat 8 or fresh seat 9); then its own gate.
 - **Rulings this generation (all recorded durably):** WP3.10 round-0 Q-C upheld, AD-22 extended (absent
   edit list = identity presentation; 09ac181); Q-A/B/D no objection with build notes (1-byte sentinel
   invariant; nothing NUT/setts leaks into IF-5; unreadable-tail warning in SinkReport; 16 KiB provenance
