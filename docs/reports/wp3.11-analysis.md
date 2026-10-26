@@ -4,8 +4,9 @@
 `53d1d906e47fe2c9`; orchestrator round-0 rulings on P1, P2 and choices 1-10). **Branch:**
 `wp3.11` (base `de206e2`). **Module:** `src/clearwater/analysis/` (`proxy.py`, `smoothing.py`,
 `store.py`, `engine.py`). **Instrument:** `tools/step_aware_eval.py`. **Ledger:**
-`docs/proofs/wp3.11-ledger.md`. **Status:** DRAFT (the step-aware figures and the V3 ruling are
-pending; Reviewer A not yet run).
+`docs/proofs/wp3.11-ledger.md`. **Status:** complete for review: the V3 ruling implemented, the
+step-aware figures re-run; Reviewer A in progress (rounds in the ledger); the Y-1 text is reconciled with
+WP3.4's at the gate.
 
 ## Public API (`clearwater.analysis`)
 
