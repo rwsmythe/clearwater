@@ -577,3 +577,65 @@ def test_a_refused_edit_puts_the_session_value_back_in_the_control(
     mode = basic.controls()["mode"]
     mode.combo.setCurrentIndex(2)
     assert mode.combo.currentText() == "b"
+
+
+# Round-1 Reviewer B remediation.
+
+
+def test_a_float_range_below_the_old_six_decimals_keeps_its_bounds_and_default(
+    make_window,
+) -> None:
+    schema = (param("tiny", "float", 1.5e-7, 1e-7, 2e-7),)
+    window, basic, _ = build(make_window, {"m": SchemaMethod("m", schema)})
+    row = basic.controls()["tiny"]
+    assert row.spin.minimum() == 1e-7 and row.spin.maximum() == 2e-7
+    assert row.spin.value() == pytest.approx(1.5e-7, abs=1e-12)
+    assert row.slider is not None and row.shown() == pytest.approx(1.5e-7, abs=1e-12)
+    seen = changes(window)
+    row.slider.setValue(row.slider.maximum())
+    row.slider.setValue(row.slider.minimum())
+    row.spin.setValue(2e-7)
+    values = [p.parameters["tiny"] for p in seen]
+    assert values[0] == 2e-7 and values[-1] == 2e-7  # the maximum is reachable
+    assert all(1e-7 <= v <= 2e-7 for v in values) and 1e-7 in values
+
+
+def test_a_range_too_narrow_to_resolve_gets_a_spin_box_alone_at_full_precision(
+    make_window,
+) -> None:
+    hi = 1.0 + 1e-14
+    schema = (param("narrow", "float", 1.0, 1.0, hi),)
+    window, basic, _ = build(make_window, {"m": SchemaMethod("m", schema)})
+    row = basic.controls()["narrow"]
+    assert row.slider is None and row.spin.decimals() == 14
+    assert float_decimals(schema[0]) == 14
+    row.spin.setValue(hi)
+    assert 1.0 <= window.session.parameters().parameters["narrow"] <= hi
+
+
+def _assert_one_visible_row_per_parameter(make_window) -> None:
+    _, basic, advanced = build(make_window)
+    for panel, kind in ((basic, "basic"), (advanced, "advanced")):
+        shown = [
+            row.parameter.name for row in panel.findChildren(ParameterRow) if row.isVisibleTo(panel)
+        ]
+        assert shown == [p.name for p in ALL_TYPES if p.panel == kind], f"{kind}: {shown}"
+
+
+def test_each_panel_shows_exactly_one_visible_row_per_parameter(make_window) -> None:
+    _assert_one_visible_row_per_parameter(make_window)
+
+
+def test_planted_basic_panel_that_adds_every_row_twice_fails(make_window, monkeypatch) -> None:
+    original = pp.BasicPanel._rebuild
+
+    def doubled(self: BasicPanel, method: Any) -> None:
+        original(self, method)
+        form = self._host.layout()
+        for row in list(self._rows.values()):
+            twin = ParameterRow(row.parameter, row.shown(), self._commit, self._host)
+            form.addRow(twin.label, twin)
+
+    monkeypatch.setattr(pp.BasicPanel, "_rebuild", doubled)
+    with pytest.raises(AssertionError, match="basic"):
+        _assert_one_visible_row_per_parameter(make_window)
