@@ -9,6 +9,7 @@ D43-D45, D81, D83; V7, V11). Reviewer A evidence: `C:\Users\rwsmy\clearwater-rev
 | Round | Head | Verdict | Blocking (crit/major) | Minor | In envelope | NEW / REOPENED | Product vs test-only fixes | Depth (dispatcher) |
 |---|---|---|---|---|---|---|---|---|
 | 0 | `d286b8d` | table only, no product code besides `export_service.py`; RULED by the dispatcher (CHARC `0e6962c39f216c86`): seam approved, C1 GRANTED, C2-C7 accepted | - | - | - | - | - | 123,884 |
+| 1 | `8639afb` | NEW_CRITICAL_MAJOR_FOUND | 2 major (F1 export gate held if setup raises after try_start; F2 warnings dropped for failed/cancelled items), 0 critical | 1 (F3 current-parameters validation untested) | 3 in, 0 out | 3 NEW, 0 REOPENED | fixes pending (F1, F2 product; F3 test) | (dispatcher fills) |
 
 ## Round 0
 
@@ -239,3 +240,21 @@ recipe section 5); the figure is filled by the dispatcher at this yield.
 - C2-C7 accepted as recommended. `SharedGate` (additive, GUI side) is the holder that creates the one
   gate when the first panel's factory runs.
 - Host: pytest hold ON at this point (CHARC's main suite); build is static-gates only until lifted.
+
+## Round 1 (Reviewer A, head `8639afb`; evidence `C:\Users\rwsmy\clearwater-review-evidence\wp3.19\r1\`)
+
+Targeted tests before the round (own modules + test_gui_deps): 53 passed, 11 s, `work/t1-r1.txt`.
+Mutation check of the new tests (script `work/mut.py`, each mutation reverted): batch stops at first
+failure -> `test_a_failed_item_is_skipped_logged_and_reported` fails; cancelled result not stopping the
+rest -> `test_a_cancelled_result_without_a_click_also_stops_the_batch`; export clears every owner's
+errors -> `test_success_clears_only_the_export_errors_and_presents_warnings`; no gate release in
+`_done` -> `test_the_reason_while_running_and_after`; duplicates / sidecars not refused ->
+`test_refused_files_are_warned_about_and_duplicates_are_not_queued`; live session parameters instead of
+the Start snapshot -> `test_one_parameter_set_and_settings_apply_to_every_item_and_are_fixed_at_start`.
+Equivalent mutant: dropping `or self._gate.current is not None` in `start()` (the following
+`try_start` is the real guard). The planted-wrong tests assert the wrong behaviour is detectable.
+The first run was green; "failing before the fix" is shown by the mutations above, not by a red first run
+(tests were written after the product code; disclosed).
+
+Findings: see `adjudication.md` in the evidence folder. F1 MAJOR confirmed by a scratch repro; F2 MAJOR
+confirmed by reading; F3 MINOR accepted. No change made in the adjudicating turn.
