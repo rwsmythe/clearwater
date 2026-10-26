@@ -8,7 +8,7 @@ Cell: `implementer-sonnet-high`, seat 1, worktree `.worktrees/wp3.18`, branch `w
 
 | Round | Depth (dispatcher) | Critical | Major | Minor | In / out of envelope | NEW / REOPENED | Reverts | Fixes: product / test-only | Transport, CLI | Verdict |
 |---|---|---|---|---|---|---|---|---|---|---|
-| 0 (design table) | (dispatcher fills) | - | - | - | - | - | - | - | - | awaiting the orchestrator's reply |
+| 0 (design table) | 177,692 (dispatcher, at the round-0 yield) | - | - | - | - | - | - | - | - | APPROVED; Q-A RULED (C) by CHARC `bdbd8323ceace897` (AD-7 amended `8c67a6d`); Q-B, Q-D, Q-E accepted |
 
 ## Round 0 -- design table (no product code yet)
 
@@ -29,6 +29,7 @@ at this yield, `NotImplementedError`). Members, as the brief drafted them, no ch
 | Member | Thread | Contract |
 |---|---|---|
 | `run(parameters, progress, *, focus_pts=None) -> None` | job worker | first call = full pass; a later call = the dependent stages after a parameter change, `focus_pts`'s reach first; returns early when `progress.cancelled()`; raises on failure; a normal return of a job the GUI did not cancel = complete |
+| `retarget(parameters, *, focus_pts=None) -> bool` (ADDED at the round-0 ruling) | MAIN | called only while a run is in flight (the panel raises `RuntimeError` otherwise); cheap, never waits; True = the run in flight finishes under `parameters` and its normal return means complete under them; False = not absorbed, the run finishes and `run(latest)` follows at its done-ok if (method id, effective values) differ. No run is ever cancelled for a parameter change |
 | `pts() -> tuple[int, ...]` | MAIN | pts with a stored proxy so far, ascending; cheap, never waits for `run` |
 | `proxy(pts_ticks) -> NDArray[uint8]` | worker | `(H, W, 3)` RGB; `KeyError` when absent |
 | `statistics(pts_ticks) -> Mapping[str, Statistics] \| None` | worker | smoothed, every stage, for the parameters of the latest COMPLETED `run`; None when not available |
@@ -60,8 +61,8 @@ race, DR-47: a cancel racing `mark_complete` leaves the engine complete; the GUI
 | done ok, run not cancelled, session parameters differ | stays `running("Updating statistics")` | `set_statistics(None)` | follow-up `run(latest, focus_pts=shown)` started FROM this `on_done` (the previous job has returned, so one run at a time) |
 | done failed | `failed(message=failure)` | `set_statistics(None)` | error banner owner `"analysis"`; provisional preview stays; slider stays on the stored proxies; "Analyse" enabled |
 | user Cancel (D70) | `cancelled` at the job's `on_done` (button disabled meanwhile) | `set_statistics(None)` | clip stays open, provisional preview (question 3); "Analyse" restarts |
-| superseded (method changed while a run is in flight; see Q-A) | stays `running` | `set_statistics(None)` | `handle.cancel()` with `cancel_reason="superseded"`; the new run starts from that job's `on_done`; never the `cancelled` phase |
-| parameters changed, phase running | unchanged | unchanged (already provisional) | marks "dirty" implicitly: the done-ok row compares parameters |
+| superseded (method changed while a run is in flight; Q-B) | stays `running` | `set_statistics(None)` | `handle.cancel()` with `cancel_reason="superseded"`; the new run starts from that job's `on_done`; never the `cancelled` phase |
+| parameters changed, phase running | unchanged | unchanged (already provisional) | `epoch+1`; `analysis.retarget(params, focus_pts=shown)`: True -> the run's target becomes the new one (done-ok then completes); False -> the done-ok row compares and follows up. NO cancel |
 | parameters changed, phase complete | `running("Updating statistics")` | `set_statistics(None)` at once; `epoch+1` | `run(latest, focus_pts=shown pts)` |
 | parameters changed, phase none/cancelled/failed | unchanged | unchanged | nothing; "Analyse" uses the latest |
 | method changed (`parameters.method` differs from the analysis's) | `running(0, nb_frames, "Starting")` | `set_statistics(None)`; `epoch+1` | gap in the brief (Q-B): cancel as "superseded", rebuild `ClipAnalysis` for the new method, full run |
@@ -138,6 +139,7 @@ All four members are SERVED; no STOP on a member. Two frictions are named (Q-A, 
 | factory `(source, method, engines)` | builds the adapter only. `AnalysisEngine(method=, backend=engines.select_backend(settings, h, w, method.id)[0], cache=engines.cache, key=DiskProxyCache.key_for(path) / cache_key(path, codec), source=engines.video_source, probe=source.probe, params=, window_s=, kind=, hw_decode=)` | the engine needs `params` at construction and the factory has none: the adapter builds the engine lazily in its first `run` (worker thread: also takes `os.stat` and the backend selection off the main thread) |
 | `run(parameters, progress, focus_pts)` | first call: `engine.set_parameters(eff, focus_pts)` (phase none: adopts, returns None) then `job = engine.analysis_job()`; later: `job = engine.set_parameters(eff, focus_pts)`; if None and phase in {none, cancelled, failed}: `job = engine.analysis_job()`; if None and complete/running: return. Then `result = job(progress)`; `result.ok` -> return; `result.failure == analysis.CANCELLED` -> return; else `raise RuntimeError(result.failure)` | `eff = imaging.effective_parameters(method, parameters)`. A change absorbed by a running job needs no call (the GUI never overlaps runs). DR-47: a cancel racing `mark_complete` leaves the engine complete and `run` returns; the GUI, which cancelled, reports "cancelled"; "Analyse" -> `set_parameters` None, phase complete -> returns at once |
 | `pts()` | `cache.lookup(key).pts_ticks` (ascending; in-progress entries are returned; None -> `()`) | F-2: `DiskProxyCache.lookup` takes the cache lock, touches the last-use stamp and sorts up to ~20,000 ticks, on the MAIN thread per progress delivery (20/s) while the writer stores proxies. The seam says "cheap, never waits for `run`"; the real cost is WP4.3's to re-measure with V7. Fallback: the adapter keeps its own list, refreshed by a worker |
+| `retarget(params, focus_pts)` | `job = engine.set_parameters(eff, focus_pts)`: None while the engine runs -> True (the job absorbs it); a job RETURNED (the run finished between the panel's call and the engine's lock; the engine is now "running") -> the adapter KEEPS that job, returns False, and runs it at the next `run()`; it never drops the job and never runs it on the main thread | cheap (engine lock only); the panel never overlaps runs, so the kept job is run by the follow-up `run(latest)` |
 | `proxy(pts)` | `cache.proxy(key, pts)` | new array each call; `KeyError` when absent |
 | `statistics(pts)` | `engine.smoothed_record(pts)`; `KeyError` -> None; unknown engine -> None | `schema_hash` is the engine's own concern; the GUI's `epoch` guard sits above it. Unused by design: `provisional_record(pts)` (WP3.16 measures the D108 provisional preview on its own float proxy; WP3.16 report "Decisions") |
 | progress | the engine reports `(done, total, message)` in cumulative frame-stage units, `total` None while unknown | the panel shows the report verbatim; the first `running(0, nb_frames)` is replaced at the first report |
@@ -145,19 +147,16 @@ All four members are SERVED; no STOP on a member. Two frictions are named (Q-A, 
 
 ### R0-8 Questions and gaps, with the recommended answer first
 
-**Q-A (STOP: the brief and WP3.11 disagree on supersession). A parameter change during a recompute.**
-Brief task 3: "a newer change supersedes the job in flight (cancelled internally)". On the
-real engine that is expensive and wrong in shape: a cancel makes the engine `_unload` (drop ALL
-statistics), and the next job then re-measures every stage for every frame from the stored
-proxies (the decode is skipped; a JPEG proxy decode per frame is still the cost, about a minute
-at 20,000 frames) instead of recomputing only the dependent stages near-first. Three options:
-(A) the brief as written; (B) RECOMMENDED: a parameter change NEVER cancels; a run in flight
-finishes, and at its done-ok the follow-up `run(latest)` starts if the parameters differ (the
-rule the brief already has for a change during the FIRST run, applied to every run), so a burst
-of changes costs at most one extra recompute; the only internal cancels left are source change
-and method change; (C) an additive seam member `retarget(parameters, focus_pts) -> bool` so the
-engine absorbs the change in flight (cost: the stub must implement absorption). B changes no
-seam name. The table above and the tests follow B; A is the fallback if you rule it.
+**Q-A (RULED (C), CHARC `bdbd8323ceace897`, AD-7 amended `8c67a6d`). A parameter change
+during a recompute.** The brief's lines 95-99 ("a newer change supersedes the job in flight,
+cancelled internally") are WITHDRAWN on this point. `ClipAnalysis.retarget(parameters, *,
+focus_pts=None) -> bool` (R0-1) offers the change to the run in flight; (B) is the fallback
+(False). No run is cancelled for a parameter change; the only cancels are the user's (D70,
+`cancelled`), a method change (Q-B, `superseded`) and a source change or close. The stub returns
+False by default (`StubClipAnalysis(absorb=True)` absorbs); tests cover both. The panel raises
+`RuntimeError` for a retarget with no run in flight; the stub does not (it cannot tell the window
+between a run's end and its done callback from a bug) and returns False there. WP4.3's adapter
+rule is in R0-7.
 
 **Q-B (gap). The method changes while a clip is open** (`parameters.method` differs; a preset
 can set it). The analysis is bound to its method. Recommended: treat as a new analysis of the

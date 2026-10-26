@@ -1,0 +1,681 @@
+"""The timeline panel (WP3.18): analysis on clip open, AD-15's states, the scrubber, the switch.
+
+:func:`install_timeline` attaches one panel in ``Area.TIMELINE``. For an opened video the panel
+builds a :class:`~clearwater.gui.analysis_service.ClipAnalysis`, runs it in the background
+through the shell's job runner (G5, D70: progress, cancel), sets the AD-15 state on the session,
+gives the scrubber (G4, D72: the stored proxy while the slider is down, the full-resolution
+corrected frame when it stops), and switches the preview from the provisional to the smoothed
+statistics when the analysis completes (D108, V18). Every frame it asks the shell to show is
+paired with its own pts's statistics (DR-44 (a)); no index is ever a key (AD-6, DR-23).
+
+Main thread only, except the job callables, which run ``ClipAnalysis.run``, ``proxy`` and
+``statistics`` on worker threads. A parameter change never cancels a run (CHARC ruling on
+Q-A): it is offered to the run in flight with ``ClipAnalysis.retarget``; when that does not
+absorb it, the run finishes and a follow-up run with the latest parameters starts from its done
+callback. The only cancels are the user's, a method change and a source change or close.
+"""
+
+from __future__ import annotations
+
+import bisect
+import logging
+import time
+from collections.abc import Iterator, Mapping
+from contextlib import contextmanager
+from dataclasses import dataclass
+from typing import Any, Literal
+
+from PySide6.QtCore import QEvent, QObject, QSignalBlocker, Qt
+from PySide6.QtWidgets import (
+    QHBoxLayout,
+    QLabel,
+    QProgressBar,
+    QPushButton,
+    QSlider,
+    QVBoxLayout,
+    QWidget,
+)
+
+from clearwater.interfaces import JobResult, Progress, Statistics
+
+from . import messages
+from .analysis_service import AnalysisFactory, ClipAnalysis, stub_analysis_factory
+from .contract import (
+    AnalysisState,
+    Area,
+    FrameOutcome,
+    JobHandle,
+    Message,
+    OpenedSource,
+    ShellContext,
+    ShellWindow,
+)
+from .imaging import effective_parameters
+
+_LOG = logging.getLogger(__name__)
+
+PANEL_TITLE = "Timeline"
+"""The title the panel attaches under (the panel's object name in ``Area.TIMELINE``)."""
+
+OWNER_ANALYSIS = "analysis"
+"""The message owner of analysis failures (DR-44 (b))."""
+
+OWNER_TIMELINE = "timeline"
+"""The message owner of scrubber failures (DR-44 (b))."""
+
+LABEL_ANALYSING = "Analysing the clip"
+"""The status text of the first run of an analysis."""
+
+LABEL_UPDATING = "Updating statistics"
+"""The status text of a run that follows a parameter change (AD-15)."""
+
+type StatsMap = Mapping[str, Statistics]
+
+
+@dataclass(frozen=True)
+class _Target:
+    """What a run analyses under: the method id and the effective parameter values."""
+
+    method_id: str
+    values: dict[str, Any]
+
+
+@dataclass
+class _Run:
+    """The run in flight."""
+
+    ticket: int
+    handle: JobHandle
+    target: _Target
+    label: str
+    reason: Literal["user", "superseded"] | None = None
+    done: int = 0
+    total: int | None = None
+
+
+@dataclass(frozen=True)
+class _Request:
+    """One request of the position lane: a proxy to show, a frame to commit, or a fix."""
+
+    seq: int
+    kind: Literal["proxy", "commit", "fix"]
+    pts: int
+    epoch: int
+    commit_seq: int
+
+
+@contextmanager
+def _blocked(widget: QWidget) -> Iterator[None]:
+    """Block a widget's signals for the duration (``QSignalBlocker``)."""
+    blocker = QSignalBlocker(widget)
+    try:
+        yield
+    finally:
+        blocker.unblock()
+
+
+class TimelinePanel(QWidget):
+    """The timeline: scrubber, progress, Cancel and Analyse for the open video.
+
+    Args:
+        context: The shell context (session, engines, jobs, messages).
+        factory: Builds the :class:`ClipAnalysis` of each opened video.
+        parent: The Qt parent.
+    """
+
+    def __init__(
+        self, context: ShellContext, factory: AnalysisFactory, parent: QWidget | None = None
+    ) -> None:
+        """Build the widgets and connect to the session."""
+        super().__init__(parent)
+        self._context = context
+        self._session = context.session
+        self._jobs = context.jobs
+        self._messages = context.messages
+        self._factory = factory
+
+        self._generation = 0
+        self._ticket = 0
+        self._seq = 0
+        self._epoch = 0
+        self._source: OpenedSource | None = None
+        self._analysis: ClipAnalysis | None = None
+        self._analysis_method = ""
+        self._run: _Run | None = None
+        self._rebuild_pending = False
+        self._done_target: _Target | None = None
+        self._pts: tuple[int, ...] = ()
+        self._slider_pts: int | None = None
+        self._dragging = False
+        self._lane: JobHandle | None = None
+        self._wanted: _Request | None = None
+        self._latest_commit = 0
+        self._shown_proxy_seq = 0
+        self._wanted_pts: int | None = None
+        self._requested: int | None = None
+        self._supplied: StatsMap | None = None
+        self._shown_pts: int | None = None
+        self._shown_statistics: StatsMap | None = None
+        self._scrub_error_shown = False
+        self._closing = False
+
+        self._slider = QSlider(Qt.Orientation.Horizontal, self)
+        self._slider.setObjectName("timeline.slider")
+        self._time = QLabel("", self)
+        self._time.setObjectName("timeline.time")
+        self._bar = QProgressBar(self)
+        self._bar.setObjectName("timeline.progress")
+        self._status = QLabel("", self)
+        self._status.setObjectName("timeline.status")
+        self._cancel = QPushButton("Cancel", self)
+        self._cancel.setObjectName("timeline.cancel")
+        self._analyse = QPushButton("Analyse", self)
+        self._analyse.setObjectName("timeline.analyse")
+        top = QHBoxLayout()
+        top.addWidget(self._slider, 1)
+        top.addWidget(self._time)
+        bottom = QHBoxLayout()
+        bottom.addWidget(self._bar, 1)
+        bottom.addWidget(self._status)
+        bottom.addWidget(self._cancel)
+        bottom.addWidget(self._analyse)
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(4, 2, 4, 2)
+        layout.addLayout(top)
+        layout.addLayout(bottom)
+
+        self._slider.sliderPressed.connect(self._on_pressed)
+        self._slider.sliderReleased.connect(self._on_released)
+        self._slider.valueChanged.connect(self._on_slider_value)
+        self._cancel.clicked.connect(self.cancel_analysis)
+        self._analyse.clicked.connect(self.start_analysis)
+        self._session.source_changed.connect(self._on_source)
+        self._session.parameters_changed.connect(self._on_parameters)
+        self._session.analysis_changed.connect(self._update_controls)
+        self._session.frame_decoded.connect(self._on_frame_decoded)
+        context.window.installEventFilter(self)
+        self._reset_scrubber()
+        self._update_controls()
+        current = self._session.source()
+        if current is not None:
+            self._on_source(current)
+
+    def eventFilter(self, watched: QObject, event: QEvent) -> bool:  # noqa: N802 -- Qt override
+        """Note that the window is closing: the shell then cancels every job itself.
+
+        The shell cancels all jobs at close, so a job that returns early is not "complete";
+        once the window closes the panel ignores every callback.
+        """
+        if watched is self._context.window and event.type() == QEvent.Type.Close:
+            self._closing = True
+        return False
+
+    # Public controls (the buttons call these).
+
+    def slider(self) -> QSlider:
+        """Return the scrubber slider (its range is the index range of ``ClipAnalysis.pts()``)."""
+        return self._slider
+
+    def pts(self) -> tuple[int, ...]:
+        """Return the pts ticks the slider ranges over."""
+        return self._pts
+
+    def cancel_analysis(self) -> None:
+        """Cancel the analysis (D70); the clip stays open and the state becomes ``cancelled``."""
+        run = self._run
+        if run is None or run.reason is not None:
+            return
+        run.reason = "user"
+        run.handle.cancel()
+        self._update_controls()
+
+    def start_analysis(self) -> None:
+        """Start the analysis again after a cancel or a failure (the Analyse button)."""
+        source = self._source
+        if source is None or self._run is not None:
+            return
+        if self._session.analysis().phase not in ("none", "cancelled", "failed"):
+            return
+        self._messages.clear(owner=OWNER_ANALYSIS)
+        if self._analysis is None or self._analysis_method != self._session.method().id:
+            self._build_and_run()
+            return
+        self._session.set_analysis(self._running_state(LABEL_ANALYSING))
+        self._start_run(LABEL_ANALYSING)
+
+    # Source and analysis.
+
+    def _on_source(self, source: object) -> None:
+        """A new source (or none): drop everything of the old one, start the new analysis."""
+        self._generation += 1
+        if self._run is not None:
+            self._run.handle.cancel()
+        if self._lane is not None:
+            self._lane.cancel()
+        self._run = None
+        self._lane = None
+        self._wanted = None
+        self._analysis = None
+        self._analysis_method = ""
+        self._rebuild_pending = False
+        self._done_target = None
+        self._epoch += 1
+        self._requested = None
+        self._supplied = None
+        self._shown_statistics = None
+        self._scrub_error_shown = False
+        self._source = None
+        self._messages.clear(owner=OWNER_ANALYSIS)
+        self._messages.clear(owner=OWNER_TIMELINE)
+        self._reset_scrubber()
+        if isinstance(source, OpenedSource) and source.kind == "video" and source.probe:
+            self._source = source
+            ticks = getattr(source.image, "pts_ticks", None)
+            self._shown_pts = ticks if isinstance(ticks, int) else None
+            self._wanted_pts = self._shown_pts
+            self._slider_pts = self._shown_pts
+            self._build_and_run()
+        self._update_controls()
+
+    def _build_and_run(self) -> None:
+        """Build the analysis for the session's method and start its first run."""
+        source = self._source
+        assert source is not None
+        method = self._session.method()
+        try:
+            self._analysis = self._factory(source, method, self._context.engines)
+        except Exception as exc:  # a factory failing is a failed analysis, never a crash
+            self._analysis = None
+            self._fail(f"The analysis could not be started: {exc}")
+            return
+        self._analysis_method = method.id
+        self._pts = ()
+        self._reset_slider_range()
+        self._session.set_analysis(self._running_state(LABEL_ANALYSING))
+        self._start_run(LABEL_ANALYSING)
+
+    def _running_state(self, label: str) -> AnalysisState:
+        """The state a run starts in: zero done of the container's frame count."""
+        source = self._source
+        total = None if source is None or source.probe is None else source.probe.video.nb_frames
+        return AnalysisState("running", 0, total, label)
+
+    def _current_target(self) -> _Target:
+        """The session's method id and effective parameter values."""
+        method = self._session.method()
+        return _Target(method.id, effective_parameters(method, self._session.parameters()))
+
+    def _start_run(self, label: str) -> bool:
+        """Start ``ClipAnalysis.run`` under the session's parameters; False when not started."""
+        analysis = self._analysis
+        assert analysis is not None
+        parameters = self._session.parameters()
+        target = self._current_target()
+        self._ticket += 1
+        ticket = self._ticket
+        generation = self._generation
+        focus = self._shown_pts
+        began = time.perf_counter()
+
+        def job(progress: Progress) -> JobResult:
+            analysis.run(parameters, progress, focus_pts=focus)
+            return JobResult(True, (), (), None, "analysis", time.perf_counter() - began)
+
+        try:
+            handle = self._jobs.run(
+                job,
+                on_done=lambda result: self._on_done(generation, ticket, result),
+                on_progress=lambda done, total, text: self._on_progress(
+                    generation, ticket, done, total, text
+                ),
+            )
+        except RuntimeError as exc:  # the job runner is closed (the window is closing)
+            _LOG.info("analysis not started: %s", exc)
+            return False
+        self._run = _Run(ticket, handle, target, label)
+        self._update_controls()
+        return True
+
+    def _on_progress(
+        self, generation: int, ticket: int, done: int, total: int | None, _text: str
+    ) -> None:
+        """Main thread: a progress report of the current run."""
+        run = self._run
+        if self._closing or generation != self._generation or run is None or run.ticket != ticket:
+            return
+        if run.reason is not None:
+            return
+        run.done, run.total = done, total
+        self._session.set_analysis(AnalysisState("running", done, total, run.label))
+        self._refresh_pts()
+
+    def _on_done(self, generation: int, ticket: int, result: JobResult) -> None:
+        """Main thread: the run ended; cancelled, failed, followed up or complete."""
+        run = self._run
+        if self._closing or generation != self._generation or run is None or run.ticket != ticket:
+            return
+        self._run = None
+        self._refresh_pts()
+        if run.reason == "superseded" and self._rebuild_pending:
+            self._rebuild_pending = False
+            self._build_and_run()
+            return
+        if run.reason is not None:  # the user's cancel (D70): the GUI is the only source of cancel
+            self._epoch += 1
+            self._session.set_statistics(None)
+            self._session.set_analysis(AnalysisState("cancelled", message="Analysis cancelled"))
+            return
+        if not result.ok:
+            self._epoch += 1
+            self._session.set_statistics(None)
+            self._fail(result.failure or "The analysis failed.")
+            return
+        now = self._current_target()
+        if now != run.target:  # AD-15: restart the dependent stages when the analysis completes
+            self._session.set_statistics(None)
+            self._session.set_analysis(AnalysisState("running", 0, run.total, LABEL_UPDATING))
+            self._start_run(LABEL_UPDATING)
+            return
+        self._messages.clear(owner=OWNER_ANALYSIS)
+        self._done_target = run.target
+        self._session.set_analysis(
+            AnalysisState("complete", run.done, run.total, "Analysis complete")
+        )
+        self._switch()
+
+    def _fail(self, text: str) -> None:
+        """Set the failed state and present the failure (owner ``analysis``)."""
+        shown = messages.ascii_text(text)
+        self._session.set_analysis(AnalysisState("failed", message=shown))
+        source = self._source
+        self._messages.present(
+            Message(
+                "error",
+                f"The analysis failed: {shown}",
+                source.path if source else None,
+                OWNER_ANALYSIS,
+            )
+        )
+
+    def _on_parameters(self, _parameters: object) -> None:
+        """Main thread: offer a change to the run in flight, or recompute when complete (AD-15)."""
+        if self._analysis is None or self._source is None:
+            return
+        if self._session.method().id != self._analysis_method:
+            self._on_method_changed()
+            return
+        target = self._current_target()
+        run = self._run
+        if run is not None:
+            if run.reason is not None or target == run.target:
+                return
+            self._epoch += 1
+            if self._retarget():
+                run.target = target
+            return
+        if self._session.analysis().phase == "complete" and target != self._done_target:
+            self._epoch += 1
+            self._session.set_statistics(None)
+            state = self._session.analysis()
+            self._session.set_analysis(AnalysisState("running", 0, state.total, LABEL_UPDATING))
+            self._start_run(LABEL_UPDATING)
+
+    def _retarget(self) -> bool:
+        """Offer the session's parameters to the run in flight (a run must be in flight)."""
+        run = self._run
+        analysis = self._analysis
+        if run is None or analysis is None or not run.handle.is_running():
+            raise RuntimeError("retarget needs a run in flight")
+        return analysis.retarget(self._session.parameters(), focus_pts=self._shown_pts)
+
+    def _on_method_changed(self) -> None:
+        """The method changed under an open clip: a new analysis (superseded, Q-B)."""
+        self._epoch += 1
+        self._session.set_statistics(None)
+        run = self._run
+        if run is not None:
+            if run.reason is None:
+                run.reason = "superseded"
+                run.handle.cancel()
+                self._rebuild_pending = True
+            return  # a user cancel in flight: Analyse builds the new analysis
+        if self._session.analysis().phase == "complete":
+            self._build_and_run()
+
+    # The scrubber (G4, D72).
+
+    def _reset_scrubber(self) -> None:
+        """Forget the pts list and disable the slider."""
+        self._pts = ()
+        self._slider_pts = None
+        self._dragging = False
+        self._reset_slider_range()
+        self._time.setText("")
+
+    def _reset_slider_range(self) -> None:
+        """Empty the slider (no proxy yet) without emitting."""
+        with _blocked(self._slider):
+            self._slider.setRange(0, 0)
+            self._slider.setValue(0)
+        self._slider.setEnabled(bool(self._pts))
+
+    def _index_of(self, pts: int | None) -> int:
+        """The slider index of the stored frame at or before ``pts`` (0 when none)."""
+        if pts is None or not self._pts:
+            return 0
+        return max(0, bisect.bisect_right(self._pts, pts) - 1)
+
+    def _refresh_pts(self) -> None:
+        """Main thread: re-read ``ClipAnalysis.pts()`` and keep the handle on its frame."""
+        analysis = self._analysis
+        if analysis is None:
+            return
+        fresh = analysis.pts()
+        if fresh == self._pts:
+            return
+        self._pts = fresh
+        if self._slider_pts is None and fresh:
+            self._slider_pts = fresh[0]
+        with _blocked(self._slider):
+            self._slider.setRange(0, max(0, len(fresh) - 1))
+            self._slider.setValue(self._index_of(self._slider_pts))
+        self._slider.setEnabled(bool(fresh))
+        self._update_time(self._slider_pts)
+
+    def _update_time(self, pts: int | None) -> None:
+        """Show the time of ``pts`` (``pts_ticks * time_base``)."""
+        source = self._source
+        if pts is None or source is None or source.probe is None:
+            self._time.setText("")
+            return
+        seconds = float(pts * source.probe.video.time_base)
+        self._time.setText(f"{seconds:.3f} s")
+
+    def _on_pressed(self) -> None:
+        """The slider went down: proxies only until it is released."""
+        self._dragging = True
+
+    def _on_released(self) -> None:
+        """The slider was released: the full-resolution corrected frame (D72)."""
+        self._dragging = False
+        if self._pts:
+            self._request("commit", self._pts[self._slider.value()])
+
+    def _on_slider_value(self, index: int) -> None:
+        """A slider value (drag, key, click): a proxy while down, else a commit."""
+        if not 0 <= index < len(self._pts):
+            return
+        pts = self._pts[index]
+        self._slider_pts = pts
+        self._update_time(pts)
+        self._request("proxy" if self._dragging else "commit", pts)
+
+    # The position lane: at most one job in flight, the latest request kept.
+
+    def _request(self, kind: Literal["proxy", "commit", "fix"], pts: int) -> None:
+        """Queue a request; the lane runs the latest one when it is free."""
+        self._seq += 1
+        if kind == "commit":
+            self._latest_commit = self._seq
+            self._wanted_pts = pts
+        self._wanted = _Request(self._seq, kind, pts, self._epoch, self._latest_commit)
+        self._pump()
+
+    def _pump(self) -> None:
+        """Start the wanted request when no lane job is in flight."""
+        analysis = self._analysis
+        request = self._wanted
+        if self._lane is not None or request is None or analysis is None:
+            return
+        self._wanted = None
+        want_statistics = request.kind != "proxy" and self._session.analysis().phase == "complete"
+        box: dict[str, Any] = {}
+        generation = self._generation
+
+        def job(progress: Progress) -> JobResult:
+            began = time.perf_counter()
+            if request.kind == "proxy":
+                box["proxy"] = analysis.proxy(request.pts)
+            elif want_statistics:
+                box["statistics"] = analysis.statistics(request.pts)
+            return JobResult(True, (), (), None, "analysis", time.perf_counter() - began)
+
+        try:
+            self._lane = self._jobs.run(
+                job, on_done=lambda result: self._on_lane_done(generation, request, box, result)
+            )
+        except RuntimeError as exc:  # the job runner is closed
+            _LOG.info("position request not started: %s", exc)
+
+    def _on_lane_done(
+        self, generation: int, request: _Request, box: dict[str, Any], result: JobResult
+    ) -> None:
+        """Main thread: a lane job ended; act on it if it is still wanted, then run the next."""
+        if self._closing or generation != self._generation:
+            return
+        self._lane = None
+        if not result.ok:
+            self._scrub_failed(result.failure or "The frame could not be read.")
+        elif request.kind == "proxy":
+            if request.seq > self._shown_proxy_seq and request.seq > self._latest_commit:
+                self._shown_proxy_seq = request.seq
+                self._context.window.preview.show_proxy(box["proxy"])
+                self._scrub_ok()
+        else:
+            self._apply(request, box.get("statistics"))
+        self._pump()
+
+    def _apply(self, request: _Request, fetched: StatsMap | None) -> None:
+        """Supply a fetched statistics set with its frame, if the request is still current."""
+        fresh = request.epoch == self._epoch
+        statistics = fetched if fresh else None
+        if request.kind == "commit":
+            if request.seq != self._latest_commit:
+                return
+            self._requested = request.pts
+            self._supplied = statistics
+            try:
+                self._session.set_position(request.pts, statistics=statistics)
+            except RuntimeError as exc:  # no video open any more
+                _LOG.info("set_position refused: %s", exc)
+                self._requested = None
+                return
+            self._scrub_ok()
+        elif request.commit_seq == self._latest_commit and fresh:  # a fix for the shown frame
+            self._session.set_statistics(statistics)
+            self._shown_statistics = statistics
+
+    def _scrub_failed(self, text: str) -> None:
+        """Present a scrubber failure (owner ``timeline``)."""
+        source = self._source
+        self._messages.present(
+            Message(
+                "error",
+                messages.ascii_text(f"The frame could not be read: {text}"),
+                source.path if source else None,
+                OWNER_TIMELINE,
+            )
+        )
+        self._scrub_error_shown = True
+
+    def _scrub_ok(self) -> None:
+        """A scrubber success clears the scrubber's own error."""
+        if self._scrub_error_shown:
+            self._messages.clear("error", owner=OWNER_TIMELINE)
+            self._scrub_error_shown = False
+
+    # Pairing frames and statistics (DR-44 (a), V18).
+
+    def _on_frame_decoded(self, outcome: object) -> None:
+        """Main thread: pair the frame the shell now shows with its own statistics."""
+        if not isinstance(outcome, FrameOutcome) or self._analysis is None:
+            return
+        if self._requested is None or outcome.requested != self._requested:
+            return
+        self._requested = None
+        if outcome.pts is None:  # the decode failed; the shell shows its error (owner shell.frame)
+            self._session.set_statistics(self._shown_statistics)
+            if self._shown_pts is not None:
+                self._wanted_pts = self._shown_pts
+                self._slider_pts = self._shown_pts
+                with _blocked(self._slider):
+                    self._slider.setValue(self._index_of(self._shown_pts))
+                self._update_time(self._shown_pts)
+            return
+        self._shown_pts = outcome.pts
+        if outcome.pts == outcome.requested:
+            self._shown_statistics = self._supplied
+            return
+        self._session.set_statistics(None)  # never another frame's statistics
+        self._shown_statistics = None
+        self._wanted_pts = outcome.pts
+        self._slider_pts = outcome.pts
+        if self._pts:
+            with _blocked(self._slider):
+                self._slider.setValue(self._index_of(outcome.pts))
+        self._update_time(outcome.pts)
+        if self._session.analysis().phase == "complete":
+            self._request("fix", outcome.pts)
+
+    def _switch(self) -> None:
+        """Completion: switch the shown frame from the provisional to the smoothed statistics."""
+        if self._dragging or self._wanted_pts is None:
+            return
+        self._request("commit", self._wanted_pts)
+
+    # Controls.
+
+    def _update_controls(self, *_: object) -> None:
+        """Set the buttons, the bar and the status text from the session's analysis state."""
+        state = self._session.analysis()
+        run = self._run
+        source_is_video = self._source is not None
+        self._cancel.setEnabled(run is not None and run.reason is None and state.phase == "running")
+        self._analyse.setEnabled(
+            source_is_video and run is None and state.phase in ("none", "cancelled", "failed")
+        )
+        if state.phase == "running":
+            if state.total:
+                self._bar.setRange(0, state.total)
+                self._bar.setValue(min(state.done, state.total))
+            else:
+                self._bar.setRange(0, 0)
+            text = state.message or LABEL_ANALYSING
+            self._status.setText(
+                f"{text}: {state.done}/{'?' if state.total is None else state.total}"
+            )
+        else:
+            self._bar.setRange(0, 1)
+            self._bar.setValue(1 if state.phase == "complete" else 0)
+            self._status.setText(state.message if source_is_video else "")
+
+
+def install_timeline(window: ShellWindow, analysis: AnalysisFactory | None = None) -> None:
+    """Attach the timeline panel to ``Area.TIMELINE`` (WP4.3 passes the adapter over WP3.11).
+
+    Args:
+        window: The main window.
+        analysis: Builds the analysis of each opened video; the stub analysis when None.
+    """
+    factory = analysis or stub_analysis_factory
+    window.attach(Area.TIMELINE, lambda context: TimelinePanel(context, factory), title=PANEL_TITLE)
