@@ -392,9 +392,9 @@ class SettingsDialog(QDialog):
         self.cache_spin = QSpinBox(self)
         self.cache_spin.setRange(MIN_CACHE_GB, MAX_CACHE_GB)
         self.cache_spin.setSuffix(" GB")
-        self.cache_spin.setValue(
-            min(MAX_CACHE_GB, max(MIN_CACHE_GB, round(initial.cache_limit_bytes / GB)))
-        )
+        # Integer arithmetic: a float division overflows for a huge stored int.
+        shown_gb = (initial.cache_limit_bytes + GB // 2) // GB
+        self.cache_spin.setValue(min(MAX_CACHE_GB, max(MIN_CACHE_GB, shown_gb)))
         form.addRow("Cache size limit:", self.cache_spin)
 
         self.clear_button = QPushButton("Clear cache", self)

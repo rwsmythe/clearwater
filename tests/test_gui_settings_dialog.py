@@ -679,6 +679,20 @@ def test_an_unchanged_limit_calls_nothing_and_a_stored_odd_limit_is_kept(env: En
     assert window.session.settings().cache_limit_bytes == 1_500_000_000
 
 
+def test_a_huge_stored_limit_opens_clamped_and_is_written_back_unchanged(env: Env) -> None:
+    huge = 10**400
+    window = env.start(saved=Settings(cache_limit_bytes=huge))
+    assert window.session.settings().cache_limit_bytes == huge
+    dialog = env.open(window)
+    assert dialog.cache_spin.value() == dialog.cache_spin.maximum() == 100_000
+    dialog.suffix_edit.setText("_x")
+    dialog.accept()
+    env.idle(window)
+    assert env.cache.limits == []
+    assert env.saved().cache_limit_bytes == huge
+    assert window.session.settings().cache_limit_bytes == huge
+
+
 def test_a_limit_failure_is_a_settings_error(env: Env) -> None:
     window = env.start(cache_fails=True)
     dialog = env.open(window)
