@@ -84,6 +84,7 @@ class StubExportJobs:
         busy_s: float = 0.0,
         chunks: int = 4,
         ignore_cancel: bool = False,
+        warn_on_failure: bool = False,
     ) -> None:
         self.fail = fail
         self.raise_in_job = raise_in_job
@@ -93,6 +94,7 @@ class StubExportJobs:
         self.busy_s = busy_s
         self.chunks = chunks
         self.ignore_cancel = ignore_cancel
+        self.warn_on_failure = warn_on_failure
         self.requests: list[ExportRequest] = []
         self.build_threads: list[threading.Thread] = []
         self.run_threads: list[threading.Thread] = []
@@ -113,7 +115,7 @@ class StubExportJobs:
 
             def done(ok: bool, outputs: tuple[Path, ...] = (), failure: str | None = None) -> Any:
                 self.finished.append(name)
-                warnings = self.warn if ok else ()
+                warnings = self.warn if ok or self.warn_on_failure else ()
                 return JobResult(ok, outputs, warnings, failure, "cpu", time.perf_counter() - start)
 
             if name in self.raise_in_job:
@@ -350,6 +352,24 @@ def test_the_reason_is_cleared_even_when_the_presenter_raises(
     assert any("presenter failed" in str(e[1]) for e in caught)
     assert rig.action.unavailable_reason() is None and rig.action.isEnabled()
     assert not rig.panel.is_running()
+
+
+def test_the_reason_is_cleared_when_setup_raises_after_the_gate_is_taken(
+    make_window: Any, qtbot: Any, tmp_path: Path
+) -> None:
+    """Round-1 F1: a fault between ``try_start`` and the job must not hold the gate."""
+    rig = build_rig(make_window, qtbot, tmp_path)
+
+    def explode(severity: str | None = None, *, owner: str | None = None) -> None:
+        raise RuntimeError("clear failed")
+
+    rig.window.presenter.clear = explode  # type: ignore[method-assign]
+    rig.action.trigger()
+    assert not rig.panel.is_running()
+    assert rig.action.unavailable_reason() is None and rig.action.isEnabled()
+    (error,) = presenter_of(rig.window).of("error")
+    assert "clear failed" in error.text and error.owner == "export"
+    assert rig.stub.requests == [] and not rig.panel.cancel_button.isEnabled()
 
 
 def test_success_clears_only_the_export_errors_and_presents_warnings(

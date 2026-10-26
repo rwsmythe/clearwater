@@ -11,6 +11,8 @@ panel and the batch panel.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
@@ -104,30 +106,32 @@ class ExportPanel(QWidget):
         source = self._context.session.source()
         if source is None or self._running or not self._gate.try_start("export"):
             return
-        request = ExportRequest(
-            source=source.path,
-            kind=source.kind,
-            parameters=self._context.session.parameters(),
-            settings=self._context.session.settings(),
-        )
-        self._context.messages.clear("warning", owner=OWNER)
         self._running = True
         self._cancel_requested = False
         self._handle = None
-        self.bar.setRange(0, 0)
-        self.cancel_button.setEnabled(True)
-        self.status.setText(f"Exporting {messages.file_name(source.path)}...")
-        try:
+        path = source.path
+        try:  # everything after the gate is taken is guarded, so a fault releases it again
+            request = ExportRequest(
+                source=path,
+                kind=source.kind,
+                parameters=self._context.session.parameters(),
+                settings=self._context.session.settings(),
+            )
+            self._context.messages.clear("warning", owner=OWNER)
+            self.bar.setRange(0, 0)
+            self.cancel_button.setEnabled(True)
+            self.status.setText(f"Exporting {messages.file_name(path)}...")
             job = self._exports.job(request)
             handle = self._context.jobs.run(
-                job, on_done=lambda result: self._done(request, result), on_progress=self._progress
+                job, on_done=lambda result: self._done(path, result), on_progress=self._progress
             )
             if self._running:  # a runner that completes synchronously has finished already
                 self._handle = handle
-        except Exception as error:  # a request the engine cannot even start is a failed export
+        except Exception as error:  # an export that cannot even start is a failed export
+            if not self._running:  # the result was already handled; the fault is later
+                raise
             detail = str(error) or type(error).__name__
-            failed = JobResult(False, (), (), detail, "none", 0.0)
-            self._done(request, failed)
+            self._done(path, JobResult(False, (), (), detail, "none", 0.0))
 
     def _progress(self, done: int, total: int | None, message: str) -> None:
         """Show a progress report (main thread)."""
@@ -141,7 +145,7 @@ class ExportPanel(QWidget):
         if message and not self._cancel_requested:
             self.status.setText(messages.ascii_text(message))
 
-    def _done(self, request: ExportRequest, result: JobResult) -> None:
+    def _done(self, path: Path, result: JobResult) -> None:
         """Show the result and make export available again (main thread).
 
         The panel's own state and the gate are released before anything is presented, so a
@@ -154,23 +158,21 @@ class ExportPanel(QWidget):
         self.bar.setRange(0, 1)
         self.bar.setValue(1 if result.ok else 0)
         self._gate.finish("export")
-        name = messages.file_name(request.source)
+        name = messages.file_name(path)
         if result.ok:
             saved = ", ".join(messages.file_name(p) for p in result.outputs) or name
             self.status.setText(f"Saved {saved}")
             self._context.messages.clear("error", owner=OWNER)
             for text in result.warnings:
                 self._context.messages.present(
-                    Message("warning", messages.ascii_text(text), request.source, OWNER)
+                    Message("warning", messages.ascii_text(text), path, OWNER)
                 )
         elif result.failure == CANCELLED:
             self.status.setText("Export cancelled.")
         else:
             reason = messages.ascii_text(result.failure or "the export failed")
             self.status.setText(f"Export of {name} failed.")
-            self._context.messages.present(
-                Message("error", f"{name}: {reason}", request.source, OWNER)
-            )
+            self._context.messages.present(Message("error", f"{name}: {reason}", path, OWNER))
 
 
 def export_panel_factory(exports: ExportJobs, gates: SharedGate) -> PanelFactory:
