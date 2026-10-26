@@ -193,3 +193,25 @@ item (Q3) and its reason is the detection failure. New test
 `test_a_failed_detection_gives_a_stored_encoder_the_failure_as_its_reason` fails on `8f54e53`
 (shown) and passes after; 61 passed with `tests/test_gui_deps.py`; ruff, format and mypy green.
 Report `docs/reports/wp3.20-settings.md` written. Next: full pytest window.
+
+### Reviewer B remediation (orchestrator's seat, candidate `wp3.20-mc` `bbf44e2`; depth 204,057)
+
+One remediation on branch `wp3.20`, one commit per item (no Reviewer A round; B re-runs):
+
+| Item | Severity | Commit | Test (fails on `a6ae225`) |
+|---|---|---|---|
+| Clear cache re-checks `_analysing()` (and `_closed`) after `confirm()` returns | MAJOR | `d5808a9` | `test_an_analysis_that_starts_while_the_confirmation_is_open_blocks_the_clear` |
+| Shown cache GB clamped in integer arithmetic (no float overflow) | MINOR | `d454b06` | `test_a_huge_stored_limit_opens_clamped_and_is_written_back_unchanged` (10**400) |
+| Report and test-docstring wording (gui marker, counts) | MINOR | `34075f2` | -- |
+| `itemToolTip` test defect added to the pre-review defect record | ADVISORY | `34075f2` | -- |
+
+Results (20:21Z, 11.6 GB free, foreground, `QT_QPA_PLATFORM=offscreen`):
+
+- Before: an extracted `git archive a6ae225` copy with the new test file copied in, run with that
+  tree's `src` first on `PYTHONPATH` (module path confirmed under `work/old/src`): the two new
+  tests FAIL (`OverflowError: integer division result too large for a float` for the huge limit;
+  an `AssertionError` for the confirmation test, the cache was cleared). The whole module on that
+  copy: 2 failed, 57 passed, 1 error (the error is the teardown of the overflowing window).
+- After, on head `34075f2`: `tests/test_gui_settings_dialog.py` plus `tests/test_gui_deps.py`:
+  63 passed (59 module cases, 4 deps tests). ruff check, ruff format --check, mypy strict (118
+  files) green.
