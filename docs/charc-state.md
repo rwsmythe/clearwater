@@ -57,8 +57,28 @@ of `origin/main`, unpushed; no push asked (verify `git status -sb`).
   of record is the f1c1bd8 run by code identity** (0 lines differ in src/tests/tools/pyproject/uv.lock, verified
   here); hold lifted, orchestrator's window queue proceeds one suite at a time. **Tranche A: WP3.9, WP3.4, WP3.11 accepted; WP3.10 remains** (seat 6
   stood down at d389269, RESUME HERE complete; seat 7: full-pytest window, footage legs, EXCLUSIVE floor row, report).
-- **Orchestrator gen 11 ONLINE** `clearwater-orchestrator-20261026-0844` (launched 2026-10-26 18:44Z; state 02ac918;
-  sole drainer; **cue THIS name**). Gen 10 rolled at ~395K at the WP3.11 accept boundary and stopped draining.
+- **Orchestrator gen 12 ONLINE** `clearwater-orchestrator-20261026-1223` (launched 2026-10-26 ~22:23Z; state
+  2bb9bba; sole drainer; **cue THIS name**). Gen 11 `clearwater-orchestrator-20261026-0844` rolled at ~415K at
+  the tranche-B B-gate boundary. **Gen 12 is the first role session spawned with the reaper OFF** (launcher
+  60b2642).
+- **Tranche B / WP3.10 at gen 11's rollover (2026-10-26 22:23Z):** WP3.17 (`wp3.17-mc` 0f7b5cd), WP3.19
+  (`wp3.19-mc` 1be0a99), WP3.20 (`wp3.20-mc` e47c8d2): Reviewer B blocked twice each, pass 2 ADJUDICATED AT THE
+  GATE by the orchestrator (one fix commit per finding, tests, docs; verified by execution at its seat); **CHARC
+  looked and UPHELD all three** (evidence `reviewB2\` md5s OK, five assertions OK). WP3.18: loop terminated at the
+  five-round gate, B pass 1 BLOCKED (A->B->A burst between run return and on_done with the adapter's kept job);
+  ONE remediation at a fresh seat 3 then one B re-run. WP3.10 seat 7 footage window DONE: full suite on the
+  rebased head 4434 passed / 2 skipped (also the candidate run); GX011627 all MANDATORY/REQUIRED SAME, tied True
+  (DR-18 (1) closes AT WP3.10's accept); Edits compilation accepted with the 0.79 ms coarse-timescale limit.
+  **PRODUCT DEFECT found: NVENC level cap** -- `-rc vbr -b:v 0 -cq N` without `-maxrate` lets NVENC pick HEVC
+  level 5.0, whose bitrate cap overrides cq, so High/Standard/Draft are the same ~21.7 Mb/s encode on busy 4K.
+  CHARC RULED round 9: `-maxrate`/`-bufsize` derived from the source's video bit rate (not a fixed 300M), test
+  that the three levels differ, NVENC table re-run, then the AD-12 cq/crf mapping comes to CHARC on fixed
+  figures (libx265 busy ratios 1.54 / 0.80 / 0.34 vs targets 1 / 0.5 / 0.25). DR-48 NEW (disk estimate
+  under-estimates on calm clips; 10-bit doubling wrong). Owed at accepts: WP3.17 float-resolution debt row;
+  WP3.14 brief notes (ok result names >= 1 output; per-item D87 check; DR-48). Next: WP3.18 remediation, WP3.10
+  seat 8 (round 9, NVENC re-run, EXCLUSIVE floor row LAST with OPEN/CLOSE), orchestrator B on WP3.10, then ONE
+  stacked suite over five packages (CHARC HOLDS main first), five accepts, CHARC QA on each.
+ Gen 10 rolled at ~395K at the WP3.11 accept boundary and stopped draining.
   Gen 11's first acts: WP3.10 seat 7 and tranche B dispatch (WP3.17-3.20), one heavy job at a time. No live cells
   at rollover.
 - **Tranche B seam rulings 2026-10-26 (gen 11 dispatched WP3.17-3.20 and WP3.10 seat 7 from main 718324b):**
