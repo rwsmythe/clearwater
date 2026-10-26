@@ -303,6 +303,21 @@ short-lived foreign `python.exe` processes (changing pids) at 60-98 %, with host
 on the CPU leg OfficeClickToRun.exe and SrTasks.exe at times. GPU SM clock 2130-2460 MHz at
 75-88 C over the GPU leg. Before the runs: 11.4 GB and 8.96 GB free, GPU idle.
 
+### Erratum at the gate (orchestrator, Reviewer B pass 2, 2026-10-26)
+
+Two sentences above overstate the records; the figures, the bars and every conclusion stand.
+
+- **Memory:** "the pool's used peaks are the same for both methods and so are the render
+  reserved peaks" holds only to the MiB shown. The raw records differ below it (4K analyze proxy
+  used 48.946 / 48.947 MiB; render reserved 1044.193 / 1044.143 MiB at 4K and 1998.151 /
+  1998.082 MiB at 5312 x 2988, c3 / ancuti2018). The CPU legs record no pool reserved
+  measurement at all; a `0` in the table there means "no pool", not a measured zero.
+- **Conditions:** the contamination ranges mix the two legs. Over the GPU leg (7 samples)
+  MsMpEng.exe ran at 98.7-290.1 %, foreign `python.exe` at 26.0-98.0 %, host CPU 46.7-91.6 %;
+  the 388 % Defender peak and OfficeClickToRun.exe (66.0-171.9 %) fell in the CPU leg (11
+  samples, host CPU 9.1-58.7 %). Computed from the `during` samples of
+  `core-whole-GX011627-20261026T144757Z.json` by device.
+
 ## Consumer notes
 
 - **WP3.11.** Call `analyze` per stage in order with the SMOOTHED records of the stages before
