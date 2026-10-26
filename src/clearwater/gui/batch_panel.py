@@ -312,18 +312,47 @@ class BatchPanel(QWidget):
             return
         if not self._gate.try_start("batch"):
             return
-        self._request_template = (resolved, self._context.session.settings())
-        self._running = True
-        self._cancel_requested = False
-        self._handle = None
-        for item in self._items:
-            item.state = ItemState.QUEUED
-            item.outputs = ()
-            item.warnings = ()
-            item.failure = None
-        self.report.clear()
-        self._refresh_rows()
+        try:  # everything after the gate is taken is guarded, so a fault releases it again
+            self._request_template = (resolved, self._context.session.settings())
+            self._running = True
+            self._cancel_requested = False
+            self._handle = None
+            for item in self._items:
+                item.state = ItemState.QUEUED
+                item.outputs = ()
+                item.warnings = ()
+                item.failure = None
+            self.report.clear()
+            self._refresh_rows()
+        except Exception as error:  # a batch that cannot even start is refused, not left running
+            _LOG.exception("the batch could not be started")
+            self._abandon_start()
+            detail = str(error) or type(error).__name__
+            self._context.messages.present(
+                Message(
+                    "error",
+                    messages.ascii_text(f"The batch could not start: {detail}"),
+                    None,
+                    OWNER,
+                )
+            )
+            return
         self._advance_safely()
+
+    def _abandon_start(self) -> None:
+        """Undo a Start that failed in its setup: release the gate and reset the run state."""
+        self._running = False
+        self._handle = None
+        self._current = None
+        self._cancel_requested = False
+        self._request_template = None
+        self._gate.finish("batch")
+        try:
+            self.bar.setRange(0, 1)
+            self.bar.setValue(0)
+            self._update_buttons()
+        except Exception:
+            _LOG.exception("refreshing the batch panel after a failed start failed")
 
     def cancel(self) -> None:
         """Cancel the running item; the rest of the batch will not run (D45)."""

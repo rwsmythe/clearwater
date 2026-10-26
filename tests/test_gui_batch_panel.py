@@ -234,6 +234,63 @@ def test_the_reason_is_cleared_even_when_showing_the_report_fails(
     assert batch.add_button.isEnabled()
 
 
+# The gate is never left held by a Start that fails in its setup (Reviewer B pass 1 major 2).
+
+
+def _start_with_failing_settings(
+    rig: Rig, batch: BatchPanel, monkeypatch: pytest.MonkeyPatch, start: Any
+) -> None:
+    """Make ``session.settings`` raise for the duration of ``start()``, then restore it."""
+
+    def explode() -> None:
+        raise RuntimeError("settings failed")
+
+    original = rig.window.session.settings
+    monkeypatch.setattr(rig.window.session, "settings", explode)
+    try:
+        start()
+    finally:  # the window's close (fixture teardown) reads the settings: restore them first
+        monkeypatch.setattr(rig.window.session, "settings", original)
+
+
+def test_the_gate_is_released_when_setup_raises_after_it_is_taken(
+    rig: Rig, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    batch = started(rig, [A, C])
+    _start_with_failing_settings(rig, batch, monkeypatch, batch.start)
+    assert not batch.is_running() and rig.stub.requests == []
+    assert batch._gate.current is None  # the gate is free again (no source is open here)
+    assert rig.action.unavailable_reason() == NO_SOURCE_REASON  # the batch's reason is gone
+    (error,) = presenter_of(rig.window).of("error")
+    assert error.owner == "batch" and "settings failed" in error.text
+    assert states(batch) == [ItemState.QUEUED] * 2
+    assert batch.add_button.isEnabled() and batch.start_button.isEnabled()
+    batch.start()  # the next Start works and clears the error
+    wait_batch_idle(rig)
+    assert states(batch) == [ItemState.DONE] * 2
+    assert presenter_of(rig.window).of("error") == []
+
+
+def test_planted_start_without_a_guard_after_the_gate_holds_it(
+    rig: Rig, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def unguarded(self: BatchPanel) -> None:
+        assert self._gate.try_start("batch")
+        self._request_template = (
+            self._context.session.parameters(),
+            self._context.session.settings(),
+        )
+        self._running = True  # never reached when ``settings`` raises
+
+    batch = started(rig, [A, C])
+    monkeypatch.setattr(BatchPanel, "start", unguarded)
+    with pytest.raises(RuntimeError, match="settings failed"):
+        _start_with_failing_settings(rig, batch, monkeypatch, batch.start)
+    # The test above fails on this implementation: the gate stays held with nothing running.
+    assert batch._gate.current == "batch"
+    assert not batch.is_running()
+
+
 # One parameter set or preset for every item; snapshot at Start.
 
 
