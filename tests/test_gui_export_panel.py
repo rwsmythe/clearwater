@@ -372,6 +372,47 @@ def test_the_reason_is_cleared_when_setup_raises_after_the_gate_is_taken(
     assert rig.stub.requests == [] and not rig.panel.cancel_button.isEnabled()
 
 
+def _trigger_with_failing_parameters(rig: Rig, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Make ``session.parameters`` raise, then call the panel's trigger handler directly."""
+
+    def explode() -> None:
+        raise RuntimeError("parameters failed")
+
+    monkeypatch.setattr(rig.window.session, "parameters", explode)
+    rig.panel._on_triggered()
+
+
+def test_the_reason_is_cleared_when_building_the_request_raises(
+    make_window: Any, qtbot: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Round-2 minor 1: request construction is inside the guarded block too."""
+    rig = build_rig(make_window, qtbot, tmp_path)
+    _trigger_with_failing_parameters(rig, monkeypatch)
+    assert not rig.panel.is_running()
+    assert rig.action.unavailable_reason() is None and rig.action.isEnabled()
+    (error,) = presenter_of(rig.window).of("error")
+    assert "parameters failed" in error.text and error.owner == "export"
+
+
+def test_planted_request_built_outside_the_guard_holds_the_gate(
+    make_window: Any, qtbot: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def unguarded(self: ExportPanel, *_: object) -> None:
+        source = self._context.session.source()
+        assert source is not None and self._gate.try_start("export")
+        self._running = True
+        ExportRequest(
+            source.path, source.kind, self._context.session.parameters(), Settings()
+        )  # raises before any guard
+
+    rig = build_rig(make_window, qtbot, tmp_path)
+    monkeypatch.setattr(ExportPanel, "_on_triggered", unguarded)
+    with pytest.raises(RuntimeError, match="parameters failed"):
+        _trigger_with_failing_parameters(rig, monkeypatch)
+    # The test above fails on this implementation: the reason stays set with nothing running.
+    assert rig.action.unavailable_reason() == RUNNING_EXPORT_REASON
+
+
 def test_success_clears_only_the_export_errors_and_presents_warnings(
     make_window: Any, qtbot: Any, tmp_path: Path
 ) -> None:
