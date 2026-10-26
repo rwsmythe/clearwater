@@ -2,9 +2,10 @@
 
 ``clearwater.analysis`` (WP3.11) is not imported here or anywhere in ``clearwater.gui``; WP4.3
 adapts its ``AnalysisEngine`` to :class:`ClipAnalysis` and passes the adapter's factory to
-``install_timeline``. The module imports no Qt object: everything in it runs on worker threads
-(the factory excepted, which only builds an object). Frozen at the WP3.18 round-0 yield;
-additive only until the WP3.18 accept, then a change is a CHARC ruling.
+``install_timeline``. The module imports no Qt object: ``run``, ``proxy`` and ``statistics`` run
+on worker threads, while the factory, ``pts`` and ``retarget`` are called on the main thread (the
+threading rules below). Frozen at the WP3.18 round-0 yield; additive only until the WP3.18
+accept, then a change is a CHARC ruling.
 
 Threading rules (the stub honours them, WP4.3's adapter must):
 
