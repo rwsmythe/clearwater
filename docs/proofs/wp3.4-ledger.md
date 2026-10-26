@@ -391,3 +391,11 @@ the max abs difference): the six files at `-v` now 323 passed in 93 s.
 | step | run | host before | start / end (local, -10:00) | exit | output | STOP |
 |---|---|---|---|---|---|---|
 | 1 | `core_speed.py GX011627 --memory` at `3fae1d5` | 11.4 GB free; GPU 0 %, 123 MiB | 04:43:17 / 04:47:18 | 0 | worktree `work/wp3.4/core-memory.txt`; record `C:\Users\rwsmy\clearwater\work\wp3.4\core-whole-GX011627-20261026T144318Z.json` | none: max pool reserved 1044 MiB vs estimate 1982 MiB (2160x3840), 1998 MiB vs 3792 MiB (2988x5312) |
+| 2 | `core_speed.py GX011627 --whole --cpu-frames 10` at `b29a873` (code = `3fae1d5`) | 8.96 GB free; GPU 0 %, 287 MiB | 04:47:56 / 05:37:04 | 0 | worktree `work/wp3.4/core-whole.txt`; record `C:\Users\rwsmy\clearwater\work\wp3.4\core-whole-GX011627-20261026T144757Z.json` | GPU none: core median c3 0.4392, ancuti2018 0.1987 s/frame vs 0.834. CPU subsample c3 23.6563, ancuti2018 10.2003 s/frame: above the bar; raised to the dispatcher (does the D106 STOP cover the CPU fallback?) |
+
+Step 2 record: 681 frames in the clip, n 680 per GPU row; render uploads c3 4, ancuti2018 3
+(both devices); 3-value upload cuda:0 median 0.187 ms (n 200). Contamination kept as spread:
+MsMpEng.exe (Defender) 55-388 % and foreign short-lived `python.exe` processes (60-98 %,
+changing pids) across the GPU leg; host CPU 46-92 % then; the CPU leg had
+OfficeClickToRun.exe and SrTasks.exe at times. GPU SM clock 2130-2460 MHz at 75-88 C on the GPU
+leg.
