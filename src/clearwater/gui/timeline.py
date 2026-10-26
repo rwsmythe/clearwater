@@ -588,7 +588,8 @@ class TimelinePanel(QWidget):
             self._pump()
             return
         if not result.ok:
-            self._scrub_failed(result.failure or "The frame could not be read.")
+            if request.seq == self._seq:  # the failure of a superseded request is not news
+                self._scrub_failed(result.failure or "The frame could not be read.")
         elif request.kind == "proxy":
             if request.seq > self._shown_proxy_seq and request.seq > self._latest_commit:
                 self._shown_proxy_seq = request.seq

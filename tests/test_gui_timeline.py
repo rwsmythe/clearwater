@@ -739,6 +739,30 @@ def test_scrub_failures_are_owned_by_the_timeline_and_cleared_by_the_next_succes
     release(env)
 
 
+def test_the_failure_of_a_superseded_scrub_request_is_not_presented(
+    make_env, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    env = make_env(gated=(0,), proxy_delay=0.15, fail_proxy=(PTS[2],))
+    complete(env)
+    presenter = presenter_of(env.window)
+    seen: list[Any] = []
+    original = presenter.present
+
+    def record(message: Any) -> None:
+        seen.append(message)
+        original(message)
+
+    monkeypatch.setattr(presenter, "present", record)
+    drag_to(env, 2)  # this read fails after its delay ...
+    env.wait(lambda: env.analysis.active_proxy == 1)
+    drag_to(env, 3)  # ... when a newer request already exists
+    last = np.full((12, 16, 3), PTS[3] % 251, np.uint8)
+    env.wait(lambda: bool(env.shown) and np.array_equal(env.shown[-1], last))
+    env.wait(lambda: env.window.jobs.active() == 0)
+    assert [m for m in seen if m.severity == "error"] == []
+    release(env)
+
+
 def test_run_proxy_and_statistics_run_off_the_interface_thread(make_env) -> None:
     scenario_run_thread(make_env(gated=(0,)))
 
