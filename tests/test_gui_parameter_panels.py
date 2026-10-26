@@ -549,3 +549,31 @@ def test_every_message_this_module_presents_has_an_owner(make_window, monkeypatc
     )
     basic.controls()["gain"].spin.setValue(0.1)
     assert presenter.messages and all(m.owner == "parameters" for m in presenter.messages)
+
+
+# Round-1 regressions (Reviewer A, findings 4 and 6).
+
+
+def test_int_bounds_beyond_the_spin_box_limit_are_clamped_both_ways(make_window) -> None:
+    schema = (
+        param("high", "int", 3_500_000_000, 3_000_000_000, 4_000_000_000),
+        param("low", "int", -3_500_000_000, -4_000_000_000, -3_000_000_000),
+    )
+    _, basic, _ = build(make_window, {"m": SchemaMethod("m", schema)})
+    for row in basic.controls().values():
+        assert -(2**31 - 1) <= row.spin.minimum() <= row.spin.maximum() <= 2**31 - 1
+
+
+def test_a_refused_edit_puts_the_session_value_back_in_the_control(
+    make_window, monkeypatch
+) -> None:
+    window, basic, _ = build(make_window)
+    monkeypatch.setattr(
+        window.session, "set_parameters", lambda ps: (_ for _ in ()).throw(ValueError("no"))
+    )
+    gain = basic.controls()["gain"]
+    gain.spin.setValue(0.1)
+    assert gain.spin.value() == 1.0 and gain.slider.value() == 500 and gain.shown() == 1.0
+    mode = basic.controls()["mode"]
+    mode.combo.setCurrentIndex(2)
+    assert mode.combo.currentText() == "b"

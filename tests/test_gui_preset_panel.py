@@ -611,7 +611,8 @@ def test_the_panels_own_error_is_cleared_by_its_next_success(make_window) -> Non
 
 
 @pytest.mark.parametrize(
-    "error", [OSError("disk gone"), FormatError("bad shape"), PresetError("refused")]
+    "error",
+    [OSError("disk gone"), FormatError("bad shape"), PresetError("refused"), ValueError("plain")],
 )
 def test_no_exception_escapes_a_slot(make_window, tmp_path, monkeypatch, error) -> None:
     setup = build(make_window)
@@ -684,3 +685,49 @@ def test_the_default_dialogs_are_the_qt_ones(make_window) -> None:
     window = make_window(stub_engines())
     panel = pp.preset_panel(window.context)
     assert isinstance(panel._dialogs, QtPresetDialogs)
+
+
+# Round-1 regressions (Reviewer A, findings 1-3).
+
+
+def test_load_and_export_refresh_the_list(make_window, tmp_path) -> None:
+    setup = build(make_window)
+    put(setup, "Seen")
+    setup.select("Seen")
+    setup.store.save("Added outside", new_parameter_set("c3", {}))
+    assert "Added outside" not in setup.names()
+    setup.panel.load()
+    assert "Added outside" in setup.names()
+    setup.store.save("Added again", new_parameter_set("c3", {}))
+    setup.dialogs.saves.append(tmp_path / "seen-copy.json")
+    setup.panel.export()
+    assert "Added again" in setup.names()
+
+
+def test_a_listing_error_after_a_successful_operation_is_not_hidden(
+    make_window, monkeypatch
+) -> None:
+    setup = build(make_window)
+    put(setup, "Old")
+    setup.select("Old")
+    setup.dialogs.names.append("New")
+
+    def unlistable() -> list[Any]:
+        raise OSError("folder gone")
+
+    monkeypatch.setattr(setup.store, "list_presets", unlistable)
+    setup.panel.rename()
+    assert file_for(setup, "New").exists()
+    (error,) = setup.own()
+    assert "folder gone" in error.text and error.severity == "error"
+
+
+def test_a_case_only_save_over_selects_the_stored_preset(make_window) -> None:
+    setup = build(make_window)
+    put(setup, "Mine")
+    put(setup, "Other")
+    setup.select("Other")
+    setup.dialogs.names.append("MINE")
+    setup.dialogs.answers.append(True)
+    setup.panel.save_as()
+    assert setup.panel.selected() == "Mine"
