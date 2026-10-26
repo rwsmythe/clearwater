@@ -639,3 +639,22 @@ def test_planted_basic_panel_that_adds_every_row_twice_fails(make_window, monkey
     monkeypatch.setattr(pp.BasicPanel, "_rebuild", doubled)
     with pytest.raises(AssertionError, match="basic"):
         _assert_one_visible_row_per_parameter(make_window)
+
+
+# Round-2 Reviewer B adjudication (items 1, 2, 4).
+
+
+@pytest.mark.parametrize(("lo", "hi"), [(0.0, 5e-324), (-1e308, 1e308)])
+def test_extreme_finite_float_ranges_build_and_commit_inside_their_bounds(
+    make_window, lo, hi
+) -> None:
+    schema = (param("extreme", "float", lo, lo, hi),)
+    assert pp.float_has_slider(schema[0]) is False and float_decimals(schema[0]) >= 2
+    window, basic, _ = build(make_window, {"m": SchemaMethod("m", schema)})
+    row = basic.controls()["extreme"]
+    assert row.slider is None
+    seen = changes(window)
+    row.spin.setValue(hi)
+    row.spin.setValue(lo / 2)
+    row.spin.setValue(hi / 3)
+    assert all(lo <= p.parameters["extreme"] <= hi for p in seen)

@@ -87,7 +87,8 @@ def float_has_slider(parameter: Parameter) -> bool:
 
     Both bounds must be set, apart, and the span must be resolvable: 1000 slider steps must be
     distinct values at no more than 15 decimals (the precision of a double near 1). A range
-    narrower than 1e-12 gets the spin box alone, at full precision.
+    narrower than 1e-12, one whose span is not finite (``-1e308..1e308``) and one whose step
+    underflows (``0..5e-324``) get the spin box alone.
 
     Args:
         parameter: A ``float`` parameter.
@@ -98,7 +99,23 @@ def float_has_slider(parameter: Parameter) -> bool:
     lo, hi = parameter.minimum, parameter.maximum
     if lo is None or hi is None or not hi > lo:
         return False
-    return math.ceil(-math.log10((hi - lo) / SLIDER_STEPS)) <= _MAX_DECIMALS
+    return _slider_decimals(lo, hi) is not None
+
+
+def _slider_decimals(lo: float, hi: float) -> int | None:
+    """Return the decimals that make 1000 steps over ``[lo, hi]`` distinct, or None.
+
+    None when the span is not finite (``-1e308..1e308``), the step underflows to zero
+    (``0..5e-324``) or more than 15 decimals would be needed.
+    """
+    span = hi - lo
+    if not math.isfinite(span) or not span / SLIDER_STEPS > 0:
+        return None
+    try:
+        decimals = math.ceil(-math.log10(span / SLIDER_STEPS))
+    except (ValueError, OverflowError):
+        return None
+    return decimals if decimals <= _MAX_DECIMALS else None
 
 
 def float_decimals(parameter: Parameter) -> int:
@@ -108,8 +125,10 @@ def float_decimals(parameter: Parameter) -> int:
     largest of: those of the default and of both bounds in their shortest ``repr`` (so the default
     and the bounds are shown exactly and the maximum is reachable), and, when the parameter has a
     slider (:func:`float_has_slider`), those that make its 1000 steps distinct. At least 2 (3 when
-    a bound is missing) and at most 15; only a value that needs more than 15 decimals is rounded
-    (a committed number is clamped to ``[minimum, maximum]`` regardless).
+    a bound is missing) and at most 15 (the supported resolution): the bounds and the default are
+    shown exactly only when 15 decimals resolve them. A span or a bound that 15 decimals cannot
+    resolve (``0..1e-16``) collapses in Qt's spin box, which rounds to its decimals; a committed
+    number is still clamped to ``[minimum, maximum]``.
 
     Args:
         parameter: A ``float`` parameter.
@@ -120,9 +139,8 @@ def float_decimals(parameter: Parameter) -> int:
     default = parameter.default if isinstance(parameter.default, int | float) else None
     lo, hi = parameter.minimum, parameter.maximum
     needed = max(_digits(default), _digits(lo), _digits(hi))
-    if float_has_slider(parameter):
-        assert lo is not None and hi is not None
-        needed = max(needed, math.ceil(-math.log10((hi - lo) / SLIDER_STEPS)))
+    if lo is not None and hi is not None and float_has_slider(parameter):
+        needed = max(needed, _slider_decimals(lo, hi) or 0)
     floor = _MIN_DECIMALS if lo is not None and hi is not None else 3
     return min(max(needed, floor), _MAX_DECIMALS)
 
