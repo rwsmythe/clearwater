@@ -42,77 +42,22 @@
   blob is LF (main has 0 CR bytes everywhere, the debt register included). At every gate: for each file in
   `git diff --name-only <base>..<cand>`, `git cat-file -p <cand>:<f> | tr -cd '\r' | wc -c` must be 0.
 
-### Live cells (gen 11; they die with this generation -- re-dispatch from their ledgers)
+### Live cells (gen 12; they die with this generation -- re-dispatch from their ledgers)
 
-Dispatch prompts: gen 11 scratchpad
-`C:\Users\rwsmy\AppData\Local\Temp\claude\C--Users-rwsmy-clearwater\5f10a032-edb3-44be-ab01-d21d2702ef2f\scratchpad\`
-(`prompt-wp3.10-seat7.md`, `prompt-trancheB-common.md` + `mk.py`, `prompt-wp3.18-seat2.md`, `prompt-wp3.19-seat2.md`,
-`mk_rerun.py` = builds a Reviewer B re-run prompt from pass 1 + a `rerun-section.md`). All branches from main `718324b`;
-main is now `7fff7be`+ (docs only since).
-
-| Package | Branch head / my candidate | State | Next |
+| Package | Branch head | State | Next |
 |---|---|---|---|
-| WP3.10 | `wp3.10` `5727842` (rebased by gen 11; `wp3.10-pre-rebase2` = `d389269`) | seat 7 (`wp310-cell7`): **full suite 4434 passed / 2 skipped, 2034 s, on `5727842` = my candidate-gate run** (one background process + foreground poll-waits; log `work/wp3.10/s7-full2.log`); FOOTAGE window granted ~21:10Z (legs a, b, c) | EXCLUSIVE floor row LAST and alone (OPEN/CLOSE to CHARC); report; return; then my Reviewer B (none run yet) and the stacked gate |
-| WP3.17 | `wp3.17` `f819ef3` / `wp3.17-mc` `0f7b5cd` | RETURNED. A terminated R1. **B pass 1 BLOCKED** (float decimals cap 6) -> ONE remediation -> **B pass 2 BLOCKED, ADJUDICATED AT THE GATE**: 5 fixes (`14b448e` extreme spans no slider, `72356f8` slider ends exact, `c161353` shared owner clear, `7b7b6af` save-as refresh on failure, `f819ef3` docs) VERIFIED BY EXECUTION at my seat (5 failed on `f6b40a9`; 86 passed on the candidate); #1 (spans 15 decimals cannot resolve) = a LIMIT -> **bank DR** (trigger: a method declaring such a float) | stacked gate; accept record; DR row |
-| WP3.18 | `wp3.18` (seat 2 `wp318-cell2`) | seat 1 retired at 342K after R1; seat 2: R2-R5; R3 procedural breach (fixes in the adjudicating turn; not voided); design guard after R4 -> lane restructured to ONE latest-intent invariant (`b1f9783`) + 200-seed interleaving test (`fa0fa7d`); **R5 = five-round gate: finding 1 adjudicated MINOR, loop TERMINATED**; cleanup (option S strict proxy) + report in progress | its return; my Reviewer B pass 1 (none yet) |
-| WP3.19 | `wp3.19` `071cb1f` / `wp3.19-mc` `1be0a99` | seat 1 RETURNED (A converged R2; seam wording `efc95f5d4e7b8456`), retired at 261K; **B pass 1 BLOCKED** (2 majors) -> seat 2 (`wp319-cell2`) remediation -> **B pass 2 BLOCKED, ADJUDICATED AT THE GATE**: 4 fixes VERIFIED BY EXECUTION at my seat (5 failed on `9eefd83`; 85 passed on the candidate); #1 (ok with empty outputs) downgraded, defensive text in the panel, and **for CHARC/WP3.14's brief: "an ok JobResult names at least one output"**; #5 V7 at a few hundred items = LIMIT | stacked gate; accept record; tell CHARC the WP3.14 line |
-| WP3.20 | `wp3.20` `1e0aae8` / `wp3.20-mc` `e47c8d2` | RETURNED. A terminated R1. **B pass 1 BLOCKED** (Clear-cache TOCTOU across the modal confirm) -> ONE remediation -> **B pass 2 BLOCKED (cache-limit job ordering), ADJUDICATED AT THE GATE**: `CacheLimiter` fix VERIFIED BY EXECUTION at my seat (failed on `34075f2`; 64 passed on the candidate). Interim `resolve_encoder` stub stays until WP4.3 swaps in WP3.10's (brief: "whichever lands second (or WP4.3)") | stacked gate; accept record |
+| WP3.10 | `wp3.10` `5cc94e4`+ (seat 8 `wp310-cell8`, 252K at the R10 yield) | R9 (derived maxrate, CHARC rule WITHDRAWN) blocked on the 20 Mb/s floor raising fixture levels; CHARC RULED O3 (`17f12f9dc7eba3ae`, AD-12 amended `ccaecd7`): 0.24 bpp x pixel rate High, 1/2, 1/4, bufsize = ceiling, explicit `-tier main -level L`, min(pixel ceiling, source Main-tier cap) for HEVC sources, SinkReport warning; built `5cc94e4`. **R10 = five-round gate: 0/0/2, TERMINATION ACCEPTED** (test-only cleanup). Beyond-ruling choice (cap at 6.2 / refuse at open) ACCEPTED out of envelope. FOOTAGE window GRANTED ~23:15Z | footage figures + AD-12 proposal to CHARC; then decide: seat 8 or a fresh seat 9 for the EXCLUSIVE floor row (OPEN/CLOSE to CHARC), report, return; then my Reviewer B (none yet) and WP3.10's own candidate gate (full suite) |
 
-**Reviewer B evidence:** `C:\Users\rwsmy\clearwater-review-evidence\wp3.{17,19,20}\reviewB\` (pass 1) and `reviewB2\` (pass 2), each
-with `md5sums.txt`; all passes gpt-5.6-sol high, 0 `^ERROR`, footer present, VERDICT anchored, no withheld read in the
-command lines (the hits are prompt/diff echoes). Runner: `run_review_B.sh` per folder; run it in the FOREGROUND
-(`MSYS_NO_PATHCONV=1 timeout 590 wsl.exe bash -ilc 'bash /mnt/c/.../run_review_B.sh review'`, Bash timeout 600000).
+### Where things stand (gen 12)
 
-**Gate plan (CHARC agreed):** ONE stacked full suite on main + WP3.10 + WP3.17 + WP3.18 + WP3.19 + WP3.20 (disjoint
-files; order free) replaces each GUI cell's own full pytest; then ff + accept record per package; then main gates.
-Ask CHARC to HOLD main first. **Run every long suite as ONE background process with FOREGROUND poll-wait calls**
-(CHARC `b4f1c9c8fee81d83`): an idle session gets its background shells reaped (two reaps today at 92-94 %, in
-`tests/test_prototype_backend.py`/`test_prototype_clip.py`); chunks only as the fallback after one more reap.
-
-### Where things stand -- the successor starts HERE (gen 12)
-
-Every cell of gen 11 died with it. Nothing is mid-round. In order:
-
-1. **WP3.18 Reviewer B pass 1 BLOCKED** (`wp3.18-mc` `44ef658`; evidence `...\wp3.18\reviewB\`, md5s): ONE in-envelope MAJOR
-   -- an A->B->A burst in the run-returned-to-`on_done` window: WP3.11 hands the adapter a recompute job for B (kept, per
-   CHARC point 5), the reversion to A skips `retarget` because A == `run.target`, `on_done` declares complete, and the
-   engine is left holding the B job (export enabled on the wrong statistics). Fix (panel side): once ANY `retarget`
-   returned False during a run, a follow-up `run(latest)` ALWAYS starts at done-ok; test with a stub that models the
-   retained job. Minors: #2 `_on_progress` drops the reported text (show it); #3 the report's `statistics ->
-   smoothed_record` mapping must say the adapter returns None until a full run completes (WP3.11 serves near-phase records
-   early); #4 runner close after a superseded run leaves phase "running" (set a terminal phase when `_start_run` hits a
-   closed runner). **Dispatch a FRESH seat 3** (sonnet-high; seat 2 was at 274K; CHARC's rule: a B remediation past 250K goes
-   to a fresh seat) from the ledger + `reviewB\review-B.txt`; ONE remediation, then ONE B re-run (template:
-   `mk_rerun.py` + a `rerun-section.md`); a second blocking B is adjudicated at the gate.
-2. **WP3.10:** seat 7 (`wp310-cell7`) finished the full suite (4434 passed / 2 skipped = the candidate-gate run) and the
-   FOOTAGE window (legs a, b, c; figures in its ledger's RESUME HERE and `work/wp3.10/s7-footage/`, e.g. `legb-table.txt`).
-   Footage results: (a) GX011627 MANDATORY/REQUIRED all SAME, `tied True` -> **DR-18 (1) CLOSES**; (c) the Edits
-   compilation `open` accepts 3003/60000; 2 MANDATORY DIFFERENT = the accepted "rounded UP" coarse-movie-timescale limit
-   (0.79 ms < one 1 ms tick). **(b) FINDING, a product defect:** on busy 4K, NVENC's High/Standard/Draft are the SAME encode
-   (~20 Mb/s, flat PSNR): `-rc vbr -b:v 0 -cq N` with no `-maxrate` makes NVENC pick HEVC level 5.0, whose cap overrides
-   cq (`nvcap.txt`: cq 18 21.68 vs cq 28 21.76 Mb/s; with `-maxrate 300M -bufsize 600M` 131.5 vs 37.3). **My recommended
-   ruling for you to confirm:** approve the one-line fix in `encode.py` `_video_options` (maxrate/bufsize or an explicit
-   level) + a test that the levels differ, as Reviewer A ROUND 9 scoped to the change; re-run leg (b) NVENC; propose the
-   AD-12 mappings to CHARC on the fixed figures (libx265 measured H 1.54 / S 0.80 / D 0.34 of camera on busy footage ->
-   estimate crf ~21/26/30). Disk-estimate risk for WP3.13/WP3.14: on a calm low-bit-rate clip outputs are 1.2-3.4x the
-   source (NVENC), QUALITY_RATIO 1.0 x MARGIN 1.25 under-estimates High by up to ~2.7x -> to CHARC.
-   Next: **seat 8** (opus-high) from the ledger's "RESUME HERE for seat 8" (`wp3.10` head `e7668e1`; note: the worktree's
-   `clearwater.local.toml` points at the MAIN tree's `work\`, pass `--config` with the worktree's path): round 9 (if you approve), the (b) NVENC re-run,
-   then the EXCLUSIVE floor row LAST and alone on the final code (OPEN/CLOSE to CHARC), the report, the return report. Then
-   my Reviewer B on WP3.10 (none run yet; the product converged at R4, the bench at R8).
-3. **WP3.17, WP3.19, WP3.20: B DONE** (each pass 2 adjudicated at the gate, fixes verified by execution at my seat; see the
-   Live-cells table). Ready for the stacked gate.
-4. **The stacked gate** (CHARC agreed): ask CHARC to HOLD main; build ONE stack on main of WP3.10 + 3.17 + 3.18 + 3.19 +
-   3.20 (disjoint files; any order; patch-id per package against its author branch); ONE full suite on the stack top
-   (CuPy as installed; plain background run now that the reaper is off); then ff + accept record per package (stack
-   order), then the main gates (full suite + harness gate) once; the CR blob check on every changed file; post the release
-   + return reports to CHARC; info-update to the operator.
-5. **Owed to CHARC in the release post:** WP3.17 debt row ("a float span or bounds 15 decimals cannot resolve"; trigger: a
-   method declaring one); WP3.19's line for WP3.14's brief ("an ok JobResult names at least one output") and its limit (V7
-   unmeasured at a few hundred items); WP3.20's interim `resolve_encoder` stub (WP4.3 swaps in WP3.10's); WP3.18's WP4.3
-   notes (adapter keeps its own pts list, F-2; keeps a returned job, point 5) and its R3 procedural breach (disclosed, not
-   voided); the three gate adjudications (WP3.17/3.19/3.20 B pass 2) for CHARC to look at.
-6. **Host:** one heavy job at a time. Small GUI targeted runs (<1 min, no FFmpeg/GPU) may overlap a suite or footage leg.
+1. **Tranche B ACCEPTED at main `d31dd0f`** (WP3.17, 3.18, 3.19, 3.20; one ff of `stackB-acc`; full suite on stack top
+   `d71d994` 4501 passed / 2 skipped = main's figure by code identity; harness 366 OK). Release post to CHARC 23:23Z
+   (owed rows listed there); operator FYI posted. CHARC QA pending.
+2. **WP3.18 B pass 2 CLEAN** on `d8f3859`; six minors disposed as the report's "Erratum at the gate" (`b6673df`).
+3. **WP3.10:** see Live cells. Reviewer B prompt: copy `...\wp3.18\reviewB\` runner + prompt form; its own candidate gate
+   is a full suite on `wp3.10` rebased onto main (disjoint from tranche B).
+4. **Gen-12 slips:** two bare `cd`s moved the shared cwd (once into `.worktrees/stackB`); reverted at once, the cell told.
+   Every worktree command goes in a `( cd <wt> && ... )` subshell, never `cd <wt> && ...` at top level.
 
 ### (older) Where things stood at the gen-10 handover
 
@@ -176,6 +121,10 @@ Each accepted package had its return report posted to CHARC and an info-update t
 | WP3.9 | 2026-10-21 | `09ab408` | `docs/proofs/wp3.9-accept.md`; DR-45; A converged R3; candidate 3670 passed; B clean (1 minor + 1 advisory banked, 1 erratum) | CONFIRMED in full (`bfe4b56072240ecf`; 3670 passed at CHARC's seat; worktrees `wp3.9`, `wp3.9-mc` removed by gen 10) |
 | WP3.4 | 2026-10-26 | `ad15ab4` | `docs/proofs/wp3.4-accept.md`; DR-46; A converged R1; B pass 1 blocked (dtype coercion, confirmed by execution) -> ONE remediation -> B pass 2 clean, erratum at the gate; CRLF blob caught and fixed; candidate CuPy 3970 / no-CuPy 3418 | CONFIRMED static half (`d3c7ebcf9749a876`; register rows `6b58619`) |
 | WP3.11 | 2026-10-26 | `47235b6` | `docs/proofs/wp3.11-accept.md`; DR-47; A converged R3; B pass 1 blocked (schema-hash divergence) -> fresh-seat remediation -> B pass 2 blocked (signed zero) ADJUDICATED AT THE GATE, verified by execution; stacked on WP3.4; CuPy 4200; no-CuPy reaped; main full pytest owed (CHARC asked to let its QA suite stand) | pending |
+| WP3.17 | 2026-10-26 | `d31dd0f` | `docs/proofs/wp3.17-accept.md`; A terminated R1; B blocked twice, pass 2 adjudicated at the gate (UPHELD); stacked gate 4501 passed | pending |
+| WP3.18 | 2026-10-26 | `d31dd0f` | `docs/proofs/wp3.18-accept.md`; A terminated at the R5 gate (lane restructure); B pass 1 blocked -> seat-3 remediation -> B pass 2 clean, erratum at the gate | pending |
+| WP3.19 | 2026-10-26 | `d31dd0f` | `docs/proofs/wp3.19-accept.md`; A converged R2; B blocked twice, pass 2 adjudicated at the gate (UPHELD) | pending |
+| WP3.20 | 2026-10-26 | `d31dd0f` | `docs/proofs/wp3.20-accept.md`; A terminated R1; B blocked twice, pass 2 adjudicated at the gate (UPHELD) | pending |
 | DR-44 amendment | 2026-10-21 | `de206e2` | `docs/proofs/dr44-contract-amendment.md`; B pass 1 blocked, remediated, pass 2 clean; main 3570 passed | checked (`00b7f7a8baa5ae3b`) |
 
 Kept branches (evidence; do not delete unasked): `wp3.4`, `wp3.4-mc`, `wp3.11`, `wp3.11-mc`, `wp3.10-pre-rebase`, `orch-state-g10`, `orch-state-g10b`, `wp3.9`, `wp3.9-mc`, `dr44`, `dr44-record`, `wave3-briefs`, `wp3.12`, `wp3.12-mc`, `wp3.6`, `wp3.6-mc`, `wp3.6-mc2`, `wp3.16`, `wp3.16-mc`, `wp3.16-pre-rebase`, `wp3.2`, `wp3.2-mc`, `wp3.2-mc2`, `wp3.3`, `wp3.3-mc`, `wp3.3-mc2`, `wp3.5`, `wp3.5-mc`, `wp3.5-mc2`, `wp3.15`, `wp3.15-mc`, `wp3.13`, `wp3.13-mc`, `wp3.7`, `wp3.7-mc`, `wp3.1`, `wp3.1-mc`, `wp2.3`, `wp2.3-mc`, `wp2.2`, `wp2.2-mc`, `wp1.2b`, `wp1.2b-b1`, `wp1.3d`, `wp1.3d-b1`,
