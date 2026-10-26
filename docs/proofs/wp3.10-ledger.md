@@ -14,6 +14,7 @@ Evidence root: `C:\Users\rwsmy\clearwater-review-evidence\wp3.10\` (`r0\` = this
 | 2 | Reviewer A (seat 3) on `8fe963f` | 0 | 2 + 1 self-found | 1 | reviewer MAJOR: 1 in (REJECTED with reproduction), 1 out (reviewer-tagged); MINOR: 1 out; self-found MAJOR S1: in | reviewer 2 NEW, 1 REOPENED (r1 #10); S1 NEW | 0 | PRODUCT and instrument (seat 4: S1 `3f73633`, #2 `155b691`, #3 `21059b8`) | WSL, codex-cli gpt-5.6-sol high; 20 `succeeded in`; 217,008 tokens; 1 echoed `ERROR` (sandbox subprocess, not transport) | 361K at the pause (seat 3 retired) |
 | 3 | Reviewer A (seat 4) on `21059b8`, base `ac4be92` | 0 | 3 | 1 | MAJOR: 1 in (#1 ACCEPTED), 2 out (reviewer-tagged; #2 REJECTED with reproduction, #3 REJECTED with reason); MINOR: 1 in (#4 ACCEPTED, cleanup) | 4 NEW, 0 REOPENED | 0 | PRODUCT (`2f9c240`: #1 sink cleanup; #4 report) | WSL, codex-cli 0.162.1 gpt-5.6-sol high; probe 1 + review 11 `succeeded in`; 185,272 tokens; 1 echoed `ERROR` (WSL vsock, not transport) | 211,777 at the round-3 yield |
 | 4 | Reviewer A (seat 4) on `2f9c240`, base `ac4be92` | 0 | 2 (reviewer) -> 0 adjudicated | 2 -> 4 adjudicated | all in envelope; MAJOR #1, #2 ACCEPTED and adjudicated MINOR (reproduction + reason; dispatcher UPHELD both: ZERO new blocking, the loop TERMINATES); MINOR #3, #4 ACCEPTED (cleanup) | 4 NEW, 0 REOPENED | 0 | PRODUCT and instrument, as the terminating round's cleanup (`4dfa96e`) | WSL, codex-cli 0.162.1 gpt-5.6-sol high; 15 `succeeded in`; 190,700 tokens; 2 `ERROR` matches = echoed source code, not transport | 248,871 at the round-4 yield; 279,801 after the round-4 cleanup |
+| 5 | Reviewer A (seat 5) on `dabb204`, base `be7fe51` (SCOPED to the floor-row instrument `tools/video_io_bench.py` + its tests) | 0 | 3 (reviewer) -> 1 adjudicated | 7 -> 9 adjudicated | MAJOR #2 in (ACCEPTED, blocking); MAJOR #1, #3 in, adjudicated MINOR (reproduction / reason); MINOR #4-#9 in (ACCEPTED, cleanup); MINOR #10 OUT (reviewer-tagged; BANKED) | 10 NEW, 0 REOPENED | 0 | pending the gate ruling: the fixes change the instrument's code (`tools/video_io_bench.py`) and its tests | WSL, codex-cli 0.162.1 gpt-5.6-sol high; probe 1 + review 29 `succeeded in`; 98,860 tokens; 6 `ERROR` matches = echoed source code, not transport | (dispatcher, at the round-5 yield) |
 
 Seat 1 stops after round 0 by the orchestrator's instruction (219K before product code; the build
 is the largest in the wave). A fresh cell builds from "RESUME HERE" below.
@@ -207,7 +208,8 @@ main, stream and info packets of an FFmpeg-written file).
   every file in `git diff --name-only main..HEAD` must have 0 CR bytes in its HEAD blob
   (`git show HEAD:<f> | tr -cd '\r' | wc -c`). Write files with LF only; `work\wp3.10\r4\lf.py`
   converts (replaces b"\r\n" with b"\n" and nothing else). Commit with `-c core.autocrlf=false`.
-- **Full pytest:** PENDING in seat 4's queued window (result recorded here when it lands).
+- **Full pytest:** seat 4's window was CANCELLED by the dispatcher; it runs after seat 5's tool
+  and round 5, before the footage legs (dispatcher, seat-5 dispatch).
 - **Seat 5's ladder, in order:**
   1. Write `tools/video_io_bench.py` (brief task 10, question 11, rulings Q11): WP3.9's `frames`
      straight into this sink (no correction); per-frame and min/min figures with the strays,
@@ -360,3 +362,32 @@ Seat-4 slip disclosed: several early tool calls used `cd <worktree> && ...` in t
 - LF correction (dispatcher): the CRLF "restoration" in `4dfa96e` / `141cde5` was itself the
   defect; `14e0425` stores all seven package files with LF (endings-only: an `--ignore-cr-at-eol`
   diff of the commit is empty). Every file in `main..HEAD` has 0 CR bytes in its HEAD blob.
+
+## Seat 5 (fresh seat) -- the floor-row instrument and round 5
+
+- Dispatch (orchestrator gen 10): ladder (1) tool + tests, static gates; (2) Reviewer A round 5
+  scoped to the tool's diff (five-round gate); (3) full pytest in a window; (4) footage legs in a
+  window; (5) EXCLUSIVE floor row, last and alone; (6) report and return report.
+- Built `dabb204`: `tools/video_io_bench.py` (`run CLIP`, `floor` = `FLOOR_PLAN`, ruling Q11's
+  set; WP3.9's `frames` straight into the sink; stage, per-frame, s/frame and min/min figures;
+  process-tree RSS with FFmpeg children, device-wide graphics memory, clocks and temperatures;
+  strays from a watcher PROCESS; the DR-18 (1) proof through the fidelity instrument's sampler)
+  and `tests/test_io_video_encode_bench.py` (inside the brief's `tests/test_io_video_encode*.py`
+  ownership; 21 passed, the gpu test included). Static gates clean. Found while building
+  (scratch `work\wp3.10\r5\`): the per-process CPU walk in a THREAD holds the interpreter lock in
+  long stretches (a 0.26 s probe took 23 s beside it), hence the separate watcher process; a
+  venv's `python.exe` on Windows can be a launcher whose child is the interpreter (test helper).
+- Seat-5 slip disclosed: one early tool call used `cd <worktree> && ...` (agent shells reset
+  between calls; subshells used from then on).
+
+### Round 5 (evidence `C:\Users\rwsmy\clearwater-review-evidence\wp3.10\r5\`, `adjudication.md` there)
+
+ACCEPTED, blocking: 2 (MAJOR: the strays watch misses a process for its first window, and one that
+lives under a window entirely; reproduced, `repro/repro_f2.log`). Adjudicated MINOR: 1 (the
+unattributed part of a frame interval is the loop's bookkeeping, 1.51 us mean, reproduced
+`repro/repro_f1.log`; raw wait/write lists to be kept), 3 (non-positive periods: reachable only by
+explicit misuse; defaults used in the windows). ACCEPTED MINOR: 4-9 (conditions window text,
+disk re-check per run, run options after the subcommand, NVENC test name, a failed-after-success
+test, watcher start-failure cleanup). BANKED: 10 (several GPUs, out of envelope). NEW blocking
+in envelope = 1, so the loop does not terminate; FIVE_ROUND_GATE: yield for approval to continue.
+No change made in the adjudicating turn.
