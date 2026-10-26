@@ -513,9 +513,15 @@ def scenario_drag(env: Env, ms: int = 4000) -> None:
     env.shown.clear()
     drag_to(env, 2)
     drag_to(env, 3)
-    env.wait(
-        lambda: any(np.array_equal(s, np.full((12, 16, 3), PTS[3] % 251)) for s in env.shown), ms
-    )
+
+    def proxy_shown() -> bool:
+        return any(np.array_equal(s, np.full((12, 16, 3), PTS[3] % 251)) for s in env.shown)
+
+    # whichever comes first: a position set during the drag is the failure, named as such, and
+    # not a timeout waiting for a proxy that a planted panel never requests
+    env.wait(lambda: bool(env.positions) or proxy_shown(), ms)
+    assert env.positions == [], "set_position was called during the drag"
+    env.wait(proxy_shown, ms)
     assert env.positions == []
     release(env)
     env.wait(lambda: any(p == PTS[3] for p, _ in env.positions), ms)
@@ -677,7 +683,7 @@ def test_dragging_shows_the_stored_proxy_and_never_sets_the_position(make_env) -
 
 def test_planted_set_position_during_a_drag_fails(make_env) -> None:
     env = make_env(panel_class=DragSetsPositionPanel, gated=(0,))
-    with pytest.raises(AssertionError):
+    with pytest.raises(AssertionError, match="set_position was called during the drag"):
         scenario_drag(env, ms=700)
 
 
