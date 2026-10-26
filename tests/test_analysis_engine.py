@@ -185,6 +185,20 @@ def test_a_source_only_stage_is_read_back_and_passed_through_closed_form() -> No
     assert np.all(alpha <= 0.01)
 
 
+def test_reopen_progress_counts_each_frame_stage_once() -> None:
+    """Progress units: reading cached statistics adds no units; 2 stages x 30 frames = 60."""
+    frames = synthetic_frames(30)
+    engine, _, cache = make_engine(Compensated(), frames)
+    assert run(engine).ok
+    again, _, _ = make_engine(Compensated(), frames, cache=cache)
+    progress = StubProgress()
+    assert run(again, progress).ok
+    assert again.state().done == again.state().total == 60
+    done = [r[0] for r in progress.reports]
+    assert done == sorted(done) and done[-1] == 60
+    assert {r[1] for r in progress.reports} <= {None, 60}
+
+
 def test_cancel_stops_within_one_frame_and_unloads() -> None:
     """D70, AD-15: cancel stops within one frame, never marks complete, drops the statistics."""
     frames = synthetic_frames(50)

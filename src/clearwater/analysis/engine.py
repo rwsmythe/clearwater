@@ -434,13 +434,12 @@ class AnalysisEngine:
             self._measured.ensure_axis(entry.pts_ticks)
             first = self._stages[0]
             if first.source_only and first.name in entry.stages:
-                counter[1] = counter[0] + len(entry.pts_ticks)
+                # Reading the cache adds no units: the stage's closed form counts each frame once.
                 for pts in entry.pts_ticks:
                     self._check(progress, None)
                     record = self._cache.source_statistics(self._key, first.name, pts)
                     self._measured.put(pts, first.name, record)
-                    counter[0] += 1
-                    self._report(progress, counter[0], counter[1], "reading cached statistics")
+                    self._report(progress, counter[0], None, "reading cached statistics")
             return
         self._decode(progress, pending, counter)
 
