@@ -71,6 +71,7 @@ class StubExportJobs:
         run_threads: The thread of every job run.
         reached: Per source name, set when that job reached its wait point.
         release: Set to let every waiting job go on.
+        result: When set, every job returns exactly this ``JobResult`` at once.
     """
 
     def __init__(
@@ -85,6 +86,7 @@ class StubExportJobs:
         chunks: int = 4,
         ignore_cancel: bool = False,
         warn_on_failure: bool = False,
+        result: JobResult | None = None,
     ) -> None:
         self.fail = fail
         self.raise_in_job = raise_in_job
@@ -95,6 +97,7 @@ class StubExportJobs:
         self.chunks = chunks
         self.ignore_cancel = ignore_cancel
         self.warn_on_failure = warn_on_failure
+        self.result = result
         self.requests: list[ExportRequest] = []
         self.build_threads: list[threading.Thread] = []
         self.run_threads: list[threading.Thread] = []
@@ -118,6 +121,9 @@ class StubExportJobs:
                 warnings = self.warn if ok or self.warn_on_failure else ()
                 return JobResult(ok, outputs, warnings, failure, "cpu", time.perf_counter() - start)
 
+            if self.result is not None:  # a fixed result, returned as the engine's answer
+                self.finished.append(name)
+                return self.result
             if name in self.raise_in_job:
                 raise RuntimeError(f"boom {name}")
             if name in self.fail:
@@ -498,6 +504,68 @@ def test_a_job_that_finishes_ok_after_a_cancel_keeps_its_output(
     rig.wait_export_idle()
     assert rig.panel.status.text().startswith("Saved ")
     assert len(rig.outputs()) == 1 and presenter_of(rig.window).of("error") == []
+
+
+KEPT = (Path("saved-1.png"), Path("saved-2.png"))
+NOT_OK_RESULTS = {
+    "failed": JobResult(False, KEPT, ("probe warning", "second warning"), "disk full", "cpu", 0.0),
+    "cancelled": JobResult(False, KEPT, ("probe warning", "second warning"), CANCELLED, "cpu", 0.0),
+}
+
+
+@pytest.mark.parametrize("kind", ["failed", "cancelled"])
+def test_outputs_and_warnings_of_a_non_ok_result_are_named_and_presented(
+    make_window: Any, qtbot: Any, tmp_path: Path, kind: str
+) -> None:
+    """Reviewer B pass 1 major: IF-8 allows both on a result that is not ok; neither is dropped."""
+    stub = StubExportJobs(result=NOT_OK_RESULTS[kind])
+    rig = build_rig(make_window, qtbot, tmp_path, stub=stub)
+    rig.action.trigger()
+    rig.wait_export_idle()
+    status = rig.panel.status.text()
+    assert "Saved before the stop: saved-1.png, saved-2.png" in status
+    assert status.startswith("Export cancelled." if kind == "cancelled" else "Export of photo.jpg")
+    presenter = presenter_of(rig.window)
+    assert [(m.text, m.owner) for m in presenter.of("warning")] == [
+        ("probe warning", "export"),
+        ("second warning", "export"),
+    ]
+    errors = presenter.of("error")
+    if kind == "failed":
+        (error,) = errors
+        assert error.owner == "export" and "disk full" in error.text
+    else:
+        assert errors == []
+    assert rig.action.unavailable_reason() is None
+
+
+def test_a_non_ok_result_without_outputs_adds_no_saved_line(
+    make_window: Any, qtbot: Any, tmp_path: Path
+) -> None:
+    result = JobResult(False, (), (), CANCELLED, "cpu", 0.0)
+    rig = build_rig(make_window, qtbot, tmp_path, stub=StubExportJobs(result=result))
+    rig.action.trigger()
+    rig.wait_export_idle()
+    assert rig.panel.status.text() == "Export cancelled."
+    assert presenter_of(rig.window).of("warning") == []
+
+
+@pytest.mark.parametrize("kind", ["failed", "cancelled"])
+def test_planted_done_that_drops_outputs_and_warnings_of_a_non_ok_result_is_detected(
+    make_window: Any, qtbot: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, kind: str
+) -> None:
+    original = ExportPanel._done
+
+    def dropping(self: ExportPanel, path: Path, result: JobResult) -> None:
+        original(self, path, result if result.ok else replace(result, outputs=(), warnings=()))
+
+    monkeypatch.setattr(ExportPanel, "_done", dropping)
+    rig = build_rig(make_window, qtbot, tmp_path, stub=StubExportJobs(result=NOT_OK_RESULTS[kind]))
+    rig.action.trigger()
+    rig.wait_export_idle()
+    # The test above fails on this implementation.
+    assert "Saved before the stop" not in rig.panel.status.text()
+    assert presenter_of(rig.window).of("warning") == []
 
 
 def test_the_open_source_changing_does_not_cancel_the_export(

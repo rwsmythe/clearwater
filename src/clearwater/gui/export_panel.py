@@ -163,16 +163,24 @@ class ExportPanel(QWidget):
             saved = ", ".join(messages.file_name(p) for p in result.outputs) or name
             self.status.setText(f"Saved {saved}")
             self._context.messages.clear("error", owner=OWNER)
-            for text in result.warnings:
-                self._context.messages.present(
-                    Message("warning", messages.ascii_text(text), path, OWNER)
-                )
         elif result.failure == CANCELLED:
-            self.status.setText("Export cancelled.")
+            self.status.setText(self._with_kept("Export cancelled.", result))
         else:
             reason = messages.ascii_text(result.failure or "the export failed")
-            self.status.setText(f"Export of {name} failed.")
+            self.status.setText(self._with_kept(f"Export of {name} failed.", result))
             self._context.messages.present(Message("error", f"{name}: {reason}", path, OWNER))
+        for text in result.warnings:  # IF-8 allows warnings on a result that is not ok too
+            self._context.messages.present(
+                Message("warning", messages.ascii_text(text), path, OWNER)
+            )
+
+    @staticmethod
+    def _with_kept(line: str, result: JobResult) -> str:
+        """Return ``line`` plus the files a non-ok result committed before the stop, if any."""
+        if not result.outputs:
+            return line
+        kept = ", ".join(messages.file_name(p) for p in result.outputs)
+        return f"{line} Saved before the stop: {kept}"
 
 
 def export_panel_factory(exports: ExportJobs, gates: SharedGate) -> PanelFactory:
