@@ -365,6 +365,33 @@ Conditions:
 
 Step-aware: read. Default `median_gaussian` 2.0 s stands; both candidates lose on flicker (1.7-5.4x) and the peak step (5-13x) with no gain on the rendered step, which is decisive evidence for WP5.2's table. AD-3 stays PROVISIONAL until then; a change would be spec 7.2 and the owner's. Window CLOSED acknowledged (~07:40Z).
 
+## Round 1 remediation and the V3-1 ruling (cell 2, 2026-10-26, from `e82aa2b`)
+
+One commit per finding, each with a test shown failing on the unfixed code first:
+
+| Finding | Commit | Kind | Test (failure on the unfixed code) |
+|---|---|---|---|
+| F1 | d62a822 | product | `test_a_cancel_during_the_last_smooth_is_not_published_as_complete` (result ok, phase complete) |
+| F2 | 27b6128 | product | `test_a_cancel_at_the_last_decode_report_never_marks_complete` (`marks == 1`) |
+| F3 | a4b9752 | product | `test_a_frame_size_change_with_an_equal_proxy_shape_is_refused` (1082/1081 x 1100 frames, both 541 x 550 proxies: no failure) |
+| F4 | 4b9650c | product | `test_stale_proxies_of_an_incomplete_entry_are_never_marked_complete` (job ok, stale tail marked complete) |
+| F6 | 199fc21 | product | `test_reopen_progress_counts_each_frame_stage_once` (total 90, not 60) |
+| F7 | 0f8d769 | tool | `test_the_flicker_reference_is_the_mean_of_the_own_raw_statistics` (reference R mean 0.449686 vs 0.449837); report figures await the footage re-run (WINDOW) |
+| F8 | 2e2a09c | tool + report | `test_the_instrument_runs_on_a_synthetic_step` per-kind asserts (`KeyError: 'edge_free_frames'`) |
+
+V3-1 ruling implemented at 5eb6f93: jittering-patch clip built in the test (AD-14 texture at
+480 x 270, 90 frames, 60 x 60 patch of the disc's colour, corner re-drawn uniformly in the lower
+third each frame, seed 14, all fixed before the first run); V3's 25 % asserted on L*, a*, b*,
+contrast for `GrayWorld` (ratios 0.023 / 0.024 / 0.022 / 0.023) and `GainsStretch` (0.017 /
+0.024 / 0.023 / 0.018); the patch-never-touches-the-upper-half test; the ad14-flicker tests
+assert AD-14 and record the ratios (unchanged: 0.475 / 0.447 / 0.488 / 0.476 and 0.387 / 0.482 /
+0.455 / 0.400), no xfail. Run `work/t-v3c.log`: 5 passed, 69 s. Report: V3 section with the one
+heading for CP5 / WP4.2 (24e8dcb also brings claims 3 and 9 up to the fixes and adds the DR-45 (a)
+consumer note: the engine closes the stream on the job thread, never concurrently).
+
+Gates at 24e8dcb: ruff check, ruff format --check (189 files), mypy strict (113 files) green;
+analysis tests without V3 212 passed (`work/t-an.log`), V3 file 5 passed.
+
 ## RESUME HERE (for the fresh cell; written by cell 1 at the R1 yield, 2026-10-21)
 
 **State.** Branch `wp3.11`, base `de206e2`. Built and committed: `src/clearwater/analysis/`
