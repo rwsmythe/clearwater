@@ -412,7 +412,12 @@ class AnalysisStore:
             return n > 0 and bool(table.smoothed_present[:n].all())
 
     def axis(self) -> tuple[int, ...]:
-        """Return every pts ever put since the last :meth:`clear` (the clip's frames), ascending."""
+        """Return the clip's frames since the last :meth:`clear`, ascending.
+
+        A pts joins the axis when a record is put for it or when :meth:`ensure_axis` puts the
+        frames of a reopened clip ahead of their records; :meth:`all_pts` is the subset that
+        holds a raw record.
+        """
         with self._lock:
             return tuple(self._ticks)
 
