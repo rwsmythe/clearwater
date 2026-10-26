@@ -279,10 +279,19 @@ function Get-MarkerScrubPrefix() {
 # ~400K, mouse capture, post-compaction scrollback) do not apply to a role
 # session that rolls at ~400K and is read from its transcript file. Applies at
 # the NEXT launch of each role; a live session is untouched.
+# CLAUDE_CODE_DISABLE_BG_SHELL_PRESSURE_REAP=1 (operator-directed 2026-10-26):
+# Claude Code stops a BACKGROUND shell when host memory runs low while the
+# session is IDLE. A role session's long test suite runs as a background shell
+# while the session waits, so the reaper killed two full suites at ~92 % on the
+# same day (a memory spike in GPU-heavy tests with every other cell idle),
+# leaving no figure. Role sessions run one heavy job at a time by rule, so the
+# reaper's protection is traded for a complete run. Applies at the NEXT launch
+# of each role; the operator's own terminals are untouched.
 $script:SpawnEnv = @(
     'DISABLE_AUTOUPDATER=1',
     'CLAUDE_CODE_GIT_BASH_PATH=C:\Program Files\Git\usr\bin\bash-cc.exe',
-    'CLAUDE_CODE_DISABLE_ALTERNATE_SCREEN=1'
+    'CLAUDE_CODE_DISABLE_ALTERNATE_SCREEN=1',
+    'CLAUDE_CODE_DISABLE_BG_SHELL_PRESSURE_REAP=1'
 )
 
 # The bash-cc.exe path Invoke-BashCcPreflight checks -- DERIVED from

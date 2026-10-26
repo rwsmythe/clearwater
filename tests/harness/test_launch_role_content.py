@@ -372,10 +372,14 @@ def _marker_scrub_prefix() -> str:
 # refusal when the copy is absent).
 # CLAUDE_CODE_DISABLE_ALTERNATE_SCREEN (2026-09-22, operator-directed): force the
 # classic renderer so a role session's history stays in native scrollback.
+# CLAUDE_CODE_DISABLE_BG_SHELL_PRESSURE_REAP (2026-10-26, operator-directed): keep
+# Claude Code's low-memory reaper from stopping a role session's background
+# test suite while the session idles (two full suites lost at ~92 % that day).
 _SPAWN_ENV = (
     ("DISABLE_AUTOUPDATER", "1"),
     ("CLAUDE_CODE_GIT_BASH_PATH", "C:\\Program Files\\Git\\usr\\bin\\bash-cc.exe"),
     ("CLAUDE_CODE_DISABLE_ALTERNATE_SCREEN", "1"),
+    ("CLAUDE_CODE_DISABLE_BG_SHELL_PRESSURE_REAP", "1"),
 )
 
 
