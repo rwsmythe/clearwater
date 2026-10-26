@@ -291,11 +291,14 @@ class BatchPanel(QWidget):
         self._refresh_rows()
 
     def clear_queue(self) -> None:
-        """Empty the queue and clear this panel's messages (not while a batch runs)."""
+        """Empty the queue and clear this panel's warnings (not while a batch runs).
+
+        Errors are kept until the next successful Start (C3).
+        """
         if self._running:
             return
         self._items = []
-        self._context.messages.clear(owner=OWNER)
+        self._context.messages.clear("warning", owner=OWNER)
         self._refresh_rows()
 
     def refresh_presets(self) -> None:

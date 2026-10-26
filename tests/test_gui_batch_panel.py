@@ -691,6 +691,19 @@ def test_the_add_remove_and_clear_buttons(rig: Rig) -> None:
     assert presenter_of(rig.window).of("warning") == []  # Clear removes this panel's messages
 
 
+def test_clear_removes_this_panels_warnings_but_keeps_its_errors(rig: Rig) -> None:
+    """Reviewer B pass 2 #4 (C3): errors are kept until the next successful Start."""
+    presenter = presenter_of(rig.window)
+    batch = started(rig, [A])
+    presenter.present(Message("warning", "queue warning", None, "batch"))
+    presenter.present(Message("error", "Start refused", None, "batch"))
+    presenter.present(Message("warning", "another owner's", None, "shell.preview"))
+    batch.clear_button.click()
+    assert batch.items() == []
+    assert [m.text for m in presenter.of("warning")] == ["another owner's"]
+    assert [m.text for m in presenter.of("error")] == ["Start refused"]
+
+
 def test_editing_is_locked_while_running_and_export_is_unavailable(
     make_window: Any, qtbot: Any, tmp_path: Path
 ) -> None:
