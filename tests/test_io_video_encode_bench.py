@@ -313,6 +313,9 @@ def test_run_once_records_the_row_and_deletes_the_output(sample: Any, tmp_path: 
     assert telemetry["errors"] == []
     assert telemetry["periods_s"] == {"memory": 0.02, "gpu": 0.5}
     assert telemetry["gaps_s"]["memory"]["n"] == telemetry["rss_samples"] - 1
+    offsets = record["offsets_s"]  # round 8 #1: the telemetry placed on the run's clock
+    assert -0.05 < offsets["telemetry_origin"] <= 0
+    assert offsets["strays_primed"] < offsets["telemetry_origin"]
     names = [m["name"] for m in telemetry["peak_tree_rss_members"]]
     assert any("ffmpeg" in name for name in names)
     assert telemetry["peak_tree_rss_bytes"] > 0

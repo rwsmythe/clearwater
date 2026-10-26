@@ -29,12 +29,17 @@ The strays (:class:`StrayWatch`: the processes that used more than a quarter of 
 each marked as the run's own or a stray) are read in the frame loop itself: primed before the
 run, read after every ``--strays-every`` frames and once more after ``close``. A strays window
 so covers the frames between two readings (the last one, the rest of the stream and
-``close``). A reading takes seconds (every process's counter is read), so the loop pauses for
-it: the pause is recorded and kept out of every frame figure and stage time. During a pause
-the decoder keeps decoding until its output pipe and FFmpeg's own frame buffers are full, and
-the encoder works through what it holds, so the frames right after a pause can run faster:
-the first of them is recorded apart from the summaries, as the first frame is, and the raw
-lists show how far the effect reaches.
+``close``; the first one also holds the run's setup before the probe). A reading takes
+seconds (every process's counter is read), so the loop pauses for it: the pause is recorded
+and kept out of every frame figure and stage time. During a pause the decoder keeps decoding
+until its output pipe and FFmpeg's own frame buffers are full, and the encoder works through
+what it holds, so the frames right after a pause can run faster: the first of them is
+recorded apart from the summaries, as the first frame is, and the raw lists show how far the
+effect reaches.
+
+The run's clock starts at the probe. The NVENC proof's sampler, then the telemetry start right
+before it; ``offsets_s`` gives where the telemetry's zero and the end of the strays priming lie
+on the run's clock (negative: before the probe), so every sample time can be placed on it.
 
 Conditions (the strays over one second, then the same graphics-card reading, the CPU load over
 half a second and the CPU frequency) are recorded before and after each run. An NVENC run is
@@ -372,7 +377,7 @@ class Telemetry:
                 target=self._loop, args=("gpu", gpu_every, self._sample_gpu), daemon=True
             ),
         }
-        self._started = 0.0
+        self.origin: float | None = None
         self.peak_rss = 0
         self.peak_members: list[dict[str, Any]] = []
         self.peak_at_s = 0.0
@@ -381,13 +386,13 @@ class Telemetry:
         self.errors: list[str] = []
 
     def start(self) -> None:
-        """Start both samplers."""
-        self._started = time.monotonic()
+        """Start both samplers; :attr:`origin` is the ``time.perf_counter`` of their times' zero."""
+        self.origin = time.perf_counter()
         for thread in self._threads.values():
             thread.start()
 
     def _elapsed(self) -> float:
-        return time.monotonic() - self._started
+        return time.perf_counter() - (self.origin or 0.0)
 
     def _loop(self, name: str, every: float, sample: Callable[[float], None]) -> None:
         due = 0.0
@@ -633,12 +638,13 @@ def _measure(
     stream: Iterator[Frame] | None = None
     began = time.perf_counter()
     watch = StrayWatch()
-    strays: dict[str, Any] = {"every_frames": strays_every, "prime_s": time.perf_counter() - began}
+    primed = time.perf_counter()
+    strays: dict[str, Any] = {"every_frames": strays_every, "prime_s": primed - began}
     started = time.perf_counter()  # set again below; here for the last reading on a failure
     try:
-        telemetry.start()
         if sampler is not None:
             sampler.start()
+        telemetry.start()
         started = time.perf_counter()
         info = source.probe(path)
         probed = time.perf_counter()
@@ -681,6 +687,9 @@ def _measure(
             sink.ended = vf._clock()
         samples = sampler.stop() if sampler is not None else None
         record["telemetry"] = telemetry.stop()
+        record["offsets_s"] = {"strays_primed": primed - started}
+        if telemetry.origin is not None:
+            record["offsets_s"]["telemetry_origin"] = telemetry.origin - started
         record["strays"] = {**strays, "pauses_s": pauses, "windows": windows}
     count = report.frames_written
     paused = sum(pauses)
