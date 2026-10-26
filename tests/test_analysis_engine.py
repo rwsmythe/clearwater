@@ -191,6 +191,25 @@ def test_cancel_stops_within_one_frame_and_unloads() -> None:
     assert run(engine).ok and engine.is_complete()
 
 
+def test_a_cancel_during_the_last_smooth_is_not_published_as_complete() -> None:
+    """D70, AD-15: a cancel that arrives while the last stage is smoothed still unloads."""
+    frames = synthetic_frames(30)
+    engine, _, _ = make_engine(GrayWorld(), frames)
+    smooth = engine.store.smooth
+
+    def cancelling_smooth(stage: str, *args: Any) -> None:
+        smooth(stage, *args)
+        if stage == "fusion":
+            engine.cancel()
+
+    engine.store.smooth = cancelling_smooth  # type: ignore[method-assign]
+    result = run(engine)
+    assert not result.ok and result.failure == CANCELLED
+    assert engine.state().phase == "cancelled" and not engine.is_complete()
+    with pytest.raises(KeyError):
+        engine.smoothed_record(frames[0].pts_ticks)
+
+
 def test_a_failing_analyze_gives_failed_with_its_message() -> None:
     """A failure carries its message; nothing is marked complete; statistics are dropped."""
     method = GrayWorld()

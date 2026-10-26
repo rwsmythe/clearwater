@@ -266,7 +266,12 @@ class AnalysisEngine:
         return self._job
 
     def cancel(self) -> None:
-        """Ask the running job to stop; it returns to the unloaded state within one frame."""
+        """Ask the running job to stop; it returns to the unloaded state within one frame.
+
+        The job checks for a cancel after every frame and every smoothing, and once more under
+        the engine's lock before it publishes ``"complete"``; a cancel after that is too late
+        and leaves the analysis complete.
+        """
         self._cancel.set()
 
     def smoothed_record(
@@ -401,7 +406,10 @@ class AnalysisEngine:
                 self._run_stages(progress, pending, counter)
             except _SupersededError:
                 continue
+            self._check(progress, None)
             with self._lock:
+                if self._cancel.is_set():
+                    raise _CancelledError
                 if self._generation != pending.generation:
                     continue
                 self._state = AnalysisSnapshot(
@@ -507,6 +515,7 @@ class AnalysisEngine:
             )
             self._check(progress, generation)
             self._store.smooth(stage.name, stage.smoothed, self._window_s, self._kind)
+            self._check(progress, generation)
 
     def _near_phase(
         self,
@@ -543,6 +552,7 @@ class AnalysisEngine:
             self._store.smooth_at(
                 stage.name, stage.smoothed, self._window_s, self._kind, axis[out_lo], axis[out_hi]
             )
+            self._check(progress, pending.generation)
 
     def _measure(
         self,
