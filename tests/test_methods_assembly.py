@@ -418,6 +418,12 @@ def broken_records(record: Mapping[str, Any], names: tuple[str, ...]) -> Iterato
         too_large = value.astype(np.float64).astype(object)
         too_large.flat[0] = 10**400  # no float holds it: OverflowError inside np.array (R1 F1)
         yield name, {**record, name: too_large.tolist()}
+        # right shape, finite once coerced, but not numbers of a numeric dtype (Reviewer B B1)
+        as_float = value.astype(np.float64)
+        yield name, {**record, name: as_float != 0}
+        yield name, {**record, name: as_float.astype(str)}
+        yield name, {**record, name: as_float.astype(object)}
+        yield name, {**record, name: as_float.astype(np.complex128)}
 
 
 @pytest.mark.parametrize("method_id", METHOD_IDS)
@@ -457,6 +463,23 @@ def test_records_accept_lists_and_float32_arrays() -> None:
     as_lists = {s: {k: np.asarray(v).tolist() for k, v in r.items()} for s, r in own.items()}
     reference = host(m.render(image, {}, own).pixels)
     assert_same_bits(host(m.render(image, {}, as_lists).pixels), reference)
+
+
+@pytest.mark.parametrize("method_id", METHOD_IDS)
+def test_records_accept_integer_arrays_and_python_number_lists(method_id: str) -> None:
+    """Integer and float dtypes pass the Y-2 check; only their values decide (Reviewer B B1)."""
+    m = method(method_id)
+    image = as_image(scene())
+    own = analyze_all(m, image, {})
+    for stage in m.stages:
+        record = {k: np.asarray(v, dtype=np.float64) for k, v in own[stage.name].items()}
+        forms = [
+            {k: np.rint(v * 1000).astype(np.int64) for k, v in record.items()},
+            {k: np.rint(v * 1000).astype(np.int64).tolist() for k, v in record.items()},
+            {k: v.tolist() for k, v in record.items()},
+        ]
+        for form in forms:
+            m.closed_form(stage.name, {}, {}, form)  # raises ValueError if Y-2 refuses it
 
 
 # -- closed form (AD-7, Y-1 d) ---------------------------------------------------------------------

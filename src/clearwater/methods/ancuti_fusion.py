@@ -463,7 +463,10 @@ def _compensation_record(
 def _checked_record(stage: Stage, record: Statistics) -> _Record:
     """Return a supplied record as float64 host arrays, or raise ValueError (Y-2).
 
-    The names must be exactly the stage's statistics, each of its fixed shape and finite.
+    The names must be exactly the stage's statistics, each a host array (or nested list) of
+    integer or real numbers, of its fixed shape and finite. Booleans, complex numbers, text,
+    Python objects and dates are refused before any conversion would coerce them; a Python int
+    too large for any integer dtype lands as an object array and is refused with them.
     """
     for name in stage.statistics:
         if name not in record:
@@ -474,7 +477,10 @@ def _checked_record(stage: Stage, record: Statistics) -> _Record:
     checked: _Record = {}
     for name in stage.statistics:
         try:
-            value = np.array(record[name], dtype=np.float64)
+            supplied = np.asarray(record[name])
+            if supplied.dtype.kind not in "iuf":
+                raise TypeError(f"dtype {supplied.dtype} is not integer or real")
+            value = np.array(supplied, dtype=np.float64)
         except (TypeError, ValueError, OverflowError) as exc:
             raise ValueError(
                 f"stage {stage.name!r}: statistic {name!r} is not a host array of numbers ({exc})"
