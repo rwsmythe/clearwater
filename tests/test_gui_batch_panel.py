@@ -404,6 +404,51 @@ def test_the_start_refusal_is_cleared_by_the_next_start(rig: Rig) -> None:
     assert presenter_of(rig.window).of("error") == []
 
 
+def test_a_refusal_is_kept_by_the_next_refusal_and_cleared_by_a_successful_start(
+    rig: Rig,
+) -> None:
+    """Reviewer B pass 1 minor: C3, errors are kept until the next success."""
+    rig.window.context.presets.save("bad", new_parameter_set("nope", {}))
+    batch = started(rig, [A])
+    batch.refresh_presets()
+    batch.parameter_combo.setCurrentIndex(batch.parameter_combo.findData("bad"))
+    presenter = presenter_of(rig.window)
+    batch.start()
+    (first,) = presenter.of("error")
+    batch.parameter_combo.setCurrentIndex(batch.parameter_combo.findData("bad"))
+    presenter.present(Message("warning", "queue warning", A, "batch"))
+    batch.start()  # a second refusal: the earlier error is still shown, the warning is gone
+    errors = presenter.of("error")
+    assert len(errors) == 2 and errors[0] == first and "bad" in errors[1].text
+    assert presenter.of("warning") == []
+    assert not batch.is_running() and rig.stub.requests == []
+    batch.parameter_combo.setCurrentIndex(0)
+    batch.start()
+    wait_batch_idle(rig)
+    assert presenter.of("error") == []
+
+
+def test_planted_start_that_clears_errors_at_trigger_is_detected(
+    rig: Rig, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    original = BatchPanel.start
+
+    def clearing(self: BatchPanel) -> None:
+        self._context.messages.clear("error", owner="batch")
+        original(self)
+
+    monkeypatch.setattr(BatchPanel, "start", clearing)
+    rig.window.context.presets.save("bad", new_parameter_set("nope", {}))
+    batch = started(rig, [A])
+    batch.refresh_presets()
+    batch.parameter_combo.setCurrentIndex(batch.parameter_combo.findData("bad"))
+    presenter = presenter_of(rig.window)
+    presenter.present(Message("error", "earlier refusal", None, "batch"))
+    batch.start()
+    # The test above fails on this implementation: the earlier error is gone from the list.
+    assert "earlier refusal" not in [e.text for e in presenter.of("error")]
+
+
 # D45 / G8: cancel stops the whole remaining batch.
 
 

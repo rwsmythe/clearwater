@@ -298,10 +298,12 @@ class BatchPanel(QWidget):
         available or the set fails validation. The settings are ``session.settings()`` now;
         later changes do not reach the run. Every row is reset to queued, so a previous run is
         run again in full; the previous report is cleared.
+        This panel's warnings are cleared at every trigger; its errors are kept until a Start
+        succeeds.
         """
         if self._running or not self._items or self._gate.current is not None:
             return
-        self._context.messages.clear(owner=OWNER)
+        self._context.messages.clear("warning", owner=OWNER)  # errors stay until a Start succeeds
         chosen = self.parameter_combo.currentData()
         self.refresh_presets()
         resolved = self._resolve_parameters(chosen)
@@ -324,6 +326,7 @@ class BatchPanel(QWidget):
                 item.failure = None
             self.report.clear()
             self._refresh_rows()
+            self._context.messages.clear("error", owner=OWNER)  # this Start succeeded
         except Exception as error:  # a batch that cannot even start is refused, not left running
             _LOG.exception("the batch could not be started")
             self._abandon_start()
