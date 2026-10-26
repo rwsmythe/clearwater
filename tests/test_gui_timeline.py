@@ -1242,6 +1242,27 @@ def test_closing_the_window_mid_analysis_does_not_report_a_completion(make_env) 
     assert "complete" not in env.phases and env.analysis.cancelled_runs == [0]
 
 
+def test_closing_the_runner_during_a_superseded_run_leaves_a_terminal_phase(make_env) -> None:
+    env = make_env(method_ids=("statm", "other"), gated=(0,))
+    env.open()
+    env.wait(lambda: len(env.analysis.runs) == 1)
+    env.session.set_parameters(new_parameter_set("other", {}))  # the run is "superseded"
+    assert env.window.jobs.close(5.0)  # delivers the old run's on_done: the rebuild finds it closed
+    assert env.session.analysis().phase == "cancelled"
+    assert "complete" not in env.phases
+    assert env.session.statistics() is None
+    assert not env.button("timeline.cancel").isEnabled()
+
+
+def test_a_change_after_the_runner_closed_leaves_a_terminal_phase(make_env) -> None:
+    env = make_env(gated=(0,))
+    complete(env)
+    env.window.jobs.close(5.0)
+    env.set_level(0.8)  # a recompute is wanted but no job can run
+    assert env.session.analysis().phase == "cancelled"
+    assert env.session.statistics() is None
+
+
 # The latest-intent rule of the position lane: a seeded random interleaving (WP3.18, rounds 1-4).
 
 INTERLEAVE_STORED = (0, 4000, 7000, 10000, 13000)  # the frames sit at the stored pts

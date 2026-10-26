@@ -359,6 +359,8 @@ class TimelinePanel(QWidget):
             )
         except RuntimeError as exc:  # the job runner is closed (the window is closing)
             _LOG.info("analysis not started: %s", exc)
+            # No job will ever end this state: the terminal phase an ordinary close gives.
+            self._session.set_analysis(AnalysisState("cancelled", message="Analysis cancelled"))
             return False
         self._run = _Run(ticket, handle, target, label)
         self._update_controls()
