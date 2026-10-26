@@ -4,10 +4,13 @@ Brief `docs/briefs/wp3.4-brief.md` (FINAL, CHARC rulings `53d1d906e47fe2c9`); ro
 rulings in `docs/proofs/wp3.4-ledger.md` (orchestrator, generation 9). Branch `wp3.4`, base
 `de206e2`. Stack as locked: NumPy, SciPy and CuPy 14.x per `uv.lock`.
 
-**Status: DRAFT.** Reviewer A converged at round 1 (no critical or major finding; its three
-minors fixed). Full pytest with CuPy importable green at `84ad0ef` (3868 passed, 2 skipped).
-Open: the EXCLUSIVE speed row and memory re-check (task 8) and full pytest without CuPy
-importable and again on the final head (windows).
+**Status: complete, for the gate.** Reviewer A converged at round 1 (no critical or major
+finding; its three minors fixed). Full pytest on `877d122` (product code as `3fae1d5`): without
+CuPy importable 3316 passed, 554 skipped; with CuPy 3867 passed, 2 skipped, 1 failed --
+`test_prototype_clip.py::test_footage_smoke_gx011628`, FFmpeg "Cannot allocate memory" while
+other cells ran (code this package does not touch; the test passed alone straight after, and
+in the full run at `84ad0ef`, 3868 passed). Speed row and memory re-check recorded in EXCLUSIVE
+windows (below): no STOP.
 
 ## What was built
 
@@ -241,11 +244,61 @@ the AD-4 floor binds on that crop at full resolution (N{} range 0.0165 < 0.02; t
 ran the unfloored prototype); the product's rows are the V8 figures. The tightest margin is
 p99 3.25/255 against 4/255 (0024.925, c3, k = 4).
 
-## Speed row and memory re-check -- PENDING (EXCLUSIVE windows)
+## Speed row and memory re-check (EXCLUSIVE windows, 2026-10-26)
 
-Instrument ready (`tools/core_speed.py --whole`, `--memory`; smoke-run on the 320 x 180 fixture
-clip only). Bar: D106's interim figure, 25 min/min = 0.834 s per frame at 30000/1001 fps for
-the whole export; the row reports the core's share.
+`tools/core_speed.py` on GX011627 (3840 x 2160, 681 frames), product code as at `3fae1d5`, each
+run alone in a window granted by the orchestrator; rows in `docs/proofs/wp3.4-ledger.md`
+("Exclusive windows"). Records in the working folder's `wp3.4/`:
+`core-whole-GX011627-20261026T144318Z.json` (`--memory`) and
+`core-whole-GX011627-20261026T144757Z.json` (`--whole --cpu-frames 10`). Bar: D106's interim
+figure, 25 min/min = 0.834 s per frame at 30000/1001 fps for the whole export.
+
+**Memory** (counting allocator on the CuPy pool, high-water; RSS sampled; MiB): no product peak
+exceeds `memory_estimate_bytes`. The two methods' figures are the same except the full-frame
+`analyze` reserved peak.
+
+| size | leg | pool used | pool reserved (c3 / ancuti2018) | RSS + (c3 / ancuti2018) | estimate |
+|---|---|---|---|---|---|
+| 3840 x 2160 | analyze, proxy | 49 | 60 / 54 | 0 / 0 | 1982 |
+| 3840 x 2160 | analyze, full frame | 783 | 952 / 857 | 133 / 0 | 1982 |
+| 3840 x 2160 | render | 973 | 1044 / 1044 | 15 / 0 | 1982 |
+| 3840 x 2160 | render, CPU | -- | 0 / 0 | 879 / 870 | 1982 |
+| 5312 x 2988 | analyze, proxy | 60 | 73 / 66 | 0 / 0 | 3792 |
+| 5312 x 2988 | analyze, full frame | 1499 | 1822 / 1641 | 352 / 0 | 3792 |
+| 5312 x 2988 | render | 1862 | 1998 / 1998 | 84 / 0 | 3792 |
+| 5312 x 2988 | render, CPU | -- | 0 / 0 | 1678 / 1678 | 3792 |
+
+The highest reserved peak is 53 % of the estimate at both sizes (1044 / 1982, 1998 / 3792).
+
+**Speed, GPU, the whole clip** (n 680 per row; seconds per frame, median with p10-p90):
+
+| method | upload 4K | analyze (all stages, proxy) | render 4K | core (analyze + render) | min/min | prototype `correct()` |
+|---|---|---|---|---|---|---|
+| c3 | 0.0179 (0.0149-0.0209) | 0.0274 (0.0202-0.0371) | 0.4101 (0.3997-0.4430) | **0.4392** (0.4234-0.4733) | 13.16 | 0.4952 (0.4752-0.5334) |
+| ancuti2018 | 0.0179 (0.0149-0.0209) | 0.0183 (0.0129-0.0257) | 0.1793 (0.1764-0.1896) | **0.1987** (0.1908-0.2130) | 5.96 | 0.2598 (0.2530-0.2815) |
+
+Per stage on the GPU: ancuti2018 compensation 0.0029, white_balance 0.0017, fusion 0.0135; c3
+white_balance 0.0083, fusion 0.0188 (the proxy upload 0.0018 apart). Both cores are under
+D106's 0.834 s/frame: c3 at 53 % of the bar, ancuti2018 at 24 %. The core leaves 0.395 s
+(c3) and 0.635 s (ancuti2018) per frame for the rest of the export (upload, decode, transport,
+smoothing, encode).
+
+**CPU, 10 evenly spread frames (evidence only).** Core median c3 23.6563 s/frame (708.98
+min/min), ancuti2018 10.2003 s/frame (305.70 min/min); render 23.0204 / 9.9705, analyze
+0.6430 / 0.2465. The bar applies to the GPU whole-export path (the brief's task 8 times the
+full clip on the GPU; the CPU subsample is WP3.1's ruled practice, and Gate 1 option C already
+recorded the CPU path far over D106; orchestrator ruling, 2026-10-26).
+
+**DR-40 (b)** from the record: render uploads per call c3 4, ancuti2018 3 (both devices); a
+3-value upload on cuda:0 has median 0.187 ms (p10 0.125, p90 0.344, n 200), so the per-call
+uploads cost about 0.75 ms (c3) and 0.56 ms (ancuti2018) per frame, 0.2 % and 0.3 % of the
+core.
+
+**Conditions** (sampled before, every N frames and after; contaminated rows kept as spread):
+the host was not quiet. Over the GPU leg, MsMpEng.exe (Defender) ran at 55-388 % and
+short-lived foreign `python.exe` processes (changing pids) at 60-98 %, with host CPU 46-92 %;
+on the CPU leg OfficeClickToRun.exe and SrTasks.exe at times. GPU SM clock 2130-2460 MHz at
+75-88 C over the GPU leg. Before the runs: 11.4 GB and 8.96 GB free, GPU idle.
 
 ## Consumer notes
 
@@ -273,12 +326,16 @@ this package's. DR-38 (a), (b) ADDRESSED by tests; (c) CLOSES; (d) CLOSES -- the
 tests pinned the root cause the fix removes (two `__cause__` assertions expected the
 OverflowError); they now expect the core's ValueError (granted, option A). DR-40 (a)
 CLOSES by `test_dr40a_np_float_alpha_reaches_the_result` (`compensation.py` unchanged); (b)
-recorded by the speed row (pending), the fix stays WP3.21's. DR-13 placement only, stays OPEN.
+recorded by the speed row (c3 4, ancuti2018 3 uploads per render call; 0.187 ms per 3-value
+upload on cuda:0), the fix stays WP3.21's. DR-13 placement only, stays OPEN.
 
 ## Limits
 
 - Product against prototype is shown on 64 x 96 stills and synthetic scenes up to 180 x 270;
   the 4K agreement of the steps is WP3.2's and WP3.3's (their evidence).
-- The memory and speed figures are pending.
+- The speed and memory figures come from one clip (GX011627, 4K) on the owner's laptop with a
+  busy host (Defender and foreign Python processes over the GPU leg; kept as spread); the
+  5312 x 2988 memory figures use the 4K frame padded by reflection, not footage of that size. The CPU
+  speed is a 10-frame subsample.
 - V8 is shown on two 1080 x 1920 crops of one clip (the ruled content); the frames live in the
   working folder, so the test skips on a machine without them.

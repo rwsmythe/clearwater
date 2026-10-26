@@ -399,3 +399,26 @@ MsMpEng.exe (Defender) 55-388 % and foreign short-lived `python.exe` processes (
 changing pids) across the GPU leg; host CPU 46-92 % then; the CPU leg had
 OfficeClickToRun.exe and SrTasks.exe at times. GPU SM clock 2130-2460 MHz at 75-88 C on the GPU
 leg.
+
+Depth at the exclusive-window close (dispatcher): **53,053**. STOP question ruled (orchestrator,
+FINAL, 2026-10-26): NO STOP; the bar applies to the GPU whole-export path, the CPU 10-frame
+subsample is evidence only (WP3.1's ruled practice; Gate 1 option C already recorded the CPU path
+over D106). The report states the CPU min/min with this reading and lists the contamination.
+
+## Full pytest (cell 4, window granted 2026-10-26; head `877d122`, product code as `3fae1d5`)
+
+| run | basetemp | result | exit | output |
+|---|---|---|---|---|
+| no CuPy (`sys.modules["cupy"] = ["cupyx"] = None`, scratch wrapper) | `work/pt-nocupy` | 3316 passed, 554 skipped, 1 warning in 1009.36s (0:16:49) | 0 | `work/pt-nocupy.txt` |
+| CuPy importable | `work/pt-cupy` | 1 failed, 3867 passed, 2 skipped, 2 warnings in 1512.52s (0:25:12) | 1 | `work/pt-cupy.txt` |
+| the failure alone, straight after | `work/pt-cupy-rerun` | 1 passed, 1 warning in 50.21s | 0 | `work/pt-cupy-rerun.txt` |
+
+The failure: `tests/test_prototype_clip.py::test_footage_smoke_gx011628`, `ClipError` "the decoder
+failed (status 4294967284): ... Error encoding a frame: Cannot allocate memory" (FFmpeg's own
+allocation, 4K decode in the prototype). This package touches neither `tools/prototype` nor that
+test (`git diff de206e2..HEAD` empty on both); the wp3.10 and wp3.11 cells started during the
+run (25 min against 16-17 min). Read as transient host memory, reported to the dispatcher with the
+WINDOW RELEASED line.
+
+Step 4: report speed and memory sections filled, DR-40 (b) from the record, DRAFT removed, status
+and Limits updated.
