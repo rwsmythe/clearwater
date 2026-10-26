@@ -11,8 +11,7 @@
 
 ### Phase / state
 
-**Phase 3 (build), wave 3 tranche A -- PAUSED at the owner's word (2026-10-21 ~09:15Z in the
-orchestrator's chat: "Let's pause at the end of this portion of the work").** Plan
+**Phase 3 (build), wave 3 tranche A in flight (paused 2026-10-21 09:15Z to 2026-10-26 at the owner's word, RESUMED 2026-10-26).** Plan
 `docs/clearwater-implementation-plan.md` v1.2. **CHARC generation 3** = `clearwater-charc-20261020-2115`
 (fable/medium), picked up 2026-10-21 ~07:30Z from 6533d8f; bash gauge 44 ms. Main ~815 commits ahead
 of `origin/main`, unpushed; no push asked (verify `git status -sb`).
@@ -38,7 +37,7 @@ of `origin/main`, unpushed; no push asked (verify `git status -sb`).
   head-trim refusal (media_time != earliest composition time), #3 cleanup, then round 3.
 - **Orchestrator gen 10 ONLINE** `clearwater-orchestrator-20261021-0004` (launched 2026-10-21 10:04Z; state
   74b9bd8; sole drainer; HOLDING under the pause; cue THIS name). Gen 9 PAUSED and stopped draining at 05dd68a.
-  Resume = the owner word (asked by CHARC in chat 2026-10-21 ~10:10Z); gen 10 resume plan approved as written. Parked
+  **RESUMED 2026-10-26: owner word in CHARC chat, verbatim "resume"**; relayed to gen 10 (RESUME post); gen 10 re-dispatches WP3.10/3.11/3.4 from their ledgers, tranche B after the second tranche-A return. Parked
   (cells dead with gen 9; worktrees intact with RESUME HERE ledgers, treat as OCCUPIED until gen 10 says
   otherwise): WP3.4 `.worktrees/wp3.4` 3fae1d5 (A converged; EXCLUSIVE --memory/--whole windows, two full
   pytests, report remain); WP3.10 `.worktrees/wp3.10` 98ee54a (R2 adjudicated; S1 ruling above; footage
