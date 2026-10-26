@@ -234,6 +234,36 @@ def test_a_cancel_at_the_last_decode_report_never_marks_complete() -> None:
     assert entry is not None and not entry.complete
 
 
+def test_a_cancel_during_the_post_pass_lookup_never_marks_complete() -> None:
+    """B1, D70: a cancel arriving inside the post-pass ``lookup`` stops before ``mark_complete``."""
+
+    class CancellingLookup(CountingCache):
+        """Cancels the engine during its second ``lookup`` (the one after the decode pass)."""
+
+        def __init__(self) -> None:
+            super().__init__()
+            self.lookups = 0
+            self.engine: Any = None
+
+        def lookup(self, key: CacheKey) -> Any:
+            self.lookups += 1
+            entry = super().lookup(key)
+            if self.lookups == 2:
+                self.engine.cancel()
+            return entry
+
+    frames = synthetic_frames(12)
+    cache = CancellingLookup()
+    engine, source, _ = make_engine(GrayWorld(), frames, cache=cache)
+    cache.engine = engine
+    result = run(engine)
+    assert not result.ok and result.failure == CANCELLED
+    assert source.yielded == len(frames) and cache.lookups == 2
+    assert cache.marks == 0
+    entry = super(CancellingLookup, cache).lookup(KEY)
+    assert entry is not None and not entry.complete
+
+
 def test_a_cancel_during_the_last_smooth_is_not_published_as_complete() -> None:
     """D70, AD-15: a cancel that arrives while the last stage is smoothed still unloads."""
     frames = synthetic_frames(30)

@@ -504,6 +504,7 @@ class AnalysisEngine:
                 f"the cache entry holds {len(stale)} proxies not decoded by this pass (first at "
                 f"pts {stale[0]}): it cannot be marked complete"
             )
+        self._check(progress, None)  # a cancel that arrived during the lookup
         self._cache.mark_complete(self._key)
 
     # --- stages -------------------------------------------------------------------------------
