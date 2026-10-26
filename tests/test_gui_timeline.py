@@ -459,9 +459,16 @@ def scenario_decode_failure(env: Env, ms: int = 4000) -> None:
     env.wait(
         lambda: any(m.owner == "shell.frame" for m in presenter_of(env.window).of("error")), ms
     )
+
+    def statistics_restored_to_the_last_shown_frame() -> bool:
+        stats = env.session.statistics()
+        return stats is not None and env.statistics_mean() == pytest.approx(smooth(PTS[1]))
+
+    # asserted before the slider's rollback, so a panel that keeps the requested frame's
+    # statistics fails on them, by this condition, and not on the slider
+    env.wait(statistics_restored_to_the_last_shown_frame, ms)
     env.wait(lambda: env.slider().value() == 1, ms)
     assert env.session.current_image().pts_ticks == PTS[1]
-    assert env.statistics_mean() == pytest.approx(smooth(PTS[1]))
 
 
 def scenario_run_thread(env: Env, ms: int = 4000) -> None:
@@ -757,7 +764,7 @@ def test_a_decode_failure_restores_the_last_shown_frames_statistics_and_the_slid
 
 def test_planted_requested_statistics_kept_after_a_failed_decode_fails(make_env) -> None:
     env = make_env(panel_class=KeepRequestedStatisticsPanel, gated=(0,), fail_decode=(PTS[2],))
-    with pytest.raises(AssertionError):
+    with pytest.raises(AssertionError, match="statistics_restored_to_the_last_shown_frame"):
         scenario_decode_failure(env, ms=700)
 
 
