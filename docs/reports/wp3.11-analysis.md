@@ -45,7 +45,7 @@ inline, is re-measured from the stored proxies if the change touches it).
 | 6 | Store checks (DR-25 (1), (2), (4)-(7)): missing or extra name, shape change (also after invalidation), non-finite, non-real dtype refused at `put` with pts, stage and statistic named; hash mismatch refused on put and read; windows `Fraction(str(w))`. | `tests/test_analysis_store.py`, `test_windows_are_exact_decimals` |
 | 7 | Recompute (AD-7, P1): first invalidated stage by `depends_on_parameters`; a closed-form stage reads no proxy; near set = the exact closure over the real pts, 30 frames per stage at 29.97 fps (Gaussian 29 + median 1): stage 1 over +-60, stage 2 over +-30 for c3 (+-90 for three stages); the displayed frame's smoothed record is final at the end of the near phase and equals the final one; planted Gaussian-only and single-stage reaches are refused; "complete" only after the background part. AD-7's "+-29" is the Gaussian alone. | `tests/test_analysis_recompute.py` |
 | 8 | Provisional (D108, V18 engine side): `provisional_record(pts)` is the frame's own chain on its stored proxy, available while the analysis runs; the smoothed record after. | `test_provisional_statistics_come_before_the_smoothed_ones` |
-| 9 | Cancel and states (AD-15, D70): cancel within one frame (checked after every frame, after every smoothing, and under the engine lock before "complete" is published), no `mark_complete`, statistics dropped, phase `cancelled` (the unloaded state); a failure gives `failed` with `"<Type>: <text>"`. Cancel during a recompute is the same (choice 6); the stored proxies stay in the cache and the entry stays complete, so the re-analysis does not decode again (a cancel DURING the decode pass leaves the entry incomplete, so that re-analysis decodes). | `test_cancel_*`, `test_a_cancel_*`, `test_a_failing_analyze_*` |
+| 9 | Cancel and states (AD-15, D70): cancel within one frame (checked after every frame, between the 2048-frame chunks a stage is smoothed in (`SMOOTH_CHUNK`; `smooth_at` over the chunks equals `smooth` over the clip, tested), after every smoothing, and under the engine lock before "complete" is published), no `mark_complete`, statistics dropped, phase `cancelled` (the unloaded state); a failure gives `failed` with `"<Type>: <text>"`. Cancel during a recompute is the same (choice 6); the stored proxies stay in the cache and the entry stays complete, so the re-analysis does not decode again (a cancel DURING the decode pass leaves the entry incomplete, so that re-analysis decodes). | `test_cancel_*`, `test_a_cancel_*`, `test_a_failing_analyze_*` |
 | 10 | V3 / AD-14 (Q7): see "V3" below. | `tests/test_analysis_v3.py` |
 
 ## The `schema_hash`
@@ -192,4 +192,5 @@ record `analyze` returned and never uses a cached record without passing it thro
   used from two threads).
 - Scrubbing during a recompute does not re-prioritise it; a new `set_parameters` does.
 - The step-aware kinds read the whole series (a global noise scale), so their near phase is the
-  whole clip.
+  whole clip, and a stage is smoothed under them in one call: a cancel then waits for that
+  stage's smoothing (evaluation kinds; the default is chunked).

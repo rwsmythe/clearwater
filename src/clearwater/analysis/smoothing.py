@@ -56,7 +56,7 @@ STEP_AWARE_KINDS = ("median_gaussian_cut", "median_bilateral")
 KINDS = (DEFAULT_KIND, "gaussian", *STEP_AWARE_KINDS)
 """Every smoothing kind this module implements."""
 
-_LOCAL_KINDS = (DEFAULT_KIND, "gaussian")
+LOCAL_KINDS = (DEFAULT_KIND, "gaussian")
 """Kinds whose output at a frame reads only the samples within its windows."""
 
 _CHUNK_ELEMENTS = 1 << 22
@@ -153,7 +153,7 @@ def reach(
     pts = np.asarray(ticks, dtype=np.int64)
     if not 0 <= lo <= hi < len(pts):
         raise ValueError(f"output interval {lo}..{hi} outside 0..{len(pts) - 1}")
-    if kind not in _LOCAL_KINDS:
+    if kind not in LOCAL_KINDS:
         return 0, len(pts) - 1
     first, last = _span(pts, lo, hi, half_window_ticks(window_s, time_base))
     if kind == DEFAULT_KIND:

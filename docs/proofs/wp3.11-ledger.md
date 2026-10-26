@@ -423,7 +423,10 @@ instrument 217 passed (`work/t-r2.log`). Full pytest NOT yet run (needs a window
 **Do next, in order.**
 1. Remediate R2 (dispatcher RULED both MAJOR; A2 in envelope by task 8), one commit per finding,
    each with a test shown failing on the unfixed code. A1 DONE (see its commit; test
-   `test_a_reader_never_gets_old_records_under_the_new_schema`, unfixed: served/served). A2:
+   `test_a_reader_never_gets_old_records_under_the_new_schema`, unfixed: served/served). A2 DONE
+   (its commit: `SMOOTH_CHUNK` 2048, `_smooth_stage` via `smooth_at` with `_check` between;
+   test `test_a_cancel_during_a_stages_smoothing_stops_before_the_stage_ends`, unfixed rows
+   [60, 60]; guard `test_chunked_smoothing_equals_the_whole_series`). Was:
    - A1: in `AnalysisEngine._drive`, call `invalidate_from` BEFORE setting `schema_hash` on
      `_store` and `_measured`; test: plant a reader in `store.invalidate_from` (as
      `r2/probe_r2.py` A1 does) and assert it gets KeyError (on the unfixed code it is served the

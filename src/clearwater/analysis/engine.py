@@ -47,7 +47,7 @@ from clearwater.interfaces import (
 )
 
 from .proxy import frame_pixels_on_host, make_proxy, proxy_image
-from .smoothing import DEFAULT_KIND, DEFAULT_WINDOW_S, KINDS, exact_window, reach
+from .smoothing import DEFAULT_KIND, DEFAULT_WINDOW_S, KINDS, LOCAL_KINDS, exact_window, reach
 from .store import AnalysisStore, SchemaMismatchError, schema_hash
 
 type Phase = Literal["none", "running", "complete", "cancelled", "failed"]
@@ -55,6 +55,11 @@ type Phase = Literal["none", "running", "complete", "cancelled", "failed"]
 
 CANCELLED = "cancelled"
 """The ``JobResult.failure`` of a cancelled job."""
+
+SMOOTH_CHUNK = 2048
+"""Frames per chunk when a stage is smoothed for the whole clip; a cancel is checked between
+chunks (task 8), so it waits for one chunk, not the stage (0.3-0.7 s per statistic at 107,892
+frames when smoothed whole)."""
 
 
 @dataclass(frozen=True)
@@ -525,9 +530,27 @@ class AnalysisEngine:
             self._measure(
                 progress, pending, stage, self._store.raw_missing(stage.name), counter, message
             )
+            self._smooth_stage(progress, generation, stage)
+            self._check(progress, generation)
+
+    def _smooth_stage(self, progress: Progress, generation: int, stage: Stage) -> None:
+        """Smooth a stage for every frame, in chunks of outputs with a cancel check between.
+
+        ``smooth_at`` over consecutive chunks equals ``smooth`` over the whole clip (each output
+        reads its own windows). A step-aware kind reads the whole series, so it is smoothed in
+        one call (limit: a cancel then waits for the stage's smoothing).
+        """
+        if self._kind not in LOCAL_KINDS:
             self._check(progress, generation)
             self._store.smooth(stage.name, stage.smoothed, self._window_s, self._kind)
+            return
+        axis = self._store.axis()
+        for lo in range(0, len(axis), SMOOTH_CHUNK):
             self._check(progress, generation)
+            hi = min(lo + SMOOTH_CHUNK, len(axis)) - 1
+            self._store.smooth_at(
+                stage.name, stage.smoothed, self._window_s, self._kind, axis[lo], axis[hi]
+            )
 
     def _near_phase(
         self,

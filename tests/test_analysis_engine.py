@@ -9,7 +9,9 @@ from typing import Any
 import numpy as np
 import pytest
 
-from clearwater.analysis import CANCELLED, make_proxy
+from clearwater.analysis import CANCELLED, DEFAULT_KIND, make_proxy, smooth_series
+from clearwater.analysis import engine as engine_module
+from clearwater.analysis import store as store_module
 from clearwater.cache import DiskProxyCache
 from clearwater.interfaces import CacheKey, JobResult
 from clearwater.interfaces.stubs import StubProgress
@@ -236,19 +238,63 @@ def test_a_cancel_during_the_last_smooth_is_not_published_as_complete() -> None:
     """D70, AD-15: a cancel that arrives while the last stage is smoothed still unloads."""
     frames = synthetic_frames(30)
     engine, _, _ = make_engine(GrayWorld(), frames)
-    smooth = engine.store.smooth
+    smooth, smooth_at = engine.store.smooth, engine.store.smooth_at
+    last = frames[-1].pts_ticks
 
     def cancelling_smooth(stage: str, *args: Any) -> None:
         smooth(stage, *args)
         if stage == "fusion":
             engine.cancel()
 
+    def cancelling_smooth_at(stage: str, *args: Any) -> None:
+        smooth_at(stage, *args)
+        if stage == "fusion" and args[-1] == last:  # the whole-clip pass's last chunk
+            engine.cancel()
+
     engine.store.smooth = cancelling_smooth  # type: ignore[method-assign]
+    engine.store.smooth_at = cancelling_smooth_at  # type: ignore[method-assign]
     result = run(engine)
     assert not result.ok and result.failure == CANCELLED
     assert engine.state().phase == "cancelled" and not engine.is_complete()
     with pytest.raises(KeyError):
         engine.smoothed_record(frames[0].pts_ticks)
+
+
+def test_a_cancel_during_a_stages_smoothing_stops_before_the_stage_ends(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Task 8: a cancel from inside a stage's smoothing stops before the stage is smoothed."""
+    monkeypatch.setattr(engine_module, "SMOOTH_CHUNK", 16, raising=False)
+    frames = synthetic_frames(60)
+    engine, _, cache = make_engine(GrayWorld(), frames)
+    rows: list[int] = []
+
+    def cancelling(ticks: Any, *args: Any, **kwargs: Any) -> Any:
+        out = kwargs.get("out", args[4] if len(args) > 4 else None)
+        rows.append(len(ticks) if out is None else out[1] - out[0] + 1)
+        engine.cancel()
+        return smooth_series(ticks, *args, **kwargs)
+
+    monkeypatch.setattr(store_module, "smooth_series", cancelling)
+    result = run(engine)
+    assert not result.ok and result.failure == CANCELLED
+    # white_balance smooths 2 statistics over 60 frames; the cancel lands within one chunk.
+    assert 0 < sum(rows) < 2 * len(frames), rows
+    assert engine.state().phase == "cancelled"
+    assert isinstance(cache, CountingCache) and cache.marks == 1  # the decode pass had ended
+
+
+def test_chunked_smoothing_equals_the_whole_series(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A stage smoothed in chunks equals the series smoothed whole, on every frame."""
+    monkeypatch.setattr(engine_module, "SMOOTH_CHUNK", 7, raising=False)
+    frames = synthetic_frames(60)
+    engine, _, _ = make_engine(GrayWorld(), frames)
+    assert run(engine).ok
+    ticks = np.array(engine.store.axis())
+    time_base = frames[0].time_base
+    for stage, name in (("white_balance", "gains"), ("fusion", "level")):
+        whole = smooth_series(ticks, time_base, _raw_series(engine, stage, name), 2.0, DEFAULT_KIND)
+        np.testing.assert_allclose(_smoothed_series(engine, stage, name), whole, rtol=0, atol=1e-12)
 
 
 def test_a_reader_never_gets_old_records_under_the_new_schema() -> None:
