@@ -370,6 +370,10 @@ class ParameterRow(QWidget):
             return float(position)
         lo, hi = self.parameter.minimum, self.parameter.maximum
         assert lo is not None and hi is not None
+        if position <= 0:
+            return lo
+        if position >= SLIDER_STEPS:
+            return hi  # exactly: lo + 1000 * span / 1000 can miss the maximum
         return lo + position * (hi - lo) / SLIDER_STEPS
 
     def _slider_position(self, number: float) -> int:

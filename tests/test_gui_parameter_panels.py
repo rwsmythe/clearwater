@@ -658,3 +658,14 @@ def test_extreme_finite_float_ranges_build_and_commit_inside_their_bounds(
     row.spin.setValue(lo / 2)
     row.spin.setValue(hi / 3)
     assert all(lo <= p.parameters["extreme"] <= hi for p in seen)
+
+
+def test_the_slider_ends_map_exactly_to_the_bounds(make_window) -> None:
+    lo, hi = -424.66669714012824, -47.19110516014397
+    schema = (param("odd", "float", -200.0, lo, hi),)
+    window, basic, _ = build(make_window, {"m": SchemaMethod("m", schema)})
+    row = basic.controls()["odd"]
+    seen = changes(window)
+    row.slider.setValue(pp.SLIDER_STEPS)
+    row.slider.setValue(0)
+    assert [p.parameters["odd"] for p in seen] == [hi, lo]
