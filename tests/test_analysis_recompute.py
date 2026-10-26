@@ -258,6 +258,22 @@ def test_an_equal_value_of_another_number_type_keeps_the_helper_hash() -> None:
     assert engine.smoothed_record(frames[5].pts_ticks, schema_hash=helper)
 
 
+def test_a_bool_for_a_number_is_a_change_and_an_equal_number_is_not() -> None:
+    """``1`` -> ``True`` recomputes under a new hash; ``1`` -> ``1.0`` stays no change."""
+    frames = synthetic_frames(20)
+    method = GrayWorld()
+    engine, _, _ = make_engine(method, frames, params={"strength": 1})
+    assert run(engine).ok
+    assert engine.set_parameters({**engine.parameters, "strength": 1.0}, None) is None
+    old = engine.schema_hash
+    job = engine.set_parameters({**engine.parameters, "strength": True}, None)
+    assert job is not None and engine.schema_hash != old
+    helper = schema_hash(method, engine.parameters, "median_gaussian", 2.0)
+    assert helper == engine.schema_hash
+    assert job(StubProgress()).ok
+    assert engine.smoothed_record(frames[5].pts_ticks, schema_hash=helper)
+
+
 def test_a_change_before_any_analysis_is_used_by_the_next_job() -> None:
     """Phase none: no job is returned; the analysis then runs under the new values."""
     frames = synthetic_frames(20)

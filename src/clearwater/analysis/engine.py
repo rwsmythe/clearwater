@@ -48,7 +48,7 @@ from clearwater.interfaces import (
 
 from .proxy import frame_pixels_on_host, make_proxy, proxy_image
 from .smoothing import DEFAULT_KIND, DEFAULT_WINDOW_S, KINDS, LOCAL_KINDS, exact_window, reach
-from .store import AnalysisStore, SchemaMismatchError, schema_hash
+from .store import AnalysisStore, SchemaMismatchError, same_value, schema_hash
 
 type Phase = Literal["none", "running", "complete", "cancelled", "failed"]
 """The phase of a clip's analysis; the values of ``gui.contract.AnalysisPhase`` (AD-15)."""
@@ -218,7 +218,9 @@ class AnalysisEngine:
     ) -> Callable[[Progress], JobResult] | None:
         """Apply new parameter values (7.3, AD-7).
 
-        The first invalidated stage is the first whose ``depends_on_parameters`` names a
+        A value is changed when it differs as ``schema_hash`` hashes it (numbers by their float
+        value, a ``bool`` distinct from ``1``), so change detection and the hash agree. The
+        first invalidated stage is the first whose ``depends_on_parameters`` names a
         changed value; it and every later stage are recomputed, first for the frames within the
         cumulative smoothing reach of ``around_pts``, then for the rest of the clip.
 
@@ -238,7 +240,7 @@ class AnalysisEngine:
             changed = {
                 name
                 for name in set(old) | set(new)
-                if (name in old) != (name in new) or old.get(name) != new.get(name)
+                if (name in old) != (name in new) or not same_value(old.get(name), new.get(name))
             }
             first = next(
                 (

@@ -55,7 +55,9 @@ SHA-256 hex of canonical JSON (`sort_keys`, compact separators, floats by `repr`
 `depends_on_parameters`. A parameter no stage depends on leaves it unchanged; a missing name and
 `None` differ. Every number (`int` or `float`, at any depth, never a `bool`) is hashed as its
 `float` value, so equal values hash equal whatever their Python type (`1` and `1.0`, as a preset
-read from JSON may give: `set_parameters` treats them as no change), while `True` and `1` differ.
+read from JSON may give: `set_parameters` treats them as no change), while `True` and `1` differ
+(a change, recomputed under a new hash: `set_parameters` decides "changed" with `same_value`, the
+hash's canonical form compared with its types).
 
 ## V3 (engine side, ruling Q7 and CHARC ruling V3-1)
 
@@ -210,3 +212,5 @@ the method is a ValueError.
   stage's smoothing (evaluation kinds; the default is chunked).
 - A job callable is not one-shot: an OLD callable kept and run concurrently with a new job would
   be a second writer of the store and cache (the one-writer condition is the caller's; B5, banked).
+- `schema_hash` and `set_parameters` compare numbers as floats, so two `int` values beyond 2**53
+  that round to the same float are the same value (no recompute, one hash).

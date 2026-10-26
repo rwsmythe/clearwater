@@ -67,6 +67,41 @@ def _canonical(value: Any) -> Any:
     return value
 
 
+def same_value(first: Any, second: Any) -> bool:
+    """Return True when two parameter values are equal as :func:`schema_hash` hashes them.
+
+    Both are passed through the hash's canonical form (every number as its ``float``) and then
+    compared with their types, so ``1`` equals ``1.0`` but ``True`` never equals ``1`` (Python's
+    ``True == 1.0`` would say otherwise).
+
+    Args:
+        first: One value.
+        second: The other value.
+
+    Returns:
+        Whether the values hash the same.
+
+    Raises:
+        OverflowError: An ``int`` too large for a ``float``.
+    """
+    return _same_canonical(_canonical(first), _canonical(second))
+
+
+def _same_canonical(first: Any, second: Any) -> bool:
+    """Compare two canonical values, their types included, at every depth."""
+    if type(first) is not type(second):
+        return False
+    if isinstance(first, list):
+        return len(first) == len(second) and all(
+            _same_canonical(a, b) for a, b in zip(first, second, strict=True)
+        )
+    if isinstance(first, dict):
+        return first.keys() == second.keys() and all(
+            _same_canonical(item, second[key]) for key, item in first.items()
+        )
+    return bool(first == second)
+
+
 def schema_hash(
     method: CorrectionMethod,
     params: Mapping[str, Any],

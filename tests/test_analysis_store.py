@@ -10,6 +10,7 @@ import numpy as np
 import pytest
 
 from clearwater.analysis import AnalysisStore, SchemaMismatchError, schema_hash, smooth_series
+from clearwater.analysis.store import same_value
 from clearwater.interfaces import StatisticsStore
 from clearwater.interfaces.stubs import C3_STAGES, StubCorrectionMethod
 from test_analysis_support import GrayWorld
@@ -235,6 +236,15 @@ def test_schema_hash_canonicalises_numbers_but_not_bools() -> None:
     assert digest([1, {"a": 2}]) == digest([1.0, {"a": 2.0}])
     with pytest.raises(ValueError, match="cannot be hashed"):
         digest(10**400)
+
+
+def test_same_value_agrees_with_the_hash_at_every_depth() -> None:
+    """Equal numbers of either type are the same value; a bool never equals a number."""
+    assert same_value(1, 1.0) and same_value(None, None) and same_value("a", "a")
+    assert same_value([1, {"a": 2}], (1.0, {"a": 2.0}))
+    assert not same_value(1, True) and not same_value(0.0, False) and not same_value(1, 2)
+    assert not same_value([1, True], [1.0, 1]) and not same_value({"a": 1}, {"a": True})
+    assert not same_value([1], [1, 1]) and not same_value({"a": 1}, {"b": 1})
 
 
 def test_one_writer_and_reader_threads() -> None:
