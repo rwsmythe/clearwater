@@ -355,6 +355,20 @@ def _snapshot(folder: Path) -> dict[str, tuple[bytes, int]]:
     }
 
 
+def test_the_options_follow_the_subcommand(
+    folders: LocalConfig, sample: Any, capsys: pytest.CaptureFixture[str]
+) -> None:
+    (folders.footage_path / "GX000003.mp4").write_bytes(sample(SAMPLE).read_bytes())
+    argv = ["run", "GX000003", "--encoder", "libx265", "--quality", "draft", "--keep"]
+    argv += ["--software-decode", "--memory-every", "0.05", "--gpu-every", "2"]
+    argv += ["--strays-every", "1"]  # as the usage shows them (round 5 #6)
+    assert bench.main(argv) == 0
+    out = capsys.readouterr().out
+    record = json.loads(Path(out.strip().splitlines()[-1].removeprefix("RECORD ")).read_text())
+    run = record["runs"][0]
+    assert Path(run["output"]).is_file() and run["decode"]["hw_decode_asked"] is False
+
+
 def test_floor_dry_run_resolves_every_clip(
     folders: LocalConfig, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -398,8 +412,8 @@ def test_run_writes_the_record_and_leaves_the_footage_alone(
     clip.parent.mkdir()
     clip.write_bytes(sample(SAMPLE).read_bytes())
     footage = _snapshot(folders.footage_path)
-    argv = ["--software-decode", "--memory-every", "0.05", "--strays-every", "1"]
-    argv += ["run", "GX000001", "--encoder", "libx265", "--quality", "draft", "--runs", "2"]
+    argv = ["run", "GX000001", "--encoder", "libx265", "--quality", "draft", "--runs", "2"]
+    argv += ["--software-decode", "--memory-every", "0.05", "--strays-every", "1"]
     assert bench.main(argv) == 0
     out = capsys.readouterr().out
     rows = [line for line in out.splitlines() if line.startswith("ROW GX000001.mp4 libx265")]
@@ -416,7 +430,7 @@ def test_a_failed_run_keeps_the_record_and_exits_1(
     folders: LocalConfig, capsys: pytest.CaptureFixture[str]
 ) -> None:
     (folders.footage_path / "GX000002.mp4").write_bytes(b"\x00" * 64)
-    assert bench.main(["--strays-every", "1", "run", "GX000002", "--encoder", "libx265"]) == 1
+    assert bench.main(["run", "GX000002", "--encoder", "libx265", "--strays-every", "1"]) == 1
     out = capsys.readouterr().out
     path = Path(out.strip().splitlines()[-1].removeprefix("RECORD "))
     record = json.loads(path.read_text(encoding="utf-8"))

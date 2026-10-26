@@ -37,8 +37,11 @@ telemetry track). The record (``io-bench-<name>-<UTC stamp>.json`` there) is rew
 every run, so a run that fails keeps the runs before it. Usage::
 
     uv run python tools/video_io_bench.py run GX011627 [--runs 3] [--encoder hevc_nvenc]
-        [--quality standard] [--bit-depth N] [--software-decode] [--keep]
-    uv run python tools/video_io_bench.py floor [--dry-run]
+        [--quality standard] [--bit-depth N] [OPTIONS]
+    uv run python tools/video_io_bench.py floor [--dry-run] [OPTIONS]
+
+where OPTIONS, after the subcommand, are ``--config FILE``, ``--keep``, ``--software-decode``,
+``--memory-every S``, ``--gpu-every S`` and ``--strays-every S``.
 
 ``floor`` runs :data:`FLOOR_PLAN`, ruling Q11's row set, in order. Exit status 0 when every
 run finished; 1 when a run failed (the record says which and why); 2 on a usage,
@@ -746,21 +749,22 @@ def main(argv: Sequence[str] | None = None) -> int:
     Returns:
         The exit status.
     """
+    options = argparse.ArgumentParser(add_help=False)
+    options.add_argument("--config", type=Path, help="local configuration file to read")
+    options.add_argument("--keep", action="store_true", help="keep the outputs")
+    options.add_argument("--software-decode", action="store_true", help="decode without CUDA")
+    options.add_argument("--memory-every", type=float, default=0.25, help="seconds")
+    options.add_argument("--gpu-every", type=float, default=1.0, help="seconds")
+    options.add_argument("--strays-every", type=float, default=30.0, help="seconds")
     parser = argparse.ArgumentParser(description=(__doc__ or "").splitlines()[0])
-    parser.add_argument("--config", type=Path, help="local configuration file to read")
-    parser.add_argument("--keep", action="store_true", help="keep the outputs")
-    parser.add_argument("--software-decode", action="store_true", help="decode without CUDA")
-    parser.add_argument("--memory-every", type=float, default=0.25, help="seconds")
-    parser.add_argument("--gpu-every", type=float, default=1.0, help="seconds")
-    parser.add_argument("--strays-every", type=float, default=30.0, help="seconds")
     commands = parser.add_subparsers(dest="command", required=True)
-    one = commands.add_parser("run", help="one leg")
+    one = commands.add_parser("run", help="one leg", parents=[options])
     one.add_argument("clip", help="footage stem, for example GX011627")
     one.add_argument("--runs", type=int, default=1)
     one.add_argument("--encoder", default="hevc_nvenc", choices=("hevc_nvenc", "libx265"))
     one.add_argument("--quality", default="standard", choices=("high", "standard", "draft"))
     one.add_argument("--bit-depth", type=int, choices=(8, 10), help="the source's when omitted")
-    floor = commands.add_parser("floor", help="the ruled row set (FLOOR_PLAN)")
+    floor = commands.add_parser("floor", help="the ruled row set (FLOOR_PLAN)", parents=[options])
     floor.add_argument("--dry-run", action="store_true", help="list the runs and stop")
     args = parser.parse_args(argv)
     if args.command == "run":
