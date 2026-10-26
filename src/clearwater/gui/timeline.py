@@ -312,7 +312,11 @@ class TimelinePanel(QWidget):
         began = time.perf_counter()
 
         def job(progress: Progress) -> JobResult:
-            analysis.run(parameters, progress, focus_pts=focus)
+            try:
+                analysis.run(parameters, progress, focus_pts=focus)
+            except Exception:
+                if not progress.cancelled():  # a failure of its own; after a cancel it is not one
+                    raise
             # Whoever cancelled (the user, a method change, a source change, the runner's own
             # cancel at close), a cancelled job is never complete, even if the analysis finished
             # first (DR-47's shape; conservative: "Analyse" then costs the engine nothing).
@@ -548,10 +552,14 @@ class TimelinePanel(QWidget):
 
         def job(progress: Progress) -> JobResult:
             began = time.perf_counter()
-            if request.kind == "proxy":
-                box["proxy"] = analysis.proxy(request.pts)
-            elif want_statistics:
-                box["statistics"] = analysis.statistics(request.pts)
+            try:
+                if request.kind == "proxy":
+                    box["proxy"] = analysis.proxy(request.pts)
+                elif want_statistics:
+                    box["statistics"] = analysis.statistics(request.pts)
+            except Exception:
+                if not progress.cancelled():  # a read failure of its own, not a cancelled read
+                    raise
             ok = not progress.cancelled()
             failure = None if ok else CANCELLED
             return JobResult(ok, (), (), failure, "analysis", time.perf_counter() - began)

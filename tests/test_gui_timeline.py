@@ -143,6 +143,7 @@ class ScriptedAnalysis:
         gated: Sequence[int] = (0,),
         absorb: bool = False,
         ignore_cancel: bool = False,
+        raise_on_cancel: bool = False,
         fail_runs: Sequence[int] = (),
         proxy_delay: float = 0.0,
         fail_proxy: Sequence[int] = (),
@@ -153,6 +154,7 @@ class ScriptedAnalysis:
         self.gated = set(gated)
         self.absorb = absorb
         self.ignore_cancel = ignore_cancel
+        self.raise_on_cancel = raise_on_cancel
         self.fail_runs = set(fail_runs)
         self.proxy_delay = proxy_delay
         self.fail_proxy = set(fail_proxy)
@@ -189,6 +191,8 @@ class ScriptedAnalysis:
             while not gate.wait(0.005):
                 if progress.cancelled() and not self.ignore_cancel:
                     self.cancelled_runs.append(index)
+                    if self.raise_on_cancel:  # an analysis that fails while it is stopping
+                        raise RuntimeError("scripted failure while cancelling")
                     return
         if progress.cancelled() and not self.ignore_cancel:
             self.cancelled_runs.append(index)
@@ -592,6 +596,28 @@ def test_a_cancel_by_a_third_party_is_never_a_completion(make_env, ignore_cancel
     assert "complete" not in env.phases
     assert env.session.statistics() is None
     assert env.button("timeline.analyse").isEnabled()
+
+
+def test_an_exception_after_a_third_party_cancel_is_a_cancel_not_a_failure(make_env) -> None:
+    env = make_env(gated=(0,), raise_on_cancel=True)
+    env.open()
+    env.wait(lambda: env.session.analysis().done == 1)
+    env.window.jobs.cancel()  # the analysis raises while it stops
+    env.phase_is("cancelled")
+    assert "failed" not in env.phases and "complete" not in env.phases
+    assert presenter_of(env.window).of("error") == []
+    assert env.button("timeline.analyse").isEnabled()
+
+
+def test_a_scrub_read_that_fails_after_a_cancel_shows_no_error(make_env) -> None:
+    env = make_env(gated=(0,), proxy_delay=0.3, fail_proxy=(PTS[2],))
+    complete(env)
+    drag_to(env, 2)  # the proxy read sleeps, then raises KeyError
+    env.wait(lambda: env.analysis.active_proxy == 1)
+    env.window.jobs.cancel()
+    env.wait(lambda: env.window.jobs.active() == 0)
+    env.qtbot.wait(50)
+    assert presenter_of(env.window).of("error") == []
 
 
 def test_retarget_with_no_run_in_flight_raises_in_the_panel(make_env) -> None:
