@@ -271,3 +271,7 @@ Green after the cleanup (targeted, both modules + `test_gui_deps.py`): 73 passed
 | 3 MINOR: save-over covered only an ASCII case change | `d5c3487` | `SAME_NAME` parametrisation (Strasse/STRASSE, composed/decomposed Cafe); planted `lower()` key `test_planted_lower_case_name_key_fails` |
 
 Items 1 and 2 share one test file, so their tests are one commit. Static gates green at `eda1d94` (ruff, format, mypy); tests not yet run (host hold).
+
+Results (host free 11.5 GB; foreground; headless; extracted copy of `6e295c1` with the new test files, then the head):
+- Old product `6e295c1` + new tests (`tests/test_gui_parameter_panels.py`, `tests/test_gui_preset_panel.py`, `tests/test_gui_deps.py`): 2 failed, 79 passed. The failures are the item-1 tests (`test_a_float_range_below_the_old_six_decimals_keeps_its_bounds_and_default`, `test_a_range_too_narrow_to_resolve_gets_a_spin_box_alone_at_full_precision`). Items 2 and 3 are test additions: their checks pass on the old product, and their planted wrong implementations (doubled Basic panel, `lower()` key) are caught by the helpers.
+- Head `eda1d94` product (docs after): 81 passed. `ruff check .`, `ruff format --check .`, `mypy` clean. CR bytes 0 in blob and file for all six changed files.
