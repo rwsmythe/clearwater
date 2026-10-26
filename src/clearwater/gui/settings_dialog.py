@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import contextlib
 import dataclasses
+import threading
 import time
 from collections.abc import Callable, Sequence
 from pathlib import Path
@@ -52,7 +53,14 @@ from PySide6.QtWidgets import (
 )
 
 from clearwater.config import SETTINGS_FILE_NAME, save_settings
-from clearwater.interfaces import EncoderCapability, FormatError, JobResult, Progress, Settings
+from clearwater.interfaces import (
+    EncoderCapability,
+    FormatError,
+    JobResult,
+    Progress,
+    ProxyCache,
+    Settings,
+)
 from clearwater.jobs import validate_suffix
 
 from .contract import Message, ShellContext, ShellWindow
@@ -271,6 +279,45 @@ class EncoderCatalog(QObject):
         return self._failure
 
 
+class CacheLimiter:
+    """Serialises the cache-limit calls so that the last accepted limit wins (D71).
+
+    Every accepted limit change runs ``cache.set_limit_bytes`` in its own job, and jobs may run in
+    any order. :meth:`want` (interface thread) records the newest limit; each job calls
+    :meth:`apply` (worker thread), which takes the call lock and applies the newest recorded
+    limit, whichever job it belongs to. So the cache always ends at the last accepted value, and
+    two calls never overlap. :meth:`want` takes only the short value lock, never the call lock, so
+    the interface thread never waits for a call in progress.
+    """
+
+    def __init__(self) -> None:
+        """Create a limiter that has no limit wanted yet."""
+        self._latest: int | None = None
+        self._value_lock = threading.Lock()
+        self._call_lock = threading.Lock()
+
+    def want(self, limit_bytes: int) -> None:
+        """Record the newest accepted limit.
+
+        Args:
+            limit_bytes: The limit in bytes.
+        """
+        with self._value_lock:
+            self._latest = limit_bytes
+
+    def apply(self, cache: ProxyCache) -> None:
+        """Set the newest recorded limit on the cache, one call at a time (worker thread).
+
+        Args:
+            cache: The proxy cache (IF-7).
+        """
+        with self._call_lock:
+            with self._value_lock:
+                limit = self._latest
+            if limit is not None:
+                cache.set_limit_bytes(limit)
+
+
 class SettingsDialog(QDialog):
     """The settings dialog (G12); build one with :func:`settings_dialog`."""
 
@@ -280,6 +327,7 @@ class SettingsDialog(QDialog):
         choosers: SettingsChoosers,
         resolve_encoder: EncoderResolver,
         catalog: EncoderCatalog,
+        cache_limiter: CacheLimiter,
     ) -> None:
         """Create the dialog on the session's current settings.
 
@@ -288,12 +336,14 @@ class SettingsDialog(QDialog):
             choosers: The folder chooser and confirmation.
             resolve_encoder: The one "auto" rule, used for the 10-bit rule.
             catalog: The session's encoder capabilities; started here when idle.
+            cache_limiter: The session's cache-limit serialiser, shared between dialogs.
         """
         super().__init__(context.window)
         self._context = context
         self._choosers = choosers
         self._resolve = resolve_encoder
         self._catalog = catalog
+        self._limiter = cache_limiter
         self._initial = context.session.settings()
         self._folder: Path | None = self._initial.output_folder
         self._clearing = False
@@ -707,13 +757,15 @@ class SettingsDialog(QDialog):
             context.messages.clear(owner=OWNER_SETTINGS)
 
     def _set_cache_limit(self, limit_bytes: int) -> None:
-        """Set the cache limit in a job (it may evict on disk)."""
+        """Set the cache limit in a job (it may evict on disk); the newest accepted limit wins."""
         context = self._context
         cache = context.engines.cache
+        limiter = self._limiter
+        limiter.want(limit_bytes)
 
         def job(progress: Progress) -> JobResult:
             started = time.perf_counter()
-            cache.set_limit_bytes(limit_bytes)
+            limiter.apply(cache)
             return _done(started)
 
         def done(result: JobResult) -> None:
@@ -743,6 +795,7 @@ def settings_dialog(
     choosers: SettingsChoosers | None = None,
     resolve_encoder: EncoderResolver | None = None,
     catalog: EncoderCatalog | None = None,
+    cache_limiter: CacheLimiter | None = None,
 ) -> SettingsDialog:
     """Build a new settings dialog on the session's current settings.
 
@@ -752,6 +805,8 @@ def settings_dialog(
         resolve_encoder: The one "auto" rule; :func:`interim_resolve_encoder` when None.
         catalog: The session's encoder capabilities, shared between dialogs; a new one for this
             dialog when None.
+        cache_limiter: The session's cache-limit serialiser, shared between dialogs so that the
+            last accepted limit wins; a new one for this dialog when None.
 
     Returns:
         The dialog; the shell opens it with ``QDialog.open()``.
@@ -761,6 +816,7 @@ def settings_dialog(
         choosers or QtChoosers(context.window),
         resolve_encoder or interim_resolve_encoder,
         catalog or EncoderCatalog(context.window),
+        cache_limiter or CacheLimiter(),
     )
 
 
@@ -773,7 +829,7 @@ def install_settings_dialog(
     """Register the settings dialog with the window (Tools > Settings).
 
     The encoder capabilities are read once, by the first dialog that opens, and shared by every
-    later one.
+    later one; so is the serialiser of the cache-limit calls.
 
     Args:
         window: The main window.
@@ -781,10 +837,15 @@ def install_settings_dialog(
         resolve_encoder: The one "auto" rule; :func:`interim_resolve_encoder` when None.
     """
     catalog = EncoderCatalog(window)
+    cache_limiter = CacheLimiter()
 
     def factory(context: ShellContext) -> SettingsDialog:
         return settings_dialog(
-            context, choosers=choosers, resolve_encoder=resolve_encoder, catalog=catalog
+            context,
+            choosers=choosers,
+            resolve_encoder=resolve_encoder,
+            catalog=catalog,
+            cache_limiter=cache_limiter,
         )
 
     window.set_settings_dialog(factory)
