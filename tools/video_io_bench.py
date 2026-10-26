@@ -10,8 +10,9 @@ the seconds per frame and minutes of processing per minute of footage (``min/min
 seconds over ``frames / frame_rate``), and per frame the interval between the ends of two
 successive writes, the wait for the decoder and the ``write`` call (each list kept whole, and
 summarised). An interval is its wait plus its write plus the loop's own bookkeeping (a few
-microseconds). The first frame's interval also holds the decoder's start and FFmpeg's start-up
-on both sides; it is kept apart from the summaries.
+microseconds). The first frame's interval also holds the decoder's start (its FFmpeg starts at
+the first frame asked for) and the encoder's first frame; the encoder's FFmpeg starts inside
+``open`` and is timed there. The first interval is kept apart from the summaries.
 
 Plan 4.3 / frame rule 7: an EXCLUSIVE run, best effort on a shared laptop. A telemetry thread
 and a watcher process record, without stopping the frame loop:
