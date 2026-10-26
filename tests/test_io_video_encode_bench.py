@@ -204,6 +204,12 @@ def test_run_once_records_the_row_and_deletes_the_output(sample: Any, tmp_path: 
     assert len(record["per_frame_s"]) == frames
     assert record["per_frame"]["n"] == frames - 1
     assert record["decode_wait"]["n"] == record["write"]["n"] == frames - 1
+    triples = zip(record["per_frame_s"], record["decode_wait_s"], record["write_s"], strict=True)
+    for number, (interval, wait, write) in enumerate(triples):
+        # an interval is its wait and its write plus microseconds of bookkeeping (round 5 #1);
+        # the first one also holds the decoder's start
+        assert wait + write <= interval + 2e-5
+        assert number == 0 or interval - (wait + write) < 0.005
     stages = record["stages_s"]
     assert stages["total"] == pytest.approx(
         stages["probe"] + stages["open"] + stages["stream"] + stages["close"]

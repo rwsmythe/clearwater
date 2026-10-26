@@ -8,8 +8,10 @@ of an export: probe, decode, transport, encode, mux and the sink's own verificat
 Per run the record holds the time of each stage (probe, ``open``, the frame stream, ``close``),
 the seconds per frame and minutes of processing per minute of footage (``min/min``: elapsed
 seconds over ``frames / frame_rate``), and per frame the interval between the ends of two
-successive writes, split into the wait for the decoder and the ``write`` call. The first
-frame's interval (FFmpeg start-up on both sides) is kept apart from the per-frame summaries.
+successive writes, the wait for the decoder and the ``write`` call (each list kept whole, and
+summarised). An interval is its wait plus its write plus the loop's own bookkeeping (a few
+microseconds). The first frame's interval also holds the decoder's start and FFmpeg's start-up
+on both sides; it is kept apart from the summaries.
 
 Plan 4.3 / frame rule 7: an EXCLUSIVE run, best effort on a shared laptop. A telemetry thread
 records, on its own clock and without stopping the frame loop:
@@ -694,6 +696,8 @@ def _measure(
             "decode_wait": summarise(waits[1:]),
             "write": summarise(writes[1:]),
             "per_frame_s": [round(value, 5) for value in intervals],
+            "decode_wait_s": [round(value, 5) for value in waits],
+            "write_s": [round(value, 5) for value in writes],
             "output_bytes": output.stat().st_size,
             "output_video_bit_rate": video_bit_rate(output),
             "source_video_bit_rate": video_bit_rate(path),
