@@ -8,7 +8,7 @@ D43-D45, D81, D83; V7, V11). Reviewer A evidence: `C:\Users\rwsmy\clearwater-rev
 
 | Round | Head | Verdict | Blocking (crit/major) | Minor | In envelope | NEW / REOPENED | Product vs test-only fixes | Depth (dispatcher) |
 |---|---|---|---|---|---|---|---|---|
-| 0 | (this commit) | table only, no product code besides `export_service.py` | - | - | - | - | - | (dispatcher fills) |
+| 0 | `d286b8d` | table only, no product code besides `export_service.py`; RULED by the dispatcher (CHARC `0e6962c39f216c86`): seam approved, C1 GRANTED, C2-C7 accepted | - | - | - | - | - | 123,884 |
 
 ## Round 0
 
@@ -225,3 +225,17 @@ not cancel; Q6 STRONG, five-round gate.
 
 `scripts/cell_depth.py` is the dispatcher's instrument (a cell cannot read its own transcript depth,
 recipe section 5); the figure is filled by the dispatcher at this yield.
+
+### 0.10 Round-0 ruling (CHARC `0e6962c39f216c86`, relayed by the orchestrator)
+
+- C1 GRANTED: ONE NEW file `src/clearwater/jobs/export_seam.py` (owned by this package; stdlib and
+  `clearwater.interfaces` only) holds `CANCELLED`, `UNAVAILABLE_TEXT`, `ExportRequest`, `ExportJobs`,
+  `unavailable_exports`; `gui/export_service.py` re-exports them and keeps `ActivityGate`, `SharedGate`
+  and the two reason strings. `jobs/__init__.py` is NOT edited. One test asserts the seam module loads no
+  PySide6 (subprocess, in `tests/test_gui_export_panel.py`).
+- Docstring notes adopted in `ExportJobs.job` / `CANCELLED`: a missing source is the JOB's failure, never a
+  build-time `ValueError`; `CANCELLED` is reserved and returned as the constant; output-name collisions
+  across batch items are caught by the filesystem scan at each plan (D34-D36), not by shared state.
+- C2-C7 accepted as recommended. `SharedGate` (additive, GUI side) is the holder that creates the one
+  gate when the first panel's factory runs.
+- Host: pytest hold ON at this point (CHARC's main suite); build is static-gates only until lifted.
