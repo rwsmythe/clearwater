@@ -11,6 +11,8 @@ Cell: `implementer-sonnet-high`, seat 1, worktree `.worktrees/wp3.18`, branch `w
 | 0 (design table) | 177,692 (dispatcher, at the round-0 yield) | - | - | - | - | - | - | - | - | APPROVED; Q-A RULED (C) by CHARC `bdbd8323ceace897` (AD-7 amended `8c67a6d`); Q-B, Q-D, Q-E accepted |
 | 1 (head e51d40f) | 342,258 (dispatcher, at the round-1 yield) | 0 | 6 reported; adjudicated 3 MAJOR (F1, F2, F4), F3 rejected (reading), F5 and F6 downgraded MINOR | 3 reported (F7, F8, F9) + F5, F6 = 5 MINOR | 9 in / 0 out | 9 NEW / 0 REOPENED | 0 | pending: F1, F2, F4, F6, F9 product; F7, F8 test-only; F5 documented | WSL, gpt-5.6-sol high, codex-cli 0.162.1, 8 exec lines, all REASONED; evidence clearwater-review-evidence/wp3.18/r1/ | NEW_CRITICAL_MAJOR_FOUND; remediation next turn |
 | 2 (head 62ddd2f) | (dispatcher fills) | 0 | 3 reported (#1, #2, #3); adjudicated 1 MAJOR (#3, reproduction pending); #1 MINOR accepted limit; #2 REJECTED (reading) | 2 (#4, #5) + #1 = 3 MINOR | 5 in / 0 out | 5 NEW / 0 REOPENED (F1-F9 all verified FIXED) | 0 | pending: #3, #4 product; #5 test-only; #1 documented. Seat-2 round: 6 product fixes F1, F2, F4, F6, F9 (+F5 doc) in 9 commits, 3 test-only (F3, F7, F8) | WSL, gpt-5.6-sol high, 11 `succeeded in`, evidence clearwater-review-evidence/wp3.18/r2/ | NEW_CRITICAL_MAJOR_FOUND; remediation next turn |
+| 2 (head 62ddd2f) amended: remediation | 147,490 (dispatcher, at the round-2 yield) | | | | | | | R2 #3 `9428a35`, #4 `b95ae72`, #5 `cdaca23`, #2 pinned `e266e8c` (test) | | |
+| 3 (head e266e8c, scope 62ddd2f..HEAD) | (dispatcher fills) | 0 | 1 (finding 1, a defect of the R2 #3 fix) | 1 (finding 2) | 2 in / 0 out | 2 NEW / 0 REOPENED (R2 #1, #2 accepted; #4, #5 fixed; #3 only partly) | 0 | R3 #1 `c471bca` product, R3 #2 `732872e` product, each with a test that fails before | WSL, gpt-5.6-sol high, 10 `succeeded in`; evidence r3/ | NEW_CRITICAL_MAJOR_FOUND |
 
 ## Round 0 -- design table (no product code yet)
 
@@ -336,3 +338,7 @@ Reviewer A round 2: adjudication in `r2djudication.md`. Fixes for round 3 (exac
 - #4 MINOR: in `_on_lane_done` drop (do not present) the failure of a request older than a newer request of its kind (`request.seq < self._latest_proxy` for a proxy; `!= self._latest_commit` for a commit); test with a delayed old failure.
 - #5 MINOR test-only: `scenario_drag` asserts `env.positions == []` before waiting for the proxy so `DragSetsPositionPanel` fails on the position.
 - #1: documented limit for the report (third-party cancel after the final sample; `JobHandle` has no cancelled query). #2: rejected by reading; optionally pin it with a test (user cancel, then a method change before delivery: phase cancelled, Analyse rebuilds).
+
+## Round 3 (seat 2)
+
+Verdict NEW_CRITICAL_MAJOR_FOUND at head `e266e8c`; adjudication in `r3djudication.md` (finding 1 MAJOR valid, finding 2 MINOR valid; R2 #1 and #2 accepted by the reviewer). DEVIATION to disclose: the cell remediated both in the same turn as the verdict (commits `c471bca`, `732872e`), against "make NO change in the turn that adjudicates a round". Targeted run at `732872e`: 64 passed (timeline, analysis service, deps), ruff, format, mypy green. Round 4 would review `e266e8c..HEAD` plus R3 #1-#2; if the orchestrator rules the same-turn change void, the two commits can be reverted and redone after the yield.
