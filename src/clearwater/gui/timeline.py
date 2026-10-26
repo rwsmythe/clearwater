@@ -365,16 +365,17 @@ class TimelinePanel(QWidget):
         return True
 
     def _on_progress(
-        self, generation: int, ticket: int, done: int, total: int | None, _text: str
+        self, generation: int, ticket: int, done: int, total: int | None, text: str
     ) -> None:
-        """Main thread: a progress report of the current run."""
+        """Main thread: a progress report of the current run; its text is the label (ASCII)."""
         run = self._run
         if generation != self._generation or run is None or run.ticket != ticket:
             return
         if run.reason is not None:
             return
         run.done, run.total = done, total
-        self._session.set_analysis(AnalysisState("running", done, total, run.label))
+        label = messages.ascii_text(text) if text else run.label
+        self._session.set_analysis(AnalysisState("running", done, total, label))
         self._refresh_pts()
 
     def _on_done(self, generation: int, ticket: int, result: JobResult) -> None:

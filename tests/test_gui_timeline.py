@@ -36,6 +36,7 @@ from clearwater.gui.analysis_service import stub_analysis_factory
 from clearwater.gui.engines import stub_probe
 from clearwater.gui.shell import NEEDS_ANALYSIS_REASON, MainWindow
 from clearwater.gui.timeline import (
+    LABEL_ANALYSING,
     LABEL_UPDATING,
     OWNER_ANALYSIS,
     OWNER_TIMELINE,
@@ -155,6 +156,7 @@ class ScriptedAnalysis:
         proxy_delay: float = 0.0,
         fail_proxy: Sequence[int] = (),
         retains: bool = False,
+        progress_text: str = "scripted",
     ) -> None:
         self.method_id = method_id
         self.ticks = tuple(ticks)
@@ -167,6 +169,7 @@ class ScriptedAnalysis:
         self.proxy_delay = proxy_delay
         self.fail_proxy = set(fail_proxy)
         self.retains = retains
+        self.progress_text = progress_text
         self.kept: Any = None
         self.returned = threading.Event()
         self.active = False
@@ -208,7 +211,7 @@ class ScriptedAnalysis:
             self.returned.set()
 
     def _run(self, index: int, progress: Any) -> None:
-        progress.report(1, len(self.ticks), "scripted")
+        progress.report(1, len(self.ticks), self.progress_text)
         if index in self.gated:
             gate = self.gate(index)
             while not gate.wait(0.005):
@@ -611,6 +614,27 @@ def test_progress_reaches_the_session_and_export_names_it(make_env) -> None:
     assert reason is not None and "1/5" in reason
     assert env.button("timeline.cancel").isEnabled()
     assert not env.button("timeline.analyse").isEnabled()
+
+
+def test_the_reported_progress_text_is_the_label(make_env) -> None:
+    env = make_env(progress_text="reading cached statistics")
+    env.open()
+    env.wait(lambda: env.session.analysis().done == 1)
+    assert env.session.analysis().message == "reading cached statistics"
+
+
+def test_an_empty_progress_text_keeps_the_runs_label(make_env) -> None:
+    env = make_env(progress_text="")
+    env.open()
+    env.wait(lambda: env.session.analysis().done == 1)
+    assert env.session.analysis().message == LABEL_ANALYSING
+
+
+def test_a_non_ascii_progress_text_is_escaped(make_env) -> None:
+    env = make_env(progress_text="d\u00e9codage")
+    env.open()
+    env.wait(lambda: env.session.analysis().done == 1)
+    assert env.session.analysis().message == "d\\xe9codage"
 
 
 def test_cancel_gives_cancelled_drops_statistics_and_analyse_restarts(make_env) -> None:
