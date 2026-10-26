@@ -4,9 +4,10 @@
 
 1. **Decode pass** (7.2 item 1, D70, D86): every frame once; its uint8 proxy (AD-5) is stored in
    the cache and READ BACK, and the first stage is measured on the read-back proxy (it has no
-   earlier stage). ``mark_complete`` follows the last frame, never a cancel or a failure. A
-   complete cache entry skips the pass (V17); a source-only first stage is then read back with
-   ``source_statistics`` and passed through ``closed_form`` (Y-1 (e)).
+   earlier stage). ``mark_complete`` follows the last frame, never a failure and never after a
+   cancel the job has seen; a cancel during or after ``mark_complete`` leaves a complete entry.
+   A complete cache entry skips the pass (V17); a source-only first stage is then read back
+   with ``source_statistics`` and passed through ``closed_form`` (Y-1 (e)).
 2. **Staged statistics** (7.2 item 2, D97, D57): each later stage is measured on every STORED
    proxy with the SMOOTHED records of all earlier stages, then smoothed over pts.
 3. **Recompute** (7.3, AD-7): a parameter change invalidates from the first stage that depends
