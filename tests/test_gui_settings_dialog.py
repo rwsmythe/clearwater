@@ -1,7 +1,8 @@
 """WP3.20 settings dialog (G12, G13, D74, D71, AD-9, DR-35, DR-44 (b)) and the refusal (S4).
 
-Every test drives the dialog through the shell: ``Tools > Settings`` triggers the factory that
-``install_settings_dialog`` registered. The folder chooser and the confirmation are injected, the
+Every test but ``test_interim_rule_matches_the_wp310_rule`` (a direct call) drives the dialog
+through the shell: ``Tools > Settings`` triggers the factory that ``install_settings_dialog``
+registered. The folder chooser and the confirmation are injected, the
 sink reports a chosen capability list, the cache records the thread of every call, and the
 locations are under ``tmp_path``.
 """

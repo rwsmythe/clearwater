@@ -63,8 +63,11 @@ session only; <file> was left unchanged." and the refusal's own text.
 
 ## Claims and evidence
 
-Tests are in `tests/test_gui_settings_dialog.py` (41 test functions, 61 cases with
-`tests/test_gui_deps.py`), all `gui`-marked, headless, folders under `tmp_path`, injected choosers.
+Tests are in `tests/test_gui_settings_dialog.py` (43 test functions; parametrised ones collect to
+more cases), headless, folders under `tmp_path`, injected choosers. The module carries the `gui`
+marker on every test through its `pytestmark`; one of them, `test_interim_rule_matches_the_wp310_rule`,
+calls the function directly and creates no Qt object. `tests/test_gui_deps.py` (4 tests, run
+unchanged) is not `gui`-marked and creates no Qt object.
 
 | Claim | Evidence (test) |
 |---|---|
@@ -87,14 +90,16 @@ Tests are in `tests/test_gui_settings_dialog.py` (41 test functions, 61 cases wi
 | Planted wrong implementations are caught by name | `test_planted_save_while_refused_is_caught`, `test_planted_dropped_last_parameters_is_caught`, `test_planted_clear_on_the_interface_thread_is_caught`, `test_planted_selectable_unavailable_encoder_is_caught` (each also has a test that the same scenario passes on the real dialog) |
 | Dependency and `QSettings` rules | `tests/test_gui_deps.py`, run unchanged, covers the new module |
 
-Defects found by the tests before the review: `resolve_encoder` was called with an empty
-capability list while the list was being read (fixed, `8f54e53`).
+Defects found by the first run of the tests, before the review (both fixed in `8f54e53`): a test
+used `QComboBox.itemToolTip`, which does not exist (test code; the tool tip is read with
+`itemData(i, ToolTipRole)`), and `resolve_encoder` was called with an empty capability list while
+the list was being read (product code).
 
 ## Gates
 
 Static gates on the final head: `uv run ruff check .`, `uv run ruff format --check .`,
 `uv run mypy` (strict, 118 files): green. Targeted tests on the final head:
-`tests/test_gui_settings_dialog.py` and `tests/test_gui_deps.py`, 61 passed. Full pytest: run by the
+`tests/test_gui_settings_dialog.py` and `tests/test_gui_deps.py`: the counts are in the ledger. Full pytest: run by the
 orchestrator on the merge candidate (stacked gate). Reviewer A (STRONG, `gpt-5.6-sol` high, codex-cli
 0.162.1 over WSL): one round, no critical or major finding, one minor (a stored encoder after a
 failed detection carried the wrong reason), fixed in the terminating cleanup; ledger
