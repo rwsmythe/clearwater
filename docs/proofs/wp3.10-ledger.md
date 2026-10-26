@@ -15,7 +15,8 @@ Evidence root: `C:\Users\rwsmy\clearwater-review-evidence\wp3.10\` (`r0\` = this
 | 3 | Reviewer A (seat 4) on `21059b8`, base `ac4be92` | 0 | 3 | 1 | MAJOR: 1 in (#1 ACCEPTED), 2 out (reviewer-tagged; #2 REJECTED with reproduction, #3 REJECTED with reason); MINOR: 1 in (#4 ACCEPTED, cleanup) | 4 NEW, 0 REOPENED | 0 | PRODUCT (`2f9c240`: #1 sink cleanup; #4 report) | WSL, codex-cli 0.162.1 gpt-5.6-sol high; probe 1 + review 11 `succeeded in`; 185,272 tokens; 1 echoed `ERROR` (WSL vsock, not transport) | 211,777 at the round-3 yield |
 | 4 | Reviewer A (seat 4) on `2f9c240`, base `ac4be92` | 0 | 2 (reviewer) -> 0 adjudicated | 2 -> 4 adjudicated | all in envelope; MAJOR #1, #2 ACCEPTED and adjudicated MINOR (reproduction + reason; dispatcher UPHELD both: ZERO new blocking, the loop TERMINATES); MINOR #3, #4 ACCEPTED (cleanup) | 4 NEW, 0 REOPENED | 0 | PRODUCT and instrument, as the terminating round's cleanup (`4dfa96e`) | WSL, codex-cli 0.162.1 gpt-5.6-sol high; 15 `succeeded in`; 190,700 tokens; 2 `ERROR` matches = echoed source code, not transport | 248,871 at the round-4 yield; 279,801 after the round-4 cleanup |
 | 5 | Reviewer A (seat 5) on `dabb204`, base `be7fe51` (SCOPED to the floor-row instrument `tools/video_io_bench.py` + its tests) | 0 | 3 (reviewer) -> 1 adjudicated | 7 -> 9 adjudicated | MAJOR #2 in (ACCEPTED, blocking); MAJOR #1, #3 in, adjudicated MINOR (reproduction / reason); MINOR #4-#9 in (ACCEPTED, cleanup); MINOR #10 OUT (reviewer-tagged; BANKED) | 10 NEW, 0 REOPENED | 0 | INSTRUMENT code and tests (`deb1765`..`fa5d939`; #7 test-only); gate: CONTINUE APPROVED | WSL, codex-cli 0.162.1 gpt-5.6-sol high; probe 1 + review 29 `succeeded in`; 98,860 tokens; 6 `ERROR` matches = echoed source code, not transport | 211,706 at the round-5 yield |
-| 6 | Reviewer A (seat 5) on `fa5d939`, base `dabb204` (SCOPED to the round-5 remediation of the instrument) | 0 | 2 | 1 | all in envelope; MAJOR #1, #2 ACCEPTED (blocking, both reproduced); MINOR #3 ACCEPTED (cleanup) | 3 NEW, 0 REOPENED (#2 introduced by the round-5 #9 fix `7059dda`) | 0 | pending: seat 6 remediates (instrument code) | WSL, codex-cli 0.162.1 gpt-5.6-sol high; probe 1 + review 19 `succeeded in`; 104,892 tokens; 8 `ERROR` matches = 4 echoed source, 4 reviewer tool-call parse errors (codex_core router), 1 WSL vsock; none transport | 286,315 at the round-6 yield (seat 5) |
+| 6 | Reviewer A (seat 5) on `fa5d939`, base `dabb204` (SCOPED to the round-5 remediation of the instrument) | 0 | 2 | 1 | all in envelope; MAJOR #1, #2 ACCEPTED (blocking, both reproduced); MINOR #3 ACCEPTED (cleanup) | 3 NEW, 0 REOPENED (#2 introduced by the round-5 #9 fix `7059dda`) | 0 | INSTRUMENT code and tests (seat 6: `609b9a3` #1, `02a0a92` #2, `5c1c949` #3 docstring) | WSL, codex-cli 0.162.1 gpt-5.6-sol high; probe 1 + review 19 `succeeded in`; 104,892 tokens; 8 `ERROR` matches = 4 echoed source, 4 reviewer tool-call parse errors (codex_core router), 1 WSL vsock; none transport | 286,315 at the round-6 yield (seat 5) |
+| 7 | Reviewer A (seat 6) on `5c1c949`, base `fa5d939` (SCOPED to the round-6 remediation of the instrument) | 0 | 2 (reviewer) -> 0 adjudicated (#2 for the dispatcher: telemetry machinery, design guard) | 2 -> 4 adjudicated (#4 out) | MAJOR #1 in, adjudicated MINOR (reason); MAJOR #2 in, adjudicated MINOR (reproduction); MINOR #3 in (cleanup); MINOR #4 OUT (reviewer-tagged; BANKED again) | 3 NEW, 1 REOPENED (#4 = R5 #10) | 0 | none yet (the yield carries the design-guard proposal) | WSL, codex-cli 0.162.1 gpt-5.6-sol high; probe 1 + review 13 `succeeded in`; 98,804 tokens; 1 `ERROR` match = echoed source code, not transport | (dispatcher, at the round-7 yield) |
 
 Seat 1 stops after round 0 by the orchestrator's instruction (219K before product code; the build
 is the largest in the wave). A fresh cell builds from "RESUME HERE" below.
@@ -194,6 +195,11 @@ main, stream and info packets of an FFmpeg-written file).
 - WINDOW RELEASED at the end of this round.
 
 ## RESUME HERE (current; for seat 6 -- seat 5 retires after round 6)
+
+- **Seat 6 status (2026-10-26):** ladder step 1 done to the round-7 verdict: R6 remediated
+  (`609b9a3`, `02a0a92`, `5c1c949`), round 7 run and adjudicated (`r7\adjudication.md`); the
+  yield carries the dispatcher's design guard (round 7 #2 is telemetry machinery). Steps 2-5 not
+  started.
 
 - Base `ac4be92` (main with WP3.9; the dispatcher rebased the branch at seat 4; pre-rebase branch
   `wp3.10-pre-rebase` at `98ee54a`). Reviewer A evidence `r1\`..`r6\` under
@@ -440,3 +446,30 @@ window and drops the final one sent after it, `repro/repro_r6f1.log`; present si
 whole wait, nothing recorded, `repro/repro_r6f2.log`; introduced by the round-5 #9 fix
 `7059dda`). ACCEPTED MINOR: 3 (the first interval's docstring). The loop does not terminate;
 seat 5 retires per the dispatcher's seat plan; the remediation is seat 6's (RESUME HERE).
+
+## Seat 6 (fresh seat) -- round-6 remediation and round 7
+
+- Seat 5's round-6 depth: 286,315 (dispatcher-read at its R6 yield). Head `f3df19d` clean at
+  pickup. Seat-6 slips disclosed: the first tool call began with `cd <worktree> 2>/dev/null;`
+  (a bare `cd`; the shells reset between calls; subshells used from then on); `b9dcb37` carries
+  only the depth figure (its ledger edit script failed before the commit helper ran; this
+  section and row 7 follow in the next commit).
+- Round-6 remediation, one commit per finding (pre-fix runs: `r7\remediation\`): `609b9a3` #1
+  (the watcher tags its last window `final`; `stop` receives until it or the wait ends, recording
+  the latter; the new tests on `fa5d939`: 4 failed); `02a0a92` #2 (the parent closes its copy of
+  the watcher's end once it is primed; an ended pipe is recorded with its time and dropped while
+  the sampling goes on; `stop` records a watcher not alive, exit code, no wait; the new tests on
+  `fa5d939`: 2 failed, one waited the patched 30 s); `5c1c949` #3 (docstring only, no test). At
+  `5c1c949`: the bench module 50 passed (`-m "not footage"`, the gpu test ran); ruff, format,
+  mypy clean.
+
+### Round 7 (evidence `C:\Users\rwsmy\clearwater-review-evidence\wp3.10\r7\`, `adjudication.md` there)
+
+Reviewer: 2 MAJOR, 2 MINOR; the three round-6 fixes verified present. #1 (the loop holds the
+previous frame during `next`) adjudicated MINOR by reason (one RGB frame, 94.9 MiB at 4K, against
+N4's 16 GB, on the safe side). #2 (the recorded periods are nominal; the GPU reading is bound to
+the memory loop) adjudicated MINOR by reproduction (`repro/repro_r7f2.log`: RSS mean 0.375 s
+against 0.25, GPU 1.16 s against 1.0 at the defaults) -- telemetry machinery, so the dispatcher
+rules and the design guard's proposal goes with the yield. #3 (a watcher dying before "ready"
+costs the 60 s start wait) MINOR cleanup. #4 = R5 #10 REOPENED, OUT, banked. All but #4 present
+since `dabb204`. No change in the adjudicating turn.
