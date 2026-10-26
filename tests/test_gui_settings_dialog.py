@@ -1,0 +1,784 @@
+"""WP3.20 settings dialog (G12, G13, D74, D71, AD-9, DR-35, DR-44 (b)) and the refusal (S4).
+
+Every test drives the dialog through the shell: ``Tools > Settings`` triggers the factory that
+``install_settings_dialog`` registered. The folder chooser and the confirmation are injected, the
+sink reports a chosen capability list, the cache records the thread of every call, and the
+locations are under ``tmp_path``.
+"""
+
+# The shared fixture ``make_window`` is imported from gui_support and used as a parameter.
+# ruff: noqa: F401, F811
+
+from __future__ import annotations
+
+import dataclasses
+import threading
+from collections.abc import Callable, Sequence
+from pathlib import Path
+from typing import Any
+
+import pytest
+from PySide6.QtWidgets import QDialog
+
+from clearwater.config import load_settings, save_settings
+from clearwater.gui import AnalysisState, Message, stub_engines
+from clearwater.gui import settings_dialog as module
+from clearwater.gui.settings_dialog import (
+    AUTO_TEXT,
+    CLEAR_BLOCKED_REASON,
+    NO_ENCODER_REASON,
+    NOT_FOUND_REASON,
+    OWNER_SETTINGS,
+    SAME_FOLDER_TEXT,
+    SettingsDialog,
+    install_settings_dialog,
+)
+from clearwater.gui.shell import MainWindow
+from clearwater.interfaces import EncoderCapability, Settings
+from clearwater.interfaces.stubs import StubProxyCache, StubVideoSink
+from clearwater.jobs import TEMP_MARKER, validate_suffix
+from gui_support import image, make_window, open_and_wait, photo_engines, presenter_of, wait_idle
+
+pytestmark = pytest.mark.gui
+
+NVENC = EncoderCapability("hevc_nvenc", False, "No NVIDIA encoder was found.", (), True)
+X265 = EncoderCapability("libx265", True, None, (8, 10), False)
+CAPS = (NVENC, X265)
+
+
+class CapsSink(StubVideoSink):
+    """A sink reporting a chosen capability list (or raising)."""
+
+    def __init__(self, caps: Sequence[EncoderCapability], fail: str | None = None) -> None:
+        super().__init__()
+        self.caps = tuple(caps)
+        self.fail = fail
+        self.threads: list[threading.Thread] = []
+
+    def capabilities(self) -> tuple[EncoderCapability, ...]:
+        self.threads.append(threading.current_thread())
+        if self.fail is not None:
+            raise RuntimeError(self.fail)
+        return self.caps
+
+
+class RecordingCache(StubProxyCache):
+    """A cache recording the thread of every clear and every limit change."""
+
+    def __init__(self, fail: bool = False) -> None:
+        super().__init__()
+        self.cleared: list[threading.Thread] = []
+        self.limits: list[tuple[int, threading.Thread]] = []
+        self.fail = fail
+
+    def clear(self) -> None:
+        self.cleared.append(threading.current_thread())
+        if self.fail:
+            raise OSError("disk is busy")
+        super().clear()
+
+    def set_limit_bytes(self, n: int) -> None:
+        self.limits.append((n, threading.current_thread()))
+        if self.fail:
+            raise OSError("disk is busy")
+        super().set_limit_bytes(n)
+
+
+class FakeChoosers:
+    """Records the questions; never shows a dialog."""
+
+    def __init__(self) -> None:
+        self.folder: Path | None = None
+        self.answer = True
+        self.asked_folder: list[Path | None] = []
+        self.confirms: list[str] = []
+
+    def choose_folder(self, initial: Path | None) -> Path | None:
+        self.asked_folder.append(initial)
+        return self.folder
+
+    def confirm(self, text: str) -> bool:
+        self.confirms.append(text)
+        return self.answer
+
+
+class Env:
+    """One test's windows, engines and fakes."""
+
+    def __init__(self, qtbot: Any, build: Callable[..., MainWindow], tmp_path: Path) -> None:
+        self.qtbot = qtbot
+        self.build = build
+        self.config = tmp_path / "config"
+        self.choosers = FakeChoosers()
+        self.sink = CapsSink(CAPS)
+        self.cache = RecordingCache()
+        self.resolve_calls: list[tuple[str, tuple[EncoderCapability, ...]]] = []
+
+    def start(
+        self,
+        *,
+        caps: Sequence[EncoderCapability] = CAPS,
+        fail: str | None = None,
+        saved: Settings | None = None,
+        raw: str | None = None,
+        cache_fails: bool = False,
+        resolve: Callable[[str, Sequence[EncoderCapability]], str] | None = None,
+        photo: Path | None = None,
+    ) -> MainWindow:
+        """Build a window on this test's folders with the dialog installed."""
+        if saved is not None:
+            save_settings(self.config, saved)
+        if raw is not None:
+            self.config.mkdir(parents=True, exist_ok=True)
+            (self.config / "settings.json").write_text(raw, encoding="utf-8")
+        self.sink = CapsSink(caps, fail)
+        self.cache = RecordingCache(cache_fails)
+        base = photo_engines({photo: image(40, 60)}) if photo is not None else stub_engines()
+        engines = dataclasses.replace(base, video_sink=self.sink, cache=self.cache)
+        window = self.build(engines)
+        if resolve is None:
+            install_settings_dialog(window, choosers=self.choosers)
+        else:
+
+            def spy(setting: str, capabilities: Sequence[EncoderCapability]) -> str:
+                self.resolve_calls.append((setting, tuple(capabilities)))
+                return resolve(setting, capabilities)
+
+            install_settings_dialog(window, choosers=self.choosers, resolve_encoder=spy)
+        return window
+
+    def open(self, window: MainWindow) -> SettingsDialog:
+        """Trigger Tools > Settings and wait for the encoder list."""
+        window.shell_actions.settings.trigger()
+        dialog = window._settings_dialog
+        assert isinstance(dialog, SettingsDialog)
+        self.qtbot.waitUntil(lambda: dialog.encoder_combo.isEnabled(), timeout=5000)
+        return dialog
+
+    def idle(self, window: MainWindow) -> None:
+        """Wait until every job has delivered its result."""
+        self.qtbot.waitUntil(lambda: window.jobs.active() == 0, timeout=5000)
+        self.qtbot.wait(20)
+
+    def saved(self) -> Settings:
+        """The settings file as ``load_settings`` reads it."""
+        return load_settings(self.config)
+
+
+@pytest.fixture
+def env(qtbot: Any, make_window: Callable[..., MainWindow], tmp_path: Path) -> Env:
+    return Env(qtbot, make_window, tmp_path)
+
+
+def pick(combo: Any, data: object) -> None:
+    """Choose the item holding ``data`` as a user would."""
+    index = combo.findData(data)
+    assert index >= 0, data
+    combo.setCurrentIndex(index)
+
+
+def items(combo: Any) -> list[tuple[Any, str, bool, str]]:
+    """(data, text, enabled, tool tip) of every item of a combo."""
+    model = combo.model()
+    return [
+        (combo.itemData(i), combo.itemText(i), model.item(i).isEnabled(), combo.itemToolTip(i))
+        for i in range(combo.count())
+    ]
+
+
+# First run (G12 defaults).
+
+
+def test_first_run_shows_g12_defaults(env: Env) -> None:
+    window = env.start()
+    dialog = env.open(window)
+    assert dialog.folder_label.text() == SAME_FOLDER_TEXT
+    assert dialog.suffix_edit.text() == "_corrected"
+    assert dialog.png_combo.currentData() == 16
+    assert dialog.encoder_combo.currentData() == "auto"
+    assert dialog.encoder_combo.currentText() == AUTO_TEXT
+    assert dialog.quality_combo.currentData() == "standard"
+    assert dialog.quality_combo.currentText() == "Standard"
+    assert not dialog.ten_bit_check.isChecked()
+    assert dialog.provenance_check.isChecked()
+    assert dialog.cache_spin.value() == 20
+    assert not dialog.force_cpu_check.isChecked()
+    assert dialog.ok_button.isEnabled()
+    assert not dialog.refusal_label.isVisibleTo(dialog)
+    assert dialog.edited_settings() == Settings()
+
+
+def test_quality_names_and_stored_forms(env: Env) -> None:
+    window = env.start()
+    dialog = env.open(window)
+    assert [(d, t) for d, t, *_ in items(dialog.quality_combo)] == [
+        ("high", "High"),
+        ("standard", "Standard"),
+        ("draft", "Draft"),
+    ]
+    assert [d for d, *_ in items(dialog.png_combo)] == [16, 8]
+
+
+# Round trip (G12) and persistence (G13).
+
+
+def _set_folder(env: Env, dialog: SettingsDialog) -> None:
+    env.choosers.folder = Path("out")
+    dialog.choose_folder_button.click()
+
+
+def _set_suffix(env: Env, dialog: SettingsDialog) -> None:
+    dialog.suffix_edit.setText("_clean")
+
+
+def _set_png(env: Env, dialog: SettingsDialog) -> None:
+    pick(dialog.png_combo, 8)
+
+
+def _set_encoder(env: Env, dialog: SettingsDialog) -> None:
+    pick(dialog.encoder_combo, "libx265")
+
+
+def _set_quality(env: Env, dialog: SettingsDialog) -> None:
+    pick(dialog.quality_combo, "draft")
+
+
+def _set_ten_bit(env: Env, dialog: SettingsDialog) -> None:
+    dialog.ten_bit_check.setChecked(True)
+
+
+def _set_provenance(env: Env, dialog: SettingsDialog) -> None:
+    dialog.provenance_check.setChecked(False)
+
+
+def _set_cache(env: Env, dialog: SettingsDialog) -> None:
+    dialog.cache_spin.setValue(5)
+
+
+def _set_force_cpu(env: Env, dialog: SettingsDialog) -> None:
+    dialog.force_cpu_check.setChecked(True)
+
+
+ROUND_TRIPS = [
+    (_set_folder, {"output_folder": Path("out")}),
+    (_set_suffix, {"output_suffix": "_clean"}),
+    (_set_png, {"png_bit_depth": 8}),
+    (_set_encoder, {"video_encoder": "libx265"}),
+    (_set_quality, {"quality_level": "draft"}),
+    (_set_ten_bit, {"ten_bit_for_eight_bit": True}),
+    (_set_provenance, {"provenance": False}),
+    (_set_cache, {"cache_limit_bytes": 5 * 10**9}),
+    (_set_force_cpu, {"force_cpu": True}),
+]
+
+
+@pytest.mark.parametrize(
+    ("edit", "expected"), ROUND_TRIPS, ids=[e.__name__ for e, _ in ROUND_TRIPS]
+)
+def test_each_setting_round_trips(
+    env: Env, edit: Callable[..., None], expected: dict[str, Any]
+) -> None:
+    window = env.start()
+    parameters = window.session.parameters()
+    window.session.set_settings(dataclasses.replace(Settings(), last_parameters=parameters))
+    dialog = env.open(window)
+    edit(env, dialog)
+    dialog.accept()
+    want = dataclasses.replace(Settings(), last_parameters=parameters, **expected)
+    assert window.session.settings() == want
+    assert env.saved() == want
+    assert env.saved().last_parameters == parameters
+    env.idle(window)
+
+
+def test_second_window_opens_with_the_saved_values(env: Env, make_window: Any) -> None:
+    window = env.start()
+    dialog = env.open(window)
+    _set_folder(env, dialog)
+    _set_suffix(env, dialog)
+    _set_png(env, dialog)
+    _set_quality(env, dialog)
+    _set_encoder(env, dialog)
+    _set_ten_bit(env, dialog)
+    _set_provenance(env, dialog)
+    _set_cache(env, dialog)
+    _set_force_cpu(env, dialog)
+    dialog.accept()
+    env.idle(window)
+    window.close()
+    again = env.start()
+    second = env.open(again)
+    assert second.folder_label.text() == str(Path("out"))
+    assert second.suffix_edit.text() == "_clean"
+    assert second.png_combo.currentData() == 8
+    assert second.quality_combo.currentData() == "draft"
+    assert second.encoder_combo.currentData() == "libx265"
+    assert second.ten_bit_check.isChecked()
+    assert not second.provenance_check.isChecked()
+    assert second.cache_spin.value() == 5
+    assert second.force_cpu_check.isChecked()
+
+
+def test_cancel_changes_nothing(env: Env) -> None:
+    window = env.start()
+    dialog = env.open(window)
+    dialog.suffix_edit.setText("_other")
+    dialog.cache_spin.setValue(3)
+    dialog.force_cpu_check.setChecked(True)
+    dialog.reject()
+    env.idle(window)
+    assert window.session.settings() == Settings()
+    assert not env.config.joinpath("settings.json").exists()
+    assert env.cache.limits == []
+
+
+def test_use_source_folder_and_cancelled_chooser(env: Env) -> None:
+    window = env.start(saved=Settings(output_folder=Path("out")))
+    dialog = env.open(window)
+    assert dialog.folder_label.text() == str(Path("out"))
+    env.choosers.folder = None  # the user cancelled the chooser
+    dialog.choose_folder_button.click()
+    assert env.choosers.asked_folder == [Path("out")]
+    assert dialog.edited_settings().output_folder == Path("out")
+    dialog.use_source_button.click()
+    assert dialog.folder_label.text() == SAME_FOLDER_TEXT
+    assert dialog.edited_settings().output_folder is None
+
+
+# D74: encoders.
+
+
+def test_unavailable_encoder_is_disabled_with_its_reason(env: Env) -> None:
+    window = env.start()
+    dialog = env.open(window)
+    rows = {d: (t, enabled, tip) for d, t, enabled, tip in items(dialog.encoder_combo)}
+    assert list(rows) == ["auto", "hevc_nvenc", "libx265"]
+    text, enabled, tip = rows["hevc_nvenc"]
+    assert not enabled
+    assert text == f"hevc_nvenc (unavailable: {NVENC.reason})"
+    assert tip == NVENC.reason
+    assert rows["libx265"] == ("libx265", True, "")
+    assert rows["auto"][1]
+
+
+def test_an_unavailable_encoder_cannot_be_accepted(env: Env) -> None:
+    window = env.start()
+    dialog = env.open(window)
+    dialog.encoder_combo.setCurrentIndex(dialog.encoder_combo.findData("hevc_nvenc"))
+    assert not dialog.ok_button.isEnabled()
+    dialog.accept()
+    assert window.session.settings() == Settings()
+    assert not env.config.joinpath("settings.json").exists()
+
+
+def test_encoder_list_waits_for_the_sink_and_is_read_once(env: Env) -> None:
+    window = env.start()
+    window.shell_actions.settings.trigger()
+    dialog = window._settings_dialog
+    assert isinstance(dialog, SettingsDialog)
+    assert not dialog.encoder_combo.isEnabled()
+    assert dialog.encoder_note.text() == "Detecting encoders..."
+    env.qtbot.waitUntil(lambda: dialog.encoder_combo.isEnabled(), timeout=5000)
+    assert dialog.encoder_note.text() == ""
+    assert env.sink.threads and env.sink.threads[0] is not threading.main_thread()
+    dialog.reject()
+    env.qtbot.wait(20)
+    second = env.open(window)
+    assert second.encoder_combo.isEnabled()
+    assert len(env.sink.threads) == 1
+
+
+def test_a_failed_detection_leaves_only_automatic(env: Env) -> None:
+    window = env.start(fail="ffmpeg is missing")
+    dialog = env.open(window)
+    assert [d for d, *_ in items(dialog.encoder_combo)] == ["auto"]
+    assert "ffmpeg is missing" in dialog.encoder_note.text()
+    assert not dialog.ten_bit_check.isEnabled()
+    assert dialog.ten_bit_note.text() == NO_ENCODER_REASON
+
+
+def test_a_stored_encoder_this_computer_does_not_report_is_kept(env: Env) -> None:
+    window = env.start(saved=Settings(video_encoder="old_encoder"))
+    dialog = env.open(window)
+    rows = {d: (t, enabled, tip) for d, t, enabled, tip in items(dialog.encoder_combo)}
+    text, enabled, tip = rows["old_encoder"]
+    assert (text, enabled, tip) == (
+        f"old_encoder (unavailable: {NOT_FOUND_REASON})",
+        False,
+        NOT_FOUND_REASON,
+    )
+    assert dialog.encoder_combo.currentData() == "old_encoder"
+    assert dialog.ok_button.isEnabled()
+    dialog.accept()
+    assert env.saved().video_encoder == "old_encoder"
+    assert window.session.settings().video_encoder == "old_encoder"
+
+
+def test_ten_bit_follows_the_encoder_and_keeps_a_stored_true(env: Env) -> None:
+    only8 = EncoderCapability("libx265", True, None, (8,), False)
+    window = env.start(caps=(NVENC, only8), saved=Settings(ten_bit_for_eight_bit=True))
+    dialog = env.open(window)
+    assert dialog.ten_bit_check.isChecked()
+    assert not dialog.ten_bit_check.isEnabled()
+    assert dialog.ten_bit_check.toolTip() == "libx265 cannot write 10-bit video."
+    assert dialog.ten_bit_note.text() == "libx265 cannot write 10-bit video."
+    dialog.accept()
+    assert env.saved().ten_bit_for_eight_bit is True
+
+
+def test_ten_bit_is_enabled_for_an_encoder_with_10(env: Env) -> None:
+    window = env.start()
+    dialog = env.open(window)
+    assert dialog.ten_bit_check.isEnabled()
+    assert dialog.ten_bit_note.text() == ""
+    dialog.ten_bit_check.setChecked(True)
+    pick(dialog.encoder_combo, "libx265")
+    assert dialog.ten_bit_check.isEnabled()
+    assert dialog.ten_bit_check.isChecked()
+
+
+def test_auto_is_resolved_by_the_injected_rule(env: Env) -> None:
+    nvenc8 = EncoderCapability("hevc_nvenc", True, None, (8,), True)
+    window = env.start(caps=(nvenc8, X265), resolve=lambda setting, caps: "hevc_nvenc")
+    dialog = env.open(window)
+    assert env.resolve_calls
+    assert all(call == ("auto", (nvenc8, X265)) for call in env.resolve_calls)
+    assert not dialog.ten_bit_check.isEnabled()
+    assert dialog.ten_bit_note.text() == "hevc_nvenc cannot write 10-bit video."
+    pick(dialog.encoder_combo, "libx265")
+    assert dialog.ten_bit_check.isEnabled()
+
+
+def test_interim_rule_matches_the_wp310_rule() -> None:
+    resolve = module.interim_resolve_encoder
+    assert resolve("auto", (NVENC, X265)) == "libx265"
+    nvenc = EncoderCapability("hevc_nvenc", True, None, (8, 10), True)
+    assert resolve("auto", (X265, nvenc)) == "hevc_nvenc"
+    assert resolve("libx265", ()) == "libx265"
+    with pytest.raises(LookupError):
+        resolve("auto", (NVENC,))
+
+
+# DR-35: the suffix.
+
+
+@pytest.mark.parametrize(
+    "suffix", ["a/b", "a\\b", "..", "x..y", "name.", "name ", f"x{TEMP_MARKER}", 'a"b', "a\x01"]
+)
+def test_an_invalid_suffix_disables_ok_with_the_error_text(env: Env, suffix: str) -> None:
+    window = env.start()
+    dialog = env.open(window)
+    dialog.suffix_edit.setText(suffix)
+    with pytest.raises(ValueError) as caught:
+        validate_suffix(suffix)
+    assert not dialog.ok_button.isEnabled()
+    assert (
+        dialog.suffix_error.text() == str(caught.value).encode("ascii", "backslashreplace").decode()
+    )
+    dialog.accept()  # refused: nothing applied
+    assert window.session.settings() == Settings()
+    dialog.suffix_edit.setText("_ok")
+    assert dialog.ok_button.isEnabled()
+    assert dialog.suffix_error.text() == ""
+
+
+def test_an_empty_suffix_is_valid(env: Env) -> None:
+    window = env.start()
+    dialog = env.open(window)
+    dialog.suffix_edit.setText("")
+    assert dialog.ok_button.isEnabled()
+    dialog.accept()
+    assert env.saved().output_suffix == ""
+
+
+def test_a_stored_invalid_suffix_disables_ok_until_fixed(env: Env) -> None:
+    window = env.start(saved=Settings(output_suffix="bad/suffix"))
+    dialog = env.open(window)
+    assert not dialog.ok_button.isEnabled()
+    assert "bad/suffix" in dialog.suffix_error.text()
+
+
+# AD-9: force CPU.
+
+
+def test_force_cpu_shows_cpu_forced_in_the_status_bar(env: Env, qtbot: Any) -> None:
+    path = Path("p.png")
+    window = env.start(photo=path)
+    open_and_wait(qtbot, window, path)
+    assert window.session.backend() == "CPU: stub"
+    dialog = env.open(window)
+    dialog.force_cpu_check.setChecked(True)
+    dialog.accept()
+    wait_idle(qtbot, window)
+    assert window.session.backend() == "CPU: forced"
+    assert window.device_label.text() == "Device: CPU: forced"
+    env.idle(window)
+
+
+# S4: the refused settings file.
+
+
+UNSUPPORTED = '{"format_version": 999, "kept": true}\n'
+
+
+def _refusal_scenario(env: Env) -> None:
+    """OK applies to the session, writes nothing, says why."""
+    window = env.start(raw=UNSUPPORTED)
+    path = env.config / "settings.json"
+    before = path.read_bytes()
+    assert window.session.settings_refusal() is not None
+    dialog = env.open(window)
+    assert "this session only" in dialog.refusal_label.text()
+    assert "settings.json" in dialog.refusal_label.text()
+    assert window.session.settings_refusal().text in dialog.refusal_label.text()
+    dialog.suffix_edit.setText("_fresh")
+    dialog.accept()
+    assert window.session.settings().output_suffix == "_fresh"
+    assert path.read_bytes() == before
+    env.idle(window)
+    window.close()
+    assert path.read_bytes() == before  # the close save is refused as well
+
+
+def test_ok_while_the_file_is_refused_is_session_only(env: Env) -> None:
+    _refusal_scenario(env)
+
+
+# D71: the cache.
+
+
+def test_clear_cache_runs_off_the_interface_thread_after_a_confirmation(env: Env) -> None:
+    window = env.start()
+    dialog = env.open(window)
+    dialog.clear_button.click()
+    assert len(env.choosers.confirms) == 1
+    assert dialog.clear_button.text() == "Clearing..."
+    assert not dialog.clear_button.isEnabled()
+    env.qtbot.waitUntil(lambda: dialog.cache_note.text() == "Cache cleared.", timeout=5000)
+    assert len(env.cache.cleared) == 1
+    assert env.cache.cleared[0] is not threading.main_thread()
+    assert dialog.clear_button.text() == "Clear cache"
+    assert dialog.clear_button.isEnabled()
+    assert not presenter_of(window).of("error")
+
+
+def test_declined_confirmation_clears_nothing(env: Env) -> None:
+    window = env.start()
+    dialog = env.open(window)
+    env.choosers.answer = False
+    dialog.clear_button.click()
+    env.idle(window)
+    assert len(env.choosers.confirms) == 1
+    assert env.cache.cleared == []
+    assert dialog.clear_button.isEnabled()
+
+
+def test_clear_cache_is_disabled_while_a_clip_is_analysed(env: Env) -> None:
+    window = env.start()
+    dialog = env.open(window)
+    window.session.set_analysis(AnalysisState(phase="running", done=1, total=10))
+    assert not dialog.clear_button.isEnabled()
+    assert dialog.clear_button.toolTip() == CLEAR_BLOCKED_REASON
+    assert dialog.cache_note.text() == CLEAR_BLOCKED_REASON
+    dialog.clear_button.click()
+    assert env.choosers.confirms == []
+    window.session.set_analysis(AnalysisState(phase="complete"))
+    assert dialog.clear_button.isEnabled()
+    assert dialog.clear_button.toolTip() == ""
+    assert dialog.cache_note.text() == ""
+
+
+def test_clear_cache_disabled_from_the_start_when_analysis_is_running(env: Env) -> None:
+    window = env.start()
+    window.session.set_analysis(AnalysisState(phase="running"))
+    dialog = env.open(window)
+    assert not dialog.clear_button.isEnabled()
+
+
+def test_clear_cache_failure_is_a_settings_error(env: Env) -> None:
+    window = env.start(cache_fails=True)
+    dialog = env.open(window)
+    dialog.clear_button.click()
+    env.qtbot.waitUntil(lambda: bool(presenter_of(window).of("error")), timeout=5000)
+    (error,) = presenter_of(window).of("error")
+    assert error.owner == OWNER_SETTINGS
+    assert "disk is busy" in error.text
+    assert dialog.clear_button.isEnabled()
+    assert dialog.cache_note.text() == ""
+
+
+def test_clear_cache_result_after_the_dialog_closed_is_safe(env: Env) -> None:
+    window = env.start(cache_fails=True)
+    dialog = env.open(window)
+    dialog.clear_button.click()
+    dialog.reject()
+    env.qtbot.waitUntil(lambda: bool(presenter_of(window).of("error")), timeout=5000)
+    env.idle(window)
+
+
+def test_a_limit_change_sets_the_limit_in_bytes_off_the_interface_thread(env: Env) -> None:
+    window = env.start()
+    dialog = env.open(window)
+    dialog.cache_spin.setValue(7)
+    dialog.accept()
+    env.idle(window)
+    assert [n for n, _ in env.cache.limits] == [7 * 10**9]
+    assert env.cache.limits[0][1] is not threading.main_thread()
+    assert env.cache.limit_bytes() == 7 * 10**9
+
+
+def test_an_unchanged_limit_calls_nothing_and_a_stored_odd_limit_is_kept(env: Env) -> None:
+    window = env.start(saved=Settings(cache_limit_bytes=1_500_000_000))
+    dialog = env.open(window)
+    assert dialog.cache_spin.value() == 2
+    dialog.suffix_edit.setText("_x")
+    dialog.accept()
+    env.idle(window)
+    assert env.cache.limits == []
+    assert env.saved().cache_limit_bytes == 1_500_000_000
+    assert window.session.settings().cache_limit_bytes == 1_500_000_000
+
+
+def test_a_limit_failure_is_a_settings_error(env: Env) -> None:
+    window = env.start(cache_fails=True)
+    dialog = env.open(window)
+    dialog.cache_spin.setValue(4)
+    dialog.accept()
+    env.qtbot.waitUntil(lambda: bool(presenter_of(window).of("error")), timeout=5000)
+    (error,) = presenter_of(window).of("error")
+    assert error.owner == OWNER_SETTINGS
+    assert "disk is busy" in error.text
+    assert env.saved().cache_limit_bytes == 4 * 10**9
+
+
+def test_cache_spin_has_a_minimum_of_one_gb(env: Env) -> None:
+    window = env.start(saved=Settings(cache_limit_bytes=0))
+    dialog = env.open(window)
+    assert dialog.cache_spin.minimum() == 1
+    assert dialog.cache_spin.value() == 1
+    dialog.accept()
+    assert env.saved().cache_limit_bytes == 0  # not edited: written back unchanged
+
+
+# DR-44 (b): message owners.
+
+
+def test_a_save_clears_only_the_settings_errors(env: Env) -> None:
+    window = env.start()
+    presenter = presenter_of(window)
+    presenter.present(Message("error", "preview", owner="shell.preview"))
+    presenter.present(Message("error", "earlier", owner=OWNER_SETTINGS))
+    dialog = env.open(window)
+    dialog.suffix_edit.setText("_x")
+    dialog.accept()
+    assert [m.owner for m in presenter.of("error")] == ["shell.preview"]
+
+
+def test_a_failed_save_names_the_file_and_the_session_still_gets_the_settings(env: Env) -> None:
+    window = env.start()
+    path = env.config / "settings.json"
+    path.mkdir(parents=True)  # a directory in the way: the atomic replace fails
+    dialog = env.open(window)
+    dialog.suffix_edit.setText("_x")
+    dialog.accept()
+    (error,) = presenter_of(window).of("error")
+    assert error.owner == OWNER_SETTINGS
+    assert "settings.json" in error.text
+    assert error.path == path
+    assert window.session.settings().output_suffix == "_x"
+    path.rmdir()
+
+
+def test_every_message_of_the_dialog_is_ascii(env: Env) -> None:
+    window = env.start(cache_fails=True)
+    dialog = env.open(window)
+    dialog.clear_button.click()
+    env.qtbot.waitUntil(lambda: bool(presenter_of(window).of("error")), timeout=5000)
+    assert all(m.text.isascii() for m in presenter_of(window).messages)
+
+
+# Planted wrong implementations: each scenario must fail on a wrong dialog.
+
+
+def _save_while_refused(self: SettingsDialog) -> None:
+    new = self.edited_settings()
+    module.save_settings(self._context.locations.config_dir, new)
+    self._context.session.set_settings(new)
+    QDialog.accept(self)
+
+
+def test_planted_save_while_refused_is_caught(env: Env, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(SettingsDialog, "accept", _save_while_refused)
+    with pytest.raises(AssertionError):
+        _refusal_scenario(env)
+
+
+def _last_parameters_scenario(env: Env) -> None:
+    window = env.start()
+    parameters = window.session.parameters()
+    window.session.set_settings(dataclasses.replace(Settings(), last_parameters=parameters))
+    dialog = env.open(window)
+    dialog.suffix_edit.setText("_x")
+    dialog.accept()
+    assert env.saved().last_parameters == parameters
+    assert window.session.settings().last_parameters == parameters
+
+
+def test_last_parameters_scenario_passes_on_the_real_dialog(env: Env) -> None:
+    _last_parameters_scenario(env)
+
+
+def test_planted_dropped_last_parameters_is_caught(
+    env: Env, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    real = SettingsDialog.edited_settings
+
+    def dropping(self: SettingsDialog) -> Settings:
+        return dataclasses.replace(real(self), last_parameters=None)
+
+    monkeypatch.setattr(SettingsDialog, "edited_settings", dropping)
+    with pytest.raises(AssertionError):
+        _last_parameters_scenario(env)
+
+
+def _clear_thread_scenario(env: Env) -> None:
+    window = env.start()
+    dialog = env.open(window)
+    dialog.clear_button.click()
+    env.qtbot.waitUntil(lambda: bool(env.cache.cleared), timeout=5000)
+    assert env.cache.cleared[0] is not threading.main_thread()
+
+
+def test_planted_clear_on_the_interface_thread_is_caught(
+    env: Env, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def inline(self: SettingsDialog) -> None:
+        if self._choosers.confirm("sure?"):
+            self._context.engines.cache.clear()
+
+    monkeypatch.setattr(SettingsDialog, "_on_clear_clicked", inline)
+    with pytest.raises(AssertionError):
+        _clear_thread_scenario(env)
+
+
+def test_clear_thread_scenario_passes_on_the_real_dialog(env: Env) -> None:
+    _clear_thread_scenario(env)
+
+
+def _disabled_scenario(env: Env) -> None:
+    window = env.start()
+    dialog = env.open(window)
+    rows = {d: enabled for d, _, enabled, _ in items(dialog.encoder_combo)}
+    assert not rows["hevc_nvenc"]
+
+
+def test_disabled_scenario_passes_on_the_real_dialog(env: Env) -> None:
+    _disabled_scenario(env)
+
+
+def test_planted_selectable_unavailable_encoder_is_caught(
+    env: Env, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(SettingsDialog, "_disable_item", lambda self, index, reason: None)
+    with pytest.raises(AssertionError):
+        _disabled_scenario(env)
