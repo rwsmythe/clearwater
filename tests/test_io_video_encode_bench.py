@@ -391,7 +391,7 @@ def test_a_failing_probe_deletes_the_created_output(tmp_path: Path) -> None:
 
 @pytest.mark.gpu
 @pytest.mark.usefixtures("quick")
-def test_an_nvenc_run_records_the_proof(sample: Any, tmp_path: Path) -> None:
+def test_an_nvenc_run_records_a_proof_tied_or_with_its_reason(sample: Any, tmp_path: Path) -> None:
     nvenc = {c.name: c for c in detect_capabilities()}["hevc_nvenc"]
     if not nvenc.available:
         pytest.skip(f"NVENC is not available: {nvenc.reason}")
@@ -405,8 +405,11 @@ def test_an_nvenc_run_records_the_proof(sample: Any, tmp_path: Path) -> None:
         keep=False,
         periods=FAST,
     )
+    # a sub-second encode is often missed by pmon, so `tied` is not asserted here; it is
+    # established on footage in the window (DR-18 (1); round 5 #7)
     proof = record["nvenc_proof"]
     assert isinstance(proof["tied"], bool) and proof["pid"] is not None
+    assert proof["window_s"] > 0 and proof["samples"] >= 1
     assert proof["tied"] or proof["reason"]
     assert "hevc_nvenc" in record["encode_command"]
     assert not (tmp_path / "nvenc.mp4").exists()
