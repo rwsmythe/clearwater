@@ -208,3 +208,5 @@ the method is a ValueError.
 - The step-aware kinds read the whole series (a global noise scale), so their near phase is the
   whole clip, and a stage is smoothed under them in one call: a cancel then waits for that
   stage's smoothing (evaluation kinds; the default is chunked).
+- A job callable is not one-shot: an OLD callable kept and run concurrently with a new job would
+  be a second writer of the store and cache (the one-writer condition is the caller's; B5, banked).
