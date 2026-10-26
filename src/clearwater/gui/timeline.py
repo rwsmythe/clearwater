@@ -361,12 +361,12 @@ class TimelinePanel(QWidget):
             return
         cancelled = run.reason is not None or result.failure == CANCELLED
         if cancelled:  # the user's cancel (D70), or a third party's: either way not complete
-            self._epoch += 1
+            self._statistics_stale()
             self._session.set_statistics(None)
             self._session.set_analysis(AnalysisState("cancelled", message="Analysis cancelled"))
             return
         if not result.ok:
-            self._epoch += 1
+            self._statistics_stale()
             self._session.set_statistics(None)
             self._fail(result.failure or "The analysis failed.")
             return
@@ -382,6 +382,18 @@ class TimelinePanel(QWidget):
             AnalysisState("complete", run.done, run.total, "Analysis complete")
         )
         self._switch()
+
+    def _statistics_stale(self) -> None:
+        """The statistics a commit could carry stop being right: new epoch, nothing to restore.
+
+        Bumps the epoch (a lane result fetched before is supplied as None) and forgets both the
+        statistics of the shown frame and those supplied with a decode still pending, so a
+        failed or late decode never remembers or re-supplies the mapping of the old parameters
+        (DR-44 (a)).
+        """
+        self._epoch += 1
+        self._supplied = None
+        self._shown_statistics = None
 
     def _fail(self, text: str) -> None:
         """Set the failed state and present the failure (owner ``analysis``)."""
@@ -409,12 +421,12 @@ class TimelinePanel(QWidget):
         if run is not None:
             if run.reason is not None or target == run.target:
                 return
-            self._epoch += 1
+            self._statistics_stale()
             if self._retarget():
                 run.target = target
             return
         if self._session.analysis().phase == "complete" and target != self._done_target:
-            self._epoch += 1
+            self._statistics_stale()
             self._session.set_statistics(None)
             state = self._session.analysis()
             self._session.set_analysis(AnalysisState("running", 0, state.total, LABEL_UPDATING))
@@ -430,7 +442,7 @@ class TimelinePanel(QWidget):
 
     def _on_method_changed(self) -> None:
         """The method changed under an open clip: a new analysis (superseded, Q-B)."""
-        self._epoch += 1
+        self._statistics_stale()
         self._session.set_statistics(None)
         run = self._run
         if run is not None:

@@ -238,16 +238,28 @@ class ScriptedAnalysis:
 
 
 class FlakySource:
-    """Wraps a video source; a decode that starts at one of ``fail_ticks`` raises."""
+    """Wraps a video source; a decode that starts at one of ``fail_ticks`` raises.
 
-    def __init__(self, inner: Any, fail_ticks: Sequence[int]) -> None:
+    A decode that starts at one of ``hold_ticks`` first waits for ``hold`` (``holding`` is set
+    while it waits), so a test can change the parameters while that decode is pending.
+    """
+
+    def __init__(
+        self, inner: Any, fail_ticks: Sequence[int], hold_ticks: Sequence[int] = ()
+    ) -> None:
         self.inner = inner
         self.fail_starts = {Fraction(t, 90000) for t in fail_ticks}
+        self.hold_starts = {Fraction(t, 90000) for t in hold_ticks}
+        self.hold = threading.Event()
+        self.holding = threading.Event()
 
     def probe(self, path: Path) -> Any:
         return self.inner.probe(path)
 
     def frames(self, probe: Any, *, hw_decode: bool, start_s: Any = None, end_s: Any = None) -> Any:
+        if start_s is not None and start_s in self.hold_starts:
+            self.holding.set()
+            self.hold.wait(5)
         if start_s is not None and start_s in self.fail_starts:
             raise OSError("scripted disk read error")
         return self.inner.frames(probe, hw_decode=hw_decode, start_s=start_s, end_s=end_s)
@@ -263,6 +275,7 @@ class Env:
     panel: TimelinePanel
     methods: dict[str, StatMethod]
     built: list[ScriptedAnalysis]
+    source: Any = None
     positions: list[tuple[int, Any]] = field(default_factory=list)
     stat_calls: list[Any] = field(default_factory=list)
     shown: list[Any] = field(default_factory=list)
@@ -333,6 +346,7 @@ def make_env(qtbot: Any, make_window: Any, tmp_path: Path, monkeypatch: pytest.M
         panel_class: type[TimelinePanel] | None = None,
         factory: Any = None,
         fail_decode: Sequence[int] = (),
+        hold_decode: Sequence[int] = (),
         photos: dict[Path, Any] | None = None,
         **analysis_options: Any,
     ) -> Env:
@@ -341,9 +355,9 @@ def make_env(qtbot: Any, make_window: Any, tmp_path: Path, monkeypatch: pytest.M
         engines = video_engines(
             frames, video_probe=probe_for(len(ticks)), methods=all_methods, photos=photos
         )
-        if fail_decode:
+        if fail_decode or hold_decode:
             engines = dataclasses.replace(
-                engines, video_source=FlakySource(engines.video_source, fail_decode)
+                engines, video_source=FlakySource(engines.video_source, fail_decode, hold_decode)
             )
         window = make_window(engines)
         window.shell_actions.export.set_unavailable(None)  # as WP3.19 does when it connects
@@ -363,7 +377,7 @@ def make_env(qtbot: Any, make_window: Any, tmp_path: Path, monkeypatch: pytest.M
             window.attach(Area.TIMELINE, lambda ctx: cls(ctx, use), title="Timeline")
             panel = window.findChild(cls)
         assert panel is not None
-        env = Env(qtbot, tmp_path, window, panel, all_methods, built)
+        env = Env(qtbot, tmp_path, window, panel, all_methods, built, engines.video_source)
         session = window.session
         original_position = session.set_position
         original_statistics = session.set_statistics
@@ -838,6 +852,44 @@ def test_a_commit_in_flight_when_a_drag_starts_is_not_applied_before_the_release
     release(env)
     env.wait(lambda: any(p == PTS[3] for p, _ in env.positions))
     assert [p for p, _ in env.positions] == [PTS[3]]
+
+
+def test_a_failed_decode_after_a_parameter_change_restores_no_statistics(make_env) -> None:
+    env = make_env(gated=(0, 1), fail_decode=(PTS[2],))
+    complete(env)
+    env.slider().setValue(1)
+    env.wait(lambda: env.session.current_image().pts_ticks == PTS[1])
+    env.rendered_is(smooth(PTS[1]))
+    gate = threading.Event()
+    env.analysis.statistics_gate = gate
+    env.slider().setValue(2)  # the lane job waits inside statistics(PTS[2]); its decode will fail
+    env.wait(env.analysis.statistics_waiting.is_set)
+    env.set_level(0.8)  # the statistics of the shown frame are now the old parameters'
+    gate.set()
+    env.wait(lambda: any(m.owner == "shell.frame" for m in presenter_of(env.window).of("error")))
+    env.wait(lambda: env.slider().value() == 1)  # the rollback follows the restore
+    assert env.session.current_image().pts_ticks == PTS[1]
+    assert env.session.statistics() is None  # not the mapping of the old parameters
+    env.analysis.release(1)
+    env.phase_is("complete")
+
+
+def test_a_frame_decoded_after_a_parameter_change_is_not_remembered_with_old_statistics(
+    make_env,
+) -> None:
+    env = make_env(gated=(0, 1), hold_decode=(PTS[2],), fail_decode=(PTS[3],))
+    complete(env)
+    env.slider().setValue(2)  # committed with the smoothed statistics; its decode is held
+    env.wait(env.source.holding.is_set)
+    env.set_level(0.8)  # the statistics supplied with that decode are the old parameters'
+    env.source.hold.set()
+    env.wait(lambda: env.session.current_image().pts_ticks == PTS[2])
+    env.slider().setValue(3)  # a provisional commit (running again); its decode fails
+    env.wait(lambda: any(m.owner == "shell.frame" for m in presenter_of(env.window).of("error")))
+    env.wait(lambda: env.slider().value() == 2)
+    assert env.session.statistics() is None
+    env.analysis.release(1)
+    env.phase_is("complete")
 
 
 def test_a_method_change_while_running_rebuilds_the_analysis_as_superseded(make_env) -> None:
