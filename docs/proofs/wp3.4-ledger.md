@@ -446,3 +446,5 @@ Gates on `062d4d2`: ruff check, ruff format --check, mypy (109 files) green (`wo
 again on the docs commit after re-wrapping the docstring (`work/b1-static2.txt`);
 the six package files with CuPy 325 passed (323 + the 2 new), without CuPy 291 passed, 34 skipped
 (`work/b1-pkg-gpu.txt`, `work/b1-pkg-cpu.txt`). No full pytest (the orchestrator's candidate gate).
+
+Depth at the B-remediation yield (dispatcher): **119,850**.
