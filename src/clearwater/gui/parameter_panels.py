@@ -342,7 +342,10 @@ class ParameterRow(QWidget):
         """Put the slider at ``number`` without a signal."""
         if self.slider is not None:
             with QSignalBlocker(self.slider):
-                self.slider.setValue(self._slider_position(number))
+                position = self._slider_position(number)
+                self.slider.setValue(
+                    max(self.slider.minimum(), min(self.slider.maximum(), position))
+                )
 
     # What the program does.
 
@@ -352,7 +355,7 @@ class ParameterRow(QWidget):
         if isinstance(spin, QDoubleSpinBox):
             spin.setValue(float(number))
         elif spin is not None:
-            spin.setValue(round(number))
+            spin.setValue(max(spin.minimum(), min(spin.maximum(), round(number))))
 
     def _widget_value(self) -> ParameterValue:
         """Return the value the value widgets hold (even while they are disabled)."""
