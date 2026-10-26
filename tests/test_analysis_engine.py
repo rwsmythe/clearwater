@@ -106,19 +106,20 @@ def test_statistics_are_measured_on_the_stored_proxy(tmp_path: Path) -> None:
         engine, _, _ = make_engine(method, frames, cache=cache)  # type: ignore[arg-type]
         engine._key = key
         assert run(engine).ok
-        stage_one = [
-            img
-            for (stage, _), img in zip(method.calls, method.images, strict=True)
-            if stage == "white_balance"
-        ]
-        assert len(stage_one) == 12
         lossy = 0
-        for frame, image in zip(frames, stage_one, strict=True):
-            stored = cache.proxy(key, frame.pts_ticks)
-            expected = (stored.astype(np.float32) / np.float32(255)).astype(np.float64)
-            assert np.array_equal(image, expected)
-            pre_store = make_proxy(np.asarray(frame.pixels)).astype(np.float64) / 255
-            lossy += int(not np.array_equal(pre_store, expected))
+        for name in (stage.name for stage in method.stages):  # every stage, not only the first
+            measured = [
+                img
+                for (stage, _), img in zip(method.calls, method.images, strict=True)
+                if stage == name
+            ]
+            assert len(measured) == 12, name
+            for frame, image in zip(frames, measured, strict=True):
+                stored = cache.proxy(key, frame.pts_ticks)
+                expected = (stored.astype(np.float32) / np.float32(255)).astype(np.float64)
+                assert np.array_equal(image, expected), name
+                pre_store = make_proxy(np.asarray(frame.pixels)).astype(np.float64) / 255
+                lossy += int(not np.array_equal(pre_store, expected))
         assert lossy > 0  # the codec is lossy, so a planted pre-store measurement would differ
 
 
