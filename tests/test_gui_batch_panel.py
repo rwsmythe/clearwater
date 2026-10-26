@@ -30,6 +30,7 @@ from clearwater.gui.batch_panel import (
 from clearwater.gui.export_panel import ExportPanel
 from clearwater.gui.export_service import RUNNING_BATCH_REASON, RUNNING_EXPORT_REASON
 from clearwater.gui.shell import NO_SOURCE_REASON
+from clearwater.interfaces import JobResult
 from clearwater.jobs.export_seam import CANCELLED
 from gui_support import image, make_window, open_and_wait, photo_engines, presenter_of
 from test_gui_export_panel import (
@@ -161,6 +162,36 @@ def test_warnings_of_failed_and_cancelled_items_are_kept_and_reported(rig: Rig) 
     lines = cancelled.report.toPlainText().splitlines()
     at = lines.index("2. b.mp4 - cancelled")
     assert lines[at + 1] == "   warning: probe warning"
+
+
+def _record_not_ok_results(rig: Rig) -> list[tuple[Path, ...]]:
+    """Record a failed and a cancelled result that carry outputs; return the kept outputs."""
+    batch = started(rig, [A, B])
+    failed, cancelled = batch.items()
+    batch._record(failed, JobResult(False, (Path("x.png"),), ("w",), "bad", "cpu", 0.0))
+    batch._record(cancelled, JobResult(False, (Path("y.png"),), (), CANCELLED, "cpu", 0.0))
+    assert (failed.state, cancelled.state) == (ItemState.FAILED, ItemState.CANCELLED)
+    return [failed.outputs, cancelled.outputs]
+
+
+def test_outputs_committed_before_a_failure_or_cancel_are_kept_and_reported(rig: Rig) -> None:
+    """Round-2 minor 2: the report lists what exists, whatever the outcome."""
+    assert _record_not_ok_results(rig) == [(Path("x.png"),), (Path("y.png"),)]
+
+
+def test_planted_record_that_clears_outputs_of_a_non_ok_result_is_detected(
+    rig: Rig, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    original = BatchPanel._record
+
+    def clearing(self: BatchPanel, item: BatchItem, result: Any) -> None:
+        original(self, item, result)
+        if not result.ok:
+            item.outputs = ()
+
+    monkeypatch.setattr(BatchPanel, "_record", clearing)
+    # The test above fails on this implementation.
+    assert _record_not_ok_results(rig) == [(), ()]
 
 
 def test_a_job_that_cannot_be_built_or_raises_fails_its_item_only(rig: Rig) -> None:
