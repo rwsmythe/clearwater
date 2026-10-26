@@ -400,31 +400,112 @@ def test_quality_levels_follow_ad12(
         assert _after(command, "-preset") == "medium"
 
 
+NTSC = Fraction(30000, 1001)
+MAIN_6_0 = (180, False)  # what GX011627 signals: level 6.0, Main tier
+MAIN_2_0 = (60, False)  # what the 320x180 WP2.3 HEVC samples signal
+QUALITIES = ("high", "standard", "draft")
+UHD30 = [(59_660_019, "5.2"), (29_830_009, "5.1"), (14_915_004, "5.0")]
+"""(maxrate, level) per quality at 3840x2160 and 30000/1001 fps, from the pixel rate alone."""
+
+
+def _level(spec: tuple[int, bool] | None) -> Any:
+    return verify.HevcLevel(*spec) if spec is not None else None
+
+
+def _sized(width: int, height: int, rate: Fraction) -> ProbeResult:
+    base = _probe()
+    return replace(base, video=replace(base.video, width=width, height=height, frame_rate=rate))
+
+
 @pytest.mark.parametrize(
-    ("source_bit_rate", "maxrate"),
+    ("width", "height", "rate", "source", "expected"),
     [
-        (55_530_681, 111_061_362),  # GX011627: twice the source's video bit rate
-        (12_000_000, 24_000_000),
-        (5_154_342, 20_000_000),  # a calm low-rate clip: the floor
-        (0, 20_000_000),
-        (None, 20_000_000),  # not listed: the floor
+        (3840, 2160, NTSC, MAIN_6_0, UHD30),
+        (3840, 2160, NTSC, None, UHD30),
+        (1920, 1080, NTSC, None, [(14_915_004, "4.1"), (7_457_502, "4.0"), (3_728_751, "4.0")]),
+        (
+            1920,
+            1080,
+            2 * NTSC,
+            None,
+            [(29_830_009, "5.1"), (14_915_004, "4.1"), (7_457_502, "4.1")],
+        ),
+        (320, 180, NTSC, MAIN_2_0, [(414_305, "2.0"), (207_152, "2.0"), (103_576, "2.0")]),
     ],
+    ids=["4k30-hevc6.0", "4k30-h264", "1080p30", "1080p59.94", "320x180-hevc2.0"],
 )
-@pytest.mark.parametrize("quality", ["high", "standard", "draft"])
-def test_nvenc_rate_ceiling_is_derived_from_the_source_bit_rate(
-    source_bit_rate: int | None, maxrate: int, quality: str
+def test_nvenc_options_follow_the_pixel_rate_at_an_explicit_main_tier_level(
+    width: int,
+    height: int,
+    rate: Fraction,
+    source: Any,
+    expected: list[tuple[int, str]],
 ) -> None:
-    command = _command(
-        _probe(), encoder="hevc_nvenc", quality=quality, source_bit_rate=source_bit_rate
-    )
-    assert _after(command, "-maxrate") == str(maxrate)
-    assert _after(command, "-bufsize") == str(2 * maxrate)
-    assert encode.nvenc_rate_ceiling(source_bit_rate) == (maxrate, 2 * maxrate)
+    # High = 0.24 bit/pixel x the pixel rate, rounded down; Standard 1/2; Draft 1/4 (AD-12).
+    for quality, (maxrate, level) in zip(QUALITIES, expected, strict=True):
+        probe = _sized(width, height, rate)
+        command = _command(
+            probe, encoder="hevc_nvenc", quality=quality, source_level=_level(source)
+        )
+        assert _after(command, "-maxrate") == str(maxrate)
+        assert _after(command, "-bufsize") == str(maxrate)
+        assert _after(command, "-tier") == "main"
+        assert _after(command, "-level") == level
+
+
+@pytest.mark.parametrize(
+    ("source", "expected"),
+    [
+        # a planted low-level HEVC source: High is cut to level 5.1's Main-tier cap, then halved
+        ((153, False), [(40_000_000, "5.1"), (20_000_000, "5.0"), (10_000_000, "5.0")]),
+        # the High tier, or a level the table does not know: the pixel-rate ceiling alone
+        ((153, True), UHD30),
+        ((77, False), UHD30),
+    ],
+    ids=["main-5.1", "high-5.1", "unknown"],
+)
+def test_a_main_tier_source_level_caps_the_high_ceiling(
+    source: Any, expected: list[tuple[int, str]]
+) -> None:
+    for quality, (maxrate, level) in zip(QUALITIES, expected, strict=True):
+        rate = encode.nvenc_rate(3840, 2160, NTSC, quality, _level(source))
+        assert (rate.maxrate, rate.bufsize, rate.level) == (maxrate, maxrate, level)
+
+
+def test_nvenc_rate_refuses_a_picture_no_level_holds() -> None:
+    with pytest.raises(ValueError, match="no HEVC level"):
+        encode.nvenc_rate(16384, 16384, NTSC, "high", None)
+    with pytest.raises(ValueError, match="not positive"):
+        encode.nvenc_rate(320, 180, Fraction(0), "high", None)
+    # a ceiling above every Main-tier cap that holds the picture is cut to the highest one
+    rate = encode.nvenc_rate(3840, 2160, Fraction(240), "high", None)
+    assert (rate.maxrate, rate.level) == (240_000_000, "6.2")
 
 
 def test_libx265_has_no_rate_ceiling() -> None:
-    command = _command(_probe(), encoder="libx265", source_bit_rate=55_530_681)
-    assert "-maxrate" not in command and "-bufsize" not in command
+    command = _command(_sized(3840, 2160, NTSC), encoder="libx265", source_level=_level(MAIN_6_0))
+    for option in ("-maxrate", "-bufsize", "-tier", "-level"):
+        assert option not in command
+
+
+@pytest.mark.parametrize(
+    ("source", "output", "warned"),
+    [
+        (MAIN_2_0, (60, False), False),
+        (MAIN_6_0, (156, False), False),
+        (MAIN_2_0, (120, False), True),  # a higher level
+        (MAIN_2_0, (60, True), True),  # the High tier over a Main-tier source
+        ((153, True), (153, True), False),
+        (None, (186, True), False),  # not an HEVC source
+        (MAIN_2_0, None, False),  # the output's level not read
+    ],
+)
+def test_a_higher_output_level_or_tier_is_warned(source: Any, output: Any, warned: bool) -> None:
+    warning = encode.level_warning(_level(source), _level(output))
+    assert (warning is not None) == warned
+    if warning is not None:
+        assert warning.isascii()
+        assert _level(output).name in warning and _level(source).name in warning
 
 
 def test_colour_tags_go_on_the_stream_and_the_frames() -> None:

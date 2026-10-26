@@ -15,6 +15,16 @@ pts it receives; for a B-frame source its ``media_time`` may differ from the sou
 presentation is the same (AD-22), and an absent source edit list becomes an identity list (AD-22
 extended). Edit lists of any other form are refused at :meth:`FFmpegVideoSink.open`.
 
+Rate (D75, AD-12): libx265 runs at a constant ``-crf``. NVENC runs at a constant ``-cq`` under a
+ceiling (:func:`nvenc_rate`) set from the output's pixel rate, halved for Standard and halved
+again for Draft, and capped by an HEVC source's own Main-tier level. Left to itself, NVENC picks
+the lowest level the picture size allows and caps the rate under it, so the three levels came
+out at one rate on busy 4K; given a ``-maxrate`` alone, it SILENTLY switches to the High tier
+once the ceiling passes the Main-tier cap of that level, even with ``-tier main``. So the sink
+sets ``-tier main`` and an explicit ``-level`` (the lowest Main-tier level that holds both the
+ceiling and the picture format), and ``close`` warns when the output still signals a higher
+level or tier than an HEVC source's own.
+
 Colour (D54, D55, D114): the frames are converted to the source's Y'CbCr matrix, range, chroma
 subsampling and siting by :func:`clearwater.color.encode_filter`, and the output is tagged with
 the source's resolved colour description, the D54 assumed values included (with a warning).
@@ -34,6 +44,7 @@ import subprocess
 import threading
 import time
 from collections.abc import Mapping
+from dataclasses import dataclass
 from fractions import Fraction
 from pathlib import Path
 from typing import IO, Any, Literal, NoReturn
@@ -52,6 +63,7 @@ from clearwater.interfaces import FormatError
 from clearwater.interfaces.image import Frame
 from clearwater.interfaces.video import EncoderCapability, ProbeResult, SinkReport
 from clearwater.io.video import nut
+from clearwater.io.video.boxes import BoxError
 from clearwater.io.video.capability import (
     AUTO,
     BIT_DEPTHS,
@@ -64,11 +76,13 @@ from clearwater.io.video.inputs import ascii_text
 from clearwater.io.video.probe import VideoProbeError, find_tool
 from clearwater.io.video.verify import (
     TIMECODE_TAG,
+    HevcLevel,
     PacketTable,
     check_output,
     frame_end,
     not_carried,
     presentation_end,
+    read_hevc_level,
     read_packet_table,
     readable_end,
     square_pixels,
@@ -81,9 +95,31 @@ QUALITY_VALUE = {"high": 18, "standard": 23, "draft": 28}
 """The constant-quality value per level: NVENC ``-cq`` and libx265 ``-crf`` (AD-12,
 PROVISIONAL until WP3.10's quality check is ruled on)."""
 
-NVENC_MAXRATE_FLOOR = 20_000_000
-"""The lowest NVENC rate ceiling, in bits per second, for a low-rate source or one whose bit
-rate is not known (CHARC ruling d329e80e351c3dcc)."""
+NVENC_BITS_PER_PIXEL = Fraction(24, 100)
+"""NVENC's High ceiling in bits per output pixel (AD-12 as amended, CHARC 17f12f9dc7eba3ae;
+PROVISIONAL until re-derived with the cq values on the re-run figures)."""
+
+NVENC_RATE_SHARE = {"high": 1, "standard": 2, "draft": 4}
+"""What the High ceiling is divided by for each level (Standard half, Draft a quarter)."""
+
+HEVC_MAIN_TIER_LEVELS: tuple[tuple[int, int, int, int], ...] = (
+    (30, 36_864, 552_960, 128_000),
+    (60, 122_880, 3_686_400, 1_500_000),
+    (63, 245_760, 7_372_800, 3_000_000),
+    (90, 552_960, 16_588_800, 6_000_000),
+    (93, 983_040, 33_177_600, 10_000_000),
+    (120, 2_228_224, 66_846_720, 12_000_000),
+    (123, 2_228_224, 133_693_440, 20_000_000),
+    (150, 8_912_896, 267_386_880, 25_000_000),
+    (153, 8_912_896, 534_773_760, 40_000_000),
+    (156, 8_912_896, 1_069_547_520, 60_000_000),
+    (180, 35_651_584, 1_069_547_520, 60_000_000),
+    (183, 35_651_584, 2_139_095_040, 120_000_000),
+    (186, 35_651_584, 4_278_190_080, 240_000_000),
+)
+"""HEVC levels as ``(general_level_idc, MaxLumaPs, MaxLumaSr, Main-tier MaxBR)`` (ITU-T H.265
+Tables A.8 and A.9; MaxBR in bits per second for the Main and Main 10 profiles, at most the
+Main-tier MaxCPB in bits)."""
 
 PROVENANCE_TAG = "comment"
 """The MP4 container tag that carries the provenance JSON (D91; written without
@@ -168,36 +204,103 @@ def provenance_comment(provenance: Mapping[str, Any] | None) -> str:
     return text
 
 
-def nvenc_rate_ceiling(source_bit_rate: int | None) -> tuple[int, int]:
-    """Return NVENC's ``-maxrate`` and ``-bufsize`` for a source, in bits per second and bits.
+@dataclass(frozen=True)
+class NvencRate:
+    """NVENC's rate ceiling for one output (:func:`nvenc_rate`).
 
-    Without a ceiling NVENC picks the lowest level the picture size allows and caps the rate
-    below that level's limit, so High, Standard and Draft all come out at about the same rate
-    on busy 4K. The ceiling is twice the source's video bit rate, at least
-    :data:`NVENC_MAXRATE_FLOOR`; the buffer is twice the ceiling (CHARC ruling
-    d329e80e351c3dcc). ``-cq`` still sets the quality below the ceiling.
+    Attributes:
+        maxrate: ``-maxrate`` in bits per second.
+        bufsize: ``-bufsize`` in bits (equal to ``maxrate``: one second).
+        level: ``-level`` as FFmpeg spells it, for example ``"5.2"``; always with ``-tier main``.
+    """
+
+    maxrate: int
+    bufsize: int
+    level: str
+
+
+def _main_tier_cap(level_idc: int) -> int | None:
+    """Return a level's Main-tier MaxBR in bits per second, or None for an unknown level."""
+    return next((cap for idc, _, _, cap in HEVC_MAIN_TIER_LEVELS if idc == level_idc), None)
+
+
+def nvenc_rate(
+    width: int, height: int, frame_rate: Fraction, quality: str, source_level: HevcLevel | None
+) -> NvencRate:
+    """Return NVENC's rate ceiling and level for an output (AD-12 as amended).
+
+    The High ceiling is :data:`NVENC_BITS_PER_PIXEL` times the output's pixel rate, rounded
+    down; for an HEVC source signalling a Main-tier level it is at most that level's Main-tier
+    cap (a source signalling the High tier, a level this table does not know, or no level --
+    an H.264 source -- leaves the pixel-rate ceiling alone). Standard is half the High
+    ceiling and Draft a quarter. The level is the lowest Main-tier level that holds the
+    picture (luma picture size, each dimension, luma sample rate) and the ceiling; a ceiling
+    above every Main-tier cap that holds the picture is cut to the highest such cap.
 
     Args:
-        source_bit_rate: The source's video bit rate as ffprobe lists it, or None when the
-            listing gives none (then the floor is used).
+        width: The output width in pixels.
+        height: The output height in pixels.
+        frame_rate: The frames per second (the source's average for a variable-rate source).
+        quality: ``"high"``, ``"standard"`` or ``"draft"``.
+        source_level: The level and tier the source signals, or None (not HEVC, or unread).
 
     Returns:
-        ``(maxrate, bufsize)``.
+        The ceiling, the buffer and the level.
+
+    Raises:
+        ValueError: If the frame rate is not positive or no HEVC level holds the picture.
     """
-    known = source_bit_rate if source_bit_rate is not None and source_bit_rate > 0 else 0
-    maxrate = max(2 * known, NVENC_MAXRATE_FLOOR)
-    return maxrate, 2 * maxrate
+    if frame_rate <= 0:
+        raise ValueError(f"the frame rate {frame_rate} is not positive")
+    high = int(NVENC_BITS_PER_PIXEL * width * height * frame_rate)
+    if source_level is not None and not source_level.high_tier:
+        cap = _main_tier_cap(source_level.level_idc)
+        if cap is not None:
+            high = min(high, cap)
+    maxrate = max(high // NVENC_RATE_SHARE[quality], 1)
+    luma = width * height
+    fitting = [
+        (idc, cap)
+        for idc, picture, rate, cap in HEVC_MAIN_TIER_LEVELS
+        if luma <= picture and max(width, height) ** 2 <= 8 * picture and luma * frame_rate <= rate
+    ]
+    if not fitting:
+        raise ValueError(f"no HEVC level holds {width}x{height} at {float(frame_rate):.3f} fps")
+    idc, cap = next(((i, c) for i, c in fitting if c >= maxrate), fitting[-1])
+    maxrate = min(maxrate, cap)
+    return NvencRate(maxrate=maxrate, bufsize=maxrate, level=f"{idc / 30:.1f}")
+
+
+def level_warning(source: HevcLevel | None, output: HevcLevel | None) -> str | None:
+    """Return a warning when the output signals a higher HEVC level or tier than the source.
+
+    Args:
+        source: The level and tier an HEVC source signals, or None (not HEVC, or unread).
+        output: The level and tier the output signals, or None (unread).
+
+    Returns:
+        The warning, or None when either is unknown or the output is not higher.
+    """
+    if source is None or output is None:
+        return None
+    if output.level_idc <= source.level_idc and (source.high_tier or not output.high_tier):
+        return None
+    return (
+        f"The output signals HEVC level {output.name}, above the source's own {source.name}; "
+        "a player that plays the source may not play the output."
+    )
 
 
 def _encoder_options(
-    encoder: str, quality: str, bit_depth: int, source_bit_rate: int | None
+    encoder: str, quality: str, bit_depth: int, rate: NvencRate | None
 ) -> list[str]:
     """Return the encoder, rate control, pixel format and profile options (AD-12)."""
     value = str(QUALITY_VALUE[quality])
     if encoder == HARDWARE_ENCODER:
-        maxrate, bufsize = nvenc_rate_ceiling(source_bit_rate)
+        assert rate is not None  # encode_command computes it for NVENC
         options = ["-c:v", encoder, "-preset", "p5", "-tune", "hq", "-rc", "vbr", "-b:v", "0"]
-        options += ["-cq", value, "-maxrate", str(maxrate), "-bufsize", str(bufsize)]
+        options += ["-cq", value, "-maxrate", str(rate.maxrate), "-bufsize", str(rate.bufsize)]
+        options += ["-tier", "main", "-level", rate.level]
         pix_fmt = "p010le" if bit_depth == 10 else "yuv420p"
     else:
         options = ["-c:v", encoder, "-preset", "medium", "-crf", value]
@@ -222,7 +325,7 @@ def encode_command(
     bit_depth: int,
     comment: str,
     cut_at: Fraction | None,
-    source_bit_rate: int | None = None,
+    source_level: HevcLevel | None = None,
 ) -> list[str]:
     """Return the one FFmpeg command that encodes the piped frames and muxes the source's tracks.
 
@@ -238,11 +341,14 @@ def encode_command(
         comment: The provenance JSON, or the empty string.
         cut_at: Where to stop reading the source's audio and data tracks, as FFmpeg's input
             ``-to`` reads it (seconds after the input's start), or None to copy them whole.
-        source_bit_rate: The source's video bit rate in bits per second, for NVENC's rate
-            ceiling (:func:`nvenc_rate_ceiling`), or None when it is not known.
+        source_level: The HEVC level and tier the source signals, for NVENC's ceiling
+            (:func:`nvenc_rate`), or None.
 
     Returns:
         The command.
+
+    Raises:
+        ValueError: For NVENC, if :func:`nvenc_rate` cannot set a ceiling for the picture.
     """
     video = probe.video
     names = ffmpeg_color_names(video.color)
@@ -268,6 +374,9 @@ def encode_command(
             maps += ["-map", f"1:{data.index}"]
     rotation = ["-display_rotation", str(video.rotation)] if video.rotation else []
     cut = ["-to", _seconds(cut_at)] if cut_at is not None else []
+    rate = None
+    if encoder == HARDWARE_ENCODER:
+        rate = nvenc_rate(video.width, video.height, video.frame_rate, quality, source_level)
     return [
         str(ffmpeg),
         "-nostdin",
@@ -291,7 +400,7 @@ def encode_command(
         *maps,
         "-vf",
         vf,
-        *_encoder_options(encoder, quality, bit_depth, source_bit_rate),
+        *_encoder_options(encoder, quality, bit_depth, rate),
         *tags,
         "-tag:v",
         "hvc1",
@@ -355,6 +464,16 @@ def _edit_list_refusal(probe: ProbeResult, table: PacketTable) -> str | None:
     return None
 
 
+def _source_level(probe: ProbeResult) -> HevcLevel | None:
+    """Return the HEVC level and tier the source signals; None when not HEVC or unreadable."""
+    if probe.video.codec != "hevc":
+        return None
+    try:
+        return read_hevc_level(probe.path)
+    except (BoxError, OSError):
+        return None  # then the pixel-rate ceiling alone
+
+
 def _remove(path: Path) -> None:
     """Delete a file, retrying briefly while a just-ended process still holds it (Windows)."""
     for attempt in range(_REMOVE_TRIES):
@@ -393,9 +512,10 @@ class FFmpegVideoSink:
         self._written: list[int] = []
         self._warnings: list[str] = []
         self._audio_end: Fraction | None = None
-        self.rate_ceiling: tuple[int, int] | None = None
-        """NVENC's ``(maxrate, bufsize)`` chosen at ``open`` (:func:`nvenc_rate_ceiling`); None
-        for libx265 or before ``open``. ``SinkReport`` (IF-5, frozen) has no field for it."""
+        self._source_level: HevcLevel | None = None
+        self.nvenc_rate: NvencRate | None = None
+        """NVENC's ceiling and level chosen at ``open`` (:func:`nvenc_rate`); None for libx265
+        or before ``open``. ``SinkReport`` (IF-5, frozen) has no field for it."""
 
     # --- IF-5 -------------------------------------------------------------------------------
 
@@ -501,6 +621,18 @@ class FFmpegVideoSink:
             kind: EncodeErrorKind = "missing_tool" if error.kind == "missing_tool" else "refused"
             raise VideoEncodeError(kind, str(error)) from error
         self._check_source(probe, source)
+        source_level = _source_level(probe)
+        rate = None
+        if encoder == HARDWARE_ENCODER:
+            video = probe.video
+            try:
+                rate = nvenc_rate(
+                    video.width, video.height, video.frame_rate, quality, source_level
+                )
+            except ValueError as error:
+                raise VideoEncodeError(
+                    "refused", f"This video cannot be written: {ascii_text(str(error))}"
+                ) from error
         cut_at = self._plan_tracks(probe, source)
         self._probe, self._source = probe, source
         self._source_pts = frozenset(source.video_pts)
@@ -522,10 +654,9 @@ class FFmpegVideoSink:
             bit_depth=bit_depth,
             comment=comment,
             cut_at=cut_at,
-            source_bit_rate=source.video.bit_rate,
+            source_level=source_level,
         )
-        if encoder == HARDWARE_ENCODER:
-            self.rate_ceiling = nvenc_rate_ceiling(source.video.bit_rate)
+        self._source_level, self.nvenc_rate = source_level, rate
         try:  # built before FFmpeg starts, so a failure here leaves nothing running
             header = nut.stream_header(
                 width=probe.video.width,
@@ -889,6 +1020,14 @@ class FFmpegVideoSink:
                 "verify_failed",
                 "The finished video does not match what was written: " + "; ".join(problems),
             )
+        if self._source_level is not None:
+            try:
+                output_level = read_hevc_level(out_path)
+            except (BoxError, OSError):
+                output_level = None  # the level is a warning, not a MANDATORY item
+            warning = level_warning(self._source_level, output_level)
+            if warning is not None:
+                self._warnings.append(warning)
         return SinkReport(
             frames_written=len(self._written),
             warnings=tuple(self._warnings),

@@ -38,6 +38,7 @@ from clearwater.io.video import (
     resolve_encoder,
 )
 from clearwater.io.video import encode as encode_module
+from clearwater.io.video import verify as verify_module
 from clearwater.io.video.boxes import read_movie_boxes
 from clearwater.io.video.verify import read_packet_table
 from clearwater.jobs.naming import MediaKind, plan_output
@@ -668,49 +669,74 @@ def test_open_refuses_by_name(
     assert out.stat().st_size == 0
 
 
+# --- the NVENC level (AD-12 as amended) -------------------------------------------------------
+
+
+def _with_hvcc(
+    source: Path, out: Path, *, level_idc: int | None = None, high: bool = False
+) -> Path:
+    """Copy ``source`` to ``out`` with its ``hvcC`` level and tier bytes planted."""
+    data = bytearray(source.read_bytes())
+    at = data.index(b"hvcC") + 4  # the payload follows the box type
+    if level_idc is not None:
+        data[at + 12] = level_idc
+    if high:
+        data[at + 1] |= 0x20
+    out.write_bytes(bytes(data))
+    return out
+
+
+def test_the_hevc_level_is_read_from_hvcc(sample: Sample, tmp_path: Path) -> None:
+    level = verify_module.read_hevc_level(sample("vid-vfr"))
+    assert (level.level_idc, level.high_tier, level.name) == (60, False, "2.0 Main")
+    assert verify_module.read_hevc_level(sample("vid-untagged")) is None  # H.264
+    planted = _with_hvcc(sample("vid-vfr"), tmp_path / "high.mp4", level_idc=153, high=True)
+    level = verify_module.read_hevc_level(planted)
+    assert (level.level_idc, level.high_tier, level.name) == (153, True, "5.1 High")
+
+
+def _nvenc_encode(source: Path, out: Path, quality: str) -> tuple[FFmpegVideoSink, SinkReport]:
+    info = probe(source)
+    out.write_bytes(b"")
+    sink = FFmpegVideoSink()
+    try:
+        sink.open(info, out, encoder="hevc_nvenc", quality=quality, bit_depth=8, provenance=None)
+        for frame in vf.decode_frames(source, info):
+            sink.write(frame)
+        report = sink.close()
+    except BaseException:
+        sink.abort()
+        raise
+    return sink, report
+
+
 @pytest.mark.gpu
-def test_open_derives_the_nvenc_ceiling_from_the_source_listing(
-    sample: Sample, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+@pytest.mark.parametrize("name", ["vid-vfr", "vid-hevc8-bt709-full"])
+def test_nvenc_keeps_a_small_sample_at_its_own_main_tier_level(
+    sample: Sample, tmp_path: Path, name: str
 ) -> None:
     _need("hevc_nvenc")
-    source = sample("vid-vfr")
-    entries = ["-select_streams", "v:0", "-show_entries", "stream=bit_rate", "-of", "csv=p=0"]
-    listed = subprocess.run(
-        ["ffprobe", "-v", "error", *entries, str(source)],
-        capture_output=True,
-        text=True,
-        check=True,
-    ).stdout.strip()
-    assert read_packet_table(source).video.bit_rate == int(listed)
-    real = encode_module.read_packet_table
-
-    def busy(path: Path, *, strict: bool = False) -> Any:  # the source listed at 33 Mb/s
-        table = real(path, strict=strict)
-        rows = tuple(
-            replace(s, bit_rate=33_000_000) if s.index == table.video_index else s
-            for s in table.streams
-        )
-        return replace(table, streams=rows)
-
-    started: list[list[str]] = []
-
-    def capture(self: FFmpegVideoSink, command: list[str]) -> None:
-        started.append(command)
-        raise RuntimeError("captured")
-
-    monkeypatch.setattr(encode_module, "read_packet_table", busy)
-    monkeypatch.setattr(FFmpegVideoSink, "_start", capture)
-    sink = FFmpegVideoSink()
     out = tmp_path / "out.mp4"
-    out.write_bytes(b"")
-    with pytest.raises(RuntimeError, match="captured"):
-        sink.open(
-            probe(source), out, encoder="hevc_nvenc", quality="high", bit_depth=8, provenance=None
-        )
-    command = started[0]
-    assert command[command.index("-maxrate") + 1] == "66000000"
-    assert command[command.index("-bufsize") + 1] == "132000000"
-    assert sink.rate_ceiling == (66_000_000, 132_000_000)
+    sink, report = _nvenc_encode(sample(name), out, "high")
+    assert sink.nvenc_rate is not None and sink.nvenc_rate.level == "2.0"
+    level = verify_module.read_hevc_level(out)
+    assert (level.level_idc, level.high_tier) == (60, False)  # 2.0 Main, as the source
+    assert not any("HEVC level" in w for w in report.warnings)
+
+
+@pytest.mark.gpu
+def test_a_planted_low_level_source_caps_the_ceiling_and_warns(
+    sample: Sample, tmp_path: Path
+) -> None:
+    _need("hevc_nvenc")
+    # The 320x180 picture needs level 2.0; the source claims 1.0 Main (cap 128 kb/s).
+    source = _with_hvcc(sample("vid-vfr"), tmp_path / "low.mp4", level_idc=30)
+    out = tmp_path / "out.mp4"
+    sink, report = _nvenc_encode(source, out, "high")
+    assert sink.nvenc_rate is not None
+    assert (sink.nvenc_rate.maxrate, sink.nvenc_rate.level) == (128_000, "2.0")
+    warnings = [w for w in report.warnings if "HEVC level" in w]
+    assert len(warnings) == 1 and "2.0 Main" in warnings[0] and "1.0 Main" in warnings[0]
 
 
 @pytest.mark.usefixtures("no_ffmpeg_start")
@@ -1382,6 +1408,9 @@ def test_gx011627_nvenc_levels_give_distinct_sizes(tmp_path: Path) -> None:
         out = tmp_path / f"GX011627-{quality}.mp4"
         vf.encode_file(source, out, encoder="hevc_nvenc", quality=quality, bit_depth=8)
         sizes[quality] = out.stat().st_size
+        level = verify_module.read_hevc_level(out)
         os.remove(out)
-    # Without a rate ceiling the three came within 5 % of each other on this busy clip.
+        assert level is not None and not level.high_tier and level.level_idc <= 180  # <= 6.0 Main
+    # Without a ceiling the three came within 5 % of each other on this busy clip; with the
+    # pixel-rate ceiling (High, half, a quarter) each is well apart from the next.
     assert sizes["high"] > 1.25 * sizes["standard"] > 1.25 * 1.25 * sizes["draft"], sizes

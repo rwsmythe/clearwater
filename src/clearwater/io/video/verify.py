@@ -55,7 +55,7 @@ point may be kept or dropped."""
 
 _STREAM_ENTRIES = (
     "stream=index,codec_type,codec_tag_string,time_base,start_pts,duration_ts,nb_frames,"
-    "bit_rate,sample_aspect_ratio:stream_side_data=rotation:format_tags=creation_time,firmware"
+    "sample_aspect_ratio:stream_side_data=rotation:format_tags=creation_time,firmware"
 )
 MAX_SAMPLES = 10_000_000
 """The most video samples a sample table may describe (46 hours at 60 fps); more is malformed."""
@@ -87,6 +87,24 @@ class SampleTable:
 
 
 @dataclass(frozen=True)
+class HevcLevel:
+    """The HEVC level and tier a video track signals in its ``hvcC`` box.
+
+    Attributes:
+        level_idc: ``general_level_idc``: 30 times the level number (180 is level 6.0).
+        high_tier: ``general_tier_flag``: True for the High tier, False for the Main tier.
+    """
+
+    level_idc: int
+    high_tier: bool
+
+    @property
+    def name(self) -> str:
+        """The level and tier as people write them, for example ``"6.0 Main"``."""
+        return f"{self.level_idc / 30:.1f} {'High' if self.high_tier else 'Main'}"
+
+
+@dataclass(frozen=True)
 class StreamRow:
     """One stream of a packet table.
 
@@ -103,8 +121,6 @@ class StreamRow:
             whose packets are never listed (a data track).
         frames: The sample count the stream list gives (``nb_frames``, from the container's
             sample table, no packet read), or None.
-        bit_rate: The stream's bit rate in bits per second as the stream list gives it (for
-            MP4, the track's sample sizes over its duration), or None when it gives none.
     """
 
     index: int
@@ -117,7 +133,6 @@ class StreamRow:
     rotation: Fraction | None
     packets: int | None
     frames: int | None = None
-    bit_rate: int | None = None
 
 
 @dataclass(frozen=True)
@@ -313,6 +328,65 @@ def _table_entries(data: bytes, span: tuple[int, int], form: str) -> Iterator[tu
         yield struct.unpack_from(form, data, start + 8 + index * 8)
 
 
+def _video_media(moov: bytes) -> tuple[int, int] | None:
+    """Return the ``mdia`` payload span of the first video track in ``moov``, or None."""
+    for kind, start, end in _boxes(moov, 0, len(moov)):
+        if kind != b"trak":
+            continue
+        mdia = _child(moov, (start, end), b"mdia")
+        hdlr = _child(moov, mdia, b"hdlr") if mdia else None
+        if mdia is None or hdlr is None or hdlr[1] - hdlr[0] < 12:
+            continue
+        if moov[hdlr[0] + 8 : hdlr[0] + 12] == b"vide":
+            return mdia
+    return None
+
+
+_VISUAL_SAMPLE_ENTRY = 78
+"""Bytes of a visual sample entry's fixed fields, before its child boxes (ISO 14496-12)."""
+
+_HEVC_ENTRIES = (b"hvc1", b"hev1")
+
+
+def read_hevc_level(path: Path) -> HevcLevel | None:
+    """Read the level and tier the first video track signals in its ``hvcC`` box.
+
+    Only ``moov`` is read (no decode, no FFmpeg): the first sample entry of the video track's
+    ``stsd``, which for HEVC is ``hvc1`` or ``hev1`` with an ``hvcC`` child.
+
+    Args:
+        path: The file; opened read only.
+
+    Returns:
+        The level and tier, or None when the file has no ``moov``, no video track, or its first
+        video sample entry is not HEVC or has no ``hvcC``.
+
+    Raises:
+        BoxError: If a box on the path is malformed or ``hvcC`` is too short.
+        OSError: If the file cannot be read.
+    """
+    moov = _moov(path)
+    mdia = _video_media(moov) if moov is not None else None
+    if moov is None or mdia is None:
+        return None
+    minf = _child(moov, mdia, b"minf")
+    stbl = _child(moov, minf, b"stbl") if minf else None
+    stsd = _child(moov, stbl, b"stsd") if stbl else None
+    if stsd is None or stsd[1] - stsd[0] < 8:
+        return None
+    entry = next(_boxes(moov, stsd[0] + 8, stsd[1]), None)  # after version, flags and count
+    if entry is None or entry[0] not in _HEVC_ENTRIES:
+        return None
+    if entry[2] - entry[1] < _VISUAL_SAMPLE_ENTRY:
+        raise BoxError("HEVC sample entry too short")
+    config = _child(moov, (entry[1] + _VISUAL_SAMPLE_ENTRY, entry[2]), b"hvcC")
+    if config is None:
+        return None
+    if config[1] - config[0] < 13:
+        raise BoxError("hvcC too short")
+    return HevcLevel(level_idc=moov[config[0] + 12], high_tier=bool(moov[config[0] + 1] & 0x20))
+
+
 def read_sample_table(path: Path) -> SampleTable | None:
     """Read the first video track's sample timing from ``moov`` (``mdhd``, ``stts``, ``ctts``).
 
@@ -475,7 +549,6 @@ def read_packet_table(path: Path, *, strict: bool = False) -> PacketTable:
             rotation=_rotation(s),
             packets=counts.get(index),
             frames=_int(s.get("nb_frames")),
-            bit_rate=_int(s.get("bit_rate")),
         )
         for s in raw_streams
         if (index := _int(s.get("index"))) is not None
