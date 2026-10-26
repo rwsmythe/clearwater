@@ -1022,7 +1022,9 @@ def test_a_method_change_while_running_rebuilds_the_analysis_as_superseded(make_
     env.open()
     env.wait(lambda: len(env.analysis.runs) == 1)
     first = env.analysis
+    assert env.button("timeline.cancel").isEnabled()
     env.session.set_parameters(new_parameter_set("other", {}))
+    assert not env.button("timeline.cancel").isEnabled()  # at once, not when the old run ends
     env.wait(lambda: len(env.built) == 2)
     assert first.cancelled_runs == [0]
     assert env.built[1].method_id == "other"

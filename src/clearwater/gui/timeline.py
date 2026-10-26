@@ -460,6 +460,7 @@ class TimelinePanel(QWidget):
                 run.reason = "superseded"
                 run.handle.cancel()
                 self._rebuild_pending = True
+                self._update_controls()  # Cancel does nothing now: do not offer it
             return  # a user cancel in flight: Analyse builds the new analysis
         if self._session.analysis().phase == "complete":
             self._build_and_run()
