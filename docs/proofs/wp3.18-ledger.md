@@ -10,6 +10,7 @@ Cell: `implementer-sonnet-high`, seat 1, worktree `.worktrees/wp3.18`, branch `w
 |---|---|---|---|---|---|---|---|---|---|---|
 | 0 (design table) | 177,692 (dispatcher, at the round-0 yield) | - | - | - | - | - | - | - | - | APPROVED; Q-A RULED (C) by CHARC `bdbd8323ceace897` (AD-7 amended `8c67a6d`); Q-B, Q-D, Q-E accepted |
 | 1 (head e51d40f) | 342,258 (dispatcher, at the round-1 yield) | 0 | 6 reported; adjudicated 3 MAJOR (F1, F2, F4), F3 rejected (reading), F5 and F6 downgraded MINOR | 3 reported (F7, F8, F9) + F5, F6 = 5 MINOR | 9 in / 0 out | 9 NEW / 0 REOPENED | 0 | pending: F1, F2, F4, F6, F9 product; F7, F8 test-only; F5 documented | WSL, gpt-5.6-sol high, codex-cli 0.162.1, 8 exec lines, all REASONED; evidence clearwater-review-evidence/wp3.18/r1/ | NEW_CRITICAL_MAJOR_FOUND; remediation next turn |
+| 2 (head 62ddd2f) | (dispatcher fills) | 0 | 3 reported (#1, #2, #3); adjudicated 1 MAJOR (#3, reproduction pending); #1 MINOR accepted limit; #2 REJECTED (reading) | 2 (#4, #5) + #1 = 3 MINOR | 5 in / 0 out | 5 NEW / 0 REOPENED (F1-F9 all verified FIXED) | 0 | pending: #3, #4 product; #5 test-only; #1 documented. Seat-2 round: 6 product fixes F1, F2, F4, F6, F9 (+F5 doc) in 9 commits, 3 test-only (F3, F7, F8) | WSL, gpt-5.6-sol high, 11 `succeeded in`, evidence clearwater-review-evidence/wp3.18/r2/ | NEW_CRITICAL_MAJOR_FOUND; remediation next turn |
 
 ## Round 0 -- design table (no product code yet)
 
@@ -323,3 +324,15 @@ head, plus VERIFY F1-F9.
    `JobRunner.cancel()` by anyone is a cancel, one-job rule per analysis, `focus_pts` ignored by
    the stub) and the structured return report (under about 70 lines, recipe section 4), delivered
    with SendMessage to the orchestrator.
+
+## Round 2 (seat 2) -- remediation record and verdict
+
+Remediation commits (base `70a36a7`): F1 `9e88331`, F2 `cdbf0b6`, F4 `de12da2`, F3 test `4edd0c5`, F7 `4920020`, F8 `42fdfb3`, F5 `8001663`, F9 `31f5a67`, F6 `62ddd2f`. Two deviations from RESUME HERE, ACCEPTED by the orchestrator: F1 uses `_latest_proxy` (not `_latest_request`: a later fix request must not drop a still-latest commit); F2 also clears `_supplied` in `_statistics_stale()` (a decode landing after a change must not remember the old mapping).
+
+Red-before-green (targeted, offscreen, foreground; the `e51d40f` copy at `work/wp318-base` with the new test files and `PYTHONPATH` set to its `src`, `clearwater.__file__` checked): 6 failed, 50 passed, each for its named reason: F1 (`positions` held the commit made during the drag), F2 x2 (`statistics()` was the old mapping), F4 x2 (phase "failed" / a timeline error), F6 (`pts`/`retarget` waited for the stat). Head `62ddd2f`: 60 passed in 12-13 s, three runs (`tests/test_gui_timeline.py`, `tests/test_gui_analysis_service.py`, `tests/test_gui_deps.py`). V7 observed maximum 12 and 13 ms. ruff check, ruff format --check, mypy strict green. Full pytest: not run here (orchestrator, stacked gate).
+
+Reviewer A round 2: adjudication in `r2djudication.md`. Fixes for round 3 (exact):
+- #3 MAJOR: reproduce first (a `FlakySource` hold of the decode of a committed pts, the slider pressed and moved meanwhile; the preview must still show the drag's proxy after the held decode finishes). Fix: in `_on_frame_decoded`, when the frame is not the latest request's, or whenever `self._dragging`, re-request the proxy of `self._slider_pts`; a regression test that fails on `62ddd2f`.
+- #4 MINOR: in `_on_lane_done` drop (do not present) the failure of a request older than a newer request of its kind (`request.seq < self._latest_proxy` for a proxy; `!= self._latest_commit` for a commit); test with a delayed old failure.
+- #5 MINOR test-only: `scenario_drag` asserts `env.positions == []` before waiting for the proxy so `DragSetsPositionPanel` fails on the position.
+- #1: documented limit for the report (third-party cancel after the final sample; `JobHandle` has no cancelled query). #2: rejected by reading; optionally pin it with a test (user cancel, then a method change before delivery: phase cancelled, Analyse rebuilds).
