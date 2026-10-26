@@ -93,6 +93,7 @@ class FakeChoosers:
         self.answer = True
         self.asked_folder: list[Path | None] = []
         self.confirms: list[str] = []
+        self.while_open: Callable[[], None] | None = None
 
     def choose_folder(self, initial: Path | None) -> Path | None:
         self.asked_folder.append(initial)
@@ -100,6 +101,8 @@ class FakeChoosers:
 
     def confirm(self, text: str) -> bool:
         self.confirms.append(text)
+        if self.while_open is not None:  # what happens while the modal box runs its event loop
+            self.while_open()
         return self.answer
 
 
@@ -607,6 +610,22 @@ def test_clear_cache_is_disabled_while_a_clip_is_analysed(env: Env) -> None:
     assert dialog.clear_button.isEnabled()
     assert dialog.clear_button.toolTip() == ""
     assert dialog.cache_note.text() == ""
+
+
+def test_an_analysis_that_starts_while_the_confirmation_is_open_blocks_the_clear(
+    env: Env,
+) -> None:
+    window = env.start()
+    dialog = env.open(window)
+    env.choosers.while_open = lambda: window.session.set_analysis(AnalysisState(phase="running"))
+    dialog.clear_button.click()
+    env.idle(window)
+    assert len(env.choosers.confirms) == 1
+    assert env.cache.cleared == []
+    assert not dialog.clear_button.isEnabled()
+    assert dialog.clear_button.toolTip() == CLEAR_BLOCKED_REASON
+    assert dialog.cache_note.text() == CLEAR_BLOCKED_REASON
+    assert not presenter_of(window).of("error")
 
 
 def test_clear_cache_disabled_from_the_start_when_analysis_is_running(env: Env) -> None:

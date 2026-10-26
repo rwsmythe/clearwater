@@ -600,12 +600,19 @@ class SettingsDialog(QDialog):
                 self.cache_note.setText("")
 
     def _on_clear_clicked(self) -> None:
-        """Confirm, then clear the cache in a job."""
+        """Confirm, check again that no analysis runs, then clear the cache in a job."""
         if self._clearing or self._analysing():
             return
         if not self._choosers.confirm(
             "Remove every cached proxy and statistic? Clips are analysed again when needed."
         ):
+            return
+        # The confirmation runs a nested event loop: an analysis may have started, or the dialog
+        # may have closed, while it was open.
+        if self._closed:
+            return
+        if self._analysing():
+            self._update_clear_button()
             return
         self._clearing = True
         self.cache_note.setText("")
