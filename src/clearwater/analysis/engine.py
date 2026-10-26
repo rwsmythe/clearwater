@@ -451,7 +451,7 @@ class AnalysisEngine:
         later = len(self._stages) - 1
         counter[1] = None if total is None else counter[0] + total * (1 + later)
         frames: Iterator[Frame] = iter(self._source.frames(self._probe, hw_decode=self._hw_decode))
-        count = 0
+        decoded: list[int] = []
         last: int | None = None
         shape: tuple[int, ...] | None = None
         try:
@@ -478,7 +478,7 @@ class AnalysisEngine:
                 self._store.put(pts, first.name, record, schema_hash=pending.schema)
                 if first.source_only:
                     self._cache.store_source_statistics(self._key, first.name, pts, record)
-                count += 1
+                decoded.append(pts)
                 last = pts
                 counter[0] += 1
                 self._report(progress, counter[0], counter[1], "decoding")
@@ -486,9 +486,18 @@ class AnalysisEngine:
             close = getattr(frames, "close", None)
             if close is not None:
                 close()
-        if count == 0:
+        if not decoded:
             raise ValueError("the frame source yielded no frames")
         self._check(progress, None)  # a cancel raised by the last frame's report
+        entry = self._cache.lookup(self._key)
+        stale = sorted(set(entry.pts_ticks) - set(decoded)) if entry is not None else []
+        if stale:
+            # IF-7 offers no delete, so an entry holding frames this pass did not decode (the
+            # tail of an earlier, longer pass) is left incomplete rather than marked complete.
+            raise ValueError(
+                f"the cache entry holds {len(stale)} proxies not decoded by this pass (first at "
+                f"pts {stale[0]}): it cannot be marked complete"
+            )
         self._cache.mark_complete(self._key)
 
     # --- stages -------------------------------------------------------------------------------

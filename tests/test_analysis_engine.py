@@ -148,6 +148,21 @@ def test_an_incomplete_entry_runs_the_decode_pass() -> None:
     assert cache.marks == 1
 
 
+def test_stale_proxies_of_an_incomplete_entry_are_never_marked_complete() -> None:
+    """IF-7: proxies the pass did not store (an earlier, longer pass's tail) fail by name."""
+    frames = synthetic_frames(20)
+    cache = CountingCache()
+    stale = frames[-1].pts_ticks + 1001
+    cache.store_proxy(KEY, stale, make_proxy(np.asarray(frames[0].pixels)))
+    engine, source, _ = make_engine(GrayWorld(), frames, cache=cache)
+    result = run(engine)
+    assert not result.ok and str(stale) in str(result.failure), result.failure
+    assert "not decoded by this pass" in str(result.failure)
+    assert source.yielded == 20 and cache.marks == 0
+    entry = cache.lookup(KEY)
+    assert entry is not None and not entry.complete
+
+
 def test_a_source_only_stage_is_read_back_and_passed_through_closed_form() -> None:
     """Y-1 (e): the cached record is used only through ``closed_form`` with the current params."""
     frames = synthetic_frames(30)
