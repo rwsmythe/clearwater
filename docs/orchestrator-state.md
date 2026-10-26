@@ -5,6 +5,11 @@
 
 ### Generation
 
+- **Generation 12 LIVE** (`clearwater-orchestrator-20261026-1223`), picked up 2026-10-26 ~22:20Z at main `2bb9bba`;
+  bash-launch gauge 38 ms; inbox empty at pickup. Dispatched: `wp318-cell3` (WP3.18 B pass 1 remediation from `579321a`;
+  prompt `prompt-wp3.18-seat3.md`) and `wp310-cell8` (WP3.10 from `e7668e1`; NVENC fix APPROVED as Reviewer A round 9,
+  `-movie_timescale` OUT; a level above the camera's own goes to CHARC; prompt `prompt-wp3.10-seat8.md`). Gen-12 scratchpad:
+  `C:\Users\rwsmy\AppData\Local\Temp\claude\C--Users-rwsmy-clearwater\f349a91a-0fc1-41b7-87cd-c3ae4c1377e2\scratchpad\`.
 - **Generation 11** (`clearwater-orchestrator-20261026-0844`) ROLLED OVER 2026-10-26 ~22:30Z at ~415K (depth cap), at a
   boundary with no cell mid-round (verify: `comms/.launch-sessions.json`). **Generation 12 starts here.** Earlier: gen 10
   `clearwater-orchestrator-20261021-0004`, gen 9 `-20261020-1959`, gen 8 `-1556`, gen 7 `-1419`, gen 6 `-1134`, gen 5
