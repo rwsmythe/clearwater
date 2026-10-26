@@ -112,13 +112,13 @@ class ExportPanel(QWidget):
         self._handle = None
         path = source.path
         try:  # everything after the gate is taken is guarded, so a fault releases it again
+            self._context.messages.clear("warning", owner=OWNER)  # before anything can fault
             request = ExportRequest(
                 source=path,
                 kind=source.kind,
                 parameters=self._context.session.parameters(),
                 settings=self._context.session.settings(),
             )
-            self._context.messages.clear("warning", owner=OWNER)
             self.bar.setRange(0, 0)
             self.cancel_button.setEnabled(True)
             self.status.setText(f"Exporting {messages.file_name(path)}...")

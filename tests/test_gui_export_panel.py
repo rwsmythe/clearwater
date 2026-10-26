@@ -404,6 +404,21 @@ def test_the_reason_is_cleared_when_building_the_request_raises(
     assert "parameters failed" in error.text and error.owner == "export"
 
 
+def test_a_stale_warning_does_not_survive_a_setup_fault(
+    make_window: Any, qtbot: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Reviewer B pass 2 #3: the export's own warnings are cleared before the request is built."""
+    rig = build_rig(make_window, qtbot, tmp_path)
+    presenter = presenter_of(rig.window)
+    presenter.present(Message("warning", "stale warning", PHOTO, "export"))
+    presenter.present(Message("warning", "another owner's", None, "shell.preview"))
+    _trigger_with_failing_parameters(rig, monkeypatch)
+    assert [m.text for m in presenter.of("warning")] == ["another owner's"]
+    (error,) = presenter.of("error")
+    assert "parameters failed" in error.text and error.owner == "export"
+    assert rig.action.unavailable_reason() is None
+
+
 def test_planted_request_built_outside_the_guard_holds_the_gate(
     make_window: Any, qtbot: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
