@@ -642,9 +642,21 @@ class TimelinePanel(QWidget):
     # Pairing frames and statistics (DR-44 (a), V18).
 
     def _on_frame_decoded(self, outcome: object) -> None:
-        """Main thread: pair the frame the shell now shows with its own statistics."""
+        """Main thread: pair the frame the shell now shows with its own statistics.
+
+        A decode started by an earlier commit can finish while the slider is down; the shell
+        then renders that older frame over the drag's proxy. The proxy of the slider's pts is
+        requested again (after any fix request, so that one is dropped as older than it, and the
+        release commits the statistics).
+        """
         if not isinstance(outcome, FrameOutcome) or self._analysis is None:
             return
+        self._pair_frame(outcome)
+        if self._dragging and self._pts and self._slider_pts is not None:
+            self._request("proxy", self._slider_pts)
+
+    def _pair_frame(self, outcome: FrameOutcome) -> None:
+        """Pair a decoded frame with its statistics (DR-44 (a)); see :meth:`_on_frame_decoded`."""
         if self._requested is None or outcome.requested != self._requested:
             return
         self._requested = None

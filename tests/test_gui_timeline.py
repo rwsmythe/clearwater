@@ -283,6 +283,7 @@ class Env:
     positions: list[tuple[int, Any]] = field(default_factory=list)
     stat_calls: list[Any] = field(default_factory=list)
     shown: list[Any] = field(default_factory=list)
+    display: list[str] = field(default_factory=list)
     states: list[Any] = field(default_factory=list)
 
     @property
@@ -399,6 +400,20 @@ def make_env(qtbot: Any, make_window: Any, tmp_path: Path, monkeypatch: pytest.M
             env.shown.append(np.array(proxy))
             original_show(proxy, corrected)
 
+        widget = window.preview_widget
+        original_proxy = widget.set_proxy
+        original_result = widget.set_result
+
+        def spy_set_proxy(before: Any, after: Any) -> None:
+            env.display.append("proxy")
+            original_proxy(before, after)
+
+        def spy_set_result(before: Any, after: Any, k: int) -> None:
+            env.display.append("result")
+            original_result(before, after, k)
+
+        monkeypatch.setattr(widget, "set_proxy", spy_set_proxy)
+        monkeypatch.setattr(widget, "set_result", spy_set_result)
         monkeypatch.setattr(session, "set_position", spy_position)
         monkeypatch.setattr(session, "set_statistics", spy_statistics)
         monkeypatch.setattr(window.controller, "show_proxy", spy_show)
@@ -888,6 +903,26 @@ def test_a_commit_in_flight_when_a_drag_starts_is_not_applied_before_the_release
     release(env)
     env.wait(lambda: any(p == PTS[3] for p, _ in env.positions))
     assert [p for p, _ in env.positions] == [PTS[3]]
+
+
+def test_a_frame_decoded_during_a_drag_does_not_leave_an_older_frame_over_the_proxy(
+    make_env,
+) -> None:
+    env = make_env(gated=(0,), hold_decode=(PTS[2],))
+    complete(env)
+    env.slider().setValue(2)  # a click: committed, the shell's decode of PTS[2] is held
+    env.wait(env.source.holding.is_set)
+    drag_to(env, 3)  # the drag starts within the decode time: the proxy of PTS[3]
+    last = np.full((12, 16, 3), PTS[3] % 251, np.uint8)
+    env.wait(lambda: bool(env.shown) and np.array_equal(env.shown[-1], last))
+    env.source.hold.set()  # the older frame arrives while the slider is still down
+    env.wait(lambda: env.session.current_image().pts_ticks == PTS[2])
+    env.qtbot.wait(300)  # the render of that frame and the proxy re-shown settle
+    assert env.slider().isSliderDown()
+    assert env.display[-1] == "proxy"  # the drag's proxy, not the older frame's render
+    assert np.array_equal(env.shown[-1], last)
+    release(env)
+    env.wait(lambda: any(p == PTS[3] for p, _ in env.positions))
 
 
 def test_a_failed_decode_after_a_parameter_change_restores_no_statistics(make_env) -> None:
