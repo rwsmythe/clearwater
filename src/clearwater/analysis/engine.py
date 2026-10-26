@@ -463,13 +463,14 @@ class AnalysisEngine:
                         f"the frame source returned pts {pts} after pts {last}: frames out of "
                         "order or duplicated"
                     )
-                proxy = make_proxy(frame_pixels_on_host(frame, self._backend))
-                if shape is not None and proxy.shape != shape:
+                pixels = frame_pixels_on_host(frame, self._backend)
+                if shape is not None and pixels.shape != shape:
                     raise ValueError(
-                        f"the frame at pts {pts} gives a {proxy.shape} proxy, earlier frames "
-                        f"{shape}: the frame size changed within the clip"
+                        f"the frame at pts {pts} is {pixels.shape}, earlier frames {shape}: "
+                        "the frame size changed within the clip"
                     )
-                shape = proxy.shape
+                shape = pixels.shape
+                proxy = make_proxy(pixels)
                 self._cache.store_proxy(self._key, pts, proxy)
                 stored = self._cache.proxy(self._key, pts)
                 record = self._method.analyze(first.name, self._image(stored), pending.params, {})

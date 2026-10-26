@@ -270,6 +270,23 @@ def test_out_of_order_pts_and_size_changes_are_refused() -> None:
     assert "frame size changed" in str(run(engine).failure)
 
 
+def test_a_frame_size_change_with_an_equal_proxy_shape_is_refused() -> None:
+    """Task 2: a frame size change is refused even when both sizes give one proxy shape."""
+    first = np.full((1082, 1100, 3), 0.5, dtype=np.float32)
+    second = np.full((1081, 1100, 3), 0.5, dtype=np.float32)
+    assert make_proxy(first).shape == make_proxy(second).shape == (541, 550, 3)
+    frames = [
+        make_frame(first, 0, Frame_TB, 0),
+        make_frame(first, 1001, Frame_TB, 1),
+        make_frame(second, 2002, Frame_TB, 2),
+    ]
+    engine, _, cache = make_engine(GrayWorld(), frames)
+    failure = str(run(engine).failure)
+    assert "frame size changed" in failure and "(1081, 1100, 3)" in failure, failure
+    assert "(1082, 1100, 3)" in failure
+    assert isinstance(cache, CountingCache) and cache.marks == 0
+
+
 def test_provisional_statistics_come_before_the_smoothed_ones() -> None:
     """V18 (engine side): a frame's own chain while the analysis runs, smoothed after."""
     frames = synthetic_frames(60)
