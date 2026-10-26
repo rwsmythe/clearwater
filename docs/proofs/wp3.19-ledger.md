@@ -301,3 +301,35 @@ F4 test (request construction raising), F5 test (outputs of a non-ok result kept
 (batch). The minor-1/minor-2 tests and their planted versions pass; the first run showed two teardown errors in the
 minor-1 helper (a patched `session.parameters` used by the window's close), fixed in the test helper. Full pytest: run by
 the orchestrator on the merge candidate (stacked gate). Reviewer A terminated at round 2.
+
+## Reviewer B pass 1 remediation (seat 2)
+
+Pass 1 (orchestrator's seat, merge candidate `wp3.19-mc` `70c25ee`): 0 critical, 2 major, 3 minor, 1 advisory, all
+REASONED. Seat-2 cell, fixes on `wp3.19` from head `b12c3fd` (base `718324b`); targeted runs only (own modules plus
+`tests/test_gui_deps.py`, headless, fresh `--basetemp`), the host busy with WP3.10's suite. "Before" = the new tests run
+against `git archive b12c3fd` extracted to `work/old1` with `PYTHONPATH` set to its `src` (`clearwater.__file__` checked:
+`work/old1/src/clearwater/__init__.py`); for the test-only items the "before" is a copy with the named defect planted.
+
+| # | Commit | Test(s) | Before | After |
+|---|---|---|---|---|
+| 1 MAJOR export non-ok outputs/warnings | `f0106f1` | `test_outputs_and_warnings_of_a_non_ok_result_are_named_and_presented[failed\|cancelled]` (+ no-outputs case, + planted drop) | 2 failed, 3 passed (`work/b1.txt`) | 5 passed (`work/h1.txt`) |
+| 2 MAJOR batch Start setup guard | `5e35f10` | `test_the_gate_is_released_when_setup_raises_after_it_is_taken` (+ planted unguarded Start) | 1 failed, 1 passed (`work/b2.txt`) | 2 passed (`work/h2.txt`) |
+| 3 MINOR errors kept until a Start succeeds | `d4cd1e4` | `test_a_refusal_is_kept_by_the_next_refusal_and_cleared_by_a_successful_start` (+ planted clear-at-trigger, + the old refusal test) | 1 failed, 2 passed (`work/b3.txt`) | 3 passed (`work/h3.txt` interrupted, see below; module 34 passed `work/h5.txt`) |
+| 4 MINOR (test) report lists non-ok outputs | `6fbbb05` | `test_the_report_lists_the_outputs_of_a_failed_or_cancelled_item[failed\|cancelled]` (+ planted omitting `format_report`) | 2 failed, 1 passed against a product with `output:` lines omitted for non-ok items (`work/b4.txt`) | 3 passed (`work/h7.txt`) |
+| 5 MINOR (test) closed runner | `9eefd83` | `test_a_closed_runner_fails_the_export_and_releases_the_gate`, `test_a_closed_runner_fails_every_item_and_releases_the_gate` (+ 2 planted leaks) | 2 failed, 2 passed against a product that does not release the gate when the failure text contains "closed" (`work/b5.txt`) | 4 passed (`work/h9.txt`) |
+| 6 ADVISORY report text | this commit | n/a | n/a | n/a |
+
+Final head targeted run: 77 passed in 11 s (`work/tfinal2.txt`; three repeats of the 70-test run before the last two
+test commits: 70 passed each, 11 s). Gates on the final head: ruff check, ruff format --check (207 files), mypy (121
+source files) green; LF check (`git cat-file -p HEAD:<f> | tr -cd '' | wc -c`) 0 for every file changed since
+`718324b`.
+
+Disclosures: (a) one run of the whole batch module (`work/h3.txt`, run while the commit for item 3 was chained after it)
+stalled after 12 tests for over 4 minutes under host load and was stopped by killing its own pytest PIDs; item 3's commit
+`d4cd1e4` was created by the chained command after that kill, so it was not preceded by a green full-module run. The module
+was then run in full (34 passed, 4.6 s; later 37 and 70 and 77 passed, four repeats in total), and the stall did not
+reproduce; cause not established (host contention suspected). (b) `ruff format` / the test planted for item 2 asserts the
+gate directly (`batch._gate.current`) because the shell's no-source reason masks the batch reason in the rig. (c) The
+failed-item error text for a Start whose setup raised is "The batch could not start: <detail>" (owner `"batch"`). (d) The
+seam is untouched. Depth at this yield: reported by the orchestrator from the transcript (the cell cannot read it).
+

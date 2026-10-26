@@ -3,7 +3,7 @@
 Package `clearwater.gui` (`export_panel.py`, `batch_panel.py`, `export_service.py`) plus one granted new file
 `clearwater.jobs.export_seam` (`src/clearwater/jobs/export_seam.py`); tests `tests/test_gui_export_panel.py`,
 `tests/test_gui_batch_panel.py`. Spec v0.5.4 (G7, G8, G9; D43-D45, D81, D83; V7, V11 GUI leg), architecture FINAL 1.0
-(IF-8, IF-9, IF-10; AD-15, AD-20, AD-25 (a)). Base `718324b`. Rulings: brief CHARC `53d1d906e47fe2c9`; round 0 CHARC
+(IF-8, IF-9, IF-10; AD-15, AD-20, AD-25 (a)). Base `718324b` (the branch `wp3.19`'s base; the merge candidate is rebased onto main by the orchestrator). Rulings: brief CHARC `53d1d906e47fe2c9`; round 0 CHARC
 `0e6962c39f216c86` (seam approved, the extra file granted, C2-C7 accepted). Ledger: `docs/proofs/wp3.19-ledger.md`.
 Nothing under `src/clearwater/interfaces/`, `config/`, `core/`, `io/` was changed; no existing file under
 `src/clearwater/gui/` or `jobs/` was edited (`gui/__init__.py` and `jobs/__init__.py` untouched); no dependency.
@@ -41,7 +41,8 @@ Nothing under `src/clearwater/interfaces/`, `config/`, `core/`, `io/` was change
 Minor 3 of Reviewer A round 2 (wording of item 5 for `outputs` on a non-ok result): RULED by CHARC `efc95f5d4e7b8456`,
 applied in `export_seam.py`: "on a non-ok result, `outputs` lists any file committed before the stop (normally none)"
 (and `warnings` any warning raised before it), consistent with "an output already committed is never removed". Wording
-only; no name or signature changed. The panel keeps whatever `outputs` and `warnings` a result carries.
+only; no name or signature changed. Both panels keep whatever `outputs` and `warnings` a result carries, after Reviewer B pass 1 (the Export
+panel names the outputs and presents the warnings of a failed or cancelled result too; the batch report lists them per item).
 
 ## State tables
 
@@ -49,13 +50,15 @@ Export panel (`ExportPanel`):
 
 | State | Status | Bar | Cancel | Caller reason on `actions.export` |
 |---|---|---|---|---|
-| idle | last result or "Ready." | 0 of 1 | disabled | None (or "A batch is running." while a batch runs) |
+| idle | last result or "Ready." | 0 of 1 before any run and after a failure or cancel; 1 of 1 after a success | disabled | None (or "A batch is running." while a batch runs) |
 | running | "Exporting <file>..." then the job's message | determinate, busy when total is None | enabled | "An export is running." |
 | cancelling | "Cancelling..." | as running | disabled | "An export is running." |
 
 Result: ok -> "Saved <names>", the panel's errors cleared (owner `"export"`), each warning a warning with owner
 `"export"`; `failure == CANCELLED` -> "Export cancelled." and no error; otherwise an error naming the file (owner
-`"export"`). A job that finishes ok after the click is saved (the output is kept). At trigger the panel's earlier warnings
+`"export"`). On either non-ok branch, any committed outputs are named in the status line ("... Saved before the stop:
+<names>") and each warning is presented as a warning (owner `"export"`). A job that finishes ok after the click is
+saved (the output is kept). At trigger the panel's earlier warnings
 are cleared. Everything after the gate is taken is inside one guarded block; the panel's state and the gate are released
 before anything is presented.
 
@@ -98,14 +101,14 @@ The five counts partition the items. Layout is asserted by `test_the_report_layo
 
 | # | Claim | Evidence (tests; `test_gui_export_panel.py` = EP, `test_gui_batch_panel.py` = BP) |
 |---|---|---|
-| 1 | File > Export starts one job for the open source with a snapshot request; progress reaches the bar (busy for no total); success, warnings, failure, cancel shown as above | EP `test_triggering_exports_the_open_source_with_a_snapshot_request`, `test_progress_reaches_the_bar_and_a_missing_total_is_a_busy_bar`, `test_success_clears_only_the_export_errors_and_presents_warnings`, `test_failure_is_an_error_naming_the_file_with_owner_export`, `test_a_job_that_raises_is_a_failed_export`, `test_a_job_that_cannot_be_built_is_a_failed_export`, `test_cancel_shows_cancelled_and_leaves_no_partial_output`, `test_a_job_that_finishes_ok_after_a_cancel_keeps_its_output` |
-| 2 | `actions.export` only through `set_unavailable`; the shell's reasons (no source, AD-15) always hold; the reason is cleared after every run, also after a presenter fault, a setup fault, a job that cannot be built | EP `test_install_clears_the_not_available_reason`, `test_the_shells_reasons_still_hold_after_install`, `test_ad15_clearing_this_packages_reason_leaves_the_shells_reason`, `test_the_reason_while_running_and_after`, `test_the_reason_is_cleared_even_when_the_presenter_raises`, `test_the_reason_is_cleared_when_setup_raises_after_the_gate_is_taken`, `test_the_reason_is_cleared_when_building_the_request_raises`; planted: `test_planted_set_enabled_during_analysis_is_detected`, `test_planted_request_built_outside_the_guard_holds_the_gate` |
-| 3 | G7/D81: a failed item is skipped, logged and reported; the rest run | BP `test_a_failed_item_is_skipped_logged_and_reported`, `test_a_job_that_cannot_be_built_or_raises_fails_its_item_only`, `test_a_fault_while_recording_an_item_never_leaves_the_batch_running`; planted `test_planted_batch_that_stops_at_the_first_failure_is_detected` |
-| 4 | One parameter set or preset for every item, resolved once at Start; settings snapshot at Start; an unavailable-method, invalid or vanished preset, or an invalid current set, refuses the start | BP `test_one_parameter_set_and_settings_apply_to_every_item_and_are_fixed_at_start`, `test_a_preset_is_applied_to_every_item`, `test_a_preset_the_methods_cannot_use_refuses_the_start` (2 cases), `test_a_preset_deleted_after_it_was_chosen_refuses_the_start`, `test_the_current_parameters_are_validated_too`, `test_the_start_refusal_is_cleared_by_the_next_start`; planted `test_planted_current_parameters_without_validation_are_detected` |
+| 1 | File > Export starts one job for the open source with a snapshot request; progress reaches the bar (busy for no total); success, warnings, failure, cancel shown as above | EP `test_triggering_exports_the_open_source_with_a_snapshot_request`, `test_progress_reaches_the_bar_and_a_missing_total_is_a_busy_bar`, `test_success_clears_only_the_export_errors_and_presents_warnings`, `test_failure_is_an_error_naming_the_file_with_owner_export`, `test_a_job_that_raises_is_a_failed_export`, `test_a_job_that_cannot_be_built_is_a_failed_export`, `test_cancel_shows_cancelled_and_leaves_no_partial_output`, `test_a_job_that_finishes_ok_after_a_cancel_keeps_its_output`, `test_outputs_and_warnings_of_a_non_ok_result_are_named_and_presented` (failed and cancelled), `test_a_non_ok_result_without_outputs_adds_no_saved_line`; planted `test_planted_done_that_drops_outputs_and_warnings_of_a_non_ok_result_is_detected` |
+| 2 | `actions.export` only through `set_unavailable`; the shell's reasons (no source, AD-15) always hold; the reason is cleared after every run, also after a presenter fault, a setup fault, a job that cannot be built | EP `test_install_clears_the_not_available_reason`, `test_the_shells_reasons_still_hold_after_install`, `test_ad15_clearing_this_packages_reason_leaves_the_shells_reason`, `test_the_reason_while_running_and_after`, `test_the_reason_is_cleared_even_when_the_presenter_raises`, `test_the_reason_is_cleared_when_setup_raises_after_the_gate_is_taken`, `test_the_reason_is_cleared_when_building_the_request_raises`, `test_a_closed_runner_fails_the_export_and_releases_the_gate`; planted: `test_planted_gate_leak_on_a_closed_runner_is_detected`, `test_planted_set_enabled_during_analysis_is_detected`, `test_planted_request_built_outside_the_guard_holds_the_gate` |
+| 3 | G7/D81: a failed item is skipped, logged and reported; the rest run | BP `test_a_failed_item_is_skipped_logged_and_reported`, `test_a_job_that_cannot_be_built_or_raises_fails_its_item_only`, `test_a_fault_while_recording_an_item_never_leaves_the_batch_running`, `test_a_closed_runner_fails_every_item_and_releases_the_gate`, `test_the_gate_is_released_when_setup_raises_after_it_is_taken`; planted `test_planted_gate_leak_on_a_closed_runner_is_detected`, `test_planted_start_without_a_guard_after_the_gate_holds_it`; planted `test_planted_batch_that_stops_at_the_first_failure_is_detected` |
+| 4 | One parameter set or preset for every item, resolved once at Start; settings snapshot at Start; an unavailable-method, invalid or vanished preset, or an invalid current set, refuses the start | BP `test_one_parameter_set_and_settings_apply_to_every_item_and_are_fixed_at_start`, `test_a_preset_is_applied_to_every_item`, `test_a_preset_the_methods_cannot_use_refuses_the_start` (2 cases), `test_a_preset_deleted_after_it_was_chosen_refuses_the_start`, `test_the_current_parameters_are_validated_too`, `test_the_start_refusal_is_cleared_by_the_next_start`, `test_a_refusal_is_kept_by_the_next_refusal_and_cleared_by_a_successful_start` (errors kept until a Start succeeds, warnings cleared at trigger); planted `test_planted_start_that_clears_errors_at_trigger_is_detected`, planted `test_planted_current_parameters_without_validation_are_detected` |
 | 5 | D45/G8: cancel stops the whole remaining batch; no job starts after it; completed outputs are kept and the cancelled item leaves no temporary | BP `test_cancel_stops_the_remaining_items_and_keeps_completed_outputs`, `test_an_item_that_finishes_ok_after_the_cancel_is_done_and_the_rest_not_run`, `test_a_cancelled_result_without_a_click_also_stops_the_batch`; planted `test_planted_cancel_that_lets_the_next_item_start_is_detected` |
 | 6 | D83: sidecars and unsupported extensions are refused with a `"batch"` warning; duplicates (normcase of abspath) are not queued; Add, Remove selected, Clear | BP `test_refused_files_are_warned_about_and_duplicates_are_not_queued`, `test_the_add_remove_and_clear_buttons` |
 | 7 | One activity at a time; queue editing locked while running; Start unavailable while an export runs; the batch needs no open source and ignores AD-15 | BP `test_editing_is_locked_while_running_and_export_is_unavailable`, `test_start_is_unavailable_while_an_export_runs`, `test_the_batch_needs_no_open_source_and_no_analysis`; EP `test_activity_gate_allows_one_activity_and_survives_a_failing_subscriber`, `test_shared_gate_creates_one_gate` |
-| 8 | The end-of-run report lists counts, outputs, warnings (also of failed and cancelled items) and failures; stays until the next Start; Start re-runs the whole queue | BP `test_the_report_layout`, `test_the_report_stays_until_the_next_start_and_start_runs_the_whole_queue_again`, `test_warnings_of_failed_and_cancelled_items_are_kept_and_reported`, `test_outputs_committed_before_a_failure_or_cancel_are_kept_and_reported`, `test_warnings_are_counted_and_listed_per_item`; planted `test_planted_record_that_clears_outputs_of_a_non_ok_result_is_detected` |
+| 8 | The end-of-run report lists counts, outputs, warnings (also of failed and cancelled items) and failures; stays until the next Start; Start re-runs the whole queue | BP `test_the_report_layout`, `test_the_report_stays_until_the_next_start_and_start_runs_the_whole_queue_again`, `test_warnings_of_failed_and_cancelled_items_are_kept_and_reported`, `test_outputs_committed_before_a_failure_or_cancel_are_kept_and_reported`, `test_the_report_lists_the_outputs_of_a_failed_or_cancelled_item` (failed and cancelled; the report text), planted `test_planted_format_report_that_omits_outputs_of_a_non_ok_item_is_detected`, `test_warnings_are_counted_and_listed_per_item`; planted `test_planted_record_that_clears_outputs_of_a_non_ok_result_is_detected` |
 | 9 | DR-44 (b): every message carries an owner; another owner's error survives | EP `test_success_clears_only_the_export_errors_and_presents_warnings`; BP `test_another_owners_error_survives_the_batch` |
 | 10 | Nothing heavy or Qt on the wrong thread: jobs run on worker threads; `job()` is built on the main thread; V7 bound | EP `test_the_export_job_runs_on_a_worker_thread`, planted `test_planted_export_run_on_the_main_thread_is_detected`, `test_v7_interface_never_waits_more_than_100_ms_during_an_export`; BP `test_v7_interface_never_waits_more_than_100_ms_during_a_batch` |
 | 11 | The product default fails with "Export is not available in this build." and writes nothing; the seam loads no PySide6 | EP `test_the_unavailable_default_fails_and_writes_nothing`, `test_the_product_default_reports_that_export_is_unavailable`, `test_the_seam_module_loads_no_pyside6`, `test_the_gui_module_re_exports_the_seam`; `tests/test_gui_deps.py` (run, unchanged) |
@@ -123,8 +126,8 @@ else heavy running): 13 ms during the export, 11 ms during the batch.
 ## Gates
 
 - ruff check, ruff format --check, mypy strict: green on the final head (see the ledger for the commands' last lines).
-- Own modules plus `tests/test_gui_deps.py`, headless (`QT_QPA_PLATFORM=offscreen`), final head: 61 passed in 10 s
-  (`work/t1-final.txt`). The two round-2 cleanup tests first errored at teardown (the window's close saves
+- Own modules plus `tests/test_gui_deps.py`, headless (`QT_QPA_PLATFORM=offscreen`), after the Reviewer B remediation:
+  77 passed in 11 s (`work/tfinal2.txt`; 61 passed before it, `work/t1-final.txt`). The two round-2 cleanup tests first errored at teardown (the window's close saves
   `session.parameters`, which the test had left patched); fixed in the test helper, then green.
 - full pytest: run by the orchestrator on the merge candidate (stacked gate).
 - Mutation checks of the new tests (`work/mut.py`, each mutation reverted): the batch stopping at the first failure, a
@@ -142,8 +145,24 @@ else heavy running): 13 ms during the export, 11 ms during the batch.
 | 1 | `8639afb` | NEW_CRITICAL_MAJOR_FOUND | 2 major, 1 minor: F1 the export gate stayed held when setup after `try_start` raised (fixed, confirmed by a scratch repro); F2 warnings of failed and cancelled items dropped (fixed); F3 the current parameters' validation untested (test added) |
 | 2 | `735dd5f` | NO_NEW_CRITICAL_MAJOR | 3 minor: request-construction variant of F1's test (added), outputs of a non-ok result kept (test added), seam wording on `outputs` of a non-ok result (see above) |
 
-Terminated at round 2 by the dispatcher's ruling (zero new blocking). Reviewer B: the orchestrator's seat pass on the
-merge candidate.
+Terminated at round 2 by the dispatcher's ruling (zero new blocking).
+
+## Reviewer B (the orchestrator's seat pass on the merge candidate `wp3.19-mc` `70c25ee`), pass 1 and its remediation
+
+Pass 1 verdict `NEW_CRITICAL_MAJOR_FOUND`: 0 critical, 2 major, 3 minor, 1 advisory, all REASONED (the reviewer's sandbox
+could not run Qt). Remediated by a second implementer cell on `wp3.19` (one commit per item, each regression test shown
+failing on `b12c3fd` or, for the test-only items, against a copy of the product with the named defect planted):
+
+| # | Finding | Commit | Result |
+|---|---|---|---|
+| 1 | MAJOR: the Export panel dropped `outputs` and `warnings` of a failed or cancelled result | `f0106f1` | now named ("Saved before the stop: ...") and presented (owner `"export"`); 2 regression cases failed on `b12c3fd`, green now |
+| 2 | MAJOR: batch Start left the gate held when setup after `try_start` raised | `5e35f10` | guarded block; gate released, state reset, error (owner `"batch"`); 1 regression test failed on `b12c3fd`, green now |
+| 3 | MINOR: an invalid Start cleared the earlier batch error (C3) | `d4cd1e4` | warnings cleared at trigger, errors only on a successful Start; 1 test failed on `b12c3fd`, green now |
+| 4 | MINOR (test): the outputs-kept test never formatted the report | `6fbbb05` | 2 cases assert the report text; failed against a planted `format_report` that omits them, green now |
+| 5 | MINOR (test): no closed-runner test | `9eefd83` | Export and Batch with `QtJobRunner.close()`; failed against a planted gate leak, green now |
+| 6 | ADVISORY: report text | this commit | idle bar after a success is `1 of 1`; line 44 qualified; base stays `718324b` |
+
+Reviewer B's re-run covers the remediation; no Reviewer A round was run.
 
 ## Limits
 
