@@ -126,8 +126,9 @@ source's `media_time` and rate kept, AD-22's reading applied to the cut list), t
 audio presentation effect, the movie duration and the copied packets are all the source's cut
 there. DR-18: (1) NVENC proof from `nvidia-smi pmon` samples tied to the FFmpeg PID, the GPU
 UUID and the encode window, the samples and the window on ONE monotonic clock (a sample counts
-when its `nvidia-smi` call overlaps the window), or the reason it is not tied (for example an
-encode shorter than the sampling period); (2) AAC configuration, priming and side data compared, MANDATORY; (3) a roster
+when its `nvidia-smi` call overlaps the window), `tied` only when the GPU those samples name
+resolves to a UUID (round-2 #3), or the reason it is not tied (for example an encode shorter
+than the sampling period, or a GPU index with no UUID); DR-18 (1) closes only on `tied`; (2) AAC configuration, priming and side data compared, MANDATORY; (3) a roster
 invariant -- a missing or unexpected item makes a MANDATORY item DIFFERENT; (4) decoded frames with
 no pts counted in both files. The telemetry data track's values are reduced to packet counts in
 the record; no payload, digest or decoded value is kept. Every location-like tag value (keys

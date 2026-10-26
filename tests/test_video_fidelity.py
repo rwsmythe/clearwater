@@ -167,6 +167,16 @@ def test_the_nvenc_proof_ties_the_pid_gpu_and_window() -> None:
     assert not vf.nvenc_proof(_run("libx265", []))["tied"]
 
 
+def test_the_nvenc_proof_is_not_tied_without_a_resolved_gpu_uuid() -> None:
+    # Round-2 #3: a hit on a GPU index with no UUID read "tied" with a "?" UUID.
+    for gpus in ({}, {"0": ""}, {"1": "GPU-1234"}):
+        gpu = vf.GpuSamples(gpus, [(5001.0, 5002.0, "0", 4242, "37")], None)
+        run = vf.EncodeRun(SinkReport(1, (), ()), "hevc_nvenc", 8, 4242, 5000.0, 5010.0, gpu)
+        proof = vf.nvenc_proof(run)
+        assert not proof["tied"] and proof["gpu_uuid"] == [], proof
+        assert "GPU index 0" in proof["reason"] and "no UUID" in proof["reason"]
+
+
 def test_the_sampler_and_the_encode_window_share_one_clock(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

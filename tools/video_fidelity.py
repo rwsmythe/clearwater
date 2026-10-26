@@ -395,9 +395,10 @@ def nvenc_proof(run: EncodeRun) -> dict[str, Any]:
 
     Returns:
         ``tied`` True when at least one sample whose ``nvidia-smi`` call overlaps the window
-        shows the FFmpeg PID with a non-zero encoder load, with the GPU UUID, the PID and the
-        matching samples (their times in seconds from the window's start); otherwise ``tied``
-        False and the reason.
+        shows the FFmpeg PID with a non-zero encoder load on a GPU whose UUID is resolved,
+        with the GPU UUID, the PID and the matching samples (their times in seconds from the
+        window's start); otherwise ``tied`` False and the reason (no matching sample, or no
+        UUID for the GPU the matching samples name).
     """
     if run.encoder != "hevc_nvenc":
         return {"tied": False, "reason": f"not an NVENC encode ({run.encoder})"}
@@ -420,11 +421,17 @@ def nvenc_proof(run: EncodeRun) -> dict[str, Any]:
             [round(called - run.started, 2), round(returned - run.started, 2), index, pid, load]
             for called, returned, index, pid, load in hits
         ],
-        "gpu_uuid": sorted({gpu.gpus.get(row[2], "?") for row in hits}),
+        "gpu_uuid": sorted({gpu.gpus[row[2]] for row in hits if gpu.gpus.get(row[2])}),
     }
-    proof["tied"] = bool(hits)
+    proof["tied"] = bool(proof["gpu_uuid"])  # DR-18 (1) closes only on a named GPU
     if not hits:
         proof["reason"] = "no sample in the window showed the FFmpeg PID with encoder load"
+    elif not proof["tied"]:
+        indexes = ", ".join(sorted({row[2] for row in hits}))
+        proof["reason"] = (
+            f"the samples showing the FFmpeg PID name GPU index {indexes}, which nvidia-smi "
+            "resolved to no UUID"
+        )
     return proof
 
 
