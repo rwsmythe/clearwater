@@ -196,6 +196,27 @@ def test_the_initial_analysis_stays_running_through_the_staged_part() -> None:
     assert engine.state().phase == "complete"
 
 
+def test_the_phase_is_running_inside_every_smoothing_call() -> None:
+    """AD-15: never ``complete`` before the last ``smooth_at`` (first analysis and recompute)."""
+    frames = synthetic_frames(60)
+    engine, _, _ = make_engine(GrayWorld(), frames)
+    smooth_at = engine.store.smooth_at
+    phases: list[str] = []
+
+    def recording_smooth_at(stage: str, *args: Any) -> None:
+        phases.append(engine.state().phase)
+        smooth_at(stage, *args)
+
+    engine.store.smooth_at = recording_smooth_at  # type: ignore[method-assign]
+    assert run(engine).ok
+    first = len(phases)
+    job = engine.set_parameters({**engine.parameters, "strength": 0.3}, frames[30].pts_ticks)
+    assert job is not None and job(StubProgress()).ok
+    assert first > 0 and len(phases) > first  # both jobs smoothed through smooth_at
+    assert set(phases) == {"running"}
+    assert engine.state().phase == "complete"
+
+
 def test_a_change_during_a_running_job_is_absorbed() -> None:
     """Choice 5: the running job takes the change; the result is a fresh analysis's."""
     frames = synthetic_frames(90)
