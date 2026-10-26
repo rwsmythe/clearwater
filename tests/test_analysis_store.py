@@ -221,6 +221,22 @@ def test_schema_hash_binds_shaping_parameters_and_the_smoother() -> None:
         schema_hash(method, {**params, "strength": float("nan")}, "median_gaussian", 2.0)
 
 
+def test_schema_hash_canonicalises_numbers_but_not_bools() -> None:
+    """B2: ``1`` and ``1.0`` hash equal (a preset from JSON); another value or ``True`` differs."""
+    method = GrayWorld()
+
+    def digest(strength: Any) -> str:
+        return schema_hash(method, {"strength": strength, "gamma": 1.0}, "median_gaussian", 2.0)
+
+    assert digest(1) == digest(1.0)
+    assert digest(0) == digest(0.0)
+    assert digest(2) != digest(1.0)
+    assert digest(True) != digest(1) and digest(False) != digest(0)
+    assert digest([1, {"a": 2}]) == digest([1.0, {"a": 2.0}])
+    with pytest.raises(ValueError, match="cannot be hashed"):
+        digest(10**400)
+
+
 def test_one_writer_and_reader_threads() -> None:
     """One writer putting and smoothing while readers read raw, smoothed and the axis."""
     store = _store()

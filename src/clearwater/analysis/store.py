@@ -48,6 +48,25 @@ def shaping_parameters(method: CorrectionMethod) -> tuple[str, ...]:
     return tuple(sorted({name for stage in method.stages for name in stage.depends_on_parameters}))
 
 
+def _canonical(value: Any) -> Any:
+    """Return ``value`` with every ``int`` or ``float`` (never a ``bool``) as its ``float``.
+
+    Lists, tuples and dicts are walked; anything else is returned unchanged.
+
+    Raises:
+        OverflowError: An ``int`` too large for a ``float``.
+    """
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, int | float):
+        return float(value)
+    if isinstance(value, list | tuple):
+        return [_canonical(item) for item in value]
+    if isinstance(value, dict):
+        return {key: _canonical(item) for key, item in value.items()}
+    return value
+
+
 def schema_hash(
     method: CorrectionMethod,
     params: Mapping[str, Any],
@@ -59,7 +78,10 @@ def schema_hash(
     A SHA-256 hex digest over canonical JSON of the method id, the value of every parameter
     named in any stage's ``depends_on_parameters`` (sorted by name, each as ``[name, present,
     value]`` so a missing name and a ``None`` value differ), the smoothing kind and the window
-    as an exact decimal. A parameter no stage depends on does not change it.
+    as an exact decimal. A parameter no stage depends on does not change it. Every number (an
+    ``int`` or a ``float``, at any depth, never a ``bool``) is hashed as its ``float`` value, so
+    values that compare equal hash equal whatever their Python type (``1`` and ``1.0``, as a
+    preset read from JSON may give), while ``True`` stays distinct from ``1``.
 
     Args:
         method: The correction method.
@@ -73,7 +95,13 @@ def schema_hash(
     Raises:
         ValueError: A shaping parameter's value is not JSON-representable (or not finite).
     """
-    entries = [[name, name in params, params.get(name)] for name in shaping_parameters(method)]
+    try:
+        entries = [
+            [name, name in params, _canonical(params.get(name))]
+            for name in shaping_parameters(method)
+        ]
+    except OverflowError as exc:
+        raise ValueError(f"a shaping parameter cannot be hashed: {exc}") from exc
     document = {
         "method": method.id,
         "parameters": entries,

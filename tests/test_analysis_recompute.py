@@ -9,7 +9,7 @@ import pytest
 from numpy.typing import NDArray
 
 import clearwater.analysis.engine as engine_module
-from clearwater.analysis import CANCELLED, reach
+from clearwater.analysis import CANCELLED, reach, schema_hash
 from clearwater.interfaces import CacheKey
 from clearwater.interfaces.stubs import StubProgress
 from test_analysis_support import (
@@ -230,6 +230,19 @@ def test_a_parameter_no_stage_depends_on_changes_nothing() -> None:
     assert engine.set_parameters({**engine.parameters, "unused": 0.9}, None) is None
     assert engine.schema_hash == before and engine.is_complete()
     assert engine.parameters["unused"] == 0.9
+
+
+def test_an_equal_value_of_another_number_type_keeps_the_helper_hash() -> None:
+    """B2: ``1.0`` -> ``1`` is no change, and the helper's hash still reads the statistics."""
+    frames = synthetic_frames(20)
+    method = GrayWorld()
+    engine, _, _ = make_engine(method, frames, params={"strength": 1.0})
+    assert run(engine).ok
+    assert engine.set_parameters({**engine.parameters, "strength": 1}, None) is None
+    assert engine.is_complete() and type(engine.parameters["strength"]) is int
+    helper = schema_hash(method, engine.parameters, "median_gaussian", 2.0)
+    assert helper == engine.schema_hash
+    assert engine.smoothed_record(frames[5].pts_ticks, schema_hash=helper)
 
 
 def test_a_change_before_any_analysis_is_used_by_the_next_job() -> None:
