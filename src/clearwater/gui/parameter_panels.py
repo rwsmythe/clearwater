@@ -240,12 +240,12 @@ class ParameterRow(QWidget):
         lo = (
             -_INT_LIMIT
             if parameter.minimum is None
-            else max(-_INT_LIMIT, math.ceil(parameter.minimum))
+            else min(_INT_LIMIT, max(-_INT_LIMIT, math.ceil(parameter.minimum)))
         )
         hi = (
             _INT_LIMIT
             if parameter.maximum is None
-            else min(_INT_LIMIT, math.floor(parameter.maximum))
+            else max(-_INT_LIMIT, min(_INT_LIMIT, math.floor(parameter.maximum)))
         )
         spin = QSpinBox()
         spin.setKeyboardTracking(False)
