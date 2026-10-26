@@ -425,6 +425,40 @@ def test_strays_are_read_between_frames_and_kept_out_of_the_figures(
     assert record["per_frame"]["n"] == record["write"]["n"] == frames - 1 - len(apart)
 
 
+class _QuickWatch(_SlowWatch):
+    def window(self) -> dict[str, Any]:
+        return {"seconds": 0.0, "busy": []}
+
+
+@pytest.mark.usefixtures("quick")
+def test_the_last_strays_window_ends_at_close(
+    sample: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(bench, "StrayWatch", _QuickWatch)
+    real_stop = bench.Telemetry.stop
+
+    def slow_stop(self: Any) -> dict[str, Any]:
+        time.sleep(0.6)  # a sampler slow to stop
+        return real_stop(self)
+
+    monkeypatch.setattr(bench.Telemetry, "stop", slow_stop)
+    record = bench.run_once(
+        sample(SAMPLE),
+        tmp_path / "last.mp4",
+        encoder="libx265",
+        quality="draft",
+        bit_depth=None,
+        hw_decode=False,
+        keep=False,
+        periods=FAST,
+    )
+    stages = record["stages_s"]
+    closed_at = stages["total"] + stages["strays_pauses"]  # close's end, on the run's clock
+    last = record["strays"]["windows"][-1]
+    assert last["after_frame"] == record["frames"]
+    assert closed_at - 0.01 <= last["at_s"] < closed_at + 0.3  # round 8 #2: not after the stops
+
+
 def test_run_once_refuses_a_strays_count_below_one(tmp_path: Path) -> None:
     output = tmp_path / "never.mp4"
     with pytest.raises(ValueError, match="positive number of frames"):

@@ -671,6 +671,9 @@ def _measure(
         sink.abort()
         raise
     finally:
+        # the last strays window ends here: right after close (or the failure), before the
+        # decode is closed and the samplers stop
+        windows.append(_strays_window(watch, len(intervals), time.perf_counter() - started))
         close = getattr(stream, "close", None)
         if callable(close):
             close()
@@ -678,7 +681,6 @@ def _measure(
             sink.ended = vf._clock()
         samples = sampler.stop() if sampler is not None else None
         record["telemetry"] = telemetry.stop()
-        windows.append(_strays_window(watch, len(intervals), time.perf_counter() - started))
         record["strays"] = {**strays, "pauses_s": pauses, "windows": windows}
     count = report.frames_written
     paused = sum(pauses)
