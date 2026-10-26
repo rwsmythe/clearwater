@@ -164,4 +164,24 @@ self-readable (`scripts/cell_depth.py` reads my transcript); dispatcher fills: _
 
 | Round | Critical | Major | Minor | In envelope | Out | NEW | REOPENED | Reverts | Fixes (product / test-only) | Transport | Depth | Adjudication |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| 0 | -- | -- | -- | -- | -- | -- | -- | -- | -- | -- | (dispatcher) | read and table only |
+| 0 | -- | -- | -- | -- | -- | -- | -- | -- | -- | -- | 101,295 (dispatcher) | read and table only |
+| 1 | 0 | 0 | 1 | 1 in / 0 out | -- | 1 NEW | 0 | 0 | none yet (cleanup pending: product + test) | codex-cli 0.162.1 via WSL, gpt-5.6-sol high, read-only; head `8f54e53` | (dispatcher) | `NO_NEW_CRITICAL_MAJOR`; converged |
+
+### Round 1 detail (Reviewer A, head `8f54e53`)
+
+Evidence: `C:\Users\rwsmy\clearwater-review-evidence\wp3.20\r1\` (prompt, diff, transcript,
+`adjudication.md`, `md5sums.txt`, `test-summary.txt`: 60 passed). Mechanical assertions all met
+(model and effort match the tier; tokens footer; 19 `succeeded in`; no ERROR; VERDICT anchored).
+
+Before the round: the first run of the new tests showed one test-code error (`itemToolTip` does
+not exist on `QComboBox`) and one product defect (`resolve_encoder` was called with an empty
+capability list while the list was still being read); both fixed in `8f54e53` (product + test).
+The four planted-wrong tests pass only because the wrong dialog raises `AssertionError` in the
+scenario.
+
+| # | Severity | Tag | In envelope | NEW/REOPENED | Finding | Adjudication |
+|---|---|---|---|---|---|---|
+| 1 | MINOR | REASONED | yes | NEW | `settings_dialog.py:452`: after a failed capability read with a stored non-auto encoder, the stored encoder is appended as a second item reasoned "not found on this computer" (wrong cause); the failed-detection test uses `auto` only | ACCEPTED, non-blocking: terminating cleanup shows the failure as that item's reason and the test is seeded with a stored encoder |
+
+Gate status: zero NEW blocking findings, so Reviewer A has converged at round 1. Pending: the
+terminating cleanup for finding 1 (product and test), then the full pytest window.
