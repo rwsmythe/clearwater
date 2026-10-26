@@ -35,7 +35,14 @@ from clearwater.interfaces import JobResult, ParameterSet, Settings, validate_pa
 
 from . import messages, sources
 from .contract import JobHandle, Message, PanelFactory, ShellContext
-from .export_service import CANCELLED, ActivityGate, ExportJobs, ExportRequest, SharedGate
+from .export_service import (
+    CANCELLED,
+    NO_OUTPUT_TEXT,
+    ActivityGate,
+    ExportJobs,
+    ExportRequest,
+    SharedGate,
+)
 
 OWNER = "batch"
 """The ``Message.owner`` of this panel's messages (DR-44 (b))."""
@@ -473,8 +480,10 @@ class BatchPanel(QWidget):
         item.outputs = tuple(result.outputs)  # whatever the outcome: the report lists what exists
         item.warnings = tuple(result.warnings)  # IF-8 allows warnings on a result that is not ok
         if result.ok:
+            if not result.outputs:  # an ok result names a file by contract; say so if it does not
+                item.warnings += (NO_OUTPUT_TEXT,)
             item.failure = None
-            item.state = ItemState.DONE_WITH_WARNINGS if result.warnings else ItemState.DONE
+            item.state = ItemState.DONE_WITH_WARNINGS if item.warnings else ItemState.DONE
         elif result.failure == CANCELLED:
             item.failure = None
             item.state = ItemState.CANCELLED

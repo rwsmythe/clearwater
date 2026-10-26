@@ -29,6 +29,7 @@ from .batch_panel import batch_panel_factory
 from .contract import Area, JobHandle, Message, PanelFactory, ShellContext, ShellWindow
 from .export_service import (
     CANCELLED,
+    NO_OUTPUT_TEXT,
     ActivityGate,
     ExportJobs,
     ExportRequest,
@@ -160,9 +161,14 @@ class ExportPanel(QWidget):
         self._gate.finish("export")
         name = messages.file_name(path)
         if result.ok:
-            saved = ", ".join(messages.file_name(p) for p in result.outputs) or name
-            self.status.setText(f"Saved {saved}")
             self._context.messages.clear("error", owner=OWNER)
+            if result.outputs:
+                self.status.setText(
+                    "Saved " + ", ".join(messages.file_name(p) for p in result.outputs)
+                )
+            else:  # an ok result names a file by contract; if it does not, say so, never guess
+                self.status.setText(NO_OUTPUT_TEXT)
+                self._context.messages.present(Message("warning", NO_OUTPUT_TEXT, path, OWNER))
         elif result.failure == CANCELLED:
             self.status.setText(self._with_kept("Export cancelled.", result))
         else:

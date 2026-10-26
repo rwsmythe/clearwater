@@ -241,6 +241,41 @@ def test_planted_format_report_that_omits_outputs_of_a_non_ok_item_is_detected(
     assert "output: " not in batch.report.toPlainText()
 
 
+def test_an_ok_item_without_outputs_is_done_with_a_warning(rig: Rig) -> None:
+    """Reviewer B pass 2: an ok result that names no file is counted, but flagged."""
+    rig.stub.result = JobResult(True, (), ("soft clip",), None, "cpu", 0.0)
+    batch = started(rig, [A])
+    batch.start()
+    wait_batch_idle(rig)
+    assert states(batch) == [ItemState.DONE_WITH_WARNINGS]
+    assert batch.items()[0].warnings == (
+        "soft clip",
+        "Export finished, but no output file was reported.",
+    )
+    report = batch.report.toPlainText()
+    assert "Succeeded 0, with warnings 1, failed 0" in report
+    assert "   warning: Export finished, but no output file was reported." in report
+
+
+def test_planted_record_that_counts_an_ok_item_without_outputs_as_plain_done(
+    rig: Rig, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    original = BatchPanel._record
+
+    def plain(self: BatchPanel, item: BatchItem, result: Any) -> None:
+        original(self, item, result)
+        if result.ok and not result.outputs:
+            item.warnings, item.state = (), ItemState.DONE
+
+    monkeypatch.setattr(BatchPanel, "_record", plain)
+    rig.stub.result = JobResult(True, (), (), None, "cpu", 0.0)
+    batch = started(rig, [A])
+    batch.start()
+    wait_batch_idle(rig)
+    # The test above fails on this implementation.
+    assert states(batch) == [ItemState.DONE]
+
+
 def test_a_job_that_cannot_be_built_or_raises_fails_its_item_only(rig: Rig) -> None:
     batch = started(rig, [A, B, C], raise_on_build=(B.name,), raise_in_job=(C.name,))
     batch.start()

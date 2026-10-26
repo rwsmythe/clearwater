@@ -23,6 +23,7 @@ from clearwater.jobs.export_seam import (
 
 __all__ = [
     "CANCELLED",
+    "NO_OUTPUT_TEXT",
     "RUNNING_BATCH_REASON",
     "RUNNING_EXPORT_REASON",
     "UNAVAILABLE_TEXT",
@@ -35,6 +36,9 @@ __all__ = [
 ]
 
 _LOG = logging.getLogger(__name__)
+
+NO_OUTPUT_TEXT = "Export finished, but no output file was reported."
+"""Shown (and warned about) when a result with ``ok=True`` names no output file."""
 
 RUNNING_EXPORT_REASON = "An export is running."
 """The reason on ``actions.export`` while the open source's export runs."""

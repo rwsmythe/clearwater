@@ -568,6 +568,46 @@ def test_planted_done_that_drops_outputs_and_warnings_of_a_non_ok_result_is_dete
     assert presenter_of(rig.window).of("warning") == []
 
 
+NO_OUTPUT = "Export finished, but no output file was reported."
+
+
+def test_an_ok_result_without_outputs_is_not_reported_as_saved(
+    make_window: Any, qtbot: Any, tmp_path: Path
+) -> None:
+    """Reviewer B pass 2: never claim "Saved <source>" when no output file was reported."""
+    result = JobResult(True, (), (), None, "cpu", 0.0)
+    rig = build_rig(make_window, qtbot, tmp_path, stub=StubExportJobs(result=result))
+    rig.action.trigger()
+    rig.wait_export_idle()
+    assert rig.panel.status.text() == NO_OUTPUT
+    presenter = presenter_of(rig.window)
+    assert [(m.text, m.owner) for m in presenter.of("warning")] == [(NO_OUTPUT, "export")]
+    assert presenter.of("error") == [] and rig.action.unavailable_reason() is None
+
+
+def test_planted_done_that_shows_the_source_name_for_an_ok_result_without_outputs(
+    make_window: Any, qtbot: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    original = ExportPanel._done
+
+    def guessing(self: ExportPanel, path: Path, result: JobResult) -> None:
+        original(self, path, result)
+        if result.ok and not result.outputs:
+            self.status.setText(f"Saved {path.name}")
+
+    monkeypatch.setattr(ExportPanel, "_done", guessing)
+    rig = build_rig(
+        make_window,
+        qtbot,
+        tmp_path,
+        stub=StubExportJobs(result=JobResult(True, (), (), None, "cpu", 0.0)),
+    )
+    rig.action.trigger()
+    rig.wait_export_idle()
+    # The test above fails on this implementation.
+    assert rig.panel.status.text() == "Saved photo.jpg"
+
+
 def _close_the_runner(rig: Rig) -> None:
     """Close the window's job runner, as the shell does at close: ``run`` then raises."""
     assert rig.window.context.jobs.close(5.0)  # type: ignore[attr-defined]
