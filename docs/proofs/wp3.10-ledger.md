@@ -195,61 +195,127 @@ main, stream and info packets of an FFmpeg-written file).
   presentation-effect proof. Audio: identity edit at 0.
 - WINDOW RELEASED at the end of this round.
 
-## RESUME HERE (current; for seat 7 -- written by seat 6 after the round-8 cleanup)
+## RESUME HERE (current; for seat 8 -- written by seat 7 at the dispatcher's rollover)
 
-- Base `ac4be92` (main with WP3.9; the dispatcher rebased the branch at seat 4; pre-rebase branch
-  `wp3.10-pre-rebase` at `98ee54a`). Reviewer A evidence `r1\`..`r8\` under
-  `C:\Users\rwsmy\clearwater-review-evidence\wp3.10\`. Head at handover: the commit carrying
-  this section (the cleanup head is `db6f791`).
-- **Reviewer A is CLOSED, rounds 1-8.** The product converged at round 4 (cleanup `4dfa96e`). The
-  floor-row instrument `tools/video_io_bench.py` (built `dabb204`) went through rounds 5-8: round
-  5 the five-round gate (CONTINUE APPROVED); rounds 6-7 blocking findings in the watcher process,
-  hence the dispatcher's DESIGN GUARD ruling OPTION B after round 7 (the watcher, its pipe and
-  all IPC removed; strays read synchronously between frames; the RSS/GPU telemetry kept, one
-  thread per sampler); round 8 NO_NEW_CRITICAL_MAJOR, the loop TERMINATED. Its three MINORs were
-  cleaned up (`491ecb3` #3, `f262b75` #2, `db6f791` #1; pre-fix runs `r8\cleanup\`). NO round 9:
-  cleanup after a terminating round opens no round (dispatcher ruling, as at round 4). The next
-  Reviewer A round would be 9 and the next five-round gate 10, should a change reopen the loop.
-- **Validation at `db6f791`:** the five video modules (`test_io_video_encode.py`, `_bench`,
-  `_units`, `test_io_video_probe_rules.py`, `test_video_fidelity.py`) `-m "not footage"`: 250
-  passed, 2 deselected, 6 min 35 s (`r8\cleanup\five-video-modules-at-db6f791.log`); `uv run
-  ruff check .`, `ruff format --check .`, `mypy` clean. The bench module now has 50 tests.
+- Base `718324b` (main with WP3.4 and WP3.11; the generation-11 dispatcher rebased the branch at
+  seat 7's dispatch: `git range-diff` showed all 53 commits identical; the pre-rebase head is kept
+  as `wp3.10-pre-rebase2` = `d389269`; the earlier `wp3.10-pre-rebase` = `98ee54a`). Diff base:
+  `git -C <worktree> merge-base main HEAD`. Head at handover: the commit carrying this section
+  (product head unchanged since `db6f791`; seat 7 made NO code change). Reviewer A evidence
+  `r1\`..`r8\` and seat 7's footage evidence `s7-footage\` under
+  `C:\Users\rwsmy\clearwater-review-evidence\wp3.10\`.
+- **Reviewer A: rounds 1-8 CLOSED** (product converged at round 4, cleanup `4dfa96e`; the floor-row
+  instrument `tools/video_io_bench.py` rounds 5-8, option-B redesign after round 7, round 8
+  NO_NEW_CRITICAL_MAJOR, cleanup `491ecb3`/`f262b75`/`db6f791`, no round 9 for that cleanup). The
+  NVENC finding below would open ROUND 9 (the next five-round gate is 10).
+- Seat 7 depth (dispatcher figures): 50,200 at the step-1 yield; 69,519 at the full-suite grant.
+
+### Seat 7 results (all on `5727842` = the rebased head; same code as `db6f791`)
+
+- **Static gates:** `uv sync` no change; `ruff check .` clean; `ruff format --check .` 211 files
+  formatted; `mypy` no issues in 123 source files.
+- **FULL PYTEST:** 4434 passed, 2 skipped, 0 failed, 0 errors, 2 warnings (CuPy "CUDA path could
+  not be detected", PIL "Corrupt EXIF data"; neither WP3.10's), 2034.05 s (0:33:54), exit 0; CuPy
+  14.2.0 as installed; one background process kept alive by foreground poll-waits; also the
+  orchestrator's candidate-gate run. Log `work/wp3.10/s7-full2.log`. (The first attempt,
+  `s7-full.log`, was killed by Claude Code's low-memory reaper at 92% with no summary: NOT a
+  result. Fallback chunk list `work/wp3.10/chunks.txt`: 10 chunks, union = the 4436 collected
+  ids exactly, `s7-union.diff` empty.) The `-q` log gives no skip reasons.
+- **FOOTAGE window** (21:12Z-22:22Z 2026-10-26, not a timing run; free memory 10.4-11.4 GB before
+  each run; every output deleted; nothing footage-derived committed; no `gpmd`, IMU or GPS value
+  read). Evidence `C:\Users\rwsmy\clearwater-review-evidence\wp3.10\s7-footage\` (`legb-table.txt`,
+  `legb.tsv`, the 14 bench records `io-bench-*-20261026T2*.json`, the compare records with gpmd
+  values redacted, `nvcap.txt`, the logs). Scratch config pointing the working folder at the
+  worktree's `work\` (the worktree's own `clearwater.local.toml` points at the MAIN tree's
+  `work\`): pass `--config <file>` with `working_path = '<worktree>\work'`.
+  - **(a) GX011627 product leg:** `video_io_bench.py run GX011627 --keep` (WP3.9 `frames` -> the
+    sink, NVENC 8-bit Standard): 681 frames, `nvenc_proof.tied` True; then `video_fidelity.py
+    compare <source> <output> --bit-depth 8`: 46 items, DIFFERENT by class MANDATORY 0, REQUIRED
+    0, BEST-EFFORT 8 (the round-0 eight: timecode value on stream tags, camera `udta` atoms, ftyp
+    brands, container tags, stream tags, track layout, video sample-entry boxes, non-video edit
+    lists as written); M+R all SAME; gpmd and creation time SAME. The `footage`-marked tests
+    (`test_io_video_encode.py`, `test_io_video_probe_rules.py`): 2 passed, 211 s.
+  - **(b) AD-12 table** (GX011627 busy, camera 55.53 Mb/s; calm clip GX011610 = the lowest camera
+    bit rate among Snorkel clips under 1000 frames, 5.15 Mb/s, 966 frames; output / camera video
+    bit rate; PSNR y to the source; file-size ratio for `QUALITY_RATIO` in brackets):
+
+    | Clip | Encoder | High | Standard | Draft | High 10-bit |
+    |---|---|---|---|---|---|
+    | GX011627 | NVENC | 0.356, 35.82 dB [0.359] | 0.350, 35.82 dB [0.353] | 0.338, 35.82 dB [0.341] | 0.357, 35.77 dB [0.360] |
+    | GX011627 | libx265 | 1.540, 43.06 dB [1.537] | 0.800, 39.61 dB [0.800] | 0.344, 36.73 dB [0.347] | -- |
+    | GX011610 | NVENC | 3.494, 55.87 dB [3.367] | 2.273, 54.48 dB [2.207] | 1.228, 52.23 dB [1.214] | 3.521, 52.64 dB [3.392] |
+    | GX011610 | libx265 | 1.795, 53.38 dB [1.753] | 0.874, 50.81 dB [0.878] | 0.385, 48.46 dB [0.414] | -- |
+
+    10-bit costs about 0-1% over 8-bit in size (`disk_space` doubles the estimate for D76).
+    The runs' informal s/frame (NOT timing figures): NVENC 0.15-0.17, libx265 0.20-0.33.
+  - **(c) Edits compilation** (`video_fidelity.py encode <path> --encoder hevc_nvenc --quality
+    standard --bit-depth 8`; 1080p60 h264, 10,800 frames): `open` ACCEPTS the 3003/60000 reorder
+    delay (round-2 #2 rule). AD-22 note fires (media_time 1001/20000 against 0, convention). Frame
+    count, per-frame pts, all start-offset rows, video edit as written, audio packets, audio sync,
+    AAC configuration/priming/side data, missing-pts and roster: SAME. **2 MANDATORY DIFFERENT:**
+    `mvhd` and the audio entry of the edit-list effect: source 180.079 (180079/1000, movie
+    timescale 1000) against output 180.078209 (7941449/44100). The output keeps the audio's exact
+    length; the source's value is that length rounded UP to its 1 ms movie tick (0.79 ms, under
+    one tick). Video effect exact. This is report section 9's coarse-movie-timescale limit,
+    observed on a real file (the accepted "rounded UP" limitation); no code change. OPTIONAL
+    round-9 item for the successor's call: `-movie_timescale` = the source's.
+  - **DR-18 (1) CLOSED on `tied`:** every NVENC run in the footage window was tied (GPU UUID,
+    FFmpeg PID, encode window).
+- **FINDING (product defect, reproduced): NVENC's three levels collapse on busy 4K.** With the
+  sink's `-rc vbr -b:v 0 -cq N` and no `-maxrate`, NVENC auto-selects HEVC level 5.0 whose
+  bit-rate cap overrides `cq`: GX011627 High / Standard / Draft all about 19-20 Mb/s, PSNR flat
+  35.82 dB. Repro (`s7-footage\nvcap.txt`, first 150 frames, video only, file to file): cq 18
+  21.68 Mb/s, cq 28 21.76 Mb/s (level 5.0; `-tier high` no change); `-maxrate 300M -bufsize 600M`
+  cq 18 131.5 / cq 28 37.3 Mb/s (level 6.1); `-level 5.1 -tier high` still capped (~35.7 both);
+  `-rc constqp -qp 18/28` 175.9 / 41.6 Mb/s. Recommended fix: `-maxrate`/`-bufsize` (or an
+  explicit level) on the NVENC options in `src/clearwater/io/video/encode.py` `_video_options`
+  (about line 171), plus a test that the three levels give distinct rates. Mind playback: the
+  maxrate run's level rose to 6.1.
+- **libx265 AD-12 PROPOSAL (no code change):** on busy footage H 1.54 / S 0.80 / D 0.34 against
+  the targets 1 / 0.5 / 0.25, all over; interpolated estimate crf about 21 / 26 / 30 (to verify).
+- **Disk-estimate risk (WP3.13 / WP3.14's files, for the report and the return report):** on the
+  calm low-bit-rate clip the outputs are 1.2-3.4x the SOURCE size (NVENC) and 0.4-1.8x (libx265),
+  so `QUALITY_RATIO` High 1.0 with `MARGIN` 1.25 underestimates by up to about 2.7x there.
+
+### Seat 8's ladder (the dispatcher's RECOMMENDED ruling, for the successor to confirm)
+
+  1. Confirm the ruling with the dispatcher: approve the NVENC fix as Reviewer A ROUND 9, scoped
+     to the change (the fix + its test); the `-movie_timescale` item in or out at its call.
+  2. Build the fix (one commit per logical change; the test fails on `db6f791`); targeted runs of
+     the five video modules `-m "not footage"` (about 6.5 min); static gates; Reviewer A round 9
+     per `docs/review-gate-clearwater.md`; ledger row 9.
+  3. FOOTAGE window: re-run leg (b) NVENC on the fixed code (both clips, High/Standard/Draft
+     8-bit and High 10-bit; the driver is the bench `run --keep --encoder --bit-depth --quality
+     --config`, then `ffmpeg -i out -i src -an -dn -sn -lavfi "[0:v][1:v]psnr" -f null -` (10-bit:
+     both inputs `scale=in_range=full:out_range=full,format=yuv420p10le` first), then delete the
+     output); re-check leg (a)'s M+R all SAME on the fixed code. Propose the NVENC and libx265
+     AD-12 mappings to the dispatcher for CHARC on the fixed figures.
+  4. A full pytest window if the dispatcher wants it on the final code (one background process,
+     foreground poll-waits under 540 s each; the reaper kills an idle session's background job).
+  5. EXCLUSIVE window, LAST and alone, on the FINAL code: `uv run python tools/video_io_bench.py
+     floor --dry-run --config <file>` first, then `... floor --config <file>` (options AFTER the
+     subcommand; defaults `--memory-every 0.25`, `--gpu-every 1`, `--strays-every 300`); the
+     record lands under `<working>\wp3.10\bench\`. State whether the floor row fits inside the
+     ~0.39 s/frame left after WP3.4's 0.4392 s/frame c3 core under D106's 0.834 s/frame at 4K;
+     read from the raw `per_frame_s` how many frames after each strays pause run fast (only the
+     first is set apart) and report it.
+  6. The report `docs/reports/wp3.10-video-encode.md`: section 1's bench line, section 5's
+     GX011627 row, section 6's counts, section 7 (AD-12 table, `QUALITY_RATIO` figures for Q13,
+     the speed row), section 8 (DR-18 (1) CLOSED on `tied`), section 9 (the Edits observation of
+     the coarse-movie-timescale limit, the disk-estimate risk, the instrument's limits, the
+     pause/strays semantics below, R5 #10's index/uuid mitigation note); DRAFT and PENDING
+     removed; the status line (it still says seat 4).
+  7. The return report to the dispatcher by message (brief "Return report", under about 70
+     lines): branch head, files, claims with evidence paths, test counts, Reviewer A rounds and
+     verdicts, the footage and speed figures, limits, debt dispositions, anything for Reviewer B.
+
+### Carried (still binding)
+
 - **LF RULE (dispatcher, binding):** LF in every committed blob. Before every commit: every file
   in `git diff --name-only main..HEAD` has 0 CR bytes in its HEAD blob
   (`git show HEAD:<f> | tr -cd '\r' | wc -c`). Write files with LF only; commit with
-  `git -C <worktree> -c core.autocrlf=false commit ... -- <paths>`. Seats 5 and 6 used a scratch
-  helper `commit.sh` (CR check on the working files, add, commit by pathspec with the footer
-  from a message file, then the main..HEAD blob check); rebuild it or check by hand.
-- **Seat 7's ladder, in order** (each window from the dispatcher; ask by ending the turn with
-  `WINDOW REQUEST: <...>`; send `WINDOW RELEASED: <summary>` after; a run that dies without a
-  summary is reported, not restarted):
-  1. FULL PYTEST (never yet run on this branch): check >= 5 GB free first; run in the
-     background with `QT_QPA_PLATFORM=offscreen`, `--basetemp=work/<name>`, output to a file;
-     grep the summary.
-  2. FOOTAGE window: the GX011627 product leg through WP3.9's `frames` and this sink (NVENC
-     8-bit Standard; the instrument's summary all MANDATORY and REQUIRED SAME; the
-     `footage`-marked test); the AD-12 quality table (GX011627 busy + one calm Snorkel clip,
-     each level per encoder at 8 bits and NVENC High at 10 bits; output bit rate against the
-     camera's; PSNR to the source as a sanity figure; targets High ~ camera, Standard ~ 1/2,
-     Draft ~ 1/4; a miss is a proposal to CHARC, no code change); the Edits compilation through
-     `open` (the round-2 #2 rule must accept its 3003/60000 reorder delay). No `gpmd`, IMU or
-     GPS value read; no footage-derived output committed.
-  3. EXCLUSIVE window, LAST and alone: `uv run python tools/video_io_bench.py floor --dry-run`
-     first, then `... floor` (options AFTER the subcommand; defaults: `--memory-every 0.25`,
-     `--gpu-every 1`, `--strays-every 300` frames); the record lands under
-     `work\wp3.10\bench\`. For CHARC's note: WP3.4's c3 core takes 0.4392 s/frame of D106's
-     0.834 s/frame at 4K, leaving about 0.39 s/frame for decode, transport and encode; state in
-     the report's speed section whether the floor row fits inside that. Read from the raw
-     `per_frame_s` how many frames after each strays pause run fast (the dispatcher asked for
-     this; only the first is set apart) and report it.
-  4. The report `docs/reports/wp3.10-video-encode.md`: its PENDING sections (section 7 "AD-12
-     quality table and the speed row", the GX011627 row of the V4 table, the `QUALITY_RATIO`
-     figures for question 13), the instrument's limits and the pause/strays semantics below,
-     R5 #10's mitigation note; DRAFT and PENDING removed. Its status line still says seat 4.
-  5. The return report to the dispatcher by message (brief "Return report", under about 70
-     lines): branch head, files, claims with evidence paths, test counts, Reviewer A rounds 1-8
-     and verdicts, the footage and speed figures, limits, debt dispositions, the items below,
-     anything for Reviewer B.
+  `git -C <worktree> -c core.autocrlf=false commit ... -- <paths>`. Python's `write_text` on
+  Windows writes CRLF: use `newline="\n"` or strip CR.
 - **The strays and pause semantics (option B, as built; state them in the report):** the
   `StrayWatch` is primed before the run (`strays.prime_s`), read after every `--strays-every`
   frames and once more right after `close` (first thing in the `finally`, also on a failure).
@@ -258,27 +324,26 @@ main, stream and info packets of an FFmpeg-written file).
   reading pauses the loop for seconds: the pause (`strays.pauses_s`, `stages_s.strays_pauses`)
   is kept out of every interval, stage and rate; the frame right after each pause is set apart
   (`after_pause_frames`, `after_pause`), as the first frame is. During a pause the decoder
-  fills its output pipe AND FFmpeg's own frame buffers (not the pipe alone: the dispatcher's
-  "bounded by the pipe depth" was corrected and accepted at round 8) and the encoder works
-  through what it holds, so a few frames after a pause may run fast. The telemetry: one thread
-  for RSS and one for the GPU, each on its own schedule (no catch-up burst), every sample timed
-  (`rss` pairs, `gpu[].t_s`), `gaps_s` beside the nominal `periods_s`; `stop` records a sampler
-  that ended early or did not stop within `_SAMPLER_JOIN_S` (30 s). The NVENC proof's sampler
-  starts first, the telemetry right before the probe; `offsets_s` places the telemetry's zero
-  and the end of the strays priming on the run's clock (negative = before the probe). The
-  frame is released after its write is timed, before the next `next` (its release falls in the
-  next interval's bookkeeping).
+  fills its output pipe AND FFmpeg's own frame buffers and the encoder works through what it
+  holds, so a few frames after a pause may run fast. The telemetry: one thread for RSS and one
+  for the GPU, each on its own schedule (no catch-up burst), every sample timed (`rss` pairs,
+  `gpu[].t_s`), `gaps_s` beside the nominal `periods_s`; `stop` records a sampler that ended
+  early or did not stop within `_SAMPLER_JOIN_S` (30 s). The NVENC proof's sampler starts first,
+  the telemetry right before the probe; `offsets_s` places the telemetry's zero and the end of
+  the strays priming on the run's clock (negative = before the probe). The frame is released
+  after its write is timed, before the next `next`.
 - Decided and not to be redone: round 0 (NUT + end sentinel + setts/noise BSF, INFO packet), the
   round-0 rulings, CHARC's Q-A/Q-B/Q-C/Q-D notes, P8, the S1/#2/#3 ruling, round 3's #2/#3
   rejections, round 4's two downgrades, round 5's gate ruling, downgrades and bank, round 7's
-  downgrades and the option-B ruling, round 8's termination and its no-round-9 ruling.
-- Return-report items already known: DR-18 (1) closes only on `tied` (an NVENC run with a
-  resolved GPU UUID in the footage or speed window; the bench records `nvenc_proof` per run);
-  DR-15's iPhone leg stays OPEN; the banked WP3.7 item (`probe.py` `_run_ffprobe` inherits
-  `FFREPORT`); the accepted "rounded UP" limitation; the #2 refusal is not applied when the sample
-  table cannot be read; R5 #10 banked (several GPUs; reopened as R7 #4 and banked again; the
-  index/uuid mitigation is a note in the report); the option-B redesign and its cost; the
-  pause/strays semantics above.
+  downgrades and the option-B ruling, round 8's termination and its no-round-9 ruling; seat 7's
+  full suite and footage figures above (re-run only what the fix touches).
+- Return-report items already known: DR-18 (1) CLOSED on `tied` (footage window); DR-15's iPhone
+  leg stays OPEN; the banked WP3.7 item (`probe.py` `_run_ffprobe` inherits `FFREPORT`); the
+  accepted "rounded UP" limitation (now observed on the Edits compilation); the #2 refusal is
+  not applied when the sample table cannot be read; R5 #10 banked (several GPUs; reopened as R7
+  #4 and banked again; the index/uuid mitigation is a note in the report); the option-B
+  redesign and its cost; the pause/strays semantics above; the NVENC finding and its ruling;
+  the disk-estimate risk.
 - Instrument limits: RSS sampled (0.25 s nominal; the actual gaps in `gaps_s`); graphics memory
   device-wide (`memory.used`; per-process reads 0/N/A under WDDM); the instrument loads the
   machine a little (`nvidia-smi` each second in its own thread, `pmon` each 0.5 s on NVENC, a
@@ -286,16 +351,17 @@ main, stream and info packets of an FFmpeg-written file).
   of the figures); no CPU temperature on Windows; a process that starts and exits between two
   strays readings is not seen; only the first frame after a pause is set apart.
 - Working notes: the bench module (50 tests) takes about 2.5 min; the five video modules about
-  6.5 min; targeted runs use `-m "not footage"` and `-k`. Use a fresh `--basetemp=work/wp3.10/<x>`
-  per run, creating its parent folder first (a missing parent gave WinError 3). Pre-fix runs:
+  6.5 min; the full suite about 34 min (4436 tests). Targeted runs use `-m "not footage"` and
+  `-k`. Use a fresh `--basetemp=work/wp3.10/<x>` per run, creating its parent folder first. In a
+  `while read` loop, give `uv run` `< /dev/null` (it eats the loop's input). ffprobe/ffmpeg on
+  footage take Windows paths (`C:/...` or `C:\...`), not `/c/...` with `file:`. Pre-fix runs:
   `git archive <sha> | tar -x -C work\wp3.10\<x>\old-<sha>`, copy the new test file and
   `clearwater.local.toml` in, run from that folder (subshell) with `PYTHONPATH=<old>\src` and the
-  worktree's `.venv\Scripts\python.exe -m pytest`; a script outside pytest needs
-  `PYTHONPATH` in Windows form (`C:\...\tools;C:\...\src`). A venv's `python.exe` on Windows is a
-  launcher whose child is the interpreter. The per-process CPU walk must never run in a thread
-  of the measured process (it holds the interpreter lock: a 0.26 s probe took 23 s). Use
+  worktree's `.venv\Scripts\python.exe -m pytest`; a script outside pytest needs `PYTHONPATH` in
+  Windows form. A venv's `python.exe` on Windows is a launcher whose child is the interpreter.
+  The per-process CPU walk must never run in a thread of the measured process. Use
   `( cd <worktree> && ... )` subshells, never a bare `cd`. Write ledger edits as a Python script
-  file with raw strings (an inline heredoc with `\U` in a non-raw string failed once).
+  file with raw strings.
 
 ## Seat 2 (`wp310-cell2`) -- build and round 1
 
