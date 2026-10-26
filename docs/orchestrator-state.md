@@ -5,15 +5,14 @@
 
 ### Generation
 
-- **Generation 10** (`clearwater-orchestrator-20261021-0004`) ROLLED OVER 2026-10-26 ~18:45Z at ~395K, at the WP3.11
-  accept boundary (no gate open, no cell mid-round). **Generation 11 starts here** (verify:
-  `comms/.launch-sessions.json`). Earlier: gen 9 `clearwater-orchestrator-20261020-1959`, gen 8 `-1556`, gen 7 `-1419`,
-  gen 6 `-1134`, gen 5 `-0802`, gen 4 `-0524`, gen 3 `-20261019-2346`, gen 2 `-20261018-1442`, gen 1 `-20261014-1258`.
-- **Inbox:** gen 10 drained through CHARC's WP3.4 QA note (`d3c7ebcf9749a876`) and STOPPED DRAINING at its rollover
-  announcement. You are the sole drainer (verify: `uv run python scripts/role_mail.py list --role orchestrator`).
+- **Generation 11** (`clearwater-orchestrator-20261026-0844`) LIVE since 2026-10-26 ~18:45Z (verify:
+  `comms/.launch-sessions.json`). Earlier: gen 10 `clearwater-orchestrator-20261021-0004`, gen 9 `-20261020-1959`,
+  gen 8 `-1556`, gen 7 `-1419`, gen 6 `-1134`, gen 5 `-0802`, gen 4 `-0524`, gen 3 `-20261019-2346`, gen 2
+  `-20261018-1442`, gen 1 `-20261014-1258`.
+- **Inbox:** gen 11 is the sole drainer (verify: `uv run python scripts/role_mail.py list --role orchestrator`).
 - **CHARC is generation 3:** `clearwater-charc-20261020-2115`. Cue that exact name (re-read
   `comms/.launch-sessions.json` before each cue; CHARC rolls over too).
-- Bash-launch gauge at gen-10 bring-up: 43.6 ms. Re-measure at yours.
+- Bash-launch gauge at gen-11 bring-up: 122.9 ms.
 
 ### Standing operator rulings
 
@@ -36,15 +35,23 @@
   blob is LF (main has 0 CR bytes everywhere, the debt register included). At every gate: for each file in
   `git diff --name-only <base>..<cand>`, `git cat-file -p <cand>:<f> | tr -cd '\r' | wc -c` must be 0.
 
-### Live cells at the gen-10 rollover (they die with gen 10; re-dispatch from their ledgers)
+### Live cells (gen 11; they die with this generation -- re-dispatch from their ledgers)
 
-| Package | Branch / head (worktree `.worktrees/<branch>`) | Seats so far | State at rollover | Next step |
+Dispatch prompts: gen 11 scratchpad
+`C:\Users\rwsmy\AppData\Local\Temp\claude\C--Users-rwsmy-clearwater\5f10a032-edb3-44be-ab01-d21d2702ef2f\scratchpad\`
+(`prompt-wp3.10-seat7.md`, `prompt-trancheB-common.md` + `mk.py` -> `prompt-wp3.1N.md`). All worktrees from main `718324b`.
+
+| Package | Cell | Branch / head at writing | State | Next |
 |---|---|---|---|---|
-| WP3.10 video encode | `wp3.10` `d389269` (rebased onto main `ac4be92` by gen 10; `wp3.10-pre-rebase` = `98ee54a`) | 6 (seat 6 at ~215K, stood down) | Product: Reviewer A converged R4. Bench tool `tools/video_io_bench.py`: R5 (five-round gate, continue approved), R6, R7 (design guard -> hybrid: strays synchronous, watcher process REMOVED), R8 CLEAN -> loop CLOSED; R8 cleanup done; LF normalised (`14e0425`). RESUME HERE complete for seat 7. | Dispatch seat 7 (opus-high) from RESUME HERE with a tight reading list; it asks for: full pytest window, footage legs (GX011627 product leg, AD-12 quality table, Edits compilation through `open`), EXCLUSIVE floor row (OPEN/CLOSE to CHARC; nothing else heavy), report, return. Then my gate (rebase onto main; WP3.4/WP3.11 files disjoint). |
+| WP3.10 | `wp310-cell7` (opus-high) | `wp3.10` `5727842` (rebased by gen 11 onto `718324b`; `wp3.10-pre-rebase2` = `d389269`; range-diff 53/53 identical) | static gates green at 50K | full pytest window 19:38Z (also the candidate gate run); then footage legs; then EXCLUSIVE floor row last, alone (OPEN/CLOSE to CHARC); report; return |
+| WP3.17 | `wp317-cell1` (sonnet-high) | `wp3.17` (R1 at `b2822d3`) | round-0 STOPs ruled at my seat (normalisation low<high limit; dialogs kw; status label; warning clear; real-schema test import); R1 7 findings, downgrades UPHELD, loop TERMINATED at R1, cleanup in progress; 222,661 at R1 | report; return (full pytest = my stacked gate) |
+| WP3.18 | `wp318-cell1` (sonnet-high) | `wp3.18` `44cec16` | seam APPROVED by CHARC (`bdbd8323ceace897`, AD-7 amended `8c67a6d`): additive `retarget(parameters, *, focus_pts=None) -> bool`, (B) fallback, never cancel on a parameter change; my build ruling: cancel detected by the panel's own job checking `progress.cancelled()` after `run` (no window event filter); 177,692 at round 0 | targeted tests, Reviewer A |
+| WP3.19 | `wp319-cell1` (sonnet-high) | `wp3.19` (R1 at `8639afb`) | C1 GRANTED by CHARC (`0e6962c39f216c86`, arch note `42f8d70`): ONE new file `src/clearwater/jobs/export_seam.py`, gui re-exports; R1 2 major + 1 minor upheld, remediation; 236,905 at R1 | remediation, R2 (re-seat from RESUME HERE if R2 is not small) |
+| WP3.20 | `wp320-cell1` (sonnet-high) | `wp3.20` `76076d7` | RETURNED. S1 (capabilities job at first open), S2 (kw-only injection) ruled at my seat; A terminated R1 (1 minor, cleaned up); 187,529 at R1 | my gate: stacked; swap `interim_resolve_encoder` for WP3.10's real one by whichever lands second (or WP4.3) |
 
-**Tranche B (WP3.17-3.20, sonnet-high) is DISPATCHABLE NOW** (CHARC, `d3c7ebcf9749a876`: after WP3.11's accept, one gate
-at a time on this host). Briefs FINAL on main (`docs/briefs/wp3.17..wp3.20-brief.md`). Plan the window queue: four
-cells plus WP3.10's seat 7 means strict one-heavy-job-at-a-time.
+**Gate plan:** one stacked full suite (CuPy) on the top of the tranche-B stack (+ WP3.10) replaces each GUI cell's own
+full pytest (cells told "run by the orchestrator on the merge candidate"); main's owed figure for `47235b6` = the
+`f1c1bd8` run by code identity (CHARC `73a2991aae7b877b`; its own run was reaped at 93 %).
 
 ### Where things stand -- the successor starts HERE
 
