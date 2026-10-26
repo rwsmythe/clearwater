@@ -9,11 +9,9 @@ from __future__ import annotations
 
 import json
 import math
-import multiprocessing
 import shutil
 import subprocess
 import sys
-import threading
 import time
 import weakref
 from fractions import Fraction
@@ -29,7 +27,7 @@ from local_config import LocalConfig
 
 pytestmark = pytest.mark.usefixtures("ffmpeg_tools")
 
-FAST = (0.02, 0.5, 1.0)
+FAST = (0.02, 0.5)
 SAMPLE = "vid-hevc8-bt709-full"
 
 
@@ -175,213 +173,26 @@ def test_stray_watch_charges_a_process_started_inside_the_window() -> None:
         child.wait()
 
 
-@pytest.mark.parametrize("periods", [(0.0, 1.0, 1.0), (0.1, -1.0, 1.0), (0.1, 1.0, math.inf)])
+@pytest.mark.parametrize("periods", [(0.0, 1.0), (0.1, -1.0), (0.1, math.inf)])
 def test_telemetry_refuses_a_period_that_is_not_positive(
-    periods: tuple[float, float, float],
+    periods: tuple[float, float],
 ) -> None:
-    memory, gpu, strays = periods
+    memory, gpu = periods
     with pytest.raises(ValueError, match="positive"):
-        bench.Telemetry(memory_every=memory, gpu_every=gpu, strays_every=strays)
+        bench.Telemetry(memory_every=memory, gpu_every=gpu)
 
 
-def test_telemetry_watcher_starts_reports_and_stops() -> None:
-    telemetry = bench.Telemetry(memory_every=0.05, gpu_every=1.0, strays_every=0.5)
+def test_telemetry_samples_in_a_thread_and_starts_no_process() -> None:
+    telemetry = bench.Telemetry(memory_every=0.05, gpu_every=1.0)
     telemetry.start()
-    watcher = telemetry._watcher
-    assert watcher is not None and watcher.is_alive()
-    time.sleep(8)  # one window reads every process: about 2.5 s on the owner's laptop
-    record = telemetry.stop()
-    assert record["errors"] == []
-    assert len(record["strays"]) >= 2  # at least one period and the last window at the stop
-    assert [w.get("final", False) for w in record["strays"]][-2:] == [False, True]
-    assert record["rss_samples"] > 5
-    assert watcher.pid not in {m["pid"] for m in record["peak_tree_rss_members"]}
-    assert not watcher.is_alive()
-
-
-class _FakeWatch:
-    """A :class:`bench.StrayWatch` that numbers its windows instead of reading processes."""
-
-    def __init__(self, root: int) -> None:
-        self.count = 0
-
-    def window(self) -> dict[str, Any]:
-        self.count += 1
-        return {"seconds": 0.01, "busy": [], "n": self.count}
-
-
-def test_the_watchers_last_window_alone_is_tagged_final(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(bench, "StrayWatch", _FakeWatch)
-    mine, theirs = multiprocessing.Pipe()
-    loop = threading.Thread(target=bench.stray_loop, args=(theirs, 0.01, 0))
-    loop.start()
-    assert mine.recv() == "ready"
-    time.sleep(0.2)
-    mine.send("stop")
-    windows = []
-    while not windows or not windows[-1].get("final"):
-        assert mine.poll(5)
-        windows.append(mine.recv())
-    loop.join(5)
-    assert not loop.is_alive() and not mine.poll(0.1)
-    assert len(windows) >= 2 and [w["n"] for w in windows] == list(range(1, len(windows) + 1))
-    assert [w.get("final", False) for w in windows] == [False] * (len(windows) - 1) + [True]
-
-
-class _ScriptedPipe:
-    """The parent's end of the watcher pipe, played from a script (round 6 #1)."""
-
-    def __init__(self, queued: list[dict[str, Any]], after_stop: list[dict[str, Any]]) -> None:
-        self.queue = list(queued)
-        self.after_stop = after_stop
-        self.lock = threading.Lock()
-        self.sent: list[Any] = []
-
-    def send(self, obj: Any) -> None:
-        self.sent.append(obj)
-
-        def later() -> None:
-            time.sleep(0.5)  # the watcher finishes the window it is computing
-            with self.lock:
-                self.queue.extend(self.after_stop)
-
-        threading.Thread(target=later, daemon=True).start()
-
-    def poll(self, timeout: float | None = 0.0) -> bool:
-        end = time.monotonic() + (timeout or 0.0)
-        while True:
-            with self.lock:
-                if self.queue:
-                    return True
-            if time.monotonic() >= end:
-                return False
-            time.sleep(0.01)
-
-    def recv(self) -> Any:
-        with self.lock:
-            return self.queue.pop(0)
-
-    def close(self) -> None:
-        pass
-
-
-class _FakeWatcher:
-    """A started watcher seen from the parent (no process: nothing to join)."""
-
-    pid = None
-    exitcode = None
-
-    def is_alive(self) -> bool:
-        return True
-
-
-def _scripted_telemetry(pipe: _ScriptedPipe) -> bench.Telemetry:
-    telemetry = bench.Telemetry(memory_every=0.05, gpu_every=10.0, strays_every=30.0)
-    telemetry._watcher, telemetry._connection = _FakeWatcher(), pipe  # type: ignore[assignment]
-    return telemetry
-
-
-def test_stop_keeps_a_queued_window_and_the_final_one_after_it() -> None:
-    periodic = {"seconds": 30.0, "busy": []}
-    final = {"seconds": 12.0, "busy": [{"name": "late-stray"}], "final": True}
-    pipe = _ScriptedPipe([periodic], [final])
-    record = _scripted_telemetry(pipe).stop()
-    assert pipe.sent == ["stop"]
-    assert [w["seconds"] for w in record["strays"]] == [30.0, 12.0]  # round 6 #1
-    assert record["strays"][-1]["busy"] == [{"name": "late-stray"}]
-    assert record["errors"] == []
-
-
-def test_a_final_window_that_does_not_come_is_recorded(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(bench, "_WATCHER_WAIT_S", 1.0)
-    pipe = _ScriptedPipe([{"seconds": 30.0, "busy": []}], [])
-    began = time.monotonic()
-    record = _scripted_telemetry(pipe).stop()
-    assert time.monotonic() - began < 5
-    assert [w["seconds"] for w in record["strays"]] == [30.0]
-    assert record["errors"] == ["the strays watcher sent no final window within 1 s"]
-
-
-@pytest.mark.parametrize("seen_by", ["sampling", "stop"])
-def test_a_watcher_that_dies_mid_run_is_recorded_and_not_waited_for(
-    monkeypatch: pytest.MonkeyPatch, seen_by: str
-) -> None:
-    monkeypatch.setattr(bench, "_WATCHER_WAIT_S", 30.0)  # the start's wait, and stop's
-    memory_every = 0.05 if seen_by == "sampling" else 30.0  # 30 s: the thread never looks again
-    telemetry = bench.Telemetry(memory_every=memory_every, gpu_every=60.0, strays_every=60.0)
-    telemetry.start()
-    watcher = telemetry._watcher
-    assert watcher is not None and watcher.pid is not None
-    psutil.Process(watcher.pid).kill()
-    watcher.join(10)
-    if seen_by == "sampling":
-        deadline = time.monotonic() + 5
-        while not telemetry.errors and time.monotonic() < deadline:
-            time.sleep(0.05)
-        assert telemetry.errors and telemetry.errors[0].startswith("the strays watcher ended at")
-        samples = telemetry.rss_samples
-        time.sleep(0.5)
-        assert telemetry.rss_samples > samples  # the memory sampling goes on (round 6 #2)
-    began = time.monotonic()
-    record = telemetry.stop()
-    assert time.monotonic() - began < 10  # not the 30 s wait
-    assert sorted(e.split(" (")[0].split(" at ")[0] for e in record["errors"]) == [
-        "the strays watcher ended",
-        "the strays watcher was not alive",
-    ]
-    assert record["rss_samples"] > 0
-
-
-class _RecordingContext:
-    """A multiprocessing context that remembers the pipes and processes it makes."""
-
-    def __init__(self, real: Any) -> None:
-        self.real = real
-        self.ends: list[Any] = []
-        self.processes: list[Any] = []
-
-    def Pipe(self) -> tuple[Any, Any]:  # noqa: N802 - the multiprocessing name
-        ends = self.real.Pipe()
-        self.ends.extend(ends)
-        return ends
-
-    def Process(self, *args: Any, **kwargs: Any) -> Any:  # noqa: N802 - the multiprocessing name
-        process = self.real.Process(*args, **kwargs)
-        self.processes.append(process)
-        return process
-
-
-@pytest.mark.parametrize("failure", ["no ready", "start raises"])
-def test_a_watcher_that_fails_to_start_is_ended_and_its_pipe_closed(
-    monkeypatch: pytest.MonkeyPatch, failure: str
-) -> None:
-    contexts: list[_RecordingContext] = []
-    real = multiprocessing.get_context
-
-    def get_context(method: str) -> _RecordingContext:
-        contexts.append(_RecordingContext(real(method)))
-        return contexts[-1]
-
-    monkeypatch.setattr(bench.multiprocessing, "get_context", get_context)
-    if failure == "no ready":
-        monkeypatch.setattr(bench, "_WATCHER_WAIT_S", 0.001)  # far shorter than a spawn
-    else:
-
-        def poll(self: Any, timeout: float | None = None) -> bool:
-            raise OSError("planted")
-
-        monkeypatch.setattr(type(real("spawn").Pipe()[0]), "poll", poll)
-    telemetry = bench.Telemetry(memory_every=0.05, gpu_every=5.0, strays_every=5.0)
-    telemetry.start()
-    monkeypatch.undo()
     try:
-        assert len(telemetry.errors) == 1 and "watcher" in telemetry.errors[0]  # round 5 #9
-        (context,) = contexts
-        assert [end.closed for end in context.ends] == [True, True]
-        assert [process.exitcode is not None for process in context.processes] == [True]
+        time.sleep(0.5)
+        children = psutil.Process().children(recursive=True)
+        assert [c for c in children if bench._name(c) not in bench._SAMPLER_NAMES] == []
     finally:
         record = telemetry.stop()
-    assert record["rss_samples"] > 0 and record["strays"] == []
+    assert record["errors"] == [] and record["rss_samples"] > 5 and record["gpu"]
+    assert "strays" not in record  # the strays are read in the frame loop (round 7, option B)
 
 
 # --- one run ---------------------------------------------------------------------------------
@@ -435,10 +246,13 @@ def test_run_once_records_the_row_and_deletes_the_output(sample: Any, tmp_path: 
     assert record["output_bytes"] > 0 and record["output_video_bit_rate"] > 0
     telemetry = record["telemetry"]
     assert telemetry["errors"] == []
-    assert telemetry["periods_s"] == {"memory": 0.02, "gpu": 0.5, "strays": 1.0}
+    assert telemetry["periods_s"] == {"memory": 0.02, "gpu": 0.5}
     names = [m["name"] for m in telemetry["peak_tree_rss_members"]]
     assert any("ffmpeg" in name for name in names)
-    assert telemetry["peak_tree_rss_bytes"] > 0 and telemetry["strays"]
+    assert telemetry["peak_tree_rss_bytes"] > 0
+    assert record["strays"]["every_frames"] == bench.STRAYS_EVERY_FRAMES > frames
+    assert [w["after_frame"] for w in record["strays"]["windows"]] == [frames]  # after close
+    assert record["strays"]["pauses_s"] == [] and record["after_pause_frames"] == []
     assert record["before"]["moment"] == "before" and record["after"]["moment"] == "after"
     assert _ffmpeg_children() == []
 
@@ -492,6 +306,73 @@ def test_the_loop_holds_one_frame_at_a_time(
     )
     assert len(previous_alive) == record["frames"] + 1
     assert not any(previous_alive)  # round 7 #1: released before the next is asked for
+
+
+class _SlowWatch:
+    """A :class:`bench.StrayWatch` whose every reading takes 0.3 s."""
+
+    def __init__(self, root: int | None = None) -> None:
+        self.readings = 0
+
+    def window(self) -> dict[str, Any]:
+        time.sleep(0.3)
+        self.readings += 1
+        return {"seconds": 0.3, "busy": []}
+
+
+@pytest.mark.usefixtures("quick")
+def test_strays_are_read_between_frames_and_kept_out_of_the_figures(
+    sample: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(bench, "StrayWatch", _SlowWatch)
+    record = bench.run_once(
+        sample(SAMPLE),
+        tmp_path / "strays.mp4",
+        encoder="libx265",
+        quality="draft",
+        bit_depth=None,
+        hw_decode=False,
+        keep=False,
+        periods=FAST,
+        strays_every=3,
+    )
+    frames = record["frames"]
+    assert frames >= 7
+    strays = record["strays"]
+    assert strays["every_frames"] == 3
+    assert [w["after_frame"] for w in strays["windows"]] == [*range(3, frames + 1, 3), frames]
+    assert all(w["read_s"] >= 0.29 for w in strays["windows"])
+    pauses = strays["pauses_s"]
+    assert len(pauses) == frames // 3 and all(pause >= 0.29 for pause in pauses)
+    stages = record["stages_s"]
+    assert stages["strays_pauses"] == pytest.approx(sum(pauses))
+    # no pause inside a frame interval or a stage: the intervals add up to the stream alone
+    assert sum(record["per_frame_s"]) == pytest.approx(stages["stream"], abs=0.01)
+    assert stages["total"] == pytest.approx(
+        stages["probe"] + stages["open"] + stages["stream"] + stages["close"]
+    )
+    assert record["total"]["s_per_frame"] == pytest.approx(stages["total"] / frames)
+    # the frame right after a pause is recorded apart, as the first one is
+    apart = list(range(3, frames, 3))
+    assert record["after_pause_frames"] == apart
+    assert record["after_pause"]["n"] == len(apart)
+    assert record["per_frame"]["n"] == record["write"]["n"] == frames - 1 - len(apart)
+
+
+def test_run_once_refuses_a_strays_count_below_one(tmp_path: Path) -> None:
+    output = tmp_path / "never.mp4"
+    with pytest.raises(ValueError, match="positive number of frames"):
+        bench.run_once(
+            tmp_path / "absent.mp4",
+            output,
+            encoder="libx265",
+            quality="draft",
+            bit_depth=None,
+            hw_decode=False,
+            keep=False,
+            strays_every=0,
+        )
+    assert not output.exists()
 
 
 @pytest.mark.usefixtures("quick")
@@ -610,16 +491,18 @@ def test_the_options_follow_the_subcommand(
     (folders.footage_path / "GX000003.mp4").write_bytes(sample(SAMPLE).read_bytes())
     argv = ["run", "GX000003", "--encoder", "libx265", "--quality", "draft", "--keep"]
     argv += ["--software-decode", "--memory-every", "0.05", "--gpu-every", "2"]
-    argv += ["--strays-every", "1"]  # as the usage shows them (round 5 #6)
+    argv += ["--strays-every", "1000"]  # as the usage shows them (round 5 #6)
     assert bench.main(argv) == 0
     out = capsys.readouterr().out
     record = json.loads(Path(out.strip().splitlines()[-1].removeprefix("RECORD ")).read_text())
     run = record["runs"][0]
     assert Path(run["output"]).is_file() and run["decode"]["hw_decode_asked"] is False
+    assert run["strays"]["every_frames"] == 1000
+    assert run["telemetry"]["periods_s"] == {"memory": 0.05, "gpu": 2.0}
 
 
 @pytest.mark.parametrize("value", ["0", "-0.5", "nan", "inf", "soon"])
-@pytest.mark.parametrize("option", ["--memory-every", "--gpu-every", "--strays-every"])
+@pytest.mark.parametrize("option", ["--memory-every", "--gpu-every"])
 def test_a_bad_period_is_a_usage_error(
     folders: LocalConfig, option: str, value: str, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -627,6 +510,16 @@ def test_a_bad_period_is_a_usage_error(
         bench.main(["floor", "--dry-run", option, value])
     assert stop.value.code == 2
     assert "positive number of seconds" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("value", ["0", "-3", "1.5", "soon"])
+def test_a_bad_strays_count_is_a_usage_error(
+    folders: LocalConfig, value: str, capsys: pytest.CaptureFixture[str]
+) -> None:
+    with pytest.raises(SystemExit) as stop:
+        bench.main(["floor", "--dry-run", "--strays-every", value])
+    assert stop.value.code == 2
+    assert "positive whole number" in capsys.readouterr().err
 
 
 def test_floor_dry_run_resolves_every_clip(
@@ -673,7 +566,7 @@ def test_run_writes_the_record_and_leaves_the_footage_alone(
     clip.write_bytes(sample(SAMPLE).read_bytes())
     footage = _snapshot(folders.footage_path)
     argv = ["run", "GX000001", "--encoder", "libx265", "--quality", "draft", "--runs", "2"]
-    argv += ["--software-decode", "--memory-every", "0.05", "--strays-every", "1"]
+    argv += ["--software-decode", "--memory-every", "0.05", "--strays-every", "1000"]
     assert bench.main(argv) == 0
     out = capsys.readouterr().out
     rows = [line for line in out.splitlines() if line.startswith("ROW GX000001.mp4 libx265")]
@@ -704,7 +597,7 @@ def test_the_disk_is_checked_before_every_run_and_earlier_runs_are_kept(
 
     monkeypatch.setattr(bench.shutil, "disk_usage", usage)
     argv = ["run", "GX000004", "--encoder", "libx265", "--quality", "draft", "--runs", "2"]
-    assert bench.main([*argv, "--keep", "--strays-every", "1"]) == 1  # round 5 #5 and #8
+    assert bench.main([*argv, "--keep", "--strays-every", "1000"]) == 1  # round 5 #5 and #8
     captured = capsys.readouterr()
     assert "FAILED BenchError" in captured.err and len(calls) == 3
     path = Path(captured.out.strip().splitlines()[-1].removeprefix("RECORD "))
@@ -717,7 +610,7 @@ def test_a_failed_run_keeps_the_record_and_exits_1(
     folders: LocalConfig, capsys: pytest.CaptureFixture[str]
 ) -> None:
     (folders.footage_path / "GX000002.mp4").write_bytes(b"\x00" * 64)
-    assert bench.main(["run", "GX000002", "--encoder", "libx265", "--strays-every", "1"]) == 1
+    assert bench.main(["run", "GX000002", "--encoder", "libx265", "--strays-every", "1000"]) == 1
     out = capsys.readouterr().out
     path = Path(out.strip().splitlines()[-1].removeprefix("RECORD "))
     record = json.loads(path.read_text(encoding="utf-8"))

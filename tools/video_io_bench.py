@@ -15,15 +15,22 @@ the first frame asked for) and the encoder's first frame; the encoder's FFmpeg s
 ``open`` and is timed there. The first interval is kept apart from the summaries.
 
 Plan 4.3 / frame rule 7: an EXCLUSIVE run, best effort on a shared laptop. A telemetry thread
-and a watcher process record, without stopping the frame loop:
+records, without stopping the frame loop:
 
 - the resident memory of the process tree (this Python process and its FFmpeg children; the
   ``nvidia-smi`` processes the instrument itself starts are listed apart and not counted),
   every ``--memory-every`` seconds, with the peak and its members (N4);
 - the graphics card (clocks, temperature, utilisation, device-wide memory in use, power and
-  the active clock-event reasons) every ``--gpu-every`` seconds, with the memory peak;
-- in the watcher process (:class:`StrayWatch`), the processes that used more than a quarter of
-  one logical CPU over each ``--strays-every`` window, each marked as the run's own or a stray.
+  the active clock-event reasons) every ``--gpu-every`` seconds, with the memory peak.
+
+The strays (:class:`StrayWatch`: the processes that used more than a quarter of one logical CPU,
+each marked as the run's own or a stray) are read in the frame loop itself: primed before the
+run, read after every ``--strays-every`` frames and once more after ``close``. A strays window
+so covers the frames between two readings (the last one, the rest of the stream and
+``close``). A reading takes seconds (every process's counter is read), so the loop pauses for
+it: the pause is recorded and kept out of every frame figure and stage time. During a pause
+the decoder runs ahead, by at most what its pipe holds, so the frame right after each pause is
+recorded apart from the summaries, as the first frame is.
 
 Conditions (the strays over one second, then the same graphics-card reading, the CPU load over
 half a second and the CPU frequency) are recorded before and after each run. An NVENC run is
@@ -42,7 +49,7 @@ every run, so a run that fails keeps the runs before it. Usage::
     uv run python tools/video_io_bench.py floor [--dry-run] [OPTIONS]
 
 where OPTIONS, after the subcommand, are ``--config FILE``, ``--keep``, ``--software-decode``,
-``--memory-every S``, ``--gpu-every S`` and ``--strays-every S``.
+``--memory-every S``, ``--gpu-every S`` and ``--strays-every N`` (frames).
 
 ``floor`` runs :data:`FLOOR_PLAN`, ruling Q11's row set, in order. The free space is checked
 for every leg before the first run and again before each run. Exit status 0 when every run
@@ -56,7 +63,6 @@ import argparse
 import contextlib
 import json
 import math
-import multiprocessing
 import os
 import shutil
 import statistics
@@ -68,9 +74,8 @@ from collections.abc import Collection, Iterator, Sequence
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from fractions import Fraction
-from multiprocessing.process import BaseProcess
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any
 
 import psutil
 
@@ -93,29 +98,14 @@ at the camera's bit rate, so an output is about the source's size at most)."""
 STRAY_CPU_PERCENT = 25.0
 """A process above this share of one logical CPU over a window is listed."""
 
+STRAYS_EVERY_FRAMES = 300
+"""The strays are read after every this many frames by default."""
+
 _GPU_QUERY = (
     "clocks.sm,clocks.mem,clocks.video,temperature.gpu,utilization.gpu,utilization.encoder,"
     "utilization.decoder,memory.used,power.draw,clocks_event_reasons.active"
 )
 _SAMPLER_NAMES = frozenset({"nvidia-smi", "nvidia-smi.exe"})
-_WATCHER_WAIT_S = 60.0
-_WATCHER_JOIN_S = 10.0
-
-
-class Pipe(Protocol):
-    """One end of a :func:`multiprocessing.Pipe` (its type differs by platform)."""
-
-    def send(self, obj: Any) -> None:
-        """Send an object to the other end."""
-
-    def recv(self) -> Any:
-        """Receive an object from the other end."""
-
-    def poll(self, timeout: float | None = ...) -> bool:
-        """Return whether there is something to receive, waiting up to ``timeout`` seconds."""
-
-    def close(self) -> None:
-        """Close this end."""
 
 
 class BenchError(RuntimeError):
@@ -212,9 +202,8 @@ def _name(process: psutil.Process) -> str:
 def tree_rss(exclude: Collection[int] = ()) -> tuple[int, list[dict[str, Any]]]:
     """Return the resident bytes of this process tree and its members (name, pid, bytes).
 
-    The ``nvidia-smi`` samplers and the processes in ``exclude`` (the strays watcher) are the
-    instrument's, not the export's, and are left out; so is a member that exits between the
-    listing and the reading.
+    The ``nvidia-smi`` samplers and the processes in ``exclude`` are the instrument's, not the
+    export's, and are left out; so is a member that exits between the listing and the reading.
 
     Args:
         exclude: Process ids to leave out.
@@ -243,7 +232,7 @@ class StrayWatch:
     exits inside one window).
     Reading every process's counter takes seconds of CPU on Windows and holds the interpreter
     lock in long stretches (measured: a 0.26 s probe took 23 s beside a watch in a thread), so
-    during a run the watch lives in a process of its own (:func:`stray_loop`).
+    during a run it is read between frames, with the loop paused (see the module docstring).
     """
 
     def __init__(self, root: int | None = None) -> None:
@@ -294,9 +283,9 @@ class StrayWatch:
 
         Returns:
             The window's length in seconds and its busy processes (name, pid, percent of one
-            logical CPU, ``own`` True for the root process and its descendants: FFmpeg, the
-            instrument's ``nvidia-smi`` and the watcher; a new process also carries ``new`` and
-            ``alive_s``), busiest first.
+            logical CPU, ``own`` True for the root process and its descendants: FFmpeg and the
+            instrument's ``nvidia-smi``; a new process also carries ``new`` and ``alive_s``),
+            busiest first.
         """
         now = time.monotonic()
         busy = []
@@ -318,41 +307,6 @@ class StrayWatch:
         seconds = now - self._started
         self._started = now
         return {"seconds": round(seconds, 2), "busy": sorted(busy, key=lambda b: -b["cpu"])}
-
-
-def stray_loop(connection: Pipe, every: float, root: int) -> None:
-    """Send a :class:`StrayWatch` window every ``every`` seconds until told to stop.
-
-    Runs in the watcher process: it sends ``"ready"`` once primed, then a window each period;
-    on any message from the other end it sends the last window, tagged ``"final": True`` so the
-    other end can tell it from a periodic window still in the pipe, and returns.
-
-    Args:
-        connection: This end of the pipe.
-        every: The window length in seconds.
-        root: The run's process id.
-    """
-    watch = StrayWatch(root)
-    connection.send("ready")
-    while not connection.poll(every):
-        connection.send(watch.window())
-    connection.send({**watch.window(), "final": True})
-
-
-def _end_watcher(watcher: BaseProcess, ends: Sequence[Pipe], *, kill: bool) -> None:
-    """Join a started watcher and close the pipe ends.
-
-    The watcher is killed first when ``kill``, or when it has not ended within the join wait.
-    """
-    if watcher.pid is not None:
-        if kill:
-            watcher.kill()
-        watcher.join(timeout=_WATCHER_JOIN_S)
-        if watcher.is_alive():
-            watcher.kill()
-            watcher.join(timeout=_WATCHER_JOIN_S)
-    for end in ends:
-        end.close()
 
 
 def conditions(moment: str) -> dict[str, Any]:
@@ -381,168 +335,76 @@ def conditions(moment: str) -> dict[str, Any]:
 
 
 class Telemetry:
-    """Samples memory and the graphics card in a thread, and the strays in a watcher process."""
+    """Samples the process tree's memory and the graphics card in a thread."""
 
-    def __init__(self, *, memory_every: float, gpu_every: float, strays_every: float) -> None:
+    def __init__(self, *, memory_every: float, gpu_every: float) -> None:
         """Set the sampling periods in seconds.
 
         Args:
             memory_every: Between two readings of the process tree's resident memory.
             gpu_every: Between two graphics-card readings.
-            strays_every: The length of a strays window.
 
         Raises:
             ValueError: A period is not a finite number above zero.
         """
-        if not all(math.isfinite(p) and p > 0 for p in (memory_every, gpu_every, strays_every)):
+        if not all(math.isfinite(p) and p > 0 for p in (memory_every, gpu_every)):
             raise ValueError("every telemetry period must be a positive number of seconds")
-        self._periods = (memory_every, gpu_every, strays_every)
+        self._periods = (memory_every, gpu_every)
         self._stop = threading.Event()
         self._thread = threading.Thread(target=self._run, daemon=True)
-        self._watcher: BaseProcess | None = None
-        self._connection: Pipe | None = None
         self._started = 0.0
         self.peak_rss = 0
         self.peak_members: list[dict[str, Any]] = []
         self.peak_at_s = 0.0
         self.rss_samples = 0
         self.gpu: list[dict[str, Any]] = []
-        self.strays: list[dict[str, Any]] = []
         self.errors: list[str] = []
 
     def start(self) -> None:
-        """Start the watcher process, wait until it is primed, then start sampling.
-
-        Once the watcher is primed this process closes its copy of the watcher's pipe end, so
-        the watcher's own exit ends the pipe and is seen here.
-        """
-        context = multiprocessing.get_context("spawn")
-        mine, theirs = context.Pipe()
-        watcher = context.Process(
-            target=stray_loop, args=(theirs, self._periods[2], os.getpid()), daemon=True
-        )
-        try:
-            watcher.start()
-            if mine.poll(_WATCHER_WAIT_S) and mine.recv() == "ready":
-                self._watcher, self._connection = watcher, mine
-                theirs.close()
-            else:
-                self.errors.append("the strays watcher did not start")
-                _end_watcher(watcher, (mine, theirs), kill=True)
-        except Exception as error:  # telemetry never ends the run; the record says it failed
-            self.errors.append(f"the strays watcher failed: {type(error).__name__}: {error}")
-            _end_watcher(watcher, (mine, theirs), kill=True)
+        """Start sampling."""
         self._started = time.monotonic()
         self._thread.start()
 
     def _run(self) -> None:
-        memory_every, gpu_every, _ = self._periods
-        exclude = {self._watcher.pid} if self._watcher and self._watcher.pid else set()
+        memory_every, gpu_every = self._periods
         next_gpu = 0.0
         try:
             while True:
                 elapsed = time.monotonic() - self._started
-                self._sample_rss(elapsed, exclude)
+                self._sample_rss(elapsed)
                 if elapsed >= next_gpu:
                     self.gpu.append({"t_s": round(elapsed, 2), **gpu_reading()})
                     next_gpu = elapsed + gpu_every
-                self._receive(wait=0.0)
                 if self._stop.wait(memory_every):
                     break
         except Exception as exc:  # telemetry never ends the run; the record says it stopped
             self.errors.append(f"sampling stopped: {type(exc).__name__}: {exc}")
 
-    def _receive(self, wait: float) -> bool:
-        """Keep the windows in the pipe, waiting up to ``wait`` seconds for the first one.
-
-        An ended pipe (the watcher exited or was killed) is recorded by :meth:`_lost`; the
-        memory and graphics-card sampling go on.
-
-        Returns:
-            True when the watcher's final window was among them (nothing after it is read).
-        """
-        connection = self._connection
-        try:
-            while connection is not None and connection.poll(wait):
-                wait = 0.0
-                window = connection.recv()
-                elapsed = time.monotonic() - self._started
-                self.strays.append({"t_s": round(elapsed, 2), **window})
-                if window.get("final"):
-                    return True
-        except (OSError, EOFError) as error:
-            self._lost(error)
-        return False
-
-    def _lost(self, error: BaseException) -> None:
-        """Record when the watcher's pipe ended, close it and receive nothing more."""
-        elapsed = time.monotonic() - self._started
-        self.errors.append(
-            f"the strays watcher ended at {elapsed:.2f} s: {type(error).__name__}: {error}"
-        )
-        connection, self._connection = self._connection, None
-        if connection is not None:
-            with contextlib.suppress(OSError):
-                connection.close()
-
-    def _sample_rss(self, elapsed: float, exclude: Collection[int]) -> None:
-        total, members = tree_rss(exclude)
+    def _sample_rss(self, elapsed: float) -> None:
+        total, members = tree_rss()
         self.rss_samples += 1
         if total > self.peak_rss:
             self.peak_rss, self.peak_members, self.peak_at_s = total, members, elapsed
 
-    def _ask_final(self) -> None:
-        """Tell the live watcher to stop and receive until its final window or the wait ends."""
-        try:
-            if self._connection is not None:
-                self._connection.send("stop")
-        except OSError as error:
-            self._lost(error)
-        deadline = time.monotonic() + _WATCHER_WAIT_S
-        final = False
-        while not final and self._connection is not None:
-            left = deadline - time.monotonic()
-            if left <= 0:
-                self.errors.append(
-                    f"the strays watcher sent no final window within {_WATCHER_WAIT_S:g} s"
-                )
-                break
-            final = self._receive(wait=left)
-
     def stop(self) -> dict[str, Any]:
-        """Stop sampling and the watcher, and return what was recorded.
+        """Stop sampling and return what was recorded.
 
         Returns:
             The sampling periods, the memory peak (bytes, its members, when), the graphics-card
-            readings and their memory peak, the strays windows (the last one ends at the stop),
-            and the errors that stopped the watcher or the sampling, if any: a watcher that
-            ended during the run (when) or was not alive at the stop (its exit code; it is not
-            waited for), and a final window that did not come within the wait.
+            readings and their memory peak, and the errors that stopped the sampling, if any.
         """
         self._stop.set()
         if self._thread.is_alive():
             self._thread.join(timeout=60)
-        watcher = self._watcher
-        if watcher is not None:
-            if not watcher.is_alive():
-                self.errors.append(
-                    f"the strays watcher was not alive at the stop (exit code {watcher.exitcode})"
-                )
-                self._receive(wait=0.0)  # what it sent before it ended, then the pipe's end
-            elif self._connection is not None:
-                self._ask_final()
-            ends = (self._connection,) if self._connection is not None else ()
-            _end_watcher(watcher, ends, kill=False)
         used = [m for m in (memory_used_mib(r) for r in self.gpu) if m is not None]
         return {
-            "periods_s": dict(zip(("memory", "gpu", "strays"), self._periods, strict=True)),
+            "periods_s": dict(zip(("memory", "gpu"), self._periods, strict=True)),
             "peak_tree_rss_bytes": self.peak_rss,
             "peak_tree_rss_members": self.peak_members,
             "peak_tree_rss_at_s": round(self.peak_at_s, 2),
             "rss_samples": self.rss_samples,
             "peak_gpu_memory_used_mib": max(used) if used else None,
             "gpu": self.gpu,
-            "strays": self.strays,
             "errors": self.errors,
         }
 
@@ -647,7 +509,8 @@ def run_once(
     bit_depth: int | None,
     hw_decode: bool,
     keep: bool,
-    periods: tuple[float, float, float] = (0.25, 1.0, 30.0),
+    periods: tuple[float, float] = (0.25, 1.0),
+    strays_every: int = STRAYS_EVERY_FRAMES,
 ) -> dict[str, Any]:
     """Decode ``path`` with WP3.9's source and write every frame through the product sink.
 
@@ -664,14 +527,18 @@ def run_once(
         bit_depth: The output bit depth; the source's when None.
         hw_decode: Ask WP3.9's source for a CUDA decode (software when unavailable).
         keep: Keep the output instead of deleting it.
-        periods: The telemetry periods (memory, graphics card, strays) in seconds.
+        periods: The telemetry periods (memory, graphics card) in seconds.
+        strays_every: Read the strays after every this many frames.
 
     Returns:
         The run's record.
 
     Raises:
         BenchError: The output exists already (it is left as it was).
+        ValueError: ``strays_every`` is below one.
     """
+    if strays_every < 1:
+        raise ValueError("strays_every must be a positive number of frames")
     output.parent.mkdir(parents=True, exist_ok=True)
     try:
         with output.open("xb"):
@@ -680,7 +547,9 @@ def run_once(
         raise BenchError(f"{output} exists; a run never overwrites a file") from error
     finished = False
     try:
-        record = _measure(path, output, encoder, quality, bit_depth, hw_decode, periods)
+        record = _measure(
+            path, output, encoder, quality, bit_depth, hw_decode, periods, strays_every
+        )
         finished = True
     finally:
         if not (finished and keep):
@@ -697,18 +566,26 @@ def _measure(
     quality: str,
     bit_depth: int | None,
     hw_decode: bool,
-    periods: tuple[float, float, float],
+    periods: tuple[float, float],
+    strays_every: int,
 ) -> dict[str, Any]:
     """Run :func:`run_once`'s decode-encode loop into the existing, empty ``output``."""
     record: dict[str, Any] = {"before": conditions("before")}
-    telemetry = Telemetry(memory_every=periods[0], gpu_every=periods[1], strays_every=periods[2])
+    telemetry = Telemetry(memory_every=periods[0], gpu_every=periods[1])
     source = FFmpegVideoSource()
     sink = _BenchSink()
     sampler = vf._Sampler() if encoder == "hevc_nvenc" else None
     intervals: list[float] = []
     waits: list[float] = []
     writes: list[float] = []
+    pauses: list[float] = []
+    after_pause: list[int] = []
+    windows: list[dict[str, Any]] = []
     stream: Iterator[Frame] | None = None
+    began = time.perf_counter()
+    watch = StrayWatch()
+    strays: dict[str, Any] = {"every_frames": strays_every, "prime_s": time.perf_counter() - began}
+    started = time.perf_counter()  # set again below; here for the last reading on a failure
     try:
         telemetry.start()
         if sampler is not None:
@@ -733,6 +610,11 @@ def _measure(
             writes.append(written - decoded)
             intervals.append(written - previous)
             previous = written
+            if len(intervals) % strays_every == 0:
+                windows.append(_strays_window(watch, len(intervals), written - started))
+                previous = time.perf_counter()
+                pauses.append(previous - written)
+                after_pause.append(len(intervals))  # the index of the next frame
         streamed = time.perf_counter()
         report = sink.close()
         closed = time.perf_counter()
@@ -747,7 +629,12 @@ def _measure(
             sink.ended = vf._clock()
         samples = sampler.stop() if sampler is not None else None
         record["telemetry"] = telemetry.stop()
+        windows.append(_strays_window(watch, len(intervals), time.perf_counter() - started))
+        record["strays"] = {**strays, "pauses_s": pauses, "windows": windows}
     count = report.frames_written
+    paused = sum(pauses)
+    apart = {0, *after_pause}
+    kept = [i for i in range(len(intervals)) if i not in apart]
     cuda = hw_decode and cuda_decode_available()
     record.update(
         {
@@ -767,16 +654,19 @@ def _measure(
             "stages_s": {
                 "probe": probed - started,
                 "open": opened - probed,
-                "stream": streamed - opened,
+                "stream": streamed - opened - paused,
                 "close": closed - streamed,
-                "total": closed - started,
+                "total": closed - started - paused,
+                "strays_pauses": paused,
             },
-            "total": rate(closed - started, count, info.video.frame_rate),
-            "stream": rate(streamed - opened, count, info.video.frame_rate),
+            "total": rate(closed - started - paused, count, info.video.frame_rate),
+            "stream": rate(streamed - opened - paused, count, info.video.frame_rate),
             "first_frame_s": intervals[0] if intervals else None,
-            "per_frame": summarise(intervals[1:]),
-            "decode_wait": summarise(waits[1:]),
-            "write": summarise(writes[1:]),
+            "after_pause_frames": [i for i in after_pause if i < len(intervals)],
+            "after_pause": summarise([intervals[i] for i in after_pause if i < len(intervals)]),
+            "per_frame": summarise([intervals[i] for i in kept]),
+            "decode_wait": summarise([waits[i] for i in kept]),
+            "write": summarise([writes[i] for i in kept]),
             "per_frame_s": [round(value, 5) for value in intervals],
             "decode_wait_s": [round(value, 5) for value in waits],
             "write_s": [round(value, 5) for value in writes],
@@ -796,6 +686,18 @@ def _measure(
         }
     )
     return record
+
+
+def _strays_window(watch: StrayWatch, frames: int, at_s: float) -> dict[str, Any]:
+    """Read ``watch`` after ``frames`` frames, ``at_s`` seconds into the run, timing the read."""
+    began = time.perf_counter()
+    window = watch.window()
+    return {
+        "after_frame": frames,
+        "at_s": round(at_s, 2),
+        **window,
+        "read_s": round(time.perf_counter() - began, 3),
+    }
 
 
 # --- the command line ----------------------------------------------------------------------
@@ -831,6 +733,21 @@ def period(text: str) -> float:
     return seconds
 
 
+def frame_count(text: str) -> int:
+    """Parse a number of frames: a whole number above zero.
+
+    Raises:
+        argparse.ArgumentTypeError: Anything else.
+    """
+    try:
+        frames = int(text)
+    except ValueError:
+        frames = 0
+    if frames < 1:
+        raise argparse.ArgumentTypeError(f"a frame count must be a positive whole number: {text}")
+    return frames
+
+
 def _write(path: Path, record: dict[str, Any]) -> None:
     path.write_text(json.dumps(record, indent=2, default=str), encoding="utf-8")
 
@@ -850,7 +767,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     options.add_argument("--software-decode", action="store_true", help="decode without CUDA")
     options.add_argument("--memory-every", type=period, default=0.25, help="seconds")
     options.add_argument("--gpu-every", type=period, default=1.0, help="seconds")
-    options.add_argument("--strays-every", type=period, default=30.0, help="seconds")
+    options.add_argument(
+        "--strays-every", type=frame_count, default=STRAYS_EVERY_FRAMES, help="frames"
+    )
     parser = argparse.ArgumentParser(description=(__doc__ or "").splitlines()[0])
     commands = parser.add_subparsers(dest="command", required=True)
     one = commands.add_parser("run", help="one leg", parents=[options])
@@ -903,7 +822,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                     bit_depth=leg.bit_depth,
                     hw_decode=not args.software_decode,
                     keep=args.keep,
-                    periods=(args.memory_every, args.gpu_every, args.strays_every),
+                    periods=(args.memory_every, args.gpu_every),
+                    strays_every=args.strays_every,
                 )
             except Exception as error:
                 record["failed"] = {
