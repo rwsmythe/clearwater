@@ -14,6 +14,7 @@ shows tells which statistics were supplied. Planted wrong panels fail the same s
 from __future__ import annotations
 
 import dataclasses
+import random
 import threading
 import time
 from collections import defaultdict
@@ -39,6 +40,7 @@ from clearwater.gui.timeline import (
     OWNER_ANALYSIS,
     OWNER_TIMELINE,
     TimelinePanel,
+    _blocked,
     install_timeline,
 )
 from clearwater.interfaces import Frame, Image, Parameter, Statistics
@@ -1149,6 +1151,237 @@ def test_closing_the_window_mid_analysis_does_not_report_a_completion(make_env) 
     env.window.close()
     env.qtbot.wait(100)
     assert "complete" not in env.phases and env.analysis.cancelled_runs == [0]
+
+
+# The latest-intent rule of the position lane: a seeded random interleaving (WP3.18, rounds 1-4).
+
+INTERLEAVE_STORED = (0, 4000, 7000, 10000, 13000)  # the frames sit at the stored pts
+INTERLEAVE_SEEDS = 200
+INTERLEAVE_STEPS = 28
+
+
+class _ManualHandle:
+    """The handle of a job the test runs by hand."""
+
+    def __init__(self) -> None:
+        self.running = True
+
+    def cancel(self) -> None:
+        return
+
+    def is_running(self) -> bool:
+        return self.running
+
+
+class ManualRunner:
+    """A job runner that runs a job only when the test says so: the lane's arrival order."""
+
+    def __init__(self) -> None:
+        self.pending: list[tuple[Any, Any, _ManualHandle]] = []
+
+    def run(self, job: Any, *, on_done: Any, on_progress: Any = None) -> _ManualHandle:
+        handle = _ManualHandle()
+        self.pending.append((job, on_done, handle))
+        return handle
+
+    def finish_one(self) -> None:
+        """Run the oldest pending job (the 'worker') and deliver its result (the main thread)."""
+        job, on_done, handle = self.pending.pop(0)
+        result = job(StubProgress())
+        handle.running = False
+        on_done(result)
+
+
+def scenario_interleave(
+    env: Env,
+    monkeypatch: pytest.MonkeyPatch,
+    seeds: range = range(INTERLEAVE_SEEDS),
+    steps: int = INTERLEAVE_STEPS,
+) -> None:
+    """Press, move, release, lane results and decodes in any order: the latest intent wins.
+
+    After every step: no ``set_position`` while the slider is down, a proxy shown only while it
+    is down and only for a value visited in this drag, the handle moved only by the hand while
+    down, no error presented. At rest with the slider down the preview shows the proxy of the
+    handle's value; after the release and a drain the position is the last intent's pts.
+    """
+    complete(env)
+    session = env.session
+    slider = env.slider()
+    stored = INTERLEAVE_STORED
+    runner = ManualRunner()
+    env.panel._jobs = runner
+    violations: list[str] = []
+    errors: list[Any] = []
+    positions: list[int] = []
+    decodes: list[int] = []
+    display: list[tuple[str, int]] = []
+    visited: set[int] = set()
+    presenter = presenter_of(env.window)
+    original_present = presenter.present
+
+    def present(message: Any) -> None:
+        if message.severity == "error":
+            errors.append(message.text)
+        original_present(message)
+
+    def set_position(pts: int, *, statistics: Any = None) -> None:
+        if slider.isSliderDown():
+            violations.append(f"set_position({pts}) while the slider is down")
+        positions.append(pts)
+        decodes.append(pts)
+
+    def show_proxy(proxy: Any, corrected: Any = None) -> None:
+        pts = next(t for t in stored if t % 251 == int(proxy[0, 0, 0]))
+        if not slider.isSliderDown():
+            violations.append(f"the proxy of {pts} shown while the slider is up")
+        elif pts not in visited:
+            violations.append(f"the proxy of {pts} shown, not a value of this drag")
+        display.append(("proxy", pts))
+
+    monkeypatch.setattr(presenter, "present", present)
+    monkeypatch.setattr(session, "set_position", set_position)
+    monkeypatch.setattr(env.window.controller, "show_proxy", show_proxy)
+    assert len({t % 251 for t in stored}) == len(stored)
+
+    def decode(rng: random.Random) -> None:
+        requested = decodes[-1]
+        decodes.clear()  # the shell's frame worker keeps the latest only
+        roll = rng.random()
+        shown = requested if roll < 0.6 else (requested + 1500 if roll < 0.8 else None)
+        if shown is not None:
+            display.append(("frame", shown))
+        session.frame_decoded.emit(FrameOutcome(requested, shown))
+
+    def drain(rng: random.Random) -> None:
+        for _ in range(100):
+            if runner.pending:
+                runner.finish_one()
+            elif decodes:
+                decode(rng)
+            else:
+                return
+        violations.append("the lane did not come to rest")
+
+    where: dict[str, Any] = {"seed": 0, "trace": []}
+
+    def fail(text: str) -> None:
+        raise AssertionError(f"interleaving seed {where['seed']}: {text}; steps {where['trace']}")
+
+    def check() -> None:
+        if violations:
+            fail(violations[0])
+        if errors:
+            fail(f"an error was presented: {errors[0]}")
+
+    for seed in seeds:
+        rng = random.Random(seed)
+        trace: list[str] = []
+        where.update(seed=seed, trace=trace)
+        positions.clear()
+        decodes.clear()
+        display.clear()
+        visited.clear()
+        intent_pts: int | None = None
+
+        for _ in range(steps):
+            step = rng.choice(("press", "move", "move", "release", "lane", "lane", "decode"))
+            before = slider.value()
+            down = slider.isSliderDown()
+            if step == "press" and not down:
+                slider.setSliderDown(True)
+                visited.clear()
+                visited.add(stored[slider.value()])
+                intent_pts = stored[slider.value()]
+            elif step == "move":
+                index = rng.choice([i for i in range(len(stored)) if i != before])
+                slider.setValue(index)
+                visited.add(stored[index])
+                intent_pts = stored[index]
+            elif step == "release" and down:
+                slider.setSliderDown(False)
+                intent_pts = stored[slider.value()]
+            elif step == "lane" and runner.pending:
+                runner.finish_one()
+            elif step == "decode" and decodes:
+                decode(rng)
+            else:
+                continue
+            trace.append(step)
+            if slider.isSliderDown() and step != "move" and slider.value() != before:
+                violations.append(f"the handle moved from {before} to {slider.value()} by itself")
+            check()
+        if slider.isSliderDown():  # at rest with the hand on the handle
+            drain(rng)
+            check()
+            if display[-1:] != [("proxy", stored[slider.value()])]:
+                fail(f"at rest the preview shows {display[-1:]}, not the proxy of the handle")
+            slider.setSliderDown(False)
+            intent_pts = stored[slider.value()]
+            trace.append("release")
+        drain(rng)
+        check()
+        if intent_pts is not None and positions[-1:] != [intent_pts]:
+            fail(f"the position is {positions[-1:]}, not the last intent {intent_pts}")
+
+
+class IntentlessPressPanel(TimelinePanel):
+    """Planted (round 4): a press takes no intent and asks for no proxy."""
+
+    def _on_pressed(self) -> None:
+        self._dragging = True
+        self._drag += 1
+
+
+class NoReshowPanel(TimelinePanel):
+    """Planted (round 2, #3): a frame decoded during a drag does not bring the proxy back."""
+
+    def _reshow_proxy(self) -> None:
+        return
+
+
+class FollowingHandlePanel(TimelinePanel):
+    """Planted (round 3, #1): the handle follows the shown frame also under the hand."""
+
+    def _follow(self, pts: int) -> None:
+        self._slider_pts = pts
+        with _blocked(self._slider):
+            self._slider.setValue(self._index_of(pts))
+        self._update_time(pts)
+
+
+class NewestCommitPanel(TimelinePanel):
+    """Planted (round 1, F1): a commit applies if it is the newest COMMIT, drags ignored."""
+
+    _last_commit = 0
+
+    def _request(self, kind: Any, pts: int) -> None:
+        super()._request(kind, pts)
+        if kind == "commit":
+            self._last_commit = self._seq
+
+    def _current(self, request: Any) -> bool:
+        if request.kind == "proxy":
+            return super()._current(request)
+        return request.ref == self._last_commit
+
+
+def test_the_latest_intent_wins_over_every_seeded_interleaving(
+    make_env, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    env = make_env(ticks=INTERLEAVE_STORED, gated=(0,))
+    scenario_interleave(env, monkeypatch)
+
+
+@pytest.mark.parametrize(
+    "plant", [IntentlessPressPanel, NoReshowPanel, FollowingHandlePanel, NewestCommitPanel]
+)
+def test_planted_lane_orderings_fail_the_interleaving_by_name(
+    make_env, monkeypatch: pytest.MonkeyPatch, plant: type[TimelinePanel]
+) -> None:
+    env = make_env(ticks=INTERLEAVE_STORED, gated=(0,), panel_class=plant)
+    with pytest.raises(AssertionError, match="interleaving seed"):
+        scenario_interleave(env, monkeypatch)
 
 
 # V7, the default install.
