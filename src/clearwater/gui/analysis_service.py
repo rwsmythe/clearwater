@@ -77,11 +77,12 @@ class ClipAnalysis(Protocol):
     def retarget(self, parameters: ParameterSet, *, focus_pts: int | None = None) -> bool:
         """Offer new parameters to the run in flight (main thread; added at the round-0 ruling).
 
-        Called only while the GUI has a run in flight (from its submission to its done
-        callback), cheap, never waiting for :meth:`run`. The GUI enforces the condition and
-        raises ``RuntimeError`` itself when asked to retarget with no run in flight; an
-        implementation need not prove it, and in the window where its run has already ended
-        returns False. No run is ever cancelled for a parameter change.
+        Called only while a run is in flight, which means from the GUI's ``jobs.run`` until
+        that job's ``on_done``; cheap, never waiting for :meth:`run`. The GUI enforces the
+        condition and raises ``RuntimeError`` itself when asked to retarget with no run in
+        flight. Between the return of :meth:`run` and the ``on_done`` an implementation returns
+        False, never raises (it cannot tell that window from a bug). No run is ever cancelled
+        for a parameter change.
 
         Args:
             parameters: The new parameter set (same method as the run's).

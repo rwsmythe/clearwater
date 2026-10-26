@@ -567,6 +567,27 @@ def test_a_cancelled_run_that_finished_anyway_is_still_cancelled(make_env) -> No
     assert env.session.statistics() is None
 
 
+@pytest.mark.parametrize("ignore_cancel", [False, True])
+def test_a_cancel_by_a_third_party_is_never_a_completion(make_env, ignore_cancel: bool) -> None:
+    env = make_env(gated=(0,), ignore_cancel=ignore_cancel)
+    env.open()
+    env.wait(lambda: env.session.analysis().done == 1)
+    env.window.jobs.cancel()  # not the panel's cancel: the runner's own (close does the same)
+    env.analysis.release(0)  # an analysis that ignores the cancel finishes anyway
+    env.phase_is("cancelled")
+    assert "complete" not in env.phases
+    assert env.session.statistics() is None
+    assert env.button("timeline.analyse").isEnabled()
+
+
+def test_retarget_with_no_run_in_flight_raises_in_the_panel(make_env) -> None:
+    env = make_env(gated=(0,))
+    complete(env)  # the run ended and its on_done was delivered
+    with pytest.raises(RuntimeError):
+        env.panel._retarget()
+    assert env.analysis.retargets == []
+
+
 def test_a_failed_analysis_says_why_keeps_the_preview_and_clears_on_analyse(make_env) -> None:
     env = make_env(gated=(), fail_runs=(0,))
     env.open()

@@ -8,11 +8,13 @@ corrected frame when it stops), and switches the preview from the provisional to
 statistics when the analysis completes (D108, V18). Every frame it asks the shell to show is
 paired with its own pts's statistics (DR-44 (a)); no index is ever a key (AD-6, DR-23).
 
-Main thread only, except the job callables, which run ``ClipAnalysis.run``, ``proxy`` and
-``statistics`` on worker threads. A parameter change never cancels a run (CHARC ruling on
-Q-A): it is offered to the run in flight with ``ClipAnalysis.retarget``; when that does not
-absorb it, the run finishes and a follow-up run with the latest parameters starts from its done
-callback. The only cancels are the user's, a method change and a source change or close.
+Whoever cancels a job, its result is "cancelled", never complete (the job callable checks the
+IF-8 progress after the seam call returns). Main thread only, except the job callables, which
+run ``ClipAnalysis.run``, ``proxy`` and ``statistics`` on worker threads. A parameter change
+never cancels a run (CHARC ruling on Q-A): it is offered to the run in flight with
+``ClipAnalysis.retarget``; when that does not absorb it, the run finishes and a follow-up run
+with the latest parameters starts from its done callback. The GUI itself cancels only for the
+user (D70), a method change and a source change.
 """
 
 from __future__ import annotations
@@ -25,7 +27,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Any, Literal
 
-from PySide6.QtCore import QEvent, QObject, QSignalBlocker, Qt
+from PySide6.QtCore import QSignalBlocker, Qt
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
@@ -65,6 +67,9 @@ OWNER_TIMELINE = "timeline"
 
 LABEL_ANALYSING = "Analysing the clip"
 """The status text of the first run of an analysis."""
+
+CANCELLED = "cancelled"
+"""The ``JobResult.failure`` of a job the runner cancelled, whoever cancelled it."""
 
 LABEL_UPDATING = "Updating statistics"
 """The status text of a run that follows a parameter change (AD-15)."""
@@ -157,7 +162,6 @@ class TimelinePanel(QWidget):
         self._shown_pts: int | None = None
         self._shown_statistics: StatsMap | None = None
         self._scrub_error_shown = False
-        self._closing = False
 
         self._slider = QSlider(Qt.Orientation.Horizontal, self)
         self._slider.setObjectName("timeline.slider")
@@ -193,22 +197,11 @@ class TimelinePanel(QWidget):
         self._session.parameters_changed.connect(self._on_parameters)
         self._session.analysis_changed.connect(self._update_controls)
         self._session.frame_decoded.connect(self._on_frame_decoded)
-        context.window.installEventFilter(self)
         self._reset_scrubber()
         self._update_controls()
         current = self._session.source()
         if current is not None:
             self._on_source(current)
-
-    def eventFilter(self, watched: QObject, event: QEvent) -> bool:  # noqa: N802 -- Qt override
-        """Note that the window is closing: the shell then cancels every job itself.
-
-        The shell cancels all jobs at close, so a job that returns early is not "complete";
-        once the window closes the panel ignores every callback.
-        """
-        if watched is self._context.window and event.type() == QEvent.Type.Close:
-            self._closing = True
-        return False
 
     # Public controls (the buttons call these).
 
@@ -319,7 +312,12 @@ class TimelinePanel(QWidget):
 
         def job(progress: Progress) -> JobResult:
             analysis.run(parameters, progress, focus_pts=focus)
-            return JobResult(True, (), (), None, "analysis", time.perf_counter() - began)
+            # Whoever cancelled (the user, a method change, a source change, the runner's own
+            # cancel at close), a cancelled job is never complete, even if the analysis finished
+            # first (DR-47's shape; conservative: "Analyse" then costs the engine nothing).
+            ok = not progress.cancelled()
+            failure = None if ok else CANCELLED
+            return JobResult(ok, (), (), failure, "analysis", time.perf_counter() - began)
 
         try:
             handle = self._jobs.run(
@@ -341,7 +339,7 @@ class TimelinePanel(QWidget):
     ) -> None:
         """Main thread: a progress report of the current run."""
         run = self._run
-        if self._closing or generation != self._generation or run is None or run.ticket != ticket:
+        if generation != self._generation or run is None or run.ticket != ticket:
             return
         if run.reason is not None:
             return
@@ -352,7 +350,7 @@ class TimelinePanel(QWidget):
     def _on_done(self, generation: int, ticket: int, result: JobResult) -> None:
         """Main thread: the run ended; cancelled, failed, followed up or complete."""
         run = self._run
-        if self._closing or generation != self._generation or run is None or run.ticket != ticket:
+        if generation != self._generation or run is None or run.ticket != ticket:
             return
         self._run = None
         self._refresh_pts()
@@ -360,7 +358,8 @@ class TimelinePanel(QWidget):
             self._rebuild_pending = False
             self._build_and_run()
             return
-        if run.reason is not None:  # the user's cancel (D70): the GUI is the only source of cancel
+        cancelled = run.reason is not None or result.failure == CANCELLED
+        if cancelled:  # the user's cancel (D70), or a third party's: either way not complete
             self._epoch += 1
             self._session.set_statistics(None)
             self._session.set_analysis(AnalysisState("cancelled", message="Analysis cancelled"))
@@ -538,7 +537,9 @@ class TimelinePanel(QWidget):
                 box["proxy"] = analysis.proxy(request.pts)
             elif want_statistics:
                 box["statistics"] = analysis.statistics(request.pts)
-            return JobResult(True, (), (), None, "analysis", time.perf_counter() - began)
+            ok = not progress.cancelled()
+            failure = None if ok else CANCELLED
+            return JobResult(ok, (), (), failure, "analysis", time.perf_counter() - began)
 
         try:
             self._lane = self._jobs.run(
@@ -551,9 +552,12 @@ class TimelinePanel(QWidget):
         self, generation: int, request: _Request, box: dict[str, Any], result: JobResult
     ) -> None:
         """Main thread: a lane job ended; act on it if it is still wanted, then run the next."""
-        if self._closing or generation != self._generation:
+        if generation != self._generation:
             return
         self._lane = None
+        if result.failure == CANCELLED:  # cancelled by anyone (close included): not a result
+            self._pump()
+            return
         if not result.ok:
             self._scrub_failed(result.failure or "The frame could not be read.")
         elif request.kind == "proxy":
