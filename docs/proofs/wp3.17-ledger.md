@@ -9,7 +9,7 @@ value is the user-facing value, shown as declared).
 
 | Round | Date | Blocking (crit/maj) | Minor | In/out envelope | NEW/REOPENED | Reverts | Fix kind | Transport | Depth |
 |---|---|---|---|---|---|---|---|---|---|
-| 0 (design) | 2026-10-26 | n/a | n/a | n/a | n/a | n/a | n/a | n/a | (dispatcher fills; a cell cannot read its own) |
+| 0 (design) | 2026-10-26 | n/a | n/a | n/a | n/a | n/a | n/a | n/a | 123,285 (dispatcher, round-0 yield) |
 
 ## Round 0: the design table (brief task 1)
 
@@ -225,4 +225,6 @@ and unbounded float and int, bool, enum, nullable bounded float, nullable bool; 
 
 ### 11. `scripts/cell_depth.py`
 
-A cell cannot read its own depth (recipe section 5); the dispatcher fills the Depth column.
+A cell cannot read its own depth (recipe section 5); the dispatcher fills the Depth column (round 0: 123,285).
+
+Round-0 ruling (dispatcher, FINAL): table approved; STOP-1, STOP-2 (all four) and STOP-3 accepted as recommended. STOP-1 additionally requires a test with a test method that has the same kind of relation, showing the ValueError reaches the user as the preview's `shell.preview` error, and a named limit / consumer note (an IF-3 constraints field would be an AD-20 matter).
