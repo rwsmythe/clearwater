@@ -928,6 +928,72 @@ def test_a_cleanup_error_never_replaces_the_original_error(
     out.unlink(missing_ok=True)
 
 
+def _wedged(timeout: float | None = None) -> int:
+    raise subprocess.TimeoutExpired("ffmpeg", timeout or 0)
+
+
+def test_abort_deletes_out_path_when_ffmpeg_does_not_end_in_time(
+    sample: Sample, tmp_path: Path
+) -> None:
+    # Round-3 finding 1: a process step that raised skipped the deletion, and a second abort
+    # was a no-op.
+    out = tmp_path / "out.mp4"
+    sink, _ = _opened(sample("vid-vfr"), out)
+    process = sink._process
+    assert process is not None
+    real_wait = process.wait
+    process.wait = _wedged
+    try:
+        sink.abort()
+        assert not out.exists()
+    finally:
+        process.wait = real_wait
+        process.kill()
+        real_wait()
+
+
+def test_a_second_abort_deletes_what_the_first_could_not(
+    sample: Sample, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    out = tmp_path / "out.mp4"
+    sink, _ = _opened(sample("vid-vfr"), out)
+    remove = encode_module._remove
+    calls: list[Path] = []
+
+    def held_once(path: Path) -> None:
+        calls.append(path)
+        if len(calls) == 1:
+            raise PermissionError("the file is in use")
+        remove(path)
+
+    monkeypatch.setattr(encode_module, "_remove", held_once)
+    sink.abort()
+    assert out.exists()  # the first deletion failed (and abort did not raise)
+    sink.abort()
+    assert not out.exists() and calls == [out, out]
+
+
+def test_a_failure_deletes_out_path_and_keeps_the_first_error_when_ffmpeg_hangs(
+    sample: Sample, tmp_path: Path
+) -> None:
+    out = tmp_path / "out.mp4"
+    sink, frames = _opened(sample("vid-vfr"), out)
+    process = sink._process
+    assert process is not None
+    real_wait = process.wait
+    process.wait = _wedged
+    try:
+        with pytest.raises(VideoEncodeError) as caught:
+            sink.write(replace(frames[0], device="cuda:0"))
+        assert caught.value.kind == "frame"
+        assert any("TimeoutExpired" in note for note in getattr(caught.value, "__notes__", []))
+        assert not out.exists()
+    finally:
+        process.wait = real_wait
+        process.kill()
+        real_wait()
+
+
 # --- composition with the safe write (N8, 8.4) ------------------------------------------------
 
 

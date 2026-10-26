@@ -1,10 +1,9 @@
 # WP3.10 -- Video encode, mux and timing (report)
 
-**Status:** DRAFT (seat 3, after the Reviewer A round-1 remediation), branch `wp3.10` from main
-`de206e2`. The synthetic and fixture legs are
-complete; the footage legs (the GX011627 product leg through WP3.9's decoder, the AD-12 quality
-table, the export FLOOR speed row) wait for WP3.9 on main (brief question 12) and are marked
-PENDING below. Round 0 (the pts-carrier spike, the design table, the rulings) is recorded in
+**Status:** DRAFT (seat 4, after the Reviewer A round-3 remediation), branch `wp3.10` rebased
+onto main `ac4be92` (WP3.9's decoder merged). The synthetic and fixture legs are complete; the
+footage legs (the GX011627 product leg through WP3.9's decoder, the AD-12 quality table, the
+export FLOOR speed row) wait for the dispatcher's windows and are marked PENDING below. Round 0 (the pts-carrier spike, the design table, the rulings) is recorded in
 `docs/proofs/wp3.10-ledger.md`; its evidence is `C:\Users\rwsmy\clearwater-review-evidence\wp3.10\r0\`.
 
 ## 1. What was built
@@ -97,8 +96,11 @@ kept audio packets with dts below 1.4787 s).
   A mismatch is `verify_failed`. Returns `SinkReport(frames_written, warnings, not_carried)`.
 - **Failure** anywhere in `open` after FFmpeg starts (sending the header), `write` or `close`: FFmpeg is killed, its
   pipes closed, `out_path` deleted, the ORIGINAL error raised; a cleanup error is attached as a
-  note (`add_note`), never in its place (DR-20 (6)). Every failure is final. **`abort`** is
-  idempotent, never raises, deletes `out_path` and nothing else.
+  note (`add_note`), never in its place (DR-20 (6)); `out_path` is deleted in a `finally`, so a
+  process step that raises (FFmpeg not ending within 30 s) never skips the deletion (round-3
+  finding 1). Every failure is final. **`abort`** is idempotent, never raises, deletes `out_path`
+  and nothing else; after a failure or an earlier `abort` whose cleanup did not finish it repeats
+  the cleanup (a second `abort` deletes what the first could not); after `close` it does nothing.
 - **Threads:** the caller's thread writes stdin; one daemon thread drains stderr into an 8 KiB
   tail (ASCII-escaped in messages); stdout is discarded. A dead encoder is seen at the next write
   or inside the wait (DR-28 (4)).
@@ -178,7 +180,7 @@ one clock for the NVENC proof; negative pts refused at `open`; no `FFREPORT` fil
 detection, the encoder or the listings; the header built before FFmpeg starts; a failed output
 listing an error; `abort` after a refused `open` deleting `out_path`.
 
-## 7. AD-12 quality table and the speed row -- PENDING (WP3.9)
+## 7. AD-12 quality table and the speed row -- PENDING (a footage window and the exclusive window)
 
 ## 8. Debt and decided items
 

@@ -341,7 +341,7 @@ class FFmpegVideoSink:
 
     One sink writes one output: ``open``, ``write`` per frame in pts order, then ``close`` (or
     ``abort``). Any failure is final: the encoder is stopped, the output deleted, and the sink
-    accepts nothing more except ``abort``, which is then a no-op.
+    accepts nothing more except ``abort``, which then only repeats that cleanup.
     """
 
     def __init__(self) -> None:
@@ -531,11 +531,16 @@ class FFmpegVideoSink:
 
         Idempotent and never raises: it may run while another error is being handled, and that
         error must stay the one reported (DR-20 (6)). Deletes ``out_path`` and nothing else.
+        After a failure or an earlier ``abort`` whose cleanup did not finish, it tries again
+        (stops FFmpeg if it still runs, deletes ``out_path`` if it is still there); after a
+        successful ``close`` it does nothing (the output is the caller's).
         """
+        if self._phase == "closed":
+            return
         if self._phase in ("new", "open"):
             self._phase = "aborted"
-            with contextlib.suppress(Exception):
-                self._cleanup()
+        with contextlib.suppress(Exception):
+            self._cleanup()
 
     # --- open -------------------------------------------------------------------------------
 
@@ -829,16 +834,22 @@ class FFmpegVideoSink:
         raise error
 
     def _cleanup(self) -> None:
-        """Kill FFmpeg if it runs, close its pipes, and delete ``out_path``."""
-        process = self._process
-        if process is not None:
-            if process.poll() is None:
-                process.kill()
-            with contextlib.suppress(OSError, ValueError):
-                if process.stdin is not None:
-                    process.stdin.close()
-            process.wait(timeout=30)
-            if self._stderr_thread is not None:
-                self._stderr_thread.join(timeout=5)
-        if self._out_path is not None:
-            _remove(self._out_path)
+        """Kill FFmpeg if it runs, close its pipes, and delete ``out_path``.
+
+        ``out_path`` is deleted even when a process step raises (round-3 finding 1). Raises the
+        process step's error, or the deletion's (with the process step's as its context).
+        """
+        try:
+            process = self._process
+            if process is not None:
+                if process.poll() is None:
+                    process.kill()
+                with contextlib.suppress(OSError, ValueError):
+                    if process.stdin is not None:
+                        process.stdin.close()
+                process.wait(timeout=30)
+                if self._stderr_thread is not None:
+                    self._stderr_thread.join(timeout=5)
+        finally:
+            if self._out_path is not None:
+                _remove(self._out_path)
