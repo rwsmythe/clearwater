@@ -5,8 +5,7 @@
 `wp3.11` (base `de206e2`). **Module:** `src/clearwater/analysis/` (`proxy.py`, `smoothing.py`,
 `store.py`, `engine.py`). **Instrument:** `tools/step_aware_eval.py`. **Ledger:**
 `docs/proofs/wp3.11-ledger.md`. **Status:** complete for review: the V3 ruling implemented, the
-step-aware figures re-run; Reviewer A in progress (rounds in the ledger); the Y-1 text is reconciled with
-WP3.4's at the gate.
+step-aware figures re-run; Reviewer A converged at round 3 (rounds in the ledger).
 
 ## Public API (`clearwater.analysis`)
 
@@ -141,18 +140,31 @@ the step columns are the rendered change across +-1 s over the source's.
 
 ## Y-1 (the statistics contract; one text identical to WP3.4's report)
 
-DRAFT, to be reconciled with WP3.4's at the gate. IF-3 fixes the signatures, not what a record
-holds or who calls `closed_form`; read as follows (an IF-3 reading, not an amendment). (a)
-`analyze` returns every name of the stage's `Stage.statistics` for that frame, render-ready, as
-float64 host arrays of a fixed shape per name. (b) White-balance `gains` are the gray-world gains
-BEFORE the strength and the D99 clamp; strength and clamp are applied inside `render` and inside
-later stages' `analyze`, after smoothing (AD-6). (c) Ancuti `alpha` is the capped alpha per
-frame, smoothed as a value (AD-6, WP1.4b claim 10). (d) `closed_form` returns the full record
-with every parameter-dependent name recomputed from the measured names, or None when the stage's
-measurement depends on parameters or earlier stages: in v1 non-None only for Ancuti
-`compensation`. (e) Ancuti `compensation` is the only `source_only` stage; the engine caches the
-record `analyze` returned and never uses a cached record without passing it through
-`closed_form` with the current parameters.
+> **Q1 (Y-1) RULED as recommended**, and it is an IF-3 READING, not an amendment:
+> `closed_form` is non-None only for the `source_only` compensation stage; WB `gains` are
+> pre-strength/pre-clamp, applied in `render` after smoothing; Ancuti `alpha` is capped per
+> frame and smoothed as a value.
+>
+> (a) `analyze` returns every name of the stage's `Stage.statistics` for that frame,
+> render-ready (as `clearwater.gui.imaging.measure_statistics` on main already relies on), as
+> float64 host arrays of a fixed shape per name; (b) white balance `gains` are the gray-world
+> gains BEFORE the strength and the D99 clamp (the prototype `Statistics.white_balance_gains`;
+> WP3.2 consumer note "`applied_gains` takes the smoothed gray-world gains"); strength and clamp
+> are applied inside `render` and inside later stages' `analyze`, after smoothing (AD-6), which
+> is why the frozen `C3_STAGES` lists them only under `fusion`; (c) Ancuti `alpha` is the
+> capped alpha per frame, smoothed as a value (AD-6, WP1.4b claim 10); (d) `closed_form`
+> returns the full record with every parameter-dependent name recomputed from the measured
+> names, or None when the stage's measurement depends on parameters or earlier stages: in v1
+> non-None only for Ancuti `compensation`; (e) Ancuti `compensation` is the only `source_only`
+> stage; the engine caches the record `analyze` returned and never uses a cached record without
+> passing it through `closed_form` with the current parameters.
+
+(Quoted from the brief's ruling and question 1; the dispatcher relays it to WP3.11 for
+identity.) Y-2: `analyze` (the consumed earlier records), `render` (every stage) and
+`closed_form` (`measured`) refuse a record that lacks a declared name, carries another, holds
+another shape, a non-finite value or no numbers, with one ValueError naming the stage and the
+statistic; a missing stage is a KeyError naming it (stub parity); a key that is not a stage of
+the method is a ValueError.
 
 ## Consumer notes
 
