@@ -321,14 +321,14 @@ against `git archive b12c3fd` extracted to `work/old1` with `PYTHONPATH` set to 
 
 Final head targeted run: 77 passed in 11 s (`work/tfinal2.txt`; three repeats of the 70-test run before the last two
 test commits: 70 passed each, 11 s). Gates on the final head: ruff check, ruff format --check (207 files), mypy (121
-source files) green; LF check (`git cat-file -p HEAD:<f> | tr -cd '' | wc -c`) 0 for every file changed since
+source files) green; LF check (`git cat-file -p HEAD:<f> | tr -cd '\r' | wc -c`) 0 for every file changed since
 `718324b`.
 
 Disclosures: (a) one run of the whole batch module (`work/h3.txt`, run while the commit for item 3 was chained after it)
 stalled after 12 tests for over 4 minutes under host load and was stopped by killing its own pytest PIDs; item 3's commit
 `d4cd1e4` was created by the chained command after that kill, so it was not preceded by a green full-module run. The module
 was then run in full (34 passed, 4.6 s; later 37 and 70 and 77 passed, four repeats in total), and the stall did not
-reproduce; cause not established (host contention suspected). (b) `ruff format` / the test planted for item 2 asserts the
+reproduce; cause not established (host contention suspected). (b) The tests for item 2 assert the
 gate directly (`batch._gate.current`) because the shell's no-source reason masks the batch reason in the rig. (c) The
 failed-item error text for a Start whose setup raised is "The batch could not start: <detail>" (owner `"batch"`). (d) The
 seam is untouched. Depth at this yield: reported by the orchestrator from the transcript (the cell cannot read it).
