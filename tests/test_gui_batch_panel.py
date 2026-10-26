@@ -134,6 +134,35 @@ def test_warnings_are_counted_and_listed_per_item(rig: Rig) -> None:
     assert report.count("warning: soft clip") == 2
 
 
+def test_warnings_of_failed_and_cancelled_items_are_kept_and_reported(rig: Rig) -> None:
+    """Round-1 F2: IF-8 allows warnings on a result that is not ok; the report lists them."""
+    batch = started(rig, [A, B, C], fail=(B.name,), warn=("probe warning",), warn_on_failure=True)
+    batch.start()
+    wait_batch_idle(rig)
+    assert [i.warnings for i in batch.items()] == [("probe warning",)] * 3
+    report = batch.report.toPlainText()
+    lines = report.splitlines()
+    at = lines.index("2. b.mp4 - FAILED")
+    assert lines[at + 1 : at + 3] == [
+        "   warning: probe warning",
+        "   failure: b.mp4 could not be read",
+    ]
+    cancelled = started(rig, [A, B, C], fail=(), wait_on=(B.name,))
+    cancelled.start()
+    rig.qtbot.waitUntil(lambda: rig.stub.reached[B.name].is_set(), timeout=10000)
+    cancelled.cancel_button.click()
+    wait_batch_idle(rig)
+    assert states(cancelled) == [
+        ItemState.DONE_WITH_WARNINGS,
+        ItemState.CANCELLED,
+        ItemState.NOT_RUN,
+    ]
+    assert cancelled.items()[1].warnings == ("probe warning",)
+    lines = cancelled.report.toPlainText().splitlines()
+    at = lines.index("2. b.mp4 - cancelled")
+    assert lines[at + 1] == "   warning: probe warning"
+
+
 def test_a_job_that_cannot_be_built_or_raises_fails_its_item_only(rig: Rig) -> None:
     batch = started(rig, [A, B, C], raise_on_build=(B.name,), raise_in_job=(C.name,))
     batch.start()

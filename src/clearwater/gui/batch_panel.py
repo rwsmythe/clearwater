@@ -438,8 +438,8 @@ class BatchPanel(QWidget):
 
     def _record(self, item: BatchItem, result: JobResult) -> None:
         """Set the item's final state from its result (D81); a cancel stops the rest (D45)."""
-        item.outputs = tuple(result.outputs) if result.ok else ()
-        item.warnings = tuple(result.warnings) if result.ok else ()
+        item.outputs = tuple(result.outputs)  # whatever the outcome: the report lists what exists
+        item.warnings = tuple(result.warnings)  # IF-8 allows warnings on a result that is not ok
         if result.ok:
             item.failure = None
             item.state = ItemState.DONE_WITH_WARNINGS if result.warnings else ItemState.DONE
