@@ -304,6 +304,7 @@ class PresetPanel(QWidget):
             self._session.set_parameters(parameter_set)
 
         ok, _ = self._attempt(action, f"Cannot load preset {name!r}")
+        self.refresh()
         if ok:
             self._succeed(f"Loaded {name!r}.")
 
@@ -416,6 +417,7 @@ class PresetPanel(QWidget):
             f"Cannot export {name!r}",
             target,
         )
+        self.refresh()
         if ok:
             self._succeed(f"Exported {name!r} to {file_name(target)}.")
 
