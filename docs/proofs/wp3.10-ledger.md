@@ -13,7 +13,7 @@ Evidence root: `C:\Users\rwsmy\clearwater-review-evidence\wp3.10\` (`r0\` = this
 | 1 | Reviewer A (seat 2) on `fd6e52d` | 0 | 11 | 2 | MAJOR: 9 in, 2 out (reviewer-tagged); MINOR: 2 in | 13 NEW, 0 REOPENED | 0 | PRODUCT and instrument (seat 3: `9785956`, `7035be6`, report `8fe963f`) | WSL, codex-cli gpt-5.6-sol high; 12 `succeeded in`; 171,804 tokens | (dispatcher) |
 | 2 | Reviewer A (seat 3) on `8fe963f` | 0 | 2 + 1 self-found | 1 | reviewer MAJOR: 1 in (REJECTED with reproduction), 1 out (reviewer-tagged); MINOR: 1 out; self-found MAJOR S1: in | reviewer 2 NEW, 1 REOPENED (r1 #10); S1 NEW | 0 | PRODUCT and instrument (seat 4: S1 `3f73633`, #2 `155b691`, #3 `21059b8`) | WSL, codex-cli gpt-5.6-sol high; 20 `succeeded in`; 217,008 tokens; 1 echoed `ERROR` (sandbox subprocess, not transport) | 361K at the pause (seat 3 retired) |
 | 3 | Reviewer A (seat 4) on `21059b8`, base `ac4be92` | 0 | 3 | 1 | MAJOR: 1 in (#1 ACCEPTED), 2 out (reviewer-tagged; #2 REJECTED with reproduction, #3 REJECTED with reason); MINOR: 1 in (#4 ACCEPTED, cleanup) | 4 NEW, 0 REOPENED | 0 | PRODUCT (`2f9c240`: #1 sink cleanup; #4 report) | WSL, codex-cli 0.162.1 gpt-5.6-sol high; probe 1 + review 11 `succeeded in`; 185,272 tokens; 1 echoed `ERROR` (WSL vsock, not transport) | 211,777 at the round-3 yield |
-| 4 | Reviewer A (seat 4) on `2f9c240`, base `ac4be92` | 0 | 2 (reviewer) -> 0 adjudicated | 2 -> 4 adjudicated | all in envelope; MAJOR #1, #2 ACCEPTED and adjudicated MINOR (reproduction + reason, dispatcher to uphold); MINOR #3, #4 ACCEPTED (cleanup) | 4 NEW, 0 REOPENED | 0 | pending (adjudication turn: no change) | WSL, codex-cli 0.162.1 gpt-5.6-sol high; 15 `succeeded in`; 190,700 tokens; 2 `ERROR` matches = echoed source code, not transport | (dispatcher) |
+| 4 | Reviewer A (seat 4) on `2f9c240`, base `ac4be92` | 0 | 2 (reviewer) -> 0 adjudicated | 2 -> 4 adjudicated | all in envelope; MAJOR #1, #2 ACCEPTED and adjudicated MINOR (reproduction + reason; dispatcher UPHELD both: ZERO new blocking, the loop TERMINATES); MINOR #3, #4 ACCEPTED (cleanup) | 4 NEW, 0 REOPENED | 0 | PRODUCT and instrument, as the terminating round's cleanup (`4dfa96e`) | WSL, codex-cli 0.162.1 gpt-5.6-sol high; 15 `succeeded in`; 190,700 tokens; 2 `ERROR` matches = echoed source code, not transport | 248,871 at the round-4 yield |
 
 Seat 1 stops after round 0 by the orchestrator's instruction (219K before product code; the build
 is the largest in the wave). A fresh cell builds from "RESUME HERE" below.
@@ -191,39 +191,42 @@ main, stream and info packets of an FFmpeg-written file).
   presentation-effect proof. Audio: identity edit at 0.
 - WINDOW RELEASED at the end of this round.
 
-## RESUME HERE (current; seat 4, round 4 adjudicated at `2f9c240` + the ledger commits)
+## RESUME HERE (current; seat 4, Reviewer A CONVERGED at round 4; cleanup `4dfa96e`)
 
 - Base `ac4be92` (main with WP3.9; the dispatcher rebased the branch at seat 4; pre-rebase branch
-  `wp3.10-pre-rebase` at `98ee54a`). Reviewer A diffs are `ac4be92..HEAD`; runner and prompt
-  builder in `r4\` (`run_review.sh`, `mkprompt.py`).
-- Rounds 1-3 fully remediated (round 3: `2f9c240`). **Round 4 HAS RUN and is ADJUDICATED**
-  (evidence `r4\`, section "Round 4" below): 2 reviewer MAJOR accepted and adjudicated MINOR
-  with reproduction and reason, 2 MINOR accepted. Pending the dispatcher's ruling on the two
-  downgrades, NO remediation started. Upheld -> round 4 terminates the loop and the four are fixed
-  once as its cleanup (no round 5); not upheld -> fix, then round 5 (the five-round gate yield).
-  The four fixes, each with a test failing first:
-  - **#1** `encode._start`: start the stderr thread inside the guarded block, so a failure there
-    goes through `_fail` (FFmpeg killed, `out_path` deleted, `encoder_failed`); plant from
-    `r4\repro\repro_r4.py` F1 (patch `Thread.start` for the `_drain` target only).
-  - **#2** `tools/video_fidelity._RecordingSink`: end the encode window when `_end_stream` returns
-    (FFmpeg's exit seen), not after verification; `EncodeRun.ended` docstring; a test that the
-    window ends before `_verify` runs.
-  - **#3** `encode.open`: a refusal makes the sink failed (second `open` -> `state`; `abort` still
-    deletes `out_path`; the existing refused-open abort test must still pass).
-  - **#4** the stale comment in `test_a_cleanup_error_never_replaces_the_original_error`.
-- After the loop converges: WINDOW requests -- full pytest; footage (GX011627 product leg through
-  WP3.9's `frames`, the AD-12 quality table, the Edits compilation through `open` for the #2 rule);
-  last and alone, EXCLUSIVE: the export FLOOR speed row (`tools/video_io_bench.py`, not yet
-  written). Then the report's PENDING sections and the return report.
+  `wp3.10-pre-rebase` at `98ee54a`). Reviewer A evidence `r1\`..`r4\`; runner and prompt builder
+  in `r4\` (`run_review.sh`, `mkprompt.py`).
+- **Reviewer A CONVERGED at round 4** (the dispatcher upheld both MAJOR->MINOR adjudications: zero
+  new blocking). The four round-4 findings are fixed once as the cleanup, `4dfa96e`, each with a
+  test that fails on `9e271c0` (`r4\repro\cleanup-prefix-fails.log`; #4 is a comment). No round 5.
+  The five video modules at `4dfa96e` (`-m "not footage"`): 219 passed, 2 deselected; ruff,
+  format, mypy clean.
+- **Next (window-gated; the dispatcher queues them and decides which seat takes them):**
+  1. FULL PYTEST (WINDOW REQUESTED at the round-4 cleanup yield): in the background with
+     `QT_QPA_PLATFORM=offscreen`, `--basetemp=work/<name>`, output to a file; grep the summary;
+     then `WINDOW RELEASED: <summary line>`.
+  2. FOOTAGE: the GX011627 product leg through WP3.9's `frames` (NVENC 8-bit Standard, the
+     instrument's summary all MANDATORY and REQUIRED SAME); the AD-12 quality table (GX011627
+     busy + one calm Snorkel clip, each level per encoder at 8 bits and NVENC High at 10 bits:
+     bit rate against the camera's, PSNR as a sanity figure; a miss is a proposal to CHARC, no
+     code change); the Edits compilation through `open` (the #2 rule must accept its
+     3003/60000 reorder delay).
+  3. EXCLUSIVE, last and alone: the export FLOOR speed row, `tools/video_io_bench.py` (NOT YET
+     WRITTEN; brief task 10 and question 11).
+  4. The report's PENDING sections (sections 6-7 and the GX011627 row), DRAFT removed, then the
+     return report to the dispatcher (brief "Return report").
 - Decided and not to be redone: round 0 (NUT + end sentinel + setts/noise BSF, INFO packet), the
   round-0 rulings, CHARC's Q-A/Q-B/Q-C/Q-D notes, P8 (stated non-square SAR refused; an unseen
-  SAR is 1:1, `01d1578`), the S1/#2/#3 ruling, round 3's #2/#3 rejections (dispatcher upheld).
-- Working notes: targeted runs use `-m "not footage"`; the five video modules (encode, units,
-  fidelity, probe rules, decode rules) take about 5 min (216 passed at `2f9c240`). Scratch under
-  `work\wp3.10\r3\`, `r4\` (gitignored). "Fails on the unfixed code" runs: `git archive HEAD`
-  into `work\wp3.10\r3\old`, the new test files copied in, `PYTHONPATH=<old>\src` with the
-  worktree's `.venv` python. Use `( cd <worktree> && ... )` subshells, never a bare `cd`.
-  Test-file edits with non-ASCII must use escapes.
+  SAR is 1:1, `01d1578`), the S1/#2/#3 ruling, round 3's #2/#3 rejections and round 4's two
+  downgrades (dispatcher upheld).
+- Working notes: targeted runs use `-m "not footage"`; the five video modules take about 4-5 min.
+  Scratch under `work\wp3.10\r3\`, `r4\` (gitignored). "Fails on the unfixed code" runs:
+  `git archive HEAD` into `work\wp3.10\r3\old`, the new test files copied in,
+  `PYTHONPATH=<old>\src` with the worktree's `.venv` python. Use `( cd <worktree> && ... )`
+  subshells, never a bare `cd`. The committed files are CRLF (except
+  `tests/test_io_video_encode_units.py`, LF); `sed -i` and LF-writing scripts drop the CRs, so
+  edit with the Edit tool or restore with `work\wp3.10\r4\crlf.py`. Test-file edits with
+  non-ASCII must use escapes.
 
 ## Seat 2 (`wp310-cell2`) -- build and round 1
 
@@ -328,3 +331,10 @@ PID reuse with NVENC load in that tail), 3 (MINOR: a refused `open` leaves the s
 4 (MINOR: a stale test comment). Remediation follows the dispatcher's ruling on the downgrades.
 Seat-4 slip disclosed: several early tool calls used `cd <worktree> && ...` in the tool's shell
 (agent shells reset between calls; switched to subshells).
+
+- Round-4 ruling (dispatcher, FINAL): both downgrades upheld; the loop terminates at round 4.
+  Cleanup `4dfa96e`: #1 the stderr-thread start inside the failure path (`encoder_failed`); #2 the
+  instrument's encode window ends at FFmpeg's exit (`_RecordingSink._end_stream`), stated in the
+  report; #3 a refused `open` is final; #4 the stale comment. Three tests fail on `9e271c0`. The
+  same commit restores the CRLF endings that two `sed -i` edits in `2f9c240` dropped (test module,
+  report); the ledger's (dropped by `9e271c0`) are restored with this entry.
