@@ -62,8 +62,14 @@ def test_the_instrument_runs_on_a_synthetic_step(
     assert record["excerpt_frames"] == 60 and record["span_frames"] == 240
     assert record["step_index_in_excerpt"] == 30
     assert set(record["methods"]) == {"c3", "ancuti2018"}
-    assert record["methods"]["c3"]["edge_free_frames"] == 60
-    assert record["methods"]["ancuti2018"]["edge_free_frames"] < 60
+    # Edge-free per kind (R1 F8): the step-aware kinds read the whole series, so none is.
+    c3, ancuti = (record["methods"][m]["kinds"] for m in ("c3", "ancuti2018"))
+    assert c3["median_gaussian"]["edge_free_frames"] == 60
+    assert 0 < ancuti["median_gaussian"]["edge_free_frames"] < 60
+    assert c3["median_gaussian"]["reach_frames"] == [60, 60]
+    for kind in ("median_gaussian_cut", "median_bilateral"):
+        assert c3[kind]["edge_free_frames"] == ancuti[kind]["edge_free_frames"] == 0
+        assert c3[kind]["reach_frames"] == [90, 90]
     for data in record["methods"].values():
         assert set(data["kinds"]) == set(tool.KINDS)
         for figures in data["kinds"].values():

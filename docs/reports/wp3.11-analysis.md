@@ -72,8 +72,10 @@ Run 2026-10-21 in a dispatcher window (`uv run python tools/step_aware_eval.py`,
 `work/wp3.11/step-aware/step-aware.json`): GX011600, 359 frames (11.95 s: WP1.3D's 6 s excerpt
 from 662.031 s widened by 3 s each side), proxies FFmpeg's 540-line resize quantised to uint8;
 figures on the excerpt's 179 frames; the step at excerpt frame 27 (pts 662.962 s, luma +23.1
-levels over +-0.5 s); edge-free frames (beyond the staged reach from both span ends, DR-25 (3)):
-179 of 179 for c3 (reach 60), 177 of 179 for ancuti2018 (reach 90); "away from the step" = the
+levels over +-0.5 s); edge-free frames (beyond the staged reach from both span ends, DR-25 (3)),
+per kind: under `median_gaussian` 179 of 179 for c3 (reach 60), 177 of 179 for ancuti2018 (reach
+90); under the step-aware kinds 0 (they read the whole span: a global noise scale, so every
+output depends on both span ends); "away from the step" = the
 121 frame steps more than 1 s from it. Flicker and peak step in 8-bit levels (WP1.4b's measure);
 the step columns are the rendered change across +-1 s over the source's.
 

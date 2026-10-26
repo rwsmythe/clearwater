@@ -123,11 +123,15 @@ def load_proxies(
 
 
 def staged_reach(
-    ticks: NDArray[np.int64], time_base: Fraction, stages: int, lo: int, hi: int
+    ticks: NDArray[np.int64], time_base: Fraction, stages: int, kind: str, lo: int, hi: int
 ) -> tuple[int, int]:
-    """The input frames a staged analysis of ``stages`` stages reads for outputs ``lo..hi``."""
+    """The input frames a staged analysis of ``stages`` stages reads for outputs ``lo..hi``.
+
+    A step-aware kind reads the whole series (its noise scale is the series'), so its reach is
+    the whole span and no frame is edge-free under it.
+    """
     for _ in range(stages):
-        lo, hi = reach(ticks, time_base, WINDOW_S, "median_gaussian", lo, hi)
+        lo, hi = reach(ticks, time_base, WINDOW_S, kind, lo, hi)
     return lo, hi
 
 
@@ -262,11 +266,6 @@ def evaluate(out: Path, device: str, log: Callable[[str], None]) -> dict[str, An
     }
     for method in METHODS:
         stages = len(temporal.STAGES[method])
-        lo_reach, hi_reach = staged_reach(ticks, time_base, stages, lo, hi)
-        edge_free = 0
-        for i in indices:
-            first, last = staged_reach(ticks, time_base, stages, i, i)
-            edge_free += int(first > 0 and last < len(ticks) - 1)
         per_kind: dict[str, Any] = {}
         series_by_kind: dict[str, Series] = {}
         for kind in KINDS:
@@ -281,7 +280,14 @@ def evaluate(out: Path, device: str, log: Callable[[str], None]) -> dict[str, An
             measured = temporal.flicker(signals, reference)
             away_value = float(measured.per_step[away_steps].mean())
             steps = signal_steps(signals, source, step, rate)
+            lo_reach, hi_reach = staged_reach(ticks, time_base, stages, kind, lo, hi)
+            edge_free = 0
+            for i in indices:
+                first, last = staged_reach(ticks, time_base, stages, kind, i, i)
+                edge_free += int(first > 0 and last < len(ticks) - 1)
             per_kind[kind] = {
+                "reach_frames": [lo - lo_reach, hi_reach - hi],
+                "edge_free_frames": edge_free,
                 "flicker_all": measured.value,
                 "flicker_away_from_step": away_value,
                 "flicker_peak_step_8bit": float(measured.per_step.max()),
@@ -293,8 +299,6 @@ def evaluate(out: Path, device: str, log: Callable[[str], None]) -> dict[str, An
             )
         record["methods"][method] = {
             "stages": stages,
-            "reach_frames": [lo - lo_reach, hi_reach - hi],
-            "edge_free_frames": edge_free,
             "kinds": per_kind,
         }
     (out / "step-aware.json").write_text(json.dumps(record, indent=1), encoding="utf-8")
