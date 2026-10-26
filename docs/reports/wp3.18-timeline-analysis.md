@@ -31,6 +31,9 @@ Targeted evidence is in `tests/test_gui_timeline.py` (T) and `tests/test_gui_ana
 | DR-23 / AD-6: pts keys, a VFR clip scrubs to exact pts; D98 a one-stage method | T `test_a_vfr_clip_scrubs_to_exact_pts_with_their_own_statistics`; A `test_a_three_stage_method_and_a_one_stage_method_both_complete` |
 | AD-15: a change during the run is offered with `retarget` (absorbed: complete once under the new values; not absorbed: one follow-up run before "complete"); after completion a change goes provisional, then smoothed; export unavailable until the final completion | T `test_a_change_during_the_run_not_absorbed_triggers_one_follow_up_before_complete`, `test_a_change_during_the_run_that_is_absorbed_completes_once_under_the_new_values`, `test_after_completion_a_change_goes_provisional_then_smoothed_again`, `test_a_commit_in_flight_when_the_parameters_change_carries_no_stale_statistics` |
 | Q-B: a method change while running or complete builds a new analysis (superseded, never "cancelled"); during a user cancel it stays "cancelled"; Analyse rebuilds | T `test_a_method_change_while_running_rebuilds_the_analysis_as_superseded`, `test_a_method_change_after_completion_analyses_again`, `test_a_method_change_during_a_user_cancel_stays_cancelled_and_analyse_rebuilds`, `test_analyse_after_a_cancel_and_a_method_change_builds_the_new_methods_analysis` |
+| Reviewer B pass 1 (#1): an A-B-A burst in the window between the run's return and its `on_done`, with a stub that retains the recompute job, never completes under the kept job; a follow-up `run` runs it | T `test_a_burst_in_the_window_before_on_done_never_completes_under_a_kept_job` (5 bursts), `test_a_burst_that_the_run_in_flight_absorbs_needs_no_follow_up` |
+| Reviewer B pass 1 (#2): the progress label is the reported text (ASCII-escaped), the run's label when empty | T `test_the_reported_progress_text_is_the_label`, `test_an_empty_progress_text_keeps_the_runs_label`, `test_a_non_ascii_progress_text_is_escaped` |
+| Reviewer B pass 1 (#4): a closed runner ends a superseded run's rebuild, or a recompute, in `cancelled` | T `test_closing_the_runner_during_a_superseded_run_leaves_a_terminal_phase`, `test_a_change_after_the_runner_closed_leaves_a_terminal_phase` |
 | Stale work: a source change or a photo mid-analysis leaves nothing of the old job; closing starts nothing | T `test_a_source_change_mid_analysis_leaves_no_state_or_statistics_from_the_old_job`, `test_a_photo_opened_mid_analysis_cancels_the_run`, `test_closing_the_window_mid_analysis_does_not_report_a_completion` |
 | Threads: `run`, `proxy`, `statistics` never on the main thread | T `test_run_proxy_and_statistics_run_off_the_interface_thread`; planted `test_planted_analysis_run_on_the_interface_thread_fails` |
 | V7: the interface never waits more than 100 ms during a ~2 s NumPy analysis and a drag | T `test_v7_interface_never_waits_more_than_100_ms_during_analysis_and_a_drag`; observed maxima 14, 23, 39 ms (seat 1) and 12, 13 ms (seat 2), informational; the bound is asserted |
@@ -58,7 +61,8 @@ run is in flight (from the panel's `jobs.run` until that job's `on_done`); the p
 otherwise; an implementation returns False between its `run` returning and the `on_done`, never raises. (2) True:
 the run in flight finishes under the new parameters and its done-ok means complete under them; the epoch guard
 still drops any statistics fetched before the change. (3) False: not absorbed; at done-ok a follow-up
-`run(latest)` starts if (method id, effective values) differ. No run is cancelled for a parameter change; the
+`run(latest)` starts if (method id, effective values) differ, and ALWAYS once any `retarget` of that run returned False
+(the analysis may hold a job for the refused values; Reviewer B pass 1, #1). No run is cancelled for a parameter change; the
 only cancels are the user's (D70, phase "cancelled"), a method change (Q-B, "superseded") and a source change or
 close. (4) The stub returns False by default (`StubClipAnalysis(absorb=True)` absorbs); both paths are tested.
 (5) WP4.3's adapter: `engine.set_parameters(values, focus_pts)` returning None while the engine runs means True;
@@ -74,14 +78,15 @@ never on the main thread.
 |---|---|---|
 | video opened | `running(0, nb_frames or None)` | none |
 | progress | `running(done, total, msg)` | - |
-| done ok, run not cancelled, parameters equal the run's | `complete` | switch: commit the shown pts with `statistics(pts)` |
-| done ok, parameters differ | stays `running("Updating statistics")` | `None`; follow-up `run(latest)` from `on_done` |
+| done ok, run not cancelled, parameters equal the run's and no `retarget` of the run returned False | `complete` | switch: commit the shown pts with `statistics(pts)` |
+| done ok, parameters differ, or any `retarget` of the run returned False (even if the parameters are back at the run's own) | stays `running("Updating statistics")` | `None`; follow-up `run(latest)` from `on_done` |
 | done failed | `failed(message)`, error owner `"analysis"` | `None` |
 | user Cancel (or any cancel) | `cancelled` at the job's `on_done` | `None` |
 | method change while running | stays `running`; the run is cancelled as "superseded", the new analysis starts from its `on_done` | `None` |
 | parameters changed, running | unchanged; `retarget` | unchanged |
 | parameters changed, complete | `running("Updating statistics")` | `None` at once; `run(latest, focus_pts=shown)` |
-| source changed / closed | the shell resets | all callbacks of the old generation are ignored |
+| source changed | the panel drops the old run (cancelled by the generation bump) and starts the new source's analysis | all callbacks of the old generation are ignored |
+| runner closed (window close) | the runner cancels every job and delivers its `on_done`: `cancelled`; a run that cannot start because the runner is closed (a superseded run's rebuild, an Analyse, a recompute) ends in `cancelled` too, never `running` with no job | `None` |
 
 ## The drag rule (the latest-intent invariant, in plain words)
 
@@ -107,10 +112,10 @@ module docstring states it.
 | factory `(source, method, engines)` | builds the adapter only. The engine is `AnalysisEngine(method=, backend=engines.select_backend(settings, h, w, method.id)[0], cache=engines.cache, key=DiskProxyCache.key_for(path) / cache_key(path, codec), source=engines.video_source, probe=source.probe, params=, window_s=, kind=, hw_decode=)` | The engine needs `params` at construction and the factory has none: the adapter builds the engine lazily in its first `run` (a worker thread: also takes `os.stat` and the backend selection off the main thread). |
 | `run(parameters, progress, focus_pts)` | First call: `engine.set_parameters(eff, focus_pts)` (phase none: adopts, returns None), then `job = engine.analysis_job()`. Later: `job = engine.set_parameters(eff, focus_pts)`; if None and phase in {none, cancelled, failed}: `job = engine.analysis_job()`; if None and complete/running: return. Then `result = job(progress)`; `result.ok` -> return; `result.failure == analysis.CANCELLED` -> return; else `raise RuntimeError(result.failure)` | `eff = imaging.effective_parameters(method, parameters)`. DR-47: a cancel racing `mark_complete` leaves the engine complete and `run` returns; the GUI, which cancelled, reports "cancelled"; "Analyse" -> `set_parameters` None, phase complete -> returns at once. |
 | `pts()` | `cache.lookup(key).pts_ticks` (ascending; in-progress entries are returned; None -> `()`) | **F-2 (CHARC point 5).** `DiskProxyCache.lookup` takes the cache lock, touches the last-use stamp and sorts up to ~20,000 ticks, on the MAIN thread, once per progress delivery (20/s) while the writer stores proxies. The seam says "cheap, never waits for `run`"; the real cost is WP4.3's to re-measure with V7. Expected fix: the adapter keeps its own pts list, refreshed by a worker. |
-| `retarget(params, focus_pts)` | `job = engine.set_parameters(eff, focus_pts)`: None while the engine runs -> True (the job absorbs it); a job RETURNED (the run finished between the panel's call and the engine's lock) -> the adapter KEEPS that job, returns False, and runs it at the next `run()`; it never drops the job and never runs it on the main thread | Cheap (engine lock only); the panel never overlaps runs, so the kept job is run by the follow-up `run(latest)`. |
+| `retarget(params, focus_pts)` | `job = engine.set_parameters(eff, focus_pts)`: None while the engine runs -> True (the job absorbs it); a job RETURNED (the run finished between the panel's call and the engine's lock) -> the adapter KEEPS that job, returns False, and runs it at the next `run()`; it never drops the job and never runs it on the main thread | Cheap (engine lock only); the panel never overlaps runs, and since `retarget` returned False the run's `on_done` ALWAYS starts a follow-up `run(latest)` (even when the parameters were changed back to the run's own, A-B-A), so the kept job is run by it and the panel never declares complete while the engine holds a job. |
 | `proxy(pts)` | `cache.proxy(key, pts)` | A new array each call; `KeyError` when absent. |
-| `statistics(pts)` | `engine.smoothed_record(pts)`; `KeyError` -> None; unknown engine -> None | `schema_hash` is the engine's own concern; the GUI's epoch guard sits above it. Unused by design: `provisional_record(pts)` (WP3.16 measures the D108 provisional preview on its own float proxy). |
-| progress | the engine reports `(done, total, message)` in cumulative frame-stage units, `total` None while unknown | The panel shows the report verbatim; the first `running(0, nb_frames)` is replaced at the first report. |
+| `statistics(pts)` | `engine.smoothed_record(pts)`; `KeyError` -> None; unknown engine -> None; **and None until a full `run` of the adapter has completed under the latest parameters** (Reviewer B pass 1, #3) | WP3.11 serves a frame's smoothed record after the recompute near-phase, while the whole run is still running, and while it holds a kept recompute job; the seam says "None while no completed run", so the adapter gates on its own completed-run state (set when `run` returns ok, cleared at the start of any `run`, and whenever it keeps a job). A direct `engine.smoothed_record` mapping would break the seam. `schema_hash` is the engine's own concern; the GUI's epoch guard sits above it. Unused by design: `provisional_record(pts)` (WP3.16 measures the D108 provisional preview on its own float proxy). |
+| progress | the engine reports `(done, total, message)` in cumulative frame-stage units, `total` None while unknown | The panel's label is the reported text (non-ASCII backslash-escaped), or the run's own label ("Analysing the clip", "Updating statistics") for an empty text; the first `running(0, nb_frames)` is replaced at the first report. |
 | cancel | `progress.cancelled()` is checked by the engine after every frame | `engine.cancel()` is not needed: the GUI cancels through the job handle. |
 
 ## Limits
@@ -180,11 +185,22 @@ two findings (`c471bca`, `732872e`), against "make NO change in the turn that ad
 orchestrator noted the breach and did not void the change (each fix was reproduced first and has a test that fails
 on the old code). Rounds 4 and 5 kept the rule: the verdict turns changed nothing but the ledger.
 
+**Reviewer B pass 1** (the orchestrator's Codex pass at its seat, on the merge candidate `44ef658`, all findings
+REASONED, verdict NEW_CRITICAL_MAJOR_FOUND): #1 MAJOR (an A-B-A burst between the run's return and its `on_done`
+declared complete while the engine held B's job), #2, #3, #4 MINOR. Remediated by seat 3 in `a49c36a` (#1: a run
+whose `retarget` returned False always follows up in `on_done`; the test stub models the retained job, so a premature
+complete is observable; three of five bursts failed on `579321a`), `6f5fd11` (#2: the progress label is the reported
+text, ASCII-escaped, the run's label when empty), `f50aee0` (#4: `_start_run` meeting a closed runner sets
+`cancelled`; two tests failed on `579321a`), and this report (#3: the adapter returns None until its own full `run`
+completed; no code, the mapping row says it; `analysis_service.py` holds the seam text only, which already says
+"the latest completed run"). `bd2d70b` wraps a docstring line. The interleaving oracle covers the position lane
+only; the burst window is covered by its own parametrised test.
+
 ## Gates
 
 - `uv run ruff check .`, `uv run ruff format --check .`, `uv run mypy` (strict, 119 source files): green at the
   final head.
 - Targeted pytest (`tests/test_gui_timeline.py`, `tests/test_gui_analysis_service.py`, `tests/test_gui_deps.py`,
-  headless, foreground): 71 passed in about 14.5 s, repeated runs.
+  headless, foreground): 82 passed in about 16 s at `bd2d70b` (71 at `579321a`), repeated runs.
 - Full pytest: run by the orchestrator on the merge candidate (stacked gate).
 - No harness gate (no `scripts/`, `.claude/` or kernel doc changed). Footage folder not used.

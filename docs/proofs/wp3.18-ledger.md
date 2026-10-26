@@ -359,3 +359,24 @@ Round 5 (head `fa0fa7d`): NEW_CRITICAL_MAJOR_FOUND; adjudication in `r5djudicat
 ## Round 5 ruling and closing (seat 2)
 
 Orchestrator ruling: round 5 has zero blocking findings (finding 1 MINOR by effect), no round 6. Cleanup `b50a36e`: `_current` accepts a proxy only if its pts equals `pts()[slider.value()]`; the interleaving oracle asserts the shown proxy is the handle's value, checks the statistics given to `set_position` and `set_statistics`, and each planted panel must fail with its own phrase; a fifth plant (`SameDragProxyPanel`) is the A-then-B ordering. Red before: with the new oracle, the real interleaving test failed on the pre-S product at seed 0 ("the proxy of 0 shown while the handle is on 13000"). Plant seeds with the final code: 0, 17, 15, 0, 0. Targeted at `b50a36e`: 71 passed (about 14.5 s, repeated); ruff, format, mypy strict green. Report written: `docs/reports/wp3.18-timeline-analysis.md`.
+
+## Reviewer B pass 1 remediation (seat 3)
+
+Orchestrator ruling (final): remediate Reviewer B pass 1 on the merge candidate `44ef658` (= `579321a` rebased), one
+commit per item, each product fix with a test shown failing on a `git archive 579321a` copy (`PYTHONPATH` = the copy's
+`src`, `clearwater.__file__` checked) and green on the head. Seam, `retarget` contract and the latest-intent lane
+unchanged. Depth at the seat-3 yield: (dispatcher fills).
+
+| Item | Commit | Test | Before (579321a copy) | After |
+|---|---|---|---|---|
+| #1 MAJOR, A-B-A in the return-to-`on_done` window | `a49c36a` (`_Run.kept`; done-ok follows up when any `retarget` returned False) | `test_a_burst_in_the_window_before_on_done_never_completes_under_a_kept_job` (5 bursts), `test_a_burst_that_the_run_in_flight_absorbs_needs_no_follow_up`; stub `ScriptedAnalysis(retains=True)` models the kept job (`statistics` None while it is held) | 3 failed (B-A, B-A-B-A, A-B-A: `len(runs)` 1 not 2), 3 passed (B, B-C, absorbed) | 6 passed; planted revert of the `run.kept or` condition: the same 3 failed |
+| #2 MINOR, progress text | `6f5fd11` | `test_the_reported_progress_text_is_the_label`, `test_a_non_ascii_progress_text_is_escaped`, `test_an_empty_progress_text_keeps_the_runs_label` | 2 failed (label was "Analysing the clip"), 2 passed (the empty-text test holds both sides; the fallback test and the old progress test) | 4 passed |
+| #3 MINOR, `statistics` mapping | this docs commit | report only: the mapping row says the adapter returns None until its own full `run` completed (WP3.11 serves a record after the recompute near-phase); no code, the adapter mapping lives only in the report | - | - |
+| #4 MINOR, closed runner | `f50aee0` (`_start_run` sets `cancelled` on the closed-runner `RuntimeError`) | `test_closing_the_runner_during_a_superseded_run_leaves_a_terminal_phase`, `test_a_change_after_the_runner_closed_leaves_a_terminal_phase` | 2 failed (phase stayed `running`) | 2 passed |
+| style | `bd2d70b` | - | ruff E501 in the `a49c36a` docstring | ruff clean |
+
+The oracle (`test_the_latest_intent_wins_over_every_seeded_interleaving`) was not extended: it drives the position
+lane with a hand-run job, not the parameter path; the burst window has its own parametrised test. Gates at `bd2d70b`
+(plus the docs commit): ruff check, ruff format --check, mypy strict (119 files) green; targeted
+(`test_gui_timeline.py`, `test_gui_analysis_service.py`, `test_gui_deps.py`, headless) 82 passed twice (15.5 s, 16.1 s).
+No Reviewer A round (the orchestrator's Reviewer B re-run covers the remediation).
