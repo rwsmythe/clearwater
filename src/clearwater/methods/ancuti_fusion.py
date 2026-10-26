@@ -412,9 +412,10 @@ class AncutiFusionMethod:
 def blend_with_original(fused: Array, original: Array, percent: float) -> Array:
     """Return ``(1 - b) * fused + b * original`` with ``b = percent / 100`` (spec 6.7, AD-8).
 
-    0 % gives the fused image, 100 % the original (bit for bit: the other term is multiplied by
-    exactly 0). Linear in the display-encoded values, as the prototype's ``correct``; both
-    arrays lie in [0, 1], so the result does too and is not clipped.
+    0 % gives the fused image, 100 % the original (identical values, the other term being
+    multiplied by exactly 0; the sign of zero aside, as ``0 * x + -0.0`` may give ``+0.0``).
+    Linear in the display-encoded values, as the prototype's ``correct``; both arrays lie in
+    [0, 1], so the result does too and is not clipped.
 
     Args:
         fused: The corrected image, float32 ``(H, W, 3)``.

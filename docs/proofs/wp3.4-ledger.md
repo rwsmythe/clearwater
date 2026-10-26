@@ -422,3 +422,27 @@ WINDOW RELEASED line.
 
 Step 4: report speed and memory sections filled, DR-40 (b) from the record, DRAFT removed, status
 and Limits updated.
+
+## Reviewer B remediation (cell 4, 2026-10-26; orchestrator adjudication FINAL, one round)
+
+B on candidate `1dcfdaf` (evidence `C:\Users\rwsmy\clearwater-review-evidence\wp3.4\reviewB\review-B.txt`)
+returned NEW_CRITICAL_MAJOR_FOUND. Adjudicated: B1 MAJOR, B2 MINOR, B3 ADVISORY (wording), all ACCEPTED.
+
+- **B1** (`062d4d2`, product + test): `_checked_record` -- the package's only Y-2 checker, used by
+  both methods' `render`, `analyze` (earlier records) and `closed_form` -- now takes
+  `np.asarray` first and refuses any dtype kind outside "iuf" with the Y-2 ValueError; the
+  try/except stays (a CuPy array is still refused: "Implicit conversion to a NumPy array is not
+  allowed", checked by hand). Failing first on `478ecab`: the extended
+  `test_y2_render_and_analyze_refuse_a_record_that_does_not_fit` failed for both methods (DID NOT
+  RAISE; `work/b1-red.txt`); the per-dtype probe `work/b1-probe.py` on `478ecab`: bool, str and
+  object ACCEPTED, complex only a ComplexWarning (`work/b1-probe-red.txt`); after the fix all four
+  refused (`work/b1-probe-green.txt`). New `test_records_accept_integer_arrays_and_python_number_lists`
+  (int64 arrays, int lists, float lists; both methods) passes before and after.
+- **B2, B3** (docs commit): the memory sentence states what the table shows; the blend claims
+  (report claim 5 and V9 line, `blend_with_original` docstring) qualified "the sign of zero
+  aside" (`0 * x + -0.0` gives `+0.0`, checked). No code change.
+
+Gates on `062d4d2`: ruff check, ruff format --check, mypy (109 files) green (`work/b1-static.txt`);
+again on the docs commit after re-wrapping the docstring (`work/b1-static2.txt`);
+the six package files with CuPy 325 passed (323 + the 2 new), without CuPy 291 passed, 34 skipped
+(`work/b1-pkg-gpu.txt`, `work/b1-pkg-cpu.txt`). No full pytest (the orchestrator's candidate gate).

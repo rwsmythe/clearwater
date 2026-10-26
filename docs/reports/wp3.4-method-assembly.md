@@ -175,7 +175,8 @@ from a record with capped blue alpha). DR-19 closes at this accept.
    CPU counter; on the GPU under `cupyx.allow_synchronize(False)`. Planted "clamp skipped",
    "alpha from smoothed means", "render measuring the bounds" (with a host read the product
    never makes) and "strength or clamp before smoothing" fail.
-5. **Blend**: 100 % returns the input bit for bit, 0 % the corrected image, 50 % the midpoint;
+5. **Blend**: 100 % returns the input, 0 % the corrected image (identical values, the sign of
+   a zero component aside: a -0.0 can come back as +0.0), 50 % the midpoint;
    planted inversion fails. Output float32 in [0, 1], same device and colour description, a
    `Frame` keeps its pts.
 6. **Host reads per frame (DR-38 a)**: counted per stage on the CPU and on the GPU (with every
@@ -199,7 +200,8 @@ from a record with capped blue alpha). DR-19 closes at this accept.
    Same device twice bit-identical on each device (N10).
 10. **V9 at method level**: `Params.neutral()` values give the input with **max 0 and mean 0**
     (exactly) on all six stills and the scene, both methods, CPU and GPU (bound 2/255, 0.2/255);
-    a control off its neutral value misses the bound (planted). Blend 100 returns the input.
+    a control off its neutral value misses the bound (planted). Blend 100 returns the input (the
+    sign of zero aside).
 11. **Schema** (claims in "Schema" and "DR-19 rule"); planted default off AD-8, cap in c3's
     schema, neutral off `Params.neutral()`, `laplacian_fraction` in Basic all fail by name.
 12. **Core fixes**: `backend_for` (cpu without importing CuPy; the probed GPU; ValueError
@@ -254,8 +256,9 @@ run alone in a window granted by the orchestrator; rows in `docs/proofs/wp3.4-le
 figure, 25 min/min = 0.834 s per frame at 30000/1001 fps for the whole export.
 
 **Memory** (counting allocator on the CuPy pool, high-water; RSS sampled; MiB): no product peak
-exceeds `memory_estimate_bytes`. The two methods' figures are the same except the full-frame
-`analyze` reserved peak.
+exceeds `memory_estimate_bytes`. The pool's used peaks are the same for both methods and so are
+the render reserved peaks; the `analyze` reserved peaks (proxy and full frame) and the RSS
+figures (the GPU legs, and the 4K CPU render 879 / 870) differ slightly between them.
 
 | size | leg | pool used | pool reserved (c3 / ancuti2018) | RSS + (c3 / ancuti2018) | estimate |
 |---|---|---|---|---|---|
