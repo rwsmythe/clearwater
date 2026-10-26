@@ -11,7 +11,8 @@ Evidence root: `C:\Users\rwsmy\clearwater-review-evidence\wp3.10\` (`r0\` = this
 |---|---|---|---|---|---|---|---|---|---|---|
 | 0 | design table + pts-carrier spike (no review, no product code) | -- | -- | -- | -- | -- | 0 | none (no product code) | -- | 219,455 at the round-0 yield |
 | 1 | Reviewer A (seat 2) on `fd6e52d` | 0 | 11 | 2 | MAJOR: 9 in, 2 out (reviewer-tagged); MINOR: 2 in | 13 NEW, 0 REOPENED | 0 | PRODUCT and instrument (seat 3: `9785956`, `7035be6`, report `8fe963f`) | WSL, codex-cli gpt-5.6-sol high; 12 `succeeded in`; 171,804 tokens | (dispatcher) |
-| 2 | Reviewer A (seat 3) on `8fe963f` | 0 | 2 + 1 self-found | 1 | reviewer MAJOR: 1 in (REJECTED with reproduction), 1 out (reviewer-tagged); MINOR: 1 out; self-found MAJOR S1: in | reviewer 2 NEW, 1 REOPENED (r1 #10); S1 NEW | 0 | pending (adjudication turn: no change) | WSL, codex-cli gpt-5.6-sol high; 20 `succeeded in`; 217,008 tokens; 1 echoed `ERROR` (sandbox subprocess, not transport) | (dispatcher) |
+| 2 | Reviewer A (seat 3) on `8fe963f` | 0 | 2 + 1 self-found | 1 | reviewer MAJOR: 1 in (REJECTED with reproduction), 1 out (reviewer-tagged); MINOR: 1 out; self-found MAJOR S1: in | reviewer 2 NEW, 1 REOPENED (r1 #10); S1 NEW | 0 | PRODUCT and instrument (seat 4: S1 `3f73633`, #2 `155b691`, #3 `21059b8`) | WSL, codex-cli gpt-5.6-sol high; 20 `succeeded in`; 217,008 tokens; 1 echoed `ERROR` (sandbox subprocess, not transport) | 361K at the pause (seat 3 retired) |
+| 3 | Reviewer A (seat 4) on `21059b8`, base `ac4be92` | 0 | 3 | 1 | MAJOR: 1 in (#1 ACCEPTED), 2 out (reviewer-tagged; #2 REJECTED with reproduction, #3 REJECTED with reason); MINOR: 1 in (#4 ACCEPTED, cleanup) | 4 NEW, 0 REOPENED | 0 | pending (adjudication turn: no change) | WSL, codex-cli 0.162.1 gpt-5.6-sol high; probe 1 + review 11 `succeeded in`; 185,272 tokens; 1 echoed `ERROR` (WSL vsock, not transport) | (dispatcher) |
 
 Seat 1 stops after round 0 by the orchestrator's instruction (219K before product code; the build
 is the largest in the wave). A fresh cell builds from "RESUME HERE" below.
@@ -189,35 +190,30 @@ main, stream and info packets of an FFmpeg-written file).
   presentation-effect proof. Audio: identity edit at 0.
 - WINDOW RELEASED at the end of this round.
 
-## RESUME HERE (current; seat 3 paused by the orchestrator at `b18d7cc` + this ledger commit)
+## RESUME HERE (current; seat 4, round 3 adjudicated at `21059b8` + this ledger commit)
 
-- **Round 1: fully remediated.** All accepted findings (1-4, 6-9, 11-13) and the finding-5 report
-  text are fixed and tested (`9785956` instrument, `7035be6` sink, `8fe963f` report); 5 and 10
-  stay rejected with their reproductions. Nothing of round 1 remains.
-- **Round 2 HAS RUN and is ADJUDICATED** (on `8fe963f`, before the pause reached this seat;
-  evidence `r2\`, section "Round 2" below). Pending the dispatcher's ruling, NO remediation
-  started:
-  - **S1** (self-found MAJOR, in envelope, blocking): a truncated source cut at a packet
-    boundary (no corrupt-flagged packet) has no "next pts" after its last readable frame;
-    `verify.frame_end` falls back to the whole file's presentation end, so the last frame and the
-    audio cut run to it. Proposed fix: the next pts from the source's own video sample table
-    (`stts` + `ctts` in the intact `moov`, mapped through the edit list), used by the sink's
-    `_plan_tracks`/`frame_end` and the instrument's `_readable_end`; a regression test on a
-    moov-first file cut at 60 % (`r2\repro\repro_f1b.py`), failing on the current code.
-  - **#2** (REOPENED r1 #10, out of envelope, banked): a keyframe-aligned head trim passes `open`.
-    Proposed with S1: refuse a media segment whose `media_time` is not the track's earliest
-    composition time (the same sample-table read); test from `r2\repro\repro_f2.py`.
-  - **#3** (MINOR cleanup): `nvenc_proof` must not say `tied` without a resolved GPU UUID.
-  - Then Reviewer A round 3 on that remediation (recommended: product-code change), then a
-    full-pytest WINDOW request.
-- Still waiting for WP3.9 on main: the GX011627 product leg, the AD-12 quality table, the export
-  FLOOR speed row (`tools/video_io_bench.py`, EXCLUSIVE window), the report's PENDING sections.
+- Base `ac4be92` (main with WP3.9; the dispatcher rebased the branch at seat 4; pre-rebase branch
+  `wp3.10-pre-rebase` at `98ee54a`). Reviewer A diffs are `ac4be92..HEAD`.
+- **Round 2: fully remediated** per CHARC `26c54f1567f948e1` (section "Seat 4" below).
+- **Round 3 HAS RUN and is ADJUDICATED** (evidence `r3\`, section "Round 3" below). Pending the
+  dispatcher's reply, NO remediation started:
+  - **#1** (MAJOR, in envelope, blocking): `abort`/`_fail` can leave `out_path` when a process
+    step of `_cleanup` raises. Fix: `_remove(out_path)` in a `finally` after the process steps,
+    the first error kept (DR-20 (6)); test = `r3\repro\repro_f1.py` as a pytest plant, failing on
+    the current code.
+  - **#4** (MINOR cleanup): the report's status lines.
+  - #2, #3 rejected (reproduction / reason). Then Reviewer A round 4.
+- After Reviewer A converges: WINDOW requests -- full pytest; footage (GX011627 product leg through
+  WP3.9's `frames`, the AD-12 quality table, the Edits compilation through `open` for the #2 rule);
+  last and alone, EXCLUSIVE: the export FLOOR speed row (`tools/video_io_bench.py`, not yet written).
 - Decided and not to be redone: round 0 (NUT + end sentinel + setts/noise BSF, INFO packet), the
   round-0 rulings, CHARC's Q-A/Q-B/Q-C/Q-D notes, P8 (stated non-square SAR refused; an unseen
-  SAR is 1:1, `01d1578`).
-- Working notes: targeted runs use `-m "not footage"`; the e2e module takes about 3.5 min, the
-  unit, fidelity and probe modules about 35 s. Scratch scripts are under `work\wp3.10\r2\`
-  (gitignored). Test-file edits with non-ASCII must use escapes.
+  SAR is 1:1, `01d1578`), the S1/#2/#3 ruling.
+- Working notes: targeted runs use `-m "not footage"`; the five video modules (encode, units,
+  fidelity, probe rules, decode rules) take about 5 min. Scratch under `work\wp3.10\r3\`
+  (gitignored). "Fails on the unfixed code" runs: `git archive HEAD` into `work\wp3.10\r3\old`, the
+  new test files copied in, `PYTHONPATH=<old>\src` with the worktree's `.venv` python. Test-file
+  edits with non-ASCII must use escapes.
 
 ## Seat 2 (`wp310-cell2`) -- build and round 1
 
@@ -270,3 +266,39 @@ in-envelope, NEW): a truncated source whose cut leaves no corrupt-flagged packet
 frame extended to the whole file's presentation end (`repro/repro_f1b.*`, cut at 60 %: the
 output's video edit list says 2.0 s over 1.1 s of media; caught by the instrument's
 video-duration row, not by `close`). Remediation follows the dispatcher's reply.
+
+## Seat 4 (fresh seat after the pause) -- round-2 remediation and round 3
+
+- Started from CHARC `26c54f1567f948e1` (FINAL) on the rebased branch (`43b68ff` on `ac4be92`).
+  One commit per finding, each with tests that fail on the unfixed code (run on `git archive` of
+  the pre-fix head with the new tests; logs in `r3\remediation\`):
+  - **S1** `3f73633`: `verify.read_sample_table` (the video track's `mdhd` + `stts` + signed
+    `ctts` from `moov`, bounds-checked, at most `MAX_SAMPLES`), `_sample_pts` (composition times
+    moved by the one offset the first listed packet shows, checked against EVERY listed packet,
+    else absent), `PacketTable.samples` / `.sample_pts`; `frame_end` takes the next pts from the
+    sample table when known; `readable_end` (refuses when the end cannot be told) is used by BOTH
+    `encode._plan_tracks` and `tools/video_fidelity._readable_end`. `probe.py` untouched; no
+    interface changed. Tests: the moov-first libx264 clip cut at 60 % (no corrupt packet; oracle
+    = the next pts in the WHOLE file; output edit end, audio, V4) -- pre-fix: edit end 2 s where
+    11/10 s (`s1-prefix-fails.log`); the sample table agrees with the listing on libx264/libx265
+    B-frame and plain clips; unit tests of `readable_end` and the mapping.
+  - **#2** `155b691`: `_edit_list_refusal` refuses a media segment whose `media_time` is not the
+    track's earliest composition time (recorded in the round-0 table above). Tests: the
+    keyframe-aligned head trim of `r2\repro\repro_f2.py` refused by name before FFmpeg starts
+    (pre-fix: FFmpeg started); four unit forms (`f2-prefix-fails.log`).
+  - **#3** `21059b8`: `nvenc_proof` is `tied` only with a resolved GPU UUID, else the reason names
+    the index (`f3-prefix-fails.log`).
+- Checked on every WP2.3 video fixture and the r2 cut files: the sample table maps (scratch
+  `work\wp3.10\r3s1*.py`). Targeted run before review at `21059b8`: the five video modules
+  `-m "not footage"` 213 passed, 2 deselected; ruff, format, mypy clean.
+
+### Round 3 (evidence `C:\Users\rwsmy\clearwater-review-evidence\wp3.10\r3\`, `adjudication.md` there)
+
+ACCEPTED: 1 (MAJOR, in envelope: `abort` / `_fail` skip deleting `out_path` when a process step of
+the cleanup raises; reproduced with a planted `wait` timeout, `repro/repro_f1.*`), 4 (MINOR: stale
+report status lines). REJECTED: 2 (reviewer-tagged out of envelope; an edit list ending inside the
+last frame is the source's own presentation and the output keeps it, every MANDATORY and REQUIRED
+item SAME, `repro/repro_f2.*`; the same script on a fractional-tick end shows the accepted
+"rounded UP" limitation as a reported 1-tick DIFFERENT), 3 (reviewer-tagged out of envelope;
+FFmpeg reads `stts`/`ctts` regardless of version exactly as the reader does, and the mapping is
+checked against every listed packet). Remediation follows the dispatcher's reply.
