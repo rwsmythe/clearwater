@@ -55,9 +55,48 @@ SHA-256 hex of canonical JSON (`sort_keys`, compact separators, floats by `repr`
 `depends_on_parameters`. A parameter no stage depends on leaves it unchanged; a missing name and
 `None` differ.
 
-## V3
+## V3 (engine side, ruling Q7 and CHARC ruling V3-1)
 
-PENDING the dispatcher's ruling on finding V3-1 (ledger).
+`tests/test_analysis_v3.py`, two test-local methods with real whole-frame statistics: gray-world
+gains (`GrayWorld`) and gains plus a 0.5/99.5 % luma stretch (`GainsStretch`, c3's two kinds of
+statistic). V3's metric: in the untouched region of the output, the per-frame mean L*, a*, b*
+(CIELAB D65, the output read as sRGB) and a contrast measure (the standard deviation of L* over the
+region); flicker = the standard deviation of the frame-to-frame differences of each measure; the
+smoothed figure renders with `smoothed_record`, the per-frame one with `provisional_record`
+(each frame's own chain on its stored proxy). Run `work/t-v3c.log` (5 passed, 69 s, FFmpeg).
+
+**Asserted: the jittering-patch clip.** Built in the test, no committed fixture: the AD-14
+texture (`tools/fixtures/flicker.texture`) at 480 x 270, 90 frames at 30000/1001, a 60 x 60 patch
+of the AD-14 disc's colour whose corner is re-drawn uniformly at random each frame inside the
+lower third (seed 14; size, seed and count fixed before the first run); the measured region is
+the upper half, which `test_the_jittering_patch_never_touches_the_measured_region` proves
+untouched in every frame. V3's 25 % is asserted on all four measures for both methods:
+
+| Method | Per-frame L* / a* / b* / contrast | Smoothed (2.0 s `median_gaussian`) | Ratio |
+|---|---|---|---|
+| GrayWorld | 0.012418 / 0.037711 / 0.050001 / 0.003546 | 0.000283 / 0.000887 / 0.001125 / 0.000081 | 0.023 / 0.024 / 0.022 / 0.023 |
+| GainsStretch | 0.224233 / 0.038049 / 0.043777 / 0.135870 | 0.003863 / 0.000915 / 0.000995 / 0.002462 | 0.017 / 0.024 / 0.023 / 0.018 |
+
+**`ad14-flicker`: AD-14 asserted, V3's ratios recorded.** AD-14's figure after smoothing is
+0.0042/255 (GrayWorld) and 0.0533/255 (GainsStretch), under 0.5/255 by two orders of magnitude
+and below the per-frame figures (0.0076, 0.0835).
+
+### V3 ratios on steadily moving content (information for CP5 / WP4.2, not a decision request)
+
+| Source | V3 ratio (smoothed / per-frame flicker) |
+|---|---|
+| `ad14-flicker`, GrayWorld (L* / a* / b* / contrast) | 0.475 / 0.447 / 0.488 / 0.476 |
+| `ad14-flicker`, GainsStretch (L* / a* / b* / contrast) | 0.387 / 0.482 / 0.455 / 0.400 |
+| WP1.4 real footage (AD-14's row: 0.053/0.151 to 0.106/0.236) | 0.35 to 0.45 |
+
+Cause: the AD-14 disc sweeps steadily across the frame, so the whole-frame statistics follow a
+smooth curve; their frame-to-frame differences are nearly constant, and their standard deviation
+measures the curve's curvature, which a centred smoother must keep (keeping a smooth trend is
+the case for the 2 s window in WP1.4). On such content V3's ratio says nothing about smoothing;
+on white-noise-like statistics (the jittering patch) the default leaves about 2 %. Under V3's
+"tunable" clause these figures go on the owner-pending list for CP5 / WP4.2 as information; V3 on
+real footage stays V2's (D112). AD-14 is extended by one clause on main (`docs/decisions.md`,
+b9f3d09).
 
 ## Step-aware design task (AD-3, question 6)
 
