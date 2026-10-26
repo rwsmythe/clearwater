@@ -955,6 +955,30 @@ def test_a_frame_decoded_during_a_drag_does_not_leave_an_older_frame_over_the_pr
     env.wait(lambda: any(p == PTS[3] for p, _ in env.positions))
 
 
+def test_a_frame_decoded_with_another_pts_during_a_drag_keeps_the_drags_proxy(make_env) -> None:
+    stored = (1000, 4000, 7000, 10000, 13000)  # between the frames: a commit decodes the next one
+    env = make_env(gated=(0,), stored=stored, hold_decode=(4000,))
+    env.open()
+    env.wait(lambda: len(env.analysis.runs) > 0)
+    env.analysis.release(0)
+    env.phase_is("complete")
+    env.wait(lambda: env.slider().maximum() == len(stored) - 1)
+    env.qtbot.wait(100)
+    env.slider().setValue(1)  # a click: commits 4000; the decode (it will yield 6006) is held
+    env.wait(env.source.holding.is_set)
+    drag_to(env, 3)  # the drag starts within the decode time
+    last = np.full((12, 16, 3), stored[3] % 251, np.uint8)
+    env.wait(lambda: bool(env.shown) and np.array_equal(env.shown[-1], last))
+    env.source.hold.set()  # the frame at 6006 arrives, not the one requested, slider still down
+    env.wait(lambda: env.session.current_image().pts_ticks == PTS[2])
+    env.qtbot.wait(300)
+    assert env.slider().isSliderDown() and env.slider().value() == 3  # the drag is not moved
+    assert presenter_of(env.window).of("error") == []  # no proxy was asked for the frame's pts
+    assert env.display[-1] == "proxy" and np.array_equal(env.shown[-1], last)
+    release(env)
+    env.wait(lambda: any(p == stored[3] for p, _ in env.positions))
+
+
 def test_a_failed_decode_after_a_parameter_change_restores_no_statistics(make_env) -> None:
     env = make_env(gated=(0, 1), fail_decode=(PTS[2],))
     complete(env)

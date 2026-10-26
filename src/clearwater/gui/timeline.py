@@ -653,8 +653,9 @@ class TimelinePanel(QWidget):
         if not isinstance(outcome, FrameOutcome) or self._analysis is None:
             return
         self._pair_frame(outcome)
-        if self._dragging and self._pts and self._slider_pts is not None:
-            self._request("proxy", self._slider_pts)
+        index = self._slider.value()
+        if self._dragging and 0 <= index < len(self._pts):  # a pts the analysis stores
+            self._request("proxy", self._pts[index])
 
     def _pair_frame(self, outcome: FrameOutcome) -> None:
         """Pair a decoded frame with its statistics (DR-44 (a)); see :meth:`_on_frame_decoded`."""
@@ -665,10 +666,7 @@ class TimelinePanel(QWidget):
             self._session.set_statistics(self._shown_statistics)
             if self._shown_pts is not None:
                 self._wanted_pts = self._shown_pts
-                self._slider_pts = self._shown_pts
-                with _blocked(self._slider):
-                    self._slider.setValue(self._index_of(self._shown_pts))
-                self._update_time(self._shown_pts)
+                self._follow(self._shown_pts)
             return
         self._shown_pts = outcome.pts
         if outcome.pts == outcome.requested:
@@ -677,13 +675,19 @@ class TimelinePanel(QWidget):
         self._session.set_statistics(None)  # never another frame's statistics
         self._shown_statistics = None
         self._wanted_pts = outcome.pts
-        self._slider_pts = outcome.pts
-        if self._pts:
-            with _blocked(self._slider):
-                self._slider.setValue(self._index_of(outcome.pts))
-        self._update_time(outcome.pts)
+        self._follow(outcome.pts)
         if self._session.analysis().phase == "complete":
             self._request("fix", outcome.pts)
+
+    def _follow(self, pts: int) -> None:
+        """Move the handle and the time label to the frame the shell shows (not under a drag)."""
+        if self._dragging:  # the hand holds the handle: it stays where the user put it
+            return
+        self._slider_pts = pts
+        if self._pts:
+            with _blocked(self._slider):
+                self._slider.setValue(self._index_of(pts))
+        self._update_time(pts)
 
     def _switch(self) -> None:
         """Completion: switch the shown frame from the provisional to the smoothed statistics."""
