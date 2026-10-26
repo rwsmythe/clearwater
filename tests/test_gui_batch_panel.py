@@ -224,6 +224,36 @@ def test_one_parameter_set_and_settings_apply_to_every_item_and_are_fixed_at_sta
     assert [r.kind for r in rig.stub.requests] == ["photo", "video", "photo"]
 
 
+def test_the_current_parameters_are_validated_too(rig: Rig) -> None:
+    """Round-1 F3: an invalid current set refuses the start as an invalid preset does."""
+    rig.window.session.set_parameters(new_parameter_set("stub", {"bogus": 1}))
+    batch = started(rig, [A])
+    batch.start()
+    assert not batch.is_running() and rig.stub.requests == []
+    (error,) = presenter_of(rig.window).of("error")
+    assert error.owner == "batch" and "current parameters" in error.text.lower()
+    assert "not valid" in error.text
+
+
+def test_planted_current_parameters_without_validation_are_detected(
+    rig: Rig, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    original = BatchPanel._resolve_parameters
+
+    def unchecked(self: BatchPanel, name: str | None) -> Any:
+        if name is None:
+            return self._context.session.parameters()
+        return original(self, name)
+
+    monkeypatch.setattr(BatchPanel, "_resolve_parameters", unchecked)
+    rig.window.session.set_parameters(new_parameter_set("stub", {"bogus": 1}))
+    batch = started(rig, [A])
+    batch.start()
+    wait_batch_idle(rig)
+    # The test above fails on this implementation: the batch runs with an invalid set.
+    assert rig.stub.requests and presenter_of(rig.window).of("error") == []
+
+
 def test_a_preset_is_applied_to_every_item(rig: Rig) -> None:
     rig.window.context.presets.save("mine", new_parameter_set("stub", {}))
     batch = started(rig, [A, C])
