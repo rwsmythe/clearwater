@@ -392,7 +392,8 @@ class FFmpegVideoSink:
         that the encoder cannot write; an unknown quality level; a provenance object JSON cannot
         hold; a stated non-square pixel aspect ratio (CHARC P8; a ratio that cannot be seen is
         treated as 1:1); an edit list the sink cannot reproduce; a frame with a negative pts.
-        ``out_path`` is recorded first, so :meth:`abort` after a refusal still deletes it.
+        ``out_path`` is recorded first, so :meth:`abort` after a refusal still deletes it. A
+        refusal is final: the sink cannot be opened again (use a new sink).
 
         Args:
             probe: The source's probe result.
@@ -413,6 +414,35 @@ class FFmpegVideoSink:
                 "state", f"A video output cannot be opened twice ({self._phase})."
             )
         self._out_path = out_path  # first: abort() deletes it even after a refusal below
+        try:
+            command, header = self._prepare(
+                probe,
+                out_path,
+                encoder=encoder,
+                quality=quality,
+                bit_depth=bit_depth,
+                provenance=provenance,
+            )
+        except BaseException:
+            self._phase = "failed"  # a refusal is final (round-4 #3); abort still deletes out_path
+            raise
+        self._start(self._command(command))
+        try:
+            self._send(header)
+        except BaseException as error:
+            self._fail(error)
+
+    def _prepare(
+        self,
+        probe: ProbeResult,
+        out_path: Path,
+        *,
+        encoder: str,
+        quality: str,
+        bit_depth: int,
+        provenance: Mapping[str, Any] | None,
+    ) -> tuple[list[str], bytes]:
+        """Run every check of :meth:`open`; return the FFmpeg command and the NUT stream header."""
         self._warnings = []
         self._audio_end = None
         for fault in probe.faults:
@@ -471,11 +501,7 @@ class FFmpegVideoSink:
             raise VideoEncodeError(
                 "refused", f"This video cannot be written: {ascii_text(str(error))}"
             ) from error
-        self._start(self._command(command))
-        try:
-            self._send(header)
-        except BaseException as error:
-            self._fail(error)
+        return command, header
 
     def write(self, frame: Frame) -> None:
         """Write one frame, in pts order, with its exact pts.
@@ -660,10 +686,20 @@ class FFmpegVideoSink:
         self._process = process
         self._stdin = process.stdin
         self._phase = "open"
-        stderr = process.stderr
-        assert stderr is not None  # stderr=PIPE
-        thread = threading.Thread(target=self._drain, args=(stderr,), daemon=True)
-        thread.start()
+        try:  # FFmpeg runs from here: any failure goes through _fail (round-4 #1)
+            stderr = process.stderr
+            assert stderr is not None  # stderr=PIPE
+            thread = threading.Thread(target=self._drain, args=(stderr,), daemon=True)
+            thread.start()
+        except BaseException as error:
+            if isinstance(error, Exception):
+                failure = VideoEncodeError(
+                    "encoder_failed",
+                    f"FFmpeg's error output cannot be read: {ascii_text(str(error))}",
+                )
+                failure.__cause__ = error
+                error = failure
+            self._fail(error)
         self._stderr_thread = thread
 
     def _drain(self, stream: IO[bytes]) -> None:

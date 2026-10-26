@@ -13,6 +13,7 @@ import json
 import os
 import shutil
 import subprocess
+import threading
 import time
 from collections.abc import Callable, Iterator
 from dataclasses import replace
@@ -812,6 +813,26 @@ def test_open_twice_is_refused(sample: Sample, tmp_path: Path) -> None:
     assert not out.exists()
 
 
+@pytest.mark.usefixtures("no_ffmpeg_start")
+def test_a_refused_open_is_final(sample: Sample, tmp_path: Path) -> None:
+    # Round-4 finding 3: a refused sink could be opened again, and abort then forgot the first
+    # path.
+    info = probe(sample("vid-vfr"))
+    first, second = tmp_path / "first.mp4", tmp_path / "second.mp4"
+    first.write_bytes(b"")
+    second.write_bytes(b"")
+    sink = FFmpegVideoSink()
+    options: dict[str, Any] = {"quality": "draft", "bit_depth": 8, "provenance": None}
+    with pytest.raises(VideoEncodeError) as refused:
+        sink.open(info, first, encoder="auto", **options)
+    assert refused.value.kind == "refused"
+    with pytest.raises(VideoEncodeError) as again:
+        sink.open(info, second, encoder="libx265", **options)
+    assert again.value.kind == "state"
+    sink.abort()
+    assert not first.exists() and second.exists()
+
+
 # --- write rules, failures and abort ----------------------------------------------------------
 
 
@@ -848,7 +869,8 @@ def test_write_refuses_a_bad_frame_and_deletes_the_output(
         sink.write(plant(frames[2], frames))
     assert caught.value.kind == "frame" and words in str(caught.value)
     assert not out.exists()
-    sink.abort()  # a no-op after a failure; never raises
+    sink.abort()  # after a failure it repeats the cleanup (round 3); it never raises
+    assert not out.exists()
     with pytest.raises(VideoEncodeError) as again:
         sink.write(frames[2])
     assert again.value.kind == "state"
@@ -926,6 +948,52 @@ def test_a_cleanup_error_never_replaces_the_original_error(
     sink.abort()  # never raises, even now
     monkeypatch.undo()
     out.unlink(missing_ok=True)
+
+
+def test_a_drain_thread_that_cannot_start_stops_ffmpeg_and_deletes_out_path(
+    sample: Sample, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Round-4 finding 1: the stderr thread started after FFmpeg, outside the failure path.
+    start = threading.Thread.start
+
+    def refuse_drain(self: threading.Thread) -> None:
+        if getattr(getattr(self, "_target", None), "__name__", "") == "_drain":
+            raise RuntimeError("can't start new thread")
+        start(self)
+
+    monkeypatch.setattr(threading.Thread, "start", refuse_drain)
+    source = sample("vid-vfr")
+    info = probe(source)
+    out = tmp_path / "out.mp4"
+    out.write_bytes(b"")
+    sink = FFmpegVideoSink()
+    try:
+        with pytest.raises(VideoEncodeError) as caught:
+            sink.open(info, out, encoder="libx265", quality="draft", bit_depth=8, provenance=None)
+        assert caught.value.kind == "encoder_failed" and "error output" in str(caught.value)
+        assert isinstance(caught.value.__cause__, RuntimeError)
+        assert sink._process is not None and sink._process.poll() is not None
+        assert not out.exists()
+    finally:
+        if sink._process is not None and sink._process.poll() is None:
+            sink._process.kill()
+            sink._process.wait()
+
+
+def test_the_encode_window_ends_when_ffmpeg_exits(
+    sample: Sample, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Round-4 finding 2: the NVENC proof's window ran on through the output's verification.
+    verified: list[float] = []
+    verify = FFmpegVideoSink._verify
+
+    def timed(self: FFmpegVideoSink, end: int) -> SinkReport:
+        verified.append(vf._clock())
+        return verify(self, end)
+
+    monkeypatch.setattr(FFmpegVideoSink, "_verify", timed)
+    run = vf.encode_file(sample("vid-vfr"), tmp_path / "out.mp4", encoder="libx265")
+    assert run.started < run.ended <= verified[0]
 
 
 def _wedged(timeout: float | None = None) -> int:

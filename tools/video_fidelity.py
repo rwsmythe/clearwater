@@ -317,6 +317,11 @@ class _RecordingSink(FFmpegVideoSink):
         process = self._process
         self.pid = process.pid if process is not None else None
 
+    def _end_stream(self) -> int:
+        end = super()._end_stream()
+        self.ended = _clock()  # FFmpeg's exit seen: the window closes before verification
+        return end
+
 
 @dataclass
 class EncodeRun:
@@ -328,7 +333,8 @@ class EncodeRun:
         bit_depth: The output bit depth.
         pid: The FFmpeg process id.
         started: Start of the encode window (FFmpeg about to start), on :data:`_clock`.
-        ended: End of the window (the sink closed or aborted), on the same clock.
+        ended: End of the window, on the same clock: when the sink saw FFmpeg exit, before the
+            output is verified (round-4 #2); after a failure before that, when the sink failed.
         gpu: The graphics-card samples taken during the window (NVENC only), or None.
     """
 
@@ -382,7 +388,8 @@ def encode_file(
         sink.abort()
         raise
     finally:
-        sink.ended = _clock()
+        if not sink.ended:  # FFmpeg's exit was not seen: the encode failed first
+            sink.ended = _clock()
         samples = sampler.stop() if sampler is not None else None
     return EncodeRun(report, encoder, depth, sink.pid, sink.started, sink.ended, samples)
 

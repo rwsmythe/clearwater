@@ -72,7 +72,8 @@ kept audio packets with dts below 1.4787 s).
   sample table cannot be read); no head trim (first pts = the empty edit's dwell); no tail trim.
   Anything else is refused by name. The NUT stream header is built before FFmpeg starts (a
   header that cannot be built is a refusal, nothing running), and `out_path` is recorded first,
-  so `abort` after a refused `open` deletes it.
+  so `abort` after a refused `open` deletes it. A refusal is final: the sink cannot be opened
+  again (round-4 finding 3).
 - **`write`** checks, by name: `device == "cpu"` (Q14), the source time base, an integer pts that
   is a pts of the source and later than the previous one, a float32 NumPy array of the source's
   `(height, width, 3)`, no NaN (`rgb_to_planes`); quantises at the OUTPUT depth from a
@@ -94,7 +95,8 @@ kept audio packets with dts below 1.4787 s).
   of them, or for a truncated source exactly the source's packets before the cut (a packet within
   2 us of the cut may go either way: FFmpeg reads `-to` and the input start in microseconds).
   A mismatch is `verify_failed`. Returns `SinkReport(frames_written, warnings, not_carried)`.
-- **Failure** anywhere in `open` after FFmpeg starts (sending the header), `write` or `close`: FFmpeg is killed, its
+- **Failure** anywhere in `open` after FFmpeg starts (starting the stderr thread -- round-4
+  finding 1, now `encoder_failed` -- or sending the header), `write` or `close`: FFmpeg is killed, its
   pipes closed, `out_path` deleted, the ORIGINAL error raised; a cleanup error is attached as a
   note (`add_note`), never in its place (DR-20 (6)); `out_path` is deleted in a `finally`, so a
   process step that raises (FFmpeg not ending within 30 s) never skips the deletion (round-3
@@ -127,7 +129,9 @@ the end of its last packet before it; the video duration, the video edit list as
 source's `media_time` and rate kept, AD-22's reading applied to the cut list), the video and
 audio presentation effect, the movie duration and the copied packets are all the source's cut
 there. DR-18: (1) NVENC proof from `nvidia-smi pmon` samples tied to the FFmpeg PID, the GPU
-UUID and the encode window, the samples and the window on ONE monotonic clock (a sample counts
+UUID and the encode window -- from just before FFmpeg starts to the moment the sink sees FFmpeg
+exit, before the output is verified (round-4 finding 2; it used to run on through the
+verification) -- the samples and the window on ONE monotonic clock (a sample counts
 when its `nvidia-smi` call overlaps the window), `tied` only when the GPU those samples name
 resolves to a UUID (round-2 #3), or the reason it is not tied (for example an encode shorter
 than the sampling period, or a GPU index with no UUID); DR-18 (1) closes only on `tied`; (2) AAC configuration, priming and side data compared, MANDATORY; (3) a roster
