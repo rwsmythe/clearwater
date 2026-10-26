@@ -385,3 +385,9 @@ made pytest diff ~580 KB byte strings at `-v` whenever a planted test expected t
 test > 100 s at `-v`, 2 s at `-q`; the six package files 35 min at `-v`). Replaced by
 `assert_same_bits` (dtype, shape, bytes; short message with the count of differing elements and
 the max abs difference): the six files at `-v` now 323 passed in 93 s.
+
+## Exclusive windows (cell 4, 2026-10-26; window granted by the orchestrator, gen 10)
+
+| step | run | host before | start / end (local, -10:00) | exit | output | STOP |
+|---|---|---|---|---|---|---|
+| 1 | `core_speed.py GX011627 --memory` at `3fae1d5` | 11.4 GB free; GPU 0 %, 123 MiB | 04:43:17 / 04:47:18 | 0 | worktree `work/wp3.4/core-memory.txt`; record `C:\Users\rwsmy\clearwater\work\wp3.4\core-whole-GX011627-20261026T144318Z.json` | none: max pool reserved 1044 MiB vs estimate 1982 MiB (2160x3840), 1998 MiB vs 3792 MiB (2988x5312) |
