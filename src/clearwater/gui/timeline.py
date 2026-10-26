@@ -15,6 +15,18 @@ never cancels a run (CHARC ruling on Q-A): it is offered to the run in flight wi
 ``ClipAnalysis.retarget``; when that does not absorb it, the run finishes and a follow-up run
 with the latest parameters starts from its done callback. The GUI itself cancels only for the
 user (D70), a method change and a source change.
+
+The position lane obeys ONE rule, "the latest intent". Every user event (press, value change,
+release, and the completion switch) and nothing else takes the next number of one sequence and
+becomes the newest intent; a fix request (the statistics of a frame the shell decoded at another
+pts) and the re-show of the drag's proxy take numbers too but are not intents. A lane result is
+applied only if it belongs to the newest intent: a commit if it IS the newest intent, a fix if
+the commit whose frame it repairs is, a proxy if the slider is still down in the drag it was
+asked for (the proxy the newest intent needs). Hence ``set_position`` is called only for a commit
+that is the newest intent, so never while the slider is down, and release always commits
+``pts()[value]``. While the slider is down the handle belongs to the hand: each value shows the
+stored proxy of its pts, a frame the shell decodes meanwhile only makes the same proxy be shown
+again, and nothing moves the handle.
 """
 
 from __future__ import annotations
@@ -106,7 +118,8 @@ class _Request:
     kind: Literal["proxy", "commit", "fix"]
     pts: int
     epoch: int
-    commit_seq: int
+    ref: int
+    """What the request belongs to: its commit (or the one it repairs), or its drag (a proxy)."""
 
 
 @contextmanager
@@ -154,9 +167,10 @@ class TimelinePanel(QWidget):
         self._dragging = False
         self._lane: JobHandle | None = None
         self._wanted: _Request | None = None
-        self._latest_commit = 0
-        self._latest_proxy = 0
+        self._intent = 0
+        self._drag = 0
         self._shown_proxy_seq = 0
+        self._requested_seq = 0
         self._wanted_pts: int | None = None
         self._requested: int | None = None
         self._supplied: StatsMap | None = None
@@ -261,6 +275,7 @@ class TimelinePanel(QWidget):
         self._done_target = None
         self._epoch += 1
         self._requested = None
+        self._requested_seq = 0
         self._supplied = None
         self._shown_statistics = None
         self._scrub_error_shown = False
@@ -515,14 +530,23 @@ class TimelinePanel(QWidget):
         self._time.setText(f"{seconds:.3f} s")
 
     def _on_pressed(self) -> None:
-        """The slider went down: proxies only until it is released."""
+        """The slider went down: a new drag, proxies only until it is released (a new intent)."""
         self._dragging = True
+        self._drag += 1
+        index = self._slider.value()
+        if 0 <= index < len(self._pts):
+            self._request("proxy", self._pts[index])  # the proxy of the value under the hand
+        else:
+            self._take_intent()
 
     def _on_released(self) -> None:
-        """The slider was released: the full-resolution corrected frame (D72)."""
+        """The slider was released: the full-resolution corrected frame (D72), always."""
         self._dragging = False
-        if self._pts:
-            self._request("commit", self._pts[self._slider.value()])
+        index = self._slider.value()
+        if 0 <= index < len(self._pts):
+            self._request("commit", self._pts[index])
+        else:
+            self._take_intent()
 
     def _on_slider_value(self, index: int) -> None:
         """A slider value (drag, key, click): a proxy while down, else a commit."""
@@ -535,16 +559,43 @@ class TimelinePanel(QWidget):
 
     # The position lane: at most one job in flight, the latest request kept.
 
-    def _request(self, kind: Literal["proxy", "commit", "fix"], pts: int) -> None:
-        """Queue a request; the lane runs the latest one when it is free."""
+    def _take_intent(self) -> int:
+        """Take the next number of the one sequence for a user event: the newest intent."""
         self._seq += 1
-        if kind == "commit":
-            self._latest_commit = self._seq
-            self._wanted_pts = pts
-        elif kind == "proxy":
-            self._latest_proxy = self._seq
-        self._wanted = _Request(self._seq, kind, pts, self._epoch, self._latest_commit)
+        self._intent = self._seq
+        return self._seq
+
+    def _request(self, kind: Literal["proxy", "commit", "fix"], pts: int) -> None:
+        """Queue a request; the lane runs the latest one when it is free.
+
+        A proxy or a commit is a user event and becomes the newest intent; a fix repairs the
+        frame of the last applied commit and is never an intent.
+        """
+        if kind == "fix":
+            self._seq += 1
+            ref = self._requested_seq
+        else:
+            ref = self._take_intent()
+            if kind == "proxy":
+                ref = self._drag
+            else:
+                self._wanted_pts = pts
+        self._wanted = _Request(self._seq, kind, pts, self._epoch, ref)
         self._pump()
+
+    def _reshow_proxy(self) -> None:
+        """Ask for the proxy of the slider's value again (not an intent: the drag's own need)."""
+        index = self._slider.value()
+        if self._dragging and 0 <= index < len(self._pts):  # a pts the analysis stores
+            self._seq += 1
+            self._wanted = _Request(self._seq, "proxy", self._pts[index], self._epoch, self._drag)
+            self._pump()
+
+    def _current(self, request: _Request) -> bool:
+        """True when the request's result still belongs to the newest intent."""
+        if request.kind == "proxy":
+            return self._dragging and request.ref == self._drag
+        return request.ref == self._intent  # the commit itself, or the commit a fix repairs
 
     def _pump(self) -> None:
         """Start the wanted request when no lane job is in flight."""
@@ -589,10 +640,10 @@ class TimelinePanel(QWidget):
             self._pump()
             return
         if not result.ok:
-            if request.seq == self._seq:  # the failure of a superseded request is not news
+            if request.seq == self._seq and self._current(request):  # a superseded one: no news
                 self._scrub_failed(result.failure or "The frame could not be read.")
         elif request.kind == "proxy":
-            if request.seq > self._shown_proxy_seq and request.seq > self._latest_commit:
+            if self._current(request) and request.seq > self._shown_proxy_seq:
                 self._shown_proxy_seq = request.seq
                 self._context.window.preview.show_proxy(box["proxy"])
                 self._scrub_ok()
@@ -601,24 +652,24 @@ class TimelinePanel(QWidget):
         self._pump()
 
     def _apply(self, request: _Request, fetched: StatsMap | None) -> None:
-        """Supply a fetched statistics set with its frame, if the request is still current."""
-        if request.seq < self._latest_proxy:  # a drag started meanwhile: the release commits
+        """Supply a fetched statistics set with its frame, if the request is the newest intent."""
+        if not self._current(request):  # a newer intent (a drag, a later commit) supersedes it
             return
         fresh = request.epoch == self._epoch
         statistics = fetched if fresh else None
         if request.kind == "commit":
-            if request.seq != self._latest_commit:
-                return
             self._requested = request.pts
+            self._requested_seq = request.seq
             self._supplied = statistics
             try:
                 self._session.set_position(request.pts, statistics=statistics)
             except RuntimeError as exc:  # no video open any more
                 _LOG.info("set_position refused: %s", exc)
                 self._requested = None
+                self._requested_seq = 0
                 return
             self._scrub_ok()
-        elif request.commit_seq == self._latest_commit and fresh:  # a fix for the shown frame
+        elif fresh:  # a fix for the shown frame
             self._session.set_statistics(statistics)
             self._shown_statistics = statistics
 
@@ -647,16 +698,13 @@ class TimelinePanel(QWidget):
         """Main thread: pair the frame the shell now shows with its own statistics.
 
         A decode started by an earlier commit can finish while the slider is down; the shell
-        then renders that older frame over the drag's proxy. The proxy of the slider's pts is
-        requested again (after any fix request, so that one is dropped as older than it, and the
-        release commits the statistics).
+        then renders that older frame over the drag's proxy, so the proxy of the slider's value
+        is asked for again. The release commits.
         """
         if not isinstance(outcome, FrameOutcome) or self._analysis is None:
             return
         self._pair_frame(outcome)
-        index = self._slider.value()
-        if self._dragging and 0 <= index < len(self._pts):  # a pts the analysis stores
-            self._request("proxy", self._pts[index])
+        self._reshow_proxy()
 
     def _pair_frame(self, outcome: FrameOutcome) -> None:
         """Pair a decoded frame with its statistics (DR-44 (a)); see :meth:`_on_frame_decoded`."""
@@ -677,8 +725,8 @@ class TimelinePanel(QWidget):
         self._shown_statistics = None
         self._wanted_pts = outcome.pts
         self._follow(outcome.pts)
-        if self._session.analysis().phase == "complete":
-            self._request("fix", outcome.pts)
+        if self._session.analysis().phase == "complete" and self._requested_seq == self._intent:
+            self._request("fix", outcome.pts)  # only for the frame of the newest intent
 
     def _follow(self, pts: int) -> None:
         """Move the handle and the time label to the frame the shell shows (not under a drag)."""

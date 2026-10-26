@@ -643,7 +643,9 @@ def test_an_exception_after_a_third_party_cancel_is_a_cancel_not_a_failure(make_
 def test_a_scrub_read_that_fails_after_a_cancel_shows_no_error(make_env) -> None:
     env = make_env(gated=(0,), proxy_delay=0.3, fail_proxy=(PTS[2],))
     complete(env)
-    drag_to(env, 2)  # the proxy read sleeps, then raises KeyError
+    env.slider().setValue(2)
+    env.wait(lambda: any(p == PTS[2] for p, _ in env.positions) and env.window.jobs.active() == 0)
+    env.slider().setSliderDown(True)  # the press asks for this value's proxy: it sleeps, raises
     env.wait(lambda: env.analysis.active_proxy == 1)
     env.window.jobs.cancel()
     env.wait(lambda: env.window.jobs.active() == 0)
@@ -953,6 +955,25 @@ def test_a_frame_decoded_during_a_drag_does_not_leave_an_older_frame_over_the_pr
     assert np.array_equal(env.shown[-1], last)
     release(env)
     env.wait(lambda: any(p == PTS[3] for p, _ in env.positions))
+
+
+def test_pressing_the_slider_without_moving_supersedes_a_commit_in_flight(make_env) -> None:
+    env = make_env(gated=(0,))
+    complete(env)
+    env.positions.clear()
+    env.shown.clear()
+    gate = threading.Event()
+    env.analysis.statistics_gate = gate
+    env.slider().setValue(2)  # a key step: a commit whose statistics read is running
+    env.wait(env.analysis.statistics_waiting.is_set)
+    env.slider().setSliderDown(True)  # the hand takes the handle; the value does not change
+    gate.set()
+    held = np.full((12, 16, 3), PTS[2] % 251, np.uint8)
+    env.wait(lambda: bool(env.shown) and np.array_equal(env.shown[-1], held))
+    env.qtbot.wait(100)
+    assert env.positions == []  # the older commit was dropped: no position while the slider is down
+    release(env)
+    env.wait(lambda: [p for p, _ in env.positions] == [PTS[2]])
 
 
 def test_a_frame_decoded_with_another_pts_during_a_drag_keeps_the_drags_proxy(make_env) -> None:
