@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import math
 import shutil
+import statistics
 import subprocess
 import sys
 import time
@@ -438,6 +439,37 @@ def test_run_once_refuses_a_strays_count_below_one(tmp_path: Path) -> None:
             strays_every=0,
         )
     assert not output.exists()
+
+
+@pytest.mark.usefixtures("quick")
+def test_a_frames_release_is_not_timed_as_its_write(
+    sample: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    real = bench.FFmpegVideoSource.frames
+
+    def frames(self: Any, info: Any, **kwargs: Any) -> Any:
+        for item in real(self, info, **kwargs):
+            weakref.finalize(item, time.sleep, 0.15)  # a slow release
+            box = [item]
+            del item
+            yield box.pop()  # the loop's reference is the only one
+
+    monkeypatch.setattr(bench.FFmpegVideoSource, "frames", frames)
+    record = bench.run_once(
+        sample(SAMPLE),
+        tmp_path / "release.mp4",
+        encoder="libx265",
+        quality="draft",
+        bit_depth=None,
+        hw_decode=False,
+        keep=False,
+        periods=FAST,
+    )
+    assert statistics.median(record["write_s"]) < 0.15  # round 8 #3: the write alone
+    assert statistics.median(record["decode_wait_s"]) < 0.15
+    # the release lands between the write's end and the next wait, inside the next interval
+    triples = zip(record["per_frame_s"], record["decode_wait_s"], record["write_s"], strict=True)
+    assert all(interval - (wait + write) >= 0.14 for interval, wait, write in list(triples)[1:])
 
 
 @pytest.mark.usefixtures("quick")

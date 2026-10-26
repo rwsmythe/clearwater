@@ -10,9 +10,10 @@ the seconds per frame and minutes of processing per minute of footage (``min/min
 seconds over ``frames / frame_rate``), and per frame the interval between the ends of two
 successive writes, the wait for the decoder and the ``write`` call (each list kept whole, and
 summarised). An interval is its wait plus its write plus the loop's own bookkeeping (a few
-microseconds). The first frame's interval also holds the decoder's start (its FFmpeg starts at
-the first frame asked for) and the encoder's first frame; the encoder's FFmpeg starts inside
-``open`` and is timed there. The first interval is kept apart from the summaries.
+microseconds) and the release of the frame before it. The first frame's interval also holds
+the decoder's start (its FFmpeg starts at the first frame asked for) and the encoder's first
+frame; the encoder's FFmpeg starts inside ``open`` and is timed there. The first interval is
+kept apart from the summaries.
 
 Plan 4.3 / frame rule 7: an EXCLUSIVE run, best effort on a shared laptop. Two telemetry
 threads (:class:`Telemetry`) record, each on its own schedule and without stopping the frame
@@ -652,8 +653,8 @@ def _measure(
                 break
             decoded = time.perf_counter()
             sink.write(frame)
-            del frame  # one frame held at a time: released before the next is decoded
             written = time.perf_counter()
+            del frame  # one frame held at a time: released before the next is decoded
             waits.append(decoded - before)
             writes.append(written - decoded)
             intervals.append(written - previous)
