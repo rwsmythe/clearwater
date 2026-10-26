@@ -9,7 +9,8 @@ D43-D45, D81, D83; V7, V11). Reviewer A evidence: `C:\Users\rwsmy\clearwater-rev
 | Round | Head | Verdict | Blocking (crit/major) | Minor | In envelope | NEW / REOPENED | Product vs test-only fixes | Depth (dispatcher) |
 |---|---|---|---|---|---|---|---|---|
 | 0 | `d286b8d` | table only, no product code besides `export_service.py`; RULED by the dispatcher (CHARC `0e6962c39f216c86`): seam approved, C1 GRANTED, C2-C7 accepted | - | - | - | - | - | 123,884 |
-| 1 | `8639afb` | NEW_CRITICAL_MAJOR_FOUND | 2 major (F1 export gate held if setup raises after try_start; F2 warnings dropped for failed/cancelled items), 0 critical | 1 (F3 current-parameters validation untested) | 3 in, 0 out | 3 NEW, 0 REOPENED | fixes pending (F1, F2 product; F3 test) | (dispatcher fills) |
+| 1 | `8639afb` | NEW_CRITICAL_MAJOR_FOUND | 2 major (F1 export gate held if setup raises after try_start; F2 warnings dropped for failed/cancelled items), 0 critical | 1 (F3 current-parameters validation untested) | 3 in, 0 out | 3 NEW, 0 REOPENED | F1, F2 product + tests, F3 test (852192d, 3d01ae6, 735dd5f) | (dispatcher fills) |
+| 2 | `735dd5f` | NO_NEW_CRITICAL_MAJOR (CONVERGED) | 0 critical, 0 major | 3 (F4 F1-test variant; F5 outputs-kept test; F6 seam docstring on outputs of a non-ok result) | 3 in, 0 out | 3 NEW, 0 REOPENED | R1 fixes were product (F1 export_panel, F2 batch_panel) + tests; R2 cleanup test-only plus one docstring | (dispatcher fills) |
 
 ## Round 0
 
@@ -258,3 +259,31 @@ The first run was green; "failing before the fix" is shown by the mutations abov
 
 Findings: see `adjudication.md` in the evidence folder. F1 MAJOR confirmed by a scratch repro; F2 MAJOR
 confirmed by reading; F3 MINOR accepted. No change made in the adjudicating turn.
+
+## Round 2 (Reviewer A, head `735dd5f`, diff `8639afb..735dd5f`; evidence `...\wp3.19\r2\`)
+
+Order used: the R1 regression tests were run on the UNFIXED code first (before the 19:38Z slot end):
+`r2\regression-on-8639afb.txt` -- `test_the_reason_is_cleared_when_setup_raises_after_the_gate_is_taken`
+(F1) and `test_warnings_of_failed_and_cancelled_items_are_kept_and_reported` (F2) FAIL; the F3 test passes
+on the unfixed code (the product already validated the current set; it is a coverage gap), its planted
+version `test_planted_current_parameters_without_validation_are_detected` shows the check distinguishes.
+Then the fixes (one commit per finding: F1 `852192d`, F2 `3d01ae6`, F3 `735dd5f`; the F2 stub flag
+`warn_on_failure` rides in F1's commit with the shared test file), then 57 passed (own modules + deps,
+`work/t1-r2c.txt`), then Reviewer A round 2 (the Codex pass ran after the tests, within the slot).
+Verdict `NO_NEW_CRITICAL_MAJOR`; 3 minors accepted (`adjudication.md`). Terminating cleanup pending:
+F4 test (request construction raising), F5 test (outputs of a non-ok result kept), F6 seam docstring
+(`outputs` on a non-ok result = files committed before the stop, normally none; wording only).
+
+## RESUME HERE (if re-seated)
+
+- Worktree `.worktrees/wp3.19`, branch `wp3.19`, head `735dd5f` plus this ledger commit. Base `718324b`.
+- Rulings: CHARC `53d1d906e47fe2c9` (brief), `0e6962c39f216c86` (round 0: seam approved, C1 granted:
+  `jobs/export_seam.py`, C2-C7 accepted). Round 1 adjudication upheld by the dispatcher.
+- Done: round 0, build, R1 (2 major fixed), R2 CONVERGED.
+- Remains: (1) terminating cleanup F4/F5 (tests) and F6 (seam docstring), no further Reviewer A round;
+  (2) `WINDOW REQUEST: full pytest` on the final head; (3) report `docs/reports/wp3.19-batch-export.md`
+  (claims, evidence paths, limits, "Seam for WP3.14 and WP4.3"); (4) the structured return report.
+- Gates now: ruff, format, mypy green; targeted 57 passed. Observed V7 maxima: see the V7 test prints
+  (`work/t1-r2c.txt`, run with -s to read); no full suite run yet.
+- Notes for the report: tests were written after the product code (disclosed); mutation checks in
+  `work/mut.py`; equivalent mutant on `start()`'s second gate guard; stub `warn_on_failure` option.
