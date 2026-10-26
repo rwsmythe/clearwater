@@ -68,7 +68,11 @@ main, stream and info packets of an FFmpeg-written file).
   duration DIFFERENT; B-frame pts shifted to 0) (`logs/r4.log`, `logs/r5.log`). On noedit-bf pts,
   start offset and duration are SAME; compare.py's effect model reads an absent list as starting
   at the earliest composition time, so its effect row also differs. Multi-segment, rate != 1 and
-  trims (first pts != the empty-edit dwell) -> refused at `open` by name.
+  trims (first pts != the empty-edit dwell) -> refused at `open` by name. **Added seat 4 (CHARC
+  ruling `26c54f1567f948e1`, round-2 #2):** a media segment whose `media_time` is not the track's
+  earliest composition time (from the sample table, `stts` + `ctts`) -> refused at `open` by
+  name ("an edit list whose media segment starts at X s rather than at the video's earliest
+  frame (Y s)"); equal is AD-22's identity-by-effect form (the Edits compilation's 3003/60000).
 - P4 Q9 (cut audio/gpmd at the video end): `-shortest` CUTS THE VIDEO (19 of 24 frames on
   fx-truncated, `logs/r7.log`) -> unusable; the end is unknown when FFmpeg starts.
 - P5 `tools/container_spike/compare.py` cannot read a truncated source (`ProbeError: top-level

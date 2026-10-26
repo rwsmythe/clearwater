@@ -769,6 +769,27 @@ def test_open_refuses_an_unavailable_encoder_or_depth_with_the_reason(
 
 
 @pytest.mark.usefixtures("no_ffmpeg_start")
+def test_open_refuses_a_head_trim_that_lands_on_a_keyframe(tmp_path: Path) -> None:
+    # Round-2 #2 (REOPENED r1 #10): media_time on a keyframe leaves no discarded packet, so
+    # the first pts equals the dwell and the old checks passed it.
+    source = tmp_path / "gop10.mp4"
+    _ffmpeg(
+        "-f", "lavfi", "-i", "testsrc2=size=160x120:rate=30:duration=2", "-c:v", "libx264",
+        "-bf", "0", "-g", "10", "-keyint_min", "10", "-sc_threshold", "0", "-an", str(source),
+    )  # fmt: skip
+    boxes = read_movie_boxes(source)
+    assert boxes.movie_timescale is not None and boxes.video_timescale is not None
+    third_movie, third_media = boxes.movie_timescale // 3, boxes.video_timescale // 3
+    _patch_media_edit(source, 0, lambda s, m, r: (s - third_movie, m + third_media, r))
+    assert probe(source).edit_list[0].media_time_s == Fraction(1, 3)
+    out = tmp_path / "out.mp4"
+    with pytest.raises(VideoEncodeError) as caught:
+        _open(source, out)
+    assert caught.value.kind == "refused" and "earliest frame (0 s)" in str(caught.value)
+    assert out.stat().st_size == 0
+
+
+@pytest.mark.usefixtures("no_ffmpeg_start")
 def test_open_refuses_non_square_pixels(clips: Clips, tmp_path: Path) -> None:
     source = clips.make("sar", codec="libx264", offset="0", vf_chain="setsar=2/1")
     with pytest.raises(VideoEncodeError) as caught:

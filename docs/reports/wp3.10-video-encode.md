@@ -66,7 +66,11 @@ kept audio packets with dts below 1.4787 s).
   ffprobe listing; GoPro and iPhone sources are square); an edit list other than the reproduced
   forms; a video pts below 0 (legal ISO without an edit list; NUT pts are unsigned). Reproduced
   forms: absent; one media segment (identity or the reorder delay); an empty edit then one media
-  segment; every rate 1; no head trim (first pts = the empty edit's dwell); no tail trim.
+  segment; every rate 1; the media segment's `media_time` equal to the track's earliest
+  composition time from its sample table (equal = AD-22's identity-by-effect form, for example
+  the Edits compilation's 3003/60000; anything else is a trim, refused by name -- round-2 #2,
+  which closed a keyframe-aligned head trim that passed the next check; not applied when the
+  sample table cannot be read); no head trim (first pts = the empty edit's dwell); no tail trim.
   Anything else is refused by name. The NUT stream header is built before FFmpeg starts (a
   header that cannot be built is a refusal, nothing running), and `out_path` is recorded first,
   so `abort` after a refused `open` deletes it.

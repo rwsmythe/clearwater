@@ -294,8 +294,10 @@ def _edit_list_refusal(probe: ProbeResult, table: PacketTable) -> str | None:
     """Return why the source's video edit list is a form the sink cannot reproduce, or None.
 
     Reproduced: none (absent), one media segment, or an empty edit followed by one media
-    segment, every rate 1, with the first frame presented where the media segment starts (no
-    head trim) and the last frame starting before the presentation ends (no tail trim).
+    segment, every rate 1, with the media segment starting at the track's earliest composition
+    time from its sample table (identity, or AD-22's reorder delay; anything else is a trim,
+    round-2 #2), the first frame presented where the media segment starts (no head trim) and
+    the last frame starting before the presentation ends (no tail trim).
     """
     edits = probe.edit_list
     if not edits:
@@ -306,6 +308,12 @@ def _edit_list_refusal(probe: ProbeResult, table: PacketTable) -> str | None:
     media = [e for e in edits if e.media_time_s is not None]
     if len(media) != 1 or len(empties) > 1 or (empties and edits[0].media_time_s is not None):
         return "an edit list with several segments"
+    start = media[0].media_time_s
+    if table.samples is not None and start != table.samples.earliest:
+        return (
+            f"an edit list whose media segment starts at {start} s rather than at the video's "
+            f"earliest frame ({table.samples.earliest} s)"
+        )
     dwell = empties[0].segment_duration_s if empties else Fraction(0)
     time_base = probe.video.time_base
     first = min(table.video_pts, default=0) * time_base

@@ -468,6 +468,29 @@ def test_edit_list_forms(
         assert result is not None and refusal in result
 
 
+@pytest.mark.parametrize(
+    ("media_time", "earliest", "refused"),
+    [
+        (Fraction(0), 0, False),  # identity
+        (Fraction(1, 15), 2000, False),  # AD-22's reorder delay
+        (Fraction(1, 3), 0, True),  # a head trim that lands on a keyframe
+        (Fraction(0), 2000, True),  # the presentation starts before the earliest frame
+    ],
+    ids=["identity", "reorder-delay", "keyframe-trim", "before-earliest"],
+)
+def test_the_media_segment_starts_at_the_earliest_composition_time(
+    media_time: Fraction, earliest: int, refused: bool
+) -> None:
+    # Round-2 #2: a keyframe-aligned head trim passed open (its first pts equals the dwell).
+    probe = _probe(edits=(_media(Fraction(4004, 30000), media_time),))
+    samples = verify.SampleTable(30000, (earliest, earliest + 1001, earliest + 2002))
+    result = encode._edit_list_refusal(probe, replace(_table((0, 1001, 2002)), samples=samples))
+    if refused:
+        assert result is not None and "earliest frame" in result
+    else:
+        assert result is None
+
+
 # --- verify helpers ---------------------------------------------------------------------------
 
 
