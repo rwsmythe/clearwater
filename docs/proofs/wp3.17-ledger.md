@@ -10,7 +10,7 @@ value is the user-facing value, shown as declared).
 | Round | Date | Blocking (crit/maj) | Minor | In/out envelope | NEW/REOPENED | Reverts | Fix kind | Transport | Depth |
 |---|---|---|---|---|---|---|---|---|---|
 | 0 (design) | 2026-10-26 | n/a | n/a | n/a | n/a | n/a | n/a | n/a | 123,285 (dispatcher, round-0 yield) |
-| 1 | 2026-10-26 | reviewer-tagged 0/3 MAJOR (#1, #2, #4); my proposal: 0 blocking (#1, #2 proposed MINOR, #4 out of envelope) | 4 (#3, #5, #6, #7) + #1, #2 as proposed | 4 in (#1, #2, #3, #7) / 3 out (#4, #5, #6) | 7 NEW / 0 REOPENED | 0 | planned: product (#1, #2, #3, #4, #6) + test (#7); #5 stays a limitation | WSL, codex-cli, gpt-5.6-sol high | (dispatcher fills) |
+| 1 | 2026-10-26 | reviewer-tagged 0/3 MAJOR (#1, #2, #4); my proposal: 0 blocking (#1, #2 proposed MINOR, #4 out of envelope) | 4 (#3, #5, #6, #7) + #1, #2 as proposed | 4 in (#1, #2, #3, #7) / 3 out (#4, #5, #6) | 7 NEW / 0 REOPENED | 0 | product (#1, #2, #3, #4, #6) + test (#7); #5 stays a limitation | WSL, codex-cli, gpt-5.6-sol high | 222,661 (dispatcher, round-1 yield) |
 
 ## Round 0: the design table (brief task 1)
 
@@ -245,3 +245,19 @@ Evidence `C:\Users\rwsmy\clearwater-review-evidence\wp3.17\r1\` (prompt, diff, r
 | 7 | MINOR | MINOR (test), in, NEW | `test_no_exception_escapes_a_slot` has no plain `ValueError` case | add the case |
 
 Blocking under the rubric: the reviewer's MAJORs #1 and #2 are in envelope and new; my proposed severity is MINOR for both (no data loss, no wrong preset applied; #2 needs the folder to become unlistable right after a successful write), which the dispatcher may overrule. #4 is out of envelope (non-blocking by rule). Fixes planned for the next turn: product code (#1, #2, #3, #4, #6) and a test (#7); no change was made in the adjudicating turn.
+
+### Round 1 ruling and cleanup (dispatcher, FINAL)
+
+The proposed severities were upheld: round 1 leaves zero new blocking findings, so Reviewer A terminates at round 1 and the fixes are the terminating cleanup (no round 2). #5 is an accepted limitation, named in the report. Depth at the round-1 yield: 222,661.
+
+Cleanup commits (regression tests first in `d330a70`, run red on `b2822d3`: 5 failed, plus 1 teardown error; the #7 test is a gap addition and passes on both):
+
+| Finding | Commit | Regression test |
+|---|---|---|
+| #1 | `e7efe31` | `test_load_and_export_refresh_the_list` |
+| #2, #3 | `2dc845a` (one commit: both rewrite the same operation tails) | `test_a_listing_error_after_a_successful_operation_is_not_hidden`, `test_a_case_only_save_over_selects_the_stored_preset` |
+| #4 | `ca44ae7`, `88d377e` (the first fix still raised OverflowError on an out-of-range default; the test caught it) | `test_int_bounds_beyond_the_spin_box_limit_are_clamped_both_ways` |
+| #6 | `5eef87f` | `test_a_refused_edit_puts_the_session_value_back_in_the_control` |
+| #7 | `d330a70` | `test_no_exception_escapes_a_slot[plain ValueError]` |
+
+Green after the cleanup (targeted, both modules + `test_gui_deps.py`): 73 passed; ruff, format, mypy clean. Report: `docs/reports/wp3.17-parameter-panels-presets.md`. Next: `WINDOW REQUEST: full pytest` on the final head.
