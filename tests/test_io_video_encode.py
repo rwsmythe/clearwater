@@ -44,6 +44,7 @@ from clearwater.io.video.verify import read_packet_table
 from clearwater.jobs.naming import MediaKind, plan_output
 from clearwater.jobs.safe_write import SafeWrite
 from container_spike import compare
+from local_config import FootageLookupError, find_footage_file, load_local_config
 
 pytestmark = pytest.mark.usefixtures("ffmpeg_tools")
 
@@ -718,9 +719,9 @@ def test_nvenc_keeps_a_small_sample_at_its_own_main_tier_level(
     _need("hevc_nvenc")
     out = tmp_path / "out.mp4"
     sink, report = _nvenc_encode(sample(name), out, "high")
-    assert sink.nvenc_rate is not None and sink.nvenc_rate.level == "2.0"
     level = verify_module.read_hevc_level(out)
     assert (level.level_idc, level.high_tier) == (60, False)  # 2.0 Main, as the source
+    assert sink.nvenc_rate is not None and sink.nvenc_rate.level == "2.0"
     assert not any("HEVC level" in w for w in report.warnings)
 
 
@@ -1363,23 +1364,36 @@ def test_nvenc_is_detected_with_both_depths() -> None:
 # --- the real clip ----------------------------------------------------------------------------
 
 
+def _footage_clip(stem: str, root: Path) -> Path:
+    """Return a footage clip; skip only when the folder was searched and the clip is not there.
+
+    Several matches, a missing footage folder and a folder that cannot be searched are errors,
+    never a silent skip (the conftest already skips footage tests without a configured folder).
+    """
+    try:
+        return find_footage_file(stem, root)
+    except FootageLookupError as error:
+        if error.matches or error.__cause__ is not None or not root.is_dir():
+            raise
+        pytest.skip(f"{stem} is not in the footage folder")
+
+
+def test_the_footage_lookup_skips_only_a_missing_clip(tmp_path: Path) -> None:
+    with pytest.raises(FootageLookupError):
+        _footage_clip("GX011627", tmp_path / "absent")  # no folder: an error, not a skip
+    with pytest.raises(pytest.skip.Exception):
+        _footage_clip("GX011627", tmp_path)  # searched, not there: the one skip
+
+
 @pytest.mark.footage
 @pytest.mark.gpu
 @pytest.mark.slow
 def test_gx011627_through_the_sink_keeps_every_mandatory_and_required_item(
     tmp_path: Path,
 ) -> None:
-    from local_config import FootageLookupError, find_footage_file, load_local_config
-
     if not _nvenc_ready():
         pytest.skip("NVENC is not available on this machine")
-    config = load_local_config()
-    try:
-        source = find_footage_file("GX011627", config.footage_path)
-    except FootageLookupError as error:
-        if error.matches:
-            raise
-        pytest.skip("GX011627 is not in the footage folder")
+    source = _footage_clip("GX011627", load_local_config().footage_path)
     out = tmp_path / "GX011627-out.mp4"
     run = vf.encode_file(source, out, encoder="hevc_nvenc", quality="standard", bit_depth=8)
     record = vf.fidelity_record(source, out, bit_depth=8, run=run)
@@ -1392,25 +1406,18 @@ def test_gx011627_through_the_sink_keeps_every_mandatory_and_required_item(
 @pytest.mark.gpu
 @pytest.mark.slow
 def test_gx011627_nvenc_levels_give_distinct_sizes(tmp_path: Path) -> None:
-    from local_config import FootageLookupError, find_footage_file, load_local_config
-
     if not _nvenc_ready():
         pytest.skip("NVENC is not available on this machine")
-    config = load_local_config()
-    try:
-        source = find_footage_file("GX011627", config.footage_path)
-    except FootageLookupError as error:
-        if error.matches:
-            raise
-        pytest.skip("GX011627 is not in the footage folder")
+    source = _footage_clip("GX011627", load_local_config().footage_path)
     sizes: dict[str, int] = {}
+    expected = {"high": "5.2 Main", "standard": "5.1 Main", "draft": "5.0 Main"}  # <= 6.0 Main
     for quality in ("high", "standard", "draft"):
         out = tmp_path / f"GX011627-{quality}.mp4"
         vf.encode_file(source, out, encoder="hevc_nvenc", quality=quality, bit_depth=8)
         sizes[quality] = out.stat().st_size
         level = verify_module.read_hevc_level(out)
         os.remove(out)
-        assert level is not None and not level.high_tier and level.level_idc <= 180  # <= 6.0 Main
+        assert level is not None and level.name == expected[quality], (quality, level)
     # Without a ceiling the three came within 5 % of each other on this busy clip; with the
     # pixel-rate ceiling (High, half, a quarter) each is well apart from the next.
     assert sizes["high"] > 1.25 * sizes["standard"] > 1.25 * 1.25 * sizes["draft"], sizes

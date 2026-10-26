@@ -18,6 +18,8 @@ Evidence root: `C:\Users\rwsmy\clearwater-review-evidence\wp3.10\` (`r0\` = this
 | 6 | Reviewer A (seat 5) on `fa5d939`, base `dabb204` (SCOPED to the round-5 remediation of the instrument) | 0 | 2 | 1 | all in envelope; MAJOR #1, #2 ACCEPTED (blocking, both reproduced); MINOR #3 ACCEPTED (cleanup) | 3 NEW, 0 REOPENED (#2 introduced by the round-5 #9 fix `7059dda`) | 0 | INSTRUMENT code and tests (seat 6: `609b9a3` #1, `02a0a92` #2, `5c1c949` #3 docstring) | WSL, codex-cli 0.162.1 gpt-5.6-sol high; probe 1 + review 19 `succeeded in`; 104,892 tokens; 8 `ERROR` matches = 4 echoed source, 4 reviewer tool-call parse errors (codex_core router), 1 WSL vsock; none transport | 286,315 at the round-6 yield (seat 5) |
 | 7 | Reviewer A (seat 6) on `5c1c949`, base `fa5d939` (SCOPED to the round-6 remediation of the instrument) | 0 | 2 (reviewer) -> 0 adjudicated (#2 for the dispatcher: telemetry machinery, design guard) | 2 -> 4 adjudicated (#4 out) | MAJOR #1 in, adjudicated MINOR (reason); MAJOR #2 in, adjudicated MINOR (reproduction); MINOR #3 in (cleanup); MINOR #4 OUT (reviewer-tagged; BANKED again) | 3 NEW, 1 REOPENED (#4 = R5 #10) | 0 | INSTRUMENT code and tests (`98c805a` #1, `9e6a529` option B, `cb0f762` #2, `d4c08e8` docstring; #3 moot) | WSL, codex-cli 0.162.1 gpt-5.6-sol high; probe 1 + review 13 `succeeded in`; 98,804 tokens; 1 `ERROR` match = echoed source code, not transport | 116,371 at the round-7 yield (seat 6) |
 | 8 | Reviewer A (seat 6) on `d4c08e8`, base `1087343` (SCOPED to the round-7 remediation and the option-B telemetry redesign) | 0 | 0 | 3 | all in envelope; MINOR #1-#3 ACCEPTED (cleanup); ZERO new blocking: the loop TERMINATES | 3 NEW, 0 REOPENED (#2 from `9e6a529`, #3 from `98c805a`) | 0 | INSTRUMENT code and tests, the terminating round's cleanup (`491ecb3` #3, `f262b75` #2, `db6f791` #1); no round 9 (ruling) | WSL, codex-cli 0.162.1 gpt-5.6-sol high; probe 1 + review 26 `succeeded in`; 107,893 tokens; 1 `ERROR` match = echoed source code, not transport | 204,725 at the round-8 yield (seat 6) |
+| 9 | Reviewer A (seat 8) on `ab70b47`, base `e7668e1` (SCOPED to the NVENC rate ceiling, CHARC d329e80e351c3dcc: maxrate = max(2 x source rate, 20 Mb/s)) | 0 | 1 | 0 | MAJOR #1 in envelope (the WP2.3 samples), ACCEPTED, reproduced | 1 NEW (introduced by the ruled 20 Mb/s floor), 0 REOPENED | 0 | PRODUCT (`5cc94e4`, after CHARC's 17f12f9dc7eba3ae O3 ruling withdrew the derived rule) | WSL, codex-cli 0.162.1 gpt-5.6-sol high; probe 1 + review 13 `succeeded in`; 104,444 tokens; 2 `ERROR` matches = echoed source, not transport | 176K (seat 8, at the R9 yield) |
+| 10 | Reviewer A (seat 8) on `5cc94e4`, base `ab70b47` (SCOPED to the R9 #1 remediation + R9 #1 to verify); FIVE-ROUND GATE | 0 | 0 | 2 | MINOR #1, #2 in envelope, ACCEPTED (cleanup); ZERO new blocking: the loop TERMINATES (gate: termination ACCEPTED) | 2 NEW, 0 REOPENED | 0 | TEST-ONLY, the terminating round's cleanup (the commit carrying this row) | WSL, codex-cli 0.162.1 gpt-5.6-sol high; probe 1 + review 28 `succeeded in`; 99,422 tokens; 0 `ERROR` matches | 252K (seat 8, at the R10 yield) |
 
 Seat 1 stops after round 0 by the orchestrator's instruction (219K before product code; the build
 is the largest in the wave). A fresh cell builds from "RESUME HERE" below.
@@ -362,6 +364,35 @@ main, stream and info packets of an FFmpeg-written file).
   The per-process CPU walk must never run in a thread of the measured process. Use
   `( cd <worktree> && ... )` subshells, never a bare `cd`. Write ledger edits as a Python script
   file with raw strings.
+
+## Seat 8 -- the NVENC fix, rounds 9 and 10
+
+- Mechanism measurements (synthetic busy 4K/1080p, `s8-nvenc\` in the evidence root): with
+  `-b:v 0` and no `-maxrate` NVENC picks the lowest level the picture allows at Main tier and caps
+  under it (4K: 5.0, about 21 Mb/s for cq 18/23/28; 1080p: 4.0); given `-maxrate` alone it
+  SILENTLY switches to the High tier past that level's Main-tier cap, even with `-tier main`;
+  `-level L -tier main` explicit keeps Main. Sources GX011627 and GX011610: HEVC Main, level 6.0,
+  Main tier. Seat 8 STOPPED with options O1-O4 (playback compatibility = CHARC's call).
+- CHARC d329e80e351c3dcc (derived maxrate = max(2 x source rate, 20 Mb/s), bufsize 2 x) built as
+  `ab70b47`; round 9 found the floor raised the 320x180 samples from 2.0 Main to 4.0 High
+  (R9 #1, `r9\r9-level-repro.txt`). CHARC 17f12f9dc7eba3ae (AD-12 amended on main `ccaecd7`)
+  withdrew it and ruled O3 with an edge rule, built as `5cc94e4`: High ceiling 0.24 bit/pixel x
+  the output pixel rate (PROVISIONAL), Standard 1/2, Draft 1/4, bufsize = ceiling; an HEVC
+  source's Main-tier level caps High; `-tier main -level L` explicit (lowest Main-tier level
+  holding ceiling and picture); a `SinkReport` warning when the output signals a higher level or
+  tier than an HEVC source; `StreamRow.bit_rate` removed. Seat 8's choice beyond the ruling (a
+  ceiling above every fitting Main-tier cap is cut to 6.2's 240 Mb/s; a picture no level holds is
+  refused at `open`) ACCEPTED by the dispatcher as out of envelope (report limits).
+- Round 10 (`r10\adjudication.md`): NO_NEW_CRITICAL_MAJOR; #1 the footage test checked only
+  <= 6.0 Main (now the exact 5.2 / 5.1 / 5.0 Main); #2 both footage tests skipped on a missing or
+  unreadable footage folder (`_footage_clip` now skips only a searched folder without the clip,
+  with a test). Termination ACCEPTED at the five-round gate; no round 11.
+- Failing-before: the new unit tests 17/17 fail on `ab70b47` and `e7668e1` (API absent); the
+  small-sample test fails on `ab70b47` ON BEHAVIOUR (output `(120, True)` = 4.0 High against
+  2.0 Main; run with `ab70b47`'s code and the new hvcC reader). Five video modules
+  (`-m "not footage"`) after the cleanup: 272 passed, 3 deselected (5:51). ruff, format, mypy clean.
+- Process note: one run of the units module during the dispatcher's suite made sub-second FFmpeg
+  reads (a hold breach; noted, no harm).
 
 ## Seat 2 (`wp310-cell2`) -- build and round 1
 
