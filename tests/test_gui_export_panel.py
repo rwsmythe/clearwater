@@ -378,8 +378,12 @@ def _trigger_with_failing_parameters(rig: Rig, monkeypatch: pytest.MonkeyPatch) 
     def explode() -> None:
         raise RuntimeError("parameters failed")
 
+    original = rig.window.session.parameters
     monkeypatch.setattr(rig.window.session, "parameters", explode)
-    rig.panel._on_triggered()
+    try:
+        rig.panel._on_triggered()
+    finally:  # the window's close (fixture teardown) saves the parameters: restore them first
+        monkeypatch.setattr(rig.window.session, "parameters", original)
 
 
 def test_the_reason_is_cleared_when_building_the_request_raises(
