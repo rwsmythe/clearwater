@@ -15,6 +15,7 @@ import subprocess
 import sys
 import threading
 import time
+import weakref
 from fractions import Fraction
 from pathlib import Path
 from typing import Any
@@ -457,6 +458,40 @@ def test_run_once_keeps_the_output_when_asked(sample: Any, tmp_path: Path) -> No
     )
     assert record["output"] == str(output) and output.stat().st_size == record["output_bytes"]
     assert record["bit_depth"] == 10
+
+
+@pytest.mark.usefixtures("quick")
+def test_the_loop_holds_one_frame_at_a_time(
+    sample: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    real = bench.FFmpegVideoSource.frames
+    previous_alive: list[bool] = []
+
+    def frames(self: Any, info: Any, **kwargs: Any) -> Any:
+        stream = real(self, info, **kwargs)
+        previous: weakref.ref[Any] | None = None
+        while True:
+            previous_alive.append(previous is not None and previous() is not None)
+            item = next(stream, None)
+            if item is None:
+                return
+            previous = weakref.ref(item)
+            yield item
+            del item  # this wrapper's own reference
+
+    monkeypatch.setattr(bench.FFmpegVideoSource, "frames", frames)
+    record = bench.run_once(
+        sample(SAMPLE),
+        tmp_path / "one.mp4",
+        encoder="libx265",
+        quality="draft",
+        bit_depth=None,
+        hw_decode=False,
+        keep=False,
+        periods=FAST,
+    )
+    assert len(previous_alive) == record["frames"] + 1
+    assert not any(previous_alive)  # round 7 #1: released before the next is asked for
 
 
 @pytest.mark.usefixtures("quick")

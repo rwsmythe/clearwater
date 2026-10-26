@@ -727,6 +727,7 @@ def _measure(
                 break
             decoded = time.perf_counter()
             sink.write(frame)
+            del frame  # one frame held at a time: released before the next is decoded
             written = time.perf_counter()
             waits.append(decoded - before)
             writes.append(written - decoded)
