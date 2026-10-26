@@ -16,21 +16,28 @@ whether they were carried; never a location tag), then the packets of the video 
 the packets of the audio streams. The packets of a data track (the camera's telemetry, the
 timecode) are never listed: the listings select the video and audio streams only, and a data
 track is judged from the stream list (its sample count) alone.
+
+Each table also carries the video track's own sample table (``stts`` and ``ctts`` from
+``moov``, read by :func:`read_sample_table`). A cut-short file's packet listing stops at the
+cut, but its ``moov`` (when it can be read at all) still describes every sample, so the frame
+after the last readable one -- and so where that frame ends -- comes from the sample table,
+exact in ticks (:func:`readable_end`).
 """
 
 from __future__ import annotations
 
 import json
 import re
+import struct
 import subprocess
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass, field
 from fractions import Fraction
 from pathlib import Path
 from typing import Any
 
 from clearwater.interfaces.video import ProbeResult
-from clearwater.io.video.boxes import BoxError, read_movie_boxes
+from clearwater.io.video.boxes import MAX_MOOV_BYTES, BoxError, read_movie_boxes
 from clearwater.io.video.capability import tool_env
 from clearwater.io.video.inputs import ascii_text
 from clearwater.io.video.probe import VideoProbeError, find_tool
@@ -50,8 +57,33 @@ _STREAM_ENTRIES = (
     "stream=index,codec_type,codec_tag_string,time_base,start_pts,duration_ts,nb_frames,"
     "sample_aspect_ratio:stream_side_data=rotation:format_tags=creation_time,firmware"
 )
+MAX_SAMPLES = 10_000_000
+"""The most video samples a sample table may describe (46 hours at 60 fps); more is malformed."""
+
 _PACKET_ENTRIES = "packet=stream_index,pts,flags"
 _RATIO = re.compile(r"^(\d+):(\d+)$")
+_HEADER = 8
+_LARGE_HEADER = 16
+
+
+@dataclass(frozen=True)
+class SampleTable:
+    """The video track's sample timing as its ``moov`` writes it (``stts`` and ``ctts``).
+
+    Attributes:
+        timescale: The video media's ticks per second (``mdhd``).
+        composition: Every sample's composition time in media ticks, in decode order: its
+            decode time (the ``stts`` deltas summed from 0) plus its ``ctts`` offset (0
+            without a ``ctts`` box). Never empty.
+    """
+
+    timescale: int
+    composition: tuple[int, ...]
+
+    @property
+    def earliest(self) -> Fraction:
+        """The track's earliest composition time, in seconds."""
+        return Fraction(min(self.composition), self.timescale)
 
 
 @dataclass(frozen=True)
@@ -99,6 +131,12 @@ class PacketTable:
         tags: The ``creation_time`` and ``firmware`` container tags that are present.
         audio_pts: Per audio stream index, its packets' pts in file order (None for a packet
             without one).
+        samples: The video track's sample table, or None when it cannot be read.
+        sample_pts: Every video sample's pts as the demuxer gives it, in decode order, from
+            the sample table: its composition times moved by the one offset the listed packets
+            show (the edit list's effect). None when there is no sample table, it disagrees
+            with the listed packets, or a listed packet has no pts. On a cut-short file it runs
+            past the listing to the samples the cut removed.
     """
 
     streams: tuple[StreamRow, ...]
@@ -108,6 +146,8 @@ class PacketTable:
     video_corrupt_pts: tuple[int, ...]
     tags: Mapping[str, str]
     audio_pts: Mapping[int, tuple[int | None, ...]] = field(default_factory=dict)
+    samples: SampleTable | None = None
+    sample_pts: tuple[int, ...] | None = None
 
     @property
     def video(self) -> StreamRow:
@@ -192,11 +232,183 @@ def _packets(document: Mapping[str, Any]) -> list[Mapping[str, Any]]:
     return [p for p in document.get("packets") or [] if isinstance(p, Mapping)]
 
 
+def _boxes(data: bytes, start: int, end: int) -> Iterator[tuple[bytes, int, int]]:
+    """Yield the child boxes in ``data[start:end]`` as ``(type, payload_start, box_end)``.
+
+    Raises:
+        BoxError: If a child is smaller than its header or extends past ``end``.
+    """
+    pos = start
+    while end - pos >= _HEADER:  # fewer bytes left: QuickTime's 32-bit zero terminator
+        size, kind = struct.unpack_from(">I4s", data, pos)
+        header = _HEADER
+        if size == 1:
+            if end - pos < _LARGE_HEADER:
+                raise BoxError("64-bit box header past the end of its parent")
+            (size,) = struct.unpack_from(">Q", data, pos + _HEADER)
+            header = _LARGE_HEADER
+        elif size == 0:
+            size = end - pos
+        if size < header or pos + size > end:
+            raise BoxError("box size is inconsistent with its parent")
+        yield kind, pos + header, pos + size
+        pos += size
+
+
+def _child(data: bytes, span: tuple[int, int], kind: bytes) -> tuple[int, int] | None:
+    """Return the payload span of the first child of ``span`` of the given type, or None."""
+    for found, start, end in _boxes(data, *span):
+        if found == kind:
+            return start, end
+    return None
+
+
+def _moov(path: Path) -> bytes | None:
+    """Return the payload of the file's ``moov`` box, or None when it has none.
+
+    Top-level boxes are walked by their sizes (the media data is skipped, never read).
+
+    Raises:
+        BoxError: If a top-level box before ``moov`` is malformed, or ``moov`` overruns the file.
+        OSError: If the file cannot be read.
+    """
+    with path.open("rb") as handle:
+        total = handle.seek(0, 2)
+        pos = 0
+        while total - pos >= _HEADER:
+            handle.seek(pos)
+            size, kind = struct.unpack(">I4s", handle.read(_HEADER))
+            header = _HEADER
+            if size == 1:
+                extension = handle.read(_HEADER)
+                if len(extension) < _HEADER:
+                    raise BoxError("64-bit top-level box header is cut short")
+                (size,) = struct.unpack(">Q", extension)
+                header = _LARGE_HEADER
+            elif size == 0:
+                size = total - pos
+            if size < header:
+                raise BoxError("top-level box smaller than its header")
+            if kind == b"moov":
+                if pos + size > total or size - header > MAX_MOOV_BYTES:
+                    raise BoxError("moov is cut short or larger than the supported maximum")
+                handle.seek(pos + header)
+                return handle.read(size - header)
+            pos += size
+    return None
+
+
+def _table_entries(data: bytes, span: tuple[int, int], form: str) -> Iterator[tuple[int, int]]:
+    """Yield the ``(count, value)`` entries of an ``stts`` or ``ctts`` payload."""
+    start, end = span
+    if end - start < 8:
+        raise BoxError("sample table box too short")
+    (count,) = struct.unpack_from(">I", data, start + 4)
+    if count * 8 > end - start - 8:
+        raise BoxError("sample table entry count past the end of the box")
+    for index in range(count):
+        yield struct.unpack_from(form, data, start + 8 + index * 8)
+
+
+def read_sample_table(path: Path) -> SampleTable | None:
+    """Read the first video track's sample timing from ``moov`` (``mdhd``, ``stts``, ``ctts``).
+
+    Only ``moov`` is read, so the table is whole on a file cut short inside its media data.
+    ``ctts`` offsets are read as signed (version 1 is signed; FFmpeg reads version 0 the same
+    way).
+
+    Args:
+        path: The file; opened read only.
+
+    Returns:
+        The table, or None when the file has no ``moov``, no video track or no ``stts``.
+
+    Raises:
+        BoxError: If a box on the path is malformed, the ``ctts`` sample count differs from the
+            ``stts`` one, or the table describes more than :data:`MAX_SAMPLES` samples.
+        OSError: If the file cannot be read.
+    """
+    moov = _moov(path)
+    if moov is None:
+        return None
+    for kind, start, end in _boxes(moov, 0, len(moov)):
+        if kind != b"trak":
+            continue
+        mdia = _child(moov, (start, end), b"mdia")
+        hdlr = _child(moov, mdia, b"hdlr") if mdia else None
+        if mdia is None or hdlr is None or hdlr[1] - hdlr[0] < 12:
+            continue
+        if moov[hdlr[0] + 8 : hdlr[0] + 12] != b"vide":
+            continue
+        mdhd = _child(moov, mdia, b"mdhd")
+        minf = _child(moov, mdia, b"minf")
+        stbl = _child(moov, minf, b"stbl") if minf else None
+        stts = _child(moov, stbl, b"stts") if stbl else None
+        if mdhd is None or stts is None:
+            return None
+        if mdhd[1] - mdhd[0] < 4 or moov[mdhd[0]] not in (0, 1):
+            raise BoxError("mdhd too short or of unknown version")
+        offset = mdhd[0] + 4 + (16 if moov[mdhd[0]] == 1 else 8)
+        if offset + 4 > mdhd[1]:
+            raise BoxError("mdhd too short")
+        (timescale,) = struct.unpack_from(">I", moov, offset)
+        if timescale == 0:
+            raise BoxError("time scale is zero")
+        decode: list[int] = []
+        now = 0
+        for count, delta in _table_entries(moov, stts, ">II"):
+            if len(decode) + count > MAX_SAMPLES:
+                raise BoxError("the sample table describes too many samples")
+            for _ in range(count):
+                decode.append(now)
+                now += delta
+        if not decode:
+            return None
+        assert stbl is not None  # stts was found inside it
+        ctts = _child(moov, stbl, b"ctts")
+        offsets: list[int] = []
+        if ctts is not None:
+            for count, value in _table_entries(moov, ctts, ">Ii"):
+                if len(offsets) + count > len(decode):
+                    raise BoxError("ctts describes more samples than stts")
+                offsets += [value] * count
+            if len(offsets) != len(decode):
+                raise BoxError("ctts describes fewer samples than stts")
+        else:
+            offsets = [0] * len(decode)
+        composition = tuple(d + o for d, o in zip(decode, offsets, strict=True))
+        return SampleTable(timescale=int(timescale), composition=composition)
+    return None
+
+
+def _sample_pts(
+    samples: SampleTable | None, listed: Sequence[int], missing: int, time_base: Fraction | None
+) -> tuple[int, ...] | None:
+    """Map a sample table onto the demuxer's pts, checked against every listed packet.
+
+    The demuxer's pts are the composition times moved by one offset (the edit list's effect:
+    an empty edit's dwell less the media segment's start). The offset is read off the first
+    listed packet and must hold for every listed packet, which are the table's first samples
+    in decode order (a cut file lists a prefix).
+    """
+    if samples is None or missing or not listed or time_base != Fraction(1, samples.timescale):
+        return None
+    composition = samples.composition
+    if len(listed) > len(composition):
+        return None
+    shift = listed[0] - composition[0]
+    if any(pts != time + shift for pts, time in zip(listed, composition, strict=False)):
+        return None
+    return tuple(time + shift for time in composition)
+
+
 def read_packet_table(path: Path, *, strict: bool = False) -> PacketTable:
     """List the stream facts and the video and audio packets of one file (no decode).
 
     Three ``ffprobe`` calls: the stream list, the video stream's packets, the audio streams'
-    packets (skipped without audio). A data track's packets are never listed.
+    packets (skipped without audio). A data track's packets are never listed. The video
+    track's sample table is read from ``moov`` and mapped onto the listed pts
+    (``PacketTable.sample_pts``); a malformed table is recorded as absent.
 
     Args:
         path: The file; opened read only.
@@ -265,6 +477,11 @@ def read_packet_table(path: Path, *, strict: bool = False) -> PacketTable:
         if (index := _int(s.get("index"))) is not None
     )
     tags = (document.get("format") or {}).get("tags") or {}
+    try:
+        samples = read_sample_table(path)
+    except (BoxError, OSError):
+        samples = None  # a malformed table is no table: whatever needs it refuses
+    video_time_base = next((s.time_base for s in streams if s.index == video_index), None)
     return PacketTable(
         streams=streams,
         video_index=video_index,
@@ -277,6 +494,8 @@ def read_packet_table(path: Path, *, strict: bool = False) -> PacketTable:
             if isinstance(tags, Mapping) and key in tags
         },
         audio_pts={index: tuple(listed) for index, listed in audio_pts.items()},
+        samples=samples,
+        sample_pts=_sample_pts(samples, video_pts, missing, video_time_base),
     )
 
 
@@ -329,7 +548,9 @@ def frame_end(probe: ProbeResult, table: PacketTable, last_pts: int) -> int:
     """Return the end time of the frame at ``last_pts``: the source's next pts, else its end.
 
     The sink sends this as the end sentinel, so the last frame written keeps its source
-    duration, also when the caller stops early (a truncated source or a readable tail).
+    duration, also when the caller stops early (a truncated source or a readable tail). The
+    next pts comes from the sample table when it is known (``PacketTable.sample_pts``, which
+    on a cut file names the samples past the cut too), else from the listed packets.
 
     Args:
         probe: The source's probe result.
@@ -340,7 +561,8 @@ def frame_end(probe: ProbeResult, table: PacketTable, last_pts: int) -> int:
         The end in ticks; greater than ``last_pts`` whenever ``last_pts`` is a source pts and
         the presentation ends after the last source pts (both checked by the sink).
     """
-    later = [p for p in table.video_pts if p > last_pts]
+    known = table.sample_pts if table.sample_pts is not None else table.video_pts
+    later = [p for p in known if p > last_pts]
     if later:
         return min(later)
     end = presentation_end(probe, table)
@@ -348,6 +570,35 @@ def frame_end(probe: ProbeResult, table: PacketTable, last_pts: int) -> int:
     if whole * end.denominator != end.numerator:
         whole += 1  # a fractional tick: the frame keeps at least its full source duration
     return whole
+
+
+def readable_end(probe: ProbeResult, table: PacketTable, last_pts: int) -> int:
+    """Return the end of the last readable frame of a cut-short source, in ticks (D86).
+
+    A cut file's packet listing stops at the cut, so "the next pts" is the next pts in the
+    source's own sample table (:func:`frame_end`), exact in ticks; the whole file's
+    presentation end is used only when the sample table shows no later frame. The sink plans
+    its cut with this and the fidelity instrument judges the output with it, so the two agree.
+
+    Args:
+        probe: The source's probe result.
+        table: The source's packet table.
+        last_pts: The pts of the last readable frame, in ticks.
+
+    Returns:
+        The end in ticks.
+
+    Raises:
+        VideoProbeError: ``"unreadable"`` when the sample table is unknown and the listing
+            names no later frame, so where the frame ends cannot be told.
+    """
+    if table.sample_pts is None and not any(p > last_pts for p in table.video_pts):
+        raise VideoProbeError(
+            "unreadable",
+            f"{ascii_text(probe.path.name)} is cut short, and where its last readable frame "
+            "ends cannot be read from its sample table.",
+        )
+    return frame_end(probe, table, last_pts)
 
 
 def _edit_problems(out_path: Path, first: Fraction, end: Fraction) -> list[str]:

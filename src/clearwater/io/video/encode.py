@@ -70,6 +70,7 @@ from clearwater.io.video.verify import (
     not_carried,
     presentation_end,
     read_packet_table,
+    readable_end,
     square_pixels,
 )
 
@@ -587,7 +588,9 @@ class FFmpegVideoSink:
     def _plan_tracks(self, probe: ProbeResult, source: PacketTable) -> Fraction | None:
         """Decide how the audio and data tracks end for a cut-short source (D86, Q-B).
 
-        A truncated file: the tracks are cut where its readable video ends. An unreadable tail:
+        A truncated file: the tracks are cut where its readable video ends, the end of its last
+        readable frame read from the source's sample table (:func:`.verify.readable_end`;
+        refused when it cannot be told). An unreadable tail:
         the tracks are copied whole, and a warning says they run past the last video frame.
 
         Returns:
@@ -601,7 +604,10 @@ class FFmpegVideoSink:
             readable = sorted(p for p in source.video_pts if first_bad is None or p < first_bad)
             if not readable:
                 raise VideoEncodeError("refused", "The video has no readable frame.")
-            end = frame_end(probe, source, readable[-1])
+            try:
+                end = readable_end(probe, source, readable[-1])
+            except VideoProbeError as error:
+                raise VideoEncodeError("refused", str(error)) from error
             self._warnings.append(
                 "The source is cut short; the output ends at its last readable frame, and the "
                 "audio and other tracks are cut at the same point."

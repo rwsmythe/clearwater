@@ -420,6 +420,57 @@ def test_a_truncated_source_cuts_audio_at_the_readable_end(
     assert len(kept) < len(source_audio)
 
 
+def test_a_source_cut_at_a_packet_boundary_ends_at_its_last_readable_frame(
+    clips: Clips, runs: Runs, tmp_path: Path
+) -> None:
+    # Round-2 S1: a moov-first file cut where no packet is flagged corrupt lists nothing after
+    # its last readable frame; that frame and the audio cut used to run to the WHOLE file's
+    # presentation end (2 s here) instead of the next pts in the source's own sample table.
+    whole = clips.make(
+        "faststart", codec="libx264", offset="0", out_options=("-movflags", "+faststart")
+    )
+    data = whole.read_bytes()
+    cut = tmp_path / "cut.mp4"
+    cut.write_bytes(data[: int(len(data) * 0.6)])
+    info = probe(cut)
+    assert "truncated" in {f.kind for f in info.faults}
+    table = read_packet_table(cut)
+    assert not table.video_corrupt_pts  # the S1 case: the listing simply ends
+    ordered = sorted(read_packet_table(whole).video_pts)
+    last = max(table.video_pts)
+    end = ordered[ordered.index(last) + 1] * info.video.time_base  # the oracle: the whole file
+    out, run, record = runs.get(cut, "libx265", 8)
+    assert run.report.frames_written == len(table.video_pts)
+    boxes = read_movie_boxes(out)
+    assert boxes.movie_timescale is not None
+    shown = sum(Fraction(e.segment_duration, boxes.movie_timescale) for e in boxes.edits)
+    assert shown == end, (shown, end)
+    base = Fraction(1, 48000)
+    source_audio = compare.stream_packets(cut, info.audio[0].index, base)
+    kept = [p for p in source_audio if p.pts is not None and p.pts < end]
+    output_audio = compare.stream_packets(out, 1, base)
+    assert [(p.pts, p.md5) for p in output_audio] == [(p.pts, p.md5) for p in kept]
+    _assert_v4(record)
+
+
+@pytest.mark.parametrize(
+    ("name", "codec", "bframes", "offset"),
+    [
+        ("table-x264-bf", "libx264", True, "0.5"),
+        ("table-x265-bf", "libx265", True, "0"),
+        ("table-x264", "libx264", False, "0"),
+    ],
+)
+def test_the_sample_table_agrees_with_the_listing(
+    clips: Clips, name: str, codec: str, bframes: bool, offset: str
+) -> None:
+    source = clips.make(name, codec=codec, bframes=bframes, offset=offset)
+    table = read_packet_table(source)
+    assert table.samples is not None and table.sample_pts == table.video_pts
+    media = [e.media_time_s for e in probe(source).edit_list if e.media_time_s is not None]
+    assert media == [table.samples.earliest]
+
+
 def _patch_mvhd_duration(path: Path, change: int) -> None:
     """Add ``change`` ticks to the movie header's duration."""
     data = bytearray(path.read_bytes())

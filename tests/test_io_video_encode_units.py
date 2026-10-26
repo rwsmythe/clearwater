@@ -490,6 +490,32 @@ def test_frame_end_is_the_next_source_pts_else_the_presentation_end() -> None:
     assert verify.frame_end(odd, table, 3003) == 4005  # a fractional tick rounds up
 
 
+def test_a_cut_files_frame_end_comes_from_its_sample_table() -> None:
+    # Round-2 S1: the listing of a cut file stops at the cut; the sample table does not.
+    probe = _probe(edits=(_media(Fraction(4004, 30000)),))
+    cut = replace(_table((0, 1001)), sample_pts=(0, 1001, 2002, 3003))
+    assert verify.frame_end(probe, cut, 1001) == 2002  # was 4004, the whole file's end
+    assert verify.readable_end(probe, cut, 1001) == 2002
+    assert verify.readable_end(probe, cut, 3003) == 4004  # the table's own last frame
+    unknown = _table((0, 1001))
+    with pytest.raises(VideoProbeError, match="cut short") as caught:
+        verify.readable_end(probe, unknown, 1001)
+    assert caught.value.kind == "unreadable"
+    assert verify.readable_end(probe, _table((0, 1001, 2002)), 1001) == 2002  # listed: no table
+
+
+def test_the_sample_table_maps_onto_the_listed_pts_by_one_offset() -> None:
+    samples = verify.SampleTable(30000, (2002, 5005, 3003, 4004))  # decode order, B-frames
+    assert verify._sample_pts(samples, (15000, 18003), 0, TB) == (15000, 18003, 16001, 17002)
+    assert verify._sample_pts(samples, (15000, 18004), 0, TB) is None  # disagrees
+    assert verify._sample_pts(samples, (15000,), 1, TB) is None  # a packet without a pts
+    assert verify._sample_pts(samples, (15000,), 0, Fraction(1, 90000)) is None  # other ticks
+    assert verify._sample_pts(samples, (), 0, TB) is None
+    assert verify._sample_pts(None, (15000,), 0, TB) is None
+    assert verify._sample_pts(samples, (0, 1, 2, 3, 4), 0, TB) is None  # more than the table
+    assert samples.earliest == Fraction(2002, 30000)
+
+
 def _out_table(
     pts: tuple[int, ...],
     audio: tuple[int | None, ...] = AUDIO_PTS,

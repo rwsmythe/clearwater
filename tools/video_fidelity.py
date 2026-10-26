@@ -76,7 +76,7 @@ from clearwater.color import decode_filter, ffmpeg_color_names, planes_to_rgb, r
 from clearwater.interfaces.image import Frame
 from clearwater.interfaces.video import ProbeResult, SinkReport
 from clearwater.io.video import FFmpegVideoSink, VideoEncodeError, VideoProbeError, probe
-from clearwater.io.video.verify import frame_end, read_packet_table
+from clearwater.io.video.verify import read_packet_table, readable_end
 from container_spike import compare
 from local_config import LocalConfigError, load_local_config
 
@@ -857,7 +857,7 @@ def _readable_end(source: Path, info: ProbeResult, facts: compare.Facts) -> Frac
         return None
     table = read_packet_table(source)
     last = max(readable) / info.video.time_base
-    return frame_end(info, table, int(last)) * info.video.time_base
+    return readable_end(info, table, int(last)) * info.video.time_base  # the sink's own rule
 
 
 def _kept_end(facts: compare.Facts, index: int, end: Fraction) -> Fraction | None:

@@ -76,7 +76,13 @@ kept audio packets with dts below 1.4787 s).
   C-contiguous array (DR-39 (b) not reopened); polls FFmpeg; sends the NUT frame header and the
   payload as two pipe writes.
 - **`close`** sends the sentinel at the end of the last frame (the next source pts, else the
-  presentation end: the edit list's segment sum, or `start_pts + duration_ts` without one),
+  presentation end: the edit list's segment sum, or `start_pts + duration_ts` without one). The
+  next pts comes from the source's own sample table (`stts` + `ctts` from `moov`, mapped onto the
+  listed pts by the one offset every listed packet shows, `verify.read_sample_table`): a cut
+  file's listing stops at the cut, its `moov` does not, so the last readable frame ends at the
+  next sample's pts, exact in ticks (round-2 S1; `verify.readable_end`, which the instrument
+  uses too). A truncated source whose sample table cannot be read and whose listing names no
+  later frame is refused at `open`, by name. Then it
   closes stdin, waits with polling (`POLL_S` 0.2 s; backstop 1800 s), checks the exit status, then
   reads the output back and checks: frame count and every pts against the pts written, the video
   start, the video edit list against the written start and end (its `media_time` is checked
@@ -109,7 +115,8 @@ description, the raw tag beside it (Q-E); pixel format and bit depth against the
 convention differs (AD-22) or where an absent source list became an identity list (AD-22
 extended, Q-C) -- every note is listed in `summary.notes`, never silent; the effect item models an
 absent list as the identity from media time 0; a cut-short source is compared on its readable
-part (D86): the video ends at the readable end and, for a truncated file, each copied track at
+part (D86): the video ends at the readable end (`verify.readable_end`, the sink's own rule:
+the next pts in the source's sample table) and, for a truncated file, each copied track at
 the end of its last packet before it; the video duration, the video edit list as written (the
 source's `media_time` and rate kept, AD-22's reading applied to the cut list), the video and
 audio presentation effect, the movie duration and the copied packets are all the source's cut
