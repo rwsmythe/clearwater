@@ -15,6 +15,9 @@ import pytest
 from numpy.typing import NDArray
 
 import step_aware_eval as tool
+from prototype import temporal
+from prototype.backend import select_backend
+from prototype.clip import make_params
 
 
 def _clip() -> tuple[NDArray[np.uint8], NDArray[np.int64], Fraction]:
@@ -30,10 +33,12 @@ def _clip() -> tuple[NDArray[np.uint8], NDArray[np.int64], Fraction]:
     return np.stack(frames), ticks, Fraction(1, 30000)
 
 
-def test_the_instrument_runs_on_a_synthetic_step(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """The record holds every method and kind; the edge-free count and the step are found."""
+def _use_synthetic_clip(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> NDArray[np.uint8]:
+    """Point the instrument at the synthetic clip; the "excerpt" is frames 90..149 (2 s).
+
+    c3's reach (60) fits inside the span, Ancuti's (90) reaches the first frame from the
+    excerpt's first.
+    """
     proxies, ticks, time_base = _clip()
 
     class Config:
@@ -41,11 +46,17 @@ def test_the_instrument_runs_on_a_synthetic_step(
 
     monkeypatch.setattr(tool, "load_local_config", lambda: Config())
     monkeypatch.setattr(tool, "load_proxies", lambda out, root, log: (proxies, ticks, time_base))
-    # The "excerpt" is frames 90..149 (2 s): c3's reach (60) fits inside the span, Ancuti's (90)
-    # reaches the first frame from the excerpt's first.
     monkeypatch.setattr(tool, "EXCERPT_START_S", Fraction(90 * 1001, 30000))
     monkeypatch.setattr(tool, "EXCERPT_DURATION_S", Fraction(60 * 1001, 30000))
     monkeypatch.setattr(tool, "AWAY_S", 0.5)
+    return proxies
+
+
+def test_the_instrument_runs_on_a_synthetic_step(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The record holds every method and kind; the edge-free count and the step are found."""
+    _use_synthetic_clip(tmp_path, monkeypatch)
     lines: list[str] = []
     record: dict[str, Any] = tool.evaluate(tmp_path / "out", "cpu", lines.append)
     assert record["excerpt_frames"] == 60 and record["span_frames"] == 240
@@ -62,6 +73,35 @@ def test_the_instrument_runs_on_a_synthetic_step(
     text = tool.table(record)
     assert text.count("\n") == 1 + 2 * len(tool.KINDS)
     assert "median_gaussian_cut" in text
+
+
+def test_the_flicker_reference_is_the_mean_of_the_own_raw_statistics(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """WP1.4b's flicker reference: the excerpt's own raw statistics, averaged (R1 F7)."""
+    proxies = _use_synthetic_clip(tmp_path, monkeypatch)
+    references: dict[str, Any] = {}
+    render = tool.render_signals
+
+    def spy(
+        proxies: NDArray[np.uint8], indices: Any, method: str, statistics: Any, backend: Any
+    ) -> NDArray[np.float64]:
+        references.setdefault(method, (statistics(indices[0]), statistics(indices[-1])))
+        return render(proxies, indices, method, statistics, backend)
+
+    monkeypatch.setattr(tool, "render_signals", spy)
+    tool.evaluate(tmp_path / "out", "cpu", lambda text: None)
+    backend = select_backend("cpu")
+    for method in tool.METHODS:
+        params = make_params(method, neutral=False)
+        images = [tool.image(proxies, i) for i in range(90, 150)]
+        own_raw = temporal.stack([temporal.statistics_of(im, params, backend) for im in images])
+        expected = temporal.stack([temporal.constant_statistics(own_raw)])
+        first, last = (temporal.stack([record]) for record in references[method])
+        assert set(first) == set(expected) == set(last)
+        for name, values in expected.items():
+            np.testing.assert_allclose(first[name], values, rtol=1e-9, atol=1e-12, err_msg=name)
+            np.testing.assert_array_equal(first[name], last[name])
 
 
 def test_default_output_is_the_worktree_work_folder() -> None:

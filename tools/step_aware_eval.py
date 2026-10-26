@@ -199,6 +199,20 @@ def render_signals(
     )
 
 
+def reference_statistics(
+    proxies: NDArray[np.uint8], indices: Sequence[int], method: str, backend: Backend
+) -> Any:
+    """The flicker reference's constant record, as WP1.4b claim 10b computes it.
+
+    The mean, over the excerpt's frames, of each frame's own raw (unsmoothed, unstaged)
+    statistics (``temporal.statistics_of``), so the reference does not depend on the kind under
+    test (``tools/noise_experiments.py``: ``constant_statistics(raw)``).
+    """
+    params = make_params(method, neutral=False)
+    own_raw = [temporal.statistics_of(image(proxies, i), params, backend) for i in indices]
+    return temporal.constant_statistics(temporal.stack(own_raw))
+
+
 def _constant(record: Any) -> Callable[[int], Any]:
     """The same record for every frame."""
 
@@ -259,10 +273,7 @@ def evaluate(out: Path, device: str, log: Callable[[str], None]) -> dict[str, An
             started = time.perf_counter()
             series_by_kind[kind], _ = staged(proxies, ticks, time_base, method, kind, backend, log)
             log(f"  {method} {kind}: analysed in {time.perf_counter() - started:.0f} s")
-        reference_series = series_by_kind["median_gaussian"]
-        constant = temporal.constant_statistics(
-            {name: values[lo : hi + 1] for name, values in reference_series.items()}
-        )
+        constant = reference_statistics(proxies, indices, method, backend)
         reference = render_signals(proxies, indices, method, _constant(constant), backend)
         for kind in KINDS:
             series = series_by_kind[kind]
