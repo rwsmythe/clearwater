@@ -1,0 +1,227 @@
+# WP3.19 ledger (batch queue and export progress)
+
+Cell: implementer-sonnet-high, seat 1. Worktree `.worktrees/wp3.19`, branch `wp3.19`, base `718324b`.
+Brief `docs/briefs/wp3.19-brief.md` (FINAL; rulings CHARC `53d1d906e47fe2c9`). Spec v0.5.4 (G7, G8, G9;
+D43-D45, D81, D83; V7, V11). Reviewer A evidence: `C:\Users\rwsmy\clearwater-review-evidence\wp3.19\rN\`.
+
+## Cumulative round ledger
+
+| Round | Head | Verdict | Blocking (crit/major) | Minor | In envelope | NEW / REOPENED | Product vs test-only fixes | Depth (dispatcher) |
+|---|---|---|---|---|---|---|---|---|
+| 0 | (this commit) | table only, no product code besides `export_service.py` | - | - | - | - | - | (dispatcher fills) |
+
+## Round 0
+
+### 0.1 Reading done and what it fixed
+
+Read: dispatch recipe, brief, review gate Part 1, frame 1/2/4/5, `gui/contract.py`, `gui/jobs.py`,
+`gui/sources.py`, `gui/shell.py` (`ExportAction`, `export_reason`, `attach`), `gui/messages.py`
+(`clear(owner=)`), `tests/gui_support.py`, the WP3.16 and WP3.13 reports, `interfaces/jobs.py`,
+`interfaces/settings.py`, `interfaces/parameters.py` (`validate_parameter_set`), `config/presets.py`
+(`PresetStore.list_presets` -> `PresetEntry(name, path, parameter_set | None, error)`).
+Facts that shape the design:
+
+- `ExportAction` has ONE caller slot (`set_unavailable`), shown after the shell's reason. Two panels
+  (Export, Batch) share it, so a shared gate must decide the text: `ActivityGate` below.
+- `QtJobRunner.run` returns `on_done` exactly once on the main thread; an escaping exception in the job
+  is already a failed `JobResult` (`failure` = `"<Type>: <msg>"`); `close()` cancels every job and
+  delivers `on_done` before the settings write. A cancelled job's `JobResult` is whatever the job returns,
+  so the seam fixes the cancel result (`ok` False, `failure` = `CANCELLED`).
+- `MessagePresenter.clear(severity, owner=)` removes by both; the capturing test presenter keeps a
+  message when EITHER filter does not match, so `clear("error", owner="export")` is exact there too.
+- `sources.route(path)` returns `"photo" | "video" | Message` (a refusal for a sidecar, D83, or an
+  unknown extension); it never opens the file.
+
+### 0.2 The seam (`export_service.py`, COMMITTED at this yield, frozen; additive only until accept)
+
+```python
+CANCELLED = "cancelled"                       # JobResult.failure of a cancelled job
+UNAVAILABLE_TEXT = "Export is not available in this build."
+
+@dataclass(frozen=True)
+class ExportRequest:
+    source: Path                              # the file to export (a batch item need not be open)
+    kind: Literal["photo", "video"]           # from sources.route
+    parameters: ParameterSet                  # IF-9, resolved once
+    settings: Settings                        # IF-10 snapshot
+
+class ExportJobs(Protocol):
+    def job(self, request: ExportRequest) -> Callable[[Progress], JobResult]: ...
+
+def unavailable_exports() -> ExportJobs       # every job: ok False, failure UNAVAILABLE_TEXT, writes nothing
+```
+
+Contract of `ExportJobs.job` (stated in its docstring; WP3.14's brief cites it):
+1. `job(request)` is called on the INTERFACE thread: it only builds the callable (no file access, no
+   decode) and may raise `ValueError` for a request it can never run (the panel shows that as the item's
+   failure and goes on).
+2. The callable runs on a worker thread, touches no Qt object, reports `progress.report(done, total,
+   message)` (total None = busy), checks `progress.cancelled()` at least between units of work.
+3. Safe writing: a cancel or failure leaves no partial output and no temporary (G8, D44, V11); a file
+   already committed is never removed.
+4. A video's analysis (AD-15) is inside the job: a batch item needs no prior analysis. (For the open
+   source, WP3.18's finished analysis may already be in the cache; the job decides, the panel does not
+   care.)
+5. Result: success `ok` True, `outputs` = committed files, `warnings` (ASCII-safe strings), `failure` None;
+   failure `ok` False, `outputs` empty, `failure` the user-readable reason; cancel `ok` False, `outputs`
+   empty, `failure == CANCELLED`. Cancel and failure are distinguished ONLY by `failure == CANCELLED`.
+6. One job per source file (the GUI sequences a batch, ruling Q1): every job owns a fresh `Reservations`
+   (an item is committed before the next plans), so WP3.14 needs no cross-job reservation state.
+
+GUI-side, in the same module, NOT part of what WP3.14 implements (additive; named so it is not mistaken
+for the seam): `Activity = Literal["export","batch"]`, `RUNNING_EXPORT_REASON` ("An export is running."),
+`RUNNING_BATCH_REASON` ("A batch is running."), `ActivityGate(apply)` with `current`, `reason()`,
+`subscribe(cb)`, `try_start(activity) -> bool`, `finish(activity)`. It imports no Qt (the `apply` callable
+is `actions.export.set_unavailable`); `finish` applies the reason BEFORE it calls subscribers and a
+raising subscriber is logged and skipped, so the reason cannot stay set after a callback exception.
+
+Other public names (modules `export_panel`, `batch_panel`; not seam):
+`install_export_panels(window, exports=None) -> None` (attaches "Export" and "Batch" to `Area.JOBS`,
+one gate shared); `export_panel_factory(exports, gate) -> PanelFactory`, `batch_panel_factory(exports,
+gate, *, choose_files=None) -> PanelFactory`; classes `ExportPanel(QWidget)`, `BatchPanel(QWidget)`
+(`choose_files: Callable[[QWidget], list[Path]] | None` is the injectable file dialog for tests, like the
+shell's `choose_file`); `ItemState` (batch item states), `BatchItem`, `format_report(...)`.
+
+### 0.3 Export state table (`ExportPanel`)
+
+| State | Status line | Bar | Cancel | Gate / `actions.export` caller reason |
+|---|---|---|---|---|
+| idle (initial) | last result, or "Ready." | hidden or 0 | disabled | None, unless a batch runs (then "A batch is running." from the gate); the shell's own reasons (no source, AD-15) show through `unavailable_reason()` regardless |
+| running | "Exporting <file>..." plus the job's message | determinate when the job reports a total, busy (0,0) when `total` is None | enabled | "An export is running." |
+| cancelling | "Cancelling..." | as running | disabled | "An export is running." |
+
+Transitions:
+- install: `gate = ActivityGate(actions.export.set_unavailable)` clears the "not available yet" reason.
+- idle -> running: `actions.export.triggered` (the action is disabled while any reason holds, so this
+  needs source + AD-15 ok + no activity). Handler re-checks `session.source()` is not None and
+  `gate.try_start("export")`; else ignores. Builds `ExportRequest(source.path, source.kind,
+  session.parameters(), session.settings())`, `clear("warning", owner="export")` (choice C3), then
+  `jobs.run(exports.job(request), on_done, on_progress)`.
+- running -> cancelling: Cancel button -> `handle.cancel()`.
+- running/cancelling -> idle: `on_done(result)`; inside `try/finally`, `gate.finish("export")` runs
+  first (reason cleared even if presenting raises). Then: `ok` -> status "Saved <names>" (names ASCII
+  escaped), `clear("error", owner="export")`, each warning presented as `Message("warning", text, path,
+  "export")`; not ok and `failure == CANCELLED` -> "Export cancelled.", no error; not ok otherwise ->
+  `Message("error", "<file>: <failure>", path, "export")`. A cancel requested but the job finished `ok`
+  is reported as saved (the output is kept, G8).
+- A synchronous failure of `exports.job(request)` or `jobs.run(...)` is shown as the same error, and the
+  gate is finished again.
+- The open source changing or closing while running does nothing to the export (ruling Q5).
+
+### 0.4 Batch item states (`BatchPanel`)
+
+States: `queued`, `running`, `done`, `done with warnings`, `failed`, `cancelled`, `not run`.
+
+| From | Event | To |
+|---|---|---|
+| (absent) | Add files (route ok, not a duplicate) | queued |
+| any row | Start (gate acquired; whole queue re-run, ruling Q4) | queued (all rows reset, report cleared) |
+| queued | previous item ended, no cancel requested | running |
+| queued | previous item ended, cancel requested | not run |
+| running | `on_done` ok, no warnings | done |
+| running | `on_done` ok with warnings | done with warnings |
+| running | `on_done` not ok, `failure != CANCELLED` (D81) | failed, then the NEXT item starts (unless cancel was requested) |
+| running | `on_done` not ok, `failure == CANCELLED` | cancelled; every remaining queued -> not run |
+| running | `exports.job()` or `jobs.run()` raises | failed (text = exception), next item starts |
+| running | Cancel clicked | handle.cancel(); the row stays running until its `on_done`; a result `ok` still counts done (kept, G8) |
+
+The run ends when no row is queued or running: `gate.finish("batch")`, report built, shown, logged at INFO.
+Rows are kept (Start re-runs the whole queue). Remove/Clear/Add/Start/parameter combo are disabled while
+the run is in progress; Cancel is enabled only while it is. Start is disabled while the queue is empty, or
+`gate.current` is not None (an export runs).
+
+### 0.5 End-of-run report layout (read-only `QPlainTextEdit`, kept until the next Start; same text at INFO)
+
+```
+Batch finished: 5 items.                         (or "Batch cancelled: 5 items.")
+Succeeded 1, with warnings 1, failed 1, cancelled 1, not run 1.
+1. clipA.mp4 - done
+   output: D:\out\clipA_corrected.mp4
+2. photoB.jpg - done with warnings
+   output: D:\out\photoB_corrected.png
+   warning: <text>
+3. clipC.mp4 - FAILED
+   failure: <text>
+4. clipD.mp4 - cancelled
+5. clipE.mp4 - not run
+```
+The five counts partition the items. File names are shown as the path's name (Qt text); the INFO log line
+and every presenter message go through `messages.ascii_text`. A failed item is also logged at WARNING on
+`clearwater.gui.batch` (D81) when it ends.
+
+### 0.6 Test list (all `gui`-marked, headless; test-side `StubExportJobs` writes a small file under
+`tmp_path` through `plan_output` + `SafeWrite` with ONE `Reservations` per job; it can fail by name, wait
+on an event, busy NumPy, and records the thread and the request)
+
+`tests/test_gui_export_panel.py`:
+1. install clears "not available yet"; the shell's no-source reason still shows; disabled with the shell's
+   reason during a running video analysis (AD-15 hold; also a planted `setEnabled(True)` fails by name).
+2. triggered -> request carries path, kind, parameters, settings (snapshot: a later `set_parameters` does not
+   change it).
+3. progress reaches the bar (determinate; busy when total None).
+4. success: "Saved ...", `error`/owner `export` cleared; DR-44 (b): a `shell.preview` error survives.
+5. warnings presented with owner `export`; failure -> error naming the file, owner `export`.
+6. cancel -> "Export cancelled.", no error; G8: stub `SafeWrite` aborted, no temporary and no final file.
+7. reason "An export is running." while running, cleared after, also after a presenter that raises.
+8. a second trigger while running is ignored (gate); export unavailable while a batch runs.
+9. the job runs on a worker thread (planted main-thread run fails by name); source change does not cancel.
+10. `unavailable_exports()` -> failure text, nothing written.
+11. V7: 10 ms probe never waits > 100 ms during a ~2 s NumPy stub export (informational max recorded).
+12. `ActivityGate` unit tests (single activity, subscriber exception).
+
+`tests/test_gui_batch_panel.py`:
+13. G7/D81: three items, the second fails: first and third done, failure logged (caplog), reported.
+14. one parameter set / preset applied to every item (requests); "Current parameters" resolved once at Start
+    (a later change does not reach the run); settings snapshot at Start.
+15. preset whose method is not in `engines.methods`, or failing `validate_parameter_set`, or unreadable:
+    Start refused with an error (owner `batch`), nothing runs.
+16. D45: cancel during the second of three: second cancelled, third not run, first's output kept (G8);
+    planted "cancel lets the next start" and planted "stops at the first failure" fail by name.
+17. D83: `.LRV` and unknown extension refused with a warning (owner `batch`) and not queued; duplicates
+    (case/normalisation) not queued; Remove selected, Clear.
+18. queue editing disabled while running; Start disabled when empty / export running; export reason "A batch
+    is running." during and cleared after (also after cancel, after an exception in a callback).
+19. report: counts, per-item outputs/warnings/failure, stays until the next Start, INFO log; re-run (Q4).
+20. job build/run raising -> item failed, batch continues.
+21. DR-44 (b): an error with owner `shell.preview` survives a batch's start and end.
+22. V7: probe during a batch of CPU-heavy items.
+23. `tests/test_gui_deps.py` run, not changed.
+
+### 0.7 Answers to the brief's open questions (rulings Q1-Q6 are adopted as written)
+
+Q1 GUI sequences the batch; Q2 seam frozen here; Q3 `sources.route`/`file_filter` used read-only,
+`gui/__init__.py` untouched; Q4 Start re-runs the whole queue; Q5 snapshot request, source change does
+not cancel; Q6 STRONG, five-round gate.
+
+### 0.8 Choices the brief leaves open (STOP; my recommended answer first)
+
+- **C1 (consumer-visible): where the seam lives.** `clearwater.gui.export_service` is in the `gui`
+  package, whose `__init__` imports PySide6, so WP3.14 (in `clearwater.jobs`) or WP4.1's headless runner
+  importing `ExportRequest` loads PySide6 and breaks the "`.jobs` loads no PySide6" rule in spirit (the
+  test only imports `clearwater.jobs`). Recommended: PROCEED AS BRIEFED (seam in `gui/export_service.py`,
+  module itself Qt-free), and WP3.14's brief decides: import it (its engine is wired in the GUI process
+  anyway; a headless runner would not) or, preferably, CHARC grants ONE NEW file
+  `src/clearwater/jobs/export_seam.py` (PySide-free) now, holding the seam names, with
+  `gui/export_service.py` re-exporting them. I proceed with the brief's layout unless told otherwise; the
+  move is mechanical (names unchanged).
+- **C2: `ActivityGate`** (one shared gate for the one `ReasonAction` caller slot) lives in
+  `export_service.py` and is GUI-side, additive. Recommended: yes (no further file; no import cycle between
+  `export_panel` and `batch_panel`).
+- **C3: stale messages.** Brief: an export that succeeds clears the export's own `error`s. Reading I
+  will implement unless told otherwise: at trigger the panel also clears its own `warning`s
+  (`clear("warning", owner="export")`) so warnings do not pile up across exports; errors stay until the
+  next success (G10). Batch route warnings and start-refusal errors (owner `batch`) are cleared at Start
+  and by the Clear button.
+- **C4: Batch and AD-15.** The shell's export reason (no source, analysis) does not apply to the batch (a
+  batch item's analysis is inside its job); Start needs only a non-empty queue and no other activity.
+  Recommended: yes.
+- **C5: duplicates** compared by `os.path.normcase(os.path.abspath(path))`; no filesystem access.
+- **C6: a batch-wide D87 disk-space check** (WP3.13 note: sum estimates per volume) is impossible with one
+  job per item; each job checks its own item. Not this package; recorded for WP3.14's brief.
+- **C7: extra `batch_panel_factory(..., choose_files=None)`** keyword for tests; `install_export_panels`
+  keeps the briefed signature.
+
+### 0.9 Depth reading
+
+`scripts/cell_depth.py` is the dispatcher's instrument (a cell cannot read its own transcript depth,
+recipe section 5); the figure is filled by the dispatcher at this yield.
