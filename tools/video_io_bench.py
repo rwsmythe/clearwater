@@ -98,6 +98,7 @@ _GPU_QUERY = (
 )
 _SAMPLER_NAMES = frozenset({"nvidia-smi", "nvidia-smi.exe"})
 _WATCHER_WAIT_S = 60.0
+_WATCHER_JOIN_S = 10.0
 
 
 class Pipe(Protocol):
@@ -336,6 +337,22 @@ def stray_loop(connection: Pipe, every: float, root: int) -> None:
     connection.send(watch.window())
 
 
+def _end_watcher(watcher: BaseProcess, ends: Sequence[Pipe], *, kill: bool) -> None:
+    """Join a started watcher and close the pipe ends.
+
+    The watcher is killed first when ``kill``, or when it has not ended within the join wait.
+    """
+    if watcher.pid is not None:
+        if kill:
+            watcher.kill()
+        watcher.join(timeout=_WATCHER_JOIN_S)
+        if watcher.is_alive():
+            watcher.kill()
+            watcher.join(timeout=_WATCHER_JOIN_S)
+    for end in ends:
+        end.close()
+
+
 def conditions(moment: str) -> dict[str, Any]:
     """Record the machine's conditions at ``moment``: strays over 1 s, graphics card, CPU.
 
@@ -382,6 +399,7 @@ class Telemetry:
         self._thread = threading.Thread(target=self._run, daemon=True)
         self._watcher: BaseProcess | None = None
         self._connection: Pipe | None = None
+        self._their_end: Pipe | None = None
         self._started = 0.0
         self.peak_rss = 0
         self.peak_members: list[dict[str, Any]] = []
@@ -401,12 +419,13 @@ class Telemetry:
         try:
             watcher.start()
             if mine.poll(_WATCHER_WAIT_S) and mine.recv() == "ready":
-                self._watcher, self._connection = watcher, mine
+                self._watcher, self._connection, self._their_end = watcher, mine, theirs
             else:
                 self.errors.append("the strays watcher did not start")
-                watcher.kill()
-        except (OSError, EOFError) as error:
+                _end_watcher(watcher, (mine, theirs), kill=True)
+        except Exception as error:  # telemetry never ends the run; the record says it failed
             self.errors.append(f"the strays watcher failed: {type(error).__name__}: {error}")
+            _end_watcher(watcher, (mine, theirs), kill=True)
         self._started = time.monotonic()
         self._thread.start()
 
@@ -460,11 +479,8 @@ class Telemetry:
                     self._receive(wait=0.0)
             except (OSError, EOFError) as error:
                 self.errors.append(f"the strays watcher failed: {type(error).__name__}: {error}")
-            watcher.join(timeout=_WATCHER_WAIT_S)
-            if watcher.is_alive():
-                watcher.kill()
-                watcher.join(timeout=_WATCHER_WAIT_S)
-            connection.close()
+            ends = (connection, self._their_end) if self._their_end else (connection,)
+            _end_watcher(watcher, ends, kill=False)
         used = [m for m in (memory_used_mib(r) for r in self.gpu) if m is not None]
         return {
             "periods_s": dict(zip(("memory", "gpu", "strays"), self._periods, strict=True)),

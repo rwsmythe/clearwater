@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import math
+import multiprocessing
 import shutil
 import subprocess
 import sys
@@ -193,6 +194,58 @@ def test_telemetry_watcher_starts_reports_and_stops() -> None:
     assert record["rss_samples"] > 5
     assert watcher.pid not in {m["pid"] for m in record["peak_tree_rss_members"]}
     assert not watcher.is_alive()
+
+
+class _RecordingContext:
+    """A multiprocessing context that remembers the pipes and processes it makes."""
+
+    def __init__(self, real: Any) -> None:
+        self.real = real
+        self.ends: list[Any] = []
+        self.processes: list[Any] = []
+
+    def Pipe(self) -> tuple[Any, Any]:  # noqa: N802 - the multiprocessing name
+        ends = self.real.Pipe()
+        self.ends.extend(ends)
+        return ends
+
+    def Process(self, *args: Any, **kwargs: Any) -> Any:  # noqa: N802 - the multiprocessing name
+        process = self.real.Process(*args, **kwargs)
+        self.processes.append(process)
+        return process
+
+
+@pytest.mark.parametrize("failure", ["no ready", "start raises"])
+def test_a_watcher_that_fails_to_start_is_ended_and_its_pipe_closed(
+    monkeypatch: pytest.MonkeyPatch, failure: str
+) -> None:
+    contexts: list[_RecordingContext] = []
+    real = multiprocessing.get_context
+
+    def get_context(method: str) -> _RecordingContext:
+        contexts.append(_RecordingContext(real(method)))
+        return contexts[-1]
+
+    monkeypatch.setattr(bench.multiprocessing, "get_context", get_context)
+    if failure == "no ready":
+        monkeypatch.setattr(bench, "_WATCHER_WAIT_S", 0.001)  # far shorter than a spawn
+    else:
+
+        def poll(self: Any, timeout: float | None = None) -> bool:
+            raise OSError("planted")
+
+        monkeypatch.setattr(type(real("spawn").Pipe()[0]), "poll", poll)
+    telemetry = bench.Telemetry(memory_every=0.05, gpu_every=5.0, strays_every=5.0)
+    telemetry.start()
+    monkeypatch.undo()
+    try:
+        assert len(telemetry.errors) == 1 and "watcher" in telemetry.errors[0]  # round 5 #9
+        (context,) = contexts
+        assert [end.closed for end in context.ends] == [True, True]
+        assert [process.exitcode is not None for process in context.processes] == [True]
+    finally:
+        record = telemetry.stop()
+    assert record["rss_samples"] > 0 and record["strays"] == []
 
 
 # --- one run ---------------------------------------------------------------------------------
