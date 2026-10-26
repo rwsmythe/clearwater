@@ -12,7 +12,7 @@ Tier STRONG. Brief `docs/briefs/wp3.11-brief.md` (FINAL; CHARC rulings `53d1d906
 | R1 remediation (cell 2, head e327954) | 171,115 (dispatcher, at the remediation yield) | - | - | - | - | - | 0 | F1-F4, F6 product; F7, F8 tool; V3-1 test-only | - | remediated; step-aware re-run in a window |
 | 2 (head 7c8e6ed) | 202,325 | 0 | 1 NEW (A1) + 1 REOPENED (A2, F1's "during" half; MINOR recommended) | 0 (A2 if downgraded) | 2 in / 0 out | 1 NEW / 1 REOPENED | 0 | none yet (both product) | WSL, gpt-5.6-sol high, 14 exec lines, both REASONED by the reviewer, both reproduced by the cell | NEW_CRITICAL_MAJOR_FOUND; adjudicated, next round needed |
 | 3 (head 7f9dff8) | 237,310 | 0 | 0 | 1 (B1, docstring) | 1 in / 0 out | 1 NEW / 0 REOPENED | 0 | R2 fixes: A1, A2 product (f139ef5, 7f9dff8); B1 not yet (docstring) | WSL, gpt-5.6-sol high, 17 exec lines, REASONED | NO_NEW_CRITICAL_MAJOR: CONVERGED (zero new blocking) |
-| Reviewer B remediation (seat 3, from d95ae5b) | the dispatcher's | - | B2 (B1 adjudicated MINOR) | B1, B3, B4; B5 ADVISORY out, banked | 4 in / 1 out | 5 NEW / 0 REOPENED | 0 | B1, B2 product; B3, B4 test-only; B5 report line | Reviewer B at the orchestrator's seat (REASONED) | remediated; the orchestrator's B re-run next |
+| Reviewer B remediation (seat 3, from d95ae5b) | 90,601 (dispatcher, at the remediation yield) | - | B2 (B1 adjudicated MINOR) | B1, B3, B4; B5 ADVISORY out, banked | 4 in / 1 out | 5 NEW / 0 REOPENED | 0 | B1, B2 product; B3, B4 test-only; B5 report line | Reviewer B at the orchestrator's seat (REASONED) | remediated; the orchestrator's B re-run next |
 
 ## Round 0 -- design table (no product code yet)
 
@@ -476,3 +476,17 @@ Raised, NOT fixed (beyond the ruling): `True == 1` in Python, so `set_parameters
 differs: the B2 failure class for a bool value (`probe_bool.py` / `probe_bool.txt`: job None,
 helper hash differs, SchemaMismatchError). Reachable only if a bool reaches a numeric parameter.
 Also: an `int` beyond 2**53 now hashes as its nearest float.
+
+Orchestrator (FINAL, at the 90,601 yield): remediation ACCEPTED; the raised bool item RULED IN:
+`set_parameters` decides "changed" through `schema_hash`'s canonical form. Implemented at
+the commit after 08413df with one deviation in mechanism, not intent: the ruled `_canonical(old) !=
+_canonical(new)` still passes `1` -> `True` because Python's `True == 1.0`
+(`bool-literal-ruling.txt`: the new test failed with the literal comparison). So
+`store.same_value` compares the canonical forms WITH their types at every depth (`1` equals
+`1.0`; `True` never equals a number). Tests `test_a_bool_for_a_number_is_a_change_and_an_equal_number_is_not`
+(failed first on 08413df: `bool-failing-first-recompute.txt`, `assert (None is not None)`) and
+`test_same_value_agrees_with_the_hash_at_every_depth`; `probe_bool-after.txt`: a job is
+returned and the helper hash equals the engine's. Report: the schema_hash sentence and a limit
+line (ints beyond 2**53 compare and hash as their nearest float). Gates: ruff, format, mypy
+strict green; the eight analysis files 228 passed (`analysis-tests-2.txt`, before a
+whitespace-only `ruff format` of one engine line; the three affected files re-run, 60 passed).
