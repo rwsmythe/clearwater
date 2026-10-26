@@ -227,7 +227,12 @@ class StrayWatch:
     """Lists the processes above :data:`STRAY_CPU_PERCENT` of one logical CPU per window.
 
     Each :meth:`window` reports the CPU each process used since the previous call (or since
-    the watch was created), so a sustained load shows and a one-second spike is averaged out.
+    the watch was created), so a sustained load shows and a one-second spike is averaged out. A
+    process that appeared since the previous walk of the process list is charged the CPU it has
+    used since it was created, over the time it has been alive, and marked ``new``; so a stray
+    that starts inside a window is seen in that window. A process that exits before the window
+    ends cannot be read and is not reported for that window (nor at all when it starts and
+    exits inside one window).
     Reading every process's counter takes seconds of CPU on Windows and holds the interpreter
     lock in long stretches (measured: a 0.26 s probe took 23 s beside a watch in a thread), so
     during a run the watch lives in a process of its own (:func:`stray_loop`).
@@ -241,29 +246,51 @@ class StrayWatch:
         """
         self._root = os.getpid() if root is None else root
         self._processes: dict[int, psutil.Process] = {}
-        self._prime()
+        self._walked_at = time.time()
+        self._walk(charge=False)
         self._started = time.monotonic()
 
-    def _prime(self) -> None:
+    def _walk(self, *, charge: bool) -> list[dict[str, Any]]:
+        """Prime every process not yet known; charge the new ones when ``charge``.
+
+        A process created at or after the start of the previous walk is new: it cannot have
+        been primed. Its CPU since creation over its lifetime is returned when it reaches
+        :data:`STRAY_CPU_PERCENT`.
+        """
+        previous, self._walked_at = self._walked_at, time.time()
+        busy = []
         for process in psutil.process_iter(["name"]):
-            if process.pid not in self._processes:
-                with contextlib.suppress(psutil.Error):
-                    process.cpu_percent(None)
-                    self._processes[process.pid] = process
+            if process.pid in self._processes:
+                continue
+            with contextlib.suppress(psutil.Error):
+                if charge and process.create_time() >= previous:
+                    alive = max(time.time() - process.create_time(), 1e-3)
+                    times = process.cpu_times()
+                    percent = 100.0 * (times.user + times.system) / alive
+                    if percent >= STRAY_CPU_PERCENT and process.pid != 0:
+                        busy.append(
+                            {
+                                "name": process.info.get("name"),
+                                "pid": process.pid,
+                                "cpu": round(percent, 1),
+                                "new": True,
+                                "alive_s": round(alive, 2),
+                            }
+                        )
+                process.cpu_percent(None)
+                self._processes[process.pid] = process
+        return busy
 
     def window(self) -> dict[str, Any]:
         """Return the busy processes since the previous window and start the next one.
 
         Returns:
             The window's length in seconds and its busy processes (name, pid, percent of one
-            logical CPU, and ``own`` True for the root process and its descendants: FFmpeg,
-            the instrument's ``nvidia-smi`` and the watcher), busiest first.
+            logical CPU, ``own`` True for the root process and its descendants: FFmpeg, the
+            instrument's ``nvidia-smi`` and the watcher; a new process also carries ``new`` and
+            ``alive_s``), busiest first.
         """
         now = time.monotonic()
-        try:
-            own = {process.pid for process in own_tree(self._root, samplers=True)}
-        except psutil.Error:
-            own = set()
         busy = []
         for pid, process in list(self._processes.items()):
             try:
@@ -272,17 +299,16 @@ class StrayWatch:
                 del self._processes[pid]
                 continue
             if percent >= STRAY_CPU_PERCENT and pid != 0:
-                busy.append(
-                    {
-                        "name": process.info.get("name"),
-                        "pid": pid,
-                        "cpu": percent,
-                        "own": pid in own,
-                    }
-                )
+                busy.append({"name": process.info.get("name"), "pid": pid, "cpu": percent})
+        busy += self._walk(charge=True)
+        try:
+            own = {process.pid for process in own_tree(self._root, samplers=True)}
+        except psutil.Error:
+            own = set()
+        for entry in busy:
+            entry["own"] = entry["pid"] in own
         seconds = now - self._started
         self._started = now
-        self._prime()
         return {"seconds": round(seconds, 2), "busy": sorted(busy, key=lambda b: -b["cpu"])}
 
 

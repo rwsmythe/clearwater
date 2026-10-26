@@ -141,6 +141,24 @@ def test_stray_watch_marks_the_runs_own_processes() -> None:
             process.wait()
 
 
+def test_stray_watch_charges_a_process_started_inside_the_window() -> None:
+    watch = bench.StrayWatch()
+    child = _busy_child()  # started after the watch was primed (round 5 #2)
+    try:
+        time.sleep(2.0)
+        busy = {entry["pid"]: entry for entry in watch.window()["busy"]}
+        seen = [busy[pid] for pid in _tree(child) if pid in busy]
+        assert len(seen) == 1
+        assert seen[0]["new"] is True and seen[0]["own"] is True
+        assert seen[0]["cpu"] >= bench.STRAY_CPU_PERCENT and seen[0]["alive_s"] > 0
+        time.sleep(1.0)
+        again = {entry["pid"]: entry for entry in watch.window()["busy"]}
+        assert seen[0]["pid"] in again and "new" not in again[seen[0]["pid"]]
+    finally:
+        child.kill()
+        child.wait()
+
+
 def test_telemetry_watcher_starts_reports_and_stops() -> None:
     telemetry = bench.Telemetry(memory_every=0.05, gpu_every=1.0, strays_every=0.5)
     telemetry.start()
