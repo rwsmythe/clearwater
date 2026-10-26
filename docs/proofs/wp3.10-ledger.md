@@ -191,30 +191,39 @@ main, stream and info packets of an FFmpeg-written file).
   presentation-effect proof. Audio: identity edit at 0.
 - WINDOW RELEASED at the end of this round.
 
-## RESUME HERE (current; seat 4, round 3 adjudicated at `21059b8` + this ledger commit)
+## RESUME HERE (current; seat 4, round 4 adjudicated at `2f9c240` + the ledger commits)
 
 - Base `ac4be92` (main with WP3.9; the dispatcher rebased the branch at seat 4; pre-rebase branch
-  `wp3.10-pre-rebase` at `98ee54a`). Reviewer A diffs are `ac4be92..HEAD`.
-- **Round 2: fully remediated** per CHARC `26c54f1567f948e1` (section "Seat 4" below).
-- **Round 3 HAS RUN and is ADJUDICATED** (evidence `r3\`, section "Round 3" below). Pending the
-  dispatcher's reply, NO remediation started:
-  - **#1** (MAJOR, in envelope, blocking): `abort`/`_fail` can leave `out_path` when a process
-    step of `_cleanup` raises. Fix: `_remove(out_path)` in a `finally` after the process steps,
-    the first error kept (DR-20 (6)); test = `r3\repro\repro_f1.py` as a pytest plant, failing on
-    the current code.
-  - **#4** (MINOR cleanup): the report's status lines.
-  - #2, #3 rejected (reproduction / reason). Then Reviewer A round 4.
-- After Reviewer A converges: WINDOW requests -- full pytest; footage (GX011627 product leg through
+  `wp3.10-pre-rebase` at `98ee54a`). Reviewer A diffs are `ac4be92..HEAD`; runner and prompt
+  builder in `r4\` (`run_review.sh`, `mkprompt.py`).
+- Rounds 1-3 fully remediated (round 3: `2f9c240`). **Round 4 HAS RUN and is ADJUDICATED**
+  (evidence `r4\`, section "Round 4" below): 2 reviewer MAJOR accepted and adjudicated MINOR
+  with reproduction and reason, 2 MINOR accepted. Pending the dispatcher's ruling on the two
+  downgrades, NO remediation started. Upheld -> round 4 terminates the loop and the four are fixed
+  once as its cleanup (no round 5); not upheld -> fix, then round 5 (the five-round gate yield).
+  The four fixes, each with a test failing first:
+  - **#1** `encode._start`: start the stderr thread inside the guarded block, so a failure there
+    goes through `_fail` (FFmpeg killed, `out_path` deleted, `encoder_failed`); plant from
+    `r4\repro\repro_r4.py` F1 (patch `Thread.start` for the `_drain` target only).
+  - **#2** `tools/video_fidelity._RecordingSink`: end the encode window when `_end_stream` returns
+    (FFmpeg's exit seen), not after verification; `EncodeRun.ended` docstring; a test that the
+    window ends before `_verify` runs.
+  - **#3** `encode.open`: a refusal makes the sink failed (second `open` -> `state`; `abort` still
+    deletes `out_path`; the existing refused-open abort test must still pass).
+  - **#4** the stale comment in `test_a_cleanup_error_never_replaces_the_original_error`.
+- After the loop converges: WINDOW requests -- full pytest; footage (GX011627 product leg through
   WP3.9's `frames`, the AD-12 quality table, the Edits compilation through `open` for the #2 rule);
-  last and alone, EXCLUSIVE: the export FLOOR speed row (`tools/video_io_bench.py`, not yet written).
+  last and alone, EXCLUSIVE: the export FLOOR speed row (`tools/video_io_bench.py`, not yet
+  written). Then the report's PENDING sections and the return report.
 - Decided and not to be redone: round 0 (NUT + end sentinel + setts/noise BSF, INFO packet), the
   round-0 rulings, CHARC's Q-A/Q-B/Q-C/Q-D notes, P8 (stated non-square SAR refused; an unseen
-  SAR is 1:1, `01d1578`), the S1/#2/#3 ruling.
+  SAR is 1:1, `01d1578`), the S1/#2/#3 ruling, round 3's #2/#3 rejections (dispatcher upheld).
 - Working notes: targeted runs use `-m "not footage"`; the five video modules (encode, units,
-  fidelity, probe rules, decode rules) take about 5 min. Scratch under `work\wp3.10\r3\`
-  (gitignored). "Fails on the unfixed code" runs: `git archive HEAD` into `work\wp3.10\r3\old`, the
-  new test files copied in, `PYTHONPATH=<old>\src` with the worktree's `.venv` python. Test-file
-  edits with non-ASCII must use escapes.
+  fidelity, probe rules, decode rules) take about 5 min (216 passed at `2f9c240`). Scratch under
+  `work\wp3.10\r3\`, `r4\` (gitignored). "Fails on the unfixed code" runs: `git archive HEAD`
+  into `work\wp3.10\r3\old`, the new test files copied in, `PYTHONPATH=<old>\src` with the
+  worktree's `.venv` python. Use `( cd <worktree> && ... )` subshells, never a bare `cd`.
+  Test-file edits with non-ASCII must use escapes.
 
 ## Seat 2 (`wp310-cell2`) -- build and round 1
 
@@ -303,3 +312,19 @@ item SAME, `repro/repro_f2.*`; the same script on a fractional-tick end shows th
 "rounded UP" limitation as a reported 1-tick DIFFERENT), 3 (reviewer-tagged out of envelope;
 FFmpeg reads `stts`/`ctts` regardless of version exactly as the reader does, and the mapping is
 checked against every listed packet). Remediation follows the dispatcher's reply.
+
+- Round-3 remediation `2f9c240` (dispatcher: R3 adjudication accepted as written): #1 `_cleanup`
+  deletes `out_path` in a `finally`; `abort` repeats the cleanup after a failure or an unfinished
+  abort, does nothing after `close`; #4 report status lines. Three tests fail on `21059b8`
+  (`r4\repro\r3f1-prefix-fails.log`). Five video modules at `2f9c240`: 216 passed.
+
+### Round 4 (evidence `C:\Users\rwsmy\clearwater-review-evidence\wp3.10\r4\`, `adjudication.md` there)
+
+ACCEPTED, all in envelope, all NEW: 1 (reviewer MAJOR, adjudicated MINOR: a failing stderr-thread
+start leaves FFmpeg running and `out_path` with a raw exception; reproduced; the caller's `abort`
+recovers both, reproduced; trigger = thread-start failure), 2 (reviewer MAJOR, adjudicated MINOR:
+the NVENC window includes 0.44 s of output verification on a 1.06 s window; a false `tied` needs
+PID reuse with NVENC load in that tail), 3 (MINOR: a refused `open` leaves the sink reopenable),
+4 (MINOR: a stale test comment). Remediation follows the dispatcher's ruling on the downgrades.
+Seat-4 slip disclosed: several early tool calls used `cd <worktree> && ...` in the tool's shell
+(agent shells reset between calls; switched to subshells).
