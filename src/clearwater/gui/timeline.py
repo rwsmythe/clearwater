@@ -14,8 +14,8 @@ run ``ClipAnalysis.run``, ``proxy`` and ``statistics`` on worker threads. A para
 never cancels a run (CHARC ruling on Q-A): it is offered to the run in flight with
 ``ClipAnalysis.retarget``; when that does not absorb it, the run finishes and a follow-up run
 with the latest parameters starts from its done callback, always (the analysis may hold a job
-for the refused parameters, even if they were changed back to the run's own). The GUI itself cancels only for the
-user (D70), a method change and a source change.
+for the refused parameters, even if they were changed back to the run's own). The GUI itself
+cancels only for the user (D70), a method change and a source change.
 
 The position lane obeys ONE rule, "the latest intent". Every user event (press, value change,
 release, and the completion switch) and nothing else takes the next number of one sequence and
