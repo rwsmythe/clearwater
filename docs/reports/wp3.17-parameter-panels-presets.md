@@ -21,8 +21,8 @@ Everything comes from the selected method's IF-3 schema; a parameter is in exact
 
 | Type | Widget | Range, step, decimals | Commit signal |
 |---|---|---|---|
-| `float`, both bounds | `QDoubleSpinBox` + `QSlider` 0..1000, linear | `[min, max]`; decimals from the span (1000 distinct steps) and from the default and bounds, 2..6; step a power of ten near span/100 | spin `valueChanged` (keyboard tracking off) and slider `valueChanged` (every value of a drag) |
-| `float`, fewer bounds | `QDoubleSpinBox` | missing side +/-1e9; decimals from the default, 3..6 | spin `valueChanged` |
+| `float`, both bounds | `QDoubleSpinBox` + `QSlider` 0..1000, linear | `[min, max]`; decimals: the largest of those of the default and of both bounds in their shortest `repr` (shown exactly, maximum reachable) and, with a slider, those that make its 1000 steps distinct; 2..15; step a power of ten near span/100 | spin `valueChanged` (keyboard tracking off) and slider `valueChanged` (every value of a drag) |
+| `float`, fewer bounds, or a span below 1e-12 | `QDoubleSpinBox` only | missing side +/-1e9; decimals from the default and bounds, 3..15 | spin `valueChanged` |
 | `int`, both bounds | `QSpinBox` + `QSlider` over `[min, max]` | clamped to +/-(2^31-1) both sides | both |
 | `int`, fewer bounds | `QSpinBox` | missing side +/-(2^31-1) | spin |
 | `bool` | `QCheckBox` | | `toggled` |
@@ -33,6 +33,14 @@ A committed number is also clamped to the schema range. Real-schema coverage (`m
 bounded float, bounded nullable float (the gain caps), bounded int, bool; enum and unbounded numbers
 occur only in the test methods. `blend_with_original` is shown as declared, 0..100, nothing
 special-cased (CHARC blend ruling).
+
+Decimals rule (Reviewer B #1): Qt rounds a `QDoubleSpinBox`'s bounds and value to its decimals, so
+`float_decimals` takes the shortest-`repr` decimals of the default and both bounds, raised to make the
+slider's 1000 steps distinct when there is a slider, clamped to 2..15 (3..15 without both bounds). A
+range whose 1000 steps would need more than 15 decimals (span below 1e-12) gets no slider
+(`float_has_slider`). Only a value that needs more than 15 decimals is rounded, and a committed number
+is clamped to `[minimum, maximum]` regardless. Test: a 1e-7..2e-7 schema with default 1.5e-7 keeps its
+bounds and default and reaches its maximum.
 
 ## The method-switch rule
 
@@ -110,6 +118,7 @@ fixes are the terminating cleanup (one regression test per finding, red on `b282
   cannot see it. The panel commits any value the schema allows; the method refuses the pair at render
   and the shell presents that as its `shell.preview` error (shown by a test). An IF-3 `constraints`
   field would be an AD-20 matter.
+- A float needing more than 15 decimals (or a span below 1e-12) is shown without a slider and rounded to 15 decimals.
 - #5 (round 1, accepted limitation): a number whose minimum equals its maximum gets no slider (a
   zero span has no meaning); no real schema has one.
 - A number with no bound on a side is shown in +/-1e9 (float) or +/-(2^31-1) (int); a schema bound

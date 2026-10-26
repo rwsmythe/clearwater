@@ -261,3 +261,13 @@ Cleanup commits (regression tests first in `d330a70`, run red on `b2822d3`: 5 fa
 | #7 | `d330a70` | `test_no_exception_escapes_a_slot[plain ValueError]` |
 
 Green after the cleanup (targeted, both modules + `test_gui_deps.py`): 73 passed; ruff, format, mypy clean. Report: `docs/reports/wp3.17-parameter-panels-presets.md`. Full pytest: run by the orchestrator on the merge candidate (stacked gate), not by the cell.
+
+## Reviewer B remediation (orchestrator, `wp3.17-mc` 8e0ed98; depth 249,866)
+
+| Item | Commit | Test |
+|---|---|---|
+| 1 MAJOR: spin box decimals capped at 6 (1e-7..2e-7 range showed 0.000000, maximum unreachable) | `eda1d94` (rule: shortest-repr decimals of default and bounds, raised for the slider, 2..15; no slider below span 1e-12) | `test_a_float_range_below_the_old_six_decimals_keeps_its_bounds_and_default`, `test_a_range_too_narrow_to_resolve_...` in `f1d60e9` (red on `6e295c1`: run after "suite ended") |
+| 2 MINOR: one-control-per-parameter checked only `controls()` | `f1d60e9` | `test_each_panel_shows_exactly_one_visible_row_per_parameter`; planted doubled Basic panel `test_planted_basic_panel_that_adds_every_row_twice_fails` |
+| 3 MINOR: save-over covered only an ASCII case change | `d5c3487` | `SAME_NAME` parametrisation (Strasse/STRASSE, composed/decomposed Cafe); planted `lower()` key `test_planted_lower_case_name_key_fails` |
+
+Items 1 and 2 share one test file, so their tests are one commit. Static gates green at `eda1d94` (ruff, format, mypy); tests not yet run (host hold).
