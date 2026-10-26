@@ -487,6 +487,7 @@ class AnalysisEngine:
                 close()
         if count == 0:
             raise ValueError("the frame source yielded no frames")
+        self._check(progress, None)  # a cancel raised by the last frame's report
         self._cache.mark_complete(self._key)
 
     # --- stages -------------------------------------------------------------------------------

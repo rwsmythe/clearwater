@@ -191,6 +191,18 @@ def test_cancel_stops_within_one_frame_and_unloads() -> None:
     assert run(engine).ok and engine.is_complete()
 
 
+def test_a_cancel_at_the_last_decode_report_never_marks_complete() -> None:
+    """D70, IF-7: a cancel raised by the last frame's report stops before ``mark_complete``."""
+    frames = synthetic_frames(12)
+    engine, source, cache = make_engine(GrayWorld(), frames)
+    result = run(engine, CancelAfter(len(frames)))
+    assert not result.ok and result.failure == CANCELLED
+    assert source.yielded == len(frames)
+    assert isinstance(cache, CountingCache) and cache.marks == 0
+    entry = cache.lookup(KEY)
+    assert entry is not None and not entry.complete
+
+
 def test_a_cancel_during_the_last_smooth_is_not_published_as_complete() -> None:
     """D70, AD-15: a cancel that arrives while the last stage is smoothed still unloads."""
     frames = synthetic_frames(30)
