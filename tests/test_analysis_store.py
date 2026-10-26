@@ -47,6 +47,10 @@ def test_conforms_to_if4() -> None:
         ),
         ({"means": np.zeros(3), "gains": np.zeros(3, complex)}, r"'gains' has dtype complex"),
         ({"means": np.zeros(3), "gains": np.array(["a", "b", "c"])}, r"'gains' has dtype"),
+        (
+            {"means": np.zeros(3), "gains": np.array([True, False, True])},
+            r"pts 7, stage 'white_balance': statistic 'gains' has dtype bool",
+        ),
     ],
 )
 def test_put_refuses_a_bad_record_by_name(record: dict[str, Any], match: str) -> None:
@@ -55,6 +59,15 @@ def test_put_refuses_a_bad_record_by_name(record: dict[str, Any], match: str) ->
     with pytest.raises(ValueError, match=match):
         store.put(7, "white_balance", record)
     assert store.all_pts() == []
+
+
+def test_put_accepts_integer_records() -> None:
+    """Y-2's dtype rule is signed, unsigned or floating ("iuf"); integers are stored as float64."""
+    store = _store()
+    store.put(0, "white_balance", {"means": np.arange(3), "gains": np.ones(3, np.uint8)})
+    record = store.raw(0, "white_balance")
+    assert record["means"].dtype == np.float64 and record["means"].tolist() == [0.0, 1.0, 2.0]
+    assert record["gains"].tolist() == [1.0, 1.0, 1.0]
 
 
 def test_put_refuses_a_shape_change_even_after_invalidation() -> None:

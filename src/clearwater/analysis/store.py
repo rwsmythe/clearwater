@@ -28,8 +28,8 @@ from clearwater.interfaces import CorrectionMethod, Stage, Statistics, Statistic
 
 from .smoothing import exact_window, reach, smooth_series
 
-_NUMERIC_KINDS = "biuf"
-"""NumPy dtype kinds a statistic may have: boolean, signed, unsigned, floating."""
+_NUMERIC_KINDS = "iuf"
+"""NumPy dtype kinds a statistic may have: signed, unsigned, floating (Y-2, as WP3.4's methods)."""
 
 
 class SchemaMismatchError(ValueError):
