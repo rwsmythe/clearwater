@@ -443,4 +443,7 @@ MemoryError in run A while another package's full pytest ran, cleared on the re-
    0.05 s shutdown timeout failed under host load); the file re-run 13 passed and the test alone
    5 of 5 passed (`work/t-full.log`, `work/t-gui.log`). Was: Full pytest in a dispatcher WINDOW (`QT_QPA_PLATFORM=offscreen`, `--basetemp=work/<name>`,
    output to a file; grep the summary); `WINDOW RELEASED: <summary>`.
-3. The final return report (recipe section 4; brief "Return report").
+3. DONE (FINAL report delivered; depth 251,880). The final return report (recipe section 4; brief "Return report").
+4. Dispatcher's post-report change (Y-2 identity with WP3.4's gate fix): the store's dtype rule
+   `_NUMERIC_KINDS` "biuf" -> "iuf" (bool refused at `put`); test case `...has dtype bool`
+   failed first on 0747a82 (DID NOT RAISE), `test_put_accepts_integer_records` guards ints.
