@@ -94,8 +94,8 @@ capability list while the list was being read (fixed, `8f54e53`).
 
 Static gates on the final head: `uv run ruff check .`, `uv run ruff format --check .`,
 `uv run mypy` (strict, 118 files): green. Targeted tests on the final head:
-`tests/test_gui_settings_dialog.py` and `tests/test_gui_deps.py`, 61 passed. Full pytest: see the
-return report (run in the dispatcher's window). Reviewer A (STRONG, `gpt-5.6-sol` high, codex-cli
+`tests/test_gui_settings_dialog.py` and `tests/test_gui_deps.py`, 61 passed. Full pytest: run by the
+orchestrator on the merge candidate (stacked gate). Reviewer A (STRONG, `gpt-5.6-sol` high, codex-cli
 0.162.1 over WSL): one round, no critical or major finding, one minor (a stored encoder after a
 failed detection carried the wrong reason), fixed in the terminating cleanup; ledger
 `docs/proofs/wp3.20-ledger.md`, evidence `C:\Users\rwsmy\clearwater-review-evidence\wp3.20\r1\`.
