@@ -287,7 +287,7 @@ def test_planted_save_that_overwrites_without_asking_fails(make_window, monkeypa
             self._store.save(name, self._session.parameters(), overwrite=True)
 
     monkeypatch.setattr(PresetPanel, "save_as", wrong)
-    with pytest.raises(AssertionError):
+    with pytest.raises(AssertionError, match="without asking"):
         _assert_save_over_needs_confirmation(make_window)
 
 
@@ -327,9 +327,10 @@ def _assert_nothing_applied_after_a_schema_problem(make_window) -> None:
     before = setup.session_parameters()
     setup.select("Broken")
     setup.panel.load()
-    (error,) = setup.own()
-    assert "gain" in error.text and "mode" in error.text  # every problem is listed
     assert setup.session_parameters() is before, "a preset was applied despite a schema problem"
+    errors = setup.own()
+    assert len(errors) == 1
+    assert "gain" in errors[0].text and "mode" in errors[0].text  # every problem is listed
 
 
 def test_load_with_schema_problems_lists_them_all_and_applies_nothing(make_window) -> None:
@@ -338,7 +339,7 @@ def test_load_with_schema_problems_lists_them_all_and_applies_nothing(make_windo
 
 def test_planted_load_that_skips_validation_fails(make_window, monkeypatch) -> None:
     monkeypatch.setattr(pp, "validate_parameter_set", lambda *args, **kwargs: [])
-    with pytest.raises(AssertionError):
+    with pytest.raises(AssertionError, match="despite a schema problem"):
         _assert_nothing_applied_after_a_schema_problem(make_window)
 
 
@@ -528,7 +529,7 @@ def test_planted_export_that_overwrites_without_asking_fails(
             self._store.export_preset(name, target, overwrite=True)
 
     monkeypatch.setattr(PresetPanel, "export", wrong)
-    with pytest.raises(AssertionError):
+    with pytest.raises(AssertionError, match="without asking"):
         _assert_export_over_a_file_needs_confirmation(make_window, tmp_path)
 
 
@@ -592,7 +593,7 @@ def test_planted_clear_without_an_owner_fails(make_window, monkeypatch) -> None:
         self.status.setText(text)
 
     monkeypatch.setattr(PresetPanel, "_succeed", wrong)
-    with pytest.raises(AssertionError):
+    with pytest.raises(AssertionError, match="without the panel's owner"):
         _assert_a_foreign_error_survives_a_load(make_window)
 
 

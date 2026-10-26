@@ -388,7 +388,7 @@ def test_planted_programmatic_update_that_re_emits_fails(make_window, monkeypatc
             return None
 
     monkeypatch.setattr(pp, "QSignalBlocker", NoBlocker)
-    with pytest.raises(AssertionError):
+    with pytest.raises(AssertionError, match="external change"):
         _assert_external_update_does_not_commit(make_window)
 
 
@@ -467,7 +467,7 @@ def test_the_switch_carries_over_only_values_valid_for_the_new_method(make_windo
 
 def test_planted_switch_without_validation_fails(make_window, monkeypatch) -> None:
     monkeypatch.setattr(pp, "validate_parameter_set", lambda *args, **kwargs: [])
-    with pytest.raises(AssertionError):
+    with pytest.raises(AssertionError, match="big"):
         _assert_switch_carries_only_valid_values(make_window)
 
 
