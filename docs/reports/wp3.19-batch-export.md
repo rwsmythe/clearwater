@@ -127,7 +127,8 @@ else heavy running): 13 ms during the export, 11 ms during the batch.
 
 - ruff check, ruff format --check, mypy strict: green on the final head (see the ledger for the commands' last lines).
 - Own modules plus `tests/test_gui_deps.py`, headless (`QT_QPA_PLATFORM=offscreen`), after the Reviewer B remediation:
-  77 passed in 11 s (`work/tfinal2.txt`; 61 passed before it, `work/t1-final.txt`). The two round-2 cleanup tests first errored at teardown (the window's close saves
+  77 passed in 11 s (`work/tfinal2.txt`; 61 passed before it, `work/t1-final.txt`); after the pass-2 changes 85 passed
+  (`work/i4.txt`). The two round-2 cleanup tests first errored at teardown (the window's close saves
   `session.parameters`, which the test had left patched); fixed in the test helper, then green.
 - full pytest: run by the orchestrator on the merge candidate (stacked gate).
 - Mutation checks of the new tests (`work/mut.py`, each mutation reverted): the batch stopping at the first failure, a
@@ -164,6 +165,19 @@ failing on `b12c3fd` or, for the test-only items, against a copy of the product 
 
 Reviewer B's re-run covers the remediation; no Reviewer A round was run.
 
+## Reviewer B pass 2 (adjudicated at the gate)
+
+Pass 2 verified all six pass-1 items fixed and blocked again; the orchestrator adjudicated it at the gate (no third B) and
+ruled these changes, one commit each, each test failing on `9eefd83` (the product's "before"):
+
+| # | Ruling | Commit | Result |
+|---|---|---|---|
+| 1 | MINOR: an ok result with no outputs must not read "Saved <source>" | `0da4102` | Export: status and a warning (owner `"export"`) "Export finished, but no output file was reported."; batch: "done with warnings" with that text. `export_seam.py` untouched; whether such a result is legal is a contract question for CHARC and WP3.14. |
+| 2 | MINOR: queued files sharing a basename were indistinguishable | `f9238cf` | rows, the "Item n of m" line and `format_report` show `<name> (<parent folder>)` when a name repeats (`item_labels`) |
+| 3 | MINOR: a stale export warning survived a setup fault | `51fde41` | the panel's warnings are cleared before the request is built |
+| 4 | MINOR: Clear Queue cleared the batch errors | `c05d5d7` | Clear removes this panel's warnings only (C3) |
+| 5 | LIMIT | this commit | the limit sentence above now says the V7 test uses 2 items and a few hundred are unmeasured |
+
 ## Limits
 
 - The engine is WP3.14's (wave 4): every test runs against the test-side stub; the product default writes nothing until
@@ -172,7 +186,9 @@ Reviewer B's re-run covers the remediation; no Reviewer A round was run.
   job checks its own item. For WP3.14's brief.
 - A job that blocks past cancellation keeps the gate held until its `on_done` arrives (DR-44 (c), WP4.3). A job that holds
   the GIL in pure Python can break V7 (WP4.3 re-measures with the real engines).
-- A batch of a few hundred files rebuilds the list widget on every item state change (bounded; not measured).
+- A batch of a few hundred files rebuilds the list widget (and the queue's row labels) on every item state change. LIMIT:
+  the V7 test uses 2 items; a queue of a few hundred files is unmeasured (it is bounded work on the main thread, not a
+  measured figure).
 - Warnings are ASCII-escaped in banners; the report view shows file names and paths as Qt text, the INFO log line is
   ASCII-escaped.
 - Chapter grouping review (G11, D80, V12) is deferred to v2; no drag-and-drop onto the queue; the queue is not saved

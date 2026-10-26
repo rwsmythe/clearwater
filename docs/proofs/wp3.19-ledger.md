@@ -333,3 +333,21 @@ gate directly (`batch._gate.current`) because the shell's no-source reason masks
 failed-item error text for a Start whose setup raised is "The batch could not start: <detail>" (owner `"batch"`). (d) The
 seam is untouched. Depth at this yield: reported by the orchestrator from the transcript (the cell cannot read it).
 
+## Reviewer B pass 2 (adjudicated at the gate; seat 2, from head `e1330f5`)
+
+Pass 2 verified the six pass-1 items fixed and blocked again; the orchestrator adjudicated at the gate (no third B). Each
+test below was run against `git archive 9eefd83` (`work/old2`, `clearwater.__file__` checked) before the fix, and on the
+head after. Targeted runs only (own modules plus `tests/test_gui_deps.py`, headless).
+
+| # | Commit | Test(s) | Before (9eefd83) | After |
+|---|---|---|---|---|
+| 1 ok without outputs | `0da4102` | `test_an_ok_result_without_outputs_is_not_reported_as_saved`, `test_an_ok_item_without_outputs_is_done_with_a_warning` (+ 2 planted) | 2 failed, 3 passed (`work/j1.txt`) | 81 passed (`work/i1.txt`) |
+| 2 shared basename | `f9238cf` | `test_files_that_share_a_name_are_told_apart_by_their_folder` (+ planted) | 2 failed (`work/j2.txt`; the planted one needs the new `item_labels`) | 83 passed (`work/i2.txt`) |
+| 3 stale warning | `51fde41` | `test_a_stale_warning_does_not_survive_a_setup_fault` | 1 failed (`work/j3.txt`) | 84 passed (`work/i3.txt`) |
+| 4 Clear keeps errors | `c05d5d7` | `test_clear_removes_this_panels_warnings_but_keeps_its_errors` | 1 failed (`work/j4.txt`) | 85 passed (`work/i4.txt`) |
+| 5 limit sentence | docs commit | n/a | n/a | n/a |
+
+Notes: `NO_OUTPUT_TEXT` lives in `gui/export_service.py` (re-exported nowhere else; `export_panel` imports `batch_panel`, so
+the shared constant cannot live in the panel). `export_seam.py` untouched. The label shows the full parent path, not
+only the folder name, so two cards whose folders share a name stay distinct. Depth: reported by the orchestrator.
+
