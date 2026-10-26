@@ -275,3 +275,15 @@ Items 1 and 2 share one test file, so their tests are one commit. Static gates g
 Results (host free 11.5 GB; foreground; headless; extracted copy of `6e295c1` with the new test files, then the head):
 - Old product `6e295c1` + new tests (`tests/test_gui_parameter_panels.py`, `tests/test_gui_preset_panel.py`, `tests/test_gui_deps.py`): 2 failed, 79 passed. The failures are the item-1 tests (`test_a_float_range_below_the_old_six_decimals_keeps_its_bounds_and_default`, `test_a_range_too_narrow_to_resolve_gets_a_spin_box_alone_at_full_precision`). Items 2 and 3 are test additions: their checks pass on the old product, and their planted wrong implementations (doubled Basic panel, `lower()` key) are caught by the helpers.
 - Head `eda1d94` product (docs after): 81 passed. `ruff check .`, `ruff format --check .`, `mypy` clean. CR bytes 0 in blob and file for all six changed files.
+
+## Reviewer B pass 2 (adjudicated at the gate; fixes on `wp3.17`)
+
+| Item | Commit | Test (red on `f6b40a9`, green on the head) |
+|---|---|---|
+| #2 MAJOR `float_has_slider` raised for `0..5e-324` / `-1e308..1e308` | `14b448e` | `test_extreme_finite_float_ranges_build_and_commit_inside_their_bounds[...]` (2) |
+| #3 slider ends not exact | `72356f8` | `test_the_slider_ends_map_exactly_to_the_bounds` |
+| #4 Basic refusal survived an Advanced success | `c161353` | `test_a_successful_edit_in_the_other_panel_clears_the_shared_owners_error` |
+| #5 Save as failure path did not refresh | `7b7b6af` | `test_a_failed_save_as_still_refreshes_the_list` |
+| #1 LIMIT (15-decimal resolution) and #6 report corrections | the docs commit after `7b7b6af` | n/a |
+
+Before: extracted `f6b40a9` + the new test files, foreground, host free 9.3 GB: 5 failed, 81 passed (the five tests above). After, on the head: 86 passed (both modules + `tests/test_gui_deps.py`). The product file equals the staged final version commit by commit (one commit per item).

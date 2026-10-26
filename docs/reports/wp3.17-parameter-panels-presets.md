@@ -22,7 +22,7 @@ Everything comes from the selected method's IF-3 schema; a parameter is in exact
 | Type | Widget | Range, step, decimals | Commit signal |
 |---|---|---|---|
 | `float`, both bounds | `QDoubleSpinBox` + `QSlider` 0..1000, linear | `[min, max]`; decimals: the largest of those of the default and of both bounds in their shortest `repr` (shown exactly, maximum reachable) and, with a slider, those that make its 1000 steps distinct; 2..15; step a power of ten near span/100 | spin `valueChanged` (keyboard tracking off) and slider `valueChanged` (every value of a drag) |
-| `float`, fewer bounds, or a span below 1e-12 | `QDoubleSpinBox` only | missing side +/-1e9; decimals from the default and bounds, 3..15 | spin `valueChanged` |
+| `float`, fewer bounds, or a span 15 decimals cannot resolve (below 1e-12, not finite, or whose step underflows) | `QDoubleSpinBox` only | missing side +/-1e9; decimals from the default and bounds, 3..15 | spin `valueChanged` |
 | `int`, both bounds | `QSpinBox` + `QSlider` over `[min, max]` | clamped to +/-(2^31-1) both sides | both |
 | `int`, fewer bounds | `QSpinBox` | missing side +/-(2^31-1) | spin |
 | `bool` | `QCheckBox` | | `toggled` |
@@ -37,9 +37,10 @@ special-cased (CHARC blend ruling).
 Decimals rule (Reviewer B #1): Qt rounds a `QDoubleSpinBox`'s bounds and value to its decimals, so
 `float_decimals` takes the shortest-`repr` decimals of the default and both bounds, raised to make the
 slider's 1000 steps distinct when there is a slider, clamped to 2..15 (3..15 without both bounds). A
-range whose 1000 steps would need more than 15 decimals (span below 1e-12) gets no slider
-(`float_has_slider`). Only a value that needs more than 15 decimals is rounded, and a committed number
-is clamped to `[minimum, maximum]` regardless. Test: a 1e-7..2e-7 schema with default 1.5e-7 keeps its
+range whose 1000 steps would need more than 15 decimals (span below 1e-12), whose span is not
+finite (`-1e308..1e308`) or whose step underflows (`0..5e-324`) gets no slider (`float_has_slider`).
+A committed number is clamped to `[minimum, maximum]` regardless. Slider positions 0 and 1000 map
+exactly to the minimum and the maximum. Test: a 1e-7..2e-7 schema with default 1.5e-7 keeps its
 bounds and default and reaches its maximum.
 
 ## The method-switch rule
@@ -89,7 +90,7 @@ unsupported version) that nothing acts on. The panel never calls `save_settings`
 
 ## Gates
 
-Own tests with `test_gui_deps.py`: 73 passed (headless, targeted). `uv run ruff check .`, `ruff
+Own tests with `test_gui_deps.py`: 86 passed (both new modules and `tests/test_gui_deps.py`, headless, targeted). `uv run ruff check .`, `ruff
 format --check .` and `mypy` clean. Full pytest: run by the orchestrator on the merge candidate (stacked gate). Reviewer A (STRONG, at the cell's seat): round 1 reported 7 findings (3 tagged MAJOR);
 the dispatcher upheld the proposed severities (0 blocking), so the loop ended at round 1 and its
 fixes are the terminating cleanup (one regression test per finding, red on `b2822d3`).
@@ -118,13 +119,14 @@ fixes are the terminating cleanup (one regression test per finding, red on `b282
   cannot see it. The panel commits any value the schema allows; the method refuses the pair at render
   and the shell presents that as its `shell.preview` error (shown by a test). An IF-3 `constraints`
   field would be an AD-20 matter.
-- A float needing more than 15 decimals (or a span below 1e-12) is shown without a slider and rounded to 15 decimals.
+- **Supported resolution (banked as a debt row; trigger: a method declaring a float parameter whose span or bounds 15 decimals cannot resolve).** The bounds and the default are shown exactly only when 15 decimals resolve them. A span or bound beyond that (for example `0..1e-16`) collapses in Qt's spin box, which rounds to its decimals; the committed value is still clamped to `[minimum, maximum]`. No real schema is near it.
+- A slider with flat steps (a range whose 1000 steps repeat a rounded value) commits the same value more than once; harmless, the preview is latest-wins.
 - #5 (round 1, accepted limitation): a number whose minimum equals its maximum gets no slider (a
   zero span has no meaning); no real schema has one.
 - A number with no bound on a side is shown in +/-1e9 (float) or +/-(2^31-1) (int); a schema bound
   beyond that is clamped. The real schemas have small finite bounds.
 - A method switch drops, without telling the user, the values that do not carry over.
-- The Basic and Advanced panels each clear their `"parameters"` error only after they presented one.
+- Any successful commit from either panel clears the errors of the shared owner `"parameters"` (Reviewer B pass 2 #4).
 - Every store call and the list refresh are synchronous on the interface thread (envelope: a local
   folder, presets up to 1 MiB).
 - No undo and no "reset to defaults" (not in G3/G6). `Parameter.neutral` is not used.
