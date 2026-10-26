@@ -8,6 +8,7 @@ arithmetic, the cleanup and the command line are checked.
 from __future__ import annotations
 
 import json
+import math
 import subprocess
 import sys
 import time
@@ -159,6 +160,15 @@ def test_stray_watch_charges_a_process_started_inside_the_window() -> None:
         child.wait()
 
 
+@pytest.mark.parametrize("periods", [(0.0, 1.0, 1.0), (0.1, -1.0, 1.0), (0.1, 1.0, math.inf)])
+def test_telemetry_refuses_a_period_that_is_not_positive(
+    periods: tuple[float, float, float],
+) -> None:
+    memory, gpu, strays = periods
+    with pytest.raises(ValueError, match="positive"):
+        bench.Telemetry(memory_every=memory, gpu_every=gpu, strays_every=strays)
+
+
 def test_telemetry_watcher_starts_reports_and_stops() -> None:
     telemetry = bench.Telemetry(memory_every=0.05, gpu_every=1.0, strays_every=0.5)
     telemetry.start()
@@ -224,6 +234,7 @@ def test_run_once_records_the_row_and_deletes_the_output(sample: Any, tmp_path: 
     assert record["output_bytes"] > 0 and record["output_video_bit_rate"] > 0
     telemetry = record["telemetry"]
     assert telemetry["errors"] == []
+    assert telemetry["periods_s"] == {"memory": 0.02, "gpu": 0.5, "strays": 1.0}
     names = [m["name"] for m in telemetry["peak_tree_rss_members"]]
     assert any("ffmpeg" in name for name in names)
     assert telemetry["peak_tree_rss_bytes"] > 0 and telemetry["strays"]
@@ -367,6 +378,17 @@ def test_the_options_follow_the_subcommand(
     record = json.loads(Path(out.strip().splitlines()[-1].removeprefix("RECORD ")).read_text())
     run = record["runs"][0]
     assert Path(run["output"]).is_file() and run["decode"]["hw_decode_asked"] is False
+
+
+@pytest.mark.parametrize("value", ["0", "-0.5", "nan", "inf", "soon"])
+@pytest.mark.parametrize("option", ["--memory-every", "--gpu-every", "--strays-every"])
+def test_a_bad_period_is_a_usage_error(
+    folders: LocalConfig, option: str, value: str, capsys: pytest.CaptureFixture[str]
+) -> None:
+    with pytest.raises(SystemExit) as stop:  # round 5 #3
+        bench.main(["floor", "--dry-run", option, value])
+    assert stop.value.code == 2
+    assert "positive number of seconds" in capsys.readouterr().err
 
 
 def test_floor_dry_run_resolves_every_clip(

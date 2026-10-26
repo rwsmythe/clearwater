@@ -367,7 +367,12 @@ class Telemetry:
             memory_every: Between two readings of the process tree's resident memory.
             gpu_every: Between two graphics-card readings.
             strays_every: The length of a strays window.
+
+        Raises:
+            ValueError: A period is not a finite number above zero.
         """
+        if not all(math.isfinite(p) and p > 0 for p in (memory_every, gpu_every, strays_every)):
+            raise ValueError("every telemetry period must be a positive number of seconds")
         self._periods = (memory_every, gpu_every, strays_every)
         self._stop = threading.Event()
         self._thread = threading.Thread(target=self._run, daemon=True)
@@ -435,9 +440,9 @@ class Telemetry:
         """Stop sampling and the watcher, and return what was recorded.
 
         Returns:
-            The memory peak (bytes, its members, when), the graphics-card readings and their
-            memory peak, the strays windows (the last one ends at the stop), and the errors
-            that stopped the watcher or the sampling, if any.
+            The sampling periods, the memory peak (bytes, its members, when), the graphics-card
+            readings and their memory peak, the strays windows (the last one ends at the stop),
+            and the errors that stopped the watcher or the sampling, if any.
         """
         self._stop.set()
         if self._thread.is_alive():
@@ -458,6 +463,7 @@ class Telemetry:
             connection.close()
         used = [m for m in (memory_used_mib(r) for r in self.gpu) if m is not None]
         return {
+            "periods_s": dict(zip(("memory", "gpu", "strays"), self._periods, strict=True)),
             "peak_tree_rss_bytes": self.peak_rss,
             "peak_tree_rss_members": self.peak_members,
             "peak_tree_rss_at_s": round(self.peak_at_s, 2),
@@ -736,6 +742,22 @@ def row_line(record: dict[str, Any]) -> str:
     )
 
 
+def period(text: str) -> float:
+    """Parse a telemetry period: a finite number of seconds above zero.
+
+    Raises:
+        argparse.ArgumentTypeError: Anything else (a zero or negative period would make the
+            telemetry loop spin and distort the run it measures).
+    """
+    try:
+        seconds = float(text)
+    except ValueError:
+        seconds = math.nan
+    if not (math.isfinite(seconds) and seconds > 0):
+        raise argparse.ArgumentTypeError(f"a period must be a positive number of seconds: {text}")
+    return seconds
+
+
 def _write(path: Path, record: dict[str, Any]) -> None:
     path.write_text(json.dumps(record, indent=2, default=str), encoding="utf-8")
 
@@ -753,9 +775,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     options.add_argument("--config", type=Path, help="local configuration file to read")
     options.add_argument("--keep", action="store_true", help="keep the outputs")
     options.add_argument("--software-decode", action="store_true", help="decode without CUDA")
-    options.add_argument("--memory-every", type=float, default=0.25, help="seconds")
-    options.add_argument("--gpu-every", type=float, default=1.0, help="seconds")
-    options.add_argument("--strays-every", type=float, default=30.0, help="seconds")
+    options.add_argument("--memory-every", type=period, default=0.25, help="seconds")
+    options.add_argument("--gpu-every", type=period, default=1.0, help="seconds")
+    options.add_argument("--strays-every", type=period, default=30.0, help="seconds")
     parser = argparse.ArgumentParser(description=(__doc__ or "").splitlines()[0])
     commands = parser.add_subparsers(dest="command", required=True)
     one = commands.add_parser("run", help="one leg", parents=[options])
