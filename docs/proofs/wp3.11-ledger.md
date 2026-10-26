@@ -11,6 +11,7 @@ Tier STRONG. Brief `docs/briefs/wp3.11-brief.md` (FINAL; CHARC rulings `53d1d906
 | 1 (head 00b248b) | 316,506 (at the window yield; the R1 yield's figure is the dispatcher's) | 0 | 3 (F1, F2, F5) | 5 (F3, F4, F6, F7, F8) | 8 in / 0 out | 8 NEW / 0 REOPENED | 0 | F5 test-only, fixed out of band at 9c53134; F1-F4, F6 product; F7, F8 tool -- NOT yet fixed | WSL, gpt-5.6-sol high, 19 exec lines, all findings REASONED | NEW_CRITICAL_MAJOR_FOUND; adjudicated (F3, F4 downgraded to MINOR), next round needed |
 | R1 remediation (cell 2, head e327954) | 171,115 (dispatcher, at the remediation yield) | - | - | - | - | - | 0 | F1-F4, F6 product; F7, F8 tool; V3-1 test-only | - | remediated; step-aware re-run in a window |
 | 2 (head 7c8e6ed) | 202,325 | 0 | 1 NEW (A1) + 1 REOPENED (A2, F1's "during" half; MINOR recommended) | 0 (A2 if downgraded) | 2 in / 0 out | 1 NEW / 1 REOPENED | 0 | none yet (both product) | WSL, gpt-5.6-sol high, 14 exec lines, both REASONED by the reviewer, both reproduced by the cell | NEW_CRITICAL_MAJOR_FOUND; adjudicated, next round needed |
+| 3 (head 7f9dff8) | dispatcher's figure at this yield | 0 | 0 | 1 (B1, docstring) | 1 in / 0 out | 1 NEW / 0 REOPENED | 0 | R2 fixes: A1, A2 product (f139ef5, 7f9dff8); B1 not yet (docstring) | WSL, gpt-5.6-sol high, 17 exec lines, REASONED | NO_NEW_CRITICAL_MAJOR: CONVERGED (zero new blocking) |
 
 ## Round 0 -- design table (no product code yet)
 
@@ -412,30 +413,30 @@ smoothing" half.
 The step-aware re-run (F7) ran in the granted window before the round: exit 0, the table moved by
 at most 0.002 flicker and 0.09 peak (`work/wp3.11/step-aware-f7.log`; report f53a1a2).
 
-## RESUME HERE (cell 2, at the R2 yield, 2026-10-26; supersedes cell 1's)
+## Round 3 (Reviewer A) -- CONVERGED
 
-**State.** Branch `wp3.11`, base `de206e2`, head = this ledger commit (code as at 7c8e6ed). R1
-remediated (table above), V3-1 implemented, step-aware re-run done, report complete except the
-Y-1 text (DRAFT until the gate reconciles it with WP3.4's; do not change it unless told). Gates at
-7c8e6ed: ruff check, ruff format --check, mypy strict green; analysis tests incl. V3 and the
-instrument 217 passed (`work/t-r2.log`). Full pytest NOT yet run (needs a window).
+Evidence `C:\Users\rwsmy\clearwater-review-evidence\wp3.11\r3\` (prompt listing R2's A1, A2 and
+R1's findings to verify, diff de206e2..7f9dff8, transcript, `test-summary.txt`, probe,
+`adjudication.md`, `md5sums.txt`). No earlier finding reported unfixed or regressed. One MINOR:
+B1 `store.py:414` the `axis()` docstring says "every pts ever put", but `ensure_axis` (reopen)
+adds pts ahead of their records; CONFIRMED, docstring only, fixed in the terminating round's
+cleanup. Zero new blocking: the loop terminates at round 3.
+
+R2 remediation (dispatcher ruled A1 and A2 MAJOR): A1 f139ef5 (invalidate before re-hashing;
+test `test_a_reader_never_gets_old_records_under_the_new_schema`, unfixed served/served); A2
+7f9dff8 (`SMOOTH_CHUNK` 2048, `_smooth_stage` through `smooth_at` with a cancel check between;
+test `test_a_cancel_during_a_stages_smoothing_stops_before_the_stage_ends`, unfixed rows [60, 60];
+guard `test_chunked_smoothing_equals_the_whole_series`; the F1 test now hooks `smooth_at` too).
+Gates at 7f9dff8: ruff, format, mypy strict green; analysis tests 215 + V3 5 passed (one host
+MemoryError in run A while another package's full pytest ran, cleared on the re-run).
+
+## RESUME HERE (cell 2, at the R3 yield, 2026-10-26)
+
+**State.** Head = this ledger commit (code as at 7f9dff8). Reviewer A CONVERGED at round 3.
 
 **Do next, in order.**
-1. Remediate R2 (dispatcher RULED both MAJOR; A2 in envelope by task 8), one commit per finding,
-   each with a test shown failing on the unfixed code. A1 DONE (see its commit; test
-   `test_a_reader_never_gets_old_records_under_the_new_schema`, unfixed: served/served). A2 DONE
-   (its commit: `SMOOTH_CHUNK` 2048, `_smooth_stage` via `smooth_at` with `_check` between;
-   test `test_a_cancel_during_a_stages_smoothing_stops_before_the_stage_ends`, unfixed rows
-   [60, 60]; guard `test_chunked_smoothing_equals_the_whole_series`). Was:
-   - A1: in `AnalysisEngine._drive`, call `invalidate_from` BEFORE setting `schema_hash` on
-     `_store` and `_measured`; test: plant a reader in `store.invalidate_from` (as
-     `r2/probe_r2.py` A1 does) and assert it gets KeyError (on the unfixed code it is served the
-     old record).
-   - A2 (whatever severity the dispatcher rules): cancel checked during a stage's smoothing, e.g.
-     the engine smooths in chunks of outputs through `smooth_at` (equal to the whole, tested) or
-     per statistic, with `_check` between; the stage must still end as `smoothed_complete`; test:
-     cancel from inside a stage's smoothing and see it stop before the stage's smoothing ends.
-2. Reviewer A round 3 (copy `r2\run_review.sh` and `r2\review-prompt.md` to `r3`, retitle, list
-   R2's A1/A2 to verify, refresh the diff and `test-summary.txt`).
-3. Full pytest in a dispatcher WINDOW (`QT_QPA_PLATFORM=offscreen`, `--basetemp=work/<name>`,
-   output to a file); then the final return report.
+1. Cleanup: B1, the `AnalysisStore.axis` docstring (the clip's frames, put by `put` or
+   `ensure_axis`); one commit; no new round.
+2. Full pytest in a dispatcher WINDOW (`QT_QPA_PLATFORM=offscreen`, `--basetemp=work/<name>`,
+   output to a file; grep the summary); `WINDOW RELEASED: <summary>`.
+3. The final return report (recipe section 4; brief "Return report").
