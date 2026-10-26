@@ -38,13 +38,13 @@ inline, is re-measured from the stored proxies if the change touches it).
 |---|---|---|
 | 1 | Proxy (AD-5, Q3, P2): block mean by `max(1, min(H, W) // 540)` with `ceil` edge blocks, kept in float64 and quantised `floor(x * 255 + 0.5)` clipped; its float32 cast equals `gui.imaging.downscale` bit for bit and the factor equals `statistics_factor`; on 8-bit data it equals WP3.12's `floor((sum + 8) / 16)`, which the float32 path misses on about half the exact ties (reproduction `C:\Users\rwsmy\clearwater-review-evidence\wp3.11\r0\q3_quantisation_repro.py`). | `tests/test_analysis_proxy.py` |
 | 2 | Every statistic is measured on the proxy AS STORED: `store_proxy` then `proxy` read back, `/ 255` as float32 on the injected backend, at first analysis and on reopen; a lossy codec (`DiskProxyCache`, JPEG q75) shows a planted pre-store measurement would differ. | `test_statistics_are_measured_on_the_stored_proxy` |
-| 3 | Decode pass: one iteration of the source; progress; cancel between frames; an early end is not an error (D86); zero frames, out-of-order or duplicate pts and a size change fail by name; `mark_complete` after the last proxy only. A complete entry skips the pass (the source is never iterated) and gives bit-identical statistics (V17 analysis side); an incomplete one does not skip. | `tests/test_analysis_engine.py` |
+| 3 | Decode pass: one iteration of the source; progress; cancel between frames; an early end is not an error (D86); zero frames, out-of-order or duplicate pts and a decoded frame size change (even one that gives the same proxy shape) fail by name; `mark_complete` after the last proxy only, never after a cancel raised by the last frame's report, and never while the entry holds proxies this pass did not decode (an earlier, longer pass's tail; IF-7 has no delete, so the pass fails by name). A complete entry skips the pass (the source is never iterated) and gives bit-identical statistics (V17 analysis side); an incomplete one does not skip. | `tests/test_analysis_engine.py` |
 | 4 | Staged statistics (D97): each later stage measured on the stored proxies with the SMOOTHED records of all earlier stages, then smoothed; a one-stage method runs (D98). | `test_stage_two_is_measured_with_stage_one_smoothed`, `test_a_one_stage_method_runs` |
 | 5 | Smoother: `median_gaussian` over pts, exact windows; equals the prototype's `Smoother("median_gaussian", w).apply` within 1e-12 on CFR (5 rates x 5 lengths x 4 windows, including 1- and 2-frame series); on `vid-vfr`'s 1001/1001/2002 durations it equals a direct definition and differs from a planted tap filter (DR-23). | `tests/test_analysis_smoothing.py` |
 | 6 | Store checks (DR-25 (1), (2), (4)-(7)): missing or extra name, shape change (also after invalidation), non-finite, non-real dtype refused at `put` with pts, stage and statistic named; hash mismatch refused on put and read; windows `Fraction(str(w))`. | `tests/test_analysis_store.py`, `test_windows_are_exact_decimals` |
 | 7 | Recompute (AD-7, P1): first invalidated stage by `depends_on_parameters`; a closed-form stage reads no proxy; near set = the exact closure over the real pts, 30 frames per stage at 29.97 fps (Gaussian 29 + median 1): stage 1 over +-60, stage 2 over +-30 for c3 (+-90 for three stages); the displayed frame's smoothed record is final at the end of the near phase and equals the final one; planted Gaussian-only and single-stage reaches are refused; "complete" only after the background part. AD-7's "+-29" is the Gaussian alone. | `tests/test_analysis_recompute.py` |
 | 8 | Provisional (D108, V18 engine side): `provisional_record(pts)` is the frame's own chain on its stored proxy, available while the analysis runs; the smoothed record after. | `test_provisional_statistics_come_before_the_smoothed_ones` |
-| 9 | Cancel and states (AD-15, D70): cancel within one frame, no `mark_complete`, statistics dropped, phase `cancelled` (the unloaded state); a failure gives `failed` with `"<Type>: <text>"`. Cancel during a recompute is the same (choice 6); the stored proxies stay in the cache and the entry stays complete, so the re-analysis does not decode again (a cancel DURING the decode pass leaves the entry incomplete, so that re-analysis decodes). | `test_cancel_*`, `test_a_failing_analyze_*` |
+| 9 | Cancel and states (AD-15, D70): cancel within one frame (checked after every frame, after every smoothing, and under the engine lock before "complete" is published), no `mark_complete`, statistics dropped, phase `cancelled` (the unloaded state); a failure gives `failed` with `"<Type>: <text>"`. Cancel during a recompute is the same (choice 6); the stored proxies stay in the cache and the entry stays complete, so the re-analysis does not decode again (a cancel DURING the decode pass leaves the entry incomplete, so that re-analysis decodes). | `test_cancel_*`, `test_a_cancel_*`, `test_a_failing_analyze_*` |
 | 10 | V3 / AD-14 (Q7): see "V3" below. | `tests/test_analysis_v3.py` |
 
 ## The `schema_hash`
@@ -155,7 +155,7 @@ record `analyze` returned and never uses a cached record without passing it thro
 
 - **WP3.18 (timeline and analysis):** run `engine.analysis_job()` on `JobRunner.run`; map
   `engine.state()` to `AnalysisState(**dataclasses.asdict(...))` for `Session.set_analysis`;
-  progress units are cumulative frame-stage units (choice 7). Preview: `smoothed_record(pts)`
+  progress units are cumulative frame-stage units (choice 7; reading a source-only stage's cached statistics on reopen adds none, with `total` None while it runs). Preview: `smoothed_record(pts)`
   (KeyError while not final) else `provisional_record(pts)` (None while the proxy is not stored;
   then the shell's own D108 path). On a parameter change call `set_parameters(params, displayed
   pts)` and run the returned job if any. AD-15 reads "restart the dependent stages when analysis
@@ -164,6 +164,12 @@ record `analyze` returned and never uses a cached record without passing it thro
   `smoothed_record(pts, schema_hash=engine.schema_hash)` (or a hash from
   `clearwater.analysis.schema_hash(method, params, kind, window_s)`); a mismatch raises
   `SchemaMismatchError`.
+- **Stream close and cancel (DR-45 (a)):** the engine never closes a frame stream from another
+  thread. `cancel()` only sets an event; the job thread sees it between frames, leaves the loop
+  and closes the iterator `VideoSource.frames` returned (`close()` when it has one) in a
+  `finally` on the job thread itself, as after a failure or the last frame. So DR-45 (a)'s
+  concurrent public `close()` is not reached from this package. A decoder that blocks inside
+  one frame delays the cancel until that frame arrives.
 - **WP4.2 (end to end):** V3 with the product method; V17 holds by construction (the same stored
   pixels at first analysis and on reopen).
 - **WP4.3 (wiring):** inject `DiskProxyCache` (with its registered codec, DR-41), the key from
