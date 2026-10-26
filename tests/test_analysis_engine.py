@@ -251,6 +251,49 @@ def test_a_cancel_during_the_last_smooth_is_not_published_as_complete() -> None:
         engine.smoothed_record(frames[0].pts_ticks)
 
 
+def test_a_reader_never_gets_old_records_under_the_new_schema() -> None:
+    """DR-25 (4): while a change is taken up, a reader gets KeyError, never the old records."""
+    frames = synthetic_frames(60)
+    engine, _, _ = make_engine(GrayWorld(), frames)
+    assert run(engine).ok
+    pts = frames[30].pts_ticks
+    seen: list[str] = []
+    invalidate = engine.store.invalidate_from
+    rehash = type(engine.store).schema_hash
+
+    def read() -> None:
+        try:
+            engine.smoothed_record(pts)
+            seen.append("served")
+        except KeyError:
+            seen.append("KeyError")
+
+    def reading_invalidate(stage: str) -> None:
+        read()  # before the invalidation
+        invalidate(stage)
+        read()  # after it
+
+    class Store(type(engine.store)):  # type: ignore[misc]
+        @property
+        def schema_hash(self) -> str:
+            return rehash.fget(self)  # type: ignore[no-any-return]
+
+        @schema_hash.setter
+        def schema_hash(self, value: str) -> None:
+            read()  # before the store is switched to ``value``
+            rehash.fset(self, value)
+            read()  # after it
+
+    engine.store.__class__ = Store
+    engine.store.invalidate_from = reading_invalidate  # type: ignore[method-assign]
+    job = engine.set_parameters({**engine.parameters, "gamma": 2.0}, pts)
+    assert job is not None
+    seen.clear()
+    assert job(StubProgress()).ok
+    assert len(seen) >= 4 and set(seen[:4]) == {"KeyError"}, seen
+    assert engine.smoothed_record(pts)["fusion"]["level"] is not None
+
+
 def test_a_failing_analyze_gives_failed_with_its_message() -> None:
     """A failure carries its message; nothing is marked complete; statistics are dropped."""
     method = GrayWorld()

@@ -395,10 +395,12 @@ class AnalysisEngine:
         counter: list[Any] = [0, None]  # frame-stage units done, total (None while unknown)
         while True:
             pending = self._take()
-            self._store.schema_hash = pending.schema
-            self._measured.schema_hash = pending.schema
+            # Invalidate BEFORE re-hashing: until the store holds the new hash a reader's hash
+            # mismatches (KeyError), and by then the old records of the changed stages are gone.
             if pending.first_invalid is not None:
                 self._store.invalidate_from(self._stages[pending.first_invalid].name)
+            self._store.schema_hash = pending.schema
+            self._measured.schema_hash = pending.schema
             if not self._decoded:
                 self._load(progress, pending, counter)
                 self._decoded = True

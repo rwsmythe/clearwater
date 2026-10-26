@@ -10,7 +10,7 @@ Tier STRONG. Brief `docs/briefs/wp3.11-brief.md` (FINAL; CHARC rulings `53d1d906
 | 0 (design table) | 143,868 | - | - | - | - | - | - | - | - | APPROVED as written (orchestrator round-0 rulings: P1, P2, choices 1-10) |
 | 1 (head 00b248b) | 316,506 (at the window yield; the R1 yield's figure is the dispatcher's) | 0 | 3 (F1, F2, F5) | 5 (F3, F4, F6, F7, F8) | 8 in / 0 out | 8 NEW / 0 REOPENED | 0 | F5 test-only, fixed out of band at 9c53134; F1-F4, F6 product; F7, F8 tool -- NOT yet fixed | WSL, gpt-5.6-sol high, 19 exec lines, all findings REASONED | NEW_CRITICAL_MAJOR_FOUND; adjudicated (F3, F4 downgraded to MINOR), next round needed |
 | R1 remediation (cell 2, head e327954) | 171,115 (dispatcher, at the remediation yield) | - | - | - | - | - | 0 | F1-F4, F6 product; F7, F8 tool; V3-1 test-only | - | remediated; step-aware re-run in a window |
-| 2 (head 7c8e6ed) | dispatcher's figure at this yield | 0 | 1 NEW (A1) + 1 REOPENED (A2, F1's "during" half; MINOR recommended) | 0 (A2 if downgraded) | 2 in / 0 out | 1 NEW / 1 REOPENED | 0 | none yet (both product) | WSL, gpt-5.6-sol high, 14 exec lines, both REASONED by the reviewer, both reproduced by the cell | NEW_CRITICAL_MAJOR_FOUND; adjudicated, next round needed |
+| 2 (head 7c8e6ed) | 202,325 | 0 | 1 NEW (A1) + 1 REOPENED (A2, F1's "during" half; MINOR recommended) | 0 (A2 if downgraded) | 2 in / 0 out | 1 NEW / 1 REOPENED | 0 | none yet (both product) | WSL, gpt-5.6-sol high, 14 exec lines, both REASONED by the reviewer, both reproduced by the cell | NEW_CRITICAL_MAJOR_FOUND; adjudicated, next round needed |
 
 ## Round 0 -- design table (no product code yet)
 
@@ -421,7 +421,9 @@ Y-1 text (DRAFT until the gate reconciles it with WP3.4's; do not change it unle
 instrument 217 passed (`work/t-r2.log`). Full pytest NOT yet run (needs a window).
 
 **Do next, in order.**
-1. Remediate R2, one commit per finding, each with a test shown failing on the unfixed code:
+1. Remediate R2 (dispatcher RULED both MAJOR; A2 in envelope by task 8), one commit per finding,
+   each with a test shown failing on the unfixed code. A1 DONE (see its commit; test
+   `test_a_reader_never_gets_old_records_under_the_new_schema`, unfixed: served/served). A2:
    - A1: in `AnalysisEngine._drive`, call `invalidate_from` BEFORE setting `schema_hash` on
      `_store` and `_measured`; test: plant a reader in `store.invalidate_from` (as
      `r2/probe_r2.py` A1 does) and assert it gets KeyError (on the unfixed code it is served the
