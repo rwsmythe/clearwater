@@ -434,8 +434,8 @@ class SettingsDialog(QDialog):
         """Fill the encoder list from the catalog and select ``selected``.
 
         Unavailable items are disabled with their reason; a stored encoder the sink does not
-        report is added as a disabled item; while the report is being read the control is
-        disabled.
+        report is added as a disabled item (its reason is the detection failure when the report
+        could not be read); while the report is being read the control is disabled.
         """
         combo = self.encoder_combo
         combo.blockSignals(True)
@@ -453,8 +453,13 @@ class SettingsDialog(QDialog):
             if self._catalog.detecting():
                 combo.addItem(selected, selected)
             else:
-                combo.addItem(f"{selected} (unavailable: {NOT_FOUND_REASON})", selected)
-                self._disable_item(combo.count() - 1, NOT_FOUND_REASON)
+                reason = NOT_FOUND_REASON
+                if self._catalog.failure() is not None:
+                    reason = ascii_text(
+                        f"encoders could not be detected: {self._catalog.failure()}"
+                    )
+                combo.addItem(f"{selected} (unavailable: {reason})", selected)
+                self._disable_item(combo.count() - 1, reason)
         self._select(combo, selected)
         combo.setEnabled(not self._catalog.detecting())
         combo.blockSignals(False)

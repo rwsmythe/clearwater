@@ -403,6 +403,21 @@ def test_a_failed_detection_leaves_only_automatic(env: Env) -> None:
     assert dialog.ten_bit_note.text() == NO_ENCODER_REASON
 
 
+def test_a_failed_detection_gives_a_stored_encoder_the_failure_as_its_reason(env: Env) -> None:
+    window = env.start(fail="ffmpeg is missing", saved=Settings(video_encoder="libx265"))
+    dialog = env.open(window)
+    rows = {d: (t, enabled, tip) for d, t, enabled, tip in items(dialog.encoder_combo)}
+    assert list(rows) == ["auto", "libx265"]
+    text, enabled, tip = rows["libx265"]
+    assert not enabled
+    assert "ffmpeg is missing" in tip
+    assert NOT_FOUND_REASON not in text
+    assert text == f"libx265 (unavailable: {tip})"
+    assert dialog.encoder_combo.currentData() == "libx265"
+    dialog.accept()
+    assert env.saved().video_encoder == "libx265"
+
+
 def test_a_stored_encoder_this_computer_does_not_report_is_kept(env: Env) -> None:
     window = env.start(saved=Settings(video_encoder="old_encoder"))
     dialog = env.open(window)
