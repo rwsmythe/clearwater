@@ -13,7 +13,8 @@ IF-8 progress after the seam call returns). Main thread only, except the job cal
 run ``ClipAnalysis.run``, ``proxy`` and ``statistics`` on worker threads. A parameter change
 never cancels a run (CHARC ruling on Q-A): it is offered to the run in flight with
 ``ClipAnalysis.retarget``; when that does not absorb it, the run finishes and a follow-up run
-with the latest parameters starts from its done callback. The GUI itself cancels only for the
+with the latest parameters starts from its done callback, always (the analysis may hold a job
+for the refused parameters, even if they were changed back to the run's own). The GUI itself cancels only for the
 user (D70), a method change and a source change.
 
 The position lane obeys ONE rule, "the latest intent". Every user event (press, value change,
@@ -109,6 +110,8 @@ class _Run:
     reason: Literal["user", "superseded"] | None = None
     done: int = 0
     total: int | None = None
+    kept: bool = False
+    """A ``retarget`` returned False: the analysis may hold a job for later parameters."""
 
 
 @dataclass(frozen=True)
@@ -397,7 +400,10 @@ class TimelinePanel(QWidget):
             self._fail(result.failure or "The analysis failed.")
             return
         now = self._current_target()
-        if now != run.target:  # AD-15: restart the dependent stages when the analysis completes
+        # AD-15: restart the dependent stages when the analysis completes. A kept job is run by
+        # ``run`` whatever the values are now: a burst that returned to the run's own values (A,
+        # B, A) still leaves the analysis holding the job of B, so it is never complete.
+        if run.kept or now != run.target:
             self._session.set_statistics(None)
             self._session.set_analysis(AnalysisState("running", 0, run.total, LABEL_UPDATING))
             self._start_run(LABEL_UPDATING)
@@ -450,6 +456,8 @@ class TimelinePanel(QWidget):
             self._statistics_stale()
             if self._retarget():
                 run.target = target
+            else:
+                run.kept = True  # from now on this run's done-ok never declares complete
             return
         if self._session.analysis().phase == "complete" and target != self._done_target:
             self._statistics_stale()

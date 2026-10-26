@@ -134,6 +134,11 @@ class ScriptedAnalysis:
     Run ``k`` waits for ``release(k)`` when ``k`` is in ``gated``; a run that is cancelled
     returns early (unless ``ignore_cancel``) and publishes nothing. A run that completes
     publishes the parameters it ends under: its own, or the ones ``retarget`` accepted.
+
+    With ``retains`` it models the WP3.11 adapter: a ``retarget`` after ``run`` has returned
+    (the window before ``on_done``) makes the engine hold a recompute job (``kept``) under the
+    new parameters and return False; ``statistics`` is None while a job is kept; the next
+    ``run`` runs it (clears ``kept``). ``returned`` is set when ``run`` has returned.
     """
 
     def __init__(
@@ -149,6 +154,7 @@ class ScriptedAnalysis:
         fail_runs: Sequence[int] = (),
         proxy_delay: float = 0.0,
         fail_proxy: Sequence[int] = (),
+        retains: bool = False,
     ) -> None:
         self.method_id = method_id
         self.ticks = tuple(ticks)
@@ -160,6 +166,10 @@ class ScriptedAnalysis:
         self.fail_runs = set(fail_runs)
         self.proxy_delay = proxy_delay
         self.fail_proxy = set(fail_proxy)
+        self.retains = retains
+        self.kept: Any = None
+        self.returned = threading.Event()
+        self.active = False
         self.lock = threading.Lock()
         self.gates: dict[int, threading.Event] = {}
         self.runs: list[tuple[Any, int | None]] = []
@@ -187,6 +197,17 @@ class ScriptedAnalysis:
             self.threads["run"].add(threading.current_thread())
             self.published = None
             self.target = parameters
+            self.kept = None  # the retained job (if any) is the one this run executes
+            self.active = True
+            self.returned.clear()
+        try:
+            self._run(index, progress)
+        finally:
+            with self.lock:
+                self.active = False
+            self.returned.set()
+
+    def _run(self, index: int, progress: Any) -> None:
         progress.report(1, len(self.ticks), "scripted")
         if index in self.gated:
             gate = self.gate(index)
@@ -207,6 +228,9 @@ class ScriptedAnalysis:
     def retarget(self, parameters: Any, *, focus_pts: int | None = None) -> bool:
         self.threads["retarget"].add(threading.current_thread())
         self.retargets.append(parameters)
+        if self.retains and not self.active:  # run has returned: the engine hands out a job
+            self.kept = parameters
+            return False
         if self.absorb:
             self.target = parameters
         return self.absorb
@@ -237,7 +261,7 @@ class ScriptedAnalysis:
         if gate is not None:
             self.statistics_waiting.set()
             gate.wait(5)
-        if published is None or pts_ticks not in self.ticks:
+        if published is None or self.kept is not None or pts_ticks not in self.ticks:
             return None
         level = float(published.parameters.get("level", 0.5))
         return {"only": {"mean": np.full(3, smooth(pts_ticks, level))}}
@@ -879,6 +903,47 @@ def test_a_change_during_the_run_that_is_absorbed_completes_once_under_the_new_v
     env.phase_is("complete")
     assert len(env.analysis.runs) == 1 and "cancelled" not in env.phases
     env.rendered_is(smooth(0, 0.8))
+
+
+@pytest.mark.parametrize(
+    "levels",
+    [(0.8, 0.5), (0.8,), (0.8, 0.3), (0.8, 0.5, 0.8, 0.5), (0.5, 0.8, 0.5)],
+    ids=["B-A", "B", "B-C", "B-A-B-A", "A-B-A"],
+)
+def test_a_burst_in_the_window_before_on_done_never_completes_under_a_kept_job(
+    make_env, levels: tuple[float, ...]
+) -> None:
+    """The run has returned, its ``on_done`` is queued; the engine keeps a job for each change.
+
+    The panel must not declare complete while the engine holds a job that changed what
+    ``statistics`` serves, even when the burst ends on the run's own values (A-B-A).
+    """
+    env = make_env(gated=(0,), retains=True)
+    env.open()
+    env.wait(lambda: len(env.analysis.runs) == 1)
+    analysis = env.analysis
+    analysis.release(0)
+    assert analysis.returned.wait(5)  # the worker returned; no event loop turn since: queued
+    for level in levels:
+        env.set_level(level)
+    assert analysis.kept is not None  # the engine holds the recompute job of the first change
+    env.phase_is("complete")
+    assert len(analysis.runs) == 2  # the follow-up ran the kept job under the latest values
+    assert analysis.runs[1][0].parameters["level"] == levels[-1]
+    assert analysis.kept is None
+    assert env.session.statistics() is not None
+    env.rendered_is(smooth(0, levels[-1]))
+
+
+def test_a_burst_that_the_run_in_flight_absorbs_needs_no_follow_up(make_env) -> None:
+    env = make_env(gated=(0,), absorb=True, retains=True)
+    env.open()
+    env.wait(lambda: len(env.analysis.runs) == 1)
+    env.set_level(0.8)  # the run is active: absorbed, nothing kept
+    env.set_level(0.5)
+    env.analysis.release(0)
+    env.phase_is("complete")
+    assert len(env.analysis.runs) == 1 and env.analysis.kept is None
 
 
 def test_after_completion_a_change_goes_provisional_then_smoothed_again(make_env) -> None:
