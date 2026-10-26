@@ -204,3 +204,34 @@ only; the burst window is covered by its own parametrised test.
   headless, foreground): 82 passed in about 16 s at `bd2d70b` (71 at `579321a`), repeated runs.
 - Full pytest: run by the orchestrator on the merge candidate (stacked gate).
 - No harness gate (no `scripts/`, `.claude/` or kernel doc changed). Footage folder not used.
+
+## Erratum at the gate (orchestrator, Reviewer B pass 2)
+
+Reviewer B pass 2 (the orchestrator's Codex pass on the merge candidate `d8f3859`; evidence
+`C:\Users\rwsmy\clearwater-review-evidence\wp3.18\reviewB2\`, `md5sums.txt` there) found no new critical or major
+finding; the pass-1 remedies hold. Its six minor and advisory items are disposed of here; no code changed.
+
+1. **The `run` row of the WP4.3 mapping is incomplete (corrected here).** With a kept job, WP3.11's engine is already
+   running under it, so the row's "Later" rule (`set_parameters` returns None, phase running -> return) would return
+   without running the kept job, and the panel would declare complete. The binding mapping: **a kept job takes
+   priority.** `run` first offers the latest parameters with `engine.set_parameters(eff, focus_pts)`, then executes
+   the kept job (`result = job(progress)`) and clears it; only when no job is kept does the "First call" / "Later"
+   rule apply. WP4.3 proves with a test against the real engine that the kept job ends under the latest parameters,
+   and if it does not, runs one more job; this is WP4.3's to build, and the GUI side needs no change.
+2. **Stub limit:** `StubClipAnalysis.statistics()` can return the previous run's statistics when a new `run` starts
+   between its read of the published store and its return (a reader/worker race). The panel's epoch guard keeps
+   such statistics from the preview after a parameter change, so the GUI effect is bounded; the stub honours "None
+   while no completed run" only up to this race. Banked as a limit (test stub only).
+3. **Oracle limit:** the seeded interleaving oracle does not reject a transient `set_position` of an intermediate
+   commit (A) while the slider is up and a later intent (B) is pending, when A's statistics match A; it checks the
+   final position. The product drops A (`_current()`); the claim that the oracle proves the invariant after every
+   ordering is narrowed to: it proves the final state and every statistics pairing.
+4. **DR-44 (a) row:** "only pts from `ClipAnalysis.pts()` are requested" holds for decode requests; statistics are
+   also requested for a decoded frame's own `FrameOutcome.pts`, which may lie outside `pts()` (then `statistics()`
+   returns None). The pairing claim is unchanged.
+5. **Factory row:** `AnalysisFactory` receives `(source, method, engines)` and no `Settings`; the backend selection
+   needs the live settings (`force_cpu`), so WP4.3's factory reads them through a closure or provider over the
+   session. No seam change.
+6. **Test count:** "71 tests" in "What was built" is the pre-remediation figure; the package now has 82 with
+   `tests/test_gui_deps.py`, and `tests/test_gui_analysis_service.py` carries no module-level `gui` mark (it creates
+   no Qt objects).
