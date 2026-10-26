@@ -155,6 +155,7 @@ class TimelinePanel(QWidget):
         self._lane: JobHandle | None = None
         self._wanted: _Request | None = None
         self._latest_commit = 0
+        self._latest_proxy = 0
         self._shown_proxy_seq = 0
         self._wanted_pts: int | None = None
         self._requested: int | None = None
@@ -517,6 +518,8 @@ class TimelinePanel(QWidget):
         if kind == "commit":
             self._latest_commit = self._seq
             self._wanted_pts = pts
+        elif kind == "proxy":
+            self._latest_proxy = self._seq
         self._wanted = _Request(self._seq, kind, pts, self._epoch, self._latest_commit)
         self._pump()
 
@@ -571,6 +574,8 @@ class TimelinePanel(QWidget):
 
     def _apply(self, request: _Request, fetched: StatsMap | None) -> None:
         """Supply a fetched statistics set with its frame, if the request is still current."""
+        if request.seq < self._latest_proxy:  # a drag started meanwhile: the release commits
+            return
         fresh = request.epoch == self._epoch
         statistics = fetched if fresh else None
         if request.kind == "commit":

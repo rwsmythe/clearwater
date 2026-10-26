@@ -819,6 +819,27 @@ def test_a_commit_in_flight_when_the_parameters_change_carries_no_stale_statisti
     env.phase_is("complete")
 
 
+def test_a_commit_in_flight_when_a_drag_starts_is_not_applied_before_the_release(
+    make_env,
+) -> None:
+    env = make_env(gated=(0,))
+    complete(env)
+    env.positions.clear()
+    env.shown.clear()
+    gate = threading.Event()
+    env.analysis.statistics_gate = gate
+    env.slider().setValue(2)  # not down: a commit; its lane job waits inside statistics(PTS[2])
+    env.wait(env.analysis.statistics_waiting.is_set)
+    drag_to(env, 3)  # the slider goes down and moves: a newer request, a proxy
+    gate.set()
+    last = np.full((12, 16, 3), PTS[3] % 251, np.uint8)
+    env.wait(lambda: bool(env.shown) and np.array_equal(env.shown[-1], last))
+    assert env.positions == []  # the older commit was dropped, the drag shows proxies only
+    release(env)
+    env.wait(lambda: any(p == PTS[3] for p, _ in env.positions))
+    assert [p for p, _ in env.positions] == [PTS[3]]
+
+
 def test_a_method_change_while_running_rebuilds_the_analysis_as_superseded(make_env) -> None:
     env = make_env(method_ids=("statm", "other"), gated=(0,))
     env.open()
