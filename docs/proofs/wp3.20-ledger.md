@@ -165,7 +165,7 @@ self-readable (`scripts/cell_depth.py` reads my transcript); dispatcher fills: _
 | Round | Critical | Major | Minor | In envelope | Out | NEW | REOPENED | Reverts | Fixes (product / test-only) | Transport | Depth | Adjudication |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
 | 0 | -- | -- | -- | -- | -- | -- | -- | -- | -- | -- | 101,295 (dispatcher) | read and table only |
-| 1 | 0 | 0 | 1 | 1 in / 0 out | -- | 1 NEW | 0 | 0 | none yet (cleanup pending: product + test) | codex-cli 0.162.1 via WSL, gpt-5.6-sol high, read-only; head `8f54e53` | (dispatcher) | `NO_NEW_CRITICAL_MAJOR`; converged |
+| 1 | 0 | 0 | 1 | 1 in / 0 out | -- | 1 NEW | 0 | 0 | none yet (cleanup pending: product + test) | codex-cli 0.162.1 via WSL, gpt-5.6-sol high, read-only; head `8f54e53` | 187,529 (dispatcher) | `NO_NEW_CRITICAL_MAJOR`; converged |
 
 ### Round 1 detail (Reviewer A, head `8f54e53`)
 
@@ -185,3 +185,11 @@ scenario.
 
 Gate status: zero NEW blocking findings, so Reviewer A has converged at round 1. Pending: the
 terminating cleanup for finding 1 (product and test), then the full pytest window.
+
+### Terminating cleanup (CHARC ruling: round 1 upheld, no round 2)
+
+Finding 1 fixed in `a6ae225`: with a failed capability read the stored encoder stays a disabled
+item (Q3) and its reason is the detection failure. New test
+`test_a_failed_detection_gives_a_stored_encoder_the_failure_as_its_reason` fails on `8f54e53`
+(shown) and passes after; 61 passed with `tests/test_gui_deps.py`; ruff, format and mypy green.
+Report `docs/reports/wp3.20-settings.md` written. Next: full pytest window.
