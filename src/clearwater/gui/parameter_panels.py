@@ -25,6 +25,7 @@ import dataclasses
 import math
 from collections.abc import Callable
 from contextlib import ExitStack
+from decimal import Decimal
 from functools import partial
 from typing import Literal
 
@@ -68,25 +69,47 @@ _INT_LIMIT = 2**31 - 1
 """The limit of a ``QSpinBox`` (and so of an int with no bound on one side)."""
 
 _MIN_DECIMALS = 2
-_MAX_DECIMALS = 6
+_MAX_DECIMALS = 15
 _NONE = object()
 """A value no parameter can have: ``_shown`` before the first :meth:`ParameterRow.show`."""
 
 
 def _digits(number: float | None) -> int:
-    """Return how many decimals (at most 6) ``number`` needs to be shown exactly."""
+    """Return how many decimals ``number`` needs to be shown exactly (its shortest repr)."""
     if number is None:
         return 0
-    text = f"{float(number):.{_MAX_DECIMALS}f}".rstrip("0")
-    return len(text.split(".")[1]) if "." in text else 0
+    exponent = Decimal(repr(float(number))).as_tuple().exponent
+    return max(0, -exponent) if isinstance(exponent, int) else 0
+
+
+def float_has_slider(parameter: Parameter) -> bool:
+    """Return whether a ``float`` parameter gets a slider next to its spin box.
+
+    Both bounds must be set, apart, and the span must be resolvable: 1000 slider steps must be
+    distinct values at no more than 15 decimals (the precision of a double near 1). A range
+    narrower than 1e-12 gets the spin box alone, at full precision.
+
+    Args:
+        parameter: A ``float`` parameter.
+
+    Returns:
+        True when a slider is shown.
+    """
+    lo, hi = parameter.minimum, parameter.maximum
+    if lo is None or hi is None or not hi > lo:
+        return False
+    return math.ceil(-math.log10((hi - lo) / SLIDER_STEPS)) <= _MAX_DECIMALS
 
 
 def float_decimals(parameter: Parameter) -> int:
     """Return the spin box decimals of a ``float`` parameter.
 
-    With both bounds: enough decimals that the slider's 1000 steps are distinct values, and enough
-    to show the default and both bounds exactly. With fewer bounds: enough for the default.
-    Always between 2 and 6 (3 and 6 when unbounded).
+    Qt rounds a ``QDoubleSpinBox``'s bounds and value to its decimals, so the decimals are the
+    largest of: those of the default and of both bounds in their shortest ``repr`` (so the default
+    and the bounds are shown exactly and the maximum is reachable), and, when the parameter has a
+    slider (:func:`float_has_slider`), those that make its 1000 steps distinct. At least 2 (3 when
+    a bound is missing) and at most 15; only a value that needs more than 15 decimals is rounded
+    (a committed number is clamped to ``[minimum, maximum]`` regardless).
 
     Args:
         parameter: A ``float`` parameter.
@@ -96,12 +119,12 @@ def float_decimals(parameter: Parameter) -> int:
     """
     default = parameter.default if isinstance(parameter.default, int | float) else None
     lo, hi = parameter.minimum, parameter.maximum
-    if lo is not None and hi is not None and hi > lo:
-        need = math.ceil(-math.log10((hi - lo) / SLIDER_STEPS))
-        decimals = max(need, _digits(default), _digits(lo), _digits(hi), _MIN_DECIMALS)
-    else:
-        decimals = max(3, _digits(default), _digits(lo), _digits(hi))
-    return min(decimals, _MAX_DECIMALS)
+    needed = max(_digits(default), _digits(lo), _digits(hi))
+    if float_has_slider(parameter):
+        assert lo is not None and hi is not None
+        needed = max(needed, math.ceil(-math.log10((hi - lo) / SLIDER_STEPS)))
+    floor = _MIN_DECIMALS if lo is not None and hi is not None else 3
+    return min(max(needed, floor), _MAX_DECIMALS)
 
 
 def float_step(parameter: Parameter, decimals: int) -> float:
@@ -119,7 +142,8 @@ def float_step(parameter: Parameter, decimals: int) -> float:
         The step.
     """
     lo, hi = parameter.minimum, parameter.maximum
-    if lo is not None and hi is not None and hi > lo:
+    if float_has_slider(parameter):
+        assert lo is not None and hi is not None
         step = 10.0 ** round(math.log10((hi - lo) / 100))
     elif isinstance(parameter.default, int | float) and parameter.default != 0:
         step = 10.0 ** (math.floor(math.log10(abs(parameter.default))) - 1)
@@ -224,7 +248,7 @@ class ParameterRow(QWidget):
         self.spin = spin
         layout.addWidget(spin)
         self._value_widgets.append(spin)
-        if lo is not None and hi is not None and hi > lo:
+        if float_has_slider(parameter):
             slider = QSlider(Qt.Orientation.Horizontal)
             slider.setRange(0, SLIDER_STEPS)
             slider.setSingleStep(1)
