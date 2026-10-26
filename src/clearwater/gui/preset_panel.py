@@ -236,8 +236,11 @@ class PresetPanel(QWidget):
         """Select the preset called ``name`` when it is listed and readable."""
         for index in range(self.list.count()):
             item = self.list.item(index)
-            if item.data(Qt.ItemDataRole.UserRole) == name and (
-                item.flags() & Qt.ItemFlag.ItemIsSelectable
+            stored = item.data(Qt.ItemDataRole.UserRole)
+            if (
+                isinstance(stored, str)
+                and _name_key(stored) == _name_key(name)
+                and item.flags() & Qt.ItemFlag.ItemIsSelectable
             ):
                 self.list.setCurrentItem(item)
                 return
@@ -265,6 +268,18 @@ class PresetPanel(QWidget):
         self._context.messages.clear("error", owner=OWNER_PRESETS)
         self._context.messages.clear("warning", owner=OWNER_PRESETS)
         self.status.setText(ascii_text(text))
+
+    def _finish(self, ok: bool, text: str, select: str | None = None) -> None:
+        """End an operation: on success clear this panel's messages first, then list again.
+
+        The order matters: a listing error that ``refresh`` presents must outlive the success
+        that precedes it. A success then selects the preset ``select`` names, if any.
+        """
+        if ok:
+            self._succeed(text)
+        self.refresh()
+        if ok and select is not None:
+            self.select(select)
 
     def _attempt(
         self, action: Callable[[], _T], what: str, path: Path | None = None
@@ -304,9 +319,7 @@ class PresetPanel(QWidget):
             self._session.set_parameters(parameter_set)
 
         ok, _ = self._attempt(action, f"Cannot load preset {name!r}")
-        self.refresh()
-        if ok:
-            self._succeed(f"Loaded {name!r}.")
+        self._finish(ok, f"Loaded {name!r}.")
 
     def save_as(self) -> None:
         """Save the session's parameters as a preset, asking before replacing one."""
@@ -334,10 +347,7 @@ class PresetPanel(QWidget):
             lambda: self._store.save(name, self._session.parameters(), overwrite=bool(replaces)),
             what,
         )
-        self.refresh()
-        if saved:
-            self.select(name)
-            self._succeed(f"Saved {name!r}.")
+        self._finish(saved, f"Saved {name!r}.", name)
 
     def rename(self) -> None:
         """Rename the selected preset."""
@@ -348,10 +358,7 @@ class PresetPanel(QWidget):
         if new is None or new == old:
             return
         ok, _ = self._attempt(lambda: self._store.rename(old, new), f"Cannot rename {old!r}")
-        self.refresh()
-        if ok:
-            self.select(new)
-            self._succeed(f"Renamed {old!r} to {new!r}.")
+        self._finish(ok, f"Renamed {old!r} to {new!r}.", new)
 
     def delete(self) -> None:
         """Delete the selected preset after the user confirmed."""
@@ -359,9 +366,7 @@ class PresetPanel(QWidget):
         if name is None or not self._dialogs.confirm(f"Delete preset {name!r}?"):
             return
         ok, _ = self._attempt(lambda: self._store.delete(name), f"Cannot delete {name!r}")
-        self.refresh()
-        if ok:
-            self._succeed(f"Deleted {name!r}.")
+        self._finish(ok, f"Deleted {name!r}.")
 
     def import_file(self) -> None:
         """Import a preset file, checked against the schemas of the available methods."""
@@ -377,14 +382,15 @@ class PresetPanel(QWidget):
             f"Cannot import {file_name(path)}",
             path,
         )
-        self.refresh()
         if not ok or result is None:
+            self.refresh()
             return
-        self.select(result.name)
-        if result.name == path.stem:
-            self._succeed(f"Imported {result.name!r}.")
-        else:
-            self._succeed(f"Imported as {result.name!r}.")
+        stored = result.name
+        self._finish(
+            True,
+            f"Imported {stored!r}." if stored == path.stem else f"Imported as {stored!r}.",
+            stored,
+        )
         if result.provenance_dropped:
             keys = ", ".join(result.dropped_keys)
             self._context.messages.present(
@@ -417,9 +423,7 @@ class PresetPanel(QWidget):
             f"Cannot export {name!r}",
             target,
         )
-        self.refresh()
-        if ok:
-            self._succeed(f"Exported {name!r} to {file_name(target)}.")
+        self._finish(ok, f"Exported {name!r} to {file_name(target)}.")
 
 
 def preset_panel(context: ShellContext, *, dialogs: PresetDialogs | None = None) -> QWidget:
