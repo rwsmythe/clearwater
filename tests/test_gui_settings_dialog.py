@@ -72,6 +72,8 @@ class RecordingCache(StubProxyCache):
         self.cleared: list[threading.Thread] = []
         self.limits: list[tuple[int, threading.Thread]] = []
         self.fail = fail
+        self.first_limit_entered = threading.Event()
+        self.release_first_limit: threading.Event | None = None  # set: the first call blocks on it
 
     def clear(self) -> None:
         self.cleared.append(threading.current_thread())
@@ -81,6 +83,9 @@ class RecordingCache(StubProxyCache):
 
     def set_limit_bytes(self, n: int) -> None:
         self.limits.append((n, threading.current_thread()))
+        if len(self.limits) == 1 and self.release_first_limit is not None:
+            self.first_limit_entered.set()
+            assert self.release_first_limit.wait(10)
         if self.fail:
             raise OSError("disk is busy")
         super().set_limit_bytes(n)
@@ -692,6 +697,30 @@ def test_a_huge_stored_limit_opens_clamped_and_is_written_back_unchanged(env: En
     assert env.cache.limits == []
     assert env.saved().cache_limit_bytes == huge
     assert window.session.settings().cache_limit_bytes == huge
+
+
+def test_the_last_accepted_limit_wins_whatever_order_the_jobs_run_in(env: Env) -> None:
+    window = env.start()
+    release = threading.Event()
+    env.cache.release_first_limit = release  # the first set_limit_bytes call is held back
+    try:
+        first = env.open(window)
+        first.cache_spin.setValue(5)
+        first.accept()
+        assert env.cache.first_limit_entered.wait(5)
+        second = env.open(window)
+        assert second.cache_spin.value() == 5
+        second.cache_spin.setValue(7)
+        second.accept()
+        env.qtbot.wait(100)  # the second job is queued behind the first
+        release.set()
+        env.idle(window)
+    finally:
+        release.set()
+    assert window.session.settings().cache_limit_bytes == 7 * 10**9
+    assert env.cache.limit_bytes() == 7 * 10**9
+    assert env.cache.limits[-1][0] == 7 * 10**9
+    assert not presenter_of(window).of("error")
 
 
 def test_a_limit_failure_is_a_settings_error(env: Env) -> None:

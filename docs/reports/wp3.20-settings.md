@@ -63,7 +63,7 @@ session only; <file> was left unchanged." and the refusal's own text.
 
 ## Claims and evidence
 
-Tests are in `tests/test_gui_settings_dialog.py` (43 test functions; parametrised ones collect to
+Tests are in `tests/test_gui_settings_dialog.py` (44 test functions; parametrised ones collect to
 more cases), headless, folders under `tmp_path`, injected choosers. The module carries the `gui`
 marker on every test through its `pytestmark`; one of them, `test_interim_rule_matches_the_wp310_rule`,
 calls the function directly and creates no Qt object. `tests/test_gui_deps.py` (4 tests, run
@@ -104,6 +104,23 @@ orchestrator on the merge candidate (stacked gate). Reviewer A (STRONG, `gpt-5.6
 0.162.1 over WSL): one round, no critical or major finding, one minor (a stored encoder after a
 failed detection carried the wrong reason), fixed in the terminating cleanup; ledger
 `docs/proofs/wp3.20-ledger.md`, evidence `C:\Users\rwsmy\clearwater-review-evidence\wp3.20\r1\`.
+
+## Reviewer B remediation (orchestrator's seat)
+
+- Pass 1 (major): Clear cache re-checks the analysis phase after the confirmation returns
+  (`d5808a9`); (minor) the shown cache GB is clamped in integer arithmetic (`d454b06`); report
+  wording (`34075f2`).
+- Pass 2 (major, predates the remediation): each accepted limit change ran an independent job with
+  the value it captured, so a delayed earlier job could leave the cache at the earlier limit while
+  the settings held the later one. `CacheLimiter` (one per installed dialog, shared by every
+  dialog, created by `install_settings_dialog`; `settings_dialog` takes it as the keyword
+  `cache_limiter`) records the newest accepted limit under a short value lock on the interface
+  thread, and each job applies the NEWEST recorded limit under a separate call lock on its worker
+  thread, so calls never overlap and the last accepted value wins in any job order; no Qt object or
+  `Session` is read from the worker. Test:
+  `test_the_last_accepted_limit_wins_whatever_order_the_jobs_run_in` (the first
+  `set_limit_bytes` is held back, a second dialog accepts 7 GB, the first is released; the cache
+  must end at 7 GB; it ends at 5 GB on `34075f2`).
 
 ## Limits
 

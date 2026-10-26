@@ -215,3 +215,16 @@ Results (20:21Z, 11.6 GB free, foreground, `QT_QPA_PLATFORM=offscreen`):
 - After, on head `34075f2`: `tests/test_gui_settings_dialog.py` plus `tests/test_gui_deps.py`:
   63 passed (59 module cases, 4 deps tests). ruff check, ruff format --check, mypy strict (118
   files) green.
+
+### Reviewer B pass 2 remediation (depth 218,410)
+
+MAJOR (predates the remediation): the cache-limit jobs were independent, so a delayed earlier
+job could leave the cache at the earlier limit. Fixed in `06f5937` (`CacheLimiter`: newest wanted
+limit under a value lock, calls serialised under a call lock); test
+`test_the_last_accepted_limit_wins_whatever_order_the_jobs_run_in` in the next commit.
+
+- Before: extracted `git archive 34075f2` with the new test file copied in: the test FAILS
+  (`assert 5000000000 == 7 * 10**9`, the cache ended at 5 GB).
+- After, on the head: `tests/test_gui_settings_dialog.py` plus `tests/test_gui_deps.py`: 64
+  passed, twice in a row (60 module cases, 4 deps tests); ruff check, ruff format --check, mypy
+  strict (118 files) green.
