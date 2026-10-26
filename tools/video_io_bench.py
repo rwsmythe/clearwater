@@ -30,8 +30,10 @@ run, read after every ``--strays-every`` frames and once more after ``close``. A
 so covers the frames between two readings (the last one, the rest of the stream and
 ``close``). A reading takes seconds (every process's counter is read), so the loop pauses for
 it: the pause is recorded and kept out of every frame figure and stage time. During a pause
-the decoder runs ahead, by at most what its pipe holds, so the frame right after each pause is
-recorded apart from the summaries, as the first frame is.
+the decoder keeps decoding until its output pipe and FFmpeg's own frame buffers are full, and
+the encoder works through what it holds, so the frames right after a pause can run faster:
+the first of them is recorded apart from the summaries, as the first frame is, and the raw
+lists show how far the effect reaches.
 
 Conditions (the strays over one second, then the same graphics-card reading, the CPU load over
 half a second and the CPU frequency) are recorded before and after each run. An NVENC run is
