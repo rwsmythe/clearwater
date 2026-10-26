@@ -194,6 +194,49 @@ def test_planted_record_that_clears_outputs_of_a_non_ok_result_is_detected(
     assert _record_not_ok_results(rig) == [(), ()]
 
 
+@pytest.mark.parametrize(
+    ("failure", "label"),
+    [("disk full", "FAILED"), (CANCELLED, "cancelled")],
+    ids=["failed", "cancelled"],
+)
+def test_the_report_lists_the_outputs_of_a_failed_or_cancelled_item(
+    rig: Rig, failure: str, label: str
+) -> None:
+    """Reviewer B pass 1 minor: the "reported" half of the outputs-kept claim."""
+    rig.stub.result = JobResult(False, (Path("x.png"), Path("y.png")), (), failure, "cpu", 0.0)
+    batch = started(rig, [A, C])
+    batch.start()
+    wait_batch_idle(rig)
+    lines = batch.report.toPlainText().splitlines()
+    at = lines.index(f"1. a.jpg - {label}")
+    assert lines[at + 1 : at + 3] == [f"   output: {Path('x.png')}", f"   output: {Path('y.png')}"]
+    assert batch.items()[0].outputs == (Path("x.png"), Path("y.png"))
+
+
+def test_planted_format_report_that_omits_outputs_of_a_non_ok_item_is_detected(
+    rig: Rig, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    original = batch_module.format_report
+
+    def omitting(items: list[BatchItem], *, cancelled: bool) -> str:
+        shown = [
+            i
+            if i.state in (ItemState.DONE, ItemState.DONE_WITH_WARNINGS)
+            else replace(i, outputs=())
+            for i in items
+        ]
+        return original(shown, cancelled=cancelled)
+
+    monkeypatch.setattr(batch_module, "format_report", omitting)
+    rig.stub.result = JobResult(False, (Path("x.png"),), (), "disk full", "cpu", 0.0)
+    batch = started(rig, [A])
+    batch.start()
+    wait_batch_idle(rig)
+    # The test above fails on this implementation: the item has its outputs, the report omits them.
+    assert batch.items()[0].outputs == (Path("x.png"),)
+    assert "output: " not in batch.report.toPlainText()
+
+
 def test_a_job_that_cannot_be_built_or_raises_fails_its_item_only(rig: Rig) -> None:
     batch = started(rig, [A, B, C], raise_on_build=(B.name,), raise_in_job=(C.name,))
     batch.start()
