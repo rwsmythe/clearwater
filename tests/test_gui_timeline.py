@@ -1039,6 +1039,26 @@ def test_analyse_after_a_cancel_and_a_method_change_builds_the_new_methods_analy
     env.phase_is("complete")
 
 
+def test_a_method_change_during_a_user_cancel_stays_cancelled_and_analyse_rebuilds(
+    make_env,
+) -> None:
+    env = make_env(method_ids=("statm", "other"), gated=(0,), ignore_cancel=True)
+    env.open()
+    env.wait(lambda: env.session.analysis().done == 1)
+    env.button("timeline.cancel").click()  # D70: the user's cancel, still being delivered
+    env.session.set_parameters(new_parameter_set("other", {}))
+    env.qtbot.wait(50)
+    assert len(env.built) == 1  # not superseded: the analysis is not restarted
+    env.analysis.release(0)
+    env.phase_is("cancelled")
+    assert len(env.built) == 1 and env.session.statistics() is None
+    env.button("timeline.analyse").click()  # the next Analyse rebuilds for the new method
+    env.wait(lambda: len(env.built) == 2 and len(env.built[1].runs) == 1)
+    assert env.built[1].method_id == "other"
+    env.built[1].release(0)
+    env.phase_is("complete")
+
+
 # Stale work, close.
 
 
