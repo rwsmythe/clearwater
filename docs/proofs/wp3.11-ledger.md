@@ -490,3 +490,19 @@ returned and the helper hash equals the engine's. Report: the schema_hash senten
 line (ints beyond 2**53 compare and hash as their nearest float). Gates: ruff, format, mypy
 strict green; the eight analysis files 228 passed (`analysis-tests-2.txt`, before a
 whitespace-only `ruff format` of one engine line; the three affected files re-run, 60 passed).
+
+## Reviewer B pass 2 remediation (seat 3, 2026-10-26, from `9b4e969`)
+
+Review `C:\Users\rwsmy\clearwater-review-evidence\wp3.11\reviewB2\review-B.txt`, adjudicated at
+the gate by the orchestrator (FINAL). Evidence under `work/wp3.11/reviewB-remediation/`, method
+as for pass 1 (`git archive` of the base into scratch, new tests copied in; plants for test gaps).
+
+| Item | Ruling | Commit | Test | Failing first |
+|---|---|---|---|---|
+| #1 | MAJOR (executed by B): `0.0` -> `-0.0` no change for `same_value`, but the hash differed | ef6c24d (`_canonical` adds `0.0` to every float; docstrings, report sentence) | `test_schema_hash_canonicalises_numbers_but_not_bools` (signed-zero asserts, `same_value(0.0, -0.0)`), `test_a_signed_zero_is_no_change_and_keeps_the_helper_hash` | `b2p1-failing-first.txt` on 9b4e969: both failed (f619570f... vs 2adc70a8...) |
+| #4 | MINOR, test gap | 1cb64c2 | `test_the_phase_is_running_inside_every_smoothing_call` (a `smooth_at` wrapper over a first job and a recompute) | plant `b2p4-plant.diff` (complete after the last stage's measurement, before its smoothing): old phase tests passed (`b2p4-plant-old-tests.txt`), the new one failed (`b2p4-plant-new-test.txt`) |
+| #2 | MINOR, accepted as a limit | aea94d5 (report: the decode-pass cancel sentences made precise; limit line) | - | - |
+| #3 | MINOR, accepted as a limit | c527ca5 (report: the cancel row; limit line) | - | - |
+
+Gates at c527ca5: ruff check, ruff format --check (189 files), mypy strict (113 files) green; the
+eight analysis test files 230 passed (`analysis-tests-3.txt`). No full pytest.
