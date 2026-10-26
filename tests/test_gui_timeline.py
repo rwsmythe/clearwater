@@ -945,6 +945,25 @@ def test_a_method_change_after_completion_analyses_again(make_env) -> None:
     env.phase_is("complete")
 
 
+def test_analyse_after_a_cancel_and_a_method_change_builds_the_new_methods_analysis(
+    make_env,
+) -> None:
+    env = make_env(method_ids=("statm", "other"), gated=(0,))
+    env.open()
+    env.wait(lambda: env.session.analysis().done == 1)
+    env.button("timeline.cancel").click()
+    env.phase_is("cancelled")
+    env.session.set_parameters(new_parameter_set("other", {}))  # nothing runs: cancelled
+    env.qtbot.wait(50)
+    assert len(env.built) == 1 and env.session.analysis().phase == "cancelled"
+    env.button("timeline.analyse").click()  # the lazy rebuild: a new analysis for the new method
+    env.wait(lambda: len(env.built) == 2)
+    env.wait(lambda: len(env.built[1].runs) == 1)
+    assert env.built[1].method_id == "other"
+    env.built[1].release(0)
+    env.phase_is("complete")
+
+
 # Stale work, close.
 
 
