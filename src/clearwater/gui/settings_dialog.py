@@ -510,10 +510,13 @@ class SettingsDialog(QDialog):
     def _update_ten_bit(self) -> None:
         """Enable the 10-bit option or disable it with the reason (D76); keep its value."""
         name = str(self.encoder_combo.currentData())
-        capability = self._selected_capability()
         if self._catalog.detecting():
-            reason = DETECTING_TEXT
-        elif capability is None:
+            self.ten_bit_check.setEnabled(False)
+            self.ten_bit_check.setToolTip(DETECTING_TEXT)
+            self.ten_bit_note.setText(DETECTING_TEXT)
+            return
+        capability = self._selected_capability()
+        if capability is None:
             reason = NO_ENCODER_REASON if name == AUTO else f"{name} cannot write 10-bit video."
         elif not capability.available or 10 not in capability.bit_depths:
             reason = f"{capability.name} cannot write 10-bit video."

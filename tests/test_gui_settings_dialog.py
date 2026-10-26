@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QDialog
 
 from clearwater.config import load_settings, save_settings
@@ -181,7 +182,12 @@ def items(combo: Any) -> list[tuple[Any, str, bool, str]]:
     """(data, text, enabled, tool tip) of every item of a combo."""
     model = combo.model()
     return [
-        (combo.itemData(i), combo.itemText(i), model.item(i).isEnabled(), combo.itemToolTip(i))
+        (
+            combo.itemData(i),
+            combo.itemText(i),
+            model.item(i).isEnabled(),
+            combo.itemData(i, Qt.ItemDataRole.ToolTipRole) or "",
+        )
         for i in range(combo.count())
     ]
 
