@@ -111,6 +111,17 @@ def test_gpu_reading_without_nvidia_smi(monkeypatch: pytest.MonkeyPatch) -> None
     assert bench.gpu_reading() == {"unavailable": "nvidia-smi did not run: FileNotFoundError"}
 
 
+def test_conditions_strays_window_is_the_one_second(monkeypatch: pytest.MonkeyPatch) -> None:
+    def slow_reading() -> dict[str, str]:
+        time.sleep(2.0)
+        return {"unavailable": "planted slow nvidia-smi"}
+
+    monkeypatch.setattr(bench, "gpu_reading", slow_reading)
+    record = bench.conditions("before")
+    assert record["moment"] == "before" and record["gpu"]["unavailable"]
+    assert 1.0 <= record["strays"]["seconds"] < 1.5  # not the GPU or CPU readings (round 5 #4)
+
+
 def test_tree_rss_counts_children_and_leaves_out_the_excluded() -> None:
     child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"])
     try:

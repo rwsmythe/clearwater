@@ -14,21 +14,21 @@ microseconds). The first frame's interval also holds the decoder's start and FFm
 on both sides; it is kept apart from the summaries.
 
 Plan 4.3 / frame rule 7: an EXCLUSIVE run, best effort on a shared laptop. A telemetry thread
-records, on its own clock and without stopping the frame loop:
+and a watcher process record, without stopping the frame loop:
 
 - the resident memory of the process tree (this Python process and its FFmpeg children; the
   ``nvidia-smi`` processes the instrument itself starts are listed apart and not counted),
   every ``--memory-every`` seconds, with the peak and its members (N4);
 - the graphics card (clocks, temperature, utilisation, device-wide memory in use, power and
   the active clock-event reasons) every ``--gpu-every`` seconds, with the memory peak;
-- the processes that used more than a quarter of one logical CPU over each
-  ``--strays-every`` window, each marked as the run's own or a stray.
+- in the watcher process (:class:`StrayWatch`), the processes that used more than a quarter of
+  one logical CPU over each ``--strays-every`` window, each marked as the run's own or a stray.
 
-Conditions (the same graphics-card reading, the CPU load and frequency, the strays over one
-second) are recorded before and after each run. An NVENC run is also tied to the encode
-window, the GPU UUID and the FFmpeg PID by ``tools/video_fidelity.py``'s ``nvidia-smi pmon``
-sampler (DR-18 (1)). The machine's other load is recorded, never prevented: a contaminated row
-is kept as spread.
+Conditions (the strays over one second, then the same graphics-card reading, the CPU load over
+half a second and the CPU frequency) are recorded before and after each run. An NVENC run is
+also tied to the encode window, the GPU UUID and the FFmpeg PID by
+``tools/video_fidelity.py``'s ``nvidia-smi pmon`` sampler (DR-18 (1)). The machine's other
+load is recorded, never prevented: a contaminated row is kept as spread.
 
 The footage is reached only through ``local_config.find_footage_file`` and only read. Each
 output is written under the working folder (``wp3.10/bench``), to a new file that must not
@@ -336,7 +336,9 @@ def stray_loop(connection: Pipe, every: float, root: int) -> None:
 
 
 def conditions(moment: str) -> dict[str, Any]:
-    """Record the machine's conditions at ``moment``: graphics card, CPU, strays over 1 s.
+    """Record the machine's conditions at ``moment``: strays over 1 s, graphics card, CPU.
+
+    The strays window is read right after its one second, before the slower readings.
 
     Args:
         moment: A label such as ``"before"``.
@@ -346,6 +348,7 @@ def conditions(moment: str) -> dict[str, Any]:
     """
     watch = StrayWatch()
     time.sleep(1.0)
+    strays = watch.window()
     frequency = psutil.cpu_freq()
     return {
         "moment": moment,
@@ -353,7 +356,7 @@ def conditions(moment: str) -> dict[str, Any]:
         "gpu": gpu_reading(),
         "cpu_total_percent": psutil.cpu_percent(interval=0.5),
         "cpu_mhz": round(frequency.current) if frequency is not None else None,
-        "strays": watch.window(),
+        "strays": strays,
     }
 
 
