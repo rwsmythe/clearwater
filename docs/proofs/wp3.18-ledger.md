@@ -9,7 +9,7 @@ Cell: `implementer-sonnet-high`, seat 1, worktree `.worktrees/wp3.18`, branch `w
 | Round | Depth (dispatcher) | Critical | Major | Minor | In / out of envelope | NEW / REOPENED | Reverts | Fixes: product / test-only | Transport, CLI | Verdict |
 |---|---|---|---|---|---|---|---|---|---|---|
 | 0 (design table) | 177,692 (dispatcher, at the round-0 yield) | - | - | - | - | - | - | - | - | APPROVED; Q-A RULED (C) by CHARC `bdbd8323ceace897` (AD-7 amended `8c67a6d`); Q-B, Q-D, Q-E accepted |
-| 1 (head e51d40f) | (dispatcher fills) | 0 | 6 reported; adjudicated 3 MAJOR (F1, F2, F4), F3 rejected (reading), F5 and F6 downgraded MINOR | 3 reported (F7, F8, F9) + F5, F6 = 5 MINOR | 9 in / 0 out | 9 NEW / 0 REOPENED | 0 | pending: F1, F2, F4, F6, F9 product; F7, F8 test-only; F5 documented | WSL, gpt-5.6-sol high, codex-cli 0.162.1, 8 exec lines, all REASONED; evidence clearwater-review-evidence/wp3.18/r1/ | NEW_CRITICAL_MAJOR_FOUND; remediation next turn |
+| 1 (head e51d40f) | 342,258 (dispatcher, at the round-1 yield) | 0 | 6 reported; adjudicated 3 MAJOR (F1, F2, F4), F3 rejected (reading), F5 and F6 downgraded MINOR | 3 reported (F7, F8, F9) + F5, F6 = 5 MINOR | 9 in / 0 out | 9 NEW / 0 REOPENED | 0 | pending: F1, F2, F4, F6, F9 product; F7, F8 test-only; F5 documented | WSL, gpt-5.6-sol high, codex-cli 0.162.1, 8 exec lines, all REASONED; evidence clearwater-review-evidence/wp3.18/r1/ | NEW_CRITICAL_MAJOR_FOUND; remediation next turn |
 
 ## Round 0 -- design table (no product code yet)
 
@@ -190,3 +190,136 @@ lane's bounded concurrency (one job in flight, latest wanted kept).
 `tests/test_gui_timeline.py`, `tests/test_gui_analysis_service.py`,
 `docs/reports/wp3.18-timeline-analysis.md`, this ledger. `src/clearwater/gui/__init__.py` is not
 edited (ruling Q1); consumers import by module path.
+
+## RESUME HERE (for seat 2)
+
+State at the seat-1 stop (depth 342,258): branch `wp3.18`, worktree `.worktrees/wp3.18`, base
+`718324b`. Product head reviewed in round 1: `e51d40f` (later commits are ledger-only). Round 1
+verdict NEW_CRITICAL_MAJOR_FOUND, adjudication UPHELD in full by the orchestrator. NO remediation
+has been made. Gates at `e51d40f`: ruff check, ruff format --check, mypy green; targeted tests
+53 passed (`tests/test_gui_timeline.py`, `tests/test_gui_analysis_service.py`,
+`tests/test_gui_deps.py`). Full pytest NOT yet run (only in a window the orchestrator grants).
+
+### Rulings that bind
+
+- Round 0: seam APPROVED. Q-A RULED (C) by CHARC `bdbd8323ceace897` (AD-7 amended `8c67a6d`):
+  `ClipAnalysis.retarget(parameters, *, focus_pts=None) -> bool`. (1) main thread, cheap, never
+  waits; called only while a run is in flight, meaning from the panel's `jobs.run` until that job's
+  `on_done`; the panel raises `RuntimeError` otherwise; an implementation returns False between
+  its `run` returning and the `on_done`, never raises. (2) True: the run in flight finishes under
+  the new parameters, its done-ok means complete under them; the epoch guard still drops any
+  statistics fetched before the change. (3) False: not absorbed; at done-ok `run(latest)` starts
+  if (method id, effective values) differ. NO run is cancelled for a parameter change; the only
+  cancels are the user's (D70, phase "cancelled"), a method change (Q-B, "superseded") and a
+  source change or close. (4) the stub returns False by default (`StubClipAnalysis(absorb=True)`
+  absorbs); both paths tested. (5) WP4.3 adapter: `engine.set_parameters(values, focus_pts)`
+  returning None while running means True; if it RETURNS a job, the adapter keeps it, returns
+  False and runs it at the next `run()`, never dropping it and never on the main thread. Q-B
+  (method change under an open clip: new analysis, old run "superseded"), Q-D (initial total
+  `nb_frames` or None), Q-E (completion switch via `set_position`, extra decode recorded as a
+  limit) and the (method id, effective values) comparison with the epoch guard are ACCEPTED.
+  F-2 (`DiskProxyCache.lookup` on the main thread via `pts()`) goes to WP4.3's V7 re-measure; the
+  adapter keeping its own pts list is the expected fix: put it in the consumer notes.
+- Build ruling: the panel's own job callable checks the IF-8 `progress.cancelled()` AFTER the seam
+  call and returns `JobResult(ok=False, failure="cancelled")` (analysis run and lane jobs); there
+  is NO window event filter. `QtProgress.cancelled()` stays True after the job returns (checked).
+  A cancel that lands after the analysis really finished reads as cancelled (limit, DR-47's
+  shape). A test calls `window.jobs.cancel()` mid-run.
+
+### Round-1 findings and the exact fix for each (evidence: `adjudication.md` in `r1`)
+
+- F1 MAJOR: `timeline.py` `_apply` (commit and fix) applies a result while a newer request exists.
+  Fix: keep `self._latest_request` (seq of the newest request of ANY kind); in `_apply`, drop a
+  commit or a fix that is older than a newer PROXY request (a drag started); the release commit
+  follows. Test: a commit job blocked in `statistics` (use `statistics_gate`), the slider goes
+  down and moves, the gate opens: `set_position` is not called until release.
+- F2 MAJOR: `_shown_statistics` survives a parameter or method change. Fix: set it to None
+  wherever `self._epoch += 1` is done for a parameter/method change (in `_on_parameters`,
+  `_on_method_changed`, the failure and cancel branches of `_on_done`), so a failed decode then
+  re-supplies None. Test: a decode of a position pending (FlakySource), parameters change, the
+  decode fails: `session.statistics()` is None (not the old mapping).
+- F3 REJECTED (reading): from none/cancelled/failed the panel rebuilds lazily at Analyse
+  (`start_analysis` compares `_analysis_method` with `session.method().id`). ADD the test: cancel,
+  change the method, click Analyse -> a new analysis for the new method is built and runs.
+- F4 MAJOR: an exception from `run` after a runner cancel reads as "failed". Fix: in the job
+  callable (analysis run and lane job) wrap the seam call in `try/except Exception`: if
+  `progress.cancelled()` return the cancel marker `JobResult`, else re-raise. Test: a scripted
+  analysis that raises after `jobs.cancel()`: phase "cancelled", no "failed", no banner.
+- F5 MINOR: lane jobs of an old source can overlap new-source lane jobs (a source change clears
+  `_lane`). Fix: document in the `_on_source` comment and the report that the one-job rule is per
+  `ClipAnalysis` (the old job runs on the old object and its result is dropped by generation).
+- F6 MINOR: `StubClipAnalysis._cache_key` holds `_lock` across `os.stat`, so main-thread `pts` /
+  `retarget` (which take the lock) can wait. Fix: stat outside the lock, then store under it.
+- F7 MINOR test-only: `scenario_run_thread` must assert the run thread BEFORE waiting for
+  completion, so `InlineRunPanel` fails on the main-thread assertion.
+- F8 MINOR test-only: `scenario_decode_failure` must assert the restored statistics BEFORE the
+  slider rollback, so `KeepRequestedStatisticsPanel` fails on the statistics.
+- F9 MINOR: `analysis_service.py` module docstring first sentence says everything except the
+  factory runs on workers; `pts` and `retarget` are main-thread (see its threading rules). Fix the
+  sentence.
+
+Also update the review prompt: the "binding" paragraph overstated Q-B ("every method change");
+say: a method change while running or complete builds a new analysis (superseded); from
+none/cancelled/failed, Analyse rebuilds.
+
+### Commands and timing
+
+Enter the worktree in a SUBSHELL only. Targeted run (headless, foreground, fresh basetemp, parent
+created first, at least 5 GB free first, only in a slot the orchestrator grants):
+`QT_QPA_PLATFORM=offscreen uv run pytest tests/test_gui_timeline.py tests/test_gui_analysis_service.py tests/test_gui_deps.py --basetemp=work/<fresh> -q -p no:cacheprovider > work/<name>.log 2>&1`
+(about 13 s for 53 tests; add the new tests). Static: `uv run ruff check .`,
+`uv run ruff format --check .`, `uv run mypy`. LF check per committed file:
+`git cat-file -p HEAD:<f> | tr -cd '\r' | wc -c` must print 0 (do NOT trust `grep -c`). Normalise
+working copies with `sed -i 's/\r$//'` before committing; commit with
+`git -c core.autocrlf=false commit ... -- <paths>` after `git add` for new files. Write long
+text through the Write tool and a small Python merge script: a bash heredoc holding apostrophes
+or triple quotes fails to parse in this shell.
+
+### V7 figures (informational, 3 runs at `e51d40f`)
+
+Observed maximum main-thread gap during a ~2 s CPU-heavy stub analysis and a drag: 14, 23, 39 ms
+(the bound is 100 ms; the bound is asserted, the figure is not).
+
+### Mutations (each reverted; each made its named test fail)
+
+M1 epoch check removed (`fresh = True`): the stale-statistics commit test. M2 job callable without
+the cancel check: the third-party-cancel tests. M3 follow-up skipped: the not-absorbed test. M4
+`retarget` not called: both retarget tests. M5 no `set_statistics(None)` on a pts mismatch: the
+mismatch test. M6 no fix request on a mismatch: the mismatch test. M7 lane unbounded: the
+latest-wins test. M9 no switch commit: the V18 test. M8 (dropping the decode-failure restore) did
+NOT apply (the replacement text did not match); that property is covered by the planted-panel test
+`test_planted_requested_statistics_kept_after_a_failed_decode_fails` and the scenario test only:
+re-run M8 against the fixed code (the failure branch of `_on_frame_decoded` without
+`set_statistics(self._shown_statistics)`).
+
+### Reviewer A (runner and round 2)
+
+Evidence root `C:\Users\rwsmy\clearwater-review-evidence\wp3.18\`; round 1 is in `r1\`
+(`run_review.sh`, `review-prompt.md`, `review-diff.txt`, `review.txt`, `review.stderr.txt`,
+`probe.*`, `test-summary.txt`, `adjudication.md`, `md5sums.txt`). For `r2\`: copy `r1\run_review.sh`
+(paths say `r1`: edit to `r2`), write `review-prompt.md` (round-2 header, the F1-F9 list above to
+VERIFY, the fixes to check for new defects), `review-diff.txt` = `git diff -U8 718324b HEAD --
+src tests ':!uv.lock' ':!docs/proofs'` (cumulative, so it holds every fix) and `test-summary.txt`.
+Probe first: `wsl.exe bash -ilc 'bash /mnt/c/Users/rwsmy/clearwater-review-evidence/wp3.18/r2/run_review.sh probe'`
+(needs `succeeded in` in `probe.stderr.txt` and READY in `probe.txt`). Then run the review as a
+background Bash call (`run_in_background: true`, with a `timeout 3000` on the wsl command) and wait
+with a loop on `review.done`; `setsid nohup ... &` silently fails from git bash and wasted 19
+minutes. The review takes about 4 minutes. Mechanical assertions: model `gpt-5.6-sol` and effort
+high in the stderr banner, the `tokens used` footer, the `^VERDICT` line, at least one
+`succeeded in`, no transport `ERROR`. Round-2 scope: the diff from `e51d40f` to the remediation
+head, plus VERIFY F1-F9.
+
+### What remains
+
+1. The remediation above (one commit per logical change, conventional, `Co-Authored-By` footer),
+   targeted tests green, red-before-green shown for F1, F2, F4, the lazy-rebuild test and F6 (run
+   each new test on the unfixed code first).
+2. Reviewer A round 2 (and more to convergence; five-round gate at round 5); at each verdict END
+   THE TURN with the ledger row before remediating.
+3. On convergence: `WINDOW REQUEST: full pytest` (one window, the final head).
+4. The report `docs/reports/wp3.18-timeline-analysis.md` (claims, evidence, limits, "Seam for
+   WP4.3" with the retarget rule and the pts-list note, DR-44 (a)/(b) dispositions, DR-23, AD-15,
+   limits: extra decode at the switch, a cancel after the finished analysis reads cancelled,
+   `JobRunner.cancel()` by anyone is a cancel, one-job rule per analysis, `focus_pts` ignored by
+   the stub) and the structured return report (under about 70 lines, recipe section 4), delivered
+   with SendMessage to the orchestrator.
