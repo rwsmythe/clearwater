@@ -183,6 +183,19 @@ def test_complete_only_after_the_background_part() -> None:
     assert engine.state().phase == "complete"
 
 
+def test_the_initial_analysis_stays_running_through_the_staged_part() -> None:
+    """B4, AD-15: a first analysis is ``running`` at every callback, ``complete`` only after."""
+    frames = synthetic_frames(60)
+    engine, _, _ = make_engine(GrayWorld(), frames)
+    seen: list[tuple[str, str]] = []
+    job = engine.analysis_job()
+    assert job(Hook(lambda message: seen.append((engine.state().phase, message)))).ok
+    assert {phase for phase, _ in seen} == {"running"}
+    assert any(message == "decoding" for _, message in seen)
+    assert any(message.startswith("stage fusion") for _, message in seen)  # the staged part
+    assert engine.state().phase == "complete"
+
+
 def test_a_change_during_a_running_job_is_absorbed() -> None:
     """Choice 5: the running job takes the change; the result is a fresh analysis's."""
     frames = synthetic_frames(90)
