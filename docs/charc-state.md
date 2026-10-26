@@ -52,13 +52,26 @@ of `origin/main`, unpushed; no push asked (verify `git status -sb`).
   rows DR-23 CLOSED (product), DR-25 (1)(2)(4)-(7) CLOSED (3) open, DR-45 note (this commit). **Main's full pytest
   is OWED and is CHARC's run**: the orchestrator's stack-top f1c1bd8 CuPy 4200 passed / 2 skipped / 1935 s stands
   for the candidate (code identical to 47235b6); its no-CuPy leg was reaped at ~5 % (not a result; the brief needs
-  none); CHARC's full pytest on main 47235b6 RUNNING in the background (`work/charc-qa/wp311-pytest.log`), its figure
-  becomes main's figure of record and goes here. **Tranche A: WP3.9, WP3.4, WP3.11 accepted; WP3.10 remains** (seat 6
+  none); CHARC's full pytest on main 47235b6 was STOPPED at ~93 % by Claude Code's low-memory reaper (no failure
+  seen, one skip; NOT a result; not restarted on CHARC's own initiative, the owner may ask). **RULED: main's figure
+  of record is the f1c1bd8 run by code identity** (0 lines differ in src/tests/tools/pyproject/uv.lock, verified
+  here); hold lifted, orchestrator's window queue proceeds one suite at a time. **Tranche A: WP3.9, WP3.4, WP3.11 accepted; WP3.10 remains** (seat 6
   stood down at d389269, RESUME HERE complete; seat 7: full-pytest window, footage legs, EXCLUSIVE floor row, report).
 - **Orchestrator gen 11 ONLINE** `clearwater-orchestrator-20261026-0844` (launched 2026-10-26 18:44Z; state 02ac918;
   sole drainer; **cue THIS name**). Gen 10 rolled at ~395K at the WP3.11 accept boundary and stopped draining.
   Gen 11's first acts: WP3.10 seat 7 and tranche B dispatch (WP3.17-3.20), one heavy job at a time. No live cells
   at rollover.
+- **Tranche B seam rulings 2026-10-26 (gen 11 dispatched WP3.17-3.20 and WP3.10 seat 7 from main 718324b):**
+  WP3.19 C1 GRANTED: the export seam (`ExportRequest`, `ExportJobs`, `CANCELLED`, `unavailable_exports`) lives in
+  the new PySide-free `src/clearwater/jobs/export_seam.py` (owned by WP3.19), `gui/export_service.py` re-exports and
+  keeps `ActivityGate`; `jobs/__init__.py` not edited; architecture note 42f8d70; seam approved as committed d286b8d
+  with three docstring notes. WP3.18 Q-A RULED (C): additive `ClipAnalysis.retarget(parameters, *, focus_pts=None)
+  -> bool` mapping to `AnalysisEngine.set_parameters` absorb (None while running = True), (B) finish-then-rerun as
+  the False fallback, (A) cancel-and-restart withdrawn; AD-7 amended 8c67a6d; seam approved as committed 9f7c981;
+  the retarget race (set_parameters returns a job) handled by the adapter keeping it for the next run. The
+  orchestrator's own rulings (WP3.19 C2-C7; WP3.18 Q-B/D/E; WP3.20 capability job at first dialog open; WP3.17
+  `normalisation_low < high` as a limit with an AD-20 consumer note) stand. Window queue agreed: (1) WP3.10 seat 7
+  full pytest, (2) WP3.10 footage legs, (3) tranche B suites one at a time, (4) WP3.10 EXCLUSIVE floor row last.
 - **Rulings this generation (all recorded durably):** WP3.10 round-0 Q-C upheld, AD-22 extended (absent
   edit list = identity presentation; 09ac181); Q-A/B/D no objection with build notes (1-byte sentinel
   invariant; nothing NUT/setts leaks into IF-5; unreadable-tail warning in SinkReport; 16 KiB provenance
