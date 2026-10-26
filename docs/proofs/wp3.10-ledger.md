@@ -16,7 +16,8 @@ Evidence root: `C:\Users\rwsmy\clearwater-review-evidence\wp3.10\` (`r0\` = this
 | 4 | Reviewer A (seat 4) on `2f9c240`, base `ac4be92` | 0 | 2 (reviewer) -> 0 adjudicated | 2 -> 4 adjudicated | all in envelope; MAJOR #1, #2 ACCEPTED and adjudicated MINOR (reproduction + reason; dispatcher UPHELD both: ZERO new blocking, the loop TERMINATES); MINOR #3, #4 ACCEPTED (cleanup) | 4 NEW, 0 REOPENED | 0 | PRODUCT and instrument, as the terminating round's cleanup (`4dfa96e`) | WSL, codex-cli 0.162.1 gpt-5.6-sol high; 15 `succeeded in`; 190,700 tokens; 2 `ERROR` matches = echoed source code, not transport | 248,871 at the round-4 yield; 279,801 after the round-4 cleanup |
 | 5 | Reviewer A (seat 5) on `dabb204`, base `be7fe51` (SCOPED to the floor-row instrument `tools/video_io_bench.py` + its tests) | 0 | 3 (reviewer) -> 1 adjudicated | 7 -> 9 adjudicated | MAJOR #2 in (ACCEPTED, blocking); MAJOR #1, #3 in, adjudicated MINOR (reproduction / reason); MINOR #4-#9 in (ACCEPTED, cleanup); MINOR #10 OUT (reviewer-tagged; BANKED) | 10 NEW, 0 REOPENED | 0 | INSTRUMENT code and tests (`deb1765`..`fa5d939`; #7 test-only); gate: CONTINUE APPROVED | WSL, codex-cli 0.162.1 gpt-5.6-sol high; probe 1 + review 29 `succeeded in`; 98,860 tokens; 6 `ERROR` matches = echoed source code, not transport | 211,706 at the round-5 yield |
 | 6 | Reviewer A (seat 5) on `fa5d939`, base `dabb204` (SCOPED to the round-5 remediation of the instrument) | 0 | 2 | 1 | all in envelope; MAJOR #1, #2 ACCEPTED (blocking, both reproduced); MINOR #3 ACCEPTED (cleanup) | 3 NEW, 0 REOPENED (#2 introduced by the round-5 #9 fix `7059dda`) | 0 | INSTRUMENT code and tests (seat 6: `609b9a3` #1, `02a0a92` #2, `5c1c949` #3 docstring) | WSL, codex-cli 0.162.1 gpt-5.6-sol high; probe 1 + review 19 `succeeded in`; 104,892 tokens; 8 `ERROR` matches = 4 echoed source, 4 reviewer tool-call parse errors (codex_core router), 1 WSL vsock; none transport | 286,315 at the round-6 yield (seat 5) |
-| 7 | Reviewer A (seat 6) on `5c1c949`, base `fa5d939` (SCOPED to the round-6 remediation of the instrument) | 0 | 2 (reviewer) -> 0 adjudicated (#2 for the dispatcher: telemetry machinery, design guard) | 2 -> 4 adjudicated (#4 out) | MAJOR #1 in, adjudicated MINOR (reason); MAJOR #2 in, adjudicated MINOR (reproduction); MINOR #3 in (cleanup); MINOR #4 OUT (reviewer-tagged; BANKED again) | 3 NEW, 1 REOPENED (#4 = R5 #10) | 0 | none yet (the yield carries the design-guard proposal) | WSL, codex-cli 0.162.1 gpt-5.6-sol high; probe 1 + review 13 `succeeded in`; 98,804 tokens; 1 `ERROR` match = echoed source code, not transport | (dispatcher, at the round-7 yield) |
+| 7 | Reviewer A (seat 6) on `5c1c949`, base `fa5d939` (SCOPED to the round-6 remediation of the instrument) | 0 | 2 (reviewer) -> 0 adjudicated (#2 for the dispatcher: telemetry machinery, design guard) | 2 -> 4 adjudicated (#4 out) | MAJOR #1 in, adjudicated MINOR (reason); MAJOR #2 in, adjudicated MINOR (reproduction); MINOR #3 in (cleanup); MINOR #4 OUT (reviewer-tagged; BANKED again) | 3 NEW, 1 REOPENED (#4 = R5 #10) | 0 | INSTRUMENT code and tests (`98c805a` #1, `9e6a529` option B, `cb0f762` #2, `d4c08e8` docstring; #3 moot) | WSL, codex-cli 0.162.1 gpt-5.6-sol high; probe 1 + review 13 `succeeded in`; 98,804 tokens; 1 `ERROR` match = echoed source code, not transport | 116,371 at the round-7 yield (seat 6) |
+| 8 | Reviewer A (seat 6) on `d4c08e8`, base `1087343` (SCOPED to the round-7 remediation and the option-B telemetry redesign) | 0 | 0 | 3 | all in envelope; MINOR #1-#3 ACCEPTED (cleanup); ZERO new blocking: the loop TERMINATES | 3 NEW, 0 REOPENED (#2 from `9e6a529`, #3 from `98c805a`) | 0 | pending: the terminating round's cleanup (instrument code) | WSL, codex-cli 0.162.1 gpt-5.6-sol high; probe 1 + review 26 `succeeded in`; 107,893 tokens; 1 `ERROR` match = echoed source code, not transport | (dispatcher, at the round-8 yield) |
 
 Seat 1 stops after round 0 by the orchestrator's instruction (219K before product code; the build
 is the largest in the wave). A fresh cell builds from "RESUME HERE" below.
@@ -198,8 +199,9 @@ main, stream and info packets of an FFmpeg-written file).
 
 - **Seat 6 status (2026-10-26):** ladder step 1 done to the round-7 verdict: R6 remediated
   (`609b9a3`, `02a0a92`, `5c1c949`), round 7 run and adjudicated (`r7\adjudication.md`); the
-  yield carries the dispatcher's design guard (round 7 #2 is telemetry machinery). Steps 2-5 not
-  started.
+  yield carries the dispatcher's design guard (round 7 #2 is telemetry machinery). Ruled
+  OPTION B; remediated `98c805a`..`d4c08e8`; round 8 NO_NEW_CRITICAL_MAJOR, the loop TERMINATES;
+  its three MINORs are the cleanup still to do (`r8\adjudication.md`). Steps 2-5 not started.
 
 - Base `ac4be92` (main with WP3.9; the dispatcher rebased the branch at seat 4; pre-rebase branch
   `wp3.10-pre-rebase` at `98ee54a`). Reviewer A evidence `r1\`..`r6\` under
@@ -473,3 +475,27 @@ against 0.25, GPU 1.16 s against 1.0 at the defaults) -- telemetry machinery, so
 rules and the design guard's proposal goes with the yield. #3 (a watcher dying before "ready"
 costs the 60 s start wait) MINOR cleanup. #4 = R5 #10 REOPENED, OUT, banked. All but #4 present
 since `dabb204`. No change in the adjudicating turn.
+- Round-7 ruling (dispatcher, FINAL; depth 116,371 at the round-7 yield): #1 and #2 MINOR
+  UPHELD; #3 moot under option B; #4 banked. DESIGN GUARD: OPTION B, hybrid: the strays read
+  synchronously between frames, the watcher process, its pipe and all IPC removed; the RSS/GPU
+  thread kept with the #2 fix (every sample timed, actual gaps beside the nominal periods, the
+  GPU reads on their own schedule, a sampler that ends early or does not stop in time recorded).
+- Round-7 remediation (pre-fix runs: `r8\remediation\`): `98c805a` #1 (the frame released before
+  the next `next`; the test on `1087343` failed); `9e6a529` option B (strays primed before the
+  run, read after every `--strays-every` frames, now a frame count, default 300, and after
+  `close`; pauses recorded and kept out of every figure; the frame after a pause recorded apart;
+  the watcher tests removed; the new tests on `1087343`: 9 failed, and a probe there shows the
+  telemetry starting a `python.exe` child); `cb0f762` #2 (one thread per sampler on its own
+  schedule; RSS samples timed; `gaps_s`; the stop records a sampler that ended early or did not
+  stop within `_SAMPLER_JOIN_S` = 30 s; the tests on `9e6a529`: 4 failed, the ended-early one
+  shows the GPU readings stopping with the memory sampler); `d4c08e8` docstring (a pause lets the
+  decoder fill its pipe AND FFmpeg's own frame buffers, not the pipe alone; the dispatcher's
+  "bounded by the pipe depth" corrected; the raw lists show how far the effect reaches, to be read
+  on the footage runs). At `cb0f762`: the bench module 48 passed; ruff, format, mypy clean.
+
+### Round 8 (evidence `C:\Users\rwsmy\clearwater-review-evidence\wp3.10\r8\`, `adjudication.md` there)
+
+NO_NEW_CRITICAL_MAJOR: 3 MINOR, all in envelope, ACCEPTED as cleanup: #1 the telemetry origin
+and the strays priming precede `started` with no offset recorded; #2 the final strays reading
+comes after the samplers stop, not right after `close`; #3 `written` is read after `del frame`.
+The loop TERMINATES at round 8. No change in the adjudicating turn.
