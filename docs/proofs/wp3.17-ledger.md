@@ -260,4 +260,4 @@ Cleanup commits (regression tests first in `d330a70`, run red on `b2822d3`: 5 fa
 | #6 | `5eef87f` | `test_a_refused_edit_puts_the_session_value_back_in_the_control` |
 | #7 | `d330a70` | `test_no_exception_escapes_a_slot[plain ValueError]` |
 
-Green after the cleanup (targeted, both modules + `test_gui_deps.py`): 73 passed; ruff, format, mypy clean. Report: `docs/reports/wp3.17-parameter-panels-presets.md`. Next: `WINDOW REQUEST: full pytest` on the final head.
+Green after the cleanup (targeted, both modules + `test_gui_deps.py`): 73 passed; ruff, format, mypy clean. Report: `docs/reports/wp3.17-parameter-panels-presets.md`. Full pytest: run by the orchestrator on the merge candidate (stacked gate), not by the cell.

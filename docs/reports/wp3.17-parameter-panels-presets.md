@@ -82,8 +82,7 @@ unsupported version) that nothing acts on. The panel never calls `save_settings`
 ## Gates
 
 Own tests with `test_gui_deps.py`: 73 passed (headless, targeted). `uv run ruff check .`, `ruff
-format --check .` and `mypy` clean. Full pytest: see the ledger (run in the dispatcher's window on the
-final head). Reviewer A (STRONG, at the cell's seat): round 1 reported 7 findings (3 tagged MAJOR);
+format --check .` and `mypy` clean. Full pytest: run by the orchestrator on the merge candidate (stacked gate). Reviewer A (STRONG, at the cell's seat): round 1 reported 7 findings (3 tagged MAJOR);
 the dispatcher upheld the proposed severities (0 blocking), so the loop ended at round 1 and its
 fixes are the terminating cleanup (one regression test per finding, red on `b2822d3`).
 
