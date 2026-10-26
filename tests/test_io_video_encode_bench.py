@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import math
+import shutil
 import subprocess
 import sys
 import time
@@ -457,6 +458,33 @@ def test_run_writes_the_record_and_leaves_the_footage_alone(
     assert len(record["runs"]) == 2 and "failed" not in record
     assert [p.suffix for p in path.parent.iterdir()] == [".json"]  # outputs deleted
     assert _snapshot(folders.footage_path) == footage
+
+
+def test_the_disk_is_checked_before_every_run_and_earlier_runs_are_kept(
+    folders: LocalConfig,
+    sample: Any,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    (folders.footage_path / "GX000004.mp4").write_bytes(sample(SAMPLE).read_bytes())
+    real = shutil.disk_usage
+    calls: list[Path] = []
+
+    def usage(path: Any) -> Any:
+        calls.append(Path(path))
+        if len(calls) <= 2:  # the check before any run and the one before run 1
+            return real(path)
+        return type("Usage", (), {"free": bench.DISK_MARGIN_BYTES})()
+
+    monkeypatch.setattr(bench.shutil, "disk_usage", usage)
+    argv = ["run", "GX000004", "--encoder", "libx265", "--quality", "draft", "--runs", "2"]
+    assert bench.main([*argv, "--keep", "--strays-every", "1"]) == 1  # round 5 #5 and #8
+    captured = capsys.readouterr()
+    assert "FAILED BenchError" in captured.err and len(calls) == 3
+    path = Path(captured.out.strip().splitlines()[-1].removeprefix("RECORD "))
+    record = json.loads(path.read_text(encoding="utf-8"))
+    assert len(record["runs"]) == 1 and Path(record["runs"][0]["output"]).is_file()
+    assert record["failed"]["error"].startswith("BenchError")
 
 
 def test_a_failed_run_keeps_the_record_and_exits_1(

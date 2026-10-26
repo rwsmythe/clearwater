@@ -43,9 +43,10 @@ every run, so a run that fails keeps the runs before it. Usage::
 where OPTIONS, after the subcommand, are ``--config FILE``, ``--keep``, ``--software-decode``,
 ``--memory-every S``, ``--gpu-every S`` and ``--strays-every S``.
 
-``floor`` runs :data:`FLOOR_PLAN`, ruling Q11's row set, in order. Exit status 0 when every
-run finished; 1 when a run failed (the record says which and why); 2 on a usage,
-configuration, footage-lookup or disk-space error before any run.
+``floor`` runs :data:`FLOOR_PLAN`, ruling Q11's row set, in order. The free space is checked
+for every leg before the first run and again before each run. Exit status 0 when every run
+finished; 1 when a run failed or the disk filled up between runs (the record says which and
+why); 2 on a usage, configuration, footage-lookup or disk-space error before any run.
 """
 
 from __future__ import annotations
@@ -824,6 +825,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             output = out_dir / f"{leg.clip}-{leg.encoder}-{depth}-{stamp}-{len(record['runs'])}.mp4"
             print(f"RUN {leg.clip} {leg.encoder} {depth} {leg.quality} ({number}/{leg.runs})")
             try:
+                check_disk(paths[leg.clip], out_dir)  # again: kept outputs add up
                 run = run_once(
                     paths[leg.clip],
                     output,
