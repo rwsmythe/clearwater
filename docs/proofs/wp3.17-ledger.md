@@ -10,6 +10,7 @@ value is the user-facing value, shown as declared).
 | Round | Date | Blocking (crit/maj) | Minor | In/out envelope | NEW/REOPENED | Reverts | Fix kind | Transport | Depth |
 |---|---|---|---|---|---|---|---|---|---|
 | 0 (design) | 2026-10-26 | n/a | n/a | n/a | n/a | n/a | n/a | n/a | 123,285 (dispatcher, round-0 yield) |
+| 1 | 2026-10-26 | reviewer-tagged 0/3 MAJOR (#1, #2, #4); my proposal: 0 blocking (#1, #2 proposed MINOR, #4 out of envelope) | 4 (#3, #5, #6, #7) + #1, #2 as proposed | 4 in (#1, #2, #3, #7) / 3 out (#4, #5, #6) | 7 NEW / 0 REOPENED | 0 | planned: product (#1, #2, #3, #4, #6) + test (#7); #5 stays a limitation | WSL, codex-cli, gpt-5.6-sol high | (dispatcher fills) |
 
 ## Round 0: the design table (brief task 1)
 
@@ -228,3 +229,19 @@ and unbounded float and int, bool, enum, nullable bounded float, nullable bool; 
 A cell cannot read its own depth (recipe section 5); the dispatcher fills the Depth column (round 0: 123,285).
 
 Round-0 ruling (dispatcher, FINAL): table approved; STOP-1, STOP-2 (all four) and STOP-3 accepted as recommended. STOP-1 additionally requires a test with a test method that has the same kind of relation, showing the ValueError reaches the user as the preview's `shell.preview` error, and a named limit / consumer note (an IF-3 constraints field would be an AD-20 matter).
+
+## Round 1 (Reviewer A, STRONG, head b2822d3)
+
+Evidence `C:\Users\rwsmy\clearwater-review-evidence\wp3.17\r1\` (prompt, diff, review.txt, stderr, adjudication.md, md5sums.txt, test-summary.txt). Own tests at the reviewed head: 67 passed (both new modules + `test_gui_deps.py`); ruff, format, mypy green. Verdict NEW_CRITICAL_MAJOR_FOUND (reviewer tags). Mechanical assertions: banner gpt-5.6-sol / high, 10 `succeeded in`, `tokens used` 136,361, no ERROR, VERDICT at column 0.
+
+| # | Reviewer tag | Mine | Finding | Plan |
+|---|---|---|---|---|
+| 1 | MAJOR REASONED | MINOR, in, NEW | Load and Export never refresh the list | add `refresh()` after both |
+| 2 | MAJOR REASONED | MINOR, in, NEW | `refresh()` listing error is cleared by the following `_succeed()` | refresh before `_succeed`, keep the listing error visible |
+| 3 | MINOR | MINOR, in, NEW | after a case-only save-over `select(name)` misses the stored name | select by the store's name key |
+| 4 | MAJOR REASONED OOE | MINOR/banked, out, NEW | int bounds beyond the `QSpinBox` limit not clamped both ways | clamp both ways (cheap) |
+| 5 | MINOR OOE | limitation, out, NEW | equal min and max get no slider | accepted limitation (degenerate; no real schema) |
+| 6 | MINOR OOE | MINOR, out, NEW | a refused `set_parameters` leaves the widget showing the attempted value | re-show the session value on refusal |
+| 7 | MINOR | MINOR (test), in, NEW | `test_no_exception_escapes_a_slot` has no plain `ValueError` case | add the case |
+
+Blocking under the rubric: the reviewer's MAJORs #1 and #2 are in envelope and new; my proposed severity is MINOR for both (no data loss, no wrong preset applied; #2 needs the folder to become unlistable right after a successful write), which the dispatcher may overrule. #4 is out of envelope (non-blocking by rule). Fixes planned for the next turn: product code (#1, #2, #3, #4, #6) and a test (#7); no change was made in the adjudicating turn.
