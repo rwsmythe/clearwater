@@ -12,6 +12,7 @@ Tier STRONG. Brief `docs/briefs/wp3.11-brief.md` (FINAL; CHARC rulings `53d1d906
 | R1 remediation (cell 2, head e327954) | 171,115 (dispatcher, at the remediation yield) | - | - | - | - | - | 0 | F1-F4, F6 product; F7, F8 tool; V3-1 test-only | - | remediated; step-aware re-run in a window |
 | 2 (head 7c8e6ed) | 202,325 | 0 | 1 NEW (A1) + 1 REOPENED (A2, F1's "during" half; MINOR recommended) | 0 (A2 if downgraded) | 2 in / 0 out | 1 NEW / 1 REOPENED | 0 | none yet (both product) | WSL, gpt-5.6-sol high, 14 exec lines, both REASONED by the reviewer, both reproduced by the cell | NEW_CRITICAL_MAJOR_FOUND; adjudicated, next round needed |
 | 3 (head 7f9dff8) | 237,310 | 0 | 0 | 1 (B1, docstring) | 1 in / 0 out | 1 NEW / 0 REOPENED | 0 | R2 fixes: A1, A2 product (f139ef5, 7f9dff8); B1 not yet (docstring) | WSL, gpt-5.6-sol high, 17 exec lines, REASONED | NO_NEW_CRITICAL_MAJOR: CONVERGED (zero new blocking) |
+| Reviewer B remediation (seat 3, from d95ae5b) | the dispatcher's | - | B2 (B1 adjudicated MINOR) | B1, B3, B4; B5 ADVISORY out, banked | 4 in / 1 out | 5 NEW / 0 REOPENED | 0 | B1, B2 product; B3, B4 test-only; B5 report line | Reviewer B at the orchestrator's seat (REASONED) | remediated; the orchestrator's B re-run next |
 
 ## Round 0 -- design table (no product code yet)
 
@@ -447,3 +448,31 @@ MemoryError in run A while another package's full pytest ran, cleared on the re-
 4. Dispatcher's post-report change (Y-2 identity with WP3.4's gate fix): the store's dtype rule
    `_NUMERIC_KINDS` "biuf" -> "iuf" (bool refused at `put`); test case `...has dtype bool`
    failed first on 0747a82 (DID NOT RAISE), `test_put_accepts_integer_records` guards ints.
+
+## Reviewer B remediation (seat 3, 2026-10-26, from `d95ae5b`)
+
+Review text `C:\Users\rwsmy\clearwater-review-evidence\wp3.11\reviewB\review-B.txt` (run at the
+orchestrator's seat; all five REASONED). Rulings are the orchestrator's (FINAL). Failing-first
+evidence under `work/wp3.11/reviewB-remediation/`: `git archive d95ae5b` unpacked to a scratch
+tree, the new test copied in, run with the worktree's venv and `PYTHONPATH=<scratch>/src` (the
+import resolves to the scratch tree). B3 and B4 are test gaps (the product code was right), so
+their failing-first is a PLANTED mutation of d95ae5b (`b3-plant.diff`, `b4-plant.diff`): the old
+test passes the plant, the new one fails it.
+
+| Finding | Ruling | Commit | Test | Failing first |
+|---|---|---|---|---|
+| B2 | MAJOR, in envelope | 5fa4fae (product: `_canonical` in `schema_hash`; docstring and report sentence) | `test_schema_hash_canonicalises_numbers_but_not_bools`, `test_an_equal_value_of_another_number_type_keeps_the_helper_hash` | `b2-failing-first.txt`: 2 failed (hash 731f9f95... vs 12233289...) |
+| B1 | MINOR (adjudicated), cleanup | 661eed1 (product: `_check` before `mark_complete`) | `test_a_cancel_during_the_post_pass_lookup_never_marks_complete` | `b1-failing-first.txt`: `marks` 1 == 0 failed |
+| B3 | MINOR, test gap | 6833f15 (test: every stage) | `test_statistics_are_measured_on_the_stored_proxy` | `b3-plant-old-test.txt` passed, `b3-plant-new-test.txt` failed (`AssertionError: fusion`) |
+| B4 | MINOR, test gap | 7330842 (test) | `test_the_initial_analysis_stays_running_through_the_staged_part` | `b4-plant-old-test.txt` passed, `b4-plant-new-test.txt` failed (`{'complete', 'running'} == {'running'}`) |
+| B5 | ADVISORY, out of envelope, BANKED | 7e025e5 (one report limit line; the orchestrator files the debt row) | - | - |
+
+Gates at 7e025e5: ruff check, ruff format --check (189 files), mypy strict (113 files) green; the
+eight analysis test files 226 passed (`analysis-tests.txt`). No full pytest (the dispatcher's
+candidate gate). Every blob changed since de206e2 has 0 CR bytes at HEAD.
+
+Raised, NOT fixed (beyond the ruling): `True == 1` in Python, so `set_parameters` treats `1` ->
+`True` on a shaping parameter as no change while `schema_hash` (bool kept distinct, as ruled)
+differs: the B2 failure class for a bool value (`probe_bool.py` / `probe_bool.txt`: job None,
+helper hash differs, SchemaMismatchError). Reachable only if a bool reaches a numeric parameter.
+Also: an `int` beyond 2**53 now hashes as its nearest float.
