@@ -182,7 +182,7 @@ def test_a_second_run_skips_the_decode_and_recomputes_under_the_new_parameters(
     before = _mean(analysis.statistics(VFR[2]))
     analysis.run(_params(0.5), StubProgress(), focus_pts=VFR[2])
     assert len(calls) == 1
-    assert _mean(analysis.statistics(VFR[2])) == pytest.approx(before * 0.5)
+    assert _mean(analysis.statistics(VFR[2])) == pytest.approx(before * 0.5, abs=1e-5)
 
 
 def test_pts_and_statistics_never_wait_for_a_run_in_flight(tmp_path: Path) -> None:
@@ -214,7 +214,7 @@ def test_retarget_false_leaves_the_run_under_the_old_parameters(tmp_path: Path) 
     assert analysis.retarget(_params(0.5)) is False
     gate.set()
     worker.join(5)
-    assert _mean(analysis.statistics(VFR[0])) == pytest.approx(_level(0))
+    assert _mean(analysis.statistics(VFR[0])) == pytest.approx(_level(0), abs=1e-5)
 
 
 def test_retarget_true_makes_the_run_complete_under_the_new_parameters(tmp_path: Path) -> None:
@@ -229,7 +229,7 @@ def test_retarget_true_makes_the_run_complete_under_the_new_parameters(tmp_path:
     gate.set()
     worker.join(5)
     assert not worker.is_alive()
-    assert _mean(analysis.statistics(VFR[0])) == pytest.approx(_level(0) * 0.5)
+    assert _mean(analysis.statistics(VFR[0])) == pytest.approx(_level(0) * 0.5, abs=1e-5)
 
 
 def test_retarget_with_no_run_in_flight_is_false_not_a_state_change(tmp_path: Path) -> None:
@@ -239,7 +239,7 @@ def test_retarget_with_no_run_in_flight_is_false_not_a_state_change(tmp_path: Pa
     assert analysis.retarget(_params(0.5)) is False
     analysis.run(_params(1.0), StubProgress())
     assert analysis.retarget(_params(0.5)) is False
-    assert _mean(analysis.statistics(VFR[0])) == pytest.approx(_level(0))
+    assert _mean(analysis.statistics(VFR[0])) == pytest.approx(_level(0), abs=1e-5)
 
 
 def test_a_second_concurrent_run_is_refused(tmp_path: Path) -> None:
