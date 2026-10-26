@@ -13,6 +13,7 @@ import multiprocessing
 import shutil
 import subprocess
 import sys
+import threading
 import time
 from fractions import Fraction
 from pathlib import Path
@@ -191,9 +192,113 @@ def test_telemetry_watcher_starts_reports_and_stops() -> None:
     record = telemetry.stop()
     assert record["errors"] == []
     assert len(record["strays"]) >= 2  # at least one period and the last window at the stop
+    assert [w.get("final", False) for w in record["strays"]][-2:] == [False, True]
     assert record["rss_samples"] > 5
     assert watcher.pid not in {m["pid"] for m in record["peak_tree_rss_members"]}
     assert not watcher.is_alive()
+
+
+class _FakeWatch:
+    """A :class:`bench.StrayWatch` that numbers its windows instead of reading processes."""
+
+    def __init__(self, root: int) -> None:
+        self.count = 0
+
+    def window(self) -> dict[str, Any]:
+        self.count += 1
+        return {"seconds": 0.01, "busy": [], "n": self.count}
+
+
+def test_the_watchers_last_window_alone_is_tagged_final(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(bench, "StrayWatch", _FakeWatch)
+    mine, theirs = multiprocessing.Pipe()
+    loop = threading.Thread(target=bench.stray_loop, args=(theirs, 0.01, 0))
+    loop.start()
+    assert mine.recv() == "ready"
+    time.sleep(0.2)
+    mine.send("stop")
+    windows = []
+    while not windows or not windows[-1].get("final"):
+        assert mine.poll(5)
+        windows.append(mine.recv())
+    loop.join(5)
+    assert not loop.is_alive() and not mine.poll(0.1)
+    assert len(windows) >= 2 and [w["n"] for w in windows] == list(range(1, len(windows) + 1))
+    assert [w.get("final", False) for w in windows] == [False] * (len(windows) - 1) + [True]
+
+
+class _ScriptedPipe:
+    """The parent's end of the watcher pipe, played from a script (round 6 #1)."""
+
+    def __init__(self, queued: list[dict[str, Any]], after_stop: list[dict[str, Any]]) -> None:
+        self.queue = list(queued)
+        self.after_stop = after_stop
+        self.lock = threading.Lock()
+        self.sent: list[Any] = []
+
+    def send(self, obj: Any) -> None:
+        self.sent.append(obj)
+
+        def later() -> None:
+            time.sleep(0.5)  # the watcher finishes the window it is computing
+            with self.lock:
+                self.queue.extend(self.after_stop)
+
+        threading.Thread(target=later, daemon=True).start()
+
+    def poll(self, timeout: float | None = 0.0) -> bool:
+        end = time.monotonic() + (timeout or 0.0)
+        while True:
+            with self.lock:
+                if self.queue:
+                    return True
+            if time.monotonic() >= end:
+                return False
+            time.sleep(0.01)
+
+    def recv(self) -> Any:
+        with self.lock:
+            return self.queue.pop(0)
+
+    def close(self) -> None:
+        pass
+
+
+class _FakeWatcher:
+    """A started watcher seen from the parent (no process: nothing to join)."""
+
+    pid = None
+    exitcode = None
+
+    def is_alive(self) -> bool:
+        return True
+
+
+def _scripted_telemetry(pipe: _ScriptedPipe) -> bench.Telemetry:
+    telemetry = bench.Telemetry(memory_every=0.05, gpu_every=10.0, strays_every=30.0)
+    telemetry._watcher, telemetry._connection = _FakeWatcher(), pipe  # type: ignore[assignment]
+    return telemetry
+
+
+def test_stop_keeps_a_queued_window_and_the_final_one_after_it() -> None:
+    periodic = {"seconds": 30.0, "busy": []}
+    final = {"seconds": 12.0, "busy": [{"name": "late-stray"}], "final": True}
+    pipe = _ScriptedPipe([periodic], [final])
+    record = _scripted_telemetry(pipe).stop()
+    assert pipe.sent == ["stop"]
+    assert [w["seconds"] for w in record["strays"]] == [30.0, 12.0]  # round 6 #1
+    assert record["strays"][-1]["busy"] == [{"name": "late-stray"}]
+    assert record["errors"] == []
+
+
+def test_a_final_window_that_does_not_come_is_recorded(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(bench, "_WATCHER_WAIT_S", 1.0)
+    pipe = _ScriptedPipe([{"seconds": 30.0, "busy": []}], [])
+    began = time.monotonic()
+    record = _scripted_telemetry(pipe).stop()
+    assert time.monotonic() - began < 5
+    assert [w["seconds"] for w in record["strays"]] == [30.0]
+    assert record["errors"] == ["the strays watcher sent no final window within 1 s"]
 
 
 class _RecordingContext:

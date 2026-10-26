@@ -323,7 +323,8 @@ def stray_loop(connection: Pipe, every: float, root: int) -> None:
     """Send a :class:`StrayWatch` window every ``every`` seconds until told to stop.
 
     Runs in the watcher process: it sends ``"ready"`` once primed, then a window each period;
-    on any message from the other end it sends the last window and returns.
+    on any message from the other end it sends the last window, tagged ``"final": True`` so the
+    other end can tell it from a periodic window still in the pipe, and returns.
 
     Args:
         connection: This end of the pipe.
@@ -334,7 +335,7 @@ def stray_loop(connection: Pipe, every: float, root: int) -> None:
     connection.send("ready")
     while not connection.poll(every):
         connection.send(watch.window())
-    connection.send(watch.window())
+    connection.send({**watch.window(), "final": True})
 
 
 def _end_watcher(watcher: BaseProcess, ends: Sequence[Pipe], *, kill: bool) -> None:
@@ -446,12 +447,21 @@ class Telemetry:
         except Exception as exc:  # telemetry never ends the run; the record says it stopped
             self.errors.append(f"sampling stopped: {type(exc).__name__}: {exc}")
 
-    def _receive(self, wait: float) -> None:
+    def _receive(self, wait: float) -> bool:
+        """Keep the windows in the pipe, waiting up to ``wait`` seconds for the first one.
+
+        Returns:
+            True when the watcher's final window was among them (nothing after it is read).
+        """
         connection = self._connection
         while connection is not None and connection.poll(wait):
+            wait = 0.0
             window = connection.recv()
             elapsed = time.monotonic() - self._started
             self.strays.append({"t_s": round(elapsed, 2), **window})
+            if window.get("final"):
+                return True
+        return False
 
     def _sample_rss(self, elapsed: float, exclude: Collection[int]) -> None:
         total, members = tree_rss(exclude)
@@ -465,7 +475,8 @@ class Telemetry:
         Returns:
             The sampling periods, the memory peak (bytes, its members, when), the graphics-card
             readings and their memory peak, the strays windows (the last one ends at the stop),
-            and the errors that stopped the watcher or the sampling, if any.
+            and the errors that stopped the watcher or the sampling, if any (a final window
+            that did not come within the wait is one).
         """
         self._stop.set()
         if self._thread.is_alive():
@@ -474,9 +485,14 @@ class Telemetry:
         if watcher is not None and connection is not None:
             try:
                 connection.send("stop")
-                count = len(self.strays)
-                while len(self.strays) == count and connection.poll(_WATCHER_WAIT_S):
-                    self._receive(wait=0.0)
+                deadline = time.monotonic() + _WATCHER_WAIT_S
+                final = False
+                while not final and (left := deadline - time.monotonic()) > 0:
+                    final = self._receive(wait=left)
+                if not final:
+                    self.errors.append(
+                        f"the strays watcher sent no final window within {_WATCHER_WAIT_S:g} s"
+                    )
             except (OSError, EOFError) as error:
                 self.errors.append(f"the strays watcher failed: {type(error).__name__}: {error}")
             ends = (connection, self._their_end) if self._their_end else (connection,)
