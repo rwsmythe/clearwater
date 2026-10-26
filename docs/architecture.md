@@ -239,6 +239,13 @@ class JobResult:
 Analysis, export and batch share these; the GUI runs jobs on a worker thread and marshals
 `report` to the main thread.
 
+Export seam (not a frozen interface; WP3.19 round 0, frozen additive-only until WP3.19's accept,
+CHARC ruling 2026-10-26): `ExportRequest`, `ExportJobs`, `CANCELLED` and `unavailable_exports`
+live in `clearwater.jobs.export_seam`, which imports only the standard library and
+`clearwater.interfaces` (no Qt, no `gui`), so WP3.14's engine and a headless runner name the seam
+types without loading PySide6. `clearwater.gui.export_service` re-exports them and keeps the
+GUI-only `ActivityGate`. `jobs/__init__.py` is not edited for it; WP3.14 adds its own exports.
+
 ### IF-9 Parameter set
 
 JSON per AD-13: `format_version`, `method`, `parameters`, `created`, `app_version`; the provenance
