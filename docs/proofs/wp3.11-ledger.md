@@ -9,6 +9,8 @@ Tier STRONG. Brief `docs/briefs/wp3.11-brief.md` (FINAL; CHARC rulings `53d1d906
 |---|---|---|---|---|---|---|---|---|---|---|
 | 0 (design table) | 143,868 | - | - | - | - | - | - | - | - | APPROVED as written (orchestrator round-0 rulings: P1, P2, choices 1-10) |
 | 1 (head 00b248b) | 316,506 (at the window yield; the R1 yield's figure is the dispatcher's) | 0 | 3 (F1, F2, F5) | 5 (F3, F4, F6, F7, F8) | 8 in / 0 out | 8 NEW / 0 REOPENED | 0 | F5 test-only, fixed out of band at 9c53134; F1-F4, F6 product; F7, F8 tool -- NOT yet fixed | WSL, gpt-5.6-sol high, 19 exec lines, all findings REASONED | NEW_CRITICAL_MAJOR_FOUND; adjudicated (F3, F4 downgraded to MINOR), next round needed |
+| R1 remediation (cell 2, head e327954) | 171,115 (dispatcher, at the remediation yield) | - | - | - | - | - | 0 | F1-F4, F6 product; F7, F8 tool; V3-1 test-only | - | remediated; step-aware re-run in a window |
+| 2 (head 7c8e6ed) | dispatcher's figure at this yield | 0 | 1 NEW (A1) + 1 REOPENED (A2, F1's "during" half; MINOR recommended) | 0 (A2 if downgraded) | 2 in / 0 out | 1 NEW / 1 REOPENED | 0 | none yet (both product) | WSL, gpt-5.6-sol high, 14 exec lines, both REASONED by the reviewer, both reproduced by the cell | NEW_CRITICAL_MAJOR_FOUND; adjudicated, next round needed |
 
 ## Round 0 -- design table (no product code yet)
 
@@ -392,35 +394,43 @@ consumer note: the engine closes the stream on the job thread, never concurrentl
 Gates at 24e8dcb: ruff check, ruff format --check (189 files), mypy strict (113 files) green;
 analysis tests without V3 212 passed (`work/t-an.log`), V3 file 5 passed.
 
-## RESUME HERE (for the fresh cell; written by cell 1 at the R1 yield, 2026-10-21)
+## Round 2 (Reviewer A) -- adjudicated, NOT remediated
 
-**State.** Branch `wp3.11`, base `de206e2`. Built and committed: `src/clearwater/analysis/`
-(`proxy.py`, `smoothing.py`, `store.py`, `engine.py`, `__init__.py`), tests
-`tests/test_analysis_{support,proxy,smoothing,store,engine,recompute,deps,v3,step_aware_eval}.py`
-(`test_analysis_support.py` holds the helpers and test-local methods, no tests),
-`tools/step_aware_eval.py`, report DRAFT `docs/reports/wp3.11-analysis.md`. Gates at the last
-commit: ruff check, ruff format --check, mypy strict green; analysis tests 206 passed (fast),
-V3 file 2 passed + 2 xfailed (about 100 s, FFmpeg), instrument 2 passed. The round-0 design table
-above (R0-1..R0-13) is APPROVED and is the design; read it, not the code history.
+Evidence `C:\Users\rwsmy\clearwater-review-evidence\wp3.11\r2\` (prompt listing R1's findings to
+verify, diff de206e2..7c8e6ed, transcript `review.txt` + `review.stderr.txt`, `test-summary.txt`
+(217 passed at 7c8e6ed), `probe.txt`, `probe_r2.py` + `probe_r2.txt` (the cell's reproductions),
+`adjudication.md`, `md5sums.txt`). The reviewer reports R1's F1-F8 fixed except F1's "during
+smoothing" half.
+
+- A1 MAJOR, NEW, CONFIRMED (executed by the cell): `_drive` re-hashes the store, then
+  invalidates; a reader in between is served the OLD records under the NEW schema (DR-25 (4)).
+- A2 MAJOR as filed, REOPENED (F1), CONFIRMED; MINOR recommended for the dispatcher: no cancel
+  check DURING a stage's whole-series smoothing; measured 0.29-0.72 s per statistic at 107,892
+  frames, so a few seconds per stage at the envelope's end; the outcome is right, only the latency
+  misses "within one frame".
+
+The step-aware re-run (F7) ran in the granted window before the round: exit 0, the table moved by
+at most 0.002 flicker and 0.09 peak (`work/wp3.11/step-aware-f7.log`; report f53a1a2).
+
+## RESUME HERE (cell 2, at the R2 yield, 2026-10-26; supersedes cell 1's)
+
+**State.** Branch `wp3.11`, base `de206e2`, head = this ledger commit (code as at 7c8e6ed). R1
+remediated (table above), V3-1 implemented, step-aware re-run done, report complete except the
+Y-1 text (DRAFT until the gate reconciles it with WP3.4's; do not change it unless told). Gates at
+7c8e6ed: ruff check, ruff format --check, mypy strict green; analysis tests incl. V3 and the
+instrument 217 passed (`work/t-r2.log`). Full pytest NOT yet run (needs a window).
 
 **Do next, in order.**
-1. Remediate R1 (one commit per finding, each with a test that fails on the unfixed code):
-   F1, F2 (product, MAJOR); F3, F4, F6 (product, MINOR); F7, F8 (tool; F7 changes the report's
-   step-aware figures -> needs a WINDOW for the re-run; ask with "WINDOW REQUEST").
-2. Implement the V3-1 ruling (above): a seeded jitter-position patch clip built in the test (no
-   new committed fixture; the patch re-drawn uniformly in a lower-third band each frame; a test
-   proves it never touches the upper half), asserting V3's 25 % on L*, a*, b*, contrast for both
-   test-local methods (`GrayWorld`, `GainsStretch`); the ad14-flicker tests assert AD-14 and
-   RECORD the four V3 ratios (no xfail); the report gets one heading with the ad14 ratios
-   (0.39-0.49) and WP1.4's real-footage ratios (0.35-0.45) and the cause, as information for
-   CP5 / WP4.2.
-3. Reviewer A round 2 (runner/prompt shape in `C:\Users\rwsmy\clearwater-review-evidence\wp3.11\r1\`;
-   new folder r2; the prompt lists R1's findings to verify as fixed).
-4. Full pytest in a dispatcher WINDOW; then the final return report.
-
-**Held / open.**
-- Y-1: the report carries cell 1's DRAFT text; the dispatcher reconciles it with WP3.4's at the
-  gate (do not change it unless told).
-- Step-aware: evaluated (table in the report, `work/wp3.11/step-aware/step-aware.json`); default
-  unchanged; F7 will move the flicker figures slightly.
-- The report still says "DRAFT" and "V3 ... PENDING"; finish both.
+1. Remediate R2, one commit per finding, each with a test shown failing on the unfixed code:
+   - A1: in `AnalysisEngine._drive`, call `invalidate_from` BEFORE setting `schema_hash` on
+     `_store` and `_measured`; test: plant a reader in `store.invalidate_from` (as
+     `r2/probe_r2.py` A1 does) and assert it gets KeyError (on the unfixed code it is served the
+     old record).
+   - A2 (whatever severity the dispatcher rules): cancel checked during a stage's smoothing, e.g.
+     the engine smooths in chunks of outputs through `smooth_at` (equal to the whole, tested) or
+     per statistic, with `_check` between; the stage must still end as `smoothed_complete`; test:
+     cancel from inside a stage's smoothing and see it stop before the stage's smoothing ends.
+2. Reviewer A round 3 (copy `r2\run_review.sh` and `r2\review-prompt.md` to `r3`, retitle, list
+   R2's A1/A2 to verify, refresh the diff and `test-summary.txt`).
+3. Full pytest in a dispatcher WINDOW (`QT_QPA_PLATFORM=offscreen`, `--basetemp=work/<name>`,
+   output to a file); then the final return report.
