@@ -301,6 +301,36 @@ def test_a_final_window_that_does_not_come_is_recorded(monkeypatch: pytest.Monke
     assert record["errors"] == ["the strays watcher sent no final window within 1 s"]
 
 
+@pytest.mark.parametrize("seen_by", ["sampling", "stop"])
+def test_a_watcher_that_dies_mid_run_is_recorded_and_not_waited_for(
+    monkeypatch: pytest.MonkeyPatch, seen_by: str
+) -> None:
+    monkeypatch.setattr(bench, "_WATCHER_WAIT_S", 30.0)  # the start's wait, and stop's
+    memory_every = 0.05 if seen_by == "sampling" else 30.0  # 30 s: the thread never looks again
+    telemetry = bench.Telemetry(memory_every=memory_every, gpu_every=60.0, strays_every=60.0)
+    telemetry.start()
+    watcher = telemetry._watcher
+    assert watcher is not None and watcher.pid is not None
+    psutil.Process(watcher.pid).kill()
+    watcher.join(10)
+    if seen_by == "sampling":
+        deadline = time.monotonic() + 5
+        while not telemetry.errors and time.monotonic() < deadline:
+            time.sleep(0.05)
+        assert telemetry.errors and telemetry.errors[0].startswith("the strays watcher ended at")
+        samples = telemetry.rss_samples
+        time.sleep(0.5)
+        assert telemetry.rss_samples > samples  # the memory sampling goes on (round 6 #2)
+    began = time.monotonic()
+    record = telemetry.stop()
+    assert time.monotonic() - began < 10  # not the 30 s wait
+    assert sorted(e.split(" (")[0].split(" at ")[0] for e in record["errors"]) == [
+        "the strays watcher ended",
+        "the strays watcher was not alive",
+    ]
+    assert record["rss_samples"] > 0
+
+
 class _RecordingContext:
     """A multiprocessing context that remembers the pipes and processes it makes."""
 

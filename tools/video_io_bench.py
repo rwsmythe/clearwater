@@ -400,7 +400,6 @@ class Telemetry:
         self._thread = threading.Thread(target=self._run, daemon=True)
         self._watcher: BaseProcess | None = None
         self._connection: Pipe | None = None
-        self._their_end: Pipe | None = None
         self._started = 0.0
         self.peak_rss = 0
         self.peak_members: list[dict[str, Any]] = []
@@ -411,7 +410,11 @@ class Telemetry:
         self.errors: list[str] = []
 
     def start(self) -> None:
-        """Start the watcher process, wait until it is primed, then start sampling."""
+        """Start the watcher process, wait until it is primed, then start sampling.
+
+        Once the watcher is primed this process closes its copy of the watcher's pipe end, so
+        the watcher's own exit ends the pipe and is seen here.
+        """
         context = multiprocessing.get_context("spawn")
         mine, theirs = context.Pipe()
         watcher = context.Process(
@@ -420,7 +423,8 @@ class Telemetry:
         try:
             watcher.start()
             if mine.poll(_WATCHER_WAIT_S) and mine.recv() == "ready":
-                self._watcher, self._connection, self._their_end = watcher, mine, theirs
+                self._watcher, self._connection = watcher, mine
+                theirs.close()
             else:
                 self.errors.append("the strays watcher did not start")
                 _end_watcher(watcher, (mine, theirs), kill=True)
@@ -450,18 +454,35 @@ class Telemetry:
     def _receive(self, wait: float) -> bool:
         """Keep the windows in the pipe, waiting up to ``wait`` seconds for the first one.
 
+        An ended pipe (the watcher exited or was killed) is recorded by :meth:`_lost`; the
+        memory and graphics-card sampling go on.
+
         Returns:
             True when the watcher's final window was among them (nothing after it is read).
         """
         connection = self._connection
-        while connection is not None and connection.poll(wait):
-            wait = 0.0
-            window = connection.recv()
-            elapsed = time.monotonic() - self._started
-            self.strays.append({"t_s": round(elapsed, 2), **window})
-            if window.get("final"):
-                return True
+        try:
+            while connection is not None and connection.poll(wait):
+                wait = 0.0
+                window = connection.recv()
+                elapsed = time.monotonic() - self._started
+                self.strays.append({"t_s": round(elapsed, 2), **window})
+                if window.get("final"):
+                    return True
+        except (OSError, EOFError) as error:
+            self._lost(error)
         return False
+
+    def _lost(self, error: BaseException) -> None:
+        """Record when the watcher's pipe ended, close it and receive nothing more."""
+        elapsed = time.monotonic() - self._started
+        self.errors.append(
+            f"the strays watcher ended at {elapsed:.2f} s: {type(error).__name__}: {error}"
+        )
+        connection, self._connection = self._connection, None
+        if connection is not None:
+            with contextlib.suppress(OSError):
+                connection.close()
 
     def _sample_rss(self, elapsed: float, exclude: Collection[int]) -> None:
         total, members = tree_rss(exclude)
@@ -469,33 +490,47 @@ class Telemetry:
         if total > self.peak_rss:
             self.peak_rss, self.peak_members, self.peak_at_s = total, members, elapsed
 
+    def _ask_final(self) -> None:
+        """Tell the live watcher to stop and receive until its final window or the wait ends."""
+        try:
+            if self._connection is not None:
+                self._connection.send("stop")
+        except OSError as error:
+            self._lost(error)
+        deadline = time.monotonic() + _WATCHER_WAIT_S
+        final = False
+        while not final and self._connection is not None:
+            left = deadline - time.monotonic()
+            if left <= 0:
+                self.errors.append(
+                    f"the strays watcher sent no final window within {_WATCHER_WAIT_S:g} s"
+                )
+                break
+            final = self._receive(wait=left)
+
     def stop(self) -> dict[str, Any]:
         """Stop sampling and the watcher, and return what was recorded.
 
         Returns:
             The sampling periods, the memory peak (bytes, its members, when), the graphics-card
             readings and their memory peak, the strays windows (the last one ends at the stop),
-            and the errors that stopped the watcher or the sampling, if any (a final window
-            that did not come within the wait is one).
+            and the errors that stopped the watcher or the sampling, if any: a watcher that
+            ended during the run (when) or was not alive at the stop (its exit code; it is not
+            waited for), and a final window that did not come within the wait.
         """
         self._stop.set()
         if self._thread.is_alive():
             self._thread.join(timeout=60)
-        watcher, connection = self._watcher, self._connection
-        if watcher is not None and connection is not None:
-            try:
-                connection.send("stop")
-                deadline = time.monotonic() + _WATCHER_WAIT_S
-                final = False
-                while not final and (left := deadline - time.monotonic()) > 0:
-                    final = self._receive(wait=left)
-                if not final:
-                    self.errors.append(
-                        f"the strays watcher sent no final window within {_WATCHER_WAIT_S:g} s"
-                    )
-            except (OSError, EOFError) as error:
-                self.errors.append(f"the strays watcher failed: {type(error).__name__}: {error}")
-            ends = (connection, self._their_end) if self._their_end else (connection,)
+        watcher = self._watcher
+        if watcher is not None:
+            if not watcher.is_alive():
+                self.errors.append(
+                    f"the strays watcher was not alive at the stop (exit code {watcher.exitcode})"
+                )
+                self._receive(wait=0.0)  # what it sent before it ended, then the pipe's end
+            elif self._connection is not None:
+                self._ask_final()
+            ends = (self._connection,) if self._connection is not None else ()
             _end_watcher(watcher, ends, kill=False)
         used = [m for m in (memory_used_mib(r) for r in self.gpu) if m is not None]
         return {
