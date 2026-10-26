@@ -9,6 +9,7 @@ Cell: `implementer-sonnet-high`, seat 1, worktree `.worktrees/wp3.18`, branch `w
 | Round | Depth (dispatcher) | Critical | Major | Minor | In / out of envelope | NEW / REOPENED | Reverts | Fixes: product / test-only | Transport, CLI | Verdict |
 |---|---|---|---|---|---|---|---|---|---|---|
 | 0 (design table) | 177,692 (dispatcher, at the round-0 yield) | - | - | - | - | - | - | - | - | APPROVED; Q-A RULED (C) by CHARC `bdbd8323ceace897` (AD-7 amended `8c67a6d`); Q-B, Q-D, Q-E accepted |
+| 1 (head e51d40f) | (dispatcher fills) | 0 | 6 reported; adjudicated 3 MAJOR (F1, F2, F4), F3 rejected (reading), F5 and F6 downgraded MINOR | 3 reported (F7, F8, F9) + F5, F6 = 5 MINOR | 9 in / 0 out | 9 NEW / 0 REOPENED | 0 | pending: F1, F2, F4, F6, F9 product; F7, F8 test-only; F5 documented | WSL, gpt-5.6-sol high, codex-cli 0.162.1, 8 exec lines, all REASONED; evidence clearwater-review-evidence/wp3.18/r1/ | NEW_CRITICAL_MAJOR_FOUND; remediation next turn |
 
 ## Round 0 -- design table (no product code yet)
 
