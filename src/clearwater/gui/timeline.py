@@ -240,7 +240,13 @@ class TimelinePanel(QWidget):
     # Source and analysis.
 
     def _on_source(self, source: object) -> None:
-        """A new source (or none): drop everything of the old one, start the new analysis."""
+        """A new source (or none): drop everything of the old one, start the new analysis.
+
+        The one-job-in-flight rule of the position lane is per ``ClipAnalysis``: a lane job of
+        the old source may still be running on the old object while the new source's first lane
+        job starts on the new one. The old job is cancelled and its result is dropped by the
+        generation check; it never reaches the session.
+        """
         self._generation += 1
         if self._run is not None:
             self._run.handle.cancel()
