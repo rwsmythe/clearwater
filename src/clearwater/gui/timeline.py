@@ -22,7 +22,8 @@ becomes the newest intent; a fix request (the statistics of a frame the shell de
 pts) and the re-show of the drag's proxy take numbers too but are not intents. A lane result is
 applied only if it belongs to the newest intent: a commit if it IS the newest intent, a fix if
 the commit whose frame it repairs is, a proxy if the slider is still down in the drag it was
-asked for (the proxy the newest intent needs). Hence ``set_position`` is called only for a commit
+asked for and it is the proxy of the handle's value (the one the newest intent needs; a proxy
+of a value the hand has passed is dropped). Hence ``set_position`` is called only for a commit
 that is the newest intent, so never while the slider is down, and release always commits
 ``pts()[value]``. While the slider is down the handle belongs to the hand: each value shows the
 stored proxy of its pts, a frame the shell decodes meanwhile only makes the same proxy be shown
@@ -593,8 +594,14 @@ class TimelinePanel(QWidget):
 
     def _current(self, request: _Request) -> bool:
         """True when the request's result still belongs to the newest intent."""
-        if request.kind == "proxy":
-            return self._dragging and request.ref == self._drag
+        if request.kind == "proxy":  # the proxy of the value under the hand, nothing it passed
+            index = self._slider.value()
+            return (
+                self._dragging
+                and request.ref == self._drag
+                and 0 <= index < len(self._pts)
+                and request.pts == self._pts[index]
+            )
         return request.ref == self._intent  # the commit itself, or the commit a fix repairs
 
     def _pump(self) -> None:

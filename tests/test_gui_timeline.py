@@ -1216,7 +1216,7 @@ def scenario_interleave(
     positions: list[int] = []
     decodes: list[int] = []
     display: list[tuple[str, int]] = []
-    visited: set[int] = set()
+    shown_frame = [0]  # the pts of the frame the shell shows (the open frame to begin with)
     presenter = presenter_of(env.window)
     original_present = presenter.present
 
@@ -1225,22 +1225,39 @@ def scenario_interleave(
             errors.append(message.text)
         original_present(message)
 
+    def own(statistics: Any, pts: int) -> bool:
+        """True when the statistics are None or the ones the scripted analysis gives that pts."""
+        if statistics is None:
+            return True
+        return abs(float(np.asarray(statistics["only"]["mean"])[0]) - smooth(pts)) < 1e-6
+
     def set_position(pts: int, *, statistics: Any = None) -> None:
         if slider.isSliderDown():
             violations.append(f"set_position({pts}) while the slider is down")
+        if not own(statistics, pts):
+            violations.append(f"set_position({pts}) with the statistics of another frame")
         positions.append(pts)
         decodes.append(pts)
+
+    def set_statistics(statistics: Any) -> None:
+        if not own(statistics, shown_frame[0]):
+            violations.append(
+                f"statistics of another frame supplied for the frame {shown_frame[0]}"
+            )
 
     def show_proxy(proxy: Any, corrected: Any = None) -> None:
         pts = next(t for t in stored if t % 251 == int(proxy[0, 0, 0]))
         if not slider.isSliderDown():
             violations.append(f"the proxy of {pts} shown while the slider is up")
-        elif pts not in visited:
-            violations.append(f"the proxy of {pts} shown, not a value of this drag")
+        elif pts != stored[slider.value()]:
+            violations.append(
+                f"the proxy of {pts} shown while the handle is on {stored[slider.value()]}"
+            )
         display.append(("proxy", pts))
 
     monkeypatch.setattr(presenter, "present", present)
     monkeypatch.setattr(session, "set_position", set_position)
+    monkeypatch.setattr(session, "set_statistics", set_statistics)
     monkeypatch.setattr(env.window.controller, "show_proxy", show_proxy)
     assert len({t % 251 for t in stored}) == len(stored)
 
@@ -1251,6 +1268,7 @@ def scenario_interleave(
         shown = requested if roll < 0.6 else (requested + 1500 if roll < 0.8 else None)
         if shown is not None:
             display.append(("frame", shown))
+            shown_frame[0] = shown
         session.frame_decoded.emit(FrameOutcome(requested, shown))
 
     def drain(rng: random.Random) -> None:
@@ -1281,7 +1299,6 @@ def scenario_interleave(
         positions.clear()
         decodes.clear()
         display.clear()
-        visited.clear()
         intent_pts: int | None = None
 
         for _ in range(steps):
@@ -1290,13 +1307,10 @@ def scenario_interleave(
             down = slider.isSliderDown()
             if step == "press" and not down:
                 slider.setSliderDown(True)
-                visited.clear()
-                visited.add(stored[slider.value()])
                 intent_pts = stored[slider.value()]
             elif step == "move":
                 index = rng.choice([i for i in range(len(stored)) if i != before])
                 slider.setValue(index)
-                visited.add(stored[index])
                 intent_pts = stored[index]
             elif step == "release" and down:
                 slider.setSliderDown(False)
@@ -1350,6 +1364,15 @@ class FollowingHandlePanel(TimelinePanel):
         self._update_time(pts)
 
 
+class SameDragProxyPanel(TimelinePanel):
+    """Planted (round 5): any proxy of the drag counts, also one the handle has moved on from."""
+
+    def _current(self, request: Any) -> bool:
+        if request.kind == "proxy":
+            return self._dragging and request.ref == self._drag
+        return super()._current(request)
+
+
 class NewestCommitPanel(TimelinePanel):
     """Planted (round 1, F1): a commit applies if it is the newest COMMIT, drags ignored."""
 
@@ -1374,13 +1397,20 @@ def test_the_latest_intent_wins_over_every_seeded_interleaving(
 
 
 @pytest.mark.parametrize(
-    "plant", [IntentlessPressPanel, NoReshowPanel, FollowingHandlePanel, NewestCommitPanel]
+    ("plant", "reason"),
+    [
+        (IntentlessPressPanel, "while the slider is down"),
+        (NoReshowPanel, "not the proxy of the handle"),
+        (FollowingHandlePanel, "the handle moved from"),
+        (NewestCommitPanel, "while the slider is down"),
+        (SameDragProxyPanel, "shown while the handle is on"),
+    ],
 )
 def test_planted_lane_orderings_fail_the_interleaving_by_name(
-    make_env, monkeypatch: pytest.MonkeyPatch, plant: type[TimelinePanel]
+    make_env, monkeypatch: pytest.MonkeyPatch, plant: type[TimelinePanel], reason: str
 ) -> None:
     env = make_env(ticks=INTERLEAVE_STORED, gated=(0,), panel_class=plant)
-    with pytest.raises(AssertionError, match="interleaving seed"):
+    with pytest.raises(AssertionError, match=f"interleaving seed .*{reason}"):
         scenario_interleave(env, monkeypatch)
 
 
