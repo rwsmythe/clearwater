@@ -369,9 +369,55 @@ def test_still_is_what_the_manifest_says(sample_id: str, sample: Callable[[str],
         assert color["primaries"] == ("display-p3" if kind == "display-p3" else "bt709")
     if entry["kind"] in ("jpeg", "heic"):
         assert measured["orientation"] == facts["exif_orientation"]
-    assert metadata["source_format"] == entry["kind"]
     assert metadata["orientation"] == (measured.get("orientation") or 1)
     assert photo_expect["image"]["orientation_applied"] is True
+
+
+@pytest.mark.parametrize("sample_id", STILL_IDS)
+def test_still_container_format_is_read_from_magic_bytes(
+    sample_id: str, sample: Callable[[str], Path]
+) -> None:
+    """Each still's container, read from its own bytes, is the kind the manifest records."""
+    entry = ENTRIES[sample_id]
+    path = sample(sample_id)
+    data = path.read_bytes()
+    assert stills.container_format(data) == entry["kind"]
+    assert stills.check_still_format(data, entry["kind"]) is None
+    assert entry["expect"]["photo"]["metadata"]["source_format"] == entry["kind"]
+    measured = stills.measure(path, None)["format"]
+    assert measured == entry["facts"]["format"] == entry["kind"].upper()
+
+
+def test_planted_wrong_container_fails_by_name(
+    sample: Callable[[str], Path], tmp_path: Path
+) -> None:
+    """A TIFF under a .jpg name, and an mp42 ftyp file as a HEIC, fail the format check by name."""
+    entry = ENTRIES["jpeg-gradient-none"]
+    tiff = sample("tiff8-gradient-none").read_bytes()
+    planted = tmp_path / "x.jpg"
+    planted.write_bytes(tiff)
+    assert entry["kind"] == "jpeg"
+    # The old comparison read two manifest fields, so the bytes never reached it.
+    assert entry["expect"]["photo"]["metadata"]["source_format"] == entry["kind"]
+    problem = stills.check_still_format(planted.read_bytes(), "jpeg")
+    assert problem is not None and "'tiff'" in problem and "'jpeg'" in problem
+    mp4_like = struct.pack(">I", 24) + b"ftypmp42" + bytes(4) + b"mp42isom"
+    assert stills.container_format(mp4_like) is None
+    problem = stills.check_still_format(mp4_like, "heic")
+    assert problem is not None and "no known still container" in problem and "'heic'" in problem
+    with pytest.raises(ValueError, match="'tiff' container, the requested kind is 'jpeg'"):
+        stills._record(
+            _guard(tmp_path),
+            tmp_path,
+            sample_id="x",
+            relative="x.jpg",
+            kind="jpeg",
+            serves=[],
+            exercises="planted",
+            expected={},
+            icc=None,
+            extra={},
+        )
 
 
 def _unit_pixels(path: Path) -> np.ndarray[Any, Any]:
@@ -473,45 +519,67 @@ def test_stills_carry_no_gps(sample: Callable[[str], Path]) -> None:
         assert int(ExifTags.Base.GPSInfo) not in exif, sample_id
 
 
-XMP_MARKERS = (b"<x:xmpmeta", b"<?xpacket", b"ns.adobe.com/xap", b"exif:GPS", b"GPSLatitude")
-"""Byte strings that mark an XMP packet or a GPS value in any container."""
-
-
-def _xmp_markers(data: bytes) -> list[bytes]:
-    """Return the XMP or GPS markers found anywhere in a file's raw bytes."""
-    return [marker for marker in XMP_MARKERS if marker in data]
-
-
 def _committed_files() -> list[Path]:
     """Every committed fixture file except the manifest, including any the manifest omits."""
     return sorted(p for p in FIXTURES_DIR.rglob("*") if p.is_file() and p.name != "manifest.json")
 
 
-def test_no_committed_file_carries_an_xmp_packet_or_gps_text() -> None:
-    """The raw bytes of every committed sample, whatever its container, hold no XMP or GPS."""
+def test_no_committed_file_carries_xmp_or_a_gps_property() -> None:
+    """The raw bytes of every committed sample, whatever its container, name no XMP or GPS."""
     files = _committed_files()
     assert len(files) >= 86
-    found = {p.name: _xmp_markers(p.read_bytes()) for p in files}
-    assert {name: marks for name, marks in found.items() if marks} == {}
+    found = {p.name: stills.xmp_gps_findings(p.read_bytes()) for p in files}
+    assert {name: names for name, names in found.items() if names} == {}
 
 
-def test_planted_xmp_gps_packet_is_caught_by_name(sample: Callable[[str], Path]) -> None:
-    """A JPEG with an APP1 XMP packet holding GPS fails the scan, naming the markers."""
-    data = sample("jpeg-gradient-none").read_bytes()
-    packet = (
-        b"http://ns.adobe.com/xap/1.0/\x00<x:xmpmeta xmlns:x='adobe:ns:meta/'>"
-        b"<rdf:Description exif:GPSLatitude='21,18.5N'/></x:xmpmeta>"
-    )
-    segment = b"\xff\xe1" + struct.pack(">H", len(packet) + 2) + packet
-    planted = data[:2] + segment + data[2:]
-    assert _xmp_markers(data) == []
-    assert _xmp_markers(planted) == [
-        b"<x:xmpmeta",
-        b"ns.adobe.com/xap",
-        b"exif:GPS",
-        b"GPSLatitude",
+OLD_XMP_MARKERS = (b"<x:xmpmeta", b"<?xpacket", b"ns.adobe.com/xap", b"exif:GPS", b"GPSLatitude")
+"""The fixed spellings the scan used before WP-T3; kept only to show they miss the plant."""
+
+PLANTED_XMP = (
+    b'<ns0:xmpmeta xmlns:ns0="adobe:ns:meta/">'
+    b'<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">'
+    b'<rdf:Description xmlns:foo="http://ns.adobe.com/exif/1.0/" '
+    b'foo:GPSLongitude="0,0.0E" foo:GPSAltitude="0/1"/>'
+    b"</rdf:RDF></ns0:xmpmeta>"
+)
+"""XMP with a prefix of its own (``foo``, ``ns0``) holding only synthetic zero GPS values."""
+
+
+def test_planted_xmp_with_another_prefix_and_gps_only_is_caught_by_name(
+    sample: Callable[[str], Path],
+) -> None:
+    """XMP under other prefixes with only GPSLongitude/GPSAltitude is named; the old list is blind.
+
+    The XMP rides in an uncompressed PNG ``iTXt`` chunk, which needs no ``xap`` packet header
+    (a JPEG APP1 packet starts with one, and the old list matched that header; the second half
+    plants that form too).
+    """
+    expected = [
+        "GPSAltitude",
+        "GPSLongitude",
+        "adobe:ns:meta/",
+        "http://ns.adobe.com/exif/1.0/",
     ]
-    with Image.open(io.BytesIO(planted)) as image:  # still a readable JPEG, EXIF GPS untouched
+    png = sample("png8-gradient-none").read_bytes()
+    itxt = stills._chunk(b"iTXt", b"XML:com.adobe.xmp\x00\x00\x00\x00\x00" + PLANTED_XMP)
+    planted = png[:-12] + itxt + png[-12:]
+    assert stills.xmp_gps_findings(png) == []
+    assert stills.xmp_gps_findings(planted) == expected
+    assert [m for m in OLD_XMP_MARKERS if m in planted] == []  # the old scan passes it
+    with Image.open(io.BytesIO(planted)) as image:  # still a readable PNG, EXIF GPS absent
+        assert not image.getexif().get_ifd(ExifTags.IFD.GPSInfo)
+
+    jpeg = sample("jpeg-gradient-none").read_bytes()
+    packet = b"http://ns.adobe.com/xap/1.0/\x00" + PLANTED_XMP
+    segment = b"\xff\xe1" + struct.pack(">H", len(packet) + 2) + packet
+    planted_jpeg = jpeg[:2] + segment + jpeg[2:]
+    assert stills.xmp_gps_findings(jpeg) == []
+    assert stills.xmp_gps_findings(planted_jpeg) == sorted(
+        [*expected, "http://ns.adobe.com/xap/1.0/"]
+    )
+    # The old list saw only the packet header, never a GPS property.
+    assert [m for m in OLD_XMP_MARKERS if m in planted_jpeg] == [b"ns.adobe.com/xap"]
+    with Image.open(io.BytesIO(planted_jpeg)) as image:
         assert not image.getexif().get_ifd(ExifTags.IFD.GPSInfo)
 
 
@@ -573,7 +641,7 @@ def test_planted_udta_payload_is_caught_by_name(
         data[start : start + 4] = struct.pack(">I", size)
     problems = _udta_problems(bytes(data))
     assert any("udta holds [b'meta', b'GPMF']" in p for p in problems), problems
-    assert _xmp_markers(bytes(data)) == []  # only the udta walk can see this one
+    assert stills.xmp_gps_findings(bytes(data)) == []  # only the udta walk can see this one
     planted = tmp_path / "planted-udta.mp4"
     planted.write_bytes(bytes(data))
     assert video.measure(planted)["has_location_tag"] is False  # the old tag check passes it
@@ -610,7 +678,8 @@ def test_ad24_heic_cases_differ_as_named(
 ) -> None:
     path = sample(f"heic-ad24-{case}")
     data = path.read_bytes()
-    assert photo.heif_transforms(data)["irot"] == irot
+    assert photo.heif_transforms(data)["irot"] == irot  # the independent second reader
+    assert stills.heif_primary_properties(data)["irot"] == irot
     raw = pillow_heif.open_heif(str(path)).info.get("exif")
     assert photo.load_exif(raw).get(int(ExifTags.Base.Orientation)) == tag
     pillow_heif.register_heif_opener()
@@ -637,6 +706,155 @@ def test_ad24_heic_cases_differ_as_named(
         assert photo.pose(never, 8, upright, 8, 6) == "upright"
     if case == "neither":
         assert photo.pose(always, 8, upright, 8, 1) == "upright"
+
+
+HEIC_IDS = [i for i in STILL_IDS if ENTRIES[i]["kind"] == "heic"]
+
+
+def _manifest_disagreements(data: bytes, facts: dict[str, Any]) -> list[str]:
+    """Name each primary-item transform that differs from the manifest facts."""
+    props = stills.heif_primary_properties(data)
+    return [
+        f"{name} is {props[name]!r}, the manifest has {facts[name]!r}"
+        for name in ("irot", "imir")
+        if props[name] != facts[name]
+    ]
+
+
+@pytest.mark.parametrize("sample_id", HEIC_IDS)
+def test_heic_primary_properties_come_through_ipma_and_ispe(
+    sample_id: str, sample: Callable[[str], Path]
+) -> None:
+    """The primary item's irot, imir and ispe, read through ipma, agree with the manifest."""
+    data = sample(sample_id).read_bytes()
+    facts = ENTRIES[sample_id]["facts"]
+    assert _manifest_disagreements(data, facts) == []
+    assert stills.check_heif_extents(facts, stills.heif_primary_properties(data)) == []
+    second = photo.heif_transforms(data)  # the independent reader agrees on these one-item files
+    assert (second["irot"], second["imir"]) == (facts["irot"], facts["imir"])
+
+
+def _ipco_property(data: bytes, kind: str) -> tuple[int, int]:
+    """Return the 1-based ``ipco`` index and body offset of the first ``kind`` property."""
+    meta, meta_end = stills._child(data, "meta", 0, len(data))
+    iprp, iprp_end = stills._child(data, "iprp", meta + 4, meta_end)
+    ipco, ipco_end = stills._child(data, "ipco", iprp, iprp_end)
+    for number, (name, body, _) in enumerate(stills._boxes(data, ipco, ipco_end), start=1):
+        if name == kind:
+            return number, body
+    raise AssertionError(f"no {kind} property")
+
+
+def test_planted_irot_not_associated_with_the_primary_fails_by_name(
+    sample: Callable[[str], Path],
+) -> None:
+    """An irot left in ipco but dropped from the primary's ipma entry reads as no rotation."""
+    data = sample("heic-ad24-both").read_bytes()
+    facts = ENTRIES["heic-ad24-both"]["facts"]
+    index, _ = _ipco_property(data, "irot")
+    meta, meta_end = stills._child(data, "meta", 0, len(data))
+    iprp, iprp_end = stills._child(data, "iprp", meta + 4, meta_end)
+    (ipma,) = [body for kind, body, _ in stills._boxes(data, iprp, iprp_end) if kind == "ipma"]
+    assert data[ipma : ipma + 4] == bytes(
+        4
+    )  # version 0, flags 0: item id u16, one-byte associations
+    assert struct.unpack(">I", data[ipma + 4 : ipma + 8]) == (1,)
+    count = data[ipma + 10]
+    planted = bytearray(data)
+    for at in range(ipma + 11, ipma + 11 + count):
+        if data[at] & 0x7F == index:
+            planted[at] = 0
+    assert bytes(planted) != data and len(planted) == len(data)
+    # The old reader never looked at ipma, so it still says 270 and the manifest comparison passes.
+    assert photo.heif_transforms(bytes(planted))["irot"] == 270 == facts["irot"]
+    assert stills.heif_primary_properties(bytes(planted))["irot"] is None
+    assert _manifest_disagreements(bytes(planted), facts) == ["irot is None, the manifest has 270"]
+    assert stills.check_heif_extents(facts, stills.heif_primary_properties(bytes(planted)))
+
+
+def test_planted_ispe_disagreeing_with_stored_size_fails_by_name(
+    sample: Callable[[str], Path],
+) -> None:
+    """An ispe width that is not the stored width is named against the stored size."""
+    data = sample("heic-ad24-irot-only").read_bytes()
+    facts = ENTRIES["heic-ad24-irot-only"]["facts"]
+    assert (facts["stored_width"], facts["stored_height"]) == (64, 96)
+    _, body = _ipco_property(data, "ispe")
+    planted = bytearray(data)
+    planted[body + 4 : body + 8] = struct.pack(">I", 128)  # version/flags, then width
+    props = stills.heif_primary_properties(bytes(planted))
+    assert props["ispe"] == (128, 96)
+    problems = stills.check_heif_extents(facts, props)
+    assert problems[0] == "ispe is (128, 96), the stored size is (64, 96)"
+    assert stills.check_heif_extents(facts, stills.heif_primary_properties(data)) == []
+
+
+def _box(kind: bytes, body: bytes) -> bytes:
+    """Encode one ISO-BMFF box."""
+    return struct.pack(">I", 8 + len(body)) + kind + body
+
+
+def _ipma(version: int, flags: int, entries: list[tuple[int, list[int]]]) -> bytes:
+    """Encode an ``ipma`` box: ``(item, associations)`` entries, associations as raw numbers."""
+    body = bytes([version]) + flags.to_bytes(3, "big") + struct.pack(">I", len(entries))
+    for item, associations in entries:
+        body += struct.pack(">H" if version < 1 else ">I", item) + bytes([len(associations)])
+        for association in associations:
+            body += struct.pack(">H", association) if flags & 1 else bytes([association])
+    return _box(b"ipma", body)
+
+
+def _synthetic_heif(primary: int | None, pitm_version: int, ipmas: list[bytes]) -> bytes:
+    """Build a HEIF skeleton: ispe 64x96 (1), irot 90 (2), irot 270 (3), imir (4), ispe 8x8 (5)."""
+    ispe = _box(b"ispe", bytes(4) + struct.pack(">II", 64, 96))
+    other = _box(b"ispe", bytes(4) + struct.pack(">II", 8, 8))
+    ipco = _box(
+        b"ipco",
+        ispe + _box(b"irot", b"\x01") + _box(b"irot", b"\x03") + _box(b"imir", b"\x01") + other,
+    )
+    pitm = b""
+    if primary is not None:
+        wide = struct.pack(">H" if pitm_version < 1 else ">I", primary)
+        pitm = _box(b"pitm", bytes([pitm_version, 0, 0, 0]) + wide)
+    meta = _box(b"meta", bytes(4) + pitm + _box(b"iprp", ipco + b"".join(ipmas)))
+    return _box(b"ftyp", b"heic" + bytes(4) + b"mif1") + meta
+
+
+def test_heif_primary_properties_reads_the_ipma_variants() -> None:
+    """Item and association widths, the essential bit, index 0, two ipma boxes, a late primary."""
+    # Version 0, one-byte associations: item 1 is rotated 90 (index 2), the primary item 2 is
+    # rotated 270 (index 3, essential bit set) with an index-0 association and a mirror.
+    plain = _ipma(0, 0, [(1, [1, 2]), (2, [0x81, 0x83, 0, 4])])
+    got = stills.heif_primary_properties(_synthetic_heif(2, 0, [plain]))
+    assert got == {"item": 2, "irot": 270, "imir": 1, "ispe": (64, 96)}
+    assert stills.heif_primary_properties(_synthetic_heif(1, 0, [plain]))["irot"] == 90
+    # Version 1 with flags 1: 32-bit item ids, 16-bit associations (essential bit 0x8000), a
+    # 32-bit pitm, and the primary's associations split over two ipma boxes.
+    first = _ipma(1, 1, [(7, [1]), (9, [1])])
+    second = _ipma(1, 1, [(9, [0x8003])])
+    got = stills.heif_primary_properties(_synthetic_heif(9, 1, [first, second]))
+    assert got == {"item": 9, "irot": 270, "imir": None, "ispe": (64, 96)}
+    # An item with no transform properties reads as none.
+    bare = _ipma(0, 0, [(1, [1])])
+    assert stills.heif_primary_properties(_synthetic_heif(1, 0, [bare]))["irot"] is None
+
+
+@pytest.mark.parametrize(
+    ("primary", "ipmas", "message"),
+    [
+        (None, [_ipma(0, 0, [(1, [1])])], "pitm"),
+        (3, [_ipma(0, 0, [(1, [1])])], "no 'ipma' entry for the primary item 3"),
+        (1, [_ipma(0, 0, [(1, [2])])], "no 'ispe' property"),
+        (1, [_ipma(0, 0, [(1, [1, 5])])], "two 'ispe' properties"),
+        (1, [_ipma(0, 0, [(1, [1, 9])])], "beyond the 5 properties"),
+    ],
+)
+def test_heif_primary_properties_names_the_missing_piece(
+    primary: int | None, ipmas: list[bytes], message: str
+) -> None:
+    """A missing pitm, ipma entry or ispe, or a bad index, is a ValueError that says which."""
+    with pytest.raises(ValueError, match=message):
+        stills.heif_primary_properties(_synthetic_heif(primary, 0, ipmas))
 
 
 def test_heic_ten_bit_arrives_as_sixteen_bit_samples(sample: Callable[[str], Path]) -> None:
@@ -1018,6 +1236,78 @@ def test_planted_clip_at_another_rate_fails_by_name(
         "packet_pts_sha256 is" in problem
     )  # the timing, by name (the stream still declares 30000/1001)
     assert verify_generated(entry, sample("ad14-flicker")) is None
+
+
+OLD_STREAM_IDENTITY = tuple(n for n in flicker.STREAM_IDENTITY if n != "ffprobe_errors")
+"""The identity fields the gate compared before WP-T3 (no ffprobe errors, no durations)."""
+
+
+def _old_gate_problems(path: Path, recorded: dict[str, Any]) -> list[str]:
+    """Return what the pre-WP-T3 identity comparison reports for a clip."""
+    stream = flicker.probe_clip(path)
+    return [name for name in OLD_STREAM_IDENTITY if stream.get(name) != recorded[name]]
+
+
+@needs_ffmpeg
+def test_flicker_identity_includes_ffprobe_errors_and_packet_durations(
+    sample: Callable[[str], Path],
+) -> None:
+    """The real clip has no ffprobe complaints and the declared rate's packet durations."""
+    assert "ffprobe_errors" in flicker.STREAM_IDENTITY
+    recorded = ENTRIES["ad14-flicker"]["facts"]["stream"]
+    assert recorded["ffprobe_errors"] == []
+    clip = sample("ad14-flicker")
+    assert flicker.probe_clip(clip)["ffprobe_errors"] == []
+    durations = flicker.packet_durations(clip)
+    assert len(durations) == 90
+    assert recorded["r_frame_rate"] == "30000/1001" and recorded["time_base"] == "1/1000"
+    assert all(abs(d - 33.37) <= 1 for d in durations)  # 1001 / 30000 s in milliseconds
+    assert flicker.identity_problems(clip, recorded) == []
+    assert flicker.duration_problem([33, 34, 33], "30000/1001", "1/1000") is None
+    assert flicker.duration_problem([33, 17], "30000/1001", "1/1000") is not None
+
+
+@needs_ffmpeg
+def test_planted_truncated_clip_fails_by_name(
+    sample: Callable[[str], Path], tmp_path: Path
+) -> None:
+    """A clip with its last 40 bytes cut is reported by its ffprobe errors, and by them alone."""
+    recorded = ENTRIES["ad14-flicker"]["facts"]["stream"]
+    planted = tmp_path / "truncated.mkv"
+    planted.write_bytes(sample("ad14-flicker").read_bytes()[:-40])
+    problems = flicker.identity_problems(planted, recorded)
+    assert any(p.startswith("ffprobe_errors is [") for p in problems), problems
+    # Give the manifest copy every other identity field of the plant: only the errors are left.
+    stream = flicker.probe_clip(planted)
+    assert stream["ffprobe_errors"] != []
+    same_but_errors = {**recorded, **{n: stream[n] for n in OLD_STREAM_IDENTITY}}
+    problems = flicker.identity_problems(planted, same_but_errors)
+    assert len(problems) == 1 and problems[0].startswith("ffprobe_errors is ["), problems
+    assert _old_gate_problems(planted, same_but_errors) == []  # the old tuple passes it
+    entry = {**ENTRIES["ad14-flicker"], "facts": {**ENTRIES["ad14-flicker"]["facts"]}}
+    entry["facts"]["stream"] = same_but_errors
+    assert "ffprobe_errors is" in (verify_generated(entry, planted) or "")
+
+
+@needs_ffmpeg
+def test_planted_clip_with_other_packet_durations_fails_by_name(
+    sample: Callable[[str], Path], tmp_path: Path
+) -> None:
+    """The clip's packets restamped with 17 tick durations keep pts and rates, and are named."""
+    entry = ENTRIES["ad14-flicker"]
+    recorded = entry["facts"]["stream"]
+    video.run_ffmpeg(
+        _guard(tmp_path),
+        ["-i", str(sample("ad14-flicker")), "-c", "copy", "-an", "-bsf:v", "setts=duration=17"],
+        tmp_path / "durations-17.mkv",
+        tmp_path,
+    )  # fmt: skip
+    planted = tmp_path / "durations-17.mkv"
+    assert flicker.packet_durations(planted) == [17] * 90
+    assert _old_gate_problems(planted, recorded) == []  # pts hash, counts and rates all equal
+    problems = flicker.identity_problems(planted, recorded)
+    assert problems == ["packet_durations is [17], the declared rate gives 33.37 ticks"]
+    assert "packet_durations is [17]" in (verify_generated(entry, planted) or "")
 
 
 @needs_ffmpeg
