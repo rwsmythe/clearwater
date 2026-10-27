@@ -100,8 +100,14 @@
   QUALITY_RATIO) fixed. Cell 3 retired 302,881 at dc76d92; cell 4 `wp314-cell4` (38K) remediates then V16 rows.
   WP-T4 E1 quiet-seat probe PASSED (DR-58 (c) trigger not fired). Next: B pass 2, V16 exclusive blocks (OPEN/CLOSE to
   me), candidate full suite, WP-T4 rung 4.
-- **EXCLUSIVE WINDOW OPEN 2026-10-27 11:40Z: WP3.14 V16 block 1** (GX011627 x6 + synthetic 5.3K, ~1 h; msg
-  `e3f5c7f65cbbdd54`); block 2 GX011625 (~2.5-3 h) follows as its own OPEN. **NOTHING HEAVY AT THIS SEAT until CLOSE.**
+- **EXCLUSIVE WINDOW OPEN 2026-10-27 13:05Z: WP3.14 V16 block 2** (GX011625 14,938 frames, one cold c3 run, auto
+  encoder, ~4.5 h, allow 5 h; msg `8ce78d1c60253f08`). Block 1 CLOSED 12:58Z (ran 11:33-12:57Z, all runs ok). **NOTHING
+  HEAVY AT THIS SEAT until the orchestrator posts CLOSE.** Block 1 rows: GX011627 c3 cold 1.061-1.065 s/frame = 31.9
+  min/min MISS of D106's interim 25 (analysis pass ~30 %, frames ~0.74 s/frame); c3 warm 23.2 meets; ancuti2018 cold
+  21.6 meets; c3 libx265 cold 35.6 (14 s close); synthetic 5.3K 8:7 cold 136, 6.2 GiB RSS / 6.0 GiB GPU. **CHARC RULED
+  (msg e1711557): the miss is WP3.21 DATA, not a stop, not a defect** (V16 "tunable"; D106 names WP3.21 and the WP5.2
+  re-measure; brief item 10 "best effort", Done = row recorded). Accept record states the miss plainly; the split,
+  the libx265 and 5.3K rows and the two "Not carried" warnings (D86 as designed) go into WP3.21's brief baseline.
 - **WP3.14 B pass 2 BLOCKED (1 major), adjudicated AT THE GATE, CHARC UPHELD** (light checks: reviewB2 md5s OK,
   assertions OK, VERDICT BLOCKING anchored; candidate `wp3.14-mc` 2e9fd35 patch-id f21b6411 on 9753b7b..2e1dc11 and
   52ee9e2..2e9fd35; footprint owned + granted engine.py block). F1 MAJOR: photo path had no cancel check between the
