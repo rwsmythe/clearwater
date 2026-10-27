@@ -111,6 +111,15 @@
   CLOSED, DR-35 (a) mechanism amended, DR-57 (a) ADDRESSED; NEW DR-62 (GUI recompute vs export, WP4.3), DR-63 (sink
   phase write window, next encode.py touch), DR-64 (N6 body erratum, owner's word).** Worktrees `wp3.14`, `wp3.14-mc`,
   `orch-state-g14` released. WP3.21 brief: orchestrator drafts from the V16 baseline, I approve FINAL.
+- **WP3.21 brief APPROVED FINAL** (draft 84b793c; my rulings msg in the Rulings section; AD-7 READING and the oracle
+  tiers recorded in `docs/decisions.md`): Q1 grants as recommended (`memory.py` only by me; `encode.py` grant closes
+  DR-63); Q2 AD-7 reading YES with the COMPOSED-reach lead (90 frames c3) and one thread per decoder; Q3 two tiers,
+  records and proxy bytes tier 1 ALWAYS (the AD-5 1e-3 leg struck), Gaussian 1e-5 CONFIRMED; Q4 FFT of the same
+  truncated kernel with scipy-`reflect` padding, float32, IIR excluded; Q5 a miss = YIELD to me (follow-on or WP5.2
+  figure; D106 owner's; D109 no fallback); Q6 tool not timers, 5 % check on summed MEANS; Q7 whole V16_PLAN; Q8 DR-40
+  (b) stays OPEN, ask at round 0 if >1 %; Q9 memory budget, formula change = STOP; Q10 interim windows. Dispatch
+  `implementer-opus-high` after WP-T4 rung 4; both nets Codex. Owed at its accept: AD-11 tunable note stands; the
+  N6 figure is WP5.2's (AD-21).
 - **WP-T4 rebased onto ba6e923 (f8b8f4b, patch-id 525a84c8 unchanged): NO OBJECTION** (rung 4 measures main's suite,
   ~160 more tests incl. WP3.14's libx265 sinks; diagnostic parallel leg not a figure of record; Codex turn 5 accounts
   for test IDs by collection). Rung 4 round 1 OPEN comes as its own post; nothing heavy here while OPEN.
