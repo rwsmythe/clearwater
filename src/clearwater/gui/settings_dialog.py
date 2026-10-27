@@ -722,18 +722,20 @@ class SettingsDialog(QDialog):
         return dataclasses.replace(self._context.session.settings(), **changes)
 
     def accept(self) -> None:
-        """Validate, save unless the file was refused, apply, set the cache limit, close."""
+        """Validate settings to apply, save unless refused, apply, set the cache limit, close."""
+        new = self.edited_settings()
         try:
-            validate_suffix(self.suffix_edit.text())
-        except ValueError:
+            validate_suffix(new.output_suffix)
+        except ValueError as error:
             self._check_suffix()
+            detail = ascii_text(str(error))[:200]
+            _present_error(self._context, f"The output suffix is not valid: {detail}")
             return
         if self._encoder_unacceptable():
             return
         context = self._context
         session = context.session
         old = session.settings()
-        new = self.edited_settings()
         if session.settings_refusal() is None:
             self._save(new)
         session.set_settings(new)

@@ -528,6 +528,100 @@ def test_a_stored_invalid_suffix_disables_ok_until_fixed(env: Env) -> None:
     assert "bad/suffix" in dialog.suffix_error.text()
 
 
+def _assert_suffix_refusal_then_correction(
+    env: Env, window: MainWindow, dialog: SettingsDialog, stored: Settings
+) -> None:
+    """Refuse the applied suffix without saving, then accept a corrected edit."""
+    path = env.config / "settings.json"
+    assert not path.exists()
+    with pytest.raises(ValueError) as caught:
+        validate_suffix(stored.output_suffix)
+    detail = str(caught.value).encode("ascii", "backslashreplace").decode()[:200]
+    dialog.accept()
+    assert not path.exists(), "invalid applied suffix was written"
+    assert dialog.result() != QDialog.DialogCode.Accepted
+    assert window.session.settings() == stored
+    (error,) = presenter_of(window).of("error")
+    assert error.owner == OWNER_SETTINGS
+    assert error.text == f"The output suffix is not valid: {detail}"
+    assert error.text.isascii()
+
+    dialog.suffix_edit.setText("_fixed")
+    assert dialog.ok_button.isEnabled()
+    assert dialog.suffix_error.text() == ""
+    dialog.accept()
+    expected = dataclasses.replace(stored, output_suffix="_fixed")
+    assert dialog.result() == QDialog.DialogCode.Accepted
+    assert env.saved() == expected
+    assert window.session.settings() == expected
+    assert not presenter_of(window).of("error")
+    env.idle(window)
+
+
+def test_a_stored_suffix_that_fails_validation_in_its_last_character_is_refused(
+    env: Env,
+) -> None:
+    """Validate the last character even beyond the control's usual edit limit."""
+    stored = Settings(output_suffix="a" * 32767 + "/")
+    window = env.start(saved=stored)
+    dialog = env.open(window)
+    # It was loaded from disk; removing the fixture file makes any write observable.
+    (env.config / "settings.json").unlink()
+    _assert_suffix_refusal_then_correction(env, window, dialog, stored)
+
+
+def test_a_stored_suffix_with_a_newline_is_refused(env: Env) -> None:
+    """Refuse a newline in a loaded suffix and allow a valid correction."""
+    stored = Settings(output_suffix="bad\nsuffix")
+    window = env.start(saved=stored)
+    dialog = env.open(window)
+    (env.config / "settings.json").unlink()
+    _assert_suffix_refusal_then_correction(env, window, dialog, stored)
+
+
+def _stored_suffix_scenario(env: Env, suffix: str = "bad/suffix") -> None:
+    """The session's current suffix must be validated when the field is unedited."""
+    window = env.start()
+    dialog = env.open(window)
+    stored = dataclasses.replace(Settings(), output_suffix=suffix)
+    window.session.set_settings(stored)
+    assert dialog.suffix_edit.text() == "_corrected"
+    assert dialog.edited_settings().output_suffix == suffix
+    _assert_suffix_refusal_then_correction(env, window, dialog, stored)
+
+
+@pytest.mark.parametrize(
+    "suffix", ["bad/suffix", "\u00e9" * 100 + "/"], ids=["separator", "non-ascii-error"]
+)
+def test_stored_suffix_scenario_passes_on_the_real_dialog(env: Env, suffix: str) -> None:
+    """Catch field-only validation, including escaping and limiting the error detail."""
+    _stored_suffix_scenario(env, suffix)
+
+
+def test_planted_field_only_suffix_check_is_caught(
+    env: Env, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The shared scenario detects a save after validating only the displayed field."""
+
+    def field_only(self: SettingsDialog) -> None:
+        try:
+            validate_suffix(self.suffix_edit.text())
+        except ValueError:
+            self._check_suffix()
+            return
+        if self._encoder_unacceptable():
+            return
+        new = self.edited_settings()
+        if self._context.session.settings_refusal() is None:
+            self._save(new)
+        self._context.session.set_settings(new)
+        QDialog.accept(self)
+
+    monkeypatch.setattr(SettingsDialog, "accept", field_only)
+    with pytest.raises(AssertionError, match="invalid applied suffix was written"):
+        _stored_suffix_scenario(env)
+
+
 # AD-9: force CPU.
 
 
