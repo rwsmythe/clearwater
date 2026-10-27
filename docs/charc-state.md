@@ -286,8 +286,9 @@ release post.
 
 ### Frozen inputs (verify each at its path)
 
-- Spec `docs/underwater-correction-spec.md` **v0.5.4** (owner-approved 2026-10-20 ~16:00Z,
-  verbatim "Gate 1: Option C.  2. Keep.  3. approve 0.5.4"; applied 9cf16c5). D106 interim N6
+- Spec `docs/underwater-correction-spec.md` **v0.5.5** (text only, owner 2026-10-27 verbatim
+  "Apply D75 erratum": D75 parenthetical = AD-12 final mapping; v0.5.4 owner-approved 2026-10-20
+  ~16:00Z, verbatim "Gate 1: Option C.  2. Keep.  3. approve 0.5.4"; applied 9cf16c5). D106 interim N6
   25 min/min; D100 caps KEPT; chapter handling deferred to v2 (v0.5.3).
 - Architecture `docs/architecture.md` **FINAL 1.0**; decisions `docs/decisions.md` AD-1..AD-27.
 - Interfaces **IF-1..IF-10 FROZEN** in `src/clearwater/interfaces/` (WP2.2, main b288533); any
@@ -411,9 +412,8 @@ release post.
 ### Owner
 
 **No owner decision open.** Owner-pending inputs: photos (memory-test photo leg; AD-24 HEIC rule
-provisional until then; WP3.6P runs on them), an iPhone video clip (DR-15 B-frame edit-list leg), and a spec
-errata note for the next edition: D75's parenthetical still quotes cq 18/23/28 and crf 18/23/28 (AD-12 ruled
-cq 22/26/30, crf 21/26/30 on 2026-10-27; D75 defers to AD-12, so nothing blocks on it). Owner-reserved items (plan s.3): footage categories, look check and V2
+provisional until then; WP3.6P runs on them) and an iPhone video clip (DR-15 B-frame edit-list leg). The D75
+erratum is APPLIED (spec v0.5.5, 2026-10-27). Owner-reserved items (plan s.3): footage categories, look check and V2
 visual review, anything relaxing a mandatory requirement, any spec change. Everything else CHARC
 rules in the operator's stead (standing direction 2026-10-14, verbatim in CLAUDE.md "Roles";
 memory `clearwater-unattended-rule.md`); read the owner's words back verbatim with their time;
