@@ -29,12 +29,15 @@ lane and "the Claude pass" for the Codex lane.
 
 - `REVIEWER` = the Codex CLI as an adversarial correctness reviewer
   (`docs/codex-reviewer.md`). **Transport pinned at bootstrap: WSL** (`wsl.exe
-  bash -ilc` with the PATH prefix; `codex-cli 0.162.1` verified live 2026-10-14 at the WP0.1 accept (0.157.0 at bootstrap);
-  no Windows-native codex is installed on this machine). Re-probe liveness at the
+  bash -ilc` with the PATH prefix; `codex-cli 0.162.1` verified live 2026-10-14 at the WP0.1 accept (0.157.0 at bootstrap).
+  Since 2026-10-27 a Windows-native `codex-cli 0.162.1` is ALSO installed (the implementer lane uses it); both
+  transports gave the same banner for the new pin on 2026-10-27. B stays on WSL unless a seat records a reason). Re-probe liveness at the
   bring-up of every review loop with a one-command probe through the exact
   invocation and require one `^ succeeded in` line before round 1. Tier by the
-  blast radius of a MISSED finding: `strong` (`-m gpt-5.6-sol -c
-  model_reasoning_effort=high`, passed PER CALL) for every product-code package;
+  blast radius of a MISSED finding: `strong` (`-m gpt-6.1-sol -c
+  model_reasoning_effort=high`, passed PER CALL; **pin moved from `gpt-5.6-sol` on 2026-10-27, owner-directed,
+  banner value `model: gpt-6.1-sol` from that date; the WP3.10 gate's two B passes ran on the old pin and stand**)
+  for every product-code package;
   `fast` for docs, briefs and tools under `tools/` that produce no shipped output.
   Never tier the rigor.
 - `PRODUCT_REPRESENTATION` = the pre-generated diff against the brief's base SHA

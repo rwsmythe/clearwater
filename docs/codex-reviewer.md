@@ -54,12 +54,15 @@ by task difficulty:
 Mechanism: add `-p <tier>` to the `codex exec` command (a Codex *profile*
 layered over the base config). **The profiles are CONFIGURED (2026-07-22,
 operator-directed; mapping per the OpenAI model docs
-developers.openai.com/api/docs/models/all):** `strong` = `gpt-5.6-sol` / high
+developers.openai.com/api/docs/models/all):** `strong` = `gpt-6.1-sol` / high
 effort (sol = "frontier model for complex professional work"; gating and
 production-code reviews -- `-p strong` is REQUIRED for them, never omitted);
-`fast` = `gpt-5.6-luna` / medium (luna = "optimized for cost-sensitive
-workloads"; plan / doc / low-blast rounds). `gpt-5.6-terra` (the
-intelligence/cost balance) is unassigned -- adopt it only via a deliberate tier
+`fast` = `gpt-6-luna` / medium (luna = "optimized for cost-sensitive
+workloads"; plan / doc / low-blast rounds). **Moved one generation on 2026-10-27
+(owner-directed; was `gpt-5.6-sol` / `gpt-5.6-luna` from 2026-07-22): the catalog default is now
+`gpt-6.1-sol`; the profile FILES in both the Windows and the WSL `~/.codex` were rewritten the same
+day, and the banner format was unchanged on codex-cli 0.162.1 under both transports.** `gpt-6.1-terra`
+(the intelligence/cost balance) is unassigned -- adopt it only via a deliberate tier
 decision. Current Codex CLIs take profiles as PER-PROFILE FILES
 (`~/.codex/<tier>.config.toml`), not a legacy `[profiles.*]` table in
 `config.toml` (the table now ERRORS). The files live in the WINDOWS `~/.codex`;
@@ -107,11 +110,13 @@ WSL, no PATH wrapper, no detach-checkout:
   count:**
   1. **BANNER** -- the transcript's model and effort lines say what you
      intended. **CONCRETE VALUES for a `-p strong` gating round, so a cell can
-     assert without knowing what the profile resolves to: `model: gpt-5.6-sol`
+     assert without knowing what the profile resolves to: `model: gpt-6.1-sol`
      AND `reasoning effort: high` (version-coupled: probed at codex-cli
      0.147.0 2026-08-11 and RE-PROBED at **0.152.1** 2026-09-07 by two
      independent cells plus the orchestrator's own gating round -- banner FORMAT
-     and VALUES unchanged across the bump; re-probe on any further CLI bump).** PROBED FACT, ours not
+     and VALUES unchanged across the bump; re-probe on any further CLI bump;
+     **the VALUE changed from `gpt-5.6-sol` on 2026-10-27 with the pin, re-probed
+     at 0.162.1 under WSL and Windows-native the same day**).** PROBED FACT, ours not
      inherited: an unknown `-p` profile name produces NO error and NO warning
      -- the run silently proceeds at `gpt-5.6-terra` / `medium`, a downgrade of
      BOTH model and effort that every pre-assertion check passed. The positive
@@ -246,7 +251,8 @@ SHOWN REPAIRED BY THE BRING-UP PROBE OF ASSERTION 5 -- for cell rounds AND for R
 B.** The Windows CLI regressed at 0.155.1 (above). WSL's codex is the same version and
 its own sandbox runs commands and reads worktree files. The tier is passed PER CALL,
 never from the global config (which an update rewrote: its default model changed
-under us): `-m gpt-5.6-sol -c model_reasoning_effort=high -s read-only`, and the banner
+under us): `-m gpt-6.1-sol -c model_reasoning_effort=high -s read-only` (the model name as
+pinned on the day; `gpt-5.6-sol` until 2026-10-27), and the banner
 assertion checks exactly those values. Every ledger line records transport + CLI
 version. The rest of this paragraph is the wrapper as first written:
 **THE WINDOWS PATH IS REPAIRED BY ONE PER-CALL FLAG (CHARC, 2026-09-21, on the operator's
@@ -355,8 +361,9 @@ turn in a git worktree, resumed by session id (`codex exec resume <id>`); the dr
   default), `gpt-6-astra`, `gpt-6.1-terra`, `gpt-6-sol`, `gpt-6-luna`, `gpt-5.6-sol/terra/luna`.
   The implementer lane uses `gpt-6.1-sol` at high (effort peaks before max on this family;
   escalation is `gpt-6-astra` at medium for one re-seat, never Sol above high). The review
-  profiles above still pin `gpt-5.6-sol`; the upgrade to `gpt-6.1-sol` is a gate decision taken
-  at a wave boundary with the transition head-to-head, not silently.
+  profiles above moved to `gpt-6.1-sol` / `gpt-6-luna` on 2026-10-27 (owner-directed), with the
+  transition head-to-head run once on a finished tree (the same prompt and diff as a recorded
+  `gpt-5.6-sol` pass).
 - **The weekly readout** for the dispatch tiebreak is `scripts/usage_codex.py` (the native
   executable's `app-server`, `account/rateLimits/read`; the npm shim hangs under pipes).
 - **Reviewer for a Codex cell is the other model:** a `claude -p` read-only pass the driver runs

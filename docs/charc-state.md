@@ -136,7 +136,9 @@ of `origin/main`, unpushed; no push asked (verify `git status -sb`).
   assertions), fill Parts 1-2 lane-dependent reviewer, orchestrator-context two-net + lane rule, codex-reviewer
   implementer section, dispatch-recipe process-turn sentence, HD-1 in decisions.md, CLAUDE.md line, manifest 22.
   NEXT: Stage 2 calibration at the wave 4 briefs (the orchestrator names the pair; CHARC assigns lanes; the pace
-  tiebreak is suspended for the pair); the review pin upgrade + transition head-to-head at the first Codex gate. Codex catalog at this
+  tiebreak is suspended for the pair); the review pin upgrade is DONE 2026-10-27 at the owner's word (`strong` = `gpt-6.1-sol`/high, `fast` =
+  `gpt-6-luna`/medium, both `~/.codex` sides; fill + codex-reviewer banner value updated; WP3.10's B passes on the old
+  pin stand); head-to-head on WP3.20 bbf44e2 recorded in the pass 4.6. Codex catalog at this
   login: 6.1-sol (default), 6-astra, 6.1-terra, 6-sol, 6-luna, 5.6-sol/terra/luna. Research notes (owner-supplied,
   untracked) in `research/multi-model development/`.
 - **WP3.10 floor row DONE (seat 9, EXCLUSIVE window 2026-10-27 01:09Z-02:02Z, CLOSE c02b6a47c057f2e4):** on
