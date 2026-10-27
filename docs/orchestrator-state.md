@@ -27,8 +27,7 @@
     each EXCLUSIVE with OPEN/CLOSE to CHARC; ~85 min baseline + ~9 + serial per round); a third round only on the 15 %
     rule. Then a FRESH Codex session for tabulation, report, gate text and reviews via the ledger.
   - **WP3.21:** brief helper `wp321-brief-helper` (Agent, opus) drafting in `.worktrees/brief-wp3.21`
-    (`docs/briefs/wp3.21-brief.md`; read-only otherwise; notes `scratchpad
-otes-wp3.21-brief.md`). CHARC approves FINAL.
+    (`docs/briefs/wp3.21-brief.md`; read-only otherwise; notes `scratchpad\notes-wp3.21-brief.md`). CHARC approves FINAL.
   - Gen-14 slips: four bare `cd`s with a cell live (`cd <wt> && ...` at top level counts), each reverted next call.
 - **Generation 13 ROLLED OVER 2026-10-27 at ~360K (depth cap). Generation 14 starts at "Live cells" below (RESUME HERE).**
   Gen 13 was `clearwater-orchestrator-20261026-2029`, picked up 2026-10-27 ~06:30Z at main `1217443`;
