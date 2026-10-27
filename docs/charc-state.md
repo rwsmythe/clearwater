@@ -144,6 +144,22 @@ of `origin/main`, unpushed; no push asked (verify `git status -sb`).
   dead Windows shim, only `-ilc` reaches the WSL binary). Codex catalog at this
   login: 6.1-sol (default), 6-astra, 6.1-terra, 6-sol, 6-luna, 5.6-sol/terra/luna. Research notes (owner-supplied,
   untracked) in `research/multi-model development/`.
+- **WP3.10 ACCEPTED 2026-10-27 at main 47bc6d6 (orchestrator gen 12; wave 3 COMPLETE).** Candidate `wp3.10-mc`
+  7f98848 (= `wp3.10` 2b8cd29 rebased onto 59049a9; 72 commits; accept chain 831fb8d on ceec6b9); record
+  `docs/proofs/wp3.10-accept.md`; B trees kept as `wp3.10-mc1` 78ae77a / `wp3.10-mc2` da33e63. **CHARC QA CONFIRMED
+  (static):** `git diff 7f98848 47bc6d6 -- src tests tools pyproject.toml uv.lock` = 0 lines; whole-diff patch-id of
+  base..mc = base..main restricted to the 14 package files (63c56241); footprint owned files only (interfaces,
+  pyproject, uv.lock untouched); every changed blob LF by cat-file; both B passes md5 OK, five assertions OK
+  (gpt-5.6-sol/high, the pin of the day; 0 ^ERROR; 31/32 succeeded; 318,111 / 242,942 tokens; VERDICTs anchored);
+  ruff/format (227)/mypy (132)/harness 379 clean on main at this seat. Full pytest: the candidate's run 7f98848
+  4766 passed / 2 skipped / 2715 s is main's figure by code identity (verified here); the first candidate run was
+  VOID (no `clearwater.local.toml` in the gate worktree) -- rule added to the fill's GATE_CHECKS. Register: DR-17,
+  DR-18, DR-26 CLOSED; DR-20 (4)(6) CLOSED; DR-39 (a) CLOSED, (c) PARTLY; DR-56 (audio edit-list tail not compared),
+  DR-57 (sink limits a-d), DR-58 (several GPUs; probe.py FFREPORT; timing-bound test) NEW; DR-15's iPhone leg
+  OPEN (owner clip). **For WP3.14's brief:** QUALITY_RATIO figures (report 7.2) with DR-48 as ruled; cancel goes
+  through `abort`; a `close` after a partial write is refused by design; provenance < 16 KiB; `resolve_encoder` is
+  the ONE "auto" rule (WP3.20's stub swapped at WP4.3, DR-52); the V16 end-to-end row. Owner: D75 parenthetical
+  erratum (v0.5.5). Orchestrator process note: five bare `cd`s this generation, all reverted, no cell affected.
 - **WP3.10 floor row DONE (seat 9, EXCLUSIVE window 2026-10-27 01:09Z-02:02Z, CLOSE c02b6a47c057f2e4):** on
   e04a7cb (mapping commit, values-only CONFIRMED at this seat: NVENC_CQ 22/26/30, X265_CRF 21/26/30, one selection
   line in `_encoder_options`). NVENC 8-bit 4K 0.154-0.156 s/frame (3 runs GX011627; GX011625 all 14,938 frames

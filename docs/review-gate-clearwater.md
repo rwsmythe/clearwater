@@ -143,6 +143,9 @@ the brief.
 `GATE_CHECKS` (the orchestrator runs every one at its own seat, on the merge
 candidate rebased onto main, and records the actual output lines):
 
+- **Before any suite in a gate worktree, copy the main tree's uncommitted `clearwater.local.toml`
+  into it** (WP3.10's first gate run was VOID without it: the footage tests skipped and the
+  look-check tests failed on `LocalConfigError`; added 2026-10-27).
 - `uv run ruff check .`, `uv run ruff format --check .`, `uv run mypy`,
   `uv run pytest` (with the hardware-marked tests the brief requires, run solo
   where a test is normally skipped or load-sensitive, quoting the enabling reading
