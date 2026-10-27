@@ -20,7 +20,7 @@ Evidence root: `C:\Users\rwsmy\clearwater-review-evidence\wp3.10\` (`r0\` = this
 | 8 | Reviewer A (seat 6) on `d4c08e8`, base `1087343` (SCOPED to the round-7 remediation and the option-B telemetry redesign) | 0 | 0 | 3 | all in envelope; MINOR #1-#3 ACCEPTED (cleanup); ZERO new blocking: the loop TERMINATES | 3 NEW, 0 REOPENED (#2 from `9e6a529`, #3 from `98c805a`) | 0 | INSTRUMENT code and tests, the terminating round's cleanup (`491ecb3` #3, `f262b75` #2, `db6f791` #1); no round 9 (ruling) | WSL, codex-cli 0.162.1 gpt-5.6-sol high; probe 1 + review 26 `succeeded in`; 107,893 tokens; 1 `ERROR` match = echoed source code, not transport | 204,725 at the round-8 yield (seat 6) |
 | 9 | Reviewer A (seat 8) on `ab70b47`, base `e7668e1` (SCOPED to the NVENC rate ceiling, CHARC d329e80e351c3dcc: maxrate = max(2 x source rate, 20 Mb/s)) | 0 | 1 | 0 | MAJOR #1 in envelope (the WP2.3 samples), ACCEPTED, reproduced | 1 NEW (introduced by the ruled 20 Mb/s floor), 0 REOPENED | 0 | PRODUCT (`5cc94e4`, after CHARC's 17f12f9dc7eba3ae O3 ruling withdrew the derived rule) | WSL, codex-cli 0.162.1 gpt-5.6-sol high; probe 1 + review 13 `succeeded in`; 104,444 tokens; 2 `ERROR` matches = echoed source, not transport | 176K (seat 8, at the R9 yield) |
 | 10 | Reviewer A (seat 8) on `5cc94e4`, base `ab70b47` (SCOPED to the R9 #1 remediation + R9 #1 to verify); FIVE-ROUND GATE | 0 | 0 | 2 | MINOR #1, #2 in envelope, ACCEPTED (cleanup); ZERO new blocking: the loop TERMINATES (gate: termination ACCEPTED) | 2 NEW, 0 REOPENED | 0 | TEST-ONLY, the terminating round's cleanup (the commit carrying this row) | WSL, codex-cli 0.162.1 gpt-5.6-sol high; probe 1 + review 28 `succeeded in`; 99,422 tokens; 0 `ERROR` matches | 252K (seat 8, at the R10 yield) |
-| S9 | no review (CHARC `c1d67b39bb72cc1f`: a values-only mapping commit owes NO Reviewer A round) -- the AD-12 mapping `e04a7cb` | -- | -- | -- | -- | -- | 0 | PRODUCT values + the AD-12 unit test (values only) | -- | (dispatcher; seat 9 at the mapping yield) |
+| S9 | no review (CHARC `c1d67b39bb72cc1f`: a values-only mapping commit owes NO Reviewer A round) -- the AD-12 mapping `e04a7cb` | -- | -- | -- | -- | -- | 0 | PRODUCT values + the AD-12 unit test (values only) | -- | 69,810 (seat 9, at the mapping yield) |
 
 Seat 1 stops after round 0 by the orchestrator's instruction (219K before product code; the build
 is the largest in the wave). A fresh cell builds from "RESUME HERE" below.
@@ -198,7 +198,37 @@ main, stream and info packets of an FFmpeg-written file).
   presentation-effect proof. Audio: identity edit at 0.
 - WINDOW RELEASED at the end of this round.
 
-## RESUME HERE (current; for the floor row, the report and the return report -- written by seat 8)
+## RESUME HERE (current; written by seat 9 -- the ladder is DONE)
+
+- **State at seat 9's final yield:** product head `e04a7cb` (the AD-12 mapping, values-only, no
+  Reviewer A round owed); the floor row ran (below); the report `docs/reports/wp3.10-video-encode.md`
+  is FINAL (no PENDING left); the return report went to the dispatcher. Nothing of the ladder is
+  left for a seat 10 except what the dispatcher asks: the orchestrator's stacked full suite, the
+  merge, Reviewer B at the orchestrator's seat. A seat 10 reads this section and "Carried" only.
+- **Seat 9 floor row** (EXCLUSIVE window CHARC `a2f398778e3a8c5c`, 2026-10-27 01:09:42Z to
+  02:02:44Z, on `e04a7cb`, alone on the host, 11.4 GB free memory before; `floor --dry-run` then
+  `floor --config work\wp3.10\s8\local.toml`, exit 0; record and logs in
+  `C:\Users\rwsmy\clearwater-review-evidence\wp3.10\s9-floor\` with `md5sums.txt`; analysis
+  `s9_an.py` / `s9_an.txt` there). s/frame (probe+open+stream+close, pauses out) / min/min / peak
+  tree RSS / peak device GPU memory: GX011627 NVENC 8 Standard x3 0.1540 / 0.1553 / 0.1555
+  (4.61-4.66), 2044-2048 MiB, 1083 MiB, tied; GX011625 NVENC 8 full (14,938 frames) 0.1552
+  (4.65), 2065 MiB, tied; GX011627 libx265 8 0.2792 (8.37), 3519 MiB, 611 MiB; GX011627 NVENC 10
+  0.1742 (5.22), 2401 MiB, 1375 MiB, tied. FITS inside the ~0.395 s/frame left after WP3.4's
+  0.4392 c3 core under D106's 0.834 (sum 0.593-0.595 at NVENC 8-bit; 0.613 at 10-bit; 0.718 on
+  libx265; an estimate, the end-to-end row is WP3.14's). After each strays pause only the first
+  frame (already set apart) runs fast: below the run's p10 0 or 1 frame at 57 of 59 pauses, 2 at
+  2 (GX011625). Strays: `System` 25-34 % of one CPU, `SearchProtocolHost.exe` 43 % once. File
+  ratios at the ruled Standard (for Q13): GX011627 NVENC 8 0.495, NVENC 10 0.498, libx265 0.486;
+  GX011625 NVENC 8 1.264 (calm, camera 6.58 Mb/s).
+- **Report changes (seat 9):** status FINAL; section 1 renames `QUALITY_VALUE` to `NVENC_CQ` /
+  `X265_CRF` (CHARC's addition at the grant) and adds the bench and `read_hevc_level`; section 2
+  the ruled values and the NVENC ceiling options with their reason; section 5 the GX011627 and
+  Edits rows; section 6 the counts at `e04a7cb`; section 7 the ruled mapping, the measured
+  tables, `QUALITY_RATIO`, the floor row; section 8 AD-12, DR-18 (1), DR-48; section 9 the items
+  of seat 8's ladder.
+
+### Seat 8's RESUME HERE (superseded by the section above; kept for its figures)
+
 
 - Base `718324b` (main with WP3.4 and WP3.11); diff base `git -C <worktree> merge-base main HEAD`.
   Product head `0b76301` (R10 cleanup; the commit carrying this section adds only ledger text).
