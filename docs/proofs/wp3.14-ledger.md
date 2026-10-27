@@ -373,6 +373,23 @@ clean-path analysis close error is now a WARNING too.
 Gates after B1 (b): ruff check, ruff format --check, mypy (136 files) clean; the nine analysis files with the engine,
 disk-space and batch files 350 passed.
 
+## Reviewer B pass 2 gate fix (cell 4)
+
+Reviewer B pass 2 (orchestrator seat, `wp3.14-mc` `99171df` = `b4259cc` on main; evidence
+`C:\Users\rwsmy\clearwater-review-evidence\wp3.14\reviewB2\review-B.txt`) BLOCKED with 1 MAJOR. A second blocking B is
+adjudicated at the gate (no pass 3; the orchestrator verifies the fix by execution). Ruling (orchestrator gen 14, FINAL):
+fix all four in one gate-fix series, failing test or control first; `engine.py` stays as it is; no V16.
+
+| # | Sev | Failing first | Fix |
+|---|---|---|---|
+| 1 | MAJOR | `test_a_cancel_on_the_photo_writing_report_never_calls_the_writer`: `the photo writer ran after a cancel: [...shot_corrected.clearwater-partial-....png]`; `test_a_photo_writer_error_after_a_cancel_is_cancelled`: `failure is not the CANCELLED constant: 'shot.png: disk full while writing shot_corrected.png: OSError: [Errno 28] No space left on device'` | `export.py` photo: (a) `_check_cancel` after the "Writing" report and stage, before `SafeWrite`; (b) the `SafeWrite` block (begin, writer, commit) wrapped: an `Exception` while `cancelled()` holds -> `CANCELLED`, its text to INFO; planted `test_planted_no_cancel_check_before_the_photo_write_fails_by_name` (no check from the "Writing" stage on) |
+| 2 | MINOR | reproduced first (scratch test, uncommitted): the OLD oracle passed with `_check_space` planted out (`1 passed`) | test-only: `_SizedStat` keeps every real stat field but `st_size`; B asserted by its failure text (`b.mp4: Not enough free space in ...`) and absent from the analysed names (the `_cache_key` the analysis uses); planted `test_planted_no_d87_fails_the_per_item_test_by_name` fails by name |
+| 3 | ADVISORY | control first: `test_planted_close_guard_only_while_an_error_is_in_flight_fails_by_name` (rebuilds `_decode` with `except BaseException:` guarded + `else:` bare close) fails the clean-path assertion by name | test-only: `test_a_clean_path_analysis_stream_close_error_is_a_warning` (ok, output committed, the close error a WARNING from `clearwater.analysis.engine`) |
+| 4 | MINOR | the report's scope line said nothing under `analysis/` changed | report: the granted `engine.py` edit named there |
+
+Gates: ruff check, ruff format --check, mypy (136 files) clean; `test_jobs_export.py`, `test_jobs_batch.py`,
+`test_jobs_disk_space.py`, `test_jobs_export_photo.py` 128 passed (>= 11 GB free).
+
 ## RESUME HERE (cell 4: the V16 rows and the FINAL return report)
 
 Cell 3 stood down at a clean commit after the review loop TERMINATED at R2 (planned re-seat: V16 is several long
