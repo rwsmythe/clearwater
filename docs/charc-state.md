@@ -111,6 +111,16 @@ of `origin/main`, unpushed; no push asked (verify `git status -sb`).
   WP3.18 adapter mapping (kept job takes priority; own pts list; live Settings closure), DR-50/51/52 swaps, V7
   re-measure. WP3.18's R3 procedural breach: disclosed, not voided (accepted). WP3.20 B "succeeded in" strict counts
   18/19 (raw 20/21 include prompt echoes) -- the strict pattern `^\s*succeeded in [0-9]` is the standing count.
+- **WP3.10 floor row DONE (seat 9, EXCLUSIVE window 2026-10-27 01:09Z-02:02Z, CLOSE c02b6a47c057f2e4):** on
+  e04a7cb (mapping commit, values-only CONFIRMED at this seat: NVENC_CQ 22/26/30, X265_CRF 21/26/30, one selection
+  line in `_encoder_options`). NVENC 8-bit 4K 0.154-0.156 s/frame (3 runs GX011627; GX011625 all 14,938 frames
+  0.1552), 10-bit 0.1742, libx265 0.2792; peak RSS 2.0-3.5 GiB. FITS D106: 0.4392 (c3 core) + 0.155 = 0.594 of
+  0.834 s/frame, ~0.24 spare (sum of separate timings; end-to-end is WP3.14's V16 row). Strays-pause: only the
+  first frame after a pause runs fast. Record `clearwater-review-evidence\wp3.10\s9-floor\`. Seat 9 head
+  4dbb2d5, report FINAL. Disclosed: leg (a) M+R fidelity check ran on 0b76301 (cq 23), not e04a7cb; CHARC RULED no
+  re-run (M+R items are container/timing/metadata, independent of the cq value; note in the accept record).
+  QUALITY_RATIO measured (busy Standard file ratio 0.495/0.498/0.486) feeds DR-48's rule. Next: orchestrator B on a
+  rebased candidate, candidate gate (full suite -- host free), accept, release post, CHARC QA; DR-18 (1) row.
 - **WP3.10 AD-12 mapping RULED 2026-10-27 (orchestrator query 71bc572ed8981978):** ADOPT libx265 crf 21/26/30,
   NVENC cq 22/26/30, 0.24 bit/pixel FINAL; AD-12 amended in `docs/decisions.md` with the measured figures (seat 8
   footage window 23:29Z-00:52Z, ledger `docs/proofs/wp3.10-ledger.md` on `wp3.10` df055c2, product head 0b76301,
