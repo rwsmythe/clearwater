@@ -5,9 +5,12 @@
 
 ### Generation
 
-- **Generation 12 ROLLED OVER 2026-10-27 ~06:30Z at ~380K (depth cap), at a clean boundary: NO cell or helper live, no
-  window open, no suite running.** Generation 13 starts here: drain the inbox at pickup (CHARC gen 4's FINAL rulings on the
-  wave 4 briefs will be there), then follow "Where things stand" item 5 (RESUME HERE).
+- **Generation 13 LIVE** (`clearwater-orchestrator-20261026-2029`), picked up 2026-10-27 ~06:30Z at main `1217443`;
+  bash-launch gauge 23 ms; inbox empty at pickup, then CHARC FINAL `3c3c35d7e40b525e` (all four wave 4 briefs approved).
+  Briefs FINAL on main `9753b7b` (rulings recorded in each brief). Gen-13 scratchpad:
+  `C:\Users\rwsmy\AppData\Local\Temp\claude\C--Users-rwsmy-clearwater\be0b3fbb-8bfc-4f0b-804e-6a1844f3710c\scratchpad\`
+  (dispatch prompts `prompt-wp3.14-cell1.md`, `prompt-wp-t3-cell1.md`, Codex addenda `addendum-wp3.20r.md`, `addendum-wp-t4.md`).
+- Generation 12 ROLLED OVER 2026-10-27 ~06:30Z at ~380K (depth cap), at a clean boundary.
 - Generation 12 (`clearwater-orchestrator-20261026-1223`), picked up 2026-10-26 ~22:20Z at main `2bb9bba`;
   bash-launch gauge 38 ms; inbox empty at pickup. Dispatched: `wp318-cell3` (WP3.18 B pass 1 remediation from `579321a`;
   prompt `prompt-wp3.18-seat3.md`) and `wp310-cell8` (WP3.10 from `e7668e1`; NVENC fix APPROVED as Reviewer A round 9,
@@ -47,9 +50,24 @@
   blob is LF (main has 0 CR bytes everywhere, the debt register included). At every gate: for each file in
   `git diff --name-only <base>..<cand>`, `git cat-file -p <cand>:<f> | tr -cd '\r' | wc -c` must be 0.
 
-### Live cells (gen 12; they die with this generation -- re-dispatch from their ledgers)
+### Live cells (gen 13; Claude cells die with this generation -- re-dispatch from their ledgers)
 
-None. `wp310-cell8` stood down at 305K, `wp310-cell9` at 339,190 (2026-10-27 ~04:29Z); no cell mid-round.
+All four from main `9753b7b`, dispatched 2026-10-27 06:35-06:40Z. Pace readings at dispatch: Codex 1.71 (23 % at 13.4 %,
+06:38:42Z), Claude 2.115 (26 % at 12.3 %, 06:38:56Z; `python scripts/usage_claude.py`, the owner's standing rule).
+
+| Package | Cell | Lane / reviewers | Worktree, branch | Depth at dispatch | State |
+|---|---|---|---|---|---|
+| WP3.14 | `wp314-cell1` (opus-high subagent) | Claude; A and B Codex `gpt-6.1-sol`/high | `.worktrees/wp3.14`, `wp3.14` | 0 | round 0 (design table yield) |
+| WP3.20R | Codex cell (`codex_cell.py turn`) | Codex (CALIBRATION); A and B Claude opus/high; B head-to-head owed | `.worktrees/wp3.20r`, `wp3.20r` | 0 | turn 1; evidence `clearwater-review-evidence\wp3.20r\cell\` |
+| WP-T3 | `wpt3-cell1` (sonnet-high subagent) | Claude (CALIBRATION); A and B Codex `gpt-6.1-sol`/high | `.worktrees/wp-t3`, `wp-t3` | 0 | build to Reviewer A R1 |
+| WP-T4 | Codex cell (`codex_cell.py turn`) | Codex by the pace tiebreak; A and B Claude opus/high (Q6) | `.worktrees/wp-t4`, `wp-t4` | 0 | turn 1 (rungs 0-1); evidence `clearwater-review-evidence\wp-t4\cell\` |
+
+- Each worktree carries its own uncommitted `clearwater.local.toml` with `working_path` = that worktree's `work\`.
+- Codex cells: resume with `--session <id>` from the turn JSON; commit each turn with `codex_cell.py commit`. A Codex
+  session SURVIVES this generation (re-read the last `turn-N.json` and `return-N.md` in its evidence folder).
+- Fence: `tests/fixture_plugin.py` is shared: WP-T3 edits `verify_generated` only; WP-T4 edits `SampleProvider.path` and
+  helpers after it. Full suites are the orchestrator's candidate gates (WP-T3, WP3.20R) or granted windows (WP3.14);
+  WP-T4's heavy legs are RUN REQUESTs this seat runs.
 
 ### Where things stand (gen 12)
 
@@ -94,7 +112,9 @@ None. `wp310-cell8` stood down at 305K, `wp310-cell9` at 339,190 (2026-10-27 ~04
      the pair, lane by the pace tiebreak (R3) at dispatch with both readouts in the dispatch row; reviewer = the other model.
      At its accept the fill's GATE_CHECKS suite line becomes the two-leg command (you write it from its report).
    - **Spec is v0.5.5** (`a5f9245`, D75 erratum, text only); every wave 4 brief cites v0.5.5.
-   - **RESUME HERE (gen 13):** FOUR briefs DRAFT on branch `wave4-briefs` `b7764c5` (worktree `.worktrees/wave4-briefs`;
+   - **DONE by gen 13:** CHARC FINAL `3c3c35d7e40b525e`; briefs FINAL at main `9753b7b`; all four dispatched (Live
+     cells above). WP3.21's brief may be drafted while WP3.14 runs.
+   - (gen 12's resume text, superseded:) FOUR briefs DRAFT on branch `wave4-briefs` `b7764c5` (worktree `.worktrees/wave4-briefs`;
      author branches `brief-wp3.14`, `brief-wp3.20r`, `brief-wpt3`, `brief-wpt4`), posted to CHARC 06:28Z (`9ea33cc0` file),
      FINAL pending. Then: (1) apply CHARC's FINAL edits on `wave4-briefs` (a FINAL commit as wave 3's `0f51822`), ff main;
      (2) dispatch WP3.14 (opus-high) FIRST; (3) the pair: WP3.20R via `scripts/codex_cell.py turn` (Codex cell; you commit
