@@ -13,15 +13,19 @@
     (CHARC QA CONFIRMED; DR-53/54/55 closed, DR-61; CALIBRATION RULED: Codex lane STAYS for sonnet-high; pace tiebreak
     resumes). Codex depth = `last_token_usage.input_tokens` in `~/.codex/sessions/.../rollout-*-<session>.jsonl` (PINNED;
     the footer is cumulative billing).
-  - **WP3.14:** cells 1-3 retired (cell 3 at 302,881). A CONVERGED at R2 (G1 interrupt reading UPHELD by CHARC; Q2
-    AMENDED `e7d25105`, in the brief at `2fea775`). **Cell 4** `wp314-cell4` (opus-high; 0 at dispatch, 38,603 at window
-    request, 146,307 at the B1 remediation yield): did the ONE B pass 1 remediation (B1 (a) cancel from `cancelled()`;
-    B1 (b) GRANTED one-block edit `analysis/engine.py` finally (CHARC `d9154e06`); B3 post-commit callbacks guarded; B4
-    exact Fractions); head `b4259cc`. B pass 1 (`wp3.14/eviewB\`) BLOCKED 2 major (B2 V16-owed DECLINED as sequencing).
-    Candidate `wp3.14-mc` `99171df` on `c9838cd` (patch-id `4b6d4d9e` = author). **B pass 2 RUNNING** (`reviewB2\`); a
-    second blocking B is adjudicated at the gate. NEXT: OPEN exclusive -> grant cell 4 V16 GX011627 x6 + 5.3K (~1 h),
-    then GX011625 (~2.5-3 h) -> cell 4 fills the report's V16 section + FINAL return -> rebase, candidate FULL pytest
-    (main's config: the 9 look-check skips run; quote both counts), harness, record, ff, release.
+  - **WP3.14 (checkpoint 13:05Z):** cells 1-3 retired (cell 1 238,362; cell 2 ~208K; cell 3 302,881). A CONVERGED at R2
+    (Q2 AMENDED `e7d25105`, brief `2fea775`). **Cell 4** `wp314-cell4` (opus-high; 202,398 at the block 1 yield): B pass 1
+    (`wp3.14/reviewB/`) BLOCKED 2 major -> ONE remediation (B1 (a) export.py; B1 (b) GRANTED engine.py finally guard,
+    CHARC `d9154e06`; B3; B4; B2 DECLINED as sequencing). B pass 2 (`reviewB2/`) BLOCKED F1 major -> ADJUDICATED AT THE
+    GATE: fix `bcc7fa3` verified by execution (pre-fix swap fails both tests), CHARC UPHELD (`58cb06ed`; record the
+    in-block `import logging` in engine.py as style debt for WP3.11's next touch, no DR row). Author head `2e1dc11`;
+    candidate `wp3.14-mc` `2e9fd35` (patch-id `f21b6411` = author `9753b7b..2e1dc11`). V16 block 1 DONE 11:33-12:58Z
+    (all ok; cold c3 GX011627 31.9 min/min MISSES D106 interim 25 -> data for WP3.21, posted to CHARC; warm 23.2 and
+    ancuti2018 21.6 meet; 5.3K peak 6.2/6.0 GiB). **Block 2 GX011625 EXCLUSIVE OPEN 13:05Z (~4.5 h, allow 5)**, granted.
+    NEXT: cell 4 WINDOW RELEASED -> post CLOSE -> cell 4 V16 fill + FINAL return -> rebase mc, candidate FULL pytest
+    (main's config; the 9 look-check skips run; quote both counts), harness, CR check, accept record (engine.py grant +
+    style debt, both B passes + gate adjudication, Q2 amended, cell depths), ff, release (CHARC owes rows: Q5 cache
+    serialisation; encode.py close sets closed only from open; Flag (i)), operator FYI.
   - **WP-T4:** Codex session `01a17c16-...`, depth 284,234 (session file) at turn 4 (`8927a82`, rung 3 done, zero
     violators, E1 marked slow). E1 quiet-seat probe PASSED 10:27Z (DR-58 (c) not fired). Rung 4 = TWO rounds (Q7; a
     third only if PARALLEL+SERIAL totals differ > 15 %): wrappers `work/wp-t4/run_r4_r{1,2}_{baseline,parallel,serial}.ps1`
