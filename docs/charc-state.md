@@ -111,6 +111,22 @@ of `origin/main`, unpushed; no push asked (verify `git status -sb`).
   WP3.18 adapter mapping (kept job takes priority; own pts list; live Settings closure), DR-50/51/52 swaps, V7
   re-measure. WP3.18's R3 procedural breach: disclosed, not voided (accepted). WP3.20 B "succeeded in" strict counts
   18/19 (raw 20/21 include prompt echoes) -- the strict pattern `^\s*succeeded in [0-9]` is the standing count.
+- **HARNESS CHANGE IN FLIGHT: dual-model implementers (owner-directed 2026-10-26/27).** Design pass
+  `docs/proofs/harness-dual-model-implementers.md` (CHARC, 2026-10-27). Rules: R1 task fit first (Opus-class
+  packages stay Claude; Sonnet-class eligible for Claude or a Codex `gpt-6.1-sol`/high cell); R2 the reviewer (A and
+  B) is always the OTHER model from the implementer (B stays the orchestrator's own PROCESS at its seat: `codex exec`
+  or `claude -p`, never a subagent); R3 tiebreak on weekly PACE (used % / elapsed fraction of the window), both
+  readouts confirmed live 2026-10-27 (Claude 21 % at ~10 % elapsed = pace 2.1x; Codex 22 % at ~22 % = 1.0x). Owner:
+  "Start calibration this phase, write up the harness change." Stages: 0 probes (codex exec write mode in a
+  worktree, resume, depth, the `claude -p` read-only reviewer with assertions, usage scripts) -> 1 operative edits
+  (new cell `.claude/agents/implementer-codex-sol-high.md`, fill Parts 1-2, orchestrator-context, codex-reviewer,
+  dispatch-recipe sentence, `scripts/usage_{codex,claude}.py` + tests, .gitignore, CLAUDE.md line, HD-1) -> 2
+  CALIBRATION on the first two Sonnet-class wave 4 packages (one per lane, CHARC assigns at brief time; metrics and
+  decision rule in the pass 4.3) -> 3 template port (owner). Owner decisions open (pass section 5): Codex commit
+  footer form; Claude readout via scheduled task (recommended) vs permission rule; review pin upgrade
+  `gpt-5.6-sol` -> `gpt-6.1-sol` at the wave 4 boundary (recommended); template port timing. Codex catalog at this
+  login: 6.1-sol (default), 6-astra, 6.1-terra, 6-sol, 6-luna, 5.6-sol/terra/luna. Research notes (owner-supplied,
+  untracked) in `research/multi-model development/`.
 - **WP3.10 floor row DONE (seat 9, EXCLUSIVE window 2026-10-27 01:09Z-02:02Z, CLOSE c02b6a47c057f2e4):** on
   e04a7cb (mapping commit, values-only CONFIRMED at this seat: NVENC_CQ 22/26/30, X265_CRF 21/26/30, one selection
   line in `_encoder_options`). NVENC 8-bit 4K 0.154-0.156 s/frame (3 runs GX011627; GX011625 all 14,938 frames
