@@ -241,7 +241,7 @@ Q1-Q16 as ADOPTED by CHARC `3c3c35d7`; applied as above. Q11's "optional injecte
 | Round | Head | Transport, CLI, banner | CRIT | MAJOR | MINOR | In / out of envelope | NEW / REOPENED | Reverts | Fixes change | Verdict | Depth (dispatcher-read) |
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | R1 | `7bb5d85` | WSL, codex-cli 0.162.1, `gpt-6.1-sol` / high | 0 | 2 | 6 | 8 / 0 | 8 / 0 | 0 | product (F1 (a), F2, F3, F4: `095a345`), tool (F8: `02324a7`), test-only (F5, F6, F7: `095a345`); F1 (b) held for CHARC | NEW_CRITICAL_MAJOR_FOUND (counts: every assertion met) | 123,184 (59 turns) |
-| R2 | `c3a2fc9` | WSL, codex-cli 0.162.1, `gpt-6.1-sol` / high | 0 | 1 | 7 | 8 / 0 | 8 / 0 | 0 | pending: tool (G4), test-only (G3, G5-G8); product only if G1 (a) / G2 are ruled defects | NEW_CRITICAL_MAJOR_FOUND (counts: every assertion met); G1 recommended NOT A DEFECT, ruling asked | to be given at the R2 yield |
+| R2 | `c3a2fc9` | WSL, codex-cli 0.162.1, `gpt-6.1-sol` / high | 0 | 1 | 7 | 8 / 0 | 8 / 0 | 0 | cleanup only: tool (G4: `756da22`), test-only (G3, G5-G8: `756da22`, `04822ef`); G1, G2 ruled NOT A DEFECT | NEW_CRITICAL_MAJOR_FOUND (counts: every assertion met); adjudicated ZERO new blocking -> loop TERMINATED | 255,161 (143 turns) |
 
 R1 findings and adjudication (evidence `C:\Users\rwsmy\clearwater-review-evidence\wp3.14\r1\`, md5s there):
 
@@ -316,32 +316,75 @@ R2 findings and adjudication (evidence `C:\Users\rwsmy\clearwater-review-evidenc
 | G7 | MINOR | the commit-leftover test assumes `os.link` works | CONFIRMED. Test fix. |
 | G8 | MINOR | no control for a close error without a cancel, nor a clean-path stream-close error | CONFIRMED. Tests to add. |
 
-## RESUME HERE (cell 3, R2 adjudicated; G1 ruling asked)
+R2 rulings (orchestrator gen 14, FINAL): G1 (a) and G2 NOT DEFECTS -- "whether `close` raised" in the amended Q2 means an
+`Exception`; a `KeyboardInterrupt` or `SystemExit` is meant to propagate and the engine never turns a `BaseException`
+into a result; the reproduction (`r2\f1-repro.txt`: the interrupt propagates, tail [close, abort], only the sources
+remain) shows the cleanup holds; one line in the report's limits; CHARC told (a reopen would come from CHARC). G1 (b)
+NOT A DEFECT (`fired` is set only after `cancelled()` read True). R2 has ZERO new blocking: the loop TERMINATES, no R3.
+G3-G8 fixed once as the terminating round's cleanup.
 
-Cell 3 (`implementer-opus-high`, fresh seat; dispatch depth 0). Cell 2's build (`20f0ac3`, `e7d9092`, `3a723cc`:
-photo and video end-to-end tests, `tools/export_bench.py`) is the product under review; its detail is in the commits.
+R2 cleanup (cell 3), controls first where one applies:
+- `756da22` (G4, G5) `tools/export_bench.py`: the stray window read at the export's end, then the telemetry stop, then
+  the GPU sampler; the sampler built by `_gpu_sampler(leg)`; `tests/test_export_bench.py`: the order test with a sampler
+  double (failed on the previous order: strays after telemetry) and `test_the_gpu_sampler_runs_for_nvenc_legs_only`.
+- `04822ef` (G3, G6-G8) tests only: `FakeSink.abort` signals `aborted_in_close` after its effects; the product-sink close
+  test parametrised over `before_finish`, `after_finish`, `after_closed` (libx265, the 4 s 160x96 clip, 3 passed in
+  14 s); the commit-leftover test controls `_install` (no `os.link` assumption); a close error without a cancel keeps its
+  text (planted every-error-is-a-cancel engine fails by name); a clean-path stream-close error is the failure (planted
+  always-quiet close fails by name).
+- Gates at `04822ef`: ruff check, ruff format --check, mypy (136 files) clean; `test_jobs_export.py` +
+  `test_export_bench.py` 87 passed; the product close timings 3 passed; the close/commit subset 10 consecutive clean
+  runs. No product code changed in the cleanup. No test was run after `04822ef` (the host goes to exclusive windows).
+- Report `docs/reports/wp3.14-export-batch.md` written (its V16 section OWED, replaced by cell 4).
+
+## RESUME HERE (cell 4: the V16 rows and the FINAL return report)
+
+Cell 3 stood down at a clean commit after the review loop TERMINATED at R2 (planned re-seat: V16 is several long
+exclusive windows). Cell 4 is a FRESH seat.
 
 | Gate | Dispatcher-read depth |
 |---|---|
 | Cell 3 dispatch | 0 (fresh seat) |
 | Cell 3 R1 yield | 123,184 (59 turns) |
 | Cell 3 R1-remediation yield | not read (the F1 (b) ruling arrived in the same turn) |
-| Cell 3 R2 yield | to be given by the dispatcher |
+| Cell 3 R2 yield | 255,161 (143 turns) |
+| Cell 4 dispatch | to be given by the dispatcher |
 
-Windows (both granted in the cell-3 prompt):
-- Config STOP: the worktree's `clearwater.local.toml` line 18 was junk (TOML parse error), so the first footage run
-  skipped (2 s, not a result). The orchestrator deleted the line at its seat; re-granted.
-- FOOTAGE (WINDOW RELEASED): `pytest tests/test_jobs_export_video.py -m footage` (offscreen, `--basetemp=work/pt-footage`;
-  `-m footage` alone selects it): GX011627 through the engine, NVENC 8-bit Standard, c3: 1 passed, 28 deselected,
-  772 s (07:58Z-08:10:48Z); 11.8 GB free before. No fix.
-- FULL (WINDOW RELEASED): `pytest -m "not footage"` (offscreen, `-p no:cacheprovider`, `--basetemp=work/pt-full`),
-  08:11:00Z-08:50:39Z: 4864 passed, 10 skipped (outside the package: `test_color_roundtrip.py` 1,
-  `test_methods_assembly_v8.py` 9), 17 deselected, 0 failed, 2378.7 s; exit 0 in `work/pt-full.done`. Every package file
-  passed with no skip, the 5.3K 8:7 synthetic leg included. No fix.
-- Static gates at `7bb5d85`: ruff check, ruff format --check, mypy (136 files) clean.
+**State:** the product, its tests, the instrument and the report are done and committed on `wp3.14` (head after this
+ledger commit). Reviewer A converged (R1, R2; evidence `C:\Users\rwsmy\clearwater-review-evidence\wp3.14\r1\`, `r2\`).
+Last full suite: `7bb5d85`, 4864 passed / 0 failed (the remediation since is in this package's files only; the merge
+candidate's full suite is the orchestrator's). Do NOT reopen the review, re-run the suite, or edit product code; a defect
+found during the V16 runs is a STOP with a reproduction.
 
-**Next:** the dispatcher's ruling on G1 (a) / G2. If NOT A DEFECT: R2 has zero new blocking and TERMINATES the loop;
-G3-G8 are fixed once in the terminating round's cleanup (failing tests / controls first), no R3. If ruled a defect:
-fix G1 (a) (and G2) with G3-G8, then R3 (runner copied to `r3`, diff `c3a2fc9..HEAD`). Then the report
-`docs/reports/wp3.14-export-batch.md` (with the one-line "superseded by WP3.14" note for WP3.13's batch-sum sentence),
-the V16 windows (GX011627 rows first, GX011625 LAST), the FINAL return report.
+**Work order (ladder item 10, Q11, Q12; EXCLUSIVE, best effort; each window granted by the dispatcher, one at a time,
+>= 5 GB free, nothing else heavy):**
+1. Before any window: `uv run python tools/export_bench.py v16 --dry-run` (writes nothing) to list the plan; read
+   `tools/export_bench.py`'s module docstring for the record's fields. No other preparation is needed.
+2. WINDOW REQUEST per clip, in this order, each its own window:
+   (a) `v16 --clip GX011627` -- 3 cold, 1 warm, 1 `ancuti2018`, 1 libx265 (6 runs);
+   (b) `v16 --clip synthetic-5k3` -- the generated 5.3K 8:7 clip (150 frames), memory peaks (N4, V15 for WP5.2);
+   (c) `v16 --clip GX011625` -- 1 cold, the sustained row, LAST. If (c) cannot be granted within the package's life it is
+       recorded OWED in the accept record and taken before WP3.21 dispatches, never dropped (Q12).
+   Run each in the foreground with its output to a file under `work\`; wait inside one tool call; the record is
+   `work\wp3.14\bench\export-bench-*.json` (rewritten after every run). Exit 0 = every run ok; 1 = a run failed (the
+   record says why: report it, do not re-run without the dispatcher); 2 = usage, config, footage or disk error.
+   Send `WINDOW RELEASED: <rows, durations, exit>` at the yield after each window.
+3. Replace the report's "V16 (ladder item 10)" section with the rows: per run frames, wall s/frame, min/min against
+   D106's 25 min/min (0.834 s/frame at 30000/1001; verdict), per-frame median / p90 / max, the analysis share, the phase
+   split from the stamps (probe, analysis, open, frames, close, committed -- the close-to-committed time is the
+   cancel-latency figure the R1 F1 discussion named), strays, clocks and temperatures before/after, peak process-tree
+   RSS (N4 16 GB) and peak graphics memory, the NVENC proof, `cache_complete_at_start`; the moment and conditions of
+   each window; and the D87 estimate for GX011627 and GX011625 at Standard (`estimate_video_bytes` from each clip's
+   probe; state the figure and its two terms). Nothing footage-derived committed; no location tag in any committed
+   record.
+4. FINAL: END YOUR TURN with the structured return report (the brief's "Return report", under about 70 lines): public
+   API, phase and thread table, failure table, cancel path, D87 figures, V4 table per sample, V11 legs, the V16 rows
+   with their conditions, DR dispositions, gates, Reviewer A rounds (R1, R2 TERMINATED) and verdict, open items
+   (below), and the one-line "superseded by WP3.14" note for WP3.13's batch-sum sentence (Flag (ii); it is in the
+   report's D87 section).
+
+**Open items for the accept (carry into the return report):** a NEW DR row for serialising a GUI recompute against a
+running export (Q5, WP4.3 trigger); CHARC's MINOR row against `io/video/encode.py` (`close` sets `"closed"` only from
+`"open"`, condition 3 of `e7d25105`); Flag (i) (spec 10.2's N6 body vs D106, CHARC's v0.5.6 candidate); the 9
+`test_methods_assembly_v8` skips are the worktree's own `work\` lacking `wp1.3\frames` (main's configuration runs
+them).
