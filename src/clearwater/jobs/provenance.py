@@ -3,7 +3,7 @@
 The object is AD-13's parameter-set object plus ``"source"`` and ``"settings"``. The source is
 named by its file NAME only, never its path (a path carries the owner's folder names into every
 shared output). Only probe facts are recorded: no tag dictionary, no GoPro settings, no location
-value and nothing read from a ``gpmd`` track.
+value and nothing read from the camera's telemetry track.
 """
 
 from __future__ import annotations

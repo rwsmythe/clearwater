@@ -235,3 +235,46 @@ Q1-Q16 as ADOPTED by CHARC `3c3c35d7`; applied as above. Q11's "optional injecte
   `plan_output` + reserved-name rule -> D87 check -> analysis -> D87 RE-CHECK immediately before `SafeWrite.begin`
   -> open/encode. Nothing is written before `begin` in either position. Photo: read -> backend -> measure ->
   render -> plan + reserved-name rule -> D87 -> write.
+
+## RESUME HERE (cell 1, end of build turn 1)
+
+**Done (committed on `wp3.14`):**
+- `f29449c` DR-48 in `disk_space.py` (ratios 1.10/0.50/0.25, ceiling via `clearwater.io.video.encode` at call
+  time, no 10-bit doubling, keyword signature per Q7, per-item docstring sentence) + `tests/test_jobs_disk_space.py`
+  (ratio wins high-rate, ceiling wins low-rate, both encoders and 10-bit equal, patched constant changes the estimate).
+- `d5c0adf` `jobs/export.py` (`ExportEngine`, `is_reserved_device_name`, `effective_parameters`, the watchdog),
+  `jobs/provenance.py`, `jobs/batch.py` (`run_batch`, `BatchReport`, `BatchItem`), `jobs/__init__.py` exports; the
+  video order per the round-0 ORDER RULING (cheap refusals and D87 before the analysis, D87 re-check before `begin`).
+- Next commit (this turn): `tests/test_jobs_export_support.py` (doubles: `Rig`, `FakeSink` with blocking / failing
+  writes, photo reader/writer doubles), `tests/test_jobs_export.py` (52 tests: seam, `CANCELLED` identity + planted
+  copy, cancel at each phase, blocked write released by the watchdog + planted no-watchdog control, planted
+  close-on-cancel control, disk full via sink/writer/cause chain, temp-leftover warning, stop after commit lists the
+  file, DR-20 (7), D87 refuse + re-check + per-item batch + planted batch-wide control, settings failures, DR-35 (a)
+  reserved names, one `Reservations` spy, force CPU / fallback warning + log line, `auto` -> libx265 in provenance,
+  unavailable explicit encoder before analysis, provenance key set and size, N8, static import/GPS scan),
+  `tests/test_jobs_batch.py` (D81, D45, raising job, cancel before start).
+- Gates at this point: ruff check clean, ruff format --check clean (233 files), mypy clean (135 files), targeted
+  pytest over `tests/test_jobs_*.py` 233 passed (includes WP3.13's import test, unchanged).
+
+**Next (ladder items still open):**
+1. `tests/test_jobs_export_photo.py`: real `PhotoReader`/`PhotoWriter`/`available_methods()` with the CPU backend
+   (`clearwater.core.backend.backend_for("cpu")`); one sample per family (`jpeg-*`, `heic8-*`, `heic10-*`,
+   `png8-*`, `png16-*`, `tiff8-*`, `jpeg-orient-port-o6`; fixture `sample(id)` from `tests/fixture_plugin.py`) to PNG
+   8 and 16; statistics equal `clearwater.gui.imaging.measure_statistics` (mark `gui`; spy `method.analyze` via the
+   `on_stage`-free route: wrap the method to record its returns); provenance parseable (`iTXt`) when on, absent off.
+2. `tests/test_jobs_export_video.py`: real `FFmpegVideoSource`, `FFmpegVideoSink`, `DiskProxyCache(tmp)`,
+   `cache_key`, `available_methods()`, `select_backend` (CPU forced for libx265 legs; GPU under `gpu` for NVENC);
+   V4 via `video_fidelity.fidelity_record(source, out)` + `_assert_v4` shape from `tests/test_io_video_encode.py`
+   lines ~162-170 on `vid-hevc8-bt709-full`, `vid-hevc10`, `vid-untagged`, `vid-vfr`, `vid-rotated`,
+   `vid-truncated` (D86 warning); `vid-hlg`, `vid-pq`, `gopro-*-lrv`/`-thm` readable failures, nothing written;
+   synthetic 5.3K 8:7 (`slow`); DR-28 (1) recording-sink digest vs independent render + controls (pts +-1, drop,
+   duplicate, sampled decode order criterion + planted swap); V11 subprocess export killed mid-encode ->
+   `remove_leftovers`; the `footage` GX011627 leg (`gpu`, `slow`; `local_config.find_footage_file`), NVENC 8-bit
+   Standard, c3 defaults.
+3. `tools/export_bench.py` + `tests/test_export_bench.py` (Q11: `run`/`v16`/`--dry-run`, `on_stage` timestamps,
+   imports from `tools/video_io_bench.py`; records under `work/wp3.14/bench/`).
+4. Then: WINDOW REQUEST full + footage (GX011627 V4 leg) before Reviewer A round 1.
+
+**Open:** none from the dispatcher. Note for the report: the static GPS/IMU scan uses word boundaries
+(`\b(gpmd|gpmf|gps|imu|latitude|longitude)\b`) so "minimum" does not trip it; `provenance.py`'s docstring says
+"camera's telemetry track" for that reason.
