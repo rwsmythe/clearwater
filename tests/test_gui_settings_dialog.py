@@ -563,7 +563,7 @@ def _unavailable_stored_scenario(env: Env) -> tuple[MainWindow, SettingsDialog]:
     path = env.config / "settings.json"
     path.unlink()  # The setting was loaded; any refusal-time write is now observable.
     assert not dialog.ok_button.isEnabled(), "reported-unavailable stored encoder left OK enabled"
-    expected = f"hevc_nvenc is unavailable: {NVENC.reason}. Choose another encoder."
+    expected = "hevc_nvenc is unavailable: No NVIDIA encoder was found. Choose another encoder."
     assert dialog.encoder_note.text() == expected
     dialog.accept()
     assert not path.exists()
@@ -607,8 +607,77 @@ def test_a_stored_encoder_arriving_unavailable_after_detection_refuses_ok(env: E
     env.qtbot.waitUntil(lambda: dialog.encoder_combo.isEnabled(), timeout=5000)
     assert not dialog.ok_button.isEnabled()
     assert dialog.encoder_note.text() == (
-        f"hevc_nvenc is unavailable: {NVENC.reason}. Choose another encoder."
+        "hevc_nvenc is unavailable: No NVIDIA encoder was found. Choose another encoder."
     )
+
+
+def test_a_reported_unavailable_encoder_from_the_current_session_is_refused(env: Env) -> None:
+    """Validate the encoder actually applied when the unedited combo and session diverge."""
+    window = env.start()
+    dialog = env.open(window)
+    stored = dataclasses.replace(Settings(), video_encoder="hevc_nvenc")
+    window.session.set_settings(stored)
+    assert dialog.encoder_combo.currentData() == "auto"
+    dialog.accept()
+    assert not (env.config / "settings.json").exists()
+    assert window.session.settings() == stored
+    assert dialog.result() != QDialog.DialogCode.Accepted
+    assert not dialog.ok_button.isEnabled()
+    expected = "hevc_nvenc is unavailable: No NVIDIA encoder was found. Choose another encoder."
+    assert dialog.encoder_note.text() == expected
+    (error,) = presenter_of(window).of("error")
+    assert error.owner == OWNER_SETTINGS and error.text == expected
+    pick(dialog.encoder_combo, "libx265")
+    assert dialog.encoder_note.text() == ""
+    dialog.accept()
+    assert env.saved().video_encoder == "libx265"
+    assert window.session.settings().video_encoder == "libx265"
+    assert dialog.result() == QDialog.DialogCode.Accepted
+
+
+@pytest.mark.parametrize("fail", [None, "ffmpeg is missing"], ids=["absent", "report-failed"])
+def test_a_current_session_encoder_the_sink_does_not_report_is_kept(
+    env: Env, fail: str | None
+) -> None:
+    """Preserve Q3 for the current session's unreported encoder on the same divergence route."""
+    window = env.start(fail=fail)
+    dialog = env.open(window)
+    stored = dataclasses.replace(Settings(), video_encoder="old_encoder")
+    window.session.set_settings(stored)
+    dialog.accept()
+    assert env.saved() == stored
+    assert window.session.settings() == stored
+    assert dialog.result() == QDialog.DialogCode.Accepted
+    assert not presenter_of(window).of("error")
+
+
+def test_return_saves_edits_after_an_unavailable_encoder_is_replaced(env: Env) -> None:
+    """Re-enabling OK makes a direct Return event save after the refusal is corrected."""
+    window = env.start(saved=Settings(video_encoder="hevc_nvenc"))
+    first = env.open(window)
+    first.reject()
+    env.qtbot.wait(20)
+    # The cached report makes OK disabled before this dialog is shown.
+    dialog = env.open(window)
+    env.qtbot.wait(20)
+    pick(dialog.encoder_combo, "libx265")
+    dialog.suffix_edit.setText("_keyboard")
+    env.qtbot.keyClick(dialog.suffix_edit, Qt.Key.Key_Return)
+    assert dialog.result() == QDialog.DialogCode.Accepted
+    assert window.session.settings().output_suffix == "_keyboard"
+    assert env.saved().output_suffix == "_keyboard"
+    assert env.saved().video_encoder == "libx265"
+
+
+def test_an_encoder_refusal_reason_has_one_sentence_ending(env: Env) -> None:
+    """Reuse a reason's terminal full stop in the note and the settings error."""
+    window = env.start(saved=Settings(video_encoder="hevc_nvenc"))
+    dialog = env.open(window)
+    expected = "hevc_nvenc is unavailable: No NVIDIA encoder was found. Choose another encoder."
+    assert dialog.encoder_note.text() == expected
+    dialog.accept()
+    (error,) = presenter_of(window).of("error")
+    assert error.owner == OWNER_SETTINGS and error.text == expected
 
 
 def test_unavailable_stored_scenario_passes_on_the_real_dialog(env: Env) -> None:
@@ -622,10 +691,10 @@ def test_planted_stored_unavailable_accepted_is_caught(
     """Detect a planted bypass that treats every unchanged stored encoder as valid."""
     real = SettingsDialog._encoder_unacceptable
 
-    def stored_bypass(self: SettingsDialog) -> bool:
+    def stored_bypass(self: SettingsDialog, name: str | None = None) -> bool:
         if self.encoder_combo.currentData() == self._initial.video_encoder:
             return False
-        return real(self)
+        return real(self, name)
 
     monkeypatch.setattr(SettingsDialog, "_encoder_unacceptable", stored_bypass)
     with pytest.raises(AssertionError, match="reported-unavailable stored encoder left OK enabled"):
@@ -804,6 +873,29 @@ def test_a_stored_suffix_with_a_newline_is_refused(env: Env) -> None:
     dialog = env.open(window)
     (env.config / "settings.json").unlink()
     _assert_suffix_refusal_then_correction(env, window, dialog, stored)
+
+
+def test_a_stored_suffix_refusal_shows_the_applied_value_error_in_the_dialog(env: Env) -> None:
+    """Show the rejected stored value beside the field and disable OK until correction."""
+    window = env.start()
+    dialog = env.open(window)
+    stored = dataclasses.replace(Settings(), output_suffix="bad/suffix")
+    window.session.set_settings(stored)
+    dialog.accept()
+    assert "bad/suffix" in dialog.suffix_error.text()
+    assert dialog.suffix_edit.toolTip() == dialog.suffix_error.text()
+    assert not dialog.ok_button.isEnabled()
+    assert not (env.config / "settings.json").exists()
+    assert window.session.settings() == stored
+    assert dialog.result() != QDialog.DialogCode.Accepted
+    (error,) = presenter_of(window).of("error")
+    assert error.owner == OWNER_SETTINGS
+    dialog.suffix_edit.setText("_fixed")
+    assert dialog.suffix_error.text() == ""
+    assert dialog.ok_button.isEnabled()
+    dialog.accept()
+    assert env.saved().output_suffix == "_fixed"
+    assert dialog.result() == QDialog.DialogCode.Accepted
 
 
 def _stored_suffix_scenario(env: Env, suffix: str = "bad/suffix") -> None:

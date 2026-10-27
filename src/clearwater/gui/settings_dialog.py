@@ -535,15 +535,21 @@ class SettingsDialog(QDialog):
         if not self._closed:
             self._on_catalog_state()
 
-    def _update_encoder_note(self) -> None:
-        """Explain detection state or why the selected encoder is refused."""
+    def _update_encoder_note(self, name: str | None = None) -> None:
+        """Explain detection state or why the encoder to apply is refused.
+
+        Args:
+            name: The encoder to apply, or None to read the edited settings.
+        """
+        if name is None:
+            name = self.edited_settings().video_encoder
         failure = self._catalog.failure()
         if self._catalog.detecting():
             self.encoder_note.setText(DETECTING_TEXT)
-        elif self._encoder_unacceptable():
-            name = self.encoder_combo.currentData()
+        elif self._encoder_unacceptable(name):
             capability = next((c for c in self._catalog.capabilities() if c.name == name), None)
             reason = "not available" if capability is None else capability.reason or "not available"
+            reason = reason.removesuffix(".")
             self.encoder_note.setText(
                 ascii_text(f"{name} is unavailable: {reason}. Choose another encoder.")
             )
@@ -589,8 +595,8 @@ class SettingsDialog(QDialog):
         self.ten_bit_check.setToolTip(reason)
         self.ten_bit_note.setText(reason)
 
-    def _encoder_unacceptable(self) -> bool:
-        """Return whether the selected encoder is refused by the capability rules.
+    def _encoder_unacceptable(self, name: str | None = None) -> bool:
+        """Return whether the encoder to apply is refused by the capability rules.
 
         Selected | Sink report              | Stored?          | OK
         auto     | any                      | any              | allowed
@@ -600,15 +606,20 @@ class SettingsDialog(QDialog):
         a name   | absent, or report failed | stored           | allowed (Q3)
         a name   | not reported             | picked           | refused
 
-        While detection runs the encoder control is disabled. A stored name
-        missing from the report is preserved; a reported unavailable name is refused.
+        While detection runs the encoder control is disabled. A name stored in
+        the current session but missing from the report is preserved; a reported
+        unavailable name is refused.
+
+        Args:
+            name: The encoder to apply, or None to read the edited settings.
         """
-        name = str(self.encoder_combo.currentData())
+        if name is None:
+            name = self.edited_settings().video_encoder
         if name == AUTO or self._catalog.detecting():
             return False
         capability = next((c for c in self._catalog.capabilities() if c.name == name), None)
         if capability is None:
-            return name != self._initial.video_encoder
+            return name != self._context.session.settings().video_encoder
         return not capability.available
 
     # Suffix, folder.
@@ -628,6 +639,7 @@ class SettingsDialog(QDialog):
     def _refresh_ok(self) -> None:
         """Enable OK only while the suffix and the encoder choice are acceptable."""
         self.ok_button.setEnabled(not self.suffix_error.text() and not self._encoder_unacceptable())
+        self.ok_button.setDefault(self.ok_button.isEnabled())
 
     def _show_folder(self) -> None:
         """Show the output folder (D34)."""
@@ -762,11 +774,16 @@ class SettingsDialog(QDialog):
             validate_suffix(new.output_suffix)
         except ValueError as error:
             self._check_suffix()
-            detail = ascii_text(str(error))[:200]
+            reason = ascii_text(str(error))
+            self.suffix_error.setText(reason)
+            self.suffix_edit.setToolTip(reason)
+            self._refresh_ok()
+            detail = reason[:200]
             _present_error(self._context, f"The output suffix is not valid: {detail}")
             return
-        if self._encoder_unacceptable():
-            self._update_encoder_note()
+        if self._encoder_unacceptable(new.video_encoder):
+            self._update_encoder_note(new.video_encoder)
+            self._refresh_ok()
             _present_error(self._context, self.encoder_note.text())
             return
         context = self._context

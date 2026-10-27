@@ -1,59 +1,60 @@
 # WP3.20R: settings dialog hardening
 
-Scope: DR-53, DR-54, DR-55 only; package diff base **528d865**; spec v0.5.5.
-This report supersedes WP3.20 narrative for these rows, including accept order; only its authorized capability bullet changed.
+Scope: DR-53..DR-55; spec v0.5.5; diff base **528d865**. This report supersedes WP3.20
+narrative for these rows, including accept order; only its authorized capability bullet changed.
 
-Changes in `src/clearwater/gui/settings_dialog.py`:
+Product methods changed: `accept`, `_encoder_unacceptable`, `_update_encoder_note`,
+`_on_encoder_changed`, `_refresh_ok`, `_on_choose_folder`, `_on_clear_clicked`.
 
-- DR-53: `accept()` builds `edited_settings()` once and validates `new.output_suffix` before
-  save/apply/close. Failure calls `_check_suffix()` and presents a settings-owned error with
-  ASCII detail cut to 200 characters; a corrected suffix can then be saved.
-- DR-54: `_encoder_unacceptable`, `_update_encoder_note`, `_on_encoder_changed`, `accept`:
-  an encoder the sink reports unavailable is refused whether stored or picked; OK is disabled,
-  its reason is visible in `encoder_note`, and direct accept presents the same settings error.
-  A stored unreported encoder (including report failure) stays shown unavailable and is written
-  back unchanged unless edited. Pending detection disables the control and defers refusal;
-  report arrival re-evaluates OK. Acceptable selection clears the refusal note. Q3 stands.
-- DR-55: `_on_choose_folder` and `_on_clear_clicked` catch `Exception` around injected calls,
-  with the foreign-code comments. Failures present the specified settings-owned errors,
-  ASCII-escape exception text, preserve folder/cache state and permit retry.
+- DR-53: validate the one `edited_settings()` object subsequently saved/applied. A suffix
+  refusal calls `_check_suffix`, shows the applied-value error beside the field and in its
+  tooltip, disables OK, and presents a settings-owned error with ASCII detail cut to 200 chars.
+- DR-54: validate the encoder actually applied, including session/unedited-control divergence.
+  A reported-unavailable encoder is refused whether stored or picked: OK disabled, reason
+  visible, direct accept presents the same settings error. A reason's terminal full stop is
+  reused. An acceptable choice clears the refusal note; enabled OK is made the default.
+- DR-55: catch `Exception` only around injected chooser calls, with foreign-code comments.
+  Settings errors escape non-ASCII details; folder/cache state is preserved and retries work.
 
 Encoder truth table (also in `_encoder_unacceptable`'s docstring; 10-bit rule unchanged):
 
-| Selected | Sink report | Stored? | OK |
+| Encoder to apply | Sink report | Stored in current session? | OK |
 |---|---|---|---|
 | `auto` | any | any | allowed |
-| any | still being read | any | allowed; re-evaluate on arrival |
+| any | still being read | any | allowed; disabled control, re-evaluate on arrival |
 | name | reported unavailable | stored or picked | refused |
 | name | reported available | any | allowed |
-| name | absent or report failed | stored | allowed |
+| name | absent or report failed | stored | allowed; kept unchanged unless edited (Q3) |
 | name | not reported | picked | refused |
 
-Tests ran before each row's product edit; names/logs: `docs/proofs/wp3.20r-ledger.md`. "Base" means that row's unchanged pre-fix module.
+Tests ran before each fix; "base" below is the unchanged pre-fix module. Full names/logs:
+`docs/proofs/wp3.20r-ledger.md`; reviewer r1 separately compared its 81 input dialog cases with base 528d865.
 
-| Row / named evidence | Base result | Final head |
+| Evidence | Base / pre-cleanup result | Final head |
 |---|---|---|
-| DR-53: `test_a_stored_suffix_that_fails_validation_in_its_last_character_is_refused`, `test_a_stored_suffix_with_a_newline_is_refused` | Already refused, but complete tests FAILED for missing settings error | PASSED |
-| DR-53: `test_stored_suffix_scenario_passes_on_the_real_dialog` (2 cases) | FAILED: invalid applied suffix written | PASSED |
-| DR-54: stored-unavailable refusal, recovery, pending-report and `test_unavailable_stored_scenario_passes_on_the_real_dialog` | 4 FAILED: OK enabled for stored unavailable encoder | PASSED |
-| DR-54: `test_auto_is_resolved_by_a_rule_that_disagrees_with_the_interim_rule` (both directions) | 2 PASSED; existing behavior tested more strongly | PASSED |
-| DR-55: raising folder/confirmation, retry, `test_chooser_scenario_passes_on_the_real_dialog`, extended ASCII test | 8 FAILED plus 8 pytest-qt slot-exception errors | PASSED |
+| DR-53 constructor suffixes: final-character slash at length 32768; newline | Already refused; new complete tests FAILED for missing settings error | PASSED |
+| `_stored_suffix_scenario` (2 cases) | FAILED: invalid applied suffix written | PASSED |
+| DR-54 stored unavailable, recovery, pending report, real scenario | 4 FAILED: OK left enabled | PASSED |
+| Disagreeing injected resolver, both 10-bit directions | 2 PASSED already; spy and enabled state prove rule use | PASSED |
+| DR-55 chooser failures, retry, real scenarios, extended ASCII test | 8 FAILED + 8 pytest-qt escaped-slot errors | PASSED |
+| R1 applied encoder, visible suffix reason, direct Return, single punctuation | Each new regression FAILED without its fix; current-unreported controls already PASSED | PASSED |
 
-Planted controls: `test_planted_field_only_suffix_check_is_caught`, `test_planted_stored_unavailable_accepted_is_caught`, `test_planted_unwrapped_chooser_is_caught`.
-All catcher tests pass on base/head; their wrong implementations fail the named shared scenarios.
-DR-53 Q1 reproduction: constructor kept all 32768 characters and the newline; no truncation or
-flattening occurred, so base already refused both. The positive control opens on defaults,
-uses session `set_settings` to install `bad/suffix` with the field unedited, and catches the
-base accepting/writing it. This deterministic divergence is fixed; no suffix length rule added.
+Planted catchers: `test_planted_field_only_suffix_check_is_caught`, `test_planted_stored_unavailable_accepted_is_caught`, `test_planted_unwrapped_chooser_is_caught`.
+Their wrong implementations fail named shared scenarios; all catcher tests pass on final head.
+DR-53 Q1: constructor kept all 32768 characters/newline, so truncation was NOT reproduced.
+The positive control opens defaults, installs `bad/suffix` through session `set_settings`
+without editing the field, then catches base accepting/writing it. No suffix length rule added.
 
-HD-1: 44 -> 59 test functions: **15 new**, **1 changed** (ASCII test), no removals;
-the 15 include **3 planted-control** and **3 real-scenario control** functions. New cases: 21.
-Final targeted run: **85 passed in 9.00s** (81 dialog + 4 unchanged dependency cases); `PYTHONPATH=scripts`, committed mkdir shim, cacheprovider disabled, `tmp-t5`.
-Static gates: Ruff check **All checks passed!**; mypy strict **Success: no issues found in 132
-source files**. Sandbox `ruff format --check .`: exit 101, **Expected a ruff source file**;
-owned-file format check: **2 files already formatted**. Dispatcher confirmed turn-4 global
-formatting outside sandbox: **227 files already formatted**, exit 0. Turn-5 logs: `work/wp3.20r/turn5-*`.
-Verification: red failures confirmed all three defects; fixes and planted controls verified;
-final targeted pass found no new in-scope issue. Reviewer A: pending after this handoff.
-Limits: global formatting needs seat confirmation; full suite is the orchestrator's; DR-52 and other historical report content unchanged.
-Owned files/LF, interfaces, dependencies, local config and read-only footage locks honored. No OS-specific product code or open product question.
+HD-1: 44 -> 64 test functions: **20 new** (15 build + 5 cleanup), **1 changed**, no removals;
+new functions include **3 planted** and **3 real-scenario controls**; 27 added cases, 64 -> 91.
+Final shim run: **91 passed in 9.60s** (87 dialog + 4 unchanged dependency cases), offscreen,
+`PYTHONPATH=scripts`, cacheprovider disabled, `tmp-t6`. Ruff: **All checks passed!**; strict mypy:
+**Success: no issues found in 132 source files**. Global format: exit 101, **Expected a ruff
+source file** (sandbox artifact); owned format: **2 files already formatted**. Logs: `work/wp3.20r/turn6-*`.
+Reviewer A r1: **0 critical, 0 major, 3 minor, 3 advisory; NO_NEW_CRITICAL_MAJOR**; loop terminated.
+Cleanup fixes 1, 3, 5; finding 2's narrower direct-Return failure gets the authorized one-line fix.
+Own probe did not reproduce Cancel/closing: without focus Return left dialog open; with focus it saved.
+Limits: advisory 4's cosmetic split escape at the 200-char cut is declined; advisory 6's duplicate
+and stale session-only banners are banked (pre-existing save-only clearing). DR-52 unchanged.
+Global formatting needs seat confirmation; full suite is the orchestrator's. Owned files/LF,
+interfaces, dependencies, local config and read-only footage locks honored; no OS-specific code.

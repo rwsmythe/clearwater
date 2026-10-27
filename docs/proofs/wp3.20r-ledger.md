@@ -18,8 +18,10 @@
   Dispatcher-supplied end-of-turn-3 figure: **111,584**, supplied at the turn-4
   gate; turn 3 originally committed as `26b8ff5`, now rebased as `7c43b65`.
   Dispatcher-supplied end-of-turn-4 figure: **131,507**, supplied at the turn-5
-  gate; turn 4 committed as `d80a921`. Turn-5 figure not yet supplied.
-  No reviewer has run; Reviewer A follows turn 5.
+  gate; turn 4 committed as `d80a921`. Dispatcher-supplied end-of-turn-5 figure:
+  **149,041**, supplied at the round-1 gate; turn 5 committed as `a0de531`.
+  Turn-6 figure not yet supplied. Reviewer A round 1 terminated; see its
+  adjudication and cleanup record below.
 
 ## Baseline and sandbox observations
 
@@ -145,9 +147,9 @@ S55 roster:
 |---|---|---|---|---|
 | 1 | DR-53 constructor truncation; value divergence; DR-54 stored bypass; DR-55 chooser escape | Constructor truncation rejected by both runtime measurements; divergence, stored bypass and both slot escapes confirmed by six asserted scratch cases, consistent with code paths. | Scratch import-root slip only; no product/test fixes authorized this turn. | Targeted pytest cannot complete with prescribed basetemp; later implementation and all review rounds pending. |
 
-| Reviewer A round | Severity counts | In / out of envelope | NEW / REOPENED | Reverts | Product / test-only fixes | Verdict | Dispatcher token figure |
-|---|---|---|---|---|---|---|---|
-| Not started | n/a | n/a | n/a | 0 | 0 / 0 | Scheduled after turn 5 | Turn 4: 131,507 |
+| Reviewer A round | Severity counts | In / out of envelope | NEW / REOPENED | Reverts | Product / test-only fixes | Transport / CLI | Verdict | Dispatcher token figure |
+|---|---|---|---|---|---|---|---|---|
+| 1 | critical 0; major 0; minor 3; advisory 3 | 6 / 0 | 6 / 0 | 0 | 4 finding cleanups / 1 planted-test signature adaptation; 5 new regression/control functions | `claude -p` opus/high via `scripts/codex_cell.py review`; local CLI 2.1.300 | `NO_NEW_CRITICAL_MAJOR`; TERMINATED, one cleanup; no round 2 | 149,041 |
 
 Locks this turn: owned deliverable only; product/tests and frozen interfaces
 untouched; no dependency or OS-specific product change; local configuration
@@ -505,3 +507,109 @@ one-bullet-only replacement, LF and report length are checked in
 `work/wp3.20r/turn5-deliverable-check.log`. Interfaces, dependencies, local config,
 committed shim and footage untouched; no OS-specific code, git writes, reviewer
 or mailbox activity.
+
+## Reviewer A round 1: terminating adjudication and cleanup (turn 6)
+
+Input: `528d865..a0de531`. Read all of
+`C:/Users/rwsmy/clearwater-review-evidence/wp3.20r/r1/review.txt` and its md5
+manifest. Review text md5 **baf1eaf2fdf36ee030eb2dd49af75c57** independently
+verified. Durable prompt, diff, input, JSON and review text are in that same
+external evidence folder; it was read only. Dispatcher assertions: requested
+`claude-opus-5-5` high; `is_error` false; 33 turns; worktree clean afterwards;
+8 read-only-policy permission denials (not defects or transport failures).
+Transport: `claude -p --model opus --effort high`, driven by
+`scripts/codex_cell.py review`. Local `claude --version` reads **2.1.300 (Claude
+Code)** (`work/wp3.20r/turn6-claude-version.log`); the version of the completed
+review invocation was not separately asserted by the dispatcher.
+
+Verdict: **NO_NEW_CRITICAL_MAJOR**, 0 critical, 0 major, 3 minor, 3 advisory;
+ZERO NEW BLOCKING terminates under fill Part 1. No round 2, no new reviewer,
+no reverts and no reopened findings. All six findings are NEW and within the
+declared operating envelope; cleanup scope is narrower than operating envelope,
+as specified for the declined/banked advisories below. Findings retain the
+reviewer's **EXECUTED** tag; none was tagged REASONED.
+
+### Every finding adjudicated
+
+| # | Severity / envelope / tag | Independent confirmation or rejection | Disposition |
+|---|---|---|---|
+| 1 | MINOR; IN; EXECUTED; NEW | New applied-encoder regression FAILED on unchanged `a0de531`: default combo plus current-session `hevc_nvenc` wrote settings. | CONFIRMED, FIXED: `accept` passes `new.video_encoder` into the predicate/note. Their default queries use edited settings, and Q3 compares the current session's stored value. Refusal disables OK, shows the actual reason and returns before save/apply/close. Added unavailable-current-session test and two current-unreported controls. |
+| 2 | MINOR; IN; EXECUTED; NEW | PARTIALLY CONFIRMED: direct Return without explicit focus did not accept; own probe showed NO default button, result 0, dialog still visible/open. Explicitly focusing the suffix gave default OK and Accepted. The claimed Cancel default / silent close was NOT reproduced and is rejected on this measured surface. | Applied the expressly authorized ONE-LINE default restoration in `_refresh_ok`. The direct-Return regression FAILED without it and now PASSES. Mechanism predates package (`54e2749`); owner explicitly authorized this one-line cleanup despite the fill's normal provenance banking rule. |
+| 3 | MINOR; IN; EXECUTED; NEW | New in-dialog suffix-reason regression FAILED on unchanged code: `suffix_error` empty after applied stored suffix `bad/suffix` was refused. | CONFIRMED, FIXED: after `_check_suffix`, `accept` shows the actual validation reason in label/tool tip and refreshes OK. A different valid edit clears it and saves. The existing unchanged-control writeback rule was not redesigned. |
+| 4 | ADVISORY; IN; EXECUTED; NEW | Scratch run confirmed ASCII detail length 200 with a trailing lone backslash for 100 accented characters plus `/`; repeated after cleanup with same result. | CONFIRMED, DECLINED as cosmetic. Preserve Q5's ASCII 200-character bound; complete-escape truncation would add a formatting rule beyond the literal cut. No acceptance/state failure; disclosed in report and final handoff. |
+| 5 | ADVISORY; IN; EXECUTED; NEW | New punctuation regression and four adjusted note/scenario cases FAILED on unchanged code for `found.. Choose`. | CONFIRMED, FIXED trivially in `_update_encoder_note`: reuse one terminal full stop. Note and settings message match, fallback reason unchanged. |
+| 6 | ADVISORY; IN; EXECUTED; NEW | Scratch run confirmed two identical errors after two direct accepts, and one chooser error left after a successful session-only accept with a refused settings file; file bytes unchanged. Repeated after cleanup. | CONFIRMED, BANKED: message deduplication and clearing on session-only acceptance are outside DR-53..55 cleanup; brief explicitly excludes changing OK's refused-settings-file behavior. Save-only clearing/presentation predates package at `54e2749`; no banner lifecycle redesign. |
+
+Independent advisory/default probes: `work/wp3.20r/turn6_advisory_probe.py`,
+logs `turn6-advisory-probe.log` (unchanged code) and
+`turn6-advisory-after-cleanup.log`. The latter confirms direct Return now has
+default OK after encoder correction and accepts whether explicit focus is set
+or not. It also confirms advisories 4, 6a and 6b remain exactly as disclosed.
+
+Provenance evidence: `git log -S 'context.messages.clear(owner=OWNER_SETTINGS)'`,
+`git log -S 'context.messages.present'`, and
+`git log -S 'self.ok_button.setEnabled(not self.suffix_error.text()'` over the
+owned module each identify **54e2749**, WP3.20's original dialog. Logs:
+`turn6-banner-origin.log`, `turn6-present-origin.log`, `turn6-default-origin.log`.
+
+### Red / green / verification record
+
+All pytest runs used offscreen Qt, `PYTHONPATH=scripts`, the committed mkdir
+shim, disabled cacheprovider, both targeted files and `tmp-t6`; the keyboard
+confirmation filtered those same files with `-k return_saves_edits`.
+
+| Check | Observed result | Log under `work/wp3.20r/` |
+|---|---|---|
+| Initial regression run before product edit | Exit 1; **7 failed, 84 passed in 9.47s**: applied encoder, missing local suffix reason, punctuation/new expected-note cases; explicit-focus Return variant already passed | `turn6-red-pytest.log` |
+| Revised direct-Return regression before product edit | Exit 1; **1 failed, 90 deselected in 1.02s**; result 0, not Accepted | `turn6-default-red-pytest.log` |
+| First head run | Exit 1; **1 failed, 90 passed in 7.28s**; only planted stored-bypass adapter rejected the new optional argument with TypeError | `turn6-green-pytest.log` |
+| Final targeted run after adapter correction | Exit 0; **91 passed in 9.60s** | `turn6-final-pytest.log` |
+| `uv run ruff check .` | Exit 0; **All checks passed!**; two old access-denied traversal warnings | `turn6-ruff-check.log` |
+| `uv run ruff format --check .` | Exit 101; **Expected a ruff source file** (same sandbox artifact) | `turn6-ruff-format.log` |
+| Owned-file format check | Exit 0; **2 files already formatted** | `turn6-owned-format-check.log` |
+| `uv run mypy` | Exit 0; **Success: no issues found in 132 source files** | `turn6-mypy.log` |
+
+The initial explicit-focus keyboard variant passing was investigated rather
+than reported as a failing check. Cached-report setup plus an unfocused direct
+key event confirmed the narrower default-restoration issue before implementation.
+All four changed product behaviors have a regression that failed without the
+fix. Two extra current-unreported controls already passed and protect Q3 from
+over-refusal. The planted adapter now accepts the optional argument while still
+restoring the wrong stored-equality bypass; it fails the same named assertion,
+not a TypeError. No review finding was reopened by this test-only adaptation.
+
+Verification loop: suspect -> independent red/probe -> classify -> fix 1/2/3/5
+once -> repeat whole targeted run and statics. Final inspection confirms one
+edited settings snapshot is applied; encoder refusal uses that snapshot's name;
+both refusal branches return before saving/applying/closing; suffix label/tool
+tip show the actual reason; optional encoder arguments retain Q3's current
+stored value; default restoration is one line. The final pass found no new
+in-scope issue. Retained cosmetic/banner limits are explicit rather than silently
+counted as fixed. Review input's independent original-base run was also recorded
+by Reviewer A: **16 failed, 65 passed, 8 errors**, the 81 input dialog cases.
+
+### Final report, counts and scope
+
+Updated the hardening report by replacement for actual-value encoder validation,
+local suffix reason, default restoration, punctuation, current-session Q3
+controls, final counts/gates and Reviewer A's terminating verdict/retained limits.
+The old WP3.20 report is untouched this turn; its one-bullet correction still
+stands, now also true for the session-divergence encoder route.
+
+AST/source comparison with package base `528d865`: **44 -> 64 test functions**,
+**20 new**, **1 changed original** (ASCII test), no removals; 3 planted and
+3 real-scenario control functions remain. Cleanup adds 5 functions / 6 cases;
+the new total is **91 cases**, 87 dialog plus 4 unchanged deps, 27 above base.
+Two previously added functions changed during cleanup (punctuation expectation
+and planted adapter); no original Q3 or agreeing-resolver test changed. Counts
+and review md5 check: `work/wp3.20r/turn6-test-counts.log`.
+
+Reviewer A is **TERMINATED at round 1**, with one non-blocking cleanup. No extra
+round or approval request. Outstanding gate work belongs to the orchestrator:
+seat confirmation of global formatting, full suite, Reviewer B and acceptance.
+No scope deviation; declined/banked advisories 4 and 6 are the disclosed limits.
+Final LF, one-bullet-only historical-report preservation, protected test sources,
+four-file turn scope and five-file package scope are checked in
+`work/wp3.20r/turn6-deliverable-check.log`. Interfaces, contract, shared fixtures,
+dependencies, shim, local config and footage untouched; no OS-specific product
+code, git writes, reviewer run or mailbox activity by this cell.
