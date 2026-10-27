@@ -494,7 +494,14 @@ class AnalysisEngine:
         finally:
             close = getattr(frames, "close", None)
             if close is not None:
-                close()
+                try:
+                    close()
+                except Exception as exc:  # a cleanup error is a log line, never the pass's outcome
+                    import logging  # here: this block is the module's one granted edit (WP3.14)
+
+                    logging.getLogger(__name__).warning(
+                        "the decode stream's close raised %s: %s", type(exc).__name__, exc
+                    )
         if not decoded:
             raise ValueError("the frame source yielded no frames")
         self._check(progress, None)  # a cancel raised by the last frame's report

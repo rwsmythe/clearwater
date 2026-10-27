@@ -10,11 +10,13 @@ from __future__ import annotations
 
 import ast
 import errno
+import inspect
 import json
 import logging
 import os
 import re
 import shutil
+import textwrap
 import threading
 import time
 from pathlib import Path
@@ -23,6 +25,7 @@ from typing import Any
 import pytest
 
 import clearwater.jobs
+from clearwater.analysis import engine as engine_module
 from clearwater.interfaces import JobResult, Settings
 from clearwater.interfaces.stubs import StubProgress
 from clearwater.jobs import Reservations, SafeWrite, is_reserved_device_name, run_batch
@@ -682,18 +685,49 @@ def _assert_analysis_cancel_kept(result: JobResult) -> None:
 def test_a_cancel_during_the_analysis_survives_a_raising_stream_close(
     tmp_path: Path, caplog: pytest.LogCaptureFixture
 ) -> None:
-    # Reviewer B B1 (Q2 as amended): the analysis stream's close error replaced the analysis's
-    # own cancel outcome, and the job read the cancel from that text, so it became a failure.
+    # Reviewer B B1: the analysis stream's close error replaced the analysis's own cancel
+    # outcome, and the job read the cancel from that text, so it became a failure. Since B1 (b)
+    # the close error is the analysis engine's WARNING line and the analysis keeps its cancel.
     rig = Rig(tmp_path)
-    with caplog.at_level(logging.INFO, logger="clearwater.jobs.export"):
+    with caplog.at_level(logging.WARNING, logger="clearwater.analysis.engine"):
         result = _analysis_cancel_with_a_raising_close(rig)
     _assert_analysis_cancel_kept(result)
     assert not result.ok and result.outputs == ()
     assert any(
-        r.levelno == logging.INFO and "cleanup close failed" in r.getMessage()
+        r.levelno == logging.WARNING and "cleanup close failed" in r.getMessage()
         for r in caplog.records
     ), caplog.text
     assert rig.sinks == [] or "open" not in rig.sink.calls
+    _no_partials(rig)
+
+
+def _analysis_error_after_a_cancel(rig: Rig) -> JobResult:
+    """Run a cold analysis whose method asks the cancel and then raises (B1, Q2 as amended)."""
+    progress = StubProgress()
+
+    def analyze(*args: Any, **kwargs: Any) -> Any:
+        progress.cancel()
+        raise RuntimeError("the stopped analysis failed")
+
+    rig.method.analyze = analyze  # type: ignore[method-assign]
+    result: JobResult = rig.run(rig.request(), progress)
+    return result
+
+
+def test_an_analysis_error_after_a_cancel_is_cancelled(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    # Reviewer B B1 (Q2 as amended): a non-ok analysis result while cancelled() holds is a
+    # cancel, read from the flag, never from the result's text; that text goes to an INFO line.
+    rig = Rig(tmp_path)
+    with caplog.at_level(logging.INFO, logger="clearwater.jobs.export"):
+        result = _analysis_error_after_a_cancel(rig)
+    _assert_analysis_cancel_kept(result)
+    assert not result.ok and result.outputs == ()
+    assert any(
+        r.levelno == logging.INFO and "the stopped analysis failed" in r.getMessage()
+        for r in caplog.records
+    ), caplog.text
     _no_partials(rig)
 
 
@@ -708,9 +742,84 @@ def test_planted_analysis_cancel_read_from_the_text_fails_by_name(
         raise export_module._FailureError(f"{name}: analysis failed: {result.failure}")
 
     monkeypatch.setattr(export_module, "_check_analysis", text_only)
-    result = _analysis_cancel_with_a_raising_close(Rig(tmp_path))
+    result = _analysis_error_after_a_cancel(Rig(tmp_path))
     with pytest.raises(AssertionError, match="an analysis cancel was lost"):
         _assert_analysis_cancel_kept(result)
+
+
+def _analysis_failure_with_a_raising_close(rig: Rig) -> JobResult:
+    """Fail the cold analysis's method while its decode stream's ``close`` raises (B1 (b))."""
+    stages: list[str] = []
+    rig.engine._on_stage = stages.append  # type: ignore[assignment]
+    real_frames = rig.source.frames
+
+    def frames(*args: Any, **kwargs: Any) -> Any:
+        stream = real_frames(*args, **kwargs)
+        return _CloseRaises(stream) if "frames" not in stages else stream
+
+    def analyze(*args: Any, **kwargs: Any) -> Any:
+        raise ValueError("ORIGINAL analyze failed")
+
+    rig.source.frames = frames  # type: ignore[method-assign]
+    rig.method.analyze = analyze  # type: ignore[method-assign]
+    result: JobResult = rig.run(rig.request())
+    assert "analysis" in stages and "frames" not in stages, stages
+    return result
+
+
+def _assert_analysis_failure_kept(result: JobResult) -> None:
+    assert result.failure == "clip.mp4: analysis failed: ValueError: ORIGINAL analyze failed", (
+        f"the analysis's own failure was replaced: {result.failure!r}"
+    )
+
+
+def test_a_method_failure_during_the_analysis_survives_a_raising_stream_close(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    # Reviewer B B1 (b), granted (CHARC d9154e06): the analysis's decode pass closed its stream
+    # unguarded in a finally, so the close error replaced the method's failure.
+    rig = Rig(tmp_path)
+    with caplog.at_level(logging.WARNING, logger="clearwater.analysis.engine"):
+        result = _analysis_failure_with_a_raising_close(rig)
+    _assert_analysis_failure_kept(result)
+    assert not result.ok and result.outputs == ()
+    assert any(
+        r.levelno == logging.WARNING
+        and r.name == "clearwater.analysis.engine"
+        and "cleanup close failed" in r.getMessage()
+        for r in caplog.records
+    ), caplog.text
+    _no_partials(rig)
+
+
+def _bare_close_decode() -> Any:
+    """Rebuild ``AnalysisEngine._decode`` from its source with the close unguarded (planted)."""
+    lines = textwrap.dedent(inspect.getsource(engine_module.AnalysisEngine._decode)).splitlines(
+        keepends=True
+    )
+    start = next(i for i, line in enumerate(lines) if line.strip() == "if close is not None:") + 1
+    assert lines[start].strip() == "try:", f"the guarded close moved: {lines[start]!r}"
+    indent = len(lines[start]) - len(lines[start].lstrip())
+    end = start + 1
+    while end < len(lines) and (
+        not lines[end].strip()
+        or len(lines[end]) - len(lines[end].lstrip()) > indent
+        or lines[end].lstrip().startswith("except")
+    ):
+        end += 1
+    planted = "".join([*lines[:start], " " * indent + "close()\n", *lines[end:]])
+    namespace: dict[str, Any] = {}
+    exec(compile(planted, "<planted bare close>", "exec"), vars(engine_module), namespace)
+    return namespace["_decode"]
+
+
+def test_planted_bare_analysis_stream_close_fails_by_name(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(engine_module.AnalysisEngine, "_decode", _bare_close_decode())
+    result = _analysis_failure_with_a_raising_close(Rig(tmp_path))
+    with pytest.raises(AssertionError, match="the analysis's own failure was replaced"):
+        _assert_analysis_failure_kept(result)
 
 
 class _RaisesOnSaved(StubProgress):
