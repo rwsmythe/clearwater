@@ -36,7 +36,20 @@
   Commission msg `f0741947` to orchestrator gen 12: Sonnet-class, THIRD after the calibration pair, lane by
   pace tiebreak, figures to HD-1 flagged outside the pair; brief by one helper, CHARC approves FINAL; at its
   accept the fill's GATE_CHECKS suite line becomes the two-leg command and CHARC QA uses the same.
-- **Orchestrator gen 12 ONLINE** `clearwater-orchestrator-20261026-1223` (sole drainer; **cue THIS name**).
+- **Spec v0.5.5** applied (owner 2026-10-27 verbatim "Apply D75 erratum"; main a5f9245, text only; FYI `e414d7d0`).
+- **Wave 4 briefs FINAL** (msg `b83526ce`, 2026-10-27 06:34Z, answering gen 12's `4b2d7b2e92048eaf`; drafts on
+  `wave4-briefs` b7764c5): WP3.14, WP3.20R, WP-T3, WP-T4 all APPROVED, 36 questions ruled (helper recommendations
+  adopted except: WP-T3 Q1 Reviewer A = Codex, my earlier "Claude" line was WRONG and is corrected; WP-T4 Q3 the
+  fixture-cache race is reproduced with a slowed generator and LOCKED, not left to luck; WP-T4 Q6 the orchestrator's
+  reviewer form (FAST Codex for a Claude cell, the pinned opus/high Claude pass for a Codex cell); WP-T4 Q7 two
+  interleaved rounds, a third only on >15 % disagreement; WP3.14 Q12 GX011625 sustained row KEPT, last, OWED if
+  not granted). WP3.14 Q8 D87 = REFUSE before writing (reading of record: stricter than 8.4's "warned", no owner
+  decision). **IF-9 docstring amended ba28175**: provenance `source` = file NAME never the path (AD-13 amended,
+  AD-20 record). At accepts I owe: DR rows (WP3.14 Q5 cache serialisation; WP-T3 Q3 XMP encodings), DR-53
+  mechanism text (WP3.20R turn-1 record), the CLAUDE.md two-leg pointer (WP-T4), HD-1 calibration figures.
+- **Orchestrator gen 13 ONLINE** `clearwater-orchestrator-20261026-2029` (launched by gen 12 at 06:29Z; state
+  1217443; sole drainer; **cue THIS name**). Gen 12 rolled at ~380K. Gen 13's plan: apply the FINALs on
+  `wave4-briefs`, ff main, dispatch WP3.14 (opus-high), then WP3.20R (Codex) + WP-T3 (sonnet-high), then WP-T4.
 
 ### Generation 3 (2026-10-21 07:30Z to 2026-10-27 05:50Z; rolled at 420K; kept as record)
 
@@ -412,8 +425,9 @@ release post.
 ### Owner
 
 **No owner decision open.** Owner-pending inputs: photos (memory-test photo leg; AD-24 HEIC rule
-provisional until then; WP3.6P runs on them) and an iPhone video clip (DR-15 B-frame edit-list leg). The D75
-erratum is APPLIED (spec v0.5.5, 2026-10-27). Owner-reserved items (plan s.3): footage categories, look check and V2
+provisional until then; WP3.6P runs on them), an iPhone video clip (DR-15 B-frame edit-list leg), and ONE spec
+text erratum for v0.5.6: section 10.2's N6 body still says "about 3.3 minutes per minute" where D106/V16 read the
+interim 25 min/min (found by the WP3.14 brief helper 2026-10-27; nothing blocks on it). D75 erratum APPLIED (v0.5.5). Owner-reserved items (plan s.3): footage categories, look check and V2
 visual review, anything relaxing a mandatory requirement, any spec change. Everything else CHARC
 rules in the operator's stead (standing direction 2026-10-14, verbatim in CLAUDE.md "Roles";
 memory `clearwater-unattended-rule.md`); read the owner's words back verbatim with their time;
