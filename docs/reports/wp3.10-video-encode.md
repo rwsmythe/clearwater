@@ -102,7 +102,9 @@ kept audio packets with dts below 1.4787 s).
   B-frame decode-order listing, VFR and an empty-edit dwell need nothing special), for a
   `truncated` source only those before its first corrupt packet (Q-B, the frames before the cut;
   `verify.readable_video_pts`), and for an `unreadable_tail` source every such pts up to the last
-  one written (its decodable end cannot be told without decoding, D86). The message names the
+  one written (its decodable end cannot be told without decoding, D86). That is the ONE place a
+  short output verifies: an early stop on an `unreadable_tail` source is the decoder's end, never
+  a gap (orchestrator ruling on the Reviewer B pass 1 remediation). The message names the
   first missing pts and the counts, or the frames written past the readable end. The check runs
   BEFORE the sentinel, so FFmpeg never finishes an incomplete export, and on the sink's own state
   rather than on FFmpeg's output: what is missing is a caller fact, known before any output exists.
@@ -198,13 +200,14 @@ carries it, the instrument's does not).
 `tests/test_io_video_encode_units.py` 80, `tests/test_io_video_encode.py` 113 (2 `footage`),
 `tests/test_io_video_encode_bench.py` 50, `tests/test_video_fidelity.py` 13 and
 `tests/test_io_video_probe_rules.py` 26 (1 `footage`; this package's module names only). At
-`e04a7cb`: the five modules `-m "not footage"` 274 passed, 3 deselected (5:35). At `673f958`
-(Reviewer B pass 1 #1 and #7): 278 passed, 1 failed, 3 deselected (6:12); the failure is the
-bench's timing test `test_strays_are_read_between_frames_and_kept_out_of_the_figures` (the sum
-of the frame intervals against the stream stage within 0.01 s; the gap is the decoder's end after
-the last frame, outside the sink), which passes on rerun and fails 1 run in 6 on `e04a7cb`'s code
-too (pre-existing, not changed here). ruff, ruff format (211 files) and mypy strict (123 files)
-clean. The three `footage` tests passed at `0b76301` in
+`e04a7cb`: the five modules `-m "not footage"` 274 passed, 3 deselected (5:35). At `4537881`
+(Reviewer B pass 1 remediation): 279 passed, 3 deselected (6:33). The bench's two timing
+assertions (the frame intervals against the stream stage, within 0.01 s) flaked under pytest
+(1 run in 6 on `e04a7cb`): the stream also holds steps outside every interval where a thread
+switch cost up to 0.035 s. Their tolerances now come from what they guard: half the shortest
+planted strays pause (a pause left inside an interval still fails) and 0.1 s for the row (a
+`close` counted into the stream still fails); both negative cases planted and shown failing.
+ruff, ruff format (211 files) and mypy strict (123 files) clean. The three `footage` tests passed at `0b76301` in
 seat 8's footage window (the mapping commit touches no footage test). The full suite is the
 orchestrator's stacked gate (seat 7's run on `5727842`: 4434 passed, 2 skipped). They include eight planted wrong implementations that fail by name (CFR on
 `vid-vfr`, start offset zeroed, `media_time` copied verbatim, colour tags omitted, `tv` on a `pc`
