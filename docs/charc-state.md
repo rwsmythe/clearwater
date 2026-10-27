@@ -145,7 +145,7 @@ of `origin/main`, unpushed; no push asked (verify `git status -sb`).
   login: 6.1-sol (default), 6-astra, 6.1-terra, 6-sol, 6-luna, 5.6-sol/terra/luna. Research notes (owner-supplied,
   untracked) in `research/multi-model development/`.
 - **CHARC GENERATION 3 (`clearwater-charc-20261020-2115`) ROLLED OVER 2026-10-27 ~05:50Z at 420K (depth cap).**
-  The successor (gen 4) reads this file first, then `docs/charc-charter.md`, then drains its inbox. **FIRST ITEM
+  Gen 4 = `clearwater-charc-20261026-2007` (launched BY GEN 3 via `scripts/launch_role.ps1 -Role charc` at 06:07Z; the rolling CHARC always launches its successor -- owner rule). It reads this file first, then `docs/charc-charter.md`, then drains its inbox. **FIRST ITEM
   OWED: the orchestrator's QUERY `280fb7a08b5e5cfc` (2026-10-27 05:44Z, in `comms/charc/read/` -- gen 3 acked it
   while reading, so it is NOT in the inbox; open the file by name): wave 4 composition and the calibration pair.**
   The orchestrator reports wave 4 as framed has NO Sonnet-class package and recommends WP3.14 + WP3.21 (Opus-class,
