@@ -1,9 +1,11 @@
 # WP3.10 -- Video encode, mux and timing (report)
 
-**Status:** DRAFT (seat 4, after the Reviewer A round-3 remediation), branch `wp3.10` rebased
-onto main `ac4be92` (WP3.9's decoder merged). The synthetic and fixture legs are complete; the
-footage legs (the GX011627 product leg through WP3.9's decoder, the AD-12 quality table, the
-export FLOOR speed row) wait for the dispatcher's windows and are marked PENDING below. Round 0 (the pts-carrier spike, the design table, the rulings) is recorded in
+**Status:** FINAL (seat 9), branch `wp3.10` on main `718324b` (WP3.9's decoder, WP3.4 and
+WP3.11 merged); product head `e04a7cb`, the AD-12 mapping as RULED (CHARC `c1d67b39bb72cc1f`,
+AD-12 amended on main `759f0d0`). Reviewer A rounds 1-10 are closed: the product converged at
+round 4, the floor-row instrument at round 8, the NVENC rate ceiling at round 10; the mapping
+commit is values-only and owed no round (the ruling). The footage legs ran in seat 7's and seat
+8's footage windows, the floor row in seat 9's exclusive window (section 7). Round 0 (the pts-carrier spike, the design table, the rulings) is recorded in
 `docs/proofs/wp3.10-ledger.md`; its evidence is `C:\Users\rwsmy\clearwater-review-evidence\wp3.10\r0\`.
 
 ## 1. What was built
@@ -12,14 +14,14 @@ export FLOOR speed row) wait for the dispatcher's windows and are marked PENDING
 |---|---|
 | `src/clearwater/io/video/nut.py` | The pts carrier on the encode pipe: a stdlib NUT framer (main, stream and INFO packets; per frame a syncpoint and a checksummed frame header with the full pts), the one-byte END SENTINEL and the input bitstream filter `setts=duration=...,noise=drop=lt(size,2)`. Invariant: a real frame is never under 2 bytes (`frame_header` refuses it), so the drop removes the sentinel only. |
 | `src/clearwater/io/video/capability.py` | D74: `detect_capabilities()` (the `-encoders` listing plus one one-frame test encode per encoder and bit depth to the null muxer, run in parallel, cached per process) and `resolve_encoder(setting, capabilities)`, the ONE `"auto"` rule (NVENC when available, else libx265); `tool_env()`, the environment of every FFmpeg and ffprobe process the detection and the sink start (`FFREPORT` removed, so no tool writes a report file of its own). |
-| `src/clearwater/io/video/encode.py` | IF-5 `VideoSink`: `FFmpegVideoSink`; `VideoEncodeError(kind, message)`; `encode_command`; `provenance_comment`; `QUALITY_LEVELS` / `QUALITY_VALUE` (AD-12). |
-| `src/clearwater/io/video/verify.py` | The packet table (three ffprobe listings, no decode: the stream list, the video stream's packets, the audio streams' packets; a data track's packets are never listed) read from the source at `open` (tolerant of a cut-short file) and from the output at `close` (a non-zero ffprobe exit fails); `check_output` (D94 "verified"); `not_carried` (D105). |
+| `src/clearwater/io/video/encode.py` | IF-5 `VideoSink`: `FFmpegVideoSink`; `VideoEncodeError(kind, message)`; `encode_command`; `provenance_comment`; `QUALITY_LEVELS`; `NVENC_CQ` / `X265_CRF` (AD-12: one value table per encoder); the NVENC rate ceiling `nvenc_rate` (`NVENC_BITS_PER_PIXEL`, `NVENC_RATE_SHARE`) and `level_warning` (AD-12 as amended, round 9). |
+| `src/clearwater/io/video/verify.py` | The packet table (three ffprobe listings, no decode: the stream list, the video stream's packets, the audio streams' packets; a data track's packets are never listed) read from the source at `open` (tolerant of a cut-short file) and from the output at `close` (a non-zero ffprobe exit fails); `check_output` (D94 "verified"); `not_carried` (D105); `read_hevc_level` (the level and tier an HEVC file signals, read from its `hvcC`). |
 | `src/clearwater/io/video/__init__.py` | Appended exports (X-V2): `FFmpegVideoSink`, `VideoEncodeError`, `QUALITY_LEVELS`, `detect_capabilities`, `resolve_encoder`; the module docstring's last sentence updated. |
 | `tools/video_fidelity.py` | The V4 instrument (DR-18): `compare` and `encode` subcommands, reusing WP1.5's `compare.py` by import. |
+| `tools/video_io_bench.py` | The export FLOOR row (Q11): WP3.9's `frames` straight into the sink, no correction; per-stage and per-frame times, min/min, the strays, clocks and temperatures, peak process-tree RSS and graphics memory, the NVENC proof; `run` and `floor` subcommands (section 7.3). |
 | `tools/container_spike/spike.py` | DR-26 only (Q15): `_chapter` and the camera default resolve through `find_footage_file`. |
-| `tests/test_io_video_encode_units.py`, `tests/test_io_video_encode.py`, `tests/test_video_fidelity.py` | The tests (section 6). `tests/test_io_video_probe_rules.py`: this package's four module names added to the expected set (standing grant), nothing else. |
+| `tests/test_io_video_encode_units.py`, `tests/test_io_video_encode.py`, `tests/test_io_video_encode_bench.py`, `tests/test_video_fidelity.py` | The tests (section 6). `tests/test_io_video_probe_rules.py`: this package's four module names added to the expected set (standing grant), nothing else. |
 
-`tools/video_io_bench.py` (the speed row) is PENDING: it runs WP3.9's `frames` into this sink.
 
 ## 2. The encode command (one FFmpeg process; each option's reason)
 
@@ -32,8 +34,9 @@ ffmpeg -nostdin -hide_banner -nostats -loglevel error -y          # -y: SafeWrit
   [-to <readable end - input start>] -i <source, absolute>        # input 1: tracks, metadata
   -map 0:v:0 -map 1:<each audio> -map 1:<each data stream except tmcd>
   -vf "<encode_filter(stream, bit_depth)>,setparams=color_primaries=..:color_trc=..:colorspace=..:range=.."
-  NVENC:   -c:v hevc_nvenc -preset p5 -tune hq -rc vbr -b:v 0 -cq 18|23|28  -pix_fmt yuv420p|p010le
-  libx265: -c:v libx265 -preset medium -crf 18|23|28 -x265-params log-level=error -pix_fmt yuv420p|yuv420p10le
+  NVENC:   -c:v hevc_nvenc -preset p5 -tune hq -rc vbr -b:v 0 -cq 22|26|30
+           -maxrate <ceiling> -bufsize <ceiling> -tier main -level <L>  -pix_fmt yuv420p|p010le
+  libx265: -c:v libx265 -preset medium -crf 21|26|30 -x265-params log-level=error -pix_fmt yuv420p|yuv420p10le
   -profile:v main|main10
   -color_primaries .. -color_trc .. -colorspace .. -color_range ..    # D55; D54 assumed values tagged (DR-17)
   -tag:v hvc1 -fps_mode passthrough -enc_time_base:v demux -video_track_timescale <tb den>
@@ -46,6 +49,20 @@ ffmpeg -nostdin -hide_banner -nostats -loglevel error -y          # -y: SafeWrit
 
 The process runs with `tool_env()` (no `FFREPORT`), as do the test encodes and the ffprobe
 listings.
+
+**The NVENC rate ceiling (AD-12 as amended, round 9; `nvenc_rate`).** Without a ceiling NVENC
+signals HEVC level 5.0 and that level's Main-tier cap overrides `-cq`, so the three levels came
+out at one rate on busy 4K (seat 7: GX011627 High / Standard / Draft 0.356 / 0.350 / 0.338 x
+the camera's rate, PSNR flat 35.82 dB). The sink therefore sets `-maxrate` = 0.24 bit/pixel
+(`NVENC_BITS_PER_PIXEL`, FINAL) x width x height x frame rate for High, a half for Standard and
+a quarter for Draft (`NVENC_RATE_SHARE`), and `-bufsize` = the ceiling; for an HEVC source
+signalling a Main-tier level the High ceiling is at most that level's Main-tier cap, so the
+output never signals above the source. Given `-maxrate` alone, NVENC silently switches to the
+High tier once the ceiling passes the Main-tier cap of the level it picked, even with `-tier
+main`, so `-tier main -level L` is set explicitly at the lowest Main-tier level that holds the
+ceiling and the picture. GX011627 (3840x2160 at 30000/1001, source 6.0 Main): ceilings 59.66 /
+29.83 / 14.92 Mb/s, signalled 5.2 / 5.1 / 5.0 Main. `-cq` decides calm scenes and the ceiling
+binds busy ones. libx265 has no ceiling.
 
 The truncation `-to` is relative to the input's earliest stream start: FFmpeg 9.0.2 applies an
 input `-to` under `-copyts` from that start (measured: `-to 1.0` on a file starting at 0.4787 s
@@ -144,7 +161,7 @@ the facts are read, before any comparison: only their presence is compared, and 
 value reaches an item or a record (tested with a planted `location` tag; WP1.5's own record
 carries it, the instrument's does not).
 
-## 5. V4 per sample (libx265 always; NVENC on this laptop) -- every MANDATORY and REQUIRED item SAME
+## 5. V4 per sample (libx265 always; NVENC on this laptop) -- every MANDATORY and REQUIRED item SAME (except the Edits compilation's two: section 9)
 
 | Source | 8-bit out | 10-bit out | Notes |
 |---|---|---|---|
@@ -162,13 +179,18 @@ carries it, the instrument's does not).
 | synthetic VFR gap with offset | SAME | -- | |
 | synthetic BT.601 | -- | SAME (D76) | BT.709 primaries with the warning (Q17) |
 | synthetic 5.3K 8:7 (`slow`) | SAME | -- | |
-| GX011627 (product leg through WP3.9) | PENDING | -- | round 0 (test-side decode): 41 items, M+R all SAME |
+| GX011627 (product leg through WP3.9, NVENC 8-bit Standard) | SAME | -- | 46 items; DIFFERENT only BEST-EFFORT 8 (the round-0 eight: timecode value on stream tags, camera `udta` atoms, ftyp brands, container tags, stream tags, track layout, video sample-entry boxes, non-video edit lists as written); `gpmd` packet counts and creation time SAME; NVENC proof tied (seat 8 on `0b76301`; the mapping commit changes only the `-cq` value) |
+| Edits compilation (1080p60 H.264, 10,800 frames, NVENC 8-bit Standard) | 2 MANDATORY DIFFERENT | -- | `mvhd` and the audio entry of the edit-list effect differ by 0.79 ms, under one 1 ms movie tick (section 9); every other item SAME; reorder delay 3003/60000 accepted with the AD-22 note (seat 7 on `5727842`) |
 
 ## 6. Tests
 
-`tests/test_io_video_encode_units.py` 53, `tests/test_io_video_encode.py` 92 (+1 `footage`),
-`tests/test_video_fidelity.py` 12 -- all passing on the branch (targeted runs, `-m "not
-footage"`; the full suite waits for a window). They include eight planted wrong implementations that fail by name (CFR on
+`tests/test_io_video_encode_units.py` 78, `tests/test_io_video_encode.py` 110 (2 `footage`),
+`tests/test_io_video_encode_bench.py` 50, `tests/test_video_fidelity.py` 13 and
+`tests/test_io_video_probe_rules.py` 26 (1 `footage`; this package's module names only). At
+`e04a7cb`: the five modules `-m "not footage"` 274 passed, 3 deselected (5:35); ruff, ruff format
+(211 files) and mypy strict (123 files) clean. The three `footage` tests passed at `0b76301` in
+seat 8's footage window (the mapping commit touches no footage test). The full suite is the
+orchestrator's stacked gate (seat 7's run on `5727842`: 4434 passed, 2 skipped). They include eight planted wrong implementations that fail by name (CFR on
 `vid-vfr`, start offset zeroed, `media_time` copied verbatim, colour tags omitted, `tv` on a `pc`
 source, rotation dropped, audio re-encoded, 8-bit for a 10-bit source), the sentinel positive
 control (a one-byte real frame is caught by the sink's check and by the instrument), the
@@ -182,17 +204,115 @@ duration; the cut-short reading catching a planted video `media_time`, video rat
 and audio `media_time`; a cut audio stream accepting exactly the source's packets before the cut;
 one clock for the NVENC proof; negative pts refused at `open`; no `FFREPORT` file from the
 detection, the encoder or the listings; the header built before FFmpeg starts; a failed output
-listing an error; `abort` after a refused `open` deleting `out_path`.
+listing an error; `abort` after a refused `open` deleting `out_path`. Round 9 added the NVENC
+ceiling tests (the pixel-rate ceilings, the source's cap, the explicit level, the level warning,
+a small-sample encode that signals the expected Main-tier level; each failing before the fix) and
+round 10 pinned the footage test to the exact 5.2 / 5.1 / 5.0 Main; the AD-12 unit test pins all
+six values of the ruled mapping.
 
-## 7. AD-12 quality table and the speed row -- PENDING (a footage window and the exclusive window)
+## 7. AD-12 quality table, `QUALITY_RATIO` and the floor row
+
+### 7.1 The mapping (RULED)
+
+CHARC `c1d67b39bb72cc1f`, AD-12 amended on main `759f0d0`, FINAL; product commit `e04a7cb`.
+
+| Level | NVENC `-cq` (`NVENC_CQ`) | NVENC ceiling (4K 29.97) | libx265 `-crf` (`X265_CRF`) | Target (AD-12) |
+|---|---|---|---|---|
+| High | 22 | 0.24 bit/pixel = 59.66 Mb/s | 21 | about the camera's rate on busy scenes |
+| Standard | 26 | a half = 29.83 Mb/s | 26 | about half |
+| Draft | 30 | a quarter = 14.92 Mb/s | 30 | about a quarter |
+
+Measured through the product sink (output video bit rate as a multiple of the camera's, PSNR y
+to the source; GX011627 busy, camera 55.53 Mb/s; GX011610 calm, 5.15 Mb/s, the lowest camera
+rate among Snorkel clips under 1000 frames; evidence `s7-footage\` and `s8-footage\` under
+`C:\Users\rwsmy\clearwater-review-evidence\wp3.10\`; nothing footage-derived committed). The
+ruled values, seat 8 (the table patched in the driver process; NVENC at the High ceiling, so its
+Standard and Draft columns show where `-cq` alone lands before the lower ceilings bind):
+
+| Clip | Encoder | High | Standard | Draft |
+|---|---|---|---|---|
+| GX011627 | libx265 crf 21 / 26 / 30 | 1.073, 41.01 dB | 0.484, 37.77 dB | 0.246, 35.74 dB |
+| GX011610 | libx265 crf 21 / 26 / 30 | 1.194, 51.86 dB | 0.539, 49.41 dB | 0.278, 47.46 dB |
+| GX011627 | NVENC cq 22 / 26 / 30 (High ceiling) | 0.927, 39.65 dB | 0.638 (above the Standard ceiling) | 0.376 (above the Draft ceiling) |
+| GX011610 | NVENC cq 22 / 26 / 30 | 2.65, 54.97 dB | 1.57, 53.22 dB | 0.94, 51.24 dB |
+
+On the ruled code with its own ceilings (the floor row, 7.3, Standard): GX011627 NVENC 8-bit
+0.492, NVENC 10-bit 0.496, libx265 0.484; GX011625 (calm 4K, camera 6.58 Mb/s) NVENC 8-bit 1.276.
+
+Superseded figures, for the record: at 18 / 23 / 28, NVENC with the ceilings (seat 8) GX011627
+1.018 / 0.515 / 0.258 (39.70 / 37.08 / 34.87 dB) and GX011610 4.099 / 2.274 / 1.228 (56.40 /
+54.48 / 52.23 dB); libx265 (seat 7) GX011627 1.540 / 0.800 / 0.344 and GX011610 1.795 / 0.874 /
+0.385, over the targets; NVENC without the ceiling (seat 7, the round-9 defect) 0.356 / 0.350 /
+0.338 at a flat 35.82 dB. 10-bit costs 0-1 % over 8-bit at the same value.
+
+### 7.2 `QUALITY_RATIO` (Q13; `jobs.disk_space` is WP3.13's file, not changed here)
+
+Output FILE size over source file size; the constant is High 1.0 / Standard 0.5 / Draft 0.25
+(times `MARGIN` 1.25; doubled for 10-bit). Measured at the ruled values:
+
+- **Busy 4K** (GX011627): file to file from the floor row, Standard NVENC 8-bit 0.495, NVENC
+  10-bit 0.498, libx265 0.486. High and Draft from the video-rate ratios in 7.1 (on this clip the
+  file ratio ran within about 1 % of the video-rate ratio in every measured row): libx265 about 1.07
+  / 0.25; NVENC about 0.93 / 0.26 (Draft ceiling-bound; cq 30 was not run under its own ceiling).
+- **Calm** (GX011610, 5.15 Mb/s camera): from the video-rate ratios, libx265 about 1.19 / 0.54 /
+  0.28 and NVENC about 2.65 / 1.57 / 0.94 (seat 8's calm file ratios ran 1-4 % under the
+  video-rate ratios: audio and telemetry are a larger share). GX011625 (calm 4K, 6.58 Mb/s), NVENC
+  Standard file to file: 1.264.
+- **10-bit:** 0-1 % over 8-bit (NVENC Standard 0.498 against 0.495), not double.
+
+The busy figures sit near the constant; calm footage runs up to 2.65 x the source at High, over
+1.0 x 1.25. The orchestrator or WP3.14 updates the constant; DR-48's disposition is section 9's.
+
+### 7.3 The export FLOOR row (Q11; exclusive, best effort)
+
+Window CHARC `a2f398778e3a8c5c`, run 2026-10-27 01:09:42Z to 02:02:44Z on `e04a7cb`, alone on
+the host (11.4 GB free memory before; the idle background processes recorded as strays when
+busy). `uv run python tools/video_io_bench.py floor --dry-run --config <scratch>` then `floor
+--config <scratch>`, exit 0; record `io-bench-floor-20261027T010942Z.json` under the worktree's
+`work\wp3.10\bench\` (not committed). Every run decodes with CUDA (WP3.9 `frames`) at Standard.
+
+| Run | Frames | s/frame | stream s/frame | min/min | per frame median / p90 / max | first frame s | peak tree RSS | peak GPU memory (device) | NVENC proof |
+|---|---|---|---|---|---|---|---|---|---|
+| GX011627 NVENC 8-bit (1/3) | 681 | 0.1540 | 0.1508 | 4.61 | 0.149 / 0.165 / 0.202 | 0.580 | 2044 MiB | 1083 MiB | tied |
+| GX011627 NVENC 8-bit (2/3) | 681 | 0.1553 | 0.1529 | 4.65 | 0.151 / 0.171 / 0.197 | 0.459 | 2046 MiB | 1083 MiB | tied |
+| GX011627 NVENC 8-bit (3/3) | 681 | 0.1555 | 0.1531 | 4.66 | 0.151 / 0.169 / 0.202 | 0.447 | 2048 MiB | 1083 MiB | tied |
+| GX011625 NVENC 8-bit | 14,938 | 0.1552 | 0.1549 | 4.65 | 0.154 / 0.172 / 0.304 | 0.460 | 2065 MiB | 1083 MiB | tied |
+| GX011627 libx265 8-bit | 681 | 0.2792 | 0.2736 | 8.37 | 0.270 / 0.342 / 0.432 | 0.476 | 3519 MiB | 611 MiB (decoder only) | none (no NVENC) |
+| GX011627 NVENC 10-bit | 681 | 0.1742 | 0.1719 | 5.22 | 0.170 / 0.188 / 0.240 | 0.467 | 2401 MiB | 1375 MiB | tied |
+
+`s/frame` = probe + `open` + the frame stream + `close`, over the frames; the strays pauses
+(2.2-3.9 s each, every 300 frames) are kept out. Stages on GX011627 NVENC: probe 0.64-0.71 s,
+`open` 0.34-0.86 s, `close` 0.59-0.63 s (libx265 2.85 s). Peak RSS members: Python 348-369 MiB,
+the decoder's FFmpeg about 920 MiB, the encoder's 776-784 MiB (NVENC 8-bit), 1112 MiB (10-bit),
+2233 MiB (libx265). Conditions: GPU 56-62 C, SM clock up to 1980 MHz under load, clock-event reasons
+0x1 and 0x24 (0x24 also at idle before the first run); CPU 4001 MHz and 1.8-9.4 % total load
+before and after every run. Strays: only `System` (25-34 % of one logical CPU) in most windows
+and `SearchProtocolHost.exe` (43 %) once (NVENC 10-bit, first window).
+
+**Against D106 at 4K:** WP3.4's c3 core takes 0.4392 s/frame of D106's 0.834, leaving about
+0.395. The floor at NVENC 8-bit Standard is 0.154-0.156 s/frame (GX011627 x 3 and the full
+14,938 frames of GX011625): it FITS, with about 0.24 s/frame to spare (sum 0.593-0.595 s/frame).
+NVENC 10-bit (0.174, sum 0.613) and libx265 (0.279, sum 0.718) fit too. The sum is an estimate:
+the core and the floor were timed apart, decode and encode run in their own FFmpeg processes and
+may overlap with the core or contend with it for the GPU; the end-to-end row is WP3.14's (V16).
+
+**After each strays pause** (raw `per_frame_s`, 59 pauses, 49 of them on GX011625): only the
+first frame runs fast, and it is the one already set apart (`after_pause_frames`). It averaged
+0.88-0.94 x the run's median on NVENC and 0.54 x on libx265; from the second frame on, the mean
+is 0.91-1.09 x the median, inside the run's spread. Counting frames below the run's p10 from the
+pause on: 0 or 1 at 57 pauses and 2 at 2 (GX011625; the second just under p10). Setting one frame
+apart is enough; the figures above stand.
 
 ## 8. Debt and decided items
 
 - **AD-22 / DR-15:** implemented; proven on synthetic libx264/libx265 B-frame clips (and the
   Edits compilation in round 0, by boxes); the iPhone leg stays OPEN (Q7).
 - **DR-17:** CLOSED on `vid-untagged` (tagged, warned, both depths).
-- **DR-18:** (1)-(4) CLOSED by the instrument (section 4); (1) has a recorded reason when no
-  sample sees the encoder.
+- **AD-12:** verified on footage and RULED (section 7.1).
+- **DR-18:** (1)-(4) CLOSED by the instrument (section 4). (1) CLOSED on `tied`: every NVENC run
+  in seat 7's and seat 8's footage windows and in the floor row was tied (GPU UUID, FFmpeg PID,
+  encode window); a run the proof cannot tie carries the reason.
+- **DR-48** (WP3.13's disk estimate): measured here (7.2); disposition ruled by CHARC (section 9).
 - **DR-20 (4)** CLOSED for the product: the instrument's colour rows compare with the resolved
   description and a field it leaves `unknown` is DIFFERENT, never skipped; a `yuvj420p` output
   tagged `tv` fails the range row (and `encode_filter` refuses `yuvj420p` with a limited range
@@ -215,7 +335,22 @@ listing an error; `abort` after a refused `open` deleting `out_path`.
   then sees `encoder_failed`).
 - **WP4.3:** FFmpeg is started with `subprocess.Popen` directly; the shared CREATE_NO_WINDOW spawn
   helper (AD-23 extended) is WP4.3's.
-- **`QUALITY_RATIO`** (`jobs.disk_space`, Q13): the measured ratios go into section 7.
+- **`QUALITY_RATIO`** (`jobs.disk_space`, Q13): the measured ratios are in 7.2; the orchestrator
+  or WP3.14 updates the constant, not this package.
+- **The disk-estimate risk (DR-48):** a source-relative estimate under-states the output on calm,
+  low-bit-rate footage (NVENC High 2.65 x a 5.15 Mb/s camera against 1.0 x 1.25), so D87's
+  refusal could pass a write that fills the disk. CHARC ruled DR-48's disposition in the debt
+  register on main (`759f0d0`) for WP3.14's brief: the larger of the source-relative estimate and
+  the AD-12 ceiling for the level times the duration, times `MARGIN`, both encoders, without the
+  10-bit doubling. No code of this package changes.
+- **The NVENC ceiling out of envelope (dispatcher-ACCEPTED):** a ceiling above every Main-tier cap
+  that holds the picture is cut to the highest such cap (6.2's 240 Mb/s); a picture no HEVC level
+  holds is refused at `open`, by name. Neither occurs for GoPro or iPhone footage.
+- **The level warning, every encoder:** `close` reads the level the output signals and warns when
+  it is above an HEVC source's level or tier, libx265 outputs included (libx265 has no ceiling;
+  GX011627's libx265 outputs signalled 5.0 Main, under the source's 6.0 Main).
+- **Variable frame rate:** the pixel rate behind the NVENC ceiling uses the source's AVERAGE frame
+  rate, so on a variable-rate source a stretch above the average gets the average's ceiling.
 - **Out of envelope, not refused:** data tracks other than the HERO13 set (for example an iPhone
   `mebx` track) and audio codecs MP4 cannot hold are passed to the muxer, which fails
   (`encoder_failed`, with FFmpeg's message).
@@ -223,9 +358,34 @@ listing an error; `abort` after a refused `open` deleting `out_path`.
   (`cc28699`) still inherits `FFREPORT`, so a probe run with it set writes an ffprobe report file
   into the working folder; the sink's own processes do not. The fix (`env=` from a shared helper)
   is WP3.7's file.
-- **Movie duration on a coarse movie timescale:** the `mvhd` row is exact. A source whose movie
-  timescale cannot represent its presentation exactly (iPhone's 600 is the likely case) would read
-  DIFFERENT against an output whose timescale can; untested (no iPhone clip; DR-15's iPhone leg).
-  GoPro (movie timescale 30000) and every synthetic and fixture sample compare exactly.
+- **Movie duration on a coarse movie timescale:** the `mvhd` row is exact, so a source whose movie
+  timescale cannot represent its presentation exactly reads DIFFERENT against an output whose
+  timescale can. OBSERVED on the Edits compilation (movie timescale 1000; seat 7): `mvhd` and
+  the audio entry of the edit-list effect, source 180.079 s (180079/1000) against output
+  180.078209 s (7941449/44100). The output keeps the audio's exact length; the source's value is
+  that length rounded UP to its 1 ms tick (0.79 ms, under one tick); the video effect is exact.
+  This is the accepted "rounded UP" limitation; no code change (a later option: `-movie_timescale`
+  set to the source's). iPhone (600) stays untested (DR-15's iPhone leg). GoPro (movie timescale
+  30000) and every synthetic and fixture sample compare exactly.
 - Only whole-clip exports are verified for the start offset: the sink copies audio and data whole,
   so an export that starts after the source's first frame is outside this package.
+- **The floor-row instrument's limits:** RSS sampled (0.25 s nominal; the actual gaps in
+  `gaps_s`); graphics memory device-wide (`memory.used`; per-process reads 0 or N/A under WDDM);
+  the instrument loads the machine a little (`nvidia-smi` each second in its own thread, `pmon`
+  each 0.5 s on NVENC, a strays reading of 2.2-3.9 s every 300 frames with the loop paused and
+  the pause kept out of the figures); no CPU temperature on Windows; a process that starts and
+  exits between two strays readings is not seen; only the first frame after a pause is set apart
+  (enough, 7.3). Several NVIDIA GPUs (R5 #10, banked out of envelope): the GPU reading takes the
+  first `nvidia-smi` line; adding `index` and `uuid` to the query would show a mismatch (noted,
+  not built).
+- **Pause and strays semantics (option B):** the `StrayWatch` is primed before the run, read after
+  every `--strays-every` frames and once more right after `close` (first in the `finally`, also on
+  a failure). A strays window covers the frames between two readings; the first also holds the
+  setup before the probe, the last the rest of the stream and `close`. Each in-loop reading pauses
+  the loop; the pause (`strays.pauses_s`, `stages_s.strays_pauses`) is kept out of every interval,
+  stage and rate, and the frame right after it is set apart (`after_pause_frames`, `after_pause`),
+  as the first frame is. The telemetry runs two threads (RSS, GPU), each on its own schedule with
+  every sample timed; `offsets_s` places the telemetry's zero and the end of the strays priming on
+  the run's clock.
+- **Process note:** one run of the units module during the dispatcher's suite made sub-second
+  FFmpeg reads (a hold breach in seat 8; noted, no harm).
