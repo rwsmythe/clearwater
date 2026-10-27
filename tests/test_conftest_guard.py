@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import getpass
 import importlib.util
+import json
 import os
 import subprocess
 import sys
@@ -25,6 +26,17 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parent.parent
 _SCRUBBED_ENV = ("PYTEST_ADDOPTS", "TMP", "TEMP", "TMPDIR", "PYTEST_DEBUG_TEMPROOT")
 _PLANTED = {"a.txt": b"alpha\x00bytes", "sub/b.bin": bytes(range(256))}
+_BASETEMP_TARGETS = (
+    pytest.param("{footage}", id="equal"),
+    pytest.param("{footage}" + os.sep, id="trailing-separator"),
+    pytest.param("{footage}/sub", id="existing-subfolder"),
+    pytest.param("{footage}/not-yet-there", id="missing-subfolder"),
+    pytest.param("{footage}/not-yet-there/deeper", id="missing-nested"),
+    pytest.param("{footage}/sub/../a-sibling", id="dotdot-inside"),
+    pytest.param("../area/footage/sub", id="relative-inside"),
+    pytest.param("../area/footage", id="relative-equal"),
+    pytest.param("{area}", id="ancestor"),
+)
 _MINI_PYPROJECT = (
     "[tool.pytest.ini_options]\n"
     'pythonpath = ["tools"]\n'
@@ -183,37 +195,105 @@ def test_control_without_the_guard_pytest_wipes_the_footage(tmp_path: Path) -> N
     assert not (mini.footage / "sub" / "b.bin").exists()
 
 
-@pytest.mark.parametrize(
-    "target",
-    [
-        "{footage}",
-        "{footage}" + os.sep,
-        "{footage}/sub",
-        "{footage}/not-yet-there",
-        "{footage}/not-yet-there/deeper",
-        "{footage}/sub/../a-sibling",
-        "../area/footage/sub",
-        "../area/footage",
-        "{area}",
-    ],
-    ids=[
-        "equal",
-        "trailing-separator",
-        "existing-subfolder",
-        "missing-subfolder",
-        "missing-nested",
-        "dotdot-inside",
-        "relative-inside",
-        "relative-equal",
-        "ancestor",
-    ],
-)
+@pytest.mark.parametrize("target", _BASETEMP_TARGETS)
 def test_basetemp_in_footage_is_refused(tmp_path: Path, target: str) -> None:
     mini = _build(tmp_path)
     before = _snapshot(mini.footage)
     arg = target.format(footage=mini.footage, area=mini.area)
     result = _run(tmp_path, mini, f"--basetemp={arg}")
     _assert_refused(result, mini, before)
+
+
+def test_workers_without_the_guard_wipe_the_footage(tmp_path: Path) -> None:
+    """Demonstrate the worker run's destructive effect without the guard (w1)."""
+    mini = _build(tmp_path, guard=False)
+    before = _snapshot(mini.footage)
+    result = _run(tmp_path, mini, "-n", "2", f"--basetemp={mini.footage}")
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert _snapshot(mini.footage) != before
+    assert not (mini.footage / "a.txt").exists()
+    assert not (mini.footage / "sub" / "b.bin").exists()
+
+
+@pytest.mark.parametrize("target", _BASETEMP_TARGETS)
+def test_workers_basetemp_in_footage_is_refused(tmp_path: Path, target: str) -> None:
+    """Refuse worker startup for equal, contained and ancestor temp roots (w2)."""
+    mini = _build(tmp_path)
+    before = _snapshot(mini.footage)
+    arg = target.format(footage=mini.footage, area=mini.area)
+    result = _run(tmp_path, mini, "-n", "2", f"--basetemp={arg}")
+    _assert_refused(result, mini, before)
+    assert not list(mini.footage.rglob("popen-gw*"))
+
+
+@pytest.mark.parametrize("variable", ["PYTEST_DEBUG_TEMPROOT", "TMPDIR", "TEMP", "TMP", "all"])
+def test_workers_temp_environment_in_footage_is_refused(tmp_path: Path, variable: str) -> None:
+    """Refuse worker startup when an environment-selected root is unsafe (w3)."""
+    mini = _build(tmp_path)
+    before = _snapshot(mini.footage)
+    inside = str(mini.footage / "sub")
+    if variable == "PYTEST_DEBUG_TEMPROOT":
+        env = {variable: inside}
+    elif variable == "all":
+        env = dict.fromkeys(("TMPDIR", "TEMP", "TMP"), inside)
+    else:
+        env = dict.fromkeys(("TMPDIR", "TEMP", "TMP"), "")
+        env[variable] = inside
+    result = _run(tmp_path, mini, "-n", "2", env_extra=env)
+    _assert_refused(result, mini, before)
+    assert not list(mini.footage.rglob("popen-gw*"))
+
+
+def test_workers_basetemp_in_working_folder_passes(tmp_path: Path) -> None:
+    """Observe both workers' safe temp roots and registered guard plugin (w4)."""
+    mini = _build(tmp_path)
+    before = _snapshot(mini.footage)
+    controller_basetemp = mini.work / "bt"
+    probe = mini.root / "tests" / "test_workers.py"
+    _assert_under(tmp_path, controller_basetemp, probe)
+    probe.write_text(
+        """import json
+import os
+from pathlib import Path
+
+import pytest
+
+
+@pytest.mark.parametrize("slot", [0, 1])
+def test_records_worker(tmp_path, pytestconfig, slot):
+    worker = os.environ["PYTEST_XDIST_WORKER"]
+    guard_path = Path(__file__).with_name("conftest.py").resolve()
+    guard_registered = any(
+        Path(plugin.__file__).resolve() == guard_path
+        for plugin in pytestconfig.pluginmanager.get_plugins()
+        if getattr(plugin, "__file__", None)
+    )
+    record = {
+        "worker": worker,
+        "basetemp": str(pytestconfig.option.basetemp),
+        "guard_registered": guard_registered,
+    }
+    output = pytestconfig.rootpath.parent / "work" / f"worker-{worker}.json"
+    output.write_text(json.dumps(record), encoding="utf-8")
+""",
+        encoding="utf-8",
+    )
+    result = _run(
+        tmp_path, mini, "-n", "2", f"--basetemp={controller_basetemp}", "-k", "records_worker"
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    paths = list(mini.work.glob("worker-gw*.json"))
+    _assert_under(tmp_path, *paths)
+    records = [json.loads(path.read_text(encoding="utf-8")) for path in paths]
+    assert len(records) == 2
+    assert {record["worker"] for record in records} == {"gw0", "gw1"}
+    for record in records:
+        assert record["guard_registered"] is True
+        worker_basetemp = Path(record["basetemp"])
+        _assert_under(controller_basetemp, worker_basetemp)
+        assert worker_basetemp.name == f"popen-{record['worker']}"
+        assert _plain(worker_basetemp.resolve()).parent == _plain(controller_basetemp.resolve())
+    assert _snapshot(mini.footage) == before
 
 
 def test_temp_variables_in_footage_are_refused(tmp_path: Path) -> None:
