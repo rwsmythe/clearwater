@@ -156,14 +156,14 @@ class FakeSink:
 
     def abort(self) -> None:
         self.calls.append("abort")
-        if self._in_close:
-            self.aborted_in_close.set()
+        in_close = self._in_close
         self.aborted.set()
-        if self.phase == "closed":
-            return  # the output is the caller's after a close
-        self.phase = "aborted"
-        with contextlib.suppress(OSError):  # never raises, like the product's abort
-            self._delete()
+        if self.phase != "closed":  # after a close the output is the caller's
+            self.phase = "aborted"
+            with contextlib.suppress(OSError):  # never raises, like the product's abort
+                self._delete()
+        if in_close:  # signalled last: a test released on it sees every effect above
+            self.aborted_in_close.set()
 
     def _gate(self, name: str) -> None:
         """Stop at ``name`` when it is the configured gate, until released."""

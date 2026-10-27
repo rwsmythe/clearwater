@@ -541,27 +541,41 @@ def test_a_cancel_mid_encode_leaves_nothing_and_keeps_earlier_outputs(
     assert earlier.read_bytes() == b"an earlier output"
 
 
-class _CancelInCloseSink(FFmpegVideoSink):
-    """The product sink; the cancel rises inside its real ``close``, which then waits (bounded)
-    until the job's watchdog has called ``abort`` before it ends the stream."""
+_PRODUCT_CLOSE_TIMINGS = ("before_finish", "after_finish", "after_closed")
+"""Where the cancel rises inside the product sink's real ``close``: before it ends the stream,
+after its finish but before it marks itself closed, and after that mark."""
 
-    def __init__(self, progress: StubProgress) -> None:
+
+class _CancelInCloseSink(FFmpegVideoSink):
+    """The product sink; at ``timing`` inside its real ``close`` the cancel rises and the close
+    waits (bounded) until the job's watchdog has called ``abort``, then carries on."""
+
+    def __init__(self, progress: StubProgress, timing: str) -> None:
         super().__init__()
         self._progress = progress
+        self._timing = timing
         self._in_close = False
         self.aborted_in_close = threading.Event()
+
+    def _cancel_here(self, timing: str) -> None:
+        if timing == self._timing:
+            self._progress.cancel()
+            self.aborted_in_close.wait(5.0)
 
     def close(self) -> SinkReport:
         self._in_close = True
         try:
-            return super().close()
+            report = super().close()
+            self._cancel_here("after_closed")
+            return report
         finally:
             self._in_close = False
 
     def _finish(self) -> SinkReport:
-        self._progress.cancel()
-        self.aborted_in_close.wait(5.0)
-        return super()._finish()
+        self._cancel_here("before_finish")
+        report = super()._finish()
+        self._cancel_here("after_finish")
+        return report
 
     def abort(self) -> None:
         super().abort()
@@ -569,10 +583,12 @@ class _CancelInCloseSink(FFmpegVideoSink):
             self.aborted_in_close.set()
 
 
+@pytest.mark.parametrize("timing", _PRODUCT_CLOSE_TIMINGS)
 def test_a_cancel_during_the_product_sinks_close_is_aborted_and_leaves_nothing(
-    clips: Clips, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    clips: Clips, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, timing: str
 ) -> None:
-    # Q2 as amended (CHARC `e7d25105` condition 2): libx265, a short synthetic clip.
+    # Q2 as amended (CHARC `e7d25105` condition 2; R2 G6 the later timings): libx265, a short
+    # synthetic clip. Each timing ends CANCELLED with nothing written and no commit.
     source = clips.make("dr28")
     out = tmp_path / "out"
     out.mkdir()
@@ -590,7 +606,7 @@ def test_a_cancel_during_the_product_sinks_close_is_aborted_and_leaves_nothing(
     sinks: list[_CancelInCloseSink] = []
 
     def sink() -> _CancelInCloseSink:
-        sinks.append(_CancelInCloseSink(progress))
+        sinks.append(_CancelInCloseSink(progress, timing))
         return sinks[-1]
 
     engine = product_engine(tmp_path / "cache", sink_factory=sink)

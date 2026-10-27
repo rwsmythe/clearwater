@@ -14,6 +14,7 @@ import json
 import logging
 import os
 import re
+import shutil
 import threading
 import time
 from pathlib import Path
@@ -391,6 +392,53 @@ def test_a_cancel_during_close_is_aborted_by_the_watchdog_at_every_timing(
     _no_partials(rig)
 
 
+def _assert_close_error_kept(result: JobResult, text: str) -> None:
+    assert result.failure is not CANCELLED, "a close error without a cancel became CANCELLED"
+    assert result.failure == text, result.failure
+
+
+def test_a_close_error_without_a_cancel_keeps_its_text(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # R2 G8: only a cancel turns a close error into CANCELLED; otherwise its text is the failure.
+    commits = _commit_spy(monkeypatch)
+    rig = Rig(tmp_path)
+    sink = FakeSink()
+    sink.close_error = RuntimeError("verify_failed: the output does not match")
+    rig.next_sink = lambda: sink
+    result = rig.run(rig.request())
+    _assert_close_error_kept(
+        result, "clip.mp4: RuntimeError: verify_failed: the output does not match"
+    )
+    assert result.outputs == () and commits == []
+    _no_partials(rig)
+
+
+def test_planted_every_close_error_cancelled_fails_by_name(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    real = export_module.ExportEngine._encode
+
+    def planted(self: Any, *args: Any) -> Any:
+        try:
+            return real(self, *args)
+        except export_module._CancelledError:
+            raise
+        except Exception as exc:  # a wrong implementation: every close error read as a cancel
+            raise export_module._CancelledError from exc
+
+    monkeypatch.setattr(export_module.ExportEngine, "_encode", planted)
+    rig = Rig(tmp_path)
+    sink = FakeSink()
+    sink.close_error = RuntimeError("verify_failed: the output does not match")
+    rig.next_sink = lambda: sink
+    result = rig.run(rig.request())
+    with pytest.raises(AssertionError, match="a close error without a cancel became CANCELLED"):
+        _assert_close_error_kept(
+            result, "clip.mp4: RuntimeError: verify_failed: the output does not match"
+        )
+
+
 def test_the_watchdog_is_joined_before_commit(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -486,8 +534,13 @@ def test_a_temporary_left_after_a_successful_commit_is_a_warning(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     # R1 F3: commit() links the final and then removes the temporary; when that removal fails
-    # the job is ok but the leftover must still be reported (DR-57 (c), D85).
-    monkeypatch.setattr(safe_write_module, "_unlink_quietly", lambda path: None)
+    # the job is ok but the leftover must still be reported (DR-57 (c), D85). The install step
+    # is controlled here (R2 G7): a link-then-failed-unlink on any volume, links supported or not.
+    def install_leaving_the_temporary(temp: Path, final: Path) -> bool:
+        shutil.copyfile(temp, final)
+        return True
+
+    monkeypatch.setattr(safe_write_module, "_install", install_leaving_the_temporary)
     rig = Rig(tmp_path)
     result = rig.run(rig.request())
     assert result.ok and result.outputs == (tmp_path / "clip_corrected.mp4",), result.failure
@@ -561,6 +614,49 @@ def test_a_stream_close_error_never_replaces_the_original_failure(
     assert "cleanup close failed" in caplog.text
     assert "close" not in rig.sink.calls and "abort" in rig.sink.calls
     _no_partials(rig)
+
+
+def _clean_path_stream_close(rig: Rig) -> JobResult:
+    """Run a job whose export stream's close raises after every frame was written."""
+    stages: list[str] = []
+    rig.engine._on_stage = stages.append  # type: ignore[assignment]
+    real_frames = rig.source.frames
+
+    def frames(*args: Any, **kwargs: Any) -> Any:
+        stream = real_frames(*args, **kwargs)
+        return _CloseRaises(stream) if "frames" in stages else stream
+
+    rig.source.frames = frames  # type: ignore[method-assign]
+    result: JobResult = rig.run(rig.request())
+    return result
+
+
+def _assert_clean_path_close_error_is_the_failure(result: JobResult) -> None:
+    assert result.failure == "clip.mp4: OSError: cleanup close failed", (
+        f"a clean-path stream-close error was suppressed: {result.failure!r}"
+    )
+
+
+def test_a_clean_path_stream_close_error_is_the_failure(tmp_path: Path) -> None:
+    # R2 G8: with no earlier error the stream's close error is the job's own failure, never
+    # suppressed into a committed output.
+    rig = Rig(tmp_path)
+    result = _clean_path_stream_close(rig)
+    _assert_clean_path_close_error_is_the_failure(result)
+    assert result.outputs == () and "close" not in rig.sink.calls
+    _no_partials(rig)
+
+
+def test_planted_always_quiet_stream_close_fails_by_name(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    real = export_module._close_stream
+    monkeypatch.setattr(
+        export_module, "_close_stream", lambda frames, quietly: real(frames, quietly=True)
+    )
+    result = _clean_path_stream_close(Rig(tmp_path))
+    with pytest.raises(AssertionError, match="a clean-path stream-close error was suppressed"):
+        _assert_clean_path_close_error_is_the_failure(result)
 
 
 def test_a_stop_after_commit_still_lists_the_committed_file(tmp_path: Path) -> None:
