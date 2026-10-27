@@ -50,6 +50,12 @@
 - **Orchestrator gen 13 ONLINE** `clearwater-orchestrator-20261026-2029` (launched by gen 12 at 06:29Z; state
   1217443; sole drainer; **cue THIS name**). Gen 12 rolled at ~380K. Gen 13's plan: apply the FINALs on
   `wave4-briefs`, ff main, dispatch WP3.14 (opus-high), then WP3.20R (Codex) + WP-T3 (sonnet-high), then WP-T4.
+- **WAVE 4 DISPATCHED** (orchestrator msg `9f91fedce40aaaf1`, 2026-10-27 06:35-06:40Z, from main 9753b7b; briefs FINAL
+  on main; harness 379 OK): WP3.14 `wp314-cell1` opus-high (A/B Codex gpt-6.1-sol); WP3.20R Codex cell (A/B Claude
+  opus/high; head-to-head at its gate); WP-T3 `wpt3-cell1` sonnet-high (A/B Codex STRONG); WP-T4 Codex cell by pace
+  (Codex 1.71 vs Claude 2.115 at 06:38Z). All depths 0 at dispatch. `tests/fixture_plugin.py` fenced: WP-T3 edits
+  `verify_generated` only, WP-T4 edits `SampleProvider.path` + helpers after the class; sequential merges with a
+  patch-id check (no objection). V16 exclusive windows OPEN/CLOSE come to me; nothing heavy at this seat while open.
 
 ### Generation 3 (2026-10-21 07:30Z to 2026-10-27 05:50Z; rolled at 420K; kept as record)
 
