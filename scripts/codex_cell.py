@@ -13,8 +13,13 @@ improvises the flags:
     a turn without the overrides silently runs on the global config's model).
     The transcript and the ``-o`` return file land in the evidence folder; the
     banner assertions (model, effort, sandbox line, session id), the anchored
-    ``^ERROR`` lines, the ``tokens used`` footer and the return file's
-    ``FILES CHANGED`` / ``COMMIT`` block are printed as one JSON object.
+    ``^ERROR`` lines, the ``tokens used`` footer, the context depth of record
+    and the return file's ``FILES CHANGED`` / ``COMMIT`` block are printed as
+    one JSON object. The footer is cumulative billing, NOT depth; the depth of
+    record is ``last_token_usage.input_tokens`` of the last ``token_count``
+    event in the session's ``rollout-*-<session id>.jsonl`` under
+    ``$CODEX_HOME/sessions`` (default ``~/.codex/sessions``), printed as
+    ``depth_input_tokens`` with ``context_window`` (pinned 2026-10-27).
 
 ``commit``
     The sandbox protects ``.git``, so the cell cannot commit. This reads the
@@ -84,6 +89,45 @@ def parse_banner(transcript: str) -> dict[str, Any]:
         "tokens_used": tokens,
         "succeeded_in": len(re.findall(r"^\s*succeeded in \d", transcript, flags=re.M)),
     }
+
+
+def sessions_root() -> pathlib.Path:
+    """The Codex sessions folder: ``$CODEX_HOME/sessions`` or ``~/.codex/sessions``."""
+    home = os.environ.get("CODEX_HOME")
+    base = pathlib.Path(home) if home else pathlib.Path.home() / ".codex"
+    return base / "sessions"
+
+
+def read_depth(session_id: str | None, root: pathlib.Path | None = None) -> dict[str, int | None]:
+    """The context depth of record for a session: the last request's input tokens.
+
+    Scans the newest ``rollout-*-<session_id>.jsonl`` under ``root`` (default
+    :func:`sessions_root`) for ``token_count`` events and returns
+    ``last_token_usage.input_tokens`` and ``model_context_window`` of the last
+    one. Both are ``None`` when the session, the file or the event is missing;
+    a malformed line is skipped. Reads only; stdlib only.
+    """
+    out: dict[str, int | None] = {"depth_input_tokens": None, "context_window": None}
+    if not session_id:
+        return out
+    base = root if root is not None else sessions_root()
+    if not base.is_dir():
+        return out
+    files = sorted(base.rglob(f"rollout-*-{session_id}.jsonl"))
+    if not files:
+        return out
+    for line in files[-1].read_text("utf-8", errors="replace").splitlines():
+        if '"token_count"' not in line:
+            continue
+        try:
+            info = json.loads(line).get("payload", {}).get("info") or {}
+        except (ValueError, AttributeError):
+            continue
+        last = info.get("last_token_usage") or {}
+        if isinstance(last.get("input_tokens"), int):
+            out["depth_input_tokens"] = last["input_tokens"]
+            out["context_window"] = info.get("model_context_window")
+    return out
 
 
 def parse_return(text: str) -> dict[str, Any]:
@@ -199,6 +243,7 @@ def cmd_turn(args: argparse.Namespace) -> int:
     rc = _run_to_file(cmd, args.prompt, str(transcript), args.worktree)
     text = transcript.read_text("utf-8", errors="replace")
     banner = parse_banner(text)
+    depth = read_depth(banner["session_id"] or args.session)
     ret = (
         parse_return(return_file.read_text("utf-8", errors="replace"))
         if return_file.exists()
@@ -214,6 +259,7 @@ def cmd_turn(args: argparse.Namespace) -> int:
         "effort_ok": banner["effort"] == args.effort,
         "sandbox_ok": bool(banner["sandbox"] and banner["sandbox"].startswith("workspace-write")),
         **banner,
+        **depth,
         **ret,
     }
     print(json.dumps(out))

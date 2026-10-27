@@ -81,7 +81,7 @@
   class** (A rounds 1 vs 1; B-upheld blocking 0 vs 0; no lock violation; 0 STOPs; 0 reverts). Pace tiebreak resumes
   after the pair. **Codex depth reading PINNED** (pass 3.3): `last_token_usage.input_tokens` of the last request in the
   session rollout jsonl, NOT the cumulative `tokens used` footer (WP-T4 turn 4: 536,544 footer vs 284,234 depth).
-  Small harness item owed when the host is quiet: `codex_cell.py` prints that figure beside the footer.
+  Harness item DONE 17:40Z: `codex_cell.py turn` prints `depth_input_tokens` / `context_window` (`read_depth`; harness 382 OK; live reading 284,234 / 475,000 on the WP-T4 session).
 - **WP-T4** (Codex, depth 284K, past evaluation): rung 3 done, zero violators, diagnostic parallel leg 3,882 passed in
   358 s (peak RSS 6.8 GB); E1 failed its bound serially in the sandbox (quiet-seat probe first; DR-58 (c) trigger
   fires if it fails quiet too: widen with reason, no skip). Rung 4 = TWO rounds (Q7), exclusive windows while WP3.14 is
@@ -100,9 +100,14 @@
   QUALITY_RATIO) fixed. Cell 3 retired 302,881 at dc76d92; cell 4 `wp314-cell4` (38K) remediates then V16 rows.
   WP-T4 E1 quiet-seat probe PASSED (DR-58 (c) trigger not fired). Next: B pass 2, V16 exclusive blocks (OPEN/CLOSE to
   me), candidate full suite, WP-T4 rung 4.
-- **EXCLUSIVE WINDOW OPEN 2026-10-27 13:05Z: WP3.14 V16 block 2** (GX011625 14,938 frames, one cold c3 run, auto
-  encoder, ~4.5 h, allow 5 h; msg `8ce78d1c60253f08`). Block 1 CLOSED 12:58Z (ran 11:33-12:57Z, all runs ok). **NOTHING
-  HEAVY AT THIS SEAT until the orchestrator posts CLOSE.** Block 1 rows: GX011627 c3 cold 1.061-1.065 s/frame = 31.9
+- **WP3.14 V16 BOTH BLOCKS CLOSED** (block 1 11:33-12:57Z, msg `8ce78d1c60253f08`; block 2 GX011625 13:05-17:25Z,
+  CLOSE 17:26Z msg `7439db035704c44e`). **Seat free; no window open.** Block 2 row: 14,938 frames, 1.0429 s/frame =
+  31.26 min/min MISS (within 2 % of GX011627 cold); analysis 4,638 s = 29.8 %; frames median steady 0.755 -> 0.726
+  over 4 h; GPU 82/93 C; RSS 2.9 / GPU 2.4 GiB; close -> committed 1.87 s. **GPU at idle clocks (SM 210 MHz,
+  5.1 W) through the 77-min analysis phase: WP3.21's first question** (where the analysis pass spends its
+  0.31 s/frame; decode / host statistics / upload). Next at the orchestrator: cell 4 report fill + FINAL return,
+  candidate full suite (non-exclusive; I run nothing heavier than the harness gate meanwhile), accept, CHARC QA,
+  WP-T4 rung 4. Block 1 rows: GX011627 c3 cold 1.061-1.065 s/frame = 31.9
   min/min MISS of D106's interim 25 (analysis pass ~30 %, frames ~0.74 s/frame); c3 warm 23.2 meets; ancuti2018 cold
   21.6 meets; c3 libx265 cold 35.6 (14 s close); synthetic 5.3K 8:7 cold 136, 6.2 GiB RSS / 6.0 GiB GPU. **CHARC RULED
   (msg e1711557): the miss is WP3.21 DATA, not a stop, not a defect** (V16 "tunable"; D106 names WP3.21 and the WP5.2

@@ -145,7 +145,8 @@ a post-pass `git status --porcelain` = empty control in row 2.
   `rollout-*-<session>.jsonl` under `~/.codex/sessions/` (the per-turn `tokens used` footer is cumulative
   billing, NOT depth: WP-T4 turn 4 footer 536,544 vs last request 284,234 in a 475,000 window; for WP3.20R
   the two happened to agree, 204,598 vs 202,061). The ~250K evaluation / ~400K STOP lines apply to that
-  figure. `codex_cell.py` may print it beside the footer (small harness item).
+  figure. `codex_cell.py turn` prints it beside the footer as `depth_input_tokens` / `context_window`
+  (`read_depth`, landed 2026-10-27 17:40Z; the live reading reproduces 284,234 / 475,000).
 - **Assertions per turn** (carried from the reviewer doc): banner model `gpt-6.1-sol` and
   `reasoning effort: high`; `^ERROR` classified by provenance; `tokens used` footer; the return
   report delivered as the `-o` file (an absent file is a failed handoff).

@@ -7,7 +7,10 @@ No subprocess, no network. The facts pinned here were probed on 2026-10-27.
 from __future__ import annotations
 
 import importlib.util
+import json
+import os
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -74,6 +77,69 @@ class BannerParse(unittest.TestCase):
         b = self.m.parse_banner("nothing here\n")
         self.assertIsNone(b["model"])
         self.assertIsNone(b["tokens_used"])
+
+
+class DepthReading(unittest.TestCase):
+    """``read_depth``: the figure of record is the LAST request's input tokens, not the footer."""
+
+    SID = "01a17c16-3707-7e30-b81b-ecb9320feb6b"
+
+    def _event(self, ordinal: int, inp: int, total: int) -> str:
+        return json.dumps(
+            {
+                "timestamp": "2026-10-27T09:27:00.708Z",
+                "ordinal": ordinal,
+                "type": "event_msg",
+                "payload": {
+                    "type": "token_count",
+                    "info": {
+                        "total_token_usage": {"input_tokens": total, "total_tokens": total},
+                        "last_token_usage": {"input_tokens": inp, "total_tokens": inp + 100},
+                        "model_context_window": 475000,
+                    },
+                },
+            }
+        )
+
+    def test_last_token_count_event_wins(self) -> None:
+        m = _load()
+        with tempfile.TemporaryDirectory() as td:
+            day = Path(td) / "2026" / "10" / "26"
+            day.mkdir(parents=True)
+            f = day / f"rollout-2026-10-26T20-39-53-{self.SID}.jsonl"
+            lines = [
+                json.dumps({"type": "session_meta", "payload": {"id": self.SID}}),
+                self._event(5, 279776, 13000000),
+                "not json {",
+                json.dumps({"type": "event_msg", "payload": {"type": "token_count", "info": None}}),
+                self._event(9, 284234, 13712757),
+            ]
+            f.write_text("\n".join(lines) + "\n", encoding="utf-8")
+            d = m.read_depth(self.SID, Path(td))
+        self.assertEqual(d["depth_input_tokens"], 284234)
+        self.assertEqual(d["context_window"], 475000)
+
+    def test_missing_session_is_none(self) -> None:
+        m = _load()
+        with tempfile.TemporaryDirectory() as td:
+            self.assertEqual(
+                m.read_depth("no-such-session", Path(td)),
+                {"depth_input_tokens": None, "context_window": None},
+            )
+            self.assertEqual(m.read_depth(None, Path(td))["depth_input_tokens"], None)
+        self.assertIsNone(m.read_depth(self.SID, Path(td) / "gone")["depth_input_tokens"])
+
+    def test_sessions_root_honours_codex_home(self) -> None:
+        m = _load()
+        old = os.environ.get("CODEX_HOME")
+        try:
+            os.environ["CODEX_HOME"] = str(Path("C:/x/codexhome"))
+            self.assertEqual(m.sessions_root(), Path("C:/x/codexhome") / "sessions")
+        finally:
+            if old is None:
+                del os.environ["CODEX_HOME"]
+            else:
+                os.environ["CODEX_HOME"] = old
 
 
 class ReturnParse(unittest.TestCase):
