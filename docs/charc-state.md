@@ -144,6 +144,27 @@ of `origin/main`, unpushed; no push asked (verify `git status -sb`).
   dead Windows shim, only `-ilc` reaches the WSL binary). Codex catalog at this
   login: 6.1-sol (default), 6-astra, 6.1-terra, 6-sol, 6-luna, 5.6-sol/terra/luna. Research notes (owner-supplied,
   untracked) in `research/multi-model development/`.
+- **CHARC GENERATION 3 (`clearwater-charc-20261020-2115`) ROLLED OVER 2026-10-27 ~05:50Z at 420K (depth cap).**
+  The successor (gen 4) reads this file first, then `docs/charc-charter.md`, then drains its inbox. **FIRST ITEM
+  OWED: the orchestrator's QUERY `280fb7a08b5e5cfc` (2026-10-27 05:44Z, in `comms/charc/read/` -- gen 3 acked it
+  while reading, so it is NOT in the inbox; open the file by name): wave 4 composition and the calibration pair.**
+  The orchestrator reports wave 4 as framed has NO Sonnet-class package and recommends WP3.14 + WP3.21 (Opus-class,
+  Claude lane) plus two small debt packages as the calibration pair: WP3.20R (settings dialog, DR-53/54/55) and WP-T3
+  (fixture checkers, DR-33); it asks for a ruling on the set, the lanes and who drafts the briefs. **Gen 3's
+  preliminary view (not a ruling; the successor rules after reading the full post):** the pair is sound in kind --
+  both are well-specified remediation packages with fixed tests, the right class for `implementer-codex-sol-high`
+  and `implementer-sonnet-high`; check they are comparable in size (ladder rungs, owned files, test roster) before
+  assigning lanes, prefer WP3.20R -> Codex (the DR rows are precise, the findings came from the Claude pass so
+  Claude reviewing Codex closes the loop) and WP-T3 -> Sonnet; the pace tiebreak is suspended for the pair (design
+  pass 4.3); briefs drafted by the orchestrator, CHARC rules on them as usual; WP3.14 and WP3.21 stay Claude
+  (Opus-class, frozen-interface adjacent). Reviewer B for WP3.20R = the Claude pass (`codex_cell.py review`); B for
+  the others = Codex at the NEW pin `gpt-6.1-sol`. The LANE head-to-head (Codex B and Claude B on ONE finished
+  tree) is owed at WP3.20R's gate.
+- **Gen 3's last state:** wave 3 COMPLETE (WP3.10 accepted 47bc6d6, CHARC QA confirmed d834993). Harness: the
+  dual-model lane landed (3c230e4), the Reviewer B pin moved to `gpt-6.1-sol`/high (fac53e9; head-to-head ceec6b9),
+  the weekly readouts live (9c15d0c), owner decisions recorded (7681dcd). Owner-pending: D75 parenthetical erratum
+  (v0.5.5), photos (WP3.6P), the iPhone clip (DR-15). Nothing heavy runs at the CHARC seat. The Codex discussion
+  with the owner is CLOSED (all four decisions taken 2026-10-27).
 - **WP3.10 ACCEPTED 2026-10-27 at main 47bc6d6 (orchestrator gen 12; wave 3 COMPLETE).** Candidate `wp3.10-mc`
   7f98848 (= `wp3.10` 2b8cd29 rebased onto 59049a9; 72 commits; accept chain 831fb8d on ceec6b9); record
   `docs/proofs/wp3.10-accept.md`; B trees kept as `wp3.10-mc1` 78ae77a / `wp3.10-mc2` da33e63. **CHARC QA CONFIRMED
