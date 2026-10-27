@@ -240,7 +240,7 @@ Q1-Q16 as ADOPTED by CHARC `3c3c35d7`; applied as above. Q11's "optional injecte
 
 | Round | Head | Transport, CLI, banner | CRIT | MAJOR | MINOR | In / out of envelope | NEW / REOPENED | Reverts | Fixes change | Verdict | Depth (dispatcher-read) |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| R1 | `7bb5d85` | WSL, codex-cli 0.162.1, `gpt-6.1-sol` / high | 0 | 2 | 6 | 8 / 0 | 8 / 0 | 0 | pending: product (F1 ruling, F2, F3, F4), tool (F8), test-only (F5, F6, F7) | NEW_CRITICAL_MAJOR_FOUND (counts: every assertion met) | to be given at the R1 yield |
+| R1 | `7bb5d85` | WSL, codex-cli 0.162.1, `gpt-6.1-sol` / high | 0 | 2 | 6 | 8 / 0 | 8 / 0 | 0 | product (F1 (a), F2, F3, F4: `095a345`), tool (F8: `02324a7`), test-only (F5, F6, F7: `095a345`); F1 (b) held for CHARC | NEW_CRITICAL_MAJOR_FOUND (counts: every assertion met) | 123,184 (59 turns) |
 
 R1 findings and adjudication (evidence `C:\Users\rwsmy\clearwater-review-evidence\wp3.14\r1\`, md5s there):
 
@@ -255,7 +255,30 @@ R1 findings and adjudication (evidence `C:\Users\rwsmy\clearwater-review-evidenc
 | F7 | MINOR | Fresh `Reservations` per job not tested across jobs | CONFIRMED. Test fix. |
 | F8 | MINOR | `export_bench` stops telemetry after the stray window and sampler stop | CONFIRMED. Tool fix. |
 
-## RESUME HERE (cell 3, R1 adjudicated)
+R1 rulings (orchestrator gen 14, FINAL): F2-F8 adjudication ACCEPTED as classified, each fixed failing test first. F1 (a)
+(a cancel check immediately before `sink.close()`) is inside Q2's "between phases": done now. F1 (b) (the watchdog alive
+THROUGH `close()`) needs a CHARC amendment of Q2; the orchestrator recommended yes on condition of one deterministic test
+per abort timing (a sink double that blocks in `close`), one product-sink cancel during a real `close`, and the post-close
+cancel check kept as mandatory. Not built until the ruling is relayed. Round 2 waits for (b) and reviews the whole
+remediation.
+
+R1 remediation (cell 3), failing tests first: on the unfixed product 6 of the new tests failed by their reason (F4
+`() == ('sink warning', ...)`, F1 (a) `'close' not in calls`, F3 x2 no leftover warning, F2 `OSError: cleanup close failed`
+in place of the render error, F8 `['strays', 'telemetry']`); F5, F6, F7 are test-only, each with a control that the
+broken form fails (F5 a leaked `clip_corrected*.mp4` / temporary raises; F6 the 0x08 pattern finds nothing in a planted
+text the real one catches; F7 a planted shared registry fails "a registry was reused across jobs").
+- `095a345` `export.py`: `_check_cancel` before `sink.close()`; the sink's warnings copied right after `close` (inside
+  the abort guard); `run.write` assigned before `with` (a failed `begin` reaches the result); the leftover warning on any
+  outcome; `_close_stream(frames, quietly=...)` (quiet = a WARNING log line while another error propagates; on the clean
+  path its error is the job's own). `tests/test_jobs_export.py`: the eight tests and controls above.
+- `02324a7` `tools/export_bench.py`: telemetry stopped first, then the stray window and the sampler;
+  `tests/test_export_bench.py`: the order test.
+- Gates at `02324a7`: ruff check, ruff format --check, mypy (136 files) clean; targeted: `test_jobs_export.py`,
+  `test_jobs_batch.py`, `test_jobs_disk_space.py`, `test_export_bench.py`, `test_jobs_export_photo.py` 116 passed;
+  `test_jobs_export_video.py -m "not slow and not footage"` 26 passed (NVENC legs ran); the killed-subprocess V11 leg
+  1 passed (63 s); WP3.13's import test 1 passed. >= 10 GB free before each run.
+
+## RESUME HERE (cell 3, R1 remediation (F1 (a), F2-F8) committed; F1 (b) waits for CHARC)
 
 Cell 3 (`implementer-opus-high`, fresh seat; dispatch depth 0). Cell 2's build (`20f0ac3`, `e7d9092`, `3a723cc`:
 photo and video end-to-end tests, `tools/export_bench.py`) is the product under review; its detail is in the commits.
@@ -263,7 +286,8 @@ photo and video end-to-end tests, `tools/export_bench.py`) is the product under 
 | Gate | Dispatcher-read depth |
 |---|---|
 | Cell 3 dispatch | 0 (fresh seat) |
-| Cell 3 R1 yield | to be given by the dispatcher |
+| Cell 3 R1 yield | 123,184 (59 turns) |
+| Cell 3 R1-remediation yield | to be given by the dispatcher |
 
 Windows (both granted in the cell-3 prompt):
 - Config STOP: the worktree's `clearwater.local.toml` line 18 was junk (TOML parse error), so the first footage run
@@ -277,10 +301,11 @@ Windows (both granted in the cell-3 prompt):
   passed with no skip, the 5.3K 8:7 synthetic leg included. No fix.
 - Static gates at `7bb5d85`: ruff check, ruff format --check, mypy (136 files) clean.
 
-**Next (the remediation; a fresh seat if the dispatcher reads past ~250K):** wait for the dispatcher's ruling on F1,
-then fix F1 (as ruled), F2-F8 with failing tests first (F2: original error kept when the stream's close raises, the
-cleanup error logged; F3: leftover warning on an ok result and after a failed `begin`; F4: sink warnings kept on a stop
-after close; F5: `_no_partials` rejects the planned finals; F6: a real `\b` pattern plus a control that it matches;
-F7: distinct registries across jobs, references held; F8: telemetry stopped at `ended`), targeted runs, then R2 with
-the runner copied to `r2` (same `-m gpt-6.1-sol`, diff `7bb5d85..HEAD` scoped plus the full context). Then the report,
-the V16 windows (GX011627 rows first, GX011625 LAST), the FINAL return report.
+**Next:** on CHARC's ruling on F1 (b): if amended, keep the watchdog alive through `close()` with one deterministic test
+per abort timing on a double that blocks in `close` (abort before / during the flush -> close raises, CANCELLED; abort
+after the flush and before the sink marks itself closed -> output deleted, close returns, the job sees `fired`,
+CANCELLED; abort after close -> no-op, the post-close check cancels), one product-sink cancel during a real `close`,
+and the post-close cancel check kept; if not amended, F1 (b) is banked as a stated limit (cancel waits for the flush and
+verify; the V16 row's close-to-committed stamps measure it). Then Reviewer A R2 over the whole remediation (runner
+copied to `r2`, same `-m gpt-6.1-sol`, diff `7bb5d85..HEAD` plus the full context). Then the report, the V16 windows
+(GX011627 rows first, GX011625 LAST), the FINAL return report.
