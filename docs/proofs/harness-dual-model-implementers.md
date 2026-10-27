@@ -344,8 +344,9 @@ stay here.
 ### 4.6 A separate decision: the Codex review pin -- DONE 2026-10-27 (owner: "We also need to update the reviewer codex invocation, it sounds like the model versions are out of date")
 
 Moved the same day, not at the wave boundary: `strong` = `gpt-6.1-sol` / high, `fast` = `gpt-6-luna` /
-medium, in `~/.codex/{strong,fast}.config.toml` on Windows and `~/.codex/{strong,fast,review-strong,
-review-fast}.config.toml` on WSL; the fill's per-call `-m` and the banner assertion value in
+medium, in `~/.codex/{strong,fast}.config.toml` on Windows and on WSL (the WSL `review-strong` /
+`review-fast` profiles belong to the sibling harnesses and still pin `gpt-5.5` / `gpt-5.4-mini`, names
+ABSENT from this login's catalog; left alone here, flagged to those harnesses' CHARCs); the fill's per-call `-m` and the banner assertion value in
 `docs/codex-reviewer.md` follow. Both transports gave `model: gpt-6.1-sol` / `reasoning effort: high`
 on codex-cli 0.162.1. WP3.10's two B passes ran on the old pin and stand. The transition
 head-to-head (same tree `bbf44e2`, same prompt and diff as the WP3.20 B pass 1 of 2026-10-26, WSL

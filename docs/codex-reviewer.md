@@ -60,8 +60,8 @@ production-code reviews -- `-p strong` is REQUIRED for them, never omitted);
 `fast` = `gpt-6-luna` / medium (luna = "optimized for cost-sensitive
 workloads"; plan / doc / low-blast rounds). **Moved one generation on 2026-10-27
 (owner-directed; was `gpt-5.6-sol` / `gpt-5.6-luna` from 2026-07-22): the catalog default is now
-`gpt-6.1-sol`; the profile FILES in both the Windows and the WSL `~/.codex` were rewritten the same
-day, and the banner format was unchanged on codex-cli 0.162.1 under both transports.** `gpt-6.1-terra`
+`gpt-6.1-sol`; the `strong`/`fast` profile FILES in both the Windows and the WSL `~/.codex` were rewritten the
+same day (other harnesses' `review-*` profiles there are theirs), and the banner format was unchanged on codex-cli 0.162.1 under both transports.** `gpt-6.1-terra`
 (the intelligence/cost balance) is unassigned -- adopt it only via a deliberate tier
 decision. Current Codex CLIs take profiles as PER-PROFILE FILES
 (`~/.codex/<tier>.config.toml`), not a legacy `[profiles.*]` table in
