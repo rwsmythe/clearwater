@@ -255,6 +255,17 @@ cat review-prompt.md .review-diff.txt | \
   `Bash(python scripts/usage_claude.py*)` in `.claude/settings.json` (owner, 2026-10-27; main `9c15d0c`). Second
   reading 03:57Z: Claude 22 % at 10.7 % elapsed = pace 2.06; Codex 22 % at 11.8 % = pace 1.87.
 
+- **Stage 2 substrate finding (orchestrator gen 13, WP3.20R turn 1, 2026-10-27 06:46Z): pytest `tmp_path`
+  fails inside the unelevated sandbox.** Python 3.12.13 on Windows turns `os.mkdir(path, 0o700)` into an
+  owner-only ACL; pytest creates its basetemp and numbered directories at 0o700; the sandbox's restricted
+  token is then denied its own `listdir` (`PermissionError [WinError 5]` at `pytest_sessionfinish ->
+  cleanup_dead_symlinks`, every `tmp_path` fixture errored). Fix landed by CHARC the same hour:
+  `scripts/sandbox_mkdir_shim.py` (harness core, stdlib-only; maps 0o700 to 0o777 in `os.mkdir`, nothing
+  else), loaded ONLY by the cell's own runs via `PYTHONPATH=scripts ... -p sandbox_mkdir_shim -p
+  no:cacheprovider`; the cell preamble carries the command. Gate runs and CHARC QA never load it. The
+  orchestrator's uncommitted `work/sandbox/` copy (identical body) was the bridge for the two Codex cells
+  in flight. Base green with the shim at the orchestrator's seat: 64 passed.
+
 ### 4.1b The Claude reviewer pass on WP3.20 (2026-10-27 04:02Z-04:11Z; evidence `clearwater-review-evidence\probes\claudeB-wp3.20\`)
 
 - **Form that ran:** `claude -p --model opus --effort high --no-session-persistence --output-format json`, cwd the

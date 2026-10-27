@@ -92,6 +92,14 @@ HOW YOU RUN (Codex lane; each point is probed fact, 2026-10-27):
   out, NEW vs REOPENED, reverts, product-code vs test-only fixes), and end the
   turn with the ledger row and the FILES CHANGED block. **At round 5 and every 5
   rounds thereafter, STOP and report the ledger for APPROVAL TO CONTINUE.**
+- **Run pytest WITH the sandbox shim** (probed 2026-10-27, WP3.20R turn 1): under
+  the sandbox's restricted token, pytest's own 0o700 temp directories are unreadable
+  and every `tmp_path` fixture errors with `PermissionError [WinError 5]`. Your
+  test command is therefore always
+  `PYTHONPATH=scripts uv run pytest <targets> --basetemp=work/<arc>/tmp -p sandbox_mkdir_shim -p no:cacheprovider`
+  (`scripts/sandbox_mkdir_shim.py`, committed harness file: it widens mode 0o700
+  to 0o777 in `os.mkdir` and nothing else). Gate runs at your dispatcher's seat
+  never load it; a result you report without it is not a result.
 - Route every runner output to a FILE under the worktree and report its summary
   lines; never paste a whole log into your message. `uv run ...` works (the uv
   cache is writable). Do not re-read a document you have already read; your

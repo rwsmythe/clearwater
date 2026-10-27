@@ -210,6 +210,10 @@ INSTANCE_STUB_RELPATHS: tuple[str, ...] = (
 # application-agnostic + stdlib-only.
 INSTANCE_SURFACE_RELPATHS: tuple[str, ...] = (
     "APPLICATION.md",
+    # the sandboxed implementer cell's test-runner plugin (2026-10-27): it names
+    # the application test runner by its mechanism, so it is instance surface,
+    # not core; loaded only by a cell's own test runs, never at a gate.
+    "scripts/sandbox_mkdir_shim.py",
     # the project's agent-facing entry doc (names the application toolchain).
     "CLAUDE.md",
     # the concrete seam-3 fill (also matches the review-gate-<app> pattern).
