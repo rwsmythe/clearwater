@@ -197,22 +197,83 @@ main, stream and info packets of an FFmpeg-written file).
   presentation-effect proof. Audio: identity edit at 0.
 - WINDOW RELEASED at the end of this round.
 
-## RESUME HERE (current; for seat 8 -- written by seat 7 at the dispatcher's rollover)
+## RESUME HERE (current; for the floor row, the report and the return report -- written by seat 8)
 
-- Base `718324b` (main with WP3.4 and WP3.11; the generation-11 dispatcher rebased the branch at
-  seat 7's dispatch: `git range-diff` showed all 53 commits identical; the pre-rebase head is kept
-  as `wp3.10-pre-rebase2` = `d389269`; the earlier `wp3.10-pre-rebase` = `98ee54a`). Diff base:
-  `git -C <worktree> merge-base main HEAD`. Head at handover: the commit carrying this section
-  (product head unchanged since `db6f791`; seat 7 made NO code change). Reviewer A evidence
-  `r1\`..`r8\` and seat 7's footage evidence `s7-footage\` under
+- Base `718324b` (main with WP3.4 and WP3.11); diff base `git -C <worktree> merge-base main HEAD`.
+  Product head `0b76301` (R10 cleanup; the commit carrying this section adds only ledger text).
+  Reviewer A evidence `r1\`..`r10\`; seat 7's footage `s7-footage\`; seat 8's NVENC
+  measurements `s8-nvenc\` and footage window `s8-footage\`, all under
   `C:\Users\rwsmy\clearwater-review-evidence\wp3.10\`.
-- **Reviewer A: rounds 1-8 CLOSED** (product converged at round 4, cleanup `4dfa96e`; the floor-row
-  instrument `tools/video_io_bench.py` rounds 5-8, option-B redesign after round 7, round 8
-  NO_NEW_CRITICAL_MAJOR, cleanup `491ecb3`/`f262b75`/`db6f791`, no round 9 for that cleanup). The
-  NVENC finding below would open ROUND 9 (the next five-round gate is 10).
-- Seat 7 depth (dispatcher figures): 50,200 at the step-1 yield; 69,519 at the full-suite grant.
+- **Reviewer A: rounds 1-10 CLOSED.** Product converged at round 4; instrument rounds 5-8; the
+  NVENC fix rounds 9-10 (round 10 = five-round gate, termination ACCEPTED, test-only cleanup
+  `0b76301`, no round 11). Seat 8's section below the rounds records the mechanism, both CHARC
+  rulings and the failing-before runs.
+- Seat 8 depth (dispatcher figures): 176K at the R9 yield; 252K at the R10 yield.
+- **Gates at `0b76301`:** ruff clean; format 211 files; mypy 123 files clean; five video modules
+  (`-m "not footage"`) 272 passed, 3 deselected (5:51); footage tests (`test_io_video_encode.py`,
+  `test_io_video_probe_rules.py`, `-m footage`) 3 passed (11:42). Full pytest: seat 7's run on
+  `5727842` (4434 passed / 2 skipped) before round 9; the final code's run is the orchestrator's
+  stacked gate.
 
-### Seat 7 results (all on `5727842` = the rebased head; same code as `db6f791`)
+### Seat 8 footage window (2026-10-26 23:29Z-01:05Z; not a timing run; free memory 11.7-11.8 GB before each leg; every output deleted; nothing footage-derived committed; no `gpmd`, IMU or GPS value read)
+
+- **Leg (a) on `0b76301`:** GX011627 through WP3.9's `frames` and the sink (NVENC 8-bit Standard),
+  `video_fidelity.py compare`: 46 items, DIFFERENT by class MANDATORY 0, REQUIRED 0, BEST-EFFORT 8;
+  M+R all SAME; `nvenc_proof.tied` True on every NVENC leg.
+- **Leg (b) NVENC re-run** (the bench `run --keep`, cq 18/23/28 with the pixel-rate ceilings;
+  output video rate / camera's; file-size / source-size for `QUALITY_RATIO` in brackets; PSNR y to
+  the source; signalled level beside the source's own 6.0 Main; leaky-bucket worst excess at the
+  ceiling, under the bufsize = ceiling in every row):
+
+  | Clip | Level | Video Mb/s (x camera) [size ratio] | PSNR y | Signalled (source 6.0 Main) | maxrate | bucket excess |
+  |---|---|---|---|---|---|---|
+  | GX011627 (camera 55.53) | High 8 | 56.55 (1.018) [1.018] | 39.70 | 5.2 Main | 59.66 | 43.4 Mbit |
+  | GX011627 | Standard 8 | 28.57 (0.515) [0.517] | 37.08 | 5.1 Main | 29.83 | 21.4 Mbit |
+  | GX011627 | Draft 8 | 14.31 (0.258) [0.261] | 34.87 | 5.0 Main | 14.92 | 9.1 Mbit |
+  | GX011627 | High 10 | 56.60 (1.019) [1.019] | 39.63 | 5.2 Main | 59.66 | 43.7 Mbit |
+  | GX011610 (camera 5.15) | High 8 | 21.13 (4.099) [3.942] | 56.40 | 5.2 Main | 59.66 | 0 |
+  | GX011610 | Standard 8 | 11.72 (2.274) [2.208] | 54.48 | 5.1 Main | 29.83 | 0.3 Mbit |
+  | GX011610 | Draft 8 | 6.33 (1.228) [1.214] | 52.23 | 5.0 Main | 14.92 | 0.2 Mbit |
+  | GX011610 | High 10 | 21.04 (4.083) [3.926] | 52.89 | 5.2 Main | 59.66 | 0 |
+
+  Before the fix (seat 7): GX011627 NVENC 0.356 / 0.350 / 0.338, PSNR flat 35.82.
+- **AD-12 alternatives** (the product sink with `QUALITY_VALUE` patched in the driver process
+  only, `s8-footage\ad12alt.log`): libx265 crf 21 / 26 / 30 on GX011627 = 1.073 / 0.484 / 0.246 x
+  camera (PSNR 41.01 / 37.77 / 35.74), on GX011610 = 1.194 / 0.539 / 0.278 (51.86 / 49.41 /
+  47.46). NVENC cq 22 / 26 / 30 at the High ceiling on GX011627 = 51.47 / 35.44 / 20.86 Mb/s
+  (each above the Standard / Draft ceilings, so those still bind), on GX011610 = 13.66 / 8.09 /
+  4.85 Mb/s = 2.65 / 1.57 / 0.94 x camera (PSNR 54.97 / 53.22 / 51.24).
+- The AD-12 proposal (NVENC cq and the 0.24 constant, libx265 crf) went to the dispatcher for
+  CHARC at seat 8's footage yield; NO code change for the mapping without a ruling.
+
+### The ladder from here
+
+  1. If CHARC rules a new AD-12 mapping: change `QUALITY_VALUE` (and `NVENC_BITS_PER_PIXEL` if
+     ruled) in `src/clearwater/io/video/encode.py`, the AD-12 unit tests, one commit; the five
+     video modules; Reviewer A only if the dispatcher rules a round (a value change).
+  2. EXCLUSIVE window, LAST and alone, on the FINAL code: `uv run python tools/video_io_bench.py
+     floor --dry-run --config <file>` then `... floor --config <file>` (options AFTER the
+     subcommand; scratch config `work\wp3.10\s8\local.toml` = the worktree's `work\`); the record
+     lands under `<working>\wp3.10\bench\`. State whether the floor row fits inside the ~0.39
+     s/frame left after WP3.4's 0.4392 s/frame c3 core under D106's 0.834 s/frame at 4K; read
+     from the raw `per_frame_s` how many frames after each strays pause run fast (only the first
+     is set apart). Send `WINDOW RELEASED: <summary>`.
+  3. The report `docs/reports/wp3.10-video-encode.md`: status line (still says seat 4), DRAFT and
+     PENDING removed; section 1 the bench line; section 2 the NVENC options (`-maxrate`,
+     `-bufsize`, `-tier main -level`, their reason); section 5 the GX011627 row (leg (a) above);
+     section 6 the test counts; section 7 the AD-12 table above, the `QUALITY_RATIO` figures (Q13;
+     the orchestrator or WP3.14 updates the constant), the speed row; section 8 DR-18 (1) CLOSED
+     on `tied`; section 9: the Edits observation of the coarse-movie-timescale limit (seat 7 (c)),
+     the disk-estimate risk citing DR-48 (CHARC, on main), the out-of-envelope ceiling clamp to
+     6.2's 240 Mb/s and the refusal of a picture no level holds (dispatcher-ACCEPTED), the level
+     warning also on libx265 outputs, the average-frame-rate pixel rate on VFR sources, the
+     instrument's limits, the pause/strays semantics, R5 #10's index/uuid mitigation note; the
+     process note on the hold breach (one line).
+  4. The return report to the dispatcher (brief "Return report", under about 70 lines): branch
+     head, files, claims with evidence paths, test counts, Reviewer A rounds 1-10 and verdicts,
+     the footage and speed figures, limits, debt dispositions, anything for Reviewer B.
+
+### Seat 7 results (all on `5727842` = the rebased head; same code as `db6f791`; its NVENC rows are the pre-fix figures)
 
 - **Static gates:** `uv sync` no change; `ruff check .` clean; `ruff format --check .` 211 files
   formatted; `mypy` no issues in 123 source files.
@@ -278,38 +339,6 @@ main, stream and info packets of an FFmpeg-written file).
 - **Disk-estimate risk (WP3.13 / WP3.14's files, for the report and the return report):** on the
   calm low-bit-rate clip the outputs are 1.2-3.4x the SOURCE size (NVENC) and 0.4-1.8x (libx265),
   so `QUALITY_RATIO` High 1.0 with `MARGIN` 1.25 underestimates by up to about 2.7x there.
-
-### Seat 8's ladder (the dispatcher's RECOMMENDED ruling, for the successor to confirm)
-
-  1. Confirm the ruling with the dispatcher: approve the NVENC fix as Reviewer A ROUND 9, scoped
-     to the change (the fix + its test); the `-movie_timescale` item in or out at its call.
-  2. Build the fix (one commit per logical change; the test fails on `db6f791`); targeted runs of
-     the five video modules `-m "not footage"` (about 6.5 min); static gates; Reviewer A round 9
-     per `docs/review-gate-clearwater.md`; ledger row 9.
-  3. FOOTAGE window: re-run leg (b) NVENC on the fixed code (both clips, High/Standard/Draft
-     8-bit and High 10-bit; the driver is the bench `run --keep --encoder --bit-depth --quality
-     --config`, then `ffmpeg -i out -i src -an -dn -sn -lavfi "[0:v][1:v]psnr" -f null -` (10-bit:
-     both inputs `scale=in_range=full:out_range=full,format=yuv420p10le` first), then delete the
-     output); re-check leg (a)'s M+R all SAME on the fixed code. Propose the NVENC and libx265
-     AD-12 mappings to the dispatcher for CHARC on the fixed figures.
-  4. A full pytest window if the dispatcher wants it on the final code (one background process,
-     foreground poll-waits under 540 s each; the reaper kills an idle session's background job).
-  5. EXCLUSIVE window, LAST and alone, on the FINAL code: `uv run python tools/video_io_bench.py
-     floor --dry-run --config <file>` first, then `... floor --config <file>` (options AFTER the
-     subcommand; defaults `--memory-every 0.25`, `--gpu-every 1`, `--strays-every 300`); the
-     record lands under `<working>\wp3.10\bench\`. State whether the floor row fits inside the
-     ~0.39 s/frame left after WP3.4's 0.4392 s/frame c3 core under D106's 0.834 s/frame at 4K;
-     read from the raw `per_frame_s` how many frames after each strays pause run fast (only the
-     first is set apart) and report it.
-  6. The report `docs/reports/wp3.10-video-encode.md`: section 1's bench line, section 5's
-     GX011627 row, section 6's counts, section 7 (AD-12 table, `QUALITY_RATIO` figures for Q13,
-     the speed row), section 8 (DR-18 (1) CLOSED on `tied`), section 9 (the Edits observation of
-     the coarse-movie-timescale limit, the disk-estimate risk, the instrument's limits, the
-     pause/strays semantics below, R5 #10's index/uuid mitigation note); DRAFT and PENDING
-     removed; the status line (it still says seat 4).
-  7. The return report to the dispatcher by message (brief "Return report", under about 70
-     lines): branch head, files, claims with evidence paths, test counts, Reviewer A rounds and
-     verdicts, the footage and speed figures, limits, debt dispositions, anything for Reviewer B.
 
 ### Carried (still binding)
 
