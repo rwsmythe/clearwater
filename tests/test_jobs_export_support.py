@@ -168,6 +168,42 @@ class FakePhotoWriter:
         out_path.write_bytes(np.asarray(image.pixels).tobytes())
 
 
+def product_engine(
+    cache_folder: Path,
+    *,
+    methods: Mapping[str, Any] | None = None,
+    select: Callable[[Settings, int, int, str], tuple[ArrayBackend, str]] | None = None,
+    sink_factory: Callable[[], Any] | None = None,
+    on_stage: Callable[[str], None] | None = None,
+) -> ExportEngine:
+    """Return the engine over the product collaborators (what WP4.3 will wire).
+
+    Args:
+        cache_folder: The analysis cache folder (under the test's temporary folder).
+        methods: The methods by id; ``available_methods()`` when None.
+        select: The backend selector; ``clearwater.core.select_backend`` when None.
+        sink_factory: The sink factory; ``FFmpegVideoSink`` when None.
+        on_stage: The phase hook.
+    """
+    from clearwater.cache import DiskProxyCache, cache_key
+    from clearwater.core import select_backend
+    from clearwater.io.photo import PhotoReader, PhotoWriter
+    from clearwater.io.video import FFmpegVideoSink, FFmpegVideoSource
+    from clearwater.methods import available_methods
+
+    return ExportEngine(
+        methods=methods if methods is not None else available_methods(),
+        video_source=FFmpegVideoSource(),
+        sink_factory=sink_factory or FFmpegVideoSink,
+        photo_reader=PhotoReader(),
+        photo_writer=PhotoWriter(),
+        cache=DiskProxyCache(cache_folder),
+        cache_key=cache_key,
+        select_backend=select or select_backend,
+        on_stage=on_stage,
+    )
+
+
 class Rig:
     """An engine over doubles, with a source file on disk and a fresh sink per job."""
 

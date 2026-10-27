@@ -521,6 +521,9 @@ def test_dr35a_a_reserved_device_name_is_refused_with_nothing_written(tmp_path: 
         ("CONSOLE.png", False),
         ("COM10.mp4", False),
         ("NUL_2.MP4", False),
+        ("NUL2.MP4", False),
+        ("CONSOLE.MP4", False),
+        (".NUL", False),
     ],
 )
 def test_reserved_device_names(name: str, reserved: bool) -> None:
