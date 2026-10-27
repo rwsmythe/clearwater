@@ -149,8 +149,8 @@ Kept branches (evidence; do not delete unasked): `wp3.10`, `wp3.10-mc`, `wp3.10-
 - **Gate worktrees need the local config (gen 12, WP3.10):** copy the main tree's uncommitted `clearwater.local.toml`
   into every `-mc`/stack worktree BEFORE its full suite. Without it `test_lookcheck_deep.py` fails on `LocalConfigError`
   and the footage tests skip (27 skips instead of 2); that run is VOID.
-- **CR check:** use `git cat-file -p <rev>:<f> | tr -cd '' | wc -c`, never `grep -c $''` (it miscounted every line
-  as a CR in a loop at gen 12).
+- **CR check:** count with `tr -cd` given a carriage-return argument (the line-endings rule above), never `grep -c` (it
+  miscounted every line as a CR in a loop at gen 12).
 - **Merging:** rebase in a `-mc` worktree; compare `git patch-id --stable` (author range vs
   candidate vs main); gate there; Reviewer B; `git merge --ff-only`; `uv sync`; re-gate main. Ask
   CHARC to hold main from B to the merge; no orchestrator commit on main in that window either.
