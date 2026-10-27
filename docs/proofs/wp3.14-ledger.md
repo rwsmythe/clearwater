@@ -240,6 +240,16 @@ Q1-Q16 as ADOPTED by CHARC `3c3c35d7`; applied as above. Q11's "optional injecte
 
 Cell 2 (`implementer-opus-high`, fresh seat after cell 1's planned re-seat at `db4498c`; dispatch depth 0).
 
+| Gate | Dispatcher-read depth |
+|---|---|
+| Cell 2 dispatch | 0 (fresh seat) |
+| Cell 2 build yield (window request) | 207,998 (78 turns) |
+
+Window plan CONFIRMED (orchestrator gen 13): footage window `tests/test_jobs_export_video.py -m footage` (GX011627 V4
+leg) first, then full window `uv run pytest -m "not footage"` (offscreen, basetemp under `work/`, the 5.3K leg
+inside it), then Reviewer A round 1. Each grant arrives as its own message; nothing heavy before it. A
+multi-finding remediation after round 1 goes to a fresh seat.
+
 **Done (committed on `wp3.14`), RESUME "Next" items 1-3 of cell 1:**
 - `20f0ac3` `tests/test_jobs_export_photo.py`: one WP2.3 sample per still family (`jpeg-gradient-srgb`,
   `heic8-gradient-srgb`, `heic10-gradient-display-p3`, `png8-gradient-srgb`, `png16-gradient-srgb`,
