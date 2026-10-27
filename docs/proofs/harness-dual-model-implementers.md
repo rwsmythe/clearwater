@@ -62,12 +62,13 @@ a separate gate decision (section 4.6).
 | Subscription | Readout | Used | Window elapsed | Pace | Resets |
 |---|---|---|---|---|---|
 | Claude (Max 20x) | `GET https://api.anthropic.com/api/oauth/usage` with the Claude Code OAuth bearer token (`~/.claude/.credentials.json`) and `anthropic-beta: oauth-2025-04-20`; fields `five_hour`, `seven_day` (`utilization`, `resets_at`), `limits[]` (session / weekly_all / weekly_scoped Fable = 50 % of weekly), `seven_day_breakdown` | 21 % (Claude Code 97 % of it; Fable scoped 14 % of its own half) | ~10 % (window began 2026-10-26 10:00Z) | **~2.1x** | 2026-11-02 10:00Z |
-| Codex (prolite) | native `codex.exe app-server`, JSON-RPC `initialize` -> `initialized` -> `account/rateLimits/read`; `rateLimits.primary = {usedPercent, windowDurationMins: 10080, resetsAt}` | 22 % | ~22 % | **~1.0x** | 2026-11-01 13:23Z |
+| Codex (prolite) | native `codex.exe app-server`, JSON-RPC `initialize` -> `initialized` -> `account/rateLimits/read`; `rateLimits.primary = {usedPercent, windowDurationMins: 10080, resetsAt}` | 22 % | ~11 % (window began 2026-10-26 08:03Z) | **~2.0x** (CORRECTED 2026-10-27 03:49Z: the first write-up mis-converted the epoch and said 1.0x) | 2026-11-02 08:03Z |
 
-The raw percentages are equal; the pace is not. Wave 3's gates spent a fifth of Claude's week in
-seventeen hours. Sustained, Claude runs dry near day five while Codex coasts: that is the case for
-the change in one row, and it is why the dispatch rule compares PACE (projected end-of-window
-utilization), not used percent, because the two windows reset a day apart.
+Both lanes run near 2x pace: wave 3's gates spent a fifth of EACH week in under a day (Claude on
+the cells and the director, Codex on the Reviewer A loops and the B passes). Neither coasts; the
+case for the change is CAPACITY (two allotments) and the ability to steer spend between them, and
+the dispatch rule compares PACE (projected end-of-window utilization), not used percent, because
+the two windows reset at different hours and started a day apart.
 
 Access constraints: the Codex read needs no credential handling by an agent. The Claude read uses
 the stored OAuth token, which the auto-mode classifier refuses to let an agent touch ("Credential
