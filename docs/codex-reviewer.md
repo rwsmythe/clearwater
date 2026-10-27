@@ -331,6 +331,37 @@ against Windows `git diff --numstat` (the WSL CRLF phantom).
   A B round finding only pre-existing debt and nothing introduced is B WORKING,
   not B failing -- do not read a quiet round as grounds to retire the pass.
 
+## Codex as an IMPLEMENTER (2026-10-27; probed facts, Windows-native codex-cli 0.162.1)
+
+The same CLI can run an implementer cell non-interactively: one `codex exec` process per cell
+turn in a git worktree, resumed by session id (`codex exec resume <id>`); the driver
+`scripts/codex_cell.py` pins the form. Facts a seat must not rediscover:
+
+- **Sandbox:** `-s workspace-write` works ONLY with `-c windows.sandbox="unelevated"` on this
+  substrate (the legacy `elevated` mode in the user config fails every command with
+  `helper_unknown_error: setup refresh had errors`). Writable roots beyond the worktree go in
+  `-c sandbox_workspace_write.writable_roots=[...]` (the package-manager cache is needed for the
+  project's runners). A write outside the roots is swallowed SILENTLY (the tool reports success,
+  no file appears): the cell's claims about effects outside the worktree are unverifiable, so
+  the gate's footprint checks stay mandatory.
+- **`.git` is protected** inside the sandbox, in a worktree and in a clone alike: the cell cannot
+  commit. It ends every turn with a `FILES CHANGED:` list and a `COMMIT:` subject; the driver
+  commits those paths by pathspec with the footer naming the model (`codex_cell.py commit`).
+- **`codex exec resume` takes no `-m`, `-s` or `--add-dir`.** Every turn, first or resumed,
+  carries `-c model=... -c model_reasoning_effort=... -c windows.sandbox=...
+  -c sandbox_workspace_write.writable_roots=[...]`; a resumed turn without them silently runs on
+  the GLOBAL config's model (observed). The banner assertion is per TURN.
+- **Model catalog at this login (app-server `model/list`, 2026-10-27):** `gpt-6.1-sol` (the
+  default), `gpt-6-astra`, `gpt-6.1-terra`, `gpt-6-sol`, `gpt-6-luna`, `gpt-5.6-sol/terra/luna`.
+  The implementer lane uses `gpt-6.1-sol` at high (effort peaks before max on this family;
+  escalation is `gpt-6-astra` at medium for one re-seat, never Sol above high). The review
+  profiles above still pin `gpt-5.6-sol`; the upgrade to `gpt-6.1-sol` is a gate decision taken
+  at a wave boundary with the transition head-to-head, not silently.
+- **The weekly readout** for the dispatch tiebreak is `scripts/usage_codex.py` (the native
+  executable's `app-server`, `account/rateLimits/read`; the npm shim hangs under pipes).
+- **Reviewer for a Codex cell is the other model:** a `claude -p` read-only pass the driver runs
+  between turns (`codex_cell.py review`); `--bare` drops OAuth and is never used.
+
 ## Codex is replaceable
 
 Codex is **one replaceable `REVIEWER` implementation, not part of the core

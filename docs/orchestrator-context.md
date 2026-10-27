@@ -55,6 +55,15 @@ CODE-BEARING arc requires BOTH nets, and they are different instruments:
    reality) and adversarial hunting (a hostile net for the cases nobody
    thought to check) have DIFFERENT failure coverages; neither substitutes.
 
+**The reviewer in BOTH nets is the OTHER model from the implementer (owner, 2026-10-27):**
+a Claude cell is reviewed by Codex; a Codex cell (run by you as `codex exec` turns through
+`scripts/codex_cell.py`, never through the Agent tool) is reviewed by Claude (`claude -p`,
+read-only, a PROCESS at your seat). Lane choice: task fit first (a package that designs or
+touches a frozen interface is never Codex); for an eligible well-specified package, the lane
+with the LOWER weekly pace from `scripts/usage_codex.py` and `scripts/usage_claude.py`
+(`pace` = used share / elapsed share of the window); record both readings, the paces and the
+lane in the dispatch row and the brief header. The seam-3 fill carries the pinned forms.
+
 A read-only / deterministic / byte-identity arc MAY substitute independent
 verification for the adversarial nets -- WITH the reason stated in the brief.
 The concrete reviewer mechanism + the pinned working invocation live in the

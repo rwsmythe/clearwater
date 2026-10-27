@@ -34,10 +34,26 @@ import urllib.error
 import urllib.request
 from typing import Any
 
-from usage_codex import pace_from
-
 USAGE_URL = "https://api.anthropic.com/api/oauth/usage"
 WEEK_MINS = 7 * 24 * 60
+
+
+def pace_from(
+    used_percent: float, window_mins: float, resets_at_epoch: float, now_epoch: float
+) -> dict[str, Any]:
+    """Return the elapsed fraction and pace for one lane's window.
+
+    The same formula as ``scripts/usage_codex.py`` (kept inline so each readout
+    stays a standalone stdlib script); 1.0 means on track to use exactly the
+    allotment by the reset.
+    """
+    window_s = max(window_mins, 1.0) * 60.0
+    remaining = max(0.0, min(window_s, resets_at_epoch - now_epoch))
+    elapsed = max(1e-6, min(1.0, 1.0 - remaining / window_s))
+    return {
+        "elapsed_fraction": round(elapsed, 6),
+        "pace": round((used_percent / 100.0) / elapsed, 3),
+    }
 
 
 def parse_usage(body: dict[str, Any], now_epoch: float) -> dict[str, Any]:

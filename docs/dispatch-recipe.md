@@ -29,6 +29,11 @@ default* (not as a universal requirement).
    unsent).
 6. Honor the disciplines (5).
 
+A cell may run as a sequence of PROCESS runs rather than one conversation (a substrate
+may require it): then one run is one TURN, the run's end is the yield, the next prompt
+resumes it, and a cell that cannot write its own history ends every turn naming the files it
+changed so its dispatcher records them. Everything else in this recipe applies unchanged.
+
 ## 1. Isolated workspace
 
 Parallel implementers must not collide -- each works in its own isolated

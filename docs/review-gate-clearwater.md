@@ -11,6 +11,22 @@ incident history; the history is in those harnesses' fills if ever needed.
 
 ## Part 1 -- the review-to-convergence loop (Reviewer A, run by the cell)
 
+**Two implementer lanes, one rule (owner, 2026-10-26/27; design pass
+`docs/proofs/harness-dual-model-implementers.md`): the reviewer in BOTH nets is the OTHER model
+from the implementer.** Claude cells (`implementer-opus-high`, `implementer-sonnet-*`) get the
+Codex reviewer below, unchanged. The Codex cell (`implementer-codex-sol-high`, run by the
+orchestrator as `codex exec` turns through `scripts/codex_cell.py`) gets the CLAUDE reviewer:
+`claude -p --model opus --effort high` (never `--bare`: it drops OAuth), read-only tool policy
+(Read/Grep/Glob, `git` reads, the project's runners and `python` probes; Edit/Write/Agent/web
+denied), JSON output, run BY THE DRIVER between cell turns on the pre-generated diff
+(`codex_cell.py review`), its findings file handed to the cell on the next turn for the cell's
+own adjudication, fixes and ledger. Its assertions: the result's `modelUsage` key is the Opus
+model; the effort is the invocation record (not echoed); `is_error` false; a `VERDICT:` line;
+`git status --porcelain` empty afterwards (the reviewer wrote nothing); every finding tagged
+EXECUTED or REASONED. Evidence, tiering (strong = Opus high for product code, fast = Sonnet
+medium for docs) and the ledger are as below. The rest of Part 1 reads "Codex" for the Claude
+lane and "the Claude pass" for the Codex lane.
+
 - `REVIEWER` = the Codex CLI as an adversarial correctness reviewer
   (`docs/codex-reviewer.md`). **Transport pinned at bootstrap: WSL** (`wsl.exe
   bash -ilc` with the PATH prefix; `codex-cli 0.162.1` verified live 2026-10-14 at the WP0.1 accept (0.157.0 at bootstrap);
@@ -80,6 +96,13 @@ the brief.
    on the owner's catch: the first fill text made B a subagent cell; WP1.1, WP1.2A
    and WP1.5's first B ran in that form. See the accept records for the
    retroactive pass.)* Shape:
+   - **The other model (2026-10-27):** for a Claude-implemented package B is the Codex pass
+     below; for a Codex-implemented package B is the CLAUDE pass of Part 1, run by the
+     orchestrator as a PROCESS at its seat (`scripts/codex_cell.py review` against the merge
+     candidate's base, or the same command by hand), never a subagent; its assertions and
+     evidence files as Part 1, the prompt built neutrally as below. The one-time transition
+     head-to-head (both B's on one finished tree) is owed at the first Codex-implemented
+     package's gate.
    - **Tier:** the package's tier (STRONG for product-bearing results), the pinned
      WSL transport, per-call flags, probe and the five mechanical assertions
      exactly as Part 1; stdout and stderr split; a done marker written last. The

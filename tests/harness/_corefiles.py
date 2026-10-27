@@ -35,6 +35,11 @@ CORE_RELPATHS = (
     # required to stay stdlib-only (its own docstring says so), so it gets
     # the SAME mechanized guard rather than staying true only by inspection.
     "scripts/cell_depth.py",
+    # The dual-model implementer lane (2026-10-27): readouts + the Codex cell
+    # driver, all stdlib-only by design (they run at a bare seat).
+    "scripts/usage_codex.py",
+    "scripts/usage_claude.py",
+    "scripts/codex_cell.py",
 )
 
 

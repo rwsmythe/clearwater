@@ -28,6 +28,7 @@ comms/*
 
 # Adversarial-review / findings artifacts (the review loop writes these locally)
 .codex-*
+.review-*
 .copowers-*
 
 # --- Clearwater (application) --------------------------------------------

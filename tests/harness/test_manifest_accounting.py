@@ -30,6 +30,11 @@ SHIPPED_MANIFEST = {
     "scripts/comms_ui.py",
     "scripts/launch_role.ps1",
     "scripts/cell_depth.py",
+    # 2026-10-27: the dual-model implementer lane (generic/stdlib-only/no-app
+    # vocabulary): the two weekly-usage readouts and the Codex cell driver.
+    "scripts/usage_codex.py",
+    "scripts/usage_claude.py",
+    "scripts/codex_cell.py",
     ".claude/settings.json",
     ".claude/hooks/user_prompt_submit.py",
     ".claude/hooks/stop.py",
@@ -81,15 +86,18 @@ def _unaccounted(tracked: set[str]) -> list[str]:
 
 
 class ManifestAccountingTest(unittest.TestCase):
-    def test_manifest_count_is_nineteen(self) -> None:
+    def test_manifest_count_is_twenty_two(self) -> None:
         # The shipped-manifest count: 17 post-ARC-8, PLUS the 2026-08 harness-wide
         # model-prompting standard (docs/model-prompting-standard.md) = 18, PLUS
         # the 2026-09 dispatcher depth instrument (scripts/cell_depth.py,
-        # generic/stdlib-only/no-app-vocabulary) = 19.
+        # generic/stdlib-only/no-app-vocabulary) = 19, PLUS the 2026-10-27
+        # dual-model implementer lane (two usage readouts + the Codex cell
+        # driver, same posture) = 22.
         self.assertEqual(
-            len(SHIPPED_MANIFEST), 19,
-            "the shipped manifest is 19 files (17 post-ARC-8 plus the "
-            "model-prompting standard plus the cell-depth instrument)")
+            len(SHIPPED_MANIFEST), 22,
+            "the shipped manifest is 22 files (17 post-ARC-8 plus the "
+            "model-prompting standard, the cell-depth instrument and the three "
+            "dual-model lane scripts)")
 
     def test_charc_state_pointer_is_shipped(self) -> None:
         # The state-pointer file must be a tracked shipped-manifest file.
