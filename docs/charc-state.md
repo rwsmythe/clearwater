@@ -111,6 +111,18 @@ of `origin/main`, unpushed; no push asked (verify `git status -sb`).
   WP3.18 adapter mapping (kept job takes priority; own pts list; live Settings closure), DR-50/51/52 swaps, V7
   re-measure. WP3.18's R3 procedural breach: disclosed, not voided (accepted). WP3.20 B "succeeded in" strict counts
   18/19 (raw 20/21 include prompt echoes) -- the strict pattern `^\s*succeeded in [0-9]` is the standing count.
+- **WP3.10 AD-12 mapping RULED 2026-10-27 (orchestrator query 71bc572ed8981978):** ADOPT libx265 crf 21/26/30,
+  NVENC cq 22/26/30, 0.24 bit/pixel FINAL; AD-12 amended in `docs/decisions.md` with the measured figures (seat 8
+  footage window 23:29Z-00:52Z, ledger `docs/proofs/wp3.10-ledger.md` on `wp3.10` df055c2, product head 0b76301,
+  evidence `s8-footage\ad12alt.log`). D75 READ as deferring to AD-12 ("provisional mapping AD-12 ... verified at
+  WP3.10"): no decision_request; the stale parenthetical is an OWNER spec-errata item (next edition, v0.5.5). No
+  Reviewer A round for the mapping commit PROVIDED it is values-only: two tables (NVENC cq, x265 crf) replacing
+  `QUALITY_VALUE`, `_video_options` picks by encoder, PROVISIONAL dropped from the docstrings, AD-12 tests
+  updated; any other logic change owes a round. Reviewer B at the orchestrator's seat covers it. Seat 8 STANDS DOWN
+  (305K); seat 9 fresh (implementer-opus-high) from RESUME HERE: mapping commit, five video modules, EXCLUSIVE
+  floor row LAST on the final code (OPEN/CLOSE to CHARC; nothing heavy at this seat), report, return report; then
+  orchestrator B, candidate gate, CHARC QA. DR-48 disposition RULED (max(ratio x source, ceiling x duration) x
+  margin; no 10-bit doubling) for WP3.14's brief. DR-18 (1) closes at the accept.
 - **WP3.10 (seat 8, 252K at R10):** R10 at the five-round gate 0/0/2, termination accepted; O3 remediation 5cc94e4 as
   ruled (0.24 bpp; explicit `-tier main -level L`; min() edge; hvcC source level; SinkReport warning); orchestrator's
   out-of-envelope choices ACCEPTED by CHARC: a ceiling above every Main-tier cap is cut to 6.2's 240 Mb/s, a picture no
@@ -297,7 +309,9 @@ release post.
 ### Owner
 
 **No owner decision open.** Owner-pending inputs: photos (memory-test photo leg; AD-24 HEIC rule
-provisional until then; WP3.6P runs on them) and an iPhone video clip (DR-15 B-frame edit-list leg). Owner-reserved items (plan s.3): footage categories, look check and V2
+provisional until then; WP3.6P runs on them), an iPhone video clip (DR-15 B-frame edit-list leg), and a spec
+errata note for the next edition: D75's parenthetical still quotes cq 18/23/28 and crf 18/23/28 (AD-12 ruled
+cq 22/26/30, crf 21/26/30 on 2026-10-27; D75 defers to AD-12, so nothing blocks on it). Owner-reserved items (plan s.3): footage categories, look check and V2
 visual review, anything relaxing a mandatory requirement, any spec change. Everything else CHARC
 rules in the operator's stead (standing direction 2026-10-14, verbatim in CLAUDE.md "Roles";
 memory `clearwater-unattended-rule.md`); read the owner's words back verbatim with their time;
