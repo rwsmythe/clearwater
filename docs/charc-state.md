@@ -61,6 +61,14 @@
   figures banked in the QA post: one seat 159,635; A 1 round 88,642 tokens; B 105,819; dispatch-to-accept 1 h 28 min.
   Pair ruling at WP3.20R's accept (its Claude B of record DONE clean, 5 advisories; Codex B head-to-head and full
   suite pending).
+- **WP3.14 Q2 AMENDED** (orchestrator query `755fe8deb5073865` on Reviewer A R1 F1 MAJOR; CHARC ruling 2026-10-27 ~09:15Z):
+  cancel stays live THROUGH `sink.close()`: check before `close`, watchdog alive through it and joined before the
+  post-close check and `commit`; the post-close cancel check is MANDATORY and UNCONDITIONAL (verified at the code:
+  `encode.py` `close` writes `"closed"` unconditionally and can overwrite the watchdog's `"aborted"`). Conditions:
+  per-timing tests on a blocking double, one product-sink cancel-during-close test, no edit to `encode.py`, watchdog
+  joined, V16 stamps kept. **Owed at WP3.14's accept: MINOR DR row on the sink's phase write and abort docstring
+  window (trigger: next touch of `encode.py`).** Cell 3: 123K at R1; A R1 0/2/6 all in envelope; footage V4 leg SAME;
+  `-m "not footage"` 4864 / 10 skipped / 2379 s.
 - Gen 13 `-2029` ROLLED 07:51Z at ~345K (state 930a78d, FYI `080ce65fb13768e9`): WP-T3 cell DONE
   (A converged R1, candidate `wp-t3-mc` 0fbbe44 on 528d865, full pytest 4,867 passed / 2 skipped / 2873 s, fixtures
   byte-identical; B staged for gen 14); WP3.20R build DONE in 6 Codex turns (64K-205K tokens; Claude A R1
