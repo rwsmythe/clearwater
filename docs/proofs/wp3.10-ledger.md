@@ -21,7 +21,7 @@ Evidence root: `C:\Users\rwsmy\clearwater-review-evidence\wp3.10\` (`r0\` = this
 | 9 | Reviewer A (seat 8) on `ab70b47`, base `e7668e1` (SCOPED to the NVENC rate ceiling, CHARC d329e80e351c3dcc: maxrate = max(2 x source rate, 20 Mb/s)) | 0 | 1 | 0 | MAJOR #1 in envelope (the WP2.3 samples), ACCEPTED, reproduced | 1 NEW (introduced by the ruled 20 Mb/s floor), 0 REOPENED | 0 | PRODUCT (`5cc94e4`, after CHARC's 17f12f9dc7eba3ae O3 ruling withdrew the derived rule) | WSL, codex-cli 0.162.1 gpt-5.6-sol high; probe 1 + review 13 `succeeded in`; 104,444 tokens; 2 `ERROR` matches = echoed source, not transport | 176K (seat 8, at the R9 yield) |
 | 10 | Reviewer A (seat 8) on `5cc94e4`, base `ab70b47` (SCOPED to the R9 #1 remediation + R9 #1 to verify); FIVE-ROUND GATE | 0 | 0 | 2 | MINOR #1, #2 in envelope, ACCEPTED (cleanup); ZERO new blocking: the loop TERMINATES (gate: termination ACCEPTED) | 2 NEW, 0 REOPENED | 0 | TEST-ONLY, the terminating round's cleanup (the commit carrying this row) | WSL, codex-cli 0.162.1 gpt-5.6-sol high; probe 1 + review 28 `succeeded in`; 99,422 tokens; 0 `ERROR` matches | 252K (seat 8, at the R10 yield) |
 | S9 | no review (CHARC `c1d67b39bb72cc1f`: a values-only mapping commit owes NO Reviewer A round) -- the AD-12 mapping `e04a7cb` | -- | -- | -- | -- | -- | 0 | PRODUCT values + the AD-12 unit test (values only) | -- | 69,810 (seat 9, at the mapping yield) |
-| B1 | Reviewer B pass 1 (the orchestrator's seat) on `wp3.10-mc` `78ae77a` (= `4dbb2d5` rebased); remediation by seat 9 | 0 | 6 (reviewer) -> 1 upheld (#1) | 3 -> 2 upheld (#7, #8); #3, #5 adjudicated MINOR limits; #4, #6, #9 NOT NEW; #2 NOT UPHELD (reproduction owed, done: caught) | #1 in envelope, BLOCKING | 9 NEW, 0 REOPENED | 0 | PRODUCT and tests (`673f958` #1 + #7 + #8 docstrings), report text (`b7953a8` #8, limits #3 #4 #5 #9); no Reviewer A round (the orchestrator's B pass 2 covers it) | WSL, codex-cli 0.162.1 gpt-5.6-sol high; 31 `succeeded in`; 318,111 tokens; 0 `^ERROR` (orchestrator's run assertions) | 145,489 (seat 9, at the return) |
+| B1 | Reviewer B pass 1 (the orchestrator's seat) on `wp3.10-mc` `78ae77a` (= `4dbb2d5` rebased); remediation by seat 9 | 0 | 6 (reviewer) -> 1 upheld (#1) | 3 -> 2 upheld (#7, #8); #3, #5 adjudicated MINOR limits; #4, #6, #9 NOT NEW; #2 NOT UPHELD (reproduction owed, done: caught) | #1 in envelope, BLOCKING | 9 NEW, 0 REOPENED | 0 | PRODUCT and tests (`673f958` #1 + #7 + #8 docstrings), report text (`b7953a8` #8, limits #3 #4 #5 #9); no Reviewer A round (the orchestrator's B pass 2 covers it) | WSL, codex-cli 0.162.1 gpt-5.6-sol high; 31 `succeeded in`; 318,111 tokens; 0 `^ERROR` (orchestrator's run assertions) | 145,489 (seat 9, at the return); 246,815 at the remediation yield |
 
 Seat 1 stops after round 0 by the orchestrator's instruction (219K before product code; the build
 is the largest in the wave). A fresh cell builds from "RESUME HERE" below.
@@ -269,6 +269,27 @@ main, stream and info packets of an FFmpeg-written file).
   end of stream), outside the sink. It passes on rerun (2 of 3) and fails 1 of 6 isolated runs on
   `e04a7cb`'s code (`strays-old.log`): a pre-existing timing flake in the instrument's test, not
   changed (out of this remediation's scope; for the dispatcher). 0 CR bytes on the branch's files.
+
+- **Orchestrator rulings on the remediation yield** (depth 246,815): (1) the `unreadable_tail`
+  early stop ACCEPTED as read (D86); the report says it is the ONE place a short output verifies
+  (report commit after `4537881`). (2) the strays flake FIXED test-only.
+- **Flake fix `4537881` (test-only; `tools/video_io_bench.py` unchanged):** option (a), adding the
+  stream's measured tail, was tried and REJECTED by evidence: a failing run had a 0.0001 s tail and
+  a 0.0146 s residual (`strays-option-a-rejected.log`; no GC in the gap, so a thread switch outside
+  any measurable point; a standalone probe, `strays_probe.py` / `strays-probe-nopause.log`, shows
+  residuals under 1 ms outside pytest). Option (b) TAKEN: the strays assertion allows
+  `min(pauses) / 2` (0.15 s); negative proof: a pause planted inside the intervals (scratch edit of
+  the instrument, reverted, `strays-negative-planted.diff` / `.log`) FAILS, 4.57 against 0.23 +-
+  0.15. The same flake hit the sibling assertion in `test_run_once_records_the_row_and_deletes_the_output`
+  in the whole-module run (0.212 against 0.246 +- 0.01); fixed the same way at 0.1 s (above the
+  measured 0.035 s stalls, far under the 0.3-0.9 s `open` / `close` a misplaced boundary adds);
+  negative proof: `close` planted into the stream FAILS, 0.27 against 0.68 +- 0.1
+  (`row-negative-planted.*`). Proof (`strays-final-10.log`): strays test 10/10, row test 10/10,
+  the whole bench module 50 passed.
+- **Gates at `4537881`:** ruff clean; format 211 files; mypy 123 files clean; five video modules
+  `-m "not footage"` 279 passed, 3 deselected (6:33; `five4.log`); 0 CR bytes on the branch's
+  files. The working tree briefly held CRLF copies after a plain `git checkout` revert; restored
+  with `-c core.autocrlf=false checkout` before any commit.
 
 ### Seat 8's RESUME HERE (superseded by the section above; kept for its figures)
 
