@@ -247,6 +247,9 @@ INSTANCE_SURFACE_PREFIXES: tuple[str, ...] = (
     # per-arc proofs, accept records, round ledgers, completion reports.
     "docs/proofs/",
     "docs/reports/",
+    # owner-supplied research material (2026-10-27: the multi-model development
+    # notes behind the dual-model implementer change); instance content by design.
+    "research/",
     # The application SOURCE surface: the package, its tools and its tests.
     # tests/harness/ is the HARNESS suite and stays core-scanned (see
     # is_instance_surface, which carves it out of the tests/ prefix).
