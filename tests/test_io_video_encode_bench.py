@@ -304,7 +304,11 @@ def test_run_once_records_the_row_and_deletes_the_output(sample: Any, tmp_path: 
     rate = Fraction(record["frame_rate"])
     assert record["total"]["s_per_frame"] == pytest.approx(stages["total"] / frames)
     assert record["total"]["min_per_min"] == pytest.approx(stages["total"] / float(frames / rate))
-    assert sum(record["per_frame_s"]) == pytest.approx(stages["stream"], abs=0.01)
+    # the intervals add up to the stream; the stream also holds the steps outside every interval
+    # (the decoder's end after the last write), where a thread switch costs up to a few
+    # hundredths of a second (measured 0.035 s), so 0.1 s: still far under the ``open`` or the
+    # ``close`` (each about 0.3-0.9 s here) that a misplaced stage boundary would add
+    assert sum(record["per_frame_s"]) == pytest.approx(stages["stream"], abs=0.1)
     assert record["decode"]["cuda"] is False and "-hwaccel" not in record["decode"]["command"]
     assert "libx265" in record["encode_command"]
     assert record["nvenc_proof"] == {"tied": False, "reason": "not an NVENC encode (libx265)"}
@@ -415,8 +419,12 @@ def test_strays_are_read_between_frames_and_kept_out_of_the_figures(
     assert len(pauses) == frames // 3 and all(pause >= 0.29 for pause in pauses)
     stages = record["stages_s"]
     assert stages["strays_pauses"] == pytest.approx(sum(pauses))
-    # no pause inside a frame interval or a stage: the intervals add up to the stream alone
-    assert sum(record["per_frame_s"]) == pytest.approx(stages["stream"], abs=0.01)
+    # no pause inside a frame interval or a stage: the intervals add up to the stream alone.
+    # The stream also holds the steps outside every interval (the decoder's end after the last
+    # write, the loop's own lines), where a thread switch can cost a few hundredths of a second;
+    # so the tolerance is half the shortest planted pause, and a pause left inside an interval
+    # (each one 0.3 s) still fails.
+    assert sum(record["per_frame_s"]) == pytest.approx(stages["stream"], abs=min(pauses) / 2)
     assert stages["total"] == pytest.approx(
         stages["probe"] + stages["open"] + stages["stream"] + stages["close"]
     )
