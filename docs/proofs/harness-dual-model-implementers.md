@@ -1,6 +1,6 @@
 # Harness change: dual-model implementers (Claude and Codex), cross-model review, weekly-headroom dispatch
 
-CHARC design pass, 2026-10-27. Status: **WRITTEN UP for the owner; calibration starts this phase
+CHARC design pass, 2026-10-27. Status: **Stage 0 and Stage 1 DONE 2026-10-27 (sections 4.1a/4.1b; the Stage 1 commit after main `68e3a2c`); Stage 2 calibration pending the wave 4 briefs.** Originally: WRITTEN UP for the owner; calibration starts this phase
 (owner, 2026-10-27: "Start calibration this phase, write up the harness change").** Nothing in the
 operating docs changes until the Stage 1 edits below are made; this pass is the argument, the
 evidence and the exact edit list, per the dispatch recipe's rule that argument lives in the design

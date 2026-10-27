@@ -129,7 +129,14 @@ of `origin/main`, unpushed; no push asked (verify `git status -sb`).
   sandbox (`-c windows.sandbox="unelevated"`), `.git` is sandbox-protected so the ORCHESTRATOR commits per turn, resume
   needs `-c model=... -c windows.sandbox=... -c sandbox_workspace_write.writable_roots=[...]` every turn; the Claude
   reviewer pass (`claude -p --model opus --effort high`, no `--bare`) is credible: on accepted WP3.20 it found DR-53,
-  DR-54 and DR-52 errata that two Codex passes missed. Readouts committed 9c15d0c. NEXT: Stage 1 operative edits. Codex catalog at this
+  DR-54 and DR-52 errata that two Codex passes missed. Readouts committed 9c15d0c. **Stage 1 LANDED (one harness commit after 68e3a2c; harness gate 379 OK):** cell
+  `.claude/agents/implementer-codex-sol-high.md` (the staged preamble; not a subagent), driver `scripts/codex_cell.py`
+  (`turn` = pinned codex exec / resume with the four `-c` overrides + banner assertions; `commit` = the FILES CHANGED
+  block by pathspec with the owner's footer; `review` = the Claude `-p` read-only pass with model/clean-tree
+  assertions), fill Parts 1-2 lane-dependent reviewer, orchestrator-context two-net + lane rule, codex-reviewer
+  implementer section, dispatch-recipe process-turn sentence, HD-1 in decisions.md, CLAUDE.md line, manifest 22.
+  NEXT: Stage 2 calibration at the wave 4 briefs (the orchestrator names the pair; CHARC assigns lanes; the pace
+  tiebreak is suspended for the pair); the review pin upgrade + transition head-to-head at the first Codex gate. Codex catalog at this
   login: 6.1-sol (default), 6-astra, 6.1-terra, 6-sol, 6-luna, 5.6-sol/terra/luna. Research notes (owner-supplied,
   untracked) in `research/multi-model development/`.
 - **WP3.10 floor row DONE (seat 9, EXCLUSIVE window 2026-10-27 01:09Z-02:02Z, CLOSE c02b6a47c057f2e4):** on
