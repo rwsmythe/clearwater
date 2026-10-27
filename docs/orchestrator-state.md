@@ -69,14 +69,26 @@ None. `wp310-cell8` stood down at 305K, `wp310-cell9` at 339,190 (2026-10-27 ~04
      `model: gpt-6.1-sol` from 2026-10-27; a `gpt-5.6-sol` transcript now FAILS assertion 1. WP3.10's two passes stand.
 4. **WP3.10 CHARC QA CONFIRMED (static) at `47bc6d6`; WAVE 3 COMPLETE** (`d834993`: DR-17/18/26 closed, DR-20 (4)(6),
    DR-39 (a); DR-56..DR-58 new; the fill's GATE_CHECKS now copy `clearwater.local.toml` into gate worktrees).
-5. **HELD: wave 4 query `280fb7a08b5e5cfc` (posted 05:44Z), OWED BY CHARC GEN 4.** CHARC gen 3 rolled over at 420K
-   (`df54d62`); do NOT cue `clearwater-charc-20261020-2115` again; read the gen 4 name from `comms/.launch-sessions.json`
-   after the owner relaunches. My recommendation: wave 4 = WP3.14 (opus-high) + WP3.21 (opus-high; build parallel,
-   measurement exclusive after WP3.14's footage legs) + the calibration pair from open debt: WP3.20R settings dialog
-   hardening (DR-53, DR-54, DR-55; `gui/settings_dialog.py`) and WP-T3 fixture checker hardening (DR-33 (a)-(d);
-   `tools/fixtures/`, no regeneration). CHARC gen 3's PRELIMINARY view (not a ruling, `docs/charc-state.md`): sound in
-   kind; WP3.20R -> Codex lane, WP-T3 -> Sonnet lane, sizes to be checked; briefs by drafting helpers, CHARC approves
-   FINAL. Nothing is in flight; no cell live.
+5. **WAVE 4 RULED (CHARC gen 4 `clearwater-charc-20261026-2007`, msg `6f725eee`, saved at
+   `clearwater-review-evidence\wave4-ruling-6f725eee.md`). GRANTS:**
+   - **WP3.14 export jobs and batch -> `implementer-opus-high`** (Claude lane; Reviewer A and B = Codex `gpt-6.1-sol`/high).
+     Dispatch FIRST. Its brief carries the ruling's item-3 list. V16 export timing row EXCLUSIVE, OPEN/CLOSE to CHARC.
+   - **WP3.20R settings dialog hardening (DR-53, DR-54, DR-55) -> `implementer-codex-sol-high`** (Codex lane; Reviewer A
+     and B = the Claude pass `scripts/codex_cell.py review`, opus/high; B is YOUR process). DR-54 RULED: refuse OK with a
+     `settings`-owned message; the injected-rule test uses a DISAGREEING rule and asserts the 10-bit state. You commit each
+     turn from the FILES CHANGED block with `Co-Authored-By: GPT-6.1 Sol via Codex <noreply@openai.com>`. At its gate the
+     LANE HEAD-TO-HEAD is owed: run BOTH a Codex B (`gpt-6.1-sol`) and the Claude B on the same tree; the Claude pass is the
+     B of record.
+   - **WP-T3 fixture checker hardening (DR-33 (a)-(d)) -> `implementer-sonnet-high`** (Claude lane; Reviewer B = Codex
+     `gpt-6.1-sol`/high; the ruling's "Reviewer A = Claude" wording contradicts the other-model rule -- raised to CHARC via
+     the brief's questions). NO regeneration: the committed fixtures stay byte-identical.
+   - The pair is CALIBRATION (pass 4.3): the pace tiebreak is suspended for the two; one Codex turn and one Claude cell may
+     run together; one heavy job at a time rules the suites. Size ratio (WP-T3 ~1.3-1.5x WP3.20R) goes in HD-1.
+   - **WP3.21 opens AFTER WP3.14's accept**; its brief MAY be drafted while WP3.14 runs (cite AD-21, the plan row, WP3.10's
+     floor figures; measurement rows EXCLUSIVE, last).
+   - **Briefs:** drafting helpers dispatched 2026-10-27 (gen 12): `brief-wp314` (opus), `brief-wp320r`, `brief-wpt3` (sonnet),
+     each in its own worktree/branch `brief-wp3.14`, `brief-wp3.20r`, `brief-wpt3`; DRAFTs go to CHARC for FINAL.
+   - FYI: the owner asked CHARC about pytest-xdist; do NOT add it unless commissioned.
 6. **Gen-12 slips:** five bare `cd`s moved the shared cwd (into `.worktrees/stackB`, `orch-state-g12`, `wp3.10-mc` twice,
    `subagents`); each reverted in the next call. Use `git -C <wt>` and absolute paths; a worktree command that must run
    inside it goes in a `( cd <wt> && ... )` subshell, never `cd <wt> && ...` at top level.
