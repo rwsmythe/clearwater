@@ -38,3 +38,11 @@ Scope: tests and tools only. Files: `tools/fixtures/stills.py`, `tools/fixtures/
 - A real camera HEIC (grid, thumbnails, auxiliary items) is outside the envelope: the `ipma` reader handles a primary that is not the first item, but no such file is committed. A truncated `ipma` may raise `struct.error` rather than `ValueError`.
 - A packet with no reported duration reads as -1 and so fails the duration rule.
 - Tests build plants with the private helpers `stills._child`, `stills._boxes`, `stills._chunk`.
+
+## Erratum at the gate (Reviewer B, orchestrator generation 14)
+
+- "Plants (each in `tmp_path`)": the T4, T6 and T7 plants and the short-`ispe` plant are built in memory, not
+  written under `tmp_path`; each still fails by name.
+- Item (d): `verify_generated` takes `r_frame_rate` and `time_base` from the manifest's own stream facts;
+  `build_clip` takes them from the freshly measured clip, whose `r_frame_rate` it first checks against the
+  intended rate.
