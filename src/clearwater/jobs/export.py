@@ -527,13 +527,31 @@ class ExportEngine:
         )
         progress.report(3, 4, f"Writing {run.name}")
         self._stage("write")
+        self._check_cancel(progress)  # a cancel asked on the "Writing" report never writes
         run.write = SafeWrite(plan, reservations)  # held first: a failed begin may leave one
-        with run.write as write:
-            self._photo_writer.write(
-                host, meta, write.temp_path, bit_depth=settings.png_bit_depth, provenance=provenance
-            )
-            self._check_cancel(progress)
-            final = write.commit()
+        try:
+            with run.write as write:
+                self._photo_writer.write(
+                    host,
+                    meta,
+                    write.temp_path,
+                    bit_depth=settings.png_bit_depth,
+                    provenance=provenance,
+                )
+                self._check_cancel(progress)
+                final = write.commit()
+        except _CancelledError:
+            raise
+        except Exception as exc:
+            if progress.cancelled():  # read from the flag, never the error's text (Q2 as amended)
+                _LOG.info(
+                    "export %s: cancelled; the stopped write reported %s: %s",
+                    run.name,
+                    type(exc).__name__,
+                    ascii_text(str(exc)),
+                )
+                raise _CancelledError from exc
+            raise
         run.outputs.append(final)
         _after_commit(run.name, lambda: self._stage("committed"))
         _after_commit(run.name, lambda: progress.report(4, 4, f"Saved {ascii_text(final.name)}"))

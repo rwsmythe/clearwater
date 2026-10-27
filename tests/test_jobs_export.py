@@ -251,6 +251,72 @@ def test_a_stop_after_close_keeps_the_sink_warnings(
     assert result.warnings == expected
 
 
+def _photo_cancel_at_the_write(rig: Rig, *, in_writer: bool) -> JobResult:
+    """Cancel on the photo's "Writing" report, or inside the writer, which then hits ENOSPC."""
+    progress: StubProgress = CancelAt("Writing")
+    if in_writer:
+        progress = StubProgress()
+        real_write = rig.writer.write
+
+        def write(*args: Any, **kwargs: Any) -> None:
+            progress.cancel()
+            rig.writer.error = OSError(errno.ENOSPC, "No space left on device")
+            real_write(*args, **kwargs)
+
+        rig.writer.write = write  # type: ignore[method-assign]
+    result: JobResult = rig.run(rig.request("photo"), progress)
+    return result
+
+
+def _assert_photo_writer_never_ran(rig: Rig) -> None:
+    assert rig.writer.paths == [], f"the photo writer ran after a cancel: {rig.writer.paths}"
+
+
+def test_a_cancel_on_the_photo_writing_report_never_calls_the_writer(tmp_path: Path) -> None:
+    # Reviewer B pass 2 finding 1: no cancel check stood between the "Writing" report and the
+    # writer, so a cancel asked there wrote the photo (and an ENOSPC became a disk-full failure).
+    rig = Rig(tmp_path)
+    result = _photo_cancel_at_the_write(rig, in_writer=False)
+    _assert_photo_writer_never_ran(rig)
+    _assert_cancel_contract(result)
+    assert result.outputs == ()
+    _no_partials(rig)
+
+
+def test_a_photo_writer_error_after_a_cancel_is_cancelled(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    # Reviewer B pass 2 finding 1 (Q2 as amended): a writer error while cancelled() holds is a
+    # cancel, never a disk-full failure; the error's text goes to an INFO line.
+    rig = Rig(tmp_path)
+    with caplog.at_level(logging.INFO, logger="clearwater.jobs.export"):
+        result = _photo_cancel_at_the_write(rig, in_writer=True)
+    _assert_cancel_contract(result)
+    assert result.outputs == () and len(rig.writer.paths) == 1
+    assert any(
+        r.levelno == logging.INFO and "No space left on device" in r.getMessage()
+        for r in caplog.records
+    ), caplog.text
+    _no_partials(rig)
+
+
+def test_planted_no_cancel_check_before_the_photo_write_fails_by_name(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    stages: list[str] = []
+    real_check = export_module.ExportEngine._check_cancel
+
+    def planted(progress: Any) -> None:
+        if not stages or stages[-1] != "write":  # no check from the "Writing" report onward
+            real_check(progress)
+
+    monkeypatch.setattr(export_module.ExportEngine, "_check_cancel", staticmethod(planted))
+    rig = Rig(tmp_path, on_stage=stages.append)
+    _photo_cancel_at_the_write(rig, in_writer=False)
+    with pytest.raises(AssertionError, match="the photo writer ran after a cancel"):
+        _assert_photo_writer_never_ran(rig)
+
+
 def test_a_cancel_at_the_close_boundary_aborts_without_closing(tmp_path: Path) -> None:
     # R1 F1 (a): a cancel seen after the last frame and before close() must not finish the
     # output; the job checks immediately before close (Q2 "between phases").
@@ -822,6 +888,90 @@ def test_planted_bare_analysis_stream_close_fails_by_name(
         _assert_analysis_failure_kept(result)
 
 
+def _guard_only_while_an_error_is_in_flight() -> Any:
+    """Rebuild ``AnalysisEngine._decode`` guarding the close only after an error (planted).
+
+    The decode pass's ``finally`` becomes ``except BaseException:`` (the guarded close, then
+    ``raise``) plus ``else:`` with a bare close, so a clean-path close error escapes.
+    """
+    lines = textwrap.dedent(inspect.getsource(engine_module.AnalysisEngine._decode)).splitlines(
+        keepends=True
+    )
+    guard = next(i for i, line in enumerate(lines) if line.strip() == "if close is not None:")
+    start = max(i for i in range(guard) if lines[i].strip() == "finally:")
+    indent = len(lines[start]) - len(lines[start].lstrip())
+    end = start + 1
+    while end < len(lines) and (
+        not lines[end].strip() or len(lines[end]) - len(lines[end].lstrip()) > indent
+    ):
+        end += 1
+    body = " " * (indent + 4)
+    planted = "".join(
+        [
+            *lines[:start],
+            " " * indent + "except BaseException:\n",
+            *lines[start + 1 : end],
+            body + "raise\n",
+            " " * indent + "else:\n",
+            body + 'close = getattr(frames, "close", None)\n',
+            body + "if close is not None:\n",
+            body + "    close()\n",
+            *lines[end:],
+        ]
+    )
+    namespace: dict[str, Any] = {}
+    exec(compile(planted, "<planted conditional guard>", "exec"), vars(engine_module), namespace)
+    return namespace["_decode"]
+
+
+def _clean_analysis_close_raises(rig: Rig) -> JobResult:
+    """Run a job whose analysis decodes every frame and whose analysis stream's close raises."""
+    stages: list[str] = []
+    rig.engine._on_stage = stages.append  # type: ignore[assignment]
+    real_frames = rig.source.frames
+
+    def frames(*args: Any, **kwargs: Any) -> Any:
+        stream = real_frames(*args, **kwargs)
+        return _CloseRaises(stream) if "frames" not in stages else stream
+
+    rig.source.frames = frames  # type: ignore[method-assign]
+    result: JobResult = rig.run(rig.request())
+    return result
+
+
+def _assert_clean_analysis_close_is_a_warning(result: JobResult) -> None:
+    assert result.ok, f"a clean-path analysis close error failed the job: {result.failure!r}"
+
+
+def test_a_clean_path_analysis_stream_close_error_is_a_warning(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    # Reviewer B pass 2 finding 3: the granted B1 (b) guard holds on the clean path too (the
+    # statistics are complete): the export is ok and the close error is a WARNING line.
+    rig = Rig(tmp_path)
+    with caplog.at_level(logging.WARNING, logger="clearwater.analysis.engine"):
+        result = _clean_analysis_close_raises(rig)
+    _assert_clean_analysis_close_is_a_warning(result)
+    assert result.outputs == (tmp_path / "clip_corrected.mp4",)
+    assert any(
+        r.levelno == logging.WARNING
+        and r.name == "clearwater.analysis.engine"
+        and "cleanup close failed" in r.getMessage()
+        for r in caplog.records
+    ), caplog.text
+
+
+def test_planted_close_guard_only_while_an_error_is_in_flight_fails_by_name(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        engine_module.AnalysisEngine, "_decode", _guard_only_while_an_error_is_in_flight()
+    )
+    result = _clean_analysis_close_raises(Rig(tmp_path))
+    with pytest.raises(AssertionError, match="a clean-path analysis close error failed the job"):
+        _assert_clean_analysis_close_is_a_warning(result)
+
+
 class _RaisesOnSaved(StubProgress):
     """A progress whose report after the commit (``Saved ...``) raises."""
 
@@ -936,7 +1086,21 @@ def test_d87_is_re_checked_after_the_analysis(
     assert rig.source.iterations == 1 and "open" not in rig.sink.calls
 
 
-def _three_item_batch(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, exports: Any) -> list[str]:
+class _SizedStat:
+    """An ``os.stat`` result with every real field but ``st_size`` (Reviewer B pass 2, 2)."""
+
+    def __init__(self, info: os.stat_result, size: int) -> None:
+        self._info = info
+        self.st_size = size
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._info, name)
+
+
+def _three_item_batch(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, exports: Any
+) -> tuple[Any, list[str]]:
+    """Run a, b (1 GB, does not fit), c; return the batch report and the analysed file names."""
     rig = Rig(tmp_path)
     sources = []
     for name, size in (("a.mp4", 10), ("b.mp4", 10**9), ("c.mp4", 10)):
@@ -947,23 +1111,48 @@ def _three_item_batch(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, exports: 
 
     def stat(path: Any, *args: Any, **kwargs: Any) -> Any:
         info = real_stat(path, *args, **kwargs)
-        if Path(path).name == "b.mp4":
-            return os.stat_result((info.st_mode, 0, 0, 0, 0, 0, 10**9, 0, 0, 0))
-        return info
+        return _SizedStat(info, 10**9) if Path(path).name == "b.mp4" else info
 
     monkeypatch.setattr(export_module.os, "stat", stat)
+    analysed: list[str] = []
+    real_key = rig.engine._cache_key
+
+    def key(path: Path) -> Any:
+        analysed.append(path.name)  # the job builds its analysis with this key
+        return real_key(path)
+
+    rig.engine._cache_key = key  # type: ignore[method-assign]
     rig_probe_rate = rig.probe  # tiny frames: the ceiling term is small
     assert rig_probe_rate.video.width == 12
     _free(monkeypatch, 5 * 10**8)
     engine = exports(rig)
     requests = [rig.request(source=s) for s in sources]
-    report = run_batch(engine, requests, StubProgress())
-    return [item.state for item in report.items]
+    return run_batch(engine, requests, StubProgress()), analysed
+
+
+def _assert_b_refused_by_d87_before_its_analysis(report: Any, analysed: list[str]) -> None:
+    failure = report.items[1].result.failure if report.items[1].result is not None else None
+    assert failure is not None and failure.startswith("b.mp4: Not enough free space in "), (
+        f"item B did not fail on D87: {failure!r}"
+    )
+    assert "b.mp4" not in analysed, f"item B was refused only after its analysis: {analysed}"
+    states = [item.state for item in report.items]
+    assert states == ["done with warnings", "failed", "done with warnings"], states
 
 
 def test_d87_is_per_item_in_a_batch(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    states = _three_item_batch(tmp_path, monkeypatch, lambda rig: rig.engine)
-    assert states == ["done with warnings", "failed", "done with warnings"]
+    report, analysed = _three_item_batch(tmp_path, monkeypatch, lambda rig: rig.engine)
+    _assert_b_refused_by_d87_before_its_analysis(report, analysed)
+    assert analysed == ["a.mp4", "c.mp4"]
+
+
+def test_planted_no_d87_fails_the_per_item_test_by_name(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(export_module.ExportEngine, "_check_space", staticmethod(lambda *a: None))
+    report, analysed = _three_item_batch(tmp_path, monkeypatch, lambda rig: rig.engine)
+    with pytest.raises(AssertionError, match="item B did not fail on D87"):
+        _assert_b_refused_by_d87_before_its_analysis(report, analysed)
 
 
 class _BatchWideCheck:
@@ -986,7 +1175,8 @@ class _BatchWideCheck:
 def test_planted_batch_wide_d87_fails_by_name(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    states = _three_item_batch(tmp_path, monkeypatch, _BatchWideCheck)
+    report, _ = _three_item_batch(tmp_path, monkeypatch, _BatchWideCheck)
+    states = [item.state for item in report.items]
     assert states != ["done with warnings", "failed", "done with warnings"]
 
 
