@@ -30,7 +30,7 @@ from clearwater.jobs import export as export_module
 from clearwater.jobs import naming as naming_module
 from clearwater.jobs import safe_write as safe_write_module
 from clearwater.jobs.export_seam import CANCELLED, ExportJobs, ExportRequest
-from test_jobs_export_support import FakeSink, Rig, parameter_set
+from test_jobs_export_support import CLOSE_GATES, FakeSink, Rig, parameter_set
 
 BLOCK_BOUND_S = 3.0
 """A cancel during a blocked write must end the job well within this (the double blocks 5 s)."""
@@ -209,7 +209,9 @@ def test_cancel_immediately_before_commit_deletes_the_finished_temporary(
     monkeypatch.setattr(FakeSink, "close", close_then_cancel)
     result = rig.run(rig.request(), progress)
     _assert_cancel_contract(result)
-    assert rig.sink.calls[-2:] == ["close", "abort"]
+    calls = rig.sink.calls
+    after = calls[calls.index("close") + 1 :]  # the watchdog may also see the flag before it stops
+    assert after and set(after) == {"abort"}, calls
     _no_partials(rig)
 
 
@@ -318,7 +320,7 @@ def _assert_never_closed_after_a_cancel(sink: FakeSink) -> None:
 def test_planted_close_on_cancel_fails_by_name(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    real = export_module.ExportEngine._encode
+    real = export_module.ExportEngine._write_frames
 
     def planted(self: Any, *args: Any) -> None:
         try:
@@ -327,11 +329,75 @@ def test_planted_close_on_cancel_fails_by_name(
             args[6].close()  # the sink: a wrong implementation finishing the partial output
             raise
 
-    monkeypatch.setattr(export_module.ExportEngine, "_encode", planted)
+    monkeypatch.setattr(export_module.ExportEngine, "_write_frames", planted)
     rig = Rig(tmp_path)
     rig.run(rig.request(), CancelAt("Exporting"))
     with pytest.raises(AssertionError, match="close called after a cancel"):
         _assert_never_closed_after_a_cancel(rig.sink)
+
+
+# --- cancel during close (Q2 as amended, CHARC `e7d25105`) ------------------------------------
+
+
+def _commit_spy(monkeypatch: pytest.MonkeyPatch) -> list[list[str]]:
+    """Record each commit with the cancel watchdogs alive at that moment (none may be)."""
+    commits: list[list[str]] = []
+    real = SafeWrite.commit
+    earlier = set(threading.enumerate())  # only this test's jobs count
+
+    def commit(self: SafeWrite) -> Path:
+        alive = [t for t in threading.enumerate() if t not in earlier]
+        commits.append([t.name for t in alive if t.name == "export-cancel"])
+        return real(self)
+
+    monkeypatch.setattr(SafeWrite, "commit", commit)
+    return commits
+
+
+@pytest.mark.parametrize("gate", CLOSE_GATES)
+def test_a_cancel_during_close_is_aborted_by_the_watchdog_at_every_timing(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+    gate: str,
+) -> None:
+    # The watchdog stays alive through close(): abort before the flush, during it, after the
+    # finish but before the sink marks itself closed, and after that mark each end CANCELLED
+    # with nothing on disk, and close is never followed by commit.
+    caplog.set_level(logging.INFO, logger="clearwater.jobs.export")
+    commits = _commit_spy(monkeypatch)
+    rig = Rig(tmp_path)
+    sink = FakeSink()
+    sink.close_gate = gate
+    rig.next_sink = lambda: sink
+    progress = StubProgress()
+    box: dict[str, Any] = {}
+    thread = threading.Thread(target=lambda: box.update(r=rig.run(rig.request(), progress)))
+    thread.start()
+    assert sink.at_gate.wait(10), "close never reached the gate"
+    progress.cancel()
+    aborted = sink.aborted_in_close.wait(BLOCK_BOUND_S)
+    sink.release.set()
+    thread.join(15)
+    assert not thread.is_alive(), "the job did not end"
+    assert aborted, "the watchdog never aborted during close"
+    _assert_cancel_contract(box["r"])
+    assert box["r"].outputs == ()
+    assert commits == [], "close was followed by commit"
+    assert sink.calls.count("close") == 1
+    assert sink.calls.index("abort") > sink.calls.index("close")
+    if gate in ("before_flush", "flush"):  # close raised: its error is a log line, not the failure
+        assert "the stopped encoder reported RuntimeError: encoder_failed" in caplog.text
+    _no_partials(rig)
+
+
+def test_the_watchdog_is_joined_before_commit(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    commits = _commit_spy(monkeypatch)
+    rig = Rig(tmp_path)
+    assert rig.run(rig.request()).ok
+    assert commits == [[]], "a cancel watchdog was alive at the rename"
 
 
 # --- failure (V11, D87, DR-57 (c), DR-20 (7)) --------------------------------------------------

@@ -7,8 +7,10 @@ with a fresh :class:`~clearwater.jobs.naming.Reservations` (DR-35 (b)). A video'
 inside the job (AD-7, AD-15), so a batch item needs no prior analysis.
 
 Threads: everything runs on the caller's worker thread, one frame in flight. During a video
-encode one watchdog thread polls ``progress.cancelled()`` and calls the sink's ``abort`` once,
-which releases a write blocked on FFmpeg's input (DR-57 (b)); it touches nothing else.
+encode, from after the sink's ``open`` until its ``close`` has returned, one watchdog thread polls
+``progress.cancelled()`` and calls the sink's ``abort`` once, which releases a write blocked on
+FFmpeg's input (DR-57 (b)) or a ``close`` still flushing; it touches nothing else, and it is
+joined before the post-close cancel check and ``commit``.
 
 Every collaborator is injected (plan 8.1: ``jobs`` reaches correction methods only through IF-3),
 so this module imports nothing from ``clearwater.gui``, ``clearwater.methods``,
@@ -46,6 +48,7 @@ from clearwater.interfaces import (
     Progress,
     ProxyCache,
     Settings,
+    SinkReport,
     VideoSink,
     VideoSource,
 )
@@ -579,16 +582,9 @@ class ExportEngine:
                     bit_depth=bit_depth,
                     provenance=provenance,
                 )
-                self._encode(probe, method, backend, engine, params, hw_decode, sink, progress, run)
-                self._stage("close")
-                self._check_cancel(progress)  # a cancel after the last frame never closes
-                report = sink.close()
-                # The sink's warnings are the job's from here, so a stop before commit keeps them.
-                run.warnings.extend(ascii_text(w) for w in report.warnings)
-                run.warnings.extend(
-                    f"Not carried to the output: {ascii_text(item)}" for item in report.not_carried
+                report = self._encode(
+                    probe, method, backend, engine, params, hw_decode, sink, progress, run
                 )
-                self._check_cancel(progress)
             except BaseException:
                 sink.abort()  # never close after a stop: kill FFmpeg, delete the temporary
                 raise
@@ -640,44 +636,87 @@ class ExportEngine:
         sink: VideoSink,
         progress: Progress,
         run: _Run,
-    ) -> None:
-        """Render and write every decoded frame in pts order, under the cancel watchdog."""
-        schema = engine.schema_hash
-        total = probe.video.nb_frames
-        message = f"Exporting {run.name}"
+    ) -> SinkReport:
+        """Write every frame and close the sink, under the cancel watchdog (Q2 as amended).
+
+        The watchdog runs from after ``open`` until ``close`` has returned or raised, so a cancel
+        during the flush and verification also reaches ``abort``. It is stopped and joined before
+        the post-close cancel check, which is unconditional, and before ``commit``: no second
+        thread is alive at the rename. A cancel is read from ``progress.cancelled()``, never
+        from an error's text; the stopped encoder's error then goes to the log, not the result.
+
+        Returns:
+            The sink's report (its warnings and ``not_carried`` items are already the job's).
+        """
         watchdog = _Watchdog(progress, sink)
-        self._stage("frames")
-        frames: Iterator[Frame] = self._video_source.frames(probe, hw_decode=hw_decode)
         watchdog.start()
         try:
             try:
-                for written, frame in enumerate(frames, start=1):
-                    self._check_cancel(progress)
-                    statistics = engine.smoothed_record(frame.pts_ticks, schema_hash=schema)
-                    on_device = dataclasses.replace(
-                        frame,
-                        pixels=backend.asarray(frame.pixels, np.float32),
-                        device=backend.device,
-                    )
-                    rendered = method.render(on_device, params, statistics)
-                    sink.write(
-                        dataclasses.replace(
-                            frame,
-                            pixels=np.asarray(backend.to_host(rendered.pixels), dtype=np.float32),
-                            device="cpu",
-                        )
-                    )
-                    progress.report(written, total, message)
-            except BaseException:
-                _close_stream(frames, quietly=True)  # the earlier error stays the failure
-                raise
-            _close_stream(frames, quietly=False)
+                self._write_frames(
+                    probe, method, backend, engine, params, hw_decode, sink, progress, run
+                )
+                self._stage("close")
+                self._check_cancel(progress)  # a cancel after the last frame never closes
+                report = sink.close()
+                # The sink's warnings are the job's from here, so a stop before commit keeps them.
+                run.warnings.extend(ascii_text(w) for w in report.warnings)
+                run.warnings.extend(
+                    f"Not carried to the output: {ascii_text(item)}" for item in report.not_carried
+                )
+            finally:
+                watchdog.stop()
+        except _CancelledError:
+            raise
         except Exception as exc:
-            if watchdog.fired:
+            if watchdog.fired or progress.cancelled():
+                _LOG.info(
+                    "export %s: cancelled; the stopped encoder reported %s: %s",
+                    run.name,
+                    type(exc).__name__,
+                    ascii_text(str(exc)),
+                )
                 raise _CancelledError from exc
             raise
-        finally:
-            watchdog.stop()
-        if watchdog.fired:
-            raise _CancelledError
-        self._check_cancel(progress)
+        self._check_cancel(progress)  # mandatory, whatever close returned
+        return report
+
+    def _write_frames(
+        self,
+        probe: ProbeResult,
+        method: CorrectionMethod,
+        backend: ArrayBackend,
+        engine: AnalysisEngine,
+        params: Mapping[str, Any],
+        hw_decode: bool,
+        sink: VideoSink,
+        progress: Progress,
+        run: _Run,
+    ) -> None:
+        """Render and write every decoded frame in pts order; close the stream on this thread."""
+        schema = engine.schema_hash
+        total = probe.video.nb_frames
+        message = f"Exporting {run.name}"
+        self._stage("frames")
+        frames: Iterator[Frame] = self._video_source.frames(probe, hw_decode=hw_decode)
+        try:
+            for written, frame in enumerate(frames, start=1):
+                self._check_cancel(progress)
+                statistics = engine.smoothed_record(frame.pts_ticks, schema_hash=schema)
+                on_device = dataclasses.replace(
+                    frame,
+                    pixels=backend.asarray(frame.pixels, np.float32),
+                    device=backend.device,
+                )
+                rendered = method.render(on_device, params, statistics)
+                sink.write(
+                    dataclasses.replace(
+                        frame,
+                        pixels=np.asarray(backend.to_host(rendered.pixels), dtype=np.float32),
+                        device="cpu",
+                    )
+                )
+                progress.report(written, total, message)
+        except BaseException:
+            _close_stream(frames, quietly=True)  # the earlier error stays the failure
+            raise
+        _close_stream(frames, quietly=False)

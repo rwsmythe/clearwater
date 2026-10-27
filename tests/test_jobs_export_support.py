@@ -5,8 +5,10 @@ Imported by ``tests/test_jobs_export*.py`` and ``tests/test_jobs_batch.py``; hol
 
 from __future__ import annotations
 
+import contextlib
 import errno
 import threading
+import time
 from collections.abc import Callable, Mapping, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
@@ -40,6 +42,10 @@ CAPABILITIES = (
     EncoderCapability("libx265", True, None, (8, 10), False),
 )
 
+CLOSE_GATES = ("before_flush", "flush", "finished", "closed")
+"""Where :class:`FakeSink`'s ``close`` can stop: before the flush, in it, after the finish but
+before the closed mark, after the mark (the four abort timings of CHARC `e7d25105`)."""
+
 
 def parameter_set(method: str = "grayworld", **values: Any) -> ParameterSet:
     """Return a (partial) parameter set for ``method``."""
@@ -63,8 +69,13 @@ class FakeSink:
     """An IF-5 sink double: writes a byte per frame to ``out_path``; records every call.
 
     Options: ``block_at`` (a write that blocks until :meth:`abort`, or ``block_timeout_s``
-    passes and it raises), ``fail_at`` (a write that raises ``fail_error``), ``close_error``.
-    Like the product sink it deletes ``out_path`` on a failure and on ``abort``.
+    passes and it raises), ``fail_at`` (a write that raises ``fail_error``), ``close_error``,
+    ``close_gate`` (``close`` stops at one of :data:`CLOSE_GATES`, sets ``at_gate`` and waits
+    for ``release``; at ``"flush"`` an ``abort`` releases it instead, as killing FFmpeg ends a
+    real flush). Like the product sink it deletes ``out_path`` on a failure and on ``abort``,
+    and an ``abort`` after ``close`` has marked itself closed does nothing; an ``abort`` in the
+    window after the finish and before that mark deletes the output while ``close`` still
+    returns its report (WP3.10's sink, CHARC `e7d25105` condition 1).
     """
 
     def __init__(self, capabilities: Sequence[EncoderCapability] = CAPABILITIES) -> None:
@@ -81,6 +92,13 @@ class FakeSink:
         self.fail_error: BaseException = OSError(errno.ENOSPC, "No space left on device")
         self.close_error: BaseException | None = None
         self.report = SinkReport(0, ("sink warning",), ("timecode track",))
+        self.phase = "new"
+        self.close_gate: str | None = None
+        self.at_gate = threading.Event()
+        self.release = threading.Event()
+        self.gate_timeout_s = 10.0
+        self.aborted_in_close = threading.Event()
+        self._in_close = False
 
     def capabilities(self) -> tuple[EncoderCapability, ...]:
         self.calls.append("capabilities")
@@ -91,6 +109,7 @@ class FakeSink:
         self.out_path = out_path
         self.open_kwargs = kwargs
         out_path.write_bytes(b"H")
+        self.phase = "open"
 
     def write(self, frame: Frame) -> None:
         self.calls.append("write")
@@ -112,15 +131,56 @@ class FakeSink:
 
     def close(self) -> SinkReport:
         self.calls.append("close")
-        if self.close_error is not None:
-            self._delete()
-            raise self.close_error
-        return SinkReport(len(self.frames), self.report.warnings, self.report.not_carried)
+        self._in_close = True
+        try:
+            if self.close_error is not None:
+                self._delete()
+                raise self.close_error
+            self._gate("before_flush")
+            self._stopped()
+            if self.close_gate == "flush":  # blocks like FFmpeg's flush: abort ends it
+                self.at_gate.set()
+                end = time.monotonic() + self.gate_timeout_s
+                while not (self.aborted.is_set() or self.release.is_set()):
+                    if time.monotonic() > end:
+                        raise TimeoutError("the flush was never released")
+                    time.sleep(0.01)
+                self._stopped()
+            report = SinkReport(len(self.frames), self.report.warnings, self.report.not_carried)
+            self._gate("finished")
+            self.phase = "closed"
+            self._gate("closed")
+            return report
+        finally:
+            self._in_close = False
 
     def abort(self) -> None:
         self.calls.append("abort")
+        if self._in_close:
+            self.aborted_in_close.set()
         self.aborted.set()
-        self._delete()
+        if self.phase == "closed":
+            return  # the output is the caller's after a close
+        self.phase = "aborted"
+        with contextlib.suppress(OSError):  # never raises, like the product's abort
+            self._delete()
+
+    def _gate(self, name: str) -> None:
+        """Stop at ``name`` when it is the configured gate, until released."""
+        if self.close_gate != name:
+            return
+        self.at_gate.set()
+        if not self.release.wait(self.gate_timeout_s):
+            raise TimeoutError(f"the close gate {name!r} was never released")
+
+    def _stopped(self) -> None:
+        """Raise as a real sink does once its encoder was stopped by ``abort``."""
+        if self.aborted.is_set():
+            # A concurrent abort may be deleting the same file (Windows: delete pending); the
+            # stopped encoder's error stays the one raised, never the cleanup's.
+            with contextlib.suppress(OSError):
+                self._delete()
+            raise RuntimeError("encoder_failed: the encoder was stopped")
 
     def _delete(self) -> None:
         if self.out_path is not None:

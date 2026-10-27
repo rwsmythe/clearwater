@@ -17,6 +17,7 @@ import hashlib
 import os
 import subprocess
 import sys
+import threading
 import time
 from collections.abc import Callable, Iterator
 from dataclasses import replace
@@ -30,10 +31,10 @@ import video_fidelity as vf
 from clearwater.analysis import AnalysisEngine
 from clearwater.cache import DiskProxyCache, cache_key
 from clearwater.core import backend_for
-from clearwater.interfaces import Frame, JobResult, ProbeResult, Settings
+from clearwater.interfaces import Frame, JobResult, ProbeResult, Settings, SinkReport
 from clearwater.interfaces.stubs import StubProgress
 from clearwater.io.video import FFmpegVideoSink, FFmpegVideoSource, detect_capabilities, probe
-from clearwater.jobs import ExportEngine, effective_parameters, remove_leftovers
+from clearwater.jobs import ExportEngine, SafeWrite, effective_parameters, remove_leftovers
 from clearwater.jobs import export as export_module
 from clearwater.jobs.export_seam import CANCELLED, ExportRequest
 from clearwater.jobs.safe_write import is_temporary_name
@@ -540,8 +541,70 @@ def test_a_cancel_mid_encode_leaves_nothing_and_keeps_earlier_outputs(
     assert earlier.read_bytes() == b"an earlier output"
 
 
+class _CancelInCloseSink(FFmpegVideoSink):
+    """The product sink; the cancel rises inside its real ``close``, which then waits (bounded)
+    until the job's watchdog has called ``abort`` before it ends the stream."""
+
+    def __init__(self, progress: StubProgress) -> None:
+        super().__init__()
+        self._progress = progress
+        self._in_close = False
+        self.aborted_in_close = threading.Event()
+
+    def close(self) -> SinkReport:
+        self._in_close = True
+        try:
+            return super().close()
+        finally:
+            self._in_close = False
+
+    def _finish(self) -> SinkReport:
+        self._progress.cancel()
+        self.aborted_in_close.wait(5.0)
+        return super()._finish()
+
+    def abort(self) -> None:
+        super().abort()
+        if self._in_close:
+            self.aborted_in_close.set()
+
+
+def test_a_cancel_during_the_product_sinks_close_is_aborted_and_leaves_nothing(
+    clips: Clips, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Q2 as amended (CHARC `e7d25105` condition 2): libx265, a short synthetic clip.
+    source = clips.make("dr28")
+    out = tmp_path / "out"
+    out.mkdir()
+    earlier = out / "earlier-output.mp4"
+    earlier.write_bytes(b"an earlier output")
+    commits: list[Path] = []
+    real_commit = SafeWrite.commit
+
+    def commit(self: SafeWrite) -> Path:
+        commits.append(self.temp_path)
+        return real_commit(self)
+
+    monkeypatch.setattr(SafeWrite, "commit", commit)
+    progress = StubProgress()
+    sinks: list[_CancelInCloseSink] = []
+
+    def sink() -> _CancelInCloseSink:
+        sinks.append(_CancelInCloseSink(progress))
+        return sinks[-1]
+
+    engine = product_engine(tmp_path / "cache", sink_factory=sink)
+    result = _export(engine, source, _settings(out), progress=progress)
+    assert sinks and sinks[0].aborted_in_close.is_set(), "the watchdog never aborted during close"
+    assert result.failure is CANCELLED and result.outputs == ()
+    assert commits == [], "close was followed by commit"
+    assert sorted(p.name for p in out.iterdir()) == ["earlier-output.mp4"]
+    assert earlier.read_bytes() == b"an earlier output"
+
+
 _CHILD = """
 import sys
+import threading
 from pathlib import Path
 
 from clearwater.interfaces import Settings
