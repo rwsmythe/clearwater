@@ -29,9 +29,13 @@
   test file vs 1 module 851 + 868); the new lane got the smaller package. Lane head-to-head (both Bs on one tree)
   owed at WP3.20R's gate. Briefs: one drafting helper each, CHARC approves FINAL; WP3.14's brief carries the
   recorded consumer notes (listed in the ruling). Orchestrator gen 12 (~300K) drafts, dispatches helpers, rolls.
-- **Owner question 2026-10-27 (in CHARC chat):** does the full suite run with parallel workers? Answer: NO
-  (no pytest-xdist in the lock; serial `uv run pytest`; 4,766 tests, 27-45 min). Proposal to the owner: xdist
-  for the non-gpu/footage/slow partition, serial for the rest, as a small package; AWAITING the owner's word.
+- **WP-T4 parallel test workers COMMISSIONED** (owner 2026-10-27, verbatim "commission it", after asking
+  whether the full suite runs with parallel workers; it did not: no xdist, serial, 4,766 tests, 27-45 min).
+  AD-28 on main e2b471d (`pytest-xdist` dev group, MIT; two-leg suite: parallel leg `-n <=4` over tests with
+  none of gpu/footage/gui/slow, serial leg over the marked tests; figures of record from serial runs only).
+  Commission msg `f0741947` to orchestrator gen 12: Sonnet-class, THIRD after the calibration pair, lane by
+  pace tiebreak, figures to HD-1 flagged outside the pair; brief by one helper, CHARC approves FINAL; at its
+  accept the fill's GATE_CHECKS suite line becomes the two-leg command and CHARC QA uses the same.
 - **Orchestrator gen 12 ONLINE** `clearwater-orchestrator-20261026-1223` (sole drainer; **cue THIS name**).
 
 ### Generation 3 (2026-10-21 07:30Z to 2026-10-27 05:50Z; rolled at 420K; kept as record)
