@@ -126,6 +126,33 @@ def test_run_once_keeps_the_folder_when_asked_and_never_reuses_one(
     assert (run_dir / "out").is_dir()  # left as it was
 
 
+def test_telemetry_stops_at_the_end_of_the_export(
+    sample: Any, tmp_path: Path, quick: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # R1 F8: the memory peaks must cover the export only, so sampling stops before the stray
+    # window and the fidelity sampler are read (each can take seconds).
+    order: list[str] = []
+
+    class Telemetry(bench.Telemetry):
+        def stop(self) -> Any:
+            order.append("telemetry")
+            return super().stop()
+
+    class StrayWatch(bench.StrayWatch):
+        def window(self) -> Any:
+            order.append("strays")
+            return super().window()
+
+    monkeypatch.setattr(bench, "Telemetry", Telemetry)
+    monkeypatch.setattr(bench, "StrayWatch", StrayWatch)
+    leg = bench.Leg("x", 1, encoder="libx265")
+    record = bench.run_once(
+        sample(SAMPLE), tmp_path / "run-0", leg, force_cpu=True, keep=False, periods=FAST
+    )
+    assert record["ok"], record["failure"]
+    assert order == ["telemetry", "strays"]
+
+
 # --- the command line ------------------------------------------------------------------------
 
 

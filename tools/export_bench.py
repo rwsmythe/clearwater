@@ -416,11 +416,11 @@ def _measure(
         result: JobResult = job(clocked)
     finally:
         ended = time.perf_counter()
-        strays = watch.window()
-        samples = sampler.stop() if sampler is not None else None
-        record["telemetry"] = telemetry.stop()
+        record["telemetry"] = telemetry.stop()  # first: the peaks cover the export only
         if telemetry.origin is not None:
             record["telemetry_origin_s"] = telemetry.origin - started
+        strays = watch.window()
+        samples = sampler.stop() if sampler is not None else None
     try:
         info: ProbeResult | None = FFmpegVideoSource().probe(path)
     except Exception:  # the job has already reported why the clip is unusable
