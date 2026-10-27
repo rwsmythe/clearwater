@@ -111,9 +111,14 @@
   CLOSED, DR-35 (a) mechanism amended, DR-57 (a) ADDRESSED; NEW DR-62 (GUI recompute vs export, WP4.3), DR-63 (sink
   phase write window, next encode.py touch), DR-64 (N6 body erratum, owner's word).** Worktrees `wp3.14`, `wp3.14-mc`,
   `orch-state-g14` released. WP3.21 brief: orchestrator drafts from the V16 baseline, I approve FINAL.
-- **EXCLUSIVE WINDOW OPEN 2026-10-27 19:15Z: WP-T4 rung 4 ROUND 1** (baseline, parallel, serial back to back on
-  `wp-t4` dd49a15 rebased on ba6e923; ~2.5 h; msg `dda7eb8bfab490be`). **NOTHING HEAVY AT THIS SEAT until CLOSE.**
-  Round 2 gets its own OPEN. Turn 5: collection 4,032 parallel + 1,046 serial = 5,078 disjoint and exhaustive; 193
+- **EXCLUSIVE WINDOW OPEN 2026-10-27 ~21:31Z: WP-T4 rung 4 ROUND 2** (same head dd49a15, wrappers `run_r4_r2_*`;
+  ~2 h 20 min; msg `fe2a610eafd5c405`). **NOTHING HEAVY AT THIS SEAT until CLOSE.** **Round 1 CLOSED 21:29Z** (msg
+  `7bb7c019595a6e24`): BASELINE 5,067 passed / 11 env skips / 4,564.80 s; PARALLEL 4,031 / 1 / 497.30 s; SERIAL
+  1,036 / 10 / 3,335.36 s; counts hold (5,078); 0 failures = 0 violators; P+S 3,832.66 s = -16.0 %. Sampler: peak RSS
+  6.97 GB, min available 7.05 GB, GPU rise 903 MiB (the import-time context finding). **Reading sent for the report:
+  the serial leg is 73 % of the baseline wall, so the two-leg suite is bounded by the marked set, not by workers;
+  the report carries the serial wall BY MARKER and the ten longest serial tests; shrinking the set is a follow-on,
+  not WP-T4's.** Third round only if the two P+S totals differ by more than 15 %. Turn 5: collection 4,032 parallel + 1,046 serial = 5,078 disjoint and exhaustive; 193
   IDs added since 2aca60e, 4 renamed; no violator; E1 the only exception; +1,036 MiB GPU rise in the non-GPU leg stays
   a FINDING (import-time probe), no marker change. Codex depth after turn 5 reads 95,253 / 475,000 (compacted inside
   Codex; the pinned reading is the live figure). WP3.21 brief FINAL at 43cc1ed (my rulings verbatim, 0 CR).
