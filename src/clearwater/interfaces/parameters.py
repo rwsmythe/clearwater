@@ -1,9 +1,9 @@
 """IF-9: the parameter set, its JSON form and its method-schema validation.
 
 The JSON follows AD-13: ``format_version``, ``method``, ``parameters``, ``created``,
-``app_version``; the provenance sidecar (D90) adds ``source`` (path, size, mtime, probe summary)
-and ``settings`` (encoder, quality, bit depth, device). Only format version 1 exists; any other
-is refused by name. No file I/O lives here.
+``app_version``; the provenance object (D90, D91) adds ``source`` (file name, never the full
+path; size, mtime, probe summary) and ``settings`` (encoder, quality, bit depth, device). Only
+format version 1 exists; any other is refused by name. No file I/O lives here.
 """
 
 from __future__ import annotations
@@ -119,8 +119,10 @@ class ParameterSet:
         created: When the set was created: a timezone-aware datetime, written and read in UTC.
             Serialised as ISO-8601.
         app_version: The Clearwater version that wrote the set.
-        source: Provenance only: the source file's path, size, mtime and a probe summary, as
-            JSON-native values; None for a preset.
+        source: Provenance only: the source file's NAME (its last path component, never the
+            full path: a path carries the owner's folder names into every shared output;
+            AD-13 amended 2026-10-27), size, mtime and a probe summary, as JSON-native
+            values; None for a preset.
         settings: Provenance only: encoder, quality, bit depth and device, as JSON-native
             values; None for a preset.
     """
