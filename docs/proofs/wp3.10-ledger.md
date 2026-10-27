@@ -20,6 +20,7 @@ Evidence root: `C:\Users\rwsmy\clearwater-review-evidence\wp3.10\` (`r0\` = this
 | 8 | Reviewer A (seat 6) on `d4c08e8`, base `1087343` (SCOPED to the round-7 remediation and the option-B telemetry redesign) | 0 | 0 | 3 | all in envelope; MINOR #1-#3 ACCEPTED (cleanup); ZERO new blocking: the loop TERMINATES | 3 NEW, 0 REOPENED (#2 from `9e6a529`, #3 from `98c805a`) | 0 | INSTRUMENT code and tests, the terminating round's cleanup (`491ecb3` #3, `f262b75` #2, `db6f791` #1); no round 9 (ruling) | WSL, codex-cli 0.162.1 gpt-5.6-sol high; probe 1 + review 26 `succeeded in`; 107,893 tokens; 1 `ERROR` match = echoed source code, not transport | 204,725 at the round-8 yield (seat 6) |
 | 9 | Reviewer A (seat 8) on `ab70b47`, base `e7668e1` (SCOPED to the NVENC rate ceiling, CHARC d329e80e351c3dcc: maxrate = max(2 x source rate, 20 Mb/s)) | 0 | 1 | 0 | MAJOR #1 in envelope (the WP2.3 samples), ACCEPTED, reproduced | 1 NEW (introduced by the ruled 20 Mb/s floor), 0 REOPENED | 0 | PRODUCT (`5cc94e4`, after CHARC's 17f12f9dc7eba3ae O3 ruling withdrew the derived rule) | WSL, codex-cli 0.162.1 gpt-5.6-sol high; probe 1 + review 13 `succeeded in`; 104,444 tokens; 2 `ERROR` matches = echoed source, not transport | 176K (seat 8, at the R9 yield) |
 | 10 | Reviewer A (seat 8) on `5cc94e4`, base `ab70b47` (SCOPED to the R9 #1 remediation + R9 #1 to verify); FIVE-ROUND GATE | 0 | 0 | 2 | MINOR #1, #2 in envelope, ACCEPTED (cleanup); ZERO new blocking: the loop TERMINATES (gate: termination ACCEPTED) | 2 NEW, 0 REOPENED | 0 | TEST-ONLY, the terminating round's cleanup (the commit carrying this row) | WSL, codex-cli 0.162.1 gpt-5.6-sol high; probe 1 + review 28 `succeeded in`; 99,422 tokens; 0 `ERROR` matches | 252K (seat 8, at the R10 yield) |
+| S9 | no review (CHARC `c1d67b39bb72cc1f`: a values-only mapping commit owes NO Reviewer A round) -- the AD-12 mapping `e04a7cb` | -- | -- | -- | -- | -- | 0 | PRODUCT values + the AD-12 unit test (values only) | -- | (dispatcher; seat 9 at the mapping yield) |
 
 Seat 1 stops after round 0 by the orchestrator's instruction (219K before product code; the build
 is the largest in the wave). A fresh cell builds from "RESUME HERE" below.
@@ -214,6 +215,24 @@ main, stream and info packets of an FFmpeg-written file).
   `test_io_video_probe_rules.py`, `-m footage`) 3 passed (11:42). Full pytest: seat 7's run on
   `5727842` (4434 passed / 2 skipped) before round 9; the final code's run is the orchestrator's
   stacked gate.
+
+### Seat 9 -- the AD-12 mapping (values-only; CHARC `c1d67b39bb72cc1f`, AD-12 amended on main `759f0d0`, FINAL)
+
+- **Ruling:** libx265 `-crf` 21 / 26 / 30, NVENC `-cq` 22 / 26 / 30 (High / Standard / Draft), the
+  0.24 bit/pixel High ceiling FINAL; the commit values-only (two tables picked by encoder,
+  PROVISIONAL out of the tables' and `NVENC_BITS_PER_PIXEL`'s docstrings, the AD-12 unit tests on
+  the new values, nothing else); NO Reviewer A round under these terms. `QUALITY_RATIO` (Q13) NOT
+  changed here: the measured ratios go to report section 7. DR-48's disposition is CHARC's, in
+  the register on main, for WP3.14's brief; report section 9 cites it.
+- **Commit `e04a7cb`** (`encode.py` +7/-5, `test_io_video_encode_units.py` +6/-4): `QUALITY_VALUE`
+  replaced by `NVENC_CQ` and `X265_CRF`; `_encoder_options` (the brief's `_video_options`; the
+  function that builds the rate options is named `_encoder_options`) picks the table by encoder,
+  one line; the two docstrings lose PROVISIONAL; `test_quality_levels_follow_ad12` now pins all
+  six values (two rows added). `QUALITY_VALUE` had no other user in `src/`, `tests/` or `tools/`.
+- **Gates at `e04a7cb`:** ruff clean; format 211 files; mypy 123 files clean; five video modules
+  (`test_io_video_encode_units`, `test_io_video_encode`, `test_io_video_encode_bench`,
+  `test_video_fidelity`, `test_io_video_probe_rules`; `-m "not footage"`) 274 passed, 3
+  deselected (5:35; 11.4 GB free memory, 79 GB disk before); 0 CR bytes in the branch's 15 files.
 
 ### Seat 8 footage window (2026-10-26 23:29Z to 2026-10-27 00:52Z; not a timing run; free memory 11.7-11.8 GB before each leg; every output deleted; nothing footage-derived committed; no `gpmd`, IMU or GPS value read)
 
