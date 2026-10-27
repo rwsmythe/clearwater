@@ -390,7 +390,24 @@ fix all four in one gate-fix series, failing test or control first; `engine.py` 
 Gates: ruff check, ruff format --check, mypy (136 files) clean; `test_jobs_export.py`, `test_jobs_batch.py`,
 `test_jobs_disk_space.py`, `test_jobs_export_photo.py` 128 passed (>= 11 GB free).
 
-## RESUME HERE (cell 4: the V16 rows and the FINAL return report)
+## V16 rows (cell 4; ladder item 10, Q11, Q12)
+
+Two EXCLUSIVE windows on `2e1dc11`, granted by the orchestrator (gen 14), CHARC holding; records under
+`work/wp3.14/bench/` (not committed); every run ok, exits 0.
+- Block 1, 2026-10-27 11:33:36Z-12:57:47Z, free memory 11.72 / 11.87 GB: GX011627 c3 cold x3 1.0654 / 1.0611 / 1.0631
+  s/frame (31.93 / 31.80 / 31.86 min/min, MISS), warm 0.7743 (23.21, meets), ancuti2018 cold 0.7202 (21.58, meets),
+  libx265 cold 1.1877 (35.60, MISS; close 14.0 s); synthetic 5.3K 8:7 cold 4.5389 (136.03, MISS; peaks 6354 MiB RSS,
+  6104 MiB GPU). NVENC proof tied on every NVENC run.
+- Block 2, 13:05:12Z-17:25:11Z, free memory 11.7 GB, disk 46.7 GB: GX011625 c3 cold sustained, 14,938 frames, 1.0429
+  s/frame (31.26, MISS), analysis 29.8 %, close->committed 1.870 s, peaks 2903 MiB / 2450 MiB, tied; no thermal
+  degradation (first hour 0.7549, last hour 0.7263 s/frame median; GPU peak 93 C); GPU at idle clocks through the
+  77-minute analysis phase.
+- CHARC `7ce2b89f`: the D106 miss on cold c3 is a measured figure for WP3.21 (not a stop, not a defect); the report's
+  V16 section carries the split, libx265, 5.3K, the two "Not carried" warnings and the thermals as ruled. D87 at
+  Standard: GX011627 105,909,120 B, GX011625 2,323,157,760 B (both ceiling-bound; each covers its output). CHARC
+  `5cedff17` Limits notes added (the F1 (b) Windows flake, the G1 line).
+
+## RESUME HERE -- CLOSED (cell 4 completed the V16 rows and the FINAL return; nothing owed)
 
 Cell 3 stood down at a clean commit after the review loop TERMINATED at R2 (planned re-seat: V16 is several long
 exclusive windows). Cell 4 is a FRESH seat.
@@ -403,6 +420,11 @@ exclusive windows). Cell 4 is a FRESH seat.
 | Cell 3 R2 yield | 255,161 (143 turns) |
 | Cell 4 dispatch | 0 (fresh seat) |
 | Cell 4 window request (dry run) | 38,603 (12 turns) |
+| Cell 4 B1 (b) yield | 146,307 |
+| Cell 4 gate-fix yield (Reviewer B pass 2) | 183,062 (93 turns) |
+| Cell 4 V16 block 1 release | 202,398 |
+| Cell 4 V16 block 2 release | 218,272 |
+| Cell 4 FINAL return | read by the dispatcher at the return |
 
 **State:** the product, its tests, the instrument and the report are done and committed on `wp3.14` (head after this
 ledger commit). Reviewer A converged (R1, R2; evidence `C:\Users\rwsmy\clearwater-review-evidence\wp3.14\r1\`, `r2\`).

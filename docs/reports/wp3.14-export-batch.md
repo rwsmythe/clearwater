@@ -94,7 +94,7 @@ ceil(max(QUALITY_RATIO[level] x source_size, NVENC_BITS_PER_PIXEL / NVENC_RATE_S
 Standard 0.50 / Draft 0.25 and `MARGIN` 1.25, each an exact `Fraction` (11/10, 1/2, 1/4, 5/4; a binary-float 1.10 gave
 1,375,001 bytes for a 1,000,000-byte source at High, Reviewer B B4). Example (4K 29.97, 60 s, Standard): ceiling 29.8 Mb/s -> 223.7 MB x 1.25 =
 279.7 MB; a busy 900 MB source -> ratio 450 MB x 1.25 = 562.5 MB (ratio wins); a calm 49 MB source -> 279.7 MB. The
-footage figures for GX011627 and GX011625 are recorded with the V16 rows.
+footage figures: GX011627 105,909,120 B and GX011625 2,323,157,760 B at Standard (both ceiling-bound; V16 section).
 
 **Superseded by WP3.14:** WP3.13's note "Sum the estimates per destination volume before one `check_free_space`" (and
 the `check_free_space` docstring sentence "A batch sums its estimates per volume and checks once.", replaced in
@@ -175,6 +175,11 @@ adjudicated at the gate (no pass 3): all four fixed in one gate-fix series, veri
 - One frame in flight; no frame-level parallelism or upload/download overlap (WP3.21).
 - A `BaseException` that is not an `Exception` (`KeyboardInterrupt`, `SystemExit`) propagates out of a job by design and
   is never turned into a result; the sink's `abort` and the `SafeWrite` block still remove the temporary (R2 ruling).
+  G1: reproduced in `clearwater-review-evidence\wp3.14\r2\f1-repro.txt` (the interrupt propagates, tail [close, abort],
+  only the sources remain); WP5.1's V11 leg re-checks it.
+- Windows: the F1 (b) test double's 1-in-23 flake was two unlinkers of one file (the double's `abort` and its
+  stopped-encoder cleanup racing on the temporary, `PermissionError`); both were made non-raising (test-only), then 30
+  consecutive clean runs.
 - A genuine failure that coincides with a cancel is reported as `CANCELLED` (the cancel is read from the flag); its text
   goes to the log.
 - A real encoder disk full during the encode is named by FFmpeg's own text; `is_disk_full` classifies an `OSError` chain.
@@ -204,6 +209,58 @@ not reached. DR-20 (7) CLOSED. DR-43, DR-52, DR-16 not this package's.
 
 ## V16 (ladder item 10)
 
-OWED: the export rows (GX011627 x3 cold, x1 warm, x1 ancuti2018, x1 libx265; synthetic 5.3K 8:7; GX011625 LAST), each
-in its own EXCLUSIVE window, taken by the next cell with `tools/export_bench.py`; this section is replaced with the rows,
-their conditions and the D87 footage figures.
+`tools/export_bench.py v16` on `2e1dc11` (product engine end to end: probe, the clip's whole analysis, per-frame render,
+encode, mux and verification), defaults c3, encoder auto, Standard, 8-bit as the source; EXCLUSIVE windows, the host
+otherwise idle (CHARC holding), best effort on the shared laptop. Records under `work/wp3.14/bench/`
+(`export-bench-v16-gx011627-20261027T113337Z.json`, `-synthetic-5k3-20261027T124545Z.json`,
+`-gx011625-20261027T130513Z.json`); nothing footage-derived committed. D106 interim: 25 min/min = 0.834 s/frame at
+30000/1001. Every run ok, every frame written, both exits 0.
+
+| Run | Frames | s/frame | min/min (D106) | Per frame median / p90 / max (s) | Analysis share | Phases s: probe / analysis / open / frames / close->committed | Peak tree RSS | Peak GPU mem | NVENC proof |
+|---|---|---|---|---|---|---|---|---|---|
+| GX011627 c3 cold 1/3 | 681 | 1.0654 | 31.93 MISS | 0.740 / 0.767 / 0.888 | 30.4 % | 1.72 / 220.3 / 0.44 / 502.4 / 0.672 | 2819 MiB | 2409 MiB | tied |
+| GX011627 c3 cold 2/3 | 681 | 1.0611 | 31.80 MISS | 0.739 / 0.763 / 0.850 | 30.4 % | 1.03 / 219.9 / 0.43 / 500.7 / 0.627 | 2848 MiB | 2409 MiB | tied |
+| GX011627 c3 cold 3/3 | 681 | 1.0631 | 31.86 MISS | 0.743 / 0.766 / 0.872 | 30.2 % | 0.72 / 218.7 / 0.38 / 503.5 / 0.636 | 2850 MiB | 2409 MiB | tied |
+| GX011627 c3 warm (cache complete at start) | 681 | 0.7743 | 23.21 meets | 0.745 / 0.773 / 0.874 | 3.6 % | 0.79 / 19.2 / 0.47 / 506.1 / 0.673 | 2852 MiB | 2409 MiB | tied |
+| GX011627 ancuti2018 cold | 681 | 0.7202 | 21.58 meets | 0.423 / 0.452 / 0.583 | 40.9 % | 0.76 / 200.5 / 0.42 / 288.2 / 0.556 | 2834 MiB | 2409 MiB | tied |
+| GX011627 c3 libx265 cold | 681 | 1.1877 | 35.60 MISS | 0.861 / 0.951 / 1.192 | 26.5 % | 0.75 / 214.3 / 0.41 / 579.4 / 14.026 | 4109 MiB | 1937 MiB | none (libx265) |
+| synthetic 5.3K 8:7 c3 cold (5312x4648) | 150 | 4.5389 | 136.03 MISS | 3.714 / 4.006 / 4.438 | 16.6 % | 6.80 / 112.8 / 0.39 / 560.0 / 0.832 | 6354 MiB | 6104 MiB | tied |
+| GX011625 c3 cold, sustained | 14,938 | 1.0429 | 31.26 MISS | 0.737 / 0.769 / 1.437 | 29.8 % | 2.64 / 4638.2 / 0.86 / 10,935.2 / 1.870 | 2903 MiB | 2450 MiB | tied |
+
+The per-frame figures are the intervals between successive `Exporting` reports (decode, upload, render, download and
+write of one frame), the first frame apart; close->committed is the stamp gap from the `close` stage to `committed`
+(flush, mux, verification and the rename: the cancel-latency window the R1 F1 discussion named).
+
+**D106 is missed on cold c3 at 4K, as measured: 31.3-31.9 min/min against 25.** The rows are recorded as WP3.21's
+baseline (CHARC `7ce2b89f`: a measured figure, not a stop, not a defect).
+- The split: cold c3 1.061-1.065 s/frame (GX011627) and 1.043 (GX011625) = the analysis pass (about 30 % of the wall
+  time) + the frame path at about 0.74 s/frame. Warm c3 0.774 s/frame (23.2 min/min) and ancuti2018 cold 0.720 (21.6)
+  meet. The frame path alone is within D106 at 4K; the cold miss is the analysis pass plus the c3 cost, consistent with
+  WP3.10's floor row (I/O 0.154-0.156 s/frame) and WP3.4's c3 core (0.439 s/frame). WP3.21's targets are the analysis
+  pass (overlap or device-resident) and the 3C Gaussian, as D106 lists.
+- Observation for WP3.21: during GX011625's 77-minute analysis phase the GPU sat at idle clocks (median SM 210 MHz,
+  5.1 W, 59 C), so the pass looks CPU- or decode-bound.
+- libx265 (cold 35.6 min/min, MISS; its close 14.0 s against 0.6-0.7 s with NVENC): the CPU encode is the fallback
+  path, not the measured mode. Recorded; no action.
+- 5.3K 8:7 cold: 136 min/min, peak 6.2 GiB tree RSS and 6.0 GiB graphics memory: "supported, best-effort on speed"
+  (D106); N4's 16 GB respected. Its first frame took 10.6 s (the first 4K frame about 1 s).
+- Every output carries two warnings, "Not carried to the output: camera firmware tag" and "...: camera settings atoms
+  (moov/udta)": D86 and WP3.10's sink behaviour as designed, not a regression.
+- GX011625 thermals: no degradation. Frames phase first hour median 0.7549 s/frame (p90 0.7775), last hour 0.7263 (p90
+  0.7475); GPU median 82 C / 1590 MHz SM / 51.7 W in the first hour, 79 C / 1620 MHz / 51.9 W in the last; peak 93 C.
+  Twelve intervals exceeded 1.0 s (max 1.437 s).
+
+Conditions and moments (UTC, 2026-10-27; GPU clocks and temperature from `nvidia-smi` before and after each run):
+
+| Window | Runs | Before / after |
+|---|---|---|
+| Block 1, 11:33:36Z-12:57:47Z (free memory 11.72 GB, then 11.87 GB before the 5.3K row; the GX011627 legs ran back to back in one invocation) | GX011627 cold 1/3 11:33:43-11:46:02, 2/3 11:46:08-11:58:24, 3/3 11:58:31-12:10:47, warm 12:14:27-12:23:27, ancuti2018 12:23:34-12:31:56, libx265 12:32:02-12:45:42; 5.3K 12:46:08-12:57:46 | idle clocks before (SM 210 MHz; 1980 MHz before runs 1 and 7), 60-70 C before, 68-72 C after; CPU 1-11 % before; strays: none foreign during any run (the runner's `bash.exe`, 32 % for 0.5 s, before run 1 only) |
+| Block 2, 13:05:12Z-17:25:11Z (free memory 11.7 GB, disk 46.7 GB) | GX011625 13:05:18-17:25:09 | SM 210 MHz, 54 C, CPU 2.2 % before; SM 210 MHz, 70 C, CPU 2.4 % after; no foreign stray over 15,579 s |
+
+Telemetry errors: 0 on every run. Outputs: GX011627 85,975,154 B (NVENC c3), 85,727,426 B (ancuti2018), 123,813,667 B
+(libx265); GX011625 1,794,336,305 B; each under its D87 estimate below.
+
+D87 at Standard from each clip's probe (`estimate_video_bytes`; ceil(max(0.50 x source, ceiling) x 1.25)):
+GX011627 (3840x2160 at 29.970, 22.72 s, source 158,509,660 B): ratio term 79,254,830 B, ceiling term 84,727,296 B,
+estimate 105,909,120 B (ceiling wins). GX011625 (3840x2160 at 29.970, 498.43 s, source 425,926,523 B): ratio term
+212,963,262 B, ceiling term 1,858,526,208 B, estimate 2,323,157,760 B (ceiling wins).
