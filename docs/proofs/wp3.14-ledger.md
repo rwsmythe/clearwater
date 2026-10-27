@@ -241,6 +241,7 @@ Q1-Q16 as ADOPTED by CHARC `3c3c35d7`; applied as above. Q11's "optional injecte
 | Round | Head | Transport, CLI, banner | CRIT | MAJOR | MINOR | In / out of envelope | NEW / REOPENED | Reverts | Fixes change | Verdict | Depth (dispatcher-read) |
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | R1 | `7bb5d85` | WSL, codex-cli 0.162.1, `gpt-6.1-sol` / high | 0 | 2 | 6 | 8 / 0 | 8 / 0 | 0 | product (F1 (a), F2, F3, F4: `095a345`), tool (F8: `02324a7`), test-only (F5, F6, F7: `095a345`); F1 (b) held for CHARC | NEW_CRITICAL_MAJOR_FOUND (counts: every assertion met) | 123,184 (59 turns) |
+| R2 | `c3a2fc9` | WSL, codex-cli 0.162.1, `gpt-6.1-sol` / high | 0 | 1 | 7 | 8 / 0 | 8 / 0 | 0 | pending: tool (G4), test-only (G3, G5-G8); product only if G1 (a) / G2 are ruled defects | NEW_CRITICAL_MAJOR_FOUND (counts: every assertion met); G1 recommended NOT A DEFECT, ruling asked | to be given at the R2 yield |
 
 R1 findings and adjudication (evidence `C:\Users\rwsmy\clearwater-review-evidence\wp3.14\r1\`, md5s there):
 
@@ -278,7 +279,44 @@ text the real one catches; F7 a planted shared registry fails "a registry was re
   `test_jobs_export_video.py -m "not slow and not footage"` 26 passed (NVENC legs ran); the killed-subprocess V11 leg
   1 passed (63 s); WP3.13's import test 1 passed. >= 10 GB free before each run.
 
-## RESUME HERE (cell 3, R1 remediation (F1 (a), F2-F8) committed; F1 (b) waits for CHARC)
+R1 rulings, F1 (b) (CHARC `e7d25105`, relayed FINAL): Q2 AMENDED -- check before `close()`; the watchdog alive THROUGH
+`close()`, stopped and JOINED after it and before the unconditional post-close check and `commit`; the cancel read from
+`cancelled()`, the original error to the log line; conditions: one deterministic test per abort timing on a double
+whose `close` blocks, one libx265 product-sink test cancelling during a real `close`, `io/video/encode.py` NOT edited
+(CHARC banks a MINOR row: `close` should set `"closed"` only from `"open"`), poll and single `abort` unchanged, the V16
+stamps `close` and `committed` kept; F2 keeps the ORIGINAL error.
+- `c3a2fc9` `export.py`: `_encode` owns the watchdog from after `open` through `close`; the frame loop moved to
+  `_write_frames`; inner `finally` stops and joins; `except Exception` -> `CANCELLED` when `fired` or `cancelled()`, the
+  error logged at INFO; post-close `_check_cancel`. Tests: `FakeSink` close gates (`CLOSE_GATES`: before_flush, flush,
+  finished, closed), the four timing tests, the joined-before-commit test, the product-sink test
+  (`_CancelInCloseSink`, libx265). On `716feaa`'s engine the four timing tests and the product test failed "the watchdog
+  never aborted during close". The double's `abort` and stopped-encoder cleanup made non-raising after a 1-in-23 flake
+  (a concurrent unlink on Windows raised PermissionError in the double); then 30 consecutive clean runs.
+- Gates at `c3a2fc9`: ruff, format, mypy clean; targeted 121 passed (jobs, batch, disk space, bench, photo);
+  `test_jobs_export_video.py -m "not footage"` 29 passed (17.5 min on the busy host; this run included the slow 5.3K
+  synthetic leg through a mistyped `--deselect` -- a deviation from "short targeted runs", 9 frames, >= 8.8 GB free);
+  the product-sink close test 3 of 3.
+- Skips question (dispatcher): the 10 full-run skips are environmental (9) and by design (1). `test_methods_assembly_v8.py`
+  x9: "look-check frame absent: C:\Users\rwsmy\clearwater\.worktrees\wp3.14\work\wp1.3\frames\GX011625_0024.925.png"
+  (5) and "...GX011625_0114.648.png" (4) -- the worktree's working folder has no `wp1.3/frames` (the main tree's
+  `work/` has them). `test_color_roundtrip.py` x1: "swscale reads a yuvj format as full whatever in_range says
+  (refused instead)" -- the code skips that case by design.
+
+R2 findings and adjudication (evidence `C:\Users\rwsmy\clearwater-review-evidence\wp3.14\r2\`, md5s there; reproduction
+`f1-repro.py` / `.txt`):
+
+| # | Sev | Finding | Adjudication |
+|---|---|---|---|
+| G1 | MAJOR | (a) a non-Exception `BaseException` (KeyboardInterrupt, SystemExit) from frames/close bypasses the post-close check; (b) `fired or cancelled()` short-circuits the flag read | (a) CONFIRMED, reproduced: the interrupt propagates, `abort` called, only the sources remain. RECOMMEND NOT A DEFECT (no non-Exception BaseException becomes a result anywhere in the engine; converting would swallow an interrupt). (b) NOT A DEFECT (`fired` is set only after `cancelled()` read True; sticky flag; same outcome). RULING ASKED. |
+| G2 | MINOR | `_close_stream(quietly=True)` suppresses only `Exception` | CONFIRMED; same principle as G1 (a); RECOMMEND NOT A DEFECT, rides on that ruling. |
+| G3 | MINOR | `FakeSink.abort` signals `aborted_in_close` before its effects | CONFIRMED. Test fix (signal last). |
+| G4 | MINOR | the stray window now includes the telemetry join | CONFIRMED. Tool fix (strays at `ended`, then telemetry, then the sampler). |
+| G5 | MINOR | the order test has no sampler | CONFIRMED. Test fix. |
+| G6 | MINOR | the product-sink test covers one timing | CONFIRMED as scope (condition 2 = one); two more product timings reachable from the subclass. Test addition. |
+| G7 | MINOR | the commit-leftover test assumes `os.link` works | CONFIRMED. Test fix. |
+| G8 | MINOR | no control for a close error without a cancel, nor a clean-path stream-close error | CONFIRMED. Tests to add. |
+
+## RESUME HERE (cell 3, R2 adjudicated; G1 ruling asked)
 
 Cell 3 (`implementer-opus-high`, fresh seat; dispatch depth 0). Cell 2's build (`20f0ac3`, `e7d9092`, `3a723cc`:
 photo and video end-to-end tests, `tools/export_bench.py`) is the product under review; its detail is in the commits.
@@ -287,7 +325,8 @@ photo and video end-to-end tests, `tools/export_bench.py`) is the product under 
 |---|---|
 | Cell 3 dispatch | 0 (fresh seat) |
 | Cell 3 R1 yield | 123,184 (59 turns) |
-| Cell 3 R1-remediation yield | to be given by the dispatcher |
+| Cell 3 R1-remediation yield | not read (the F1 (b) ruling arrived in the same turn) |
+| Cell 3 R2 yield | to be given by the dispatcher |
 
 Windows (both granted in the cell-3 prompt):
 - Config STOP: the worktree's `clearwater.local.toml` line 18 was junk (TOML parse error), so the first footage run
@@ -301,11 +340,8 @@ Windows (both granted in the cell-3 prompt):
   passed with no skip, the 5.3K 8:7 synthetic leg included. No fix.
 - Static gates at `7bb5d85`: ruff check, ruff format --check, mypy (136 files) clean.
 
-**Next:** on CHARC's ruling on F1 (b): if amended, keep the watchdog alive through `close()` with one deterministic test
-per abort timing on a double that blocks in `close` (abort before / during the flush -> close raises, CANCELLED; abort
-after the flush and before the sink marks itself closed -> output deleted, close returns, the job sees `fired`,
-CANCELLED; abort after close -> no-op, the post-close check cancels), one product-sink cancel during a real `close`,
-and the post-close cancel check kept; if not amended, F1 (b) is banked as a stated limit (cancel waits for the flush and
-verify; the V16 row's close-to-committed stamps measure it). Then Reviewer A R2 over the whole remediation (runner
-copied to `r2`, same `-m gpt-6.1-sol`, diff `7bb5d85..HEAD` plus the full context). Then the report, the V16 windows
-(GX011627 rows first, GX011625 LAST), the FINAL return report.
+**Next:** the dispatcher's ruling on G1 (a) / G2. If NOT A DEFECT: R2 has zero new blocking and TERMINATES the loop;
+G3-G8 are fixed once in the terminating round's cleanup (failing tests / controls first), no R3. If ruled a defect:
+fix G1 (a) (and G2) with G3-G8, then R3 (runner copied to `r3`, diff `c3a2fc9..HEAD`). Then the report
+`docs/reports/wp3.14-export-batch.md` (with the one-line "superseded by WP3.14" note for WP3.13's batch-sum sentence),
+the V16 windows (GX011627 rows first, GX011625 LAST), the FINAL return report.
