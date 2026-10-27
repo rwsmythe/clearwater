@@ -22,6 +22,7 @@ Evidence root: `C:\Users\rwsmy\clearwater-review-evidence\wp3.10\` (`r0\` = this
 | 10 | Reviewer A (seat 8) on `5cc94e4`, base `ab70b47` (SCOPED to the R9 #1 remediation + R9 #1 to verify); FIVE-ROUND GATE | 0 | 0 | 2 | MINOR #1, #2 in envelope, ACCEPTED (cleanup); ZERO new blocking: the loop TERMINATES (gate: termination ACCEPTED) | 2 NEW, 0 REOPENED | 0 | TEST-ONLY, the terminating round's cleanup (the commit carrying this row) | WSL, codex-cli 0.162.1 gpt-5.6-sol high; probe 1 + review 28 `succeeded in`; 99,422 tokens; 0 `ERROR` matches | 252K (seat 8, at the R10 yield) |
 | S9 | no review (CHARC `c1d67b39bb72cc1f`: a values-only mapping commit owes NO Reviewer A round) -- the AD-12 mapping `e04a7cb` | -- | -- | -- | -- | -- | 0 | PRODUCT values + the AD-12 unit test (values only) | -- | 69,810 (seat 9, at the mapping yield) |
 | B1 | Reviewer B pass 1 (the orchestrator's seat) on `wp3.10-mc` `78ae77a` (= `4dbb2d5` rebased); remediation by seat 9 | 0 | 6 (reviewer) -> 1 upheld (#1) | 3 -> 2 upheld (#7, #8); #3, #5 adjudicated MINOR limits; #4, #6, #9 NOT NEW; #2 NOT UPHELD (reproduction owed, done: caught) | #1 in envelope, BLOCKING | 9 NEW, 0 REOPENED | 0 | PRODUCT and tests (`673f958` #1 + #7 + #8 docstrings), report text (`b7953a8` #8, limits #3 #4 #5 #9); no Reviewer A round (the orchestrator's B pass 2 covers it) | WSL, codex-cli 0.162.1 gpt-5.6-sol high; 31 `succeeded in`; 318,111 tokens; 0 `^ERROR` (orchestrator's run assertions) | 145,489 (seat 9, at the return); 246,815 at the remediation yield |
+| B2 | Reviewer B pass 2 (the orchestrator's seat) on `wp3.10-mc` `da33e63` (= `6a4d09a` rebased); adjudicated at the gate (second blocking B, fill Part 2): ONE gate fix by seat 9 | 0 | 3 (reviewer) -> 1 upheld (#1, a regression of the pass-1 remediation, executed at the gate) | 3 + 1 advisory: #2, #4 limits, #5 test-strength note, #7 erratum; #3 NOT NEW; #6 non-blocking by rule | #1 in envelope | 7 NEW, 0 REOPENED (#1 introduced by `673f958`) | 0 | PRODUCT and tests (`39bc9ac`: one helper `readable_video_pts` = the packets before the first corrupt one in decode order, used by `_plan_tracks` and `missing_frames`); report errata | (orchestrator's run assertions in `reviewB2\adjudication.md`) | ~250K at the previous yield (dispatcher) |
 
 Seat 1 stops after round 0 by the orchestrator's instruction (219K before product code; the build
 is the largest in the wave). A fresh cell builds from "RESUME HERE" below.
@@ -290,6 +291,23 @@ main, stream and info packets of an FFmpeg-written file).
   `-m "not footage"` 279 passed, 3 deselected (6:33; `five4.log`); 0 CR bytes on the branch's
   files. The working tree briefly held CRLF copies after a plain `git checkout` revert; restored
   with `-c core.autocrlf=false checkout` before any commit.
+
+- **Gate fix for Reviewer B pass 2 #1 (`39bc9ac`):** a truncated source's readable frames =
+  the pts of the packets listed before the first corrupt packet in decode order, sorted, once
+  (`verify.readable_video_pts`), the single truth for `_plan_tracks` (the Q-B track cut) and
+  `missing_frames`. `vid-truncated` unchanged (24 = 24, `reviewB2-fix\vid-truncated-same.log`).
+  Failing-before (`reviewB2-fix\before.log`, `git archive 6a4d09a`): the recipe test's `close`
+  raised "1 frames past the readable end were written (the first at pts 30208)"; the unit test
+  lacked 6006. After: 18 truncated / cut / completeness tests passed (`after-targeted.log`).
+  Report errata: #2 and #4 limit rows, the #5 note, the #7 wording.
+- **Gates at `39bc9ac`:** ruff clean; format 211 files; mypy 123 files clean; five video modules
+  `-m "not footage"`: 280 passed, 3 deselected (6:07, `reviewB2-fixive3.log`). Two earlier
+  runs (`five.log` 10:01 with 6.8 GB free while another load ran; `five2.log` 7:05) each had ONE
+  failure, the bench row test's `-0.05 < offsets["telemetry_origin"]` (-0.069, -0.062: the
+  telemetry's start latency, before the probe, untouched by this fix); it passes isolated 4/4 on
+  new and old code, 3/3 right after the new test, and `6a4d09a`'s full run passed 279
+  (`five-old-6a4d09a.log`). A load-sensitive bound in the instrument's test, not changed (scope),
+  for the dispatcher. 0 CR bytes on the branch's files.
 
 ### Seat 8's RESUME HERE (superseded by the section above; kept for its figures)
 
