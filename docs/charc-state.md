@@ -112,7 +112,9 @@
   phase write window, next encode.py touch), DR-64 (N6 body erratum, owner's word).** Worktrees `wp3.14`, `wp3.14-mc`,
   `orch-state-g14` released. WP3.21 brief: orchestrator drafts from the V16 baseline, I approve FINAL.
 - **EXCLUSIVE WINDOW OPEN 2026-10-27 ~21:31Z: WP-T4 rung 4 ROUND 2** (same head dd49a15, wrappers `run_r4_r2_*`;
-  ~2 h 20 min; msg `fe2a610eafd5c405`). **NOTHING HEAVY AT THIS SEAT until CLOSE.** **Round 1 CLOSED 21:29Z** (msg
+  ~2 h 20 min; msg `fe2a610eafd5c405`), **extended by the APPROVED D3 durations leg** (serial expression with
+  `--durations=0 --junitxml` under `work/`, diagnostic only, not a round, not in the 15 % rule; by-marker wall from
+  junit `time`, setup/call split for the ten longest; CLOSE ~00:45Z 2026-10-28). **NOTHING HEAVY AT THIS SEAT until CLOSE.** **Round 1 CLOSED 21:29Z** (msg
   `7bb7c019595a6e24`): BASELINE 5,067 passed / 11 env skips / 4,564.80 s; PARALLEL 4,031 / 1 / 497.30 s; SERIAL
   1,036 / 10 / 3,335.36 s; counts hold (5,078); 0 failures = 0 violators; P+S 3,832.66 s = -16.0 %. Sampler: peak RSS
   6.97 GB, min available 7.05 GB, GPU rise 903 MiB (the import-time context finding). **Reading sent for the report:
