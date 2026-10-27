@@ -31,8 +31,10 @@
 - **Owner word 2026-10-20:** spec **v0.5.4**, plan v1.2, architecture FINAL 1.0, interim N6 = 25 min/min (D106),
   gain caps KEPT (D100). Owner-pending list (CHARC carries it): photos (WP3.6P), an iPhone clip (DR-15's B-frame
   leg), the V3 ratio figures as information for CP5/WP4.2 (now also in the WP3.11 record).
-- **GoPro IMU and GPS are OUT OF SCOPE**: no `gpmd`, IMU or GPS data read or committed; GPMF settings only from
-  `moov/udta` (FMWR/PRTN/PTCL). Location tags must never reach a committed record (WP3.10 R1 #2).
+- **GoPro IMU and GPS are OUT OF SCOPE**: nothing from a `gpmd` track, IMU or GPS is ever COMMITTED (the owner's rule;
+  CHARC `b238bd27`: a byte hash in an uncommitted `work\` record is within it, kept out of evidence copies too); no product
+  module decodes or parses `gpmd`; GPMF settings only from `moov/udta` (FMWR/PRTN/PTCL). Location tags never reach a
+  committed record (WP3.10 R1 #2).
 - **Cell depth:** read `uv run python scripts/cell_depth.py <cell>` at dispatch, every yield, before any ruling;
   ~250K evaluation, ~400K STOP. Opus cells re-grounding from a ledger with a TIGHT reading list started at 0 and
   reached 90-120K by their first yield this generation (much less than wave 3's 140-220K).
@@ -44,20 +46,31 @@
 
 ### Live cells (gen 12; they die with this generation -- re-dispatch from their ledgers)
 
-| Package | Branch head | State | Next |
-|---|---|---|---|
-| WP3.10 | `wp3.10` `df055c2` (product `0b76301`; seat 8 `wp310-cell8` STOOD DOWN at 305K, 2026-10-27 ~00:55Z) | O3 built `5cc94e4`; R10 five-round gate TERMINATED (cleanup `0b76301`). CHARC QA ACCEPTED both out-of-envelope choices and the termination. **Footage window CLOSED 00:52Z:** leg (a) M+R 0 DIFFERENT, footage tests 3 passed, leg (b) GX011627 NVENC 1.018 / 0.515 / 0.258 x camera at 5.2 / 5.1 / 5.0 Main (was 0.356 / 0.350 / 0.338). AD-12 QUERY to CHARC 00:54Z (recommend libx265 crf 21/26/30, NVENC cq 22/26/30, 0.24 FINAL; D75 text question) | on CHARC's ruling: dispatch FRESH seat 9 (implementer-opus-high) from the ledger RESUME HERE: ruled values, EXCLUSIVE floor row (OPEN/CLOSE to CHARC), report, return; then my Reviewer B, then WP3.10's own candidate gate (full suite) |
+None. `wp310-cell8` stood down at 305K, `wp310-cell9` at 339,190 (2026-10-27 ~04:29Z); no cell mid-round.
 
 ### Where things stand (gen 12)
 
-1. **Tranche B ACCEPTED at main `d31dd0f`** (WP3.17, 3.18, 3.19, 3.20; one ff of `stackB-acc`; full suite on stack top
-   `d71d994` 4501 passed / 2 skipped = main's figure by code identity; harness 366 OK). Release post to CHARC 23:23Z
-   (owed rows listed there); operator FYI posted. **CHARC QA CONFIRMED (static half), no re-run; DR-49..DR-52, DR-44 (a)(b) ADDRESSED (main `71c7652`).**
-2. **WP3.18 B pass 2 CLEAN** on `d8f3859`; six minors disposed as the report's "Erratum at the gate" (`b6673df`).
-3. **WP3.10:** see Live cells. Reviewer B prompt: copy `...\wp3.18\reviewB\` runner + prompt form; its own candidate gate
-   is a full suite on `wp3.10` rebased onto main (disjoint from tranche B).
-4. **Gen-12 slips:** two bare `cd`s moved the shared cwd (once into `.worktrees/stackB`); reverted at once, the cell told.
-   Every worktree command goes in a `( cd <wt> && ... )` subshell, never `cd <wt> && ...` at top level.
+1. **WP3.10 ACCEPTED at main `47bc6d6`** (2026-10-27; one ff of `wp3.10-acc` `831fb8d` on main `ceec6b9`; record
+   `docs/proofs/wp3.10-accept.md`). Candidate `wp3.10-mc` `7f98848` full pytest 4766 passed / 2 skipped (2715 s) = main's
+   figure by code identity; harness 379 OK; mypy 132 clean. AD-12 RULED (cq 22/26/30, crf 21/26/30, 0.24 FINAL;
+   `759f0d0`); floor row 0.155 s/frame NVENC 4K, fits D106. B pass 1 blocked (completeness) -> seat-9 remediation; B pass 2
+   blocked (a regression: truncated B-frame refusal, EXECUTED at this seat) ADJUDICATED AT THE GATE, CHARC UPHELD
+   (`b4e4a184`), gate fix `39bc9ac`. Release post 05:37Z (owed rows listed there); operator FYI posted. **CHARC QA pending.**
+2. **Tranche B ACCEPTED at main `d31dd0f`** (WP3.17-3.20); CHARC QA CONFIRMED (static half); DR-49..DR-52.
+3. **Harness changes landed (CHARC, owner-directed, 2026-10-27):**
+   - **Dual-model implementer lane** (`3c230e4`; design `docs/proofs/harness-dual-model-implementers.md`): Codex cell
+     `implementer-codex-sol-high` driven by `scripts/codex_cell.py`; the reviewer is always the OTHER model. **At the wave 4
+     briefs name the first two Sonnet-class packages (well-specified, no frozen interface, comparable size) as the
+     CALIBRATION pair**; CHARC assigns one to `implementer-sonnet-high`, one to the Codex cell. A Codex-implemented package
+     gets a Claude Reviewer A and a Claude Reviewer B run by you as a `claude -p` PROCESS (pinned invocation in the fill;
+     never improvise it). Dispatch tiebreak on weekly PACE (`scripts/usage_codex.py`, `scripts/usage_claude.py`), both
+     readings in the dispatch row.
+   - **Reviewer B pin moved** (`fac53e9`): `gpt-6.1-sol` / high (fast `gpt-6-luna` / medium). Banner assertion value
+     `model: gpt-6.1-sol` from 2026-10-27; a `gpt-5.6-sol` transcript now FAILS assertion 1. WP3.10's two passes stand.
+4. **Next:** wave-4 dispatch planning on CHARC's direction (read the design pass and the updated fill Parts 1-2 first).
+5. **Gen-12 slips:** five bare `cd`s moved the shared cwd (into `.worktrees/stackB`, `orch-state-g12`, `wp3.10-mc` twice,
+   `subagents`); each reverted in the next call. Use `git -C <wt>` and absolute paths; a worktree command that must run
+   inside it goes in a `( cd <wt> && ... )` subshell, never `cd <wt> && ...` at top level.
 
 ### (older) Where things stood at the gen-10 handover
 
@@ -125,13 +138,19 @@ Each accepted package had its return report posted to CHARC and an info-update t
 | WP3.18 | 2026-10-26 | `d31dd0f` | `docs/proofs/wp3.18-accept.md`; A terminated at the R5 gate (lane restructure); B pass 1 blocked -> seat-3 remediation -> B pass 2 clean, erratum at the gate | CONFIRMED static half (CHARC QA on `d31dd0f`; DR-49..DR-52) |
 | WP3.19 | 2026-10-26 | `d31dd0f` | `docs/proofs/wp3.19-accept.md`; A converged R2; B blocked twice, pass 2 adjudicated at the gate (UPHELD) | CONFIRMED static half (CHARC QA on `d31dd0f`; DR-49..DR-52) |
 | WP3.20 | 2026-10-26 | `d31dd0f` | `docs/proofs/wp3.20-accept.md`; A terminated R1; B blocked twice, pass 2 adjudicated at the gate (UPHELD) | CONFIRMED static half (CHARC QA on `d31dd0f`; DR-49..DR-52) |
+| WP3.10 | 2026-10-27 | `47bc6d6` | `docs/proofs/wp3.10-accept.md`; nine seats; A ten rounds (product R4, instrument R8, NVENC ceiling R10 five-round gate); AD-12 RULED; floor row fits D106; B pass 1 blocked -> remediation; B pass 2 blocked ADJUDICATED AT THE GATE (CHARC UPHELD), gate fix verified by execution; candidate 4766 passed | pending |
 | DR-44 amendment | 2026-10-21 | `de206e2` | `docs/proofs/dr44-contract-amendment.md`; B pass 1 blocked, remediated, pass 2 clean; main 3570 passed | checked (`00b7f7a8baa5ae3b`) |
 
-Kept branches (evidence; do not delete unasked): `wp3.4`, `wp3.4-mc`, `wp3.11`, `wp3.11-mc`, `wp3.10-pre-rebase`, `orch-state-g10`, `orch-state-g10b`, `wp3.9`, `wp3.9-mc`, `dr44`, `dr44-record`, `wave3-briefs`, `wp3.12`, `wp3.12-mc`, `wp3.6`, `wp3.6-mc`, `wp3.6-mc2`, `wp3.16`, `wp3.16-mc`, `wp3.16-pre-rebase`, `wp3.2`, `wp3.2-mc`, `wp3.2-mc2`, `wp3.3`, `wp3.3-mc`, `wp3.3-mc2`, `wp3.5`, `wp3.5-mc`, `wp3.5-mc2`, `wp3.15`, `wp3.15-mc`, `wp3.13`, `wp3.13-mc`, `wp3.7`, `wp3.7-mc`, `wp3.1`, `wp3.1-mc`, `wp2.3`, `wp2.3-mc`, `wp2.2`, `wp2.2-mc`, `wp1.2b`, `wp1.2b-b1`, `wp1.3d`, `wp1.3d-b1`,
+Kept branches (evidence; do not delete unasked): `wp3.10`, `wp3.10-mc`, `wp3.10-mc1`, `wp3.10-mc2`, `wp3.10-acc`, `wp3.4`, `wp3.4-mc`, `wp3.11`, `wp3.11-mc`, `wp3.10-pre-rebase`, `orch-state-g10`, `orch-state-g10b`, `wp3.9`, `wp3.9-mc`, `dr44`, `dr44-record`, `wave3-briefs`, `wp3.12`, `wp3.12-mc`, `wp3.6`, `wp3.6-mc`, `wp3.6-mc2`, `wp3.16`, `wp3.16-mc`, `wp3.16-pre-rebase`, `wp3.2`, `wp3.2-mc`, `wp3.2-mc2`, `wp3.3`, `wp3.3-mc`, `wp3.3-mc2`, `wp3.5`, `wp3.5-mc`, `wp3.5-mc2`, `wp3.15`, `wp3.15-mc`, `wp3.13`, `wp3.13-mc`, `wp3.7`, `wp3.7-mc`, `wp3.1`, `wp3.1-mc`, `wp2.3`, `wp2.3-mc`, `wp2.2`, `wp2.2-mc`, `wp1.2b`, `wp1.2b-b1`, `wp1.3d`, `wp1.3d-b1`,
 `wp1.4b`, plus the earlier packages' (`git branch`).
 
 ### Practice notes (this instance)
 
+- **Gate worktrees need the local config (gen 12, WP3.10):** copy the main tree's uncommitted `clearwater.local.toml`
+  into every `-mc`/stack worktree BEFORE its full suite. Without it `test_lookcheck_deep.py` fails on `LocalConfigError`
+  and the footage tests skip (27 skips instead of 2); that run is VOID.
+- **CR check:** use `git cat-file -p <rev>:<f> | tr -cd '' | wc -c`, never `grep -c $''` (it miscounted every line
+  as a CR in a loop at gen 12).
 - **Merging:** rebase in a `-mc` worktree; compare `git patch-id --stable` (author range vs
   candidate vs main); gate there; Reviewer B; `git merge --ff-only`; `uv sync`; re-gate main. Ask
   CHARC to hold main from B to the merge; no orchestrator commit on main in that window either.
