@@ -401,7 +401,7 @@ def heif_primary_properties(data: bytes) -> dict[str, Any]:
         (item,) = struct.unpack(">I", data[pitm + 4 : pitm + 8])
     iprp, iprp_end = _child(data, "iprp", inner, meta_end)
     ipco, ipco_end = _child(data, "ipco", iprp, iprp_end)
-    properties = [(kind, body) for kind, body, _ in _boxes(data, ipco, ipco_end)]
+    properties = list(_boxes(data, ipco, ipco_end))
     indices: list[int] | None = None
     for kind, body, stop in _boxes(data, iprp, iprp_end):
         if kind != "ipma":
@@ -440,12 +440,15 @@ def heif_primary_properties(data: bytes) -> dict[str, Any]:
     for index in indices:
         if index > len(properties):
             raise ValueError(f"'ipma' index {index} is beyond the {len(properties)} properties")
-        kind, body = properties[index - 1]
+        kind, body, stop = properties[index - 1]
         if kind not in ("irot", "imir", "ispe"):
             continue
         if kind in seen:
             raise ValueError(f"the primary item {item} has two {kind!r} properties")
         seen.add(kind)
+        needed = 12 if kind == "ispe" else 1  # ispe: version/flags, width, height
+        if stop - body < needed:
+            raise ValueError(f"the {kind!r} property is {stop - body} bytes, needs {needed}")
         if kind == "irot":
             result["irot"] = (data[body] & 3) * 90
         elif kind == "imir":

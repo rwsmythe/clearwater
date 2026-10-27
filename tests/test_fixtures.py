@@ -787,6 +787,10 @@ def test_planted_ispe_disagreeing_with_stored_size_fails_by_name(
     problems = stills.check_heif_extents(facts, props)
     assert problems[0] == "ispe is (128, 96), the stored size is (64, 96)"
     assert stills.check_heif_extents(facts, stills.heif_primary_properties(data)) == []
+    # The old checks (the independent irot reader, the irot/imir comparison with the manifest)
+    # never looked at ispe, so they pass the plant.
+    assert photo.heif_transforms(bytes(planted))["irot"] == facts["irot"]
+    assert _manifest_disagreements(bytes(planted), facts) == []
 
 
 def _box(kind: bytes, body: bytes) -> bytes:
@@ -804,9 +808,14 @@ def _ipma(version: int, flags: int, entries: list[tuple[int, list[int]]]) -> byt
     return _box(b"ipma", body)
 
 
-def _synthetic_heif(primary: int | None, pitm_version: int, ipmas: list[bytes]) -> bytes:
-    """Build a HEIF skeleton: ispe 64x96 (1), irot 90 (2), irot 270 (3), imir (4), ispe 8x8 (5)."""
-    ispe = _box(b"ispe", bytes(4) + struct.pack(">II", 64, 96))
+def _synthetic_heif(
+    primary: int | None, pitm_version: int, ipmas: list[bytes], ispe_body: bytes | None = None
+) -> bytes:
+    """Build a HEIF skeleton: ispe 64x96 (1), irot 90 (2), irot 270 (3), imir (4), ispe 8x8 (5).
+
+    ``ispe_body`` replaces the body of property 1 (to plant a short ``ispe``).
+    """
+    ispe = _box(b"ispe", bytes(4) + struct.pack(">II", 64, 96) if ispe_body is None else ispe_body)
     other = _box(b"ispe", bytes(4) + struct.pack(">II", 8, 8))
     ipco = _box(
         b"ipco",
@@ -1670,3 +1679,16 @@ def test_cli_rejects_an_unknown_group_and_reports_missing_ffmpeg(
     monkeypatch.setattr(video, "tools_available", lambda: False)
     assert generate.main(["--out", str(tmp_path / "v"), "--group", "video"]) == 2
     assert "error: ffmpeg and ffprobe must be on the PATH" in capsys.readouterr().err
+
+
+def test_planted_short_ispe_is_refused_not_read_from_the_next_box() -> None:
+    """An ispe that ends after its width is an error, not a height read from the next box."""
+    short = bytes(4) + struct.pack(">I", 64)  # version/flags and width, no height
+    ipmas = [_ipma(0, 0, [(1, [1])])]
+    assert stills.heif_primary_properties(_synthetic_heif(1, 0, ipmas))["ispe"] == (64, 96)
+    planted = _synthetic_heif(1, 0, ipmas, ispe_body=short)
+    # The next box is the 9-byte irot: its size field sits where the height would be.
+    _, body = _ipco_property(planted, "ispe")
+    assert struct.unpack(">II", planted[body + 4 : body + 12]) == (64, 9)
+    with pytest.raises(ValueError, match="'ispe' property is 8 bytes, needs 12"):
+        stills.heif_primary_properties(planted)
