@@ -5,7 +5,8 @@
 
 ### Generation
 
-- **Generation 13 LIVE** (`clearwater-orchestrator-20261026-2029`), picked up 2026-10-27 ~06:30Z at main `1217443`;
+- **Generation 13 ROLLED OVER 2026-10-27 at ~360K (depth cap). Generation 14 starts at "Live cells" below (RESUME HERE).**
+  Gen 13 was `clearwater-orchestrator-20261026-2029`, picked up 2026-10-27 ~06:30Z at main `1217443`;
   bash-launch gauge 23 ms; inbox empty at pickup, then CHARC FINAL `3c3c35d7e40b525e` (all four wave 4 briefs approved).
   Briefs FINAL on main `9753b7b` (rulings recorded in each brief). Gen-13 scratchpad:
   `C:\Users\rwsmy\AppData\Local\Temp\claude\C--Users-rwsmy-clearwater\be0b3fbb-8bfc-4f0b-804e-6a1844f3710c\scratchpad\`
@@ -50,24 +51,28 @@
   blob is LF (main has 0 CR bytes everywhere, the debt register included). At every gate: for each file in
   `git diff --name-only <base>..<cand>`, `git cat-file -p <cand>:<f> | tr -cd '\r' | wc -c` must be 0.
 
-### Live cells (gen 13; Claude cells die with this generation -- re-dispatch from their ledgers)
+### Live cells and RESUME HERE (written by gen 13 at its rollover; gen 14 starts here)
 
-All four from main `9753b7b`, dispatched 2026-10-27 06:35-06:40Z. Pace readings at dispatch: Codex 1.71 (23 % at 13.4 %,
-06:38:42Z), Claude 2.115 (26 % at 12.3 %, 06:38:56Z; `python scripts/usage_claude.py`, the owner's standing rule).
+Base of the wave: main `9753b7b`; main now `528d865`+ (CHARC's sandbox shim `542bc11`). Pace at dispatch: Codex 1.71, Claude
+2.115. **Claude cells died with gen 13; Codex SESSIONS survive** (resume with `codex_cell.py turn --session <id>`).
 
-| Package | Cell | Lane / reviewers | Worktree, branch | Depth at dispatch | State |
-|---|---|---|---|---|---|
-| WP3.14 | `wp314-cell1` (opus-high subagent) | Claude; A and B Codex `gpt-6.1-sol`/high | `.worktrees/wp3.14`, `wp3.14` | 0 | round 0 (design table yield) |
-| WP3.20R | Codex cell (`codex_cell.py turn`) | Codex (CALIBRATION); A and B Claude opus/high; B head-to-head owed | `.worktrees/wp3.20r`, `wp3.20r` | 0 | turn 1; evidence `clearwater-review-evidence\wp3.20r\cell\` |
-| WP-T3 | `wpt3-cell1` (sonnet-high subagent) | Claude (CALIBRATION); A and B Codex `gpt-6.1-sol`/high | `.worktrees/wp-t3`, `wp-t3` | 0 | build to Reviewer A R1 |
-| WP-T4 | Codex cell (`codex_cell.py turn`) | Codex by the pace tiebreak; A and B Claude opus/high (Q6) | `.worktrees/wp-t4`, `wp-t4` | 0 | turn 1 (rungs 0-1); evidence `clearwater-review-evidence\wp-t4\cell\` |
+| Package | State at rollover | Branch head | Next action (gen 14) |
+|---|---|---|---|
+| WP-T3 (sonnet; calibration) | DONE by the cell (`wpt3-cell1` retired at 159,635). A converged R1 (0 blocking; 2 minors fixed in cleanup). | `wp-t3` `296eb18`; candidate `wp-t3-mc` `0fbbe44` on `528d865`, patch-id `e38fa930` = author | Candidate full pytest: DONE at gen 13: 4867 passed, 2 skipped, EXIT=0 (07:02:45Z-07:50:41Z, 2873.78 s, host shared with light cells; log .worktrees/wp-t3-mc/work/pt-full.log). Static gates on the candidate clean (ruff, format 227, mypy 132). NEXT: Reviewer B (Codex `gpt-6.1-sol`/high): prompt, diff and runner STAGED in `clearwater-review-evidence\wp-t3\reviewB\`, probe PASSED (banner gpt-6.1-sol/high, 1 succeeded in). Run `MSYS_NO_PATHCONV=1 wsl.exe bash -ilc 'bash /mnt/c/Users/rwsmy/clearwater-review-evidence/wp-t3/reviewB/run_review_B.sh review'` (>= 5 GB free, nothing heavy). Then harness gate, accept record, ff main, debt rows (DR-33 (a)-(d) close; Q3 MINOR DR row for UTF-16/compressed-iTXt XMP), release post to CHARC, operator FYI. |
+| WP3.20R (Codex; calibration) | BUILD DONE: 6 turns (tokens 64,199 / 92,340 / 111,584 / 131,507 / 149,041 / 204,598). A R1 (Claude opus/high, `wp3.20r\r1\`, md5s) NO_NEW_CRITICAL_MAJOR, 3 minor + 3 advisory; turn 6 cleanup: 1,3,5 fixed, 2 one-line fix, 4 declined, 6 banked (origin `54e2749`). Final return report = `cell\return-6.md`. | `wp3.20r` `32d30dc` on base `528d865` | Candidate `wp3.20r-mc` on main, patch-id, full pytest (FULL: shared GUI module), then the HEAD-TO-HEAD B: Claude B of record (`codex_cell.py review --base <main> --out ...\wp3.20r\reviewB\`, prompt built neutrally from the brief, NOT from r1's) AND a Codex B (`gpt-6.1-sol`/high, WSL runner as WP-T3's) on the same tree; table both. HD-1 calibration figures: test counts from the report, the six token figures, Claude review cost. Session id `01a17c14-71f3-7dd1-9c62-766a10c9c8cf`. |
+| WP3.14 (opus) | Cell 1 retired at 238,362 (R0 + engine); cell 2 (`wp314-cell2`) retired with gen 13 at ~208K+, IDLE at a yield: build items 1-3 DONE, waiting for WINDOWS. Rulings O1-O4 + ORDER in the ledger; O1 UPHELD by CHARC. | `wp3.14` `7bb5d85` (base `9753b7b`) | Re-dispatch cell 3 (opus-high) from `prompt-wp3.14-cell2.md` + the ledger's RESUME HERE (cell 2's status). Window queue CONFIRMED to the cell: (1) footage `uv run pytest tests/test_jobs_export_video.py -m footage` (GX011627 V4 leg); (2) full `uv run pytest -m "not footage"` offscreen (5.3K leg inside); (3) Reviewer A R1 (Codex gpt-6.1-sol/high). V16 rows later, EXCLUSIVE, OPEN/CLOSE to CHARC. |
+| WP-T4 (Codex by pace) | Turns 1-3 committed (`cd4697e` lock via orchestrator `uv lock`; `0fa0757` guard cases (w1)-(w4), 60 passed unshimmed at this seat; `28af9ba` cold-cache race REPRODUCED + lock + two-process test). Tokens 73,551 / 119,645 / 220,811 (past 250K soon: evaluate; bounded steps continue). | `wp-t4` `28af9ba` on base `528d865` | Pending RUN REQUEST (turn 3, `cell\return-3.md`): `powershell -NoProfile -File work/wp-t4/run_parallel_01.ps1` in the worktree (READ the wrapper and `monitor_pytest.py` first), in a window; hand the log paths back in turn 4 (rung 3.3 classification). Session id `01a17c16-3707-7e30-b81b-ecb9320feb6b`. Fence: `tests/fixture_plugin.py` -- WP-T3 `verify_generated`, WP-T4 imports + `SampleProvider`; merge WP-T3 first. |
 
-- Each worktree carries its own uncommitted `clearwater.local.toml` with `working_path` = that worktree's `work\`.
-- Codex cells: resume with `--session <id>` from the turn JSON; commit each turn with `codex_cell.py commit`. A Codex
-  session SURVIVES this generation (re-read the last `turn-N.json` and `return-N.md` in its evidence folder).
-- Fence: `tests/fixture_plugin.py` is shared: WP-T3 edits `verify_generated` only; WP-T4 edits `SampleProvider.path` and
-  helpers after it. Full suites are the orchestrator's candidate gates (WP-T3, WP3.20R) or granted windows (WP3.14);
-  WP-T4's heavy legs are RUN REQUESTs this seat runs.
+- **Host queue (one heavy job at a time):** WP-T3 suite (running at rollover in gen 13's shell; if it died, rerun
+  `( cd .worktrees/wp-t3-mc && QT_QPA_PLATFORM=offscreen uv run pytest -q -rs -p no:cacheprovider --basetemp=work/pt-mc )`)
+  -> WP-T3 B -> WP3.14 footage -> WP3.14 full -> WP-T4 PARALLEL leg 1 -> WP3.20R candidate full + B pair. Reorder freely.
+- **Codex-lane practice (gen 13):** every turn = `codex_cell.py turn` in the background, then `codex_cell.py commit`
+  (check CR bytes; run `ruff format --check .` at THIS seat: the sandbox's exit 101 is an artifact); the cell never
+  sees a tool result you do not paste into the next prompt. Prompts live in `clearwater-review-evidence\<arc>\cell\prompt-N.md`.
+  Sandbox pytest form: `PYTHONPATH=scripts ... -p sandbox_mkdir_shim -p no:cacheprovider` (CHARC `542bc11`). A sandbox
+  cannot reach the package index (`uv lock` is a RUN REQUEST). Delete the stray `work/sandbox/` copies at teardown.
+- **Gen-13 slips:** four bare `cd`s (twice with cells live), each reverted next call. Put EVERY worktree command in a
+  `( cd <wt> && ... )` subshell; never start a command line with `cd <wt>`.
 
 ### Where things stand (gen 12)
 
