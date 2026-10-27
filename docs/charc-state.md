@@ -100,6 +100,20 @@
   QUALITY_RATIO) fixed. Cell 3 retired 302,881 at dc76d92; cell 4 `wp314-cell4` (38K) remediates then V16 rows.
   WP-T4 E1 quiet-seat probe PASSED (DR-58 (c) trigger not fired). Next: B pass 2, V16 exclusive blocks (OPEN/CLOSE to
   me), candidate full suite, WP-T4 rung 4.
+- **WP3.14 ACCEPTED** by gen 14 2026-10-27 18:48Z at main ba6e923 (record `docs/proofs/wp3.14-accept.md`; candidate
+  `wp3.14-mc` c9da9ce = `wp3.14` 1449a77 rebased twice; full pytest 5056 / 2 / 4568 s on 2b27454 = main's figure by code
+  identity, `src tests tools` differ only by my harness test). **CHARC QA CONFIRMED (static):** patch-id 9ef47483 on all
+  three ranges from the true bases; c9da9ce ff-ancestor; record docs only; footprint 16 owned files + granted engine.py
+  block; interfaces / seam / naming / safe_write / pyproject / uv.lock / conftest / fixtures untouched since 9753b7b;
+  17 blobs 0 CR; B pass 1 and 2 md5s OK, assertions OK (strict succeeded 19 / 36, VERDICT anchored 12166 / 14532),
+  footage mentions = prompt withheld line + brief echoes; ruff / format 237 / mypy 136 / harness 382 at this seat; no
+  suite (WP-T4 rung 4 windows next). **Register (this commit): DR-48, DR-28 CLOSED; DR-35 (b), DR-57 (b)(c), DR-20 (7)
+  CLOSED, DR-35 (a) mechanism amended, DR-57 (a) ADDRESSED; NEW DR-62 (GUI recompute vs export, WP4.3), DR-63 (sink
+  phase write window, next encode.py touch), DR-64 (N6 body erratum, owner's word).** Worktrees `wp3.14`, `wp3.14-mc`,
+  `orch-state-g14` released. WP3.21 brief: orchestrator drafts from the V16 baseline, I approve FINAL.
+- **WP-T4 rebased onto ba6e923 (f8b8f4b, patch-id 525a84c8 unchanged): NO OBJECTION** (rung 4 measures main's suite,
+  ~160 more tests incl. WP3.14's libx265 sinks; diagnostic parallel leg not a figure of record; Codex turn 5 accounts
+  for test IDs by collection). Rung 4 round 1 OPEN comes as its own post; nothing heavy here while OPEN.
 - **WP3.14 V16 BOTH BLOCKS CLOSED** (block 1 11:33-12:57Z, msg `8ce78d1c60253f08`; block 2 GX011625 13:05-17:25Z,
   CLOSE 17:26Z msg `7439db035704c44e`). **Seat free; no window open.** Block 2 row: 14,938 frames, 1.0429 s/frame =
   31.26 min/min MISS (within 2 % of GX011627 cold); analysis 4,638 s = 29.8 %; frames median steady 0.755 -> 0.726
