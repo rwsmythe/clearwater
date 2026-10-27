@@ -5,7 +5,10 @@
 
 ### Generation
 
-- **Generation 12 LIVE** (`clearwater-orchestrator-20261026-1223`), picked up 2026-10-26 ~22:20Z at main `2bb9bba`;
+- **Generation 12 ROLLED OVER 2026-10-27 ~06:30Z at ~380K (depth cap), at a clean boundary: NO cell or helper live, no
+  window open, no suite running.** Generation 13 starts here: drain the inbox at pickup (CHARC gen 4's FINAL rulings on the
+  wave 4 briefs will be there), then follow "Where things stand" item 5 (RESUME HERE).
+- Generation 12 (`clearwater-orchestrator-20261026-1223`), picked up 2026-10-26 ~22:20Z at main `2bb9bba`;
   bash-launch gauge 38 ms; inbox empty at pickup. Dispatched: `wp318-cell3` (WP3.18 B pass 1 remediation from `579321a`;
   prompt `prompt-wp3.18-seat3.md`) and `wp310-cell8` (WP3.10 from `e7668e1`; NVENC fix APPROVED as Reviewer A round 9,
   `-movie_timescale` OUT; a level above the camera's own goes to CHARC; prompt `prompt-wp3.10-seat8.md`). Gen-12 scratchpad:
@@ -16,7 +19,7 @@
   `-0802`, gen 4 `-0524`, gen 3 `-20261019-2346`, gen 2 `-20261018-1442`, gen 1 `-20261014-1258`.
 - **Inbox:** gen 11 drained through CHARC's launcher FYI (`fd3e79167cc76899`) and STOPPED DRAINING at its rollover
   announcement. You are the sole drainer.
-- **CHARC is generation 3:** `clearwater-charc-20261020-2115`. Cue that exact name (re-read `comms/.launch-sessions.json`).
+- **CHARC is generation 4:** `clearwater-charc-20261026-2007` (gen 3 `-20261020-2115` is DONE; never cue it). Cue that exact name (re-read `comms/.launch-sessions.json`).
 - **Your session runs WITHOUT the background-shell reaper** (launcher `60b2642`, owner-directed): a full suite can run as a
   plain background job again; one heavy job at a time is still the rule.
 - Bash-launch gauge at gen-11 bring-up: 122.9 ms. Re-measure at yours.
@@ -86,8 +89,20 @@ None. `wp310-cell8` stood down at 305K, `wp310-cell9` at 339,190 (2026-10-27 ~04
      run together; one heavy job at a time rules the suites. Size ratio (WP-T3 ~1.3-1.5x WP3.20R) goes in HD-1.
    - **WP3.21 opens AFTER WP3.14's accept**; its brief MAY be drafted while WP3.14 runs (cite AD-21, the plan row, WP3.10's
      floor figures; measurement rows EXCLUSIVE, last).
-   - **Briefs:** drafting helpers dispatched 2026-10-27 (gen 12): `brief-wp314` (opus), `brief-wp320r`, `brief-wpt3` (sonnet),
-     each in its own worktree/branch `brief-wp3.14`, `brief-wp3.20r`, `brief-wpt3`; DRAFTs go to CHARC for FINAL.
+   - **WP-T4 parallel test workers COMMISSIONED** (owner "commission it"; CHARC `f0741947`, saved at
+     `clearwater-review-evidence\wpt4-commission-f0741947.md`; AD-28 on main `e2b471d`): Sonnet-class, dispatched THIRD after
+     the pair, lane by the pace tiebreak (R3) at dispatch with both readouts in the dispatch row; reviewer = the other model.
+     At its accept the fill's GATE_CHECKS suite line becomes the two-leg command (you write it from its report).
+   - **Spec is v0.5.5** (`a5f9245`, D75 erratum, text only); every wave 4 brief cites v0.5.5.
+   - **RESUME HERE (gen 13):** FOUR briefs DRAFT on branch `wave4-briefs` `b7764c5` (worktree `.worktrees/wave4-briefs`;
+     author branches `brief-wp3.14`, `brief-wp3.20r`, `brief-wpt3`, `brief-wpt4`), posted to CHARC 06:28Z (`9ea33cc0` file),
+     FINAL pending. Then: (1) apply CHARC's FINAL edits on `wave4-briefs` (a FINAL commit as wave 3's `0f51822`), ff main;
+     (2) dispatch WP3.14 (opus-high) FIRST; (3) the pair: WP3.20R via `scripts/codex_cell.py turn` (Codex cell; you commit
+     each turn from FILES CHANGED with the GPT-6.1 Sol footer) and WP-T3 (sonnet-high subagent); (4) WP-T4 third, by the
+     pace tiebreak (`scripts/usage_codex.py`, `scripts/usage_claude.py`). Gen 12 disagreed with the WP-T4 helper's Q6
+     (a FAST "Claude Sonnet medium" reviewer): the fill's pinned Claude pass is opus/high; follow CHARC's FINAL.
+     Write each dispatch prompt in your scratchpad; cell depth read at every yield. WP3.21's brief may be drafted while
+     WP3.14 runs (CHARC ruling item 1).
    - FYI: the owner asked CHARC about pytest-xdist; do NOT add it unless commissioned.
 6. **Gen-12 slips:** five bare `cd`s moved the shared cwd (into `.worktrees/stackB`, `orch-state-g12`, `wp3.10-mc` twice,
    `subagents`); each reverted in the next call. Use `git -C <wt>` and absolute paths; a worktree command that must run
@@ -162,7 +177,7 @@ Each accepted package had its return report posted to CHARC and an info-update t
 | WP3.10 | 2026-10-27 | `47bc6d6` | `docs/proofs/wp3.10-accept.md`; nine seats; A ten rounds (product R4, instrument R8, NVENC ceiling R10 five-round gate); AD-12 RULED; floor row fits D106; B pass 1 blocked -> remediation; B pass 2 blocked ADJUDICATED AT THE GATE (CHARC UPHELD), gate fix verified by execution; candidate 4766 passed | pending |
 | DR-44 amendment | 2026-10-21 | `de206e2` | `docs/proofs/dr44-contract-amendment.md`; B pass 1 blocked, remediated, pass 2 clean; main 3570 passed | checked (`00b7f7a8baa5ae3b`) |
 
-Kept branches (evidence; do not delete unasked): `wp3.10`, `wp3.10-mc`, `wp3.10-mc1`, `wp3.10-mc2`, `wp3.10-acc`, `wp3.4`, `wp3.4-mc`, `wp3.11`, `wp3.11-mc`, `wp3.10-pre-rebase`, `orch-state-g10`, `orch-state-g10b`, `wp3.9`, `wp3.9-mc`, `dr44`, `dr44-record`, `wave3-briefs`, `wp3.12`, `wp3.12-mc`, `wp3.6`, `wp3.6-mc`, `wp3.6-mc2`, `wp3.16`, `wp3.16-mc`, `wp3.16-pre-rebase`, `wp3.2`, `wp3.2-mc`, `wp3.2-mc2`, `wp3.3`, `wp3.3-mc`, `wp3.3-mc2`, `wp3.5`, `wp3.5-mc`, `wp3.5-mc2`, `wp3.15`, `wp3.15-mc`, `wp3.13`, `wp3.13-mc`, `wp3.7`, `wp3.7-mc`, `wp3.1`, `wp3.1-mc`, `wp2.3`, `wp2.3-mc`, `wp2.2`, `wp2.2-mc`, `wp1.2b`, `wp1.2b-b1`, `wp1.3d`, `wp1.3d-b1`,
+Kept branches (evidence; do not delete unasked): `wave4-briefs`, `brief-wp3.14`, `brief-wp3.20r`, `brief-wpt3`, `brief-wpt4`, `orch-state-g12`, `wp3.10`, `wp3.10-mc`, `wp3.10-mc1`, `wp3.10-mc2`, `wp3.10-acc`, `wp3.4`, `wp3.4-mc`, `wp3.11`, `wp3.11-mc`, `wp3.10-pre-rebase`, `orch-state-g10`, `orch-state-g10b`, `wp3.9`, `wp3.9-mc`, `dr44`, `dr44-record`, `wave3-briefs`, `wp3.12`, `wp3.12-mc`, `wp3.6`, `wp3.6-mc`, `wp3.6-mc2`, `wp3.16`, `wp3.16-mc`, `wp3.16-pre-rebase`, `wp3.2`, `wp3.2-mc`, `wp3.2-mc2`, `wp3.3`, `wp3.3-mc`, `wp3.3-mc2`, `wp3.5`, `wp3.5-mc`, `wp3.5-mc2`, `wp3.15`, `wp3.15-mc`, `wp3.13`, `wp3.13-mc`, `wp3.7`, `wp3.7-mc`, `wp3.1`, `wp3.1-mc`, `wp2.3`, `wp2.3-mc`, `wp2.2`, `wp2.2-mc`, `wp1.2b`, `wp1.2b-b1`, `wp1.3d`, `wp1.3d-b1`,
 `wp1.4b`, plus the earlier packages' (`git branch`).
 
 ### Practice notes (this instance)
