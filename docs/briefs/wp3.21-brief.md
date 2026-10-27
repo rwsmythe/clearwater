@@ -1,8 +1,9 @@
-# WP3.21 — Optimisation package (dispatch brief, DRAFT)
+# WP3.21 — Optimisation package (dispatch brief, FINAL)
 
-**Status:** DRAFT 2026-10-27, for CHARC's FINAL approval; written by a drafting helper for the
+**Status:** FINAL 2026-10-27 (CHARC `b16da9c25ddfb8c8`, rulings below, which take precedence over the text
+above them); DRAFT `84b793c` written by a drafting helper for the
 orchestrator from CHARC's rulings of 2026-10-27 (the V16 baseline, the first question, D106's
-list, the re-measure, visual equality, the lane). Not approved; base = the main commit named at
+list, the re-measure, visual equality, the lane). Base = the main commit named at
 dispatch (drafted on `0228bcd`). Owner decisions: none inside the package (an output change
 beyond the tolerance below, or relaxing D106, is owner-reserved: a STOP, never done here).
 - Spec **v0.5.5**: D106, D31, D68, D69, D92, D107, D109 (reserve, out of scope), D110, D111;
@@ -265,3 +266,29 @@ during its export (DR-62), other operating systems (portable code, not run there
     so the order of tasks 4-6 follows figures; these rows are development evidence, the task-10
     rows are the figures of record. Alternative: measure only at task 10 (no evidence for the
     order).
+
+## Rulings (CHARC `b16da9c25ddfb8c8`, 2026-10-27, verbatim; FINAL)
+
+AD-7 reading and the oracle recorded in `docs/decisions.md` (`1cd46fd`).
+
+**Q1 grants: RECOMMENDED.** Now: `analysis/engine.py`, `analysis/proxy.py`, `jobs/export.py`, `core/backend.py`, `tools/export_bench.py`. At round 0 from the table, dispatcher's grant: `io/video/decode.py`, `io/video/encode.py` (DR-63 then CLOSES in the same touch, mandatory), `color/samples.py`, `core/ops.py`. `core/memory.py` only by my ruling (Q9). `methods/` not owned (Q8).
+
+**Q2 AD-7 READING: YES, recorded.** Inside an export job, "export waits for the whole clip's recompute" means every exported frame renders with its FINAL smoothed record, bit for bit the record the whole-clip analysis gives; the job may render frame i once the analysis is final for i. AD-15 (the GUI's export disabled until analysis completes) is unchanged; the reading is for the job's own pass, not for the GUI. Two decoders, each iterated and closed by ONE thread (DR-45 (a)), rather than a frame ring. Two conditions: (a) **the lead is the COMPOSED reach over the stage dependency chain**, not the larger of the two: where stage 2's raw input depends on stage 1's SMOOTHED value, frame i's stage-2 record is final only when stage 1 is final out to i + reach2, i.e. raw stage-1 statistics present to i + reach1 + reach2 (c3: 90 frames at 29.97, over pts so VFR holds); the round-0 table derives the lead from `depends_on_parameters` / the stage graph and the planted "render before final" test plants a lead short by ONE frame at the composed bound; (b) the cache entry's `mark_complete` stays after the whole pass (V17) and the export half never writes the cache (one writer per key, DR-62 not widened).
+
+**Q3 oracle: RECOMMENDED with one tightening.** Tier 1 (bit-identical digests, records, proxy bytes) for every change that keeps the arithmetic; tier 2 (AD-11: max 2e-3 absolute per channel, mean 2e-4, pre-encode, same device) for a change that alters the render arithmetic. **Tightening: the statistics records (raw AND smoothed) and the proxy bytes are tier 1 ALWAYS.** The analysis cache is shared with the GUI (V8, V17, `downscale` equality) and with every later export; a device block mean or any analysis-path change is admitted only bit-identical, otherwise it is a STOP, never a tolerance. The brief's "unless the change reaches the analysis path (then within AD-5's 1e-3)" is struck. **Gaussian bound CONFIRMED: max abs 1e-5 against the current filter on [0, 1] float32 data** (1/400 of an 8-bit level; the float32 FFT of a 4K plane carries roundoff of order 1e-6, so this is a ceiling, not a target); measured in round 0 on 4K frames, 5.3K and step edges at every border, reported as the figure, a measured exceedance is a round-0 STOP with the figure. No owner look check inside tier 2 (AD-11 treats it as the same output); outside tier 2 a STOP (owner-reserved). After encode V4 SAME through `tools/video_fidelity.py`. Helper flag: the 1 fps float-frame sample (23 frames, ~2.3 GB under `work/`, nothing committed) CONFIRMED; disk has room.
+
+**Q4 Gaussian route: RECOMMENDED.** FFT or overlap-add of the SAME truncated kernel (radius `int(4 sigma + 0.5)`) with padding that reproduces scipy's `mode="reflect"` exactly (edge pixel duplicated: d c b a | a b c d | d c b a), both backends, float32 only (no float64 FFT), above a sigma threshold set in round 0 so the product-against-prototype bit-for-bit tests stay unchanged where they can; any test that must move to a tolerance is in the round-0 table for my ruling, never edited. IIR EXCLUDED this package (an IF-2 reading would be mine, and it is not needed to meet 25).
+
+**Q5 if cold c3 still misses 25: RECOMMENDED.** The cell YIELDs with the figures and the next candidates; I choose between a follow-on package and recording the figure for WP5.2 (where D106 says N6 is re-set); relaxing D106 is the owner's; D109 is NOT a fallback (it changes the statistics). Missing the ~10 min/min aim is not a failure. The accept does not wait on the interim.
+
+**Q6 breakdown instrument: RECOMMENDED** (a tool driving the product functions in the pass's order with its own clock, records checked equal to the engine's bit for bit; one `cProfile` cross-check of the real `analysis_job()`, overhead noted, not a figure of record; no product timers, no dependency). Helper flag, the 5 % sum CHECK, CONFIRMED in this form: the SUM of per-step MEANS equals the mean per-frame wall of the same run within 5 % (medians are reported beside, not summed); a residual above 5 % is itself a finding named in the table (unattributed time), not a failed instrument.
+
+**Q7 re-measure set: RECOMMENDED, the whole `V16_PLAN`** (GX011625 is in the plan row; the 5.3K row re-checks N4 under the overlap and the FFT). `export_bench.py` gains the output-folder option, default unchanged.
+
+**Q8 DR-40 (b): not this package's; stays OPEN.** If task 1's frame-path breakdown shows per-call constant uploads above 1 % of the render, the round-0 table asks for `methods/compensation.py` and `white_balance.py`; otherwise I record the row as measured-negligible at the next `methods/` touch.
+
+**Q9 memory: RECOMMENDED.** The round-0 table budgets the two decoders, the lead and the FFT buffers against N4 (16 GB RAM, the 8 GB card); the 4K and 5.3K rows re-measure peaks; `memory_estimate_bytes` stays at or above the measured reserved peak; a formula change is a STOP to me. If the FFT buffers break the 5.3K budget, the alternative (direct filter above 4K) is the fallback, decided in round 0 or by a STOP.
+
+**Q10 interim timings: RECOMMENDED** (one GX011627 cold c3 run per candidate in a short EXCLUSIVE window you grant; development evidence, not of record; OPEN/CLOSE to me as every window).
+
+Two notes for the cell text: (i) in the Done clause, "every existing test unchanged or changed only by a CHARC ruling" includes WP3.14's cancel / failure / D87 / V11 tests and WP3.11's `smooth_at` tests by name; (ii) the fill's GATE_CHECKS line will be the two-leg command once WP-T4 lands, so the brief says "the full suite per the fill's GATE_CHECKS at dispatch" (it does; keep it).
