@@ -140,10 +140,12 @@ a post-pass `git status --porcelain` = empty control in row 2.
   working folder; the footage folder, outside both, is read-only at the kernel level, a stronger
   control than the Claude cell's prompt lock. The dispatcher still proves the footage path
   untouched at the gate (unchanged GATE_CHECK).
-- **Depth:** `scripts/cell_depth.py` reads Claude transcripts only. A Codex cell's figure is the
-  `tokens used` footer of each turn plus the session file under `~/.codex/sessions/`; Stage 0
-  pins the reading and the ~250K evaluation / ~400K STOP lines are re-expressed in Codex tokens
-  (same numbers until measured otherwise).
+- **Depth (PINNED 2026-10-27 at Stage 2):** `scripts/cell_depth.py` reads Claude transcripts only. A
+  Codex cell's figure of record is `last_token_usage.input_tokens` of the LAST request in the session's
+  `rollout-*-<session>.jsonl` under `~/.codex/sessions/` (the per-turn `tokens used` footer is cumulative
+  billing, NOT depth: WP-T4 turn 4 footer 536,544 vs last request 284,234 in a 475,000 window; for WP3.20R
+  the two happened to agree, 204,598 vs 202,061). The ~250K evaluation / ~400K STOP lines apply to that
+  figure. `codex_cell.py` may print it beside the footer (small harness item).
 - **Assertions per turn** (carried from the reviewer doc): banner model `gpt-6.1-sol` and
   `reasoning effort: high`; `^ERROR` classified by provenance; `tokens used` footer; the return
   report delivered as the `-o` file (an absent file is a failed handoff).
@@ -330,6 +332,25 @@ cat review-prompt.md .review-diff.txt | \
   round and no more B-upheld blocking findings than the Claude package, and no lock violation.
   Otherwise the Codex lane is restricted to the sonnet-medium class (mechanical passes) for one
   more calibration package before CHARC rules again. The outcome and figures go in HD-1.
+
+#### 4.3a Stage 2 RESULT (CHARC, 2026-10-27 ~09:55Z): the Codex lane STAYS for the sonnet-high class
+
+| Metric | WP3.20R (Codex cell; Claude A/B) | WP-T3 (Sonnet cell; Codex A/B) |
+|---|---|---|
+| Size | 1 module 851 + 1 test file 868; 3 rows; 20 new tests | 2 modules + plugin fn + 1,382-line test file; 4 items; 10 tests (~1.3-1.5x) |
+| Reviewer A rounds; findings | 1; 0/0/3 + 3 advisory, all in envelope | 1; 0/0/2 |
+| STOPs | 0 | 0 |
+| B pass-1 verdict | clean (Claude); head-to-head Codex also clean, 2 minor 1 advisory | clean, 3 minor 4 advisory |
+| Footprint / lock violations | none | none |
+| Suite regressions at the gate | 0 (4894 / 2) | 0 (4867 / 2) |
+| Tokens / cost | cell 6 turns, depth 202,061; A $2.03; B $1.86; Codex B 94,197 | cell 159,635; A 88,642; B 105,819 |
+| Wall dispatch to accept | 3 h 06 min (incl. the sandbox pytest shim hour) | 1 h 28 min |
+| Scope discipline (reverts) | 0 | 0 |
+
+Decision rule (section 4.3): no more than one extra A round (0 extra), no more B-upheld blocking findings (0 vs 0),
+no lock violation: the Codex lane STAYS. Substrate findings for the record: the sandbox pytest ACL shim (4.1a) and
+the depth reading (3.3). The lane head-to-head on one tree: equal verdicts; the Claude pass executes the real Qt
+suite where the Codex pass (no `uv` in WSL) reasons from AST and doubles. Recorded in HD-1.
 
 ### 4.4 Stage 3: template port (`rwsmythe/harness-template`)
 
