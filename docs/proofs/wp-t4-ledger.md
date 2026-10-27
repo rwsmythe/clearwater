@@ -4,22 +4,32 @@
 
 - Codex lane: turn 1 assigned rungs 0 and 1; turn 2 assigned the remaining
   dependency checks and rung 2's worker guard cases.
-- Current package diff base: **`2aca60e`**; branch: `wp-t4`. Generation 14
-  rebased the three accepted commits to `dfb7214`, `e374e1a`, `6ac384a`;
-  it reports content unchanged and patch-id `586b61a1` preserved.
+- Current package diff base: **`ba6e923`**; branch: `wp-t4`. Generation 14
+  rebased the four accepted commits to `e8f30e5`, `4488d50`, `a38e680`,
+  `f8b8f4b`; it reports content unchanged and patch-id `525a84c8` preserved.
+  HEAD on entry to turn 5 is `f8b8f4b`, with clean git status. The new main
+  includes WP3.20R (`dbb5858`), WP3.14 (`ba6e923`), harness and docs changes.
+  Historical heads in the evidence below describe the runs when they occurred.
   Historical rung-0 collection base: `9753b7b4cc05bf43c25442cb87aa74e23f2b584f`.
 - Initial tracked/untracked status: clean (`STATUS_COUNT=0`), recorded before
   changes in `work/wp-t4/turn1-base.txt`. The ignored local config was present;
   it was not edited.
 - Q3's deterministic reproduction and mandatory cache lock were completed in
-  turn 3. The current measurement plan follows generation 14's explicit turn-4
-  dispatch: **three interleaved BASELINE -> PARALLEL -> SERIAL rounds**.
+  turn 3. Generation 14's turn-5 dispatch restores FINAL ruling Q7:
+  **TWO interleaved BASELINE -> PARALLEL -> SERIAL rounds**; a third only if
+  the two PARALLEL+SERIAL wall-time totals differ by more than 15 percent.
+  D1 and D2 are diagnostics, not measurement rounds.
 - Shared/in-flight files remain untouched, including WP-T3's `verify_generated`
   and `tests/test_fixtures.py`. No source, frozen interface, harness, product,
   or footage edit was made. All cell-authored artifacts are inside the worktree;
   no effect outside the permitted workspace/cache is claimed.
 - Dispatcher-supplied `tokens used` footers: turn 1 **73,551**, turn 2 **119,645**,
-  turn 3 **220,811**. Turn-4 reading is pending; no estimate substituted.
+  turn 3 **220,811**. The dispatcher supplied turn 4's actual session-request
+  **depth_input_tokens = 284,234**, window 475,000; this is an input-depth
+  reading, distinct from the earlier `tokens used` footers. Evaluation point
+  (~250K) has been crossed; this turn yields to a fresh Codex session for
+  rung 4 tabulation and later work. No turn-5 depth estimate is substituted;
+  the driver now prints `depth_input_tokens` and supplies the next reading.
 
 ## Turn 1 evidence: collection and dependency
 
@@ -532,12 +542,15 @@ missing observations, lower N or alter marker meaning. The medians additionally
 need matching frozen heads, matching sampler snapshots, green legs and matching
 per-round outcome totals.
 
-### Rung-4 requests: three interleaved rounds, one wrapper per window
+### Active rung-4 requests: two rounds; third conditional (turn-5 ruling)
 
-Generation 14's turn-4 dispatch explicitly requests three rounds. Each round
-runs **BASELINE, then PARALLEL, then SERIAL**, one granted quiet-host window at
-a time, on the frozen post-E1 head. No rung-4 window has been run by the cell.
-Commands, collected counts and logs are recorded in `turn4-r4-plan.json`.
+Generation 14's turn-5 dispatch supersedes the turn-4 request for three rounds.
+Run **r1 and r2 only**, each **BASELINE, then PARALLEL, then SERIAL**, one
+quiet-host window at a time on the same frozen source. Request r3 only if Q7's
+15-percent drift condition is met. The three r3 wrappers remain available but
+are not unconditional requests. No rung-4 window has been run by the cell or
+reported by the dispatcher. `turn4-r4-plan.json` records the nine available
+commands; its first six entries are the active requests, not its old counts.
 
 The nine wrappers call `work/wp-t4/run_r4.ps1` with fixed round/leg arguments.
 They resolve the worktree from their own path, set `QT_QPA_PLATFORM=offscreen`,
@@ -548,8 +561,9 @@ sampler source, start it hidden, and wait for baseline readiness before pytest.
 They preserve separate leg and sampler exits. Logs and sampler data stay under
 `work/wp-t4/`. No extra heavy job or N change is launched automatically.
 
-The plan uses the same marker expressions throughout: all **4,889** tests in
-BASELINE, **3,882** in PARALLEL, **1,007** in SERIAL. Per-round passed/skipped/
+The plan uses the same marker expressions throughout. Turn-5 collection on
+`f8b8f4b` replaces the old counts: **5,078** tests in BASELINE, **4,032** in
+PARALLEL, **1,046** in SERIAL. Per-round passed/skipped/
 failed/xfailed totals must add to BASELINE, with zero PARALLEL failures. Sampled
 GPU activity remains a disclosed finding. Final figures must state the actual
 start times and conditions: same quiet host, **not a figure of record**.
@@ -569,9 +583,6 @@ PowerShell parse errors (`turn4-wrapper-syntax.log`).
 | 2 / baseline | `powershell -NoProfile -File work/wp-t4/run_r4_r2_baseline.ps1` | `uv run pytest -q -rs --basetemp=work/wp-t4/r4-r2-baseline-tmp` |
 | 2 / parallel | `powershell -NoProfile -File work/wp-t4/run_r4_r2_parallel.ps1` | `uv run pytest -q -rs -n 4 -m "not gpu and not footage and not gui and not slow" --basetemp=work/wp-t4/r4-r2-parallel-tmp` |
 | 2 / serial | `powershell -NoProfile -File work/wp-t4/run_r4_r2_serial.ps1` | `uv run pytest -q -rs -m "gpu or footage or gui or slow" --basetemp=work/wp-t4/r4-r2-serial-tmp` |
-| 3 / baseline | `powershell -NoProfile -File work/wp-t4/run_r4_r3_baseline.ps1` | `uv run pytest -q -rs --basetemp=work/wp-t4/r4-r3-baseline-tmp` |
-| 3 / parallel | `powershell -NoProfile -File work/wp-t4/run_r4_r3_parallel.ps1` | `uv run pytest -q -rs -n 4 -m "not gpu and not footage and not gui and not slow" --basetemp=work/wp-t4/r4-r3-parallel-tmp` |
-| 3 / serial | `powershell -NoProfile -File work/wp-t4/run_r4_r3_serial.ps1` | `uv run pytest -q -rs -m "gpu or footage or gui or slow" --basetemp=work/wp-t4/r4-r3-serial-tmp` |
 
 ### Turn-4 verification loop
 
@@ -598,15 +609,197 @@ files have no turn-4 diff. All nine ordered wrappers exist, no rung-4 measuremen
 log exists, and the command table matches the plan JSON. `git diff --check`
 exited 0. The corrected sampler's current SHA-256 is
 `64a57c731a09a7eca1e4c6f5b882975888ca0233434cc02b2c69e0dbc7ee0854`;
-the three actual PARALLEL snapshots must match while the plan remains frozen.
+all required PARALLEL snapshots must match while the plan remains frozen.
+
+## Turn 5 -- rebased collection and D2 classification
+
+### Rebase, current partition and every changed node ID
+
+Generation 14 rebased onto `ba6e923` so rung 4 measures main's accepted WP3.14
+and WP3.20R tests. The four package commits are now `e8f30e5`, `4488d50`,
+`a38e680`, `f8b8f4b`; unchanged content/patch-id `525a84c8` is the dispatcher's
+reported rebase assertion. Local `turn5-head.log` confirms those commits and
+base; `turn5-initial-status.log` is empty. This turn changes only this ledger.
+
+Three sandbox collections on `f8b8f4b` used `QT_QPA_PLATFORM=offscreen`,
+`PYTHONPATH=<this worktree>/scripts`, `PYTEST_PLUGINS=sandbox_mkdir_shim`, and
+`CUPY_CACHE_DIR=<this worktree>/work/wp-t4/cupy-cache`. Each command was
+`uv run pytest --collect-only -q --strict-markers -p sandbox_mkdir_shim
+-p no:cacheprovider --basetemp=work/wp-t4/t5-collect-<leg>`, with no marker
+expression for all, `-m "not gpu and not footage and not gui and not slow"`
+for parallel, and `-m "gpu or footage or gui or slow"` for serial. The shim
+and writable CuPy cache are sandbox collection accommodations; the dispatcher's
+D2 and measurement windows do not load the shim.
+
+| Collection | Turn-4 after-E1 | Turn-5 current | Added IDs | Removed IDs | Exit / summary |
+|---|---|---|---|---|---|
+| All | 4889 | 5078 | 193 | 4 | 0; 5078 collected |
+| Parallel | 3882 | 4032 | 154 | 4 | 0; 4032/5078, 1046 deselected |
+| Serial | 1007 | 1046 | 39 | 0 | 0; 1046/5078, 4032 deselected |
+
+All changed IDs, by file (A+/A- = all added/removed; P and S likewise):
+
+| File under tests/ | A+ | A- | P+ | P- | S+ | S- |
+|---|---|---|---|---|---|---|
+| test_export_bench.py | 15 | 0 | 15 | 0 | 0 | 0 |
+| test_gui_settings_dialog.py | 27 | 0 | 0 | 0 | 27 | 0 |
+| test_jobs_batch.py | 4 | 0 | 4 | 0 | 0 | 0 |
+| test_jobs_disk_space.py | 9 | 4 | 9 | 4 | 0 | 0 |
+| test_jobs_export.py | 88 | 0 | 88 | 0 | 0 | 0 |
+| test_jobs_export_photo.py | 18 | 0 | 15 | 0 | 3 | 0 |
+| test_jobs_export_video.py | 32 | 0 | 23 | 0 | 9 | 0 |
+| TOTAL | 193 | 4 | 154 | 4 | 39 | 0 |
+
+The four removed IDs are all in `tests/test_jobs_disk_space.py`:
+
+- `test_video_estimate_uses_ratio_and_margin[draft-0.25]`
+- `test_video_estimate_uses_ratio_and_margin[high-1.0]`
+- `test_video_estimate_uses_ratio_and_margin[standard-0.5]`
+- `test_video_ten_bit_doubles_only_for_eight_bit_sources`
+
+These are the old disk estimate oracles replaced on main by WP3.14's DR-48
+ratio/ceiling rules (source `tests/test_jobs_disk_space.py:25-132`). No other
+file removes a node. `test_jobs_export_support.py` contains support only and
+adds zero collected IDs. Existing common IDs have **zero partition transfers**.
+The new serial IDs consist of 27 GUI settings tests, three GUI photo-statistics
+cases, six GPU NVENC video cases, two slow video cases, and one combined
+footage/GPU/slow video case: 27+3+6+2+1 = 39. Their own marks already exclude
+them from parallel; these are main's additions, not WP-T4 exceptions.
+
+Evidence: `turn5-collect-{all,parallel,serial}.log` (all EXIT=0),
+`turn5-{all,parallel,serial}.nodes`, exact corresponding `.added.nodes` /
+`.removed.nodes`, and `turn5-collection-accounting.json`. The scratch verifier
+compares raw node IDs including literal escapes in parameter names. An initial
+path-normalization attempt also changed parameter backslashes and falsely
+reported 54 extra replacements; that verifier error was corrected before
+accepting any counts. Independent readback in `turn5-account-independent.log`
+checks the saved raw sets, count arithmetic and zero existing-node transfers.
+No duplicate ID occurs. `turn5-intersection.setdiff` and
+`turn5-union-difference.setdiff` are both empty: **4032 + 1046 = 5078**, disjoint
+and exhaustive. These counts replace the brief's historical 3762+1006 for the
+current tree. **D2's 4031 passed + 1 skipped = 4032** selected IDs, exactly.
+
+### D2 -- zero violators, complete GPU data, diagnostic only
+
+Dispatcher-supplied D2 evidence was read locally: preflight, leg summary,
+command/head files, sampler summary and EXIT lines. It ran at the owner's seat
+outside the sandbox with no shim on `f8b8f4b`. The heavy-run row below records
+its exact times, command, counts and memory. Wall time is **509.1597583 s**;
+pytest reports **505.66 s**. The sole skip is the existing swscale/full-range
+refusal at `tests/test_color_roundtrip.py:121`; five warnings are not failures.
+Leg, sampler and wrapper all EXIT=0. There are **zero failures and zero
+violators** from D2, under rung 3's failure-plus-serial-confirmation definition.
+No owned or other-package test is changed or newly marked in turn 5.
+
+There are 509 RSS observations, peak summed pytest-tree RSS **7,060,955,136 B**,
+minimum available **7,007,793,152 B**, no access-denied reading, no sample below
+2 GiB and no remaining child PID. Of 510 real GPU queries, none is unavailable;
+GPU complete is true. Two reads are slow; longest **0.938 s**. Maximum RSS
+interval is **1.485 s**, GPU observation age **1.359 s**. These successful slow
+reads satisfy the corrected instrument policy; neither was fabricated or
+silently omitted. Source snapshot SHA matches the unchanged turn-4 sampler.
+
+GPU baseline **0 MiB**, sampled peak **1036 MiB**, sampled rise **1036 MiB**
+establish graphics-card activity in the nominal non-GPU leg. D1's +1334 MiB
+remains a lower bound because of its gaps. D2 matches the known mechanism:
+`tests/test_prototype_backend.py:23` still calls `select_backend("auto")` at
+module import, reaching `tools/prototype/backend.py:196-217`, including the
+actual CuPy allocation/kernel at line 211. Collection imports modules before
+marker deselection, in each worker. The newly added job tests use the CPU
+selector double (`tests/test_jobs_export_support.py:55-66,301`), force CPU for
+real photo/video/libx265 runs (`test_jobs_export_photo.py:44-47`,
+`test_jobs_export_video.py:83-86`), and mark real NVENC cases GPU (`:164,708`).
+Export-bench real runs force CPU (`test_export_bench.py:84,122,160,239`);
+its sampler-construction assertion at :166-168 does not start an NVENC run.
+Static reading identifies no new unmarked GPU execution mechanism in those
+added tests. System-wide aggregate memory samples do not prove that the old
+import probe is the sole contributor or attribute every MiB. **Finding remains
+raised; no marker, product or tools change**. D2 is not a settled round.
+
+### Added-test risks and complete exception list
+
+Static evidence is in `turn5-path-port-static.log`, `turn5-selectors.log`,
+`turn5-static-bounds-gpu.log` and the targeted source readings. Added export,
+batch, disk-space and benchmark tests keep writable folders under `tmp_path`;
+benchmark local config is replaced by a fake config at
+`tests/test_export_bench.py:176-178`. Shared generated inputs use the already
+locked sample provider. Video session clips/reference caches use each worker's
+own `tmp_path_factory` (`test_jobs_export_video.py:154,402`), with sequential
+in-worker use. GUI settings locations are under their per-test temporary root
+and the whole module is GUI-marked (:44). No fixed-port binding or new shared
+writable repository path was identified. This is static evidence and one
+passing parallel diagnostic, not a proof against every possible interleaving.
+
+New timing watch finding, for WP3.14's next touch: `tests/test_jobs_export.py`
+sets `BLOCK_BOUND_S=3.0` (:39). `test_cancel_releases_a_write_blocked_on_the_encoder`
+and its planted counterpart `test_planted_cancel_polled_only_between_frames_hangs_past_the_bound`
+use `_blocked_write_cancel` / `_assert_released_within_bound` (:341-391).
+`test_a_cancel_during_close_is_aborted_by_the_watchdog_at_every_timing` has
+four CLOSE_GATES cases and waits up to the same bound (:427-455). These six
+parallel cases all passed D2. They check cancellation responsiveness; no
+failure justifies treating them as violators or adding an exception now.
+Report the bounds as watch items for the owning package; do not edit or mark
+its tests without CHARC's grant. GUI settings' Qt waits are already serial.
+The added export-bench tests check arithmetic and relative record relationships,
+not E1's tight absolute telemetry-origin bound. No new exception is demonstrated.
+
+Complete WP-T4 exception list (one moved node, no whole file, no xdist_group):
+
+| Test ID | Reason | Remedy / current status |
+|---|---|---|
+| `tests/test_io_video_encode_bench.py::test_run_once_records_the_row_and_deletes_the_output` | timing bound, DR-58 (c); stays serial | Required `@pytest.mark.slow` plus exact reason comment; bound unchanged; strict collection confirms SERIAL |
+
+`tests/test_gui_analysis_service.py::test_pts_and_statistics_never_wait_for_a_run_in_flight`
+remains PARALLEL (unmarked GUI module), confirmed again by turn-5 sets; it
+passed D2. No fresh failure or exception is claimed. The previous E1 serial
+sandbox failure is not erased by D2 because E1 was deselected from D2; no
+quiet-seat E1 result has been supplied yet. New WP3.14/WP3.20R violations,
+if later demonstrated, are findings for those packages' next touch, never
+in-envelope code changes by this cell (CHARC's binding condition).
+
+### Wrappers and measurement readiness
+
+No runner or sampler was edited in this turn. All nine fixed wrapper files
+match the turn-4 templates exactly. Comparing `run_r4.ps1` to the successfully
+executed `run_turn5_diag.ps1` yields only its stated diagnostic header and
+evidence-prefix substitutions; executable logic is otherwise identical.
+`turn5-wrapper-check.log` records this comparison, 9/9 template matches,
+zero existing rung-4 log artifacts and the unchanged sampler SHA. Current
+byte hashes of the common runner, nine wrappers and sampler are retained in
+`turn5-wrapper-hashes.json`. All ten PowerShell runner files parse with **zero
+errors** (`turn5-wrapper-syntax.log`). The prior dynamic overwrite-refusal
+proof (9/9) remains in `turn4-wrapper-guards.log`; it was not rerun as a suite.
+Readback confirms >=5 GiB preflight, refusal of every existing evidence/temp
+path, and sampler snapshot/hash/readiness beside every PARALLEL run. D2 used
+that same runner logic with its unique prefix. No R4 evidence was overwritten.
+The six active RUN REQUESTS are in the active table above. R3 wrappers are
+retained solely for Q7's conditional third round; D2 never substitutes for r1.
+
+### Turn-5 verification loop
+
+| ID | Severity / class | Suspected / confirmed / rejected evidence | Disposition |
+|---|---|---|---|
+| T5-1 | Verification, collection accounting | 193 added / 4 removed IDs; per-file table and raw sets; no existing transfers; D2 matches 4032 | Confirmed; replace active count expectations with 4032+1046=5078 |
+| T5-2 | Minor, scratch verifier only | Path normalization altered parameter escapes and invented 54 ID replacements | Confirmed verifier defect; fixed before accepting proof, independently rechecked raw sets |
+| T5-3 | Verification, D2 classification | 4031 passed / 1 skipped / zero failures; all three exits 0 | Confirmed zero violators; diagnostic only, not a round |
+| T5-4 | Major nominal, marker/collection finding outside scope | Complete GPU series rises 1036 MiB; old import probe still present; new job paths CPU or GPU-marked | Confirmed sampled rise; sole attribution unproved; raised, no fix or new marker |
+| T5-5 | Minor nominal, other-package timing watch | Six added WP3.14 cancellation cases use a three-second bound; all passed D2 | Risk identified; no confirmed violator/exception; report for next touch, no edit |
+| T5-6 | Verification, measurement readiness | 9/9 wrapper templates; common runner matches diagnostic copy except header/prefix; 10 parsers clean; sampler hash unchanged | Confirmed; six r1/r2 windows requested, r3 conditional only |
+
+No tests were executed by the cell in turn 5: three collections and static
+checks only. No final-suite-green, completed measurement, median, review-round
+or package-completion claim is made. Final turn-5 evidence checks are recorded
+in `turn5-final-check.log`; handoff remains pending actual dispatcher windows.
 
 ## Heavy-run ledger
 
-The dispatcher ran D1 after turn-3 yield. No heavy leg was executed by the cell.
+The dispatcher ran D1 after turn-3 yield and D2 before turn 5. Both are
+diagnostic only, not rounds. No heavy leg was executed by the cell.
 
 | Run / head | Start UTC | End UTC | Command / log under work/wp-t4 | N | Counts | Leg / sampler / wrapper exit | Free before | Peak summed RSS | Minimum available | GPU / qualification |
 |---|---|---|---|---|---|---|---|---|---|---|
 | D1 diagnostic / `6ac384a`, before E1 | 2026-10-27 08:51:03.9259564Z | 2026-10-27 08:57:03.4570794Z | `uv run pytest -q -rs -n 4 -m "not gpu and not footage and not gui and not slow" --basetemp=work/wp-t4/t3-parallel-01`; `turn3-parallel-01.log` | 4 | 3882 passed, 1 skipped, 0 failed, 0 xfailed; 5 warnings | 0 / 4 / 4 | 11.899719 GiB | 6,821,711,872 B | 6,184,673,280 B | Baseline 123 MiB, observed peak 1457 MiB, rise 1334 MiB; 5/360 GPU gaps; diagnostic only |
+| D2 diagnostic / `f8b8f4b`, base `ba6e923`, after E1 | 2026-10-27 18:50:09.8062115Z | 2026-10-27 18:58:38.9712187Z | `uv run pytest -q -rs -n 4 -m "not gpu and not footage and not gui and not slow" --basetemp=work/wp-t4/turn5-diag-parallel-tmp`; `turn5-diag-parallel.log` | 4 | 4031 passed, 1 skipped, 0 failed, 0 xfailed; 5 warnings | 0 / 0 / 0 | 12.59000015258789 GiB | 7,060,955,136 B | 7,007,793,152 B | Baseline 0 MiB, peak 1036 MiB, rise 1036 MiB; 510 queries, zero unavailable; diagnostic only, not a round |
 
 D1 wall time: **359.5270566 seconds** (pytest's own duration 358.33 seconds).
 Its 360 RSS samples have no access-denied reading, no <2 GiB sample and no
@@ -617,18 +810,85 @@ including per-round counts, frozen HEAD and sampler hash, not estimated figures.
 
 | Round | Critical / major / minor | In / out of envelope | NEW / REOPENED | Reverts | Product / test-only fixes | Reviewer transport / version | Dispatcher-read depth | Disposition |
 |---|---|---|---|---|---|---|---|---|
-| Not started | N/A | N/A | N/A | 0 | 0 / 0 | Driver-owned Claude Opus high; pending | Turn-3 footer 220,811; turn 4 pending | End-of-rung-3 yield; E1 quiet-seat check, then requested measurement windows |
+| Not started | N/A | N/A | N/A | 0 | 0 / 0 | Driver-owned Claude Opus high; pending | Turn-3 footer 220,811; turn-4 depth_input_tokens 284,234 / 475,000 | Turn-5 pre-rung-4 yield to fresh session; r1/r2 requested, r3 conditional |
 
-## Open handoff
+## RESUME HERE -- fresh Codex session after the two rounds
 
-1. Driver-owned Reviewer A and its assertions remain pending; no review round
-   is claimed clean or counted toward convergence.
-2. Quiet-seat E1 probe requested first, because the light serial sandbox run
-   failed its unchanged timing bound. A seat failure needs a disposition before
-   the long measurement sequence; this cell will not relax the bound.
-3. Rung 3 classification and E1's mandatory slow mark are complete. Violator
-   list empty; exception list contains E1 only. Three interleaved measurement
-   rounds are requested through the nine wrappers above, one window at a time.
-4. The Q2 docstring paragraph, final report, reviewer rounds, measurement-based
-   N rationale and final both-leg gate remain future work. The watch node's
-   actual parallel membership and the observed GPU rise remain disclosed.
+1. Start from this ledger's dispatch/scope and turn-5 sections. Package diff
+   base is `ba6e923`; entry HEAD was `f8b8f4b`; the next commit is ledger only.
+   Preserve all evidence under `work/wp-t4/`. Read the dispatcher-supplied
+   turn-5 depth_input_tokens and record it; do not equate the old token-usage
+   footers to input depth. This session yields after the evaluation point;
+   no completed review round or rung-4 measurement is claimed.
+2. The dispatcher runs six windows, in order: r1 baseline, parallel, serial;
+   r2 baseline, parallel, serial. Read `r4-r{1,2}-{baseline,parallel,serial}.log`
+   summaries plus EXIT/start/end/wall fields, free-before logs, head/command/
+   conditions files, and parallel sampler logs, JSONL and snapshot hashes.
+   PowerShell pytest logs may be UTF-16; JSONL is UTF-8. Confirm each started
+   AND finished. Read actual outcomes, skips and warnings; do not infer them
+   from D1/D2. The expected collections are 5078 / 4032 / 1046. Both partitions
+   must add to BASELINE for each outcome (passed/skipped/failed/xfailed).
+3. Fill one heavy-run row per window with measured start/end, exact command,
+   N, counts, exits, free-before and parallel peak RSS/min available/GPU
+   completeness. All windows need >=5 GiB free before; every parallel sample
+   needs >=2 GiB available. A lower sample is a failed run and a STOP, never
+   permission to reduce N. All required parallel legs must be green, heads
+   must match and sampler snapshots must match the SHA recorded below. A
+   genuine GPU query error voids a complete GPU figure; successful slow reads
+   are valid only with their actual cadence/age disclosed. Keep GPU activity
+   raised; marker meaning is outside this package.
+4. Compare the two PARALLEL+SERIAL wall-time totals. Q7 requires a third full
+   interleaved round only when they differ by >15 percent; D2 never counts.
+   Report both totals and an explicit percentage denominator. If choosing
+   the first versus second total as denominator changes the threshold
+   decision, ask the dispatcher for the ruling before requesting r3. Do not
+   launch any window yourself. Existing r3 wrappers can be requested if the
+   condition is met. Compute medians for BASELINE, PARALLEL, SERIAL and each
+   round's P+S sum, using only the required valid rounds. Record start times,
+   same quiet host, and "not a figure of record". Justify N=4 (AD-28 cap)
+   from actual saving and peak memory, not a prospective estimate.
+5. No D1/D2 violator exists. A new parallel failure must be confirmed serially
+   before being called a violator. Report a failure that also fails serially
+   as pre-existing; never silently fix it. CHARC's condition: findings in
+   WP3.14 or WP3.20R tests are reported for that package's next touch, never
+   edited by this cell. Other tests outside WP-T4's owned envelope require
+   a grant before code edits. New timing watch items are in turn-5 static
+   findings below. E1 alone is the mandated moved exception; do not widen
+   its unchanged bound. Its light sandbox serial failure is still raised:
+   no separate quiet-seat probe result was supplied by turn 5. Quiet-seat
+   BASELINE/SERIAL results must resolve it, or the dispatcher must adjudicate
+   a repeated failure. The watch node in GUI analysis service is PARALLEL,
+   despite the old dispatch statement; collection proves this.
+6. Finish Q2's ONE module-docstring paragraph in `tests/conftest.py`, using
+   installed xdist source anchors already recorded in rung 2. Worker basetemp
+   derives from the controller root/popen-gwN; controller guard configures
+   before workers start. Conftest executable-code changes are forbidden;
+   a guard failure on a worker is a STOP. Respect the WP-T3 fence around
+   `verify_generated` and all product/tools/src/interface ownership limits.
+7. Write NEW `docs/reports/wp-t4-parallel-tests.md`: claims, current partition
+   proof and historical count changes, worker guard/positive control with
+   source lines, deterministic cache-race red/green proof and conservative
+   stale-lock rule, suspected/confirmed/rejected/fixed findings, complete
+   exception list, pre-existing failures, figures/medians/memory/GPU limits,
+   N rationale, review state and limits. Current node evidence is
+   `turn5-{all,parallel,serial}.nodes`, exact added/removed lists and
+   `turn5-collection-accounting.json`; all remain uncommitted scratch.
+   Dependency versions, MIT metadata quotations and old guard/cache
+   evidence are retained earlier in this ledger; do not claim new runs.
+8. Report section "Gate text for the orchestrator" must quote exact commands
+   as executed, propose replacing the fill's pytest sentence with the two
+   legs, "figures from serial runs only", and "new parallel-leg tests:
+   per-test tmp_path, no shared path; an exception is slow with a reason".
+   Supply the one-line CLAUDE.md pointer. Edit neither review-gate fill nor
+   CLAUDE.md; do not create docs/testing.md. Run ruff check, format --check
+   and mypy with logs. After any file changes following the final settled
+   round, request BOTH legs once more, per rung 5; green old diagnostics are
+   not final gates. Harness gate is not required for this package's files.
+9. Driver owns Reviewer A/B (pinned Claude Opus high), its transport and
+   assertions. No substitute reviewer or mailbox post. Adjudicate every
+   finding with severity, evidence, NEW/REOPENED and envelope classification;
+   maintain cumulative counts, reverts and product/test fixes. Zero new
+   blocking terminates per the fill; at round 5 and each fifth, STOP for
+   approval. Final return report under about 70 lines plus FILES CHANGED and
+   COMMIT; the dispatcher commits, never the cell. Do not mark complete
+   before measurement, final gates, report and reviews actually finish.
