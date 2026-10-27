@@ -4,21 +4,22 @@
 
 - Codex lane: turn 1 assigned rungs 0 and 1; turn 2 assigned the remaining
   dependency checks and rung 2's worker guard cases.
-- Current package diff base: `528d865`; branch: `wp-t4`. The turn-3 dispatcher
-  rebased the content-unchanged turn-1/2 commits to `cd4697e` / `0fa0757`.
+- Current package diff base: **`2aca60e`**; branch: `wp-t4`. Generation 14
+  rebased the three accepted commits to `dfb7214`, `e374e1a`, `6ac384a`;
+  it reports content unchanged and patch-id `586b61a1` preserved.
   Historical rung-0 collection base: `9753b7b4cc05bf43c25442cb87aa74e23f2b584f`.
 - Initial tracked/untracked status: clean (`STATUS_COUNT=0`), recorded before
   changes in `work/wp-t4/turn1-base.txt`. The ignored local config was present;
   it was not edited.
-- Q3 requires the deterministic cold-cache reproduction and lock in a later
-  turn. Q7 requires two interleaved measurement rounds, with a third only if
-  the two parallel-plus-serial times differ by more than 15 percent.
+- Q3's deterministic reproduction and mandatory cache lock were completed in
+  turn 3. The current measurement plan follows generation 14's explicit turn-4
+  dispatch: **three interleaved BASELINE -> PARALLEL -> SERIAL rounds**.
 - Shared/in-flight files remain untouched, including WP-T3's `verify_generated`
   and `tests/test_fixtures.py`. No source, frozen interface, harness, product,
   or footage edit was made. All cell-authored artifacts are inside the worktree;
   no effect outside the permitted workspace/cache is claimed.
-- Dispatcher-supplied `tokens used` footers: turn 1 **73,551**, turn 2 **119,645**.
-  Turn-3 reading is pending; no estimate substituted.
+- Dispatcher-supplied `tokens used` footers: turn 1 **73,551**, turn 2 **119,645**,
+  turn 3 **220,811**. Turn-4 reading is pending; no estimate substituted.
 
 ## Turn 1 evidence: collection and dependency
 
@@ -403,25 +404,231 @@ sibling lock absent, and removed only `work/fixtures/generated`; the requested
 first full leg will therefore start **cold**. Logs, test temp roots and the
 worktree-local CuPy cache were retained as evidence.
 
+## Turn 4: rung-3 classification, E1 and the measurement-window handoff
+
+### Diagnostic full leg and collection reconciliation
+
+The cell read the diagnostic leg, preflight and sampler summaries supplied by
+generation 14. The PowerShell leg log is UTF-16; sampler JSONL is UTF-8.
+The pytest leg itself exited **0**, while the sampler and wrapper exited **4**.
+There were **zero failures/errors and zero violators from this run**. Its one
+skip is `tests/test_color_roundtrip.py:121`, reason:
+`swscale reads a yuvj format as full whatever in_range says (refused instead)`.
+The five warnings are not outcome failures.
+
+Fresh collection on base `2aca60e`, before adding E1's marker, produced:
+**4,889 all; 3,883 parallel; 1,006 serial**, all exit 0. Therefore the executed
+leg's **3,882 passed + 1 skipped = 3,883** accounts for every selected node.
+Compared with turn 3's old-base parallel collection, the exact node-set change
+is **103 added and two removed**, all in `tests/test_fixtures.py`, for a net
+increase of 101. This was measured, not inferred from the rebase description.
+The changed-ID lists are `turn4-rebase-added.nodes` and
+`turn4-rebase-removed.nodes` under `work/wp-t4/`.
+
+After E1's marker, explicit `--strict-markers` collection produced:
+**4,889 all; 3,882 parallel; 1,007 serial**, all exit 0. The sorted node sets
+prove disjoint legs whose union equals the full suite; the full node set did
+not change, and E1 is the only node transferred from parallel to serial.
+Evidence: `turn4-before-e1-collect-{all,parallel,serial}.log`,
+`turn4-after-e1-collect-{all,parallel,serial}.log`, `turn4-partition.log`,
+`turn4-partition.json`, and `turn4-{before,after}-{all,parallel,serial}.nodes`.
+All these are scratch files under `work/wp-t4/`. Collection used the committed
+sandbox shim and a worktree-local CUPY_CACHE_DIR, as diagnosed in turn 3.
+
+### Complete exception and violator lists
+
+**Confirmed full-leg violators: none.** No speculative concurrency remedy or
+xdist grouping was added. No in-flight-owned test was edited.
+
+| Test ID | Reason | Remedy / status |
+|---|---|---|
+| `tests/test_io_video_encode_bench.py::test_run_once_records_the_row_and_deletes_the_output` | `timing bound, DR-58 (c); stays serial` | Added exactly that comment and `@pytest.mark.slow`; body and `-0.05` bound unchanged |
+
+This is the complete moved-test exception list: **one test**, no whole file,
+no marker meaning changed, no `xdist_group` or `--dist loadgroup` used. `slow`
+was already registered; strict collection confirms the marker is accepted.
+
+**Dispatch fact correction:** the GUI service watch node
+`tests/test_gui_analysis_service.py::test_pts_and_statistics_never_wait_for_a_run_in_flight`
+is actually **in the parallel leg**, and absent from serial, both before and
+after E1. `turn4-watch-membership.log` and the collected node lists establish
+this. The source has no applicable gui marker. The diagnostic full leg passed
+it (its only skip was the different color-roundtrip node). The instruction to
+say this watch item is excluded by `not gui` contradicts measured membership;
+no gui marker was added or its meaning changed to make that statement true.
+
+### Existing E1 serial timing failure, raised without relaxing it
+
+A light serial sandbox run of E1 with `--strict-markers`, a fresh basetemp and
+the shim failed its existing bound at line 323:
+`assert -0.05 < offsets["telemetry_origin"] <= 0`, observed
+`offsets["telemetry_origin"] = -0.06995480007026345`.
+Result: **1 failed, exit 1**, `work/wp-t4/turn4-e1-serial.log`.
+The test body is unchanged by this package; only its marker/comment changed.
+The preceding full diagnostic leg passed E1. This is a raised, existing timing
+failure in the serial sandbox environment, **not a parallel violator**. Its
+environmental cause is not claimed established. The bound was not widened,
+the test was not skipped, and a rerun-until-green was not substituted for the
+failure. Quiet-seat reproduction is requested before the long round windows:
+
+```powershell
+powershell -NoProfile -File work/wp-t4/run_e1_seat_probe.ps1
+```
+
+That unshimmed wrapper runs exactly
+`uv run pytest -q -rs --strict-markers --basetemp=work/wp-t4/turn4-e1-seat-tmp tests/test_io_video_encode_bench.py::test_run_once_records_the_row_and_deletes_the_output`,
+redirects both streams to `work/wp-t4/turn4-e1-seat.log` and appends `EXIT=`.
+It refuses existing evidence. A repeat failure at the quiet seat needs a
+dispatcher/architect disposition; this cell has no grant to relax the bound.
+
+### GPU gaps, negative timeout and corrected scratch sampler
+
+The diagnostic JSONL has 360 RSS samples and five missing GPU readings. Four
+GPU errors say timeout 0.8 seconds; one says approximately -0.013 seconds.
+The inspected old sampler supplied a **fixed positive `timeout=0.8`** to
+`subprocess.run`; its scheduling tick only computed a sleep duration.
+CPython 3.12.13 `Lib/subprocess.py:1228` passes `self._remaining_time(endtime)`
+from `communicate` into `wait`, and the Windows `_wait` at line 1593 includes
+that timeout argument in `TimeoutExpired`. Once the communicate deadline is
+exhausted, the reported remaining duration can be negative. The observed
+negative value is consistent with this CPython path; it does not demonstrate
+a sampler timeout derived from the sampling tick.
+Evidence: `turn4-sampler-diagnostic.log` and the inspected stdlib source.
+
+The five gaps leave the GPU series incomplete: **1457 MiB is an observed peak
+and the +1334 MiB rise is an observed lower bound**, not a certified complete
+sampled GPU peak. The rise itself is established and is raised as graphics-card
+use in the nominal non-GPU leg, as required by the brief. The previously traced
+module-import GPU probe remains an identified pre-existing mechanism; no
+marker/product/tool fix was made. The leg's wall time and complete RSS/available
+memory series remain valid diagnostic evidence, with no memory-floor breach.
+**D1 does not count as a settled rung-4 round**: GPU data have gaps, it predates
+E1's partition change, and it has no paired baseline/serial measurements.
+
+`work/wp-t4/monitor_pytest.py` now uses a fixed positive **5-second** GPU-query
+timeout and a separate GPU-reading thread. Main-thread RSS and available-memory
+polls keep their one-second schedule. Every real GPU query records its own
+completion time, sequence, elapsed duration and slow-read flag. RSS records
+carry the latest GPU observation with its timestamp and explicit age; reused
+readings are not represented as fresh queries. Baseline readiness is signaled
+before pytest starts. Genuine query failures still make `gpu_complete=false`
+and sampler exit nonzero; slow successful reads remain measured observations.
+Summary fields also expose query/error counts, longest read, maximum observation
+age and maximum RSS polling interval. No gap is filled by an invented value.
+
+A controlled smoke check injected a two-second delay before every successful
+real GPU query. It passed: **8 RSS samples, 5 GPU queries, 5 slow successful
+reads, GPU complete, longest read 2.2040 s, maximum RSS interval 1.0310 s**;
+sampler exit 0 and the two-worker pytest workload passed. Evidence:
+`turn4-sampler-smoke.log`, `turn4-sampler-smoke.jsonl`, and its monitor/pytest
+logs. These are instrument checks, not measurement figures for N=4.
+
+For rung 4, a usable full PARALLEL measurement needs the intended one-second
+RSS series, complete real GPU query results when nvidia-smi is present, explicit
+latencies/ages for slow observations, sampler exit 0 and no available-memory
+sample below 2 GiB. A real GPU query failure requires a fresh measurement window
+after the instrument issue is resolved; the cell will not silently validate
+missing observations, lower N or alter marker meaning. The medians additionally
+need matching frozen heads, matching sampler snapshots, green legs and matching
+per-round outcome totals.
+
+### Rung-4 requests: three interleaved rounds, one wrapper per window
+
+Generation 14's turn-4 dispatch explicitly requests three rounds. Each round
+runs **BASELINE, then PARALLEL, then SERIAL**, one granted quiet-host window at
+a time, on the frozen post-E1 head. No rung-4 window has been run by the cell.
+Commands, collected counts and logs are recorded in `turn4-r4-plan.json`.
+
+The nine wrappers call `work/wp-t4/run_r4.ps1` with fixed round/leg arguments.
+They resolve the worktree from their own path, set `QT_QPA_PLATFORM=offscreen`,
+refuse the shim, check >=5 GiB available before each run, refuse every existing
+evidence path and basetemp, record HEAD/commands/conditions, and append UTC
+start/end, wall seconds and `EXIT=`. Parallel wrappers copy and hash the exact
+sampler source, start it hidden, and wait for baseline readiness before pytest.
+They preserve separate leg and sampler exits. Logs and sampler data stay under
+`work/wp-t4/`. No extra heavy job or N change is launched automatically.
+
+The plan uses the same marker expressions throughout: all **4,889** tests in
+BASELINE, **3,882** in PARALLEL, **1,007** in SERIAL. Per-round passed/skipped/
+failed/xfailed totals must add to BASELINE, with zero PARALLEL failures. Sampled
+GPU activity remains a disclosed finding. Final figures must state the actual
+start times and conditions: same quiet host, **not a figure of record**.
+
+All nine overwrite refusals were exercised with planted run-log artifacts and
+an error-only uv stub, so **no real uv/pytest command could start**. Nine of
+nine refused before preflight and preserved the planted bytes; only those
+planted files were removed afterwards (`turn4-wrapper-guards.log` plus per-case
+logs). The common runner, nine run wrappers and E1 seat wrapper have zero
+PowerShell parse errors (`turn4-wrapper-syntax.log`).
+
+| Round / leg | Dispatcher RUN REQUEST | Exact pytest command (wrapper redirects to its unique log and appends EXIT) |
+|---|---|---|
+| 1 / baseline | `powershell -NoProfile -File work/wp-t4/run_r4_r1_baseline.ps1` | `uv run pytest -q -rs --basetemp=work/wp-t4/r4-r1-baseline-tmp` |
+| 1 / parallel | `powershell -NoProfile -File work/wp-t4/run_r4_r1_parallel.ps1` | `uv run pytest -q -rs -n 4 -m "not gpu and not footage and not gui and not slow" --basetemp=work/wp-t4/r4-r1-parallel-tmp` |
+| 1 / serial | `powershell -NoProfile -File work/wp-t4/run_r4_r1_serial.ps1` | `uv run pytest -q -rs -m "gpu or footage or gui or slow" --basetemp=work/wp-t4/r4-r1-serial-tmp` |
+| 2 / baseline | `powershell -NoProfile -File work/wp-t4/run_r4_r2_baseline.ps1` | `uv run pytest -q -rs --basetemp=work/wp-t4/r4-r2-baseline-tmp` |
+| 2 / parallel | `powershell -NoProfile -File work/wp-t4/run_r4_r2_parallel.ps1` | `uv run pytest -q -rs -n 4 -m "not gpu and not footage and not gui and not slow" --basetemp=work/wp-t4/r4-r2-parallel-tmp` |
+| 2 / serial | `powershell -NoProfile -File work/wp-t4/run_r4_r2_serial.ps1` | `uv run pytest -q -rs -m "gpu or footage or gui or slow" --basetemp=work/wp-t4/r4-r2-serial-tmp` |
+| 3 / baseline | `powershell -NoProfile -File work/wp-t4/run_r4_r3_baseline.ps1` | `uv run pytest -q -rs --basetemp=work/wp-t4/r4-r3-baseline-tmp` |
+| 3 / parallel | `powershell -NoProfile -File work/wp-t4/run_r4_r3_parallel.ps1` | `uv run pytest -q -rs -n 4 -m "not gpu and not footage and not gui and not slow" --basetemp=work/wp-t4/r4-r3-parallel-tmp` |
+| 3 / serial | `powershell -NoProfile -File work/wp-t4/run_r4_r3_serial.ps1` | `uv run pytest -q -rs -m "gpu or footage or gui or slow" --basetemp=work/wp-t4/r4-r3-serial-tmp` |
+
+### Turn-4 verification loop
+
+| ID | Severity / class | Confirmed / rejected evidence | Disposition |
+|---|---|---|---|
+| T4-1 | Verification, count reconciliation | 103 added and 2 removed fixture-test IDs explain the net +101 selected tests; 3882+1 matches the executed leg | Report corrected by measured node sets; no test edit needed |
+| T4-2 | Minor, scratch measurement instrument | Five GPU gaps; old code fixed timeout 0.8; CPython remaining-deadline path explains the negative message | Fixed scratch instrument with 5-second queries, asynchronous GPU reads and explicit latency/age; slow-read smoke passes |
+| T4-3 | Minor, dispatch fact correction | Watch node appears in parallel and not serial in both collections | Raised with proof; no marker edit |
+| T4-4 | Major nominal, existing serial timing failure | E1 fails the unchanged -0.05 bound with -0.0699548 in a serial sandbox run | Not a violator; raised for quiet-seat check; no bound relaxation or skip |
+| T4-5 | Verification, exception budget | Strict marker collection accepts E1; one node transfers and all-suite node set is identical | One mandated slow exception, within the 20-test limit; no grouping |
+
+Final lint/type checks all exit 0: ruff check passes, ruff format reports 228
+files already formatted, and mypy reports no issues in 132 source files.
+Evidence: `turn4-ruff-check.log`, `turn4-ruff-format.log`, `turn4-mypy.log`.
+The single E1 timing failure is disclosed above; an all-tests-green claim is
+not made for the current head. Independent reviewer rounds remain pending.
+
+Final turn-4 state checks (`turn4-final-state.log`, exit 0) confirm exactly two
+owned changed paths, LF-only bytes, and an exact two-line test-file change:
+the required reason comment plus `@pytest.mark.slow`. The entire remaining
+file, including E1's body and bound, is byte-identical to HEAD. Protected source,
+tools, scripts, fixture infrastructure, in-flight fixture tests and dependency
+files have no turn-4 diff. All nine ordered wrappers exist, no rung-4 measurement
+log exists, and the command table matches the plan JSON. `git diff --check`
+exited 0. The corrected sampler's current SHA-256 is
+`64a57c731a09a7eca1e4c6f5b882975888ca0233434cc02b2c69e0dbc7ee0854`;
+the three actual PARALLEL snapshots must match while the plan remains frozen.
+
 ## Heavy-run ledger
 
-No heavy window consumed in turns 1-3. The first full PARALLEL window is
-requested at turn-3 yield, not executed. Future rows will record start,
-end, command, N, outcome counts, exit, available memory before, peak summed RSS,
-minimum available memory and any GPU-memory change from dispatcher evidence.
+The dispatcher ran D1 after turn-3 yield. No heavy leg was executed by the cell.
+
+| Run / head | Start UTC | End UTC | Command / log under work/wp-t4 | N | Counts | Leg / sampler / wrapper exit | Free before | Peak summed RSS | Minimum available | GPU / qualification |
+|---|---|---|---|---|---|---|---|---|---|---|
+| D1 diagnostic / `6ac384a`, before E1 | 2026-10-27 08:51:03.9259564Z | 2026-10-27 08:57:03.4570794Z | `uv run pytest -q -rs -n 4 -m "not gpu and not footage and not gui and not slow" --basetemp=work/wp-t4/t3-parallel-01`; `turn3-parallel-01.log` | 4 | 3882 passed, 1 skipped, 0 failed, 0 xfailed; 5 warnings | 0 / 4 / 4 | 11.899719 GiB | 6,821,711,872 B | 6,184,673,280 B | Baseline 123 MiB, observed peak 1457 MiB, rise 1334 MiB; 5/360 GPU gaps; diagnostic only |
+
+D1 wall time: **359.5270566 seconds** (pytest's own duration 358.33 seconds).
+Its 360 RSS samples have no access-denied reading, no <2 GiB sample and no
+remaining child PID. Rung-4 rows will be added from actual window results,
+including per-round counts, frozen HEAD and sampler hash, not estimated figures.
 
 ## Cumulative review-round ledger
 
 | Round | Critical / major / minor | In / out of envelope | NEW / REOPENED | Reverts | Product / test-only fixes | Reviewer transport / version | Dispatcher-read depth | Disposition |
 |---|---|---|---|---|---|---|---|---|
-| Not started | N/A | N/A | N/A | 0 | 0 / 0 | Driver-owned Claude Opus high; pending | Turn-2 footer 119,645; turn 3 pending | Yield turn 3 for first diagnostic PARALLEL window |
+| Not started | N/A | N/A | N/A | 0 | 0 / 0 | Driver-owned Claude Opus high; pending | Turn-3 footer 220,811; turn 4 pending | End-of-rung-3 yield; E1 quiet-seat check, then requested measurement windows |
 
 ## Open handoff
 
 1. Driver-owned Reviewer A and its assertions remain pending; no review round
    is claimed clean or counted toward convergence.
-2. First diagnostic PARALLEL window requested through
-   `powershell -NoProfile -File work/wp-t4/run_parallel_01.ps1`; details below.
-3. Rung 3.3 failure classification, rung 3.4's E1 slow mark, the Q2 docstring
-   paragraph, measurement rounds, final report and both-leg gate remain future
-   work, subject to dispatch. No test has been moved out of the parallel leg yet.
+2. Quiet-seat E1 probe requested first, because the light serial sandbox run
+   failed its unchanged timing bound. A seat failure needs a disposition before
+   the long measurement sequence; this cell will not relax the bound.
+3. Rung 3 classification and E1's mandatory slow mark are complete. Violator
+   list empty; exception list contains E1 only. Three interleaved measurement
+   rounds are requested through the nine wrappers above, one window at a time.
+4. The Q2 docstring paragraph, final report, reviewer rounds, measurement-based
+   N rationale and final both-leg gate remain future work. The watch node's
+   actual parallel membership and the observed GPU rise remain disclosed.

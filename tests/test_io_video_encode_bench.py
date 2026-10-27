@@ -269,6 +269,8 @@ def quick(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(bench, "conditions", lambda moment: {"moment": moment})
 
 
+# timing bound, DR-58 (c); stays serial
+@pytest.mark.slow
 def test_run_once_records_the_row_and_deletes_the_output(sample: Any, tmp_path: Path) -> None:
     source = sample(SAMPLE)
     before = (source.read_bytes(), source.stat().st_mtime_ns)
