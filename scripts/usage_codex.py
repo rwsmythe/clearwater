@@ -120,7 +120,8 @@ def read_rate_limits(exe: str, timeout: float) -> dict[str, Any]:
             elif msg.get("id") == 2:
                 if "error" in msg:
                     raise RuntimeError(str(msg["error"]))
-                return msg["result"]
+                result: dict[str, Any] = msg["result"]
+                return result
         raise TimeoutError(f"no rateLimits response within {timeout:.0f} s")
     finally:
         proc.kill()

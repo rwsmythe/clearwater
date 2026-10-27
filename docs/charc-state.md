@@ -116,7 +116,7 @@ of `origin/main`, unpushed; no push asked (verify `git status -sb`).
   packages stay Claude; Sonnet-class eligible for Claude or a Codex `gpt-6.1-sol`/high cell); R2 the reviewer (A and
   B) is always the OTHER model from the implementer (B stays the orchestrator's own PROCESS at its seat: `codex exec`
   or `claude -p`, never a subagent); R3 tiebreak on weekly PACE (used % / elapsed fraction of the window), both
-  readouts confirmed live 2026-10-27 (Claude 21 % at ~10 % elapsed = pace 2.1x; Codex 22 % at ~22 % = 1.0x). Owner:
+  readouts confirmed live 2026-10-27 (Claude 21 % at ~10 % elapsed = pace 2.1x; Codex 22 % at ~11 % = pace ~2.0x, CORRECTED 03:49Z from a mis-converted 1.0x; both lanes near 2x). Owner:
   "Start calibration this phase, write up the harness change." Stages: 0 probes (codex exec write mode in a
   worktree, resume, depth, the `claude -p` read-only reviewer with assertions, usage scripts) -> 1 operative edits
   (new cell `.claude/agents/implementer-codex-sol-high.md`, fill Parts 1-2, orchestrator-context, codex-reviewer,

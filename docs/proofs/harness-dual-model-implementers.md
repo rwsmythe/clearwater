@@ -220,6 +220,41 @@ cat review-prompt.md .review-diff.txt | \
 5. `scripts/usage_codex.py` and `scripts/usage_claude.py` with their parse tests; the scheduled
    task created by the owner if option (a) is chosen.
 
+### 4.1a Stage 0 RESULTS (CHARC, 2026-10-27; probes in `.worktrees/probe-codex` and `clearwater-cells/probe-codex`; evidence `clearwater-review-evidence\probes\`)
+
+- **The Codex write lane WORKS under the UNELEVATED Windows sandbox.** The user config's `[windows] sandbox =
+  "elevated"` (legacy) fails every command with `helper_unknown_error: setup refresh had errors`; passing
+  `-c windows.sandbox="unelevated"` per call gives a working `workspace-write` sandbox: writes inside the worktree
+  succeed, and `uv run ruff` runs once the uv cache is a writable root (`--add-dir C:\Users\rwsmy\AppData\Local\uv`).
+  The pinned invocation in 3.3 gains both flags.
+- **The sandbox protects every `.git` directory**, in a worktree AND in a plain clone: `git add` fails with
+  `index.lock: Permission denied`. So the Codex cell CANNOT commit. Rule: the DRIVER (the orchestrator) commits
+  after each turn, by pathspec, from the files the return report names, with the footer `Co-Authored-By: GPT-6.1
+  Sol via Codex <noreply@openai.com>`; one commit per turn (a limit against the recipe's one-per-logical-change,
+  recorded in the cell file). Isolation stays the worktree; a clone buys nothing.
+- **An outside write is swallowed SILENTLY:** `Set-Content` to a path outside the writable roots returned
+  "succeeded" to the model and produced NO file. Good for the footage lock, bad for trust: a Codex cell's report
+  of any effect outside the workspace is unverifiable from inside; the gate's footage-untouched and footprint
+  checks stay mandatory and the cell file says so.
+- **`codex exec resume <session-id>` accepts NO `-m`, `-s` or `--add-dir`.** Every resumed turn must carry
+  `-c model="gpt-6.1-sol" -c model_reasoning_effort=high -c windows.sandbox="unelevated"
+  -c sandbox_workspace_write.writable_roots=["..."]`, or the turn silently runs on the GLOBAL config's model
+  (observed: `gpt-6-astra`, caught by the banner assertion) under the legacy sandbox. The banner assertion is per
+  TURN, not per cell.
+- **The auto-mode classifier refused `--dangerously-bypass-approvals-and-sandbox`** ("Create Unsafe Agents");
+  not pursued, the sandboxed lane is the design.
+- **The Claude reviewer pass:** `--bare` drops OAuth ("Not logged in"), so the pass runs WITHOUT `--bare` (the
+  project hooks run; harmless). The `--output-format json` result carries `modelUsage` keyed by the model id
+  (assertion 1's model half), `session_id`, `permission_denials`, `num_turns`, `usage`; EFFORT is not echoed, so
+  that half of assertion 1 is the invocation record. stdin works from a combined prompt+diff file when the process
+  is started DETACHED with redirected stdin (a Claude Code background shell is reaped under memory pressure; a
+  detached process is not). The head-to-head on the WP3.20 candidate (the Codex B's own prompt and diff, verbatim)
+  was launched 2026-10-27 ~04:02Z; its result is recorded in 4.1b when in.
+- **Readouts:** `scripts/usage_codex.py` and `scripts/usage_claude.py` are live and tested
+  (`tests/harness/test_usage_readouts.py`), the Claude one under the standing rule
+  `Bash(python scripts/usage_claude.py*)` in `.claude/settings.json` (owner, 2026-10-27; main `9c15d0c`). Second
+  reading 03:57Z: Claude 22 % at 10.7 % elapsed = pace 2.06; Codex 22 % at 11.8 % = pace 1.87.
+
 ### 4.2 Stage 1: the operative edits (CHARC, after Stage 0, one harness commit, harness gate green)
 
 | File | Change |
