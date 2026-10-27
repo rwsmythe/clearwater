@@ -40,8 +40,12 @@ A control still at the value it first displayed never overwrites its field; the 
 ## Encoder and 10-bit rules
 
 - An unavailable capability is a disabled item, "<name> (unavailable: <reason>)", the reason also
-  its tool tip; an unavailable encoder cannot be accepted (OK is disabled if one is selected by
-  any route and was not the stored value).
+  its tool tip. An encoder the sink reports as unavailable is never accepted, whether stored
+  or picked: OK is disabled, the reason is shown in the dialog, and a direct accept presents
+  a settings-owned error. A stored encoder the sink does not report (absent, or detection
+  failed) stays shown unavailable and is written back unchanged unless another is picked.
+  While detection is pending the control is disabled and encoder refusal is deferred;
+  OK is re-evaluated when the report arrives.
 - A stored encoder the sink does not report stays as a disabled, selected item and is written back
   unchanged unless the user picks another; its reason is "not found on this computer", or the
   detection failure when the report could not be read.

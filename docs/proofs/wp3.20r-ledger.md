@@ -17,7 +17,8 @@
   figure: **92,340**, supplied at the turn-3 gate; turn 2 committed as `944b5d2`.
   Dispatcher-supplied end-of-turn-3 figure: **111,584**, supplied at the turn-4
   gate; turn 3 originally committed as `26b8ff5`, now rebased as `7c43b65`.
-  Turn-4 figure not yet supplied.
+  Dispatcher-supplied end-of-turn-4 figure: **131,507**, supplied at the turn-5
+  gate; turn 4 committed as `d80a921`. Turn-5 figure not yet supplied.
   No reviewer has run; Reviewer A follows turn 5.
 
 ## Baseline and sandbox observations
@@ -146,7 +147,7 @@ S55 roster:
 
 | Reviewer A round | Severity counts | In / out of envelope | NEW / REOPENED | Reverts | Product / test-only fixes | Verdict | Dispatcher token figure |
 |---|---|---|---|---|---|---|---|
-| Not started | n/a | n/a | n/a | 0 | 0 / 0 | Scheduled after turn 5 | Turn 3: 111,584 |
+| Not started | n/a | n/a | n/a | 0 | 0 / 0 | Scheduled after turn 5 | Turn 4: 131,507 |
 
 Locks this turn: owned deliverable only; product/tests and frozen interfaces
 untouched; no dependency or OS-specific product change; local configuration
@@ -445,3 +446,62 @@ ASCII-ledger and protected-test source checks are recorded in
 `work/wp3.20r/turn4-deliverable-check.log`. Only the three owned files changed;
 frozen interfaces, dependencies, local config, harness shim and footage are
 untouched. No OS-specific product code, git writes, reviewer or mailbox activity.
+
+## Turn 5: report and static gates
+
+Starting HEAD `d80a921`; cumulative package diff base remains **528d865**.
+Dispatcher-supplied end-of-turn-4 token figure **131,507** recorded above.
+The dispatcher confirmed turn-4 global formatting outside the sandbox:
+**227 files already formatted**, exit 0 (seat evidence, not a cell rerun).
+
+Wrote `docs/reports/wp3.20r-settings-hardening.md`: changes per row, corrected
+encoder claim and full truth table, pre-fix/head evidence, the ruled DR-53
+constructor non-reproduction and actual divergence reproduction, planted
+controls, HD-1 counts, gate results and limits. It supersedes historical
+WP3.20 narrative for these rows, explicitly including the suffix accept order;
+the old report's other historical content remains outside the authorized edit.
+Replaced only the unavailable-capability bullet under "Encoder and 10-bit rules"
+in `docs/reports/wp3.20-settings.md`, with the reported-unavailable refusal,
+stored-unreported allowance and pending-detection behavior. No product/test edit.
+
+### HD-1 count
+
+AST/source comparison against `528d865` in `work/wp3.20r/turn5-test-counts.log`:
+base 44 and head 59 test functions; **15 new**, **1 changed**, no removed tests.
+The changed function is `test_every_message_of_the_dialog_is_ascii`. New tests
+include **3 planted-control functions** (4 cases) and **3 real-scenario control
+functions** (5 cases), leaving 9 primary new functions. This matches the brief's
+15-function estimate; parameterization adds 21 cases overall, 64 -> 85 targeted
+cases (81 dialog plus 4 unchanged dependency cases).
+
+### Final turn-5 gates
+
+Pytest used `QT_QPA_PLATFORM=offscreen`, `PYTHONPATH=scripts`,
+`-p sandbox_mkdir_shim -p no:cacheprovider`, both targeted files and
+`--basetemp=work/wp3.20r/tmp-t5 -q`. Gate runs at the seat never load the shim.
+
+| Command | Observed result | Log under `work/wp3.20r/` |
+|---|---|---|
+| Targeted pytest | Exit 0; **85 passed in 9.00s** | `turn5-pytest.log` |
+| `uv run ruff check .` | Exit 0; **All checks passed!**; two access-denied traversal warnings | `turn5-ruff-check.log` |
+| `uv run ruff format --check .` | Exit 101; **Expected a ruff source file** (sandbox artifact) | `turn5-ruff-format.log` |
+| Owned Python file format check | Exit 0; **2 files already formatted** | `turn5-owned-format-check.log` |
+| `uv run mypy` | Exit 0; **Success: no issues found in 132 source files** | `turn5-mypy.log` |
+
+Verification loop: DR-53 field/applied divergence confirmed on unchanged code,
+constructor truncation rejected by runtime measurements, actual applied-value
+validation and missing settings error fixed; DR-54 bypass confirmed then fixed,
+the stronger disagreeing resolver tests already passed; DR-55 escaped calls
+confirmed by assertions plus pytest-qt and fixed. Planted implementations still
+fail all named shared scenarios; catcher tests pass. The complete targeted
+turn-5 run found no new in-scope issue. Compared report claims with those measured
+paths, the product diff and gate results. No product/test correction this turn.
+
+Review status: **Reviewer A not yet run**; dispatcher runs it after this handoff.
+No convergence verdict is claimed. No open product question or scope deviation.
+Global formatting awaits turn-5 seat confirmation; the full suite remains the
+orchestrator's. Only owned docs changed this turn; cumulative owned-file scope,
+one-bullet-only replacement, LF and report length are checked in
+`work/wp3.20r/turn5-deliverable-check.log`. Interfaces, dependencies, local config,
+committed shim and footage untouched; no OS-specific code, git writes, reviewer
+or mailbox activity.
