@@ -1,0 +1,658 @@
+"""The export engine: one job per photo or video, behind the WP3.19 seam (WP3.14; IF-8).
+
+:class:`ExportEngine` implements :class:`~clearwater.jobs.export_seam.ExportJobs`. A job reads one
+source, corrects it with the injected IF-3 method and writes one output through
+:func:`~clearwater.jobs.naming.plan_output` and :class:`~clearwater.jobs.safe_write.SafeWrite`
+with a fresh :class:`~clearwater.jobs.naming.Reservations` (DR-35 (b)). A video's analysis runs
+inside the job (AD-7, AD-15), so a batch item needs no prior analysis.
+
+Threads: everything runs on the caller's worker thread, one frame in flight. During a video
+encode one watchdog thread polls ``progress.cancelled()`` and calls the sink's ``abort`` once,
+which releases a write blocked on FFmpeg's input (DR-57 (b)); it touches nothing else.
+
+Every collaborator is injected (plan 8.1: ``jobs`` reaches correction methods only through IF-3),
+so this module imports nothing from ``clearwater.gui``, ``clearwater.methods``,
+``clearwater.core`` or ``clearwater.io.photo``.
+"""
+
+from __future__ import annotations
+
+import dataclasses
+import logging
+import os
+import threading
+import time
+from collections.abc import Callable, Iterator, Mapping
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any
+
+import numpy as np
+
+import clearwater
+from clearwater.analysis import CANCELLED as ANALYSIS_CANCELLED
+from clearwater.analysis import AnalysisEngine, block_mean, proxy_factor
+from clearwater.interfaces import (
+    ArrayBackend,
+    CacheKey,
+    CorrectionMethod,
+    Frame,
+    Image,
+    JobResult,
+    ParameterSet,
+    PhotoSink,
+    PhotoSource,
+    ProbeResult,
+    Progress,
+    ProxyCache,
+    Settings,
+    VideoSink,
+    VideoSource,
+)
+from clearwater.io.video import (
+    VideoDecodeError,
+    VideoEncodeError,
+    VideoProbeError,
+    is_sidecar,
+    resolve_encoder,
+    sidecar_fault,
+)
+from clearwater.io.video.encode import POLL_S
+from clearwater.io.video.inputs import ascii_text
+
+from .disk_space import check_free_space, estimate_photo_bytes, estimate_video_bytes
+from .export_seam import CANCELLED, ExportRequest
+from .naming import MediaKind, OutputPlan, Reservations, plan_output, validate_suffix
+from .provenance import photo_source_summary, provenance_object, video_source_summary
+from .safe_write import SafeWrite, SafeWriteError, is_disk_full
+
+_LOG = logging.getLogger(__name__)
+
+RESERVED_DEVICE_NAMES = frozenset(
+    {"CON", "PRN", "AUX", "NUL"}
+    | {f"COM{i}" for i in range(1, 10)}
+    | {f"LPT{i}" for i in range(1, 10)}
+)
+"""Windows device names no output may take (DR-35 (a); a portable rule applied on every OS)."""
+
+WATCHDOG_JOIN_S = 60.0
+"""How long the job waits for the cancel watchdog to end after it is told to stop."""
+
+BackendSelector = Callable[[Settings, int, int, str], tuple[ArrayBackend, str]]
+"""IF-2 ``select_backend``: settings, height, width, method id -> backend and reason."""
+
+_READABLE_ERRORS = (VideoProbeError, VideoDecodeError, VideoEncodeError, SafeWriteError)
+"""Errors whose message is already written for the user (shown without the type name)."""
+
+
+def is_reserved_device_name(name: str) -> bool:
+    """Tell whether a file name is a Windows device name (``NUL.MP4``, ``con.png``, ``COM1 .x``).
+
+    The part before the first dot, with trailing spaces and dots stripped, is compared without
+    regard to case. Windows 11 build 26300 creates ``NUL.MP4`` as an ordinary file, but older
+    Windows versions and copies onto other volumes do not, so every OS refuses the name.
+
+    Args:
+        name: A file name (no folder).
+
+    Returns:
+        True when the name is reserved.
+    """
+    return name.split(".", 1)[0].rstrip(" .").upper() in RESERVED_DEVICE_NAMES
+
+
+def effective_parameters(method: CorrectionMethod, parameters: ParameterSet) -> dict[str, Any]:
+    """Return the method defaults overlaid with the set's values (IF-9 sets may be partial).
+
+    The same rule as the preview's (``clearwater.gui.imaging.effective_parameters``), so an
+    export renders with the values the preview showed.
+
+    Args:
+        method: The method whose schema applies.
+        parameters: The parameter set.
+
+    Returns:
+        Parameter name -> value.
+    """
+    values: dict[str, Any] = {p.name: p.default for p in method.parameters}
+    values.update(parameters.parameters)
+    return values
+
+
+class _CancelledError(Exception):
+    """The job stopped because ``progress.cancelled()`` was True."""
+
+
+class _FailureError(Exception):
+    """A readable failure; the message is the ``JobResult.failure`` text."""
+
+
+@dataclass
+class _Run:
+    """The state of one running job, read when its result is built."""
+
+    name: str
+    device: str = "none"
+    warnings: list[str] = field(default_factory=list)
+    outputs: list[Path] = field(default_factory=list)
+    write: SafeWrite | None = None
+    final_name: str | None = None
+
+
+class _Relabel:
+    """A :class:`Progress` that prefixes each message (the analysis phase's progress)."""
+
+    def __init__(self, progress: Progress, prefix: str) -> None:
+        self._progress = progress
+        self._prefix = prefix
+
+    def report(self, done: int, total: int | None, message: str) -> None:
+        """Pass the report on with the prefix."""
+        self._progress.report(done, total, f"{self._prefix}: {message}")
+
+    def cancelled(self) -> bool:
+        """Return the wrapped progress's cancel flag."""
+        return self._progress.cancelled()
+
+
+class _Watchdog:
+    """Polls the cancel flag during an encode and calls the sink's ``abort`` once (Q2)."""
+
+    def __init__(self, progress: Progress, sink: VideoSink) -> None:
+        self._progress = progress
+        self._sink = sink
+        self._stop = threading.Event()
+        self.fired = False
+        self._thread = threading.Thread(target=self._watch, name="export-cancel", daemon=True)
+
+    def start(self) -> None:
+        """Start polling."""
+        self._thread.start()
+
+    def stop(self) -> None:
+        """Stop polling and wait for the thread (it never runs past this call's return)."""
+        self._stop.set()
+        self._thread.join(WATCHDOG_JOIN_S)
+        if self._thread.is_alive():  # pragma: no cover - abort is bounded by the sink
+            _LOG.warning("the export cancel watchdog did not end within %s s", WATCHDOG_JOIN_S)
+
+    def _watch(self) -> None:
+        while True:
+            try:
+                cancelled = self._progress.cancelled()
+            except Exception:  # a broken progress object must not kill the watchdog silently
+                _LOG.exception("progress.cancelled() raised in the export watchdog")
+                cancelled = False
+            if cancelled:
+                self.fired = True
+                self._sink.abort()
+                return
+            if self._stop.wait(POLL_S):
+                return
+
+
+def _caused_by_disk_full(exc: BaseException) -> bool:
+    """Tell whether ``exc`` or anything in its cause or context chain is a disk full (D87)."""
+    seen: set[int] = set()
+    current: BaseException | None = exc
+    while current is not None and id(current) not in seen:
+        if is_disk_full(current):
+            return True
+        seen.add(id(current))
+        current = current.__cause__ or current.__context__
+    return False
+
+
+class ExportEngine:
+    """The export engine (IF-8 jobs behind the WP3.19 ``ExportJobs`` seam).
+
+    Each call of :meth:`job` builds one job for one source. Jobs share nothing but the injected
+    collaborators; one export activity runs at a time (the GUI's gate, or :func:`run_batch`).
+    """
+
+    def __init__(
+        self,
+        *,
+        methods: Mapping[str, CorrectionMethod],
+        video_source: VideoSource,
+        sink_factory: Callable[[], VideoSink],
+        photo_reader: PhotoSource,
+        photo_writer: PhotoSink,
+        cache: ProxyCache,
+        cache_key: Callable[[Path], CacheKey],
+        select_backend: BackendSelector,
+        app_version: str = clearwater.__version__,
+        on_stage: Callable[[str], None] | None = None,
+    ) -> None:
+        """Store the collaborators; nothing runs until a job runs.
+
+        Args:
+            methods: The correction methods by id (IF-3).
+            video_source: The frame source (IF-5), also given to each job's analysis engine.
+            sink_factory: Returns a fresh, unopened video sink (IF-5) for each video job.
+            photo_reader: The photo source (IF-6).
+            photo_writer: The photo sink (IF-6).
+            cache: The proxy cache each video job's analysis engine uses (IF-7).
+            cache_key: The cache key of a source file.
+            select_backend: The backend selector (IF-2; D111, AD-9).
+            app_version: The version recorded in provenance.
+            on_stage: Called with a phase name at each phase boundary (the V16 instrument's
+                hook: ``"probe"``, ``"analysis"``, ``"open"``, ``"frames"``, ``"close"`` for a
+                video; ``"read"``, ``"measure"``, ``"render"``, ``"write"`` for a photo; then
+                ``"committed"``). None in the product; the engine reads no clock of its own.
+        """
+        self._methods = dict(methods)
+        self._video_source = video_source
+        self._sink_factory = sink_factory
+        self._photo_reader = photo_reader
+        self._photo_writer = photo_writer
+        self._cache = cache
+        self._cache_key = cache_key
+        self._select_backend = select_backend
+        self._app_version = app_version
+        self._on_stage = on_stage
+
+    def job(self, request: ExportRequest) -> Callable[[Progress], JobResult]:
+        """Return the IF-8 job that exports ``request`` (the ``ExportJobs`` contract).
+
+        Touches no file: a missing or unreadable source is the job's failure.
+
+        Args:
+            request: What to export.
+
+        Returns:
+            The job.
+
+        Raises:
+            ValueError: The request is malformed in itself (a kind other than ``"photo"`` or
+                ``"video"``, or a field of the wrong type).
+        """
+        if not isinstance(request, ExportRequest):
+            raise ValueError(f"not an export request: {type(request).__name__}")
+        if request.kind not in ("photo", "video"):
+            raise ValueError(f"unknown export kind {request.kind!r}")
+        if not isinstance(request.source, Path):
+            raise ValueError(f"the source must be a Path, got {type(request.source).__name__}")
+        if not isinstance(request.parameters, ParameterSet):
+            raise ValueError("the parameters must be a ParameterSet")
+        if not isinstance(request.settings, Settings):
+            raise ValueError("the settings must be a Settings")
+
+        def run(progress: Progress) -> JobResult:
+            return self._run(request, progress)
+
+        return run
+
+    # --- the job ------------------------------------------------------------------------------
+
+    def _run(self, request: ExportRequest, progress: Progress) -> JobResult:
+        """Run one job and turn its outcome into a :class:`JobResult`."""
+        start = time.perf_counter()
+        run = _Run(name=ascii_text(request.source.name) or ascii_text(str(request.source)))
+        failure: str | None = None
+        try:
+            self._check_cancel(progress)
+            method = self._prepare(request, run)
+            if request.kind == "photo":
+                self._photo(request, method, progress, run)
+            else:
+                self._video(request, method, progress, run)
+        except _CancelledError:
+            failure = CANCELLED
+        except _FailureError as exc:
+            failure = str(exc)
+        except Exception as exc:  # every other error is a failed result with its own text
+            failure = self._describe(run, exc)
+        if failure is not None and run.write is not None and run.write.temp_leftover:
+            run.warnings.append(
+                f"The temporary file {ascii_text(run.write.temp_path.name)} could not be removed; "
+                "it is removed at the next start."
+            )
+        result = JobResult(
+            ok=failure is None,
+            outputs=tuple(run.outputs),
+            warnings=tuple(run.warnings),
+            failure=failure,
+            device=run.device,
+            elapsed_s=time.perf_counter() - start,
+        )
+        outcome = "ok" if failure is None else ("cancelled" if failure is CANCELLED else "failed")
+        _LOG.info(
+            "export %s: %s; device %s%s",
+            run.name,
+            outcome,
+            run.device,
+            "" if failure is None or failure is CANCELLED else f"; {failure}",
+        )
+        return result
+
+    def _describe(self, run: _Run, exc: Exception) -> str:
+        """Return the readable failure text of an unexpected error (its ORIGINAL text)."""
+        text = str(exc) if isinstance(exc, _READABLE_ERRORS) else f"{type(exc).__name__}: {exc}"
+        text = ascii_text(text)
+        if _caused_by_disk_full(exc):
+            target = run.final_name or run.name
+            return f"{run.name}: disk full while writing {ascii_text(target)}: {text}"
+        return f"{run.name}: {text}"
+
+    def _stage(self, name: str) -> None:
+        """Call the phase hook, when one is injected."""
+        if self._on_stage is not None:
+            self._on_stage(name)
+
+    @staticmethod
+    def _check_cancel(progress: Progress) -> None:
+        """Stop with :class:`_CancelledError` once the cancel was asked."""
+        if progress.cancelled():
+            raise _CancelledError
+
+    def _prepare(self, request: ExportRequest, run: _Run) -> CorrectionMethod:
+        """Check the settings, the method and the sidecar rule (job start; DR-35 (b), D83)."""
+        settings = request.settings
+        folder = settings.output_folder
+        if folder is not None and not folder.is_dir():
+            raise _FailureError(
+                f"{run.name}: the output folder does not exist: {ascii_text(str(folder))}"
+            )
+        try:
+            validate_suffix(settings.output_suffix)
+        except ValueError as exc:
+            raise _FailureError(f"{run.name}: {ascii_text(str(exc))}") from exc
+        method = self._methods.get(request.parameters.method)
+        if method is None:
+            raise _FailureError(
+                f"{run.name}: unknown correction method {ascii_text(request.parameters.method)!r}"
+            )
+        if is_sidecar(request.source):
+            raise _FailureError(f"{run.name}: {sidecar_fault(request.source).message}")
+        return method
+
+    def _plan(
+        self, request: ExportRequest, kind: MediaKind, reservations: Reservations, run: _Run
+    ) -> OutputPlan:
+        """Plan the final name and refuse a Windows device name (DR-35 (a))."""
+        plan = plan_output(request.source, request.settings, kind, reservations)
+        run.final_name = plan.path.name
+        if is_reserved_device_name(plan.path.name):
+            reservations.release(plan.path)
+            raise _FailureError(
+                f"{run.name}: the output name {ascii_text(plan.path.name)} is a reserved device "
+                "name on Windows; change the output suffix."
+            )
+        return plan
+
+    @staticmethod
+    def _check_space(run: _Run, folder: Path, needed: int) -> None:
+        """Refuse the item when its estimate does not fit (D87; per item, never batch-wide)."""
+        check = check_free_space(folder, needed)
+        if not check.ok:
+            raise _FailureError(f"{run.name}: {check.message()}")
+
+    def _note_device(self, run: _Run, reason: str) -> None:
+        """Record the backend reason and the AD-9 fallback warning."""
+        run.device = reason
+        if reason.startswith("CPU") and reason != "CPU: forced":
+            run.warnings.append(f"Processed on the CPU ({reason}).")
+
+    # --- photo (8.1, IF-6) --------------------------------------------------------------------
+
+    def _photo(
+        self, request: ExportRequest, method: CorrectionMethod, progress: Progress, run: _Run
+    ) -> None:
+        """Read, measure, render and write one photo."""
+        settings = request.settings
+        progress.report(0, 4, f"Reading {run.name}")
+        self._stage("read")
+        image, meta = self._photo_reader.read(request.source)
+        stat = os.stat(request.source)
+        pixels = np.asarray(image.pixels, dtype=np.float32)
+        height, width = pixels.shape[0], pixels.shape[1]
+        self._check_cancel(progress)
+        backend, reason = self._select_backend(settings, height, width, method.id)
+        self._note_device(run, reason)
+        params = effective_parameters(method, request.parameters)
+
+        progress.report(1, 4, f"Measuring {run.name}")
+        self._stage("measure")
+        proxy_pixels = block_mean(pixels, proxy_factor(height, width)).astype(np.float32)
+        proxy = Image(
+            pixels=backend.asarray(proxy_pixels, np.float32),
+            device=backend.device,
+            color=image.color,
+            orientation_applied=True,
+        )
+        statistics: dict[str, Any] = {}
+        for stage in method.stages:
+            self._check_cancel(progress)
+            statistics[stage.name] = method.analyze(stage.name, proxy, params, dict(statistics))
+
+        progress.report(2, 4, f"Rendering {run.name}")
+        self._stage("render")
+        self._check_cancel(progress)
+        on_device = Image(
+            pixels=backend.asarray(pixels, np.float32),
+            device=backend.device,
+            color=image.color,
+            orientation_applied=True,
+        )
+        rendered = method.render(on_device, params, statistics)
+        host = dataclasses.replace(
+            rendered,
+            pixels=np.asarray(backend.to_host(rendered.pixels), dtype=np.float32),
+            device="cpu",
+        )
+        self._check_cancel(progress)
+
+        reservations = Reservations()
+        plan = self._plan(request, MediaKind.PHOTO, reservations, run)
+        self._check_space(
+            run, plan.folder, estimate_photo_bytes(width, height, settings.png_bit_depth)
+        )
+        provenance = (
+            provenance_object(
+                method=method.id,
+                parameters=params,
+                app_version=self._app_version,
+                source=photo_source_summary(request.source, stat, width, height),
+                settings={"png_bit_depth": settings.png_bit_depth, "device": reason},
+            )
+            if settings.provenance
+            else None
+        )
+        progress.report(3, 4, f"Writing {run.name}")
+        self._stage("write")
+        with SafeWrite(plan, reservations) as write:
+            run.write = write
+            self._photo_writer.write(
+                host, meta, write.temp_path, bit_depth=settings.png_bit_depth, provenance=provenance
+            )
+            self._check_cancel(progress)
+            final = write.commit()
+        run.outputs.append(final)
+        self._stage("committed")
+        progress.report(4, 4, f"Saved {ascii_text(final.name)}")
+
+    # --- video (8.2; data flow "video export (jobs)") ----------------------------------------
+
+    def _video(
+        self, request: ExportRequest, method: CorrectionMethod, progress: Progress, run: _Run
+    ) -> None:
+        """Probe, analyse, render and encode one video."""
+        settings = request.settings
+        progress.report(0, None, f"Preparing {run.name}")
+        self._stage("probe")
+        probe = self._video_source.probe(request.source)
+        for fault in probe.faults:
+            if fault.severity == "refuse":
+                raise _FailureError(f"{run.name}: {ascii_text(fault.message)}")
+        for fault in probe.faults:
+            if fault.kind == "gp_log" and fault.severity == "warn":
+                run.warnings.append(ascii_text(fault.message))
+        self._check_cancel(progress)
+        video = probe.video
+        backend, reason = self._select_backend(settings, video.height, video.width, method.id)
+        self._note_device(run, reason)
+
+        sink = self._sink_factory()
+        capabilities = sink.capabilities()
+        encoder = resolve_encoder(settings.video_encoder, capabilities)
+        bit_depth = 10 if video.bit_depth == 10 or settings.ten_bit_for_eight_bit else 8
+        capability = next((c for c in capabilities if c.name == encoder), None)
+        if capability is None or not capability.available:
+            why = (
+                "" if capability is None or capability.reason is None else f": {capability.reason}"
+            )
+            raise _FailureError(f"{run.name}: the encoder {encoder} is not available here{why}")
+        if bit_depth not in capability.bit_depths:
+            raise _FailureError(
+                f"{run.name}: the encoder {encoder} cannot write {bit_depth}-bit video"
+            )
+
+        reservations = Reservations()
+        plan = self._plan(request, MediaKind.VIDEO, reservations, run)
+        stat = os.stat(request.source)
+        needed = estimate_video_bytes(
+            stat.st_size,
+            settings,
+            width=video.width,
+            height=video.height,
+            frame_rate=video.frame_rate,
+            duration_s=probe.duration_s,
+        )
+        self._check_space(run, plan.folder, needed)
+        self._check_cancel(progress)
+
+        params = effective_parameters(method, request.parameters)
+        hw_decode = backend.device != "cpu"
+        engine = self._analyse(request, method, backend, probe, params, hw_decode, progress, run)
+        self._check_space(run, plan.folder, needed)  # the analysis cache may share the volume
+        self._check_cancel(progress)
+
+        provenance = (
+            provenance_object(
+                method=method.id,
+                parameters=params,
+                app_version=self._app_version,
+                source=video_source_summary(probe, stat),
+                settings={
+                    "encoder": encoder,
+                    "quality": settings.quality_level,
+                    "bit_depth": bit_depth,
+                    "device": reason,
+                },
+            )
+            if settings.provenance
+            else None
+        )
+        with SafeWrite(plan, reservations) as write:
+            run.write = write
+            try:
+                self._stage("open")
+                sink.open(
+                    probe,
+                    write.temp_path,
+                    encoder=encoder,
+                    quality=settings.quality_level,
+                    bit_depth=bit_depth,
+                    provenance=provenance,
+                )
+                self._encode(probe, method, backend, engine, params, hw_decode, sink, progress, run)
+                self._stage("close")
+                report = sink.close()
+                self._check_cancel(progress)
+            except BaseException:
+                sink.abort()  # never close after a stop: kill FFmpeg, delete the temporary
+                raise
+            final = write.commit()
+        run.outputs.append(final)
+        run.warnings.extend(ascii_text(w) for w in report.warnings)
+        run.warnings.extend(
+            f"Not carried to the output: {ascii_text(item)}" for item in report.not_carried
+        )
+        self._stage("committed")
+        progress.report(report.frames_written, video.nb_frames, f"Saved {ascii_text(final.name)}")
+
+    def _analyse(
+        self,
+        request: ExportRequest,
+        method: CorrectionMethod,
+        backend: ArrayBackend,
+        probe: ProbeResult,
+        params: Mapping[str, Any],
+        hw_decode: bool,
+        progress: Progress,
+        run: _Run,
+    ) -> AnalysisEngine:
+        """Run the clip's whole analysis on this thread (AD-7, AD-15) and return its engine."""
+        self._stage("analysis")
+        engine = AnalysisEngine(
+            method=method,
+            backend=backend,
+            cache=self._cache,
+            key=self._cache_key(request.source),
+            source=self._video_source,
+            probe=probe,
+            params=params,
+            hw_decode=hw_decode,
+        )
+        result = engine.analysis_job()(_Relabel(progress, f"Analysing {run.name}"))
+        if not result.ok:
+            if result.failure == ANALYSIS_CANCELLED:
+                raise _CancelledError
+            raise _FailureError(f"{run.name}: analysis failed: {ascii_text(str(result.failure))}")
+        if not engine.is_complete():
+            raise _FailureError(f"{run.name}: analysis did not complete")
+        return engine
+
+    def _encode(
+        self,
+        probe: ProbeResult,
+        method: CorrectionMethod,
+        backend: ArrayBackend,
+        engine: AnalysisEngine,
+        params: Mapping[str, Any],
+        hw_decode: bool,
+        sink: VideoSink,
+        progress: Progress,
+        run: _Run,
+    ) -> None:
+        """Render and write every decoded frame in pts order, under the cancel watchdog."""
+        schema = engine.schema_hash
+        total = probe.video.nb_frames
+        message = f"Exporting {run.name}"
+        watchdog = _Watchdog(progress, sink)
+        self._stage("frames")
+        frames: Iterator[Frame] = self._video_source.frames(probe, hw_decode=hw_decode)
+        watchdog.start()
+        try:
+            try:
+                for written, frame in enumerate(frames, start=1):
+                    self._check_cancel(progress)
+                    statistics = engine.smoothed_record(frame.pts_ticks, schema_hash=schema)
+                    on_device = dataclasses.replace(
+                        frame,
+                        pixels=backend.asarray(frame.pixels, np.float32),
+                        device=backend.device,
+                    )
+                    rendered = method.render(on_device, params, statistics)
+                    sink.write(
+                        dataclasses.replace(
+                            frame,
+                            pixels=np.asarray(backend.to_host(rendered.pixels), dtype=np.float32),
+                            device="cpu",
+                        )
+                    )
+                    progress.report(written, total, message)
+            finally:
+                close = getattr(frames, "close", None)
+                if close is not None:
+                    close()  # on this thread only (DR-45 (a))
+        except Exception as exc:
+            if watchdog.fired:
+                raise _CancelledError from exc
+            raise
+        finally:
+            watchdog.stop()
+        if watchdog.fired:
+            raise _CancelledError
+        self._check_cancel(progress)

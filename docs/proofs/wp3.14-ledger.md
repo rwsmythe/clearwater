@@ -214,3 +214,24 @@ Q1-Q16 as ADOPTED by CHARC `3c3c35d7`; applied as above. Q11's "optional injecte
   backend is chosen. (d) The AD-9 warning appears for every CPU reason except `"CPU: forced"`.
 - Order note (no question): the brief's video order (analysis BEFORE `resolve_encoder` and D87) is followed, so an
   unavailable explicit encoder or a full disk is reported after the analysis pass.
+
+### Round-0 rulings (orchestrator gen 13; depth at this yield 164,553, 51 turns)
+
+| Gate | Dispatcher-read depth |
+|---|---|
+| Round-0 yield | 164,553 (51 turns) |
+
+- O1 ADOPT (A): `export.py` refuses a planned FINAL name whose part before the first dot (case-insensitive, trailing
+  spaces and dots stripped) is `CON`, `PRN`, `AUX`, `NUL`, `COM1`-`COM9`, `LPT1`-`LPT9`; portable rule on every OS, on
+  the plan before `SafeWrite.begin`, readable failure starting with the file name, nothing written. Tests: `NU.MP4` +
+  `L` refused, nothing on disk; `NULL.MP4`, `CONSOLE.png` accepted. Reproduction of record: Windows 10.0.26300
+  creates `NUL.MP4` as an ordinary file, so DR-35 (a)'s "export fails" premise does not hold on this build; the rule
+  is a portability guard.
+- O2 ADOPT: `is_disk_full` over the error and its cause/context chain; FFmpeg's own disk-full message kept verbatim
+  (no text matching); the report states a real encoder disk full is named by FFmpeg's text.
+- O3 ADOPT: `on_stage: Callable[[str], None] | None = None`, called at phase boundaries; the engine reads no clock.
+- O4 (a)-(d) CONFIRMED.
+- ORDER RULING (video): probe -> refuse faults -> `select_backend` -> `resolve_encoder` (D74 refusal) ->
+  `plan_output` + reserved-name rule -> D87 check -> analysis -> D87 RE-CHECK immediately before `SafeWrite.begin`
+  -> open/encode. Nothing is written before `begin` in either position. Photo: read -> backend -> measure ->
+  render -> plan + reserved-name rule -> D87 -> write.
