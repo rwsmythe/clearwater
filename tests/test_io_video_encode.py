@@ -31,6 +31,7 @@ from clearwater.interfaces.settings import Settings
 from clearwater.interfaces.video import EncoderCapability, Fault, ProbeResult, SinkReport
 from clearwater.io.video import (
     FFmpegVideoSink,
+    FFmpegVideoSource,
     VideoEncodeError,
     detect_capabilities,
     nut,
@@ -391,6 +392,39 @@ def test_a_short_5k_8_by_7_clip(clips: Clips, runs: Runs) -> None:
     _, _, record = runs.get(source, "libx265", 8)
     _assert_v4(record)
     assert _items(record)["frame size and sample aspect ratio"]["output"][:2] == [5312, 4648]
+
+
+def test_a_truncated_b_frame_source_exports_every_frame_the_decoder_yields(
+    tmp_path: Path,
+) -> None:
+    # Reviewer B pass 2 #1: cut inside its last packet, the clip's decode order ends with a
+    # P-frame, then B-frames before it; the P-frame decodes, so the readable set is the packets
+    # listed before the corrupt one, not the pts below it. The complete export must close.
+    whole = tmp_path / "bf.mp4"
+    _ffmpeg(
+        "-f", "lavfi", "-i", "testsrc=size=320x240:rate=30", "-t", "2", "-c:v", "libx264",
+        "-bf", "3", "-b_strategy", "0", "-g", "60", "-pix_fmt", "yuv420p",
+        "-movflags", "+faststart", str(whole),
+    )  # fmt: skip
+    listing = subprocess.run(
+        ["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "packet=pos",
+         "-of", "csv=p=0", str(whole)],
+        check=True, capture_output=True, text=True,
+    ).stdout  # fmt: skip
+    last = max(int(line.split(",")[0]) for line in listing.split() if line.strip())
+    source = tmp_path / "bf-cut.mp4"
+    source.write_bytes(whole.read_bytes()[: last + 10])
+    info = probe(source)
+    assert "truncated" in {fault.kind for fault in info.faults}
+    frames = list(FFmpegVideoSource().frames(info, hw_decode=False))
+    table = read_packet_table(source)
+    corrupt = table.video_corrupt_pts[0]
+    assert any(f.pts_ticks > corrupt for f in frames)  # the case: a frame beyond the corrupt pts
+    out = tmp_path / "out.mp4"
+    report = _write_all(FFmpegVideoSink(), source, out, info=info, frames=iter(frames))
+    assert report.frames_written == len(frames)
+    assert sorted(read_packet_table(out).video_pts) == [f.pts_ticks for f in frames]
+    assert any("cut short" in warning for warning in report.warnings)
 
 
 def test_a_truncated_source_cuts_audio_at_the_readable_end(

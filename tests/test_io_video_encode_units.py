@@ -663,13 +663,16 @@ def test_missing_frames_wants_the_whole_readable_video_in_any_listing_order() ->
 
 def test_missing_frames_follows_the_cut_of_a_truncated_or_unreadable_source() -> None:
     truncated = _probe(faults=(Fault("truncated", "warn", "cut"),))
-    cut = _table((0, 3003, 1001, 2002), corrupt=(3003,))
-    assert verify.readable_video_pts(truncated, cut) == (0, 1001, 2002)
-    assert verify.missing_frames(truncated, cut, [0, 1001, 2002]) is None
-    past = verify.missing_frames(truncated, cut, [0, 1001, 2002, 3003])
+    # decode order with B-frames: the P-frame 6006 is listed (and decoded) before the corrupt
+    # B-frame 5005 (Reviewer B pass 2 #1: the cut is in file order, not below the corrupt pts)
+    cut = _table((0, 3003, 1001, 2002, 6006, 4004, 5005), corrupt=(5005,))
+    readable = (0, 1001, 2002, 3003, 4004, 6006)
+    assert verify.readable_video_pts(truncated, cut) == readable
+    assert verify.missing_frames(truncated, cut, list(readable)) is None
+    past = verify.missing_frames(truncated, cut, [*readable[:5], 5005, 6006])
     assert past is not None and "1 frames past the readable end" in past
-    short = verify.missing_frames(truncated, cut, [0, 1001])
-    assert short is not None and "pts 2002," in short
+    short = verify.missing_frames(truncated, cut, [0, 1001, 2002, 3003])
+    assert short is not None and "pts 4004," in short
     tail = _probe(faults=(Fault("unreadable_tail", "warn", "tail"),))
     whole = _table((0, 1001, 2002, 3003))
     assert verify.missing_frames(tail, whole, [0, 1001]) is None  # the decoder's end (D86)

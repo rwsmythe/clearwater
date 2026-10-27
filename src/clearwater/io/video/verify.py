@@ -681,8 +681,11 @@ def readable_end(probe: ProbeResult, table: PacketTable, last_pts: int) -> int:
 def readable_video_pts(probe: ProbeResult, source: PacketTable) -> tuple[int, ...]:
     """Return the source video pts an export writes, in presentation order (D86, Q-B).
 
-    Every listed pts; for a source the probe found ``truncated``, only those before its first
-    corrupt packet's pts (the frames before the cut, as the sink plans the cut at ``open``).
+    Every listed pts; for a source the probe found ``truncated``, the pts of the packets listed
+    BEFORE its first corrupt packet in file (decode) order: the frames WP3.9's decoder yields
+    before the cut. With B-frames that set is not "every pts below the corrupt packet's" (a
+    P-frame decoded before the cut can lie after B-frames that come after it in the file;
+    Reviewer B pass 2 #1). The sink plans the track cut at ``open`` from the same set.
 
     Args:
         probe: The source's probe result.
@@ -691,11 +694,12 @@ def readable_video_pts(probe: ProbeResult, source: PacketTable) -> tuple[int, ..
     Returns:
         The pts in ticks, ascending, each once.
     """
-    pts = sorted(set(source.video_pts))
+    listed = list(source.video_pts)
     if any(fault.kind == "truncated" for fault in probe.faults):
-        first_bad = min(source.video_corrupt_pts, default=None)
-        pts = [p for p in pts if first_bad is None or p < first_bad]
-    return tuple(pts)
+        corrupt = set(source.video_corrupt_pts)
+        cut = next((i for i, p in enumerate(listed) if p in corrupt), len(listed))
+        listed = listed[:cut]
+    return tuple(sorted(set(listed)))
 
 
 def missing_frames(probe: ProbeResult, source: PacketTable, written: Sequence[int]) -> str | None:

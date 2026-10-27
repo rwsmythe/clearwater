@@ -90,6 +90,7 @@ from clearwater.io.video.verify import (
     read_hevc_level,
     read_packet_table,
     readable_end,
+    readable_video_pts,
     square_pixels,
 )
 
@@ -818,8 +819,7 @@ class FFmpegVideoSink:
         """
         kinds = {fault.kind for fault in probe.faults}
         if "truncated" in kinds:
-            first_bad = min(source.video_corrupt_pts, default=None)
-            readable = sorted(p for p in source.video_pts if first_bad is None or p < first_bad)
+            readable = readable_video_pts(probe, source)  # the completeness rule's set too
             if not readable:
                 raise VideoEncodeError("refused", "The video has no readable frame.")
             try:
