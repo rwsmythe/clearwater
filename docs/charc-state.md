@@ -111,6 +111,12 @@
   CLOSED, DR-35 (a) mechanism amended, DR-57 (a) ADDRESSED; NEW DR-62 (GUI recompute vs export, WP4.3), DR-63 (sink
   phase write window, next encode.py touch), DR-64 (N6 body erratum, owner's word).** Worktrees `wp3.14`, `wp3.14-mc`,
   `orch-state-g14` released. WP3.21 brief: orchestrator drafts from the V16 baseline, I approve FINAL.
+- **EXCLUSIVE WINDOW OPEN 2026-10-27 19:15Z: WP-T4 rung 4 ROUND 1** (baseline, parallel, serial back to back on
+  `wp-t4` dd49a15 rebased on ba6e923; ~2.5 h; msg `dda7eb8bfab490be`). **NOTHING HEAVY AT THIS SEAT until CLOSE.**
+  Round 2 gets its own OPEN. Turn 5: collection 4,032 parallel + 1,046 serial = 5,078 disjoint and exhaustive; 193
+  IDs added since 2aca60e, 4 renamed; no violator; E1 the only exception; +1,036 MiB GPU rise in the non-GPU leg stays
+  a FINDING (import-time probe), no marker change. Codex depth after turn 5 reads 95,253 / 475,000 (compacted inside
+  Codex; the pinned reading is the live figure). WP3.21 brief FINAL at 43cc1ed (my rulings verbatim, 0 CR).
 - **WP3.21 brief APPROVED FINAL** (draft 84b793c; my rulings msg in the Rulings section; AD-7 READING and the oracle
   tiers recorded in `docs/decisions.md`): Q1 grants as recommended (`memory.py` only by me; `encode.py` grant closes
   DR-63); Q2 AD-7 reading YES with the COMPOSED-reach lead (90 frames c3) and one thread per decoder; Q3 two tiers,
