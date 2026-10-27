@@ -278,6 +278,17 @@ Approved: opus-high, Claude lane, Codex A/B at `gpt-6.1-sol`/high. The answers b
 
 - Q1 threading: ADOPTED (one frame in flight, one watchdog per encode; overlap is WP3.21's; `hw_decode` True unless the backend is the CPU).
 - Q2 cancel granularity: ADOPTED (per frame, between phases, immediately before `commit`; watchdog 0.2 s calls `abort` once; never touches the FrameStream).
+  **AMENDED 2026-10-27 (CHARC `e7d25105`, on Reviewer A R1 F1), replacing the question's sentence "The watchdog stops
+  before `close`; ...":** `progress.cancelled()` is checked immediately before `close()`; the watchdog stays alive
+  THROUGH `close()` and is stopped (joined) after `close` returns and BEFORE the post-close cancel check and `commit`;
+  the post-close cancel check is MANDATORY and UNCONDITIONAL: whether `close` raised or returned a report, a job that
+  sees `cancelled()` True there calls `abort`, leaves the `SafeWrite` block and returns `CANCELLED`, whether or not the
+  temporary still exists (the cancel is recognised from `cancelled()`, not from the error text; the original error goes
+  to the log line). A cancel seen after `commit` is ok. Conditions: one deterministic test per abort timing on a
+  blocking sink double (before the flush, during it, after the finish before the phase write, after `"closed"`); one
+  product-sink libx265 test cancelling during a real `close`; `io/video/encode.py` not edited (MINOR row at the
+  accept: `close` should set `"closed"` only from `"open"`); poll and single `abort` unchanged, the watchdog joined
+  before `commit`; V16 still stamps `close` and `committed`.
 - Q3 committed before the stop: ADOPTED (held by construction; the planted stop-after-commit test lists the file).
 - Q4 engine dependencies: ADOPTED (injected methods mapping, source, sink factory, photo reader/writer, cache + key function, backend selector; `jobs` never imports `clearwater.methods`).
 - Q5 analysis in the job: ADOPTED (own `AnalysisEngine` per job on the injected cache; a cache `RuntimeError` is a readable failure; GUI-recompute-during-export serialisation becomes a NEW DR row at the accept, WP4.3 trigger).
