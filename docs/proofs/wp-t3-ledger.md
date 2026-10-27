@@ -50,6 +50,9 @@ checked it with `git diff --quiet 9753b7b -- tests/fixtures`.
 
 ## Other record
 
+- Head after the round 1 cleanup: `b3d612a` (`tests/test_fixtures.py`: 347 passed, 0 skipped;
+  ruff, format, mypy clean; `tests/fixtures` identical to `9753b7b`).
+
 - Real clip `ad14-flicker`: 90 packets, every duration 33 ticks (rule 33.37 +/- 1); no STOP.
 - Mutation checks (checker deliberately broken, the named test fails): packet-call errors dropped
   -> `test_planted_truncated_clip_fails_by_name`; brand rule relaxed, GPS regex narrowed to
