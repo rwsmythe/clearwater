@@ -138,7 +138,10 @@ of `origin/main`, unpushed; no push asked (verify `git status -sb`).
   NEXT: Stage 2 calibration at the wave 4 briefs (the orchestrator names the pair; CHARC assigns lanes; the pace
   tiebreak is suspended for the pair); the review pin upgrade is DONE 2026-10-27 at the owner's word (`strong` = `gpt-6.1-sol`/high, `fast` =
   `gpt-6-luna`/medium, both `~/.codex` sides; fill + codex-reviewer banner value updated; WP3.10's B passes on the old
-  pin stand); head-to-head on WP3.20 bbf44e2 recorded in the pass 4.6. Codex catalog at this
+  pin stand); head-to-head on WP3.20 bbf44e2 DONE (pass 4.6): gpt-6.1-sol found both old-pin majors in ONE pass plus
+  DR-53/54 and a new DR-55, at 99K tokens vs 160K; the pin move stands on evidence. Sibling CHARCs notified (coa
+  confirmed its driver passes `-m gpt-6-astra` per call and is unaffected; `wsl.exe bash -lc` resolves codex to the
+  dead Windows shim, only `-ilc` reaches the WSL binary). Codex catalog at this
   login: 6.1-sol (default), 6-astra, 6.1-terra, 6-sol, 6-luna, 5.6-sol/terra/luna. Research notes (owner-supplied,
   untracked) in `research/multi-model development/`.
 - **WP3.10 floor row DONE (seat 9, EXCLUSIVE window 2026-10-27 01:09Z-02:02Z, CLOSE c02b6a47c057f2e4):** on

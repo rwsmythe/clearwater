@@ -352,6 +352,21 @@ on codex-cli 0.162.1. WP3.10's two B passes ran on the old pin and stand. The tr
 head-to-head (same tree `bbf44e2`, same prompt and diff as the WP3.20 B pass 1 of 2026-10-26, WSL
 transport) is recorded below when in. The original recommendation follows for the record.
 
+**Head-to-head RESULT (same tree `bbf44e2`, same prompt and diff, WSL transport, read-only; evidence
+`clearwater-review-evidence\probes\codexB61-wp3.20\`):**
+
+| Pass | Model | Tokens | Time | Verdict | Findings |
+|---|---|---|---|---|---|
+| WP3.20 B pass 1, 2026-10-26 | gpt-5.6-sol / high | 159,950 | ~6 min | NEW_CRITICAL_MAJOR_FOUND | 1 MAJOR (clear-cache check only before the modal confirmation), 2 minors (`OverflowError` on a huge stored cache limit; test/report count overstated), 1 advisory |
+| WP3.20 B pass 2, 2026-10-26, on the pass-1 fixes | gpt-5.6-sol / high | 147,508 | | NEW_CRITICAL_MAJOR_FOUND | 1 MAJOR (independent cache-limit jobs, a delayed earlier one wins) |
+| This pass, 2026-10-27 | gpt-6.1-sol / high | 99,044 | 5 min | NEW_CRITICAL_MAJOR_FOUND | 2 MAJOR (the pass-1 major; a stored encoder REPORTED unavailable is accepted = DR-54), 4 minors (the pass-2 major, found one pass earlier; the long-suffix bypass = DR-53; chooser/confirm exceptions escape the slots = NEW, DR-55; the `OverflowError`) |
+
+Assertions on the new pass: banner `gpt-6.1-sol` / `high`; 0 `^ERROR`; 17 `succeeded in`; tokens footer; VERDICT
+anchored; no file changed. Reading: on one finished tree the new pin found every blocking finding the old pin needed
+two passes for, plus the two defects the Claude pass found and one more, at 62 % of pass 1's tokens. The pin move
+stands on evidence, not only on the catalog. The B-independence "transition head-to-head" debt for the PIN is paid;
+the one for the LANE (Codex B vs Claude B on one tree) is still owed at the first Codex-implemented gate.
+
 
 `strong` = `gpt-5.6-sol` is one generation behind the catalog default `gpt-6.1-sol`. CHARC
 recommends upgrading the pin at the wave 4 boundary, with the B-independence transition
