@@ -47,8 +47,11 @@
   decision). **IF-9 docstring amended ba28175**: provenance `source` = file NAME never the path (AD-13 amended,
   AD-20 record). At accepts I owe: DR rows (WP3.14 Q5 cache serialisation; WP-T3 Q3 XMP encodings), DR-53
   mechanism text (WP3.20R turn-1 record), the CLAUDE.md two-leg pointer (WP-T4), HD-1 calibration figures.
-- **Orchestrator gen 14** `clearwater-orchestrator-20261026-2151` (launched by gen 13 at 07:51Z; **cue THIS name**;
-  announce expected). Gen 13 `-2029` ROLLED 07:51Z at ~345K (state 930a78d, FYI `080ce65fb13768e9`): WP-T3 cell DONE
+- **Orchestrator gen 14 ONLINE** `clearwater-orchestrator-20261026-2151` (launched by gen 13 at 07:51Z, picked up
+  07:52Z at 69fce7a, msg `a7da60b8`; sole drainer; **cue THIS name**). Running: WP-T3 Reviewer B on `wp-t3-mc`
+  0fbbe44; WP3.14 cell 3 with footage V4 leg then full suite then A R1. **HOST HOLD: no suite at this seat until
+  gen 14 says the host is free; hold main from WP-T3's B to its merge when told.** Heavy queue: WP3.14 footage ->
+  WP3.14 full -> WP-T4 parallel run -> WP3.20R candidate full suite. Gen 13 `-2029` ROLLED 07:51Z at ~345K (state 930a78d, FYI `080ce65fb13768e9`): WP-T3 cell DONE
   (A converged R1, candidate `wp-t3-mc` 0fbbe44 on 528d865, full pytest 4,867 passed / 2 skipped / 2873 s, fixtures
   byte-identical; B staged for gen 14); WP3.20R build DONE in 6 Codex turns (64K-205K tokens; Claude A R1
   NO_NEW_CRITICAL_MAJOR, 3 minors 3 advisories, 4 fixed 1 declined 1 banked `54e2749`; candidate gate and the B
