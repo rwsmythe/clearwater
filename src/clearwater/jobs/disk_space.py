@@ -23,11 +23,18 @@ from pathlib import Path
 from clearwater.interfaces.settings import Settings
 from clearwater.io.video import encode as _encode
 
-QUALITY_RATIO: dict[str, float] = {"high": 1.10, "standard": 0.50, "draft": 0.25}
-"""Output size over source size per quality level (WP3.10 report 7.2, busy libx265; DR-48)."""
+QUALITY_RATIO: dict[str, Fraction] = {
+    "high": Fraction(11, 10),
+    "standard": Fraction(1, 2),
+    "draft": Fraction(1, 4),
+}
+"""Output size over source size per quality level (WP3.10 report 7.2, busy libx265; DR-48).
 
-MARGIN = 1.25
-"""Safety margin multiplied into the video estimate."""
+Exact decimals 1.10 / 0.50 / 0.25: a binary float such as ``1.10`` would add a byte to the
+estimate at some sizes (Reviewer B B4)."""
+
+MARGIN = Fraction(5, 4)
+"""Safety margin multiplied into the video estimate (1.25, exact)."""
 
 PHOTO_OVERHEAD_BYTES = 1024 * 1024
 """Allowance for the embedded colour profile and metadata of a photo."""
@@ -109,8 +116,8 @@ def estimate_video_bytes(
         Fraction(_encode.NVENC_BITS_PER_PIXEL) / share * width * height * Fraction(frame_rate)
     )
     ceiling_bytes = ceiling_bits_per_s * Fraction(duration_s) / 8
-    relative_bytes = Fraction(ratio) * source_size
-    return math.ceil(max(relative_bytes, ceiling_bytes) * Fraction(MARGIN))
+    relative_bytes = ratio * source_size
+    return math.ceil(max(relative_bytes, ceiling_bytes) * MARGIN)
 
 
 def estimate_photo_bytes(width: int, height: int, bit_depth: int) -> int:

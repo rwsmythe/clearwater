@@ -33,16 +33,34 @@ def _ceiling_bytes(level: str, duration_s: Fraction) -> Fraction:
     return Fraction(encode.NVENC_BITS_PER_PIXEL) / share * 3840 * 2160 * FPS * duration_s / 8
 
 
-@pytest.mark.parametrize(("level", "ratio"), [("high", 1.10), ("standard", 0.50), ("draft", 0.25)])
-def test_video_ratio_term_wins_on_a_high_rate_source(level: str, ratio: float) -> None:
-    # 60 s at 200 Mb/s: the source-relative term is above every level's ceiling.
+@pytest.mark.parametrize(
+    ("level", "ratio"), [("high", "1.10"), ("standard", "0.50"), ("draft", "0.25")]
+)
+def test_video_ratio_term_wins_on_a_high_rate_source(level: str, ratio: str) -> None:
+    # 60 s at 200 Mb/s: the source-relative term is above every level's ceiling. The oracle
+    # reads the ruled decimals from text, so a binary-float ratio cannot pass by mirroring.
     duration = Fraction(60)
     size = 200_000_000 * 60 // 8
-    assert QUALITY_RATIO[level] == ratio
-    assert MARGIN == 1.25
-    assert Fraction(ratio) * size > _ceiling_bytes(level, duration)
+    exact = Fraction(ratio)
+    assert QUALITY_RATIO[level] == exact
+    assert Fraction(5, 4) == MARGIN
+    assert exact * size > _ceiling_bytes(level, duration)
     got = estimate_video_bytes(size, Settings(quality_level=level), duration_s=duration, **UHD)
-    assert got == math.ceil(Fraction(ratio) * size * Fraction(MARGIN))
+    assert got == math.ceil(exact * size * Fraction(5, 4))
+
+
+def test_high_ratio_is_the_exact_decimal() -> None:
+    # Reviewer B B4: Fraction(1.10) kept the binary approximation and gave 1,375,001 bytes.
+    # 1 s at 640x360: the ceiling term (well under 1 MB) loses to 1.10 x 1,000,000.
+    got = estimate_video_bytes(
+        1_000_000,
+        Settings(quality_level="high"),
+        width=640,
+        height=360,
+        frame_rate=FPS,
+        duration_s=Fraction(1),
+    )
+    assert got == 1_375_000
 
 
 @pytest.mark.parametrize("level", ["high", "standard", "draft"])
