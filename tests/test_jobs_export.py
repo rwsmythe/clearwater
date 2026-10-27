@@ -659,15 +659,116 @@ def test_planted_always_quiet_stream_close_fails_by_name(
         _assert_clean_path_close_error_is_the_failure(result)
 
 
-def test_a_stop_after_commit_still_lists_the_committed_file(tmp_path: Path) -> None:
-    def stop(stage: str) -> None:
-        if stage == "committed":
-            raise RuntimeError("planted stop after commit")
+def _analysis_cancel_with_a_raising_close(rig: Rig) -> JobResult:
+    """Cancel during a cold analysis whose decode stream's ``close`` raises (Reviewer B B1)."""
+    stages: list[str] = []
+    rig.engine._on_stage = stages.append  # type: ignore[assignment]
+    real_frames = rig.source.frames
 
-    rig = Rig(tmp_path, on_stage=stop)
-    result = rig.run(rig.request())
-    assert not result.ok and result.failure == "clip.mp4: RuntimeError: planted stop after commit"
-    assert result.outputs == (tmp_path / "clip_corrected.mp4",) and result.outputs[0].exists()
+    def frames(*args: Any, **kwargs: Any) -> Any:
+        stream = real_frames(*args, **kwargs)
+        return _CloseRaises(stream) if "frames" not in stages else stream
+
+    rig.source.frames = frames  # type: ignore[method-assign]
+    result: JobResult = rig.run(rig.request(), CancelAt("Analysing"))
+    assert "analysis" in stages and "frames" not in stages, stages
+    return result
+
+
+def _assert_analysis_cancel_kept(result: JobResult) -> None:
+    assert result.failure is CANCELLED, f"an analysis cancel was lost: {result.failure!r}"
+
+
+def test_a_cancel_during_the_analysis_survives_a_raising_stream_close(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    # Reviewer B B1 (Q2 as amended): the analysis stream's close error replaced the analysis's
+    # own cancel outcome, and the job read the cancel from that text, so it became a failure.
+    rig = Rig(tmp_path)
+    with caplog.at_level(logging.INFO, logger="clearwater.jobs.export"):
+        result = _analysis_cancel_with_a_raising_close(rig)
+    _assert_analysis_cancel_kept(result)
+    assert not result.ok and result.outputs == ()
+    assert any(
+        r.levelno == logging.INFO and "cleanup close failed" in r.getMessage()
+        for r in caplog.records
+    ), caplog.text
+    assert rig.sinks == [] or "open" not in rig.sink.calls
+    _no_partials(rig)
+
+
+def test_planted_analysis_cancel_read_from_the_text_fails_by_name(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def text_only(result: JobResult, progress: Any, name: str) -> None:
+        if result.ok:
+            return
+        if result.failure == export_module.ANALYSIS_CANCELLED:
+            raise export_module._CancelledError
+        raise export_module._FailureError(f"{name}: analysis failed: {result.failure}")
+
+    monkeypatch.setattr(export_module, "_check_analysis", text_only)
+    result = _analysis_cancel_with_a_raising_close(Rig(tmp_path))
+    with pytest.raises(AssertionError, match="an analysis cancel was lost"):
+        _assert_analysis_cancel_kept(result)
+
+
+class _RaisesOnSaved(StubProgress):
+    """A progress whose report after the commit (``Saved ...``) raises."""
+
+    def report(self, done: int, total: int | None, message: str) -> None:
+        super().report(done, total, message)
+        if message.startswith("Saved"):
+            raise RuntimeError("planted callback failure after commit")
+
+
+def _raising_after_commit(rig: Rig, kind: str, hook: str) -> JobResult:
+    """Run a job whose progress report or ``committed`` stage hook raises after the commit."""
+    progress: StubProgress = StubProgress()
+    if hook == "progress":
+        progress = _RaisesOnSaved()
+    else:
+
+        def stage(name: str) -> None:
+            if name == "committed":
+                raise RuntimeError("planted callback failure after commit")
+
+        rig.engine._on_stage = stage  # type: ignore[assignment]
+    result: JobResult = rig.run(rig.request(kind), progress)
+    return result
+
+
+def _assert_ok_after_commit(result: JobResult, final: Path) -> None:
+    assert result.ok, f"a callback after commit failed the job: {result.failure!r}"
+    assert result.outputs == (final,) and final.exists()
+
+
+@pytest.mark.parametrize("hook", ["progress", "stage"])
+@pytest.mark.parametrize(
+    ("kind", "final"), [("video", "clip_corrected.mp4"), ("photo", "shot_corrected.png")]
+)
+def test_a_raising_callback_after_commit_keeps_the_result_ok(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture, kind: str, final: str, hook: str
+) -> None:
+    # Reviewer B B3: a raising progress or stage callback after commit turned an ok export with
+    # a committed output into a failure; it is a WARNING and the result stays ok (Q3).
+    with caplog.at_level(logging.WARNING, logger="clearwater.jobs.export"):
+        result = _raising_after_commit(Rig(tmp_path), kind, hook)
+    _assert_ok_after_commit(result, tmp_path / final)
+    assert any(
+        r.levelno == logging.WARNING and "planted callback failure after commit" in r.getMessage()
+        for r in caplog.records
+    ), caplog.text
+
+
+@pytest.mark.parametrize("hook", ["progress", "stage"])
+def test_planted_unguarded_callback_after_commit_fails_by_name(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, hook: str
+) -> None:
+    monkeypatch.setattr(export_module, "_after_commit", lambda name, call: call())
+    result = _raising_after_commit(Rig(tmp_path), "video", hook)
+    with pytest.raises(AssertionError, match="a callback after commit failed the job"):
+        _assert_ok_after_commit(result, tmp_path / "clip_corrected.mp4")
 
 
 def test_nothing_is_written_after_commit_and_earlier_outputs_are_untouched(tmp_path: Path) -> None:

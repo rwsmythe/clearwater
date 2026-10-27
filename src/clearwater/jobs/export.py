@@ -217,6 +217,46 @@ def _close_stream(frames: Iterator[Frame], *, quietly: bool) -> None:
         )
 
 
+def _check_analysis(result: JobResult, progress: Progress, name: str) -> None:
+    """Raise for a non-ok analysis result: a cancel when one was asked, else its failure.
+
+    A cancel is read from ``progress.cancelled()``, never from the result's text (Q2 as amended):
+    a cleanup error during the stop (the decode stream's ``close``) can replace the analysis's
+    own outcome, so that text goes to the log, not the result.
+
+    Raises:
+        _CancelledError: The analysis stopped and the cancel was asked.
+        _FailureError: The analysis failed with no cancel asked.
+    """
+    if result.ok:
+        return
+    if progress.cancelled() or result.failure == ANALYSIS_CANCELLED:
+        if result.failure != ANALYSIS_CANCELLED:
+            _LOG.info(
+                "export %s: cancelled; the stopped analysis reported %s",
+                name,
+                ascii_text(str(result.failure)),
+            )
+        raise _CancelledError
+    raise _FailureError(f"{name}: analysis failed: {ascii_text(str(result.failure))}")
+
+
+def _after_commit(name: str, call: Callable[[], None]) -> None:
+    """Run one callback after ``commit``; its error is a WARNING, never the job's failure.
+
+    The output is committed by then, so the result stays ok with it (Reviewer B B3).
+    """
+    try:
+        call()
+    except Exception as exc:
+        _LOG.warning(
+            "export %s: a callback after the commit raised %s: %s; the output is kept",
+            name,
+            type(exc).__name__,
+            ascii_text(str(exc)),
+        )
+
+
 def _caused_by_disk_full(exc: BaseException) -> bool:
     """Tell whether ``exc`` or anything in its cause or context chain is a disk full (D87)."""
     seen: set[int] = set()
@@ -495,8 +535,8 @@ class ExportEngine:
             self._check_cancel(progress)
             final = write.commit()
         run.outputs.append(final)
-        self._stage("committed")
-        progress.report(4, 4, f"Saved {ascii_text(final.name)}")
+        _after_commit(run.name, lambda: self._stage("committed"))
+        _after_commit(run.name, lambda: progress.report(4, 4, f"Saved {ascii_text(final.name)}"))
 
     # --- video (8.2; data flow "video export (jobs)") ----------------------------------------
 
@@ -590,8 +630,11 @@ class ExportEngine:
                 raise
             final = write.commit()
         run.outputs.append(final)
-        self._stage("committed")
-        progress.report(report.frames_written, video.nb_frames, f"Saved {ascii_text(final.name)}")
+        saved = f"Saved {ascii_text(final.name)}"
+        _after_commit(run.name, lambda: self._stage("committed"))
+        _after_commit(
+            run.name, lambda: progress.report(report.frames_written, video.nb_frames, saved)
+        )
 
     def _analyse(
         self,
@@ -617,10 +660,7 @@ class ExportEngine:
             hw_decode=hw_decode,
         )
         result = engine.analysis_job()(_Relabel(progress, f"Analysing {run.name}"))
-        if not result.ok:
-            if result.failure == ANALYSIS_CANCELLED:
-                raise _CancelledError
-            raise _FailureError(f"{run.name}: analysis failed: {ascii_text(str(result.failure))}")
+        _check_analysis(result, progress, run.name)
         if not engine.is_complete():
             raise _FailureError(f"{run.name}: analysis did not complete")
         return engine
