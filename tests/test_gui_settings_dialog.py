@@ -444,6 +444,83 @@ def test_a_stored_encoder_this_computer_does_not_report_is_kept(env: Env) -> Non
     assert window.session.settings().video_encoder == "old_encoder"
 
 
+def _unavailable_stored_scenario(env: Env) -> tuple[MainWindow, SettingsDialog]:
+    """Refuse a reported-unavailable stored encoder without writing or applying."""
+    stored = Settings(video_encoder="hevc_nvenc")
+    window = env.start(saved=stored)
+    dialog = env.open(window)
+    path = env.config / "settings.json"
+    path.unlink()  # The setting was loaded; any refusal-time write is now observable.
+    assert not dialog.ok_button.isEnabled(), "reported-unavailable stored encoder left OK enabled"
+    expected = f"hevc_nvenc is unavailable: {NVENC.reason}. Choose another encoder."
+    assert dialog.encoder_note.text() == expected
+    dialog.accept()
+    assert not path.exists()
+    assert dialog.result() != QDialog.DialogCode.Accepted
+    assert window.session.settings() == stored
+    (error,) = presenter_of(window).of("error")
+    assert error.owner == OWNER_SETTINGS
+    assert error.text == expected
+    return window, dialog
+
+
+def test_a_stored_encoder_the_sink_reports_unavailable_is_refused(env: Env) -> None:
+    """A stored encoder must still satisfy the sink's current availability report."""
+    _unavailable_stored_scenario(env)
+
+
+def test_picking_another_encoder_after_the_refusal_accepts(env: Env) -> None:
+    """Selecting an available encoder clears the refusal note and permits a save."""
+    window, dialog = _unavailable_stored_scenario(env)
+    pick(dialog.encoder_combo, "libx265")
+    assert dialog.ok_button.isEnabled()
+    assert dialog.encoder_note.text() == ""
+    assert dialog.encoder_combo.toolTip() == ""
+    dialog.accept()
+    assert dialog.result() == QDialog.DialogCode.Accepted
+    assert env.saved().video_encoder == "libx265"
+    assert window.session.settings().video_encoder == "libx265"
+    assert not presenter_of(window).of("error")
+    env.idle(window)
+
+
+def test_a_stored_encoder_arriving_unavailable_after_detection_refuses_ok(env: Env) -> None:
+    """Defer encoder refusal until the pending capability report arrives."""
+    window = env.start(saved=Settings(video_encoder="hevc_nvenc"))
+    window.shell_actions.settings.trigger()
+    dialog = window._settings_dialog
+    assert isinstance(dialog, SettingsDialog)
+    assert not dialog.encoder_combo.isEnabled()
+    assert dialog.ok_button.isEnabled()
+    assert dialog.encoder_note.text() == "Detecting encoders..."
+    env.qtbot.waitUntil(lambda: dialog.encoder_combo.isEnabled(), timeout=5000)
+    assert not dialog.ok_button.isEnabled()
+    assert dialog.encoder_note.text() == (
+        f"hevc_nvenc is unavailable: {NVENC.reason}. Choose another encoder."
+    )
+
+
+def test_unavailable_stored_scenario_passes_on_the_real_dialog(env: Env) -> None:
+    """The shared unavailable-stored scenario passes on the real dialog."""
+    _unavailable_stored_scenario(env)
+
+
+def test_planted_stored_unavailable_accepted_is_caught(
+    env: Env, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Detect a planted bypass that treats every unchanged stored encoder as valid."""
+    real = SettingsDialog._encoder_unacceptable
+
+    def stored_bypass(self: SettingsDialog) -> bool:
+        if self.encoder_combo.currentData() == self._initial.video_encoder:
+            return False
+        return real(self)
+
+    monkeypatch.setattr(SettingsDialog, "_encoder_unacceptable", stored_bypass)
+    with pytest.raises(AssertionError, match="reported-unavailable stored encoder left OK enabled"):
+        _unavailable_stored_scenario(env)
+
+
 def test_ten_bit_follows_the_encoder_and_keeps_a_stored_true(env: Env) -> None:
     only8 = EncoderCapability("libx265", True, None, (8,), False)
     window = env.start(caps=(NVENC, only8), saved=Settings(ten_bit_for_eight_bit=True))
@@ -477,6 +554,45 @@ def test_auto_is_resolved_by_the_injected_rule(env: Env) -> None:
     assert dialog.ten_bit_note.text() == "hevc_nvenc cannot write 10-bit video."
     pick(dialog.encoder_combo, "libx265")
     assert dialog.ten_bit_check.isEnabled()
+
+
+@pytest.mark.parametrize(
+    ("capabilities", "interim", "resolved", "enabled", "note"),
+    [
+        (
+            (EncoderCapability("hevc_nvenc", True, None, (8,), True), X265),
+            "hevc_nvenc",
+            "libx265",
+            True,
+            "",
+        ),
+        (
+            (X265, EncoderCapability("eight_bit_encoder", True, None, (8,), False)),
+            "libx265",
+            "eight_bit_encoder",
+            False,
+            "eight_bit_encoder cannot write 10-bit video.",
+        ),
+    ],
+    ids=["injected-enables-ten-bit", "injected-disables-ten-bit"],
+)
+def test_auto_is_resolved_by_a_rule_that_disagrees_with_the_interim_rule(
+    env: Env,
+    capabilities: tuple[EncoderCapability, ...],
+    interim: str,
+    resolved: str,
+    enabled: bool,
+    note: str,
+) -> None:
+    """The injected resolver, rather than a restated rule, controls 10-bit support."""
+    assert module.interim_resolve_encoder("auto", capabilities) == interim != resolved
+    window = env.start(caps=capabilities, resolve=lambda setting, caps: resolved)
+    dialog = env.open(window)
+    assert env.resolve_calls
+    assert all(call == ("auto", capabilities) for call in env.resolve_calls)
+    assert dialog.ten_bit_check.isEnabled() == enabled
+    assert dialog.ten_bit_note.text() == note
+    assert dialog.ten_bit_check.toolTip() == note
 
 
 def test_interim_rule_matches_the_wp310_rule() -> None:

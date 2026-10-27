@@ -11,7 +11,9 @@
   ledger. Scratch scripts, logs and reproduction settings stay in ignored
   `work/wp3.20r/`.
 - Dispatcher-supplied end-of-turn-1 token figure: **64,199**, supplied at the
-  turn-2 gate; turn 1 committed as `c46eb1a`. Turn-2 figure not yet supplied.
+  turn-2 gate; turn 1 committed as `c46eb1a`. Dispatcher-supplied end-of-turn-2
+  figure: **92,340**, supplied at the turn-3 gate; turn 2 committed as `944b5d2`.
+  Turn-3 figure not yet supplied.
   No reviewer has run; Reviewer A follows turn 5.
 
 ## Baseline and sandbox observations
@@ -238,3 +240,98 @@ format check passes. No scope deviation; extra parameterization covers the
 required ASCII/length behavior. Only the three turn-2 owned files changed;
 interfaces, dependencies, local configuration and footage untouched; no new
 OS-specific product code. Sandbox plugin and all logs remain uncommitted.
+
+## Turn 3: DR-54
+
+### Carried gate evidence
+
+The dispatcher confirmed the turn-2 tree outside the sandbox: formatter
+**227 files already formatted**, exit 0; Ruff check **All checks passed!**.
+It classifies the formatter crash as a sandbox artifact, likely related to the
+old unreadable turn-1 temp root. This is dispatcher evidence, not a cell rerun.
+Per direction, no broad tracked-file or discovery diagnostic was repeated.
+
+### Tests first
+
+Added six test functions, seven cases: the three required refusal/recovery/
+pending-report tests; the two opposite disagreeing-resolver cases; and the
+real-dialog/planted-dialog shared-scenario controls. The unchanged module for
+this turn was `944b5d2` (DR-53 already applied). Both constructor-based refusal
+scenarios load the real settings file and then remove only that fixture file,
+so a refusal-time write is observable. No product edit preceded the red run.
+
+| Test | Unchanged module | Final head |
+|---|---|---|
+| `test_a_stored_encoder_the_sink_reports_unavailable_is_refused` | FAILED: stored unavailable encoder left OK enabled | PASSED |
+| `test_picking_another_encoder_after_the_refusal_accepts` | FAILED: initial refusal left OK enabled | PASSED; selecting `libx265` clears note/tool tip, enables OK, saves/applies it and clears the settings error |
+| `test_a_stored_encoder_arriving_unavailable_after_detection_refuses_ok` | FAILED: OK still enabled after report arrival | PASSED; OK allowed while pending and disabled on arrival |
+| `test_unavailable_stored_scenario_passes_on_the_real_dialog` | FAILED: stored unavailable encoder left OK enabled | PASSED; no write/apply/close and exactly one settings-owned error matching the note |
+| `test_planted_stored_unavailable_accepted_is_caught` | PASSED: scenario catches the stored-equality bypass | PASSED; fails by the named `reported-unavailable stored encoder left OK enabled` assertion |
+| `test_auto_is_resolved_by_a_rule_that_disagrees_with_the_interim_rule[injected-enables-ten-bit]` | PASSED | PASSED |
+| `test_auto_is_resolved_by_a_rule_that_disagrees_with_the_interim_rule[injected-disables-ten-bit]` | PASSED | PASSED |
+
+The injected-rule tests deliberately disagree in both directions: available
+8-bit NVENC plus 10-bit x265 makes the interim rule choose NVENC while the
+injected rule chooses x265, enabling 10-bit with an empty note. In the reverse
+case, x265 plus an available named 8-bit test encoder makes the interim rule
+choose x265 while the injected rule chooses the 8-bit encoder, disabling 10-bit
+with `<name> cannot write 10-bit video.`. Both assert the spy saw only
+`("auto", capabilities)` and check the enabled state, note and tool tip.
+The existing agreeing injected-rule test remains unchanged.
+
+### Product change and truth table
+
+Changed `_encoder_unacceptable`, `_update_encoder_note`, `_on_encoder_changed`
+and `accept`. `_encoder_unacceptable` now checks reported availability before
+the stored-unreported exception; its docstring carries this table:
+
+| Selected | Sink report | Stored? | OK |
+|---|---|---|---|
+| `auto` | any | any | allowed |
+| any | still being read | any | allowed; control disabled, re-evaluate on arrival |
+| name | reported unavailable | stored or picked | refused |
+| name | reported available | any | allowed |
+| name | absent, or report failed | stored | allowed (Q3) |
+| name | not reported | picked | refused |
+
+The refusal note uses the exact prescribed template and the capability reason,
+or `not available`. The full sentence is ASCII-escaped. Encoder changes refresh
+the note; an acceptable choice removes the refusal. A direct `accept()` refreshes
+the note and presents that same sentence through `_present_error`, returning
+before saving/applying/closing. `_refresh_ok` and catalog-arrival refresh reuse
+the new refusal predicate. Detection and the injected 10-bit rule are unchanged.
+Reason text is used verbatim, including a reason's own terminal punctuation.
+
+### Gates, fixes and verification
+
+Every pytest run used the supplied sandbox shim and disabled cacheprovider,
+both targeted files, offscreen Qt and `--basetemp=work/wp3.20r/tmp-t3 -q`.
+
+| Check | Observed result | Log under `work/wp3.20r/` |
+|---|---|---|
+| Tests before product edit | Exit 1; **4 failed, 72 passed in 7.16s**, no setup errors | `turn3-red-pytest.log` |
+| First head run | Exit 0; **76 passed in 6.19s** | `turn3-green-pytest.log` |
+| Initial mypy | Exit 1; `Returning Any from function declared to return "bool" [no-any-return]` at the new missing-capability comparison | `turn3-mypy.log` |
+| Final targeted run after the type fix | Exit 0; **76 passed in 6.62s** | `turn3-final-pytest.log` |
+| Final `uv run ruff check .` | Exit 0; **All checks passed!**; two access-denied traversal warnings | `turn3-final-ruff-check.log` |
+| Final `uv run ruff format --check .` | Exit 101; **Expected a ruff source file** (same sandbox panic) | `turn3-final-ruff-format.log` |
+| Format check of the two changed Python files | Exit 0; **2 files already formatted** | `turn3-final-owned-format-check.log` |
+| Final `uv run mypy` | Exit 0; **Success: no issues found in 132 source files** | `turn3-final-mypy.log` |
+
+Verification loop: suspected the stored-equality bypass; confirmed independently
+by the four red failures on unchanged product code; fixed the predicate and both
+message surfaces; the whole targeted run passed. Mypy confirmed an `Any` leak
+from Qt's `currentData()` comparison; normalized the selected name to `str`,
+then reran tests and static gates. The planted bypass still fails its named
+scenario. Final code inspection confirms each truth-table branch and the early
+return before save/apply/close. No new in-scope finding in the final pass.
+
+`test_a_stored_encoder_this_computer_does_not_report_is_kept` and
+`test_a_failed_detection_gives_a_stored_encoder_the_failure_as_its_reason`
+pass in the final targeted run and remain unchanged. No DR-52 implementation
+change. No reviewer yet; report-bullet replacement remains turn 5's task.
+Limits: default formatter command needs dispatcher confirmation outside sandbox;
+full suite remains the orchestrator's. Owned files only; no interface, dependency,
+local-config or footage change; no OS-specific product code; no git writes,
+reviewer or mailbox activity. LF and unchanged-test checks are recorded in
+`work/wp3.20r/turn3-deliverable-check.log`.

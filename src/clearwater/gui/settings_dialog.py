@@ -536,10 +536,17 @@ class SettingsDialog(QDialog):
             self._on_catalog_state()
 
     def _update_encoder_note(self) -> None:
-        """Say why the encoder control is limited: detecting, or the detection failure."""
+        """Explain detection state or why the selected encoder is refused."""
         failure = self._catalog.failure()
         if self._catalog.detecting():
             self.encoder_note.setText(DETECTING_TEXT)
+        elif self._encoder_unacceptable():
+            name = self.encoder_combo.currentData()
+            capability = next((c for c in self._catalog.capabilities() if c.name == name), None)
+            reason = "not available" if capability is None else capability.reason or "not available"
+            self.encoder_note.setText(
+                ascii_text(f"{name} is unavailable: {reason}. Choose another encoder.")
+            )
         elif failure is not None:
             self.encoder_note.setText(ascii_text(f"Encoders could not be detected: {failure}"))
         else:
@@ -547,7 +554,8 @@ class SettingsDialog(QDialog):
         self.encoder_combo.setToolTip(self.encoder_note.text())
 
     def _on_encoder_changed(self, _index: int) -> None:
-        """The user chose an encoder: re-evaluate the 10-bit rule and OK."""
+        """The user chose an encoder: refresh its note, the 10-bit rule and OK."""
+        self._update_encoder_note()
         self._update_ten_bit()
         self._refresh_ok()
 
@@ -582,12 +590,26 @@ class SettingsDialog(QDialog):
         self.ten_bit_note.setText(reason)
 
     def _encoder_unacceptable(self) -> bool:
-        """Return True when the encoder was changed to one the sink reports as unavailable."""
-        name = self.encoder_combo.currentData()
-        if name == self._initial.video_encoder or name == AUTO or self._catalog.detecting():
+        """Return whether the selected encoder is refused by the capability rules.
+
+        Selected | Sink report              | Stored?          | OK
+        auto     | any                      | any              | allowed
+        any      | still being read         | any              | allowed; re-evaluate on arrival
+        a name   | reported, unavailable    | stored or picked | refused
+        a name   | reported, available      | any              | allowed
+        a name   | absent, or report failed | stored           | allowed (Q3)
+        a name   | not reported             | picked           | refused
+
+        While detection runs the encoder control is disabled. A stored name
+        missing from the report is preserved; a reported unavailable name is refused.
+        """
+        name = str(self.encoder_combo.currentData())
+        if name == AUTO or self._catalog.detecting():
             return False
         capability = next((c for c in self._catalog.capabilities() if c.name == name), None)
-        return capability is None or not capability.available
+        if capability is None:
+            return name != self._initial.video_encoder
+        return not capability.available
 
     # Suffix, folder.
 
@@ -732,6 +754,8 @@ class SettingsDialog(QDialog):
             _present_error(self._context, f"The output suffix is not valid: {detail}")
             return
         if self._encoder_unacceptable():
+            self._update_encoder_note()
+            _present_error(self._context, self.encoder_note.text())
             return
         context = self._context
         session = context.session
