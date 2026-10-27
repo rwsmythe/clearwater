@@ -91,13 +91,15 @@ from clearwater.io.video.verify import (
 QUALITY_LEVELS = ("high", "standard", "draft")
 """The named quality levels (D75), as IF-10 ``quality_level`` spells them."""
 
-QUALITY_VALUE = {"high": 18, "standard": 23, "draft": 28}
-"""The constant-quality value per level: NVENC ``-cq`` and libx265 ``-crf`` (AD-12,
-PROVISIONAL until WP3.10's quality check is ruled on)."""
+NVENC_CQ = {"high": 22, "standard": 26, "draft": 30}
+"""NVENC's ``-cq`` value per level (AD-12, ruled on WP3.10's measured figures)."""
+
+X265_CRF = {"high": 21, "standard": 26, "draft": 30}
+"""libx265's ``-crf`` value per level (AD-12, ruled on WP3.10's measured figures)."""
 
 NVENC_BITS_PER_PIXEL = Fraction(24, 100)
 """NVENC's High ceiling in bits per output pixel (AD-12 as amended, CHARC 17f12f9dc7eba3ae;
-PROVISIONAL until re-derived with the cq values on the re-run figures)."""
+ruled on WP3.10's measured figures)."""
 
 NVENC_RATE_SHARE = {"high": 1, "standard": 2, "draft": 4}
 """What the High ceiling is divided by for each level (Standard half, Draft a quarter)."""
@@ -295,7 +297,7 @@ def _encoder_options(
     encoder: str, quality: str, bit_depth: int, rate: NvencRate | None
 ) -> list[str]:
     """Return the encoder, rate control, pixel format and profile options (AD-12)."""
-    value = str(QUALITY_VALUE[quality])
+    value = str((NVENC_CQ if encoder == HARDWARE_ENCODER else X265_CRF)[quality])
     if encoder == HARDWARE_ENCODER:
         assert rate is not None  # encode_command computes it for NVENC
         options = ["-c:v", encoder, "-preset", "p5", "-tune", "hq", "-rc", "vbr", "-b:v", "0"]

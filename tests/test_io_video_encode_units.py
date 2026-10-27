@@ -381,10 +381,12 @@ def test_rotation_is_set_on_the_frames_input_counter_clockwise() -> None:
 @pytest.mark.parametrize(
     ("encoder", "quality", "depth", "expected"),
     [
-        ("hevc_nvenc", "high", 8, ["-cq", "18", "-pix_fmt", "yuv420p", "-profile:v", "main"]),
-        ("hevc_nvenc", "standard", 10, ["-cq", "23", "-pix_fmt", "p010le", "-profile:v", "main10"]),
-        ("libx265", "draft", 8, ["-crf", "28", "-pix_fmt", "yuv420p", "-profile:v", "main"]),
-        ("libx265", "high", 10, ["-crf", "18", "-pix_fmt", "yuv420p10le", "-profile:v", "main10"]),
+        ("hevc_nvenc", "high", 8, ["-cq", "22", "-pix_fmt", "yuv420p", "-profile:v", "main"]),
+        ("hevc_nvenc", "standard", 10, ["-cq", "26", "-pix_fmt", "p010le", "-profile:v", "main10"]),
+        ("hevc_nvenc", "draft", 8, ["-cq", "30", "-pix_fmt", "yuv420p", "-profile:v", "main"]),
+        ("libx265", "draft", 8, ["-crf", "30", "-pix_fmt", "yuv420p", "-profile:v", "main"]),
+        ("libx265", "high", 10, ["-crf", "21", "-pix_fmt", "yuv420p10le", "-profile:v", "main10"]),
+        ("libx265", "standard", 8, ["-crf", "26", "-pix_fmt", "yuv420p", "-profile:v", "main"]),
     ],
 )
 def test_quality_levels_follow_ad12(
