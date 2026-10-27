@@ -57,7 +57,8 @@ the camera's rate, PSNR flat 35.82 dB). The sink therefore sets `-maxrate` = 0.2
 (`NVENC_BITS_PER_PIXEL`, FINAL) x width x height x frame rate for High, a half for Standard and
 a quarter for Draft (`NVENC_RATE_SHARE`), and `-bufsize` = the ceiling; for an HEVC source
 signalling a Main-tier level the High ceiling is at most that level's Main-tier cap, so the
-output never signals above the source. Given `-maxrate` alone, NVENC silently switches to the
+output never signals above the source, except a source whose own signalled level cannot hold
+its picture (warned). Given `-maxrate` alone, NVENC silently switches to the
 High tier once the ceiling passes the Main-tier cap of the level it picked, even with `-tier
 main`, so `-tier main -level L` is set explicitly at the lowest Main-tier level that holds the
 ceiling and the picture. GX011627 (3840x2160 at 30000/1001, source 6.0 Main): ceilings 59.66 /
@@ -100,7 +101,10 @@ kept audio packets with dts below 1.4787 s).
   are not the source's whole readable video (`verify.missing_frames`, Reviewer B pass 1 #1): the
   pts written must be exactly the source's listed video pts in presentation order (sorted, so a
   B-frame decode-order listing, VFR and an empty-edit dwell need nothing special), for a
-  `truncated` source only those before its first corrupt packet (Q-B, the frames before the cut;
+  `truncated` source only the packets listed before its first corrupt packet in file (decode)
+  order, which is what WP3.9 decodes (with B-frames a P-frame before the cut can lie after
+  B-frames listed after it; Reviewer B pass 2 #1, the gate fix; `_plan_tracks` cuts the tracks
+  from the same set) (Q-B, the frames before the cut;
   `verify.readable_video_pts`), and for an `unreadable_tail` source every such pts up to the last
   one written (its decodable end cannot be told without decoding, D86). That is the ONE place a
   short output verifies: an early stop on an `unreadable_tail` source is the decoder's end, never
@@ -207,6 +211,8 @@ assertions (the frame intervals against the stream stage, within 0.01 s) flaked 
 switch cost up to 0.035 s. Their tolerances now come from what they guard: half the shortest
 planted strays pause (a pause left inside an interval still fails) and 0.1 s for the row (a
 `close` counted into the stream still fails); both negative cases planted and shown failing.
+The negatives are evidence (`reviewB-remed\`), not assertions: the row test does not itself
+assert that `close` exceeds 0.1 s (Reviewer B pass 2 #5).
 ruff, ruff format (211 files) and mypy strict (123 files) clean. The three `footage` tests passed at `0b76301` in
 seat 8's footage window (the mapping commit touches no footage test). The full suite is the
 orchestrator's stacked gate (seat 7's run on `5727842`: 4434 passed, 2 skipped). They include eight planted wrong implementations that fail by name (CFR on
@@ -423,6 +429,14 @@ apart is enough; the figures above stand.
   it never raises, so a failed kill or a wait past 30 s leaves FFmpeg running and possibly
   `out_path` held; a second `abort` repeats the cleanup. On Windows the kill of the sink's own
   child fails only on access denial.
+- **`close` does not compare an audio track's edit-list duration or its last packet's duration
+  (Reviewer B pass 2 #2, limit):** an audio tail trim shorter than one packet passes `close`.
+  Non-video edit lists "as written" are a BEST-EFFORT row of the V4 instrument by design (round
+  0); the audio start and `media_time` effect IS checked, through the packet pts (pass-1 #2
+  reproduction).
+- **Rotation is compared as an integer (Reviewer B pass 2 #4, limit):** `close` truncates the
+  output's display rotation to an integer; the sink writes only the probe's integer rotation
+  (`-display_rotation`), so a fractional rotation cannot come from it.
 - **The floor row subtracts the strays pauses (Reviewer B pass 1 #9):** decode and encode go on
   during a pause, so subtracting the whole pause biases the floor low by the work done in it; the
   measured bound is about one frame per pause (7.3: only the first frame after a pause runs fast,
