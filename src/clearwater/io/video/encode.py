@@ -29,10 +29,14 @@ Colour (D54, D55, D114): the frames are converted to the source's Y'CbCr matrix,
 subsampling and siting by :func:`clearwater.color.encode_filter`, and the output is tagged with
 the source's resolved colour description, the D54 assumed values included (with a warning).
 
-On any failure the encoder is stopped, the output file is deleted and the original error is
-raised; an error while cleaning up is attached to it as a note, never in its place (DR-20 (6)).
-:meth:`FFmpegVideoSink.close` reads the finished output back and checks the MANDATORY items it
-can see without decoding (:mod:`.verify`); a mismatch is a failure like any other.
+A refusal at :meth:`FFmpegVideoSink.open` (before FFmpeg is started) leaves ``out_path`` as it
+was, for :meth:`FFmpegVideoSink.abort` or the caller's ``SafeWrite`` to delete. Any other failure
+-- FFmpeg cannot be started, or a failure in ``open`` after it starts, in ``write`` or in
+``close`` -- stops the encoder, deletes the output file and raises the original error; an error
+while cleaning up is attached to it as a note, never in its place (DR-20 (6)).
+:meth:`FFmpegVideoSink.close` first refuses frames that are not the source's whole readable video
+(:func:`.verify.missing_frames`), then reads the finished output back and checks the MANDATORY
+items it can see without decoding (:mod:`.verify`); a mismatch is a failure like any other.
 """
 
 from __future__ import annotations
@@ -80,6 +84,7 @@ from clearwater.io.video.verify import (
     PacketTable,
     check_output,
     frame_end,
+    missing_frames,
     not_carried,
     presentation_end,
     read_hevc_level,
@@ -492,8 +497,9 @@ class FFmpegVideoSink:
     """Writes corrected frames to an HEVC MP4 with the source's timing and tracks (IF-5).
 
     One sink writes one output: ``open``, ``write`` per frame in pts order, then ``close`` (or
-    ``abort``). Any failure is final: the encoder is stopped, the output deleted, and the sink
-    accepts nothing more except ``abort``, which then only repeats that cleanup.
+    ``abort``). Any failure is final: the sink accepts nothing more except ``abort``. A refusal
+    at ``open`` leaves ``out_path`` to ``abort`` (or the caller's ``SafeWrite``); every other
+    failure stops the encoder and deletes the output, and ``abort`` then only repeats that.
     """
 
     def __init__(self) -> None:
@@ -563,7 +569,7 @@ class FFmpegVideoSink:
         Raises:
             VideoEncodeError: ``"state"`` when already opened; ``"refused"``,
                 ``"unavailable"`` or ``"missing_tool"`` as above; ``"encoder_failed"`` when
-                FFmpeg cannot be started or stops at once.
+                FFmpeg cannot be started or stops at once (the output is deleted).
         """
         if self._phase != "new":
             raise VideoEncodeError(
@@ -708,14 +714,17 @@ class FFmpegVideoSink:
 
         Raises:
             VideoEncodeError: ``"state"`` when not open or nothing was written;
-                ``"encoder_failed"`` when FFmpeg fails; ``"verify_failed"`` when the output
-                does not match what was written. The output is deleted.
+                ``"verify_failed"`` when the frames written are not the source's whole
+                readable video (checked before the stream is ended) or the output does not
+                match what was written; ``"encoder_failed"`` when FFmpeg fails. The output is
+                deleted.
         """
         if self._phase != "open":
             raise VideoEncodeError("state", f"No video output is open ({self._phase}).")
         try:
             if not self._written:
                 raise VideoEncodeError("state", "No frames were written, so there is no video.")
+            self._check_complete()
             report = self._finish()
         except BaseException as error:
             self._fail(error)
@@ -850,9 +859,11 @@ class FFmpegVideoSink:
                 env=tool_env(),  # no FFREPORT: FFmpeg writes out_path and nothing else
             )
         except OSError as error:
-            raise VideoEncodeError(
+            failure = VideoEncodeError(
                 "encoder_failed", f"FFmpeg could not be started: {ascii_text(str(error))}"
-            ) from error
+            )
+            failure.__cause__ = error
+            self._fail(failure)  # final, and out_path deleted like any failure (Reviewer B #7)
         self._process = process
         self._stdin = process.stdin
         self._phase = "open"
@@ -964,6 +975,17 @@ class FFmpegVideoSink:
             return process.wait(timeout=10)
         except subprocess.TimeoutExpired:
             return None
+
+    def _check_complete(self) -> None:
+        """Refuse frames that are not the source's whole readable video (D94, Reviewer B #1).
+
+        Run before the end sentinel: an incomplete export fails before FFmpeg finishes it.
+        """
+        probe, source = self._probe, self._source
+        assert probe is not None and source is not None
+        problem = missing_frames(probe, source, self._written)
+        if problem is not None:
+            raise VideoEncodeError("verify_failed", f"The video is incomplete: {problem}.")
 
     def _finish(self) -> SinkReport:
         """Send the end sentinel, wait for FFmpeg with polling, then verify the output."""

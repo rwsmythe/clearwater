@@ -678,6 +678,63 @@ def readable_end(probe: ProbeResult, table: PacketTable, last_pts: int) -> int:
     return frame_end(probe, table, last_pts)
 
 
+def readable_video_pts(probe: ProbeResult, source: PacketTable) -> tuple[int, ...]:
+    """Return the source video pts an export writes, in presentation order (D86, Q-B).
+
+    Every listed pts; for a source the probe found ``truncated``, only those before its first
+    corrupt packet's pts (the frames before the cut, as the sink plans the cut at ``open``).
+
+    Args:
+        probe: The source's probe result.
+        source: The source's packet table.
+
+    Returns:
+        The pts in ticks, ascending, each once.
+    """
+    pts = sorted(set(source.video_pts))
+    if any(fault.kind == "truncated" for fault in probe.faults):
+        first_bad = min(source.video_corrupt_pts, default=None)
+        pts = [p for p in pts if first_bad is None or p < first_bad]
+    return tuple(pts)
+
+
+def missing_frames(probe: ProbeResult, source: PacketTable, written: Sequence[int]) -> str | None:
+    """Return why the frames written are not the source's whole readable video, or None.
+
+    The frames written must be exactly :func:`readable_video_pts`. For a source the probe found
+    ``unreadable_tail`` the decodable end cannot be told without decoding, so the frames written
+    must be those pts up to the last one written, none skipped (an early stop there is the
+    decoder's end, D86).
+
+    Args:
+        probe: The source's probe result.
+        source: The source's packet table.
+        written: The pts of every frame written, in ticks, ascending.
+
+    Returns:
+        The first missing pts and the counts, or None when nothing is missing or extra.
+    """
+    readable = readable_video_pts(probe, source)
+    tail = any(fault.kind == "unreadable_tail" for fault in probe.faults)
+    required = [p for p in readable if p <= written[-1]] if tail and written else list(readable)
+    done = set(written)
+    missing = [p for p in required if p not in done]
+    extra = sorted(done.difference(readable))
+    parts = []
+    if missing:
+        at = float(missing[0] * probe.video.time_base)
+        scope = " up to the last frame written" if tail else ""
+        parts.append(
+            f"{len(missing)} of the source's {len(required)} readable frames{scope} were not "
+            f"written (the first at pts {missing[0]}, {at:.6f} s; {len(written)} written)"
+        )
+    if extra:
+        parts.append(
+            f"{len(extra)} frames past the readable end were written (the first at pts {extra[0]})"
+        )
+    return "; ".join(parts) or None
+
+
 def _edit_problems(out_path: Path, first: Fraction, end: Fraction) -> list[str]:
     """Check the output video's edit list against the written start and end, in seconds."""
     try:

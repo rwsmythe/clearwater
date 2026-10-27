@@ -649,6 +649,35 @@ def test_the_sample_table_maps_onto_the_listed_pts_by_one_offset() -> None:
     assert samples.earliest == Fraction(2002, 30000)
 
 
+def test_missing_frames_wants_the_whole_readable_video_in_any_listing_order() -> None:
+    # Reviewer B pass 1 #1: the frames written must be the source's readable video.
+    source = _table((0, 3003, 1001, 2002))  # decode order (B-frames)
+    probe = _probe()
+    assert verify.missing_frames(probe, source, [0, 1001, 2002, 3003]) is None
+    gap = verify.missing_frames(probe, source, [0, 2002, 3003])
+    assert gap is not None and "1 of the source's 4 readable frames" in gap
+    assert "pts 1001," in gap and "3 written" in gap
+    early = verify.missing_frames(probe, source, [0, 1001])
+    assert early is not None and "2 of the source's 4" in early and "pts 2002," in early
+
+
+def test_missing_frames_follows_the_cut_of_a_truncated_or_unreadable_source() -> None:
+    truncated = _probe(faults=(Fault("truncated", "warn", "cut"),))
+    cut = _table((0, 3003, 1001, 2002), corrupt=(3003,))
+    assert verify.readable_video_pts(truncated, cut) == (0, 1001, 2002)
+    assert verify.missing_frames(truncated, cut, [0, 1001, 2002]) is None
+    past = verify.missing_frames(truncated, cut, [0, 1001, 2002, 3003])
+    assert past is not None and "1 frames past the readable end" in past
+    short = verify.missing_frames(truncated, cut, [0, 1001])
+    assert short is not None and "pts 2002," in short
+    tail = _probe(faults=(Fault("unreadable_tail", "warn", "tail"),))
+    whole = _table((0, 1001, 2002, 3003))
+    assert verify.missing_frames(tail, whole, [0, 1001]) is None  # the decoder's end (D86)
+    skipped = verify.missing_frames(tail, whole, [0, 2002])
+    assert skipped is not None and "up to the last frame written" in skipped
+    assert "pts 1001," in skipped
+
+
 def _out_table(
     pts: tuple[int, ...],
     audio: tuple[int | None, ...] = AUDIO_PTS,

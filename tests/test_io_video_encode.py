@@ -991,6 +991,56 @@ def test_close_without_frames_and_calls_out_of_order(sample: Sample, tmp_path: P
     fresh.abort()
 
 
+@pytest.mark.parametrize("plant", ["gap", "early-stop"])
+def test_close_refuses_an_incomplete_video_and_deletes_the_output(
+    sample: Sample, tmp_path: Path, plant: str
+) -> None:
+    # Reviewer B pass 1 #1: close checked the output against the frames written, never against
+    # the source, so a frame skipped in the middle or an early stop passed as a whole export.
+    out = tmp_path / "out.mp4"
+    sink, frames = _opened(sample("vid-vfr"), out)
+    chosen = [*frames[:2], *frames[3:]] if plant == "gap" else frames[:-2]
+    missing = frames[2] if plant == "gap" else frames[-2]
+    for frame in chosen:
+        sink.write(frame)
+    with pytest.raises(VideoEncodeError) as caught:
+        sink.close()
+    message = str(caught.value)
+    assert caught.value.kind == "verify_failed" and "incomplete" in message, message
+    assert f"pts {missing.pts_ticks}," in message and f"{len(chosen)} written" in message
+    assert not out.exists()
+    process = sink._process
+    assert process is not None and process.poll() is not None
+    with pytest.raises(VideoEncodeError) as again:
+        sink.close()
+    assert again.value.kind == "state"
+
+
+def test_ffmpeg_that_cannot_be_started_fails_the_sink_for_good(
+    sample: Sample, tmp_path: Path
+) -> None:
+    # Reviewer B pass 1 #7: an OSError from Popen left the sink "new" and the temporary behind.
+    gone = tmp_path / "no-such-ffmpeg"
+    sink = _Planted(lambda command: [str(gone), *command[1:]])  # FFmpeg gone since the lookup
+    source = sample("vid-vfr")
+    info = probe(source)
+    out = tmp_path / "out.mp4"
+    out.write_bytes(b"")
+    options: dict[str, Any] = {"quality": "draft", "bit_depth": 8, "provenance": None}
+    with pytest.raises(VideoEncodeError) as caught:
+        sink.open(info, out, encoder="libx265", **options)
+    assert caught.value.kind == "encoder_failed" and "could not be started" in str(caught.value)
+    assert isinstance(caught.value.__cause__, OSError)
+    assert not out.exists()
+    other = tmp_path / "other.mp4"
+    other.write_bytes(b"")
+    with pytest.raises(VideoEncodeError) as again:
+        sink.open(info, other, encoder="libx265", **options)
+    assert again.value.kind == "state"
+    sink.abort()
+    assert other.exists()
+
+
 def test_abort_is_idempotent_and_deletes_only_out_path(sample: Sample, tmp_path: Path) -> None:
     out = tmp_path / "out.mp4"
     neighbour = tmp_path / "neighbour.mp4"
