@@ -69,6 +69,23 @@
   joined, V16 stamps kept. **Owed at WP3.14's accept: MINOR DR row on the sink's phase write and abort docstring
   window (trigger: next touch of `encode.py`).** Cell 3: 123K at R1; A R1 0/2/6 all in envelope; footage V4 leg SAME;
   `-m "not footage"` 4864 / 10 skipped / 2379 s.
+- **WP3.20R ACCEPTED** by gen 14 2026-10-27 09:46Z at main dbb5858 (record `docs/proofs/wp3.20r-accept.md` with the lane
+  head-to-head table; candidate `wp3.20r-mc` 3d01da3 = `wp3.20r` 32d30dc on base 528d865; A = Claude opus/high R1
+  0/0/3+3 terminated; B of record Claude clean 5 advisories; Codex B head-to-head clean 2 minor 1 advisory; candidate
+  full pytest 4,894 / 2 / 2786 s = main's figure by code identity over the owned files). **CHARC QA CONFIRMED (static,
+  msg `d4130a37`):** patch-id 01c1b13a on the author range and both candidate ranges; ff-ancestor; owned files identical
+  across reviewed/tested/merged trees; 0 CR; both B evidence sets md5 OK and assertions OK (Claude JSON: is_error False,
+  modelUsage claude-opus-5-5, VERDICT anchored; Codex: banner, 0 ERROR, 18/18 succeeded, VERDICT anchored); static and
+  harness 379 at this seat. Register e7fef3d: DR-53 (mechanism amended), DR-54, DR-55 CLOSED; DR-61 NEW.
+- **CALIBRATION RULED 2026-10-27 ~09:50Z (HD-1 amended; design pass 4.3a): the Codex lane STAYS for the sonnet-high
+  class** (A rounds 1 vs 1; B-upheld blocking 0 vs 0; no lock violation; 0 STOPs; 0 reverts). Pace tiebreak resumes
+  after the pair. **Codex depth reading PINNED** (pass 3.3): `last_token_usage.input_tokens` of the last request in the
+  session rollout jsonl, NOT the cumulative `tokens used` footer (WP-T4 turn 4: 536,544 footer vs 284,234 depth).
+  Small harness item owed when the host is quiet: `codex_cell.py` prints that figure beside the footer.
+- **WP-T4** (Codex, depth 284K, past evaluation): rung 3 done, zero violators, diagnostic parallel leg 3,882 passed in
+  358 s (peak RSS 6.8 GB); E1 failed its bound serially in the sandbox (quiet-seat probe first; DR-58 (c) trigger
+  fires if it fails quiet too: widen with reason, no skip). Rung 4 = TWO rounds (Q7), exclusive windows while WP3.14 is
+  parked; OPEN/CLOSE to me. Session plan approved: under ~350K for rung 4, fresh session for report and reviews.
 - Gen 13 `-2029` ROLLED 07:51Z at ~345K (state 930a78d, FYI `080ce65fb13768e9`): WP-T3 cell DONE
   (A converged R1, candidate `wp-t3-mc` 0fbbe44 on 528d865, full pytest 4,867 passed / 2 skipped / 2873 s, fixtures
   byte-identical; B staged for gen 14); WP3.20R build DONE in 6 Codex turns (64K-205K tokens; Claude A R1
