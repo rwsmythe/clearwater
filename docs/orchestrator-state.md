@@ -17,7 +17,7 @@
     AMENDED `e7d25105`, in the brief at `2fea775`). **Cell 4** `wp314-cell4` (opus-high; 0 at dispatch, 38,603 at window
     request, 146,307 at the B1 remediation yield): did the ONE B pass 1 remediation (B1 (a) cancel from `cancelled()`;
     B1 (b) GRANTED one-block edit `analysis/engine.py` finally (CHARC `d9154e06`); B3 post-commit callbacks guarded; B4
-    exact Fractions); head `b4259cc`. B pass 1 (`wp3.14eviewB\`) BLOCKED 2 major (B2 V16-owed DECLINED as sequencing).
+    exact Fractions); head `b4259cc`. B pass 1 (`wp3.14/eviewB\`) BLOCKED 2 major (B2 V16-owed DECLINED as sequencing).
     Candidate `wp3.14-mc` `99171df` on `c9838cd` (patch-id `4b6d4d9e` = author). **B pass 2 RUNNING** (`reviewB2\`); a
     second blocking B is adjudicated at the gate. NEXT: OPEN exclusive -> grant cell 4 V16 GX011627 x6 + 5.3K (~1 h),
     then GX011625 (~2.5-3 h) -> cell 4 fills the report's V16 section + FINAL return -> rebase, candidate FULL pytest
