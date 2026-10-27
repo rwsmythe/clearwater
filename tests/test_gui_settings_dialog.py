@@ -100,13 +100,19 @@ class FakeChoosers:
         self.asked_folder: list[Path | None] = []
         self.confirms: list[str] = []
         self.while_open: Callable[[], None] | None = None
+        self.raise_on_choose: Exception | None = None
+        self.raise_on_confirm: Exception | None = None
 
     def choose_folder(self, initial: Path | None) -> Path | None:
         self.asked_folder.append(initial)
+        if self.raise_on_choose is not None:
+            raise self.raise_on_choose
         return self.folder
 
     def confirm(self, text: str) -> bool:
         self.confirms.append(text)
+        if self.raise_on_confirm is not None:
+            raise self.raise_on_confirm
         if self.while_open is not None:  # what happens while the modal box runs its event loop
             self.while_open()
         return self.answer
@@ -358,6 +364,111 @@ def test_use_source_folder_and_cancelled_chooser(env: Env) -> None:
     dialog.use_source_button.click()
     assert dialog.folder_label.text() == SAME_FOLDER_TEXT
     assert dialog.edited_settings().output_folder is None
+
+
+def _chooser_scenario(
+    env: Env, operation: str = "choose", *, analysing: bool = False
+) -> tuple[MainWindow, SettingsDialog]:
+    """A chooser failure becomes a settings error without changing dialog or cache state."""
+    window = env.start(saved=Settings(output_folder=Path("original")))
+    dialog = env.open(window)
+    if analysing:
+        window.session.set_analysis(AnalysisState(phase="running"))
+    before = window.session.settings()
+    before_file = (env.config / "settings.json").read_bytes()
+    before_note = dialog.cache_note.text()
+    if operation == "choose":
+        env.choosers.raise_on_choose = OSError("injected chooser failed")
+        button = dialog.choose_folder_button
+        expected = "The output folder could not be chosen: injected chooser failed"
+    else:
+        assert operation == "confirm"
+        env.choosers.raise_on_confirm = RuntimeError("injected chooser failed")
+        button = dialog.clear_button
+        expected = "The cache was not cleared: the confirmation failed: injected chooser failed"
+    button.click()
+    errors = presenter_of(window).of("error")
+    assert len(errors) == 1, "chooser failure did not present exactly one settings error"
+    assert errors[0].owner == OWNER_SETTINGS
+    assert errors[0].text == expected
+    assert errors[0].text.isascii()
+    assert dialog.edited_settings().output_folder == Path("original")
+    assert dialog.folder_label.text() == str(Path("original"))
+    assert window.session.settings() == before
+    assert (env.config / "settings.json").read_bytes() == before_file
+    assert dialog.result() != QDialog.DialogCode.Accepted
+    assert not dialog._clearing
+    assert env.cache.cleared == []
+    assert env.cache.limits == []
+    assert dialog.clear_button.isEnabled() == (not analysing)
+    assert dialog.clear_button.text() == "Clear cache"
+    assert dialog.cache_note.text() == before_note
+    return window, dialog
+
+
+@pytest.mark.parametrize("analysing", [False, True], ids=["idle", "analysis-running"])
+def test_a_raising_folder_chooser_is_a_settings_error(env: Env, analysing: bool) -> None:
+    """Catch an OSError from a folder-button click and preserve the analysis button state."""
+    _chooser_scenario(env, analysing=analysing)
+
+
+def test_a_raising_confirmation_is_a_settings_error_and_clears_nothing(env: Env) -> None:
+    """A raising confirmation must not launch a cache clear or escape its button slot."""
+    _chooser_scenario(env, "confirm")
+
+
+@pytest.mark.parametrize("operation", ["choose", "confirm"])
+def test_a_dialog_still_works_after_a_chooser_failure(env: Env, operation: str) -> None:
+    """The same dialog can retry a folder choice or cache confirmation successfully."""
+    window, dialog = _chooser_scenario(env, operation)
+    if operation == "choose":
+        env.choosers.raise_on_choose = None
+        env.choosers.folder = Path("chosen")
+        dialog.choose_folder_button.click()
+        assert dialog.edited_settings().output_folder == Path("chosen")
+        assert dialog.folder_label.text() == str(Path("chosen"))
+        assert env.choosers.asked_folder == [Path("original"), Path("original")]
+        assert env.cache.cleared == []
+    else:
+        env.choosers.raise_on_confirm = None
+        dialog.clear_button.click()
+        env.qtbot.waitUntil(lambda: dialog.cache_note.text() == "Cache cleared.", timeout=5000)
+        assert len(env.choosers.confirms) == 2
+        assert len(env.cache.cleared) == 1
+        assert dialog.clear_button.isEnabled()
+        assert not dialog._clearing
+    assert len(presenter_of(window).of("error")) == 1
+
+
+@pytest.mark.parametrize("operation", ["choose", "confirm"])
+def test_chooser_scenario_passes_on_the_real_dialog(env: Env, operation: str) -> None:
+    """The shared chooser-failure scenario passes on both real slots."""
+    _chooser_scenario(env, operation)
+
+
+@pytest.mark.parametrize("operation", ["choose", "confirm"])
+def test_planted_unwrapped_chooser_is_caught(
+    env: Env, monkeypatch: pytest.MonkeyPatch, operation: str
+) -> None:
+    """Detect bare injected calls while capturing the deliberately escaped Qt exception."""
+
+    def unwrapped(self: SettingsDialog) -> None:
+        if operation == "choose":
+            self._choosers.choose_folder(self._folder)
+        else:
+            self._choosers.confirm("Clear the cache?")
+
+    method = "_on_choose_folder" if operation == "choose" else "_on_clear_clicked"
+    monkeypatch.setattr(SettingsDialog, method, unwrapped)
+    with (
+        env.qtbot.captureExceptions() as exceptions,
+        pytest.raises(
+            AssertionError, match="chooser failure did not present exactly one settings error"
+        ),
+    ):
+        _chooser_scenario(env, operation)
+    assert len(exceptions) == 1
+    assert isinstance(exceptions[0][1], OSError if operation == "choose" else RuntimeError)
 
 
 # D74: encoders.
@@ -988,6 +1099,16 @@ def test_every_message_of_the_dialog_is_ascii(env: Env) -> None:
     dialog = env.open(window)
     dialog.clear_button.click()
     env.qtbot.waitUntil(lambda: bool(presenter_of(window).of("error")), timeout=5000)
+    env.choosers.raise_on_choose = OSError("folder \u2603")
+    dialog.choose_folder_button.click()
+    env.choosers.raise_on_confirm = RuntimeError("confirm \u00e9")
+    dialog.clear_button.click()
+    errors = presenter_of(window).of("error")
+    assert "The output folder could not be chosen: folder \\u2603" in [m.text for m in errors]
+    assert "The cache was not cleared: the confirmation failed: confirm \\xe9" in [
+        m.text for m in errors
+    ]
+    assert all(m.owner == OWNER_SETTINGS for m in errors)
     assert all(m.text.isascii() for m in presenter_of(window).messages)
 
 

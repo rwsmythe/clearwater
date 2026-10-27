@@ -634,8 +634,12 @@ class SettingsDialog(QDialog):
         self.folder_label.setText(SAME_FOLDER_TEXT if self._folder is None else str(self._folder))
 
     def _on_choose_folder(self) -> None:
-        """Ask for an output folder; a cancel changes nothing."""
-        chosen = self._choosers.choose_folder(self._folder)
+        """Ask for a folder; preserve it on cancellation or a reported chooser failure."""
+        try:
+            chosen = self._choosers.choose_folder(self._folder)
+        except Exception as error:  # choosers are foreign injected code
+            _present_error(self._context, f"The output folder could not be chosen: {error}")
+            return
         if chosen is not None:
             self._folder = chosen
             self._show_folder()
@@ -672,12 +676,20 @@ class SettingsDialog(QDialog):
                 self.cache_note.setText("")
 
     def _on_clear_clicked(self) -> None:
-        """Confirm, check again that no analysis runs, then clear the cache in a job."""
+        """Confirm safely, check again that no analysis runs, then clear in a job."""
         if self._clearing or self._analysing():
             return
-        if not self._choosers.confirm(
-            "Remove every cached proxy and statistic? Clips are analysed again when needed."
-        ):
+        try:
+            confirmed = self._choosers.confirm(
+                "Remove every cached proxy and statistic? Clips are analysed again when needed."
+            )
+        except Exception as error:  # choosers are foreign injected code
+            _present_error(
+                self._context, f"The cache was not cleared: the confirmation failed: {error}"
+            )
+            self._update_clear_button()
+            return
+        if not confirmed:
             return
         # The confirmation runs a nested event loop: an analysis may have started, or the dialog
         # may have closed, while it was open.

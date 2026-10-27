@@ -2,7 +2,9 @@
 
 ## Dispatch and scope
 
-- Turn 1: read, reproduce, table; branch `wp3.20r`, base and observed HEAD
+- Current package diff base: **`528d865`**, after the dispatcher rebase before
+  turn 4. Use this base for review and the final report.
+- Historical turn 1: read, reproduce, table; branch `wp3.20r`, base and observed HEAD
   `9753b7b`. The initial tracked working tree was clean.
 - Read the dispatch recipe, application definition, CLAUDE.md, supplied FINAL
   brief and dispatch, settings-dialog module and tests, and DR-53..DR-55.
@@ -13,7 +15,9 @@
 - Dispatcher-supplied end-of-turn-1 token figure: **64,199**, supplied at the
   turn-2 gate; turn 1 committed as `c46eb1a`. Dispatcher-supplied end-of-turn-2
   figure: **92,340**, supplied at the turn-3 gate; turn 2 committed as `944b5d2`.
-  Turn-3 figure not yet supplied.
+  Dispatcher-supplied end-of-turn-3 figure: **111,584**, supplied at the turn-4
+  gate; turn 3 originally committed as `26b8ff5`, now rebased as `7c43b65`.
+  Turn-4 figure not yet supplied.
   No reviewer has run; Reviewer A follows turn 5.
 
 ## Baseline and sandbox observations
@@ -142,7 +146,7 @@ S55 roster:
 
 | Reviewer A round | Severity counts | In / out of envelope | NEW / REOPENED | Reverts | Product / test-only fixes | Verdict | Dispatcher token figure |
 |---|---|---|---|---|---|---|---|
-| Not started | n/a | n/a | n/a | 0 | 0 / 0 | Scheduled after turn 5 | Turn 1: 64,199 |
+| Not started | n/a | n/a | n/a | 0 | 0 / 0 | Scheduled after turn 5 | Turn 3: 111,584 |
 
 Locks this turn: owned deliverable only; product/tests and frozen interfaces
 untouched; no dependency or OS-specific product change; local configuration
@@ -335,3 +339,109 @@ full suite remains the orchestrator's. Owned files only; no interface, dependenc
 local-config or footage change; no OS-specific product code; no git writes,
 reviewer or mailbox activity. LF and unchanged-test checks are recorded in
 `work/wp3.20r/turn3-deliverable-check.log`.
+
+## Turn 4: DR-55
+
+### Rebase and carried gate evidence
+
+The dispatcher rebased the branch onto main **`528d865`**, the new package diff
+base. Main added harness files only; the three package commits' content is
+unchanged. Historical run records above retain the original hashes; mapping:
+
+| Turn | Original commit | Rebased commit |
+|---|---|---|
+| 1 | `c46eb1a` | `ea22295` |
+| 2 | `944b5d2` | `db71de3` |
+| 3 | `26b8ff5` | `7c43b65` |
+
+The dispatcher confirmed the turn-3 tree's repository formatter outside the
+sandbox: **227 files already formatted**, exit 0. The cell's exit 101 remains
+a sandbox artifact. No broad formatting diagnostic was repeated.
+
+Read the newly committed `scripts/sandbox_mkdir_shim.py` (introduced on main
+at `542bc11`). It wraps `os.mkdir`, widening only 0o700 to 0o777, with typed
+arguments and otherwise unchanged forwarding. All turn-4 pytest runs used
+`QT_QPA_PLATFORM=offscreen`, `PYTHONPATH=scripts`,
+`-p sandbox_mkdir_shim -p no:cacheprovider`, both targeted files and
+`--basetemp=work/wp3.20r/tmp-t4 -q`. The old `work/sandbox/`, inaccessible temp
+root and cache directories were left untouched. The committed harness shim was
+read only and is not a package change. Seat gate runs never load it.
+
+### Tests first and observed red results
+
+Extended the owned test file's `FakeChoosers` with `raise_on_choose` and
+`raise_on_confirm`, each an exception instance or None. Added five test
+functions, nine parameterized cases, plus `_chooser_scenario`; extended the
+existing ASCII-message test. All were run before editing the slots, on
+unchanged product code at `7c43b65`.
+
+| Test | Unchanged module | Final head |
+|---|---|---|
+| `test_a_raising_folder_chooser_is_a_settings_error[idle]` | FAILED and Qt teardown ERROR: OSError escapes, settings error missing | PASSED |
+| `test_a_raising_folder_chooser_is_a_settings_error[analysis-running]` | FAILED and Qt teardown ERROR: same escape | PASSED; Clear cache remains disabled for analysis |
+| `test_a_raising_confirmation_is_a_settings_error_and_clears_nothing` | FAILED and Qt teardown ERROR: RuntimeError escapes | PASSED; no cache call, `_clearing` False, button enabled |
+| `test_a_dialog_still_works_after_a_chooser_failure[choose]` | FAILED and Qt teardown ERROR at initial chooser failure | PASSED; second click chooses the folder |
+| `test_a_dialog_still_works_after_a_chooser_failure[confirm]` | FAILED and Qt teardown ERROR at initial confirmation failure | PASSED; second click clears the cache once |
+| `test_chooser_scenario_passes_on_the_real_dialog[choose]` | FAILED and Qt teardown ERROR | PASSED |
+| `test_chooser_scenario_passes_on_the_real_dialog[confirm]` | FAILED and Qt teardown ERROR | PASSED |
+| `test_planted_unwrapped_chooser_is_caught[choose]` | PASSED | PASSED; scenario detects missing settings error and capture records the deliberately escaped OSError |
+| `test_planted_unwrapped_chooser_is_caught[confirm]` | PASSED | PASSED; same, with RuntimeError |
+| Extended `test_every_message_of_the_dialog_is_ascii` | FAILED and Qt teardown ERROR: new errors absent and non-ASCII exceptions escape | PASSED; both new texts have escaped non-ASCII details and settings ownership |
+
+The red summary was **8 failed, 77 passed, 8 errors in 8.85s**, exit 1. The
+eight errors were pytest-qt reporting the intended escaped slot exceptions,
+not setup failures. Normal regression cases click real buttons without capturing
+exceptions. Only the planted cases capture their deliberately escaped exception
+with `qtbot.captureExceptions`, then verify the shared scenario fails by the
+named `chooser failure did not present exactly one settings error` assertion.
+
+The shared scenario checks unchanged output folder/label, session and settings
+file bytes, non-Accepted result, `_clearing` False, no cache clear/limit calls,
+and the clear-button/cache-note state for the analysis phase. Both retry paths
+reuse the same dialog; successful choosing/clearing does not claim to clear the
+earlier settings banner (that is successful save's existing behavior).
+
+### Product behavior
+
+Changed only `_on_choose_folder` and `_on_clear_clicked` this turn. Each catches
+`Exception` around its injected chooser call, with the foreign-injected-code
+comment, and reports through `_present_error`:
+
+- `The output folder could not be chosen: <error>`
+- `The cache was not cleared: the confirmation failed: <error>`
+
+Both return before changing the folder or launching cache work. Confirmation
+failure also refreshes the button for the current analysis phase. The cache
+clearing flag remains False. The existing presenter escapes non-ASCII text;
+tests exercise a snowman in the folder error and an accented character in the
+confirmation error, asserting their literal ASCII escapes and owner `settings`.
+Updated the two slot docstrings to reflect the behavior.
+
+### Gates and verification loop
+
+| Check | Observed result | Log under `work/wp3.20r/` |
+|---|---|---|
+| Tests before product edit | Exit 1; **8 failed, 77 passed, 8 errors in 8.85s** | `turn4-red-pytest.log` |
+| First head run | Exit 0; **85 passed in 6.26s** | `turn4-green-pytest.log` |
+| Initial Ruff check | Exit 1; `SIM117` on nested capture/assertion contexts in the planted test | `turn4-ruff-check.log` |
+| Final targeted run after combining the contexts | Exit 0; **85 passed in 6.68s** | `turn4-final-pytest.log` |
+| Final `uv run ruff check .` | Exit 0; **All checks passed!**; two access-denied traversal warnings | `turn4-final-ruff-check.log` |
+| Final `uv run ruff format --check .` | Exit 101; **Expected a ruff source file** (sandbox artifact) | `turn4-final-ruff-format.log` |
+| Owned Python file format check | Exit 0; **2 files already formatted** | `turn4-final-owned-format-check.log` |
+| Final `uv run mypy` | Exit 0; **Success: no issues found in 132 source files** | `turn4-final-mypy.log` |
+
+Verification loop: suspected unguarded injected calls; confirmed by the red
+assertions and independent pytest-qt exception reports for both slots; fixed
+with narrowly placed catches and the specified settings messages; all targeted
+tests passed. Ruff confirmed a test-only context-style slip; combined the
+contexts and repeated the whole targeted run and gates. Both planted unwrapped
+slots still fail their scenario by name. Final code inspection confirms no
+folder assignment or cache-job scheduling precedes the injected call's success.
+No new DR-55 issue found in the final pass. Reviewer A is still pending turn 5.
+
+No scope deviation or open product question. Default repository formatting
+needs seat confirmation; full suite remains the orchestrator's. Scope, LF,
+ASCII-ledger and protected-test source checks are recorded in
+`work/wp3.20r/turn4-deliverable-check.log`. Only the three owned files changed;
+frozen interfaces, dependencies, local config, harness shim and footage are
+untouched. No OS-specific product code, git writes, reviewer or mailbox activity.
