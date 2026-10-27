@@ -92,6 +92,14 @@
   loop TERMINATES at R2; G3-G8 cleanup once. Cell 3 at 255,161: cleanup + report, then fresh cell 4 for the V16 rows
   and the return report. Host order agreed: E1 quiet probe -> WP3.14 V16 windows -> WP3.14 candidate gate -> WP-T4
   rung 4 (two rounds). OPEN/CLOSE per block come to me.
+- **WP3.14 B pass 1 BLOCKED** (orchestrator `cc86ea6856e566a7`, 10:40Z; candidate `wp3.14-mc` b830412 = dc76d92 on
+  dbb5858, patch-id 82236c64; Codex B 167,472 tokens): B1 MAJOR split: (a) cancel recognised from `progress.cancelled()`
+  FIXED in owned code; (b) `analysis/engine.py:494-497` bare `close()` in a `finally` replaces the original failure --
+  **CHARC GRANTED a one-line guarded-close fix in engine.py NOW (DR-20 (6) pattern), five conditions, no DR row**;
+  B2 (V16 rows owed) declined as sequencing, upheld; B3 (raising progress after commit) and B4 (Fraction-exact
+  QUALITY_RATIO) fixed. Cell 3 retired 302,881 at dc76d92; cell 4 `wp314-cell4` (38K) remediates then V16 rows.
+  WP-T4 E1 quiet-seat probe PASSED (DR-58 (c) trigger not fired). Next: B pass 2, V16 exclusive blocks (OPEN/CLOSE to
+  me), candidate full suite, WP-T4 rung 4.
 - Gen 13 `-2029` ROLLED 07:51Z at ~345K (state 930a78d, FYI `080ce65fb13768e9`): WP-T3 cell DONE
   (A converged R1, candidate `wp-t3-mc` 0fbbe44 on 528d865, full pytest 4,867 passed / 2 skipped / 2873 s, fixtures
   byte-identical; B staged for gen 14); WP3.20R build DONE in 6 Codex turns (64K-205K tokens; Claude A R1
