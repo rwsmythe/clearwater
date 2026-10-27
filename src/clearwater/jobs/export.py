@@ -191,6 +191,29 @@ class _Watchdog:
                 return
 
 
+def _close_stream(frames: Iterator[Frame], *, quietly: bool) -> None:
+    """Close a decode stream on the job's thread (DR-45 (a)).
+
+    Args:
+        frames: The stream; one without ``close`` is left alone.
+        quietly: True while another error is being handled: a close error is then a log line,
+            never the failure (task 5); False lets it raise as the job's own failure.
+    """
+    close = getattr(frames, "close", None)
+    if close is None:
+        return
+    try:
+        close()
+    except Exception as exc:
+        if not quietly:
+            raise
+        _LOG.warning(
+            "closing the decode stream failed after an earlier error: %s: %s",
+            type(exc).__name__,
+            ascii_text(str(exc)),
+        )
+
+
 def _caused_by_disk_full(exc: BaseException) -> bool:
     """Tell whether ``exc`` or anything in its cause or context chain is a disk full (D87)."""
     seen: set[int] = set()
@@ -303,7 +326,7 @@ class ExportEngine:
             failure = str(exc)
         except Exception as exc:  # every other error is a failed result with its own text
             failure = self._describe(run, exc)
-        if failure is not None and run.write is not None and run.write.temp_leftover:
+        if run.write is not None and run.write.temp_leftover:  # also after an ok commit (D85)
             run.warnings.append(
                 f"The temporary file {ascii_text(run.write.temp_path.name)} could not be removed; "
                 "it is removed at the next start."
@@ -461,8 +484,8 @@ class ExportEngine:
         )
         progress.report(3, 4, f"Writing {run.name}")
         self._stage("write")
-        with SafeWrite(plan, reservations) as write:
-            run.write = write
+        run.write = SafeWrite(plan, reservations)  # held first: a failed begin may leave one
+        with run.write as write:
             self._photo_writer.write(
                 host, meta, write.temp_path, bit_depth=settings.png_bit_depth, provenance=provenance
             )
@@ -544,8 +567,8 @@ class ExportEngine:
             if settings.provenance
             else None
         )
-        with SafeWrite(plan, reservations) as write:
-            run.write = write
+        run.write = SafeWrite(plan, reservations)  # held first: a failed begin may leave one
+        with run.write as write:
             try:
                 self._stage("open")
                 sink.open(
@@ -558,17 +581,19 @@ class ExportEngine:
                 )
                 self._encode(probe, method, backend, engine, params, hw_decode, sink, progress, run)
                 self._stage("close")
+                self._check_cancel(progress)  # a cancel after the last frame never closes
                 report = sink.close()
+                # The sink's warnings are the job's from here, so a stop before commit keeps them.
+                run.warnings.extend(ascii_text(w) for w in report.warnings)
+                run.warnings.extend(
+                    f"Not carried to the output: {ascii_text(item)}" for item in report.not_carried
+                )
                 self._check_cancel(progress)
             except BaseException:
                 sink.abort()  # never close after a stop: kill FFmpeg, delete the temporary
                 raise
             final = write.commit()
         run.outputs.append(final)
-        run.warnings.extend(ascii_text(w) for w in report.warnings)
-        run.warnings.extend(
-            f"Not carried to the output: {ascii_text(item)}" for item in report.not_carried
-        )
         self._stage("committed")
         progress.report(report.frames_written, video.nb_frames, f"Saved {ascii_text(final.name)}")
 
@@ -643,10 +668,10 @@ class ExportEngine:
                         )
                     )
                     progress.report(written, total, message)
-            finally:
-                close = getattr(frames, "close", None)
-                if close is not None:
-                    close()  # on this thread only (DR-45 (a))
+            except BaseException:
+                _close_stream(frames, quietly=True)  # the earlier error stays the failure
+                raise
+            _close_stream(frames, quietly=False)
         except Exception as exc:
             if watchdog.fired:
                 raise _CancelledError from exc

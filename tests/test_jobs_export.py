@@ -28,6 +28,7 @@ from clearwater.jobs import Reservations, SafeWrite, is_reserved_device_name, ru
 from clearwater.jobs import disk_space as disk_space_module
 from clearwater.jobs import export as export_module
 from clearwater.jobs import naming as naming_module
+from clearwater.jobs import safe_write as safe_write_module
 from clearwater.jobs.export_seam import CANCELLED, ExportJobs, ExportRequest
 from test_jobs_export_support import FakeSink, Rig, parameter_set
 
@@ -48,9 +49,37 @@ class CancelAt(StubProgress):
             self.cancel()
 
 
-def _no_partials(rig: Rig) -> None:
-    left = [n for n in rig.files() if naming_module.is_temporary_name(n) or "_out" in n]
+_FINAL_STEMS = ("clip_corrected", "shot_corrected")
+"""The stems of the rig's planned finals (numbered ones included: ``clip_corrected_2.mp4``)."""
+
+
+def _no_partials(rig: Rig, keep: tuple[Path, ...] = ()) -> None:
+    """Assert no temporary and no final but those in ``keep`` is in the rig's folder."""
+    kept = {p.name for p in keep}
+    left = [
+        n
+        for n in rig.files()
+        if naming_module.is_temporary_name(n) or (n.startswith(_FINAL_STEMS) and n not in kept)
+    ]
     assert left == [], left
+
+
+def test_no_partials_catches_a_leaked_final_and_a_temporary(tmp_path: Path) -> None:
+    rig = Rig(tmp_path)
+    (tmp_path / "earlier_corrected.mp4").write_bytes(b"an earlier output is not a leak")
+    _no_partials(rig)
+    for name in ("clip_corrected.mp4", "clip_corrected_2.mp4", "shot_corrected.png"):
+        leaked = tmp_path / name
+        leaked.write_bytes(b"x")
+        with pytest.raises(AssertionError, match=name):
+            _no_partials(rig)
+        _no_partials(rig, keep=(leaked,))
+        leaked.unlink()
+    temporary = naming_module.temporary_path(tmp_path / "other.mp4", naming_module.new_token())
+    assert naming_module.is_temporary_name(temporary.name)
+    temporary.write_bytes(b"x")
+    with pytest.raises(AssertionError, match=temporary.name):
+        _no_partials(rig)
 
 
 # --- the seam -------------------------------------------------------------------------------
@@ -107,7 +136,7 @@ def test_ok_video_names_its_committed_output_and_carries_the_sink_warnings(tmp_p
     exporting = [r for r in progress.reports if r[2].startswith("Exporting")]
     assert exporting == [(i, 6, "Exporting clip.mp4") for i in range(1, 7)]
     assert any(r[2].startswith("Analysing clip.mp4: ") for r in progress.reports)
-    _no_partials(rig)
+    _no_partials(rig, keep=result.outputs)
 
 
 def test_ok_photo_reports_four_steps(tmp_path: Path) -> None:
@@ -181,6 +210,50 @@ def test_cancel_immediately_before_commit_deletes_the_finished_temporary(
     result = rig.run(rig.request(), progress)
     _assert_cancel_contract(result)
     assert rig.sink.calls[-2:] == ["close", "abort"]
+    _no_partials(rig)
+
+
+def test_a_stop_after_close_keeps_the_sink_warnings(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # R1 F4: the SinkReport's warnings were copied only after commit, so a stop between
+    # close and commit lost them (the seam: a non-ok result carries the warnings raised before).
+    expected = ("sink warning", "Not carried to the output: timecode track")
+    rig = Rig(tmp_path)
+    progress = StubProgress()
+    real_close = FakeSink.close
+
+    def close_then_cancel(self: FakeSink) -> Any:
+        report = real_close(self)
+        progress.cancel()
+        return report
+
+    monkeypatch.setattr(FakeSink, "close", close_then_cancel)
+    result = rig.run(rig.request(), progress)
+    _assert_cancel_contract(result)
+    assert result.warnings == expected
+    monkeypatch.setattr(FakeSink, "close", real_close)
+
+    def refuse(self: SafeWrite) -> Path:
+        raise PermissionError(13, "planted commit failure")
+
+    monkeypatch.setattr(SafeWrite, "commit", refuse)
+    (tmp_path / "second").mkdir()
+    second = Rig(tmp_path / "second")
+    result = second.run(second.request())
+    assert result.failure == "clip.mp4: PermissionError: [Errno 13] planted commit failure"
+    assert result.warnings == expected
+
+
+def test_a_cancel_at_the_close_boundary_aborts_without_closing(tmp_path: Path) -> None:
+    # R1 F1 (a): a cancel seen after the last frame and before close() must not finish the
+    # output; the job checks immediately before close (Q2 "between phases").
+    progress = StubProgress()
+    rig = Rig(tmp_path, on_stage=lambda s: progress.cancel() if s == "close" else None)
+    result = rig.run(rig.request(), progress)
+    _assert_cancel_contract(result)
+    assert "close" not in rig.sink.calls and rig.sink.calls[-1] == "abort"
+    assert result.outputs == ()
     _no_partials(rig)
 
 
@@ -338,6 +411,90 @@ def test_a_temporary_that_cannot_be_deleted_is_a_warning(
     assert result.failure.startswith("clip.mp4: disk full while writing")
     assert len(result.warnings) == 1
     assert "could not be removed; it is removed at the next start" in result.warnings[0]
+
+
+_LEFTOVER = "could not be removed; it is removed at the next start"
+
+
+def test_a_temporary_left_after_a_successful_commit_is_a_warning(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # R1 F3: commit() links the final and then removes the temporary; when that removal fails
+    # the job is ok but the leftover must still be reported (DR-57 (c), D85).
+    monkeypatch.setattr(safe_write_module, "_unlink_quietly", lambda path: None)
+    rig = Rig(tmp_path)
+    result = rig.run(rig.request())
+    assert result.ok and result.outputs == (tmp_path / "clip_corrected.mp4",), result.failure
+    assert [w for w in result.warnings if _LEFTOVER in w] != [], result.warnings
+    assert any(naming_module.is_temporary_name(n) for n in rig.files())
+
+
+def test_a_temporary_left_by_a_failed_begin_is_a_warning(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # R1 F3: when SafeWrite's begin fails after creating the temporary and its abort cannot
+    # remove it, the leftover must reach the result (the write was not yet the job's).
+    real_begin = SafeWrite.begin
+
+    def begin_then_fail(self: SafeWrite) -> Path:
+        real_begin(self)
+        raise OSError(5, "planted begin failure")
+
+    real_unlink = Path.unlink
+
+    def refuse(self: Path, missing_ok: bool = False) -> None:
+        if naming_module.is_temporary_name(self.name):
+            raise PermissionError(13, "in use")
+        real_unlink(self, missing_ok=missing_ok)
+
+    monkeypatch.setattr(SafeWrite, "begin", begin_then_fail)
+    monkeypatch.setattr(Path, "unlink", refuse)
+    for kind in ("video", "photo"):
+        folder = tmp_path / kind
+        folder.mkdir()
+        rig = Rig(folder)
+        result = rig.run(rig.request(kind))
+        assert result.failure.endswith("OSError: [Errno 5] planted begin failure"), result.failure
+        assert [w for w in result.warnings if _LEFTOVER in w] != [], (kind, result.warnings)
+
+
+class _CloseRaises:
+    """A decode iterator whose ``close`` raises (a cleanup error)."""
+
+    def __init__(self, frames: Any) -> None:
+        self._frames = iter(frames)
+
+    def __iter__(self) -> _CloseRaises:
+        return self
+
+    def __next__(self) -> Any:
+        return next(self._frames)
+
+    def close(self) -> None:
+        raise OSError("cleanup close failed")
+
+
+def test_a_stream_close_error_never_replaces_the_original_failure(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    # R1 F2: the decode stream's close ran unguarded in a finally, so its error replaced the
+    # render error (ladder 5: "a cleanup error is a log line or a warning, never the failure").
+    stages: list[str] = []
+    rig = Rig(tmp_path, on_stage=stages.append)
+    real_frames = rig.source.frames
+
+    def frames(*args: Any, **kwargs: Any) -> Any:
+        stream = real_frames(*args, **kwargs)
+        return _CloseRaises(stream) if "frames" in stages else stream
+
+    rig.source.frames = frames  # type: ignore[method-assign]
+    rig.method.render = lambda *a, **k: (_ for _ in ()).throw(ValueError("ORIGINAL render failed"))  # type: ignore[method-assign]
+    with caplog.at_level(logging.WARNING, logger="clearwater.jobs.export"):
+        result = rig.run(rig.request())
+    assert result.failure == "clip.mp4: ValueError: ORIGINAL render failed"
+    assert "cleanup close failed" in caplog.text
+    assert "close" not in rig.sink.calls and "abort" in rig.sink.calls
+    _no_partials(rig)
 
 
 def test_a_stop_after_commit_still_lists_the_committed_file(tmp_path: Path) -> None:
@@ -530,27 +687,55 @@ def test_reserved_device_names(name: str, reserved: bool) -> None:
     assert is_reserved_device_name(name) is reserved
 
 
-def test_one_reservations_reaches_plan_output_and_safe_write(
+def _registries_of_two_jobs(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    seen: list[tuple[str, int]] = []
+) -> list[tuple[str, Reservations | None]]:
+    """Run two video jobs and return each (call, registry) seen by plan_output and SafeWrite.
+
+    The registries themselves are held (not their ``id``), so a freed one's id cannot be
+    reused by the next job's and pass for a fresh registry.
+    """
+    seen: list[tuple[str, Reservations | None]] = []
     real_plan = export_module.plan_output
     real_init = SafeWrite.__init__
 
     def plan(source: Path, settings: Settings, kind: Any, reservations: Reservations) -> Any:
-        seen.append(("plan", id(reservations)))
+        seen.append(("plan", reservations))
         return real_plan(source, settings, kind, reservations)
 
     def init(self: SafeWrite, plan: Any, reservations: Reservations | None = None) -> None:
-        seen.append(("write", id(reservations)))
+        seen.append(("write", reservations))
         real_init(self, plan, reservations)
 
     monkeypatch.setattr(export_module, "plan_output", plan)
     monkeypatch.setattr(SafeWrite, "__init__", init)
     rig = Rig(tmp_path)
     assert rig.run(rig.request()).ok and rig.run(rig.request()).ok
+    return seen
+
+
+def _assert_one_fresh_registry_per_job(seen: list[tuple[str, Reservations | None]]) -> None:
     assert [s[0] for s in seen] == ["plan", "write", "plan", "write"]
-    assert seen[0][1] == seen[1][1] and seen[2][1] == seen[3][1]
+    assert seen[0][1] is seen[1][1] and seen[2][1] is seen[3][1], "plan and write differ"
+    assert seen[0][1] is not None
+    assert seen[0][1] is not seen[2][1], "a registry was reused across jobs"
+
+
+def test_one_fresh_reservations_per_job_reaches_plan_output_and_safe_write(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _assert_one_fresh_registry_per_job(_registries_of_two_jobs(tmp_path, monkeypatch))
+
+
+def test_planted_shared_registry_fails_by_name(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # R1 F7: a single registry reused by every job must fail the per-job property.
+    shared = Reservations()
+    monkeypatch.setattr(export_module, "Reservations", lambda: shared)
+    seen = _registries_of_two_jobs(tmp_path, monkeypatch)
+    with pytest.raises(AssertionError, match="a registry was reused across jobs"):
+        _assert_one_fresh_registry_per_job(seen)
 
 
 def test_force_cpu_and_the_fallback_reason(
@@ -658,6 +843,28 @@ def test_n8_the_source_is_untouched_after_success_failure_and_cancel(tmp_path: P
 # --- static ----------------------------------------------------------------------------------
 
 
+_TELEMETRY_NAMES = re.compile(
+    r"(?<![a-z])(gpmd|gpmf|gps|imu|latitude|longitude)(?![a-z])", re.IGNORECASE
+)
+"""A GPS, IMU or GoPro telemetry name, standing alone or as a part of an identifier
+(``read_gps_fix``, ``IMU``), but not inside a longer word (``minimum``)."""
+
+
+def test_the_telemetry_name_guard_catches_a_planted_name() -> None:
+    # R1 F6: the guard's pattern once carried literal backspace bytes where word boundaries
+    # were meant, so it matched nothing; this control keeps the pattern honest.
+    planted = 'track = "gpmd"\ndef read_gps_fix(): ...\nIMU_RATE = 200\nlatitude = 0\n'
+    broken = "\x08(gpmd|gpmf|gps|imu|latitude|longitude)\x08"
+    assert re.findall(broken, planted, re.IGNORECASE) == []
+    assert [m.lower() for m in _TELEMETRY_NAMES.findall(planted)] == [
+        "gpmd",
+        "gps",
+        "imu",
+        "latitude",
+    ]
+    assert _TELEMETRY_NAMES.findall("the minimum simulated gpsx value") == []
+
+
 def test_no_jobs_module_imports_methods_or_gui_or_reads_gps() -> None:
     folder = Path(clearwater.jobs.__file__).parent
     for path in sorted(folder.glob("*.py")):
@@ -671,5 +878,5 @@ def test_no_jobs_module_imports_methods_or_gui_or_reads_gps() -> None:
                 names = [node.module]
             for name in names:
                 assert not name.startswith(("clearwater.methods", "clearwater.gui")), (path, name)
-        found = re.findall(r"(gpmd|gpmf|gps|imu|latitude|longitude)", text, re.IGNORECASE)
+        found = _TELEMETRY_NAMES.findall(text)
         assert found == [], (path.name, found)
