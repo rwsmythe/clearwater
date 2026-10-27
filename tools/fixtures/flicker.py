@@ -26,6 +26,7 @@ import math
 import subprocess
 import sys
 from collections.abc import Iterator
+from fractions import Fraction
 from pathlib import Path
 from typing import Any
 
@@ -331,10 +332,15 @@ def probe_clip(path: Path) -> dict[str, Any]:
 
     Returns:
         The stream identity: everything :func:`measure_clip` records except the decode.
+        ``ffprobe_errors`` holds the stderr lines of both ffprobe calls (the stream call's,
+        then the packet scan's): a truncated clip complains only in the packet scan.
     """
     data, errors = video.ffprobe_json(path, "-show_streams", "-show_format")
     stream = next(s for s in data["streams"] if s["codec_type"] == "video")
-    packets, _ = video.ffprobe_json(path, "-select_streams", "v:0", "-show_entries", "packet=pts")
+    packets, packet_errors = video.ffprobe_json(
+        path, "-select_streams", "v:0", "-show_entries", "packet=pts"
+    )
+    errors = [*errors, *packet_errors]
     ticks = [int(p["pts"]) for p in packets["packets"]]
     return {
         "container": data["format"]["format_name"],
@@ -362,8 +368,81 @@ STREAM_IDENTITY = (
     "time_base",
     "packet_pts_count",
     "packet_pts_sha256",
+    "ffprobe_errors",
 )
-"""The :func:`probe_clip` fields a clip must match the manifest on, besides its decoded frames."""
+"""The :func:`probe_clip` fields a clip must match the manifest on, besides its decoded frames.
+
+The packet durations are checked separately (:func:`identity_problems`), against the rate the
+manifest declares, because the manifest records no durations.
+"""
+
+
+def packet_durations(path: Path) -> list[int]:
+    """Read the duration of each video packet, in ticks of the stream's time base.
+
+    Args:
+        path: The clip.
+
+    Returns:
+        One integer per packet; -1 for a packet that reports no duration.
+    """
+    packets, _ = video.ffprobe_json(
+        path, "-select_streams", "v:0", "-show_entries", "packet=duration"
+    )
+    return [int(p["duration"]) if "duration" in p else -1 for p in packets["packets"]]
+
+
+def duration_problem(durations: list[int], r_frame_rate: str, time_base: str) -> str | None:
+    """Compare packet durations with the frame period a stream's declared rate implies.
+
+    The expected duration is ``1 / r_frame_rate`` in ticks of ``time_base``
+    (``30000/1001`` and ``1/1000`` give 33.37 ticks); a packet is wrong when it differs from
+    that by more than one tick, which allows the rounding of a millisecond time base.
+
+    Args:
+        durations: The packet durations in ticks (:func:`packet_durations`).
+        r_frame_rate: The stream's ``r_frame_rate`` (``"30000/1001"``).
+        time_base: The stream's ``time_base`` (``"1/1000"``).
+
+    Returns:
+        None when every duration is within one tick; otherwise a message naming the distinct
+        durations found and the expected figure.
+    """
+    expected = Fraction(r_frame_rate.split("/")[1]) / Fraction(r_frame_rate.split("/")[0])
+    expected /= Fraction(time_base)
+    if all(abs(d - expected) <= 1 for d in durations):
+        return None
+    return (
+        f"packet_durations is {sorted(set(durations))}, "
+        f"the declared rate gives {float(expected):.2f} ticks"
+    )
+
+
+def identity_problems(path: Path, recorded: dict[str, Any]) -> list[str]:
+    """Compare a clip's stream identity and packet durations with the manifest's stream facts.
+
+    Args:
+        path: The clip.
+        recorded: The manifest entry's ``facts["stream"]``; its ``r_frame_rate`` and
+            ``time_base`` also set the duration every packet must have.
+
+    Returns:
+        ``"<name> is X, the manifest has Y"`` for each differing :data:`STREAM_IDENTITY` field,
+        then the :func:`duration_problem` message when the durations disagree with the declared
+        rate; empty when the clip is the recorded one.
+    """
+    stream = probe_clip(path)
+    problems = [
+        f"{name} is {stream.get(name)!r}, the manifest has {recorded[name]!r}"
+        for name in STREAM_IDENTITY
+        if stream.get(name) != recorded[name]
+    ]
+    wrong = duration_problem(
+        packet_durations(path), recorded["r_frame_rate"], recorded["time_base"]
+    )
+    if wrong:
+        problems.append(wrong)
+    return problems
 
 
 def measure_clip(path: Path) -> dict[str, Any]:
@@ -538,6 +617,11 @@ def build_clip(guard: WriteGuard, out: Path) -> manifest.Entry:
     for name, want in (("codec", "ffv1"), ("decoded_frames", FRAMES), ("r_frame_rate", FRAME_RATE)):
         if measured[name] != want:
             wrong.append(f"{name} is {measured[name]!r}, intended {want!r}")
+    wrong_durations = duration_problem(
+        packet_durations(file), measured["r_frame_rate"], measured["time_base"]
+    )
+    if wrong_durations:
+        wrong.append(wrong_durations)
     if design["disc_pixels_in_region"] or design["region_pixels_changed_between_frames"]:
         wrong.append("the disc enters the measured region")
     if wrong:

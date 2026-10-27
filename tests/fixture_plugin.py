@@ -86,9 +86,11 @@ def writable_dir(path: Path) -> bool:
 def verify_generated(entry: dict[str, Any], path: Path) -> str | None:
     """Check a generated sample's stream identity and decoded frames against the manifest.
 
-    The identity is the container, codec, pixel format, size, frame rates, time base and the hash
-    of the packet pts list (:data:`flicker.STREAM_IDENTITY`); the frames are the decoded frame
-    count and their SHA-256. The same frames remuxed at another rate fail the first check.
+    The identity is the container, codec, pixel format, size, frame rates, time base, the hash
+    of the packet pts list and ffprobe's complaints (:data:`flicker.STREAM_IDENTITY`), plus the
+    packet durations against the declared rate (:func:`flicker.identity_problems`); the frames
+    are the decoded frame count and their SHA-256. The same frames remuxed at another rate fail
+    the first check.
 
     Args:
         entry: The sample's manifest entry (the flicker clip).
@@ -102,14 +104,9 @@ def verify_generated(entry: dict[str, Any], path: Path) -> str | None:
     design = entry["facts"]["design"]
     recorded = entry["facts"]["stream"]
     try:
-        stream = flicker.probe_clip(path)
-    except (video.GenerationError, KeyError, StopIteration, ValueError) as error:
+        differ = flicker.identity_problems(path, recorded)
+    except (video.GenerationError, KeyError, StopIteration, ValueError, ZeroDivisionError) as error:
         return f"{path.name}: cannot probe the stream ({error!r})"
-    differ = [
-        f"{name} is {stream.get(name)!r}, the manifest has {recorded[name]!r}"
-        for name in flicker.STREAM_IDENTITY
-        if stream.get(name) != recorded[name]
-    ]
     if differ:
         return f"{path.name}: " + "; ".join(differ)
     try:

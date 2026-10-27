@@ -14,10 +14,11 @@ data down to 8 bits) is listed in the manifest's ``omitted`` block.
 from __future__ import annotations
 
 import hashlib
+import re
 import struct
 import sys
 import zlib
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
 from pathlib import Path
 from typing import Any
 
@@ -312,6 +313,230 @@ def tiff_bits_per_sample(data: bytes) -> tuple[int, ...]:
     raise ValueError("no BitsPerSample entry")
 
 
+XMP_MARKERS = (
+    b"http://ns.adobe.com/xap/1.0/",
+    b"adobe:ns:meta/",
+    b"http://ns.adobe.com/exif/1.0/",
+    b"<?xpacket",
+)
+"""Byte strings that mark an XMP packet in any container: the APP1 packet header, the
+``x:xmpmeta`` namespace, the EXIF namespace and the packet processing instruction. Namespace
+URIs, not the prefixes a writer happens to choose."""
+
+_GPS_NAME = re.compile(rb"GPS[A-Za-z]+")
+
+
+def xmp_gps_findings(data: bytes) -> list[str]:
+    """Name the XMP markers and ``GPS*`` properties found anywhere in a file's raw bytes.
+
+    A ``GPS`` property is any run ``GPS`` + letters, as an element or an attribute, with any
+    namespace prefix or none. Only names are returned: the scan exists to refuse location
+    data, so no value is ever read out, printed or logged.
+
+    Args:
+        data: The whole file, of any container.
+
+    Returns:
+        The markers present (from :data:`XMP_MARKERS`, as text) and the GPS property names
+        (for example ``GPSLongitude``), sorted and without duplicates; empty for a clean file.
+        Only ASCII or UTF-8 text is scanned: UTF-16 and compressed XMP are not.
+    """
+    found = {marker.decode("ascii") for marker in XMP_MARKERS if marker in data}
+    found.update(match.decode("ascii") for match in _GPS_NAME.findall(data))
+    return sorted(found)
+
+
+def _boxes(data: bytes, start: int, end: int) -> Iterator[tuple[str, int, int]]:
+    """Yield ``(type, body_start, box_end)`` for each ISO-BMFF box in ``data[start:end]``."""
+    at = start
+    while at + 8 <= end:
+        (size,) = struct.unpack(">I", data[at : at + 4])
+        kind = data[at + 4 : at + 8].decode("latin-1")
+        header = 8
+        if size == 1:
+            (size,) = struct.unpack(">Q", data[at + 8 : at + 16])
+            header = 16
+        elif size == 0:
+            size = end - at
+        if size < header or at + size > end:
+            raise ValueError(f"the {kind!r} box at byte {at} does not fit its parent")
+        yield kind, at + header, at + size
+        at += size
+
+
+def _child(data: bytes, kind: str, start: int, end: int) -> tuple[int, int]:
+    """Return ``(body_start, box_end)`` of the first ``kind`` box in ``data[start:end]``."""
+    for name, body, stop in _boxes(data, start, end):
+        if name == kind:
+            return body, stop
+    raise ValueError(f"no {kind!r} box")
+
+
+def heif_primary_properties(data: bytes) -> dict[str, Any]:
+    """Read the primary image item's transform and extent properties from a HEIF file.
+
+    Walks ``meta``: ``pitm`` names the primary item, every ``ipma`` box in ``iprp`` gives the
+    item's property indices (1-based into the ``ipco`` list; index 0 means none; the
+    essential bit is masked off), and only the properties so associated count. A property
+    that sits in ``ipco`` without an association to the primary item is ignored.
+
+    Args:
+        data: The whole HEIF file.
+
+    Returns:
+        ``item``: the primary item id; ``irot``: its rotation in degrees anticlockwise
+        (``(byte & 3) * 90``) or None; ``imir``: its mirror axis (``byte & 1``) or None;
+        ``ispe``: its ``(width, height)`` before any transform.
+
+    Raises:
+        ValueError: A box is missing or malformed, ``pitm`` or the primary's ``ipma`` entry
+            is absent, the primary has no ``ispe``, or it has two properties of one type.
+    """
+    meta, meta_end = _child(data, "meta", 0, len(data))
+    inner = meta + 4  # meta is a full box: version and flags first
+    pitm, _ = _child(data, "pitm", inner, meta_end)
+    if data[pitm] == 0:
+        (item,) = struct.unpack(">H", data[pitm + 4 : pitm + 6])
+    else:
+        (item,) = struct.unpack(">I", data[pitm + 4 : pitm + 8])
+    iprp, iprp_end = _child(data, "iprp", inner, meta_end)
+    ipco, ipco_end = _child(data, "ipco", iprp, iprp_end)
+    properties = [(kind, body) for kind, body, _ in _boxes(data, ipco, ipco_end)]
+    indices: list[int] | None = None
+    for kind, body, stop in _boxes(data, iprp, iprp_end):
+        if kind != "ipma":
+            continue
+        version, flags = data[body], int.from_bytes(data[body + 1 : body + 4], "big")
+        (count,) = struct.unpack(">I", data[body + 4 : body + 8])
+        at = body + 8
+        for _ in range(count):
+            if version < 1:
+                (entry,) = struct.unpack(">H", data[at : at + 2])
+                at += 2
+            else:
+                (entry,) = struct.unpack(">I", data[at : at + 4])
+                at += 4
+            n = data[at]
+            at += 1
+            if entry == item and indices is None:
+                indices = []
+            for _ in range(n):
+                if flags & 1:
+                    (assoc,) = struct.unpack(">H", data[at : at + 2])
+                    at += 2
+                    index = assoc & 0x7FFF
+                else:
+                    index = data[at] & 0x7F
+                    at += 1
+                if at > stop:
+                    raise ValueError("an 'ipma' entry runs past its box")
+                if entry == item and indices is not None and index:
+                    indices.append(index)
+    if indices is None:
+        raise ValueError(f"no 'ipma' entry for the primary item {item}")
+    result: dict[str, Any] = {"item": item, "irot": None, "imir": None}
+    ispe: tuple[int, int] | None = None
+    seen: set[str] = set()
+    for index in indices:
+        if index > len(properties):
+            raise ValueError(f"'ipma' index {index} is beyond the {len(properties)} properties")
+        kind, body = properties[index - 1]
+        if kind not in ("irot", "imir", "ispe"):
+            continue
+        if kind in seen:
+            raise ValueError(f"the primary item {item} has two {kind!r} properties")
+        seen.add(kind)
+        if kind == "irot":
+            result["irot"] = (data[body] & 3) * 90
+        elif kind == "imir":
+            result["imir"] = data[body] & 1
+        else:
+            ispe = struct.unpack(">II", data[body + 4 : body + 12])
+    if ispe is None:
+        raise ValueError(f"the primary item {item} has no 'ispe' property")
+    result["ispe"] = ispe
+    return result
+
+
+def check_heif_extents(facts: dict[str, Any], props: dict[str, Any]) -> list[str]:
+    """Compare a HEIC's ``ispe`` with the sizes the manifest facts claim.
+
+    ``ispe`` is the stored size, before ``irot``. It must equal ``stored_width`` x
+    ``stored_height`` when the facts carry them, and, turned by an ``irot`` of 90 or 270, the
+    ``width`` x ``height`` that libheif reports after applying ``irot``.
+
+    Args:
+        facts: The measured facts, with ``width`` and ``height`` and optionally the stored size.
+        props: The result of :func:`heif_primary_properties`.
+
+    Returns:
+        One message per disagreement; empty when the sizes agree.
+    """
+    problems = []
+    ispe = tuple(props["ispe"])
+    if "stored_width" in facts and "stored_height" in facts:
+        stored = (facts["stored_width"], facts["stored_height"])
+        if ispe != stored:
+            problems.append(f"ispe is {ispe}, the stored size is {stored}")
+    turned = ispe[::-1] if props["irot"] in (90, 270) else ispe
+    decoded = (facts["width"], facts["height"])
+    if turned != decoded:
+        problems.append(
+            f"ispe after irot {props['irot']} is {turned}, the decoded size is {decoded}"
+        )
+    return problems
+
+
+_PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
+_HEIC_BRANDS = (b"heic", b"heix")
+"""Major brands of the committed HEICs; a video ``ftyp`` or an AVIF is not one of them."""
+
+_FORMAT_NAMES = {"png": "PNG", "jpeg": "JPEG", "tiff": "TIFF", "heic": "HEIC"}
+"""The manifest's ``format`` spelling of each :func:`container_format` result."""
+
+
+def container_format(data: bytes) -> str | None:
+    """Name a still's container from its first bytes alone.
+
+    Nothing here comes from Pillow, the file name or the manifest.
+
+    Args:
+        data: The whole file (or at least its first 12 bytes).
+
+    Returns:
+        ``"png"`` (the 8-byte signature), ``"jpeg"`` (``FF D8 FF``), ``"tiff"`` (``II*`` or
+        ``MM`` + a zero byte + ``*``), ``"heic"`` (an ISO-BMFF ``ftyp`` box whose major brand is
+        ``heic`` or ``heix``), else None.
+    """
+    if data.startswith(_PNG_SIGNATURE):
+        return "png"
+    if data.startswith(b"\xff\xd8\xff"):
+        return "jpeg"
+    if data[:4] in (b"II*\x00", b"MM\x00*"):
+        return "tiff"
+    if data[4:8] == b"ftyp" and data[8:12] in _HEIC_BRANDS:
+        return "heic"
+    return None
+
+
+def check_still_format(data: bytes, kind: str) -> str | None:
+    """Compare a still's container, read from its bytes, with the kind it is meant to be.
+
+    Args:
+        data: The whole file.
+        kind: The manifest ``kind`` the file is recorded under (``png``, ``jpeg``, ``tiff``,
+            ``heic``).
+
+    Returns:
+        None when :func:`container_format` equals ``kind``, else a message naming both.
+    """
+    actual = container_format(data)
+    if actual == kind:
+        return None
+    found = "no known still container" if actual is None else f"a {actual!r} container"
+    return f"the bytes are {found}, the requested kind is {kind!r}"
+
+
 def measure(path: Path, expected_icc: bytes | None) -> dict[str, Any]:
     """Measure a written still: format, size, depth, profile, Orientation, GPS.
 
@@ -328,34 +553,34 @@ def measure(path: Path, expected_icc: bytes | None) -> dict[str, Any]:
         ``icc_md5``, ``exif_orientation``, ``has_gps`` and, for HEIC, ``irot`` and ``imir``.
     """
     data = path.read_bytes()
-    facts: dict[str, Any] = {}
+    container = container_format(data)
+    if container is None:
+        raise ValueError(f"{path.name}: not a PNG, JPEG, TIFF or HEIC container by its bytes")
+    facts: dict[str, Any] = {"format": _FORMAT_NAMES[container]}
     embedded: bytes | None
-    if data.startswith(photo.PNG_SIGNATURE):
+    if container == "png":
         chunks = photo.png_chunks(data)
         ihdr = dict(chunks)["IHDR"]
         width, height = struct.unpack(">II", ihdr[:8])
-        facts.update(format="PNG", width=width, height=height, bit_depth=ihdr[8])
+        facts.update(width=width, height=height, bit_depth=ihdr[8])
         embedded = photo.stdlib_iccp(data)
         exif = None
         facts["chunks"] = [kind for kind, _ in chunks]
-    elif data[4:8] == b"ftyp":
+    elif container == "heic":
         heif = pillow_heif.open_heif(str(path))
-        facts.update(
-            format="HEIC", width=heif.size[0], height=heif.size[1], bit_depth=heif.info["bit_depth"]
-        )
-        facts.update(photo.heif_transforms(data))
+        facts.update(width=heif.size[0], height=heif.size[1], bit_depth=heif.info["bit_depth"])
+        props = heif_primary_properties(data)
+        facts.update(irot=props["irot"], imir=props["imir"])
         embedded = heif.info.get("icc_profile")
         raw = heif.info.get("exif")
         exif = photo.load_exif(raw) if raw else None
     else:
         with Image.open(path) as image:
             depth = 8  # a JPEG's sample precision
-            if image.format == "TIFF":
+            if container == "tiff":
                 bits = tiff_bits_per_sample(data)  # the file's own BitsPerSample
                 depth = bits[0] if len(set(bits)) == 1 else 0
-            facts.update(
-                format=image.format, width=image.width, height=image.height, bit_depth=depth
-            )
+            facts.update(width=image.width, height=image.height, bit_depth=depth)
             embedded = image.info.get("icc_profile")
             exif = image.getexif()
     facts.update(_exif_facts(exif))
@@ -406,8 +631,16 @@ def _record(
 ) -> manifest.Entry:
     """Measure the file at ``out / relative`` and build its manifest entry."""
     file = guard.check(out / relative)
+    data = file.read_bytes()
+    wrong = check_still_format(data, kind)
+    if wrong:
+        raise ValueError(f"{relative}: {wrong}")
     facts = measure(file, icc)
     facts.update(extra)
+    if kind == "heic":
+        problems = check_heif_extents(facts, heif_primary_properties(data))
+        if problems:
+            raise ValueError(f"{relative}: {'; '.join(problems)}")
     return manifest.entry(
         sample_id=sample_id,
         group="stills",
