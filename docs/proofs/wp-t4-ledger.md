@@ -4,7 +4,9 @@
 
 - Codex lane: turn 1 assigned rungs 0 and 1; turn 2 assigned the remaining
   dependency checks and rung 2's worker guard cases.
-- Base: `9753b7b4cc05bf43c25442cb87aa74e23f2b584f`; branch: `wp-t4`.
+- Current package diff base: `528d865`; branch: `wp-t4`. The turn-3 dispatcher
+  rebased the content-unchanged turn-1/2 commits to `cd4697e` / `0fa0757`.
+  Historical rung-0 collection base: `9753b7b4cc05bf43c25442cb87aa74e23f2b584f`.
 - Initial tracked/untracked status: clean (`STATUS_COUNT=0`), recorded before
   changes in `work/wp-t4/turn1-base.txt`. The ignored local config was present;
   it was not edited.
@@ -15,8 +17,8 @@
   and `tests/test_fixtures.py`. No source, frozen interface, harness, product,
   or footage edit was made. All cell-authored artifacts are inside the worktree;
   no effect outside the permitted workspace/cache is claimed.
-- Dispatcher-supplied turn-1 `tokens used` footer: **73,551** (generation 13's
-  turn-2 dispatch). Turn-2 reading is pending; no estimate substituted.
+- Dispatcher-supplied `tokens used` footers: turn 1 **73,551**, turn 2 **119,645**.
+  Turn-3 reading is pending; no estimate substituted.
 
 ## Turn 1 evidence: collection and dependency
 
@@ -213,6 +215,10 @@ failure or new pre-existing test failure was found. The final scoped pass found
 no further issue after the individual cases, whole file and lint/type checks.
 Independent Reviewer A remains pending with the driver.
 
+The turn-3 dispatcher also supplied an independent, unshimmed run of the
+committed guard file: **60 passed in 49.64s, EXIT=0**. Its log path was not
+supplied. This confirms that the committed cases do not depend on the shim.
+
 Turn-2 final state: `git -c core.autocrlf=false diff --check` exited 0.
 `turn2-final-state.log` exited 0 after checking that exactly this ledger and
 `tests/test_conftest_guard.py` are changed, both contain LF-only bytes, and
@@ -220,9 +226,187 @@ Turn-2 final state: `git -c core.autocrlf=false diff --check` exited 0.
 are unchanged against turn-2 HEAD. Status and diff summary are recorded in
 `turn2-final-status.log` and `turn2-diff-stat.log`.
 
+## Turn 3: static pass and mandatory cold-cache lock
+
+Turn scope is rung 3 parts 1-2, then the first diagnostic full PARALLEL request.
+No full leg or measurement round was executed by the cell. Sandbox pytest uses
+absolute `PYTHONPATH=(Resolve-Path scripts).Path`, `PYTEST_PLUGINS=sandbox_mkdir_shim`,
+`-p sandbox_mkdir_shim -p no:cacheprovider`, offscreen Qt and fresh basetemps.
+The old `work/sandbox/` was left alone.
+
+### Static inventory
+
+The broad scratch search produced 672 candidate lines, including harness hits.
+The refined product-only search excludes `tests/harness/**` and produced 135
+rows (`turn3-static-shared-paths.txt`); the port search produced zero candidate
+lines (`turn3-static-ports.txt`). This is a risk inventory, not a claim that
+the unexecuted full leg has no violators.
+
+| Candidate | Evidence / classification | Disposition |
+|---|---|---|
+| Shared generated fixture | `tests/fixture_plugin.py` originally had one `GENERATED_DIR` at line 41 and an unlocked verify/generate sequence in `SampleProvider.path` | Confirmed by the two-process reproduction below; fixed in owned code |
+| Local config / real work | Config-backed bench tests inject fake config rooted in `tmp_path` (`tests/test_io_video_encode_bench.py:615`); look-check helpers use their passed temp root; inventory's real scan is footage-marked (`tests/test_inventory.py:1125`) | No additional shared writer confirmed; runtime window remains necessary |
+| Module/session state | `synthetic_pack` (`tests/test_lookcheck.py:554`) and `deep_pack` (`tests/test_lookcheck_deep.py:564`) allocate with `tmp_path_factory.mktemp`; generated samples are the confirmed cross-worker exception | Temp roots are worker-specific; no order dependency proved |
+| Process checks / fixed names | `_ffmpeg_children` (`tests/test_io_video_encode_bench.py:35`) examines descendants of the current worker, rather than every worker; fixed output names examined live beneath per-test or per-module temp roots | No process-count or filename violator confirmed; telemetry timing remains a watch item |
+| Fixed listeners | No product-test socket/localhost/bind/listen candidates in the focused search | No fixed port confirmed; harness matches excluded |
+| Mandatory E1 | `tests/test_io_video_encode_bench.py::test_run_once_records_the_row_and_deletes_the_output`, bound at line 321 | Pending rung 3.4: `@pytest.mark.slow`, comment `timing bound, DR-58 (c); stays serial`; bound unchanged |
+| GUI service timing | `tests/test_gui_analysis_service.py::test_pts_and_statistics_never_wait_for_a_run_in_flight`, 0.2-second bound at line 199 | Watch only; no failure confirmed and no edit made |
+| Collection GPU probe | `tests/test_prototype_backend.py:23` selects auto backend during import; see diagnostic below | Pre-existing, raised; no marker or product/tool change made |
+
+No in-flight-owned test was edited. `tests/test_fixtures.py` was read and four
+of its provider tests were executed, but its bytes were not changed. The
+`verify_generated` function and its surrounding writable-dir block remain
+unchanged. The only fixture-plugin edits are necessary imports, the owned
+`SampleProvider.path` body/docstring, and a helper placed after the class.
+
+### Deterministic reproduction and regression
+
+`tests/test_fixture_cache_lock.py` runs two spawned Python processes with real
+providers and real manifest/FFmpeg verification. A wrapper performs the real
+initial missing-file check, then synchronizes those two cold misses. A delayed
+generator wrapper sleeps two seconds. With competing generators, one produces
+the real clip while the other holds a deliberately incomplete file at the same
+path until the first provider's real final verification returns; it then
+regenerates the clip normally. This makes the partial-write window deterministic.
+It does not change `verify_generated` on disk or replace its verification result.
+
+The scratch `turn3_cold_probe.py` resolves the actual worktree target
+`work/fixtures/generated`, asserts both exact equality and containment within
+the resolved worktree before calling `shutil.rmtree`, and invokes that same
+two-process harness. It deletes no other directory.
+
+| Run | Result | Evidence under `work/wp-t4/` |
+|---|---|---|
+| Actual cold cache, unlocked | Both child processes exited 0; two generator calls; one provider recorded `Failed: regenerated sample 'ad14-flicker' does not match the manifest ... cannot probe ... KeyError('streams')`; harness exit 1 | `uv run python work/wp-t4/turn3_cold_probe.py`; `turn3-cold-probe-red.log` |
+| Committed regression against unlocked code | Exit 1 at `tests/test_fixture_cache_lock.py:131`, `assert all(record["ok"] for record in result["records"]), result`; same partial-clip verification failure and two generator calls | Serial containing pytest, basetemp `work/wp-t4/t3-regression-red`; `turn3-regression-red.log` |
+| New file, locked | 4 passed; exit 0 | Serial containing pytest, basetemp `work/wp-t4/t3-lock-green`; `turn3-lock-green.log` |
+| Actual cold cache, locked | Two successful providers, one generator call, no timeout; exit 0 | `uv run python work/wp-t4/turn3_cold_probe.py --phase after-lock`; `turn3-cold-probe-green.log` |
+| Worker integration | 8 passed at `-n 4`; exit 0 | Basetemp `work/wp-t4/t3-lock-workers`; `turn3-lock-workers.log` |
+
+The worker integration's exact test selection is the whole new
+`tests/test_fixture_cache_lock.py` plus these unchanged `tests/test_fixtures.py`
+nodes: `test_plugin_regenerates_a_stale_clip_and_verifies_it`,
+`test_plugin_fails_when_regeneration_cannot_match`,
+`test_plugin_skips_a_generated_sample_when_ffmpeg_is_absent`, and
+`test_plugin_hands_out_committed_samples_without_ffmpeg`. Its command was
+`uv run pytest -q -rs -n 4 -p sandbox_mkdir_shim -p no:cacheprovider
+--basetemp=work/wp-t4/t3-lock-workers` followed by that selection.
+
+### Lock policy and limits
+
+`SampleProvider.path` (`tests/fixture_plugin.py:170`, acquisition at line 202)
+re-verifies after entering `_generated_cache_lock` (line 217), so another
+process's completed generation is reused. The helper uses exclusive creation
+of `.<cache-name>.lock` beside the cache, records the owner PID, waits at most
+180 monotonic seconds with 50 ms polling, and releases in `finally`, including
+when generation or verification raises. An existing lock aged at least 900
+seconds causes an immediate suspected-stale error with instructions to confirm
+the owner has stopped before removing it. Age does not authorize stealing the
+lock; there is no unsafe age-only unlink race or OS-specific PID-liveness code.
+This is the explicit stale-lock rule. A killed process therefore requires
+owner-confirmed cleanup, rather than automatic lock stealing.
+
+The new tests cover the two-process cold miss, an occupied lock's bounded wait,
+the conservative stale-lock rule and exception release/reacquisition. No new
+dependency, OS-specific implementation or product/frozen-interface edit was made.
+
+### Optional collection diagnostic
+
+An optional full parallel-partition collection unexpectedly spun in the sandbox
+before producing node IDs. After observing 205 seconds of CPU use, the cell
+verified its unique basetemp argument and stopped only that collection's uv
+process tree (`turn3-collection-processes.log`, `turn3-stop-collection.log`;
+the original runner ended with `EXIT=15`). A bounded 10-second faulthandler
+reproduction exited 1 and identified this stack:
+`test_prototype_backend.py:23` -> `select_backend` -> `_probe_gpu` -> CuPy
+`arange` -> CUDA compiler cache -> `tempfile.NamedTemporaryFile`.
+Evidence: `turn3-collection-trace.log`, `turn3-collection-trace.txt`.
+
+The installed CuPy cache code reads `CUPY_CACHE_DIR` at
+`.venv/Lib/site-packages/cupy/cuda/_compiler_cache.py:93`. Setting only that
+variable to this worktree's `work/wp-t4/cupy-cache` made the same collection
+finish: **3,782 / 4,788 collected, 1,006 deselected, exit 0**
+(`turn3-collection-local-cache.log`, 30-second bound not reached).
+No product code or marker changed. The successful cache writes are inside the
+worktree; no successful default-cache write outside it is claimed.
+
+The collection GPU probe predates this package: blame identifies `fedb8c9a`
+for line 23, and the `git log -S select_backend` evidence also predates the
+package (`turn3-collection-provenance.log`). Marker selection occurs after
+module import, so excluding GPU-marked execution does not prevent that probe.
+GPU-memory rise during the requested full leg is not yet measured; if observed
+it must be reported, with marker semantics left out of scope.
+
+### Sampler and first full-leg request
+
+Uncommitted instrument: `work/wp-t4/monitor_pytest.py` (stdlib plus existing
+psutil). Start it before pytest with the matching basetemp and launcher PID/file.
+It finds the topmost pytest launcher/interpreter among that launcher's
+descendants, excluding the uv wrapper, and samples once per second: summed
+tree RSS, system available bytes, and per-GPU used MiB through `nvidia-smi`
+when available. It records UTC timestamps, process IDs, query errors, peak RSS,
+minimum available memory, GPU baseline/peak/rise, and remaining child PIDs.
+A sample below 2 GiB, inaccessible RSS or an incomplete present-GPU reading
+makes the sampler nonzero. It does not lower N or kill the pytest run.
+
+The first smoke test's host-wide command-line search missed the short workload
+and exited 3 (`turn3-sampler-smoke.log`). Replacing that search with the explicit
+launcher's descendant tree passed: six samples, maximum six observed tree
+processes including both workers, positive RSS, complete GPU readings, no
+remaining children; exit 0 (`turn3-sampler-smoke-02.log`,
+`turn3-sampler-smoke-02.jsonl`). The smoke pytest itself passed two items.
+These are instrument checks, not N=4 memory figures or figures of record.
+
+The dispatcher-ready scratch script `work/wp-t4/run_parallel_01.ps1` has a
+zero-error PowerShell parse (`turn3-runner-syntax.log`). It checks >=5 GiB
+available before starting, refuses a shim-enabled environment, starts the
+sampler hidden, and executes exactly:
+
+```powershell
+$env:QT_QPA_PLATFORM = 'offscreen'
+uv run pytest -q -rs -n 4 -m "not gpu and not footage and not gui and not slow" --basetemp=work/wp-t4/t3-parallel-01 > work/wp-t4/turn3-parallel-01.log 2>&1
+```
+
+It appends UTC start/end, wall seconds and `EXIT=` to the leg log. Its sampler
+command is `uv run python work/wp-t4/monitor_pytest.py --basetemp
+work/wp-t4/t3-parallel-01 --launcher-pid-file
+work/wp-t4/turn3-parallel-01-launcher.pid --out
+work/wp-t4/turn3-parallel-01-memory.jsonl`; stdout/stderr and exit status also
+go to files under `work/wp-t4/`. No shim is loaded at the dispatcher's seat.
+The first leg is diagnostic: E1 is still unmarked on this turn's head and will
+receive its mandated slow mark in the next rung-3.4 scope. No test was moved
+out in this turn, and no settled round is claimed.
+
+### Turn-3 verification loop and checks
+
+| ID | Severity / class | Suspected / confirmed / rejected | Fix / disposition |
+|---|---|---|---|
+| T3-1 | Major, introduced concurrency exposure; in envelope | Confirmed shared-cache race with two real processes, actual cold worktree cache and failing standalone regression | Fixed in test infrastructure with the lock and post-acquisition re-verification; real-cache and 8-test worker checks pass |
+| T3-2 | Minor, scratch instrument | First sampler discovery missed its short target; confirmed exit 3 | Fixed with explicit launcher ancestry; six-sample smoke passes |
+| T3-3 | Minor, style | Initial checks found one long line and one non-raw regex; format check failed | Fixed in the new test file only; final lint/format green |
+| T3-4 | Major nominal, pre-existing environment/marker issue; not a new blocking review finding | Bounded trace confirms collection GPU probe stalls at default CuPy cache creation; local-cache environment completes the same collection | Sandbox cache redirected only for that diagnostic; GPU import access raised to dispatcher, no product/tool/marker edit |
+| T3-5 | Verification, rejected false positives | Other shared config paths, module fixtures and worker-local process checks examined; no further violator confirmed | Runtime classification awaits the full-leg output; no speculative test edits |
+
+Final code checks: `uv run ruff check .` all checks passed,
+`uv run ruff format --check .` 228 files already formatted, and
+`uv run mypy` no issues in 132 source files; all exit 0. Logs are
+`turn3-ruff-check.log`, `turn3-ruff-format.log`, `turn3-mypy.log`.
+
+Final state checks (`turn3-final-state.log`, exit 0) confirm exactly the three
+owned changed paths, LF-only bytes, byte identity of `verify_generated` and
+its surrounding writable-dir block, unchanged session-fixture tail and other
+SampleProvider methods, and placement of the helper after the class. Product,
+tools, scripts, harness, conftest, in-flight fixture tests and dependency files
+have no turn-3 diff. `git diff --check` also exited 0. After all checks, the
+cell again resolved and asserted the exact worktree cache target, verified its
+sibling lock absent, and removed only `work/fixtures/generated`; the requested
+first full leg will therefore start **cold**. Logs, test temp roots and the
+worktree-local CuPy cache were retained as evidence.
+
 ## Heavy-run ledger
 
-No heavy windows requested or consumed in turns 1 or 2. Future rows will record start,
+No heavy window consumed in turns 1-3. The first full PARALLEL window is
+requested at turn-3 yield, not executed. Future rows will record start,
 end, command, N, outcome counts, exit, available memory before, peak summed RSS,
 minimum available memory and any GPU-memory change from dispatcher evidence.
 
@@ -230,13 +414,14 @@ minimum available memory and any GPU-memory change from dispatcher evidence.
 
 | Round | Critical / major / minor | In / out of envelope | NEW / REOPENED | Reverts | Product / test-only fixes | Reviewer transport / version | Dispatcher-read depth | Disposition |
 |---|---|---|---|---|---|---|---|---|
-| Not started | N/A | N/A | N/A | 0 | 0 / 0 | Driver-owned Claude Opus high; pending | Turn-1 footer 73,551; turn 2 pending | Yield turn 2 for driver review / next dispatch |
+| Not started | N/A | N/A | N/A | 0 | 0 / 0 | Driver-owned Claude Opus high; pending | Turn-2 footer 119,645; turn 3 pending | Yield turn 3 for first diagnostic PARALLEL window |
 
 ## Open handoff
 
 1. Driver-owned Reviewer A and its assertions remain pending; no review round
    is claimed clean or counted toward convergence.
-2. Rungs 3-5, the Q2 docstring paragraph, heavy-run sampler, measurement rounds,
-   final report and both-leg gate remain future work, subject to dispatch.
-3. No additional RUN REQUEST is needed for turn 2 unless the dispatcher wants
-   to repeat these light tests without the sandbox shim at its seat.
+2. First diagnostic PARALLEL window requested through
+   `powershell -NoProfile -File work/wp-t4/run_parallel_01.ps1`; details below.
+3. Rung 3.3 failure classification, rung 3.4's E1 slow mark, the Q2 docstring
+   paragraph, measurement rounds, final report and both-leg gate remain future
+   work, subject to dispatch. No test has been moved out of the parallel leg yet.

@@ -23,8 +23,11 @@ Nothing here reads the footage folder or any local configuration.
 from __future__ import annotations
 
 import json
+import os
 import tempfile
-from collections.abc import Callable
+import time
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
@@ -166,7 +169,8 @@ class SampleProvider:
 
         A committed sample is returned as it is. A generated sample is verified on its first use
         in the session, a cache hit included (stream identity and decoded frames against the
-        manifest), and regenerated into the cache when absent or stale.
+        manifest), and regenerated into the cache when absent or stale. Regeneration holds a
+        process-shared cache lock and verifies again after acquiring it.
 
         Args:
             sample_id: The manifest id.
@@ -178,6 +182,7 @@ class SampleProvider:
             pytest.skip.Exception: The sample must be generated or probed and FFmpeg is absent.
             pytest.fail.Exception: A committed file is missing, or a regenerated one still does
                 not match the manifest.
+            TimeoutError: The shared cache lock is busy for too long or suspected stale.
         """
         if sample_id in self._ready:
             return self._ready[sample_id]
@@ -191,15 +196,72 @@ class SampleProvider:
                 pytest.skip(SKIP_NO_FFMPEG)
             path = self.generated_dir / entry["path"]
             if verify_generated(entry, path) is not None:
-                generate.generate(self.scratch(), self.generated_dir, [entry["group"]])
-                problem = verify_generated(entry, path)
-                if problem is not None:
-                    pytest.fail(
-                        f"regenerated sample {sample_id!r} does not match the manifest: {problem}",
-                        pytrace=False,
-                    )
+                with _generated_cache_lock(self.generated_dir):
+                    if verify_generated(entry, path) is not None:
+                        generate.generate(self.scratch(), self.generated_dir, [entry["group"]])
+                        problem = verify_generated(entry, path)
+                        if problem is not None:
+                            pytest.fail(
+                                f"regenerated sample {sample_id!r} does not match the manifest: "
+                                f"{problem}",
+                                pytrace=False,
+                            )
         self._ready[sample_id] = path
         return path
+
+
+@contextmanager
+def _generated_cache_lock(
+    cache: Path, *, timeout_s: float = 180, stale_after_s: float = 900
+) -> Iterator[None]:
+    """Serialize cache regeneration with an exclusively created sibling lock file.
+
+    A lock at least 15 minutes old is suspected stale by default. It is reported,
+    with recovery instructions, rather than stolen: age cannot establish that a
+    slow or suspended owner has stopped. Normal release also runs on exceptions.
+
+    Args:
+        cache: The generated-fixture cache shared by processes.
+        timeout_s: Maximum time to wait for an occupied lock, using a monotonic clock.
+        stale_after_s: Lock age in seconds that triggers a suspected-stale error.
+
+    Yields:
+        None while this process owns the regeneration lock.
+
+    Raises:
+        TimeoutError: The lock is suspected stale or the wait bound expires.
+        OSError: The lock's parent or file cannot be created, written or removed.
+    """
+    lock = cache.parent / f".{cache.name}.lock"
+    lock.parent.mkdir(parents=True, exist_ok=True)
+    deadline = time.monotonic() + timeout_s
+    while True:
+        try:
+            handle = lock.open("x", encoding="ascii")
+        except FileExistsError:
+            try:
+                age = time.time() - lock.stat().st_mtime
+            except FileNotFoundError:
+                age = 0  # The owner released between exclusive-create and stat.
+            if age >= stale_after_s:
+                raise TimeoutError(
+                    f"suspected stale generated-fixture cache lock: {lock}; "
+                    "confirm its owner has stopped before removing the lock file"
+                ) from None
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise TimeoutError(
+                    f"timed out waiting for generated-fixture cache lock: {lock}"
+                ) from None
+            time.sleep(min(0.05, remaining))
+        else:
+            break
+    try:
+        with handle:
+            handle.write(f"pid={os.getpid()}\n")
+        yield
+    finally:
+        lock.unlink()
 
 
 @pytest.fixture(scope="session")
