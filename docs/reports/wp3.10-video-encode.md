@@ -96,7 +96,17 @@ kept audio packets with dts below 1.4787 s).
   `(height, width, 3)`, no NaN (`rgb_to_planes`); quantises at the OUTPUT depth from a
   C-contiguous array (DR-39 (b) not reopened); polls FFmpeg; sends the NUT frame header and the
   payload as two pipe writes.
-- **`close`** sends the sentinel at the end of the last frame (the next source pts, else the
+- **`close`** first refuses, by name (`verify_failed`, "The video is incomplete"), frames that
+  are not the source's whole readable video (`verify.missing_frames`, Reviewer B pass 1 #1): the
+  pts written must be exactly the source's listed video pts in presentation order (sorted, so a
+  B-frame decode-order listing, VFR and an empty-edit dwell need nothing special), for a
+  `truncated` source only those before its first corrupt packet (Q-B, the frames before the cut;
+  `verify.readable_video_pts`), and for an `unreadable_tail` source every such pts up to the last
+  one written (its decodable end cannot be told without decoding, D86). The message names the
+  first missing pts and the counts, or the frames written past the readable end. The check runs
+  BEFORE the sentinel, so FFmpeg never finishes an incomplete export, and on the sink's own state
+  rather than on FFmpeg's output: what is missing is a caller fact, known before any output exists.
+  Then `close` sends the sentinel at the end of the last frame (the next source pts, else the
   presentation end: the edit list's segment sum, or `start_pts + duration_ts` without one). The
   next pts comes from the source's own sample table (`stts` + `ctts` from `moov`, mapped onto the
   listed pts by the one offset every listed packet shows, `verify.read_sample_table`): a cut
@@ -112,8 +122,9 @@ kept audio packets with dts below 1.4787 s).
   of them, or for a truncated source exactly the source's packets before the cut (a packet within
   2 us of the cut may go either way: FFmpeg reads `-to` and the input start in microseconds).
   A mismatch is `verify_failed`. Returns `SinkReport(frames_written, warnings, not_carried)`.
-- **Failure** anywhere in `open` after FFmpeg starts (starting the stderr thread -- round-4
-  finding 1, now `encoder_failed` -- or sending the header), `write` or `close`: FFmpeg is killed, its
+- **Failure** when FFmpeg cannot be started (`encoder_failed`, the `OSError` as its cause;
+  Reviewer B pass 1 #7), or anywhere in `open` after FFmpeg starts (starting the stderr thread --
+  round-4 finding 1, now `encoder_failed` -- or sending the header), `write` or `close`: FFmpeg is killed, its
   pipes closed, `out_path` deleted, the ORIGINAL error raised; a cleanup error is attached as a
   note (`add_note`), never in its place (DR-20 (6)); `out_path` is deleted in a `finally`, so a
   process step that raises (FFmpeg not ending within 30 s) never skips the deletion (round-3
@@ -184,11 +195,16 @@ carries it, the instrument's does not).
 
 ## 6. Tests
 
-`tests/test_io_video_encode_units.py` 78, `tests/test_io_video_encode.py` 110 (2 `footage`),
+`tests/test_io_video_encode_units.py` 80, `tests/test_io_video_encode.py` 113 (2 `footage`),
 `tests/test_io_video_encode_bench.py` 50, `tests/test_video_fidelity.py` 13 and
 `tests/test_io_video_probe_rules.py` 26 (1 `footage`; this package's module names only). At
-`e04a7cb`: the five modules `-m "not footage"` 274 passed, 3 deselected (5:35); ruff, ruff format
-(211 files) and mypy strict (123 files) clean. The three `footage` tests passed at `0b76301` in
+`e04a7cb`: the five modules `-m "not footage"` 274 passed, 3 deselected (5:35). At `673f958`
+(Reviewer B pass 1 #1 and #7): 278 passed, 1 failed, 3 deselected (6:12); the failure is the
+bench's timing test `test_strays_are_read_between_frames_and_kept_out_of_the_figures` (the sum
+of the frame intervals against the stream stage within 0.01 s; the gap is the decoder's end after
+the last frame, outside the sink), which passes on rerun and fails 1 run in 6 on `e04a7cb`'s code
+too (pre-existing, not changed here). ruff, ruff format (211 files) and mypy strict (123 files)
+clean. The three `footage` tests passed at `0b76301` in
 seat 8's footage window (the mapping commit touches no footage test). The full suite is the
 orchestrator's stacked gate (seat 7's run on `5727842`: 4434 passed, 2 skipped). They include eight planted wrong implementations that fail by name (CFR on
 `vid-vfr`, start offset zeroed, `media_time` copied verbatim, colour tags omitted, `tv` on a `pc`
@@ -204,7 +220,10 @@ duration; the cut-short reading catching a planted video `media_time`, video rat
 and audio `media_time`; a cut audio stream accepting exactly the source's packets before the cut;
 one clock for the NVENC proof; negative pts refused at `open`; no `FFREPORT` file from the
 detection, the encoder or the listings; the header built before FFmpeg starts; a failed output
-listing an error; `abort` after a refused `open` deleting `out_path`. Round 9 added the NVENC
+listing an error; `abort` after a refused `open` deleting `out_path`. Reviewer B pass 1 added
+a gap in the middle and an early stop refused at `close` (both DID NOT RAISE on `e04a7cb`), the
+readable-pts rule on decode-order listings, a truncated cut and an unreadable tail, and FFmpeg
+that cannot be started failing the sink for good (on `e04a7cb` `out_path` stayed). Round 9 added the NVENC
 ceiling tests (the pixel-rate ceilings, the source's cap, the explicit level, the level warning,
 a small-sample encode that signals the expected Main-tier level; each failing before the fix) and
 round 10 pinned the footage test to the exact 5.2 / 5.1 / 5.0 Main; the AD-12 unit test pins all
@@ -330,8 +349,11 @@ apart is enough; the figures above stand.
 
 - **IF-9 / WP3.14:** provenance JSON over 16 KiB is refused at `open` (it travels on the command
   line); WP3.14 should keep provenance well under that.
-- **WP3.14:** the sink deletes `out_path` on any failure; `SafeWrite.abort` tolerates the missing
-  temporary. A cancel from another thread should call `abort` (it kills FFmpeg; the writing thread
+- **WP3.14:** the sink deletes `out_path` on every failure from the moment it tries to start
+  FFmpeg: FFmpeg that cannot be started, and any failure in `open` after that, in `write` or in
+  `close`. A REFUSAL at `open` (an option, the source or the provenance refused before FFmpeg is
+  started) leaves `out_path` as it was: the caller's `abort` deletes it (it was recorded first),
+  or `SafeWrite` does. `SafeWrite.abort` tolerates the missing temporary. A cancel from another thread should call `abort` (it kills FFmpeg; the writing thread
   then sees `encoder_failed`).
 - **WP4.3:** FFmpeg is started with `subprocess.Popen` directly; the shared CREATE_NO_WINDOW spawn
   helper (AD-23 extended) is WP4.3's.
@@ -387,5 +409,21 @@ apart is enough; the figures above stand.
   as the first frame is. The telemetry runs two threads (RSS, GPU), each on its own schedule with
   every sample timed; `offsets_s` places the telemetry's zero and the end of the strays priming on
   the run's clock.
+- **`close` does not compare audio payload bytes (Reviewer B pass 1 #3, limit):** it checks every
+  audio stream's packet pts and count, not the packet bytes. Audio is stream-copied (`-c:a copy`),
+  so a payload change needs a command change; the V4 instrument (`tools/video_fidelity.py`)
+  hashes the payloads.
+- **A blocking stdin write has no deadline (Reviewer B pass 1 #4, limit; DR-28 (4)):** if a live
+  FFmpeg stops reading, `write` (or the sentinel in `close`) blocks. The recovery is `abort` from
+  another thread: it kills FFmpeg, the pipe breaks, and the writing thread sees `encoder_failed`.
+- **`abort` cannot ensure FFmpeg ended if the kill itself fails (Reviewer B pass 1 #5, limit):**
+  it never raises, so a failed kill or a wait past 30 s leaves FFmpeg running and possibly
+  `out_path` held; a second `abort` repeats the cleanup. On Windows the kill of the sink's own
+  child fails only on access denial.
+- **The floor row subtracts the strays pauses (Reviewer B pass 1 #9):** decode and encode go on
+  during a pause, so subtracting the whole pause biases the floor low by the work done in it; the
+  measured bound is about one frame per pause (7.3: only the first frame after a pause runs fast,
+  and it is set apart): the time it saves is about 0.02-0.12 s per pause, at most about 0.0004
+  s/frame over the 300 frames between two pauses.
 - **Process note:** one run of the units module during the dispatcher's suite made sub-second
   FFmpeg reads (a hold breach in seat 8; noted, no harm).
