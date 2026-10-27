@@ -11,12 +11,30 @@
 
 ### Phase / state
 
-**Phase 3 (build), wave 3 tranche A in flight (paused 2026-10-21 09:15Z to 2026-10-26 at the owner's word, RESUMED 2026-10-26).** Plan
-`docs/clearwater-implementation-plan.md` v1.2. **CHARC generation 3** = `clearwater-charc-20261020-2115`
-(fable/medium), picked up 2026-10-21 ~07:30Z from 6533d8f; bash gauge 44 ms. Main ~815 commits ahead
-of `origin/main`, unpushed; no push asked (verify `git status -sb`).
+**Phase 3 (build), wave 3 COMPLETE, wave 4 being commissioned (2026-10-27).** Plan
+`docs/clearwater-implementation-plan.md` v1.2. **CHARC generation 4** = `clearwater-charc-20261026-2007`
+(fable/medium), launched by gen 3 at 06:07Z, picked up 2026-10-27 ~06:10Z from main 08a14ee; bash gauge
+44 ms; inbox empty at pickup (gen 3 acked the wave 4 query while reading). Main ~1136 commits ahead of
+`origin/main`, unpushed; no push asked (verify `git status -sb`).
 
-### Generation 3 so far (2026-10-21 07:30Z onward)
+### Generation 4 so far (2026-10-27 06:10Z onward)
+
+- **Wave 4 RULED** (msg `6f725eee`, 2026-10-27 06:11Z, answering orchestrator query `280fb7a08b5e5cfc`):
+  wave 4 = WP3.14 (opus-high, Claude) + the calibration pair NOW; **WP3.21 opens AFTER WP3.14's accept**
+  (plan row dependency; V16 end-to-end row is the baseline; one GPU) with its brief draftable meanwhile.
+  Pair: **WP3.20R settings dialog hardening (DR-53/54/55; DR-52 out) -> `implementer-codex-sol-high`**, A and
+  B = the Claude pass (`codex_cell.py review`); DR-54 = REFUSE OK with a settings-owned message, disagreeing
+  injected rule. **WP-T3 fixture checker hardening (DR-33 (a)-(d), no regeneration) -> `implementer-sonnet-high`**,
+  B = Codex `gpt-6.1-sol`/high. Size ratio recorded for HD-1: WP-T3 ~1.3-1.5x larger (6 tool modules + 1,382-line
+  test file vs 1 module 851 + 868); the new lane got the smaller package. Lane head-to-head (both Bs on one tree)
+  owed at WP3.20R's gate. Briefs: one drafting helper each, CHARC approves FINAL; WP3.14's brief carries the
+  recorded consumer notes (listed in the ruling). Orchestrator gen 12 (~300K) drafts, dispatches helpers, rolls.
+- **Owner question 2026-10-27 (in CHARC chat):** does the full suite run with parallel workers? Answer: NO
+  (no pytest-xdist in the lock; serial `uv run pytest`; 4,766 tests, 27-45 min). Proposal to the owner: xdist
+  for the non-gpu/footage/slow partition, serial for the rest, as a small package; AWAITING the owner's word.
+- **Orchestrator gen 12 ONLINE** `clearwater-orchestrator-20261026-1223` (sole drainer; **cue THIS name**).
+
+### Generation 3 (2026-10-21 07:30Z to 2026-10-27 05:50Z; rolled at 420K; kept as record)
 
 - **WP3.9 video decode ACCEPTED** by orchestrator gen 9, main 09ab408 (record `docs/proofs/wp3.9-accept.md`;
   B clean NO_NEW_CRITICAL_MAJOR; DR-45 NEW; DR-36 (a)(b) CLOSED by CHARC 1d1ead6). **CHARC QA CONFIRMED,
