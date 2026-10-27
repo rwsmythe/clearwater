@@ -46,13 +46,13 @@
 
 | Package | Branch head | State | Next |
 |---|---|---|---|
-| WP3.10 | `wp3.10` `5cc94e4`+ (seat 8 `wp310-cell8`, 252K at the R10 yield) | R9 (derived maxrate, CHARC rule WITHDRAWN) blocked on the 20 Mb/s floor raising fixture levels; CHARC RULED O3 (`17f12f9dc7eba3ae`, AD-12 amended `ccaecd7`): 0.24 bpp x pixel rate High, 1/2, 1/4, bufsize = ceiling, explicit `-tier main -level L`, min(pixel ceiling, source Main-tier cap) for HEVC sources, SinkReport warning; built `5cc94e4`. **R10 = five-round gate: 0/0/2, TERMINATION ACCEPTED** (test-only cleanup). Beyond-ruling choice (cap at 6.2 / refuse at open) ACCEPTED out of envelope. FOOTAGE window GRANTED ~23:15Z | footage figures + AD-12 proposal to CHARC; then decide: seat 8 or a fresh seat 9 for the EXCLUSIVE floor row (OPEN/CLOSE to CHARC), report, return; then my Reviewer B (none yet) and WP3.10's own candidate gate (full suite) |
+| WP3.10 | `wp3.10` `df055c2` (product `0b76301`; seat 8 `wp310-cell8` STOOD DOWN at 305K, 2026-10-27 ~00:55Z) | O3 built `5cc94e4`; R10 five-round gate TERMINATED (cleanup `0b76301`). CHARC QA ACCEPTED both out-of-envelope choices and the termination. **Footage window CLOSED 00:52Z:** leg (a) M+R 0 DIFFERENT, footage tests 3 passed, leg (b) GX011627 NVENC 1.018 / 0.515 / 0.258 x camera at 5.2 / 5.1 / 5.0 Main (was 0.356 / 0.350 / 0.338). AD-12 QUERY to CHARC 00:54Z (recommend libx265 crf 21/26/30, NVENC cq 22/26/30, 0.24 FINAL; D75 text question) | on CHARC's ruling: dispatch FRESH seat 9 (implementer-opus-high) from the ledger RESUME HERE: ruled values, EXCLUSIVE floor row (OPEN/CLOSE to CHARC), report, return; then my Reviewer B, then WP3.10's own candidate gate (full suite) |
 
 ### Where things stand (gen 12)
 
 1. **Tranche B ACCEPTED at main `d31dd0f`** (WP3.17, 3.18, 3.19, 3.20; one ff of `stackB-acc`; full suite on stack top
    `d71d994` 4501 passed / 2 skipped = main's figure by code identity; harness 366 OK). Release post to CHARC 23:23Z
-   (owed rows listed there); operator FYI posted. CHARC QA pending.
+   (owed rows listed there); operator FYI posted. **CHARC QA CONFIRMED (static half), no re-run; DR-49..DR-52, DR-44 (a)(b) ADDRESSED (main `71c7652`).**
 2. **WP3.18 B pass 2 CLEAN** on `d8f3859`; six minors disposed as the report's "Erratum at the gate" (`b6673df`).
 3. **WP3.10:** see Live cells. Reviewer B prompt: copy `...\wp3.18\reviewB\` runner + prompt form; its own candidate gate
    is a full suite on `wp3.10` rebased onto main (disjoint from tranche B).
@@ -121,10 +121,10 @@ Each accepted package had its return report posted to CHARC and an info-update t
 | WP3.9 | 2026-10-21 | `09ab408` | `docs/proofs/wp3.9-accept.md`; DR-45; A converged R3; candidate 3670 passed; B clean (1 minor + 1 advisory banked, 1 erratum) | CONFIRMED in full (`bfe4b56072240ecf`; 3670 passed at CHARC's seat; worktrees `wp3.9`, `wp3.9-mc` removed by gen 10) |
 | WP3.4 | 2026-10-26 | `ad15ab4` | `docs/proofs/wp3.4-accept.md`; DR-46; A converged R1; B pass 1 blocked (dtype coercion, confirmed by execution) -> ONE remediation -> B pass 2 clean, erratum at the gate; CRLF blob caught and fixed; candidate CuPy 3970 / no-CuPy 3418 | CONFIRMED static half (`d3c7ebcf9749a876`; register rows `6b58619`) |
 | WP3.11 | 2026-10-26 | `47235b6` | `docs/proofs/wp3.11-accept.md`; DR-47; A converged R3; B pass 1 blocked (schema-hash divergence) -> fresh-seat remediation -> B pass 2 blocked (signed zero) ADJUDICATED AT THE GATE, verified by execution; stacked on WP3.4; CuPy 4200; no-CuPy reaped; main full pytest owed (CHARC asked to let its QA suite stand) | pending |
-| WP3.17 | 2026-10-26 | `d31dd0f` | `docs/proofs/wp3.17-accept.md`; A terminated R1; B blocked twice, pass 2 adjudicated at the gate (UPHELD); stacked gate 4501 passed | pending |
-| WP3.18 | 2026-10-26 | `d31dd0f` | `docs/proofs/wp3.18-accept.md`; A terminated at the R5 gate (lane restructure); B pass 1 blocked -> seat-3 remediation -> B pass 2 clean, erratum at the gate | pending |
-| WP3.19 | 2026-10-26 | `d31dd0f` | `docs/proofs/wp3.19-accept.md`; A converged R2; B blocked twice, pass 2 adjudicated at the gate (UPHELD) | pending |
-| WP3.20 | 2026-10-26 | `d31dd0f` | `docs/proofs/wp3.20-accept.md`; A terminated R1; B blocked twice, pass 2 adjudicated at the gate (UPHELD) | pending |
+| WP3.17 | 2026-10-26 | `d31dd0f` | `docs/proofs/wp3.17-accept.md`; A terminated R1; B blocked twice, pass 2 adjudicated at the gate (UPHELD); stacked gate 4501 passed | CONFIRMED static half (CHARC QA on `d31dd0f`; DR-49..DR-52) |
+| WP3.18 | 2026-10-26 | `d31dd0f` | `docs/proofs/wp3.18-accept.md`; A terminated at the R5 gate (lane restructure); B pass 1 blocked -> seat-3 remediation -> B pass 2 clean, erratum at the gate | CONFIRMED static half (CHARC QA on `d31dd0f`; DR-49..DR-52) |
+| WP3.19 | 2026-10-26 | `d31dd0f` | `docs/proofs/wp3.19-accept.md`; A converged R2; B blocked twice, pass 2 adjudicated at the gate (UPHELD) | CONFIRMED static half (CHARC QA on `d31dd0f`; DR-49..DR-52) |
+| WP3.20 | 2026-10-26 | `d31dd0f` | `docs/proofs/wp3.20-accept.md`; A terminated R1; B blocked twice, pass 2 adjudicated at the gate (UPHELD) | CONFIRMED static half (CHARC QA on `d31dd0f`; DR-49..DR-52) |
 | DR-44 amendment | 2026-10-21 | `de206e2` | `docs/proofs/dr44-contract-amendment.md`; B pass 1 blocked, remediated, pass 2 clean; main 3570 passed | checked (`00b7f7a8baa5ae3b`) |
 
 Kept branches (evidence; do not delete unasked): `wp3.4`, `wp3.4-mc`, `wp3.11`, `wp3.11-mc`, `wp3.10-pre-rebase`, `orch-state-g10`, `orch-state-g10b`, `wp3.9`, `wp3.9-mc`, `dr44`, `dr44-record`, `wave3-briefs`, `wp3.12`, `wp3.12-mc`, `wp3.6`, `wp3.6-mc`, `wp3.6-mc2`, `wp3.16`, `wp3.16-mc`, `wp3.16-pre-rebase`, `wp3.2`, `wp3.2-mc`, `wp3.2-mc2`, `wp3.3`, `wp3.3-mc`, `wp3.3-mc2`, `wp3.5`, `wp3.5-mc`, `wp3.5-mc2`, `wp3.15`, `wp3.15-mc`, `wp3.13`, `wp3.13-mc`, `wp3.7`, `wp3.7-mc`, `wp3.1`, `wp3.1-mc`, `wp2.3`, `wp2.3-mc`, `wp2.2`, `wp2.2-mc`, `wp1.2b`, `wp1.2b-b1`, `wp1.3d`, `wp1.3d-b1`,
