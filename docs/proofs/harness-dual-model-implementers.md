@@ -255,6 +255,30 @@ cat review-prompt.md .review-diff.txt | \
   `Bash(python scripts/usage_claude.py*)` in `.claude/settings.json` (owner, 2026-10-27; main `9c15d0c`). Second
   reading 03:57Z: Claude 22 % at 10.7 % elapsed = pace 2.06; Codex 22 % at 11.8 % = pace 1.87.
 
+### 4.1b The Claude reviewer pass on WP3.20 (2026-10-27 04:02Z-04:11Z; evidence `clearwater-review-evidence\probes\claudeB-wp3.20\`)
+
+- **Form that ran:** `claude -p --model opus --effort high --no-session-persistence --output-format json`, cwd the
+  `wp3.20-mc` worktree (head `e47c8d2`), tools Read/Grep/Glob plus `git diff|log|show|status` and
+  `uv run pytest|ruff|mypy`, Edit/Write/Agent/web denied; stdin = the Codex B pass 1 prompt and diff verbatim.
+  Result JSON: `claude-opus-5-5`, 40 turns, 512 s, 46.5K output tokens, 170K cache-creation, 4.48M cache-read,
+  list cost $3.19; `VERDICT: NO_NEW_CRITICAL_MAJOR`; `git status --porcelain` empty afterwards (control 6 passed);
+  8 permission denials (grep/python/PowerShell probes and a scratch write under `work/`).
+- **Not a same-tree head-to-head, and the pass SAID SO:** the Codex pass 1 diff was against `bbf44e2`, the tree
+  was `e47c8d2` (both Codex-found majors already fixed). The pass reconciled the two before reviewing and tagged
+  every finding EXECUTED or REASONED as the prompt demands. The strict transition head-to-head (both B's on one
+  finished tree) is still owed once, at the first Codex-implemented package's gate.
+- **What it found on the accepted tree, none raised by either Codex pass:** six minors and advisories, all in
+  envelope and all checked at this seat: a stored over-long or newline suffix bypasses `validate_suffix` through
+  the field's truncation (DR-53); a stored encoder the sink now reports UNAVAILABLE is accepted (DR-54); the
+  report cites four pre-rebase SHAs and omits `cache_limiter` from the public API (DR-52 errata); the interim
+  rule's error behaviour differs from WP3.10's although a test claims they match (DR-52 amended); the injected-rule
+  test cannot fail on a restated rule (DR-54 disposition). Reading: the Claude pass is a credible B; it hunts the
+  same "what is absent" class, verifies on reality where its tools allow, and reports what it could not execute.
+- **Tool policy change for Stage 1:** allow `Bash(uv run:*)`, `Bash(python:*)`, `Bash(.venv/Scripts/python.exe:*)`,
+  `Bash(grep:*)`, `Bash(ls:*)` so probes EXECUTE (the Codex sandbox lets its reviewer write to /tmp; the Claude pass
+  had no scratch at all); Edit/Write stay denied; the post-pass `git status` control is the integrity check. Cost
+  per pass is of the same order as a Codex pass (Codex WP3.20 passes: 160K and 148K tokens).
+
 ### 4.2 Stage 1: the operative edits (CHARC, after Stage 0, one harness commit, harness gate green)
 
 | File | Change |

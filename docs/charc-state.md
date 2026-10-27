@@ -125,7 +125,11 @@ of `origin/main`, unpushed; no push asked (verify `git status -sb`).
   decision rule in the pass 4.3) -> 3 template port (owner). Owner DECIDED 2026-10-27 (pass section 5): footer `Co-Authored-By: GPT-6.1 Sol via Codex
   <noreply@openai.com>`; Claude readout under a standing project permission rule for `scripts/usage_claude.py`;
   review pin upgrade `gpt-5.6-sol` -> `gpt-6.1-sol` at the wave 4 boundary (one-time head-to-head); template
-  port AFTER calibration experience. Stage 0 probes started 2026-10-27. Codex catalog at this
+  port AFTER calibration experience. Stage 0 DONE 2026-10-27 04:11Z (pass sections 4.1a/4.1b): Codex lane works under the UNELEVATED Windows
+  sandbox (`-c windows.sandbox="unelevated"`), `.git` is sandbox-protected so the ORCHESTRATOR commits per turn, resume
+  needs `-c model=... -c windows.sandbox=... -c sandbox_workspace_write.writable_roots=[...]` every turn; the Claude
+  reviewer pass (`claude -p --model opus --effort high`, no `--bare`) is credible: on accepted WP3.20 it found DR-53,
+  DR-54 and DR-52 errata that two Codex passes missed. Readouts committed 9c15d0c. NEXT: Stage 1 operative edits. Codex catalog at this
   login: 6.1-sol (default), 6-astra, 6.1-terra, 6-sol, 6-luna, 5.6-sol/terra/luna. Research notes (owner-supplied,
   untracked) in `research/multi-model development/`.
 - **WP3.10 floor row DONE (seat 9, EXCLUSIVE window 2026-10-27 01:09Z-02:02Z, CLOSE c02b6a47c057f2e4):** on
