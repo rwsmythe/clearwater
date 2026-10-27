@@ -1,8 +1,7 @@
-# WP-T4 -- Parallel test workers (dispatch brief, DRAFT)
+# WP-T4 -- Parallel test workers (dispatch brief, FINAL)
 
-**Status:** DRAFT 2026-10-27, written by a drafting helper for the orchestrator (generation 12)
-at CHARC's ruling `6f725eee`. Not approved; base = the pre-dispatch main commit named at
-dispatch. Source: the owner's commission (2026-10-27, "commission it"), CHARC commission
+**Status:** FINAL 2026-10-27 (CHARC `3c3c35d7e40b525e`); written by a drafting helper for the orchestrator (generation 12)
+at CHARC's ruling `6f725eee`. Approved; base = the main commit named in the dispatch prompt. Source: the owner's commission (2026-10-27, "commission it"), CHARC commission
 `f0741947`, AD-28 (`docs/decisions.md`). Spec **v0.5.5**; no spec clause changes. Tests, a
 dependency and a report only: no product code, nothing under `src/clearwater/interfaces/`
 (frozen) or `src/`.
@@ -237,8 +236,18 @@ guard's documented limits (DR-22).
 
 ## Rulings
 
-None yet. CHARC fills this section at approval; where a ruling and the ladder differ, the ruling
-governs.
+FINAL (CHARC FINAL `3c3c35d7e40b525e` (2026-10-27 06:33Z, replying to `4b2d7b2e92048eaf`)). Approved: lane by the pace tiebreak at dispatch (third); where a ruling and the
+ladder differ, the ruling governs (Q3 and Q7 are AMENDED and change the ladder).
+
+- Q1 where the commands live: ADOPTED ONLY the fill's GATE_CHECKS line (the orchestrator writes it at accept from the report's "Gate text") plus one CLAUDE.md Conventions line (CHARC writes it); NO `docs/testing.md`. AD-28's "or a short docs/testing.md" is withdrawn by this ruling.
+- Q2 `tests/conftest.py`: ADOPTED one docstring paragraph only; a code change is a STOP.
+- Q3 `tests/fixture_plugin.py` cold-cache race: AMENDED. The race is structurally evident (N workers, one path, no lock) and the cold worktree IS the gate's normal state, so "leave it to timing luck" is not an acceptable end state. The cell REPRODUCES it deterministically (two processes against a cold cache with the generator slowed by an injected delay, e.g. a monkeypatched `generate.generate` that sleeps 2 s before writing), then adds the stdlib exclusive-create lock with re-verify-after-acquire, bounded wait and stale-lock rule, and the two-process test that fails without the lock. If even the slowed form does not reproduce, that is a STOP with the record, not a silent skip.
+- Q4 execnet: ADOPTED (lock gains exactly pytest-xdist and execnet; both licences quoted).
+- Q5 exception budget: ADOPTED (more than 20 tests or a whole file = yield).
+- Q6 reviewer tier: ADOPTED THE ORCHESTRATOR'S form, not the helper's. Claude lane: FAST Codex (`gpt-6-luna`/medium) for A and B (tools class per the fill). Codex lane: the fill's pinned Claude pass (`claude -p --model opus --effort high`) for A and B; there is no "Sonnet medium" variant and nobody improvises the invocation.
+- Q7 run counts: AMENDED. TWO interleaved rounds (BASELINE, PARALLEL, SERIAL each), a THIRD only if the two rounds' PARALLEL+SERIAL totals differ by more than 15 %. Saves about an hour of host time; the baseline is not a figure of record.
+- Q8 memory floor: ADOPTED (2 GB available at any sample fails the run; the cell never lowers N itself).
+- Note: the `gui` partition (411 tests) stays serial under AD-28; whether it can run under workers is a follow-up measurement, not this package's.
 
 ## Questions for CHARC (recommended answer first)
 

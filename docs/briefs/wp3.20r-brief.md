@@ -1,7 +1,7 @@
-# WP3.20R — Settings dialog hardening (dispatch brief, DRAFT)
+# WP3.20R — Settings dialog hardening (dispatch brief, FINAL)
 
-**Status:** DRAFT 2026-10-27, written by a drafting helper for the orchestrator (generation 12) at
-CHARC's ruling `6f725eee`. Not approved; base = the pre-dispatch main commit named at dispatch.
+**Status:** FINAL 2026-10-27 (CHARC `3c3c35d7e40b525e`); written by a drafting helper for the orchestrator (generation 12) at
+CHARC's ruling `6f725eee`. Approved; base = the main commit named in the dispatch prompt.
 Owner decisions: none inside the package.
 - Spec **v0.5.5**. Rows: `docs/debt-register.md` DR-53, DR-54, DR-55 (quoted below). Package
   hardened: WP3.20, brief `docs/briefs/wp3.20-brief.md`, report `docs/reports/wp3.20-settings.md`,
@@ -214,6 +214,22 @@ that route only to force the divergence the register describes).
   `_on_catalog_state` (`:525`) re-runs `_refresh_ok`. Probed at drafting with PySide6 6.12.0:
   `QLineEdit(text, parent)` keeps a 32768-character text and a newline; `setText` cuts to
   `maxLength()` (32767).
+
+## Rulings
+
+FINAL (CHARC FINAL `3c3c35d7e40b525e` (2026-10-27 06:33Z, replying to `4b2d7b2e92048eaf`)). Approved: Codex cell (`implementer-codex-sol-high`); Claude Reviewer A and B via
+`scripts/codex_cell.py review`; the lane head-to-head (a Codex B at `gpt-6.1-sol` AND the Claude B
+on the same tree, the Claude pass being the B of record) is owed at the gate. Where a ruling and
+the ladder or a question differ, the ruling governs.
+
+- Carried from CHARC `6f725eee`: DR-54 RULED: refuse OK with a `settings`-owned message; the injected-rule test uses a DISAGREEING rule and asserts the 10-bit state.
+- Q1 DR-53 does not reproduce through the constructor: ADOPTED keep the scope and remedy (validate what is applied), the divergence scenario is the positive control that fails on the base; the two register scenarios are written as tests stated as "may pass on the base"; CHARC amends DR-53's mechanism text at the accept from the turn-1 reproduction record. The brief's "Done" line is read accordingly: the row is shown by the divergence test.
+- Q2 DR-54 message: ADOPTED BOTH (`encoder_note` in the dialog + a `settings`-owned error `Message` when `accept()` refuses).
+- Q3 DR-55 catch: ADOPTED `except Exception` around the injected call, with the comment.
+- Q4 WP3.20 report bullet: ADOPTED replace the one bullet (supersession by replacement).
+- Q5 message length: ADOPTED cut the ValueError text to 200 characters.
+- Q6 Reviewer A timing: ADOPTED one round after turn 5 on the cumulative diff, then the fill's policy.
+- Calibration note for HD-1: planned 15 tests (9 + 6 controls) vs CHARC's 4-6 estimate; the planted-defect rule explains it; the actual count is recorded at the accept.
 
 ## Questions for CHARC (recommended answer first)
 

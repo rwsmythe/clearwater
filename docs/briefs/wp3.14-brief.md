@@ -1,7 +1,7 @@
-# WP3.14 — Export jobs and batch (dispatch brief, DRAFT)
+# WP3.14 — Export jobs and batch (dispatch brief, FINAL)
 
-**Status:** DRAFT 2026-10-27, written by a drafting helper for the orchestrator (generation 12) at
-CHARC's ruling `6f725eee`. Not approved; base = the pre-dispatch main commit named at dispatch.
+**Status:** FINAL 2026-10-27 (CHARC `3c3c35d7e40b525e`); written by a drafting helper for the orchestrator (generation 12) at
+CHARC's ruling `6f725eee`. Approved; base = the main commit named in the dispatch prompt.
 Owner decisions: none inside the package (a mandatory item that cannot be met is a STOP; relaxing
 one is owner-reserved).
 - Spec **v0.5.5** (main `a5f9245`, owner-approved 2026-10-27, the D75 erratum, text only):
@@ -270,6 +270,31 @@ Binding as written; where a ruling and the ladder or a question differ, the ruli
   CHARC ruling to change); the seam moved to `clearwater.jobs.export_seam` (CHARC 2026-10-26,
   architecture IF-8); the non-ok `outputs` wording (CHARC `efc95f5d4e7b8456`). WP3.19 question 1:
   the GUI sequences its batch; WP3.14 supplies the per-item job.
+
+### FINAL rulings on the questions (CHARC FINAL `3c3c35d7e40b525e` (2026-10-27 06:33Z, replying to `4b2d7b2e92048eaf`))
+
+Approved: opus-high, Claude lane, Codex A/B at `gpt-6.1-sol`/high. The answers below govern the
+"Questions for CHARC" section.
+
+- Q1 threading: ADOPTED (one frame in flight, one watchdog per encode; overlap is WP3.21's; `hw_decode` True unless the backend is the CPU).
+- Q2 cancel granularity: ADOPTED (per frame, between phases, immediately before `commit`; watchdog 0.2 s calls `abort` once; never touches the FrameStream).
+- Q3 committed before the stop: ADOPTED (held by construction; the planted stop-after-commit test lists the file).
+- Q4 engine dependencies: ADOPTED (injected methods mapping, source, sink factory, photo reader/writer, cache + key function, backend selector; `jobs` never imports `clearwater.methods`).
+- Q5 analysis in the job: ADOPTED (own `AnalysisEngine` per job on the injected cache; a cache `RuntimeError` is a readable failure; GUI-recompute-during-export serialisation becomes a NEW DR row at the accept, WP4.3 trigger).
+- Q6 QUALITY_RATIO: ADOPTED High 1.10 / Standard 0.50 / Draft 0.25, MARGIN 1.25 (busy libx265 1.07 measured; the ceiling term bounds NVENC).
+- Q7 `estimate_video_bytes` signature: ADOPTED in place (`source_size, settings, *, width, height, frame_rate, duration_s`; `source_bit_depth` dropped with the doubling).
+- Q8 D87 warn or refuse: ADOPTED REFUSE before writing, batch continues (D81). Reading of record: 8.4's "warned" is satisfied by the refusal message the user sees (the panel's error, the batch report); a refusal is stricter than the text, not a relaxation, so no owner decision. In a headless batch there is no one to warn, which settles it. WP4.3 may add a proceed-anyway confirmation in the GUI if the owner asks at CP5; the engine's rule stays refuse.
+- Q9 headless `run_batch`: ADOPTED (small; D81 skip-and-log, D45 stop, per-item results, count summary; the GUI keeps its own sequencing).
+- Q10 provenance key set: ADOPTED, file NAME not path. RULED and applied (the pre-dispatch commit, main `ba28175`: IF-9 docstring amended, AD-13 amended). No `GoProInfo`, no tag dictionary, no location value.
+- Q11 V16 instrument `tools/export_bench.py`: ADOPTED (imports from `tools/video_io_bench.py`, `run`/`v16`/`--dry-run`; cold-cache figure of record, warm beside it; stage split from Progress callbacks and an injected clock, no product timers).
+- Q12 footage rows: ADOPTED IN FULL, GX011625 KEPT (the sustained row is what N6 measures and it is WP3.21's baseline; the WP3.10 floor used the same clip). Order: GX011627 rows first, GX011625 LAST, each its own OPEN/CLOSE; if the GX011625 window cannot be granted within the package's life, the row is recorded OWED in the accept record and taken before WP3.21 dispatches, never dropped.
+- Q13 DR-57 (a): ADOPTED (instrument-side hash on the engine's outputs, not in the product job).
+- Q14 DR-43: ADOPTED, not this package's (stays WP3.6P / `io.photo`).
+- Q15 progress units: ADOPTED.
+- Q16 DR-28 (1): ADOPTED (full-coverage digest before encode plus controls; sampled order criterion after encode).
+- Flag (i) spec 10.2 N6 body "about 3.3 minutes per minute" vs D106/V16's interim 25 min/min: an OWNER text erratum like D75; CHARC carries it (v0.5.6 candidate); nothing blocks.
+- Flag (ii) WP3.13's per-volume batch-sum note and the `check_free_space` docstring sentence: superseded; the cell edits the docstring sentence as an owned file (`disk_space.py`); the WP3.13 report is NOT edited (a one-line "superseded by WP3.14" note goes in WP3.14's report).
+- Flag (iii) the copied WP3.10 runner's old pin: the cell changes `-m` to `gpt-6.1-sol` before the first round; a round whose banner reads 5.6 is void.
 
 ## Questions for CHARC (recommended answer first)
 

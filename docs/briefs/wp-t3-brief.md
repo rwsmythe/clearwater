@@ -1,7 +1,7 @@
-# WP-T3 — Fixture checker hardening (dispatch brief, DRAFT)
+# WP-T3 — Fixture checker hardening (dispatch brief, FINAL)
 
-**Status:** DRAFT 2026-10-27, written by a drafting helper for the orchestrator (generation 12) at
-CHARC's ruling `6f725eee`. Not approved; base = the pre-dispatch main commit named at dispatch.
+**Status:** FINAL 2026-10-27 (CHARC `3c3c35d7e40b525e`); written by a drafting helper for the orchestrator (generation 12) at
+CHARC's ruling `6f725eee`. Approved; base = the main commit named in the dispatch prompt.
 Closes DR-33 (a)-(d) (`docs/debt-register.md`). Spec **v0.5.5**; AD-14, AD-24 (the fixtures'
 owners); the WP2.3 brief `docs/briefs/wp2.3-brief.md` built what this hardens. Owner
 decisions: none. Not exclusive; records no timing. Tests and tools only; no product code.
@@ -229,7 +229,15 @@ bytes; XMP by namespace URI and any `GPS*` property; AD-24 `irot` through `ipma`
 checked; the two flicker identity fields; each with a planted defect that fails. NO
 regeneration of committed samples (the 87 fixtures stay byte-identical; GATE_CHECKS asserts
 it)." Lane: `implementer-sonnet-high`; the pace tiebreak is suspended for the calibration pair.
-No other ruling yet; CHARC's rulings on the questions below are recorded here when given.
+FINAL (CHARC FINAL `3c3c35d7e40b525e` (2026-10-27 06:33Z, replying to `4b2d7b2e92048eaf`)). Approved: `implementer-sonnet-high`; Codex Reviewer A AND B at
+`gpt-6.1-sol`/high.
+
+- Q1 Reviewer A's model: the helper is RIGHT and CHARC's ruling line was WRONG. R2 makes both reviewers the OTHER model: Reviewer A = Codex (the cell's loop), Reviewer B = Codex at the orchestrator's seat. CORRECTED; the brief as drafted stands.
+- Q2 packet durations without touching the manifest: ADOPTED (rule derived from the manifest's own `r_frame_rate`/`time_base`; `tests/fixture_plugin.py` `verify_generated` one call; the real clip outside the rule = STOP and CHARC chooses).
+- Q3 XMP encodings: ADOPTED accept and state; the UTF-16 / compressed-iTXt gap becomes a MINOR DR row at the accept (trigger: the first PNG sample carrying an iTXt chunk, or XMP writing by any generator).
+- Q4 tier: ADOPTED STRONG for A and B (equal rigor across the pair).
+- Q5 "87": ADOPTED the gate is `git diff --quiet <base> -- tests/fixtures` (all 87 tracked files, manifest included).
+- Q6 HEIC brands: ADOPTED strict `heic`/`heix`.
 
 ## Questions for CHARC (recommended answer first)
 
