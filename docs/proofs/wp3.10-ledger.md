@@ -215,7 +215,7 @@ main, stream and info packets of an FFmpeg-written file).
   `5727842` (4434 passed / 2 skipped) before round 9; the final code's run is the orchestrator's
   stacked gate.
 
-### Seat 8 footage window (2026-10-26 23:29Z-01:05Z; not a timing run; free memory 11.7-11.8 GB before each leg; every output deleted; nothing footage-derived committed; no `gpmd`, IMU or GPS value read)
+### Seat 8 footage window (2026-10-26 23:29Z to 2026-10-27 00:52Z; not a timing run; free memory 11.7-11.8 GB before each leg; every output deleted; nothing footage-derived committed; no `gpmd`, IMU or GPS value read)
 
 - **Leg (a) on `0b76301`:** GX011627 through WP3.9's `frames` and the sink (NVENC 8-bit Standard),
   `video_fidelity.py compare`: 46 items, DIFFERENT by class MANDATORY 0, REQUIRED 0, BEST-EFFORT 8;
