@@ -15,6 +15,7 @@ from typing import Any
 import pytest
 
 import export_bench as bench
+import video_fidelity as vf
 from local_config import LocalConfig
 
 pytestmark = pytest.mark.usefixtures("ffmpeg_tools")
@@ -129,9 +130,17 @@ def test_run_once_keeps_the_folder_when_asked_and_never_reuses_one(
 def test_telemetry_stops_at_the_end_of_the_export(
     sample: Any, tmp_path: Path, quick: None, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    # R1 F8: the memory peaks must cover the export only, so sampling stops before the stray
-    # window and the fidelity sampler are read (each can take seconds).
+    # R1 F8 / R2 G4-G5: the stray window is read first (a quick snapshot at the export's end),
+    # then the memory telemetry is stopped (its join can take seconds), then the GPU sampler.
     order: list[str] = []
+
+    class Sampler:
+        def start(self) -> None:
+            order.append("sampler start")
+
+        def stop(self) -> list[Any]:
+            order.append("sampler")
+            return []
 
     class Telemetry(bench.Telemetry):
         def stop(self) -> Any:
@@ -145,12 +154,18 @@ def test_telemetry_stops_at_the_end_of_the_export(
 
     monkeypatch.setattr(bench, "Telemetry", Telemetry)
     monkeypatch.setattr(bench, "StrayWatch", StrayWatch)
+    monkeypatch.setattr(bench, "_gpu_sampler", lambda leg: Sampler())
     leg = bench.Leg("x", 1, encoder="libx265")
     record = bench.run_once(
         sample(SAMPLE), tmp_path / "run-0", leg, force_cpu=True, keep=False, periods=FAST
     )
     assert record["ok"], record["failure"]
-    assert order == ["telemetry", "strays"]
+    assert order == ["sampler start", "strays", "telemetry", "sampler"]
+
+
+def test_the_gpu_sampler_runs_for_nvenc_legs_only() -> None:
+    assert bench._gpu_sampler(bench.Leg("x", 1, encoder="libx265")) is None
+    assert isinstance(bench._gpu_sampler(bench.Leg("x", 1, encoder="hevc_nvenc")), vf._Sampler)
 
 
 # --- the command line ------------------------------------------------------------------------

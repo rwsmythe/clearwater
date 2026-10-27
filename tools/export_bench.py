@@ -377,6 +377,11 @@ def run_once(
     return record
 
 
+def _gpu_sampler(leg: Leg) -> Any | None:
+    """Return the NVENC-proof GPU sampler for an NVENC leg, None for a libx265 leg."""
+    return vf._Sampler() if leg.encoder != "libx265" else None
+
+
 def _measure(
     path: Path, run_dir: Path, leg: Leg, force_cpu: bool, periods: tuple[float, float]
 ) -> dict[str, Any]:
@@ -405,7 +410,7 @@ def _measure(
     engine = build_engine(cache_dir, sink, clocked.stage)
     request = ExportRequest(path, "video", _parameters(leg.method), settings)
     telemetry = Telemetry(memory_every=periods[0], gpu_every=periods[1])
-    sampler = vf._Sampler() if leg.encoder != "libx265" else None
+    sampler = _gpu_sampler(leg)
     watch = StrayWatch()
     if sampler is not None:
         sampler.start()
@@ -416,10 +421,10 @@ def _measure(
         result: JobResult = job(clocked)
     finally:
         ended = time.perf_counter()
-        record["telemetry"] = telemetry.stop()  # first: the peaks cover the export only
+        strays = watch.window()  # a quick snapshot: the stray window ends with the export
+        record["telemetry"] = telemetry.stop()  # next: its join may take seconds
         if telemetry.origin is not None:
             record["telemetry_origin_s"] = telemetry.origin - started
-        strays = watch.window()
         samples = sampler.stop() if sampler is not None else None
     try:
         info: ProbeResult | None = FFmpegVideoSource().probe(path)
