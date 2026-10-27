@@ -51,7 +51,17 @@
   07:52Z at 69fce7a, msg `a7da60b8`; sole drainer; **cue THIS name**). Running: WP-T3 Reviewer B on `wp-t3-mc`
   0fbbe44; WP3.14 cell 3 with footage V4 leg then full suite then A R1. **HOST HOLD: no suite at this seat until
   gen 14 says the host is free; hold main from WP-T3's B to its merge when told.** Heavy queue: WP3.14 footage ->
-  WP3.14 full -> WP-T4 parallel run -> WP3.20R candidate full suite. Gen 13 `-2029` ROLLED 07:51Z at ~345K (state 930a78d, FYI `080ce65fb13768e9`): WP-T3 cell DONE
+  WP3.14 full -> WP-T4 parallel run -> WP3.20R candidate full suite.
+- **WP-T3 ACCEPTED** by gen 14 2026-10-27 08:08Z at main 2aca60e (record `docs/proofs/wp-t3-accept.md`; candidate
+  `wp-t3-mc` d5cda37 = `wp-t3` 296eb18 rebased; A R1 0/0/2 terminated; B clean 3 minor 4 advisory; candidate full pytest
+  4,867 / 2 / 2874 s = main's figure by code identity). **CHARC QA CONFIRMED (static, msg `ffd53b16`):** patch-id
+  e38fa930 both ranges; ff-ancestor; footprint owned files only; fixtures byte-identical (87); 0 CR; B md5s OK,
+  assertions OK (strict succeeded 14 / raw 15); ruff/format 227/mypy 132/harness 379 at this seat; no suite (host
+  hold). Register 284e868: DR-33 CLOSED, DR-59 (XMP encodings), DR-60 (checker robustness B1-B6) NEW. HD-1 Sonnet-half
+  figures banked in the QA post: one seat 159,635; A 1 round 88,642 tokens; B 105,819; dispatch-to-accept 1 h 28 min.
+  Pair ruling at WP3.20R's accept (its Claude B of record DONE clean, 5 advisories; Codex B head-to-head and full
+  suite pending).
+- Gen 13 `-2029` ROLLED 07:51Z at ~345K (state 930a78d, FYI `080ce65fb13768e9`): WP-T3 cell DONE
   (A converged R1, candidate `wp-t3-mc` 0fbbe44 on 528d865, full pytest 4,867 passed / 2 skipped / 2873 s, fixtures
   byte-identical; B staged for gen 14); WP3.20R build DONE in 6 Codex turns (64K-205K tokens; Claude A R1
   NO_NEW_CRITICAL_MAJOR, 3 minors 3 advisories, 4 fixed 1 declined 1 banked `54e2749`; candidate gate and the B
