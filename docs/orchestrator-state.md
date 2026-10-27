@@ -8,21 +8,26 @@
 - **Generation 14 LIVE** `clearwater-orchestrator-20261026-2151`, picked up 2026-10-27 07:52Z at main `69fce7a`;
   bash gauge 40 ms; inbox empty. Scratchpad
   `C:\Users\rwsmy\AppData\Local\Temp\claude\C--Users-rwsmy-clearwater\91de222f-a75d-4590-9741-d95f2af531b3\scratchpad\`
-  (`prompt-wp3.14-cell3.md`). Gen-14 checkpoint (08:15Z), SUPERSEDES the gen-13 table below where they differ:
-  - **WP-T3 ACCEPTED at main `2aca60e`** (record `docs/proofs/wp-t3-accept.md`; B clean, 3 minor + 4 advisory;
-    erratum at the gate; rows owed by CHARC; release `f68b2a16`, operator FYI posted).
-  - **WP3.20R:** candidate `wp3.20r-mc` `7749c6e` on `70e316d` (patch-id `01c1b13a` = author; static clean). B PAIR DONE:
-    Claude B of record (`wp3.20r\reviewB\`) NO_NEW_CRITICAL_MAJOR, 5 advisory, $1.86, 324 s, 26 turns; Codex B
-    (`wp3.20r\reviewB-codex\`) NO_NEW_CRITICAL_MAJOR, 2 minor + 1 advisory, tokens 94,197 (no Qt run: no `uv` in WSL).
-    OWED: rebase onto main, candidate FULL pytest, harness, record with the head-to-head table, ff.
-  - **WP3.14 cell 3** `wp314-cell3` (opus-high, depth 0 at dispatch 07:53Z): both windows granted in its prompt
-    (footage V4 leg, then full `-m "not footage"` -> marker `.worktrees\wp3.14\work\pt-full.done`), then A R1; yields at
-    R1's verdict. The worktree's `clearwater.local.toml` had a junk line 18 (gen-13 setup slip); fixed at this seat
-    07:57Z. **Parse-check every copied config at worktree setup.**
-  - **WP-T4:** rebased onto `2aca60e` (head `6ac384a`, patch-id `586b61a1` unchanged; pre-rebase `wp-t4-pre-rebase`).
-    Run request `work/wp-t4/run_parallel_01.ps1` (read; fine) runs after WP3.14's full window; turn 4 prompt must name
-    the new head.
-  - Gen-14 slips: two bare `cd`s with a cell live (into `wp-t4`, `wp-t3-mc`), each reverted next call.
+  (`prompt-wp3.14-cell3.md`, `prompt-wp3.14-cell4.md`). Gen-14 checkpoint (11:20Z), SUPERSEDES the gen-13 table below:
+  - **WP-T3 ACCEPTED** main `2aca60e` (CHARC QA CONFIRMED; DR-33 closed, DR-59/60). **WP3.20R ACCEPTED** main `dbb5858`
+    (CHARC QA CONFIRMED; DR-53/54/55 closed, DR-61; CALIBRATION RULED: Codex lane STAYS for sonnet-high; pace tiebreak
+    resumes). Codex depth = `last_token_usage.input_tokens` in `~/.codex/sessions/.../rollout-*-<session>.jsonl` (PINNED;
+    the footer is cumulative billing).
+  - **WP3.14:** cells 1-3 retired (cell 3 at 302,881). A CONVERGED at R2 (G1 interrupt reading UPHELD by CHARC; Q2
+    AMENDED `e7d25105`, in the brief at `2fea775`). **Cell 4** `wp314-cell4` (opus-high; 0 at dispatch, 38,603 at window
+    request, 146,307 at the B1 remediation yield): did the ONE B pass 1 remediation (B1 (a) cancel from `cancelled()`;
+    B1 (b) GRANTED one-block edit `analysis/engine.py` finally (CHARC `d9154e06`); B3 post-commit callbacks guarded; B4
+    exact Fractions); head `b4259cc`. B pass 1 (`wp3.14eviewB\`) BLOCKED 2 major (B2 V16-owed DECLINED as sequencing).
+    Candidate `wp3.14-mc` `99171df` on `c9838cd` (patch-id `4b6d4d9e` = author). **B pass 2 RUNNING** (`reviewB2\`); a
+    second blocking B is adjudicated at the gate. NEXT: OPEN exclusive -> grant cell 4 V16 GX011627 x6 + 5.3K (~1 h),
+    then GX011625 (~2.5-3 h) -> cell 4 fills the report's V16 section + FINAL return -> rebase, candidate FULL pytest
+    (main's config: the 9 look-check skips run; quote both counts), harness, record, ff, release.
+  - **WP-T4:** Codex session `01a17c16-...`, depth 284,234 (session file) at turn 4 (`8927a82`, rung 3 done, zero
+    violators, E1 marked slow). E1 quiet-seat probe PASSED 10:27Z (DR-58 (c) not fired). Rung 4 = TWO rounds (Q7; a
+    third only if PARALLEL+SERIAL totals differ > 15 %): wrappers `work/wp-t4/run_r4_r{1,2}_{baseline,parallel,serial}.ps1`
+    (read; fine), each EXCLUSIVE, after WP3.14's accept. Then turn 5 tabulation in this session (keep < ~350K); report and
+    reviews from a FRESH Codex session via the ledger (CHARC approved).
+  - Gen-14 slips: four bare `cd`s with a cell live (`cd <wt> && ...` at top level counts), each reverted next call.
 - **Generation 13 ROLLED OVER 2026-10-27 at ~360K (depth cap). Generation 14 starts at "Live cells" below (RESUME HERE).**
   Gen 13 was `clearwater-orchestrator-20261026-2029`, picked up 2026-10-27 ~06:30Z at main `1217443`;
   bash-launch gauge 23 ms; inbox empty at pickup, then CHARC FINAL `3c3c35d7e40b525e` (all four wave 4 briefs approved).
