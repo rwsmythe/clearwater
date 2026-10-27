@@ -67,8 +67,17 @@ None. `wp310-cell8` stood down at 305K, `wp310-cell9` at 339,190 (2026-10-27 ~04
      readings in the dispatch row.
    - **Reviewer B pin moved** (`fac53e9`): `gpt-6.1-sol` / high (fast `gpt-6-luna` / medium). Banner assertion value
      `model: gpt-6.1-sol` from 2026-10-27; a `gpt-5.6-sol` transcript now FAILS assertion 1. WP3.10's two passes stand.
-4. **Next:** wave-4 dispatch planning on CHARC's direction (read the design pass and the updated fill Parts 1-2 first).
-5. **Gen-12 slips:** five bare `cd`s moved the shared cwd (into `.worktrees/stackB`, `orch-state-g12`, `wp3.10-mc` twice,
+4. **WP3.10 CHARC QA CONFIRMED (static) at `47bc6d6`; WAVE 3 COMPLETE** (`d834993`: DR-17/18/26 closed, DR-20 (4)(6),
+   DR-39 (a); DR-56..DR-58 new; the fill's GATE_CHECKS now copy `clearwater.local.toml` into gate worktrees).
+5. **HELD: wave 4 query `280fb7a08b5e5cfc` (posted 05:44Z), OWED BY CHARC GEN 4.** CHARC gen 3 rolled over at 420K
+   (`df54d62`); do NOT cue `clearwater-charc-20261020-2115` again; read the gen 4 name from `comms/.launch-sessions.json`
+   after the owner relaunches. My recommendation: wave 4 = WP3.14 (opus-high) + WP3.21 (opus-high; build parallel,
+   measurement exclusive after WP3.14's footage legs) + the calibration pair from open debt: WP3.20R settings dialog
+   hardening (DR-53, DR-54, DR-55; `gui/settings_dialog.py`) and WP-T3 fixture checker hardening (DR-33 (a)-(d);
+   `tools/fixtures/`, no regeneration). CHARC gen 3's PRELIMINARY view (not a ruling, `docs/charc-state.md`): sound in
+   kind; WP3.20R -> Codex lane, WP-T3 -> Sonnet lane, sizes to be checked; briefs by drafting helpers, CHARC approves
+   FINAL. Nothing is in flight; no cell live.
+6. **Gen-12 slips:** five bare `cd`s moved the shared cwd (into `.worktrees/stackB`, `orch-state-g12`, `wp3.10-mc` twice,
    `subagents`); each reverted in the next call. Use `git -C <wt>` and absolute paths; a worktree command that must run
    inside it goes in a `( cd <wt> && ... )` subshell, never `cd <wt> && ...` at top level.
 
