@@ -21,6 +21,7 @@ Evidence root: `C:\Users\rwsmy\clearwater-review-evidence\wp3.10\` (`r0\` = this
 | 9 | Reviewer A (seat 8) on `ab70b47`, base `e7668e1` (SCOPED to the NVENC rate ceiling, CHARC d329e80e351c3dcc: maxrate = max(2 x source rate, 20 Mb/s)) | 0 | 1 | 0 | MAJOR #1 in envelope (the WP2.3 samples), ACCEPTED, reproduced | 1 NEW (introduced by the ruled 20 Mb/s floor), 0 REOPENED | 0 | PRODUCT (`5cc94e4`, after CHARC's 17f12f9dc7eba3ae O3 ruling withdrew the derived rule) | WSL, codex-cli 0.162.1 gpt-5.6-sol high; probe 1 + review 13 `succeeded in`; 104,444 tokens; 2 `ERROR` matches = echoed source, not transport | 176K (seat 8, at the R9 yield) |
 | 10 | Reviewer A (seat 8) on `5cc94e4`, base `ab70b47` (SCOPED to the R9 #1 remediation + R9 #1 to verify); FIVE-ROUND GATE | 0 | 0 | 2 | MINOR #1, #2 in envelope, ACCEPTED (cleanup); ZERO new blocking: the loop TERMINATES (gate: termination ACCEPTED) | 2 NEW, 0 REOPENED | 0 | TEST-ONLY, the terminating round's cleanup (the commit carrying this row) | WSL, codex-cli 0.162.1 gpt-5.6-sol high; probe 1 + review 28 `succeeded in`; 99,422 tokens; 0 `ERROR` matches | 252K (seat 8, at the R10 yield) |
 | S9 | no review (CHARC `c1d67b39bb72cc1f`: a values-only mapping commit owes NO Reviewer A round) -- the AD-12 mapping `e04a7cb` | -- | -- | -- | -- | -- | 0 | PRODUCT values + the AD-12 unit test (values only) | -- | 69,810 (seat 9, at the mapping yield) |
+| B1 | Reviewer B pass 1 (the orchestrator's seat) on `wp3.10-mc` `78ae77a` (= `4dbb2d5` rebased); remediation by seat 9 | 0 | 6 (reviewer) -> 1 upheld (#1) | 3 -> 2 upheld (#7, #8); #3, #5 adjudicated MINOR limits; #4, #6, #9 NOT NEW; #2 NOT UPHELD (reproduction owed, done: caught) | #1 in envelope, BLOCKING | 9 NEW, 0 REOPENED | 0 | PRODUCT and tests (`673f958` #1 + #7 + #8 docstrings), report text (`b7953a8` #8, limits #3 #4 #5 #9); no Reviewer A round (the orchestrator's B pass 2 covers it) | WSL, codex-cli 0.162.1 gpt-5.6-sol high; 31 `succeeded in`; 318,111 tokens; 0 `^ERROR` (orchestrator's run assertions) | 145,489 (seat 9, at the return) |
 
 Seat 1 stops after round 0 by the orchestrator's instruction (219K before product code; the build
 is the largest in the wave). A fresh cell builds from "RESUME HERE" below.
@@ -200,6 +201,9 @@ main, stream and info packets of an FFmpeg-written file).
 
 ## RESUME HERE (current; written by seat 9 -- the ladder is DONE)
 
+- **State after the Reviewer B pass 1 remediation (seat 9):** product head `673f958`, report
+  `b7953a8` (the section "Seat 9 -- Reviewer B pass 1 remediation" below); next is the
+  orchestrator's Reviewer B pass 2.
 - **State at seat 9's final yield:** product head `e04a7cb` (the AD-12 mapping, values-only, no
   Reviewer A round owed); the floor row ran (below); the report `docs/reports/wp3.10-video-encode.md`
   is FINAL (no PENDING left); the return report went to the dispatcher. Nothing of the ladder is
@@ -226,6 +230,45 @@ main, stream and info packets of an FFmpeg-written file).
   Edits rows; section 6 the counts at `e04a7cb`; section 7 the ruled mapping, the measured
   tables, `QUALITY_RATIO`, the floor row; section 8 AD-12, DR-18 (1), DR-48; section 9 the items
   of seat 8's ladder.
+
+### Seat 9 -- Reviewer B pass 1 remediation (orchestrator order; adjudication `C:\Users\rwsmy\clearwater-review-evidence\wp3.10\reviewB\adjudication.md`; evidence `...\wp3.10\reviewB-remed\` with `md5sums.txt`)
+
+- **#1 (MAJOR, UPHELD) `673f958`:** `close` refuses, before the end sentinel, frames that are not
+  the source's whole readable video: `verify.readable_video_pts` (every listed pts, sorted, each
+  once; a `truncated` source only before its first corrupt packet's pts, the same rule as
+  `_plan_tracks`, Q-B) and `verify.missing_frames` (exactly those pts; an `unreadable_tail`
+  source every such pts up to the last written, since its decodable end is not known without
+  decoding, D86). `verify_failed` "The video is incomplete: N of the source's M readable frames
+  were not written (the first at pts P, S s; K written)" or "frames past the readable end were
+  written". Placed before the sentinel (in `close`, `_check_complete`) rather than in
+  `check_output`: what is missing is a fact about the caller's frames, known before any output
+  exists, so no encode is finished or read back for an export that must fail. `_plan_tracks` is
+  not touched (its truncated rule is duplicated in the helper; a later cleanup can share it).
+- **Failing-before** (`b1-before.log`, the new tests on `git archive e04a7cb` with the worktree's
+  venv): the gap and early-stop tests `DID NOT RAISE`; the start-failure test `assert not
+  out.exists()` failed; the two unit tests failed (API absent). After (`b1-after-targeted.log`):
+  47 passed, including every VFR, B-frame, offset/empty-edit, truncated, cut and every-sample test.
+- **#7 (MINOR, UPHELD) `673f958`:** an `OSError` from `Popen` goes through `_fail`:
+  `encoder_failed` with the `OSError` as its cause, phase failed (a second `open` is `state`),
+  `out_path` deleted like every failure after the options are accepted. Test with a planted
+  missing executable.
+- **#8 (MINOR, UPHELD):** module and class docstrings, `open`'s Raises (`673f958`) and report
+  sections 3 and 9 (`b7953a8`): a refusal at `open` leaves `out_path` to `abort` / `SafeWrite`;
+  every failure from the start attempt on deletes it.
+- **#2 reproduction** (`reviewB-remed\repro_b2.py`, `.log`, `README.txt`): synthetic HEVC + AAC
+  source; the product output PASSES `check_output`; a copy with ONE byte changed inside the audio
+  `elst` (media_time 1024 -> 2048, every packet byte identical) FAILS ("audio stream 0: packet 0
+  at -16/375 s where the source has -8/375 s"); remuxes with audio `-itsoffset` +0.5 s and
+  -0.0213 s (`-c copy`) FAIL the same way. #2 stays NOT UPHELD.
+- **Limits in report section 9** (`b7953a8`): #3, #4, #5, #9 as ordered.
+- **Gates at `673f958`:** ruff clean; format 211 files; mypy 123 files clean; five video modules
+  `-m "not footage"`: 278 passed, 1 failed, 3 deselected (6:33 and 6:12, two runs, same one
+  failure): `test_io_video_encode_bench.py::test_strays_are_read_between_frames_and_kept_out_of_the_figures`
+  (the sum of the frame intervals against the stream stage within 0.01 s; obtained 0.575 / 0.226
+  against 0.591 / 0.242). The gap is `streamed - last write` = the decoder's final `next` (WP3.9's
+  end of stream), outside the sink. It passes on rerun (2 of 3) and fails 1 of 6 isolated runs on
+  `e04a7cb`'s code (`strays-old.log`): a pre-existing timing flake in the instrument's test, not
+  changed (out of this remediation's scope; for the dispatcher). 0 CR bytes on the branch's files.
 
 ### Seat 8's RESUME HERE (superseded by the section above; kept for its figures)
 
