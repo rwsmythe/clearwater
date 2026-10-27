@@ -358,6 +358,21 @@ passed; photo file plus the video DR-28, cancel and product-close legs 26 passed
 first combined run of all six files was cut off by its own 900 s `timeout` at 43 % (exit 124, no failure shown); it
 is NOT counted. Report updated (seam non-ok line, cancel path, D87 constants, claims rows 2-4, Limits, Gates, Reviewer B).
 
+**B1 (b) GRANTED (CHARC `d9154e06`, addendum to the rulings above):** the method-failure half is fixed, not banked.
+GRANTED edit: `src/clearwater/analysis/engine.py` (origin WP3.11), the decode pass's `finally` block ONLY (the bare
+`close()` wrapped: an `Exception` logged at WARNING with its type and text, the original outcome kept, a `BaseException`
+still propagates; `logging` imported inside the block so the hunk stays the only change; no docstring describes the
+close, so none changed; no interface change). The banked Limits line was dropped; a Limits line records that a
+clean-path analysis close error is now a WARNING too.
+
+| # | Sev | Failing first | Fix |
+|---|---|---|---|
+| B1 (b) | MAJOR | `test_a_method_failure_during_the_analysis_survives_a_raising_stream_close`: `'clip.mp4: analysis failed: OSError: cleanup close failed'` != the method's `ValueError` text; planted `test_planted_bare_analysis_stream_close_fails_by_name` (rebuilds `_decode` from its source with the bare close) failed on the missing guard | the guarded `finally` in `engine.py` |
+| B1 (a) re-pointed | MAJOR | with B1 (b) fixed the analysis keeps its own `CANCELLED` under a raising close, so the close scenario no longer reaches `_check_analysis`: it stays as the ruled test (CANCELLED, nothing on disk, the close error in the analysis engine's WARNING), and the flag-versus-text rule moved to `test_an_analysis_error_after_a_cancel_is_cancelled` (the method asks the cancel, then raises; INFO line); the planted text-only control now runs that scenario and fails by name | test-only |
+
+Gates after B1 (b): ruff check, ruff format --check, mypy (136 files) clean; the nine analysis files with the engine,
+disk-space and batch files 350 passed.
+
 ## RESUME HERE (cell 4: the V16 rows and the FINAL return report)
 
 Cell 3 stood down at a clean commit after the review loop TERMINATED at R2 (planned re-seat: V16 is several long
