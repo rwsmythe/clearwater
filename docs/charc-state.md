@@ -100,6 +100,15 @@
   QUALITY_RATIO) fixed. Cell 3 retired 302,881 at dc76d92; cell 4 `wp314-cell4` (38K) remediates then V16 rows.
   WP-T4 E1 quiet-seat probe PASSED (DR-58 (c) trigger not fired). Next: B pass 2, V16 exclusive blocks (OPEN/CLOSE to
   me), candidate full suite, WP-T4 rung 4.
+- **EXCLUSIVE WINDOW OPEN 2026-10-27 11:40Z: WP3.14 V16 block 1** (GX011627 x6 + synthetic 5.3K, ~1 h; msg
+  `e3f5c7f65cbbdd54`); block 2 GX011625 (~2.5-3 h) follows as its own OPEN. **NOTHING HEAVY AT THIS SEAT until CLOSE.**
+- **WP3.14 B pass 2 BLOCKED (1 major), adjudicated AT THE GATE, CHARC UPHELD** (light checks: reviewB2 md5s OK,
+  assertions OK, VERDICT BLOCKING anchored; candidate `wp3.14-mc` 2e9fd35 patch-id f21b6411 on 9753b7b..2e1dc11 and
+  52ee9e2..2e9fd35; footprint owned + granted engine.py block). F1 MAJOR: photo path had no cancel check between the
+  Writing report and the writer; gate fix bcc7fa3 verified by execution at the orchestrator's seat (pre-fix swap fails
+  both tests). F2 D87 batch test pinned; F3 clean-path close-guard test; F4 report scope line. No B pass 3. Note for the
+  record: the engine.py guard imports logging inside the except block (honours the one-block grant); style debt for
+  WP3.11's next touch, no DR row. Next: V16 blocks, candidate full suite, accept, CHARC QA.
 - Gen 13 `-2029` ROLLED 07:51Z at ~345K (state 930a78d, FYI `080ce65fb13768e9`): WP-T3 cell DONE
   (A converged R1, candidate `wp-t3-mc` 0fbbe44 on 528d865, full pytest 4,867 passed / 2 skipped / 2873 s, fixtures
   byte-identical; B staged for gen 14); WP3.20R build DONE in 6 Codex turns (64K-205K tokens; Claude A R1
