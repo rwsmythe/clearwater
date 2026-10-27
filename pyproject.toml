@@ -33,6 +33,8 @@ gpu = ["cupy-cuda12x[ctk]>=14.2,<15"]
 # The application toolchain (plan PD9).
 dev = [
     "pytest>=8.3,<9",
+    # WP-T4 (AD-28, CHARC grant; MIT): parallel test workers.
+    "pytest-xdist>=3.6,<4",
     "ruff>=0.6,<1",
     "mypy>=1.11,<2",
     "psutil>=6,<8",
