@@ -56,6 +56,15 @@
   (Codex 1.71 vs Claude 2.115 at 06:38Z). All depths 0 at dispatch. `tests/fixture_plugin.py` fenced: WP-T3 edits
   `verify_generated` only, WP-T4 edits `SampleProvider.path` + helpers after the class; sequential merges with a
   patch-id check (no objection). V16 exclusive windows OPEN/CLOSE come to me; nothing heavy at this seat while open.
+- **WP3.14 R0** (orchestrator FYI `e1387fa8`, 06:46Z): DR-35 (a) premise FALSE on Windows 11 26300 (`NUL.MP4` is an
+  ordinary file); orchestrator ruled a portable reserved-name guard (option A), CHARC UPHELD; DR-35 (a) mechanism text
+  to amend at the accept. Cell depth 165K at R0 (re-seat expected after the build).
+- **HARNESS: Codex sandbox pytest shim LANDED** main 542bc11 (orchestrator gen 13 finding on WP3.20R turn 1: Python
+  3.12 `os.mkdir(0o700)` = owner-only ACL, the sandbox token cannot list pytest's own temp dirs, every `tmp_path`
+  errored). `scripts/sandbox_mkdir_shim.py` (INSTANCE SURFACE in `genericity_lists.py`, not core: the guard bans the
+  runner's name in core, manifest stays 22); preamble command `PYTHONPATH=scripts uv run pytest ... -p
+  sandbox_mkdir_shim -p no:cacheprovider`; design pass 4.1a entry. Gate runs never load it. Harness 379 OK. HD-1 note
+  owed at the calibration ruling. WP3.20R turn 1: 64,199 tokens, all three rows reproduce on the base.
 
 ### Generation 3 (2026-10-21 07:30Z to 2026-10-27 05:50Z; rolled at 420K; kept as record)
 
