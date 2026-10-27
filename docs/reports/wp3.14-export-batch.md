@@ -34,8 +34,10 @@ cache, cache_key, select_backend, app_version=clearwater.__version__, on_stage=N
 - failure: `ok` False, a readable ASCII text that starts with the file name (so never `CANCELLED`); the ORIGINAL
   error's text (a cleanup error is a log line).
 - cancel: `failure` IS `clearwater.jobs.export_seam.CANCELLED` (identity).
-- non-ok: `outputs` lists a file committed before the stop (only a stop after `commit` can have one); `warnings` those
-  raised before the stop (the sink's included once `close` returned).
+- non-ok: `outputs` lists the files committed before the stop; a job commits at most one output and nothing after its
+  `commit` can fail it (a raising `committed` stage hook or final progress report is a WARNING line, Reviewer B B3), so
+  the engine's non-ok results carry none; `warnings` those raised before the stop (the sink's included once `close`
+  returned).
 - `device` the `select_backend` reason (`"none"` before the backend is chosen); `elapsed_s` wall seconds; one INFO line
   per job naming the file, the outcome and the device.
 - One fresh `Reservations` per job passed to both `plan_output` and `SafeWrite` (DR-35 (b)).
@@ -56,12 +58,15 @@ stream is closed on the job thread (DR-45 (a)). One `AnalysisEngine` per job, ru
 
 ## Cancel path (G8, D44, D45; DR-57 (b))
 
-Before every phase and frame: `cancelled()` -> stop. Analysis: its `CANCELLED` -> the seam's `CANCELLED`. Encode and
+Before every phase and frame: `cancelled()` -> stop. Analysis: a non-ok analysis result while `cancelled()` holds (or
+its own `CANCELLED`) -> the seam's `CANCELLED`, read from the flag, never the text; a different text (a cleanup error
+that replaced the analysis's outcome) goes to an INFO line (Reviewer B B1). Encode and
 close: the watchdog's `abort` kills FFmpeg, releasing a blocked write or a flushing `close`; the job reads the cancel
 from the flag (or the watchdog having fired), never from the error text, and logs the stopped encoder's error. A cancel
 after the last frame never calls `close`; `close` is never called after a partial write; the post-close check is
 unconditional (an `Exception` from `close` or a report). After any stop past `open` the job calls `abort` and leaves the
-`SafeWrite` block, which deletes the temporary. After `commit` the result is ok.
+`SafeWrite` block, which deletes the temporary. After `commit` the result is ok with its output: the `committed` stage
+hook and the final progress report each run guarded, and an error from either is a WARNING line (Reviewer B B3).
 
 ## Failure table (every row: `ok` False, `outputs` (), the source and earlier outputs untouched, nothing on disk)
 
@@ -84,7 +89,8 @@ Per item, inside the job, before `SafeWrite.begin` and again after the analysis:
 needed)`; short is the job's failure, nothing written, a batch continues (D81). Never batch-wide. Video: `needed =
 ceil(max(QUALITY_RATIO[level] x source_size, NVENC_BITS_PER_PIXEL / NVENC_RATE_SHARE[level] x W x H x fps x duration_s /
 8) x MARGIN)`, exact fractions until the ceiling, both encoders, no 10-bit doubling; `QUALITY_RATIO` High 1.10 /
-Standard 0.50 / Draft 0.25, `MARGIN` 1.25. Example (4K 29.97, 60 s, Standard): ceiling 29.8 Mb/s -> 223.7 MB x 1.25 =
+Standard 0.50 / Draft 0.25 and `MARGIN` 1.25, each an exact `Fraction` (11/10, 1/2, 1/4, 5/4; a binary-float 1.10 gave
+1,375,001 bytes for a 1,000,000-byte source at High, Reviewer B B4). Example (4K 29.97, 60 s, Standard): ceiling 29.8 Mb/s -> 223.7 MB x 1.25 =
 279.7 MB; a busy 900 MB source -> ratio 450 MB x 1.25 = 562.5 MB (ratio wins); a calm 49 MB source -> 279.7 MB. The
 footage figures for GX011627 and GX011625 are recorded with the V16 rows.
 
@@ -105,9 +111,9 @@ largest parameter set's JSON stays under half of `PROVENANCE_MAX_BYTES` (16 KiB)
 | # | Claim | Evidence |
 |---|---|---|
 | 1 | Seam: `job()` builds without touching a file; `ValueError` only for a malformed request; each result branch; `CANCELLED` by identity | E `test_job_builds_without_touching_any_file`, `test_job_raises_value_error_only_for_a_malformed_request`, `test_ok_video_names_its_committed_output_and_carries_the_sink_warnings`, `test_cancel_returns_the_seam_constant_itself`, `test_a_genuine_failure_never_equals_cancelled`; planted `test_planted_engine_returning_a_copy_of_the_string_fails_by_name` |
-| 2 | Cancel at each phase, a blocked write released, before close, inside close at four timings (double) and three (product sink), before commit, after commit | E `test_cancel_at_each_phase_leaves_nothing`, `test_cancel_releases_a_write_blocked_on_the_encoder`, `test_a_cancel_at_the_close_boundary_aborts_without_closing`, `test_a_cancel_during_close_is_aborted_by_the_watchdog_at_every_timing`, `test_cancel_immediately_before_commit_deletes_the_finished_temporary`, `test_a_cancel_after_commit_is_ok`, `test_the_watchdog_is_joined_before_commit`; V `test_a_cancel_mid_encode_leaves_nothing_and_keeps_earlier_outputs`, `test_a_cancel_during_the_product_sinks_close_is_aborted_and_leaves_nothing`; planted `test_planted_cancel_polled_only_between_frames_hangs_past_the_bound`, `test_planted_close_on_cancel_fails_by_name` |
-| 3 | Failure keeps the original text; nothing left; disk full named; cleanup errors never the failure; leftovers warned; nothing after commit | E `test_disk_full_*` (3), `test_an_encoder_killed_mid_stream_keeps_the_original_error`, `test_a_method_error_leaves_nothing_and_never_closes`, `test_a_close_error_without_a_cancel_keeps_its_text`, `test_a_stream_close_error_never_replaces_the_original_failure`, `test_a_clean_path_stream_close_error_is_the_failure`, `test_a_temporary_*` (3), `test_a_stop_after_commit_still_lists_the_committed_file`, `test_nothing_is_written_after_commit_and_earlier_outputs_are_untouched`, `test_a_stop_after_close_keeps_the_sink_warnings`; planted `test_planted_every_close_error_cancelled_fails_by_name`, `test_planted_always_quiet_stream_close_fails_by_name` |
-| 4 | D87 per item, re-checked after analysis, both figures; DR-48 formula, units, one constant source, no 10-bit doubling | E `test_d87_refuses_before_any_write_with_both_figures`, `test_d87_is_re_checked_after_the_analysis`, `test_d87_is_per_item_in_a_batch`; planted `test_planted_batch_wide_d87_fails_by_name`; D `test_video_*` (5) |
+| 2 | Cancel at each phase, during the analysis with a raising stream close, a blocked write released, before close, inside close at four timings (double) and three (product sink), before commit, after commit | E `test_cancel_at_each_phase_leaves_nothing`, `test_a_cancel_during_the_analysis_survives_a_raising_stream_close` (planted `test_planted_analysis_cancel_read_from_the_text_fails_by_name`), `test_cancel_releases_a_write_blocked_on_the_encoder`, `test_a_cancel_at_the_close_boundary_aborts_without_closing`, `test_a_cancel_during_close_is_aborted_by_the_watchdog_at_every_timing`, `test_cancel_immediately_before_commit_deletes_the_finished_temporary`, `test_a_cancel_after_commit_is_ok`, `test_the_watchdog_is_joined_before_commit`; V `test_a_cancel_mid_encode_leaves_nothing_and_keeps_earlier_outputs`, `test_a_cancel_during_the_product_sinks_close_is_aborted_and_leaves_nothing`; planted `test_planted_cancel_polled_only_between_frames_hangs_past_the_bound`, `test_planted_close_on_cancel_fails_by_name` |
+| 3 | Failure keeps the original text; nothing left; disk full named; cleanup errors never the failure; leftovers warned; nothing after commit | E `test_disk_full_*` (3), `test_an_encoder_killed_mid_stream_keeps_the_original_error`, `test_a_method_error_leaves_nothing_and_never_closes`, `test_a_close_error_without_a_cancel_keeps_its_text`, `test_a_stream_close_error_never_replaces_the_original_failure`, `test_a_clean_path_stream_close_error_is_the_failure`, `test_a_temporary_*` (3), `test_a_raising_callback_after_commit_keeps_the_result_ok` (video and photo, progress and stage; planted `test_planted_unguarded_callback_after_commit_fails_by_name`), `test_nothing_is_written_after_commit_and_earlier_outputs_are_untouched`, `test_a_stop_after_close_keeps_the_sink_warnings`; planted `test_planted_every_close_error_cancelled_fails_by_name`, `test_planted_always_quiet_stream_close_fails_by_name` |
+| 4 | D87 per item, re-checked after analysis, both figures; DR-48 formula, units, one constant source, no 10-bit doubling | E `test_d87_refuses_before_any_write_with_both_figures`, `test_d87_is_re_checked_after_the_analysis`, `test_d87_is_per_item_in_a_batch`; planted `test_planted_batch_wide_d87_fails_by_name`; D `test_video_*` (5), `test_high_ratio_is_the_exact_decimal` (the oracle reads the ruled decimals from text) |
 | 5 | Settings refusals, DR-35 (a)/(b), D111/AD-9, the one "auto" rule, provenance | E `test_a_missing_output_folder_is_a_readable_failure`, `test_an_invalid_suffix_is_a_readable_failure`, `test_an_unknown_method_is_a_readable_failure`, `test_a_sidecar_is_a_readable_failure`, `test_dr35a_*`, `test_reserved_device_names`, `test_one_fresh_reservations_per_job_reaches_plan_output_and_safe_write` (planted `test_planted_shared_registry_fails_by_name`), `test_force_cpu_and_the_fallback_reason`, `test_auto_without_nvenc_resolves_to_libx265_and_provenance_records_it`, `test_an_unavailable_explicit_encoder_fails_before_the_analysis`, `test_provenance_*` (2) |
 | 6 | Photo: one sample per still family to PNG 8 and 16; statistics equal the preview's bit for bit; provenance on/off | P `test_each_still_family_exports_to_png`, `test_photo_statistics_equal_the_previews_bit_for_bit`, `test_provenance_is_absent_when_off` |
 | 7 | V4 end to end, every decodable WP2.3 sample, libx265 and NVENC (`gpu`), all MANDATORY and REQUIRED SAME; refused samples write nothing; 5.3K 8:7; GX011627 (`footage`) | V `test_v4_every_decodable_sample_through_the_engine`, `test_refused_samples_fail_readably_with_nothing_written`, `test_v4_synthetic_5k3_8_7_clip`, `test_gx011627_through_the_engine_keeps_every_mandatory_and_required_item` |
@@ -135,6 +141,11 @@ Synthetic 5.3K 8:7 (5312x4648, 9 frames, `slow`): passed. GX011627 (NVENC 8-bit 
   clean runs. The full suite on the merge candidate is the orchestrator's (stacked gate).
 - Failing first: every remediation test failed by its reason on the engine before its fix (ledger, R1 and F1 (b)
   records); test-only fixes carry a planted control that fails by name.
+- After the Reviewer B pass 1 remediation (cell 4, targeted, >= 11 GB free): ruff check, ruff format --check, mypy (136
+  files) clean; the engine, disk-space and batch files 101 passed; the photo file and the video file's DR-28, cancel and
+  product-close legs 26 passed; the bench, naming and safe-write files 175 passed. Failing first: the ten new tests
+  failed on the unfixed engine (the B1 test on the close error's text, the B3 tests on the callback's failure text, B4
+  on 1,375,001 bytes, the planted controls on their missing seams).
 
 ## Reviewer A (STRONG; WSL codex-cli 0.162.1, `gpt-6.1-sol`, effort high; evidence `clearwater-review-evidence\wp3.14\r1`, `r2`)
 
@@ -144,6 +155,8 @@ Synthetic 5.3K 8:7 (5312x4648, 9 frames, `slow`): passed. GX011627 (NVENC 8-bit 
 | R2 | `c3a2fc9` | NEW_CRITICAL_MAJOR_FOUND, adjudicated zero new blocking | 1 MAJOR ruled NOT A DEFECT (a `KeyboardInterrupt`/`SystemExit` propagates past the post-close check; reproduced: `abort` called, nothing left), 7 MINOR (one ruled not a defect with it; six fixed in the terminating round's cleanup) |
 
 The loop TERMINATED at R2 (zero new blocking). Reviewer B is the orchestrator's seat pass on the merge candidate.
+Pass 1 (`wp3.14-mc` `b830412`) BLOCKED; rulings: B1 the cancel half fixed (`_check_analysis`), the method-failure half
+BANKED (Limits); B2 (V16 owed) declined as sequencing; B3 fixed (`_after_commit`); B4 fixed (exact fractions).
 
 ## Limits
 
@@ -163,6 +176,10 @@ The loop TERMINATED at R2 (zero new blocking). Reviewer B is the orchestrator's 
   `close` still returns a report); the job's post-close check cancels. CHARC banks a MINOR row against `encode.py`.
 - A cancel blocked outside the encode (for example a long decode during the analysis) waits for the next check (out of
   envelope, DR-44 (c), WP4.3).
+- A method failure during the cold analysis's decode pass whose decode stream's `close` then raises is reported with
+  the close error's text, not the method's: `analysis/engine.py` (WP3.11's module, lines 494-497) closes the stream
+  unguarded in a `finally`. The product decoder suppresses its own close errors, so only an injected source reaches it.
+  BANKED (Reviewer B B1, the method-failure half); trigger: the next touch of `analysis/engine.py`.
 
 ## Debt dispositions
 

@@ -337,6 +337,27 @@ R2 cleanup (cell 3), controls first where one applies:
   runs. No product code changed in the cleanup. No test was run after `04822ef` (the host goes to exclusive windows).
 - Report `docs/reports/wp3.14-export-batch.md` written (its V16 section OWED, replaced by cell 4).
 
+## Reviewer B pass 1 remediation (cell 4)
+
+Reviewer B (orchestrator seat, `wp3.14-mc` `b830412` = `dc76d92` on main `dbb5858`; evidence
+`C:\Users\rwsmy\clearwater-review-evidence\wp3.14\reviewB\review-B.txt`) BLOCKED. Rulings (orchestrator gen 14,
+FINAL): B1 MAJOR, the cancel half this cell's (a non-ok analysis result while `cancelled()` is True becomes `CANCELLED`,
+its text to an INFO line), the method-failure half BANKED (`analysis/engine.py:494-497`, WP3.11's, not edited; a Limits
+line, trigger the next touch of that module); B2 MAJOR (V16 owed) DECLINED as sequencing; B3 MINOR fix (a raising
+progress or stage callback after `commit` is a WARNING, the result stays ok); B4 ADVISORY fix (exact `Fraction` ratios,
+an independent oracle). Granted: `export.py`, `disk_space.py`, owned tests; no V16.
+
+| # | Sev | Failing first (unfixed engine) | Fix |
+|---|---|---|---|
+| B1 | MAJOR | `test_a_cancel_during_the_analysis_survives_a_raising_stream_close`: `'clip.mp4: analysis failed: OSError: cleanup close failed'` is not `CANCELLED`; planted text-only `_check_analysis` fails by name | `_check_analysis(result, progress, name)`: `cancelled()` (or the analysis's own `CANCELLED`) -> `_CancelledError`, a different text to INFO |
+| B3 | MINOR | `test_a_raising_callback_after_commit_keeps_the_result_ok` x4 (video/photo x progress/stage): `'clip.mp4: RuntimeError: planted callback failure after commit'`; planted unguarded `_after_commit` x2 fails by name | `_after_commit(name, call)` runs the `committed` hook and the final report each guarded, WARNING with the error's type and text; the old `test_a_stop_after_commit_still_lists_the_committed_file` (it asserted the failure B3 removes) replaced |
+| B4 | ADVISORY | `test_high_ratio_is_the_exact_decimal`: `1375001 == 1375000`; `test_video_ratio_term_wins_on_a_high_rate_source[high-1.10]` (oracle from the decimal text) | `QUALITY_RATIO` 11/10, 1/2, 1/4 and `MARGIN` 5/4 as `Fraction` |
+
+Gates: ruff check, ruff format --check, mypy (136 files) clean; targeted (>= 11 GB free): engine, disk-space, batch 101
+passed; photo file plus the video DR-28, cancel and product-close legs 26 passed; bench, naming, safe-write 175 passed. A
+first combined run of all six files was cut off by its own 900 s `timeout` at 43 % (exit 124, no failure shown); it
+is NOT counted. Report updated (seam non-ok line, cancel path, D87 constants, claims rows 2-4, Limits, Gates, Reviewer B).
+
 ## RESUME HERE (cell 4: the V16 rows and the FINAL return report)
 
 Cell 3 stood down at a clean commit after the review loop TERMINATED at R2 (planned re-seat: V16 is several long
@@ -348,7 +369,8 @@ exclusive windows). Cell 4 is a FRESH seat.
 | Cell 3 R1 yield | 123,184 (59 turns) |
 | Cell 3 R1-remediation yield | not read (the F1 (b) ruling arrived in the same turn) |
 | Cell 3 R2 yield | 255,161 (143 turns) |
-| Cell 4 dispatch | to be given by the dispatcher |
+| Cell 4 dispatch | 0 (fresh seat) |
+| Cell 4 window request (dry run) | 38,603 (12 turns) |
 
 **State:** the product, its tests, the instrument and the report are done and committed on `wp3.14` (head after this
 ledger commit). Reviewer A converged (R1, R2; evidence `C:\Users\rwsmy\clearwater-review-evidence\wp3.14\r1\`, `r2\`).
