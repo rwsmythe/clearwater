@@ -289,7 +289,9 @@ head-to-head run once (old pin and new pin on the same finished tree, the WP3.10
 gate is still open, else the first wave 4 accept), and re-probing the banner values on the new
 model. Not before: changing B's model mid-gate changes the net under a package in flight.
 
-## 5. Decisions needed from the owner
+## 5. Decisions needed from the owner -- ALL DECIDED 2026-10-27
+
+Owner, 2026-10-27, verbatim: "Concur with attribution footer; I am ok with the standing permission rule; concur with the pin upgrade; we will port to the template once we have execution experience to verify the changes are positive." So: (1) footer `Co-Authored-By: GPT-6.1 Sol via Codex <noreply@openai.com>`; (2) the Claude readout runs under a standing project permission rule for `scripts/usage_claude.py` (option (b)); (3) the review pin upgrades to `gpt-6.1-sol` at the wave 4 boundary with the one-time head-to-head; (4) the template port waits for calibration experience. The questions as they were put:
 
 1. **Attribution footer for Codex commits:** `Co-Authored-By: GPT-6.1 Sol via Codex
    <noreply@openai.com>` (CHARC's proposal) or another form.

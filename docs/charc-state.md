@@ -122,9 +122,10 @@ of `origin/main`, unpushed; no push asked (verify `git status -sb`).
   (new cell `.claude/agents/implementer-codex-sol-high.md`, fill Parts 1-2, orchestrator-context, codex-reviewer,
   dispatch-recipe sentence, `scripts/usage_{codex,claude}.py` + tests, .gitignore, CLAUDE.md line, HD-1) -> 2
   CALIBRATION on the first two Sonnet-class wave 4 packages (one per lane, CHARC assigns at brief time; metrics and
-  decision rule in the pass 4.3) -> 3 template port (owner). Owner decisions open (pass section 5): Codex commit
-  footer form; Claude readout via scheduled task (recommended) vs permission rule; review pin upgrade
-  `gpt-5.6-sol` -> `gpt-6.1-sol` at the wave 4 boundary (recommended); template port timing. Codex catalog at this
+  decision rule in the pass 4.3) -> 3 template port (owner). Owner DECIDED 2026-10-27 (pass section 5): footer `Co-Authored-By: GPT-6.1 Sol via Codex
+  <noreply@openai.com>`; Claude readout under a standing project permission rule for `scripts/usage_claude.py`;
+  review pin upgrade `gpt-5.6-sol` -> `gpt-6.1-sol` at the wave 4 boundary (one-time head-to-head); template
+  port AFTER calibration experience. Stage 0 probes started 2026-10-27. Codex catalog at this
   login: 6.1-sol (default), 6-astra, 6.1-terra, 6-sol, 6-luna, 5.6-sol/terra/luna. Research notes (owner-supplied,
   untracked) in `research/multi-model development/`.
 - **WP3.10 floor row DONE (seat 9, EXCLUSIVE window 2026-10-27 01:09Z-02:02Z, CLOSE c02b6a47c057f2e4):** on
