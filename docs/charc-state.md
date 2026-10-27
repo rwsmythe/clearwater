@@ -86,6 +86,12 @@
   358 s (peak RSS 6.8 GB); E1 failed its bound serially in the sandbox (quiet-seat probe first; DR-58 (c) trigger
   fires if it fails quiet too: widen with reason, no skip). Rung 4 = TWO rounds (Q7), exclusive windows while WP3.14 is
   parked; OPEN/CLOSE to me. Session plan approved: under ~350K for rung 4, fresh session for report and reviews.
+- **WP3.14 R2** (orchestrator `4f38492340043510`, 10:18Z): F1 (b) built c3a2fc9 meeting the five conditions; A R2 (Codex)
+  1 MAJOR + 7 MINOR; G1 (a) KeyboardInterrupt/SystemExit skipping the post-close check ruled NOT A DEFECT by the
+  orchestrator, **CHARC UPHELD** (unconditional = Exception or report, never BaseException; cleanup holds by repro);
+  loop TERMINATES at R2; G3-G8 cleanup once. Cell 3 at 255,161: cleanup + report, then fresh cell 4 for the V16 rows
+  and the return report. Host order agreed: E1 quiet probe -> WP3.14 V16 windows -> WP3.14 candidate gate -> WP-T4
+  rung 4 (two rounds). OPEN/CLOSE per block come to me.
 - Gen 13 `-2029` ROLLED 07:51Z at ~345K (state 930a78d, FYI `080ce65fb13768e9`): WP-T3 cell DONE
   (A converged R1, candidate `wp-t3-mc` 0fbbe44 on 528d865, full pytest 4,867 passed / 2 skipped / 2873 s, fixtures
   byte-identical; B staged for gen 14); WP3.20R build DONE in 6 Codex turns (64K-205K tokens; Claude A R1
