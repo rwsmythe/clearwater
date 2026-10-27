@@ -236,53 +236,51 @@ Q1-Q16 as ADOPTED by CHARC `3c3c35d7`; applied as above. Q11's "optional injecte
   -> open/encode. Nothing is written before `begin` in either position. Photo: read -> backend -> measure ->
   render -> plan + reserved-name rule -> D87 -> write.
 
-## RESUME HERE (cell 2, end of build turn 1)
+## Cumulative round ledger (Reviewer A)
 
-Cell 2 (`implementer-opus-high`, fresh seat after cell 1's planned re-seat at `db4498c`; dispatch depth 0).
+| Round | Head | Transport, CLI, banner | CRIT | MAJOR | MINOR | In / out of envelope | NEW / REOPENED | Reverts | Fixes change | Verdict | Depth (dispatcher-read) |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| R1 | `7bb5d85` | WSL, codex-cli 0.162.1, `gpt-6.1-sol` / high | 0 | 2 | 6 | 8 / 0 | 8 / 0 | 0 | pending: product (F1 ruling, F2, F3, F4), tool (F8), test-only (F5, F6, F7) | NEW_CRITICAL_MAJOR_FOUND (counts: every assertion met) | to be given at the R1 yield |
+
+R1 findings and adjudication (evidence `C:\Users\rwsmy\clearwater-review-evidence\wp3.14\r1\`, md5s there):
+
+| # | Sev | Finding | Adjudication |
+|---|---|---|---|
+| F1 | MAJOR | No cancel coverage while `sink.close()` flushes and verifies (watchdog stopped before close); no check between `_stage("close")` and `close()` | CONFIRMED; CONFORMS TO RULED Q2 ("The watchdog stops before `close`"); the end state stays right (post-close check, SafeWrite deletes the temporary, CANCELLED) but the cancel waits for close. STOP: needs a ruling. Recommended: keep the watchdog alive through `close` (+ a check right before it). |
+| F2 | MAJOR | `frames.close()` unguarded in `finally` replaces the original error | CONFIRMED (code; ladder 5). The shipped decoder's close suppresses its OSErrors, so the product wiring rarely reaches it; accepted MAJOR. Product fix. |
+| F3 | MINOR | Leftover temporary after a successful `commit()` (and after a failed `begin`) not reported | CONFIRMED. Product fix. |
+| F4 | MINOR | SinkReport warnings dropped on a stop after `close` | CONFIRMED. Product fix. |
+| F5 | MINOR | `_no_partials` matches `"_out"`, not the `*_corrected.*` finals | CONFIRMED. Test fix. |
+| F6 | MINOR | Telemetry-name guard regex carries literal 0x08 bytes (vacuous) | CONFIRMED (`od -c`); property holds today. Test fix. |
+| F7 | MINOR | Fresh `Reservations` per job not tested across jobs | CONFIRMED. Test fix. |
+| F8 | MINOR | `export_bench` stops telemetry after the stray window and sampler stop | CONFIRMED. Tool fix. |
+
+## RESUME HERE (cell 3, R1 adjudicated)
+
+Cell 3 (`implementer-opus-high`, fresh seat; dispatch depth 0). Cell 2's build (`20f0ac3`, `e7d9092`, `3a723cc`:
+photo and video end-to-end tests, `tools/export_bench.py`) is the product under review; its detail is in the commits.
 
 | Gate | Dispatcher-read depth |
 |---|---|
-| Cell 2 dispatch | 0 (fresh seat) |
-| Cell 2 build yield (window request) | 207,998 (78 turns) |
+| Cell 3 dispatch | 0 (fresh seat) |
+| Cell 3 R1 yield | to be given by the dispatcher |
 
-Window plan CONFIRMED (orchestrator gen 13): footage window `tests/test_jobs_export_video.py -m footage` (GX011627 V4
-leg) first, then full window `uv run pytest -m "not footage"` (offscreen, basetemp under `work/`, the 5.3K leg
-inside it), then Reviewer A round 1. Each grant arrives as its own message; nothing heavy before it. A
-multi-finding remediation after round 1 goes to a fresh seat.
+Windows (both granted in the cell-3 prompt):
+- Config STOP: the worktree's `clearwater.local.toml` line 18 was junk (TOML parse error), so the first footage run
+  skipped (2 s, not a result). The orchestrator deleted the line at its seat; re-granted.
+- FOOTAGE (WINDOW RELEASED): `pytest tests/test_jobs_export_video.py -m footage` (offscreen, `--basetemp=work/pt-footage`;
+  `-m footage` alone selects it): GX011627 through the engine, NVENC 8-bit Standard, c3: 1 passed, 28 deselected,
+  772 s (07:58Z-08:10:48Z); 11.8 GB free before. No fix.
+- FULL (WINDOW RELEASED): `pytest -m "not footage"` (offscreen, `-p no:cacheprovider`, `--basetemp=work/pt-full`),
+  08:11:00Z-08:50:39Z: 4864 passed, 10 skipped (outside the package: `test_color_roundtrip.py` 1,
+  `test_methods_assembly_v8.py` 9), 17 deselected, 0 failed, 2378.7 s; exit 0 in `work/pt-full.done`. Every package file
+  passed with no skip, the 5.3K 8:7 synthetic leg included. No fix.
+- Static gates at `7bb5d85`: ruff check, ruff format --check, mypy (136 files) clean.
 
-**Done (committed on `wp3.14`), RESUME "Next" items 1-3 of cell 1:**
-- `20f0ac3` `tests/test_jobs_export_photo.py`: one WP2.3 sample per still family (`jpeg-gradient-srgb`,
-  `heic8-gradient-srgb`, `heic10-gradient-display-p3`, `png8-gradient-srgb`, `png16-gradient-srgb`,
-  `tiff8-gradient-srgb`, `jpeg-orient-port-o6`) to PNG 8 and 16 through the product engine (CPU forced): IHDR
-  bit depth, decoded size, provenance (`iTXt`) parseable with the file NAME only, absent when off, N8. Statistics
-  equal `gui.imaging.measure_statistics` bit for bit (`gui`) on two samples (factor 1) and a 1131 x 1700 synthetic
-  PNG (factor 2, partial last block row) with a full-image control that the comparison tells apart. Support:
-  `product_engine(...)` in `tests/test_jobs_export_support.py`. O1 near-miss names `NUL2.MP4`, `CONSOLE.MP4`,
-  `.NUL` added (accepted).
-- `e7d9092` `tests/test_jobs_export_video.py`: V4 through the engine and `video_fidelity.fidelity_record` on
-  `vid-hevc8-bt709-full`, `vid-hevc10`, `vid-untagged`, `vid-vfr`, `vid-rotated`, `vid-truncated` (D86 "cut
-  short" warning), libx265 and NVENC (`gpu`), all MANDATORY and REQUIRED SAME, frame count, N8; `vid-hlg`,
-  `vid-pq` and the four GoPro `.LRV`/`.THM` samples readable failures, nothing written, no cache; DR-28 (1): a
-  digest of every frame handed to the sink against an independent decode + analysis (own cache) + render of a
-  4 s synthetic clip with a turning cast (120 frames; the 2 s window varies per frame), plus a sampled decode of
-  the output (each sampled frame nearest its own corrected frame); controls fail BY NAME: statistics pts +1 and -1
-  ("differ from their own render"), dropped frame ("no frame was written"), duplicated ("written twice"), a
-  pixel swap of frames 40/41 ("output frame 40 is nearer corrected frame 41"). V11 with the product sink: encoder
-  killed after frame 5 (readable failure, nothing left, earlier output and source untouched); a cancel mid-encode
-  (`CANCELLED`, nothing left); a subprocess export killed after 10 frames leaves only temporary-shaped files that
-  `remove_leftovers` removes (`slow`). Written, NOT yet run (window): the 5.3K 8:7 synthetic leg (`slow`) and the
-  GX011627 leg (`footage`, `gpu`, `slow`; NVENC 8-bit Standard, c3 defaults).
-- `3a723cc` `tools/export_bench.py` + `tests/test_export_bench.py` (Q11/Q12): `run` / `v16 [--clip STEM]
-  [--dry-run]`, `V16_PLAN` = GX011627 x3 cold, x1 warm, x1 ancuti2018, x1 libx265; synthetic 5.3K 8:7 x1;
-  GX011625 x1 LAST. Phases from `on_stage` stamps, per-frame intervals from the `Exporting` progress reports;
-  D106 verdict (0.834 s/frame = 25 min/min at 30000/1001); conditions, whole-run strays, Telemetry peaks, NVENC
-  proof from WP3.10's helpers; `cache_complete_at_start` recorded (a warm run skips the decode pass only: the
-  later stages are analysed again from the cached proxies, the product's V17 behaviour). Records under
-  `work/wp3.14/bench/`; run folders (output + cache) deleted unless `--keep`.
-- Gates at `3a723cc`: ruff check clean, ruff format --check clean, mypy clean (136 files); targeted pytest:
-  `test_jobs_export_photo.py` 18 passed; `test_jobs_export.py` + `test_jobs_batch.py` + photo 77 passed;
-  `test_jobs_export_video.py -m "not slow and not footage"` 26 passed (NVENC legs ran); the killed-process leg
-  1 passed (64 s); `test_export_bench.py` 13 passed. Every committed blob in `9753b7b..HEAD` LF.
-
-**Next:** WINDOW REQUEST full (+ the 5.3K synthetic leg inside it) and a footage window for the GX011627 V4 leg;
-then Reviewer A round 1 (runner from `wp3.10/r10`, `-m gpt-6.1-sol`).
+**Next (the remediation; a fresh seat if the dispatcher reads past ~250K):** wait for the dispatcher's ruling on F1,
+then fix F1 (as ruled), F2-F8 with failing tests first (F2: original error kept when the stream's close raises, the
+cleanup error logged; F3: leftover warning on an ok result and after a failed `begin`; F4: sink warnings kept on a stop
+after close; F5: `_no_partials` rejects the planned finals; F6: a real `\b` pattern plus a control that it matches;
+F7: distinct registries across jobs, references held; F8: telemetry stopped at `ended`), targeted runs, then R2 with
+the runner copied to `r2` (same `-m gpt-6.1-sol`, diff `7bb5d85..HEAD` scoped plus the full context). Then the report,
+the V16 windows (GX011627 rows first, GX011625 LAST), the FINAL return report.
