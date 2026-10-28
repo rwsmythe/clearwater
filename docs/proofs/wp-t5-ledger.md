@@ -2,7 +2,7 @@
 
 ## Dispatch and depth
 
-Codex lane, turns 1-4, rungs 0-3 and rung-4 preparation, 2026-10-28. Base:
+Codex lane, turns 1-5, rungs 0-4 and draft rung 5, 2026-10-28. Base:
 `3aa3c51da6cc5870322fb4688fbc61227f4efdd2`, branch `wp-t5`.
 The initial `git status --porcelain` was empty. Evidence is under
 `work/wp-t5/`; no footage was opened by this cell. The supplied local
@@ -10,8 +10,10 @@ configuration was not changed. Turns 1-2 changed this ledger only; the dispatche
 committed them at `a9abb8d` and `b17b2d4`. Turn 3 changed the two approved test
 files and this ledger, committed by the dispatcher at `045d622`; product code
 remains unchanged. The two rung-3 test edits were bundled as requested by the
-turn-3 dispatch. Turn 4 updates this ledger and ignored request/evidence artifacts;
-both test files are restored byte-for-byte to HEAD after CPU-only control cycles.
+turn-3 dispatch. Turn 4 updated this ledger and ignored request/evidence artifacts,
+committed at `259a219`; both test files were restored byte-for-byte to HEAD after
+CPU-only control cycles. Turn 5 adds the DRAFT report and updates this ledger;
+tests remain unchanged since W3's head `259a219`.
 
 Depth figures are dispatcher readings, never cell estimates.
 
@@ -20,10 +22,11 @@ Depth figures are dispatcher readings, never cell estimates.
 | 1 / rung 0 | 182,117 | 138,874 | 475,000 | Dispatcher reading supplied at turn 2; collection artifact resolved at seat |
 | 2 / rungs 1-2 | 351,779 | 164,909 | 258,400 | Dispatcher reading supplied at turn 3; round-0 table approved with comparability amendment |
 | 3 / rung 3 | 455,659 | 209,195 | 475,000 | Dispatcher reading supplied at turn 4; W2 ran, runner exited 2 after the intended depth failure |
-| 4 / controls and rung-4 preparation | Not yet supplied | Not yet supplied | 475,000 last reported | Yield W2b and conditional W3 requests; dispatcher monitors depth |
+| 4 / controls and rung-4 preparation | 547,891 cumulative | 82,213 | 258,400 | Dispatcher reading supplied at turn 5; W2b and W3 completed at seat |
+| 5 / draft report and ledger | Not yet supplied | Not yet supplied | 258,400 last reported | Yield for Reviewer A; standard gate still pending |
 
 The reported window changed from 475,000 (turn 1) to 258,400 (turn 2), then
-475,000 (turn 3). All figures are retained as given; the dispatcher said it
+475,000 (turn 3), then 258,400 (turn 4). All figures are retained as given; the dispatcher said it
 monitors depth against the smaller window. No cell estimate replaces a reading.
 
 ## Rung 0 commands and results
@@ -422,6 +425,131 @@ check has `EXIT=0`, and the restore check has `EXIT=0`, HEAD-identical bytes and
 0 CR in both files. W2b's depth evidence check must also have `EXIT=0`.
 No further cell turn or edit is needed between those runs under those conditions.
 
+## Turn 5: W2b and W3 evidence, report and static checks
+
+The dispatcher ran W2b and W3 unedited after seat `bash -n`; both syntax logs
+have `EXIT=0`, and both request logs have final `EXIT=0` plus their success
+markers. This cell read logs/XML/observations and ran light audits only, no
+pytest body. W2b wrapper period was 21:20:37-21:26:08Z; the heavy case's own
+meta timestamps are 21:20:38-21:26:07Z below. W3 wrapper period was
+21:57:37-22:43:57Z, including the final light collection/identity checks.
+
+Exact commands from the run metadata (normal shell quoting shown):
+
+```text
+C5: env PYTHONPATH=work/wp-t5 uv run pytest -q -rfEs tests/test_io_video_encode.py::test_gx011627_nvenc_levels_give_distinct_sizes --durations=0 -p w2_observer --basetemp=work/wp-t5/w2b-control-standard-draft --junitxml=work/wp-t5/w2b-control-standard-draft.xml
+C6: uv run pytest -q -rs -n 4 -m "not gpu and not footage and not gui and not slow" --basetemp=work/wp-t5/after-parallel --junitxml=work/wp-t5/after-parallel.xml
+C7: uv run pytest -q -rs -m "gpu or footage or gui or slow" --basetemp=work/wp-t5/after-serial --durations=0 --junitxml=work/wp-t5/after-serial.xml
+```
+
+| Window / case | Start UTC, 2026-10-28 | End UTC | Command / evidence prefix under `work/wp-t5/` | Counts / pytest elapsed | EXIT | Available bytes before | Wall seconds |
+|---|---|---|---|---|---|---|---|
+| W2b / draft-as-standard control | 21:20:38Z | 21:26:07Z | C5 / `w2b-control-standard-draft` | 1 failed as intended, 0 skipped; 327.94 s | 1 | 11,666,051,072 | 328.925 |
+| W3 / AFTER PARALLEL | 21:57:37Z | 22:06:08Z | C6 / `after-parallel` | 4174 passed, 1 skipped, 5 warnings; 508.72 s | 0 | 11,578,253,312 | 509.951 |
+| W3 / AFTER SERIAL | 22:06:08Z | 22:43:49Z | C7 / `after-serial` | 1104 passed, 10 skipped, 4175 deselected, 1 warning; 2259.49 s | 0 | 11,683,901,440 | 2261.414 |
+
+Every prefix has `.log`, `.xml`, `-meta.log`; all memory preflights exceed
+5 GiB. These rows are the heavy runs; the existing depth export was NOT rerun.
+W2b depth evidence, initial/final restore, and draft observation checks all
+report `EXIT=0`. The draft failure is the named levels test at its standard
+level assertion: `HevcLevel(level_idc=150, high_tier=False)`, actual 5.0 Main
+versus expected 5.1 Main. Actual observations show the fixture's draft encode
+under its standard output name, then high, both 681 frames and outputs removed.
+Both test files match HEAD bytes with 0 CR before/after; no plant remains.
+`W2B_REQUEST_EXIT=0`; the two W2 script defects remain disclosed above.
+
+W3's `after-frozen.json` records head
+`259a2190d5fd74764ecde1c37da074be244c74cb`, unchanged local config hash and
+absent V8 frames. `after-preflight.log` and `after-identity-check.log` both
+have `EXIT=0`; `W3_REQUEST_EXIT=0`. Serial skip lines are identical to W1.
+PARALLEL's single skip is the standing swscale refusal at
+`tests/test_color_roundtrip.py:121`. No W3 overlap was reported; W1's ruled
+WP4.1 overlap is still disclosed, so an unqualified quiet-host claim is not made.
+
+The light seat collections were:
+
+| Collection command | Start/end UTC | Available bytes | Result |
+|---|---|---|---|
+| `uv run pytest --collect-only -q --basetemp=work/wp-t5/after-collect-all` | 22:43:50Z / 22:43:53Z | 11,723,149,312 | 5289 collected in 1.91 s; wall 3.311 s; EXIT=0 |
+| `uv run pytest --collect-only -q -m "gpu or footage or gui or slow" --basetemp=work/wp-t5/after-collect-serial` | 22:43:53Z / 22:43:57Z | 11,733,430,272 | 1114/5289 collected, 4175 deselected in 1.88 s; wall 3.351 s; EXIT=0 |
+
+`after-all.txt`/`after-serial.txt` exactly match baseline node-ID membership
+and counts (5289/1114 unique); both `.diff` files are empty. The independent
+turn-5 audit reconfirms this rather than trusting only the wrapper summary.
+
+### W1/W3 four-test timing and savings
+
+Phase figures below come from `--durations=0` logs; JUnit supplies totals and
+counts, per the resolved turn-2 ruling. XML has no per-phase fields.
+
+| DR-65 body | BEFORE call (s) | AFTER call (s) | BEFORE XML total (s) | AFTER XML total (s) |
+|---|---|---|---|---|
+| `test_v4_synthetic_5k3_8_7_clip` | 354.99 | 122.76 | 355.100 | 122.836 |
+| `test_gx011627_through_the_engine_keeps_every_mandatory_and_required_item` | 434.35 | 415.64 | 434.428 | 415.713 |
+| `test_gx011627_through_the_sink_keeps_every_mandatory_and_required_item` | 215.98 | 50.50 | 216.052 | 214.834 |
+| `test_gx011627_nvenc_levels_give_distinct_sizes` | 492.51 | 320.71 | 492.585 | 320.794 |
+
+AFTER sink setup is 164.27 s (retained shared standard encode), synthetic
+setup 0.01 s, engine/levels setups hidden (< 0.005 s). All BEFORE setups are
+hidden (< 0.005 s). The log hides 1798 AFTER phases below that bound; no hidden
+phase is invented as zero. AFTER teardown in table order is
+0.07/0.07/0.07/0.08 s; BEFORE is 0.11/0.07/0.07/0.08 s.
+
+Whole SERIAL saving = 2798.380 - 2261.414 = **536.966 s (19.19%)**, above
+T5-Q5's > 110 s, so no second pair. The three changed XML testcase totals
+save 405.273 s; unchanged engine varies by 18.715 s; all four save 423.988 s.
+The remaining 112.978 s of whole-leg difference is other suite work/overhead
+variation, not assigned to the edits. This distinction and W1 overlap bound
+the attribution. `after-comparison.json` and independently computed
+`turn5-figures.json` agree on the wall saving.
+
+### Assertion audit and report status
+
+`git diff 3aa3c51..HEAD -- tests/` removes **zero assert lines**: removed /
+re-added assert-line list = EMPTY. The audit independently verifies each old
+assert's source text in the same test, unchanged markers, unowned function/
+class ASTs, and no product/instrument changes. The retained assertions are:
+
+- Synthetic test: `assert result.ok, result.failure`; one output and
+  `_assert_v4(vf.fidelity_record(source, output, bit_depth=8))`. Added only
+  `assert probe(source).video.nb_frames == 3` beside the duration reduction.
+- Sink: `assert run.report.frames_written == 681` and its own
+  `_assert_v4(record)`, computed in the body from source/output and actual run.
+- Levels: `assert level is not None and level.name == expected[quality], (quality, level)`
+  for every quality; `assert sizes["high"] > 1.25 * sizes["standard"] > 1.25 * 1.25 * sizes["draft"], sizes`.
+- Engine: entire unchanged test, including `assert result.ok, result.failure`,
+  one output and its V4 helper call.
+- Both V4 helpers unchanged: `assert summary["mandatory_and_required_all_same"], (wrong["MANDATORY"], wrong[compare.REQUIRED])`;
+  `assert _items(record)[vf._ROSTER_ITEM]["status"] == "SAME"`.
+
+`git diff 259a219 -- tests/` is empty, including the working tree, captured in
+`turn5-tests-since-w3.diff`. No test changed since W3. Independent audit
+`turn5-evidence-audit.log` has `EXIT=0`; it reads existing evidence and source,
+never executes a pytest body.
+
+`docs/reports/wp-t5-suite-cost.md` is **DRAFT** until standard gate and Reviewer
+A converge. It includes current source anchors, assertion/object map, both
+controls, share made/not made, W1 overlap, both configurations and limits.
+Standard gate at the dispatcher seat uses main `work/` inputs, expected
+1113/1 SERIAL; both legs and actual gate wall remain PENDING. Documentation
+changes after W3, so the final candidate still needs that gate. Proposed
+DR-65 closure is conditional; CLAUDE.md's standard serial replacement stays
+PENDING rather than incorrectly using the 1104/10 comparison wall. Neither
+CLAUDE.md nor the register is edited.
+
+Final static-check evidence under `work/wp-t5/`:
+
+| Command | Summary | EXIT | Log |
+|---|---|---|---|
+| `uv run ruff check .` | All checks passed | 0 | `turn5-ruff-check.log` |
+| `uv run ruff format --check .` | 250 files already formatted; dispatcher seat rerun pending | 0 | `turn5-ruff-format.log` |
+| `uv run mypy` | Success: no issues found in 138 source files | 0 | `turn5-mypy.log` |
+
+Tests are outside mypy's configured files as before. Uv reports that the main
+tree `VIRTUAL_ENV` does not match `.venv` and is ignored; checks use this
+worktree's project environment. No new dependency or file outside the owned
+tracked envelope is introduced.
+
 ## Verification and review ledger
 
 | Turn | Suspected | Independently confirmed / rejected | Fixed / open |
@@ -440,9 +568,15 @@ No further cell turn or edit is needed between those runs under those conditions
 | 4 | Control grep might misclassify a real failure | Confirmed MAJOR: `-rs` omitted the expected FAILED line; wrapper exited 2 | New W2b uses JUnit failure identity/reason and `-rfEs`; draft control pending |
 | 4 | Patch reversal might violate LF-only discipline | Confirmed MAJOR at seat: 726 CR bytes; dispatcher restored HEAD with autocrlf disabled | Both CPU-only safe apply/reverse cycles pass HEAD-byte / 0-CR / empty-diff checks; W2b uses safe Git option throughout |
 | 4 | New Bash requests might be syntax-verified in this sandbox | Rejected: both `bash -n` attempts blocked before parsing, Win32 error 5, EXIT=256 | Mandatory seat syntax checks remain; no heavy run attempted |
+| 5 | Corrected controls might still misclassify or leave a plant/CRLF | Rejected by actual named draft assertion, observation checks, depth evidence and both HEAD-byte/0-CR checks, wrapper EXIT=0 | Both controls confirmed; no source plant remains |
+| 5 | W3 might change counts/skips or test IDs | Rejected by XML/logs and independent audit: same 1104/10 SERIAL skip lines, identical 5289/1114 IDs | Comparison green; standard gate remains distinct and pending |
+| 5 | All whole-leg time saved might be attributable to edited bodies | Rejected: changed three XML totals save 405.273 s; whole leg saves 536.966 s | Report states phase movement and other suite variation; no over-attribution |
+| 5 | An assert might have been weakened or removed | Rejected by committed diff and independent verbatim/AST audit | Zero removed assert lines; only frame precondition added; tests unchanged since W3 |
+| 5 | Standard gate might be complete because W3 is green | Rejected: working-folder inputs differ and acceptance/review not supplied | DRAFT report, conditional DR-65 closure and CLAUDE figure pending |
 
 No Reviewer A round has been supplied or adjudicated yet. The round-0 design
 was approved; it is not a Reviewer A round. Future round rows record severity,
 envelope, NEW/REOPENED, reverts, product/test-only fixes, evidence and dispatcher
-depth. Turn 4 records W2 and yields corrected W2b plus conditional W3 requests;
-no heavy command or planted full-size test was run by the cell.
+depth. Turn 5 records W2b/W3 and yields the DRAFT report for Reviewer A over
+`3aa3c51..HEAD`. The standard gate and Reviewer A verdict remain PENDING.
+No heavy command or planted full-size test was run by the cell.
