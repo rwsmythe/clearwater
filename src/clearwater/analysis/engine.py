@@ -19,14 +19,25 @@
 Threading: the jobs this engine returns run on one worker thread at a time (the only writer of
 the store and the only caller of the cache's store methods); ``state``, ``smoothed_record``,
 ``provisional_record`` and ``is_complete`` may be called from any thread.
+
+**Streamed analysis** (WP3.21; AD-7 as read at ruling Q2): ``analysis_job(stream=True)`` runs the
+same passes, but every :data:`STREAM_STEP` or more first-stage records it measures and smooths
+each later stage as far as its records are FINAL, and publishes how many frames from the clip's
+start hold a final record of every stage. ``smoothed_record`` then waits for a frame's record to
+be final, so an export can render beside the analysis with exactly the whole-clip records. A
+record is final once the first stage's raw records cover the composed reach of every stage
+(:func:`composed_reach`) and, on a decoded prefix, one more frame follows that reach (the
+``at_end`` margin, :func:`lead_frames`).
 """
 
 from __future__ import annotations
 
+import logging
 import threading
 import time
-from collections.abc import Callable, Iterator, Mapping
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, replace
+from fractions import Fraction
 from typing import Any, Literal
 
 import numpy as np
@@ -51,6 +62,8 @@ from .proxy import frame_pixels_on_host, make_proxy, proxy_image
 from .smoothing import DEFAULT_KIND, DEFAULT_WINDOW_S, KINDS, LOCAL_KINDS, exact_window, reach
 from .store import AnalysisStore, SchemaMismatchError, same_value, schema_hash
 
+_LOG = logging.getLogger(__name__)
+
 type Phase = Literal["none", "running", "complete", "cancelled", "failed"]
 """The phase of a clip's analysis; the values of ``gui.contract.AnalysisPhase`` (AD-15)."""
 
@@ -61,6 +74,17 @@ SMOOTH_CHUNK = 2048
 """Frames per chunk when a stage is smoothed for the whole clip; a cancel is checked between
 chunks (task 8), so it waits for one chunk, not the stage (0.3-0.7 s per statistic at 107,892
 frames when smoothed whole)."""
+
+STREAM_STEP = 16
+"""Fewest new first-stage records between two advances of a streamed analysis; an advance also
+waits for 1/:data:`STREAM_SHARE` of the records in, so the store's whole-axis copies in
+``smooth_at`` cost O(n log n) over a clip rather than O(n^2)."""
+
+STREAM_SHARE = 64
+"""See :data:`STREAM_STEP`."""
+
+STREAM_WAIT_S = 1.0
+"""How long a read of a streamed record waits between two looks when no publication wakes it."""
 
 
 @dataclass(frozen=True)
@@ -79,6 +103,132 @@ class AnalysisSnapshot:
     done: int = 0
     total: int | None = None
     message: str = ""
+
+
+class RenderBeforeFinalError(RuntimeError):
+    """A streamed record was about to be read before it is final (the overlap's guard, WP3.21)."""
+
+
+class AnalysisStoppedError(RuntimeError):
+    """A streamed analysis stopped (cancelled or failed) before the record asked for was final."""
+
+
+def composed_reach(
+    ticks: Sequence[int] | NDArray[np.int64],
+    time_base: Fraction,
+    window_s: float | Fraction | str,
+    kind: str,
+    stages: int,
+    index: int,
+) -> tuple[int, int]:
+    """Return the first stage's raw records that the last of ``stages`` stages reads for one frame.
+
+    The engine measures every later stage with the SMOOTHED records of ALL earlier stages
+    (``_measure``), so the stage graph it runs is a chain whatever ``depends_on_stages``
+    declares: the last stage's record of frame ``index`` reads that stage's raw records over
+    :func:`~clearwater.analysis.smoothing.reach`, each of which reads the earlier stage's
+    smoothed record, and so on to the first stage (ruling Q2 (a), Q-c). Over pts, so VFR holds.
+
+    Args:
+        ticks: The axis's pts ticks, strictly ascending.
+        time_base: Seconds per tick.
+        window_s: The smoothing window in seconds.
+        kind: The smoothing kind.
+        stages: The number of stages (at least 1).
+        index: The frame's index on the axis.
+
+    Returns:
+        ``(first, last)`` indices of the first stage's raw records read, inclusive.
+
+    Raises:
+        ValueError: No stage, or what :func:`~clearwater.analysis.smoothing.reach` refuses.
+    """
+    if stages < 1:
+        raise ValueError(f"a method has at least one stage, got {stages}")
+    span = (index, index)
+    for _ in range(stages):
+        span = reach(ticks, time_base, window_s, kind, *span)
+    return span
+
+
+def lead_frames(
+    ticks: Sequence[int] | NDArray[np.int64],
+    time_base: Fraction,
+    window_s: float | Fraction | str,
+    kind: str,
+    stages: int,
+    index: int,
+) -> int:
+    """Return how many frames after ``index`` must be decoded before its record is final.
+
+    The composed reach's end (:func:`composed_reach`) less ``index``, plus ONE: on a decoded
+    prefix ``smooth_series`` sets ``at_end`` when a reach ends on the prefix's last frame, which
+    it cannot tell from the clip's last, so one more frame must follow (Q-c). At 30000/1001 with
+    the default 2 s ``median_gaussian`` each smoothing reads 29 + 1 frames, so the lead is 61 for
+    two stages (c3) and 91 for three (ancuti2018). It is derived at run time from the axis, so a
+    VFR clip gives its own figure; give the whole clip's axis (near the end the reach is clipped).
+
+    Args:
+        ticks: The clip's pts ticks, strictly ascending.
+        time_base: Seconds per tick.
+        window_s: The smoothing window in seconds.
+        kind: The smoothing kind.
+        stages: The number of stages.
+        index: The frame's index on the axis.
+
+    Returns:
+        The lead in frames.
+    """
+    return composed_reach(ticks, time_base, window_s, kind, stages, index)[1] - index + 1
+
+
+def _usable_end(raw: int, known: int, whole: bool) -> int:
+    """Return the last first-stage index a final record's reach may end on (-1 when none).
+
+    ``raw`` first-stage records are in, from the start of an axis of ``known`` frames; on a
+    decoded prefix (``whole`` False) one more frame must follow the reach (the ``at_end`` margin).
+    """
+    return raw - 1 if whole else min(raw, known - 1) - 1
+
+
+@dataclass(frozen=True)
+class _Published:
+    """What a streamed analysis has published for its readers (under the stream's condition).
+
+    Attributes:
+        ticks: The axis as known: the decoded prefix, or the whole clip (a complete cache entry).
+        raw: First-stage raw records in, from the axis's start.
+        whole: True when ``ticks`` is the whole clip.
+        final: Frames from the axis's start that hold a final record of every stage.
+        state: ``"running"``, ``"complete"`` (every record final) or ``"stopped"``.
+    """
+
+    ticks: NDArray[np.int64]
+    raw: int
+    whole: bool
+    final: int
+    state: Literal["running", "complete", "stopped"]
+
+
+class _Stream:
+    """A streamed job's state: the counts the analysis thread owns and what it has published.
+
+    Attributes:
+        cond: Guards ``published``; notified at every publication.
+        published: The latest publication.
+        raw: Per stage, the raw records measured from the axis's start.
+        smoothed: Per stage, the outputs smoothed (final) from the axis's start.
+        advanced: First-stage records in at the last advance.
+        closed: Per stage, whether ``closed_form`` answers (``_measure``'s memo across calls).
+    """
+
+    def __init__(self, stages: int) -> None:
+        self.cond = threading.Condition()
+        self.published = _Published(np.zeros(0, dtype=np.int64), 0, False, 0, "running")
+        self.raw = [0] * stages
+        self.smoothed = [0] * stages
+        self.advanced = 0
+        self.closed: dict[str, bool | None] = {}
 
 
 class _CancelledError(Exception):
@@ -162,6 +312,7 @@ class AnalysisEngine:
         self._around: int | None = None
         self._decoded = False
         self._cancel = threading.Event()
+        self._stream: _Stream | None = None
 
     # --- public API ---------------------------------------------------------------------------
 
@@ -192,7 +343,7 @@ class AnalysisEngine:
         with self._lock:
             return self._state.phase == "complete"
 
-    def analysis_job(self) -> Callable[[Progress], JobResult]:
+    def analysis_job(self, *, stream: bool = False) -> Callable[[Progress], JobResult]:
         """Return the IF-8 job that analyses the clip to completion; the phase becomes running.
 
         The job runs the decode pass (unless the cache entry is complete), then every stage not
@@ -200,15 +351,25 @@ class AnalysisEngine:
         are absorbed by it. Cancel (the progress's or :meth:`cancel`) returns to the unloaded
         state.
 
+        Args:
+            stream: Publish each frame's record once it is final, while the job runs, and make
+                :meth:`smoothed_record` wait for it (WP3.21; an export's own engine). Only an
+                engine's first job streams, and its parameters are then fixed.
+
         Returns:
             A callable for ``JobRunner.run``.
 
         Raises:
-            RuntimeError: A job of this engine is already running.
+            RuntimeError: A job of this engine is already running, or ``stream`` is asked of
+                an engine that has run a job.
         """
         with self._lock:
             if self._running:
                 raise RuntimeError("an analysis job of this clip is already running")
+            if stream:
+                if self._state.phase != "none":
+                    raise RuntimeError("only an engine's first analysis job can stream")
+                self._stream = _Stream(len(self._stages))
             self._running = True
             self._cancel.clear()
             self._state = AnalysisSnapshot("running", 0, None, "starting")
@@ -234,9 +395,14 @@ class AnalysisEngine:
             running job absorbs the change, when no stage depends on a changed value, or when
             the clip is not analysed (phase none, cancelled or failed: the next
             :meth:`analysis_job` uses the new values).
+
+        Raises:
+            RuntimeError: The engine streams (its parameters are fixed).
         """
         new = dict(params)
         with self._lock:
+            if self._stream is not None:
+                raise RuntimeError("the parameters of a streamed analysis are fixed")
             old = self._params
             changed = {
                 name
@@ -288,7 +454,9 @@ class AnalysisEngine:
         """Return every stage's smoothed statistics for one frame, for render (7.2 item 3).
 
         Available for a frame once its values are final under the current parameters: after
-        the whole analysis, or after a recompute's near phase for the displayed frame.
+        the whole analysis, or after a recompute's near phase for the displayed frame. On a
+        streamed engine the call WAITS until the frame's record is final (or the analysis has
+        stopped) and checks finality against the composed reach before it reads (WP3.21).
 
         Args:
             pts_ticks: The frame's pts ticks.
@@ -300,7 +468,64 @@ class AnalysisEngine:
         Raises:
             SchemaMismatchError: ``schema_hash`` is not the current parameters' hash.
             KeyError: The frame's smoothed statistics are not (yet) available.
+            AnalysisStoppedError: A streamed analysis stopped before the record was final.
+            RenderBeforeFinalError: A streamed analysis published the frame as final while its
+                composed reach says it is not (the overlap's guard).
         """
+        stream = self._stream
+        if stream is None:
+            return self._read(pts_ticks, schema_hash)
+        with stream.cond:
+            while True:
+                published = stream.published
+                if published.state == "stopped":
+                    raise AnalysisStoppedError(
+                        f"the analysis stopped before the record of pts {pts_ticks} was final"
+                    )
+                if published.state == "complete" or self._is_final(published, int(pts_ticks)):
+                    # Read under the condition: a stopping analysis publishes "stopped" under
+                    # it BEFORE it clears the store, so this read never meets a cleared store.
+                    return self._read(pts_ticks, schema_hash)
+                stream.cond.wait(STREAM_WAIT_S)
+
+    def streamed(self) -> tuple[int, bool]:
+        """Return a streamed analysis's final frames from the clip's start and whether it ended.
+
+        Returns:
+            ``(final, ended)``; ``(0, False)`` before the first publication, and for an engine
+            that does not stream.
+        """
+        stream = self._stream
+        if stream is None:
+            return 0, False
+        with stream.cond:
+            published = stream.published
+        return published.final, published.state != "running"
+
+    def _is_final(self, published: _Published, pts: int) -> bool:
+        """Tell whether ``pts`` may be read under ``published``; the guard raises otherwise."""
+        index = int(np.searchsorted(published.ticks, pts))
+        if index >= published.final:
+            return False
+        if int(published.ticks[index]) != pts:
+            return True  # not on the axis inside the final part: the read raises KeyError
+        last = composed_reach(
+            published.ticks, self._time_base, self._window_s, self._kind, len(self._stages), index
+        )[1]
+        usable = _usable_end(published.raw, len(published.ticks), published.whole)
+        if last > usable:
+            raise RenderBeforeFinalError(
+                f"pts {pts} (frame {index}) was published final, but its record reads the first "
+                f"stage's raw records out to frame {last} and {published.raw} of "
+                f"{len(published.ticks)} known frames are in"
+                + ("" if published.whole else ", with one more needed after its reach")
+                + f": {published.raw - 1 - index} frames after it, lead "
+                f"{last - index + 1} (render before final)"
+            )
+        return True
+
+    def _read(self, pts_ticks: int, schema_hash: str | None) -> dict[str, Statistics]:
+        """Read every stage's smoothed record of one frame (see :meth:`smoothed_record`)."""
         with self._lock:
             current = self._hash
         if schema_hash is not None and schema_hash != current:
@@ -345,14 +570,20 @@ class AnalysisEngine:
         """Run the state machine to completion (IF-8)."""
         start = time.perf_counter()
         failure: str | None = None
+        completed = False
         try:
             self._drive(progress)
+            completed = True
         except _CancelledError:
             failure = CANCELLED
+            self._end_stream(completed=False)  # before the store is cleared (smoothed_record)
             self._unload(AnalysisSnapshot("cancelled", 0, None, "analysis cancelled"))
         except Exception as exc:  # a failure is a failed result with its message
             failure = f"{type(exc).__name__}: {exc}"
+            self._end_stream(completed=False)
             self._unload(AnalysisSnapshot("failed", 0, None, failure))
+        finally:
+            self._end_stream(completed=completed)
         return JobResult(
             ok=failure is None,
             outputs=(),
@@ -374,6 +605,21 @@ class AnalysisEngine:
             self._around = None
             self._state = state
             self._running = False
+
+    def _end_stream(self, *, completed: bool) -> None:
+        """Publish a streamed job's end once: every record final, or stopped (readers wake)."""
+        stream = self._stream
+        if stream is None:
+            return
+        with stream.cond:
+            if stream.published.state != "running":
+                return
+            if completed:
+                ticks = np.asarray(self._store.axis(), dtype=np.int64)
+                stream.published = _Published(ticks, len(ticks), True, len(ticks), "complete")
+            else:
+                stream.published = replace(stream.published, state="stopped")
+            stream.cond.notify_all()
 
     def _take(self) -> _Pending:
         """Take the current parameters and the pending invalidation."""
@@ -491,17 +737,15 @@ class AnalysisEngine:
                 last = pts
                 counter[0] += 1
                 self._report(progress, counter[0], counter[1], "decoding")
+                if self._stream is not None:
+                    self._advance(progress, pending, counter, len(decoded), whole=False)
         finally:
             close = getattr(frames, "close", None)
             if close is not None:
                 try:
                     close()
                 except Exception as exc:  # a cleanup error is a log line, never the pass's outcome
-                    import logging  # here: this block is the module's one granted edit (WP3.14)
-
-                    logging.getLogger(__name__).warning(
-                        "the decode stream's close raised %s: %s", type(exc).__name__, exc
-                    )
+                    _LOG.warning("the decode stream's close raised %s: %s", type(exc).__name__, exc)
         if not decoded:
             raise ValueError("the frame source yielded no frames")
         self._check(progress, None)  # a cancel raised by the last frame's report
@@ -535,11 +779,21 @@ class AnalysisEngine:
         )
         if pending.around_pts is not None:
             self._near_phase(progress, pending, todo[0], axis, counter)
+        stream = self._stream
+        if stream is not None and len(self._store.raw_missing(self._stages[0].name)) == len(axis):
+            self._stream_stored(progress, pending, counter, axis)
+        memo = None if stream is None else stream.closed
         for index in todo:
             stage = self._stages[index]
             message = f"stage {stage.name} ({index + 1} of {len(self._stages)})"
             self._measure(
-                progress, pending, stage, self._store.raw_missing(stage.name), counter, message
+                progress,
+                pending,
+                stage,
+                self._store.raw_missing(stage.name),
+                counter,
+                message,
+                memo,
             )
             self._smooth_stage(progress, generation, stage)
             self._check(progress, generation)
@@ -549,14 +803,16 @@ class AnalysisEngine:
 
         ``smooth_at`` over consecutive chunks equals ``smooth`` over the whole clip (each output
         reads its own windows). A step-aware kind reads the whole series, so it is smoothed in
-        one call (limit: a cancel then waits for the stage's smoothing).
+        one call (limit: a cancel then waits for the stage's smoothing). A streamed job starts
+        after the outputs it has already smoothed (they are final).
         """
         if self._kind not in LOCAL_KINDS:
             self._check(progress, generation)
             self._store.smooth(stage.name, stage.smoothed, self._window_s, self._kind)
             return
         axis = self._store.axis()
-        for lo in range(0, len(axis), SMOOTH_CHUNK):
+        start = 0 if self._stream is None else self._stream.smoothed[self._stages.index(stage)]
+        for lo in range(start, len(axis), SMOOTH_CHUNK):
             self._check(progress, generation)
             hi = min(lo + SMOOTH_CHUNK, len(axis)) - 1
             self._store.smooth_at(
@@ -608,10 +864,15 @@ class AnalysisEngine:
         frames: list[int],
         counter: list[Any],
         message: str,
+        memo: dict[str, bool | None] | None = None,
     ) -> None:
-        """Measure ``stage`` for ``frames``: closed form when the method gives one, else analyze."""
+        """Measure ``stage`` for ``frames``: closed form when the method gives one, else analyze.
+
+        ``memo`` carries whether the closed form answers from one call to the next (a streamed
+        job measures a stage in several calls; one call over every frame is the same).
+        """
         earlier_stages = self._stages[: self._stages.index(stage)]
-        use_closed_form: bool | None = None
+        use_closed_form = None if memo is None else memo.get(stage.name)
         for pts in frames:
             self._check(progress, pending.generation)
             earlier = {
@@ -628,6 +889,8 @@ class AnalysisEngine:
                     record = self._method.closed_form(stage.name, pending.params, earlier, measured)
                     if use_closed_form is None:
                         use_closed_form = record is not None
+                        if memo is not None:
+                            memo[stage.name] = use_closed_form
             if record is None:
                 stored = self._cache.proxy(self._key, pts)
                 record = self._method.analyze(
@@ -637,3 +900,96 @@ class AnalysisEngine:
             self._store.put(pts, stage.name, record, schema_hash=pending.schema)
             counter[0] += 1
             self._report(progress, counter[0], counter[1], message)
+
+    # --- streamed job (WP3.21) ----------------------------------------------------------------
+
+    def _stream_stored(
+        self, progress: Progress, pending: _Pending, counter: list[Any], axis: tuple[int, ...]
+    ) -> None:
+        """Measure the first stage frame by frame over a complete cache entry, advancing.
+
+        Args:
+            progress: The job's progress.
+            pending: The job's parameters.
+            counter: The job's unit counter.
+            axis: The whole clip's axis.
+        """
+        first = self._stages[0]
+        assert self._stream is not None
+        message = f"stage {first.name} (1 of {len(self._stages)})"
+        for count, pts in enumerate(axis, start=1):
+            self._measure(progress, pending, first, [pts], counter, message, self._stream.closed)
+            self._advance(progress, pending, counter, count, whole=True)
+
+    def _advance(
+        self, progress: Progress, pending: _Pending, counter: list[Any], raw: int, *, whole: bool
+    ) -> None:
+        """Bring every stage as far as its records are final and publish the final frames.
+
+        Runs on the analysis thread once :data:`STREAM_STEP` (and 1/:data:`STREAM_SHARE` of the
+        axis) more first-stage records are in. Stage by stage, the outputs whose reach ends on a
+        record that is in (and, on a decoded prefix, not on its last frame) are final: they are
+        smoothed, and the next stage is measured on them (it reads every earlier stage's
+        smoothed record). A step-aware kind reads the whole series, so it publishes only at the
+        end.
+
+        Args:
+            progress: The job's progress (the cancel check).
+            pending: The job's parameters.
+            counter: The job's unit counter.
+            raw: First-stage raw records in, from the axis's start.
+            whole: True when the axis is the whole clip (a complete cache entry).
+        """
+        stream = self._stream
+        assert stream is not None
+        if self._kind not in LOCAL_KINDS or raw - stream.advanced < max(
+            STREAM_STEP, raw // STREAM_SHARE
+        ):
+            return
+        stream.advanced = raw
+        stream.raw[0] = raw
+        axis = self._store.axis()
+        ticks = np.asarray(axis, dtype=np.int64)
+        ends: list[int] = []
+        usable = _usable_end(raw, len(ticks), whole)
+        for index in range(len(self._stages)):
+            usable = self._final_end(ticks, stream.smoothed[index], usable)
+            ends.append(usable)
+        for index, stage in enumerate(self._stages):
+            if index > 0 and ends[index - 1] >= stream.raw[index]:
+                frames = list(axis[stream.raw[index] : ends[index - 1] + 1])
+                message = f"stage {stage.name} ({index + 1} of {len(self._stages)})"
+                self._measure(progress, pending, stage, frames, counter, message, stream.closed)
+                stream.raw[index] = ends[index - 1] + 1
+            if ends[index] >= stream.smoothed[index]:
+                self._store.smooth_at(
+                    stage.name,
+                    stage.smoothed,
+                    self._window_s,
+                    self._kind,
+                    axis[stream.smoothed[index]],
+                    axis[ends[index]],
+                )
+                stream.smoothed[index] = ends[index] + 1
+        with stream.cond:
+            stream.published = _Published(ticks, raw, whole, self._final_count(stream), "running")
+            stream.cond.notify_all()
+
+    def _final_end(self, ticks: NDArray[np.int64], lo: int, usable: int) -> int:
+        """Return the last output from ``lo`` whose reach ends at or before ``usable``.
+
+        Reach ends do not decrease along the axis, so the search halves. ``lo - 1`` when none.
+        """
+        best = lo - 1
+        low, high = lo, usable
+        while low <= high:
+            mid = (low + high) // 2
+            if reach(ticks, self._time_base, self._window_s, self._kind, mid, mid)[1] <= usable:
+                best, low = mid, mid + 1
+            else:
+                high = mid - 1
+        return best
+
+    def _final_count(self, stream: _Stream) -> int:
+        """The frames from the axis's start whose every stage is final: the last stage's count."""
+        return stream.smoothed[-1]

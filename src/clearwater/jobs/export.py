@@ -6,11 +6,18 @@ source, corrects it with the injected IF-3 method and writes one output through
 with a fresh :class:`~clearwater.jobs.naming.Reservations` (DR-35 (b)). A video's analysis runs
 inside the job (AD-7, AD-15), so a batch item needs no prior analysis.
 
-Threads: everything runs on the caller's worker thread, one frame in flight. During a video
-encode, from after the sink's ``open`` until its ``close`` has returned, one watchdog thread polls
-``progress.cancelled()`` and calls the sink's ``abort`` once, which releases a write blocked on
-FFmpeg's input (DR-57 (b)) or a ``close`` still flushing; it touches nothing else, and it is
-joined before the post-close cancel check and ``commit``.
+Threads: the job runs on the caller's worker thread, one frame in flight. A video's analysis
+runs on its own thread beside the export (WP3.21; AD-7 as read at ruling Q2): it iterates and
+closes its own decode stream (DR-45 (a)), is the only caller of the cache's store methods (one
+writer per key, DR-62 not widened) and never calls the job's ``report`` (its reports are passed
+on by the job's thread until the export starts, Q-R3). The job renders frame i once the engine
+has published i's record as final for every stage (``smoothed_record`` waits), so every frame
+renders with exactly the whole-clip record; each thread holds one decoded frame at a time. The
+analysis thread has ended before the sink's ``close`` and is joined on every path out of the job.
+During a video encode, from after the sink's ``open`` until its ``close`` has returned, one
+watchdog thread polls ``progress.cancelled()`` and calls the sink's ``abort`` once, which
+releases a write blocked on FFmpeg's input (DR-57 (b)) or a ``close`` still flushing; it touches
+nothing else, and it is joined before the post-close cancel check and ``commit``.
 
 Every collaborator is injected (plan 8.1: ``jobs`` reaches correction methods only through IF-3),
 so this module imports nothing from ``clearwater.gui``, ``clearwater.methods``,
@@ -34,6 +41,7 @@ import numpy as np
 import clearwater
 from clearwater.analysis import CANCELLED as ANALYSIS_CANCELLED
 from clearwater.analysis import AnalysisEngine, block_mean, proxy_factor
+from clearwater.analysis.engine import AnalysisStoppedError
 from clearwater.interfaces import (
     ArrayBackend,
     CacheKey,
@@ -80,6 +88,10 @@ RESERVED_DEVICE_NAMES = frozenset(
 
 WATCHDOG_JOIN_S = 60.0
 """How long the job waits for the cancel watchdog to end after it is told to stop."""
+
+ANALYSIS_JOIN_S = 60.0
+"""How long the job waits for its analysis thread to end after it is told to stop (the thread
+looks at its cancel once per frame)."""
 
 BackendSelector = Callable[[Settings, int, int, str], tuple[ArrayBackend, str]]
 """IF-2 ``select_backend``: settings, height, width, method id -> backend and reason."""
@@ -192,6 +204,145 @@ class _Watchdog:
                 return
             if self._stop.wait(POLL_S):
                 return
+
+
+class _Fold:
+    """The analysis thread's :class:`Progress` (WP3.21, Q-R3).
+
+    ``report`` never reaches the job's progress from the analysis thread: until the export
+    starts its reports are kept, in order, for the job's thread to pass on; after that they are
+    dropped (the job reports its frames). ``cancelled`` reads the job's flag, as the cancel
+    watchdog does from its thread.
+    """
+
+    def __init__(self, progress: Progress) -> None:
+        self._progress = progress
+        self._cond = threading.Condition()
+        self._kept: list[tuple[int, int | None, str]] = []
+        self._keeping = True
+        self._ended = False
+
+    def report(self, done: int, total: int | None, message: str) -> None:
+        """Keep the report for the job's thread (until the export starts)."""
+        with self._cond:
+            if self._keeping:
+                self._kept.append((done, total, message))
+                self._cond.notify_all()
+
+    def cancelled(self) -> bool:
+        """Return the job's cancel flag."""
+        return self._progress.cancelled()
+
+    def end(self) -> None:
+        """Mark the analysis thread's job as returned (wakes :meth:`take`)."""
+        with self._cond:
+            self._ended = True
+            self._cond.notify_all()
+
+    def take(self, timeout: float) -> tuple[list[tuple[int, int | None, str]], bool]:
+        """Wait up to ``timeout`` for a report or the end; return the kept reports and the end."""
+        with self._cond:
+            if not self._kept and not self._ended:
+                self._cond.wait(timeout)
+            kept, self._kept = self._kept, []
+            return kept, self._ended
+
+    def stop_keeping(self) -> None:
+        """Drop every later report (the export has started)."""
+        with self._cond:
+            self._keeping = False
+            self._kept = []
+
+
+class _Analysis:
+    """A video job's analysis on its own thread beside the export (WP3.21; AD-7 as read at Q2).
+
+    The thread runs the engine's streamed job (``analysis_job(stream=True)``). The job's thread
+    waits for the LEAD (the first frame final, or the analysis ended), reads each frame's record
+    through the engine's ``smoothed_record`` (which waits until the record is final), and
+    :meth:`finish` joins the thread and turns its result into the job's outcome with
+    :func:`_check_analysis`, as the serial analysis did.
+
+    Attributes:
+        engine: The clip's analysis engine.
+    """
+
+    def __init__(self, engine: AnalysisEngine, progress: Progress, name: str) -> None:
+        self.engine = engine
+        self._progress = progress
+        self._name = name
+        self._fold = _Fold(progress)
+        self._result: JobResult | None = None
+        self._job: Callable[[Progress], JobResult] | None = None
+        self._thread = threading.Thread(target=self._run, name="export-analysis", daemon=True)
+
+    def start(self) -> None:
+        """Start the analysis thread."""
+        self._job = self.engine.analysis_job(stream=True)
+        self._thread.start()
+
+    def _run(self) -> None:
+        try:
+            assert self._job is not None
+            self._result = self._job(self._fold)
+        finally:
+            self._fold.end()
+
+    def lead(self) -> None:
+        """Pass the analysis's reports on until its first frame is final or it has ended.
+
+        An analysis that ends within its lead (a clip shorter than the lead) is checked here,
+        before anything is written, exactly as the serial analysis was.
+
+        Raises:
+            _CancelledError: The analysis stopped and the cancel was asked.
+            _FailureError: The analysis failed or did not complete.
+        """
+        relabel = _Relabel(self._progress, f"Analysing {self._name}")
+        try:
+            while True:
+                kept, ended = self._fold.take(POLL_S)
+                for done, total, message in kept:
+                    relabel.report(done, total, message)
+                if ended:
+                    self.finish()
+                    return
+                if self._progress.cancelled():
+                    self.engine.cancel()  # the thread also sees the flag at its next frame
+                elif self.engine.streamed()[0] >= 1:
+                    return
+        except BaseException:
+            self.stop()
+            raise
+        finally:
+            self._fold.stop_keeping()
+
+    def finish(self) -> None:
+        """Wait for the analysis thread and raise unless the analysis completed.
+
+        Raises:
+            _CancelledError: The analysis stopped and the cancel was asked.
+            _FailureError: The analysis failed or did not complete.
+        """
+        while self._thread.is_alive():
+            if self._progress.cancelled():
+                self.engine.cancel()
+            self._thread.join(POLL_S)
+        result = self._result or JobResult(
+            False, (), (), "the analysis thread ended without a result", "none", 0.0
+        )
+        _check_analysis(result, self._progress, self._name)
+        if not self.engine.is_complete():
+            raise _FailureError(f"{self._name}: analysis did not complete")
+
+    def stop(self) -> None:
+        """Stop the analysis if it still runs and join its thread (never raises)."""
+        if not self._thread.is_alive():
+            return
+        self.engine.cancel()
+        self._thread.join(ANALYSIS_JOIN_S)
+        if self._thread.is_alive():  # pragma: no cover - the thread checks its cancel per frame
+            _LOG.warning("the export's analysis thread did not end within %s s", ANALYSIS_JOIN_S)
 
 
 def _close_stream(frames: Iterator[Frame], *, quietly: bool) -> None:
@@ -608,45 +759,50 @@ class ExportEngine:
 
         params = effective_parameters(method, request.parameters)
         hw_decode = backend.device != "cpu"
-        engine = self._analyse(request, method, backend, probe, params, hw_decode, progress, run)
-        self._check_space(run, plan.folder, needed)  # the analysis cache may share the volume
-        self._check_cancel(progress)
+        analysis = self._analyse(request, method, backend, probe, params, hw_decode, progress, run)
+        try:
+            # After the lead: the analysis cache may share the volume (on a clip longer than the
+            # lead the cache goes on growing during the export).
+            self._check_space(run, plan.folder, needed)
+            self._check_cancel(progress)
 
-        provenance = (
-            provenance_object(
-                method=method.id,
-                parameters=params,
-                app_version=self._app_version,
-                source=video_source_summary(probe, stat),
-                settings={
-                    "encoder": encoder,
-                    "quality": settings.quality_level,
-                    "bit_depth": bit_depth,
-                    "device": reason,
-                },
+            provenance = (
+                provenance_object(
+                    method=method.id,
+                    parameters=params,
+                    app_version=self._app_version,
+                    source=video_source_summary(probe, stat),
+                    settings={
+                        "encoder": encoder,
+                        "quality": settings.quality_level,
+                        "bit_depth": bit_depth,
+                        "device": reason,
+                    },
+                )
+                if settings.provenance
+                else None
             )
-            if settings.provenance
-            else None
-        )
-        run.write = SafeWrite(plan, reservations)  # held first: a failed begin may leave one
-        with run.write as write:
-            try:
-                self._stage("open")
-                sink.open(
-                    probe,
-                    write.temp_path,
-                    encoder=encoder,
-                    quality=settings.quality_level,
-                    bit_depth=bit_depth,
-                    provenance=provenance,
-                )
-                report = self._encode(
-                    probe, method, backend, engine, params, hw_decode, sink, progress, run
-                )
-            except BaseException:
-                sink.abort()  # never close after a stop: kill FFmpeg, delete the temporary
-                raise
-            final = write.commit()
+            run.write = SafeWrite(plan, reservations)  # held first: a failed begin may leave one
+            with run.write as write:
+                try:
+                    self._stage("open")
+                    sink.open(
+                        probe,
+                        write.temp_path,
+                        encoder=encoder,
+                        quality=settings.quality_level,
+                        bit_depth=bit_depth,
+                        provenance=provenance,
+                    )
+                    report = self._encode(
+                        probe, method, backend, analysis, params, hw_decode, sink, progress, run
+                    )
+                except BaseException:
+                    sink.abort()  # never close after a stop: kill FFmpeg, delete the temporary
+                    raise
+                final = write.commit()
+        finally:
+            analysis.stop()  # joined on every path (on the clean path it ended before close)
         run.outputs.append(final)
         saved = f"Saved {ascii_text(final.name)}"
         _after_commit(run.name, lambda: self._stage("committed"))
@@ -664,8 +820,12 @@ class ExportEngine:
         hw_decode: bool,
         progress: Progress,
         run: _Run,
-    ) -> AnalysisEngine:
-        """Run the clip's whole analysis on this thread (AD-7, AD-15) and return its engine."""
+    ) -> _Analysis:
+        """Start the clip's analysis on its own thread and wait for its lead (AD-7 as read at Q2).
+
+        Returns:
+            The running (or, for a clip within its lead, finished) analysis.
+        """
         self._stage("analysis")
         engine = AnalysisEngine(
             method=method,
@@ -677,18 +837,17 @@ class ExportEngine:
             params=params,
             hw_decode=hw_decode,
         )
-        result = engine.analysis_job()(_Relabel(progress, f"Analysing {run.name}"))
-        _check_analysis(result, progress, run.name)
-        if not engine.is_complete():
-            raise _FailureError(f"{run.name}: analysis did not complete")
-        return engine
+        analysis = _Analysis(engine, progress, run.name)
+        analysis.start()
+        analysis.lead()
+        return analysis
 
     def _encode(
         self,
         probe: ProbeResult,
         method: CorrectionMethod,
         backend: ArrayBackend,
-        engine: AnalysisEngine,
+        analysis: _Analysis,
         params: Mapping[str, Any],
         hw_decode: bool,
         sink: VideoSink,
@@ -711,7 +870,7 @@ class ExportEngine:
         try:
             try:
                 self._write_frames(
-                    probe, method, backend, engine, params, hw_decode, sink, progress, run
+                    probe, method, backend, analysis, params, hw_decode, sink, progress, run
                 )
                 self._stage("close")
                 self._check_cancel(progress)  # a cancel after the last frame never closes
@@ -743,14 +902,19 @@ class ExportEngine:
         probe: ProbeResult,
         method: CorrectionMethod,
         backend: ArrayBackend,
-        engine: AnalysisEngine,
+        analysis: _Analysis,
         params: Mapping[str, Any],
         hw_decode: bool,
         sink: VideoSink,
         progress: Progress,
         run: _Run,
     ) -> None:
-        """Render and write every decoded frame in pts order; close the stream on this thread."""
+        """Render and write every decoded frame in pts order; close the stream on this thread.
+
+        Each frame's record is read once it is final (``smoothed_record`` waits for the
+        analysis); after the last frame the analysis thread is joined and its outcome checked.
+        """
+        engine = analysis.engine
         schema = engine.schema_hash
         total = probe.video.nb_frames
         message = f"Exporting {run.name}"
@@ -759,7 +923,11 @@ class ExportEngine:
         try:
             for written, frame in enumerate(frames, start=1):
                 self._check_cancel(progress)
-                statistics = engine.smoothed_record(frame.pts_ticks, schema_hash=schema)
+                try:
+                    statistics = engine.smoothed_record(frame.pts_ticks, schema_hash=schema)
+                except AnalysisStoppedError:
+                    analysis.finish()  # raises the analysis's own outcome
+                    raise
                 on_device = dataclasses.replace(
                     frame,
                     pixels=backend.asarray(frame.pixels, np.float32),
@@ -778,3 +946,4 @@ class ExportEngine:
             _close_stream(frames, quietly=True)  # the earlier error stays the failure
             raise
         _close_stream(frames, quietly=False)
+        analysis.finish()
