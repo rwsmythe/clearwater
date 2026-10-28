@@ -13,6 +13,27 @@
   - **Cell 7 DISPATCHED** (`wp321-cell7`, implementer-opus-high, background) from `wp3.21` `ea78946`; depth 0 at dispatch. Prompt
     `dispatch-wp3.21-cell7.md` in the gen-16 scratchpad. Order: fix -> pair (light) -> serial leg (window) -> task 10 (windows) -> report.
   - Slip: one bare `cd` into `.worktrees/wp3.21` (no cell live), reverted next call.
+  - **Cell 7 (dispatch 0 -> stood down at 346,814, three readings agreeing 15:24-15:26Z):**
+    - Fix `57a7a2e` (conftest autouse plan release; narrowing ACCEPTED by CHARC). Serial leg 2 GREEN at `afad7af`
+      (1112 passed / 1 skip `test_photo_check.py:139`); parallel leg stands (identical node ids).
+    - Task 10 block 1 GX011627 (V16 of record at 4K): cold c3 9.57/9.78/9.92 min/min [31.8-31.9]; warm 9.06 (ruled (a): label
+      the peak, prime makes no plans); ancuti 8.74; libx265 14.59; OFF row 17.25 (#2+#3 about -0.25 s/frame).
+      Slow frames = `STREAM_STEP = 16` waits (export now analysis-bound): CHARC's 4th register row.
+    - Block 2 5.3K STOP (device-wide 7,854 over 6,281 and 7,371) -> attribution (A) -> fix RULED: (b3) device-wide job estimate
+      in `core/memory.py` + one `free_all_blocks` at the analysis-end boundary in `jobs/export.py`; AD-1 amended `14a3a5c`.
+      Fit exact from a 4K attribution run: NVDEC 80 MiB + 51 B/px, NVENC 368 MiB + 36 B/px, context 272. IF-8 reporting
+      deviation ACCEPTED (bench record reports it; WP4.3 row). Block 2 re-run on `227ed32` PASSES: pool 4,311.7 <= 6,281.4
+      (binding at 5.3K); device 7,901 <= 10,330.8 (recorded); 36.65 min/min.
+    - Post-convergence range for MY Reviewer B: `afad7af..227ed32` (`jobs/export.py`, `core/memory.py`, `tools/export_bench.py`,
+      tests `test_wp321_fft_release.py`, `test_wp321_overlap.py`, new `test_wp321_job_memory.py`); plus `57a7a2e` conftest.
+    - Fit script evidence copied to `work\wp3.21\fit_sessions.py` (md5 `23391ae7...`).
+  - **Cell 8 DISPATCHED** (`wp321-cell8`, implementer-opus-high, background) from `61a3e08` ~15:27Z; prompt
+    `dispatch-wp3.21-cell8.md` (gen-16 scratchpad). Order: recollect -> parallel leg (window) -> serial leg (window) -> block 3
+    GX011625 LAST (window, 4K: instrument (i) binds) -> report (+ CHARC's two readings, e2c24dee) -> return report.
+  - **Then:** Reviewer B (Codex `gpt-6.1-sol`/high at MY seat, whole package on the final head, post-convergence range named),
+    candidate on main, two-leg suite on the candidate, harness gate, accept record, ff. CHARC owes QA + FOUR register rows.
+  - Gen-16 slips: a second bare `cd` into the worktree with cell 7 live (returned in the same call); one unchecked claim
+    (jobs -> core "forbidden") caught and corrected before posting.
 - **Generation 15 ROLLED OVER 2026-10-28 ~12:20Z at ~390K, at a clean boundary: no cell working, no window open, host free.
   GENERATION 16 STARTS HERE.**
   - **RESUME HERE -- WP3.21 (the only package in flight):**
