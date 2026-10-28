@@ -14,6 +14,7 @@ Brief `docs/briefs/wp4.1-brief.md` FINAL (rulings CHARC `2c4476d9869df056`). Rev
 | Y5 round 2 adjudicated (cell 3) | 2026-10-28 21:20Z | 93,956 |
 | Y6 round 3 adjudicated (cell 3) | 2026-10-28 21:56Z | 208,313 (seat plan per the 250K rule: cell 3 stands down after the R3 minors, no round 4 here) |
 | Seat change | 2026-10-28 | cell 3 stood down at 238,831 (final reading; head `817f027`); cell 4 (`implementer-opus-high`) from 0 at dispatch |
+| Y7 round 4 adjudicated (cell 4) | 2026-10-28 23:14Z | 109,960 |
 
 ## Task 1: map (main `3aa3c51`)
 
@@ -317,7 +318,7 @@ md5s). Probe 20:14:34Z: one `succeeded in` line, banner `gpt-6.1-sol` / high.
 | 1 | `ef6bf2f` | 0 | 2 (F1, F3) | 6 (F2 downgraded, F4-F8) | 8 / 0 | 8 / 0 | 0 | runner (`tools/`, F1-F4), root docstring (F6), report (F5, F7), one test (F8) | 299,161 |
 | 2 | `dca6d1e` | 0 | 2 (G1 NEW, G2 REOPENED) | 5 (G3, G4, G5 downgraded, G6, G7) | 7 / 0 | 3 / 4 | 0 | runner (`tools/`, G1-G7 incl. the G5 docstring), tests, report | 93,956 |
 | 3 | `899102d` | 0 | 1 (H1 NEW; accepted-component code reachable through the swap: STOP) | 6 (H2-H4 downgraded, H5, H6, H7) | 7 / 0 | 6 / 1 | 0 | runner (`tools/`, H2-H5), tests (H6, H7 test-only), report; H1 BANKED to WP4.3 (CHARC `5fab48cc2a5174cb`) | 208,313 |
-| 4 | `844b996` | 0 | 1 (I1 NEW: beside-source through a file symlink writes into the footage folder) | 4 (I2 downgraded, I3, I4, I5 test-only) | 5 / 0 | 4 / 1 | 0 | runner (`tools/`, I1-I4), one test oracle (I5); NOT yet remediated | (dispatcher's figure at Y7) |
+| 4 | `844b996` | 0 | 1 (I1 NEW: beside-source through a file symlink writes into the footage folder) | 4 (I2 downgraded, I3, I4, I5 test-only) | 5 / 0 | 4 / 1 | 0 | runner (`tools/`, I1-I4), one test oracle (I5) | 109,960 |
 
 ### Round 1 (20:14-20:24Z) -- VERDICT NEW_CRITICAL_MAJOR_FOUND; adjudicated, NOT yet remediated
 
@@ -499,6 +500,38 @@ there is a stand-in). Full table in `r4/adjudication.md`.
 - Mechanical: VERDICT anchored; 38 `succeeded in`; `tokens used` 172,631; three timestamped ERROR
   lines (models refresh at start-up and once mid-run, MCP connector), two echoed source: round
   COUNTS.
+
+### Round 4 rulings and remediation
+
+- Orchestrator at Y7 (23:14Z): GO, FINAL. I1 MAJOR upheld and BROADENED: check what the job
+  will actually write (each output, the record, the settings file) by the realpath of its
+  nearest existing ancestor; the `source.parent` check stays as a belt; two tests (file symlink;
+  folder link `--out` into the footage), each skipping where the link cannot be created. I2
+  MINOR upheld; I3 (exit 2), I4, I5 GO as planned (I5: STOP if the writer drops Interop). Round
+  5 is the five-round gate; design guard: another blocking finding in the containment/redaction
+  surface -> STOP and propose the simpler design, no sixth patch.
+- I5 pre-check (`r4/r4_i5_writer.py` -> `.out`): a test-built JPEG's Interop IFD
+  (`{1: 'R98', 2: b'0100'}`) is kept by the photo path; no `io.photo` STOP.
+- Failing first (`work/wp4.1-c4-r4red.log`, on `a6e9cd4`): `test_i1_*` x2, `test_i2_*`,
+  `test_i3_*`, `test_i4_*` 5 failed for their findings. In the second I1 test the folder-link
+  `--out`, the record inside a folder link and the dangling `--record` link were already refused
+  by the old resolved check (`Path.resolve` follows links); its RED assertion was the
+  `settings.json` file link. The I5 test is a test strengthening with a planted control (the
+  writer already keeps Interop).
+- `af36baf` (runner + tests): `writes_inside()` (real path of the nearest existing path, a link
+  included even when dangling) for each output folder as `jobs.naming` plans it (`source.parent`
+  beside a source, plus the old source check), the record, the settings folder and its
+  `settings.json`; a dangling `--record` link counts as existing (`os.path.lexists`); `main`
+  redacts `default_config_path().parent`; `parameters_for(file=)` runs `validate_parameter_set`
+  against the method schema (exit 2); `read_parameter_file` refuses a file over
+  `MAX_PRESET_BYTES` unread; the V5 oracle compares the Interop IFD (`assert_exif_kept`,
+  `interop_of`).
+- `0fd538e`: report claims row (R4), V5 Interop, limits (config folder, links, a link created
+  during the run not seen, importer parity).
+- Light runs on `af36baf`: ruff, ruff format --check (259), mypy (141) green; `-n 4 -m "not gpu
+  and not footage and not slow"` over the six WP4.1 files plus `test_gui_deps`, `test_gui_status`,
+  `test_core_deps`, `test_jobs_naming`, `test_jobs_export_photo`: 464 passed, 0 skipped
+  (`work/wp4.1-c4-r4fix-light.log`).
 
 ## RESUME HERE (cell 4, after cell 3)
 
