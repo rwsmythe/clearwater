@@ -10,6 +10,7 @@ Brief `docs/briefs/wp4.1-brief.md` FINAL (rulings CHARC `2c4476d9869df056`). Rev
 |---|---|---|
 | Y1 round 0 | 2026-10-28 | 140,680 |
 | Y4 round 1 adjudicated | 2026-10-28 | 299,161 (past the 250K evaluation point: last bounded step in this seat) |
+| Seat change | 2026-10-28 | cell 2 stood down at 66,183 (final reading; committed `dca6d1e`, prepared r2, ran nothing); cell 3 (`implementer-opus-high`) from 0 at dispatch |
 
 ## Task 1: map (main `3aa3c51`)
 
@@ -311,6 +312,7 @@ md5s). Probe 20:14:34Z: one `succeeded in` line, banner `gpt-6.1-sol` / high.
 | Round | Head | Critical | Major (blocking) | Minor | In / out envelope | New / reopened | Reverts | Fixes touch | Depth |
 |---|---|---|---|---|---|---|---|---|---|
 | 1 | `ef6bf2f` | 0 | 2 (F1, F3) | 6 (F2 downgraded, F4-F8) | 8 / 0 | 8 / 0 | 0 | runner (`tools/`, F1-F4), root docstring (F6), report (F5, F7), one test (F8) | 299,161 |
+| 2 | `dca6d1e` | 0 | 2 (G1 NEW, G2 REOPENED) | 5 (G3, G4, G5 downgraded, G6, G7) | 7 / 0 | 3 / 4 | 0 | not yet remediated | (dispatcher's figure at Y5) |
 
 ### Round 1 (20:14-20:24Z) -- VERDICT NEW_CRITICAL_MAJOR_FOUND; adjudicated, NOT yet remediated
 
@@ -362,6 +364,33 @@ string in the record or the captured output.
 - Light runs on `d22f1aa`: ruff check, ruff format --check (259 files), mypy (141 files) green;
   `-n 4 -m "not gpu and not footage and not slow"` over the six WP4.1 test files plus
   `test_gui_deps` and `test_gui_status`: 306 passed (18.7 s, `work/wp4.1-r1fix-light.log`).
+
+### Round 2 (21:05-21:15Z, cell 3) -- VERDICT NEW_CRITICAL_MAJOR_FOUND; adjudicated, NOT yet remediated
+
+Probe 21:05:09Z: one `succeeded in`, banner `gpt-6.1-sol` / high. Light re-check on `dca6d1e`
+before the round: ruff, ruff format --check (259), mypy (141) green; the six WP4.1 files plus
+`test_gui_deps`, `test_gui_status`, `-n 4 -m "not gpu and not footage and not slow"`: 306 passed
+(`work/wp4.1-c3-light.log`). Reproductions native (`r2/r2_repro*.py`, outputs under
+`work/wp4.1-r2-repro`; the footage folder there is a stand-in). Full table in `r2/adjudication.md`.
+
+- G1 MAJOR CONFIRMED (NEW, in envelope): `inside()` misses the `\\?\` extended spelling; `--out
+  \\?\<footage>\sub` exits 0 and writes the PNG into the footage folder (the plain spelling: 2).
+- G2 MAJOR CONFIRMED (REOPENED, F1's claim): a non-ASCII folder (`priv` + U+00E9) reaches the record
+  `failure` and stderr in full, as `ascii_text` escapes it before the redactor's Unicode patterns.
+- G3 MINOR CONFIRMED (REOPENED, F1 class): argparse errors echo a path (repr) before redaction.
+- G4 MINOR CONFIRMED (REOPENED, F1 class): `--encoder` text reaches `settings.video_encoder` raw.
+- G5 MAJOR reported, CONFIRMED as MINOR (NEW): the writer's HEIC provenance carries `"profile"`
+  (WP3.6 `7624f5c`); `--parameters` refuses it (exit 2) exactly as the accepted
+  `PresetStore.import_preset` does (WP3.15 `75d7dc5`). The brief's contract (IF-9 / AD-13) holds;
+  the runner's "provenance JSON" docstring over-claims. Writer-vs-importer mismatch banked as an
+  accepted-component item for the orchestrator.
+- G6 MINOR CONFIRMED (REOPENED F1 class + NEW exit contract): a record-write `OSError` escapes
+  `main` with the full record path.
+- G7 MINOR CONFIRMED (NEW; reachability REASONED): `io/photo/exif.py` logs a non-int Orientation
+  with `%r`; the runner's filter prints the EXIF value.
+- Mechanical: VERDICT anchored; 31 `succeeded in`; `tokens used` 210,773; four start-up ERROR
+  lines (models refresh, MCP connector, two websocket DNS failures; HTTPS carried the run), the
+  rest echoed source: round COUNTS.
 
 ## RESUME HERE (cell 2, after cell 1)
 
