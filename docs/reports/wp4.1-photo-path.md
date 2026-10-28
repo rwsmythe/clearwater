@@ -76,7 +76,18 @@
   redacted against the paths its arguments name (R2 G3). A path the run does not know (a drive
   root, or a folder no request, flag or file names) would be printed as the engine gives it. No
   EXIF tag value is printed: a WARNING from `clearwater.io.photo.exif`, and any `%r` argument,
-  is shown with `...` in its place (R2 G7).
+  is shown with `...` in its place (R2 G7). The library `run()` applies the same filter while its
+  batch runs (R3 H3).
+- **Host logging (R3 H4):** a process that installs its own logging handlers (a host program,
+  pytest) receives the engine's records as they are logged, full paths and tag values included
+  (`run_batch`'s INFO report and WARNINGs, the photo modules' WARNINGs). The runner redacts what
+  it prints and records, not another program's logging.
+- **GUI preview of an nclx-only Display P3 photo (R3 H1, BANKED to WP4.3 by CHARC
+  `5fab48cc2a5174cb`):** the GUI preview of an nclx-only P3 photo is shown unconverted until
+  WP4.3; the export is correct (it embeds the D53 built-in Display P3 profile). The `gui` display
+  path passes only the source's ICC profile to `display_image` (WP3.16), and the real reader the
+  WP4.1 swap installs gives such a photo no ICC profile. The WP2.3 P3 stills carry ICC profiles,
+  so the shipped fixtures do not reach it.
 - **Footage check spellings:** the runner compares paths resolved, without the `\\?\` and
   `\\?\UNC\` prefixes and, where the footage folder exists, by file identity (a share of the
   same drive, a short 8.3 name) (R2 G1). A file system without file identities (`st_ino` 0)
