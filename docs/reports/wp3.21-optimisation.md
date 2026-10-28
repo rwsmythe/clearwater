@@ -336,7 +336,10 @@ not re-run; the pool instrument (ii) was not sampled in their records (it was bu
 | 4K device frames OFF | 2 / yes | 2,925 / 4,065 | 1,140 | not sampled |
 | WP3.14 baseline 4K c3 / libx265; 5.3K | 1 / yes, no; 1 / yes | 2,409 / 3,582; 1,937 / 2,929; 6,104 / 9,050 | 992-2,946 | - |
 
-Every measured device-wide peak is covered, each asserted by a test (`test_wp321_job_memory.py`).
+Every measured device-wide peak is covered. The rows measured before the constants landed (`227ed32`) are each asserted
+by a test (`test_wp321_job_memory.py`); the two rows measured on `227ed32`, the 5.3K block 2 re-run (7,901) and block 3
+(3,277), are covered by the same estimates (10,330.8 and 4,065.4) and checked in their own records (`memory_check.passes`
+true), not by a test (Reviewer B, B3).
 
 ## The micro-timing (Q-R5; development evidence)
 
