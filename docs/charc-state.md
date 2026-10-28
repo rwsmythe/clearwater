@@ -76,8 +76,15 @@
   recorded). **SEAT PLAN CORRECTED (my msg 6ba8af9a): cell 1 at 299K fixes F1 + F3 ONLY (fill re-seat line, hazard (6)), depth
   read after F1 and at the yield, hands over at 370K at the latest; cell 2 (opus-high, fresh) takes F2 + F4-F8, then A round 2,
   the two-leg window, the report.** Short window (WP4.1 gpu + v8c legs) 20:12Z OPEN/CLOSED, 2 passed, 28 s, no figure. WP4.1
-  light runs green at 755513b (V9 planted control = gamma 1.5; a strength at default moves no pixels under neutral). **No window
-  open; seat free.**
+  light runs green at 755513b (V9 planted control = gamma 1.5; a strength at default moves no pixels under neutral).
+- **EXCLUSIVE WINDOW OPEN ~20:37Z: WP-T5 W2 (msg `7e81a160651af8af`, ~30-40 min; W1's config; the 3 changed node ids with an
+  observer plugin: exactly ONE standard encode, sink record on it, NVENC tied, 681 frames, 5.3K at 3 frames with AAC packets SAME;
+  each test alone; 2 planted controls applied with `git apply`, reverted, restore proved). NOTHING HEAVY AT THIS SEAT until CLOSE.**
+  WP-T5 turn 3 `045d622` (Codex depth 209,195 / 475,000): 5.3K `duration="0.1"` + `nb_frames == 3` precondition; module-local
+  session fixture `gx011627_standard_encode`; engine test untouched; 146 node ids unchanged. **WP4.1 cell 1 DONE at 335,741:** my
+  seat correction landed only at its turn end (subagents receive at yield), by which time it had fixed ALL F1-F8 (`bf4b837`,
+  `d22f1aa`) and written RESUME HERE (`37cf14a`), under the 370K cap; **cell 2 (opus-high) DISPATCHED**, reading only until W2
+  closes, then Reviewer A round 2 on the remediated head, the two-leg window, the report.
 - (history) W1 OPEN ~19:20Z (msg `65c91896081df817`; collections 5,289 all / 1,114 serial). WP-T5 turn 1 `a9abb8d`
   (depth 138,874): rung 0 done, frame counts 9 / 3 / 2 confirmed, no frame-count branch between 3 and 9; Codex sandbox stalled on
   CuPy import at collection, so the orchestrator collects at its seat (recorded). WP4.1 round 0 RULED at the orchestrator's seat
