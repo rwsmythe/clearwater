@@ -46,7 +46,8 @@ Cell `implementer-opus-high` (Claude lane), worktree `.worktrees/wp3.21`, branch
 | 21 | cell 6: Reviewer A round 1 adjudicated (`b1bb9cc`) | 140,415 |
 | 22 | cell 6: Reviewer A round 2 adjudicated, loop terminates (`047656f`) | 179,866 |
 | 23 | cell 6: cleanup committed (`1df2626`); WINDOW REQUEST (parallel leg) | 215,100 |
-| 24 | cell 6: WINDOW RELEASED (parallel leg); WINDOW REQUEST (serial leg) | (dispatcher fills) |
+| 24 | cell 6: WINDOW RELEASED (parallel leg); WINDOW REQUEST (serial leg) | 227,414 |
+| 25 | cell 6: serial leg 1 FAILED; STOP; RESUME HERE (cell 7) | (dispatcher fills) |
 
 ## RESUME HERE (cell 6, after cell 5)
 
@@ -1714,6 +1715,12 @@ hevc8-bt709-full-c3-cpu/gpu, rotated-c3-cpu/gpu, truncated-c3-cpu/gpu, vfr-c3-cp
 (13), and `cand-devframes2-*`, `cand-overlap-*`, `cand-p3-*` (outside the grant's globs). C:
 free 26 GB before (19 GB at the request), **37 GB after**.
 
+**Orchestrator's record (serial grant, item 2):** the superseded candidates were deleted WHOLE
+under the orchestrator's ORIGINAL grant; its amendment (keep each `oracle.json`) crossed the
+delete (the orchestrator's slip, as it records). The verdict lines survive in
+`work\wp3.21\logs\{devframes-gx,ad29-gx,interim2}-*.log` (and the WP2.3 legs in
+`oracle-{ad29,devframes}-wp23.log`); every `ref-*` and `cand-fft-*` folder is intact.
+
 **Amendment arrived AFTER the delete (orchestrator, keep `oracle.json` and small text files):**
 the whole folders were already removed (`rm -rf`, not recoverable), so the 27 `oracle.json`
 records behind H7-H14 are LOST. What survives (uncommitted, under `work\wp3.21\`): the run logs
@@ -1723,3 +1730,54 @@ with each leg's `ORACLE` summary and `VERDICT` line -- `logs\oracle-ad29-wp23.lo
 120 frames, 0 differing), and the driver scripts `oracle-ad29-*.sh`, `oracle-devframes-*.sh`,
 `interim2.sh`. The `ref-*` references the legs compared against are intact, so any leg can be
 re-recorded from its script if a record is needed.
+
+### Serial leg (EXCLUSIVE window, OPEN 11:25:28Z per the orchestrator; HEAD `fc947b5`)
+
+`( cd <worktree> && unset PYTEST_ADDOPTS && export QT_QPA_PLATFORM=offscreen && uv run pytest
+-q -rs -m "gpu or footage or gui or slow" --basetemp=work/wp321-suite-serial > ... )`, started
+11:26:05Z, done marker `EXIT=1 2026-10-28T12:09:30Z`; log `work\wp321-suite-serial.log` (worktree).
+
+- **1 failed, 1,109 passed, 1 skipped, 4,148 deselected in 2,603.17 s** (collected 1,111).
+- Skip: `tests\test_photo_check.py:139: the footage folder has no photos yet (WP3.6P is
+  queued)`. Against WP-T4's accepted serial leg (1,036 passed, 10 skipped): its other 9 skips
+  were `test_methods_assembly_v8.py:44` (look-check frames absent from a gate worktree); this
+  worktree's `clearwater.local.toml` points `working_path` at the main tree's `work\`, where
+  `wp1.3\frames` exist, so the 9 V8 tests RAN and passed. 1,111 vs 1,046 collected: the
+  package's own gpu/footage/slow tests plus what merged after WP-T4.
+- **FAILED `tests/test_prototype_backend.py::test_bench_gpu_records_graphics_memory`**
+  (`:345`, `assert 0.133 >= 1.0` on `estimate.ratio_to_gpu_pool_reserved`). Alone it passes
+  (60 s). **Cause, reproduced:** the product's FFT route (task 6) leaves cuFFT plans in the
+  calling thread's plan cache, holding pool blocks that `free_all_blocks` cannot free, until a
+  job end calls `release_fft_plans`. `test_methods_assembly_v8.py` (gpu/slow, 1080 x 1920 crops,
+  so the gate routes its blurs to the FFT) runs earlier on pytest's main thread; the prototype
+  bench then counts those plans as its reserved pool. Repro 1:
+  `pytest -m "gpu or slow" tests/test_methods_assembly_v8.py <the test>` -> 9 passed, 1 failed
+  (`0.139`), log `work\c6-proto2.log`. Repro 2 (`C:\Users\rwsmy\clearwater\work\wp3.21\proto_plans_repro.py`):
+  fresh ratio 1.669 (reserved 1.9 MiB); after one 4K FFT blur 0.100 (32.1 MiB); after
+  `release_fft_plans` 1.668 (1.9 MiB).
+- This is the suite-level face of the out-of-scope GUI-preview plan item (CHARC register row,
+  WP4.3): any non-job caller keeps its thread's plans. The failing test, the V8 test, the
+  prototype bench and `tests/conftest.py` are all unowned; **STOP** to the dispatcher with
+  options (recommended first): (A) grant an autouse fixture in `tests/conftest.py` that, after
+  each test, calls `release_fft_plans` on the GPU backend only if `cupy` is already imported
+  (no import otherwise); (B) product, owned `core/backend.py`: no plan outlives a
+  `gaussian_blur` call (plans built per call; costs plan creation per blur, needs a timing
+  window, and moots `release_fft_plans`); (C) a CHARC ruling on the existing test.
+
+## RESUME HERE (cell 7, after cell 6)
+
+**State:** branch `wp3.21` on base `d1e4537`, NO rebase; worktree CLEAN at the ledger head.
+Cell 6's commits: r1 ledger `b1bb9cc`; F5 fix + order test `9d73fe4`; r2 ledger `047656f`;
+cleanup `1df2626`; ledgers `012641e`, `fc947b5`, `f141354`, `70ae22d`, this one.
+**Reviewer A CONVERGED at round 2** (sections "Round 1", "Round 2", "Cleanup" above;
+evidence `C:\Users\rwsmy\clearwater-review-evidence\wp3.21\r1\`, `r2\`). Banked for the report's Limits:
+r1 F3 (analysis stalled >= 60 s in one frame), F2 abort-first (ruled (a): correct R0.2's
+"E joins A before the sink's abort" in the report; the order abort -> A joined -> release is
+pinned), F10, F11 (out of envelope), the F9 residual 2 ms pacing sleep.
+**Suite:** parallel leg PASSED (4,147 / 1 skipped, the accepted `test_color_roundtrip.py:121`);
+serial leg 1 FAILED, the STOP above. On the dispatcher's ruling: apply it, re-run what the
+ruling names (at least the V8 + prototype pair, then the serial leg in a window).
+**Then:** task 10 (RESUME HERE (cell 6) item 3, unchanged), the report (item 4: add Reviewer A's
+rounds, the corrected R0.2 order, the Limits above, and the plan-cache finding), the return
+report. Standing rules: as in RESUME HERE (cell 6). Never write `\a`, `\b` etc. in a non-raw
+Python literal in ledger scripts (a BEL slipped in at `f141354`, fixed `70ae22d`).
