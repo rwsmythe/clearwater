@@ -228,6 +228,14 @@
   select_backend (core/backend.py:613) and the IF-2 method, so the figure misleads nobody; showing it is WP4.3's business. Part 2
   (boundary release in `_Analysis._run` finally, once per job; planted 64 MiB test; F2 order re-pinned abort -> boundary -> release)
   ACCEPTED as built (b5a383c). Cell 7 266,488, continues for the bounded remainder.**
+- **EXCLUSIVE WINDOW OPEN 2026-10-28 ~15:07Z: 4K ATTRIBUTION RUN (GX011627 ON) first -> exact refit + covered-row test + commit ->
+  BLOCK 2 RE-RUN on that commit with both instruments (~15-20 min)** (msg `fc94c9446ebfde88`). **NOTHING HEAVY AT THIS SEAT until
+  CLOSE.** (b3) built 9a4256b: `core/memory.py` `session_bytes` + `job_device_memory_estimate_bytes(h, w, pool_estimate, *,
+  decoders, nvenc)` (pool estimate passed in; memory.py backend-free); `export_bench.py` record `memory_check` with (i) and (ii) +
+  passes; 26 tests; light 225; WP3.14 bench/select tests unchanged. The cell's provisional fit from cell 5's render-only pool
+  crossed my ruling; the orchestrator corrected the order (measured 4K first). **DEVIATION ACCEPTED: the job cannot REPORT the
+  total itself (IF-8 JobResult FROZEN, no field); the bench record reports it; no product-side reporter; folded into the WP4.3
+  register row I owe (show the figure = IF-8/IF-2 extension, WP4.3's if its GUI wants it).** Cell 7 depth 305,720.
 - (history) attribution window OPEN ~14:20Z (msg `4ebb2986077a3c1e`).
 - (history) block 2 OPEN ~14:03Z (msg `f643b1059bdc063a`). STOP test
   (conservative): nvidia-smi device-wide memory.used (same instrument as the baseline 6,104; ~250-330 MiB idle + decoder + NVENC
