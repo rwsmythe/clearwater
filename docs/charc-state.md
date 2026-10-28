@@ -143,8 +143,10 @@
   **Cell 4 DISPATCHED 07:31Z** (msg `94c72e704d83c247`) from `wp3.21` e6d27a0 (cell 3 handover, final 265,087), AD-29's eight
   conditions in its prompt; order #2 rework -> oracle WINDOW -> #3 -> unchanged. Brief names the four layering tests (b26b051;
   CRLF blob corrected within a minute by e6f7193; 0 CR at HEAD, verified at my seat).
-- **EXCLUSIVE WINDOW OPEN 2026-10-28 ~07:47Z: WP3.21 AD-29 #2 ORACLE (GX011627 + synthetic 4K, ~12 min, head 867d5fb, product
-  0cc11cd)** (msg `1ec355e68f10ef7e`). **NOTHING HEAVY AT THIS SEAT until CLOSE.** Non-TIER1 = STOP. Cell 4 yield 6, depth 148,982:
+- **WP3.21 AD-29 #2 ORACLE WINDOW CLOSED 07:56Z: reworked #2 TIER1 on GX011627 (681 / 0 differing, max abs 0, mean abs 0) and
+  synthetic 4K (120 / 0)** (msg `c6afcfc8bacaf5d5`; OPEN `1ec355e68f10ef7e`; head 867d5fb). AD-29 item 6 met before #3. The io.video
+  Protocol pair asserts both directions (`test_wp321_device_frames.py:82` / `:92`); the analysis pair comes at #3. **No window open;
+  seat free.** Cell 4 on #3 (tier 1 or STOP). Cell 4 yield 6, depth 148,982:
   #2 reworked under AD-29 as follow-up commits (`DeviceFrameBackend` Protocol in `decode.py`; `device_backend=None`; samples.py
   identical to d1e4537; interfaces/ no diff; 4 layering tests 28 passed; light 883 passed; WP2.3 oracle 10/10 TIER1 max abs 0).
   **Orchestrator reading ACCEPTED, AD-29 item 1 clarified: device methods on `CupyBackend(CoreBackend)`, not the shared base
