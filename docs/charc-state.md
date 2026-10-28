@@ -140,7 +140,17 @@
   since ba6e923 (`git diff --stat ba6e923 main -- src tests tools pyproject.toml uv.lock` empty), so these legs are
   the suite gate for the rebased candidate (orchestrator re-confirms after the rebase). Next at the orchestrator:
   `wp-t4-mc` rebase + patch-id + static + harness gate, Reviewer B (Claude pass at its seat), accept with the fill's
-  GATE_CHECKS edit; then my QA (CLAUDE.md line, HD-1 third point, suite-cost row, m5 row, DR-58 (c)). **Round 1 CLOSED 21:29Z** (msg
+  GATE_CHECKS edit; then my QA (CLAUDE.md line, HD-1 third point, suite-cost row, m5 row, DR-58 (c)).
+- **WP-T4 Reviewer B (Claude pass at the orchestrator's seat, Opus high, read-only; `wp-t4eviewB\`, `review.txt`
+  md5 f544e951...) = NO_NEW_CRITICAL_MAJOR, 4 minor 4 advisory** (msg `530d5027f50a7f2e`). Candidate `wp-t4-mc` ed7eca9
+  = 7 commits on 7f4b80d, patch-id 3aafebff pre/post rebase, code diff vs 08e87f5 empty, 9 files, 0 CR, ruff/format/
+  mypy/harness 382 OK. Lock and guard claims REASONED (sandbox refused work/ writes); A executed them. Adjudication
+  ACCEPTED (my msg ack-revb): B1 -> RAISED GPU finding; B2 complete parallel-leg bound list as WATCH (encode_bench
+  `1.0<=strays<1.5`, `<1.0` tightest); B3/B4/B5 -> GATE_CHECKS (quoted -rs skips vs previous gate, PYTEST_ADDOPTS
+  unset + collection diff vs main, exit 0 + count match, run from Git Bash); B6 under m2 limit; B7/B8 docs-only turn 8
+  (new patch-id of record; identity diff must stay empty). **Fill rule ACCEPTED with qualifier:** new wall-clock bound
+  in a parallel-leg test = `slow` with a reason naming the bound (timing isolation, not duration); generous sanity
+  ceilings (>=10x expected, anti-hang) exempt; NEW tests only. Both A and B = Claude Opus high (lane rule met). **Round 1 CLOSED 21:29Z** (msg
   `7bb7c019595a6e24`): BASELINE 5,067 passed / 11 env skips / 4,564.80 s; PARALLEL 4,031 / 1 / 497.30 s; SERIAL
   1,036 / 10 / 3,335.36 s; counts hold (5,078); 0 failures = 0 violators; P+S 3,832.66 s = -16.0 %. Sampler: peak RSS
   6.97 GB, min available 7.05 GB, GPU rise 903 MiB (the import-time context finding). **Reading sent for the report:
