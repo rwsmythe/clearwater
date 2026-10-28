@@ -28,6 +28,8 @@ Cell `implementer-opus-high` (Claude lane), worktree `.worktrees/wp3.21`, branch
 | 9 | cell 4 stands down after interim 2; RESUME HERE (cell 5) | (dispatcher fills) |
 | 9 (read) | cell 4's last reading at stand-down (given to cell 5) | 236,806 at yield 8; 257,383 final |
 | 10 | cell 5: micro-timing instrument built; WINDOW REQUEST | (dispatcher fills) |
+| 10 (read) | as given at the micro-timing grant | 87,298 |
+| 11 | cell 5: WINDOW RELEASED (micro-timing); task 6 build-or-yield | (dispatcher fills) |
 
 ## RESUME HERE (cell 5, after cell 4's interim 2)
 
@@ -196,6 +198,34 @@ only on its reading; task 7 and Q-R7; Reviewer A; the two-leg suite; task 10 LAS
    of render (now about 0.35 s/frame of the 0.501) BEFORE any FFT code is written. If the share is
    too small for the FFT to move the end-to-end figure by more than the oracle's tier-2 cost is
    worth, that is a YIELD to the dispatcher (taken to CHARC), not an automatic build.
+
+### Q-R5 micro-timing (EXCLUSIVE window 2026-10-28, OPEN 08:43Z; development evidence)
+
+Driver `work\wp3.21lur_microtiming.py` (uncommitted; `--selftest` worst 6.0e-7 on small arrays
+incl. repeated reflection). GPU events, warm-up 3, median of 20. Run 1 (`logs\microtiming-1.log`,
+GX011627 frame 0, 4K) finished the render and 4K rows, then STOPPED by the cell in the 5.3K rows:
+the instrument's cuFFT plan cache (one plan set per ladder shape, never freed) filled the card
+(7,839 of 8,188 MiB) and paged (2-D medians of 4-9 s); its JSON was not written, the 4K figures
+are the log's. Run 2 (`--only-53k`, plan cache and pool cleared per row; JSON
+`microtiminglur-microtiming-53k-20261028T090504Z.json`, 321 s, card 1.8 GB between rows).
+
+- **Blur share of c3 render at 4K:** render 0.500 s (events); with the per-call wrapper 0.504 s,
+  of which blur 0.360 s = **71.4 %**. Calls per frame: mask (H,W) sigma 21.6 0.020 s; Cb and Cr
+  (H,W) sigma 108 0.099 + 0.100 s; sharpen (H,W,3) 10.8 0.032 s; Laplacian (H,W) 2.16 x2 0.003 s;
+  saliency Lab (H,W,3) 6.48 x2 0.020 s.
+- **Under the Q-R1 gate (min(H,W) >= 1080, sigma >= 32) only Cb and Cr switch:** direct 0.198 s
+  -> per-axis FFT 0.0185 s, **saving 0.180 s/frame** (render 0.50 -> about 0.32). If the frames
+  phase stays render-bound: 0.501 -> about 0.32 s/frame, whole job about 15.4 -> 10-11 min/min
+  (projection, not a figure).
+- **Threshold:** FFT wins from sigma 16 (RGB) / 8-24 (one plane) at 4K; 32 stays (moving it up
+  only loses; the 21.6 mask call stays direct by the ruling's floor).
+- **Bound:** max abs on [0, 1] data 2.2-3.1e-7 on the 4K render calls, <= 2.68e-6 on the 4K
+  ladder, <= 2.92e-6 at 5.3K sigma 270 (per-axis and 2-D alike); every FFT row deterministic on
+  repeat. (The Lab saliency call, below the gate, shows 6.1e-5 absolute on magnitudes ~100.)
+- **5.3K memory (run 2):** one plane (the c3 Cb/Cr shape) sigma 232-270: peak +0.53-0.56 GiB per
+  call over the input, of which the cached cuFFT plans hold 0.45-0.54 GiB AFTER the call; RGB
+  sigma 270 +1.9 GiB (plans 1.6 GiB). R0.3 budgeted 0.3-0.5 GB transient: the plan workspace makes
+  it about 0.55 GB and PERSISTENT while the plan cache holds it.
 
 ## Re-seat: cell 2 (2026-10-28), rulings since round 0
 
