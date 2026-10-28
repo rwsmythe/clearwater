@@ -158,6 +158,30 @@ def clips(tmp_path_factory: pytest.TempPathFactory) -> Clips:
     return Clips(tmp_path_factory.mktemp("wp310-clips"))
 
 
+@pytest.fixture(scope="session")
+def gx011627_standard_encode(
+    tmp_path_factory: pytest.TempPathFactory,
+) -> Iterator[tuple[Path, vf.EncodeRun]]:
+    """Encode GX011627 once at standard quality for the sink and level checks.
+
+    Args:
+        tmp_path_factory: Factory for a session folder under pytest's temp root.
+
+    Yields:
+        The encoded output and its own encode run, including the NVENC sampler.
+    """
+    if not _nvenc_ready():
+        pytest.skip("NVENC is not available on this machine")
+    source = _footage_clip("GX011627", load_local_config().footage_path)
+    out = tmp_path_factory.mktemp("wp-t5-gx011627-standard") / "GX011627-standard.mp4"
+    try:
+        run = vf.encode_file(source, out, encoder="hevc_nvenc", quality="standard", bit_depth=8)
+        yield out, run
+    finally:
+        if out.exists():
+            os.remove(out)
+
+
 def _items(record: dict[str, Any]) -> dict[str, dict[str, Any]]:
     return {item["name"]: item for item in record["items"]}
 
@@ -1473,34 +1497,35 @@ def test_the_footage_lookup_skips_only_a_missing_clip(tmp_path: Path) -> None:
 @pytest.mark.gpu
 @pytest.mark.slow
 def test_gx011627_through_the_sink_keeps_every_mandatory_and_required_item(
-    tmp_path: Path,
+    gx011627_standard_encode: tuple[Path, vf.EncodeRun],
 ) -> None:
-    if not _nvenc_ready():
-        pytest.skip("NVENC is not available on this machine")
     source = _footage_clip("GX011627", load_local_config().footage_path)
-    out = tmp_path / "GX011627-out.mp4"
-    run = vf.encode_file(source, out, encoder="hevc_nvenc", quality="standard", bit_depth=8)
+    out, run = gx011627_standard_encode
     record = vf.fidelity_record(source, out, bit_depth=8, run=run)
     _assert_v4(record)
     assert run.report.frames_written == 681
-    os.remove(out)
 
 
 @pytest.mark.footage
 @pytest.mark.gpu
 @pytest.mark.slow
-def test_gx011627_nvenc_levels_give_distinct_sizes(tmp_path: Path) -> None:
-    if not _nvenc_ready():
-        pytest.skip("NVENC is not available on this machine")
+def test_gx011627_nvenc_levels_give_distinct_sizes(
+    tmp_path: Path, gx011627_standard_encode: tuple[Path, vf.EncodeRun]
+) -> None:
     source = _footage_clip("GX011627", load_local_config().footage_path)
+    standard_out, _ = gx011627_standard_encode
     sizes: dict[str, int] = {}
     expected = {"high": "5.2 Main", "standard": "5.1 Main", "draft": "5.0 Main"}  # <= 6.0 Main
     for quality in ("high", "standard", "draft"):
-        out = tmp_path / f"GX011627-{quality}.mp4"
-        vf.encode_file(source, out, encoder="hevc_nvenc", quality=quality, bit_depth=8)
+        if quality == "standard":
+            out = standard_out
+        else:
+            out = tmp_path / f"GX011627-{quality}.mp4"
+            vf.encode_file(source, out, encoder="hevc_nvenc", quality=quality, bit_depth=8)
         sizes[quality] = out.stat().st_size
         level = verify_module.read_hevc_level(out)
-        os.remove(out)
+        if quality != "standard":
+            os.remove(out)
         assert level is not None and level.name == expected[quality], (quality, level)
     # Without a ceiling the three came within 5 % of each other on this busy clip; with the
     # pixel-rate ceiling (High, half, a quarter) each is well apart from the next.

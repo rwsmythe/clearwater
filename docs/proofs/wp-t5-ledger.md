@@ -2,19 +2,26 @@
 
 ## Dispatch and depth
 
-Codex lane, turns 1-2, rungs 0-2, 2026-10-28. Base:
+Codex lane, turns 1-3, rungs 0-3, 2026-10-28. Base:
 `3aa3c51da6cc5870322fb4688fbc61227f4efdd2`, branch `wp-t5`.
 The initial `git status --porcelain` was empty. Evidence is under
 `work/wp-t5/`; no footage was opened by this cell. The supplied local
-configuration was not changed. Turns 1-2 change this ledger only; no product or
-test file has been changed. Turn 1 was committed by the dispatcher at `a9abb8d`.
+configuration was not changed. Turns 1-2 changed this ledger only; the dispatcher
+committed them at `a9abb8d` and `b17b2d4`. Turn 3 changes the two approved test
+files and this ledger; product code remains unchanged. The two rung-3 test edits
+are bundled in this turn as requested by the turn-3 dispatch.
 
 Depth figures are dispatcher readings, never cell estimates.
 
 | Turn / gate | Tokens (as supplied) | Input depth | Window | Disposition |
 |---|---|---|---|---|
 | 1 / rung 0 | 182,117 | 138,874 | 475,000 | Dispatcher reading supplied at turn 2; collection artifact resolved at seat |
-| 2 / rungs 1-2 | Not yet supplied | Not yet supplied | 475,000 | Yield round-0 design table; build nothing before reply |
+| 2 / rungs 1-2 | 351,779 | 164,909 | 258,400 | Dispatcher reading supplied at turn 3; round-0 table approved with comparability amendment |
+| 3 / rung 3 | Not yet supplied | Not yet supplied | 258,400 last reported | Yield build and W2 request |
+
+The reported window changed from 475,000 (turn 1) to 258,400 (turn 2). Both
+figures are retained as given; the dispatcher monitors depth against the smaller
+window. No cell estimate replaces either reading.
 
 ## Rung 0 commands and results
 
@@ -72,7 +79,7 @@ has been adopted for the sandbox artifact.
 
 ## Frame-count ground and branch audit
 
-The current test is `tests/test_jobs_export_video.py:214-221`: 5312x4648,
+The baseline test is `tests/test_jobs_export_video.py:214-221`: 5312x4648,
 30000/1001, duration 0.3, CPU-forced libx265. `Clips.make` supplies sine audio
 and AAC at `:142-147`; `_settings` forces CPU at `:83-86`; `_export` selects c3
 at `:95`. The light lavfi count confirms the existing nine frames and the ruled
@@ -98,7 +105,7 @@ claim that W2 has already verified V4 on the changed clip.
 
 ## Encode-call ground
 
-`tests/test_io_video_encode.py:1482` uses
+At base `3aa3c51`, `tests/test_io_video_encode.py:1482` uses
 `vf.encode_file(source, out, encoder="hevc_nvenc", quality="standard", bit_depth=8)`.
 The standard iteration of `:1498-1500` has exactly the same source, encoder,
 quality and bit depth, with only the output path different. The AST check in
@@ -177,9 +184,18 @@ Sharing moves the retained standard encode into the first consumer's fixture
 SETUP, so final analysis must compare XML totals and the full SERIAL wall as
 well as call phases; a phase shift alone is not a saved encode.
 
-## Rung 2: round-0 design table (proposed; awaiting dispatcher reply)
+**MINOR / EXECUTED, aggregate reporting discrepancy:** CHARC's turn-3 packet
+describes the four calls as 1498.9 s (54%). The four individual log readings
+above sum to 1497.83 s, a 1.07 s difference. Retain those call phases as the
+figures of record, as ruled, and describe their share as approximately 54%.
+This does not change W1 wall, the projection, or the > 110 s acceptance bar.
 
-This table builds nothing. It follows CHARC's adopted T5-Q1-Q7 rulings; no
+## Rung 2: round-0 design table (approved, comparability amended)
+
+The orchestrator approved this table on 2026-10-28, with the comparability
+amendment below from CHARC `2548bd27b24909b8`. Its source-line anchors refer to
+the pre-build base `3aa3c51`; function names identify the built code. It follows
+CHARC's adopted T5-Q1-Q7 rulings; no
 `conftest.py`, new shared module, cross-file share or frozen-interface change
 is proposed. Fixture code stays in `tests/test_io_video_encode.py`.
 
@@ -195,7 +211,7 @@ is proposed. Fixture code stays in `tests/test_io_video_encode.py`.
 | Assertion-map identity: all four | Names, node IDs and markers remain unchanged. No assertion line is removed or weakened. The three changed bodies remain the only test bodies edited; no test is added. The existing collections contain 5,289 all / 1,114 SERIAL IDs for the rung-4 identity comparison. |
 | Projected saving from W1 | 5.3K: 354.99 / 9 * 3 = 118.33 s projected call, saving 236.66 s. One standard encode: approximately 492.51 / 3 = 164.17 s under an explicit equal-thirds assumption, not individually timed. Combined approximately 400.83 s, with projected SERIAL wall 2397.550 s; actual W3 saving must exceed 110 s. Fixed costs, quality-dependent encode costs and W1's stated overlap limit the projection. |
 | Sharing the assertions forbid | ENGINE is not shared with SINK/levels. Its corrected c3 output has provenance=True and a `JobResult`; the uncorrected `vf.encode_file` output has its encode-specific sampler/`EncodeRun`. Substitution would lose either engine-path V4 or the sink's tied NVENC proof / 681-frame assertion. The sink's fidelity record also stays in its own body; levels only needs size and level. High/draft cannot share standard because their distinct levels and size ratios are the point. This is DR-65's required recorded reason for the share not made. |
-| Comparability finding and recommendation | **MAJOR / EXECUTED for any claim of standard-gate equivalence, not a product defect:** W1 has 9 missing-look-check-frame skips plus the standing photo skip, so it is a valid ruled BEFORE timing but NOT the standard 1,113-passed / 1-skipped gate. Agree with the dispatcher: run the W3 comparison SERIAL leg with the SAME local config AND the same absent `work/wp1.3/frames` inputs as W1, expecting 1,104 passed / 10 skipped and identical skip reasons. Then the dispatcher copies the main tree's 96 frame files (reported 3.4 GB) into this worktree's `work/wp1.3/frames`, read-only and uncommitted, before separate package gate legs. Gate SERIAL then expects 1,113 passed / 1 skipped if the other conditions stay the same. Record BOTH comparison and gate figures; the frame-populated gate wall is not substituted for the like-for-like W3 wall. W1 overlap remains disclosed even though CHARC ruled it stands. |
+| Comparability ruling (CHARC `2548bd27b24909b8`) | **MAJOR / EXECUTED for any claim of standard-gate equivalence, not a product defect:** W1 has 9 missing-look-check-frame skips plus the standing photo skip, so it is a valid ruled BEFORE timing but NOT the standard gate. W3 and any W2 pair use the SAME local config and absent `work/wp1.3/frames` state as W1; full comparison SERIAL expects 1,104 passed / 10 skipped with identical skip reasons. NO frames copy. The dispatcher runs separate gate legs at its seat in a gate worktree whose `clearwater.local.toml` working folder points to the MAIN tree's `work/`, containing the V8 frames, as WP3.21 did. Gate SERIAL expects 1,113 passed / 1 skipped if other conditions stay the same. Record both configs and both figures, explaining that the working-folder inputs account for the 9 V8 outcomes. The gate wall is not substituted for the like-for-like W3 wall. W1 overlap remains disclosed; the four individual bodies' call phases remain the per-test figures of record. |
 
 W1 skip evidence, read from `before-serial.log` (paths are relative here to
 avoid repeating the machine prefix):
@@ -207,9 +223,74 @@ avoid repeating the machine prefix):
 - `SKIPPED [1] tests/test_photo_check.py:139`: the footage folder has no photos
   yet (WP3.6P is queued).
 
-No frames were copied, opened or deleted by this cell. The proposed order of
-comparison and gate legs awaits the dispatcher reply; no extra window is
-claimed granted. T5-Q5's > 110 s rule and its additional-pair branch still bind.
+No frames were copied, opened or deleted by this cell; none will be copied for
+the gate under the amended ruling. The local config here remains unchanged.
+T5-Q5's > 110 s rule and its additional-pair branch still bind. No extra window
+is claimed granted.
+
+## Turn 3: rung-3 build and light checks
+
+- `tests/test_jobs_export_video.py`: the 5.3K test now uses duration 0.1 and
+  asserts `probe(source).video.nb_frames == 3`; all existing assertions and
+  export settings remain unchanged.
+- `tests/test_io_video_encode.py`: added the approved session fixture
+  `gx011627_standard_encode` beside `clips`, with Google-style docstring,
+  pre-encode readiness checks, one real standard encode, `(out, run)` yield and
+  `finally` cleanup. The sink body still creates its own fidelity record and
+  checks 681 written frames. Levels reads standard size/level from that output;
+  high/draft remain body encodes and are removed as before. The standard output
+  is left for fixture teardown. No import, other helper or other test changed.
+
+| Light check | Evidence under `work/wp-t5/` | Result |
+|---|---|---|
+| `uv run ruff check tests/test_jobs_export_video.py tests/test_io_video_encode.py` | `w2-ruff-check.log` | `All checks passed!`, `EXIT=0` |
+| `uv run ruff format --check tests/test_jobs_export_video.py tests/test_io_video_encode.py` | `w2-ruff-format-check.log` | `2 files already formatted`, `EXIT=0`; no sandbox formatter artifact this time |
+| Owned-file collection with sandbox shim | `w2-collect-owned.log`, `w2-collect-owned.txt`, `w2-base-owned.txt`, `w2-collect-owned.diff` | 146 tests collected in 0.69 s, `EXIT=0`; 146 unique IDs exactly match the two files' subset of `base-all.txt`; identity diff empty |
+| Source/AST audit against `3aa3c51` | `w2-source-audit.log` | Every old assert retained verbatim, all changed-test markers identical, all unowned function/class ASTs unchanged; only the approved fixture added; `EXIT=0` |
+| Control-patch preflight | `w2-control-manifest.json`, `w2-control-depth.patch`, `w2-control-standard-draft.patch` | Both single-line plants parse and pass `git apply --check`; neither patch applied in the cell |
+| Light real instrument/control witness (160x96, CPU, three frames) | `w2-light-instrument-control.log` | Real libx265 export; unchanged `_assert_v4` passes at selected depth 8, fails at selected depth 10 with bit-depth item DIFFERENT; observer sees AAC and nonempty packets SAME; `EXIT=0` |
+
+The owned-file collection command, with `PYTHONPATH=scripts`, offscreen Qt and
+empty `PYTEST_ADDOPTS`, was:
+
+```text
+uv run pytest --collect-only -q tests/test_jobs_export_video.py tests/test_io_video_encode.py --basetemp=work/wp-t5/w2-collect-owned -p sandbox_mkdir_shim -p no:cacheprovider
+```
+
+The small instrument witness validates the observer's item schema and the
+bit-depth plant cheaply. It does NOT stand in for the actual changed 5.3K
+test's W2 control or a full-resolution fidelity result. No GPU/footage test body
+or suite leg ran in this cell.
+
+### W2 request and controls (not executed by the cell)
+
+The complete dispatcher-only command script is
+`work/wp-t5/w2-run-request.sh`; run from this worktree after the turn is
+committed. It uses W1's unchanged config, offscreen Qt and unset
+`PYTEST_ADDOPTS`. Every heavy case checks >= 5 GiB available, records the exact
+command and UTC start/end in `w2-<case>-meta.log`, records wall / summary / EXIT
+in `w2-<case>.log`, and writes `w2-<case>.xml`. Approximate requested window:
+30-40 minutes for all five serial cases, not a measured performance claim.
+
+| W2 case | Selection / plant | Required result |
+|---|---|---|
+| `combined` | Exactly the changed 5.3K, sink and levels node IDs, one process, `--durations=0` | 3 passed; one NVENC standard encode, matching sink output/EncodeRun and tied proof, 681 frames; 5.3K record count 3 and nonempty AAC packets SAME; footage-derived outputs removed |
+| `sink-alone` | Only sink selected with `-k` in its module | 1 passed, proving the fixture works with this test alone |
+| `levels-alone` | Only levels selected with `-k` in its module | 1 passed, proving the fixture works with this test alone |
+| `control-depth` | Apply `w2-control-depth.patch`: ONLY this test's `fidelity_record` argument changes from `bit_depth=8` to 10; select just the 5.3K node | `EXIT=1`, named test FAILED, observed bit-depth item DIFFERENT; restore patch |
+| `control-standard-draft` | Apply `w2-control-standard-draft.patch`: ONLY the shared fixture's encode quality changes from standard to draft, yielding the real draft output as standard; select just levels | `EXIT=1`, named levels test FAILED at level or size assertion; restore patch |
+
+Both full-size planted breaks need W2: the 5.3K control needs the actual CPU
+export (although its instrument behavior has a light witness), and the draft
+control needs the real footage/NVENC output. The scratch observer
+`work/wp-t5/w2_observer.py` delegates all encode/fidelity calls unchanged and
+records selected frame/audio/depth items, encode counts, output/run identities,
+NVENC tie and output cleanup under `work/wp-t5/w2-*-observation.json`. It adds
+no persistent test logging and no fixture module to the repository. Combined
+observations and the depth control have separate validation logs. The request
+script restores each control, has an EXIT cleanup trap, and finally checks
+that the test files match the committed candidate. The script is prepared,
+not run; all five heavy-run ledger rows await dispatcher results.
 
 ## Verification and review ledger
 
@@ -219,11 +300,14 @@ claimed granted. T5-Q5's > 110 s rule and its additional-pair branch still bind.
 | 1 | Sink and levels standard encodes might differ | Rejected: call-site AST comparison plus `encode_file` implementation | No test edit yet |
 | 1 | JUnit might provide phase timings | Confirmed reporting mismatch by pytest implementation | RULED turn 2: XML totals/counts, phase log for phases; hidden setups reported as bounds |
 | 1 | Baseline collection might be blocked under the sandbox | Confirmed sandbox no-progress; dispatcher collections passed | RESOLVED at seat; sandbox artifact, not product finding; no source fix |
-| 2 | W1 might be standard-gate equivalent | Rejected: log shows 9 missing V8-frame skips plus 1 standing photo skip; XML confirms 10 skips / 1114 tests | Table recommends like-for-like W3, then separate gate legs with dispatcher-copied frames |
+| 2 | W1 might be standard-gate equivalent | Rejected: log shows 9 missing V8-frame skips plus 1 standing photo skip; XML confirms 10 skips / 1114 tests | RULED turn 3: like-for-like W3 here; separate seat gate worktree config points working folder to main work; NO frames copy |
 | 2 | A full sink call might equal the saved encode duration | Rejected: source shows fidelity computation in the sink call; W1 has no per-quality encode timings | Projection labels equal-thirds estimate, retains fidelity computation and counts fixture setup |
+| 3 | Refactoring might remove an assertion or change an unowned body | Rejected by verbatim-assert / marker audit, unchanged unowned ASTs and empty node-ID diff | No corrective change needed; full W2 still pending |
+| 3 | The depth plant or observer might use the wrong item shape | Confirmed actual packet item names include a stream suffix and sequence summaries carry `count`; scratch observer/check corrected before request, then real small CPU witness passed | Work artifacts corrected; no extra test/product changes |
+| 3 | CHARC's aggregate might equal the sum of logged calls | Rejected: 1498.9 vs logged sum 1497.83, difference 1.07 s | MINOR reporting discrepancy disclosed; individual logged call phases retained per ruling |
 
-No Reviewer A round has been supplied or adjudicated yet. The rung-2 round-0
-design table above is awaiting dispatcher reply; this is not a Reviewer A
-round. Future round rows record severity, envelope, NEW/REOPENED, reverts,
-product/test-only fixes, evidence and dispatcher depth. No test or product code
-was built, no assertion was changed and no heavy command was run in turn 2.
+No Reviewer A round has been supplied or adjudicated yet. The round-0 design
+was approved; it is not a Reviewer A round. Future round rows record severity,
+envelope, NEW/REOPENED, reverts, product/test-only fixes, evidence and dispatcher
+depth. Turn 3 builds the approved test-only changes and yields for W2; no
+heavy command or planted full-size test was run by the cell.

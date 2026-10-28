@@ -212,7 +212,8 @@ def test_refused_samples_fail_readably_with_nothing_written(
 
 @pytest.mark.slow
 def test_v4_synthetic_5k3_8_7_clip(clips: Clips, tmp_path: Path) -> None:
-    source = clips.make("gopro-5k3-8x7", size="5312x4648", rate="30000/1001", duration="0.3")
+    source = clips.make("gopro-5k3-8x7", size="5312x4648", rate="30000/1001", duration="0.1")
+    assert probe(source).video.nb_frames == 3
     out = tmp_path / "out"
     out.mkdir()
     result = _export(product_engine(tmp_path / "cache"), source, _settings(out))
