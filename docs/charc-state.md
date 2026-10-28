@@ -102,8 +102,14 @@
   `ad582f053ab6724d`.) **STACKED GATE WP-T5 + WP4.1 RULED YES (my msg ruling-stack):** own Reviewer B and record per package;
   per-package patch-id before/after rebase; stack-top two-leg suite in the main-work gate config (1,113 / 1 expected) = figure of
   record for both by code identity; replaces WP4.1 cell 4's final-head suite only if patch-id equal to cell 4's head; HOLD CAP
-  ~2 h after WP-T5's Reviewer A converges, else WP-T5 gates alone. Next: Codex turn 5 (report, ledger), WP-T5 Reviewer A (FAST
-  Claude pass), WP4.1 cell 4 round 4; then the stacked gate.
+  ~2 h after WP-T5's Reviewer A converges, else WP-T5 gates alone.
+- **WP-T5 REVIEWER A R1 CONVERGED ~23:00Z (msg `7402a1cc9ce15a38`; Claude pass opus-5-5/high on `3aa3c51..6467e54`,
+  `wp-t5\r1\`, review.txt md5 d1f4dda4...): 0/0/2/5; R1-1 no test asserts `nvenc_proof.tied` (pre-existing; closure says
+  'observed in W2', not 'proof'); R1-2 closure carries both figures (536.97 s whole leg; 405.27 s attributable to the three tests;
+  remainder = variation 112.98 + engine test 18.72; W1 overlap named). Advisories = limits (3-frame libx265 may emit no B-frames so
+  the 5.3K test may not reach `ctts`; fixture failure shows as setup ERROR). Cleanup turn 6 docs-only; tests frozen after W3.
+  **HOLD CAP runs out ~01:00Z (2026-10-29): WP4.1 cell 4 (round 4 running) ready by then = stacked gate, else WP-T5 gates alone.**
+  Next: WP-T5 Reviewer B (Claude pass at the orchestrator's seat on the rebased candidate), then the gate; my QA after each accept.
 - **WP4.1 R3 H1 RULED (A) BANK to WP4.3 (my msg ruling-h1), four conditions:** the GUI preview shows an nclx-only Display P3 HEIC
   UNCONVERTED (`gui/render_worker.py`, `gui/preview.py` pass only `icc_profile`; WP3.16 lines c9fb2e8 / b51cc8d, reachable with
   real data since WP4.1's swap 4ee4ea7; preview (199, 40, 60) vs (217, 0, 54) via the D53 built-in; export correct; evidence
