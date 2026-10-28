@@ -192,9 +192,20 @@
   STOP ruling and dispatches **cell 7** from ledger RESUME HERE `ea78946` (line 1767). **Ruling (A) relayed in full; cell 7
   DISPATCHED 12:23Z** (`wp321-cell7`, opus-high, depth 0; msg `a9e0cb823b141331`; state cfc4d4c): fix -> V8 + prototype pair (light)
   -> serial leg (window) -> task 10 last (one window per block) -> report -> return report; then Reviewer B at gen 16's seat, accept.
-- **EXCLUSIVE WINDOW OPEN 2026-10-28 ~13:23Z: WP3.21 TASK 10 BLOCK 1, GX011627 (~40-50 min): export_bench v16 --device-frames
-  (3 cold c3, 1 warm c3, 1 ancuti2018, 1 libx265), then the OFF row (1 cold c3 without device frames) if time allows** (msg
-  `dd8ea61455082eff`). **NOTHING HEAVY AT THIS SEAT until CLOSE.** Code head 57a7a2e. Cell 7 depth 123,491. **Warm-row memory
+- **EXCLUSIVE WINDOW OPEN 2026-10-28 ~14:03Z: WP3.21 TASK 10 BLOCK 2, synthetic 5.3K 8:7 c3 cold = the AD-1 row (~5-15 min; fresh
+  process, plans/pool clear by construction)** (msg `f643b1059bdc063a`). **NOTHING HEAVY AT THIS SEAT until CLOSE.** STOP test
+  (conservative): nvidia-smi device-wide memory.used (same instrument as the baseline 6,104; ~250-330 MiB idle + decoder + NVENC
+  sessions) vs 6,281 (5,897 + 384) and vs base x 1.25 = 7,371; above either = STOP to me, idle offset stated. Block 3 GX011625
+  (~1.5-2.5 h) LAST in its own OPEN. Cell 7 depth 154,676.
+- **BLOCK 1 CLOSED 13:59Z (GX011627, 681 frames, device frames ON, hw decode ON): V16 FIGURES OF RECORD.** c3 cold x3 0.3195 /
+  0.3264 / 0.3310 s/frame = **9.57 / 9.78 / 9.92 min/min** [WP3.14 31.8-31.9] (RSS 3,394-3,417 / GPU 3,130-3,244 MiB); c3 warm 9.06
+  [23.2] (labelled per (a)); ancuti2018 cold 8.74 [21.6]; libx265 cold 14.59 [35.6] (stray System 41.5 % CPU kept as spread); OFF row
+  (device frames off) 17.25 -> #2 + #3 worth ~-0.25 s/frame, lead 19.7 -> 5.2 s. Every NVENC row meets D106's 25; cold c3 meets the
+  ~10 aim (AD-21). **Slow frames PLACED: every 16 frames in every cold device-frames row (c3 19, 35, ... 611; ~0.55 s vs 0.29-0.30
+  median), stopping where the analysis thread returned, none in the warm row; record_wait sums 10.7-11.5 s = the excess; cause =
+  `analysis/engine.py` STREAM_STEP 16: with the FFT the frame loop OUTRUNS the streamed analysis, so the overlapped job is now
+  ANALYSIS-BOUND. No fix in this package; report names the analysis pass as the next target.** -> FOURTH register row owed at the
+  accept (analysis-bound overlapped export; lever = the analysis pass, not the step). Code head 57a7a2e. Cell 7 depth 123,491. **Warm-row memory
   method RULED (a): run as is; label the warm row's GPU peak "includes the prime analysis's pooled blocks (the product's own
   state after an analysis)"; the 5.3K COLD row is the figure of record and carries the STOP check; no tool change after
   convergence.** GOP check (light): 681 packets, no B-frames, keyframe every 30; frames 323 / 387 are NOT keyframes, so decode
