@@ -45,7 +45,8 @@ Cell `implementer-opus-high` (Claude lane), worktree `.worktrees/wp3.21`, branch
 | 20 | cell 5 stands down after the oracle legs; RESUME HERE (cell 6) | (dispatcher fills) |
 | 21 | cell 6: Reviewer A round 1 adjudicated (`b1bb9cc`) | 140,415 |
 | 22 | cell 6: Reviewer A round 2 adjudicated, loop terminates (`047656f`) | 179,866 |
-| 23 | cell 6: cleanup committed (`1df2626`); WINDOW REQUEST (parallel leg) | (dispatcher fills) |
+| 23 | cell 6: cleanup committed (`1df2626`); WINDOW REQUEST (parallel leg) | 215,100 |
+| 24 | cell 6: WINDOW RELEASED (parallel leg); WINDOW REQUEST (serial leg) | (dispatcher fills) |
 
 ## RESUME HERE (cell 6, after cell 5)
 
@@ -1687,3 +1688,28 @@ the measured-sample TIER2 case passed on both).
 r2: 0 blocking). Banked for the report's Limits: r1 F3 (an analysis stalled >= 60 s inside one
 frame), F2 (abort-first, ruled (a); the design text corrected in the report), F10, F11 (out of
 envelope), the F9 residual pacing sleep.
+
+## Two-leg suite (GATE_CHECKS; cell 6)
+
+### Parallel leg (EXCLUSIVE window, OPEN 11:13:30Z per the orchestrator; HEAD `012641e`)
+
+`( cd <worktree> && unset PYTEST_ADDOPTS && export QT_QPA_PLATFORM=offscreen && uv run pytest
+-q -rs -n 4 -m "not gpu and not footage and not gui and not slow"
+--basetemp=work/wp321-suite-parallel > work/wp321-suite-parallel.log 2>&1; echo EXIT=... >
+work/wp321-suite-parallel.done )`, started 11:13:42Z, done marker `EXIT=0 2026-10-28T11:23:18Z`.
+
+- **4,147 passed, 1 skipped, 5 warnings in 575.06 s**; collected 4,148 of 5,259 (1,111
+  deselected; `--collect-only` with the same marker).
+- The one skip, pre-existing (WP3.14 and WP-T4 ledgers carry it):
+  `tests\test_color_roundtrip.py:121: swscale reads a yuvj format as full whatever in_range
+  says (refused instead)`.
+
+### Oracle-candidate cleanup (orchestrator grant at the parallel-leg OPEN)
+
+Deleted under `C:\Users\rwsmy\clearwater\work\wp3.21\oracle\` (superseded by `cand-fft-*`),
+27 folders, about 11 GB: `cand-devframes-{GX011627-c3, synth4k-c3, hevc10-c3-cpu/gpu,
+hevc8-bt709-full-c3-cpu/gpu, rotated-c3-cpu/gpu, truncated-c3-cpu/gpu, vfr-c3-cpu/gpu}` (12),
+`cand-ad29-*` the same 12, `cand-i2-{GX011627-ancuti2018, GX011627-c3, synth4k-c3}` (3). List in
+`work\wp3.21\logs\c6-oracle-cleanup.txt`. Not touched: every `ref-*` (26), every `cand-fft-*`
+(13), and `cand-devframes2-*`, `cand-overlap-*`, `cand-p3-*` (outside the grant's globs). C:
+free 26 GB before (19 GB at the request), **37 GB after**.
