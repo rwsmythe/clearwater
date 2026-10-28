@@ -39,6 +39,13 @@ provider's ``--cache-clear`` clears only ``.pytest_cache`` subfolders and runs a
 this hook (a conftest registers after the built-in plugins and later-registered
 hooks run first); tests pin both.
 
+With pytest-xdist 3.8.0 local popen workers, the controller guard configures
+before session startup launches workers. ``xdist/workermanage.py:337-341``
+derives each worker's ``popen-gwN`` basetemp below the controller's basetemp;
+``xdist/remote.py:400,420-427`` assigns it before the worker configures its
+plugins and runs this guard again. Controller refusal therefore precedes
+worker temp-root creation; the worker checks its assigned child root as well.
+
 When the guard loads (pytest 8.4.2, ``_pytest/config/__init__.py``
 ``_set_initial_conftests`` and ``_try_load_conftest``): for every existing path
 argument (``testpaths`` when none is given) pytest loads the conftest files found at

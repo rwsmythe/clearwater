@@ -18,7 +18,8 @@
   turn 3. Generation 14's turn-5 dispatch restores FINAL ruling Q7:
   **TWO interleaved BASELINE -> PARALLEL -> SERIAL rounds**; a third only if
   the two PARALLEL+SERIAL wall-time totals differ by more than 15 percent.
-  D1 and D2 are diagnostics, not measurement rounds.
+  D1, D2 and D3 are diagnostics, not measurement rounds. R1/r2 are now measured
+  on `dd49a15`; their P+S totals differ by <1%, so no third round is requested.
 - Shared/in-flight files remain untouched, including WP-T3's `verify_generated`
   and `tests/test_fixtures.py`. No source, frozen interface, harness, product,
   or footage edit was made. All cell-authored artifacts are inside the worktree;
@@ -26,10 +27,14 @@
 - Dispatcher-supplied `tokens used` footers: turn 1 **73,551**, turn 2 **119,645**,
   turn 3 **220,811**. The dispatcher supplied turn 4's actual session-request
   **depth_input_tokens = 284,234**, window 475,000; this is an input-depth
-  reading, distinct from the earlier `tokens used` footers. Evaluation point
-  (~250K) has been crossed; this turn yields to a fresh Codex session for
-  rung 4 tabulation and later work. No turn-5 depth estimate is substituted;
-  the driver now prints `depth_input_tokens` and supplies the next reading.
+  reading, distinct from the earlier `tokens used` footers. Turn 5 ended at
+  **depth_input_tokens = 95,253**, supplied by generation 14 after committing
+  the ledger as `dd49a15`. CHARC ruled a fresh session "a choice, not a
+  necessity" after the depth fell to 95K. **SESSION CHOICE: this session
+  continues; no fresh session is used**, because it already holds rungs 1-3.
+  The old RESUME HERE checklist was followed in turn 6 and is now updated for
+  Reviewer A, final settled-head legs and the return. Turn-6 depth is pending
+  the driver's reading; no estimate or older peak is substituted for it.
 
 ## Turn 1 evidence: collection and dependency
 
@@ -542,15 +547,15 @@ missing observations, lower N or alter marker meaning. The medians additionally
 need matching frozen heads, matching sampler snapshots, green legs and matching
 per-round outcome totals.
 
-### Active rung-4 requests: two rounds; third conditional (turn-5 ruling)
+### Rung-4 protocol and executed requests (updated turn 6)
 
-Generation 14's turn-5 dispatch supersedes the turn-4 request for three rounds.
-Run **r1 and r2 only**, each **BASELINE, then PARALLEL, then SERIAL**, one
-quiet-host window at a time on the same frozen source. Request r3 only if Q7's
-15-percent drift condition is met. The three r3 wrappers remain available but
-are not unconditional requests. No rung-4 window has been run by the cell or
-reported by the dispatcher. `turn4-r4-plan.json` records the nine available
-commands; its first six entries are the active requests, not its old counts.
+Generation 14's turn-5 dispatch superseded the turn-4 request for three rounds.
+The dispatcher has now completed **r1 and r2**, each **BASELINE, then PARALLEL,
+then SERIAL**, on `dd49a15`, one quiet-host window at a time. Q7's 15-percent
+drift condition is not met: no r3 is needed, requested or included. The three
+r3 wrappers remain unused. `turn4-r4-plan.json` records nine available commands;
+the first six were executed. No heavy leg was executed by the cell. The
+executed rows and source-file-derived figures are recorded below.
 
 The nine wrappers call `work/wp-t4/run_r4.ps1` with fixed round/leg arguments.
 They resolve the worktree from their own path, set `QT_QPA_PLATFORM=offscreen`,
@@ -575,7 +580,7 @@ planted files were removed afterwards (`turn4-wrapper-guards.log` plus per-case
 logs). The common runner, nine run wrappers and E1 seat wrapper have zero
 PowerShell parse errors (`turn4-wrapper-syntax.log`).
 
-| Round / leg | Dispatcher RUN REQUEST | Exact pytest command (wrapper redirects to its unique log and appends EXIT) |
+| Round / leg | Executed dispatcher wrapper | Exact pytest command (wrapper redirects to its unique log and appends EXIT) |
 |---|---|---|
 | 1 / baseline | `powershell -NoProfile -File work/wp-t4/run_r4_r1_baseline.ps1` | `uv run pytest -q -rs --basetemp=work/wp-t4/r4-r1-baseline-tmp` |
 | 1 / parallel | `powershell -NoProfile -File work/wp-t4/run_r4_r1_parallel.ps1` | `uv run pytest -q -rs -n 4 -m "not gpu and not footage and not gui and not slow" --basetemp=work/wp-t4/r4-r1-parallel-tmp` |
@@ -791,104 +796,264 @@ checks only. No final-suite-green, completed measurement, median, review-round
 or package-completion claim is made. Final turn-5 evidence checks are recorded
 in `turn5-final-check.log`; handoff remains pending actual dispatcher windows.
 
+## Turn 6 -- rung 4 measured, report and Reviewer A handoff
+
+### Session and evidence provenance
+
+Generation 14 accepted turn 5 as `dd49a15`, ledger only, and supplied
+**depth_input_tokens 95,253**. CHARC's session ruling is recorded at the top:
+a fresh session was optional, this one continues because rungs 1-3 are already
+in context. The old RESUME HERE checklist was followed in this session.
+`turn6-collection-head.txt` confirms marker collection ran on `dd49a15`, before
+this turn's conftest docstring edit. The source/package diff base is `ba6e923`.
+
+The dispatcher performed all six r1/r2 windows and D3. Cell readback decoded
+PowerShell UTF-16 logs, verified summary AND EXIT plus recorded command/head/
+free-before data, and parsed UTF-8 sampler JSONL. `turn6-run-data.json` and
+`turn6-run-readback.log` preserve the extracted values. The prompt's summary
+was a cross-check, not the measurement source. This matters at rounding: r1
+P+S is 3832.6676705 s, hence **3832.67** rounded, not the prompt's 3832.66.
+No heavy run or test execution was performed by the cell in turn 6; only four
+marker collections, file parsing/static checks and gates.
+
+### Count reconciliation, times, saving and N=4
+
+For BOTH rounds independently: **4031+1036=5067 passed; 1+10=11 skipped**;
+failed/errors/xfailed/xpassed all **0+0=0**. Selected totals are
+**4032+1046=5078**. All six leg exits, two sampler exits and wrapper exits are
+zero. Head files all record `dd49a15d4659f2eb42acee24e5f3eac4e1c05272`.
+Commands, individual start/end times, N, counts, free-before, wall seconds and
+parallel memory/GPU completeness are in the heavy-run table below. Per-run
+pytest elapsed strings are retained in readback JSON; figures use wrapper wall.
+
+| Round | BASELINE s | PARALLEL s | SERIAL s | P+S s | Saving s | Saving % | SERIAL / BASELINE |
+|---|---|---|---|---|---|---|---|
+| 1 | 4564.80 | 497.30 | 3335.36 | 3832.67 | 732.13 | 16.04% | 73.07% |
+| 2 | 4349.92 | 493.54 | 3372.59 | 3866.13 | 483.78 | 11.12% | 77.53% |
+| Median | 4457.36 | 495.42 | 3353.98 | 3849.40 | retain per-round figures | retain per-round figures | retain per-round figures |
+
+Savings differ by **248.3433344 s / 4.9168798 percentage points**. BASELINE
+fell **4.7072446%** (r1 denominator), while P+S rose only **0.8732105%**
+(r1 denominator) / **0.8656515%** (r2 denominator), an absolute **33.4672558 s**.
+This baseline drift is disclosed, not averaged into one savings claim. No
+third round is required under Q7; D3 is never a threshold input. Same quiet
+host; **not a figure of record**. The serial set bounds the speedup: SERIAL
+is 73.07% / 77.53% of BASELINE. Offscreen gui and slow cases without a device
+are possible owner follow-ons by caution, never marker changes in WP-T4.
+
+Every free-before reading is >=5 GiB. Across required parallel windows, peak
+summed pytest-tree RSS is **6,967,926,784 B (6.49 GiB)** and minimum available
+**7,047,557,120 B (6.56 GiB)**, comfortably above 2 GiB. N=4 is AD-28's cap,
+not a guessed optimum; measured whole-suite saving of 11.12-16.04% and those
+memory observations justify the chosen cap on this host. No N=2 or N>4 run
+was performed. R1/r2 have 498/494 RSS samples, 499/495 GPU queries and no gaps,
+access-denied RSS, <2 GiB samples or remaining child PID. Both sampler copies
+match SHA `64a57c731a09a7eca1e4c6f5b882975888ca0233434cc02b2c69e0dbc7ee0854`.
+Independent `turn6-sample-verification.log` recomputes maxima/minima and query
+counts from raw rows, verifies floor/access/error flags and snapshot bytes.
+
+### D3 serial breakdown, overlap and privacy
+
+D3 is a separate diagnostic, with explicit dispatcher/CHARC approval; not a
+round and never included in medians or the 15-percent rule. Its exact command,
+start/end, wall and free-before are in the heavy-run row. `d3-serial.log`
+EXIT=0; 1036 passed, 10 skipped, 4032 deselected. JUnit has exactly the same
+1046 unique IDs as the serial collection, with no failure/error testcase.
+
+Four collections on dd49a15 use `uv run pytest --collect-only -q
+--strict-markers -p sandbox_mkdir_shim -p no:cacheprovider
+--basetemp=work/wp-t4/t6-collect-<marker> -m <marker>` for gpu, footage, gui and
+slow, all EXIT=0. Sandbox env: QT_QPA_PLATFORM=offscreen, absolute worktree
+scripts in PYTHONPATH, PYTEST_PLUGINS=sandbox_mkdir_shim, and work-local
+CUPY_CACHE_DIR. Exact marker IDs are `turn6-{gpu,footage,gui,slow}.nodes`.
+JUnit classname/name keys map one-to-one to raw IDs, including parameters
+and classes. Every marker union ID appears in D3 and vice versa. JUnit's
+configured/default total time includes setup, call and teardown.
+
+| Marker | IDs (skipped) | Sum of JUnit testcase seconds |
+|---|---|---|
+| gpu | 586 (4) | 1843.366 |
+| footage | 17 (1) | 2001.211 |
+| gui | 441 (0) | 67.769 |
+| slow | 20 (5) | 2931.947 |
+| Of which in two or more markers (counted once here) | 13 | 2011.870 |
+| De-duplicated SERIAL total | 1046 (10) | 3326.963 |
+
+The 13 overlapping cases are **8 two-marker and 5 three-marker** cases.
+Marker rows sum to **6844.293 s** and repeat **3517.330 s** of memberships;
+unique time is **3326.963 s**. The overlap line itself counts each overlapping
+case once (2011.870 s), so subtracting it once from marker rows is incorrect.
+D3 wall **3331.3104851 s** minus de-duplicated cases leaves **4.3474851 s
+(0.13050375%)**. This is unassigned launch/collection/session-hook/reporting/
+teardown overhead plus timing precision, not an extra independently timed
+fixture bucket. Test-attributed module/session fixture times are already
+inside JUnit cases. `turn6-analysis.json` and its log hold exact arithmetic.
+
+| Rank / node ID | Markers | JUnit total s | Setup s | Call s | Teardown s | Cost |
+|---|---|---|---|---|---|---|
+| 1. `tests/test_jobs_export_video.py::test_v4_synthetic_5k3_8_7_clip` | slow | 870.740 | 0.01 | 870.73 | <0.005 (hidden) | Body |
+| 2. `tests/test_jobs_export_video.py::test_gx011627_through_the_engine_keeps_every_mandatory_and_required_item` | gpu, footage, slow | 725.154 | <0.005 (hidden) | 725.15 | <0.005 (hidden) | Body |
+| 3. `tests/test_io_video_encode.py::test_gx011627_nvenc_levels_give_distinct_sizes` | gpu, footage, slow | 472.503 | <0.005 (hidden) | 472.50 | <0.005 (hidden) | Body |
+| 4. `tests/test_io_video_encode.py::test_gx011627_through_the_sink_keeps_every_mandatory_and_required_item` | gpu, footage, slow | 207.834 | 0.01 | 207.83 | <0.005 (hidden) | Body |
+| 5. `tests/test_color_roundtrip.py::test_pair_round_trip_on_the_owners_main_case` | footage, slow | 161.405 | 0.01 | 161.40 | <0.005 (hidden) | Body |
+| 6. `tests/test_io_video_decode_hw.py::test_the_real_clip_decodes_to_its_pts_and_the_reference_bytes` | footage, slow | 140.412 | 41.90 | 98.51 | <0.005 (hidden) | Body + module-fixture setup |
+| 7. `tests/test_io_video_decode_hw.py::test_the_real_clip_through_the_forced_default_pipe_is_identical` | footage, slow | 126.265 | <0.005 (hidden) | 126.26 | <0.005 (hidden) | Body |
+| 8. `tests/test_io_video_decode_hw.py::test_the_real_clip_through_cuda_decode_is_identical` | gpu, footage, slow | 94.030 | <0.005 (hidden) | 94.03 | <0.005 (hidden) | Body |
+| 9. `tests/test_prototype_backend.py::test_bench_gpu_records_graphics_memory` | gpu | 59.999 | <0.005 (hidden) | 60.00 | <0.005 (hidden) | Body |
+| 10. `tests/test_prototype_clip.py::test_bench_whole_clip_modes_record_their_pass` | gpu | 58.139 | 0.01 | 58.13 | <0.005 (hidden) | Body |
+
+All ten are dominated by call/body cost. Case 6 also includes **41.90 s setup**
+from the phase log, associated with the first use of module-scoped footage
+and reference fixtures (`tests/test_io_video_decode_hw.py:75-107`), including
+independent FFmpeg hash generation. Fixture-scope/placement is an owner question;
+the fixture is already module-scoped, not repeatedly rebuilt per case. Its
+98.51 s call remains body cost. The other top setups are <=0.01 s and all top
+teardowns are hidden below 0.005 s. `--durations=0` still hides those phases
+without -vv; do not invent zero/exact values or infer precision beyond the
+printed two decimals. JUnit totals have three decimals, so rounded phase
+sums need not match exactly. No new heavy -vv rerun was requested.
+
+`turn6-privacy-check.log` EXIT=0: the ten node IDs fit an ASCII test-name
+grammar and contain no absolute path, coordinates or location tokens. The
+only embedded clip name is gx011627, confirmed already in committed reports
+by `git grep -i gx011627 HEAD -- docs/reports`. The report has no hostname,
+absolute footage path or raw XML. JUnit and the full durations text stay only
+under work; only requested aggregate tables, ten IDs and phase values are
+copied. No new footage-derived output, image, location or metadata is committed.
+
+### E1 closure, environment skips and GPU finding
+
+The initial sandbox E1 timing failure remains historical evidence, with its
+bound untouched. `turn6-scope-e1.log` independently confirms E1 membership in
+all/serial, four exhaustive green quiet-seat outcomes and complete skip lists
+that exclude E1. The quiet -q logs contain no individual PASS line: the proof
+uses their totals and complete skips, not a fabricated per-node line. D3
+explicitly has a passing E1 testcase (19.306 s) and a 19.30 s call duration.
+**T4-4 is resolved by quiet-seat results; no bound relaxation, skip or fix.**
+
+Nine of eleven BASELINE skips are missing look-check frames under ignored
+work/wp1.3, at test_methods_assembly_v8.py:44. The other two are the known
+swscale/full-range refusal and no-photo skip (test_color_roundtrip.py:121,
+test_photo_check.py:139). Parallel has the first, serial the other ten; both
+rounds and D3 agree. Dispatcher says main has the look-check frames and shows
+two skips; the cell did not run main or copy footage-derived frames. This
+worktree's measurement retains and discloses the nine environment skips.
+
+The raised GPU activity reproduces with complete series in D2/r1/r2 at peaks
+**1036/1037/1049 MiB**, rises **1036/903/911 MiB**, baselines **0/134/138 MiB**.
+The traced mechanism remains module import at test_prototype_backend.py:23,
+select_backend -> _probe_gpu -> CuPy allocation/kernel at prototype/backend.py:211,
+before marker deselection in each worker. New job CPU paths/GPU marks are
+unchanged. System-wide samples do not exclusively attribute every MiB to that
+probe. **Finding remains raised; marker meaning is out of scope.** No new
+violator or exception was found; E1 remains the only WP-T4 moved node.
+
+### Q2, report and static gates
+
+Q2 adds ONE module-docstring paragraph to tests/conftest.py describing the
+controller-first order and derived popen-gwN child root, with installed xdist
+source anchors. `turn6-conftest-ast.log` EXIT=0 compares `ast.dump` of each
+module after removing its module-docstring node; results are identical, SHA
+`ccb362b5189b7daa23d6a3e65d7291f6d92f69fd1a655ea4e6c358d7c09de23e`.
+The removed/added docstring text differs by exactly the one paragraph. No
+executable guard or other product/interface/tool code changed in turn 6.
+
+NEW docs/reports/wp-t4-parallel-tests.md contains claims and limits, dependency
+MIT quotations and lock check, current partition/rebase accounting, guard
+source/positive control, deterministic cache red/green and lock policy,
+complete exception/violator list, figures/medians/saving spread/N rationale,
+D3 breakdown/top ten/privacy, resolved E1 and raised GPU findings, and exact
+executed commands plus proposed gate replacement/CLAUDE pointer. Neither the
+fill nor CLAUDE.md is edited; docs/testing.md is not created. The dispatcher
+owns those accept-time edits. No deviation beyond recorded sandbox collection
+accommodations and the explicitly superseded round/session choices is hidden.
+
+Static gates on final Python content all EXIT=0: **ruff check passes; ruff
+format reports 238 files already formatted; mypy finds no issues in 136 source
+files**. Logs: turn6-ruff-check.log, turn6-ruff-format.log, turn6-mypy.log.
+UV warns it ignores the inherited VIRTUAL_ENV in favor of this project's
+.venv; that warning is not a failing check. Only report/ledger documentation
+is updated after those checks; final verification rechecks the AST/scope and
+static gate result files. `git diff --check` and final evidence checks are
+recorded in turn6-final-check.log. Final two-leg gates remain pending Reviewer A.
+
+### Turn-6 verification loop
+
+| ID | Severity / class | Confirmed / rejected evidence | Disposition |
+|---|---|---|---|
+| T6-1 | Verification, figure provenance / counts | Six logs and command/head/free files read; raw sampler extrema recomputed; both outcomes add | Confirmed measured r1/r2 only; no third; per-round saving retained |
+| T6-2 | Minor nominal, serial-set follow-on outside scope | D3 1046 cases map exactly; marker sums/weighted overlap reconcile; serial is 73-77% of baseline | Raised owner follow-on; no marker or body/fixture change |
+| T6-3 | Verification, phase precision / fixture attribution | Durations hide <0.005 phases and round others; 41.90 setup appears on module-fixture first use | Hidden values disclosed, not invented; separate fixture/body costs |
+| T6-4 | Verification, resolved historical T4-4 | Quiet-seat B/S r1/r2 have no E1 skip/failure; D3 JUnit explicit pass | CLOSED by quiet-seat results; unchanged bound |
+| T6-5 | Major nominal, existing GPU/marker finding outside scope | Complete D2/r1/r2 peaks 1036/1037/1049; traced import mechanism remains | Raised; no fix, marker meaning out of scope |
+| T6-6 | Verification, docstring-only ownership | AST minus module docstring identical; exact one-paragraph delta | Confirmed Q2 within envelope |
+| T6-7 | Verification, report privacy / gates | ASCII/location checks and prior committed clip name; static gates all 0 | Confirmed; ready for driver-owned Reviewer A, no final-gate claim |
+
 ## Heavy-run ledger
 
-The dispatcher ran D1 after turn-3 yield and D2 before turn 5. Both are
-diagnostic only, not rounds. No heavy leg was executed by the cell.
+The dispatcher ran D1, D2, both settled rounds and D3. D1/D2/D3 are
+diagnostic only, not rounds. R1/R2 are the only measured rounds; all six
+windows and D3 ran on `dd49a15`, outside the sandbox without the shim, in
+quiet windows acknowledged by CHARC. No heavy leg was executed by the cell.
 
 | Run / head | Start UTC | End UTC | Command / log under work/wp-t4 | N | Counts | Leg / sampler / wrapper exit | Free before | Peak summed RSS | Minimum available | GPU / qualification |
 |---|---|---|---|---|---|---|---|---|---|---|
 | D1 diagnostic / `6ac384a`, before E1 | 2026-10-27 08:51:03.9259564Z | 2026-10-27 08:57:03.4570794Z | `uv run pytest -q -rs -n 4 -m "not gpu and not footage and not gui and not slow" --basetemp=work/wp-t4/t3-parallel-01`; `turn3-parallel-01.log` | 4 | 3882 passed, 1 skipped, 0 failed, 0 xfailed; 5 warnings | 0 / 4 / 4 | 11.899719 GiB | 6,821,711,872 B | 6,184,673,280 B | Baseline 123 MiB, observed peak 1457 MiB, rise 1334 MiB; 5/360 GPU gaps; diagnostic only |
 | D2 diagnostic / `f8b8f4b`, base `ba6e923`, after E1 | 2026-10-27 18:50:09.8062115Z | 2026-10-27 18:58:38.9712187Z | `uv run pytest -q -rs -n 4 -m "not gpu and not footage and not gui and not slow" --basetemp=work/wp-t4/turn5-diag-parallel-tmp`; `turn5-diag-parallel.log` | 4 | 4031 passed, 1 skipped, 0 failed, 0 xfailed; 5 warnings | 0 / 0 / 0 | 12.59000015258789 GiB | 7,060,955,136 B | 7,007,793,152 B | Baseline 0 MiB, peak 1036 MiB, rise 1036 MiB; 510 queries, zero unavailable; diagnostic only, not a round |
+| R1 baseline / `dd49a15` | 2026-10-27T19:09:09.9423940Z | 2026-10-27T20:25:14.7409654Z | `uv run pytest -q -rs --basetemp=work/wp-t4/r4-r1-baseline-tmp`; `r4-r1-baseline.log`; wall 4564.7952512 s | 1 | 5067 passed, 11 skipped, 0 failed, 0 xfailed | 0 / N/A / 0 | 12.454143524 GiB | not sampled | not sampled | not sampled |
+| R1 parallel / `dd49a15` | 2026-10-27T20:25:16.5545092Z | 2026-10-27T20:33:33.8627916Z | `uv run pytest -q -rs -n 4 -m "not gpu and not footage and not gui and not slow" --basetemp=work/wp-t4/r4-r1-parallel-tmp`; `r4-r1-parallel.log`; wall 497.3035847 s | 4 | 4031 passed, 1 skipped, 0 failed, 0 xfailed | 0 / 0 / 0 | 12.627063751 GiB | 6,967,926,784 B | 7,047,557,120 B | Complete; 499 queries; baseline 134, peak 1037, rise 903 MiB; zero gaps |
+| R1 serial / `dd49a15` | 2026-10-27T20:33:35.5773853Z | 2026-10-27T21:29:10.9443000Z | `uv run pytest -q -rs -m "gpu or footage or gui or slow" --basetemp=work/wp-t4/r4-r1-serial-tmp`; `r4-r1-serial.log`; wall 3335.3640858 s | 1 | 1036 passed, 10 skipped, 0 failed, 0 xfailed | 0 / N/A / 0 | 12.748401642 GiB | not sampled | not sampled | not sampled |
+| R2 baseline / `dd49a15` | 2026-10-27T21:30:32.8419642Z | 2026-10-27T22:43:02.7659107Z | `uv run pytest -q -rs --basetemp=work/wp-t4/r4-r2-baseline-tmp`; `r4-r2-baseline.log`; wall 4349.9191726 s | 1 | 5067 passed, 11 skipped, 0 failed, 0 xfailed | 0 / N/A / 0 | 12.545288086 GiB | not sampled | not sampled | not sampled |
+| R2 parallel / `dd49a15` | 2026-10-27T22:43:03.8385947Z | 2026-10-27T22:51:17.3838295Z | `uv run pytest -q -rs -n 4 -m "not gpu and not footage and not gui and not slow" --basetemp=work/wp-t4/r4-r2-parallel-tmp`; `r4-r2-parallel.log`; wall 493.5412374 s | 4 | 4031 passed, 1 skipped, 0 failed, 0 xfailed | 0 / 0 / 0 | 12.853286743 GiB | 6,854,651,904 B | 7,504,404,480 B | Complete; 495 queries; baseline 138, peak 1049, rise 911 MiB; zero gaps |
+| R2 serial / `dd49a15` | 2026-10-27T22:51:18.9534591Z | 2026-10-27T23:47:31.5505229Z | `uv run pytest -q -rs -m "gpu or footage or gui or slow" --basetemp=work/wp-t4/r4-r2-serial-tmp`; `r4-r2-serial.log`; wall 3372.5936889 s | 1 | 1036 passed, 10 skipped, 0 failed, 0 xfailed | 0 / N/A / 0 | 12.952400208 GiB | not sampled | not sampled | not sampled |
+| D3 diagnostic SERIAL / `dd49a15`, not a round | 2026-10-27T23:47:41.3884587Z | 2026-10-28T00:43:12.7028183Z | `uv run pytest -q -rs -m "gpu or footage or gui or slow" --durations=0 --junitxml=work/wp-t4/d3-serial-junit.xml --basetemp=work/wp-t4/d3-serial-tmp`; `d3-serial.log`; wall 3331.3104851 s | 1 | 1036 passed, 10 skipped, 0 failed, 0 xfailed; 4032 deselected | 0 / N/A / 0 | 12.675758362 GiB | not sampled | not sampled | not sampled; diagnostic only |
 
 D1 wall time: **359.5270566 seconds** (pytest's own duration 358.33 seconds).
 Its 360 RSS samples have no access-denied reading, no <2 GiB sample and no
-remaining child PID. Rung-4 rows will be added from actual window results,
-including per-round counts, frozen HEAD and sampler hash, not estimated figures.
+remaining child PID. Rung-4 rows above come from actual window files,
+including per-round counts, frozen HEAD and sampler hashes; none is estimated.
 
 ## Cumulative review-round ledger
 
 | Round | Critical / major / minor | In / out of envelope | NEW / REOPENED | Reverts | Product / test-only fixes | Reviewer transport / version | Dispatcher-read depth | Disposition |
 |---|---|---|---|---|---|---|---|---|
-| Not started | N/A | N/A | N/A | 0 | 0 / 0 | Driver-owned Claude Opus high; pending | Turn-3 footer 220,811; turn-4 depth_input_tokens 284,234 / 475,000 | Turn-5 pre-rung-4 yield to fresh session; r1/r2 requested, r3 conditional |
+| Not started | N/A | N/A | N/A | 0 | 0 / 0 | Driver-owned Claude Opus high; pending | Turn-5 depth_input_tokens 95,253; session continues by CHARC choice | R1/R2 measured; turn 6 ready for Reviewer A; no clean review claimed |
 
-## RESUME HERE -- fresh Codex session after the two rounds
+## RESUME HERE -- this session continues; Reviewer A then final legs
 
-1. Start from this ledger's dispatch/scope and turn-5 sections. Package diff
-   base is `ba6e923`; entry HEAD was `f8b8f4b`; the next commit is ledger only.
-   Preserve all evidence under `work/wp-t4/`. Read the dispatcher-supplied
-   turn-5 depth_input_tokens and record it; do not equate the old token-usage
-   footers to input depth. This session yields after the evaluation point;
-   no completed review round or rung-4 measurement is claimed.
-2. The dispatcher runs six windows, in order: r1 baseline, parallel, serial;
-   r2 baseline, parallel, serial. Read `r4-r{1,2}-{baseline,parallel,serial}.log`
-   summaries plus EXIT/start/end/wall fields, free-before logs, head/command/
-   conditions files, and parallel sampler logs, JSONL and snapshot hashes.
-   PowerShell pytest logs may be UTF-16; JSONL is UTF-8. Confirm each started
-   AND finished. Read actual outcomes, skips and warnings; do not infer them
-   from D1/D2. The expected collections are 5078 / 4032 / 1046. Both partitions
-   must add to BASELINE for each outcome (passed/skipped/failed/xfailed).
-3. Fill one heavy-run row per window with measured start/end, exact command,
-   N, counts, exits, free-before and parallel peak RSS/min available/GPU
-   completeness. All windows need >=5 GiB free before; every parallel sample
-   needs >=2 GiB available. A lower sample is a failed run and a STOP, never
-   permission to reduce N. All required parallel legs must be green, heads
-   must match and sampler snapshots must match the SHA recorded below. A
-   genuine GPU query error voids a complete GPU figure; successful slow reads
-   are valid only with their actual cadence/age disclosed. Keep GPU activity
-   raised; marker meaning is outside this package.
-4. Compare the two PARALLEL+SERIAL wall-time totals. Q7 requires a third full
-   interleaved round only when they differ by >15 percent; D2 never counts.
-   Report both totals and an explicit percentage denominator. If choosing
-   the first versus second total as denominator changes the threshold
-   decision, ask the dispatcher for the ruling before requesting r3. Do not
-   launch any window yourself. Existing r3 wrappers can be requested if the
-   condition is met. Compute medians for BASELINE, PARALLEL, SERIAL and each
-   round's P+S sum, using only the required valid rounds. Record start times,
-   same quiet host, and "not a figure of record". Justify N=4 (AD-28 cap)
-   from actual saving and peak memory, not a prospective estimate.
-5. No D1/D2 violator exists. A new parallel failure must be confirmed serially
-   before being called a violator. Report a failure that also fails serially
-   as pre-existing; never silently fix it. CHARC's condition: findings in
-   WP3.14 or WP3.20R tests are reported for that package's next touch, never
-   edited by this cell. Other tests outside WP-T4's owned envelope require
-   a grant before code edits. New timing watch items are in turn-5 static
-   findings below. E1 alone is the mandated moved exception; do not widen
-   its unchanged bound. Its light sandbox serial failure is still raised:
-   no separate quiet-seat probe result was supplied by turn 5. Quiet-seat
-   BASELINE/SERIAL results must resolve it, or the dispatcher must adjudicate
-   a repeated failure. The watch node in GUI analysis service is PARALLEL,
-   despite the old dispatch statement; collection proves this.
-6. Finish Q2's ONE module-docstring paragraph in `tests/conftest.py`, using
-   installed xdist source anchors already recorded in rung 2. Worker basetemp
-   derives from the controller root/popen-gwN; controller guard configures
-   before workers start. Conftest executable-code changes are forbidden;
-   a guard failure on a worker is a STOP. Respect the WP-T3 fence around
-   `verify_generated` and all product/tools/src/interface ownership limits.
-7. Write NEW `docs/reports/wp-t4-parallel-tests.md`: claims, current partition
-   proof and historical count changes, worker guard/positive control with
-   source lines, deterministic cache-race red/green proof and conservative
-   stale-lock rule, suspected/confirmed/rejected/fixed findings, complete
-   exception list, pre-existing failures, figures/medians/memory/GPU limits,
-   N rationale, review state and limits. Current node evidence is
-   `turn5-{all,parallel,serial}.nodes`, exact added/removed lists and
-   `turn5-collection-accounting.json`; all remain uncommitted scratch.
-   Dependency versions, MIT metadata quotations and old guard/cache
-   evidence are retained earlier in this ledger; do not claim new runs.
-8. Report section "Gate text for the orchestrator" must quote exact commands
-   as executed, propose replacing the fill's pytest sentence with the two
-   legs, "figures from serial runs only", and "new parallel-leg tests:
-   per-test tmp_path, no shared path; an exception is slow with a reason".
-   Supply the one-line CLAUDE.md pointer. Edit neither review-gate fill nor
-   CLAUDE.md; do not create docs/testing.md. Run ruff check, format --check
-   and mypy with logs. After any file changes following the final settled
-   round, request BOTH legs once more, per rung 5; green old diagnostics are
-   not final gates. Harness gate is not required for this package's files.
-9. Driver owns Reviewer A/B (pinned Claude Opus high), its transport and
-   assertions. No substitute reviewer or mailbox post. Adjudicate every
-   finding with severity, evidence, NEW/REOPENED and envelope classification;
-   maintain cumulative counts, reverts and product/test fixes. Zero new
-   blocking terminates per the fill; at round 5 and each fifth, STOP for
-   approval. Final return report under about 70 lines plus FILES CHANGED and
-   COMMIT; the dispatcher commits, never the cell. Do not mark complete
-   before measurement, final gates, report and reviews actually finish.
+1. Generation 14 supplied turn-5 depth_input_tokens **95,253** and CHARC chose
+   continuity, so follow this checklist in the same session. Record the next
+   driver-read depth without estimating it. Current diff base `ba6e923`;
+   rung-4/D3 head `dd49a15`; turn-6 changes are report, ledger and ONE
+   conftest docstring paragraph only. No other edits or heavy runs this turn.
+2. Rung 4 is DONE: r1/r2 only, six windows green and outcome sets reconciled.
+   Their P+S drift is <1%, below Q7's 15% rule; **do not request r3**. D1/D2/D3
+   are diagnostics, never rounds. Preserve all scratch evidence under work.
+   New report and this ledger hold figures and exact commands; raw XML and
+   durations stay under work. E1's quiet-seat pass resolves the old failure;
+   GPU import activity and serial-set/other-package watch findings stay raised.
+3. **Next: driver-owned Reviewer A**, pinned Claude Opus/high per fill; its
+   transport/assertions and findings file come from the dispatcher. This turn
+   yields ready for Reviewer A. Do not substitute a reviewer, post mailboxes,
+   or request the final two legs before Reviewer A settles.
+4. Adjudicate every finding with severity, confirm/reject evidence, envelope
+   and NEW/REOPENED classification. Fix only owned files; product/tools/src/
+   frozen-interface or conftest executable changes are STOPs. WP3.14/WP3.20R
+   test findings are reported for their next touch, never edited by this cell.
+   Keep cumulative review ledger counts, reverts and product/test-only fixes.
+   At round 5 and every fifth, STOP for approval. Follow fill convergence,
+   never claim a clean round before the actual reviewer result.
+5. **After Reviewer A settles**, rerun required static gates if fixes warrant,
+   then request final PARALLEL and SERIAL once on the settled head, one window
+   each, with fresh unique evidence/basetemp roots and sampler as appropriate.
+   The dispatcher runs them outside the sandbox. Files changed after rung 4,
+   so the old rounds do not replace this final gate. Do not reuse r1/r2 or D3
+   evidence names and do not request another BASELINE for final two-leg gates.
+   Apply >=5 GiB preflight and 2 GiB sampled floor, never lower N yourself.
+6. After green final legs, reconcile 4032+1046=5078 collections and per-outcome
+   totals/skips (or explicitly account for any authorized collection changes).
+   Update report/ledger with exact final evidence and review adjudication;
+   finish the return report under about 70 lines plus FILES CHANGED and COMMIT.
+   Do not mark complete until review, final gate and delivered report are done.
+   Reviewer B and accept-time edits to review-gate fill/CLAUDE pointer belong
+   to the orchestrator. No docs/testing.md, harness changes or footage output.
