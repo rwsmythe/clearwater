@@ -133,7 +133,20 @@
   fixed in cleanup turn 7. **Turn 7 committed 08e87f5** (report + ledger only; m1/m3/m4/m6 fixed, gate text runnable
   with collect-only set checks and --basetemp under work/; m2 LIMIT, lock messages name the path; m5 NOT taken = my
   MINOR row at the accept; CLAUDE.md pointer median P+S 3,849 s ~64 min; depth 212,913).
-- **WP-T4 FINAL LEGS GREEN; WINDOW CLOSED 2026-10-28 02:32Z** (msg `7d52d1b2d7af76a2`; OPEN was `3c3394e7d2adc0d2`,
+- **WP3.21 DISPATCHED 2026-10-28 ~03:20Z** (msg `8719064da5137bc3`): `implementer-opus-high` cell 1 (`wp321-cell1`), worktree
+  `.worktrees/wp3.21` on d1e4537, brief FINAL 43cc1ed, both nets Codex `gpt-6.1-sol`/high (A at the cell's seat, B at the
+  orchestrator's). First yield = task 1 WINDOW REQUEST (GX011627 breakdown; task 2 base reference may ride as a second leg);
+  orchestrator posts OPEN/CLOSE to me. **No window open now; seat free.** Round-0 design table is a YIELD; open choice = STOP.
+- **WP-T4 ACCEPTED main d1e4537 (patch-id of record 0984fd4b); CHARC QA DONE 2026-10-28** (msg `cdf86fe7f7af3a4c`; record
+  `docs/proofs/wp-t4-accept.md`). My QA: patch-id 0984fd4b on `ba6e923..wp-t4`, `f467a20..217f1a0`, and main; ff from f467a20;
+  9 package files + record + fill, all 0 CR; frozen interfaces untouched; code identity vs 08e87f5 empty; Reviewer B evidence
+  `wp-t4/reviewB/` md5s OK, `review.json` is_error false, 76 turns, modelUsage `claude-opus-5-5`, one VERDICT line
+  NO_NEW_CRITICAL_MAJOR; ruff / format 238 / mypy 136 / harness 382 OK at my seat. Fill GATE_CHECKS = the two-leg gate with my
+  timing-bound qualifier verbatim. **Owed items WRITTEN:** CLAUDE.md Conventions Tests line (two-leg command, median ~64 min vs
+  72-76); HD-1 third data point in `docs/decisions.md`; register DR-58 (c) CLOSED (E1 slow), NEW DR-65 (suite-cost concentration,
+  four export bodies 68 % of the serial leg), NEW DR-66 (m5 MINOR, worker-side refusal unreachable in envelope). Worktrees
+  `wp-t4`, `wp-t4-mc` released (branches kept).
+- **WP-T4 final legs green; window CLOSED 2026-10-28 02:32Z** (msg `7d52d1b2d7af76a2`; OPEN was `3c3394e7d2adc0d2`,
   01:27-02:32Z). **No window open; seat free.** Head 08e87f5: PARALLEL 4,031 / 1 skip / 451.96 s; SERIAL 1,036 / 10 /
   3,405.58 s; counts 5,078; 0 failures; P+S 3,857.5 s (between the rounds' 3,832.7 and 3,866.1). Sampler: peak RSS
   6.91 GB, min available 6.78 GB, GPU rise 878 MiB (same import-time finding). Code identity: main moved docs-only
