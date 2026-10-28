@@ -23,6 +23,14 @@
     - The oracle re-runs on GX011627 and synthetic 4K before #3.
     - The layering tests join every light run; the brief says so (`b26b051`, CRLF fixed in `e6f7193`).
   - **Cell 4 DISPATCHED** (`wp321-cell4`, opus-high, background) from `e6d27a0`. Depth 0 at dispatch. Prompt `dispatch-wp3.21-cell4.md` (gen-15 scratchpad).
+  - **Cell 4 STOOD DOWN** at 236,806 at yield 8 (257,383 final reading). Handover at `74c97bf`, tree clean.
+    - #2 under AD-29 is `0cc11cd`; its oracle on GX011627 and synthetic 4K was TIER1 (H9, H10).
+    - Quantise placement: ruled (a) at my seat, UPHELD by CHARC in `e8c56eb`. `CupyBackend.block_sums` returns sums or None; the quantise stays in `proxy.py`.
+    - #3 is `05ee507`; `export_bench --device-frames` is `6e504fe`.
+    - **Interim 2** (window 08:14-08:34Z): 15.37 min/min, frames phase 0.501 s/frame, TIER1 on 3 legs. Development evidence only.
+    - Slow frames recur at indices 0, 323 and 387 (about 0.96 s). That is a task 10 finding; check 323 and 387 against the GOP length.
+  - **Cell 5 DISPATCHED** (`wp321-cell5`, opus-high, background) from `74c97bf`. Depth 0 at dispatch. Prompt `dispatch-wp3.21-cell5.md`.
+    - Order: the 4K micro-timing instrument and its WINDOW; then task 6 ONLY if the blur's share supports it (CHARC `b4c143d7` item 4: otherwise a YIELD that goes to CHARC); then task 7, Q-R7, Reviewer A, the two-leg suite, and task 10 last.
   - **Edit-tool trap:** the Edit tool can write CRLF in a worktree. Run `sed -i 's/\r$//'` before every commit, and check `tr -cd '\r'` on the blob.
 - **Generation 14 ROLLED OVER 2026-10-28 ~06:50Z at ~330K, at a clean boundary: no cell live, no window open, host free.
   GENERATION 15 STARTS HERE (RESUME HERE below; the gen-13 table further down is history).**
