@@ -35,8 +35,9 @@
   The old RESUME HERE checklist was followed in turn 6 and is now updated for
   Reviewer A, final settled-head legs and the return. The dispatcher supplied
   **turn-6 depth_input_tokens = 152,531** after accepting turn 6 as `5e6a8d3`
-  (three files, zero CR bytes). Turn-7 depth remains pending the driver's
-  reading; no estimate or older peak is substituted for it.
+  (three files, zero CR bytes). Turn 7 was accepted as **08e87f5**; the
+  dispatcher supplied **turn-7 depth_input_tokens = 212,913**. Turn-8 depth
+  remains pending the driver's reading; no estimate is substituted.
 
 - CHARC's later figure ruling `144f9735` governs the interpretation of all
   historical "not a figure of record" condition strings below: these ARE
@@ -1168,6 +1169,171 @@ cleanup (wrappers record that actual HEAD; they do not pin 5e6a8d3):
 No BASELINE, r3 or review round 2 is requested. Final gates are not yet
 claimed green; Reviewer B/accept remain driver/CHARC work.
 
+## Turn 8 -- final gates and Reviewer B report corrections
+
+### Final two legs and merge candidate
+
+Turn 7 accepted as **08e87f5**, depth **212,913 input tokens** supplied by
+generation 14. Final PARALLEL/SERIAL ran at the owner's seat on that head,
+outside sandbox without shim, using the approved wrappers in a single
+CHARC-acknowledged exclusive heavy-job window. Every figure was read from
+final-* evidence files, not taken from the dispatch summary. Exact start/end,
+commands, N, counts, wall time, free-before and parallel memory/GPU are now
+in the heavy-run table. `turn8-final-readback.log` / `turn8-final-data.json`
+record decoded UTF-16 log summaries, EXIT and head/command/free files.
+
+Both final legs EXIT=0: PARALLEL **4031 passed, 1 skipped**, **451.9640804 s**;
+SERIAL **1036 passed, 10 skipped, 4032 deselected**, **3405.5786459 s**.
+Actual start/end window: 2026-10-28T01:27:41.3114764Z through
+2026-10-28T02:31:59.8207948Z. Both head files are
+08e87f51f242b8e3339ec8adee2b3cceef4c7f6a. Outcomes still reconcile:
+**4031+1036=5067 passed; 1+10=11 skipped; 4032+1046=5078 selected**;
+zero failures/errors/xfailed/xpassed. Skip reasons are unchanged, including
+nine environment-only missing-frame skips in SERIAL. No extra round/median
+or replacement suite figure is created from these acceptance checks.
+
+Parallel preflight **12.48272705078125 GiB**, serial **12.52798080444336 GiB**.
+Sampler EXIT=0: **452 RSS samples**, peak summed pytest-tree RSS
+**6,906,589,184 B**, minimum available **6,779,842,560 B**, no <2 GiB sample,
+RSS denial or remaining child. **453 complete GPU queries**; baseline **178**,
+peak **1056**, rise **878 MiB**; no slow read, longest 0.187 s, maximum GPU age
+0.406 s, RSS interval 1.110 s. Raw sample extrema, floors/query completeness
+and unchanged snapshot SHA 64a57c731a09a7eca1e4c6f5b882975888ca0233434cc02b2c69e0dbc7ee0854
+were independently verified, not only trusted from the summary record.
+
+Original package diff base **ba6e923**; merge candidate **wp-t4-mc / ed7eca9**
+is rebased on main **7f4b80d**. The driver reports stable patch-id **3aafebff**
+both before/after. Local git verification confirms candidate ref ed7eca9,
+empty 08e87f5-to-candidate code/dependency diff in src/tests/tools/pyproject.toml/
+uv.lock, and docs-only intervening main paths (turn8-candidate-code-stat.log,
+turn8-intervening-main-paths.log). CHARC ruled the final legs stand as the
+candidate's suite gate. Driver's candidate checks: ruff clean, format **238**,
+mypy **136**, harness **382 OK**, collection **5078/4032/1046**. These are
+explicitly seat-reported checks; no cell-run harness claim is made.
+
+### Reviewer B transport and all eight adjudications
+
+B ran at the driver's seat on ed7eca9 using codex_cell.py review, Claude Opus
+high, read-only. Dispatcher assertions: modelUsage **claude-opus-5-5**,
+is_error false, **76 turns**, clean worktree. The permitted review file alone
+was read; locally verified MD5 **f544e951a79fda4078517dc9586a1504**.
+Verdict **VERDICT: NO_NEW_CRITICAL_MAJOR**. Four Minor / four Advisory.
+B's sandbox refused work/ writes: its attempted lock run produced four
+basetemp setup errors, not an executed regression result. Claims 2 and 3 are
+REASONED; A executed lock/guard tests, and final full legs are green. Other
+executed source/collection/arithmetic checks are labelled as in B's report.
+No hidden test pass or unclassified permission denial is claimed.
+
+| B finding | Severity | Evidence / verification | NEW / REOPENED | Cell fix envelope / gate owner's ruling | Disposition |
+|---|---|---|---|---|---|
+| 1 | Minor | Review EXECUTED membership / REASONED device use; cell reads fixture :589-594, four test definitions and clip.py :1391/:1408, verifies six selected IDs | NEW | In, report completeness; marker fix out of scope | FIXED report: real neutral_analysis device work and all four unmarked consumers named; probe redesign alone insufficient; finding stays raised |
+| 2 | Minor | Review EXECUTED membership; independent broad rg + AST/source/readbacks extend B's list and match every listed function to selected IDs | NEW | In, report completeness; owning-package test edits forbidden | FIXED report: complete clock/assertion/scheduling inventory plus bounded waits, bounds and owners; WATCH, no failures or changes |
+| 3 | Minor | REASONED expected-skip comparison gap | NEW | Outside cell edit envelope: fill belongs to orchestrator | OWNER disposition: folded into fill at accept, as explicitly directed; proposed quote preserved |
+| 4 | Minor | REASONED candidate/main removed-ID and environment-selection gap | NEW | Outside cell edit envelope: fill belongs to orchestrator | OWNER disposition: folded into fill at accept; no cell gate-text rewrite |
+| 5 | Advisory | REASONED collection exit/nonempty/summary/BOM gap | NEW | Outside cell edit envelope: fill belongs to orchestrator | OWNER disposition: folded into fill at accept; exact owner sentence added after proposal |
+| 6 | Advisory | REASONED KeyboardInterrupt after exclusive-create but before try/finally can strand lock | NEW | In, existing m2 recovery limit | LIMIT recorded under m2; 180/900 s policy unchanged; no code fix |
+| 7 | Advisory | EXECUTED source: committed w1 :213 is !=; historical red log shows == in uncommitted variant | NEW | In, report citation | FIXED report: committed != assertion and absent-file lines 214-215 distinguished from historical deliberately false == red |
+| 8 | Advisory | EXECUTED git/source: candidate base differs by docs-only main commits | NEW | In, report provenance | FIXED report: original base ba6e923 / candidate base 7f4b80d and ed7eca9 stated; figures unaffected |
+
+All B findings are NEW, not reopened regressions: B1 extends the already raised
+GPU finding beyond A's corrected three-probe inventory; B2 expands the earlier
+WATCH list; B6 is another path into the already recorded m2 limit. A's fixes
+were not reverted. B total: **4 cell documentation fixes, 3 gate-owner
+dispositions, 1 recorded limit**. No code/test fix, no test mark, no new
+exception or dependency. The owner explicitly routes 3-5 to the fill; the
+report's proposed gate block is unchanged. Per instruction it now adds exactly:
+"Reviewer B findings 3-5 were folded into the fill by the orchestrator at the accept."
+The sentence records the gate owner's disposition, not a cell edit to that file.
+
+### Verified real GPU fixture and full timing-bound inventory
+
+Module-scoped neutral_analysis is decorated at test_prototype_clip.py:589,
+defines at :590 and calls real run_analyse at :594 with auto-selected GPU.
+Analysis uses backend.xp at tools/prototype/clip.py:1391 and moves raw frames
+to backend.to_device at :1408 before device analysis/synchronization. Module
+skip is FFmpeg-only. Four unmarked consumers, all selected, are:
+
+- `tests/test_prototype_clip.py::test_the_analysis_record_holds_one_entry_per_frame` at :597, 1 selected case.
+- `tests/test_prototype_clip.py::test_a_record_of_another_clip_or_other_settings_is_refused` at :755, 1 selected case.
+- `tests/test_prototype_clip.py::test_a_record_with_another_time_base_rate_or_depth_is_refused` at :942, 3 selected cases.
+- `tests/test_prototype_clip.py::test_a_record_with_another_decode_command_is_refused` at :952, 1 selected case.
+
+All are WP1.2 Part B; six IDs in total. The module fixture can run in multiple
+workers on the usable GPU host. **Probe redesign alone would not remove device
+work from the nominal non-GPU leg.** This is in addition to the three verified
+import probes, not a claim that all memory peaks have one exclusive cause.
+Finding stays raised; marker meaning/fix out of scope. Source and membership
+proof is in turn8-final-readback.log and turn8-final-data.json.
+
+The old two-family timing WATCH summary is superseded. The independent search
+covered clock calls, waits/joins/deadlines and assertions in tests, filtered
+against saved current parallel IDs, plus a separate time.sleep/assert review.
+Evidence: turn8-all-time-candidates.log, turn8-all-bound-candidates.log,
+turn8-bound-inventory.log, turn8-sleep-assert-review.log, turn8-timing-proof.log
+and the structured turn8-timing-inventory.json. It found **18 live-clock /
+scheduling / assertion-backed completion groups**, with exact selected test
+functions, bounds and owners tabulated in the report, plus **9 bounded-wait
+safeguard groups**. All listed functions have actual parallel IDs. No blind
+copy of B's examples or false claim of executing these tests this turn.
+
+Owner/bound summary (full nodes and source anchors in the report):
+
+| Owner / file | Verified remaining bounds / scheduling budgets |
+|---|---|
+| WP3.10 / test_io_video_encode_bench.py | 1.0<=strays<1.5 s; stop<1 s with 0.3 s join; memory median gap<0.1 s, GPU gap>=0.29 s; read/pause>=0.29 s; last-window delta [-0.01,+0.3) s; >5 RSS after 0.5 s, >10 after 2 s, >5 GPU after 1 s; 0.5/1.5 and 2/1 s stray observation windows |
+| WP3.9 / test_io_video_decode_lifecycle.py | Close/death elapsed<15 s; other lifecycle/event/pipe joins 15 s each; close timer 0.2 s with 0.05 s/frame and count<44 |
+| WP3.10 / test_io_video_encode.py | Dead-encoder elapsed<15 s |
+| WP1.2B / test_prototype_clip.py | Stalled decoder/encoder elapsed<30 s (1 s planted stall); 0.02 s writer sleep tests two-frame occupancy |
+| WP3.18 / test_gui_analysis_service.py | Read elapsed<0.2 s; pts/retarget caller join 1 s; setup/worker waits 5 s, cleanup join 10 s |
+| WP3.14 / test_jobs_export.py and test_jobs_export_video.py | Release/abort within 3 s (negative control expects bound failure); initial/gate budget 10 s, completion join 15 s; doubles block 5 s / gates 10 s; real product-close abort event wait 5 s |
+| WP3.11 / test_analysis_engine.py and test_analysis_store.py | Pause/resume events 10 s; worker/readers join 30 s; store reader join 10 s |
+| WP3.12 / test_cache_robust.py | Reader/writer join 120 s; event/release/final joins 30 s; clear remains alive after 0.5 s, then ends after 30 s release joins |
+| WP3.10 / test_video_fidelity.py | Poll up to 10 s for sampler rows before encode-window proof |
+| WP-T4 / test_fixture_cache_lock.py | Cold race 120 s deadline, synchronization 60 s, partial-writer wait 3 s, terminated-child join 10 s |
+
+General reference-process/mini-pytest safety timeouts (for example 60 s color
+reference / 120 s guard mini) are runner safeguards, not product latency
+assertions. Media PTS, fake-clock arithmetic and nonnegative elapsed values
+are not host wall-time bounds. E1's tight origin bound is SERIAL. No listed
+case failed in any measured parallel leg or the final one (its only skip is
+swscale, not listed). WATCH belongs to each owning package; no bound widening,
+serial mark or code/test change. Timing inventory does not imply extra
+violators, movement budget or a new review/gate run.
+
+### w1 citation, candidate base and completion
+
+Committed tests/test_conftest_guard.py:213 actually asserts
+`assert _snapshot(mini.footage) != before`; :214-215 require both planted
+files absent. The old turn2-positive-control-red.log deliberately tested
+`== before` and failed at 213 before the committed control was finalized.
+The report previously failed to distinguish that uncommitted variant. It now
+names the committed inequality and explicitly labels the historical equality
+variant, just as m1's committed race citation was corrected. No test changed.
+
+The report now records final gates, candidate provenance, B transport/limits
+and all owned corrections. It keeps the proposed gate text as the historical
+proposal; only the mandated gate-owner sentence follows it. m2 gains B6's
+interrupted-acquisition variant as a limit, no code change. The candidate's
+base is explicit and source-identical figures stand under CHARC's ruling.
+
+Turn-8 static gates all EXIT=0: `uv run ruff check .` passes;
+`uv run ruff format --check .` reports **238 files already formatted**;
+`uv run mypy` reports **no issues in 136 source files**. Logs:
+turn8-ruff-check.log, turn8-ruff-format.log, turn8-mypy.log. `git diff --check`
+and exact `git diff --stat HEAD -- src tests tools pyproject.toml uv.lock`
+proof are in turn8-final-check.log / turn8-docs-only-stat.log. The latter
+has empty code/dependency diff output. Final source/AST/node membership,
+proposal preservation, privacy, Markdown and file-scope checks are logged;
+there is no new test/collection/heavy run in this docs-only turn.
+
+The report and ledger are the ONLY turn-8 changes. No test-file, product,
+source/tool/dependency/gate-fill/CLAUDE edit and no heavy run or new collection
+was done by the cell this turn. Final source/code is unchanged, so the
+owner's standing final-gate ruling applies to these docs corrections. Cell
+return is delivered with this final yield; no RUN REQUEST remains. **COMPLETE
+except the orchestrator's accept**, including its fill/CLAUDE pointer and D3
+register row. Raised nonblocking device/timing/recovery limits stay visible.
+
 ## Heavy-run ledger
 
 The dispatcher ran D1, D2, both settled rounds and D3. D1/D2/D3 are
@@ -1186,6 +1352,8 @@ quiet windows acknowledged by CHARC. No heavy leg was executed by the cell.
 | R2 parallel / `dd49a15` | 2026-10-27T22:43:03.8385947Z | 2026-10-27T22:51:17.3838295Z | `uv run pytest -q -rs -n 4 -m "not gpu and not footage and not gui and not slow" --basetemp=work/wp-t4/r4-r2-parallel-tmp`; `r4-r2-parallel.log`; wall 493.5412374 s | 4 | 4031 passed, 1 skipped, 0 failed, 0 xfailed | 0 / 0 / 0 | 12.853286743 GiB | 6,854,651,904 B | 7,504,404,480 B | Complete; 495 queries; baseline 138, peak 1049, rise 911 MiB; zero gaps |
 | R2 serial / `dd49a15` | 2026-10-27T22:51:18.9534591Z | 2026-10-27T23:47:31.5505229Z | `uv run pytest -q -rs -m "gpu or footage or gui or slow" --basetemp=work/wp-t4/r4-r2-serial-tmp`; `r4-r2-serial.log`; wall 3372.5936889 s | 1 | 1036 passed, 10 skipped, 0 failed, 0 xfailed | 0 / N/A / 0 | 12.952400208 GiB | not sampled | not sampled | not sampled |
 | D3 diagnostic SERIAL / `dd49a15`, not a round | 2026-10-27T23:47:41.3884587Z | 2026-10-28T00:43:12.7028183Z | `uv run pytest -q -rs -m "gpu or footage or gui or slow" --durations=0 --junitxml=work/wp-t4/d3-serial-junit.xml --basetemp=work/wp-t4/d3-serial-tmp`; `d3-serial.log`; wall 3331.3104851 s | 1 | 1036 passed, 10 skipped, 0 failed, 0 xfailed; 4032 deselected | 0 / N/A / 0 | 12.675758362 GiB | not sampled | not sampled | not sampled; diagnostic only |
+| FINAL parallel / `08e87f5` | 2026-10-28T01:27:41.3114764Z | 2026-10-28T01:35:13.2794620Z | `uv run pytest -q -rs -n 4 -m "not gpu and not footage and not gui and not slow" --basetemp=work/wp-t4/final-parallel-tmp`; `final-parallel.log`; wall 451.9640804 s | 4 | 4031 passed, 1 skipped, 0 failed, 0 xfailed | 0 / 0 / 0 | 12.482727051 GiB | 6,906,589,184 B | 6,779,842,560 B | Complete; 453 queries; baseline 178, peak 1056, rise 878 MiB; zero gaps |
+| FINAL serial / `08e87f5` | 2026-10-28T01:35:14.2384032Z | 2026-10-28T02:31:59.8207948Z | `uv run pytest -q -rs -m "gpu or footage or gui or slow" --basetemp=work/wp-t4/final-serial-tmp`; `final-serial.log`; wall 3405.5786459 s | 1 | 1036 passed, 10 skipped, 0 failed, 0 xfailed; 4032 deselected | 0 / N/A / 0 | 12.527980804 GiB | not sampled | not sampled | not sampled |
 
 D1 wall time: **359.5270566 seconds** (pytest's own duration 358.33 seconds).
 Its 360 RSS samples have no access-denied reading, no <2 GiB sample and no
@@ -1194,46 +1362,43 @@ including per-round counts, frozen HEAD and sampler hashes; none is estimated.
 
 ## Cumulative review-round ledger
 
-| Round | Critical / major / minor / advisory | In / out of fix envelope | NEW / REOPENED | Reverts | Product / test-code / docs finding fixes | Reviewer transport / version | Dispatcher-read depth | Disposition |
+| Round | Critical / major / minor / advisory | In / out of cell fix envelope | NEW / REOPENED | Reverts | Product / test-code / cell docs fixes | Reviewer transport / version | Dispatcher-read depth | Disposition |
 |---|---|---|---|---|---|---|---|---|
-| A1 | 0 / 0 / 6 / 5 | 10 / 1 (a3 watch; test edits not owned) | 11 / 0 | 0 | 0 / 0 / 4 | codex_cell.py review; Claude Opus high; modelUsage claude-opus-5-5; driver assertions above | Turn 6 depth_input_tokens 152,531; turn 7 pending | NO_NEW_CRITICAL_MAJOR; all seven claims hold; zero new blocking terminates; one cleanup, no A2 |
+| A1 | 0 / 0 / 6 / 5 | 10 / 1 (a3 test edits not owned) | 11 / 0 | 0 | 0 / 0 / 4 | Driver codex_cell.py review; Claude Opus high; claude-opus-5-5 | Turn 6 152,531 | NO_NEW_CRITICAL_MAJOR; seven claims hold; zero new blocking terminates; single cleanup, no A2 |
+| B seat | 0 / 0 / 4 / 4 | 5 / 3 (gate text 3-5 owned by orchestrator) | 8 / 0 | 0 | 0 / 0 / 4 | Driver codex_cell.py review; Claude Opus high; claude-opus-5-5; claims 2/3 REASONED due write denial | Turn 7 212,913; turn 8 pending | NO_NEW_CRITICAL_MAJOR; 4 cell docs corrections, 3 gate-owner dispositions, 1 m2 limit; final gates green, accept remains |
 
-Cumulative: eleven findings adjudicated, four documentation fixes and seven
-limits/watch dispositions; no unclassified issue, reopening or revert. The
-transport's twelve denials are classified read-only scratch-write refusals,
-not findings against product code. Reviewer B remains pending at the driver.
+Cumulative: **0 Critical, 0 Major, 10 Minor, 9 Advisory; 19 NEW, 0 REOPENED**;
+cell-fix envelope 15 in / 4 out (report/watch permitted, source/gate edits not).
+**8 cell docs finding fixes, 8 LIMIT/WATCH dispositions, 3 gate-owner
+dispositions**; zero reverts, product/test-code fixes or unclassified issues.
+Neither review's sandbox/setup refusal is misreported as an executed test
+failure or pass. A executed guard/lock coverage; final legs ran green at seat.
 
-## RESUME HERE -- final two legs, then Reviewer B and accept
+## RESUME HERE -- COMPLETE except orchestrator accept
 
-1. Latest supplied depth: turn 6 **152,531 input tokens**; record turn 7's next
-   driver-read figure without estimating it. This session continues by CHARC
-   choice. Package base `ba6e923`; A1 reviewed `5e6a8d3`; turn 7 changes only
-   report/ledger. Dispatcher commits; cell never writes .git or a mailbox.
-2. Reviewer A **TERMINATED after round 1**, zero new blocking, seven claims
-   hold. All m1-m6/a1-a5 are adjudicated above: 4 docs fixes, 7 recorded
-   limits/watch items. This is the single cleanup; **do not request A round 2**.
-   Record the distinction between accepted suite wall-time figures and N6/V16
-   product figures (serial in their own windows). No source/test/plugin code
-   changed in cleanup; report records actual committed-red line 132.
-3. **Next: final PARALLEL then SERIAL** using run_final_parallel.ps1 and
-   run_final_serial.ps1, after committing cleanup, one dispatcher-granted
-   quiet window each, outside sandbox without shim. Fresh final-* evidence
-   names, >=5 GiB preflight, unchanged sampler beside parallel. No BASELINE,
-   no r3 (measured drift <1%), no N change. D1/D2/D3 never become rounds.
-4. Read final head/command/free/start/end/wall/EXIT and parallel sampler data;
-   confirm same committed head, both legs green, 4032+1046=5078 collection and
-   expected counts/skips (or explicitly account for any authorized change).
-   Preserve the measured r1/r2 figures as the suite record; final gate legs
-   are acceptance checks, not replacement rounds. Stop/report if sampled
-   available memory <2 GiB; do not lower N. Keep GPU finding and all limits.
-5. After final gates, deliver the return/report update with actual outcomes,
-   reviewer A adjudication and any final evidence; no acceptance claim before
-   required evidence. **Reviewer B runs at the orchestrator's seat next**, then
-   CHARC/orchestrator accept. Fill/CLAUDE pointer and D3 register row are theirs
-   to write at accept; no claim that those changes/row already exist. No test
-   marker, other-package test, product/src/tools/frozen-interface or conftest
-   executable edit is owned. No docs/testing.md or footage-derived artifacts.
-6. Final return under about 70 lines plus FILES CHANGED and COMMIT. The
-   package is not complete merely because A1 terminated: final gates, Reviewer
-   B and owner accept remain. Maintain severity/envelope/evidence records for
-   any subsequent seat findings; do not silently expand ownership.
+1. Cell work and final return are COMPLETE. Turn-7 depth supplied as **212,913
+   input tokens**; record turn-8 driver reading if supplied, never estimate it.
+   Package original base ba6e923; final gated head 08e87f5; candidate ed7eca9
+   on main 7f4b80d, docs-only intervening commits. Stable patch-id 3aafebff is
+   driver-reported; local source/dependency diff is empty. No code/test change
+   in this final documentation cleanup, and no additional gate is requested.
+2. R1/R2 suite figures and final legs are green and reconciled; no r3 or new
+   BASELINE. Final source-equivalent legs stand for candidate by CHARC ruling.
+   A1 terminated after zero new blocking; one cleanup. B seat ran with zero
+   new critical/major, all eight findings adjudicated. B claims 2/3 reasoned
+   due scratch write refusal, covered by A execution and final suite runs.
+3. Only **orchestrator accept** remains: commit/cherry-pick these report/ledger
+   corrections onto candidate, write fill GATE_CHECKS (including B3-5), CLAUDE
+   median-suite pointer and CHARC's D3 register row, then accept. Those surfaces
+   are not cell-owned and are not claimed edited by the cell. No further
+   RUN REQUEST, test/marker change or code cleanup is authorized in this turn.
+4. Preserve nonblocking findings: real GPU fixture plus three import probes;
+   complete named timing/synchronization WATCH list by owning package; m2/B6
+   recovery and the other lock/coverage/Windows limits. Product timing/memory
+   figures stay serial in their own N6/V16 windows. Suite figures retain
+   same-round savings/spread and median P+S, not product-performance claims.
+5. No mailbox/git write by cell; dispatcher commits the two owned doc paths.
+   No footage-derived output, XML, durations dump, GPS/location data, source,
+   harness, dependency, gate-fill or CLAUDE change is included. The final yield
+   supplies correction summary, verified bounds, gate results, docs-only proof
+   and FILES CHANGED/COMMIT for the dispatcher.

@@ -1,10 +1,16 @@
 # WP-T4: parallel test workers
 
-Status: rung 4 measured; Reviewer A round 1 adjudicated in one cleanup.
-Reviewer A found zero new critical/major findings; its loop terminates per the
-fill. Final settled-head two-leg gates, Reviewer B and acceptance remain pending.
-Package diff base: `ba6e923`; measurement head: `dd49a15` (all six windows and
-D3). Measurements were read from the worktree evidence, not copied from a
+Status: cell implementation, measurements, final two-leg gates and Reviewer
+A/B report corrections are complete; only the orchestrator's accept remains.
+Both reviews report zero new critical/major findings, with all findings
+adjudicated and nonblocking limits/watch items retained.
+Original package diff base: `ba6e923`; merge candidate `ed7eca9` sits on main
+**`7f4b80d`**. Intervening main changes are docs only. Measurement head was
+`dd49a15` (all six r1/r2 windows and D3); final-gate head was `08e87f5`.
+The driver reports stable patch-id `3aafebff` before/after the candidate rebase;
+local git comparison confirms empty diff in src/tests/tools/pyproject.toml/
+uv.lock between final-gate head and candidate, so CHARC ruled the final gates
+stand for the candidate. Measurements were read from the worktree evidence, not copied from a
 prompt. They describe the owner's Windows 11 / NTFS laptop, Python 3.12,
 pytest 8.4.2, pytest-xdist 3.8.0 with local execnet popen workers and headless
 Qt (`QT_QPA_PLATFORM=offscreen`). These are suite wall-time figures on the
@@ -123,7 +129,7 @@ on refusal, with no `popen-gw*` entry under fake footage:
 
 | Case | Coverage / observed result |
 |---|---|
-| w1 control, guard absent | Real `-n 2 --basetemp=<fake footage>` run deletes both planted files. The deliberately false unchanged-bytes assertion failed at `tests/test_conftest_guard.py:213`; final control expects the deletion. |
+| w1 control, guard absent | Real `-n 2 --basetemp=<fake footage>` run deletes both planted files. Committed `tests/test_conftest_guard.py:213` asserts `_snapshot(mini.footage) != before`; lines 214-215 assert both planted files absent. The historical deliberately false `== before` assertion at line 213 belonged to an uncommitted red variant, not the committed control. |
 | w2 guard present | Nine equivalent/inside/ancestor basetemp targets refuse on the controller before workers exist, with exit 4, `footage guard` and folder name in stderr; planted bytes unchanged. |
 | w3 guard present | PYTEST_DEBUG_TEMPROOT inside fake footage, TMP/TEMP/TMPDIR separately and together: five controller-refusal cases with the same exit/content/byte checks. |
 | w4 safe work folder | Exit 0 with both worker IDs recorded, worker basetemp under controller root and guard module registered as a plugin on each worker. |
@@ -204,6 +210,9 @@ Recorded lock limits from Reviewer A (no code change in this cleanup):
   but timeout/stale messages do not print PID or age. Recovery requires
   inspecting that lock and confirming the holder has stopped. Rules stay
   180 s / 900 s; no unsafe age-only stealing or OS-specific liveness is added.
+  Reviewer B #6 adds the tiny KeyboardInterrupt window after exclusive-create
+  succeeds but before the protected try/finally is entered: it can leave the
+  same lock residue and uses this same recovery limit, with no code change.
 - a1: the writer lock is not a reader lease. If two successive transient
   verification failures cause regeneration of a valid clip, an already-ready
   reader can encounter the in-place rewrite. This rare scenario remains a
@@ -225,11 +234,74 @@ No test was relabelled to hide a worker failure. Static checks found no new
 shared writable path/fixed port in added job tests; session synthetic clips
 and references use worker-local `tmp_path_factory`. Shared sample generation
 uses the lock. CPU selectors/forced-CPU settings cover new real CPU exports;
-new real NVENC cases already carry gpu marks. The added WP3.14 cancellation
-cases with a three-second bound remain reported watch items, not demonstrated
-violators. The GUI-analysis-service <0.2 s watch case is actually unmarked
-and remains in PARALLEL; it passed both measured legs. WP3.14/WP3.20R findings
-belong to their owner's next touch and are not edited by this cell.
+new real NVENC cases already carry gpu marks. The timing-bound inventory below replaces the earlier incomplete two-family
+watch summary. All listed selected cases passed every measured parallel leg;
+none is a demonstrated violator. These are WATCH items for the named owning
+packages. WP3.14/WP3.20R findings belong to their owner's next touch; no test,
+marker or bound is changed in this docs-only cleanup.
+
+### Verified timing bounds left in PARALLEL (Reviewer B finding 2)
+
+The complete live-clock assertion inventory on the 4032 selected IDs follows,
+including scheduling/count windows and assertion-backed completion waits.
+This was independently searched with rg over tests for clocks, elapsed,
+deadline, waits/joins and assertions, then read in source and matched against
+saved raw parallel IDs using AST function definitions. It was not copied from
+B's list. Evidence: `work/wp-t4/turn8-all-time-candidates.log`,
+`turn8-all-bound-candidates.log`, `turn8-bound-inventory.log` and
+`turn8-timing-proof.log` and a separate time.sleep/assertion review. Every
+listed function has selected parallel IDs.
+Media timestamps, fake-clock arithmetic and nonnegative elapsed fields are
+not host completion bounds. E1's tight telemetry-origin bound is SERIAL,
+so it is not in this list. General subprocess-run safety timeouts are execution
+safeguards, not additional assertions about product latency.
+
+| File / selected test functions | Owner | Bound / budget |
+|---|---|---|
+| `tests/test_io_video_encode_bench.py`: `test_conditions_strays_window_is_the_one_second` | WP3.10 | 1.0 <= strays.seconds < 1.5 s (:125) |
+| `tests/test_io_video_encode_bench.py`: `test_telemetry_samples_in_a_thread_and_starts_no_process` | WP3.10 | After 0.5 s sleep: >5 RSS samples and a GPU sample (:188-195) |
+| `tests/test_io_video_encode_bench.py`: `test_each_sampler_keeps_its_own_schedule_and_every_sample_its_time` | WP3.10 | 2 s observation: >10 RSS; memory median gap <0.1 s; GPU median gap >=0.29 s (:213-223) |
+| `tests/test_io_video_encode_bench.py`: `test_a_sampler_that_ends_early_is_recorded` | WP3.10 | After 1 s: exactly 3 RSS and >5 GPU samples (:239-243) |
+| `tests/test_io_video_encode_bench.py`: `test_a_sampler_that_does_not_stop_in_time_is_recorded` | WP3.10 | stop elapsed <1.0 s (:258), with planted sampler join 0.3 s (:251) |
+| `tests/test_io_video_encode_bench.py`: `test_strays_are_read_between_frames_and_kept_out_of_the_figures` | WP3.10 | Each read and pause >=0.29 s (:419,421); interval accounting abs tolerance min(pauses)/2 (:429) |
+| `tests/test_io_video_encode_bench.py`: `test_the_last_strays_window_ends_at_close` | WP3.10 | closed_at-0.01 <= last.at_s < closed_at+0.3 s (:472) |
+| `tests/test_io_video_decode_lifecycle.py`: `test_close_after_one_frame_ends_ffmpeg_and_the_thread`, `test_a_planted_ffmpeg_death_mid_stream_raises_and_never_hangs` | WP3.9 | elapsed < BOUND_S=15 s (:47,82,127) |
+| `tests/test_io_video_encode.py`: `test_a_dead_encoder_is_seen_at_the_next_write` | WP3.10 | elapsed <15 s (:998) |
+| `tests/test_prototype_clip.py`: `test_a_stalled_decoder_stops_the_pass`, `test_a_stalled_encoder_stops_the_pass` | WP1.2 Part B | elapsed <30 s (:326,343); planted stall detector 1 s |
+| `tests/test_gui_analysis_service.py`: `test_pts_and_statistics_never_wait_for_a_run_in_flight` | WP3.18 | elapsed <0.2 s (:199); setup event/worker join 5 s (:195,201) |
+| `tests/test_gui_analysis_service.py`: `test_pts_and_retarget_never_wait_for_the_file_system` | WP3.18 | Caller must finish after join(1.0) (:231-232); source gate 5 s; worker join 10 s |
+| `tests/test_jobs_export.py`: `test_cancel_releases_a_write_blocked_on_the_encoder`, `test_planted_cancel_polled_only_between_frames_hangs_past_the_bound` | WP3.14 | release <3 s (:39,364); planted negative control expects bound assertion to fail; initial-block deadline 10 s; join 15 s |
+| `tests/test_jobs_export.py`: `test_a_cancel_during_close_is_aborted_by_the_watchdog_at_every_timing` | WP3.14 | Four cases: abort event within 3 s (:449); gate entry within 10 s (:447); thread finishes within join(15) (:451-452) |
+| `tests/test_jobs_export_video.py`: `test_a_cancel_during_the_product_sinks_close_is_aborted_and_leaves_nothing` | WP3.14 | Three product-close cases use abort-event wait 5.0 s (:563), then require abort observed (:614) |
+| `tests/test_io_video_decode_lifecycle.py`: `test_close_from_another_thread_ends_the_reader_without_an_error` | WP3.9 | Close timer 0.2 s, consumer sleep 0.05 s/frame, then count <44 (:525-539); scheduling condition, not a fixed whole-test elapsed cap |
+| `tests/test_io_video_encode_bench.py`: `test_stray_watch_marks_the_runs_own_processes`, `test_stray_watch_charges_a_process_started_inside_the_window` | WP3.10 | Fixed observation sleeps 0.5/1.5 s and 2/1 s; then busy-CPU threshold and process-membership assertions (:141-174); load-sensitive windows, not elapsed upper caps |
+| `tests/test_prototype_clip.py`: `test_at_most_two_frames_are_in_flight_after_the_core` | WP1.2 Part B | Planted writer sleep 0.02 s, then max in-flight frames must equal OUTPUT_FRAMES=2 (:370-400); scheduling/occupancy, not a run-time cap |
+
+The search also retains bounded synchronization/cleanup/polling safeguards,
+which are possible host-load sensitivities rather than performance targets:
+
+| File / selected test functions | Owner | Bound / budget |
+|---|---|---|
+| `tests/test_analysis_engine.py`: `test_provisional_statistics_come_before_the_smoothed_ones`, `test_readers_on_other_threads_while_the_job_writes` | WP3.11 | pause event within 10 s, worker/readers join 30 s (:450,460,512) |
+| `tests/test_analysis_store.py`: `test_one_writer_and_reader_threads` | WP3.11 | Reader cleanup joins 10 s (:284) before final data/error assertions |
+| `tests/test_cache_robust.py`: `test_readers_see_whole_records_while_one_writer_stores` | WP3.12 | Worker joins 120 s (:313), followed by completion/data assertions |
+| `tests/test_cache_robust.py`: `test_a_second_store_on_a_key_that_is_still_being_stored_is_a_runtime_error` | WP3.12 | Entry/release waits and final writer join 30 s each (:326,334,342) |
+| `tests/test_cache_robust.py`: `test_clear_waits_for_a_reader_that_holds_the_pack_open_for_longer_than_any_retry` | WP3.12 | Entry/release/final joins 30 s; clear still alive after join(0.5), then ended after release/join(30) (:545-559) |
+| `tests/test_gui_analysis_service.py`: `test_retarget_false_leaves_the_run_under_the_old_parameters`, `test_retarget_true_makes_the_run_complete_under_the_new_parameters`, `test_a_second_concurrent_run_is_refused` | WP3.18 | Entry events and worker joins 5 s (:248-291), then data/completion assertions |
+| `tests/test_io_video_decode_lifecycle.py`: `test_an_iterator_dropped_without_close_is_cleaned_up`, `test_a_close_landing_during_the_start_leaves_no_process`, `test_two_concurrent_shutdowns_both_return_after_the_cleanup`, `test_the_large_pipe_holds_16_mib_without_a_reader` | WP3.9 | 15 s per lifecycle wait/join (:101-103,148-149,175-180,416-417); not a 15 s cap on the sum |
+| `tests/test_video_fidelity.py`: `test_the_sampler_and_the_encode_window_share_one_clock` | WP3.10 | Poll budget 10 s for 3 rows (:201-203), then assert encode-window proof |
+| `tests/test_fixture_cache_lock.py`: `test_two_processes_share_one_verified_cold_cache_generation` | WP-T4 | Cold-race child deadline 120 s; synchronization 60 s; optional partial-writer wait 3 s; termination join 10 s (:39-111) |
+
+These expand B's examples: particularly the memory-sampler median gap <0.1 s,
+stray-window end tolerance, GUI-service join(1.0), and real product-close abort
+wait(5.0) were absent from the old summary. WP3.11 pause helpers also use a
+10 s resume wait; WP3.14 doubles have 5 s blocking-write and 10 s gate waits.
+Reference-process helpers and miniature pytest runners have bounded safety
+waits (for example 60 s for the color reference and 120 s for the guard minis);
+these are not product performance assertions. No listed timing case failed
+in either measured round or the final parallel leg: that leg's only skip is
+the known swscale case, which is not in this inventory. Owning packages decide
+follow-on changes; WP-T4 neither widens bounds nor adds serial marks.
 
 | WP-T4 exception (complete list) | Reason | Remedy |
 |---|---|---|
@@ -351,8 +423,9 @@ full durations listing, hostname, absolute footage path or image/metadata is
 committed. Privacy check `turn6-privacy-check.log` validates all ten node IDs
 against an ASCII test-name grammar, rejects path/coordinate/location tokens,
 and verifies the only embedded footage clip name, `gx011627`, already occurs
-in committed reports (`git grep -i gx011627 HEAD -- docs/reports`). The report
-carries only the requested aggregate tables, ten node IDs and phase values.
+in committed reports (`git grep -i gx011627 HEAD -- docs/reports`). From those D3 artifacts, this report
+copies only the requested aggregate tables, ten node IDs and phase values;
+the GPU/timing inventories elsewhere are verified from source.
 
 Follow-on for CHARC at accept: the first four export test bodies in the table
 sum to **2276.21 s**, about **68.3% of D3's serial wall**. These WP3.14/WP3.10
@@ -372,9 +445,69 @@ allocation/kernel at `tools/prototype/backend.py:211`. Fixing only one module
 would leave the other probes. Modules import before marker deselection in
 each worker, so the nominal non-GPU expression does not prevent that probe.
 Static inspection found no new unmarked GPU execution path in the added job
-tests. System-wide memory samples cannot attribute every MiB exclusively to
-that probe. The finding remains raised; **marker meaning and a GPU-probe
+tests, but the pre-existing prototype fixture also performs real device work.
+`tests/test_prototype_clip.py:589-594` defines module-scoped `neutral_analysis`:
+it calls `clip.run_analyse(..., GPU, ...)` with the auto-selected module backend.
+In `tools/prototype/clip.py:1391` the analysis chooses `backend.xp`, and :1408
+moves each decoded frame through `backend.to_device(raw)` before analysis and
+synchronization. This is device analysis, not just an import probe.
+
+Four unmarked selected test functions use that fixture (six parameterized IDs):
+
+- `tests/test_prototype_clip.py::test_the_analysis_record_holds_one_entry_per_frame` (:597; 1 selected case).
+- `tests/test_prototype_clip.py::test_a_record_of_another_clip_or_other_settings_is_refused` (:755; 1 selected case).
+- `tests/test_prototype_clip.py::test_a_record_with_another_time_base_rate_or_depth_is_refused` (:942; 3 selected cases).
+- `tests/test_prototype_clip.py::test_a_record_with_another_decode_command_is_refused` (:952; 1 selected case).
+
+All belong to WP1.2 Part B. Their module skip depends on FFmpeg availability,
+not a gpu marker; on this usable-GPU host they ran in the parallel legs and
+can instantiate real analysis in multiple workers. **A probe redesign alone
+would not remove device work from the nominal non-GPU leg.** This finding
+stays raised; marker meaning and fixes remain outside WP-T4. No test changes.
+System-wide memory samples cannot attribute every MiB exclusively to
+those probes and the fixture. The finding remains raised; **marker meaning and a GPU-probe
 redesign are outside WP-T4**. These are sampled peaks, not continuous maxima.
+
+## Final gates, merge candidate and Reviewer B
+
+Final legs ran at the owner's seat, outside the sandbox without the shim,
+on **08e87f5**, in a CHARC-acknowledged quiet window. Values below were read
+from `work/wp-t4/final-*` files; these are final acceptance checks, not another
+settled round or replacements for the r1/r2 suite figures.
+
+| Leg | Start UTC | End UTC | Exact command | Outcomes | Wall s | Free before GiB | Exit |
+|---|---|---|---|---|---|---|---|
+| parallel | 2026-10-28T01:27:41.3114764Z | 2026-10-28T01:35:13.2794620Z | `uv run pytest -q -rs -n 4 -m "not gpu and not footage and not gui and not slow" --basetemp=work/wp-t4/final-parallel-tmp` | 4031 passed, 1 skipped, 5 warnings | 451.9640804 | 12.482727051 | 0 |
+| serial | 2026-10-28T01:35:14.2384032Z | 2026-10-28T02:31:59.8207948Z | `uv run pytest -q -rs -m "gpu or footage or gui or slow" --basetemp=work/wp-t4/final-serial-tmp` | 1036 passed, 10 skipped, 4032 deselected, 1 warning | 3405.5786459 | 12.527980804 | 0 |
+
+Counts reconcile again: 4031+1036=5067 passed; 1+10=11 skipped;
+4032+1046=5078 selected; zero failed/errors/xfailed/xpassed. Skip reasons are
+unchanged. Parallel sampler EXIT=0: **452 RSS samples**, peak tree RSS
+**6,906,589,184 B**, minimum available **6,779,842,560 B**, no access-denied or
+<2 GiB sample, no remaining child PID. All **453 GPU queries** succeeded;
+baseline **178 MiB**, peak **1056 MiB**, rise **878 MiB**. Longest query 0.187 s,
+maximum observation age 0.406 s, maximum RSS interval 1.110 s. Raw sample/query
+extrema and the unchanged sampler snapshot hash were independently reconciled
+in `turn8-final-readback.log`; the actual command/head/free-before files agree.
+
+Candidate **ed7eca9** on main **7f4b80d** carries the seven commits rebased from
+original base ba6e923. The driver reports unchanged stable patch-id 3aafebff;
+local code/dependency diff between 08e87f5 and candidate is empty and intervening
+main paths are all docs. CHARC ruled those final suite gates stand for the
+candidate. Dispatcher-reported candidate checks: ruff clean, 238 formatted,
+mypy 136 clean, harness **382 OK**, collection **5078/4032/1046**. This cell
+does not claim to have executed that seat-only harness run.
+
+Reviewer B: driver's `codex_cell.py review`, Claude Opus/high, read-only,
+modelUsage **claude-opus-5-5**, is_error false, 76 turns, clean worktree;
+`VERDICT: NO_NEW_CRITICAL_MAJOR`. Permitted review-file MD5 locally checked:
+**f544e951a79fda4078517dc9586a1504**. Its attempted lock run had four basetemp
+setup errors because its read-only sandbox refused work/ writes; claims 2/3
+are REASONED, not executed passes. Reviewer A executed the lock/guard checks
+and the final legs are green. All eight B findings are adjudicated: 1/2/7/8
+report corrections here; 3-5 assigned to the orchestrator's fill at accept;
+6 recorded under m2's interrupted-acquisition lock-recovery limit. No code or
+marker change and no further heavy run is requested for this docs-only turn.
 
 ## Verification and remaining acceptance
 
@@ -402,6 +535,14 @@ There is no changed Python/test file in the cleanup; the test run verifies
 m1's current green. Final scope/runner/privacy checks and diff whitespace
 validation are in `work/wp-t4/turn7-final-check.log`.
 
+Turn-8 docs-only gates all EXIT=0: ruff check passes; ruff format reports
+**238 files already formatted**; mypy is clean in **136 source files**
+(`work/wp-t4/turn8-{ruff-check,ruff-format,mypy}.log`). `git diff --check`
+passes and `git diff --stat HEAD -- src tests tools pyproject.toml uv.lock`
+is empty. Source/dependency/marker identity and the final-gate standing ruling
+are preserved; no new heavy run or test-file change accompanies these report
+corrections. Final proof is `work/wp-t4/turn8-final-check.log`.
+
 Reviewer A ran on `5e6a8d3` through the driver's pinned Claude Opus/high
 invocation (modelUsage claude-opus-5-5), read-only. Its verdict is
 `VERDICT: NO_NEW_CRITICAL_MAJOR`; all seven CLAIMS_FIRST checks hold.
@@ -410,13 +551,13 @@ ledger: four documentation findings fixed, seven limits/watch items recorded.
 There are zero new blocking findings, so the loop terminates after round 1
 and this single cleanup; no round 2 is requested. The reviewer independently
 ran four lock tests and 60 guard tests under workers. Driver assertions and
-permission-denial provenance are recorded in the ledger. Final PARALLEL and
-SERIAL runs are now requested on the committed cleanup head because files
-changed after rung 4; those final legs have not run. The harness gate is not required for this
+permission-denial provenance are recorded in the ledger. Final PARALLEL and SERIAL gates subsequently ran green on 08e87f5 and stand
+for the code-identical merge candidate by CHARC's ruling. Reviewer B's report
+corrections are recorded in this docs-only turn; no rerun is requested. The harness gate is not required for this
 package's owned files. Final acceptance and changes to the fill/CLAUDE.md belong
-to the orchestrator. Open items: final two-leg gates, Reviewer B at the
-orchestrator's seat, return/owner acceptance, and the recorded limits and
-GPU/serial-set/other-package timing follow-ons.
+to the orchestrator. Cell work and the final return are complete; only the
+orchestrator's accept remains. Raised GPU/serial-set/timing and recovery limits
+are owner follow-ons, not undisclosed acceptance claims.
 
 ## Gate text for the orchestrator
 
@@ -460,6 +601,8 @@ edits the fill, keeping its other hardware and harness requirements):
 > `uv run pytest --collect-only -q -m "not gpu and not footage and not gui and not slow" --basetemp=work/pytest-gate-RUN-collect-parallel > work/pytest-gate-RUN-parallel.txt`
 >
 > `uv run pytest --collect-only -q -m "gpu or footage or gui or slow" --basetemp=work/pytest-gate-RUN-collect-serial > work/pytest-gate-RUN-serial.txt`
+
+Reviewer B findings 3-5 were folded into the fill by the orchestrator at the accept.
 
 All commands above use committed dependencies, pytest and the standard library;
 no uncommitted helper is required. `work/` and the fresh evidence names must
