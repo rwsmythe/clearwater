@@ -201,13 +201,13 @@ only on its reading; task 7 and Q-R7; Reviewer A; the two-leg suite; task 10 LAS
 
 ### Q-R5 micro-timing (EXCLUSIVE window 2026-10-28, OPEN 08:43Z; development evidence)
 
-Driver `work\wp3.21lur_microtiming.py` (uncommitted; `--selftest` worst 6.0e-7 on small arrays
+Driver `work\wp3.21\blur_microtiming.py` (uncommitted; `--selftest` worst 6.0e-7 on small arrays
 incl. repeated reflection). GPU events, warm-up 3, median of 20. Run 1 (`logs\microtiming-1.log`,
 GX011627 frame 0, 4K) finished the render and 4K rows, then STOPPED by the cell in the 5.3K rows:
 the instrument's cuFFT plan cache (one plan set per ladder shape, never freed) filled the card
 (7,839 of 8,188 MiB) and paged (2-D medians of 4-9 s); its JSON was not written, the 4K figures
 are the log's. Run 2 (`--only-53k`, plan cache and pool cleared per row; JSON
-`microtiminglur-microtiming-53k-20261028T090504Z.json`, 321 s, card 1.8 GB between rows).
+`microtiming\blur-microtiming-53k-20261028T090504Z.json`, 321 s, card 1.8 GB between rows).
 
 - **Blur share of c3 render at 4K:** render 0.500 s (events); with the per-call wrapper 0.504 s,
   of which blur 0.360 s = **71.4 %**. Calls per frame: mask (H,W) sigma 21.6 0.020 s; Cb and Cr
