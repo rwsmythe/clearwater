@@ -2010,3 +2010,11 @@ direct Gaussian); cell 5's 5.3K render pool peak 2,710 MiB (2,798 at the max fra
   6,281 (x 0.70 / x 0.58) and under the base 5,897.** The breach exists only in the device-wide
   figure the ruled test used, and is FFmpeg's (about 2.4 GB for the export decoder and NVENC,
   plus about 0.8-1.25 GB for the overlap's analysis decoder) plus the context, on top of the pool.
+- **Per thread (CHARC's ask 1), stated plainly:** CuPy's default pool is ONE pool shared by
+  every thread of the process; no per-thread pool figure is obtainable through the backend. The
+  nearest proxy, an ATTRIBUTION BY TIMING, NOT A MEASUREMENT (scratchpad `pool_growth.py`,
+  `work\wp3.21\logs\c7-attr-pool-growth.txt`, from the recorded per-call reads): each rise in the
+  pool total between two consecutive backend-call reads is credited to the thread whose call
+  ended the interval. ON: analysis thread 3,297 MiB (lead 824, overlap 2,473), render thread
+  1,130 (overlap); OFF: analysis 1,080 (lead 44, overlap 1,036), render 2,547. Order-dependent:
+  a thread that grows the pool first leaves free blocks the other reuses uncounted.
