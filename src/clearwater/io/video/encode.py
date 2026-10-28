@@ -76,6 +76,7 @@ from clearwater.io.video.capability import (
     detect_capabilities,
     tool_env,
 )
+from clearwater.io.video.decode import DeviceFrameBackend
 from clearwater.io.video.inputs import ascii_text
 from clearwater.io.video.probe import VideoProbeError, find_tool
 from clearwater.io.video.verify import (
@@ -494,15 +495,6 @@ def _remove(path: Path) -> None:
             time.sleep(_REMOVE_PAUSE_S)
 
 
-def _cupy_device(pixels: object) -> str | None:
-    """Return ``"cuda:<n>"`` for a CuPy array on device n, None for anything else."""
-    if not type(pixels).__module__.startswith("cupy"):
-        return None
-    device = getattr(pixels, "device", None)
-    number = getattr(device, "id", None)
-    return None if not isinstance(number, int) else f"cuda:{number}"
-
-
 class FFmpegVideoSink:
     """Writes corrected frames to an HEVC MP4 with the source's timing and tracks (IF-5).
 
@@ -512,8 +504,19 @@ class FFmpegVideoSink:
     failure stops the encoder and deletes the output, and ``abort`` then only repeats that.
     """
 
-    def __init__(self) -> None:
-        """Create a sink that has not been opened."""
+    def __init__(self, *, device_backend: object | None = None) -> None:
+        """Create a sink that has not been opened.
+
+        Args:
+            device_backend: The job's backend. When it satisfies
+                :class:`~clearwater.io.video.decode.DeviceFrameBackend` (the GPU backend, AD-29),
+                a frame on its device is quantised there and only its planes are downloaded.
+                None (the default) or a backend without the device extensions (the CPU backend)
+                keeps the host-only rule: a frame not on ``"cpu"`` is refused.
+        """
+        self._device_backend = (
+            device_backend if isinstance(device_backend, DeviceFrameBackend) else None
+        )
         self._phase: _Phase = "new"
         self._phase_lock = threading.Lock()  # close's and abort's transitions (DR-63)
         self._process: subprocess.Popen[bytes] | None = None
@@ -698,10 +701,11 @@ class FFmpegVideoSink:
 
         Args:
             frame: The corrected frame: float32 ``(height, width, 3)``, the source's time base,
-                a pts of the source later than the previous frame's. On the CPU a NumPy array;
-                on ``"cuda:<n>"`` a real device array of that device, quantised there and
-                downloaded as planes (WP3.21 #2). A device label on host pixels is refused (call
-                the backend's ``to_host`` and label the frame ``"cpu"``).
+                a pts of the source later than the previous frame's. On the CPU a NumPy array.
+                On the device of the sink's ``device_backend`` (WP3.21 #2, AD-29) an array of
+                that backend, quantised there and downloaded as planes. Any other device label,
+                and a device label on host pixels, is refused (call the backend's ``to_host``
+                and label the frame ``"cpu"``).
 
         Raises:
             VideoEncodeError: ``"state"`` when not open; ``"frame"`` for a frame that breaks a
@@ -927,13 +931,16 @@ class FFmpegVideoSink:
         """Check one frame against the rules of :meth:`write`; return its pts and its planes."""
         probe = self._probe
         assert probe is not None
-        pixels = frame.pixels
+        pixels: Any = frame.pixels  # on a device, an array of that backend (IF-1 types the host's)
+        backend = self._device_backend
         on_device = frame.device != "cpu"
-        if on_device and _cupy_device(pixels) != frame.device:
+        if on_device and (
+            backend is None or frame.device != backend.device or isinstance(pixels, np.ndarray)
+        ):
             raise VideoEncodeError(
                 "frame",
-                f"The frame is on {ascii_text(str(frame.device))} but its pixels are not an "
-                "array of that device; copy it to the host first (backend.to_host).",
+                f"The frame is on {ascii_text(str(frame.device))}; copy it to the host first "
+                "(backend.to_host).",
             )
         if frame.time_base != probe.video.time_base:
             raise VideoEncodeError(
@@ -955,16 +962,21 @@ class FFmpegVideoSink:
             raise VideoEncodeError(
                 "frame", f"The frame is {type(pixels).__name__}, not a float32 NumPy array."
             )
-        if on_device and pixels.dtype != np.float32:
-            raise VideoEncodeError("frame", f"The device frame is {pixels.dtype}, not float32.")
+        if on_device and getattr(pixels, "dtype", None) != np.float32:
+            dtype = getattr(pixels, "dtype", None)
+            raise VideoEncodeError("frame", f"The device frame is {dtype}, not float32.")
         if pixels.shape != self._shape:
             raise VideoEncodeError(
                 "frame", f"The frame shape {pixels.shape} is not the source's {self._shape}."
             )
+        if on_device:
+            assert backend is not None
+            try:
+                return pts, backend.rgb_to_planes(pixels, bit_depth=self._bit_depth)
+            except (TypeError, ValueError) as error:  # not this backend's array, or a NaN
+                raise VideoEncodeError("frame", ascii_text(str(error))) from error
         try:
-            if not on_device:
-                pixels = np.ascontiguousarray(pixels)
-            return pts, rgb_to_planes(pixels, bit_depth=self._bit_depth)
+            return pts, rgb_to_planes(np.ascontiguousarray(pixels), bit_depth=self._bit_depth)
         except ColorError as error:
             raise VideoEncodeError("frame", ascii_text(str(error))) from error
 

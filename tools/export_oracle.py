@@ -237,14 +237,15 @@ class RecordingSink(FFmpegVideoSink):
         devices: The ``Frame.device`` values the sink was given (WP3.21 #2's evidence).
     """
 
-    def __init__(self, folder: Path, every: int) -> None:
+    def __init__(self, folder: Path, every: int, *, device_backend: object | None = None) -> None:
         """Record into ``folder`` (the kept frames), keeping every ``every``-th frame.
 
         Args:
             folder: Where the ``.npy`` frames go (made on first use).
             every: Keep frames ``0, every, 2 * every, ...`` in write order; 1 keeps all.
+            device_backend: The product sink's ``device_backend`` (AD-29; None: host only).
         """
-        super().__init__()
+        super().__init__(device_backend=device_backend)
         self._folder = folder
         self._every = max(1, every)
         self.frames: list[tuple[int, str]] = []
@@ -373,7 +374,9 @@ class Job:
         method: The method id.
         force_cpu: ``Settings.force_cpu``.
         every_frame: Keep every pre-encode frame, not one per second.
-        device_frames: Build the video source with device frames (WP3.21 #2).
+        device_frames: Build the video source and the sink with the backend the job selects
+            (``device_backend``, WP3.21 #2, AD-29): device frames on the GPU backend, the host
+            path on the CPU backend.
     """
 
     source: Path
@@ -412,16 +415,24 @@ def record_clip(
     out_dir.mkdir()
     inner = (methods or available_methods())[job.method]
     method = RecordingMethod(inner)
-    source = FFmpegVideoSource(device_frames=job.device_frames)
+    settings = Settings(output_folder=out_dir, force_cpu=job.force_cpu)
     try:
-        probe: ProbeResult | None = source.probe(job.source)
+        probe: ProbeResult | None = FFmpegVideoSource().probe(job.source)
     except Exception:  # the job probes again and reports why the clip is unusable
         probe = None
     every = 1 if probe is None else sample_every(probe.video.frame_rate, job.every_frame)
+    # AD-29: the source and the sink get the backend the job will select; the CPU backend has
+    # no device extensions, so a --force-cpu leg stays on the host path by structure.
+    device_backend = None
+    if job.device_frames and probe is not None:
+        device_backend, _reason = select_backend(
+            settings, probe.video.height, probe.video.width, job.method
+        )
+    source = FFmpegVideoSource(device_backend=device_backend)
     sinks: list[RecordingSink] = []
 
     def sink() -> RecordingSink:
-        sinks.append(RecordingSink(folder / "frames", every))
+        sinks.append(RecordingSink(folder / "frames", every, device_backend=device_backend))
         return sinks[-1]
 
     cache = DiskProxyCache(cache_dir)
@@ -435,7 +446,6 @@ def record_clip(
         cache_key=cache_key,
         select_backend=select_backend,
     )
-    settings = Settings(output_folder=out_dir, force_cpu=job.force_cpu)
     parameters = ParameterSet(
         method=job.method, parameters={}, created=datetime.now(UTC), app_version="export-oracle"
     )

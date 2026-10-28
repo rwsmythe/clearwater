@@ -16,18 +16,19 @@ A file the probe flagged ``truncated`` or ``unreadable_tail`` yields every decod
 ends without raising (D86; the warning is the probe's fault). On a file the probe found clean, an
 FFmpeg failure raises :class:`VideoDecodeError` after the last good frame.
 
-Device frames (WP3.21 #2) are opt-in at construction and off by default: a source built with
-``device_frames=True`` uploads each frame's integer planes and converts them on the GPU for a
-``frames(..., hw_decode=True)`` call, yielding frames on ``"cuda:<n>"``. The caller's
-``hw_decode`` states that its backend is the GPU (the export job and the analysis engine pass
-``backend.device != "cpu"``); the frames themselves are the host conversion's, bit for bit.
+Device frames (WP3.21 #2, AD-29) are opt-in at construction and off by default: a source built
+with ``device_backend=<the GPU backend>`` uploads each frame's integer planes and converts them on
+that backend's device for a ``frames(..., hw_decode=True)`` call. The backend is reached only
+through :class:`DeviceFrameBackend`, this package's Protocol for the IF-2 device extensions; a
+backend without them (the CPU backend), or None, leaves every frame on the host as before. The
+caller's ``hw_decode`` states that its backend is the GPU (the export job and the analysis engine
+pass ``backend.device != "cpu"``); the frames themselves are the host conversion's, bit for bit.
 """
 
 from __future__ import annotations
 
 import collections
 import contextlib
-import importlib
 import io
 import logging
 import math
@@ -37,13 +38,13 @@ import re
 import subprocess
 import threading
 import weakref
-from collections.abc import Iterator
+from collections.abc import Buffer, Iterator
 from fractions import Fraction
 from pathlib import Path
-from typing import IO, Any, Literal
+from typing import IO, Literal, Protocol, runtime_checkable
 
 from clearwater.color import decode_filter, planes_to_rgb, rgb_frame_bytes
-from clearwater.interfaces.image import Frame
+from clearwater.interfaces.image import Array, Frame
 from clearwater.interfaces.video import ProbeResult
 from clearwater.io.video.inputs import ascii_text
 from clearwater.io.video.pipes import open_frame_pipe
@@ -80,6 +81,30 @@ DecodeErrorKind = Literal["refused", "unreadable", "pts"]
 
 _cuda_available: bool | None = None
 _cuda_lock = threading.Lock()
+
+
+@runtime_checkable
+class DeviceFrameBackend(Protocol):
+    """The IF-2 device extensions ``clearwater.io.video`` calls (AD-29), by structure.
+
+    NOT part of the frozen IF-2 ABC: the GPU backend provides them and the CPU backend does not.
+    The names and signatures are the GPU backend's; the decode calls :meth:`planes_to_rgb` and
+    the sink :meth:`rgb_to_planes`. A backend that does not satisfy this Protocol (the CPU
+    backend) or None leaves the source and the sink on their host paths.
+
+    Attributes:
+        device: The device the arrays live on, ``"cuda:<n>"``.
+    """
+
+    device: str
+
+    def planes_to_rgb(self, data: Buffer, *, width: int, height: int, bit_depth: int) -> Array:
+        """Upload one planar G, B, R frame and convert it to float32 RGB on the device."""
+        ...
+
+    def rgb_to_planes(self, a: Array, *, bit_depth: int) -> bytes:
+        """Quantise a float32 RGB device array to one planar G, B, R frame on the device."""
+        ...
 
 
 class VideoDecodeError(Exception):
@@ -400,8 +425,7 @@ class FrameStream(Iterator[Frame]):
         *,
         start_s: Fraction | None,
         end_s: Fraction | None,
-        xp: Any = None,
-        device: str = "cpu",
+        device_backend: DeviceFrameBackend | None = None,
     ) -> None:
         """Prepare the decode; nothing runs yet.
 
@@ -410,13 +434,11 @@ class FrameStream(Iterator[Frame]):
             command: The FFmpeg command (:func:`decode_command`).
             start_s: The first time to yield, or None.
             end_s: The time to stop before, or None.
-            xp: The array module of the frames' pixels: None for NumPy, or CuPy for frames
-                converted on the device.
-            device: The frames' device, ``"cpu"`` with NumPy, ``"cuda:<n>"`` with CuPy.
+            device_backend: The backend that converts each frame on its device, or None for
+                host frames.
         """
         video = probe.video
-        self._xp = xp
-        self._device = device
+        self._device_backend = device_backend
         self._probe = probe
         self._command = command
         self._start_s = start_s
@@ -504,21 +526,20 @@ class FrameStream(Iterator[Frame]):
     def _frame(self, pts: int) -> Frame:
         """Build the IF-1 frame from the buffer and its pts."""
         video = self._probe.video
-        if self._xp is None:
+        backend = self._device_backend
+        if backend is None:
             pixels = planes_to_rgb(
                 self._buffer, width=video.width, height=video.height, bit_depth=video.bit_depth
             )
+            device = "cpu"
         else:
-            pixels = planes_to_rgb(
-                self._buffer,
-                width=video.width,
-                height=video.height,
-                bit_depth=video.bit_depth,
-                xp=self._xp,
+            pixels = backend.planes_to_rgb(
+                self._buffer, width=video.width, height=video.height, bit_depth=video.bit_depth
             )
+            device = backend.device
         return Frame(
             pixels=pixels,
-            device=self._device,
+            device=device,
             color=video.color,
             orientation_applied=False,
             pts=pts * self._time_base,
@@ -664,15 +685,17 @@ class FrameStream(Iterator[Frame]):
 class FFmpegVideoSource:
     """The IF-5 video source: WP3.7's probe and an FFmpeg decode per :meth:`frames` call."""
 
-    def __init__(self, *, device_frames: bool = False) -> None:
+    def __init__(self, *, device_backend: object | None = None) -> None:
         """Choose where the frames of a ``hw_decode`` decode are converted.
 
         Args:
-            device_frames: Convert the frames of a ``frames(..., hw_decode=True)`` call on the
-                GPU and yield them there (off by default: every frame on the host). A call with
-                ``hw_decode=False`` always yields host frames.
+            device_backend: The job's backend. When it satisfies :class:`DeviceFrameBackend`
+                (the GPU backend), the frames of a ``frames(..., hw_decode=True)`` call are
+                converted on its device and yielded there. None (the default) or a backend
+                without the device extensions (the CPU backend) yields every frame on the host;
+                a call with ``hw_decode=False`` always does.
         """
-        self.device_frames = device_frames
+        self.device_backend = device_backend
 
     def probe(self, path: Path) -> ProbeResult:
         """Probe a file (delegates to :func:`clearwater.io.video.probe`).
@@ -704,9 +727,9 @@ class FFmpegVideoSource:
         Args:
             probe: The probe result of the file; its colour description is used unchanged.
             hw_decode: Decode with CUDA when a CUDA device is available (otherwise in software,
-                with the same frames; the reason is logged once). With ``device_frames`` it
-                also states that the caller's backend is the GPU: the frames are converted and
-                yielded there.
+                with the same frames; the reason is logged once). With a ``device_backend`` that
+                satisfies :class:`DeviceFrameBackend` it also states that the caller's backend
+                is the GPU: the frames are converted and yielded on that backend's device.
             start_s: The first frame yielded is the first whose pts is at or after this time;
                 None for the start.
             end_s: No frame whose pts is at or after this time is yielded; None for the end.
@@ -729,8 +752,7 @@ class FFmpegVideoSource:
         cuda = hw_decode and cuda_decode_available()
         seek = seek_position(probe, start_s) if start_s is not None else None
         command = decode_command(probe, ffmpeg=ffmpeg, cuda=cuda, seek=seek)
-        if self.device_frames and hw_decode:
-            cupy = importlib.import_module("cupy")
-            device = f"cuda:{int(cupy.cuda.runtime.getDevice())}"
-            return FrameStream(probe, command, start_s=start_s, end_s=end_s, xp=cupy, device=device)
+        backend = self.device_backend
+        if hw_decode and isinstance(backend, DeviceFrameBackend):
+            return FrameStream(probe, command, start_s=start_s, end_s=end_s, device_backend=backend)
         return FrameStream(probe, command, start_s=start_s, end_s=end_s)

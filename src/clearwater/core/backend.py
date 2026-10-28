@@ -7,6 +7,11 @@ on either device (D107, N3). CuPy is imported only here and only when a :class:`
 built or :func:`select_backend` probes the device, so ``import clearwater.core`` works without
 it. ``CoreBackend.xp`` is for ``clearwater.core`` only (WP3.1 ruling 1.1).
 
+IF-2 device extensions (AD-29, WP3.21): :class:`CupyBackend` also converts FFmpeg's planar
+frames on the device (``planes_to_rgb``, ``rgb_to_planes``). They are NOT part of the frozen
+ABC; the GPU backend provides them and the CPU backend does not, so a consumer that tests for
+its own package's Protocol takes its host path on the CPU by structure.
+
 Conventions (spec 6.4, D39; IF-1):
 
 - Every image method takes and returns float32. A non-float32 input raises ValueError and an
@@ -37,7 +42,7 @@ import functools
 import importlib
 import logging
 import math
-from collections.abc import Sequence
+from collections.abc import Buffer, Sequence
 from typing import Any
 
 import numpy as np
@@ -67,6 +72,9 @@ _LUMA_COEFFICIENTS: dict[str, tuple[float, float]] = {
     "bt709": (0.2126, 0.0722),  # ITU-R BT.709-6, Part 2 items 3.2-3.3
     "bt601": (0.299, 0.114),  # ITU-R BT.601-7, item 2.5.1
 }
+_PLANE_G, _PLANE_B, _PLANE_R = 0, 1, 2
+"""FFmpeg's planar RGB order (``gbrp`` / ``gbrp10le``, AD-10): the IF-2 device extensions."""
+
 _RANGES = ("full", "limited")
 # Limited range: per-component scale and offset applied to the full-range (Y, Cb, Cr).
 _LIMITED_SCALE = np.array([219.0 / 255.0, 224.0 / 255.0, 224.0 / 255.0], dtype=np.float64)
@@ -117,6 +125,17 @@ def _conversion(matrix: str, range_: str) -> tuple[NDArray[np.float32], NDArray[
         forward = forward * _LIMITED_SCALE[:, None]
         inverse = inverse / _LIMITED_SCALE[None, :]
     return forward.T.astype(np.float32), inverse.T.astype(np.float32)
+
+
+def _plane_dtype(bit_depth: int) -> np.dtype[Any]:
+    """Return FFmpeg's planar sample dtype at a bit depth (little-endian words for 10-bit).
+
+    Raises:
+        ValueError: The bit depth is not 8 or 10.
+    """
+    if bit_depth not in (8, 10):
+        raise ValueError(f"the bit depth must be 8 or 10, got {bit_depth!r}")
+    return np.dtype(np.uint8) if bit_depth == 8 else np.dtype("<u2")
 
 
 class CoreBackend:
@@ -476,8 +495,93 @@ class CupyBackend(CoreBackend):
         """
         cupy = importlib.import_module("cupy")
         ndimage = importlib.import_module("cupyx.scipy.ndimage")
-        device = f"cuda:{int(cupy.cuda.runtime.getDevice())}"
-        super().__init__("cupy", device, cupy, ndimage)
+        self._device_id = int(cupy.cuda.runtime.getDevice())
+        super().__init__("cupy", f"cuda:{self._device_id}", cupy, ndimage)
+
+    # -- IF-2 device extensions (AD-29) ---------------------------------------------------------
+    #
+    # IF-2 device extensions: NOT part of the frozen ABC; provided by the GPU backend; absent on
+    # the CPU backend. A consumer reaches them only through the one ``runtime_checkable``
+    # Protocol of its own package (``clearwater.io.video.decode.DeviceFrameBackend``), with the
+    # same names and signatures, and takes its host path when a backend lacks them.
+
+    def planes_to_rgb(self, data: Buffer, *, width: int, height: int, bit_depth: int) -> Array:
+        """Upload one planar G, B, R frame and convert it to float32 RGB on the device.
+
+        The device twin of ``clearwater.color.planes_to_rgb`` (WP3.21 #2): only the integer
+        planes cross the bus (a third of the float32 frame's bytes at 8-bit, two thirds at
+        10-bit), and each sample is divided by ``float32(2**bit_depth - 1)`` on the device. That
+        is one correctly rounded IEEE float32 division per sample, the host's operation, so the
+        result equals the host conversion bit for bit.
+
+        Args:
+            data: The raw frame as FFmpeg's ``gbrp`` / ``gbrp10le`` writes it. It may be reused
+                once this returns: the copy from pageable host memory has read it.
+            width: Frame width in pixels.
+            height: Frame height in pixels.
+            bit_depth: 8 or 10.
+
+        Returns:
+            A new C-contiguous float32 device array of shape ``(height, width, 3)``, channels
+            R, G, B.
+
+        Raises:
+            ValueError: The bit depth is not 8 or 10, or ``data`` is not exactly one contiguous
+                frame of that size.
+        """
+        dtype = _plane_dtype(bit_depth)
+        view = memoryview(data)
+        if not view.c_contiguous:
+            raise ValueError("the frame buffer must be contiguous")
+        expected = 3 * width * height * dtype.itemsize
+        if width < 1 or height < 1 or view.nbytes != expected:
+            raise ValueError(
+                f"a {width}x{height} {bit_depth}-bit frame is {expected} bytes, not {view.nbytes}"
+            )
+        planes = self.xp.asarray(np.frombuffer(view, dtype=dtype).reshape(3, height, width))
+        scale = np.float32(2**bit_depth - 1)
+        rgb: Array = self.xp.empty((height, width, 3), dtype=np.float32)
+        rgb[..., 0] = planes[_PLANE_R] / scale
+        rgb[..., 1] = planes[_PLANE_G] / scale
+        rgb[..., 2] = planes[_PLANE_B] / scale
+        return rgb
+
+    def rgb_to_planes(self, a: Array, *, bit_depth: int) -> bytes:
+        """Quantise a float32 RGB device array to one planar G, B, R frame on the device.
+
+        The device twin of ``clearwater.color.rgb_to_planes`` (D39, WP3.21 #2): clipped to
+        [0, 1], scaled by ``2**bit_depth - 1`` and rounded half to even, each a kernel of its
+        own (no fused multiply-add), so the bytes are the host's; only the planes are
+        downloaded (synchronously: the copy has completed on return).
+
+        Args:
+            a: A float32 ``(H, W, 3)`` RGB array on this backend's device.
+            bit_depth: 8 or 10.
+
+        Returns:
+            The frame as FFmpeg's ``gbrp`` (8-bit) or ``gbrp10le`` (10-bit) reads it.
+
+        Raises:
+            TypeError: ``a`` is not an array of this backend, or lies on another device.
+            ValueError: The bit depth is not 8 or 10, ``a`` is not a float32 ``(H, W, 3)``
+                array, or it holds a NaN.
+        """
+        dtype = _plane_dtype(bit_depth)
+        self.check_rgb(a)
+        held: Any = a  # a CuPy array (IF-1 types the host's)
+        if int(held.device.id) != self._device_id:
+            raise TypeError(f"the array lies on cuda:{int(held.device.id)}, not {self.device}")
+        xp = self.xp
+        scaled = xp.clip(a, np.float32(0), np.float32(1)) * np.float32(2**bit_depth - 1)
+        if bool(xp.isnan(scaled.sum())):
+            raise ValueError("the array holds a NaN; it cannot be quantised")
+        height, width = a.shape[:2]
+        planes = xp.empty((3, height, width), dtype=dtype)
+        planes[_PLANE_G] = xp.rint(scaled[..., 1])
+        planes[_PLANE_B] = xp.rint(scaled[..., 2])
+        planes[_PLANE_R] = xp.rint(scaled[..., 0])
+        host: NDArray[Any] = xp.asnumpy(planes)
+        return host.tobytes()
 
     def free_device_bytes(self) -> int | None:
         """Return the memory free for this process's arrays, in bytes.
