@@ -219,6 +219,15 @@
   term = floor + per_pixel x (W x H), constants fitted from the 5.3K remainders and the 4K cold-row peaks (two sizes, two
   constants), 1080p by extrapolation stated as such; the total must cover every measured device-wide peak; the cell yields the
   fitted constants and the checks before coding (b3).**
+  **Fit UNDERDETERMINED (4 constants, 3 equations; the 4K pool during the overlap never measured; a common floor fits NEGATIVE
+  with the pool at its estimate) -> RULED (my ruling-fit, msg `7fbfe9f761dde8fe`): (1)(a) ONE 4K attribution run (GX011627 ON, same
+  uncommitted driver, ~4-5 min) GRANTED, FIRST in block 2's re-run window; exact fit, constants rounded up, a floor <= 0 clamped to
+  0 (per-pixel form (S) as a result); covered-row test incl. the 4K run. (2)(a) pool term stays the selection bound; job total at
+  5.3K (~10.1 GB) exceeds the card by design (pool part loose: 4,427 vs 6,281), stated in docstring + record; BINDING 5.3K check =
+  instrument (ii) pool peak vs 6,281 + covered rows; (i) binding at 4K. Verified: `memory_estimate_bytes` consumed ONLY by
+  select_backend (core/backend.py:613) and the IF-2 method, so the figure misleads nobody; showing it is WP4.3's business. Part 2
+  (boundary release in `_Analysis._run` finally, once per job; planted 64 MiB test; F2 order re-pinned abort -> boundary -> release)
+  ACCEPTED as built (b5a383c). Cell 7 266,488, continues for the bounded remainder.**
 - (history) attribution window OPEN ~14:20Z (msg `4ebb2986077a3c1e`).
 - (history) block 2 OPEN ~14:03Z (msg `f643b1059bdc063a`). STOP test
   (conservative): nvidia-smi device-wide memory.used (same instrument as the baseline 6,104; ~250-330 MiB idle + decoder + NVENC
