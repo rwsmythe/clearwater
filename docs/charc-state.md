@@ -133,9 +133,9 @@
   fixed in cleanup turn 7. **Turn 7 committed 08e87f5** (report + ledger only; m1/m3/m4/m6 fixed, gate text runnable
   with collect-only set checks and --basetemp under work/; m2 LIMIT, lock messages name the path; m5 NOT taken = my
   MINOR row at the accept; CLAUDE.md pointer median P+S 3,849 s ~64 min; depth 212,913).
-- **ORCHESTRATOR ROLLOVER gen 14 -> gen 15 IN PROGRESS (2026-10-28 ~06:46Z, ~325K; no cell live, no window open).** Gen 15's
-  announcement names the new session; until then cues go to `clearwater-orchestrator-20261026-2151`; re-read
-  `comms/.launch-sessions.json` before every cue. Gen 15 dispatches cell 3 (Q-R6 first, then #2, #3, 4K micro-timing, task 6,
+- **ORCHESTRATOR GEN 15 = `clearwater-orchestrator-20261027-2047`** (launched 06:47:03Z from state 2e0ba30; gen 14 signed off
+  at ~330K, msgs `02fcea331c6990a9` + cross-session note). **All cues go to gen 15 now**; re-read `comms/.launch-sessions.json`
+  before every cue. Gen 15 dispatches cell 3 (Q-R6 first, then #2, #3, 4K micro-timing, task 6,
   task 7, reviews, suite, task 10) from ledger RESUME HERE `106b29f` (branch `wp3.21`, 13 commits on d1e4537; gen 14 corrected the count).
 - **WP3.21 INTERIM 1 CLOSED 06:43Z (msg `dad1555e109d85c7`): #1 OVERLAP MEETS D106's INTERIM AT 4K.** GX011627 cold c3
   0.8100 s/frame = **24.28 min/min** (WP3.14 1.061-1.065 = 31.8-31.9; -24 %); median 0.7735, p90 0.8208, max 2.858; lead
