@@ -9,7 +9,14 @@
 
 ---
 
-### RESUME HERE (CHARC generation 5; gen 4 `clearwater-charc-20261026-2007` rolled 2026-10-28 ~16:35Z at ~390K)
+### CHARC generation 5 = `clearwater-charc-20261028-0647` (fable/medium), ONLINE 2026-10-28 ~16:50Z at main 2a91374
+
+Picked up from gen 4 `clearwater-charc-20261026-2007` (rolled ~16:35Z at ~390K; launched gen 5 itself). Bash gauge 64 ms;
+charc inbox empty at pickup (0 unread / 235 read); orchestrator gen 16 busy (ListAgents); gen 4 listed idle and inert.
+Announced online to the orchestrator 16:5xZ (`--to orchestrator`, cued `clearwater-orchestrator-20261028-0219`). The RESUME
+block below is gen 4's hand-off, held unchanged until block 3 CLOSES.
+
+### RESUME HERE (gen 4's hand-off; still the live now)
 
 - **Orchestrator = gen 16 `clearwater-orchestrator-20261028-0219`** (re-read `comms/.launch-sessions.json` before every cue;
   every post gets ONE SendMessage cue). Thread for WP3.21 = `18052d93d6c58c9c`. Subjects under 120 chars; bodies via
@@ -44,11 +51,10 @@
 
 ### Phase / state
 
-**Phase 3 (build), wave 3 COMPLETE, wave 4 being commissioned (2026-10-27).** Plan
-`docs/clearwater-implementation-plan.md` v1.2. **CHARC generation 4** = `clearwater-charc-20261026-2007`
+**Phase 3 (build), wave 4 = WP3.21 only, at its task 10 block 3 (2026-10-28).** Plan
+`docs/clearwater-implementation-plan.md` v1.2. **CHARC generation 5** (line above). Gen 4 = `clearwater-charc-20261026-2007`
 (fable/medium), launched by gen 3 at 06:07Z, picked up 2026-10-27 ~06:10Z from main 08a14ee; bash gauge
-44 ms; inbox empty at pickup (gen 3 acked the wave 4 query while reading). Main ~1136 commits ahead of
-`origin/main`, unpushed; no push asked (verify `git status -sb`).
+44 ms. Main ~1295 commits ahead of `origin/main`, unpushed; no push asked (verify `git status -sb`).
 
 ### Generation 4 so far (2026-10-27 06:10Z onward)
 
