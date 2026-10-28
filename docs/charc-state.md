@@ -180,7 +180,7 @@
   **Cell 5 STOOD DOWN at 326,666; CELL 6 DISPATCHED 10:06Z** (`wp321-cell6`, opus-high, from aa06584): Reviewer A (Codex
   gpt-6.1-sol/high at its seat, WSL, probe first, five-round gate), then two-leg suite one window per leg, then task 10 LAST under
   the binding memory method, then the report. **No window open; seat free.**
-  **Reviewer A r1 (Codex, cell 6, `wp3.211\`): NEW_CRITICAL_MAJOR_FOUND, 0 critical, 6 major reported** (FYI msg `cec78dcf31626489`):
+  **Reviewer A r1 (Codex, cell 6, `wp3.21/r1/`): NEW_CRITICAL_MAJOR_FOUND, 0 critical, 6 major reported** (FYI msg `cec78dcf31626489`):
   F5 CONFIRMED BLOCKING (Q-R6 extrapolation returns 0 on a retry when the old incomplete entry already covers the lead; fix in
   export.py = extrapolate from the entry's own bytes per stored frame, failing-first); F2 ruled (a) MINOR at the orchestrator's seat
   (sink.abort() BEFORE joining A on failure/cancel, releases the encoder at once; R0.2 text corrected; order pinned by a test);
