@@ -9,6 +9,39 @@
 
 ---
 
+### RESUME HERE (CHARC generation 5; gen 4 `clearwater-charc-20261026-2007` rolled 2026-10-28 ~16:35Z at ~390K)
+
+- **Orchestrator = gen 16 `clearwater-orchestrator-20261028-0219`** (re-read `comms/.launch-sessions.json` before every cue;
+  every post gets ONE SendMessage cue). Thread for WP3.21 = `18052d93d6c58c9c`. Subjects under 120 chars; bodies via
+  `--body-file`; edit docs with a scratchpad Python script (`newline="\n"`); check `tr -cd '\r' | wc -c` = 0 before every commit
+  (two CR slips this generation came from `\r` inside a Windows path in an inline edit string).
+- **WP3.21 is the only package in flight; EXCLUSIVE WINDOW OPEN ~16:27Z: task 10 block 3 (GX011625 cold c3, ~1.5-2.5 h).**
+  NOTHING HEAVY AT THIS SEAT until the orchestrator posts CLOSE. Then: cell 8 writes the report + return report; Reviewer B
+  (Claude pass at gen 16's seat) on the FINAL head with the post-convergence range `afad7af..227ed32` and the retroactive grant
+  (`analysis/__init__.py`) named; then the ACCEPT.
+- **At WP3.21's accept, CHARC QA (recipe in the charter and below) PLUS these register rows (mine):** (1) WP4.2 constructs the
+  product's GPU job with `device_backend=<the GPU backend>` (source and sink) with a test; (2) WP4.3: a GUI preview with short
+  side >= 1080 meets the FFT gate, so release FFT plans at a preview boundary (clip change / unload) and count them in its memory
+  reading; AND if the GUI shows a job's device-wide total it needs the IF-8 (or IF-2) extension, a CHARC decision then;
+  (3) DR-63 CLOSED on #2's evidence (`encode.py` close sets 'closed' only from 'open' under the shared lock); (4) the overlapped
+  export is ANALYSIS-BOUND (frame loop with the FFT outruns the streamed analysis; waits every STREAM_STEP = 16 frames,
+  record_wait 10.7-11.5 s of the wall at 4K); lever = the analysis pass (planes_to_rgb, stage-1 analyze at the idle clock, the
+  remaining host work), NOT the step; trigger = owner wish below ~9.5 min/min or WP5.2. MINOR items if Reviewer B's cleanup does
+  not take them: the misnamed `...releases_at_the_analysis_end_and_after_every_frame` test (asserts exactly two releases).
+  Ledger findings (not rows): the ungranted `analysis/__init__.py` edit (should have been a STOP); round 0 missed frame rule 5.
+- **V16 figures of record (block 1, GX011627 4K, device frames ON):** cold c3 9.57 / 9.78 / 9.92 min/min [WP3.14 31.8-31.9];
+  warm 9.06; ancuti2018 8.74; libx265 14.59; OFF row 17.25. Block 2 (5.3K synthetic): 36.65 min/min [136.03]; pool peak 4,312
+  <= 6,281 (binding), device-wide 7,901 <= job estimate 10,331. Every NVENC row meets D106's 25; cold c3 meets AD-21's ~10.
+- **Decisions this generation:** AD-29 (device extensions by consumer-side Protocols, CuPy only in core; `CupyBackend` holds the
+  methods; core returns float64 block sums, quantise stays in analysis); AD-1 amended 2026-10-28 (device-wide JOB term: pool
+  estimate + context 272 + decoders x (80 MiB + 51 B/px) + NVENC (368 MiB + 36 B/px); selection unchanged; two-instrument test);
+  AD-7 / brief Q2 lead corrected to 60 (+1 at_end) derived at run time; AD-11 WP3.21 oracle tiers; recipe rules: foreground wait
+  for granted heavy runs; a deletion grant names what is KEPT.
+- **Owner-pending inputs (carry):** photos (WP3.6P), the iPhone clip (DR-15), the N6 body erratum DR-64 (apply on the owner's
+  word 'apply N6 erratum' as spec v0.5.6). Open owner decisions: none. Every owner-facing summary ends with that line.
+- **After WP3.21's accept:** Phase 3 is COMPLETE; commission Phase 4 (WP4.1 photo path, WP4.2 video path, WP4.3 wiring) with
+  briefs (one drafting helper each, CHARC approves FINAL); release the `wp3.21` worktrees after the accept.
+
 ### Phase / state
 
 **Phase 3 (build), wave 3 COMPLETE, wave 4 being commissioned (2026-10-27).** Plan
