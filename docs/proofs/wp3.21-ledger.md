@@ -31,6 +31,9 @@ Cell `implementer-opus-high` (Claude lane), worktree `.worktrees/wp3.21`, branch
 | 10 (read) | as given at the micro-timing grant | 87,298 |
 | 11 | cell 5: WINDOW RELEASED (micro-timing); task 6 build-or-yield | (dispatcher fills) |
 | 11 (read) | as given at the release acknowledgement (HOLD for CHARC on task 6) | 111,973 |
+| 12 | cell 5: Q-R7 built in the hold | (dispatcher fills) |
+| 12 (read) | as given with the task 6 GO relay | 141,332 |
+| 13 | cell 5: STOP, a correction to the micro-timing's 5.3K memory figure before the task 6 build | (dispatcher fills) |
 
 ## RESUME HERE (cell 5, after cell 4's interim 2)
 
@@ -259,6 +262,45 @@ are the log's. Run 2 (`--only-53k`, plan cache and pool cleared per row; JSON
   (2) the read time counting the read itself -> documented as an upper bound, not fixed; (3)
   `prime_cache` (warm runs) stamped too -> rejected, the patch covers the job call only. Nothing
   new on a second pass.
+
+### CHARC `8e103622` (relayed with the task 6 GO): TASK 6 GO and Q-C5a RULED
+
+- **Task 6 GO.** Q-R1's gate exactly as ruled (min(H, W) >= 1080 AND sigma >= 32, inside
+  `core/backend.py`, identical for both backends); the per-axis route; the 21.6 mask blur stays
+  direct; the 2-D variant recorded, NOT built. Expected oracle: tier 2 on 1080p and 4K renders,
+  tier 1 everywhere else (analysis, records, proxies); anything outside it a STOP.
+- **Q-C5a (a), with two conditions.** (1) Job-boundary release: `CupyBackend` gains ONE method
+  clearing the cuFFT plan cache and the pool's free blocks; `jobs/export.py` calls it at the END
+  of every export job (success, failure, cancel) in the existing `finally`, never per frame;
+  tested on the cancel and failure paths. (2) The plans are counted: the measured persistent plan
+  figure per shape folds into `memory_estimate_bytes` for a GPU job whose clip meets the gate,
+  beside the transient; the 5.3K re-read reports persistent and transient separately, at the
+  default parameters.
+- **Maximum-parameter 5.3K row: YES.** If it breaches the card, the gate ALSO keys on the
+  PROJECTED plan-plus-buffer bytes for (H, W, sigma) against a FIXED budget constant in core
+  (never live free memory); a call over the projection runs direct; the report states the
+  constant and the pairs it excludes. A breach at DEFAULT parameters at 5.3K is a STOP to CHARC.
+- **Estimate:** about 7.3 of 8 GB at 5.3K default is inside AD-1 on paper; task 10's 5.3K row is
+  the measurement of record with the plans counted; a measured peak above AD-1's estimate is a
+  STOP with direct-above-4K ready in the deterministic form above.
+
+### STOP (cell 5, yield 13): the micro-timing's 5.3K memory figure was misread
+
+- **The error.** The release said "+0.53-0.56 GiB per call, of which the cached plans hold
+  0.45-0.54 GiB". The driver's `peak_extra_bytes` is taken AFTER the warm-up, when the plans
+  already sit in the pool's used bytes, so it EXCLUDES them: the plans are IN ADDITION. One plane
+  at 5.3K sigma 232-270 costs about 0.55 GiB transient PLUS about 0.5 GiB persistent plans, about
+  1.05 GiB, not 0.55. Re-checked light at 1080p and 1440p (plans retained after the call
+  20-129 MiB, transient 35-71 MiB, separate). The 5.3K default estimate becomes about 6.0 +
+  0.78 + 0.55 + 0.5 = **about 7.8 of 8.0 GiB** (was 7.3).
+- **Plan size is not a clean function of the shape** (1440x2560: 129 MiB at sigma 32, 83 at
+  108; cuFFT's algorithm depends on the length), so "the measured figure per shape" cannot be
+  folded by a formula without a table or a cuFFT size query.
+- **Light prototype, chunked per-axis route** (the same kernel, padding and arithmetic per column
+  or row; the transform over fixed batches of 512 lines): at 1440x2560 sigma 54 / 108, 2.68 /
+  2.69 ms against 2.60 / 3.01 unchunked (direct 17.2 / 34.5); plans 36 / 33 MiB against 106 /
+  83; peak including plans 84 MiB against 170 / 153; max abs identical (9.5e-7 / 1.25e-6).
+  Chunking bounds both the plans and the transient by the batch, independent of the width.
 
 ## Re-seat: cell 2 (2026-10-28), rulings since round 0
 
