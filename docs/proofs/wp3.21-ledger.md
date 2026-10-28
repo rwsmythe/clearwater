@@ -38,6 +38,24 @@ dispatcher (orchestrator generation 14):
   GX011627 cold c3 export, about 12 min), plus a 4K direct-vs-FFT blur micro-timing; each
   requested separately.
 - **Q-R1 (the FFT gate): OPEN with CHARC.** Task 6 does not start until the ruling is relayed.
+  Superseded below (CHARC `5b05c53d`).
+
+### CHARC rulings `5b05c53d` (relayed by the orchestrator after yield 3)
+
+- **Q-R2..Q-R5: CONCURRED**, with one addition to Q-R2: before #3 (the device block mean) lands
+  on the device-frame conversions, the oracle must exercise those conversions on GX011627, in a
+  granted window.
+- **Q-R1: RULED; task 6 unblocked** (still after #1-#3 and the micro-timing):
+  - the FFT gate lives inside the IF-2 implementation in `src/clearwater/core/backend.py`,
+    identically for both backends;
+  - the FFT only when `min(H, W) >= 1080` AND `sigma >= 32` px; the sigma threshold is
+    PROVISIONAL until the 4K micro-timing and may move only upward, never below 32;
+  - required tests: (a) a tripwire deriving the largest possible proxy short side from
+    `analysis/proxy.py`'s own rule and asserting it is below the 1080 gate; (b) a planted
+    analysis-sized blur bit-identical to the direct path; (c) FFT against direct within 1e-5 at
+    1080p and at 4K.
+- **Recipe rule (main `3df4206`):** a granted heavy run waits in the FOREGROUND; never go idle on
+  a background completion notice.
 
 ## Task 4 (#1): the overlap, as built (cell 2)
 
