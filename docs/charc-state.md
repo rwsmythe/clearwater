@@ -141,7 +141,7 @@
   the suite gate for the rebased candidate (orchestrator re-confirms after the rebase). Next at the orchestrator:
   `wp-t4-mc` rebase + patch-id + static + harness gate, Reviewer B (Claude pass at its seat), accept with the fill's
   GATE_CHECKS edit; then my QA (CLAUDE.md line, HD-1 third point, suite-cost row, m5 row, DR-58 (c)).
-- **WP-T4 Reviewer B (Claude pass at the orchestrator's seat, Opus high, read-only; `wp-t4eviewB\`, `review.txt`
+- **WP-T4 Reviewer B (Claude pass at the orchestrator's seat, Opus high, read-only; `wp-t4/reviewB/`, `review.txt`
   md5 f544e951...) = NO_NEW_CRITICAL_MAJOR, 4 minor 4 advisory** (msg `530d5027f50a7f2e`). Candidate `wp-t4-mc` ed7eca9
   = 7 commits on 7f4b80d, patch-id 3aafebff pre/post rebase, code diff vs 08e87f5 empty, 9 files, 0 CR, ruff/format/
   mypy/harness 382 OK. Lock and guard claims REASONED (sandbox refused work/ writes); A executed them. Adjudication
