@@ -41,7 +41,89 @@ Cell `implementer-opus-high` (Claude lane), worktree `.worktrees/wp3.21`, branch
 | 15 (read) | as given at the memory re-read grant | 289,841 |
 | 16 | cell 5: WINDOW RELEASED (memory re-read); WINDOW REQUEST (oracle legs) | (dispatcher fills) |
 
-## RESUME HERE (cell 5, after cell 4's interim 2)
+## RESUME HERE (cell 6, after cell 5)
+
+**State at hand-over:** branch `wp3.21` on base `d1e4537`, NO rebase, worktree CLEAN at the
+ledger head. Cell 5's commits: ledger `650a693`..; Q-R7 bench stamps `83349d7`; task 6 gate,
+route and job-end release `7061699`; batched route and the GPU estimate's bound `17743ec`.
+`interfaces/` and `color/samples.py` equal `d1e4537`. Tasks 1-7 are DONE (task 7: the engine
+`import logging` and DR-63 closed by cells 3/4; DR-40 (b) measured-negligible per Q8; Q-R7 is the
+bench's tool-side stamps). The cell-5 sections below ("Re-seat: cell 5" onward, before
+"Re-seat: cell 2") hold the evidence; read "Task 6 under (A), as built" and "Task 6 memory
+re-read" if a task needs them.
+
+**Task 6 as built (CHARC `5b05c53d` Q-R1, `8e103622`, `1db8547f` (A), `72becf26`):**
+`core/backend.py` `fft_route` (min(H, W) >= 1080 and sigma >= 32, both backends), per-axis
+float32 rfft in batches of at most 512 lines (last batch = final positions), EVEN transform
+length (cuFFT odd lengths are batch-position dependent: the FINDING); `fft_memory_bound_bytes`
+added by `CupyBackend.memory_estimate_bytes`; `CupyBackend.release_fft_plans` called once per job
+from `ExportEngine._run`'s `finally` through `jobs.export.JobDeviceBackend` (AD-29). Tests:
+`tests/test_wp321_fft_gaussian.py` (44, one `footage`), `tests/test_wp321_fft_release.py` (9),
+`tests/test_wp321_bench.py` (+4 for Q-R7).
+
+**Oracle legs for task 6:** script `work\wp3.21\oracle-fft.sh` (steps `wp23`, `gx`, `synth`,
+`gxa`; expected TIER1, TIER2, TIER2, TIER1). STATUS: see "Task 6 oracle legs" below; if that
+section is missing, the window was never run and cell 6 requests it first (one window, serial).
+
+**Remaining order (each heavy run in its own granted window):**
+
+1. **Reviewer A** (brief "Review loop"): Codex `gpt-6.1-sol` / high at the cell's seat over WSL,
+   probe first; copy the runner and prompt shape from
+   `C:\Users\rwsmy\clearwater-review-evidence\wp3.14\r2\`; evidence
+   `C:\Users\rwsmy\clearwater-review-evidence\wp3.21\rN\` with md5s; the banner must read
+   `gpt-6.1-sol` (else the round is void); `--glob '!docs/proofs/**'`, withhold
+   `clearwater-review-evidence`, forbid the footage folder; WHAT TO EXAMINE is the brief's list
+   (add: the FFT gate and batching, the even-length rule, the bound, the release paths). END THE
+   TURN once a round's verdict is adjudicated, before remediating; keep the cumulative round
+   ledger; STOP at round 5 for approval. Fill: `docs/review-gate-clearwater.md` Part 1.
+2. **The two-leg suite** (GATE_CHECKS), one window per leg, from Git Bash, `PYTEST_ADDOPTS`
+   unset, `QT_QPA_PLATFORM=offscreen`, foreground, output under `work/`:
+   `uv run pytest -q -rs -n 4 -m "not gpu and not footage and not gui and not slow" --basetemp=work/<run>-parallel`
+   then `uv run pytest -q -rs -m "gpu or footage or gui or slow" --basetemp=work/<run>-serial`.
+3. **Task 10, the V16 re-measure, LAST** (CHARC `eab16ca8`): `tools/export_bench.py v16
+   --device-frames --subdir wp3.21/bench` on the final commit; GX011627 rows first, GX011625
+   LAST, each block its own window. Header: device frames ON, hw_decode ON, the backend, the
+   cache state. OFF row on GX011627 c3 only if it fits the same window (it gives the #2 / #3
+   split, CHARC `b4c143d7` 1). The report: the frames-phase trio (0.714 serial, 0.778 interim 1,
+   0.501 interim 2) plus task 10's; the stubs sentence (no product code constructs the real
+   source yet; the GUI's path is the stubs' until WP4.2); the hw_decode limit sentence (a CPU
+   backend with a hardware decoder is not supported); every row beside its baseline row; the
+   analysis share from the Q-R7 keys (`lead_s` + `record_wait_s`, `analysis_share_overlapped`).
+   **Memory method (binding, CHARC `1db8547f`): every peak with the plan cache and the pool
+   cleared first.** The 5.3K row is the measurement of record with the plans counted against
+   the GPU estimate (5.3K: 6,281 MiB = 5,897 + 384); a peak above it is a STOP to CHARC.
+   FINDING to place (CHARC `b4c143d7` 2): the recurring ~0.96 s frames (interim 2 indices 0, 323,
+   387; median 0.483); check 323 / 387 (64 apart) against GX011627's GOP via ffprobe keyframe
+   flags (read-only) before naming decoder seek, sink write, cache flush or GC; no fix unless the
+   cause is in an owned file and one line.
+4. **Report** `docs/reports/wp3.21-optimisation.md` (claims, evidence paths, limits, baseline
+   beside result; plan size follows transform length, not shape, is the reason the bound is per
+   line length; the odd-length cuFFT finding; the micro-timing and memory re-read tables), then
+   the return report (under about 70 lines, by SendMessage to the dispatcher).
+
+**Open with CHARC:** whether `select_backend` decides on the GPU estimate (base + bound) or the
+base (orchestrator recommended (a), the base; it blocks nothing; do NOT change
+`test_core_select.py`). **Out of scope:** the GUI preview's plans (CHARC's register row,
+binding WP4.3, written at the accept).
+
+**Standing rules (all binding):** worktree only, absolute paths or `git -C` or a `( cd ... )`
+subshell, never a bare `cd`; never edit the main tree; never `git stash`, `git clean -x`, merge
+or rebase. Commit by pathspec `git -c core.autocrlf=false commit -m "...(wp3.21)..." -- <paths>`
+with the `Co-Authored-By:` footer; new files need `git add -- <file>` first; normalise each
+edited file with `sed -i 's/\r$//'` and prove 0 CR (and no control characters: a Python
+literal `\b` in a ledger script became a backspace once) per committed blob. Scripts holding
+ledger text: write them with the Write tool under a private scratchpad folder (bash heredocs
+fail on some text). Footage READ-ONLY, only through `find_footage_file`; nothing
+footage-derived committed; never decode `gpmd`, never read a location tag. Nothing under
+`src/clearwater/interfaces/` changes; edit only the brief's files and the Q-R2 grants. No new
+dependency, no OS-specific code. Every heavy run EXCLUSIVE with the dispatcher's grant (WINDOW
+REQUEST with commands, durations, evidence; at least 5 GB free; one job at a time; WINDOW
+RELEASED after); wait in the FOREGROUND, one stage per call. Non-TIER1 where tier 1 is expected,
+anything outside tier 2, an AD-1 breach, an unowned-file change: STOP. The light set always
+includes every `*_deps.py` / `*_rules.py`. Depth: record the dispatcher's figure at each yield;
+about 250K the evaluation point, about 400K STOP with a RESUME HERE.
+
+## RESUME HERE (cell 5, after cell 4's interim 2) -- SUPERSEDED by RESUME HERE (cell 6) above
 
 **State at hand-over** (cell 4 stood down after yield 9 on the dispatcher's instruction; depth at
 yield 8 was 236,806): branch `wp3.21` on base `d1e4537`, NO rebase, worktree CLEAN at the ledger
