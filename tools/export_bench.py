@@ -534,6 +534,25 @@ def _describe(leg: Leg) -> str:
     return f"{leg.clip} x{leg.runs} {leg.method} {leg.encoder} {leg.quality} {leg.cache}"
 
 
+def bench_folder(working: Path, subdir: Path) -> Path:
+    """Return the records' folder: ``subdir`` under the working folder, never outside it.
+
+    Args:
+        working: The working folder (local configuration).
+        subdir: A relative folder (WP3.21 writes ``wp3.21/bench``; the default is WP3.14's).
+
+    Returns:
+        The folder.
+
+    Raises:
+        ValueError: ``subdir`` is absolute or leads out of the working folder.
+    """
+    folder = (working / subdir).resolve()
+    if subdir.is_absolute() or not folder.is_relative_to(working.resolve()):
+        raise ValueError(f"--subdir {subdir} is not a folder under the working folder {working}")
+    return folder
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Run the V16 row (or one leg) and write its record under the working folder.
 
@@ -549,6 +568,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     options.add_argument("--force-cpu", action="store_true", help="force the CPU backend")
     options.add_argument("--memory-every", type=period, default=0.25, help="seconds")
     options.add_argument("--gpu-every", type=period, default=1.0, help="seconds")
+    options.add_argument(
+        "--subdir",
+        type=Path,
+        default=SUBDIR,
+        help=f"records and outputs under this folder of the working folder (default {SUBDIR})",
+    )
     parser = argparse.ArgumentParser(description=(__doc__ or "").splitlines()[0])
     commands = parser.add_subparsers(dest="command", required=True)
     one = commands.add_parser("run", help="one leg", parents=[options])
@@ -578,7 +603,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     dry_run = getattr(args, "dry_run", False)
     try:
         config = load_local_config(args.config)
-        out_dir = config.working_path / SUBDIR
+        out_dir = bench_folder(config.working_path, args.subdir)
         footage = {
             leg.clip: find_footage_file(leg.clip, config.footage_path)
             for leg in legs
