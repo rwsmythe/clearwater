@@ -63,6 +63,13 @@
   Codex 0.188 vs Claude 1.355 at 19:02Z; the orchestrator runs W1/W2/W3 in exclusive windows (OPEN/CLOSE to me); reviewer = the
   Claude pass FAST (STRONG on any non-test change). Evidence `clearwater-review-evidence\wp-t5\cell\`. **No window open yet; W1
   (BEFORE serial leg ~45 min) comes first. Nothing heavy at this seat while any window is OPEN.**
+- **EXCLUSIVE WINDOW OPEN ~19:20Z: WP-T5 W1 BEFORE serial leg on 3aa3c51 (msg `65c91896081df817`, ~45 min, run at the
+  orchestrator's seat; collections 5,289 all / 1,114 serial). NOTHING HEAVY AT THIS SEAT until CLOSE.** WP-T5 turn 1 `a9abb8d`
+  (depth 138,874): rung 0 done, frame counts 9 / 3 / 2 confirmed, no frame-count branch between 3 and 9; Codex sandbox stalled on
+  CuPy import at collection, so the orchestrator collects at its seat (recorded). WP4.1 round 0 RULED at the orchestrator's seat
+  (FYI `a83c68c87441b510`, ledger b8b2485, depth 140,680): S1 N10 brief text corrected to AD-11 pre-encode (provenance `created`
+  differs by design); S4 `tests/test_app_deps.py` GRANTED to WP4.1 (the one gui-to-app edge + no PySide6/CuPy on importing
+  `clearwater.app`); S2-S7 inside the brief. Nothing to rule.
 - **Owner-pending inputs (carry):** photos (WP3.6P; WP4.1 records the owner-photo leg OWED), the iPhone clip (DR-15), the N6 body
   erratum DR-64 (apply on the owner's word 'apply N6 erratum' as spec v0.5.6). Open owner decisions: none. Every owner-facing
   summary ends with that line.
