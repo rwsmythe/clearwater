@@ -314,6 +314,7 @@ md5s). Probe 20:14:34Z: one `succeeded in` line, banner `gpt-6.1-sol` / high.
 |---|---|---|---|---|---|---|---|---|---|
 | 1 | `ef6bf2f` | 0 | 2 (F1, F3) | 6 (F2 downgraded, F4-F8) | 8 / 0 | 8 / 0 | 0 | runner (`tools/`, F1-F4), root docstring (F6), report (F5, F7), one test (F8) | 299,161 |
 | 2 | `dca6d1e` | 0 | 2 (G1 NEW, G2 REOPENED) | 5 (G3, G4, G5 downgraded, G6, G7) | 7 / 0 | 3 / 4 | 0 | runner (`tools/`, G1-G7 incl. the G5 docstring), tests, report | 93,956 |
+| 3 | `899102d` | 0 | 1 (H1 NEW; accepted-component code reachable through the swap: STOP) | 6 (H2-H4 downgraded, H5, H6, H7) | 7 / 0 | 6 / 1 | 0 | not yet remediated | (dispatcher's figure at Y6) |
 
 ### Round 1 (20:14-20:24Z) -- VERDICT NEW_CRITICAL_MAJOR_FOUND; adjudicated, NOT yet remediated
 
@@ -422,6 +423,30 @@ before the round: ruff, ruff format --check (259), mypy (141) green; the six WP4
   and not footage and not slow"` over the six WP4.1 files plus `test_gui_deps`, `test_gui_status`,
   `test_core_deps`, `test_jobs_naming`, `test_jobs_export_photo`: 455 passed, 0 skipped (the UNC
   share was reachable) (`work/wp4.1-c3-r2fix-light.log`).
+
+### Round 3 (21:41-21:51Z, cell 3) -- VERDICT NEW_CRITICAL_MAJOR_FOUND; adjudicated, NOT yet remediated
+
+Whole-package diff `3aa3c51..899102d` (rounds 1-2 named as history, withheld). Probe 21:41:01Z:
+one `succeeded in`, banner `gpt-6.1-sol` / high. Reproductions native (`r3/r3_repro*.py`,
+outputs under `work/wp4.1-r3-repro`). Full table in `r3/adjudication.md`.
+
+- H1 MAJOR CONFIRMED (NEW, in envelope via a test-built input): a nclx-only Display P3 HEIC is
+  previewed unconverted ((199, 40, 60) shown; (217, 0, 54) with the D53 built-in the export
+  embeds): `gui` passes only `icc_profile` to `display_image`. Defect lines WP3.16 (`c9fb2e8`,
+  `b51cc8d`), reachable since the WP4.1 swap `4ee4ea7`; contested provenance counts as
+  introduced; the fix is in unowned `gui` files: STOP (recommend BANK for WP4.3).
+- H2 MAJOR reported, MINOR CONFIRMED (REOPENED, F1 class): `repr(ascii_text(path))` (a folder
+  given as `--method`) escapes the Redactor.
+- H3 MAJOR reported, MINOR CONFIRMED (NEW): library `run()` prints the batch WARNING unredacted.
+- H4 MAJOR reported, MINOR CONFIRMED (NEW): a host handler receives the engine's records as
+  logged (the accepted run_batch INFO limitation's class).
+- H5 MINOR CONFIRMED (NEW): `NaN` inside `settings` accepted; the importer's `loads_object`
+  refuses it.
+- H6 MINOR CONFIRMED (NEW, test-only): V5/V9 expected built-in derived via production
+  `built_in_profile()`.
+- H7 MINOR CONFIRMED (NEW, test-only): the import test intercepts only reader/engine.
+- Mechanical: VERDICT anchored; 48 `succeeded in`; `tokens used` 220,986; three start-up ERROR
+  lines (models refresh x2, MCP connector), the rest echoed source: round COUNTS.
 
 ## RESUME HERE (cell 2, after cell 1)
 
