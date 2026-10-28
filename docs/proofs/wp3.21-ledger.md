@@ -460,6 +460,75 @@ run", main `e6f7193`):
 DR-63's fix, the oracle's `sink_devices` record and the device-frame tests keep their history;
 the follow-up moves the CuPy code into `core`, restores `samples.py` and re-points the tests.
 
+## Task 5a (#2) under AD-29, as built (cell 4, `0cc11cd`)
+
+- `core/backend.py`: `CupyBackend.planes_to_rgb(data, *, width, height, bit_depth) -> Array`
+  and `CupyBackend.rgb_to_planes(a, *, bit_depth) -> bytes`, under a comment block and module
+  docstring paragraph naming them "IF-2 device extensions: NOT part of the frozen ABC; provided
+  by the GPU backend; absent on the CPU backend". The arithmetic is cell 3's (`3da1e6f`), moved:
+  the integer planes uploaded and divided by `float32(2**n-1)`; clip, multiply, `rint` as
+  separate kernels, NaN by a reduction read back, planes downloaded synchronously. Refusals are
+  `ValueError` (bit depth, size, NaN, non-float32 via `check_rgb`) and `TypeError` (not a CuPy
+  array, or another device's). Core imports nothing from `color`.
+- **Where the methods sit (reading of AD-29 items 1 and 3, not a choice):** on `CupyBackend`,
+  the GPU `CoreBackend` in `core/backend.py`, NOT on the shared base class: AD-29 says "absent
+  on the CPU backend" and requires the CPU backend NOT to satisfy the Protocol, which a method
+  on the base would contradict (`NumpyBackend` subclasses it).
+- `io/video/decode.py`: `DeviceFrameBackend`, the ONE `runtime_checkable` Protocol of
+  `clearwater.io.video` (`device: str`, `planes_to_rgb`, `rgb_to_planes`; the decode calls the
+  first, the sink the second). `FFmpegVideoSource(*, device_backend=None)`; device frames only
+  for `hw_decode=True` AND `isinstance(backend, DeviceFrameBackend)`; else `FrameStream` is the
+  base's call. `importlib`/CuPy gone from the module.
+- `io/video/encode.py` imports the Protocol from `decode`. `FFmpegVideoSink(*,
+  device_backend=None)` keeps the backend only if it satisfies the Protocol. `_payload`: a
+  non-`cpu` label is refused with the BASE's text ("copy it to the host first
+  (backend.to_host)") unless the sink has a device backend, the label equals its device and the
+  pixels are not NumPy; then dtype/shape as before and `backend.rgb_to_planes`, its
+  `TypeError`/`ValueError` mapped to `VideoEncodeError("frame")`. The host branch is the base's
+  `rgb_to_planes(np.ascontiguousarray(...))`. DR-63's lock unchanged.
+- `color/samples.py`: byte-identical to `d1e4537` (`git diff d1e4537 HEAD -- <f>` empty).
+- `jobs/export.py`: unchanged by the rework (a frame the source yielded on the device stays
+  there; host frames as the base).
+- `tools/export_oracle.py`: probes with a plain source, then (with `--device-frames`) calls
+  `select_backend(settings, H, W, method)` and builds the source and `RecordingSink` with
+  `device_backend=` that result; `--force-cpu` gives the CPU backend, hence the host path by
+  structure. The record keys are unchanged (`device_frames`, `sink_devices`).
+
+Tests (`tests/test_wp321_device_frames.py`, 34 items, re-pointed and extended): the GPU backend
+satisfies `DeviceFrameBackend` with `inspect.signature`-equal methods; the CPU backend has
+neither method and does not satisfy it; the conversions equal the host's (every 8/10-bit code;
+random odd and 4K planes with the buffer zeroed after the call; every tie and its neighbours,
+the clip limits, +-inf, random); size, bit-depth, NaN, float64 and host-array refusals; source
+default `None`; software decode host for none/CPU/GPU backends; a CPU-backend source with
+`hw_decode=True` equals the base source frame for frame; device decode = host decode on all
+five WP2.3 samples; the sink's device payload = host payload; a device write closes and
+verifies; wrong-label, float64 refusals; a device label on host pixels refused with `to_host`
+for none/CPU/GPU sinks; a sink with no or the CPU backend refuses a real device frame; DR-63
+both tests. **Failing-first** against `e6d27a0` (cell 3's #2): 35 fail, 27 pass (of the
+62-item run with the four layering tests): all 34 device-frames items fail (the DR-63 and
+host-path items only on the new `device_backend=` keyword) plus
+`test_core_deps.py::test_static_rule_over_src`.
+
+Light run (`-n 4`, `not footage and not slow`): color, core, decode (incl. hw, lifecycle),
+encode (incl. 962/1101/1211/1259 UNCHANGED), oracle tool, `test_jobs_export.py`,
+`test_wp321_*`, EVERY `*_deps.py` / `*_rules.py` (7 files, incl. AD-29's four): **883 passed,
+1 skipped** (`test_color_roundtrip.py:121`, the standing swscale skip), log
+`work\c4-light1.log` (worktree). The four layering tests alone: 28 passed. ruff, format, mypy
+strict clean.
+
+Oracle, WP2.3 samples with `--device-frames`, every frame (driver
+`work\wp3.21\oracle-ad29-wp23.sh`, log `logs\oracle-ad29-wp23.log`; records made on `4dd9280` +
+the uncommitted rework, which is `0cc11cd`'s tree): **10 of 10 TIER1, max abs 0** (GPU legs vs
+`ref-*-c3-gpu-a`, `--force-cpu` legs vs `ref-*-c3-cpu-a`); `sink_devices` `['cuda:0']` on every
+GPU leg, `['cpu']` on every CPU leg.
+
+| # | Item | Suspected | Confirmed | Rejected | Fixed |
+|---|---|---|---|---|---|
+| V21 | the CPU backend satisfies the Protocol through its `device` attribute (a data member) | yes | - | rejected: `isinstance(NumpyBackend(), DeviceFrameBackend)` is False (test) | - |
+| V22 | a sink built with the CPU backend accepts a device frame | yes | - | rejected: the backend is kept only if it satisfies the Protocol; refused with `to_host` (test) | - |
+| V23 | mypy narrows the device branch of `_payload` to unreachable (IF-1 types pixels as NumPy), hiding it from type checking | yes | yes (mypy `unreachable`) | - | `pixels: Any`; a non-array under a device label refused by `getattr(..., "dtype")`, not an AttributeError |
+| V24 | a stale `device_frames=` / `xp=` caller left in `src`/`tools`/`tests` | yes | - | rejected: grep finds only the oracle's `Job.device_frames` flag, which now selects the backend | - |
+
 ## Re-grounding (2026-10-27/28, against `d1e4537`)
 
 Anchors checked against the code before use:
