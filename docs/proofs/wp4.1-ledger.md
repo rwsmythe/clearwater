@@ -223,3 +223,32 @@ Table R0-1..R0-8 APPROVED as written.
 - S6 RULED: no logging handler installed by the runner; its docstring says so.
 - S7 RULED: `--parameters` takes AD-13 preset or provenance JSON, `source`/`settings` dropped
   as `PresetStore` import does; `--method` with `--parameters` exits 2 with a readable text.
+
+## Build log
+
+- Task 3 root `157273a`; task 4 GUI swap `4ee4ea7`; runner `f8464f5`; runner tests (35, 2.5 s)
+  committed. Light runs green: `test_app_composition` (10), `test_app_deps` (6),
+  `test_gui_deps`, `test_core_deps`, `test_jobs_naming` (129 with the two above),
+  `test_gui_status`, `test_gui_deps`, `test_gui_startup` (32, offscreen).
+
+### S8 (STOP, Y3; reproduced) V9 at 8 bit from 10- and 16-bit sources
+
+Task 6 V9: "every still, 8 and 16 bit: ... max <= 2/255, mean <= 0.2/255 (AD-11), colour
+description and ICC bytes unchanged". Probe (scratch `v9_probe.py`, `v9_probe2.py`; 66 stills x
+{c3, ancuti2018} x {8, 16} = 264 runner exports, `--neutral`, `force_cpu`, outputs under
+`work/wp4.1-v9probe`, 4.0 s):
+
+- 36 of 264 miss mean <= 0.2/255, ALL at 8 bit from a source above 8 bit (heic10-*, png16-*):
+  worst mean 0.256/255 (`heic10-gradient-*`), max 0.499/255. That is 8-bit quantisation alone
+  (a uniform rounding error has mean 1/4 step): against the source rounded to the export depth
+  the error is max 0.0000/255, mean 0.0000/255 on all 264.
+- 8-bit sources at either depth and every 16-bit export: max 0.0019/255, mean 0.0012/255.
+- Colour description (primaries, transfer, matrix, range) equal on all 264. ICC bytes differ
+  on the 10 HEIC stills without an embedded profile (`heic8/10-*-none`, `heic-ad24-*`): the
+  output carries the D53 built-in profile, as V5 requires.
+
+Recommended: V9's reference is the source quantised to the export bit depth (the user chose
+the reduction; V9 tests that the neutral pipeline is the identity), bound max <= 2/255 and
+mean <= 0.2/255 as AD-11 says; the raw figure against the unquantised source is recorded, and
+asserted at 16 bit and for 8-bit sources. ICC: equal to the source's, or to the D53 built-in
+where V5 requires it. Alternative: assert V9 at 16 bit only for sources above 8 bit.
