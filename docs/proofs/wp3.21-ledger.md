@@ -60,7 +60,8 @@ Cell `implementer-opus-high` (Claude lane), worktree `.worktrees/wp3.21`, branch
 | 35 | cell 7: the fit window granted (4K attribution, fit, block 2 re-run) | 316,605 |
 | 36 | cell 7: WINDOW RELEASED; RESUME HERE (cell 8); stand down | (dispatcher fills) |
 | 37 | cell 8: recollection; WINDOW REQUEST (parallel leg) | 62,302 |
-| 38 | cell 8: WINDOW RELEASED (parallel leg green); WINDOW REQUEST (serial leg) | (dispatcher fills) |
+| 38 | cell 8: WINDOW RELEASED (parallel leg green); WINDOW REQUEST (serial leg) | 67,467 |
+| 39 | cell 8: WINDOW RELEASED (serial leg green); WINDOW REQUEST (block 3, GX011625) | (dispatcher fills) |
 
 ## RESUME HERE (cell 6, after cell 5)
 
@@ -2271,3 +2272,19 @@ work/c8-suite-parallel.done )`, started 15:30:17Z (local clock), done marker
   `test_a_video_job_releases_at_the_analysis_end_and_after_every_frame` asserts two releases,
   the analysis end and the job end; "after every frame" means after the last frame. The name is
   banked for Reviewer B.
+
+### Serial leg (EXCLUSIVE window, GRANTED 15:41Z per the orchestrator; HEAD `2b14e21`)
+
+`( cd <worktree> && unset PYTEST_ADDOPTS && export QT_QPA_PLATFORM=offscreen && uv run pytest
+-q -rs -m "gpu or footage or gui or slow" --basetemp=work/c8-suite-serial > work/c8-suite-serial.log
+2>&1; echo EXIT=... > work/c8-suite-serial.done )`, started 15:40:14Z (local clock), done marker
+`EXIT=0 2026-10-28T16:25:02Z`; log `work\c8-suite-serial.log` (worktree).
+
+- **1,113 passed, 1 skipped, 4,175 deselected, 1 warning in 2,685.30 s (0:44:45)**; 1,113 + 1 =
+  1,114 collected, zero failures or errors.
+- Skip, the same one as cell 7's serial leg 2: `tests\test_photo_check.py:139: the footage folder
+  has no photos yet (WP3.6P is queued)`.
+- **The two-leg suite is GREEN on code `227ed32`** (parallel 4,174 passed / 1 skipped; serial
+  1,113 / 1). After: RAM 12.8 GiB available, C: 32 GB free.
+- CHARC (relayed at the grant): the misnamed two-release test is a MINOR; renamed in Reviewer
+  B's cleanup if B lists it, otherwise a MINOR row at the accept. Not renamed in this seat.
