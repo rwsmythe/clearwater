@@ -159,7 +159,16 @@
   FINAL 512 (overlap recomputed); REQUIRED test bit-identical to unchunked on non-multiple-of-512 shapes at 1080p / 4K / 5.3K;
   Q-C5a (2) restated as a BOUND per line length measured with the plan cache CLEARED first, added to memory_estimate_bytes for the
   clip's longer side, test asserts peak < bound; (1) job-end release and the fixed-budget projection rule unchanged. Expected 5.3K
-  default ~7.0-7.1 GiB; task 10 5.3K row = measurement of record, breach = STOP to me.** **No window open; seat free.**
+  default ~7.0-7.1 GiB; task 10 5.3K row = measurement of record, breach = STOP to me.**
+  **Task 6 gate/route/release BUILT `7061699`** (msg `909645ddab0d76cf`; cell 5 depth 232,900 at yield 14): `FFT_MIN_SHORT_SIDE` 1080 /
+  `FFT_MIN_SIGMA` 32 in core, `fft_route(h, w, sigma)` reads shape + sigma only; per-axis rfft inside `gaussian_blur` on both
+  backends; `CupyBackend.release_fft_plans()`; tests (a) proxy tripwire max short side 1079, (b) 1079-high blur bit-identical CPU +
+  GPU, (c) 1080p / 4K / 5.3K within 1e-5 deterministic + GX011627 frame 0; light 2,156 passed. Orchestrator placement ruling
+  CONCURRED: release in `_run`'s finally (covers photo jobs; a 12 MP photo meets the gate), logged if it raises, never replaces the
+  outcome. **OWED AT WP3.21's ACCEPT (mine), now THREE rows: WP4.2 `device_backend=<GPU backend>`; WP4.3 GUI preview >= 1080 short
+  side releases FFT plans at a preview boundary (clip change / unload) and counts them in its memory reading; DR-63 CLOSED.** Cell 5
+  finishes batching (A), the estimate fold + bound test, ONE window (4K + 5.3K memory re-read + oracle legs), then hands to **cell 6**
+  (Reviewer A, two-leg suite, task 10). **No window open; seat free.**
 - **(history) micro-timing window ~08:43Z** (msg `f02a8e3d3ecf679e`). Measures: blur share of c3 render at 4K (CUDA events, median of 20); each render
   blur direct vs R0.4 per-axis FFT and 2-D FFT (time, max abs, determinism, pool bytes); sigma ladder 8-270 at 4K and 5.3K 8:7.
   Dry run 1080p synthetic: blur 57 % of render; gate-eligible = the two Cb/Cr blurs at 0.05 x short side; FFT error <= 8.6e-7.
