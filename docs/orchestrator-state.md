@@ -31,6 +31,21 @@
     - Slow frames recur at indices 0, 323 and 387 (about 0.96 s). That is a task 10 finding; check 323 and 387 against the GOP length.
   - **Cell 5 DISPATCHED** (`wp321-cell5`, opus-high, background) from `74c97bf`. Depth 0 at dispatch. Prompt `dispatch-wp3.21-cell5.md`.
     - Order: the 4K micro-timing instrument and its WINDOW; then task 6 ONLY if the blur's share supports it (CHARC `b4c143d7` item 4: otherwise a YIELD that goes to CHARC); then task 7, Q-R7, Reviewer A, the two-leg suite, and task 10 last.
+  - **Cell 5 STOOD DOWN** at 326,666 (final reading). Handover at `aa06584`, tree clean.
+    - **Micro-timing:** the gate-eligible Cb/Cr blurs are 39 % of render. Task 6 GO (CHARC `8e103622`).
+    - **Q-C5a:**
+      - (a) plan cache kept, with a job-end `release_fft_plans` in `ExportEngine._run`'s finally (covers photos; concurred).
+      - STOP on additive plan memory -> (A) chunked: 512-line batches, EVEN fast length (cuFFT odd lengths are position-dependent). Bound per line length folded into `CupyBackend.memory_estimate_bytes`.
+      - `select_backend` stays on base (RULED (a); a 5.3K peak above base x 1.25 = STOP, then (b)).
+    - **Memory re-read:** every peak under base + bound (5.3K max-fraction 2,798 MiB vs 6,281). Render saving: 4K -0.181 s, 5.3K 2.93 -> 0.78 s.
+    - **Oracle:**
+      - WP2.3 TIER1 x10; GX011627 c3 TIER2 (7.06e-6); synthetic 4K TIER2 (2.44e-6); GX011627 ancuti2018 TIER1. Records and proxies equal throughout.
+      - Quantised (sink rule, round half even): 8-bit 14,858 / 10-bit 60,692 of 572 M values changed, max 1 code.
+    - Product commits: `83349d7` Q-R7, `7061699`, `17743ec`.
+    - **CHARC owes 3 register rows at the accept:** WP4.2 `device_backend`, WP4.3 preview plan release, DR-63 closed.
+  - **Cell 6 DISPATCHED** (`wp321-cell6`, opus-high, background) from `aa06584`. Depth 0 at dispatch. Prompt `dispatch-wp3.21-cell6.md`.
+    - Order: Reviewer A (Codex at its seat) -> the two-leg suite (one window per leg) -> task 10 LAST (windows; the binding memory method) -> report -> return report.
+    - Then MY Reviewer B (Codex `gpt-6.1-sol`/high at my seat) and the accept.
   - **Edit-tool trap:** the Edit tool can write CRLF in a worktree. Run `sed -i 's/\r$//'` before every commit, and check `tr -cd '\r'` on the blob.
 - **Generation 14 ROLLED OVER 2026-10-28 ~06:50Z at ~330K, at a clean boundary: no cell live, no window open, host free.
   GENERATION 15 STARTS HERE (RESUME HERE below; the gen-13 table further down is history).**
