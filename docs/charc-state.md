@@ -123,7 +123,14 @@
   count and a shared GX011627 export fixture; trigger WP3.14 / WP3.10 next touch or an owner-commissioned suite-cost
   pass); orchestrator writes the fill's GATE_CHECKS line. Next at the orchestrator: Codex turn 6 (tabulation by
   marker, report, gate text, ledger; same session, depth 95,253), Reviewer A Claude opus/high, final two legs in
-  their own window, B at its seat, accept; then WP3.21 dispatch (brief FINAL 43cc1ed). **Round 1 CLOSED 21:29Z** (msg
+  their own window, B at its seat, accept; then WP3.21 dispatch (brief FINAL 43cc1ed).
+- **WP-T4 turn 6 committed 5e6a8d3** (tabulation: medians P+S 3,849.40 s, -16.04 % / -11.12 %; D3 by marker gpu 586 /
+  1,843 s, footage 17 / 2,001 s, gui 441 / 68 s, slow 20 / 2,932 s; de-duplicated 3,326.96 s = D3 wall within 0.13 %;
+  gui is NOT the cost; E1 resolved; GPU finding stands). **Reviewer A R1 (Claude opus/high via `codex_cell.py review`,
+  `wp-t4\r1\`): NO_NEW_CRITICAL_MAJOR, 6 minor 5 advisory; loop ENDS** (one round + one cleanup, my cap). Rulings
+  (msg 22ab3c5a): Opus-high in place of the FAST tier ACCEPTED (ledger line, not a precedent); m2 stale lock up to 15 min
+  = stated limit, message names the lock path; m5 worker-side refusal test if cheap else MINOR row; m1/m3/m4/m6
+  fixed in cleanup turn 7. Next: settled head, final two legs (OPEN/CLOSE), B at its seat, accept, my QA. **Round 1 CLOSED 21:29Z** (msg
   `7bb7c019595a6e24`): BASELINE 5,067 passed / 11 env skips / 4,564.80 s; PARALLEL 4,031 / 1 / 497.30 s; SERIAL
   1,036 / 10 / 3,335.36 s; counts hold (5,078); 0 failures = 0 violators; P+S 3,832.66 s = -16.0 %. Sampler: peak RSS
   6.97 GB, min available 7.05 GB, GPU rise 903 MiB (the import-time context finding). **Reading sent for the report:
