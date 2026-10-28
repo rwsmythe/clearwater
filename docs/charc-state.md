@@ -9,84 +9,50 @@
 
 ---
 
-### CHARC generation 5 = `clearwater-charc-20261028-0647` (fable/medium), ONLINE 2026-10-28 ~16:50Z at main 2a91374
+### RESUME HERE (CHARC generation 5 = `clearwater-charc-20261028-0647`, fable/medium, ONLINE 2026-10-28 16:50Z)
 
-Picked up from gen 4 `clearwater-charc-20261026-2007` (rolled ~16:35Z at ~390K; launched gen 5 itself). Bash gauge 64 ms;
-charc inbox empty at pickup (0 unread / 235 read); orchestrator gen 16 busy (ListAgents); gen 4 listed idle and inert.
-Announced online to the orchestrator 16:5xZ (`--to orchestrator`, cued `clearwater-orchestrator-20261028-0219`). The RESUME
-block below is gen 4's hand-off, held unchanged until block 3 CLOSES.
-
-- **BLOCK 3 CLOSED 17:47Z, WINDOW CLOSED (msg `287333353dce5f6e`): GX011625 c3 cold sustained 14,938 frames, 0.3195 s/frame =
-  9.58 min/min [WP3.14 31.26]; (i) device-wide 3,277 <= 4,065 BINDING, (ii) pool 1,511 <= 2,174; no STOP. LAST heavy run of WP3.21;
-  code FINAL at 227ed32 (ledger 21e3f38). Thermals 95 C peak / power cap, last-quarter median +4 % = spread. **No window open; seat free.**
-  **RULED (my msg b7143a50): the candidate two-leg suite is NOT required** -- `git diff --stat d1e4537 main -- src tests tools
-  pyproject.toml uv.lock` EMPTY at my seat (main docs-only since the branch base), so `wp3.21-mc` is code-identical to 227ed32 and the
-  green two-leg suite is the candidate's figure by code identity, on condition the orchestrator's `git diff --stat wp3.21-mc 227ed32`
-  over the same paths is empty and the record names both runs; harness gate / static / Reviewer B still run. Next at the orchestrator:
-  cell 8 report `docs/reports/wp3.21-optimisation.md` + return report, candidate, Reviewer B (final head, `afad7af..227ed32`
-  post-convergence, grant named), accept record, ff-merge; then my QA + the owed rows.
-- **V4 SAME WINDOW CLOSED 18:05Z (msg `2af334d142930d91`): 13/13 compares SAME, 0 MANDATORY / 0 REQUIRED different (BEST-EFFORT 5-8
-  = D86 not-carried container set); Done clause met. CELL 8 RETURNED and STOOD DOWN (final 185,908); branch `wp3.21` 8a9b97a (report
-  `docs/reports/wp3.21-optimisation.md` + ledger; docs-only since 227ed32). Records under work/wp3.10/wp3.21-v4/ (tool root), kept
-  outputs work/wp3.21/oracle/v4-*/out/ NOT deleted. **No window open; seat free; NO CELL IN FLIGHT.** Orchestrator next: candidate
-  `wp3.21-mc` (code-identity check recorded), Reviewer B, harness + static, accept record, ff-merge.**
-- **REVIEWER B BLOCKING (2 major) ADJUDICATED AT THE GATE, CHARC UPHELD (A) 18:26Z (query `d75a07306ffb2681`; my msg 24a26b64).**
-  Candidate `wp3.21-mc` 0ca1970 on main 9db55fa, code-identical to 227ed32 (verified at my seat, empty diff over src tests tools
-  pyproject uv.lock); B evidence `clearwater-review-evidence\wp3.21\reviewB\` md5s OK (6), VERDICT anchored line 77, banner
-  gpt-6.1-sol, 16 succeeded, 330,349 tokens. B1 (D87 retry extrapolation uses the lead's marginal rate) = the Q-R6 form as ruled,
-  NOT A DEFECT (B's own-rate wording came from the orchestrator's prompt paraphrase; recorded); B2 (bench exit 0 on
-  `memory_check.passes` false) NOT A DEFECT (STOP was the record's reading by design); B3 report sentence = docs fix on the
-  candidate; B4 (10-bit needs 40 bits, bound safe) + misnamed release test = one MINOR row; B5 (boundary-free test shorter than
-  the lead) = row; B1 advisory row (max of the two rates at next touch); B2 MINOR row (non-zero exit at next bench touch). No B
-  pass 2. Register rows at my QA: DR-67..DR-74 drafted in the scratchpad script `edit_register_wp321.py` (DR-63 CLOSED there).
-  Next: orchestrator's B3 commit, accept record, ff-merge, release post; then my QA.
-- (history) V4 SAME window OPEN ~17:58Z (msg `20eb361d0e4e06d9`, ~25-30 min).
-  Done-clause gap cell 8 caught (brief line 46 / Q3: V4 SAME through `tools/video_fidelity.py` after encode; no cell ran it). The
-  orchestrator took option (a), the measured run (six WP2.3 samples x GPU/CPU legs + GX011627 c3 device frames, `--keep`, outputs
-  under work/wp3.21/v4/), declined the reasoning waiver (b); I CONCUR, no ruling (silence = (a) as the post invited). Any item not
-  SAME on MANDATORY/REQUIRED = STOP. No code change; code stays 227ed32; head 9942c71 docs-only; static gates clean there.
-
-### RESUME HERE (gen 4's hand-off; the accept-time items below still bind)
-
-- **Orchestrator = gen 16 `clearwater-orchestrator-20261028-0219`** (re-read `comms/.launch-sessions.json` before every cue;
-  every post gets ONE SendMessage cue). Thread for WP3.21 = `18052d93d6c58c9c`. Subjects under 120 chars; bodies via
-  `--body-file`; edit docs with a scratchpad Python script (`newline="\n"`); check `tr -cd '\r' | wc -c` = 0 before every commit
-  (two CR slips this generation came from `\r` inside a Windows path in an inline edit string).
-- **WP3.21 is the only package in flight; EXCLUSIVE WINDOW OPEN ~16:27Z: task 10 block 3 (GX011625 cold c3, ~1.5-2.5 h).**
-  NOTHING HEAVY AT THIS SEAT until the orchestrator posts CLOSE. Then: cell 8 writes the report + return report; Reviewer B
-  (Claude pass at gen 16's seat) on the FINAL head with the post-convergence range `afad7af..227ed32` and the retroactive grant
-  (`analysis/__init__.py`) named; then the ACCEPT.
-- **At WP3.21's accept, CHARC QA (recipe in the charter and below) PLUS these register rows (mine):** (1) WP4.2 constructs the
-  product's GPU job with `device_backend=<the GPU backend>` (source and sink) with a test; (2) WP4.3: a GUI preview with short
-  side >= 1080 meets the FFT gate, so release FFT plans at a preview boundary (clip change / unload) and count them in its memory
-  reading; AND if the GUI shows a job's device-wide total it needs the IF-8 (or IF-2) extension, a CHARC decision then;
-  (3) DR-63 CLOSED on #2's evidence (`encode.py` close sets 'closed' only from 'open' under the shared lock); (4) the overlapped
-  export is ANALYSIS-BOUND (frame loop with the FFT outruns the streamed analysis; waits every STREAM_STEP = 16 frames,
-  record_wait 10.7-11.5 s of the wall at 4K); lever = the analysis pass (planes_to_rgb, stage-1 analyze at the idle clock, the
-  remaining host work), NOT the step; trigger = owner wish below ~9.5 min/min or WP5.2. MINOR items if Reviewer B's cleanup does
-  not take them: the misnamed `...releases_at_the_analysis_end_and_after_every_frame` test (asserts exactly two releases).
-  Ledger findings (not rows): the ungranted `analysis/__init__.py` edit (should have been a STOP); round 0 missed frame rule 5.
-- **V16 figures of record (block 1, GX011627 4K, device frames ON):** cold c3 9.57 / 9.78 / 9.92 min/min [WP3.14 31.8-31.9];
-  warm 9.06; ancuti2018 8.74; libx265 14.59; OFF row 17.25. Block 2 (5.3K synthetic): 36.65 min/min [136.03]; pool peak 4,312
-  <= 6,281 (binding), device-wide 7,901 <= job estimate 10,331. Every NVENC row meets D106's 25; cold c3 meets AD-21's ~10.
-- **Decisions this generation:** AD-29 (device extensions by consumer-side Protocols, CuPy only in core; `CupyBackend` holds the
-  methods; core returns float64 block sums, quantise stays in analysis); AD-1 amended 2026-10-28 (device-wide JOB term: pool
-  estimate + context 272 + decoders x (80 MiB + 51 B/px) + NVENC (368 MiB + 36 B/px); selection unchanged; two-instrument test);
-  AD-7 / brief Q2 lead corrected to 60 (+1 at_end) derived at run time; AD-11 WP3.21 oracle tiers; recipe rules: foreground wait
-  for granted heavy runs; a deletion grant names what is KEPT.
-- **Owner-pending inputs (carry):** photos (WP3.6P), the iPhone clip (DR-15), the N6 body erratum DR-64 (apply on the owner's
-  word 'apply N6 erratum' as spec v0.5.6). Open owner decisions: none. Every owner-facing summary ends with that line.
-- **After WP3.21's accept:** Phase 3 is COMPLETE; commission Phase 4 (WP4.1 photo path, WP4.2 video path, WP4.3 wiring) with
-  briefs (one drafting helper each, CHARC approves FINAL); release the `wp3.21` worktrees after the accept.
+- **Orchestrator = gen 16 `clearwater-orchestrator-20261028-0219`** (~190K at 18:30Z; re-read `comms/.launch-sessions.json` before
+  every cue; every post gets ONE SendMessage cue). Subjects under 120 chars; bodies via `--body-file`; edit docs with a scratchpad
+  Python script (`newline="\n"`); `tr -cd '\r' | wc -c` = 0 before every commit; commit by pathspec; never an uncommitted edit left
+  in the main tree (hazard 7). Bash gauge 64 ms at pickup. Gen 4 `clearwater-charc-20261026-2007` rolled ~16:35Z at ~390K and
+  launched this seat itself.
+- **PHASE 3 COMPLETE 2026-10-28 18:30Z. WP3.21 ACCEPTED main `7e228fb`** (record `docs/proofs/wp3.21-accept.md`; candidate `wp3.21-mc`
+  0ca1970 = `wp3.21` 227ed32 code; two-leg suite on 227ed32 = main's figure by code identity, main docs-only since d1e4537, verified
+  here; Reviewer B BLOCKING 2 major adjudicated at the gate, CHARC UPHELD (A), msg 24a26b64). **CHARC QA CONFIRMED (static, msg
+  83b59f48):** whole-diff patch-id 906842c7 identical on `d1e4537..wp3.21` and `6d48541..7e228fb`; `git diff 7e228fb 227ed32` over
+  src tests tools pyproject uv.lock EMPTY; footprint owned + named grants; interfaces / export_seam / samples.py / pyproject / uv.lock /
+  fixtures untouched; cupy only under core/; 0 CR; B md5s OK (6), VERDICT anchored, gpt-6.1-sol, 16 succeeded; ruff / format 250 /
+  mypy 138 / harness 382 (1 skipped) at this seat; no suite here. **Register `cffd243`: DR-63 CLOSED; NEW DR-67 (WP4.2
+  `device_backend`), DR-68 (WP4.3 preview FFT plans), DR-69 (job estimate bench-only; IF-8/IF-2 extension = CHARC decision at WP4.3),
+  DR-70 (analysis-bound export; trigger owner wish < ~9.5 or WP5.2), DR-71..DR-74 (B1 max of rates, B2 bench exit, B4 + misnamed test,
+  B5 longer boundary-free case).** Worktrees `wp3.21`, `wp3.21-mc` released (branches kept); deletion grant for the 13 V4
+  `*_corrected.mp4` outputs ONLY, everything else under work/wp3.21 and work/wp3.10/wp3.21-v4 KEPT.
+- **V16 figures of record (device frames ON, exclusive windows):** GX011627 cold c3 9.57 / 9.78 / 9.92 min/min [31.8-31.9];
+  GX011625 sustained 9.58 [31.26]; warm 9.06; ancuti2018 8.74; libx265 14.59; 5.3K synthetic 36.65 [136.03]. Memory: 4K device-wide
+  3,277 <= 4,065, pool 1,511 <= 2,174; 5.3K pool 4,312 <= 6,281 (binding), device-wide 7,901 <= 10,331. D106's 25 met on every NVENC
+  row; AD-21's ~10 met cold. Next speed lever = the analysis pass (DR-70), not before WP5.2 or an owner wish.
+- **PHASE 4 COMMISSIONED 18:37Z (msg 136bfecd, new thread):** WP4.1 photo path -> WP4.2 video path -> WP4.3 wiring IN ORDER, all
+  `implementer-opus-high`, A and B Codex gpt-6.1-sol/high; plus **WP-T5 suite cost (DR-65)**, Sonnet-class by pace tiebreak,
+  concurrent with WP4.1 (disjoint test files). One drafting helper per brief; CHARC approves each FINAL; drafts arrive as one set with
+  numbered questions. Ruled bounds in the post: composition root replaces `gui/engines.py` stub wiring (photo legs in WP4.1, video in
+  WP4.2; a new module = my pass before dispatch); headless runner under tools/ owned by WP4.1, extended by WP4.2; WP4.2 binds DR-67
+  (+ DR-71/73(a)/74 where reached), V4 SAME leg through the product composition (one window), no V16 re-measure (WP5.2); WP4.3 binds
+  DR-68, DR-69 (IF-8/IF-2 extension = STOP to me), DR-52, DR-62, WP3.18 adapter notes, DR-50/51 swaps, V7 re-measure, G1-G13; WP-T5
+  = minimum-frame 5.3K V4 export + shared GX011627 export fixture, no product code, serial wall before/after. **NEXT AT THIS SEAT:
+  rule the brief packet(s); then dispatch rulings; windows OPEN/CLOSE as before; CHARC QA at each accept (recipe: standing rules
+  below).**
+- **Owner-pending inputs (carry):** photos (WP3.6P; WP4.1 records the owner-photo leg OWED), the iPhone clip (DR-15), the N6 body
+  erratum DR-64 (apply on the owner's word 'apply N6 erratum' as spec v0.5.6). Open owner decisions: none. Every owner-facing
+  summary ends with that line.
 
 ### Phase / state
 
-**Phase 3 (build), wave 4 = WP3.21 only, at its task 10 block 3 (2026-10-28).** Plan
-`docs/clearwater-implementation-plan.md` v1.2. **CHARC generation 5** (line above). Gen 4 = `clearwater-charc-20261026-2007`
+**Phase 4 (integration) COMMISSIONED 2026-10-28; Phase 3 COMPLETE at main 7e228fb.** Plan
+`docs/clearwater-implementation-plan.md` v1.2. **CHARC generation 5** (RESUME HERE above). Gen 4 = `clearwater-charc-20261026-2007`
 (fable/medium), launched by gen 3 at 06:07Z, picked up 2026-10-27 ~06:10Z from main 08a14ee; bash gauge
 44 ms. Main ~1295 commits ahead of `origin/main`, unpushed; no push asked (verify `git status -sb`).
 
-### Generation 4 so far (2026-10-27 06:10Z onward)
+### Generation 4 (2026-10-27 06:10Z to 2026-10-28 16:35Z; rolled at ~390K; kept as record)
 
 - **Wave 4 RULED** (msg `6f725eee`, 2026-10-27 06:11Z, answering orchestrator query `280fb7a08b5e5cfc`):
   wave 4 = WP3.14 (opus-high, Claude) + the calibration pair NOW; **WP3.21 opens AFTER WP3.14's accept**
