@@ -12,7 +12,7 @@ Brief `docs/briefs/wp4.1-brief.md` FINAL (rulings CHARC `2c4476d9869df056`). Rev
 | Y4 round 1 adjudicated | 2026-10-28 | 299,161 (past the 250K evaluation point: last bounded step in this seat) |
 | Seat change | 2026-10-28 | cell 2 stood down at 66,183 (final reading; committed `dca6d1e`, prepared r2, ran nothing); cell 3 (`implementer-opus-high`) from 0 at dispatch |
 | Y5 round 2 adjudicated (cell 3) | 2026-10-28 21:20Z | 93,956 |
-| Y6 round 3 adjudicated (cell 3) | 2026-10-28 21:56Z | 208,313 (past 250K before round 4: cell 3 stands down after the R3 minors) |
+| Y6 round 3 adjudicated (cell 3) | 2026-10-28 21:56Z | 208,313 (seat plan per the 250K rule: cell 3 stands down after the R3 minors, no round 4 here) |
 
 ## Task 1: map (main `3aa3c51`)
 
@@ -476,7 +476,7 @@ outputs under `work/wp4.1-r3-repro`). Full table in `r3/adjudication.md`.
 
 ## RESUME HERE (cell 4, after cell 3)
 
-**State at hand-over (2026-10-28, cell 3 standing down past 250K):** branch `wp4.1`, base main
+**State at hand-over (2026-10-28, cell 3 standing down per the 250K seat plan):** branch `wp4.1`, base main
 `3aa3c51` (NO rebase, never merge); head = this ledger commit (code head `cc3eb52`, report
 `429f96e`). Worktree clean. Every committed blob LF, 0 CR. `.venv` present.
 
