@@ -1904,5 +1904,5 @@ frame loop now outruns the analysis (c3: analysis ends at 197-205 s of a 218-225
 export waits at each advance. Interim 2's 323 and 387 are on this cycle (19 + 16 k). Frame 0 is
 the first-frame cost (keyframe, plan creation, NVENC start). **No fix:** a smaller step would not
 make the analysis faster (the job is analysis-bound during the overlap; the step only sets the
-grain of the waits, at most one step of about 4.6 s at the end) and would cost O(n^2) copies
-(the constant's own docstring); the next gain is the analysis pass itself (a report finding).
+grain of the waits, at most one step of about 4.6 s at the end) and would add the store's whole-axis copies
+per advance (`smooth_at`, the constant's docstring); the next gain is the analysis pass itself (a report finding).
