@@ -317,6 +317,7 @@ md5s). Probe 20:14:34Z: one `succeeded in` line, banner `gpt-6.1-sol` / high.
 | 1 | `ef6bf2f` | 0 | 2 (F1, F3) | 6 (F2 downgraded, F4-F8) | 8 / 0 | 8 / 0 | 0 | runner (`tools/`, F1-F4), root docstring (F6), report (F5, F7), one test (F8) | 299,161 |
 | 2 | `dca6d1e` | 0 | 2 (G1 NEW, G2 REOPENED) | 5 (G3, G4, G5 downgraded, G6, G7) | 7 / 0 | 3 / 4 | 0 | runner (`tools/`, G1-G7 incl. the G5 docstring), tests, report | 93,956 |
 | 3 | `899102d` | 0 | 1 (H1 NEW; accepted-component code reachable through the swap: STOP) | 6 (H2-H4 downgraded, H5, H6, H7) | 7 / 0 | 6 / 1 | 0 | runner (`tools/`, H2-H5), tests (H6, H7 test-only), report; H1 BANKED to WP4.3 (CHARC `5fab48cc2a5174cb`) | 208,313 |
+| 4 | `844b996` | 0 | 1 (I1 NEW: beside-source through a file symlink writes into the footage folder) | 4 (I2 downgraded, I3, I4, I5 test-only) | 5 / 0 | 4 / 1 | 0 | runner (`tools/`, I1-I4), one test oracle (I5); NOT yet remediated | (dispatcher's figure at Y7) |
 
 ### Round 1 (20:14-20:24Z) -- VERDICT NEW_CRITICAL_MAJOR_FOUND; adjudicated, NOT yet remediated
 
@@ -474,6 +475,30 @@ outputs under `work/wp4.1-r3-repro`). Full table in `r3/adjudication.md`.
   `test_core_deps`, `test_jobs_naming`, `test_jobs_export_photo`: 458 passed, 0 skipped
   (`work/wp4.1-c3-r3fix-light.log`; run before a final docstring reflow, ruff/format/mypy re-run
   green after it).
+
+### Round 4 (22:56-23:08Z, cell 4) -- VERDICT NEW_CRITICAL_MAJOR_FOUND; adjudicated, NOT yet remediated
+
+Whole-package diff `3aa3c51..844b996` (rounds 1-3 named as history, withheld; H4 and H1 added to
+the accepted limitations; claim 3 updated for H2, H3, H5). Light set re-run on `844b996` first:
+ruff, ruff format --check (259), mypy (141) green; 458 passed, 0 skipped
+(`work/wp4.1-c4-light.log`). Probe 22:55:48Z: one `succeeded in`, banner `gpt-6.1-sol` / high.
+Reproductions native (`r4/r4_repro*.py`, outputs under `work/wp4.1-r4-repro`; the footage folder
+there is a stand-in). Full table in `r4/adjudication.md`.
+
+- I1 MAJOR CONFIRMED (NEW, in envelope): a file symlink inside the footage folder to a photo
+  outside it, given with `--beside-source`, exits 0 and writes `linked_corrected.png` into the
+  footage folder: `check_outputs` resolves the source (the target) while `jobs.naming` plans
+  `source.parent` unresolved. Control (a plain file inside) refused, exit 2.
+- I2 MAJOR reported, MINOR CONFIRMED (REOPENED, F1 class; as G3/G6): an unreadable local
+  configuration prints its full path (`LocalConfigError` text) on the exit-2 refusal; no record.
+- I3 MINOR CONFIRMED (NEW): `--parameters` is not validated against the method schema (the
+  importer's step); a wrong-typed value runs the batch and fails the item readably (exit 1).
+- I4 MINOR CONFIRMED (NEW): `--parameters` omits the importer's 1 MiB cap.
+- I5 MINOR CONFIRMED (NEW, test-only): the V5 EXIF oracle never compares the Interop IFD; 0 of 30
+  EXIF-bearing stills carry one, so the leg is unreached.
+- Mechanical: VERDICT anchored; 38 `succeeded in`; `tokens used` 172,631; three timestamped ERROR
+  lines (models refresh at start-up and once mid-run, MCP connector), two echoed source: round
+  COUNTS.
 
 ## RESUME HERE (cell 4, after cell 3)
 
