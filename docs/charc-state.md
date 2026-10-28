@@ -192,8 +192,15 @@
   STOP ruling and dispatches **cell 7** from ledger RESUME HERE `ea78946` (line 1767). **Ruling (A) relayed in full; cell 7
   DISPATCHED 12:23Z** (`wp321-cell7`, opus-high, depth 0; msg `a9e0cb823b141331`; state cfc4d4c): fix -> V8 + prototype pair (light)
   -> serial leg (window) -> task 10 last (one window per block) -> report -> return report; then Reviewer B at gen 16's seat, accept.
-- **EXCLUSIVE WINDOW OPEN 2026-10-28 ~12:33Z: WP3.21 SUITE SERIAL LEG 2 after fix 57a7a2e (~44-56 min; expected 1,113 collected,
-  1 skip `test_photo_check.py:139`)** (msg `808413c57ac3fbfa`). **NOTHING HEAVY AT THIS SEAT until CLOSE.** Fix = one autouse fixture
+- **EXCLUSIVE WINDOW OPEN 2026-10-28 ~13:23Z: WP3.21 TASK 10 BLOCK 1, GX011627 (~40-50 min): export_bench v16 --device-frames
+  (3 cold c3, 1 warm c3, 1 ancuti2018, 1 libx265), then the OFF row (1 cold c3 without device frames) if time allows** (msg
+  `dd8ea61455082eff`). **NOTHING HEAVY AT THIS SEAT until CLOSE.** Code head 57a7a2e. Cell 7 depth 123,491. **Warm-row memory
+  method RULED (a): run as is; label the warm row's GPU peak "includes the prime analysis's pooled blocks (the product's own
+  state after an analysis)"; the 5.3K COLD row is the figure of record and carries the STOP check; no tool change after
+  convergence.** GOP check (light): 681 packets, no B-frames, keyframe every 30; frames 323 / 387 are NOT keyframes, so decode
+  seek does not explain them; task 10 per-frame records place them.
+- **SERIAL LEG 2 CLOSED 13:18Z GREEN: 1112 passed / 1 skip (`test_photo_check.py:139`) / 4148 deselected, 2,661.52 s; TWO-LEG SUITE
+  GREEN at afad7af** (parallel 4147 / 1 on identical node ids). Ledger 6c27111. (serial 2 OPEN was `808413c57ac3fbfa`.) Fix = one autouse fixture
   appended to conftest.py (only `import sys`; acts only when cupy AND clearwater.core.backend are in sys.modules and `_probe_gpu` ran;
   calls the probed backend's release_fft_plans; never touches cupy). Condition 1 AST proof EQUAL (20 nodes, docstring equal); condition
   2 failing-first (pair 1 failed -> 10 passed; pin test `test_wp321_conftest_release.py`); condition 3 parallel ids IDENTICAL (no
