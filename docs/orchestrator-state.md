@@ -34,6 +34,23 @@
     candidate on main, two-leg suite on the candidate, harness gate, accept record, ff. CHARC owes QA + FOUR register rows.
   - Gen-16 slips: a second bare `cd` into the worktree with cell 7 live (returned in the same call); one unchecked claim
     (jobs -> core "forbidden") caught and corrected before posting.
+  - **Cell 8 (dispatch 0 -> stood down at 257,412):** two-leg suite GREEN on `227ed32` (parallel 4174/1 488 s; serial
+    1113/1 2,685 s; collection 4,175 + 1,114 = 5,289). Block 3 GX011625 9.58 min/min, (i) 3,277 <= 4,065.4 binding,
+    (ii) 1,510.8 <= 2,173.8. Report `docs/reports/wp3.21-optimisation.md`. Cell 8 caught a Done-clause gap: V4 SAME never
+    run -> granted window -> 13/13 SAME (records `work\wp3.10\wp3.21-v4\`; 13 kept outputs `work\wp3.21\oracle\v4-*\out\`
+    NOT deleted, cleanup needs my grant naming them).
+  - **Reviewer B** on `0ca1970`: BLOCKING (2 major) -> adjudicated at the gate, CHARC UPHELD (A) `3c1478caceafdf28`
+    (B1 D87 rate and B2 bench exit NOT DEFECTS vs rulings; B3 report sentence fixed docs-only; B1/B2/B4/B5 + misnamed
+    test = CHARC's rows). Evidence `clearwater-review-evidence\wp3.21\reviewB\` (md5 `review-B.txt` f0093217...).
+    Two-leg suite on the candidate NOT required (CHARC `1bd3eb2b`: code identity to `227ed32`, checked empty).
+  - **WP3.21 ACCEPTED 2026-10-28 ~18:40Z: main `7e228fb`** (ff from `wp3.21-mc`; accept record
+    `docs/proofs/wp3.21-accept.md`). Harness gate on main 382 OK (skip 1). PHASE 3 COMPLETE; CHARC owes QA + the rows,
+    then commissions Phase 4 (WP4.1 photo path, WP4.2 video path, WP4.3 wiring).
+  - **NEXT:** release post (done with this commit) -> CHARC QA -> Phase 4 briefs and dispatch. Leftover worktrees
+    `.worktrees/wp3.21`, `.worktrees/wp3.21-mc` (branches merged) kept until CHARC's QA; then remove them (`git worktree
+    remove`, never `git clean -x`). Evidence cleanup of the V4 kept outputs on a grant naming them.
+  - Gen-16 slips (cont.): a THIRD bare `cd` into `.worktrees/wp3.21` with cell 8 live (no write; returned next call); my
+    Reviewer B prompt paraphrased Q-R6 in A F5's fallback words (the source of B1).
 - **Generation 15 ROLLED OVER 2026-10-28 ~12:20Z at ~390K, at a clean boundary: no cell working, no window open, host free.
   GENERATION 16 STARTS HERE.**
   - **RESUME HERE -- WP3.21 (the only package in flight):**
