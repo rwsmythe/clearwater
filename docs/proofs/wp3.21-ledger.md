@@ -210,6 +210,64 @@ the Q-R7 stamp; Reviewer A; the two-leg suite (one window per leg); task 10 LAST
   `export.py`: the planted test fails (the job succeeded), the complete-entry test passes (an
   invariant). Light: overlap + `test_jobs_export.py` 111 passed; ruff, format, mypy clean.
 
+## Task 5a (#2): device frame conversions, as built (cell 3)
+
+- `color/samples.py`: `planes_to_rgb(..., xp=np)`; with CuPy it uploads the integer planes (25 MB
+  at 4K 8-bit, not 99.5 MB float32) and divides on the device; `rgb_to_planes` quantises a CuPy
+  array on the device (same clip, multiply, `rint`; the NaN refusal is a reduction read back as a
+  bool) and downloads the planes (`asnumpy`, synchronous). The host path's arithmetic is
+  unchanged. CuPy 14.2.0 / NumPy 2.5.4 promote `uint8|uint16 / float32` to float32 on both.
+- `io/video/decode.py`: `FFmpegVideoSource(*, device_frames=False)` (OPT-IN, off by default).
+  Device frames only for `frames(..., hw_decode=True)`; `hw_decode=False` always yields host
+  frames. Device label `cuda:<getDevice()>`, as `CupyBackend` names it. IF-5 unchanged.
+  **Design note for the dispatcher (not a STOP; one line to change if ruled otherwise):** IF-5's
+  `frames` carries no backend, so `hw_decode` is the only per-call signal; the export and the
+  engine pass `hw_decode = backend.device != "cpu"`, so a device-frame source yields device
+  frames exactly when the job's backend is the GPU, and the `force_cpu` path is the base's.
+- `io/video/encode.py`: `_payload` accepts a frame labelled `cuda:<n>` only when its pixels are a
+  CuPy array ON device n (`_cupy_device`); a device label on host pixels is refused with the
+  same `to_host` text (`test_io_video_encode.py` 962/1101/1211/1259 UNCHANGED, passing); a CuPy
+  array labelled `cpu` or another device is refused; a float64 device frame is refused.
+  **DR-63 CLOSED at this touch:** `close` sets `"closed"` only from `"open"` under a
+  `_phase_lock` that `abort`'s transition also takes; `abort`'s docstring names the window.
+- `jobs/export.py` `_write_frames`: a host frame goes to the sink on the host as before; a frame
+  the source yielded on the device stays there (no `to_host` of the float32 render).
+- `tools/export_oracle.py`: `--device-frames` (`Job.device_frames`), recorded with
+  `sink_devices` (the `Frame.device` values the sink was given). Not a compare key.
+- Not yet wired: `tools/export_bench.py` gains `--device-frames` at the #2+#3 interim's touch.
+  The product has no real wiring of `FFmpegVideoSource` in `src/` (the GUI uses stubs).
+
+Tests `tests/test_wp321_device_frames.py` (25, 22 `gpu`): exhaustive 8/10-bit codes and random
+odd and 4K planes device = host bit for bit (the host buffer zeroed after the call); quantise
+device = host bytes on every code's tie and its neighbours, the clip limits, +-inf and random
+values; NaN and dtype refusals on the device; default off; `hw_decode=False` host with the mode
+on; a device decode equals the host decode frame by frame on all five WP2.3 video samples;
+the sink's device payload equals the host payload; a device-frame write closes and verifies; the
+wrong-label, float64 and host-pixels refusals; DR-63 (an abort inside `close`'s window survives
+it and a later abort retries; a clean close then abort keeps the output). **Failing-first**
+against `82c6d38`'s three modules: 20 fail, 5 pass (invariants the base also holds: the two
+wrong-label refusals, the host-pixels refusal, the device NaN/dtype refusal through NumPy's
+dispatch, and the clean close).
+
+Light runs: color, decode, encode (incl. 962/1101/1211/1259), oracle tool, jobs_export, overlap,
+device frames: **554 passed, 1 skipped** (`-n 4`, `not footage and not slow`). Oracle on the
+WP2.3 samples with `--device-frames`, every frame (`work\wp3.21\oracle-devframes-wp23.sh`, log
+`logs\oracle-devframes-wp23.log`): **10 of 10 TIER1** (GPU legs against `ref-*-c3-gpu-a`, the
+`--force-cpu` legs against `ref-*-c3-cpu-a`); `cand-devframes2-vfr-c3-gpu` records
+`sink_devices ['cuda:0']`, the CPU leg `['cpu']`.
+
+Memory (watch item): E's float32 frame was already uploaded per frame; new on the card are the
+integer planes (transient, 25 MB at 4K, 74 MB at 5.3K 8-bit) and A's float32 frame (A was host;
+99.5 MB at 4K, 296 MB at 5.3K) until #3. Estimate +0.13 GB at 4K, +0.4 GB at 5.3K over R0.3's
+6.5 GB, so about 6.9 of 8 GB at 5.3K before the FFT. Host: about -0.1 GB per thread at 4K.
+
+| # | Item | Suspected | Confirmed | Rejected | Fixed |
+|---|---|---|---|---|---|
+| V17 | the upload reads the decode's reused buffer after return (a corrupt next frame) | yes | - | rejected: a pageable-memory copy has consumed the buffer on return; the test zeroes the buffer after the call and the device copy holds | - |
+| V18 | CuPy computes `uint / float32` in float64 then rounds (double rounding) | yes | - | rejected: result dtype float32 and every 8/10-bit code bit-equal (exhaustive test) | - |
+| V19 | a non-CuPy device array (`__cuda_array_interface__`) reaches CuPy ops in the sink | yes | yes, by reading the first draft (any CUDA array accepted) | - | `_cupy_device`: CuPy arrays only, device id matched to the label |
+| V20 | DR-63's check-then-set in `close` races `abort` without a lock | yes | yes, by reading | - | `_phase_lock` around both transitions |
+
 ## RESUME HERE (cell 3, taking #2 and #3)
 
 State at hand-over (cell 2, depth 287,974 at yield 3): branch `wp3.21` on `d1e4537`, no rebase.

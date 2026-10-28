@@ -956,6 +956,8 @@ class ExportEngine:
 
         Each frame's record is read once it is final (``smoothed_record`` waits for the
         analysis); after the last frame the analysis thread is joined and its outcome checked.
+        A host frame is rendered and handed to the sink on the host, as before; a frame the
+        source yielded on the device stays there and the sink quantises it on the device.
         """
         engine = analysis.engine
         schema = engine.schema_hash
@@ -977,13 +979,15 @@ class ExportEngine:
                     device=backend.device,
                 )
                 rendered = method.render(on_device, params, statistics)
-                sink.write(
-                    dataclasses.replace(
+                if frame.device == "cpu":
+                    out = dataclasses.replace(
                         frame,
                         pixels=np.asarray(backend.to_host(rendered.pixels), dtype=np.float32),
                         device="cpu",
                     )
-                )
+                else:  # a device-frame source (WP3.21 #2): the sink quantises on the device
+                    out = dataclasses.replace(frame, pixels=rendered.pixels, device=rendered.device)
+                sink.write(out)
                 progress.report(written, total, message)
         except BaseException:
             _close_stream(frames, quietly=True)  # the earlier error stays the failure

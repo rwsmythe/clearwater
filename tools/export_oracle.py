@@ -234,6 +234,7 @@ class RecordingSink(FFmpegVideoSink):
     Attributes:
         frames: (pts ticks, SHA-256 of the float32 pixels) per written frame, in order.
         samples: pts ticks -> the ``.npy`` file name of a kept frame.
+        devices: The ``Frame.device`` values the sink was given (WP3.21 #2's evidence).
     """
 
     def __init__(self, folder: Path, every: int) -> None:
@@ -248,9 +249,11 @@ class RecordingSink(FFmpegVideoSink):
         self._every = max(1, every)
         self.frames: list[tuple[int, str]] = []
         self.samples: dict[int, str] = {}
+        self.devices: set[str] = set()
 
     def write(self, frame: Frame) -> None:
         """Record the frame's digest (and keep it when due), then write it."""
+        self.devices.add(frame.device)
         pixels = host(frame.pixels)
         pts = int(frame.pts_ticks)
         if len(self.frames) % self._every == 0:
@@ -370,12 +373,14 @@ class Job:
         method: The method id.
         force_cpu: ``Settings.force_cpu``.
         every_frame: Keep every pre-encode frame, not one per second.
+        device_frames: Build the video source with device frames (WP3.21 #2).
     """
 
     source: Path
     method: str = "c3"
     force_cpu: bool = False
     every_frame: bool = False
+    device_frames: bool = False
 
 
 def record_clip(
@@ -407,7 +412,7 @@ def record_clip(
     out_dir.mkdir()
     inner = (methods or available_methods())[job.method]
     method = RecordingMethod(inner)
-    source = FFmpegVideoSource()
+    source = FFmpegVideoSource(device_frames=job.device_frames)
     try:
         probe: ProbeResult | None = source.probe(job.source)
     except Exception:  # the job probes again and reports why the clip is unusable
@@ -461,6 +466,7 @@ def record_clip(
         "source_mtime_ns": stat.st_mtime_ns,
         "method": job.method,
         "force_cpu": job.force_cpu,
+        "device_frames": job.device_frames,
         "device": result.device,
         "git_head": git_head(),
         "made": datetime.now(UTC).isoformat(),
@@ -470,6 +476,7 @@ def record_clip(
         "sample_every": every,
         "frames": [[pts, digest] for pts, digest in (recorder.frames if recorder else [])],
         "samples": {str(pts): name for pts, name in (recorder.samples if recorder else {}).items()},
+        "sink_devices": sorted(recorder.devices) if recorder else [],
         "renders": {
             str(pts): {"digest": digest, "values": values}
             for pts, (digest, values) in sorted(method.renders.items())
@@ -641,6 +648,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     rec.add_argument("--method", default="c3", choices=tuple(available_methods()))
     rec.add_argument("--force-cpu", action="store_true", help="force the CPU backend")
     rec.add_argument("--every-frame", action="store_true", help="keep every pre-encode frame")
+    rec.add_argument(
+        "--device-frames", action="store_true", help="decode to device frames (WP3.21 #2)"
+    )
     rec.add_argument("--name", help="the record folder's name (default: clip-method-device-stamp)")
     rec.add_argument("--keep", action="store_true", help="keep the cache and the output")
     rec.add_argument("--config", type=Path, help="local configuration file to read")
@@ -682,7 +692,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         folder = out_dir / name
         refuse_inside(folder, config.footage_path, "record folder")
         record = record_clip(
-            Job(source, args.method, args.force_cpu, args.every_frame), folder, keep=args.keep
+            Job(source, args.method, args.force_cpu, args.every_frame, args.device_frames),
+            folder,
+            keep=args.keep,
         )
     except (LocalConfigError, ValueError, OSError, OracleError) as error:
         print(f"ERROR {type(error).__name__}: {error}", file=sys.stderr)

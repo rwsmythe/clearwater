@@ -494,6 +494,15 @@ def _remove(path: Path) -> None:
             time.sleep(_REMOVE_PAUSE_S)
 
 
+def _cupy_device(pixels: object) -> str | None:
+    """Return ``"cuda:<n>"`` for a CuPy array on device n, None for anything else."""
+    if not type(pixels).__module__.startswith("cupy"):
+        return None
+    device = getattr(pixels, "device", None)
+    number = getattr(device, "id", None)
+    return None if not isinstance(number, int) else f"cuda:{number}"
+
+
 class FFmpegVideoSink:
     """Writes corrected frames to an HEVC MP4 with the source's timing and tracks (IF-5).
 
@@ -506,6 +515,7 @@ class FFmpegVideoSink:
     def __init__(self) -> None:
         """Create a sink that has not been opened."""
         self._phase: _Phase = "new"
+        self._phase_lock = threading.Lock()  # close's and abort's transitions (DR-63)
         self._process: subprocess.Popen[bytes] | None = None
         self._stdin: IO[bytes] | None = None
         self._stderr_thread: threading.Thread | None = None
@@ -687,9 +697,11 @@ class FFmpegVideoSink:
         timecode (regenerated) and rotation. The frame is quantised at the OUTPUT bit depth.
 
         Args:
-            frame: The corrected frame: float32 ``(height, width, 3)`` on the CPU (call the
-                backend's ``to_host`` first), the source's time base, a pts of the source
-                later than the previous frame's.
+            frame: The corrected frame: float32 ``(height, width, 3)``, the source's time base,
+                a pts of the source later than the previous frame's. On the CPU a NumPy array;
+                on ``"cuda:<n>"`` a real device array of that device, quantised there and
+                downloaded as planes (WP3.21 #2). A device label on host pixels is refused (call
+                the backend's ``to_host`` and label the frame ``"cpu"``).
 
         Raises:
             VideoEncodeError: ``"state"`` when not open; ``"frame"`` for a frame that breaks a
@@ -729,7 +741,9 @@ class FFmpegVideoSink:
             report = self._finish()
         except BaseException as error:
             self._fail(error)
-        self._phase = "closed"
+        with self._phase_lock:
+            if self._phase == "open":  # an abort that landed during _finish stays (DR-63)
+                self._phase = "closed"
         return report
 
     def abort(self) -> None:
@@ -740,11 +754,18 @@ class FFmpegVideoSink:
         After a failure or an earlier ``abort`` whose cleanup did not finish, it tries again
         (stops FFmpeg if it still runs, deletes ``out_path`` if it is still there); after a
         successful ``close`` it does nothing (the output is the caller's).
+
+        The window (DR-63): an ``abort`` from another thread while ``close`` is still running
+        (after its last check, before it returns) deletes the output, and ``close`` then
+        returns its report for a file that is gone; the phase stays ``"aborted"``, so a later
+        ``abort`` tries the cleanup again. The caller decides by its own cancel state after
+        ``close``, never by ``close`` having returned.
         """
-        if self._phase == "closed":
-            return
-        if self._phase in ("new", "open"):
-            self._phase = "aborted"
+        with self._phase_lock:
+            if self._phase == "closed":
+                return
+            if self._phase in ("new", "open"):
+                self._phase = "aborted"
         with contextlib.suppress(Exception):
             self._cleanup()
 
@@ -906,11 +927,13 @@ class FFmpegVideoSink:
         """Check one frame against the rules of :meth:`write`; return its pts and its planes."""
         probe = self._probe
         assert probe is not None
-        if frame.device != "cpu":
+        pixels = frame.pixels
+        on_device = frame.device != "cpu"
+        if on_device and _cupy_device(pixels) != frame.device:
             raise VideoEncodeError(
                 "frame",
-                f"The frame is on {ascii_text(str(frame.device))}; copy it to the host first "
-                "(backend.to_host).",
+                f"The frame is on {ascii_text(str(frame.device))} but its pixels are not an "
+                "array of that device; copy it to the host first (backend.to_host).",
             )
         if frame.time_base != probe.video.time_base:
             raise VideoEncodeError(
@@ -928,17 +951,20 @@ class FFmpegVideoSink:
             raise VideoEncodeError(
                 "frame", f"The frame pts {pts} does not follow the previous {self._written[-1]}."
             )
-        pixels = frame.pixels
-        if not isinstance(pixels, np.ndarray) or pixels.dtype != np.float32:
+        if not on_device and (not isinstance(pixels, np.ndarray) or pixels.dtype != np.float32):
             raise VideoEncodeError(
                 "frame", f"The frame is {type(pixels).__name__}, not a float32 NumPy array."
             )
+        if on_device and pixels.dtype != np.float32:
+            raise VideoEncodeError("frame", f"The device frame is {pixels.dtype}, not float32.")
         if pixels.shape != self._shape:
             raise VideoEncodeError(
                 "frame", f"The frame shape {pixels.shape} is not the source's {self._shape}."
             )
         try:
-            return pts, rgb_to_planes(np.ascontiguousarray(pixels), bit_depth=self._bit_depth)
+            if not on_device:
+                pixels = np.ascontiguousarray(pixels)
+            return pts, rgb_to_planes(pixels, bit_depth=self._bit_depth)
         except ColorError as error:
             raise VideoEncodeError("frame", ascii_text(str(error))) from error
 

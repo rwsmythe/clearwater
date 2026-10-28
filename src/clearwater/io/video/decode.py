@@ -15,12 +15,19 @@ runs ffprobe.
 A file the probe flagged ``truncated`` or ``unreadable_tail`` yields every decodable frame and
 ends without raising (D86; the warning is the probe's fault). On a file the probe found clean, an
 FFmpeg failure raises :class:`VideoDecodeError` after the last good frame.
+
+Device frames (WP3.21 #2) are opt-in at construction and off by default: a source built with
+``device_frames=True`` uploads each frame's integer planes and converts them on the GPU for a
+``frames(..., hw_decode=True)`` call, yielding frames on ``"cuda:<n>"``. The caller's
+``hw_decode`` states that its backend is the GPU (the export job and the analysis engine pass
+``backend.device != "cpu"``); the frames themselves are the host conversion's, bit for bit.
 """
 
 from __future__ import annotations
 
 import collections
 import contextlib
+import importlib
 import io
 import logging
 import math
@@ -33,7 +40,7 @@ import weakref
 from collections.abc import Iterator
 from fractions import Fraction
 from pathlib import Path
-from typing import IO, Literal
+from typing import IO, Any, Literal
 
 from clearwater.color import decode_filter, planes_to_rgb, rgb_frame_bytes
 from clearwater.interfaces.image import Frame
@@ -393,6 +400,8 @@ class FrameStream(Iterator[Frame]):
         *,
         start_s: Fraction | None,
         end_s: Fraction | None,
+        xp: Any = None,
+        device: str = "cpu",
     ) -> None:
         """Prepare the decode; nothing runs yet.
 
@@ -401,8 +410,13 @@ class FrameStream(Iterator[Frame]):
             command: The FFmpeg command (:func:`decode_command`).
             start_s: The first time to yield, or None.
             end_s: The time to stop before, or None.
+            xp: The array module of the frames' pixels: None for NumPy, or CuPy for frames
+                converted on the device.
+            device: The frames' device, ``"cpu"`` with NumPy, ``"cuda:<n>"`` with CuPy.
         """
         video = probe.video
+        self._xp = xp
+        self._device = device
         self._probe = probe
         self._command = command
         self._start_s = start_s
@@ -490,11 +504,21 @@ class FrameStream(Iterator[Frame]):
     def _frame(self, pts: int) -> Frame:
         """Build the IF-1 frame from the buffer and its pts."""
         video = self._probe.video
-        return Frame(
-            pixels=planes_to_rgb(
+        if self._xp is None:
+            pixels = planes_to_rgb(
                 self._buffer, width=video.width, height=video.height, bit_depth=video.bit_depth
-            ),
-            device="cpu",
+            )
+        else:
+            pixels = planes_to_rgb(
+                self._buffer,
+                width=video.width,
+                height=video.height,
+                bit_depth=video.bit_depth,
+                xp=self._xp,
+            )
+        return Frame(
+            pixels=pixels,
+            device=self._device,
             color=video.color,
             orientation_applied=False,
             pts=pts * self._time_base,
@@ -640,6 +664,16 @@ class FrameStream(Iterator[Frame]):
 class FFmpegVideoSource:
     """The IF-5 video source: WP3.7's probe and an FFmpeg decode per :meth:`frames` call."""
 
+    def __init__(self, *, device_frames: bool = False) -> None:
+        """Choose where the frames of a ``hw_decode`` decode are converted.
+
+        Args:
+            device_frames: Convert the frames of a ``frames(..., hw_decode=True)`` call on the
+                GPU and yield them there (off by default: every frame on the host). A call with
+                ``hw_decode=False`` always yields host frames.
+        """
+        self.device_frames = device_frames
+
     def probe(self, path: Path) -> ProbeResult:
         """Probe a file (delegates to :func:`clearwater.io.video.probe`).
 
@@ -670,7 +704,9 @@ class FFmpegVideoSource:
         Args:
             probe: The probe result of the file; its colour description is used unchanged.
             hw_decode: Decode with CUDA when a CUDA device is available (otherwise in software,
-                with the same frames; the reason is logged once).
+                with the same frames; the reason is logged once). With ``device_frames`` it
+                also states that the caller's backend is the GPU: the frames are converted and
+                yielded there.
             start_s: The first frame yielded is the first whose pts is at or after this time;
                 None for the start.
             end_s: No frame whose pts is at or after this time is yielded; None for the end.
@@ -693,4 +729,8 @@ class FFmpegVideoSource:
         cuda = hw_decode and cuda_decode_available()
         seek = seek_position(probe, start_s) if start_s is not None else None
         command = decode_command(probe, ffmpeg=ffmpeg, cuda=cuda, seek=seek)
+        if self.device_frames and hw_decode:
+            cupy = importlib.import_module("cupy")
+            device = f"cuda:{int(cupy.cuda.runtime.getDevice())}"
+            return FrameStream(probe, command, start_s=start_s, end_s=end_s, xp=cupy, device=device)
         return FrameStream(probe, command, start_s=start_s, end_s=end_s)
