@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import dataclasses
 import json
+import os
 import shutil
 from collections.abc import Mapping
 from fractions import Fraction
@@ -147,14 +148,30 @@ def test_a_record_proxy_or_analyze_difference_fails_with_equal_frames(
 
 
 def test_a_differing_frame_without_a_sample_is_unmeasured(base: Path, tmp_path: Path) -> None:
+    # One unmeasured differing frame beside a measured one: the measured sample carries tier 2.
+    def change(record: dict[str, Any]) -> None:
+        pts = record["frames"][3][0]
+        record["frames"][3][1] = "0" * 64
+        del record["samples"][str(pts)]
+        record["frames"][4][1] = "1" * 64  # its kept sample is the base's: measured, 0 apart
+
+    result = eo.compare(base, _mutated(base, tmp_path, change))
+    assert result["verdict"] == "TIER2", result["reasons"]
+    assert result["frames_differing"] == 2
+    assert result["frames_unmeasured"] == result["frames_measured"] == 1
+
+
+def test_differing_frames_with_none_measured_fail(base: Path, tmp_path: Path) -> None:
+    # Reviewer A round 1, F6: a tier-2 verdict needs at least one measured differing frame.
     def change(record: dict[str, Any]) -> None:
         pts = record["frames"][3][0]
         record["frames"][3][1] = "0" * 64
         del record["samples"][str(pts)]
 
     result = eo.compare(base, _mutated(base, tmp_path, change))
-    assert result["verdict"] == "TIER2"
+    assert result["verdict"] == "FAIL"
     assert result["frames_differing"] == result["frames_unmeasured"] == 1
+    assert any("none was measured" in reason for reason in result["reasons"])
 
 
 def test_one_frame_per_second_keeps_23_frames_of_gx011627() -> None:
@@ -253,3 +270,50 @@ def test_the_synthetic_clip_is_refused_when_its_bytes_are_not_the_recorded_ones(
     clip.write_bytes(b"made again")
     with pytest.raises(eo.OracleError, match="SHA-256 differs"):
         eo.synthetic_4k(tmp_path)
+
+
+def _aliasing_realpath(alias: Path, target: Path) -> Any:
+    """A ``realpath`` that resolves ``alias`` (and below) to ``target``, as a junction would."""
+    real = os.path.realpath
+
+    def realpath(path: Any, *args: Any, **kwargs: Any) -> str:
+        text = os.path.abspath(path)
+        base = os.path.abspath(alias)
+        if os.path.normcase(text) == os.path.normcase(base) or os.path.normcase(text).startswith(
+            os.path.normcase(base) + os.sep
+        ):
+            return str(target) + text[len(base) :]
+        return real(path, *args, **kwargs)
+
+    return realpath
+
+
+def test_refuse_inside_follows_an_alias_of_the_footage_folder(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Reviewer A round 1, F7: a link or junction to the footage folder is refused too.
+    footage, alias = tmp_path / "footage", tmp_path / "alias"
+    monkeypatch.setattr(os.path, "realpath", _aliasing_realpath(alias, footage))
+    for path in (alias, alias / "wp3.21" / "ref"):
+        with pytest.raises(eo.OracleError, match="inside the footage folder"):
+            eo.refuse_inside(path, footage, "record folder")
+    eo.refuse_inside(tmp_path / "work" / "wp3.21", footage, "record folder")
+
+
+@pytest.mark.parametrize("name", ["", ".", "..", "../escape", "a/b", "a\\b", "/abs", "C:x"])
+def test_record_name_refuses_anything_but_a_plain_name(name: str) -> None:
+    # Reviewer A round 1, F8: ``--name`` is one folder under the output folder.
+    if name == "a\\b" and os.sep == "/":
+        pytest.skip("a backslash is a plain character in a POSIX name")
+    with pytest.raises(eo.OracleError, match="not a plain folder name"):
+        eo.record_name(name)
+    assert eo.record_name("ref-GX011627-c3") == "ref-GX011627-c3"
+
+
+def test_main_refuses_a_name_outside_the_output_folder(
+    folders: LocalConfig, capsys: pytest.CaptureFixture[str]
+) -> None:
+    argv = ["record", "--clip", "GX000001", "--force-cpu", "--name", "../escape"]
+    assert eo.main(argv) == 2
+    assert "not a plain folder name" in capsys.readouterr().err
+    assert not folders.working_path.exists()

@@ -980,9 +980,10 @@ def refuse_inside(folder: Path, footage: Path) -> None:
     Raises:
         BreakdownError: It does.
     """
-    out = Path(os.path.normcase(os.path.abspath(folder)))
-    root = Path(os.path.normcase(os.path.abspath(footage)))
-    if out == root or root in out.parents:
+    # Lexical and resolved forms: the resolved one follows a link or junction (F7, round 1).
+    outs = [Path(os.path.normcase(f(folder))) for f in (os.path.abspath, os.path.realpath)]
+    roots = [Path(os.path.normcase(f(footage))) for f in (os.path.abspath, os.path.realpath)]
+    if any(out == root or root in out.parents for out in outs for root in roots):
         raise BreakdownError(f"{folder} lies inside the footage folder; nothing is written there")
 
 

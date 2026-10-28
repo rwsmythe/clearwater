@@ -9,6 +9,7 @@ record's shape, the cleanup and the refusal of an output inside the footage fold
 from __future__ import annotations
 
 import json
+import os
 import types
 from pathlib import Path
 from typing import Any
@@ -325,3 +326,31 @@ def test_a_run_records_the_occupancy_by_step(sample: Any, tmp_path: Path) -> Non
     if occupancy["unavailable"] is None:
         assert occupancy["samples"] > 0
     assert record["phases"]["decode_pass"]["device_steps"] == ["proxy_image", "analyze"]
+
+
+def _aliasing_realpath(alias: Path, target: Path) -> Any:
+    """A ``realpath`` that resolves ``alias`` (and below) to ``target``, as a junction would."""
+    real = os.path.realpath
+
+    def realpath(path: Any, *args: Any, **kwargs: Any) -> str:
+        text = os.path.abspath(path)
+        base = os.path.abspath(alias)
+        if os.path.normcase(text) == os.path.normcase(base) or os.path.normcase(text).startswith(
+            os.path.normcase(base) + os.sep
+        ):
+            return str(target) + text[len(base) :]
+        return real(path, *args, **kwargs)
+
+    return realpath
+
+
+def test_refuse_inside_follows_an_alias_of_the_footage_folder(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Reviewer A round 1, F7: a link or junction to the footage folder is refused too.
+    footage, alias = tmp_path / "footage", tmp_path / "alias"
+    monkeypatch.setattr(os.path, "realpath", _aliasing_realpath(alias, footage))
+    for path in (alias, alias / "wp3.21" / "breakdown"):
+        with pytest.raises(bd.BreakdownError, match="inside the footage folder"):
+            bd.refuse_inside(path, footage)
+    bd.refuse_inside(tmp_path / "work" / "wp3.21", footage)

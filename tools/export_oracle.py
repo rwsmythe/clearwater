@@ -586,6 +586,11 @@ def compare(reference_dir: Path, candidate_dir: Path) -> dict[str, Any]:
         measured.append({"pts": pts, **figures})
     max_abs = max((max(m["max_abs"]) for m in measured), default=0.0)
     mean_abs = max((max(m["mean_abs"]) for m in measured), default=0.0)
+    if differing and not measured:
+        # A tier-2 verdict rests on the sampled frames; with none measured it has no figure.
+        reasons.append(
+            f"{len(differing)} frames differ and none was measured (no sampled frame among them)"
+        )
     if differing and (max_abs > TIER2_MAX_ABS or mean_abs > TIER2_MEAN_ABS):
         reasons.append(
             f"frames exceed AD-11's bound: max abs {max_abs:.3g} (limit {TIER2_MAX_ABS:g}), "
@@ -620,10 +625,42 @@ def refuse_inside(path: Path, footage: Path, what: str) -> None:
     Raises:
         OracleError: It does.
     """
-    target = Path(os.path.normcase(os.path.abspath(path)))
-    root = Path(os.path.normcase(os.path.abspath(footage)))
-    if target == root or root in target.parents:
+    targets, roots = path_forms(path), path_forms(footage)
+    if any(target == root or root in target.parents for target in targets for root in roots):
         raise OracleError(f"the {what} {path} lies inside the footage folder")
+
+
+def path_forms(path: Path) -> tuple[Path, Path]:
+    """Return a path's lexical and resolved absolute forms, case-normalised.
+
+    The resolved form follows symbolic links and junctions in the existing part of the path, so
+    an alias of the footage folder is caught as well as its own name (Reviewer A round 1, F7).
+
+    Args:
+        path: The path.
+
+    Returns:
+        The lexical form and the resolved form.
+    """
+    lexical = Path(os.path.normcase(os.path.abspath(path)))
+    return lexical, Path(os.path.normcase(os.path.realpath(path)))
+
+
+def record_name(name: str) -> str:
+    """Return ``name`` if it is a plain folder name, one path component under the output folder.
+
+    Args:
+        name: The ``--name`` value.
+
+    Returns:
+        The name.
+
+    Raises:
+        OracleError: It is empty, ``.`` or ``..``, absolute, or holds a separator or a drive.
+    """
+    if name in {"", ".", ".."} or Path(name).name != name or Path(name).anchor:
+        raise OracleError(f"the record name {name!r} is not a plain folder name")
+    return name
 
 
 def summary_line(record: Mapping[str, Any]) -> str:
@@ -687,6 +724,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         config = load_local_config(args.config)
         out_dir = config.working_path / SUBDIR
         refuse_inside(out_dir, config.footage_path, "output folder")
+        if args.name is not None:
+            record_name(args.name)  # refused before anything is made
         if args.clip is not None:
             source = find_footage_file(args.clip, config.footage_path)
         elif args.file is not None:
@@ -698,7 +737,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             source = synthetic_4k(out_dir)
         device = "cpu" if args.force_cpu else "auto"
         stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
-        name = args.name or f"{source.stem}-{args.method}-{device}-{stamp}"
+        name = record_name(args.name or f"{source.stem}-{args.method}-{device}-{stamp}")
         folder = out_dir / name
         refuse_inside(folder, config.footage_path, "record folder")
         record = record_clip(

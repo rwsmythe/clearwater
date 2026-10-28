@@ -101,7 +101,8 @@ class _Streams(ListSource):
         return self._stream(tag)
 
     def _stream(self, tag: str) -> Iterator[Frame]:
-        self.threads[tag] = threading.current_thread().name
+        with self._lock:
+            self.threads[tag] = threading.current_thread().name
         alive: list[weakref.ref[np.ndarray]] = []
         for frame in self._frames:
             held = sum(1 for ref in alive if ref() is not None)
@@ -239,7 +240,10 @@ def test_a_planted_lead_short_by_one_fails_by_name(
         return final + 1 if 0 < final < stream.raw[0] else final  # past the start's clipping
 
     monkeypatch.setattr(engine_module.AnalysisEngine, "_final_count", short)
-    rig, _, _ = _rig(tmp_path)
+    rig, source, _ = _rig(tmp_path)
+    release = threading.Event()
+    rig.method.hook = _hold_analysis(source, 100, release)  # never complete before the plant
+    _release_on_abort(monkeypatch, release)
     result = rig.run(rig.request())
     assert not result.ok
     assert "RenderBeforeFinalError" in result.failure and "render before final" in result.failure
@@ -372,9 +376,14 @@ def test_cancel_during_the_lead(tmp_path: Path) -> None:
     assert rig.sinks == [] or "open" not in rig.sink.calls  # the lead never ended
 
 
-def test_cancel_mid_encode_with_a_write_blocked_until_abort(tmp_path: Path) -> None:
-    rig, _, cache = _rig(tmp_path)
+def test_cancel_mid_encode_with_a_write_blocked_until_abort(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    rig, source, cache = _rig(tmp_path)
     progress = StubProgress()
+    release = threading.Event()
+    rig.method.hook = _hold_analysis(source, 100, release)
+    _release_on_abort(monkeypatch, release)
 
     def blocking() -> FakeSink:
         sink = FakeSink()
@@ -438,17 +447,20 @@ def test_no_analysis_thread_is_alive_at_commit(
 
 
 def test_an_analysis_failure_mid_export_keeps_its_own_text(tmp_path: Path) -> None:
-    rig, _, cache = _rig(tmp_path)
+    rig, source, cache = _rig(tmp_path)
     exported = [0]
+    five = threading.Event()
     real_render = rig.method.render
 
     def render(image: Any, params: Any, statistics: Any) -> Any:
         exported[0] += 1
+        if exported[0] >= 5:
+            five.set()
         return real_render(image, params, statistics)
 
     def hook(stage: str) -> None:
-        time.sleep(0.002)
-        if exported[0] >= 5:
+        if _analysis_decoded(source) >= 100:  # still streaming: the export has started
+            five.wait(30)
             raise ValueError("ORIGINAL analysis failure mid-export")
 
     rig.method.render = render  # type: ignore[method-assign]
@@ -562,10 +574,38 @@ def test_the_re_check_adds_nothing_for_a_complete_cache_entry(
 
 def _analysis_decoded(source: _Streams) -> int:
     """Frames the latest analysis-thread stream has yielded so far."""
-    tags = [tag for tag, name in source.threads.items() if name == "export-analysis"]
+    with source._lock:  # E registers its stream from its own thread (round 2, F1)
+        threads = list(source.threads.items())
+        events = list(source.events)
+    tags = [tag for tag, name in threads if name == "export-analysis"]
     if not tags:
         return 0
-    return sum(1 for tag, _ in source.events if tag == tags[-1])
+    return sum(1 for tag, _ in events if tag == tags[-1])
+
+
+def _hold_analysis(source: _Streams, at: int, release: threading.Event) -> Any:
+    """A method hook holding the analysis thread, once ``at`` frames are decoded, until released.
+
+    The analysis is then alive, deterministically, while the export reaches the point a test
+    needs (round 1, F9: an event, never a sleep, decides the overlap); the wait is bounded.
+    """
+
+    def hook(stage: str) -> None:
+        if _analysis_decoded(source) >= at:
+            release.wait(30)
+
+    return hook
+
+
+def _release_on_abort(monkeypatch: pytest.MonkeyPatch, release: threading.Event) -> None:
+    """Make every sink abort set ``release`` first (the held analysis can then be joined)."""
+    real_abort = FakeSink.abort
+
+    def abort(self: FakeSink) -> None:
+        release.set()
+        real_abort(self)
+
+    monkeypatch.setattr(FakeSink, "abort", abort)
 
 
 def test_the_re_check_on_a_retry_over_an_incomplete_entry_scales_its_own_bytes(
