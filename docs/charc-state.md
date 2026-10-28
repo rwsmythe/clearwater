@@ -91,7 +91,16 @@
   re-check, Reviewer A round 2, adjudicate, yield before any remediation (window request in the same yield if clean); WP-T5 Codex
   **turn 4** running (corrected W2b script, W3 script prepared, W2 ledger rows, a stated condition for W3 straight after W2b).
   Window plan: W2b (~10 min) then W3 (~55 min), each opened only at a WP4.1 yield; WP4.1's two-leg suite after W3 unless ready
-  first. **No window open; seat free.**
+  first.
+- **EXCLUSIVE WINDOW OPEN ~21:21Z: WP-T5 W2b (msg `125c9dae6a66d68f`, ~10 min; depth control decided from W2 evidence, the
+  draft-as-standard control re-run with -rfEs and autocrlf-safe apply/revert, restore check). NOTHING HEAVY AT THIS SEAT until
+  CLOSE.** Codex turn 4 259a219 (depth 82,213). **WP4.1 R2 (cell 3, depth 93,956 at yield): 0 critical / 2 major / 5 minor, all in
+  envelope: G1 `\\?\` path spelling defeats `inside()` so `--out` could write INTO the footage folder (a real safety catch); G2 =
+  F1 REOPENED, a non-ASCII folder path escapes the Redactor via `ascii_text`; G3/G4/G6/G7 minor; G5 MAJOR->MINOR.** Orchestrator
+  GOes the remediation after W2b (runner + its test + report limits; under the 250K rule). **BANKED TO ME (G5), row at WP4.1's
+  accept, trigger WP4.3:** the photo writer's HEIC provenance carries `"profile": "built-in sRGB"` (WP3.6 7624f5c) which the
+  accepted `PresetStore.import_preset` (WP3.15 75d7dc5) refuses, as the runner's `--parameters` does; IF-9 / AD-13 hold; two
+  accepted components disagree; runner docstring narrowed to the AD-13 forms. W3 at WP4.1's next yield.
 - (history) W2 OPEN ~20:37Z (msg `7e81a160651af8af`, ~30-40 min; W1's config; the 3 changed node ids with an
   observer plugin: exactly ONE standard encode, sink record on it, NVENC tied, 681 frames, 5.3K at 3 frames with AAC packets SAME;
   each test alone; 2 planted controls applied with `git apply`, reverted, restore proved). NOTHING HEAVY AT THIS SEAT until CLOSE.**
