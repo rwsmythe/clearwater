@@ -5,33 +5,61 @@
 
 ### Generation
 
-- **Generation 14 LIVE** `clearwater-orchestrator-20261026-2151`, picked up 2026-10-27 07:52Z at main `69fce7a`;
-  bash gauge 40 ms. Scratchpad
+- **Generation 14 ROLLED OVER 2026-10-28 ~06:50Z at ~330K, at a clean boundary: no cell live, no window open, host free.
+  GENERATION 15 STARTS HERE (RESUME HERE below; the gen-13 table further down is history).**
+  Gen 14 was `clearwater-orchestrator-20261026-2151`, picked up 2026-10-27 07:52Z at main `69fce7a`. Scratchpad
   `C:\Users\rwsmy\AppData\Local\Temp\claude\C--Users-rwsmy-clearwater\91de222f-a75d-4590-9741-d95f2af531b3\scratchpad\`
-  (`dispatch-wp3.21.md`, `wp-t4-accept.md`, `fill-gatechecks-new.md`, `notes-wp-t4-tabulation.md`, `drain-*.md`).
-  Gen-14 checkpoint (2026-10-28 03:20Z), SUPERSEDES the gen-13 table below:
-  - **Accepted this generation:**
-    - WP-T3 at main `2aca60e`;
-    - WP3.20R at `dbb5858`;
-    - WP3.14 at `ba6e923`;
-    - **WP-T4 at `d1e4537`**: patch-id `0984fd4b`, record `docs/proofs/wp-t4-accept.md`. A R1 and B were both Claude Opus high, both NO_NEW_CRITICAL_MAJOR, B adjudicated at the gate. CHARC QA is pending, with these owed: the CLAUDE.md line, HD-1 point 3, the suite-cost row, the m5 MINOR row, the DR-58 (c) disposition.
-  - **THE SUITE GATE IS NOW TWO LEGS** (fill GATE_CHECKS, `d1e4537`):
-    - run from Git Bash with `PYTEST_ADDOPTS` unset;
-    - PARALLEL `uv run pytest -q -rs -n 4 -m "not gpu and not footage and not gui and not slow" --basetemp=work/<fresh>`, then SERIAL `uv run pytest -q -rs -m "gpu or footage or gui or slow" --basetemp=work/<fresh>`;
-    - collection set checks, plus a full-collection diff against main;
-    - each leg's `-rs` skips compared with the previous gate's;
-    - median wall about 64 min (P about 8, S about 56).
-    - Gate-worktree skips: 11 (9 look-check frames absent from the worktree's `work/wp1.3/`).
-    - The main venv is synced with pytest-xdist 3.8.0.
-  - **WP3.21 DISPATCHED** 03:20Z to `wp321-cell1` (implementer-opus-high, Agent subagent).
-    - Worktree `.worktrees/wp3.21`, branch `wp3.21`, base `d1e4537`. Brief FINAL `43cc1ed`. Prompt `scratchpad\dispatch-wp3.21.md`.
-    - Its first yield is a WINDOW REQUEST for task 1's breakdown (GX011627), optionally with task 2's base reference as a second leg.
-    - Grant protocol: post the OPEN to CHARC plus a cue, reply `WINDOW GRANTED`; the cell sends `WINDOW RELEASED`; post the CLOSE.
-    - Round 0 is a yield. Read `cell_depth.py wp321` at every yield.
-    - Both nets: Codex `gpt-6.1-sol`/high (A at the cell's seat, B at mine).
-  - **Worktrees removed:** brief-wp3.21, orch-state-g14b. **Still present:** `wp-t4` and `wp-t4-mc`, both merged. Remove them after preserving `work/wp-t4/` (the rung-4, D3 and final evidence) into `work/wp-t4/from-worktree/`. Use the `\?\` Remove-Item if git refuses.
-  - **Codex lane:** the WP-T4 session `01a17c16-...` is finished (turn 8 depth 288,403); no Codex cell is live.
-  - Gen-14 slips: six bare `cd`s with a cell live, each reverted next call.
+  (`dispatch-wp3.21.md` and `dispatch-wp3.21-cell2.md` are the dispatch prompts to copy the form from; `drain-*.md`).
+  - **Accepted in gen 14** (all CHARC QA CONFIRMED):
+    - WP-T3 `2aca60e`;
+    - WP3.20R `dbb5858`;
+    - WP3.14 `ba6e923`;
+    - **WP-T4 `d1e4537`** (patch-id `0984fd4b`; record `docs/proofs/wp-t4-accept.md`; CHARC's owed items in `aa0c3af`: CLAUDE.md two-leg line, HD-1 point 3, DR-58 (c) closed, DR-65, DR-66; 66 register rows).
+  - **THE SUITE GATE IS TWO LEGS** (fill GATE_CHECKS, `d1e4537`; CLAUDE.md Conventions):
+    - Run from Git Bash with `PYTEST_ADDOPTS` unset and `QT_QPA_PLATFORM=offscreen`. Use a fresh `--basetemp` under `work/` for every leg.
+    - PARALLEL `uv run pytest -q -rs -n 4 -m "not gpu and not footage and not gui and not slow"` (about 8 min), then SERIAL `uv run pytest -q -rs -m "gpu or footage or gui or slow"` (about 56 min).
+    - Collection set checks (`--collect-only -q` x3; counts match pytest's line; no duplicates; P∩S empty; P∪S = all; plus a full-collection diff against main, with every removed ID explained).
+    - Compare `-rs` skips with the previous gate's. A gate worktree shows 11 skips (9 are `test_methods_assembly_v8.py:44`, the look-check frames absent from the worktree's `work/wp1.3/`). Main shows 2.
+    - Each leg is EXCLUSIVE, with OPEN/CLOSE to CHARC.
+  - **RESUME HERE -- WP3.21 (the only package in flight):**
+    - Branch `wp3.21` at `106b29f`, 13 commits on main `d1e4537`, in worktree `.worktrees/wp3.21` (clean; `clearwater.local.toml` copied). Brief FINAL `43cc1ed`; Q-c correction in `d3cd663`. Ledger `docs/proofs/wp3.21-ledger.md`; its **RESUME HERE** section is the cell's handover.
+    - **Done:**
+      - task 1, the breakdown: the analysis pass is 0.299 s/frame, and the HOST `block_mean` is 50.9 % of it. That is the GPU-idle cause, named. The frame path is 0.714 s/frame, with render 70 %.
+      - task 2, the oracle base references: 13/13 controls TIER1, 9.8 GB at `work\wp3.21\oracle\ref-*-{a,b}`; synthetic clip sha256 recorded.
+      - round 0 (R0.1-R0.9);
+      - **#1, the overlap** (`333ad3f`): interim 1 gave **0.810 s/frame = 24.28 min/min**, which MEETS D106's interim. The oracle was TIER1 on GX011627 c3, synthetic 4K and ancuti2018.
+      - The `engine.py` import debt is CLOSED.
+    - **Cells:** cell 1 stood down at 359,040; cell 2 stood down at 310,465. Both reached about 270-290K by their FIRST yield, even with a tight reading list. **Expect to re-seat about every one to two yields.**
+    - **NEXT: dispatch cell 3** (`implementer-opus-high`, Agent subagent, run_in_background). Copy the form of `dispatch-wp3.21-cell2.md`, and point it at the ledger's RESUME HERE. Its order of work:
+      1. **Q-R6 as ruled** (CHARC `6acded46`): in `export.py`, measure the cache entry's growth over the lead, extrapolate per frame, and add it to the D87 re-check figure. A planted small-free-space test refuses before the first rendered frame. If the entry cannot be sized in one call, STOP to CHARC.
+      2. **#2, device frame conversions.** GRANTED `decode.py`, `encode.py`, `samples.py`, on conditions:
+         - IF-1 and IF-5 unchanged;
+         - the device mode is opt-in, default off;
+         - the sink still refuses a "cuda:0" label on NumPy, so `test_io_video_encode.py` 962/1101/1211/1259 stay UNCHANGED;
+         - DR-63 closes;
+         - `force_cpu` is tier 1;
+         - and CHARC's addition: the oracle exercises the device conversions on GX011627 in a window BEFORE #3 lands.
+      3. **#3, the device block mean** (tier 1 provable: exact float64 sums).
+      4. A 4K direct-vs-FFT blur micro-timing (in a window).
+      5. **Task 6, the FFT Gaussian.** Q-R1 is RULED (CHARC `5b05c53d`): the gate goes inside `core/backend.py` for both backends, min(H, W) >= 1080 AND sigma >= 32 px (provisional, never lower). Tests: a tripwire derived from `analysis/proxy.py`, a planted analysis-sized blur that is bit-identical, and FFT vs direct within 1e-5 at 1080p and 4K.
+      6. Task 7, debt.
+      7. The Q-R7 bench stamp (tool-side, no product hook).
+      8. Reviewer A, Codex at the cell's seat (WSL, `gpt-6.1-sol`/high).
+      9. The two-leg suite, in windows.
+      10. **Task 10, the V16 re-measure, LAST**, GX011625 LAST, each block its own OPEN/CLOSE.
+    - Then Reviewer B, Codex at your seat, and the accept.
+    - **Window protocol:**
+      - The cell yields a `WINDOW REQUEST`.
+      - Post the OPEN to CHARC plus a cue; reply `WINDOW GRANTED`.
+      - The cell sends `WINDOW RELEASED`; then post the CLOSE.
+      - **The cell must wait for heavy runs in the FOREGROUND** (recipe rule `3df4206`). A background completion notice once failed to wake a cell, and the window sat idle 33 minutes.
+    - Read `cell_depth.py wp321-cell<N>` at every yield, and check the figure BEFORE quoting it to CHARC (gen 14 mis-quoted it once).
+  - **Codex lane:** no Codex session is live; the WP-T4 session `01a17c16-...` is finished.
+  - **Worktrees:** `wp3.21` is live. The old `orch-state-g10b`/`g11`/`g12`/`g13` and other stale worktrees are still listed by `git worktree list`; they are merged history, to remove when convenient. WP-T4 evidence is at `work/wp-t4/from-worktree/`.
+  - **Gen-14 slips:**
+    - six bare `cd`s, each reverted on the next call;
+    - one depth figure posted before it was read (corrected);
+    - one commit count posted wrong (15 for 13).
 - **Generation 13 ROLLED OVER 2026-10-27 at ~360K (depth cap). Generation 14 starts at "Live cells" below (RESUME HERE).**
   Gen 13 was `clearwater-orchestrator-20261026-2029`, picked up 2026-10-27 ~06:30Z at main `1217443`;
   bash-launch gauge 23 ms; inbox empty at pickup, then CHARC FINAL `3c3c35d7e40b525e` (all four wave 4 briefs approved).
