@@ -5,6 +5,13 @@
 
 ### Generation
 
+- **Generation 15 LIVE** (`clearwater-orchestrator-20261027-2047`), picked up 2026-10-28 ~06:55Z at main `2e2f7e6`;
+  bash-launch gauge 32 ms; drained CHARC `4dc2978b` (interim-1 CLOSE ack, four readings, order confirmed).
+  Scratchpad `C:\Users\rwsmy\AppData\Local\Temp\claude\C--Users-rwsmy-clearwater\94502559-d259-46f8-87c6-0cfa0ec22300\scratchpad\`.
+  - **WP3.21 cell 3 DISPATCHED** (`wp321-cell3`, implementer-opus-high, background) from `wp3.21` `106b29f`; prompt
+    `dispatch-wp3.21-cell3.md` in the gen-15 scratchpad. Depth at dispatch 0. Order: ledger record (CHARC readings) ->
+    Q-R6 -> #2 -> WINDOW (GX011627 oracle on #2) -> #3 -> windows -> task 6 -> 7 -> Q-R7 -> Reviewer A -> suite -> task 10.
+  - CHARC cue target unchanged: `clearwater-charc-20261026-2007`.
 - **Generation 14 ROLLED OVER 2026-10-28 ~06:50Z at ~330K, at a clean boundary: no cell live, no window open, host free.
   GENERATION 15 STARTS HERE (RESUME HERE below; the gen-13 table further down is history).**
   Gen 14 was `clearwater-orchestrator-20261026-2151`, picked up 2026-10-27 07:52Z at main `69fce7a`. Scratchpad
