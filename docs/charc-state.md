@@ -92,9 +92,10 @@
   **turn 4** running (corrected W2b script, W3 script prepared, W2 ledger rows, a stated condition for W3 straight after W2b).
   Window plan: W2b (~10 min) then W3 (~55 min), each opened only at a WP4.1 yield; WP4.1's two-leg suite after W3 unless ready
   first.
-- **EXCLUSIVE WINDOW OPEN ~21:21Z: WP-T5 W2b (msg `125c9dae6a66d68f`, ~10 min; depth control decided from W2 evidence, the
-  draft-as-standard control re-run with -rfEs and autocrlf-safe apply/revert, restore check). NOTHING HEAVY AT THIS SEAT until
-  CLOSE.** Codex turn 4 259a219 (depth 82,213). **WP4.1 R2 (cell 3, depth 93,956 at yield): 0 critical / 2 major / 5 minor, all in
+- **W2b CLOSED 21:26Z (msg `2d744869f4fdf495`): depth control DECIDED from W2 evidence (junit names the one failure; depth 10 vs
+  output 8 DIFFERENT); draft-as-standard control CAUGHT by name (levels test, 5.0 Main, 328 s); both test files byte-identical to
+  HEAD, 0 CR. W3 run condition MET; W3 (~55 min, both legs, W1's config) opens at WP4.1 cell 3's next yield. No window open;
+  seat free.** (history: W2b OPEN ~21:21Z, msg `125c9dae6a66d68f`.) Codex turn 4 259a219 (depth 82,213). **WP4.1 R2 (cell 3, depth 93,956 at yield): 0 critical / 2 major / 5 minor, all in
   envelope: G1 `\\?\` path spelling defeats `inside()` so `--out` could write INTO the footage folder (a real safety catch); G2 =
   F1 REOPENED, a non-ASCII folder path escapes the Redactor via `ascii_text`; G3/G4/G6/G7 minor; G5 MAJOR->MINOR.** Orchestrator
   GOes the remediation after W2b (runner + its test + report limits; under the 250K rule). **BANKED TO ME (G5), row at WP4.1's
