@@ -61,7 +61,8 @@ Cell `implementer-opus-high` (Claude lane), worktree `.worktrees/wp3.21`, branch
 | 36 | cell 7: WINDOW RELEASED; RESUME HERE (cell 8); stand down | (dispatcher fills) |
 | 37 | cell 8: recollection; WINDOW REQUEST (parallel leg) | 62,302 |
 | 38 | cell 8: WINDOW RELEASED (parallel leg green); WINDOW REQUEST (serial leg) | 67,467 |
-| 39 | cell 8: WINDOW RELEASED (serial leg green); WINDOW REQUEST (block 3, GX011625) | (dispatcher fills) |
+| 39 | cell 8: WINDOW RELEASED (serial leg green); WINDOW REQUEST (block 3, GX011625) | 83,323 |
+| 40 | cell 8: WINDOW RELEASED (block 3, both instruments pass); report next | (dispatcher fills) |
 
 ## RESUME HERE (cell 6, after cell 5)
 
@@ -2288,3 +2289,47 @@ work/c8-suite-parallel.done )`, started 15:30:17Z (local clock), done marker
   1,113 / 1). After: RAM 12.8 GiB available, C: 32 GB free.
 - CHARC (relayed at the grant): the misnamed two-release test is a MINOR; renamed in Reviewer
   B's cleanup if B lists it, otherwise a MINOR row at the accept. Not renamed in this seat.
+
+### Block 3: GX011625 c3 cold, sustained, LAST (window GRANTED 16:27Z; ran 16:27:27Z-17:47:22Z, EXIT 0)
+
+Code `227ed32` (head `29e068e`, ledger only on top). `( cd <worktree> && uv run python
+tools/export_bench.py v16 --device-frames --subdir wp3.21/bench --clip GX011625 > ... )`, a fresh
+process; record `C:\Users\rwsmy\clearwater\work\wp3.21\bench\export-bench-v16-gx011625-20261028T162727Z.json`,
+log `work\wp3.21\logs\c8-v16-gx25.log`, summary `c8-v16-gx25-summary.txt` (worktree; scratchpad
+script `gx25_summary.py`). Before: 12.8 GiB available, card 131 MiB used / SM 210 MHz / 51 C.
+Header: device frames ON, hw_decode ON, `CupyBackend(device='cuda:0')`, cache cold
+(`cache_complete_at_start` False), encoder auto -> `hevc_nvenc` (NVENC proof tied), Standard,
+8-bit.
+
+| row | frames | s/frame | min/min | per-frame median / p90 / max | first | lead s / record wait s / share | peak RSS MiB | peak GPU MiB |
+|---|---|---|---|---|---|---|---|---|
+| WP3.14 baseline | 14,938 | 1.0429 | 31.26 | 0.737 / 0.769 / 1.437 | - | whole analysis (29.8 %) | 2,903 | 2,450 |
+| **WP3.21** | 14,938 | **0.3195** | **9.58** | 0.2989 / 0.3365 / 4.1172 | 0.802 | 4.90 / 269.68 / 5.75 % | 3,653 (a) | 3,277 |
+
+- Phases (s): probe 1.55, lead 4.90, open 1.03, frames 4,763.95, close 1.61, committed 0.04;
+  wall 4,773.08 s. Output 1,794,734,980 B (baseline 1,794,336,305), every frame written; the
+  two standing D86 warnings (firmware tag, udta atoms).
+- **Two-instrument check, both PASS:** (i) BINDING at 4K: device-wide peak **3,277.0 MiB <=
+  4,065.4** (the job estimate, two decoders + NVENC; idle before 248.0, so 3,029 above idle);
+  (ii) recorded: pool reserved peak **1,510.8 MiB <= 2,173.8** (the pool estimate, AD-1 base +
+  FFT bound). Device-wide median 3,211 during the overlap, 2,438 after the analysis returned;
+  peak at 1,516 s. One telemetry sample read `memory.used` 0 (a reading, not a state).
+- (a) Peak tree RSS 3,653 MiB at 1,972 s: the job's own processes 3,366 (python 751, three
+  `ffmpeg.exe` 917 / 780 / 918); the tree's member list also carries five `msedge.exe` (287 MiB),
+  which the job did not start. Recorded as read, not placed. N4's 16 GB held either way.
+- **The STREAM_STEP waits, placed:** 261 frames above 1.6 x the median; their excess over the
+  median sums to 269.39 s against `record_wait_s` 269.68, so the stall IS the slow frames. They
+  fall at 51 + 16 k up to frame 1,011 (66 frames, mean 0.56 s), then the gap grows by
+  `max(STREAM_STEP, raw // STREAM_SHARE)` (`engine.py` 945-946: 17 from 1,011, 20 by 1,208, 229
+  at the end) and each wait lengthens with it (mean 2.99 s past frame 10,000; max 4.117 s at
+  13,109; `record_wait_max_s` 3.83). The analysis thread returned at 4,690.6 s (frame 14,655):
+  the job is analysis-bound for 98 % of its frames (analysis 0.314 s/frame against a frame path
+  median of 0.299), so the step sets the grain of the waits, not the wall. No slow frame after
+  the analysis end. Off the cycle: six short bursts of 2-6 frames at 0.5-0.7 s (4,024; 4,169-4,174;
+  5,966; 7,675-7,678; 8,837; 10,012), not placed (spread).
+- Thermals: first hour median 85 C / SM 1,845 MHz / 64.8 W (reasons: SW thermal slowdown in about
+  half the samples, SW power cap the rest), after it 79 C / 1,575 MHz / 54.8 W (power cap); peak 95
+  C at 1,536 s. Frames first hour median 0.2951 s (p90 0.3345), last quarter 0.3066. Baseline:
+  82 C / 1,590 MHz first hour, peak 93 C. Strays over the run: `System` 26.8 % CPU (kept as
+  spread); after: one foreign `python.exe` at 31.1 % for 1 s. Telemetry errors 0. After: SM 210
+  MHz, 69 C, card 335 MiB.
