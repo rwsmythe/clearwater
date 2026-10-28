@@ -63,6 +63,7 @@ Cell `implementer-opus-high` (Claude lane), worktree `.worktrees/wp3.21`, branch
 | 38 | cell 8: WINDOW RELEASED (parallel leg green); WINDOW REQUEST (serial leg) | 67,467 |
 | 39 | cell 8: WINDOW RELEASED (serial leg green); WINDOW REQUEST (block 3, GX011625) | 83,323 |
 | 40 | cell 8: WINDOW RELEASED (block 3, both instruments pass); report next | (dispatcher fills) |
+| 41 | cell 8: report written; STOP (V4 SAME not in the record); WINDOW REQUEST (V4) | (dispatcher fills) |
 
 ## RESUME HERE (cell 6, after cell 5)
 
@@ -2333,3 +2334,24 @@ Header: device frames ON, hw_decode ON, `CupyBackend(device='cuda:0')`, cache co
   82 C / 1,590 MHz first hour, peak 93 C. Strays over the run: `System` 26.8 % CPU (kept as
   spread); after: one foreign `python.exe` at 31.1 % for 1 s. Telemetry errors 0. After: SM 210
   MHz, 69 C, card 335 MiB.
+
+### CHARC addition (relayed at the block 3 grant)
+
+`src/clearwater/analysis/__init__.py` (+6 additive re-exports, `05ee507`) was outside the brief's
+owned list: GRANTED retroactively by CHARC (`407750217110613c`); the report's file list names it
+with that grant. **MINOR ledger finding:** the ungranted edit should have been a STOP (cell 4).
+Not a register row.
+
+### Report (`docs/reports/wp3.21-optimisation.md`) and static gates on the final head
+
+Written from this ledger and the task 10 records. Static on the head: ruff check clean, ruff
+format --check 250 files, mypy 138 source files no issues (`work\wp3.21\logs\c8-static.log`).
+`interfaces/` and `color/samples.py` equal `d1e4537` (empty diff).
+
+### STOP (cell 8, yield 41): V4 SAME is not in the package's record
+
+The brief's Done clause requires "V4 SAME on the WP2.3 samples and GX011627 through the
+optimised engine" (ruling Q3: "After encode V4 SAME through `tools/video_fidelity.py`"). A search
+of this ledger finds no `video_fidelity` run by any cell, and no RESUME HERE named it. The bench
+deletes its outputs unless `--keep`, so no optimised output exists to compare. Reported in the
+report's Open items; raised to the dispatcher with a proposed window (recommended first).
