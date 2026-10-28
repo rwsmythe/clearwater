@@ -180,6 +180,12 @@
   **Cell 5 STOOD DOWN at 326,666; CELL 6 DISPATCHED 10:06Z** (`wp321-cell6`, opus-high, from aa06584): Reviewer A (Codex
   gpt-6.1-sol/high at its seat, WSL, probe first, five-round gate), then two-leg suite one window per leg, then task 10 LAST under
   the binding memory method, then the report. **No window open; seat free.**
+  **Reviewer A r1 (Codex, cell 6, `wp3.211\`): NEW_CRITICAL_MAJOR_FOUND, 0 critical, 6 major reported** (FYI msg `cec78dcf31626489`):
+  F5 CONFIRMED BLOCKING (Q-R6 extrapolation returns 0 on a retry when the old incomplete entry already covers the lead; fix in
+  export.py = extrapolate from the entry's own bytes per stored frame, failing-first); F2 ruled (a) MINOR at the orchestrator's seat
+  (sink.abort() BEFORE joining A on failure/cancel, releases the encoder at once; R0.2 text corrected; order pinned by a test);
+  F1 / F4 rejected (DR-57 (b) hung-encoder case; V17 complete semantics); F3 banked to Limits; F6-F9 minor in the cleanup; F10-F11
+  out of envelope. Cell 6 depth 140,415; round 2 after F5. Nothing to rule.
 - **ORACLE LEG synth CLOSED 09:58Z: synthetic 4K c3 TIER2 as expected, 120 frames, max abs 2.44e-6, mean abs 2.62e-7; records/proxies
   equal by construction** (synth OPEN was `1e7d4c07c4a26046`). Cell 5 depth 310,029 at the synth OPEN.
 - **ORACLE LEG gx CLOSED 09:56Z: GX011627 c3 TIER2 as expected, 681 frames differing, max abs 7.06e-6, mean abs 7.95e-7 (AD-11
