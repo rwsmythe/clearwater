@@ -70,7 +70,7 @@ from clearwater.cache import DiskProxyCache, cache_key
 from clearwater.core import select_backend
 from clearwater.interfaces import JobResult, ParameterSet, ProbeResult, Settings, SinkReport
 from clearwater.io.photo import PhotoReader, PhotoWriter
-from clearwater.io.video import FFmpegVideoSource, find_tool
+from clearwater.io.video import FFmpegVideoSink, FFmpegVideoSource, find_tool
 from clearwater.jobs import ExportEngine, effective_parameters
 from clearwater.jobs.export_seam import ExportRequest
 from clearwater.methods import available_methods
@@ -205,8 +205,11 @@ class _Clocked:
 class _BenchSink(vf._RecordingSink):
     """The product sink, recording its encode window, the resolved encoder and its report."""
 
-    def __init__(self) -> None:
+    def __init__(self, device_backend: object | None = None) -> None:
         super().__init__()
+        # ``vf._RecordingSink`` builds the product sink without a device backend; build it again
+        # with one (AD-29). Nothing has run yet, so this only sets the product sink's own state.
+        FFmpegVideoSink.__init__(self, device_backend=device_backend)
         self.encoder: str | None = None
         self.bit_depth: int | None = None
         self.report: SinkReport | None = None
@@ -227,6 +230,7 @@ def build_engine(
     cache_folder: Path,
     sink_factory: Callable[[], Any],
     on_stage: Callable[[str], None] | None,
+    device_backend: object | None = None,
 ) -> ExportEngine:
     """Return the export engine over the product collaborators.
 
@@ -234,13 +238,14 @@ def build_engine(
         cache_folder: The analysis cache folder of this run.
         sink_factory: Returns the run's sink.
         on_stage: The phase hook.
+        device_backend: The video source's ``device_backend`` (AD-29; None: host frames).
 
     Returns:
         The engine.
     """
     return ExportEngine(
         methods=available_methods(),
-        video_source=FFmpegVideoSource(),
+        video_source=FFmpegVideoSource(device_backend=device_backend),
         sink_factory=sink_factory,
         photo_reader=PhotoReader(),
         photo_writer=PhotoWriter(),
@@ -340,6 +345,7 @@ def run_once(
     force_cpu: bool,
     keep: bool,
     periods: tuple[float, float] = (0.25, 1.0),
+    device_frames: bool = False,
 ) -> dict[str, Any]:
     """Run one export job of ``path`` into ``run_dir`` and measure it.
 
@@ -354,6 +360,9 @@ def run_once(
         force_cpu: Force the CPU backend (``Settings.force_cpu``).
         keep: Keep the output and the cache folder.
         periods: The telemetry periods (memory, graphics card) in seconds.
+        device_frames: Build the video source and the sink with the backend the job selects
+            (``device_backend``, WP3.21 #2/#3, AD-29): device frames on the GPU backend, the
+            host path on the CPU backend.
 
     Returns:
         The run's record.
@@ -367,7 +376,7 @@ def run_once(
         raise BenchError(f"{run_dir} exists; a run never reuses a folder") from error
     finished = False
     try:
-        record = _measure(path, run_dir, leg, force_cpu, periods)
+        record = _measure(path, run_dir, leg, force_cpu, periods, device_frames)
         finished = True
     finally:
         if not (finished and keep):
@@ -383,7 +392,12 @@ def _gpu_sampler(leg: Leg) -> Any | None:
 
 
 def _measure(
-    path: Path, run_dir: Path, leg: Leg, force_cpu: bool, periods: tuple[float, float]
+    path: Path,
+    run_dir: Path,
+    leg: Leg,
+    force_cpu: bool,
+    periods: tuple[float, float],
+    device_frames: bool = False,
 ) -> dict[str, Any]:
     """Run :func:`run_once`'s job and build its record."""
     out_dir, cache_dir = run_dir / "out", run_dir / "cache"
@@ -395,6 +409,14 @@ def _measure(
         force_cpu=force_cpu,
     )
     record: dict[str, Any] = {"leg": asdict(leg), "clip": path.name, "force_cpu": force_cpu}
+    device_backend = None
+    if device_frames:  # the backend the job will select for this clip (the same call)
+        probed = FFmpegVideoSource().probe(path)
+        device_backend, _ = select_backend(
+            settings, probed.video.height, probed.video.width, leg.method
+        )
+    record["device_frames"] = device_frames
+    record["device_backend"] = None if device_backend is None else repr(device_backend)
     if leg.cache == "warm":
         record["prime_s"] = prime_cache(path, cache_dir, settings, leg.method)
     entry = DiskProxyCache(cache_dir).lookup(cache_key(path))
@@ -404,10 +426,10 @@ def _measure(
     sinks: list[_BenchSink] = []
 
     def sink() -> _BenchSink:
-        sinks.append(_BenchSink())
+        sinks.append(_BenchSink(device_backend))
         return sinks[-1]
 
-    engine = build_engine(cache_dir, sink, clocked.stage)
+    engine = build_engine(cache_dir, sink, clocked.stage, device_backend)
     request = ExportRequest(path, "video", _parameters(leg.method), settings)
     telemetry = Telemetry(memory_every=periods[0], gpu_every=periods[1])
     sampler = _gpu_sampler(leg)
@@ -566,6 +588,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     options.add_argument("--config", type=Path, help="local configuration file to read")
     options.add_argument("--keep", action="store_true", help="keep the outputs and caches")
     options.add_argument("--force-cpu", action="store_true", help="force the CPU backend")
+    options.add_argument(
+        "--device-frames",
+        action="store_true",
+        help="build the source and sink with the selected backend (device frames on the GPU)",
+    )
     options.add_argument("--memory-every", type=period, default=0.25, help="seconds")
     options.add_argument("--gpu-every", type=period, default=1.0, help="seconds")
     options.add_argument(
@@ -622,7 +649,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 0
     stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     record_path = out_dir / f"export-bench-{name}-{stamp}.json"
-    record: dict[str, Any] = {"plan": [asdict(leg) for leg in legs], "pid": os.getpid(), "runs": []}
+    record: dict[str, Any] = {
+        "plan": [asdict(leg) for leg in legs],
+        "pid": os.getpid(),
+        "device_frames": args.device_frames,
+        "runs": [],
+    }
     for leg in legs:
         for number in range(1, leg.runs + 1):
             print(f"RUN {_describe(leg)} ({number}/{leg.runs})", flush=True)
@@ -636,6 +668,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                     force_cpu=args.force_cpu,
                     keep=args.keep,
                     periods=(args.memory_every, args.gpu_every),
+                    device_frames=args.device_frames,
                 )
             except Exception as error:
                 record["failed"] = {"leg": asdict(leg), "error": f"{type(error).__name__}: {error}"}
