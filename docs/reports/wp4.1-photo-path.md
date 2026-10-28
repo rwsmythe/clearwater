@@ -1,6 +1,6 @@
 # WP4.1 report: photo path end to end
 
-**Status:** DRAFT (cell 1, 2026-10-28), branch `wp4.1` on base main `3aa3c51`. Brief
+**Status:** FINAL (cell 4, 2026-10-28), branch `wp4.1` on base main `3aa3c51`. Brief
 `docs/briefs/wp4.1-brief.md` FINAL (CHARC `2c4476d9869df056`); round-0 table and rulings in
 `docs/proofs/wp4.1-ledger.md` (R0-1..R0-10, S1..S8).
 
@@ -39,7 +39,7 @@
 
 ## Claims and evidence
 
-(Test node ids; counts and figures filled from the final runs.)
+(Test node ids.)
 
 | Claim | Evidence |
 |---|---|
@@ -52,6 +52,7 @@
 | Runner: exit 0/1/2, record schema 1 with names only, footage refusals, no PySide6 / CuPy, cancel and Ctrl-C, DR-62 order, DR-6, DR-35 (a), video unavailable | `tests/test_headless_export.py` |
 | Runner (Reviewer A round 2): footage refusals through the `\\?\` and `\\?\UNC\` spellings; no full path for a non-ASCII folder, an `argparse` refusal, a record field or a record that cannot be written; no EXIF tag value printed | `tests/test_headless_export.py::test_g1_*` to `::test_g7_*` |
 | Runner (Reviewer A round 4): every write target (each output folder as the export plans it, the record, the settings folder and file) checked by the real path of its nearest existing path, so a file link, a folder link or a dangling link into the footage folder is refused; a local-configuration refusal names no full path; `--parameters` validated against the method schema and capped at 1 MiB, as the importer does | `tests/test_headless_export.py::test_i1_*` to `::test_i4_*` |
+| Runner (Reviewer A round 5): a parameter file whose `created` stamp overflows in UTC is a usage refusal | `tests/test_headless_export.py::test_j1_a_created_stamp_out_of_range_is_a_usage_refusal` |
 | V5 on every WP2.3 still at 8 and 16 bit (planted `iCCP`-dropping writer); the Interop IFD kept on a test-built JPEG (no WP2.3 still carries one; planted drop) | `tests/test_wp41_photo_path.py::test_v5_*` |
 | V9 neutral identity, both methods, every still, 8 and 16 bit (planted off-neutral control) | `tests/test_wp41_photo_path.py::test_v9_*` |
 | V10: D84, D35, D36, N8, D116, D83, D45 | `tests/test_wp41_photo_path.py::test_v10_*` |
@@ -101,6 +102,11 @@
   `settings` added), with its 1 MiB cap and its method-schema validation (R4 I3, I4). The provenance text `PhotoWriter` embeds for a HEIC given a built-in profile
   carries `"profile"` (WP3.6 `7624f5c`), which both the runner and the accepted importer refuse
   (`unknown keys: profile`, exit 2; R2 G5). The writer-versus-AD-13 key set is banked with CHARC.
+- **Importer `OverflowError` (accepted component, banked, R5 J1):** a preset whose `created`
+  stamp overflows when normalised to UTC (`0001-01-01T00:00:00+01:00`) escapes the accepted
+  `PresetStore.import_preset` as `OverflowError` (`ParameterSet.from_dict`; not owned). The
+  runner refuses it (exit 2); the importer's behaviour is an item for the orchestrator
+  (reproduction `C:\Users\rwsmy\clearwater-review-evidence\wp4.1\r5\r5_repro.py`).
 
 ## OWED (not limits of the code)
 
@@ -112,6 +118,57 @@
   `uv run python tools/headless_export.py <photo> [...] --out work/wp3.6p/out --bit-depth 16 --record work/wp3.6p/record.json`
   and, for V9, the same with `--neutral`.
 - No photo look check (owner-reserved).
+
+## Figures
+
+**V8 (c)** (`tests/test_wp41_v8.py`, `slow`, on the 1080 x 1920 look-check crops; 1/255; AD-11
+as amended 2026-10-21: mean <= 1, p99 <= 2 at k = 2 and <= 4 at k = 4; p99.9 and max recorded,
+never asserted). From the hardware leg on `755513b` (`-m "gpu or slow"` on
+`test_wp41_photo_path.py` + `test_wp41_v8.py`: 2 passed, 0 skipped, RTX 4070 Laptop):
+
+| Frame | k | mean | p99 | p99.9 | max |
+|---|---|---|---|---|---|
+| GX011625_0024.925 | 2 | 0.093 | 1.105 | 8.874 | 29.729 |
+| GX011625_0024.925 | 4 | 0.266 | 3.696 | 12.850 | 28.039 |
+| GX011625_0114.648 | 2 | 0.084 | 0.472 | 2.783 | 29.354 |
+| GX011625_0114.648 | 4 | 0.292 | 1.363 | 4.428 | 22.683 |
+
+**V9 raw figures** (CHARC ruling S8; from the S8 probe recorded in the ledger, before
+`755513b`: 66 stills x {c3, ancuti2018} x {8, 16} = 264 runner exports, `--neutral`, CPU):
+against the source quantised to the export depth by the writer's rule, max 0.0000/255 and mean
+0.0000/255 on all 264; against the unquantised source, 8-bit sources at either depth and every
+16-bit export max 0.0019/255, mean 0.0012/255; 8-bit exports of 10- and 16-bit sources worst
+mean 0.256/255, max 0.499/255 (8-bit quantisation alone; recorded, not asserted, per S8). The V9
+test records the raw error of every export (`record_property`). The stacked candidate gate
+re-runs both: the GPU and V8 (c) legs in its serial leg, V9 (with the pinned built-in ICC oracle
+of R3 H6) in its parallel leg.
+
+## Gates
+
+- ruff check, ruff format --check (259 files), mypy strict (141 source files): green on
+  `23fc88b`; the WP4.1 files plus `test_gui_deps`, `test_gui_status`, `test_core_deps`,
+  `test_jobs_naming`, `test_jobs_export_photo` (`-n 4 -m "not gpu and not footage and not
+  slow"`): 465 passed, 0 skipped.
+- The two-leg suite: run by the orchestrator's stacked candidate gate; counts and skip lines in
+  `docs/proofs/wp4.1-accept.md`.
+
+## Reviewer A
+
+STRONG tier (Codex `gpt-6.1-sol` / high, WSL, codex-cli 0.162.1), whole-package diff from
+`3aa3c51` each round, prior rounds withheld; evidence
+`C:\Users\rwsmy\clearwater-review-evidence\wp4.1\r1\` to `r5\`; ledger
+`docs/proofs/wp4.1-ledger.md`.
+
+| Round | Head | Critical | Major | Minor | Verdict |
+|---|---|---|---|---|---|
+| 1 | `ef6bf2f` | 0 | 2 (F1 path privacy, F3 settings version) | 6 | NEW_CRITICAL_MAJOR_FOUND; fixed |
+| 2 | `dca6d1e` | 0 | 2 (G1 extended-path footage check, G2 non-ASCII folder) | 5 | NEW_CRITICAL_MAJOR_FOUND; fixed |
+| 3 | `899102d` | 0 | 1 (H1 GUI preview, accepted code: BANKED to WP4.3) | 6 | NEW_CRITICAL_MAJOR_FOUND; minors fixed |
+| 4 | `844b996` | 0 | 1 (I1 linked source beside-source) | 4 | NEW_CRITICAL_MAJOR_FOUND; fixed (I1 broadened to every write target) |
+| 5 | `f17ab36` | 0 | 0 | 1 (J1) | NO_NEW_CRITICAL_MAJOR; J1 fixed in the cleanup (`23fc88b`) |
+
+The loop terminated at round 5, the five-round gate, on a round with zero new blocking
+findings.
 
 ## Register rows (main `cffd243`)
 
