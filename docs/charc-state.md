@@ -111,14 +111,19 @@
   CLOSED, DR-35 (a) mechanism amended, DR-57 (a) ADDRESSED; NEW DR-62 (GUI recompute vs export, WP4.3), DR-63 (sink
   phase write window, next encode.py touch), DR-64 (N6 body erratum, owner's word).** Worktrees `wp3.14`, `wp3.14-mc`,
   `orch-state-g14` released. WP3.21 brief: orchestrator drafts from the V16 baseline, I approve FINAL.
-- **EXCLUSIVE WINDOW OPEN 2026-10-27 ~21:31Z: WP-T4 rung 4 ROUND 2** (same head dd49a15, wrappers `run_r4_r2_*`;
-  ~2 h 20 min; msg `fe2a610eafd5c405`), **extended by the APPROVED D3 durations leg** (serial expression with
-  `--durations=0 --junitxml` under `work/`, diagnostic only, not a round, not in the 15 % rule; by-marker wall from
-  junit `time`, setup/call split for the ten longest; CLOSE ~00:45Z 2026-10-28). **NOTHING HEAVY AT THIS SEAT until CLOSE.**
-  **Round 2 DONE 23:47Z** (msg `23cd376ed4fda4dd`): BASELINE 4,349.92 s; PARALLEL 493.54; SERIAL 3,372.59; counts hold;
-  0 failures; P+S 3,866.13 vs round 1 3,832.66 = 0.87 %: **NO ROUND 3.** Saving -11.1 % (round 2) / -16.0 % (round 1);
-  the BASELINE moved 4.7 % between rounds while P+S moved under 1 %, so the report states P+S against both baselines
-  and the spread. GPU rise 911 MiB (same finding). D3 durations leg running 23:47Z-. **Round 1 CLOSED 21:29Z** (msg
+- **WP-T4 RUNG 4 COMPLETE; WINDOW CLOSED 2026-10-28 00:43Z** (msgs `7bb7c019595a6e24`, `23cd376ed4fda4dd`,
+  `837716adc8e9d3a8`). **No window open; seat free.** Head dd49a15 on ba6e923. Round 1: BASELINE 4,564.80 s / PARALLEL
+  497.30 / SERIAL 3,335.36 (P+S 3,832.66, -16.0 %); round 2: 4,349.92 / 493.54 / 3,372.59 (P+S 3,866.13, -11.1 %);
+  P+S differ 0.87 % = NO ROUND 3; counts 4,032 + 1,046 = 5,078 both rounds; 0 failures = 0 violators; GPU rise
+  903 / 911 MiB in the non-GPU leg (import-time context FINDING, no marker change). D3 durations leg (diagnostic,
+  junit under work/): serial wall 3,331 s; four WP3.14 / WP3.10 real-clip and synthetic-5.3K export tests = 2,276 s =
+  68 % of the serial leg (`test_v4_synthetic_5k3_8_7_clip` 871 s the largest). **Owed at WP-T4's accept (my QA):**
+  CLAUDE.md Conventions line (two-leg command, median P+S ~64 min vs baseline ~74 min with the spread); HD-1 third
+  data point (Codex lane); NEW register row on suite-cost concentration (lever = the synthetic 5.3K clip's frame
+  count and a shared GX011627 export fixture; trigger WP3.14 / WP3.10 next touch or an owner-commissioned suite-cost
+  pass); orchestrator writes the fill's GATE_CHECKS line. Next at the orchestrator: Codex turn 6 (tabulation by
+  marker, report, gate text, ledger; same session, depth 95,253), Reviewer A Claude opus/high, final two legs in
+  their own window, B at its seat, accept; then WP3.21 dispatch (brief FINAL 43cc1ed). **Round 1 CLOSED 21:29Z** (msg
   `7bb7c019595a6e24`): BASELINE 5,067 passed / 11 env skips / 4,564.80 s; PARALLEL 4,031 / 1 / 497.30 s; SERIAL
   1,036 / 10 / 3,335.36 s; counts hold (5,078); 0 failures = 0 violators; P+S 3,832.66 s = -16.0 %. Sampler: peak RSS
   6.97 GB, min available 7.05 GB, GPU rise 903 MiB (the import-time context finding). **Reading sent for the report:
