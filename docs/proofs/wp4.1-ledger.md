@@ -8,7 +8,7 @@ Brief `docs/briefs/wp4.1-brief.md` FINAL (rulings CHARC `2c4476d9869df056`). Rev
 
 | Yield | Moment | Depth |
 |---|---|---|
-| Y1 round 0 | 2026-10-28 | (dispatcher) |
+| Y1 round 0 | 2026-10-28 | 140,680 |
 
 ## Task 1: map (main `3aa3c51`)
 
@@ -202,3 +202,24 @@ file is the runner's own write.
 - **S7.** `--parameters FILE`: Recommended: the AD-13 preset or provenance JSON; `source` and
   `settings` dropped; `--method` with `--parameters` is a usage refusal (the file names its
   method).
+
+### R0-10 Rulings on Y1 (orchestrator, 2026-10-28; CHARC informed)
+
+Table R0-1..R0-8 APPROVED as written.
+
+- S1 RULED (a): AD-11 defines N10 as bit-identical PRE-ENCODE; the provenance `created` stamp is
+  metadata. Assert byte-identical files with provenance OFF; with provenance ON every chunk equal
+  except the provenance `iTXt`, whose JSON is equal in every key but `created`; decoded pixels
+  bit-identical in both. Reproduction of record (scratch `n10_repro.py`, `jpeg-gradient-srgb`,
+  `force_cpu`, c3, two exports each): provenance on, sizes 1895/1895, NOT identical; provenance
+  off, sizes 1075/1075, identical.
+- S2 RULED: add `--cache-limit-bytes N` (the full IF-10 flag set).
+- S3 RULED as recommended: `RefusedRequest` failed inside the one `run_batch`, kind
+  `"refused"`, batch continues; a sidecar and an unknown suffix pinned by tests.
+- S4 GRANTED: `tests/test_app_deps.py`; allows exactly `gui/engines.py ->
+  clearwater.app.composition`; importing `clearwater.app` and `clearwater.app.composition`
+  loads no PySide6 and no CuPy.
+- S5 RULED: a missing `--out` exits 2; an existing `--record` exits 2, never overwritten.
+- S6 RULED: no logging handler installed by the runner; its docstring says so.
+- S7 RULED: `--parameters` takes AD-13 preset or provenance JSON, `source`/`settings` dropped
+  as `PresetStore` import does; `--method` with `--parameters` exits 2 with a readable text.
