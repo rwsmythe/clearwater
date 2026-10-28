@@ -298,3 +298,37 @@ small perturbation. From the notice: no runs.
 | GX011625_0024.925 | 4 | 0.266 | 3.696 | 12.850 | 28.039 |
 | GX011625_0114.648 | 2 | 0.084 | 0.472 | 2.783 | 29.354 |
 | GX011625_0114.648 | 4 | 0.292 | 1.363 | 4.428 | 22.683 |
+
+## Reviewer A
+
+Transport WSL, Codex v0.162.1, `gpt-6.1-sol` / high (STRONG). Evidence
+`C:\Users\rwsmy\clearwater-review-evidence\wp4.1\rN\` (prompt, diff, transcript, adjudication,
+md5s). Probe 20:14:34Z: one `succeeded in` line, banner `gpt-6.1-sol` / high.
+
+### Cumulative round ledger
+
+| Round | Head | Critical | Major (blocking) | Minor | In / out envelope | New / reopened | Reverts | Fixes touch | Depth |
+|---|---|---|---|---|---|---|---|---|---|
+| 1 | `ef6bf2f` | 0 | 2 (F1, F3) | 6 (F2 downgraded, F4-F8) | 8 / 0 | 8 / 0 | 0 | (pending: runner product-side tool code, report, one test) | (dispatcher) |
+
+### Round 1 (20:14-20:24Z) -- VERDICT NEW_CRITICAL_MAJOR_FOUND; adjudicated, NOT yet remediated
+
+- F1 MAJOR CONFIRMED (in envelope): path privacy. The D87 refusal text names the output folder
+  and reaches the record verbatim (reproduced: `"failure": "jpeg-gradient-srgb.jpg: Not enough
+  free space in C:\...\work\wp4.1-r1-repro\out: need 1,085,440 bytes, 0 free."`); the usage
+  refusal of a missing parameter file (OSError text) and `load_settings`'s corrupt-file WARNING
+  print full paths to stderr.
+- F2 MAJOR reported, CONFIRMED as MINOR: `--record` named as a planned output PNG -> export
+  committed, then `FileExistsError` escapes `main` (reproduced). Contrived argument; nothing harmed.
+- F3 MAJOR CONFIRMED (in envelope): a settings file with `format_version` 99 ->
+  `UnsupportedFormatVersionError` escapes `main` instead of exit 2 (reproduced).
+- F4 MINOR CONFIRMED: a loaded `output_suffix` is not validated at usage.
+- F5 MINOR CONFIRMED: `load_settings` may rename a corrupt `settings.json`; docstring and the
+  report's DR-34 line say read-only.
+- F6 MINOR CONFIRMED: importing `clearwater.core` builds its module-level `NumpyBackend`; the
+  root's "nothing is built" is too wide.
+- F7 MINOR CONFIRMED: DR-43 limit text (the output keeps a minimal EXIF block; the source fields
+  are lost).
+- F8 MINOR CONFIRMED (test-only): the N10 chunk filter matches a keyword prefix.
+- Mechanical: VERDICT anchored; 32 `succeeded in`; `tokens used` 171,507; two start-up ERROR lines
+  from offline network connectors (not the exec channel), the rest echoed source: round COUNTS.
