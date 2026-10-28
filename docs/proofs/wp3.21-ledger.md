@@ -2003,3 +2003,10 @@ direct Gaussian); cell 5's 5.3K render pool peak 2,710 MiB (2,798 at the max fra
   790-1,240, the analysis device frames about 800 of pool. Even OFF (no device frames) the peak
   7,593 breaches both bounds: the decoder term alone does. The estimate counts no FFmpeg memory
   (export decoder + NVENC about 2.4 GB here) and AD-1's figure is the render's arrays.
+- **Against AD-1's own definition** (`core/memory.py` module docstring: the estimate is of the
+  render's arrays, checked against "the pool's reserved peak"; "the CUDA context and library
+  workspaces are not counted"; the decoders and the encoder do not exist when the backend is
+  chosen): the 5.3K **pool reserved peak is 4,427 MiB ON / 3,628 OFF, UNDER the GPU estimate
+  6,281 (x 0.70 / x 0.58) and under the base 5,897.** The breach exists only in the device-wide
+  figure the ruled test used, and is FFmpeg's (about 2.4 GB for the export decoder and NVENC,
+  plus about 0.8-1.25 GB for the overlap's analysis decoder) plus the context, on top of the pool.
