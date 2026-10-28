@@ -300,6 +300,20 @@ core and no layer loads core; an interface between modules, hence CHARC's. (N) N
 (`like=`, `__array_function__`, the array's `.get()`): passes the scan's letter, not its intent.
 (D) drop #2/#3 and revert `3da1e6f`'s product part.
 
+### CHARC ruling `eab16ca8` (relayed after yield 4; crossed the yield-5 STOP)
+
+- Q-device-frames RULED (a): task 10's V16 figure of record runs with `--device-frames` ON.
+  The record header names the configuration (device frames ON, hw_decode ON, the backend, the
+  cache state). The report says in one sentence that no product code constructs the real source
+  yet (the GUI's path is the stubs' until WP4.2). The `device_frames=False` default stays.
+- An OFF row on GX011627 c3 only if it fits the same task 10 window; never extend it for that.
+  CHARC writes the WP4.2 register row at accept.
+- The hw_decode coupling is ACCEPTED; the report's Limits states that a CPU backend with a
+  hardware decoder is not a supported combination.
+- A non-TIER1 in a window is a STOP (D109). Plan the handover in the ledger before the task 6
+  build if the reading passes ~250K.
+- The yield-5 STOP (frame rule 5) is NOT addressed by this ruling and still holds.
+
 ## RESUME HERE (cell 3, taking #2 and #3)
 
 State at hand-over (cell 2, depth 287,974 at yield 3): branch `wp3.21` on `d1e4537`, no rebase.
