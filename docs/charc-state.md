@@ -186,9 +186,15 @@
   (sink.abort() BEFORE joining A on failure/cancel, releases the encoder at once; R0.2 text corrected; order pinned by a test);
   F1 / F4 rejected (DR-57 (b) hung-encoder case; V17 complete semantics); F3 banked to Limits; F6-F9 minor in the cleanup; F10-F11
   out of envelope. Cell 6 depth 140,415; round 2 after F5. Nothing to rule.
-- **EXCLUSIVE WINDOW OPEN 2026-10-28 ~11:13Z: WP3.21 TWO-LEG SUITE, PARALLEL LEG (~8 min, -n 4, offscreen, PYTEST_ADDOPTS unset,
-  basetemp work/wp321-suite-parallel in the worktree)** (msg `d113bb7affcf0675`). **NOTHING HEAVY AT THIS SEAT until CLOSE.** Serial
-  leg follows in its own window; then task 10 LAST. **Reviewer A CONVERGED r2** (NO_NEW_CRITICAL_MAJOR, evidence wp3.21/r2/; F5 fixed
+- **EXCLUSIVE WINDOW OPEN 2026-10-28 ~11:25Z: WP3.21 SUITE SERIAL LEG (~56 min, `-m "gpu or footage or gui or slow"`, offscreen,
+  PYTEST_ADDOPTS unset, basetemp work/wp321-suite-serial; skips vs WP-T4 serial 1036 / 10)** (msg `9eaa4c78e158e9db`). **NOTHING
+  HEAVY AT THIS SEAT until CLOSE.** Then task 10 LAST. Cell 6 depth 227,414.
+- **PARALLEL LEG CLOSED 11:23Z: 4147 passed, 1 skipped (`test_color_roundtrip.py:121`, the same single skip as WP-T4's 4031 / 1),
+  575 s, EXIT 0; 4,148 of 5,259 collected (+116 tests in this package).** Orchestrator deletion-grant SLIP recorded: 27 superseded
+  oracle candidate folders (cand-devframes-*, cand-ad29-*, cand-i2-*, ~11 GB) deleted whole before the amendment to keep each
+  `oracle.json` landed; lost = per-run oracle.json for H7-H14 (development evidence, superseded by cand-fft-*); verdict lines
+  survive in the logs and the ledger; every ref-* and cand-fft-* intact. Not a register row (work/ evidence). Lesson noted: a deletion
+  grant names what is KEPT in the same message. (parallel OPEN was `d113bb7affcf0675`.) **Reviewer A CONVERGED r2** (NO_NEW_CRITICAL_MAJOR, evidence wp3.21/r2/; F5 fixed
   9d73fe4 with failing-first retry test 0 -> 23,040 bytes; F2 order abort -> join A -> release pinned; cleanup 1df2626 tools+tests
   only; light 2,655 passed). Cell 6 on 012641e.
 - **ORACLE LEG synth CLOSED 09:58Z: synthetic 4K c3 TIER2 as expected, 120 frames, max abs 2.44e-6, mean abs 2.62e-7; records/proxies
