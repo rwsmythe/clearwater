@@ -70,18 +70,19 @@ _MIB = 1024 * 1024
 
 CUDA_CONTEXT_BYTES = 272 * _MIB
 """The device-wide memory this process holds after the GPU probe, before any frame (measured
-246 and 261 MiB on the RTX 4070 Laptop GPU, the desktop's own use included; rounded up)."""
+115, 246 and 261 MiB on the RTX 4070 Laptop GPU, the desktop's own use included; the largest
+rounded up)."""
 
-NVDEC_FLOOR_BYTES = 416 * _MIB
+NVDEC_FLOOR_BYTES = 80 * _MIB
 """The fixed part of one FFmpeg NVDEC decoding session (see :func:`session_bytes`)."""
 
-NVDEC_BYTES_PER_PIXEL = 37
+NVDEC_BYTES_PER_PIXEL = 51
 """The per-pixel part of one NVDEC session, bytes per pixel of the decoded frame."""
 
-NVENC_FLOOR_BYTES = 384 * _MIB
+NVENC_FLOOR_BYTES = 368 * _MIB
 """The fixed part of one FFmpeg NVENC encoding session (see :func:`session_bytes`)."""
 
-NVENC_BYTES_PER_PIXEL = 35
+NVENC_BYTES_PER_PIXEL = 36
 """The per-pixel part of one NVENC session, bytes per pixel of the encoded frame."""
 
 SESSION_KINDS: tuple[str, ...] = ("nvdec", "nvenc")
@@ -91,24 +92,25 @@ SESSION_KINDS: tuple[str, ...] = ("nvdec", "nvenc")
 def session_bytes(kind: str, height: int, width: int) -> int:
     """Estimate the device memory of one FFmpeg hardware session at a frame size.
 
-    ``floor + per_pixel x (width x height)``, the line through two measured sizes, both read
-    device-wide (``nvidia-smi`` ``memory.used``) during an export job on the RTX 4070 Laptop GPU
-    (WP3.21 task 10; ``docs/proofs/wp3.21-ledger.md``, "The task 10 fix"):
+    ``floor + per_pixel x (width x height)``, the line through two measured sizes, fitted
+    EXACTLY (two sizes, two constants per kind; CHARC ruling ``3f17304438bc2555``). Both sizes
+    are in-process attributions of one export job each on the RTX 4070 Laptop GPU (WP3.21 task
+    10; ``docs/proofs/wp3.21-ledger.md``, "The task 10 fix"), read device-wide (``nvidia-smi``
+    ``memory.used``) less the device-wide figure after the process's probe (its context) less the
+    pool's reserved bytes read at the same instant: that REMAINDER is FFmpeg's (``nvidia-smi``
+    reports no per-process figure under WDDM). The second decoder is the remainder's rise during
+    the overlap over the frames-only plateau (max); NVENC is the frames-only remainder (max) less
+    one decoder:
 
-    - 5.3K 8:7 (5312 x 4648), in-process attribution: the second decoder = the overlap's rise over
-      the frames-only plateau, max 1,256 MiB (1,237 with device frames); NVENC = the frames-only
-      remainder (device-wide - context - pool), max 2,448, less one decoder = 1,192 MiB.
-    - 4K (3840 x 2160): the cold c3 rows' device-wide peak 3,244 MiB (two decoders and NVENC) less
-      the 4K render pool peak 947 MiB (WP3.21 task 6 memory re-read, the only measured 4K pool
-      figure) and the context 261 = 2,036 MiB, split between the kinds in the 5.3K proportion
-      (1,256 : 1,256 : 1,192): NVDEC 690, NVENC 655 MiB.
+    - 5.3K 8:7 (5312 x 4648, synthetic, device frames ON and OFF, the larger of the two): NVDEC
+      1,256.0 MiB, NVENC 1,192.3 MiB;
+    - 4K (3840 x 2160, GX011627, c3 cold, device frames ON): NVDEC 472.0 MiB, NVENC 642.4 MiB.
 
-    Solved: NVDEC 404.3 MiB + 36.17 B/px, NVENC 383.7 MiB + 34.33 B/px; rounded UP to the
-    constants (416 MiB + 37 B/px, 384 MiB + 35 B/px). Residual of the rounded line over the
-    measured terms: NVDEC +31 MiB at 5.3K and +18 at 4K, NVENC +16 and +6. The 4K split rests on
-    the 5.3K proportion and on the render-only pool figure (a larger measured 4K job pool would
-    lower the floors). A frame below 4K, 1080p included, is an extrapolation of the same line
-    (1080p: NVDEC 489, NVENC 453 MiB), not a measurement.
+    Solved: NVDEC 75.4 MiB + 50.14 B/px, NVENC 364.2 MiB + 35.17 B/px (both floors above 0, so no
+    clamp); rounded UP to the constants (80 MiB + 51 B/px, 368 MiB + 36 B/px). Residual of the
+    rounded line over the measured terms: NVDEC +11.4 MiB at 4K and +24.9 at 5.3K, NVENC +10.4
+    and +23.4. A frame below 4K, 1080p included, is an extrapolation of the same line (1080p:
+    NVDEC 181, NVENC 439 MiB), not a measurement.
 
     Args:
         kind: ``"nvdec"`` or ``"nvenc"``.

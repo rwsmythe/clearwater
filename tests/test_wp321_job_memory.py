@@ -40,10 +40,10 @@ def _total(size: tuple[int, int], decoders: int, nvenc: bool = True) -> float:
 @pytest.mark.parametrize(
     ("size", "kind", "measured_mib"),
     [
-        (K53, "nvdec", 1256.0),  # the overlap's rise over the frames-only plateau (max)
-        (K53, "nvenc", 1192.0),  # the frames-only remainder 2,448 less one decoder
-        (K4, "nvdec", 690.4),  # 3,244 - 947 - 261, split in the 5.3K proportion
-        (K4, "nvenc", 655.2),
+        (K53, "nvdec", 1256.0),  # the overlap's remainder rise over the frames-only plateau
+        (K53, "nvenc", 1192.3),  # the frames-only remainder 2,448.3 less one decoder
+        (K4, "nvdec", 472.0),  # the GX011627 attribution, the same reading
+        (K4, "nvenc", 642.4),  # its frames-only remainder 1,114.4 less one decoder
     ],
 )
 def test_each_session_term_covers_its_fitted_point(
@@ -60,6 +60,7 @@ def test_each_session_term_covers_its_fitted_point(
         ("5.3K attribution, device frames OFF", K53, 2, True, 7593.0),
         ("5.3K task 10 block 2", K53, 2, True, 7854.0),
         ("5.3K WP3.14 baseline, one decoder, host frames", K53, 1, True, 6104.0),
+        ("4K GX011627 attribution, device frames ON", K4, 2, True, 3054.0),
         ("4K c3 cold 1", K4, 2, True, 3244.0),
         ("4K c3 cold 2", K4, 2, True, 3142.0),
         ("4K c3 cold 3", K4, 2, True, 3130.0),
