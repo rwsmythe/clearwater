@@ -30,9 +30,29 @@ every timed device call is followed by a device synchronisation, so a step's tim
 
 The CHECK (CHARC ruling Q6): the sum of the per-step MEANS equals the mean per-frame wall of the
 same phase within 5 %; medians are reported beside, never summed. A residual above 5 % is a
-finding (unattributed time), not a failed instrument. The graphics card is sampled through the
-whole run (WP3.10's :class:`~video_io_bench.Telemetry`) and its readings are summarised per
-phase, so an idle card is tied to the steps of the phase it idled in.
+finding (unattributed time), not a failed instrument.
+
+**Per-step GPU occupancy** (CHARC's addition to task 1), two figures beside each step's time:
+
+- *The device bound*: the steps that issue CUDA work (:data:`DEVICE_STEPS`: ``proxy_image``,
+  ``analyze``, ``upload``, ``render``, ``to_host``) each end with a device synchronisation, so
+  the device can be busy at most for their time; every other step is host work (NumPy, the JPEG
+  codec, the pipes, the store) during which this process's CUDA stream is idle. A phase's
+  ``device_share_bound`` is the sum of its device steps' means over its mean wall: an exact upper
+  bound on the CUDA compute share, by construction.
+- *The sampled occupancy*: ONE ``nvidia-smi --loop-ms`` process (:class:`OccupancySampler`,
+  every :data:`OCCUPANCY_MS` ms; no process start per reading) reads the CuPy device's
+  ``utilization.gpu`` (NVML: the share of the last sample period in which a kernel ran),
+  ``utilization.decoder`` (NVDEC), ``utilization.encoder`` (NVENC), the SM clock and the power;
+  each reading is stamped on arrival with the instrument's clock and attributed to the step
+  whose interval holds the stamp (:func:`occupancy_by_step`). NVML averages over its own sample
+  period (1/6 s to 1 s by product), so a reading partly covers the steps before the one it lands
+  in: per step it is a statistical figure over many frames, and the device bound is the exact
+  one. CUDA events are not used: on a stream idle between synchronised steps, an event pair
+  measures the step's span, not the device's busy time.
+
+WP3.10's :class:`~video_io_bench.Telemetry` samples the process tree's memory throughout (and the
+card, every :data:`TELEMETRY_GPU_S` s by default, for its memory peak).
 
 Plan 4.3: an EXCLUSIVE run, on a full clip. The footage is reached only through
 ``local_config.find_footage_file`` and only read (FFmpeg maps the first video stream only: no
@@ -42,7 +62,7 @@ working folder inside the footage folder is refused. Usage::
 
     uv run python tools/analysis_breakdown.py GX011627 [--method c3] [--force-cpu]
         [--skip-profile] [--skip-frames] [--keep] [--config FILE]
-        [--memory-every S] [--gpu-every S]
+        [--memory-every S] [--gpu-every S] [--occupancy-ms MS]
 
 Exit status 0 when every phase ran and the replica equals the engine; 1 when a phase failed or
 the records differ (the record says which); 2 on a usage, configuration or footage-lookup error.
@@ -51,6 +71,7 @@ the records differ (the record says which); 2 on a usage, configuration or foota
 from __future__ import annotations
 
 import argparse
+import bisect
 import contextlib
 import cProfile
 import dataclasses
@@ -61,7 +82,9 @@ import os
 import pstats
 import shutil
 import statistics
+import subprocess
 import sys
+import threading
 import time
 from collections.abc import Callable, Iterator, Mapping, Sequence
 from datetime import UTC, datetime
@@ -103,6 +126,26 @@ RESIDUAL_LIMIT = 0.05
 
 PROFILE_LINES = 40
 """How many functions of the ``cProfile`` cross-check the record keeps (by own time)."""
+
+DEVICE_STEPS = frozenset({"proxy_image", "analyze", "upload", "render", "to_host"})
+"""The steps that issue CUDA work (each ends with a device synchronisation on the GPU)."""
+
+OCCUPANCY_MS = 200
+"""The occupancy sampler's period in milliseconds (one ``nvidia-smi --loop-ms`` process)."""
+
+OCCUPANCY_QUERY = (
+    "pci.bus_id",
+    "utilization.gpu",
+    "utilization.decoder",
+    "utilization.encoder",
+    "clocks.sm",
+    "power.draw",
+)
+"""The fields each occupancy reading carries."""
+
+TELEMETRY_GPU_S = 10.0
+"""The default period of :class:`~video_io_bench.Telemetry`'s own card readings (a process start
+each), kept long so that the occupancy sampler is the only frequent reader."""
 
 _T = TypeVar("_T")
 
@@ -163,6 +206,8 @@ class StepClock:
     Attributes:
         frames: One ``{step: seconds}`` dict per frame, ``"wall"`` included.
         once: Steps timed once per phase (a stage's smoothing, the sink's close).
+        intervals: ``(start, end, step)`` of every timed step, in the instrument's clock (the
+            occupancy readings are attributed to them).
     """
 
     def __init__(self, synchronize: Callable[[], None]) -> None:
@@ -174,16 +219,19 @@ class StepClock:
         self._synchronize = synchronize
         self.frames: list[dict[str, float]] = []
         self.once: dict[str, float] = {}
+        self.intervals: list[tuple[float, float, str]] = []
         self._current: dict[str, float] | None = None
 
     def begin(self) -> None:
         """Start a frame."""
         self._current = {}
 
-    def add(self, step: str, seconds: float) -> None:
-        """Add seconds to a step of the current frame."""
+    def add(self, step: str, seconds: float, start: float | None = None) -> None:
+        """Add seconds to a step of the current frame (and its interval, given its start)."""
         assert self._current is not None, "add outside a frame"
         self._current[step] = self._current.get(step, 0.0) + seconds
+        if start is not None:
+            self.intervals.append((start, start + seconds, step))
 
     def time(self, step: str, call: Callable[..., _T], *args: Any, device: bool = False) -> _T:
         """Run ``call(*args)`` as one step of the current frame and return its result.
@@ -201,7 +249,7 @@ class StepClock:
         result = call(*args)
         if device:
             self._synchronize()
-        self.add(step, time.perf_counter() - began)
+        self.add(step, time.perf_counter() - began, began)
         return result
 
     def end(self, wall: float) -> None:
@@ -217,7 +265,9 @@ class StepClock:
         result = call(*args)
         if device:
             self._synchronize()
-        self.once[step] = self.once.get(step, 0.0) + time.perf_counter() - began
+        ended = time.perf_counter()
+        self.once[step] = self.once.get(step, 0.0) + ended - began
+        self.intervals.append((began, ended, step))
         return result
 
 
@@ -237,7 +287,9 @@ def phase_summary(clock: StepClock, started: float, ended: float) -> dict[str, A
         the order first seen), the per-frame ``wall`` summary and the first frame's wall apart
         (``first_wall_s``: it carries the device's first-call set-up), ``sum_of_means_s``,
         ``mean_wall_s``, ``residual`` (the unattributed fraction of the mean wall),
-        ``within_limit`` and the ``once`` steps.
+        ``within_limit``, the ``once`` steps, the phase's ``device_steps`` and
+        ``device_share_bound`` (their means over the mean wall: on the GPU, the most the device
+        can have been busy with this process's work).
     """
     names: list[str] = []
     for frame in clock.frames:
@@ -251,6 +303,8 @@ def phase_summary(clock: StepClock, started: float, ended: float) -> dict[str, A
     mean_wall = statistics.fmean(walls) if walls else 0.0
     sum_of_means = sum(step["mean"] for step in steps.values())
     residual = (mean_wall - sum_of_means) / mean_wall if mean_wall > 0 else 0.0
+    device = [name for name in steps if name in DEVICE_STEPS]
+    device_mean = sum(steps[name]["mean"] for name in device)
     return {
         "frames": count,
         "wall_s": ended - started,
@@ -262,6 +316,8 @@ def phase_summary(clock: StepClock, started: float, ended: float) -> dict[str, A
         "residual": residual,
         "within_limit": abs(residual) <= RESIDUAL_LIMIT,
         "once": dict(clock.once),
+        "device_steps": device,
+        "device_share_bound": device_mean / mean_wall if mean_wall > 0 else 0.0,
     }
 
 
@@ -369,8 +425,8 @@ def _next_frame(
     waited = time.perf_counter() - began
     clock.begin()
     converted = planes.take()
-    clock.add("decode_wait", waited - converted)
-    clock.add("planes_to_rgb", converted)
+    clock.add("decode_wait", waited - converted, began)
+    clock.add("planes_to_rgb", converted, began + waited - converted)  # the end of ``next``
     return frame, began
 
 
@@ -700,10 +756,12 @@ def replay_frame_path(
             rendered = clock.time("render", method.render, on_device, params, record, device=True)
             host = clock.time("to_host", _download, rendered, backend)
             quantised.take()
-            clock.time("sink_write", _write, sink, frame, host)
-            planar = quantised.take()
-            clock.add("sink_write", -planar)
-            clock.add("rgb_to_planes", planar)
+            write_began = time.perf_counter()
+            _write(sink, frame, host)
+            write_ended = time.perf_counter()
+            planar = quantised.take()  # ``_payload`` quantises first, then the pipe write
+            clock.add("rgb_to_planes", planar, write_began)
+            clock.add("sink_write", write_ended - write_began - planar, write_began + planar)
             written += 1
             clock.time("report", progress.report, written, video.nb_frames, "Exporting")
             clock.end(time.perf_counter() - began)
@@ -728,6 +786,161 @@ GPU_FIELDS = (
     "memory.used",
 )
 """The graphics-card readings summarised per phase."""
+
+
+def bus_key(bus_id: str) -> tuple[int, int, str] | None:
+    """Return a PCI bus id as (domain, bus, device.function), whatever its zero padding.
+
+    ``nvidia-smi`` writes ``00000000:01:00.0`` and CuPy ``0000:01:00.0``.
+    """
+    parts = bus_id.strip().lower().split(":")
+    if len(parts) != 3:
+        return None
+    try:
+        return int(parts[0], 16), int(parts[1], 16), parts[2]
+    except ValueError:
+        return None
+
+
+def parse_occupancy(line: str) -> dict[str, Any] | None:
+    """Parse one ``nvidia-smi`` CSV line of :data:`OCCUPANCY_QUERY` (``[N/A]`` becomes None).
+
+    Args:
+        line: The line, without its stamp.
+
+    Returns:
+        Field -> value (the bus id a string, the others floats or None), or None for a line that
+        does not have the fields.
+    """
+    values = [value.strip() for value in line.split(",")]
+    if len(values) != len(OCCUPANCY_QUERY):
+        return None
+    row: dict[str, Any] = {"pci.bus_id": values[0]}
+    for name, value in zip(OCCUPANCY_QUERY[1:], values[1:], strict=True):
+        try:
+            row[name] = float(value)
+        except ValueError:
+            row[name] = None
+    return row
+
+
+class OccupancySampler:
+    """ONE ``nvidia-smi --loop-ms`` process, its readings stamped with the instrument's clock.
+
+    Attributes:
+        samples: ``(stamp, reading)`` in arrival order; the stamp is ``time.perf_counter()`` when
+            the line arrived.
+        unavailable: Why nothing was sampled, or None.
+    """
+
+    def __init__(self, period_ms: int = OCCUPANCY_MS, bus_id: str | None = None) -> None:
+        """Set the period and the device (its PCI bus id; None keeps every device's readings)."""
+        self._period_ms = period_ms
+        self._bus = None if bus_id is None else bus_key(bus_id)
+        self._process: subprocess.Popen[str] | None = None
+        self._thread: threading.Thread | None = None
+        self.samples: list[tuple[float, dict[str, Any]]] = []
+        self.unavailable: str | None = None
+
+    def start(self) -> None:
+        """Start the sampler (a missing ``nvidia-smi`` is recorded, never raised)."""
+        command = [
+            "nvidia-smi",
+            f"--query-gpu={','.join(OCCUPANCY_QUERY)}",
+            "--format=csv,noheader,nounits",
+            f"--loop-ms={self._period_ms}",
+        ]
+        try:
+            self._process = subprocess.Popen(
+                command,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
+                text=True,
+                bufsize=1,
+            )
+        except OSError as exc:
+            self.unavailable = f"nvidia-smi did not start: {type(exc).__name__}"
+            return
+        self._thread = threading.Thread(target=self._read, name="occupancy", daemon=True)
+        self._thread.start()
+
+    def _read(self) -> None:
+        process = self._process
+        assert process is not None and process.stdout is not None
+        with contextlib.suppress(OSError, ValueError):
+            for line in process.stdout:
+                stamp = time.perf_counter()
+                row = parse_occupancy(line)
+                if row is None:
+                    continue
+                if self._bus is not None and bus_key(row["pci.bus_id"]) != self._bus:
+                    continue
+                self.samples.append((stamp, row))
+
+    def stop(self) -> None:
+        """Stop the process and the reader (idempotent)."""
+        process = self._process
+        if process is not None and process.poll() is None:
+            process.terminate()
+            try:
+                process.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.wait(timeout=10)
+        if self._thread is not None:
+            self._thread.join(timeout=10)
+        if process is not None and not self.samples and self.unavailable is None:
+            self.unavailable = "nvidia-smi gave no reading of the device"
+
+
+OCCUPANCY_MEANS = ("utilization.gpu", "utilization.decoder", "utilization.encoder", "power.draw")
+"""The occupancy fields averaged per step (the SM clock is a median)."""
+
+
+def occupancy_by_step(
+    samples: Sequence[tuple[float, Mapping[str, Any]]],
+    intervals: Sequence[tuple[float, float, str, str]],
+    spans: Mapping[str, tuple[float, float]],
+) -> dict[str, dict[str, Any]]:
+    """Attribute each occupancy reading to the step whose interval holds its stamp.
+
+    A reading inside a phase's span but in no step's interval goes to that phase's ``(loop)``
+    (the loop's own bookkeeping, or a phase without a step clock); one outside every span is
+    dropped.
+
+    Args:
+        samples: ``(stamp, reading)`` from :class:`OccupancySampler`.
+        intervals: ``(start, end, phase, step)`` of every timed step, in the same clock.
+        spans: Phase -> (start, end), in the same clock.
+
+    Returns:
+        Phase -> step -> the reading count, the means of :data:`OCCUPANCY_MEANS` and the median
+        ``clocks.sm`` (None when no reading carries a field).
+    """
+    ordered = sorted(intervals)
+    starts = [interval[0] for interval in ordered]
+    groups: dict[tuple[str, str], list[Mapping[str, Any]]] = {}
+    for stamp, row in samples:
+        index = bisect.bisect_right(starts, stamp) - 1
+        if index >= 0 and stamp < ordered[index][1]:
+            key = (ordered[index][2], ordered[index][3])
+        else:
+            phase = next((name for name, (lo, hi) in spans.items() if lo <= stamp <= hi), None)
+            if phase is None:
+                continue
+            key = (phase, "(loop)")
+        groups.setdefault(key, []).append(row)
+    result: dict[str, dict[str, Any]] = {}
+    for (phase, step), rows in groups.items():
+        figures: dict[str, Any] = {"samples": len(rows)}
+        for field in OCCUPANCY_MEANS:
+            numbers = [float(r[field]) for r in rows if r.get(field) is not None]
+            figures[field] = statistics.fmean(numbers) if numbers else None
+        clocks = [float(r["clocks.sm"]) for r in rows if r.get("clocks.sm") is not None]
+        figures["clocks.sm"] = statistics.median(clocks) if clocks else None
+        result.setdefault(phase, {})[step] = figures
+    return result
 
 
 def gpu_by_phase(
@@ -781,7 +994,8 @@ def run(
     force_cpu: bool,
     profile: bool,
     frames: bool,
-    periods: tuple[float, float] = (0.25, 1.0),
+    periods: tuple[float, float] = (0.25, TELEMETRY_GPU_S),
+    occupancy_ms: int = OCCUPANCY_MS,
     record: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Run the phases on one clip into ``run_dir`` and return the record.
@@ -794,6 +1008,7 @@ def run(
         profile: Run phase 2 (the engine under ``cProfile``) and the equality check.
         frames: Run phase 3 (the frame path; it renders with phase 2's engine).
         periods: The telemetry periods (memory, graphics card) in seconds.
+        occupancy_ms: The occupancy sampler's period in milliseconds.
         record: The record to fill (a new one when None); a phase that raises leaves what
             the phases before it recorded, and the telemetry.
 
@@ -825,18 +1040,29 @@ def run(
             "source_frames": video.nb_frames,
         }
     )
+    bus_id = None
+    if backend.device != "cpu":
+        bus_id = str(importlib.import_module("cupy").cuda.Device().pci_bus_id)
+    sampler = OccupancySampler(occupancy_ms, bus_id)
+    sampler.start()
     telemetry = Telemetry(memory_every=periods[0], gpu_every=periods[1])
     telemetry.start()
     origin = telemetry.origin if telemetry.origin is not None else time.perf_counter()
     spans: dict[str, tuple[float, float]] = {}
+    absolute: dict[str, tuple[float, float]] = {}
     phases: dict[str, Any] = {}
+    labelled: list[tuple[float, float, str, str]] = []
     planes, quantised = Accumulator(), Accumulator()
     progress = _Progress()
 
     def span(name: str, began: float) -> float:
         ended = time.perf_counter()
         spans[name] = (began - origin, ended - origin)
+        absolute[name] = (began, ended)
         return ended
+
+    def label(phase: str, clock: StepClock) -> None:
+        labelled.extend((lo, hi, phase, step) for lo, hi, step in clock.intervals)
 
     try:
         with (
@@ -847,12 +1073,15 @@ def run(
             began = time.perf_counter()
             replay_decode_pass(replica, clock, planes, progress)
             phases["decode_pass"] = phase_summary(clock, began, span("decode_pass", began))
+            label("decode_pass", clock)
             began = time.perf_counter()
             stage_clocks = replay_later_stages(replica, lambda: StepClock(synchronize), progress)
             ended = span("later_stages", began)
             phases["later_stages"] = {
                 name: phase_summary(*timed) for name, timed in stage_clocks.items()
             }
+            for name, (stage_clock, _, _) in stage_clocks.items():
+                label(f"stage:{name}", stage_clock)
             phases["later_stages_wall_s"] = ended - began
             if profile:
                 engine, _, _ = build_analysis(
@@ -869,8 +1098,18 @@ def run(
                         engine, backend, method, run_dir / "out.mp4", clock, planes, quantised
                     )
                     phases["frame_path"] = phase_summary(clock, began, span("frame_path", began))
+                    label("frame_path", clock)
     finally:
+        sampler.stop()
         record["telemetry"] = telemetry.stop()
+        record["occupancy"] = {
+            "method": f"one nvidia-smi --loop-ms={occupancy_ms} process, stamped on arrival",
+            "device_bus_id": bus_id,
+            "unavailable": sampler.unavailable,
+            "samples": len(sampler.samples),
+            "by_step": occupancy_by_step(sampler.samples, labelled, absolute),
+            "readings": [[round(stamp - origin, 3), row] for stamp, row in sampler.samples],
+        }
         record["phases"] = phases
         record["phase_spans_s"] = spans
         record["timer_calls"] = {"planes_to_rgb": planes.calls, "rgb_to_planes": quantised.calls}
@@ -911,6 +1150,10 @@ def summary_lines(record: Mapping[str, Any]) -> list[str]:
             )
         for step, seconds in table["once"].items():
             lines.append(f"ONCE {name} {step}: {seconds:.3f} s")
+        lines.append(
+            f"DEVICE {name}: device steps {', '.join(table['device_steps']) or 'none'}; "
+            f"bound {100 * table['device_share_bound']:.1f} % of the mean wall"
+        )
     equality = record.get("equality")
     if equality is not None:
         lines.append(
@@ -919,6 +1162,15 @@ def summary_lines(record: Mapping[str, Any]) -> list[str]:
         )
     if "profile" in record:
         lines.append(f"PROFILE engine wall {record['profile']['wall_s']:.2f} s (cProfile on)")
+    for phase, steps in record.get("occupancy", {}).get("by_step", {}).items():
+        for step, figures in steps.items():
+            lines.append(
+                f"OCCUPANCY {phase} {step}: {figures['samples']} readings; "
+                f"util {_fmt(figures['utilization.gpu'])} %, "
+                f"dec {_fmt(figures['utilization.decoder'])} %, "
+                f"enc {_fmt(figures['utilization.encoder'])} %, "
+                f"SM {_fmt(figures['clocks.sm'])} MHz"
+            )
     for name, gpu in record.get("gpu_by_phase", {}).items():
         lines.append(
             f"GPU {name}: {gpu['readings']} readings; median SM {gpu['clocks.sm']} MHz, "
@@ -926,6 +1178,11 @@ def summary_lines(record: Mapping[str, Any]) -> list[str]:
             f"enc {gpu['utilization.encoder']} %, {gpu['power.draw']} W"
         )
     return lines
+
+
+def _fmt(value: float | None) -> str:
+    """A figure to one decimal, or ``-`` when absent."""
+    return "-" if value is None else f"{value:.1f}"
 
 
 def _save(path: Path, record: Mapping[str, Any]) -> None:
@@ -950,7 +1207,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--keep", action="store_true", help="keep the caches and the output")
     parser.add_argument("--config", type=Path, help="local configuration file to read")
     parser.add_argument("--memory-every", type=period, default=0.25, help="seconds")
-    parser.add_argument("--gpu-every", type=period, default=1.0, help="seconds")
+    parser.add_argument("--gpu-every", type=period, default=TELEMETRY_GPU_S, help="seconds")
+    parser.add_argument(
+        "--occupancy-ms", type=int, default=OCCUPANCY_MS, help="occupancy sampling period"
+    )
     args = parser.parse_args(argv)
     try:
         config = load_local_config(args.config)
@@ -979,6 +1239,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             profile=not args.skip_profile,
             frames=not (args.skip_profile or args.skip_frames),
             periods=(args.memory_every, args.gpu_every),
+            occupancy_ms=max(100, args.occupancy_ms),
             record=record,
         )
         if record.get("equality", {}).get("equal") is False:

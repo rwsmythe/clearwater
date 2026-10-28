@@ -225,3 +225,103 @@ def test_a_missing_clip_is_a_usage_error(
     assert bd.main(["GX099999"]) == 2
     assert "not in the footage folder" in capsys.readouterr().err
     assert not folders.working_path.exists()
+
+
+# --- per-step GPU occupancy (CHARC's addition to task 1) --------------------------------------
+
+
+def test_the_clock_records_each_steps_interval() -> None:
+    clock = bd.StepClock(lambda: None)
+    clock.begin()
+    clock.add("decode_wait", 0.5, 10.0)
+    clock.add("untimed", 0.25)  # no start: a duration only
+    clock.time("host", lambda: None)
+    clock.end(1.0)
+    clock.time_once("close", lambda: None)
+    assert [step for _, _, step in clock.intervals] == ["decode_wait", "host", "close"]
+    assert clock.intervals[0][:2] == (10.0, 10.5)
+    assert all(lo <= hi for lo, hi, _ in clock.intervals)
+
+
+def test_the_device_bound_is_the_device_steps_share_of_the_wall() -> None:
+    clock = bd.StepClock(lambda: None)
+    clock.begin()
+    for name, seconds in (("block_mean", 0.6), ("analyze", 0.1), ("proxy_image", 0.1)):
+        clock.add(name, seconds)
+    clock.end(1.0)
+    summary = bd.phase_summary(clock, 0.0, 1.0)
+    assert summary["device_steps"] == ["analyze", "proxy_image"]
+    assert summary["device_share_bound"] == pytest.approx(0.2)
+
+
+def test_bus_ids_match_whatever_their_padding() -> None:
+    assert bd.bus_key("00000000:01:00.0") == bd.bus_key("0000:01:00.0") == (0, 1, "00.0")
+    assert bd.bus_key("00000000:02:00.0") != bd.bus_key("0000:01:00.0")
+    assert bd.bus_key("garbage") is None
+
+
+def test_an_occupancy_line_is_parsed_with_absent_fields_as_none() -> None:
+    row = bd.parse_occupancy("00000000:01:00.0, 37, 12, [N/A], 1980, 17.5")
+    assert row == {
+        "pci.bus_id": "00000000:01:00.0",
+        "utilization.gpu": 37.0,
+        "utilization.decoder": 12.0,
+        "utilization.encoder": None,
+        "clocks.sm": 1980.0,
+        "power.draw": 17.5,
+    }
+    assert bd.parse_occupancy("00000000:01:00.0, 37") is None
+
+
+def test_readings_go_to_the_step_whose_interval_holds_their_stamp() -> None:
+    def reading(util: float, sm: float) -> dict[str, Any]:
+        return {"utilization.gpu": util, "utilization.decoder": 0.0, "utilization.encoder": 0.0,
+                "clocks.sm": sm, "power.draw": 5.0}  # fmt: skip
+
+    intervals = [(0.0, 1.0, "p", "block_mean"), (1.0, 1.2, "p", "analyze")]
+    samples = [
+        (0.1, reading(0, 210)),
+        (0.9, reading(10, 210)),
+        (1.1, reading(90, 1980)),
+        (1.5, reading(5, 210)),  # inside the phase, in no step
+        (9.0, reading(1, 210)),  # outside every phase: dropped
+    ]
+    result = bd.occupancy_by_step(samples, intervals, {"p": (0.0, 2.0)})
+    assert set(result) == {"p"}
+    assert result["p"]["block_mean"]["samples"] == 2
+    assert result["p"]["block_mean"]["utilization.gpu"] == 5.0
+    assert result["p"]["block_mean"]["clocks.sm"] == 210.0
+    assert result["p"]["analyze"] == {
+        "samples": 1, "utilization.gpu": 90.0, "utilization.decoder": 0.0,
+        "utilization.encoder": 0.0, "power.draw": 5.0, "clocks.sm": 1980.0,
+    }  # fmt: skip
+    assert result["p"]["(loop)"]["samples"] == 1
+
+
+def test_a_missing_nvidia_smi_is_recorded_not_raised(monkeypatch: pytest.MonkeyPatch) -> None:
+    def refuse(*args: Any, **kwargs: Any) -> Any:
+        raise FileNotFoundError("nvidia-smi")
+
+    monkeypatch.setattr(bd.subprocess, "Popen", refuse)
+    sampler = bd.OccupancySampler(200)
+    sampler.start()
+    sampler.stop()
+    sampler.stop()
+    assert sampler.samples == [] and "did not start" in str(sampler.unavailable)
+
+
+def test_a_run_records_the_occupancy_by_step(sample: Any, tmp_path: Path) -> None:
+    record = bd.run(
+        sample(SAMPLE), tmp_path / "run", "c3", force_cpu=True, profile=True, frames=True,
+        periods=FAST, occupancy_ms=100,
+    )  # fmt: skip
+    occupancy = record["occupancy"]
+    assert occupancy["device_bus_id"] is None  # the CPU backend: every device's readings
+    assert "--loop-ms=100" in occupancy["method"]
+    assert occupancy["samples"] == len(occupancy["readings"])
+    known = {"decode_pass", "stage:white_balance", "stage:fusion", "frame_path",
+             "later_stages", "engine_profiled"}  # fmt: skip
+    assert set(occupancy["by_step"]) <= known
+    if occupancy["unavailable"] is None:
+        assert occupancy["samples"] > 0
+    assert record["phases"]["decode_pass"]["device_steps"] == ["proxy_image", "analyze"]
