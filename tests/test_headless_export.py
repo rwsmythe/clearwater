@@ -497,7 +497,8 @@ def _path_forms(folder: Path) -> list[str]:
     forms = set()
     for path in (folder, folder.resolve()):
         text = str(path)
-        forms.update({text, text.replace("\\", "\\\\"), path.as_posix()})
+        spellings = {text, text.replace("\\", "\\\\"), path.as_posix()}
+        forms.update(spellings | {he.ascii_text(form) for form in spellings})  # escaped (G2)
     return sorted(form.lower() for form in forms)
 
 
@@ -590,3 +591,226 @@ def test_f4_a_loaded_suffix_is_validated_before_anything_runs(
     assert _main(sample(STILL), "--out", out, "--force-cpu", "--settings-dir", folder) == 2
     assert "forbidden characters" in capsys.readouterr().err
     assert list(out.iterdir()) == []
+
+
+# --- Reviewer A round 2 (G1-G7) -----------------------------------------------------------------
+
+WINDOWS = sys.platform == "win32"
+EXTENDED = "\\\\?\\"  # the Windows extended-length prefix
+LOCAL_SHARE = Path("\\\\localhost\\C$\\")  # the administrative share, where it is reachable
+
+
+def _extended(path: Path) -> Path:
+    return Path(EXTENDED + str(path.resolve()))
+
+
+def _unc_extended(path: Path) -> Path | None:
+    """``path`` on drive C spelled through ``localhost``'s ``C$`` share, extended; None if not."""
+    resolved = path.resolve()
+    if not WINDOWS or resolved.drive.upper() != "C:" or not LOCAL_SHARE.is_dir():
+        return None
+    return Path(EXTENDED + "UNC\\localhost\\C$\\" + str(resolved)[3:])
+
+
+@pytest.mark.skipif(not WINDOWS, reason="the extended-length spellings exist only on Windows")
+def test_g1_inside_sees_every_spelling_of_the_same_folder(tmp_path: Path) -> None:
+    footage = tmp_path / "footage"
+    (footage / "sub").mkdir(parents=True)
+    assert he.inside(_extended(footage / "sub"), footage)
+    assert he.inside(footage / "sub", _extended(footage))
+    assert he.inside(_extended(footage / "sub" / "new.png"), footage)  # need not exist
+    assert not he.inside(_extended(tmp_path / "footage2"), footage)
+    assert he.plain_path(Path(EXTENDED + "UNC\\server\\share\\x")) == Path("\\\\server\\share\\x")
+    assert he.plain_path(Path(EXTENDED + "C:\\x")) == Path("C:\\x")
+    assert he.plain_path(Path("C:\\x")) == Path("C:\\x")
+    unc = _unc_extended(footage / "sub")
+    if unc is not None:  # the share and its extended spelling name the same folder
+        assert he.inside(unc, footage)
+        assert he.inside(Path(str(unc).replace(EXTENDED + "UNC", "\\")), footage)
+
+
+@pytest.mark.skipif(not WINDOWS, reason="the extended-length spellings exist only on Windows")
+@pytest.mark.parametrize("spelling", ["extended", "unc"])
+def test_g1_main_refuses_every_footage_check_through_another_spelling(
+    sample, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys, spelling: str
+) -> None:
+    footage = tmp_path / "footage"
+    footage.mkdir()
+    source = _copy(sample, STILL, footage)
+    spelled = _extended(footage) if spelling == "extended" else _unc_extended(footage)
+    if spelled is None:
+        pytest.skip("the administrative share of drive C on localhost is not reachable")
+    monkeypatch.setattr(he, "configured_footage_folder", lambda config=None: footage)
+    out = tmp_path / "out"
+    out.mkdir()
+    assert _main(spelled / source.name, "--beside-source", "--force-cpu") == 2
+    assert _main(source, "--out", spelled, "--force-cpu") == 2
+    assert _main(source, "--out", out, "--force-cpu", "--record", spelled / "r.json") == 2
+    assert _main(source, "--out", out, "--force-cpu", "--settings-dir", spelled) == 2
+    assert capsys.readouterr().err.count("inside the footage folder") == 4
+    assert sorted(p.name for p in footage.iterdir()) == [source.name] and list(out.iterdir()) == []
+    monkeypatch.setattr(he, "configured_footage_folder", lambda config=None: spelled)
+    assert _main(source, "--out", footage, "--force-cpu") == 2  # the configured side spelled
+    assert sorted(p.name for p in footage.iterdir()) == [source.name]
+
+
+@pytest.mark.skipif(not WINDOWS, reason="the extended-length spellings exist only on Windows")
+def test_g1_the_redactor_hides_the_extended_spellings(tmp_path: Path) -> None:
+    folder = tmp_path / "out"
+    folder.mkdir()
+    redact = he.Redactor([folder])
+    texts = [str(_extended(folder)) + "\\a.png", repr(str(_extended(folder)))]
+    unc = _unc_extended(folder)
+    if unc is not None:
+        share = str(unc).replace(EXTENDED + "UNC", "\\")
+        texts += [str(unc), share]
+        assert he.Redactor([Path(share)])(str(unc)) == he.Redactor([unc])(share) == "out"
+    for text in texts:
+        assert _no_full_path(redact(text), tmp_path)
+
+
+def test_g2_a_non_ascii_folder_is_hidden_in_the_record_and_the_output(
+    sample, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, no_footage: None, capsys
+) -> None:
+    from clearwater.jobs import SpaceCheck
+
+    base = tmp_path / "priv\u00e9 \u6c34"
+    out = base / "out"
+    out.mkdir(parents=True)
+    monkeypatch.setattr(
+        "clearwater.jobs.export.check_free_space",
+        lambda folder, needed: SpaceCheck(folder=folder, needed=needed, free=0, ok=False),
+    )
+    record = base / "r.json"
+    assert _main(sample(STILL), "--out", out, "--force-cpu", "--record", record) == 1
+    failure = json.loads(record.read_text(encoding="ascii"))["items"][0]["failure"]
+    assert failure.startswith(f"{STILL}.jpg: Not enough free space in out: need ")
+    captured = capsys.readouterr()
+    for text in (record.read_text(encoding="ascii"), captured.out, captured.err):
+        assert _no_full_path(text, base) and _no_full_path(text, tmp_path)
+
+
+def test_g3_an_argument_error_names_no_full_path(sample, tmp_path: Path, capsys) -> None:
+    out = tmp_path / "priv\u00e9"
+    out.mkdir()
+    assert _main(sample(STILL), "--out", out, "--bit-depth", out / "x") == 2
+    err = capsys.readouterr().err
+    assert "argument --bit-depth: invalid int value" in err and err.startswith("usage:")
+    assert _no_full_path(err, tmp_path) and _no_full_path(err, out)
+    assert _main("--out", out) == 2  # no source: argparse's own message
+    assert "the following arguments are required: PATH" in capsys.readouterr().err
+
+
+def test_g4_every_record_text_field_is_redacted(
+    sample, tmp_path: Path, out: Path, no_footage: None
+) -> None:
+    record = tmp_path / "r.json"
+    status = _main(
+        sample(STILL), "--out", out, "--force-cpu", "--encoder", out, "--record", record
+    )  # fmt: skip
+    assert status == 0
+    text = record.read_text(encoding="ascii")
+    assert json.loads(text)["settings"]["video_encoder"] == "out"
+    assert _no_full_path(text, tmp_path)
+
+
+@pytest.mark.parametrize("fails", ["open", "write"])
+def test_g6_a_record_that_cannot_be_written_exits_1_without_a_full_path(
+    sample, tmp_path: Path, out: Path, monkeypatch: pytest.MonkeyPatch, no_footage, capsys, fails
+) -> None:
+    import builtins
+
+    record = tmp_path / "r.json"
+
+    class _Full:
+        def __init__(self, handle) -> None:
+            self._handle = handle
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc) -> None:
+            self._handle.close()
+
+        def write(self, text: str) -> int:
+            self._handle.write(text[:10])  # a partial record, then the disk is full
+            raise OSError(28, "No space left on device", str(record))
+
+    def full_open(path, mode="r", *args, **kwargs):
+        if fails == "open":
+            raise OSError(28, "No space left on device", str(path))
+        return _Full(builtins.open(path, mode, *args, **kwargs))
+
+    monkeypatch.setattr(he, "open", full_open, raising=False)
+    assert _main(sample(STILL), "--out", out, "--force-cpu", "--record", record) == 1
+    captured = capsys.readouterr()
+    assert "the --record file cannot be written" in captured.err
+    assert _no_full_path(captured.out + captured.err, tmp_path)
+    assert not record.exists()  # the partial record this run created is removed
+    assert sorted(p.name for p in out.iterdir()) == [f"{STILL}_corrected.png"]  # exports kept
+
+
+def test_g6_a_record_written_by_another_process_is_never_removed(
+    sample, tmp_path: Path, out: Path, monkeypatch: pytest.MonkeyPatch, no_footage, capsys
+) -> None:
+    record = tmp_path / "r.json"
+
+    def theirs(path, mode="r", *args, **kwargs):
+        Path(path).write_text("theirs", encoding="ascii")  # appears just before the "x" open
+        raise FileExistsError(17, "File exists", str(path))
+
+    monkeypatch.setattr(he, "open", theirs, raising=False)
+    assert _main(sample(STILL), "--out", out, "--force-cpu", "--record", record) == 1
+    assert record.read_text(encoding="ascii") == "theirs"
+    assert "appeared during the run" in capsys.readouterr().err
+
+
+def test_g7_a_photo_warning_prints_no_tag_value() -> None:
+    import logging
+
+    log_filter = he._RedactingFilter(he.Redactor([]))
+
+    def shown(logger: str, msg: str, *args: object) -> str:
+        record = logging.LogRecord(logger, logging.WARNING, __file__, 1, msg, args, None)
+        assert log_filter.filter(record)
+        return record.getMessage()
+
+    exif = "clearwater.io.photo.exif"
+    text = shown(exif, "EXIF Orientation %r is not 1 to 8; taken as 1", "PRIVATE_EXIF_VALUE")
+    assert text == "EXIF Orientation ... is not 1 to 8; taken as 1"
+    text = shown(exif, "%s: the EXIF block is damaged (%s); it is not carried", "a.jpg", "PRIV")
+    assert "PRIV" not in text and "damaged" in text
+    reader = "clearwater.io.photo.reader"
+    text = shown(reader, "%s: TIFF Orientation %r is not 1 to 8; taken as 1", "a.tif", "PRIVATE")
+    assert text == "a.tif: TIFF Orientation ... is not 1 to 8; taken as 1"
+    assert shown(reader, "%s: alpha channel dropped", "a.png") == "a.png: alpha channel dropped"
+
+
+def test_g7_a_planted_exif_value_is_not_printed_by_the_runner(tmp_path: Path) -> None:
+    import struct
+
+    from PIL import Image
+
+    source = tmp_path / "planted.jpg"
+    value = b"PRIVATE_EXIF_VALUE\x00"  # Orientation (0x0112) stored as ASCII text: not 1 to 8
+    ifd = struct.pack("<HHHII", 1, 0x0112, 2, len(value), 26) + struct.pack("<I", 0)
+    block = b"Exif\x00\x00" + b"II*\x00" + struct.pack("<I", 8) + ifd + value
+    Image.new("RGB", (32, 24), (40, 90, 120)).save(source, exif=block)
+    out = tmp_path / "out"
+    out.mkdir()
+    code = (
+        "import sys\n"
+        f"sys.path.insert(0, {str(TOOLS)!r})\n"
+        "import headless_export as he\n"
+        "he.configured_footage_folder = lambda config=None: None\n"
+        "print('STATUS', he.main(sys.argv[1:]))\n"
+    )
+    done = subprocess.run(
+        [sys.executable, "-c", code, str(source), "--out", str(out), "--force-cpu"],
+        capture_output=True,
+        text=True,
+        timeout=300,
+    )
+    assert "STATUS 0" in done.stdout, done.stderr
+    assert "Orientation ... is not 1 to 8" in done.stderr  # the WARNING is printed
+    assert "PRIVATE_EXIF_VALUE" not in done.stdout + done.stderr

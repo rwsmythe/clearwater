@@ -24,8 +24,9 @@ Exit status: 0 when every item is done (with or without warnings); 1 when any it
 cancelled or was not run; 2 for a usage refusal, with nothing run (a bad flag, a missing
 ``--out`` folder, an invalid suffix (given or loaded), an unknown method, an unreadable parameter
 file, a settings file that cannot be used, an output or a source beside which outputs would go
-inside the configured footage folder, a ``--record`` file that exists or does not end in
-``.json``). A record file that appears during the run is not written: a message, status 1.
+inside the configured footage folder however either is spelled, a ``--record`` file that exists
+or does not end in ``.json``). A record file that appears during the run is not written, and one
+that cannot be written is removed if this run created it: a message, status 1.
 Ctrl-C sets the batch's cancel flag: the running job stops at its next check and leaves no
 partial output (D44), the rest are not run (D45), and the exit status is 1.
 
@@ -35,9 +36,11 @@ EXIF content or location tag. The summary lines go to stdout and the ``[i/n]`` p
 to stderr. Every folder the run knows (the output folder, each source's folder, the settings,
 record and parameter folders) is shown by its NAME in every record field and printed line, one
 :class:`Redactor` applied at each exit point: an engine text such as the D87 free-space refusal
-names its folder. This tool installs no logging handler, so ``run_batch``'s INFO report (which
-names full output paths) is not emitted; Python's last-resort handler prints WARNING lines only,
-and while :func:`main` runs a filter on that handler passes them through the same redactor.
+names its folder; an ``argparse`` refusal is redacted against the paths its arguments name. This
+tool installs no logging handler, so ``run_batch``'s INFO report (which names full output paths)
+is not emitted; Python's last-resort handler prints WARNING lines only, and while :func:`main`
+runs a filter on that handler passes them through the same redactor and prints no tag value
+(an EXIF module argument or a ``%r`` argument is shown as ``...``).
 """
 
 from __future__ import annotations
@@ -56,7 +59,7 @@ import time
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path, PurePath
-from typing import Any, Final, Literal
+from typing import Any, Final, Literal, NoReturn, cast
 
 import clearwater
 from clearwater.app import composition
@@ -88,6 +91,12 @@ PROVENANCE_KEYS: Final = ("source", "settings")
 
 STATES_DONE: Final = frozenset({"done", "done with warnings"})
 """The item states that give exit status 0."""
+
+EXTENDED_PREFIXES: Final = (("\\\\?\\UNC\\", "\\\\"), ("\\\\?\\", ""))
+"""Windows extended-length prefixes and what each stands for, longest first (:func:`plain_path`)."""
+
+TAG_VALUE_LOGGER: Final = "clearwater.io.photo.exif"
+"""The logger whose WARNING arguments may carry EXIF content; none is printed (:func:`main`)."""
 
 
 class RunnerRefusalError(Exception):
@@ -185,9 +194,13 @@ class RunRecord:
 class Redactor:
     """Replace every spelling of known folders in a text by the folder's name (case-insensitive).
 
-    The spellings are the path as given and resolved, with backslashes, with doubled backslashes
-    (an ``OSError`` text quotes the path's ``repr``) and with forward slashes. A folder without a
-    name (a drive root) is not replaced.
+    The spellings are the path as given, resolved and without a Windows extended-length prefix
+    (:func:`plain_path`), plus a UNC path's extended spelling; each with backslashes, with doubled
+    backslashes (an ``OSError`` or ``argparse`` text quotes the path's ``repr``) and with forward
+    slashes; and each of those also with its non-ASCII characters escaped as :func:`ascii_text`
+    escapes them (engine texts are escaped before they reach the runner). A spelling without a
+    separator says nothing a name does not, so it is not replaced; nor is a folder without a
+    name (a drive root).
     """
 
     def __init__(self, folders: Iterable[Path]) -> None:
@@ -198,12 +211,18 @@ class Redactor:
         """
         forms: dict[str, str] = {}
         for folder in folders:
-            for path in (Path(folder), Path(folder).resolve()):
+            resolved = Path(folder).resolve()
+            paths = [Path(folder), resolved, plain_path(resolved)]
+            if str(paths[2]).startswith("\\\\"):  # a UNC path: also its extended spelling
+                paths.append(Path("\\\\?\\UNC\\" + str(paths[2])[2:]))
+            for path in paths:
                 if not path.name:
                     continue
                 text = str(path)
-                for form in (text, text.replace("\\", "\\\\"), path.as_posix()):
-                    forms.setdefault(form, ascii_text(path.name))
+                for base in (text, text.replace("\\", "\\\\"), path.as_posix()):
+                    for form in (base, ascii_text(base)):
+                        if "\\" in form or "/" in form:
+                            forms.setdefault(form, ascii_text(path.name))
         self._patterns = [
             (re.compile(re.escape(form), re.IGNORECASE), name)
             for form, name in sorted(forms.items(), key=lambda item: -len(item[0]))
@@ -234,7 +253,11 @@ def folders_of(requests: Sequence[ExportRequest]) -> tuple[Path, ...]:
 
 
 class _RedactingFilter(logging.Filter):
-    """A filter on the last-resort handler that redacts each record's text (:func:`main`)."""
+    """A filter on the last-resort handler that redacts each record's text (:func:`main`).
+
+    No tag value is printed: every argument of a :data:`TAG_VALUE_LOGGER` record, and every
+    ``%r`` argument (the photo modules log a tag value with ``%r``), is shown as ``...``.
+    """
 
     def __init__(self, redact: Redactor) -> None:
         super().__init__()
@@ -242,9 +265,38 @@ class _RedactingFilter(logging.Filter):
 
     def filter(self, record: logging.LogRecord) -> bool:
         """Replace the record's message by its redacted text; keep the record."""
-        record.msg = self._redact(record.getMessage())
+        record.msg = self._redact(_without_tag_values(record))
         record.args = None
         return True
+
+
+def _without_tag_values(record: logging.LogRecord) -> str:
+    """Return the record's message with its tag-value arguments shown as ``...``."""
+    message, args = str(record.msg), record.args
+    if not args:  # logging formats nothing without arguments
+        return message
+    if not isinstance(args, tuple):  # a mapping (not used by the photo modules)
+        return record.getMessage() if record.name != TAG_VALUE_LOGGER else message
+    conversions = list(re.finditer(r"%[-#0 +]*\d*(?:\.\d+)?[a-zA-Z%]", message))
+    if sum(match.group() != "%%" for match in conversions) != len(args):
+        return message  # not a plain %-format: the fixed text, no argument
+    pieces: list[str] = []
+    start, given = 0, iter(args)
+    for match in conversions:
+        pieces.append(message[start : match.start()])
+        start = match.end()
+        if match.group() == "%%":
+            pieces.append("%")
+            continue
+        arg = next(given)
+        if record.name == TAG_VALUE_LOGGER or match.group().endswith("r"):
+            pieces.append("...")
+            continue
+        try:
+            pieces.append(match.group() % (arg,))
+        except (TypeError, ValueError):
+            return message  # a malformed record: the fixed text, no argument
+    return "".join(pieces) + message[start:]
 
 
 @contextlib.contextmanager
@@ -309,10 +361,13 @@ def requests_for(
 
 
 def read_parameter_file(path: Path) -> ParameterSet:
-    """Read an AD-13 preset or provenance JSON file as a parameter set.
+    """Read an AD-13 preset JSON file as a parameter set.
 
-    The document is migrated (``clearwater.config.migrate``), its keys checked
-    (``check_parameter_set_keys``), and its ``source`` and ``settings`` provenance keys dropped.
+    The document is migrated (``clearwater.config.migrate``), its ``source`` and ``settings``
+    provenance keys dropped and its keys checked (``check_parameter_set_keys``): the forms
+    ``PresetStore.import_preset`` reads, a preset and a preset with only those two keys added.
+    Any other key is refused, as the importer refuses it; so is the provenance text the photo
+    writer embeds when it adds ``profile`` for a built-in profile (an open item owned by CHARC).
 
     Args:
         path: The JSON file.
@@ -410,19 +465,64 @@ def configured_footage_folder(config: Path | None = None) -> Path | None:
         ) from exc
 
 
+def plain_path(path: Path) -> Path:
+    r"""Return ``path`` without a Windows extended-length prefix (``\\?\`` or ``\\?\UNC\``).
+
+    Only a path whose text begins with the prefix changes; a resolved path on another operating
+    system begins with ``/`` and never does.
+
+    Args:
+        path: Any path.
+
+    Returns:
+        The same path in its ordinary spelling.
+    """
+    text = str(path)
+    for prefix, replacement in EXTENDED_PREFIXES:
+        if text[: len(prefix)].upper() == prefix.upper():
+            return Path(replacement + text[len(prefix) :])
+    return Path(path)
+
+
+def _resolved(path: Path) -> Path:
+    """Return ``path`` resolved, in its ordinary spelling and resolved again (``..`` collapsed)."""
+    resolved = Path(path).resolve()
+    plain = plain_path(resolved)
+    return resolved if plain == resolved else plain.resolve()
+
+
 def inside(path: Path, folder: Path) -> bool:
-    """Return whether ``path`` is ``folder`` or lies under it (resolved, case-normalised).
+    """Return whether ``path`` is ``folder`` or lies under it, however either is spelled.
+
+    The paths are compared resolved, without an extended-length prefix (:func:`plain_path`) and
+    case-normalised; and, when ``folder`` exists, ``path`` or its nearest existing ancestors are
+    compared with it by file identity (``os.path.samestat``), which equates the remaining
+    spellings of one folder (a share of the same drive, a short 8.3 name).
 
     Args:
         path: The path to test (need not exist).
         folder: The folder.
 
     Returns:
-        True when the resolved ``path`` is inside the resolved ``folder``.
+        True when ``path`` is inside ``folder``.
     """
-    resolved = PurePath(os.path.normcase(str(Path(path).resolve())))
-    root = PurePath(os.path.normcase(str(Path(folder).resolve())))
-    return resolved == root or resolved.is_relative_to(root)
+    resolved, root = _resolved(path), _resolved(folder)
+    texts = PurePath(os.path.normcase(str(resolved))), PurePath(os.path.normcase(str(root)))
+    if texts[0] == texts[1] or texts[0].is_relative_to(texts[1]):
+        return True
+    try:
+        root_stat = os.stat(root)
+    except (OSError, ValueError):
+        return False
+    if not root_stat.st_ino:  # a file system without file identities: the text check stands
+        return False
+    for candidate in (resolved, *resolved.parents):
+        try:
+            if os.path.samestat(os.stat(candidate), root_stat):
+                return True
+        except (OSError, ValueError):
+            continue
+    return False
 
 
 def check_outputs(requests: Sequence[ExportRequest], footage_folder: Path | None) -> None:
@@ -495,6 +595,8 @@ def run(
 def record_object(record: RunRecord) -> dict[str, Any]:
     """Return the record as a JSON-native object (schema 1; file names only, never full paths).
 
+    Every text field, the settings' included, passes through the run's :class:`Redactor`.
+
     Args:
         record: The run's record.
 
@@ -512,10 +614,8 @@ def record_object(record: RunRecord) -> dict[str, Any]:
                 "kind": kind,
                 "state": item.state,
                 "outputs": [] if result is None else [ascii_text(p.name) for p in result.outputs],
-                "warnings": [] if result is None else [redact(w) for w in result.warnings],
-                "failure": None
-                if result is None or result.failure is None
-                else redact(result.failure),
+                "warnings": [] if result is None else list(result.warnings),
+                "failure": None if result is None else result.failure,
                 "device": None if result is None else ascii_text(result.device),
                 "elapsed_s": None if result is None else result.elapsed_s,
             }
@@ -523,7 +623,7 @@ def record_object(record: RunRecord) -> dict[str, Any]:
     first = record.report.items[0].request if record.report.items else None
     settings = first.settings if first is not None else None
     states = [item.state for item in record.report.items]
-    return {
+    data = {
         "schema": SCHEMA,
         "tool": "headless_export",
         "app_version": clearwater.__version__,
@@ -535,6 +635,18 @@ def record_object(record: RunRecord) -> dict[str, Any]:
         "elapsed_s": record.elapsed_s,
         "items": items,
     }
+    return cast(dict[str, Any], _redacted(data, redact))
+
+
+def _redacted(value: object, redact: Redactor) -> object:
+    """Return a JSON-native value with every string in it passed through ``redact``."""
+    if isinstance(value, str):
+        return redact(value)
+    if isinstance(value, list):
+        return [_redacted(entry, redact) for entry in value]
+    if isinstance(value, dict):
+        return {key: _redacted(entry, redact) for key, entry in value.items()}
+    return value
 
 
 def _settings_object(settings: Settings) -> dict[str, Any]:
@@ -597,9 +709,35 @@ def summary_lines(record: RunRecord) -> list[str]:
     return lines
 
 
+class _UsageError(Exception):
+    """An ``argparse`` usage refusal, raised instead of printed so the text can be redacted."""
+
+
+class _Parser(argparse.ArgumentParser):
+    """An ``ArgumentParser`` whose usage refusals raise :class:`_UsageError` (:func:`main`)."""
+
+    def error(self, message: str) -> NoReturn:
+        """Raise the refusal; :func:`main` prints it redacted after the usage line."""
+        raise _UsageError(message)
+
+
+def _folders_named_in(argv: Sequence[str]) -> list[Path]:
+    """Every path an argument could name, and its folder (a ``--flag=value`` value included)."""
+    found: list[Path] = []
+    for token in argv:
+        value = token.split("=", 1)[1] if token.startswith("--") and "=" in token else token
+        try:
+            path = Path(value)
+            path.resolve()
+        except (OSError, ValueError):
+            continue
+        found += [path, path.parent]
+    return found
+
+
 def _parser() -> argparse.ArgumentParser:
     """The command-line parser."""
-    parser = argparse.ArgumentParser(
+    parser = _Parser(
         prog="headless_export",
         description="Export photos through Clearwater's export engine without the interface.",
     )
@@ -626,7 +764,10 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--method", metavar="ID", help="the correction method (default c3)")
     params = parser.add_mutually_exclusive_group()
     params.add_argument(
-        "--parameters", type=Path, metavar="FILE", help="an AD-13 preset or provenance JSON file"
+        "--parameters",
+        type=Path,
+        metavar="FILE",
+        help="an AD-13 preset JSON file (one with only source and settings added is read too)",
     )
     params.add_argument(
         "--neutral", action="store_true", help="every parameter at its neutral value (V9)"
@@ -707,9 +848,15 @@ def main(argv: Sequence[str] | None = None, *, exports: ExportJobs | None = None
     Returns:
         The exit status: 0, 1 or 2 (see the module docstring).
     """
+    parser = _parser()
+    given = list(sys.argv[1:] if argv is None else argv)
     try:
-        args = _parser().parse_args(argv)
-    except SystemExit as exc:  # argparse refused the usage (2) or printed the help (0)
+        args = parser.parse_args(given)
+    except _UsageError as exc:  # argparse refused the usage: its text redacted, status 2
+        text = Redactor(_folders_named_in(given))(str(exc))
+        print(f"{parser.format_usage()}{parser.prog}: error: {text}", file=sys.stderr)
+        return 2
+    except SystemExit as exc:  # the help was printed (0)
         return exc.code if isinstance(exc.code, int) else 2
     own = [args.out, args.settings_dir]
     own += [None if args.record is None else args.record.parent]
@@ -756,15 +903,33 @@ def _main(
             signal.signal(signal.SIGINT, previous)
     for line in summary_lines(record):
         print(line)
-    if args.record is not None:
-        try:
-            with open(args.record, "x", encoding="ascii", newline="\n") as handle:
-                handle.write(record_json(record) + "\n")
-        except FileExistsError:  # it appeared during the run: never overwritten
-            message = "the --record file appeared during the run; it was not written."
-            print(f"headless_export: {message}", file=sys.stderr)
-            return 1
+    if args.record is not None and not _write_record(args.record, record, redact):
+        return 1
     return exit_status(record)
+
+
+def _write_record(path: Path, record: RunRecord, redact: Redactor) -> bool:
+    """Write the record file, never over another; on failure print why (redacted), return False.
+
+    A partial file is removed only when this run created it.
+    """
+    created = False
+    try:
+        with open(path, "x", encoding="ascii", newline="\n") as handle:
+            created = True
+            handle.write(record_json(record) + "\n")
+    except FileExistsError:  # it appeared during the run: never overwritten
+        message = "the --record file appeared during the run; it was not written."
+        print(f"headless_export: {message}", file=sys.stderr)
+        return False
+    except OSError as exc:
+        if created:
+            with contextlib.suppress(OSError):
+                Path(path).unlink()
+        message = f"the --record file cannot be written: {redact(str(exc))}"
+        print(f"headless_export: {message}", file=sys.stderr)
+        return False
+    return True
 
 
 if __name__ == "__main__":
