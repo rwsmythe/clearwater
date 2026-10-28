@@ -63,8 +63,13 @@
   Codex 0.188 vs Claude 1.355 at 19:02Z; the orchestrator runs W1/W2/W3 in exclusive windows (OPEN/CLOSE to me); reviewer = the
   Claude pass FAST (STRONG on any non-test change). Evidence `clearwater-review-evidence\wp-t5\cell\`. **No window open yet; W1
   (BEFORE serial leg ~45 min) comes first. Nothing heavy at this seat while any window is OPEN.**
-- **EXCLUSIVE WINDOW OPEN ~19:20Z: WP-T5 W1 BEFORE serial leg on 3aa3c51 (msg `65c91896081df817`, ~45 min, run at the
-  orchestrator's seat; collections 5,289 all / 1,114 serial). NOTHING HEAVY AT THIS SEAT until CLOSE.** WP-T5 turn 1 `a9abb8d`
+- **W1 CLOSED 20:08Z (msg `60e90b28ba1d0b94`): BEFORE serial leg on 3aa3c51 EXIT 0, 1,104 passed / 10 skipped, wall 2,798.4 s;
+  four DR-65 bodies 492.5 + 434.4 + 355.0 + 216.0 = 1,498.9 s (54 %); projection 6.5-7.5 min saving, W3 decides. 9 of the 10 skips =
+  v8 look-check frames absent (the Codex worktree's own work/ has no wp1.3/frames) -> NOT gate-equivalent. RULED (my msg ack-w1):
+  W3 / W2 same config as W1 (like-for-like); the GATE legs run at the orchestrator's seat with the gate worktree's local config
+  pointing at the MAIN tree's work/ (no 3.4 GB copy), expected 1,113 / 1; both configs stated in the record. **No window open; seat
+  free.** WP-T5 turn 2 (round-0 table) running; WP4.1 released for light runs.
+- (history) W1 OPEN ~19:20Z (msg `65c91896081df817`; collections 5,289 all / 1,114 serial). WP-T5 turn 1 `a9abb8d`
   (depth 138,874): rung 0 done, frame counts 9 / 3 / 2 confirmed, no frame-count branch between 3 and 9; Codex sandbox stalled on
   CuPy import at collection, so the orchestrator collects at its seat (recorded). WP4.1 round 0 RULED at the orchestrator's seat
   (FYI `a83c68c87441b510`, ledger b8b2485, depth 140,680): S1 N10 brief text corrected to AD-11 pre-encode (provenance `created`
