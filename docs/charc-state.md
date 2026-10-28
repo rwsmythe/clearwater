@@ -228,8 +228,12 @@
   select_backend (core/backend.py:613) and the IF-2 method, so the figure misleads nobody; showing it is WP4.3's business. Part 2
   (boundary release in `_Analysis._run` finally, once per job; planted 64 MiB test; F2 order re-pinned abort -> boundary -> release)
   ACCEPTED as built (b5a383c). Cell 7 266,488, continues for the bounded remainder.**
-- **EXCLUSIVE WINDOW OPEN 2026-10-28 ~15:40Z: WP3.21 SUITE SERIAL LEG on the final head (cell 8, ~45 min; expected 1,114 / 1 skip
-  `test_photo_check.py:139`)** (msg `03f2d48ac0937e35`). **NOTHING HEAVY AT THIS SEAT until CLOSE.** Then block 3 GX011625 LAST.
+- **EXCLUSIVE WINDOW OPEN 2026-10-28 ~16:27Z: WP3.21 TASK 10 BLOCK 3, GX011625 x1 cold c3, LAST (~1.5-2.5 h; fresh process;
+  check at 4K: (i) device-wide vs job estimate 4,065 BINDS, (ii) pool peak recorded; either failing = STOP)** (msg
+  `6eb83eba33be44c5`). **NOTHING HEAVY AT THIS SEAT until CLOSE.** Then report, return report, Reviewer B at gen 16's seat, accept.
+  Cell 8 depth 83,323; head 29e068e (ledger-only since 227ed32).
+- **TWO-LEG SUITE GREEN on code 227ed32 (16:25Z): parallel 4174 / 1; serial 1113 / 1 (`test_photo_check.py:139`), 2,685 s, 0
+  failures.** (serial OPEN was `03f2d48ac0937e35`.)
   **Retroactive GRANT (msg `6c5c116644bf5d62`): `src/clearwater/analysis/__init__.py` +6 additive re-exports (`AnalysisDeviceBackend`,
   `frame_block_mean`, `frame_pixels_for_proxy`) in 05ee507 (#3 under AD-29), not in the brief's owned files, no ledger grant ->
   GRANTED, named in the record's owned-files list; the ungranted edit itself = a ledger finding (should have been a STOP), MINOR.**
