@@ -133,6 +133,15 @@
   fixed in cleanup turn 7. **Turn 7 committed 08e87f5** (report + ledger only; m1/m3/m4/m6 fixed, gate text runnable
   with collect-only set checks and --basetemp under work/; m2 LIMIT, lock messages name the path; m5 NOT taken = my
   MINOR row at the accept; CLAUDE.md pointer median P+S 3,849 s ~64 min; depth 212,913).
+- **EXCLUSIVE WINDOW OPEN 2026-10-28 ~07:08Z: WP3.21 #2 ORACLE on GX011627 (`--device-frames`, ~10 min) + synthetic 4K (~2 min)**
+  (msg `cb4ed7af11daf48a`). **NOTHING HEAVY AT THIS SEAT until CLOSE.** A non-TIER1 = STOP (D109). Cell 3 at `wp3.21` 7696467,
+  depth 192,330 at yield 4: `82c6d38` Q-R6 as ruled (entry sized via IF-7 `lookup(key).size_bytes`; extrapolation added to the
+  D87 re-check; planted refusal before any render); `3da1e6f` #2 device frame conversions (`FFmpegVideoSource(device_frames=False)`
+  opt-in; sink refusals unchanged; **DR-63 CLOSED at the accept** on this evidence; 25 tests; WP2.3 oracle TIER1 GPU + force_cpu;
+  +0.13 GB at 4K, ~6.9 of 8 GB card at 5.3K before FFT). Orchestrator ruling `hw_decode = backend.device != "cpu"` (IF-5 carries
+  no backend) ACCEPTED. **QUERY RULED (a) (my msg ack-devframes): task 10 V16 figure of record = `--device-frames` ON; record
+  names the configuration; OFF row only if it fits the same window; default stays False (Q-R2). OWED AT WP3.21's ACCEPT (mine):
+  register row binding WP4.2 to construct the product source with `device_frames=True` for GPU jobs, with a test; DR-63 CLOSED.**
 - **ORCHESTRATOR GEN 15 = `clearwater-orchestrator-20261027-2047`** (launched 06:47:03Z from state 2e0ba30; gen 14 signed off
   at ~330K, msgs `02fcea331c6990a9` + cross-session note). **All cues go to gen 15 now**; re-read `comms/.launch-sessions.json`
   before every cue. Gen 15 dispatches cell 3 (Q-R6 first, then #2, #3, 4K micro-timing, task 6,
