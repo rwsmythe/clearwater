@@ -149,7 +149,9 @@
   frames at indices 323 / 0 / 387 = FINDING for task 10 to place; peak RSS 3,393 MiB, graphics 3,138 MiB (+0.26 GB at 4K vs the
   +0.13 estimate, inside AD-1; 5.3K row = watch)** (msg `494cd8a04f40f124`; OPEN `e09002e4eb2349ec`; product 0ed0672, records
   git_head 23f8918 ledger-only). **No window open; seat free.** Cell 4 records H11-H14, writes RESUME HERE, stands down; cell 5
-  (opus-high) next: 4K direct-vs-FFT micro-timing instrument onward. Cell 4 yield 8, depth 236,806: `05ee507`
+  (opus-high) **DISPATCHED 08:38Z** from `wp3.21` 74c97bf (cell 4 final 257,383; RESUME HERE ledger line 30; msg
+  `e718f9408dc84098`); my four readings in its prompt; FFT gated: WINDOW RELEASED states the blur share + build-or-yield, the
+  orchestrator confirms before any FFT code, a yield comes to me. No window open. Cell 4 yield 8, depth 236,806: `05ee507`
   #3 under AD-29 as amended (`block_sums` float64 host sums or None at the bound, reductions only, no frame-sized temporary;
   `AnalysisDeviceBackend` Protocol; host fallback on None / k==1 / no extension; engine +2 lines); `6e504fe` export_bench records
   the configuration header; 21 tests (Protocol pair, device == host bit for bit and proxy byte for byte at 4K k4, 5.3K k5/k8, k2 odd
