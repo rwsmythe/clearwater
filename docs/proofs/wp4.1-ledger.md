@@ -9,6 +9,7 @@ Brief `docs/briefs/wp4.1-brief.md` FINAL (rulings CHARC `2c4476d9869df056`). Rev
 | Yield | Moment | Depth |
 |---|---|---|
 | Y1 round 0 | 2026-10-28 | 140,680 |
+| Y4 round 1 adjudicated | 2026-10-28 | 299,161 (past the 250K evaluation point: last bounded step in this seat) |
 
 ## Task 1: map (main `3aa3c51`)
 
@@ -309,7 +310,7 @@ md5s). Probe 20:14:34Z: one `succeeded in` line, banner `gpt-6.1-sol` / high.
 
 | Round | Head | Critical | Major (blocking) | Minor | In / out envelope | New / reopened | Reverts | Fixes touch | Depth |
 |---|---|---|---|---|---|---|---|---|---|
-| 1 | `ef6bf2f` | 0 | 2 (F1, F3) | 6 (F2 downgraded, F4-F8) | 8 / 0 | 8 / 0 | 0 | (pending: runner product-side tool code, report, one test) | (dispatcher) |
+| 1 | `ef6bf2f` | 0 | 2 (F1, F3) | 6 (F2 downgraded, F4-F8) | 8 / 0 | 8 / 0 | 0 | runner (`tools/`, F1-F4), root docstring (F6), report (F5, F7), one test (F8) | 299,161 |
 
 ### Round 1 (20:14-20:24Z) -- VERDICT NEW_CRITICAL_MAJOR_FOUND; adjudicated, NOT yet remediated
 
@@ -332,3 +333,75 @@ md5s). Probe 20:14:34Z: one `succeeded in` line, banner `gpt-6.1-sol` / high.
 - F8 MINOR CONFIRMED (test-only): the N10 chunk filter matches a keyword prefix.
 - Mechanical: VERDICT anchored; 32 `succeeded in`; `tokens used` 171,507; two start-up ERROR lines
   from offline network connectors (not the exec channel), the rest echoed source: round COUNTS.
+
+### Round 1 remediation (orchestrator GO at Y4; adjudication APPROVED as written)
+
+Orchestrator condition on F1: one redaction helper applied at every exit point (record fields,
+stdout, stderr); plant BOTH a D87 refusal and a corrupt-settings WARNING; assert no `tmp_path`
+string in the record or the captured output.
+
+- Failing first: five new tests in `tests/test_headless_export.py` (`test_f1_*` x2, `test_f2_*`,
+  `test_f3_*`, `test_f4_*`) ran RED on `c6aabc0` (`work/wp4.1-r1fix-red.log`: 5 failed, each for
+  its finding: the D87 text with `C:\...\out`, the WARNING with the settings path,
+  `UnsupportedFormatVersionError` escaping, `FileExistsError` escaping, exit 1 for a loaded
+  `a/b` suffix), then GREEN.
+- `bf4b837` (runner): `Redactor` (every known folder, as given and resolved, backslash,
+  doubled-backslash and forward-slash spellings, case-insensitive, shown by its NAME) applied to
+  record `failure`/`warnings`, the stderr refusal and progress lines and, through a filter on
+  `logging.lastResort` for the duration of `main` (no handler installed), every WARNING printed;
+  `folders_of(requests)` + the settings, record and parameter folders; `RunRecord.folders`;
+  `run(..., known_folders=())`. F3: `load_settings` errors (`OSError`, `ValueError` incl.
+  `UnsupportedFormatVersionError`) are a usage refusal (exit 2). F2: `--record` must end in
+  `.json` (exit 2); a record file appearing during the run is not written (message, exit 1). F4:
+  the effective suffix is validated after the overlay. F5: the docstring states the loader's
+  rename (D89).
+- `d22f1aa`: F6 root docstring ("builds none of the root's components and probes no device";
+  core's module-level CPU backend named); F8 N10 filter matches the keyword plus NUL and asserts
+  exactly one chunk set aside; F5 report DR-34 line; F7 report DR-43 limit (the minimal D63 block
+  is written; the source fields are lost).
+- Light runs on `d22f1aa`: ruff check, ruff format --check (259 files), mypy (141 files) green;
+  `-n 4 -m "not gpu and not footage and not slow"` over the six WP4.1 test files plus
+  `test_gui_deps` and `test_gui_status`: 306 passed (18.7 s, `work/wp4.1-r1fix-light.log`).
+
+## RESUME HERE (cell 2, after cell 1)
+
+**State at hand-over (2026-10-28, cell 1 at depth 299,161):** head `d22f1aa` on branch `wp4.1`
+(base main `3aa3c51`; NO rebase, never merge). Worktree clean apart from this ledger commit.
+Every committed blob LF, 0 CR. `.venv` present (`uv sync` done).
+
+**Done:** round-0 table (R0-1..R0-10) and rulings S1-S8 above; tasks 3-7 built: the root
+(`src/clearwater/app/`), the GUI swap (`gui/engines.py`), the runner (`tools/headless_export.py`),
+the tests (`tests/test_app_composition.py`, `tests/test_app_deps.py`,
+`tests/test_headless_export.py`, `tests/test_wp41_photo_path.py`, `tests/test_wp41_v8.py`,
+`tests/test_wp41_gui.py`), the report draft (`docs/reports/wp4.1-photo-path.md`). The hardware
+leg (gpu + v8c) ran in its window on `755513b` (figures above); it has NOT re-run since the
+round-1 fixes (they touch no hardware-marked test; the full gate covers it). Reviewer A round 1
+adjudicated, approved and remediated.
+
+**Round table so far:** round 1 on `ef6bf2f`: 0 critical, 2 major blocking (F1, F3), 6 minor
+(F2 downgraded, F4-F8), all new and in envelope, 0 reverts; fixes in the runner (tool code),
+the root's docstring, the report and one test. Remediated in `bf4b837`, `d22f1aa`.
+
+**Next (cell 2):**
+1. Reviewer A **round 2** on the remediated head (`d22f1aa` or later): copy
+   `C:\Users\rwsmy\clearwater-review-evidence\wp4.1\r1\run_review.sh` and `review-prompt.md` to
+   `...\wp4.1\r2\`; set the HEAD sha and "round 2"; scope the diff either to the whole package
+   (`git diff -U8 3aa3c51..HEAD -- . ':(exclude)docs/proofs/**'`) or to `c6aabc0..HEAD` with the
+   round-1 findings named as remediated (prior rounds WITHHELD: name them in the prompt as
+   history, not as files); refresh `test-summary.txt`; probe first (one `succeeded in` line,
+   banner `gpt-6.1-sol` / high); run with a background start and a foreground `until [ -f
+   .../review.done ]` poll; adjudicate; yield (Y4) before remediating; five-round gate at
+   round 5.
+2. Ask for the **two-leg suite window** (CLAUDE.md commands, fresh `--basetemp` per leg under
+   `work/wp4.1-<run>-*`, 5 GiB check, Git Bash, `PYTEST_ADDOPTS` unset, `QT_QPA_PLATFORM=offscreen`).
+3. Fill the report's figures and counts (`docs/reports/wp4.1-photo-path.md`: both legs' counts
+   and skip lines, the V8 (c) table, the V9 raw figures, the Reviewer A rounds) and mark it FINAL.
+4. The **return report** (recipe section 4, under about 60-70 lines) to the orchestrator by
+   SendMessage as the final message.
+
+**Notes for cell 2:** the runner's footage check reads `clearwater.local.toml` via
+`tools/local_config.py`; tests use `no_footage` / `footage_folder=None`. V9 follows CHARC S8
+(`6c108416f38ca32a`); CHARC adds the AD-11 clarification to `docs/decisions.md` (not ours). The
+V9 planted control is `gamma` (probe above). WP-T5 runs beside us and owns
+`tests/test_jobs_export_video.py` and `tests/test_io_video_encode.py`; its serial-leg windows are
+exclusive (no runs while open).
