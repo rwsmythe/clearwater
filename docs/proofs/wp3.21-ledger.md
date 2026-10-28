@@ -48,7 +48,8 @@ Cell `implementer-opus-high` (Claude lane), worktree `.worktrees/wp3.21`, branch
 | 23 | cell 6: cleanup committed (`1df2626`); WINDOW REQUEST (parallel leg) | 215,100 |
 | 24 | cell 6: WINDOW RELEASED (parallel leg); WINDOW REQUEST (serial leg) | 227,414 |
 | 25 | cell 6: serial leg 1 FAILED; STOP; RESUME HERE (cell 7) | (dispatcher fills) |
-| 26 | cell 7: ruling (A) fix built (`57a7a2e`); WINDOW REQUEST (serial leg 2) | (dispatcher fills) |
+| 26 | cell 7: ruling (A) fix built (`57a7a2e`); WINDOW REQUEST (serial leg 2) | 97,433 |
+| 27 | cell 7: WINDOW RELEASED (serial leg 2 green); WINDOW REQUEST (task 10 block 1) | (dispatcher fills) |
 
 ## RESUME HERE (cell 6, after cell 5)
 
@@ -1828,3 +1829,25 @@ on the thread, the second asserts none at its start).
 explained because this worktree's `working_path` points at the main tree's `work/`, so the
 look-check frames exist and the nine V8 tests RAN and passed; the collection 1,111 against 1,046
 is this package's tests plus those nine.
+
+### Serial leg 2 (EXCLUSIVE window, GRANTED 12:33Z; HEAD `afad7af`)
+
+`( cd <worktree> && unset PYTEST_ADDOPTS && export QT_QPA_PLATFORM=offscreen && uv run pytest
+-q -rs -m "gpu or footage or gui or slow" --basetemp=work/wp321-suite-serial2 > ... )`, started
+12:33:42Z, done marker `EXIT=0 2026-10-28T13:18:05Z`; log `work\wp321-suite-serial2.log`.
+
+- **1,112 passed, 1 skipped, 4,148 deselected, 1 warning in 2,661.52 s (0:44:21)**; collected
+  1,113 (serial leg 1's 1,111 plus the pin's 2). No failure: the bench test now passes after
+  the V8 file in the same process.
+- Skip: `tests\test_photo_check.py:139: the footage folder has no photos yet (WP3.6P is queued)`.
+- With the parallel leg's 4,147 passed / 1 skipped (node ids unchanged), the two-leg suite is
+  GREEN at `afad7af`.
+
+### Task 10 preparation: GX011627's GOP (light, read-only, 13:20Z)
+
+`ffprobe -select_streams v:0 -show_entries packet=pts,flags` on the clip through
+`find_footage_file` (video stream only; no tag read), script in the session scratchpad, output
+`work\wp3.21\logs\c7-gop-GX011627.txt`: 681 packets, decode order equals presentation order (no
+B-frames), keyframes every 30 frames (0, 30, ..., 660). **Frame 0 is a keyframe; 323 and 387 are
+NOT** (nearest 300/330 and 360/390), and 64 is not a multiple of the GOP. So decoder seeking or
+keyframe decode does not explain 323 / 387; the placement waits on task 10's per-frame records.
