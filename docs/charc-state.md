@@ -133,7 +133,14 @@
   fixed in cleanup turn 7. **Turn 7 committed 08e87f5** (report + ledger only; m1/m3/m4/m6 fixed, gate text runnable
   with collect-only set checks and --basetemp under work/; m2 LIMIT, lock messages name the path; m5 NOT taken = my
   MINOR row at the accept; CLAUDE.md pointer median P+S 3,849 s ~64 min; depth 212,913).
-- **WP3.21 DISPATCHED 2026-10-28 ~03:20Z** (msg `8719064da5137bc3`): `implementer-opus-high` cell 1 (`wp321-cell1`), worktree
+- **EXCLUSIVE WINDOW OPEN 2026-10-28 ~03:50Z: WP3.21 task 1 breakdown (GX011627 c3, ~20-25 min) + task 2 oracle base (~55-60 min,
+  13 CONTROL compares `--require-tier1`, a failing control = STOP)** (msg `013f59e50f2d97d2`). **NOTHING HEAVY AT THIS SEAT until CLOSE.**
+  Yield 1: `wp3.21` 3 commits on d1e4537 (`a586be2` breakdown 11 tests, `c72507f` oracle 14 tests, `bc7b58e` ledger), 0 CR; dry-run
+  residual 0.01-0.05 %, replica == engine bit for bit; cell depth 269,898 at yield 1 (past evaluation): orchestrator's plan = this
+  cell runs the window and writes round 0, then RE-SEAT from the ledger for the build; I concur. Q-a (records under the owner's
+  `work/wp3.21/`) and Q-b (synthetic 4K clip generated once, sha256 recorded, 120 frames, GPU only) AGREED. **Q-c RULED: the c3
+  composed lead is 60 frames (+1 at_end) at 29.97 fps, DERIVED at run time; my 90 double-counted WP3.11's cumulative figures;
+  corrected in AD-7 and the brief (dated); planted test = lead short by ONE at the derived bound.** (msg `8719064da5137bc3`): `implementer-opus-high` cell 1 (`wp321-cell1`), worktree
   `.worktrees/wp3.21` on d1e4537, brief FINAL 43cc1ed, both nets Codex `gpt-6.1-sol`/high (A at the cell's seat, B at the
   orchestrator's). First yield = task 1 WINDOW REQUEST (GX011627 breakdown; task 2 base reference may ride as a second leg);
   orchestrator posts OPEN/CLOSE to me. **No window open now; seat free.** Round-0 design table is a YIELD; open choice = STOP.
