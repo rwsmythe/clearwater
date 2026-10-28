@@ -49,7 +49,8 @@ Cell `implementer-opus-high` (Claude lane), worktree `.worktrees/wp3.21`, branch
 | 24 | cell 6: WINDOW RELEASED (parallel leg); WINDOW REQUEST (serial leg) | 227,414 |
 | 25 | cell 6: serial leg 1 FAILED; STOP; RESUME HERE (cell 7) | (dispatcher fills) |
 | 26 | cell 7: ruling (A) fix built (`57a7a2e`); WINDOW REQUEST (serial leg 2) | 97,433 |
-| 27 | cell 7: WINDOW RELEASED (serial leg 2 green); WINDOW REQUEST (task 10 block 1) | (dispatcher fills) |
+| 27 | cell 7: WINDOW RELEASED (serial leg 2 green); WINDOW REQUEST (task 10 block 1) | 123,491 |
+| 28 | cell 7: WINDOW RELEASED (task 10 block 1); WINDOW REQUEST (block 2, 5.3K) | (dispatcher fills) |
 
 ## RESUME HERE (cell 6, after cell 5)
 
@@ -1851,3 +1852,57 @@ is this package's tests plus those nine.
 B-frames), keyframes every 30 frames (0, 30, ..., 660). **Frame 0 is a keyframe; 323 and 387 are
 NOT** (nearest 300/330 and 360/390), and 64 is not a multiple of the GOP. So decoder seeking or
 keyframe decode does not explain 323 / 387; the placement waits on task 10's per-frame records.
+
+## Task 10: the V16 re-measure (EXCLUSIVE windows; figures of record)
+
+Code at `57a7a2e` (the last code commit; the branch head carries ledger commits only). Records
+under `C:\Users\rwsmy\clearwater\work\wp3.21\bench\`, logs and summaries under the worktree's
+`work\wp3.21\logs\c7-v16-*`. Summaries by a scratchpad script (`v16_rows.py`) reading the JSON.
+Header for every row below unless stated: device frames ON (`--device-frames`), hw_decode ON
+(the job sets it for a GPU backend), backend `CupyBackend(device='cuda:0')`, result device GPU,
+encoder auto (`hevc_nvenc`, NVENC proof tied) unless libx265, Standard, 8-bit.
+
+### Block 1: GX011627 (window GRANTED 13:23Z; ran 13:23:17Z-13:52:07Z, EXIT 0; OFF row 13:52:23Z-13:59:15Z, EXIT 0)
+
+`tools/export_bench.py v16 --device-frames --subdir wp3.21/bench --clip GX011627` (record
+`export-bench-v16-gx011627-20261028T132317Z.json`, log `c7-v16-gx27.log`, summary
+`c7-v16-gx27-summary.txt`); then the OFF row `run GX011627 --runs 1 --cache cold --method c3
+--subdir wp3.21/bench` (no `--device-frames`; record `export-bench-GX011627-20261028T135223Z.json`,
+`c7-v16-gx27-off*.{log,txt}`). One process per command (the OFF row a fresh process).
+
+| row | s/frame | min/min | per-frame median / p90 / max | first | lead s / record wait s / share | peak RSS MiB | peak GPU MiB |
+|---|---|---|---|---|---|---|---|
+| c3 cold 1 | 0.3195 | 9.57 | 0.2895 / 0.3219 / 0.6018 | 0.812 | 5.36 / 10.73 / 7.39 % | 3,394 | 3,244 |
+| c3 cold 2 | 0.3264 | 9.78 | 0.2966 / 0.3316 / 0.6244 | 0.733 | 5.04 / 11.38 / 7.39 % | 3,417 | 3,142 |
+| c3 cold 3 | 0.3310 | 9.92 | 0.3016 / 0.3339 / 0.6878 | 0.807 | 5.27 / 11.50 / 7.44 % | 3,396 | 3,130 |
+| c3 warm (cache complete at start) | 0.3022 | 9.06 | 0.2963 / 0.3185 / 0.3585 | 0.694 | 1.56 / 0.10 / 0.81 % | 2,456 | 2,601 (a) |
+| ancuti2018 cold | 0.2917 | 8.74 | 0.2553 / 0.2708 / 1.2119 | 0.611 | 7.74 / 15.42 / 11.66 % | 3,396 | 3,014 |
+| c3 libx265 cold (NVENC not tied, as expected) | 0.4869 | 14.59 | 0.4257 / 0.5518 / 3.5933 | 0.775 | 5.39 / 1.56 / 2.10 % | 4,963 | 2,761 |
+| c3 cold, device frames OFF | 0.5757 | 17.25 | 0.5363 / 0.5737 / 3.0895 | 1.073 | 19.72 / 8.77 / 7.27 % | 4,017 | 2,925 |
+
+- **Every NVENC row meets D106's interim 25 min/min; cold c3 at 4K meets the ~10 min/min aim**
+  (9.57-9.92; baseline 31.8-31.9). Clocks before each run SM 210 MHz idle (the first run 1,980,
+  from the GOP probe), temperatures 52-69 C, memory.used 248-335 MiB between runs. Strays: none
+  except the libx265 row (`System` 41.5 % CPU, kept as spread) and the OFF row (`System` 29.1 %).
+- (a) **Warm row, PROVISIONAL pending CHARC's ruling on the warm-row method:** its GPU peak
+  includes the prime analysis's pooled blocks (the product's own state after an analysis; the
+  prime makes no plans); the bench was run unchanged (dispatcher, 13:23Z, option (a)).
+- ON vs OFF on cold c3 (#2 device frames + #3 device block mean, which need device frames): 0.3195-0.3310
+  against 0.5757 s/frame, about -0.25 s/frame; the OFF row's lead is 19.7 s against 5.0-5.4 s
+  (the host block mean in the analysis pass).
+
+**The recurring slow frames, placed (CHARC `b4c143d7` 2):** the GOP check (above) rules out
+keyframes for 323 / 387. In every cold device-frames row the slow frames (> 1.6 x median) recur
+EVERY 16 FRAMES (c3: 19, 35, 51, ..., 611 in all three runs, about 0.52-0.69 s against a median
+of 0.29-0.30; ancuti2018: 5, 21, 37, ..., 581) and STOP at the frame where the analysis thread
+returned (the frame whose interval ends after `analysis_end_s`: 611 in each c3 run, 581 for
+ancuti2018). The warm row (no analysis decode pass to wait on) has NONE besides frame 0. The
+record wait (the frame loop's time inside `smoothed_record`) sums to 10.7-11.5 s, about the
+excess of those 37 frames (37 x ~0.27 s). Cause: `analysis/engine.py` `STREAM_STEP = 16`, the
+streamed analysis advances its smoothed records every 16 first-stage records; with the FFT the
+frame loop now outruns the analysis (c3: analysis ends at 197-205 s of a 218-225 s job), so the
+export waits at each advance. Interim 2's 323 and 387 are on this cycle (19 + 16 k). Frame 0 is
+the first-frame cost (keyframe, plan creation, NVENC start). **No fix:** a smaller step would not
+make the analysis faster (the job is analysis-bound during the overlap; the step only sets the
+grain of the waits, at most one step of about 4.6 s at the end) and would cost O(n^2) copies
+(the constant's own docstring); the next gain is the analysis pass itself (a report finding).
