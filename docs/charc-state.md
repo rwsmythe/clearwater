@@ -168,7 +168,19 @@
   outcome. **OWED AT WP3.21's ACCEPT (mine), now THREE rows: WP4.2 `device_backend=<GPU backend>`; WP4.3 GUI preview >= 1080 short
   side releases FFT plans at a preview boundary (clip change / unload) and counts them in its memory reading; DR-63 CLOSED.** Cell 5
   finishes batching (A), the estimate fold + bound test, ONE window (4K + 5.3K memory re-read + oracle legs), then hands to **cell 6**
-  (Reviewer A, two-leg suite, task 10). **No window open; seat free.**
+  (Reviewer A, two-leg suite, task 10).
+- **EXCLUSIVE WINDOW OPEN 2026-10-28 ~09:48Z: WP3.21 TASK 6 MEMORY RE-READ (~5 min; uncommitted `work/wp3.21/fft_memory.py`;
+  GX011627 frame 0 read-only + 5.3K synthetic; default and max fractions; plans/pool cleared first; peak split plans/transient
+  beside base + bound; render FFT on/off)** (msg `afe6000f86033792`). **NOTHING HEAVY AT THIS SEAT until CLOSE.** Task 6 (A) built
+  `17743ec` (cell 5 depth 289,841 at yield 15): batches <= 512, last = final positions; **FINDING: odd cuFFT lengths are batch-
+  position dependent (1 ulp), so the route takes the smallest EVEN fast length** (accepted numeric detail of the ruled path, no tier
+  change); chunked == unchunked bit for bit at 1080p / 4K / 5.3K non-multiple shapes GPU + 1080p CPU, pinned. Bound
+  `fft_memory_bound_bytes` = 48 B x 512 x L (L = pow2 >= longer + 2(shorter+1)) = 96 / 192 / 384 MiB; measured 5.3K default
+  111-124 MiB (54 plans), max fractions 227-255 MiB (112 plans); unbatched 1.05 GiB -> batched 0.11 GiB; GPU test peak < bound.
+  **QUERY RULED (a): `select_backend` stays on AD-1's BASE estimate (bound <= 384 MiB inside the 1.25 margin; pinned 4K figures in
+  `test_core_select.py` and IF-2's example text unchanged); `CupyBackend.memory_estimate_bytes` = base + bound is the AD-1 figure
+  the re-read and task 10 check; task 10's 5.3K peak settles it.** Then oracle legs (GX011627 c3 TIER2 expected, synth 4K TIER2,
+  ancuti2018 TIER1) each in its own OPEN; cell 6 before them if cell 5 passes ~330K. **No window open; seat free.** (superseded by the OPEN above)
 - **(history) micro-timing window ~08:43Z** (msg `f02a8e3d3ecf679e`). Measures: blur share of c3 render at 4K (CUDA events, median of 20); each render
   blur direct vs R0.4 per-axis FFT and 2-D FFT (time, max abs, determinism, pool bytes); sigma ladder 8-270 at 4K and 5.3K 8:7.
   Dry run 1080p synthetic: blur 57 % of render; gate-eligible = the two Cb/Cr blurs at 0.05 x short side; FFT error <= 8.6e-7.
