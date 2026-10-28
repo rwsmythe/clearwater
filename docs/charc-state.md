@@ -109,7 +109,16 @@
   remainder = variation 112.98 + engine test 18.72; W1 overlap named). Advisories = limits (3-frame libx265 may emit no B-frames so
   the 5.3K test may not reach `ctts`; fixture failure shows as setup ERROR). Cleanup turn 6 docs-only; tests frozen after W3.
   **HOLD CAP runs out ~01:00Z (2026-10-29): WP4.1 cell 4 (round 4 running) ready by then = stacked gate, else WP-T5 gates alone.**
-  Next: WP-T5 Reviewer B (Claude pass at the orchestrator's seat on the rebased candidate), then the gate; my QA after each accept.
+- **WP-T5 REVIEWER B CLEAN 23:14Z (msg `5e2e07d8118d51d2`): candidate `wp-t5-mc` c5a5654 on main 51f0e5e, patch-id 2f1173a5 =
+  author branch; Claude pass opus-5-5/high, 25 turns, `wp-t5\reviewB\` review.txt md5 55e16d69...; 0/0/1/5 (F1 report cites
+  author SHAs -> record maps 045d622->7341c73, 259a219->7c42596, code identity empty; F2 erratum at the gate). WP-T5 WAITS for the
+  stacked gate. **WP4.1 R4 (cell 4, 109,960): 0/1/4; I1 MAJOR a file symlink inside the footage folder + `--beside-source` put a
+  PNG inside (naming planned from the unresolved parent) -> GO broadened: realpath check on EVERY planned write target with symlink
+  and junction failing-first tests; I2 MINOR upheld; I3-I5 minor (Interop IFD drop would be io.photo's = STOP). R5 = FIVE-ROUND
+  GATE with the orchestrator's DESIGN GUARD (fourth blocking round on the containment/redaction surface). MY PRE-RULING (msg
+  ack-r4): a FIFTH blocking finding there = STOP and the brief's Q9 ALTERNATIVE (`--out` always required with realpath outside
+  footage; `--beside-source` removed; D34 default proved at the library API on tmp_path only); not before. Candidate estimate
+  00:15-00:30Z inside the 01:00Z cap.** My QA after each accept.
 - **WP4.1 R3 H1 RULED (A) BANK to WP4.3 (my msg ruling-h1), four conditions:** the GUI preview shows an nclx-only Display P3 HEIC
   UNCONVERTED (`gui/render_worker.py`, `gui/preview.py` pass only `icc_profile`; WP3.16 lines c9fb2e8 / b51cc8d, reachable with
   real data since WP4.1's swap 4ee4ea7; preview (199, 40, 60) vs (217, 0, 54) via the D53 built-in; export correct; evidence
