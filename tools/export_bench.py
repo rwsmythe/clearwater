@@ -24,7 +24,12 @@ processing per minute of footage against D106's interim 25 min/min (0.834 s/fram
 the analysis share, the strays over the whole run and the conditions (strays, graphics-card
 clocks and temperature, CPU) before and after, the peak resident memory of the process tree
 (FFmpeg children included) and the peak graphics memory in use (N4, both from WP3.10's
-:class:`~video_io_bench.Telemetry`), and the NVENC proof (DR-18 (1)). Plan 4.3 / frame rule 7:
+:class:`~video_io_bench.Telemetry`), and the NVENC proof (DR-18 (1)). On the GPU backend the
+record also holds the two-instrument memory check (WP3.21 task 10, CHARC ruling
+``cadc39fc8a199a57`` item 3, :func:`memory_check`): the device-wide peak against the job's
+device-wide estimate (``core.memory.job_device_memory_estimate_bytes``), the idle before the run
+stated, and the in-process pool's reserved peak, sampled through the backend, against the
+backend's pool estimate (AD-1's base plus the FFT bound). Plan 4.3 / frame rule 7:
 an EXCLUSIVE run, best effort on a shared laptop; the machine's other load is recorded, never
 prevented, and a contaminated row is kept as spread.
 
@@ -59,6 +64,7 @@ import os
 import shutil
 import subprocess
 import sys
+import threading
 import time
 from collections.abc import Callable, Iterator, Sequence
 from dataclasses import asdict, dataclass
@@ -73,6 +79,7 @@ import video_fidelity as vf
 from clearwater.analysis import AnalysisEngine
 from clearwater.cache import DiskProxyCache, cache_key
 from clearwater.core import select_backend
+from clearwater.core.memory import job_device_memory_estimate_bytes
 from clearwater.interfaces import JobResult, ParameterSet, ProbeResult, Settings, SinkReport
 from clearwater.io.photo import PhotoReader, PhotoWriter
 from clearwater.io.video import FFmpegVideoSink, FFmpegVideoSource, find_tool
@@ -278,6 +285,98 @@ class _OverlapStamps:
             "record_wait_max_s": max(self.record_reads, default=0.0),
             "analysis_share_overlapped": (lead + stall) / total if total > 0 else None,
         }
+
+
+class _PoolPeak:
+    """The GPU backend's pool reserved bytes (``total_bytes``), sampled on a thread (task 10).
+
+    The pool is read through the job's backend (``backend.xp``: CuPy's default pool, shared by
+    every thread of the process); a backend without one (the CPU backend) records nothing. The
+    reserved figure only grows between frees, so a sampled maximum holds until a free.
+    """
+
+    def __init__(self, backend: object | None, every: float = 0.1) -> None:
+        on_gpu = getattr(backend, "device", "cpu") != "cpu"
+        getter = getattr(getattr(backend, "xp", None), "get_default_memory_pool", None)
+        self._pool: Any = getter() if on_gpu and callable(getter) else None
+        self._every = every
+        self.peak_bytes: int | None = None
+        self._stop = threading.Event()
+        self._thread = threading.Thread(target=self._loop, name="bench-pool", daemon=True)
+
+    def start(self) -> None:
+        """Start sampling (a no-op without a pool)."""
+        if self._pool is not None:
+            self._read()
+            self._thread.start()
+
+    def stop(self) -> int | None:
+        """Stop sampling and return the peak reserved bytes (None without a pool)."""
+        if self._pool is not None:
+            self._stop.set()
+            self._thread.join(timeout=10)
+            self._read()
+        return self.peak_bytes
+
+    def _read(self) -> None:
+        held = int(self._pool.total_bytes())
+        self.peak_bytes = held if self.peak_bytes is None else max(self.peak_bytes, held)
+
+    def _loop(self) -> None:
+        while not self._stop.wait(self._every):
+            self._read()
+
+
+def memory_check(
+    record: dict[str, Any], backend: object | None, info: ProbeResult | None, pool_peak: int | None
+) -> dict[str, Any]:
+    """Return the run's two-instrument memory check (WP3.21 task 10; CHARC ``cadc39fc8a199a57``).
+
+    (i) The device-wide peak (``nvidia-smi`` ``memory.used``, the telemetry's) against the job's
+    device-wide estimate: the backend's pool estimate plus the context, one NVDEC session per
+    open decoder (two for a cold job: the export's and the analysis's during the overlap; one
+    over a complete cache entry) and NVENC when the sink encoded with it; the idle before the run
+    is stated, not subtracted. (ii) The pool's reserved peak against the backend's pool estimate.
+    Both at or under: ``passes``.
+
+    Args:
+        record: The run's record so far (the leg, encoder, cache state, telemetry, conditions).
+        backend: The job's backend (the same selection call as the job's).
+        info: The clip's probe, or None.
+        pool_peak: The sampled pool reserved peak in bytes, or None.
+
+    Returns:
+        ``{"applies": False}`` off the GPU backend or without a probe; else both figures, both
+        bounds, the inputs of the estimate and the verdicts.
+    """
+    estimate = getattr(backend, "memory_estimate_bytes", None)
+    if info is None or pool_peak is None or not callable(estimate):
+        return {"applies": False}
+    height, width = info.video.height, info.video.width
+    pool_estimate = int(estimate(height, width, record["leg"]["method"]))
+    decoders = 1 if record.get("cache_complete_at_start") else 2
+    nvenc = record.get("encoder") == "hevc_nvenc"
+    job_estimate = job_device_memory_estimate_bytes(
+        height, width, pool_estimate, decoders=decoders, nvenc=nvenc
+    )
+    device_peak = record["telemetry"].get("peak_gpu_memory_used_mib")
+    idle = (record.get("before") or {}).get("gpu", {}).get("memory.used")
+    mib = 1024**2
+    device_ok = device_peak is not None and float(device_peak) <= job_estimate / mib
+    pool_ok = pool_peak <= pool_estimate
+    return {
+        "applies": True,
+        "decoders": decoders,
+        "nvenc": nvenc,
+        "device_peak_mib": device_peak,
+        "idle_before_mib": None if idle is None else float(idle),
+        "job_estimate_mib": round(job_estimate / mib, 1),
+        "device_ok": device_ok,
+        "pool_peak_mib": round(pool_peak / mib, 1),
+        "pool_estimate_mib": round(pool_estimate / mib, 1),
+        "pool_ok": pool_ok,
+        "passes": device_ok and pool_ok,
+    }
 
 
 class _BenchSink(vf._RecordingSink):
@@ -487,12 +586,11 @@ def _measure(
         force_cpu=force_cpu,
     )
     record: dict[str, Any] = {"leg": asdict(leg), "clip": path.name, "force_cpu": force_cpu}
-    device_backend = None
-    if device_frames:  # the backend the job will select for this clip (the same call)
-        probed = FFmpegVideoSource().probe(path)
-        device_backend, _ = select_backend(
-            settings, probed.video.height, probed.video.width, leg.method
-        )
+    probed = FFmpegVideoSource().probe(path)
+    # The backend the job will select for this clip (the same call): the memory check's, and
+    # with --device-frames the source's and the sink's.
+    job_backend, _ = select_backend(settings, probed.video.height, probed.video.width, leg.method)
+    device_backend = job_backend if device_frames else None
     record["device_frames"] = device_frames
     record["device_backend"] = None if device_backend is None else repr(device_backend)
     if leg.cache == "warm":
@@ -512,9 +610,11 @@ def _measure(
     stamps = _OverlapStamps(time.perf_counter)
     telemetry = Telemetry(memory_every=periods[0], gpu_every=periods[1])
     sampler = _gpu_sampler(leg)
+    pool = _PoolPeak(job_backend)
     watch = StrayWatch()
     if sampler is not None:
         sampler.start()
+    pool.start()
     telemetry.start()
     job = engine.job(request)
     started = time.perf_counter()
@@ -528,6 +628,7 @@ def _measure(
         if telemetry.origin is not None:
             record["telemetry_origin_s"] = telemetry.origin - started
         samples = sampler.stop() if sampler is not None else None
+        pool_peak = pool.stop()
     try:
         info: ProbeResult | None = FFmpegVideoSource().probe(path)
     except Exception:  # the job has already reported why the clip is unusable
@@ -589,6 +690,7 @@ def _measure(
     else:
         record["nvenc_proof"] = {"tied": False, "reason": "the encode did not finish"}
     record["after"] = conditions("after")
+    record["memory_check"] = memory_check(record, job_backend, info, pool_peak)
     return record
 
 
@@ -612,7 +714,19 @@ def row_line(record: dict[str, Any]) -> str:
         f"max {per_frame.get('max', 0):.4f}; analysis {100 * record['analysis_share']:.1f} %; "
         f"lead + stall {100 * (record.get('analysis_share_overlapped') or 0):.1f} %; "
         f"peak tree RSS {peak:.0f} MiB; peak GPU memory {gpu} MiB; "
-        f"tied {record['nvenc_proof'].get('tied')}"
+        f"tied {record['nvenc_proof'].get('tied')}{_check_text(record.get('memory_check'))}"
+    )
+
+
+def _check_text(check: dict[str, Any] | None) -> str:
+    """Return the row line's memory-check tail ('' when the check does not apply)."""
+    if not check or not check.get("applies"):
+        return ""
+    return (
+        f"; device {check['device_peak_mib']} / {check['job_estimate_mib']} MiB "
+        f"(idle {check['idle_before_mib']}) {'ok' if check['device_ok'] else 'OVER'}; "
+        f"pool {check['pool_peak_mib']} / {check['pool_estimate_mib']} MiB "
+        f"{'ok' if check['pool_ok'] else 'OVER'}"
     )
 
 
