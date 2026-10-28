@@ -228,9 +228,17 @@
   select_backend (core/backend.py:613) and the IF-2 method, so the figure misleads nobody; showing it is WP4.3's business. Part 2
   (boundary release in `_Analysis._run` finally, once per job; planted 64 MiB test; F2 order re-pinned abort -> boundary -> release)
   ACCEPTED as built (b5a383c). Cell 7 266,488, continues for the bounded remainder.**
-- **EXCLUSIVE WINDOW OPEN 2026-10-28 ~15:07Z: 4K ATTRIBUTION RUN (GX011627 ON) first -> exact refit + covered-row test + commit ->
-  BLOCK 2 RE-RUN on that commit with both instruments (~15-20 min)** (msg `fc94c9446ebfde88`). **NOTHING HEAVY AT THIS SEAT until
-  CLOSE.** (b3) built 9a4256b: `core/memory.py` `session_bytes` + `job_device_memory_estimate_bytes(h, w, pool_estimate, *,
+- **WINDOW CLOSED 15:21Z: BLOCK 2 RE-RUN PASSES BOTH INSTRUMENTS on 227ed32** (msg `37be8fe8cb46f38f`): (ii) pool reserved peak
+  4,311.7 MiB <= 6,281.4 (binding at 5.3K); (i) device-wide 7,901 <= job estimate 10,330.8 (idle 256); speed 1.2229 s/frame = 36.65
+  min/min [136.03]; RSS 7,753. 4K attribution (GX011627 ON): peak 3,054 (pool 1,353, remainder 1,586), frames-only 2,433, NVDEC
+  increment +472.0; the part-2 boundary free returned ~150 MiB. **Exact four-point fit, NO clamp: NVDEC 80 MiB + 51 B/px; NVENC
+  368 MiB + 36 B/px; context 272** (solved 75.4 + 50.14 / 364.2 + 35.17; residuals 10-25 MiB; 1080p extrapolated 181 / 439). ALL
+  covered rows pass with margins 652-2,946 MiB. Light 226, WP3.14 bench/select tests unchanged, 0 CR since afad7af. Post-convergence
+  range for Reviewer B = afad7af..227ed32 (export.py boundary free; memory.py estimate + fit; export_bench two-instrument check;
+  3 test files). **Cell 7 STOOD DOWN 344,750; cell 8 next from 61a3e08:** recollect both sets, two-leg suite on the final head (one
+  window per leg), block 3 GX011625 LAST, report, return report. **No window open; seat free.** Fit script evidence
+  work/wp3.21/fit_sessions.py md5 23391ae7.
+- (history) window OPEN ~15:07Z (msg `fc94c9446ebfde88`). (b3) built 9a4256b: `core/memory.py` `session_bytes` + `job_device_memory_estimate_bytes(h, w, pool_estimate, *,
   decoders, nvenc)` (pool estimate passed in; memory.py backend-free); `export_bench.py` record `memory_check` with (i) and (ii) +
   passes; 26 tests; light 225; WP3.14 bench/select tests unchanged. The cell's provisional fit from cell 5's render-only pool
   crossed my ruling; the orchestrator corrected the order (measured 4K first). **DEVIATION ACCEPTED: the job cannot REPORT the
