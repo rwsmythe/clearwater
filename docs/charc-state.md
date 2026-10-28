@@ -95,7 +95,18 @@
 - **W2b CLOSED 21:26Z (msg `2d744869f4fdf495`): depth control DECIDED from W2 evidence (junit names the one failure; depth 10 vs
   output 8 DIFFERENT); draft-as-standard control CAUGHT by name (levels test, 5.0 Main, 328 s); both test files byte-identical to
   HEAD, 0 CR. W3 run condition MET; W3 (~55 min, both legs, W1's config) opens at WP4.1 cell 3's next yield. No window open;
-  seat free.** (history: W2b OPEN ~21:21Z, msg `125c9dae6a66d68f`.) Codex turn 4 259a219 (depth 82,213). **WP4.1 R2 (cell 3, depth 93,956 at yield): 0 critical / 2 major / 5 minor, all in
+  seat free.** (history: W2b OPEN ~21:21Z, msg `125c9dae6a66d68f`.)
+- **EXCLUSIVE WINDOW OPEN ~21:59Z: WP-T5 W3 AFTER two legs (msg `ad582f053ab6724d`, ~55 min, W1's config 1,104 / 10, saving vs
+  2,798.4 s against the 110 s bar). NOTHING HEAVY AT THIS SEAT until CLOSE.** WP4.1 cell 3 yielded for it.
+- **WP4.1 R3 H1 RULED (A) BANK to WP4.3 (my msg ruling-h1), four conditions:** the GUI preview shows an nclx-only Display P3 HEIC
+  UNCONVERTED (`gui/render_worker.py`, `gui/preview.py` pass only `icc_profile`; WP3.16 lines c9fb2e8 / b51cc8d, reachable with
+  real data since WP4.1's swap 4ee4ea7; preview (199, 40, 60) vs (217, 0, 54) via the D53 built-in; export correct; evidence
+  `wp4.1\r3\`). (1) register row at WP4.1's accept BINDING for WP4.3 (trigger = its V8 photo leg; fix = tag the display copy of
+  a no-ICC tagged source with the D53 built-in + chromatic nclx-only P3 test); (2) WP4.3 brief revision carries it under Q12 as a
+  REQUIRED test; (3) WP4.1 report Limits + accept record name it; (4) the WP2.3 fixture gap (every P3 still carries ICC) recorded;
+  WP4.3 builds the sample under tmp_path or adds an nclx-only fixture at round 0. Rest of R3: H2-H4 MINOR UPHELD, H5-H7 MINOR;
+  cell 3 (208,313) does the bounded minors, RESUME HERE, stands down; cell 4 runs round 4, the two-leg suite, the report.
+  **Owed at WP4.1's accept (mine): the H1 row; the G5 writer/importer row (trigger WP4.3); WP3.6P OWED noted.** Codex turn 4 259a219 (depth 82,213). **WP4.1 R2 (cell 3, depth 93,956 at yield): 0 critical / 2 major / 5 minor, all in
   envelope: G1 `\\?\` path spelling defeats `inside()` so `--out` could write INTO the footage folder (a real safety catch); G2 =
   F1 REOPENED, a non-ASCII folder path escapes the Redactor via `ascii_text`; G3/G4/G6/G7 minor; G5 MAJOR->MINOR.** Orchestrator
   GOes the remediation after W2b (runner + its test + report limits; under the 250K rule). **BANKED TO ME (G5), row at WP4.1's
