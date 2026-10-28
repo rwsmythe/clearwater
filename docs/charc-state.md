@@ -133,9 +133,17 @@
   fixed in cleanup turn 7. **Turn 7 committed 08e87f5** (report + ledger only; m1/m3/m4/m6 fixed, gate text runnable
   with collect-only set checks and --basetemp under work/; m2 LIMIT, lock messages name the path; m5 NOT taken = my
   MINOR row at the accept; CLAUDE.md pointer median P+S 3,849 s ~64 min; depth 212,913).
-- **EXCLUSIVE WINDOW OPEN 2026-10-28 ~06:05Z: WP3.21 INTERIM 1 (the #1 overlap; export_bench GX011627 cold c3 ~10 min,
-  oracle GX011627 c3 ~12 min, synthetic 4K ~2 min, ancuti2018 ~8.5 min if it fits)** (msg `7c702bf6ba630948`). **NOTHING HEAVY
-  AT THIS SEAT until CLOSE.** Cell 2 built #1: `333ad3f` (engine.py + export.py + `tests/test_wp321_overlap.py`), `62f1da6`
+- **ORCHESTRATOR ROLLOVER gen 14 -> gen 15 IN PROGRESS (2026-10-28 ~06:46Z, ~325K; no cell live, no window open).** Gen 15's
+  announcement names the new session; until then cues go to `clearwater-orchestrator-20261026-2151`; re-read
+  `comms/.launch-sessions.json` before every cue. Gen 15 dispatches cell 3 (Q-R6 first, then #2, #3, 4K micro-timing, task 6,
+  task 7, reviews, suite, task 10) from ledger RESUME HERE `106b29f` (branch `wp3.21`, 13 commits on d1e4537; gen 14 corrected the count).
+- **WP3.21 INTERIM 1 CLOSED 06:43Z (msg `dad1555e109d85c7`): #1 OVERLAP MEETS D106's INTERIM AT 4K.** GX011627 cold c3
+  0.8100 s/frame = **24.28 min/min** (WP3.14 1.061-1.065 = 31.8-31.9; -24 %); median 0.7735, p90 0.8208, max 2.858; lead
+  18.8 s (3.4 % of 551.6 s); peak RSS 3,987 MiB, graphics 2,877 MiB; frames phase 0.778 vs serial frame path 0.714 (~0.06
+  contention from the analysis thread, #3 should remove most). Oracle TIER1 x3 (GX011627 c3 681 frames 0 differing; synthetic
+  4K 120 frames; ancuti2018 lead 91, 2,043 analyze calls equal). ONE run; figures of record = task 10 re-measure, made LAST.
+  Cell 2 STOOD DOWN at 310,465. **No window open; seat free.**
+- **(history) WP3.21 interim 1 window ~06:05Z** (msg `7c702bf6ba630948`). Cell 2 built #1: `333ad3f` (engine.py + export.py + `tests/test_wp321_overlap.py`), `62f1da6`
   (`export_bench --subdir`), `613024d` ledger; `analysis_job(stream=True)`, `RenderBeforeFinalError` by name, lead derived
   61 / 91 / 127, sink opens after the lead, analysis thread joined in `finally`, module `_LOG` (import-logging debt closed);
   21 new tests, 14 fail on base; existing WP3.14 / engine / export / GUI tests unchanged and green; oracle WP2.3 10/10 TIER1.
