@@ -165,7 +165,7 @@ before/after snapshots, 51 -> 68 C.
 - **Q-R7: ACCEPTED** (orchestrator): report end-to-end s/frame plus the lead, with a tool-side
   analysis-end stamp in `export_bench` and no product hook (to build at task 10's touch of
   `export_bench.py`).
-- **Q-R6:** with CHARC (orchestrator recommended ACCEPT). The current code runs the re-check
+- **Q-R6:** RULED by CHARC `6acded46` (see RESUME HERE, first item). The current code runs the re-check
   after the lead.
 
 ## RESUME HERE (cell 3, taking #2 and #3)
@@ -174,6 +174,15 @@ State at hand-over (cell 2, depth 287,974 at yield 3): branch `wp3.21` on `d1e45
 #1 (task 4) is DONE and committed (`333ad3f` overlap, `62f1da6` bench `--subdir`, then ledger
 commits); interim 1 recorded above (24.28 min/min, TIER1 on every oracle leg run). Task 7 so
 far: the engine `import logging` debt CLOSED. Nothing of #2, #3 or task 6 is started.
+
+**FIRST ITEM, before #2: Q-R6 as RULED (CHARC `6acded46`; CHARC also concurred with Q-R7).**
+ACCEPT the D87 re-check after the lead, plus one cheap addition in `jobs/export.py`: (1) measure
+the cache entry's growth over the lead; (2) extrapolate that growth per frame over the remaining
+frames; (3) add the result to the re-check's required figure. A planted small-free-space test
+must show the refusal BEFORE the first rendered frame. No change to `disk_space.py`, no spec
+change. If the cache entry cannot be sized in one call, that is a STOP to CHARC (check IF-7's
+`ProxyCache` / `CacheEntry` for a size before designing; do not walk the cache folder by hand
+without asking).
 
 Read, in order: this ledger's Round 0 (R0.1-R0.9), the re-seat rulings, "Task 4 (#1): the
 overlap, as built" (with its existing-test constraints), interim 1 and this section. Then the
