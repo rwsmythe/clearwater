@@ -17,6 +17,7 @@ Cell `implementer-opus-high` (Claude lane), worktree `.worktrees/wp3.21`, branch
 | 3 (last) | cell 2 stood down after interim 1 (re-seat to cell 3) | 310,465 |
 | 4 | cell 3: Q-R6 and #2 built; WINDOW REQUEST for #2's GX011627 oracle leg | (dispatcher fills) |
 | 4 (read) | as given at the grant | 192,330 |
+| 5 | cell 3: STOP, frame rule 5 (CuPy outside core) on #2 and the #3 draft | (dispatcher fills) |
 
 ## Re-seat: cell 2 (2026-10-28), rulings since round 0
 
@@ -275,6 +276,29 @@ integer planes (transient, 25 MB at 4K, 74 MB at 5.3K 8-bit) and A's float32 fra
 | V18 | CuPy computes `uint / float32` in float64 then rounds (double rounding) | yes | - | rejected: result dtype float32 and every 8/10-bit code bit-equal (exhaustive test) | - |
 | V19 | a non-CuPy device array (`__cuda_array_interface__`) reaches CuPy ops in the sink | yes | yes, by reading the first draft (any CUDA array accepted) | - | `_cupy_device`: CuPy arrays only, device id matched to the label |
 | V20 | DR-63's check-then-set in `close` races `abort` without a lock | yes | yes, by reading | - | `_phase_lock` around both transitions |
+
+## STOP (cell 3, yield 5): frame rule 5 forbids CuPy outside `clearwater.core`
+
+Found while building #3. **`tests/test_core_deps.py::test_static_rule_over_src` (WP3.1, plan
+8.1 frame rule 5) FAILS on the committed #2 (`3da1e6f`)**: `color/samples.py` and
+`io/video/decode.py` each "imports cupy" (`importlib.import_module("cupy")`); the #3 draft adds
+`analysis/proxy.py`. The rule: no module outside `core` imports `cupy`/`cupyx` or reads `.xp`
+(static AST scan). Also binding: `test_color_deps` (color imports only `clearwater.color` and
+`clearwater.interfaces`), `test_io_video_decode_rules` and `test_analysis_deps` (importing
+`io.video` / `analysis` loads no `clearwater.core` and no `cupy`). Round 0's table (R0.1, R0.7)
+did not list this rule; my #2 light run (554) did not include `test_core_deps`. Reproduction:
+`uv run pytest tests/test_core_deps.py::test_static_rule_over_src` on `3da1e6f`.
+The arithmetic stands (H7/H8 TIER1); the code's FORM breaks an existing test that stays
+unchanged. The #3 draft (device block sums, exact; 42 device-frame tests pass) is saved
+uncommitted and as `work\wp3.21\c3-draft-3-device-block-mean.patch`.
+
+Options sent to the dispatcher (recommended first): (R) consumer-side structural protocols: core
+implements device conversions on `CoreBackend` (granted `core/backend.py`); `io/video` and
+`analysis` declare a local `runtime_checkable` Protocol for what they call and receive the
+backend by injection (source and sink built with it, the engine's own backend), so CuPy stays in
+core and no layer loads core; an interface between modules, hence CHARC's. (N) NumPy dispatch
+(`like=`, `__array_function__`, the array's `.get()`): passes the scan's letter, not its intent.
+(D) drop #2/#3 and revert `3da1e6f`'s product part.
 
 ## RESUME HERE (cell 3, taking #2 and #3)
 
