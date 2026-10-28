@@ -133,9 +133,14 @@
   fixed in cleanup turn 7. **Turn 7 committed 08e87f5** (report + ledger only; m1/m3/m4/m6 fixed, gate text runnable
   with collect-only set checks and --basetemp under work/; m2 LIMIT, lock messages name the path; m5 NOT taken = my
   MINOR row at the accept; CLAUDE.md pointer median P+S 3,849 s ~64 min; depth 212,913).
-- **EXCLUSIVE WINDOW OPEN 2026-10-28 ~01:33Z: WP-T4 FINAL two legs at 08e87f5** (PARALLEL ~8 min then SERIAL ~56 min;
-  msg `3c3394e7d2adc0d2`). **NOTHING HEAVY AT THIS SEAT until CLOSE.** Then: candidate rebased onto main, Reviewer B
-  (Claude pass at the orchestrator's seat), accept, my QA (CLAUDE.md line, HD-1 third point, suite-cost row, m5 row). **Round 1 CLOSED 21:29Z** (msg
+- **WP-T4 FINAL LEGS GREEN; WINDOW CLOSED 2026-10-28 02:32Z** (msg `7d52d1b2d7af76a2`; OPEN was `3c3394e7d2adc0d2`,
+  01:27-02:32Z). **No window open; seat free.** Head 08e87f5: PARALLEL 4,031 / 1 skip / 451.96 s; SERIAL 1,036 / 10 /
+  3,405.58 s; counts 5,078; 0 failures; P+S 3,857.5 s (between the rounds' 3,832.7 and 3,866.1). Sampler: peak RSS
+  6.91 GB, min available 6.78 GB, GPU rise 878 MiB (same import-time finding). Code identity: main moved docs-only
+  since ba6e923 (`git diff --stat ba6e923 main -- src tests tools pyproject.toml uv.lock` empty), so these legs are
+  the suite gate for the rebased candidate (orchestrator re-confirms after the rebase). Next at the orchestrator:
+  `wp-t4-mc` rebase + patch-id + static + harness gate, Reviewer B (Claude pass at its seat), accept with the fill's
+  GATE_CHECKS edit; then my QA (CLAUDE.md line, HD-1 third point, suite-cost row, m5 row, DR-58 (c)). **Round 1 CLOSED 21:29Z** (msg
   `7bb7c019595a6e24`): BASELINE 5,067 passed / 11 env skips / 4,564.80 s; PARALLEL 4,031 / 1 / 497.30 s; SERIAL
   1,036 / 10 / 3,335.36 s; counts hold (5,078); 0 failures = 0 violators; P+S 3,832.66 s = -16.0 %. Sampler: peak RSS
   6.97 GB, min available 7.05 GB, GPU rise 903 MiB (the import-time context finding). **Reading sent for the report:
