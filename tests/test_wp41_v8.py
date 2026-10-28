@@ -16,16 +16,16 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-import headless_export as he
 import numpy as np
 import pytest
-from test_wp41_photo_path import Recording, export, only_output
 
+import headless_export as he
 from clearwater.app import composition
 from clearwater.core import backend_for
 from clearwater.interfaces import ColorDescription, Image, PhotoMetadata
 from clearwater.io.photo import PhotoReader
 from clearwater.jobs import effective_parameters
+from test_wp41_photo_path import Recording, export, only_output
 
 pytestmark = pytest.mark.gui
 
@@ -128,7 +128,7 @@ def test_v8a_job_statistics_equal_the_previews(sample, tmp_path: Path, sample_id
 class OneStepOff(Recording):
     """Planted writer double: records, then writes with one sample raised by one 16-bit step."""
 
-    def write(self, image, meta, out_path, *, bit_depth, provenance) -> None:  # noqa: D102
+    def write(self, image, meta, out_path, *, bit_depth, provenance) -> None:
         pixels = np.array(image.pixels, dtype=np.float32, copy=True)
         pixels[0, 0, 0] = min(1.0, pixels[0, 0, 0] + 1.0 / 65535.0)
         changed = Image(pixels, image.device, image.color, image.orientation_applied)
@@ -233,7 +233,11 @@ def test_v8c_k_above_1_on_real_sized_content(tmp_path: Path, record_property) ->
             )
             figures = _v8c_figures(preview, downscale(output, k))
             record_property(f"v8c-{FRAMES[index]}-k{k}", {n: v * 255 for n, v in figures.items()})
-            assert _within_v8(figures, k), (FRAMES[index], k, {n: v * 255 for n, v in figures.items()})
+            assert _within_v8(figures, k), (
+                FRAMES[index],
+                k,
+                {n: v * 255 for n, v in figures.items()},
+            )
             # Planted: the preview rendered with the other frame's statistics misses the bound.
             other = render_host(
                 c3, cpu, downscale(image.pixels, k), image.color, params, stats[1 - index]

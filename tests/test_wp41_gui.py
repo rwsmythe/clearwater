@@ -12,11 +12,11 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
-from gui_support import make_window, open_and_wait, presenter_of, wait_idle
 
 from clearwater.gui.engines import default_engines
 from clearwater.interfaces import Settings
 from clearwater.io.photo import PhotoReader
+from gui_support import make_window, open_and_wait, presenter_of, wait_idle
 
 pytestmark = pytest.mark.gui
 

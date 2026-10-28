@@ -18,15 +18,13 @@ import zlib
 from pathlib import Path
 from typing import Any
 
-import headless_export as he
 import numpy as np
 import pillow_heif
 import pytest
-from fixture_plugin import load_manifest
 from PIL import ExifTags, ImageOps
 from PIL import Image as PILImage
-from spike_io import photo as spike
 
+import headless_export as he
 from clearwater import core
 from clearwater.app import composition
 from clearwater.config import new_parameter_set
@@ -36,6 +34,8 @@ from clearwater.io.photo import png as png_tools
 from clearwater.io.photo.png import PROVENANCE_KEYWORD
 from clearwater.io.photo.writer import built_in_profile
 from clearwater.jobs.batch import BatchItem
+from fixture_plugin import load_manifest
+from spike_io import photo as spike
 
 _MANIFEST = load_manifest()
 ENTRIES = {e["id"]: e for e in _MANIFEST["samples"]}
@@ -164,7 +164,7 @@ def upright(scene: str) -> np.ndarray:
 class DropIccp(PhotoWriter):
     """Planted writer double: writes as the product does, then removes the ``iCCP`` chunk."""
 
-    def write(self, image, meta, out_path, *, bit_depth, provenance) -> None:  # noqa: D102
+    def write(self, image, meta, out_path, *, bit_depth, provenance) -> None:
         super().write(image, meta, out_path, bit_depth=bit_depth, provenance=provenance)
         data = Path(out_path).read_bytes()
         kept, at = [data[:8]], 8
@@ -183,7 +183,7 @@ class Recording(PhotoWriter):
         super().__init__()
         self.pixels: list[np.ndarray] = []
 
-    def write(self, image, meta, out_path, *, bit_depth, provenance) -> None:  # noqa: D102
+    def write(self, image, meta, out_path, *, bit_depth, provenance) -> None:
         self.pixels.append(np.array(image.pixels, dtype=np.float32, copy=True))
         super().write(image, meta, out_path, bit_depth=bit_depth, provenance=provenance)
 
@@ -332,7 +332,9 @@ def test_v9_neutral_is_the_identity(
             assert raw_max <= 2.0 and raw_mean <= 0.2, (sample_id, depth, raw_max, raw_mean)
         written, _ = PhotoReader().read(output)
         tags = ("primaries", "transfer", "matrix", "range")
-        assert [getattr(written.color, t) for t in tags] == [getattr(original.color, t) for t in tags]
+        assert [getattr(written.color, t) for t in tags] == [
+            getattr(original.color, t) for t in tags
+        ]
         built_in = built_in_profile(original.color, meta.source_format)
         expected_icc = original.color.icc_profile if built_in is None else built_in[1]
         assert written.color.icc_profile == expected_icc, sample_id
@@ -343,7 +345,10 @@ def test_v9_planted_control_off_neutral_misses_the_bound(sample, tmp_path, sampl
     source = sample(sample_id)
     neutral = he.parameters_for(neutral=True)
     method = composition.correction_methods()["c3"]
-    off = next(p for p in method.parameters if p.type == "float" and p.neutral != p.default)
+    # gamma alone off neutral (its default 1.5): a strength at its default changes nothing while
+    # the stage it scales is neutral, so it would not be a control.
+    off = next(p for p in method.parameters if p.name == "gamma")
+    assert off.neutral != off.default
     params = new_parameter_set("c3", {**neutral.parameters, off.name: off.default})
     output = only_output(export([source], tmp_path, parameters=params, png_bit_depth=16))
     q_max, q_mean, _, _ = v9_difference(source, output, 16)
