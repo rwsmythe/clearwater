@@ -67,9 +67,11 @@
   look-check crop (skipped without `work/wp1.3/frames`); sizes up to 48 MP are OWED (V15, WP5.2).
 - **V9 at 8 bit from 10- and 16-bit sources** (S8): see the ledger for the ruling.
 - **N10 with provenance on** (S1): files differ only in the provenance `created` stamp.
-- **Runner texts:** the record carries the engine's failure texts verbatim; the runner refuses a
-  missing `--out` up front, so no text the envelope reaches names a folder path. A folder removed
-  during a batch would put the engine's folder text into the record (out of envelope).
+- **Runner texts:** the record and every printed line carry the engine's texts with each folder
+  the run knows (the output folder, each source's folder, the settings, record and parameter
+  folders) shown by its name only (`tools/headless_export.py` `Redactor`, R1 F1); a path the run
+  does not know (a drive root, or a folder no request, flag or file names) would be printed as the
+  engine gives it.
 
 ## OWED (not limits of the code)
 
