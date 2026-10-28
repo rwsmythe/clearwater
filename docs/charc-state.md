@@ -186,6 +186,11 @@
   (sink.abort() BEFORE joining A on failure/cancel, releases the encoder at once; R0.2 text corrected; order pinned by a test);
   F1 / F4 rejected (DR-57 (b) hung-encoder case; V17 complete semantics); F3 banked to Limits; F6-F9 minor in the cleanup; F10-F11
   out of envelope. Cell 6 depth 140,415; round 2 after F5. Nothing to rule.
+- **EXCLUSIVE WINDOW OPEN 2026-10-28 ~11:13Z: WP3.21 TWO-LEG SUITE, PARALLEL LEG (~8 min, -n 4, offscreen, PYTEST_ADDOPTS unset,
+  basetemp work/wp321-suite-parallel in the worktree)** (msg `d113bb7affcf0675`). **NOTHING HEAVY AT THIS SEAT until CLOSE.** Serial
+  leg follows in its own window; then task 10 LAST. **Reviewer A CONVERGED r2** (NO_NEW_CRITICAL_MAJOR, evidence wp3.21/r2/; F5 fixed
+  9d73fe4 with failing-first retry test 0 -> 23,040 bytes; F2 order abort -> join A -> release pinned; cleanup 1df2626 tools+tests
+  only; light 2,655 passed). Cell 6 on 012641e.
 - **ORACLE LEG synth CLOSED 09:58Z: synthetic 4K c3 TIER2 as expected, 120 frames, max abs 2.44e-6, mean abs 2.62e-7; records/proxies
   equal by construction** (synth OPEN was `1e7d4c07c4a26046`). Cell 5 depth 310,029 at the synth OPEN.
 - **ORACLE LEG gx CLOSED 09:56Z: GX011627 c3 TIER2 as expected, 681 frames differing, max abs 7.06e-6, mean abs 7.95e-7 (AD-11
