@@ -24,6 +24,146 @@ Cell `implementer-opus-high` (Claude lane), worktree `.worktrees/wp3.21`, branch
 | 7 | cell 4: STOP, AD-29 item 1 "the block sums with their quantise" (where #3's quantise lives) | (dispatcher fills) |
 | 7 (read) | as given with the ruling (a) | 164,381 |
 | 8 | cell 4: #3 built; WINDOW REQUEST for interim 2 (#1+#2+#3, device frames ON) | (dispatcher fills) |
+| 8 (read) | as given at the interim-2 grant | 236,806 (the dispatcher: hand over after the window) |
+| 9 | cell 4 stands down after interim 2; RESUME HERE (cell 5) | (dispatcher fills) |
+
+## RESUME HERE (cell 5, after cell 4's interim 2)
+
+**State at hand-over** (cell 4 stood down after yield 9 on the dispatcher's instruction; depth at
+yield 8 was 236,806): branch `wp3.21` on base `d1e4537`, NO rebase, worktree CLEAN at the ledger
+head. Product commits, in order: #1 overlap `333ad3f` (interim 1); Q-R6 `82c6d38`; #2 `3da1e6f`
+then its AD-29 rework `0cc11cd`; #3 `05ee507`; `export_bench --device-frames` `6e504fe`. Debt
+CLOSED at the touch: the engine `import logging` (WP3.11 style) and DR-63 (`encode.py`
+close/abort under `_phase_lock`). `color/samples.py` and `src/clearwater/interfaces/` equal
+`d1e4537`.
+
+**Oracle and interim record so far (every leg TIER1, max abs 0):** WP2.3 x10 for #1, #2 (AD-29)
+and #3 (`--device-frames`, GPU and `--force-cpu` legs); GX011627 + synthetic 4K for #2 under
+AD-29 (H9, H10); interim 2 (H11-H14): 15.37 min/min, frames phase 0.501 s/frame, three oracle
+legs TIER1. The WP2.3 samples are 320x180 (k = 1): they pin routing, never `block_sums`; only
+the 4K legs pin it.
+
+**AD-29 as ruled and amended (binding; decisions.md on main, `589f90e`, `ce55a95`, `e8c56eb`):**
+
+1. Device methods live on `CupyBackend` (the GPU `CoreBackend` in `core/backend.py`), NOT on
+   the shared base, so the CPU backend has none (CHARC confirmed, `ce55a95`): `planes_to_rgb`,
+   `rgb_to_planes`, `block_sums`, under the comment "IF-2 device extensions: NOT part of the
+   frozen ABC; provided by the GPU backend; absent on the CPU backend". IF-2 and `interfaces/`
+   never change.
+2. One `runtime_checkable` Protocol per consumer package, same names and signatures as
+   `CupyBackend`'s: `clearwater.io.video.decode.DeviceFrameBackend` (encode imports it) and
+   `clearwater.analysis.proxy.AnalysisDeviceBackend`. Every satisfaction test asserts BOTH that
+   `CupyBackend` satisfies it AND that `NumpyBackend` does not (present for both). No consumer
+   imports `core` or `cupy`, and none reads `.xp`.
+3. Host path default and fallback by structure: `FFmpegVideoSource(device_backend=None)`,
+   `FFmpegVideoSink(device_backend=None)`; None or the CPU backend runs the base's path (the
+   sink refuses a device label with the base's `to_host` text; `test_io_video_encode.py`
+   962/1101/1211/1259 UNCHANGED). Device frames only for `hw_decode=True` (the coupling is
+   ACCEPTED; the report's Limits say a CPU backend with a hardware decoder is not a supported
+   combination). The tools (`export_oracle.py --device-frames`, `export_bench.py
+   --device-frames`) pass `select_backend`'s result.
+4. Ruling (a), UPHELD by CHARC (`e8c56eb`): `CupyBackend.block_sums(a, k)` returns float64 host
+   sums or None at the exactness bound (the bound in core); `analysis/proxy.py` keeps `_divide`
+   and `quantise` (single source of the AD-5 rule); None takes the host reduction with identical
+   bytes: a structural choice between two exact paths, NOT a D109 fallback. #3 is tier 1 or STOP.
+5. `test_core_deps`, `test_color_deps`, `test_io_video_decode_rules`, `test_analysis_deps` join
+   EVERY light run (in practice every `tests/*_deps.py` and `tests/*_rules.py`).
+6. CHARC's WP4.2 register row at the accept binds the product's GPU job to
+   `device_backend=<the GPU backend>`, with a test.
+
+**Remaining order (CHARC-confirmed; each heavy run in its own granted window):**
+
+1. **The 4K direct-vs-FFT blur micro-timing (Q-R5; NOT started).** Instrument plan:
+   - Purpose: set Q-R1's provisional sigma threshold (32 px, may move only UPWARD) before task 6
+     is built; the 3C render blurs at `c3_kernel_fraction x short side` (default 0.05: 108 px at
+     4K, 54 px at 1080p; R0.4).
+   - Home: `tools/` new files outside the owned list need a grant, so the recommended home is an
+     UNCOMMITTED driver `work\wp3.21\blur_microtiming.py` (development evidence; if a committed
+     tool is wanted, that is a question to the dispatcher first).
+   - Body: the direct path is `CupyBackend.gaussian_blur`; the FFT path is R0.4's route
+     prototyped in the driver (per axis, the SAME scipy kernel `_gaussian_kernel1d(sigma, 0,
+     radius)` with `radius = int(4 * sigma + 0.5)`, reflect padding including repeated
+     reflection, axis 0 then axis 1, `cupyx.scipy.fft`, float32).
+   - Inputs: a real 4K frame of GX011627 (decoded through `FFmpegVideoSource`, path from
+     `tools/local_config.find_footage_file`) and a 5.3K 8:7 synthetic frame. Shapes `(H, W, 3)`
+     and `(H, W)`. Sigma ladder 8, 16, 24, 32, 48, 54, 64, 108, 128, 270.
+   - Method: warm-up 3, then the median of 20 timed by `cupy.cuda.Event` pairs, synchronised. Also
+     record each pair's max abs difference, to read against the 1e-5 bound early, and the peak
+     GPU memory per sigma (the FFT's padded buffers are the 5.3K watch item).
+   - Output: JSON under `work\wp3.21\microtiming\`. WINDOW REQUEST with the command, about 10 min.
+2. **Task 6, the FFT Gaussian, under Q-R1 as RULED (CHARC `5b05c53d`):**
+   - The gate lives INSIDE `gaussian_blur` in `core/backend.py`, identical for both backends:
+     the FFT only when `min(H, W) >= 1080` AND `sigma >= threshold` (32, or higher from the
+     micro-timing, never lower).
+   - Tests: (a) a tripwire deriving the largest proxy short side from `analysis/proxy.py`'s own
+     rule (`ceil(S / (S // 540))` <= 1079) and asserting it is below 1080; (b) a planted
+     analysis-sized blur bit-identical to the direct path; (c) FFT vs direct within 1e-5 at 1080p
+     and 4K; plus R0.4's step edges at every border and the 5.3K check. Deterministic on repeat.
+     The memory peak is re-read (the 5.3K watch item; an AD-1 breach is a STOP to CHARC).
+   - Then the oracle legs within tier 2 in a window: WP2.3 light, and GX011627 + synthetic 4K.
+   - Plan the next handover in the ledger BEFORE the task 6 build if the depth reading passes
+     about 250K.
+3. **Task 7 and Q-R7:** the tool-side analysis-end stamp in `export_bench.py` (Q-R7: the
+   overlap makes `on_stage("analysis")` -> `"open"` the LEAD; task 10 reports the analysis share
+   as the lead plus the export's stall time). No product hook unless ruled. The `device_frames`
+   header and the run's `device_backend` are already in (`6e504fe`). DR-40 (b) is recorded as
+   measured-negligible per Q8.
+4. **Reviewer A:**
+   - Codex `gpt-6.1-sol` / high, at the cell's seat over WSL, probe first. Copy the runner and
+     prompt shape from `C:\Users\rwsmy\clearwater-review-evidence\wp3.14\r2\`.
+   - Evidence in `...\wp3.21\rN\` with md5s. The banner must read `gpt-6.1-sol`; a round under
+     another pin is void.
+   - The prompt withholds `docs/proofs/**` (`--glob '!docs/proofs/**'`) and
+     `clearwater-review-evidence`, and forbids the footage folder. WHAT TO EXAMINE is the brief's
+     list.
+   - END THE TURN as soon as a round's verdict is adjudicated, before remediating. Keep the
+     cumulative round ledger. STOP at round 5 for approval.
+5. **The two-leg suite (GATE_CHECKS):** one window per leg, from Git Bash with
+   `PYTEST_ADDOPTS` unset and `QT_QPA_PLATFORM=offscreen`, waited in the FOREGROUND:
+   - `uv run pytest -q -rs -n 4 -m "not gpu and not footage and not gui and not slow" --basetemp=work/<run>-parallel`
+   - `uv run pytest -q -rs -m "gpu or footage or gui or slow" --basetemp=work/<run>-serial`
+   - Output to files under `work/`; a reaped run is not a result.
+6. **Task 10, the V16 re-measure, LAST** (CHARC `eab16ca8`):
+   - `export_bench.py v16 --device-frames --subdir wp3.21/bench` on the final commit. GX011627
+     rows first, GX011625 LAST, each block its own window.
+   - The record header names the configuration: device frames ON, hw_decode ON, the backend,
+     the cache state.
+   - An OFF row on GX011627 c3 only if it fits the same window; never extend a window for it.
+   - The report says in one sentence that no product code constructs the real source yet (the
+     GUI's path is the stubs' until WP4.2). The `device_backend=None` default stays.
+   - The table puts every row beside its baseline row.
+7. **Report** `docs/reports/wp3.21-optimisation.md`, then the return report (under about 70
+   lines, by SendMessage to the dispatcher).
+
+**Standing rules (all binding):**
+
+- Worktree `C:\Users\rwsmy\clearwater\.worktrees\wp3.21` only, by absolute paths or `git -C`.
+  Never `cd` into the main tree, never edit it. Never `git stash`, `git clean -x`, merge or rebase.
+- Commit by pathspec: `git -c core.autocrlf=false commit -m "...(wp3.21)..." -- <paths>`,
+  conventional, with the `Co-Authored-By:` footer.
+- Line endings: normalise each edited file with `sed -i 's/\r$//'` BEFORE scripted edits (the
+  checkout is CRLF; the Edit tool writes CRLF), and prove 0 CR per committed blob.
+- A sed over a glob can mark untouched CRLF files as modified (V30): restore them with
+  `git checkout --`.
+- Multi-line Python edits: write them to a scratchpad file and run that (bash heredocs holding
+  some ledger text fail to parse).
+- Footage `C:\Users\rwsmy\clearwater-footage\` is READ-ONLY, reached only through
+  `tools/local_config.find_footage_file`; nothing footage-derived is committed. Never decode
+  `gpmd`; never read or log a location tag.
+- Nothing under `src/clearwater/interfaces/` changes. Edit only the brief's files plus the Q-R2
+  grants (`io/video/decode.py`, `io/video/encode.py`); `color/samples.py` stays at base.
+- No new dependency. No OS-specific code.
+- Every heavy run is EXCLUSIVE and needs the dispatcher's grant: a WINDOW REQUEST with exact
+  commands, durations and evidence paths; at least 5 GB free; one job at a time; then
+  `WINDOW RELEASED: <summary>` with EXIT / COMPARE-EXIT and times. Oracle references are at
+  `work\wp3.21\oracle\ref-*-a` (and `-b`). Wait in the FOREGROUND, one stage per Bash call.
+- A non-TIER1 result in a window is a STOP (D109). Outside the tolerance, a needed change to an
+  unowned file, a dependency, or an AD-1 breach is a STOP. A choice the brief or the rulings leave
+  open is a STOP, with the recommended answer first.
+- The light set always includes every `*_deps.py` / `*_rules.py`. Logs go to files; grep the
+  summaries.
+- Depth: the dispatcher reads `scripts/cell_depth.py` at each yield; record it. About 250K is
+  the evaluation point; about 400K is a STOP at the step boundary with RESUME HERE.
 
 ## Re-seat: cell 2 (2026-10-28), rulings since round 0
 
@@ -320,7 +460,7 @@ core and no layer loads core; an interface between modules, hence CHARC's. (N) N
   build if the reading passes ~250K.
 - The yield-5 STOP (frame rule 5) is NOT addressed by this ruling and still holds.
 
-## RESUME HERE (cell 4, taking the frame-rule-5 ruling, then #2/#3 again)
+## Hand-over to cell 4 (SUPERSEDED by RESUME HERE (cell 5) above)
 
 State at hand-over (cell 3 stood down at yield 5, depth 251,077): branch `wp3.21` on `d1e4537`,
 no rebase; worktree CLEAN at the ledger head. Done and committed: #1 overlap (`333ad3f`,
@@ -634,6 +774,36 @@ not `block_sums`; the k > 1 path is pinned end to end only by the interim-2 orac
 | V29 | a lone edge row/column when k divides neither side, or `full_rows == 0` (H < k) | yes | - | rejected for the edges (odd 1081x1923 test); H < k cannot reach k > 1 (k <= min(H, W) // 540), guarded by `if full_rows:` anyway | - |
 | V30 | the CRLF normalisation rewrote `smoothing.py` / `store.py` (CRLF checkout) | yes | yes (status showed them modified, no content diff) | - | `git checkout --` both; never committed |
 
+## Interim 2 (#1+#2+#3, device frames ON; development evidence, not of record; EXCLUSIVE window 2026-10-28)
+
+Driver `work\wp3.21\interim2.sh` (interim 1's with `--device-frames`; 5 GiB check per step), logs
+`work\wp3.21\logs\interim2-{1..4}.log`. Bench record
+`work\wp3.21\bench\export-bench-GX011627-20261028T081448Z.json` (header and run
+`device_frames: true`, `device_backend: CupyBackend(device='cuda:0')`).
+
+| Figure (GX011627, cold c3, GPU, hw_decode, NVENC) | Interim 1 (#1) | Interim 2 (#1+#2+#3) |
+|---|---|---|
+| s/frame (whole job) | 0.810 (24.28 min/min at 30000/1001) | 0.5130 |
+| min/min | 24.28 | **15.37** (meets D106 25) |
+| lead (the `analysis` phase) | - | 5.28 s |
+| frames phase s/frame | 0.778 (serial path 0.714) | **0.5014** (341.44 s / 681) |
+| per frame median / p90 / max | 0.7735 / - / 2.858 | 0.4830 / 0.5341 / 0.9649 |
+| peak tree RSS | 3,987 MiB | 3,393 MiB |
+| peak GPU memory | 2,877 MiB | 3,138.0 MiB |
+
+- Oracle: GX011627 c3, synthetic 4K c3, GX011627 ancuti2018 all **TIER1, max abs 0**, every
+  sink frame on `cuda:0` (H12-H14). These pin #3's `block_sums` at k = 4 end to end (the WP2.3
+  samples, k = 1, could not).
+- What #2+#3 recovered: the frames phase 0.778 -> 0.501 s/frame, below the serial 0.714; #2 and
+  #3 were not separated (one run).
+- The top frames recur (index 323 0.965 s, index 0 0.955 s, index 387 0.947 s), not a one-off at
+  the lead: task 10's report places them (CHARC `4dc2978b` point 3).
+- Memory: GPU +261 MiB over interim 1 (device frames: integer planes and A's float32 frame on the
+  card); host -594 MiB. Both inside AD-1. The 5.3K estimate (about 6.9 of 8 GB before the FFT)
+  remains the watch item.
+- INTERIM figures, one run, cold cache: never quoted as V16's result outside this ledger; the
+  figures of record are task 10's.
+
 ## Re-grounding (2026-10-27/28, against `d1e4537`)
 
 Anchors checked against the code before use:
@@ -716,6 +886,10 @@ Anchors checked against the code before use:
 | H8 | same window | 07:15:38Z | 07:17:11Z | `oracle-devframes-gx.sh 2`: record `cand-devframes-synth4k-c3` (`--device-frames`) + compare | GPU (auto), sha256-guarded clip | 12.19 GiB | not sampled | 0 (COMPARE-EXIT 0) |
 | H9 | #2 under AD-29 (granted at yield 6), cell 4 | 07:46:59Z | 07:54:31Z | `oracle-ad29-gx.sh 1`: record `cand-ad29-GX011627-c3` (`--device-frames`) + compare vs `ref-GX011627-c3-a` | GPU (auto), device frames, head `867d5fb`; strays: 4 idle python (comms, 47-106 MB) | 11.43 GiB | not sampled | 0 (COMPARE-EXIT 0): TIER1, 681 frames, max abs 0; `sink_devices ['cuda:0']`; job wall 445.6 s |
 | H10 | same window | 07:54:48Z | 07:56:21Z | `oracle-ad29-gx.sh 2`: record `cand-ad29-synth4k-c3` + compare vs `ref-synth4k-c3-a` | GPU (auto), sha256-guarded clip | 11.63 GiB | not sampled | 0 (COMPARE-EXIT 0): TIER1, 120 frames, max abs 0; `['cuda:0']`; 88.3 s |
+| H11 | interim 2 (granted at yield 8; OPEN 08:14Z), cell 4 | 08:14:47Z | 08:20:59Z | `interim2.sh 1`: `export_bench.py run GX011627 --cache cold --method c3 --subdir wp3.21/bench --device-frames` | GPU `CupyBackend(device='cuda:0')`, device frames ON, hw_decode, auto -> hevc_nvenc, Standard, cold cache; telemetry 0.25 s / 1 s; strays: only this job (own python); product `0ed0672`, records stamp `23f8918` (ledger-only on top) | 11.45 GiB | tree RSS 3,393 MiB; GPU memory 3,138.0 MiB | 0 |
+| H12 | same window | 08:21:15Z | 08:28:21Z | `interim2.sh 2`: oracle `cand-i2-GX011627-c3` (`--device-frames`) + compare vs `ref-GX011627-c3-a` | GPU (auto) | 11.68 GiB | not sampled | 0 (COMPARE-EXIT 0): TIER1, 681 frames, max abs 0; `['cuda:0']` |
+| H13 | same window | 08:28:34Z | 08:30:01Z | `interim2.sh 3`: oracle `cand-i2-synth4k-c3` + compare vs `ref-synth4k-c3-a` | GPU (auto), sha256-guarded clip | 11.58 GiB | not sampled | 0 (COMPARE-EXIT 0): TIER1, 120 frames, max abs 0; `['cuda:0']` |
+| H14 | same window | 08:30:05Z | 08:34:06Z | `interim2.sh 4`: oracle `cand-i2-GX011627-ancuti2018` + compare vs `ref-GX011627-ancuti2018-a` | GPU (auto) | 11.67 GiB | not sampled | 0 (COMPARE-EXIT 0): TIER1, 681 frames, max abs 0; `['cuda:0']` |
 
 Light runs (no window): `vid-hevc8-bt709-full` dry runs of both tools on the GPU (breakdown:
 residuals 0.01-0.05 %, replica equals engine on 180 records and 45 proxies; oracle base control
