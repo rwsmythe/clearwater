@@ -130,7 +130,12 @@
   `wp-t4\r1\`): NO_NEW_CRITICAL_MAJOR, 6 minor 5 advisory; loop ENDS** (one round + one cleanup, my cap). Rulings
   (msg 22ab3c5a): Opus-high in place of the FAST tier ACCEPTED (ledger line, not a precedent); m2 stale lock up to 15 min
   = stated limit, message names the lock path; m5 worker-side refusal test if cheap else MINOR row; m1/m3/m4/m6
-  fixed in cleanup turn 7. Next: settled head, final two legs (OPEN/CLOSE), B at its seat, accept, my QA. **Round 1 CLOSED 21:29Z** (msg
+  fixed in cleanup turn 7. **Turn 7 committed 08e87f5** (report + ledger only; m1/m3/m4/m6 fixed, gate text runnable
+  with collect-only set checks and --basetemp under work/; m2 LIMIT, lock messages name the path; m5 NOT taken = my
+  MINOR row at the accept; CLAUDE.md pointer median P+S 3,849 s ~64 min; depth 212,913).
+- **EXCLUSIVE WINDOW OPEN 2026-10-28 ~01:33Z: WP-T4 FINAL two legs at 08e87f5** (PARALLEL ~8 min then SERIAL ~56 min;
+  msg `3c3394e7d2adc0d2`). **NOTHING HEAVY AT THIS SEAT until CLOSE.** Then: candidate rebased onto main, Reviewer B
+  (Claude pass at the orchestrator's seat), accept, my QA (CLAUDE.md line, HD-1 third point, suite-cost row, m5 row). **Round 1 CLOSED 21:29Z** (msg
   `7bb7c019595a6e24`): BASELINE 5,067 passed / 11 env skips / 4,564.80 s; PARALLEL 4,031 / 1 / 497.30 s; SERIAL
   1,036 / 10 / 3,335.36 s; counts hold (5,078); 0 failures = 0 violators; P+S 3,832.66 s = -16.0 %. Sampler: peak RSS
   6.97 GB, min available 7.05 GB, GPU rise 903 MiB (the import-time context finding). **Reading sent for the report:
