@@ -213,6 +213,12 @@
   pool peak vs 6,281). Then light set -> TWO-LEG SUITE again on the final head -> block 2 re-run -> block 3 LAST -> report;
   Reviewer B reviews the FINAL head with the post-convergence diff named; cell 7 (223K) takes the fix + 5.3K re-check, cell 8
   the suite, block 3, report. AD-1 AMENDED (dated) in decisions.md.** **No window open; seat free.**
+  Relayed; seat SET (msg `066a5ccab8691211`): cell 7 fix -> light set -> block 2 re-run (both instruments) -> RESUME HERE; cell 8
+  two-leg suite on the final head -> block 3 LAST -> report (block 2 before the suite still measures the final head since the suite
+  changes no code). **Scaling of the NVDEC/NVENC terms PRE-RULED (my msg ack-scaling): SCALED by pixels with a per-session FLOOR,
+  term = floor + per_pixel x (W x H), constants fitted from the 5.3K remainders and the 4K cold-row peaks (two sizes, two
+  constants), 1080p by extrapolation stated as such; the total must cover every measured device-wide peak; the cell yields the
+  fitted constants and the checks before coding (b3).**
 - (history) attribution window OPEN ~14:20Z (msg `4ebb2986077a3c1e`).
 - (history) block 2 OPEN ~14:03Z (msg `f643b1059bdc063a`). STOP test
   (conservative): nvidia-smi device-wide memory.used (same instrument as the baseline 6,104; ~250-330 MiB idle + decoder + NVENC
