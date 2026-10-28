@@ -22,7 +22,7 @@
   gui-to-app edge (`tests/test_app_deps.py`).
 - **The headless runner** `tools/headless_export.py` (a test tool): library API `route`,
   `requests_for`, `parameters_for`, `read_parameter_file`, `configured_footage_folder`,
-  `inside`, `check_outputs`, `run`, `record_object`, `record_json`, `exit_status`,
+  `inside`, `writes_inside`, `check_outputs`, `run`, `record_object`, `record_json`, `exit_status`,
   `summary_lines`, `main`; a CLI with the full IF-10 flag set but `last_parameters`
   (`--out | --beside-source`, `--suffix`, `--bit-depth`, `--no-provenance`, `--force-cpu`,
   `--encoder`, `--quality`, `--ten-bit`, `--cache-limit-bytes`) plus `--method`,
@@ -51,7 +51,8 @@
 | Runner: routing equal to `gui.sources` (sidecar and unknown suffix refused, batch continues) | `tests/test_headless_export.py::test_the_routing_tables_and_texts_equal_the_interfaces`, `...::test_refused_items_fail_and_the_batch_continues` |
 | Runner: exit 0/1/2, record schema 1 with names only, footage refusals, no PySide6 / CuPy, cancel and Ctrl-C, DR-62 order, DR-6, DR-35 (a), video unavailable | `tests/test_headless_export.py` |
 | Runner (Reviewer A round 2): footage refusals through the `\\?\` and `\\?\UNC\` spellings; no full path for a non-ASCII folder, an `argparse` refusal, a record field or a record that cannot be written; no EXIF tag value printed | `tests/test_headless_export.py::test_g1_*` to `::test_g7_*` |
-| V5 on every WP2.3 still at 8 and 16 bit (planted `iCCP`-dropping writer) | `tests/test_wp41_photo_path.py::test_v5_*` |
+| Runner (Reviewer A round 4): every write target (each output folder as the export plans it, the record, the settings folder and file) checked by the real path of its nearest existing path, so a file link, a folder link or a dangling link into the footage folder is refused; a local-configuration refusal names no full path; `--parameters` validated against the method schema and capped at 1 MiB, as the importer does | `tests/test_headless_export.py::test_i1_*` to `::test_i4_*` |
+| V5 on every WP2.3 still at 8 and 16 bit (planted `iCCP`-dropping writer); the Interop IFD kept on a test-built JPEG (no WP2.3 still carries one; planted drop) | `tests/test_wp41_photo_path.py::test_v5_*` |
 | V9 neutral identity, both methods, every still, 8 and 16 bit (planted off-neutral control) | `tests/test_wp41_photo_path.py::test_v9_*` |
 | V10: D84, D35, D36, N8, D116, D83, D45 | `tests/test_wp41_photo_path.py::test_v10_*` |
 | N10 per S1 | `tests/test_wp41_photo_path.py::test_n10_the_same_still_twice_is_identical` |
@@ -70,7 +71,7 @@
 - **N10 with provenance on** (S1): files differ only in the provenance `created` stamp.
 - **Runner texts:** the record and every printed line carry the engine's texts with each folder
   the run knows (the output folder, each source's folder, the settings, record and parameter
-  folders) shown by its name only, in every spelling the runner can name (as given, resolved,
+  folders, the local configuration's folder (R4 I2)) shown by its name only, in every spelling the runner can name (as given, resolved,
   without an extended-length prefix, escaped as `ascii_text` escapes it, quoted as `repr` quotes
   it; `tools/headless_export.py` `Redactor`, R1 F1, R2 G2-G4, G6); an `argparse` refusal is
   redacted against the paths its arguments name (R2 G3). A path the run does not know (a drive
@@ -91,10 +92,13 @@
 - **Footage check spellings:** the runner compares paths resolved, without the `\\?\` and
   `\\?\UNC\` prefixes and, where the footage folder exists, by file identity (a share of the
   same drive, a short 8.3 name) (R2 G1). A file system without file identities (`st_ino` 0)
-  falls back to the text comparison.
+  falls back to the text comparison. Every write target is also followed through links: the real
+  path of its nearest existing path (the target itself when it exists, a dangling link included)
+  must lie outside the footage folder, and outputs beside a source go to the source's own folder,
+  not its link target's (R4 I1). A link created after the check (during the run) is not seen.
 - **`--parameters` and photo provenance (OPEN ITEM, owned by CHARC):** the runner reads the
   forms `PresetStore.import_preset` reads (an AD-13 preset; a preset with only `source` and
-  `settings` added). The provenance text `PhotoWriter` embeds for a HEIC given a built-in profile
+  `settings` added), with its 1 MiB cap and its method-schema validation (R4 I3, I4). The provenance text `PhotoWriter` embeds for a HEIC given a built-in profile
   carries `"profile"` (WP3.6 `7624f5c`), which both the runner and the accepted importer refuse
   (`unknown keys: profile`, exit 2; R2 G5). The writer-versus-AD-13 key set is banked with CHARC.
 
