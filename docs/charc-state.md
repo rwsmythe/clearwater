@@ -16,7 +16,17 @@ charc inbox empty at pickup (0 unread / 235 read); orchestrator gen 16 busy (Lis
 Announced online to the orchestrator 16:5xZ (`--to orchestrator`, cued `clearwater-orchestrator-20261028-0219`). The RESUME
 block below is gen 4's hand-off, held unchanged until block 3 CLOSES.
 
-### RESUME HERE (gen 4's hand-off; still the live now)
+- **BLOCK 3 CLOSED 17:47Z, WINDOW CLOSED (msg `287333353dce5f6e`): GX011625 c3 cold sustained 14,938 frames, 0.3195 s/frame =
+  9.58 min/min [WP3.14 31.26]; (i) device-wide 3,277 <= 4,065 BINDING, (ii) pool 1,511 <= 2,174; no STOP. LAST heavy run of WP3.21;
+  code FINAL at 227ed32 (ledger 21e3f38). Thermals 95 C peak / power cap, last-quarter median +4 % = spread. **No window open; seat free.**
+  **RULED (my msg b7143a50): the candidate two-leg suite is NOT required** -- `git diff --stat d1e4537 main -- src tests tools
+  pyproject.toml uv.lock` EMPTY at my seat (main docs-only since the branch base), so `wp3.21-mc` is code-identical to 227ed32 and the
+  green two-leg suite is the candidate's figure by code identity, on condition the orchestrator's `git diff --stat wp3.21-mc 227ed32`
+  over the same paths is empty and the record names both runs; harness gate / static / Reviewer B still run. Next at the orchestrator:
+  cell 8 report `docs/reports/wp3.21-optimisation.md` + return report, candidate, Reviewer B (final head, `afad7af..227ed32`
+  post-convergence, grant named), accept record, ff-merge; then my QA + the owed rows.
+
+### RESUME HERE (gen 4's hand-off; the accept-time items below still bind)
 
 - **Orchestrator = gen 16 `clearwater-orchestrator-20261028-0219`** (re-read `comms/.launch-sessions.json` before every cue;
   every post gets ONE SendMessage cue). Thread for WP3.21 = `18052d93d6c58c9c`. Subjects under 120 chars; bodies via
