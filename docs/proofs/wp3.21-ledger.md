@@ -50,7 +50,8 @@ Cell `implementer-opus-high` (Claude lane), worktree `.worktrees/wp3.21`, branch
 | 25 | cell 6: serial leg 1 FAILED; STOP; RESUME HERE (cell 7) | (dispatcher fills) |
 | 26 | cell 7: ruling (A) fix built (`57a7a2e`); WINDOW REQUEST (serial leg 2) | 97,433 |
 | 27 | cell 7: WINDOW RELEASED (serial leg 2 green); WINDOW REQUEST (task 10 block 1) | 123,491 |
-| 28 | cell 7: WINDOW RELEASED (task 10 block 1); WINDOW REQUEST (block 2, 5.3K) | (dispatcher fills) |
+| 28 | cell 7: WINDOW RELEASED (task 10 block 1); WINDOW REQUEST (block 2, 5.3K) | 154,676 (at the grant) |
+| 29 | cell 7: block 2 5.3K GPU peak above both bounds; STOP | (dispatcher fills) |
 
 ## RESUME HERE (cell 6, after cell 5)
 
@@ -1907,3 +1908,29 @@ the first-frame cost (keyframe, plan creation, NVENC start). **No fix:** a small
 make the analysis faster (the job is analysis-bound during the overlap; the step only sets the
 grain of the waits, at most one step of about 4.6 s at the end) and would add the store's whole-axis copies
 per advance (`smooth_at`, the constant's docstring); the next gain is the analysis pass itself (a report finding).
+
+### Block 2: synthetic 5.3K 8:7 c3 cold (window GRANTED 14:03Z; ran 14:03:10Z-14:06:51Z, EXIT 0)
+
+`v16 --device-frames --subdir wp3.21/bench --clip synthetic-5k3` (a fresh process, its first
+job; record `export-bench-v16-synthetic-5k3-20261028T140310Z.json`, log `c7-v16-5k3.log`,
+summary `c7-v16-5k3-summary.txt`, GPU timeline `c7-v16-5k3-gpu-timeline.txt`).
+
+| row | frames | s/frame | min/min | per-frame median / p90 / max | first | peak RSS | peak GPU |
+|---|---|---|---|---|---|---|---|
+| baseline (WP3.14) | 150 | 4.5389 | 136.03 | 3.714 / 4.006 / 4.438 | - | 6,354 MiB | 6,104 MiB |
+| WP3.21 | 150 | 1.1830 | 35.46 | 1.0691 / 1.1167 / 1.6372 | 1.973 | 7,405 MiB | **7,854 MiB** |
+
+- Phases: probe 6.18, lead 6.96, open 0.59, frames 162.73, close 0.94 s; the analysis thread
+  returned at 78.9 s (frame 57); record wait 0.03 s. Peak tree RSS at 48 s: python 1,227 MiB +
+  three `ffmpeg.exe` of 2,086 / 2,006 / 2,086 MiB (N4's 16 GB held).
+- **GPU (nvidia-smi `memory.used`, device-wide, 1 s samples; idle before 248 MiB):** 2,110 at
+  12 s; **7,853-7,854 from 18 s to about 55 s** (the overlap: both decoders, the analysis thread
+  and the render); 6,718 at 60 s, 6,606 at 72-78 s, **6,598 plateau from about 84 s** (frames
+  only, after the analysis returned); 5,462 from about 162 s. The card has 8 GB (8,188 MiB).
+- **STOP (the ruled test, conservative reading, confirmed by the dispatcher at the grant):**
+  7,854 MiB is above the GPU estimate 6,281 (5,897 + 384) by 1,573 MiB and above base x 1.25
+  (7,371) by 483 MiB; with the 248 MiB idle offset removed it is 7,606, still above both. The
+  frames-only plateau (6,598; 6,350 less idle) is also above 6,281. Against the baseline's 6,104:
+  x 1.29. The 4K rows are likewise above their baseline (3,130-3,244 against 2,409 MiB, x 1.30-1.35),
+  not a ruled STOP. Not attributed yet between CuPy's pool (render, the analysis thread's device
+  frames, FFT plans and buffers) and the FFmpeg decoders' and NVENC's own device memory.
