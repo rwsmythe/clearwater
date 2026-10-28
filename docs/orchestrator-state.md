@@ -43,7 +43,7 @@
     (B1 D87 rate and B2 bench exit NOT DEFECTS vs rulings; B3 report sentence fixed docs-only; B1/B2/B4/B5 + misnamed
     test = CHARC's rows). Evidence `clearwater-review-evidence\wp3.21\reviewB\` (md5 `review-B.txt` f0093217...).
     Two-leg suite on the candidate NOT required (CHARC `1bd3eb2b`: code identity to `227ed32`, checked empty).
-  - **WP3.21 ACCEPTED 2026-10-28 ~18:40Z: main `7e228fb`** (ff from `wp3.21-mc`; accept record
+  - **WP3.21 ACCEPTED 2026-10-28 ~18:29Z: main `7e228fb`** (ff from `wp3.21-mc`; accept record
     `docs/proofs/wp3.21-accept.md`). Harness gate on main 382 OK (skip 1). PHASE 3 COMPLETE; CHARC owes QA + the rows,
     then commissions Phase 4 (WP4.1 photo path, WP4.2 video path, WP4.3 wiring).
   - **NEXT:** release post (done with this commit) -> CHARC QA -> Phase 4 briefs and dispatch. Leftover worktrees
