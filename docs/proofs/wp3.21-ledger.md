@@ -43,6 +43,8 @@ Cell `implementer-opus-high` (Claude lane), worktree `.worktrees/wp3.21`, branch
 | 16 (read) | as given at the gx grant | 298,494 |
 | 17-19 (read) | at the synth and gxa grants | 310,029; 312,501 |
 | 20 | cell 5 stands down after the oracle legs; RESUME HERE (cell 6) | (dispatcher fills) |
+| 21 | cell 6: Reviewer A round 1 adjudicated (`b1bb9cc`) | 140,415 |
+| 22 | cell 6: Reviewer A round 2 adjudicated, loop terminates | (dispatcher fills) |
 
 ## RESUME HERE (cell 6, after cell 5)
 
@@ -1602,7 +1604,8 @@ adjudication, repro, md5s). Runner copied from WP3.14 r2; WSL, codex-cli 0.162.1
 
 | Round | Critical | Major | Minor | In / out of envelope | New / reopened | Reverts | Product or test-only | Transport / CLI | Depth |
 |---|---|---|---|---|---|---|---|---|---|
-| 1 | 0 | 6 reported; 1 confirmed blocking (F5), F2 pending a ruling | 5 reported (+ F3, F6, F7 adjudicated minor) | in: F1-F9; out: F10, F11 (banked) | all NEW | 0 | none yet (adjudication turn) | WSL, 0.162.1, gpt-6.1-sol high | (dispatcher fills) |
+| 1 | 0 | 6 reported; 1 confirmed blocking (F5), F2 pending a ruling | 5 reported (+ F3, F6, F7 adjudicated minor) | in: F1-F9; out: F10, F11 (banked) | all NEW | 0 | PRODUCT (F5 `jobs/export.py`, `9d73fe4`) + tests | WSL, 0.162.1, gpt-6.1-sol high | 140,415 |
+| 2 | 0 | 0 | 1 (test helper race) | in | NEW | 0 | test-only (cleanup) | WSL, 0.162.1, gpt-6.1-sol high | (dispatcher fills) |
 
 ### Round 1 (cell 6; HEAD `aa06584`, diff `d1e4537..aa06584` without `docs/proofs`)
 
@@ -1628,3 +1631,28 @@ source. Round COUNTS. Pre-run: ruff, format, mypy clean; light set 2,641 passed 
 - Remediation plan (next turn, after the dispatcher's word): F5 in `jobs/export.py`
   (extrapolate from the entry's bytes per stored frame when the lead stored nothing new) with
   a failing-first test; F2 per the ruling; the minors once in the terminating round.
+
+Dispatcher rulings on round 1 (relayed at the r1 yield, depth 140,415): F5 CONFIRMED
+BLOCKING, fix as adjudicated with a failing-first retry test; F2 RULED (a): keep abort-first,
+MINOR, correct the design text in the report, pin abort -> A joined -> release with one test;
+F1/F4 rejected and F3 banked to Limits accepted; F6-F9 to the terminating round's cleanup;
+F10/F11 banked.
+
+Remediation `9d73fe4`: `_Analysis.cache_growth_bytes` scales the entry's own bytes per stored
+frame when the lead stored nothing new; tests
+`test_the_re_check_on_a_retry_over_an_incomplete_entry_scales_its_own_bytes` (FAILED on the
+r1 engine: `0 == 23,040`) and `test_a_failing_job_aborts_then_joins_the_analysis_then_releases`
+(an event holds A alive until the abort; passes on both, it pins the ruled order). Overlap file
+25 passed; the two tests x6 passed; ruff, format, mypy clean; light set 2,643 passed (426 s).
+
+### Round 2 (cell 6; HEAD `9d73fe4`, diff `aa06584..9d73fe4`, scoped)
+
+Exit 0 10:57:28Z; banner `gpt-6.1-sol` / high; tokens 75,977; 18 `succeeded in`; VERDICT
+`NO_NEW_CRITICAL_MAJOR`; 3 background model-list refresh timeouts (not transport). Round COUNTS.
+
+- r2 F1 (MINOR, EXECUTED): `_analysis_decoded` iterates `source.threads` while E's stream
+  registers its tag: CONFIRMED, test-only; snapshot under the source's lock in cleanup.
+- The reviewer's probes confirmed the growth arithmetic (10 cases, 23,040 bytes) and the order
+  abort -> join -> release.
+- **ZERO NEW BLOCKING: the loop TERMINATES at round 2.** Cleanup (once, never another round):
+  r2 F1; r1 F6, F7, F8, F9.
