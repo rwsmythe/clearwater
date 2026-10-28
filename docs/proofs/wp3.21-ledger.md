@@ -20,6 +20,8 @@ Cell `implementer-opus-high` (Claude lane), worktree `.worktrees/wp3.21`, branch
 | 5 | cell 3: STOP, frame rule 5 (CuPy outside core) on #2 and the #3 draft | (dispatcher fills) |
 | 5 (read) | cell 3 stood down after the STOP (re-seat to cell 4) | 251,077 |
 | 6 | cell 4: #2 reworked under AD-29; WINDOW REQUEST for the GX011627 + synthetic 4K oracle legs | (dispatcher fills) |
+| 6 (read) | as given at the grant | 148,982 |
+| 7 | cell 4: STOP, AD-29 item 1 "the block sums with their quantise" (where #3's quantise lives) | (dispatcher fills) |
 
 ## Re-seat: cell 2 (2026-10-28), rulings since round 0
 
@@ -529,6 +531,11 @@ GPU leg, `['cpu']` on every CPU leg.
 | V23 | mypy narrows the device branch of `_payload` to unreachable (IF-1 types pixels as NumPy), hiding it from type checking | yes | yes (mypy `unreachable`) | - | `pixels: Any`; a non-array under a device label refused by `getattr(..., "dtype")`, not an AttributeError |
 | V24 | a stale `device_frames=` / `xp=` caller left in `src`/`tools`/`tests` | yes | - | rejected: grep finds only the oracle's `Job.device_frames` flag, which now selects the backend | - |
 
+**Orchestrator ruling at the yield-6 grant:** the device methods on `CupyBackend` rather than on
+the `CoreBackend` base are ACCEPTED (a base method would make `NumpyBackend` satisfy the
+Protocol, against AD-29 item 3); relayed to CHARC. **AD-29 item 6 MET:** the reworked #2 is
+TIER1 on GX011627 and synthetic 4K (H9, H10) before #3.
+
 ## Re-grounding (2026-10-27/28, against `d1e4537`)
 
 Anchors checked against the code before use:
@@ -609,6 +616,8 @@ Anchors checked against the code before use:
 | H6 | same window | 06:36:30Z | 06:43:07Z | `interim1.sh 4`: oracle record `cand-overlap-GX011627-ancuti2018` + compare | GPU (auto) | 12.03 GiB | not sampled | 0 |
 | H7 | #2 oracle (granted at yield 4), cell 3 | 07:08:29Z | 07:15:24Z | `oracle-devframes-gx.sh 1`: record `cand-devframes-GX011627-c3` (`--device-frames`) + compare | GPU (auto), device frames; strays: only this job | 11.96 GiB | not sampled | 0 (COMPARE-EXIT 0) |
 | H8 | same window | 07:15:38Z | 07:17:11Z | `oracle-devframes-gx.sh 2`: record `cand-devframes-synth4k-c3` (`--device-frames`) + compare | GPU (auto), sha256-guarded clip | 12.19 GiB | not sampled | 0 (COMPARE-EXIT 0) |
+| H9 | #2 under AD-29 (granted at yield 6), cell 4 | 07:46:59Z | 07:54:31Z | `oracle-ad29-gx.sh 1`: record `cand-ad29-GX011627-c3` (`--device-frames`) + compare vs `ref-GX011627-c3-a` | GPU (auto), device frames, head `867d5fb`; strays: 4 idle python (comms, 47-106 MB) | 11.43 GiB | not sampled | 0 (COMPARE-EXIT 0): TIER1, 681 frames, max abs 0; `sink_devices ['cuda:0']`; job wall 445.6 s |
+| H10 | same window | 07:54:48Z | 07:56:21Z | `oracle-ad29-gx.sh 2`: record `cand-ad29-synth4k-c3` + compare vs `ref-synth4k-c3-a` | GPU (auto), sha256-guarded clip | 11.63 GiB | not sampled | 0 (COMPARE-EXIT 0): TIER1, 120 frames, max abs 0; `['cuda:0']`; 88.3 s |
 
 Light runs (no window): `vid-hevc8-bt709-full` dry runs of both tools on the GPU (breakdown:
 residuals 0.01-0.05 %, replica equals engine on 180 records and 45 proxies; oracle base control
