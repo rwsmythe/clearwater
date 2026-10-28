@@ -228,8 +228,10 @@
   select_backend (core/backend.py:613) and the IF-2 method, so the figure misleads nobody; showing it is WP4.3's business. Part 2
   (boundary release in `_Analysis._run` finally, once per job; planted 64 MiB test; F2 order re-pinned abort -> boundary -> release)
   ACCEPTED as built (b5a383c). Cell 7 266,488, continues for the bounded remainder.**
-- **EXCLUSIVE WINDOW OPEN 2026-10-28 ~15:36Z: WP3.21 SUITE PARALLEL LEG on the final head (cell 8, ~10 min; head 0bce49b,
-  ledger-only since 227ed32)** (msg `afaadfc07237ce40`). **NOTHING HEAVY AT THIS SEAT until CLOSE.** Recollection 5,289 / 4,175 /
+- **EXCLUSIVE WINDOW OPEN 2026-10-28 ~15:40Z: WP3.21 SUITE SERIAL LEG on the final head (cell 8, ~45 min; expected 1,114 / 1 skip
+  `test_photo_check.py:139`)** (msg `03f2d48ac0937e35`). **NOTHING HEAVY AT THIS SEAT until CLOSE.** Then block 3 GX011625 LAST.
+- **PARALLEL LEG GREEN on the final head 15:38Z: 4174 passed / 1 skip (`test_color_roundtrip.py:121`) / 0 failures, 488 s; head 2b14e21,
+  code 227ed32** (parallel OPEN was `afaadfc07237ce40`; it ran 15:30-15:38Z). Recollection 5,289 / 4,175 /
   1,114 explained: parallel +27 (`test_wp321_job_memory.py`), 3 ids RENAMED by part 2 in `test_wp321_fft_release.py` (none removed);
   serial +1 (gpu boundary-free test). Naming point banked for B: `...releases_at_the_analysis_end_and_after_every_frame` asserts
   exactly TWO releases (name overstates; assertion right) -> rename in B's cleanup or a MINOR. Cell 8 dispatched ~15:27Z from
