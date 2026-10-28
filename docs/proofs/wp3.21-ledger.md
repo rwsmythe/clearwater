@@ -14,6 +14,7 @@ Cell `implementer-opus-high` (Claude lane), worktree `.worktrees/wp3.21`, branch
 | 2 | round 0 yield | (dispatcher fills) |
 | 2 (read) | cell 1 stood down after round 0 (re-seat) | 359,040 |
 | 3 (read) | cell 2: #1 built, interim-1 WINDOW REQUEST (granted) | 287,974 (past the evaluation point: run the window, record, hand over to cell 3) |
+| 3 (last) | cell 2 stood down after interim 1 (re-seat to cell 3) | 310,465 |
 
 ## Re-seat: cell 2 (2026-10-28), rulings since round 0
 
@@ -167,6 +168,25 @@ before/after snapshots, 51 -> 68 C.
   `export_bench.py`).
 - **Q-R6:** RULED by CHARC `6acded46` (see RESUME HERE, first item). The current code runs the re-check
   after the lead.
+
+## Re-seat: cell 3 (2026-10-28)
+
+Cell 3 re-seats cell 2 (last depth 310,465) on the same branch at `106b29f`, no rebase. CHARC's
+readings of interim 1 (`4dc2978b`, relayed by the orchestrator generation 15):
+
+1. 24.28 min/min is INTERIM (one run, cold cache); the figures of record are task 10's, made
+   LAST. 24.28 is not quoted as V16's result outside this ledger.
+2. The frames phase is 0.778 s/frame overlapped against the serial path's 0.714: the analysis
+   thread's contention (about 0.06 s/frame, about 8 %). #3 is the lever; the 0.714 / 0.778 pair
+   is kept so task 10 can show what #3 recovered.
+3. The single 2.858 s max frame (median 0.7735): task 10's report says where it fell (lead end,
+   first sink write, or a decoder seek) if the per-frame record shows it. A one-off at the lead
+   is expected; a recurring one is a finding.
+4. Memory at interim 1: peak RSS 3,987 MiB, graphics 2,877 MiB at 4K, both inside AD-1.
+
+Order of work (CHARC confirmed): Q-R6 as ruled; #2; a WINDOW REQUEST for #2's GX011627 oracle
+leg; #3; the #2+#3 interim and the 4K blur micro-timing (separate windows); task 6; task 7 and
+the Q-R7 stamp; Reviewer A; the two-leg suite (one window per leg); task 10 LAST.
 
 ## RESUME HERE (cell 3, taking #2 and #3)
 
