@@ -137,6 +137,10 @@
   at ~330K, msgs `02fcea331c6990a9` + cross-session note). **All cues go to gen 15 now**; re-read `comms/.launch-sessions.json`
   before every cue. Gen 15 dispatches cell 3 (Q-R6 first, then #2, #3, 4K micro-timing, task 6,
   task 7, reviews, suite, task 10) from ledger RESUME HERE `106b29f` (branch `wp3.21`, 13 commits on d1e4537; gen 14 corrected the count).
+  **Gen 15 ONLINE 06:49Z** (msg `df928159ff567231`, picked up at 2e2f7e6, state 0f66ba2); **WP3.21 CELL 3 DISPATCHED**
+  (`wp321-cell3`, opus-high, from `wp3.21` 106b29f, depth 0; my four readings + AD-1 breach = STOP rule in its prompt; order
+  Q-R6 -> #2 -> oracle window -> #3 -> interim/micro-timing windows -> task 6 -> task 7 -> A -> suite -> task 10 last). No window
+  open; the first WINDOW REQUEST is posted to me as OPEN before the grant. My ack msg e2eee35a.
 - **WP3.21 INTERIM 1 CLOSED 06:43Z (msg `dad1555e109d85c7`): #1 OVERLAP MEETS D106's INTERIM AT 4K.** GX011627 cold c3
   0.8100 s/frame = **24.28 min/min** (WP3.14 1.061-1.065 = 31.8-31.9; -24 %); median 0.7735, p90 0.8208, max 2.858; lead
   18.8 s (3.4 % of 551.6 s); peak RSS 3,987 MiB, graphics 2,877 MiB; frames phase 0.778 vs serial frame path 0.714 (~0.06
