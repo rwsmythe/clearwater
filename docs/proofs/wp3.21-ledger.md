@@ -30,6 +30,7 @@ Cell `implementer-opus-high` (Claude lane), worktree `.worktrees/wp3.21`, branch
 | 10 | cell 5: micro-timing instrument built; WINDOW REQUEST | (dispatcher fills) |
 | 10 (read) | as given at the micro-timing grant | 87,298 |
 | 11 | cell 5: WINDOW RELEASED (micro-timing); task 6 build-or-yield | (dispatcher fills) |
+| 11 (read) | as given at the release acknowledgement (HOLD for CHARC on task 6) | 111,973 |
 
 ## RESUME HERE (cell 5, after cell 4's interim 2)
 
@@ -226,6 +227,38 @@ are the log's. Run 2 (`--only-53k`, plan cache and pool cleared per row; JSON
   call over the input, of which the cached cuFFT plans hold 0.45-0.54 GiB AFTER the call; RGB
   sigma 270 +1.9 GiB (plans 1.6 GiB). R0.3 budgeted 0.3-0.5 GB transient: the plan workspace makes
   it about 0.55 GB and PERSISTENT while the plan cache holds it.
+
+### Release and HOLD (orchestrator, after yield 11)
+
+- Reported as CHARC `c07f38f9` asked: the gate-eligible calls (Cb, Cr) are **39.3 %** of the 4K
+  render (0.198 of 0.504 s; all blur 71.4 %); projected **about 10.0 min/min at 4K against
+  interim 2's 15.37** if the whole 0.180 s/frame reaches the critical path (10-11 if part of
+  the frames phase is bound elsewhere). A projection, not a figure.
+- Recommendation BUILD (gate 32, per-axis route); the orchestrator concurred and forwarded it.
+  OPEN question **Q-C5a**, the cuFFT plan-cache policy: (a) RECOMMENDED, CuPy's default cache,
+  counted in task 6's 5.3K memory re-read (an AD-1 breach a STOP with Q9's fallback); (b) free
+  the plans per blur; (c) cap the cache's memsize (process-wide). Plus a maximum-parameter 5.3K
+  row for the memory re-read (raised fractions can route RGB calls through the FFT, about
+  +1.9 GiB at 5.3K). HOLD: no FFT product code until CHARC's go.
+
+### Q-R7, as built in the hold (cell 5, `83349d7`)
+
+- `tools/export_bench.py` `_OverlapStamps`: for the job's call only, wraps
+  `AnalysisEngine.analysis_job` (stamps when the returned job returns, on the analysis thread)
+  and `AnalysisEngine.smoothed_record` (times each frame-loop read: the wait for a final record
+  plus the read, an upper bound on the stall) on the CLASS, restored in `finally`. No product
+  hook. Record keys: `lead_s` (= the `analysis` phase), `analysis_end_s`, `record_reads`,
+  `record_wait_s`, `record_wait_max_s`, `analysis_share_overlapped` ((lead + stall) / wall);
+  `analysis_share` kept (now the lead's share). The row line adds "lead + stall".
+- Tests (`tests/test_wp321_bench.py`, +4): a CPU run on the WP2.3 sample records the stamps
+  (45 reads, the end inside the job, the share by its formula) and restores both methods; a
+  fake clock pins the stall and end arithmetic; the methods are restored when the block raises;
+  no analysis gives no end stamp. Light set (these + `test_export_bench.py` + every
+  `*_deps.py` / `*_rules.py`): 102 passed. ruff, format, mypy (138 files) clean.
+- Verification loop: suspected (1) the class patch leaking past the run -> pinned by two tests;
+  (2) the read time counting the read itself -> documented as an upper bound, not fixed; (3)
+  `prime_cache` (warm runs) stamped too -> rejected, the patch covers the job call only. Nothing
+  new on a second pass.
 
 ## Re-seat: cell 2 (2026-10-28), rulings since round 0
 
