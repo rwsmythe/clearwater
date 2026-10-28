@@ -328,3 +328,35 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
     for item in items:
         if "footage" in item.keywords:
             item.add_marker(skip)
+
+
+@pytest.fixture(autouse=True)
+def _release_fft_plans(request: pytest.FixtureRequest) -> None:
+    """Release the GPU backend's cuFFT plans after each test (WP3.21, CHARC ruling (A)).
+
+    The FFT Gaussian leaves its plans in the calling thread's plan cache until something calls
+    ``CupyBackend.release_fft_plans``; an export job does so at its end, a test calling the core
+    directly does not, so the plans (and the pool blocks they hold) would reach the next test.
+    After each test this calls that same release on the probed GPU backend, the one
+    ``backend_for`` and ``select_backend`` return. The cache is per thread, not per backend
+    object, so the release also clears plans made through another ``CupyBackend`` on this
+    thread; before the process's first probe it does nothing. It imports nothing: it acts only
+    when ``cupy`` and ``clearwater.core.backend`` are already loaded and the GPU has been
+    probed, and it never touches ``cupy`` itself.
+
+    Args:
+        request: The test's fixture request, which runs the release at teardown.
+    """
+    import sys
+
+    def release() -> None:
+        core_backend = sys.modules.get("clearwater.core.backend")
+        if "cupy" not in sys.modules or core_backend is None:
+            return
+        if core_backend._probe_gpu.cache_info().currsize == 0:
+            return  # never probed: no test reached the GPU backend
+        gpu, _ = core_backend._probe_gpu()
+        if gpu is not None:
+            gpu.release_fft_plans()
+
+    request.addfinalizer(release)
