@@ -16,6 +16,7 @@ Cell `implementer-opus-high` (Claude lane), worktree `.worktrees/wp3.21`, branch
 | 3 (read) | cell 2: #1 built, interim-1 WINDOW REQUEST (granted) | 287,974 (past the evaluation point: run the window, record, hand over to cell 3) |
 | 3 (last) | cell 2 stood down after interim 1 (re-seat to cell 3) | 310,465 |
 | 4 | cell 3: Q-R6 and #2 built; WINDOW REQUEST for #2's GX011627 oracle leg | (dispatcher fills) |
+| 4 (read) | as given at the grant | 192,330 |
 
 ## Re-seat: cell 2 (2026-10-28), rulings since round 0
 
@@ -257,6 +258,12 @@ WP2.3 samples with `--device-frames`, every frame (`work\wp3.21\oracle-devframes
 `--force-cpu` legs against `ref-*-c3-cpu-a`); `cand-devframes2-vfr-c3-gpu` records
 `sink_devices ['cuda:0']`, the CPU leg `['cpu']`.
 
+**Oracle on GX011627 (H7, H8; logs `logs\devframes-gx-{1,2}.log`), against the base `-a`:**
+GX011627 c3 **TIER1** (681 frames, 0 differing; records, 1,362 analyze calls, proxies equal;
+`sink_devices ['cuda:0']`; oracle job wall 408.0 s against #1's 587.2 s, development evidence
+only); synthetic 4K c3 **TIER1** (120 frames; `['cuda:0']`; 89.0 s against 117.6 s). CHARC's
+addition is met: the device-frame conversions are exercised on GX011627 before #3.
+
 Memory (watch item): E's float32 frame was already uploaded per frame; new on the card are the
 integer planes (transient, 25 MB at 4K, 74 MB at 5.3K 8-bit) and A's float32 frame (A was host;
 99.5 MB at 4K, 296 MB at 5.3K) until #3. Estimate +0.13 GB at 4K, +0.4 GB at 5.3K over R0.3's
@@ -415,6 +422,8 @@ Anchors checked against the code before use:
 | H4 | same window | 06:23:50Z | 06:33:43Z | `interim1.sh 2`: oracle record `cand-overlap-GX011627-c3` + compare | GPU (auto) | 12.05 GiB | not sampled | 0 |
 | H5 | same window | 06:34:02Z | 06:36:04Z | `interim1.sh 3`: oracle record `cand-overlap-synth4k-c3` + compare | GPU (auto), sha256-guarded clip | 12.01 GiB | not sampled | 0 |
 | H6 | same window | 06:36:30Z | 06:43:07Z | `interim1.sh 4`: oracle record `cand-overlap-GX011627-ancuti2018` + compare | GPU (auto) | 12.03 GiB | not sampled | 0 |
+| H7 | #2 oracle (granted at yield 4), cell 3 | 07:08:29Z | 07:15:24Z | `oracle-devframes-gx.sh 1`: record `cand-devframes-GX011627-c3` (`--device-frames`) + compare | GPU (auto), device frames; strays: only this job | 11.96 GiB | not sampled | 0 (COMPARE-EXIT 0) |
+| H8 | same window | 07:15:38Z | 07:17:11Z | `oracle-devframes-gx.sh 2`: record `cand-devframes-synth4k-c3` (`--device-frames`) + compare | GPU (auto), sha256-guarded clip | 12.19 GiB | not sampled | 0 (COMPARE-EXIT 0) |
 
 Light runs (no window): `vid-hevc8-bt709-full` dry runs of both tools on the GPU (breakdown:
 residuals 0.01-0.05 %, replica equals engine on 180 records and 45 proxies; oracle base control
