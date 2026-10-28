@@ -35,6 +35,8 @@ Cell `implementer-opus-high` (Claude lane), worktree `.worktrees/wp3.21`, branch
 | 12 (read) | as given with the task 6 GO relay | 141,332 |
 | 13 | cell 5: STOP, a correction to the micro-timing's 5.3K memory figure before the task 6 build | (dispatcher fills) |
 | 14 | cell 5: task 6 gate, route and job-end release built (`7061699`); batching and the estimate fold wait on the yield-13 STOP | (dispatcher fills) |
+| 13 (read) | as given with the STOP acknowledgement | 163,071 |
+| 15 | cell 5: batched route and the estimate's bound built (`17743ec`); WINDOW REQUEST (memory re-read) | (dispatcher fills) |
 
 ## RESUME HERE (cell 5, after cell 4's interim 2)
 
@@ -346,6 +348,70 @@ built what the STOP's answer cannot change and held the rest.
 - **Open item:** a GUI preview of 1080 or more on its short side also meets the gate; its plans
   stay cached on the GUI's thread (no job end releases them). Not this package's surface (Q-C5a
   is the export job's); recorded for the orchestrator.
+
+### CHARC `1db8547f`: the yield-13 STOP RULED (A), chunked per-axis (relayed)
+
+1. The batch is a FIXED constant in core, 512 lines; the last batch is the FINAL 512 lines (one
+   plan set per axis); overlapping lines recomputed, not blended. REQUIRED test: chunked
+   bit-identical to unchunked per-axis on line counts NOT multiples of 512 along BOTH axes, at
+   1080p, 4K and 5.3K 8:7 (synthetic, GPU). Oracle expectation unchanged (tier 2 on renders,
+   tier 1 elsewhere).
+2. Q-C5a (2) restated as a BOUND: with the batch fixed, plan-plus-transient depends only on the
+   transform (line) length and the batch; measure at 1080p, 4K, 5.3K along both axes with the
+   plan cache AND the pool cleared first; `memory_estimate_bytes` for a gated GPU job adds the
+   bound for the clip's LONGER side; a test asserts each measured peak is under it.
+3. Condition (1) unchanged; the fixed-budget projection rule for the max-parameter row stands.
+   **Binding for task 6 AND task 10: every peak is taken with the plan cache and the pool
+   cleared first.** The report gives plan size following transform length, not shape, as the
+   reason the bound is per line length. Task 10's 5.3K row is the measurement of record; a
+   peak above AD-1's estimate is a STOP. Each heavy run is its own WINDOW REQUEST.
+
+### Task 6 under (A), as built (cell 5, `17743ec`)
+
+- **Batching.** `FFT_BATCH_LINES = 512` lines (1-D transforms) per batch: `512 // C` positions
+  along the other spatial axis, each with its C channels (so a batch never exceeds 512 lines
+  and the bound holds for RGB calls too); `fft_batch_starts` steps by the batch and makes the
+  last batch the final positions.
+- **FINDING (fixed in the route): odd FFT lengths are batch-position dependent in cuFFT.** The
+  first build was bit-identical at 1080p but NOT at 4K / 5.3K (1 ulp on the last batch's rows).
+  Isolated: `cupyx.scipy.fft.rfft` at length 4725 (odd; cupyx's `next_fast_len` includes 7) of
+  rows `[1649:2161]` differs from the same rows of the whole-array transform; at an even start
+  or an even length it is equal. Over ten lengths, every odd one (4725, 6561) was
+  position-dependent and every even one position-independent. The route now takes the
+  smallest EVEN fast length; then chunked equals unchunked bit for bit on every required shape,
+  CPU and GPU (pinned by tests).
+- **The bound.** `fft_memory_bound_bytes(h, w) = 48 B x 512 x length` with `length` the power
+  of two at or above `longer + 2 * (shorter + 1)` (every spatial fraction of both methods is at
+  most 0.25, so every gated radius is at most the short side plus one); 0 below the gate's
+  shape. 96 / 192 / 384 MiB at 1080p / 4K / 5.3K. `CupyBackend.memory_estimate_bytes` = AD-1's
+  base + the bound; `NumpyBackend`'s unchanged.
+- **Measured (plans and pool cleared first; FFT-specific = peak - base - the two passes'
+  full-size outputs, which the direct filter also allocates):**
+
+| size | sigma (fraction) | C | FFT-specific peak | plans held after | bound |
+|---|---|---|---|---|---|
+| 1080p | 54 (0.05) | 1 / 3 | 34 / 33 MiB | 15 MiB | 96 MiB |
+| 1080p | 270 (0.25) | 1 / 3 | 45 / 52 MiB | 13 MiB | 96 MiB |
+| 4K | 108 (0.05) | 1 / 3 | 67 / 67 MiB | 30 MiB | 192 MiB |
+| 4K | 540 (0.25) | 1 / 3 | 89 / 105 MiB | 25 MiB | 192 MiB |
+| 5.3K | 232 (0.05) | 1 / 3 | 111 / 124 MiB | 54 MiB | 384 MiB |
+| 5.3K | 1162 (0.25) | 1 / 3 | 227 / 255 MiB | 112 MiB | 384 MiB |
+
+  Ratio to `512 x length x 4 B` at most 8.91; the constant is 12 samples. Against the unbatched
+  route at 5.3K (about 1.05 GiB per one-plane call) the batched one needs 0.11 GiB.
+- **Tests (+ to `tests/test_wp321_fft_gaussian.py`):** the batch starts; chunked bit-identical
+  to unchunked (`FFT_BATCH_LINES` patched to 10**9) at (1080, 1920), (1081, 1923, 3), (2160,
+  3840), (2161, 3843, 3), (4648, 5312), (4649, 5313) sigma 1162 on the GPU, the first two on the
+  CPU; the bound 0 below the gate and the CPU estimate unchanged; per size, fractions 0.05 and
+  0.25, C 1 and 3: the GPU estimate is base + bound and the measured peak (plans and pool
+  cleared first) is under the bound. Task 6 tests 43 passed; light set 2,169 passed; slow V8
+  and 4K CPU bound 7 passed; ruff, format, mypy clean.
+- **OPEN (for the orchestrator): `select_backend` still decides on AD-1's base estimate.**
+  It calls `memory.memory_estimate_bytes`, not the backend's method; folding the bound into the
+  decision changes `test_core_select.py`'s pinned 4K figures (its "1,982 MiB exceeds free 1,981
+  MiB" threshold and IF-2's own example text), which only a ruling may change. Recommended:
+  leave the decision on the base (the bound is at most 384 MiB at 5.3K under the 1.25 margin)
+  and let task 10's measured 5.3K peak against the GPU estimate settle it.
 
 ## Re-seat: cell 2 (2026-10-28), rulings since round 0
 
