@@ -30,6 +30,16 @@ block below is gen 4's hand-off, held unchanged until block 3 CLOSES.
   `docs/reports/wp3.21-optimisation.md` + ledger; docs-only since 227ed32). Records under work/wp3.10/wp3.21-v4/ (tool root), kept
   outputs work/wp3.21/oracle/v4-*/out/ NOT deleted. **No window open; seat free; NO CELL IN FLIGHT.** Orchestrator next: candidate
   `wp3.21-mc` (code-identity check recorded), Reviewer B, harness + static, accept record, ff-merge.**
+- **REVIEWER B BLOCKING (2 major) ADJUDICATED AT THE GATE, CHARC UPHELD (A) 18:26Z (query `d75a07306ffb2681`; my msg 24a26b64).**
+  Candidate `wp3.21-mc` 0ca1970 on main 9db55fa, code-identical to 227ed32 (verified at my seat, empty diff over src tests tools
+  pyproject uv.lock); B evidence `clearwater-review-evidence\wp3.21\reviewB\` md5s OK (6), VERDICT anchored line 77, banner
+  gpt-6.1-sol, 16 succeeded, 330,349 tokens. B1 (D87 retry extrapolation uses the lead's marginal rate) = the Q-R6 form as ruled,
+  NOT A DEFECT (B's own-rate wording came from the orchestrator's prompt paraphrase; recorded); B2 (bench exit 0 on
+  `memory_check.passes` false) NOT A DEFECT (STOP was the record's reading by design); B3 report sentence = docs fix on the
+  candidate; B4 (10-bit needs 40 bits, bound safe) + misnamed release test = one MINOR row; B5 (boundary-free test shorter than
+  the lead) = row; B1 advisory row (max of the two rates at next touch); B2 MINOR row (non-zero exit at next bench touch). No B
+  pass 2. Register rows at my QA: DR-67..DR-74 drafted in the scratchpad script `edit_register_wp321.py` (DR-63 CLOSED there).
+  Next: orchestrator's B3 commit, accept record, ff-merge, release post; then my QA.
 - (history) V4 SAME window OPEN ~17:58Z (msg `20eb361d0e4e06d9`, ~25-30 min).
   Done-clause gap cell 8 caught (brief line 46 / Q3: V4 SAME through `tools/video_fidelity.py` after encode; no cell ran it). The
   orchestrator took option (a), the measured run (six WP2.3 samples x GPU/CPU legs + GX011627 c3 device frames, `--keep`, outputs
