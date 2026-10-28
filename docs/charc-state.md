@@ -70,6 +70,10 @@
   (FYI `a83c68c87441b510`, ledger b8b2485, depth 140,680): S1 N10 brief text corrected to AD-11 pre-encode (provenance `created`
   differs by design); S4 `tests/test_app_deps.py` GRANTED to WP4.1 (the one gui-to-app edge + no PySide6/CuPy on importing
   `clearwater.app`); S2-S7 inside the brief. Nothing to rule.
+- **WP4.1 S8 RULED (A) 19:29Z (query `ec230a99117732c4`; my msg 53d047cf): V9's reference for an export BELOW the source depth =
+  the source quantised to the export depth by the writer's rule; AD-11 bound unchanged; raw error recorded and asserted for 16-bit
+  exports and 8-bit sources; ICC = source's or the D53 built-in; planted control kept. AD-11 clarified (dated) in decisions.md at
+  this seat. W1 STANDS despite the cell's ~4 s probe inside it (orchestrator's slip, recorded).**
 - **Owner-pending inputs (carry):** photos (WP3.6P; WP4.1 records the owner-photo leg OWED), the iPhone clip (DR-15), the N6 body
   erratum DR-64 (apply on the owner's word 'apply N6 erratum' as spec v0.5.6). Open owner decisions: none. Every owner-facing
   summary ends with that line.
