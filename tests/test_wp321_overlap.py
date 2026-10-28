@@ -30,6 +30,8 @@ from clearwater.analysis.smoothing import DEFAULT_KIND, DEFAULT_WINDOW_S
 from clearwater.interfaces import CacheKey, Frame, JobResult, ProbeResult
 from clearwater.interfaces.stubs import StubProgress, StubProxyCache
 from clearwater.jobs import SafeWrite
+from clearwater.jobs import export as export_module
+from clearwater.jobs.disk_space import SpaceCheck
 from clearwater.jobs.export_seam import CANCELLED
 from clearwater.methods.ancuti_fusion import ANCUTI2018_STAGES, C3_STAGES
 from test_analysis_support import CFR_STEP, CFR_TIME_BASE, ListSource
@@ -492,3 +494,66 @@ def test_the_cpu_path_overlaps_on_the_numpy_backend(tmp_path: Path) -> None:
     assert result.device == "CPU: forced"
     _assert_overlapped(source)
     _assert_whole_clip_records(rig.method.renders, _whole_clip_records(rig))  # type: ignore[attr-defined]
+
+
+# --- the D87 re-check after the lead (CHARC ruling Q-R6) ------------------------------------------
+
+
+def test_the_re_check_adds_the_cache_growth_and_refuses_before_the_first_frame(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # The volume has room for the output's own estimate but not for the cache entry's growth
+    # over the frames the analysis has still to store: the re-check after the lead refuses.
+    rig, source, cache = _rig(tmp_path)
+    held = threading.Event()
+    seen: dict[str, Any] = {}
+
+    def hook(stage: str) -> None:
+        time.sleep(0.002)
+        if sum(1 for tag, _ in source.events if tag == "stream-0") >= 100:  # past the lead
+            held.wait(30)  # the cache entry stays as it was at the re-check
+
+    def check(folder: Path, needed: int) -> SpaceCheck:
+        if "first" not in seen:
+            seen["first"] = needed  # the volume holds exactly the output's estimate
+        else:
+            entry = cache.lookup(KEY)
+            assert entry is not None
+            seen["second"], seen["entry"] = needed, entry
+            held.set()
+        return SpaceCheck(
+            folder=folder, needed=needed, free=seen["first"], ok=needed <= seen["first"]
+        )
+
+    rig.method.hook = hook
+    monkeypatch.setattr(export_module, "check_free_space", check)
+    result = rig.run(rig.request())
+    assert not result.ok and "Not enough free space" in result.failure, result.failure
+    entry = seen["entry"]
+    stored = len(entry.pts_ticks)
+    assert 0 < stored < FRAMES
+    assert seen["second"] - seen["first"] == -(-entry.size_bytes * (FRAMES - stored) // stored)
+    assert seen["second"] > seen["first"]
+    # Refused before the first rendered frame, nothing opened, the analysis stopped and joined.
+    assert rig.method.renders == {}  # type: ignore[attr-defined]
+    assert rig.sinks == [] or "open" not in rig.sink.calls
+    assert _analysis_threads() == []
+    assert not cache.lookup(KEY).complete  # type: ignore[union-attr]
+    assert sorted(p.name for p in rig.folder.iterdir()) == ["clip.mp4", "shot.png"]
+
+
+def test_the_re_check_adds_nothing_for_a_complete_cache_entry(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    rig, _, _ = _rig(tmp_path)
+    assert rig.run(rig.request()).ok  # the first export fills and completes the cache entry
+    needs: list[int] = []
+
+    def check(folder: Path, needed: int) -> SpaceCheck:
+        needs.append(needed)
+        return SpaceCheck(folder=folder, needed=needed, free=needs[0], ok=needed <= needs[0])
+
+    monkeypatch.setattr(export_module, "check_free_space", check)
+    result = rig.run(rig.request())
+    assert result.ok, result.failure
+    assert len(needs) == 2 and needs[0] == needs[1]

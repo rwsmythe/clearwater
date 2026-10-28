@@ -188,6 +188,28 @@ Order of work (CHARC confirmed): Q-R6 as ruled; #2; a WINDOW REQUEST for #2's GX
 leg; #3; the #2+#3 interim and the 4K blur micro-timing (separate windows); task 6; task 7 and
 the Q-R7 stamp; Reviewer A; the two-leg suite (one window per leg); task 10 LAST.
 
+### Q-R6, as built (cell 3)
+
+- **Sized in one call:** IF-7's `ProxyCache.lookup(key).size_bytes` (the entry's pack plus
+  auxiliary files; the stub sums its proxies and records). No STOP.
+- `jobs/export.py`: `_Analysis.start` looks the entry up BEFORE the thread starts;
+  `cache_growth_bytes(frames)` looks it up again after the lead and returns
+  `ceil(grown x remaining / stored)` (grown = size growth since start, stored = pts added since
+  start, remaining = clip frames - pts held); 0 for a complete entry, a missing one, or no growth.
+  The re-check is `_check_space(needed + growth)`. Clip frames = `nb_frames`, else
+  `ceil(duration_s x frame_rate)`. `disk_space.py` and the spec unchanged.
+- The growth is added whether or not the cache shares the output's volume: IF-7 does not expose
+  the cache root, and the ruling adds it unconditionally (conservative).
+- `lookup` from the job's thread: a read under the store's lock; it refreshes the entry's
+  last-use stamp and the eviction pin, as the engine's own `_load` lookup of the same key already
+  does. No proxy or record store from E (one writer per key holds).
+- Tests (`tests/test_wp321_overlap.py`, +2): the planted volume holding exactly the output's
+  estimate refuses at the re-check with the growth equal to the extrapolation of the entry seen
+  at the check, BEFORE the first rendered frame (no render, no `open`, thread joined, entry not
+  complete, folder clean); a complete entry adds nothing. Failing-first against `104e4ab`'s
+  `export.py`: the planted test fails (the job succeeded), the complete-entry test passes (an
+  invariant). Light: overlap + `test_jobs_export.py` 111 passed; ruff, format, mypy clean.
+
 ## RESUME HERE (cell 3, taking #2 and #3)
 
 State at hand-over (cell 2, depth 287,974 at yield 3): branch `wp3.21` on `d1e4537`, no rebase.

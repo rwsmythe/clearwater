@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import dataclasses
 import logging
+import math
 import os
 import threading
 import time
@@ -44,6 +45,7 @@ from clearwater.analysis import AnalysisEngine, block_mean, proxy_factor
 from clearwater.analysis.engine import AnalysisStoppedError
 from clearwater.interfaces import (
     ArrayBackend,
+    CacheEntry,
     CacheKey,
     CorrectionMethod,
     Frame,
@@ -267,19 +269,55 @@ class _Analysis:
         engine: The clip's analysis engine.
     """
 
-    def __init__(self, engine: AnalysisEngine, progress: Progress, name: str) -> None:
+    def __init__(
+        self,
+        engine: AnalysisEngine,
+        progress: Progress,
+        name: str,
+        cache: ProxyCache,
+        key: CacheKey,
+    ) -> None:
         self.engine = engine
         self._progress = progress
         self._name = name
+        self._cache = cache
+        self._key = key
+        self._before: CacheEntry | None = None
         self._fold = _Fold(progress)
         self._result: JobResult | None = None
         self._job: Callable[[Progress], JobResult] | None = None
         self._thread = threading.Thread(target=self._run, name="export-analysis", daemon=True)
 
     def start(self) -> None:
-        """Start the analysis thread."""
+        """Size the clip's cache entry, then start the analysis thread."""
+        self._before = self._cache.lookup(self._key)
         self._job = self.engine.analysis_job(stream=True)
         self._thread.start()
+
+    def cache_growth_bytes(self, frames: int) -> int:
+        """Extrapolate the cache entry's growth over the lead to the frames still to store.
+
+        The D87 re-check runs after the lead (CHARC ruling Q-R6), while the analysis goes on
+        storing proxies on a volume the output may share. The entry's growth since :meth:`start`,
+        per frame stored in that time, is scaled to the frames the entry does not hold yet.
+
+        Args:
+            frames: The clip's frame count.
+
+        Returns:
+            The estimated bytes the entry still grows by; 0 for a complete entry or when nothing
+            was stored during the lead.
+        """
+        after = self._cache.lookup(self._key)
+        if after is None or after.complete:
+            return 0
+        before = self._before
+        grown = after.size_bytes - (0 if before is None else before.size_bytes)
+        stored = len(after.pts_ticks) - (0 if before is None else len(before.pts_ticks))
+        remaining = frames - len(after.pts_ticks)
+        if grown <= 0 or stored <= 0 or remaining <= 0:
+            return 0
+        return -(-grown * remaining // stored)
 
     def _run(self) -> None:
         try:
@@ -761,9 +799,13 @@ class ExportEngine:
         hw_decode = backend.device != "cpu"
         analysis = self._analyse(request, method, backend, probe, params, hw_decode, progress, run)
         try:
-            # After the lead: the analysis cache may share the volume (on a clip longer than the
-            # lead the cache goes on growing during the export).
-            self._check_space(run, plan.folder, needed)
+            # After the lead: the analysis cache may share the volume, and on a clip longer than
+            # the lead it goes on growing during the export, so its extrapolated growth is
+            # added to the item's estimate (CHARC ruling Q-R6).
+            frames = video.nb_frames
+            if frames is None:
+                frames = math.ceil(probe.duration_s * video.frame_rate)
+            self._check_space(run, plan.folder, needed + analysis.cache_growth_bytes(frames))
             self._check_cancel(progress)
 
             provenance = (
@@ -827,17 +869,18 @@ class ExportEngine:
             The running (or, for a clip within its lead, finished) analysis.
         """
         self._stage("analysis")
+        key = self._cache_key(request.source)
         engine = AnalysisEngine(
             method=method,
             backend=backend,
             cache=self._cache,
-            key=self._cache_key(request.source),
+            key=key,
             source=self._video_source,
             probe=probe,
             params=params,
             hw_decode=hw_decode,
         )
-        analysis = _Analysis(engine, progress, run.name)
+        analysis = _Analysis(engine, progress, run.name, self._cache, key)
         analysis.start()
         analysis.lead()
         return analysis
