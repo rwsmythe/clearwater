@@ -55,6 +55,14 @@
   brief's table (the orchestrator's record lists them; I write the register). **NEXT:** orchestrator writes rulings into the
   briefs, commits `briefs-p4`, ff main, dispatches WP4.1 (opus-high) + WP-T5 (lane by pace); WP4.2 / WP4.3 FINAL on my word after
   their predecessor's accept + one revision; windows OPEN/CLOSE as before; CHARC QA at each accept (standing rules below).
+- **PHASE 4 LIVE 19:07Z (msg `89e7cc14ede77ef3`): briefs on main 3aa3c51 (WP4.1 + WP-T5 FINAL; WP4.2 + WP4.3 DRAFT RULED, FINAL on
+  my word after the predecessor's accept + one revision; each carries my packet verbatim as `## Rulings`; verified at my seat: 0 CR,
+  rulings section x4, AD-11 AS AMENDED in WP4.3).** Live cells (OCCUPIED worktrees): **WP4.1 `wp41-cell1`** opus-high in
+  `.worktrees/wp4.1` from 3aa3c51 (depth 0 at dispatch; yields Y1 round-0 table BEFORE building, Y2 window requests, Y3 STOPs, Y4
+  each A round, Y5 return); **WP-T5 Codex lane** (`codex_cell.py turn`, turn 1 = rung 0) in `.worktrees/wp-t5` from 3aa3c51, pace
+  Codex 0.188 vs Claude 1.355 at 19:02Z; the orchestrator runs W1/W2/W3 in exclusive windows (OPEN/CLOSE to me); reviewer = the
+  Claude pass FAST (STRONG on any non-test change). Evidence `clearwater-review-evidence\wp-t5\cell\`. **No window open yet; W1
+  (BEFORE serial leg ~45 min) comes first. Nothing heavy at this seat while any window is OPEN.**
 - **Owner-pending inputs (carry):** photos (WP3.6P; WP4.1 records the owner-photo leg OWED), the iPhone clip (DR-15), the N6 body
   erratum DR-64 (apply on the owner's word 'apply N6 erratum' as spec v0.5.6). Open owner decisions: none. Every owner-facing
   summary ends with that line.
