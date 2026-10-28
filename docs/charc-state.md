@@ -69,6 +69,15 @@
   W3 / W2 same config as W1 (like-for-like); the GATE legs run at the orchestrator's seat with the gate worktree's local config
   pointing at the MAIN tree's work/ (no 3.4 GB copy), expected 1,113 / 1; both configs stated in the record. **No window open; seat
   free.** WP-T5 turn 2 (round-0 table) running; WP4.1 released for light runs.
+- **WP4.1 REVIEWER A R1 (head ef6bf2f; FYI `152c00dbd05527be`): 0 critical / 2 major / 6 minor, all NEW in envelope; adjudication
+  UPHELD (F2 MINOR). F1 path privacy (D87 refusal text and two stderr lines carry full paths -> one redaction helper at every exit
+  + test); F3 `UnsupportedFormatVersionError` escapes `main` -> usage refusal exit 2 + test; F2, F4-F8 minors. V8 (c) on two
+  1080x1920 crops inside the amended bounds (k=2 mean 0.08-0.09, p99 0.47-1.11; k=4 mean 0.27-0.29, p99 1.36-3.70; max ~22-30
+  recorded). **SEAT PLAN CORRECTED (my msg 6ba8af9a): cell 1 at 299K fixes F1 + F3 ONLY (fill re-seat line, hazard (6)), depth
+  read after F1 and at the yield, hands over at 370K at the latest; cell 2 (opus-high, fresh) takes F2 + F4-F8, then A round 2,
+  the two-leg window, the report.** Short window (WP4.1 gpu + v8c legs) 20:12Z OPEN/CLOSED, 2 passed, 28 s, no figure. WP4.1
+  light runs green at 755513b (V9 planted control = gamma 1.5; a strength at default moves no pixels under neutral). **No window
+  open; seat free.**
 - (history) W1 OPEN ~19:20Z (msg `65c91896081df817`; collections 5,289 all / 1,114 serial). WP-T5 turn 1 `a9abb8d`
   (depth 138,874): rung 0 done, frame counts 9 / 3 / 2 confirmed, no frame-count branch between 3 and 9; Codex sandbox stalled on
   CuPy import at collection, so the orchestrator collects at its seat (recorded). WP4.1 round 0 RULED at the orchestrator's seat
