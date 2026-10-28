@@ -63,7 +63,8 @@ Cell `implementer-opus-high` (Claude lane), worktree `.worktrees/wp3.21`, branch
 | 38 | cell 8: WINDOW RELEASED (parallel leg green); WINDOW REQUEST (serial leg) | 67,467 |
 | 39 | cell 8: WINDOW RELEASED (serial leg green); WINDOW REQUEST (block 3, GX011625) | 83,323 |
 | 40 | cell 8: WINDOW RELEASED (block 3, both instruments pass); report next | (dispatcher fills) |
-| 41 | cell 8: report written; STOP (V4 SAME not in the record); WINDOW REQUEST (V4) | (dispatcher fills) |
+| 41 | cell 8: report written; STOP (V4 SAME not in the record); WINDOW REQUEST (V4) | 185,908 (given with "no more heavy runs") |
+| 42 | cell 8: thermals item; return report (final) | (dispatcher fills) |
 
 ## RESUME HERE (cell 6, after cell 5)
 
@@ -2355,3 +2356,13 @@ optimised engine" (ruling Q3: "After encode V4 SAME through `tools/video_fidelit
 of this ledger finds no `video_fidelity` run by any cell, and no RESUME HERE named it. The bench
 deletes its outputs unless `--keep`, so no optimised output exists to compare. Reported in the
 report's Open items; raised to the dispatcher with a proposed window (recommended first).
+
+### Dispatcher at yield 41 (depth 185,908) and CHARC `1bd3eb2b`
+
+The dispatcher verified block 3 on disk (both instruments; 9.576 min/min recomputed), posted the
+CLOSE to CHARC, and directed: the report, then the return report as the final message; **no more
+heavy runs**. So the V4 window was NOT run; V4 SAME stays an OPEN item in the report and the return
+report for the dispatcher's ruling (options (a) the window, (b) a CHARC waiver). CHARC `1bd3eb2b`:
+the block 3 thermals (95 C peak, the power cap, the last-quarter median +4 % over the first hour)
+and the `System` stray at 26.8 % are recorded as spread, not a limit; applied to the report's
+Conditions.

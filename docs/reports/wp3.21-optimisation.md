@@ -257,9 +257,10 @@ arithmetic, and their memory is re-stated against the new job total below. In ea
   the first), 52-69 C.
 - Block 2 re-run: 15:17:48Z-15:21:22Z.
 - Block 3: 16:27:27Z-17:47:22Z. First hour 85 C / SM 1,845 MHz / 64.8 W; software thermal slowdown in about half the
-  samples, power cap in the rest. After that, 79 C / 1,575 MHz / 54.8 W; peak 95 C (baseline 82 C / 1,590 MHz,
-  peak 93 C). Frames-phase median 0.2951 s in the first hour, 0.3066 in the last quarter. Stray: `System` 26.8 % CPU
-  over the run, kept as spread.
+  samples, power cap in the rest. After that, 79 C / 1,575 MHz / 54.8 W under the power cap; peak 95 C (baseline
+  82 C / 1,590 MHz, peak 93 C). Frames-phase median 0.2951 s in the first hour, 0.3066 in the last quarter (+4 %).
+  Stray: `System` 26.8 % CPU over the run. Per CHARC (`1bd3eb2b`) the thermals, the power cap, the +4 % and the
+  stray are recorded as SPREAD, not as a limit; 9.58 min/min meets D106 and the ~10 aim with margin either way.
 - Telemetry errors 0 on every row; the NVENC proof is tied on every NVENC row.
 
 ## Memory (N4 and AD-1)
