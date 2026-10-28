@@ -313,7 +313,7 @@ md5s). Probe 20:14:34Z: one `succeeded in` line, banner `gpt-6.1-sol` / high.
 | Round | Head | Critical | Major (blocking) | Minor | In / out envelope | New / reopened | Reverts | Fixes touch | Depth |
 |---|---|---|---|---|---|---|---|---|---|
 | 1 | `ef6bf2f` | 0 | 2 (F1, F3) | 6 (F2 downgraded, F4-F8) | 8 / 0 | 8 / 0 | 0 | runner (`tools/`, F1-F4), root docstring (F6), report (F5, F7), one test (F8) | 299,161 |
-| 2 | `dca6d1e` | 0 | 2 (G1 NEW, G2 REOPENED) | 5 (G3, G4, G5 downgraded, G6, G7) | 7 / 0 | 3 / 4 | 0 | not yet remediated | 93,956 |
+| 2 | `dca6d1e` | 0 | 2 (G1 NEW, G2 REOPENED) | 5 (G3, G4, G5 downgraded, G6, G7) | 7 / 0 | 3 / 4 | 0 | runner (`tools/`, G1-G7 incl. the G5 docstring), tests, report | 93,956 |
 
 ### Round 1 (20:14-20:24Z) -- VERDICT NEW_CRITICAL_MAJOR_FOUND; adjudicated, NOT yet remediated
 
@@ -366,7 +366,7 @@ string in the record or the captured output.
   `-n 4 -m "not gpu and not footage and not slow"` over the six WP4.1 test files plus
   `test_gui_deps` and `test_gui_status`: 306 passed (18.7 s, `work/wp4.1-r1fix-light.log`).
 
-### Round 2 (21:05-21:15Z, cell 3) -- VERDICT NEW_CRITICAL_MAJOR_FOUND; adjudicated, NOT yet remediated
+### Round 2 (21:05-21:15Z, cell 3) -- VERDICT NEW_CRITICAL_MAJOR_FOUND; adjudicated, remediated below
 
 Probe 21:05:09Z: one `succeeded in`, banner `gpt-6.1-sol` / high. Light re-check on `dca6d1e`
 before the round: ruff, ruff format --check (259), mypy (141) green; the six WP4.1 files plus
@@ -392,6 +392,36 @@ before the round: ruff, ruff format --check (259), mypy (141) green; the six WP4
 - Mechanical: VERDICT anchored; 31 `succeeded in`; `tokens used` 210,773; four start-up ERROR
   lines (models refresh, MCP connector, two websocket DNS failures; HTTPS carried the run), the
   rest echoed source: round COUNTS.
+
+### Round 2 remediation (orchestrator GO at Y5, 21:20Z; recommended plan FINAL)
+
+- Failing first: eleven new tests in `tests/test_headless_export.py` (`test_g1_*` x4 incl. the
+  two spellings, `test_g2_*`, `test_g3_*`, `test_g4_*`, `test_g6_*` x3, `test_g7_*` x2) ran RED on
+  `c45a82c` (`work/wp4.1-c3-r2red.log`: 11 failed, 1 passed, the passing one the "appeared during
+  the run" control; `work/wp4.1-c3-r2red2.log`: the planted ASCII Orientation printed
+  `'PRIVATE_EXIF_VALUE'` end to end), then GREEN. The test helper `_path_forms` now also checks
+  the `ascii_text` spellings.
+- `69e29a9` (runner + tests): G1 `plain_path` strips `\\?\UNC\` and `\\?\`; `inside` compares the
+  resolved prefix-free paths and, where the footage folder exists, file identity of `path` and
+  its existing ancestors (`os.path.samestat`; skipped when `st_ino` is 0), so a share of the same
+  drive and an 8.3 name are inside too (beyond the ruling's letter, same direction: refuses only
+  more; probe: `\\localhost\C$\...`, `\\?\UNC\localhost\C$\...`, `CLEARW~1` all samefile).
+  G2-G4: the Redactor adds the prefix-free and UNC-extended spellings and each form's
+  `ascii_text` escape, and skips separator-free forms (a bare name hides nothing and its
+  case-insensitive match could alter a file name now that every record field is redacted); an
+  `argparse` refusal raises `_UsageError` and `main` prints the usage line plus the text redacted
+  against every path the arguments name; `record_object` passes every string through the
+  Redactor. G5: `read_parameter_file` and `--parameters` help narrowed to the importer's forms.
+  G6: `_write_record` -> redacted message, exit 1, a partial file removed only if this run created
+  it. G7: the filter shows every argument of a `clearwater.io.photo.exif` WARNING, and every `%r`
+  argument of any record (the reader's TIFF Orientation `%r` too, same "no tag value" outcome), as
+  `...`.
+- `4d80289`: report limits (redaction spellings, footage check spellings, the G5 OPEN ITEM owned
+  by CHARC) and a claims row.
+- Light runs on `69e29a9`: ruff, ruff format --check (259), mypy (141) green; `-n 4 -m "not gpu
+  and not footage and not slow"` over the six WP4.1 files plus `test_gui_deps`, `test_gui_status`,
+  `test_core_deps`, `test_jobs_naming`, `test_jobs_export_photo`: 455 passed, 0 skipped (the UNC
+  share was reachable) (`work/wp4.1-c3-r2fix-light.log`).
 
 ## RESUME HERE (cell 2, after cell 1)
 
