@@ -96,8 +96,14 @@
   output 8 DIFFERENT); draft-as-standard control CAUGHT by name (levels test, 5.0 Main, 328 s); both test files byte-identical to
   HEAD, 0 CR. W3 run condition MET; W3 (~55 min, both legs, W1's config) opens at WP4.1 cell 3's next yield. No window open;
   seat free.** (history: W2b OPEN ~21:21Z, msg `125c9dae6a66d68f`.)
-- **EXCLUSIVE WINDOW OPEN ~21:59Z: WP-T5 W3 AFTER two legs (msg `ad582f053ab6724d`, ~55 min, W1's config 1,104 / 10, saving vs
-  2,798.4 s against the 110 s bar). NOTHING HEAVY AT THIS SEAT until CLOSE.** WP4.1 cell 3 yielded for it.
+- **W3 CLOSED 22:44Z (query `cf2e5e6007c760a2`): AFTER parallel 4,174 / 1 in 509.95 s; serial 1,104 / 10 in 2,261.41 s, W1's ten
+  skips identical, collections identical (5,289 / 1,114). SAVING 536.97 s (~9 min) > 110 s bar; no second pair. DR-65 closes at
+  WP-T5's accept with the engine test's recorded reason. No window open; seat free.** (history: W3 OPEN ~21:59Z, msg
+  `ad582f053ab6724d`.) **STACKED GATE WP-T5 + WP4.1 RULED YES (my msg ruling-stack):** own Reviewer B and record per package;
+  per-package patch-id before/after rebase; stack-top two-leg suite in the main-work gate config (1,113 / 1 expected) = figure of
+  record for both by code identity; replaces WP4.1 cell 4's final-head suite only if patch-id equal to cell 4's head; HOLD CAP
+  ~2 h after WP-T5's Reviewer A converges, else WP-T5 gates alone. Next: Codex turn 5 (report, ledger), WP-T5 Reviewer A (FAST
+  Claude pass), WP4.1 cell 4 round 4; then the stacked gate.
 - **WP4.1 R3 H1 RULED (A) BANK to WP4.3 (my msg ruling-h1), four conditions:** the GUI preview shows an nclx-only Display P3 HEIC
   UNCONVERTED (`gui/render_worker.py`, `gui/preview.py` pass only `icc_profile`; WP3.16 lines c9fb2e8 / b51cc8d, reachable with
   real data since WP4.1's swap 4ee4ea7; preview (199, 40, 60) vs (217, 0, 54) via the D53 built-in; export correct; evidence
