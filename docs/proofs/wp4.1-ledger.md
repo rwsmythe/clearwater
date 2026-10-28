@@ -11,6 +11,7 @@ Brief `docs/briefs/wp4.1-brief.md` FINAL (rulings CHARC `2c4476d9869df056`). Rev
 | Y1 round 0 | 2026-10-28 | 140,680 |
 | Y4 round 1 adjudicated | 2026-10-28 | 299,161 (past the 250K evaluation point: last bounded step in this seat) |
 | Seat change | 2026-10-28 | cell 2 stood down at 66,183 (final reading; committed `dca6d1e`, prepared r2, ran nothing); cell 3 (`implementer-opus-high`) from 0 at dispatch |
+| Y5 round 2 adjudicated (cell 3) | 2026-10-28 21:20Z | 93,956 |
 
 ## Task 1: map (main `3aa3c51`)
 
@@ -312,7 +313,7 @@ md5s). Probe 20:14:34Z: one `succeeded in` line, banner `gpt-6.1-sol` / high.
 | Round | Head | Critical | Major (blocking) | Minor | In / out envelope | New / reopened | Reverts | Fixes touch | Depth |
 |---|---|---|---|---|---|---|---|---|---|
 | 1 | `ef6bf2f` | 0 | 2 (F1, F3) | 6 (F2 downgraded, F4-F8) | 8 / 0 | 8 / 0 | 0 | runner (`tools/`, F1-F4), root docstring (F6), report (F5, F7), one test (F8) | 299,161 |
-| 2 | `dca6d1e` | 0 | 2 (G1 NEW, G2 REOPENED) | 5 (G3, G4, G5 downgraded, G6, G7) | 7 / 0 | 3 / 4 | 0 | not yet remediated | (dispatcher's figure at Y5) |
+| 2 | `dca6d1e` | 0 | 2 (G1 NEW, G2 REOPENED) | 5 (G3, G4, G5 downgraded, G6, G7) | 7 / 0 | 3 / 4 | 0 | not yet remediated | 93,956 |
 
 ### Round 1 (20:14-20:24Z) -- VERDICT NEW_CRITICAL_MAJOR_FOUND; adjudicated, NOT yet remediated
 

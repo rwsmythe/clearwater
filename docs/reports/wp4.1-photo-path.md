@@ -50,6 +50,7 @@
 | The shell on `default_engines()` opens a still with the real reader, `Device: CPU: forced` | `tests/test_wp41_gui.py` |
 | Runner: routing equal to `gui.sources` (sidecar and unknown suffix refused, batch continues) | `tests/test_headless_export.py::test_the_routing_tables_and_texts_equal_the_interfaces`, `...::test_refused_items_fail_and_the_batch_continues` |
 | Runner: exit 0/1/2, record schema 1 with names only, footage refusals, no PySide6 / CuPy, cancel and Ctrl-C, DR-62 order, DR-6, DR-35 (a), video unavailable | `tests/test_headless_export.py` |
+| Runner (Reviewer A round 2): footage refusals through the `\\?\` and `\\?\UNC\` spellings; no full path for a non-ASCII folder, an `argparse` refusal, a record field or a record that cannot be written; no EXIF tag value printed | `tests/test_headless_export.py::test_g1_*` to `::test_g7_*` |
 | V5 on every WP2.3 still at 8 and 16 bit (planted `iCCP`-dropping writer) | `tests/test_wp41_photo_path.py::test_v5_*` |
 | V9 neutral identity, both methods, every still, 8 and 16 bit (planted off-neutral control) | `tests/test_wp41_photo_path.py::test_v9_*` |
 | V10: D84, D35, D36, N8, D116, D83, D45 | `tests/test_wp41_photo_path.py::test_v10_*` |
@@ -69,9 +70,22 @@
 - **N10 with provenance on** (S1): files differ only in the provenance `created` stamp.
 - **Runner texts:** the record and every printed line carry the engine's texts with each folder
   the run knows (the output folder, each source's folder, the settings, record and parameter
-  folders) shown by its name only (`tools/headless_export.py` `Redactor`, R1 F1); a path the run
-  does not know (a drive root, or a folder no request, flag or file names) would be printed as the
-  engine gives it.
+  folders) shown by its name only, in every spelling the runner can name (as given, resolved,
+  without an extended-length prefix, escaped as `ascii_text` escapes it, quoted as `repr` quotes
+  it; `tools/headless_export.py` `Redactor`, R1 F1, R2 G2-G4, G6); an `argparse` refusal is
+  redacted against the paths its arguments name (R2 G3). A path the run does not know (a drive
+  root, or a folder no request, flag or file names) would be printed as the engine gives it. No
+  EXIF tag value is printed: a WARNING from `clearwater.io.photo.exif`, and any `%r` argument,
+  is shown with `...` in its place (R2 G7).
+- **Footage check spellings:** the runner compares paths resolved, without the `\\?\` and
+  `\\?\UNC\` prefixes and, where the footage folder exists, by file identity (a share of the
+  same drive, a short 8.3 name) (R2 G1). A file system without file identities (`st_ino` 0)
+  falls back to the text comparison.
+- **`--parameters` and photo provenance (OPEN ITEM, owned by CHARC):** the runner reads the
+  forms `PresetStore.import_preset` reads (an AD-13 preset; a preset with only `source` and
+  `settings` added). The provenance text `PhotoWriter` embeds for a HEIC given a built-in profile
+  carries `"profile"` (WP3.6 `7624f5c`), which both the runner and the accepted importer refuse
+  (`unknown keys: profile`, exit 2; R2 G5). The writer-versus-AD-13 key set is banked with CHARC.
 
 ## OWED (not limits of the code)
 
