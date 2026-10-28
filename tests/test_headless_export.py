@@ -150,7 +150,7 @@ def test_a_parameter_file_is_read_with_its_provenance_dropped(tmp_path: Path) ->
     ("text", "match"),
     [
         ("{not json", "not a readable parameter file"),
-        ("[1, 2]", "not a JSON object"),
+        ("[1, 2]", "expected a JSON object"),
         ('{"format_version": 99}', "not a readable parameter file"),
     ],
 )
@@ -814,3 +814,57 @@ def test_g7_a_planted_exif_value_is_not_printed_by_the_runner(tmp_path: Path) ->
     assert "STATUS 0" in done.stdout, done.stderr
     assert "Orientation ... is not 1 to 8" in done.stderr  # the WARNING is printed
     assert "PRIVATE_EXIF_VALUE" not in done.stdout + done.stderr
+
+
+# --- Reviewer A round 3 (H2, H3, H5) ------------------------------------------------------------
+
+
+def test_h2_a_repr_of_an_escaped_folder_is_hidden(
+    sample, tmp_path: Path, no_footage: None, capsys
+) -> None:
+    out = tmp_path / "privé" / "out"
+    out.mkdir(parents=True)
+    text = he.Redactor([out])(he._unknown_method(str(out), {"c3": None}))
+    assert text == "unknown correction method 'out'; the methods are c3."
+    assert _main(sample(STILL), "--out", out, "--method", out) == 2
+    err = capsys.readouterr().err
+    assert "unknown correction method 'out'" in err and _no_full_path(err, tmp_path)
+
+
+def test_h3_the_library_run_prints_its_warnings_redacted(sample, tmp_path: Path) -> None:
+    out = tmp_path / "out"
+    out.mkdir()
+    code = (
+        "import sys\n"
+        "from pathlib import Path\n"
+        f"sys.path.insert(0, {str(TOOLS)!r})\n"
+        "import headless_export as he\n"
+        "from clearwater.config import new_parameter_set\n"
+        "from clearwater.interfaces import Settings\n"
+        "from clearwater.jobs import SpaceCheck\n"
+        "import clearwater.jobs.export as export\n"
+        "export.check_free_space = lambda f, n: SpaceCheck(folder=f, needed=n, free=0, ok=False)\n"
+        "settings = Settings(output_folder=Path(sys.argv[2]), force_cpu=True)\n"
+        "requests = he.requests_for([Path(sys.argv[1])], parameters=new_parameter_set('c3', {}),\n"
+        "                           settings=settings)\n"
+        "record = he.run(requests, footage_folder=None)\n"
+        "print('STATE', record.report.items[0].state)\n"
+    )
+    done = subprocess.run(
+        [sys.executable, "-c", code, str(sample(STILL)), str(out)],
+        capture_output=True,
+        text=True,
+        timeout=300,
+    )
+    assert "STATE failed" in done.stdout, done.stderr
+    assert "Not enough free space in out" in done.stderr  # the batch WARNING was printed
+    assert _no_full_path(done.stdout + done.stderr, tmp_path)
+
+
+def test_h5_a_non_finite_number_anywhere_in_a_parameter_file_is_refused(tmp_path: Path) -> None:
+    preset = new_parameter_set("c3", {}).to_dict()
+    text = json.dumps({**preset, "settings": {"bad": 0.5}}).replace("0.5", "NaN")
+    path = tmp_path / "p.json"
+    path.write_text(text, encoding="utf-8")
+    with pytest.raises(he.RunnerRefusalError, match=r"p\.json is not a readable parameter file"):
+        he.read_parameter_file(path)

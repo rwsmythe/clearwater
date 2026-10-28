@@ -40,7 +40,10 @@ names its folder; an ``argparse`` refusal is redacted against the paths its argu
 tool installs no logging handler, so ``run_batch``'s INFO report (which names full output paths)
 is not emitted; Python's last-resort handler prints WARNING lines only, and while :func:`main`
 runs a filter on that handler passes them through the same redactor and prints no tag value
-(an EXIF module argument or a ``%r`` argument is shown as ``...``).
+(an EXIF module argument or a ``%r`` argument is shown as ``...``); :func:`run` does the same
+while its batch runs. A process that installs its own logging handlers (a host program, pytest)
+receives the engine's records as they are logged, full paths and tag values included: the
+runner redacts what it prints and records, not another program's logging.
 """
 
 from __future__ import annotations
@@ -70,6 +73,7 @@ from clearwater.config import (
     new_parameter_set,
 )
 from clearwater.interfaces import JobResult, ParameterSet, Progress, Settings
+from clearwater.interfaces.parameters import loads_object
 from clearwater.io.video.inputs import ascii_text, is_sidecar, sidecar_fault
 from clearwater.jobs import BatchReport, run_batch, validate_suffix
 from clearwater.jobs.export_seam import ExportJobs, ExportRequest
@@ -198,7 +202,8 @@ class Redactor:
     (:func:`plain_path`), plus a UNC path's extended spelling; each with backslashes, with doubled
     backslashes (an ``OSError`` or ``argparse`` text quotes the path's ``repr``) and with forward
     slashes; and each of those also with its non-ASCII characters escaped as :func:`ascii_text`
-    escapes them (engine texts are escaped before they reach the runner). A spelling without a
+    escapes them (engine texts are escaped before they reach the runner), and that escaped form
+    with its backslashes doubled (the ``repr`` of an escaped path). A spelling without a
     separator says nothing a name does not, so it is not replaced; nor is a folder without a
     name (a drive root).
     """
@@ -220,7 +225,8 @@ class Redactor:
                     continue
                 text = str(path)
                 for base in (text, text.replace("\\", "\\\\"), path.as_posix()):
-                    for form in (base, ascii_text(base)):
+                    escaped = ascii_text(base)
+                    for form in (base, escaped, escaped.replace("\\", "\\\\")):
                         if "\\" in form or "/" in form:
                             forms.setdefault(form, ascii_text(path.name))
         self._patterns = [
@@ -363,9 +369,10 @@ def requests_for(
 def read_parameter_file(path: Path) -> ParameterSet:
     """Read an AD-13 preset JSON file as a parameter set.
 
-    The document is migrated (``clearwater.config.migrate``), its ``source`` and ``settings``
-    provenance keys dropped and its keys checked (``check_parameter_set_keys``): the forms
-    ``PresetStore.import_preset`` reads, a preset and a preset with only those two keys added.
+    The document is decoded as the importer decodes it (``loads_object``: one JSON object, no
+    non-finite number anywhere), migrated (``clearwater.config.migrate``), its ``source`` and
+    ``settings`` provenance keys dropped and its keys checked (``check_parameter_set_keys``): the
+    forms ``PresetStore.import_preset`` reads, a preset and a preset with only those two keys added.
     Any other key is refused, as the importer refuses it; so is the provenance text the photo
     writer embeds when it adds ``profile`` for a built-in profile (an open item owned by CHARC).
 
@@ -380,9 +387,7 @@ def read_parameter_file(path: Path) -> ParameterSet:
     """
     name = ascii_text(Path(path).name)
     try:
-        data = json.loads(Path(path).read_text(encoding="utf-8"))
-        if not isinstance(data, dict):
-            raise ValueError("the document is not a JSON object")
+        data = loads_object(Path(path).read_text(encoding="utf-8"))
         data = migrate("preset", data)
         kept = {key: value for key, value in data.items() if key not in PROVENANCE_KEYS}
         parameter_set = ParameterSet.from_dict(kept)
@@ -562,6 +567,10 @@ def run(
 ) -> RunRecord:
     """Run one batch over the requests, in order, on the caller's thread (G7; D45, D81; DR-62).
 
+    While the batch runs, Python's last-resort handler prints its WARNING lines through a
+    :class:`Redactor` of the run's folders (as :func:`main` does); a caller's own logging
+    handlers receive the engine's records as logged.
+
     Args:
         requests: The items (:func:`requests_for`).
         exports: The export engine; ``composition.export_jobs()`` when None.
@@ -583,12 +592,13 @@ def run(
     )
     check_outputs(requests, folder)
     engine = _WithRefusals(composition.export_jobs() if exports is None else exports)
+    folders = tuple(dict.fromkeys([*folders_of(requests), *map(Path, known_folders)]))
     start = time.perf_counter()
-    report = run_batch(engine, list(requests), progress or RunnerProgress())
+    with _redacted_last_resort(Redactor(folders)):
+        report = run_batch(engine, list(requests), progress or RunnerProgress())
     routes = tuple(
         "refused" if isinstance(request, RefusedRequest) else request.kind for request in requests
     )
-    folders = tuple(dict.fromkeys([*folders_of(requests), *map(Path, known_folders)]))
     return RunRecord(report, routes, parameters_from, time.perf_counter() - start, folders)
 
 

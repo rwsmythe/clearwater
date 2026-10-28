@@ -32,7 +32,6 @@ from clearwater.interfaces import ParameterSet, Settings
 from clearwater.io.photo import PhotoReader, PhotoWriter
 from clearwater.io.photo import png as png_tools
 from clearwater.io.photo.png import PROVENANCE_KEYWORD
-from clearwater.io.photo.writer import built_in_profile
 from clearwater.jobs.batch import BatchItem
 from fixture_plugin import load_manifest
 from spike_io import photo as spike
@@ -42,6 +41,15 @@ ENTRIES = {e["id"]: e for e in _MANIFEST["samples"]}
 STILL_IDS = [e["id"] for e in _MANIFEST["samples"] if e["group"] == "stills"]
 ORIENT_IDS = [i for i in STILL_IDS if i.startswith("jpeg-orient-")]
 AD24_IDS = [i for i in STILL_IDS if i.startswith("heic-ad24-")]
+
+SRGB_BUILT_IN_MD5 = "ca34a0279325928fc9fd3fc7eff99eb9"
+"""The D53 built-in sRGB profile's md5, as `tests/test_io_photo_srgb.py` pins it."""
+
+BUILT_IN_SRGB_IDS = frozenset(
+    [*AD24_IDS, *(f"heic{d}-{c}-none" for d in (8, 10) for c in ("gradient", "lowred", "uniform"))]
+)
+"""The stills tagged sRGB by ``nclx`` without an ICC profile: the export embeds the D53 built-in
+(pinned here, not derived through the writer's own ``built_in_profile``)."""
 
 ORIENTATION = int(ExifTags.Base.Orientation)
 SOFTWARE = int(ExifTags.Base.Software)
@@ -199,10 +207,9 @@ def assert_v5_icc(output: Path, sample_id: str, source: Path) -> None:
         assert got is not None, f"iCCP missing: {sample_id} carries an ICC profile"
         assert hashlib.md5(got).hexdigest() == facts["icc_md5"], f"iCCP differs: {sample_id}"
         return
-    image, meta = PhotoReader().read(source)
-    built_in = built_in_profile(image.color, meta.source_format)
-    if built_in is not None:
-        assert got == built_in[1], f"iCCP is not the D53 built-in {built_in[0]}: {sample_id}"
+    if sample_id in BUILT_IN_SRGB_IDS:
+        assert got is not None, f"iCCP missing: {sample_id} gets the D53 built-in sRGB"
+        assert hashlib.md5(got).hexdigest() == SRGB_BUILT_IN_MD5, f"not the built-in: {sample_id}"
     else:
         assert got is None, f"iCCP present for an untagged source: {sample_id}"
 
@@ -319,7 +326,7 @@ def test_v9_neutral_is_the_identity(
     sample, tmp_path, record_property, sample_id: str, method_id: str
 ) -> None:
     source = sample(sample_id)
-    original, meta = PhotoReader().read(source)
+    original, _ = PhotoReader().read(source)
     params = he.parameters_for(method_id, neutral=True)
     for depth in (8, 16):
         out = tmp_path / f"d{depth}"
@@ -335,9 +342,12 @@ def test_v9_neutral_is_the_identity(
         assert [getattr(written.color, t) for t in tags] == [
             getattr(original.color, t) for t in tags
         ]
-        built_in = built_in_profile(original.color, meta.source_format)
-        expected_icc = original.color.icc_profile if built_in is None else built_in[1]
-        assert written.color.icc_profile == expected_icc, sample_id
+        if sample_id in BUILT_IN_SRGB_IDS:
+            assert original.color.icc_profile is None, sample_id
+            got = written.color.icc_profile or b""
+            assert hashlib.md5(got).hexdigest() == SRGB_BUILT_IN_MD5, sample_id
+        else:
+            assert written.color.icc_profile == original.color.icc_profile, sample_id
 
 
 @pytest.mark.parametrize("sample_id", ["jpeg-gradient-srgb", "png16-lowred-display-p3"])

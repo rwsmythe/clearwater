@@ -176,10 +176,12 @@ def test_importing_the_root_builds_nothing_and_loads_no_qt_or_cupy() -> None:
     code = (
         "import sys\n"
         "import clearwater.io.photo.reader as r, clearwater.jobs.export as e\n"
+        "import clearwater.io.photo.writer as w, clearwater.methods as m\n"
         "built = []\n"
-        "orig_r, orig_e = r.PhotoReader.__init__, e.ExportEngine.__init__\n"
         "r.PhotoReader.__init__ = lambda self, *a, **k: built.append('reader')\n"
         "e.ExportEngine.__init__ = lambda self, *a, **k: built.append('engine')\n"
+        "w.PhotoWriter.__init__ = lambda self, *a, **k: built.append('writer')\n"
+        "m.available_methods = lambda *a, **k: built.append('methods') or {}\n"
         "import clearwater.app, clearwater.app.composition\n"
         "bad = sorted(m for m in sys.modules\n"
         "             if m.split('.')[0] in ('PySide6', 'shiboken6', 'cupy', 'cupyx'))\n"
