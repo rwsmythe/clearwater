@@ -191,6 +191,12 @@ during its export (DR-62), other operating systems (portable code, not run there
   `work/`. Gates: ruff check, ruff format --check, mypy strict, full suite (in a window); no
   harness gate. Report `docs/reports/wp3.21-optimisation.md` (claims, evidence paths, limits,
   the baseline beside the result).
+- **Layering tests in every light run (AD-29, CHARC 2026-10-28, after the yield-5 STOP).** Every
+  light run includes `tests/test_core_deps.py`, `tests/test_color_deps.py`,
+  `tests/test_io_video_decode_rules.py` and `tests/test_analysis_deps.py` (plan 8.1 frame rule 5:
+  nothing outside `clearwater.core` imports `cupy`/`cupyx` or reads `.xp`). Device work reaches the
+  GPU only through AD-29's IF-2 device extensions on `CoreBackend`, by one consumer-side
+  `runtime_checkable` Protocol per package.
 
 ## Questions for CHARC (recommended answer first)
 
