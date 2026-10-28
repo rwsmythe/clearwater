@@ -1,0 +1,642 @@
+"""Headless export runner: drive a photo export or batch without the interface (WP4.1, test tool).
+
+A test tool, not a product feature (plan section 6, WP4.1): acceptance tests (WP5.1) and manual
+runs drive the product's composition root (:mod:`clearwater.app.composition`) through one
+:func:`clearwater.jobs.run_batch` on the caller's thread, one job at a time (DR-62). Every write
+goes through the export engine and ``SafeWrite``; this tool writes nothing itself but the record
+file it is asked for. It loads no PySide6, and with ``--force-cpu`` no CuPy.
+
+Library API: :func:`route`, :func:`requests_for`, :func:`parameters_for`, :func:`check_outputs`,
+:func:`run`, :func:`record_json`, :func:`exit_status` and :func:`main`. Command line::
+
+    uv run python tools/headless_export.py PATH [PATH ...] (--out DIR | --beside-source)
+        [--suffix S] [--bit-depth {8,16}] [--no-provenance] [--force-cpu] [--encoder NAME]
+        [--quality {high,standard,draft}] [--ten-bit] [--cache-limit-bytes N] [--method ID]
+        [--parameters FILE | --neutral] [--settings-dir DIR] [--record FILE]
+
+Kinds are decided by extension exactly as ``clearwater.gui.sources.route`` decides them; a
+sidecar (D83) or an unknown extension is a failed item with the interface's text and the batch
+goes on (D81). In WP4.1 a video item fails with ``UNAVAILABLE_TEXT`` (WP4.2 adds video).
+
+Exit status: 0 when every item is done (with or without warnings); 1 when any item failed, was
+cancelled or was not run; 2 for a usage refusal, with nothing run (a bad flag, a missing
+``--out`` folder, an invalid suffix, an unknown method, an unreadable parameter file, an output
+or a source beside which outputs would go inside the configured footage folder, an existing
+``--record`` file). Ctrl-C sets the batch's cancel flag: the running job stops at its next check
+and leaves no partial output (D44), the rest are not run (D45), and the exit status is 1.
+
+The record (``--record FILE``, JSON, ``"schema": 1``, fields additive only) names sources and
+outputs by file name only, never by full path (as AD-13 rules for provenance), and carries no
+EXIF content or location tag. The summary lines go to stdout and the ``[i/n]`` progress messages
+to stderr. This tool installs no logging handler, so ``run_batch``'s INFO report (which names
+full output paths) is not emitted; Python's last-resort handler prints WARNING lines only.
+"""
+
+from __future__ import annotations
+
+import argparse
+import dataclasses
+import json
+import os
+import signal
+import sys
+import threading
+import time
+from collections.abc import Callable, Mapping, Sequence
+from dataclasses import dataclass
+from pathlib import Path, PurePath
+from typing import Any, Final, Literal
+
+import clearwater
+from clearwater.app import composition
+from clearwater.config import (
+    check_parameter_set_keys,
+    load_settings,
+    migrate,
+    new_parameter_set,
+)
+from clearwater.interfaces import JobResult, ParameterSet, Progress, Settings
+from clearwater.io.video.inputs import ascii_text, is_sidecar, sidecar_fault
+from clearwater.jobs import BatchReport, run_batch, validate_suffix
+from clearwater.jobs.export_seam import ExportJobs, ExportRequest
+from local_config import LocalConfigError, default_config_path, load_local_config
+
+SCHEMA: Final = 1
+"""The record's schema number; fields are only ever added under it."""
+
+PHOTO_SUFFIXES: Final = frozenset(
+    {".heic", ".heif", ".jpg", ".jpeg", ".png", ".tif", ".tiff", ".dng"}
+)
+"""Photo extensions, equal to ``clearwater.gui.sources.PHOTO_SUFFIXES`` (a ``gui`` test pins it)."""
+
+VIDEO_SUFFIXES: Final = frozenset({".mp4"})
+"""Video extensions, equal to ``clearwater.gui.sources.VIDEO_SUFFIXES`` (a ``gui`` test pins it)."""
+
+PROVENANCE_KEYS: Final = ("source", "settings")
+"""The provenance keys a parameter file's set drops, as ``PresetStore`` import drops them."""
+
+STATES_DONE: Final = frozenset({"done", "done with warnings"})
+"""The item states that give exit status 0."""
+
+
+class RunnerRefusalError(Exception):
+    """A usage refusal: nothing is run and the command line exits with status 2."""
+
+
+class _Configured:
+    """The type of :data:`CONFIGURED`."""
+
+
+CONFIGURED: Final = _Configured()
+"""Read the footage folder from ``clearwater.local.toml`` (:func:`configured_footage_folder`)."""
+
+
+@dataclass(frozen=True)
+class RefusedRequest(ExportRequest):
+    """A request for a path the runner refuses as the interface does (a sidecar, an unknown type).
+
+    It goes through the batch like any item and fails at once with :attr:`refusal`, opening no
+    file. ``kind`` is a placeholder no engine sees.
+
+    Attributes:
+        refusal: The failure text, the interface's refusal text for the path.
+    """
+
+    refusal: str = ""
+
+
+class RunnerProgress:
+    """The batch's ``Progress``: a cancel flag, and the report messages passed to a callback."""
+
+    def __init__(self, on_report: Callable[[str], None] | None = None) -> None:
+        """Create the flag, not set.
+
+        Args:
+            on_report: Called with each report message; none when None.
+        """
+        self._event = threading.Event()
+        self._on_report = on_report
+
+    def report(self, done: int, total: int | None, message: str) -> None:
+        """Pass the message on (IF-8 ``Progress.report``)."""
+        if self._on_report is not None:
+            self._on_report(message)
+
+    def cancelled(self) -> bool:
+        """Return whether :meth:`cancel` was called (IF-8 ``Progress.cancelled``)."""
+        return self._event.is_set()
+
+    def cancel(self) -> None:
+        """Ask the running job and the batch to stop (any thread; a signal handler)."""
+        self._event.set()
+
+
+class _WithRefusals:
+    """The ``ExportJobs`` the batch runs: a :class:`RefusedRequest` fails, the rest pass on."""
+
+    def __init__(self, exports: ExportJobs) -> None:
+        self._exports = exports
+
+    def job(self, request: ExportRequest) -> Callable[[Progress], JobResult]:
+        """Return a failing job for a refused request, else the wrapped engine's job."""
+        if isinstance(request, RefusedRequest):
+            text = request.refusal
+
+            def refuse(progress: Progress) -> JobResult:
+                return JobResult(
+                    ok=False, outputs=(), warnings=(), failure=text, device="none", elapsed_s=0.0
+                )
+
+            return refuse
+        return self._exports.job(request)
+
+
+@dataclass(frozen=True)
+class RunRecord:
+    """What one run did.
+
+    Attributes:
+        report: The batch report, one item per request in order.
+        routes: Each item's route: ``"photo"``, ``"video"`` or ``"refused"``.
+        parameters_from: Where the parameters came from: ``"defaults"``, ``"file"``,
+            ``"neutral"`` or ``"given"`` (a library caller's own set).
+        elapsed_s: The batch's wall time in seconds (information only).
+    """
+
+    report: BatchReport
+    routes: tuple[str, ...]
+    parameters_from: str
+    elapsed_s: float
+
+
+def route(path: Path) -> Literal["photo", "video"] | str:
+    """Decide an item's kind by extension, as ``clearwater.gui.sources.route`` does.
+
+    Args:
+        path: The source path (not opened).
+
+    Returns:
+        ``"photo"`` or ``"video"``, or the refusal text (the interface's) for a sidecar (D83) or
+        an extension that is neither a photo's nor a video's.
+    """
+    if is_sidecar(path):
+        return sidecar_fault(path).message
+    suffix = path.suffix.lower()
+    if suffix in PHOTO_SUFFIXES:
+        return "photo"
+    if suffix in VIDEO_SUFFIXES:
+        return "video"
+    return f"{ascii_text(path.name)} is not a supported photo or video file."
+
+
+def requests_for(
+    paths: Sequence[Path], *, parameters: ParameterSet, settings: Settings
+) -> list[ExportRequest]:
+    """Build one export request per path, in order.
+
+    Args:
+        paths: The sources.
+        parameters: The parameter set every item renders with.
+        settings: The settings every item exports with.
+
+    Returns:
+        The requests; a refused path (see :func:`route`) gives a :class:`RefusedRequest`.
+    """
+    requests: list[ExportRequest] = []
+    for path in paths:
+        source = Path(path)
+        kind = route(source)
+        if kind == "photo":
+            requests.append(ExportRequest(source, "photo", parameters, settings))
+        elif kind == "video":
+            requests.append(ExportRequest(source, "video", parameters, settings))
+        else:
+            requests.append(RefusedRequest(source, "photo", parameters, settings, kind))
+    return requests
+
+
+def read_parameter_file(path: Path) -> ParameterSet:
+    """Read an AD-13 preset or provenance JSON file as a parameter set.
+
+    The document is migrated (``clearwater.config.migrate``), its keys checked
+    (``check_parameter_set_keys``), and its ``source`` and ``settings`` provenance keys dropped.
+
+    Args:
+        path: The JSON file.
+
+    Returns:
+        The parameter set.
+
+    Raises:
+        RunnerRefusalError: The file cannot be read or is not a parameter set.
+    """
+    name = ascii_text(Path(path).name)
+    try:
+        data = json.loads(Path(path).read_text(encoding="utf-8"))
+        if not isinstance(data, dict):
+            raise ValueError("the document is not a JSON object")
+        data = migrate("preset", data)
+        kept = {key: value for key, value in data.items() if key not in PROVENANCE_KEYS}
+        parameter_set = ParameterSet.from_dict(kept)
+        check_parameter_set_keys(parameter_set, name)
+    except (OSError, UnicodeDecodeError, ValueError, RecursionError) as exc:
+        raise RunnerRefusalError(
+            f"{name} is not a readable parameter file: {ascii_text(str(exc))}"
+        ) from exc
+    return parameter_set
+
+
+def parameters_for(
+    method_id: str | None = None, *, file: Path | None = None, neutral: bool = False
+) -> ParameterSet:
+    """Return the parameter set of a run: a file's, the method's neutral values, or its defaults.
+
+    Args:
+        method_id: The method; ``"c3"`` (D16) when None. Must be None when ``file`` is given (the
+            file names its method).
+        file: An AD-13 preset or provenance JSON file (:func:`read_parameter_file`).
+        neutral: Every parameter of the method at its IF-3 ``neutral`` value (V9).
+
+    Returns:
+        The parameter set; for the defaults an empty one (the engine fills in the defaults).
+
+    Raises:
+        RunnerRefusalError: ``file`` with ``method_id`` or with ``neutral``, an unknown method,
+            or an unreadable file.
+    """
+    methods = composition.correction_methods()
+    if file is not None:
+        if method_id is not None:
+            raise RunnerRefusalError(
+                "--method cannot be combined with --parameters: the parameter file names its "
+                "method."
+            )
+        if neutral:
+            raise RunnerRefusalError("--neutral cannot be combined with --parameters.")
+        parameter_set = read_parameter_file(file)
+        method_id = parameter_set.method
+        if method_id not in methods:
+            raise RunnerRefusalError(_unknown_method(method_id, methods))
+        return parameter_set
+    method_id = "c3" if method_id is None else method_id
+    method = methods.get(method_id)
+    if method is None:
+        raise RunnerRefusalError(_unknown_method(method_id, methods))
+    values = {p.name: p.neutral for p in method.parameters} if neutral else {}
+    return new_parameter_set(method_id, values)
+
+
+def _unknown_method(method_id: str, methods: Mapping[str, object]) -> str:
+    """The refusal text of an unknown method id."""
+    return (
+        f"unknown correction method {ascii_text(method_id)!r}; "
+        f"the methods are {', '.join(methods)}."
+    )
+
+
+def configured_footage_folder(config: Path | None = None) -> Path | None:
+    """Return the footage folder of the local configuration, or None when there is none.
+
+    Args:
+        config: The configuration file; ``local_config.default_config_path()`` when None.
+
+    Returns:
+        The configured footage folder, or None when the configuration file does not exist.
+
+    Raises:
+        RunnerRefusalError: The configuration file exists but cannot be read.
+    """
+    path = default_config_path() if config is None else config
+    if not path.exists():
+        return None
+    try:
+        return load_local_config(path).footage_path
+    except LocalConfigError as exc:
+        raise RunnerRefusalError(
+            f"the local configuration cannot be read, so the footage folder is unknown: {exc}"
+        ) from exc
+
+
+def inside(path: Path, folder: Path) -> bool:
+    """Return whether ``path`` is ``folder`` or lies under it (resolved, case-normalised).
+
+    Args:
+        path: The path to test (need not exist).
+        folder: The folder.
+
+    Returns:
+        True when the resolved ``path`` is inside the resolved ``folder``.
+    """
+    resolved = PurePath(os.path.normcase(str(Path(path).resolve())))
+    root = PurePath(os.path.normcase(str(Path(folder).resolve())))
+    return resolved == root or resolved.is_relative_to(root)
+
+
+def check_outputs(requests: Sequence[ExportRequest], footage_folder: Path | None) -> None:
+    """Refuse a run that would write inside the footage folder (question 9; DR-37 (c)).
+
+    Args:
+        requests: The run's requests.
+        footage_folder: The read-only footage folder; nothing is checked when None.
+
+    Raises:
+        RunnerRefusalError: An output folder inside the footage folder, or outputs beside a source
+            inside it.
+    """
+    if footage_folder is None:
+        return
+    for request in requests:
+        folder = request.settings.output_folder
+        if folder is not None and inside(folder, footage_folder):
+            raise RunnerRefusalError(
+                "the output folder is inside the footage folder, which is read-only."
+            )
+        if folder is None and inside(request.source, footage_folder):
+            raise RunnerRefusalError(
+                f"{ascii_text(request.source.name)} is inside the footage folder, which is "
+                "read-only: outputs beside it are refused; give --out."
+            )
+
+
+def run(
+    requests: Sequence[ExportRequest],
+    *,
+    exports: ExportJobs | None = None,
+    progress: Progress | None = None,
+    footage_folder: Path | _Configured | None = CONFIGURED,
+    parameters_from: str = "given",
+) -> RunRecord:
+    """Run one batch over the requests, in order, on the caller's thread (G7; D45, D81; DR-62).
+
+    Args:
+        requests: The items (:func:`requests_for`).
+        exports: The export engine; ``composition.export_jobs()`` when None.
+        progress: The batch's progress and cancel flag; a :class:`RunnerProgress` when None.
+        footage_folder: The folder no output may go into (:func:`check_outputs`);
+            :data:`CONFIGURED` reads it from the local configuration; None checks nothing.
+        parameters_from: Recorded as :attr:`RunRecord.parameters_from`.
+
+    Returns:
+        The record.
+
+    Raises:
+        RunnerRefusalError: The footage check refused the run; nothing ran.
+    """
+    folder = (
+        configured_footage_folder() if isinstance(footage_folder, _Configured) else footage_folder
+    )
+    check_outputs(requests, folder)
+    engine = _WithRefusals(composition.export_jobs() if exports is None else exports)
+    start = time.perf_counter()
+    report = run_batch(engine, list(requests), progress or RunnerProgress())
+    routes = tuple(
+        "refused" if isinstance(request, RefusedRequest) else request.kind for request in requests
+    )
+    return RunRecord(report, routes, parameters_from, time.perf_counter() - start)
+
+
+def record_object(record: RunRecord) -> dict[str, Any]:
+    """Return the record as a JSON-native object (schema 1; file names only, never full paths).
+
+    Args:
+        record: The run's record.
+
+    Returns:
+        The object.
+    """
+    items: list[dict[str, Any]] = []
+    for index, (item, kind) in enumerate(zip(record.report.items, record.routes, strict=True), 1):
+        result = item.result
+        items.append(
+            {
+                "index": index,
+                "source": ascii_text(item.request.source.name),
+                "kind": kind,
+                "state": item.state,
+                "outputs": [] if result is None else [ascii_text(p.name) for p in result.outputs],
+                "warnings": [] if result is None else [ascii_text(w) for w in result.warnings],
+                "failure": None
+                if result is None or result.failure is None
+                else ascii_text(result.failure),
+                "device": None if result is None else ascii_text(result.device),
+                "elapsed_s": None if result is None else result.elapsed_s,
+            }
+        )
+    first = record.report.items[0].request if record.report.items else None
+    settings = first.settings if first is not None else None
+    states = [item.state for item in record.report.items]
+    return {
+        "schema": SCHEMA,
+        "tool": "headless_export",
+        "app_version": clearwater.__version__,
+        "method": None if first is None else first.parameters.method,
+        "parameters_from": record.parameters_from,
+        "settings": None if settings is None else _settings_object(settings),
+        "counts": record.report.counts(),
+        "cancelled": any(state in ("cancelled", "not run") for state in states),
+        "elapsed_s": record.elapsed_s,
+        "items": items,
+    }
+
+
+def _settings_object(settings: Settings) -> dict[str, Any]:
+    """The record's settings: every IF-10 field but the folder path and ``last_parameters``."""
+    return {
+        "beside_source": settings.output_folder is None,
+        "output_suffix": ascii_text(settings.output_suffix),
+        "png_bit_depth": settings.png_bit_depth,
+        "provenance": settings.provenance,
+        "force_cpu": settings.force_cpu,
+        "video_encoder": ascii_text(settings.video_encoder),
+        "quality_level": settings.quality_level,
+        "ten_bit_for_eight_bit": settings.ten_bit_for_eight_bit,
+        "cache_limit_bytes": settings.cache_limit_bytes,
+    }
+
+
+def record_json(record: RunRecord) -> str:
+    """Return the record as JSON text (ASCII, indented).
+
+    Args:
+        record: The run's record.
+
+    Returns:
+        The JSON text.
+    """
+    return json.dumps(record_object(record), indent=2, ensure_ascii=True)
+
+
+def exit_status(record: RunRecord) -> int:
+    """Return the command line's exit status for a run that ran.
+
+    Args:
+        record: The run's record.
+
+    Returns:
+        0 when every item is done (with or without warnings), else 1.
+    """
+    return 0 if all(item.state in STATES_DONE for item in record.report.items) else 1
+
+
+def summary_lines(record: RunRecord) -> list[str]:
+    """Return the ASCII summary of a run: a count line, then each item with names only.
+
+    Args:
+        record: The run's record.
+
+    Returns:
+        The lines.
+    """
+    data = record_object(record)
+    counts = ", ".join(f"{n} {state}" for state, n in data["counts"].items() if n)
+    lines = [f"Batch of {len(data['items'])}: {counts}"]
+    for item in data["items"]:
+        lines.append(f"{item['index']}. {item['source']}: {item['state']}")
+        lines.extend(f"   saved {name}" for name in item["outputs"])
+        lines.extend(f"   warning: {text}" for text in item["warnings"])
+        if item["state"] == "failed":
+            lines.append(f"   failure: {item['failure']}")
+    return lines
+
+
+def _parser() -> argparse.ArgumentParser:
+    """The command-line parser."""
+    parser = argparse.ArgumentParser(
+        prog="headless_export",
+        description="Export photos through Clearwater's export engine without the interface.",
+    )
+    parser.add_argument("paths", nargs="+", type=Path, metavar="PATH", help="the sources")
+    where = parser.add_mutually_exclusive_group(required=True)
+    where.add_argument("--out", type=Path, metavar="DIR", help="the output folder (must exist)")
+    where.add_argument(
+        "--beside-source", action="store_true", help="write each output beside its source (D34)"
+    )
+    parser.add_argument("--suffix", metavar="S", help="the output name suffix (D36)")
+    parser.add_argument("--bit-depth", type=int, choices=(8, 16), help="the PNG bit depth (D22)")
+    parser.add_argument("--no-provenance", action="store_true", help="embed no provenance (D91)")
+    parser.add_argument("--force-cpu", action="store_true", help="process on the CPU (AD-9)")
+    parser.add_argument("--encoder", metavar="NAME", help="the video encoder (D26)")
+    parser.add_argument(
+        "--quality", choices=("high", "standard", "draft"), help="the video quality (D75)"
+    )
+    parser.add_argument(
+        "--ten-bit", action="store_true", help="10-bit video from 8-bit sources (D76)"
+    )
+    parser.add_argument(
+        "--cache-limit-bytes", type=int, metavar="N", help="the proxy-cache limit (D71)"
+    )
+    parser.add_argument("--method", metavar="ID", help="the correction method (default c3)")
+    params = parser.add_mutually_exclusive_group()
+    params.add_argument(
+        "--parameters", type=Path, metavar="FILE", help="an AD-13 preset or provenance JSON file"
+    )
+    params.add_argument(
+        "--neutral", action="store_true", help="every parameter at its neutral value (V9)"
+    )
+    parser.add_argument(
+        "--settings-dir", type=Path, metavar="DIR", help="load settings.json from this folder"
+    )
+    parser.add_argument("--record", type=Path, metavar="FILE", help="write the JSON record here")
+    return parser
+
+
+def _settings(args: argparse.Namespace) -> Settings:
+    """The run's settings: the loaded or default settings with the given flags overlaid."""
+    if args.settings_dir is not None and not args.settings_dir.is_dir():
+        raise RunnerRefusalError("the --settings-dir folder does not exist.")
+    base = Settings() if args.settings_dir is None else load_settings(args.settings_dir)
+    if args.out is not None and not args.out.is_dir():
+        raise RunnerRefusalError("the --out folder does not exist.")
+    changes: dict[str, Any] = {"output_folder": args.out}
+    if args.suffix is not None:
+        try:
+            validate_suffix(args.suffix)
+        except ValueError as exc:
+            raise RunnerRefusalError(ascii_text(str(exc))) from exc
+        changes["output_suffix"] = args.suffix
+    if args.bit_depth is not None:
+        changes["png_bit_depth"] = args.bit_depth
+    if args.no_provenance:
+        changes["provenance"] = False
+    if args.force_cpu:
+        changes["force_cpu"] = True
+    if args.encoder is not None:
+        changes["video_encoder"] = args.encoder
+    if args.quality is not None:
+        changes["quality_level"] = args.quality
+    if args.ten_bit:
+        changes["ten_bit_for_eight_bit"] = True
+    if args.cache_limit_bytes is not None:
+        if args.cache_limit_bytes < 0:
+            raise RunnerRefusalError("--cache-limit-bytes must not be negative.")
+        changes["cache_limit_bytes"] = args.cache_limit_bytes
+    return dataclasses.replace(base, **changes)
+
+
+def _check_own_paths(args: argparse.Namespace, footage: Path | None) -> None:
+    """Refuse a record file that exists, has no folder, or lies in the footage folder."""
+    for flag, path in (("--settings-dir", args.settings_dir), ("--record", args.record)):
+        if path is not None and footage is not None and inside(path, footage):
+            raise RunnerRefusalError(
+                f"the {flag} path is inside the footage folder, which is read-only."
+            )
+    if args.record is not None:
+        if args.record.exists():
+            raise RunnerRefusalError("the --record file exists; it is never overwritten.")
+        if not args.record.parent.is_dir():
+            raise RunnerRefusalError("the folder of the --record file does not exist.")
+
+
+def main(argv: Sequence[str] | None = None, *, exports: ExportJobs | None = None) -> int:
+    """Run the command line.
+
+    Args:
+        argv: The arguments; ``sys.argv[1:]`` when None.
+        exports: The export engine; ``composition.export_jobs()`` when None (tests only).
+
+    Returns:
+        The exit status: 0, 1 or 2 (see the module docstring).
+    """
+    try:
+        args = _parser().parse_args(argv)
+    except SystemExit as exc:  # argparse refused the usage (2) or printed the help (0)
+        return exc.code if isinstance(exc.code, int) else 2
+    try:
+        footage = configured_footage_folder()
+        _check_own_paths(args, footage)
+        settings = _settings(args)
+        if args.parameters is not None:
+            parameters = parameters_for(args.method, file=args.parameters)
+            source = "file"
+        else:
+            parameters = parameters_for(args.method, neutral=args.neutral)
+            source = "neutral" if args.neutral else "defaults"
+        requests = requests_for(args.paths, parameters=parameters, settings=settings)
+        check_outputs(requests, footage)
+    except RunnerRefusalError as exc:
+        print(f"headless_export: {exc}", file=sys.stderr)
+        return 2
+    progress = RunnerProgress(lambda message: print(ascii_text(message), file=sys.stderr))
+    on_main = threading.current_thread() is threading.main_thread()
+    previous = signal.signal(signal.SIGINT, lambda *_: progress.cancel()) if on_main else None
+    try:
+        record = run(
+            requests,
+            exports=exports,
+            progress=progress,
+            footage_folder=footage,
+            parameters_from=source,
+        )
+    finally:
+        if previous is not None:
+            signal.signal(signal.SIGINT, previous)
+    for line in summary_lines(record):
+        print(line)
+    if args.record is not None:
+        with open(args.record, "x", encoding="ascii", newline="\n") as handle:
+            handle.write(record_json(record) + "\n")
+    return exit_status(record)
+
+
+if __name__ == "__main__":
+    sys.exit(main())
