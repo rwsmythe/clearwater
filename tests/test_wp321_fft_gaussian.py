@@ -7,6 +7,10 @@ gate, so no statistic ever meets the route; (b) a planted analysis-sized blur bi
 the direct filter; (c) the FFT route within 1e-5 (CHARC Q3) of the direct filter at 1080p, 4K
 and 5.3K, on step edges at every border, with repeated reflection, and on a real 4K frame;
 deterministic on repeat. The direct reference is the call ``gaussian_blur`` made before task 6.
+CHARC ruling (A): the route runs in batches of 512 lines, the last batch the final lines, and is
+bit-identical to one batch per axis at 1080p, 4K and 5.3K on line counts that are not multiples
+of 512; Q-C5a condition 2: the measured peak, plans and pool cleared first, is under the bound
+the GPU backend's ``memory_estimate_bytes`` adds.
 """
 
 from __future__ import annotations
@@ -17,13 +21,17 @@ from typing import Any
 import numpy as np
 import pytest
 
+import clearwater.core.backend as backend_module
 from clearwater.analysis.proxy import block_mean, proxy_factor
-from clearwater.core import backend_for
+from clearwater.core import backend_for, memory_estimate_bytes
 from clearwater.core.backend import (
+    FFT_BOUND_BYTES_PER_SAMPLE,
     FFT_MIN_SHORT_SIDE,
     FFT_MIN_SIGMA,
     GAUSSIAN_TRUNCATE,
     CoreBackend,
+    fft_batch_starts,
+    fft_memory_bound_bytes,
     fft_route,
     gaussian_kernel,
     reflect_index,
@@ -210,3 +218,101 @@ def test_c_a_real_4k_frame_within_the_bound() -> None:
     for a, sigma in ((rgb[..., 1].copy(), 108.0), (rgb, 32.0)):
         error = _max_abs(gpu, gpu.gaussian_blur(a, sigma), _direct(gpu, a, sigma))
         assert error <= BOUND, f"sigma {sigma}: max abs {error:.3e}"
+
+
+# --- the batches (CHARC ruling (A)) -------------------------------------------------------
+
+
+def test_the_batches_cover_every_line_with_one_length() -> None:
+    assert fft_batch_starts(300, 512) == [0]
+    assert fft_batch_starts(1024, 512) == [0, 512]
+    assert fft_batch_starts(1081, 512) == [0, 512, 569]  # the last is the final 512 lines
+    for lines in (512, 513, 1080, 1920, 2160, 3840, 4648, 5312):
+        starts = fft_batch_starts(lines, 512)
+        covered = set().union(*(range(s, s + 512) for s in starts))
+        assert covered == set(range(lines)) and starts[-1] == lines - 512
+
+
+BATCHED = [
+    ((1080, 1920), 54.0),
+    ((1081, 1923, 3), 32.0),
+    ((2160, 3840), 108.0),
+    ((2161, 3843, 3), 32.0),
+    ((4648, 5312), 232.4),
+    ((4649, 5313), 1162.0),
+]
+"""Line counts that are not multiples of 512 along both axes, at 1080p, 4K and 5.3K 8:7."""
+
+
+def _batched_is_unbatched(
+    backend: CoreBackend, monkeypatch: pytest.MonkeyPatch, shape: tuple[int, ...], sigma: float
+) -> None:
+    a = backend.asarray(np.random.default_rng(9).random(shape, dtype=np.float32))
+    batched = backend.to_host(backend.gaussian_blur(a, sigma))
+    monkeypatch.setattr(backend_module, "FFT_BATCH_LINES", 10**9)  # one batch per axis
+    unbatched = backend.to_host(backend.gaussian_blur(a, sigma))
+    assert np.array_equal(batched, unbatched)
+
+
+@pytest.mark.gpu
+@pytest.mark.parametrize(("shape", "sigma"), BATCHED)
+def test_the_batched_route_is_the_unbatched_one_bit_for_bit_gpu(
+    monkeypatch: pytest.MonkeyPatch, shape: tuple[int, ...], sigma: float
+) -> None:
+    _batched_is_unbatched(_gpu(), monkeypatch, shape, sigma)
+
+
+@pytest.mark.parametrize(("shape", "sigma"), BATCHED[:2])
+def test_the_batched_route_is_the_unbatched_one_bit_for_bit_cpu(
+    monkeypatch: pytest.MonkeyPatch, shape: tuple[int, ...], sigma: float
+) -> None:
+    _batched_is_unbatched(CPU, monkeypatch, shape, sigma)
+
+
+# --- the memory bound (Q-C5a condition 2) ----------------------------------------------------
+
+
+def test_the_bound_is_zero_below_the_gate_and_the_cpu_estimate_is_unchanged() -> None:
+    assert fft_memory_bound_bytes(1079, 1920) == 0
+    assert fft_memory_bound_bytes(1080, 1920) == FFT_BOUND_BYTES_PER_SAMPLE * 512 * 4096
+    assert CPU.memory_estimate_bytes(2160, 3840, "c3") == memory_estimate_bytes(2160, 3840, "c3")
+
+
+@pytest.mark.gpu
+@pytest.mark.parametrize("size", [(1080, 1920), (2160, 3840), (4648, 5312)])
+def test_the_measured_peak_is_under_the_bound_the_gpu_estimate_adds(
+    size: tuple[int, int],
+) -> None:
+    gpu = _gpu()
+    cupy = gpu.xp
+    pool, plans = cupy.get_default_memory_pool(), cupy.fft.config.get_plan_cache()
+    bound = fft_memory_bound_bytes(*size)
+    assert gpu.memory_estimate_bytes(*size, "c3") == memory_estimate_bytes(*size, "c3") + bound
+    peak = [0]
+
+    def tracking(nbytes: int) -> Any:
+        block = pool.malloc(nbytes)
+        peak[0] = max(peak[0], pool.used_bytes())
+        return block
+
+    cupy.cuda.set_allocator(tracking)
+    try:
+        for fraction in (0.05, 0.25):  # c3_kernel_fraction: the default and the maximum
+            for channels in (1, 3):
+                shape = size if channels == 1 else (*size, channels)
+                a = gpu.asarray(np.random.default_rng(2).random(shape, dtype=np.float32))
+                plans.clear()  # the binding method: plans and pool cleared before each peak
+                pool.free_all_blocks()
+                base = pool.used_bytes()
+                peak[0] = base
+                out = gpu.gaussian_blur(a, fraction * min(size))
+                cupy.cuda.Device().synchronize()
+                # Over the input: the two passes' full-size outputs (as the direct filter's)
+                # and the FFT's own plans and batch buffers, which the bound covers.
+                own = peak[0] - base - 2 * a.nbytes
+                assert own <= bound, f"{shape} {fraction}: {own / 2**20:.0f} MiB"
+                del out, a
+    finally:
+        cupy.cuda.set_allocator(pool.malloc)
+        plans.clear()
+        pool.free_all_blocks()

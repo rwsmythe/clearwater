@@ -79,6 +79,16 @@ FFT_MIN_SHORT_SIDE = 1080
 FFT_MIN_SIGMA = 32.0
 """The FFT Gaussian's floor on sigma in pixels (Q-R1; the Q-R5 micro-timing kept it at 32)."""
 
+FFT_BATCH_LINES = 512
+"""The most lines (1-D transforms) per FFT batch (CHARC ruling (A), yield 13)."""
+
+FFT_BOUND_BYTES_PER_SAMPLE = 48
+"""The FFT route's bound, in bytes per sample of one batch (``FFT_BATCH_LINES`` lines of the
+bound's transform length): the plans of both axes plus one batch's buffers. Measured with the
+plan cache and the pool cleared first (Q-C5a condition 2, WP3.21 cell 5): at most 8.91 float32
+samples, about 36 bytes, at 1080p, 4K and 5.3K for every fraction up to 0.25 and 1 or 3 channels;
+48 bytes is 12 samples."""
+
 _BINOMIAL_5 = np.array([1.0, 4.0, 6.0, 4.0, 1.0], dtype=np.float32) / np.float32(16.0)
 
 _MIB = 1024 * 1024
@@ -339,28 +349,46 @@ class CoreBackend:
         return out
 
     def _fft_correlate(self, a: Array, weights: NDArray[np.float32], axis: int) -> Array:
-        """Correlate one spatial axis with a symmetric kernel by a float32 real FFT.
+        """Correlate one spatial axis with a symmetric kernel by a float32 real FFT, in batches.
 
-        The axis is padded as ``mode="reflect"`` pads it (repeated reflection included), the
-        padded line and the kernel are transformed at a fast length of at least ``n + 2r`` (so
-        the ``n`` kept samples see no wrap-around), multiplied and transformed back. A symmetric
-        kernel makes the convolution the correlation ``gaussian_filter`` computes.
+        Each line along ``axis`` is padded as ``mode="reflect"`` pads it (repeated reflection
+        included), transformed with the kernel at a fast length of at least ``n + 2r`` (so the
+        ``n`` kept samples see no wrap-around), multiplied and transformed back; a symmetric
+        kernel makes the convolution the correlation ``gaussian_filter`` computes. The lines go
+        through in batches of at most :data:`FFT_BATCH_LINES` lines (``FFT_BATCH_LINES // C``
+        positions along the other spatial axis, each with its ``C`` channels), the last batch
+        being the final positions (see :func:`fft_batch_starts`), so every transform of the axis
+        has one shape and one plan set, and the plans and buffers are bounded by the batch and
+        the transform length whatever the width (CHARC ruling (A)). The transform length is
+        EVEN: at an odd length cuFFT's result for a line depends on its position in the batch
+        (measured at 4725 and 6561, not at any even length tried), so the last, overlapping
+        batch would not equal the lines it recomputes; at an even length every batch gives the
+        unbatched transform's lines bit for bit.
         """
         xp, fft = self.xp, self.fft
         radius = (weights.size - 1) // 2
         n = a.shape[axis]
-        padded = xp.take(a, xp.asarray(reflect_index(n, radius)), axis=axis)
         size = int(fft.next_fast_len(n + 2 * radius, real=True))
+        while size % 2:  # cuFFT's odd real lengths give a line's result by its batch position
+            size = int(fft.next_fast_len(size + 1, real=True))
         shape = [1] * a.ndim
         shape[axis] = size // 2 + 1
-        spectrum = fft.rfft(padded, n=size, axis=axis)
-        del padded
-        spectrum *= fft.rfft(xp.asarray(weights), n=size).reshape(shape)
-        full = fft.irfft(spectrum, n=size, axis=axis)
-        del spectrum
+        kernel = fft.rfft(xp.asarray(weights), n=size).reshape(shape)
+        index = xp.asarray(reflect_index(n, radius))
         kept = [slice(None)] * a.ndim
         kept[axis] = slice(2 * radius, 2 * radius + n)
-        out: Array = xp.ascontiguousarray(full[tuple(kept)], dtype=np.float32)
+        other = 1 - axis
+        channels = a.shape[2] if a.ndim == 3 else 1
+        batch = max(1, FFT_BATCH_LINES // channels)  # positions x channels <= FFT_BATCH_LINES
+        out: Array = xp.empty_like(a)
+        for start in fft_batch_starts(a.shape[other], batch):
+            lines = [slice(None)] * a.ndim
+            lines[other] = slice(start, start + batch)
+            spectrum = fft.rfft(xp.take(a[tuple(lines)], index, axis=axis), n=size, axis=axis)
+            spectrum *= kernel
+            full = fft.irfft(spectrum, n=size, axis=axis)
+            del spectrum
+            out[tuple(lines)] = full[tuple(kept)]  # an overlapped line is recomputed, not blended
         return out
 
     def _binomial_blur(self, a: Array) -> Array:
@@ -746,6 +774,26 @@ class CupyBackend(CoreBackend):
         self.xp.fft.config.get_plan_cache().clear()
         self.xp.get_default_memory_pool().free_all_blocks()
 
+    def memory_estimate_bytes(self, height: int, width: int, method_id: str) -> int:
+        """Estimate the device memory a frame of this size needs on the GPU (AD-1, Q-C5a).
+
+        The base estimate plus :func:`fft_memory_bound_bytes`: the FFT Gaussian's cached plans
+        and batch buffers, which a frame meeting the gate's shape may need.
+
+        Args:
+            height: Frame height in pixels.
+            width: Frame width in pixels.
+            method_id: The correction method id (``"c3"`` or ``"ancuti2018"``).
+
+        Returns:
+            The estimate in bytes.
+
+        Raises:
+            ValueError: An unknown method id or a size under 1.
+        """
+        base = memory.memory_estimate_bytes(height, width, method_id)
+        return base + fft_memory_bound_bytes(height, width)
+
     def free_device_bytes(self) -> int | None:
         """Return the memory free for this process's arrays, in bytes.
 
@@ -773,6 +821,49 @@ def fft_route(height: int, width: int, sigma_px: float) -> bool:
         True when ``min(height, width) >= FFT_MIN_SHORT_SIDE`` and ``sigma_px >= FFT_MIN_SIGMA``.
     """
     return min(height, width) >= FFT_MIN_SHORT_SIDE and sigma_px >= FFT_MIN_SIGMA
+
+
+def fft_memory_bound_bytes(height: int, width: int) -> int:
+    """Return a bound on the FFT Gaussian's plans and batch buffers for a frame (Q-C5a (2)).
+
+    With the batch fixed, the cost depends only on the transform length (cuFFT's plan size
+    follows the transform length, not the image shape) and the batch. Every gated call's
+    radius is at most the short side plus one (every spatial fraction of both methods is at most
+    0.25, so ``4 * sigma`` is at most the short side), so no transform is longer than the
+    power of two at or above ``longer + 2 * (shorter + 1)``, which is even and so at least the
+    route's own length. 0 when no call can meet the gate's shape.
+
+    Args:
+        height: Frame height in pixels.
+        width: Frame width in pixels.
+
+    Returns:
+        ``FFT_BOUND_BYTES_PER_SAMPLE * FFT_BATCH_LINES * length`` bytes, or 0.
+    """
+    shorter, longer = min(height, width), max(height, width)
+    if shorter < FFT_MIN_SHORT_SIDE:
+        return 0
+    length = 1 << (longer + 2 * (shorter + 1) - 1).bit_length()
+    return FFT_BOUND_BYTES_PER_SAMPLE * FFT_BATCH_LINES * length
+
+
+def fft_batch_starts(lines: int, batch: int) -> list[int]:
+    """Return the first line of each FFT batch: every batch is ``batch`` lines long.
+
+    The batches step by ``batch`` and the last one is the final ``batch`` lines, overlapping its
+    predecessor when ``lines`` is not a multiple of ``batch``; fewer lines than ``batch`` make one
+    batch of them all.
+
+    Args:
+        lines: The number of lines.
+        batch: The batch length.
+
+    Returns:
+        The start of each batch, ascending.
+    """
+    if lines <= batch:
+        return [0]
+    return [*range(0, lines - batch, batch), lines - batch]
 
 
 def gaussian_kernel(sigma_px: float) -> NDArray[np.float64]:
