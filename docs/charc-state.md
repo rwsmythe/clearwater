@@ -25,7 +25,12 @@ block below is gen 4's hand-off, held unchanged until block 3 CLOSES.
   over the same paths is empty and the record names both runs; harness gate / static / Reviewer B still run. Next at the orchestrator:
   cell 8 report `docs/reports/wp3.21-optimisation.md` + return report, candidate, Reviewer B (final head, `afad7af..227ed32`
   post-convergence, grant named), accept record, ff-merge; then my QA + the owed rows.
-- **EXCLUSIVE WINDOW OPEN ~17:58Z: WP3.21 V4 SAME (msg `20eb361d0e4e06d9`, ~25-30 min). NOTHING HEAVY AT THIS SEAT until CLOSE.**
+- **V4 SAME WINDOW CLOSED 18:05Z (msg `2af334d142930d91`): 13/13 compares SAME, 0 MANDATORY / 0 REQUIRED different (BEST-EFFORT 5-8
+  = D86 not-carried container set); Done clause met. CELL 8 RETURNED and STOOD DOWN (final 185,908); branch `wp3.21` 8a9b97a (report
+  `docs/reports/wp3.21-optimisation.md` + ledger; docs-only since 227ed32). Records under work/wp3.10/wp3.21-v4/ (tool root), kept
+  outputs work/wp3.21/oracle/v4-*/out/ NOT deleted. **No window open; seat free; NO CELL IN FLIGHT.** Orchestrator next: candidate
+  `wp3.21-mc` (code-identity check recorded), Reviewer B, harness + static, accept record, ff-merge.**
+- (history) V4 SAME window OPEN ~17:58Z (msg `20eb361d0e4e06d9`, ~25-30 min).
   Done-clause gap cell 8 caught (brief line 46 / Q3: V4 SAME through `tools/video_fidelity.py` after encode; no cell ran it). The
   orchestrator took option (a), the measured run (six WP2.3 samples x GPU/CPU legs + GX011627 c3 device frames, `--keep`, outputs
   under work/wp3.21/v4/), declined the reasoning waiver (b); I CONCUR, no ruling (silence = (a) as the post invited). Any item not
