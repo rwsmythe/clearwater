@@ -146,7 +146,10 @@
 - **WP3.21 AD-29 #2 ORACLE WINDOW CLOSED 07:56Z: reworked #2 TIER1 on GX011627 (681 / 0 differing, max abs 0, mean abs 0) and
   synthetic 4K (120 / 0)** (msg `c6afcfc8bacaf5d5`; OPEN `1ec355e68f10ef7e`; head 867d5fb). AD-29 item 6 met before #3. The io.video
   Protocol pair asserts both directions (`test_wp321_device_frames.py:82` / `:92`); the analysis pair comes at #3. **No window open;
-  seat free.** Cell 4 on #3 (tier 1 or STOP). Cell 4 yield 6, depth 148,982:
+  seat free.** Cell 4 on #3 (tier 1 or STOP). **Cell 4 STOP at yield 7 (164,381) on AD-29 item 1 "block sums with their quantise":
+  orchestrator ruled (a) at its seat, UPHELD and AD-29 amended: `CupyBackend.block_sums` returns float64 HOST sums (or None when
+  the exactness bound fails); `_divide` and `quantise` stay single-sourced in `analysis/proxy.py`; None -> host reduction, same bytes;
+  tests = Protocol pair both directions + planted bound failure giving identical bytes** (msg `f1cfe0996a95d0df`). Cell 4 yield 6, depth 148,982:
   #2 reworked under AD-29 as follow-up commits (`DeviceFrameBackend` Protocol in `decode.py`; `device_backend=None`; samples.py
   identical to d1e4537; interfaces/ no diff; 4 layering tests 28 passed; light 883 passed; WP2.3 oracle 10/10 TIER1 max abs 0).
   **Orchestrator reading ACCEPTED, AD-29 item 1 clarified: device methods on `CupyBackend(CoreBackend)`, not the shared base
