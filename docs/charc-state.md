@@ -201,9 +201,19 @@
   ~4 min EXCLUSIVE attribution window, uncommitted driver under work/wp3.21/, in-process pool used/total per sample + plan cache +
   per-pid nvidia-smi if WDDM reports it; split the 7,854 and the overlap's +1,256 before any fix is ruled; no product change, no
   commit. Block 3 (GX011625) HELD.** Cell 7 depth 167,263; ledger f6c9511.
-- **EXCLUSIVE WINDOW OPEN 2026-10-28 ~14:20Z: WP3.21 5.3K ATTRIBUTION RUN (A) on my word (~4-10 min; my three asks relayed
-  verbatim; uncommitted driver; no product change, no commit)** (msg `4ebb2986077a3c1e`). **NOTHING HEAVY AT THIS SEAT until
-  CLOSE.** Cell 7 depth 180,200.
+- **ATTRIBUTION CLOSED 14:27Z (msgs `948b4bfaa1d35f1e`, addendum `77343768b31407e4`): the 5.3K breach is DEVICE-WIDE ONLY.**
+  Pool reserved peak 4,427 MiB ON / 3,628 OFF (UNDER AD-1's 6,281 and base 5,897); remainder = FFmpeg export decoder + NVENC
+  ~2,445 every phase + the overlap's SECOND decoder ~790-1,240 (vanishes when the analysis thread exits; OFF still 7,593) +
+  context ~250; pool CACHED 1,246 at peak / 3,483 plateau never returned before job end; analysis-half device frames ~800 pool /
+  ~330 device-wide (secondary). nvidia-smi per-pid [N/A] under WDDM; per-thread pool not measurable (one shared pool; timing
+  attribution recorded as a label). **FIX RULED (my ruling-5k3-fix): (b3) AD-1 gains a device-wide JOB term (pool estimate +
+  context + decoders x NVDEC + NVENC; constants from these remainders; overlap = two decoders) in `core/memory.py`, selection
+  UNCHANGED; plus ONE `free_all_blocks` at the analysis-end boundary in `jobs/export.py` (bounded, no arithmetic change). (b2),
+  (b4) not taken; (C) owner-reserved, not taken. STOP test for the re-run = BOTH instruments (device-wide vs the job total;
+  pool peak vs 6,281). Then light set -> TWO-LEG SUITE again on the final head -> block 2 re-run -> block 3 LAST -> report;
+  Reviewer B reviews the FINAL head with the post-convergence diff named; cell 7 (223K) takes the fix + 5.3K re-check, cell 8
+  the suite, block 3, report. AD-1 AMENDED (dated) in decisions.md.** **No window open; seat free.**
+- (history) attribution window OPEN ~14:20Z (msg `4ebb2986077a3c1e`).
 - (history) block 2 OPEN ~14:03Z (msg `f643b1059bdc063a`). STOP test
   (conservative): nvidia-smi device-wide memory.used (same instrument as the baseline 6,104; ~250-330 MiB idle + decoder + NVENC
   sessions) vs 6,281 (5,897 + 384) and vs base x 1.25 = 7,371; above either = STOP to me, idle offset stated. Block 3 GX011625
