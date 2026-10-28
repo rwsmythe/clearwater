@@ -143,9 +143,16 @@
   **Cell 4 DISPATCHED 07:31Z** (msg `94c72e704d83c247`) from `wp3.21` e6d27a0 (cell 3 handover, final 265,087), AD-29's eight
   conditions in its prompt; order #2 rework -> oracle WINDOW -> #3 -> unchanged. Brief names the four layering tests (b26b051;
   CRLF blob corrected within a minute by e6f7193; 0 CR at HEAD, verified at my seat).
-- **EXCLUSIVE WINDOW OPEN 2026-10-28 ~08:43Z: WP3.21 4K BLUR MICRO-TIMING (~10 min; uncommitted driver
-  `work/wp3.21/blur_microtiming.py`, GX011627 frame 0 read-only; JSON under `work/wp3.21/microtiming/`)** (msg `f02a8e3d3ecf679e`).
-  **NOTHING HEAVY AT THIS SEAT until CLOSE.** Measures: blur share of c3 render at 4K (CUDA events, median of 20); each render
+- **MICRO-TIMING CLOSED ~09:10Z; TASK 6 GO + Q-C5a RULED (msg `62e85d40722a00c8`; my ruling-task6).** Cb/Cr blurs (sigma 108) =
+  0.198 of a 0.504 s render (39 %; total blur 71.4 %); per-axis FFT 0.0185 s -> -0.180 s/frame; projection 15.37 -> ~10-11
+  min/min at 4K (AD-21 target); max abs 2.2e-7..2.9e-6 deterministic (3x inside 1e-5). Gate stays 1080 / 32; per-axis; mask
+  blur direct; 2-D variant recorded not built. Run 1 died from the DRIVER never freeing plans (instrument fault). **Q-C5a = (a)
+  default plan cache + (1) `CupyBackend` method clearing plans and pool free blocks, called by export.py at JOB END in the
+  `finally`, never per frame; (2) persistent plan bytes counted in `memory_estimate_bytes` and reported separately at 5.3K.
+  Max-parameter 5.3K row: YES; on breach the gate keys on PROJECTED plan+buffer bytes vs a FIXED budget constant in core, never
+  live free memory (deterministic path per inputs); breach at DEFAULT params at 5.3K = STOP to me.** 5.3K estimate ~7.3 of 8 GB.
+  Cell 5 depth 111,973, branch de7b1fc. **No window open; seat free.**
+- **(history) micro-timing window ~08:43Z** (msg `f02a8e3d3ecf679e`). Measures: blur share of c3 render at 4K (CUDA events, median of 20); each render
   blur direct vs R0.4 per-axis FFT and 2-D FFT (time, max abs, determinism, pool bytes); sigma ladder 8-270 at 4K and 5.3K 8:7.
   Dry run 1080p synthetic: blur 57 % of render; gate-eligible = the two Cb/Cr blurs at 0.05 x short side; FFT error <= 8.6e-7.
   Cell 5 depth 87,298 at yield 10, branch 650a693. After CLOSE: share, projected saving under the Q-R1 gate, max abs vs 1e-5,
