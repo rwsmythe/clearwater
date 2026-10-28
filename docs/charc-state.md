@@ -151,7 +151,8 @@
   `finally`, never per frame; (2) persistent plan bytes counted in `memory_estimate_bytes` and reported separately at 5.3K.
   Max-parameter 5.3K row: YES; on breach the gate keys on PROJECTED plan+buffer bytes vs a FIXED budget constant in core, never
   live free memory (deterministic path per inputs); breach at DEFAULT params at 5.3K = STOP to me.** 5.3K estimate ~7.3 of 8 GB.
-  Cell 5 depth 111,973, branch de7b1fc. **No window open; seat free.**
+  Relayed to cell 5 in full 09:15Z (msg `c620af9a4886d174`; depth 141,332); cell finishes the Q-R7 tool-side stamp then builds task 6;
+  memory re-read and oracle legs come as windows. **No window open; seat free.**
 - **(history) micro-timing window ~08:43Z** (msg `f02a8e3d3ecf679e`). Measures: blur share of c3 render at 4K (CUDA events, median of 20); each render
   blur direct vs R0.4 per-axis FFT and 2-D FFT (time, max abs, determinism, pool bytes); sigma ladder 8-270 at 4K and 5.3K 8:7.
   Dry run 1080p synthetic: blur 57 % of render; gate-eligible = the two Cb/Cr blurs at 0.05 x short side; FFT error <= 8.6e-7.
