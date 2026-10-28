@@ -38,6 +38,8 @@ Cell `implementer-opus-high` (Claude lane), worktree `.worktrees/wp3.21`, branch
 | 13 (read) | as given with the STOP acknowledgement | 163,071 |
 | 14 (read) | as given with the placement ruling and the seat plan | 232,900 |
 | 15 | cell 5: batched route and the estimate's bound built (`17743ec`); WINDOW REQUEST (memory re-read) | (dispatcher fills) |
+| 15 (read) | as given at the memory re-read grant | 289,841 |
+| 16 | cell 5: WINDOW RELEASED (memory re-read); WINDOW REQUEST (oracle legs) | (dispatcher fills) |
 
 ## RESUME HERE (cell 5, after cell 4's interim 2)
 
@@ -428,6 +430,27 @@ built what the STOP's answer cannot change and held the rest.
   after the WINDOW RELEASED write RESUME HERE for cell 6 (Reviewer A, the two-leg suite, task
   10) and stand down. CHARC's seat rule: past about 330K before the memory re-read window, the
   handover comes FIRST and cell 6 runs the window.
+
+### Task 6 memory re-read (EXCLUSIVE window, OPEN about 09:58Z; development evidence)
+
+Driver `work\wp3.21\fft_memory.py` (uncommitted), log `logs\fft-memory-1.log`, JSON
+`microtiming\fft-memory-GX011627-20261028T094758Z.json`, EXIT 0. c3 render, plans and pool
+cleared before each peak (the binding method); "max" = all five spatial fractions at their
+maxima. The peak is over the input frame; the estimate is the GPU backend's (base + bound).
+
+| input | parameters | render peak | persistent plans | transient | estimate (base + bound) | render FFT / direct |
+|---|---|---|---|---|---|---|
+| 4K GX011627 frame 0 | default | 908 MiB | 30 MiB | 878 MiB | 2,174 (1,982 + 192) | 0.207 / 0.388 s |
+| 4K GX011627 frame 0 | max | 947 MiB | 69 MiB | 878 MiB | 2,174 | - |
+| 5.3K 8:7 synthetic | default | 2,710 MiB | 97 MiB | 2,614 MiB | 6,281 (5,897 + 384) | 0.777 / 2.930 s |
+| 5.3K 8:7 synthetic | max | 2,798 MiB | 184 MiB | 2,614 MiB | 6,281 | - |
+
+- Every peak plus its input is under the GPU estimate; the max-fraction 5.3K row is inside the
+  card by a wide margin, so the fixed-budget projection rule is not triggered.
+- Render-level saving at 4K: -0.181 s/frame (0.388 -> 0.207), the micro-timing's -0.180
+  projection confirmed on the product render; at 5.3K -2.15 s/frame. These are render figures
+  (one frame, median of 10), not the job's; task 10 has the figures of record.
+- At 5.3K the mask blur (0.01 x 4648 = 46.5 px) also meets the gate, hence 97 MiB of plans.
 
 ## Re-seat: cell 2 (2026-10-28), rulings since round 0
 
