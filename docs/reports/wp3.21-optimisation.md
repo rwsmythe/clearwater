@@ -31,7 +31,7 @@ tag is read.
 
 Every 4K NVENC row meets 25. The 5.3K 8:7 row went from 136.03 to 36.65 min/min (best effort, D106). N4 held on every row.
 The exported pixels: the render differs by at most 7.06e-6 before quantisation (tier 2, AD-11); the statistics records
-and the proxies are bit-identical (tier 1) on every leg.
+and the proxies are bit-identical (tier 1) on every leg. V4 is SAME on every WP2.3 sample (GPU and CPU legs) and on GX011627 through the optimised engine.
 
 ## Task 1: where the cold export spent its time (the breakdown)
 
@@ -190,6 +190,32 @@ at most 1 code value. As corroboration, the ancuti2018 output has exactly the ba
 The FFT bound (Q3: max abs 1e-5 on [0, 1] float32 data against the direct filter) measured 2.2-3.1e-7 on the 4K render
 calls, <= 2.68e-6 on the 4K ladder and <= 2.92e-6 at 5.3K sigma 270, with step edges at every border. It is
 deterministic on repeat.
+
+## V4 SAME on the optimised engine (granted window, 2026-10-28 17:58Z-18:05Z; code `227ed32`)
+
+Each export was made by `tools/export_oracle.py record --keep` through the product engine (GPU legs `--device-frames`,
+CPU legs `--force-cpu`), then compared by `tools/video_fidelity.py compare SOURCE OUTPUT` (WP3.10's V4 instrument;
+46 items). GX011627 was reached only through `find_footage_file` and read only. Driver
+`C:\Users\rwsmy\clearwater\work\wp3.21\v4.sh` (uncommitted), logs `work\wp3.21\logs\v4-{wp23,gx}.log`. hlg and pq are
+left out (readable failures with nothing written, as in WP3.14).
+
+| Sample | GPU (device frames) | CPU (`--force-cpu`) | Notes |
+|---|---|---|---|
+| hevc8-bt709-full | SAME (6 best-effort differ) | SAME (6) | none |
+| hevc10 | SAME (6) | SAME (6) | none |
+| untagged | SAME (6) | SAME (6) | none |
+| vfr | SAME (6) | SAME (6) | none |
+| rotated | SAME (5) | SAME (5) | none |
+| truncated | SAME (8) | SAME (8) | "D86: compared on the readable part, video end 0.800800 (1001/1250)"; "D86: audio side data compared on the source packets kept" |
+| GX011627 c3 (681 frames, sink `cuda:0`) | SAME (8) | - | none |
+
+SAME means every MANDATORY and every REQUIRED (D55/D114) item is SAME (0 different in both classes on all 13
+compares). The differing items are BEST-EFFORT only. They are the rewritten container: ftyp brands, container and
+stream tags other than creation_time, `moov/udta` camera atoms, track layout and video sample entry child boxes, plus
+on GX011627 the timecode tag and the non-video edit lists. These are D86's not-carried items and the sink's own
+muxing, as designed. Compare records are under `C:\Users\rwsmy\clearwater\work\wp3.10\wp3.21-v4\v4-*\` (the tool
+refuses an `--out` outside its own `wp3.10` root, so not under `wp3.21\v4` as first planned). The kept outputs are
+under `C:\Users\rwsmy\clearwater\work\wp3.21\oracle\v4-*\out\` and are NOT deleted (that needs a grant naming them).
 
 ## V16, the re-measure (task 10; EXCLUSIVE windows, figures of record)
 
@@ -430,10 +456,6 @@ The post-convergence diff (`afad7af..227ed32`) goes to Reviewer B (the orchestra
 
 ## Open items
 
-- **V4 SAME through `tools/video_fidelity.py` on the optimised engine** (the brief's Done clause: the WP2.3 samples and
-  GX011627) is NOT in this package's record. No cell ran it, and no RESUME HERE named it. The bench deletes its outputs
-  unless `--keep` is given, so there is no output to compare yet. Raised to the dispatcher with a proposed window; this
-  report is amended with the result if it is granted.
 - Reviewer B on the merge candidate (the orchestrator's seat), with the post-convergence range `afad7af..227ed32`
   named.
 - CHARC's register rows at the accept: WP4.2 (the product's GPU job built with `device_backend=<the GPU backend>`) and

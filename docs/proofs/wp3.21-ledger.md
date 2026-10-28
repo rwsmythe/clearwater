@@ -64,7 +64,8 @@ Cell `implementer-opus-high` (Claude lane), worktree `.worktrees/wp3.21`, branch
 | 39 | cell 8: WINDOW RELEASED (serial leg green); WINDOW REQUEST (block 3, GX011625) | 83,323 |
 | 40 | cell 8: WINDOW RELEASED (block 3, both instruments pass); report next | (dispatcher fills) |
 | 41 | cell 8: report written; STOP (V4 SAME not in the record); WINDOW REQUEST (V4) | 185,908 (given with "no more heavy runs") |
-| 42 | cell 8: thermals item; return report (final) | (dispatcher fills) |
+| 42 | cell 8: thermals item; return report (sent before the V4 grant) | - |
+| 43 | cell 8: V4 window GRANTED (option (a)); V4 SAME; return report (final) | 228,417 (at the grant) |
 
 ## RESUME HERE (cell 6, after cell 5)
 
@@ -2366,3 +2367,29 @@ report for the dispatcher's ruling (options (a) the window, (b) a CHARC waiver).
 the block 3 thermals (95 C peak, the power cap, the last-quarter median +4 % over the first hour)
 and the `System` stray at 26.8 % are recorded as spread, not a limit; applied to the report's
 Conditions.
+
+### V4 SAME (dispatcher GRANT, option (a), `untagged` added) (granted window, 2026-10-28 17:58Z-18:05Z; code `227ed32`)
+
+Each export was made by `tools/export_oracle.py record --keep` through the product engine (GPU legs `--device-frames`,
+CPU legs `--force-cpu`), then compared by `tools/video_fidelity.py compare SOURCE OUTPUT` (WP3.10's V4 instrument;
+46 items). GX011627 was reached only through `find_footage_file` and read only. Driver
+`C:\Users\rwsmy\clearwater\work\wp3.21\v4.sh` (uncommitted), logs `work\wp3.21\logs\v4-{wp23,gx}.log`. hlg and pq are
+left out (readable failures with nothing written, as in WP3.14).
+
+| Sample | GPU (device frames) | CPU (`--force-cpu`) | Notes |
+|---|---|---|---|
+| hevc8-bt709-full | SAME (6 best-effort differ) | SAME (6) | none |
+| hevc10 | SAME (6) | SAME (6) | none |
+| untagged | SAME (6) | SAME (6) | none |
+| vfr | SAME (6) | SAME (6) | none |
+| rotated | SAME (5) | SAME (5) | none |
+| truncated | SAME (8) | SAME (8) | "D86: compared on the readable part, video end 0.800800 (1001/1250)"; "D86: audio side data compared on the source packets kept" |
+| GX011627 c3 (681 frames, sink `cuda:0`) | SAME (8) | - | none |
+
+SAME means every MANDATORY and every REQUIRED (D55/D114) item is SAME (0 different in both classes on all 13
+compares). The differing items are BEST-EFFORT only. They are the rewritten container: ftyp brands, container and
+stream tags other than creation_time, `moov/udta` camera atoms, track layout and video sample entry child boxes, plus
+on GX011627 the timecode tag and the non-video edit lists. These are D86's not-carried items and the sink's own
+muxing, as designed. Compare records are under `C:\Users\rwsmy\clearwater\work\wp3.10\wp3.21-v4\v4-*\` (the tool
+refuses an `--out` outside its own `wp3.10` root, so not under `wp3.21\v4` as first planned). The kept outputs are
+under `C:\Users\rwsmy\clearwater\work\wp3.21\oracle\v4-*\out\` and are NOT deleted (that needs a grant naming them).
