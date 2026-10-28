@@ -36,6 +36,7 @@ Cell `implementer-opus-high` (Claude lane), worktree `.worktrees/wp3.21`, branch
 | 13 | cell 5: STOP, a correction to the micro-timing's 5.3K memory figure before the task 6 build | (dispatcher fills) |
 | 14 | cell 5: task 6 gate, route and job-end release built (`7061699`); batching and the estimate fold wait on the yield-13 STOP | (dispatcher fills) |
 | 13 (read) | as given with the STOP acknowledgement | 163,071 |
+| 14 (read) | as given with the placement ruling and the seat plan | 232,900 |
 | 15 | cell 5: batched route and the estimate's bound built (`17743ec`); WINDOW REQUEST (memory re-read) | (dispatcher fills) |
 
 ## RESUME HERE (cell 5, after cell 4's interim 2)
@@ -412,6 +413,21 @@ built what the STOP's answer cannot change and held the rest.
   MiB" threshold and IF-2's own example text), which only a ruling may change. Recommended:
   leave the decision on the base (the bound is at most 384 MiB at 5.3K under the 1.25 margin)
   and let task 10's measured 5.3K peak against the GPU estimate settle it.
+
+### Orchestrator answer to yield 14, and CHARC `72becf26`
+
+- The release in `_run`'s `finally` is ACCEPTED (orchestrator) and CONCURRED (CHARC `72becf26`):
+  it covers every export job, photos included; it runs after `_video` joins the analysis
+  thread; a raising release never replaces the outcome. Task 6's gate, route and release are as
+  ruled.
+- **OPEN, OUT OF SCOPE:** the GUI preview's FFT plans (a preview of 1080 or more on its short side
+  meets the gate; no job end releases its thread's plans). ACCEPTED as CHARC's register row,
+  binding WP4.3, written at the accept. Not this package's to fix.
+- **Seat plan:** finish (a) the batching, (b) the estimate fold and its bound test with the light
+  set (both done, `17743ec`), (c) the memory re-read and the oracle legs in windows, recorded;
+  after the WINDOW RELEASED write RESUME HERE for cell 6 (Reviewer A, the two-leg suite, task
+  10) and stand down. CHARC's seat rule: past about 330K before the memory re-read window, the
+  handover comes FIRST and cell 6 runs the window.
 
 ## Re-seat: cell 2 (2026-10-28), rulings since round 0
 
