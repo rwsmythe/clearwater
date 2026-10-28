@@ -327,25 +327,33 @@ class _Analysis:
 
         The D87 re-check runs after the lead (CHARC ruling Q-R6), while the analysis goes on
         storing proxies on a volume the output may share. The entry's growth since :meth:`start`,
-        per frame stored in that time, is scaled to the frames the entry does not hold yet.
+        per frame stored in that time, is scaled to the frames the entry does not hold yet. When
+        the lead stored nothing new (a retry over an incomplete entry that already holds the
+        lead's frames: a byte-identical proxy adds nothing), the entry's own bytes per stored
+        frame are scaled instead (Reviewer A round 1, F5).
 
         Args:
             frames: The clip's frame count.
 
         Returns:
-            The estimated bytes the entry still grows by; 0 for a complete entry or when nothing
-            was stored during the lead.
+            The estimated bytes the entry still grows by; 0 for a complete or empty entry, or when
+            the entry already holds every frame.
         """
         after = self._cache.lookup(self._key)
         if after is None or after.complete:
             return 0
+        remaining = frames - len(after.pts_ticks)
+        if remaining <= 0:
+            return 0
         before = self._before
         grown = after.size_bytes - (0 if before is None else before.size_bytes)
         stored = len(after.pts_ticks) - (0 if before is None else len(before.pts_ticks))
-        remaining = frames - len(after.pts_ticks)
-        if grown <= 0 or stored <= 0 or remaining <= 0:
+        if grown > 0 and stored > 0:
+            return -(-grown * remaining // stored)
+        held = len(after.pts_ticks)
+        if held <= 0 or after.size_bytes <= 0:
             return 0
-        return -(-grown * remaining // stored)
+        return -(-after.size_bytes * remaining // held)
 
     def _run(self) -> None:
         try:

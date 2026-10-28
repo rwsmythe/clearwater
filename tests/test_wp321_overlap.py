@@ -27,6 +27,7 @@ from clearwater.analysis import AnalysisEngine
 from clearwater.analysis import engine as engine_module
 from clearwater.analysis.engine import composed_reach, lead_frames
 from clearwater.analysis.smoothing import DEFAULT_KIND, DEFAULT_WINDOW_S
+from clearwater.core.backend import NumpyBackend
 from clearwater.interfaces import CacheKey, Frame, JobResult, ProbeResult
 from clearwater.interfaces.stubs import StubProgress, StubProxyCache
 from clearwater.jobs import SafeWrite
@@ -557,3 +558,107 @@ def test_the_re_check_adds_nothing_for_a_complete_cache_entry(
     result = rig.run(rig.request())
     assert result.ok, result.failure
     assert len(needs) == 2 and needs[0] == needs[1]
+
+
+def _analysis_decoded(source: _Streams) -> int:
+    """Frames the latest analysis-thread stream has yielded so far."""
+    tags = [tag for tag, name in source.threads.items() if name == "export-analysis"]
+    if not tags:
+        return 0
+    return sum(1 for tag, _ in source.events if tag == tags[-1])
+
+
+def test_the_re_check_on_a_retry_over_an_incomplete_entry_scales_its_own_bytes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Reviewer A round 1, F5: a cancelled export leaves an incomplete entry that already holds
+    # the retry's lead, so the lead stores nothing new (a byte-identical proxy adds nothing);
+    # the re-check then scales the entry's own bytes per stored frame, never adds 0.
+    rig, source, cache = _rig(tmp_path)
+    first = StubProgress()
+
+    def cancel_past(stage: str) -> None:
+        if _analysis_decoded(source) >= 120:
+            first.cancel()
+
+    rig.method.hook = cancel_past
+    assert rig.run(rig.request(), first).failure is CANCELLED
+    left = cache.lookup(KEY)
+    assert left is not None and not left.complete
+    assert 100 < len(left.pts_ticks) < FRAMES  # the retry's lead lies inside the entry
+
+    held = threading.Event()
+    seen: dict[str, Any] = {}
+
+    def hold_past_the_lead(stage: str) -> None:
+        if _analysis_decoded(source) >= 90:
+            held.wait(30)  # the entry stays as it was at the re-check
+
+    def check(folder: Path, needed: int) -> SpaceCheck:
+        if "first" not in seen:
+            seen["first"] = needed
+        else:
+            seen["second"], seen["entry"] = needed, cache.lookup(KEY)
+            held.set()
+        return SpaceCheck(folder=folder, needed=needed, free=10**15, ok=True)
+
+    rig.method.hook = hold_past_the_lead
+    monkeypatch.setattr(export_module, "check_free_space", check)
+    result = rig.run(rig.request())
+    assert result.ok, result.failure
+    entry = seen["entry"]
+    assert entry.pts_ticks == left.pts_ticks and entry.size_bytes == left.size_bytes
+    stored = len(entry.pts_ticks)
+    added = seen["second"] - seen["first"]
+    assert added == -(-entry.size_bytes * (FRAMES - stored) // stored) and added > 0
+
+
+class _Releasing(NumpyBackend):
+    """The CPU backend plus the jobs package's release extension, noting what it saw."""
+
+    def __init__(self, order: list[tuple[str, bool]]) -> None:
+        super().__init__()
+        self.order = order
+
+    def release_fft_plans(self) -> None:
+        self.order.append(("release", bool(_analysis_threads())))
+
+
+def test_a_failing_job_aborts_then_joins_the_analysis_then_releases(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Reviewer A round 1, F2 ruled (a): on a failure the sink is aborted FIRST (the encoder is
+    # released at once), the analysis thread is joined after, and the plans are released last.
+    rig, source, _ = _rig(tmp_path)
+    order: list[tuple[str, bool]] = []
+    backend = _Releasing(order)
+    rig.engine._select_backend = lambda settings, h, w, m: (backend, "GPU")  # type: ignore[method-assign]
+    gate = threading.Event()
+
+    def hold(stage: str) -> None:
+        if _analysis_decoded(source) >= 100:
+            gate.wait(30)  # the analysis is alive, deterministically, until the abort
+
+    real_abort = FakeSink.abort
+
+    def abort(self: FakeSink) -> None:
+        order.append(("abort", bool(_analysis_threads())))
+        gate.set()
+        real_abort(self)
+
+    real_render = rig.method.render
+    count = [0]
+
+    def render(image: Any, params: Any, statistics: Any) -> Any:
+        count[0] += 1
+        if count[0] == 3:
+            raise RuntimeError("ORIGINAL render failure")
+        return real_render(image, params, statistics)
+
+    rig.method.hook = hold
+    rig.method.render = render  # type: ignore[method-assign]
+    monkeypatch.setattr(FakeSink, "abort", abort)
+    result = rig.run(rig.request())
+    assert result.failure == "clip.mp4: RuntimeError: ORIGINAL render failure"
+    assert order == [("abort", True), ("release", False)], order
+    assert _analysis_threads() == []
