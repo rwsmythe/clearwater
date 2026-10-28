@@ -200,7 +200,10 @@
   carries NVDEC x2 at 5.3K + NVENC + two device-frame sets + pool cache, unattributed. **RULED (A) GRANTED (my ruling-5k3): one
   ~4 min EXCLUSIVE attribution window, uncommitted driver under work/wp3.21/, in-process pool used/total per sample + plan cache +
   per-pid nvidia-smi if WDDM reports it; split the 7,854 and the overlap's +1,256 before any fix is ruled; no product change, no
-  commit. Block 3 (GX011625) HELD.** Cell 7 depth 167,263; ledger f6c9511. **No window open until I grant (A)'s OPEN.**
+  commit. Block 3 (GX011625) HELD.** Cell 7 depth 167,263; ledger f6c9511.
+- **EXCLUSIVE WINDOW OPEN 2026-10-28 ~14:20Z: WP3.21 5.3K ATTRIBUTION RUN (A) on my word (~4-10 min; my three asks relayed
+  verbatim; uncommitted driver; no product change, no commit)** (msg `4ebb2986077a3c1e`). **NOTHING HEAVY AT THIS SEAT until
+  CLOSE.** Cell 7 depth 180,200.
 - (history) block 2 OPEN ~14:03Z (msg `f643b1059bdc063a`). STOP test
   (conservative): nvidia-smi device-wide memory.used (same instrument as the baseline 6,104; ~250-330 MiB idle + decoder + NVENC
   sessions) vs 6,281 (5,897 + 384) and vs base x 1.25 = 7,371; above either = STOP to me, idle offset stated. Block 3 GX011625
