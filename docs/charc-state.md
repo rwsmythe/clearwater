@@ -133,6 +133,19 @@
   fixed in cleanup turn 7. **Turn 7 committed 08e87f5** (report + ledger only; m1/m3/m4/m6 fixed, gate text runnable
   with collect-only set checks and --basetemp under work/; m2 LIMIT, lock messages name the path; m5 NOT taken = my
   MINOR row at the accept; CLAUDE.md pointer median P+S 3,849 s ~64 min; depth 212,913).
+- **EXCLUSIVE WINDOW OPEN 2026-10-28 ~06:05Z: WP3.21 INTERIM 1 (the #1 overlap; export_bench GX011627 cold c3 ~10 min,
+  oracle GX011627 c3 ~12 min, synthetic 4K ~2 min, ancuti2018 ~8.5 min if it fits)** (msg `7c702bf6ba630948`). **NOTHING HEAVY
+  AT THIS SEAT until CLOSE.** Cell 2 built #1: `333ad3f` (engine.py + export.py + `tests/test_wp321_overlap.py`), `62f1da6`
+  (`export_bench --subdir`), `613024d` ledger; `analysis_job(stream=True)`, `RenderBeforeFinalError` by name, lead derived
+  61 / 91 / 127, sink opens after the lead, analysis thread joined in `finally`, module `_LOG` (import-logging debt closed);
+  21 new tests, 14 fail on base; existing WP3.14 / engine / export / GUI tests unchanged and green; oracle WP2.3 10/10 TIER1.
+  Cell 2 depth 287,974 -> after this window it records results + handover and yields; **cell 3 re-seats for #2 and #3** (agreed).
+  Q-R7 (lead marked by the analysis->open transition; task 10 reports end-to-end s/frame + lead, tool-side stamp) CONCURRED.
+  **Q-R6 RULED (my msg ack-qr6): ACCEPT the D87 re-check after the LEAD, plus a cheap addition in `export.py`: measure the
+  cache entry's growth over the lead, extrapolate per frame over the remaining frames, add it to the re-check's required
+  figure (no `disk_space.py` change, no spec change); a planted small-free-space test shows the refusal before the first
+  rendered frame. If the cache entry cannot be sized in one call = STOP to me.** Baseline for the interim: WP3.14 cold c3
+  1.061-1.065 s/frame.
 - **WP3.21 TASK 1+2 WINDOW CLOSED 05:18Z; ROUND 0 RECEIVED (`defa2a9`, 7 commits on d1e4537, no product code); CELL 1 STOOD
   DOWN at depth 359,040 (orchestrator's CLOSE post said 285,003, corrected); CELL 2 re-seats from R0.9 for the overlap build**
   (msgs `b8ee40b1c815008c`, `3e8434f28064c2b7`). **No window open; seat free.** Breakdown GX011627 c3: analysis 0.299 s/frame,
