@@ -1884,9 +1884,10 @@ encoder auto (`hevc_nvenc`, NVENC proof tied) unless libx265, Standard, 8-bit.
   (9.57-9.92; baseline 31.8-31.9). Clocks before each run SM 210 MHz idle (the first run 1,980,
   from the GOP probe), temperatures 52-69 C, memory.used 248-335 MiB between runs. Strays: none
   except the libx265 row (`System` 41.5 % CPU, kept as spread) and the OFF row (`System` 29.1 %).
-- (a) **Warm row, PROVISIONAL pending CHARC's ruling on the warm-row method:** its GPU peak
-  includes the prime analysis's pooled blocks (the product's own state after an analysis; the
-  prime makes no plans); the bench was run unchanged (dispatcher, 13:23Z, option (a)).
+- (a) **Warm row, method RULED (a) (CHARC FINAL `522229f57cbc6870`, 13:24Z):** its GPU peak is
+  the product's own state after an analysis, pool and all; the prime makes no FFT plans (its
+  proxies are below the 1080 gate); the bench ran unchanged, (b) not taken. The STOP check stays
+  on the cold rows.
 - ON vs OFF on cold c3 (#2 device frames + #3 device block mean, which need device frames): 0.3195-0.3310
   against 0.5757 s/frame, about -0.25 s/frame; the OFF row's lead is 19.7 s against 5.0-5.4 s
   (the host block mean in the analysis pass).
