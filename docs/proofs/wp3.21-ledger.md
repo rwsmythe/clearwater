@@ -53,7 +53,8 @@ Cell `implementer-opus-high` (Claude lane), worktree `.worktrees/wp3.21`, branch
 | 28 | cell 7: WINDOW RELEASED (task 10 block 1); WINDOW REQUEST (block 2, 5.3K) | 154,676 (at the grant) |
 | 29 | cell 7: block 2 5.3K GPU peak above both bounds; STOP | 167,263 (at the HOLD) |
 | 30 | cell 7: option (A) driver drafted in the HOLD (not run) | 180,200 (at the (A) grant) |
-| 31 | cell 7: WINDOW RELEASED (attribution); split table to CHARC | (dispatcher fills) |
+| 31 | cell 7: WINDOW RELEASED (attribution); split table to CHARC | (not given) |
+| 32 | cell 7: HOLD for the fix ruling; RESUME HERE (cell 8) written | 223,058 |
 
 ## RESUME HERE (cell 6, after cell 5)
 
@@ -1770,7 +1771,7 @@ re-recorded from its script if a record is needed.
   `gaussian_blur` call (plans built per call; costs plan creation per blur, needs a timing
   window, and moots `release_fft_plans`); (C) a CHARC ruling on the existing test.
 
-## RESUME HERE (cell 7, after cell 6)
+## RESUME HERE (cell 7, after cell 6) -- SUPERSEDED by RESUME HERE (cell 8) at the end
 
 **State:** branch `wp3.21` on base `d1e4537`, NO rebase; worktree CLEAN at the ledger head.
 Cell 6's commits: r1 ledger `b1bb9cc`; F5 fix + order test `9d73fe4`; r2 ledger `047656f`;
@@ -2018,3 +2019,42 @@ direct Gaussian); cell 5's 5.3K render pool peak 2,710 MiB (2,798 at the max fra
   ended the interval. ON: analysis thread 3,297 MiB (lead 824, overlap 2,473), render thread
   1,130 (overlap); OFF: analysis 1,080 (lead 44, overlap 1,036), render 2,547. Order-dependent:
   a thread that grows the pool first leaves free blocks the other reuses uncounted.
+
+## RESUME HERE (cell 8, after cell 7)
+
+**State:** branch `wp3.21` on base `d1e4537`, NO rebase; worktree CLEAN at the ledger head. Last
+CODE commit `57a7a2e` (the ruling (A) conftest fixture + its pin); everything after is ledger.
+Cell 7's commits: `57a7a2e`, ledgers `afad7af` .. this one. Reviewer A CONVERGED at round 2
+(cell 6). **Two-leg suite GREEN at `afad7af`** (parallel 4,147 / 1 skip, collection unchanged by
+the fixture; serial leg 2 1,112 / 1 skip, "Serial leg 2" above). A code change from the fix
+ruling re-opens what the ruling names (at least the light set, oracle legs if the render or
+analysis path moves, and the suite legs per the fill).
+
+**Task 10 so far ("Task 10" sections above):** block 1 GX011627 DONE (cold c3 9.57-9.92 min/min,
+warm 9.06 with its memory method RULED (a), ancuti2018 8.74, libx265 14.59, OFF row 17.25; the
+recurring slow frames PLACED: `STREAM_STEP = 16` analysis advances, no fix). Block 2 5.3K: speed
+35.46 min/min [136.03], GPU peak 7,854 MiB device-wide above 6,281 and 7,371: **STOP, open.**
+Attribution (A) DONE: pool reserved peak 4,427 ON / 3,628 OFF (under the estimate on AD-1's own
+definition); the breach is FFmpeg (export decoder + NVENC about 2.4 GB, the overlap's analysis
+decoder about 0.8-1.25 GB) plus pool-cached; per-thread pool not measurable (timing proxy given).
+**Waiting on CHARC:** the fix ((b3) AD-1 overlap/FFmpeg term is the dispatcher's and cell 7's
+reading, pool-cached secondary: (b4) bounded pool or `free_all_blocks` at the analysis-end
+boundary) and the instrument for the re-run's STOP test. `core/memory.py` is CHARC's by Q9;
+do not change `test_core_select.py` (ruling `16a8ee8a`).
+
+**Then, in order:** the ruled fix (its own gates); re-run block 2 (5.3K) in a window with the
+named instrument; block 3 GX011625 LAST in its own window (about 1.5-2.5 h; command as block 1
+with `--clip GX011625`, wait by bounded foreground polls of a `.done` marker); the report
+`docs/reports/wp3.21-optimisation.md` per RESUME HERE (cell 6) item 4 plus: Reviewer A's rounds,
+the corrected R0.2 order (abort -> A joined -> release), the banked Limits (r1 F3, F2, F10, F11,
+the F9 residual 2 ms pacing sleep), the plan-cache finding and the conftest fix, the Limits
+sentence CHARC ruled ("any caller outside an export job keeps its thread's cuFFT plans until
+something calls the release"; the GUI preview is the product case, WP4.3 register row; test
+isolation is the fixture; tools exit their process), CHARC's pixel-change wording (never "no
+exported pixel changes"), the warm-row label, the STREAM_STEP placement (the job is
+analysis-bound during the overlap: the analysis pass is the next target), the 5.3K attribution
+and its ruling; then the return report (under about 70 lines) by SendMessage.
+
+**Evidence not committed:** `C:\Users\rwsmy\clearwater\work\wp3.21\bench\` (V16 records),
+`...\attribution\` and the driver `work\wp3.21\memory_attribution.py`; worktree
+`work\wp3.21\logs\c7-*` (summaries, GOP check, timelines). Standing rules: RESUME HERE (cell 6).
