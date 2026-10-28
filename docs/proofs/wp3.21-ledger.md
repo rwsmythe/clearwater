@@ -34,6 +34,7 @@ Cell `implementer-opus-high` (Claude lane), worktree `.worktrees/wp3.21`, branch
 | 12 | cell 5: Q-R7 built in the hold | (dispatcher fills) |
 | 12 (read) | as given with the task 6 GO relay | 141,332 |
 | 13 | cell 5: STOP, a correction to the micro-timing's 5.3K memory figure before the task 6 build | (dispatcher fills) |
+| 14 | cell 5: task 6 gate, route and job-end release built (`7061699`); batching and the estimate fold wait on the yield-13 STOP | (dispatcher fills) |
 
 ## RESUME HERE (cell 5, after cell 4's interim 2)
 
@@ -301,6 +302,50 @@ are the log's. Run 2 (`--only-53k`, plan cache and pool cleared per row; JSON
   2.69 ms against 2.60 / 3.01 unchunked (direct 17.2 / 34.5); plans 36 / 33 MiB against 106 /
   83; peak including plans 84 MiB against 170 / 153; max abs identical (9.5e-7 / 1.25e-6).
   Chunking bounds both the plans and the transient by the batch, independent of the width.
+
+### Task 6, the parts the STOP cannot change (cell 5, `7061699`)
+
+The orchestrator's nudge (the GO, sent before it saw the yield-13 STOP) said proceed; the cell
+built what the STOP's answer cannot change and held the rest.
+
+- **`core/backend.py`:** `FFT_MIN_SHORT_SIDE = 1080`, `FFT_MIN_SIGMA = 32.0`, `fft_route(h, w,
+  sigma)` (shape and sigma only, never the device or free memory); `gaussian_kernel` (scipy's
+  `_gaussian_kernel1d` weights, pinned equal by a test); `reflect_index` (numpy's `symmetric`
+  pad, repeated reflection included); `CoreBackend._fft_correlate` (per axis: reflect-pad by
+  index, `rfft` at `next_fast_len(n + 2r)`, times the kernel's spectrum, `irfft`, crop; float32);
+  `gaussian_blur` routes by `fft_route`, identical for both backends. `NumpyBackend.fft =
+  scipy.fft`; `CupyBackend.fft` a cached property importing `cupyx.scipy.fft` at first use (an
+  eager import broke `test_core_select.py`'s fake `importlib`, 7 failures, fixed without editing
+  the test). `CupyBackend.release_fft_plans()` (an IF-2 device extension under the AD-29
+  comment): clears the calling thread's cuFFT plan cache and the pool's free blocks.
+- **`jobs/export.py`:** `JobDeviceBackend` (`runtime_checkable` Protocol, the jobs package's own);
+  `_Run.backend` set at backend selection in `_video` and `_photo`; `_run`'s try gains a
+  `finally` calling `_release_fft_plans(run.backend)` once per job on every path (a raising
+  release is logged, never the job's outcome). **Placement note for the orchestrator:** the
+  ruling named "the existing `finally`" (`_video`'s, around `analysis.stop()`); that one does not
+  cover photo jobs (a 12 MP photo meets the gate), so the release sits in `_run`, which wraps
+  both; it still runs after `_video`'s `finally` has joined the analysis thread.
+- **Tests** (`tests/test_wp321_fft_gaussian.py`, `tests/test_wp321_fft_release.py`): the gate's
+  boundaries and the route taken (a spy on `_fft_correlate`); the kernel equals scipy's; the
+  reflect index equals numpy's; (a) the largest proxy short side over S <= 200,000 is 1079 by
+  `proxy_factor`, and `block_mean` at S = 1079 and 1619 agrees; (b) a (1079, 1920, 3) step-edge
+  blur at sigma 54 and 270 is bit-identical to the direct filter, CPU and GPU; (c) within 1e-5 and
+  deterministic: 1080p (one plane 54, RGB 32, sigma 300 with repeated reflection), 4K (one
+  plane 108, RGB 32; CPU `slow`), 5.3K one plane 232.4 (GPU), and GX011627 frame 0 (`gpu`,
+  `footage`); release: the CPU backend lacks the Protocol, the GPU backend has it and empties
+  its plan cache; a video job releases once after the sink's close; failure, cancel, a failure
+  before backend selection (none), a raising release (the job stays ok), photo ok and photo
+  cancelled after render (once each).
+- **Light set:** analysis, core, jobs, methods and `test_wp321_*` files plus every `*_deps.py` /
+  `*_rules.py`, `-n 4 -m "not slow and not footage and not gui"`: 2,156 passed (GPU cases at 4K
+  and 5.3K included). Slow non-footage `test_methods_assembly_v8.py` (V8 preview against the
+  downscaled export) and the 4K CPU bound cases: 7 passed. ruff, format, mypy clean;
+  `interfaces/` and `color/samples.py` equal `d1e4537`.
+- **Held for the STOP's answer:** the batching (A), the `memory_estimate_bytes` fold
+  (condition 2), the 4K and 5.3K memory re-read and the oracle legs (windows).
+- **Open item:** a GUI preview of 1080 or more on its short side also meets the gate; its plans
+  stay cached on the GUI's thread (no job end releases them). Not this package's surface (Q-C5a
+  is the export job's); recorded for the orchestrator.
 
 ## Re-seat: cell 2 (2026-10-28), rulings since round 0
 
