@@ -26,6 +26,8 @@ Cell `implementer-opus-high` (Claude lane), worktree `.worktrees/wp3.21`, branch
 | 8 | cell 4: #3 built; WINDOW REQUEST for interim 2 (#1+#2+#3, device frames ON) | (dispatcher fills) |
 | 8 (read) | as given at the interim-2 grant | 236,806 (the dispatcher: hand over after the window) |
 | 9 | cell 4 stands down after interim 2; RESUME HERE (cell 5) | (dispatcher fills) |
+| 9 (read) | cell 4's last reading at stand-down (given to cell 5) | 236,806 at yield 8; 257,383 final |
+| 10 | cell 5: micro-timing instrument built; WINDOW REQUEST | (dispatcher fills) |
 
 ## RESUME HERE (cell 5, after cell 4's interim 2)
 
@@ -171,6 +173,29 @@ over interim 1 against #2's +0.13 GB estimate; re-derive the 5.3K estimate (was 
   summaries.
 - Depth: the dispatcher reads `scripts/cell_depth.py` at each yield; record it. About 250K is
   the evaluation point; about 400K is a STOP at the step boundary with RESUME HERE.
+
+## Re-seat: cell 5 (2026-10-28)
+
+Cell 5 (`implementer-opus-high`) re-seats cell 4, which stood down at depth 236,806 (yield 8;
+257,383 final) after #2 and #3 under AD-29 and interim 2. Branch `wp3.21` at `07778d2` on base
+`d1e4537`, no rebase. Order: this record; the 4K direct-vs-FFT blur micro-timing (window); task 6
+only on its reading; task 7 and Q-R7; Reviewer A; the two-leg suite; task 10 LAST.
+
+### CHARC's interim-2 readings (`b4c143d7`, relayed by the orchestrator at the cell-5 dispatch)
+
+1. The report records the frames-phase trio: 0.714 serial, 0.778 interim 1, 0.501 interim 2. The
+   #2 / #3 split comes from task 10's OFF row if it fits; otherwise it stays unattributed.
+2. The recurring ~0.96 s frames at indices 0, 323 and 387 (median 0.483) are a FINDING for task
+   10's report to place with evidence: decoder seek or GOP boundary, sink write, cache flush, or
+   GC. Frame 0 is the first-frame cost. 323 and 387 are 64 apart, so check them against the
+   clip's GOP length (ffprobe keyframe flags, read-only) before guessing. No fix in this package
+   unless the cause is in an owned file and the fix is one line.
+3. +0.26 GB at 4K is inside AD-1. The report states the measured figure; the 5.3K row re-reads
+   the estimate.
+4. Task 6 goes ahead ONLY on the micro-timing's reading. The instrument must show the blur's share
+   of render (now about 0.35 s/frame of the 0.501) BEFORE any FFT code is written. If the share is
+   too small for the FFT to move the end-to-end figure by more than the oracle's tier-2 cost is
+   worth, that is a YIELD to the dispatcher (taken to CHARC), not an automatic build.
 
 ## Re-seat: cell 2 (2026-10-28), rulings since round 0
 
