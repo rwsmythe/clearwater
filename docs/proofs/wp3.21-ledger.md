@@ -55,7 +55,8 @@ Cell `implementer-opus-high` (Claude lane), worktree `.worktrees/wp3.21`, branch
 | 30 | cell 7: option (A) driver drafted in the HOLD (not run) | 180,200 (at the (A) grant) |
 | 31 | cell 7: WINDOW RELEASED (attribution); split table to CHARC | (not given) |
 | 32 | cell 7: HOLD for the fix ruling; RESUME HERE (cell 8) written | 223,058 |
-| 33 | cell 7: part 2 built (`b5a383c`); light STOP on the (b3) form | (dispatcher fills) |
+| 33 | cell 7: part 2 built (`b5a383c`); light STOP on the (b3) form | (not given) |
+| 34 | cell 7: (b3) built (`9a4256b`); WINDOW REQUEST (block 2 re-run) | (dispatcher fills) |
 
 ## RESUME HERE (cell 6, after cell 5)
 
@@ -2112,3 +2113,56 @@ Caveats: one anchor (5.3K) cannot separate a fixed per-process part from the per
 the 5.3K job at about 10.1 GB, above the 8 GB card (8,188 MiB), because the pool part (6,281)
 is loose against the measured pool peak (4,427); `select_backend` is unchanged, so nothing
 selects differently.
+
+### Scaling RULED (CHARC FINAL `7f58cfc1`; supersedes the light STOP above): part 1 as built (`9a4256b`)
+
+Ruled form: `session_term(kind) = floor + per_pixel x (w x h)` for NVDEC and NVENC, fitted from
+the two measured sizes with the same device-wide instrument; the context a separate constant
+(about 250, after the probe); rounded UP; the fit and residual in the docstring; 1080p an
+extrapolation; every measured device-wide peak covered, each asserted by a test, else a STOP.
+
+**The fit.** 5.3K (attribution): NVDEC 1,256, NVENC 1,192 (above). 4K: the cold rows' max
+3,244 - the 4K pool 947 - context 261 = 2,036 for two decoders + NVENC, split in the 5.3K
+proportion: NVDEC 690.4, NVENC 655.2. "The pool at its 4K figure" read as the one MEASURED 4K
+pool figure, cell 5's render pool peak at the max fractions (947 MiB, "Task 6 memory re-read");
+the 4K job pool with device frames is unmeasured. Sensitivity (disclosed): with the 4K pool
+ESTIMATE (2,174) the floors come out NEGATIVE (-222 / -211 MiB, a line that is negative at
+1080p), and with a 4K job pool scaled from 5.3K's job/render ratio (about 1,545) the floors are
+99 / 94; the measured 947 gives the largest floors (the most conservative extrapolation below
+4K). Solved: NVDEC 404.3 MiB + 36.17 B/px, NVENC 383.7 MiB + 34.33 B/px; constants **NVDEC 416 MiB +
+37 B/px, NVENC 384 MiB + 35 B/px, context 272 MiB** (261 rounded up). Residuals of the rounded
+line: NVDEC +31 (5.3K) / +18 (4K) MiB, NVENC +16 / +6. 1080p (extrapolated): NVDEC 489, NVENC 453.
+
+**Built:** `core/memory.py` `session_bytes(kind, h, w)`, `job_device_memory_estimate_bytes(h, w,
+pool_estimate_bytes, *, decoders, nvenc)` and the constants (the pool estimate passed in: the
+module stays free of the backend; `select_backend` and `core/__init__.py` untouched).
+`tools/export_bench.py`: the backend is selected for every run (the same call as the job's;
+`--device-frames` still decides the source's and the sink's), `_PoolPeak` samples the pool's
+`total_bytes` through `backend.xp` every 0.1 s (no pool on the CPU backend), and the record's
+`memory_check` holds (i) the device-wide peak against the job estimate (decoders 2 cold, 1 over
+a complete entry; NVENC when the sink encoded with it) with the idle before stated, (ii) the
+pool reserved peak against the backend's pool estimate, and `passes`; the row line ends with
+both. NOT built: a product-side report of the figure (IF-8's `JobResult` is frozen and
+`clearwater.jobs` imports nothing from `clearwater.core`), so the record is where it is reported.
+
+**Check table** (MiB; pool estimate 5.3K 6,281, 4K 2,174; every row asserted in
+`tests/test_wp321_job_memory.py`):
+
+| row | decoders / NVENC | job estimate | peak | margin |
+|---|---|---|---|---|
+| 5.3K attribution ON | 2 / yes | 10,336 | 7,921 | 2,415 |
+| 5.3K attribution OFF | 2 / yes | 10,336 | 7,593 | 2,743 |
+| 5.3K block 2 | 2 / yes | 10,336 | 7,854 | 2,482 |
+| 5.3K WP3.14 baseline | 1 / yes | 9,049 | 6,104 | 2,945 |
+| 4K c3 cold (3 runs) | 2 / yes | 4,524 | 3,130-3,244 | 1,280-1,394 |
+| 4K warm | 1 / yes | 3,815 | 2,601 | 1,214 |
+| 4K ancuti2018 | 2 / yes | 4,524 | 3,014 | 1,510 |
+| 4K libx265 | 2 / no | 3,863 | 2,761 | 1,102 |
+| 4K device frames OFF | 2 / yes | 4,524 | 2,925 | 1,599 |
+| 4K WP3.14 c3 / libx265 | 1 / yes, no | 3,815 / 3,155 | 2,409 / 1,937 | 1,406 / 1,218 |
+
+Every row covered. Tests: `test_wp321_job_memory.py` (26: the fitted points, the 13 rows, the
+sum, 1080p, refusals, the bench check on both instruments and its CPU no-op). Light set
+(`c7-b3-light.log`): it, `test_export_bench.py` (WP3.14's, unchanged), `test_wp321_bench.py`,
+`test_core_select.py`, `test_core_backend.py` and the seven layering files -> 225 passed.
+ruff check, ruff format --check (250), mypy (138) clean (`c7-b3-static.log`).
