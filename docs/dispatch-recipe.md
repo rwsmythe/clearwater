@@ -118,6 +118,12 @@ is wrong -- that is how your depth figure and any ruling that landed since reach
 gate needs you to know mid-turn is in this brief; if it is not here, it cannot reach you until you
 yield.
 
+**A granted heavy run is waited for in the FOREGROUND (2026-10-28).** When your dispatcher grants a
+long run inside an exclusive window, run it with a foreground poll-wait (a loop that checks the
+process or its result file) or end your turn and let the dispatcher re-prompt you at its end. Never
+start it in the background and idle on the completion notice: an idle cell is not woken by it, and
+the host sits unused inside the window (WP3.21 task 1: 33 minutes lost between two legs).
+
 - **Honor the brief's locks.** They are binding. A defect/gap OUTSIDE your scope
   gets FLAGGED in the return report -- never fixed inline (scope creep), never
   silently absorbed.

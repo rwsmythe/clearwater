@@ -133,7 +133,21 @@
   fixed in cleanup turn 7. **Turn 7 committed 08e87f5** (report + ledger only; m1/m3/m4/m6 fixed, gate text runnable
   with collect-only set checks and --basetemp under work/; m2 LIMIT, lock messages name the path; m5 NOT taken = my
   MINOR row at the accept; CLAUDE.md pointer median P+S 3,849 s ~64 min; depth 212,913).
-- **EXCLUSIVE WINDOW OPEN 2026-10-28 ~03:50Z: WP3.21 task 1 breakdown (GX011627 c3, ~20-25 min) + task 2 oracle base (~55-60 min,
+- **WP3.21 TASK 1+2 WINDOW CLOSED 05:18Z; ROUND 0 RECEIVED (`defa2a9`, 7 commits on d1e4537, no product code); CELL 1 STOOD
+  DOWN at depth 359,040 (orchestrator's CLOSE post said 285,003, corrected); CELL 2 re-seats from R0.9 for the overlap build**
+  (msgs `b8ee40b1c815008c`, `3e8434f28064c2b7`). **No window open; seat free.** Breakdown GX011627 c3: analysis 0.299 s/frame,
+  `block_mean` HOST float64 = 50.9 % of the pass, device bound 20 %, SM 210 MHz idle clock (the GPU-idle cause NAMED: ~80 % host
+  work starves the card, which also slows stage-1 analyze 46 ms vs 8 ms at boost); frame path 0.714 s/frame, render 70 %;
+  replica == engine (2,724 records, 681 proxies); 13/13 oracle CONTROLS TIER1, refs 9.8 GB under work/wp3.21/oracle/. 33-min
+  host-idle gap inside the window (cell idled on a background notice) -> recipe rule added (foreground poll-wait). Round 0 order:
+  #1 overlap (lead derived 61 c3 / 91 ancuti2018), #2 device frame conversions (decode/encode/samples granted, DR-63 closes),
+  #3 device block mean (exact float64 sum, proxy byte-identical), #4 FFT Gaussian (tier 2); #1-#3 projected ~0.53 s/frame
+  = ~16 min/min (meets interim 25). Orchestrator's Q-R2..Q-R5 rulings CONCURRED. **Q-R1 RULED (my msg): the FFT gate lives in
+  `core/backend.py`'s `gaussian_blur` implementation, BOTH backends, min(H, W) >= 1080 AND sigma >= 32 px (sigma threshold
+  provisional until the micro-timing, never lower); IF-2 ABC untouched; a test derives the largest proxy short side from
+  `analysis/proxy.py`'s rule and asserts the gate clears it; a planted analysis-sized blur (short side 1079, sigma 270) is
+  bit-identical to the direct path; FFT vs direct max abs <= 1e-5 on [0,1] float32 at 1080p and 4K; AD-11 end to end.**
+- **(history) EXCLUSIVE WINDOW OPEN 2026-10-28 ~03:50Z: WP3.21 task 1 breakdown (GX011627 c3, ~20-25 min) + task 2 oracle base (~55-60 min,
   13 CONTROL compares `--require-tier1`, a failing control = STOP)** (msg `013f59e50f2d97d2`). **NOTHING HEAVY AT THIS SEAT until CLOSE.**
   Yield 1: `wp3.21` 3 commits on d1e4537 (`a586be2` breakdown 11 tests, `c72507f` oracle 14 tests, `bc7b58e` ledger), 0 CR; dry-run
   residual 0.01-0.05 %, replica == engine bit for bit; cell depth 269,898 at yield 1 (past evaluation): orchestrator's plan = this
