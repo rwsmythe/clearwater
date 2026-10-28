@@ -48,6 +48,7 @@ Cell `implementer-opus-high` (Claude lane), worktree `.worktrees/wp3.21`, branch
 | 23 | cell 6: cleanup committed (`1df2626`); WINDOW REQUEST (parallel leg) | 215,100 |
 | 24 | cell 6: WINDOW RELEASED (parallel leg); WINDOW REQUEST (serial leg) | 227,414 |
 | 25 | cell 6: serial leg 1 FAILED; STOP; RESUME HERE (cell 7) | (dispatcher fills) |
+| 26 | cell 7: ruling (A) fix built (`57a7a2e`); WINDOW REQUEST (serial leg 2) | (dispatcher fills) |
 
 ## RESUME HERE (cell 6, after cell 5)
 
@@ -1781,3 +1782,49 @@ ruling names (at least the V8 + prototype pair, then the serial leg in a window)
 rounds, the corrected R0.2 order, the Limits above, and the plan-cache finding), the return
 report. Standing rules: as in RESUME HERE (cell 6). Never write `\a`, `\b` etc. in a non-raw
 Python literal in ledger scripts (a BEL slipped in at `f141354`, fixed `70ae22d`).
+
+## Cell 7: the serial-leg fix under CHARC ruling (A) (`21e6d24562923b10`)
+
+**Ruling (A), conditions in substance:** `tests/conftest.py` GRANTED for ONE autouse fixture that
+releases the FFT plans after each test; it imports nothing new, acts only when `cupy` is already
+in `sys.modules`, releases through `core`'s own `release_fft_plans`, never touches `cupy`; the
+footage guard and the WP-T4 docstring paragraph untouched, the AST outside the fixture unchanged
+(proved by `ast.dump`); a test pins it; the V8 + prototype pair re-run light; the serial leg
+again in its own window; the parallel leg's collection checked, not re-run. (B) and (C) refused.
+
+**Built (`57a7a2e`):** `tests/conftest.py` gains `_release_fft_plans` (autouse,
+`request.addfinalizer`); at teardown it reads `sys.modules` (a local `import sys`, a builtin
+already loaded) and acts only when `cupy` and `clearwater.core.backend` are both loaded and
+`_probe_gpu` has been called once (`cache_info().currsize`), then calls the probed
+`CupyBackend.release_fft_plans()`. The cache is per thread, not per backend object, so this also
+clears plans another `CupyBackend` made on pytest's thread. Not covered: a process that makes
+plans through a directly built `CupyBackend` (only `tools/core_speed.py` does) before any probe.
+Pin: `tests/test_wp321_conftest_release.py` (2 `gpu` tests in file order: the first leaves plans
+on the thread, the second asserts none at its start).
+
+**Evidence (worktree `work\`):**
+
+- Failing first, base conftest, HEAD `ea78946`: `pytest -q -rs -m "gpu or slow"
+  tests/test_methods_assembly_v8.py tests/test_prototype_backend.py::test_bench_gpu_records_graphics_memory`
+  -> **1 failed, 9 passed in 100.81 s**, `assert 0.13908809301536113 >= 1.0` at `:345`
+  (`c7-pair-before.log`, 12:25:41Z-12:27:23Z).
+- With the fixture: the same pair -> **10 passed in 101.33 s** (`c7-pair-after.log`,
+  12:28:50Z-12:30:32Z).
+- The pin with the fixture disabled (base conftest restored for the run, then the new file back,
+  `cmp` equal): **1 failed, 1 passed**, `assert (6 == 0)` (six cached Plan1d)
+  (`c7-pin-disabled.log`); with it: passed in the light set.
+- AST (`c7-ast-proof.txt`): base `d1e4537` vs new with the one `FunctionDef` removed, 20
+  top-level nodes each, `ast.dump` equal, module docstring equal (EXIT 0).
+- Light set: `test_wp321_conftest_release.py`, `test_wp321_fft_release.py` and the seven
+  `*_deps.py` / `*_rules.py` -> **86 passed** (`c7-light.log`). Static: ruff check, ruff format
+  --check (249 files), mypy (138 source files) clean (`c7-static.log`).
+- Collection (condition 3): parallel set `4148/5261 collected (1113 deselected)`, node ids
+  IDENTICAL to cell 6's `wp321-collect-parallel.log` (4148/5259; `diff` of the sorted ids empty,
+  `c7-collect-parallel.diff`), so the parallel leg is not re-run. Serial set `1113/5261`
+  (`c7-collect-serial.txt`): cell 6's 1,111 plus the pin's 2.
+- Disk 36 GB free on C:, RAM 10 GB free at 12:31Z.
+
+**For the record (CHARC, in its words):** the serial leg's single skip against WP-T4's ten is
+explained because this worktree's `working_path` points at the main tree's `work/`, so the
+look-check frames exist and the nine V8 tests RAN and passed; the collection 1,111 against 1,046
+is this package's tests plus those nine.
