@@ -5,6 +5,14 @@
 
 ### Generation
 
+- **Generation 16 (`clearwater-orchestrator-20261028-0219`) picked up 2026-10-28 ~12:20Z at main `9b8e848`.** Bash-launch gauge 33 ms.
+  Scratchpad `C:\Users\rwsmy\AppData\Local\Temp\claude\C--Users-rwsmy-clearwater\34160b8a-ea7b-45cf-9184-84c7541b64b9\scratchpad\`.
+  - CHARC RULED the serial-leg STOP **(A)** (`21e6d24562923b10`, 12:21Z): one autouse `tests/conftest.py` fixture releasing plans via
+    core's `release_fft_plans`, only when `cupy` is in `sys.modules`; `ast.dump` proof; a test pins the V8 + prototype pair; serial leg
+    again; parallel leg recollected only (re-run if its count moved); Limits sentence on callers outside a job. Recipe rule `45393bc`.
+  - **Cell 7 DISPATCHED** (`wp321-cell7`, implementer-opus-high, background) from `wp3.21` `ea78946`; depth 0 at dispatch. Prompt
+    `dispatch-wp3.21-cell7.md` in the gen-16 scratchpad. Order: fix -> pair (light) -> serial leg (window) -> task 10 (windows) -> report.
+  - Slip: one bare `cd` into `.worktrees/wp3.21` (no cell live), reverted next call.
 - **Generation 15 ROLLED OVER 2026-10-28 ~12:20Z at ~390K, at a clean boundary: no cell working, no window open, host free.
   GENERATION 16 STARTS HERE.**
   - **RESUME HERE -- WP3.21 (the only package in flight):**
