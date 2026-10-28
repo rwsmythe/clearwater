@@ -1718,7 +1718,7 @@ free 26 GB before (19 GB at the request), **37 GB after**.
 the whole folders were already removed (`rm -rf`, not recoverable), so the 27 `oracle.json`
 records behind H7-H14 are LOST. What survives (uncommitted, under `work\wp3.21\`): the run logs
 with each leg's `ORACLE` summary and `VERDICT` line -- `logs\oracle-ad29-wp23.log` and
-`logs\oracle-devframes-wp23.log` (10 + 10, all TIER1 max abs 0), `logsd29-gx-{1,2}.log`,
+`logs\oracle-devframes-wp23.log` (10 + 10, all TIER1 max abs 0), `logs\ad29-gx-{1,2}.log`,
 `logs\devframes-gx-{1,2}.log`, `logs\interim2-{2,3,4}.log` (each one VERDICT, TIER1, 681 or
 120 frames, 0 differing), and the driver scripts `oracle-ad29-*.sh`, `oracle-devframes-*.sh`,
 `interim2.sh`. The `ref-*` references the legs compared against are intact, so any leg can be
