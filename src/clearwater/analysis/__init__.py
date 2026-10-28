@@ -10,7 +10,10 @@ from __future__ import annotations
 from .engine import CANCELLED, AnalysisEngine, AnalysisSnapshot, Phase
 from .proxy import (
     PROXY_SHORT_SIDE,
+    AnalysisDeviceBackend,
     block_mean,
+    frame_block_mean,
+    frame_pixels_for_proxy,
     frame_pixels_on_host,
     make_proxy,
     proxy_factor,
@@ -40,6 +43,7 @@ __all__ = [
     "MEDIAN_WINDOW_S",
     "PROXY_SHORT_SIDE",
     "STEP_AWARE_KINDS",
+    "AnalysisDeviceBackend",
     "AnalysisEngine",
     "AnalysisSnapshot",
     "AnalysisStore",
@@ -47,6 +51,8 @@ __all__ = [
     "SchemaMismatchError",
     "block_mean",
     "exact_window",
+    "frame_block_mean",
+    "frame_pixels_for_proxy",
     "frame_pixels_on_host",
     "half_window_ticks",
     "make_proxy",

@@ -8,9 +8,10 @@ built or :func:`select_backend` probes the device, so ``import clearwater.core``
 it. ``CoreBackend.xp`` is for ``clearwater.core`` only (WP3.1 ruling 1.1).
 
 IF-2 device extensions (AD-29, WP3.21): :class:`CupyBackend` also converts FFmpeg's planar
-frames on the device (``planes_to_rgb``, ``rgb_to_planes``). They are NOT part of the frozen
-ABC; the GPU backend provides them and the CPU backend does not, so a consumer that tests for
-its own package's Protocol takes its host path on the CPU by structure.
+frames on the device (``planes_to_rgb``, ``rgb_to_planes``) and takes the analysis proxy's exact
+block sums there (``block_sums``). They are NOT part of the frozen ABC; the GPU backend provides
+them and the CPU backend does not, so a consumer that tests for its own package's Protocol takes
+its host path on the CPU by structure.
 
 Conventions (spec 6.4, D39; IF-1):
 
@@ -72,6 +73,9 @@ _LUMA_COEFFICIENTS: dict[str, tuple[float, float]] = {
     "bt709": (0.2126, 0.0722),  # ITU-R BT.709-6, Part 2 items 3.2-3.3
     "bt601": (0.299, 0.114),  # ITU-R BT.601-7, item 2.5.1
 }
+_FLOAT64_SIGNIFICAND_BITS = 53
+"""float64's significand bits: a sum that needs no more is exact in any order (WP3.21 #3)."""
+
 _PLANE_G, _PLANE_B, _PLANE_R = 0, 1, 2
 """FFmpeg's planar RGB order (``gbrp`` / ``gbrp10le``, AD-10): the IF-2 device extensions."""
 
@@ -502,8 +506,9 @@ class CupyBackend(CoreBackend):
     #
     # IF-2 device extensions: NOT part of the frozen ABC; provided by the GPU backend; absent on
     # the CPU backend. A consumer reaches them only through the one ``runtime_checkable``
-    # Protocol of its own package (``clearwater.io.video.decode.DeviceFrameBackend``), with the
-    # same names and signatures, and takes its host path when a backend lacks them.
+    # Protocol of its own package (``clearwater.io.video.decode.DeviceFrameBackend``,
+    # ``clearwater.analysis.proxy.AnalysisDeviceBackend``), with the same names and signatures,
+    # and takes its host path when a backend lacks them.
 
     def planes_to_rgb(self, data: Buffer, *, width: int, height: int, bit_depth: int) -> Array:
         """Upload one planar G, B, R frame and convert it to float32 RGB on the device.
@@ -568,9 +573,7 @@ class CupyBackend(CoreBackend):
         """
         dtype = _plane_dtype(bit_depth)
         self.check_rgb(a)
-        held: Any = a  # a CuPy array (IF-1 types the host's)
-        if int(held.device.id) != self._device_id:
-            raise TypeError(f"the array lies on cuda:{int(held.device.id)}, not {self.device}")
+        self._check_device_id(a)
         xp = self.xp
         scaled = xp.clip(a, np.float32(0), np.float32(1)) * np.float32(2**bit_depth - 1)
         if bool(xp.isnan(scaled.sum())):
@@ -582,6 +585,102 @@ class CupyBackend(CoreBackend):
         planes[_PLANE_R] = xp.rint(scaled[..., 0])
         host: NDArray[Any] = xp.asnumpy(planes)
         return host.tobytes()
+
+    def block_sums(self, a: Array, k: int) -> NDArray[np.float64] | None:
+        """Return the ``k x k`` block sums of a device array in float64 on the host, when exact.
+
+        The sums the analysis proxy's block mean divides and quantises (WP3.21 #3, AD-5): each
+        output is the sum of the source pixels its block covers, ``ceil(H / k) x ceil(W / k)``,
+        the last row and column of blocks covering fewer pixels when ``k`` does not divide the
+        size. They are taken on the device (rows, then columns) and only they are downloaded,
+        ``k * k`` times fewer values than the frame.
+
+        They are returned only when every sum, and every partial sum on the way, is exact in
+        float64, so that any summation order gives the host's sums bit for bit. A finite
+        non-zero float32 ``v`` with ``2**e <= |v|`` is a multiple of ``2**(e - 23)``; with every
+        ``|v| <= 1`` each partial sum is a multiple of ``2**(e_min - 23)`` (``e_min`` the
+        exponent of the smallest non-zero ``|v|``) below ``2**m``, ``m = ceil(log2(k * k + 1))``,
+        which float64 holds exactly when ``m - (e_min - 23) <= 53``. A decoded frame always
+        passes: its values are ``c / 255`` or ``c / 1023`` (``e_min`` -8 or -10), so 38 bits at
+        ``k = 8``.
+
+        Args:
+            a: A float32 ``(H, W, C)`` array on this backend's device.
+            k: The block factor, at least 1.
+
+        Returns:
+            float64 ``(ceil(H / k), ceil(W / k), C)`` on the host, or None when the bound does
+            not hold (a NaN, an infinity, a value above 1 in magnitude, or non-zero values too
+            small for it): the caller then reduces the frame on the host.
+
+        Raises:
+            TypeError: ``a`` is not an array of this backend, or lies on another device.
+            ValueError: ``a`` is not a float32 ``(H, W, C)`` array, or ``k`` is below 1.
+        """
+        if k < 1:
+            raise ValueError(f"the block factor must be at least 1, got {k}")
+        self.check(a)
+        if a.ndim != 3 or a.shape[0] < 1 or a.shape[1] < 1:
+            raise ValueError(f"expected an (H, W, C) array, got shape {a.shape}")
+        self._check_device_id(a)
+        if not self._sums_are_exact(a, k):
+            return None
+        xp = self.xp
+        height, width, channels = a.shape
+        full_rows, full_cols = height // k, width // k
+        rows, cols = -(-height // k), -(-width // k)
+        by_rows = xp.empty((rows, width, channels), dtype=np.float64)
+        if full_rows:
+            by_rows[:full_rows] = (
+                a[: full_rows * k]
+                .reshape(full_rows, k, width, channels)
+                .sum(axis=1, dtype=np.float64)
+            )
+        if rows > full_rows:
+            by_rows[full_rows] = a[full_rows * k :].sum(axis=0, dtype=np.float64)
+        summed = xp.empty((rows, cols, channels), dtype=np.float64)
+        if full_cols:
+            summed[:, :full_cols] = (
+                by_rows[:, : full_cols * k].reshape(rows, full_cols, k, channels).sum(axis=2)
+            )
+        if cols > full_cols:
+            summed[:, full_cols] = by_rows[:, full_cols * k :].sum(axis=1)
+        host: NDArray[np.float64] = xp.asnumpy(summed)
+        return host
+
+    def _sums_are_exact(self, a: Any, k: int) -> bool:
+        """Tell whether :meth:`block_sums`' bound holds on ``a`` (see there), by reductions only."""
+        top = max(float(a.max()), -float(a.min()))  # NaN propagates: ``not top <= 1`` below
+        if not top <= 1.0:  # a NaN, an infinity or a value above 1 in magnitude
+            return False
+        if top == 0.0:
+            return True
+        smallest = float(self._min_nonzero_magnitude(a))
+        lowest_bit = math.frexp(smallest)[1] - 1 - 23
+        highest_bit = math.ceil(math.log2(k * k + 1))
+        return highest_bit - lowest_bit <= _FLOAT64_SIGNIFICAND_BITS
+
+    @functools.cached_property
+    def _min_nonzero_magnitude(self) -> Any:
+        """A reduction kernel: the smallest non-zero ``|v|`` (no frame-sized temporary).
+
+        Called only once every ``|v| <= 1`` and some ``v`` is non-zero, so 2 stands for "no
+        value" (a zero, and the identity).
+        """
+        return self.xp.ReductionKernel(
+            "T x",
+            "T y",
+            "x == (T)0 ? (T)2 : abs(x)",
+            "min(a, b)",
+            "y = a",
+            "(T)2",
+            "clearwater_min_nonzero_magnitude",
+        )
+
+    def _check_device_id(self, a: Any) -> None:
+        """Raise TypeError when the CuPy array ``a`` lies on another device than this backend's."""
+        if int(a.device.id) != self._device_id:
+            raise TypeError(f"the array lies on cuda:{int(a.device.id)}, not {self.device}")
 
     def free_device_bytes(self) -> int | None:
         """Return the memory free for this process's arrays, in bytes.

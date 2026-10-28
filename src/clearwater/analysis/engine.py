@@ -58,7 +58,7 @@ from clearwater.interfaces import (
     VideoSource,
 )
 
-from .proxy import frame_pixels_on_host, make_proxy, proxy_image
+from .proxy import frame_pixels_for_proxy, make_proxy, proxy_image
 from .smoothing import DEFAULT_KIND, DEFAULT_WINDOW_S, KINDS, LOCAL_KINDS, exact_window, reach
 from .store import AnalysisStore, SchemaMismatchError, same_value, schema_hash
 
@@ -718,14 +718,14 @@ class AnalysisEngine:
                         f"the frame source returned pts {pts} after pts {last}: frames out of "
                         "order or duplicated"
                     )
-                pixels = frame_pixels_on_host(frame, self._backend)
+                pixels = frame_pixels_for_proxy(frame, self._backend)  # a GPU frame stays there
                 if shape is not None and pixels.shape != shape:
                     raise ValueError(
                         f"the frame at pts {pts} is {pixels.shape}, earlier frames {shape}: "
                         "the frame size changed within the clip"
                     )
                 shape = pixels.shape
-                proxy = make_proxy(pixels)
+                proxy = make_proxy(pixels, self._backend)
                 self._cache.store_proxy(self._key, pts, proxy)
                 stored = self._cache.proxy(self._key, pts)
                 record = self._method.analyze(first.name, self._image(stored), pending.params, {})
