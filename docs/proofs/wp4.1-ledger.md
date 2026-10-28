@@ -319,6 +319,7 @@ md5s). Probe 20:14:34Z: one `succeeded in` line, banner `gpt-6.1-sol` / high.
 | 2 | `dca6d1e` | 0 | 2 (G1 NEW, G2 REOPENED) | 5 (G3, G4, G5 downgraded, G6, G7) | 7 / 0 | 3 / 4 | 0 | runner (`tools/`, G1-G7 incl. the G5 docstring), tests, report | 93,956 |
 | 3 | `899102d` | 0 | 1 (H1 NEW; accepted-component code reachable through the swap: STOP) | 6 (H2-H4 downgraded, H5, H6, H7) | 7 / 0 | 6 / 1 | 0 | runner (`tools/`, H2-H5), tests (H6, H7 test-only), report; H1 BANKED to WP4.3 (CHARC `5fab48cc2a5174cb`) | 208,313 |
 | 4 | `844b996` | 0 | 1 (I1 NEW: beside-source through a file symlink writes into the footage folder) | 4 (I2 downgraded, I3, I4, I5 test-only) | 5 / 0 | 4 / 1 | 0 | runner (`tools/`, I1-I4), one test oracle (I5) | 109,960 |
+| 5 | `f17ab36` | 0 | 0 | 1 (J1) | 1 / 0 | 1 / 0 | 0 | runner (`tools/`, J1, terminating-round cleanup) | (dispatcher's figure at the return) |
 
 ### Round 1 (20:14-20:24Z) -- VERDICT NEW_CRITICAL_MAJOR_FOUND; adjudicated, NOT yet remediated
 
@@ -533,36 +534,32 @@ there is a stand-in). Full table in `r4/adjudication.md`.
   `test_core_deps`, `test_jobs_naming`, `test_jobs_export_photo`: 464 passed, 0 skipped
   (`work/wp4.1-c4-r4fix-light.log`).
 
-## RESUME HERE (cell 4, after cell 3)
+### Round 5 (23:25-23:33Z, cell 4) -- VERDICT NO_NEW_CRITICAL_MAJOR; the loop TERMINATES
 
-**State at hand-over (2026-10-28, cell 3 standing down per the 250K seat plan):** branch `wp4.1`, base main
-`3aa3c51` (NO rebase, never merge); head = this ledger commit (code head `cc3eb52`, report
-`429f96e`). Worktree clean. Every committed blob LF, 0 CR. `.venv` present.
+Whole-package diff `3aa3c51..f17ab36` (rounds 1-4 named as history, withheld; claim 3 updated
+for I1-I4, claim 4 for I5, the run-time link limit added). Probe 23:25:42Z: one `succeeded in`,
+banner `gpt-6.1-sol` / high. Full table in `r5/adjudication.md`.
 
-**Done:** rounds 1-3 adjudicated and remediated (table above). H1 banked to WP4.3 by CHARC
-`5fab48cc2a5174cb`. The hardware leg (gpu + v8c) last ran on `755513b`; no fix since touches a
-`gpu`/`slow` test's subject except the V9 ICC oracle (H6), which the serial leg covers.
+- J1 MINOR CONFIRMED (NEW): a preset whose `created` stamp overflows in UTC
+  (`0001-01-01T00:00:00+01:00`) escapes `read_parameter_file` and `main` as `OverflowError`
+  instead of exit 2. The accepted importer `PresetStore.import_preset` escapes the same error:
+  an accepted-component item (not owned), banked for the orchestrator with `r5/r5_repro.py`.
+- Mechanical: VERDICT anchored; 40 `succeeded in`; `tokens used` 152,580; ERROR lines: models
+  refresh x2, MCP connector x2, one websocket connect failure (DNS) then `Reconnecting... 2/5`,
+  after which the session completed (round 2's class, which counted), two echoed source: round
+  COUNTS (the websocket line flagged for the dispatcher).
+- ROUND_TERMINATION (zero new blocking). FIVE_ROUND_GATE reached at a terminating round: the
+  design guard did not trigger.
+- Terminating-round cleanup `23fc88b`: `read_parameter_file` also catches `OverflowError`;
+  `test_j1_*` RED first (`work/wp4.1-c4-r5red.log`); light set on `23fc88b`: ruff, ruff format
+  --check (259), mypy (141) green; 465 passed, 0 skipped (`work/wp4.1-c4-r5fix-light.log`).
 
-**Next (cell 4):**
-1. Reviewer A **round 4** on the head: new `...\wp4.1\r4\` folder; copy `r3\run_review.sh`; make
-   `review-prompt.md` from `r3\review-prompt.md` (round 4, the new HEAD sha, rounds 1-3 named as
-   history and WITHHELD, `r4/test-summary.txt`); add to "Accepted limitations" the host-logging
-   limit (H4) and the H1 GUI-preview limit (banked to WP4.3, CHARC `5fab48cc2a5174cb`); update
-   claim 3 for H3 (run() filter) and H5 (loads_object). Whole-package diff
-   `git diff -U8 3aa3c51..HEAD -- . ':(exclude)docs/proofs/**'`; refresh `test-summary.txt`
-   (figures above, with their commit); probe first (one `succeeded in`, banner `gpt-6.1-sol` /
-   high); background start, foreground `until [ -f .../review.done ]` poll; GATE_CHECKS;
-   adjudicate; YIELD before remediating. Five-round gate at round 5.
-2. The two-leg suite: by the orchestrator's candidate gate unless the orchestrator says
-   otherwise.
-3. Fill the report's figures and counts (`docs/reports/wp4.1-photo-path.md`: both legs' counts
-   and skip lines, the V8 (c) table, the V9 raw figures, the Reviewer A rounds and verdict) and
-   mark it FINAL.
-4. The **return report** (recipe section 4, under about 60-70 lines) to the orchestrator by
-   SendMessage as the final message.
+## STATE AT RETURN (cell 4, 2026-10-28; replaces the cell-3 RESUME HERE)
 
-**Notes for cell 4:** the Bash tool mangles backslashes inside heredocs here: write any script
-holding `\\?\` or `\n` literals with the Write tool and run it. `_no_full_path` in
-`tests/test_headless_export.py` checks the `ascii_text` spellings too. The UNC-spelling tests
-skip when `\\localhost\C$` is unreachable. WP-T5 owns `tests/test_jobs_export_video.py` and
-`tests/test_io_video_encode.py`; its windows are exclusive (run nothing while one is open).
+Branch `wp4.1`, base main `3aa3c51` (NO rebase, never merge); code head `23fc88b`, report FINAL
+`docs/reports/wp4.1-photo-path.md`; head = this ledger commit. Worktree clean; every committed
+blob LF, 0 CR. Reviewer A converged at round 5 (NO_NEW_CRITICAL_MAJOR; J1 fixed in the cleanup).
+The two-leg suite is the orchestrator's stacked candidate gate (CHARC `6be5d8cdcc500129`); its
+counts and skip lines go in `docs/proofs/wp4.1-accept.md`. Open items for the orchestrator: H1
+(banked to WP4.3, CHARC `5fab48cc2a5174cb`), G5 (writer provenance `"profile"` vs AD-13, CHARC),
+J1's importer twin (`PresetStore.import_preset` escapes `OverflowError`; `r5/r5_repro.py`).
