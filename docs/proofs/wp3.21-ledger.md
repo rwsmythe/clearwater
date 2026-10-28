@@ -18,6 +18,7 @@ Cell `implementer-opus-high` (Claude lane), worktree `.worktrees/wp3.21`, branch
 | 4 | cell 3: Q-R6 and #2 built; WINDOW REQUEST for #2's GX011627 oracle leg | (dispatcher fills) |
 | 4 (read) | as given at the grant | 192,330 |
 | 5 | cell 3: STOP, frame rule 5 (CuPy outside core) on #2 and the #3 draft | (dispatcher fills) |
+| 5 (read) | cell 3 stood down after the STOP (re-seat to cell 4) | 251,077 |
 
 ## Re-seat: cell 2 (2026-10-28), rulings since round 0
 
@@ -314,60 +315,106 @@ core and no layer loads core; an interface between modules, hence CHARC's. (N) N
   build if the reading passes ~250K.
 - The yield-5 STOP (frame rule 5) is NOT addressed by this ruling and still holds.
 
-## RESUME HERE (cell 3, taking #2 and #3)
+## RESUME HERE (cell 4, taking the frame-rule-5 ruling, then #2/#3 again)
 
-State at hand-over (cell 2, depth 287,974 at yield 3): branch `wp3.21` on `d1e4537`, no rebase.
-#1 (task 4) is DONE and committed (`333ad3f` overlap, `62f1da6` bench `--subdir`, then ledger
-commits); interim 1 recorded above (24.28 min/min, TIER1 on every oracle leg run). Task 7 so
-far: the engine `import logging` debt CLOSED. Nothing of #2, #3 or task 6 is started.
+State at hand-over (cell 3 stood down at yield 5, depth 251,077): branch `wp3.21` on `d1e4537`,
+no rebase; worktree CLEAN at the ledger head. Done and committed: #1 overlap (`333ad3f`,
+interim 1), Q-R6 (`82c6d38`: D87 re-check after the lead adds the cache entry's extrapolated
+growth), #2 (`3da1e6f`: device frame conversions, DR-63 closed, oracle `--device-frames` and
+`sink_devices`). #2's GX011627 and synthetic 4K oracle legs are TIER1 (H7, H8). Task 7: the
+engine `import logging` debt and DR-63 CLOSED.
 
-**FIRST ITEM, before #2: Q-R6 as RULED (CHARC `6acded46`; CHARC also concurred with Q-R7).**
-ACCEPT the D87 re-check after the lead, plus one cheap addition in `jobs/export.py`: (1) measure
-the cache entry's growth over the lead; (2) extrapolate that growth per frame over the remaining
-frames; (3) add the result to the re-check's required figure. A planted small-free-space test
-must show the refusal BEFORE the first rendered frame. No change to `disk_space.py`, no spec
-change. If the cache entry cannot be sized in one call, that is a STOP to CHARC (check IF-7's
-`ProxyCache` / `CacheEntry` for a size before designing; do not walk the cache folder by hand
-without asking).
+**THE STOP (yield 5, reproduced by the orchestrator at its seat; posted to CHARC recommending
+R).** `uv run pytest tests/test_core_deps.py::test_static_rule_over_src` FAILS on `3da1e6f`:
+`color/samples.py` and `io/video/decode.py` "import cupy" (`importlib.import_module`); the #3
+draft adds `analysis/proxy.py`. Plan 8.1 frame rule 5 (WP3.1): no module outside
+`clearwater.core` imports `cupy`/`cupyx` or reads `.xp`. Also binding and UNCHANGED:
+`test_color_deps` (color imports only `clearwater.color` / `clearwater.interfaces`),
+`test_io_video_decode_rules` and `test_analysis_deps` (importing `io.video` / `analysis` loads
+no `clearwater.core` and no `cupy`). IF-2 (frozen) cannot carry #2/#3: `asarray`/`to_host` are
+float32 only (no integer upload, no float64 sums download, no device quantise). Do NOT start
+product work until the ruling is relayed.
 
-Read, in order: this ledger's Round 0 (R0.1-R0.9), the re-seat rulings, "Task 4 (#1): the
-overlap, as built" (with its existing-test constraints), interim 1 and this section. Then the
-brief's task ladder 5-10 and Rulings, and the code: `io/video/decode.py`, `io/video/encode.py`,
-`color/samples.py`, `analysis/proxy.py`, then `engine.py`'s `_decode` (where the stream hooks
-in) and `export.py`'s `_write_frames`.
+Options (recommended first):
 
-Binding for #2 and #3 (Q-R2, granted; CHARC `5b05c53d` addition):
+- **(R) consumer-side structural Protocols, CuPy only in core.** Sketch:
+  - `core/backend.py` (granted) gains device methods on `CoreBackend` (both backends, the NumPy
+    one doing the host arithmetic): `planes_to_rgb(data, *, width, height, bit_depth)` (upload
+    the integer planes, divide by `float32(2**n-1)` on the device), `rgb_to_planes(a, *,
+    bit_depth) -> bytes` (clip, multiply, `rint` as SEPARATE kernels so no FMA contraction; NaN
+    check by a reduction read back as a bool; download the planes), `block_sums(a, k)` (float64
+    row-then-column sums on the device, downloaded; with the exactness check below).
+  - `io/video` (decode, encode) and `analysis` each declare a small local
+    `runtime_checkable` Protocol for exactly the methods they call; nobody imports core.
+  - `FFmpegVideoSource(device_backend=None)` replaces `device_frames=True` (default off; device
+    frames only for `hw_decode=True`, the ACCEPTED coupling); `FFmpegVideoSink(device_backend=
+    None)` likewise for device frames; the tools pass `select_backend`'s result (bench, oracle;
+    the oracle's `--device-frames` builds both with it). The engine uses its own injected
+    backend when it satisfies the analysis Protocol.
+  - `color/samples.py` REVERTS to the base (`git show d1e4537:src/clearwater/color/samples.py`).
+  - IF-2 untouched, but a de facto widening of the backend contract between modules: CHARC's.
+  - A NEW GX011627 oracle window for #2 before #3 lands (the code path changes).
+- **(N) NumPy dispatch** (`np.asarray(planes, like=backend.asarray(...))`, NumPy calls that
+  dispatch to CuPy, the array's `.get()`): passes the scan's letter, not its intent. Not
+  recommended.
+- **(D) drop #2/#3**: revert `3da1e6f`'s product part (keep DR-63's fix and the oracle flag if
+  ruled separable); loses about 0.17 s/frame (#2) and the analysis contention (#3).
 
-- GRANTED: `src/clearwater/io/video/decode.py`, `io/video/encode.py`, `color/samples.py`, for #2
-  and #3 only. IF-1 and IF-5 unchanged. `FFmpegVideoSource`'s device-frame mode is OPT-IN at
-  construction, off by default. The sink still refuses a `"cuda:0"` label on NumPy pixels and
-  accepts only a real device array: `tests/test_io_video_encode.py` 962, 1101, 1211, 1259 stay
-  UNCHANGED (if one cannot, STOP). DR-63 CLOSES at the `encode.py` touch ("`close` sets
-  `"closed"` only from `"open"` ... and `abort`'s docstring names the window"). The `force_cpu`
-  path gives the base's output: tier 1 on the WP2.3 CPU references (`ref-*-c3-cpu-a`).
-- **Before #3 (the device block mean) lands on the device-frame conversions, the oracle must
-  exercise those conversions on GX011627 in a granted window** (CHARC addition): land #2,
-  request a window for its GX011627 oracle leg (Q-R5's #2+#3 interim may share it only if #3 is
-  not yet in), then #3.
-- #3 is tier 1 or a STOP (Q3 tightening: records and proxy bytes tier 1 ALWAYS); R0.6 gives the
-  exactness argument to re-check in code (float64 block sums of k/255 or k/1023 are exact; one
-  correctly rounded division; the same `quantise`).
-- Tests per R0.5's `tests/test_wp321_device_frames.py` list.
+**The #3 draft** (uncommitted when the STOP landed; reverted from the tree) is at
+`C:\Users\rwsmy\clearwater\work\wp3.21\c3-draft-3-device-block-mean.patch` (a `git diff`
+against `3da1e6f`; files `analysis/proxy.py`, `analysis/engine.py`, `analysis/__init__.py`,
+`tests/test_wp321_device_frames.py`). It passed 42 device-frame tests and 423 analysis/overlap/
+export tests. What survives under (R):
 
-Task 6 (after #1-#3 and the 4K direct-vs-FFT micro-timing window, Q-R5), Q-R1 RULED (CHARC
-`5b05c53d`): the gate lives inside the IF-2 implementation in `core/backend.py`, identically for
-both backends; FFT only when `min(H, W) >= 1080` AND `sigma >= 32` px; the sigma threshold is
-PROVISIONAL until the micro-timing and may move only upward, never below 32. Required tests:
-(a) a tripwire deriving the largest possible proxy short side from `analysis/proxy.py`'s own
-rule and asserting it is below 1080; (b) a planted analysis-sized blur bit-identical to the
-direct path; (c) FFT against direct within 1e-5 at 1080p and 4K. Plus R0.4's border and 5.3K
-checks and the memory re-read (Q9).
+- the exactness argument and check (`device_sums_are_exact`: max |v| <= 1, no NaN/inf, and
+  `ceil(log2(k*k+1)) - (floor(log2(min nonzero |v|)) - 23) <= 53`; a frame that fails it is
+  reduced on the host) and the row-then-column float64 sums (`sum(axis, dtype=float64)` on
+  reshaped full blocks plus the edge row/column; memory 1/k of the frame in float64) MOVE into
+  `CoreBackend.block_sums`;
+- the host-side `_divide` split of `block_mean` (sums -> mean by counts, the same expression)
+  STAYS in `proxy.py`, so the division and `quantise` are always the host's;
+- `frame_pixels_for_proxy` STAYS in shape, but its CuPy test (`type(...).__module__`) becomes
+  "the backend satisfies the analysis Protocol and `frame.device == backend.device`";
+- the tests survive with their imports re-pointed: device block mean = host bit for bit at 4K
+  (k=4), 5.3K 16:9 (k=5), 5.3K 8:7 (k=8), odd 1081x1923 (k=2, edges), 37x53 (k=1), 8 and 10
+  bit; NaN/inf/>1/1e-30/1e-12 plants fall back and still equal the host; the bound's edge
+  (k=5: 2**-25 admitted, 2**-26 refused); a GPU frame stays on the device, the CPU backend
+  still refuses a device frame (TypeError).
 
-Then task 7 (DR-63 with #2; DR-40 (b) recorded measured-negligible per Q8), the Q-R7 stamp in
-`export_bench.py`, the review loop (Codex `gpt-6.1-sol` / high, WSL, probe first, evidence
-`C:\Users\rwsmy\clearwater-review-evidence\wp3.21\rN\`, `--glob '!docs/proofs/**'`), the full
-suite in a window, task 10 last. Heavy runs only in granted windows, waited in the FOREGROUND
-(`3df4206`).
+**Light set, from now on:** EVERY `tests/test_*_deps.py` and `tests/test_*_rules.py` joins every
+light run (`ls tests | grep -E '_(deps|rules)\.py$'`), with the touched modules' tests and the
+`test_wp321_*` files.
+
+**CHARC ruling `eab16ca8` for task 10 (binding):** the V16 figure of record runs with device
+frames ON; the record header names the configuration (device frames ON, hw_decode ON, the
+backend, the cache state); the report says in one sentence that no product code constructs the
+real source yet (the GUI's path is the stubs' until WP4.2); an OFF row on GX011627 c3 only if it
+fits the same window (never extend it); the report's Limits says a CPU backend with a hardware
+decoder is not a supported combination; the device-frame default stays off. A non-TIER1 in any
+window is a STOP (D109).
+
+**Remaining order after the ruling:**
+
+1. Implement the ruled route for #2 (under R: core methods, local Protocols, `device_backend=`,
+   samples.py reverted), failing-first, the light set incl. every deps/rules test; WP2.3 oracle
+   `--device-frames` legs (light), then a WINDOW for the GX011627 (+ synthetic 4K) #2 leg.
+2. #3 (the device block mean) from the draft, tier 1 or STOP; light set; WP2.3 oracle.
+3. Separate windows: the #2+#3 interim (GX011627 cold c3; `export_bench.py` gains the device
+   option at this touch) and the 4K direct-vs-FFT blur micro-timing (Q-R5).
+4. Task 6, the FFT Gaussian, under Q-R1 as RULED (CHARC `5b05c53d`): the gate inside
+   `core/backend.py` for both backends; FFT only when `min(H, W) >= 1080` AND `sigma >= 32` px
+   (provisional; may move only upward). Tests: (a) the proxy-size tripwire from
+   `analysis/proxy.py`'s own rule, below 1080; (b) a planted analysis-sized blur bit-identical
+   to the direct path; (c) FFT vs direct within 1e-5 at 1080p and 4K; plus R0.4's border and
+   5.3K checks and the memory re-read (watch item: about 6.9 of 8 GB at 5.3K before the FFT).
+   Plan the handover in the ledger before the task 6 build if the reading passes ~250K.
+5. Task 7: the Q-R7 tool-side analysis-end stamp in `export_bench.py`; DR-40 (b) recorded
+   measured-negligible per Q8.
+6. Reviewer A (Codex `gpt-6.1-sol` / high, WSL, probe first, evidence
+   `C:\Users\rwsmy\clearwater-review-evidence\wp3.21\rN\` with md5s, `--glob '!docs/proofs/**'`,
+   the footage folder forbidden in the prompt).
+7. The two-leg suite, one window per leg.
+8. Task 10 LAST, per `eab16ca8`, GX011625 last, each block its own window.
 
 ### Open questions raised at yield 3 (recommended answer first)
 
