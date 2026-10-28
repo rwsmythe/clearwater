@@ -6,29 +6,32 @@
 ### Generation
 
 - **Generation 14 LIVE** `clearwater-orchestrator-20261026-2151`, picked up 2026-10-27 07:52Z at main `69fce7a`;
-  bash gauge 40 ms; inbox empty. Scratchpad
+  bash gauge 40 ms. Scratchpad
   `C:\Users\rwsmy\AppData\Local\Temp\claude\C--Users-rwsmy-clearwater\91de222f-a75d-4590-9741-d95f2af531b3\scratchpad\`
-  (`prompt-wp3.14-cell3.md`, `prompt-wp3.14-cell4.md`). Gen-14 checkpoint (11:20Z), SUPERSEDES the gen-13 table below:
-  - **WP-T3 ACCEPTED** main `2aca60e` (CHARC QA CONFIRMED; DR-33 closed, DR-59/60). **WP3.20R ACCEPTED** main `dbb5858`
-    (CHARC QA CONFIRMED; DR-53/54/55 closed, DR-61; CALIBRATION RULED: Codex lane STAYS for sonnet-high; pace tiebreak
-    resumes). Codex depth = `last_token_usage.input_tokens` in `~/.codex/sessions/.../rollout-*-<session>.jsonl` (PINNED;
-    the footer is cumulative billing).
-  - **WP3.14 ACCEPTED** main `ba6e923` (checkpoint 19:10Z; CHARC QA CONFIRMED `8320a688`, register `0228bcd`: DR-48,
-    DR-28 closed, DR-62/63/64 new). Full pytest 5056 passed / 2 skipped on `2b27454`; record `docs/proofs/wp3.14-accept.md`
-    (B pass 2 adjudicated at the gate; V16 D106 interim MISSED on cold c3 31.3-31.9 min/min = WP3.21 baseline). Cell 4
-    stood down (235,023). Worktrees wp3.14, wp3.14-mc, orch-state-g14 removed; V16 records kept at
-    `work/wp3.14/from-worktree/`. Operator FYI posted.
-  - **WP-T4:** rebased onto `ba6e923` at this seat (head `f8b8f4b`, patch-id `525a84c8` unchanged; CHARC NO OBJECTION).
-    Diagnostic D2 (`work/wp-t4/run_turn5_diag.ps1`, prefix `turn5-diag-`, NOT a round): 4031 passed / 1 skipped, 509 s,
-    peak RSS 6.6 GiB, GPU complete, rise 1036 MiB. **Codex turn 5 RUNNING** (session `01a17c16-3707-7e30-b81b-ecb9320feb6b`,
-    284,234 before it; prompt `clearwater-review-evidence\wp-t4\cell\prompt-5.md`): collection accounting, D2
-    classification (a violator in WP3.14/WP3.20R tests is REPORTED, never edited), GPU disposition, pre-rung-4 yield.
-    NEXT: commit turn 5 (`codex_cell.py commit`, footer GPT-6.1 Sol), then rung 4 r1, r2 (baseline, parallel, serial;
-    each EXCLUSIVE with OPEN/CLOSE to CHARC; ~85 min baseline + ~9 + serial per round); a third round only on the 15 %
-    rule. Then a FRESH Codex session for tabulation, report, gate text and reviews via the ledger.
-  - **WP3.21:** brief helper `wp321-brief-helper` (Agent, opus) drafting in `.worktrees/brief-wp3.21`
-    (`docs/briefs/wp3.21-brief.md`; read-only otherwise; notes `scratchpad\notes-wp3.21-brief.md`). CHARC approves FINAL.
-  - Gen-14 slips: four bare `cd`s with a cell live (`cd <wt> && ...` at top level counts), each reverted next call.
+  (`dispatch-wp3.21.md`, `wp-t4-accept.md`, `fill-gatechecks-new.md`, `notes-wp-t4-tabulation.md`, `drain-*.md`).
+  Gen-14 checkpoint (2026-10-28 03:20Z), SUPERSEDES the gen-13 table below:
+  - **Accepted this generation:**
+    - WP-T3 at main `2aca60e`;
+    - WP3.20R at `dbb5858`;
+    - WP3.14 at `ba6e923`;
+    - **WP-T4 at `d1e4537`**: patch-id `0984fd4b`, record `docs/proofs/wp-t4-accept.md`. A R1 and B were both Claude Opus high, both NO_NEW_CRITICAL_MAJOR, B adjudicated at the gate. CHARC QA is pending, with these owed: the CLAUDE.md line, HD-1 point 3, the suite-cost row, the m5 MINOR row, the DR-58 (c) disposition.
+  - **THE SUITE GATE IS NOW TWO LEGS** (fill GATE_CHECKS, `d1e4537`):
+    - run from Git Bash with `PYTEST_ADDOPTS` unset;
+    - PARALLEL `uv run pytest -q -rs -n 4 -m "not gpu and not footage and not gui and not slow" --basetemp=work/<fresh>`, then SERIAL `uv run pytest -q -rs -m "gpu or footage or gui or slow" --basetemp=work/<fresh>`;
+    - collection set checks, plus a full-collection diff against main;
+    - each leg's `-rs` skips compared with the previous gate's;
+    - median wall about 64 min (P about 8, S about 56).
+    - Gate-worktree skips: 11 (9 look-check frames absent from the worktree's `work/wp1.3/`).
+    - The main venv is synced with pytest-xdist 3.8.0.
+  - **WP3.21 DISPATCHED** 03:20Z to `wp321-cell1` (implementer-opus-high, Agent subagent).
+    - Worktree `.worktrees/wp3.21`, branch `wp3.21`, base `d1e4537`. Brief FINAL `43cc1ed`. Prompt `scratchpad\dispatch-wp3.21.md`.
+    - Its first yield is a WINDOW REQUEST for task 1's breakdown (GX011627), optionally with task 2's base reference as a second leg.
+    - Grant protocol: post the OPEN to CHARC plus a cue, reply `WINDOW GRANTED`; the cell sends `WINDOW RELEASED`; post the CLOSE.
+    - Round 0 is a yield. Read `cell_depth.py wp321` at every yield.
+    - Both nets: Codex `gpt-6.1-sol`/high (A at the cell's seat, B at mine).
+  - **Worktrees removed:** brief-wp3.21, orch-state-g14b. **Still present:** `wp-t4` and `wp-t4-mc`, both merged. Remove them after preserving `work/wp-t4/` (the rung-4, D3 and final evidence) into `work/wp-t4/from-worktree/`. Use the `\?\` Remove-Item if git refuses.
+  - **Codex lane:** the WP-T4 session `01a17c16-...` is finished (turn 8 depth 288,403); no Codex cell is live.
+  - Gen-14 slips: six bare `cd`s with a cell live, each reverted next call.
 - **Generation 13 ROLLED OVER 2026-10-27 at ~360K (depth cap). Generation 14 starts at "Live cells" below (RESUME HERE).**
   Gen 13 was `clearwater-orchestrator-20261026-2029`, picked up 2026-10-27 ~06:30Z at main `1217443`;
   bash-launch gauge 23 ms; inbox empty at pickup, then CHARC FINAL `3c3c35d7e40b525e` (all four wave 4 briefs approved).
