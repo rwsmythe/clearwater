@@ -286,14 +286,26 @@ def synthetic_4k(folder: Path) -> Path:
     Args:
         folder: The oracle folder.
 
+    The clip's SHA-256 is written beside it (``.sha256``) when it is made; every later use
+    checks the bytes against it, so the reference and every candidate run the same clip (a
+    regenerated x265 clip is not guaranteed to be byte-identical; ruling Q-b).
+
     Returns:
         The clip.
 
     Raises:
-        OracleError: FFmpeg could not make it.
+        OracleError: FFmpeg could not make it, or the kept clip's bytes are not the recorded
+            ones (or its digest file is missing).
     """
     path = folder / "clips" / f"{SYNTHETIC_4K}.mp4"
+    recorded = path.with_name(f"{path.name}.sha256")
     if path.is_file():
+        if not recorded.is_file():
+            raise OracleError(
+                f"{path} has no recorded digest ({recorded.name}); refusing to use it"
+            )
+        if file_sha256(path) != recorded.read_text(encoding="ascii").strip():
+            raise OracleError(f"{path} is not the recorded clip (its SHA-256 differs); refusing")
         return path
     path.parent.mkdir(parents=True, exist_ok=True)
     partial = path.with_name(f"{path.stem}.partial.mp4")
@@ -313,6 +325,7 @@ def synthetic_4k(folder: Path) -> Path:
         tail = done.stderr.decode("utf-8", errors="replace").strip()[-400:]
         raise OracleError(f"the synthetic 4K clip could not be made: {tail}")
     partial.replace(path)
+    recorded.write_text(file_sha256(path) + "\n", encoding="ascii")
     return path
 
 

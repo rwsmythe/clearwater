@@ -237,3 +237,19 @@ def test_a_failed_job_keeps_its_record_and_exits_1(
     record = eo.load(folders.working_path / eo.SUBDIR / "bad")
     assert record["ok"] is False and record["failure"]
     assert "FAILED" in capsys.readouterr().out
+
+
+def test_the_synthetic_clip_is_refused_when_its_bytes_are_not_the_recorded_ones(
+    tmp_path: Path,
+) -> None:
+    clips = tmp_path / "clips"
+    clips.mkdir()
+    clip = clips / f"{eo.SYNTHETIC_4K}.mp4"
+    clip.write_bytes(b"made once")
+    with pytest.raises(eo.OracleError, match="no recorded digest"):
+        eo.synthetic_4k(tmp_path)
+    (clips / f"{clip.name}.sha256").write_text(eo.file_sha256(clip) + "\n", encoding="ascii")
+    assert eo.synthetic_4k(tmp_path) == clip  # the recorded bytes: used, not regenerated
+    clip.write_bytes(b"made again")
+    with pytest.raises(eo.OracleError, match="SHA-256 differs"):
+        eo.synthetic_4k(tmp_path)
