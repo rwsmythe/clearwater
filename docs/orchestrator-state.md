@@ -51,6 +51,25 @@
     remove`, never `git clean -x`). Evidence cleanup of the V4 kept outputs on a grant naming them.
   - Gen-16 slips (cont.): a THIRD bare `cd` into `.worktrees/wp3.21` with cell 8 live (no write; returned next call); my
     Reviewer B prompt paraphrased Q-R6 in A F5's fallback words (the source of B1).
+  - **WP3.21 housekeeping DONE** (CHARC QA `828f70d8`, register `cffd243` DR-63 closed, DR-67..74): 13 V4 outputs
+    deleted as granted; both worktrees removed (`wp3.21` needed a long-path `Remove-Item` after `git worktree remove`
+    failed "Filename too long"); its cell logs copied first to `work\wp3.21\worktree-work\` (126 files); branches kept.
+  - **PHASE 4 COMMISSIONED** (CHARC `159c14fb79ad1aae`): WP4.1 -> WP4.2 -> WP4.3 in order (opus-high, Codex nets) +
+    WP-T5 suite cost (DR-65, Sonnet-class by pace, concurrent with WP4.1). Four drafting helpers (general-purpose opus,
+    `p4-draft-*`) wrote drafts in `.worktrees/briefs-p4`; QA'd; packet + correction + addendum to CHARC; RULING PACKET
+    `2c4476d9869df056` (all approved, tripwires granted: `clearwater.app`, WP4.3 modules, `python -m clearwater`, the
+    leftover journal). Briefs on main `3aa3c51`: WP4.1 + WP-T5 FINAL; WP4.2 / WP4.3 DRAFT RULED (FINAL after the
+    predecessor's accept + one revision, on CHARC's word). Rulings appended verbatim by `apply_rulings.py` (scratchpad).
+  - **LIVE CELLS (dispatched ~19:05Z, base `3aa3c51`):**
+    - **WP4.1** `wp41-cell1` (implementer-opus-high, Agent, background), worktree `.worktrees/wp4.1`; prompt
+      `dispatch-wp4.1-cell1.md` (gen-16 scratchpad). Yields Y1 round-0 table, Y2 windows, Y3 STOPs, Y4 each Reviewer A
+      round at adjudication, Y5 return report.
+    - **WP-T5** CODEX lane (pace Codex 0.188 vs Claude 1.355, 19:02-19:03Z), `scripts/codex_cell.py turn`; worktree
+      `.worktrees/wp-t5` (its `clearwater.local.toml` working folder = the worktree's `work\`); prompts and evidence
+      `clearwater-review-evidence\wp-t5\cell\`; turn 1 = rung 0 + RUN REQUEST W1. I run W1/W2/W3 (OPEN/CLOSE to CHARC)
+      and commit each turn with `codex_cell.py commit` (footer `Co-Authored-By: GPT-6.1 Sol via Codex
+      <noreply@openai.com>`). Reviewer A = `codex_cell.py review` (FAST per T5-Q6).
+  - Gen-16 slip (cont.): a FOURTH bare `cd` (into `.worktrees/wp3.21/work`, no cell live, during housekeeping).
 - **Generation 15 ROLLED OVER 2026-10-28 ~12:20Z at ~390K, at a clean boundary: no cell working, no window open, host free.
   GENERATION 16 STARTS HERE.**
   - **RESUME HERE -- WP3.21 (the only package in flight):**
