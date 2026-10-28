@@ -536,6 +536,12 @@ the `CoreBackend` base are ACCEPTED (a base method would make `NumpyBackend` sat
 Protocol, against AD-29 item 3); relayed to CHARC. **AD-29 item 6 MET:** the reworked #2 is
 TIER1 on GX011627 and synthetic 4K (H9, H10) before #3.
 
+**CHARC amendment of AD-29 (main `ce55a95`, relayed after yield 7):** the device methods on
+`CupyBackend` are CONFIRMED. Every Protocol-satisfaction test asserts BOTH that `CupyBackend`
+satisfies the Protocol AND that `NumpyBackend` does not (io.video: the pair in
+`test_wp321_device_frames.py`; analysis: the same pair at #3). The yield-7 STOP (where #3's
+quantise lives) is NOT addressed by this amendment and still holds.
+
 ## Re-grounding (2026-10-27/28, against `d1e4537`)
 
 Anchors checked against the code before use:
