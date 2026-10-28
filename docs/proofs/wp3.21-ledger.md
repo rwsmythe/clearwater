@@ -56,7 +56,9 @@ Cell `implementer-opus-high` (Claude lane), worktree `.worktrees/wp3.21`, branch
 | 31 | cell 7: WINDOW RELEASED (attribution); split table to CHARC | (not given) |
 | 32 | cell 7: HOLD for the fix ruling; RESUME HERE (cell 8) written | 223,058 |
 | 33 | cell 7: part 2 built (`b5a383c`); light STOP on the (b3) form | (not given) |
-| 34 | cell 7: (b3) built (`9a4256b`); WINDOW REQUEST (block 2 re-run) | (dispatcher fills) |
+| 34 | cell 7: (b3) built (`9a4256b`); WINDOW REQUEST (block 2 re-run) | 266,488 (at the HOLD) |
+| 35 | cell 7: the fit window granted (4K attribution, fit, block 2 re-run) | 316,605 |
+| 36 | cell 7: WINDOW RELEASED; RESUME HERE (cell 8); stand down | (dispatcher fills) |
 
 ## RESUME HERE (cell 6, after cell 5)
 
@@ -2022,45 +2024,6 @@ direct Gaussian); cell 5's 5.3K render pool peak 2,710 MiB (2,798 at the max fra
   1,130 (overlap); OFF: analysis 1,080 (lead 44, overlap 1,036), render 2,547. Order-dependent:
   a thread that grows the pool first leaves free blocks the other reuses uncounted.
 
-## RESUME HERE (cell 8, after cell 7)
-
-**State:** branch `wp3.21` on base `d1e4537`, NO rebase; worktree CLEAN at the ledger head. Last
-CODE commit `57a7a2e` (the ruling (A) conftest fixture + its pin); everything after is ledger.
-Cell 7's commits: `57a7a2e`, ledgers `afad7af` .. this one. Reviewer A CONVERGED at round 2
-(cell 6). **Two-leg suite GREEN at `afad7af`** (parallel 4,147 / 1 skip, collection unchanged by
-the fixture; serial leg 2 1,112 / 1 skip, "Serial leg 2" above). A code change from the fix
-ruling re-opens what the ruling names (at least the light set, oracle legs if the render or
-analysis path moves, and the suite legs per the fill).
-
-**Task 10 so far ("Task 10" sections above):** block 1 GX011627 DONE (cold c3 9.57-9.92 min/min,
-warm 9.06 with its memory method RULED (a), ancuti2018 8.74, libx265 14.59, OFF row 17.25; the
-recurring slow frames PLACED: `STREAM_STEP = 16` analysis advances, no fix). Block 2 5.3K: speed
-35.46 min/min [136.03], GPU peak 7,854 MiB device-wide above 6,281 and 7,371: **STOP, open.**
-Attribution (A) DONE: pool reserved peak 4,427 ON / 3,628 OFF (under the estimate on AD-1's own
-definition); the breach is FFmpeg (export decoder + NVENC about 2.4 GB, the overlap's analysis
-decoder about 0.8-1.25 GB) plus pool-cached; per-thread pool not measurable (timing proxy given).
-**Waiting on CHARC:** the fix ((b3) AD-1 overlap/FFmpeg term is the dispatcher's and cell 7's
-reading, pool-cached secondary: (b4) bounded pool or `free_all_blocks` at the analysis-end
-boundary) and the instrument for the re-run's STOP test. `core/memory.py` is CHARC's by Q9;
-do not change `test_core_select.py` (ruling `16a8ee8a`).
-
-**Then, in order:** the ruled fix (its own gates); re-run block 2 (5.3K) in a window with the
-named instrument; block 3 GX011625 LAST in its own window (about 1.5-2.5 h; command as block 1
-with `--clip GX011625`, wait by bounded foreground polls of a `.done` marker); the report
-`docs/reports/wp3.21-optimisation.md` per RESUME HERE (cell 6) item 4 plus: Reviewer A's rounds,
-the corrected R0.2 order (abort -> A joined -> release), the banked Limits (r1 F3, F2, F10, F11,
-the F9 residual 2 ms pacing sleep), the plan-cache finding and the conftest fix, the Limits
-sentence CHARC ruled ("any caller outside an export job keeps its thread's cuFFT plans until
-something calls the release"; the GUI preview is the product case, WP4.3 register row; test
-isolation is the fixture; tools exit their process), CHARC's pixel-change wording (never "no
-exported pixel changes"), the warm-row label, the STREAM_STEP placement (the job is
-analysis-bound during the overlap: the analysis pass is the next target), the 5.3K attribution
-and its ruling; then the return report (under about 70 lines) by SendMessage.
-
-**Evidence not committed:** `C:\Users\rwsmy\clearwater\work\wp3.21\bench\` (V16 records),
-`...\attribution\` and the driver `work\wp3.21\memory_attribution.py`; worktree
-`work\wp3.21\logs\c7-*` (summaries, GOP check, timelines). Standing rules: RESUME HERE (cell 6).
-
 ## The task 10 fix (CHARC FINAL `cadc39fc8a199a57`, 14:32Z): (b3) + one boundary free
 
 Ruled: (1) `core/memory.py` gains `job_device_memory_estimate_bytes` = pool estimate (base + FFT
@@ -2166,3 +2129,99 @@ sum, 1080p, refusals, the bench check on both instruments and its CPU no-op). Li
 (`c7-b3-light.log`): it, `test_export_bench.py` (WP3.14's, unchanged), `test_wp321_bench.py`,
 `test_core_select.py`, `test_core_backend.py` and the seven layering files -> 225 passed.
 ruff check, ruff format --check (250), mypy (138) clean (`c7-b3-static.log`).
+
+### Fit RULED from measured points (CHARC FINAL `3f17304438bc2555` (1), (2); `49b70b95`)
+
+(1) A 4K attribution run gives the 4K points; fit floor + per-pixel per kind EXACTLY, round UP, a
+floor at or below 0 clamped to 0; the 947 render-pool reading DROPPED; the covered-row test adds
+the 4K run's peak. (2) The job total above the card at 5.3K is accepted: the pool term stays
+the selection bound (AD-1 untouched; `memory_estimate_bytes` is consumed only by
+`select_backend` and the IF-2 method); ONE sentence in the docstring and the record says which
+instrument binds where (`3c2fdf6`). The interim constants of `9a4256b` are SUPERSEDED by the
+measured fit below. **IF-8 reporting deviation ACCEPTED (CHARC `49b70b95`):** the GPU job does
+not report the figure itself because IF-8's `JobResult` is FROZEN (that is the blocker;
+`clearwater.jobs` sitting above `clearwater.core` is NOT forbidden by the architecture); the
+bench record reports the job total and carries the STOP test, no frozen interface is touched,
+and showing the figure folds into CHARC's WP4.3 register row.
+
+### The fit window (GRANTED; OPEN with CHARC from 15:06Z): (a) 4K attribution, (b) fit, (c) block 2 re-run
+
+**(a)** `memory_attribution.py --footage GX011627` (the clip through `find_footage_file`, no tag
+read; 15:09:49Z-15:13:51Z, EXIT 0; log `c7-attr-gx27-on.log`, summary
+`c7-attr-gx27-summary.txt`, record `work\wp3.21\attribution\attribution-GX011627-on-20261028T150949Z.json`):
+681 frames ok, 0.324 s/frame; device-wide after the probe 115 MiB; peak **3,054** (overlap, 21 s:
+pool used 416 / cached 937 / total 1,353, plans 30, remainder 1,586); frames-only plateau 2,433
+(pool total 1,204: the boundary free returned about 150 MiB at the analysis end; remainder
+1,114.4); overlap - frames only: remainder **+472.0** (the second decoder). Per-pid `[N/A]` again.
+
+**(b)** Fit (scratchpad `fit_sessions.py`, `work\wp3.21\logs\c7-fit.txt`): points NVDEC 5.3K
+1,256.0 / 4K 472.0; NVENC 5.3K 1,192.3 / 4K 642.4. Solved NVDEC **75.4 MiB + 50.14 B/px**, NVENC
+**364.2 MiB + 35.17 B/px**: both floors above 0, NO clamp. Rounded UP: **NVDEC 80 MiB + 51 B/px,
+NVENC 368 MiB + 36 B/px, context 272 MiB** (largest after-probe reading 261). Residuals: NVDEC
++11.4 (4K) / +24.9 (5.3K), NVENC +10.4 / +23.4. 1080p extrapolated: NVDEC 181, NVENC 439.
+Landed `227ed32` (`core/memory.py` constants and `session_bytes` docstring; the covered-row test
+gains the 4K attribution row). Light set (`c7-fit-light.log`): job_memory, export_bench
+(UNCHANGED), wp321_bench, core_select (UNCHANGED), core_backend and the seven layering files ->
+226 passed; ruff check, ruff format --check, mypy clean (`c7-fit-static.log`).
+
+| covered row (MiB) | decoders / NVENC | job estimate | peak | margin |
+|---|---|---|---|---|
+| 5.3K attribution ON / OFF, block 2 (first run) | 2 / yes | 10,331 | 7,921 / 7,593 / 7,854 | 2,410 / 2,738 / 2,477 |
+| 5.3K WP3.14 baseline | 1 / yes | 9,050 | 6,104 | 2,946 |
+| 4K GX011627 attribution | 2 / yes | 4,065 | 3,054 | 1,011 |
+| 4K c3 cold x3 | 2 / yes | 4,065 | 3,130-3,244 | 821-935 |
+| 4K warm | 1 / yes | 3,582 | 2,601 | 981 |
+| 4K ancuti2018 | 2 / yes | 4,065 | 3,014 | 1,051 |
+| 4K libx265 | 2 / no | 3,413 | 2,761 | 652 |
+| 4K device frames OFF | 2 / yes | 4,065 | 2,925 | 1,140 |
+| 4K WP3.14 c3 / libx265 | 1 / yes, no | 3,582 / 2,929 | 2,409 / 1,937 | 1,173 / 992 |
+
+**(c) Block 2 re-run ON `227ed32`** (15:17:48Z-15:21:22Z, EXIT 0; log `c7-v16-5k3-r2.log`, summary
+`c7-v16-5k3-r2-summary.txt`, record `export-bench-v16-synthetic-5k3-20261028T151748Z.json`): 150
+frames ok, NVENC tied, **1.2229 s/frame, 36.65 min/min** [baseline 4.5389, 136.03; first block 2
+1.1830, 35.46]; per frame median 1.0735 / p90 1.1784 / max 4.6539 (frame 16, during the overlap,
+not at the analysis-end boundary, which fell at frame 57; a `System` stray at 38.6 % CPU over
+the run; kept as spread, not placed); peak tree RSS 7,753 MiB (N4's 16 GB held).
+**Both instruments PASS:** (ii) BINDING at 5.3K: pool reserved peak **4,311.7 MiB <= 6,281.4**
+(the pool estimate, AD-1 base + FFT bound); (i) recorded at 5.3K: device-wide peak **7,901 MiB <=
+10,330.8** (the job estimate, two decoders + NVENC), idle before 256 MiB.
+
+## RESUME HERE (cell 8, after cell 7)
+
+**State:** branch `wp3.21` on base `d1e4537`, NO rebase; worktree CLEAN at the ledger head.
+Last CODE commit `227ed32`. Code since the suite: ruling (A) conftest fixture `57a7a2e` (suite
+legs ran on it), then the post-convergence task 10 fix: part 2 boundary free `b5a383c`, part 1
+(b3) `9a4256b` + note `3c2fdf6` + measured fit `227ed32`. Reviewer A CONVERGED at round 2 (cell
+6); the post-convergence diff (`afad7af..227ed32`, `src/clearwater/jobs/export.py`,
+`src/clearwater/core/memory.py`, `tools/export_bench.py`, three test files) goes to the
+orchestrator's Reviewer B with that range named (dispatcher's order).
+
+**Done in task 10:** block 1 GX011627 (above; the 4K rows are RE-STATED against the new job
+total in the report, NOT re-run, CHARC); block 2 5.3K re-run PASSES on `227ed32` (both
+instruments, above); the attribution and the fit.
+
+**Cell 8, in order:**
+1. The two-leg suite on the final head, each leg its own window (GATE_CHECKS; the commands in
+   RESUME HERE (cell 6) item 2, fresh basetemps). Expected collection: parallel set grows by
+   the new non-gpu tests (`test_wp321_job_memory.py` 27, part 2's test changes); recollect both
+   sets first and state the counts. If the suite forces a code change, block 2 re-runs.
+2. Block 3 GX011625, LAST, its own window: `uv run python tools/export_bench.py v16
+   --device-frames --subdir wp3.21/bench --clip GX011625` (about 1.5-2.5 h at the block-1
+   speeds; wait by bounded foreground polls of a `.done` marker). Its record carries the
+   two-instrument check (4K: instrument (i) binds).
+3. The report `docs/reports/wp3.21-optimisation.md`: RESUME HERE (cell 6) item 4, plus Reviewer
+   A's rounds, the corrected R0.2 order (abort -> A joined -> release), the banked Limits (r1 F3,
+   F2, F10, F11, the F9 residual 2 ms pacing sleep), the plan-cache finding and the conftest fix,
+   CHARC's Limits sentence ("any caller outside an export job keeps its thread's cuFFT plans
+   until something calls the release"; the GUI preview is the product case, the WP4.3 register
+   row; test isolation is the fixture; tools exit their process), CHARC's pixel-change wording
+   (never "no exported pixel changes"), the warm-row label (the product's own state after an
+   analysis, pool and all; the prime makes no FFT plans), the STREAM_STEP placement (the job is
+   analysis-bound during the overlap: the analysis pass is the next target), the 5.3K STOP, the
+   attribution, the ruled fix and its fit, the post-convergence change and its tests, the IF-8
+   deviation in the wording above, the 4K rows re-stated against the job total; then the return
+   report (under about 70 lines) by SendMessage.
+
+**Evidence not committed:** `C:\Users\rwsmy\clearwater\work\wp3.21\bench\` (V16 records),
+`...\attribution\` and the driver `work\wp3.21\memory_attribution.py`; worktree
+`work\wp3.21\logs\c7-*`. Standing rules: RESUME HERE (cell 6).
