@@ -35,7 +35,7 @@ import time
 from collections.abc import Callable, Iterator, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol, runtime_checkable
 
 import numpy as np
 
@@ -136,6 +136,32 @@ def effective_parameters(method: CorrectionMethod, parameters: ParameterSet) -> 
     return values
 
 
+@runtime_checkable
+class JobDeviceBackend(Protocol):
+    """The IF-2 device extension ``clearwater.jobs`` calls (AD-29, WP3.21 Q-C5a), by structure.
+
+    The GPU backend provides it and the CPU backend does not; a job whose backend lacks it has
+    nothing to release.
+    """
+
+    def release_fft_plans(self) -> None:
+        """Free the calling thread's FFT plans and the device pool's free blocks."""
+        ...
+
+
+def _release_fft_plans(backend: object) -> None:
+    """Release a job backend's FFT plans at the job's end (Q-C5a); never raises.
+
+    A failure to release is logged and never replaces the job's own outcome.
+    """
+    if not isinstance(backend, JobDeviceBackend):
+        return
+    try:
+        backend.release_fft_plans()
+    except Exception as exc:  # for example a CUDA error at teardown
+        _LOG.warning("releasing the FFT plans failed: %s: %s", type(exc).__name__, exc)
+
+
 class _CancelledError(Exception):
     """The job stopped because ``progress.cancelled()`` was True."""
 
@@ -154,6 +180,8 @@ class _Run:
     outputs: list[Path] = field(default_factory=list)
     write: SafeWrite | None = None
     final_name: str | None = None
+    backend: object | None = None
+    """The job's backend once selected (its FFT plans are released at the job's end)."""
 
 
 class _Relabel:
@@ -558,6 +586,8 @@ class ExportEngine:
             failure = str(exc)
         except Exception as exc:  # every other error is a failed result with its own text
             failure = self._describe(run, exc)
+        finally:  # once per job on every path, never per frame (Q-C5a)
+            _release_fft_plans(run.backend)
         if run.write is not None and run.write.temp_leftover:  # also after an ok commit (D85)
             run.warnings.append(
                 f"The temporary file {ascii_text(run.write.temp_path.name)} could not be removed; "
@@ -664,6 +694,7 @@ class ExportEngine:
         height, width = pixels.shape[0], pixels.shape[1]
         self._check_cancel(progress)
         backend, reason = self._select_backend(settings, height, width, method.id)
+        run.backend = backend
         self._note_device(run, reason)
         params = effective_parameters(method, request.parameters)
 
@@ -764,6 +795,7 @@ class ExportEngine:
         self._check_cancel(progress)
         video = probe.video
         backend, reason = self._select_backend(settings, video.height, video.width, method.id)
+        run.backend = backend
         self._note_device(run, reason)
 
         sink = self._sink_factory()

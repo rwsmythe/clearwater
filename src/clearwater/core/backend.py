@@ -26,6 +26,14 @@ Conventions (spec 6.4, D39; IF-1):
   1/8 px the kernel is exactly ``[1]``). SciPy accumulates in float64 and returns float32;
   cupyx accumulates in float32. CPU and GPU agree within AD-11, and each matches
   ``tools/prototype`` bit for bit on its own device, because the calls are the prototype's.
+- The FFT Gaussian (WP3.21 task 6, CHARC Q-R1 / Q4): when :func:`fft_route` holds (the short
+  side at least :data:`FFT_MIN_SHORT_SIDE` and sigma at least :data:`FFT_MIN_SIGMA`, the same
+  rule on both backends), ``gaussian_blur`` convolves each spatial axis by a float32 real FFT
+  (``scipy.fft`` / ``cupyx.scipy.fft``) with the SAME truncated kernel and the same ``reflect``
+  padding, axis 0 then axis 1. Only the rounding differs from the direct filter (within 1e-5 on
+  [0, 1] data); no analysis proxy reaches the route, because every proxy's short side is under
+  1080. On the GPU the cuFFT plans stay cached per thread until
+  :meth:`CupyBackend.release_fft_plans` (an export job's end).
 
 YCbCr (``rgb_to_ycbcr``, ``ycbcr_to_rgb``): matrices ``bt709`` (K_R 0.2126, K_B 0.0722, ITU-R
 BT.709-6) and ``bt601`` (K_R 0.299, K_B 0.114, ITU-R BT.601-7). In ``"full"`` range, Y spans
@@ -48,6 +56,7 @@ from typing import Any
 
 import numpy as np
 from numpy.typing import ArrayLike, DTypeLike, NDArray
+from scipy import fft as _scipy_fft
 from scipy import ndimage as _scipy_ndimage
 
 from clearwater.interfaces.backend import ArrayBackend
@@ -63,6 +72,12 @@ GAUSSIAN_TRUNCATE = 4.0
 
 MAX_KERNEL_RADIUS = 2**23
 """The widest Gaussian radius accepted, in pixels (a kernel of about 2 ** 24 taps)."""
+
+FFT_MIN_SHORT_SIDE = 1080
+"""The FFT Gaussian's floor on ``min(H, W)`` (Q-R1): every analysis proxy's short side is less."""
+
+FFT_MIN_SIGMA = 32.0
+"""The FFT Gaussian's floor on sigma in pixels (Q-R1; the Q-R5 micro-timing kept it at 32)."""
 
 _BINOMIAL_5 = np.array([1.0, 4.0, 6.0, 4.0, 1.0], dtype=np.float32) / np.float32(16.0)
 
@@ -156,6 +171,8 @@ class CoreBackend:
     device: str
     xp: Any
     ndimage: Any
+    fft: Any
+    """The FFT module (``scipy.fft`` or ``cupyx.scipy.fft``), set by the subclass."""
 
     def __init__(self, name: str, device: str, xp: Any, ndimage: Any) -> None:
         """Bind the backend to its modules.
@@ -303,7 +320,8 @@ class CoreBackend:
                 ``int(4 * sigma_px + 0.5)`` of at most :data:`MAX_KERNEL_RADIUS`.
 
         Returns:
-            The blurred array, float32, same shape.
+            The blurred array, float32, same shape. Where :func:`fft_route` holds, by the FFT
+            route (see the module notes); otherwise by ``ndimage.gaussian_filter``.
 
         Raises:
             ValueError: ``sigma_px`` is out of range, or ``a`` has the wrong dtype or shape.
@@ -311,10 +329,38 @@ class CoreBackend:
         """
         self.check_spatial(a)
         check_sigma(sigma_px)
+        if fft_route(a.shape[0], a.shape[1], sigma_px):
+            weights = gaussian_kernel(sigma_px).astype(np.float32)
+            return self._fft_correlate(self._fft_correlate(a, weights, 0), weights, 1)
         sigmas = (sigma_px, sigma_px) + (0.0,) * (a.ndim - 2)
         out: Array = self.ndimage.gaussian_filter(
             a, sigma=sigmas, mode="reflect", truncate=GAUSSIAN_TRUNCATE
         )
+        return out
+
+    def _fft_correlate(self, a: Array, weights: NDArray[np.float32], axis: int) -> Array:
+        """Correlate one spatial axis with a symmetric kernel by a float32 real FFT.
+
+        The axis is padded as ``mode="reflect"`` pads it (repeated reflection included), the
+        padded line and the kernel are transformed at a fast length of at least ``n + 2r`` (so
+        the ``n`` kept samples see no wrap-around), multiplied and transformed back. A symmetric
+        kernel makes the convolution the correlation ``gaussian_filter`` computes.
+        """
+        xp, fft = self.xp, self.fft
+        radius = (weights.size - 1) // 2
+        n = a.shape[axis]
+        padded = xp.take(a, xp.asarray(reflect_index(n, radius)), axis=axis)
+        size = int(fft.next_fast_len(n + 2 * radius, real=True))
+        shape = [1] * a.ndim
+        shape[axis] = size // 2 + 1
+        spectrum = fft.rfft(padded, n=size, axis=axis)
+        del padded
+        spectrum *= fft.rfft(xp.asarray(weights), n=size).reshape(shape)
+        full = fft.irfft(spectrum, n=size, axis=axis)
+        del spectrum
+        kept = [slice(None)] * a.ndim
+        kept[axis] = slice(2 * radius, 2 * radius + n)
+        out: Array = xp.ascontiguousarray(full[tuple(kept)], dtype=np.float32)
         return out
 
     def _binomial_blur(self, a: Array) -> Array:
@@ -485,6 +531,7 @@ class NumpyBackend(CoreBackend):
     def __init__(self) -> None:
         """Bind NumPy and ``scipy.ndimage``."""
         super().__init__("numpy", "cpu", np, _scipy_ndimage)
+        self.fft = _scipy_fft
 
 
 class CupyBackend(CoreBackend):
@@ -501,6 +548,11 @@ class CupyBackend(CoreBackend):
         ndimage = importlib.import_module("cupyx.scipy.ndimage")
         self._device_id = int(cupy.cuda.runtime.getDevice())
         super().__init__("cupy", f"cuda:{self._device_id}", cupy, ndimage)
+
+    @functools.cached_property
+    def fft(self) -> Any:
+        """``cupyx.scipy.fft``, imported at the first FFT Gaussian rather than at construction."""
+        return importlib.import_module("cupyx.scipy.fft")
 
     # -- IF-2 device extensions (AD-29) ---------------------------------------------------------
     #
@@ -682,6 +734,18 @@ class CupyBackend(CoreBackend):
         if int(a.device.id) != self._device_id:
             raise TypeError(f"the array lies on cuda:{int(a.device.id)}, not {self.device}")
 
+    def release_fft_plans(self) -> None:
+        """Free the calling thread's cuFFT plans and the memory pool's free blocks (Q-C5a).
+
+        The FFT Gaussian keeps CuPy's default plan cache, so within an export job every frame
+        reuses its plans; ``clearwater.jobs`` calls this once at the end of each job (success,
+        failure or cancel), never per frame, so the plans of one clip do not outlive its job.
+        CuPy's plan cache is per thread and per device: this clears the current device's cache of
+        the calling thread (the job's, where it renders).
+        """
+        self.xp.fft.config.get_plan_cache().clear()
+        self.xp.get_default_memory_pool().free_all_blocks()
+
     def free_device_bytes(self) -> int | None:
         """Return the memory free for this process's arrays, in bytes.
 
@@ -692,6 +756,62 @@ class CupyBackend(CoreBackend):
         """
         free, _total = self.xp.cuda.runtime.memGetInfo()
         return int(free) + int(self.xp.get_default_memory_pool().free_bytes())
+
+
+def fft_route(height: int, width: int, sigma_px: float) -> bool:
+    """Tell whether ``gaussian_blur`` takes the FFT route for this shape and sigma (Q-R1).
+
+    The rule reads the shape and sigma only, never the device or its free memory, so the route,
+    and so the output, is the same on every machine and on both backends.
+
+    Args:
+        height: The array's first spatial axis.
+        width: Its second spatial axis.
+        sigma_px: The standard deviation in pixels.
+
+    Returns:
+        True when ``min(height, width) >= FFT_MIN_SHORT_SIDE`` and ``sigma_px >= FFT_MIN_SIGMA``.
+    """
+    return min(height, width) >= FFT_MIN_SHORT_SIDE and sigma_px >= FFT_MIN_SIGMA
+
+
+def gaussian_kernel(sigma_px: float) -> NDArray[np.float64]:
+    """Return SciPy's order-0 Gaussian correlation weights for ``sigma_px`` (float64).
+
+    The weights ``scipy.ndimage`` and ``cupyx.scipy.ndimage`` build (``_gaussian_kernel1d``):
+    ``exp(-0.5 / sigma**2 * x**2)`` over ``x`` in ``[-r, r]``, ``r = int(4 * sigma + 0.5)``,
+    normalised to sum 1.
+
+    Args:
+        sigma_px: The standard deviation in pixels (already checked by :func:`check_sigma`).
+
+    Returns:
+        The ``2r + 1`` weights.
+    """
+    radius = int(GAUSSIAN_TRUNCATE * float(sigma_px) + 0.5)
+    x = np.arange(-radius, radius + 1)
+    sigma2 = float(sigma_px) * float(sigma_px)
+    weights: NDArray[np.float64] = np.exp(-0.5 / sigma2 * x**2)
+    weights /= weights.sum()
+    return weights
+
+
+def reflect_index(n: int, radius: int) -> NDArray[np.intp]:
+    """Return the source index of each sample of a line padded as ``mode="reflect"``.
+
+    ``d c b a | a b c d | d c b a``: the edge sample repeats, and a radius beyond the line
+    reflects again (period ``2n``).
+
+    Args:
+        n: The line's length (at least 1).
+        radius: The padding on each side.
+
+    Returns:
+        ``n + 2 * radius`` indices into the line.
+    """
+    i = np.mod(np.arange(-radius, n + radius), 2 * n)
+    out: NDArray[np.intp] = np.where(i < n, i, 2 * n - 1 - i)
+    return out
 
 
 def check_sigma(sigma_px: float) -> None:
