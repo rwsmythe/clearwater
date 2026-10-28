@@ -192,8 +192,16 @@
   STOP ruling and dispatches **cell 7** from ledger RESUME HERE `ea78946` (line 1767). **Ruling (A) relayed in full; cell 7
   DISPATCHED 12:23Z** (`wp321-cell7`, opus-high, depth 0; msg `a9e0cb823b141331`; state cfc4d4c): fix -> V8 + prototype pair (light)
   -> serial leg (window) -> task 10 last (one window per block) -> report -> return report; then Reviewer B at gen 16's seat, accept.
-- **EXCLUSIVE WINDOW OPEN 2026-10-28 ~14:03Z: WP3.21 TASK 10 BLOCK 2, synthetic 5.3K 8:7 c3 cold = the AD-1 row (~5-15 min; fresh
-  process, plans/pool clear by construction)** (msg `f643b1059bdc063a`). **NOTHING HEAVY AT THIS SEAT until CLOSE.** STOP test
+- **BLOCK 2 CLOSED 14:07Z = STOP (msg `1e9174b629179d0a`): synthetic 5.3K c3 cold, job ok, 1.1830 s/frame = 35.46 min/min [136.03],
+  but device-wide GPU peak 7,854 MiB (idle 248) > estimate 6,281 AND > base x 1.25 = 7,371; FLAT plateau 7,853 during the OVERLAP
+  (18-55 s; two decoders + analysis on device frames + render), 6,598 frames-only after the analysis returned at 78.9 s, 5,462 late;
+  334 MiB under the 8,188 card (cell reads pool growth into free memory, NOT proved); RSS 7,405 MiB [6,354], N4 holds; 4K rows x
+  1.30-1.35 their baseline (not a STOP). Cell 5's in-process re-read had the 5.3K RENDER at 2,710 MiB, so the device-wide figure
+  carries NVDEC x2 at 5.3K + NVENC + two device-frame sets + pool cache, unattributed. **RULED (A) GRANTED (my ruling-5k3): one
+  ~4 min EXCLUSIVE attribution window, uncommitted driver under work/wp3.21/, in-process pool used/total per sample + plan cache +
+  per-pid nvidia-smi if WDDM reports it; split the 7,854 and the overlap's +1,256 before any fix is ruled; no product change, no
+  commit. Block 3 (GX011625) HELD.** Cell 7 depth 167,263; ledger f6c9511. **No window open until I grant (A)'s OPEN.**
+- (history) block 2 OPEN ~14:03Z (msg `f643b1059bdc063a`). STOP test
   (conservative): nvidia-smi device-wide memory.used (same instrument as the baseline 6,104; ~250-330 MiB idle + decoder + NVENC
   sessions) vs 6,281 (5,897 + 384) and vs base x 1.25 = 7,371; above either = STOP to me, idle offset stated. Block 3 GX011625
   (~1.5-2.5 h) LAST in its own OPEN. Cell 7 depth 154,676.
