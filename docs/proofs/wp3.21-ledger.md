@@ -64,6 +64,11 @@ from `ExportEngine._run`'s `finally` through `jobs.export.JobDeviceBackend` (AD-
 `tests/test_wp321_fft_gaussian.py` (44, one `footage`), `tests/test_wp321_fft_release.py` (9),
 `tests/test_wp321_bench.py` (+4 for Q-R7).
 
+**Quantised difference (CHARC `173aa880`, mandatory): DONE** by the sink's own rule (float32 clip,
+scale, round half to even; checked in `rgb_to_planes`): 8-bit 14,858 of 572,313,600 values
+changed, 10-bit 60,692, max 1 code value each (see "Task 6 oracle legs"). The report states the
+rule is the product's.
+
 **Oracle legs for task 6: DONE, every leg as expected** (see "Task 6 oracle legs" below):
 WP2.3 x10 TIER1 (max abs 0); GX011627 c3 TIER2 (max abs 7.06e-6, records, proxies and analyze
 calls equal); synthetic 4K c3 TIER2 (2.44e-6); GX011627 ancuti2018 TIER1 (0). The report uses
@@ -559,9 +564,16 @@ against the `ref-*-a` base references), logs `work\wp3.21\logs\oracle-fft-<step>
   pts (each difference is a FAIL reason, `tools/export_oracle.py` 555-594); checked directly for
   gx on the two `oracle.json` files: renders 681 equal, proxies 681 equal, source statistics
   equal, analyze calls 1,362 equal, pts equal. Only the frames differ.
-- Quantised (light, cell 5): on gx's 23 sampled float frames, quantised by AD-5's rule
-  `floor(x * 255 + 0.5)` clipped (the sink's own device quantiser not checked to be the same),
-  14,793 of 572,313,600 channel values differ (2.58e-5), none by more than 1 code value.
+- **Quantised difference (MANDATORY, CHARC `173aa880`; light, cell 5)** on gx's 23 sampled float32
+  frames (572,313,600 channel values), by the PRODUCT's rule: the sink's quantiser
+  (`CupyBackend.rgb_to_planes`, the device twin of `clearwater.color.rgb_to_planes`, D39) clips
+  to [0, 1] in float32, scales by `float32(2**b - 1)` and rounds HALF TO EVEN (`rint`), checked
+  in the code (`core/backend.py` `rgb_to_planes`). It is NOT AD-5's `floor(x * 255 + 0.5)` (that
+  rule is the analysis proxy's).
+  - **8-bit: 14,858 values changed (2.60e-5), max 1 code value.**
+  - **10-bit: 60,692 values changed (1.06e-4), max 1 code value.**
+  - For reference, by AD-5's rule in float64: 8-bit 14,856, 10-bit 60,459, max 1 (an earlier
+    float32 AD-5 run gave 14,793 at 8-bit; superseded by the product-rule figures above).
 - **Report wording (CHARC, relayed):** the oracle compares FLOAT32 pre-encode frames, so the
   report never says "no exported pixel changes"; it says: "the render differs by at most 7.06e-6
   (about 0.002 of an 8-bit code value) before quantisation; after quantisation a pixel changes
