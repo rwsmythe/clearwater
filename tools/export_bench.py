@@ -12,7 +12,11 @@ The engine reads no clock: the instrument times what the engine reports. The pha
 from the engine's ``on_stage`` hook (``probe``, ``analysis``, ``open``, ``frames``, ``close``,
 ``committed``) and the per-frame figures from the ``Progress`` callbacks (the interval between
 two successive ``Exporting`` reports: decode, upload, render, download and write of one frame),
-each stamped with the instrument's own clock.
+each stamped with the instrument's own clock. With WP3.21's overlap the ``analysis`` -> ``open``
+phase is the LEAD, not the analysis (Q-R7): the analysis goes on during ``frames``, so the record
+also holds two tool-side overlap stamps (:class:`_OverlapStamps`, no product hook): when the
+analysis thread's job returned, and the time the frame loop spent reading its records (the
+export's stall on the analysis).
 
 Per run the record holds: the frames, the wall time, seconds per frame and minutes of
 processing per minute of footage against D106's interim 25 min/min (0.834 s/frame at
@@ -48,6 +52,7 @@ configuration, footage-lookup or disk-space error before any run.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import itertools
 import json
 import os
@@ -55,7 +60,7 @@ import shutil
 import subprocess
 import sys
 import time
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Iterator, Sequence
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -200,6 +205,79 @@ class _Clocked:
     def stage(self, name: str) -> None:
         """Record a phase boundary (the engine's ``on_stage`` hook)."""
         self.stages.append((name, self._clock()))
+
+
+class _OverlapStamps:
+    """Tool-side overlap stamps of one run (WP3.21 Q-R7; no product hook).
+
+    While :meth:`installed` is active, two methods of :class:`AnalysisEngine` are wrapped on the
+    class: every job ``analysis_job`` returns stamps the instrument's clock when it returns (on
+    the analysis thread), and every ``smoothed_record`` call is timed (the frame loop's read of a
+    record, which waits until the record is final). The analysis share of an overlapped job is
+    then the lead plus that stall time; the read itself is inside the figure (an upper bound on
+    the wait).
+    """
+
+    def __init__(self, clock: Callable[[], float]) -> None:
+        self._clock = clock
+        self.analysis_ended: list[float] = []
+        self.record_reads: list[float] = []
+
+    @contextlib.contextmanager
+    def installed(self) -> Iterator[None]:
+        """Wrap the two methods for the duration of the block, then restore them."""
+        analysis_job = AnalysisEngine.analysis_job
+        smoothed_record = AnalysisEngine.smoothed_record
+
+        def stamped_job(engine: AnalysisEngine, *args: Any, **kwargs: Any) -> Any:
+            job = analysis_job(engine, *args, **kwargs)
+
+            def run(progress: Any) -> Any:
+                try:
+                    return job(progress)
+                finally:
+                    self.analysis_ended.append(self._clock())
+
+            return run
+
+        def timed_record(engine: AnalysisEngine, *args: Any, **kwargs: Any) -> Any:
+            began = self._clock()
+            try:
+                return smoothed_record(engine, *args, **kwargs)
+            finally:
+                self.record_reads.append(self._clock() - began)
+
+        setattr(AnalysisEngine, "analysis_job", stamped_job)  # noqa: B010
+        setattr(AnalysisEngine, "smoothed_record", timed_record)  # noqa: B010
+        try:
+            yield
+        finally:
+            setattr(AnalysisEngine, "analysis_job", analysis_job)  # noqa: B010
+            setattr(AnalysisEngine, "smoothed_record", smoothed_record)  # noqa: B010
+
+    def figures(self, started: float, lead_s: float | None, total: float) -> dict[str, Any]:
+        """Return the record's overlap figures, times from the job's start.
+
+        Args:
+            started: When the job was called.
+            lead_s: The ``analysis`` phase (the lead); None when the job never reached it.
+            total: The job's wall time.
+
+        Returns:
+            ``lead_s``; ``analysis_end_s`` (the last analysis job's return, None if none ran);
+            ``record_reads``, ``record_wait_s`` and ``record_wait_max_s`` (the frame loop's
+            reads); ``analysis_share_overlapped`` ((lead + stall) / total).
+        """
+        stall = sum(self.record_reads)
+        lead = lead_s or 0.0
+        return {
+            "lead_s": lead_s,
+            "analysis_end_s": (self.analysis_ended[-1] - started if self.analysis_ended else None),
+            "record_reads": len(self.record_reads),
+            "record_wait_s": stall,
+            "record_wait_max_s": max(self.record_reads, default=0.0),
+            "analysis_share_overlapped": (lead + stall) / total if total > 0 else None,
+        }
 
 
 class _BenchSink(vf._RecordingSink):
@@ -431,6 +509,7 @@ def _measure(
 
     engine = build_engine(cache_dir, sink, clocked.stage, device_backend)
     request = ExportRequest(path, "video", _parameters(leg.method), settings)
+    stamps = _OverlapStamps(time.perf_counter)
     telemetry = Telemetry(memory_every=periods[0], gpu_every=periods[1])
     sampler = _gpu_sampler(leg)
     watch = StrayWatch()
@@ -440,7 +519,8 @@ def _measure(
     job = engine.job(request)
     started = time.perf_counter()
     try:
-        result: JobResult = job(clocked)
+        with stamps.installed():
+            result: JobResult = job(clocked)
     finally:
         ended = time.perf_counter()
         strays = watch.window()  # a quick snapshot: the stray window ends with the export
@@ -476,6 +556,7 @@ def _measure(
             "meets_d106": None if figures is None else figures["min_per_min"] <= D106_MIN_PER_MIN,
             "phases_s": phases,
             "analysis_share": phases.get("analysis", 0.0) / total if total > 0 else None,
+            **stamps.figures(started, phases.get("analysis"), total),
             "stages": [[name, round(at - started, 4)] for name, at in clocked.stages],
             "first_frame_s": intervals[0] if intervals else None,
             "per_frame": summarise(intervals[1:]),
@@ -529,6 +610,7 @@ def row_line(record: dict[str, Any]) -> str:
         f"{total['min_per_min']:.2f} min/min ({verdict} D106 {D106_MIN_PER_MIN:g}); per frame "
         f"median {per_frame.get('median', 0):.4f}, p90 {per_frame.get('p90', 0):.4f}, "
         f"max {per_frame.get('max', 0):.4f}; analysis {100 * record['analysis_share']:.1f} %; "
+        f"lead + stall {100 * (record.get('analysis_share_overlapped') or 0):.1f} %; "
         f"peak tree RSS {peak:.0f} MiB; peak GPU memory {gpu} MiB; "
         f"tied {record['nvenc_proof'].get('tied')}"
     )
