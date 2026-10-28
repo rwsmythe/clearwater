@@ -12,6 +12,18 @@
     `dispatch-wp3.21-cell3.md` in the gen-15 scratchpad. Depth at dispatch 0. Order: ledger record (CHARC readings) ->
     Q-R6 -> #2 -> WINDOW (GX011627 oracle on #2) -> #3 -> windows -> task 6 -> 7 -> Q-R7 -> Reviewer A -> suite -> task 10.
   - CHARC cue target unchanged: `clearwater-charc-20261026-2007`.
+  - **Cell 3 (07:28Z):**
+    - Q-R6 `82c6d38`. #2 `3da1e6f`: DR-63 fixed; GX011627 and synthetic 4K oracle TIER1 (H7, H8; window 07:08-07:17Z).
+    - Then it STOPPED: #2 imports CuPy outside core and fails `test_core_deps::test_static_rule_over_src`.
+    - Stood down at 251,077 (yield 5) / 265,087 (final reading). Handover at `e6d27a0`. Draft of #3 saved as `work\wp3.21\c3-draft-3-device-block-mean.patch`.
+  - **CHARC RULED (R) = AD-29** (`589f90e`):
+    - Device methods live on `CoreBackend` only, with one consumer-side Protocol per package.
+    - `device_backend=<backend or None>` replaces `device_frames=True`.
+    - `samples.py` goes back to base.
+    - The oracle re-runs on GX011627 and synthetic 4K before #3.
+    - The layering tests join every light run; the brief says so (`b26b051`, CRLF fixed in `e6f7193`).
+  - **Cell 4 DISPATCHED** (`wp321-cell4`, opus-high, background) from `e6d27a0`. Depth 0 at dispatch. Prompt `dispatch-wp3.21-cell4.md` (gen-15 scratchpad).
+  - **Edit-tool trap:** the Edit tool can write CRLF in a worktree. Run `sed -i 's/\r$//'` before every commit, and check `tr -cd '\r'` on the blob.
 - **Generation 14 ROLLED OVER 2026-10-28 ~06:50Z at ~330K, at a clean boundary: no cell live, no window open, host free.
   GENERATION 15 STARTS HERE (RESUME HERE below; the gen-13 table further down is history).**
   Gen 14 was `clearwater-orchestrator-20261026-2151`, picked up 2026-10-27 07:52Z at main `69fce7a`. Scratchpad
