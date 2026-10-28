@@ -1,9 +1,10 @@
 """The engines the shell runs on: stubs for tests, and what is merged for a manual run.
 
-Until WP4.3 wires the real engines, :func:`default_engines` uses the merged
-``clearwater.io.video.probe`` and ``clearwater.core.select_backend`` and the
-``clearwater.interfaces.stubs`` for everything else (photo reading WP3.6, decode WP3.9, encode
-WP3.10, cache WP3.12, the correction method WP3.4).
+Until WP4.3 wires the rest, :func:`default_engines` takes the photo reader and the correction
+methods from the composition root (:mod:`clearwater.app.composition`, WP4.1), uses the merged
+``clearwater.io.video.probe`` and ``clearwater.core.select_backend`` (through the S1 adapter) and
+the ``clearwater.interfaces.stubs`` for the video legs (decode WP3.9, encode WP3.10, cache
+WP3.12). This module is the one ``clearwater.gui`` module importing ``clearwater.app``.
 """
 
 from __future__ import annotations
@@ -13,6 +14,7 @@ from fractions import Fraction
 from pathlib import Path
 
 from clearwater import core
+from clearwater.app import composition
 from clearwater.interfaces import (
     ArrayBackend,
     ColorDescription,
@@ -152,20 +154,22 @@ def stub_engines(
 
 
 def default_engines() -> Engines:
-    """Build the engines for a manual run before WP4.3: merged probe and selection, stubs else.
+    """Build the engines for a manual run before WP4.3: real photo legs, stub video legs.
 
-    A photo cannot be read yet (the stub photo source holds none) and a probed video yields no
-    frame (the stub video source holds none), so both are refused with a G10 message.
+    The photo reader and the methods (``"c3"`` first, D16) come from the composition root, so a
+    photo opens and previews with the real reader and method; the selection is
+    :func:`stub_era_select_backend` until WP4.3 removes it. A probed video yields no frame (the
+    stub video source holds none), so it is refused with a G10 message.
 
     Returns:
         The engines.
     """
     return Engines(
-        photo_source=StubPhotoSource({}),
+        photo_source=composition.photo_reader(),
         video_probe=video_probe_file,
         video_source=StubVideoSource((), stub_probe(Path("stub.mp4"))),
         video_sink=StubVideoSink(),
         cache=StubProxyCache(),
-        methods={"stub": StubCorrectionMethod()},
+        methods=composition.correction_methods(),
         select_backend=stub_era_select_backend,
     )
