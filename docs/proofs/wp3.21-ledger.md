@@ -19,6 +19,7 @@ Cell `implementer-opus-high` (Claude lane), worktree `.worktrees/wp3.21`, branch
 | 4 (read) | as given at the grant | 192,330 |
 | 5 | cell 3: STOP, frame rule 5 (CuPy outside core) on #2 and the #3 draft | (dispatcher fills) |
 | 5 (read) | cell 3 stood down after the STOP (re-seat to cell 4) | 251,077 |
+| 6 | cell 4: #2 reworked under AD-29; WINDOW REQUEST for the GX011627 + synthetic 4K oracle legs | (dispatcher fills) |
 
 ## Re-seat: cell 2 (2026-10-28), rulings since round 0
 
@@ -428,6 +429,36 @@ window is a STOP (D109).
   the analysis. Recommended: task 10 reports the analysis share as the lead plus the export's
   stall time, and the bench gains a stamp of the analysis thread's end (the brief's "overlap
   stamps"); no product hook is added for it unless ruled.
+
+## Re-seat: cell 4 (2026-10-28), AD-29 ruled
+
+Cell 4 re-seats cell 3 (last depth 251,077) on the same branch at `e6d27a0`, no rebase. CHARC
+RULED route (R), logged as **AD-29** (main `589f90e`; brief note "Layering tests in every light
+run", main `e6f7193`):
+
+1. Device methods on `CoreBackend` in `core/backend.py` ONLY: planes -> RGB, RGB -> planes, the
+   block sums with their quantise; documented as "IF-2 device extensions: NOT part of the frozen
+   ABC; provided by the GPU backend; absent on the CPU backend". IF-2 and `interfaces/` unchanged.
+2. ONE `runtime_checkable` Protocol per consumer package naming exactly the methods it calls
+   (same names and signatures as `CoreBackend`'s), with a test that the device `CoreBackend`
+   satisfies it. No consumer imports `core`.
+3. Host path default and fallback BY STRUCTURE: source and sink take `device_backend=<backend or
+   None>` (replacing `device_frames=True`); `None`, or a backend not satisfying the Protocol (the
+   CPU backend), runs the base's host path unchanged. The engine uses its injected backend when
+   it satisfies the analysis Protocol. The tools pass `select_backend`'s result. The hw_decode
+   coupling stands.
+4. `color/samples.py` returns to the base (`d1e4537`).
+5. #3's exactness argument lives in `core`; `analysis/proxy.py` calls through its Protocol only.
+   #3 is tier 1 or STOP.
+6. A NEW oracle window (GX011627 AND synthetic 4K) on the reworked #2 BEFORE #3; non-TIER1 is a
+   STOP (D109).
+7. `test_core_deps`, `test_color_deps`, `test_io_video_decode_rules`, `test_analysis_deps` join
+   EVERY light run.
+8. Task 10 per `eab16ca8`; CHARC's WP4.2 register row binds `device_backend=<the GPU backend>`.
+
+**Rework form (cell 4's call):** follow-up commits on `3da1e6f`, not revert-and-rebuild, so
+DR-63's fix, the oracle's `sink_devices` record and the device-frame tests keep their history;
+the follow-up moves the CuPy code into `core`, restores `samples.py` and re-points the tests.
 
 ## Re-grounding (2026-10-27/28, against `d1e4537`)
 
