@@ -174,7 +174,12 @@
   source stats / analyze calls / pts equal in every TIER2. Quantised figure (mandatory): 8-bit on the 23 sampled frames = 14,793 of
   572,313,600 channel values change (2.58e-5), none by more than ONE code value, under AD-5 `floor(x*255+0.5)`; 10-bit count/max
   + a check that the sink's device `rgb_to_planes` rounds by AD-5's rule = cell 5 if depth allows, else cell 6's first item.
-  **No window open; seat free.** Cell 5 records and hands to cell 6 (Reviewer A, two-leg suite, task 10 last).
+  **Quantised figure COMPLETE by the PRODUCT's rule** (msg `a06e41142eaa40f0`; cell 5 `aa06584`): the sink rounds HALF TO EVEN
+  (`xp.rint` after clip and float32 scale, `core/backend.py` ~637-665), NOT AD-5's floor+0.5 (the proxy's rule); on the 23 frames
+  8-bit 14,858 changed (2.60e-5), 10-bit 60,692 (1.06e-4), max 1 code value; by AD-5 14,856 / 60,459. Report names the rule.
+  **Cell 5 STOOD DOWN at 326,666; CELL 6 DISPATCHED 10:06Z** (`wp321-cell6`, opus-high, from aa06584): Reviewer A (Codex
+  gpt-6.1-sol/high at its seat, WSL, probe first, five-round gate), then two-leg suite one window per leg, then task 10 LAST under
+  the binding memory method, then the report. **No window open; seat free.**
 - **ORACLE LEG synth CLOSED 09:58Z: synthetic 4K c3 TIER2 as expected, 120 frames, max abs 2.44e-6, mean abs 2.62e-7; records/proxies
   equal by construction** (synth OPEN was `1e7d4c07c4a26046`). Cell 5 depth 310,029 at the synth OPEN.
 - **ORACLE LEG gx CLOSED 09:56Z: GX011627 c3 TIER2 as expected, 681 frames differing, max abs 7.06e-6, mean abs 7.95e-7 (AD-11
