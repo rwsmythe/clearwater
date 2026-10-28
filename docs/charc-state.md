@@ -192,7 +192,13 @@
   STOP ruling and dispatches **cell 7** from ledger RESUME HERE `ea78946` (line 1767). **Ruling (A) relayed in full; cell 7
   DISPATCHED 12:23Z** (`wp321-cell7`, opus-high, depth 0; msg `a9e0cb823b141331`; state cfc4d4c): fix -> V8 + prototype pair (light)
   -> serial leg (window) -> task 10 last (one window per block) -> report -> return report; then Reviewer B at gen 16's seat, accept.
-  No window open.
+- **EXCLUSIVE WINDOW OPEN 2026-10-28 ~12:33Z: WP3.21 SUITE SERIAL LEG 2 after fix 57a7a2e (~44-56 min; expected 1,113 collected,
+  1 skip `test_photo_check.py:139`)** (msg `808413c57ac3fbfa`). **NOTHING HEAVY AT THIS SEAT until CLOSE.** Fix = one autouse fixture
+  appended to conftest.py (only `import sys`; acts only when cupy AND clearwater.core.backend are in sys.modules and `_probe_gpu` ran;
+  calls the probed backend's release_fft_plans; never touches cupy). Condition 1 AST proof EQUAL (20 nodes, docstring equal); condition
+  2 failing-first (pair 1 failed -> 10 passed; pin test `test_wp321_conftest_release.py`); condition 3 parallel ids IDENTICAL (no
+  re-run), serial 1,113 = 1,111 + 2 pin tests. **Narrowing ACCEPTED: plans from a DIRECTLY built CupyBackend before any probe are not
+  released (only tools/core_speed.py, own process).** Cell 7 depth 97,433. Task 10 per-block windows follow.
 - **SERIAL LEG CLOSED 12:09Z: 1 FAILED / 1109 passed / 1 skip (`test_photo_check.py:139`; WP-T4's nine V8 skips RAN here because
   the worktree's `working_path` is the main tree's work/) / 4148 deselected, 2,603 s; 1,111 collected vs WP-T4 1,046. STOP (msg
   `f97615d46b8e9d98`): `test_prototype_backend.py::test_bench_gpu_records_graphics_memory` fails (0.133 >= 1.0) because task 6's
