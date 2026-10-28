@@ -133,6 +133,13 @@
   fixed in cleanup turn 7. **Turn 7 committed 08e87f5** (report + ledger only; m1/m3/m4/m6 fixed, gate text runnable
   with collect-only set checks and --basetemp under work/; m2 LIMIT, lock messages name the path; m5 NOT taken = my
   MINOR row at the accept; CLAUDE.md pointer median P+S 3,849 s ~64 min; depth 212,913).
+- **WP3.21 STOP RULED 2026-10-28 (cell 3 yield 5, msg `efd136c45e8f3940`): #2 (`3da1e6f`) and the #3 draft break plan 8.1 frame
+  rule 5 (`test_core_deps::test_static_rule_over_src`: cupy imported in `color/samples.py`, `io/video/decode.py`, `analysis/proxy.py`).
+  RULING (R) = AD-29:** device extension methods on `CoreBackend` only; one `runtime_checkable` Protocol per consumer with a
+  satisfaction test; `device_backend=<backend or None>` replaces `device_frames=True`; host path = default and structural
+  fallback; `color/samples.py` back to base; `*_deps` tests in the light set; oracle re-run on GX011627 + synth 4K in a new
+  window BEFORE #3; WP4.2 row at the accept binds `device_backend=<GPU backend>`. Cell 3 STOOD DOWN at 251,077 (ledger RESUME
+  HERE + draft patch `work/wp3.21/c3-draft-3-device-block-mean.patch`); **cell 4** (opus-high) takes the ruling. No window open.
 - **WP3.21 #2 ORACLE WINDOW CLOSED 07:17Z: TIER1 on GX011627 (681 frames, 0 differing, max abs 0; 1,362 analyze calls, proxies
   equal; sink_devices [cuda:0]) and synthetic 4K (120 / 0)** (msg `3a83d79a2b8fb7c9`; OPEN was `cb4ed7af11daf48a`). Oracle walls
   408.0 s vs #1 587.2 s and 89.0 vs 117.6 (development evidence, NOT V16). **No window open; seat free.** Ledger 29eff29. Cell 3
