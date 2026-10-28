@@ -12,6 +12,120 @@ Cell `implementer-opus-high` (Claude lane), worktree `.worktrees/wp3.21`, branch
 | 1b | per-step GPU occupancy added; WINDOW REQUEST stands | (dispatcher fills) |
 | 1 (read) | as given by the dispatcher at yield 1 | 269,898 (past the 250K evaluation point: run the window, write round 0, then re-seat) |
 | 2 | round 0 yield | (dispatcher fills) |
+| 2 (read) | cell 1 stood down after round 0 (re-seat) | 359,040 |
+
+## Re-seat: cell 2 (2026-10-28), rulings since round 0
+
+Cell 2 re-seats cell 1 (last depth 359,040) on the same branch, no rebase. Rulings relayed by the
+dispatcher (orchestrator generation 14):
+
+- **Q-c (CHARC `a2ef1f64`, main `d3cd663`): RULED.** The c3 composed lead is 60 frames, +1 for
+  at_end, DERIVED at run time from the stage graph. The planted test is a lead short by ONE at
+  the derived bound.
+- **Q-R2 (orchestrator): GRANTED** `src/clearwater/io/video/decode.py`,
+  `src/clearwater/io/video/encode.py`, `src/clearwater/color/samples.py`, for #2 and #3 only, on
+  conditions: IF-1 and IF-5 unchanged; `FFmpegVideoSource`'s device-frame mode opt-in at
+  construction and off by default; the sink still refuses a `"cuda:0"` label on NumPy pixels and
+  accepts only a real device array, so `tests/test_io_video_encode.py` 962, 1101, 1211, 1259 stay
+  UNCHANGED (if one cannot, STOP); DR-63 closes at the `encode.py` touch; the `force_cpu` path
+  gives the base's output (tier 1 on the WP2.3 CPU references); #2 and #3 land only AFTER #1 and
+  its interim window.
+- **Q-R3: ACCEPTED.** The analysis thread does not call `Progress.report`; its counts fold into
+  the export thread's reports.
+- **Q-R4: ACCEPTED.** "A planted unbounded queue" reads as "each thread holds at most one decoded
+  frame, plus the watermark". A second held frame, or a watermark past its bound, fails by name.
+- **Q-R5: ACCEPTED in principle.** One interim window after #1 and one after #2+#3 (each a
+  GX011627 cold c3 export, about 12 min), plus a 4K direct-vs-FFT blur micro-timing; each
+  requested separately.
+- **Q-R1 (the FFT gate): OPEN with CHARC.** Task 6 does not start until the ruling is relayed.
+
+## Task 4 (#1): the overlap, as built (cell 2)
+
+- **Engine** (`analysis/engine.py`): `analysis_job(stream=True)` (an engine's first job only;
+  `set_parameters` then refused). The decode pass (and, for a complete cache entry, a per-frame
+  first-stage pass over the stored proxies) calls `_advance` every `STREAM_STEP` = 16 first-stage
+  records or 1/64 of the axis, whichever is more (the store's `smooth_at` copies the whole stage,
+  so this keeps the copies O(n log n)). `_advance` finds, stage by stage, the last output whose
+  `reach` ends on a record that is in and, on a decoded prefix, not on its last frame
+  (`_usable_end`, the at_end margin); it measures the next stage up to there and smooths. It
+  publishes `(ticks, raw, whole, final, state)` under a `Condition`. `_job` publishes
+  `complete` after `_drive`, or `stopped` BEFORE `_unload` clears the store. The tail (the last
+  ~61 frames) runs in the unchanged `_run_stages`, whose `_smooth_stage` starts after the
+  streamed outputs; `mark_complete` stays where it was (V17).
+- **The guard** is independent of the stream's derivation: a streamed `smoothed_record` waits
+  until `final` covers the frame (or `complete`), then checks `composed_reach` (the stage chain
+  composed from `(i, i)`) against `_usable_end` and raises `RenderBeforeFinalError` by name. The
+  read happens under the condition, so a stopping analysis never clears the store under it.
+  `lead_frames` = composed end - i + 1: 61 (c3), 91 (ancuti2018) at 30000/1001; 127 on a 60 fps
+  axis (two stages); the stage chain is linear because `_measure` passes ALL earlier stages'
+  smoothed records.
+- **Export** (`jobs/export.py`): `_Analysis` runs the streamed job on thread `export-analysis`
+  with `_Fold` as its progress (reports kept for the job's thread during the lead, dropped after;
+  `cancelled()` delegates, as the watchdog does). `_analyse` starts it and waits for the LEAD (the
+  first frame final, or the analysis ended; an analysis that ends inside its lead is checked
+  there, exactly as before, so every clip shorter than the lead runs the WP3.14 order). The D87
+  re-check and `open` follow the lead. `_write_frames` reads through the waiting
+  `smoothed_record`; on `AnalysisStoppedError` it raises the analysis's own outcome via
+  `_check_analysis`; after the last frame it joins A (`finish`) before `close`. A `finally` in
+  `_video` stops and joins A on every path.
+- **Debt (task 7, part):** the `import logging` in the decode pass's `finally` moved to a module
+  `_LOG` (WP3.11 style debt CLOSES at this touch).
+- **`tools/export_bench.py`:** `--subdir` (default `wp3.14/bench`, unchanged); refused outside
+  the working folder (`bench_folder`, `tests/test_wp321_bench.py`).
+
+### Existing-test constraints found in the build (all held, none edited)
+
+- DR-28 `statistics-pts+1` plants an engine subclass whose `smoothed_record` reads the NEXT
+  frame's record: this is why the wait lives INSIDE `smoothed_record` (a separate wait keyed on
+  E's frame would meet a not-yet-final neighbour and fail with "no frame was written").
+- DR-28 `dropped-frame` / `duplicated-frame` plant E's stream: the wait is keyed on pts, not on
+  E's index, and E does not refuse repeats (the coverage checker must see them).
+- The planted `_decode` rebuilds (`_bare_close_decode`, `_guard_only_while_...`) parse
+  `_decode`'s source: the guarded close keeps its `if close is not None:` / `try:` shape.
+- `test_planted_close_on_cancel_fails_by_name` reads the sink as `_write_frames`' 7th argument:
+  the signature keeps its order (the 4th argument is now the `_Analysis` handle).
+
+### Tests (`tests/test_wp321_overlap.py`, 21) and failing-first
+
+21 passed. Against the base code (`git archive d1e4537` with this file, the lead functions
+stubbed) **14 fail, 7 pass**: the seven that pass on the base pin invariants the serial job also
+holds (cancel before start, during the lead, before commit; no thread at commit; one frame held;
+the two planted-checker tests).
+Light runs: `test_jobs_export.py` + engine/recompute/photo 148 passed; `test_jobs_export_video.py`
+(DR-28 on 120 frames, i.e. overlapped; V11; the product-sink cancels) + oracle + bench + breakdown
+79 passed (non-footage; 19 min); analysis + GUI analysis service 243 passed; bench 21 passed.
+
+### Oracle, #1 against the base references (light: WP2.3, every frame)
+
+Driver `work\wp3.21\oracle-overlap-wp23.sh`, log `work\wp3.21\logs\oracle-overlap-wp23.log`:
+**10 of 10 TIER1** (hevc8-bt709-full, hevc10, vfr, rotated, truncated; GPU and `--force-cpu`;
+digests, records, analyze calls, proxies all equal). These clips (24-45 frames) are shorter than
+the lead, so they pin the streamed path's partial stage-1 measurement, not the overlap itself;
+the overlap is pinned on GX011627 and the synthetic 4K clip in the interim window.
+
+### Verification loop (cell 2)
+
+| # | Item | Suspected | Confirmed | Rejected | Fixed |
+|---|---|---|---|---|---|
+| V11 | a wait keyed on E's frame breaks the DR-28 `+1` plant at the watermark boundary | yes | yes, by reading (W advances in steps; frame W-1's neighbour is not final) | - | the wait moved inside `smoothed_record` |
+| V12 | a failing analysis clears the store while E reads (KeyError instead of the analysis's text) | yes | yes, by reading (`_unload` clears; E's read was outside any shared lock) | - | `stopped` published under the condition before `_unload`; the read under the same condition |
+| V13 | the planted short lead first fired at frame 0 with 15 frames after it (start clipping), not at the bound | yes | yes (first run of the test) | - | the plant adds one only past the first advance; the test asserts "60 frames after it, lead 61" |
+| V14 | `smooth_at` per frame copies the whole stage: O(n^2) on a long clip | yes | yes, by reading `_snapshot` | - | advance every max(16, n/64) records |
+| V15 | warm per-frame `_measure` calls reset its closed-form memo (a different closed_form call multiset) | yes | yes, by reading | - | `memo` carried across calls (`_Stream.closed`) |
+| V16 | lock order: E holds the condition and takes the engine and store locks | yes | - | rejected: the analysis thread never takes the condition while holding either lock (`_end_stream` and the publications run outside them) | - |
+
+### Open questions raised at this yield (recommended answer first)
+
+- **Q-R6 (D87 re-check after the lead):** the second free-space check, which WP3.14 placed after
+  the whole analysis "because the analysis cache may share the volume", now runs after the LEAD.
+  On a clip shorter than the lead it is unchanged; on a longer one the cache goes on growing
+  during the export. Recommended: accept (a disk full later is still caught and named by the
+  existing D87 paths); alternative: add the remaining proxies' estimate to the re-check (needs
+  an estimate `disk_space.py` does not have; not owned).
+- **Q-R7 (bench stamps):** with the overlap `on_stage("analysis")` -> `"open"` is the lead, not
+  the analysis. Recommended: task 10 reports the analysis share as the lead plus the export's
+  stall time, and the bench gains a stamp of the analysis thread's end (the brief's "overlap
+  stamps"); no product hook is added for it unless ruled.
 
 ## Re-grounding (2026-10-27/28, against `d1e4537`)
 
