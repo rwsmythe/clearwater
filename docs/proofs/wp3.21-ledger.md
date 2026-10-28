@@ -51,7 +51,8 @@ Cell `implementer-opus-high` (Claude lane), worktree `.worktrees/wp3.21`, branch
 | 26 | cell 7: ruling (A) fix built (`57a7a2e`); WINDOW REQUEST (serial leg 2) | 97,433 |
 | 27 | cell 7: WINDOW RELEASED (serial leg 2 green); WINDOW REQUEST (task 10 block 1) | 123,491 |
 | 28 | cell 7: WINDOW RELEASED (task 10 block 1); WINDOW REQUEST (block 2, 5.3K) | 154,676 (at the grant) |
-| 29 | cell 7: block 2 5.3K GPU peak above both bounds; STOP | (dispatcher fills) |
+| 29 | cell 7: block 2 5.3K GPU peak above both bounds; STOP | 167,263 (at the HOLD) |
+| 30 | cell 7: option (A) driver drafted in the HOLD (not run) | (dispatcher fills) |
 
 ## RESUME HERE (cell 6, after cell 5)
 
@@ -1934,3 +1935,15 @@ summary `c7-v16-5k3-summary.txt`, GPU timeline `c7-v16-5k3-gpu-timeline.txt`).
   x 1.29. The 4K rows are likewise above their baseline (3,130-3,244 against 2,409 MiB, x 1.30-1.35),
   not a ruled STOP. Not attributed yet between CuPy's pool (render, the analysis thread's device
   frames, FFT plans and buffers) and the FFmpeg decoders' and NVENC's own device memory.
+
+**HOLD (dispatcher, after the STOP):** no code change, no window, block 3 held; CHARC has the
+options with (A) recommended. In the hold the (A) driver was DRAFTED, not run:
+`C:\Users\rwsmy\clearwater\work\wp3.21\memory_attribution.py` (uncommitted; ruff clean). It runs
+ONE job through `export_bench.run_once` (the same engine, collaborators, telemetry and record) on
+the synthetic 5.3K clip, with in-process samplers: CuPy's default pool `used_bytes` /
+`total_bytes` and `cudaMemGetInfo` every 0.1 s, `nvidia-smi --query-compute-apps` every 1 s, each
+`gaussian_blur`'s per-thread plan cache, and the engine's stages on the same clock. It places
+every sample in a phase (lead / overlap / frames only / close) and summarises, at the
+device-wide peak: pool total and used, and the residual (device used - idle - pool total = the
+FFmpeg decoders', NVENC's and the extra CUDA contexts' share). `--off` runs the host-frame path
+for the same split. Output `work\wp3.21\attribution\`.
