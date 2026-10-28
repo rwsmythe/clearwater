@@ -970,3 +970,15 @@ def test_i4_a_parameter_file_over_the_importers_cap_is_refused(tmp_path: Path) -
         he.read_parameter_file(path)
     path.write_text(json.dumps({**preset, "source": {"name": "x"}}), encoding="utf-8")
     assert he.read_parameter_file(path).method == "c3"
+
+
+def test_j1_a_created_stamp_out_of_range_is_a_usage_refusal(
+    sample, tmp_path: Path, out: Path, no_footage: None, capsys
+) -> None:
+    preset = {**new_parameter_set("c3", {}).to_dict(), "created": "0001-01-01T00:00:00+01:00"}
+    path = tmp_path / "p.json"
+    path.write_text(json.dumps(preset), encoding="utf-8")
+    with pytest.raises(he.RunnerRefusalError, match=r"p\.json is not a readable parameter file"):
+        he.read_parameter_file(path)
+    assert _main(sample(STILL), "--out", out, "--force-cpu", "--parameters", path) == 2
+    assert "date value out of range" in capsys.readouterr().err and list(out.iterdir()) == []

@@ -408,7 +408,7 @@ def read_parameter_file(path: Path) -> ParameterSet:
         kept = {key: value for key, value in data.items() if key not in PROVENANCE_KEYS}
         parameter_set = ParameterSet.from_dict(kept)
         check_parameter_set_keys(parameter_set, name)
-    except (OSError, UnicodeDecodeError, ValueError, RecursionError) as exc:
+    except (OSError, UnicodeDecodeError, ValueError, RecursionError, OverflowError) as exc:
         raise RunnerRefusalError(
             f"{name} is not a readable parameter file: {ascii_text(str(exc))}"
         ) from exc
