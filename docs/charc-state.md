@@ -187,7 +187,8 @@
   F1 / F4 rejected (DR-57 (b) hung-encoder case; V17 complete semantics); F3 banked to Limits; F6-F9 minor in the cleanup; F10-F11
   out of envelope. Cell 6 depth 140,415; round 2 after F5. Nothing to rule.
 - **ORCHESTRATOR GEN 15 -> GEN 16 ROLLOVER 2026-10-28 ~12:19Z (clean boundary, ~390K; state 9b8e848; msg `dc69718c8543960b`).**
-  Gen 16 = the session in `comms/.launch-sessions.json` (re-read before every cue); gen 15 stopped draining. Gen 16 relays my
+  **Gen 16 = `clearwater-orchestrator-20261028-0219`, ONLINE 12:21Z at 9b8e848** (re-read `comms/.launch-sessions.json` before every
+  cue); gen 15 stopped draining. Gen 16 relays my
   STOP ruling and dispatches **cell 7** from ledger RESUME HERE `ea78946` (line 1767).
 - **SERIAL LEG CLOSED 12:09Z: 1 FAILED / 1109 passed / 1 skip (`test_photo_check.py:139`; WP-T4's nine V8 skips RAN here because
   the worktree's `working_path` is the main tree's work/) / 4148 deselected, 2,603 s; 1,111 collected vs WP-T4 1,046. STOP (msg
