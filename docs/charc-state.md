@@ -169,9 +169,12 @@
   side releases FFT plans at a preview boundary (clip change / unload) and counts them in its memory reading; DR-63 CLOSED.** Cell 5
   finishes batching (A), the estimate fold + bound test, ONE window (4K + 5.3K memory re-read + oracle legs), then hands to **cell 6**
   (Reviewer A, two-leg suite, task 10).
-- **EXCLUSIVE WINDOW OPEN 2026-10-28 ~09:59Z: WP3.21 ORACLE LEG gxa (GX011627 ancuti2018, device frames, `--require-tier1`, ~5 min;
-  TIER1 expected, no fusion fraction reaches sigma 32 at 4K by default; else STOP; the LAST oracle leg)** (msg `d814b05852784c29`).
-  **NOTHING HEAVY AT THIS SEAT until CLOSE.** Then cell 5 records and hands to cell 6.
+- **TASK 6 ORACLE COMPLETE; gxa CLOSED 10:03Z TIER1 (681 / 0, max abs 0)** (msg `37613171b50ac33d`; gxa OPEN `d814b05852784c29`).
+  Summary: WP2.3 TIER1 x10; GX011627 c3 TIER2 7.06e-6; synth 4K c3 TIER2 2.44e-6; GX011627 ancuti2018 TIER1; records / proxies /
+  source stats / analyze calls / pts equal in every TIER2. Quantised figure (mandatory): 8-bit on the 23 sampled frames = 14,793 of
+  572,313,600 channel values change (2.58e-5), none by more than ONE code value, under AD-5 `floor(x*255+0.5)`; 10-bit count/max
+  + a check that the sink's device `rgb_to_planes` rounds by AD-5's rule = cell 5 if depth allows, else cell 6's first item.
+  **No window open; seat free.** Cell 5 records and hands to cell 6 (Reviewer A, two-leg suite, task 10 last).
 - **ORACLE LEG synth CLOSED 09:58Z: synthetic 4K c3 TIER2 as expected, 120 frames, max abs 2.44e-6, mean abs 2.62e-7; records/proxies
   equal by construction** (synth OPEN was `1e7d4c07c4a26046`). Cell 5 depth 310,029 at the synth OPEN.
 - **ORACLE LEG gx CLOSED 09:56Z: GX011627 c3 TIER2 as expected, 681 frames differing, max abs 7.06e-6, mean abs 7.95e-7 (AD-11
