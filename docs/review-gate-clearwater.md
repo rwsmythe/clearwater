@@ -146,12 +146,42 @@ candidate rebased onto main, and records the actual output lines):
 - **Before any suite in a gate worktree, copy the main tree's uncommitted `clearwater.local.toml`
   into it** (WP3.10's first gate run was VOID without it: the footage tests skipped and the
   look-check tests failed on `LocalConfigError`; added 2026-10-27).
-- `uv run ruff check .`, `uv run ruff format --check .`, `uv run mypy`,
-  `uv run pytest` (with the hardware-marked tests the brief requires, run solo
-  where a test is normally skipped or load-sensitive, quoting the enabling reading
-  and the suite's skip count); and the harness gate `uv run python -m unittest
+- `uv run ruff check .`, `uv run ruff format --check .`, `uv run mypy`, the
+  TWO-LEG pytest gate below (with the hardware-marked tests the brief requires,
+  run solo where a test is normally skipped or load-sensitive, quoting the
+  enabling reading and each leg's skip count); and the harness gate `uv run python -m unittest
   discover -s tests/harness` whenever the change touches `scripts/`, `.claude/`,
   the kernel docs or `tests/harness/`.
+- **The two-leg pytest gate** (WP-T4, AD-28, from 2026-10-28; measurements and limits in
+  `docs/reports/wp-t4-parallel-tests.md`; median suite wall about 64 min against about 74 for
+  one process). From Git Bash (a PowerShell 5.1 redirect writes UTF-16), with
+  `QT_QPA_PLATFORM=offscreen`, `PYTEST_ADDOPTS` unset, and a new RUN identifier per gate; every
+  execution and collection leg uses its own fresh `--basetemp` under `work/`, never footage.
+  Before each heavy leg check at least 5 GiB available
+  (`uv run python -c "import psutil; assert psutil.virtual_memory().available >= 5*2**30"`).
+  Run, one heavy job at a time:
+  `uv run pytest -q -rs -n 4 -m "not gpu and not footage and not gui and not slow" --basetemp=work/pytest-gate-RUN-parallel`,
+  then `uv run pytest -q -rs -m "gpu or footage or gui or slow" --basetemp=work/pytest-gate-RUN-serial`.
+  **Collection:** collect all and both expressions
+  (`uv run pytest --collect-only -q [-m "<expression>"] --basetemp=work/pytest-gate-RUN-collect-<all|parallel|serial> > work/pytest-gate-RUN-<all|parallel|serial>.txt`),
+  each exiting 0, and keep only node-ID lines (starting `tests/` and containing `::`). Each
+  list's length equals pytest's own "N tests collected" line. Require no duplicates, an empty
+  parallel/serial intersection, a union equal to all, and parallel + serial = all. Diff the
+  candidate's full list against main's: every removed ID is explained by the package's diff, or
+  the gate is void.
+  **Outcomes:** each leg is green with passed + skipped + xfailed + xpassed equal to its
+  selected count and zero failures or errors. Quote each leg's `-rs` skip lines and compare them
+  with the previous accepted gate's. A new or moved skip (a seat where CuPy does not initialise,
+  or `clearwater.local.toml` not copied) is explained or the gate is void. Recollect at every
+  gate; the WP-T4 counts (4032 + 1046 = 5078) are not frozen.
+  **New parallel-leg tests** use a per-test `tmp_path` and no shared path. A new wall-clock bound
+  in one is marked `slow` with a reason, as E1 was. The reason names the bound and says the
+  marker is for timing isolation, not duration. A generous sanity ceiling, ten times the
+  expected figure or more and there to catch a hang, is not such a bound and stays parallel
+  (CHARC, WP-T4 accept). Any other exception is also `slow` with a reason. Existing bounds in
+  the parallel leg are watch items for their owning packages (the report lists them). Product timing and memory figures come from serial runs only, in their own windows.
+  Where a memory sampler is available, stop and report if any sample at N=4 falls below 2 GiB
+  available.
 - Every public function, class and module has a Google-style docstring; comments
   checked against the code (plan 4.5 item 2).
 - The verification-loop record and the completion report are present and the
