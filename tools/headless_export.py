@@ -22,11 +22,14 @@ goes on (D81). In WP4.1 a video item fails with ``UNAVAILABLE_TEXT`` (WP4.2 adds
 
 Exit status: 0 when every item is done (with or without warnings); 1 when any item failed, was
 cancelled or was not run; 2 for a usage refusal, with nothing run (a bad flag, a missing
-``--out`` folder, an invalid suffix (given or loaded), an unknown method, an unreadable parameter
-file, a settings file that cannot be used, an output or a source beside which outputs would go
-inside the configured footage folder however either is spelled, a ``--record`` file that exists
-or does not end in ``.json``). A record file that appears during the run is not written, and one
-that cannot be written is removed if this run created it: a message, status 1.
+``--out`` folder, an invalid suffix (given or loaded), an unknown method, a parameter file that
+is unreadable, over the importer's 1 MiB cap or not valid for its method, a settings file that
+cannot be used, an unreadable local configuration, an output folder, settings file or record
+file that would be written inside the configured footage folder however either is spelled and
+through any link (the real path of the nearest existing path is checked), or a source inside it
+beside which outputs would go, a ``--record`` file that exists or does not end in ``.json``).
+A record file that appears during the run is not written, and one that cannot be written is
+removed if this run created it: a message, status 1.
 Ctrl-C sets the batch's cancel flag: the running job stops at its next check and leaves no
 partial output (D44), the rest are not run (D45), and the exit status is 1.
 
@@ -34,16 +37,17 @@ The record (``--record FILE``, JSON, ``"schema": 1``, fields additive only) name
 outputs by file name only, never by full path (as AD-13 rules for provenance), and carries no
 EXIF content or location tag. The summary lines go to stdout and the ``[i/n]`` progress messages
 to stderr. Every folder the run knows (the output folder, each source's folder, the settings,
-record and parameter folders) is shown by its NAME in every record field and printed line, one
-:class:`Redactor` applied at each exit point: an engine text such as the D87 free-space refusal
-names its folder; an ``argparse`` refusal is redacted against the paths its arguments name. This
-tool installs no logging handler, so ``run_batch``'s INFO report (which names full output paths)
-is not emitted; Python's last-resort handler prints WARNING lines only, and while :func:`main`
-runs a filter on that handler passes them through the same redactor and prints no tag value
-(an EXIF module argument or a ``%r`` argument is shown as ``...``); :func:`run` does the same
-while its batch runs. A process that installs its own logging handlers (a host program, pytest)
-receives the engine's records as they are logged, full paths and tag values included: the
-runner redacts what it prints and records, not another program's logging.
+record and parameter folders, and the local configuration's folder) is shown by its NAME in
+every record field and printed line, one :class:`Redactor` applied at each exit point: an engine
+text such as the D87 free-space refusal names its folder; an ``argparse`` refusal is redacted
+against the paths its arguments name. This tool installs no logging handler, so ``run_batch``'s
+INFO report (which names full output paths) is not emitted; Python's last-resort handler prints
+WARNING lines only, and while :func:`main` runs a filter on that handler passes them through the
+same redactor and prints no tag value (an EXIF module argument or a ``%r`` argument is shown as
+``...``); :func:`run` does the same while its batch runs. A process that installs its own
+logging handlers (a host program, pytest) receives the engine's records as they are logged, full
+paths and tag values included: the runner redacts what it prints and records, not another
+program's logging.
 """
 
 from __future__ import annotations
@@ -67,12 +71,20 @@ from typing import Any, Final, Literal, NoReturn, cast
 import clearwater
 from clearwater.app import composition
 from clearwater.config import (
+    SETTINGS_FILE_NAME,
     check_parameter_set_keys,
     load_settings,
     migrate,
     new_parameter_set,
 )
-from clearwater.interfaces import JobResult, ParameterSet, Progress, Settings
+from clearwater.config.presets import MAX_PRESET_BYTES
+from clearwater.interfaces import (
+    JobResult,
+    ParameterSet,
+    Progress,
+    Settings,
+    validate_parameter_set,
+)
 from clearwater.interfaces.parameters import loads_object
 from clearwater.io.video.inputs import ascii_text, is_sidecar, sidecar_fault
 from clearwater.jobs import BatchReport, run_batch, validate_suffix
@@ -369,7 +381,8 @@ def requests_for(
 def read_parameter_file(path: Path) -> ParameterSet:
     """Read an AD-13 preset JSON file as a parameter set.
 
-    The document is decoded as the importer decodes it (``loads_object``: one JSON object, no
+    A file over the importer's cap (``MAX_PRESET_BYTES``, 1 MiB) is refused unread. The
+    document is decoded as the importer decodes it (``loads_object``: one JSON object, no
     non-finite number anywhere), migrated (``clearwater.config.migrate``), its ``source`` and
     ``settings`` provenance keys dropped and its keys checked (``check_parameter_set_keys``): the
     forms ``PresetStore.import_preset`` reads, a preset and a preset with only those two keys added.
@@ -387,6 +400,9 @@ def read_parameter_file(path: Path) -> ParameterSet:
     """
     name = ascii_text(Path(path).name)
     try:
+        size = Path(path).stat().st_size
+        if size > MAX_PRESET_BYTES:  # the importer's cap
+            raise ValueError(f"the file is {size} bytes; the cap is {MAX_PRESET_BYTES} bytes")
         data = loads_object(Path(path).read_text(encoding="utf-8"))
         data = migrate("preset", data)
         kept = {key: value for key, value in data.items() if key not in PROVENANCE_KEYS}
@@ -415,7 +431,8 @@ def parameters_for(
 
     Raises:
         RunnerRefusalError: ``file`` with ``method_id`` or with ``neutral``, an unknown method,
-            or an unreadable file.
+            an unreadable file, or a file's set that does not match its method's schema
+            (``validate_parameter_set``, as the importer validates it).
     """
     methods = composition.correction_methods()
     if file is not None:
@@ -428,8 +445,15 @@ def parameters_for(
             raise RunnerRefusalError("--neutral cannot be combined with --parameters.")
         parameter_set = read_parameter_file(file)
         method_id = parameter_set.method
-        if method_id not in methods:
+        method = methods.get(method_id)
+        if method is None:
             raise RunnerRefusalError(_unknown_method(method_id, methods))
+        problems = validate_parameter_set(parameter_set, method_id, method.parameters)
+        if problems:  # the importer's schema step
+            raise RunnerRefusalError(
+                f"{ascii_text(Path(file).name)} does not match method {ascii_text(method_id)!r}: "
+                + "; ".join(ascii_text(problem.message) for problem in problems)
+            )
         return parameter_set
     method_id = "c3" if method_id is None else method_id
     method = methods.get(method_id)
@@ -530,8 +554,33 @@ def inside(path: Path, folder: Path) -> bool:
     return False
 
 
+def writes_inside(target: Path, folder: Path) -> bool:
+    """Return whether a write to ``target`` would land inside ``folder``, links followed.
+
+    ``target`` is followed to where a write really goes: the real path of its nearest existing
+    path (``target`` itself when it exists, a link included even when it dangles; otherwise its
+    nearest existing ancestor) is tested with :func:`inside`, so a file link, a folder link or a
+    junction anywhere on the way is seen through.
+
+    Args:
+        target: A file or folder the run would write (need not exist).
+        folder: The folder no write may go into.
+
+    Returns:
+        True when the write would land inside ``folder``.
+    """
+    path = Path(os.path.abspath(target))
+    nearest = next((p for p in (path, *path.parents) if os.path.lexists(p)), path)
+    return inside(target, folder) or inside(Path(os.path.realpath(nearest)), folder)
+
+
 def check_outputs(requests: Sequence[ExportRequest], footage_folder: Path | None) -> None:
     """Refuse a run that would write inside the footage folder (question 9; DR-37 (c)).
+
+    Each request's output folder is the one the export plans (``jobs.naming``): the output
+    folder setting, or the source's own folder (``source.parent``, not the target of a linked
+    source); it is checked with :func:`writes_inside`. Outputs beside a source inside the footage
+    folder are refused too, however the source is spelled.
 
     Args:
         requests: The run's requests.
@@ -545,11 +594,14 @@ def check_outputs(requests: Sequence[ExportRequest], footage_folder: Path | None
         return
     for request in requests:
         folder = request.settings.output_folder
-        if folder is not None and inside(folder, footage_folder):
+        if folder is not None and writes_inside(folder, footage_folder):
             raise RunnerRefusalError(
                 "the output folder is inside the footage folder, which is read-only."
             )
-        if folder is None and inside(request.source, footage_folder):
+        if folder is None and (
+            inside(request.source, footage_folder)
+            or writes_inside(request.source.parent, footage_folder)
+        ):
             raise RunnerRefusalError(
                 f"{ascii_text(request.source.name)} is inside the footage folder, which is "
                 "read-only: outputs beside it are refused; give --out."
@@ -833,16 +885,26 @@ def _settings(args: argparse.Namespace) -> Settings:
 
 
 def _check_own_paths(args: argparse.Namespace, footage: Path | None) -> None:
-    """Refuse a record file that exists, is not ``.json``, has no folder or is in the footage."""
-    for flag, path in (("--settings-dir", args.settings_dir), ("--record", args.record)):
-        if path is not None and footage is not None and inside(path, footage):
+    """Refuse a record file that exists, is not ``.json``, has no folder or is in the footage.
+
+    The settings folder, its settings file (the loader may rename a corrupt one, D89) and the
+    record file are write targets, each checked with :func:`writes_inside` (links followed).
+    """
+    targets: list[tuple[str, Path]] = []
+    if args.settings_dir is not None:
+        targets += [("--settings-dir", args.settings_dir)]
+        targets += [("--settings-dir", args.settings_dir / SETTINGS_FILE_NAME)]
+    if args.record is not None:
+        targets += [("--record", args.record)]
+    for flag, path in targets:
+        if footage is not None and writes_inside(path, footage):
             raise RunnerRefusalError(
                 f"the {flag} path is inside the footage folder, which is read-only."
             )
     if args.record is not None:
         if args.record.suffix.lower() != ".json":
             raise RunnerRefusalError("the --record file must end in .json.")
-        if args.record.exists():
+        if os.path.lexists(args.record):  # a dangling link counts: it is never written through
             raise RunnerRefusalError("the --record file exists; it is never overwritten.")
         if not args.record.parent.is_dir():
             raise RunnerRefusalError("the folder of the --record file does not exist.")
@@ -872,6 +934,7 @@ def main(argv: Sequence[str] | None = None, *, exports: ExportJobs | None = None
     own += [None if args.record is None else args.record.parent]
     own += [None if args.parameters is None else args.parameters.parent]
     known = [Path(p) for p in own if p is not None] + [Path(p).parent for p in args.paths]
+    known += [default_config_path().parent]  # a configuration refusal names its file
     redact = Redactor(known)
     with _redacted_last_resort(redact):
         return _main(args, exports, redact, known)

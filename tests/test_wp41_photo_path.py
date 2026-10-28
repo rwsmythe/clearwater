@@ -231,13 +231,27 @@ def assert_v5_exif(output: Path, sample_id: str, source: Path) -> None:
         assert set(out) - POINTERS == {ORIENTATION, SOFTWARE}, sample_id
         assert set(sub) == {PIXEL_X, PIXEL_Y}, sample_id
         return
+    assert_exif_kept(out, src, sample_id)
+
+
+def interop_of(exif: PILImage.Exif) -> dict[int, Any]:
+    """The Interop IFD under the Exif IFD, or an empty one when there is no pointer."""
+    if int(ExifTags.IFD.Interop) not in exif.get_ifd(ExifTags.IFD.Exif):
+        return {}
+    return dict(exif.get_ifd(ExifTags.IFD.Interop))
+
+
+def assert_exif_kept(out: PILImage.Exif, src: PILImage.Exif, label: str) -> None:
+    """D63: every source field but those the export rewrites is kept (IFD0, Exif, GPS, Interop)."""
+    sub = out.get_ifd(ExifTags.IFD.Exif)
     for tag, value in src.items():
         if tag not in POINTERS | {ORIENTATION, SOFTWARE}:
-            assert out.get(tag) == value, f"IFD0 tag {tag} changed: {sample_id}"
+            assert out.get(tag) == value, f"IFD0 tag {tag} changed: {label}"
     for tag, value in src.get_ifd(ExifTags.IFD.Exif).items():
         if tag not in POINTERS | {PIXEL_X, PIXEL_Y}:
-            assert sub.get(tag) == value, f"Exif tag {tag} changed: {sample_id}"
-    assert out.get_ifd(ExifTags.IFD.GPSInfo) == src.get_ifd(ExifTags.IFD.GPSInfo), sample_id
+            assert sub.get(tag) == value, f"Exif tag {tag} changed: {label}"
+    assert out.get_ifd(ExifTags.IFD.GPSInfo) == src.get_ifd(ExifTags.IFD.GPSInfo), label
+    assert interop_of(out) == interop_of(src), f"Interop IFD changed: {label}"
 
 
 @pytest.mark.parametrize("sample_id", STILL_IDS)
@@ -266,6 +280,28 @@ def test_v5_planted_writer_dropping_iccp_fails_by_name(sample, tmp_path, sample_
     output = only_output(export([source], tmp_path, exports=exports))
     with pytest.raises(AssertionError, match="iCCP missing"):
         assert_v5_icc(output, sample_id, source)
+
+
+def test_v5_an_interop_ifd_is_kept_and_a_dropped_one_fails_by_name(tmp_path: Path) -> None:
+    # No WP2.3 still carries an Interop IFD, so this test-built JPEG gives the D63 leg one.
+    exif = PILImage.Exif()
+    exif[int(ExifTags.Base.Make)] = "TestMake"
+    sub = exif.get_ifd(ExifTags.IFD.Exif)
+    sub[int(ExifTags.Base.ExposureTime)] = 0.01
+    sub[int(ExifTags.IFD.Interop)] = {1: "R98", 2: b"0100"}
+    source = tmp_path / "interop.jpg"
+    pixels = (np.arange(32 * 48 * 3) % 251).astype(np.uint8).reshape(32, 48, 3)
+    PILImage.fromarray(pixels).save(source, exif=exif.tobytes(), quality=95)
+    src = source_exif(source, "jpeg")
+    assert src is not None and interop_of(src) == {1: "R98", 2: b"0100"}
+    out = tmp_path / "out"
+    out.mkdir()
+    written = exif_of(only_output(export([source], out)))
+    assert written is not None
+    assert_exif_kept(written, src, "interop.jpg")
+    del written.get_ifd(ExifTags.IFD.Exif)[int(ExifTags.IFD.Interop)]  # planted: Interop dropped
+    with pytest.raises(AssertionError, match="Interop IFD changed"):
+        assert_exif_kept(written, src, "interop.jpg")
 
 
 @pytest.mark.parametrize("sample_id", ORIENT_IDS)

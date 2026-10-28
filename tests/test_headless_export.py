@@ -12,6 +12,7 @@ WP4.1 failing with ``UNAVAILABLE_TEXT`` (question 4).
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import signal
 import subprocess
@@ -24,6 +25,7 @@ import pytest
 import headless_export as he
 from clearwater.app import composition
 from clearwater.config import new_parameter_set, save_settings
+from clearwater.config.presets import MAX_PRESET_BYTES
 from clearwater.interfaces import JobResult, Settings
 from clearwater.jobs.export_seam import CANCELLED, UNAVAILABLE_TEXT
 
@@ -868,3 +870,103 @@ def test_h5_a_non_finite_number_anywhere_in_a_parameter_file_is_refused(tmp_path
     path.write_text(text, encoding="utf-8")
     with pytest.raises(he.RunnerRefusalError, match=r"p\.json is not a readable parameter file"):
         he.read_parameter_file(path)
+
+
+# --- round 4: write targets followed through links, the config path, importer parity ------------
+
+
+def _symlink(target: Path, link: Path, *, directory: bool = False) -> None:
+    """Create a symbolic link, or skip the test where this user cannot create one."""
+    try:
+        os.symlink(target, link, target_is_directory=directory)
+    except (OSError, NotImplementedError) as exc:
+        pytest.skip(f"this user cannot create a symbolic link here: {type(exc).__name__}")
+
+
+def test_i1_outputs_beside_a_linked_source_inside_the_footage_are_refused(
+    sample, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys
+) -> None:
+    footage, outside = tmp_path / "footage", tmp_path / "outside"
+    footage.mkdir()
+    outside.mkdir()
+    real = _copy(sample, STILL, outside, "real.jpg")
+    link = footage / "linked.jpg"
+    _symlink(real, link)  # the link is inside, its target outside: outputs go beside the link
+    monkeypatch.setattr(he, "configured_footage_folder", lambda config=None: footage)
+    assert _main(link, "--beside-source", "--force-cpu") == 2
+    assert "inside the footage folder" in capsys.readouterr().err
+    beside = he.requests_for(
+        [link], parameters=new_parameter_set("c3", {}), settings=Settings(force_cpu=True)
+    )
+    with pytest.raises(he.RunnerRefusalError, match="outputs beside it are refused"):
+        he.run(beside, footage_folder=footage)
+    assert sorted(p.name for p in footage.iterdir()) == ["linked.jpg"]
+    assert sorted(p.name for p in outside.iterdir()) == ["real.jpg"]
+
+
+def test_i1_every_write_target_linked_into_the_footage_is_refused(
+    sample, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys
+) -> None:
+    footage, out = tmp_path / "footage", tmp_path / "out"
+    (footage / "sub").mkdir(parents=True)
+    out.mkdir()
+    linked_out = tmp_path / "linked-out"
+    _symlink(footage / "sub", linked_out, directory=True)  # a folder link into the footage
+    settings_dir = tmp_path / "settings"
+    settings_dir.mkdir()
+    save_settings(footage / "sub", Settings())
+    _symlink(footage / "sub" / "settings.json", settings_dir / "settings.json")
+    _symlink(footage / "sub" / "r.json", out / "r.json")  # a dangling link to a footage record
+    source = sample(STILL)
+    monkeypatch.setattr(he, "configured_footage_folder", lambda config=None: footage)
+    before = sorted(p.name for p in (footage / "sub").iterdir())
+    assert _main(source, "--out", linked_out, "--force-cpu") == 2
+    assert _main(source, "--out", tmp_path, "--force-cpu", "--record", linked_out / "r.json") == 2
+    assert _main(source, "--out", tmp_path, "--force-cpu", "--record", out / "r.json") == 2
+    assert _main(source, "--out", tmp_path, "--force-cpu", "--settings-dir", linked_out) == 2
+    assert _main(source, "--out", tmp_path, "--force-cpu", "--settings-dir", settings_dir) == 2
+    err = capsys.readouterr().err
+    assert err.count("inside the footage folder") == 5, err
+    assert sorted(p.name for p in (footage / "sub").iterdir()) == before
+    params = new_parameter_set("c3", {})
+    requests = he.requests_for([source], parameters=params, settings=_cpu(linked_out))
+    with pytest.raises(he.RunnerRefusalError, match="output folder is inside the footage"):
+        he.run(requests, footage_folder=footage)
+    assert not list(tmp_path.glob("*_corrected*.png"))
+
+
+def test_i2_an_unreadable_local_configuration_names_no_full_path(
+    sample, tmp_path: Path, out: Path, monkeypatch: pytest.MonkeyPatch, capsys
+) -> None:
+    config = tmp_path / "repo" / "clearwater.local.toml"
+    config.parent.mkdir()
+    config.write_text("footage_path = [\n", encoding="utf-8")
+    monkeypatch.setattr(he, "default_config_path", lambda: config)
+    assert _main(sample(STILL), "--out", out, "--force-cpu") == 2
+    err = capsys.readouterr().err
+    assert "local configuration cannot be read" in err and "clearwater.local.toml" in err
+    assert _no_full_path(err, config.parent) and list(out.iterdir()) == []
+
+
+def test_i3_a_parameter_file_against_the_method_schema_is_a_usage_refusal(
+    sample, tmp_path: Path, out: Path, no_footage: None, capsys
+) -> None:
+    name = composition.correction_methods()["c3"].parameters[0].name
+    preset = {**new_parameter_set("c3", {}).to_dict(), "parameters": {name: "invalid"}}
+    path = tmp_path / "p.json"
+    path.write_text(json.dumps(preset), encoding="utf-8")
+    with pytest.raises(he.RunnerRefusalError, match=r"p\.json does not match method 'c3'"):
+        he.parameters_for(file=path)
+    assert _main(sample(STILL), "--out", out, "--force-cpu", "--parameters", path) == 2
+    assert f"{name}: expected float, got str" in capsys.readouterr().err
+    assert list(out.iterdir()) == []
+
+
+def test_i4_a_parameter_file_over_the_importers_cap_is_refused(tmp_path: Path) -> None:
+    preset = new_parameter_set("c3", {}).to_dict()
+    path = tmp_path / "big.json"
+    path.write_text(json.dumps({**preset, "source": {"name": "x" * MAX_PRESET_BYTES}}), "utf-8")
+    with pytest.raises(he.RunnerRefusalError, match=f"the cap is {MAX_PRESET_BYTES} bytes"):
+        he.read_parameter_file(path)
+    path.write_text(json.dumps({**preset, "source": {"name": "x"}}), encoding="utf-8")
+    assert he.read_parameter_file(path).method == "c3"
