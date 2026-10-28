@@ -1,12 +1,15 @@
 # WP-T4: parallel test workers
 
-Status: rung 4 measured; report and static checks prepared for Reviewer A.
-Reviewer A, adjudication and the final settled-head two-leg gate remain pending.
+Status: rung 4 measured; Reviewer A round 1 adjudicated in one cleanup.
+Reviewer A found zero new critical/major findings; its loop terminates per the
+fill. Final settled-head two-leg gates, Reviewer B and acceptance remain pending.
 Package diff base: `ba6e923`; measurement head: `dd49a15` (all six windows and
 D3). Measurements were read from the worktree evidence, not copied from a
 prompt. They describe the owner's Windows 11 / NTFS laptop, Python 3.12,
 pytest 8.4.2, pytest-xdist 3.8.0 with local execnet popen workers and headless
-Qt (`QT_QPA_PLATFORM=offscreen`). Same quiet host; not a figure of record.
+Qt (`QT_QPA_PLATFORM=offscreen`). These are suite wall-time figures on the
+same quiet host, not product timing figures (N6/V16). Product timing and memory
+figures are obtained serially in their own windows.
 The dispatcher granted each window and ran it alone, outside the sandbox and
 without its mkdir shim. No heavy run was started by this cell.
 
@@ -33,7 +36,8 @@ N=4 is AD-28's cap. Both measured parallel legs passed, using at most
 5 GiB and every available-memory sample exceeded 2 GiB. This supports N=4 on
 this measured host given the observed 11-16% whole-suite saving; it does not
 establish N=4 as optimal on other hardware, authorize N>4, or provide an N=2
-comparison. Timing/memory figures of record must still be obtained serially.
+comparison. Product timing and memory figures are obtained serially in their
+own N6/V16 windows; the suite wall-time figures here remain valid suite figures.
 
 ## Changes and dependencies
 
@@ -120,8 +124,8 @@ on refusal, with no `popen-gw*` entry under fake footage:
 | Case | Coverage / observed result |
 |---|---|
 | w1 control, guard absent | Real `-n 2 --basetemp=<fake footage>` run deletes both planted files. The deliberately false unchanged-bytes assertion failed at `tests/test_conftest_guard.py:213`; final control expects the deletion. |
-| w2 guard present | Nine equivalent/inside/ancestor basetemp targets refuse with exit 4, `footage guard` and folder name in stderr; planted bytes unchanged. |
-| w3 guard present | PYTEST_DEBUG_TEMPROOT inside fake footage, TMP/TEMP/TMPDIR separately and together: five refusal cases with the same exit/content/byte checks. |
+| w2 guard present | Nine equivalent/inside/ancestor basetemp targets refuse on the controller before workers exist, with exit 4, `footage guard` and folder name in stderr; planted bytes unchanged. |
+| w3 guard present | PYTEST_DEBUG_TEMPROOT inside fake footage, TMP/TEMP/TMPDIR separately and together: five controller-refusal cases with the same exit/content/byte checks. |
 | w4 safe work folder | Exit 0 with both worker IDs recorded, worker basetemp under controller root and guard module registered as a plugin on each worker. |
 
 Each new case passed alone; whole file **60 passed**, including the original
@@ -139,10 +143,20 @@ Installed-source anchors (xdist 3.8.0 / pytest 8.4.2):
 - `_pytest/main.py:285-287` and `_pytest/config/__init__.py:1119`: configure
   precedes session startup. `xdist/dsession.py:83-90` starts workers during
   session startup; the controller's guard therefore refuses before xdist
-  clears/creates its root. Each worker subsequently checks its derived root.
+  clears/creates its root. Static hook ordering shows worker configure receives
+  the assigned child root; w4 establishes worker plugin registration, not an
+  independently observed worker-originated refusal.
 - Current `tests/conftest.py:260-261` is the tryfirst guard. Q2 adds one
   module-docstring paragraph only. ASTs with that docstring removed are equal
   (`work/wp-t4/turn6-conftest-ast.log`, exit 0); no guard behavior was changed.
+
+Worker-refusal coverage LIMIT (m5): w2/w3 refuse on the controller, so their
+no-worker-directory assertions follow before any worker exists. No case makes
+a worker refuse independently; a regression that made only that worker hook
+inert would be unobserved. Within the declared local popen envelope a worker-only unsafe root is unreachable: xdist assigns a child of the controller root
+only after that root was guarded and freshly created. A planted unsafe child
+would require changed worker options or filesystem interference outside that
+envelope. This cleanup records the limit rather than adding such a test.
 
 The guard's existing DR-22 limits still apply: capture/tempfile probes can
 write transient files before conftest loads, and explicit bypass/configuration
@@ -156,7 +170,18 @@ reproduction used two processes, real manifest/FFmpeg verification, synchronized
 cold misses and an injected two-second generator delay. One competing writer
 held a partial clip while the other verified it. Against unlocked code, two
 generators ran and real verification failed (`KeyError('streams')`); the committed
-regression failed at `tests/test_fixture_cache_lock.py:131`. The actual cache
+regression now re-established against byte-exact `ba6e923` plugin code fails
+at **`tests/test_fixture_cache_lock.py:132`**, the `all(record["ok"]...)`
+assertion. The staged test is byte-identical to the committed test. Its two
+child exit codes are 0, two records exist and two generator calls are recorded;
+one provider reports real partial-clip verification failure. Evidence:
+`work/wp-t4/turn7-m1-stage.log` and `turn7-m1-red.log` (expected EXIT=1).
+The original `turn3-regression-red.log` reports that same assertion at line 131
+in an earlier pre-commit variant; its exact old bytes were not retained. The
+old report carried that line forward as though it described the committed
+variant. This corrects the citation without changing the test. Current lock
+code remains green: four tests pass (`turn7-lock-green.log`, EXIT=0).
+The actual cache
 probe asserted exact resolved worktree containment before deleting only this
 worktree's generated-cache directory. No footage or sibling directory was used.
 
@@ -170,6 +195,30 @@ OS-specific liveness code was added. The locked actual cold-cache probe had
 two successful providers and exactly one generator call. Four lock tests
 passed, and eight related tests passed at `-n 4`. Red/green logs and exact
 commands are in the ledger and `work/wp-t4/turn3-*.log`.
+
+Recorded lock limits from Reviewer A (no code change in this cleanup):
+
+- m2: a hard-killed holder leaves its lock. A caller waits up to 180 s until
+  the 900 s stale threshold, then errors immediately until owner-confirmed
+  cleanup; later tests can repeat those waits. PID is recorded in the file,
+  but timeout/stale messages do not print PID or age. Recovery requires
+  inspecting that lock and confirming the holder has stopped. Rules stay
+  180 s / 900 s; no unsafe age-only stealing or OS-specific liveness is added.
+- a1: the writer lock is not a reader lease. If two successive transient
+  verification failures cause regeneration of a valid clip, an already-ready
+  reader can encounter the in-place rewrite. This rare scenario remains a
+  limit; no atomic-publication/tools or reader-lifetime change is made.
+- a2: deleting a live holder's lock contrary to its cleanup instruction can
+  make `finally: lock.unlink()` raise FileNotFoundError and mask the original
+  result. A tolerant unlink is optional; it is not added in this cleanup.
+- a4: the race regression proves one generation after re-verify, not that final
+  verify stays lexically inside the lock. A safe lock/re-verify variant with
+  final verify outside could pass; this is a coverage limit, not a failing
+  safety property demonstrated by the test.
+- a5: lock release relies on Windows 11 / NTFS POSIX-style deletion making
+  the name reusable while a waiter's stat handle may be open. Older
+  delete-pending filesystem semantics can yield PermissionError; this is
+  an explicit operating-envelope dependency, not a portability claim.
 
 D1, D2 and both measured parallel legs had **zero failures and zero violators**.
 No test was relabelled to hide a worker failure. Static checks found no new
@@ -221,8 +270,8 @@ rounds; recorded sampler snapshot SHA-256 is
 
 P+S difference is **33.467256 s**: **0.8732%** using r1 as denominator,
 **0.8657%** using r2. Both are below 15%; no r3 is requested or included.
-Windows are interleaved B/P/S, sequential and on the same quiet host; not a
-figure of record. R1 has 498 RSS observations / 499 GPU queries; r2 has 494 /
+Windows are interleaved B/P/S, sequential and on the same quiet host. These
+are suite wall-time figures, not N6/V16 product timing or memory figures. R1 has 498 RSS observations / 499 GPU queries; r2 has 494 /
 495. Neither has GPU gaps, RSS access denied, a <2 GiB sample or remaining
 child PIDs. Maximum RSS interval is 1.156 s / 1.110 s. R1 has two successful
 slow GPU reads (longest 0.953 s, maximum observation age 1.343 s); r2 has
@@ -305,14 +354,22 @@ and verifies the only embedded footage clip name, `gx011627`, already occurs
 in committed reports (`git grep -i gx011627 HEAD -- docs/reports`). The report
 carries only the requested aggregate tables, ten node IDs and phase values.
 
+Follow-on for CHARC at accept: the first four export test bodies in the table
+sum to **2276.21 s**, about **68.3% of D3's serial wall**. These WP3.14/WP3.10
+bodies' size is the lever for the owner; it is distinct from the setup/fixture
+question above. CHARC owns writing D3's register row at accept; this report
+does not claim that row already exists and makes no test or marker change.
+
 ## Raised GPU finding
 
 Graphics-card memory activity reproduces with complete observations in **D2,
 r1 and r2**, peaks **1036 / 1037 / 1049 MiB** (rises **1036 / 903 / 911 MiB**
-from baselines **0 / 134 / 138 MiB**). The traced module-import mechanism is
-`tests/test_prototype_backend.py:23` -> `prototype.backend.select_backend`
--> `_probe_gpu` -> actual CuPy allocation/kernel at
-`tools/prototype/backend.py:211`. Modules import before marker deselection in
+from baselines **0 / 134 / 138 MiB**). The verified module-import probes are
+`tests/test_prototype_backend.py:23`, `tests/test_prototype_clip.py:41` and
+`tests/test_prototype_temporal.py:47`, each calling `select_backend("auto")`.
+All reach `prototype.backend.select_backend` -> `_probe_gpu` -> actual CuPy
+allocation/kernel at `tools/prototype/backend.py:211`. Fixing only one module
+would leave the other probes. Modules import before marker deselection in
 each worker, so the nominal non-GPU expression does not prevent that probe.
 Static inspection found no new unmarked GPU execution path in the added job
 tests. System-wide memory samples cannot attribute every MiB exclusively to
@@ -336,13 +393,30 @@ Turn-6 static gates all EXIT=0: `uv run ruff check .` passes;
 `work/wp-t4/turn6-{ruff-check,ruff-format,mypy}.log`. `git diff --check`,
 AST/privacy/scope and table checks are recorded in the final verification log.
 
-Reviewer A is driver-owned Claude Opus/high per the fill. No reviewer verdict
-or convergence round is yet claimed. After its findings settle, request final
-PARALLEL and SERIAL runs on the settled head because files changed after rung
-4; those final legs have not run. The harness gate is not required for this
+Turn-7 cleanup static gates also all EXIT=0: ruff check passes, ruff format
+reports **238 files already formatted**, and mypy finds **no issues in 136
+source files** (`work/wp-t4/turn7-{ruff-check,ruff-format,mypy}.log`). Current
+lock tests are **4 passed**; all/P/S strict collections remain
+**5078 / 4032 / 1046**, with raw node sets unchanged and exact partition proof.
+There is no changed Python/test file in the cleanup; the test run verifies
+m1's current green. Final scope/runner/privacy checks and diff whitespace
+validation are in `work/wp-t4/turn7-final-check.log`.
+
+Reviewer A ran on `5e6a8d3` through the driver's pinned Claude Opus/high
+invocation (modelUsage claude-opus-5-5), read-only. Its verdict is
+`VERDICT: NO_NEW_CRITICAL_MAJOR`; all seven CLAIMS_FIRST checks hold.
+The six minor and five advisory findings are individually adjudicated in the
+ledger: four documentation findings fixed, seven limits/watch items recorded.
+There are zero new blocking findings, so the loop terminates after round 1
+and this single cleanup; no round 2 is requested. The reviewer independently
+ran four lock tests and 60 guard tests under workers. Driver assertions and
+permission-denial provenance are recorded in the ledger. Final PARALLEL and
+SERIAL runs are now requested on the committed cleanup head because files
+changed after rung 4; those final legs have not run. The harness gate is not required for this
 package's owned files. Final acceptance and changes to the fill/CLAUDE.md belong
-to the orchestrator. Open items: Reviewer A/adjudication, final two-leg gates,
-return/owner acceptance, and the raised GPU/serial-set follow-ons.
+to the orchestrator. Open items: final two-leg gates, Reviewer B at the
+orchestrator's seat, return/owner acceptance, and the recorded limits and
+GPU/serial-set/other-package timing follow-ons.
 
 ## Gate text for the orchestrator
 
@@ -356,22 +430,52 @@ uv run pytest -q -rs -m "gpu or footage or gui or slow" --basetemp=work/wp-t4/r4
 
 R2 used the same expressions with its own `r4-r2-...-tmp` roots, exactly as
 tabulated. Both legs run separately with `QT_QPA_PLATFORM=offscreen`, on one
-quiet host/window at a time; any explicit basetemp must be a fresh working-
-folder path, never footage. Do not replay a measured evidence prefix.
+quiet host/window at a time; any explicit basetemp must be a fresh working-folder path, never footage. Do not replay a measured evidence prefix.
 
 Proposed replacement for GATE_CHECKS's `uv run pytest` sentence (orchestrator
 edits the fill, keeping its other hardware and harness requirements):
 
-> Run `uv run pytest -q -rs -n 4 -m "not gpu and not footage and not gui and not slow"`,
-> then `uv run pytest -q -rs -m "gpu or footage or gui or slow"`, one heavy job
-> at a time with `QT_QPA_PLATFORM=offscreen`, at least 5 GiB free before each;
-> record both outcomes/skips and require their union to equal full collection.
-> Figures from serial runs only. New parallel-leg tests: per-test `tmp_path`,
-> no shared path; an exception is `slow` with a reason. Preserve the footage
-> guard and stop/report if N=4 sampling falls below 2 GiB available.
+> Set `QT_QPA_PLATFORM=offscreen`; choose a new RUN identifier for each gate.
+> Every execution and collection leg must use its own fresh `--basetemp`
+> path under `work/`, never footage; replace RUN consistently in the examples.
+> Before each heavy leg check at least 5 GiB available with
+> `uv run python -c "import psutil; assert psutil.virtual_memory().available >= 5*2**30"`.
+> Run `uv run pytest -q -rs -n 4 -m "not gpu and not footage and not gui and not slow" --basetemp=work/pytest-gate-RUN-parallel`,
+> then `uv run pytest -q -rs -m "gpu or footage or gui or slow" --basetemp=work/pytest-gate-RUN-serial`,
+> one heavy job at a time. Collect all and both expressions with the three
+> concrete commands below. Retain only node-ID lines (starting `tests/` and
+> containing `::`), excluding headers/summaries/warnings; require duplicate-free
+> lists, empty parallel/serial intersection, union equal to all, and
+> parallel count + serial count = all count. Require green execution legs and
+> passed + skipped + xfailed + xpassed in each leg to equal its selected count,
+> with zero failures/errors. Recollect for later packages; do not freeze the
+> WP-T4 counts. Product timing and memory figures from serial runs only, in
+> their own N6/V16 windows. New parallel-leg tests: per-test `tmp_path`, no
+> shared path; an exception is `slow` with a reason. Preserve the footage
+> guard. Where a sampler is available, stop/report if N=4 sampling falls below
+> 2 GiB available; the scratch sampler is not a committed gate prerequisite.
+>
+> `uv run pytest --collect-only -q --basetemp=work/pytest-gate-RUN-collect-all > work/pytest-gate-RUN-all.txt`
+>
+> `uv run pytest --collect-only -q -m "not gpu and not footage and not gui and not slow" --basetemp=work/pytest-gate-RUN-collect-parallel > work/pytest-gate-RUN-parallel.txt`
+>
+> `uv run pytest --collect-only -q -m "gpu or footage or gui or slow" --basetemp=work/pytest-gate-RUN-collect-serial > work/pytest-gate-RUN-serial.txt`
+
+All commands above use committed dependencies, pytest and the standard library;
+no uncommitted helper is required. `work/` and the fresh evidence names must
+exist/be reserved as appropriate before redirecting; choose a different RUN
+rather than overwriting prior evidence. On this head the required collection
+arithmetic is **4032+1046=5078**, with the exact raw-set proof in the ledger.
 
 Proposed one-line CLAUDE.md Conventions pointer (CHARC writes it):
 
-> Run the two-leg pytest gate in `docs/review-gate-clearwater.md` GATE_CHECKS (WP-T4/AD-28; rationale and measurements: `docs/reports/wp-t4-parallel-tests.md`); figures from serial runs only.
+> Run the two-leg pytest gate in `docs/review-gate-clearwater.md` GATE_CHECKS (WP-T4/AD-28: median suite P+S wall 3,849 s, about 64 min; same-round savings 16.0% / 11.1%; measurements and limits in `docs/reports/wp-t4-parallel-tests.md`); product timing and memory figures from serial runs only.
 
-This cell edits neither destination and creates no docs/testing.md.
+CHARC's suite figures of record (`144f9735`) are the same-round comparisons
+**-16.0% / -11.1%** with a **4.9 percentage-point spread**, a baseline move of
+**4.7%** versus P+S under **1%**, and median P+S **3849.40 s (64.16 min)**.
+The PARALLEL leg is stable and fast: **493.54-497.30 s** (about 494-497 s);
+SERIAL is the floor: **3335.36-3372.59 s** (about 3335-3373 s). These are
+suite wall-time figures on the same quiet host, not product timing figures
+(N6/V16). Product timing and memory figures are obtained serially in their own
+windows. This cell edits neither destination and creates no docs/testing.md.

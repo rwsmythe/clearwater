@@ -33,8 +33,17 @@
   necessity" after the depth fell to 95K. **SESSION CHOICE: this session
   continues; no fresh session is used**, because it already holds rungs 1-3.
   The old RESUME HERE checklist was followed in turn 6 and is now updated for
-  Reviewer A, final settled-head legs and the return. Turn-6 depth is pending
-  the driver's reading; no estimate or older peak is substituted for it.
+  Reviewer A, final settled-head legs and the return. The dispatcher supplied
+  **turn-6 depth_input_tokens = 152,531** after accepting turn 6 as `5e6a8d3`
+  (three files, zero CR bytes). Turn-7 depth remains pending the driver's
+  reading; no estimate or older peak is substituted for it.
+
+- CHARC's later figure ruling `144f9735` governs the interpretation of all
+  historical "not a figure of record" condition strings below: these ARE
+  same-quiet-host **suite wall-time figures**, not N6/V16 product timing
+  figures. Product timing and memory figures are obtained serially in their
+  own windows. The report now carries that distinction and the 3849 s / 64 min
+  median P+S figure for the accept-time CLAUDE pointer.
 
 ## Turn 1 evidence: collection and dependency
 
@@ -294,7 +303,7 @@ two-process harness. It deletes no other directory.
 | Run | Result | Evidence under `work/wp-t4/` |
 |---|---|---|
 | Actual cold cache, unlocked | Both child processes exited 0; two generator calls; one provider recorded `Failed: regenerated sample 'ad14-flicker' does not match the manifest ... cannot probe ... KeyError('streams')`; harness exit 1 | `uv run python work/wp-t4/turn3_cold_probe.py`; `turn3-cold-probe-red.log` |
-| Committed regression against unlocked code | Exit 1 at `tests/test_fixture_cache_lock.py:131`, `assert all(record["ok"] for record in result["records"]), result`; same partial-clip verification failure and two generator calls | Serial containing pytest, basetemp `work/wp-t4/t3-regression-red`; `turn3-regression-red.log` |
+| Pre-commit regression variant against unlocked code (citation corrected in turn 7) | Exit 1 at historical `tests/test_fixture_cache_lock.py:131`, `assert all(record["ok"] for record in result["records"]), result`; same partial-clip verification failure and two generator calls | Serial containing pytest, basetemp `work/wp-t4/t3-regression-red`; `turn3-regression-red.log` |
 | New file, locked | 4 passed; exit 0 | Serial containing pytest, basetemp `work/wp-t4/t3-lock-green`; `turn3-lock-green.log` |
 | Actual cold cache, locked | Two successful providers, one generator call, no timeout; exit 0 | `uv run python work/wp-t4/turn3_cold_probe.py --phase after-lock`; `turn3-cold-probe-green.log` |
 | Worker integration | 8 passed at `-n 4`; exit 0 | Basetemp `work/wp-t4/t3-lock-workers`; `turn3-lock-workers.log` |
@@ -989,6 +998,176 @@ recorded in turn6-final-check.log. Final two-leg gates remain pending Reviewer A
 | T6-6 | Verification, docstring-only ownership | AST minus module docstring identical; exact one-paragraph delta | Confirmed Q2 within envelope |
 | T6-7 | Verification, report privacy / gates | ASCII/location checks and prior committed clip name; static gates all 0 | Confirmed; ready for driver-owned Reviewer A, no final-gate claim |
 
+## Turn 7 -- Reviewer A round 1 and single cleanup
+
+### Reviewer provenance, assertions and terminal policy
+
+Generation 14 accepted turn 6 as `5e6a8d3`, with zero CR bytes, and supplied
+**depth_input_tokens 152,531**. This session continues under CHARC's already
+recorded choice. Package base remains `ba6e923`. Reviewer A ran on `5e6a8d3`
+via `codex_cell.py review`, `claude -p --model opus --effort high`, read-only.
+The permitted review file was read in full; its MD5 is locally verified as
+**f6626815a4690d9a752465ad1afec7fe** (`turn7-review-md5.log`). Evidence is the
+external driver-owned `wp-t4/r1/review.txt`; nothing is written there by the
+cell and no withheld folder is read/listed by the cell.
+
+Dispatcher-reported transport assertions: modelUsage **claude-opus-5-5**;
+high effort by invocation; is_error false; 63 turns; worktree clean afterwards;
+one anchored VERDICT line; all findings labelled EXECUTED or REASONED. Twelve
+permission denials were the reviewer's own scratch writes, redirects and git
+show-to-file attempts refused by read-only policy, none touching a withheld
+path. They are execution limitations, not test failures or unclassified denials.
+The brief's FAST tier mentions Sonnet medium, but FINAL Q6 / the driver model
+check / RESUME HERE pin **Opus high**. The dispatcher ran that stronger tier,
+never less rigor; no improvised Sonnet invocation was used.
+
+Verdict: **VERDICT: NO_NEW_CRITICAL_MAJOR**. All seven CLAIMS_FIRST checks
+hold. Reviewer executed complementary collections, exact lock/dependency/MIT
+and marker checks; **4 lock tests passed** and **60 guard tests passed under
+-n 2** (including nested worker execution), and checked installed source
+anchors. Sharing and arithmetic findings are reasoned/static as labelled.
+**Zero new blocking terminates the loop per the fill. No round 2.** This is
+the one cleanup allowed by CHARC's recommended one-round-plus-cleanup cap.
+No clean second round, overall acceptance or Reviewer B verdict is claimed.
+
+### Every finding adjudicated
+
+All eleven findings are **NEW**, none REOPENED. Accepted severity: six Minor,
+five Advisory; zero Critical/Major. In/out classification below refers to
+WP-T4's fix envelope: ten are in-envelope documentation/limit dispositions;
+a3's test changes would be outside the owned fix envelope (watch/report only).
+Optional code changes for m2/a2 were deliberately not taken: no test/plugin
+or product code changes, no added tests, and the 180 s / 900 s rules remain.
+
+| ID | Accepted severity | Review evidence / cell confirmation | State | Envelope | Disposition |
+|---|---|---|---|---|---|
+| m1 | Minor | REASONED in review; now EXECUTED: byte-exact base plugin plus byte-identical committed race test fails at line 132 all-ok assertion; turn7-m1-red.log EXIT=1 | NEW | In, report accuracy | FIXED: report cites 132 and distinguishes historical pre-commit variant's 131; red/green both logged |
+| m2 | Minor | REASONED; lock helper's 180 s wait / 900 s stale path and error strings confirm hard-kill residue and omitted PID/age | NEW | In, recovery limit | LIMIT recorded: killed-owner lock requires owner-confirmed cleanup; PID/age not printed; optional diagnostics/liveness not added; thresholds unchanged |
+| m3 | Minor | REASONED; sampler is uncommitted scratch and xdist -q summary omits deselected count; new three collections and raw sets confirm runnable check inputs | NEW | In, gate text | FIXED: optional where-sampler-available floor, explicit all/P/S collect commands, duplicate/intersection/union/count and outcome requirements using committed pytest/psutil |
+| m4 | Minor | EXECUTED grep plus cell AST confirms three top-level calls at backend:23, clip:41, temporal:47; turn7-collection-probe-proof.log | NEW | In, report attribution; marker fix out of scope | FIXED: name all three probes, keep GPU finding raised; no marker/tool change |
+| m5 | Minor | EXECUTED reading: w2/w3 controller refuses before workers; w4 records registration/root; local popen root is a fresh guarded controller child | NEW | In, coverage statement | LIMIT recorded: independent worker refusal is untested and worker-only unsafe root unreachable in envelope; report no longer claims it is tested; no planted out-of-envelope test |
+| m6 | Minor | REASONED; measured commands include basetemp while old quoted gate sentence omitted it | NEW | In, gate text | FIXED: quoted executions AND collections require separate fresh work/ roots, concrete RUN-labelled commands |
+| a1 | Advisory | REASONED; ready readers hold no read lease while two transient verification failures can trigger in-place regeneration | NEW | In, concurrency limit | LIMIT recorded: rare unlocked-reader/rewrite hazard; disposition only, no publication or reader-lifetime change |
+| a2 | Advisory | REASONED; finally lock.unlink can raise FileNotFoundError after incorrect live-holder deletion and mask prior result | NEW | In, recovery limit | LIMIT recorded: cleanup only after confirming stopped owner; optional tolerant unlink not added |
+| a3 | Advisory | REASONED; unmarked GUI service <0.2 s and WP3.14 three-second cancellation bounds remain parallel and passed measured rounds | NEW | Out for test edits; watch/report allowed | LIMIT / WATCH for owning packages' next touch; no edits or marks |
+| a4 | Advisory | REASONED; race regression also passes safe re-verify-under-lock / final-verify-outside variant | NEW | In, regression coverage limit | LIMIT recorded: test pins observed one-generation safety, not lexical final-verify lock scope; disposition only |
+| a5 | Advisory | REASONED; release relies on Windows 11 NTFS POSIX-style delete while waiter stat may hold a handle | NEW | In, declared operating envelope | LIMIT recorded: older delete-pending filesystem PermissionError behavior not supported; no portability promise or code change |
+
+Cumulative disposition counts: **4 FIXED documentation findings (m1,m3,m4,m6)**,
+**7 LIMIT/WATCH**; 11 adjudicated, zero unclassified. No revert; product-code
+fixes 0, test-code fixes 0, docs finding fixes 4 across report/ledger. m5's
+coverage wording is corrected while the absent independent refusal remains an
+explicit limit. A limit is not counted as a secretly fixed code issue.
+
+### m1 re-established red and current green
+
+`turn7_stage_red.py` writes only under work/wp-t4/turn7-unlocked. Staged
+fixture_plugin.py is byte-for-byte `ba6e923:tests/fixture_plugin.py`, SHA-256
+`6c82e2734ab0e60aae856d357d2426ec8b42b05b0e6500974c32f0788821f2db`.
+The staged test copy is byte-identical to the committed test, SHA-256
+`0466cddc286173a8be1d26aff50e0d6dcd7ce663833ca3de8cdbcf5294cd2361`;
+its manifest is copied into the fake repository. No tracked plugin is swapped
+or edited, no real generated cache is deleted or read, and no footage is used.
+
+Sandbox red command: `uv run pytest -q -rs -p sandbox_mkdir_shim
+-p no:cacheprovider -p fixture_plugin --basetemp=work/wp-t4/t7-m1-red
+work/wp-t4/turn7-unlocked/tests/test_fixture_cache_lock.py::test_two_processes_share_one_verified_cold_cache_generation`.
+PYTHONPATH puts that scratch tests directory before the worktree scripts/tools;
+PYTEST_PLUGINS=sandbox_mkdir_shim propagates to child pytest where needed.
+Red is **1 failed, EXIT=1 at line 132**,
+`assert all(record["ok"] for record in result["records"]), result`.
+Both spawned exit codes are 0, two result records exist, two writers generate,
+and one record contains the real partial Matroska stream verification failure.
+This is the required assertion failure, not import, fixture setup or a timeout.
+
+The historical `turn3-regression-red.log` really reports the all-ok assertion
+at 131, whereas the committed file has len(records)==2 at 131 and all-ok at
+132. That old run used an earlier pre-commit variant; its exact old bytes are
+not retained, so no unsupported claim about the reason for the offset is made.
+The report's carry-forward citation was wrong for the committed test and is
+corrected. Scratch staging hashes and line readback are in turn7-m1-stage.log.
+
+With normal scripts-only sandbox PYTHONPATH restored, the current committed
+file ran `uv run pytest -q -rs -p sandbox_mkdir_shim -p no:cacheprovider
+--basetemp=work/wp-t4/t7-lock-green tests/test_fixture_cache_lock.py`:
+**4 passed in 11.29 s**, EXIT=0 (`turn7-lock-green.log`). No code change or
+rerun of a heavy leg was needed. There are no changed test files this turn;
+report and ledger are the only owned changes.
+
+### Figure ruling and cleanup scope
+
+CHARC `144f9735`: suite saving is P+S versus BASELINE of the SAME round:
+**-16.0% / -11.1%**, spread **4.9 percentage points**; baseline moved **4.7%**
+while P+S moved under **1%**. Median P+S **3849.40 s / 64.16 min** is the
+one-line accept-time CLAUDE Conventions figure (about 3849 s, 64 min).
+PARALLEL is stable/fast **493.54-497.30 s**; SERIAL is the floor
+**3335.36-3372.59 s**. The report now calls these same-quiet-host **suite
+wall-time figures**, NOT N6/V16 product timing figures. Product timing and
+memory figures are obtained serially in their own windows. This supersedes
+the broader historical "not a figure of record" strings without editing old
+measurement logs or pretending those records were originally worded otherwise.
+
+The proposed quoted gate sentence now includes fresh work/ basetemps for both
+execution legs, all three explicit collection commands, raw node filtering and
+duplicate/disjoint/union/count/outcome arithmetic, plus available-memory
+preflight via committed psutil. Sampling below 2 GiB is conditional **where a
+sampler is available**; no uncommitted helper becomes a future gate dependency.
+The per-test tmp_path / slow-with-reason rule and product figures-from-serial
+rule remain. CLAUDE pointer carries the median suite figure; actual fill and
+CLAUDE files remain untouched. No docs/testing.md, dependency or code change.
+
+All three verified module-import GPU probes are named; GPU activity remains
+raised and marker meaning out of scope. m5 records controller-level refusal
+versus worker registration/static order precisely. Lock recovery/reader/
+regression/Windows 11 NTFS delete limits are explicit, with unchanged rules.
+Other-package timing bounds stay WATCH. Four largest export CALL phases sum
+to **2276.21 s / about 68.3% of D3 wall**; their size is the follow-on lever.
+CHARC owns D3's register row at accept; this report does not claim it exists.
+
+### Cleanup checks and final two-leg request
+
+All three strict collections EXIT=0: **5078 / 4032 / 1046**. Saved raw node
+sets `turn7-{all,parallel,serial}.nodes` equal turn-5 sets exactly (literal
+parameter escapes preserved); no duplicates, empty intersection and union
+symmetric difference. `turn7-collection-probe-proof.log` confirms the count
+and all three top-level GPU-probe line anchors. Thus the docs-only cleanup
+introduces no new test ID, exception, marker or test behavior.
+
+Scratch `run_final.ps1` copies run_r4.ps1's protocol with only final-prefix,
+header and conditions wording substitutions; `run_final_parallel.ps1` and
+`run_final_serial.ps1` are the two entrypoints. They refuse every existing
+artifact/basetemp, enforce >=5 GiB available before each leg, record actual
+committed HEAD/command/conditions/start/end/wall/EXIT, and snapshot/hash/start
+the sampler beside PARALLEL with readiness and separate exits. Prefixes are
+work/wp-t4/final-parallel and final-serial, with matching -tmp roots. No final
+leg has run. Two planted existing-log refusals preserved bytes and called no
+real uv (an error-only uv stub made heavy execution impossible), then removed
+only the planted worktree files. Three files parse with zero PowerShell errors;
+turn7-final-wrapper-refusals.log / -syntax.log / -hashes.json record the checks.
+Sampler remains SHA 64a57c731a09a7eca1e4c6f5b882975888ca0233434cc02b2c69e0dbc7ee0854.
+
+Turn-7 static gates all EXIT=0: `uv run ruff check .` passes; `uv run ruff
+format --check .` reports **238 files already formatted**; `uv run mypy`
+reports **no issues in 136 source files**. Logs: turn7-ruff-check.log,
+turn7-ruff-format.log, turn7-mypy.log. Only documentation changes in this turn;
+no changed executable/test file needs a new per-file suite. The four current
+lock tests ran green for m1 and all three strict collections ran green.
+Final scope/raw-set/probe/Markdown/privacy/runner checks and git diff --check
+are recorded in turn7-final-check.log. No final heavy-leg result is claimed.
+
+Final RUN REQUEST, one window at a time after the dispatcher commits this
+cleanup (wrappers record that actual HEAD; they do not pin 5e6a8d3):
+
+1. `powershell -NoProfile -File work/wp-t4/run_final_parallel.ps1`
+   runs `uv run pytest -q -rs -n 4 -m "not gpu and not footage and not gui and not slow" --basetemp=work/wp-t4/final-parallel-tmp`
+   to final-parallel.log with parallel sampler evidence under that prefix.
+2. `powershell -NoProfile -File work/wp-t4/run_final_serial.ps1`
+   runs `uv run pytest -q -rs -m "gpu or footage or gui or slow" --basetemp=work/wp-t4/final-serial-tmp`
+   to final-serial.log. Both append EXIT and refuse evidence reuse.
+
+No BASELINE, r3 or review round 2 is requested. Final gates are not yet
+claimed green; Reviewer B/accept remain driver/CHARC work.
+
 ## Heavy-run ledger
 
 The dispatcher ran D1, D2, both settled rounds and D3. D1/D2/D3 are
@@ -1015,45 +1194,46 @@ including per-round counts, frozen HEAD and sampler hashes; none is estimated.
 
 ## Cumulative review-round ledger
 
-| Round | Critical / major / minor | In / out of envelope | NEW / REOPENED | Reverts | Product / test-only fixes | Reviewer transport / version | Dispatcher-read depth | Disposition |
+| Round | Critical / major / minor / advisory | In / out of fix envelope | NEW / REOPENED | Reverts | Product / test-code / docs finding fixes | Reviewer transport / version | Dispatcher-read depth | Disposition |
 |---|---|---|---|---|---|---|---|---|
-| Not started | N/A | N/A | N/A | 0 | 0 / 0 | Driver-owned Claude Opus high; pending | Turn-5 depth_input_tokens 95,253; session continues by CHARC choice | R1/R2 measured; turn 6 ready for Reviewer A; no clean review claimed |
+| A1 | 0 / 0 / 6 / 5 | 10 / 1 (a3 watch; test edits not owned) | 11 / 0 | 0 | 0 / 0 / 4 | codex_cell.py review; Claude Opus high; modelUsage claude-opus-5-5; driver assertions above | Turn 6 depth_input_tokens 152,531; turn 7 pending | NO_NEW_CRITICAL_MAJOR; all seven claims hold; zero new blocking terminates; one cleanup, no A2 |
 
-## RESUME HERE -- this session continues; Reviewer A then final legs
+Cumulative: eleven findings adjudicated, four documentation fixes and seven
+limits/watch dispositions; no unclassified issue, reopening or revert. The
+transport's twelve denials are classified read-only scratch-write refusals,
+not findings against product code. Reviewer B remains pending at the driver.
 
-1. Generation 14 supplied turn-5 depth_input_tokens **95,253** and CHARC chose
-   continuity, so follow this checklist in the same session. Record the next
-   driver-read depth without estimating it. Current diff base `ba6e923`;
-   rung-4/D3 head `dd49a15`; turn-6 changes are report, ledger and ONE
-   conftest docstring paragraph only. No other edits or heavy runs this turn.
-2. Rung 4 is DONE: r1/r2 only, six windows green and outcome sets reconciled.
-   Their P+S drift is <1%, below Q7's 15% rule; **do not request r3**. D1/D2/D3
-   are diagnostics, never rounds. Preserve all scratch evidence under work.
-   New report and this ledger hold figures and exact commands; raw XML and
-   durations stay under work. E1's quiet-seat pass resolves the old failure;
-   GPU import activity and serial-set/other-package watch findings stay raised.
-3. **Next: driver-owned Reviewer A**, pinned Claude Opus/high per fill; its
-   transport/assertions and findings file come from the dispatcher. This turn
-   yields ready for Reviewer A. Do not substitute a reviewer, post mailboxes,
-   or request the final two legs before Reviewer A settles.
-4. Adjudicate every finding with severity, confirm/reject evidence, envelope
-   and NEW/REOPENED classification. Fix only owned files; product/tools/src/
-   frozen-interface or conftest executable changes are STOPs. WP3.14/WP3.20R
-   test findings are reported for their next touch, never edited by this cell.
-   Keep cumulative review ledger counts, reverts and product/test-only fixes.
-   At round 5 and every fifth, STOP for approval. Follow fill convergence,
-   never claim a clean round before the actual reviewer result.
-5. **After Reviewer A settles**, rerun required static gates if fixes warrant,
-   then request final PARALLEL and SERIAL once on the settled head, one window
-   each, with fresh unique evidence/basetemp roots and sampler as appropriate.
-   The dispatcher runs them outside the sandbox. Files changed after rung 4,
-   so the old rounds do not replace this final gate. Do not reuse r1/r2 or D3
-   evidence names and do not request another BASELINE for final two-leg gates.
-   Apply >=5 GiB preflight and 2 GiB sampled floor, never lower N yourself.
-6. After green final legs, reconcile 4032+1046=5078 collections and per-outcome
-   totals/skips (or explicitly account for any authorized collection changes).
-   Update report/ledger with exact final evidence and review adjudication;
-   finish the return report under about 70 lines plus FILES CHANGED and COMMIT.
-   Do not mark complete until review, final gate and delivered report are done.
-   Reviewer B and accept-time edits to review-gate fill/CLAUDE pointer belong
-   to the orchestrator. No docs/testing.md, harness changes or footage output.
+## RESUME HERE -- final two legs, then Reviewer B and accept
+
+1. Latest supplied depth: turn 6 **152,531 input tokens**; record turn 7's next
+   driver-read figure without estimating it. This session continues by CHARC
+   choice. Package base `ba6e923`; A1 reviewed `5e6a8d3`; turn 7 changes only
+   report/ledger. Dispatcher commits; cell never writes .git or a mailbox.
+2. Reviewer A **TERMINATED after round 1**, zero new blocking, seven claims
+   hold. All m1-m6/a1-a5 are adjudicated above: 4 docs fixes, 7 recorded
+   limits/watch items. This is the single cleanup; **do not request A round 2**.
+   Record the distinction between accepted suite wall-time figures and N6/V16
+   product figures (serial in their own windows). No source/test/plugin code
+   changed in cleanup; report records actual committed-red line 132.
+3. **Next: final PARALLEL then SERIAL** using run_final_parallel.ps1 and
+   run_final_serial.ps1, after committing cleanup, one dispatcher-granted
+   quiet window each, outside sandbox without shim. Fresh final-* evidence
+   names, >=5 GiB preflight, unchanged sampler beside parallel. No BASELINE,
+   no r3 (measured drift <1%), no N change. D1/D2/D3 never become rounds.
+4. Read final head/command/free/start/end/wall/EXIT and parallel sampler data;
+   confirm same committed head, both legs green, 4032+1046=5078 collection and
+   expected counts/skips (or explicitly account for any authorized change).
+   Preserve the measured r1/r2 figures as the suite record; final gate legs
+   are acceptance checks, not replacement rounds. Stop/report if sampled
+   available memory <2 GiB; do not lower N. Keep GPU finding and all limits.
+5. After final gates, deliver the return/report update with actual outcomes,
+   reviewer A adjudication and any final evidence; no acceptance claim before
+   required evidence. **Reviewer B runs at the orchestrator's seat next**, then
+   CHARC/orchestrator accept. Fill/CLAUDE pointer and D3 register row are theirs
+   to write at accept; no claim that those changes/row already exist. No test
+   marker, other-package test, product/src/tools/frozen-interface or conftest
+   executable edit is owned. No docs/testing.md or footage-derived artifacts.
+6. Final return under about 70 lines plus FILES CHANGED and COMMIT. The
+   package is not complete merely because A1 terminated: final gates, Reviewer
+   B and owner accept remain. Maintain severity/envelope/evidence records for
+   any subsequent seat findings; do not silently expand ownership.
