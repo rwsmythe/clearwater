@@ -40,6 +40,9 @@ Cell `implementer-opus-high` (Claude lane), worktree `.worktrees/wp3.21`, branch
 | 15 | cell 5: batched route and the estimate's bound built (`17743ec`); WINDOW REQUEST (memory re-read) | (dispatcher fills) |
 | 15 (read) | as given at the memory re-read grant | 289,841 |
 | 16 | cell 5: WINDOW RELEASED (memory re-read); WINDOW REQUEST (oracle legs) | (dispatcher fills) |
+| 16 (read) | as given at the gx grant | 298,494 |
+| 17-19 (read) | at the synth and gxa grants | 310,029; 312,501 |
+| 20 | cell 5 stands down after the oracle legs; RESUME HERE (cell 6) | (dispatcher fills) |
 
 ## RESUME HERE (cell 6, after cell 5)
 
@@ -61,9 +64,13 @@ from `ExportEngine._run`'s `finally` through `jobs.export.JobDeviceBackend` (AD-
 `tests/test_wp321_fft_gaussian.py` (44, one `footage`), `tests/test_wp321_fft_release.py` (9),
 `tests/test_wp321_bench.py` (+4 for Q-R7).
 
-**Oracle legs for task 6:** script `work\wp3.21\oracle-fft.sh` (steps `wp23`, `gx`, `synth`,
-`gxa`; expected TIER1, TIER2, TIER2, TIER1). STATUS: see "Task 6 oracle legs" below; if that
-section is missing, the window was never run and cell 6 requests it first (one window, serial).
+**Oracle legs for task 6: DONE, every leg as expected** (see "Task 6 oracle legs" below):
+WP2.3 x10 TIER1 (max abs 0); GX011627 c3 TIER2 (max abs 7.06e-6, records, proxies and analyze
+calls equal); synthetic 4K c3 TIER2 (2.44e-6); GX011627 ancuti2018 TIER1 (0). The report uses
+CHARC's wording for the pixel change (quoted there), never "no exported pixel changes".
+CHARC `16a8ee8a`: the even transform length is ACCEPTED as a numeric detail of the ruled path
+(in the report AND the route's docstring, which `17743ec` already has; the pinned tests are the
+tripwire); the `select_backend` query is RULED (a), below.
 
 **Remaining order (each heavy run in its own granted window):**
 
@@ -101,9 +108,10 @@ section is missing, the window was never run and cell 6 requests it first (one w
    line length; the odd-length cuFFT finding; the micro-timing and memory re-read tables), then
    the return report (under about 70 lines, by SendMessage to the dispatcher).
 
-**Open with CHARC:** whether `select_backend` decides on the GPU estimate (base + bound) or the
-base (orchestrator recommended (a), the base; it blocks nothing; do NOT change
-`test_core_select.py`). **Out of scope:** the GUI preview's plans (CHARC's register row,
+**RULED (CHARC `16a8ee8a`) (a):** `select_backend` stays on AD-1's BASE estimate;
+`CupyBackend.memory_estimate_bytes` (base + bound) is the figure the re-read and task 10 check
+against. If task 10's 5.3K peak exceeds base x 1.25, that is the ruled STOP, and (b), folding the
+bound into the selection, becomes the fix. Do NOT change `test_core_select.py`. **Out of scope:** the GUI preview's plans (CHARC's register row,
 binding WP4.3, written at the accept).
 
 **Standing rules (all binding):** worktree only, absolute paths or `git -C` or a `( cd ... )`
@@ -513,7 +521,7 @@ built what the STOP's answer cannot change and held the rest.
   10) and stand down. CHARC's seat rule: past about 330K before the memory re-read window, the
   handover comes FIRST and cell 6 runs the window.
 
-### Task 6 memory re-read (EXCLUSIVE window, OPEN about 09:58Z; development evidence)
+### Task 6 memory re-read (EXCLUSIVE window, OPEN 09:47:52Z (orchestrator correction); development evidence)
 
 Driver `work\wp3.21\fft_memory.py` (uncommitted), log `logs\fft-memory-1.log`, JSON
 `microtiming\fft-memory-GX011627-20261028T094758Z.json`, EXIT 0. c3 render, plans and pool
@@ -533,6 +541,32 @@ maxima. The peak is over the input frame; the estimate is the GPU backend's (bas
   projection confirmed on the product render; at 5.3K -2.15 s/frame. These are render figures
   (one frame, median of 10), not the job's; task 10 has the figures of record.
 - At 5.3K the mask blur (0.01 x 4648 = 46.5 px) also meets the gate, hence 97 MiB of plans.
+
+### Task 6 oracle legs (cell 5; each heavy leg its own EXCLUSIVE window; development evidence)
+
+Script `work\wp3.21\oracle-fft.sh` (uncommitted, `--device-frames`, candidates `cand-fft-*`
+against the `ref-*-a` base references), logs `work\wp3.21\logs\oracle-fft-<step>.log`.
+
+| step | window | clip | expected | verdict | max abs / mean abs |
+|---|---|---|---|---|---|
+| wp23 | light, 09:50:52-09:51:57Z | WP2.3 x5 x {GPU, CPU} | TIER1 | TIER1 x10 | 0 / 0 |
+| gx | OPEN 09:50:27Z; ran 09:52:10-09:56:36Z | GX011627 c3 | TIER2 | TIER2, 681 frames, 23 measured | 7.06e-6 / 7.95e-7 |
+| synth | OPEN 09:57:36Z; ran 09:57:48-09:58:46Z | synthetic 4K c3 | TIER2 | TIER2, 120 frames, 4 measured | 2.44e-6 / 2.62e-7 |
+| gxa | OPEN 09:59:11Z; ran 09:59:27-10:03:22Z | GX011627 ancuti2018 | TIER1 | TIER1, 681 frames | 0 / 0 |
+
+- Every EXIT and COMPARE-EXIT 0. For gx and synth (no `--require-tier1`), a TIER2 verdict implies
+  equal statistics records, proxies, source statistics, analyze and closed_form calls and frame
+  pts (each difference is a FAIL reason, `tools/export_oracle.py` 555-594); checked directly for
+  gx on the two `oracle.json` files: renders 681 equal, proxies 681 equal, source statistics
+  equal, analyze calls 1,362 equal, pts equal. Only the frames differ.
+- Quantised (light, cell 5): on gx's 23 sampled float frames, quantised by AD-5's rule
+  `floor(x * 255 + 0.5)` clipped (the sink's own device quantiser not checked to be the same),
+  14,793 of 572,313,600 channel values differ (2.58e-5), none by more than 1 code value.
+- **Report wording (CHARC, relayed):** the oracle compares FLOAT32 pre-encode frames, so the
+  report never says "no exported pixel changes"; it says: "the render differs by at most 7.06e-6
+  (about 0.002 of an 8-bit code value) before quantisation; after quantisation a pixel changes
+  by at most one code value, and only where the float sits within that distance of a rounding
+  boundary; not measured on the encoded output." (The quantised figure above may be added.)
 
 ## Re-seat: cell 2 (2026-10-28), rulings since round 0
 
