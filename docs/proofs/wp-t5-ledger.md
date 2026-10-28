@@ -2,14 +2,16 @@
 
 ## Dispatch and depth
 
-Codex lane, turns 1-3, rungs 0-3, 2026-10-28. Base:
+Codex lane, turns 1-4, rungs 0-3 and rung-4 preparation, 2026-10-28. Base:
 `3aa3c51da6cc5870322fb4688fbc61227f4efdd2`, branch `wp-t5`.
 The initial `git status --porcelain` was empty. Evidence is under
 `work/wp-t5/`; no footage was opened by this cell. The supplied local
 configuration was not changed. Turns 1-2 changed this ledger only; the dispatcher
-committed them at `a9abb8d` and `b17b2d4`. Turn 3 changes the two approved test
-files and this ledger; product code remains unchanged. The two rung-3 test edits
-are bundled in this turn as requested by the turn-3 dispatch.
+committed them at `a9abb8d` and `b17b2d4`. Turn 3 changed the two approved test
+files and this ledger, committed by the dispatcher at `045d622`; product code
+remains unchanged. The two rung-3 test edits were bundled as requested by the
+turn-3 dispatch. Turn 4 updates this ledger and ignored request/evidence artifacts;
+both test files are restored byte-for-byte to HEAD after CPU-only control cycles.
 
 Depth figures are dispatcher readings, never cell estimates.
 
@@ -17,11 +19,12 @@ Depth figures are dispatcher readings, never cell estimates.
 |---|---|---|---|---|
 | 1 / rung 0 | 182,117 | 138,874 | 475,000 | Dispatcher reading supplied at turn 2; collection artifact resolved at seat |
 | 2 / rungs 1-2 | 351,779 | 164,909 | 258,400 | Dispatcher reading supplied at turn 3; round-0 table approved with comparability amendment |
-| 3 / rung 3 | Not yet supplied | Not yet supplied | 258,400 last reported | Yield build and W2 request |
+| 3 / rung 3 | 455,659 | 209,195 | 475,000 | Dispatcher reading supplied at turn 4; W2 ran, runner exited 2 after the intended depth failure |
+| 4 / controls and rung-4 preparation | Not yet supplied | Not yet supplied | 475,000 last reported | Yield W2b and conditional W3 requests; dispatcher monitors depth |
 
-The reported window changed from 475,000 (turn 1) to 258,400 (turn 2). Both
-figures are retained as given; the dispatcher monitors depth against the smaller
-window. No cell estimate replaces either reading.
+The reported window changed from 475,000 (turn 1) to 258,400 (turn 2), then
+475,000 (turn 3). All figures are retained as given; the dispatcher said it
+monitors depth against the smaller window. No cell estimate replaces a reading.
 
 ## Rung 0 commands and results
 
@@ -292,6 +295,133 @@ script restores each control, has an EXIT cleanup trap, and finally checks
 that the test files match the committed candidate. The script is prepared,
 not run; all five heavy-run ledger rows await dispatcher results.
 
+## Turn 4: W2 results, corrected controls and W3 preparation
+
+W2 ran at the dispatcher's seat on committed `045d622`, 20:34:10-20:58:41Z,
+using `w2-run-request.sh` unedited. The cell read every case's log, meta log and
+JUnit XML, the combined observation/check, and the depth observation. Independent
+light extraction is `work/wp-t5/w2b-w2-evidence-audit.log`, `EXIT=0`.
+The original W2 script is retained unchanged as the run record.
+
+The following are the exact commands recorded in the corresponding meta logs;
+`PYTEST_ADDOPTS` was unset and Qt offscreen at the seat:
+
+```text
+C1: env PYTHONPATH=work/wp-t5 uv run pytest -q -rs tests/test_jobs_export_video.py::test_v4_synthetic_5k3_8_7_clip tests/test_io_video_encode.py::test_gx011627_through_the_sink_keeps_every_mandatory_and_required_item tests/test_io_video_encode.py::test_gx011627_nvenc_levels_give_distinct_sizes --durations=0 -p w2_observer --basetemp=work/wp-t5/w2-combined --junitxml=work/wp-t5/w2-combined.xml
+C2: uv run pytest -q -rs tests/test_io_video_encode.py -k test_gx011627_through_the_sink_keeps_every_mandatory_and_required_item --durations=0 --basetemp=work/wp-t5/w2-sink-alone --junitxml=work/wp-t5/w2-sink-alone.xml
+C3: uv run pytest -q -rs tests/test_io_video_encode.py -k test_gx011627_nvenc_levels_give_distinct_sizes --durations=0 --basetemp=work/wp-t5/w2-levels-alone --junitxml=work/wp-t5/w2-levels-alone.xml
+C4: env PYTHONPATH=work/wp-t5 uv run pytest -q -rs tests/test_jobs_export_video.py::test_v4_synthetic_5k3_8_7_clip --durations=0 -p w2_observer --basetemp=work/wp-t5/w2-control-depth --junitxml=work/wp-t5/w2-control-depth.xml
+```
+
+| Window / case | Start UTC, 2026-10-28 | End UTC | Command / evidence prefix under `work/wp-t5/` | Counts / skips / pytest seconds | EXIT | Available bytes before | Wall seconds |
+|---|---|---|---|---|---|---|---|
+| W2 / combined | 20:34:10Z | 20:45:11Z | C1 / `w2-combined` | 3 passed, 0 skipped; 656.67 s | 0 | 12,022,423,552 | 661.518 |
+| W2 / sink alone | 20:45:12Z | 20:48:41Z | C2 / `w2-sink-alone` | 1 passed, 113 deselected, 0 skipped; 208.06 s | 0 | 12,288,577,536 | 208.938 |
+| W2 / levels alone | 20:48:41Z | 20:56:40Z | C3 / `w2-levels-alone` | 1 passed, 113 deselected, 0 skipped; 478.02 s | 0 | 12,363,792,384 | 478.851 |
+| W2 / depth control | 20:56:40Z | 20:58:41Z | C4 / `w2-control-depth` | 1 failed as intended, 0 skipped; 119.29 s | 1 | 12,403,748,864 | 120.293 |
+
+Each prefix has `.log`, `.xml` and `-meta.log`. All memory checks exceeded
+5 GiB. The wrapper itself exited 2 after C4; it did not execute the draft
+control, the depth observation check, or its final restore check. No fifth
+heavy run is inferred. No W2 overlap was reported by the dispatcher.
+
+Combined phase log: 5.3K call 124.67 s; sink setup 160.52 s / call 49.96 s;
+levels call 317.18 s. The XML testcase totals are 124.690 / 210.479 / 317.187 s
+respectively. The setup accounts for the retained standard encode, so reduced
+sink call time alone is not the saving. The matched three W1 call phases sum
+to 1063.48 s versus this combined pytest elapsed 656.67 s (about 407 s lower,
+an informational mixed-phase comparison). Only W3's full serial wall decides
+T5-Q5; these figures do not establish the package's final wall saving.
+
+`w2-combined-observation-check.log` reports both PASS lines and `EXIT=0`.
+Independent JSON inspection confirms exactly one standard, one high and one
+draft sink encode, all 681 frames, all outputs absent at session end. The sink
+record uses the standard output and the same run identity, with NVENC tied.
+The 5.3K record has mandatory/required all SAME, source/output frame counts 3,
+AAC present, and six audio packets in both source/output compared SAME.
+The separate selections pass with standard fixture setup 157.88 s (sink) and
+161.15 s (levels), confirming either consumer works alone.
+
+### Runner defects and W2b
+
+- **MAJOR / EXECUTED, runner reporting:** line 83 expected `FAILED <nodeid>`
+  from a `-q -rs` log. The existing log has the traceback and `1 failed`, but
+  no `FAILED` summary line; the grep therefore failed despite the correct
+  control result. Line 103 had the same latent defect. The light reproduction
+  confirms the absent line, and the XML names the single failed 5.3K test.
+  W2b uses JUnit identity/counts/failure content as the verdict, with `-rfEs`
+  on its one new control run for a human-readable failure summary.
+- **MAJOR / EXECUTED, runner restoration:** the dispatcher observed that
+  `git apply -R` under `core.autocrlf=true` rewrote the synthetic test with
+  726 CR bytes. The dispatcher restored it using
+  `git -c core.autocrlf=false checkout -- tests/test_jobs_export_video.py`;
+  this cell independently confirmed HEAD-identical bytes and 0 CR. Every W2b
+  apply/check/reverse now uses `git -c core.autocrlf=false apply`. The EXIT
+  cleanup trap uses the same form. The restore verdict checks both files'
+  bytes against `git show HEAD:<path>`, 0 CR, and `git diff --exit-code`.
+
+`work/wp-t5/w2b-run-request.sh` is a new dispatcher-only request, not an edit
+to W2's record. Its light depth verdict reads the EXISTING W2 XML, log and
+observation. It proves the named `_assert_v4` failure, selected depth 10 versus
+actual output 8, and bit depth DIFFERENT; no depth rerun is needed.
+The same checker passed here (`w2b-depth-evidence-light.log`, `EXIT=0`).
+The one heavy W2b command is:
+
+```text
+env PYTHONPATH=work/wp-t5 uv run pytest -q -rfEs tests/test_io_video_encode.py::test_gx011627_nvenc_levels_give_distinct_sizes --durations=0 -p w2_observer --basetemp=work/wp-t5/w2b-control-standard-draft --junitxml=work/wp-t5/w2b-control-standard-draft.xml
+```
+
+The plant is the existing single-line fixture quality change to draft. The
+new checker requires one named levels failure at the standard level assertion,
+actual `5.0 Main`, plus observer evidence of the fixture's real draft encode
+under the standard output name and the high encode, both 681 frames and cleaned
+up. It rejects a skip, unrelated error, or an unobserved encode. All W2b output
+is under `work/wp-t5/w2b-*`; no test/product source change is retained.
+
+CPU-only checks in `w2b-light-check.log` and the final
+`w2b-light-final.log` passed, `EXIT=0`: both control patches
+were applied with autocrlf disabled, their one-line diffs inspected with
+`git diff --stat`, and reversed. Each cycle ended with both files byte-identical
+to HEAD, empty test diff and 0 CR. No pytest body ran. Git's default diff emitted
+LF-to-CRLF warnings while a plant was present; the byte checks after each safe
+reverse still proved 0 CR. Both Python evidence helpers parse and all new
+request/helper artifacts use LF. A light extraction of the real `HevcLevel`
+class confirms that its raw repr `HevcLevel(level_idc=150, high_tier=False)`
+means `5.0 Main`; the checker accepts that repr as well as pytest's expanded
+property text, avoiding reliance on a property appearing in a dataclass repr.
+
+`bash -n` was attempted on each new request script. Both invocations were
+blocked before parsing by the known sandbox `CreateFileMapping` Win32 error 5,
+`EXIT=256` (`w2b-request-syntax-sandbox.log`, `w3-request-syntax-sandbox.log`).
+Syntax is therefore NOT claimed verified here. Seat `bash -n` with `EXIT=0`
+is an explicit prerequisite in each RUN REQUEST. No alternative shell parser
+or successful syntax result is invented.
+
+### W3 prepared, not run
+
+`work/wp-t5/w3-run-request.sh` requests PARALLEL then SERIAL with `<run>=after`,
+the brief's expressions/flags and separate JUnit XMLs. Per leg it records
+>= 5 GiB preflight, exact command, UTC start/end, wall, counts/skip summary and
+EXIT. It then captures all/SERIAL collection logs and ID lists, producing
+`after-all.diff` and `after-serial.diff` against rung 0.2's IDs. Its checker
+requires zero failures/errors, SERIAL 1104 passed / 10 skipped with identical
+W1 skip lines, and matching collection membership/counts. It records actual
+W1-W3 wall saving and whether the > 110 s bar is met; a smaller saving still
+requires the ruled second pair. W3 results remain pending.
+
+Preflight rechecks both control verdicts, W2b check-log EXITs, HEAD byte
+restoration and 0 CR. The current local config hash and absent V8 frames are
+pinned; HEAD and config must stay frozen through W3. Nothing copies the V8
+frames or changes local configuration. This is the 1104/10 comparison, NOT the
+separate dispatcher-seat standard gate (1113/1, working folder = main work).
+No full suite leg or GPU/footage body ran in this cell.
+
+The dispatcher may run W3 directly after W2b ONLY if seat syntax checks pass,
+the draft control is caught by name at its expected assertion, its observation
+check has `EXIT=0`, and the restore check has `EXIT=0`, HEAD-identical bytes and
+0 CR in both files. W2b's depth evidence check must also have `EXIT=0`.
+No further cell turn or edit is needed between those runs under those conditions.
+
 ## Verification and review ledger
 
 | Turn | Suspected | Independently confirmed / rejected | Fixed / open |
@@ -305,9 +435,14 @@ not run; all five heavy-run ledger rows await dispatcher results.
 | 3 | Refactoring might remove an assertion or change an unowned body | Rejected by verbatim-assert / marker audit, unchanged unowned ASTs and empty node-ID diff | No corrective change needed; full W2 still pending |
 | 3 | The depth plant or observer might use the wrong item shape | Confirmed actual packet item names include a stream suffix and sequence summaries carry `count`; scratch observer/check corrected before request, then real small CPU witness passed | Work artifacts corrected; no extra test/product changes |
 | 3 | CHARC's aggregate might equal the sum of logged calls | Rejected: 1498.9 vs logged sum 1497.83, difference 1.07 s | MINOR reporting discrepancy disclosed; individual logged call phases retained per ruling |
+| 4 | W2 fixture might encode twice, lose the run tie, or fail when selected alone | Rejected by actual combined observer plus both separate green selections | Three changed tests passed; three-frame AAC SAME and 681-frame tied run confirmed |
+| 4 | Depth control might have failed for an unrelated reason | Rejected by named JUnit failure at `_assert_v4` plus actual bit-depth DIFFERENT observation; light verdict EXIT=0 | No heavy rerun; W2b reuses existing evidence |
+| 4 | Control grep might misclassify a real failure | Confirmed MAJOR: `-rs` omitted the expected FAILED line; wrapper exited 2 | New W2b uses JUnit failure identity/reason and `-rfEs`; draft control pending |
+| 4 | Patch reversal might violate LF-only discipline | Confirmed MAJOR at seat: 726 CR bytes; dispatcher restored HEAD with autocrlf disabled | Both CPU-only safe apply/reverse cycles pass HEAD-byte / 0-CR / empty-diff checks; W2b uses safe Git option throughout |
+| 4 | New Bash requests might be syntax-verified in this sandbox | Rejected: both `bash -n` attempts blocked before parsing, Win32 error 5, EXIT=256 | Mandatory seat syntax checks remain; no heavy run attempted |
 
 No Reviewer A round has been supplied or adjudicated yet. The round-0 design
 was approved; it is not a Reviewer A round. Future round rows record severity,
 envelope, NEW/REOPENED, reverts, product/test-only fixes, evidence and dispatcher
-depth. Turn 3 builds the approved test-only changes and yields for W2; no
-heavy command or planted full-size test was run by the cell.
+depth. Turn 4 records W2 and yields corrected W2b plus conditional W3 requests;
+no heavy command or planted full-size test was run by the cell.
