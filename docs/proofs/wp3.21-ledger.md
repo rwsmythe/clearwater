@@ -59,6 +59,7 @@ Cell `implementer-opus-high` (Claude lane), worktree `.worktrees/wp3.21`, branch
 | 34 | cell 7: (b3) built (`9a4256b`); WINDOW REQUEST (block 2 re-run) | 266,488 (at the HOLD) |
 | 35 | cell 7: the fit window granted (4K attribution, fit, block 2 re-run) | 316,605 |
 | 36 | cell 7: WINDOW RELEASED; RESUME HERE (cell 8); stand down | (dispatcher fills) |
+| 37 | cell 8: recollection; WINDOW REQUEST (parallel leg) | (dispatcher fills) |
 
 ## RESUME HERE (cell 6, after cell 5)
 
@@ -2225,3 +2226,29 @@ instruments, above); the attribution and the fit.
 **Evidence not committed:** `C:\Users\rwsmy\clearwater\work\wp3.21\bench\` (V16 records),
 `...\attribution\` and the driver `work\wp3.21\memory_attribution.py`; worktree
 `work\wp3.21\logs\c7-*`. Standing rules: RESUME HERE (cell 6).
+
+## Cell 8 (after cell 7)
+
+### Recollection on the final head `61a3e08` (last code `227ed32`; light, 15:27Z)
+
+From Git Bash in a `( cd <worktree> ... )` subshell, `PYTEST_ADDOPTS` unset,
+`QT_QPA_PLATFORM=offscreen`, fresh basetemps `work/c8-collect-{all,parallel,serial}`, outputs
+`work\wp3.21\logs\c8-collect-{all,parallel,serial}.txt` (worktree), each EXIT 0.
+
+- All: **5289 tests collected**; parallel **4175/5289 (1114 deselected)**; serial
+  **1114/5289 (4175 deselected)**. Node-id lines equal each pytest count; no duplicates; the
+  parallel/serial intersection is empty; the sorted union is byte-equal to all; 4175 + 1114 = 5289.
+- Against cell 7's sets (`work\c7-collect-{parallel,serial}.txt`, 4148 + 1113 = 5261):
+  - parallel +27: 27 new, 3 renamed (3 out, 3 in). New: `test_wp321_job_memory.py` (27: 14
+    `test_the_job_estimate_covers_every_measured_device_wide_peak`, 4
+    `test_each_session_term_covers_its_fitted_point`, 4 `test_bad_inputs_are_refused`, and one
+    each of the 1080p line, the estimate's four terms, the no-pool case and the two bench-check
+    tests). Renamed by part 2 (`b5a383c`, the boundary free): in `test_wp321_fft_release.py`,
+    `test_a_{video_job_releases_once_after_every_frame, cancelled_video_job_releases_once,
+    failed_video_job_releases_once}` became `test_a_video_job_releases_at_the_analysis_end_and_after_every_frame`,
+    `test_a_cancelled_video_job_releases_at_both_boundaries`,
+    `test_a_failed_video_job_releases_at_both_boundaries`. No other id removed.
+  - serial +1: `test_wp321_fft_release.py::test_the_analysis_end_boundary_frees_the_pools_cached_blocks`
+    (part 2's gpu test). None removed.
+- `test_wp321_overlap.py`'s part-2 edit changes no node id.
+- Disk 35 GB free on C:, RAM 11.0 GiB available at 15:28Z.
