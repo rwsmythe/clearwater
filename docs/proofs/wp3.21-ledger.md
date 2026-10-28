@@ -59,7 +59,8 @@ Cell `implementer-opus-high` (Claude lane), worktree `.worktrees/wp3.21`, branch
 | 34 | cell 7: (b3) built (`9a4256b`); WINDOW REQUEST (block 2 re-run) | 266,488 (at the HOLD) |
 | 35 | cell 7: the fit window granted (4K attribution, fit, block 2 re-run) | 316,605 |
 | 36 | cell 7: WINDOW RELEASED; RESUME HERE (cell 8); stand down | (dispatcher fills) |
-| 37 | cell 8: recollection; WINDOW REQUEST (parallel leg) | (dispatcher fills) |
+| 37 | cell 8: recollection; WINDOW REQUEST (parallel leg) | 62,302 |
+| 38 | cell 8: WINDOW RELEASED (parallel leg green); WINDOW REQUEST (serial leg) | (dispatcher fills) |
 
 ## RESUME HERE (cell 6, after cell 5)
 
@@ -2252,3 +2253,21 @@ From Git Bash in a `( cd <worktree> ... )` subshell, `PYTEST_ADDOPTS` unset,
     (part 2's gpu test). None removed.
 - `test_wp321_overlap.py`'s part-2 edit changes no node id.
 - Disk 35 GB free on C:, RAM 11.0 GiB available at 15:28Z.
+
+### Parallel leg (EXCLUSIVE window, GRANTED 15:36Z per the orchestrator; HEAD `0bce49b`)
+
+`( cd <worktree> && unset PYTEST_ADDOPTS && export QT_QPA_PLATFORM=offscreen && uv run pytest
+-q -rs -n 4 -m "not gpu and not footage and not gui and not slow"
+--basetemp=work/c8-suite-parallel > work/c8-suite-parallel.log 2>&1; echo EXIT=... >
+work/c8-suite-parallel.done )`, started 15:30:17Z (local clock), done marker
+`EXIT=0 2026-10-28T15:38:20Z`; log `work\c8-suite-parallel.log` (worktree).
+
+- **4,174 passed, 1 skipped, 5 warnings in 488.09 s (0:08:08)**; 4,174 + 1 = 4,175 collected,
+  zero failures or errors.
+- Skip, the same one as cell 6's leg: `tests\test_color_roundtrip.py:121: swscale reads a yuvj
+  format as full whatever in_range says (refused instead)`.
+- After: RAM 11.7 GiB available, C: 34 GB free.
+- Orchestrator note (for the report's test list, no code change): the renamed
+  `test_a_video_job_releases_at_the_analysis_end_and_after_every_frame` asserts two releases,
+  the analysis end and the job end; "after every frame" means after the last frame. The name is
+  banked for Reviewer B.
