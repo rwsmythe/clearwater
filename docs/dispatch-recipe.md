@@ -124,6 +124,12 @@ process or its result file) or end your turn and let the dispatcher re-prompt yo
 start it in the background and idle on the completion notice: an idle cell is not woken by it, and
 the host sits unused inside the window (WP3.21 task 1: 33 minutes lost between two legs).
 
+**A deletion grant names what is KEPT in the same message (2026-10-28).** When your dispatcher grants
+you deletion of evidence, caches or outputs, the grant lists the files or patterns that stay beside
+those that go, and you delete nothing the grant does not name. An amendment that follows a grant is
+too late by construction: you act on the first message you read (WP3.21: 27 superseded oracle
+folders deleted whole a minute before the amendment to keep each `oracle.json` arrived).
+
 - **Honor the brief's locks.** They are binding. A defect/gap OUTSIDE your scope
   gets FLAGGED in the return report -- never fixed inline (scope creep), never
   silently absorbed.

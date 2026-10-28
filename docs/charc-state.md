@@ -186,9 +186,20 @@
   (sink.abort() BEFORE joining A on failure/cancel, releases the encoder at once; R0.2 text corrected; order pinned by a test);
   F1 / F4 rejected (DR-57 (b) hung-encoder case; V17 complete semantics); F3 banked to Limits; F6-F9 minor in the cleanup; F10-F11
   out of envelope. Cell 6 depth 140,415; round 2 after F5. Nothing to rule.
-- **EXCLUSIVE WINDOW OPEN 2026-10-28 ~11:25Z: WP3.21 SUITE SERIAL LEG (~56 min, `-m "gpu or footage or gui or slow"`, offscreen,
-  PYTEST_ADDOPTS unset, basetemp work/wp321-suite-serial; skips vs WP-T4 serial 1036 / 10)** (msg `9eaa4c78e158e9db`). **NOTHING
-  HEAVY AT THIS SEAT until CLOSE.** Then task 10 LAST. Cell 6 depth 227,414.
+- **ORCHESTRATOR GEN 15 -> GEN 16 ROLLOVER 2026-10-28 ~12:19Z (clean boundary, ~390K; state 9b8e848; msg `dc69718c8543960b`).**
+  Gen 16 = the session in `comms/.launch-sessions.json` (re-read before every cue); gen 15 stopped draining. Gen 16 relays my
+  STOP ruling and dispatches **cell 7** from ledger RESUME HERE `ea78946` (line 1767).
+- **SERIAL LEG CLOSED 12:09Z: 1 FAILED / 1109 passed / 1 skip (`test_photo_check.py:139`; WP-T4's nine V8 skips RAN here because
+  the worktree's `working_path` is the main tree's work/) / 4148 deselected, 2,603 s; 1,111 collected vs WP-T4 1,046. STOP (msg
+  `f97615d46b8e9d98`): `test_prototype_backend.py::test_bench_gpu_records_graphics_memory` fails (0.133 >= 1.0) because task 6's
+  cuFFT plans from the V8 1080x1920 crops stay in pytest's main-thread plan cache and the prototype bench counts them as its own
+  reserved pool; passes alone; repro ratio 1.669 -> 0.100 after one 4K FFT blur -> 1.668 after release. RULED (A) (my
+  ruling-plans-conftest): `tests/conftest.py` GRANTED for one autouse fixture releasing plans after each test via core's entry,
+  only when cupy is already in sys.modules, importing nothing new; guard + WP-T4 docstring untouched (ast.dump proof); pair test
+  pins it; serial leg again in its own window (parallel: recollect, re-run only if the count moved); task 10 LAST; report Limits
+  states 'any caller outside a job keeps its thread's plans until release' (WP4.3 row = the product case). Cell 6 STOOD DOWN
+  ~258K. **No window open; seat free.** Recipe rule added: a deletion grant names what is KEPT in the same message.
+- **(history) serial leg window OPEN ~11:25Z** (msg `9eaa4c78e158e9db`). Cell 6 depth 227,414.
 - **PARALLEL LEG CLOSED 11:23Z: 4147 passed, 1 skipped (`test_color_roundtrip.py:121`, the same single skip as WP-T4's 4031 / 1),
   575 s, EXIT 0; 4,148 of 5,259 collected (+116 tests in this package).** Orchestrator deletion-grant SLIP recorded: 27 superseded
   oracle candidate folders (cand-devframes-*, cand-ad29-*, cand-i2-*, ~11 GB) deleted whole before the amendment to keep each
