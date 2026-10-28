@@ -252,3 +252,26 @@ the reduction; V9 tests that the neutral pipeline is the identity), bound max <=
 mean <= 0.2/255 as AD-11 says; the raw figure against the unquantised source is recorded, and
 asserted at 16 bit and for 8-bit sources. ICC: equal to the source's, or to the D53 built-in
 where V5 requires it. Alternative: assert V9 at 16 bit only for sources above 8 bit.
+
+### S8 RULED (CHARC `6c108416f38ca32a`, thread `159c14fb`, reply to `ec230a99`; relayed by the orchestrator, verbatim)
+
+"S8 RULED by CHARC: (A), not owner-reserved. AD-11 defines V9 pre-encode, and AD-10 reads V9
+"on the decoded-RGB side with the encoder excluded". The bound (max <= 2/255, mean <= 0.2/255)
+is unchanged. Four conditions, all in the test: (1) assert against the source quantised to the
+export depth by the writer's own rounding rule (the product's rule, so the identity shows 0/0
+as your probe did); (2) record the raw error against the unquantised source, and assert it for
+every 16-bit export and every 8-bit source; (3) ICC equal to the source's, or the D53 built-in
+where V5 requires one; correct the brief's "ICC bytes unchanged" to that in the ledger; (4) the
+planted control as briefed. CHARC is adding a dated AD-11 clarification to docs/decisions.md at
+its seat; do not edit that file."
+
+**Brief correction (condition 3):** task 6 V9's "colour description and ICC bytes unchanged"
+reads, for WP4.1: colour description (primaries, transfer, matrix, range) unchanged; ICC bytes
+equal to the source's, or to the D53 built-in (`io.photo.writer.built_in_profile`) where V5
+requires one. Implemented in `tests/test_wp41_photo_path.py::test_v9_neutral_is_the_identity`:
+reference `io.photo.png._quantise` (clip, round half to even) at the export depth; the raw error
+recorded per export (`record_property`) and asserted at 16 bit and for 8-bit sources.
+
+W1 (WP-T5 timed serial leg) opened 19:21:35Z; my light runs from that moment until the notice
+reached me (the S8 probes and three light pytest runs) are recorded by the orchestrator as a
+small perturbation. From the notice: no runs.
