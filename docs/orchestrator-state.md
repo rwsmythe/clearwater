@@ -5,7 +5,33 @@
 
 ### Generation
 
-- **Generation 15 LIVE** (`clearwater-orchestrator-20261027-2047`), picked up 2026-10-28 ~06:55Z at main `2e2f7e6`;
+- **Generation 15 ROLLED OVER 2026-10-28 ~12:20Z at ~390K, at a clean boundary: no cell working, no window open, host free.
+  GENERATION 16 STARTS HERE.**
+  - **RESUME HERE -- WP3.21 (the only package in flight):**
+    - Branch `wp3.21` at `ea78946`, worktree `.worktrees/wp3.21`, clean, base `d1e4537` (NO rebase). Ledger
+      `docs/proofs/wp3.21-ledger.md`; **RESUME HERE (cell 7, after cell 6)** at about line 1767 is the cell's handover.
+    - **Done:**
+      - tasks 1-7 and all their oracle legs;
+      - Reviewer A CONVERGED at round 2 (r1: F5 blocking, fixed in `9d73fe4`; F2 ruled (a) abort-first; r2 `NO_NEW_CRITICAL_MAJOR`;
+        cleanup `1df2626`; evidence `clearwater-review-evidence\wp3.21\r1\`, `r2\`);
+      - the suite PARALLEL leg: 4147 passed, 1 skipped (the WP-T4 skip), EXIT 0.
+    - **OPEN: CHARC STOP query** (post `ef9f8631`, 12:18Z). The SERIAL leg ran 1 failed, 1109 passed, 1 skipped.
+      - The failure: `test_prototype_backend.py::test_bench_gpu_records_graphics_memory` (`:345`, ratio 0.133 against >= 1.0).
+      - Cause: task 6's cuFFT plans stay in pytest's main-thread cache after `test_methods_assembly_v8.py`'s FFT-gated blurs.
+      - Recommended (A): a `tests/conftest.py` autouse fixture calls `release_fft_plans` after each test, only when `cupy` is in `sys.modules` (needs CHARC's grant; the file is unowned).
+      - Alternatives: (B) plans per call in `core/backend.py`; (C) a ruling on the test.
+    - **NEXT (gen 16):**
+      1. Drain; relay CHARC's ruling.
+      2. Dispatch **cell 7** (`implementer-opus-high`, Agent, run_in_background), copying `dispatch-wp3.21-cell6.md`'s form in the gen-15 scratchpad and pointing it at the ledger's RESUME HERE (cell 7).
+      3. Cell 7's order: the fix -> the V8 + prototype pair (light) -> the SERIAL leg again (window) -> task 10 LAST (windows; every memory peak with the plan cache and pool cleared first; the 5.3K estimate 6,281 MiB = 5,897 + 384; above base x 1.25 = STOP to CHARC) -> report -> return report.
+    - Then **Reviewer B** (Codex `gpt-6.1-sol`/high at YOUR seat, per the fill), the candidate on main, the two-leg suite on the candidate, the harness gate, the accept record and the ff.
+    - **CHARC owes 3 register rows at the accept:** WP4.2 `device_backend`; WP4.3 preview plan release; DR-63 closed.
+    - **Cells:** 3, 4, 5 and 6 all stood down cleanly. Cell 6's final reading was 257,959.
+  - **Gen-15 slips:**
+    - one CRLF blob on main (`b26b051`, fixed in `e6f7193` within a minute);
+    - five misquoted OPEN times to cells, each corrected;
+    - a deletion grant that did not name what to KEEP (27 superseded oracle folders deleted whole; the H7-H14 `oracle.json` files lost; verdict lines survive in the logs; CHARC is putting the lesson into the recipe).
+- Generation 15 (`clearwater-orchestrator-20261027-2047`), picked up 2026-10-28 ~06:55Z at main `2e2f7e6`;
   bash-launch gauge 32 ms; drained CHARC `4dc2978b` (interim-1 CLOSE ack, four readings, order confirmed).
   Scratchpad `C:\Users\rwsmy\AppData\Local\Temp\claude\C--Users-rwsmy-clearwater\94502559-d259-46f8-87c6-0cfa0ec22300\scratchpad\`.
   - **WP3.21 cell 3 DISPATCHED** (`wp321-cell3`, implementer-opus-high, background) from `wp3.21` `106b29f`; prompt
