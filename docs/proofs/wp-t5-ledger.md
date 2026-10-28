@@ -2,7 +2,7 @@
 
 ## Dispatch and depth
 
-Codex lane, turns 1-5, rungs 0-4 and draft rung 5, 2026-10-28. Base:
+Codex lane, turns 1-6, rungs 0-4 and rung-5 review cleanup, 2026-10-28. Base:
 `3aa3c51da6cc5870322fb4688fbc61227f4efdd2`, branch `wp-t5`.
 The initial `git status --porcelain` was empty. Evidence is under
 `work/wp-t5/`; no footage was opened by this cell. The supplied local
@@ -12,8 +12,9 @@ files and this ledger, committed by the dispatcher at `045d622`; product code
 remains unchanged. The two rung-3 test edits were bundled as requested by the
 turn-3 dispatch. Turn 4 updated this ledger and ignored request/evidence artifacts,
 committed at `259a219`; both test files were restored byte-for-byte to HEAD after
-CPU-only control cycles. Turn 5 adds the DRAFT report and updates this ledger;
-tests remain unchanged since W3's head `259a219`.
+CPU-only control cycles. Turn 5 added the DRAFT report and updated this ledger,
+committed at `6467e54`. Turn 6 is the single docs-only cleanup after Reviewer A
+round 1; tests remain unchanged since W3's head `259a219`.
 
 Depth figures are dispatcher readings, never cell estimates.
 
@@ -23,7 +24,8 @@ Depth figures are dispatcher readings, never cell estimates.
 | 2 / rungs 1-2 | 351,779 | 164,909 | 258,400 | Dispatcher reading supplied at turn 3; round-0 table approved with comparability amendment |
 | 3 / rung 3 | 455,659 | 209,195 | 475,000 | Dispatcher reading supplied at turn 4; W2 ran, runner exited 2 after the intended depth failure |
 | 4 / controls and rung-4 preparation | 547,891 cumulative | 82,213 | 258,400 | Dispatcher reading supplied at turn 5; W2b and W3 completed at seat |
-| 5 / draft report and ledger | Not yet supplied | Not yet supplied | 258,400 last reported | Yield for Reviewer A; standard gate still pending |
+| 5 / draft report and ledger | 598,224 cumulative | 112,624 | 258,400 | Dispatcher reading supplied at turn 6; Reviewer A round 1 terminates with zero new blocking |
+| 6 / single review cleanup | Not yet supplied | Not yet supplied | 258,400 last reported | Docs only; Reviewer B and standard stacked gate pending |
 
 The reported window changed from 475,000 (turn 1) to 258,400 (turn 2), then
 475,000 (turn 3), then 258,400 (turn 4). All figures are retained as given; the dispatcher said it
@@ -216,7 +218,7 @@ is proposed. Fixture code stays in `tests/test_io_video_encode.py`.
 | Assertion map: `test_gx011627_through_the_engine_keeps_every_mandatory_and_required_item` | Entire test unchanged (`tests/test_jobs_export_video.py:707-725`): retain NVENC/source gates, c3 `ExportEngine` job, `quality_level="standard"`, `provenance=True`, `assert result.ok, result.failure`, `(output,) = result.outputs`, `_assert_v4(vf.fidelity_record(source, output, bit_depth=8))`, and its `finally: os.remove(output)`. All helpers unchanged. |
 | Assertion-map identity: all four | Names, node IDs and markers remain unchanged. No assertion line is removed or weakened. The three changed bodies remain the only test bodies edited; no test is added. The existing collections contain 5,289 all / 1,114 SERIAL IDs for the rung-4 identity comparison. |
 | Projected saving from W1 | 5.3K: 354.99 / 9 * 3 = 118.33 s projected call, saving 236.66 s. One standard encode: approximately 492.51 / 3 = 164.17 s under an explicit equal-thirds assumption, not individually timed. Combined approximately 400.83 s, with projected SERIAL wall 2397.550 s; actual W3 saving must exceed 110 s. Fixed costs, quality-dependent encode costs and W1's stated overlap limit the projection. |
-| Sharing the assertions forbid | ENGINE is not shared with SINK/levels. Its corrected c3 output has provenance=True and a `JobResult`; the uncorrected `vf.encode_file` output has its encode-specific sampler/`EncodeRun`. Substitution would lose either engine-path V4 or the sink's tied NVENC proof / 681-frame assertion. The sink's fidelity record also stays in its own body; levels only needs size and level. High/draft cannot share standard because their distinct levels and size ratios are the point. This is DR-65's required recorded reason for the share not made. |
+| Sharing the assertions forbid | ENGINE is not shared with SINK/levels. Its corrected c3 output has provenance=True and a `JobResult`; the uncorrected `vf.encode_file` output has its encode-specific sampler/`EncodeRun`. Substitution changes the object read by engine-path V4 or the sink's own run / 681-frame assertion. R1-1 clarification: NVENC tie is preserved by one encode call yielding its actual `(out, run)` and observed by W2, but no base/current test asserts the nested `tied` field. The sink's fidelity record stays in its own body; levels only needs size and level. High/draft cannot share standard because their distinct levels and size ratios are the point. This is DR-65's required recorded reason for the share not made. |
 | Comparability ruling (CHARC `2548bd27b24909b8`) | **MAJOR / EXECUTED for any claim of standard-gate equivalence, not a product defect:** W1 has 9 missing-look-check-frame skips plus the standing photo skip, so it is a valid ruled BEFORE timing but NOT the standard gate. W3 and any W2 pair use the SAME local config and absent `work/wp1.3/frames` state as W1; full comparison SERIAL expects 1,104 passed / 10 skipped with identical skip reasons. NO frames copy. The dispatcher runs separate gate legs at its seat in a gate worktree whose `clearwater.local.toml` working folder points to the MAIN tree's `work/`, containing the V8 frames, as WP3.21 did. Gate SERIAL expects 1,113 passed / 1 skipped if other conditions stay the same. Record both configs and both figures, explaining that the working-folder inputs account for the 9 V8 outcomes. The gate wall is not substituted for the like-for-like W3 wall. W1 overlap remains disclosed; the four individual bodies' call phases remain the per-test figures of record. |
 
 W1 skip evidence, read from `before-serial.log` (paths are relative here to
@@ -550,6 +552,71 @@ tree `VIRTUAL_ENV` does not match `.venv` and is ignored; checks use this
 worktree's project environment. No new dependency or file outside the owned
 tracked envelope is introduced.
 
+## Turn 6: Reviewer A round 1 and the single cleanup
+
+The dispatcher reports Reviewer A ran at its seat via `codex_cell.py review`,
+`claude-opus-5-5` at high effort, on `3aa3c51..6467e54`. Evidence directory:
+`clearwater-review-evidence/wp-t5/r1/`. **VERDICT: NO_NEW_CRITICAL_MAJOR**.
+Zero new blocking terminates the loop under the fill's policy; this turn is
+the permitted single docs-only cleanup, not another review round.
+
+Mechanical assertions, as supplied by the dispatcher: model ok, `is_error`
+false, 34 turns, clean worktree after review, every finding tagged. Seven
+permission denials were FFmpeg probes plus one Git command excluding
+`docs/proofs`; denied commands are not claimed executed. The only
+withheld-path hit was that exclusion pattern: echo, no access. No new probe
+or review process was run by this cell.
+
+### CUMULATIVE ROUND LEDGER
+
+NEW/REOPENED below describe first/repeated review findings, not whether an
+underlying condition was introduced by this package.
+
+| Round / range | Verdict | Critical / major / minor / advisory | In-envelope / out | NEW / REOPENED | Reverts | Product-code / test-only fixes | Docs cleanup / status |
+|---|---|---|---|---|---|---|---|
+| R1 / `3aa3c51..6467e54` | `NO_NEW_CRITICAL_MAJOR`; 0 new blocking | 0 / 0 / 2 / 5 | 7 / 0; adjudication fits owned docs | 7 / 0 | 0 | 0 / 0 | Two minor corrections, two advisory report notes/limits; three advisories noted without change. Single cleanup; Reviewer A converged. |
+
+| Finding | Severity / adjudication evidence | Disposition and cleanup |
+|---|---|---|
+| R1-1 | MINOR / REASONED, confirmed by source inspection | ACCEPTED. `tools/video_fidelity.py:1276-1285` attaches encode proof outside the V4 summary; both `_assert_v4` helpers assert summary/roster only. Neither base nor current test asserts `record["encode"]["nvenc_proof"]["tied"]`. Report share-not-made and closure wording now identify the same-call `(out, run)` association and W2 observation, plus an explicit pre-existing assertion-gap limit. No test added; no regression claimed. |
+| R1-2 | MINOR / EXECUTED, saved-log/XML arithmetic | ACCEPTED. Claims and proposed closure now give 536.966 s whole-leg saving and 405.273 s attributable changed-test XML share, both > 110 s; remainder is unchanged engine 18.715 s plus other variation 112.978 s, with W1 overlap disclosed. Figures unchanged; attribution corrected. |
+| R1-3 | ADVISORY / REASONED, source/ruling; no frame-type probe | Recorded limit. At three frames libx265 medium may emit no B-frames, losing this test's `ctts` path (`verify.py:445-457`). Path is resolution-independent; longer libx265 V4 exports in the same file retain coverage, and W2 V4 items were SAME. Frame types were NOT checked in this cleanup; no claim of short-test B-frame/ctts coverage. |
+| R1-4 | ADVISORY / REASONED, fixture source and brief | NOTED, no change. Session-scoped teardown is what the approved brief requires. |
+| R1-5 | ADVISORY / REASONED, pytest fixture semantics | NOTED, no change. A shared fixture failure reports setup ERROR rather than body FAIL; the suite is still red. No new failure simulation or test change. |
+| R1-6 | ADVISORY / EXECUTED, saved timestamps/wall | Report note added: PARALLEL stamps span 511 s versus 509.951 s timed wall because the timer starts after START; no serial figure affected. |
+| R1-7 | ADVISORY / REASONED, base/current source | NOTED, no change. High/draft cleanup order predates the package; standard teardown moved as approved. |
+
+Evidence MD5s below are reproduced exactly from the dispatcher's
+`r1/md5sums.txt` readings, not recomputed by this cell:
+
+| Evidence file | MD5 |
+|---|---|
+| `review.txt` | `d1f4dda4fd864ae438b2c4beefdba32a` |
+| `review.json` | `5192d7360cac34a2c7a121f2b18a9288` |
+| `review-prompt-r1.md` | `b5e5bd7ae30ab6be58f80db001b2b542` |
+| `review-diff.txt` | `15625cbbe97337f50d4f693cd03f1a55` |
+| `review-input.txt` | `377b4536163e927a9ee5a4f2be698272` |
+
+The dispatcher also reports seat `ruff format --check .`: 250 files already
+formatted, and both turn-5 committed blobs have 0 CR. This resolves the
+turn-5 pending format rerun. No format run or test body is required in this
+docs-only cleanup; the requested ruff/mypy checks are recorded below.
+
+The report stays DRAFT with **Reviewer B and standard gate PENDING**. CHARC
+`6be5d8cdcc500129` approved a STACKED gate: WP-T5 bottom, WP4.1 stack top,
+two-leg suite at the dispatcher seat using MAIN `work/` inputs. Stack-top
+head, counts and timing are the figure of record in the accept record; do not
+forecast counts from WP-T5 alone. If WP4.1 is not ready within about two hours
+of convergence, WP-T5 gates alone. Earlier turn-5 standalone 1113/1 expectations
+are historical; the accepted stack's actual counts are still pending.
+
+Turn-6 checks (sandbox, no pytest body): `uv run ruff check .` and
+`uv run mypy`, evidence `work/wp-t5/turn6-ruff-check.log` and
+`turn6-mypy.log`: All checks passed, EXIT=0; Success: no issues found in
+138 source files, EXIT=0, respectively. Tests remain frozen:
+`git diff 259a219 -- tests/` empty (`turn6-tests-since-w3.diff`).
+Only this ledger and `docs/reports/wp-t5-suite-cost.md` are edited; LF only.
+
 ## Verification and review ledger
 
 | Turn | Suspected | Independently confirmed / rejected | Fixed / open |
@@ -573,10 +640,12 @@ tracked envelope is introduced.
 | 5 | All whole-leg time saved might be attributable to edited bodies | Rejected: changed three XML totals save 405.273 s; whole leg saves 536.966 s | Report states phase movement and other suite variation; no over-attribution |
 | 5 | An assert might have been weakened or removed | Rejected by committed diff and independent verbatim/AST audit | Zero removed assert lines; only frame precondition added; tests unchanged since W3 |
 | 5 | Standard gate might be complete because W3 is green | Rejected: working-folder inputs differ and acceptance/review not supplied | DRAFT report, conditional DR-65 closure and CLAUDE figure pending |
+| 6 | V4 helper might assert the nested NVENC tied value | Rejected by source inspection; proof is outside summary/roster | R1-1 accepted; dataflow/observer distinction and pre-existing gap documented, tests untouched |
+| 6 | Short 5.3K export might retain B-frame/ctts coverage | Not established; optional frame-type probe not run | R1-3 limit recorded; longer V4 exports retain resolution-independent path coverage per ruling |
+| 6 | Whole-leg saving might be mistaken for the attributable share | Confirmed reporting ambiguity in claims/closure | R1-2 accepted; both figures, full remainder and W1 overlap now explicit in both places |
 
-No Reviewer A round has been supplied or adjudicated yet. The round-0 design
-was approved; it is not a Reviewer A round. Future round rows record severity,
-envelope, NEW/REOPENED, reverts, product/test-only fixes, evidence and dispatcher
-depth. Turn 5 records W2b/W3 and yields the DRAFT report for Reviewer A over
-`3aa3c51..HEAD`. The standard gate and Reviewer A verdict remain PENDING.
-No heavy command or planted full-size test was run by the cell.
+Reviewer A round 1 is adjudicated and converged: zero new blocking, seven
+findings disposed as above. The round-0 design approval was not a review
+round. This single cleanup changes documentation only. Reviewer B and the
+standard stacked gate remain PENDING; no extra review round is improvised.
+No heavy command, frame-type probe or planted full-size test ran in this cell.

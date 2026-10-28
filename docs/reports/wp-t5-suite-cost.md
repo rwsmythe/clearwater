@@ -1,6 +1,6 @@
 # WP-T5: suite cost (DR-65)
 
-**DRAFT - 2026-10-28. Standard gate and Reviewer A are PENDING.**
+**DRAFT - 2026-10-28. Reviewer A converged; Reviewer B and standard gate are PENDING.**
 
 Base: `3aa3c51`. Test changes: `045d622`. W3 comparison head: `259a219`.
 The tests are unchanged since W3; this turn adds documentation only.
@@ -9,8 +9,12 @@ This report does not close DR-65 or claim standard-gate acceptance.
 ## Claims and scope
 
 The like-for-like SERIAL wall fell from **2798.380 s to 2261.414 s**:
-**536.966 s (8 min 56.966 s, 19.19%) shorter**. This exceeds T5-Q5's > 110 s
-bar, so the ruled second BEFORE/AFTER pair is unnecessary. Both comparison
+**536.966 s (8 min 56.966 s, 19.19%) shorter**. The attributable share measured
+in the three changed tests' XML totals is **405.273 s**. The remainder is
+18.715 s from the unchanged engine test plus 112.978 s of other variation;
+W1's brief WP4.1 overlap is disclosed below. Both the whole-leg saving and
+the changed-test share exceed T5-Q5's > 110 s bar, so the ruled second
+BEFORE/AFTER pair is unnecessary. Both comparison
 serial runs passed 1104 tests and skipped 10, with identical skip lines.
 W3 PARALLEL passed 4174 and skipped 1. All/SERIAL collections remain exactly
 5289/1114 unique node IDs. Every existing assertion is retained verbatim.
@@ -26,7 +30,7 @@ interface changed. Only the three approved test bodies and one fixture changed.
 | Purpose | Working-folder configuration and outcome |
 |---|---|
 | W1/W3 comparison | This worktree's unchanged `clearwater.local.toml`, working folder = this worktree's `work/`. It lacks `wp1.3/frames`. Both serial runs have 1104 passed / 10 skipped, including nine missing V8 look-check-frame skips plus the standing photo skip. W3 verifies the config hash, frozen head, absent frames and identical skip lines. No frames were copied. |
-| Standard gate | Dispatcher seat, separate gate worktree, local config working folder = MAIN tree's `work/`, which contains the V8 frames, as WP3.21 did. Expected SERIAL 1113 passed / 1 skipped. Both standard-gate legs and their actual serial wall are **PENDING**. The comparison wall must not replace the standard-gate figure. |
+| Standard gate | Dispatcher seat, local config working folder = MAIN tree's `work/`, which contains the V8 frames, as WP3.21 did. A STACKED gate with WP4.1 is approved: WP-T5 at the bottom; stack top's two-leg suite is the figure of record. Actual head, counts and serial wall belong in the accept record and are **PENDING**. The comparison wall must not replace the standard-gate figure. |
 
 Declared host: owner's Windows 11 laptop, Python 3.12, one NVIDIA GPU/NVENC,
 WP0.1 FFmpeg build, Git Bash, Qt offscreen, `PYTEST_ADDOPTS` unset. Every heavy
@@ -108,8 +112,11 @@ its own fidelity record; levels does not compute an unnecessary one.
 **Share NOT made (DR-65 recorded reason):** the engine test exports corrected
 c3 pixels with provenance and returns a `JobResult`; the sink writes an
 uncorrected file with an encode-specific sampler/`EncodeRun`. Reusing either
-would lose the engine-path V4 assertion or the sink's tied NVENC/681-frame
-proof. High/draft cannot replace standard because distinct level/size
+would substitute a different object for the engine-path V4 check or the sink's
+own encode run and asserted 681-frame count. The NVENC tie is held by the
+single `encode_file` call yielding its actual `(out, run)` and was observed
+by W2; no test asserts `record["encode"]["nvenc_proof"]["tied"]`, at base or
+now. High/draft cannot replace standard because distinct level/size
 assertions require their separate encodes. No cross-file fixture is needed.
 
 ## Measured figures
@@ -125,7 +132,10 @@ use the individual phase readings, not the packet's rounded aggregate.
 | W1 BEFORE SERIAL | 19:21:35 / 20:08:14 | 2798.380 | 2796.46 | 1104 passed, 10 skipped, 4175 deselected, 1 warning | 0 |
 | W3 AFTER PARALLEL | 21:57:37 / 22:06:08 | 509.951 | 508.72 | 4174 passed, 1 skipped, 5 warnings | 0 |
 | W3 AFTER SERIAL | 22:06:08 / 22:43:49 | 2261.414 | 2259.49 | 1104 passed, 10 skipped, 4175 deselected, 1 warning | 0 |
-| Standard gate, main working-folder inputs | PENDING | PENDING | PENDING | SERIAL expected 1113 passed / 1 skipped | PENDING |
+| Standard stacked gate, main working-folder inputs | PENDING | PENDING | PENDING | PENDING - accept record | PENDING |
+
+W3 PARALLEL's START/END stamps span 511 s while its timed wall is 509.951 s:
+the timer starts after the START stamp, and no serial figure is affected.
 
 | DR-65 body | BEFORE call (s) | AFTER call (s) | BEFORE XML total (s) | AFTER XML total (s) |
 |---|---|---|---|---|
@@ -187,13 +197,14 @@ controls, not acceptance-suite failures. No planted edit remains.
 
 ## Validation, limits and pending acceptance
 
-On head `259a219` plus these documentation edits, sandbox static checks:
+After the documentation cleanup on head `6467e54` plus these edits, sandbox
+static checks (with the earlier source audit retained because tests are frozen):
 
 | Check | Actual result / evidence under `work/wp-t5/` |
 |---|---|
-| `uv run ruff check .` | All checks passed; EXIT=0 (`turn5-ruff-check.log`) |
-| `uv run ruff format --check .` | 250 files already formatted; EXIT=0 (`turn5-ruff-format.log`); dispatcher seat rerun pending |
-| `uv run mypy` | Success: no issues found in 138 source files; EXIT=0 (`turn5-mypy.log`); tests remain outside configured mypy files |
+| `uv run ruff check .` | All checks passed; EXIT=0 (`turn6-ruff-check.log`) |
+| `uv run ruff format --check .` | 250 files already formatted; sandbox EXIT=0 (`turn5-ruff-format.log`); dispatcher reports seat rerun also 250 files already formatted |
+| `uv run mypy` | Success: no issues found in 138 source files; EXIT=0 (`turn6-mypy.log`); tests remain outside configured mypy files |
 | Source/assertion/identity audit | EXIT=0 (`turn5-evidence-audit.log`); zero removed assert lines; unowned definitions unchanged |
 | `git diff 259a219 -- tests/` | Empty (`turn5-tests-since-w3.diff`); no test change since W3 |
 
@@ -211,17 +222,43 @@ but absence scenarios were checked by source review rather than newly executed
 hardware/environment permutations. Synthetic shortening proves V4 coverage;
 it does not establish long-clip performance or N4 memory.
 
+**Pre-existing NVENC assertion gap (R1-1):** `tools/video_fidelity.py:1276-1285`
+attaches `nvenc_proof` under `record["encode"]`, outside the summary/roster
+assertions read by `_assert_v4` (`tests/test_jobs_export_video.py:107` and
+`tests/test_io_video_encode.py:189`). Neither the base nor current tests assert
+the nested `tied` value. The fixture preserves the same-call output/run
+association and W2 observed it tied; this gap is pre-existing, not a regression.
+No test was added during the docs-only cleanup; tests are frozen after W3.
+
+**Three-frame composition-offset limit (R1-3, REASONED):** libx265
+`-preset medium` may emit no B-frames at three frames. The 5.3K test may
+therefore no longer exercise the `ctts` composition-offset branch in
+`src/clearwater/io/video/verify.py:445-457`. That path is resolution-independent;
+the longer libx265 V4 export tests in the same test file retain its coverage,
+and W2 showed every V4 item SAME. Frame types were not checked with ffprobe
+during this cleanup, so B-frame/ctts coverage of this shortened test is not
+claimed. The application-path branch audit above does not establish an
+encoder's B-frame choices or the presence of a `ctts` box.
+
 Only the two test files and two owned documents are in package scope. Footage
 remains read-only; outputs/observations are uncommitted under the worktree's
 working/temp roots. No gpmd stream, IMU/GPS data or location tag was read by
 this cell or added to this report. No output or local configuration is committed.
 
-Standard gate legs, dispatcher format rerun, Reviewer A convergence, final
-acceptance and merge to main remain PENDING. Documentation now changes after
-W3, so W3 is comparison evidence on its recorded head; the standard gate must
-validate the final candidate. This DRAFT will be finalized only after those
-results. Reviewer A's whole-package range is `3aa3c51..HEAD`; the round-0
-approval is not a review round.
+Reviewer A round 1 on `3aa3c51..6467e54` returned
+`NO_NEW_CRITICAL_MAJOR`: 0 critical, 0 major, 2 minor and 5 advisory. Zero new
+blocking findings terminates the loop. This single cleanup corrects both
+minor reporting findings and records the advisory limits/notes; tests are
+unchanged. The round-0 approval was not a review round.
+
+Two acceptance items remain **PENDING: Reviewer B and the standard gate**.
+CHARC approved the STACKED gate (`6be5d8cdcc500129`): WP-T5 sits at the bottom,
+and the stack top with WP4.1 runs both legs at the dispatcher seat with MAIN
+`work/` inputs. That stack top's head, counts and timing are the figure of
+record, to be entered in the accept record. If WP4.1 is not ready within about
+two hours of this convergence, WP-T5 gates alone. W3 remains comparison
+evidence on its recorded head; the final candidate must pass that standard
+gate. This report stays DRAFT until Reviewer B and gate results are recorded.
 
 ## For CHARC
 
@@ -229,15 +266,21 @@ approval is not a review round.
 "DR-65 CLOSED by WP-T5: retained all four tests' assertions; shortened the
 5.3K 8:7 V4 export from nine to three frames and shared one GX011627 NVENC
 standard sink/levels encode. Like-for-like serial wall 2798.380 -> 2261.414 s,
-saving 536.966 s (19.19%), above 110 s; W1's brief overlap disclosed. Engine
-export remains separate because corrected c3/provenance JobResult and the
-uncorrected sink's tied EncodeRun/681-frame proof are not interchangeable.
-Standard gate and review: PENDING." Replace the pending tail with accepted
-gate/review evidence before closing the register.
+saving 536.966 s (19.19%); attributable share in the three changed tests' XML
+totals 405.273 s. Both exceed 110 s. The remainder is unchanged engine
+variation of 18.715 s plus other variation of 112.978 s; W1's brief WP4.1
+overlap is disclosed. Engine export remains separate because corrected
+c3/provenance JobResult and the uncorrected sink's own EncodeRun/asserted
+681-frame count are not interchangeable. NVENC tie is preserved by the one
+encode_file call yielding its actual (out, run), and W2 observed it tied;
+no test asserts the tied field at base or now. Reviewer A converged;
+Reviewer B and standard stacked gate: PENDING." Replace the pending tail
+with accepted gate/review evidence before closing the register.
 
 **CLAUDE.md serial-leg figure:** comparison value is 2261.414 s (1104/10);
-the replacement **standard-gate serial figure is PENDING** (expected 1113/1).
-Use the dispatcher's final gate measurement for CLAUDE.md, with its head and
-configuration; do not substitute the comparison wall. This cell edits neither
+the replacement **standard-gate serial figure is PENDING**. Use the stack
+top's final gate measurement (or standalone WP-T5 fallback) for CLAUDE.md,
+with its head, counts and MAIN `work/` configuration in the accept record;
+do not substitute the comparison wall. This cell edits neither
 CLAUDE.md nor the debt register. DR-18's tied-run association is retained;
 DR-28/57/58/22/66 and DR-36/56 receive no product/instrument/guard changes.
