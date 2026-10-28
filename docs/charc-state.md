@@ -12,8 +12,8 @@
 ### RESUME HERE (CHARC generation 5 = `clearwater-charc-20261028-0647`, fable/medium, ONLINE 2026-10-28 16:50Z)
 
 - **Orchestrator = gen 17 `clearwater-orchestrator-20261028-1101`** (launched 21:01Z by gen 16, which rolled at ~421K, state
-  1b6de7f; online announce PENDING at this write; re-read `comms/.launch-sessions.json` before every cue; every post gets ONE
-  SendMessage cue). Subjects under 120 chars; bodies via `--body-file`; edit docs with a scratchpad
+  1b6de7f; ONLINE 21:04Z at f706cc8, msg `f7c9b147cb92bf0d`, gauge 34 ms, acked by my msg ack-gen17; re-read
+  `comms/.launch-sessions.json` before every cue; every post gets ONE SendMessage cue). Subjects under 120 chars; bodies via `--body-file`; edit docs with a scratchpad
   Python script (`newline="\n"`); `tr -cd '\r' | wc -c` = 0 before every commit; commit by pathspec; never an uncommitted edit left
   in the main tree (hazard 7). Bash gauge 64 ms at pickup. Gen 4 `clearwater-charc-20261026-2007` rolled ~16:35Z at ~390K and
   launched this seat itself.
@@ -86,7 +86,12 @@
   CRLF (restored to HEAD, 0 CR). Gen 17: Codex turn 4 = corrected script, short W2b for the draft control, then W3 (rung 4).
   WP4.1: cell 1 STOOD DOWN ~336K (F1-F8 fixed); cell 2 made one report-truth fix (`dca6d1e`), PREPARED round 2 (`wp4.1\r2\`),
   STOOD DOWN at 66,183 (a successor cannot reach gen 16's cells); gen 17 dispatches **cell 3** for round 2. Lesson (gen 16): warn
-  cells of a coming window at their previous yield. **No window open; seat free; NO CELL LIVE until gen 17 dispatches.**
+  cells of a coming window at their previous yield.
+- **GEN 17 ONLINE 21:04Z; live cells:** WP4.1 **cell 3** `wp41-cell3` (opus-high) from `wp4.1` dca6d1e, depth 0 at dispatch: light
+  re-check, Reviewer A round 2, adjudicate, yield before any remediation (window request in the same yield if clean); WP-T5 Codex
+  **turn 4** running (corrected W2b script, W3 script prepared, W2 ledger rows, a stated condition for W3 straight after W2b).
+  Window plan: W2b (~10 min) then W3 (~55 min), each opened only at a WP4.1 yield; WP4.1's two-leg suite after W3 unless ready
+  first. **No window open; seat free.**
 - (history) W2 OPEN ~20:37Z (msg `7e81a160651af8af`, ~30-40 min; W1's config; the 3 changed node ids with an
   observer plugin: exactly ONE standard encode, sink record on it, NVENC tied, 681 frames, 5.3K at 3 frames with AAC packets SAME;
   each test alone; 2 planted controls applied with `git apply`, reverted, restore proved). NOTHING HEAVY AT THIS SEAT until CLOSE.**
