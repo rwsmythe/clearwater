@@ -230,6 +230,9 @@
   ACCEPTED as built (b5a383c). Cell 7 266,488, continues for the bounded remainder.**
 - **EXCLUSIVE WINDOW OPEN 2026-10-28 ~15:40Z: WP3.21 SUITE SERIAL LEG on the final head (cell 8, ~45 min; expected 1,114 / 1 skip
   `test_photo_check.py:139`)** (msg `03f2d48ac0937e35`). **NOTHING HEAVY AT THIS SEAT until CLOSE.** Then block 3 GX011625 LAST.
+  **Retroactive GRANT (msg `6c5c116644bf5d62`): `src/clearwater/analysis/__init__.py` +6 additive re-exports (`AnalysisDeviceBackend`,
+  `frame_block_mean`, `frame_pixels_for_proxy`) in 05ee507 (#3 under AD-29), not in the brief's owned files, no ledger grant ->
+  GRANTED, named in the record's owned-files list; the ungranted edit itself = a ledger finding (should have been a STOP), MINOR.**
 - **PARALLEL LEG GREEN on the final head 15:38Z: 4174 passed / 1 skip (`test_color_roundtrip.py:121`) / 0 failures, 488 s; head 2b14e21,
   code 227ed32** (parallel OPEN was `afaadfc07237ce40`; it ran 15:30-15:38Z). Recollection 5,289 / 4,175 /
   1,114 explained: parallel +27 (`test_wp321_job_memory.py`), 3 ids RENAMED by part 2 in `test_wp321_fft_release.py` (none removed);
