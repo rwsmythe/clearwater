@@ -133,8 +133,10 @@
   fixed in cleanup turn 7. **Turn 7 committed 08e87f5** (report + ledger only; m1/m3/m4/m6 fixed, gate text runnable
   with collect-only set checks and --basetemp under work/; m2 LIMIT, lock messages name the path; m5 NOT taken = my
   MINOR row at the accept; CLAUDE.md pointer median P+S 3,849 s ~64 min; depth 212,913).
-- **EXCLUSIVE WINDOW OPEN 2026-10-28 ~07:08Z: WP3.21 #2 ORACLE on GX011627 (`--device-frames`, ~10 min) + synthetic 4K (~2 min)**
-  (msg `cb4ed7af11daf48a`). **NOTHING HEAVY AT THIS SEAT until CLOSE.** A non-TIER1 = STOP (D109). Cell 3 at `wp3.21` 7696467,
+- **WP3.21 #2 ORACLE WINDOW CLOSED 07:17Z: TIER1 on GX011627 (681 frames, 0 differing, max abs 0; 1,362 analyze calls, proxies
+  equal; sink_devices [cuda:0]) and synthetic 4K (120 / 0)** (msg `3a83d79a2b8fb7c9`; OPEN was `cb4ed7af11daf48a`). Oracle walls
+  408.0 s vs #1 587.2 s and 89.0 vs 117.6 (development evidence, NOT V16). **No window open; seat free.** Ledger 29eff29. Cell 3
+  on #3 (device block mean, tier 1 or STOP); next windows: #2+#3 interim, 4K micro-timing, each requested separately. Cell 3 at `wp3.21` 7696467,
   depth 192,330 at yield 4: `82c6d38` Q-R6 as ruled (entry sized via IF-7 `lookup(key).size_bytes`; extrapolation added to the
   D87 re-check; planted refusal before any render); `3da1e6f` #2 device frame conversions (`FFmpegVideoSource(device_frames=False)`
   opt-in; sink refusals unchanged; **DR-63 CLOSED at the accept** on this evidence; 25 tests; WP2.3 oracle TIER1 GPU + force_cpu;
