@@ -140,6 +140,9 @@
   fallback; `color/samples.py` back to base; `*_deps` tests in the light set; oracle re-run on GX011627 + synth 4K in a new
   window BEFORE #3; WP4.2 row at the accept binds `device_backend=<GPU backend>`. Cell 3 STOOD DOWN at 251,077 (ledger RESUME
   HERE + draft patch `work/wp3.21/c3-draft-3-device-block-mean.patch`); **cell 4** (opus-high) takes the ruling. No window open.
+  **Cell 4 DISPATCHED 07:31Z** (msg `94c72e704d83c247`) from `wp3.21` e6d27a0 (cell 3 handover, final 265,087), AD-29's eight
+  conditions in its prompt; order #2 rework -> oracle WINDOW -> #3 -> unchanged. Brief names the four layering tests (b26b051;
+  CRLF blob corrected within a minute by e6f7193; 0 CR at HEAD, verified at my seat). No window open.
 - **WP3.21 #2 ORACLE WINDOW CLOSED 07:17Z: TIER1 on GX011627 (681 frames, 0 differing, max abs 0; 1,362 analyze calls, proxies
   equal; sink_devices [cuda:0]) and synthetic 4K (120 / 0)** (msg `3a83d79a2b8fb7c9`; OPEN was `cb4ed7af11daf48a`). Oracle walls
   408.0 s vs #1 587.2 s and 89.0 vs 117.6 (development evidence, NOT V16). **No window open; seat free.** Ledger 29eff29. Cell 3
