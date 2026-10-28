@@ -169,9 +169,14 @@
   side releases FFT plans at a preview boundary (clip change / unload) and counts them in its memory reading; DR-63 CLOSED.** Cell 5
   finishes batching (A), the estimate fold + bound test, ONE window (4K + 5.3K memory re-read + oracle legs), then hands to **cell 6**
   (Reviewer A, two-leg suite, task 10).
-- **EXCLUSIVE WINDOW OPEN 2026-10-28 ~09:48Z: WP3.21 TASK 6 MEMORY RE-READ (~5 min; uncommitted `work/wp3.21/fft_memory.py`;
-  GX011627 frame 0 read-only + 5.3K synthetic; default and max fractions; plans/pool cleared first; peak split plans/transient
-  beside base + bound; render FFT on/off)** (msg `afe6000f86033792`). **NOTHING HEAVY AT THIS SEAT until CLOSE.** Task 6 (A) built
+- **EXCLUSIVE WINDOW OPEN 2026-10-28 ~09:50Z: WP3.21 ORACLE LEG gx (GX011627 c3 on task 6 build 17743ec, device frames; ~8 min;
+  expected TIER2 renders, records/proxies tier 1; anything else = STOP)** (msg `341e39c6ab4c4018`). **NOTHING HEAVY AT THIS SEAT
+  until CLOSE.** Then synth (TIER2 expected) and gxa (ancuti2018, TIER1) each in its own OPEN; WP2.3 legs light outside windows.
+  Cell 5 depth 298,494 at yield 16; runs the legs then hands to cell 6.
+- **MEMORY RE-READ CLOSED ~09:50Z: every peak under base + bound; max-fraction 5.3K inside the card, projection rule NOT
+  triggered.** 4K default 908 MiB (plans 30, transient 878) vs estimate 2,174; 4K max 947; 5.3K default 2,710 (97 / 2,614) vs 6,281;
+  5.3K max 2,798 (184 plans). Render-level FFT saving: 4K 0.388 -> 0.207 s/frame (-0.181, confirms the micro-timing); 5.3K 2.930 ->
+  0.777 (-2.15); at 5.3K the mask blur (46.5 px) also meets the gate. (history: memory window OPEN msg `afe6000f86033792`.) Task 6 (A) built
   `17743ec` (cell 5 depth 289,841 at yield 15): batches <= 512, last = final positions; **FINDING: odd cuFFT lengths are batch-
   position dependent (1 ulp), so the route takes the smallest EVEN fast length** (accepted numeric detail of the ruled path, no tier
   change); chunked == unchunked bit for bit at 1080p / 4K / 5.3K non-multiple shapes GPU + 1080p CPU, pinned. Bound
