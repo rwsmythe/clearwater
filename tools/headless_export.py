@@ -4,7 +4,9 @@ A test tool, not a product feature (plan section 6, WP4.1): acceptance tests (WP
 runs drive the product's composition root (:mod:`clearwater.app.composition`) through one
 :func:`clearwater.jobs.run_batch` on the caller's thread, one job at a time (DR-62). Every write
 goes through the export engine and ``SafeWrite``; this tool writes nothing itself but the record
-file it is asked for. It loads no PySide6, and with ``--force-cpu`` no CuPy.
+file it is asked for (``--settings-dir``'s loader, ``clearwater.config.load_settings``, renames a
+corrupt ``settings.json`` beside itself, D89). It loads no PySide6, and with ``--force-cpu`` no
+CuPy.
 
 Library API: :func:`route`, :func:`requests_for`, :func:`parameters_for`, :func:`check_outputs`,
 :func:`run`, :func:`record_json`, :func:`exit_status` and :func:`main`. Command line::
@@ -20,29 +22,38 @@ goes on (D81). In WP4.1 a video item fails with ``UNAVAILABLE_TEXT`` (WP4.2 adds
 
 Exit status: 0 when every item is done (with or without warnings); 1 when any item failed, was
 cancelled or was not run; 2 for a usage refusal, with nothing run (a bad flag, a missing
-``--out`` folder, an invalid suffix, an unknown method, an unreadable parameter file, an output
-or a source beside which outputs would go inside the configured footage folder, an existing
-``--record`` file). Ctrl-C sets the batch's cancel flag: the running job stops at its next check
-and leaves no partial output (D44), the rest are not run (D45), and the exit status is 1.
+``--out`` folder, an invalid suffix (given or loaded), an unknown method, an unreadable parameter
+file, a settings file that cannot be used, an output or a source beside which outputs would go
+inside the configured footage folder, a ``--record`` file that exists or does not end in
+``.json``). A record file that appears during the run is not written: a message, status 1.
+Ctrl-C sets the batch's cancel flag: the running job stops at its next check and leaves no
+partial output (D44), the rest are not run (D45), and the exit status is 1.
 
 The record (``--record FILE``, JSON, ``"schema": 1``, fields additive only) names sources and
 outputs by file name only, never by full path (as AD-13 rules for provenance), and carries no
 EXIF content or location tag. The summary lines go to stdout and the ``[i/n]`` progress messages
-to stderr. This tool installs no logging handler, so ``run_batch``'s INFO report (which names
-full output paths) is not emitted; Python's last-resort handler prints WARNING lines only.
+to stderr. Every folder the run knows (the output folder, each source's folder, the settings,
+record and parameter folders) is shown by its NAME in every record field and printed line, one
+:class:`Redactor` applied at each exit point: an engine text such as the D87 free-space refusal
+names its folder. This tool installs no logging handler, so ``run_batch``'s INFO report (which
+names full output paths) is not emitted; Python's last-resort handler prints WARNING lines only,
+and while :func:`main` runs a filter on that handler passes them through the same redactor.
 """
 
 from __future__ import annotations
 
 import argparse
+import contextlib
 import dataclasses
 import json
+import logging
 import os
+import re
 import signal
 import sys
 import threading
 import time
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path, PurePath
 from typing import Any, Final, Literal
@@ -161,12 +172,94 @@ class RunRecord:
         parameters_from: Where the parameters came from: ``"defaults"``, ``"file"``,
             ``"neutral"`` or ``"given"`` (a library caller's own set).
         elapsed_s: The batch's wall time in seconds (information only).
+        folders: The folders the record's texts show by name only (:class:`Redactor`).
     """
 
     report: BatchReport
     routes: tuple[str, ...]
     parameters_from: str
     elapsed_s: float
+    folders: tuple[Path, ...] = ()
+
+
+class Redactor:
+    """Replace every spelling of known folders in a text by the folder's name (case-insensitive).
+
+    The spellings are the path as given and resolved, with backslashes, with doubled backslashes
+    (an ``OSError`` text quotes the path's ``repr``) and with forward slashes. A folder without a
+    name (a drive root) is not replaced.
+    """
+
+    def __init__(self, folders: Iterable[Path]) -> None:
+        """Build the patterns, the longest spelling first.
+
+        Args:
+            folders: The folders to show by name only.
+        """
+        forms: dict[str, str] = {}
+        for folder in folders:
+            for path in (Path(folder), Path(folder).resolve()):
+                if not path.name:
+                    continue
+                text = str(path)
+                for form in (text, text.replace("\\", "\\\\"), path.as_posix()):
+                    forms.setdefault(form, ascii_text(path.name))
+        self._patterns = [
+            (re.compile(re.escape(form), re.IGNORECASE), name)
+            for form, name in sorted(forms.items(), key=lambda item: -len(item[0]))
+        ]
+
+    def __call__(self, text: str) -> str:
+        """Return ``text`` with every known folder shown by its name, ASCII-safe."""
+        for pattern, name in self._patterns:
+            text = pattern.sub(name.replace("\\", r"\\"), text)  # the name, literally
+        return ascii_text(text)
+
+
+def folders_of(requests: Sequence[ExportRequest]) -> tuple[Path, ...]:
+    """Return the folders a run's texts may name: each output folder and each source's folder.
+
+    Args:
+        requests: The run's requests.
+
+    Returns:
+        The folders, in first-seen order, without repeats.
+    """
+    found: dict[str, Path] = {}
+    for request in requests:
+        for folder in (request.settings.output_folder, request.source.parent):
+            if folder is not None:
+                found.setdefault(str(folder), Path(folder))
+    return tuple(found.values())
+
+
+class _RedactingFilter(logging.Filter):
+    """A filter on the last-resort handler that redacts each record's text (:func:`main`)."""
+
+    def __init__(self, redact: Redactor) -> None:
+        super().__init__()
+        self._redact = redact
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        """Replace the record's message by its redacted text; keep the record."""
+        record.msg = self._redact(record.getMessage())
+        record.args = None
+        return True
+
+
+@contextlib.contextmanager
+def _redacted_last_resort(redact: Redactor) -> Iterator[None]:
+    """Redact what Python's last-resort handler prints while the block runs (no handler added)."""
+    handler = logging.lastResort
+    if handler is None:
+        yield
+        return
+    log_filter = _RedactingFilter(redact)
+    handler.addFilter(log_filter)
+    try:
+        yield
+    finally:
+        handler.removeFilter(log_filter)
 
 
 def route(path: Path) -> Literal["photo", "video"] | str:
@@ -365,6 +458,7 @@ def run(
     progress: Progress | None = None,
     footage_folder: Path | _Configured | None = CONFIGURED,
     parameters_from: str = "given",
+    known_folders: Sequence[Path] = (),
 ) -> RunRecord:
     """Run one batch over the requests, in order, on the caller's thread (G7; D45, D81; DR-62).
 
@@ -375,6 +469,8 @@ def run(
         footage_folder: The folder no output may go into (:func:`check_outputs`);
             :data:`CONFIGURED` reads it from the local configuration; None checks nothing.
         parameters_from: Recorded as :attr:`RunRecord.parameters_from`.
+        known_folders: More folders the record shows by name only, beside :func:`folders_of`
+            the requests.
 
     Returns:
         The record.
@@ -392,7 +488,8 @@ def run(
     routes = tuple(
         "refused" if isinstance(request, RefusedRequest) else request.kind for request in requests
     )
-    return RunRecord(report, routes, parameters_from, time.perf_counter() - start)
+    folders = tuple(dict.fromkeys([*folders_of(requests), *map(Path, known_folders)]))
+    return RunRecord(report, routes, parameters_from, time.perf_counter() - start, folders)
 
 
 def record_object(record: RunRecord) -> dict[str, Any]:
@@ -404,6 +501,7 @@ def record_object(record: RunRecord) -> dict[str, Any]:
     Returns:
         The object.
     """
+    redact = Redactor(record.folders)
     items: list[dict[str, Any]] = []
     for index, (item, kind) in enumerate(zip(record.report.items, record.routes, strict=True), 1):
         result = item.result
@@ -414,10 +512,10 @@ def record_object(record: RunRecord) -> dict[str, Any]:
                 "kind": kind,
                 "state": item.state,
                 "outputs": [] if result is None else [ascii_text(p.name) for p in result.outputs],
-                "warnings": [] if result is None else [ascii_text(w) for w in result.warnings],
+                "warnings": [] if result is None else [redact(w) for w in result.warnings],
                 "failure": None
                 if result is None or result.failure is None
-                else ascii_text(result.failure),
+                else redact(result.failure),
                 "device": None if result is None else ascii_text(result.device),
                 "elapsed_s": None if result is None else result.elapsed_s,
             }
@@ -544,7 +642,12 @@ def _settings(args: argparse.Namespace) -> Settings:
     """The run's settings: the loaded or default settings with the given flags overlaid."""
     if args.settings_dir is not None and not args.settings_dir.is_dir():
         raise RunnerRefusalError("the --settings-dir folder does not exist.")
-    base = Settings() if args.settings_dir is None else load_settings(args.settings_dir)
+    try:
+        base = Settings() if args.settings_dir is None else load_settings(args.settings_dir)
+    except (OSError, ValueError) as exc:  # FormatError, UnsupportedFormatVersionError
+        raise RunnerRefusalError(
+            f"the --settings-dir settings cannot be used: {ascii_text(str(exc))}"
+        ) from exc
     if args.out is not None and not args.out.is_dir():
         raise RunnerRefusalError("the --out folder does not exist.")
     changes: dict[str, Any] = {"output_folder": args.out}
@@ -570,17 +673,24 @@ def _settings(args: argparse.Namespace) -> Settings:
         if args.cache_limit_bytes < 0:
             raise RunnerRefusalError("--cache-limit-bytes must not be negative.")
         changes["cache_limit_bytes"] = args.cache_limit_bytes
-    return dataclasses.replace(base, **changes)
+    settings = dataclasses.replace(base, **changes)
+    try:  # a suffix loaded from --settings-dir is checked too
+        validate_suffix(settings.output_suffix)
+    except ValueError as exc:
+        raise RunnerRefusalError(ascii_text(str(exc))) from exc
+    return settings
 
 
 def _check_own_paths(args: argparse.Namespace, footage: Path | None) -> None:
-    """Refuse a record file that exists, has no folder, or lies in the footage folder."""
+    """Refuse a record file that exists, is not ``.json``, has no folder or is in the footage."""
     for flag, path in (("--settings-dir", args.settings_dir), ("--record", args.record)):
         if path is not None and footage is not None and inside(path, footage):
             raise RunnerRefusalError(
                 f"the {flag} path is inside the footage folder, which is read-only."
             )
     if args.record is not None:
+        if args.record.suffix.lower() != ".json":
+            raise RunnerRefusalError("the --record file must end in .json.")
         if args.record.exists():
             raise RunnerRefusalError("the --record file exists; it is never overwritten.")
         if not args.record.parent.is_dir():
@@ -601,6 +711,19 @@ def main(argv: Sequence[str] | None = None, *, exports: ExportJobs | None = None
         args = _parser().parse_args(argv)
     except SystemExit as exc:  # argparse refused the usage (2) or printed the help (0)
         return exc.code if isinstance(exc.code, int) else 2
+    own = [args.out, args.settings_dir]
+    own += [None if args.record is None else args.record.parent]
+    own += [None if args.parameters is None else args.parameters.parent]
+    known = [Path(p) for p in own if p is not None] + [Path(p).parent for p in args.paths]
+    redact = Redactor(known)
+    with _redacted_last_resort(redact):
+        return _main(args, exports, redact, known)
+
+
+def _main(
+    args: argparse.Namespace, exports: ExportJobs | None, redact: Redactor, known: list[Path]
+) -> int:
+    """Run the parsed command line with the redactor in place (:func:`main`)."""
     try:
         footage = configured_footage_folder()
         _check_own_paths(args, footage)
@@ -614,9 +737,9 @@ def main(argv: Sequence[str] | None = None, *, exports: ExportJobs | None = None
         requests = requests_for(args.paths, parameters=parameters, settings=settings)
         check_outputs(requests, footage)
     except RunnerRefusalError as exc:
-        print(f"headless_export: {exc}", file=sys.stderr)
+        print(f"headless_export: {redact(str(exc))}", file=sys.stderr)
         return 2
-    progress = RunnerProgress(lambda message: print(ascii_text(message), file=sys.stderr))
+    progress = RunnerProgress(lambda message: print(redact(message), file=sys.stderr))
     on_main = threading.current_thread() is threading.main_thread()
     previous = signal.signal(signal.SIGINT, lambda *_: progress.cancel()) if on_main else None
     try:
@@ -626,6 +749,7 @@ def main(argv: Sequence[str] | None = None, *, exports: ExportJobs | None = None
             progress=progress,
             footage_folder=footage,
             parameters_from=source,
+            known_folders=known,
         )
     finally:
         if previous is not None:
@@ -633,8 +757,13 @@ def main(argv: Sequence[str] | None = None, *, exports: ExportJobs | None = None
     for line in summary_lines(record):
         print(line)
     if args.record is not None:
-        with open(args.record, "x", encoding="ascii", newline="\n") as handle:
-            handle.write(record_json(record) + "\n")
+        try:
+            with open(args.record, "x", encoding="ascii", newline="\n") as handle:
+                handle.write(record_json(record) + "\n")
+        except FileExistsError:  # it appeared during the run: never overwritten
+            message = "the --record file appeared during the run; it was not written."
+            print(f"headless_export: {message}", file=sys.stderr)
+            return 1
     return exit_status(record)
 
 

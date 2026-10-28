@@ -487,3 +487,106 @@ def test_a_video_fails_unavailable_in_wp41(tmp_path: Path, out: Path) -> None:
         ("video",),
     )
     assert list(out.iterdir()) == []
+
+
+# --- Reviewer A round 1 (F1-F4) -----------------------------------------------------------------
+
+
+def _path_forms(folder: Path) -> list[str]:
+    """Every spelling of a folder a text could carry, lower-cased (case-insensitive check)."""
+    forms = set()
+    for path in (folder, folder.resolve()):
+        text = str(path)
+        forms.update({text, text.replace("\\", "\\\\"), path.as_posix()})
+    return sorted(form.lower() for form in forms)
+
+
+def _no_full_path(text: str, folder: Path) -> bool:
+    low = text.lower()
+    return not any(form in low for form in _path_forms(folder))
+
+
+def test_f1_a_d87_refusal_reaches_the_record_without_the_folder(
+    sample, tmp_path: Path, out: Path, monkeypatch: pytest.MonkeyPatch, no_footage: None, capsys
+) -> None:
+    from clearwater.jobs import SpaceCheck
+
+    monkeypatch.setattr(
+        "clearwater.jobs.export.check_free_space",
+        lambda folder, needed: SpaceCheck(folder=folder, needed=needed, free=0, ok=False),
+    )
+    record = tmp_path / "r.json"
+    assert _main(sample(STILL), "--out", out, "--force-cpu", "--record", record) == 1
+    failure = json.loads(record.read_text(encoding="ascii"))["items"][0]["failure"]
+    assert failure.startswith(f"{STILL}.jpg: Not enough free space in out: need ")
+    captured = capsys.readouterr()
+    for text in (record.read_text(encoding="ascii"), captured.out, captured.err):
+        assert _no_full_path(text, tmp_path)
+
+
+def test_f1_no_full_path_in_the_process_output_or_the_record(sample, tmp_path: Path) -> None:
+    out = tmp_path / "out"
+    out.mkdir()
+    settings = tmp_path / "settings"
+    settings.mkdir()
+    (settings / "settings.json").write_text("{not json", encoding="utf-8")  # a WARNING, renamed
+    record = tmp_path / "r.json"
+    code = (
+        "import sys\n"
+        f"sys.path.insert(0, {str(TOOLS)!r})\n"
+        "import headless_export as he\n"
+        "from clearwater.jobs import SpaceCheck\n"
+        "import clearwater.jobs.export as export\n"
+        "export.check_free_space = lambda f, n: SpaceCheck(folder=f, needed=n, free=0, ok=False)\n"
+        "he.configured_footage_folder = lambda config=None: None\n"
+        "print('STATUS', he.main(sys.argv[1:]))\n"
+    )
+    args = [str(sample(STILL)), "--out", str(out), "--force-cpu", "--settings-dir", str(settings)]
+    done = subprocess.run(
+        [sys.executable, "-c", code, *args, "--record", str(record)],
+        capture_output=True,
+        text=True,
+        timeout=300,
+    )
+    assert "STATUS 1" in done.stdout, done.stderr
+    assert "settings file settings" in done.stderr  # the planted WARNING was printed
+    assert "Not enough free space in out" in done.stderr + done.stdout
+    for text in (done.stdout, done.stderr, record.read_text(encoding="ascii")):
+        assert _no_full_path(text, tmp_path)
+    missing = subprocess.run(
+        [sys.executable, "-c", code, str(sample(STILL)), "--out", str(out),
+         "--parameters", str(tmp_path / "absent" / "p.json")],
+        capture_output=True, text=True, timeout=300,
+    )  # fmt: skip
+    assert "STATUS 2" in missing.stdout and "p.json is not a readable parameter" in missing.stderr
+    assert _no_full_path(missing.stdout + missing.stderr, tmp_path)
+
+
+def test_f3_an_unsupported_settings_version_is_a_usage_refusal(
+    sample, tmp_path: Path, out: Path, no_footage: None, capsys
+) -> None:
+    folder = tmp_path / "settings"
+    folder.mkdir()
+    (folder / "settings.json").write_text('{"format_version": 99}', encoding="utf-8")
+    assert _main(sample(STILL), "--out", out, "--settings-dir", folder) == 2
+    assert "--settings-dir settings cannot be used" in capsys.readouterr().err
+    assert list(out.iterdir()) == []
+
+
+def test_f2_a_record_that_is_not_json_is_refused(
+    sample, tmp_path: Path, out: Path, no_footage: None, capsys
+) -> None:
+    record = out / f"{STILL}_corrected.png"
+    assert _main(sample(STILL), "--out", out, "--force-cpu", "--record", record) == 2
+    assert "--record file must end in .json" in capsys.readouterr().err
+    assert list(out.iterdir()) == []
+
+
+def test_f4_a_loaded_suffix_is_validated_before_anything_runs(
+    sample, tmp_path: Path, out: Path, no_footage: None, capsys
+) -> None:
+    folder = tmp_path / "settings"
+    save_settings(folder, Settings(output_suffix="a/b"))
+    assert _main(sample(STILL), "--out", out, "--force-cpu", "--settings-dir", folder) == 2
+    assert "forbidden characters" in capsys.readouterr().err
+    assert list(out.iterdir()) == []
