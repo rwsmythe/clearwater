@@ -22,6 +22,8 @@ Cell `implementer-opus-high` (Claude lane), worktree `.worktrees/wp3.21`, branch
 | 6 | cell 4: #2 reworked under AD-29; WINDOW REQUEST for the GX011627 + synthetic 4K oracle legs | (dispatcher fills) |
 | 6 (read) | as given at the grant | 148,982 |
 | 7 | cell 4: STOP, AD-29 item 1 "the block sums with their quantise" (where #3's quantise lives) | (dispatcher fills) |
+| 7 (read) | as given with the ruling (a) | 164,381 |
+| 8 | cell 4: #3 built; WINDOW REQUEST for interim 2 (#1+#2+#3, device frames ON) | (dispatcher fills) |
 
 ## Re-seat: cell 2 (2026-10-28), rulings since round 0
 
@@ -541,6 +543,90 @@ TIER1 on GX011627 and synthetic 4K (H9, H10) before #3.
 satisfies the Protocol AND that `NumpyBackend` does not (io.video: the pair in
 `test_wp321_device_frames.py`; analysis: the same pair at #3). The yield-7 STOP (where #3's
 quantise lives) is NOT addressed by this amendment and still holds.
+
+## STOP (cell 4, yield 7) and ruling (a)
+
+AD-29 item 1 named "the block sums with their quantise" in core; the RESUME-HERE sketch CHARC
+ruled on kept the division and quantise on the host. **Orchestrator RULED (a)** (relayed to
+CHARC; an amendment, if any, is relayed without waiting): `CupyBackend.block_sums(a, k)` returns
+float64 host sums or None when the exactness bound fails, the bound in core; `proxy.py` keeps
+`_divide` and `quantise` and calls `block_sums` only through its one Protocol,
+`AnalysisDeviceBackend`, falling back to the host reduction on None. Reading: "the sums the
+quantise consumes" (a second quantise in core would be a second source for the AD-5 rule).
+Required tests: the Protocol pair both directions; the None path (a planted value failing the
+bound takes the host path with the same bytes).
+
+## Task 5b (#3): the device block mean, as built (cell 4, `05ee507`)
+
+- `core/backend.py`: `CupyBackend.block_sums(a, k) -> NDArray[float64] | None` (an IF-2 device
+  extension, same comment block). Refuses `k < 1`, a non-float32 or non-`(H, W, C)` array
+  (ValueError), a host array or another device's (TypeError). The bound (`_sums_are_exact`):
+  `top = max(a.max(), -a.min())` (two reductions; a NaN propagates, so `not top <= 1` refuses
+  NaN, infinities and magnitudes above 1); a zero frame is admitted; else the smallest non-zero
+  magnitude by a CuPy `ReductionKernel` (no frame-sized temporary; `2` stands for "no value"
+  since every magnitude is at most 1 there; `INFINITY` is undefined under NVRTC);
+  `ceil(log2(k*k+1)) - (frexp_exp(min) - 1 - 23) <= 53`. The sums: rows
+  (`reshape(full_rows, k, W, C).sum(axis=1, dtype=float64)` plus the edge row), then columns
+  likewise; only the `(ceil(H/k), ceil(W/k), C)` float64 sums are downloaded (4K: 4 MB; the
+  by-rows intermediate 50 MB at 4K, 74 MB at 5.3K 8:7 k=8, transient).
+- The derivation (R0.6, re-checked): a finite non-zero float32 v with `2**e <= abs(v)` is a
+  multiple of `2**(e-23)`; every other non-zero value in the frame is at least the smallest, so
+  all are multiples of `2**(e_min-23)`; every partial sum of a block is a sum of a subset of its
+  at most `k*k` values, each at most 1 in magnitude, so below `2**m`; float64 holds every
+  multiple of `2**L` below `2**m` exactly when `m - L <= 53`; then any summation order gives the
+  exact sum, which is also what the host's float64 `reduceat` gives. Subnormals take frexp's
+  exponent, which only lowers L (refuses more). Decoded data: `e_min` -8 (8-bit) or -10
+  (10-bit), `m` 5 (k=4), 5 (k=5), 7 (k=8): at most 7 + 33 = 40 bits.
+- `analysis/proxy.py`: `AnalysisDeviceBackend` (`device: str`, `block_sums`); `block_mean`'s
+  division split out as `_divide` (the same expression); `frame_block_mean(pixels, k, backend)`
+  (host pixels: `block_mean`; device pixels: `block_sums` when the backend satisfies the
+  Protocol and k > 1, `_divide` on the sums; else `block_mean(backend.to_host(pixels), k)`);
+  `make_proxy(pixels, backend=None)` = `quantise(frame_block_mean(...))`;
+  `frame_pixels_for_proxy(frame, backend)` keeps a frame on the backend's device when the
+  backend satisfies the Protocol and the pixels are not NumPy, else `frame_pixels_on_host`.
+  `analysis/__init__.py` exports the three new names. `analysis` imports no `core`, no `cupy`.
+- `analysis/engine.py`: the decode pass calls `frame_pixels_for_proxy` and
+  `make_proxy(pixels, self._backend)` (two lines).
+- `tools/export_bench.py` (`6e504fe`): `--device-frames` (global option; `run_once(...,
+  device_frames=)`): probes, `select_backend(settings, H, W, method)`, builds the source
+  (`build_engine(..., device_backend)`) and `_BenchSink(device_backend)` with it; records
+  `device_frames` (header and run) and `device_backend` (the backend's repr). `_BenchSink`
+  re-runs `FFmpegVideoSink.__init__(self, device_backend=...)` after `vf._RecordingSink`'s
+  (that class, not owned, builds the sink without one; nothing has run yet). A warm leg's
+  cache priming stays on host frames (not measured; the proxies are identical either way).
+
+Tests: `tests/test_wp321_device_proxy.py` (21): the Protocol pair (GPU satisfies with an
+`inspect.signature`-equal `block_sums`; CPU has no `block_sums` and does not satisfy); device =
+host bit for bit (float64 bytes) and the uint8 proxy byte for byte at 4K k=4, 5.3K 16:9 k=5,
+5.3K 8:7 k=8, odd 1081x1923 k=2 (edge blocks), 37x53 k=1, 8 and 10 bit; the None path: NaN,
+inf, 1.5, 1e-30, 1e-12 planted: `block_sums` is None and the result equals the host's (and the
+proxy, for the finite plants); the bound's edge (k=5: `2**-25` admitted, `2**-26` refused), a
+signed frame's sums equal NumPy's; refusals; the routing (a GPU frame stays, a host frame and
+the CPU backend as before). `tests/test_wp321_bench.py` (+2): a `--device-frames` run gives the
+sink device frames and records `CupyBackend`; with `--force-cpu` the sink gets only `cpu`
+frames and the record names `NumpyBackend`. **Failing-first:** the proxy file against
+`20ab3bb`'s analysis with core's `block_sums` already in place: 19 fail, 2 pass (the two
+core-only tests: the bound's edge, the refusals). The bench pair: not run against the base
+(the `device_frames` keyword is new; they cannot pass there).
+
+Light run (`-n 4`, `not footage and not slow`; 35 files: analysis (all), core, GUI analysis
+service, `test_jobs_export.py`, oracle tool, decode, encode, `test_wp321_*`, every
+`*_deps`/`*_rules`): **1050 passed**, warnings only the standing CUDA_PATH one; log
+`work\c4-light3.log` (worktree). Bench + layering: 51 passed. ruff, format, mypy strict clean.
+
+Oracle, WP2.3 with `--device-frames` (`oracle-p3-wp23.sh`, `logs\oracle-p3-wp23.log`): **10 of
+10 TIER1**, max abs 0. NOTE: the WP2.3 samples are 320x180 (k = 1), so they pin the routing,
+not `block_sums`; the k > 1 path is pinned end to end only by the interim-2 oracle legs
+(GX011627 k=4, synthetic 4K) in a window.
+
+| # | Item | Suspected | Confirmed | Rejected | Fixed |
+|---|---|---|---|---|---|
+| V25 | `INFINITY` as the kernel's identity | yes | yes (NVRTC: identifier undefined) | - | `2` as "no value" (every magnitude at most 1 when it runs) |
+| V26 | `cupy.max`/`min` skip NaN, so a NaN frame passes the bound | yes | - | rejected: NaN propagates (smoke run: max nan, min nan, bound False; the NaN plant test) | - |
+| V27 | the bound's frame temporaries (2 x frame) breach the memory watch item at 5.3K | yes | yes, in the draft (`xp.abs`, `xp.where`: about 0.6 GB transient at 5.3K 8:7) | - | two reductions and a reduction kernel, no frame-sized temporary |
+| V28 | mypy narrows `frame_pixels_for_proxy`'s device branch to unreachable | yes | yes | - | `pixels: Any` |
+| V29 | a lone edge row/column when k divides neither side, or `full_rows == 0` (H < k) | yes | - | rejected for the edges (odd 1081x1923 test); H < k cannot reach k > 1 (k <= min(H, W) // 540), guarded by `if full_rows:` anyway | - |
+| V30 | the CRLF normalisation rewrote `smoothing.py` / `store.py` (CRLF checkout) | yes | yes (status showed them modified, no content diff) | - | `git checkout --` both; never committed |
 
 ## Re-grounding (2026-10-27/28, against `d1e4537`)
 
