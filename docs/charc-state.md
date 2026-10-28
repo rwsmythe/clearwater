@@ -38,9 +38,23 @@
   WP4.2; a new module = my pass before dispatch); headless runner under tools/ owned by WP4.1, extended by WP4.2; WP4.2 binds DR-67
   (+ DR-71/73(a)/74 where reached), V4 SAME leg through the product composition (one window), no V16 re-measure (WP5.2); WP4.3 binds
   DR-68, DR-69 (IF-8/IF-2 extension = STOP to me), DR-52, DR-62, WP3.18 adapter notes, DR-50/51 swaps, V7 re-measure, G1-G13; WP-T5
-  = minimum-frame 5.3K V4 export + shared GX011627 export fixture, no product code, serial wall before/after. **NEXT AT THIS SEAT:
-  rule the brief packet(s); then dispatch rulings; windows OPEN/CLOSE as before; CHARC QA at each accept (recipe: standing rules
-  below).**
+  = minimum-frame 5.3K V4 export + shared GX011627 export fixture, no product code, serial wall before/after.
+- **PHASE 4 RULING PACKET POSTED 19:01Z (my msg c7452911; drafts packet `8c3c624c224c263e` + correction `56e00cce` + addendum
+  `528b3db8`; drafts on `.worktrees/briefs-p4`, branch `briefs-p4` from 6536f60): ALL FOUR DRAFTS APPROVED, 42 questions + 5 flags
+  ruled, helper recommendations adopted throughout with these notes.** Tripwires GRANTED: new package `clearwater.app`
+  (`__init__.py` Qt-free + `composition.py` in WP4.1; `main.py` the only Qt module, `startup.py`, `analysis_adapter.py`,
+  `activity.py`, `src/clearwater/__main__.py` = `python -m clearwater`, no scripts entry, in WP4.3); the leftover JOURNAL (JSON in
+  config_dir, format_version 1, atomic; start-up scans output folder + journal folders with `remove_leftovers`; never footage; D85
+  kept). 42-Q3 NARROWING accepted (GUI video legs stay stubs until WP4.3; N4 ground). 42-Q1 additive keyword-only ExportEngine
+  factories (DR-67). DR-47 (a) closes in WP4.2 ONLY if its Q7 engine.py grant fires, else trigger = next engine.py touch. 43-Q7:
+  GUI shows no device-wide total, DR-69 stays OPEN. 43-Q8 DR-62 = WAIT (per-key process-local lock, cancellable). 43-Q13:
+  AD-23's 2026-10-21 extension IS the N1 approval for the CREATE_NO_WINDOW helper in `io/video/pipes.py` (three conditions); I add
+  a dated 'applied by WP4.3' note to AD-23 at WP4.3's accept. 43-Q12 uses AD-11 AS AMENDED (k=1 exact; k>1 p99 bounds). WP-T5:
+  3 frames, module-local session fixture, engine test not shared = DR-65's recorded reason, W1 BEFORE / W3 AFTER, measurable
+  > 110 s, FAST one round; saving ~12 min/gate (my ~30 corrected). **Owed at accepts:** AD-23 note (WP4.3); DR rows per each
+  brief's table (the orchestrator's record lists them; I write the register). **NEXT:** orchestrator writes rulings into the
+  briefs, commits `briefs-p4`, ff main, dispatches WP4.1 (opus-high) + WP-T5 (lane by pace); WP4.2 / WP4.3 FINAL on my word after
+  their predecessor's accept + one revision; windows OPEN/CLOSE as before; CHARC QA at each accept (standing rules below).
 - **Owner-pending inputs (carry):** photos (WP3.6P; WP4.1 records the owner-photo leg OWED), the iPhone clip (DR-15), the N6 body
   erratum DR-64 (apply on the owner's word 'apply N6 erratum' as spec v0.5.6). Open owner decisions: none. Every owner-facing
   summary ends with that line.
