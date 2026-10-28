@@ -10,9 +10,10 @@
   product place that builds the real photo engines. `photo_reader()`, `photo_writer()`,
   `correction_methods()` (`available_methods()`, `"c3"` first, D16), `backend_selector()`
   (`clearwater.core.select_backend` itself) and `export_jobs(*, app_version, reader, writer,
-  methods, select_backend, on_stage) -> ExportJobs`. Every call returns fresh components; nothing
-  is built or probed at import; the module imports no `clearwater.gui`, PySide6 or CuPy and never
-  resolves the app-data folder. `export_jobs()` routes a photo request to `ExportEngine` and a
+  methods, select_backend, on_stage) -> ExportJobs`. Every call returns fresh components;
+  importing the root builds none of its components and probes no device (`clearwater.core` builds
+  its module-level CPU backend on import); the module imports no `clearwater.gui`, PySide6 or CuPy
+  and never resolves the app-data folder. `export_jobs()` routes a photo request to `ExportEngine` and a
   video request to `unavailable_exports().job(request)` (`UNAVAILABLE_TEXT`, nothing written);
   the engine's video collaborators are interface stubs no job reaches (question 4).
 - **The GUI's photo legs:** `gui/engines.py` `default_engines()` takes `photo_source` and
@@ -59,8 +60,9 @@
 ## Limits
 
 - **DR-42 (a):** a `cICP`-only PNG source is exported without `iCCP` (`io.photo` not owned).
-- **DR-43:** a photo exported from a damaged-EXIF source carries no EXIF and the job reports no
-  warning (a reader-side signal needs an IF-6 decision, AD-20).
+- **DR-43:** a photo exported from a damaged-EXIF source loses the source's EXIF fields (the
+  output carries only the minimal D63 block: Orientation, Software, the pixel dimensions) and the
+  job reports no warning (a reader-side signal needs an IF-6 decision, AD-20).
 - **Small-still domain:** the WP2.3 stills are 96 x 64; V8 k > 1 is shown only on the 1080 x 1920
   look-check crop (skipped without `work/wp1.3/frames`); sizes up to 48 MP are OWED (V15, WP5.2).
 - **V9 at 8 bit from 10- and 16-bit sources** (S8): see the ledger for the ruling.
@@ -96,7 +98,7 @@
 | DR-69 | NOT REACHED: the runner records `JobResult.device` only. |
 | DR-71 | NOT REACHED (`jobs/export.py` not edited). |
 | DR-37 (c), DR-1, DR-27 | NOT REACHED (`tools/local_config.py` imported, not edited). CONSUMER NOTE for DR-37 (c): the runner checks outputs, beside-source sources, `--record` and `--settings-dir` against the configured footage folder itself (`...::test_main_refuses_the_configured_footage_folder`). |
-| DR-34 | NOT REACHED (read-only use of `load_settings` and `migrate`). |
+| DR-34 | NOT REACHED (`load_settings` and `migrate` used, not edited; `load_settings` renames a corrupt `settings.json` in a `--settings-dir` beside itself, D89, which the runner's docstring states). |
 | DR-40 (b), DR-46 | NOT REACHED (`methods/` not owned). |
 | DR-73 | NOT REACHED (`core/` not edited). |
 | DR-45, DR-47, DR-56, DR-74 | NOT REACHED (video). |

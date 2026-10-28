@@ -464,10 +464,10 @@ def test_n10_the_same_still_twice_is_identical(sample, tmp_path, sample_id) -> N
     first, second = outputs[False]
     assert first.read_bytes() == second.read_bytes()  # provenance off: byte-identical
     a, b = (png_chunks(p) for p in outputs[True])
-    plain = [c for c in a if not (c[0] == b"iTXt" and c[1].startswith(PROVENANCE_KEYWORD.encode()))]
-    assert plain == [
-        c for c in b if not (c[0] == b"iTXt" and c[1].startswith(PROVENANCE_KEYWORD.encode()))
-    ]
+    key = PROVENANCE_KEYWORD.encode("latin-1") + b"\0"  # the whole keyword, never a prefix
+    plain = [c for c in a if not (c[0] == b"iTXt" and c[1].startswith(key))]
+    assert plain == [c for c in b if not (c[0] == b"iTXt" and c[1].startswith(key))]
+    assert len(plain) == len(a) - 1  # exactly the provenance chunk was set aside
     pa, pb = (provenance_of(p) for p in outputs[True])
     assert pa is not None and pb is not None
     assert {k: v for k, v in pa.items() if k != "created"} == {

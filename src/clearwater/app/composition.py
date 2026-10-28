@@ -1,7 +1,8 @@
 """The composition root: the one product place that builds the real engines (WP4.1).
 
-Each function returns a fresh real component; nothing is built and no device is probed when this
-module is imported (``clearwater.core`` probes CUDA on the first selection that is not forced).
+Each function returns a fresh real component. Importing this module builds none of the root's
+components and probes no device (``clearwater.core`` builds its module-level CPU backend when it
+is imported and probes CUDA on the first selection that is not forced).
 WP4.1 builds the photo legs: the IF-6 reader and writer of :mod:`clearwater.io.photo`, the IF-3
 methods of :mod:`clearwater.methods` (``"c3"`` first, D16), the IF-2 selection of
 :mod:`clearwater.core` and the export engine of :mod:`clearwater.jobs` behind the WP3.19
