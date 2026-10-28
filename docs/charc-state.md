@@ -143,6 +143,13 @@
   **Cell 4 DISPATCHED 07:31Z** (msg `94c72e704d83c247`) from `wp3.21` e6d27a0 (cell 3 handover, final 265,087), AD-29's eight
   conditions in its prompt; order #2 rework -> oracle WINDOW -> #3 -> unchanged. Brief names the four layering tests (b26b051;
   CRLF blob corrected within a minute by e6f7193; 0 CR at HEAD, verified at my seat).
+- **EXCLUSIVE WINDOW OPEN 2026-10-28 ~08:43Z: WP3.21 4K BLUR MICRO-TIMING (~10 min; uncommitted driver
+  `work/wp3.21/blur_microtiming.py`, GX011627 frame 0 read-only; JSON under `work/wp3.21/microtiming/`)** (msg `f02a8e3d3ecf679e`).
+  **NOTHING HEAVY AT THIS SEAT until CLOSE.** Measures: blur share of c3 render at 4K (CUDA events, median of 20); each render
+  blur direct vs R0.4 per-axis FFT and 2-D FFT (time, max abs, determinism, pool bytes); sigma ladder 8-270 at 4K and 5.3K 8:7.
+  Dry run 1080p synthetic: blur 57 % of render; gate-eligible = the two Cb/Cr blurs at 0.05 x short side; FFT error <= 8.6e-7.
+  Cell 5 depth 87,298 at yield 10, branch 650a693. After CLOSE: share, projected saving under the Q-R1 gate, max abs vs 1e-5,
+  5.3K peaks, build-or-yield for task 6 -> forwarded to me BEFORE any FFT code.
 - **WP3.21 INTERIM 2 CLOSED 08:34Z: TIER1 x3 (GX011627 c3 681/0 max abs 0; synth 4K 120/0; GX011627 ancuti2018 681/0); bench
   GX011627 cold c3 device frames ON = 0.5130 s/frame = 15.37 min/min (DEVELOPMENT evidence, not V16; interim 1 24.28); frames
   phase 0.501 s/frame (interim 1 0.778; serial path 0.714); lead 5.28 s; median 0.483, p90 0.534, max 0.965; RECURRING ~0.96 s
