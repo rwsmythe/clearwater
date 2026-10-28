@@ -1597,7 +1597,34 @@ Expected end state if #1-#3 land: frame path about 0.53 s/frame (about 16 min/mi
 
 ## Review rounds (Reviewer A)
 
-None yet (the loop runs after the build, task 9).
+Evidence `C:\Users\rwsmy\clearwater-review-evidence\wp3.21\rN\` (prompt, diff, transcript,
+adjudication, repro, md5s). Runner copied from WP3.14 r2; WSL, codex-cli 0.162.1.
 
 | Round | Critical | Major | Minor | In / out of envelope | New / reopened | Reverts | Product or test-only | Transport / CLI | Depth |
 |---|---|---|---|---|---|---|---|---|---|
+| 1 | 0 | 6 reported; 1 confirmed blocking (F5), F2 pending a ruling | 5 reported (+ F3, F6, F7 adjudicated minor) | in: F1-F9; out: F10, F11 (banked) | all NEW | 0 | none yet (adjudication turn) | WSL, 0.162.1, gpt-6.1-sol high | (dispatcher fills) |
+
+### Round 1 (cell 6; HEAD `aa06584`, diff `d1e4537..aa06584` without `docs/proofs`)
+
+Probe 10:07:51Z READY; review exit 0 10:34:00Z; banner `gpt-6.1-sol` / high; tokens 230,580;
+62 `succeeded in`; VERDICT `NEW_CRITICAL_MAJOR_FOUND`. ERROR lines: 7 background model-list
+refresh timeouts (`codex_models_manager`, also in the probe; not transport), the rest echoed
+source. Round COUNTS. Pre-run: ruff, format, mypy clean; light set 2,641 passed (420 s).
+
+- F1 (MAJOR) analysis failure vs a blocked write: REJECTED (the double's write blocks forever;
+  the product write blocks only on FFmpeg back-pressure; E sees A's text at its next record).
+- F2 (MAJOR) `sink.abort()` before A is joined: CONFIRMED against R0.2's design TEXT, no
+  guarantee broken; proposed MINOR, keep abort-first and correct the text (QUESTION to the
+  dispatcher; alternative: move `analysis.stop()` before `sink.abort()` in `_video`).
+- F3 (MAJOR) expired 60 s join: MINOR, banked (a stall >= 60 s inside one frame; the base's
+  serial job hangs on the same stall; WP3.14's envelope names it out); report Limits.
+- F4 (MAJOR) complete entry after a cancel: REJECTED (V17; the base's documented behaviour;
+  my prompt over-stated claim 2).
+- F5 (MAJOR) D87 growth 0 on a resumed incomplete entry: CONFIRMED MAJOR, in envelope
+  (repro `growth_bytes 0 frames_remaining 100`; byte-identical `store_proxy` adds nothing).
+- F6 (MAJOR) oracle TIER2 with no measured frame: CONFIRMED MINOR (tool; no recorded verdict
+  affected). F7 junction aliasing: MINOR, DR-22 precedent, harden in cleanup. F8 `--name`
+  escape: MINOR. F9 test sleeps: MINOR. F10, F11: OUT-OF-ENVELOPE, banked.
+- Remediation plan (next turn, after the dispatcher's word): F5 in `jobs/export.py`
+  (extrapolate from the entry's bytes per stored frame when the lead stored nothing new) with
+  a failing-first test; F2 per the ruling; the minors once in the terminating round.
