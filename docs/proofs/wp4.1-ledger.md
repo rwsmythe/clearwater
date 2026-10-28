@@ -12,6 +12,7 @@ Brief `docs/briefs/wp4.1-brief.md` FINAL (rulings CHARC `2c4476d9869df056`). Rev
 | Y4 round 1 adjudicated | 2026-10-28 | 299,161 (past the 250K evaluation point: last bounded step in this seat) |
 | Seat change | 2026-10-28 | cell 2 stood down at 66,183 (final reading; committed `dca6d1e`, prepared r2, ran nothing); cell 3 (`implementer-opus-high`) from 0 at dispatch |
 | Y5 round 2 adjudicated (cell 3) | 2026-10-28 21:20Z | 93,956 |
+| Y6 round 3 adjudicated (cell 3) | 2026-10-28 21:56Z | 208,313 (past 250K before round 4: cell 3 stands down after the R3 minors) |
 
 ## Task 1: map (main `3aa3c51`)
 
@@ -314,7 +315,7 @@ md5s). Probe 20:14:34Z: one `succeeded in` line, banner `gpt-6.1-sol` / high.
 |---|---|---|---|---|---|---|---|---|---|
 | 1 | `ef6bf2f` | 0 | 2 (F1, F3) | 6 (F2 downgraded, F4-F8) | 8 / 0 | 8 / 0 | 0 | runner (`tools/`, F1-F4), root docstring (F6), report (F5, F7), one test (F8) | 299,161 |
 | 2 | `dca6d1e` | 0 | 2 (G1 NEW, G2 REOPENED) | 5 (G3, G4, G5 downgraded, G6, G7) | 7 / 0 | 3 / 4 | 0 | runner (`tools/`, G1-G7 incl. the G5 docstring), tests, report | 93,956 |
-| 3 | `899102d` | 0 | 1 (H1 NEW; accepted-component code reachable through the swap: STOP) | 6 (H2-H4 downgraded, H5, H6, H7) | 7 / 0 | 6 / 1 | 0 | not yet remediated | (dispatcher's figure at Y6) |
+| 3 | `899102d` | 0 | 1 (H1 NEW; accepted-component code reachable through the swap: STOP) | 6 (H2-H4 downgraded, H5, H6, H7) | 7 / 0 | 6 / 1 | 0 | runner (`tools/`, H2-H5), tests (H6, H7 test-only), report; H1 BANKED to WP4.3 (CHARC `5fab48cc2a5174cb`) | 208,313 |
 
 ### Round 1 (20:14-20:24Z) -- VERDICT NEW_CRITICAL_MAJOR_FOUND; adjudicated, NOT yet remediated
 
@@ -424,7 +425,7 @@ before the round: ruff, ruff format --check (259), mypy (141) green; the six WP4
   `test_core_deps`, `test_jobs_naming`, `test_jobs_export_photo`: 455 passed, 0 skipped (the UNC
   share was reachable) (`work/wp4.1-c3-r2fix-light.log`).
 
-### Round 3 (21:41-21:51Z, cell 3) -- VERDICT NEW_CRITICAL_MAJOR_FOUND; adjudicated, NOT yet remediated
+### Round 3 (21:41-21:51Z, cell 3) -- VERDICT NEW_CRITICAL_MAJOR_FOUND; adjudicated, remediated below
 
 Whole-package diff `3aa3c51..899102d` (rounds 1-2 named as history, withheld). Probe 21:41:01Z:
 one `succeeded in`, banner `gpt-6.1-sol` / high. Reproductions native (`r3/r3_repro*.py`,
@@ -448,45 +449,61 @@ outputs under `work/wp4.1-r3-repro`). Full table in `r3/adjudication.md`.
 - Mechanical: VERDICT anchored; 48 `succeeded in`; `tokens used` 220,986; three start-up ERROR
   lines (models refresh x2, MCP connector), the rest echoed source: round COUNTS.
 
-## RESUME HERE (cell 2, after cell 1)
+### Round 3 rulings and remediation
 
-**State at hand-over (2026-10-28, cell 1 at depth 299,161):** head `d22f1aa` on branch `wp4.1`
-(base main `3aa3c51`; NO rebase, never merge). Worktree clean apart from this ledger commit.
-Every committed blob LF, 0 CR. `.venv` present (`uv sync` done).
+- Orchestrator at Y6 (21:56Z): adjudication UPHELD (H2-H4 MINOR on the cell's grounds, H5-H7
+  MINOR); the six-minor plan APPROVED as written. W3 (WP-T5) ran 21:59-22:44Z; nothing ran here.
+- **H1 RULED by CHARC (A), msg `5fab48cc2a5174cb`: BANKED to WP4.3** with four conditions. The
+  cell's two: (3) the report's Limits say plainly "the GUI preview of an nclx-only P3 photo is
+  shown unconverted until WP4.3; the export is correct" (done in `429f96e`); and this ledger line.
+  CHARC's and WP4.3's: the register row binding WP4.3 with the r3 reproduction
+  (`r3/r3_repro.py`), a required test in WP4.3's brief under Q12, the WP2.3 fixture gap (the P3
+  stills carry ICC) in the same row. No `gui` file touched.
+- Failing first: `test_h2_*`, `test_h3_*`, `test_h5_*` ran RED on `78b357f`
+  (`work/wp4.1-c3-r3red.log`: 3 failed for their findings, the strengthened H7 import test
+  passing as it should). H6 and H7 are test strengthenings (not planted).
+- `cc3eb52` (runner + tests): H2 doubled spelling of each `ascii_text` form; H3 `run()` wraps
+  `run_batch` in the last-resort filter; H4 module and `run()` docstrings; H5 `loads_object` (the
+  WP4.1 test's non-object match now "expected a JSON object", the decoder's text); H6
+  `SRGB_BUILT_IN_MD5` pinned for `BUILT_IN_SRGB_IDS` (the 4 AD-24 and 6 `heic*-none` stills) in V5
+  and V9; H7 the import test also intercepts `PhotoWriter.__init__` and `available_methods`.
+- `429f96e`: report limits (host logging; the H1 sentence and ruling).
+- Light runs on `cc3eb52`: ruff, ruff format --check (259), mypy (141) green; `-n 4 -m "not gpu
+  and not footage and not slow"` over the six WP4.1 files plus `test_gui_deps`, `test_gui_status`,
+  `test_core_deps`, `test_jobs_naming`, `test_jobs_export_photo`: 458 passed, 0 skipped
+  (`work/wp4.1-c3-r3fix-light.log`; run before a final docstring reflow, ruff/format/mypy re-run
+  green after it).
 
-**Done:** round-0 table (R0-1..R0-10) and rulings S1-S8 above; tasks 3-7 built: the root
-(`src/clearwater/app/`), the GUI swap (`gui/engines.py`), the runner (`tools/headless_export.py`),
-the tests (`tests/test_app_composition.py`, `tests/test_app_deps.py`,
-`tests/test_headless_export.py`, `tests/test_wp41_photo_path.py`, `tests/test_wp41_v8.py`,
-`tests/test_wp41_gui.py`), the report draft (`docs/reports/wp4.1-photo-path.md`). The hardware
-leg (gpu + v8c) ran in its window on `755513b` (figures above); it has NOT re-run since the
-round-1 fixes (they touch no hardware-marked test; the full gate covers it). Reviewer A round 1
-adjudicated, approved and remediated.
+## RESUME HERE (cell 4, after cell 3)
 
-**Round table so far:** round 1 on `ef6bf2f`: 0 critical, 2 major blocking (F1, F3), 6 minor
-(F2 downgraded, F4-F8), all new and in envelope, 0 reverts; fixes in the runner (tool code),
-the root's docstring, the report and one test. Remediated in `bf4b837`, `d22f1aa`.
+**State at hand-over (2026-10-28, cell 3 standing down past 250K):** branch `wp4.1`, base main
+`3aa3c51` (NO rebase, never merge); head = this ledger commit (code head `cc3eb52`, report
+`429f96e`). Worktree clean. Every committed blob LF, 0 CR. `.venv` present.
 
-**Next (cell 2):**
-1. Reviewer A **round 2** on the remediated head (`d22f1aa` or later): copy
-   `C:\Users\rwsmy\clearwater-review-evidence\wp4.1\r1\run_review.sh` and `review-prompt.md` to
-   `...\wp4.1\r2\`; set the HEAD sha and "round 2"; scope the diff either to the whole package
-   (`git diff -U8 3aa3c51..HEAD -- . ':(exclude)docs/proofs/**'`) or to `c6aabc0..HEAD` with the
-   round-1 findings named as remediated (prior rounds WITHHELD: name them in the prompt as
-   history, not as files); refresh `test-summary.txt`; probe first (one `succeeded in` line,
-   banner `gpt-6.1-sol` / high); run with a background start and a foreground `until [ -f
-   .../review.done ]` poll; adjudicate; yield (Y4) before remediating; five-round gate at
-   round 5.
-2. Ask for the **two-leg suite window** (CLAUDE.md commands, fresh `--basetemp` per leg under
-   `work/wp4.1-<run>-*`, 5 GiB check, Git Bash, `PYTEST_ADDOPTS` unset, `QT_QPA_PLATFORM=offscreen`).
+**Done:** rounds 1-3 adjudicated and remediated (table above). H1 banked to WP4.3 by CHARC
+`5fab48cc2a5174cb`. The hardware leg (gpu + v8c) last ran on `755513b`; no fix since touches a
+`gpu`/`slow` test's subject except the V9 ICC oracle (H6), which the serial leg covers.
+
+**Next (cell 4):**
+1. Reviewer A **round 4** on the head: new `...\wp4.1\r4\` folder; copy `r3\run_review.sh`; make
+   `review-prompt.md` from `r3\review-prompt.md` (round 4, the new HEAD sha, rounds 1-3 named as
+   history and WITHHELD, `r4/test-summary.txt`); add to "Accepted limitations" the host-logging
+   limit (H4) and the H1 GUI-preview limit (banked to WP4.3, CHARC `5fab48cc2a5174cb`); update
+   claim 3 for H3 (run() filter) and H5 (loads_object). Whole-package diff
+   `git diff -U8 3aa3c51..HEAD -- . ':(exclude)docs/proofs/**'`; refresh `test-summary.txt`
+   (figures above, with their commit); probe first (one `succeeded in`, banner `gpt-6.1-sol` /
+   high); background start, foreground `until [ -f .../review.done ]` poll; GATE_CHECKS;
+   adjudicate; YIELD before remediating. Five-round gate at round 5.
+2. The two-leg suite: by the orchestrator's candidate gate unless the orchestrator says
+   otherwise.
 3. Fill the report's figures and counts (`docs/reports/wp4.1-photo-path.md`: both legs' counts
-   and skip lines, the V8 (c) table, the V9 raw figures, the Reviewer A rounds) and mark it FINAL.
+   and skip lines, the V8 (c) table, the V9 raw figures, the Reviewer A rounds and verdict) and
+   mark it FINAL.
 4. The **return report** (recipe section 4, under about 60-70 lines) to the orchestrator by
    SendMessage as the final message.
 
-**Notes for cell 2:** the runner's footage check reads `clearwater.local.toml` via
-`tools/local_config.py`; tests use `no_footage` / `footage_folder=None`. V9 follows CHARC S8
-(`6c108416f38ca32a`); CHARC adds the AD-11 clarification to `docs/decisions.md` (not ours). The
-V9 planted control is `gamma` (probe above). WP-T5 runs beside us and owns
-`tests/test_jobs_export_video.py` and `tests/test_io_video_encode.py`; its serial-leg windows are
-exclusive (no runs while open).
+**Notes for cell 4:** the Bash tool mangles backslashes inside heredocs here: write any script
+holding `\\?\` or `\n` literals with the Write tool and run it. `_no_full_path` in
+`tests/test_headless_export.py` checks the `ascii_text` spellings too. The UNC-spelling tests
+skip when `\\localhost\C$` is unreachable. WP-T5 owns `tests/test_jobs_export_video.py` and
+`tests/test_io_video_encode.py`; its windows are exclusive (run nothing while one is open).
