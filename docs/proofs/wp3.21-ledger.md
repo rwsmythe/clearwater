@@ -55,6 +55,7 @@ Cell `implementer-opus-high` (Claude lane), worktree `.worktrees/wp3.21`, branch
 | 30 | cell 7: option (A) driver drafted in the HOLD (not run) | 180,200 (at the (A) grant) |
 | 31 | cell 7: WINDOW RELEASED (attribution); split table to CHARC | (not given) |
 | 32 | cell 7: HOLD for the fix ruling; RESUME HERE (cell 8) written | 223,058 |
+| 33 | cell 7: part 2 built (`b5a383c`); light STOP on the (b3) form | (dispatcher fills) |
 
 ## RESUME HERE (cell 6, after cell 5)
 
@@ -2058,3 +2059,56 @@ and its ruling; then the return report (under about 70 lines) by SendMessage.
 **Evidence not committed:** `C:\Users\rwsmy\clearwater\work\wp3.21\bench\` (V16 records),
 `...\attribution\` and the driver `work\wp3.21\memory_attribution.py`; worktree
 `work\wp3.21\logs\c7-*` (summaries, GOP check, timelines). Standing rules: RESUME HERE (cell 6).
+
+## The task 10 fix (CHARC FINAL `cadc39fc8a199a57`, 14:32Z): (b3) + one boundary free
+
+Ruled: (1) `core/memory.py` gains `job_device_memory_estimate_bytes` = pool estimate (base + FFT
+bound) + context + decoders x NVDEC + NVENC, terms per hardware session at the clip's size, from
+this attribution; the overlap counts TWO decoders; `select_backend` UNCHANGED; the GPU job
+REPORTS it and the STOP test compares the device-wide peak against it. (2) One pool free at the
+analysis-end boundary in `jobs/export.py`. (3) The re-run's STOP test names both instruments:
+device-wide `memory.used` against the new total (idle offset stated) AND the in-process pool
+reserved peak against 6,281. (b2), (b4) not taken. Cell 7 builds the fix and re-runs block 2,
+then hands over to cell 8. A light STOP first on the form of the (b3) terms (CHARC's under Q9).
+
+### Part 2, as built (`b5a383c`)
+
+`_Analysis._run`'s `finally` calls `_release_fft_plans(self._backend)` (the job end's entry,
+never raises) before `_fold.end()`: once per video job when the analysis thread returns, on
+every path, on that thread (its plan cache is empty; the render thread's plans stay). The job's
+end still releases on its own thread. `_Analysis` takes the backend (private class). Docstrings:
+module, `JobDeviceBackend`, `_release_fft_plans`, `_Analysis`. Tests (this package's own files):
+`test_wp321_fft_release.py` -- the double records each release's thread; the video tests expect
+`["export-analysis", <job thread>]` (renamed "... at both boundaries"); NEW `gpu`
+`test_the_analysis_end_boundary_frees_the_pools_cached_blocks` (plants a 64 MiB cached block on
+the analysis thread just before the boundary, real GPU backend: cached after < before, job ok,
+45 frames). `test_wp321_overlap.py` F2 order test: the double tells the boundary apart; expected
+`[("abort", True), ("boundary", True), ("release", False)]`, so abort -> A joined -> release
+stays pinned. Light set (`c7-p2-light.log`): the wp321 release and overlap files, the five
+`test_jobs_*` export/batch files (WP3.14's cancel, failure, D87, V11 tests unchanged) and the
+seven layering files -> 251 passed, 1 failed (the F2 order test, by the boundary's new release,
+expected); after its update the order test + the release file -> 11 passed (`c7-p2-fix.log`).
+ruff check, ruff format --check (249), mypy (138) clean (`c7-p2-static.log`).
+
+### Light STOP: the form of the NVDEC / NVENC terms (proposed, for CHARC)
+
+Constants from the attribution (MiB): NVDEC per session = the overlap increment, max of ON
+1,237 / OFF 1,256 -> **1,256**; NVENC = frames-only remainder (one decoder + NVENC), max ON
+2,440 / OFF 2,448 -> 2,448 - 1,256 = **1,192**; context = device-wide after the probe minus before
+(246 - 131, 261 - 146) = 115 -> **128**. At 5.3K (24,690,176 px): NVDEC 53.3 B/px, NVENC 50.6 B/px.
+
+| form | 5.3K, 2 dec + NVENC | 4K, 2 dec + NVENC | 4K, 1 dec + NVENC | 4K, 2 dec, libx265 |
+|---|---|---|---|---|
+| (S) scaled by pixels: 54 B/px per decoder, 51 B/px NVENC, + 128 | 10,153 | 3,560 | 3,133 | 3,156 |
+| (F) fixed per session: 1,256 per decoder, 1,192 NVENC, + 128 | 10,113 | 6,006 | 4,750 | 4,814 |
+
+Checks (device-wide peaks; the 4K idle before each run 248-329): 5.3K ON 7,921 / OFF 7,593 /
+block 2 7,854 under both forms; 4K c3 cold 3,130-3,244, ancuti 3,014, warm 2,601, OFF 2,925
+under (S) 3,560 by 316-959 raw (more with the idle removed); libx265 2,761 under 3,156; WP3.14's
+one-decoder 4K 2,409 under 3,133. (S) is the recommendation: NVDEC/NVENC surfaces scale with
+the frame, the envelope's sizes are 4K and 5.3K only, and (F) overstates 4K by about 2.8 GB.
+Caveats: one anchor (5.3K) cannot separate a fixed per-process part from the per-pixel part, so
+(S) may under-count a frame much smaller than 4K (out of the envelope); and either form puts
+the 5.3K job at about 10.1 GB, above the 8 GB card (8,188 MiB), because the pool part (6,281)
+is loose against the measured pool peak (4,427); `select_backend` is unchanged, so nothing
+selects differently.
