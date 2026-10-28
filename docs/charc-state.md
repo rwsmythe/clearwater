@@ -152,7 +152,14 @@
   Max-parameter 5.3K row: YES; on breach the gate keys on PROJECTED plan+buffer bytes vs a FIXED budget constant in core, never
   live free memory (deterministic path per inputs); breach at DEFAULT params at 5.3K = STOP to me.** 5.3K estimate ~7.3 of 8 GB.
   Relayed to cell 5 in full 09:15Z (msg `c620af9a4886d174`; depth 141,332); cell finishes the Q-R7 tool-side stamp then builds task 6;
-  memory re-read and oracle legs come as windows. **No window open; seat free.**
+  memory re-read and oracle legs come as windows.
+  **STOP yield 13 (msg `f0c06f32e48bc68e`, depth 163,071): the 5.3K FFT figure was WRONG, plans are ADDITIVE to the transient
+  (one plane ~0.55 transient + ~0.5 persistent = ~1.05 GiB; 5.3K default c3 ~7.8 of 8.0 GiB, no margin); plan size depends on
+  transform LENGTH not shape. RULED (A) CHUNKED per-axis (my ruling-chunked): batch = FIXED 512 lines in core, last batch = the
+  FINAL 512 (overlap recomputed); REQUIRED test bit-identical to unchunked on non-multiple-of-512 shapes at 1080p / 4K / 5.3K;
+  Q-C5a (2) restated as a BOUND per line length measured with the plan cache CLEARED first, added to memory_estimate_bytes for the
+  clip's longer side, test asserts peak < bound; (1) job-end release and the fixed-budget projection rule unchanged. Expected 5.3K
+  default ~7.0-7.1 GiB; task 10 5.3K row = measurement of record, breach = STOP to me.** **No window open; seat free.**
 - **(history) micro-timing window ~08:43Z** (msg `f02a8e3d3ecf679e`). Measures: blur share of c3 render at 4K (CUDA events, median of 20); each render
   blur direct vs R0.4 per-axis FFT and 2-D FFT (time, max abs, determinism, pool bytes); sigma ladder 8-270 at 4K and 5.3K 8:7.
   Dry run 1080p synthetic: blur 57 % of render; gate-eligible = the two Cb/Cr blurs at 0.05 x short side; FFT error <= 8.6e-7.
