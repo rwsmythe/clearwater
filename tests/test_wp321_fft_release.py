@@ -3,13 +3,16 @@
 ``CupyBackend.release_fft_plans`` (an IF-2 device extension, AD-29) clears the calling thread's
 cuFFT plan cache and the pool's free blocks. ``clearwater.jobs`` reaches it only through its own
 ``runtime_checkable`` Protocol (:class:`clearwater.jobs.export.JobDeviceBackend`) and calls it
-once per job on every path (success, failure, cancel; video and photo), never per frame; a
-backend without it (the CPU backend) has nothing to release, and a release that raises never
-replaces the job's outcome.
+once per job on the job's thread on every path (success, failure, cancel; video and photo),
+never per frame; a video job also calls it once on the analysis thread when that thread returns
+(the analysis-end boundary, CHARC ruling at task 10), so the pool's cached blocks go back to the
+device for the rest of the export. A backend without it (the CPU backend) has nothing to
+release, and a release that raises never replaces the job's outcome.
 """
 
 from __future__ import annotations
 
+import threading
 from pathlib import Path
 from typing import Any
 
@@ -23,6 +26,7 @@ from clearwater.interfaces import Settings
 from clearwater.interfaces.stubs import StubProgress
 from clearwater.io.video import FFmpegVideoSource
 from clearwater.jobs import ExportEngine
+from clearwater.jobs import export as export_module
 from clearwater.jobs.export import JobDeviceBackend
 from clearwater.jobs.export_seam import CANCELLED, ExportRequest
 from clearwater.methods import available_methods
@@ -37,12 +41,14 @@ class _Releasing(NumpyBackend):
     def __init__(self, error: BaseException | None = None, sink: FakeSink | None = None) -> None:
         super().__init__()
         self.releases = 0
+        self.threads: list[str] = []
         self.error = error
         self.sink = sink
         self.sink_calls: list[str] = []
 
     def release_fft_plans(self) -> None:
         self.releases += 1
+        self.threads.append(threading.current_thread().name)
         if self.sink is not None:
             self.sink_calls = list(self.sink.calls)
         if self.error is not None:
@@ -109,28 +115,67 @@ def test_the_gpu_backend_satisfies_the_protocol_and_releases() -> None:
     assert pool.total_bytes() < held  # the plans' work areas went back to the device
 
 
-def test_a_video_job_releases_once_after_every_frame(sample: Any, tmp_path: Path) -> None:
+@pytest.mark.gpu
+def test_the_analysis_end_boundary_frees_the_pools_cached_blocks(
+    sample: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    try:
+        gpu = backend_for("cuda:0")
+    except Exception as error:  # no CuPy or no device
+        pytest.skip(f"no GPU backend: {error}")
+    pool = gpu.xp.get_default_memory_pool()
+    release = export_module._release_fft_plans
+    seen: list[tuple[str, int, int]] = []
+
+    def spied(backend: object) -> None:
+        if threading.current_thread().name == "export-analysis":
+            planted = gpu.asarray(np.zeros((4096, 4096), dtype=np.float32))  # 64 MiB
+            del planted  # its block stays in the pool, cached
+        before = pool.total_bytes() - pool.used_bytes()
+        release(backend)
+        seen.append(
+            (threading.current_thread().name, before, pool.total_bytes() - pool.used_bytes())
+        )
+
+    monkeypatch.setattr(export_module, "_release_fft_plans", spied)
+    sink = FakeSink()
+    result = _video(tmp_path, sample(SAMPLE), gpu, sink)
+    assert result.ok, result.failure
+    assert len(sink.frames) == 45
+    assert [name for name, _, _ in seen] == _both_boundaries()
+    _, before, after = seen[0]
+    assert before >= 64 * 1024**2 and after < before
+
+
+def _both_boundaries() -> list[str]:
+    """The release threads of a video job: the analysis thread's return, then the job's end."""
+    return ["export-analysis", threading.current_thread().name]
+
+
+def test_a_video_job_releases_at_the_analysis_end_and_after_every_frame(
+    sample: Any, tmp_path: Path
+) -> None:
     sink = FakeSink()
     backend = _Releasing(sink=sink)
     result = _video(tmp_path, sample(SAMPLE), backend, sink)
     assert result.ok, result.failure
-    assert backend.releases == 1 and len(sink.frames) == 45
+    assert backend.threads == _both_boundaries() and len(sink.frames) == 45
     assert backend.sink_calls == sink.calls and sink.calls[-1] == "close"  # after the last frame
 
 
-def test_a_failed_video_job_releases_once(sample: Any, tmp_path: Path) -> None:
+def test_a_failed_video_job_releases_at_both_boundaries(sample: Any, tmp_path: Path) -> None:
     backend, sink = _Releasing(), FakeSink()
     sink.fail_at = 10
     result = _video(tmp_path, sample(SAMPLE), backend, sink)
     assert not result.ok and result.failure is not CANCELLED
-    assert backend.releases == 1
+    assert backend.threads == _both_boundaries()
 
 
-def test_a_cancelled_video_job_releases_once(sample: Any, tmp_path: Path) -> None:
+def test_a_cancelled_video_job_releases_at_both_boundaries(sample: Any, tmp_path: Path) -> None:
     backend, sink = _Releasing(), FakeSink()
     result = _video(tmp_path, sample(SAMPLE), backend, sink, progress=_CancelAt(10))
     assert result.failure is CANCELLED and result.outputs == ()
-    assert backend.releases == 1
+    assert backend.threads == _both_boundaries()
 
 
 def test_a_job_that_fails_before_choosing_a_backend_releases_nothing(tmp_path: Path) -> None:
@@ -143,7 +188,7 @@ def test_a_raising_release_keeps_the_jobs_outcome(sample: Any, tmp_path: Path) -
     backend, sink = _Releasing(error=RuntimeError("planted release failure")), FakeSink()
     result = _video(tmp_path, sample(SAMPLE), backend, sink)
     assert result.ok, result.failure
-    assert backend.releases == 1
+    assert backend.threads == _both_boundaries()  # the analysis thread's raise is logged too
 
 
 class _CancelOn(StubProgress):

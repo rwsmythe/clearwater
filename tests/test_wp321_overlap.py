@@ -661,7 +661,10 @@ class _Releasing(NumpyBackend):
         self.order = order
 
     def release_fft_plans(self) -> None:
-        self.order.append(("release", bool(_analysis_threads())))
+        # The analysis thread's own release as it returns (the analysis-end boundary) is told
+        # apart from the job's end-of-job release.
+        on_analysis = threading.current_thread().name == "export-analysis"
+        self.order.append(("boundary" if on_analysis else "release", bool(_analysis_threads())))
 
 
 def test_a_failing_job_aborts_then_joins_the_analysis_then_releases(
@@ -669,6 +672,7 @@ def test_a_failing_job_aborts_then_joins_the_analysis_then_releases(
 ) -> None:
     # Reviewer A round 1, F2 ruled (a): on a failure the sink is aborted FIRST (the encoder is
     # released at once), the analysis thread is joined after, and the plans are released last.
+    # The analysis thread's boundary release comes as it returns, after the abort let it go.
     rig, source, _ = _rig(tmp_path)
     order: list[tuple[str, bool]] = []
     backend = _Releasing(order)
@@ -700,5 +704,5 @@ def test_a_failing_job_aborts_then_joins_the_analysis_then_releases(
     monkeypatch.setattr(FakeSink, "abort", abort)
     result = rig.run(rig.request())
     assert result.failure == "clip.mp4: RuntimeError: ORIGINAL render failure"
-    assert order == [("abort", True), ("release", False)], order
+    assert order == [("abort", True), ("boundary", True), ("release", False)], order
     assert _analysis_threads() == []

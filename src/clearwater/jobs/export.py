@@ -14,6 +14,11 @@ on by the job's thread until the export starts, Q-R3). The job renders frame i o
 has published i's record as final for every stage (``smoothed_record`` waits), so every frame
 renders with exactly the whole-clip record; each thread holds one decoded frame at a time. The
 analysis thread has ended before the sink's ``close`` and is joined on every path out of the job.
+When the analysis thread returns, on every path, it releases the device pool's free blocks once
+through the backend's ``release_fft_plans`` (CHARC ruling, WP3.21 task 10): the blocks the
+analysis half grew the pool by go back to the device for the rest of the export, and the
+render thread's FFT plans are untouched (the plan cache is per thread; the analysis thread
+builds none). The job's end releases again on its own thread (Q-C5a).
 During a video encode, from after the sink's ``open`` until its ``close`` has returned, one
 watchdog thread polls ``progress.cancelled()`` and calls the sink's ``abort`` once, which
 releases a write blocked on FFmpeg's input (DR-57 (b)) or a ``close`` still flushing; it touches
@@ -141,7 +146,8 @@ class JobDeviceBackend(Protocol):
     """The IF-2 device extension ``clearwater.jobs`` calls (AD-29, WP3.21 Q-C5a), by structure.
 
     The GPU backend provides it and the CPU backend does not; a job whose backend lacks it has
-    nothing to release.
+    nothing to release. A video job calls it twice: once on the analysis thread when that
+    thread returns, once on the job's thread at the job's end.
     """
 
     def release_fft_plans(self) -> None:
@@ -150,9 +156,10 @@ class JobDeviceBackend(Protocol):
 
 
 def _release_fft_plans(backend: object) -> None:
-    """Release a job backend's FFT plans at the job's end (Q-C5a); never raises.
+    """Release a job backend's FFT plans and free pool blocks (Q-C5a); never raises.
 
-    A failure to release is logged and never replaces the job's own outcome.
+    Called at the job's end and when a video's analysis thread returns. A failure to release is
+    logged and never replaces the job's own outcome.
     """
     if not isinstance(backend, JobDeviceBackend):
         return
@@ -291,7 +298,8 @@ class _Analysis:
     waits for the LEAD (the first frame final, or the analysis ended), reads each frame's record
     through the engine's ``smoothed_record`` (which waits until the record is final), and
     :meth:`finish` joins the thread and turns its result into the job's outcome with
-    :func:`_check_analysis`, as the serial analysis did.
+    :func:`_check_analysis`, as the serial analysis did. When the thread returns (on every path)
+    it releases the backend's free pool blocks once, the analysis-end boundary.
 
     Attributes:
         engine: The clip's analysis engine.
@@ -300,12 +308,14 @@ class _Analysis:
     def __init__(
         self,
         engine: AnalysisEngine,
+        backend: ArrayBackend,
         progress: Progress,
         name: str,
         cache: ProxyCache,
         key: CacheKey,
     ) -> None:
         self.engine = engine
+        self._backend = backend
         self._progress = progress
         self._name = name
         self._cache = cache
@@ -360,6 +370,8 @@ class _Analysis:
             assert self._job is not None
             self._result = self._job(self._fold)
         finally:
+            # The analysis-end boundary: free the pool blocks the analysis half grew it by, once.
+            _release_fft_plans(self._backend)
             self._fold.end()
 
     def lead(self) -> None:
@@ -920,7 +932,7 @@ class ExportEngine:
             params=params,
             hw_decode=hw_decode,
         )
-        analysis = _Analysis(engine, progress, run.name, self._cache, key)
+        analysis = _Analysis(engine, backend, progress, run.name, self._cache, key)
         analysis.start()
         analysis.lead()
         return analysis
