@@ -13,6 +13,7 @@ Cell `implementer-opus-high` (Claude lane), worktree `.worktrees/wp3.21`, branch
 | 1 (read) | as given by the dispatcher at yield 1 | 269,898 (past the 250K evaluation point: run the window, write round 0, then re-seat) |
 | 2 | round 0 yield | (dispatcher fills) |
 | 2 (read) | cell 1 stood down after round 0 (re-seat) | 359,040 |
+| 3 (read) | cell 2: #1 built, interim-1 WINDOW REQUEST (granted) | 287,974 (past the evaluation point: run the window, record, hand over to cell 3) |
 
 ## Re-seat: cell 2 (2026-10-28), rulings since round 0
 
@@ -132,7 +133,88 @@ the overlap is pinned on GX011627 and the synthetic 4K clip in the interim windo
 | V15 | warm per-frame `_measure` calls reset its closed-form memo (a different closed_form call multiset) | yes | yes, by reading | - | `memo` carried across calls (`_Stream.closed`) |
 | V16 | lock order: E holds the condition and takes the engine and store locks | yes | - | rejected: the analysis thread never takes the condition while holding either lock (`_end_stream` and the publications run outside them) | - |
 
-### Open questions raised at this yield (recommended answer first)
+### Interim 1 (#1 only; development evidence, not of record; EXCLUSIVE window 2026-10-28)
+
+Driver `C:\Users\rwsmy\clearwater\work\wp3.21\interim1.sh`; logs
+`work\wp3.21\logs\interim1-{bench,oracle,synth4k,ancuti2018}.log`.
+
+**Timing (H3)**, record `work\wp3.21\bench\export-bench-GX011627-20261028T061339Z.json`:
+
+| GX011627 cold c3, hevc_nvenc, Standard | s/frame | min/min | per-frame median / p90 / max | lead (analysis -> open) | peak tree RSS | peak GPU memory |
+|---|---|---|---|---|---|---|
+| WP3.14 baseline | 1.061-1.065 | about 31.8 | - | whole analysis (about 31 %) | (WP3.14 report) | (WP3.14 report) |
+| **#1 overlap** | **0.8100** | **24.28 (meets D106's interim 25)** | 0.7735 / 0.8208 / 2.8583 | **18.8 s** (stamps 1.61 -> 20.43 s; 3.4 % of the wall) | 3,987 MiB | 2,877.0 MiB |
+
+Gain: -0.25 s/frame (-24 %). Wall 551.6 s; frames phase 529.95 s = 0.778 s/frame, against the
+breakdown's serial frame path of 0.714: the analysis thread's host work (block_mean, conversions)
+and its GPU work now share the CPU and the card with the export, about +0.06 s/frame of
+contention; #3 is expected to remove most of that host share. Peak tree RSS at 433 s (two
+decoders resident), inside R0.3's +0.5-0.8 GB estimate at 4K. The card was at 210 MHz in the
+before/after snapshots, 51 -> 68 C.
+
+**Oracle (H4-H6), every one TIER1 against the base reference `-a`:**
+
+| Clip / method | Frames | Verdict | Oracle job wall, base a / b -> #1 |
+|---|---|---|---|
+| GX011627 c3 (23 frames kept; 1,362 analyze calls) | 681 | **TIER1** (0 differing; records, analyze calls, proxies equal) | 695.2 / 702.9 -> **587.2 s** |
+| synthetic 4K c3 (120 frames, so overlapped: lead 61) | 120 | **TIER1** | 125.0 / 122.2 -> 117.6 s |
+| GX011627 ancuti2018 (lead 91; 2,043 analyze calls) | 681 | **TIER1** | 513.1 / 508.6 -> 392.0 s |
+
+### Rulings at the window grant
+
+- **Q-R7: ACCEPTED** (orchestrator): report end-to-end s/frame plus the lead, with a tool-side
+  analysis-end stamp in `export_bench` and no product hook (to build at task 10's touch of
+  `export_bench.py`).
+- **Q-R6:** with CHARC (orchestrator recommended ACCEPT). The current code runs the re-check
+  after the lead.
+
+## RESUME HERE (cell 3, taking #2 and #3)
+
+State at hand-over (cell 2, depth 287,974 at yield 3): branch `wp3.21` on `d1e4537`, no rebase.
+#1 (task 4) is DONE and committed (`333ad3f` overlap, `62f1da6` bench `--subdir`, then ledger
+commits); interim 1 recorded above (24.28 min/min, TIER1 on every oracle leg run). Task 7 so
+far: the engine `import logging` debt CLOSED. Nothing of #2, #3 or task 6 is started.
+
+Read, in order: this ledger's Round 0 (R0.1-R0.9), the re-seat rulings, "Task 4 (#1): the
+overlap, as built" (with its existing-test constraints), interim 1 and this section. Then the
+brief's task ladder 5-10 and Rulings, and the code: `io/video/decode.py`, `io/video/encode.py`,
+`color/samples.py`, `analysis/proxy.py`, then `engine.py`'s `_decode` (where the stream hooks
+in) and `export.py`'s `_write_frames`.
+
+Binding for #2 and #3 (Q-R2, granted; CHARC `5b05c53d` addition):
+
+- GRANTED: `src/clearwater/io/video/decode.py`, `io/video/encode.py`, `color/samples.py`, for #2
+  and #3 only. IF-1 and IF-5 unchanged. `FFmpegVideoSource`'s device-frame mode is OPT-IN at
+  construction, off by default. The sink still refuses a `"cuda:0"` label on NumPy pixels and
+  accepts only a real device array: `tests/test_io_video_encode.py` 962, 1101, 1211, 1259 stay
+  UNCHANGED (if one cannot, STOP). DR-63 CLOSES at the `encode.py` touch ("`close` sets
+  `"closed"` only from `"open"` ... and `abort`'s docstring names the window"). The `force_cpu`
+  path gives the base's output: tier 1 on the WP2.3 CPU references (`ref-*-c3-cpu-a`).
+- **Before #3 (the device block mean) lands on the device-frame conversions, the oracle must
+  exercise those conversions on GX011627 in a granted window** (CHARC addition): land #2,
+  request a window for its GX011627 oracle leg (Q-R5's #2+#3 interim may share it only if #3 is
+  not yet in), then #3.
+- #3 is tier 1 or a STOP (Q3 tightening: records and proxy bytes tier 1 ALWAYS); R0.6 gives the
+  exactness argument to re-check in code (float64 block sums of k/255 or k/1023 are exact; one
+  correctly rounded division; the same `quantise`).
+- Tests per R0.5's `tests/test_wp321_device_frames.py` list.
+
+Task 6 (after #1-#3 and the 4K direct-vs-FFT micro-timing window, Q-R5), Q-R1 RULED (CHARC
+`5b05c53d`): the gate lives inside the IF-2 implementation in `core/backend.py`, identically for
+both backends; FFT only when `min(H, W) >= 1080` AND `sigma >= 32` px; the sigma threshold is
+PROVISIONAL until the micro-timing and may move only upward, never below 32. Required tests:
+(a) a tripwire deriving the largest possible proxy short side from `analysis/proxy.py`'s own
+rule and asserting it is below 1080; (b) a planted analysis-sized blur bit-identical to the
+direct path; (c) FFT against direct within 1e-5 at 1080p and 4K. Plus R0.4's border and 5.3K
+checks and the memory re-read (Q9).
+
+Then task 7 (DR-63 with #2; DR-40 (b) recorded measured-negligible per Q8), the Q-R7 stamp in
+`export_bench.py`, the review loop (Codex `gpt-6.1-sol` / high, WSL, probe first, evidence
+`C:\Users\rwsmy\clearwater-review-evidence\wp3.21\rN\`, `--glob '!docs/proofs/**'`), the full
+suite in a window, task 10 last. Heavy runs only in granted windows, waited in the FOREGROUND
+(`3df4206`).
+
+### Open questions raised at yield 3 (recommended answer first)
 
 - **Q-R6 (D87 re-check after the lead):** the second free-space check, which WP3.14 placed after
   the whole analysis "because the analysis cache may share the volume", now runs after the LEAD.
@@ -218,6 +300,11 @@ Anchors checked against the code before use:
 |---|---|---|---|---|---|---|---|---|
 | H1 | task 1 (granted, CHARC OPEN) | 03:41:39Z | 03:57:05Z | `uv --directory <wt> run python tools/analysis_breakdown.py GX011627` | GPU backend, hw_decode, auto/NVENC, Standard; cProfile phase included; occupancy 5 Hz, telemetry 0.25 s / 10 s; nothing else heavy started by this cell | 11.3 GiB | tree RSS 2,870 MiB; graphics memory in use 2,421 MiB (device-wide) | 0 |
 | H2 | task 2 (same window) | 04:30:37Z | 05:17:52Z | `bash work/wp3.21/oracle-base.sh` (26 records, 13 compares) | GPU (auto) and CPU (`--force-cpu`) legs as listed; serial | 11.13 GiB | not sampled (the oracle records equality, not memory) | 0 |
+
+| H3 | interim 1 (#1), cell 2 | 06:13:38Z | 06:23:09Z | `interim1.sh 1`: `export_bench.py run GX011627 --cache cold --method c3 --subdir wp3.21/bench` | GPU, hw_decode, auto -> hevc_nvenc, Standard; telemetry 0.25 s / 1 s; strays: only this job | 12.0 GiB | tree RSS 3,987 MiB (python 1,370 + 3 ffmpeg: two decoders, one encoder); GPU memory 2,877.0 MiB | 0 |
+| H4 | same window | 06:23:50Z | 06:33:43Z | `interim1.sh 2`: oracle record `cand-overlap-GX011627-c3` + compare | GPU (auto) | 12.05 GiB | not sampled | 0 |
+| H5 | same window | 06:34:02Z | 06:36:04Z | `interim1.sh 3`: oracle record `cand-overlap-synth4k-c3` + compare | GPU (auto), sha256-guarded clip | 12.01 GiB | not sampled | 0 |
+| H6 | same window | 06:36:30Z | 06:43:07Z | `interim1.sh 4`: oracle record `cand-overlap-GX011627-ancuti2018` + compare | GPU (auto) | 12.03 GiB | not sampled | 0 |
 
 Light runs (no window): `vid-hevc8-bt709-full` dry runs of both tools on the GPU (breakdown:
 residuals 0.01-0.05 %, replica equals engine on 180 records and 45 proxies; oracle base control
