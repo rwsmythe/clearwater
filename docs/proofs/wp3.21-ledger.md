@@ -15,6 +15,7 @@ Cell `implementer-opus-high` (Claude lane), worktree `.worktrees/wp3.21`, branch
 | 2 (read) | cell 1 stood down after round 0 (re-seat) | 359,040 |
 | 3 (read) | cell 2: #1 built, interim-1 WINDOW REQUEST (granted) | 287,974 (past the evaluation point: run the window, record, hand over to cell 3) |
 | 3 (last) | cell 2 stood down after interim 1 (re-seat to cell 3) | 310,465 |
+| 4 | cell 3: Q-R6 and #2 built; WINDOW REQUEST for #2's GX011627 oracle leg | (dispatcher fills) |
 
 ## Re-seat: cell 2 (2026-10-28), rulings since round 0
 
