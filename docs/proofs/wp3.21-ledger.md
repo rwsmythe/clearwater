@@ -41,7 +41,14 @@ close/abort under `_phase_lock`). `color/samples.py` and `src/clearwater/interfa
 and #3 (`--device-frames`, GPU and `--force-cpu` legs); GX011627 + synthetic 4K for #2 under
 AD-29 (H9, H10); interim 2 (H11-H14): 15.37 min/min, frames phase 0.501 s/frame, three oracle
 legs TIER1. The WP2.3 samples are 320x180 (k = 1): they pin routing, never `block_sums`; only
-the 4K legs pin it.
+the 4K legs pin it (interim 2's H12-H14 are the only end-to-end pin for k > 1, CHARC
+`fc6e2e64`).
+
+**Carried FINDINGS for task 10's report:** the slow frames recur (interim 2: indices 323, 0,
+387 at 0.965 / 0.955 / 0.947 s, median 0.483), so the report places them from the per-frame
+record; interim 1's single 2.858 s max likewise. **Memory:** the graphics peak rose +0.26 GB
+over interim 1 against #2's +0.13 GB estimate; re-derive the 5.3K estimate (was about 6.9 of
+8 GB before the FFT) at task 6's memory re-read; a measured peak above AD-1's estimate is a STOP.
 
 **AD-29 as ruled and amended (binding; decisions.md on main, `589f90e`, `ce55a95`, `e8c56eb`):**
 
@@ -803,6 +810,15 @@ Driver `work\wp3.21\interim2.sh` (interim 1's with `--device-frames`; 5 GiB chec
   remains the watch item.
 - INTERIM figures, one run, cold cache: never quoted as V16's result outside this ledger; the
   figures of record are task 10's.
+- **This window (H12-H14) is the only end-to-end pin on `block_sums` for k > 1** (CHARC
+  `fc6e2e64`: #3 as built is AD-29 as amended; step 1's timing is development evidence beside
+  interim 1 and the 0.714 / 0.778 pair, not V16).
+- **FINDING (orchestrator, under CHARC `4dc2978b` point 3):** the slow frames RECUR (indices
+  323, 0, 387 at 0.965, 0.955, 0.947 s against a median of 0.483), not a one-off at the lead;
+  task 10's report must place them (per-frame record).
+- Graphics peak +0.26 GB over interim 1 against #2's estimate of +0.13 GB at 4K: the estimate
+  was low by about 0.13 GB; the 5.3K row (about 6.9 of 8 GB before the FFT, now possibly
+  higher) stays the watch item for task 6's memory re-read.
 
 ## Re-grounding (2026-10-27/28, against `d1e4537`)
 
