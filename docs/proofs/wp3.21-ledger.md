@@ -44,7 +44,8 @@ Cell `implementer-opus-high` (Claude lane), worktree `.worktrees/wp3.21`, branch
 | 17-19 (read) | at the synth and gxa grants | 310,029; 312,501 |
 | 20 | cell 5 stands down after the oracle legs; RESUME HERE (cell 6) | (dispatcher fills) |
 | 21 | cell 6: Reviewer A round 1 adjudicated (`b1bb9cc`) | 140,415 |
-| 22 | cell 6: Reviewer A round 2 adjudicated, loop terminates | (dispatcher fills) |
+| 22 | cell 6: Reviewer A round 2 adjudicated, loop terminates (`047656f`) | 179,866 |
+| 23 | cell 6: cleanup committed (`1df2626`); WINDOW REQUEST (parallel leg) | (dispatcher fills) |
 
 ## RESUME HERE (cell 6, after cell 5)
 
@@ -1605,7 +1606,7 @@ adjudication, repro, md5s). Runner copied from WP3.14 r2; WSL, codex-cli 0.162.1
 | Round | Critical | Major | Minor | In / out of envelope | New / reopened | Reverts | Product or test-only | Transport / CLI | Depth |
 |---|---|---|---|---|---|---|---|---|---|
 | 1 | 0 | 6 reported; 1 confirmed blocking (F5), F2 pending a ruling | 5 reported (+ F3, F6, F7 adjudicated minor) | in: F1-F9; out: F10, F11 (banked) | all NEW | 0 | PRODUCT (F5 `jobs/export.py`, `9d73fe4`) + tests | WSL, 0.162.1, gpt-6.1-sol high | 140,415 |
-| 2 | 0 | 0 | 1 (test helper race) | in | NEW | 0 | test-only (cleanup) | WSL, 0.162.1, gpt-6.1-sol high | (dispatcher fills) |
+| 2 | 0 | 0 | 1 (test helper race) | in | NEW | 0 | test-only (cleanup) | WSL, 0.162.1, gpt-6.1-sol high | 179,866 |
 
 ### Round 1 (cell 6; HEAD `aa06584`, diff `d1e4537..aa06584` without `docs/proofs`)
 
@@ -1656,3 +1657,33 @@ Exit 0 10:57:28Z; banner `gpt-6.1-sol` / high; tokens 75,977; 18 `succeeded in`;
   abort -> join -> release.
 - **ZERO NEW BLOCKING: the loop TERMINATES at round 2.** Cleanup (once, never another round):
   r2 F1; r1 F6, F7, F8, F9.
+
+### Cleanup (terminating round, once; dispatcher GO at depth 179,866; `1df2626`)
+
+Tools and tests only; every new test run failing-first against the previous tools (12 failed,
+the measured-sample TIER2 case passed on both).
+
+- r1 F6: `export_oracle.compare` adds a FAIL reason when frames differ and none was measured
+  (`test_differing_frames_with_none_measured_fail`; the unmeasured test now pairs one unmeasured
+  frame with a measured one and stays TIER2). **No recorded verdict changes:** every recorded
+  TIER2 leg measured frames (gx 23 of 681 differing, synth 4 of 120); every TIER1 leg had no
+  differing frame, where the new reason cannot apply.
+- r1 F7: `export_oracle.refuse_inside` (via `path_forms`) and `analysis_breakdown.refuse_inside`
+  compare the lexical AND the `os.path.realpath` forms (a link or junction to the footage
+  folder is refused); tests patch `realpath` to alias a folder (portable, no link created).
+- r1 F8: `export_oracle.record_name`: `--name` must be one plain component (not empty, `.`,
+  `..`, absolute, a drive, or holding a separator), checked before anything is made.
+- r1 F9: the planted short lead, the blocked write and the analysis-failure-mid-export tests
+  hold the analysis with an EVENT (`_hold_analysis`, released by the abort or by five
+  rendered frames), never a sleep. Residual, banked: the 2 ms pacing sleep stays in the rig
+  for the overlap-observation tests (equality, warm, CPU path); a race there fails loudly
+  (`the export started only after ...`), never passes vacuously.
+- r2 F1: `_Streams` registers each stream's thread under its lock and `_analysis_decoded`
+  snapshots threads and events under the same lock.
+- Gates: ruff, format, mypy clean; the five barrier tests x5 passed; light set (every
+  `*_deps.py` / `*_rules.py`) 2,655 passed (455 s).
+
+**Reviewer A: CONVERGED at round 2** (r1: 1 confirmed blocking, fixed in product code;
+r2: 0 blocking). Banked for the report's Limits: r1 F3 (an analysis stalled >= 60 s inside one
+frame), F2 (abort-first, ruled (a); the design text corrected in the report), F10, F11 (out of
+envelope), the F9 residual pacing sleep.
