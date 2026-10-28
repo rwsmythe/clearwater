@@ -173,7 +173,10 @@
   records/proxies equal; else STOP)** (msg `1e7d4c07c4a26046`). **NOTHING HEAVY AT THIS SEAT until CLOSE.** Cell 5 depth 310,029.
 - **ORACLE LEG gx CLOSED 09:56Z: GX011627 c3 TIER2 as expected, 681 frames differing, max abs 7.06e-6, mean abs 7.95e-7 (AD-11
   2e-3 / 2e-4); records (681), proxies (681), source statistics, analyze calls (1,362), pts ALL EQUAL (any inequality there = FAIL
-  by the oracle's construction, `export_oracle.py:555-594`). WP2.3 legs TIER1 x10 max abs 0 (light).** (gx OPEN was `341e39c6ab4c4018`.) Then synth (TIER2 expected) and gxa (ancuti2018, TIER1) each in its own OPEN; WP2.3 legs light outside windows.
+  by the oracle's construction, `export_oracle.py:555-594`). WP2.3 legs TIER1 x10 max abs 0 (light).** CORRECTION accepted (msg
+  `df7ed96f118b8951`): the oracle compares FLOAT pre-encode frames at the sink seam, so "no exported pixel changes" is NOT
+  established; a float within 7e-6 of a rounding boundary flips one code value. Report wording = the orchestrator's; the quantised
+  difference on the 23 sampled frames (8- and 10-bit, count and max of changed pixels) is MANDATORY (light, from the saved .npy). (gx OPEN was `341e39c6ab4c4018`.) Then synth (TIER2 expected) and gxa (ancuti2018, TIER1) each in its own OPEN; WP2.3 legs light outside windows.
   Cell 5 depth 298,494 at yield 16; runs the legs then hands to cell 6.
 - **MEMORY RE-READ CLOSED ~09:50Z: every peak under base + bound; max-fraction 5.3K inside the card, projection rule NOT
   triggered.** 4K default 908 MiB (plans 30, transient 878) vs estimate 2,174; 4K max 947; 5.3K default 2,710 (97 / 2,614) vs 6,281;
