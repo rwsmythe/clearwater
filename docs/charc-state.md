@@ -228,6 +228,12 @@
   select_backend (core/backend.py:613) and the IF-2 method, so the figure misleads nobody; showing it is WP4.3's business. Part 2
   (boundary release in `_Analysis._run` finally, once per job; planted 64 MiB test; F2 order re-pinned abort -> boundary -> release)
   ACCEPTED as built (b5a383c). Cell 7 266,488, continues for the bounded remainder.**
+- **EXCLUSIVE WINDOW OPEN 2026-10-28 ~15:36Z: WP3.21 SUITE PARALLEL LEG on the final head (cell 8, ~10 min; head 0bce49b,
+  ledger-only since 227ed32)** (msg `afaadfc07237ce40`). **NOTHING HEAVY AT THIS SEAT until CLOSE.** Recollection 5,289 / 4,175 /
+  1,114 explained: parallel +27 (`test_wp321_job_memory.py`), 3 ids RENAMED by part 2 in `test_wp321_fft_release.py` (none removed);
+  serial +1 (gpu boundary-free test). Naming point banked for B: `...releases_at_the_analysis_end_and_after_every_frame` asserts
+  exactly TWO releases (name overstates; assertion right) -> rename in B's cleanup or a MINOR. Cell 8 dispatched ~15:27Z from
+  61a3e08, depth 62,302. Then SERIAL leg (own window), block 3 LAST.
 - **WINDOW CLOSED 15:21Z: BLOCK 2 RE-RUN PASSES BOTH INSTRUMENTS on 227ed32** (msg `37be8fe8cb46f38f`): (ii) pool reserved peak
   4,311.7 MiB <= 6,281.4 (binding at 5.3K); (i) device-wide 7,901 <= job estimate 10,330.8 (idle 256); speed 1.2229 s/frame = 36.65
   min/min [136.03]; RSS 7,753. 4K attribution (GX011627 ON): peak 3,054 (pool 1,353, remainder 1,586), frames-only 2,433, NVDEC
