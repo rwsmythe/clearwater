@@ -143,6 +143,15 @@
   **Cell 4 DISPATCHED 07:31Z** (msg `94c72e704d83c247`) from `wp3.21` e6d27a0 (cell 3 handover, final 265,087), AD-29's eight
   conditions in its prompt; order #2 rework -> oracle WINDOW -> #3 -> unchanged. Brief names the four layering tests (b26b051;
   CRLF blob corrected within a minute by e6f7193; 0 CR at HEAD, verified at my seat).
+- **EXCLUSIVE WINDOW OPEN 2026-10-28 ~08:14Z: WP3.21 INTERIM 2 (#1+#2+#3, device frames ON; ~30 min, head 0ed0672): export_bench
+  GX011627 cold c3 (development timing), then oracle GX011627 c3, synthetic 4K, GX011627 ancuti2018, all `--require-tier1`**
+  (msg `e09002e4eb2349ec`). **NOTHING HEAVY AT THIS SEAT until CLOSE.** Non-TIER1 = STOP. Cell 4 yield 8, depth 236,806: `05ee507`
+  #3 under AD-29 as amended (`block_sums` float64 host sums or None at the bound, reductions only, no frame-sized temporary;
+  `AnalysisDeviceBackend` Protocol; host fallback on None / k==1 / no extension; engine +2 lines); `6e504fe` export_bench records
+  the configuration header; 21 tests (Protocol pair, device == host bit for bit and proxy byte for byte at 4K k4, 5.3K k5/k8, k2 odd
+  edges, k1, 8/10-bit; planted NaN/inf/1.5/1e-30/1e-12 -> None, host bytes); light 1050 passed. CAVEAT: WP2.3 samples 320x180 =
+  k 1, so k > 1 is pinned end to end ONLY by this window. Seat plan AGREED: cell 4 runs and records the window, writes RESUME HERE,
+  stands down; **cell 5** takes the 4K micro-timing onward.
 - **WP3.21 AD-29 #2 ORACLE WINDOW CLOSED 07:56Z: reworked #2 TIER1 on GX011627 (681 / 0 differing, max abs 0, mean abs 0) and
   synthetic 4K (120 / 0)** (msg `c6afcfc8bacaf5d5`; OPEN `1ec355e68f10ef7e`; head 867d5fb). AD-29 item 6 met before #3. The io.video
   Protocol pair asserts both directions (`test_wp321_device_frames.py:82` / `:92`); the analysis pair comes at #3. **No window open;
