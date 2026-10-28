@@ -327,6 +327,15 @@ class _PoolPeak:
             self._read()
 
 
+MEMORY_CHECK_NOTE = (
+    "At 5.3K the job total exceeds the card because its pool part is the selection bound (loose by"
+    " design: measured 4,427 MiB against 6,281), so the binding 5.3K check is the pool's reserved "
+    "peak against the pool estimate, with the covered-row tests; the device-wide check is recorded"
+    " at 5.3K and binds at 4K."
+)
+"""The record's one sentence on which instrument binds where (CHARC ruling ``3f17304438bc2555``)."""
+
+
 def memory_check(
     record: dict[str, Any], backend: object | None, info: ProbeResult | None, pool_peak: int | None
 ) -> dict[str, Any]:
@@ -376,6 +385,7 @@ def memory_check(
         "pool_estimate_mib": round(pool_estimate / mib, 1),
         "pool_ok": pool_ok,
         "passes": device_ok and pool_ok,
+        "note": MEMORY_CHECK_NOTE,
     }
 
 

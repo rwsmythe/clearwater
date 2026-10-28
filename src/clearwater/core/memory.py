@@ -141,7 +141,11 @@ def job_device_memory_estimate_bytes(
     (:data:`CUDA_CONTEXT_BYTES`) + ``decoders`` NVDEC sessions + one NVENC session when the job
     encodes with NVENC (:func:`session_bytes`). A cold video job has TWO decoders during the
     overlap (the export's and the analysis's); a job over a complete cache entry has one. The
-    figure is compared with a device-wide peak; it never chooses the backend.
+    figure is compared with a device-wide peak; it never chooses the backend. At 5.3K the job
+    total exceeds the card because its pool part is the selection bound (loose by design:
+    measured 4,427 MiB against 6,281), so the binding 5.3K check is the pool's reserved peak
+    against the pool estimate, with the covered-row tests; the device-wide check is recorded at
+    5.3K and binds at 4K.
 
     Args:
         height: Frame height in pixels, at least 1.

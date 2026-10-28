@@ -139,6 +139,7 @@ def test_the_bench_check_reports_both_instruments_and_both_bounds() -> None:
     assert check["pool_estimate_mib"] == pytest.approx(_pool_estimate(*K53) / MIB, abs=0.1)
     assert check["idle_before_mib"] == 248.0 and check["pool_peak_mib"] == 4427.0
     assert check["device_ok"] and check["pool_ok"] and check["passes"]
+    assert check["note"] == bench.MEMORY_CHECK_NOTE and "binds at 4K" in check["note"]
     line = bench._check_text(check)
     assert "device 7921.0 /" in line and "pool 4427.0 /" in line and "OVER" not in line
 
