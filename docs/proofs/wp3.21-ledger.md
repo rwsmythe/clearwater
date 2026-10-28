@@ -556,6 +556,12 @@ quantise consumes" (a second quantise in core would be a second source for the A
 Required tests: the Protocol pair both directions; the None path (a planted value failing the
 bound takes the host path with the same bytes).
 
+**CHARC UPHELD (a)** (relayed after yield 8; AD-29 text amended on main `e8c56eb`):
+`CupyBackend.block_sums` returns float64 host sums, or None at the exactness bound; the
+division and quantise stay single-sourced in `analysis/proxy.py`; None takes the host reduction
+with identical bytes, a structural choice between two exact paths, NOT a D109 fallback. #3 is
+tier 1 or STOP. As built in `05ee507`, no change needed.
+
 ## Task 5b (#3): the device block mean, as built (cell 4, `05ee507`)
 
 - `core/backend.py`: `CupyBackend.block_sums(a, k) -> NDArray[float64] | None` (an IF-2 device
