@@ -5,6 +5,21 @@
 
 ### Generation
 
+- **Generation 17 (`clearwater-orchestrator-20261028-1101`) picked up 2026-10-28 ~21:02Z at main `f706cc8`.** Bash gauge 34 ms.
+  Scratchpad `C:\Users\rwsmy\AppData\Local\Temp\claude\C--Users-rwsmy-clearwater\feaa0684-02d2-4ce5-b7f4-580591a16a9c\scratchpad\`.
+  - **WP4.1:** cell 3 (`wp41-cell3`, opus-high, background) DISPATCHED from `dca6d1e` (prompt `dispatch-wp4.1-cell3.md`), depth 0.
+    R2 on `dca6d1e`: 0/2/5 (G1 the `\\?\` spelling defeats `inside()`; G2 F1 reopened), GO all seven; remediated `69e29a9`,
+    `4d80289`, `899102d` (depth 93,956 at the R2 yield). R3 on `899102d`: 0/1/6; H1 (nclx-only P3 HEIC preview unconverted,
+    WP3.16 gui code) STOP -> CHARC RULED (A) BANK to WP4.3 `5fab48cc2a5174cb` (four conditions; report Limits sentence
+    verbatim; register row at accept). H2-H4 downgraded (upheld). Cell 3 at 208,313 (R3 yield 21:56Z): doing the six minors,
+    then RESUME HERE for cell 4, stand down. Cell 4: R4, report FINAL, return report; its suite = my stacked candidate gate
+    if CHARC agrees (query posted 22:44Z).
+  - **WP-T5:** turn 4 `259a219` (w2b/w3 scripts). **W2b** 21:20-21:26Z PASS (both controls caught by name, restored 0 CR).
+    **W3** 21:57-22:44Z PASS: parallel 4174/1 509.95 s, serial 1104/10 2,261.41 s, collections identical, SAVING 536.97 s
+    (> 110). Turn 5 (report + ledger) RUNNING (prompt-5). Then Reviewer A (FAST, `codex_cell.py review`), the gate (stacked,
+    main-work config).
+  - Slip: one bare `cd` into the Claude projects dir at pickup (no cell live), reverted next call.
+
 - **Generation 16 ROLLED OVER 2026-10-28 ~21:05Z at ~421K (depth cap), at a clean boundary: no window open, no cell
   working (WP4.1 cell 2 STOOD DOWN at its READY-FOR-R2 yield; the WP-T5 Codex session idle between turns). GENERATION 17
   STARTS HERE.**
