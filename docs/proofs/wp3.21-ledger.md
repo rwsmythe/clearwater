@@ -52,7 +52,8 @@ Cell `implementer-opus-high` (Claude lane), worktree `.worktrees/wp3.21`, branch
 | 27 | cell 7: WINDOW RELEASED (serial leg 2 green); WINDOW REQUEST (task 10 block 1) | 123,491 |
 | 28 | cell 7: WINDOW RELEASED (task 10 block 1); WINDOW REQUEST (block 2, 5.3K) | 154,676 (at the grant) |
 | 29 | cell 7: block 2 5.3K GPU peak above both bounds; STOP | 167,263 (at the HOLD) |
-| 30 | cell 7: option (A) driver drafted in the HOLD (not run) | (dispatcher fills) |
+| 30 | cell 7: option (A) driver drafted in the HOLD (not run) | 180,200 (at the (A) grant) |
+| 31 | cell 7: WINDOW RELEASED (attribution); split table to CHARC | (dispatcher fills) |
 
 ## RESUME HERE (cell 6, after cell 5)
 
@@ -1947,3 +1948,58 @@ every sample in a phase (lead / overlap / frames only / close) and summarises, a
 device-wide peak: pool total and used, and the residual (device used - idle - pool total = the
 FFmpeg decoders', NVENC's and the extra CUDA contexts' share). `--off` runs the host-frame path
 for the same split. Output `work\wp3.21\attribution\`.
+
+### Attribution run, option (A) (CHARC FINAL `e166515f`; window GRANTED 14:12Z; ran 14:14-14:26:51Z)
+
+Driver `C:\Users\rwsmy\clearwater\work\wp3.21\memory_attribution.py` (uncommitted, ruff clean; no
+product change). It runs ONE job through `export_bench.run_once` on the synthetic 5.3K clip and
+samples in process through the probed backend's `xp`: pool `used_bytes` / `total_bytes`
+(cached = total - used) every 0.1 s and after each `planes_to_rgb` / `block_sums` /
+`gaussian_blur` / `rgb_to_planes` call with the calling thread's name and plan-cache bytes; each
+second `nvidia-smi --query-compute-apps` (WDDM printed `[N/A]` for every pid, so per-pid figures
+are ABSENT) and the device-wide `memory.used` (the bench's figure) with the pool read at the same
+instant. FFmpeg's share is therefore the **REMAINDER = device-wide - device-wide after this
+process's probe (its context) - pool total**. (`cudaMemGetInfo` under WDDM reported 1,121 MiB
+used at idle: a per-process budget view, kept as `wddm_used_mib`, not used.) Self-check on the
+WP2.3 `hevc8-bt709-full` sample: PASS (`c7-attr-selfcheck3.log`). Logs `c7-attr-{on,off}.log`,
+records `work\wp3.21\attribution\attribution-{on-20261028T141721Z,off-20261028T142102Z}.json`.
+Both jobs ok, 150 frames; ON 1.257 s/frame (hooks included), OFF 2.154; analysis returned at
+91.0 s (ON) / 202.3 s (OFF). FFmpeg children: two `-hwaccel` decoders and one NVENC encoder.
+
+Device frames ON (MiB; device-wide from nvidia-smi, idle after the probe 246):
+
+| moment | device-wide | pool used | pool cached | pool total | plans (in the pool) | REMAINDER (FFmpeg + non-pool) |
+|---|---|---|---|---|---|---|
+| peak (overlap, 43.5 s) | **7,921** | 3,181 | 1,246 | 4,427 | 97 | 3,248 |
+| overlap plateau (median) | 7,905 | 1,838 | 2,553 | 4,427 | 97 | 3,232 |
+| frames-only plateau (median) | 7,113 | 944 | 3,483 | 4,427 | 97 | 2,440 |
+| overlap - frames only (median) | +792 | +894 | -930 | 0 | 0 | **+792** |
+| overlap - frames only (max) | +808 | +2,019 | -283 | 0 | 0 | +1,237 |
+
+Device frames OFF (idle after the probe 261):
+
+| moment | device-wide | pool used | pool cached | pool total | plans | REMAINDER |
+|---|---|---|---|---|---|---|
+| peak (overlap, 128.2 s) | **7,593** | 666 | 2,962 | 3,628 | 97 | 3,704 |
+| overlap plateau (median) | 7,563 | 662 | 2,966 | 3,628 | 97 | 3,674 |
+| frames-only plateau (median) | 6,337 | 662 | 2,966 | 3,628 | 97 | 2,448 |
+| overlap - frames only (median) | +1,226 | 0 | 0 | 0 | 0 | **+1,226** |
+
+Pool by thread (the 0.1 s and per-call reads): ON pool-used peak 4,005 MiB in the overlap
+(analysis thread's calls saw up to 3,570, the render thread's 2,342); OFF 2,540-2,640.
+Baselines beside: WP3.14 5.3K 6,104 MiB device-wide (one decoder, no overlap, host frames, the
+direct Gaussian); cell 5's 5.3K render pool peak 2,710 MiB (2,798 at the max fractions).
+
+**The split, read (CHARC's ask 3):**
+- The overlap's increment over the frames-only plateau is the analysis half's DECODER: it is
+  all REMAINDER (OFF +1,226, the pool unchanged; ON +792 median / +1,237 max) and it disappears
+  when the analysis decoder exits. The analysis half's device frames and block sums add POOL
+  (ON pool total 4,427 against OFF 3,628, about +800; pool used +894 median in the overlap), not
+  device-wide on top, because the pool holds what it grew to.
+- The frames-only plateau (ON 7,113; OFF 6,337) is pool total 4,427 / 3,628 + remainder about
+  2,445 (the export decoder, NVENC, this process's non-pool memory) + idle; of the pool, 3,483 /
+  2,966 MiB is CACHED (free blocks the job never returns until its end).
+- Against 6,281 at the ON peak (excess 1,640): pool cached 1,246, the analysis decoder about
+  790-1,240, the analysis device frames about 800 of pool. Even OFF (no device frames) the peak
+  7,593 breaches both bounds: the decoder term alone does. The estimate counts no FFmpeg memory
+  (export decoder + NVENC about 2.4 GB here) and AD-1's figure is the render's arrays.
