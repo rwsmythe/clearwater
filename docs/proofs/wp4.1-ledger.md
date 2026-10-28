@@ -275,3 +275,26 @@ recorded per export (`record_property`) and asserted at 16 bit and for 8-bit sou
 W1 (WP-T5 timed serial leg) opened 19:21:35Z; my light runs from that moment until the notice
 reached me (the S8 probes and three light pytest runs) are recorded by the orchestrator as a
 small perturbation. From the notice: no runs.
+
+### Light runs after W1 (granted 20:08Z) and the hardware leg
+
+- ruff check / format --check / mypy green at `755513b` (mypy: 141 source files); 8 ruff
+  findings in the three new test files fixed (import order, unused `noqa`, two long lines).
+- Parallel light run `work/wp4.1-light-7`: 271 passed, 1 failed (7.2 s): the V9 planted control.
+  Reason, 1-parameter probe (scratch `v9_planted.py`, `jpeg-gradient-srgb`, every other
+  parameter neutral, max / mean in 1/255): `c3_strength` 1.0 -> 0.000 / 0.000,
+  `white_balance_strength` 1.0 -> 0.000 / 0.000, `alpha` (ancuti2018) 1.0 -> 0.000 / 0.000,
+  `sharpen_strength` 1.0 -> 23.584 / 12.362, `gamma` 1.5 -> 21.682 / 12.982. A strength at its
+  default changes nothing while the stage it scales is neutral, so the control is now `gamma`
+  (accepted by the orchestrator); the 4 planted tests pass.
+- gui-not-slow run `work/wp4.1-light-8`: 29 passed (18 s); extra `work/wp4.1-light-9`: 141 passed.
+- Window (granted, 20:12:11Z-20:12:40Z, 10.7 GiB available): `-m "gpu or slow"` on
+  `test_wp41_photo_path.py` + `test_wp41_v8.py`: 2 passed, 0 skipped (28.0 s). V8 (c) figures
+  (1/255; bound mean <= 1, p99 <= 2 at k = 2, <= 4 at k = 4; p99.9 and max recorded only):
+
+| Frame | k | mean | p99 | p99.9 | max |
+|---|---|---|---|---|---|
+| GX011625_0024.925 | 2 | 0.093 | 1.105 | 8.874 | 29.729 |
+| GX011625_0024.925 | 4 | 0.266 | 3.696 | 12.850 | 28.039 |
+| GX011625_0114.648 | 2 | 0.084 | 0.472 | 2.783 | 29.354 |
+| GX011625_0114.648 | 4 | 0.292 | 1.363 | 4.428 | 22.683 |
