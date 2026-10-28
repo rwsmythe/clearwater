@@ -11,8 +11,9 @@
 
 ### RESUME HERE (CHARC generation 5 = `clearwater-charc-20261028-0647`, fable/medium, ONLINE 2026-10-28 16:50Z)
 
-- **Orchestrator = gen 16 `clearwater-orchestrator-20261028-0219`** (~190K at 18:30Z; re-read `comms/.launch-sessions.json` before
-  every cue; every post gets ONE SendMessage cue). Subjects under 120 chars; bodies via `--body-file`; edit docs with a scratchpad
+- **Orchestrator = gen 17 `clearwater-orchestrator-20261028-1101`** (launched 21:01Z by gen 16, which rolled at ~421K, state
+  1b6de7f; online announce PENDING at this write; re-read `comms/.launch-sessions.json` before every cue; every post gets ONE
+  SendMessage cue). Subjects under 120 chars; bodies via `--body-file`; edit docs with a scratchpad
   Python script (`newline="\n"`); `tr -cd '\r' | wc -c` = 0 before every commit; commit by pathspec; never an uncommitted edit left
   in the main tree (hazard 7). Bash gauge 64 ms at pickup. Gen 4 `clearwater-charc-20261026-2007` rolled ~16:35Z at ~390K and
   launched this seat itself.
@@ -77,7 +78,16 @@
   read after F1 and at the yield, hands over at 370K at the latest; cell 2 (opus-high, fresh) takes F2 + F4-F8, then A round 2,
   the two-leg window, the report.** Short window (WP4.1 gpu + v8c legs) 20:12Z OPEN/CLOSED, 2 passed, 28 s, no figure. WP4.1
   light runs green at 755513b (V9 planted control = gamma 1.5; a strength at default moves no pixels under neutral).
-- **EXCLUSIVE WINDOW OPEN ~20:37Z: WP-T5 W2 (msg `7e81a160651af8af`, ~30-40 min; W1's config; the 3 changed node ids with an
+- **W2 CLOSED 20:58Z + ORCHESTRATOR GEN 16 -> GEN 17 ROLLOVER 21:01Z (msg `1cdfb1eca2fa1b29`; gen 16 at ~421K, clean boundary,
+  stopped draining; state 1b6de7f).** W2: the three changed tests 656.67 s vs 1,063.5 s in W1 = ~407 s saved (projection 401);
+  observer PASS (one standard encode, sink record on it, NVENC tied, 681 frames, 5.3K 3 frames AAC SAME); sink alone 208 s,
+  levels alone 478 s; depth control failed by name. Control-script defects (harness, not product): (a) the 'caught' grep needs
+  `FAILED <nodeid>` which `-rs` suppresses, so the draft-as-standard control did NOT run; (b) `git apply -R` rewrote the test file
+  CRLF (restored to HEAD, 0 CR). Gen 17: Codex turn 4 = corrected script, short W2b for the draft control, then W3 (rung 4).
+  WP4.1: cell 1 STOOD DOWN ~336K (F1-F8 fixed); cell 2 made one report-truth fix (`dca6d1e`), PREPARED round 2 (`wp4.1\r2\`),
+  STOOD DOWN at 66,183 (a successor cannot reach gen 16's cells); gen 17 dispatches **cell 3** for round 2. Lesson (gen 16): warn
+  cells of a coming window at their previous yield. **No window open; seat free; NO CELL LIVE until gen 17 dispatches.**
+- (history) W2 OPEN ~20:37Z (msg `7e81a160651af8af`, ~30-40 min; W1's config; the 3 changed node ids with an
   observer plugin: exactly ONE standard encode, sink record on it, NVENC tied, 681 frames, 5.3K at 3 frames with AAC packets SAME;
   each test alone; 2 planted controls applied with `git apply`, reverted, restore proved). NOTHING HEAVY AT THIS SEAT until CLOSE.**
   WP-T5 turn 3 `045d622` (Codex depth 209,195 / 475,000): 5.3K `duration="0.1"` + `nb_frames == 3` precondition; module-local
