@@ -20,6 +20,7 @@ build waits for WP4.2a's merge and the orchestrator's rebase (R1-Q5 condition 3,
 | window request / release | cell 4 | not given at the grant (figure owed at the release yield) | 2026-10-29 | |
 | WINDOW RELEASED | cell 4 | 105,663 (turn 47) | 2026-10-29 | release accepted; Reviewer B ordered |
 | Y4 (Reviewer A R2) | cell 4 | 184,286 (turn 100) | 2026-10-29 | R2 TERMINATED; cleanup ruled FIX x3 |
+| Reviewer B re-run minors | cell 4 | 213,446 (turn 118) | 2026-10-29 | docs-only turn before the gate |
 
 ## Round ledger (Reviewer A, Codex `gpt-6.1-sol` / high, WSL)
 
@@ -645,6 +646,30 @@ Next, in order:
 - `tests/test_wp42_v3_figures.py`: 8 passed.
 - `ruff check .` clean; `ruff format --check .` 267 files; `mypy` 141 files clean.
 - Light set (`-n 4`, the five files of the remediation's set): 110 passed (15.85 s).
+
+## Reviewer B re-run (orchestrator seat; cell 4 docs-only turn)
+
+The re-run ran on `wp4.2-mc` `33f13e5`. That is `wp4.2` at `9aa2783` rebased onto main `246052b`,
+whose new commits are CHARC docs only; the package files are byte-identical and the patch-id
+(`d1fbdf7d`) is equal on both bases. Codex `gpt-6.1-sol` ran 09:24Z-09:36:50Z, exited 0, left
+the candidate worktree clean and read no withheld path.
+
+**`VERDICT: NO_NEW_CRITICAL_MAJOR`**, with 4 MINOR findings. The text is
+`C:\Users\rwsmy\clearwater-review-evidence\wp4.2\reviewB2\review-B.txt` (32 lines), md5
+`cabd2c51e708ca23916b4f5bd4c81203`. Each item was CONFIRMED against the file before any change:
+
+| # | Finding | Confirmed | Disposition | Change |
+|---|---|---|---|---|
+| B'1 | A packet-listing timeout text (`io/video/verify.py:234`, not owned) carries the full FFprobe executable path. The runner's `Redactor` does not know that path. Reachable only on a 120 s ffprobe timeout | yes, as stated | BANK | None. **DR-81 (c) candidate for CHARC**, trigger "the runner's next redaction touch, WP4.3". WP4.2 makes no `Redactor` edit |
+| B'2 | The record's video facts (`tools/headless_export.py` ~57) misdescribe failures. `_ObservedSink.write` notes the device BEFORE delegating, so a failed first write still sets `frame_device`. `decode_passes` counts the passes started | yes (`write` at `:262-272`, `frames` at `:225-232`) | FIX, docs only | `frame_device` is the frame device of the sink's first ATTEMPTED write, set even when that write failed. `decode_passes` is 1 (V17) or 2 for an export that got as far as rendering, and 1 for a job that failed after its analysis began and before rendering. No code change |
+| B'3 | `_NoCacheFolder` says "every use refuses", but `limit_bytes()` returns 0 (`src/clearwater/app/composition.py` ~89) | yes (`:130-132`) | FIX, docs only | Every operation that needs a cache folder refuses with `VIDEO_NEEDS_A_CACHE`; `limit_bytes` returns 0 |
+| B'4 | `_parser()`'s description says photos only (`tools/headless_export.py` ~1130) | yes | FIX, help text only | Now "Export photos and video through ...". No test pins the old text: a grep for "Export photos through" found only the tool itself and its `.pyc`, nothing in `tests/` |
+
+Gates after the change: `ruff check .` clean (the new help line was wrapped to 100 columns); `ruff
+format --check .` 267 files; `mypy` 141 files clean; light set (`-n 4`):
+`tests/test_headless_export.py`, `tests/test_wp42_runner_video.py` and
+`tests/test_app_composition.py`, 97 passed (25.83 s). `--help` now opens with "Export photos and
+video through Clearwater's export engine without the interface."
 
 ## RESUME HERE (the FINAL docs turn)
 

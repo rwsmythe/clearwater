@@ -86,7 +86,10 @@ VIDEO_NEEDS_A_CACHE = "video export needs a cache folder; none was given"
 
 
 class _NoCacheFolder:
-    """The IF-7 cache of an :func:`export_jobs` built without a cache folder: every use refuses.
+    """The IF-7 cache of an :func:`export_jobs` built without a cache folder.
+
+    Every operation that needs a cache folder refuses with :data:`VIDEO_NEEDS_A_CACHE`;
+    :meth:`limit_bytes` returns 0.
 
     The video job asks for its cache key (:meth:`key_for`) before any cache method, so a video
     request that reaches the cache fails there, after its probe and before its analysis or any

@@ -54,9 +54,11 @@ summary line and the batch WARNING that carry the same text. Each item's last fi
 otherwise ``{"device_backend": "cuda:0" | null, "frame_device": "cuda:0" | "cpu" | null,
 "encoder": <name> | null, "decode_passes": <int>}``: the device of the backend the job built its
 source and sink with (null for a CPU job or when the job ended before building them), the device
-of the first frame the sink received (null when none was written), the encoder the sink was
-opened with (null when it was not opened), and how many times the job's source began a decode
-(1 when a complete cache entry let the analysis skip its pass, V17; 2 when it analysed). The
+of the frame of the sink's first attempted write (set even when that write failed; null when no
+write was attempted), the encoder the sink was opened with (null when it was not opened), and
+how many decode passes the job's source started: for an export that got as far as rendering, 1
+when a complete cache entry let the analysis skip its pass (V17) and 2 when it analysed; a job
+that failed after its analysis began and before rendering counts 1. The
 summary lines go to stdout and the ``[i/n]`` progress messages to stderr. Every folder the run knows
 (the output folder, each source's folder, the settings, record, parameter and cache folders, and the
 local configuration's folder) is shown by its NAME in every record field and printed line, one
@@ -1127,7 +1129,9 @@ def _parser() -> argparse.ArgumentParser:
     """The command-line parser."""
     parser = _Parser(
         prog="headless_export",
-        description="Export photos through Clearwater's export engine without the interface.",
+        description=(
+            "Export photos and video through Clearwater's export engine without the interface."
+        ),
     )
     parser.add_argument("paths", nargs="+", type=Path, metavar="PATH", help="the sources")
     where = parser.add_mutually_exclusive_group(required=True)
