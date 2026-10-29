@@ -118,6 +118,13 @@
   unreadable_tail Limit now says a gap inside the written range is refused, an early end accepted (cell 2's 'sink refuses a short
   set' was false for that case). Builders all in `__all__`, alias dropped. WP4.2b: turn 6 running; one extra parameter row in its one
   runner test granted at the orchestrator's seat.
+- **V3 WINDOW 06:15-06:24Z RELEASED + STOP RULED 06:30Z (query `e29ac0a1978afabb`): CPU and GPU V3 figures on `wp4.2` e3b5d5f differ
+  in 13/64 rows (12 encoded characterisation rows at the 2nd-3rd decimal, 1 planted row by 0.001); every V3 / AD-14 asserted or
+  recorded row (24) SAME, pre-encode. RULED (a): the claim narrows to the 24 deciding rows by md5 (selection in compare.txt; files
+  3ec7f59c gpu / 1eba25f5 cpu; driver b128c609); mechanism stated as the cell's reading; V4 SAME (AD-11 tolerance) unaffected; CPU
+  leg coverage = 'the same V3/AD-14 figures, not the same encoded characterisation'. WP4.2 suite HELD until WP4.2b merges. Cell 3
+  237,804 at the yield (evaluation point). WP4.2b: A converged R2; candidate `wp4.2b-mc` a6910f1 on f3835cc (patch-id b88eac69);
+  Reviewer B running; own window next.
 - **(history) After WP4.1's accept:** WP4.2's brief (DRAFT RULED on main 3aa3c51) got ONE revision pass against WP4.1's accept record, then FINAL
   on CHARC's word; its revision must carry: DR-78/79 (B2 rows) as WP4.2 items, the WP4.1 runner's final names and the stream-syntax
   predicate, the Limit text. WP4.3's revision later carries DR-75 (REQUIRED test under its Q12), DR-76, DR-77, and the AD-23 'applied by
