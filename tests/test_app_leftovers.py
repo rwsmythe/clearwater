@@ -164,7 +164,7 @@ def test_a_journal_that_cannot_be_read_is_never_overwritten(
         with pytest.raises(OSError, match="the journal is locked"):
             journal.add(tmp_path / "b")
         with pytest.raises(OSError, match="the journal is locked"):
-            journal.drop([kept])
+            journal.drop([(kept, tmp_path / "a")])
         with caplog.at_level(logging.WARNING, logger=startup.__name__):
             assert journal.entries() == ()
         assert "could not be read" in caplog.text
@@ -249,6 +249,37 @@ def test_a_folder_whose_clean_up_failed_keeps_its_entry_until_it_succeeds(
     report = clean_leftovers(cpu_settings(), WriteJournal(tmp_path / "config"))  # the next start
     assert report.removed == (planted,) and not planted.exists()
     assert journal.entries() == ()
+
+
+def test_entries_sharing_an_id_are_cleared_folder_by_folder(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """R3-2 (ruling d6e9abdf, MINOR): start-up drops an entry by its (id, folder) pair.
+
+    Two entries with one id (a journal the program did not write: its ids are uuid4), the first
+    folder's removal refused: that folder's entry remains, the clean folder's entry goes.
+    """
+    locked, clean = tmp_path / "locked", tmp_path / "clean"
+    for folder in (locked, clean):
+        folder.mkdir()
+    config = tmp_path / "config"
+    config.mkdir()
+    entries = [{"id": "dup", "folder": str(locked)}, {"id": "dup", "folder": str(clean)}]
+    document = {"format_version": 1, "entries": entries}
+    (config / JOURNAL_FILE_NAME).write_text(json.dumps(document), encoding="utf-8")
+    journal = WriteJournal(config)
+    planted = _temporary(locked)
+    real_unlink = os.unlink
+
+    def refuse(path: str) -> None:
+        if Path(path) == planted:
+            raise PermissionError("in use")
+        real_unlink(path)
+
+    monkeypatch.setattr(safe_write_module.os, "unlink", refuse)
+    report = clean_leftovers(cpu_settings(), journal)
+    assert [path for path, _ in report.failed] == [planted] and planted.exists()
+    assert journal.entries() == (("dup", locked),)
 
 
 # V11 and the footage-absence test on the running shell.

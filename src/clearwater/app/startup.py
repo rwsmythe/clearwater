@@ -102,21 +102,33 @@ class WriteJournal:
         Raises:
             OSError: The journal cannot be read or written; nothing was written.
         """
-        self.drop((entry_id,))
+        self._keep_only(lambda entry: entry["id"] != entry_id)
 
-    def drop(self, entry_ids: Iterable[str]) -> None:
-        """Remove the entries with these ids; an unknown id is ignored.
+    def drop(self, entries: Iterable[tuple[str, Path]]) -> None:
+        """Remove the entries matching these ``(id, folder)`` pairs; an absent pair is ignored.
+
+        Matching the pair, not the id, keeps the entry of another folder that shares the id (a
+        journal the program did not write: its ids are uuid4) when that folder's clean-up failed
+        (R3-2, ruling d6e9abdf).
 
         Args:
-            entry_ids: The ids to remove.
+            entries: The ``(id, folder)`` pairs to remove, as :meth:`entries` returns them.
 
         Raises:
             OSError: The journal cannot be read or written; nothing was written.
         """
-        gone = set(entry_ids)
+        gone = set(entries)
+        self._keep_only(lambda entry: (entry["id"], Path(entry["folder"])) not in gone)
+
+    def _keep_only(self, keep: Callable[[dict[str, str]], bool]) -> None:
+        """Rewrite the journal with the entries ``keep`` accepts; no write when none goes.
+
+        Raises:
+            OSError: The journal cannot be read or written; nothing was written.
+        """
         with self._lock:
             entries = self._read()
-            kept = [entry for entry in entries if entry["id"] not in gone]
+            kept = [entry for entry in entries if keep(entry)]
             if len(kept) != len(entries):
                 self._write(kept)
 
@@ -270,7 +282,8 @@ def clean_leftovers(settings: Settings, journal: WriteJournal) -> LeftoverReport
     entries stay and are scanned again at the next start (R2-1, ruling 38a7c702). A folder the
     operating system refuses as a path (a NUL character in ``output_folder``, say) is skipped and
     logged, so nothing here raises before the window shows (R3-1, ruling d6e9abdf); a journal
-    entry with such a folder keeps its entry (``holds_leftovers``).
+    entry with such a folder keeps its entry (``holds_leftovers``). An entry is cleared by its
+    ``(id, folder)`` pair (R3-2).
 
     Args:
         settings: The settings of the one settings read.
@@ -298,7 +311,7 @@ def clean_leftovers(settings: Settings, journal: WriteJournal) -> LeftoverReport
     for folder in sorted(unclean):
         _LOG.warning("the write journal keeps %s until its clean-up succeeds", folder)
     try:
-        journal.drop(entry_id for entry_id, folder in entries if folder not in unclean)
+        journal.drop((entry_id, folder) for entry_id, folder in entries if folder not in unclean)
     except OSError as error:
         _LOG.warning("the write journal could not be cleared: %s", error)
     return report
