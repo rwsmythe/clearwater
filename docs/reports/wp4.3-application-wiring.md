@@ -66,18 +66,25 @@ V7 (WP3.16's 10 ms probe; longest gap, p99, ticks). Gate forms on the fixture cl
 
 | Scenario | Gate form (fixture) | Window (GX011627) | Stub era |
 |---|---|---|---|
-| (a) analysis | 12.0 / 11.0 ms, 260 ticks | pending | WP3.18 12-39 ms |
-| (b) scrubbing during it | 12.0 / 11.4 ms, 266 | pending | WP3.18 12-39 ms |
-| (c) File > Export | 11.0 / 11.0 ms, 480 | pending | WP3.19 11-13 ms |
-| (d) a 300-still batch (DR-50) | 30.0 / 14.0 ms, 942 | pending | WP3.19 11-13 ms (2 items) |
-| (e) a 1:1 4K render during (c) | 20.0 / 12.0 ms, 1218 | pending | WP3.16 11-12 ms |
-| (f) start-up, slow cache open | 49.0 / 11.0 ms, 329 | pending | none |
+| (a) analysis | 13.0 / 11.0 ms, 239 ticks | pending | WP3.18 12-39 ms |
+| (b) scrubbing during it | 13.0 / 12.0 ms, 249; 37 scrub moves during the analysis | pending | WP3.18 12-39 ms |
+| (c) File > Export | 12.0 / 11.0 ms, 437 | pending | WP3.19 11-13 ms |
+| (d) a 300-still batch (DR-50) | 34.0 / 14.0 ms, 948 | pending | WP3.19 11-13 ms (2 items) |
+| (e) a 1:1 4K render during (c) | 25.0 / 15.0 ms, 1135; 1 render at 1:1 during the export | pending | WP3.16 11-12 ms |
+| (f) start-up, slow cache open | 35.0 / 12.0 ms, 338; the analysis waited for the open | pending | none |
+
+Each gate form now witnesses its workload (R1-12). The fixture clip's export ends before a 1:1 4K
+render does, so (e) arranges the overlap: the export's encode starts once the 1:1 view is asked
+for and its job returns only after a 1:1 render arrived. The figures above are from cell 4's
+targeted run (2026-10-29, after WP-T6's serial leg; a shared host).
 
 V8 (AD-11 as amended) on the shell, (mean, p99, max) in [0, 1] units, the preview's uint8 against
 the exported 16-bit PNG: smooth synthetic scene k = 1 exact (within the 16-bit step), k = 2
 (0.00100, 0.00196, 0.0145), k = 4 (0.00106, 0.00422, 0.0228); the WP1.3 look-check crop k = 2
 (0.00117, 0.00459, 0.117), k = 4 (0.00156, 0.0146, 0.109). Video pre-encode at k = 2: mean
-0.00305, max 0.0817. DR-75: the nclx-only Display P3 sample shows (217, 0, 54), the colour its
+0.00305, p99 0.0392, max 0.0817 on the 320 x 180 fixture frame: the p99 is over AD-11's 2/255
+for k = 2, which AD-11 sets for real-size content, so it is RECORDED and not asserted (R1-13;
+a CHARC ruling is asked at cell 4's Group C yield). DR-75: the nclx-only Display P3 sample shows (217, 0, 54), the colour its
 export's embedded profile gives; the base rule shows (199, 40, 60) and its planted form fails.
 V18 gate form on `hevc8-bt709-full` with the held engine: a corrected frame before completion,
 the engine's `smoothed_record` after. GX011627 V18: window, pending.
@@ -87,6 +94,15 @@ MB after it (6 cuFFT plans on `clearwater-preview`), 7,388.9 MB after the bounda
 
 DR-44 (c): from `close()`, an analysis mid-decode ended in 17 ms, an export mid-encode in 10 ms,
 a batch item in 23 ms (fixture clip); `gui/jobs.py` is not touched. GX011627: window, pending.
+The start-up jobs (R1-5), reproduced on the real `main()` path with a 12 s cache open and a
+close 0.3 s after the window showed: the close returned after the 5 s `SHUTDOWN_TIMEOUT_S` wait
+(the open cannot be cancelled), `app.exec()` returned with it, and the process ended 0.3 s later
+with the open's daemon thread abandoned: no exit hang past the timeout and no late delivery
+after the loop, so `gui/jobs.py` is not touched. The device probe's `on_done` was delivered
+inside the close (the runner delivers every ended job there); a guard in `app/main.py` now drops
+every start-up callback once the window got its close event, the catalog's included, and a test
+shows a late delivery to a loop that keeps running reaches nothing (evidence
+`C:\Users\rwsmy\clearwater-review-evidence\wp4.3\major5\`, `md5sums.txt`).
 
 ## DR dispositions
 
@@ -111,8 +127,10 @@ a batch item in 23 ms (fixture clip); `gui/jobs.py` is not touched. GX011627: wi
 
 - The V7 and start-up figures above come from a shared host; the figures of record come from the
   exclusive window.
-- `gui/shell.py`'s module and `run` docstrings still say WP4.3 calls `run`; the grant was the
-  device text only, so they are left and flagged.
+- The shell's close waits up to `SHUTDOWN_TIMEOUT_S` (5 s) for a start-up job that cannot be
+  cancelled (the cache's first open); the interface thread is held for that wait (R1-5).
+- The V8 video leg's p99 is measured on the 320 x 180 fixture only (R1-13); a real-size video
+  frame's p99 is window evidence.
 - A journal entry that cannot be written fails the export readably before any read or probe,
   with nothing written (R1-2, ruling d530b564); the output folder is always scanned.
 - A journal entry stays until its folder's clean-up has succeeded (R1-3). A folder that no longer
@@ -121,3 +139,18 @@ a batch item in 23 ms (fixture clip); `gui/jobs.py` is not touched. GX011627: wi
   next starts (its path then reads as missing) is not removed when the drive comes back, unless
   that folder is the output folder or a later export's destination again; it stays a visible
   `.clearwater-partial` file the user can delete.
+
+## Collection diff against `038f02e`
+
+Every node ID removed from a test file that exists on the base, with its reason (fill
+GATE_CHECKS). Every other change only adds node IDs: eight new `tests/test_app_*.py` files, new
+cases in `test_app_composition.py`, and `test_app_leftovers.py`'s undecodable-journal parameter,
+which became bytes with its five old ids kept and two added.
+
+| Removed node ID | Reason |
+|---|---|
+| `tests/test_app_deps.py::test_no_app_module_imports_the_gui_or_qt` | RENAMED to `::test_no_app_module_but_main_imports_the_gui_or_qt_and_none_imports_cupy` (Q15: `main.py` is exempt from the gui/Qt ban; the cupy ban covers all) |
+| `tests/test_gui_settings_dialog.py::test_auto_is_resolved_by_a_rule_that_disagrees_with_the_interim_rule` | RENAMED to `::test_auto_is_resolved_by_a_rule_that_disagrees_with_the_default_rule` (DR-52: the interim rule is gone; it compares with `capability.resolve_encoder`) |
+| `tests/test_gui_settings_dialog.py::test_interim_rule_matches_the_wp310_rule` | DELETED (DR-52: `interim_resolve_encoder` deleted) |
+| `tests/test_gui_status.py::test_stub_era_adapter_estimates_an_unknown_method_as_c3` | DELETED (Q11: the S1 stand-in `stub_era_select_backend` deleted) |
+| `tests/test_gui_status.py::test_default_engines_select_cpu_forced_with_the_real_selection` | DELETED (Q11, the same) |

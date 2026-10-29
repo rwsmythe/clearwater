@@ -479,3 +479,62 @@ the layering and composition tests): 170 passed 1 xfailed, and 10 passed. ruff c
 Line endings: `preview.py` and `render_worker.py` were CRLF in this worktree's checkout
 (`core.autocrlf=true`); the edits normalised them to LF before the `autocrlf=false` commits; every
 committed blob checked 0 CR, 0 non-ASCII.
+
+Depth at the Group B yield: 219,999 (`scripts/cell_depth.py`, 96 turns, stable over two readings
+70 s apart; given by the dispatcher, gen 21). Dispatcher QA: 3 commits, 0 CR, owned files only;
+both deviations accepted.
+
+### Group C (shutdown and the rest)
+
+- R1-5 MAJOR, `24b3d87`. REPRODUCED FIRST on the real `main()` path (uncommitted driver
+  `C:\Users\rwsmy\clearwater-review-evidence\wp4.3\major5\repro_major5.py`, md5 `d94edd78767d30b2279bca3b3fb76de8`;
+  a 12 s cache open, the close 0.3 s after the show; runs and `notes.txt` in that folder with
+  `md5sums.txt`): the close returned after the 5 s `SHUTDOWN_TIMEOUT_S` wait, `app.exec()` with
+  it, the process ended 0.33 s later (the open's daemon thread abandoned): NO exit hang past the
+  timeout, NO late delivery after the loop; the probe's `on_done` was delivered INSIDE the close
+  (the runner's designed delivery of ended jobs). So `gui/jobs.py` is NOT touched. Fix in
+  `app/main.py`: `_CloseWatch` (an event filter noting the window's close event before the
+  shell's shutdown) and `_UnlessClosed` (the window's runner whose `on_done`/`on_progress` are
+  dropped once closed) carry all three start-up jobs, the catalog's completion included
+  (`dataclasses.replace(window.context, jobs=...)`); `_on_settings` does not re-probe after the
+  close. Test `test_app_startup.py::test_no_start_up_callback_reaches_the_window_after_its_close`
+  (close wait made 0.2 s; red on the unguarded main: both callbacks delivered, the open's late
+  through the test's running loop).
+- R1-11 MINOR, `34cc899`: `PreviewController.release_device_plans(timeout_s | None, *,
+  cancelled=)` queues the release once and waits in 50 ms slices; the wrapper's
+  `release_device_plans(progress) -> bool` waits with no deadline and returns `CANCELLED` unwritten
+  on a cancel, never selecting first (a stopped preview worker counts as released: it released at
+  its stop). `PLAN_RELEASE_TIMEOUT_S` removed. Tests
+  `test_app_activity.py::test_a_job_cancelled_while_waiting_for_the_plan_release_never_runs` and
+  `test_app_preview_fft.py::test_the_release_wait_has_no_deadline_but_ends_on_a_cancel` (red on the
+  base: the engine ran; the API had no cancel).
+- R1-12 MINOR (test-only), `75a3e7a`: `Figures.witness`; (b) counts scrub moves during the analysis
+  (37), (f) counts an analysis wait that began before the open ended and returned after it (1),
+  (e) counts 1:1 renders of the photo while the export runs. (e) was 0 as written: the fixture
+  export ended before the 4K render (the reviewer's point CONFIRMED), so (e) now ARRANGES the
+  overlap (the export's encode waits for the 1:1 request; its job returns after a 1:1 render
+  arrived): witness 1.
+- R1-13 MINOR (test-only), `75a3e7a`: the video leg computes p99 at k = 2 beside the harness's
+  mean (asserted equal): **p99 0.0392 (10/255) on the 320 x 180 fixture, OVER the 2/255 bound.**
+  Cell 3's proposed fix ("assert p99 <= 2/255") cannot hold at fixture size: RECORDED and printed,
+  NOT asserted; ruling asked at this yield. The report's V8 paragraph and Limits carry it.
+- R1-14 MINOR (test-only), `75a3e7a`:
+  `test_app_startup.py::test_the_cleanup_ends_before_any_panel_or_job` records `MainWindow`,
+  the clean-up's start AND end, the four installs, `show`, then the three jobs.
+- R1-15 MINOR (68d5b4c7 item 2), `0238c47`: `RENAME_TEXT` carries no name; the single test asserts
+  the panel's final text `"<name>: this file name ...; rename the file."` exactly once; batch
+  items carry the bare text under their label.
+- Portable DR-82 form (68d5b4c7), `0238c47`:
+  `test_app_wiring.py::test_g10_dr82_the_wrappers_refusal_on_every_os[photo]` and `[video]`
+  (`activity.final_output_path` planted to raise `OutputNameError`; the engine never runs; nothing
+  written); the NTFS-stream tests stay as the Windows real-name proof.
+- R1-16 MINOR (68d5b4c7 item 1), `8ace451`: `gui/shell.py` module and `run` docstrings name
+  `python -m clearwater` / `clearwater.app.main.main` as the entry point; docs only.
+- The report's collection diff (68d5b4c7 item 3): a "Collection diff against `038f02e`" section
+  lists the five removed node IDs (two renamed, three deleted) with reasons.
+
+Targeted runs (shared host, after WP-T6's serial leg): `test_app_startup` 9 passed 1 xfailed;
+activity/preview_fft/startup/wiring/deps 70 passed 1 xfailed (not gpu); V7/V8/startup 20 tests,
+the two red cases above fixed or recorded, then 4 passed on the reworked cases; DR-82 9 passed;
+gui/app deps, activity, wiring 54 passed. ruff check, ruff format --check (280), mypy strict
+(146): clean at every commit.
