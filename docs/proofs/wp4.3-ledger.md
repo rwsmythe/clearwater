@@ -803,3 +803,34 @@ Item 2 of the same post rules WP4.3a's R1 (F1-F9, the F4 grant); it exists and i
 
 One line per finding: the finding, the commit, the test. Groups per the dispatch: A (start-up and the
 journal: R3-1, R3-2), B (the witnesses: R3-3, R3-4, R3-5 and the report sentence at `:100`).
+
+### Group A (start-up and the journal)
+
+The ruling went into this ledger verbatim first (`314dc92`), before any code. Red first on
+`314dc92` (3 failed the right way: `clean_leftovers` and `make_app` raised `ValueError: scandir:
+embedded null character in path` from `safe_write.py:354`; the duplicate-id journal read `()`
+after "keeps ...locked"); green after. Targeted run (`test_app_leftovers`, `test_app_activity`,
+`test_app_startup`, `test_app_wiring` and the eight layering tests, `gui` included): 143 passed
+1 xfailed (DR-85's strict marker) in 90 s. ruff check, ruff format --check (280), mypy strict
+(146): clean. Every committed blob 0 CR, 0 NUL, ASCII. Logs under `work/wp4.3-c6/`.
+
+- R3-1 MAJOR, `13c96f7`: `clean_leftovers` skips every folder `_is_path` refuses (the output
+  folder included) with one warning naming it (`%r`, so the NUL prints as ` `), and the
+  journal's folders are still scanned and cleared; nothing raises before `show()`. Tests
+  `test_app_leftovers.py::test_an_output_folder_the_os_refuses_is_skipped_and_logged` (the bad
+  `Settings` built directly) and `::test_a_settings_file_with_an_output_folder_the_os_refuses_still_starts`
+  (`gui`: a saved settings file edited to a NUL `output_folder`, start-up through `make_app`; it
+  asserts only what holds under either store: the window shows, the journal's planted temporary is
+  removed, the journal is cleared).
+- R3-2 MINOR (reclassified, CHARC `d6e9abdf`: reachable only through a journal the program did
+  not write, uuid4 ids; a lost record, not a crash), `099893a`: `WriteJournal.drop` takes the
+  `(id, folder)` pairs `entries()` returns; `remove(entry_id)` keeps the by-id rule (one private
+  `_keep_only` under the lock for both). Test
+  `test_app_leftovers.py::test_entries_sharing_an_id_are_cleared_folder_by_folder` (the probe's
+  form, the first folder's unlink refused by a planted `os.unlink`, portable): the locked folder's
+  entry remains, the clean folder's goes. The R2-1 test's `drop` call now passes a pair.
+
+Decision for Reviewer A to challenge: `drop`'s argument changed from ids to pairs (its only
+product caller is `clean_leftovers`). R3-1 and R3-2 are two commits (the shared file split by
+content). Slip: one bare `cd` into the worktree at the start of a ledger-edit command (the tool
+resets its directory; `pwd` checked afterwards: the main tree); not repeated.
