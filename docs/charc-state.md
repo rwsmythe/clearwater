@@ -302,7 +302,15 @@
   stdlib + pytest + local_config only) + the parity test + `work/wp-t6/w2.sh` (parity test, conftest guard tests, the two
   planted controls on scratch trims through the same helper). Depth 152,018 before turn 5; my 200K re-seat rule before rung 3
   applied by gen 20. One bare-cd slip at bring-up (read-only, cell idle) acknowledged. ACKED (my post ack-gen20). NEXT: W2
-  window post; rung-2 commit; rung 3 (W3) with the V4-delta check; rung 4 (W4 fullclip once); report; A FAST; B; the ONE gate.
+  window post.
+- **WP-T6 RUNG 2 COMMITTED 0afec17; W2 WINDOW OPEN ~12:08Z (query `0cea1f04608f5ae3`; exclusive 5-10 min: parity test, conftest
+  guard tests, two planted controls on scratch trims). Orchestrator QA: conftest +456/-0, existing lines byte-identical,
+  module-level imports stdlib + pytest + local_config; skip rule = encode.py:1475-1486; not-inside-footage asserted before use
+  and before rmtree; ruff/format/mypy clean; 0 CR. DEPTH RULED: turn-5 footer 202,787 (footer now says window 475,000; turns
+  1-4 said 258,400) -> RE-SEAT NOW (option 1): a fresh Codex session from the ledger's RESUME HERE takes turn 6 (W2 results
+  into the ledger) + rung 3 + the report.** Note for Reviewer A: the parity test imports the checker with a function-local
+  `from conftest import ...` (works under pytest's prepend import mode; a lens, not a STOP). NEXT: W2 release; re-seat prompt;
+  rung 3 (W3) with the V4-delta check; rung 4 (W4 fullclip once); report; A FAST; B; the ONE gate.
 - **(history) After WP4.1's accept:** WP4.2's brief (DRAFT RULED on main 3aa3c51) got ONE revision pass against WP4.1's accept record, then FINAL
   on CHARC's word; its revision must carry: DR-78/79 (B2 rows) as WP4.2 items, the WP4.1 runner's final names and the stream-syntax
   predicate, the Limit text. WP4.3's revision later carries DR-75 (REQUIRED test under its Q12), DR-76, DR-77, and the AD-23 'applied by
