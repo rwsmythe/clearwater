@@ -28,6 +28,7 @@ import dataclasses
 import logging
 import sys
 import threading
+import time
 from pathlib import Path
 from typing import Any
 
@@ -536,3 +537,56 @@ def test_g13_settings_and_last_parameters_persist_over_two_window_lifetimes(
     second = started(make_app, qtbot, None, where=where)
     assert second.window.session.settings().output_suffix == "_kept"
     assert second.window.session.parameters().parameters == changed.parameters
+
+
+# DR-44 (c) (question 8 as ruled): measured with the real jobs at close.
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize("job", ["analysis", "export", "batch"])
+def test_dr44c_a_real_job_ends_within_the_shutdown_timeout_at_close(
+    make_app, qtbot, sample, tmp_path, monkeypatch, job
+) -> None:
+    """From ``close()``: an analysis mid-decode, an export mid-encode, a batch item."""
+    from clearwater.gui.jobs import QtJobRunner
+    from clearwater.gui.shell import SHUTDOWN_TIMEOUT_S
+
+    out = tmp_path / "out"
+    out.mkdir()
+    closes: list[tuple[bool, float]] = []
+    real_close = QtJobRunner.close
+
+    def timed(self: QtJobRunner, timeout_s: float) -> bool:
+        began = time.perf_counter()
+        ended = real_close(self, timeout_s)
+        closes.append((ended, time.perf_counter() - began))
+        return ended
+
+    monkeypatch.setattr(QtJobRunner, "close", timed)
+    application = started(make_app, qtbot, cpu_settings(output_folder=out))
+    window = application.window
+    if job == "analysis":
+        window.open_path(sample(CLIP))
+        qtbot.waitUntil(
+            lambda: (
+                window.session.analysis().phase == "running" and window.session.analysis().done > 0
+            ),
+            timeout=60000,
+        )
+    elif job == "export":
+        open_source(qtbot, application, sample(CLIP))
+        wait_analysis(qtbot, application)
+        export = panel(application, ExportPanel)
+        window.shell_actions.export.trigger()
+        qtbot.waitUntil(lambda: export.bar.maximum() > 0 and export.bar.value() > 0, timeout=60000)
+    else:
+        batch = panel(application, BatchPanel)
+        batch.add_paths([sample(CLIP), sample("jpeg-gradient-srgb")])
+        batch.start()
+        qtbot.waitUntil(lambda: batch.items()[0].state is ItemState.RUNNING, timeout=60000)
+        qtbot.waitUntil(lambda: batch.bar.value() > 0, timeout=60000)
+    window.close()
+    (ended, elapsed) = closes[0]
+    print(f"DR-44 (c) {job}: ended {ended} in {elapsed * 1000:.0f} ms")
+    assert ended and elapsed < SHUTDOWN_TIMEOUT_S
+    assert no_temporaries(out)
