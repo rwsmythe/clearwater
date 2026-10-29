@@ -12,17 +12,26 @@
     `c8340144a8e87c09`: R1-Q1..Q4 all (a); DR-79 (b) not reproduced at CHARC's seat (defensive wrap); R1-Q5 (a) **WP4.2a
     split to the Codex lane** with a CAP. **Main `aa4761b`: WP4.2 FINAL + `docs/briefs/wp4.2a-brief.md` FINAL** (harness
     382 OK). FYI to CHARC posted 02:22Z.
-  - **LIVE (dispatched 02:21-02:24Z, base `aa4761b`; paces Codex 0.414 vs Claude 1.331):**
-    - **WP4.2a** CODEX lane: worktree `.worktrees/wp4.2a` (local config working folder = the worktree's `work\`),
-      evidence `C:\Users\rwsmy\clearwater-review-evidence\wp4.2a\cell\` (`prompt-N.md` = agent file + brief + `dispatch-N.md`).
-      Turn 1 = tasks 1-2 (round-0 note), then yield. I commit each turn (`codex_cell.py commit`), run its two-leg window,
-      Reviewer A = `codex_cell.py review` (STRONG), Reviewer B = the Claude pass at my seat.
-    - **WP4.2 round 0** `wp42-cell1` (implementer-opus-high, background), worktree `.worktrees/wp4.2`, ROUND 0 ONLY,
-      ledger-only commits; depth 0 at dispatch. At Y1: I rebase `wp4.2` onto main AFTER WP4.2a merges, then grant the
-      build (same cell if under ~150K at Y1, else a fresh cell from the ledger's RESUME HERE (build)).
-    - **CAP (CHARC condition 3):** if WP4.2a has not merged by WP4.2's Y1 + 3 h, STOP WP4.2a at a committed head, WP4.2
-      builds on main, WP4.2a's remainder rebases after WP4.2's accept; I decide and tell CHARC.
-  - Slip: one bare `cd` into `.worktrees/brief-wp4.2r` (harness gate; no cell live), reverted next call.
+  - **WP4.2a ACCEPTED main `3aa25a5` (~04:25Z, inside the CAP 05:33Z)**: record `docs/proofs/wp4.2a-accept.md`; Codex
+    six turns (session `01a18576-...`); A R1 BLOCKING (F1 drive-relative escape) -> R2 `NO_NEW_CRITICAL_MAJOR`; B (Claude,
+    my seat) `NO_NEW_CRITICAL_MAJOR`; gate 4539/1 + 1126/1. F1's root cause = DR-80 (CHARC `0f138ff`) -> **WP4.2b**.
+    CHARC owes: DR-78/79 CLOSED, an N1+B-F1 row, N5. Worktrees `wp4.2a`, `wp4.2a-mc` can go after CHARC's QA (logs copied
+    to `work\wp4.2a\cell-logs\`, `gate-logs\`).
+  - WP4.2 round 0: `wp42-cell1` Y1 02:33:37Z at 209,438, STOOD DOWN. CHARC `881cc956f1335e7e`: record-shape tripwire
+    APPROVED (3 conditions), R0-Q2 = (b'), my seat rulings concurred; all in the ledger (`9f4c0db` after rebase).
+  - **LIVE (dispatched ~04:27Z, base main `f991254`; paces Codex 0.459 vs Claude 1.34, 04:26Z):**
+    - **WP4.2 build** `wp42-cell2` (implementer-opus-high, background), worktree `.worktrees/wp4.2` (rebased by me onto
+      `f991254`, ledger-only commits on top). Prompt `dispatch-wp4.2-cell2.md` (scratchpad). Depth 0 at dispatch. Yields:
+      windows, STOPs, each Reviewer A verdict (no change in that turn), the return. Reviewer A = Codex at its seat.
+    - **WP4.2b** CODEX lane (DR-80, `jobs/naming.py` `_base_plan` name validation): worktree `.worktrees/wp4.2b` (local
+      config working folder = the worktree's `work\`), evidence `clearwater-review-evidence\wp4.2b\cell\`; turn 1 = round 0.
+      Gate: STACKED with WP4.2's two-leg suite if ready first (expected), else its own window; tell CHARC which.
+  - **Practice (gen 18):** `codex_cell.py turn --add-dir X` REPLACES the default writable root (the uv cache): never pass
+    it; the cell reads review files without it. A Codex sandbox refuses `\\localhost\` shares: three UNC nodes in
+    `test_headless_export.py` are seat-verified, deselected in sandbox runs. Reviewer B on a Codex package = the Claude pass
+    via `codex_cell.py review` with R1's prompt re-headed (candidate sha, main base) plus the post-R1 behaviours.
+  - Slips: THREE bare `cd`s (into `.worktrees/brief-wp4.2r` for the harness gate; into `.worktrees/wp4.2a-mc/work/wp4.2a`
+    reading gate logs; no cell working either time), each reverted next call.
 
 - **Generation 17 ROLLED OVER 2026-10-29 ~01:55Z at ~395K, at a CLEAN boundary: no cell live, no window open, no package
   in flight, host free, main not held. GENERATION 18 STARTS HERE.**
