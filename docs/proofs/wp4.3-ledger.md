@@ -650,3 +650,54 @@ file (S6's "treated as empty", unchanged). Slips: one bare `cd` into the session
 probe command (a no-op for the repo; not repeated); one heredoc collapsed `\x00` to a literal NUL
 byte in `startup.py`, caught by a NUL-byte check before any commit and repaired by a script
 written with the Write tool.
+
+Depth at the Group A yield: 108,533 (`scripts/cell_depth.py`, 40 turns; given by the dispatcher,
+gen 21). Dispatcher QA: 3 commits, owned files only, 0 CR and 0 NUL in every blob; the shared
+R2-1/R2-2 commit accepted; both slips noted with their fixes.
+
+### Group B (the adapter, the preview and the worker)
+
+Red first on `6773070` (the four product tests failed the right way: the second retarget returned
+True with a kept job waiting; the recompute after `cache.clear()` raised `RuntimeError: KeyError:
+'nothing is cached for CacheKey(...)'`; `run_chore` returned True at the worker's exit point; the
+unload ran the old render after the release, order `['release', 'render']`); green after.
+Targeted run (`test_app_analysis_adapter`, `test_app_preview_fft` with its `gpu` tests,
+`test_gui_preview`, `test_gui_threads`, `test_app_startup`, `test_app_activity`, `test_app_wiring`,
+`test_app_leftovers` and the eight layering tests): 237 passed 1 xfailed, 0 skipped; V7 (f) alone:
+1 passed, then 3 more passes of it 3.6 s each (witness 1; longest 57.0 ms, p99 11.0 ms on a shared
+host, shape only). ruff check, ruff format --check (280), mypy strict (146): clean. Every committed
+blob 0 CR, 0 NUL, ASCII.
+
+- R2-5 MINOR, `ca76904`: `_engine_for` also rebuilds when the engine has run (phase not `none`)
+  and `cache.lookup(key)` is None or not complete (`_entry_lost`; a cache read error is not taken
+  as a loss); logged. Test
+  `test_app_analysis_adapter.py::test_a_recompute_after_the_cache_was_cleared_decodes_again`
+  (the second engine decodes all 24 frames, completes at the new strength; a third run over the
+  complete entry builds no engine).
+- R2-8 MINOR, `ca76904`: `retarget` returns False and clears completion whenever a kept job waits
+  after `set_parameters` (the kept job still absorbs the parameters). Test
+  `::test_a_second_retarget_while_a_kept_job_waits_is_false` (the next run ends at the second
+  retarget's strength).
+- R2-6 MINOR, `7ed51ab`: `PreviewController._on_source` invalidates the renderer and clears the
+  full-render indicator before it queues the release. Test
+  `test_app_preview_fft.py::test_an_unload_drops_the_old_sources_pending_render` (a render waits
+  behind a blocked task; `session._open(None)`; order `['release']`). Note: no product path
+  unloads today (`shell._on_opened` never opens None); the test drives the session as the
+  reviewer's probe did.
+- R2-7 MINOR, `7ed51ab`: `LatestWorker._ended` is set in the section that decides the end (and in
+  a `finally` around the loop, `_run` -> `_loop`); `run_chore` refuses when it is set (it replaces
+  `_stopping and not is_alive()`). Test
+  `::test_a_chore_offered_after_the_worker_decided_to_end_is_refused` (`_ExitHold` parks the
+  worker just after it leaves its last section; `run_chore` then returns False, nothing stranded).
+- R2-9 MINOR (test-only, REOPENED R1-12), `7f7d60b`: the stub open waits on an event the
+  witnessed wait sets (cap 30 s), then sleeps 150 ms, so the wait is real and over 100 ms. Red
+  proof of the old form (uncommitted scratch test, the analysis's run planted 2 s late): old form
+  FAILED with witness 0, new form passed. Evidence
+  `C:\Users\rwsmy\clearwater-review-evidence\wp4.3\c5-r2-9\` (`test_zz_c5_r29_scratch.py` md5
+  `2896a6104102517d2a56836f10f55109`, `r29-red.txt` `3c9cb7d71a553cd5a5de2ecd58b16da4`); the scratch
+  file was removed from `tests/` after the run.
+
+Decisions for Reviewer A to challenge: R2-5 also rebuilds after a cancelled or failed decode (the
+entry incomplete; the old engine would have started a fresh `analysis_job` anyway, so the result
+is the same); R2-9 sleeps AFTER the event rather than before it, so the analysis's wait itself is
+longer than 100 ms (the adjudication's "after a >= 150 ms sleep" read for both properties).
