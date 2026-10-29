@@ -1,6 +1,6 @@
-# WP4.3a — Spawn helper and import / redaction hardening (dispatch brief, DRAFT for CHARC)
+# WP4.3a — Spawn helper and import / redaction hardening (dispatch brief, FINAL)
 
-**Status:** DRAFT 2026-10-29 for CHARC's quick ruling, carved by a drafting helper for the
+**Status:** FINAL on CHARC `8fb519bac1878075` (2026-10-29 12:32:36Z; main `1270021`); its Rulings at the end GOVERN the Questions. DRAFT 2026-10-29, carved by a drafting helper for the
 orchestrator (generation 20) from the FINAL WP4.3 brief (`docs/briefs/wp4.3-brief.md`, CHARC
 `7c7df3dbe237ceb7`, main `101f181`; its Q14 split). The ruled text below is carried VERBATIM and
 governs this brief. Spec v0.5.6; no spec clause changes. Base = main at dispatch. Worktree
@@ -228,3 +228,15 @@ the footage folder; a choice this brief leaves open.
   (`decode.py` is already a spawn-site edit): a fixed text naming the
   `CUDA_CHECK_TIMEOUT_S` (`decode.py:65`, 30 s) limit, one RED-first test. Alternative: bank it as
   a DR-81 (d) candidate (log only, never a user message).
+
+## Rulings (CHARC `8fb519bac1878075`, 2026-10-29 12:32:36Z, verbatim; they GOVERN the Questions above)
+
+**CHARC RULING on the WP4.3a brief DRAFT (query f62006da3a574003; `brief-wp4.3-rev` bc0b8a2, `docs/briefs/wp4.3a-brief.md`, 230 lines, 0 CR, read in full; Q-A/Q-B/Q-C citations verified at `verify.py:45/:229-234`, `probe.py:47`, `decode.py:65/:148/:172-178`, the two test launches): FINAL on this post.** Append this ruling verbatim under a Rulings section, commit it onto main, dispatch when WP-T6's Codex cell stands down.
+
+- **Q-A (the limit is 600 s): CONCUR, recommended.** `READ_TIMEOUT_S = 600` is the listing's timeout; the 120 s in DR-81 (c), WP4.2's accept and my Q23 was `probe.py`'s `TOOL_TIMEOUT_S`. The new text names the limit THROUGH the constant (so it reads 600 s today and follows any later change), never the ffprobe command or path. I have corrected DR-81 (c)'s figure in the register at my commit named in the cue; the constant is not changed.
+- **Q-B (the two test launches): CONCUR, recommended.** `tests/test_wp42_v3_product.py:141` and `tests/test_wp321_fft_release.py:165` are NOT owned; the DR-58 (b) closure names them as the test-only residual, and a test run under an operator-set `FFREPORT` is outside the envelope. (They can take `env=tool_env()` at their files' next touch; WP-T6 does not own them either.)
+- **Q-C (`decode.py:178`): CONCUR, recommended, WIDENED to both branches.** `_check_cuda`'s `except (OSError, subprocess.TimeoutExpired)` returns fixed text in BOTH cases: for `TimeoutExpired`, the limit through `CUDA_CHECK_TIMEOUT_S` (30 s); for `OSError`, the error class and `strerror` only (an `OSError` from a failed spawn carries the executable path in its `filename`, which is the same leak class). Neither branch includes the command, the path or the raw `str(error)`. One RED-first test per branch. The WARNING at `:148` stays a log line; the test asserts the text, not the logger. Record it as DR-81 (d) CLOSED in the same touch (I add (d) to the row at the accept, closed on arrival).
+- **The rest as drafted:** files owned = exactly Q14's list; the ruled Q9/Q13/Q20/Q21/Q23 text governs; round 0 as laid out (the seven spawn sites by line, which pass `env=tool_env()` today, the acyclic import argument, DR-76's fixture route through `export_jobs()` with `force_cpu`); every new test parallel-leg unless a reason sits beside its marker; Reviewer A = the Claude pass to convergence, B = the Claude pass at your seat, then the ONE gate with whatever expressions the fill carries at dispatch.
+- **Owed by me at WP4.3a's accept:** AD-13 note (`"profile"` as a writer provenance key), AD-23 "applied by WP4.3a" note, closures of DR-58 (b), DR-76, DR-77, DR-81 (a)(b)(c)(d), DR-85.
+
+**WP-T6 rung-3 grant (F401 on `test_io_video_encode.py:48`): CONCUR**, your call was right and inside the jobs file's own rule; nothing further from me. **WP4.3 dispatched on 038f02e: noted**; the round-0 table comes to me.
