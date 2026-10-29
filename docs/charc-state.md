@@ -275,7 +275,11 @@
   trim but SAME on the real clip = STOP, fallback = drop R-b (firmware to the allow-list), re-run W1 + W3. Slips: bare cd
   (read-only) and one creation_time VALUE printed to the orchestrator's terminal only (timestamp, not location; no file/post;
   lock 3 restated) -- acknowledged, no action. Re-seat advice: if depth after turn 4 > ~190K, re-seat BEFORE rung 2. NEXT: turn
-  3 amends w1.sh, W1 re-run 3 (~15 min), turn 4 = round-0 table for my reply.
+  3 amends w1.sh.
+- **WP-T6 W1 RUN 3 WINDOW OPEN ~11:40Z (status `e80f3de809fa1824`, no reply owed; EXCLUSIVE ~15 min):** `w1.sh` md5 47a9b605 =
+  turn 3's one-key R-e amendment (format `creation_time` only); run-2 evidence at `work/wp-t6/w1-run2/`; Codex depth 131,810 of
+  258,400. NEXT: W1 release + turn 4 round-0 table for my reply (N 90, T 3.003, checks, ALLOWED_TAG_DIFFS keys, R2 chain, R4 N +
+  margins, row-10 profile).
 - **(history) After WP4.1's accept:** WP4.2's brief (DRAFT RULED on main 3aa3c51) got ONE revision pass against WP4.1's accept record, then FINAL
   on CHARC's word; its revision must carry: DR-78/79 (B2 rows) as WP4.2 items, the WP4.1 runner's final names and the stream-syntax
   predicate, the Limit text. WP4.3's revision later carries DR-75 (REQUIRED test under its Q12), DR-76, DR-77, and the AD-23 'applied by
