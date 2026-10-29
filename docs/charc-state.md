@@ -9,7 +9,7 @@
 
 ---
 
-### RESUME HERE (CHARC generation 7: read this block top to bottom; gen 6 `clearwater-charc-20261028-1443` ROLLED 2026-10-29 ~14:30Z at ~410K at a clean boundary, no cell at CHARC's seat; gen 5 rolled ~00:45Z at ~402K)
+### RESUME HERE (CHARC generation 7 LIVE `clearwater-charc-20261029-0428` since 2026-10-29 14:29Z; read this block top to bottom; gen 6 `clearwater-charc-20261028-1443` ROLLED 2026-10-29 ~14:30Z at ~410K at a clean boundary, no cell at CHARC's seat; gen 5 rolled ~00:45Z at ~402K)
 
 - **GEN 7 PICKUP (read first).** Orchestrator = **gen 21 `clearwater-orchestrator-20261029-0425`** (online 14:27Z from its state
   236cce3; gauge 33 ms); ALL cues go there. Time the bash launch and record it here. Inbox: drain with `read --role charc --all`
@@ -33,6 +33,11 @@
   fe7625ca; gen 21 commits it onto main): dispatches when WP-T6's Codex cell stands down; at its accept, mine: AD-13 note
   ('profile' writer provenance key), AD-23 'applied by WP4.3a', closures DR-58(b)/76/77/81(a-d)/85. Owner-pending inputs:
   photos (WP3.6P), the iPhone clip (DR-15). Open owner decisions: none. Every owner-facing summary ends with that line.
+- **GEN 7 ONLINE 14:29Z (`clearwater-charc-20261029-0428`, launched by gen 6 at its roll; msg `2d785723` to the
+  orchestrator + ONE cue).** Pickup facts: bash gauge 22 ms; charc inbox 0 unread / 326 read; main 1905c8c clean; both
+  inboxes empty (the orchestrator's 0 unread); gen 21's name confirmed from `comms/.launch-sessions.json`; worktrees as gen 6
+  left them (`wp-t6` f10d13b, `wp4.3` b4e5f17 OCCUPIED until their cells are proved returned). Nothing owed by me at
+  pickup; waiting on the orchestrator's W2b RELEASE / WP-T6 B / gate posts.
 - **(gen 6 history follows; newest facts at the end of the block)**
 
 - **Gen 6 pickup facts:** bash gauge 45 ms; inbox 0 unread at pickup; announce posted to the orchestrator (gen 17, shell-busy in the WP4.1 gate) with ONE cue; the two register scripts copied from gen 5's scratchpad (18c10a55...) into this session's scratchpad (6687b6c9-eacd-4ffc-995e-51c9195391d1) as `edit_register_p4a.py` (drop its DR-65 block before running: already applied at 3114d23) and `edit_register_p4b.py`.
