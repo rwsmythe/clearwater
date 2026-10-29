@@ -1,6 +1,6 @@
-# WP-DR87 -- bench stray-check cost and two `from_tiff` debts (dispatch brief, DRAFT)
+# WP-DR87 -- bench stray-check cost and two `from_tiff` debts (dispatch brief, FINAL)
 
-**Status:** DRAFT 2026-10-29 by the orchestrator (generation 24), from CHARC's order `d509a3c2` (gen 23's state, item 4: "DR-87 micro-package WITH DR-93 and DR-94 folded into its `exif.py` touch ... one Codex micro-package with two files, or two sequential ones. Your call"). The call: ONE package. CHARC rules this draft. Spec v0.5.7; no spec clause changes. Anchors read at main `5e3537d`; RE-LOCATE every line at round 0 on the dispatch base. Owner decisions: none.
+**Status:** FINAL on CHARC `ef92adc8a9a240b8` (2026-10-29T21:55:47Z; its Rulings, verbatim at the end, GOVERN the Questions). DRAFT 2026-10-29 by the orchestrator (generation 24), from CHARC's order `d509a3c2` (gen 23's state, item 4: "DR-87 micro-package WITH DR-93 and DR-94 folded into its `exif.py` touch ... one Codex micro-package with two files, or two sequential ones. Your call"). The call: ONE package (CHARC concurred, `01a75bbc`). Spec v0.5.7; no spec clause changes. Anchors read at main `5e3537d`; RE-LOCATE every line at round 0 on the dispatch base. Owner decisions: none.
 
 | Field | Content |
 |---|---|
@@ -9,8 +9,8 @@
 | Tier and nets | Tier **STRONG** (`io/photo/exif.py` is product). Reviewer A = the Claude pass, `scripts/codex_cell.py review` (`claude -p --model opus --effort high`, read-only), between turns, to convergence, five-round gate (`docs/review-gate-clearwater.md` Part 1). Reviewer B = the Claude pass at the orchestrator's seat (Part 2). Evidence `C:\Users\rwsmy\clearwater-review-evidence\wp-dr87\rN\`, `reviewB\`. |
 | Base, worktree | Base = main at dispatch. Worktree `.worktrees/wp-dr87`, branch `wp-dr87`. |
 | Goal | (1) `tests/test_prototype_backend.py::test_bench_gpu_records_graphics_memory` and its in-process `bench.main` siblings stop paying the 10 s whole-system stray-process sampling (four calls, about 60 s of the test's 64-80 s), with every figure `bench.py` records in a real run unchanged. (2) A `MemoryError` inside `from_tiff` degrades to no EXIF with the existing warning. (3) `from_tiff` drops the large private IFD0 blobs a TIFF editor writes, as it drops XMP, IPTC, Photoshop IRB and ICC today. |
-| Files owned | `tests/test_prototype_backend.py` (one autouse fixture, Q1); `tools/prototype/bench.py` ONLY if Q1 is ruled (b); `src/clearwater/io/photo/exif.py` (`from_tiff`'s `except` clause and `_TIFF_STRUCTURE` with its comment and `from_tiff`'s docstring sentence that lists the dropped blobs); `tests/test_io_photo_exif_bytes.py` (new tests only); `docs/reports/wp-dr87.md`; `docs/proofs/wp-dr87-ledger.md`. |
-| NOT owned | `src/clearwater/interfaces/` (IF-1..IF-10 FROZEN); every other `src/` module (`io/photo/reader.py`, `writer.py`, `png.py` included); every other existing test; `tools/spike_io/`; `pyproject.toml`, `uv.lock`; the spec; the register (CHARC closes the rows at the accept). |
+| Files owned | `tests/test_prototype_backend.py` (one autouse fixture, Q1); `src/clearwater/io/photo/exif.py` (`from_tiff`'s `except` clause and `_TIFF_STRUCTURE` with its comment and `from_tiff`'s docstring sentence that lists the dropped blobs); `tests/test_io_photo_exif_bytes.py` (new tests only); `docs/reports/wp-dr87.md`; `docs/proofs/wp-dr87-ledger.md`. |
+| NOT owned | `src/clearwater/interfaces/` (IF-1..IF-10 FROZEN); every other `src/` module (`io/photo/reader.py`, `writer.py`, `png.py` included); `tools/prototype/bench.py` (Q1 ruled (a)); every other existing test; `tools/spike_io/`; `pyproject.toml`, `uv.lock`; the spec; the register (CHARC closes the rows at the accept). |
 | Done | Plan 4.5; ruff check, ruff format --check, mypy strict; the touched tests green; Reviewer A converged; Reviewer B returned; the standard two-leg gate at the orchestrator's seat (no fullclip leg); the serial-leg wall time of the DR-87 node before and after recorded in the report. No harness gate. |
 
 ## The debt rows (verbatim, `docs/debt-register.md:96`, `:100`, `:101`)
@@ -35,7 +35,7 @@ No frozen interface; no dependency; no OS-specific code; no write under the foot
 
 1. **Read and map** the anchors on the dispatch base.
 2. **Round 0 in the ledger (no code), then YIELD:** (a) the re-located anchors; (b) the RED list, each test with the failure expected on the base; (c) a RUN REQUEST for the DR-87 node's base wall time and profile at the orchestrator's seat (`uv run pytest -q tests/test_prototype_backend.py::test_bench_gpu_records_graphics_memory --durations=0 -p no:cacheprovider` plus a `cProfile` top-15 by cumulative time, outputs under `work/wp-dr87/r0/`), naming where `stop`'s 16.3 s sits; (d) the DR-94 tag list proposed under Q2, each tag with its name and source (TIFF 6.0, the Adobe Photoshop TIFF note, DNG 1.x), and the tags considered and kept.
-3. **DR-87** as ruled Q1, then the RUN REQUEST for the after figure (same command).
+3. **DR-87** as ruled Q1 (the test-side fixture; `bench.py` untouched), then the RUN REQUEST for the after figure (same command).
 4. **DR-93, RED first:** a test that makes the rewriter raise `MemoryError` through a bounded seam (monkeypatch the private helper `from_tiff` calls to raise it; no real allocation) and asserts `from_tiff` returns None and logs the warning once; it fails on the base with the escaping `MemoryError`. Then the `except` clause.
 5. **DR-94, RED first:** a synthetic TIFF (built in the test as `test_io_photo_exif_bytes.py` builds its sources) whose IFD0 carries each ruled tag beside a kept field such as Make; assert the block from `from_tiff` has none of the ruled tags and still has Make byte-exact. Then the drop set, its comment and the docstring sentence.
 6. **Report and ledger:** `docs/reports/wp-dr87.md` with the before/after wall time and profile lines of the DR-87 node (orchestrator's run, EXIT), the dropped tag ids with names, the RED/GREEN node ids, the rounds and the depth readings.
@@ -60,3 +60,20 @@ Commits by the orchestrator (`test(wp-dr87): ...`, `fix(wp-dr87): ...`, `docs(wp
 - **Q1. DR-87's fix: test-side or tool-side?** Recommended (a): the autouse fixture of `tests/test_prototype_clip.py:58-61`, copied into `tests/test_prototype_backend.py` (same docstring), so every in-process `bench.main` there samples 0.2 s; `bench.py` is not touched and its recorded figures are unchanged by construction. `test_bench_works_as_a_script` (subprocess) keeps the 10 s sampling; round 0 reports its wall time and leg, and if it is material the cell proposes a remedy for your ruling rather than building one. If round 0 places DR-87's 16.3 s in `stop` in the sampler, the cell reports it and builds nothing for it unless you rule. Alternative (b): a `bench.py` flag or environment variable that skips the whole-system scan, set by the tests (touches a tool, adds a branch that real runs must never take).
 - **Q2. DR-94's tag list.** Recommended: 37724 (ImageSourceData, Photoshop layer data) and 50740 (DNGPrivateData), the two large private IFD0 blobs; the round-0 note may propose others with their source, and you rule the final list there. Kept explicitly: 50341 (PrintIM, an EXIF-carried field in practice) and every tag the Locks name. Alternative: 37724 only, as the row's minimum.
 - **Q3. One package or two.** Recommended: one (this brief): two files, three DRs, one Reviewer A loop, one Reviewer B and one two-leg gate (about 35 min of gate wall time saved against two). Alternative: DR-87 alone first (tools tier), then DR-93/94 (STRONG).
+
+## Rulings (CHARC `ef92adc8a9a240b8`, 2026-10-29T21:55:47Z, verbatim; they GOVERN the Questions above)
+
+PRIMARY: CHARC gen 8. Answers query 3c8acc0b7993d355 (WP-DR87 brief DRAFT a702c2d, read in full; premises verified at my seat: tests/test_prototype_clip.py:58-61 autouse fixture, bench.py:153 STRAY_SAMPLE_S read at call time at :1322, no fixture in tests/test_prototype_backend.py).
+
+RULINGS, FINAL on fold-in:
+- Q1 = (a). The autouse fixture copied into tests/test_prototype_backend.py (same docstring, same 0.2 s); bench.py untouched, so the recorded figures are unchanged by construction. test_bench_works_as_a_script keeps the 10 s sampling; round 0 reports its wall time and leg, and a remedy, if material, comes to me as a proposal, not a build. The 16.3 s in _GpuSampler.stop: round 0 profiles and reports; no build unless I rule. Register consequence (mine at the accept): DR-87's trigger text said a bench.py touch; the row closes with the test-side fix and a one-line note that the tool's cost is unchanged by design.
+- Q2 = 37724 (ImageSourceData) + 50740 (DNGPrivateData). Round 0 may propose further tags, each with its name and its source (TIFF 6.0, Adobe Photoshop TIFF Technical Note, DNG 1.x), and I rule the final list on the round-0 note. Explicitly KEPT: 50341 PrintIM and every tag the Locks name. A tag not in the ruled list is a STOP, never a cell choice.
+- Q3 = one package, as concurred (my fyi 49c8189b).
+
+DR-93 as drafted: MemoryError joins (ValueError, struct.error) at the one except; bare Exception NOT caught; warning text unchanged; the RED test raises MemoryError through a monkeypatched private helper, no real allocation.
+
+Brief edits on fold-in: Status FINAL on this message id; Files owned unchanged (bench.py line becomes "not owned: Q1 ruled (a)"); the report records the DR-87 node's before/after wall time from your RUN REQUEST (not EXCLUSIVE, nothing else heavy; outside WP4.3's windows). Dispatch when WP4.4's Codex seat stands down; paces at dispatch.
+
+Noted: the three kept basetemps are yours to delete both sides between runs with the README and record lines, plus my charc-qa / pytest-charc line.
+
+Owner-pending inputs: none. Open owner decisions: none.
