@@ -236,7 +236,7 @@ appears in no computed set) and the import-time witness extension (DR-84).
 | build (tasks 3-10) | - | - | - | - | product + tests | - | 553,419 at the build yield (cell 2 retired PAST the ~400K stop: the whole build ran in one turn with no yield, so the dispatcher could not read it earlier) |
 | R1 (Reviewer A, `038f02e..99da8aa`) | 0 / 5 / 11 | 16 in / 0 out (R1-5's reachability to be proven on the `main()` path) | 16 new / 0 reopened | 0 | none yet (adjudicating turn; proposed: product + tests) | WSL, codex-cli 0.162.1, `gpt-6.1-sol` high | 129,481 at the R1 yield (cell 3; `scripts/cell_depth.py`, given by the dispatcher in cell 4's dispatch) |
 | R2 (Reviewer A, `038f02e..362a8b2`) | 0 / 3 / 6 | 9 in / 0 out | 8 new / 1 reopened (R2-9 = R1-12; the reviewer also tagged R2-1 as R1-3 and R2-3 as R1-5, adjudicated NEW: distinct paths, the R1 fixes hold) | 0 | R1 remediation (groups A-C): product + tests; R2 remediation (cell 5, groups A-C): product (startup, adapter, preview, render worker, main, settings_dialog under the 38a7c702 grant) + tests; R2-9 test-only | WSL, codex-cli 0.162.1, `gpt-6.1-sol` high | 316,716 at the Group C yield (cell 4, 156 turns; `scripts/cell_depth.py`); seat retired at 355,066 (cell 4 stood down after the R2 yield) |
-| R3 (Reviewer A, `038f02e..028bc4f`) | 0 / 2 / 3 | 5 in / 0 out | 3 new / 2 reopened (R3-3, R3-4 = R1-12; the reviewer also tagged R3-1 as R2-2 and R3-2 as R1-3, adjudicated NEW: distinct routes, the earlier fixes hold) | 0 | none yet (review-only turn); proposed: product (`app/startup.py`) + tests, one report sentence | WSL, codex-cli 0.162.1, `gpt-6.1-sol` high | 222,999 at the Group C yield (cell 5, 109 turns; `scripts/cell_depth.py`); R3 adjudicated in the same seat |
+| R3 (Reviewer A, `038f02e..028bc4f`) | 0 / 2 / 3 | 5 in / 0 out | 3 new / 2 reopened (R3-3, R3-4 = R1-12; the reviewer also tagged R3-1 as R2-2 and R3-2 as R1-3, adjudicated NEW: distinct routes, the earlier fixes hold) | 0 | none yet (review-only turn); proposed: product (`app/startup.py`) + tests, one report sentence | WSL, codex-cli 0.162.1, `gpt-6.1-sol` high | 222,999 at the Group C yield (cell 5, 109 turns; `scripts/cell_depth.py`); R3 adjudicated in the same seat; seat retired at 271,612 (cell 5 yielded R3 there and stood down). CHARC `d6e9abdf`: R3-2 RECLASSIFIED MINOR (counts now 0 / 1 / 4) |
 
 ## CHARC round-0 ruling (`fcb2a9205c060013`, 2026-10-29 12:54:46Z, verbatim; it GOVERNS the STOP items above)
 
@@ -787,3 +787,19 @@ grant; the process kill noted.
   `846af4619ce41919d263948d70e3b7e2`.
 - Five-round gate: round 3 of 5; two NEW in-envelope majors whose fixes change product code, so
   the loop continues after remediation (R4). Yielded BEFORE any remediation (review-only turn).
+
+## CHARC R3 ruling (`d6e9abdfa16feb0e`, 2026-10-29 17:03:59Z, item 1 verbatim; it GOVERNS R3's dispositions)
+
+**1. WP4.3 R3 (round 3 of 5).**
+- **R3-1 MAJOR = FIX in BOTH places, RULED.** (i) WP4.3 cell 6, `app/startup.py`: `clean_leftovers` skips and logs any folder `_is_path` refuses (the output folder included) and never raises before `show()`; RED-first on a NUL `output_folder`. This is defence in depth and stays whatever the source does. (ii) **Scope addition to WP4.3a, GRANTED:** in `config/settings_store.py`, an `output_folder` (and any other path-valued field) that cannot be a path (NUL, or `Path()` raising `ValueError`) is treated like an out-of-range field by the EXISTING per-field rule (`_clamp`, :129: replaced by its default with one warning), NOT a whole-file set-aside: the file is well-formed, one value is unusable, and the user's other settings survive. One decode check + one RED-first test in `tests/test_config_settings.py` (owned). Codex seat 2 folds it into the R1 remediation turn; it is the DR-85 sibling in spirit ("a settings file cannot stop the program from starting") and the brief's register table gains one line. Banking it is DECLINED: the startup skip alone leaves a silently ignored output folder with no warning at the source.
+- **R3-2 = FIX by the (id, folder) pair, RULED; severity MINOR.** Reachable only through a journal the program did not write (uuid4 ids); R2-2's precedent was a CRASH on a foreign journal, this is a lost record on one; the work is the same. The adjudication table records the reclassification and why.
+- **R3-3, R3-4 (reopened R1-12) = FIX test-only:** V7 (e)'s witness must prove an encode OVERLAPS a 1:1 render and check `result.k`; V7 (b) counts proxies shown during the analysis, not slider moves. This is the second reopen of R1-12: cell 6's prompt quotes the V7 scenario text verbatim beside each witness so the witness is derived from the scenario, not the implementation.
+- **R3-5 = FIX test-only** + the report sentence at `:100`; "mid-decode" / "mid-encode" are proved by a predicate on the source's or sink's progress at the close, not by timing.
+- Seat: fresh cell 6 from the ledger; Group A (R3-1, R3-2) yield, Group B (R3-3..R3-5) yield, then R4 review-only. Concurred. R4 is round 4 of 5; if R4 finds a NEW major, the fill's re-seat line applies and I want the R4 verdict before any Group is dispatched.
+
+Item 2 of the same post rules WP4.3a's R1 (F1-F9, the F4 grant); it exists and is not this cell's.
+
+## Remediation of R3 (cell 6, implementer-opus-high; 2026-10-29)
+
+One line per finding: the finding, the commit, the test. Groups per the dispatch: A (start-up and the
+journal: R3-1, R3-2), B (the witnesses: R3-3, R3-4, R3-5 and the report sentence at `:100`).
