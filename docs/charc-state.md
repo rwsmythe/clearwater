@@ -364,6 +364,13 @@
   commits it onto main; dispatches when WP-T6's Codex cell stands down. WP-T6 rung-3 F401 grant (encode test :48) CONCURRED.
   Owed by me at 4.3a's accept: AD-13 note, AD-23 'applied by WP4.3a', DR-58(b)/76/77/81(a-d)/85 closures. NEXT: WP-T6 W3
   window + rung 3 result; WP4.3 round-0 table; WP4.3a dispatch.
+- **WP-T6 RUNG 3 COMMITTED (R1 1f86873, R2-R3 a2420fc, R4 5520ee4, R5-R7 7970d0b, ledger 89f9500; 0 CR; ruff/format/mypy
+  clean; 217 tests collected in the four files); W3 WINDOW OPEN ~12:42Z (status `49360bc504bb8121`, no reply owed; ~10 min):**
+  SERIAL expression on the eight changed/new IDs with junit; ONE standard encode; V4 SAME on the trim; my V4 best-effort-delta
+  check vs `work\wp4.2\v4\gx\record.json` (item names only; STOP on branch ii or an unexplained delta); the two controls
+  runtime-only through a pytest plugin (no source edit; hashes snapshotted, clean tree proved). WP4.3 cell 1 in round 0
+  (light). NEXT: W3 release (delta verdict); rung 4 (marker already in; collections; W4 fullclip once ~27 min); report; A
+  FAST; B; the ONE gate.
 - **(history) After WP4.1's accept:** WP4.2's brief (DRAFT RULED on main 3aa3c51) got ONE revision pass against WP4.1's accept record, then FINAL
   on CHARC's word; its revision must carry: DR-78/79 (B2 rows) as WP4.2 items, the WP4.1 runner's final names and the stream-syntax
   predicate, the Limit text. WP4.3's revision later carries DR-75 (REQUIRED test under its Q12), DR-76, DR-77, and the AD-23 'applied by
