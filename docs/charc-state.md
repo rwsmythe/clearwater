@@ -9,7 +9,47 @@
 
 ---
 
-### RESUME HERE (CHARC generation 5 = `clearwater-charc-20261028-0647`, fable/medium, ONLINE 2026-10-28 16:50Z)
+### RESUME HERE (CHARC generation 6; gen 5 `clearwater-charc-20261028-0647` rolled 2026-10-29 ~00:45Z at ~402K)
+
+- **Orchestrator = gen 17 `clearwater-orchestrator-20261028-1101`** (re-read `comms/.launch-sessions.json` before every cue; every post
+  gets ONE SendMessage cue). Subjects under 120 chars (the poster refuses longer; two refusals this generation at 123-125); bodies via
+  `--body-file`; edit docs with a scratchpad Python script (`newline="\n"`); `tr -cd '\r' | wc -c` = 0 before every commit; commit by
+  pathspec; never an uncommitted edit left in the main tree (hazard 7); HOLD MAIN when the orchestrator asks (no commit, state included,
+  until its ff post).
+- **EXCLUSIVE WINDOW OPEN ~00:45Z (2026-10-29): WP4.1's own two-leg gate on `wp4.1-mc3` 96d72c7 (msg `72ea01043bfa90e1`, ~64 min).
+  NOTHING HEAVY AT THIS SEAT until the orchestrator posts CLOSE.** Then: harness gate, accept record, the orchestrator asks for a
+  HOLD just before the ff, ff, release post; **then CHARC QA (standing recipe below) and the register rows (scripts READY in gen 5's
+  scratchpad, re-create if gone: `edit_register_p4a.py <t5> <w41>` minus its DR-65 part (already applied) = DR-75 H1 nclx-only P3
+  preview BINDING WP4.3, DR-76 G5 writer `profile` vs `import_preset` (WP4.3), DR-77 `import_preset` OverflowError (WP4.3);
+  `edit_register_p4b.py <w41>` = DR-78 B2-1 stream syntax in planned output FILE names BINDING WP4.2, DR-79 B2-2/3/4 minors (WP4.2)).**
+  WP4.1 facts for the record check: author head `3b8b43b` (= cell 4 final 0a0a787 + B pass-1 remediation), B pass 1 BLOCKING (B1 ADS via
+  hard link, CONFIRMED) remediated by cell 4 as ONE structural write-target predicate (my ruling-b1: no `:` after the prefix, no `\\?\`
+  forms, no reparse point on existing ancestors, realpath outside footage; residual hard-link-outside-footage = a Limit; design guard
+  CLOSED), B pass 2 BLOCKING 1/3 adjudicated at the gate by irreversibility, UPHELD (B2-1 banked WP4.2 + Limit; Erratum docs commit on
+  the candidate); Reviewer A R1-R5 = 0/2/6, 0/2/5, 0/1(H1 banked)/6, 0/1/4, 0/0/1 (five-round gate); evidence `wp4.1\r1..r5`,
+  `reviewB`, `reviewB2`. Owed in its record: the H1 Limit sentence (condition 3), WP3.6P OWED, the stacked-gate note (WP4.1's suite is its
+  OWN gate now since the candidate changed after the stack). WP4.1 brief rulings: S1 N10 = AD-11 pre-encode; S4 `tests/test_app_deps.py`
+  granted; S8 (A) V9 reference quantised to the export depth (AD-11 clarified in decisions.md).
+- **After WP4.1's accept:** WP4.2's brief (DRAFT RULED on main 3aa3c51) gets ONE revision pass against WP4.1's accept record, then FINAL
+  on CHARC's word; its revision must carry: DR-78/79 (B2 rows) as WP4.2 items, the WP4.1 runner's final names and the stream-syntax
+  predicate, the Limit text. WP4.3's revision later carries DR-75 (REQUIRED test under its Q12), DR-76, DR-77, and the AD-23 'applied by
+  WP4.3' note is mine at its accept. Lane: WP4.2 / WP4.3 opus-high, Codex nets. Order WP4.2 -> WP4.3.
+- **WP-T5 ACCEPTED main 4933a45 (2026-10-29 00:40Z), CHARC QA CONFIRMED (my msg 56844e86; register + CLAUDE.md 3114d23, DR-65
+  CLOSED).** Serial leg 2,798 -> 2,261 s like-for-like; stacked gate green 4,473 / 1 + 1,126 / 1. Worktrees `wp-t5`, `wp-t5-mc`
+  released (orchestrator copies logs out first).
+- **Phase 4 commission (my msg 136bfecd) and ruling packet (c7452911) are verbatim in the four briefs on main 3aa3c51**; WP4.2 Q3
+  narrowing accepted; DR-47 (a) closes in WP4.2 only if its Q7 engine.py grant fires; DR-62 = WAIT; DR-69 stays OPEN (GUI shows no
+  device-wide total); 43-Q13 AD-23 extension = N1 approval for the CREATE_NO_WINDOW helper.
+- **Owner-pending inputs (carry):** photos (WP3.6P; WP4.1 records the owner-photo leg OWED), the iPhone clip (DR-15), the N6 body
+  erratum DR-64 (apply on the owner's word 'apply N6 erratum' as spec v0.5.6). Open owner decisions: none. Every owner-facing summary
+  ends with that line.
+- **Rules learned this generation:** a seat correction to a working cell lands only at its yield (warn cells of windows at the previous
+  yield); the stacked-gate form needs a hold cap so a ready package is not held hostage; a design guard's pre-ruled remedy must fit the
+  trigger's CLASS (the fifth finding was a stream-syntax route the Q9 alternative did not touch; the structural predicate did).
+
+### Generation 5 (2026-10-28 16:50Z to 2026-10-29 00:45Z; rolled at ~402K; kept as record)
+
+#### Gen 5 live block as left (`clearwater-charc-20261028-0647`, fable/medium, ONLINE 2026-10-28 16:50Z)
 
 - **Orchestrator = gen 17 `clearwater-orchestrator-20261028-1101`** (launched 21:01Z by gen 16, which rolled at ~421K, state
   1b6de7f; ONLINE 21:04Z at f706cc8, msg `f7c9b147cb92bf0d`, gauge 34 ms, acked by my msg ack-gen17; re-read
@@ -158,8 +198,8 @@
 
 ### Phase / state
 
-**Phase 4 (integration) COMMISSIONED 2026-10-28; Phase 3 COMPLETE at main 7e228fb.** Plan
-`docs/clearwater-implementation-plan.md` v1.2. **CHARC generation 5** (RESUME HERE above). Gen 4 = `clearwater-charc-20261026-2007`
+**Phase 4 (integration) in flight: WP-T5 ACCEPTED 4933a45, WP4.1 at its own gate, WP4.2 / WP4.3 DRAFT RULED.** Plan
+`docs/clearwater-implementation-plan.md` v1.2. **CHARC generation 6** (RESUME HERE above); gen 5 = `clearwater-charc-20261028-0647`. Gen 4 = `clearwater-charc-20261026-2007`
 (fable/medium), launched by gen 3 at 06:07Z, picked up 2026-10-27 ~06:10Z from main 08a14ee; bash gauge
 44 ms. Main ~1295 commits ahead of `origin/main`, unpushed; no push asked (verify `git status -sb`).
 
