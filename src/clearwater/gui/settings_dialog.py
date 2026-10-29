@@ -14,8 +14,9 @@ encoder this computer no longer reports) is written back unchanged unless the us
 ``last_parameters`` stays as the session holds it.
 
 Encoder capabilities are read once per session through the injected sink, in a job started by
-the first dialog that opens (the contract gives ``install_settings_dialog`` no context to start
-it earlier); start-up detection is WP4.3's.
+the first dialog that opens, or earlier by the application's start-up through the ``catalog``
+argument of :func:`install_settings_dialog` (WP4.3, DR-52). The one "auto" rule is WP3.10's
+``clearwater.io.video.capability.resolve_encoder``.
 
 Message owner: every message this module presents has owner :data:`OWNER_SETTINGS`.
 Threading: everything here runs on the interface thread except the job callables, which only
@@ -61,6 +62,7 @@ from clearwater.interfaces import (
     ProxyCache,
     Settings,
 )
+from clearwater.io.video.capability import resolve_encoder as wp310_resolve_encoder
 from clearwater.jobs import validate_suffix
 
 from .contract import Message, ShellContext, ShellWindow
@@ -99,39 +101,8 @@ CLEAR_BLOCKED_REASON = "The cache cannot be cleared while a clip is being analys
 NOT_FOUND_REASON = "not found on this computer"
 """Why a stored encoder the sink does not report is shown unavailable."""
 
-_HARDWARE_ENCODER = "hevc_nvenc"
-_SOFTWARE_ENCODER = "libx265"
-
 type EncoderResolver = Callable[[str, Sequence[EncoderCapability]], str]
 """``resolve_encoder(setting, capabilities) -> name``: the one "auto" rule (WP3.10)."""
-
-
-def interim_resolve_encoder(setting: str, capabilities: Sequence[EncoderCapability]) -> str:
-    """Stand in for WP3.10's ``resolve_encoder`` until that package is on main.
-
-    It has WP3.10's signature and rule: ``"auto"`` becomes ``hevc_nvenc`` when it is available,
-    else ``libx265`` when it is available; any other setting is returned unchanged. When WP3.10
-    is on main, this function is deleted and ``resolve_encoder`` of
-    ``clearwater.io.video.capability`` becomes the default of the ``resolve_encoder`` parameters
-    of :func:`settings_dialog` and :func:`install_settings_dialog`.
-
-    Args:
-        setting: ``"auto"`` or an encoder name.
-        capabilities: The sink's capability report.
-
-    Returns:
-        The encoder name, never ``"auto"``.
-
-    Raises:
-        LookupError: The setting is ``"auto"`` and neither encoder is available.
-    """
-    if setting != AUTO:
-        return setting
-    available = {c.name for c in capabilities if c.available}
-    for name in (_HARDWARE_ENCODER, _SOFTWARE_ENCODER):
-        if name in available:
-            return name
-    raise LookupError("no HEVC encoder is available")
 
 
 class SettingsChoosers(Protocol):
@@ -207,6 +178,19 @@ class QtChoosers:
 def _done(started: float) -> JobResult:
     """Return the successful result of a job that started at ``started``."""
     return JobResult(True, (), (), None, "cpu", time.perf_counter() - started)
+
+
+def _detail(error: BaseException) -> str:
+    """Return an error's text for a message, never raising (DR-61 (i), (iii)).
+
+    The exception's own text, or its type name when the text is empty or cannot be formatted
+    (an injected chooser's exception whose ``__str__`` raises).
+    """
+    try:
+        text = str(error)
+    except Exception:  # the exception's own formatting failed
+        text = ""
+    return text or type(error).__name__
 
 
 def _present_error(context: ShellContext, text: str, path: Path | None = None) -> None:
@@ -348,6 +332,7 @@ class SettingsDialog(QDialog):
         self._folder: Path | None = self._initial.output_folder
         self._clearing = False
         self._closed = False
+        self._shown_errors: set[str] = set()
         self.setWindowTitle("Settings")
         self.setObjectName("settings_dialog")
         catalog.start(context)
@@ -358,8 +343,21 @@ class SettingsDialog(QDialog):
         self._check_suffix()
         self._update_clear_button()
         context.session.analysis_changed.connect(self._update_clear_button)
+        context.session.settings_changed.connect(self._on_session_settings)
         catalog.ready.connect(self._on_catalog_ready)
         self.finished.connect(self._on_finished)
+
+    def _error(self, text: str, path: Path | None = None) -> None:
+        """Present a settings error banner, once while it is shown (DR-61 (iii)).
+
+        A text this dialog presented since it last cleared its banners is not presented again,
+        so repeating a refused action does not stack copies of one banner.
+        """
+        shown = ascii_text(text)
+        if shown in self._shown_errors:
+            return
+        self._shown_errors.add(shown)
+        _present_error(self._context, shown, path)
 
     # Construction.
 
@@ -535,6 +533,19 @@ class SettingsDialog(QDialog):
         if not self._closed:
             self._on_catalog_state()
 
+    def _on_session_settings(self, _settings: object) -> None:
+        """The session's settings changed: re-evaluate what OK would apply (DR-61 (ii)).
+
+        An unedited control applies the session's value, so a refusal that came from the
+        session's value (a suffix refused at OK) is lifted when the session is corrected.
+        """
+        if self._closed:
+            return
+        self._check_suffix()
+        self._update_encoder_note()
+        self._update_ten_bit()
+        self._refresh_ok()
+
     def _update_encoder_note(self, name: str | None = None) -> None:
         """Explain detection state or why the encoder to apply is refused.
 
@@ -650,7 +661,8 @@ class SettingsDialog(QDialog):
         try:
             chosen = self._choosers.choose_folder(self._folder)
         except Exception as error:  # choosers are foreign injected code
-            _present_error(self._context, f"The output folder could not be chosen: {error}")
+            detail = _detail(error)
+            self._error(f"The output folder could not be chosen: {detail}")
             return
         if chosen is not None:
             self._folder = chosen
@@ -696,8 +708,8 @@ class SettingsDialog(QDialog):
                 "Remove every cached proxy and statistic? Clips are analysed again when needed."
             )
         except Exception as error:  # choosers are foreign injected code
-            _present_error(
-                self._context, f"The cache was not cleared: the confirmation failed: {error}"
+            self._error(
+                f"The cache was not cleared: the confirmation failed: {_detail(error)}",
             )
             self._update_clear_button()
             return
@@ -725,13 +737,13 @@ class SettingsDialog(QDialog):
             context.jobs.run(job, on_done=self._on_clear_done)
         except RuntimeError as error:  # the job runner is closed: the window is shutting down
             self._clearing = False
-            _present_error(context, f"The cache could not be cleared: {error}")
+            self._error(f"The cache could not be cleared: {_detail(error)}")
             self._update_clear_button()
 
     def _on_clear_done(self, result: JobResult) -> None:
         """Main thread: the clear job ended."""
         if not result.ok:
-            _present_error(self._context, f"The cache could not be cleared: {result.failure}")
+            self._error(f"The cache could not be cleared: {result.failure}")
         if self._closed:
             return
         self._clearing = False
@@ -779,12 +791,12 @@ class SettingsDialog(QDialog):
             self.suffix_edit.setToolTip(reason)
             self._refresh_ok()
             detail = reason[:200]
-            _present_error(self._context, f"The output suffix is not valid: {detail}")
+            self._error(f"The output suffix is not valid: {detail}")
             return
         if self._encoder_unacceptable(new.video_encoder):
             self._update_encoder_note(new.video_encoder)
             self._refresh_ok()
-            _present_error(self._context, self.encoder_note.text())
+            self._error(self.encoder_note.text())
             return
         context = self._context
         session = context.session
@@ -803,13 +815,13 @@ class SettingsDialog(QDialog):
         try:
             save_settings(context.locations.config_dir, settings)
         except (FormatError, ValueError, OSError) as error:
-            _present_error(
-                context,
-                f"The settings could not be saved to {file_name(path)}: {error}",
+            self._error(
+                f"The settings could not be saved to {file_name(path)}: {_detail(error)}",
                 path,
             )
         else:
             context.messages.clear(owner=OWNER_SETTINGS)
+            self._shown_errors.clear()
 
     def _set_cache_limit(self, limit_bytes: int) -> None:
         """Set the cache limit in a job (it may evict on disk); the newest accepted limit wins."""
@@ -825,18 +837,19 @@ class SettingsDialog(QDialog):
 
         def done(result: JobResult) -> None:
             if not result.ok:
-                _present_error(context, f"The cache limit could not be set: {result.failure}")
+                self._error(f"The cache limit could not be set: {result.failure}")
 
         try:
             context.jobs.run(job, on_done=done)
         except RuntimeError as error:  # the job runner is closed: the window is shutting down
-            _present_error(context, f"The cache limit could not be set: {error}")
+            self._error(f"The cache limit could not be set: {_detail(error)}")
 
     def _on_finished(self, _result: int) -> None:
         """The dialog closed: stop listening and let Qt delete it."""
         self._closed = True
         for signal, slot in (
             (self._context.session.analysis_changed, self._update_clear_button),
+            (self._context.session.settings_changed, self._on_session_settings),
             (self._catalog.ready, self._on_catalog_ready),
         ):
             with contextlib.suppress(RuntimeError, TypeError):
@@ -857,7 +870,8 @@ def settings_dialog(
     Args:
         context: The shell context.
         choosers: The folder chooser and confirmation; the Qt ones when None.
-        resolve_encoder: The one "auto" rule; :func:`interim_resolve_encoder` when None.
+        resolve_encoder: The one "auto" rule; WP3.10's
+            ``clearwater.io.video.capability.resolve_encoder`` when None.
         catalog: The session's encoder capabilities, shared between dialogs; a new one for this
             dialog when None.
         cache_limiter: The session's cache-limit serialiser, shared between dialogs so that the
@@ -869,7 +883,7 @@ def settings_dialog(
     return SettingsDialog(
         context,
         choosers or QtChoosers(context.window),
-        resolve_encoder or interim_resolve_encoder,
+        resolve_encoder or wp310_resolve_encoder,
         catalog or EncoderCatalog(context.window),
         cache_limiter or CacheLimiter(),
     )
@@ -880,18 +894,22 @@ def install_settings_dialog(
     *,
     choosers: SettingsChoosers | None = None,
     resolve_encoder: EncoderResolver | None = None,
+    catalog: EncoderCatalog | None = None,
 ) -> None:
     """Register the settings dialog with the window (Tools > Settings).
 
-    The encoder capabilities are read once, by the first dialog that opens, and shared by every
-    later one; so is the serialiser of the cache-limit calls.
+    The encoder capabilities are read once and shared by every dialog: by the first dialog that
+    opens, or earlier when the caller starts ``catalog`` itself (the application's start-up
+    detection, DR-52); so is the serialiser of the cache-limit calls.
 
     Args:
         window: The main window.
         choosers: The folder chooser and confirmation; the Qt ones when None.
-        resolve_encoder: The one "auto" rule; :func:`interim_resolve_encoder` when None.
+        resolve_encoder: The one "auto" rule; WP3.10's
+            ``clearwater.io.video.capability.resolve_encoder`` when None.
+        catalog: The session's encoder capabilities (the start-up's); a new one when None.
     """
-    catalog = EncoderCatalog(window)
+    catalog = catalog if catalog is not None else EncoderCatalog(window)
     cache_limiter = CacheLimiter()
 
     def factory(context: ShellContext) -> SettingsDialog:

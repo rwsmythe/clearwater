@@ -1,10 +1,11 @@
 """WP3.20 settings dialog (G12, G13, D74, D71, AD-9, DR-35, DR-44 (b)) and the refusal (S4).
 
-Every test but ``test_interim_rule_matches_the_wp310_rule`` (a direct call) drives the dialog
-through the shell: ``Tools > Settings`` triggers the factory that ``install_settings_dialog``
-registered. The folder chooser and the confirmation are injected, the
-sink reports a chosen capability list, the cache records the thread of every call, and the
-locations are under ``tmp_path``.
+WP4.3 deleted the stand-in rule and its mirror test (DR-52): WP3.10's ``resolve_encoder`` is the
+default, ``install_settings_dialog`` takes the start-up's catalog, and the DR-61 cases are at the
+end. Every test drives the dialog through the shell: ``Tools > Settings`` triggers the factory
+that ``install_settings_dialog`` registered. The folder chooser and the confirmation are
+injected, the sink reports a chosen capability list, the cache records the thread of every call,
+and the locations are under ``tmp_path``.
 """
 
 # The shared fixture ``make_window`` is imported from gui_support and used as a parameter.
@@ -38,6 +39,8 @@ from clearwater.gui.settings_dialog import (
 from clearwater.gui.shell import MainWindow
 from clearwater.interfaces import EncoderCapability, Settings
 from clearwater.interfaces.stubs import StubProxyCache, StubVideoSink
+from clearwater.io.video import capability
+from clearwater.io.video.encode import VideoEncodeError
 from clearwater.jobs import TEMP_MARKER, validate_suffix
 from gui_support import image, make_window, open_and_wait, photo_engines, presenter_of, wait_idle
 
@@ -737,7 +740,7 @@ def test_auto_is_resolved_by_the_injected_rule(env: Env) -> None:
 
 
 @pytest.mark.parametrize(
-    ("capabilities", "interim", "resolved", "enabled", "note"),
+    ("capabilities", "default", "resolved", "enabled", "note"),
     [
         (
             (EncoderCapability("hevc_nvenc", True, None, (8,), True), X265),
@@ -756,16 +759,16 @@ def test_auto_is_resolved_by_the_injected_rule(env: Env) -> None:
     ],
     ids=["injected-enables-ten-bit", "injected-disables-ten-bit"],
 )
-def test_auto_is_resolved_by_a_rule_that_disagrees_with_the_interim_rule(
+def test_auto_is_resolved_by_a_rule_that_disagrees_with_the_default_rule(
     env: Env,
     capabilities: tuple[EncoderCapability, ...],
-    interim: str,
+    default: str,
     resolved: str,
     enabled: bool,
     note: str,
 ) -> None:
     """The injected resolver, rather than a restated rule, controls 10-bit support."""
-    assert module.interim_resolve_encoder("auto", capabilities) == interim != resolved
+    assert capability.resolve_encoder("auto", capabilities) == default != resolved
     window = env.start(caps=capabilities, resolve=lambda setting, caps: resolved)
     dialog = env.open(window)
     assert env.resolve_calls
@@ -773,16 +776,6 @@ def test_auto_is_resolved_by_a_rule_that_disagrees_with_the_interim_rule(
     assert dialog.ten_bit_check.isEnabled() == enabled
     assert dialog.ten_bit_note.text() == note
     assert dialog.ten_bit_check.toolTip() == note
-
-
-def test_interim_rule_matches_the_wp310_rule() -> None:
-    resolve = module.interim_resolve_encoder
-    assert resolve("auto", (NVENC, X265)) == "libx265"
-    nvenc = EncoderCapability("hevc_nvenc", True, None, (8, 10), True)
-    assert resolve("auto", (X265, nvenc)) == "hevc_nvenc"
-    assert resolve("libx265", ()) == "libx265"
-    with pytest.raises(LookupError):
-        resolve("auto", (NVENC,))
 
 
 # DR-35: the suffix.
@@ -1289,3 +1282,91 @@ def test_planted_selectable_unavailable_encoder_is_caught(
     monkeypatch.setattr(SettingsDialog, "_disable_item", lambda self, index, reason: None)
     with pytest.raises(AssertionError):
         _disabled_scenario(env)
+
+
+# WP4.3: DR-52 (WP3.10's rule, the catalog argument) and DR-61 (i)-(iii).
+
+
+def test_the_default_rule_is_wp310s_and_the_stand_in_is_gone() -> None:
+    assert not hasattr(module, "interim_resolve_encoder")
+    assert module.wp310_resolve_encoder is capability.resolve_encoder
+
+
+def test_wp310s_unavailable_error_is_shown_as_the_d74_reason(env: Env) -> None:
+    """With neither encoder available, "auto" raises VideoEncodeError("unavailable") (WP3.10)."""
+    none = (NVENC, EncoderCapability("libx265", False, "libx265 is missing.", (), False))
+    with pytest.raises(VideoEncodeError) as caught:
+        capability.resolve_encoder("auto", none)
+    assert caught.value.kind == "unavailable"
+    window = env.start(caps=none)
+    dialog = env.open(window)
+    assert not dialog.ten_bit_check.isEnabled()
+    assert dialog.ten_bit_note.text() == NO_ENCODER_REASON
+    assert dialog.ten_bit_check.toolTip() == NO_ENCODER_REASON
+    rows = {d: (enabled, tip) for d, _, enabled, tip in items(dialog.encoder_combo)}
+    assert rows["hevc_nvenc"] == (False, "No NVIDIA encoder was found.")
+    assert rows["libx265"] == (False, "libx265 is missing.")
+    assert dialog.ok_button.isEnabled()  # "auto" itself is allowed (Q3); export refuses it
+
+
+def test_the_start_up_catalog_is_the_dialogs(env: Env, qtbot: Any) -> None:
+    """DR-52: start-up detection runs once through the catalog the dialog then shows."""
+    window = env.start()
+    catalog = module.EncoderCatalog(window)
+    install_settings_dialog(window, choosers=env.choosers, catalog=catalog)
+    catalog.start(window.context)
+    qtbot.waitUntil(lambda: not catalog.detecting(), timeout=5000)
+    assert catalog.capabilities() == CAPS
+    dialog = env.open(window)
+    assert dialog.encoder_combo.isEnabled() and dialog.encoder_note.text() == ""
+    assert len(env.sink.threads) == 1  # the dialog did not detect again
+
+
+class _UnprintableError(OSError):
+    def __str__(self) -> str:
+        raise RuntimeError("no text")
+
+
+@pytest.mark.parametrize(
+    ("error", "detail"),
+    [(_UnprintableError("x"), "_UnprintableError"), (OSError(), "OSError")],
+    ids=["str-raises", "empty-text"],
+)
+def test_a_chooser_error_without_usable_text_is_named_by_its_type(
+    env: Env, error: Exception, detail: str
+) -> None:
+    """DR-61 (i), (iii): the detail is formatted with a fallback; nothing escapes the slot."""
+    window = env.start()
+    dialog = env.open(window)
+    env.choosers.raise_on_choose = error
+    dialog._on_choose_folder()
+    (shown,) = presenter_of(window).of("error")
+    assert shown.text == f"The output folder could not be chosen: {detail}"
+    assert shown.owner == OWNER_SETTINGS
+
+
+def test_correcting_the_session_after_a_refused_applied_suffix_enables_ok(env: Env) -> None:
+    """DR-61 (ii): OK is re-evaluated when the session's settings change."""
+    window = env.start()
+    dialog = env.open(window)
+    window.session.set_settings(dataclasses.replace(Settings(), output_suffix="bad/suffix"))
+    dialog.accept()
+    assert not dialog.ok_button.isEnabled()
+    window.session.set_settings(dataclasses.replace(Settings(), output_suffix="_ok"))
+    assert dialog.suffix_error.text() == ""
+    assert dialog.ok_button.isEnabled()
+    dialog.accept()
+    assert dialog.result() == QDialog.DialogCode.Accepted
+    assert env.saved().output_suffix == "_ok"
+
+
+def test_repeated_refused_accepts_show_one_banner(env: Env) -> None:
+    """DR-61 (iii): the same refusal presented again does not stack a second banner."""
+    window = env.start()
+    dialog = env.open(window)
+    window.session.set_settings(dataclasses.replace(Settings(), output_suffix="bad/suffix"))
+    dialog.accept()
+    dialog.accept()
+    dialog.accept()
+    errors = presenter_of(window).of("error")
+    assert len(errors) == 1 and errors[0].text.startswith("The output suffix is not valid:")

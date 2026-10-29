@@ -169,3 +169,21 @@ failed detection carried the wrong reason), fixed in the terminating cleanup; le
   today (a small addition for WP4.3).
 - **WP3.18 (analysis):** the dialog disables Clear cache while `Session.analysis().phase ==
   "running"`; keep setting the phase through `Session.set_analysis`.
+
+## Erratum (WP4.3, DR-52)
+
+Appended by WP4.3, which swapped the stand-in rule for WP3.10's; the text above is unchanged.
+
+1. **Commits.** The four SHAs cited above (`8f54e53`, `d5808a9`, `d454b06`, `34075f2`) are the
+   pre-rebase ones. The merge candidate's commits are `262d24f`, `5d34e9e`, `1171731` and
+   `639101c`, in the same order.
+2. **Public API.** `settings_dialog` also takes `cache_limiter=None` (the session's cache-limit
+   serialiser, shared between dialogs). Since WP4.3 `install_settings_dialog` takes
+   `catalog=None` as well (the start-up detection's catalog), and `interim_resolve_encoder` is
+   gone.
+3. **The stand-in rule.** `interim_resolve_encoder` did not match WP3.10's rule on its errors:
+   WP3.10 raises `VideoEncodeError("refused")` for an unknown setting and
+   `VideoEncodeError("unavailable")` where the stand-in raised `LookupError`, so
+   `test_interim_rule_matches_the_wp310_rule` did not prove what its name says. WP4.3 deleted
+   the stand-in and that test; `clearwater.io.video.capability.resolve_encoder` is the default
+   of both functions, and a test shows its `"unavailable"` error as the 10-bit option's reason.
