@@ -6,9 +6,9 @@ is imported and probes CUDA on the first selection that is not forced).
 WP4.1 builds the photo legs: the IF-6 reader and writer of :mod:`clearwater.io.photo`, the IF-3
 methods of :mod:`clearwater.methods` (``"c3"`` first, D16), the IF-2 selection of
 :mod:`clearwater.core` and the export engine of :mod:`clearwater.jobs` behind the WP3.19
-``ExportJobs`` seam. A video request reaching :func:`export_jobs` fails with
-:data:`~clearwater.jobs.export_seam.UNAVAILABLE_TEXT` and writes nothing; WP4.2 builds the video
-legs here and removes that routing.
+``ExportJobs`` seam. WP4.2 adds the video legs: the IF-5 source and sink of
+:mod:`clearwater.io.video`, built per video job on the backend the job selected (DR-67), and the
+IF-7 proxy cache of :mod:`clearwater.cache` over a folder the caller passes in.
 
 This module imports nothing from ``clearwater.gui``, no PySide6 and no ``cupy``/``cupyx``
 (AD-29), and never resolves the app-data folder: the caller passes settings in.
@@ -17,26 +17,31 @@ This module imports nothing from ``clearwater.gui``, no PySide6 and no ``cupy``/
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
-from fractions import Fraction
 from pathlib import Path
+from typing import NoReturn
+
+import numpy as np
+from numpy.typing import NDArray
 
 import clearwater
 from clearwater import core
+from clearwater.cache import DiskProxyCache
 from clearwater.interfaces import (
+    DEFAULT_CACHE_LIMIT_BYTES,
+    ArrayBackend,
+    CacheEntry,
     CacheKey,
-    ColorDescription,
     CorrectionMethod,
-    JobResult,
     PhotoSink,
     PhotoSource,
-    ProbeResult,
-    Progress,
-    VideoStreamInfo,
+    ProxyCache,
+    Statistics,
+    VideoSink,
+    VideoSource,
 )
-from clearwater.interfaces.stubs import StubProxyCache, StubVideoSink, StubVideoSource
 from clearwater.io.photo import PhotoReader, PhotoWriter
+from clearwater.io.video import FFmpegVideoSink, FFmpegVideoSource
 from clearwater.jobs import BackendSelector, ExportEngine
-from clearwater.jobs.export_seam import ExportJobs, ExportRequest, unavailable_exports
 from clearwater.methods import available_methods
 
 
@@ -76,73 +81,104 @@ def backend_selector() -> BackendSelector:
     return core.select_backend
 
 
-class _PhotoExports:
-    """The root's ``ExportJobs`` in WP4.1: photos to the engine, videos unavailable (WP4.2 removes).
+VIDEO_NEEDS_A_CACHE = "video export needs a cache folder; none was given"
+"""The failure of a video job from :func:`export_jobs` built without a cache folder."""
 
-    A photo request gets the export engine's job. A video request gets the job of
-    :func:`~clearwater.jobs.export_seam.unavailable_exports`, which fails with ``UNAVAILABLE_TEXT``
-    and opens no file. Any other request is passed to the engine, which refuses it as malformed.
+
+class _NoCacheFolder:
+    """The IF-7 cache of an :func:`export_jobs` built without a cache folder: every use refuses.
+
+    The video job asks for its cache key (:meth:`key_for`) before any cache method, so a video
+    request fails there, after its probe and before its analysis or any write; a photo job never
+    reaches the cache.
     """
 
-    def __init__(self, engine: ExportEngine) -> None:
-        """Hold the engine.
+    def _refuse(self) -> NoReturn:
+        raise RuntimeError(VIDEO_NEEDS_A_CACHE)
 
-        Args:
-            engine: The photo export engine.
-        """
-        self._engine = engine
-        self._unavailable = unavailable_exports()
+    def key_for(self, path: Path) -> CacheKey:
+        """Refuse: there is no cache folder."""
+        self._refuse()
 
-    def job(self, request: ExportRequest) -> Callable[[Progress], JobResult]:
-        """Return the IF-8 job for ``request`` (the ``ExportJobs`` contract).
+    def lookup(self, key: CacheKey) -> CacheEntry | None:
+        """Refuse: there is no cache folder."""
+        self._refuse()
 
-        Args:
-            request: What to export.
+    def store_proxy(self, key: CacheKey, pts_ticks: int, proxy: NDArray[np.uint8]) -> None:
+        """Refuse: there is no cache folder."""
+        self._refuse()
 
-        Returns:
-            The job.
+    def proxy(self, key: CacheKey, pts_ticks: int) -> NDArray[np.uint8]:
+        """Refuse: there is no cache folder."""
+        self._refuse()
 
-        Raises:
-            ValueError: The request is malformed in itself (raised by the engine).
-        """
-        if isinstance(request, ExportRequest) and request.kind == "video":
-            return self._unavailable.job(request)
-        return self._engine.job(request)
+    def store_source_statistics(
+        self, key: CacheKey, stage: str, pts_ticks: int, stats: Statistics
+    ) -> None:
+        """Refuse: there is no cache folder."""
+        self._refuse()
 
+    def source_statistics(self, key: CacheKey, stage: str, pts_ticks: int) -> Statistics:
+        """Refuse: there is no cache folder."""
+        self._refuse()
 
-def _no_video_probe() -> ProbeResult:
-    """Return the probe result of the never-reached stub video source (no file is probed)."""
-    video = VideoStreamInfo(
-        codec="none",
-        width=1,
-        height=1,
-        bit_depth=8,
-        pix_fmt="none",
-        chroma_siting="unspecified",
-        color=ColorDescription("bt709", "bt709", "bt709", "limited", 8, False, None),
-        frame_rate=Fraction(1),
-        time_base=Fraction(1),
-        nb_frames=0,
-        rotation=0,
-        vfr=False,
-    )
-    return ProbeResult(
-        path=Path("none"),
-        container="none",
-        duration_s=Fraction(0),
-        start_offset_s=Fraction(0),
-        video=video,
-        audio=(),
-        data=(),
-        edit_list=(),
-        faults=(),
-        gopro=None,
-    )
+    def mark_complete(self, key: CacheKey) -> None:
+        """Refuse: there is no cache folder."""
+        self._refuse()
+
+    def limit_bytes(self) -> int:
+        """Return zero: there is no cache folder."""
+        return 0
+
+    def set_limit_bytes(self, n: int) -> None:
+        """Refuse: there is no cache folder."""
+        self._refuse()
+
+    def clear(self) -> None:
+        """Refuse: there is no cache folder."""
+        self._refuse()
 
 
-def _no_cache_key(path: Path) -> CacheKey:
-    """Refuse: video export is not built in WP4.1, so no cache key is ever needed."""
-    raise RuntimeError("video export is not available in this build")
+def video_source(device_backend: ArrayBackend | None = None) -> VideoSource:
+    """Return a new video source (IF-5; WP3.9 probe and FFmpeg decode).
+
+    Args:
+        device_backend: The video job's GPU backend, whose ``hw_decode`` frames are then
+            converted and yielded on its device (DR-67, AD-29); None for a CPU job or a probe.
+
+    Returns:
+        A :class:`~clearwater.io.video.FFmpegVideoSource`.
+    """
+    return FFmpegVideoSource(device_backend=device_backend)
+
+
+def video_sink(device_backend: ArrayBackend | None = None) -> VideoSink:
+    """Return a new, unopened video sink (IF-5; WP3.10 FFmpeg encode and verification).
+
+    Args:
+        device_backend: The video job's GPU backend, on whose device a device frame is then
+            quantised (DR-67, AD-29); None for a CPU job.
+
+    Returns:
+        A :class:`~clearwater.io.video.FFmpegVideoSink`.
+    """
+    return FFmpegVideoSink(device_backend=device_backend)
+
+
+def proxy_cache(folder: Path, limit_bytes: int = DEFAULT_CACHE_LIMIT_BYTES) -> DiskProxyCache:
+    """Return the proxy cache over ``folder`` with its registered default codec (IF-7; DR-41).
+
+    Opening it removes the entries of another cache format version (D113) and applies the
+    limit (D71); the folder is created on the first store.
+
+    Args:
+        folder: The cache folder; the caller's (the root never resolves the app-data folder).
+        limit_bytes: The size limit in bytes (``Settings.cache_limit_bytes``).
+
+    Returns:
+        A :class:`~clearwater.cache.DiskProxyCache`; its ``key_for`` is the key of a source.
+    """
+    return DiskProxyCache(folder, limit_bytes)
 
 
 def export_jobs(
@@ -153,14 +189,21 @@ def export_jobs(
     methods: Mapping[str, CorrectionMethod] | None = None,
     select_backend: BackendSelector | None = None,
     on_stage: Callable[[str], None] | None = None,
-) -> ExportJobs:
-    """Return a new export engine for photos behind the WP3.19 seam (videos fail, WP4.2 adds them).
+    cache_folder: Path | None = None,
+    cache_limit_bytes: int = DEFAULT_CACHE_LIMIT_BYTES,
+    source_for: Callable[[ArrayBackend | None], VideoSource] | None = None,
+    sink_for: Callable[[ArrayBackend | None], VideoSink] | None = None,
+) -> ExportEngine:
+    """Return a new export engine for photos and videos (the WP3.19 ``ExportJobs`` seam).
 
-    The engine reads with :func:`photo_reader`, renders with :func:`correction_methods`, selects
-    with :func:`backend_selector` and writes with :func:`photo_writer` through
-    ``clearwater.jobs.SafeWrite``. A video request's job fails with ``UNAVAILABLE_TEXT`` and writes
-    nothing; the engine's video collaborators are interface stubs that no job reaches. The
-    overrides exist for tests and for the V8 recording sink only.
+    A photo is read with :func:`photo_reader`, rendered with :func:`correction_methods` on the
+    backend :func:`backend_selector` picks and written with :func:`photo_writer` through
+    ``clearwater.jobs.SafeWrite``. A video is probed by :func:`video_source`; each video job then
+    builds its own source and sink with :func:`video_source` and :func:`video_sink` on the
+    backend it selected (DR-67), analyses through :func:`proxy_cache` over ``cache_folder`` and
+    encodes through ``SafeWrite``; each input file is its own clip (spec section 5.5). Without
+    ``cache_folder`` a video request fails with :data:`VIDEO_NEEDS_A_CACHE` and writes nothing.
+    The overrides exist for tests and instruments only.
 
     Args:
         app_version: The version recorded in provenance (D91).
@@ -169,20 +212,36 @@ def export_jobs(
         methods: The methods by id, default first; :func:`correction_methods` when None.
         select_backend: The backend selection; :func:`backend_selector` when None.
         on_stage: The engine's phase hook (the V16 instrument's); none when None.
+        cache_folder: The analysis cache folder (the caller's: ``app_locations().cache_dir`` in
+            the application); None for an engine without video.
+        cache_limit_bytes: The cache size limit (``Settings.cache_limit_bytes``).
+        source_for: Builds a video job's frame source from its device backend;
+            :func:`video_source` when None.
+        sink_for: Builds a video job's sink from its device backend; :func:`video_sink` when
+            None.
 
     Returns:
-        The export jobs.
+        The export engine.
     """
-    engine = ExportEngine(
+    cache: ProxyCache
+    key: Callable[[Path], CacheKey]
+    if cache_folder is None:
+        refusing = _NoCacheFolder()
+        cache, key = refusing, refusing.key_for
+    else:
+        disk = proxy_cache(cache_folder, cache_limit_bytes)
+        cache, key = disk, disk.key_for
+    return ExportEngine(
         methods=correction_methods() if methods is None else methods,
-        video_source=StubVideoSource((), _no_video_probe()),
-        sink_factory=StubVideoSink,
+        video_source=video_source(),
+        sink_factory=video_sink,
         photo_reader=photo_reader() if reader is None else reader,
         photo_writer=photo_writer() if writer is None else writer,
-        cache=StubProxyCache(),
-        cache_key=_no_cache_key,
+        cache=cache,
+        cache_key=key,
         select_backend=backend_selector() if select_backend is None else select_backend,
         app_version=app_version,
         on_stage=on_stage,
+        source_for=video_source if source_for is None else source_for,
+        sink_for=video_sink if sink_for is None else sink_for,
     )
-    return _PhotoExports(engine)

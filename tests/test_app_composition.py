@@ -2,9 +2,9 @@
 
 Covers task 3: every function returns a fresh real component; ``"c3"`` is first (D16); the
 selection is ``clearwater.core.select_backend`` itself; ``export_jobs`` exports a photo through
-the real reader, method and writer and fails a video with ``UNAVAILABLE_TEXT`` writing nothing
-(question 4); importing the root loads no PySide6 or CuPy and builds nothing; and no other module
-under ``src/clearwater`` constructs the real photo engines (a static test with a planted control).
+the real reader, method and writer and runs a video as the real video job (WP4.2); importing
+the root loads no PySide6 or CuPy and builds nothing; and no other module under
+``src/clearwater`` constructs the real photo engines (a static test with a planted control).
 """
 
 from __future__ import annotations
@@ -23,7 +23,7 @@ from clearwater.config import new_parameter_set
 from clearwater.interfaces import JobResult, Settings
 from clearwater.interfaces.stubs import StubProgress
 from clearwater.io.photo import PhotoReader, PhotoWriter
-from clearwater.jobs.export_seam import UNAVAILABLE_TEXT, ExportRequest
+from clearwater.jobs.export_seam import ExportRequest
 from clearwater.methods import AncutiFusionMethod
 
 SRC = Path(clearwater.__file__).parent
@@ -115,13 +115,18 @@ def test_a_photo_is_exported_through_the_real_engine(sample, tmp_path: Path) -> 
     assert image.pixels.shape == (64, 96, 3)
 
 
-def test_a_video_request_fails_unavailable_and_writes_nothing(tmp_path: Path) -> None:
+def test_a_video_request_runs_the_real_video_job(tmp_path: Path) -> None:
     out = tmp_path / "out"
     out.mkdir()
     source = tmp_path / "GX010001.MP4"
     source.write_bytes(b"not read")
-    result = _run(ExportRequest(source, "video", new_parameter_set("c3", {}), _settings(out)))
-    assert (result.ok, result.failure, result.outputs) == (False, UNAVAILABLE_TEXT, ())
+    request = ExportRequest(source, "video", new_parameter_set("c3", {}), _settings(out))
+    result = composition.export_jobs(cache_folder=tmp_path / "cache").job(request)(StubProgress())
+    assert (result.ok, result.outputs) == (False, ())
+    assert result.failure == (
+        "GX010001.MP4: GX010001.MP4 cannot be read as a video file; it may be damaged or not a "
+        "video."
+    )
     assert list(out.iterdir()) == [] and sorted(p.name for p in tmp_path.iterdir()) == [
         "GX010001.MP4",
         "out",
