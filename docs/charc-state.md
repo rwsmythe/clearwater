@@ -390,6 +390,11 @@
   recompute shows CPU on that run). S3 set_idle_device GRANTED. S6 journal renamed aside .bad-<UTC>. S7 uncommitted V7
   driver importing committed helpers. S-order CONFIRMED (cleanup after MainWindow, before installs and show). FRESH CELL 2
   for the build (cell 1 at 262,719).** NEXT: cell 1 final report + stand-down; cell 2 dispatched; its yields.
+- **WP-T6 W3 DONE 12:57Z (status `fa801fad17d48fc2`, no reply owed): RUNG 3 CLOSED.** Stage 1: 8 passed in 259 s (run 1
+  322 s); ONE standard encode; engine record M+R all SAME, roster SAME. Stage 2: `branch=i-proceed`, BE delta = exactly the six
+  ruled names. Stage 3 draft control caught (level name assert); stage 4 reference control caught (89 vs 90). Tree clean, tests
+  byte-identical to the snapshot. Seat 2 depth 152,719. NEXT: rung 4 (collection identities; W4 FULLCLIP once ~27 min);
+  report; A FAST; B; the ONE gate.
 - **(history) After WP4.1's accept:** WP4.2's brief (DRAFT RULED on main 3aa3c51) got ONE revision pass against WP4.1's accept record, then FINAL
   on CHARC's word; its revision must carry: DR-78/79 (B2 rows) as WP4.2 items, the WP4.1 runner's final names and the stream-syntax
   predicate, the Limit text. WP4.3's revision later carries DR-75 (REQUIRED test under its Q12), DR-76, DR-77, and the AD-23 'applied by
