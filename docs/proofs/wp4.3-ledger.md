@@ -235,7 +235,7 @@ appears in no computed set) and the import-time witness extension (DR-84).
 | 0 (design) | - | - | - | - | none (no product code) | - | 263,162 at the round-0 yield (cell 1 retired; `scripts/cell_depth.py`) |
 | build (tasks 3-10) | - | - | - | - | product + tests | - | 553,419 at the build yield (cell 2 retired PAST the ~400K stop: the whole build ran in one turn with no yield, so the dispatcher could not read it earlier) |
 | R1 (Reviewer A, `038f02e..99da8aa`) | 0 / 5 / 11 | 16 in / 0 out (R1-5's reachability to be proven on the `main()` path) | 16 new / 0 reopened | 0 | none yet (adjudicating turn; proposed: product + tests) | WSL, codex-cli 0.162.1, `gpt-6.1-sol` high | 129,481 at the R1 yield (cell 3; `scripts/cell_depth.py`, given by the dispatcher in cell 4's dispatch) |
-| R2 (Reviewer A, `038f02e..362a8b2`) | 0 / 3 / 6 | 9 in / 0 out | 8 new / 1 reopened (R2-9 = R1-12; the reviewer also tagged R2-1 as R1-3 and R2-3 as R1-5, adjudicated NEW: distinct paths, the R1 fixes hold) | 0 | R1 remediation (groups A-C): product + tests; R2: none yet (review-only turn); proposed: product (startup, adapter, preview, render worker) + tests, one grant decision (settings_dialog) | WSL, codex-cli 0.162.1, `gpt-6.1-sol` high | 316,716 at the Group C yield (cell 4, 156 turns; `scripts/cell_depth.py`); seat retired at 355,066 (cell 4 stood down after the R2 yield) |
+| R2 (Reviewer A, `038f02e..362a8b2`) | 0 / 3 / 6 | 9 in / 0 out | 8 new / 1 reopened (R2-9 = R1-12; the reviewer also tagged R2-1 as R1-3 and R2-3 as R1-5, adjudicated NEW: distinct paths, the R1 fixes hold) | 0 | R1 remediation (groups A-C): product + tests; R2 remediation (cell 5, groups A-C): product (startup, adapter, preview, render worker, main, settings_dialog under the 38a7c702 grant) + tests; R2-9 test-only | WSL, codex-cli 0.162.1, `gpt-6.1-sol` high | 316,716 at the Group C yield (cell 4, 156 turns; `scripts/cell_depth.py`); seat retired at 355,066 (cell 4 stood down after the R2 yield) |
 
 ## CHARC round-0 ruling (`fcb2a9205c060013`, 2026-10-29 12:54:46Z, verbatim; it GOVERNS the STOP items above)
 
@@ -701,3 +701,47 @@ Decisions for Reviewer A to challenge: R2-5 also rebuilds after a cancelled or f
 entry incomplete; the old engine would have started a fresh `analysis_job` anyway, so the result
 is the same); R2-9 sleeps AFTER the event rather than before it, so the analysis's wait itself is
 longer than 100 ms (the adjudication's "after a >= 150 ms sleep" read for both properties).
+
+Depth at the Group B yield: 168,297 (`scripts/cell_depth.py`, 78 turns; given by the dispatcher,
+gen 21). Dispatcher QA: 4 commits, owned files only, 0 CR and 0 NUL in every blob; the three
+choices for R3 to challenge noted.
+
+### Group C (R2-3 under the grant, R2-4 as banked, the report's wording)
+
+Red first on `9831074`: `test_gui_settings_dialog.py::test_cache_job_errors_are_not_presented_once_the_main_window_closes[window-closing]`
+failed the right way (both errors presented on the closed window: "The cache could not be
+cleared: RuntimeError: the analysis cache could not be opened: the cache volume is not mounted"
+and the limit's), `[window-open]` (the control) passed; both green after. Targeted run
+(`test_gui_settings_dialog`, `test_app_startup`, `test_app_wiring`, `test_app_leftovers` and the
+eight layering tests): 218 passed 1 xfailed, 0 skipped. ruff check, ruff format --check (280),
+mypy strict (146): clean. Every committed blob 0 CR, 0 NUL, ASCII.
+
+- R2-3 MAJOR (GRANT, narrow, 38a7c702), `be73495`: the ONE closed signal is
+  `Application.closed` (the `_CloseWatch` the start-up callbacks read, R1-5). It reaches the dialog
+  within the grant: `install_settings_dialog(..., window_closing=)` -> `settings_dialog` ->
+  `SettingsDialog` (one optional argument, never closing when None), and `build_application`
+  (owned `app/main.py`) now creates the watch before the dialog's install and passes
+  `application.closed`; `start_jobs` keeps the watch it finds. In the dialog, ONLY the clear's
+  `_on_clear_done` and the limit's `done` changed: their error goes through `_cache_job_error`,
+  which logs it (`"<text> (not shown: the window is closing)"`, WARNING, `clearwater.gui.settings_dialog`)
+  and presents nothing while the window is closing, else presents it as before. The jobs still
+  run to their end (the runner also logs "job failed"). Q1's gating, `_clearing`,
+  `_update_clear_button` and the RuntimeError branches are unchanged. Test (R1-5's form, the real
+  `build_application`): a slow FAILING open, a Clear (confirmed) and a limit change (OK) queued
+  behind it, `SHUTDOWN_TIMEOUT_S` 0.2 s; `[window-closing]` closes the main window inside the
+  wait: no settings error presented, both texts in the log; `[window-open]`: both errors presented.
+- R2-4 MINOR, BANKED as DR-90 (38a7c702; CHARC writes the row at the accept): the report's
+  Limits carry "A Clear during another clip's export fails that export readably, with nothing
+  partial written", and the DR table names DR-90. No code.
+- R1-13 condition 2 (ace08fbb), `e3d8901`: the report's V8 paragraph and Limits cite AD-11's
+  domain sentence ("on real-sized content (at least 1080p)"; "small stills and synthetic noise are
+  outside V8's domain") as the reason the fixture-frame p99 is recorded, not asserted, and name
+  the GX011627 window leg as the asserted figure of record; the "ruling asked" phrase is gone.
+- DR-89 confirmed: the D85 missing-folder Limit names DR-89 with its trigger; the DR table names
+  DR-89 and DR-90 as CHARC's rows at the accept. The report's Limits also gained R2-1's read
+  failure and R2-3's close behaviour.
+
+Slip: an empty `python - <<'EOF'` left a stray interpreter waiting on stdin (moved to the
+background by the tool's timeout); I killed that one process (my own, PID-checked; the WP4.3a
+Codex turn untouched). A heredoc with nested quotes failed to parse; the edit script was written
+with the Write tool instead (nothing applied by the failed command).
