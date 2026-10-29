@@ -160,7 +160,9 @@ def test_v8b_k1_is_exact(sample, tmp_path: Path, sample_id: str) -> None:
     out.mkdir()
     preview, written_pixels, output = _k1(source, out, Recording())
     assert (preview.dtype, preview.shape, preview.tobytes()) == (
-        written_pixels.dtype, written_pixels.shape, written_pixels.tobytes()
+        written_pixels.dtype,
+        written_pixels.shape,
+        written_pixels.tobytes(),
     )
     assert _within_half_step(output, preview)
 

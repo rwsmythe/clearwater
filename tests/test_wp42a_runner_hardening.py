@@ -140,7 +140,9 @@ def test_stream_output_on_hard_link_leaves_original_unchanged(
     assert sorted(path.name for path in out.iterdir()) == ["carrier"]
 
 
-def test_output_file_form_check_has_a_planted_control(tmp_path, monkeypatch, capsys, record_property):
+def test_output_file_form_check_has_a_planted_control(
+    tmp_path, monkeypatch, capsys, record_property
+):
     footage, out, src = _folders(tmp_path)
     source = src / "carrier:input.jpg"
     real = he._write_form_refusal
@@ -205,8 +207,15 @@ def test_apostrophe_folder_in_refused_suffix_is_hidden(tmp_path, monkeypatch, ca
     record = tmp_path / "record.json"
     monkeypatch.setattr(he, "configured_footage_folder", lambda: None)
     status = he.main(
-        [str(tmp_path / "missing.jpg"), "--out", str(out), "--suffix", suffix,
-         "--record", str(record)],
+        [
+            str(tmp_path / "missing.jpg"),
+            "--out",
+            str(out),
+            "--suffix",
+            suffix,
+            "--record",
+            str(record),
+        ],
         exports=_Jobs(),
     )
     assert status == 2
@@ -391,8 +400,11 @@ def test_signed_zero_is_distinct_in_bit_comparisons(tmp_path, site):
         else:
             expression = comparisons[["pre-encode", "decoded", "preview"].index(site)]
             namespace = {
-                "np": np, "recording": SimpleNamespace(pixels=[plus, other]),
-                "pixels": [plus, other], "preview": plus, "written_pixels": other,
+                "np": np,
+                "recording": SimpleNamespace(pixels=[plus, other]),
+                "pixels": [plus, other],
+                "preview": plus,
+                "written_pixels": other,
             }
             assert eval(compile(expression, str(tmp_path / "comparison"), "eval"), namespace) == (
                 expected

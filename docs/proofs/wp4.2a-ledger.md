@@ -5,7 +5,8 @@
 | Turn / gate | Dispatcher-read depth or tokens | Source / disposition |
 |---|---|---|
 | Turn 1 / round 0 | `tokens used` 77,213; input depth 88,453 / 475,000 | Dispatcher supplied on turn 2; driver log, 02:21:57Z start. |
-| Turn 2 / build | Pending dispatcher reading | No self-estimated depth; dispatcher reads this turn's footer. |
+| Turn 2 / build | `tokens used` 127,137; input depth 134,393 / 475,000 | Dispatcher supplied on turn 3; 02:26:28Z start. |
+| Turn 3 / cleanup | Pending dispatcher reading | No self-estimated depth; dispatcher reads this turn's footer. |
 
 Evaluation point: approximately 250K; STOP at a round boundary at approximately
 400K, using the dispatcher's reading.
@@ -184,6 +185,7 @@ follow the review/gate fill. Reviewer B runs at the orchestrator's seat.
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | 0 | `aa4761b` / turn 1 | N/A | N/A | N/A | N/A | N/A | 0 | Neither: ledger only | Reviewer not run | 88,453 input; 77,213 tokens used | Read/map complete; committed by dispatcher as `933e33e`; turn-2 GO received. |
 | Build | `933e33e` + working diff / turn 2 | N/A | N/A | N/A | In-envelope implementation | No review yet | 0 | Runner tool + four test comparisons + new regressions | Reviewer not run | Pending dispatcher | STOP: three existing tests fail on the sandbox's administrative-share probe; no existing test edited. |
+| Cleanup | `d5c9ae3` + working diff / turn 3 | N/A | N/A | N/A | In-envelope formatting | No review yet | 0 | Formatting only, no behavior change | Reviewer not run | Pending dispatcher | Turn-2 STOP resolved by dispatcher seat verification; static and permitted light checks clean; Reviewer A pending. |
 
 ## Execution record
 
@@ -213,6 +215,15 @@ of the surrounding shell's exit status. No two-leg / heavy run occurred.
 | 2 / static | `uv run mypy` | Success: no issues found in 141 source files; EXIT=0. | `mypy.log` |
 | 2 / light | `pytest -q -rs tests/test_wp42a_runner_hardening.py tests/test_headless_export.py tests/test_wp41_photo_path.py tests/test_wp41_v8.py -m 'not gpu and not footage and not slow' --basetemp=work/wp4.2a/tmp-light` | 3 failed, 337 passed, 2 deselected; EXIT=1. All 36 new cases passed; existing failures trigger STOP. | `light.log` |
 | 2 / independent STOP probe | `uv run python -c "from pathlib import Path; print(Path('//localhost/C$/').is_dir())"` | `PermissionError: [WinError 5] Access is denied`; EXIT=1. No runner module imported. | `unc-probe.log` |
+| Dispatcher / turn-3 ruling | Three UNC test names via `-k` on `d5c9ae3`, outside sandbox | 4 passed, including both spelling parameters. Dispatcher-supplied evidence, not a cell execution. | Orchestrator's turn-3 message; log path not supplied. |
+| Dispatcher / turn-3 ruling | Full four-file light command on `d5c9ae3`, outside sandbox | **sandbox-only; 340 passed at the orchestrator's seat on d5c9ae3**; 2 deselected, 26.64 s. Dispatcher-supplied evidence, not a cell execution. | Orchestrator's turn-3 message; log path not supplied. |
+| 3 / before cleanup | `uv run ruff check .`; `uv run ruff format --check .` | E501 is at new test line 143; runner line 715 is a format hunk. One E501, EXIT=1; 3 files would be reformatted, EXIT=1. | `t3-ruff-before.log`, `t3-format-before.log` |
+| 3 / cleanup | `uv run ruff format tools/headless_export.py tests/test_wp41_v8.py tests/test_wp42a_runner_hardening.py` | 3 files reformatted; EXIT=0; also fixes the sole E501. | `t3-format.log` |
+| 3 / static | `uv run ruff check .` | All checks passed; EXIT=0. | `t3-ruff-check.log` |
+| 3 / static | `uv run ruff format --check .` | 260 files already formatted; EXIT=0. | `t3-format-check.log` |
+| 3 / static | `uv run mypy` | Success: no issues found in 141 source files; EXIT=0. | `t3-mypy.log` |
+| 3 / no behavior change | `uv run python -c <AST comparison of the three formatted files against git show d5c9ae3:path>` | All three parsed ASTs identical (locations excluded); EXIT=0. | `t3-ast-check.log` |
+| 3 / light, three authorized UNC nodes deselected | `pytest -q -rs tests/test_wp42a_runner_hardening.py tests/test_headless_export.py tests/test_wp41_photo_path.py tests/test_wp41_v8.py -m 'not gpu and not footage and not slow' --deselect=tests/test_headless_export.py::test_g1_inside_sees_every_spelling_of_the_same_folder --deselect=tests/test_headless_export.py::test_g1_main_refuses_every_footage_check_through_another_spelling[unc] --deselect=tests/test_headless_export.py::test_g1_the_redactor_hides_the_extended_spellings --basetemp=work/wp4.2a/tmp-t3-light` | 337 passed, 5 deselected, EXIT=0. Three seat-verified UNC nodes explicitly deselected plus 2 marker deselections; no skips. Prefix/plugins as above, offscreen Qt. | `t3-light.log` |
 
 ### RED/GREEN by regression node
 
@@ -265,7 +276,7 @@ the original reasoned claim is not reclassified as an executed reproduction.
 | Resolve errors escape redactor construction | Nine failing injected paths plus one already-safe OSError discovery control. | Four sites wrapped; main handles propagated safe refusals; GREEN. |
 | Self-referential junction / symlink necessarily raises | Executed both on Python 3.12.13 / Windows; both returned paths. | Rejected as reproduced claim; defensive handling retained as ruled. |
 | Signed-zero assertions accept unequal bits | Corrected controls execute all four original comparisons and fail. | Four comparisons strengthened; GREEN. |
-| Existing UNC tests fail because of the new runner guard | All fail in unchanged `_unc_extended` at `LOCAL_SHARE.is_dir()`; standalone pathlib probe reproduces PermissionError without importing runner. | Environment failure confirmed independently; mandatory STOP, dispatcher ruling needed. |
+| Existing UNC tests fail because of the new runner guard | All fail in unchanged `_unc_extended` at `LOCAL_SHARE.is_dir()`; standalone pathlib probe reproduces PermissionError without importing runner. | Turn-3 FINAL ruling: sandbox artifact, not a defect; full light suite passes at dispatcher seat. |
 
 Existing failures (all `tests/test_headless_export.py`):
 
@@ -275,17 +286,20 @@ Existing failures (all `tests/test_headless_export.py`):
 
 All three fail in unchanged helper line 612, probing `\\localhost\C$\`, with
 `PermissionError [WinError 5]`, before their UNC assertions. No edits to this
-file or tests/conftest.py. Recommended answer: have the dispatcher run these
-three existing nodes at its seat to establish administrative-share capability,
-then rule on the sandbox-only failure before granting continuation. Do not
-weaken or patch the tests in this package.
+file or tests/conftest.py. The dispatcher resolved this STOP on turn 3: the
+three names selected 4 passing cases at its seat; the full light command passed
+all 340 selected cases there on `d5c9ae3`. This is a sandbox artifact, not a
+defect (FINAL ruling). Future sandbox runs deselect exactly the three failing
+nodes; every such execution row discloses those deselections. No test was
+weakened or patched.
 
 ## Current disposition
 
-Tasks 3-6 implemented and individually GREEN; the light suite finds the three
-existing administrative-share failures above. STOP under the turn-2 dispatch.
-Static formatting / E501 cleanup remains pending; strict mypy passed. Draft
-report written; Reviewer A, full two-leg gate and acceptance remain pending.
-The two-leg RUN REQUEST is conditional on the dispatcher resolving this STOP
-and the remaining formatting checks. DR-78 and DR-79 remain OPEN until
-acceptance; the dispatcher owns debt-register closure. No mailbox post.
+Tasks 3-6 implemented; turn-2 STOP resolved by the dispatcher's seat verification.
+Turn 3 makes formatter-only code/test changes; all three ASTs match `d5c9ae3`.
+Ruff check, format check and strict mypy pass. Sandbox light run: 337 passed,
+5 deselected (3 authorized UNC nodes and 2 marker exclusions), EXIT=0. The report
+is DRAFT -- for Reviewer A. Reviewer A, the full two-leg gate and acceptance
+remain pending. DR-78 and DR-79 remain OPEN until acceptance; the dispatcher
+owns register closure. No mailbox post. Yield after cleanup; adjudicate
+Reviewer A round 1 on turn 4 and yield before remediation, as dispatched.

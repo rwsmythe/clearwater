@@ -1,8 +1,9 @@
 # WP4.2a runner hardening
 
-Status: DRAFT, turn 2. Implementation on `933e33e` plus working diff. Mandatory
-STOP: three existing UNC tests fail on the sandbox's administrative-share probe.
-Reviewer A, formatting cleanup, full two-leg gate and acceptance are pending.
+Status: DRAFT -- for Reviewer A. Turn-3 cleanup on `d5c9ae3` plus working diff.
+Static checks and the permitted sandbox light run pass. The dispatcher resolved
+the UNC STOP as a sandbox artifact and verified the full light suite at its seat.
+Reviewer A, the full two-leg gate and acceptance are pending.
 
 ## Changes and regression evidence
 
@@ -81,12 +82,18 @@ when redactor construction fails.
 | `green-resolve.log` | 10 passed, 26 deselected, EXIT=0. |
 | `green-bits.log` | 4 passed, 32 deselected, EXIT=0. |
 | `mypy.log` | Success: no issues found in 141 source files; EXIT=0. |
-| `ruff-check.log` | One E501 on new test line 143; EXIT=1. Cleanup pending STOP resolution. |
-| `ruff-format-check.log` | 3 files would be reformatted, 257 already formatted; EXIT=1. Cleanup pending. |
-| `light.log` | 337 passed, 3 failed, 2 deselected; EXIT=1. All new cases pass. Existing failures below require STOP. |
+| `ruff-check.log` | Initial E501 on new test line 143; EXIT=1; corrected by turn-3 formatter cleanup. |
+| `ruff-format-check.log` | Initial 3 files would be reformatted, 257 already formatted; EXIT=1; corrected in turn 3. |
+| `light.log` | Initial 337 passed, 3 failed, 2 deselected; EXIT=1. Sandbox-only UNC failures resolved by the dispatcher's FINAL ruling. |
 | `unc-probe.log` | Standalone pathlib administrative-share probe raises PermissionError, EXIT=1, without importing runner. |
+| Dispatcher seat on `d5c9ae3` (turn-3 message) | Three UNC names: 4 passed; full light suite: 340 passed, 2 deselected in 26.64 s. Dispatcher-supplied evidence; no log path supplied. |
+| `t3-format.log` | 3 files reformatted; EXIT=0. No behavior change: ASTs identical to `d5c9ae3` in `t3-ast-check.log`, EXIT=0. |
+| `t3-ruff-check.log` | All checks passed; EXIT=0. |
+| `t3-format-check.log` | 260 files already formatted; EXIT=0. |
+| `t3-mypy.log` | Success: no issues found in 141 source files; EXIT=0. |
+| `t3-light.log` | 337 passed, 5 deselected, EXIT=0. The three authorized, seat-verified UNC nodes explicitly deselected, plus 2 marker exclusions. No skips. |
 
-Every pytest run used `PYTHONPATH=scripts`, `sandbox_mkdir_shim`,
+Every cell pytest run used `PYTHONPATH=scripts`, `sandbox_mkdir_shim`,
 `no:cacheprovider`, and a fresh basetemp under `work/wp4.2a/`. Exact commands,
 intermediate attempts and per-node RED/GREEN results are in the ledger.
 
@@ -96,12 +103,14 @@ GREEN attempt exposed a parent-prefix ordering problem in the added forms,
 fixed before its successful rerun. Rejected as product evidence: initial AST
 selector bug and the first planted test's expectation about pytest's rendered
 assertion text; both were test-only corrections. Rejected as an executed real
-loop failure: both topologies returned paths. A final full clean verification
-pass has NOT occurred, because of the following mandatory STOP.
+loop failure: both topologies returned paths. Turn 3's diff contains only
+formatter edits in code/tests, with matching ASTs, and the checks above pass.
+The full two-leg verification and independent review remain pending.
 
-## STOP and outstanding work
+## Resolved sandbox STOP and outstanding work
 
-Three existing nodes in unchanged `tests/test_headless_export.py` fail:
+Three existing nodes in unchanged `tests/test_headless_export.py` fail only in
+the sandbox:
 
 - `test_g1_inside_sees_every_spelling_of_the_same_folder`
 - `test_g1_main_refuses_every_footage_check_through_another_spelling[unc]`
@@ -112,10 +121,13 @@ All fail at the unchanged `_unc_extended` helper's `LOCAL_SHARE.is_dir()` probe
 pathlib probe confirms the environment failure independently of this change.
 No existing test was weakened or edited to bypass it.
 
-Recommended dispatcher action: run those three nodes at its seat to establish
-administrative-share capability, then rule on the sandbox failure and grant
-continuation for formatting cleanup and final checks. Reviewer A and the full
-two-leg suite remain pending; do not treat this draft as completion or closure.
+The dispatcher's turn-3 FINAL ruling resolves this STOP as a sandbox artifact,
+not a defect: the three names selected 4 passing cases, and the full light
+command passed 340 cases with 2 deselected at its seat on `d5c9ae3`. The permitted
+sandbox rerun explicitly deselected the three listed nodes and passed the
+remaining 337, with 5 total deselected. No test was changed to accommodate the
+sandbox. Formatting cleanup is complete. Reviewer A and the full two-leg suite
+remain pending; do not treat this draft as completion or closure.
 
 For CHARC, proposed closure at acceptance: **DR-78 CLOSED; DR-79 CLOSED,
 including (a) escaped apostrophe redaction, (b) defensive construction handling;

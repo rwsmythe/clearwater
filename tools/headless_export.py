@@ -712,9 +712,7 @@ def check_outputs(requests: Sequence[ExportRequest], footage_folder: Path | None
         if isinstance(request, RefusedRequest):
             continue
         try:
-            output = final_output_path(
-                request.source, request.settings, MediaKind(request.kind)
-            )
+            output = final_output_path(request.source, request.settings, MediaKind(request.kind))
         except ValueError:
             continue
         reason = _write_form_refusal(output)
