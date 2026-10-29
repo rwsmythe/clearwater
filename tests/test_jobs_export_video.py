@@ -40,7 +40,6 @@ from clearwater.jobs.export_seam import CANCELLED, ExportRequest
 from clearwater.jobs.safe_write import is_temporary_name
 from clearwater.methods import available_methods
 from container_spike import compare
-from local_config import FootageLookupError, find_footage_file, load_local_config
 from test_jobs_export_support import FakeSink, parameter_set, product_engine
 
 pytestmark = pytest.mark.usefixtures("ffmpeg_tools")
@@ -695,25 +694,16 @@ def test_v11_a_killed_export_process_leaves_only_a_temporary_that_is_cleaned_up(
 # --- the real clip (footage window) ------------------------------------------------------------
 
 
-def _footage_clip(stem: str, root: Path) -> Path:
-    """Return a footage clip; skip only when the folder was searched and the clip is not there."""
-    try:
-        return find_footage_file(stem, root)
-    except FootageLookupError as error:
-        if error.matches or error.__cause__ is not None or not root.is_dir():
-            raise
-        pytest.skip(f"{stem} is not in the footage folder")
-
-
 @pytest.mark.footage
 @pytest.mark.gpu
 @pytest.mark.slow
 def test_gx011627_through_the_engine_keeps_every_mandatory_and_required_item(
     tmp_path: Path,
+    gx011627: tuple[Path, int],
 ) -> None:
     if not _nvenc_ready():
         pytest.skip("NVENC is not available on this machine")
-    source = _footage_clip("GX011627", load_local_config().footage_path)
+    source, _ = gx011627
     out = tmp_path / "out"
     out.mkdir()
     settings = _settings(out, "hevc_nvenc", quality_level="standard", provenance=True)
