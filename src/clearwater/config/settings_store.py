@@ -35,8 +35,9 @@ def load_settings(folder: Path, *, migrations: MigrationRegistry | None = None) 
 
     A document of an older format version is migrated in memory and not rewritten. A field
     outside its allowed range (``png_bit_depth`` not 8 or 16, ``quality_level`` not
-    high/standard/draft, ``cache_limit_bytes`` negative) takes its default with a logged
-    warning. Encoder names are not checked here (D74).
+    high/standard/draft, ``cache_limit_bytes`` negative, ``output_folder`` containing NUL or
+    raising ValueError when made into an absolute path) takes its default with a logged
+    warning. The other fields and the file are kept. Encoder names are not checked here (D74).
 
     A file that cannot be read, is not valid JSON, or fails IF-10 (missing, unknown or
     wrong-type fields, non-string keys, a missing or non-integer ``format_version``) is renamed
@@ -71,7 +72,7 @@ def load_settings(folder: Path, *, migrations: MigrationRegistry | None = None) 
     except (ValueError, RecursionError, OverflowError) as error:
         # Too many digits, excessive nesting, or a stamp that overflows when converted to UTC.
         return _set_aside(path, f"cannot be decoded: {error}")
-    return _with_valid_values(settings)
+    return settings
 
 
 def save_settings(folder: Path, settings: Settings) -> Path:
@@ -118,16 +119,32 @@ def _decode(text: str, migrations: MigrationRegistry | None) -> Settings:
         _require_integer_version(last, "last_parameters")
         data = {**data, "last_parameters": migrate("preset", last, migrations)}
     check_string_keys(data, "settings")
+    invalid_output_folder = None
+    folder = data.get("output_folder")
+    if isinstance(folder, str):
+        try:
+            if "\0" in folder:
+                raise ValueError("a path cannot contain NUL")
+            Path(folder).absolute()  # Validate construction/use without requiring it to exist.
+        except ValueError:
+            invalid_output_folder = folder
+            # Let frozen IF-10 validate every other field before the per-field warning/default.
+            data = {**data, "output_folder": None}
     try:
         migrated_text = json.dumps(data, allow_nan=False)
     except (TypeError, ValueError) as error:
         raise FormatError(f"migrated settings are not JSON: {error}") from error
-    return Settings.from_json(migrated_text)
+    return _with_valid_values(
+        Settings.from_json(migrated_text), invalid_output_folder=invalid_output_folder
+    )
 
 
-def _with_valid_values(settings: Settings) -> Settings:
+def _with_valid_values(settings: Settings, *, invalid_output_folder: str | None = None) -> Settings:
     """Replace each out-of-range field by its default, logging a warning per field."""
     defaults = Settings()
+    if invalid_output_folder is not None:
+        _warn_out_of_range("output_folder", invalid_output_folder, defaults.output_folder)
+        settings = dataclasses.replace(settings, output_folder=defaults.output_folder)
     if settings.png_bit_depth not in _PNG_BIT_DEPTHS:
         _warn_out_of_range("png_bit_depth", settings.png_bit_depth, defaults.png_bit_depth)
         settings = dataclasses.replace(settings, png_bit_depth=defaults.png_bit_depth)

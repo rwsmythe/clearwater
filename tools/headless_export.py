@@ -871,6 +871,15 @@ def write_target_refusal(target: Path, footage_folder: Path) -> str | None:
     return None
 
 
+@contextlib.contextmanager
+def _footage_checks() -> Iterator[None]:
+    """Map resolution failures at write checks to a refusal without the unknown path."""
+    try:
+        yield
+    except (OSError, RuntimeError, ValueError) as exc:
+        raise RunnerRefusalError("the configured footage folder cannot be resolved.") from exc
+
+
 def check_outputs(requests: Sequence[ExportRequest], footage_folder: Path | None) -> None:
     """Refuse a run that would write inside the footage folder (question 9; DR-37 (c)).
 
@@ -960,18 +969,21 @@ def run(
         The record.
 
     Raises:
-        RunnerRefusalError: The footage check refused the run, a video item has no cache folder
-            to analyse in (``exports`` None), or a known folder could not be resolved for
-            redaction; nothing ran.
+        RunnerRefusalError: The footage check refused the run or could not resolve its folder,
+            a video item has no cache folder to analyse in (``exports`` None), or a known folder
+            could not be resolved for redaction; nothing ran.
     """
-    folder = (
-        configured_footage_folder() if isinstance(footage_folder, _Configured) else footage_folder
-    )
-    check_outputs(requests, folder)
-    if cache_folder is not None and folder is not None:
-        reason = write_target_refusal(cache_folder, folder)
-        if reason is not None:
-            raise RunnerRefusalError(f"the cache folder {reason}.")
+    with _footage_checks():
+        folder = (
+            configured_footage_folder()
+            if isinstance(footage_folder, _Configured)
+            else footage_folder
+        )
+        check_outputs(requests, folder)
+        if cache_folder is not None and folder is not None:
+            reason = write_target_refusal(cache_folder, folder)
+            if reason is not None:
+                raise RunnerRefusalError(f"the cache folder {reason}.")
     observer: _VideoObserver | None = None
     if exports is None:
         videos = [r for r in requests if r.kind == "video" and not isinstance(r, RefusedRequest)]
@@ -1200,7 +1212,7 @@ def _parser() -> argparse.ArgumentParser:
         "--parameters",
         type=Path,
         metavar="FILE",
-        help="an AD-13 preset JSON file (one with only source and settings added is read too)",
+        help="an AD-13 preset JSON file (writer provenance, including profile, is read too)",
     )
     params.add_argument(
         "--neutral", action="store_true", help="every parameter at its neutral value (V9)"
@@ -1350,13 +1362,9 @@ def _main(
     """Run the parsed command line with the redactor in place (:func:`main`)."""
     with _redacted_stderr(redact):
         try:
-            try:
+            with _footage_checks():
                 footage = configured_footage_folder()
-            except (OSError, RuntimeError) as exc:
-                raise RunnerRefusalError(
-                    "the configured footage folder cannot be resolved."
-                ) from exc
-            _check_own_paths(args, footage)
+                _check_own_paths(args, footage)
             settings = _settings(args)
             if args.parameters is not None:
                 parameters = parameters_for(args.method, file=args.parameters)
@@ -1365,7 +1373,8 @@ def _main(
                 parameters = parameters_for(args.method, neutral=args.neutral)
                 source = "neutral" if args.neutral else "defaults"
             requests = requests_for(args.paths, parameters=parameters, settings=settings)
-            check_outputs(requests, footage)
+            with _footage_checks():
+                check_outputs(requests, footage)
             videos = [
                 r for r in requests if r.kind == "video" and not isinstance(r, RefusedRequest)
             ]

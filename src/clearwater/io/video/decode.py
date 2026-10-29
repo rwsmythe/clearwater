@@ -179,7 +179,9 @@ def _check_cuda() -> tuple[bool, str]:
     except subprocess.TimeoutExpired:
         return False, f"CUDA check timed out after {CUDA_CHECK_TIMEOUT_S} s"
     except OSError as error:
-        return False, ascii_text(f"{type(error).__name__}: {error.strerror}")
+        return False, ascii_text(
+            f"{type(error).__name__}: {error.strerror or 'an operating-system error'}"
+        )
     if done.returncode == 0:
         return True, ""
     lines = done.stderr.decode("utf-8", errors="replace").strip().splitlines()

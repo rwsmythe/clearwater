@@ -20,7 +20,7 @@ HELPER = "clearwater.io.video.pipes.tool_spawn_kwargs"
 
 
 def _bindings(tree: ast.Module) -> dict[str, str]:
-    """Resolve normal and aliased imports used by the spawn-policy AST checks."""
+    """Resolve imports and chains of bound launch callables for the AST guard."""
     names = {}
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
@@ -31,27 +31,128 @@ def _bindings(tree: ast.Module) -> dict[str, str]:
         elif isinstance(node, ast.ImportFrom) and node.module and node.level == 0:
             for alias in node.names:
                 names[alias.asname or alias.name] = f"{node.module}.{alias.name}"
+    assignments = [node for node in ast.walk(tree) if isinstance(node, (ast.Assign, ast.AnnAssign))]
+    for _ in range(len(assignments) + 1):
+        changed = False
+        for node in assignments:
+            value = _qualified(node.value, names) if node.value is not None else ""
+            if value.split(".")[0] not in {"subprocess", "os", "asyncio", "functools"}:
+                continue
+            targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+            for target in targets:
+                if isinstance(target, ast.Name) and names.get(target.id) != value:
+                    names[target.id] = value
+                    changed = True
+        if not changed:
+            break
     return names
 
 
 def _qualified(node: ast.expr, names: dict[str, str]) -> str:
-    """Return an expression's imported dotted name, or an empty string."""
+    """Resolve dotted, getattr and partial callable references conservatively."""
     if isinstance(node, ast.Name):
         return names.get(node.id, node.id)
     if isinstance(node, ast.Attribute):
         return f"{_qualified(node.value, names)}.{node.attr}"
+    if isinstance(node, ast.Call):
+        function = _qualified(node.func, names)
+        if function == "getattr" and len(node.args) >= 2:
+            attribute = node.args[1]
+            name = attribute.value if isinstance(attribute, ast.Constant) else "*"
+            return f"{_qualified(node.args[0], names)}.{name}"
+        if function == "functools.partial" and node.args:
+            return _qualified(node.args[0], names)
     return ""
 
 
+def _is_spawn(name: str) -> bool:
+    """Identify process-launch APIs, including dynamic lookups of launch modules."""
+    module, _, member = name.rpartition(".")
+    if module == "subprocess":
+        return member in {
+            "run",
+            "Popen",
+            "call",
+            "check_call",
+            "check_output",
+            "getoutput",
+            "getstatusoutput",
+            "*",
+        }
+    if module == "os":
+        return member in {"system", "popen", "*"} or member.startswith(("spawn", "exec"))
+    return module == "asyncio" and (member.startswith("create_subprocess_") or member == "*")
+
+
 def _spawn_calls(tree: ast.Module) -> list[ast.Call]:
-    """Find subprocess run/Popen calls, including module and direct-import aliases."""
+    """Find launches and launch-callable factories, even behind bound/imported aliases."""
     names = _bindings(tree)
     return [
         node
         for node in ast.walk(tree)
         if isinstance(node, ast.Call)
-        and _qualified(node.func, names) in {"subprocess.run", "subprocess.Popen"}
+        and (_is_spawn(_qualified(node.func, names)) or _is_spawn(_qualified(node, names)))
     ]
+
+
+_SPAWN_APIS = (
+    [
+        ("subprocess", name)
+        for name in (
+            "run",
+            "Popen",
+            "call",
+            "check_call",
+            "check_output",
+            "getoutput",
+            "getstatusoutput",
+        )
+    ]
+    + [
+        ("os", name)
+        for name in (
+            "system",
+            "popen",
+            "spawnl",
+            "spawnle",
+            "spawnlp",
+            "spawnlpe",
+            "spawnv",
+            "spawnve",
+            "spawnvp",
+            "spawnvpe",
+            "execl",
+            "execle",
+            "execlp",
+            "execlpe",
+            "execv",
+            "execve",
+            "execvp",
+            "execvpe",
+        )
+    ]
+    + [("asyncio", "create_subprocess_exec"), ("asyncio", "create_subprocess_shell")]
+)
+
+
+@pytest.mark.parametrize(("module", "name"), _SPAWN_APIS)
+@pytest.mark.parametrize(
+    "form", ["direct", "module-alias", "from-alias", "bound", "getattr", "partial"]
+)
+def test_spawn_guard_detects_planted_bypasses(module: str, name: str, form: str) -> None:
+    """Every supported launch spelling must be visible to the product-policy guard."""
+    source = {
+        "direct": f"import {module}\n{module}.{name}('tool')",
+        "module-alias": f"import {module} as mod\nmod.{name}('tool')",
+        "from-alias": f"from {module} import {name} as child\nchild('tool')",
+        "bound": f"import {module}\nchild = {module}.{name}\nagain = child\nagain('tool')",
+        "getattr": f"import {module} as mod\ngetattr(mod, '{name}')('tool')",
+        "partial": (
+            f"import {module} as mod\nfrom functools import partial as bind\n"
+            f"child = bind(mod.{name}, 'tool')\nchild()"
+        ),
+    }[form]
+    assert _spawn_calls(ast.parse(source)), f"guard missed {form}: {module}.{name}"
 
 
 def test_every_product_spawn_uses_the_helper() -> None:
@@ -80,7 +181,7 @@ def test_every_product_spawn_uses_the_helper() -> None:
             )
             if not uses_helper or overrides_policy:
                 offenders.append(f"{path.relative_to(SRC).as_posix()}:{call.lineno}")
-    assert count > 0
+    assert count == 7, f"expected the seven ruled product spawn sites, found {count}"
     assert not offenders, f"product spawns bypassing the shared policy: {offenders}"
 
 
@@ -215,3 +316,20 @@ def test_cuda_check_oserror_omits_filename(tmp_path: Path, monkeypatch) -> None:
     available, text = decode._check_cuda()
     assert not available
     assert text == "FileNotFoundError: tool unavailable"
+
+
+def test_cuda_check_oserror_without_strerror_has_readable_fallback(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """F9: an absent strerror must use readable fixed text without exception paths."""
+    decode = importlib.import_module("clearwater.io.video.decode")
+    tool = tmp_path / "private-tools" / "ffmpeg.exe"
+    monkeypatch.setattr(decode, "find_tool", lambda name: tool)
+
+    def refused(command, **kwargs):
+        raise OSError(5, None, str(tool))
+
+    monkeypatch.setattr(decode.subprocess, "run", refused)
+    available, text = decode._check_cuda()
+    assert not available
+    assert text == "OSError: an operating-system error"

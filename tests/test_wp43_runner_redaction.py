@@ -116,37 +116,93 @@ def test_argparse_redacts_mixed_separators(tmp_path: Path, monkeypatch, capsys) 
     assert not captured.out and "Traceback" not in captured.err
 
 
-@pytest.mark.parametrize("error", [OSError, RuntimeError])
+@pytest.mark.parametrize(
+    ("route", "error"),
+    [
+        (route, error)
+        for route in (
+            "main-settings",
+            "main-record",
+            "main-cache",
+            "main-output",
+            "main-late-run",
+            "run-output",
+            "run-configured",
+            "run-cache",
+        )
+        for error in (OSError, RuntimeError, ValueError)
+        # A NUL fails the first real check, so only transient OS/runtime failures can be delayed.
+        if not (route == "main-late-run" and error is ValueError)
+    ],
+)
 def test_raising_footage_resolution_is_a_usage_refusal(
-    tmp_path: Path, monkeypatch, capsys, error
+    tmp_path: Path, monkeypatch, capsys, error, route: str
 ) -> None:
-    """DR-81 (b): resolving an unknown footage folder must refuse without its raw path."""
-    private = tmp_path / "hidden-private-parent" / "footage"
-    out = tmp_path / "out"
-    out.mkdir()
-    real_resolve = Path.resolve
+    """DR-81 (b): the real write-target resolve must refuse before any export."""
+    private = (
+        tmp_path / "hidden-private-parent" / ("footage\0" if error is ValueError else "footage")
+    )
+    out, cache, settings = (tmp_path / name for name in ("out", "cache", "settings"))
+    for folder in (out, cache, settings):
+        folder.mkdir()
+    source = tmp_path / "input.jpg"
+    PILImage.new("RGB", (8, 8), (24, 48, 72)).save(source)
+    requests = he.requests_for(
+        [source],
+        parameters=he.parameters_for(),
+        settings=Settings(output_folder=out, force_cpu=True),
+    )
+    real_resolve, real_run = Path.resolve, he.run
+    armed = route != "main-late-run"
+    reached = []
 
     def resolve(path, *args, **kwargs):
-        if path == private:
+        if path == private and armed:
+            reached.append(path)
+            if error is ValueError:
+                return real_resolve(path, *args, **kwargs)  # actual embedded-NUL failure
             raise error(f"cannot resolve {private}")
         return real_resolve(path, *args, **kwargs)
 
-    def configured():
-        return private.resolve()
+    def late_run(*args, **kwargs):
+        nonlocal armed
+        armed = True
+        return real_run(*args, **kwargs)
 
     def unexpected(*args, **kwargs):
-        pytest.fail("no request or export may begin after a footage resolution failure")
+        pytest.fail("no export engine may be constructed after a footage resolution failure")
 
     monkeypatch.setattr(Path, "resolve", resolve)
-    monkeypatch.setattr(he, "configured_footage_folder", configured)
-    monkeypatch.setattr(he, "requests_for", unexpected)
-    monkeypatch.setattr(he, "run", unexpected)
-    assert he.main([str(tmp_path / "missing.jpg"), "--out", str(out)]) == 2
-    captured = capsys.readouterr()
-    assert "headless_export" in captured.err and "footage" in captured.err
-    assert "hidden-private-parent" not in captured.err and str(tmp_path) not in captured.err
-    assert "Traceback" not in captured.err and captured.err.isascii()
-    assert not captured.out and not list(out.iterdir())
+    monkeypatch.setattr(he, "configured_footage_folder", lambda: private)
+    monkeypatch.setattr(he.composition, "export_jobs", unexpected)
+    if route == "main-late-run":
+        monkeypatch.setattr(he, "run", late_run)
+    if route.startswith("main"):
+        argv = [str(source), "--out", str(out), "--force-cpu"]
+        argv += {
+            "main-settings": ["--settings-dir", str(settings)],
+            "main-record": ["--record", str(tmp_path / "record.json")],
+            "main-cache": ["--cache-dir", str(cache)],
+        }.get(route, [])
+        assert he.main(argv) == 2
+        captured = capsys.readouterr()
+        text = captured.err
+        assert "headless_export" in text and not captured.out
+    else:
+        with pytest.raises(he.RunnerRefusalError) as caught:
+            if route == "run-cache":
+                he.run([], footage_folder=private, cache_folder=cache)
+            elif route == "run-configured":
+                he.run(requests)
+            else:
+                he.run(requests, footage_folder=private)
+        text = str(caught.value)
+    assert reached, "the product's real Path.resolve check was not reached"
+    assert "footage" in text and text.isascii()
+    assert "hidden-private-parent" not in text and str(tmp_path) not in text
+    assert "Traceback" not in text
+    assert not list(out.iterdir()) and not list(cache.iterdir()) and not list(settings.iterdir())
+    assert not (tmp_path / "record.json").exists()
 
 
 @pytest.mark.parametrize("corrupt", ["year-one", "plain-json"])
@@ -190,3 +246,35 @@ def test_settings_warning_is_printed_with_file_names_only(
     assert "private-settings-parent" not in err and str(tmp_path) not in err
     assert "settings\\settings.json" not in err and "settings/settings.json" not in err
     assert tuple(logger.handlers) == before_handlers
+
+
+def test_unusable_settings_output_warning_hides_the_private_value(
+    tmp_path: Path, monkeypatch, capsys
+) -> None:
+    """R3-1 (ii): the per-field warning must not disclose a path unknown to Redactor."""
+    settings_folder, out = tmp_path / "settings", tmp_path / "out"
+    settings_folder.mkdir()
+    out.mkdir()
+    data = json.loads(Settings(output_suffix="_kept", force_cpu=True).to_json())
+    data["output_folder"] = str(tmp_path / "unknown-private-output-parent" / "out\0")
+    settings_file = settings_folder / "settings.json"
+    original = json.dumps(data).encode("utf-8")
+    settings_file.write_bytes(original)
+    source = tmp_path / "input.jpg"
+    PILImage.new("RGB", (8, 8), (24, 48, 72)).save(source)
+    monkeypatch.setattr(he, "configured_footage_folder", lambda: None)
+    assert (
+        he.main(
+            [str(source), "--out", str(out), "--settings-dir", str(settings_folder)],
+            exports=composition.export_jobs(),
+        )
+        == 0
+    )
+    captured = capsys.readouterr()
+    assert captured.err.count("settings: output_folder=") == 1
+    assert "is out of range; using the default" in captured.err
+    assert "unknown-private-output-parent" not in captured.err and str(tmp_path) not in captured.err
+    assert "\x00" not in captured.err and r"\x00" not in captured.err
+    assert settings_file.read_bytes() == original
+    assert not list(settings_folder.glob("settings.json.bad-*"))
+    assert [p.name for p in out.iterdir()] == ["input_kept.png"]
