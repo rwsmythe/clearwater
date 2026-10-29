@@ -995,3 +995,136 @@ Open items for the EXCLUSIVE windows (granted by the dispatcher after WP4.3a's g
   backslash-bearing text with the Write tool (a heredoc collapsed `\x00` to a NUL byte twice in
   this arc, and a third collapse broke a script before it wrote); check every committed blob for
   CR and NUL.
+
+## Cell 7 (implementer-opus-high, 2026-10-29): DR-85's xfail, the S7 driver, the EXCLUSIVE windows
+
+Base main `5e3537d` (the orchestrator, gen 24, rebased the branch onto it: WP4.3a, WP4.5 and the
+inventory refresh merged; all 54 commits patch-identical, the old head kept as
+`wp4.3-pre-rebase` at `99cc84c`). The "base main `038f02e`" lines above are history.
+
+### Step 0: DR-85's xfail dropped
+
+- `300731d` `test(wp4.3): drop DR-85's xfail now that WP4.3a's fix is on main`: the
+  `xfail(strict=True, raises=OverflowError)` on
+  `test_a_settings_file_that_fails_to_decode_is_set_aside_and_start_up_goes_on` removed; the module
+  docstring's DR-85 sentence now reads "(DR-85, fixed by WP4.3a on main)". LF, 0 CR, ruff clean.
+- Light run `uv run pytest -q -rs tests/test_app_startup.py --basetemp=work/wp4.3-c7-startup`
+  (offscreen): 10 passed in 23 s, EXIT 0 (`work/wp4.3-c7/startup.txt`).
+
+### The S7 driver (uncommitted; ruling S7)
+
+Folder `C:/Users/rwsmy/clearwater-review-evidence/wp4.3/windows/` (`md5sums.txt` lists every
+file below and every copied log):
+
+| File | md5 | What |
+|---|---|---|
+| `s7_driver.py` | `0b9ee6cc3ebd2cf07c35dec934cfd901` | the driver of record for window 2 (window 1 ran `a1fb597b2ecc10cf995e244a38a159bf`; the later version only ADDS `v7c-char` and ruling B's (f) reading) |
+| `window-commands.sh` | `404c6fa85a8a6023f070b297ac7594d0` | window 1's chain |
+| `window2-commands.sh` | `fff719c6e95ce703a80eb657d6ca4800` | window 2's chain |
+| `f_build_profile.py` | `051a2061f3b7c6d89dfddb40e5134489` | the (f) build reproduction (finding B) |
+
+Form: imports the committed `tests/test_app_v7.py`, `test_app_v8_v18.py`, `test_app_wiring.py`
+and `test_app_startup.py` helpers; pytest-qt's own `QtBot.wait`/`waitUntil` (a subclass with no
+pytest request); the real engines with default `Settings` (GPU, the `auto` encoder) and
+`output_folder` under `<work>/<mode>/out`; GX011627 through `find_footage_file`; every printed
+line redacted; a footage-folder digest before and after each run (count and digest only, never a
+path) and a scan of the product logs under the work folder for the footage folder. One mode per
+process: `QT_QPA_PLATFORM=offscreen uv run python s7_driver.py <mode> <work> [--dry-run-fixture]`.
+Exit 0 PASS, 1 STOP, 2 error. Modes: `v7a`..`v7f`, `plant-f` + `v7f-settled`, `v7c-char`,
+`v8v18`, `dr44c-analysis|export|batch`. Dry runs on the committed fixture clip (NOT of record):
+`windows/dry/`, `windows/dry2/`.
+
+### Findings at preparation
+
+- **B ((f) over 100 ms, pre-show).** Dry (f) on the fixture: 158 / 651 ms (planted in-process),
+  157 ms (settled). The longest gap is the synchronous `build_application` on the interface
+  thread before the window exists: 126 ms settled, 609 ms just after planting; fresh process
+  without a cache 55 / 37 ms (first / second build), right after 20 GB of writes 933 / 771 ms
+  (`f_build_profile.py`; fsync 191 ms, `menuBar` 107 ms: the host busy). CHARC RULING B
+  (`b9a0ce010581a296`, verbatim in the dispatcher's relay): "V7 (f)'s probe starts at show() ...
+  build_application's wall time is RECORDED beside the (f) figure as a start-up figure, cold and
+  warm, and is never asserted against 100 ms." Consequences (2) and (3) are OPEN (RESUME HERE).
+- **C (round 0's plant is NOT sparse; a record correction).** Round 0's recipe (`fsutil sparse
+  setflag`, then `truncate` to 64,598,686 B) allocates every pack: on Windows `truncate` extends
+  through the C runtime's `_chsize_s`, which WRITES the zeros (`fsutil sparse queryrange`: one
+  range, 0 to 0x3d9b29e). So round 0's "made sparse and extended by truncate" (Measured start-up
+  steps, above) is wrong: its 20 GB cache-open figures are from 19.96 GB of ALLOCATED packs, which
+  is what a real full cache is. Each plant costs 19.96 GB of disk; the dispatcher deleted the
+  dry-run plants (C: 87 -> 179 GB free, then dry2's 19 GB likewise).
+- **A (the GX011627 V18/V8 leg's form).** RULED by the dispatcher (CHARC concurred): a DRIVER STEP
+  (`v8v18`), not a committed test; mean <= 1/255 AND p99 <= 2/255 at k = 2 ASSERTED at frame
+  indices 10, n/4, n/2, 3n/4; p99.9 and max RECORDED (ace08fbb condition 1).
+
+### Window 1 (granted 22:14Z; `window-commands.sh`; host exclusive; disk 179 GB before and after)
+
+| Run | EXIT | Figures (longest / p99 / ticks) |
+|---|---|---|
+| v7a (a) GX011627 analysis | 0 | 18.0 / 15.0 ms / 7,172; analysis 71.7 s, 681 frames, GPU |
+| v7b (b) scrubbing during it | 0 | 21.0 / 16.0 ms / 6,852; 1,400 proxies shown during the analysis |
+| v7c (c) File > Export | **1 STOP** | **182.0** / 12.0 ms / 20,963; export 210.2 s, one 86.0 MB output |
+
+The chain stopped at v7c. CHARC RULING on (c) (`805376769abe4177`, 22:23:44Z): (a), the (c)
+figure of record STANDS at 182.0 ms, a STOP; not re-run as a run of record; a characterisation
+run ordered. Logs: `windows/win1/`.
+
+### Window 2 (granted ~22:33Z; `window2-commands.sh`; host exclusive; disk 179 GB before/after)
+
+| Run | EXIT | Figures (longest / p99 / ticks) |
+|---|---|---|
+| v7c-char (c) CHARACTERISATION, NOT of record | 0 | 177.0 / 12.0 ms / 20,682; gaps over 50 ms: 135.8 ms at +22.29 s and 176.5 ms at +73.37 s after the trigger |
+| v7d (d) 300-still batch (DR-50) | 0 | 66.0 / 55.0 ms / 1,887; batch 32.4 s, 300 of 300 done |
+| v7e (e) 1:1 4K render during the export | **1 STOP** | **196.0** / 12.0 ms / 20,969; 1 render with k = 1 inside the sink's write; analysis before 61.6 s |
+
+The chain stopped at v7e (of record). NOT RUN: v8v18, dr44c-analysis, dr44c-export,
+dr44c-batch, plant-f, v7f-settled. Logs: `windows/win2/` (`v7c-char.txt`, `char-events.json`).
+
+**v7c-char finding (where (c)'s gaps fall).** The export's phases (relative to the trigger):
+`exports.job` on the interface thread 0.01 ms; preview release +3..+40 ms (worker); source and
+sink built +1,142 ms; sink open (encoder spawn) +2,498..+3,278 ms; first frame +3,652 ms; first
+write +4,204..+4,237 ms; 681 frames to +206,228 ms; sink close (finalise/mux)
++206,228..+207,101 ms; `on_done` on the interface thread +207,155 ms. Both long gaps fall
+MID-ENCODE (+22.3 s, +73.4 s), with NO phase event, log record, job-runner callback or gc
+collection within 1 s of either (gc: gen0 22, gen1 0, gen2 5, longest 38.1 ms, none overlapping;
+the gen-2 passes were at +35 ms, +109.7 s and +207.1 s). The watchdog (10 ms poll, samples at 60
+and 150 ms late) took its FIRST sample of each gap only at 135 and 175 ms late, i.e. the
+watchdog thread itself could not run for the gap's length. Both samples show the interface
+thread IDLE inside Qt's event loop (`qt_compat.py:160 exec` under `qtbot.wait`), no Python work
+of its own; the two compute threads were each at a device-to-host sync point:
+`clearwater-job` in `core/backend.py:666` `rgb_to_planes` (`xp.asnumpy(planes)`, via
+`io/video/encode.py:975 _payload` <- `:717 write`) and `export-analysis` in `core/ops.py:284`
+`channel_means` (`.tolist()`; via `methods/ancuti_fusion.py` `analyze` <- `analysis/engine.py`
+`_measure`). Reading (cell 7's, for CHARC to rule): NOT interface-thread work and NOT gc; a
+worker thread holding the GIL for about 135-175 ms, most likely across a CuPy device-to-host
+synchronisation on the export path (the encoder's `rgb_to_planes` or the export analysis's
+`channel_means`), which starves every other Python thread, the interface thread's probe slot
+included. The stacks name the two candidates; they do not prove which one held it.
+
+Depth: 188,424 at the first window request; 194,057 at window 1's release; 228,587 at window 2's
+grant (given by the dispatcher, gen 24).
+
+## RESUME HERE (successor of cell 7; written by cell 7, 2026-10-29)
+
+- State: branch `wp4.3`, base main `5e3537d`, head = this ledger commit (after `300731d`). No
+  product change pending; the report `docs/reports/wp4.3-application-wiring.md` is NOT yet
+  updated with any window figure.
+- OPEN with CHARC: the CAUSE of (c)'s 182.0 ms and (e)'s 196.0 ms STOPs (both of record), on the
+  v7c-char finding above. Do not re-run (c) or (e) as runs of record; do not tune.
+- NOT YET RUN (window evidence still owed, each by a WINDOW REQUEST; chain form in
+  `window2-commands.sh` minus the runs done): `v8v18` (ruling A), `dr44c-analysis`,
+  `dr44c-export`, `dr44c-batch`, `plant-f` then `v7f-settled` (ruling B reading built into the
+  driver at md5 `0b9ee6cc...`: post-show longest OF RECORD, pre-show and cold/warm build
+  recorded). Whether these run before or after CHARC's (c)/(e) ruling is the dispatcher's call.
+- Post-window code step (ruling B consequence 2, a FRESH step): move
+  `tests/test_app_v7.py::scenario_f_start_up`'s probe start to `show()`, RED-first on the planted
+  form (a planted post-show stall must still fail; the pre-show build no longer counts); the test
+  records no build figure (the driver does).
+- The report (ruling B consequence 3 and the windows): one sentence stating (f)'s rule; the
+  start-up figures 55 / 37 ms cold process, 933 / 771 ms right after 20 GB of writes
+  (disk-cache eviction, report-only), 158 / 157 ms planted / settled in-process; the V7 table's
+  "Window" column (a) 18.0 / 15.0, (b) 21.0 / 16.0, (c) 182.0 / 12.0 STOP, (d) 66.0 / 55.0,
+  (e) 196.0 / 12.0 STOP, (f) pending; DR-50 = (d)'s 300-item figure (66.0 ms, within); DR-85 now
+  closed by WP4.3a (the xfail dropped at `300731d`); every figure names its run (driver md5,
+  command, EXIT); the round-0 "sparse" correction (C).
+- Disciplines: never a bare `cd`; backslash-bearing text by the Write tool; LF, 0 CR, 0 NUL in
+  every blob; a plant costs 19.96 GB of real disk (check free space; dry-run plants are deleted
+  only on the dispatcher's word).
