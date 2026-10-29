@@ -336,6 +336,55 @@ def test_a_failed_cache_open_is_shown_once_and_photos_still_work(
     assert len([m for m in presenter(application).messages if m.owner == OWNER_STARTUP]) == 1
 
 
+def test_no_start_up_callback_reaches_the_window_after_its_close(
+    make_app, qtbot, monkeypatch
+) -> None:
+    """R1-5 (DR-44 (c)): a start-up job ending during or after the close delivers nothing.
+
+    The cache's open outlives the shell's close wait (made 0.2 s here; 5 s in the program,
+    against a first open of 16 s), then fails: its queued completion arrives while this event
+    loop still runs. The device probe ends during the close, whose wait delivers it.
+    """
+    from clearwater.gui import shell
+
+    opening, release = threading.Event(), threading.Event()
+
+    def slow_failing_open(folder: Path, limit: int = 0) -> DiskProxyCache:
+        opening.set()
+        assert release.wait(30)
+        raise OSError("the cache volume is not mounted")
+
+    calls: list[str] = []
+    for name in ("_on_cache_open", "_on_probe"):
+        real = getattr(Application, name)
+
+        def spy(self: Application, *args: Any, _name: str = name, _real: Any = real) -> Any:
+            calls.append(_name)
+            return _real(self, *args)
+
+        monkeypatch.setattr(Application, name, spy)
+    probe_gate = threading.Event()
+    real_select = core.select_backend
+
+    def held_select(settings: Settings, height: int, width: int, method_id: str) -> Any:
+        assert probe_gate.wait(30)
+        return real_select(settings, height, width, method_id)
+
+    monkeypatch.setattr(composition, "proxy_cache", slow_failing_open)
+    monkeypatch.setattr(core, "select_backend", held_select)
+    monkeypatch.setattr(shell, "SHUTDOWN_TIMEOUT_S", 0.2)
+    application = make_app(cpu_settings())
+    assert opening.wait(30)
+    threading.Timer(0.05, probe_gate.set).start()  # the probe ends inside the close's wait
+    application.window.close()
+    assert application.closed()
+    release.set()
+    qtbot.waitUntil(lambda: application.cache.wait_open(0), timeout=30000)
+    qtbot.wait(300)  # the open's queued completion is delivered by this loop
+    assert calls == []
+    assert not [m for m in presenter(application).messages if m.owner == OWNER_STARTUP]
+
+
 class _Progress:
     """A minimal IF-8 progress for a job run on the test's thread."""
 

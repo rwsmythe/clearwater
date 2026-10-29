@@ -21,16 +21,19 @@ The only ``clearwater.app`` module that imports ``clearwater.gui`` or loads Qt.
 
 from __future__ import annotations
 
+import dataclasses
 import logging
 import sys
-from collections.abc import Sequence
-from dataclasses import dataclass
+from collections.abc import Callable, Sequence
+from dataclasses import dataclass, field
 
+from PySide6.QtCore import QEvent, QObject
 from PySide6.QtWidgets import QApplication
 
 from clearwater.analysis import AnalysisEngine
 from clearwater.config import Locations, app_locations
 from clearwater.gui import MainWindow, Message, MessagePresenter
+from clearwater.gui.contract import JobHandle, JobRunner
 from clearwater.gui.engines import default_engines
 from clearwater.gui.export_panel import install_export_panels
 from clearwater.gui.parameter_panels import install_parameter_panels
@@ -42,7 +45,7 @@ from clearwater.gui.settings_dialog import (
 )
 from clearwater.gui.shell import FileChooser
 from clearwater.gui.timeline import install_timeline
-from clearwater.interfaces import JobResult
+from clearwater.interfaces import JobResult, Progress
 from clearwater.io.video.capability import resolve_encoder
 from clearwater.jobs import LeftoverReport
 
@@ -62,6 +65,69 @@ CACHE_FAILED_TEXT = "Videos cannot be analysed or exported in this session: {rea
 
 PLAN_RELEASE_TIMEOUT_S = 10.0
 """The longest wait of a job for the preview's FFT plan release (DR-68)."""
+
+
+class _CloseWatch(QObject):
+    """Sets ``closed`` when the window gets its close event, before the shell's shutdown runs."""
+
+    def __init__(self, window: MainWindow) -> None:
+        super().__init__(window)
+        self.closed = False
+        window.installEventFilter(self)
+
+    def eventFilter(self, watched: QObject, event: QEvent) -> bool:  # noqa: N802 -- Qt override
+        """Note a close event; never consume it."""
+        if event.type() == QEvent.Type.Close:
+            self.closed = True
+        return False
+
+
+class _UnlessClosed:
+    """The window's job runner whose completions are dropped once the window is closing.
+
+    The start-up jobs cannot all be cancelled (the cache's first open took 16 s; the encoder
+    detection's probes have their own timeouts), so one may end after the shell's close: the
+    runner then delivers its ``on_done`` during the close (a thread that ended) or later, while
+    an event loop still runs. Either way nothing of it reaches the closed window (DR-44 (c),
+    R1-5, ruling d530b564).
+    """
+
+    def __init__(self, inner: JobRunner, closed: Callable[[], bool]) -> None:
+        self._inner = inner
+        self._closed = closed
+
+    def run(
+        self,
+        job: Callable[[Progress], JobResult],
+        *,
+        on_done: Callable[[JobResult], None],
+        on_progress: Callable[[int, int | None, str], None] | None = None,
+    ) -> JobHandle:
+        """Start ``job`` on the window's runner; its callbacks run only while it is open."""
+
+        def done(result: JobResult) -> None:
+            if not self._closed():
+                on_done(result)
+
+        def progress(done_: int, total: int | None, message: str) -> None:
+            if on_progress is not None and not self._closed():
+                on_progress(done_, total, message)
+
+        return self._inner.run(
+            job, on_done=done, on_progress=None if on_progress is None else progress
+        )
+
+    def cancel(self) -> None:
+        """Cancel every running job."""
+        self._inner.cancel()
+
+    def active(self) -> int:
+        """Return how many jobs have not yet delivered ``on_done``."""
+        return self._inner.active()
+
+    def wait(self, timeout_s: float) -> bool:
+        """Wait for every job thread to end, at most ``timeout_s`` seconds in total."""
+        return self._inner.wait(timeout_s)
 
 
 @dataclass
@@ -89,16 +155,27 @@ class Application:
     leftovers: LeftoverReport
     analysis: EngineClipAnalysis | None = None
     _probe_generation: int = 0
+    _watch: _CloseWatch | None = field(default=None, repr=False)
+
+    def closed(self) -> bool:
+        """Return True once the window got its close event (the start-up callbacks stop)."""
+        return self._watch is not None and self._watch.closed
 
     def start_jobs(self) -> None:
-        """Start the three start-up jobs (interface thread)."""
+        """Start the three start-up jobs (interface thread), their callbacks guarded by close.
+
+        Every start-up callback, the encoder catalog's completion included, runs only while the
+        window is open (R1-5): the jobs run on the window's runner through :class:`_UnlessClosed`.
+        """
         window = self.window
+        self._watch = _CloseWatch(window)
+        jobs = _UnlessClosed(window.jobs, self.closed)
         limit = window.session.settings().cache_limit_bytes
         try:
-            window.jobs.run(cache_open_job(self.cache, limit), on_done=self._on_cache_open)
+            jobs.run(cache_open_job(self.cache, limit), on_done=self._on_cache_open)
         except RuntimeError as error:  # the runner is closed: the window is closing
             self.cache.fail(str(error))
-        self.catalog.start(window.context)
+        self.catalog.start(dataclasses.replace(window.context, jobs=jobs))
         self.probe_device()
         window.session.settings_changed.connect(self._on_settings)
 
@@ -115,8 +192,9 @@ class Application:
         job = device_probe_job(
             window.context.engines.select_backend, window.session.settings(), method_id
         )
+        jobs = _UnlessClosed(window.jobs, self.closed)
         try:
-            window.jobs.run(job, on_done=lambda result: self._on_probe(generation, result))
+            jobs.run(job, on_done=lambda result: self._on_probe(generation, result))
         except RuntimeError as error:  # the runner is closed: the window is closing
             _LOG.info("device detection not started: %s", error)
 
@@ -131,7 +209,7 @@ class Application:
 
     def _on_settings(self, _settings: object) -> None:
         """Main thread: a settings change with no file open detects again (``force_cpu``)."""
-        if self.window.session.source() is None:
+        if self.window.session.source() is None and not self.closed():
             self.probe_device()
 
     def _on_cache_open(self, result: JobResult) -> None:
