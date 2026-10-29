@@ -232,4 +232,35 @@ appears in no computed set) and the import-time witness extension (DR-84).
 
 | Round | Crit / maj / min | In-env / out | New / reopened | Reverts | Product vs test fixes | Transport, CLI | Depth (dispatcher) |
 |---|---|---|---|---|---|---|---|
-| 0 (design) | - | - | - | - | none (no product code) | - | (to be given) |
+| 0 (design) | - | - | - | - | none (no product code) | - | 263,162 at the round-0 yield (cell 1 retired; `scripts/cell_depth.py`) |
+
+## CHARC round-0 ruling (`fcb2a9205c060013`, 2026-10-29 12:54:46Z, verbatim; it GOVERNS the STOP items above)
+
+**CHARC RULING on WP4.3 round 0 (query d0a94cb7a23c5410; ledger 649483b `:199-229` read): six STOP items ruled; build goes to a FRESH cell 2 from the ledger and this post. Append this ruling to the ledger verbatim.**
+
+**S1 the cache open: (a), the deferred-open handle, GRANTED, on five conditions.** The measured 126 ms warm and 16.4 s first open make Q4 bind, and (b) would leave the window blank for the first open, against G9/V7's intent. Grants: `composition.py` beyond Q16 (ONE class `proxy_cache_opener`-returned handle, ONE builder, the widened `cache=` type on `export_jobs`) and the Q11 signature (`default_engines(*, locations=None)`, the limit argument dropped). Conditions:
+1. The handle implements IF-7 plus `key_for` by DELEGATION after open; the frozen interface is not touched, the handle lives in `app/composition.py`, and `tests/test_app_deps.py`'s rules still hold for it.
+2. Every member blocks until the open completes and is called from worker threads only; an AST or monkeypatch test proves no member runs on the UI thread. If the open FAILED, every member refuses readably with the open's reason (the `_NoCacheFolder` form), never hangs or re-raises a traceback; the GUI shows that reason once (the settings dialog's existing banner or the status line), and the photo path keeps working.
+3. The limit comes from the ONE settings read; `open(limit_bytes)` is called once by start-up job (i); a `set_limit_bytes` or `clear` from the settings dialog before the open completes is applied after it (queued), and a test drives that order.
+4. ONE `DiskProxyCache` per process stays provable: `export_jobs(cache=<handle>)` and the adapter share the instance behind the handle; Q16's test holds through the handle, and `test_each_export_jobs_call_opens_its_own_cache` stands for the `cache_folder` form.
+5. A V7 scenario with a slow open (a stub that sleeps past 100 ms) shows the UI responsive while the first job waits on the worker.
+
+**S2 the adapter's backend: the ALTERNATIVE, rebuild at a run.** Selection happens at the START of each analysis or recompute run on the worker (DR-67's rule); an in-flight job keeps its backend (the AD-7 amendment's spirit: absorbed, never cancelled); when the selection differs from the engine's, the adapter rebuilds the `AnalysisEngine` over the SAME cache instance before the run (construction is light: no device work until a run). Ground: a user who sets force-CPU and presses recompute must see CPU in the AD-9 status on THAT run, not after a clip change; the cache entry is keyed independent of the backend (V4 CPU/GPU SAME, WP4.2 task 10), so a rebuilt engine reuses the entry. Test: toggle force-CPU between two runs of one clip; the second run's `JobResult.device` and the status line say CPU; the first run's statistics are reused.
+
+**S3 `gui/shell.py` grant: GRANTED as named**: one additive `MainWindow.set_idle_device(reason)`, `Device: <reason>` while no file is open, `Device: -` until set; no other shell change.
+
+**S6 a journal that fails to decode: CONCUR**, renamed aside as `write-journal.json.bad-<UTC stamp>` (the `settings_store` form), logged, treated as empty, the output folder still scanned; one test.
+
+**S7 the V7 / GX011627 window driver: CONCUR**, an UNCOMMITTED driver in the evidence folder (md5 and command in the ledger and report) importing the committed `tests/test_app_v7.py` helpers; no environment switch in a committed test (the WP4.2 B1/B2 lesson); outputs under `work/`; no footage path in any log, record or report.
+
+**S-order: CONFIRMED.** Leftover cleanup runs after `MainWindow(...)` (it needs `Settings.output_folder` and the log from `start_up`) and before the installs and `show()`; no job can start before it ends, and a test proves it (DR-35 (c)'s closure).
+
+**Seat: FRESH cell 2 for the build, CONCUR** (cell 1 at 262,719 is past the evaluation point and the build is the main load). Cell 1's final report lands, then its STAND-DOWN. Cell 2 reads the ledger, this ruling and the brief, and builds tasks 3-12 with the round-0 names.
+
+Start-up figures noted for the report: imports 1.46 s, capabilities 550 ms fresh / 4.9 ms cached, first `select_backend` 947 ms plus `import clearwater.core` 1.03 s on the worker, leftover cleanup 0.8 ms over 750 files. All measured under WP-T6's windows, so they are shape evidence; the V7 figures of record come from the exclusive window.
+
+## RESUME HERE (cell 2; written by the dispatcher, generation 20, 2026-10-29)
+
+- Cell 1 (`wp43-cell1`) did tasks 1 and 2 (round 0, `649483b`) and retired at 263,162 by the evaluation rule; its full report is `C:\Userswsmy\clearwater-review-evidence\wp4.3\cell1-round0-return.md`; round-0 evidence `...\wp4.30\`.
+- Cell 2 builds tasks 3-12 with the round-0 design table above AS RULED: S1 = (a) the deferred-open handle with its FIVE conditions; S2 = the ALTERNATIVE (select at each run start, rebuild the engine over the same cache); S3, S6, S7 and the order as recommended. No product code exists yet; the worktree is at `649483b` plus this commit.
+- Windows (V7 exclusive, the GX011627 legs) are requested by `WINDOW REQUEST`; the ONE two-leg gate is the orchestrator's after Reviewer A converged and Reviewer B returned.
