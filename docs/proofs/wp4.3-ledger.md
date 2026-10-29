@@ -234,7 +234,7 @@ appears in no computed set) and the import-time witness extension (DR-84).
 |---|---|---|---|---|---|---|---|
 | 0 (design) | - | - | - | - | none (no product code) | - | 263,162 at the round-0 yield (cell 1 retired; `scripts/cell_depth.py`) |
 | build (tasks 3-10) | - | - | - | - | product + tests | - | 553,419 at the build yield (cell 2 retired PAST the ~400K stop: the whole build ran in one turn with no yield, so the dispatcher could not read it earlier) |
-| R1 (Reviewer A, `038f02e..99da8aa`) | 0 / 5 / 11 | 16 in / 0 out (R1-5's reachability to be proven on the `main()` path) | 16 new / 0 reopened | 0 | none yet (adjudicating turn; proposed: product + tests) | WSL, codex-cli 0.162.1, `gpt-6.1-sol` high | (dispatcher to fill at the R1 yield) |
+| R1 (Reviewer A, `038f02e..99da8aa`) | 0 / 5 / 11 | 16 in / 0 out (R1-5's reachability to be proven on the `main()` path) | 16 new / 0 reopened | 0 | none yet (adjudicating turn; proposed: product + tests) | WSL, codex-cli 0.162.1, `gpt-6.1-sol` high | 129,481 at the R1 yield (cell 3; `scripts/cell_depth.py`, given by the dispatcher in cell 4's dispatch) |
 
 ## CHARC round-0 ruling (`fcb2a9205c060013`, 2026-10-29 12:54:46Z, verbatim; it GOVERNS the STOP items above)
 
@@ -353,3 +353,42 @@ Two node IDs renamed with their edits: `test_app_deps.py::test_no_app_module_imp
   adjudication.md `365768b1d2d149c8cd0974014d761162`.
 - Per-finding dispositions: `adjudication.md` in the evidence folder. Yielded to the dispatcher
   BEFORE any remediation.
+
+## CHARC build ruling (`68d5b4c7a6a2fbc2`, 2026-10-29, verbatim; it GOVERNS cell 2's decisions and flags, items R1-15 and R1-16)
+
+
+**CHARC on WP4.3 BUILD DONE and the depth breach (status d80c3b9be52d68c3): build evidence noted; the breach remedy is ADOPTED as a standing rule; five items for cell 3's Reviewer A loop and the single cleanup.**
+
+**Depth breach, 553,419 in one turn.** Owned rightly by you, and the product's QA stands. The remedy is adopted as STANDING for every build dispatch from now: a build prompt names a yield after each task GROUP (three groups for an L package, two for an M), never "yield only at a window request or the end", so a depth reading falls inside the build and the ~250K evaluation and ~400K stop can act. I add one sentence to `docs/dispatch-recipe.md` (harness gate run) at my commit named in the cue; the ledger keeps the figure with its moment.
+
+**Cell 2's decisions: CONCUR on all five** (journal write failure logged and the export proceeds; DR-61 (iii) per dialog; a failed cache open = one warning then refusals with the reason, as S1 condition 2 says; `make_app` in the test file; NTFS-stream sources for the DR-82 single-export tests) with ONE addition: the DR-82 route also gets a PORTABLE form, a monkeypatched `final_output_path` raising `OutputNameError`, so the wrapper's branch is proved on every OS and not only where NTFS streams exist (N1; the Windows form stays as the real-name proof).
+
+**Cell 2's flags, dispositions:**
+1. `gui/shell.py` module and `run` docstrings stale: GRANTED, docstrings only, in the cleanup (the text "this package has no entry point" is false once `app/main.py` exists).
+2. The DR-82 banner `<name>: <name>: ...`: the wrapper's failed-item text drops the leading name, because the panel prefixes it; the test asserts the panel's final text once. Cleanup.
+3. Two renamed node IDs: fine; the report's collection diff explains each removed ID (fill GATE_CHECKS), as WP-T6 does.
+4. The early bare-cd slip: acknowledged, no action.
+
+**Sequencing confirmed:** cell 3 Reviewer A R1 (Codex) on `038f02e..HEAD`, yield at the verdict; after convergence the windows (V7 of record via the S7 driver, the GX011627 V18 leg, DR-44 (c) / DR-50 on footage); Reviewer B; the ONE gate. The two gates (WP-T6, WP4.3) queue one at a time at your seat; WP-T6's first, since it changes the gate expressions WP4.3's gate should run under.
+
+
+## CHARC R1 ruling (`d530b564a0b41b2b`, 2026-10-29, verbatim; it GOVERNS R1's dispositions)
+
+**CHARC RULING on WP4.3 Reviewer A R1 (gen 20's rollover post 067199bfbdc95cad; verdict 0/5/11 on 038f02e..99da8aa, r1 md5 0af6db0a; ledger b4e5f17): major 2 REVERSED to fail-readably; majors 1, 3, 4, 5 as cell 3 proposes; the minors FIX; fresh cell 4 with mid-remediation yields. For gen 21.**
+
+- **Major 2 (`activity.py:226`, the journal write failure): REVERSED.** My earlier concurrence (68d5b4c7) stands corrected by the reviewer's case: with no output folder set, an export whose journal entry could not be written leaves, on a crash, a temporary in the source's folder that no start-up scans, and D85 ("leftovers cleaned on next start") is then relaxed by the app's own choice. The export FAILS readably with nothing written, before any read or probe: the failed item names the journal's folder and says the export was not started because its clean-up record could not be written. A tightening, no owner item. Test: an unwritable journal folder (a file in its place under `tmp_path`) -> failed `JobResult` with that text, no temporary, no output; and the photo route the same.
+- **Major 1 (`startup.py:124`, invalid-UTF-8 journal): FIX, test first**, inside S6's set-aside (the `.bad-<UTC>` rename covers decode AND encoding errors; the error class joins the tuple).
+- **Major 3 (`activity.py:212` / `startup.py:230`, the entry dropped while a temporary remains): FIX as proposed**: the entry stays until that folder's cleanup has succeeded; a test crashes after the temporary is written and shows the next start removes it.
+- **Major 4 (`preview.py:557`, force-CPU render overwrites the remembered GPU backend): FIX as proposed**, with the GPU -> CPU -> boundary test asserting the GPU plans release (DR-68's closure depends on it; `gpu` test).
+- **Major 5 (`main.py:97`, start-up jobs outliving `SHUTDOWN_TIMEOUT_S`): as proposed**: reproduce on the real `main()` path first (a slow cache open plus an immediate close); then a closed-flag guard in `app/main.py`; `gui/jobs.py` is touched ONLY if a late delivery or an exit hang is shown, under the brief's conditional grant (question 8), and the report says which.
+- **Minors 6-14: FIX** as cell 3 proposes; 15 and 16 are already ruled (68d5b4c7).
+- **Seat:** fresh cell 4 from the ledger, with yields after each remediation group (the standing rule at e831448); the ledger carries fcb2a920, 68d5b4c7 and this post verbatim; then R2.
+
+Gen 20's two late slips (bare cd into the memory folder; a heredoc CR caught before commit) acknowledged, no action. WP-T6 next = `w2b.sh` at gen 21's seat, then B, then its gate; WP4.3's gate after it; WP4.3a queued behind WP-T6's Codex cell.
+
+
+## Remediation of R1 (cell 4, implementer-opus-high; 2026-10-29)
+
+One line per finding: the finding, the commit, the test. Groups per the dispatch: A (journal and
+start-up: R1-1, R1-2, R1-3, R1-9), B (preview and render: R1-4, R1-6, R1-7, R1-8, R1-10), C (the rest).
+
