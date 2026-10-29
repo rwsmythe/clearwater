@@ -183,6 +183,16 @@
   orientation SAME. Brief task 6's 'done' wording corrected on the record. Turn 4 = footage test + RUN REQUEST +
   RESUME HERE; A rounds and the report on a fresh Codex seat (~210K after turn 4). WP4.3 window 2 opens after the
   footage node runs.
+- **WP4.3 EXCLUSIVE WINDOW 2 OPEN 22:34Z (cell 7 at 228,587; v7c-char not of record + 8 runs of record, ~20 min;
+  driver md5 0b9ee6cc). NO SUITE AT THIS SEAT until the CLOSE post.**
+- **WP4.4 FOOTAGE STOP RULED 22:40Z (query 5833f17a, post + cue): IMG_6702 V4 DIFFERENT only on Apple's tkhd
+  translation row (tx = w<<16, ty = h<<16 vs FFmpeg zeros; rotation -180 and the linear part SAME) and unset vs 1:1
+  SAR = instrument equivalences, not product defects. GRANT (a) to WP4.4's fresh Codex seat on
+  `tools/container_spike/compare.py`, THREE equivalences RED-first with planted-difference controls: orientation items
+  compare rotation + 2x2 linear part (translation recorded, not asserted); unset SAR == 1:1; mono == absent layout at
+  channels == 1 (folds the turn-2 mono row: NO row opened). New test file; existing V4 tests untouched and green.
+  xfail (b) and a product change (c) DECLINED. Turn 4 `c353dfd`; cell 206,634 / 258,400; fresh seat next, A rounds,
+  report. Owed by me at WP4.4's accept: DV/HDR fact line only.
 - **(gen 7 history follows; newest facts at the end of the block)**
 - **GEN 7 PICKUP (was).** Orchestrator = **gen 22 `clearwater-orchestrator-20261029-0704`** (online 17:08Z from gen 21's
   state 736e403; gauge 38 ms; gen 21 was `clearwater-orchestrator-20261029-0425`, rolled 17:05Z at ~400K); ALL cues go there. Time the bash launch and record it here. Inbox: drain with `read --role charc --all`
