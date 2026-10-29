@@ -5,71 +5,64 @@
 
 ### Generation
 
-- **Generation 22 LIVE since 2026-10-29 ~17:05Z** (session `clearwater-orchestrator-20261029-0704`; bash gauge 38 ms, ~9.7 GB free).
-  - Drained CHARC `d6e9abdf` (R3 + WP4.3a R1 rulings). Saved verbatim at `clearwater-review-evidence\wp4.3\r3-ruling-d6e9abdf.md` and `...\wp4.3a\r1-ruling-d6e9abdf.md`.
-  - **WP4.3 cell 6 DISPATCHED** (`wp43-cell6`, opus-high, fresh, prompt `...\wp4.3\prompt-wp4.3-cell6.md`, from `21ba03f`). Order: Group A (R3-1, R3-2) yield; Group B (R3-3..R3-5) yield; R4 review-only, yield at the verdict. If this generation dies, the successor re-dispatches from the ledger with that prompt.
-  - **WP4.3a Codex turn 6 RUNNING** (session `01a18899-4b87-7f51-8850-3b34a92b7076`, prompt `...\wp4.3a\cell\prompt-6.md`). It does the R1 remediation (F1, F2, F9, F4, F3) and R3-1 (ii), the settings path field taking its per-field default. On return: commit from FILES CHANGED, QA, then R2 at this seat.
-  - Owed: the WP4.3a brief's register table gains the R3-1 (ii) line, on the accept branch.
-  - Slip: one bare `cd` into `.worktrees/wp4.3a` at bring-up, with no cell live; reverted.
+- **Generation 22 ROLLED OVER 2026-10-29 ~18:50Z at ~420K, at a clean boundary: no cell live, both Codex sessions idle. **The stacked merge is NOT done: the gate went RED on two serial tests, see below.**
+  - Session `clearwater-orchestrator-20261029-0704`. CHARC is gen 7, `clearwater-charc-20261029-0428` (re-verify: `comms/.launch-sessions.json`).
+  - Bash-launch gauge 38 ms at bring-up.
+  - **DISK is an operational constraint** (CHARC, 2026-10-29): check `df -h /c` before every gate leg, window and cache run, and STOP below 15 GB free. Remove each gate's basetemps when its record is written.
+  - **THE STACKED GATE on `stack-g22` `8e1114a`** (inventory `inv-mc` `3186ea3` + WP4.3a; patch-ids inventory `f977203c`, WP4.3a `59a6c0d1`). Logs are copied to `clearwater-review-evidence\stack-g22\`.
+    - Static: ruff, format, mypy and the harness all EXIT=0; 0 CR. Collections 5,619 + 1,137 + 7 = 6,763.
+    - **PARALLEL:** 5,618 passed, 1 skipped, EXIT=0, 1,058.60 s.
+    - **SERIAL:** 2 failed, 1,135 passed, EXIT=1, 1,879.08 s (18:08:36Z-18:39:58Z).
+      - (a) `tests/test_io_video_encode_bench.py::test_run_once_records_the_row_and_deletes_the_output`: `-0.05 < telemetry_origin` read -0.0773, the DR-58 (c) load-sensitive bound. **My `du` size scan (18:03-18:16Z) overlapped the timed leg.** RE-RUN in isolation at 18:4xZ: **PASSED**. A load flake caused by my seat, not a package fault.
+      - (b) `tests/test_photo_check.py::test_the_real_photo_leg_reads_and_round_trips_the_owners_photos` (`footage`): `IMG_6791.JPG`, `round_trip.problems == ["fields changed or lost: ['Exif.LensModel']"]`. It **FAILS ON MAIN TOO** (`27a11ae`, re-run at this seat). It is PRE-EXISTING: the owner's new Phone photos exposed it. `IMG_6791.JPG` is the file whose Make, Model and Software are NUL-filled (inventory). The test was last changed at `110878c` (WP3.6).
+    - **OWNER DIRECTION (2026-10-29 ~18:47Z, in chat to the orchestrator, verbatim):** "full re-run of the serial is not required once the issue with the round-trip test is identified and fixed and that test verifies passed (along with any test impacted by code changed by the fix)."
+  - **RESUME HERE (gen 23), in order:**
+    1. **Drain the inbox.** Then **the round-trip fix** under the owner's direction above.
+       - Root-cause it first (systematic debugging): what the photo writer / round-trip check does with an EXIF `LensModel` that is NUL-filled or otherwise odd on `IMG_6791.JPG`. Read the value's bytes, never print location tags.
+       - It is product code in WP3.6's area (`io/photo/` writer or `tools/photo_check.py`), so it is a small package with a brief, the other-model nets and CHARC's ruling on scope. Lane by pace; a Codex micro-package is likely right.
+       - Verify that test plus every test the fix's code touches. NO full serial re-run (owner).
+       - **Then merge the stack:**
+         - the records are DRAFTED, uncommitted, in `.worktrees/stack-g22/docs/proofs/` (`inventory-2026-10-29-merge.md`, `wp4.3a-accept.md`, with `@@PAR@@`/`@@SER@@` placeholders) plus the WP4.3a brief's R3-1 (ii) register line (uncommitted in `.worktrees/stack-g22/docs/briefs/wp4.3a-brief.md`);
+         - fill in the gate figures above, the (a) re-run and the (b) disposition with the fix's commit and verification;
+         - commit in `stack-g22` (`-c core.autocrlf=false`), `git merge --ff-only stack-g22` on main (or the fix first, as CHARC rules), release post to CHARC. **CHARC is HOLDING main** until that post. CHARC then commits its register rows (DR-15 note; WP4.3a closures; DR-92; the IF-10 repr row).
+    2. **THE PRUNE + ARCHIVE**, owner-approved: "prune" 18:18Z; then "additionally, I have attached an external drive (D drive) ... may be moved to an appropiate folder on the D drive" 18:25Z. Lists: CHARC `701ac3f8` as amended by `0fafd4de`; both texts are saved verbatim at `clearwater-review-evidence\prune-2026-10-29\`.
+       - Run it BETWEEN runs only.
+       - **MOVE to `D:\clearwater-archive\`** (README.md there; one subfolder per item, same relative name under `work\`):
+         - `work/wp3.21/oracle` (23 GB);
+         - `work/wp1.3d` and `work/wp1.3` WHOLE;
+         - `work/wp1.4`, `wp1.4b`, `wp1.2b`, `wp2.2`, `pt-main-wp39`, `wp-t4`.
 
-- **Generation 21 ROLLED OVER 2026-10-29 ~17:05Z at ~380K, at a clean boundary.** WP4.3 cell 5 yielded at its R3 verdict, was stood down, and dies with this generation. The WP4.3a Codex seat-2 session survives; its turn 5 finished and is committed (`a0b9235`).
-  - Session `clearwater-orchestrator-20261029-0425`. CHARC is gen 7, `clearwater-charc-20261029-0428` (re-verify: `comms/.launch-sessions.json`).
-  - Bash-launch gauge 33 ms at bring-up; free memory ~9-10 GB.
-  - **RESUME HERE (gen 22):**
-    - **Phase 4 state** (re-verify: `git log --oneline -15 main`, `docs/debt-register.md`): **WP-T6 ACCEPTED** (main `fe65e6a`; CHARC QA CONFIRMED, accept edits `c5c194e`: GATE_CHECKS now carry `and not fullclip`, DR-86/87/88). Two packages IN FLIGHT: **WP4.3** (Claude, opus-high) and **WP4.3a** (Codex). **Queued:** the DR-87 `bench.py:1305` `stray_processes` Codex micro-package, BEHIND WP4.3a (CHARC). WP4.3's gate waits on WP4.3a's DR-85 fix being on main (the strict `xfail`), so WP4.3a merges first; the other rebases with patch-id re-proved.
-    - **Standing rule (recipe `e831448`):** every BUILD dispatch names a yield after each task GROUP. It worked all generation: cells 4 and 5 yielded every group on time.
-    - **Gate expressions (fill, from `c5c194e`):** PARALLEL `-n 4 -m "not gpu and not footage and not gui and not slow and not fullclip"`; SERIAL `-m "(gpu or footage or gui or slow) and not fullclip"`. Serial leg about 1,389 s, two-leg about 35 min. Gen 21's WP-T6 gate script is the template: `clearwater-review-evidence\wp-t6\work-copy\mc\gate-g1.sh`. It runs static checks, four collections and parallel, then waits on a `serial.go` file so the timed serial leg runs only with every cell verified idle.
-  - **CHARC's rulings on BOTH open queries are WAITING UNREAD in the orchestrator inbox** (cue at ~17:08Z, message `d41f80f6`; gen 21 did not drain it). In CHARC's cue: R3-1 fixed in BOTH `app/startup.py` and, under a granted WP4.3a scope addition, `settings_store`'s per-field default; R3-2 fixed by the (id, folder) pair and reclassified MINOR; R3-3..R3-5 test-only; WP4.3a F1 fixed at the real resolve site; F4 GRANTED. Read the post itself for the binding text, save it verbatim to both evidence folders, and carry it into cell 6's prompt and WP4.3a's `prompt-6.md`.
-  - **WP4.3 (application wiring), Claude lane `implementer-opus-high`, Codex nets (WSL `gpt-6.1-sol`/high):**
-    - **Brief and rulings:** brief `docs/briefs/wp4.3-brief.md` FINAL. Rulings, all verbatim in the ledger `docs/proofs/wp4.3-ledger.md` and saved in `clearwater-review-evidence\wp4.3\`:
-      - `fcb2a920` (round 0) and `68d5b4c7` (build);
-      - `d530b564` (R1; major 2 REVERSED to fail-readably);
-      - `ace08fbb` (R1-13 = (a) on AD-11's domain clause, three conditions; the D85 missing-folder Limit with DR-89);
-      - `38a7c702` (R2; R2-3 GRANT narrow for `gui/settings_dialog.py`, one closed signal; R2-4 BANKED DR-90).
-    - **Worktree and cells:** `.worktrees/wp4.3`, branch `wp4.3`, base `038f02e`, **head `21ba03f`** (ledger only since `028bc4f`).
-      - cells 1-3 as in gen 20's state;
-      - cell 4 did the R1 remediation (Groups A-C) and R2, stood down at 355,066;
-      - cell 5 did the R2 remediation (Groups A-C) and **R3**, stood down at 271,612 (its R3 yield).
-    - **R3 = `NEW_CRITICAL_MAJOR_FOUND`, 0 / 2 MAJOR / 3 minor, all in-envelope** (evidence `wp4.3\r3\`, review `21392d76`, adjudication `abf49f67`). This is **round 3 of the five-round gate**. POSTED to CHARC by gen 21 (query `4e934f90`, with the WP4.3a F4 grant); gen 22 drains the answer.
-      - **R3-1 MAJOR:** a `settings.json` `output_folder` containing NUL is accepted by `load_settings`, then start-up's `clean_leftovers` raises `ValueError` before `show()`, so the program cannot start. The cell proposes skip-and-log in `app/startup.py` for any folder `_is_path` refuses. **FLAG:** the settings store accepts the NUL path at its source (`config/`, WP4.3a's file set). Ask CHARC whether WP4.3a (in flight, same files) also refuses it at the source.
-      - **R3-2 MAJOR:** two journal entries with one id (only a foreign or hand-edited journal; real ids are uuid4); a failed clean-up of one folder then drops both. The proposed fix removes entries by the (id, folder) pair. CHARC may reclassify to minor under the DR-89 class.
-      - **R3-3 and R3-4 (minor, REOPENED R1-12):** the V7 (e) and (b) witnesses. Test-only.
-      - **R3-5 (minor):** the DR-44 (c) close test's predicates; test-only plus the report sentence at `:100`.
-    - **NEXT:**
-      1. Drain CHARC's answer to `4e934f90` (R3 dispositions; R3-1's source-side refusal possibly added to WP4.3a's scope).
-      2. **Fresh cell 6** (opus-high) from the ledger and `r3\adjudication.md`. Base the prompt on `clearwater-review-evidence\wp4.3\prompt-wp4.3-cell5.md`: READ FIRST tight; the CHARC R3 ruling verbatim; Group A (R3-1, R3-2), then Group B (R3-3..R3-5), each a yield; then **R4** review only (`wp4.3\r4\`, "THIS IS ROUND 4"), yield at the verdict.
-      3. After A converges: the windows (V7 (a)-(f) of record; the GX011627 V18/V8 leg with p99 at k=2 ASSERTED, per `ace08fbb`; DR-44 (c)/DR-50 on footage), EXCLUSIVE, each posted to CHARC.
-      4. My Reviewer B (Codex, WSL runner `clearwater-review-evidence\wp4.2\reviewB2\run_review_B.sh` shape).
-      5. The ONE gate under the amended expressions, after WP4.3a is on main. Rebase WP4.3 and drop the DR-85 `xfail(strict)`.
-      6. The accept record carries the AD-11 domain sentence (`ace08fbb` condition 3), DR-89 and DR-90 (CHARC's rows).
-    - **Cell depths this generation** (`cell_depth.py`, each at a yield): cell 4 140,559 / 219,999 / 316,716 / 355,066 (A / B / C / R2); cell 5 108,533 / 168,297 / 222,999 / 271,612 (A / B / C / R3). An R round costs a cell about 40-50K.
-  - **WP4.3a (spawn helper and import / redaction hardening), Codex lane, Claude pass as both nets, STRONG:**
-    - **Brief and rulings:** brief `docs/briefs/wp4.3a-brief.md` FINAL on `8fb519ba` (main `e879106`). B4 ruling `a2ef868a` (saved `clearwater-review-evidence\wp4.3a\b4-ruling-b6aa800a.md`, verbatim in the ledger): GRANT a narrow edit of `tests/test_headless_export.py::test_b4_...` plus the runner's redacting WARNING handler.
-    - **Worktree:** `.worktrees/wp4.3a`, branch `wp4.3a`, base main `fe65e6a`, head `a0b9235`.
-      - Commits: `a614160` round 0; `ef903e5` the spawn helper; `fa2afab` tasks 4-5 (B4 red by design); `553d1f2` the B4 grant and the WARNING handler; `a0b9235` seat 2's R1 ledger.
-      - I commit every turn by pathspec with the GPT-6.1 Sol footer.
-    - **Seat 1** (session `01a18856-955d-74e3-b211-dfb519efdf0c`) RETIRED at input depth 237,170 of 258,400 (turn 4 footer).
-    - **Seat QA at my seat on `553d1f2`:** ruff / format 269 / mypy 141 clean; task 6's full light-run list (`io/video` with GPU and slow, config, runner, naming, layering) **884 passed, 12 footage deselected** (`work/wp4.3a/seat-t6.log`).
-    - **Reviewer A R1** (the Claude pass, `codex_cell.py review` with the ABSOLUTE worktree path; evidence `wp4.3a\r1\`, md5s in `md5sums.txt`) = **`NEW_CRITICAL_MAJOR_FOUND`: 1 MAJOR / 2 minor / 6 advisory.**
-      - F1: DR-81 (b)'s real route, `Path.resolve` in `write_target_refusal`, is outside the new guard, and the test planted the raise elsewhere.
-      - F2: the AST guard sees only run/Popen.
-      - F3: stale report lines.
-      - F4: the `--parameters` help line `:1203` is OUTSIDE the file grant. **One-line grant ASKED of CHARC in gen 21's query `4e934f90` (recommended: grant).**
-      - F5-F9: REPORT-ONLY, or F9 a one-liner.
-    - **Seat 2** = Codex session **`01a18899-4b87-7f51-8850-3b34a92b7076`** (fresh; prompt `clearwater-review-evidence\wp4.3a\cell\prompt-s2-1.md`). **Turn 5 (ledger turn 5) DONE and committed** (`a0b9235`, ledger only): R1 adjudicated, 9 NEW / 0 REOPENED; FIX F1, F2, F3, F9; REPORT-ONLY F4-F8 (F4 = the `:1203` help line, pending CHARC's one-line grant, asked in gen 21's query `4e934f90`). Depth: turn 5 `tokens used` 89,765; input depth 86,848 of 258,400.
-      - **NEXT:** write `prompt-6.md`: the depth row, CHARC's F4 answer, and the R1 remediation (F1 with the test raising from the REAL `Path.resolve` route plus the NUL `ValueError`; F2's widened AST guard pinned at seven sites with planted forms; F3 report fixes and F8's line; F9 one-liner), RED first, one yield. Then run it with `codex_cell.py turn --worktree "C:/Users/rwsmy/clearwater/.worktrees/wp4.3a" ... --turn 6 --session 01a18899-4b87-7f51-8850-3b34a92b7076` (use the id above), commit, QA, then R2 at my seat (evidence folder wp4.3a/r2 under clearwater-review-evidence, with a "THIS IS ROUND 2" section).
-      - A first Codex turn needs an ABSOLUTE `--worktree`: with a relative path, `codex exec -C` resolves it against the worktree cwd and fails (gen 21 lost one launch to this).
-    - **After A converges:** Reviewer B (the Claude pass, process, neutral prompt), the ONE gate (`gate-g1.sh` template), the accept. CHARC closes DR-58 (b), DR-76, DR-77, DR-81 (a)(b)(c) and DR-85 and writes the AD-13/AD-23 notes. DR-81's closure text also gets the pre-existing WARNING route.
-  - **Gen-21 slips (reported to CHARC):**
-    - two bare `cd`s into `.worktrees/wp-t6` (no cell live);
-    - one into `.worktrees/wp4.3a` with WP4.3 cell 5 live (it uses absolute paths);
-    - each reverted in the next call.
-    - Also one relative `--worktree` on a first Codex turn (no harm; re-run).
-  - **Practice confirmed this generation:**
-    - Holding a gate's SERIAL leg behind a go-file until every live cell is verified idle (two depth readings across a turn boundary) keeps the timed leg exclusive while the parallel leg overlaps light work.
-    - A Codex cell close to its cap: do the task-6 light runs at YOUR seat, so the next seat starts at the reviewer.
-    - Codex `context_window` footers print 475,000; the window of record stays 258,400.
-  - **Worktrees:** live `wp4.3`, `wp4.3a`, `orch-state-g21` (this commit). Removed: `wp-t6`, `wp-t6-mc` (logs copied to `clearwater-review-evidence\wp-t6\work-copy\`; branches `wp-t6`, `wp-t6-mc`, `wp-t6-mc-gated` kept). `wp4.3-rev` is removable.
+         For each: md5 manifest BEFORE; `robocopy <src> <dst> /E /COPY:DAT /R:2 /W:2 /NFL /NDL`; `md5sum -c` on D:; THEN remove the source.
+       - **DELETE:**
+         - `work/wp3.12` (24 GB);
+         - finished gate basetemps: `pytest-*`, `pt*`, `*-gate*`, `*-parallel` / `*-serial`, `wpt6-g1-main`, and `work/gate-g22` in `.worktrees/stack-g22` after the merge (logs already copied to `clearwater-review-evidence\stack-g22\`). NOT `charc-qa*` without CHARC's word; NOT `work/wp4.2/` or `work/wp3.10/`, which WP-T6's V4 delta reads.
+       - **REMOVE WORKTREES** (branches kept): `wp3.4`, `wp3.4-mc`, `wp3.10`, `wp3.10-mc`, `wp3.11`, `wp3.11-mc`, `wp3.17`..`wp3.20` and their `-mc` trees, `stackB`, `wave4-briefs`, `briefs-p4`, `brief-wp3.14`, `brief-wp3.20r`, `brief-wpt3`, `brief-wpt4`, `orch-state-g10b`..`g20`. Also `wp4.3-rev`, `wp4.3a` and `inventory-1029` once merged; `stack-g22` after its basetemps go.
+         - Use `git worktree remove --force`. On "Filename too long", follow with PowerShell `Remove-Item -LiteralPath "\\?\C:\Users\rwsmy\clearwater\.worktrees\<name>" -Recurse -Force -Confirm:$false`, then `git worktree prune`.
+       - **Record** `docs/proofs/prune-2026-10-29.md`: each item, its size, the manifest path, moved-to or deleted, and before/after `df` for C: and D:. Post it to CHARC.
+       - **Disk at 18:07Z:** C: 45 GB free. Sizes (`du`, 18:03-18:16Z): `work/` 87 GB, `.worktrees/` 19 GB (per-tree figures overlap through venv hard links), evidence 197 MB.
+    3. **WP4.3 cell 7** (opus-high, FRESH): the EXCLUSIVE windows. Dispatch prompt READY at `clearwater-review-evidence\wp4.3\prompt-wp4.3-cell7.md`; update its head line to the then-current `wp4.3` head.
+       - **FIRST rebase `wp4.3` onto the new main** (WP4.3a is merged), dropping DR-85's `xfail(strict)` in `tests/test_app_startup.py`; re-prove patch-id. Do this AFTER the stack merges. Better: have cell 7 do the rebase as its step 0, with a light run of `tests/test_app_startup.py`.
+       - Cell 7 writes the S7 driver, yields a `WINDOW REQUEST`, runs V7 (a)-(f) of record, the GX011627 V18/V8 leg (p99 at k=2 ASSERTED, p99.9 RECORDED) and DR-44 (c)/DR-50 on footage, then fills the report.
+       - Each window gets an OPEN/CLOSE post to CHARC. Check disk before each.
+       - Then Reviewer B (Codex `gpt-6.1-sol`/high, WSL runner `clearwater-review-evidence\wp4.2\reviewB2\run_review_B.sh` shape), the ONE gate, and the accept. The record carries: the AD-11 domain sentence (`ace08fbb` cond. 3), DR-89, DR-90, and the R4-2 p99.9 figures (smooth 0.00796 / 0.0108, crop 0.0350 / 0.0507 at k = 2 / 4; recorded, never asserted).
+    4. **WP4.4 (.MOV input)**, brief FINAL on main `27a11ae` (CHARC `197131fa`), dispatchable once WP4.3a is on main.
+       - Lane CODEX: read both paces at dispatch. A fresh Codex session; the preamble is `.claude/agents/implementer-codex-sol-high.md` + the brief + a dispatch block (form: `clearwater-review-evidence\inventory-1029\cell\dispatch-1.md`).
+       - It owns `encode.py`'s data-track allowlist ONLY (ruled Q2: `mebx` fails the MP4 mux; seat evidence in the brief).
+       - Commission text: `clearwater-review-evidence\wp4.4\commission-4096c6d3.md`; ruling `...\wp4.4\brief-ruling-197131fa.md`.
+       - It must not run its heavy runs during WP4.3's windows.
+    5. **Queued:** the DR-87 `bench.py:1305` `stray_processes` Codex micro-package (CHARC), then WP3.6P (real-photo verification; brief to be drafted from the WP3.6 brief's Q11 and WP4.1's owed owner-photo leg; the inventory report is its input).
+  - **Done this generation (NOT yet merged: see the gate):**
+    - **Inventory refresh: CHARC QA CONFIRMED.** Report `docs/reports/inventory-2026-10-29.md`; record `docs/proofs/inventory-2026-10-29-merge.md`; CHARC QA CONFIRMED `fffae21e`, no finding. Facts: all 20 Phone videos' video `elst` media_time is 0 (DR-15 note, CHARC's); every HEIC is Apple, with irot = EXIF on all 62; `IMG_6704`/`IMG_6772` are Dolby Vision HLG, expected refusals under spec 5.3.
+    - **WP4.3a ready to accept:** A converged at R2; B clean (DR-92, CHARC's); the merge waits on the round-trip fix.
+    - WP4.3 A converged at R4 (cells 6), cleanup done; WP4.4 brief FINAL; spec v0.5.7 (CHARC).
+    - Owner: Insta360 ON HOLD (files removed).
+  - **Gen-22 slips (reported):** two bare `cd`s (into `.worktrees/wp4.3a` at ~17:20Z with cell 6 live; to the home folder at ~17:33Z with cell 6 live), each restored in the same call; cell 6 confirmed no strays. One heredoc backslash collapse in a gate script, caught before running and rewritten with the Write tool.
+  - **Practice confirmed:**
+    - A quick seat experiment settles a brief question before CHARC rules: the `mebx` mux test took one ffmpeg call.
+    - Spot checks against disk catch probe bugs that self-consistency cannot: IMG_6703's orientation.
+    - Release the serial leg only after every reviewer process has also returned, since B ran its own `-n 4` batch. **And run NO disk scan (`du`) during a timed leg: it cost gen 22 a red serial.**
+    - A second Codex session can run beside the first: the inventory alongside WP4.3a.
+    - **Before the ff:** main carries this state commit, so rebase `stack-g22` onto main first (docs only) and re-prove the patch-ids.
 
 ### Standing operator rulings
 
