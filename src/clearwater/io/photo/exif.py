@@ -1,13 +1,14 @@
 r"""EXIF reading and the D63 edit (spec 8.1; WP3.6).
 
 ``PhotoMetadata.exif`` is the bare TIFF-structured block (it starts ``II*\0`` or ``MM\0*``; an
-``Exif\0\0`` prefix is stripped on read). Pillow's ``Image.Exif`` parses and serialises it.
+``Exif\0\0`` prefix is stripped on read). Pillow's ``Image.Exif`` supplies decoded read views;
+the writer relocates raw TIFF entries so their types, counts and value bytes survive.
 """
 
 from __future__ import annotations
 
-import io
 import logging
+import struct
 
 from PIL import ExifTags, Image
 
@@ -37,6 +38,156 @@ _TIFF_STRUCTURE = frozenset(
     | {338, 339, 347, 529, 530, 531, 532}  # extra samples, sample format, JPEG, YCbCr
     | {700, 33723, 34377, 34675}  # XMP, IPTC, Photoshop, ICC profile
 )
+
+_TYPE_SIZES = {1: 1, 2: 1, 3: 2, 4: 4, 5: 8, 6: 1, 7: 1, 8: 2, 9: 4, 10: 8, 11: 4, 12: 8}
+
+
+class _Entry:
+    """A raw TIFF entry, optionally pointing at a carried child directory."""
+
+    def __init__(
+        self,
+        tag: int,
+        kind: int,
+        count: int,
+        value: bytes,
+        child: list[_Entry] | None = None,
+    ) -> None:
+        self.tag = tag
+        self.kind = kind
+        self.count = count
+        self.value = value
+        self.child = child
+
+
+def _read_entries(data: bytes, drop: frozenset[int]) -> tuple[str, list[_Entry]]:
+    """Read classic TIFF directories without decoding their field values."""
+    if len(data) < 8 or data[:2] not in (b"II", b"MM"):
+        raise ValueError("invalid TIFF header")
+    order = "<" if data[:2] == b"II" else ">"
+    magic, root = struct.unpack_from(order + "HI", data, 2)
+    if magic == 43:
+        raise ValueError("BigTIFF cannot be read for EXIF")
+    if magic != 42:
+        raise ValueError("invalid TIFF magic")
+
+    def read(offset: int, label: str, ancestors: frozenset[int]) -> list[_Entry]:
+        if offset < 8 or offset > len(data) - 6 or offset in ancestors:
+            raise ValueError("invalid or cyclic IFD offset")
+        count = struct.unpack_from(order + "H", data, offset)[0]
+        if count > (len(data) - offset - 6) // 12:
+            raise ValueError("IFD entry table runs past block")
+        pointers = (
+            {int(EXIF_IFD): "Exif", int(GPS_IFD): "GPS"}
+            if label == "IFD0"
+            else {INTEROP_POINTER: "Interop"}
+            if label == "Exif"
+            else {}
+        )
+        entries = []
+        seen_pointers: set[int] = set()
+        for index in range(count):
+            at = offset + 2 + index * 12
+            tag, kind, number = struct.unpack_from(order + "HHI", data, at)
+            if kind == 13 or tag == 330 or (tag in IFD_POINTERS and tag not in pointers):
+                _log.warning("%s IFD-valued entry %s (type %s) dropped", label, tag, kind)
+                continue
+            if label == "IFD0" and (tag in drop or tag in (513, 514)):
+                continue
+
+            def value_bytes(kind: int = kind, number: int = number, at: int = at) -> bytes:
+                if kind not in _TYPE_SIZES:
+                    raise ValueError(f"unsupported TIFF field type {kind}")
+                length = number * _TYPE_SIZES[kind]
+                start = at + 8
+                if length > 4:
+                    start = struct.unpack_from(order + "I", data, start)[0]
+                    if start < 8:
+                        raise ValueError("value offset points inside TIFF header")
+                if start > len(data) or length > len(data) - start:
+                    raise ValueError("IFD value runs past block")
+                return data[start : start + length]
+
+            if tag in pointers:
+                try:
+                    if tag in seen_pointers:
+                        raise ValueError("duplicate IFD pointer")
+                    seen_pointers.add(tag)
+                    value = value_bytes()
+                    if kind not in (3, 4) or number != 1:
+                        raise ValueError("IFD pointer is not a single unsigned offset")
+                    child_offset = struct.unpack(order + ("H" if kind == 3 else "I"), value)[0]
+                    child = read(child_offset, pointers[tag], ancestors | {offset})
+                except ValueError as error:
+                    _log.warning("TIFF %s IFD cannot be read (%s); dropped", pointers[tag], error)
+                    continue
+                entries.append(_Entry(tag, kind, number, value, child))
+            else:
+                entries.append(_Entry(tag, kind, number, value_bytes()))
+        return entries
+
+    return order, read(root, "IFD0", frozenset())
+
+
+def _put(entries: list[_Entry], replacement: _Entry) -> None:
+    """Replace in place, or insert before the first greater tag without sorting kept entries."""
+    for index, entry in enumerate(entries):
+        if entry.tag == replacement.tag:
+            entries[index] = replacement
+            return
+    index = next(
+        (index for index, entry in enumerate(entries) if entry.tag > replacement.tag), len(entries)
+    )
+    entries.insert(index, replacement)
+
+
+def _apply_d63(entries: list[_Entry], order: str, width: int, height: int) -> None:
+    """Change only the D63 fields, creating the Exif directory when necessary."""
+    _put(entries, _Entry(ORIENTATION, 3, 1, struct.pack(order + "H", 1)))
+    _put(entries, _Entry(SOFTWARE_TAG, 2, 11, b"Clearwater\0"))
+    pointer = next((entry for entry in entries if entry.tag == EXIF_IFD), None)
+    if pointer is None:
+        pointer = _Entry(int(EXIF_IFD), 4, 1, bytes(4), [])
+        _put(entries, pointer)
+    assert pointer.child is not None
+    for tag, size in ((PIXEL_X, width), (PIXEL_Y, height)):
+        previous = next((entry for entry in pointer.child if entry.tag == tag), None)
+        kind = 3 if previous is not None and previous.kind == 3 and 0 <= size <= 65535 else 4
+        _put(
+            pointer.child,
+            _Entry(tag, kind, 1, struct.pack(order + ("H" if kind == 3 else "I"), size)),
+        )
+
+
+def _write_entries(order: str, entries: list[_Entry]) -> bytes:
+    """Lay out directories and raw values with new offsets and word padding."""
+    output = bytearray((b"II" if order == "<" else b"MM") + struct.pack(order + "HI", 42, 8))
+
+    def write(fields: list[_Entry]) -> int:
+        if len(fields) > 65535:
+            raise ValueError("too many TIFF entries")
+        offset = len(output)
+        output.extend(bytes(6 + len(fields) * 12))
+        struct.pack_into(order + "H", output, offset, len(fields))
+        for index, entry in enumerate(fields):
+            at = offset + 2 + index * 12
+            struct.pack_into(order + "HHI", output, at, entry.tag, entry.kind, entry.count)
+            value = entry.value
+            if entry.child is not None:
+                child_offset = write(entry.child)
+                value = struct.pack(order + ("H" if entry.kind == 3 else "I"), child_offset)
+            if len(value) <= 4:
+                output[at + 8 : at + 12] = value.ljust(4, b"\0")
+            else:
+                struct.pack_into(order + "I", output, at + 8, len(output))
+                output.extend(value)
+                if len(output) % 2:
+                    output.append(0)
+        # The reserved next-IFD pointer remains zero: IFD1 is deliberately not carried.
+        return offset
+
+    write(entries)
+    return bytes(output)
 
 
 def strip_prefix(block: bytes) -> bytes:
@@ -117,7 +268,7 @@ def edit(source: bytes | None, width: int, height: int) -> bytes:
     r"""Return the D63-edited EXIF block a written image carries.
 
     Orientation is set to 1 (the rotation is in the pixels), the thumbnail (IFD1) is dropped
-    (Pillow's writer does not write it), PixelXDimension and PixelYDimension are set to the
+    (the next-IFD pointer is zero), PixelXDimension and PixelYDimension are set to the
     written size, Software is set to :data:`SOFTWARE`; every other field of IFD0, the Exif IFD,
     the Interop IFD and the GPS IFD is kept. A source without EXIF gets a minimal block with
     those four fields.
@@ -129,41 +280,21 @@ def edit(source: bytes | None, width: int, height: int) -> bytes:
 
     Returns:
         The bare TIFF-structured block (no ``Exif\0\0`` prefix).
+
+    Raises:
+        ValueError: The source header, IFD0 or a kept root value is damaged or unsupported.
+        struct.error: A requested dimension or relocated offset cannot be represented.
     """
-    exif = load(source) if source else Image.Exif()
-    exif[ORIENTATION] = 1
-    exif[SOFTWARE_TAG] = SOFTWARE
-    sub = exif.get_ifd(EXIF_IFD)
-    sub[PIXEL_X] = width
-    sub[PIXEL_Y] = height
-    return strip_prefix(exif.tobytes())
-
-
-def _materialise_interop(source: Image.Exif, fields: dict[int, object]) -> None:
-    """Replace the Exif IFD's Interop pointer in ``fields`` by the Interop IFD it points to.
-
-    The pointer is a file offset into the TIFF, meaningless in the block built from it, so the
-    IFD itself is carried (Pillow writes a dict value as a nested IFD). A pointer to an IFD
-    that is empty or unreadable is dropped rather than left dangling.
-    """
-    if INTEROP_POINTER not in fields:
-        return
-    try:
-        interop = dict(source.get_ifd(INTEROP_IFD))
-    except Exception as error:  # Pillow raises assorted types on a bad offset
-        _log.warning("TIFF Interop IFD cannot be read (%s); dropped", error)
-        interop = {}
-    if interop:
-        fields[INTEROP_POINTER] = interop
-    else:
-        del fields[INTEROP_POINTER]
+    order, entries = _read_entries(strip_prefix(source), frozenset()) if source else (">", [])
+    _apply_d63(entries, order, width, height)
+    return _write_entries(order, entries)
 
 
 def from_tiff(data: bytes) -> bytes | None:
     """Build the EXIF block of a TIFF source from its IFD0, Exif IFD and GPS IFD.
 
-    Pillow opens the file lazily for its tags only, never for pixels. Structural tags, the
-    embedded profile and the XMP, IPTC and Photoshop blobs are left out. The Exif IFD's Interop
+    Raw entry bytes are carried without decoding values or reading pixels. Structural tags,
+    the embedded profile and the XMP, IPTC and Photoshop blobs are left out. The Exif IFD's Interop
     IFD is carried as an IFD, not as the file offset the TIFF stores. An IFD that cannot be read
     is dropped alone (a warning is logged); the others are kept.
 
@@ -172,35 +303,16 @@ def from_tiff(data: bytes) -> bytes | None:
 
     Returns:
         The bare EXIF block, or None when the file has no EXIF-like fields or Pillow cannot
-        read its tags (a warning is logged).
+        read its tags (a warning is logged). BigTIFF is unsupported. D63 field replacement
+        happens subsequently in :func:`edit`.
     """
-    found = False
     try:
-        with Image.open(io.BytesIO(data)) as image:
-            source = image.getexif()
-            built = Image.Exif()
-            built.endian = source.endian  # Pillow writes big-endian when unset
-            try:
-                for tag, value in source.items():
-                    if int(tag) not in _TIFF_STRUCTURE and int(tag) not in IFD_POINTERS:
-                        built[tag] = value
-                        found = True
-            except Exception as error:  # a bad IFD0 entry drops IFD0's fields only
-                _log.warning("TIFF IFD0 fields cannot be read for EXIF (%s); dropped", error)
-            for pointer, label in ((EXIF_IFD, "Exif"), (GPS_IFD, "GPS")):
-                try:
-                    fields = dict(source.get_ifd(pointer))
-                    if pointer == EXIF_IFD:
-                        _materialise_interop(source, fields)
-                    if fields:
-                        built.get_ifd(pointer).update(fields)
-                        found = True
-                except Exception as error:  # a bad pointer drops that IFD only
-                    _log.warning("TIFF %s IFD cannot be read for EXIF (%s); dropped", label, error)
-        if not found:
+        order, entries = _read_entries(data, _TIFF_STRUCTURE | {330})
+        entries = [entry for entry in entries if entry.child is None or entry.child]
+        if not entries:
             return None
-        return strip_prefix(built.tobytes())
-    except Exception as error:  # Pillow raises assorted types on odd TIFF tags
+        return _write_entries(order, entries)
+    except (ValueError, struct.error) as error:
         _log.warning("TIFF tags cannot be read for EXIF (%s); no EXIF carried", error)
         return None
 
