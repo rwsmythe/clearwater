@@ -78,6 +78,14 @@
   fit + one warning (declared / kept); IFD0 raises ONLY on header fault, offset past block, cycle. F-D RULED Limit:
   pointer types followed = 3 / 4 / 13 only; others dropped + warning; class closed. Window figure unstable (258,400 vs
   475,000): the smaller binds the stop line. Round trip PASSED again on 3020648 (268.01 s).
+- **WP4.5 R3 RULED 20:27Z (A R3 1/1/2 on seat 2's head c7c7360; query 5b5028d8, my post + cue). DESIGN GUARD ADOPTED:**
+  F-1 (distinct overlapping child offsets, quadratic 64 KB -> 55 MB) is the third round on the pointer fan-out, so the
+  shape changes: each carried pointer tag (34665 / 34853 in IFD0, 40965 in Exif) followed ONCE per parent, first
+  occurrence, later ones dropped + one warning; at most FOUR tables parsed, so entries <= 4 x len(block) / 12 by
+  construction; child cache removed; sibling same-offset parsed per label (F-2). Global entry budget DECLINED. R2 F-A
+  test rewritten to 'duplicates dropped' (owned). F-4 no change; F7 the only amplification Limit. Lane stays Codex seat
+  2 (119,808 / 258,400). If R4 blocks on this class again: STOP to me with a cap recommendation, no variant N+2 patch.
+  Round trip PASSED on c7c7360 (272.04 s).
 - **(gen 7 history follows; newest facts at the end of the block)**
 - **GEN 7 PICKUP (was).** Orchestrator = **gen 22 `clearwater-orchestrator-20261029-0704`** (online 17:08Z from gen 21's
   state 736e403; gauge 38 ms; gen 21 was `clearwater-orchestrator-20261029-0425`, rolled 17:05Z at ~400K); ALL cues go there. Time the bash launch and record it here. Inbox: drain with `read --role charc --all`
