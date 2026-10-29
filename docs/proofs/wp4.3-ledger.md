@@ -234,6 +234,7 @@ appears in no computed set) and the import-time witness extension (DR-84).
 |---|---|---|---|---|---|---|---|
 | 0 (design) | - | - | - | - | none (no product code) | - | 263,162 at the round-0 yield (cell 1 retired; `scripts/cell_depth.py`) |
 | build (tasks 3-10) | - | - | - | - | product + tests | - | 553,419 at the build yield (cell 2 retired PAST the ~400K stop: the whole build ran in one turn with no yield, so the dispatcher could not read it earlier) |
+| R1 (Reviewer A, `038f02e..99da8aa`) | 0 / 5 / 11 | 16 in / 0 out (R1-5's reachability to be proven on the `main()` path) | 16 new / 0 reopened | 0 | none yet (adjudicating turn; proposed: product + tests) | WSL, codex-cli 0.162.1, `gpt-6.1-sol` high | (dispatcher to fill at the R1 yield) |
 
 ## CHARC round-0 ruling (`fcb2a9205c060013`, 2026-10-29 12:54:46Z, verbatim; it GOVERNS the STOP items above)
 
@@ -321,3 +322,34 @@ Two node IDs renamed with their edits: `test_app_deps.py::test_no_app_module_imp
 - Dispatcher QA at `307d1e6`: 11 commits, 29 files, 0 CR bytes in every changed blob; no file under `interfaces/`, `gui/contract.py`, `gui/analysis_service.py`, `jobs/export_seam.py`, `io/video/` or `config/` changed; `ruff check` clean, `ruff format --check` 280 formatted.
 - Cell 3 runs the REVIEWER A loop (Codex `gpt-6.1-sol` / high, WSL, probe first; runner and prompt shape from `C:\Users\rwsmy\clearwater-review-evidence\wp4.2\r2\`; evidence `...\wp4.3\rN\`) to convergence under the five-round gate, yielding at every verdict BEFORE remediating. After it converges: the window requests (V7 (a)-(f) of record via the S7 driver, the GX011627 V18 leg, DR-44 (c) and DR-50 on real footage), the report's final figures, then the orchestrator's Reviewer B and the ONE gate.
 - Cell 2's flags stand for Reviewer A to weigh: stale `gui/shell.py` docstrings (not granted); the doubled `<name>: <name>:` DR-82 banner (the panel's form); the two renamed node IDs.
+
+## Reviewer A round 1 (cell 3, 2026-10-29; adjudicated, NOT remediated)
+
+- Reviewed `038f02e..99da8aa` minus `docs/proofs` (28 files, 6,704 diff lines); probe first
+  (`READY`, one `succeeded in`). Codex v0.162.1, `gpt-6.1-sol` / high, WSL, read-only; tokens
+  206,419; 38 `succeeded in`; one VERDICT line. ERROR lines are client-side (model-list refresh
+  timeouts, the MCP connector, a websocket connect with HTTP fallback), as in WP4.2 r1/B/B2.
+  Withheld access checked on every command line: clean.
+- Static checks at `99da8aa`: ruff check, ruff format --check (280), mypy strict (146): clean.
+- **Verdict `NEW_CRITICAL_MAJOR_FOUND`: 0 critical, 5 major, 11 minor.**
+  - R1-1 MAJOR: an invalid-UTF-8 journal escapes S6's set-aside (`startup.py:124`). Confirmed.
+  - R1-2 MAJOR: the export runs when its journal entry cannot be recorded (`activity.py:226`);
+    relaxes D85. Confirmed; proposed fix: fail the export readably.
+  - R1-3 MAJOR: the entry is removed while a temporary remains, at the job's end
+    (`activity.py:212`) and at start-up after a failed removal (`startup.py:230`). Confirmed.
+  - R1-4 MAJOR: a CPU render overwrites the remembered GPU backend, so the boundary release skips
+    the GPU plans (`preview.py:557`, DR-68). Confirmed.
+  - R1-5 MAJOR (REASONED): start-up jobs (16.4 s first cache open, encoder detection) can outlive
+    `SHUTDOWN_TIMEOUT_S`; their callbacks have no closed guard (DR-44 (c)). Reachability on the
+    real `main()` path to be reproduced before the fix.
+  - R1-6..R1-16 MINOR: chore/task ordering (6), a late retarget undone at publication (7), every
+    adapter retained (8), `limit_bytes()` not refusing after a failed open (9), `idle()` during a
+    chore (10), export after a release timeout (11), V7 workloads unwitnessed (12), V8 video leg
+    without p99 (13), the S-order witness (14), the doubled DR-82 banner (15, ruling needed), the
+    stale shell docstrings (16, ruling needed).
+- Evidence `C:\Users\rwsmy\clearwater-review-evidence\wp4.3\r1\` (prompt, diff, runner,
+  test summary, static, probe, transcript, adjudication, `md5sums.txt`): review.txt
+  `0af6db0a2fb4a1a8aa4c898832ace5fe`, review.stderr.txt `3896b453ffe47a788029022d8872cba8`,
+  adjudication.md `365768b1d2d149c8cd0974014d761162`.
+- Per-finding dispositions: `adjudication.md` in the evidence folder. Yielded to the dispatcher
+  BEFORE any remediation.
