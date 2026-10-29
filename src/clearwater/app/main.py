@@ -24,7 +24,7 @@ from __future__ import annotations
 import logging
 import sys
 from collections.abc import Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from PySide6.QtWidgets import QApplication
 
@@ -76,7 +76,8 @@ class Application:
         journal: The write journal (D85).
         locks: The per-clip locks (DR-62).
         leftovers: What the start-up clean-up removed and could not remove.
-        analyses: Every analysis adapter the timeline built, in order.
+        analysis: The analysis adapter the timeline built last, or None; the earlier ones are
+            not kept (R1-8).
     """
 
     window: MainWindow
@@ -86,7 +87,7 @@ class Application:
     journal: WriteJournal
     locks: ClipLocks
     leftovers: LeftoverReport
-    analyses: list[EngineClipAnalysis] = field(default_factory=list)
+    analysis: EngineClipAnalysis | None = None
     _probe_generation: int = 0
 
     def start_jobs(self) -> None:
@@ -100,6 +101,10 @@ class Application:
         self.catalog.start(window.context)
         self.probe_device()
         window.session.settings_changed.connect(self._on_settings)
+
+    def keep_analysis(self, analysis: EngineClipAnalysis) -> None:
+        """Keep the timeline's latest analysis adapter, dropping the one before (R1-8)."""
+        self.analysis = analysis
 
     def probe_device(self) -> None:
         """Run the graphics-card detection off the interface thread (AD-9, question 5)."""
@@ -168,10 +173,6 @@ def build_application(
     journal = WriteJournal(locations.config_dir)
     leftovers = clean_leftovers(window.session.settings(), journal)
     locks = ClipLocks()
-    analyses: list[EngineClipAnalysis] = []
-    factory = make_analysis_factory(
-        window.session.settings, locks=locks, engine_factory=engine_factory, built=analyses
-    )
     controller = window.controller
 
     def release_device_plans() -> None:
@@ -186,13 +187,6 @@ def build_application(
         release_device_plans=release_device_plans,
     )
     catalog = EncoderCatalog(window)
-    install_parameter_panels(window, dialogs=preset_dialogs)
-    install_timeline(window, factory)
-    install_export_panels(window, exports)
-    install_settings_dialog(
-        window, choosers=choosers, resolve_encoder=resolve_encoder, catalog=catalog
-    )
-    window.show()
     application = Application(
         window=window,
         cache=cache,
@@ -201,8 +195,20 @@ def build_application(
         journal=journal,
         locks=locks,
         leftovers=leftovers,
-        analyses=analyses,
     )
+    factory = make_analysis_factory(
+        window.session.settings,
+        locks=locks,
+        engine_factory=engine_factory,
+        on_built=application.keep_analysis,
+    )
+    install_parameter_panels(window, dialogs=preset_dialogs)
+    install_timeline(window, factory)
+    install_export_panels(window, exports)
+    install_settings_dialog(
+        window, choosers=choosers, resolve_encoder=resolve_encoder, catalog=catalog
+    )
+    window.show()
     application.start_jobs()
     return application
 

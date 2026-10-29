@@ -14,7 +14,9 @@ taken around the engine's job, cancellably.
 
 from __future__ import annotations
 
+import gc
 import threading
+import weakref
 from collections.abc import Iterator
 from dataclasses import replace
 from fractions import Fraction
@@ -294,6 +296,48 @@ def test_retarget_after_the_run_returned_is_false_and_clears_completion(tmp_path
     assert adapter.statistics(rig.frames[0].pts_ticks) is None
 
 
+def test_a_retarget_after_the_job_returned_is_not_undone_at_publication(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """R1-7: a retarget between the job's return and the run's end leaves no statistics."""
+    rig = Rig(tmp_path)
+    parked, resume = threading.Event(), threading.Event()
+    real_release = rig.locks.release
+
+    def release(key: Any) -> None:  # the run's last step before it publishes
+        parked.set()
+        assert resume.wait(10)
+        real_release(key)
+
+    monkeypatch.setattr(rig.locks, "release", release)
+    adapter = rig.adapter()
+    thread, box = run_in_thread(adapter, params())
+    assert parked.wait(30)
+    assert adapter.retarget(params(strength=0.3)) is False  # the job has returned
+    resume.set()
+    thread.join(30)
+    assert box == {} and not thread.is_alive()
+    assert adapter.statistics(rig.frames[0].pts_ticks) is None
+
+
+def test_the_factory_keeps_no_adapter_without_on_built(tmp_path: Path) -> None:
+    """R1-8: the factory holds no adapter it built; the caller decides what it keeps."""
+    rig = Rig(tmp_path)
+
+    class Source:
+        path = rig.path
+        probe = rig.probe
+
+    class Engines:
+        cache = rig.cache
+        select_backend = staticmethod(rig.select)
+
+    factory = make_analysis_factory(lambda: rig.settings, locks=rig.locks)
+    ref = weakref.ref(factory(Source(), rig.method, Engines()))
+    gc.collect()
+    assert ref() is None
+
+
 def test_a_retarget_before_the_engine_job_starts_is_absorbed(tmp_path: Path) -> None:
     """While the run waits for the clip's lock the change is taken: the run starts with it."""
     rig = Rig(tmp_path)
@@ -453,7 +497,7 @@ def test_the_factory_reads_live_settings_and_needs_the_applications_cache(
         locks=rig.locks,
         engine_factory=rig.engine_factory,
         source_for=rig.source_for,
-        built=built,
+        on_built=built.append,
     )
     adapter = factory(Source(), rig.method, Engines())
     assert built == [adapter] and rig.engines == []

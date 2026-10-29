@@ -322,13 +322,13 @@ class EngineClipAnalysis:
                     return
             result = job(_Reporter(progress, self._refresh_pts))
             with self._engine_lock, self._lock:
+                # Published with the phase, so a retarget after this point (phase "post")
+                # clears it and nothing later sets it again from a stale snapshot (R1-7).
                 self._phase = "post"
-                kept = self._kept is not None
+                self._complete = result.ok and self._kept is None
         finally:
             self._locks.release(key)
         if result.ok:
-            with self._lock:
-                self._complete = not kept
             return
         if result.failure == ANALYSIS_CANCELLED:
             return
@@ -419,7 +419,7 @@ def make_analysis_factory(
     locks: ClipLocks,
     engine_factory: EngineFactory = AnalysisEngine,
     source_for: Callable[[ArrayBackend | None], VideoSource] = composition.video_source,
-    built: list[EngineClipAnalysis] | None = None,
+    on_built: Callable[[EngineClipAnalysis], None] | None = None,
 ) -> Callable[[AnalysedSource, CorrectionMethod, AnalysisEngines], EngineClipAnalysis]:
     """Return the GUI's analysis factory over WP3.11's engine (``install_timeline``'s argument).
 
@@ -428,8 +428,8 @@ def make_analysis_factory(
         locks: The per-clip locks shared with the export wrapper.
         engine_factory: Builds each engine (tests hold a run with it).
         source_for: Builds an engine's frame source from its device backend.
-        built: When given, every adapter the factory builds is appended (tests and the V7
-            driver read the adapter of the open clip).
+        on_built: When given, called with each adapter the factory builds (the application
+            keeps the latest one only, for its tests and the V7 driver; R1-8).
 
     Returns:
         The factory: ``(source, method, engines) -> EngineClipAnalysis``. It builds only (main
@@ -457,8 +457,8 @@ def make_analysis_factory(
             engine_factory=engine_factory,
             source_for=source_for,
         )
-        if built is not None:
-            built.append(analysis)
+        if on_built is not None:
+            on_built(analysis)
         return analysis
 
     return factory

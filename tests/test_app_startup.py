@@ -18,11 +18,13 @@ GUI files. Headless on ``offscreen``, app data under ``tmp_path``.
 
 from __future__ import annotations
 
+import gc
 import json
 import os
 import subprocess
 import sys
 import threading
+import weakref
 from collections.abc import Callable, Iterator
 from pathlib import Path
 from typing import Any
@@ -126,9 +128,29 @@ def wait_analysis(
 
 
 def latest_analysis(application: Application) -> EngineClipAnalysis:
-    """The adapter the timeline built last."""
-    assert application.analyses, "no analysis was built"
-    return application.analyses[-1]
+    """The adapter the timeline built last (the only one the application keeps, R1-8)."""
+    assert application.analysis is not None, "no analysis was built"
+    return application.analysis
+
+
+@pytest.mark.gui
+def test_the_application_keeps_only_the_latest_analysis(make_app, qtbot, tmp_path, sample) -> None:
+    """R1-8: opening a second clip leaves the first clip's adapter to the garbage collector."""
+    application = make_app(cpu_settings())
+    wait_started(qtbot, application)
+    clips = []
+    for name in ("a.mp4", "b.mp4"):
+        clip = tmp_path / name
+        clip.write_bytes(sample("vid-hevc8-bt709-full").read_bytes())
+        clips.append(clip)
+    open_source(qtbot, application, clips[0])
+    wait_analysis(qtbot, application)
+    first = weakref.ref(latest_analysis(application))
+    open_source(qtbot, application, clips[1])
+    wait_analysis(qtbot, application)
+    assert latest_analysis(application)._path == clips[1]
+    gc.collect()
+    assert first() is None
 
 
 # python -m clearwater
