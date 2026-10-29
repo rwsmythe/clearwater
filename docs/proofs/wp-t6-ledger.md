@@ -22,7 +22,8 @@ the evaluation and re-seat lines. Turn 1's figures were supplied at turn 2.
 | Seat 2 turn 2 (ledger turn 7), W2 controls ruling | 164,768 | 101,282 | 258,400 | Dispatcher generation 20 at seat 2 turn 3; committed as `13a5fe6` |
 | Seat 2 turn 3 (ledger turn 8), cuts / import-scope STOP | 215,059 | 122,744 | 258,400 | Dispatcher generation 20 at seat 2 turn 4; turn-8 changes remained uncommitted for this turn's per-file handoff |
 | Seat 2 turn 4 (ledger turn 9), import grant / W3 script | 247,499 | 152,719 | 258,400 | Dispatcher generation 20 at seat 2 turn 5; R1 `1f86873`, R2-R3 `a2420fc`, R4 `5520ee4`, R5-R7 `7970d0b`, ledger `89f9500` |
-| Seat 2 turn 5 (ledger turn 10), W3 results / rung 4 request | Pending dispatcher | Pending dispatcher | 258,400 | Figures to be supplied by the dispatcher at the next turn |
+| Seat 2 turn 5 (ledger turn 10), W3 results / rung 4 request | 279,339 | 183,073 | 258,400 | Dispatcher generation 20 at seat 2 turn 6; committed as `b540844` |
+| Seat 2 turn 6 (ledger turn 11), collections / W4 results / report | Pending dispatcher | Pending dispatcher | 258,400 | Report and ledger only; figures to be supplied by the dispatcher |
 
 ## RESUME HERE (seat 2; written by the dispatcher, generation 20, 2026-10-29 ~12:12Z)
 
@@ -438,6 +439,113 @@ Verification loop: W3's saved main/delta/control/cleanup JSON and concise log
 summaries confirm rung 3. The new scripts compile and pass targeted synthetic
 checks, including a passing sink assertion at 680 that the W4 observer rejects.
 Rung 4 remains open until the real collection identities and W4 are returned.
+
+## Candidate collections -- DONE
+
+The dispatcher ran `bash work/wp-t6/cand-collect.sh`, MD5
+`07744aa8ee2eebafacfd15ae78c6f751`. It ended `CAND COLLECTION DONE`,
+EXIT 0. `work/wp-t6/cand-collection-summary.json` records pytest 8.4.2 and
+completion at 2026-10-29 13:06:30.821536Z. The four node-ID-only files are
+`cand-all.txt`, `cand-parallel.txt`, `cand-serial.txt`, `cand-fullclip.txt`.
+
+| Set | Observed count | Collection EXIT |
+|---|---:|---:|
+| All | 6,457 | 0 |
+| Amended parallel | 5,313 | 0 |
+| Amended serial | 1,137 | 0 |
+| Fullclip | 7 | 0 |
+
+The summary confirms no duplicates, pairwise-disjoint parallel/serial/fullclip
+sets, and **parallel + serial + fullclip = all**. Fullclip is exactly the six
+`[full]` forms (R1-R3, R5-R7) and R4's `[first30]`. Against the base:
+
+- ALL removes exactly the seven unsuffixed CUT IDs and adds their fourteen
+  suffixed forms plus the rung-2 parity test.
+- SERIAL removes exactly those same seven and adds the seven gate forms
+  (`[trim]` / `[first6]`) plus parity.
+- PARALLEL is unchanged.
+
+This is the actual pytest 8.4.2 collection proof of fixture-parameter marks;
+the earlier synthetic identity checks and predicted counts are superseded by
+the seat evidence. Decode's module-scoped fixtures rebuild per session source
+parameter as intended. No additional marker change was needed.
+
+## W4 -- DONE; rung 4 CLOSED
+
+The dispatcher ran `bash work/wp-t6/w4.sh`, MD5
+`16847bf19ddb53f9cc88f018fc9b8ad5`, after collection passed. The window
+record `work/wp-t6/w4/00-window.json` starts at
+2026-10-29 13:06:46.706213Z with 11,047,211,008 available bytes, above the
+5 GiB floor. The exact pytest invocation with temporary runtime observer is
+in the preceding W4 plan; it ran once, serially, with `-m fullclip`,
+`--durations=0` and `--junitxml=work/wp-t6/w4/w4-fullclip.xml`.
+
+`01-fullclip.log` reports **7 passed, 6450 deselected, 1 warning in
+1556.05 s**, EXIT 0. `02-fullclip-check.json` verifies seven passing calls,
+no failures/skips, the full sink's actual
+`run.report.frames_written == frames` assertion with both operands 681, and
+zero `gx011627_trim` fixture setups. Verification ended 13:32:43.746701Z.
+
+Times below are from `w4-fullclip.xml` and the log's duration lines. JUnit
+includes teardown; setup below the display threshold is "not listed", not
+assumed exactly zero. The shared standard encode setup is charged once to
+the sink, and the independent decoder reference setup once to R5.
+
+| Full form | Displayed setup s | Displayed call s | JUnit total s |
+|---|---:|---:|---:|
+| R1 engine `[full]` | Not listed | 445.65 | 445.748 |
+| R2 levels `[full]` | Not listed | 327.71 | 327.713 |
+| R3 sink `[full]` | 163.24 | 60.30 | 223.542 |
+| R4 round trip `[first30]` | 0.01 | 167.28 | 167.290 |
+| R5 decode `[full]` | 42.94 | 107.31 | 150.251 |
+| R6 forced default pipe `[full]` | Not listed | 135.28 | 135.280 |
+| R7 CUDA `[full]` | Not listed | 104.02 | 104.019 |
+| Sum of JUnit totals | | | 1,553.843 |
+
+`03-cleanup.json` ends at 13:32:45.218973Z, records stage 2 complete,
+steps/cleanup EXIT 0, removes both `w4-scratch` and `w4-fullclip`, and verifies
+empty test status plus `git diff --quiet`. The dispatcher reports `W4 DONE`.
+Only JSON/log/XML evidence remains. No trim was made by the full forms.
+These are package-window proof figures, never a V16 row or the AFTER gate.
+Collections and W4 satisfy rung 4; **rung 4 is CLOSED**.
+
+## Seat 2 turn 6 -- report written; review and gate pending
+
+Added `docs/reports/wp-t6-gate-sizing.md` from saved evidence only. It covers
+the seven CUT and 31 KEEP rows, preserved assertions and ruled count operands,
+W1 estimates versus W3/W4 measurements (with setup separated), trim rules and
+checks, R2's chain, R4 figures at every candidate and at 30 plus signed margins,
+row 10's banked tools lever, collection identities, W2-W4 controls and limits.
+The six-name V4 delta and its two reasons are explicit, including CHARC's
+required sentence about the three best-effort items exercised only by fullclip.
+The report carries accept actions for CHARC and a clearly pending AFTER table.
+
+Verification loop: compared saved W3/W4 JUnit times with displayed duration
+phases. Confirmed that setup ownership moved between sink/levels and must be
+charged once; report tables distinguish setup/call from totals with teardown.
+Confirmed collection identities, the observed 681 sink operands, lazy full
+fixture (zero trim setups), and cleanup in the saved JSON. No new footage,
+GPU, collection, benchmark or pytest run occurred in this cell turn. Report
+figures cite their saved source paths; historical baseline/map figures cite
+the brief's recorded source, since the original baseline log is not copied
+into this worktree. No metadata value, digest or footage path was copied.
+
+| Turn-6 static check | Result / evidence |
+|---|---|
+| `uv run ruff check .` | PASS, EXIT 0, `All checks passed!`; `work/wp-t6/seat2-turn6-ruff.log`; uv ignored the inherited main-tree virtualenv and used this project's environment |
+| `git diff --check` | PASS, EXIT 0; `work/wp-t6/seat2-turn6-diff-check.log`; Git's future CRLF-conversion notice does not change the current LF blobs |
+| Report evidence / scope / LF proof | PASS, EXIT 0; `work/wp-t6/seat2-turn6-doc-proof.log`; seven CUT and 31 KEEP rows, all W3/W4 JUnit totals, observed collection counts, required Limit sentence, pending AFTER, no digest-like value or absolute Windows path, both blobs LF, only report and ledger changed |
+
+Turn-6 verification disposition: suspected timing-category mismatch CONFIRMED
+as setup attribution plus teardown inclusion, FIXED in the report's labels
+and separate phase table. A suspected full-form trim setup is REJECTED by
+the observer's zero setup count. The final evidence/scope pass found nothing
+new. No product/test-code fix or new acceptance deviation was required.
+
+Reviewer A (dispatcher-run Claude FAST pass), Reviewer B and the ONE final
+two-leg gate remain pending. No convergence, gate PASS or Q6 saving verdict
+is claimed. The next review findings are adjudicated under the fill's round
+policy and recorded in the cumulative review-round ledger.
 
 ## Rung 0 facts (2026-10-29)
 
@@ -931,7 +1039,7 @@ pending and are not validation results.
 | W2 run 3 | 2026-10-29 12:23:16Z (dispatcher; window record 12:23:17.480106Z) / 12:24:30.353107Z | `bash work/wp-t6/w2.sh` | Parity 1 passed in 3.57 s; guard 60 passed in 41.55 s; both controls caught; W2 DONE, EXIT 0; cleanup EXIT 0 | 10,016,727,040 bytes in window record | `work/wp-t6/w2/`; script MD5 `e97c51289cb85137cf5553619970cf31`; scratch removed, no trim left |
 | W3 run 1 | 2026-10-29 12:42:26.485311Z / 12:48:00.365103Z | `bash work/wp-t6/w3.sh` | 8 passed in 322.26 s; stage 2 STOP on reference-path slip; controls not run; stage EXIT 1, cleanup EXIT 0 | 10,686,595,072 bytes | `work/wp-t6/w3-run1/`; scratch removed, tests/diff clean and bytes unchanged |
 | W3 run 2 | 2026-10-29 12:50:55.706810Z / 12:56:23.544816Z | `bash work/wp-t6/w3.sh` | 8 passed in 258.91 s; one standard encode; V4 branch (i); both controls caught; W3 DONE EXIT 0, cleanup EXIT 0 | 11,001,569,280 bytes before window; 10,989,305,856 before main pytest | `work/wp-t6/w3/`; script MD5 `0dd11553112ae203b95a0952c9485f96`; scratch removed, tests/diff clean and bytes unchanged |
-| W4 (requested, about 27 min) | Pending dispatcher | `bash work/wp-t6/w4.sh` (after `bash work/wp-t6/cand-collect.sh` passes) | Pending seven full passes and observed sink operands 681 | Script records bytes; >= 5 GiB required | `work/wp-t6/w4/`; script MD5 `16847bf19ddb53f9cc88f018fc9b8ad5`; collect script MD5 `07744aa8ee2eebafacfd15ae78c6f751` |
+| W4 | 2026-10-29 13:06:46.706213Z / 13:32:45.218973Z | `bash work/wp-t6/w4.sh` (after candidate collections passed) | 7 passed, 6450 deselected, 1 warning in 1556.05 s; W4 DONE, pytest/cleanup EXIT 0; observed both sink operands 681; zero trim setups | 11,047,211,008 bytes | `work/wp-t6/w4/`; script MD5 `16847bf19ddb53f9cc88f018fc9b8ad5`; scratch/basetemp removed, tests/diff clean |
 
 ## Review-round ledger
 
