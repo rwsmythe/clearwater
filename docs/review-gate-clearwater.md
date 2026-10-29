@@ -129,6 +129,12 @@ the brief.
      envelope -> BANKED in `docs/debt-register.md` with file:line, mechanism and
      reachability. A second blocking B is adjudicated by irreversibility at the
      gate seat, never a third remediation in the same package.
+   - **Order (owner, 2026-10-29, after WP4.2's suite ran twice):** ONE full two-leg
+     gate per package, run on the FINAL candidate AFTER Reviewer A has converged and
+     Reviewer B has returned (clean, or its single remediation and re-run done). A
+     full-suite run before B is development evidence, not the gate, and gets no
+     window; during the build the cell runs the touched files and the markers it
+     needs. B is light and read-only, so it precedes the suite.
    - **Record:** B's transcript on THE TREE BEING MERGED (path, md5, the five
      assertion results, verdict) is named in the accept record. No transcript, no
      accept.

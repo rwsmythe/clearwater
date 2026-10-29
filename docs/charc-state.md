@@ -182,6 +182,16 @@
   under work/wp4.2/b-remediation, DR-74's case, builder test), ONE B re-run, then the orchestrator's OWN two-leg gate on the final
   candidate (identity with the 401521e suite is broken). Bare-cd SLIP into `.worktrees/wp4.2-mc` acknowledged (read-only, both
   trees clean). **NEXT: remediation commit(s), A R2, B re-run, new gate (~52 min, OPEN to me), accept record, HOLD, ff.**
+- **OWNER 2026-10-29 ~09:00-09:05Z (in chat): asked why the suite is so long and why it runs more than once per package;
+  CHARC answered (eight whole-clip fidelity tests = 1,735 of 2,937 s; sequencing put the suite before Reviewer B in WP4.2, my
+  concurrence); owner: "let's commission that change".** DONE: (1) fill Part 2 new **Order** bullet = ONE full gate per
+  package AFTER A converged and B returned (WP4.2's second suite is that one gate); (2) **AD-30** gate tests sized by the
+  property proved (floors: lead 61 frames for steady-state/release/D87; six frames otherwise; 1080p unless the subject is the
+  large-frame path; GX011627 as a stream-copied ~3 s trim per session; full-clip forms behind a marker both legs exclude);
+  (3) **WP-T6 COMMISSIONED** to the orchestrator (brief drafted at its seat for my ruling, as WP-T5; tests + pyproject markers
+  only; rung 1 measures, rung 3 cuts with every assertion kept or its loss ruled; target serial leg < 900 s, two-leg ~25 min;
+  Codex-eligible, Codex pace 0.51 at 09:11Z; dispatch AFTER WP4.2's ff because the owned test files overlap). At WP-T6's
+  accept, mine: fill two-leg command + marker exclusion, CLAUDE.md gate paragraph, AD-28 figures.
 - **(history) After WP4.1's accept:** WP4.2's brief (DRAFT RULED on main 3aa3c51) got ONE revision pass against WP4.1's accept record, then FINAL
   on CHARC's word; its revision must carry: DR-78/79 (B2 rows) as WP4.2 items, the WP4.1 runner's final names and the stream-syntax
   predicate, the Limit text. WP4.3's revision later carries DR-75 (REQUIRED test under its Q12), DR-76, DR-77, and the AD-23 'applied by
