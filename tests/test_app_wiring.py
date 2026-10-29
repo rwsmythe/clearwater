@@ -438,10 +438,59 @@ def test_g10_dr82_the_single_export_of_a_refused_name_says_to_rename_it(
     application.window.shell_actions.export.trigger()
     qtbot.waitUntil(lambda: not export.is_running(), timeout=60000)
     errors = [m for m in presenter(application).of("error") if m.owner == "export"]
-    assert len(errors) == 1
-    assert RENAME_TEXT.format(name=source.name) in errors[0].text
-    assert "rename the file" in errors[0].text and source.name in errors[0].text
+    assert len(errors) == 1  # item 2 of ruling 68d5b4c7: the panel's final text, the name once
+    assert errors[0].text == (
+        f"{source.name}: this file name cannot be used for an output file; rename the file."
+    )
     assert list(out.iterdir()) == []
+
+
+@pytest.mark.parametrize("kind", ["photo", "video"])
+def test_g10_dr82_the_wrappers_refusal_on_every_os(
+    make_app, qtbot, sample, tmp_path, monkeypatch, kind
+) -> None:
+    """Ruling 68d5b4c7: the PORTABLE form, ``final_output_path`` planted to refuse the name.
+
+    The NTFS-stream test above is the real-name proof on Windows; this one proves the wrapper's
+    branch on every OS: the panel's text names the source once, the engine never runs, nothing
+    is written.
+    """
+    from clearwater.app import activity
+    from clearwater.jobs import OutputNameError
+
+    out = tmp_path / "out"
+    out.mkdir()
+    source = sample("jpeg-gradient-srgb" if kind == "photo" else CLIP)
+    application = started(make_app, qtbot, cpu_settings(output_folder=out))
+    open_source(qtbot, application, source)
+    if kind == "video":
+        wait_analysis(qtbot, application)
+
+    def refuse(path: Path, settings: Settings, media: Any) -> Path:
+        raise OutputNameError("planted")
+
+    ran: list[str] = []
+    real_job = application.exports._engine.job
+
+    def job(request: Any) -> Any:
+        inner = real_job(request)
+
+        def run(progress: Any) -> Any:
+            ran.append("engine")
+            return inner(progress)
+
+        return run
+
+    monkeypatch.setattr(activity, "final_output_path", refuse)
+    monkeypatch.setattr(application.exports._engine, "job", job)
+    export = panel(application, ExportPanel)
+    application.window.shell_actions.export.trigger()
+    qtbot.waitUntil(lambda: not export.is_running(), timeout=60000)
+    errors = [m for m in presenter(application).of("error") if m.owner == "export"]
+    assert [m.text for m in errors] == [
+        f"{source.name}: this file name cannot be used for an output file; rename the file."
+    ]
+    assert ran == [] and list(out.iterdir()) == []
 
 
 def test_g10_dr82_a_batch_item_with_a_refused_name_is_failed_and_skipped(
@@ -457,8 +506,7 @@ def test_g10_dr82_a_batch_item_with_a_refused_name_is_failed_and_skipped(
     qtbot.waitUntil(lambda: not batch.is_running(), timeout=120000)
     items = batch.items()
     assert [i.state for i in items] == [ItemState.FAILED, ItemState.FAILED, ItemState.DONE]
-    assert items[0].failure == RENAME_TEXT.format(name=photo.name)
-    assert items[1].failure == RENAME_TEXT.format(name=video.name)
+    assert items[0].failure == RENAME_TEXT and items[1].failure == RENAME_TEXT
     assert [p.name for p in out.iterdir()] == ["jpeg-gradient-srgb_corrected.png"]
 
 

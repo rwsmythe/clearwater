@@ -8,7 +8,7 @@ implements the WP3.19 ``ExportJobs`` seam over the export engine; its job callab
 worker, in this order:
 
 1. DR-82: ``jobs.naming.final_output_path`` for the source. An ``OutputNameError`` is a failed
-   result naming the source and saying to rename the file, before the engine reads or probes;
+   result saying to rename the file (the panel names the source), before any read or probe;
    any other error is left to the engine's own text.
 2. The journal entry of the destination folder (D85), before any temporary can exist. A journal
    that cannot be written fails the export readably, before the engine reads or probes and
@@ -51,8 +51,11 @@ WAITING_TEXT = "Waiting for the other job on this clip"
 OPENING_CACHE_TEXT = "Opening the analysis cache"
 """What a video job waiting for the start-up's cache open reports (ruling S1 (a))."""
 
-RENAME_TEXT = "{name}: this file name cannot be used for an output file; rename the file."
-"""The failed item's text for a source whose name gives no portable output name (DR-82, Q22)."""
+RENAME_TEXT = "this file name cannot be used for an output file; rename the file."
+"""The failed item's text for a source whose name gives no portable output name (DR-82, Q22).
+
+The panels name the source beside it (the export panel prefixes ``<name>: ``, the batch report
+lists the item), so the text carries no name of its own (ruling 68d5b4c7, item 2)."""
 
 JOURNAL_FAILED_TEXT = (
     "the export was not started because its clean-up record could not be written in {folder} "
@@ -201,7 +204,7 @@ class GuardedExports:
         try:
             folder = final_output_path(request.source, request.settings, kind).parent
         except OutputNameError:
-            failure = RENAME_TEXT.format(name=name)
+            failure = RENAME_TEXT
             _LOG.info("export %s: refused before reading; %s", name, failure)
             return JobResult(False, (), (), failure, "none", time.perf_counter() - started)
         except (ValueError, OSError):

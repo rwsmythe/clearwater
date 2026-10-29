@@ -142,10 +142,8 @@ def test_a_refused_output_name_fails_before_any_read_or_probe(
     source = tmp_path / ("carrier:input.jpg" if kind == "photo" else "carrier:clip.mp4")
     result = rig.exports.job(request(source, rig.out, kind))(StubProgress())
     assert not result.ok
-    assert result.failure == RENAME_TEXT.format(name=source.name)
-    assert result.failure == (
-        f"{source.name}: this file name cannot be used for an output file; rename the file."
-    )
+    assert result.failure == RENAME_TEXT
+    assert result.failure == "this file name cannot be used for an output file; rename the file."
     assert touched == [] and rig.events == [] and rig.journal.entries() == ()
     assert list(rig.out.iterdir()) == []
 
