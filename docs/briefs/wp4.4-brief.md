@@ -1,6 +1,6 @@
-# WP4.4 -- .MOV input (dispatch brief, DRAFT)
+# WP4.4 -- .MOV input (dispatch brief, FINAL)
 
-**Status:** DRAFT 2026-10-29 by a drafting helper for the orchestrator, from CHARC's commission
+**Status:** FINAL on CHARC `197131faf8764ebd` (2026-10-29T17:45:52Z; its Rulings, verbatim at the end, GOVERN the Questions). Drafted 2026-10-29 by a drafting helper for the orchestrator, from CHARC's commission
 `4096c6d3b96cee21` (saved at `C:\Users\rwsmy\clearwater-review-evidence\wp4.4\commission-4096c6d3.md`;
 its WP4.4 paragraph, carried verbatim below, governs this brief). CHARC rules this draft. Spec
 v0.5.7 (no further spec change). Anchors read at main `922aaa5`; RE-LOCATE every line number at
@@ -13,9 +13,9 @@ round 0 on the dispatch base (WP4.3a edits `tools/headless_export.py` and `io/vi
 | Tier and nets | Tier **STRONG** (product code). Reviewer A = the Claude pass, `scripts/codex_cell.py review` (`claude -p --model opus --effort high`, read-only), between turns, to convergence, five-round gate (`docs/review-gate-clearwater.md` Part 1). Reviewer B = the Claude pass at the orchestrator's seat (Part 2). Evidence `C:\Users\rwsmy\clearwater-review-evidence\wp4.4\rN\`, `reviewB\`. |
 | Base, worktree | Base = main at dispatch, **only AFTER WP4.3a's accept on main** (it owns `tools/headless_export.py` and `io/video/` until then). Worktree `.worktrees/wp4.4`, branch `wp4.4`. Does not displace WP4.3 / WP4.3a (commission). |
 | Gate | The standard two-leg gate at the orchestrator's seat (`docs/review-gate-clearwater.md:171-172`): `-n 4 -m "not gpu and not footage and not gui and not slow and not fullclip"`, then `-m "(gpu or footage or gui or slow) and not fullclip"`. No fullclip leg. Every new test is parallel-leg except the ONE `footage` test (serial leg; reason beside its marker: reads owner footage). |
-| Goal | An iPhone `.MOV` opens in the GUI and the runner as a video, and exports to `<stem>_corrected.mp4` with V4's MANDATORY and REQUIRED items SAME, with no change to `io/video/`. |
-| Files owned | `src/clearwater/gui/sources.py` (`VIDEO_SUFFIXES` and its docstring only); `src/clearwater/jobs/naming.py` (the video extension rule in `_base_plan` and the docstrings that state it); `tools/headless_export.py` (its `VIDEO_SUFFIXES` and docstring only); `tests/test_jobs_naming.py` (new tests; `:64-66` per Q1); `tests/test_gui_open.py` (`:93`, `:109` per Q1); NEW `tests/test_wp44_mov_input.py`; `docs/reports/wp4.4-mov-input.md`; `docs/proofs/wp4.4-ledger.md`. |
-| NOT owned | `src/clearwater/io/video/` (all of it; Q2), `src/clearwater/interfaces/` (IF-1..IF-10 FROZEN), `src/clearwater/jobs/export.py`, `gui/` beyond `sources.py`, `app/`, `tools/video_fidelity.py`, `tools/container_spike/`, `tools/local_config.py`, `tests/conftest.py`, `tests/fixtures/`, every other existing test, `pyproject.toml`, `uv.lock`, the spec, the register. |
+| Goal | An iPhone `.MOV` opens in the GUI and the runner as a video, and exports to `<stem>_corrected.mp4` with V4's MANDATORY and REQUIRED items SAME; the only `io/video/` change is `encode.py`'s data-track map (ruled Q2). |
+| Files owned | `src/clearwater/gui/sources.py` (`VIDEO_SUFFIXES` and its docstring only); `src/clearwater/jobs/naming.py` (the video extension rule in `_base_plan` and the docstrings that state it); `tools/headless_export.py` (its `VIDEO_SUFFIXES` and docstring only); `src/clearwater/io/video/encode.py` (the data-track map ONLY, as ruled Q2: an explicit allowlist constant of MP4-carried data-track tags beside the `tmcd` exclusion); `tests/test_jobs_naming.py` (new tests; `:64-66` per Q1); `tests/test_gui_open.py` (`:93`, `:109` per Q1); NEW `tests/test_wp44_mov_input.py`; `docs/reports/wp4.4-mov-input.md`; `docs/proofs/wp4.4-ledger.md`. |
+| NOT owned | `src/clearwater/io/video/` beyond `encode.py`'s data-track map (ruled Q2), `src/clearwater/interfaces/` (IF-1..IF-10 FROZEN), `src/clearwater/jobs/export.py`, `gui/` beyond `sources.py`, `app/`, `tools/video_fidelity.py`, `tools/container_spike/`, `tools/local_config.py`, `tests/conftest.py`, `tests/fixtures/`, every other existing test, `pyproject.toml`, `uv.lock`, the spec, the register. |
 | Done | Plan 4.5; ruff check, ruff format --check, mypy strict; Reviewer A converged; Reviewer B returned; the two-leg gate green; report and ledger written; the 5.2 and 8.3 lines quoted in the report. No harness gate. |
 
 ## The commission (CHARC `4096c6d3b96cee21`, its WP4.4 paragraph and scope, verbatim)
@@ -49,7 +49,7 @@ Gate: standard two-leg at your seat.
 
 ## Locks
 
-No frozen interface; no `io/video/` edit (Q2 is a STOP); no new dependency; no OS-specific code.
+No frozen interface; `io/video/` only as ruled Q2 (`encode.py`'s data-track allowlist; one attempt, deterministic, no probe-and-retry; anything beyond it is a STOP); no new dependency; no OS-specific code.
 The 8.3 rule only: `.mov` in any case maps to lower-case `.mp4`; every other video suffix is kept
 exactly (`.MP4` stays `.MP4`). Collision numbering, the source guard, the temporary marker and the
 DR-80 name check unchanged and applied to the mapped name. Refusal texts unchanged. Nothing
@@ -96,7 +96,8 @@ fidelity record or the source's tags.
 6. **The footage test (serial leg)** in the same file: `@pytest.mark.footage` with its reason;
    `find_footage_file("IMG_6702")` through the skip-only-when-absent pattern; the runner as in
    step 5 with `--record`; assert exit 0, the one output `IMG_6702_corrected.mp4`, the record's
-   item `done`, V4 as in step 5, `video frame count` 15. RUN REQUEST it; never run it at the cell.
+   item `done`, V4 as in step 5, `video frame count` 15, and the display orientation item SAME,
+   named in the assertion so the record shows it (ruled: its first proof on rotated input). RUN REQUEST it; never run it at the cell.
 7. **Report and ledger.** `docs/reports/wp4.4-mov-input.md`: the 5.2 and 8.3 lines quoted; the
    rule and where it sits; RED/GREEN node ids; the round-0 and footage evidence (format facts
    only); the best-effort items `not_carried` lists for IMG_6702 (names only); a "for CHARC" line
@@ -116,7 +117,7 @@ The footage test reads 0.5 s of owner footage read-only, CPU only; serial leg.
 
 ## STOP for
 
-Any `io/video/` change (Q2); any existing test change beyond Q1's edits; any edit outside
+Any `io/video/` change beyond ruled Q2's data-track allowlist; any existing test change beyond Q1's edits; any edit outside
 the owned list; a change to any name a `.mp4` or photo source plans today; a frozen interface; a
 dependency; any write under the footage folder; a choice this brief leaves open.
 
@@ -170,3 +171,20 @@ each lock honoured on disk, the removed and added node ids (Q1), and any deviati
   iPhone clip). IMG_6702's video edit list has media_time 0 with negative ctts. Recommended: the
   report records the edit-list rows of the footage V4 record as evidence; CHARC rules any DR-15
   closure at the accept, not the cell. Alternative: leave DR-15 untouched by this package.
+
+## Rulings (CHARC `197131faf8764ebd`, 2026-10-29T17:45:52Z, verbatim; they GOVERN the Questions above)
+
+PRIMARY: CHARC. Ruling on query 22bb1c4f585de77e: WP4.4 brief DRAFT `brief-wp4.4` 7852664 read in full at this seat. **FINAL on your word once the five answers below are folded in.** The draft is good; the helper's anchors and the seat evidence are what I would have asked for.
+
+- **Q1 = (a).** OWNED for exactly those edits: `test_jobs_naming.py:64-66` -> `clip_corrected.mp4` plus the new case-preservation test (`clip.Mp4` -> `clip_corrected.Mp4`); `test_gui_open.py:109` -> `("a.mov", "video")` + an `a.MOV` row; `:93` gains `*.mov`. The removed node id is explained in the collection diff. My commission's "every existing naming test unchanged" was wrong against 8.3; this ruling corrects it.
+- **Q2 = GRANT `io/video/encode.py` data-track map ONLY, as recommended**, effective when WP4.3a's accept is on main (the dispatch already waits). Form: an explicit allowlist constant in `encode.py` of data-track codec tags the MP4 muxer carries and the sink is proved on (the HERO13 set as mapped today, by name), beside the existing `tmcd` exclusion; a track outside it is NOT mapped, is reported through the existing `not_carried` path as "data track <tag>", best-effort under D105, and the report names it as a known limitation; the probe-and-retry form is NOT wanted (one attempt, deterministic). RED test: the footage test is the witness for `mebx` (FFmpeg cannot author one; say so), AND one unit test on the allowlist logic with a synthetic tag name (no FFmpeg) so the parallel leg covers the branch. Privacy point concurred: the dropped Core Media tracks stay out of the output, the report says so in one line. The brief's Goal line and Locks change from "no change to io/video" to "io/video/encode.py data-track map only"; `io/video/` otherwise NOT owned; a change beyond that line is a STOP.
+- **Q3 = (a).** The house V4 assertion (MANDATORY and REQUIRED SAME, roster SAME, `test_wp42_video_path.py:373-385`); no pixel bound through the runner. The commission's "within the AD-11 bound" was my slip; the brief quotes this correction.
+- **Q4 = (a), narrowed.** DR-15's register NOTE ("no B-frame as-written edit list on the owner's iPhone footage; the reorder is in negative ctts") is MINE at the inventory report's QA, from your seat evidence (all 20 video elst at time 0). WP4.4's report adds IMG_6702's rows as corroboration only; the row stays OPEN on its original trigger; the cell touches no register.
+- **Q5 = (a) OUT, with one report fact:** the two Dolby Vision clips' transfer characteristic. If it is HLG or PQ, spec 5.3 REFUSES them with a clear message and that is correct behaviour (name the clips, the tag, and the refusal text in the report, no other value); if SDR-tagged with an RPU, the report says the RPU is dropped best-effort (D105) and they are untested here. Either way no second footage test and no register row from the cell; I decide any row at the accept.
+- **Rotation addition CONCURRED:** the qt fixture carries a 180 display rotation and asserts it; display orientation is MANDATORY (D105) and this is its first proof on rotated input. Add to step 6: the footage test asserts the output's display orientation item SAME (it is inside the house roster; name it so the record shows it).
+
+Lane Codex, nets the Claude pass, after WP4.3a's accept: concurred. Fold in, mark FINAL on this message id, commit the brief onto main by pathspec.
+
+Inventory: the orientation-fallback mismatch (IMG_6703, `original_orientation` None from pillow-heif) and its correction turn noted; I QA the report after your re-run of the corrected probe.
+
+Owner-pending inputs: none. Open owner decisions: Insta360 scope (to be discussed).
