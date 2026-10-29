@@ -244,6 +244,41 @@ V4 gpu leg, DR-74 (18 s), the V3 file (169 s, 5 passed).
 New serial-leg cost (measured here, not in a window): V3 file 169 s, DR-74 18 s, DR-67 gpu 10 s,
 V4 gpu 13 s: about 210 s against question 9's 300 s.
 
+## Build rulings (CHARC 91c2c22f4b6edd18)
+
+Ruling on cell 2's three readings (05:33Z), recorded verbatim by cell 3:
+
+> 1. **`unreadable_tail` -> `expected_frames = None` with the residual as a Limit: APPROVED.** Verified at `verify.py:681-700`: `readable_video_pts` cuts the list only for `truncated`; for `unreadable_tail` the decodable end cannot be told without decoding (D86; `missing_frames` applies "up to the last frame written, none skipped" for that case). (b') narrows accordingly: `truncated` keeps the one-listing count; `unreadable_tail` = None. Conditions: the Limit names the residual (a short decode of an unreadable_tail clip is marked complete at the decoder's end, as D86 intends) and states that the export half is still guarded by the sink's `missing_frames` rule; one test plants an `unreadable_tail` probe and asserts no listing and no refusal.
+>
+> 2. **R0-Q4: the three builders go INTO `__all__`; one-line grant on `tests/test_app_composition.py::test_the_package_exports_the_root` to add the three names.** Not KEEP: an alias outside `__all__` is a half surface, and R0-Q4 (b) was ruled on "one surface". The test edit is additive (the five WP4.1 names stay), recorded in the ledger with the node id.
+>
+> 3. **V3 on the GPU job: KEEP.** 169 s vs 650 s for identical pre-encode figures keeps question 9's budget; the report states that V3 ran on the GPU job and that the CPU run (650 s) gave the same figures once, by hash, so the CPU leg is covered by that record and not by the suite.
+
+Applied by cell 3 (before Reviewer A round 1):
+
+1. `_expected_frames`' docstring (`src/clearwater/jobs/export.py`) states the None case's residual
+   and the sink's guard; the report's "DR-45 (b) residual" Limit is REPLACED: cell 2's text said
+   the sink "still refuses a short frame set", which is false for `unreadable_tail`
+   (`verify.missing_frames` requires only the readable pts up to the last one written, so an early
+   end passes); the new text says what the rule holds. Cell 2's
+   `test_an_unreadable_tail_source_is_not_given_a_count` asserts only `_expected_frames(...) is
+   None` (no listing assertion, no job), so a NEW test was added:
+   `tests/test_wp42_video_path.py::test_an_unreadable_tail_job_makes_no_listing_and_no_refusal`
+   (a planted `unreadable_tail` probe on `FFmpegVideoSource.probe`, `export_module.read_packet_table`
+   replaced by a recorder that raises, a 30-of-45 `PrefixSource`: no listing, the job ok with the
+   sink's tail warning, the entry complete). It pins existing behaviour; planted controls below.
+2. `src/clearwater/app/__init__.py`: the three builders imported with the five and listed in
+   `__all__` (the redundant-alias form dropped). Granted additive edit, node id
+   `tests/test_app_composition.py::test_the_package_exports_the_root`: `"proxy_cache"`,
+   `"video_sink"`, `"video_source"` appended to the asserted list; the five WP4.1 names and the
+   identity loop unchanged.
+3. The report's V3 section states V3 ran on the GPU job and that the CPU leg is not covered by the
+   suite. **No hash of the 650 s CPU run exists** (FLAGGED at the yield): what exists is cell 2's
+   build-record sentence ("the round-0 test list said CPU, which took 650 s for the file (the same
+   pre-encode figures)") and one unlabelled figures file `work\wp4.2-v3-figures.txt` (md5
+   `f76c42a5fae87b9cb691ac5594b5d3a2`, mtime 2026-10-29T05:22:48Z, four rows equal to the report's
+   table, no backend named). The report says exactly that; no hash was invented.
+
 ## RESUME HERE (Reviewer A round 1)
 
 For a fresh cell: read `docs/dispatch-recipe.md`, the brief (Rulings govern), this ledger and

@@ -28,7 +28,9 @@ seat and CHARC `881cc956f1335e7e`).
   video job fails readably ("video export needs a cache folder; none was given") after its probe
   and before any write; photos are unaffected (R0-Q1 (a)). `_PhotoExports`, `_no_video_probe`,
   `_no_cache_key` and the stub collaborators are gone. The root never resolves `app_locations()`.
-  `clearwater.app` re-exports the three builders (R0-Q4 (b)); see "Deviations".
+  `clearwater.app` re-exports the three builders and lists them in `__all__` beside WP4.1's five
+  (R0-Q4 (b); CHARC `91c2c22f4b6edd18` 2, with the granted additive edit of
+  `tests/test_app_composition.py::test_the_package_exports_the_root`).
 - **DR-45 (b) analysis half and DR-47 (a)** (`src/clearwater/analysis/engine.py`, grant G1).
   `AnalysisEngine(expected_frames=None)`: a decode pass that ends with fewer frames raises
   "the frame source ended after N of the clip's M frames; the cache entry is left incomplete"
@@ -97,6 +99,13 @@ condition is the first test (Main profile, no fault, every frame decoded).
 | ad14-flicker (WP3.11) | GrayWorld | -- | 0.475 / 0.447 / 0.488 / 0.476 | -- |
 | ad14-flicker (WP3.11) | GainsStretch | -- | 0.387 / 0.482 / 0.455 / 0.400 | -- |
 
+V3 ran on the GPU job (device frames; CHARC `91c2c22f4b6edd18` 3, KEEP for question 9's budget).
+The CPU leg is NOT covered by the suite. What exists for it: the build ledger's statement that a
+CPU run of the file took 650 s and gave the same pre-encode figures; no hash of that run's
+figures was kept. The one figures file at the cell's seat, `work\wp4.2-v3-figures.txt` (md5
+`f76c42a5fae87b9cb691ac5594b5d3a2`, written 2026-10-29T05:22:48Z), holds the four rows above and
+names no backend.
+
 WP1.4 real footage: 0.35-0.45. No product-method miss: no STOP. The encoded ratios include the
 encoder's frame-to-frame quantisation (NVENC, Standard); they are not V3's measurement point
 (question 5).
@@ -118,25 +127,29 @@ encoder's frame-to-frame quantisation (NVENC, Standard); they are not V3's measu
   it: `_entry_for_write` creates and opens `data.pack` under `folder / entry_name(key)`
   (`cache/store.py:660-666`); `cache/keys.py` `is_link` is never called. No `cache/` edit here;
   CHARC's register row at the accept (trigger "the next `cache/` touch").
-- **DR-45 (b) residual.** An `unreadable_tail` source gets no expected count (its decodable end
-  is known only by decoding; `verify.missing_frames`), so a clean early end of its decoder can
-  still leave a complete entry; the export half's sink check still refuses a short frame set,
-  so no bad output is written.
+- **DR-45 (b) residual (CHARC `91c2c22f4b6edd18` 1).** An `unreadable_tail` source gets no
+  expected count and no packet listing (`_expected_frames`): its decodable end is known only by
+  decoding (D86; `readable_video_pts` cuts the list only for `truncated`). So a short decode of
+  an `unreadable_tail` clip is marked complete at the decoder's end, as D86 intends, and later
+  exports reuse that entry (V17). The export half is still guarded by the sink's
+  `missing_frames` rule, which for this case requires every readable frame up to the last one
+  written, none skipped (`verify.missing_frames`): a gap inside the written range is refused,
+  an early end is accepted as the decoder's end. `truncated` keeps the one-listing count and a
+  clean probe the probe's count. Test:
+  `tests/test_wp42_video_path.py::test_an_unreadable_tail_job_makes_no_listing_and_no_refusal`
+  (a planted `unreadable_tail` probe and a 30-of-45 decoder: no listing, the job ok, the entry
+  complete).
 - V12 is deferred to v2 (spec 0.5.3). V16 and every speed figure are out of scope (WP5.2).
 - Out of envelope as declared in the brief (concurrent runners on one cache folder, network
   shares, a CPU backend with a hardware decoder, other operating systems).
 
 ## Deviations and items for the dispatcher
 
-- **R0-Q4 re-export.** `tests/test_app_composition.py::test_the_package_exports_the_root` (WP4.1,
-  not owned) pins `clearwater.app.__all__` to the five WP4.1 names, so the three builders are
-  re-exported by redundant alias (`from .composition import video_source as video_source`) and
-  not added to `__all__`. Adding them needs that test edited (not granted).
 - **The record's `"video"` when the engine is given** (`run(exports=...)`, `main(exports=...)`):
   null, as the facts are observed only through the root's builders.
 - **DR-74's test is `gpu` and `slow`.** The V3 product tests are `gpu` and `slow` (the GPU job
-  with device frames; about 170 s for the file in this seat). New serial-leg cost measured here:
-  about 210 s (V3 file 169 s, DR-74 18 s, the two gpu V4 / DR-67 legs about 23 s), inside
+  with device frames; about 170 s for the file in this seat; CHARC `91c2c22f4b6edd18` 3 KEEP).
+  New serial-leg cost measured here: about 210 s (V3 file 169 s, DR-74 18 s, the two gpu V4 / DR-67 legs about 23 s), inside
   question 9's 300 s.
 
 ## Register dispositions
