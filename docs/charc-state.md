@@ -102,6 +102,17 @@
   private blobs e.g. 37724 ImageSourceData carried as EXIF; extend `_TIFF_STRUCTURE`) + the CLAUDE.md WP4.5 sentence.**
   All three dry-run clean in sequence on a mirror. Lane share: WP4.5 Codex-built (2 seats, 9 turns), nets Claude (4 A + B);
   Codex-built packages now 7 (WP3.20R, WP-T4, WP-T5, WP-T6, WP4.3a, inventory-1029, WP4.5).
+- **RELEASE 21:19Z (msg f9633c01): stack merged by one ff, main `649be3d` (inventory record `e34c4a9`, code top
+  `d16dda5`; WP4.3a accept `649be3d`, code top `9378ecb`). HOLD LIFTED. CHARC QA CONFIRMED (static): code patch-ids
+  inventory 743a1841 and WP4.3a d6f2a2ca equal on author and merged ranges (the orchestrator's 59a6c0d1 is the with-docs
+  form); 23 stack files, interfaces / pyproject / uv.lock untouched, 0 CR in every blob. MY RELEASE COMMIT `8f10af5`
+  (the three handoff scripts run in order on main; 4 files by pathspec; 0 CR): DR-15 note; DR-58(b)/76/77/81/85
+  CLOSED; NEW DR-91 (IF-10 repr leak), DR-92 (Redactor spelling), DR-93 (from_tiff MemoryError), DR-94 (TIFF private
+  blobs); AD-13 note; AD-23 applied; CLAUDE.md current state + Insta360 ON HOLD + D: archive drive. The HOLD paragraph
+  at the top of this block is HISTORY from here. NEXT at the orchestrator (its order): prune + archive (owner-approved;
+  record `docs/proofs/prune-2026-10-29.md` posted to me), WP4.3 cell 7 (step 0 rebase onto main drops DR-85's xfail),
+  WP4.4 (Codex), DR-87 micro-package (+ DR-93/94 in the same exif.py touch), WP3.6P brief. Owed by me next: WP4.3's
+  accept (register table, DR-89, DR-90); WP4.4's accept (DV/HDR fact line if warranted); the prune record's read.
 - **(gen 7 history follows; newest facts at the end of the block)**
 - **GEN 7 PICKUP (was).** Orchestrator = **gen 22 `clearwater-orchestrator-20261029-0704`** (online 17:08Z from gen 21's
   state 736e403; gauge 38 ms; gen 21 was `clearwater-orchestrator-20261029-0425`, rolled 17:05Z at ~400K); ALL cues go there. Time the bash launch and record it here. Inbox: drain with `read --role charc --all`
