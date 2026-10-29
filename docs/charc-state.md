@@ -64,6 +64,16 @@
   lossless re-encode with decode proof + STOP, R0-Q6 (a)). **R1-Q4 REPRODUCED** (`cache/store.py:573` skips a junction entry at
   discovery; `:660-666` mkdir/write through it; `keys.py:103` is_link uncalled): my register row at WP4.2's accept, trigger the next
   `cache/` touch. WP4.2a: round 0 committed 933e33e, Codex turn 2 = build.
+- **WINDOW OPEN 03:19Z (msg `429ac5c6dfecb436`): WP4.2a two-leg gate on `wp4.2a-mc` c4eab41 (six commits rebased onto d5d4b00,
+  patch-id 9ca7ffa4 = author range aa4761b..952f31a), ~52 min EXCLUSIVE. NOTHING HEAVY HERE until the release post.** Then Reviewer B
+  (Claude pass at the orchestrator's seat), accept, a HOLD ask before the ff. WP4.2a Reviewer A converged R2 (R1 BLOCKING 1 major F1).
+  **F1 ROOT CAUSE RULED (my post 03:20Z): DR-80 on main `0f138ff`** = `jobs/naming.py` `OutputPlan.path` (:268) composes the output
+  name from the unchecked source stem; `<letter>:<rest>` gives a DRIVE-RELATIVE planned path (reproduced here with pure paths); the
+  suffix is validated (:54-75), the stem not. WP4.2a closes the runner route only (parent-of-planned-file check). **Fix = WP4.2b, Codex
+  micro-package** after WP4.2a's accept, concurrent with WP4.2's build (disjoint files: `jobs/naming.py` validation + `tests/test_jobs_naming.py`
+  + one runner test); nets = Claude passes, STRONG; gate stacked with WP4.2's suite if timing allows (orchestrator's call); BINDING at
+  the latest WP4.3. N1 (mixed-separator redaction gap) row = mine at WP4.2a's accept with the DR-78/79 rewrite. Owed at WP4.2a's accept:
+  DR-78 CLOSED, DR-79 CLOSED ('defensive; not reproduced' for (b)), N1 row, CHARC QA.
 - **(history) After WP4.1's accept:** WP4.2's brief (DRAFT RULED on main 3aa3c51) got ONE revision pass against WP4.1's accept record, then FINAL
   on CHARC's word; its revision must carry: DR-78/79 (B2 rows) as WP4.2 items, the WP4.1 runner's final names and the stream-syntax
   predicate, the Limit text. WP4.3's revision later carries DR-75 (REQUIRED test under its Q12), DR-76, DR-77, and the AD-23 'applied by
