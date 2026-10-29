@@ -321,8 +321,15 @@
   helper is LIVE at the orchestrator's seat.
 - **WP-T6 SEAT 2 LIVE (fresh Codex session 01a18792, depth 73,738 after turn 1 = the `fullclip` marker line verbatim at
   5f204e3, nothing else); W2 RUN 2 WINDOW OPEN ~12:14Z (status `d3819cad85af7c91`, no reply owed; 2-5 min; w2.sh md5 1f4025ca
-  unchanged).** NEXT: W2 release (parity test, guard tests, two controls); turn 2 = W2 into the ledger + rung 3 (W3) with the
-  V4-delta check; rung 4 (W4 fullclip once); report; A FAST; B; the ONE gate; WP4.3 draft for my ruling.
+  unchanged).**
+- **W2 RUN 2 RELEASED 12:15Z: stages 1-2 GREEN (parity 3.6 s; conftest guard 60 passed, marker line fixed it); STOP stage 3, both
+  controls missed 'caught by the named check'. RULED ~12:20Z (query `3bd1625d4d9deed2`): Q-A option 1 = the checker records a
+  pairing-count mismatch as a named 4(d) FAIL instead of raising and still returns 4(b) (the re-encode control passes iff 4(b)
+  FAILs; 4(d) recorded beside it; cause confirmed by codec-tag KEY only); Q-B option 1 = the off-by-one planted in the cut PLAN
+  (`-frames:v N+1` AND `-t` = the (N+1)th packet's pts), with 4(b)'s COUNT clause explicit (trim video packet count == N as its
+  first clause), control passes iff 4(b) or 4(c) FAILs, recorded which. The fixture still asserts every check PASS.** Seat 2
+  turn 2 = checker change + W2 run 3 request; rung 3 only after W2 is green. NEXT: W2 run 3; rung 3 (W3) with the V4-delta
+  check; rung 4 (W4 fullclip once); report; A FAST; B; the ONE gate; WP4.3 draft for my ruling.
 - **(history) After WP4.1's accept:** WP4.2's brief (DRAFT RULED on main 3aa3c51) got ONE revision pass against WP4.1's accept record, then FINAL
   on CHARC's word; its revision must carry: DR-78/79 (B2 rows) as WP4.2 items, the WP4.1 runner's final names and the stream-syntax
   predicate, the Limit text. WP4.3's revision later carries DR-75 (REQUIRED test under its Q12), DR-76, DR-77, and the AD-23 'applied by
