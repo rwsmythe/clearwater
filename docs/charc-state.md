@@ -369,8 +369,15 @@
   SERIAL expression on the eight changed/new IDs with junit; ONE standard encode; V4 SAME on the trim; my V4 best-effort-delta
   check vs `work\wp4.2\v4\gx\record.json` (item names only; STOP on branch ii or an unexplained delta); the two controls
   runtime-only through a pytest plugin (no source edit; hashes snapshotted, clean tree proved). WP4.3 cell 1 in round 0
-  (light). NEXT: W3 release (delta verdict); rung 4 (marker already in; collections; W4 fullclip once ~27 min); report; A
-  FAST; B; the ONE gate.
+  (light).
+- **W3 RUN 1 RELEASED 12:48Z: stage 1 GREEN (8 passed, 322 s; ONE standard encode; engine record M+R all SAME, roster SAME;
+  junit w3-run1/w3-serial.xml). Stage 2 hit the orchestrator's reference-path slip (runner record, not the compare record;
+  corrected to `work\wp3.10\wp4.2-v4\v4-GX011627-c3-gpu\GX011627_corrected.compare.json`, w3.sh md5 cd2e47e2). V4 DELTA
+  RULED ~12:55Z (query `89d8d15e712cf983`; my post ruling-w3delta): BRANCH (i), PROCEED: M and R empty both sides; BE same 5;
+  trim-only 3 = the R-e creation_time forms; full-only 3 (edit lists non-video, timecode value, track layout) = FEWER diffs on
+  the FFmpeg-muxed trim, exercised by `fullclip` only. Explanation table = exactly these six names, any other = STOP; Limit +
+  accept-record sentence.** NEXT: W3 run 2 in full (~7 min: stage 1, delta, both controls); rung 4 (collections; W4 fullclip
+  once ~27 min); report; A FAST; B; the ONE gate.
 - **(history) After WP4.1's accept:** WP4.2's brief (DRAFT RULED on main 3aa3c51) got ONE revision pass against WP4.1's accept record, then FINAL
   on CHARC's word; its revision must carry: DR-78/79 (B2 rows) as WP4.2 items, the WP4.1 runner's final names and the stream-syntax
   predicate, the Limit text. WP4.3's revision later carries DR-75 (REQUIRED test under its Q12), DR-76, DR-77, and the AD-23 'applied by
