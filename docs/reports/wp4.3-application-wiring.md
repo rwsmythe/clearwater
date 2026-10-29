@@ -113,5 +113,11 @@ a batch item in 23 ms (fixture clip); `gui/jobs.py` is not touched. GX011627: wi
   exclusive window.
 - `gui/shell.py`'s module and `run` docstrings still say WP4.3 calls `run`; the grant was the
   device text only, so they are left and flagged.
-- A journal that cannot be written is logged and the export goes on (a crash then leaves no
-  entry for that folder); the output folder is always scanned.
+- A journal entry that cannot be written fails the export readably before any read or probe,
+  with nothing written (R1-2, ruling d530b564); the output folder is always scanned.
+- A journal entry stays until its folder's clean-up has succeeded (R1-3). A folder that no longer
+  exists counts as clean and its entry is dropped; a folder that cannot be listed keeps its
+  entry. For D85 this means: a temporary left on a drive that is unplugged when the program
+  next starts (its path then reads as missing) is not removed when the drive comes back, unless
+  that folder is the output folder or a later export's destination again; it stays a visible
+  `.clearwater-partial` file the user can delete.

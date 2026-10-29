@@ -433,3 +433,49 @@ The step order in `activity.py`'s docstring moved (journal before the lock and t
 the ruling's "before any read or probe" needs; the lock is now released before the entry is
 removed. Slip: one bare `cd` at the end of a test-writing command (harmless no-op `true`), not
 repeated.
+
+Depth at the Group A yield: 140,559 (`scripts/cell_depth.py`, 47 turns; given by the dispatcher,
+gen 21). Dispatcher QA at its seat: 5 commits, 0 CR bytes, owned files only; the wiring-test edit
+accepted as test-only in an owned file. The report's Limits now carry the missing-folder rule and
+its D85 meaning on a drive that comes back (dispatcher's request).
+
+### Group B (the preview and render path)
+
+Red first against the base product files (a scratch copy of the new ones, restored after): all
+seven new tests failed the right way (the CPU render overwrote the device backend: no release;
+`["task", "chore"]`; `idle()` True during a chore; the release queued after the new source's
+render; the GPU plan count 6 after the boundary; the statistics of the old parameters; the first
+adapter alive). Targeted run (`test_app_preview_fft` with its `gpu` tests, `test_app_analysis_adapter`,
+`test_app_startup`, `test_app_activity`, `test_app_wiring`, `test_gui_preview`, `test_gui_threads`,
+the layering and composition tests): 170 passed 1 xfailed, and 10 passed. ruff check, ruff format
+--check (280), mypy strict (146): clean. Shared host (WP-T6's parallel leg running, no `gpu`).
+
+- R1-4 MAJOR, `7f41d14`: `PreviewController._note_backend` remembers only a backend with the
+  device extension, so a CPU render leaves the GPU one for the next boundary. Tests
+  `test_app_preview_fft.py::test_a_cpu_render_after_a_device_render_keeps_the_device_plans_released`
+  (recording backend, every OS) and `::test_force_cpu_after_a_gpu_render_still_releases_the_gpu_plans`
+  (`gpu`: 1:1 4K on the FFT route, force CPU, CPU render, source change; readings plans 6 -> 6 -> 0,
+  free 7,338,095,616 -> 7,388,270,080 bytes).
+- R1-6 MINOR, `7f41d14`: `LatestWorker._run` takes the chores and the task in ONE critical
+  section, chores first; the controller queues the release from `request()` on a source change
+  (`_release_for_source`, once per source; `_on_source` calls it too for an unload), so it precedes
+  the new source's first render although the session emits `image_changed` first. Tests
+  `::test_a_chore_queued_after_the_worker_looked_still_runs_before_the_task` (a hooked condition
+  queues a chore when the worker leaves a section with the task still waiting: red `["task",
+  "chore"]` on the two-section loop; on the one-section loop no such exit occurs) and
+  `::test_a_source_change_queues_the_release_before_the_new_sources_render`.
+- R1-7 MINOR, `7a5828c`: `_complete` is set with `_phase = "post"` under the same locks, from the
+  result, so a retarget after that point is not undone. Test
+  `test_app_analysis_adapter.py::test_a_retarget_after_the_job_returned_is_not_undone_at_publication`
+  (the run parked at the clip lock's release).
+- R1-8 MINOR, `7a5828c`: `make_analysis_factory(on_built=)` replaces `built=`; `Application.analysis`
+  (the latest adapter only, `keep_analysis`) replaces the `analyses` list; `Application` is now built
+  before the installs (no side effect; the S-order is unchanged). Tests
+  `test_app_startup.py::test_the_application_keeps_only_the_latest_analysis` (two clips, weakref
+  dead after gc) and `test_app_analysis_adapter.py::test_the_factory_keeps_no_adapter_without_on_built`.
+- R1-10 MINOR, `7f41d14`: `_busy` is True while chores run. Test
+  `test_app_preview_fft.py::test_the_worker_is_busy_while_a_chore_runs`.
+
+Line endings: `preview.py` and `render_worker.py` were CRLF in this worktree's checkout
+(`core.autocrlf=true`); the edits normalised them to LF before the `autocrlf=false` commits; every
+committed blob checked 0 CR, 0 non-ASCII.
