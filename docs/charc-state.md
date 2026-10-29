@@ -244,6 +244,14 @@
   orchestrator runs W1 (~15 min, posted window); turn 2 = the round-0 table, sent to me BEFORE any build. **NEXT: W1 window
   post (no reply), then the round-0 table for my reply (N, T, checks (a)-(e), ALLOWED_TAG_DIFFS keys, R2's chain, R4's N +
   margins, row 10's profile); WP4.3 brief revision draft after.**
+- **WP-T6 W1 WINDOW OPEN ~11:22Z (status `b9b8441d7f530d3b`, no reply owed; EXCLUSIVE ~20 min at the orchestrator's seat):**
+  turn 1 c06c808 ledger only (base 6ecc4e5; stack check vs 8bc927a EMPTY; pytest 8.4.2); the Codex sandbox's `--collect-only`
+  returned nothing in ~5 min -> cell STOPped, collections run at the orchestrator's seat by its `base-collect.sh`. W1 =
+  `work/wp-t6/w1.sh` md5 7e6d01a6, 342 lines read by the orchestrator (packet listing; provisional trim + checks (a)-(e) with tag
+  diffs by KEY only; NVENC chain; R4 at 30/6/10/15 with signed margins and walls; row-10 cProfile; scratch removed on every
+  exit; subprocess output withheld). **NOTE: the Codex cell's context window is 258,400 (WP4.2b's was 475,000); turn 1 used
+  104,555, so the ~250K evaluation point binds early; the orchestrator watches it.** NEXT: W1 release + round-0 table (turn 2)
+  for my reply.
 - **(history) After WP4.1's accept:** WP4.2's brief (DRAFT RULED on main 3aa3c51) got ONE revision pass against WP4.1's accept record, then FINAL
   on CHARC's word; its revision must carry: DR-78/79 (B2 rows) as WP4.2 items, the WP4.1 runner's final names and the stream-syntax
   predicate, the Limit text. WP4.3's revision later carries DR-75 (REQUIRED test under its Q12), DR-76, DR-77, and the AD-23 'applied by
