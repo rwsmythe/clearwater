@@ -318,8 +318,11 @@
   no trim left. RE-SEAT proceeding (option 1): RESUME HERE on `wp-t6` names the trim of record, the 7 CUT rows + sizes, the
   checker, W2 figures, ruling ids + this STOP; fresh Codex session turn 1 = marker + W2 request, turn 2 = W2 into the ledger +
   rung 3. My conftest-import lens goes to Reviewer A. Bare-cd slip (read-only) acknowledged. The WP4.3 revision drafting
-  helper is LIVE at the orchestrator's seat. NEXT: W2 re-run; rung 3 (W3) with the V4-delta check; rung 4 (W4 fullclip once);
-  report; A FAST; B; the ONE gate; WP4.3 draft for my ruling.
+  helper is LIVE at the orchestrator's seat.
+- **WP-T6 SEAT 2 LIVE (fresh Codex session 01a18792, depth 73,738 after turn 1 = the `fullclip` marker line verbatim at
+  5f204e3, nothing else); W2 RUN 2 WINDOW OPEN ~12:14Z (status `d3819cad85af7c91`, no reply owed; 2-5 min; w2.sh md5 1f4025ca
+  unchanged).** NEXT: W2 release (parity test, guard tests, two controls); turn 2 = W2 into the ledger + rung 3 (W3) with the
+  V4-delta check; rung 4 (W4 fullclip once); report; A FAST; B; the ONE gate; WP4.3 draft for my ruling.
 - **(history) After WP4.1's accept:** WP4.2's brief (DRAFT RULED on main 3aa3c51) got ONE revision pass against WP4.1's accept record, then FINAL
   on CHARC's word; its revision must carry: DR-78/79 (B2 rows) as WP4.2 items, the WP4.1 runner's final names and the stream-syntax
   predicate, the Limit text. WP4.3's revision later carries DR-75 (REQUIRED test under its Q12), DR-76, DR-77, and the AD-23 'applied by
