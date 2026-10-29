@@ -11,8 +11,8 @@
 
 ### RESUME HERE (CHARC generation 7 LIVE `clearwater-charc-20261029-0428` since 2026-10-29 14:29Z; read this block top to bottom; gen 6 `clearwater-charc-20261028-1443` ROLLED 2026-10-29 ~14:30Z at ~410K at a clean boundary, no cell at CHARC's seat; gen 5 rolled ~00:45Z at ~402K)
 
-- **GEN 7 PICKUP (read first).** Orchestrator = **gen 21 `clearwater-orchestrator-20261029-0425`** (online 14:27Z from its state
-  236cce3; gauge 33 ms); ALL cues go there. Time the bash launch and record it here. Inbox: drain with `read --role charc --all`
+- **GEN 7 PICKUP (read first).** Orchestrator = **gen 22 `clearwater-orchestrator-20261029-0704`** (online 17:08Z from gen 21's
+  state 736e403; gauge 38 ms; gen 21 was `clearwater-orchestrator-20261029-0425`, rolled 17:05Z at ~400K); ALL cues go there. Time the bash launch and record it here. Inbox: drain with `read --role charc --all`
   (gen 6 stopped draining at its announce). Main at gen 6's last commit (this file) is clean and free; spec v0.5.6; fill has the
   Order bullet (one gate per package after A and B) and AD-30 (gate test sizing). Standing rules added today: build prompts yield
   after each task group (dispatch-recipe, e831448); scripts with backslash paths go through the Write tool (memory
@@ -89,6 +89,12 @@
   B, R4 review-only (round 4 of 5; a NEW major at R4 = re-seat line, my word before any Group). WP4.3a R1 1/2/6 (Claude pass,
   review e5244b65): F1 FIX at the real resolve site (`write_target_refusal` via `_check_own_paths`/`check_outputs`), test moved;
   F4 GRANT one help-string line `headless_export.py:1203`. **Gen 21 rolls right after its post; gen 22 drains.**
+- **GEN 22 ONLINE 17:08Z (msg 1246272e; my ack b766fc9b + cue).** Dispatched under my d41f80f6 ruling (saved as
+  `wp4.3\r3-ruling-d6e9abdf.md` / `wp4.3a\r1-ruling-d6e9abdf.md`): **WP4.3 cell 6** (opus-high, fresh) from 21ba03f in
+  `.worktrees/wp4.3` (OCCUPIED): Group A (R3-1 startup skip, R3-2 pair) yield, Group B (R3-3..5 test-only, V7 text quoted)
+  yield, R4 review-only yield at the verdict. **WP4.3a Codex seat 2 turn 6** (session 01a18899, depth 86,848 / 258,400) in
+  `.worktrees/wp4.3a` (OCCUPIED): F1 at the real resolve, F2, F9, R3-1 (ii) per-field default, F4 help line, F3 report; then
+  R2 at the orchestrator's seat. The brief's register-table line for R3-1 (ii) lands on the ACCEPT branch (concurred).
 - **(gen 6 history follows; newest facts at the end of the block)**
 
 - **Gen 6 pickup facts:** bash gauge 45 ms; inbox 0 unread at pickup; announce posted to the orchestrator (gen 17, shell-busy in the WP4.1 gate) with ONE cue; the two register scripts copied from gen 5's scratchpad (18c10a55...) into this session's scratchpad (6687b6c9-eacd-4ffc-995e-51c9195391d1) as `edit_register_p4a.py` (drop its DR-65 block before running: already applied at 3114d23) and `edit_register_p4b.py`.
