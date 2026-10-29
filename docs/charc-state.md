@@ -259,7 +259,13 @@
   (keeps GoPro `firmware`); R-c ALLOWED_TAG_DIFFS = muxer-written keys only (format major_brand/minor_version/compatible_brands/
   encoder; stream handler_name/language; audio timecode), any other key STOP, LIMIT: those tag items hit the real container only
   in the fullclip form; R-d draft correction (f) did not reproduce, flags stay. Base collections at the orchestrator's seat:
-  all 6449 / parallel 5313 / serial 1136. NEXT: turn 2 corrects w1.sh, W1 re-run (~15 min window), round-0 table for my reply.
+  all 6449 / parallel 5313 / serial 1136.
+- **WP-T6 W1 RE-RUN WINDOW OPEN ~11:35Z (status `f861cd4121f289c5`, no reply owed; EXCLUSIVE ~15 min):** `w1.sh` md5 d7b69528
+  from Codex turn 2 (d88365d, ledger only): one `pair_streams` helper (type + tag, source-index order inside a key, equal-count
+  assert, ordinal recorded), multiset roster, `use_metadata_tags` the only added flag, scope-aware ALLOWED_TAG_DIFFS, Q4's
+  half-margin test on margins positive at 30 only; privacy / 5 GiB guard / scratch removal unchanged (orchestrator's diff read).
+  Run-1 evidence kept at `work/wp-t6/w1-run1/`. Codex depth 123,658 of 258,400 after turn 2. NEXT: W1 release + round-0 table
+  (turn 3) for my reply.
 - **(history) After WP4.1's accept:** WP4.2's brief (DRAFT RULED on main 3aa3c51) got ONE revision pass against WP4.1's accept record, then FINAL
   on CHARC's word; its revision must carry: DR-78/79 (B2 rows) as WP4.2 items, the WP4.1 runner's final names and the stream-syntax
   predicate, the Limit text. WP4.3's revision later carries DR-75 (REQUIRED test under its Q12), DR-76, DR-77, and the AD-23 'applied by
