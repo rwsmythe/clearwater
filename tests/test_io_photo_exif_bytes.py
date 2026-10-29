@@ -562,7 +562,7 @@ def test_r1_nested_empty_tree_leaves_no_tiff_metadata(tmp_path):
 
 
 @pytest.mark.parametrize("order", ["<", ">"])
-def test_r1_duplicate_exif_pointers_keep_both_children_with_d63_dimensions(tmp_path, order):
+def test_r3_duplicate_exif_pointer_keeps_first_child_with_d63_dimensions(tmp_path, caplog, order):
     source = _fixture(
         [(34665, 4, 1, [(36864, 7, 4, b"0230")]), (34665, 4, 1, [(36864, 7, 4, b"0231")])],
         order=order,
@@ -570,16 +570,12 @@ def test_r1_duplicate_exif_pointers_keep_both_children_with_d63_dimensions(tmp_p
     (tmp_path / "duplicate-pointers.exif").write_bytes(source)
     output = exif.edit(source, 640, 480)
     pointers = [row for row in _parse(output)[1][()] if row[0] == 34665]
-    assert len(pointers) == 2, "non-D63 duplicate pointer was dropped"
-    for pointer, version in zip(pointers, (b"0230", b"0231"), strict=True):
-        offset = struct.unpack(order + "I", pointer[3])[0]
-        count = struct.unpack_from(order + "H", output, offset)[0]
-        rows = [
-            struct.unpack_from(order + "HHI4s", output, offset + 2 + i * 12) for i in range(count)
-        ]
-        assert (36864, 7, 4, version) in rows
-        assert (40962, 4, 1, struct.pack(order + "I", 640)) in rows
-        assert (40963, 4, 1, struct.pack(order + "I", 480)) in rows
+    assert len(pointers) == 1, "later Exif pointer retained"
+    assert _entry(output, ("Exif",), 36864) == (36864, 7, 4, b"0230")
+    assert _entry(output, ("Exif",), 40962) == (40962, 4, 1, struct.pack(order + "I", 640))
+    assert _entry(output, ("Exif",), 40963) == (40963, 4, 1, struct.pack(order + "I", 480))
+    assert len(caplog.records) == 1
+    assert "IFD0" in caplog.text and "34665" in caplog.text
 
 
 @pytest.mark.parametrize("order", ["<", ">"])
@@ -635,7 +631,7 @@ def _unique_ifds(block):
 
 @pytest.mark.parametrize("order", ["<", ">"])
 @pytest.mark.parametrize("route", ["edit", "from_tiff"])
-def test_r2_shared_children_are_written_once_by_entry_count(tmp_path, order, route):
+def test_r3_shared_child_duplicate_pointers_are_dropped(tmp_path, caplog, order, route):
     a = b = c = 150
     exif_offset = 8 + 6 + 12 * (a + 2)
     interop_offset = exif_offset + 6 + 12 * (b + 2)
@@ -665,13 +661,16 @@ def test_r2_shared_children_are_written_once_by_entry_count(tmp_path, order, rou
     output = exif.edit(bytes(source), 4, 3) if route == "edit" else exif.from_tiff(bytes(source))
     assert output is not None
     after = _unique_ifds(output)
-    assert sum(map(len, after.values())) == a + b + c + 4, "shared child entries multiplied"
-    assert len(after) == 3, "shared child was serialized more than once"
-    before_pointers = [
-        [row for row in rows if row[0] in (34665, 40965)] for rows in before.values()
-    ]
-    after_pointers = [[row for row in rows if row[0] in (34665, 40965)] for rows in after.values()]
-    assert after_pointers == before_pointers, "pointer type/count/order changed"
+    assert sum(map(len, after.values())) == c + 6, "duplicate pointer entries retained"
+    assert len(after) == 3
+    directories = _parse(output)[1]
+    assert [row[:3] for row in directories[()] if row[0] == 34665] == [(34665, 3, 1)]
+    assert [row[:3] for row in directories[("Exif",)] if row[0] == 40965] == [(40965, 3, 1)]
+    assert directories[("Exif", "Interop")] == [(65000, 7, 1, b"x")] * c
+    messages = [record.getMessage() for record in caplog.records]
+    assert len(messages) == a + b - 2
+    assert sum("IFD0" in message and "34665" in message for message in messages) == a - 1
+    assert sum("Exif" in message and "40965" in message for message in messages) == b - 1
 
 
 @pytest.mark.parametrize("order", ["<", ">"])
@@ -763,3 +762,92 @@ def test_r2_read_then_write_warns_once_per_dropped_entry(tmp_path, caplog, fault
     assert len(messages) == 1, "read + write warned more than once per dropped entry"
     assert "IFD0" in messages[0]
     assert "badvalue" not in messages[0]
+
+
+@pytest.mark.parametrize("order", ["<", ">"])
+@pytest.mark.parametrize("route", ["edit", "from_tiff"])
+@pytest.mark.parametrize("tag", [34665, 34853])
+def test_r3_overlapping_children_keep_one_ifd_with_bounded_entry_count(tmp_path, order, route, tag):
+    p, n = 200, 400
+    region = 8 + 6 + 12 * p
+    source = bytearray((b"II" if order == "<" else b"MM") + struct.pack(order + "HIH", 42, 8, p))
+    for i in range(p):
+        source.extend(struct.pack(order + "HHII", tag, 4, 1, region + 12 * i))
+    source.extend(bytes(4))
+    # Every shifted child declares 65535 entries, with whole inline entries to EOF.
+    source.extend((struct.pack(order + "HHHI", 65535, 0x1234, 7, 4) + b"\xab\xcd") * n)
+    assert len(source) == 7214
+    (tmp_path / "overlapping-children.exif").write_bytes(source)
+    output = exif.edit(bytes(source), 4, 3) if route == "edit" else exif.from_tiff(bytes(source))
+    assert output is not None
+    directories = _unique_ifds(output)
+    root = directories[8]
+    assert sum(row[0] == tag for row in root) == 1, "more than one carried IFD for pointer tag"
+    total = sum(map(len, directories.values()))
+    assert 12 * total <= 4 * len(source) + 60, "written entries exceed source bound plus D63"
+    assert len(directories) <= 4
+    assert len(directories) == (3 if tag == 34853 and route == "edit" else 2)
+    path = ("Exif",) if tag == 34665 else ("GPS",)
+    fields = _parse(output)[1][path]
+    assert sum(row[0] == 0x1234 for row in fields) == n - 1, "first overlapping child not kept"
+
+
+@pytest.mark.parametrize("order", ["<", ">"])
+@pytest.mark.parametrize("route", ["edit", "from_tiff"])
+def test_r3_same_offset_siblings_are_parsed_per_label(tmp_path, caplog, order, route):
+    source = bytearray(
+        _fixture(
+            [
+                (34853, 4, 1, [(36864, 7, 4, b"0230"), (40965, 4, 1, [(1, 2, 4, b"R98\0")])]),
+                (34665, 4, 1, bytes(4)),
+            ],
+            order=order,
+        )
+    )
+    gps_at, exif_at = _record_locations(source)
+    offset = struct.unpack_from(order + "I", source, gps_at + 8)[0]
+    struct.pack_into(order + "I", source, exif_at + 8, offset)
+    (tmp_path / "same-offset.exif").write_bytes(source)
+    output = exif.edit(bytes(source), 4, 3) if route == "edit" else exif.from_tiff(bytes(source))
+    assert output is not None
+    assert ("Exif", "Interop") in _parse(output)[1], "GPS parse discarded Exif Interop"
+    if route == "from_tiff":
+        output = exif.edit(output, 4, 3)
+    directories = _parse(output)[1]
+    assert _entry(output, ("Exif", "Interop"), 1) == (1, 2, 4, b"R98\0")
+    assert not {40962, 40963, 40965}.intersection(row[0] for row in directories[("GPS",)])
+    assert _entry(output, ("Exif",), 40962) == (40962, 4, 1, struct.pack(order + "I", 4))
+    assert _entry(output, ("Exif",), 40963) == (40963, 4, 1, struct.pack(order + "I", 3))
+    assert _entry(output, (), 34665)[3] != _entry(output, (), 34853)[3]
+    messages = [record.getMessage() for record in caplog.records]
+    assert len(messages) == 1
+    assert "GPS" in messages[0] and "40965" in messages[0]
+
+
+@pytest.mark.parametrize("order", ["<", ">"])
+@pytest.mark.parametrize("route", ["edit", "from_tiff"])
+@pytest.mark.parametrize("parent,tag", [((), 34665), ((), 34853), (("Exif",), 40965)])
+def test_r3_duplicate_pointer_tags_follow_first_and_warn_per_later_entry(
+    tmp_path, caplog, order, route, parent, tag
+):
+    fields = [(tag, 4, 1, [(65001, 7, 1, value)]) for value in (b"a", b"b", b"c")]
+    source = bytearray(
+        _fixture(sub=fields, order=order) if parent else _fixture(fields, order=order)
+    )
+    first, _, last = _record_locations(source, parent)
+    offset = struct.unpack_from(order + "I", source, first + 8)[0]
+    struct.pack_into(order + "H", source, first + 2, 3)
+    source[first + 8 : first + 12] = struct.pack(order + "H", offset).ljust(4, b"\0")
+    struct.pack_into(order + "H", source, last + 2, 13)
+    (tmp_path / "duplicate-pointer-tags.exif").write_bytes(source)
+    output = exif.edit(bytes(source), 4, 3) if route == "edit" else exif.from_tiff(bytes(source))
+    assert output is not None
+    directories = _parse(output)[1]
+    pointers = [row for row in directories[parent] if row[0] == tag]
+    assert len(pointers) == 1, "later carried pointer retained"
+    assert pointers[0][1:3] == (3, 1)
+    child = (*parent, _PATHS[parent][tag])
+    assert _entry(output, child, 65001) == (65001, 7, 1, b"a"), "first pointer child not retained"
+    messages = [record.getMessage() for record in caplog.records]
+    assert len(messages) == 2, "one warning required per later pointer entry"
+    assert all((parent[-1] if parent else "IFD0") in msg and str(tag) in msg for msg in messages)

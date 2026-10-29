@@ -63,7 +63,7 @@ class _Entry:
 def _read_entries(
     data: bytes, drop: frozenset[int], *, warn: bool = True
 ) -> tuple[str, list[_Entry]]:
-    """Read each source IFD once, keeping whole entries from truncated arrays."""
+    """Read at most four label-specific IFDs, keeping whole entries from cut arrays."""
     if len(data) < 8 or data[:2] not in (b"II", b"MM"):
         raise ValueError("invalid TIFF header")
     order = "<" if data[:2] == b"II" else ">"
@@ -72,14 +72,11 @@ def _read_entries(
         raise ValueError("BigTIFF cannot be read for EXIF")
     if magic != 42:
         raise ValueError("invalid TIFF magic")
-    parsed: dict[int, list[_Entry]] = {}
 
     def read(offset: int, label: str, ancestors: frozenset[int]) -> list[_Entry]:
-        # Test ancestry before the cache: an ancestor is a cycle, a sibling is a share.
+        # Ancestor offsets are cycles; same-offset siblings are parsed per label.
         if offset < 8 or offset > len(data) - 2 or offset in ancestors:
             raise ValueError("invalid or cyclic IFD offset")
-        if offset in parsed:
-            return parsed[offset]
         declared = struct.unpack_from(order + "H", data, offset)[0]
         count = min(declared, (len(data) - offset - 2) // 12)
         if count < declared and warn:
@@ -97,9 +94,16 @@ def _read_entries(
             else {}
         )
         entries = []
+        followed: set[int] = set()
         for index in range(count):
             at = offset + 2 + index * 12
             tag, kind, number = struct.unpack_from(order + "HHI", data, at)
+            if tag in pointers:
+                if tag in followed:
+                    if warn:
+                        _log.warning("TIFF %s duplicate IFD pointer entry %s dropped", label, tag)
+                    continue
+                followed.add(tag)
             if (
                 (kind == 13 and tag not in pointers)
                 or tag == 330
@@ -150,7 +154,6 @@ def _read_entries(
                     entries.append(_Entry(tag, kind, number, value, child))
             else:
                 entries.append(_Entry(tag, kind, number, value))
-        parsed[offset] = entries
         return entries
 
     return order, read(root, "IFD0", frozenset())
@@ -178,43 +181,33 @@ def _put(entries: list[_Entry], replacement: _Entry, label: str, *, warn: bool =
 def _apply_d63(
     entries: list[_Entry], order: str, width: int, height: int, *, warn: bool = True
 ) -> None:
-    """Change the D63 fields once per shared Exif child, creating one when absent."""
+    """Change the D63 fields, creating the single Exif child when absent."""
     _put(entries, _Entry(ORIENTATION, 3, 1, struct.pack(order + "H", 1)), "IFD0", warn=warn)
     _put(entries, _Entry(SOFTWARE_TAG, 2, 11, b"Clearwater\0"), "IFD0", warn=warn)
-    pointers = [entry for entry in entries if entry.tag == EXIF_IFD]
-    if not pointers:
+    pointer = next((entry for entry in entries if entry.tag == EXIF_IFD), None)
+    if pointer is None:
         pointer = _Entry(int(EXIF_IFD), 4, 1, bytes(4), [])
         _put(entries, pointer, "IFD0", warn=warn)
-        pointers.append(pointer)
-    edited: set[int] = set()
-    for pointer in pointers:
-        assert pointer.child is not None
-        if id(pointer.child) in edited:
-            continue
-        edited.add(id(pointer.child))
-        for tag, size in ((PIXEL_X, width), (PIXEL_Y, height)):
-            previous = next((entry for entry in pointer.child if entry.tag == tag), None)
-            kind = 3 if previous is not None and previous.kind == 3 and 0 <= size <= 65535 else 4
-            _put(
-                pointer.child,
-                _Entry(tag, kind, 1, struct.pack(order + ("H" if kind == 3 else "I"), size)),
-                "Exif",
-                warn=warn,
-            )
+    assert pointer.child is not None
+    for tag, size in ((PIXEL_X, width), (PIXEL_Y, height)):
+        previous = next((entry for entry in pointer.child if entry.tag == tag), None)
+        kind = 3 if previous is not None and previous.kind == 3 and 0 <= size <= 65535 else 4
+        _put(
+            pointer.child,
+            _Entry(tag, kind, 1, struct.pack(order + ("H" if kind == 3 else "I"), size)),
+            "Exif",
+            warn=warn,
+        )
 
 
 def _write_entries(order: str, entries: list[_Entry]) -> bytes:
-    """Write each shared directory once, relocating raw values with word padding."""
+    """Write the at-most-four directories, relocating raw values with word padding."""
     output = bytearray((b"II" if order == "<" else b"MM") + struct.pack(order + "HI", 42, 8))
-    written: dict[int, int] = {}
 
     def write(fields: list[_Entry]) -> int:
-        if id(fields) in written:
-            return written[id(fields)]
         if len(fields) > 65535:
             raise ValueError("too many TIFF entries")
         offset = len(output)
-        written[id(fields)] = offset
         output.extend(bytes(6 + len(fields) * 12))
         struct.pack_into(order + "H", output, offset, len(fields))
         for index, entry in enumerate(fields):
@@ -326,10 +319,14 @@ def edit(source: bytes | None, width: int, height: int, *, _warn: bool = True) -
     dropped with IFD/tag warnings. A cut array keeps all whole entries with one warning naming
     the IFD and declared/kept counts; an absent next-IFD pointer is accepted. Invalid child
     offsets/cycles, empty children and unsupported IFD-valued entries are dropped. Header
-    faults and invalid IFD0 offsets/cycles raise. Shared children are parsed and written once.
-    Later duplicates of the four D63 fields are removed; other duplicates are retained.
-    A source without EXIF gets a
-    minimal block with those four fields. A relocated SHORT pointer promotes to LONG if needed.
+    faults and invalid IFD0 offsets/cycles raise. Only the first occurrence of each carried
+    pointer tag per parent is followed; later occurrences warn and are dropped. At most IFD0,
+    Exif, GPS and Interop are parsed and written. Same-offset siblings are parsed per label;
+    D63 dimensions affect only Exif. Written entry count is bounded by four times the source
+    byte length divided by 12, plus at most five D63 insertions. Later duplicates of the four
+    D63 fields are removed; other non-pointer duplicates are retained. A source without EXIF
+    gets a minimal block with those four fields. A relocated SHORT pointer promotes to LONG
+    if needed.
 
     Args:
         source: The source EXIF block, or None.
@@ -361,7 +358,9 @@ def from_tiff(data: bytes) -> bytes | None:
     dropped alone with an IFD/tag warning. Cut arrays retain all whole entries with one
     IFD/declared-count/kept-count warning; a missing next pointer is accepted. Invalid child
     offsets/cycles and empty children are dropped with their pointers; a faulty header or
-    invalid IFD0 offset discards the block. Shared children are parsed and written once.
+    invalid IFD0 offset discards the block. Only the first carried pointer tag per parent is
+    followed; later occurrences are dropped with individual IFD/tag warnings. At most four
+    directories are parsed and written; same-offset siblings are parsed separately per label.
     Carried pointers retain type 4 or 13; type 3 is retained unless relocation requires
     promotion to LONG. Other pointer types are dropped with an IFD/tag warning.
 

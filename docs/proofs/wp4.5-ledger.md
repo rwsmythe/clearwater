@@ -13,15 +13,15 @@ precedes new tests and product changes. Initial git status was clean, HEAD
 
 | Finding | Classification / CHARC disposition | Confirmation and commissioned action |
 | --- | --- | --- |
-| F-1 | Major, in envelope, EXECUTED; replace the R2 cache with the design guard | Distinct overlapping child offsets evade the exact-offset cache. Follow only the first occurrence of each carried pointer tag per parent (34665/34853 in IFD0, 40965 in Exif); drop later occurrences with individual IFD/tag warnings. Remove the cache. RED construction P=200/N=400 for Exif and GPS, entry-count assertions only. Exact written-entry bound requires the pre-build check recorded below. |
-| F-2 | Minor, out of envelope, EXECUTED; resolved by the commissioned guard | The offset cache ignores the label and shares the D63-modified list. Parse same-offset siblings separately per label; judge cycles by ancestor offsets. Add the ruled same-offset regression. |
-| F-3 | Advisory, in envelope, REASONED; report correction commissioned | Replace R2's shared-child mechanism/claim with the design guard and its valid bound. Name F-A and F-1 as fixed only after remediation is verified. F7 shared values remains the sole amplification Limit. |
+| F-1 | Major, in envelope, EXECUTED; FIXED by the design guard | Distinct overlapping child offsets evade the exact-offset cache. Only the first occurrence of each carried pointer tag per parent is followed (34665/34853 in IFD0, 40965 in Exif); later occurrences warn/drop. Parse/write caches removed. P=200/N=400 cases RED then green, with one-child shape and corrected +5 entry bound. |
+| F-2 | Minor, out of envelope, EXECUTED; resolved by the commissioned guard | Cache label-sharing confirmed RED. Same-offset siblings now parse per label, Exif alone gets Interop/dimensions, GPS warning names GPS/40965. Ancestor cycle checks retained. |
+| F-3 | Advisory, in envelope, REASONED; report corrected | R2's child-cache claims replaced with the guard and corrected bound. F-A and F-1 FIXED by that rule; F7 shared values remains the sole amplification Limit. |
 | F-4 | Advisory, in envelope, REASONED; no change ruled | Keep the warning on SubIFDs and other unsupported IFD-valued entries in from_tiff; this matches the binding warning policy. |
 
 The guard narrows R1 F3 only for the three structural pointer tags. All other
 non-D63 duplicate fields retain the prior pass-through rule. The R2 shared
-child test and R1 duplicate-Exif-child test will need amendment to the newly
-ruled first-pointer-only contract inside the owned test file. No other scope
+child test and R1 duplicate-Exif-child test are amended to the newly ruled
+first-pointer-only contract inside the owned test file. No other scope
 or dependency change is authorized. R4 blocking on this class must STOP to
 CHARC with a cap recommendation, per the dispatch.
 
@@ -31,7 +31,17 @@ format/check clean, all blobs LF/ASCII; real-photo node
 **1 passed in 272.04 s**. This predates R3 changes. Depth supplied at seat-2
 turn-1 yield: **119,808 input tokens**, binding window **258,400**.
 
-### R3 pre-build STOP - exact bound omits D63 insertions
+### R3 pre-build STOP - RESOLVED by the turn-3 erratum
+
+The orchestrator's turn-3 erratum to CHARC `85978ce0cd76c577`, reported to
+CHARC, resolves this STOP: **written entries <= 4 * len(source block) / 12 + 5**.
+The allowance is exactly the at-most-five D63 insertions. All other design
+guard requirements stand. The P=200/N=400 regressions must also assert exactly
+ONE Exif (or GPS) IFD; that shape assertion is the regression catch. Turn 3
+now proceeds with RED tests on the unchanged `c7c7360` product. HEAD is
+`e2df398`; git status was clean and product/test diff from `c7c7360` was empty.
+This replaces the exact bound as the binding test requirement; the following
+STOP evidence is historical.
 
 **[minor, in envelope, EXECUTED] STOP** under the dispatch instruction:
 "If you see that the ruled design cannot hold for a reason the ruling did
@@ -72,8 +82,8 @@ change. The R2 test rewrite remains pending, explicitly recorded above.
 Only this ledger changes. Scratch probe/log are ignored under work/wp4.5;
 no footage access, dependency/interface/config changes, mailbox posts or
 commits. R3 process/evidence assertions and final R4/B/gate remain dispatcher
-owned. Current depth must be read by the dispatcher; last supplied depth is
-119,808 input tokens, binding window 258,400.
+owned. Corrected turn-2 yield depth, supplied in turn 3: **135,854 input
+tokens**, binding window **258,400**. The 119,808 figure belongs to turn 1.
 
 ## Reviewer A Round 2 - seat 2 adjudication
 
@@ -265,8 +275,8 @@ no full serial leg is requested. No acceptance or convergence is claimed now.
 | T4 amended test check | Executed base test and final light run; not Reviewer A | 0 | 0 | 0 | 0 / 0 | 0 / 0 | 0 | Test-only remediation; no product change | Amended real GPS injection passes with rewrite; light run green; Reviewer A R1 pending |
 | A R1 | Claude opus/high, read-only; dispatch text and CHARC ruling `980818fc01eb77ea` | 0 | 3 | 2 (+4 advisory) | 8 / 1 | 9 / 0 | 0 | Product fixes F1/F2/F3/F4/F8; tests F6; docs F5/F7/F9 | NEW_CRITICAL_MAJOR_FOUND; remediation green at cell; R2 required |
 | A R2 | Claude opus/high, read-only on `3020648`; CHARC `72fc47f6a4ecfd91` | 0 | 1 | 1 (+4 advisory) | 6 / 0 | 6 / 0 | 0 | Product fixes F-A/B/C/F; tests/controls; report F-E and F-D Limit | NEW_CRITICAL_MAJOR_FOUND; seat 2 remediation green (907 light tests); R3 next |
-| A R3 | Claude opus/high, read-only on `c7c7360`; CHARC `85978ce0cd76c577` | 0 | 1 | 1 (+2 advisory) | 3 / 1 | 4 / 0 | 0 | None; documentation only | NEW_CRITICAL_MAJOR_FOUND; STOP before building: exact output-entry bound conflicts with D63 insertion |
-| R3 pre-build check | Cell independent synthetic struct probe | 0 | 0 | 1 | 1 / 0 | 1 / 0 | 0 | 0 / 0 | Confirmed exact-bound conflict; recommend fixed D63 allowance, ruling pending |
+| A R3 | Claude opus/high, read-only on `c7c7360`; CHARC `85978ce0cd76c577` + turn-3 bound erratum | 0 | 1 | 1 (+2 advisory) | 3 / 1 | 4 / 0 | 0 | Product guard F-1/F-2; tests; report F-3; F-4 unchanged | NEW_CRITICAL_MAJOR_FOUND; STOP resolved; 931 light tests green; R4 next |
+| R3 pre-build check | Cell independent synthetic struct probe | 0 | 0 | 1 | 1 / 0 | 1 / 0 | 0 | 0 / 0 | Confirmed exact-bound conflict; RESOLVED: five fixed D63 insertions allowed by turn-3 erratum |
 
 - Suspected: the fresh IFD construction drops source type pins.
 - Confirmed independently: source trace and parsed synthetic output agree for
@@ -285,6 +295,7 @@ no full serial leg is requested. No acceptance or convergence is claimed now.
 | Turn 4 yield | 140,712 input tokens; window 258,400 (supplied in turn 5) | R1 remediation; yield near 230K if incomplete, stop near 250K |
 | Seat 1 retirement / Seat 2 dispatch | Seat 1: 188,902 input tokens supplied; seat 2 depth not yet supplied; binding window 258,400 | Fresh seat 2 on clean `3020648`; evaluate at 200K, stop near 250K at a step boundary |
 | Seat 2 turn 1 yield / turn 2 dispatch | 119,808 input tokens; binding window 258,400 | R3 design guard commissioned on `c7c7360`; pre-build check before implementation |
+| Seat 2 turn 2 yield / turn 3 dispatch | 135,854 input tokens; binding window 258,400 | STOP resolved by the bound erratum; proceed with R3 RED/fix/report/light checks |
 
 ## Reviewer A Round 1 - adjudication and remediation
 
@@ -966,3 +977,125 @@ Reviewer A R3 runs next, then Reviewer B and final full parallel + impacted
 serial nodes at the orchestrator's seat, per the owner's direction. Final
 format/blob checks are also dispatcher-owned. Seat 2's depth is not supplied;
 the dispatcher reads it at this boundary (binding window 258,400).
+
+### R3 RED on unchanged c7c7360 product
+
+HEAD e2df398 contains only the prior ledger commit; product code diff from c7c7360 was empty. Before any product fix: exit 1, **30 failed, 224 deselected in 2.25s**. Evidence: `work/wp4.5/r3-red.log/xml`.
+
+Command: `PYTHONPATH=scripts uv run --offline pytest tests/test_io_photo_exif_bytes.py -k r3 --basetemp=work/wp4.5/tmp -p sandbox_mkdir_shim -p no:cacheprovider -m "not gpu and not footage and not gui and not slow and not fullclip" --junitxml=work/wp4.5/r3-red.xml`.
+
+R2's four A=B=C=150 cases are rewritten to expect duplicate pointer removal (156 physical entries, not 454), under the R3 design guard. R1's two distinct-child duplicate Exif cases now require only the first child and its D63 dimensions. These six amended cases retain the owned file boundary and explain six removed/replacement node IDs. New cases: eight overlapping-child constructions (P=200/N=400, two tags/routes/orders), four same-offset sibling cases, and twelve first-pointer/warning-count cases across the three pointer tags/routes/orders.
+
+| Case | Actual pre-fix result |
+| --- | --- |
+| `test_r3_duplicate_exif_pointer_keeps_first_child_with_d63_dimensions[<]` | AssertionError: later Exif pointer retained |
+| `test_r3_duplicate_exif_pointer_keeps_first_child_with_d63_dimensions[>]` | AssertionError: later Exif pointer retained |
+| `test_r3_shared_child_duplicate_pointers_are_dropped[edit-<]` | AssertionError: duplicate pointer entries retained |
+| `test_r3_shared_child_duplicate_pointers_are_dropped[edit->]` | AssertionError: duplicate pointer entries retained |
+| `test_r3_shared_child_duplicate_pointers_are_dropped[from_tiff-<]` | AssertionError: duplicate pointer entries retained |
+| `test_r3_shared_child_duplicate_pointers_are_dropped[from_tiff->]` | AssertionError: duplicate pointer entries retained |
+| `test_r3_overlapping_children_keep_one_ifd_with_bounded_entry_count[34665-edit-<]` | AssertionError: more than one carried IFD for pointer tag |
+| `test_r3_overlapping_children_keep_one_ifd_with_bounded_entry_count[34665-edit->]` | AssertionError: more than one carried IFD for pointer tag |
+| `test_r3_overlapping_children_keep_one_ifd_with_bounded_entry_count[34665-from_tiff-<]` | AssertionError: more than one carried IFD for pointer tag |
+| `test_r3_overlapping_children_keep_one_ifd_with_bounded_entry_count[34665-from_tiff->]` | AssertionError: more than one carried IFD for pointer tag |
+| `test_r3_overlapping_children_keep_one_ifd_with_bounded_entry_count[34853-edit-<]` | AssertionError: more than one carried IFD for pointer tag |
+| `test_r3_overlapping_children_keep_one_ifd_with_bounded_entry_count[34853-edit->]` | AssertionError: more than one carried IFD for pointer tag |
+| `test_r3_overlapping_children_keep_one_ifd_with_bounded_entry_count[34853-from_tiff-<]` | AssertionError: more than one carried IFD for pointer tag |
+| `test_r3_overlapping_children_keep_one_ifd_with_bounded_entry_count[34853-from_tiff->]` | AssertionError: more than one carried IFD for pointer tag |
+| `test_r3_same_offset_siblings_are_parsed_per_label[edit-<]` | AssertionError: GPS parse discarded Exif Interop |
+| `test_r3_same_offset_siblings_are_parsed_per_label[edit->]` | AssertionError: GPS parse discarded Exif Interop |
+| `test_r3_same_offset_siblings_are_parsed_per_label[from_tiff-<]` | AssertionError: GPS parse discarded Exif Interop |
+| `test_r3_same_offset_siblings_are_parsed_per_label[from_tiff->]` | AssertionError: GPS parse discarded Exif Interop |
+| `test_r3_duplicate_pointer_tags_follow_first_and_warn_per_later_entry[parent0-34665-edit-<]` | AssertionError: later carried pointer retained |
+| `test_r3_duplicate_pointer_tags_follow_first_and_warn_per_later_entry[parent0-34665-edit->]` | AssertionError: later carried pointer retained |
+| `test_r3_duplicate_pointer_tags_follow_first_and_warn_per_later_entry[parent0-34665-from_tiff-<]` | AssertionError: later carried pointer retained |
+| `test_r3_duplicate_pointer_tags_follow_first_and_warn_per_later_entry[parent0-34665-from_tiff->]` | AssertionError: later carried pointer retained |
+| `test_r3_duplicate_pointer_tags_follow_first_and_warn_per_later_entry[parent1-34853-edit-<]` | AssertionError: later carried pointer retained |
+| `test_r3_duplicate_pointer_tags_follow_first_and_warn_per_later_entry[parent1-34853-edit->]` | AssertionError: later carried pointer retained |
+| `test_r3_duplicate_pointer_tags_follow_first_and_warn_per_later_entry[parent1-34853-from_tiff-<]` | AssertionError: later carried pointer retained |
+| `test_r3_duplicate_pointer_tags_follow_first_and_warn_per_later_entry[parent1-34853-from_tiff->]` | AssertionError: later carried pointer retained |
+| `test_r3_duplicate_pointer_tags_follow_first_and_warn_per_later_entry[parent2-40965-edit-<]` | AssertionError: later carried pointer retained |
+| `test_r3_duplicate_pointer_tags_follow_first_and_warn_per_later_entry[parent2-40965-edit->]` | AssertionError: later carried pointer retained |
+| `test_r3_duplicate_pointer_tags_follow_first_and_warn_per_later_entry[parent2-40965-from_tiff-<]` | AssertionError: later carried pointer retained |
+| `test_r3_duplicate_pointer_tags_follow_first_and_warn_per_later_entry[parent2-40965-from_tiff->]` | AssertionError: later carried pointer retained |
+
+### R3 remediation and verification (seat 2, turn 3)
+
+Design guard implemented as ruled: a parent-local set consumes the first
+occurrence of each carried pointer tag in table order BEFORE pointer/value
+validation. Every later occurrence is dropped without following it, with one
+warning naming the parent IFD and tag ID. An unreadable first pointer never
+falls back to a later duplicate. Only IFD0 can follow Exif/GPS, only Exif can
+follow Interop, and the other labels cannot follow further children. Each
+label can therefore be parsed at most once: four source tables in total.
+Both the source-offset parse cache and identity write cache are removed,
+along with the shared-child dimension deduplication set. The single Exif
+child alone receives dimension edits. Same-offset siblings get independent
+per-label lists; ancestor offsets remain cycles and drop that child alone.
+F-C's whole-entry clamping, source type/count/value-byte carry, order, pointer
+type retention/promotion and the rest of D63 are unchanged.
+
+F-A and F-1 are FIXED by the guard, not banked as Limits. F7 shared VALUES,
+already reproduced on the base, remains the only amplification Limit. The
+entry-count bound is the corrected `written entries <= 4 * source bytes / 12
++ 5`, not a byte-size bound on potentially shared values. F-2's same-offset
+case is fixed by removing the cache and keeping labels independent. F-3's
+report now describes the actual guarded implementation, with the R2 cache
+history explicitly superseded. F-4 has no change, as ruled.
+
+The R3 RED roster has 30 cases: six rewritten controls and 24 new cases.
+All 30 failed through assertions on the unchanged c7c7360 product, not fixture
+errors. After the fix every case in the 254-case new file passes on the first
+GREEN run. No review finding rejected as a false positive, no reopened item,
+no revert. The rewritten A=B=C=150 case now retains 156 physical entries
+(one Exif pointer, one Interop pointer, and all 150 non-pointer Interop fields)
+and warns once for each of the 298 later structural pointers. The ordinary
+duplicate-field and D63 duplicate controls remain green.
+
+| Check | Exit | Actual result | Evidence under work/wp4.5/ |
+| --- | --- | --- | --- |
+| R3 RED, `-k r3`, product unchanged from c7c7360 | 1 | 30 failed, 224 deselected in 2.25s | `r3-red.log/xml`, per-case assertions above |
+| New file GREEN | 0 | 254 passed, 1 warning in 0.88s | `r3-green.log/xml` |
+| Authorized combined light run, after formatting | 0 | 931 passed, 5 deselected, 133 warnings in 15.46s | `r3-light.log/xml` |
+| Targeted `uv run --offline ruff check` | 0 | All checks passed! | `r3-ruff.log` |
+| `uv run --offline mypy` | 0 | Success: no issues found in 141 source files | `r3-mypy.log` |
+| Format the two owned Python files | 0 | 1 file reformatted (tests), 1 file left unchanged | `r3-format.log` |
+| Final read-only scope/byte/result audit and seven boundary probes | 0 | Four owned files only; ASCII/LF, final newlines, no trailing whitespace; diff check clean; JUnit 30 RED / 254 GREEN / 931 light; seven probes passed | `r3-final-audit.log` |
+
+Light targets and marker expression are unchanged from R2: all
+`tests/test_io_photo_*.py` (new file included once), `tests/test_photo_check.py`,
+`tests/test_wp41_photo_path.py`, `tests/test_jobs_export_photo.py`;
+`-m "not gpu and not footage and not gui and not slow and not fullclip"`.
+All pytest runs use `PYTHONPATH=scripts`, `--basetemp=work/wp4.5/tmp`,
+`-p sandbox_mkdir_shim` and `-p no:cacheprovider`. All runner output is routed
+to work/wp4.5 files. The existing bad-value fixture's one separate Pillow
+UserWarning remains; no pytest warning suppression was added.
+
+Independent boundary probes, all synthetic and in memory: root-ancestor
+cycles for Exif/GPS drop that child alone; unreadable-first-plus-valid-later
+cases for all three pointer tags do not follow the later pointer and emit
+two IFD/tag warnings; 14-byte and 10-byte empty IFD0 cases produce the five
+mandatory D63 entries and satisfy the corrected +5 bound. These are seven
+executed probes in `r3_final_audit.py`, not additional pytest case counts.
+
+Verification loop: suspected the reviewed distinct-overlap and label-sharing
+mechanisms; confirmed independently by code paths and RED structural/count
+assertions; removed the caching approach under the simpler guard; new-file,
+light, static and boundary checks pass. A final diff review checked the
+four-table call graph, first-occurrence-before-validation behavior, source
+entry byte carry, warning privacy, label-local D63 edits, cycle rule,
+docstrings and scope. No additional in-envelope defect found. The earlier
+exact-bound suspicion was confirmed and resolved only under the explicit
+erratum, now quoted in the Round 3 section and report.
+
+One logical guard remediation spans the four owned files. No writer/reader/
+PNG/interface/dependency/config/fixture/harness changes, no other existing-test
+edit, no footage read/write, no mailbox post, no commit and no write outside
+the worktree. The granted R1 test is unchanged in seat 2. Supplied footage
+and static evidence on c7c7360 and corrected depth are recorded above; this
+cell performs no footage or full-suite gate. Reviewer A R4 runs after yield;
+Reviewer B, final format/blob checks and the full parallel + impacted serial
+gate remain at the orchestrator's seat. No convergence or acceptance claim.
+If R4 blocks on this amplification class again, STOP to CHARC with the cap
+recommendation, as ruled. Last dispatcher-supplied depth is 135,854 input
+tokens; current depth is dispatcher-read at this boundary, window 258,400.

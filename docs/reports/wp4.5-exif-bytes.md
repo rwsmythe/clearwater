@@ -1,7 +1,7 @@
 # WP4.5 - EXIF byte fidelity through the photo writer
 
-Implementation and R2 remediation are complete; light verification is recorded
-below. Reviewer A R3, Reviewer B and the orchestrator's final gate remain
+Implementation and R3 remediation are complete; light verification is recorded
+below. Reviewer A R4, Reviewer B and the orchestrator's final gate remain
 pending. Product base: main `5a1538a`.
 This report contains synthetic evidence only; no real photo metadata is included.
 
@@ -35,11 +35,18 @@ offset exceeds 65535, when it promotes to LONG. The next-IFD pointer is zero, dr
 IFD1 and its thumbnail. Inserted entries precede the first greater tag, so a
 sorted source stays sorted.
 
-Each child IFD is parsed once by source offset and written once by shared
-directory identity. All pointers to that child use its single new offset;
-an ancestor offset is a cycle, while repeated sibling offsets share the child.
-The dimension edit also runs once per shared Exif child. This fixes R2 F-A's
-shared-child entry multiplication; the separate shared-value limit below remains.
+Each carried pointer tag is followed only at its FIRST occurrence in its
+parent's table order: 34665 and 34853 in IFD0, 40965 in Exif. Every later
+occurrence is dropped with one IFD/tag warning, even if the first pointer is
+unreadable. Pointers are structure; other non-D63 duplicate field values still
+pass through. At most four source tables are parsed and written: IFD0, Exif,
+GPS and Interop. No child cache remains. Same-offset siblings are parsed
+separately per label, so Interop stays under Exif and dimension edits affect
+only the Exif copy. Ancestor offsets remain cycles and drop only that child.
+Written entry count is bounded by `4 * len(source block) / 12 + 5`, including
+at most five D63 insertions (the turn-3 erratum to CHARC `85978ce0cd76c577`).
+This fixes both R2 F-A's shared-child and R3 F-1's overlapping-child entry
+multiplication. F7 shared values is the only amplification Limit below.
 
 The D63 replacements are Orientation SHORT/count 1/value 1, Software ASCII
 Clearwater with its terminating NUL, and the written pixel dimensions. Existing
@@ -47,8 +54,8 @@ SHORT dimensions remain SHORT when the new value fits; otherwise they become
 LONG. Existing LONG dimensions remain LONG, and absent dimensions are inserted
 as LONG. Each D63 tag's first occurrence is replaced in its original position;
 later duplicates are dropped with one IFD/tag warning per removed entry. Other
-duplicates, including duplicate Exif pointers, are retained. Every carried Exif
-child receives the dimension edits. An absent Exif IFD is created. A source without EXIF produces only the
+non-pointer duplicates are retained. The single carried Exif child receives
+the dimension edits. An absent Exif IFD is created. A source without EXIF produces only the
 four D63 fields and their structural Exif pointer.
 
 Counts, table extents, value lengths and offsets are checked before the
@@ -160,7 +167,11 @@ used `-m "not gpu and not footage and not gui and not slow and not fullclip"`,
 - Reviewer A R1: 3 major, 2 minor and 4 advisory findings; adjudicated and
   remediated under CHARC `980818fc01eb77ea`.
 - Reviewer A R2: 1 major, 1 minor and 4 advisory findings; adjudicated and
-  remediated under CHARC `72fc47f6a4ecfd91`; R3 pending, no convergence claim.
+  remediated under CHARC `72fc47f6a4ecfd91`; its child-cache mechanism is
+  superseded by the R3 guard.
+- Reviewer A R3: 1 major, 1 minor (out of envelope) and 2 advisory findings;
+  adjudicated under CHARC `85978ce0cd76c577` and the turn-3 bound erratum;
+  guard remediation green. R4 pending, no convergence claim.
 - Reviewer B: pending.
 - Full parallel leg: @@PAR@@
 - Impacted serial nodes: @@SER@@
@@ -189,7 +200,7 @@ CHARC `980818fc01eb77ea` amended the damage rule and dispositioned all findings:
 | --- | --- |
 | F1, major | Confirmed with RED entry-damage cases across all four IFDs and both routes. Drop only faulty entries; preserve siblings. The current array/offset damage rule is the R2 F-C rule below. |
 | F2, major | Confirmed with carried type-13 pointers in both byte orders/routes. Carry type 13 at the supported Exif/GPS/Interop pointer positions and retain its source type. Other type-13 entries remain dropped. |
-| F3, major | Confirmed duplicate D63 entries survived. Replace the first occurrence and warn/drop later D63 copies. Retain all other duplicates; duplicate Exif children each receive dimension edits. |
+| F3, major | Confirmed duplicate D63 entries survived. Replace the first occurrence and warn/drop later D63 copies. Non-pointer duplicates still pass through; the pointer-tag precision is narrowed by the R3 guard below. |
 | F4, minor | Confirmed empty Interop pointers survived. Prune empty child trees recursively in both routes. |
 | F5, minor | Update public/private docstrings and this report to distinguish entry faults from table faults and remove stale Pillow writer claims. |
 | F6, advisory | Add the missing regressions and require ValueError in the root-raise test. Reviewer layout/alignment/overlap fuzz found no defect. |
@@ -199,7 +210,7 @@ CHARC `980818fc01eb77ea` amended the damage rule and dispositioned all findings:
 
 R1 checks at the cell: new file **203 passed**, exit 0; broader light run
 **880 passed, 5 deselected**, exit 0; targeted ruff check exit 0; mypy exit 0,
-no issues in 141 source files. R2 is required for convergence. R1's reviewer
+no issues in 141 source files. These historical checks precede R2/R3. R1's reviewer
 also supplied zero mismatches over 3,000 valid layout/fidelity probes and no
 unexpected exception/hang over 20,000 mutated/truncated blocks; these are
 reviewer checks, not a substitute for the gate.
@@ -211,7 +222,7 @@ Fresh Codex seat 2 remediated under CHARC `72fc47f6a4ecfd91`:
 
 | Finding | Disposition and remediation |
 | --- | --- |
-| F-A, major | FIXED. Cache parsed children by source offset and written directories by identity, retaining duplicate pointers, source pointer types/counts and the ancestor cycle check. A=B=C=150 shared-pointer fixtures now have exactly 454 physical entries in three IFDs in both byte orders/routes; pre-fix output had 3,397,952 entries. No timing bound. This is distinct from R1 F7 shared values. |
+| F-A, major | FIXED by the R3 guard below, together with R3 F-1. R2's exact-offset cache was incomplete: distinct overlapping offsets still multiplied child entries. The superseded R2 candidate had 454 physical entries for A=B=C=150; pre-R2 had 3,397,952. The current guard drops duplicate pointers and has 156 entries. No timing bound. Distinct from R1 F7 shared values. |
 | F-B, minor | FIXED. Accept complete arrays without a next-IFD pointer in IFD0 and GPS; output next pointers remain zero. |
 | F-C, advisory, ruled amendment | FIXED under the new rule: retain all whole entries from a cut array, warn once with the IFD and declared/kept counts. Root header/offset/cycle faults raise; child offset/cycle faults drop only that child. Supersedes whole-table rejection wording and WP4.5 test controls. |
 | F-D, advisory, ruled Limit | Existing type-9 pointer drop retained with an IFD/tag warning; four passing regression controls cover both routes/orders. No pointer-type widening. |
@@ -238,6 +249,59 @@ single product logger warning asserted by the test. No cell footage run.
 Logs and JUnit files: `work/wp4.5/r2-{red,green,light}.{log,xml}`,
 `r2-ruff.log`, `r2-mypy.log`, `r2-format.log`.
 
+## Reviewer A R3
+
+Claude opus/high, read-only on `c7c7360`, returned
+`NEW_CRITICAL_MAJOR_FOUND`: one new major, one out-of-envelope minor, and two
+advisories. CHARC `85978ce0cd76c577` replaced R2's cache with the DESIGN GUARD.
+The cell's pre-build STOP proved that the exact entry bound omitted mandatory
+D63 insertions: a valid 14-byte empty IFD0 needs five output entries. The
+orchestrator's turn-3 erratum, reported to CHARC, allows those five insertions;
+all other guard requirements stand. This is an arithmetic erratum, not a
+change to the D63 contract or the pointer guard.
+
+| Finding | Disposition and verification |
+| --- | --- |
+| F-1, major, in envelope | FIXED with R2 F-A by following each carried pointer tag only once per parent and dropping each later occurrence with one warning. Remove both child caches and the shared-child dimension deduplication set. P=200/N=400 overlapping-offset fixtures for Exif and GPS, both routes/orders, require exactly one pointer/child for that label, at most four total IFDs, and `12 * output entries <= 4 * source bytes + 60`. |
+| F-2, minor, out of envelope | Resolved by the same commissioned guard. GPS-before-Exif same-offset fixtures preserve Interop only under Exif and dimensions only in Exif. The sole unsupported Interop warning correctly names GPS and tag 40965. No label-sharing cache remains. |
+| F-3, advisory | Report F-A and F-1 as FIXED by the guard and state the erratum's entry-count bound. F7 shared values, reproduced in the base, remains the only amplification Limit. |
+| F-4, advisory | No change, as ruled. from_tiff continues warning on SubIFDs and unsupported IFD-valued entries. |
+
+RED before product changes, against the unchanged `c7c7360` product:
+**30 failed, 224 deselected**, exit 1. The ledger records each actual
+failure. Six cases amend prior tests in the owned file: R1's two distinct-child
+duplicate Exif cases now keep only the first child with its D63 dimensions;
+R2's four A=B=C=150 cases now drop duplicates and retain 156 physical entries,
+including all 150 non-pointer Interop values. The 24 new cases cover eight
+overlapping-offset, four same-offset sibling and twelve pointer-tag cases
+(first occurrence, source type/count, one warning per later entry). Tests
+compare entry counts and structure, with no wall-clock bound.
+
+GREEN: **254 passed, 1 warning in 0.88 s**, exit 0. The authorized combined
+light run passed **931 tests, 5 deselected, 133 warnings in 15.46 s**, exit 0.
+Targeted ruff check: exit 0, All checks passed. Strict mypy: exit 0, no issues
+in 141 source files. Ruff formatted the owned test file; exif.py was already
+formatted. All pytest commands use the same sandbox shim, work temp root and
+five-marker exclusion documented above. Logs/JUnit: `work/wp4.5/r3-{red,green,light}.{log,xml}`;
+static/format logs: `r3-ruff.log`, `r3-mypy.log`, `r3-format.log`. The existing
+synthetic bad-value fixture still produces one separate Pillow UserWarning.
+The final byte/scope audit passes: exactly four owned files, ASCII/LF-only,
+final newlines and no trailing whitespace; `git diff --check` clean. Seven
+additional in-memory synthetic probes confirm ancestor-cycle isolation,
+no fallback after an unreadable first pointer for all three tags, and the
+corrected +5 bound on 14-byte and 10-byte empty source tables. Evidence:
+`work/wp4.5/r3-final-audit.log`.
+
+The source-offset parse cache, identity write cache and shared-dimension set
+are removed. Parent-local first-tag tracking precedes pointer validation, so
+an unreadable first occurrence does not allow a later pointer to be followed.
+There is one Exif/GPS slot from IFD0 and one Interop slot from Exif; GPS and
+Interop cannot recurse, so at most four tables are parsed. Offsets equal to
+ancestors still drop the cyclic child; equal sibling offsets get fresh lists
+under their own labels. Entry value relocation/type/count/order behavior and
+the F-C cut-array rule are unchanged. All new warnings name IFD/tag only.
+Reviewer A R4, Reviewer B and the final orchestrator gate remain pending.
+
 ## Verification loop and limits
 
 The raw-fidelity problem was confirmed independently by source inspection,
@@ -250,9 +314,11 @@ additional entry-damage, duplicate, pointer-type, empty-child and SHORT
 relocation regressions were confirmed RED before fixes and green afterward.
 R2's shared-child, missing-next-pointer, cut-array and warning-count defects
 were independently confirmed by the code paths and RED tests, fixed and checked
-green. F-D is an existing-behavior control, not a newly implemented fix. The
-final R2 light run and static checks found no further failure. Full acceptance
-depends on the pending reviews and gate figures above.
+green. F-D is an existing-behavior control, not a newly implemented fix.
+R3 independently confirmed the distinct-overlap and same-offset-label
+defects RED, then removed the cache under the guard and checked every new and
+amended case green. The final R3 light run and static checks found no further
+failure. Full acceptance depends on the pending reviews and gate figures above.
 
 Named limits:
 
