@@ -402,8 +402,16 @@
 - **W4 DONE ~13:33Z (status `b939bf0f21233da7`, no reply owed): RUNG 4 CLOSED.** `-m fullclip` 7 passed in 1,556 s; observer
   verified 7 passing calls, full sink frames_written == 681 both operands, no trim fixture set up. Full forms: engine 446 s,
   levels 328 s, round trip [first30] 167 s, default pipe 135 s, decode 107 s, CUDA 104 s, sink 60 s (+ shared encode setup).
-  Tree clean. Seat 2 depth 183,073. NEXT: rung 5 report turn; Reviewer A (Claude pass, FAST, one round + cleanup; adjudication
-  to a fresh seat 3 if depth > 200K); Reviewer B; the ONE gate = the AFTER figure (Q6 per-test sum).
+  Tree clean. Seat 2 depth 183,073.
+- **WP-T6 REVIEWER A R1 13:56Z (status `2cab9ec3890e99bd`, no reply owed): NO_NEW_CRITICAL_MAJOR, 0/0/3 minor/8 advisory**
+  (Claude pass opus/high on 6ecc4e5..04b01d2; model claude-opus-5-5; is_error false; worktree clean; 10 sandbox denials all
+  /tmp scratch, no withheld path; r1 md5 68b2ac99). Minors: F1 audio packets not compared (outside 4(b)/lock 2; wording);
+  F2 a truncated gpmd passes the prefix rule -> tie the data packet count to T; F3 no re-proof the cut is a keyframe -> source
+  packet at `count` carries K with pts_time == T, a named 4(c) sub-result + an N=75 control. Advisories: F4 the serial ORDER
+  changes (session-parametrised fixture groups items; the gate is the first whole-leg run in the new order); F5 readiness skip
+  first in body; F6 the R5-R7 locator raises on an unsearchable folder (as DR-27 (1) intends). Single cleanup (Q11) in seat 2
+  (depth 98,187 after compaction) yields `w2b.sh` (W2 stages + new controls) for the orchestrator's seat. NEXT: w2b re-proof;
+  Reviewer B (Claude pass at the orchestrator's seat); the ONE gate = AFTER figure.
 - **(history) After WP4.1's accept:** WP4.2's brief (DRAFT RULED on main 3aa3c51) got ONE revision pass against WP4.1's accept record, then FINAL
   on CHARC's word; its revision must carry: DR-78/79 (B2 rows) as WP4.2 items, the WP4.1 runner's final names and the stream-syntax
   predicate, the Limit text. WP4.3's revision later carries DR-75 (REQUIRED test under its Q12), DR-76, DR-77, and the AD-23 'applied by
