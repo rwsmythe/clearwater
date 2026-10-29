@@ -152,6 +152,13 @@
   read as untagged), color.py grant DECLINED; Q9 delete PNGs after measuring, STOP < 20 GB. Inventory QA confirmed
   done (fffae21e). Lane share: Codex WP4.4 + WP-DR87 + WP3.6P; Claude WP4.3. Spec items for the owner's NEXT revision
   bundle (not now): D63 'provisional until an owner photo is read' wording; :567 photo resolution = 24.5 MP max.
+- **WP4.4 TURN-2 STOP RULED 22:17Z (query 52fcd7bf, my post + cue): (a)** the qt fixture's audio becomes stereo PCM;
+  V4 assertion unchanged; the mono path is witnessed by the IMG_6702 footage test. Cause verified: FFmpeg 9.0.2's MP4
+  `ipcm` writer drops a DECLARED mono layout (count kept); `compare.py:1194-1209` reads mono vs absent as DIFFERENT;
+  Apple's mono lpcm declares none, so the owner's clips are SAME. Comparator grant (b) DECLINED (shared V4 instrument).
+  **Owed by me at WP4.4's accept: a MINOR row (qt declared-mono layout lost in MP4; trigger next V4 instrument touch or
+  an owner MOV DIFFERENT on that item alone) beside the DV/HDR fact line.** Turn 2 committed 35391b0; cell 163,747 /
+  258,400; turn 3 = fixture + footage test; A rounds likely on a fresh Codex seat.
 - **(gen 7 history follows; newest facts at the end of the block)**
 - **GEN 7 PICKUP (was).** Orchestrator = **gen 22 `clearwater-orchestrator-20261029-0704`** (online 17:08Z from gen 21's
   state 736e403; gauge 38 ms; gen 21 was `clearwater-orchestrator-20261029-0425`, rolled 17:05Z at ~400K); ALL cues go there. Time the bash launch and record it here. Inbox: drain with `read --role charc --all`
