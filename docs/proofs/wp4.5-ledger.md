@@ -150,7 +150,9 @@ no full serial leg is requested. No acceptance or convergence is claimed now.
 | Round | Source | Critical | Major | Minor | In / out | NEW / REOPENED | Reverts | Product / test fixes | Disposition |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | 0 | Cell source trace + executed synthetic probe; not Reviewer A | 0 | 1 | 0 | 1 / 0 | 1 / 0 | 0 | 0 / 0 | STOP resolved, Q1 = (b) (CHARC `c64900357c363330`) |
-| T2 compatibility check | Executed existing test; not Reviewer A | 0 | 1 | 0 | 1 / 0 | 1 / 0 | 0 | Product rewrite + new regression tests; no compatibility remediation | STOP: existing test injects failure in removed Pillow dependency; existing tests not owned |
+| T2 compatibility check | Executed existing test; not Reviewer A | 0 | 1 | 0 | 1 / 0 | 1 / 0 | 0 | Product rewrite + new regression tests; no compatibility remediation | Original STOP resolved by test-line grant `1d9f88948f4350c4`; granted injection blocked in T3 |
+| T3 grant check | Executed base/current test and independent TIFF inspection; not Reviewer A | 0 | 1 | 0 | 1 / 0 | 1 / 0 | 0 | Test-only attempted injection; no product change | STOP resolved by amended grant `8dd13704a85f2237`: placeholder tag then tag-ID patch and presence assertion |
+| T4 amended test check | Executed base test and final light run; not Reviewer A | 0 | 0 | 0 | 0 / 0 | 0 / 0 | 0 | Test-only remediation; no product change | Amended real GPS injection passes with rewrite; light run green; Reviewer A R1 pending |
 
 - Suspected: the fresh IFD construction drops source type pins.
 - Confirmed independently: source trace and parsed synthetic output agree for
@@ -164,6 +166,142 @@ no full serial leg is requested. No acceptance or convergence is claimed now.
 | Turn / boundary | Depth supplied by dispatcher | Action |
 | --- | --- | --- |
 | Turn 1 / Round 0 | 70,739 input tokens; window 475,000 (supplied in turn 2) | STOP resolved; proceed under Q1(b) |
+| Turn 2 yield | 114,882 input tokens; window 258,400 (supplied in turn 3) | Proceed under test-line grant `1d9f88948f4350c4` |
+| Turn 3 yield | 128,189 input tokens; window 258,400 (supplied in turn 4) | Proceed under amendment `8dd13704a85f2237` |
+
+## Turn 4 - amended grant implemented; light checks green
+
+CHARC amendment `8dd13704a85f2237` (file `cae0ebba`,
+2026-10-29T19:26:42Z) resolves the turn-3 STOP. Only the granted test changes:
+it writes LONG/count-1 tag 65000 beside Make, parses the header byte order,
+IFD0 offset/count and 12-byte entries to locate it, then patches only the
+two-byte tag ID to 34853. A pre-read assertion verifies that the GPS entry
+exists with the expected type/count and a past-EOF offset. The original final
+three assertions remain verbatim. `struct` was already imported, so no imports
+were added or removed. No product code changed in turns 3-4.
+
+Completion-record GRANT line: `tests/test_io_photo_r1.py`, only
+`test_a_tiff_with_an_unreadable_gps_ifd_keeps_its_other_fields`, CHARC
+`1d9f88948f4350c4`, amended by `8dd13704a85f2237`.
+
+### Final-form base evidence
+
+The final amended test was run against scratch `5a1538a` EXIF code using the
+same ignored plugin as turn 3; no worktree product was replaced. The real GPS
+presence assertion passed. The original damage-warning assertion failed:
+
+```text
+assert 'GPS IFD cannot be read' in "ERROR    tifffile:tifffile.py:6414 <TiffTag.fromfile> raised TiffFileError('<tifffile.TiffTag 34853 @202> invalid value offset 16777200')\n"
+```
+
+Result: exit 1, 1 failed, 1 warning in 0.26s. Evidence:
+`work/wp4.5/turn4-base.log`, `turn4-base.xml`. The ERROR above is the synthetic
+damaged-pointer diagnostic from tifffile, not an infrastructure error. This
+record supersedes the direct-extratag attempt as the grant's final base result.
+
+### Final light verification
+
+Combined targets: all `tests/test_io_photo_*.py`, `tests/test_photo_check.py`,
+`tests/test_wp41_photo_path.py`, `tests/test_jobs_export_photo.py`. Command uses
+`PYTHONPATH=scripts uv run --offline pytest <targets> -q -m "not gpu and not
+footage and not gui and not slow and not fullclip" --basetemp=work/wp4.5/tmp
+-p sandbox_mkdir_shim -p no:cacheprovider
+--junitxml=work/wp4.5/turn4-light.xml`, with output routed to
+`work/wp4.5/turn4-light.log`.
+
+| Run | Exit | Actual result |
+| --- | --- | --- |
+| Combined light targets | 0 | 789 passed, 5 deselected, 132 warnings in 15.34s |
+| Targeted ruff check on exif.py, new test file and granted existing test file | 0 | All checks passed! (`turn4-ruff-final.log`) |
+| `uv run --offline mypy` | 0 | Success: no issues found in 141 source files (`turn4-mypy.log`) |
+
+The final-form granted test accounts for the difference from turn 2: R1 is now
+34 passed/0 failed, and every other per-file count is unchanged. The combined
+run includes all 112 new byte-fidelity cases. `turn4-summary.log` records the
+JUnit-derived per-file counts. The initial turn-4 lint check found one long
+line in the granted test; it was wrapped and the targeted check re-ran green.
+No further product behavior or assertions changed.
+
+Final byte/scope check (`turn4-final-check.log`): exit 0. All three changed
+files are ASCII/LF-only with final newlines and no trailing whitespace. AST
+comparison proves no change outside the granted test, verifies the three
+original assertions verbatim, and verifies the added presence assertion. Both
+grant IDs and all three report gate placeholders are present. `git diff --check`
+exited 0. A read-only `ruff format --diff tests/test_io_photo_r1.py` exited 0 and
+reported one file already formatted (`turn4-format-diff.log`).
+
+### Return/report and verification-loop disposition
+
+Created `docs/reports/wp4.5-exif-bytes.md`: root cause, Q1 history and both
+grounds for byte pass-through, implementation, test/base evidence, owned/granted
+files, limits and the gate placeholders `@@PAR@@`, `@@SER@@`, `@@FOOT@@`.
+Reviewer A R1 follows this yield; Reviewer B and final gate figures remain
+pending. No full-suite, serial, footage, GPU, GUI, slow or fullclip run was
+performed by the cell, and no convergence/acceptance is claimed.
+
+The turn-2 compatibility suspicion and turn-3 filtered-injection suspicion are
+both confirmed and resolved under the recorded grants. The amended final test
+checks actual damaged data, its presence control passes, its base warning
+assertion fails, and its rewritten-product assertions pass. The final light
+and static checks reveal no further failure. No new finding is being banked or
+declined, and no register row is required.
+
+Only the single granted existing test, ledger and new report changed in turns
+3-4. Public interfaces, product code, dependencies/lock file, all other tests,
+fixtures, config, footage and harness remain untouched. No commits or mailbox
+posts. All generated material is synthetic and remains under the worktree.
+
+## Turn 3 - test-line grant blocked by tifffile filtering (resolved in turn 4)
+
+CHARC `1d9f88948f4350c4`, file `adea9a23`, 2026-10-29T19:22:06Z,
+granted only `tests/test_io_photo_r1.py::test_a_tiff_with_an_unreadable_gps_ifd_keeps_its_other_fields`.
+The test now removes its monkeypatch parameter/shim, requests GPS tag 34853 as a
+LONG/count-1 extratag with an offset beyond the synthetic file, and keeps the
+three assertions verbatim. No imports became unused; none were removed. `Image`
+remains used elsewhere in the file.
+
+**[major] STOP:** the mandated injection is not written. Installed tifffile
+includes 34853 in `TIFF.TAG_FILTERED` and refuses that tag in `extratags`.
+`tifffile.py:3507-3516` adds filtered tags to its skip set and logs a warning
+instead of writing them. Independent `struct` inspection of the generated
+synthetic TIFF confirms Make is present and GPS 34853 is absent. No real
+metadata was used.
+
+Actual failure on BOTH main `5a1538a`'s EXIF implementation and the current product:
+
+```text
+assert 'GPS IFD cannot be read' in "WARNING  tifffile:tifffile.py:3513 <tifffile.TiffWriter 'gps.tif'> not writing extratag 34853\n"
+```
+
+| Probe/run | Exit | Result | Evidence under work/wp4.5/ |
+| --- | --- | --- | --- |
+| Granted test against scratch base EXIF module | 1 | 1 failed in 0.60s; injection absent | `turn3-base.log`, `turn3-base.xml`, `base_exif.py`, `wp45_base_exif.py` |
+| Granted test against current product | 1 | 1 failed in 0.27s; same assertion | `turn3-grant.log`, `turn3-grant.xml` |
+| Independent TIFF inspection | 0 | Make present; GPS absent; GPS in TAG_FILTERED | `turn3-filter-probe.log` |
+
+Base method: an ignored pytest plugin obtains `git show
+5a1538a:src/clearwater/io/photo/exif.py` using `subprocess.check_output`, writes
+those bytes under `work/wp4.5/base_exif.py`, imports that scratch module, and
+redirects `reader.exif_tools` and the collected test module's `exif_tools` to it
+inside the isolated pytest process. No base file was checked out over the
+worktree. Both test runs target exactly the granted node, set
+`PYTHONPATH=scripts;work/wp4.5` for the base run (`scripts` for current), load
+`sandbox_mkdir_shim` and `no:cacheprovider`, use `--basetemp=work/wp4.5/tmp`, and
+apply the same five-marker exclusion as turn 2. The base run additionally loads
+`-p wp45_base_exif`.
+
+Recommended amendment: allow a synthetic placeholder LONG/count-1 extratag,
+then patch only its two-byte tag ID in the written IFD0 entry to 34853. Its
+out-of-range offset remains the real failure injection. Keep all three
+assertions verbatim and remain inside the granted test. No such workaround has
+been implemented because the grant specifies direct GPS `extratags` writing.
+
+The full light rerun, new static checks and report are deferred at this STOP;
+turn 2's results remain historical, not a green claim for the new test form.
+No product code changed this turn. No other existing test or import changed.
+No report or register row created, no commits/mailbox posts, no footage access.
+Reviewer A has not run. The report and completion record must name the grant
+above once the injection mechanism is resolved.
 
 ## Turn 2 - RED-first roster additions
 
