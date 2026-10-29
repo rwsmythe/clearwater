@@ -182,7 +182,7 @@ class LatestWorker:
             self._pending = None
 
     def idle(self) -> bool:
-        """Return True when no task waits or runs and no outcome is still on its way."""
+        """Return True when no task or chore waits or runs and no outcome is on its way."""
         with self._lock:
             return (
                 self._pending is None
@@ -209,24 +209,31 @@ class LatestWorker:
         return not self._thread.is_alive()
 
     def _run(self) -> None:
-        """The worker loop: chores first, then the latest task."""
+        """The worker loop: chores first, then the latest task.
+
+        The queued chores and the task are taken in ONE critical section, so a chore queued
+        before the task is taken always runs before it (R1-6); the worker is busy while a chore
+        runs (R1-10).
+        """
         while True:
             with self._lock:
                 while self._pending is None and not self._chores and not self._stopping:
                     self._lock.wait()
                 chores = list(self._chores)
                 self._chores.clear()
-            if chores:
-                self._run_chores(chores)
-                continue
-            with self._lock:
-                if self._stopping:
-                    return
-                if self._pending is None:
-                    continue
-                generation, task = self._pending
-                self._pending = None
+                if not chores:
+                    if self._stopping or self._pending is None:
+                        return
+                    generation, task = self._pending
+                    self._pending = None
                 self._busy = True
+            if chores:
+                try:
+                    self._run_chores(chores)
+                finally:
+                    with self._lock:
+                        self._busy = False
+                continue
 
             def check(generation: int = generation) -> None:
                 with self._lock:

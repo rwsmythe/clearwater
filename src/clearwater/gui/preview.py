@@ -442,6 +442,7 @@ class PreviewController(QObject):
         self._profile: bytes | None = None
         self._device_lock = threading.Lock()
         self._device_backend: object = None
+        self._plans_source: object = None
         session.parameters_changed.connect(self.request)
         session.settings_changed.connect(self.request)
         session.statistics_changed.connect(self.request)
@@ -485,6 +486,7 @@ class PreviewController(QObject):
         image = self._session.current_image()
         if image is None or self._frame_pending:
             return
+        self._release_for_source()  # a new source's first render follows the release (R1-6)
         method = self._session.method()
         params = effective_parameters(method, self._session.parameters())
         k = self._widget.needed_factor()
@@ -552,9 +554,29 @@ class PreviewController(QObject):
         return first and second
 
     def _note_backend(self, backend: object) -> None:
-        """Preview thread: remember the backend the latest render runs on (DR-68)."""
+        """Preview thread: remember the latest device backend a render ran on (DR-68).
+
+        A render on a backend without the device extension (the CPU after force CPU) leaves the
+        remembered one, so the next boundary still releases the plans the device renders left
+        on this thread (R1-4, ruling d530b564).
+        """
+        if not isinstance(backend, PreviewDeviceBackend):
+            return
         with self._device_lock:
             self._device_backend = backend
+
+    def _release_for_source(self) -> None:
+        """Main thread: queue the plan release once per source change, before its first render.
+
+        Called from :meth:`request` (the session emits ``image_changed`` before
+        ``source_changed``) and from ``_on_source`` (an unload has no render), so the release is
+        queued before the new source's first render either way (R1-6).
+        """
+        source = self._session.source()
+        if source is self._plans_source:
+            return
+        self._plans_source = source
+        self._renderer.run_chore(self._release_plans)
 
     def _release_plans(self) -> None:
         """Preview thread: release its FFT plans through the device extension (AD-29, DR-68)."""
@@ -601,7 +623,7 @@ class PreviewController(QObject):
         into the discarded one; nothing of the old source stays resident. The preview thread's
         FFT plans are released before the new source's first render (DR-68).
         """
-        self._renderer.run_chore(self._release_plans)
+        self._release_for_source()
         self._memo = PreviewMemo()
         self._framer.invalidate()
         self._frame_pending = False

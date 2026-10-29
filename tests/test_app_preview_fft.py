@@ -16,6 +16,7 @@ after it, and after the boundary; a planted controller without the release fails
 
 from __future__ import annotations
 
+import dataclasses
 import threading
 from pathlib import Path
 from typing import Any
@@ -78,6 +79,79 @@ def test_a_chore_runs_on_the_worker_thread_before_the_next_task_and_is_never_sup
     worker.run_chore(lambda: stopped.append(threading.current_thread().name))
     assert worker.stop(5)
     assert stopped == ["clearwater-test"]  # a chore queued before stop runs before the end
+
+
+class _HookedCondition:
+    """The worker's condition with hooks on the worker thread's entries and exits."""
+
+    def __init__(self, inner: Any, on_enter: Any, on_exit: Any) -> None:
+        self._inner, self._on_enter, self._on_exit = inner, on_enter, on_exit
+
+    def __enter__(self) -> Any:
+        if threading.current_thread().name == "clearwater-test":
+            self._on_enter()
+        return self._inner.__enter__()
+
+    def __exit__(self, *exc: object) -> Any:
+        if threading.current_thread().name == "clearwater-test":
+            self._on_exit()  # still holding the lock
+        return self._inner.__exit__(*exc)
+
+    def wait(self, timeout: float | None = None) -> bool:
+        return bool(self._inner.wait(timeout))
+
+    def notify_all(self) -> None:
+        self._inner.notify_all()
+
+
+def test_a_chore_queued_after_the_worker_looked_still_runs_before_the_task(qtbot: Any) -> None:
+    """R1-6: chores and the task are taken in one critical section, chores first.
+
+    When the worker leaves a critical section with the task still waiting (it looked for
+    chores, found none, and did not take the task), the hook queues a chore before its next
+    one. A loop that looks and takes in two sections then ran the task first; in one section
+    the task is taken where it is seen, so no such exit occurs.
+    """
+    order: list[str] = []
+    worker = LatestWorker("clearwater-test", lambda outcome: None)
+    inner = worker._lock
+    state = {"armed": False, "queued": False}
+
+    def on_exit() -> None:
+        if worker._pending is not None and not worker._chores and not order:
+            state["armed"] = True
+
+    def on_enter() -> None:
+        if state["armed"]:
+            state["armed"], state["queued"] = False, True
+            with inner:
+                worker._chores.append(lambda: order.append("chore"))
+
+    with inner:
+        worker._lock = _HookedCondition(inner, on_enter, on_exit)  # type: ignore[assignment]
+    assert worker.run_chore(lambda: None)  # the worker now waits in a hooked section
+    qtbot.waitUntil(worker.idle, timeout=5000)
+    worker.submit(lambda check: order.append("task"))
+    qtbot.waitUntil(lambda: worker.idle() and "task" in order, timeout=5000)
+    assert order == (["chore", "task"] if state["queued"] else ["task"])
+    assert worker.stop(5)
+
+
+def test_the_worker_is_busy_while_a_chore_runs(qtbot: Any) -> None:
+    """R1-10: ``idle()`` is False while a chore runs, so a boundary wait sees it finish."""
+    gate, started = threading.Event(), threading.Event()
+    worker = LatestWorker("clearwater-test", lambda outcome: None)
+
+    def chore() -> None:
+        started.set()
+        assert gate.wait(5)
+
+    assert worker.run_chore(chore)
+    assert started.wait(5)
+    assert not worker.idle()
+    gate.set()
+    qtbot.waitUntil(worker.idle, timeout=5000)
+    assert worker.stop(5)
     assert worker.run_chore(lambda: None) is False
 
 
@@ -118,6 +192,52 @@ def test_the_release_runs_on_the_preview_thread_at_every_boundary(make_window, q
     window.close()
     assert backend.releases == ["clearwater-preview"] * 3  # the shell's close
     assert window.controller.release_device_plans(0.5) is False  # stopped: never runs
+
+
+def test_a_cpu_render_after_a_device_render_keeps_the_device_plans_released(
+    make_window, qtbot
+) -> None:
+    """R1-4: device render, force CPU, a CPU render, then the boundary: the device releases."""
+    backend = RecordingBackend()
+
+    def select(settings: Settings, height: int, width: int, method_id: str) -> Any:
+        return (NumpyBackend(), "CPU: forced") if settings.force_cpu else (backend, "GPU")
+
+    path = Path("p.png")
+    window = make_window(photo_engines({path: image(60, 80)}, select_backend=select))
+    open_and_wait(qtbot, window, path)
+    assert window.controller._device_backend is backend  # the device render was noted
+    window.session.set_settings(dataclasses.replace(window.session.settings(), force_cpu=True))
+    wait_idle(qtbot, window)
+    assert window.session.preview_backend() == "CPU: forced"  # the CPU render ran
+    assert window.controller.release_device_plans(5)  # the boundary
+    assert backend.releases == ["clearwater-preview"]
+
+
+def test_a_source_change_queues_the_release_before_the_new_sources_render(
+    make_window, qtbot, monkeypatch
+) -> None:
+    """R1-6: the session emits ``image_changed`` before ``source_changed``; release first."""
+    first, second = Path("first.png"), Path("second.png")
+    window = make_window(photo_engines({first: image(60, 80), second: image(60, 80, seed=2)}))
+    open_and_wait(qtbot, window, first)
+    renderer = window.controller._renderer
+    calls: list[str] = []
+    real_submit, real_chore = renderer.submit, renderer.run_chore
+
+    def submit(task: Any) -> int:
+        calls.append("render")
+        return int(real_submit(task))
+
+    def run_chore(chore: Any) -> bool:
+        calls.append("release")
+        return bool(real_chore(chore))
+
+    monkeypatch.setattr(renderer, "submit", submit)
+    monkeypatch.setattr(renderer, "run_chore", run_chore)
+    open_and_wait(qtbot, window, second)
+    assert calls and calls[0] == "release" and calls.count("release") == 1
+    assert "render" in calls
 
 
 def test_a_release_asked_from_a_job_thread_runs_after_the_render_in_flight(
@@ -229,6 +349,47 @@ def test_the_device_reading_returns_after_the_boundary(make_window, qtbot) -> No
     readings = _plans_scenario(make_window, qtbot, gpu)
     print(f"DR-68 readings: {readings}")  # shown with -rP: the three device figures
     assert readings["plans_after_boundary"] == 0
+
+
+@pytest.mark.gpu
+def test_force_cpu_after_a_gpu_render_still_releases_the_gpu_plans(make_window, qtbot) -> None:
+    """R1-4 (DR-68's closure): GPU render at 1:1, force CPU, a CPU render, then the boundary."""
+    gpu = _gpu()
+    warm = gpu.asarray(np.zeros((FFT_MIN_SHORT_SIDE, 1920), dtype=np.float32))
+    gpu.gaussian_blur(warm, 54.0)
+    del warm
+    gpu.release_fft_plans()
+    big, small = Path("uhd.png"), Path("small.png")
+    engines = photo_engines(
+        {big: image(2160, 3840, seed=3), small: image(60, 80)},
+        methods=composition.correction_methods(),
+        select_backend=core.select_backend,
+    )
+    window = make_window(engines, size=(900, 700))
+    open_and_wait(qtbot, window, big, timeout_ms=120000)
+    window.view_actions["one_to_one"].trigger()
+    wait_idle(qtbot, window, timeout_ms=120000)
+    assert window.preview_widget.shown_factor() == 1
+    plans_after_gpu = _preview_plans(window)
+    window.session.set_settings(dataclasses.replace(window.session.settings(), force_cpu=True))
+    wait_idle(qtbot, window, timeout_ms=180000)
+    assert window.session.preview_backend() == "CPU: forced"  # the CPU render ran
+    plans_after_cpu = _preview_plans(window)
+    after_cpu = int(gpu.free_device_bytes() or 0)
+    open_and_wait(qtbot, window, small, timeout_ms=60000)  # the boundary: a source change
+    plans_after_boundary = _preview_plans(window)
+    after_boundary = int(gpu.free_device_bytes() or 0)
+    readings = {
+        "plans_after_gpu": plans_after_gpu,
+        "plans_after_cpu": plans_after_cpu,
+        "plans_after_boundary": plans_after_boundary,
+        "after_cpu": after_cpu,
+        "after_boundary": after_boundary,
+    }
+    print(f"R1-4 readings: {readings}")
+    assert plans_after_gpu > 0 and plans_after_cpu == plans_after_gpu, readings
+    assert plans_after_boundary == 0, f"the GPU plans were not released: {readings}"
+    assert after_boundary > after_cpu + ONE_POOL_BLOCK, f"no device memory came back: {readings}"
 
 
 @pytest.mark.gpu
