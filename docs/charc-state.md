@@ -154,6 +154,17 @@
   re-read per step), GPU idle, worktree clean at ab9ea83. Alongside, light only: Reviewer B (Codex, WSL, offline, read-only, no
   tests/FFmpeg) on `wp4.2-mc` ab9ea83 vs 38f291e, 14 owned paths, report + ledger withheld. ACCEPTABLE: task 10 is a fidelity
   (SAME) leg, not a timing figure, so a read-only reviewer beside it does not touch the hardware rule. Nothing heavy at my seat.
+- **TASK-10 WINDOW RELEASED 08:48Z (status `56141b18bc042961`, no reply owed): GREEN, 13/13 V4 compares SAME on every MANDATORY
+  and REQUIRED item** (orchestrator checked window.done OK, 16 steps exit 0, 13 SAME lines, record md5s; no footage path in logs or
+  records). GX011627 GPU 681/681 frames, BE-different 8 = WP3.21's same 8, record md5 4922fd54 (device GPU, cuda:0, hevc_nvenc,
+  2 decode passes; elapsed 218.9 s, information only, not a V16 row); WP2.3 set GPU md5 4d892589 and --force-cpu md5 99294d0a,
+  every item SAME (truncated = D86 readable part to 0.800800 s; untagged = assumed-tags warning). Free memory >= 9.37 GiB
+  throughout. `wp4.2` at 265251f (docs only: ledger +75/-1, report V4 section +40, 0 CR, Limits unchanged); cell 4 at 105,663.
+  Return report's register list = mine exactly: DR-67, DR-71, DR-73 (a)+(b), DR-74 CLOSE; DR-45 (b) CLOSES with the
+  `unreadable_tail` residual as a Limit; DR-47 (a) CLOSES, (b)(c) stay on the next `analysis/engine.py` touch; NEW R1-Q4
+  cache-interior row (store.py:573 skips a link at discovery, :660-666 writes through it; trigger next `cache/` touch); DR-81
+  untouched, trigger -> WP4.3. **NEXT: Reviewer B still running on `wp4.2-mc` ab9ea83; cell 4 report FINAL (docs only); orchestrator
+  code identity + harness gate + accept record; HOLD request to me; ff; then my QA + the rows above.**
 - **(history) After WP4.1's accept:** WP4.2's brief (DRAFT RULED on main 3aa3c51) got ONE revision pass against WP4.1's accept record, then FINAL
   on CHARC's word; its revision must carry: DR-78/79 (B2 rows) as WP4.2 items, the WP4.1 runner's final names and the stream-syntax
   predicate, the Limit text. WP4.3's revision later carries DR-75 (REQUIRED test under its Q12), DR-76, DR-77, and the AD-23 'applied by
