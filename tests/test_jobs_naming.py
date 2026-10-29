@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+import os
 import re
 import subprocess
 import sys
@@ -462,3 +464,63 @@ def test_final_output_path_is_never_the_source_through_a_folder_alias(tmp_path: 
     assert out == alias / "GX010123_2.MP4"
     assert plan_output(source, settings, MediaKind.VIDEO).path == alias / "GX010123_2.MP4"
     assert source.read_bytes() == b"src"
+
+
+# --- WP4.2b: composed output names stay portable components (DR-80) ---------------------------
+
+
+@pytest.mark.parametrize("planner", [final_output_path, _real], ids=["final", "plan"])
+@pytest.mark.parametrize("kind", [MediaKind.PHOTO, MediaKind.VIDEO], ids=["photo", "video"])
+@pytest.mark.parametrize("name", ["c:x.jpg", "carrier:x.jpg"])
+def test_composed_output_name_is_refused(tmp_path, planner, kind, name):
+    """Refuse drive-relative and stream output names without exposing their folders."""
+    source = Path(f"{tmp_path}{os.sep}{name}")
+    assert source.name == name
+    settings = Settings(output_folder=tmp_path / "out")
+
+    with pytest.raises(ValueError) as error:
+        planner(source, settings, kind)
+
+    text = str(error.value)
+    assert name in text
+    assert str(tmp_path) not in text
+    assert str(settings.output_folder) not in text
+
+
+@pytest.mark.parametrize("planner", [final_output_path, _real], ids=["final", "plan"])
+def test_video_extension_stream_is_refused(tmp_path, planner):
+    """Check the retained video extension as part of the composed name."""
+    source = Path(f"{tmp_path}{os.sep}x.mp4:s")
+    assert source.name == "x.mp4:s"
+    settings = Settings(output_folder=tmp_path / "out")
+
+    with pytest.raises(ValueError) as error:
+        planner(source, settings, MediaKind.VIDEO)
+
+    text = str(error.value)
+    assert source.name in text
+    assert str(tmp_path) not in text
+    assert str(settings.output_folder) not in text
+
+
+@pytest.mark.parametrize("planner", [final_output_path, _real], ids=["final", "plan"])
+@pytest.mark.parametrize("kind", [MediaKind.PHOTO, MediaKind.VIDEO], ids=["photo", "video"])
+@pytest.mark.parametrize("beside", [False, True], ids=["out", "beside"])
+@pytest.mark.parametrize(
+    "fixture_path",
+    [
+        entry["path"]
+        for entry in json.loads(
+            (Path(__file__).parent / "fixtures" / "manifest.json").read_text(encoding="utf-8")
+        )["samples"]
+    ],
+)
+def test_wp23_fixture_names_keep_output_paths(tmp_path, planner, kind, beside, fixture_path):
+    """Keep every manifest filename's default-suffix path unchanged."""
+    source = tmp_path / "source" / fixture_path
+    folder = source.parent if beside else tmp_path / "out"
+    settings = Settings(output_folder=None if beside else folder)
+    extension = ".png" if kind is MediaKind.PHOTO else source.suffix
+    expected = folder / f"{source.stem}_corrected{extension}"
+
+    assert planner(source, settings, kind) == expected

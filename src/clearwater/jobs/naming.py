@@ -288,11 +288,21 @@ def _base_plan(source: Path, settings: Settings, kind: MediaKind) -> OutputPlan:
     """Build the unnumbered plan (no filesystem access)."""
     validate_suffix(settings.output_suffix)
     folder = source.parent if settings.output_folder is None else settings.output_folder
+    base = source.stem + settings.output_suffix
     extension = PHOTO_EXTENSION if kind is MediaKind.PHOTO else source.suffix
+    name = base + extension
+    if (
+        any(char in name for char in "/\\:")
+        or Path(name).name != name
+        or os.path.splitdrive(name)[0] != ""
+    ):
+        raise ValueError(
+            f"output name for {source.name!r} must be a single portable name component"
+        )
     return OutputPlan(
         source=source,
         folder=folder,
-        base=source.stem + settings.output_suffix,
+        base=base,
         extension=extension,
     )
 
@@ -319,7 +329,8 @@ def final_output_path(source: Path, settings: Settings, kind: MediaKind) -> Path
         like a temporary.
 
     Raises:
-        ValueError: If the suffix is not a portable name fragment.
+        ValueError: If the suffix is not a portable name fragment, or the composed output
+            name is not a single portable name component.
     """
     plan = _base_plan(source, settings, kind)
     while is_same_path(plan.path, source) or is_temporary_name(plan.path.name):
@@ -375,7 +386,8 @@ def plan_output(
         The plan; read ``plan.path`` for the final path.
 
     Raises:
-        ValueError: If the suffix is invalid.
+        ValueError: If the suffix is invalid, or the composed output name is not a single
+            portable name component.
     """
     plan = _base_plan(source, settings, kind)
     temporaries = scan_temporaries(plan.folder)
