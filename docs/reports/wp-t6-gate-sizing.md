@@ -1,9 +1,12 @@
 # WP-T6 -- gate test sizing (AD-30)
 
-Status: rungs 0-4 complete; report prepared for Reviewer A. Reviewer A,
-Reviewer B and the one final two-leg gate are pending. The AFTER comparison
-below is intentionally unfilled. W3 is development evidence; W4 proves the
-retained full forms and is not a V16 row.
+Status: rungs 0-4 complete; Reviewer A round 1 returned zero critical/major,
+three minor and eight advisory findings. Its single cleanup adds the F2/F3
+checker guards; W2b re-proof is pending. Reviewer B and the one final two-leg
+gate are pending. The AFTER comparison below is intentionally unfilled.
+W3 is development evidence; W4 proves the retained full forms and is not a
+V16 row. Review source: `work/wp-t6/rA1/review-r1.txt`; adjudication is in the
+cumulative ledger.
 
 ## Claims and scope
 
@@ -62,7 +65,7 @@ R4 `[first6]`; retained suffixes are `[full]` except R4 `[first30]`.
 
 | Row | Test | Size and property | Assertions retained |
 |---|---|---|---|
-| R1 CUT | `test_jobs_export_video.py::test_gx011627_through_the_engine_keeps_every_mandatory_and_required_item` | Real-container V4 through c3/standard NVENC/provenance; 681 -> 90 frames | `result.ok`, one output, `_assert_v4(vf.fidelity_record(..., bit_depth=8))`, output removal; readiness skip remains first |
+| R1 CUT | `test_jobs_export_video.py::test_gx011627_through_the_engine_keeps_every_mandatory_and_required_item` | Real-container V4 through c3/standard NVENC/provenance; 681 -> 90 frames | `result.ok`, one output, `_assert_v4(vf.fidelity_record(..., bit_depth=8))`, output removal; readiness skip remains first within the test body |
 | R2 CUT | `test_io_video_encode.py::test_gx011627_nvenc_levels_give_distinct_sizes` | Busy real content, whole trim spanning several VBV buffer lengths; 681 -> 90 | All three HEVC level names and both strict 1.25 size links; shared `EncodeRun` remains tied to its encode |
 | R3 CUT | `test_io_video_encode.py::test_gx011627_through_the_sink_keeps_every_mandatory_and_required_item` | Real-container sink V4; shared standard encode on selected source | `_assert_v4(record)` and `frames_written == frames`; Q3 retains the "every frame" property on trim and full |
 | R4 CUT | `test_color_roundtrip.py::test_pair_round_trip_on_the_owners_main_case` | Main-case colour pair; 30 -> 6 decoded frames | Source format/size, base mean/share bounds, all six defect exceedances, same constants and filters |
@@ -75,6 +78,8 @@ own locator and lookup test remain; the dispatcher granted removal of only its
 unused `load_local_config` import. Decode's module fixtures rebuild for each
 session source parameter. Full-size assertions reach the original literals
 through the selected count; the full fixture lazily avoids creating a trim.
+Fixtures run before the test body's NVENC readiness skip; on an out-of-envelope
+machine without NVENC, trim/lookup errors can therefore precede that skip (F5).
 The marker's registration was advanced from rung 4 to fix the real-conftest
 guard's in-process strict-marker load (W2 run 1), with no other marker change.
 
@@ -174,7 +179,9 @@ least three seconds. The session trim lives only under the pytest temp root;
 both the root and trim folder are checked against the configured read-only
 footage folder, and teardown removes the trim folder even after failed setup.
 Lookup skips only an absent clip after a successful folder search; ambiguity,
-a missing folder and an unsearchable folder raise.
+a missing folder and an unsearchable folder raise. For decode R5-R7 this
+intentionally tightens the old locator: a walk error now raises rather than
+skips, as the brief's step 1 and DR-27 (1) require (F6).
 
 The command is fixed by the brief plus CHARC R-b's sole added metadata flag
 (`tests/conftest.py`, `gx011627_trim_plan`; rulings in the ledger). Symbolic
@@ -188,8 +195,11 @@ ffmpeg -nostdin -hide_banner -v error -y -i <source>
   -frames:v N -t T -movflags use_metadata_tags -f mp4 <trim>
 ```
 
-No `gpmd` decode occurs. Packet comparisons operate in memory; no digest is
-retained in report artifacts. `work/wp-t6/w1/02-trim-checks.json` records every
+No `gpmd` decode occurs. The copy proof covers **video and data packets**;
+audio packet fidelity to the original is not checked (F1). Audio checks cover
+roster, sample rate, channels and tags. Packet comparisons operate in memory;
+no digest is retained in report artifacts.
+`work/wp-t6/w1/02-trim-checks.json` records every
 check PASS and the stream roster: video HEVC/`hvc1`, audio AAC/`mp4a`, data
 `tmcd` and data `gpmd`. The two data tracks change muxer order, so R-a pairs
 streams by `(codec_type, codec_tag_string)` and ordinal within each key,
@@ -200,15 +210,22 @@ groups instead of raising before the packet checks.
 |---|---|---|
 | 4(a) | N >= 66 | PASS |
 | 4(b) | Video packet count equals N **and** first N packet tuples agree in decode order by PTS, duration, size, flags and MD5 | PASS; count and packet clauses are separate named sub-results in the checker |
-| 4(c) | Time base 1/30000 and sorted PTS exactly `[k * 1001 for k in range(N)]` | PASS |
+| 4(c) | Time base 1/30000 and sorted PTS exactly `[k * 1001 for k in range(N)]`; cleanup also requires the source packet at N to carry `K` and have PTS equal to planned T | Original PTS check PASS in W1/W2; new `4c_cut_on_keyframe` passes synthetic controls, W2b pending (F3) |
 | 4(d) | Same roster multiset and paired video size/pixel format/colour/rotation, audio sample rate/channels, `gpmd`/`tmcd` presence | PASS under R-a's pairing |
 | 4(e) | Filtered tag dictionaries agree under scoped R-c exceptions and R-e's semantic rule; location-like keys agree in presence | PASS |
-| Data packets | Copied data packet prefixes agree without decoding | PASS; three trim `gpmd` packets match the source prefix (23 source packets) |
+| Data packets | Copied packet prefix agrees without decoding; cleanup also requires its count to equal source packets with PTS strictly before T | Original prefix check PASS: three trim `gpmd` packets from 23 source packets; new count guard passes synthetic controls, W2b pending (F2) |
 
 The fixture asserts all five checks and copied data equality before any
 consumer runs; the dedicated parity test repeats these named assertions.
 On pairing failure the checker marks tag/data comparisons FAIL while still
 returning the packet-count, packet-equality and PTS results.
+The fixture passes its planned T into the cleaned checker; three-argument
+callers derive T independently as the first source keyframe at or after
+three seconds. The cut result is conjoined into 4(c). Data records expose
+the expected count before T, count equality and packet equality separately;
+the existing data assertion requires their conjunction. These cleanup changes
+are proved synthetically in `work/wp-t6/rA1-cleanup-synthetic.log`; the four
+real controls and positive parity run are requested in `work/wp-t6/w2b.sh`.
 
 Scoped `ALLOWED_TAG_DIFFS` is format {`major_brand`, `minor_version`,
 `compatible_brands`, `encoder`}; all streams {`handler_name`, `language`};
@@ -354,6 +371,10 @@ PARALLEL is unchanged. FULLCLIP is exactly R1-R3 and R5-R7 `[full]` plus R4
 version, including module-scoped decode fixtures depending on the session
 parameter. The collection proof, rather than a count prediction, establishes
 that no test was lost or accidentally assigned to both legs.
+Session parametrisation also regroups the serial items: the trim block now
+runs at the decode module's position, before the rest of encode/jobs. Gate
+KEEP-row timing comparisons must account for changed warm-up/state order (F4;
+`work/wp-t6/rA1/review-r1.txt`), which W3's restricted run did not exercise.
 
 ## Limits
 
@@ -368,7 +389,12 @@ that no test was lost or accidentally assigned to both legs.
 - `-frames:v N+1` alone is masked by `-t T` (the belt working, not a defect).
   The successful late-cut control moves both cut-plan flags one frame late.
 - The function-local `from conftest import ...` in the parity test relies on
-  pytest's default import mode; `--import-mode=importlib` is not proved here.
+  pytest's default import mode. Reviewer A's `--import-mode=importlib` probe
+  fails earlier while loading the existing `fixture_plugin`, before the parity
+  import is reached; that mode is outside this package's envelope (F8).
+- On the trim, R5's 1/30000 time base follows the fixture's explicit track
+  timescale flag and 4(c); only `[full]` retains proof of the camera container's
+  original time base (F10).
 - The declared seat has one GPU, serial non-xdist execution, the pinned
   FFmpeg build and a configured clip. A missing clip skips; no skip substitutes
   for these positive proofs. Fixture sessions are per worker, so serial and
@@ -439,7 +465,7 @@ Reviewer B, may fill this section. W3 and W4 figures above are not substitutes.
 | KEEP rows' individual spread and aggregate noise estimate | PENDING matched final-gate durations versus historical map; state missing rows |
 | Q6 verdict | PENDING: seven-CUT reduction must be strictly more than 110 s, with timing categories reconciled; report leg wall alongside |
 | 900 s target | PENDING observed serial wall; informational, not pass/fail |
-| Reviewer A rounds / findings / convergence; Reviewer B return | PENDING dispatcher evidence and cumulative ledger |
+| Reviewer A rounds / findings / convergence; Reviewer B return | R1: zero critical/major, three minor, eight advisory; cleanup F2/F3 is result-bearing and W2b re-proof is PENDING; B PENDING. Source: `work/wp-t6/rA1/review-r1.txt`, cumulative ledger |
 
 Static checks for this report turn and any remaining format/mypy verification
 are recorded in the cumulative ledger. No complete package/gate acceptance
