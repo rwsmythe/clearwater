@@ -24,7 +24,8 @@ the evaluation and re-seat lines. Turn 1's figures were supplied at turn 2.
 | Seat 2 turn 4 (ledger turn 9), import grant / W3 script | 247,499 | 152,719 | 258,400 | Dispatcher generation 20 at seat 2 turn 5; R1 `1f86873`, R2-R3 `a2420fc`, R4 `5520ee4`, R5-R7 `7970d0b`, ledger `89f9500` |
 | Seat 2 turn 5 (ledger turn 10), W3 results / rung 4 request | 279,339 | 183,073 | 258,400 | Dispatcher generation 20 at seat 2 turn 6; committed as `b540844` |
 | Seat 2 turn 6 (ledger turn 11), collections / W4 results / report | 454,498 | 98,187 | 258,400 | Dispatcher generation 20 at seat 2 turn 7; report `7664b82`, ledger `04b01d2`; tokens-used footer is not input depth |
-| Seat 2 turn 7 (ledger turn 12), Reviewer A R1 cleanup / W2b request | Pending dispatcher | Pending dispatcher | 258,400 | Single cleanup, result-bearing F2/F3 checker fixes; figures pending dispatcher |
+| Seat 2 turn 7 (ledger turn 12), Reviewer A R1 cleanup / W2b request | 517,709 | 157,267 | 258,400 | Dispatcher generation 20 at turn-12 footer, supplied by generation 21 at seat 2 turn 8; conftest `18e2d53`, report `6892bbd`, ledger `f10d13b` |
+| Seat 2 turn 8 (ledger turn 13), W2b results / R1 convergence | Pending dispatcher | Pending dispatcher | 258,400 | Docs only; dispatcher generation 21, CHARC generation 7; depth pending dispatcher |
 
 ## RESUME HERE (seat 2; written by the dispatcher, generation 20, 2026-10-29 ~12:12Z)
 
@@ -570,8 +571,8 @@ The source transcript remains the authority for EXECUTED/REASONED tags.
 | Finding | Severity / envelope / origin | Disposition | Confirmation and cited ground |
 |---|---|---|---|
 | F1 | Minor / in / NEW; EXECUTED | REPORT-ONLY | Confirmed: packet selectors cover video and non-tmcd data, not audio. Report now says "video and data packets" and lists audio's roster/rate/channels/tags limits. The brief's 4(b) is video-only and lock 2 governs data; an audio packet check would extend the explicitly fixed trim checks. No audio check added. |
-| F2 | Minor / in / NEW; EXECUTED | FIX, result-bearing | Confirmed: a shorter nonempty data prefix formerly passed. Preserve prefix equality and additionally require copied count equal to source packets with `pts_time < T`, using exact `Fraction` comparison. Record expected count, count equality and packet equality; fixture's existing data assertion still requires `equal`. Synthetic boundary packet at T is excluded and shortened data now fails only the new count while video verdicts stay PASS. Real boundary/count proof pending W2b; no timing tolerance or new metadata exception. |
-| F3 | Minor / in / NEW; EXECUTED | FIX, result-bearing | Confirmed: contiguous 75-frame cut formerly passed without checking source packet 75. New `4c_cut_on_keyframe` requires packet at `count` to exist, carry K and have PTS equal to T; 4(c) conjoins it with its existing time-base/PTS check. Fixture passes planned T; three-argument callers independently derive the first eligible keyframe T. Synthetic N=75 and inconsistent T both fail by name. Original 4(a)-(e) and data assertions remain. Real re-proof pending W2b. |
+| F2 | Minor / in / NEW; EXECUTED | FIX, result-bearing | Confirmed: a shorter nonempty data prefix formerly passed. Preserve prefix equality and additionally require copied count equal to source packets with `pts_time < T`, using exact `Fraction` comparison. Record expected count, count equality and packet equality; fixture's existing data assertion still requires `equal`. Synthetic boundary packet at T is excluded and shortened data now fails only the new count while video verdicts stay PASS. W2b positive parity and truncated-data controls now re-prove the guard; no timing tolerance or new metadata exception. |
+| F3 | Minor / in / NEW; EXECUTED | FIX, result-bearing | Confirmed: contiguous 75-frame cut formerly passed without checking source packet 75. New `4c_cut_on_keyframe` requires packet at `count` to exist, carry K and have PTS equal to T; 4(c) conjoins it with its existing time-base/PTS check. Fixture passes planned T; three-argument callers independently derive the first eligible keyframe T. Synthetic N=75 and inconsistent T both fail by name. Original 4(a)-(e) and data assertions remain. W2b parity passes and N=75 fails the named cut sub-result, completing real re-proof. |
 | F4 | Advisory / in / NEW; EXECUTED | REPORT-ONLY | Confirmed session-parametrisation grouping from reviewer collection: trim items move to the decode module block before remaining encode/jobs tests. Report flags changed warm-up/state order for the final gate's KEEP-row comparison; W3's restricted timing does not measure whole-leg order. No reordering plugin or test-order change introduced as a remedy. |
 | F5 | Advisory / out (no NVENC) / NEW; REASONED | REPORT-ONLY | Fixture setup precedes body skip. Report R1 now says "first within the test body" and names the out-of-envelope failure-before-skip case. The mapped R1 instruction retains the body readiness check and adds the source fixture; changing dependency order is outside the mapped cut. |
 | F6 | Advisory / in / NEW; REASONED | REPORT-ONLY | Old decode locator skipped a walk error; shared locator raises it. Report discloses the stricter R5-R7 rule. This is intentional under brief trim step 1 (unsearchable/missing folder RAISE), R5-R7's locator replacement, and DR-27 (1); encode/jobs locator behaviour remains as ruled. |
@@ -588,8 +589,8 @@ reopened finding or revert. Product-code fixes: zero. Result-bearing test
 helper fixes: F2 and F3; test assertion changes in R1-R7: zero. No added
 dependency, OS-specific code, metadata exception or pre-package conftest line
 change. R1 meets the fill's zero-new-blocking round-termination criterion;
-this is Q11's single cleanup. Its result-bearing trim guards require W2b
-re-proof before handoff. No second review round has run or is claimed here.
+this is Q11's single cleanup. Its result-bearing trim guards were re-proved
+in W2b, recorded below. R1 is converged; there is no round 2 under Q11.
 
 ### W2b request -- cleaned checker, four controls
 
@@ -617,9 +618,9 @@ path must be under this worktree's work root and outside configured footage.
    a separate log and `EXIT=` line; final output is `W2b DONE` or
    `W2b STOP stage=<n>`. No footage-derived scratch is kept.
 
-Script MD5: `273352e4c1ac2efd61ef6999b2ae5a9f`. This is a request,
-not a successful run. Historical W2-W4 figures remain historical; W4 did not
-set up a trim and no R1-R7 assertion changed in cleanup.
+Script MD5: `273352e4c1ac2efd61ef6999b2ae5a9f`. The request above was
+executed successfully as W2b below. Historical W2-W4 figures remain historical;
+W4 did not set up a trim and no R1-R7 assertion changed in cleanup.
 
 ### R1 cleanup light verification
 
@@ -641,6 +642,78 @@ comparisons do not overwrite the independently reported video 4(b) value.
 The final real four-control pass is not substituted with these synthetic
 checks. No footage read, probe, pytest or GPU execution occurred in this cell
 turn; Bash syntax validation is requested at the seat.
+
+## W2b -- DONE; Reviewer A R1 converged (seat 2 turn 8)
+
+Dispatcher generation 21 took the seat at 14:25Z on 2026-10-29; CHARC is
+generation 7, with R1 cleanup position unchanged. The dispatcher reports
+`bash work/wp-t6/w2b.sh` ran exclusively from 14:27:13Z through 14:28:28Z
+(75 s), ending **W2b DONE, EXIT 0**. The saved window timestamp is
+14:27:14.410635Z; cleanup ends 14:28:28.190149Z. Available memory was
+9,408,053,248 bytes before the window and 9,428,738,048 bytes before controls,
+both above the 5 GiB floor (`00-window.json`, `03-memory.json`). The script
+MD5 remains `273352e4c1ac2efd61ef6999b2ae5a9f`.
+
+Read all nine named evidence files under `work/wp-t6/w2b/` and independently
+matched every MD5 against the dispatcher's table; verification is saved in
+`work/wp-t6/seat2-turn8-w2b-md5.json`. These are record/log checksums, not
+packet digests. No footage-derived file or tag value is copied here.
+
+| Evidence file under `work/wp-t6/w2b/` | Verified MD5 |
+|---|---|
+| `00-window.json` | `feb3af23f6f4d3a1d4156d08f4af6c88` |
+| `01-trim.log` | `ea6cb8f42866b322f1d2ed935ae53a5d` |
+| `02-guard.log` | `8be8c52ba0c216ba96c11dc75cd6f7db` |
+| `03-memory.json` | `c3700b8e7d429307efa5826066a25a97` |
+| `03-reencode.json` | `9c093af5bd4da0910340f021082143f1` |
+| `03-extra_frame.json` | `a66a276ef6beaf15173c8f301cc9eb99` |
+| `03-non_keyframe.json` | `380493ab5bbc0248caabed70729cc31e` |
+| `03-truncated_data.json` | `7dc75ffe50e8472febf06173abaa621e` |
+| `04-cleanup.json` | `1a6c679ffccec81f945e4af071a8b5e0` |
+
+Stage 1: `test_the_gx011627_trim_is_a_stream_copy_of_the_source` passed,
+**1 passed in 3.29 s, EXIT 0** (`01-trim.log`). Stage 2:
+`tests/test_conftest_guard.py` passed, **60 passed in 41.67 s, EXIT 0**
+(`02-guard.log`). Stage 3: all four controls completed and were caught,
+EXIT 0 (`03-controls.log` and the four `03-*.json` control records).
+
+| Control | Frames expected / requested | Failed `checks` | `4b_count` | `4b_packets` | `4c_cut_on_keyframe` | `data_count_to_cut` | Caught |
+|---|---|---|---|---|---|---|---|
+| reencode | 90 / 90 | 4b, 4d, 4e | PASS | FAIL | PASS | FAIL | Yes |
+| extra_frame | 90 / 91 | 4b, 4c | FAIL | PASS | PASS | PASS | Yes |
+| non_keyframe | 75 / 75 | 4c | PASS | PASS | FAIL | FAIL | Yes |
+| truncated_data | 90 / 90 | None | PASS | PASS | PASS | FAIL | Yes, data-packet record |
+
+The truncated-data record has `failed_checks=[]` because data count is outside
+`checks`; `count_equal=false`, `packets_equal=true`, `trim_packets=1` versus
+`expected_packets_before_cut=3`, and therefore `equal=false`. It is rejected
+by the fixture's separate `assert all(item["equal"] for item in
+record["data_packet_checks"]), "data packets"` at `tests/conftest.py:853`.
+This **matches F2's adjudication**: retain the old prefix predicate and require
+its conjunction with the complete count to T, enforced by the existing data
+assertion. The runner inspected this record to count the plant as caught;
+it did not run a separate failing pytest consumer for that plant.
+
+For re-encode, `data_count_to_cut=FAIL` reflects pairing failure rather than
+a numeric data-shortage assertion. For the non-keyframe cut the independent
+F3 sub-result FAIL is the required catch; its data record additionally reports
+two copied packets versus three expected before T. Neither incidental result
+is substituted for the required named control failure.
+
+Stage 4 cleanup: EXIT 0, all steps complete. `04-cleanup.json` confirms removal
+of `w2b-scratch`, `w2b-trim` and `w2b-guard`; only evidence records/logs remain.
+No footage-derived scratch survives. The cleaned checker has a positive
+parity pass plus the two old and two new caught controls. **Reviewer A R1 is
+converged: the single cleanup is complete and re-proved, with no round 2
+under Q11.** All eleven findings remain dispositioned as above; no severity,
+envelope, NEW/REOPENED, fix or revert count changes.
+
+Turn 13 changes only ledger/report documentation. The report replaces W2b
+pending labels with these figures beside the historical W2 results; no code,
+test assertion or runner script changed. Reviewer B, rebase and the ONE gate
+remain at the dispatcher's seat. AFTER figures and Q6's verdict remain open.
+Final `git diff --check` is recorded in
+`work/wp-t6/seat2-turn8-diff-check.log` before handoff.
 
 ## Rung 0 facts (2026-10-29)
 
@@ -1135,7 +1208,7 @@ pending and are not validation results.
 | W3 run 1 | 2026-10-29 12:42:26.485311Z / 12:48:00.365103Z | `bash work/wp-t6/w3.sh` | 8 passed in 322.26 s; stage 2 STOP on reference-path slip; controls not run; stage EXIT 1, cleanup EXIT 0 | 10,686,595,072 bytes | `work/wp-t6/w3-run1/`; scratch removed, tests/diff clean and bytes unchanged |
 | W3 run 2 | 2026-10-29 12:50:55.706810Z / 12:56:23.544816Z | `bash work/wp-t6/w3.sh` | 8 passed in 258.91 s; one standard encode; V4 branch (i); both controls caught; W3 DONE EXIT 0, cleanup EXIT 0 | 11,001,569,280 bytes before window; 10,989,305,856 before main pytest | `work/wp-t6/w3/`; script MD5 `0dd11553112ae203b95a0952c9485f96`; scratch removed, tests/diff clean and bytes unchanged |
 | W4 | 2026-10-29 13:06:46.706213Z / 13:32:45.218973Z | `bash work/wp-t6/w4.sh` (after candidate collections passed) | 7 passed, 6450 deselected, 1 warning in 1556.05 s; W4 DONE, pytest/cleanup EXIT 0; observed both sink operands 681; zero trim setups | 11,047,211,008 bytes | `work/wp-t6/w4/`; script MD5 `16847bf19ddb53f9cc88f018fc9b8ad5`; scratch/basetemp removed, tests/diff clean |
-| W2b (requested, R1 cleanup) | Pending dispatcher | `bash work/wp-t6/w2b.sh` | Pending parity 1 pass, guard 60 passes, four caught controls and clean teardown | Script records bytes; >= 5 GiB required | `work/wp-t6/w2b/`; script MD5 `273352e4c1ac2efd61ef6999b2ae5a9f` |
+| W2b, R1 cleanup | 2026-10-29 14:27:13Z (dispatcher; window record 14:27:14.410635Z) / 14:28:28.190149Z | `bash work/wp-t6/w2b.sh` | Parity 1 passed in 3.29 s; guard 60 passed in 41.67 s; four controls caught; W2b DONE, all stage/cleanup EXIT 0 | 9,408,053,248 bytes at window; 9,428,738,048 before controls | `work/wp-t6/w2b/`; script MD5 `273352e4c1ac2efd61ef6999b2ae5a9f`; scratch and both basetemps removed |
 
 ## Review-round ledger
 
@@ -1145,7 +1218,7 @@ section above. No Reviewer B pass has run.
 
 | Round | Critical / major / minor / advisory | In / out | NEW / REOPENED | Reverts | Fixes | Transport / assertions / depth | Disposition |
 |---|---|---|---|---|---|---|---|
-| A R1, `6ecc4e5..04b01d2` | 0 / 0 / 3 / 8 | 9 / 2 (F5, F8 out; style F11 in) | 11 / 0; NEW blocking 0 | 0 | Product 0; test helper 2 result-bearing (F2, F3); attribute docstring and report/ledger cleanup; no R1-R7 assertion edits | Dispatcher native Claude process, `claude-opus-5-5`, high, 32 turns; model ok, `is_error=false`, clean worktree after; 10 scratch-write denials classified, no withheld access; CLI version not supplied. Seat-2 turn-6 input depth 98,187 / 258,400 | `NO_NEW_CRITICAL_MAJOR`; single cleanup built, W2b requested. All F1-F11 adjudicated. No round 2 or B claimed |
+| A R1, `6ecc4e5..04b01d2` | 0 / 0 / 3 / 8 | 9 / 2 (F5, F8 out; style F11 in) | 11 / 0; NEW blocking 0 | 0 | Product 0; test helper 2 result-bearing (F2, F3); attribute docstring and report/ledger cleanup; no R1-R7 assertion edits | Dispatcher native Claude process, `claude-opus-5-5`, high, 32 turns; model ok, `is_error=false`, clean worktree after; 10 scratch-write denials classified, no withheld access; CLI version not supplied. Seat-2 turn-6 input depth 98,187 / 258,400 | `NO_NEW_CRITICAL_MAJOR`; single cleanup complete, W2b positive proof and four controls caught; R1 CONVERGED, no round 2 under Q11. All F1-F11 adjudicated; B pending |
 
 ## Verification loop and turn boundary
 
