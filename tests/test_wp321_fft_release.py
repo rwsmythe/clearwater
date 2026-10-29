@@ -34,6 +34,8 @@ from clearwater.methods import available_methods
 from test_jobs_export_support import FakePhotoReader, FakePhotoWriter, FakeSink, parameter_set
 
 SAMPLE = "vid-hevc8-bt709-full"
+HOLD_S = 30.0
+"""DR-74's bound on each wait of its observation window (a miss fails the case)."""
 
 
 class _Releasing(NumpyBackend):
@@ -175,18 +177,36 @@ def test_the_analysis_end_release_frees_the_pool_while_frames_render(
     release = export_module._release_fft_plans
     sink = FakeSink()
     seen: list[tuple[str, int, int, list[str], int, int]] = []
+    # The observation window by construction, each wait bounded (a miss fails, never hangs):
+    # the analysis-end release waits for the first written frame, and the sink holds the next
+    # write until that release's pool drop is recorded.
+    first_written, dropped = threading.Event(), threading.Event()
+    write = sink.write
+
+    def held_write(frame: Any) -> None:
+        if len(sink.frames) == 1 and not dropped.wait(HOLD_S):
+            raise TimeoutError(
+                f"DR-74: no analysis-end pool drop within {HOLD_S} s of the first frame"
+            )
+        write(frame)
+        first_written.set()
 
     def spied(backend: object) -> None:
-        if threading.current_thread().name == "export-analysis":
+        analysis_end = threading.current_thread().name == "export-analysis"
+        if analysis_end:
             planted = gpu.asarray(np.zeros((4096, 4096), dtype=np.float32))  # 64 MiB
             del planted  # its block stays in the pool, cached
+            first_written.wait(HOLD_S)  # a miss shows as started == 0 below
         calls, started = list(sink.calls), len(sink.frames)
         before = pool.total_bytes() - pool.used_bytes()
         release(backend)
         after = pool.total_bytes() - pool.used_bytes()
         remaining = frames - len(sink.frames)  # sampled once the pool drop is observed
         seen.append((threading.current_thread().name, before, after, calls, started, remaining))
+        if analysis_end:
+            dropped.set()
 
+    monkeypatch.setattr(sink, "write", held_write)
     monkeypatch.setattr(export_module, "_release_fft_plans", spied)
     result = _video(tmp_path, source, gpu, sink)
     assert result.ok, result.failure
@@ -194,7 +214,7 @@ def test_the_analysis_end_release_frees_the_pool_while_frames_render(
     assert [name for name, *_ in seen] == _both_boundaries()
     _, before, after, calls, started, remaining = seen[0]
     assert "open" in calls and "close" not in calls  # the encode was under way
-    assert started >= 1, started  # rendering had started before the release
+    assert started >= 1, f"rendering had not started within {HOLD_S} s of the analysis end"
     assert remaining > 0, remaining  # frames still to render once the pool dropped
     assert before >= 64 * 1024**2 and after < before  # the pool's cached blocks went back
 

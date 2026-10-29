@@ -81,6 +81,7 @@ def create_figures_file(path: Path, footage_folder: Path | None, backend: str) -
     Raises:
         pytest.fail.Exception: The switch is refused (no footage folder, the footage check, or
             an existing file); nothing is created then.
+        OSError: The ``backend:`` line cannot be written; the handle is closed first.
     """
     if footage_folder is None:
         pytest.fail(f"{FIGURES_VARIABLE} is refused: no footage folder is configured")
@@ -92,8 +93,12 @@ def create_figures_file(path: Path, footage_folder: Path | None, backend: str) -
         handle = path.open("xb")
     except FileExistsError:
         pytest.fail(f"{FIGURES_VARIABLE} names an existing file; each run writes a new one")
-    handle.write(f"backend: {backend}\n".encode("ascii"))
-    handle.flush()
+    try:
+        handle.write(f"backend: {backend}\n".encode("ascii"))
+        handle.flush()
+    except BaseException:
+        handle.close()
+        raise
     return handle
 
 

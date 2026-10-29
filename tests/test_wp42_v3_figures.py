@@ -10,11 +10,15 @@ in the parallel leg (no GPU, no FFmpeg, no footage).
 
 from __future__ import annotations
 
+import builtins
+import io
 import os
 from pathlib import Path
+from typing import Any
 
 import pytest
 
+import headless_export
 from test_wp42_v3_product import _keep, create_figures_file
 
 
@@ -72,3 +76,80 @@ def test_a_fresh_path_gets_the_backend_line_then_each_line(tmp_path: Path, foota
         _keep(handle, "ad14-flicker c3 | a")
         _keep(handle, "jitter c3 | b")
     assert target.read_bytes() == b"backend: cuda:0\nad14-flicker c3 | a\njitter c3 | b\n"
+
+
+def test_a_file_planted_after_the_footage_check_is_refused_and_left_unchanged(
+    tmp_path: Path, footage: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # The file appears between the footage check and the open: only exclusive creation sees it.
+    target = tmp_path / "figures.txt"
+    check = headless_export.write_target_refusal
+
+    def planting(path: Path, folder: Path) -> str | None:
+        reason = check(path, folder)
+        target.write_bytes(b"planted\n")
+        return reason
+
+    monkeypatch.setattr(headless_export, "write_target_refusal", planting)
+    with pytest.raises(pytest.fail.Exception, match="existing file"):
+        create_figures_file(target, footage, "cpu")
+    assert target.read_bytes() == b"planted\n"
+
+
+def test_every_line_goes_through_the_one_open(
+    tmp_path: Path, footage: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    target = tmp_path / "figures.txt"
+    real_open = io.open
+    modes: list[str] = []
+
+    def counting(file: Any, mode: str = "r", *args: Any, **kwargs: Any) -> Any:
+        if os.fspath(file) == os.fspath(target):
+            modes.append(mode)
+        return real_open(file, mode, *args, **kwargs)
+
+    monkeypatch.setattr(io, "open", counting)
+    monkeypatch.setattr(builtins, "open", counting)
+    with create_figures_file(target, footage, "cpu") as handle:
+        for line in ("a", "b", "c"):
+            _keep(handle, line)
+    monkeypatch.undo()
+    assert modes == ["xb"]
+    assert target.read_bytes() == b"backend: cpu\na\nb\nc\n"
+
+
+class _FailingWrites:
+    """A file handle whose writes raise; it records whether it was closed."""
+
+    def __init__(self, handle: Any) -> None:
+        self._handle = handle
+
+    def write(self, data: bytes) -> int:
+        raise OSError("planted write failure")
+
+    def flush(self) -> None:
+        self._handle.flush()
+
+    def close(self) -> None:
+        self._handle.close()
+
+    @property
+    def closed(self) -> bool:
+        return bool(self._handle.closed)
+
+
+def test_a_failed_first_line_closes_the_handle(
+    tmp_path: Path, footage: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    target = tmp_path / "figures.txt"
+    real_open = Path.open
+    opened: list[_FailingWrites] = []
+
+    def failing(self: Path, *args: Any, **kwargs: Any) -> Any:
+        opened.append(_FailingWrites(real_open(self, *args, **kwargs)))
+        return opened[-1]
+
+    monkeypatch.setattr(Path, "open", failing)
+    with pytest.raises(OSError, match="planted write failure"):
+        create_figures_file(target, footage, "cpu")
+    assert len(opened) == 1 and opened[0].closed

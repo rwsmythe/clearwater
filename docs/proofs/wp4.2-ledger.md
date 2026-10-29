@@ -18,12 +18,15 @@ build waits for WP4.2a's merge and the orchestrator's rebase (R1-Q5 condition 3,
 | final | cell 3 | 278,978 (turn 142) | 2026-10-29 | re-seated for task 10 |
 | dispatch | cell 4 | 0 | 2026-10-29 | task 10 (the GX011627 V4 window) |
 | window request / release | cell 4 | not given at the grant (figure owed at the release yield) | 2026-10-29 | |
+| WINDOW RELEASED | cell 4 | 105,663 (turn 47) | 2026-10-29 | release accepted; Reviewer B ordered |
+| Y4 (Reviewer A R2) | cell 4 | 184,286 (turn 100) | 2026-10-29 | R2 TERMINATED; cleanup ruled FIX x3 |
 
 ## Round ledger (Reviewer A, Codex `gpt-6.1-sol` / high, WSL)
 
 | Round | Critical | Major | Minor | In / out of envelope | New / reopened | Reverts | Fixes: product / test-only | Transport, CLI | Depth |
 |---|---|---|---|---|---|---|---|---|---|
 | 1 (`1fa33a8`) | 0 | 0 | 4 | 4 in / 0 out | 4 new / 0 reopened | 0 | 1 tool code (F1) / 3 test-only (F2-F4) | WSL, codex-cli 0.162.1, `gpt-6.1-sol` / high | 165,011 (turn 50, 05:55Z) |
+| 2 (`5e74d01`, the Reviewer B remediation, diff `265251f..`) | 0 | 0 | 3 | 3 in / 0 out | 3 new / 0 reopened | 0 | 0 product / 3 test-only (R2-1..3) | WSL, `gpt-6.1-sol` / high | 184,286 (turn 100) |
 
 ## Round 0 -- read and map (task 1), evidence
 
@@ -561,6 +564,87 @@ stated residual ("a link created after the check is not seen", WP4.2a).
   `test_wp42_composition.py`, `test_wp321_fft_release.py`, `test_app_composition.py`,
   `test_headless_export.py` (the last two unchanged): **107 passed** (12.51 s).
 - Logs `work\wp4.2\b-remediation\*.log`.
+
+**CHARC addendum (`d0ba2d12`, CONCURS with every disposition):** two points. A row where the
+named path's parent is inside the stand-in footage folder and does not exist yet: it is refused
+and no folder is created. And the one module-scope `"xb"` handle. Both were already met at
+`5e74d01`, so nothing changed:
+- The row is `test_a_path_inside_the_footage_folder_is_refused_and_nothing_is_created`. Its target
+  is `footage/records/figures.txt`, it asserts `footage` stays empty, and it was RED on the old
+  logic.
+- The fixture yields the one handle, and `_keep` writes through it.
+
+## Reviewer A -- terminated at round 2 (cell 4)
+
+Head `5e74d01`; diff `git diff -U8 265251f..HEAD` without `docs/proofs` (7 files). The prompt
+names the eleven dispositions; Reviewer B's text was not given.
+
+Evidence is in `C:\Users\rwsmy\clearwater-review-evidence\wp4.2\r2\`:
+- `run_review.sh`, `review-prompt.md`, `test-summary.txt`, the probe files, `adjudication.md`,
+  `md5sums.txt`;
+- `review-diff.txt`, md5 `e0e17b049c47e355df081eb3ca424a72`;
+- `review.txt`, md5 `010afb8732c95876dd9902187cff2b8b`.
+
+The probe answered READY (09:09:36Z, `gpt-6.1-sol`, high). The review exited 0 at 09:14:11Z, with
+14 `succeeded in`, 104,080 tokens used and no withheld path read.
+**`VERDICT: NO_NEW_CRITICAL_MAJOR`**: 0 critical / 0 major / 3 minor.
+
+| # | Severity | Tag | Finding | Adjudication | Blocking | Ruling (orchestrator) |
+|---|---|---|---|---|---|---|
+| R2-1 | MINOR | REASONED | DR-74's new assertions depend on thread scheduling: the render may not have started at the analysis-end release, or may finish during it | CONFIRMED as a risk: nothing in the product makes analysis wait for a write. Passed in both GPU runs | no | FIX, deterministic on BOTH halves: a bounded wait for the first frame, and the sink holds the next write until the drop is recorded. A miss fails; it never hangs |
+| R2-2 | MINOR | EXECUTED | `create_figures_file` leaks the `"xb"` handle when the first line's write or flush raises | CONFIRMED | no | FIX: close and re-raise; add a row with a raising write |
+| R2-3 | MINOR | REASONED | The new tests do not enforce exclusive creation or the one handle | CONFIRMED | no | FIX: a file planted between the predicate and the open; exactly one open across `_keep`; each RED against the weaker form |
+
+Zero new blocking findings, so the loop TERMINATES at round 2 (fill CONVERGENCE_CRITERION). The
+three fixes are a terminating test-only cleanup in owned files, as R1's were, with no further
+counted round.
+
+Next, in order:
+1. The orchestrator's one Reviewer B re-run on the final candidate.
+2. Its two-leg gate, the package's ONE gate under CHARC's order.
+3. The FINAL docs turn.
+
+**Cleanup (test-only).**
+- **R2-1** (`tests/test_wp321_fft_release.py`, DR-74's case only, `HOLD_S = 30.0`):
+  - The sink's write after the first frame waits on `dropped`, which the analysis-end spy sets
+    once the pool drop is recorded. If the wait runs out it raises `TimeoutError("DR-74: no
+    analysis-end pool drop within 30.0 s of the first frame")`.
+  - The analysis-end spy waits up to `HOLD_S` for the first written frame. A miss fails as
+    "rendering had not started within 30.0 s of the analysis end".
+  - The DR-73 (b) rename is untouched.
+- **R2-2** (`tests/test_wp42_v3_product.py`, `create_figures_file`): the first line's write and
+  flush run inside `try`; any exception closes the handle and re-raises. The docstring's `Raises`
+  is updated.
+- **R2-3, plus R2-2's row** (`tests/test_wp42_v3_figures.py`, now 8 rows):
+  - `test_a_file_planted_after_the_footage_check_is_refused_and_left_unchanged`: the predicate is
+    monkeypatched to plant the file after it checks.
+  - `test_every_line_goes_through_the_one_open`: `io.open` and `builtins.open` are counted for the
+    target, and the count is exactly `["xb"]` across three `_keep` lines.
+  - `test_a_failed_first_line_closes_the_handle`: `Path.open` returns a handle whose writes raise.
+    The `OSError` propagates and the one handle is closed.
+
+**RED (scratch, never committed; `work\wp4.2\b-remediation\r2c\`).**
+- **DR-74 plants.** Neither run hung.
+  - `plant_b4.py` (the first write is held until the analysis thread ends): 1 failed, "rendering
+    had not started within 30.0 s of the analysis end / assert 0 >= 1" (51.16 s).
+  - `plant_release_waits.py` (the analysis-end release waits for the sink's close, bound 45 s):
+    1 failed, "gated-1080p.mp4: TimeoutError: DR-74: no analysis-end pool drop within 30.0 s of
+    the first frame" (59.85 s).
+- **Weaker helpers.** `weak.py` plus `test_weak_figures.py` (the new file pointed at a weaker
+  helper, run with `--noconftest`):
+
+  | Weak form | Result | Failed row(s) |
+  |---|---|---|
+  | `noclose` (the `5e74d01` helper) | 1 failed / 7 passed | the failed-first-line row |
+  | `existswb` (`exists()` first, then the check and `"wb"`) | 2 failed / 6 passed | the planted-after-the-check row; the one-open row (mode `wb`) |
+  | `reopen` (`_keep` reopens by name) | 1 failed / 7 passed | the one-open row |
+
+**GREEN.**
+- DR-74's case on the real product, three runs (light `gpu`, my own test, 09:18Z-09:21Z): 1 passed
+  each, in 21.02, 20.72 and 20.63 s.
+- `tests/test_wp42_v3_figures.py`: 8 passed.
+- `ruff check .` clean; `ruff format --check .` 267 files; `mypy` 141 files clean.
+- Light set (`-n 4`, the five files of the remediation's set): 110 passed (15.85 s).
 
 ## RESUME HERE (the FINAL docs turn)
 
