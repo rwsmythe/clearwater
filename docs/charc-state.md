@@ -390,6 +390,17 @@
   recompute shows CPU on that run). S3 set_idle_device GRANTED. S6 journal renamed aside .bad-<UTC>. S7 uncommitted V7
   driver importing committed helpers. S-order CONFIRMED (cleanup after MainWindow, before installs and show). FRESH CELL 2
   for the build (cell 1 at 262,719).** NEXT: cell 1 final report + stand-down; cell 2 dispatched; its yields.
+- **WP4.3 BUILD DONE 14:00Z (status `d80c3b9be52d68c3`; 11 commits b52b24a..307d1e6 on `wp4.3`, tasks 3-10; orchestrator QA:
+  29 files, 0 CR, no interfaces/contract/seam/io-video/config file, ruff + format 280 clean). DEPTH BREACH: cell 2 ran the
+  whole build in ONE turn to 553,419 (no window, so no yield); stood down; cell 3 dispatched for Reviewer A R1 (Codex) on
+  038f02e..HEAD. REMEDY ADOPTED as standing (my post ruling-wp43-build + `docs/dispatch-recipe.md` sentence at my commit):
+  a build prompt names a yield after each task group. Dev evidence: 567 passed / 1 xfail (DR-85) in 342 s; V7 forms (a)-(f)
+  all < 100 ms (worst 49 ms = start-up with a slow cache open); V8 within AD-11; DR-75 preview (217,0,54) = export's profile
+  vs base (199,40,60); DR-68 plans 6 -> 0 and memory back; DR-44 (c) jobs end 10-23 ms after close (gui/jobs.py untouched).
+  Cell 2's five decisions CONCURRED + a PORTABLE DR-82 form (monkeypatched final_output_path) beside the NTFS-stream one.
+  Flags: shell.py docstrings GRANTED (docs only); DR-82 banner double name -> wrapper drops the leading name; renamed node IDs
+  explained in the collection diff; bare-cd slip no action. NEXT: cell 3 R1 verdict; windows after A converges (V7 of record
+  via S7 driver, GX011627 V18, DR-44(c)/DR-50); B; the ONE gate, AFTER WP-T6's gate (expressions).
 - **WP-T6 W3 DONE 12:57Z (status `fa801fad17d48fc2`, no reply owed): RUNG 3 CLOSED.** Stage 1: 8 passed in 259 s (run 1
   322 s); ONE standard encode; engine record M+R all SAME, roster SAME. Stage 2: `branch=i-proceed`, BE delta = exactly the six
   ruled names. Stage 3 draft control caught (level name assert); stage 4 reference control caught (89 vs 90). Tree clean, tests

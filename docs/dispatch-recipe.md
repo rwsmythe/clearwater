@@ -116,7 +116,10 @@ turn with the report (and your ledger) as its content, and the answer arrives as
 Never wait in-turn for a reply; never poll for one. Yield at EVERY round boundary even when nothing
 is wrong -- that is how your depth figure and any ruling that landed since reach you. Anything a
 gate needs you to know mid-turn is in this brief; if it is not here, it cannot reach you until you
-yield.
+yield. **A build turn yields after each task GROUP (2026-10-29):** a build prompt names a yield
+after every two or three tasks, never "yield only at a window request or at the end", so a depth
+reading falls INSIDE the build and the evaluation point and the stop can act (a build that needed
+no window once ran eight tasks in one turn to 553K before its dispatcher could read it).
 
 **A granted heavy run is waited for in the FOREGROUND (2026-10-28).** When your dispatcher grants a
 long run inside an exclusive window, run it with a foreground poll-wait (a loop that checks the
