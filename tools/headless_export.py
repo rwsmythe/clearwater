@@ -251,8 +251,7 @@ class _ObservedSink:
         bit_depth: int,
         provenance: Mapping[str, Any] | None,
     ) -> None:
-        """Note the encoder, then open the wrapped sink (IF-5)."""
-        self._facts["encoder"] = encoder
+        """Open the wrapped sink, then note the encoder it opened with (IF-5)."""
         self._sink.open(
             probe,
             out_path,
@@ -261,6 +260,7 @@ class _ObservedSink:
             bit_depth=bit_depth,
             provenance=provenance,
         )
+        self._facts["encoder"] = encoder
 
     def write(self, frame: Frame) -> None:
         """Note the first frame's device, then write it (IF-5)."""

@@ -186,6 +186,32 @@ def test_a_photo_item_records_no_video_object(
     assert item["kind"] == "photo" and item["video"] is None
 
 
+class _Opening:
+    """A sink double whose ``open`` succeeds or raises."""
+
+    def __init__(self, refuse: bool) -> None:
+        self.refuse = refuse
+
+    def open(self, *args: object, **kwargs: object) -> None:
+        if self.refuse:
+            raise RuntimeError("the encoder cannot be opened")
+
+
+@pytest.mark.parametrize("refuse", [True, False])
+def test_the_encoder_is_recorded_only_once_the_sink_has_opened(refuse: bool) -> None:
+    """Reviewer A R1 F1: ``"encoder"`` stays null when the wrapped sink's ``open`` raises."""
+    facts = he._video_facts()
+    sink = he._ObservedSink(_Opening(refuse), facts)  # type: ignore[arg-type]
+    options: dict[str, Any] = {"quality": "standard", "bit_depth": 8, "provenance": None}
+    if refuse:
+        with pytest.raises(RuntimeError, match="cannot be opened"):
+            sink.open(None, Path("out.mp4"), encoder="libx265", **options)  # type: ignore[arg-type]
+        assert facts["encoder"] is None
+    else:
+        sink.open(None, Path("out.mp4"), encoder="libx265", **options)  # type: ignore[arg-type]
+        assert facts["encoder"] == "libx265"
+
+
 # --- the library run ----------------------------------------------------------------------------
 
 
