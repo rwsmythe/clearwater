@@ -136,6 +136,15 @@
   3cedac6 (runner conflict resolved at its seat, recorded), grants WP4.2's two-leg suite (~58 min, OPEN to me); cell 3 at ~257K
   runs it and writes the task-10 RESUME HERE; fresh cell for task 10 = the orchestrator's call.** Owed by me at WP4.2's accept:
   DR-67, DR-71, DR-73, DR-74, DR-47 (a), DR-45 (b) rows; the R1-Q4 cache-interior row; DR-81's trigger moves to WP4.3.
+- **WP4.2 SUITE WINDOW RELEASED 08:33Z (status `2a24c6cf87e37512`, no reply owed): GREEN on rebased `wp4.2` 401521e** (22 commits
+  on 38f291e; collision fix 0109c39 = two `match=` strings only, as granted): parallel 5304/1 644 s, serial 1135/1 2,937 s (1136
+  selected = WP4.2a's 1127 + 9 new: V3 file 6, DR-74, DR-67 gpu, V4 gpu). **Question 9 budget MET: ~207 s at most** (V3 ad14
+  67+44 s, V3 jitter 15+15 s, DR-74 22 s = 164 s measured; rest under the 8.5 s cut). Orchestrator FLAG noted: serial wall +396 s
+  over WP4.2a's 2,541 s with no like-for-like split (no `--durations` there; shared laptop); the per-test figure is the budget
+  evidence, ACCEPTED as such. Cell 3 stood down at 278,978; **cell 4 (opus-high) DISPATCHED for task 10** (runs + ledger + report
+  only; ledger ab9ea83). **NEXT: cell 4's WINDOW REQUEST for task 10 (GX011627 GPU + WP2.3 V4 set GPU and --force-cpu, each
+  through `video_fidelity.py compare`, EXCLUSIVE); then Reviewer B on `wp4.2-mc`, accept, my HOLD, ff.** Main still 38f291e; the
+  suite stands on the candidate only while code identity to 401521e holds (I check patch-id at the accept).
 - **(history) After WP4.1's accept:** WP4.2's brief (DRAFT RULED on main 3aa3c51) got ONE revision pass against WP4.1's accept record, then FINAL
   on CHARC's word; its revision must carry: DR-78/79 (B2 rows) as WP4.2 items, the WP4.1 runner's final names and the stream-syntax
   predicate, the Limit text. WP4.3's revision later carries DR-75 (REQUIRED test under its Q12), DR-76, DR-77, and the AD-23 'applied by
