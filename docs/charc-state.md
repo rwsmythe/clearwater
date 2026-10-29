@@ -36,7 +36,18 @@
   ~28 M. Owner: monitor and evaluate before changing; wants to lean on Codex more for development to equalise burn, never at the
   expense of quality. No lane-rule change. At each commission / brief revision CHARC names the packages eligible for the Codex lane
   under the existing rule and reports the Codex development share with the pace readout.
-- **After WP4.1's accept:** WP4.2's brief (DRAFT RULED on main 3aa3c51) gets ONE revision pass against WP4.1's accept record, then FINAL
+- **WP4.2 REVISION 1 RULED 2026-10-29 02:13Z (my post ruling-wp42r1, answering query `3511951ee31e51c9`; branch `brief-wp4.2r`
+  f794033): R1-Q1 (a) predicate (i) factored into a named helper applied to `final_output_path` (ONE predicate); R1-Q2 (a) grant of FOUR
+  `np.array_equal` sites (photo_path 514/528, v8 74 AND 162); R1-Q3 (a) mixed pin edited in place; R1-Q4 (a) round 0 reads `cache/store.py`,
+  Limit + my register row at WP4.2's accept if a reparse-point entry is not refused; DR-79 (b) NOT REPRODUCED at my seat (self-loop
+  junction: `resolve()` returns, no raise) -> defensive wrap + monkeypatched test, CLOSES as 'defensive; not reproduced'; R1-Q5 (a)
+  **WP4.2a runner hardening on the Codex lane** (existing lane rule, paces 0.424 vs 1.313; owns `tools/headless_export.py` + new
+  `tests/test_wp42a_runner_hardening.py` + the four lines; nets A and B = Claude passes; standard two-leg gate in a window) concurrent
+  with WP4.2 ROUND 0 only (opus-high); WP4.2's build waits for WP4.2a's merge with a CAP = WP4.2 round-0 yield + 3 h, then WP4.2a
+  STOPS at a committed head and rebases after. **Brief FINAL on that word** once folded in. Owed by me: DR-78/79 trigger rewrite +
+  CLOSED at WP4.2a's accept; WP4.2's DR-67/71/73/74 rows and the cache row at its accept. Owner told: the split is the existing
+  lane rule operating, not the balance change under evaluation.
+- **(history) After WP4.1's accept:** WP4.2's brief (DRAFT RULED on main 3aa3c51) got ONE revision pass against WP4.1's accept record, then FINAL
   on CHARC's word; its revision must carry: DR-78/79 (B2 rows) as WP4.2 items, the WP4.1 runner's final names and the stream-syntax
   predicate, the Limit text. WP4.3's revision later carries DR-75 (REQUIRED test under its Q12), DR-76, DR-77, and the AD-23 'applied by
   WP4.3' note is mine at its accept. Lane: WP4.2 / WP4.3 opus-high, Codex nets. Order WP4.2 -> WP4.3.
