@@ -250,8 +250,16 @@
   `work/wp-t6/w1.sh` md5 7e6d01a6, 342 lines read by the orchestrator (packet listing; provisional trim + checks (a)-(e) with tag
   diffs by KEY only; NVENC chain; R4 at 30/6/10/15 with signed margins and walls; row-10 cProfile; scratch removed on every
   exit; subprocess output withheld). **NOTE: the Codex cell's context window is 258,400 (WP4.2b's was 475,000); turn 1 used
-  104,555, so the ~250K evaluation point binds early; the orchestrator watches it.** NEXT: W1 release + round-0 table (turn 2)
-  for my reply.
+  104,555, so the ~250K evaluation point binds early; the orchestrator watches it.**
+- **WP-T6 W1 STOP RULED ~11:25Z (query `5b9dd6b0dfacc46e`; my post ruling-wp-t6-w1stop): R-a..R-d CONCURRED.** W1 ran 3 s and
+  stopped at the first trim: 4(b)/(c) PASS (90 packets equal by pts/duration/size/flags/MD5 = a true copy), 4(d)/(e) FAIL because
+  the check paired streams BY INDEX after `-write_tmcd 1` placed the regenerated tmcd after gpmd; gpmd intact (3 packets < T).
+  Facts: N = 90, T = 3.003 s, keyframes every 30. Rulings: R-a roster as a multiset, pairing by (codec_type, codec_tag_string),
+  TIGHTENED with source-index order inside a shared key + equal count; R-b `-movflags use_metadata_tags` joins the fixed flags
+  (keeps GoPro `firmware`); R-c ALLOWED_TAG_DIFFS = muxer-written keys only (format major_brand/minor_version/compatible_brands/
+  encoder; stream handler_name/language; audio timecode), any other key STOP, LIMIT: those tag items hit the real container only
+  in the fullclip form; R-d draft correction (f) did not reproduce, flags stay. Base collections at the orchestrator's seat:
+  all 6449 / parallel 5313 / serial 1136. NEXT: turn 2 corrects w1.sh, W1 re-run (~15 min window), round-0 table for my reply.
 - **(history) After WP4.1's accept:** WP4.2's brief (DRAFT RULED on main 3aa3c51) got ONE revision pass against WP4.1's accept record, then FINAL
   on CHARC's word; its revision must carry: DR-78/79 (B2 rows) as WP4.2 items, the WP4.1 runner's final names and the stream-syntax
   predicate, the Limit text. WP4.3's revision later carries DR-75 (REQUIRED test under its Q12), DR-76, DR-77, and the AD-23 'applied by
