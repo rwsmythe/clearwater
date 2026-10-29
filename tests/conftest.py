@@ -89,6 +89,7 @@ ALLOWED_TAG_DIFFS = {
     "stream": frozenset({"handler_name", "language"}),
     "audio": frozenset({"timecode"}),
 }
+"""Muxer-written tag keys allowed to differ, restricted to their ruled scopes."""
 
 
 def _canonical(path: str | os.PathLike[str]) -> Path:
@@ -492,13 +493,17 @@ def _gx011627_rotation(stream: dict[str, Any]) -> list[int]:
     return values if values else [int(stream.get("tags", {}).get("rotate", 0))]
 
 
-def gx011627_trim_checks(source: Path, trim: Path, count: int) -> dict[str, Any]:
+def gx011627_trim_checks(
+    source: Path, trim: Path, count: int, cut_text: str | None = None
+) -> dict[str, Any]:
     """Compare a trim with its source using the ruled packet, stream and tag checks.
 
     Args:
         source: The original GX011627 file, read only.
         trim: The candidate stream copy under the session temp root.
         count: Expected video frame count derived from the source's keyframe cut.
+        cut_text: Planned cut PTS, or None to derive the first source keyframe
+            at or after three seconds independently of the supplied count.
 
     Returns:
         Named 4(a)-(e) verdicts and diagnostics containing only counts, booleans,
@@ -513,7 +518,24 @@ def gx011627_trim_checks(source: Path, trim: Path, count: int) -> dict[str, Any]
     original, copied = _gx011627_document(source), _gx011627_document(trim)
     src, dst = original["streams"], copied["streams"]
     fields = ("pts_time", "duration_time", "size", "flags", "data_hash")
-    a = _gx011627_packets(source, "v:0", fields)[:count]
+    source_video = _gx011627_packets(source, "v:0", fields)
+    if cut_text is None:
+        cut_text = next(
+            (
+                p["pts_time"]
+                for p in source_video
+                if "K" in p["flags"] and Fraction(p["pts_time"]) >= 3
+            ),
+            None,
+        )
+    cut = Fraction(cut_text) if cut_text is not None else None
+    cut_on_keyframe = (
+        cut is not None
+        and 0 <= count < len(source_video)
+        and "K" in source_video[count]["flags"]
+        and Fraction(source_video[count]["pts_time"]) == cut
+    )
+    a = source_video[:count]
     b = _gx011627_packets(trim, "v:0", (*fields, "pts"))
     packet_count_equal = len(b) == count
     packets_equal = len(a) == count and _gx011627_packet_rows(a, fields) == _gx011627_packet_rows(
@@ -525,7 +547,8 @@ def gx011627_trim_checks(source: Path, trim: Path, count: int) -> dict[str, Any]
     }
     video = next((s for s in dst if s.get("codec_type") == "video"), None)
     checks["4c"] = (
-        video is not None
+        cut_on_keyframe
+        and video is not None
         and Fraction(video["time_base"]) == Fraction(1, 30000)
         and sorted(int(p["pts"]) for p in b) == [k * 1001 for k in range(count)]
     )
@@ -656,7 +679,7 @@ def gx011627_trim_checks(source: Path, trim: Path, count: int) -> dict[str, Any]
     checks["4e"] = (
         pairing_equal and location_presence and not any(not d["allowed"] for d in differences)
     )
-    # Data is never decoded: compare each copied data packet with the source prefix.
+    # Data is never decoded: require the source prefix and its full count before T.
     # A failed pairing cannot establish per-stream tags or data-packet equality.
     data_checks = [] if pairing_equal else [{"equal": False, "reason": "pairing counts differ"}]
     data_fields = ("pts_time", "duration_time", "size", "data_hash")
@@ -665,9 +688,12 @@ def gx011627_trim_checks(source: Path, trim: Path, count: int) -> dict[str, Any]
             continue
         x = _gx011627_packets(source, left["index"], data_fields)
         y = _gx011627_packets(trim, right["index"], data_fields)
-        same = bool(y) and _gx011627_packet_rows(x[: len(y)], data_fields) == _gx011627_packet_rows(
-            y, data_fields
-        )
+        expected = [p for p in x if cut is not None and Fraction(p["pts_time"]) < cut]
+        count_equal = cut is not None and len(y) == len(expected)
+        data_packets_equal = bool(y) and _gx011627_packet_rows(
+            x[: len(y)], data_fields
+        ) == _gx011627_packet_rows(y, data_fields)
+        same = count_equal and data_packets_equal
         data_checks.append(
             {
                 "codec_tag": left.get("codec_tag_string"),
@@ -676,7 +702,10 @@ def gx011627_trim_checks(source: Path, trim: Path, count: int) -> dict[str, Any]
                 "source_index": left["index"],
                 "trim_index": right["index"],
                 "source_packets": len(x),
+                "expected_packets_before_cut": len(expected),
                 "trim_packets": len(y),
+                "count_equal": count_equal,
+                "packets_equal": data_packets_equal,
                 "equal": same,
             }
         )
@@ -684,6 +713,7 @@ def gx011627_trim_checks(source: Path, trim: Path, count: int) -> dict[str, Any]
         "checks": {k: "PASS" if v else "FAIL" for k, v in checks.items()},
         "4b_count": "PASS" if packet_count_equal else "FAIL",
         "4b_packets": "PASS" if packets_equal else "FAIL",
+        "4c_cut_on_keyframe": "PASS" if cut_on_keyframe else "FAIL",
         "pairing_counts_equal": pairing_equal,
         "pairing_failure_reason": None if pairing_equal else "pairing counts differ",
         "pairing_differences": pairing_differences,
@@ -815,9 +845,9 @@ def gx011627_trim(tmp_path_factory: pytest.TempPathFactory) -> Iterator[tuple[Pa
     assert not _inside_or_equal(resolved, footage), "GX011627 trim folder is inside footage"
     trim = folder / "GX011627-trim.mp4"
     try:
-        count, _, command = _gx011627_trim_plan(source, trim)
+        count, cut_text, command = _gx011627_trim_plan(source, trim)
         _gx011627_run(command)
-        record = gx011627_trim_checks(source, trim, count)
+        record = gx011627_trim_checks(source, trim, count, cut_text)
         for name in ("4a", "4b", "4c", "4d", "4e"):
             assert record["checks"][name] == "PASS", name
         assert all(item["equal"] for item in record["data_packet_checks"]), "data packets"
