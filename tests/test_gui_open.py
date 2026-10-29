@@ -90,7 +90,7 @@ def test_file_dialog_route_uses_the_injected_chooser(make_window, qtbot) -> None
     cancelled.shell_actions.open.trigger()
     assert not cancelled.opening() and cancelled.session.source() is None
     filt = sources.file_filter()
-    for suffix in ("*.heic", "*.jpg", "*.png", "*.tif", "*.dng", "*.mp4", "All files (*)"):
+    for suffix in ("*.heic", "*.jpg", "*.png", "*.tif", "*.dng", "*.mp4", "*.mov", "All files (*)"):
         assert suffix in filt
 
 
@@ -106,7 +106,8 @@ def test_file_dialog_route_uses_the_injected_chooser(make_window, qtbot) -> None
         ("a.TIFF", "photo"),
         ("a.dng", "photo"),
         ("a.MP4", "video"),
-        ("a.mov", "refusal"),
+        ("a.mov", "video"),
+        ("a.MOV", "video"),
         ("a.txt", "refusal"),
         ("noextension", "refusal"),
         ("GX010001.LRV", "refusal"),

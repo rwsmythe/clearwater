@@ -22,8 +22,8 @@ from .contract import Engines, Message, OpenedSource
 PHOTO_SUFFIXES = frozenset({".heic", ".heif", ".jpg", ".jpeg", ".png", ".tif", ".tiff", ".dng"})
 """Photo extensions (spec 5.1). ``.dng`` is routed to the reader so its refusal is shown (D116)."""
 
-VIDEO_SUFFIXES = frozenset({".mp4"})
-"""Video extensions (spec 5.2: the MP4 container)."""
+VIDEO_SUFFIXES = frozenset({".mp4", ".mov"})
+"""Video extensions (spec 5.2, 0.5.7: MP4 and QuickTime containers)."""
 
 type SourceKind = Literal["photo", "video"]
 """What a path is opened as."""

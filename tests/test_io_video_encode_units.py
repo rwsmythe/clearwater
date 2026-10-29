@@ -77,7 +77,7 @@ def _probe(
         start_offset_s=Fraction(0),
         video=video,
         audio=(AudioStreamInfo(1, "aac", 48000, 2, Fraction(0)),),
-        data=(DataStreamInfo(2, "tmcd"), DataStreamInfo(3, "meta")),
+        data=(DataStreamInfo(2, "tmcd"), DataStreamInfo(3, "gpmd")),
         edit_list=edits,
         faults=faults,
         gopro=None,

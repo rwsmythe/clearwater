@@ -139,8 +139,8 @@ PHOTO_SUFFIXES: Final = frozenset(
 )
 """Photo extensions, equal to ``clearwater.gui.sources.PHOTO_SUFFIXES`` (a ``gui`` test pins it)."""
 
-VIDEO_SUFFIXES: Final = frozenset({".mp4"})
-"""Video extensions, equal to ``clearwater.gui.sources.VIDEO_SUFFIXES`` (a ``gui`` test pins it)."""
+VIDEO_SUFFIXES: Final = frozenset({".mp4", ".mov"})
+"""Spec 5.2 (0.5.7) video extensions; equal to the GUI's set (a ``gui`` test pins it)."""
 
 PROVENANCE_KEYS: Final = ("source", "settings", "profile")
 """The provenance keys a parameter file's set drops, as ``PresetStore`` import drops them."""

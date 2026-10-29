@@ -293,7 +293,13 @@ def _base_plan(source: Path, settings: Settings, kind: MediaKind) -> OutputPlan:
     validate_suffix(settings.output_suffix)
     folder = source.parent if settings.output_folder is None else settings.output_folder
     base = source.stem + settings.output_suffix
-    extension = PHOTO_EXTENSION if kind is MediaKind.PHOTO else source.suffix
+    extension = (
+        PHOTO_EXTENSION
+        if kind is MediaKind.PHOTO
+        else ".mp4"
+        if source.suffix.lower() == ".mov"
+        else source.suffix
+    )
     name = base + extension
     if (
         any(char in name for char in "/\\:")
@@ -314,8 +320,9 @@ def _base_plan(source: Path, settings: Settings, kind: MediaKind) -> OutputPlan:
 def final_output_path(source: Path, settings: Settings, kind: MediaKind) -> Path:
     """Return the final output path before collision numbering (spec 8.3).
 
-    ``GX010123.MP4`` becomes ``GX010123_corrected.MP4``; ``IMG_1234.HEIC`` becomes
-    ``IMG_1234_corrected.png``. Nothing is created or written. The exceptions to "no number" are
+    ``GX010123.MP4`` becomes ``GX010123_corrected.MP4``; ``IMG_1234.MOV`` becomes
+    ``IMG_1234_corrected.mp4``; ``IMG_1234.HEIC`` becomes ``IMG_1234_corrected.png``
+    (spec 8.3, 0.5.7). Nothing is created or written. The exceptions to "no number" are
     two guards: the result is never the source path, so an empty suffix in the source folder (or
     in an alias of it, such as a junction) gives the first numbered name (``GX010123_2.MP4``); and
     it never looks like a temporary, so a stem and a suffix that happen to spell
@@ -326,7 +333,8 @@ def final_output_path(source: Path, settings: Settings, kind: MediaKind) -> Path
     Args:
         source: The source file path.
         settings: The settings (``output_folder``, ``output_suffix``).
-        kind: Video keeps the source extension exactly; a photo gets ``.png``.
+        kind: A photo gets ``.png``; a video with a ``.mov`` suffix (any case) gets
+            ``.mp4``; every other video keeps its source extension exactly.
 
     Returns:
         The unnumbered path, or the ``_2`` path when the unnumbered one is the source or looks
@@ -383,7 +391,8 @@ def plan_output(
     Args:
         source: The source file path.
         settings: The settings (``output_folder``, ``output_suffix``).
-        kind: Video keeps the source extension; a photo gets ``.png``.
+        kind: A photo gets ``.png``; a video with a ``.mov`` suffix (any case) gets
+            ``.mp4``; every other video keeps its source extension exactly.
         reservations: The run's registry, or None for a one-off plan with no reservation.
 
     Returns:

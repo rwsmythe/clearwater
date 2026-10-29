@@ -63,7 +63,12 @@ def test_example_photo_becomes_png() -> None:
 
 def test_video_extension_case_is_preserved() -> None:
     out = final_output_path(Path("clip.mov"), Settings(), MediaKind.VIDEO)
-    assert out.name == "clip_corrected.mov"
+    assert out.name == "clip_corrected.mp4"
+
+
+def test_mp4_extension_case_is_preserved() -> None:
+    out = final_output_path(Path("clip.Mp4"), Settings(), MediaKind.VIDEO)
+    assert out.name == "clip_corrected.Mp4"
 
 
 def test_same_folder_as_source_by_default(tmp_path: Path) -> None:
@@ -526,3 +531,53 @@ def test_wp23_fixture_names_keep_output_paths(tmp_path, planner, kind, beside, f
     expected = folder / f"{source.stem}_corrected{extension}"
 
     assert planner(source, settings, kind) == expected
+
+
+# --- WP4.4 QuickTime sources produce MP4 (spec 8.3, 0.5.7) -------------------------------
+
+
+@pytest.mark.parametrize("planner", [final_output_path, _real], ids=["final", "plan"])
+@pytest.mark.parametrize("name", ["IMG_6702.MOV", "x.mov", "x.Mov"])
+@pytest.mark.parametrize("suffix", ["_corrected", "_fixed", ""], ids=["default", "edited", "empty"])
+@pytest.mark.parametrize("beside", [False, True], ids=["out", "beside"])
+def test_mov_output_extension(tmp_path, planner, name, suffix, beside):
+    source = tmp_path / name
+    folder = tmp_path if beside else tmp_path / "out"
+    settings = Settings(output_folder=None if beside else folder, output_suffix=suffix)
+    assert planner(source, settings, MediaKind.VIDEO) == folder / f"{source.stem}{suffix}.mp4"
+
+
+def test_mov_and_mp4_share_collision_sequence(tmp_path: Path) -> None:
+    reservations = Reservations()
+    settings = Settings(output_folder=tmp_path)
+    mov = plan_output(tmp_path / "IMG_1.MOV", settings, MediaKind.VIDEO, reservations)
+    mp4 = plan_output(tmp_path / "IMG_1.mp4", settings, MediaKind.VIDEO, reservations)
+    assert mov.path == tmp_path / "IMG_1_corrected.mp4"
+    assert mp4.path == tmp_path / "IMG_1_corrected_2.mp4"
+
+
+@pytest.mark.parametrize("temporary", [False, True], ids=["final", "temporary"])
+def test_mov_collision_uses_mapped_extension(tmp_path: Path, temporary: bool) -> None:
+    taken = tmp_path / (
+        "IMG_1_corrected.clearwater-partial-0123456789ab.mp4"
+        if temporary
+        else "IMG_1_corrected.mp4"
+    )
+    taken.write_bytes(b"occupied")
+    output = plan_output(tmp_path / "IMG_1.MOV", Settings(), MediaKind.VIDEO)
+    assert output.path == tmp_path / "IMG_1_corrected_2.mp4"
+    assert taken.read_bytes() == b"occupied"
+
+
+@pytest.mark.parametrize("planner", [final_output_path, _real], ids=["final", "plan"])
+def test_mov_temporary_path_uses_mp4(tmp_path, planner):
+    final = planner(tmp_path / "IMG_6702.MOV", Settings(), MediaKind.VIDEO)
+    temporary = temporary_path(final, "0123456789ab")
+    assert temporary.name == "IMG_6702_corrected.clearwater-partial-0123456789ab.mp4"
+
+
+@pytest.mark.parametrize("planner", [final_output_path, _real], ids=["final", "plan"])
+def test_mov_extension_stream_is_refused(tmp_path, planner):
+    source = tmp_path / "x.mov:s"
+    with pytest.raises(clearwater.jobs.OutputNameError):
+        planner(source, Settings(output_folder=tmp_path / "out"), MediaKind.VIDEO)

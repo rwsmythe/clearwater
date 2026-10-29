@@ -1,11 +1,65 @@
 # WP4.4 cumulative ledger
 
-## Round 0: STOP for an additional existing-test conflict
+## Turn 2 STOP: qt PCM audio layout differs in V4
 
-Recommended ruling: grant the single fixture correction at
+Recommended disposition: route to CHARC for an audio-mux or V4-instrument scope
+ruling; retain the fixture and the house assertion unchanged pending that ruling.
+No PCM conversion, fixture substitution, comparison weakening or audio-mux
+option has been added. Q2 grants the data map only.
+
+**[major, in-envelope, NEW, EXECUTED]**
+`tests/test_wp44_mov_input.py::test_qt_mov_probe_decode_runner_and_v4` exports
+successfully (runner exit 0, sole `clip_corrected.mp4`), but the MANDATORY item
+`audio streams present` is DIFFERENT. The synthetic MOV reports pcm_s16le,
+48000 Hz, one channel, `channel_layout=mono`; the output reports the same codec,
+sample rate and channel count but no `channel_layout` field. All other MANDATORY
+and REQUIRED items are SAME; the roster is present. This violates task 5's house
+V4 requirement. Product changes outside the granted map are not authorized.
+
+Root cause evidence, synthetic files only:
+
+- `work/wp4.4/t2/qt-green.txt`: qt fixture/export test, 1 failed, EXIT 1.
+- `work/wp4.4/t2/qt-audio-facts.txt`: independently read only codec/type/rate/
+  channel/layout fields from source and product output with ffprobe, EXIT 0.
+- `work/wp4.4/t2/qt-direct-copy-facts.txt`: plain FFmpeg stream copy from the
+  same synthetic MOV to MP4, EXIT 0, reproduces the missing output layout.
+  The direct copy bypasses correction, runner, product sink and the new data map.
+- The comparator's `audio_layout` at
+  `tools/container_spike/compare.py:1194-1209` includes `channel_layout` using
+  `s.get(k)`, so `mono` versus an absent field makes this MANDATORY item DIFFERENT.
+  No comparison code was changed.
+
+Exact independent reproduction command (source/output are synthetic work files):
+
+```bash
+ffmpeg -nostdin -hide_banner -v error -y -i work/wp4.4/tmp/t2-qt-green/test_qt_mov_probe_decode_runne0/clip.MOV -map 0 -c copy -f mp4 work/wp4.4/t2/qt-direct-copy.mp4
+```
+
+**[minor, environment, NEW, EXECUTED]** Three existing runner tests fail in
+`tests/test_headless_export.py:615`, inside `_unc_extended`, because the sandbox
+token cannot access the localhost administrative share. Each raises
+`PermissionError [WinError 5]` before it can exercise the intended product
+assertion. The runner's `inside`, `plain_path`, and `Redactor` ASTs are unchanged
+from `5e3537d`; no existing test or helper was altered to hide these failures.
+Seat reproduction is requested below. This is an environment failure, not an
+additional conflicting test expectation.
+
+**[minor, pre-existing encoding, REASONED + EXECUTED]** The inherited
+`tests/test_gui_open.py` contains U+00E9 on base line 368 (current line 369).
+All added lines are ASCII and the baseline non-ASCII sequence is unchanged.
+Whole-blob ASCII conversion would exceed Q1's three permitted edits; it was not
+performed. Dispatcher should resolve the literal whole-blob ASCII requirement
+against this inherited test content. Evidence:
+`work/wp4.4/t2/baseline-encoding.txt`, `work/wp4.4/t2/locks-final.txt`.
+
+## Round 0: additional existing-test conflict, STOP resolved
+
+CHARC `73d2797750c57625` (2026-10-29T21:59:13Z), brief commit `0b71bd3`,
+GRANTED (a): the single fixture correction at
 `tests/test_io_video_encode_units.py:80`, replacing the synthetic copied tag
 `meta` with the proved HERO13 tag `gpmd`. Keep the map assertion at lines
-365-372 unchanged. This file is currently NOT owned; no edit has been made.
+365-372 unchanged. This line alone is now owned. Option (b), adding `meta`
+to the allowlist, was DECLINED for lack of HERO13 evidence.
 
 **[major, in-envelope, NEW, REASONED + EXECUTED]** Q2's gpmd-only
 allowlist conflicts with that existing test. `_probe` supplies data streams
@@ -13,8 +67,8 @@ allowlist conflicts with that existing test. `_probe` supplies data streams
 `["0:v:0", "1:1", "1:3"]`. The ruled filter must omit `meta`, producing
 `["0:v:0", "1:1"]`. Adding `meta` to the allowlist would violate the grant:
 it is not a proved HERO13 codec tag. Q1 authorizes no change to this file.
-This needs a ruling before turn 2, under the dispatch's STOP for existing-test
-changes beyond Q1. It does not require widening product scope.
+The turn-1 STOP for existing-test changes beyond Q1 was resolved by the grant
+above. Product scope is unchanged.
 
 Cheap reproduction on unchanged product code: `uv run python -` loaded the
 existing unit module with `runpy.run_path`, called its `_command(_probe())`,
@@ -32,7 +86,7 @@ CONFIRMED: Q2 conflicts with the existing meta-map assertion; no file was change
 ## Dispatch and depth
 
 Base: `5e3537d`, branch `wp4.4`; clean at entry. Product and tests remain
-unchanged this turn. Protocol, APPLICATION, CLAUDE, prompting standard,
+unchanged in turn 1. Protocol, APPLICATION, CLAUDE, prompting standard,
 review/gate fill and the binding clauses have been read. This is a dispatched
 implementer; the using-superpowers skill explicitly exempts dispatched agents.
 The user-specified task ladder and yield schedule govern the work.
@@ -40,7 +94,8 @@ The user-specified task ladder and yield schedule govern the work.
 | Boundary | Dispatcher-supplied cell depth | Action |
 |---|---|---|
 | Turn 1 entry | Fresh session; no numeric depth supplied | Round 0 only |
-| Turn 1 exit | Pending dispatcher reading | Yield; evaluate near 200K, stop at a boundary near 250K |
+| Turn 1 exit / turn 2 entry | 102,496 input tokens; window 475,000 (dispatcher reading) | Continue tasks 3-5; evaluate near 200K, stop at a boundary near 250K |
+| Turn 2 exit | Pending dispatcher reading | Mandatory task-group yield |
 
 The dispatch's Codex/Claude pace readings describe account usage, not this
 cell's context depth; they are not substituted for a depth reading.
@@ -146,7 +201,16 @@ No `meta` or `fdsc` codec tag is established by that HERO13 evidence.
 The new unit test constructs a `ProbeResult` with gpmd, tmcd and synthetic
 zzzz data streams, invokes public `encode_command` with libx265 and checks
 the `-map` values, audio copy and deterministic exclusion. It needs neither
-FFmpeg nor footage. The existing meta-based unit assertion is the STOP above.
+FFmpeg nor footage. The existing meta-based unit fixture has the one-token
+grant above; its map assertion stays verbatim.
+
+Grant condition checked in turn 2: the `meta` at
+`tests/test_io_video_encode_units.py:753` is a `StreamRow` in the packet table
+for `test_not_carried_lists_best_effort_items`. It is passed to
+`verify.not_carried`, not to `encode_command`. That function compares the
+source and output packet tables; the probe's data tuple does not choose their
+tags. The row, its `data track meta` expectation, and all other lines in that
+test remain unaffected by changing `_probe`'s map input at line 80.
 
 No reporting change is needed: `FFmpegVideoSink` constructs its `SinkReport`
 using `not_carried(probe, source, output)` at `encode.py:1096`.
@@ -176,9 +240,16 @@ It never writes the full fidelity record, prints source paths, or persists
 arbitrary exception text or metadata. Non-format diagnostic text is withheld
 explicitly rather than risk disclosing private values.
 
-Expected from ruled Q2 evidence: encode failure on mebx (script EXIT 1),
-video hevc/hvc1, audio pcm_s16le/lpcm, two data mebx tracks. This is a prediction,
-not a cell run. On failure, comparison names remain null (not an empty pass).
+Observed at the orchestrator's seat on the unchanged base (reported at turn 2):
+stage `encode`, `VideoEncodeError`, kind `encoder_failed`, script EXIT 1,
+encoder exit 4294967274. Streams: video hevc/hvc1; audio pcm_s16le/lpcm;
+two data mebx streams (codec_name null). Failure fragments:
+`Could not find tag for codec none`, `codec not currently supported in container`,
+`Could not write header`, `Invalid argument`,
+`Nothing was written into output file`.
+The record is `work/wp4.4/r0/round0-summary.txt`; comparison was not reached,
+so DIFFERENT names are null, not an empty pass. This confirms the ruled Q2
+failure; no new product-scope STOP arises from that seat result.
 An unexpected failure or any MANDATORY/REQUIRED difference is a STOP to CHARC
 through the dispatcher. The already-ruled mebx failure is baseline evidence.
 Footage, GPU, network and heavy runs have NOT been executed by the cell.
@@ -190,13 +261,169 @@ Footage, GPU, network and heavy runs have NOT been executed by the cell.
 | 1, cheap conflict reproduction | `uv run python -` (existing `_probe` / `_command`, in-memory filtered data) | One confirmed existing-test conflict; no FFmpeg or footage | 0 |
 | 1, scratch-script lint | `uv run ruff check work/wp4.4/r0/round0.py` | All checks passed; `work/wp4.4/r0/ruff-script.txt` | 0 |
 | 1, artifact check | `uv run python -` (AST parse, import without main, ledger byte check) | PASS: script imports without executing footage code; ledger ASCII/LF; `work/wp4.4/r0/artifact-check.txt` | 0 |
-| 1, round-0 witness | Seat command above | REQUESTED, not run | Pending |
+| Seat, round-0 witness (reported turn 2) | `env -u VIRTUAL_ENV uv run python work/wp4.4/r0/round0.py > work/wp4.4/r0/round0-summary.txt 2>&1` | encoder_failed on mebx; encoder exit 4294967274; no V4 comparison | 1 |
 
 | Round | Critical / major / minor | In / out | NEW / REOPENED | Reverts | Product / test fixes | Reviewer / verdict | Depth |
 |---|---|---|---|---|---|---|---|
-| 0 (author mapping) | 0 / 1 / 0 | 1 / 0 | 1 / 0 | 0 | None / none | STOP for scope ruling; Reviewer A not yet run | Pending dispatcher |
+| 0 (author mapping) | 0 / 1 / 0 | 1 / 0 | 1 / 0 | 0 | None / none | STOP resolved by grant 73d2797750c57625; Reviewer A not yet run | 102,496 at turn-1 yield |
 
 Verification loop: suspected unlisted existing-test conflict; independently
 confirmed by fixture/expectation trace and command-construction reproduction;
-not fixed because unowned. No rejected false positives. Round 0 ends at its
-mandatory yield; further build work awaits the dispatcher's next turn.
+not fixed in turn 1 because unowned, then granted at the turn boundary.
+No rejected false positives. Round 0 ended at its mandatory yield.
+
+## Turn 2 build record (tasks 3-5)
+
+### Changes within the grants
+
+- Both suffix sets accept MOV case-insensitively and their docstrings cite
+  spec 5.2 (0.5.7). Q1's GUI filter and routing rows are changed exactly.
+  The existing GUI/runner equality test is unchanged and passed.
+- `_base_plan` maps exactly the case-insensitive `.mov` extension to `.mp4`,
+  before the existing portable-name guard. Photo and other video extensions,
+  collision numbering, reservations, partial marker and source guard are intact.
+  Three naming docstring locations now state the rule. New tests cover both
+  planners, suffix overrides, same-folder empty suffix, shared MOV/MP4 naming,
+  disk/partial collisions, mapped partial names and the `x.mov:s` refusal.
+- `MP4_DATA_CODEC_TAGS = frozenset({"gpmd"})` and its docstring are the only
+  added encode constant; the only changed encode logic is the deterministic
+  data-map membership condition beside the tmcd exclusion. No mux retry.
+  The synthetic-tag unit exercises gpmd copied, tmcd excluded, zzzz excluded,
+  audio/data stream-copy and one command list with two inputs.
+- CHARC grant `73d2797750c57625`: only
+  `tests/test_io_video_encode_units.py:80` changes meta to gpmd. The original
+  map assertion (365-372) and packet-table row 753 are verbatim against base.
+  The entire unit file differs by exactly the granted token; its 80 tests pass.
+- The test-local qt fixture authors 192x144, 30 fps, 15-frame HEVC with
+  B-frames and 48 kHz PCM s16le, then applies a 180-degree display rotation on
+  remux to `clip.MOV`. Its qt brand, B-frames, display matrix, PCM facts,
+  probe and full decode checks passed. The runner then exports, but V4 exposes
+  the audio-layout STOP above. This test was written before suffix changes,
+  and its initial RED was the base runner's MOV refusal.
+
+No footage test or final report was written this turn. No footage was accessed
+by the cell. No dependency, frozen interface, local config, register or other
+worktree was changed. All generated media and runner logs stay in `work/wp4.4/`.
+
+### RED/GREEN node identities
+
+Routing RED on unchanged product code (`routing-red2.txt`):
+
+```text
+tests/test_wp44_mov_input.py::test_runner_routes_mov[a.mov]
+tests/test_wp44_mov_input.py::test_runner_routes_mov[a.MOV]
+tests/test_wp44_mov_input.py::test_runner_routes_mov[a.Mov]
+tests/test_wp44_mov_input.py::test_qt_mov_probe_decode_runner_and_v4
+tests/test_gui_open.py::test_file_dialog_route_uses_the_injected_chooser
+tests/test_gui_open.py::test_routing_by_extension[a.mov-video]
+tests/test_gui_open.py::test_routing_by_extension[a.MOV-video]
+```
+
+Failures were MOV refusal / absent `*.mov`; 7 failed, 14 passed, EXIT 1.
+The first attempt (`routing-red.txt`) had 5 failed, 14 passed, 2 setup errors
+because the new nested basetemp parent did not exist. Creating the legitimate
+work-local parent allowed a fresh-basetemp rerun; no sandbox workaround.
+After the suffix edit, all routing nodes plus the unchanged equality pin pass:
+21 passed, 1 qt node deselected, EXIT 0 (`routing-green.txt`).
+
+Naming RED on unchanged naming code (`naming-red.txt`):
+
+```text
+tests/test_jobs_naming.py::test_video_extension_case_is_preserved
+tests/test_jobs_naming.py::test_mov_output_extension[<folder>-<suffix>-<name>-<planner>]
+tests/test_jobs_naming.py::test_mov_and_mp4_share_collision_sequence
+tests/test_jobs_naming.py::test_mov_collision_uses_mapped_extension[final]
+tests/test_jobs_naming.py::test_mov_collision_uses_mapped_extension[temporary]
+tests/test_jobs_naming.py::test_mov_temporary_path_uses_mp4[final]
+tests/test_jobs_naming.py::test_mov_temporary_path_uses_mp4[plan]
+```
+
+The parameter-family row denotes these exact 36 node IDs, the Cartesian product
+in the order displayed: folder = `out`, `beside`; suffix = `default`, `edited`,
+`empty`; name = `IMG_6702.MOV`, `x.mov`, `x.Mov`; planner = `final`, `plan`.
+All 42 failing nodes retained MOV extensions (or selected the old source-guard
+number) rather than the mapped MP4 names; 4 controls passed, 819 deselected,
+EXIT 1. After the extension rule: the entire naming file, including every
+unchanged WP2.3 control, passed: 865 passed, EXIT 0 (`naming-green.txt`).
+
+Allowlist RED on unchanged encode code (`map-red.txt`):
+`tests/test_wp44_mov_input.py::test_data_map_only_carries_proved_mp4_tags`
+failed because `1:4` (zzzz) was included; the existing map and not_carried
+controls passed: 1 failed, 2 passed, EXIT 1. After the map and one-token grant:
+81 passed, EXIT 0 (`map-green.txt`, new unit plus entire encode unit file).
+
+The qt node's latest RED is the MANDATORY audio-layout STOP, not the initial
+suffix failure. It was not weakened. All fixture-shape assertions and the
+real export complete before that failure.
+
+### Commands and outcomes
+
+Every pytest command below uses `PYTHONPATH=scripts`,
+`-p sandbox_mkdir_shim -p no:cacheprovider`, and a fresh
+`--basetemp=work/wp4.4/tmp/<run>`; GUI runs also set
+`QT_QPA_PLATFORM=offscreen`. VIRTUAL_ENV is removed in each process.
+Logs are `work/wp4.4/t2/<log>.txt`.
+
+| Run / log | Command targets and selection | Counts / result | EXIT |
+|---|---|---|---|
+| routing-red | `uv run pytest -q tests/test_wp44_mov_input.py tests/test_gui_open.py::test_file_dialog_route_uses_the_injected_chooser tests/test_gui_open.py::test_routing_by_extension -m "not gpu and not footage and not slow and not fullclip"` | 5 failed / 14 passed / 2 setup errors, absent basetemp parent | 1 |
+| routing-red2 | Same targets/selection, fresh root | 7 failed / 14 passed, expected routing RED including qt node | 1 |
+| routing-green | Same targets plus `tests/test_headless_export.py::test_the_routing_tables_and_texts_equal_the_interfaces`, `-k "not qt_mov_probe_decode_runner_and_v4"` | 21 passed / 1 deselected | 0 |
+| naming-red | `uv run pytest -q tests/test_jobs_naming.py -k "mov or extension_case_is_preserved"` | 42 failed / 4 passed / 819 deselected | 1 |
+| naming-green | `uv run pytest -q tests/test_jobs_naming.py -m "not gpu and not footage and not gui and not slow and not fullclip"` | 865 passed | 0 |
+| map-red | `uv run pytest -q tests/test_wp44_mov_input.py::test_data_map_only_carries_proved_mp4_tags tests/test_io_video_encode_units.py::test_the_map_copies_audio_and_data_but_not_the_timecode_track tests/test_io_video_encode_units.py::test_not_carried_lists_best_effort_items` | 1 failed / 2 passed | 1 |
+| map-green | `uv run pytest -q tests/test_wp44_mov_input.py::test_data_map_only_carries_proved_mp4_tags tests/test_io_video_encode_units.py -m "not gpu and not footage and not gui and not slow and not fullclip"` | 81 passed | 0 |
+| qt-green (attempt) | `uv run pytest -q tests/test_wp44_mov_input.py::test_qt_mov_probe_decode_runner_and_v4` | 1 failed: audio streams present DIFFERENT | 1 |
+| light | `uv run pytest -q tests/test_wp44_mov_input.py tests/test_jobs_naming.py tests/test_headless_export.py tests/test_io_video_encode_units.py -m "not gpu and not footage and not gui and not slow and not fullclip"` | 1020 passed / 4 failed / 1 deselected | 1 |
+| gui | `uv run pytest -q tests/test_gui_open.py` | 31 passed | 0 |
+| ruff | `uv run ruff check .` | All checks passed | 0 |
+| ruff-final | `uv run ruff check .` (after test-only layout cleanup) | All checks passed | 0 |
+| mypy | `uv run mypy` | Success: no issues in 141 source files | 0 |
+| wp44-final | `uv run pytest -q tests/test_wp44_mov_input.py -m "not gpu and not footage and not gui and not slow and not fullclip"` | 5 passed / 1 failed, same MANDATORY audio-layout difference | 1 |
+| diff-check | `git -c core.autocrlf=false diff --check` | No whitespace errors | 0 |
+| locks (initial) | `uv run python -` (whole-artifact ASCII check) | Found pre-existing U+00E9 in GUI test, not introduced | 1 |
+| locks-final | `uv run python -` (added-line ASCII, granted-token diff and AST comparisons) | PASS, including verbatim map assertion and line 753 | 0 |
+| qt-audio-facts | `uv run python -` (restricted ffprobe format fields) | Confirmed source mono versus absent output layout | 0 |
+| qt-direct-copy-facts | `uv run python -` (plain FFmpeg copy plus same ffprobe fields) | Reproduces missing layout without product path | 0 |
+
+The four failed nodes in the light run are exactly:
+
+```text
+tests/test_wp44_mov_input.py::test_qt_mov_probe_decode_runner_and_v4
+tests/test_headless_export.py::test_g1_inside_sees_every_spelling_of_the_same_folder
+tests/test_headless_export.py::test_g1_main_refuses_every_footage_check_through_another_spelling[unc]
+tests/test_headless_export.py::test_g1_the_redactor_hides_the_extended_spellings
+```
+
+No full-suite, footage, GPU, network, fullclip or heavy benchmark was requested
+directly by the cell. The existing UNC helper attempted its administrative-share
+access during the authorized light run and failed; no network workaround was
+attempted. Ruff format checking remains at the dispatcher's seat as instructed.
+
+### Seat RUN REQUESTS
+
+After CHARC dispositions the qt STOP, the final fixture/light runs will need
+to pass. The three sandbox-blocked UNC nodes need this seat command now (from
+Git Bash, estimated scheduling allowance under one minute; no timing figure):
+
+```bash
+env -u VIRTUAL_ENV uv run pytest -q tests/test_headless_export.py::test_g1_inside_sees_every_spelling_of_the_same_folder 'tests/test_headless_export.py::test_g1_main_refuses_every_footage_check_through_another_spelling[unc]' tests/test_headless_export.py::test_g1_the_redactor_hides_the_extended_spellings --basetemp=work/wp4.4/t2-seat-unc > work/wp4.4/t2/seat-unc.txt 2>&1
+```
+
+Format at the seat as commissioned:
+
+```bash
+env -u VIRTUAL_ENV uv run ruff format --check . > work/wp4.4/t2/seat-format.txt 2>&1
+```
+
+Reviewer A has not run; no convergence or package-completion claim is made.
+
+| Round / boundary | Critical / major / minor | In / environment or pre-existing | NEW / REOPENED | Reverts | Product / test fixes | Verdict | Depth |
+|---|---|---|---|---|---|---|---|
+| Turn 2 author verification (not Reviewer A) | 0 / 1 / 2 | 1 / 2 | 3 / 0 | 0 | Routing, naming, data map / RED tests and granted fixture token | STOP: qt MANDATORY audio difference; no out-of-envelope remediation | Pending dispatcher |
+
+Verification-loop record: resolved the granted round-0 test conflict; confirmed
+the new qt audio difference independently with plain FFmpeg; confirmed UNC
+failures originate in the unchanged test helper before product assertions;
+confirmed non-ASCII is inherited rather than introduced. No false-positive
+rejections, no reverts, and no fix to the unowned audio-mux/instrument surface.

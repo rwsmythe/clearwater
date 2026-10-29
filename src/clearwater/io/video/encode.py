@@ -95,6 +95,10 @@ from clearwater.io.video.verify import (
     square_pixels,
 )
 
+MP4_DATA_CODEC_TAGS = frozenset({"gpmd"})
+"""Non-timecode data tags proved carried by the MP4 muxer on HERO13; others are best-effort
+omissions reported by :func:`not_carried` (D105, WP4.4 Q2)."""
+
 QUALITY_LEVELS = ("high", "standard", "draft")
 """The named quality levels (D75), as IF-10 ``quality_level`` spells them."""
 
@@ -379,7 +383,7 @@ def encode_command(
     for audio in probe.audio:
         maps += ["-map", f"1:{audio.index}"]
     for data in probe.data:
-        if data.codec_tag != TIMECODE_TAG:
+        if data.codec_tag != TIMECODE_TAG and data.codec_tag in MP4_DATA_CODEC_TAGS:
             maps += ["-map", f"1:{data.index}"]
     rotation = ["-display_rotation", str(video.rotation)] if video.rotation else []
     cut = ["-to", _seconds(cut_at)] if cut_at is not None else []
