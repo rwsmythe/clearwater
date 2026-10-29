@@ -369,6 +369,9 @@ def _break_resolve(monkeypatch, folder, error):
 @pytest.mark.parametrize("route", ["parsed", "argument-error", "argument-discovery"])
 def test_resolve_failure_is_a_cli_usage_refusal(tmp_path, monkeypatch, capsys, error, route):
     _, out, src = _folders(tmp_path)
+    sibling_cwd = tmp_path / "cwd"
+    sibling_cwd.mkdir()
+    monkeypatch.chdir(sibling_cwd)  # no known cwd spelling can hide a dropped sibling folder
     monkeypatch.setattr(he, "configured_footage_folder", lambda: None)
     if route == "argument-error":
         # Let discovery succeed once, then fail in Redactor itself.

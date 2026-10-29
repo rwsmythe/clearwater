@@ -8,7 +8,8 @@
 | Turn 2 / build | `tokens used` 127,137; input depth 134,393 / 475,000 | Dispatcher supplied on turn 3; 02:26:28Z start. |
 | Turn 3 / cleanup | `tokens used` 140,058; input depth 146,457 / 475,000 | Dispatcher supplied on turn 4. |
 | Turn 4 / Reviewer A round 1 adjudication | `tokens used` 298,255; input depth 163,961 / 475,000 | Dispatcher supplied on turn 5; usage and input depth recorded separately as given. |
-| Turn 5 / round-1 remediation | Pending dispatcher reading | No self-estimated depth; dispatcher reads this turn's footer. |
+| Turn 5 / round-1 remediation | `tokens used` 344,071; input depth 190,250 / 475,000 | Dispatcher supplied on turn 6; usage and input depth recorded separately as given. |
+| Turn 6 / terminating cleanup | Pending dispatcher reading | No self-estimated depth; dispatcher reads this turn's footer. |
 
 Evaluation point: approximately 250K; STOP at a round boundary at approximately
 400K, using the dispatcher's reading.
@@ -189,6 +190,7 @@ follow the review/gate fill. Reviewer B runs at the orchestrator's seat.
 | Build | `933e33e` + working diff / turn 2 | N/A | N/A | N/A | In-envelope implementation | No review yet | 0 | Runner tool + four test comparisons + new regressions | Reviewer not run | Pending dispatcher | STOP: three existing tests fail on the sandbox's administrative-share probe; no existing test edited. |
 | Cleanup | `d5c9ae3` + working diff / turn 3 | N/A | N/A | N/A | In-envelope formatting | No review yet | 0 | Formatting only, no behavior change | Reviewer not run | Pending dispatcher | Turn-2 STOP resolved by dispatcher seat verification; static and permitted light checks clean; Reviewer A pending. |
 | A1 | Review `a05c13e`; adjudication turn 4; remediation turn 5 on `52e00c0` | 0 | 1 (F1) | 1 (F2); 5 advisory (F3-F7) | 6 in / 1 out (F4) | 7 NEW / 0 REOPENED | 0 | Runner code F1; four test assertions F2; test-only F5; docs F3/F4/F7; F6 declined | Driver-run Claude process; `claude-opus-5-5`, high, STRONG; CLI version not supplied | Turn 4 input 163,961; turn 5 pending | `NEW_CRITICAL_MAJOR_FOUND`; accepted fixes GREEN in turn 5; next review pending, not convergence. |
+| A2 | Review `7addc2b`; terminating cleanup turn 6 | 0 | 0 | 3 (N1-N3); 2 advisory (N4-N5) | N2/N3/N4 in; N1/N5 outside owned scope and pre-existing | 5 NEW / 0 REOPENED | 0 | Runner + test N2; docs N3/N4; bank N1/N5; no reverts | Driver-run Claude pass, STRONG; version not separately supplied this round | Turn 5 input 190,250; tokens used 344,071 | `NO_NEW_CRITICAL_MAJOR`; TERMINATING under fill CONVERGENCE_CRITERION. Non-blocking cleanup once; no next Reviewer A round. |
 
 ## Execution record
 
@@ -237,6 +239,47 @@ of the surrounding shell's exit status. No two-leg / heavy run occurred.
 | 5 / static | `uv run mypy` | Success: no issues found in 141 source files; EXIT=0. | `t5-mypy.log` |
 | 5 / hardening file | `pytest -q -rs -s tests/test_wp42a_runner_hardening.py --basetemp=work/wp4.2a/tmp-t5-hardening` | 53 passed, no skips/deselections; EXIT=0. Uses sandbox plugins as above; this file contains no UNC seat-verification nodes. | `t5-hardening.log` |
 | 5 / light, three authorized UNC nodes deselected | `pytest -q -rs tests/test_wp42a_runner_hardening.py tests/test_headless_export.py tests/test_wp41_photo_path.py tests/test_wp41_v8.py -m 'not gpu and not footage and not slow' --deselect=tests/test_headless_export.py::test_g1_inside_sees_every_spelling_of_the_same_folder --deselect=tests/test_headless_export.py::test_g1_main_refuses_every_footage_check_through_another_spelling[unc] --deselect=tests/test_headless_export.py::test_g1_the_redactor_hides_the_extended_spellings --basetemp=work/wp4.2a/tmp-t5-light` | 354 passed, 5 deselected; EXIT=0. Three authorized UNC deselections plus 2 marker exclusions; no skips. Prefix/plugins as above, offscreen Qt. | `t5-light.log` |
+| 6 / N2 RED on reviewed head | `pytest -q -rs tests/test_wp42a_runner_hardening.py -k 'cli_usage_refusal and argument-discovery and OSError' --basetemp=work/wp4.2a/tmp-t6-red-head` | 1 failed, 52 deselected; EXIT=1. Strengthened test leaks argparse's full path on `7addc2b`. | `t6-red-head.log` |
+| 6 / N2 RED on dispatch base | Same selection, `--basetemp=work/wp4.2a/tmp-t6-red-base -p t6_base_runner`; `PYTHONPATH=scripts;work/wp4.2a` | 1 failed, 52 deselected; EXIT=1. Ignored scratch plugin loads exact `git show aa4761b:tools/headless_export.py` into `headless_export` before collection. No tracked source replacement. | `t6-red-base.log`; scratch `t6_base_runner.py` |
+| 6 / N2 GREEN | `pytest -q -rs tests/test_wp42a_runner_hardening.py -k cli_usage_refusal --basetemp=work/wp4.2a/tmp-t6-green` | 6 passed, 47 deselected; EXIT=0. All CLI exception routes, sibling cwd; sandbox plugins as above. | `t6-green.log` |
+| 6 / static | `uv run ruff check .` | All checks passed; EXIT=0. | `t6-ruff-check.log` |
+| 6 / static | `uv run ruff format --check .` | 260 files already formatted; EXIT=0. | `t6-format-check.log` |
+| 6 / static | `uv run mypy` | Success: no issues found in 141 source files; EXIT=0. | `t6-mypy.log` |
+| 6 / light, three authorized UNC nodes deselected | Turn-5 light command above with `--basetemp=work/wp4.2a/tmp-t6-light`; identical marker, sandbox plugins and explicit three `--deselect` arguments | 354 passed, 5 deselected in 26.01 s; EXIT=0. Three seat-verified UNC deselections plus 2 marker exclusions; no skips. All 53 hardening cases pass. | `t6-light.log` |
+| 6 / N1 provenance | `git log --format='%h %s' -S 'path.as_posix()' -- tools/headless_export.py`; `git show f7e7442:tools/headless_export.py` (selected form-list context) | Origin WP4.1 `f7e7442`; original forms raw, doubled-backslash, forward-slash; no mixed separator form. Commands succeeded. | `t6-n1-origin.log`, `t6-n1-origin-code.log` |
+| 6 / N5 provenance | `git log --format='%h %s' -S 'return bool(got == expected)' -- tests/test_wp41_v8.py`; `git show 715fd08:tests/test_wp41_v8.py` (selected scalar-branch context) | Origin WP4.1 `715fd08`; scalar numeric equality predates this arc. Commands succeeded. | `t6-n5-origin.log`, `t6-n5-origin-code.log` |
+
+Dispatcher-supplied turn-6 evidence: on `7addc2b`, full light set **357 passed,
+2 deselected**, UNC nodes included. Reviewer A round 2 ran **127 passed**, UNC
+included; its F1 control loaded `a05c13e` and produced **9 failed / 13 passed**.
+These are seat/reviewer results, not sandbox claims. Only the single authorized
+round-2 `review.txt` was read; no other evidence-folder file was accessed.
+
+### Turn 6: Reviewer A round 2 terminating cleanup
+
+The dispatcher supplied FINAL dispositions and the fill's terminating rule:
+non-blocking findings are fixed once, with no additional review round. All five
+items are NEW; no REOPENED finding or revert. F1/F2/F5 from A1 are confirmed by
+the reviewer's executed probes; no critical/major remains. A2 converges.
+
+| Finding | Severity / origin | Final disposition and evidence |
+|---|---|---|
+| N1 | MINOR; pre-existing WP4.1 | BANK. Reviewer reproduced mixed-separator argparse leak on `aa4761b`. `git log -S 'path.as_posix()'` identifies `f7e7442` (`fix(wp4.1): runner redacts known folders at every exit point; settings and record refusals (R1 F1-F5)`); its form list has raw, doubled and forward spellings only. Condition 1 grants escaped-apostrophe forms, not arbitrary separator coverage. Report records a for-CHARC row candidate. No code fix. |
+| N2 | MINOR; introduced test/claim defect | FIX. Strengthened `test_resolve_failure_is_a_cli_usage_refusal[argument-discovery-OSError]` changes cwd to `tmp_path / 'cwd'`, a sibling of `out`. RED on both dispatch base `aa4761b` and reviewed head `7addc2b` fails at line 401's `assert str(tmp_path) not in captured.err.replace(...)`: parser text leaks the full output-folder path. The earlier GREEN was cwd-prefix masking, not a sound control. In main's owned argument-error construction wrap, compare the raw token-derived Paths with the discovered known set before constructing Redactor. If any was dropped, print existing generic pathless refusal; no new resolve call, no discovery edit, no exception text. All 6 CLI exception cases GREEN; no jobs or traceback. Report row and historical-control qualification corrected. |
+| N3 | MINOR; introduced documentation | FIX-DOC. Safe same-drive joins include drive-relative `--out C:out` with a same-letter source, not just absolute folders. Parent remains `C:out`; describe that planning shape separately from actual absolute-control export paths. |
+| N4 | ADVISORY; introduced typed-contract boundary | DOCUMENT. `Settings.output_folder` is typed `Path` or None; main passes `Path` for `--out`. A library caller passing `str` can receive `TypeError` in check_outputs. No string-coercion API expansion. |
+| N5 | ADVISORY; pre-existing WP4.1 | BANK. `git log -S 'return bool(got == expected)'` identifies `715fd08` (`test(wp4.1): V5, V9, V10, N10, GPU, V8 and shell legs; report draft (not yet run, W1 open)`). Its unchanged scalar branch equates float32 signed zero. Current statistics are dicts of ndarray, reaching the guarded array branch. Outside the four granted comparison expressions; no code fix. |
+
+Verification: the tightened N2 regression independently distinguishes both old
+runners from the cleanup; all six exception routes and the full permitted light
+selection pass. Static checks pass. Review of the diff confirms only the owned
+main argument-error wrap, the new test, report and ledger changed this turn;
+the text predicate is still single-sourced and `_folders_named_in` is untouched.
+No new dependency, src/interface edit or existing-test change. The scratch base
+loader stays ignored under `work/wp4.2a/`; no `work/sandbox/` copies were made.
+The two-leg suite has not been run by the cell; a RUN REQUEST follows in the
+handoff. Report status is `FINAL pending the two-leg gate`. Reviewer B and
+acceptance follow at the dispatcher's seat.
 
 Turn-5 runner environment: default uv-cache writable root restored by dispatcher;
 no uv-cache failure this turn. Turn 4 made no `uv run` call and had no such
@@ -372,7 +415,7 @@ The filename prefix is `tests/test_wp42a_runner_hardening.py::` throughout.
 | `test_stream_output_on_hard_link_leaves_original_unchanged` [run/main] | Both real ADS cases failed at missing refusal, `red-all.log`; no capability skip. | Both in `green-guard-2.log`; original bytes, full stream names/sizes and output carrier unchanged. |
 | `test_apostrophe_folder_in_refused_suffix_is_hidden` | Escaped known basename was not replaced, `red-all.log`. | `green-quote-2.log`. |
 | `test_apostrophe_folder_in_record_and_summary_is_hidden` [5 forms] | All 5 retain quoted folder components, `red-all.log`. | All 5 in `green-quote-2.log`. |
-| `test_resolve_failure_is_a_cli_usage_refusal` [2 exception classes x 3 routes] | Parsed and constructor routes leak exceptions; discovery RuntimeError leaks. Discovery OSError already passes (existing suppression), so that case is a control, not new RED evidence. | All 6 in `green-resolve.log`. |
+| `test_resolve_failure_is_a_cli_usage_refusal` [2 exception classes x 3 routes] | Original test: parsed and constructor routes leak exceptions; discovery RuntimeError leaks. The original discovery OSError pass was cwd-prefix masking, corrected after A2 N2: with sibling cwd that parameter is RED on `aa4761b` and `7addc2b`, full path leaked (`t6-red-base.log`, `t6-red-head.log`). | Original 6 in `green-resolve.log`; strengthened 6 in `t6-green.log` after the incomplete-discovery refusal. |
 | `test_resolve_failure_is_a_library_refusal` [run/record_object x OSError/RuntimeError] | All 4 leak original exception type, `red-all.log`. | All 4 in `green-resolve.log`. |
 | `test_signed_zero_is_distinct_in_bit_comparisons` [statistics/pre-encode/decoded/preview] | All 4 actual code forms numerically equate signed zero, `red-bits.log`. | All 4 in `green-bits.log`. |
 
@@ -410,7 +453,7 @@ the original reasoned claim is not reclassified as an executed reproduction.
 |---|---|---|
 | Source-derived output stream syntax bypasses folder guard | Eight stand-in cases and two real ADS/hard-link cases RED before helper extraction. | Fixed in owned functions; GREEN. |
 | Escaped apostrophe leaks known folder | CLI plus five record/summary forms RED. | Fixed; new quoted forms ordered before ordinary parent prefixes; GREEN. |
-| Resolve errors escape redactor construction | Nine failing injected paths plus one already-safe OSError discovery control. | Four sites wrapped; main handles propagated safe refusals; GREEN. |
+| Resolve errors escape redactor construction / discovery | Original nine failing injected paths; A2 N2 disproves the tenth case's apparent safety by removing cwd masking. | Four sites wrapped; main handles propagated safe refusals and silently dropped argument-error folders; all strengthened CLI cases GREEN in turn 6. |
 | Self-referential junction / symlink necessarily raises | Executed both on Python 3.12.13 / Windows; both returned paths. | Rejected as reproduced claim; defensive handling retained as ruled. |
 | Signed-zero assertions accept unequal bits | Corrected controls execute all four original comparisons and fail. | Four comparisons strengthened; GREEN. |
 | Existing UNC tests fail because of the new runner guard | All fail in unchanged `_unc_extended` at `LOCAL_SHARE.is_dir()`; standalone pathlib probe reproduces PermissionError without importing runner. | Turn-3 FINAL ruling: sandbox artifact, not a defect; full light suite passes at dispatcher seat. |
@@ -432,12 +475,12 @@ weakened or patched.
 
 ## Current disposition
 
-Reviewer A round 1's accepted fixes F1/F2/F5 are implemented RED-first and
-locally GREEN in turn 5; F3/F4/F7 documented, F6 declined as ruled. Static checks
-pass; all 53 hardening tests pass; light suite 354 passed, 5 deselected (three
-authorized UNC nodes plus two marker exclusions), EXIT=0. Report status is
-DRAFT -- for Reviewer A round 2. Yield for the driver's commit and round-2 pass.
-Reviewer A convergence, full two-leg gate and acceptance remain pending;
-DR-78/DR-79 stay OPEN. Product-naming root cause is disclosed for CHARC as a
-register-row candidate, not fixed outside ownership. No mailbox post or
-evidence-folder write.
+Reviewer A CONVERGED at round 2 on `7addc2b`: `NO_NEW_CRITICAL_MAJOR`, terminating.
+Its non-blocking cleanup is complete: N2 RED-first fix, N3/N4 report corrections,
+N1/N5 banked with WP4.1 `git log -S` provenance. Static checks pass; light suite
+354 passed, 5 deselected (three authorized UNC nodes plus two marker exclusions),
+EXIT=0; all 53 new cases pass. Report status is `FINAL pending the two-leg gate`.
+Yield for the driver's commit, posted two-leg window and Reviewer B. Acceptance
+remains pending; DR-78/DR-79 stay OPEN until acceptance. Product-naming root
+cause and mixed-separator redaction are disclosed for CHARC as register-row
+candidates, not fixed outside ownership. No mailbox post or evidence-folder write.

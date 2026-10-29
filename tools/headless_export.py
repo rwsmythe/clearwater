@@ -1062,7 +1062,16 @@ def main(argv: Sequence[str] | None = None, *, exports: ExportJobs | None = None
         args = parser.parse_args(given)
     except _UsageError as exc:  # argparse refused the usage: its text redacted, status 2
         try:
-            text = Redactor(_folders_named_in(given))(str(exc))
+            folders = _folders_named_in(given)
+            given_paths = [
+                Path(token.split("=", 1)[1] if token.startswith("--") and "=" in token else token)
+                for token in given
+            ]
+            if any(path not in folders for path in given_paths):
+                # Discovery can suppress a resolution failure; its partial set is unsafe.
+                text = "a given folder cannot be resolved for redaction."
+            else:
+                text = Redactor(folders)(str(exc))
         except (OSError, RuntimeError):
             text = "a given folder cannot be resolved for redaction."
         print(f"{parser.format_usage()}{parser.prog}: error: {text}", file=sys.stderr)
