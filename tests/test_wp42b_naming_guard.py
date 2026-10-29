@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
@@ -13,9 +14,16 @@ from clearwater.config import new_parameter_set
 from clearwater.interfaces import Settings
 
 
-@pytest.mark.parametrize("preflight", [False, True], ids=["engine", "before-jobs"])
+@pytest.mark.parametrize(
+    ("preflight", "drive_relative"),
+    [
+        pytest.param(False, False, id="engine"),
+        pytest.param(True, False, id="before-jobs"),
+        pytest.param(False, True, id="engine-drive-relative"),
+    ],
+)
 def test_naming_refusal_is_readable_and_writes_nothing(
-    sample, tmp_path, monkeypatch, capsys, caplog, preflight
+    sample, tmp_path, monkeypatch, capsys, caplog, preflight, drive_relative
 ):
     """Refuse a real JPEG stream before writing, preserving both source data streams."""
     if sys.platform != "win32":
@@ -25,7 +33,7 @@ def test_naming_refusal_is_readable_and_writes_nothing(
     )
     for folder in (source_folder, out, cwd, footage):
         folder.mkdir()
-    carrier = source_folder / "carrier"
+    carrier = source_folder / (source_folder.drive[0].lower() if drive_relative else "carrier")
     carrier_data = b"source carrier"
     carrier.write_bytes(carrier_data)
     source = Path(f"{carrier}:input.jpg")
@@ -35,12 +43,15 @@ def test_naming_refusal_is_readable_and_writes_nothing(
         assert source.read_bytes() == stream_data
     except OSError as exc:
         pytest.skip(f"alternate data stream creation unavailable: {type(exc).__name__}")
-    assert source.name == "carrier:input.jpg"
+    assert source.name == f"{carrier.name}:input.jpg"
     monkeypatch.chdir(cwd)
     requests = he.requests_for(
         [source],
         parameters=new_parameter_set("c3", {}),
-        settings=Settings(output_folder=out, force_cpu=True),
+        settings=Settings(
+            output_folder=Path(os.path.relpath(out, cwd)) if drive_relative else out,
+            force_cpu=True,
+        ),
     )
 
     exports = composition.export_jobs()

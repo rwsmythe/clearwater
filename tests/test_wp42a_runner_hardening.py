@@ -275,6 +275,30 @@ def test_output_file_form_check_has_a_planted_control(
     print(f"PLANTED_CONTROL caught stream-refusal assertion at line {line}: {caught.value}")
 
 
+@pytest.mark.parametrize("api", ["run", "main"])
+def test_output_file_form_check_refuses_planted_stream_before_jobs(
+    tmp_path, monkeypatch, capsys, api
+):
+    """Exercise the file-form refusal independently of the earlier naming refusal."""
+    footage, out, src = _folders(tmp_path)
+    source = src / "carrier:input.jpg"
+    planted = Path(f"{out}{os.sep}carrier:input_corrected.png")
+    monkeypatch.setattr(he, "final_output_path", lambda *args: planted)
+    jobs = _Jobs()
+    if api == "run":
+        with pytest.raises(he.RunnerRefusalError) as caught:
+            he.run(_requests(source, out), footage_folder=footage, exports=jobs)
+        text = str(caught.value)
+    else:
+        monkeypatch.setattr(he, "configured_footage_folder", lambda: footage)
+        assert he.main([str(source), "--out", str(out), "--force-cpu"], exports=jobs) == 2
+        text = capsys.readouterr().err
+    assert source.name in text and he.REFUSED_FORM in text
+    assert str(tmp_path) not in text and "Traceback" not in text
+    assert not jobs.calls
+    assert not list(out.iterdir()) and not list(src.iterdir()) and not list(footage.iterdir())
+
+
 def test_no_footage_still_skips_output_checks(tmp_path, monkeypatch):
     _, out, src = _folders(tmp_path)
 

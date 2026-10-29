@@ -5,7 +5,9 @@
 | Turn 1 / round 0 | tokens used 90,285; input depth 87,357 / 475,000 | Dispatcher supplied at turn 2; round-0 note committed as `e5983bd` |
 | Turn 2 / build | tokens used 144,321; input depth 137,070 / 475,000 | Dispatcher supplied at turn 3; WIP committed as `f1a6bba` |
 | Turn 3 / ruling check | tokens used 306,885; input depth 167,794 / 475,000 | Dispatcher supplied at turn 4; docs-only STOP committed as `79b60d9` |
-| Turn 4 / build | Pending dispatcher reading | Scope amended; implementation and light checks GREEN; ready for Reviewer A round 1 |
+| Turn 4 / build | tokens used 379,056; input depth 206,526 / 475,000 | Dispatcher supplied at turn 6; committed as `215817a`; Reviewer A round 1 completed |
+| Turn 5 / round-1 adjudication | tokens used 413,658; input depth 237,641 / 475,000 | No tracked change; adjudication delivered in return and persisted below at turn 6 |
+| Turn 6 / round-1 remediation | Pending dispatcher reading | Bounded continuation authorized near evaluation point; test/report cleanup under `8262cd59b0d48c73` |
 
 Base: `f991254`, branch `wp4.2b`. Dispatch: orchestrator generation 18,
 FINAL brief on CHARC `5c056d647ad9ca99`. Scope: DR-80 naming containment.
@@ -44,6 +46,23 @@ Received with turn 4, 2026-10-29 04:50Z. VERBATIM; GOVERNS together with
 Implementation uses only the original owned files and the three files added
 by the first ruling, with WP4.2a edits restricted by both rulings. No new
 test was added to or deleted from the WP4.2a file, and none was skipped.
+
+## Governing round-1 remediation ruling -- CHARC `8262cd59b0d48c73`
+
+Received with turn 6, 2026-10-29 05:48Z. VERBATIM; GOVERNS with
+`0c8d52528a11b714` and `050c52106cd8c6ad`:
+
+> RULING on WP4.2b R1 (query 0d0659fe906001ac): **F1 = (a) GRANTED.** ONE added test in `tests/test_wp42a_runner_hardening.py` beside the 3(d) control, its twin: the same planted old stream path through a monkeypatched `final_output_path`, the file-form check ON, asserting the `REFUSED_FORM` text, exit 2 and nothing called on the jobs double, for run and main; RED under mutation M1 (the cell records the M1 RED run in the ledger). Nothing else in the file changes; the edit list in ledger and report gains this node id with the reason "coverage of the file-form layer after naming pre-empts real names". The reviewer's mutation finding is the right test of 3(d): my wording held in letter only, the twin makes it hold in effect.
+>
+> Not (b): WP4.2a's guard coverage stays in WP4.2a's file. Not (c): a defence layer that can be deleted unnoticed is not a register item, it is a missing test, and the cell is on the file now.
+>
+> F2-F5 dispositions at your seat CONCURRED (F2 record only; F3 the deviation stated in the report, the engine-route probe named; F4 one sentence; F5 none).
+
+The seat also grants `[engine-drive-relative]` as ONE additional parameter
+row inside the existing ONE runner test, with real drive-letter ADS,
+relative output, empty cwd and the existing data-preservation/refusal
+assertions. This remediation changes only the two granted test files,
+the report and this ledger. No product edit.
 
 ## Round 0 -- runner-test premise and FINAL ruling
 
@@ -199,7 +218,8 @@ control evidence, not a post-change GREEN claim.
 | 0 | No Reviewer A run; read/map STOP ruled at turn 2 | N/A | N/A | N/A | 0 | None; ledger only | Codex cell; reviewer not invoked | tokens 90,285; input 87,357 / 475,000 |
 | Turn 2 build (not a review round) | No Reviewer A run; initial scope STOP ruled at turn 3 | N/A | N/A | N/A | 0 | Product validation + new tests | Codex cell; reviewer not invoked | tokens 144,321; input 137,070 / 475,000 |
 | Turn 3 ruling check (not a review round) | No Reviewer A run; narrower STOP ruled at turn 4 | N/A | N/A | N/A | 0 | None; documentation + cheap reproductions only | Codex cell; reviewer not invoked | tokens 306,885; input 167,794 / 475,000 |
-| Turn 4 build (not a review round) | Ready for driver's Reviewer A round 1 | N/A | N/A | N/A | 0 | Exception/export + one runner catch + granted tests | Codex cell; reviewer not invoked | Pending dispatcher |
+| Turn 4 build (not a review round) | Reviewed at round 1 | N/A | N/A | N/A | 0 | Exception/export + one runner catch + granted tests | Codex cell | tokens 379,056; input 206,526 / 475,000 |
+| Reviewer A round 1, adjudication turn 5 / cleanup turn 6 | `NO_NEW_CRITICAL_MAJOR`; 1 minor / 4 advisory adjudicated below | 0 / 0 / 1; 4 advisory | 4 / 1 | 5 / 0 | 0 | Test/report-only remediation; no product change | Driver Claude `claude-opus-5-5` / high; exit 0, 38 turns; CLI version not supplied | Turn 4: input 206,526; turn 5: input 237,641; turn 6 pending |
 
 Review policy: the driver's Claude pass, STRONG tier, per the Clearwater
 seam-3 fill. Adjudicate every supplied finding; yield at each round boundary.
@@ -572,3 +592,207 @@ The dispatcher merges WP4.2b first, rebases WP4.2 at the next yield before
 its task 5, and owns any runner-branch conflict resolution. No stacked gate.
 DR-80 closure proposal gains: the runner refuses an OutputNameError before
 jobs (exit 2); closure remains for CHARC at the accept.
+
+
+## Reviewer A round 1 -- adjudication
+
+Persisted from the turn-5 return; F1/F3/F4 FIX dispositions below were
+proposals at adjudication and are implemented under the turn-6 ruling.
+Head reviewed: `215817a`, base `f991254`. Driver reported Claude
+`claude-opus-5-5` / high, exit 0, 38 turns, clean worktree afterward.
+
+**Verdict: `NO_NEW_CRITICAL_MAJOR`.** All five findings are non-blocking.
+
+| Round | Critical | Major | Minor | Advisory | In/out envelope | NEW/REOPENED | Reverts | Fixes in adjudication turn |
+|---|---:|---:|---:|---:|---|---|---:|---|
+| 1 | 0 | 0 | 1 | 4 | 4 / 1 | 5 / 0 | 0 | None; adjudication only |
+
+| Turn | Tokens used | Input depth |
+|---|---:|---|
+| 4 | 379,056 | 206,526 / 475,000 |
+| 5 | 413,658 | 237,641 / 475,000 |
+| 6 | Pending dispatcher reading | Pending dispatcher reading |
+
+Evidence directory: `C:\Users\rwsmy\clearwater-review-evidence\wp4.2b\r1\`.
+`review.txt` MD5 `E459925B4E409A65254FE27F4AB51FC7`;
+`review-prompt-r1.md` MD5 `2A0C552F24327FF4B4DB51B39D14D8FE`.
+
+### F1 -- CONFIRM; MINOR, in-envelope, non-blocking; FIX
+
+Independently removed only check_outputs' final `_write_form_refusal(output)`
+assignment and refusal branch IN MEMORY. Baseline and M1 each produced
+126 passed, 3 UNC nodes deselected, EXIT 0, across WP4.2a hardening, the
+WP4.2b runner test and headless-export tests. XML comparison confirmed
+identical selected node IDs and no new failure. The control at WP4.2a
+lines 258-275 disables the predicate and expects refusal to fail; it cannot
+distinguish an absent branch.
+
+Proposed twin:
+`tests/test_wp42a_runner_hardening.py::test_output_file_form_check_refuses_planted_stream_before_jobs`.
+Use the same planted stream path, leave the check ON, assert REFUSED_FORM,
+name only, exit 2, zero jobs and no writes. Under M1 the fake job runs and
+main returns 1. At turn 5, no test was added; CHARC now grants both APIs.
+Evidence: `work/wp4.2b/turn5-baseline.log`, `turn5-m1.log`, their XML files,
+and `turn5-final-audit.log`.
+
+### F2 -- CONFIRM; ADVISORY, out-of-envelope, non-blocking; BANK
+
+The independent probe confirmed literal `..` passes final_output_path while
+plan_output selects `.._2` because the directory exists. It is not a source
+file; routing rejects its empty extension (`headless_export.py:395-412`).
+The ruling explicitly excludes extending the stem check to `..`.
+BANKED HERE as an accepted boundary observation; no validation change.
+
+### F3 -- CONFIRM report/coverage refinement; ADVISORY, non-blocking; FIX
+
+The deviation is already authorized and explained in ledger lines 48-64
+at the reviewed head: turn-2 FINAL requires a real multi-letter ADS and
+permits the real reader because export.py:712 stats the source before
+planning at 753. Reject any implication it was unauthorized or unrecorded.
+
+Required report wording: approved deviation from brief task 4 replaces
+nonexistent c:input.jpg plus reader double with a real carrier:input.jpg
+JPEG stream and real reader, because the photo engine stats before planning.
+Distinguish ADS coverage from drive-relative cwd-escape coverage.
+My independent real one-letter ADS/relative output/empty cwd/no-footage
+probe returned name-only OutputNameError; output/cwd stayed empty and both
+source streams remained unchanged. EXIT 0; `turn5-probes-ok.log`.
+Recommended `[engine-drive-relative]` row stays inside the ONE runner test,
+retaining the existing two cases. Now granted at the dispatcher's seat.
+
+### F4 -- CONFIRM; ADVISORY, non-blocking; FIX report sentence
+
+Independent set comparison confirmed both lists have 22 entries and differ
+exactly as described. Add: "The edited-node list includes the planted
+file-form control, which was already passing, while the previously
+failing-node list includes the unedited stream-enumerator [after-refusal]
+case, which becomes green through the new exception catch."
+Evidence: `turn5-document-audit.log`, EXIT 0.
+
+### F5 -- CONFIRM; ADVISORY, non-blocking; BANK
+
+BANKED HERE as accepted cosmetics: extension is harmlessly rebound at test
+lines 110-111, and the same-drive test name is retained to preserve mandated
+node IDs. No code change, as concurred by CHARC.
+
+### Environment and unchanged adjudication state
+
+With UV_PROJECT_ENVIRONMENT pointing to main's installed .venv,
+PYTHONPATH=scripts;src and uv run --no-sync, the observed naming import was
+`C:\Users\rwsmy\clearwater\.worktrees\wp4.2b\src\clearwater\jobs\naming.py`.
+The standalone probe prepended tools, matching pytest's configured path.
+The stray .venv contains standard skeleton entries; it was bypassed and
+left untouched. Final audit: HEAD 215817a; git status --porcelain empty.
+No tracked file changed in turn 5. The first standalone probe lacked tools
+on sys.path (EXIT 1, `turn5-probes.log`); corrected setup exited 0 in
+`turn5-probes-ok.log`. This was probe setup, not a product import failure.
+
+
+## Turn 6 -- remediation
+
+R1 cleanup under CHARC `8262cd59b0d48c73`; no product change. F1 FIXED by the
+ONE positive file-form twin below, for run/main. F3 FIXED by the explicitly
+stated approved deviation, both named engine probes and ONE extra parameter
+row in the ONE WP4.2b runner test. F4 FIXED by the list-explanation sentence.
+F2 and F5 remain BANKED observations in the preceding adjudication; no code
+change for either. No finding rejected as a false positive or reopened.
+No new blocking finding, revert or open scope question; round 2 is dispatched
+by the orchestrator after this commit. Report remains DRAFT for Reviewer A.
+
+### Additions to the WP4.2a edit list
+
+The original 22 edited-node entries above remain unchanged, with the same
+spans (all precede this insertion). The following TWO case IDs are the ONE
+new function granted for F1. The original negative planted control is
+untouched; no other existing WP4.2a function/assertion changed this turn.
+
+| Added node ID | Current span | Reason |
+|---|---|---|
+| `tests/test_wp42a_runner_hardening.py::test_output_file_form_check_refuses_planted_stream_before_jobs[run]` | 279-299 | coverage of the file-form layer after naming pre-empts real names |
+| `tests/test_wp42a_runner_hardening.py::test_output_file_form_check_refuses_planted_stream_before_jobs[main]` | 279-299 | coverage of the file-form layer after naming pre-empts real names |
+
+The twin uses the same old stream output plant, leaves `_write_form_refusal`
+ON, asserts REFUSED_FORM/name-only text, no traceback, no job calls and no
+writes. The run API raises RunnerRefusalError (the CLI exit-2 refusal type);
+the main API explicitly returns 2. It bypasses naming only, preserving the
+separate layer's positive coverage rather than relying on the negative
+control's caught failure.
+
+Added WP4.2b row:
+`tests/test_wp42b_naming_guard.py::test_naming_refusal_is_readable_and_writes_nothing[engine-drive-relative]`.
+It uses a real drive-letter carrier/ADS, relative output, empty cwd and
+footage_folder=None. Existing [engine]/[before-jobs] IDs and assertions remain.
+All three ADS rows ran without an OS-refusal skip. The function count stays
+ONE. Source/main data, source stream, failed item/name-only text, empty
+output/cwd and no traceback are checked. Real-name ADS coverage and
+one-letter drive-relative cwd-escape coverage are distinguished in report.
+
+### RED before GREEN, with product mutations IN MEMORY only
+
+M1: parse inspect.getsource(check_outputs), remove the last two statements
+of its request loop (the final `_write_form_refusal(output)` assignment and
+its refusal if), and recompile only that function into the module globals.
+The tracked runner is never edited. `pytest.main` targets the twin:
+
+```text
+uv run --no-sync python -B -
+# stdin M1 recipe above, then pytest.main(['-q', '-rf', 'tests/test_wp42a_runner_hardening.py::test_output_file_form_check_refuses_planted_stream_before_jobs', '--basetemp=work/wp4.2b/tmp-turn6-m1-red', '-p', 'sandbox_mkdir_shim', '-p', 'no:cacheprovider'])
+```
+
+Result: **2 failed**, EXIT 1 (`turn6-m1-red.log`). The run case fails
+DID NOT RAISE RunnerRefusalError; main fails `assert 1 == 2`. These are the
+named positive controls absent at R1. On the real runner both pass.
+
+M3 additionally proves the new drive-relative row catches its intended
+failure: load only the original `_base_plan` function from
+`git show f991254:src/clearwater/jobs/naming.py`, compile it IN MEMORY into
+naming's globals, then run only `[engine-drive-relative]`:
+
+```text
+uv run --no-sync python -B -
+# stdin M3 recipe above, then pytest.main(['-q', '-rf', 'tests/test_wp42b_naming_guard.py::test_naming_refusal_is_readable_and_writes_nothing[engine-drive-relative]', '--basetemp=work/wp4.2b/tmp-turn6-m3-red', '-p', 'sandbox_mkdir_shim', '-p', 'no:cacheprovider'])
+```
+
+Result: **1 failed**, EXIT 1 (`turn6-m3-red.log`): unchecked naming completes
+the job rather than failing it. Independent inspection confirms an
+`input_corrected.png` in the isolated cwd, empty output folder and both
+source streams unchanged (`turn6-outcomes-final.log`). Every write stayed
+under that run's work/wp4.2b basetemp; no tracked product mutation.
+
+### Runs and light gates
+
+Environment remains UV_PROJECT_ENVIRONMENT=C:/Users/rwsmy/clearwater/.venv,
+PYTHONPATH=scripts;src, QT_QPA_PLATFORM=offscreen. No uv sync, dependency or
+stray-.venv change. Every pytest invocation uses the mandatory sandbox shim
+and no cacheprovider. All outputs below are UTF-8 files under work/wp4.2b/.
+
+| Run | Command after `uv run --no-sync` | Log | Counts / EXIT |
+|---|---|---|---|
+| M1 RED | `python -B -` with recipe/pytest args above | `turn6-m1-red.log` | 2 failed; EXIT 1 |
+| M3 RED | `python -B -` with recipe/pytest args above | `turn6-m3-red.log` | 1 failed; EXIT 1 |
+| Focused GREEN | `pytest -q -rf -rs tests/test_wp42a_runner_hardening.py::test_output_file_form_check_refuses_planted_stream_before_jobs tests/test_wp42b_naming_guard.py --basetemp=work/wp4.2b/tmp-turn6-green -p sandbox_mkdir_shim -p no:cacheprovider` | `turn6-green.log` | 5 passed, zero skips; EXIT 0 |
+| Lint | `ruff check .` | `turn6-ruff-check.log` | All checks passed; EXIT 0 |
+| Format | `ruff format --check .` | `turn6-ruff-format.log` | 261 files already formatted; EXIT 0 |
+| Types | `mypy` | `turn6-mypy.log` | No issues in 141 source files; EXIT 0 |
+| Full light set | Exact command below | `turn6-light.log`, `turn6-light.xml` | 1079 passed, 12 deselected, zero failures/errors/skips; EXIT 0 |
+| Preliminary XML/artifact audit | `python -B -` | `turn6-outcomes.log` | XML/node checks passed; relative artifact path had no drive, causing audit IndexError; EXIT 1 |
+| Corrected XML/artifact audit | `python -B -`, resolve artifact path before reading drive | `turn6-outcomes-final.log` | All 1079 PASS; exactly three added nodes, none removed; old 22 PASS; M3 cwd escape/source preservation confirmed; EXIT 0 |
+| Adjudication persistence | `python -B -` | `turn6-adjudication-write.log` | Turn-5 findings and depth readings persisted; EXIT 0 |
+| Report update | `python -B -` | `turn6-report-write.log` | F1/F3/F4 fixes and both new API IDs/reasons recorded; EXIT 0 |
+| Final scope/blob audit | `python -B -` with git/AST/raw-byte checks | `turn6-final-scope.log` | Exactly four authorized files vs 215817a; removing ONE added WP4.2a function reconstructs the old file exactly; ONE WP4.2b function with three rows; no old node removed; zero CR for all four raw changed blobs; EXIT 0 |
+
+```text
+uv run --no-sync pytest -q -rf -rs tests/test_jobs_naming.py tests/test_wp42b_naming_guard.py tests/test_headless_export.py tests/test_wp42a_runner_hardening.py tests/test_jobs_export.py tests/test_jobs_export_photo.py tests/test_jobs_export_support.py tests/test_jobs_export_video.py -m "not gpu and not footage and not slow" --deselect=tests/test_headless_export.py::test_g1_inside_sees_every_spelling_of_the_same_folder --deselect=tests/test_headless_export.py::test_g1_main_refuses_every_footage_check_through_another_spelling[unc] --deselect=tests/test_headless_export.py::test_g1_the_redactor_hides_the_extended_spellings --basetemp=work/wp4.2b/tmp-turn6-light --junitxml=work/wp4.2b/turn6-light.xml -o junit_family=xunit1 -p sandbox_mkdir_shim -p no:cacheprovider
+```
+
+The twelve deselections are unchanged: three authorized UNC nodes and nine
+marker exclusions. XML set comparison with turn 4 proves exactly the two
+twin cases and one runner row were added, no prior node removed. All 22
+prior failures remain individually PASS. Current unedited controls also
+PASS: no-footage 302-312, refused-request 315-324, invalid-suffix 327-340.
+Only test/report remediation occurred; no source/runner/fixture/config or
+interface edit. Owner verification loop: confirm F1 with M1 survivor ->
+add positive twin -> M1 RED / real GREEN; confirm F3 route with one-letter
+probe -> add one row -> original-rule M3 RED / real GREEN; settle report
+clarity -> full light gate/outcome audit GREEN. No further issue found.
+Own-window two-leg gate, Reviewer B and Reviewer A round 2 remain pending.

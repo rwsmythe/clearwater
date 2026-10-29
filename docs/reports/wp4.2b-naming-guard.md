@@ -2,11 +2,15 @@
 
 **DRAFT -- for Reviewer A**
 
-The implementation and requested light checks are GREEN. Reviewer A round 1,
-Reviewer B and the full two-leg gate are outstanding; this is not acceptance.
+The implementation and requested light checks are GREEN. Reviewer A round 1
+returned NO_NEW_CRITICAL_MAJOR (one minor and four advisory findings); its
+non-blocking remediation is complete. Reviewer A round 2, Reviewer B and the
+full two-leg gate are outstanding; this is not acceptance.
 Base: `f991254`. Turn-2 WIP: `f1a6bba`; turn-3 STOP record: `79b60d9`.
-Both scope rulings, CHARC `0c8d52528a11b714` and `050c52106cd8c6ad`, are recorded
-verbatim in `docs/proofs/wp4.2b-ledger.md` and govern this build.
+The governing CHARC rulings `0c8d52528a11b714`, `050c52106cd8c6ad` and
+`8262cd59b0d48c73` are recorded verbatim in the ledger. The last grants ONE
+added file-form twin in WP4.2a for both APIs; the seat also grants the
+`[engine-drive-relative]` row inside the ONE WP4.2b runner test.
 
 ## Behavior and scope
 
@@ -37,6 +41,8 @@ Scope delta authorized by CHARC: one public exception class and its jobs
 export; one new catch in `check_outputs` plus its import; the existing
 WP4.2a test file edited only for the two same-drive flips, exact refusal text,
 eight drive-relative plants and the planted file-form control's isolation.
+The round-1 remediation adds only the granted positive file-form twin and
+engine-drive-relative row, with report/ledger updates; no product edit.
 No frozen-interface, dependency, composition or export-engine edit.
 
 ## Runner and engine routes
@@ -68,13 +74,28 @@ fixture output name or path changed.
 
 The ONE WP4.2b runner test function,
 `tests/test_wp42b_naming_guard.py::test_naming_refusal_is_readable_and_writes_nothing`,
-now has `[engine]` and `[before-jobs]` cases. Both use a real JPEG ADS named
-`carrier:input.jpg`, real composition and reader, no stat or reader double.
-All carrier/stream/output/cwd paths are per-test `tmp_path` children. The
-engine case uses `footage_folder=None`; the preflight case uses a stand-in
-footage folder and a forwarding job spy to prove zero job calls and exit 2.
-Both check name-only text, no traceback, empty output/cwd, and unchanged
-carrier main data and source stream. ADS creation worked here; no skip.
+retains `[engine]` and `[before-jobs]` and adds `[engine-drive-relative]`.
+The first pair uses real `carrier:input.jpg` ADS data and proves the engine
+failed-item / configured-preflight routes. The new row uses a real one-letter
+carrier matching the test folder's drive, the engine route with no footage
+preflight, a relative output folder and an empty monkeypatched cwd. It proves
+the drive-relative cwd-escape route separately from multi-letter ADS coverage.
+All rows use real composition/reader, no stat or reader double; all paths
+are per-test tmp_path children. They check readable name-only refusal, no
+traceback, empty output/cwd and unchanged carrier main data and source stream.
+The before-jobs spy checks zero job calls and CLI exit 2. All three ADS rows
+ran successfully here; no OS-refusal skip occurred.
+
+Approved deviation from brief task 4: the turn-2 FINAL ruling replaced
+nonexistent `c:input.jpg` plus a reader double with a real
+`carrier:input.jpg` JPEG stream and the real reader, because
+`ExportEngine._photo` stats the source before planning (`export.py:712`).
+The new parameter row restores automated coverage of the one-letter,
+relative-output escape while keeping ONE test function. Reviewer A's F3
+engine-route probe on a real `c:input.jpg` stream is recorded in
+`C:\Users\rwsmy\clearwater-review-evidence\wp4.2b\r1\review.txt`; the cell's
+independent equivalent is `work/wp4.2b/turn5-probes-ok.log`. Both found a
+name-only OutputNameError, empty output/cwd and unchanged source data.
 
 Original runner RED on base attempted a stream output, created `out/carrier`,
 then failed rename with WinError 87; source data remained unchanged
@@ -90,6 +111,29 @@ control and the guard controls passed (`turn4-outcomes.log`). The deselections
 are the three explicitly authorized UNC nodes plus nine marker exclusions.
 No additional suppression or skip was introduced.
 
+Round-1 F1 was independently CONFIRMED: removing the final file-form branch
+IN MEMORY left the existing 126 selected tests green, just like baseline.
+The new positive twin, parameterized `[run]` and `[main]`, keeps that branch ON
+and plants the old stream path to bypass only naming. It checks REFUSED_FORM,
+name-only text, no jobs and no writes; run raises RunnerRefusalError and main
+returns 2. Under M1 both cases are RED (2 failed, EXIT 1); on the real runner
+both are GREEN. The original negative planted control remains unchanged.
+
+The new drive-relative row is also RED with the original unchecked
+_base_plan restored IN MEMORY (M3): the job completes and writes
+`input_corrected.png` in the isolated cwd instead of the output folder.
+The test fails its required failed-item assertion (1 failed, EXIT 1).
+Both source streams remain unchanged. On the real runner all five focused
+cases pass (EXIT 0). No tracked product file was mutated.
+
+Final turn-6 light set: **1079 passed, 12 deselected, zero failures/errors/skips**,
+EXIT 0 (`turn6-light.log`, `turn6-light.xml`), using the same command/UNC
+exclusions as turn 4. XML comparison proves exactly three added node IDs,
+none removed, and all original 22 failures still PASS. Evidence:
+`turn6-m1-red.log`, `turn6-m3-red.log`, `turn6-green.log`,
+`turn6-outcomes-final.log`.
+
+
 The two same-drive cases below intentionally flip from accepted output to
 REFUSED: DR-80 refuses every colon, including the formerly normalized
 same-drive spelling. They now assert planner/preflight refusal, zero jobs,
@@ -101,7 +145,7 @@ Their original node IDs are retained; no WP4.2a test was deleted or added.
 Line spans below refer to the completed turn-4 tree. A helper-only text
 change lists both the consuming node and helper span. The negative-call
 controls formerly at :272/:285 are unchanged, now functions at lines
-278-288 and 291-300; both passed. They prove planning is skipped, as CHARC's
+302-312 and 315-324; both passed. They prove planning is skipped, as CHARC's
 second ruling corrects. The eight planted drive-relative cases are the
 actual parent-guard coverage. The planted file-form control passed at
 258-275 with all original defect-catching assertions intact.
@@ -113,7 +157,9 @@ actual parent-guard coverage. The planted file-form control passed at
   flips and the two exact-text expectation changes. No assertion is weakened
   by the plants: only the planner source moves to a plant, and a parent-drive
   assertion is added to strengthen fidelity.
-- No WP4.2a test or parametrization was added, deleted or changed.
+- That turn-4 audit changed no WP4.2a test IDs or parametrizations. Under
+  `8262cd59b0d48c73`, turn 6 adds only the one twin function with run/main
+  cases; every pre-existing WP4.2a function remains identical to `215817a`.
 - The entire runner AST matches the WIP head after removing only the new
   import/catch; the parent/file-form guard text is identical.
 - All eight plants match the unchanged old `OutputPlan.path` composition for
@@ -145,8 +191,13 @@ Reviewer A should check that fidelity explicitly against the following list.
 | `tests/test_wp42a_runner_hardening.py::test_stream_output_on_hard_link_leaves_original_unchanged[run]` | 231-255; helper 60-76 | Helper exact-text expectation only; hard-link data/stream and no-jobs assertions unchanged. |
 | `tests/test_wp42a_runner_hardening.py::test_stream_output_on_hard_link_leaves_original_unchanged[main]` | 231-255; helper 60-76 | Helper exact-text expectation only; hard-link data/stream and no-jobs assertions unchanged. |
 | `tests/test_wp42a_runner_hardening.py::test_output_file_form_check_has_a_planted_control` | 258-275 | Plant old stream output to isolate disabled file-form helper; all original planted-defect assertions unchanged. |
+| `tests/test_wp42a_runner_hardening.py::test_output_file_form_check_refuses_planted_stream_before_jobs[run]` | 279-299 | coverage of the file-form layer after naming pre-empts real names |
+| `tests/test_wp42a_runner_hardening.py::test_output_file_form_check_refuses_planted_stream_before_jobs[main]` | 279-299 | coverage of the file-form layer after naming pre-empts real names |
 
-All 22 previously failing node IDs, now independently checked PASS in XML:
+The edited-node list includes the planted file-form control, which was already passing, while the previously failing-node list includes the unedited stream-enumerator `[after-refusal]` case, which becomes green through the new exception catch.
+The two newly added twin cases likewise appear only in the edit list.
+
+All 22 previously failing node IDs, independently checked PASS in turn-6 XML:
 
 - `tests/test_wp42a_runner_hardening.py::test_stream_named_output_is_refused_before_jobs[explicit-out-jpg-run]` -- PASS
 - `tests/test_wp42a_runner_hardening.py::test_stream_named_output_is_refused_before_jobs[explicit-out-jpg-main]` -- PASS
@@ -173,29 +224,30 @@ All 22 previously failing node IDs, now independently checked PASS in XML:
 
 ## Checks, verification loop and acceptance transfer
 
-Final `ruff check .`: all checks passed, EXIT 0
-(`turn4-ruff-check-final.log`). Final `ruff format --check .`: 261 files
-already formatted, EXIT 0 (`turn4-ruff-format-final.log`). Mypy: no issues
-in 141 source files, EXIT 0 (`turn4-mypy.log`). Initial wrapping findings
-were fixed in the new runner test only. Full light command and every run's
-exit/counts are in the ledger; all pytest runs used the sandbox mkdir shim
-and disabled cacheprovider. Installed dependencies were reused read-only
-with `uv run --no-sync` and `PYTHONPATH=scripts;src`.
+Final turn-6 `ruff check .`: all checks passed, EXIT 0
+(`turn6-ruff-check.log`). `ruff format --check .`: 261 files already formatted,
+EXIT 0 (`turn6-ruff-format.log`). Mypy: no issues in 141 source files, EXIT 0
+(`turn6-mypy.log`). Full commands/counts are in the ledger. Every pytest run
+used the sandbox mkdir shim and disabled cacheprovider; installed dependencies
+were reused read-only with uv run --no-sync and PYTHONPATH=scripts;src.
 
-Owner verification loop: missing-source premise confirmed and resolved by
-real ADS; unsafe naming/write attempt confirmed RED and fixed; the 22 old
-runner conflicts confirmed, scope amendments obtained and implemented;
-RED/GREEN and the independent assertion/plant/outcome audits confirm the
-new routes and compatibility controls. Final pass found no additional
-issue. No false-positive rejection or product revert. The only deviations
-from the original brief are the explicitly recorded governing rulings.
-No unresolved scope question remains. Review/gate work remains outstanding.
+Owner verification loop: R1 F1 confirmed by a surviving M1 mutation -> the
+positive twin granted and added -> both APIs RED under M1 and GREEN on the
+real runner. F3 was already authorized/recorded; report now states that
+approved deviation explicitly, names both independent one-letter probes,
+and the new row catches original drive-relative writing under M3. F4's
+list difference is explained. F2 (unreachable literal '..') and F5 (cosmetic
+local rebinding / mandated retained name) are BANKED in the ledger, with no
+code change. Final light checks and independent outcomes/scope audits find
+no additional issue; no product revert or unresolved scope question.
 
-Only the eight owned files changed; `turn4-final-scope.log` (EXIT 0) confirms
-the restricted naming/export deltas, complete node lists in both documents,
-zero CR bytes and a clean diff whitespace check. Frozen interfaces, dependencies, local config,
-composition and export engine are unchanged. No owner footage was written;
-test media came from shared fixtures and scratch stayed under the worktree.
+This remediation's diff against `215817a` is exactly four files: the two
+tests, this report and the ledger. The WP4.2a delta is ONE added twin test
+only; the WP4.2b delta is ONE parameter row and its source/output setup.
+`turn6-final-scope.log` records the final audit, including raw blob IDs and
+zero CR bytes for every changed file. All product files, prior WP4.2a test
+functions, frozen interfaces, dependencies, local config and stray .venv
+remain unchanged. No owner footage was written; scratch stayed under work/.
 
 WP4.2b merges FIRST. The dispatcher rebases WP4.2 at its next yield before
 its task 5 and resolves any runner-branch conflict at the seat. This package
