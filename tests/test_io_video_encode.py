@@ -45,7 +45,7 @@ from clearwater.io.video.verify import read_packet_table
 from clearwater.jobs.naming import MediaKind, plan_output
 from clearwater.jobs.safe_write import SafeWrite
 from container_spike import compare
-from local_config import FootageLookupError, find_footage_file, load_local_config
+from local_config import FootageLookupError, find_footage_file
 
 pytestmark = pytest.mark.usefixtures("ffmpeg_tools")
 
@@ -161,18 +161,20 @@ def clips(tmp_path_factory: pytest.TempPathFactory) -> Clips:
 @pytest.fixture(scope="session")
 def gx011627_standard_encode(
     tmp_path_factory: pytest.TempPathFactory,
+    gx011627: tuple[Path, int],
 ) -> Iterator[tuple[Path, vf.EncodeRun]]:
     """Encode GX011627 once at standard quality for the sink and level checks.
 
     Args:
         tmp_path_factory: Factory for a session folder under pytest's temp root.
+        gx011627: The selected trim or full source and its frame count.
 
     Yields:
         The encoded output and its own encode run, including the NVENC sampler.
     """
     if not _nvenc_ready():
         pytest.skip("NVENC is not available on this machine")
-    source = _footage_clip("GX011627", load_local_config().footage_path)
+    source = gx011627[0]
     out = tmp_path_factory.mktemp("wp-t5-gx011627-standard") / "GX011627-standard.mp4"
     try:
         run = vf.encode_file(source, out, encoder="hevc_nvenc", quality="standard", bit_depth=8)
@@ -1498,21 +1500,22 @@ def test_the_footage_lookup_skips_only_a_missing_clip(tmp_path: Path) -> None:
 @pytest.mark.slow
 def test_gx011627_through_the_sink_keeps_every_mandatory_and_required_item(
     gx011627_standard_encode: tuple[Path, vf.EncodeRun],
+    gx011627: tuple[Path, int],
 ) -> None:
-    source = _footage_clip("GX011627", load_local_config().footage_path)
+    source, frames = gx011627
     out, run = gx011627_standard_encode
     record = vf.fidelity_record(source, out, bit_depth=8, run=run)
     _assert_v4(record)
-    assert run.report.frames_written == 681
+    assert run.report.frames_written == frames
 
 
 @pytest.mark.footage
 @pytest.mark.gpu
 @pytest.mark.slow
 def test_gx011627_nvenc_levels_give_distinct_sizes(
-    tmp_path: Path, gx011627_standard_encode: tuple[Path, vf.EncodeRun]
+    tmp_path: Path, gx011627_standard_encode: tuple[Path, vf.EncodeRun], gx011627: tuple[Path, int]
 ) -> None:
-    source = _footage_clip("GX011627", load_local_config().footage_path)
+    source = gx011627[0]
     standard_out, _ = gx011627_standard_encode
     sizes: dict[str, int] = {}
     expected = {"high": "5.2 Main", "standard": "5.1 Main", "draft": "5.0 Main"}  # <= 6.0 Main
