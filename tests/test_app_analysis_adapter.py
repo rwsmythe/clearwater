@@ -287,6 +287,41 @@ def test_a_job_returned_to_retarget_is_kept_and_ends_under_the_latest_parameters
     assert same_record(adapter.statistics(pts), engine.smoothed_record(pts))
 
 
+def test_a_second_retarget_while_a_kept_job_waits_is_false(tmp_path: Path) -> None:
+    """R2-8: a kept job pending means this run cannot complete under any later parameters."""
+    rig = Rig(tmp_path)
+    adapter = rig.adapter()
+    adapter.run(params(strength=0.2), StubProgress())
+    rig.hold = threading.Event()
+    thread, box = run_in_thread(adapter, params(strength=0.4))  # a recompute, held at its end
+    assert rig.held.wait(10)
+    assert adapter.retarget(params(strength=0.7)) is False  # the engine returned a job: kept
+    assert adapter.retarget(params(strength=0.8)) is False  # still kept: not absorbed here
+    rig.hold.set()
+    thread.join(10)
+    assert box == {} and adapter.statistics(rig.frames[0].pts_ticks) is None
+    rig.hold = None
+    adapter.run(params(strength=0.8), StubProgress())  # the kept job runs at the next run
+    assert rig.engines[0].parameters["strength"] == 0.8 and rig.engines[0].is_complete()
+    assert adapter.statistics(rig.frames[0].pts_ticks) is not None
+
+
+def test_a_recompute_after_the_cache_was_cleared_decodes_again(tmp_path: Path) -> None:
+    """R2-5: a cleared entry rebuilds the engine at the run's start, so the recompute works."""
+    rig = Rig(tmp_path)
+    adapter = rig.adapter()
+    adapter.run(params(strength=0.2), StubProgress())
+    assert rig.sources[0].yielded == FRAMES
+    rig.cache.clear()  # the settings dialog's Clear
+    adapter.run(params(strength=0.5), StubProgress())  # a dependent parameter changed
+    assert len(rig.engines) == 2 and rig.built_with[1]["cache"] is rig.cache
+    assert rig.sources[1].yielded == FRAMES  # the decode pass ran again over the cleared entry
+    assert rig.engines[1].is_complete() and rig.engines[1].parameters["strength"] == 0.5
+    assert adapter.statistics(rig.frames[0].pts_ticks) is not None
+    adapter.run(params(strength=0.6), StubProgress())  # the entry is complete again: no rebuild
+    assert len(rig.engines) == 2
+
+
 def test_retarget_after_the_run_returned_is_false_and_clears_completion(tmp_path: Path) -> None:
     rig = Rig(tmp_path)
     adapter = rig.adapter()

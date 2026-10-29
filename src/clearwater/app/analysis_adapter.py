@@ -12,6 +12,8 @@ gate" (items 1 and 5), with WP4.3's rulings:
   GPU, and the engine gets ``clearwater.jobs.expected_frames`` of the probe, as the export's
   does. When a run's selection differs from the engine's device, the engine is rebuilt over the
   SAME cache before the run; a run in flight keeps its backend (absorbed, never cancelled).
+  The engine is also rebuilt when it has run and the clip's cache entry is no longer complete
+  (the settings dialog's Clear, R2-5): its decoded state names proxies the cache no longer holds.
 - Kept job priority (erratum 1): a job ``retarget`` got back from ``set_parameters`` is kept and
   run by the next ``run``, after the latest parameters were offered to it.
 - Its own pts list (F-2): ``pts()`` returns a tuple the adapter refreshes on the worker; the main
@@ -219,7 +221,8 @@ class EngineClipAnalysis:
 
         Returns:
             True when the run in flight finishes under ``parameters``; False when it does not
-            (a job the engine returned is then kept for the next ``run``).
+            (a job the engine returned is then kept for the next ``run``, and while a kept job
+            waits for that run no later parameters can finish this one either, R2-8).
         """
         values = effective_parameters(self._method, parameters)
         with self._lock:
@@ -235,12 +238,13 @@ class EngineClipAnalysis:
                 engine = self._engine
                 in_flight = self._phase == "engine"
             assert engine is not None
-            job = engine.set_parameters(values, focus_pts)
-            if job is not None:
-                with self._lock:
+            job = engine.set_parameters(values, focus_pts)  # a kept job absorbs them (erratum 1)
+            with self._lock:
+                if job is not None:
                     self._kept = job
+                if self._kept is not None:
                     self._complete = False
-                return False
+                    return False
         if not in_flight:
             with self._lock:
                 self._complete = False
@@ -347,11 +351,16 @@ class EngineClipAnalysis:
     def _engine_for(self, backend: ArrayBackend, key: CacheKey) -> AnalysisEngine:
         """Return the engine on ``backend``'s device, building or rebuilding it (ruling S2).
 
-        A rebuilt engine drops the old one's kept job: its first job runs under the latest
+        It is also rebuilt when it has run and the clip's entry is no longer complete (R2-5). A
+        rebuilt engine drops the old one's kept job: its first job runs under the latest
         parameters anyway. Construction is light (no device work until a job runs); the frame
         count may list the packets of a ``truncated`` clip once.
         """
-        if self._engine is not None and self._device == backend.device:
+        if (
+            self._engine is not None
+            and self._device == backend.device
+            and not self._entry_lost(self._engine, key)
+        ):
             return self._engine
         if self._expected is None:
             self._expected = (expected_frames(self._probe),)
@@ -373,6 +382,23 @@ class EngineClipAnalysis:
             self._device = backend.device
             self._kept = None
         return engine
+
+    def _entry_lost(self, engine: AnalysisEngine, key: CacheKey) -> bool:
+        """Return True when ``engine`` has run but the clip's entry is not complete (R2-5).
+
+        A cache that cannot be read is not taken as a loss: the run then fails or succeeds on
+        the engine it has, as before.
+        """
+        if engine.state().phase == "none":
+            return False
+        try:
+            entry = self._cache.lookup(key)
+        except (OSError, RuntimeError):
+            return False
+        if entry is not None and entry.complete:
+            return False
+        _LOG.info("analysis %s: the cache entry is gone; the engine is rebuilt", self._name)
+        return True
 
     def _next_job(
         self, engine: AnalysisEngine, values: dict[str, Any], focus: int | None
