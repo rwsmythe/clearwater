@@ -16,7 +16,8 @@ the evaluation and re-seat lines. Turn 1's figures were supplied at turn 2.
 | Turn 1, rung 0 / W1 script | 101,355 | 104,555 | 258,400 | Dispatcher at turn 2; turn 1 committed as `c06c808`; dispatch pace Codex 0.54 is not a depth figure |
 | Turn 2, W1 corrections | 120,962 | 123,658 | 258,400 | Dispatcher at turn 3; committed as `d88365d` |
 | Turn 3, semantic creation_time amendment | 129,889 | 131,810 | 258,400 | Dispatcher at turn 4; committed as `78e0094` |
-| Turn 4, round-0 table | Pending dispatcher | Pending dispatcher | 258,400 | Fill after this turn; if input depth exceeds about 190K, re-seat BEFORE rung 2 |
+| Turn 4, round-0 table | 152,628 | 152,018 | 258,400 | Dispatcher generation 20 at turn 5; committed as `65b9f4f`; CHARC authorizes rung 2 in this cell |
+| Turn 5, rung-2 build | Pending dispatcher | Pending dispatcher | 258,400 | Re-evaluate after this commit; if input depth exceeds about 200K, re-seat BEFORE rung 3 |
 
 ## Rung 0 facts (2026-10-29)
 
@@ -379,6 +380,122 @@ plus one new trim test. W4 must run all fullclip forms once, including the
 681-frame sink assertion. No build occurred at turn 4; yield this table for
 CHARC before rung 2, with the dispatcher's depth check at about 190K.
 
+## CHARC round-0 ruling (verbatim)
+
+Message `22065ec5da3b4dbe`, 2026-10-29 11:50:01Z, supplied by orchestrator
+generation 20 at turn 5:
+
+**CHARC RULING on the WP-T6 round-0 table (query 075c1ac8226a2a08, ledger 65b9f4f): PROCEED to rung 2 on the table as it stands. All seven rows CUT; R4 to six frames; row 10 BANKED.**
+
+- **Trim:** N = 90, T = 3.003 s, keyframes every 30; checks 4(a)-(e) PASS under R-a/R-c/R-e; the five allowed differences are exactly the muxer-written keys plus the semantic `creation_time` (2 parts, every part equal). The audio `timecode` loss stands as the Limit I named. ACCEPTED as the trim of record; the fixture reproduces these flags and checks verbatim.
+- **R2 (levels):** PASS on the trim: 5.2 / 5.1 / 5.0 Main, ratios 2.02 and 2.07 against the 1.25 links, standard proof tied, 90 frames written, three encodes 76.6 s. Whole-trim count as ruled (Q5).
+- **R4 (round trip): CUT to six frames**, by Q4's rule: base inside both bounds at 6 (mean 0.684 of 1.0; share 0.0073 of 0.010), every plant exceeds a bound with the same verdict pattern as at 30 (the three siting/first-decode plants detect by share only at BOTH counts, so nothing changed in kind), all nine applicable half-margin tests pass, wall 35.8 s against 160.5 s. ADDED for the report: the base's figures at 6 AND at 30 side by side (the share headroom at 6 is 27 %, and a reader must see that the 30-frame base was no wider), and the sentence that FFmpeg's bit-exact filters make these verdicts deterministic (`test_color_roundtrip.py:49-50`).
+- **Row 10: BANKED, lever named.** `tools/prototype/bench.py:1305` `stray_processes` costs 59.5 s over four calls of an 80.9 s run, sampler `stop` 16.3 s more. Not this package (no `tools/`). I write the DR row at WP-T6's accept and RECOMMEND a Codex micro-package right after (one file, one function, the gate's own figure as the proof): about 60-75 s off the serial leg for a one-line brief. The owner's Q7 trigger covers the rest of the gap list; this item is cheap enough to go without waiting.
+- **Estimate:** CUT rows 1,567 -> about 231 s; projected serial leg about 1,287 s plus the trim test; Q6's verdict is the per-test sum at the gate, as ruled. 900 s stays a target.
+- **Depth:** 152,018 of 258,400 after turn 4: proceed to rung 2 in this cell. Re-evaluate after rung 2's commit: if the figure is above about 200K, re-seat BEFORE rung 3 (the rung-3 edits touch four files and carry the V4-delta check; they belong in one cell with the report).
+- **Rung 2 as planned:** the shared pairing/semantic helper, `gx011627_trim` and `gx011627` in `conftest.py` additive, the trim-parity test with its two planted controls; W2 = that test plus `test_conftest_guard.py`.
+
+## Rung 2 -- build
+
+Turn 5 adds `GX011627_FRAMES = 681` (documented), R-c's scoped
+`ALLOWED_TAG_DIFFS`, the session `gx011627_trim` and lazy trim/full `gx011627`
+fixtures, and the shared checker in `tests/conftest.py`. The module docstring
+gains one paragraph naming the fixtures. Every pre-existing conftest line is
+byte-identical: the static proof admits only equal/insert diff operations.
+The guard, skip hook, release fixture and plugin statement are unchanged.
+Only stdlib imports were added at module level (`Iterator`, `Any`); all
+video-fidelity, product, subprocess and probe imports are inside function bodies.
+
+The single `pair_streams` helper is copied verbatim from W1, with a local
+formatter fence preserving that copy. `gx011627_trim_checks` ports W1's same
+comparison predicates and returns its sanitized record instead of writing a
+file and raising at the runner boundary. This lets both the fixture and the
+parity test assert each of 4(a)-(e) by name and also assert copied data-packet
+equality. W1/current comparison ASTs are identical after helper-name mapping.
+The roster diagnostic's fixed-width zip now has `strict=True` to satisfy ruff;
+each projected tuple has exactly the three roster fields, so its result is
+unchanged. No assertion or tag exception is weakened.
+
+The helpers filter location values before comparisons, retain packet digests
+only in memory, pair repeated stream keys by index/ordinal, and apply R-e only
+to format `creation_time`. The shared trim-plan helper reproduces the ruled
+packet listing and fixed copy flags, including only R-b's added
+`-movflags use_metadata_tags`. The source locator retains the ruled exact skip
+rule: only an absent clip after a successful folder search skips; ambiguous,
+missing-folder and unsearchable-folder cases raise.
+
+The trim fixture checks both its temp root and folder against the configured
+footage folder, asserts the folder remains under the resolved session root,
+and removes its own trim folder in `finally`, including failed setup. The full
+fixture requests the trim dynamically only for its trim parameter; the full
+parameter locates the source and yields the 681-frame constant. The marker is
+applied to the full parameter as specified; registration remains rung 4.
+
+`tests/test_io_video_decode_hw.py` gains only
+`test_the_gx011627_trim_is_a_stream_copy_of_the_source`, marked footage/slow.
+It imports the checker and locator locally from `conftest`, selecting the same
+loaded module as the fixture and avoiding a duplicate helper or new support
+file. All earlier bytes of that test file are an unchanged prefix. Rung-3
+decode cuts are not implemented yet.
+
+### W2 plan and control integrity
+
+`work/wp-t6/w2.sh` runs from Git Bash at the worktree root, unsets
+`PYTEST_ADDOPTS`, sets headless Qt, and records the window start/free bytes.
+It enforces >= 5 GiB before the parity test and again before controls. Pytest
+commands and every runner result go to separate logs under `work/wp-t6/w2/`
+with `EXIT=` lines; fresh basetemps are `w2-trim` and `w2-guard`.
+
+1. Run the new parity node alone. A skip is not accepted as a positive proof:
+   the command must exit zero and report one passed test.
+2. Run `tests/test_conftest_guard.py`, requiring exit zero.
+3. Import the same conftest checker/trim plan in the seat-side control program.
+   Make scratch trims under `work/wp-t6/w2-scratch/`: replace `-c copy` with
+   `-c:v libx265`, and separately change `-frames:v N` to `N+1`. The original
+   expected count N is passed to the checker. Record named PASS/FAIL checks,
+   caught status, counts and key-only diagnostics in `03-reencode.json` and
+   `03-extra_frame.json`. A command/helper error is not a caught control;
+   both controls are attempted and the step fails unless the re-encode fails
+   4(b) and N+1 fails 4(b) or 4(c).
+4. The EXIT trap removes only scratch created by this invocation, after checking
+   its resolved absolute path. Pre-existing scratch is refused and preserved.
+   It lists remaining `GX011627-trim.mp4` filenames in both basetemps and fails
+   if any remain. `04-cleanup.json` records the end time and cleanup results;
+   the script prints `W2 DONE` or `W2 STOP stage=<n>` last. All reports/logs stay.
+
+The N+1 plant retains the fixed `-t T`; the script will report an uncaught
+control and STOP if that cap prevents an extra packet. It will not manufacture
+a rejection by changing the check's expected count or adding an unruled flag.
+Likewise a re-encode command failing before checks cannot count as 4(b) failing.
+These are control-integrity conditions, not results: W2 has not run in the cell.
+
+W2 script MD5: `1f4025ca3fa944daf62908e658f6423f` (gitignored).
+Expected seat window: about 5-10 minutes, with the CPU re-encode the uncertain
+part; no other heavy work. Exact command: `bash work/wp-t6/w2.sh`.
+
+### Rung-2 static checks and verification record
+
+| Check | Result | Evidence |
+|---|---|---|
+| `uv run ruff check tests/conftest.py tests/test_io_video_decode_hw.py` | PASS, EXIT 0 | `work/wp-t6/rung2-ruff.log`; initial B905 fixed with strict fixed-width zip, then its long line wrapped |
+| `uv run mypy` | PASS, EXIT 0; 141 source files | `work/wp-t6/rung2-mypy.log` |
+| Bash `-n work/wp-t6/w2.sh` | Sandbox blocked, EXIT 256 | `work/wp-t6/rung2-bash-syntax.log`; `CreateFileMapping ... Win32 error 5` before parsing; seat syntax check requested |
+| Additive conftest / appended test | PASS, EXIT 0 | `work/wp-t6/rung2-static-proof.json`; every old conftest line and test byte preserved |
+| Single shared pairing / predicates | PASS | Same proof: pairing source verbatim, comparison ASTs unchanged |
+| Python syntax / W2 names | PASS | Two owned files and three embedded W2 programs compile; embedded F821/F811 check passes, EXIT 0 (`rung2-w2-python-lint.log`) |
+| Module-level dependency envelope / LF | PASS | Same proof; no product/video-fidelity import at module level, all edited blobs LF |
+| Full `ruff format --check .` | Dispatcher seat pending | Only the new fragment was formatted in scratch; existing conftest bytes preserved |
+| `git diff --check` / owned scope | PASS, EXIT 0; only three owned paths | `work/wp-t6/rung2-diff-check.log`; conftest 456 insertions / zero deletions, decode test 19 insertions / zero deletions |
+| W2 footage, guard and planted controls | Pending seat | No footage/GPU command or pytest execution in this cell turn |
+
+The verification loop found one lint issue in the moved diagnostic zip; its
+strictness and wrapping were corrected inside added code. The byte-preservation,
+single-helper and unchanged-predicate checks passed after that fix. No source,
+tool, dependency or fixture-manifest change occurred. The final report must
+retain the side-by-side R4 base figures at six and 30 and state that FFmpeg's
+bit-exact filters make these verdicts deterministic in the declared envelope
+(`tests/test_color_roundtrip.py:49-50`), as the ruling requires.
+
 ## Heavy-run ledger
 
 One row per actual heavy run will include start, end, exact command, selected
@@ -390,6 +507,7 @@ pending and are not validation results.
 | W1 run 1 | 2026-10-29 11:18:06.838947Z / 11:18:09.255278Z | `bash work/wp-t6/w1.sh > work/wp-t6/w1-seat-driver.log 2>&1` | N=90; 4(a)-(c) PASS, 4(d)-(e) FAIL; STOP; process EXIT not supplied | 10,942,857,216 bytes before item 1; 10,942,246,912 before item 2; guard passed | `work/wp-t6/w1/` to be preserved as `w1-run1/`; checker fixed, re-run requested |
 | W1 run 2 | 2026-10-29 11:27:22Z / 11:27:25Z | `bash work/wp-t6/w1.sh > work/wp-t6/w1-seat-driver.log 2>&1` | 4(a)-(d) PASS, 4(e) FAIL; STOP; process EXIT not supplied | Not supplied at turn 3 | `work/wp-t6/w1/` to be preserved as `w1-run2/`; semantic amendment authorized |
 | W1 run 3 | 2026-10-29 11:33:05.984516Z / 11:41:23.101978Z | `bash work/wp-t6/w1.sh > work/wp-t6/w1-seat-driver.log 2>&1` | 4(a)-(e) PASS; three encodes; four round-trip counts; row 10: 1 passed, 1 warning; W1 DONE, EXIT 0 | 10,804,830,208 bytes before item 1; exclusive per dispatcher | `work/wp-t6/w1/`; scratch removed; round-0 table above |
+| W2 (requested, about 5-10 min) | Pending dispatcher | `bash work/wp-t6/w2.sh` | Pending parity/guard counts, two controls and EXIT | Script records bytes; >= 5 GiB required | `work/wp-t6/w2/`; no run yet |
 
 ## Review-round ledger
 
@@ -421,5 +539,9 @@ Turn 4 confirms W1 run 3's saved results and records the round-0 table, the
 measured R2 chain and R4 six-frame choice, the row-10 tools lever and the
 explicitly estimated projection. No test, measurement, profile or build ran in
 this turn. Pending at handoff: CHARC's round-0 reply and dispatcher depth check
-before rung 2. No build in `tests/` or `pyproject.toml` is authorized before that
-reply. The one tracked change is this ledger; no scratch script changed.
+before rung 2. That historical handoff was answered by CHARC's ruling above.
+Turn 5 builds rung 2 within the two owned test files plus this ledger and
+prepares the gitignored W2 script. Pending now: seat W2, full format check and
+the supplied turn-5 depth. If depth exceeds about 200K, re-seat before rung 3.
+The next turn records W2's actual controls and results; no gate or completion
+claim is made for this unrun rung.

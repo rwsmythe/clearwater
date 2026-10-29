@@ -144,3 +144,22 @@ def test_the_real_clip_through_cuda_decode_is_identical(
 ) -> None:
     needs_cuda()
     check_footage(SOURCE.frames(footage, hw_decode=True), footage_reference)
+
+
+@pytest.mark.footage
+@pytest.mark.slow
+def test_the_gx011627_trim_is_a_stream_copy_of_the_source(
+    gx011627_trim: tuple[Path, int],
+) -> None:
+    """Recheck every guarded trim property through the fixture's shared checker.
+
+    Args:
+        gx011627_trim: The checked session trim and source-derived frame count.
+    """
+    from conftest import _gx011627_source, gx011627_trim_checks
+
+    trim, count = gx011627_trim
+    record = gx011627_trim_checks(_gx011627_source(), trim, count)
+    for name in ("4a", "4b", "4c", "4d", "4e"):
+        assert record["checks"][name] == "PASS", name
+    assert all(item["equal"] for item in record["data_packet_checks"]), "data packets"

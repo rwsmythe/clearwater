@@ -56,6 +56,10 @@ or above it, up to ``--confcutdir`` (default: the ini file's folder), and in the
 below ``tests/``; ``--rootdir`` alone and ``-p no:conftest`` do not. With another
 ini file (``-c``) that lacks ``pythonpath = ["tools"]`` the import below fails
 (out of envelope). See ``docs/reports/wp-t1-pytest-guard.md``.
+
+The session fixtures ``gx011627_trim`` and ``gx011627`` provide a checked stream-copy
+trim and lazy trim/full forms of GX011627. The trim stays under the session temp root
+and is removed with its folder at teardown; fullclip forms read the original source.
 """
 
 from __future__ import annotations
@@ -63,7 +67,9 @@ from __future__ import annotations
 import getpass
 import os
 import tempfile
+from collections.abc import Iterator
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -74,6 +80,15 @@ pytest_plugins = (
 )
 
 _PYTEST_OF = "pytest-of-"
+
+GX011627_FRAMES = 681
+"""Number of video frames in the complete, unmodified GX011627 source."""
+
+ALLOWED_TAG_DIFFS = {
+    "format": frozenset({"major_brand", "minor_version", "compatible_brands", "encoder"}),
+    "stream": frozenset({"handler_name", "language"}),
+    "audio": frozenset({"timecode"}),
+}
 
 
 def _canonical(path: str | os.PathLike[str]) -> Path:
@@ -360,3 +375,444 @@ def _release_fft_plans(request: pytest.FixtureRequest) -> None:
             gpu.release_fft_plans()
 
     request.addfinalizer(release)
+
+
+# fmt: off
+def pair_streams(
+    src_streams: list[dict], dst_streams: list[dict],
+) -> list[tuple[dict, dict, tuple, int]]:
+    """Pair matching stream kinds and codec tags in index order within each key.
+
+    Args:
+        src_streams: Source stream dictionaries with container indices.
+        dst_streams: Destination stream dictionaries with container indices.
+
+    Returns:
+        Source, destination, pairing key and zero-based ordinal for each pair.
+
+    Raises:
+        AssertionError: If a pairing key has different source and destination counts.
+    """
+    src_groups, dst_groups = {}, {}
+    for streams, groups in ((src_streams, src_groups), (dst_streams, dst_groups)):
+        for stream in sorted(streams, key=lambda s: s["index"]):
+            key = (stream.get("codec_type"), stream.get("codec_tag_string"))
+            groups.setdefault(key, []).append(stream)
+    assert {key: len(rows) for key, rows in src_groups.items()} == {
+        key: len(rows) for key, rows in dst_groups.items()
+    }, "stream pairing counts differ"
+    return [
+        (source, destination, key, ordinal)
+        for key, sources in src_groups.items()
+        for ordinal, (source, destination) in enumerate(zip(sources, dst_groups[key], strict=True))
+    ]
+# fmt: on
+
+
+def _gx011627_run(command: list[str]) -> str:
+    """Capture tool output in memory, withholding raw diagnostics on failures."""
+    import subprocess
+
+    try:
+        result = subprocess.run(command, capture_output=True, timeout=900)
+    except (OSError, subprocess.TimeoutExpired):
+        raise RuntimeError("GX011627 tool failed; raw diagnostics withheld") from None
+    if result.returncode:
+        raise RuntimeError("GX011627 tool failed; raw diagnostics withheld")
+    return result.stdout.decode("utf-8")
+
+
+def _gx011627_document(path: Path) -> dict[str, Any]:
+    """Return stream facts with location values discarded before comparison."""
+    import json
+
+    import video_fidelity as vf
+    from clearwater.io.video import find_tool
+
+    raw = json.loads(
+        _gx011627_run(
+            [
+                str(find_tool("ffprobe")),
+                "-v",
+                "error",
+                "-show_format",
+                "-show_streams",
+                "-of",
+                "json",
+                str(path),
+            ]
+        )
+    )
+    for item in [raw.get("format", {}), *raw.get("streams", [])]:
+        tags = item.pop("tags", {})
+        item["location_keys"] = sorted(k for k in tags if vf.location_like(k))
+        item["tags"] = {k: v for k, v in tags.items() if not vf.location_like(k)}
+    return raw
+
+
+def _gx011627_packets(
+    path: Path, stream: str | int, entries: tuple[str, ...]
+) -> list[dict[str, Any]]:
+    """Keep ordered packet facts and hashes in memory only, without decoding data."""
+    import json
+
+    from clearwater.io.video import find_tool
+
+    return json.loads(
+        _gx011627_run(
+            [
+                str(find_tool("ffprobe")),
+                "-v",
+                "error",
+                "-select_streams",
+                str(stream),
+                "-show_packets",
+                "-show_entries",
+                "packet=" + ",".join(entries),
+                "-show_data_hash",
+                "MD5",
+                "-of",
+                "json",
+                str(path),
+            ]
+        )
+    ).get("packets", [])
+
+
+def _gx011627_packet_rows(
+    rows: list[dict[str, Any]], entries: tuple[str, ...]
+) -> list[tuple[Any, ...]]:
+    """Project packet fields without side data or payloads."""
+    return [tuple(row.get(key) for key in entries) for row in rows]
+
+
+def _gx011627_rotation(stream: dict[str, Any]) -> list[int]:
+    """Read rotation from the stream's display matrix or rotation tag."""
+    values = [s["rotation"] for s in stream.get("side_data_list", []) if "rotation" in s]
+    return values if values else [int(stream.get("tags", {}).get("rotate", 0))]
+
+
+def gx011627_trim_checks(source: Path, trim: Path, count: int) -> dict[str, Any]:
+    """Compare a trim with its source using the ruled packet, stream and tag checks.
+
+    Args:
+        source: The original GX011627 file, read only.
+        trim: The candidate stream copy under the session temp root.
+        count: Expected video frame count derived from the source's keyframe cut.
+
+    Returns:
+        Named 4(a)-(e) verdicts and diagnostics containing only counts, booleans,
+        stream kinds, codec tags, tag keys and the ruled reasons. Data-packet
+        equality is reported separately and must also pass before consumption.
+    """
+    from fractions import Fraction
+
+    original, copied = _gx011627_document(source), _gx011627_document(trim)
+    src, dst = original["streams"], copied["streams"]
+    fields = ("pts_time", "duration_time", "size", "flags", "data_hash")
+    a = _gx011627_packets(source, "v:0", fields)[:count]
+    b = _gx011627_packets(trim, "v:0", (*fields, "pts"))
+    checks = {
+        "4a": count >= 66,
+        "4b": len(a) == len(b) == count
+        and _gx011627_packet_rows(a, fields) == _gx011627_packet_rows(b, fields),
+    }
+    video = next(s for s in dst if s.get("codec_type") == "video")
+    checks["4c"] = Fraction(video["time_base"]) == Fraction(1, 30000) and sorted(
+        int(p["pts"]) for p in b
+    ) == [k * 1001 for k in range(count)]
+    roster = ("codec_type", "codec_name", "codec_tag_string")
+    parity = sorted(_gx011627_packet_rows(src, roster), key=repr) == sorted(
+        _gx011627_packet_rows(dst, roster), key=repr
+    )
+    paired = pair_streams(src, dst)
+    details = []
+    for left, right, key, ordinal in paired:
+        kind = left.get("codec_type")
+        keys = (
+            (
+                "width",
+                "height",
+                "pix_fmt",
+                "color_range",
+                "color_space",
+                "color_transfer",
+                "color_primaries",
+            )
+            if kind == "video"
+            else ("sample_rate", "channels")
+            if kind == "audio"
+            else ()
+        )
+        same = all(left.get(k) == right.get(k) for k in keys)
+        if kind == "video":
+            same = same and _gx011627_rotation(left) == _gx011627_rotation(right)
+        parity = parity and same
+        details.append(
+            {
+                "source_index": left["index"],
+                "trim_index": right["index"],
+                "pairing_key": key,
+                "ordinal": ordinal,
+                "kind": kind,
+                "fields_equal": same,
+            }
+        )
+    for tag in ("gpmd", "tmcd"):
+        parity = parity and (
+            any(s.get("codec_type") == "data" and s.get("codec_tag_string") == tag for s in src)
+            == any(s.get("codec_type") == "data" and s.get("codec_tag_string") == tag for s in dst)
+        )
+    checks["4d"] = parity
+    differences, semantic_checks, location_presence = [], [], True
+    pairs = [
+        (
+            "format",
+            original.get("format", {}),
+            copied.get("format", {}),
+            ALLOWED_TAG_DIFFS["format"],
+        )
+    ]
+    audio_timecode = []
+    for left, right, key, ordinal in paired:
+        allowed = ALLOWED_TAG_DIFFS["stream"]
+        if key[0] == "audio":
+            allowed = allowed | ALLOWED_TAG_DIFFS["audio"]
+            audio_timecode.append(
+                {
+                    "pairing_key": key,
+                    "ordinal": ordinal,
+                    "source_has_key": "timecode" in left["tags"],
+                    "trim_has_key": "timecode" in right["tags"],
+                    "survives_by_key": "timecode" in left["tags"] and "timecode" in right["tags"],
+                }
+            )
+        scope = "stream-" + str(key[0]) + "-" + str(key[1]) + "-" + str(ordinal)
+        pairs.append((scope, left, right, allowed))
+    for scope, left, right, allowed in pairs:
+        location_presence = location_presence and left["location_keys"] == right["location_keys"]
+        lt, rt = left["tags"], right["tags"]
+        keys = set(lt) | set(rt) | ({"creation_time"} if scope == "format" else set())
+        for key in sorted(keys):
+            semantic_allowed = None
+            if scope == "format" and key == "creation_time":
+                parts = rt[key].split(";") if isinstance(rt.get(key), str) else []
+                semantic_allowed = (
+                    key in lt
+                    and key in rt
+                    and bool(parts)
+                    and all(part == lt[key] for part in parts)
+                )
+                semantic_checks.append(
+                    {
+                        "scope": "format",
+                        "key": "creation_time",
+                        "parts": len(parts),
+                        "every_part_equals_source": semantic_allowed,
+                    }
+                )
+            if (
+                lt.get(key) != rt.get(key)
+                or (key in lt) != (key in rt)
+                or semantic_allowed is False
+            ):
+                permitted = semantic_allowed if semantic_allowed is not None else key in allowed
+                differences.append(
+                    {
+                        "scope": scope,
+                        "key": key,
+                        "allowed": permitted,
+                        "reason": "format creation_time semantic rule R-e"
+                        if semantic_allowed is not None
+                        else "muxer-written key ruled in R-c"
+                        if permitted
+                        else "not allowed by R-c; values withheld",
+                    }
+                )
+    checks["4e"] = location_presence and not any(not d["allowed"] for d in differences)
+    # Data is never decoded: compare each copied data packet with the source prefix.
+    data_checks = []
+    data_fields = ("pts_time", "duration_time", "size", "data_hash")
+    for left, right, key, ordinal in paired:
+        if left.get("codec_type") != "data" or left.get("codec_tag_string") == "tmcd":
+            continue
+        x = _gx011627_packets(source, left["index"], data_fields)
+        y = _gx011627_packets(trim, right["index"], data_fields)
+        same = bool(y) and _gx011627_packet_rows(x[: len(y)], data_fields) == _gx011627_packet_rows(
+            y, data_fields
+        )
+        data_checks.append(
+            {
+                "codec_tag": left.get("codec_tag_string"),
+                "pairing_key": key,
+                "ordinal": ordinal,
+                "source_index": left["index"],
+                "trim_index": right["index"],
+                "source_packets": len(x),
+                "trim_packets": len(y),
+                "equal": same,
+            }
+        )
+    record = {
+        "checks": {k: "PASS" if v else "FAIL" for k, v in checks.items()},
+        "streams": [
+            dict(zip(roster, row, strict=True)) for row in _gx011627_packet_rows(src, roster)
+        ],
+        "stream_details": details,
+        "tag_differences": differences,
+        "semantic_tag_checks": semantic_checks,
+        "location_key_presence_equal": location_presence,
+        "data_packet_checks": data_checks,
+        "audio_timecode_key_presence": audio_timecode,
+        "allowed_tag_diff_keys": {scope: sorted(keys) for scope, keys in ALLOWED_TAG_DIFFS.items()},
+    }
+    return record
+
+
+def _gx011627_source() -> Path:
+    """Locate GX011627, skipping only an absent clip in a searched footage folder.
+
+    Returns:
+        The read-only source path.
+
+    Raises:
+        FootageLookupError: If the folder is missing, unsearchable or ambiguous.
+    """
+    from local_config import FootageLookupError, find_footage_file
+
+    root = load_local_config().footage_path
+    try:
+        return find_footage_file("GX011627", root)
+    except FootageLookupError as error:
+        if error.matches or error.__cause__ is not None or not root.is_dir():
+            raise
+        pytest.skip("GX011627 is not in the footage folder")
+
+
+def _gx011627_trim_plan(source: Path, output: Path) -> tuple[int, str, list[str]]:
+    """Return the decode-order frame count, cut point and fixed stream-copy command."""
+    import csv
+    import io
+    from fractions import Fraction
+
+    from clearwater.io.video import find_tool, probe
+
+    listing = _gx011627_run(
+        [
+            str(find_tool("ffprobe")),
+            "-v",
+            "error",
+            "-select_streams",
+            "v:0",
+            "-show_entries",
+            "packet=pts_time,flags",
+            "-of",
+            "csv=p=0",
+            "-read_intervals",
+            "%+6",
+            str(source),
+        ]
+    )
+    rows = list(csv.reader(io.StringIO(listing)))
+    choices = [
+        (i, row[0])
+        for i, row in enumerate(rows)
+        if len(row) >= 2 and "K" in row[1] and Fraction(row[0]) >= 3
+    ]
+    assert choices, "GX011627: no keyframe at or after 3 seconds"
+    count, cut_text = choices[0]
+    info = probe(source)
+    maps = ["-map", "0:v:0"]
+    for audio in info.audio:
+        maps += ["-map", "0:" + str(audio.index)]
+    for data in info.data:
+        if data.codec_tag != "tmcd":
+            maps += ["-map", "0:" + str(data.index)]
+    command = [
+        str(find_tool("ffmpeg")),
+        "-nostdin",
+        "-hide_banner",
+        "-v",
+        "error",
+        "-y",
+        "-i",
+        str(source),
+        *maps,
+        "-c",
+        "copy",
+        "-map_metadata",
+        "0",
+        "-map_metadata:s:v:0",
+        "0:s:v:0",
+        "-write_tmcd",
+        "1",
+        "-video_track_timescale",
+        str(info.video.time_base.denominator),
+        "-frames:v",
+        str(count),
+        "-t",
+        cut_text,
+        "-movflags",
+        "use_metadata_tags",
+        "-f",
+        "mp4",
+        str(output),
+    ]
+    return count, cut_text, command
+
+
+@pytest.fixture(scope="session")
+def gx011627_trim(tmp_path_factory: pytest.TempPathFactory) -> Iterator[tuple[Path, int]]:
+    """Yield one guarded stream copy of GX011627 and remove its folder at teardown.
+
+    Args:
+        tmp_path_factory: Factory for the session's temp root under work/.
+
+    Yields:
+        The trim path and its source-derived frame count, after every check passes.
+    """
+    import shutil
+
+    source = _gx011627_source()
+    footage = _canonical(load_local_config().footage_path)
+    base = _canonical(tmp_path_factory.getbasetemp())
+    assert not _inside_or_equal(base, footage), "GX011627 temp root is inside footage"
+    folder = tmp_path_factory.mktemp("gx011627-trim", numbered=False)
+    resolved = _canonical(folder)
+    assert resolved.is_relative_to(base), "GX011627 trim folder escaped the session root"
+    assert not _inside_or_equal(resolved, footage), "GX011627 trim folder is inside footage"
+    trim = folder / "GX011627-trim.mp4"
+    try:
+        count, _, command = _gx011627_trim_plan(source, trim)
+        _gx011627_run(command)
+        record = gx011627_trim_checks(source, trim, count)
+        for name in ("4a", "4b", "4c", "4d", "4e"):
+            assert record["checks"][name] == "PASS", name
+        assert all(item["equal"] for item in record["data_packet_checks"]), "data packets"
+        yield trim, count
+    finally:
+        assert _canonical(folder) == resolved, "GX011627 trim folder changed at teardown"
+        assert resolved.is_relative_to(base) and not _inside_or_equal(resolved, footage)
+        shutil.rmtree(folder)
+
+
+@pytest.fixture(
+    scope="session",
+    params=[
+        pytest.param("trim", id="trim"),
+        pytest.param("full", id="full", marks=pytest.mark.fullclip),
+    ],
+)
+def gx011627(request: pytest.FixtureRequest) -> Iterator[tuple[Path, int]]:
+    """Yield the session trim, or the unchanged full source behind fullclip.
+
+    Args:
+        request: Session parameter; the trim fixture is requested only for trim.
+
+    Yields:
+        The selected source path and its expected frame count (681 for full).
+    """
+    if request.param == "trim":
+        yield request.getfixturevalue("gx011627_trim")
+    else:
+        yield _gx011627_source(), GX011627_FRAMES
