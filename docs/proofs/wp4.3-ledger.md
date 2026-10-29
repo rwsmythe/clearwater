@@ -237,7 +237,7 @@ appears in no computed set) and the import-time witness extension (DR-84).
 | R1 (Reviewer A, `038f02e..99da8aa`) | 0 / 5 / 11 | 16 in / 0 out (R1-5's reachability to be proven on the `main()` path) | 16 new / 0 reopened | 0 | none yet (adjudicating turn; proposed: product + tests) | WSL, codex-cli 0.162.1, `gpt-6.1-sol` high | 129,481 at the R1 yield (cell 3; `scripts/cell_depth.py`, given by the dispatcher in cell 4's dispatch) |
 | R2 (Reviewer A, `038f02e..362a8b2`) | 0 / 3 / 6 | 9 in / 0 out | 8 new / 1 reopened (R2-9 = R1-12; the reviewer also tagged R2-1 as R1-3 and R2-3 as R1-5, adjudicated NEW: distinct paths, the R1 fixes hold) | 0 | R1 remediation (groups A-C): product + tests; R2 remediation (cell 5, groups A-C): product (startup, adapter, preview, render worker, main, settings_dialog under the 38a7c702 grant) + tests; R2-9 test-only | WSL, codex-cli 0.162.1, `gpt-6.1-sol` high | 316,716 at the Group C yield (cell 4, 156 turns; `scripts/cell_depth.py`); seat retired at 355,066 (cell 4 stood down after the R2 yield) |
 | R3 (Reviewer A, `038f02e..028bc4f`) | 0 / 2 / 3 | 5 in / 0 out | 3 new / 2 reopened (R3-3, R3-4 = R1-12; the reviewer also tagged R3-1 as R2-2 and R3-2 as R1-3, adjudicated NEW: distinct routes, the earlier fixes hold) | 0 | R3 remediation (cell 6, groups A-B): product (`app/startup.py`: R3-1 `13c96f7`, R3-2 `099893a`) + tests; R3-3, R3-4, R3-5 test-only (`065f5f0`, `a0f43cd`) + the report's V7 rows and DR-44 (c) sentence | WSL, codex-cli 0.162.1, `gpt-6.1-sol` high | 222,999 at the Group C yield (cell 5, 109 turns; `scripts/cell_depth.py`); R3 adjudicated in the same seat; seat retired at 271,612 (cell 5 yielded R3 there and stood down). CHARC `d6e9abdf`: R3-2 RECLASSIFIED MINOR (counts now 0 / 1 / 4) |
-| R4 (Reviewer A, `038f02e..5d8e0df`) | 0 / 0 / 2 | 2 in / 0 out | 1 new / 1 reopened (R4-1 = R3-5) | 0 | none yet (review-only turn); proposed: test-only (`test_app_wiring.py`, `test_app_v8_v18.py`) + the report's V8 paragraph | WSL, codex-cli 0.162.1, `gpt-6.1-sol` high | 110,453 at the Group A yield (cell 6, 45 turns), 172,926 at the Group B yield (88 turns; `scripts/cell_depth.py`, given by the dispatcher); R4 adjudicated in the same seat. CONVERGED: zero new blocking |
+| R4 (Reviewer A, `038f02e..5d8e0df`) | 0 / 0 / 2 | 2 in / 0 out | 1 new / 1 reopened (R4-1 = R3-5) | 0 | terminating-round cleanup (cell 6): test-only (R4-1 `a4b2d5a`, R4-2 `67a285a`) + the report's DR-44 (c) sentence and V8 paragraph | WSL, codex-cli 0.162.1, `gpt-6.1-sol` high (a websocket DNS failure before the model's first output: client-side, NOT disqualifying, the dispatcher's ruling, gen 22) | 110,453 at the Group A yield (cell 6, 45 turns), 172,926 at the Group B yield (88 turns; `scripts/cell_depth.py`, given by the dispatcher); R4 adjudicated in the same seat; 213,877 at the R4 yield (117 turns). CONVERGED: zero new blocking |
 
 ## CHARC round-0 ruling (`fcb2a9205c060013`, 2026-10-29 12:54:46Z, verbatim; it GOVERNS the STOP items above)
 
@@ -881,8 +881,8 @@ ASCII.
 Beyond the named sentence: the report's V7 table rows (a), (b), (c), (e) and the witness paragraph
 were also updated (`065f5f0`), since rows (b) and (e) named the old witnesses ("scrub moves", "1
 render at 1:1 during the export") and the paragraph described the old arrangement; (d) and (f)
-keep cell 4's figures. Open for the window: the uncommitted S7 driver in the evidence folder
-imports these scenario functions; the witness keys it prints are now
+keep cell 4's figures. Open for the window: the S7 driver (not yet written; ruling S7) will import
+these scenario functions; the witness keys they return are now
 `proxies_shown_during_analysis` and `k1_renders_during_a_sink_write`.
 
 Decision for Reviewer A to challenge: the holds (V7 (e)'s write, R3-5's frame and write) are
@@ -934,3 +934,64 @@ APPROVED by the dispatcher (in scope: the report stays true to the witnesses).
 - Five-round gate: round 4 of 5. ZERO new blocking findings: by the fill's CONVERGENCE_CRITERION
   Reviewer A's loop TERMINATES here; R4-1 and R4-2 are fixed once in the terminating round's
   cleanup and open no further round. Yielded BEFORE any remediation (review-only turn).
+
+Depth at the R4 yield: 213,877 (`scripts/cell_depth.py`, 117 turns; given by the dispatcher, gen
+22). Dispatcher ruling on R4: ACCEPTED as adjudicated, Reviewer A CONVERGED at round 4 (0 / 0 / 2);
+the 17:40:58Z websocket DNS failure CONFIRMED client-side and not disqualifying (before the model's
+first output; the session ran to completion: 23 executions, the token footer, one VERDICT). R4-1
+and R4-2 FIX in the terminating round's cleanup, one turn, no further round.
+
+### Terminating-round cleanup (R4-1, R4-2)
+
+Test-only plus the report. Targeted run (`test_app_wiring`, `test_app_v8_v18`, the eight layering
+tests; `gui`, `slow` and `gpu` markers they carry included; a stacked accept gate was running on
+the host): 103 passed in 188 s. ruff check, ruff format --check (280), mypy strict (146): clean.
+Every committed blob 0 CR, 0 NUL, ASCII. Logs under `work/wp4.3-c6/` (`red-c.txt`, `green-c.txt`,
+`v8.txt`, `static-c.txt`).
+
+- R4-1 MINOR (REOPENED R3-5), `a4b2d5a`: `_ProgressSource.frames` sets `ended` in a `finally` (run
+  out, closed or raised); the analysis predicate also requires the session's analysis phase to be
+  `running` when the close begins. RED first: the new pure-Python unit test
+  `test_app_wiring.py::test_the_progress_source_has_ended_once_its_iterator_closes_or_runs_out`
+  failed on the old helper (`assert not True` from `mid_decode()` after `close()`), green after
+  (it carries the module's `gui` marker; it starts no window). The close test
+  `::test_dr44c_a_real_job_ends_within_the_shutdown_timeout_at_close` passes with the new
+  predicate: analysis 52 ms, export 33 ms, batch 39 ms, `at close [True]` (shared host, the gate
+  running); the report's DR-44 (c) sentence names the phase and these figures.
+- R4-2 MINOR (NEW), `67a285a`: `_v8_photo` returns (mean, p99, p99.9, max); p99.9 and max are
+  printed, never asserted (AD-11 as amended). Figures: smooth scene k = 2 p99.9 0.00796, k = 4
+  0.0108; the look-check crop k = 2 0.0350, k = 4 0.0507 (mean, p99 and max unchanged from the
+  report's earlier figures). The report's V8 paragraph carries them. Tests
+  `test_app_v8_v18.py::test_v8_photo_preview_at_1_1_and_k_2_and_4_against_the_downscaled_export`
+  and `::test_v8_photo_k_above_1_on_real_sized_content`. RESULT-BEARING: the dispatcher names it
+  in the accept record.
+
+**Reviewer A: TERMINAL.** Converged at round 4 of 5 (R1 0/5/11, R2 0/3/6, R3 0/1/4 after the
+reclassification, R4 0/0/2); every item fixed or ruled (R1-13 recorded per `ace08fbb`; R2-4 banked
+as DR-90); the terminating round's cleanup done at `67a285a`. No further Reviewer A round.
+
+Open items for the EXCLUSIVE windows (granted by the dispatcher after WP4.3a's gate):
+- V7 (a)-(f) of record via the S7 driver (NOT YET WRITTEN; ruling S7: uncommitted, in the
+  evidence folder, importing the committed `tests/test_app_v7.py` scenario functions); the witness
+  keys those functions return are `proxies_shown_during_analysis` (b) and
+  `k1_renders_during_a_sink_write` (e).
+- The GX011627 V18 / V8 video leg: p99 at k = 2 ASSERTED (AD-11's real-sized domain) and p99.9
+  RECORDED beside mean and max (R4-2's characterisation, never asserted).
+- DR-44 (c) and DR-50 on footage.
+
+## RESUME HERE (successor of cell 6; written by cell 6, 2026-10-29)
+
+- State: branch `wp4.3`, base main `038f02e`, head after this ledger commit. Reviewer A CONVERGED
+  at R4 and its cleanup is done (above). No product change is pending.
+- NEXT, in order (the dispatcher's word, gen 22): the EXCLUSIVE windows after WP4.3a's gate (the
+  three open items above, each by `WINDOW REQUEST`; outputs under `work/`, no footage path in any
+  record); the report's final figures from those windows (V7 table "Window" column, the GX011627
+  V8/V18 figures with p99.9, DR-44 (c)/DR-50 on footage); then the orchestrator's Reviewer B; then
+  the ONE gate, with DR-85's `xfail(strict)` dropped after rebasing onto WP4.3a.
+- Read first: this ledger's Round 0 design table, the CHARC rulings it carries, the R3 and R4
+  sections; evidence `C:\Users\rwsmy\clearwater-review-evidence\wp4.3\r4\`; ruling S7 (Round 0) for
+  the V7 window driver, which is still to be written.
+- Disciplines that bit this arc: never a bare `cd` (the orchestrator shares the process); write
+  backslash-bearing text with the Write tool (a heredoc collapsed `\x00` to a NUL byte twice in
+  this arc, and a third collapse broke a script before it wrote); check every committed blob for
+  CR and NUL.
