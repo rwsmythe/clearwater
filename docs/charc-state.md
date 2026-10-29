@@ -346,8 +346,12 @@
   WP4.3; WP-T6 W2 run 3 / rung 3 meanwhile; WP4.3a short brief for my ruling.
 - **WP-T6 W2 RUN 3 WINDOW OPEN ~12:23Z (status `dc24aecfe09cd0c0`, no reply owed; 2-5 min): checker change 13a5fe6 per my
   controls ruling (pairing-count mismatch = named 4(d) FAIL, no raise; `4b_count` / `4b_packets` split; stage 3 plants both
-  cut flags one frame late); 0 pre-rung-2 conftest lines changed; seat 2 depth 101,282. NEXT: W2 release (controls caught by
-  name) -> rung 3 (W3) with the V4-delta check.
+  cut flags one frame late); 0 pre-rung-2 conftest lines changed; seat 2 depth 101,282.
+- **W2 DONE 12:24Z (status `0cea7bdd78c88fd4`, no reply owed): parity 3.6 s, conftest guard 60 passed, BOTH controls caught
+  by name: re-encode -> 4(b) FAIL on `4b_packets` (video codec tag hvc1 -> hev1, by key; 4(d)/(e) FAIL beside, no raise);
+  late cut (91 + `-t` one frame later) -> 4(b) FAIL on `4b_count` and 4(c) FAIL. Rung 2 SETTLED.** NEXT: rung 3 (W3) with
+  the V4-delta check in seat 2; rung 4 (W4 fullclip once); report; A FAST; B; the ONE gate. WP4.3 dispatch + WP4.3a short brief
+  in parallel at the orchestrator's seat.
 - **(history) After WP4.1's accept:** WP4.2's brief (DRAFT RULED on main 3aa3c51) got ONE revision pass against WP4.1's accept record, then FINAL
   on CHARC's word; its revision must carry: DR-78/79 (B2 rows) as WP4.2 items, the WP4.1 runner's final names and the stream-syntax
   predicate, the Limit text. WP4.3's revision later carries DR-75 (REQUIRED test under its Q12), DR-76, DR-77, and the AD-23 'applied by
