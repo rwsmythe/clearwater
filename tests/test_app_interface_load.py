@@ -8,7 +8,10 @@ the planted forms of the remediation:
 - item 1: the window's paint, update, layout and timer events run no Python (the close watch was
   a Python event filter on the window, called for every one of them); the job runner hands the
   interface thread at most one report per job per tick, the latest (already so at ``1d96dc4``:
-  pinned, not a RED).
+  pinned, not a RED);
+- item 3: CPython's full (generation 2) collection never runs on a job's thread at its end, the
+  path the plan cache's release takes; the app runs it on the interface thread at a moment it
+  chooses, and the process's own collector settings come back at the window's close.
 """
 
 # ``make_app`` is imported from test_app_startup and used as a parameter.
@@ -16,7 +19,9 @@ the planted forms of the remediation:
 
 from __future__ import annotations
 
+import gc
 import sys
+import threading
 import time
 from collections import Counter
 from collections.abc import Callable
@@ -31,6 +36,9 @@ from clearwater.interfaces import JobResult, Progress
 from test_app_startup import cpu_settings, make_app, wait_started
 
 pytestmark = pytest.mark.gui
+
+SETTLE_MS = 2500
+"""Long enough for the app to see start-up over (an idle moment after the start-up jobs)."""
 
 
 def _ok() -> JobResult:
@@ -93,3 +101,57 @@ def test_the_runner_delivers_at_most_one_report_per_tick_and_the_latest(qtbot) -
     assert seen == sorted(set(seen))  # each delivery later than the one before, none repeated
     assert len(seen) <= elapsed_ms / PROGRESS_INTERVAL_MS + 2, (len(seen), elapsed_ms)
     assert last["done"] > 100 * len(seen)  # far faster than the tick: the rest were dropped
+
+
+def test_a_planted_full_collection_load_at_a_job_boundary_runs_no_full_collection_there(
+    make_app, qtbot
+) -> None:
+    """Item 3: the job's end allocates enough long-lived objects for a full collection.
+
+    The load is as many container objects as the collector tracks (at least 300,000), kept
+    alive: on ``1d96dc4`` CPython's automatic full collection then runs on the job's own thread,
+    holding the GIL, as window 3 saw at the plan cache's release. After the remediation none runs
+    there, and the deferred one runs on the interface thread once no job is running.
+    """
+    application = make_app(cpu_settings())
+    wait_started(qtbot, application)
+    qtbot.wait(SETTLE_MS)  # start-up over: the boundary below is a later job's
+    load = max(300_000, len(gc.get_objects()))
+    full: list[str] = []
+    kept: list[list[int]] = []
+
+    def on_gc(phase: str, info: dict[str, int]) -> None:
+        if phase == "start" and info["generation"] == 2:
+            full.append(threading.current_thread().name)
+
+    def job(_progress: Progress) -> JobResult:
+        kept.extend([i] for i in range(load))  # the boundary's long-lived garbage-to-be
+        return _ok()
+
+    gc.callbacks.append(on_gc)
+    try:
+        application.window.jobs.run(job, on_done=lambda _r: full.append("on_done"))
+        qtbot.waitUntil(lambda: "on_done" in full, timeout=60000)
+        at_boundary = full[: full.index("on_done")]
+        assert "clearwater-job" not in at_boundary, full
+        main = threading.main_thread().name
+        qtbot.waitUntil(lambda: main in full[len(at_boundary) + 1 :], timeout=10000)
+    finally:
+        gc.callbacks.remove(on_gc)
+        kept.clear()
+
+
+def test_the_collection_policy_holds_while_the_window_is_open_and_ends_at_its_close(
+    make_app, qtbot
+) -> None:
+    """Item 3: start-up's objects frozen, no automatic full collection; both undone at close."""
+    before, frozen_before = gc.get_threshold(), gc.get_freeze_count()  # the interpreter's own
+    application = make_app(cpu_settings())
+    wait_started(qtbot, application)
+    qtbot.waitUntil(lambda: gc.get_freeze_count() > frozen_before, timeout=10000)
+    first, second, third = gc.get_threshold()
+    assert (first, second) == before[:2]
+    assert third > 1_000_000  # no automatic full collection while the window is open
+    application.window.close()
+    assert gc.get_threshold() == before
+    assert gc.get_freeze_count() <= frozen_before
