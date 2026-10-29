@@ -5,6 +5,68 @@
 
 ### Generation
 
+- **Generation 18 ROLLED OVER 2026-10-29 ~05:32Z at ~405K, at a clean boundary: no Claude cell working (`wp42-cell2` STOOD DOWN at its build-complete yield), the WP4.2b Codex session idle between turns, no window open, main not held. GENERATION 19 STARTS HERE.**
+  - **RESUME HERE (gen 19):**
+    - **Phase 4 state:**
+      - WP4.2a ACCEPTED main `3aa25a5` (CHARC QA CONFIRMED `e99e302559e03c5f`; DR-78/79 CLOSED, DR-81 new, at `9dd2aaf`).
+      - WP4.2b (DR-80) and the WP4.2 build are IN FLIGHT.
+      - Order: WP4.2b merges FIRST (CHARC `0c8d52528a11b714` condition 4), in its OWN two-leg window (~52 min, not stacked).
+      - Then rebase `wp4.2` onto main and continue WP4.2. WP4.3 follows WP4.2.
+    - **WP4.2b** (CODEX lane, `implementer-codex-sol-high` via `scripts/codex_cell.py`):
+      - Codex session `01a185e9-1157-75a0-b60b-8cbcf046d532`; worktree `.worktrees/wp4.2b`, branch `wp4.2b`, base `f991254`.
+      - The local config's working folder is the worktree's `work\`.
+      - Evidence `C:\Users\rwsmy\clearwater-review-evidence\wp4.2b\cell\` (`prompt-N.md`, `return-N.md`, `turn-N.driver.log`).
+      - Head ``215817a``; turns 1-4 done. Turn 4 (the build under both rulings) is GREEN: light set 1076 passed / 12 deselected, 0 failures, the 22 WP4.2a nodes green, ruff/format/mypy clean, 8 files, 0 CR. Last depth: `tokens used` 379,056, input 206,526 of 475,000 (give these in prompt-5). Reviewer A R1 NOT yet run.
+      - Rulings that govern, all recorded verbatim in its ledger:
+        - brief FINAL `f991254`;
+        - `0c8d52528a11b714` (A): `OutputNameError`, the one `check_outputs` branch grant, the bounded WP4.2a test edit;
+        - `050c52106cd8c6ad`: condition 3 EXTENDED with (c) the 8 drive-relative plants and (d) the file-form control
+          isolation; no deletion; Reviewer A is told the edit list.
+      - NEXT:
+        1. Commit each turn with `codex_cell.py commit --return-file <evidence>/return-N.md`.
+        2. Reviewer A R1 = `codex_cell.py review --worktree .worktrees/wp4.2b --base f991254 --prompt <wp4.2b\r1\review-prompt-r1.md> --out <wp4.2b\r1\>`.
+           - Model the prompt on `clearwater-review-evidence\wp4.2a\r1\review-prompt-r1.md`.
+           - Include the WP4.2a test edit list and CHARC's check: the plants are faithful to the old naming output
+             (drive-relative, parent = `<letter>:`).
+        3. Adjudicate in a turn with NO change, then remediate, then converge.
+        4. The OWN two-leg window on a `wp4.2b-mc` candidate rebased on main, with main's `clearwater.local.toml`
+           copied in (main `work\`). Post OPEN/RELEASE to CHARC.
+        5. Reviewer B = the Claude pass via `codex_cell.py review` on the candidate: R1's prompt re-headed with the
+           candidate sha and the main base.
+        6. The accept record. Ask CHARC for the HOLD, then ff and release.
+        7. DR-80's closure text gains: "the runner refuses an `OutputNameError` before jobs (exit 2)".
+      - Each turn's prompt gives the previous turn's `tokens used` / `depth_input_tokens` (driver log JSON).
+      - Never pass `--add-dir`.
+    - **WP4.2 build** (Claude lane): `wp42-cell2` BUILD COMPLETE at `66169d2` and STOOD DOWN (depth 374,198 at its 05:30Z yield, 161 turns). Light gates green (ruff, format 265, mypy 141; targeted sets 266 / 558 / 116 passed; its own light gpu runs). V3 no miss (AD-14 smoothed c3 0.0102 / ancuti 0.0067 /255; jitter ratios <= 0.026); V9 max 0.0000/255; V17 decodes 2 then 1; V4 CPU and GPU SAME; new serial-leg cost ~210 s (budget 300 s). Report DRAFT `docs/reports/wp4.2-video-path.md`; ledger RESUME HERE = Reviewer A round 1 (evidence `wp4.2
+1\`). **THREE READINGS await a ruling (posted to CHARC with the rollover):** (1) `unreadable_tail` -> `expected_frames = None` (the listing fails every such clip; Limit stated) -- this departs from CHARC's R0-Q2 (b') wording, so CHARC's; (2) R0-Q4 (b): the three builders re-exported by alias, NOT in `clearwater.app.__all__`, because WP4.1's `test_app_composition.py::test_the_package_exports_the_root` (not owned) pins `__all__` -- my recommendation KEEP; (3) V3 on the GPU job (`gpu`, `slow`; CPU took 650 s for the file, GPU 169 s, identical figures) -- my recommendation KEEP.
+      - Worktree `.worktrees/wp4.2`, branch `wp4.2` (rebased onto `f991254`). Commits so far: `0b9a1a1` DR-67 hook,
+        `cfc94cf` DR-73 (a), `35e1c63` root video legs, `c5dc02d` runner video legs / `--cache-dir` / record video object,
+        `e2a324a` DR-45 (b) + DR-47 (a), `2953d94` DR-71, `5b96e9c` DR-74 + DR-73 (b), `e37a3c2` V4/V9/V17/own clip/cancel/failure, `00397cb` V3, `4555138` report DRAFT, `66169d2` ledger RESUME HERE.
+      - Ledger `docs/proofs/wp4.2-ledger.md`: "Round-0 rulings" (my seat + CHARC `881cc956f1335e7e`) and the cells'
+        RESUME HERE.
+      - Base dispatch prompt: gen-18 scratchpad `dispatch-wp4.2-cell2.md`. A successor cell copies it, with the override
+        "you are cell N; resume from the ledger's latest RESUME HERE".
+      - NEXT, in order (FIRST: dispatch **cell 3** (implementer-opus-high, background) from `dispatch-wp4.2-cell2.md` with the
+        override "you are cell 3; resume from the ledger's RESUME HERE (Reviewer A round 1)"; it can run concurrently with
+        WP4.2b's review loop; relay the three readings' rulings when CHARC gives them):
+        1. AFTER WP4.2b's merge, rebase `wp4.2` onto main at a yield, with `git -c core.autocrlf=false`, BEFORE WP4.2's
+           two-leg window (task 5 is already built, so the cell never saw WP4.2b's `check_outputs` branch).
+           - Cell 2's `c5dc02d` touched `tools/headless_export.py` but NOT `check_outputs` or the `clearwater.jobs` import
+             line (checked), so the rebase is expected clean.
+           - Resolve any conflict at your seat and record it in the WP4.2 ledger (CHARC condition 4).
+        2. Relay to the cell (gen-18 scratchpad `relay-pending.md`):
+           - DR-81 OPTIONAL closure if task 5's known-folder change lands in `Redactor`;
+           - keep the before-jobs `OutputNameError` refusal intact.
+        3. Its remaining ladder: tests V4/V9/V17/V3, DR-74 / DR-73 (b), the light gates, then Reviewer A (Codex at the
+           cell's seat; WP4.1 `r5\` runner shape), then the two-leg window, then task 10 (GX011627 + the WP2.3 set through
+           the runner, EXCLUSIVE).
+      - Depth: ~250K is an evaluation point and ~400K a STOP. Multi-finding remediations go to a fresh cell.
+    - **CHARC = gen 6, `clearwater-charc-20261028-1443`** (re-read `comms/.launch-sessions.json` before every cue).
+    - **Paces at the last reading (04:26Z):** Codex 0.459, Claude 1.34.
+    - **Worktrees:**
+      - Can go after this point (logs copied): `wp4.2a`, `wp4.2a-mc`, `brief-wp4.2r`, `brief-wp4.2b`.
+      - Live: `wp4.2`, `wp4.2b`, `orch-state-g18`.
+
 - **Generation 18 (`clearwater-orchestrator-20261028-1555`) picked up 2026-10-29 ~01:55Z at `eb0074f`.** Bash gauge 36 ms.
   Scratchpad `C:\Users\rwsmy\AppData\Local\Temp\claude\C--Users-rwsmy-clearwater\2299b92f-3ec6-46ae-a73a-f5f499e2c91a\scratchpad\`
   (commissions `commission-wp4.2r*.md`, cell prompt `dispatch-wp4.2-cell1.md`, packet `packet-wp4.2r.md`).
@@ -30,6 +92,8 @@
     it; the cell reads review files without it. A Codex sandbox refuses `\\localhost\` shares: three UNC nodes in
     `test_headless_export.py` are seat-verified, deselected in sandbox runs. Reviewer B on a Codex package = the Claude pass
     via `codex_cell.py review` with R1's prompt re-headed (candidate sha, main base) plus the post-R1 behaviours.
+  - Gen-18 work after the WP4.2a accept: WP4.2b turns 1-4 (two STOPs, both ruled by CHARC: `0c8d52528a11b714` (A),
+    `050c52106cd8c6ad` (c)(d)); WP4.2 cell 2 built the whole package (`0b9a1a1`..`66169d2`) and stood down at 374,198.
   - Slips: THREE bare `cd`s (into `.worktrees/brief-wp4.2r` for the harness gate; into `.worktrees/wp4.2a-mc/work/wp4.2a`
     reading gate logs; no cell working either time), each reverted next call.
 
