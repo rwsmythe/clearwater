@@ -49,19 +49,29 @@ def video_builders_outside_the_root(relative: str, source: str) -> list[str]:
     """Return ``"<file>:<line> <name>"`` for every use of a real video class outside the root.
 
     A use is a call or a reference by value (a class passed as a factory counts); imports and
-    ``__all__`` strings are not uses. The root and each class's own module are not reported.
+    ``__all__`` strings are not uses; a name a class is imported under (``import ... as``) is the
+    class. The root and each class's own module are not reported.
     """
     if relative == "app/composition.py":
         return []
+    tree = ast.parse(source)
+    aliases = {
+        alias.asname: alias.name
+        for node in ast.walk(tree)
+        if isinstance(node, ast.ImportFrom)
+        for alias in node.names
+        if alias.name in VIDEO_BUILDERS and alias.asname is not None
+    }
     found: list[str] = []
-    for node in ast.walk(ast.parse(source)):
-        name = (
+    for node in ast.walk(tree):
+        written = (
             node.id
             if isinstance(node, ast.Name)
             else node.attr
             if isinstance(node, ast.Attribute)
             else ""
         )
+        name = aliases.get(written, written)
         if name in VIDEO_BUILDERS and DEFINING.get(relative) != name:
             found.append(f"{relative}:{node.lineno} {name}")  # type: ignore[union-attr]
     return sorted(found)
@@ -187,6 +197,20 @@ def test_the_video_static_check_reports_a_planted_construction() -> None:
         "cache/store.py:5 FFmpegVideoSink",
     ]
     assert video_builders_outside_the_root("app/composition.py", planted) == []
+
+
+def test_the_video_static_check_reports_an_aliased_construction() -> None:
+    """Reviewer A R1 F4: a class imported under another name is still the class."""
+    planted = (
+        "from clearwater.io.video import FFmpegVideoSource as Source\n"
+        "from clearwater.cache import DiskProxyCache as Cache\n"
+        "def wire():\n"
+        "    return Source(), Cache(folder)\n"
+    )
+    assert video_builders_outside_the_root("gui/engines.py", planted) == [
+        "gui/engines.py:4 DiskProxyCache",
+        "gui/engines.py:4 FFmpegVideoSource",
+    ]
 
 
 def test_each_export_jobs_call_opens_its_own_cache(tmp_path: Path) -> None:
