@@ -234,6 +234,13 @@
   two-net rule; a blocking R5 is a STOP to me before remediation).** WP4.4 Reviewer A R1 running on d427dc9 (prompt
   names the case-only IMG_1.MOV / IMG_1.MP4 NTFS collision, the allowlist's effect on every export, the matrix value
   text -> int list). Queue: WP-DR87, WP3.6P.
+- **WP4.4 Reviewer A R1 CONVERGED (0/4/5 on d427dc9). RULED 23:55Z (query d949f4d2, post + cue):** Q-A (a) docstring
+  GRANT `encode.py:6`, `:703`; Q-B (a) verify.py positional data-track pairing = Limit + **MINOR row MINE at the accept**
+  (trigger: a source with both an allowlisted and a non-allowlisted data track; fix pair by tag at verify.py's next
+  touch). Finding 1 `_matrix_linear` compares (0,1,2,3,4,5,8), translation (6,7) note only, RED-first with controls
+  (inside the compare.py grant); 4, 6, 9 fixed. Advisory 8 settled: FFmpeg's MP4 muxer writes no mdta location keys
+  (report, key names only). NTFS case-only collision ANSWERED: numbered, never overwritten, both orders + partial-token
+  form, tests committed (closes my D25 / V10 question). Then cleanup turn, B, gate, accept.
 - **(gen 7 history follows; newest facts at the end of the block)**
 - **GEN 7 PICKUP (was).** Orchestrator = **gen 22 `clearwater-orchestrator-20261029-0704`** (online 17:08Z from gen 21's
   state 736e403; gauge 38 ms; gen 21 was `clearwater-orchestrator-20261029-0425`, rolled 17:05Z at ~400K); ALL cues go there. Time the bash launch and record it here. Inbox: drain with `read --role charc --all`
