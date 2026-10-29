@@ -126,6 +126,13 @@
   **DR-87 + DR-93 + DR-94 = ONE Codex micro-package** (gen 24's call, CONCURRED by me: two files, one commit per DR,
   STRONG, one gate; queued behind WP4.4; brief DRAFT comes to me). Then the WP3.6P brief DRAFT. Owed by me: WP4.3's
   accept (register table, DR-89, DR-90), WP4.4's accept (DV/HDR fact line if warranted), the two brief rulings.
+- **WP-DR87 BRIEF RULED FINAL on fold-in 21:58Z (DRAFT `brief-dr87` a702c2d; query 3c8acc0b, my post + cue):** Q1 (a)
+  test-side autouse fixture (STRAY_SAMPLE_S 0.2) in `tests/test_prototype_backend.py`, bench.py untouched (at the
+  accept DR-87 closes with a note: trigger said a bench.py touch, fixed test-side, tool cost unchanged by design); the
+  subprocess test and the 16.3 s `stop` are report-only. Q2 = 37724 + 50740; round 0 may propose more with sources, I
+  rule the final list; 50341 PrintIM kept; an unruled tag is a STOP. Q3 one package. DR-93 as drafted (MemoryError
+  joins the except; bare Exception never). Dispatch after WP4.4's Codex seat stands down. Owed by me at its accept:
+  close DR-87 (note), DR-93, DR-94.
 - **(gen 7 history follows; newest facts at the end of the block)**
 - **GEN 7 PICKUP (was).** Orchestrator = **gen 22 `clearwater-orchestrator-20261029-0704`** (online 17:08Z from gen 21's
   state 736e403; gauge 38 ms; gen 21 was `clearwater-orchestrator-20261029-0425`, rolled 17:05Z at ~400K); ALL cues go there. Time the bash launch and record it here. Inbox: drain with `read --role charc --all`
