@@ -24,6 +24,7 @@ import pytest
 import gui_support
 from clearwater.app import startup
 from clearwater.app.startup import JOURNAL_FILE_NAME, WriteJournal, clean_leftovers
+from clearwater.config import save_settings
 from clearwater.jobs import new_token, temporary_path
 from clearwater.jobs import safe_write as safe_write_module
 from test_app_startup import app_data, cpu_settings, make_app, wait_started
@@ -116,6 +117,27 @@ def test_a_journal_folder_the_os_refuses_lets_the_start_up_proceed(tmp_path: Pat
     assert report.removed == (planted,) and not planted.exists()
     assert [p.name.startswith(f"{JOURNAL_FILE_NAME}.bad-") for p in config.iterdir()] == [True]
     assert startup.holds_leftovers(tmp_path / "bad\x00folder")  # unlistable: the entry would stay
+
+
+def test_an_output_folder_the_os_refuses_is_skipped_and_logged(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    """R3-1 (ruling d6e9abdf): a NUL in ``output_folder`` is skipped and logged; nothing raises.
+
+    The bad ``Settings`` is built directly, so the test holds whatever the settings store does
+    with such a field at its source (WP4.3a's per-field default).
+    """
+    journaled = tmp_path / "journaled"
+    journaled.mkdir()
+    journal = WriteJournal(tmp_path / "config")
+    journal.add(journaled)
+    planted = _temporary(journaled)
+    bad = tmp_path / "bad\x00folder"
+    with caplog.at_level(logging.WARNING, logger=startup.__name__):
+        report = clean_leftovers(cpu_settings(output_folder=bad), journal)
+    assert report.removed == (planted,) and not planted.exists()
+    assert journal.entries() == ()  # the journal's folders are still scanned and cleared
+    assert "skips" in caplog.text and repr(str(bad)) in caplog.text
 
 
 def _refuse_reading(monkeypatch: pytest.MonkeyPatch, journal: WriteJournal) -> None:
@@ -248,6 +270,32 @@ def test_v11_leftovers_of_a_crash_are_removed_at_the_next_start(make_app, qtbot,
     assert set(application.leftovers.removed) == {in_out, in_journal}
     assert not in_out.exists() and not in_journal.exists()
     assert all(p.exists() for p in keep)
+    assert application.journal.entries() == ()
+    wait_started(qtbot, application)
+
+
+@pytest.mark.gui
+def test_a_settings_file_with_an_output_folder_the_os_refuses_still_starts(
+    make_app, qtbot, tmp_path
+) -> None:
+    """R3-1 (ruling d6e9abdf): start-up over a settings file whose ``output_folder`` holds a NUL.
+
+    The window shows and the journal's folder is cleaned, whether the settings store keeps the
+    field (the clean-up skips it) or replaces it by its default (WP4.3a's source-side fix).
+    """
+    journaled = tmp_path / "journaled"
+    journaled.mkdir()
+    config = app_data(tmp_path).config_dir
+    WriteJournal(config).add(journaled)
+    planted = _temporary(journaled)
+    save_settings(config, cpu_settings())
+    path = config / "settings.json"
+    data = json.loads(path.read_text(encoding="utf-8"))
+    data["output_folder"] = str(tmp_path / "bad\x00folder")
+    path.write_text(json.dumps(data), encoding="utf-8")
+    application = make_app()
+    assert application.window.isVisible()
+    assert application.leftovers.removed == (planted,) and not planted.exists()
     assert application.journal.entries() == ()
     wait_started(qtbot, application)
 

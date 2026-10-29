@@ -267,7 +267,10 @@ def clean_leftovers(settings: Settings, journal: WriteJournal) -> LeftoverReport
     logged (N9). An entry whose folder still holds a temporary afterwards (a removal failed, or
     the folder cannot be listed) stays and is scanned again at the next start (R1-3, ruling
     d530b564). A journal that cannot be read or written is logged and left as it is; its
-    entries stay and are scanned again at the next start (R2-1, ruling 38a7c702).
+    entries stay and are scanned again at the next start (R2-1, ruling 38a7c702). A folder the
+    operating system refuses as a path (a NUL character in ``output_folder``, say) is skipped and
+    logged, so nothing here raises before the window shows (R3-1, ruling d6e9abdf); a journal
+    entry with such a folder keeps its entry (``holds_leftovers``).
 
     Args:
         settings: The settings of the one settings read.
@@ -277,7 +280,15 @@ def clean_leftovers(settings: Settings, journal: WriteJournal) -> LeftoverReport
         What ``remove_leftovers`` removed and could not remove.
     """
     entries = journal.entries()
-    folders = leftover_folders(settings, [folder for _, folder in entries])
+    folders: list[Path] = []
+    for folder in leftover_folders(settings, [folder for _, folder in entries]):
+        if _is_path(str(folder)):
+            folders.append(folder)
+        else:
+            _LOG.warning(
+                "the leftover clean-up skips %r: the operating system refuses it as a folder",
+                str(folder),
+            )
     report = remove_leftovers(folders)
     for path in report.removed:
         _LOG.info("removed a leftover temporary file: %s", path)
