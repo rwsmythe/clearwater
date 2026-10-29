@@ -14,7 +14,7 @@
 - **Gen 6 pickup facts:** bash gauge 45 ms; inbox 0 unread at pickup; announce posted to the orchestrator (gen 17, shell-busy in the WP4.1 gate) with ONE cue; the two register scripts copied from gen 5's scratchpad (18c10a55...) into this session's scratchpad (6687b6c9-eacd-4ffc-995e-51c9195391d1) as `edit_register_p4a.py` (drop its DR-65 block before running: already applied at 3114d23) and `edit_register_p4b.py`.
 
 - **Orchestrator = gen 19 `clearwater-orchestrator-20261028-1931`** (launched 05:31Z by gen 18, which rolled at ~405K, state b394e7b;
-  announce pending at my last read; gen 18 was `clearwater-orchestrator-20261028-1555`; re-read `comms/.launch-sessions.json` before every cue; every post
+  ONLINE 05:33Z at b394e7b, msg `ad06ad7d0f6f044f`, gauge 53 ms; gen 18 was `clearwater-orchestrator-20261028-1555`; re-read `comms/.launch-sessions.json` before every cue; every post
   gets ONE SendMessage cue). Subjects under 120 chars (the poster refuses longer; two refusals this generation at 123-125); bodies via
   `--body-file`; edit docs with a scratchpad Python script (`newline="\n"`); `tr -cd '\r' | wc -c` = 0 before every commit; commit by
   pathspec; never an uncommitted edit left in the main tree (hazard 7); HOLD MAIN when the orchestrator asks (no commit, state included,
@@ -106,6 +106,11 @@
   with a one-line grant on `test_the_package_exports_the_root` (not KEEP); (3) V3 on the GPU job KEEP (169 s vs 650 s, same figures).
   Gen 19 next: WP4.2b R1 -> own window -> B -> accept FIRST; rebase `wp4.2`; cell 3 = WP4.2 Reviewer A R1. Worktrees wp4.2a, wp4.2a-mc,
   brief-wp4.2r, brief-wp4.2b removable by gen 19.
+- **WP4.2b R1 RULED 05:50Z (query `0d0659fe906001ac`): Claude pass NO_NEW_CRITICAL_MAJOR on 215817a; F1 MINOR (mutation M1 showed the
+  per-file form check `_write_form_refusal` :734-736 unproved once naming pre-empts real names) = (a) GRANTED, ONE twin test beside the
+  3(d) control in `test_wp42a_runner_hardening.py`, RED under M1; F2-F5 at the orchestrator's seat concurred (F3 = real `carrier:` stream
+  + real reader instead of the brief's `c:` + double, forced by export.py:712 os.stat, deviation in the report). Next: Codex turn 6,
+  R2, OWN window, B, accept (merges first). WP4.2 cell 3 (opus-high) = Reviewer A R1 from the ledger, concurrent.
 - **(history) After WP4.1's accept:** WP4.2's brief (DRAFT RULED on main 3aa3c51) got ONE revision pass against WP4.1's accept record, then FINAL
   on CHARC's word; its revision must carry: DR-78/79 (B2 rows) as WP4.2 items, the WP4.1 runner's final names and the stream-syntax
   predicate, the Limit text. WP4.3's revision later carries DR-75 (REQUIRED test under its Q12), DR-76, DR-77, and the AD-23 'applied by
