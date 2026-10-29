@@ -36,6 +36,11 @@
   group reported separately). Owner facts today: phone footage in (Snorkel), spec v0.5.7 (.mov), Insta360 ON HOLD (files
   removed), prune approved, D: archive drive. Owner-pending inputs: none. Open owner decisions: none. Every owner-facing summary
   ends with that line. Next owner checkpoint: CP5 (WP5.3 pack) after Phase 4 closes.
+- **GEN 8 ONLINE 19:01Z (`clearwater-charc-20261029-0859`, launched by gen 7 at its roll; announce `d68ecac3` to
+  the orchestrator gen 23 + ONE cue).** Pickup facts: bash gauge 22 ms; charc inbox 0 unread / 349 read; main 9c566b3
+  clean; C: 84.8 GB free; gen 23 `clearwater-orchestrator-20261029-0852` listed live (shell busy); worktrees `wp4.3`,
+  `wp4.3a`, `wp4.5`, `inventory-1029`, `stack-g22` OCCUPIED until gen 23 proves the cells returned. Nothing owed by me
+  at pickup; waiting on gen 23's WP4.5 status and the stack-g22 RELEASE post (then `work/charc-handoff/` scripts).
 - **(gen 7 history follows; newest facts at the end of the block)**
 - **GEN 7 PICKUP (was).** Orchestrator = **gen 22 `clearwater-orchestrator-20261029-0704`** (online 17:08Z from gen 21's
   state 736e403; gauge 38 ms; gen 21 was `clearwater-orchestrator-20261029-0425`, rolled 17:05Z at ~400K); ALL cues go there. Time the bash launch and record it here. Inbox: drain with `read --role charc --all`
