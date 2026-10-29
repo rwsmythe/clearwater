@@ -76,6 +76,7 @@ markers = [
     "footage: needs the owner's footage folder (skipped when the path is absent)",
     "gui: drives the PySide6 interface",
     "slow: takes more than a few seconds",
+    "fullclip: the full-size form of a gate test sized by AD-30 (whole GX011627 or the pre-AD-30 frame count); excluded from both gate legs, run in package windows",
 ]
 
 [tool.ruff]

@@ -18,6 +18,7 @@ the evaluation and re-seat lines. Turn 1's figures were supplied at turn 2.
 | Turn 3, semantic creation_time amendment | 129,889 | 131,810 | 258,400 | Dispatcher at turn 4; committed as `78e0094` |
 | Turn 4, round-0 table | 152,628 | 152,018 | 258,400 | Dispatcher generation 20 at turn 5; committed as `65b9f4f`; CHARC authorizes rung 2 in this cell |
 | Turn 5, rung-2 build | 358,551 | 202,787 | 258,400 (footer reported 475,000, unexplained; CHARC: the window of record stands) | Dispatcher generation 20; committed as `0afec17`; above 200K, so CHARC ruled RE-SEAT NOW (`6f5ebd09c017753c`, option 1): seat 1 (session `01a18757-14d0-7840-9bf3-bd6590722181`) retired |
+| Seat 2 turn 1 (ledger turn 6), marker registration | Pending dispatcher | Pending dispatcher | 258,400 | Fresh seat 2; figures to be supplied by the dispatcher at the next turn |
 
 ## RESUME HERE (seat 2; written by the dispatcher, generation 20, 2026-10-29 ~12:12Z)
 
@@ -31,6 +32,32 @@ Seat 1 retired at turn 5's commit (`0afec17`). Seat 2 is a fresh Codex session; 
 - **Remedy (dispatcher's, reported to CHARC):** bring rung 4's ONE `pyproject.toml` marker line forward, verbatim, now; then W2 runs again in full. Rung 4 keeps its collection identities and W4.
 - **Next:** seat 2 turn 1 = the marker line + a W2 RUN REQUEST (`w2.sh` unchanged unless the marker line demands otherwise; md5 `1f4025ca3fa944daf62908e658f6423f`). Turn 2 = W2's results and the two controls into this ledger, then rung 3 (with the V4 best-effort-delta check) and the W3 RUN REQUEST. Then rung 4, the report, Reviewer A, Reviewer B, the ONE gate.
 - **Reviewer A lens (CHARC, not a STOP):** the function-local `from conftest import ...` resolves to pytest's own conftest module under the default prepend import mode (`tests/` has no `__init__.py`); under importlib mode it would make a second module. If Reviewer A objects, the remedy is a tiny importable helper module under `tests/` (additive), not a conftest change.
+
+## Seat 2 turn 1 -- marker registration
+
+| Change | Reason / disposition |
+|---|---|
+| Register `fullclip` in `pyproject.toml` | Rung 4's exact marker line is moved forward under the seat-2 dispatch: the two W2 guard tests load the real conftest in-process, so its fixture parameter mark must already be registered under the outer session's `--strict-markers`. Rung 4's collection identities and W4 remain required. |
+
+Starting HEAD is `7b84890`; the worktree was clean before this turn. The marker
+line is the only `pyproject.toml` change. `work/wp-t6/w2.sh` is unchanged, with
+MD5 `1f4025ca3fa944daf62908e658f6423f` verified this turn. No footage or GPU
+command ran in the cell. W2 is requested again in full at the dispatcher's
+seat, with outputs under `work/wp-t6/w2/`; run 1's evidence remains under
+`work/wp-t6/w2-run1/`.
+
+| Light verification | Result / evidence |
+|---|---|
+| `PYTHONPATH=scripts uv run pytest tests/test_conftest_guard.py --basetemp=work/wp-t6/tmp -p sandbox_mkdir_shim -p no:cacheprovider` | Ran: 43 passed, 17 failed in 40.37 s; EXIT 1. `work/wp-t6/seat2-turn1-guard.log`. Failures include child-pytest `PermissionError [WinError 5]` diagnostics despite the outer shim; no unregistered-`fullclip` diagnostic remains. The two W2 run-1 failing node names are absent from this run's failure list. This is not a green guard-suite result; seat-side W2 must supply it. |
+| `git diff --check` | PASS, EXIT 0; `work/wp-t6/seat2-turn1-diff-check.log`. Git's line-ending conversion warnings do not change the on-disk LF check recorded in the scope proof. |
+| Exact marker / owned scope / LF | PASS; `work/wp-t6/seat2-turn1-scope-proof.json`: `pyproject.toml` differs by exactly the required one-line insertion; only it and this ledger changed, both LF. |
+
+Verification loop: the known marker failure motivated the dispatched one-line
+fix. The fresh guard run contains no marker-registration error but cannot
+validate the entire guard suite under the sandbox's child-process permissions.
+No guard test or sandbox shim was changed. W2's parity test and two controls
+remain pending the seat-side run. No new STOP or question is raised; the
+existing W2 request provides the required unsandboxed validation.
 
 ## Rung 0 facts (2026-10-29)
 
