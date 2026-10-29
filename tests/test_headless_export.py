@@ -5,8 +5,8 @@ the ``gui`` equality pin); settings and parameter sources (question 6, S7); exit
 and 2 (question 5, S5); the schema-1 record with file names only; the footage refusals
 (question 9, DR-37 (c)); no PySide6 in the runner's process and no CuPy with ``--force-cpu``; a
 library cancel and Ctrl-C (D44, D45); one job at a time in order (DR-62); damaged photos as
-failed items (DR-6, D81); the Windows device-name refusal verbatim (DR-35 (a)); and a video in
-WP4.1 failing with ``UNAVAILABLE_TEXT`` (question 4).
+failed items (DR-6, D81); the Windows device-name refusal verbatim (DR-35 (a)); and a video
+running as the real video job (WP4.2).
 """
 
 from __future__ import annotations
@@ -27,7 +27,7 @@ from clearwater.app import composition
 from clearwater.config import new_parameter_set, save_settings
 from clearwater.config.presets import MAX_PRESET_BYTES
 from clearwater.interfaces import JobResult, Settings
-from clearwater.jobs.export_seam import CANCELLED, UNAVAILABLE_TEXT
+from clearwater.jobs.export_seam import CANCELLED
 
 TOOLS = Path(he.__file__).parent
 STILL = "jpeg-gradient-srgb"
@@ -242,9 +242,11 @@ def test_the_record_has_schema_1_and_file_names_only(
 ) -> None:
     record = tmp_path / "record.json"
     missing = tmp_path / "deep" / "missing.jpg"
+    cache = tmp_path / "cache"
+    cache.mkdir()
     status = _main(
         sample(STILL), missing, tmp_path / "GX010001.MP4", "--out", out, "--force-cpu",
-        "--neutral", "--no-provenance", "--record", record,
+        "--neutral", "--no-provenance", "--record", record, "--cache-dir", cache,
     )  # fmt: skip
     assert status == 1
     text = record.read_text(encoding="ascii")
@@ -265,7 +267,7 @@ def test_the_record_has_schema_1_and_file_names_only(
     assert items[0]["outputs"] == [f"{STILL}_corrected.png"]
     assert items[0]["device"] == "CPU: forced" and items[0]["failure"] is None
     assert "missing.jpg cannot be read: the file does not exist" in items[1]["failure"]
-    assert items[2]["failure"] == UNAVAILABLE_TEXT
+    assert items[2]["failure"] == "GX010001.MP4: GX010001.MP4 was not found."
     for folder in (tmp_path, sample(STILL).parent, Path.home()):
         for form in (str(folder), str(folder).replace("\\", "\\\\"), folder.as_posix()):
             assert form not in text
@@ -477,15 +479,16 @@ def test_a_suffix_forming_a_device_name_is_refused_verbatim(
     assert list(out.iterdir()) == []
 
 
-def test_a_video_fails_unavailable_in_wp41(tmp_path: Path, out: Path) -> None:
+def test_a_video_runs_the_real_video_job_through_run(tmp_path: Path, out: Path) -> None:
     video = tmp_path / "GX010001.MP4"
     video.write_bytes(b"not decoded")
     requests = he.requests_for([video], parameters=new_parameter_set("c3", {}), settings=_cpu(out))
-    record = he.run(requests, footage_folder=None)
+    record = he.run(requests, footage_folder=None, cache_folder=tmp_path / "cache")
     item = record.report.items[0]
     assert (item.state, item.result.failure, record.routes) == (
         "failed",
-        UNAVAILABLE_TEXT,
+        "GX010001.MP4: GX010001.MP4 cannot be read as a video file; it may be damaged or not a "
+        "video.",
         ("video",),
     )
     assert list(out.iterdir()) == []

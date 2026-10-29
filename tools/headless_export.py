@@ -1,4 +1,4 @@
-"""Headless export runner: drive a photo export or batch without the interface (WP4.1, test tool).
+"""Headless export runner: drive an export or batch without the interface (WP4.1, WP4.2; test tool).
 
 A test tool, not a product feature (plan section 6, WP4.1): acceptance tests (WP5.1) and manual
 runs drive the product's composition root (:mod:`clearwater.app.composition`) through one
@@ -15,20 +15,23 @@ Library API: :func:`route`, :func:`requests_for`, :func:`parameters_for`,
     uv run python tools/headless_export.py PATH [PATH ...] (--out DIR | --beside-source)
         [--suffix S] [--bit-depth {8,16}] [--no-provenance] [--force-cpu] [--encoder NAME]
         [--quality {high,standard,draft}] [--ten-bit] [--cache-limit-bytes N] [--method ID]
-        [--parameters FILE | --neutral] [--settings-dir DIR] [--record FILE]
+        [--parameters FILE | --neutral] [--settings-dir DIR] [--record FILE] [--cache-dir DIR]
 
 Kinds are decided by extension exactly as ``clearwater.gui.sources.route`` decides them; a
 sidecar (D83) or an unknown extension is a failed item with the interface's text and the batch
-goes on (D81). In WP4.1 a video item fails with ``UNAVAILABLE_TEXT`` (WP4.2 adds video).
+goes on (D81). A video item is one clip (spec section 5.5): its own job probes, analyses through
+the proxy cache in ``--cache-dir`` (required when any item is a video), renders and encodes
+(WP4.2).
 
 Exit status: 0 when every item is done (with or without warnings); 1 when any item failed, was
 cancelled or was not run; 2 for a usage refusal, with nothing run (a bad flag, a missing
 ``--out`` folder, an invalid suffix (given or loaded), an unknown method, a parameter file that
 is unreadable, over the importer's 1 MiB cap or not valid for its method, a settings file that
-cannot be used, an unreadable local configuration, a write target the footage check refuses
-when a footage folder is configured (:func:`write_target_refusal`: an output folder, the folder
-beside a source, the settings folder and file, or the record file inside the footage folder
-however spelled, reached through a link, junction or short 8.3 name, or spelled as a stream,
+cannot be used, an unreadable local configuration, a video item without ``--cache-dir`` or a
+``--cache-dir`` folder that does not exist, a write target the footage check refuses when a
+footage folder is configured (:func:`write_target_refusal`: an output folder, the folder beside
+a source, the settings folder and file, the record file, or the cache folder inside the footage
+folder however spelled, reached through a link, junction or short 8.3 name, or spelled as a stream,
 extended-length or device path), a ``--record`` file that exists or does not end in ``.json``).
 A record file that appears during the run is not written, and one that cannot be written is
 removed if this run created it (absent a concurrent replacement of the path by another
@@ -44,20 +47,26 @@ outputs by file name only, never by full path (as AD-13 rules for provenance), a
 location tag and no EXIF content of its own. It carries the engine's failure texts verbatim
 apart from folder redaction (DR-35 (a)), and a reader failure text (``clearwater.io.photo``,
 for example a malformed TIFF Orientation) may quote the malformed tag's value; so may the
-summary line and the batch WARNING that carry the same text. The summary lines go to stdout
-and the ``[i/n]`` progress messages to stderr. Every folder the run knows (the output folder,
-each source's folder, the settings, record and parameter folders, and the local
-configuration's folder) is shown by its NAME in every record field and printed line, one
+summary line and the batch WARNING that carry the same text. Each item's last field,
+``"video"`` (WP4.2), is null for a photo or refused item and when the caller gave the engine;
+otherwise ``{"device_backend": "cuda:0" | null, "frame_device": "cuda:0" | "cpu" | null,
+"encoder": <name> | null, "decode_passes": <int>}``: the device of the backend the job built its
+source and sink with (null for a CPU job or when the job ended before building them), the device
+of the first frame the sink received (null when none was written), the encoder the sink was
+opened with (null when it was not opened), and how many times the job's source began a decode
+(1 when a complete cache entry let the analysis skip its pass, V17; 2 when it analysed). The
+summary lines go to stdout and the ``[i/n]`` progress messages to stderr. Every folder the run knows
+(the output folder, each source's folder, the settings, record, parameter and cache folders, and the
+local configuration's folder) is shown by its NAME in every record field and printed line, one
 :class:`Redactor` applied at each exit point: an engine text such as the D87 free-space refusal
 names its folder; an ``argparse`` refusal is redacted against the paths its arguments name. This
-tool installs no logging handler, so ``run_batch``'s INFO report (which names full output paths)
-is not emitted; Python's last-resort handler prints WARNING lines only, and while :func:`main`
-runs a filter on that handler passes them through the same redactor and prints no tag value
-from the EXIF module's own WARNINGs (each of their arguments, and every ``%r`` argument, is
-shown as ``...``); :func:`run` does the same while its batch runs. A process that installs its
-own logging handlers (a host program, pytest) receives the engine's records as they are logged,
-full paths and tag values included: the runner redacts what it prints and records, not another
-program's logging.
+tool installs no logging handler, so ``run_batch``'s INFO report (which names full output paths) is
+not emitted; Python's last-resort handler prints WARNING lines only, and while :func:`main` runs a
+filter on that handler passes them through the same redactor and prints no tag value from the EXIF
+module's own WARNINGs (each of their arguments, and every ``%r`` argument, is shown as ``...``);
+:func:`run` does the same while its batch runs. A process that installs its own logging handlers (a
+host program, pytest) receives the engine's records as they are logged, full paths and tag values
+included: the runner redacts what it prints and records, not another program's logging.
 """
 
 from __future__ import annotations
@@ -75,6 +84,7 @@ import threading
 import time
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
+from fractions import Fraction
 from pathlib import Path, PurePath
 from typing import Any, Final, Literal, NoReturn, cast
 
@@ -89,10 +99,17 @@ from clearwater.config import (
 )
 from clearwater.config.presets import MAX_PRESET_BYTES
 from clearwater.interfaces import (
+    ArrayBackend,
+    EncoderCapability,
+    Frame,
     JobResult,
     ParameterSet,
+    ProbeResult,
     Progress,
     Settings,
+    SinkReport,
+    VideoSink,
+    VideoSource,
     validate_parameter_set,
 )
 from clearwater.interfaces.parameters import loads_object
@@ -184,14 +201,131 @@ class RunnerProgress:
         self._event.set()
 
 
-class _WithRefusals:
-    """The ``ExportJobs`` the batch runs: a :class:`RefusedRequest` fails, the rest pass on."""
+def _video_facts() -> dict[str, Any]:
+    """A video job's record facts before the job runs (the module docstring's ``"video"``)."""
+    return {"device_backend": None, "frame_device": None, "encoder": None, "decode_passes": 0}
 
-    def __init__(self, exports: ExportJobs) -> None:
+
+class _ObservedSource:
+    """A video job's frame source that counts the decodes it begins (the record's facts)."""
+
+    def __init__(self, source: VideoSource, facts: dict[str, Any]) -> None:
+        self._source = source
+        self._facts = facts
+
+    def probe(self, path: Path) -> ProbeResult:
+        """Probe with the wrapped source (IF-5)."""
+        return self._source.probe(path)
+
+    def frames(
+        self,
+        probe: ProbeResult,
+        *,
+        hw_decode: bool,
+        start_s: Fraction | None = None,
+        end_s: Fraction | None = None,
+    ) -> Iterator[Frame]:
+        """Count one decode, then return the wrapped source's frames (IF-5)."""
+        self._facts["decode_passes"] += 1
+        return self._source.frames(probe, hw_decode=hw_decode, start_s=start_s, end_s=end_s)
+
+
+class _ObservedSink:
+    """A video job's sink that notes its encoder and its first frame's device (the record's)."""
+
+    def __init__(self, sink: VideoSink, facts: dict[str, Any]) -> None:
+        self._sink = sink
+        self._facts = facts
+
+    def capabilities(self) -> tuple[EncoderCapability, ...]:
+        """The wrapped sink's encoders (IF-5)."""
+        return self._sink.capabilities()
+
+    def open(
+        self,
+        probe: ProbeResult,
+        out_path: Path,
+        *,
+        encoder: str,
+        quality: str,
+        bit_depth: int,
+        provenance: Mapping[str, Any] | None,
+    ) -> None:
+        """Note the encoder, then open the wrapped sink (IF-5)."""
+        self._facts["encoder"] = encoder
+        self._sink.open(
+            probe,
+            out_path,
+            encoder=encoder,
+            quality=quality,
+            bit_depth=bit_depth,
+            provenance=provenance,
+        )
+
+    def write(self, frame: Frame) -> None:
+        """Note the first frame's device, then write it (IF-5)."""
+        if self._facts["frame_device"] is None:
+            self._facts["frame_device"] = frame.device
+        self._sink.write(frame)
+
+    def close(self) -> SinkReport:
+        """Close the wrapped sink (IF-5)."""
+        return self._sink.close()
+
+    def abort(self) -> None:
+        """Abort the wrapped sink (IF-5; any thread)."""
+        self._sink.abort()
+
+
+class _VideoObserver:
+    """The per-job source and sink factories :func:`run` gives the root (WP4.2).
+
+    They are the root's own builders, wrapped so that each video job's record facts are
+    collected; nothing else changes.
+
+    Attributes:
+        current: The facts of the job that runs now (one job at a time, DR-62).
+    """
+
+    def __init__(self) -> None:
+        self.current: dict[str, Any] = _video_facts()
+
+    def source_for(self, device: ArrayBackend | None) -> VideoSource:
+        """Build the job's source with :func:`composition.video_source`, noting its backend."""
+        self.current["device_backend"] = None if device is None else device.device
+        return _ObservedSource(composition.video_source(device), self.current)
+
+    def sink_for(self, device: ArrayBackend | None) -> VideoSink:
+        """Build the job's sink with :func:`composition.video_sink`."""
+        return _ObservedSink(composition.video_sink(device), self.current)
+
+
+class _WithRefusals:
+    """The ``ExportJobs`` the batch runs: a :class:`RefusedRequest` fails, the rest pass on.
+
+    With an observer, each job asked for gets one entry in :attr:`video`, in the order the
+    batch asks (``run_batch`` asks once for each item it runs, in order): the facts of a video
+    job, None for any other.
+
+    Attributes:
+        video: The facts of each job asked for.
+    """
+
+    def __init__(self, exports: ExportJobs, observer: _VideoObserver | None = None) -> None:
         self._exports = exports
+        self._observer = observer
+        self.video: list[dict[str, Any] | None] = []
 
     def job(self, request: ExportRequest) -> Callable[[Progress], JobResult]:
         """Return a failing job for a refused request, else the wrapped engine's job."""
+        observer = self._observer
+        observed = (
+            observer is not None
+            and request.kind == "video"
+            and not isinstance(request, RefusedRequest)
+        )
+        facts = _video_facts() if observed else None
+        self.video.append(facts)
         if isinstance(request, RefusedRequest):
             text = request.refusal
 
@@ -201,7 +335,15 @@ class _WithRefusals:
                 )
 
             return refuse
-        return self._exports.job(request)
+        inner = self._exports.job(request)
+        if observer is None or facts is None:
+            return inner
+
+        def run_observed(progress: Progress) -> JobResult:
+            observer.current = facts
+            return inner(progress)
+
+        return run_observed
 
 
 @dataclass(frozen=True)
@@ -217,6 +359,8 @@ class RunRecord:
         folders: The folders the record's texts show by name only (:class:`Redactor`).
         cancel_requested: The cancel flag was set when the batch ended, even after the last
             item's last check (a Ctrl-C in its commit), so the run counts as cancelled.
+        video: Each item's video facts (the record's ``"video"``), or None; empty when not
+            collected.
     """
 
     report: BatchReport
@@ -225,6 +369,7 @@ class RunRecord:
     elapsed_s: float
     folders: tuple[Path, ...] = ()
     cancel_requested: bool = False
+    video: tuple[dict[str, Any] | None, ...] = ()
 
 
 class Redactor:
@@ -745,6 +890,7 @@ def run(
     footage_folder: Path | _Configured | None = CONFIGURED,
     parameters_from: str = "given",
     known_folders: Sequence[Path] = (),
+    cache_folder: Path | None = None,
 ) -> RunRecord:
     """Run one batch over the requests, in order, on the caller's thread (G7; D45, D81; DR-62).
 
@@ -761,20 +907,41 @@ def run(
         parameters_from: Recorded as :attr:`RunRecord.parameters_from`.
         known_folders: More folders the record shows by name only, beside :func:`folders_of`
             the requests.
+        cache_folder: The analysis cache folder of the video items, passed to
+            ``composition.export_jobs()`` (with the first request's ``cache_limit_bytes``) when
+            ``exports`` is None; checked by :func:`write_target_refusal` and shown by name only.
 
     Returns:
         The record.
 
     Raises:
-        RunnerRefusalError: The footage check refused the run, or a known folder could not
-            be resolved for redaction; nothing ran.
+        RunnerRefusalError: The footage check refused the run, a video item has no cache folder
+            to analyse in (``exports`` None), or a known folder could not be resolved for
+            redaction; nothing ran.
     """
     folder = (
         configured_footage_folder() if isinstance(footage_folder, _Configured) else footage_folder
     )
     check_outputs(requests, folder)
-    engine = _WithRefusals(composition.export_jobs() if exports is None else exports)
-    folders = tuple(dict.fromkeys([*folders_of(requests), *map(Path, known_folders)]))
+    if cache_folder is not None and folder is not None:
+        reason = write_target_refusal(cache_folder, folder)
+        if reason is not None:
+            raise RunnerRefusalError(f"the cache folder {reason}.")
+    observer: _VideoObserver | None = None
+    if exports is None:
+        videos = [r for r in requests if r.kind == "video" and not isinstance(r, RefusedRequest)]
+        if videos and cache_folder is None:
+            raise RunnerRefusalError("a video item needs a cache folder (--cache-dir).")
+        observer = _VideoObserver()
+        exports = composition.export_jobs(
+            cache_folder=cache_folder,
+            cache_limit_bytes=requests[0].settings.cache_limit_bytes if requests else 0,
+            source_for=observer.source_for,
+            sink_for=observer.sink_for,
+        )
+    engine = _WithRefusals(exports, observer)
+    known = [*map(Path, known_folders), *([] if cache_folder is None else [Path(cache_folder)])]
+    folders = tuple(dict.fromkeys([*folders_of(requests), *known]))
     start = time.perf_counter()
     batch_progress = progress or RunnerProgress()
     try:
@@ -787,7 +954,11 @@ def run(
         "refused" if isinstance(request, RefusedRequest) else request.kind for request in requests
     )
     elapsed = time.perf_counter() - start
-    return RunRecord(report, routes, parameters_from, elapsed, folders, batch_progress.cancelled())
+    asked = iter(engine.video)  # one entry per item the batch ran, in order
+    video = tuple(None if item.result is None else next(asked) for item in report.items)
+    return RunRecord(
+        report, routes, parameters_from, elapsed, folders, batch_progress.cancelled(), video
+    )
 
 
 def record_object(record: RunRecord) -> dict[str, Any]:
@@ -822,6 +993,7 @@ def record_object(record: RunRecord) -> dict[str, Any]:
                 "failure": None if result is None else result.failure,
                 "device": None if result is None else ascii_text(result.device),
                 "elapsed_s": None if result is None else result.elapsed_s,
+                "video": _video_object(record, index - 1),
             }
         )
     first = record.report.items[0].request if record.report.items else None
@@ -841,6 +1013,12 @@ def record_object(record: RunRecord) -> dict[str, Any]:
         "items": items,
     }
     return cast(dict[str, Any], _redacted(data, redact))
+
+
+def _video_object(record: RunRecord, position: int) -> dict[str, Any] | None:
+    """The record's ``"video"`` field of the item at ``position`` (a copy), or None."""
+    facts = record.video[position] if position < len(record.video) else None
+    return None if facts is None else dict(facts)
 
 
 def _redacted(value: object, redact: Redactor) -> object:
@@ -984,6 +1162,12 @@ def _parser() -> argparse.ArgumentParser:
         "--settings-dir", type=Path, metavar="DIR", help="load settings.json from this folder"
     )
     parser.add_argument("--record", type=Path, metavar="FILE", help="write the JSON record here")
+    parser.add_argument(
+        "--cache-dir",
+        type=Path,
+        metavar="DIR",
+        help="the analysis cache folder (must exist; required when an item is a video)",
+    )
     return parser
 
 
@@ -1034,8 +1218,9 @@ def _settings(args: argparse.Namespace) -> Settings:
 def _check_own_paths(args: argparse.Namespace, footage: Path | None) -> None:
     """Refuse a record file that exists, is not ``.json``, has no folder or is in the footage.
 
-    The settings folder, its settings file (the loader may rename a corrupt one, D89) and the
-    record file are write targets, each checked with :func:`write_target_refusal`.
+    The settings folder, its settings file (the loader may rename a corrupt one, D89), the
+    record file and the cache folder are write targets, each checked with
+    :func:`write_target_refusal`; a cache folder that does not exist is refused.
     """
     targets: list[tuple[str, Path]] = []
     if args.settings_dir is not None:
@@ -1043,6 +1228,8 @@ def _check_own_paths(args: argparse.Namespace, footage: Path | None) -> None:
         targets += [("--settings-dir", args.settings_dir / SETTINGS_FILE_NAME)]
     if args.record is not None:
         targets += [("--record", args.record)]
+    if args.cache_dir is not None:
+        targets += [("--cache-dir", args.cache_dir)]
     for flag, path in targets:
         reason = None if footage is None else write_target_refusal(path, footage)
         if reason is not None:
@@ -1054,6 +1241,8 @@ def _check_own_paths(args: argparse.Namespace, footage: Path | None) -> None:
             raise RunnerRefusalError("the --record file exists; it is never overwritten.")
         if not args.record.parent.is_dir():
             raise RunnerRefusalError("the folder of the --record file does not exist.")
+    if args.cache_dir is not None and not args.cache_dir.is_dir():
+        raise RunnerRefusalError("the --cache-dir folder does not exist.")
 
 
 def main(argv: Sequence[str] | None = None, *, exports: ExportJobs | None = None) -> int:
@@ -1088,7 +1277,7 @@ def main(argv: Sequence[str] | None = None, *, exports: ExportJobs | None = None
         return 2
     except SystemExit as exc:  # the help was printed (0)
         return exc.code if isinstance(exc.code, int) else 2
-    own = [args.out, args.settings_dir]
+    own = [args.out, args.settings_dir, args.cache_dir]
     own += [None if args.record is None else args.record.parent]
     own += [None if args.parameters is None else args.parameters.parent]
     known = [Path(p) for p in own if p is not None] + [Path(p).parent for p in args.paths]
@@ -1122,6 +1311,9 @@ def _main(
             source = "neutral" if args.neutral else "defaults"
         requests = requests_for(args.paths, parameters=parameters, settings=settings)
         check_outputs(requests, footage)
+        videos = [r for r in requests if r.kind == "video" and not isinstance(r, RefusedRequest)]
+        if videos and args.cache_dir is None:
+            raise RunnerRefusalError("--cache-dir is required when an item is a video.")
     except RunnerRefusalError as exc:
         print(f"headless_export: {redact(str(exc))}", file=sys.stderr)
         return 2
@@ -1136,6 +1328,7 @@ def _main(
             footage_folder=footage,
             parameters_from=source,
             known_folders=known,
+            cache_folder=args.cache_dir,
         )
         for line in summary_lines(record):
             print(line)
