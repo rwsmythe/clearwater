@@ -2,7 +2,7 @@
 
 Usage::
 
-    uv run python tools/inventory.py [--config PATH] [--footage DIR] [--out DIR]
+    uv run python tools/inventory.py [--config PATH] [--footage DIR] [--out DIR] [--exclude NAME]
 
 The tool walks the footage folder (read-only), probes each video with ``ffprobe`` and each
 photo with Pillow, and writes ``<working>/reports/inventory-<YYYYMMDDTHHMMSSZ>.csv`` (one
@@ -10,6 +10,8 @@ row per file, an empty ``category`` column for the owner to fill in) and
 ``inventory-<stamp>-summary.md`` (recording modes, photo sizes, chaptered recordings,
 ``.LRV`` coverage, probe errors). Nothing is ever written under the footage folder, and an
 existing report is never overwritten: on a name collision both files take a numeric suffix.
+``--exclude NAME`` prunes one top-level folder before listing or probing it; the exact
+name comparison is case-insensitive on Windows. Its contents contribute no rows or counts.
 
 A file that cannot be probed (truncated, locked, unreadable) still gets a row with ``error``
 set; a file that vanishes before it is read is counted as skipped. The run never aborts on
@@ -794,7 +796,7 @@ def probe_photo(path: Path) -> PhotoRecord:
     return record
 
 
-def scan_tree(footage_root: Path) -> ScanResult:
+def scan_tree(footage_root: Path, *, exclude: str | None = None) -> ScanResult:
     """Walk the footage folder read-only and probe every video and photo.
 
     Symbolic links to folders are not followed. A file that vanishes before it is read
@@ -802,6 +804,8 @@ def scan_tree(footage_root: Path) -> ScanResult:
 
     Args:
         footage_root: The footage folder; nothing is created or changed under it.
+        exclude: One exact top-level folder name to prune before listing or probing it,
+            case-insensitively on Windows. Its contents contribute no rows or counts.
 
     Returns:
         The records (relative paths, sorted) and the counts of other files.
@@ -815,7 +819,11 @@ def scan_tree(footage_root: Path) -> ScanResult:
         nonlocal skipped
         skipped += 1
 
-    for directory, _folders, names in os.walk(footage_root, onerror=on_walk_error):
+    for directory, folders, names in os.walk(footage_root, onerror=on_walk_error):
+        if exclude is not None and Path(directory) == footage_root:
+            folders[:] = [
+                name for name in folders if os.path.normcase(name) != os.path.normcase(exclude)
+            ]
         for name in names:
             suffix = Path(name).suffix.lower()
             full = Path(directory) / name
@@ -1107,6 +1115,8 @@ def _resolved(path: Path) -> Path:
 def main(argv: list[str] | None = None) -> int:
     """Inventory the footage folder and print the paths of the two reports.
 
+    ``--exclude NAME`` prunes one top-level folder before its contents are listed or probed.
+
     Args:
         argv: Command-line arguments; defaults to ``sys.argv[1:]``.
 
@@ -1119,6 +1129,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--config", type=Path, help="local configuration file to read")
     parser.add_argument("--footage", type=Path, help="footage folder instead of the configured one")
     parser.add_argument("--out", type=Path, help="working folder instead of the configured one")
+    parser.add_argument(
+        "--exclude", help="exclude one exact top-level folder name (case-insensitive on Windows)"
+    )
     args = parser.parse_args(argv)
 
     footage: Path | None = args.footage
@@ -1152,7 +1165,7 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     print(f"Scanning {footage} ...")
-    result = scan_tree(footage)
+    result = scan_tree(footage, exclude=args.exclude)
     try:
         csv_path, summary_path = write_inventory(
             result.records,

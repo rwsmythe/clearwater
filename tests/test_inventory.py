@@ -964,6 +964,54 @@ class TestWriteInventory:
 
 
 class TestMain:
+    def test_exclude_prunes_only_named_top_level_folder(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        source = tmp_path / "footage"
+        for relative in ("root.jpg", "Other/Insta360/nested.jpg", "Insta360-extra/keep.jpg"):
+            path = source / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            Image.new("RGB", (7, 5), "red").save(path)
+        before = inventory.scan_tree(source)
+        assert [r.path.as_posix() for r in before.records] == [
+            "Insta360-extra/keep.jpg",
+            "Other/Insta360/nested.jpg",
+            "root.jpg",
+        ]
+        excluded = source / "Insta360"
+        excluded.mkdir()
+        Image.new("RGB", (9, 6), "blue").save(excluded / "hidden.jpg")
+        (excluded / "hidden.LRV").write_bytes(b"sidecar")
+        (excluded / "ignored.txt").write_text("ignored", encoding="ascii")
+        real_scandir = os.scandir
+
+        def guarded_scandir(path):
+            assert Path(path) != excluded, "excluded folder was listed"
+            return real_scandir(path)
+
+        monkeypatch.setattr(inventory.os, "scandir", guarded_scandir)
+        out = tmp_path / "work"
+        assert (
+            inventory.main(
+                [
+                    "--footage",
+                    str(source),
+                    "--out",
+                    str(out),
+                    "--exclude",
+                    os.path.normcase("Insta360"),
+                ]
+            )
+            == 0
+        )
+        csv_path = next((out / "reports").glob("inventory-*.csv"))
+        with csv_path.open(encoding="utf-8-sig", newline="") as handle:
+            assert list(csv.DictReader(handle)) == [inventory._csv_row(r) for r in before.records]
+        summary = next((out / "reports").glob("inventory-*-summary.md")).read_text()
+        assert "- Ignored files (not media, not sidecars): 0" in summary
+        assert "- Sidecar files (.lrv, .thm; not rows): 0" in summary
+        assert "- Skipped (vanished before reading, or folder not listable): 0" in summary
+
     def test_end_to_end(
         self, tree: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]
     ) -> None:
