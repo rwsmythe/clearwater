@@ -526,13 +526,17 @@ class ExportEngine:
         select_backend: BackendSelector,
         app_version: str = clearwater.__version__,
         on_stage: Callable[[str], None] | None = None,
+        source_for: Callable[[ArrayBackend | None], VideoSource] | None = None,
+        sink_for: Callable[[ArrayBackend | None], VideoSink] | None = None,
     ) -> None:
         """Store the collaborators; nothing runs until a job runs.
 
         Args:
             methods: The correction methods by id (IF-3).
-            video_source: The frame source (IF-5), also given to each job's analysis engine.
-            sink_factory: Returns a fresh, unopened video sink (IF-5) for each video job.
+            video_source: The video source (IF-5) every video job probes with; without
+                ``source_for`` it also decodes the job's frames and is given to its analysis.
+            sink_factory: Returns a fresh, unopened video sink (IF-5) for each video job; not
+                called when ``sink_for`` is given.
             photo_reader: The photo source (IF-6).
             photo_writer: The photo sink (IF-6).
             cache: The proxy cache each video job's analysis engine uses (IF-7).
@@ -543,6 +547,12 @@ class ExportEngine:
                 hook: ``"probe"``, ``"analysis"``, ``"open"``, ``"frames"``, ``"close"`` for a
                 video; ``"read"``, ``"measure"``, ``"render"``, ``"write"`` for a photo; then
                 ``"committed"``). None in the product; the engine reads no clock of its own.
+            source_for: Returns the frame source of one video job, called once per video job
+                right after its one ``select_backend`` call with the selected backend for a GPU
+                job and None for a CPU job (DR-67); that source decodes the job's analysis and
+                its render. None: ``video_source`` decodes.
+            sink_for: Returns the fresh, unopened sink of one video job, called once per video
+                job with the same argument as ``source_for`` (DR-67). None: ``sink_factory``.
         """
         self._methods = dict(methods)
         self._video_source = video_source
@@ -554,6 +564,8 @@ class ExportEngine:
         self._select_backend = select_backend
         self._app_version = app_version
         self._on_stage = on_stage
+        self._source_for = source_for
+        self._sink_for = sink_for
 
     def job(self, request: ExportRequest) -> Callable[[Progress], JobResult]:
         """Return the IF-8 job that exports ``request`` (the ``ExportJobs`` contract).
@@ -693,6 +705,14 @@ class ExportEngine:
         if not check.ok:
             raise _FailureError(f"{run.name}: {check.message()}")
 
+    @staticmethod
+    def _job_device(backend: ArrayBackend) -> ArrayBackend | None:
+        """Return the backend a video job's source and sink are built with (DR-67).
+
+        The job's own GPU backend (identity, never a second selection), or None for a CPU job.
+        """
+        return None if backend.device == "cpu" else backend
+
     def _note_device(self, run: _Run, reason: str) -> None:
         """Record the backend reason and the AD-9 fallback warning."""
         run.device = reason
@@ -818,7 +838,9 @@ class ExportEngine:
         run.backend = backend
         self._note_device(run, reason)
 
-        sink = self._sink_factory()
+        device = self._job_device(backend)
+        source = self._video_source if self._source_for is None else self._source_for(device)
+        sink = self._sink_factory() if self._sink_for is None else self._sink_for(device)
         capabilities = sink.capabilities()
         encoder = resolve_encoder(settings.video_encoder, capabilities)
         bit_depth = 10 if video.bit_depth == 10 or settings.ten_bit_for_eight_bit else 8
@@ -849,7 +871,9 @@ class ExportEngine:
 
         params = effective_parameters(method, request.parameters)
         hw_decode = backend.device != "cpu"
-        analysis = self._analyse(request, method, backend, probe, params, hw_decode, progress, run)
+        analysis = self._analyse(
+            request, method, backend, probe, params, hw_decode, progress, run, source
+        )
         try:
             # After the lead: the analysis cache may share the volume, and on a clip longer than
             # the lead it goes on growing during the export, so its extrapolated growth is
@@ -889,7 +913,16 @@ class ExportEngine:
                         provenance=provenance,
                     )
                     report = self._encode(
-                        probe, method, backend, analysis, params, hw_decode, sink, progress, run
+                        probe,
+                        method,
+                        backend,
+                        analysis,
+                        params,
+                        hw_decode,
+                        sink,
+                        progress,
+                        run,
+                        source,
                     )
                 except BaseException:
                     sink.abort()  # never close after a stop: kill FFmpeg, delete the temporary
@@ -914,6 +947,7 @@ class ExportEngine:
         hw_decode: bool,
         progress: Progress,
         run: _Run,
+        source: VideoSource,
     ) -> _Analysis:
         """Start the clip's analysis on its own thread and wait for its lead (AD-7 as read at Q2).
 
@@ -927,7 +961,7 @@ class ExportEngine:
             backend=backend,
             cache=self._cache,
             key=key,
-            source=self._video_source,
+            source=source,
             probe=probe,
             params=params,
             hw_decode=hw_decode,
@@ -948,6 +982,7 @@ class ExportEngine:
         sink: VideoSink,
         progress: Progress,
         run: _Run,
+        source: VideoSource,
     ) -> SinkReport:
         """Write every frame and close the sink, under the cancel watchdog (Q2 as amended).
 
@@ -965,7 +1000,7 @@ class ExportEngine:
         try:
             try:
                 self._write_frames(
-                    probe, method, backend, analysis, params, hw_decode, sink, progress, run
+                    probe, method, backend, analysis, params, hw_decode, sink, progress, run, source
                 )
                 self._stage("close")
                 self._check_cancel(progress)  # a cancel after the last frame never closes
@@ -1003,6 +1038,7 @@ class ExportEngine:
         sink: VideoSink,
         progress: Progress,
         run: _Run,
+        source: VideoSource,
     ) -> None:
         """Render and write every decoded frame in pts order; close the stream on this thread.
 
@@ -1016,7 +1052,7 @@ class ExportEngine:
         total = probe.video.nb_frames
         message = f"Exporting {run.name}"
         self._stage("frames")
-        frames: Iterator[Frame] = self._video_source.frames(probe, hw_decode=hw_decode)
+        frames: Iterator[Frame] = source.frames(probe, hw_decode=hw_decode)
         try:
             for written, frame in enumerate(frames, start=1):
                 self._check_cancel(progress)
