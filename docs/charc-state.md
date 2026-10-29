@@ -393,8 +393,13 @@
 - **WP-T6 W3 DONE 12:57Z (status `fa801fad17d48fc2`, no reply owed): RUNG 3 CLOSED.** Stage 1: 8 passed in 259 s (run 1
   322 s); ONE standard encode; engine record M+R all SAME, roster SAME. Stage 2: `branch=i-proceed`, BE delta = exactly the six
   ruled names. Stage 3 draft control caught (level name assert); stage 4 reference control caught (89 vs 90). Tree clean, tests
-  byte-identical to the snapshot. Seat 2 depth 152,719. NEXT: rung 4 (collection identities; W4 FULLCLIP once ~27 min);
-  report; A FAST; B; the ONE gate.
+  byte-identical to the snapshot. Seat 2 depth 152,719.
+- **WP-T6 RUNG 4 COLLECTIONS DONE at the orchestrator's seat; W4 FULLCLIP WINDOW OPEN ~13:07Z (status `34420ea29424803a`, no
+  reply owed; ~27 min; w4.sh md5 16847bf1 at head b540844).** Collections: all 6457 = parallel 5313 (unchanged) + serial 1137
+  (1136 - 7 + 7 gate forms + parity test) + fullclip 7; pairwise disjoint, no duplicates; ALL removes the 7 unsuffixed IDs and
+  adds 14 suffixed + parity. W4 = `-m fullclip` once with junit + runtime observer: 7 passing, full sink frames_written == 681
+  both operands, no trim fixture set up, tree proved clean. WP4.3 cell 2 building (light, no window). NEXT: W4 release;
+  report; A FAST; B; the ONE gate (AFTER figure).
 - **(history) After WP4.1's accept:** WP4.2's brief (DRAFT RULED on main 3aa3c51) got ONE revision pass against WP4.1's accept record, then FINAL
   on CHARC's word; its revision must carry: DR-78/79 (B2 rows) as WP4.2 items, the WP4.1 runner's final names and the stream-syntax
   predicate, the Limit text. WP4.3's revision later carries DR-75 (REQUIRED test under its Q12), DR-76, DR-77, and the AD-23 'applied by
