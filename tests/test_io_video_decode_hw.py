@@ -2,7 +2,7 @@
 
 - ``gpu``: ``hw_decode=True`` gives the same bytes and pts as software decode on every decodable
   sample (WP2.1S: every transport form decodes the same frames to the same bytes).
-- ``footage``: GX011627 (681 frames, pts 0 to 680 x 1001 at 1/30000; read only) decodes to
+- ``footage``: the GX011627 trim (the whole clip, 681 frames, in the ``fullclip`` form) decodes to
   every frame's pts and a per-frame hash equal to an independent FFmpeg run, through the large
   pipe, through the forced default pipe (AD-23) and, with ``gpu``, through CUDA decode.
 """
@@ -34,7 +34,6 @@ DECODABLE = [
     "vid-vfr",
     "vid-rotated",
 ]
-FOOTAGE_FRAMES = 681
 
 
 def needs_cuda() -> None:
@@ -73,18 +72,29 @@ def test_cuda_decode_gives_the_software_bytes_and_pts(
 
 
 @pytest.fixture(scope="module")
-def footage() -> ProbeResult:
-    """GX011627's probe result (read only); skips when the clip is absent."""
-    from local_config import FootageLookupError, find_footage_file, load_local_config
+def footage(gx011627: tuple[Path, int]) -> ProbeResult:
+    """Return the selected read-only GX011627 source's probe result.
 
-    config = load_local_config()
-    try:
-        path = find_footage_file("GX011627", config.footage_path)
-    except FootageLookupError as error:
-        if error.matches:
-            raise
-        pytest.skip("GX011627 is not in the footage folder")
-    return probe(path)
+    Args:
+        gx011627: The trim or full source and its independently asserted count.
+
+    Returns:
+        The selected source's probe result.
+    """
+    return probe(gx011627[0])
+
+
+@pytest.fixture(scope="module")
+def footage_frames(gx011627: tuple[Path, int]) -> int:
+    """Return the selected GX011627 count independently of probe metadata.
+
+    Args:
+        gx011627: The trim or full source and its independently asserted count.
+
+    Returns:
+        The selected source's asserted frame count.
+    """
+    return gx011627[1]
 
 
 @pytest.fixture(scope="module")
@@ -107,43 +117,52 @@ def footage_reference(footage: ProbeResult) -> list[str]:
     return digests
 
 
-def check_footage(frames: Iterator[Frame], reference: list[str]) -> None:
-    """Compare a footage decode with the reference, frame by frame."""
+def check_footage(frames: Iterator[Frame], reference: list[str], count: int) -> None:
+    """Compare a footage decode with the reference, frame by frame.
+
+    Args:
+        frames: The product decoder's frames.
+        reference: Independent per-frame digests of the selected source.
+        count: The selected source's asserted frame count.
+    """
     got = hashes(frames)
-    assert [pts for pts, _ in got] == [k * 1001 for k in range(FOOTAGE_FRAMES)]
+    assert [pts for pts, _ in got] == [k * 1001 for k in range(count)]
     assert [digest for _, digest in got] == reference
 
 
 @pytest.mark.footage
 @pytest.mark.slow
 def test_the_real_clip_decodes_to_its_pts_and_the_reference_bytes(
-    footage: ProbeResult, footage_reference: list[str]
+    footage: ProbeResult, footage_reference: list[str], footage_frames: int
 ) -> None:
     assert footage.video.time_base == Fraction(1, 30000)
-    assert len(footage_reference) == FOOTAGE_FRAMES
-    check_footage(SOURCE.frames(footage, hw_decode=False), footage_reference)
+    assert len(footage_reference) == footage_frames
+    check_footage(SOURCE.frames(footage, hw_decode=False), footage_reference, footage_frames)
 
 
 @pytest.mark.footage
 @pytest.mark.slow
 def test_the_real_clip_through_the_forced_default_pipe_is_identical(
-    footage: ProbeResult, footage_reference: list[str], monkeypatch: pytest.MonkeyPatch
+    footage: ProbeResult,
+    footage_reference: list[str],
+    footage_frames: int,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     def fail(size: int) -> tuple[int, int]:
         raise OSError("forced failure")
 
     monkeypatch.setattr(pipes, "_create_pipe", fail)
-    check_footage(SOURCE.frames(footage, hw_decode=False), footage_reference)
+    check_footage(SOURCE.frames(footage, hw_decode=False), footage_reference, footage_frames)
 
 
 @pytest.mark.footage
 @pytest.mark.gpu
 @pytest.mark.slow
 def test_the_real_clip_through_cuda_decode_is_identical(
-    footage: ProbeResult, footage_reference: list[str]
+    footage: ProbeResult, footage_reference: list[str], footage_frames: int
 ) -> None:
     needs_cuda()
-    check_footage(SOURCE.frames(footage, hw_decode=True), footage_reference)
+    check_footage(SOURCE.frames(footage, hw_decode=True), footage_reference, footage_frames)
 
 
 @pytest.mark.footage
