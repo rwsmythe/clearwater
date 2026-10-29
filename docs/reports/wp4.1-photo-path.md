@@ -163,17 +163,18 @@ against the source quantised to the export depth by the writer's rule, max 0.000
 0.0000/255 on all 264; against the unquantised source, 8-bit sources at either depth and every
 16-bit export max 0.0019/255, mean 0.0012/255; 8-bit exports of 10- and 16-bit sources worst
 mean 0.256/255, max 0.499/255 (8-bit quantisation alone; recorded, not asserted, per S8). The V9
-test records the raw error of every export (`record_property`). The stacked candidate gate
+test records the raw error of every export (`record_property`). The candidate gate
 re-runs both: the GPU and V8 (c) legs in its serial leg, V9 (with the pinned built-in ICC oracle
 of R3 H6) in its parallel leg.
 
 ## Gates
 
 - ruff check, ruff format --check (259 files), mypy strict (141 source files): green on
-  `23fc88b`; the WP4.1 files plus `test_gui_deps`, `test_gui_status`, `test_core_deps`,
-  `test_jobs_naming`, `test_jobs_export_photo` (`-n 4 -m "not gpu and not footage and not
-  slow"`): 465 passed, 0 skipped.
-- The two-leg suite: run by the orchestrator's stacked candidate gate; counts and skip lines in
+  `7003de7`; the WP4.1 files plus `test_gui_deps`, `test_gui_status`, `test_core_deps`,
+  `test_jobs_naming`, `test_jobs_export_photo` (`-n 2 -m "not gpu and not footage and not
+  slow"`, the host shared with a gate's serial leg): 478 passed, 0 skipped.
+- The two-leg suite: run by the orchestrator's candidate gate (WP4.1's own, on a candidate
+  rebased onto main after WP-T5); counts and skip lines in
   `docs/proofs/wp4.1-accept.md`.
 
 ## Reviewer A

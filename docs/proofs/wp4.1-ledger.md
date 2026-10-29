@@ -15,6 +15,7 @@ Brief `docs/briefs/wp4.1-brief.md` FINAL (rulings CHARC `2c4476d9869df056`). Rev
 | Y6 round 3 adjudicated (cell 3) | 2026-10-28 21:56Z | 208,313 (seat plan per the 250K rule: cell 3 stands down after the R3 minors, no round 4 here) |
 | Seat change | 2026-10-28 | cell 3 stood down at 238,831 (final reading; head `817f027`); cell 4 (`implementer-opus-high`) from 0 at dispatch |
 | Y7 round 4 adjudicated (cell 4) | 2026-10-28 23:14Z | 109,960 |
+| Y8 Reviewer B remediation ordered (cell 4) | 2026-10-28 23:58Z | 208,798 |
 
 ## Task 1: map (main `3aa3c51`)
 
@@ -319,7 +320,8 @@ md5s). Probe 20:14:34Z: one `succeeded in` line, banner `gpt-6.1-sol` / high.
 | 2 | `dca6d1e` | 0 | 2 (G1 NEW, G2 REOPENED) | 5 (G3, G4, G5 downgraded, G6, G7) | 7 / 0 | 3 / 4 | 0 | runner (`tools/`, G1-G7 incl. the G5 docstring), tests, report | 93,956 |
 | 3 | `899102d` | 0 | 1 (H1 NEW; accepted-component code reachable through the swap: STOP) | 6 (H2-H4 downgraded, H5, H6, H7) | 7 / 0 | 6 / 1 | 0 | runner (`tools/`, H2-H5), tests (H6, H7 test-only), report; H1 BANKED to WP4.3 (CHARC `5fab48cc2a5174cb`) | 208,313 |
 | 4 | `844b996` | 0 | 1 (I1 NEW: beside-source through a file symlink writes into the footage folder) | 4 (I2 downgraded, I3, I4, I5 test-only) | 5 / 0 | 4 / 1 | 0 | runner (`tools/`, I1-I4), one test oracle (I5) | 109,960 |
-| 5 | `f17ab36` | 0 | 0 | 1 (J1) | 1 / 0 | 1 / 0 | 0 | runner (`tools/`, J1, terminating-round cleanup) | (dispatcher's figure at the return) |
+| 5 | `f17ab36` | 0 | 0 | 1 (J1) | 1 / 0 | 1 / 0 | 0 | runner (`tools/`, J1, terminating-round cleanup) | 208,798 (read at 23:58Z, after the return) |
+| B | `aefd563` (orchestrator's Reviewer B; `0a0a787` rebased) | 0 | 1 (B1) | 8 (B2-B9; B9 out of envelope) | 8 / 1 | 6 / 3 (B1 I1 class, B2 G2 class, B4 J1 class) | 0 | runner (`tools/`, B1, B2, B4-B6), tests (B7, B8 docstring), docstrings and report (B3, B9) | 208,798 |
 
 ### Round 1 (20:14-20:24Z) -- VERDICT NEW_CRITICAL_MAJOR_FOUND; adjudicated, NOT yet remediated
 
@@ -554,12 +556,43 @@ banner `gpt-6.1-sol` / high. Full table in `r5/adjudication.md`.
   `test_j1_*` RED first (`work/wp4.1-c4-r5red.log`); light set on `23fc88b`: ruff, ruff format
   --check (259), mypy (141) green; 465 passed, 0 skipped (`work/wp4.1-c4-r5fix-light.log`).
 
-## STATE AT RETURN (cell 4, 2026-10-28; replaces the cell-3 RESUME HERE)
+### Reviewer B at the gate (orchestrator's seat) and remediation (cell 4)
 
-Branch `wp4.1`, base main `3aa3c51` (NO rebase, never merge); code head `23fc88b`, report FINAL
+- Orchestrator's Reviewer B (Codex `gpt-6.1-sol` / high) on the stacked candidate `aefd563`
+  (`0a0a787` rebased): BLOCKING. Evidence `C:\Users\rwsmy\clearwater-review-evidence\wp4.1\reviewB\`.
+  B1 MAJOR CONFIRMED at the orchestrator's seat (`b1_probe.py`): a hard link `work\alias.jpg` to a
+  footage file and `--record work\alias.jpg:record.json` create an NTFS stream on the original.
+  B2-B8 MINOR (B8 advisory), B9 MINOR out of envelope; adjudication upheld by CHARC
+  `870c8ddeb64b4e12`, which ruled Q1: ONE positive predicate at one choke point, three
+  conditions, the hard-link residual a Limit; the design guard closes with it.
+- Failing first, against the `0a0a787` runner (`work/wp4.1-c4-rbred2.log`; the runner file
+  swapped in for that run and restored, md5 checked): 8 failed (B1 `device`,
+  `folder-link-outside`, `hard-link-stream`, the predicate test; B2; B4; B5; B6), 5 passed (B1
+  `text-spelling`, `extended`, `file-link`, `junction`, `case`: classes R1-R4 already fixed, now
+  pinned). B7 is a test strengthening (the writer's incoming pixels were already equal).
+- `7003de7` (runner + tests): `write_target_refusal`: (i) no `:` after the drive or UNC prefix,
+  no `\\?\` or `\\.\` form; (ii) every existing path on the way is its own real path
+  (normcase); (iii) the deepest one's real path outside the footage folder (`inside`), named
+  first in the message. Used by `check_outputs` (output folders, `source.parent` beside a
+  source) and `_check_own_paths` (settings folder and `settings.json`, record); `writes_inside`
+  removed. B2 `_escaped_pattern` (each escape in any letter case). B4 `_settings` catches
+  `OverflowError`. B5 `RunRecord.cancel_requested` (the flag read when the batch ends) gives
+  `"cancelled": true` and status 1. B6 the SIGINT handler is restored only after the record is
+  written; status 1 when the flag is set. B7 N10 records the writer's incoming pixels. B8 the
+  GUI test's docstring narrowed (no preview-pixel assertion; no `gui/` file touched). B3, B9
+  docstrings narrowed.
+- `b488b22` and this commit: report claims, Limits (the predicate and its residual, EXIF in
+  failure texts, Ctrl-C, GUI test scope), the review table's Reviewer B row, gates.
+- Light runs on `7003de7` (host shared with the stacked gate's serial leg, so `-n 2`): ruff,
+  ruff format --check (259), mypy (141) green; the WP4.1 files plus the five extras, `-m "not gpu
+  and not footage and not slow"`: 478 passed, 0 skipped (`work/wp4.1-c4-rbfix-light.log`).
+
+## STATE AT RETURN (cell 4, 2026-10-29; replaces the earlier one)
+
+Branch `wp4.1`, base main `3aa3c51` (NO rebase, never merge); code head `7003de7`, report FINAL
 `docs/reports/wp4.1-photo-path.md`; head = this ledger commit. Worktree clean; every committed
-blob LF, 0 CR. Reviewer A converged at round 5 (NO_NEW_CRITICAL_MAJOR; J1 fixed in the cleanup).
-The two-leg suite is the orchestrator's stacked candidate gate (CHARC `6be5d8cdcc500129`); its
-counts and skip lines go in `docs/proofs/wp4.1-accept.md`. Open items for the orchestrator: H1
-(banked to WP4.3, CHARC `5fab48cc2a5174cb`), G5 (writer provenance `"profile"` vs AD-13, CHARC),
-J1's importer twin (`PresetStore.import_preset` escapes `OverflowError`; `r5/r5_repro.py`).
+blob LF, 0 CR. Reviewer A converged at round 5; the orchestrator's Reviewer B findings B1-B9
+remediated (one predicate); the orchestrator re-runs Reviewer B, then WP4.1's own two-leg gate
+on a candidate rebased onto main after WP-T5. Open items for the orchestrator: H1 (banked to
+WP4.3, CHARC `5fab48cc2a5174cb`), G5 (writer provenance `"profile"` vs AD-13, CHARC), J1's
+importer twin (`PresetStore.import_preset` escapes `OverflowError`; `r5/r5_repro.py`).
