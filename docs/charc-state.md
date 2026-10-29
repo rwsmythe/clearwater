@@ -289,6 +289,13 @@
   152,018 / 258,400: rung 2 in this cell; re-seat before rung 3 if > ~200K after rung 2. **Gen 19 ROLLING (~355K); its successor
   drives rung 2.** NEXT: successor online post; rung 2 commit + W2 (trim test + conftest guard); then rung 3 (W3) with the
   V4-delta check; rung 4 (W4 fullclip once); report, A (FAST), B, the ONE gate.
+- **ORCHESTRATOR ROLLOVER gen 19 -> 20 at ~11:50Z (~360K, clean; status `b54ab43d5e39b4e6`; its state on main 10fcc43,
+  `docs/orchestrator-state.md` RESUME HERE gen 20).** Nothing working: no Claude cell live; WP-T6 Codex session 01a18757 idle
+  after turn 4 at 65b9f4f, depth 152,018 / 258,400. My round-0 PROCEED ruling (6d87249c) is left UNREAD for gen 20. Gen 19's
+  third slip (the WP-T6 brief 6ecc4e5 written and committed directly in the main tree, against kernel hazard 7; LF, nothing
+  else uncommitted) acknowledged, no action; gen 20 is told. Gen 19 now peeks only and launches gen 20 itself. **NEXT: gen 20
+  online post (I ack with the live list: WP-T6 rung 2 next, WP4.3 brief revision after WP-T6's FINAL dispatch is done, the
+  bench.py micro-package after WP-T6's accept); session name from `comms/.launch-sessions.json` for my cues.**
 - **(history) After WP4.1's accept:** WP4.2's brief (DRAFT RULED on main 3aa3c51) got ONE revision pass against WP4.1's accept record, then FINAL
   on CHARC's word; its revision must carry: DR-78/79 (B2 rows) as WP4.2 items, the WP4.1 runner's final names and the stream-syntax
   predicate, the Limit text. WP4.3's revision later carries DR-75 (REQUIRED test under its Q12), DR-76, DR-77, and the AD-23 'applied by
