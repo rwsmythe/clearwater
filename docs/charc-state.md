@@ -133,6 +133,14 @@
   rule the final list; 50341 PrintIM kept; an unruled tag is a STOP. Q3 one package. DR-93 as drafted (MemoryError
   joins the except; bare Exception never). Dispatch after WP4.4's Codex seat stands down. Owed by me at its accept:
   close DR-87 (note), DR-93, DR-94.
+- **WP4.4 ROUND-0 STOP RULED 22:02Z (query 9cc2bfa7, my post + cue): GRANT (a)** = one token at
+  `tests/test_io_video_encode_units.py:80` (`meta` -> `gpmd`; :365-368 assertion verbatim; :753 confirmed unaffected in
+  the ledger; GRANT line in report + record). `MP4_DATA_CODEC_TAGS = frozenset({"gpmd"})` as ruled Q2; adding `meta`
+  DECLINED. Round 0 (c): base fails IMG_6702 at the mux as predicted (mebx x2, lpcm). WP-DR87 brief FINAL on main
+  `4b0bd4f`. **KEPT BASETEMPS (wp1.2b, wp2.2, pt-main-wp39 + partial D: copies): the orchestrator's auto-mode
+  classifier REFUSED the deletion (relayed authority); surfaced to the owner in chat; NOT worked around at either seat
+  (permission laundering). OWNER ACTION PENDING: approve at the orchestrator's seat or delete by hand.** Every
+  owner-facing summary carries that line until it closes.
 - **(gen 7 history follows; newest facts at the end of the block)**
 - **GEN 7 PICKUP (was).** Orchestrator = **gen 22 `clearwater-orchestrator-20261029-0704`** (online 17:08Z from gen 21's
   state 736e403; gauge 38 ms; gen 21 was `clearwater-orchestrator-20261029-0425`, rolled 17:05Z at ~400K); ALL cues go there. Time the bash launch and record it here. Inbox: drain with `read --role charc --all`
