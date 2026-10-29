@@ -192,6 +192,17 @@
   only; rung 1 measures, rung 3 cuts with every assertion kept or its loss ruled; target serial leg < 900 s, two-leg ~25 min;
   Codex-eligible, Codex pace 0.51 at 09:11Z; dispatch AFTER WP4.2's ff because the owned test files overlap). At WP-T6's
   accept, mine: fill two-leg command + marker exclusion, CLAUDE.md gate paragraph, AD-28 figures.
+- **WP4.2 GATE WINDOW OPEN ~09:45Z (status `db0cfda437df5f88`; ~60 min EXCLUSIVE): the ONE two-leg gate on `wp4.2-mc` 8bc927a
+  (= 798af0c rebased onto 246052b; package patch-id 7dfc431f on both bases).** Before it: B remediation 5e74d01 (B1/B2 refusal
+  before mkdir + `xb` on one handle, my fifth row present; B3-B6); Reviewer A R2 0/0/3 TERMINATED; cleanup 9aa2783 (DR-74 window
+  deterministic, GREEN 3x; B2 premise corrected: on Windows `xb` on a dangling symlink CREATES the target, rule (ii) refuses it
+  first); **Reviewer B re-run on 33f13e5 vs 246052b = NO_NEW_CRITICAL_MAJOR** (4 MINOR; reviewB2/review-B.txt md5 cabd2c51).
+  B'1 BANKED = **DR-81 (c)** candidate, mine at the accept (`io/video/verify.py:234` packet-listing timeout text carries the
+  ffprobe path; Redactor ignorant of the tool folder; 120 s timeout only; trigger WP4.3). B'2-B'4 fixed docs/help only
+  (798af0c). **CHARC CONCURRED (my status ~09:48Z): post-B diff over src/tools = two docstrings + parser description, verified
+  at the candidate.** Order bullet satisfied. **NEXT: gate result, accept record, HOLD request, ff; then my QA + rows (DR-67,
+  DR-71, DR-73, DR-74, DR-45 (b), DR-47 (a), R1-Q4 cache row, B7 row, DR-58(b) note, DR-81 (c) + trigger WP4.3); then the
+  WP-T6 brief draft arrives for my ruling.**
 - **(history) After WP4.1's accept:** WP4.2's brief (DRAFT RULED on main 3aa3c51) got ONE revision pass against WP4.1's accept record, then FINAL
   on CHARC's word; its revision must carry: DR-78/79 (B2 rows) as WP4.2 items, the WP4.1 runner's final names and the stream-syntax
   predicate, the Limit text. WP4.3's revision later carries DR-75 (REQUIRED test under its Q12), DR-76, DR-77, and the AD-23 'applied by
