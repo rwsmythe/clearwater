@@ -638,6 +638,7 @@ def test_s1_a_limit_and_a_clear_from_the_dialog_during_the_open_apply_after_it(
     assert window.jobs.active() >= 3  # the open, the clear and the limit wait on workers
     release.set()
     qtbot.waitUntil(lambda: window.jobs.active() == 0, timeout=60000)
-    assert application.cache.limit_bytes() == 4 * 10**9  # the dialog's, applied after the open
+    # The product's calls first: the test's own limit read below runs on this thread.
     assert threads and all(t is not threading.main_thread() for t in threads)
+    assert application.cache.limit_bytes() == 4 * 10**9  # the dialog's, applied after the open
     open_source(qtbot, application, sample("jpeg-gradient-srgb"))  # the window stayed usable

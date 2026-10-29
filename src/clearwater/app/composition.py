@@ -201,8 +201,8 @@ class DeferredProxyCache:
     a full cache took 16 s on the owner's laptop) and the limit comes from the one settings read.
     Every member waits until the open has ended and is meant for worker threads only (the GUI's
     jobs, the analysis and the export). After a failed open every member refuses with
-    :data:`CACHE_NOT_OPENED` naming the open's reason, except :meth:`limit_bytes`, which returns
-    0 (the refusing cache's form); :meth:`fail` ends the wait when the opening job cannot run,
+    :data:`CACHE_NOT_OPENED` naming the open's reason, :meth:`limit_bytes` included (ruling S1
+    condition 2; R1-9); :meth:`fail` ends the wait when the opening job cannot run,
     so nothing waits for ever. A call made while the open runs (the settings dialog's limit or
     clear) is applied after it.
 
@@ -324,9 +324,8 @@ class DeferredProxyCache:
         self._target().mark_complete(key)
 
     def limit_bytes(self) -> int:
-        """Return the size limit (IF-7); 0 after a failed open."""
-        self._ended.wait()
-        return 0 if self._cache is None else self._cache.limit_bytes()
+        """Return the size limit (IF-7)."""
+        return self._target().limit_bytes()
 
     def set_limit_bytes(self, n: int) -> None:
         """Set the size limit (IF-7); a call made during the open is applied after it."""

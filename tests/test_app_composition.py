@@ -298,13 +298,13 @@ def test_a_failed_open_refuses_every_member_readably(tmp_path: Path) -> None:
         lambda: handle.key_for(tmp_path),
         lambda: handle.lookup(None),
         lambda: handle.proxy(None, 0),
+        handle.limit_bytes,  # R1-9: every member refuses, the limit included
         lambda: handle.set_limit_bytes(1),
         handle.clear,
     ):
         with pytest.raises(RuntimeError) as caught:
             call()
         assert str(caught.value) == expected
-    assert handle.limit_bytes() == 0  # the refusing cache's form
 
 
 def test_fail_ends_the_wait_when_no_open_runs(tmp_path: Path) -> None:
