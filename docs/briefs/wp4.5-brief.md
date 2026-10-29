@@ -1,8 +1,8 @@
-# WP4.5 — EXIF byte fidelity (dispatch brief, DRAFT)
+# WP4.5 — EXIF byte fidelity (dispatch brief, FINAL)
 
-**Status:** DRAFT 2026-10-29 ~19:10Z by the orchestrator (generation 23) on CHARC's commission
-`ec87b18228de2958` (file `d3ad4388`, 2026-10-29T18:54:29Z). FINAL waits on CHARC's ruling of the
-Questions. Spec v0.5.7; no spec clause changes. Base = main `5a1538a`. Worktree `.worktrees/wp4.5`,
+**Status:** FINAL on CHARC `f34420e1c8ff5d29` (2026-10-29T18:58:23Z); its Rulings at the end GOVERN
+the Questions. DRAFT 2026-10-29 by the orchestrator (generation 23) on CHARC's commission
+`ec87b18228de2958` (file `d3ad4388`, 2026-10-29T18:54:29Z). Spec v0.5.7; no spec clause changes. Base = main `5a1538a`. Worktree `.worktrees/wp4.5`,
 branch `wp4.5`. Owner decisions: none.
 
 | Field | Content |
@@ -112,4 +112,11 @@ and the CR-byte blob check on every changed file.
 
 ## Rulings
 
-(CHARC's ruling of Q1-Q4 goes here at FINAL.)
+CHARC `f34420e1c8ff5d29` (2026-10-29T18:58:23Z), FINAL on fold-in, verbatim:
+
+- **Q1 = (a).** Keep Pillow's writer; pin every KEPT entry's SOURCE TIFF type per IFD (IFD0, Exif, GPS, Interop) from the source bytes, and carry any ASCII-typed value whose bytes are not 7-bit ASCII as its original bytes under the pinned type 2. Round 0 proves from Pillow's own source lines (the `_write_dispatch` / type-guess path) that a pinned type is honoured for a `bytes` value, nested IFDs included; it shows the LensModel case (untyped tag, bytes value) writes type 2 count 6, not type 1. (b), the byte-level IFD rewrite, ONLY if round 0 shows (a) cannot pin a type for an untyped tag; that is a STOP to me with the evidence, not the cell's choice.
+- **Q2 = as recommended.** Fidelity = type, count and value bytes of every kept entry equal; NOT entry order or offsets, NOT IFD1 (dropped by D63), NOT MakerNote internal offsets (pre-existing; a named Limit). The tests compare parsed entries (tag, type, count, bytes), not whole-blob equality.
+- **Q3 = yes.** `from_tiff` gets the same carry (it calls `tobytes()` before `edit`); one RED-first test on a TIFF source with a non-7-bit ASCII tag.
+- **Q4 = yes.** NEW `tests/test_io_photo_exif_bytes.py`; no existing test edited; an existing test that pins a guessed type is a STOP to me, not an edit.
+
+Verification per the owner's direction as the brief quotes it: the full parallel leg + the impacted serial nodes by id (`test_photo_check.py` real-photo round trip over all 73 Phone photos now green; `test_io_photo*`, `test_wp41_photo_path.py`, `test_wp41_v8.py` with markers). Lane Codex (0.359 vs 1.433): concurred.
