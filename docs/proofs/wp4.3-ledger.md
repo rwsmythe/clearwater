@@ -614,3 +614,39 @@ Owner-pending inputs: photos (WP3.6P), the iPhone clip (DR-15). Open owner decis
 One line per finding: the finding, the commit, the test. Groups per the dispatch: A (start-up and the
 journal: R2-1, R2-2), B (the adapter, the preview and the worker: R2-5..R2-9), C (R2-3 under the grant,
 R2-4 as banked, the report's R1-13 / AD-11 wording).
+
+### Group A (start-up and the journal)
+
+The two rulings went into this ledger verbatim first (`d49a25a`), before any code. Red first on
+`d49a25a` (5 failed the right way: `add` returned with no raise over a locked journal; start-up
+logged "could not be read" and never "could not be cleared"; the export's journal entry was
+written over the retained one; the NUL folder decoded as an entry; `clean_leftovers` raised
+`ValueError: scandir: embedded null character in path`); green after. Targeted run
+(`test_app_leftovers`, `test_app_activity`, `test_app_startup`, `test_app_wiring` and the eight
+layering tests): 140 passed 1 xfailed (DR-85's strict marker). ruff check, ruff format --check
+(280), mypy strict (146): clean. Every committed blob 0 CR, 0 NUL, ASCII.
+
+- R2-1 MAJOR, `b6ee84a`: `WriteJournal._read` raises an `OSError` other than the file's absence;
+  `add` and `drop` (so `remove`) raise with NOTHING written; the export then fails readably with
+  R1-2's text (its existing `OSError` branch, the reason naming the read error); start-up's
+  `entries()` logs "could not be read" and reads empty, its `drop` raises and is logged "could not
+  be cleared", and the file is kept byte for byte. Tests
+  `test_app_leftovers.py::test_a_journal_that_cannot_be_read_is_never_overwritten`,
+  `::test_a_start_up_over_an_unreadable_journal_logs_and_keeps_it` and
+  `test_app_activity.py::test_a_journal_that_cannot_be_read_fails_the_export_and_keeps_its_entries`
+  (a planted `Path.read_bytes` denial of the journal path only).
+- R2-2 MAJOR, `b6ee84a`: `_decode` rejects a folder the operating system refuses as a path
+  (`_is_path`: a NUL character; also a string `os.fsencode` cannot encode, which is POSIX's other
+  `ValueError` from `os.scandir` on a lone surrogate; on Windows that string is a missing path, so
+  only the NUL case is executable here), so S6 sets the file aside; `holds_leftovers` catches
+  `ValueError` beside `OSError` (unlistable: the entry stays). Tests
+  `test_app_leftovers.py::test_an_undecodable_journal_is_set_aside_and_read_as_empty[nul-folder]`
+  and `::test_a_journal_folder_the_os_refuses_lets_the_start_up_proceed` (the output folder still
+  scanned; the file set aside; `holds_leftovers` True on the NUL path).
+
+Decision for Reviewer A to challenge: R2-1 and R2-2 share one commit (one file, one read path).
+A set-aside rename that itself fails still lets `add` write a fresh journal over the undecodable
+file (S6's "treated as empty", unchanged). Slips: one bare `cd` into the session temp folder in a
+probe command (a no-op for the repo; not repeated); one heredoc collapsed `\x00` to a literal NUL
+byte in `startup.py`, caught by a NUL-byte check before any commit and repaired by a script
+written with the Write tool.
