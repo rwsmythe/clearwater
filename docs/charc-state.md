@@ -13,7 +13,9 @@
 
 - **Gen 6 pickup facts:** bash gauge 45 ms; inbox 0 unread at pickup; announce posted to the orchestrator (gen 17, shell-busy in the WP4.1 gate) with ONE cue; the two register scripts copied from gen 5's scratchpad (18c10a55...) into this session's scratchpad (6687b6c9-eacd-4ffc-995e-51c9195391d1) as `edit_register_p4a.py` (drop its DR-65 block before running: already applied at 3114d23) and `edit_register_p4b.py`.
 
-- **Orchestrator = gen 17 `clearwater-orchestrator-20261028-1101`** (re-read `comms/.launch-sessions.json` before every cue; every post
+- **Orchestrator = gen 18 `clearwater-orchestrator-20261028-1555`** (online 2026-10-29 01:56Z at eb0074f, msg `7b1f3a775393c5e3`, gauge
+  36 ms; gen 17 rolled ~01:55Z at ~395K, state eb0074f; gen 18's first job = the WP4.2 brief revision packet with numbered questions and
+  the Codex-eligible sub-pieces named; re-read `comms/.launch-sessions.json` before every cue; every post
   gets ONE SendMessage cue). Subjects under 120 chars (the poster refuses longer; two refusals this generation at 123-125); bodies via
   `--body-file`; edit docs with a scratchpad Python script (`newline="\n"`); `tr -cd '\r' | wc -c` = 0 before every commit; commit by
   pathspec; never an uncommitted edit left in the main tree (hazard 7); HOLD MAIN when the orchestrator asks (no commit, state included,
