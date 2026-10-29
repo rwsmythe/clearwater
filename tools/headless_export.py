@@ -97,7 +97,7 @@ from clearwater.interfaces import (
 )
 from clearwater.interfaces.parameters import loads_object
 from clearwater.io.video.inputs import ascii_text, is_sidecar, sidecar_fault
-from clearwater.jobs import BatchReport, run_batch, validate_suffix
+from clearwater.jobs import BatchReport, MediaKind, final_output_path, run_batch, validate_suffix
 from clearwater.jobs.export_seam import ExportJobs, ExportRequest
 from local_config import LocalConfigError, default_config_path, load_local_config
 
@@ -228,7 +228,8 @@ class Redactor:
     backslashes (an ``OSError`` or ``argparse`` text quotes the path's ``repr``) and with forward
     slashes; and each of those also with its non-ASCII characters escaped as :func:`ascii_text`
     escapes them (engine texts are escaped before they reach the runner), and that escaped form
-    with its backslashes doubled (the ``repr`` of an escaped path). Each escape matches the
+    with its backslashes doubled (the ``repr`` of an escaped path). Every form also matches
+    with apostrophes escaped as ``\'`` by ``repr``. Each escape matches the
     escape of any letter case of its character (``\xe9`` and ``\xc9`` alike, Reviewer B B2):
     ``re.IGNORECASE`` alone cannot equate two escapes. A spelling without a separator says
     nothing a name does not, so it is not replaced; nor is a folder without a name (a drive
@@ -242,6 +243,7 @@ class Redactor:
             folders: The folders to show by name only.
         """
         forms: dict[str, tuple[int, str]] = {}  # pattern -> (the literal's length, name)
+        quoted_forms: dict[str, tuple[int, str]] = {}
         for folder in folders:
             resolved = Path(folder).resolve()
             paths = [Path(folder), resolved, plain_path(resolved)]
@@ -255,15 +257,27 @@ class Redactor:
                     if "\\" not in base and "/" not in base:
                         continue
                     escaped = ascii_text(base)
-                    for pattern, length in (
-                        (re.escape(base), len(base)),
-                        (_escaped_pattern(base, doubled=False), len(escaped)),
-                        (_escaped_pattern(base, doubled=True), len(escaped) * 2),
+                    for pattern, length, quoted_length in (
+                        (re.escape(base), len(base), len(base)),
+                        (_escaped_pattern(base, doubled=False), len(escaped), len(escaped)),
+                        (
+                            _escaped_pattern(base, doubled=True),
+                            len(escaped) * 2,
+                            len(escaped) + escaped.count("\\"),
+                        ),
                     ):
                         forms.setdefault(pattern, (length, name))
+                        if "'" in base:
+                            quoted = pattern.replace("'", re.escape(r"\'"))
+                            quoted_forms.setdefault(quoted, (quoted_length + base.count("'"), name))
+        # Match the escaped-apostrophe spellings before an ordinary parent-folder
+        # spelling can replace their prefix. Keep the original forms' ordering.
         self._patterns = [
             (re.compile(pattern, re.IGNORECASE), name)
-            for pattern, (_, name) in sorted(forms.items(), key=lambda item: -item[1][0])
+            for pattern, (_, name) in (
+                sorted(quoted_forms.items(), key=lambda item: -item[1][0])
+                + sorted(forms.items(), key=lambda item: -item[1][0])
+            )
         ]
 
     def __call__(self, text: str) -> str:
@@ -608,6 +622,16 @@ REFUSED_FORM: Final = (
 """The refusal reason of a write target spelled as a stream, extended-length or device path."""
 
 
+def _write_form_refusal(target: Path) -> str | None:
+    r"""Return predicate (i)'s refusal for a stream, ``\\?\`` or ``\\.\`` path, else None."""
+    text = str(target)
+    if text.replace("/", "\\")[:4] in ("\\\\?\\", "\\\\.\\"):
+        return REFUSED_FORM
+    if ":" in os.path.splitdrive(text)[1]:
+        return REFUSED_FORM
+    return None
+
+
 def write_target_refusal(target: Path, footage_folder: Path) -> str | None:
     r"""Return why a planned write to ``target`` is refused, or None when it may go ahead.
 
@@ -641,10 +665,9 @@ def write_target_refusal(target: Path, footage_folder: Path) -> str | None:
     deepest = existing[0] if existing else path
     if inside(Path(os.path.realpath(deepest)), footage_folder):  # (iii), named first
         return INSIDE_FOOTAGE
-    if text.replace("/", "\\")[:4] in ("\\\\?\\", "\\\\.\\"):  # (i)
-        return REFUSED_FORM
-    if ":" in os.path.splitdrive(text)[1]:
-        return REFUSED_FORM
+    reason = _write_form_refusal(target)  # (i), shared with each planned output file
+    if reason is not None:
+        return reason
     for step in existing:
         if os.path.normcase(os.path.realpath(step)) != os.path.normcase(str(step)):
             return THROUGH_A_LINK
@@ -657,6 +680,9 @@ def check_outputs(requests: Sequence[ExportRequest], footage_folder: Path | None
     Each request's output folder is the one the export plans (``jobs.naming``): the output
     folder setting, or the source's own folder (``source.parent``, not the target of a linked
     source); each is checked with :func:`write_target_refusal` before anything runs.
+    Each planned output file (photo or video) also passes the shared text-form predicate
+    (i), :func:`_write_form_refusal`. Refused items plan no output, and an invalid suffix
+    is left to the engine's own refusal (the CLI validates it earlier).
 
     Args:
         requests: The run's requests.
@@ -664,7 +690,8 @@ def check_outputs(requests: Sequence[ExportRequest], footage_folder: Path | None
 
     Raises:
         RunnerRefusalError: An output folder, or the folder beside a source the outputs would go
-            to, that :func:`write_target_refusal` refuses.
+            to, that :func:`write_target_refusal` refuses; or a planned output file in a
+            refused text form.
     """
     if footage_folder is None:
         return
@@ -674,14 +701,25 @@ def check_outputs(requests: Sequence[ExportRequest], footage_folder: Path | None
             reason = write_target_refusal(folder, footage_folder)
             if reason is not None:
                 raise RunnerRefusalError(f"the output folder {reason}.")
+        else:
+            reason = write_target_refusal(request.source.parent, footage_folder)
+            if reason is not None:
+                name = ascii_text(request.source.name)
+                where = name if reason == INSIDE_FOOTAGE else f"the folder of {name}"
+                raise RunnerRefusalError(
+                    f"{where} {reason}: outputs beside it are refused; give --out."
+                )
+        if isinstance(request, RefusedRequest):
             continue
-        reason = write_target_refusal(request.source.parent, footage_folder)
-        if reason is not None:
-            name = ascii_text(request.source.name)
-            where = name if reason == INSIDE_FOOTAGE else f"the folder of {name}"
-            raise RunnerRefusalError(
-                f"{where} {reason}: outputs beside it are refused; give --out."
+        try:
+            output = final_output_path(
+                request.source, request.settings, MediaKind(request.kind)
             )
+        except ValueError:
+            continue
+        reason = _write_form_refusal(output)
+        if reason is not None:
+            raise RunnerRefusalError(f"the output for {ascii_text(request.source.name)} {reason}.")
 
 
 def run(
@@ -713,7 +751,8 @@ def run(
         The record.
 
     Raises:
-        RunnerRefusalError: The footage check refused the run; nothing ran.
+        RunnerRefusalError: The footage check refused the run, or a known folder could not
+            be resolved for redaction; nothing ran.
     """
     folder = (
         configured_footage_folder() if isinstance(footage_folder, _Configured) else footage_folder
@@ -723,7 +762,11 @@ def run(
     folders = tuple(dict.fromkeys([*folders_of(requests), *map(Path, known_folders)]))
     start = time.perf_counter()
     batch_progress = progress or RunnerProgress()
-    with _redacted_last_resort(Redactor(folders)):
+    try:
+        redact = Redactor(folders)
+    except (OSError, RuntimeError) as exc:
+        raise RunnerRefusalError("a given folder cannot be resolved for redaction.") from exc
+    with _redacted_last_resort(redact):
         report = run_batch(engine, list(requests), batch_progress)
     routes = tuple(
         "refused" if isinstance(request, RefusedRequest) else request.kind for request in requests
@@ -742,8 +785,14 @@ def record_object(record: RunRecord) -> dict[str, Any]:
 
     Returns:
         The object.
+
+    Raises:
+        RunnerRefusalError: A known folder could not be resolved for redaction.
     """
-    redact = Redactor(record.folders)
+    try:
+        redact = Redactor(record.folders)
+    except (OSError, RuntimeError) as exc:
+        raise RunnerRefusalError("a given folder cannot be resolved for redaction.") from exc
     items: list[dict[str, Any]] = []
     for index, (item, kind) in enumerate(zip(record.report.items, record.routes, strict=True), 1):
         result = item.result
@@ -1007,7 +1056,10 @@ def main(argv: Sequence[str] | None = None, *, exports: ExportJobs | None = None
     try:
         args = parser.parse_args(given)
     except _UsageError as exc:  # argparse refused the usage: its text redacted, status 2
-        text = Redactor(_folders_named_in(given))(str(exc))
+        try:
+            text = Redactor(_folders_named_in(given))(str(exc))
+        except (OSError, RuntimeError):
+            text = "a given folder cannot be resolved for redaction."
         print(f"{parser.format_usage()}{parser.prog}: error: {text}", file=sys.stderr)
         return 2
     except SystemExit as exc:  # the help was printed (0)
@@ -1017,9 +1069,17 @@ def main(argv: Sequence[str] | None = None, *, exports: ExportJobs | None = None
     own += [None if args.parameters is None else args.parameters.parent]
     known = [Path(p) for p in own if p is not None] + [Path(p).parent for p in args.paths]
     known += [default_config_path().parent]  # a configuration refusal names its file
-    redact = Redactor(known)
+    try:
+        redact = Redactor(known)
+    except (OSError, RuntimeError):
+        print("headless_export: a given folder cannot be resolved for redaction.", file=sys.stderr)
+        return 2
     with _redacted_last_resort(redact):
-        return _main(args, exports, redact, known)
+        try:
+            return _main(args, exports, redact, known)
+        except RunnerRefusalError as exc:  # a later redactor construction in run / record_object
+            print(f"headless_export: {redact(str(exc))}", file=sys.stderr)
+            return 2
 
 
 def _main(

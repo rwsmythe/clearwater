@@ -511,7 +511,11 @@ def test_n10_the_same_still_twice_is_identical(sample, tmp_path, sample_id) -> N
             items = export([source], out, exports=exports, provenance=provenance)
             outputs[provenance].append(only_output(items))
     assert len(recording.pixels) == 4
-    assert all(np.array_equal(recording.pixels[0], p) for p in recording.pixels[1:])  # pre-encode
+    assert all(
+        (recording.pixels[0].dtype, recording.pixels[0].shape, recording.pixels[0].tobytes())
+        == (p.dtype, p.shape, p.tobytes())
+        for p in recording.pixels[1:]
+    )  # pre-encode
     first, second = outputs[False]
     assert first.read_bytes() == second.read_bytes()  # provenance off: byte-identical
     a, b = (png_chunks(p) for p in outputs[True])
@@ -525,7 +529,10 @@ def test_n10_the_same_still_twice_is_identical(sample, tmp_path, sample_id) -> N
         k: v for k, v in pb.items() if k != "created"
     }
     pixels = [PhotoReader().read(p)[0].pixels for p in outputs[False] + outputs[True]]
-    assert all(np.array_equal(pixels[0], p) for p in pixels[1:])  # decoded bit-identical
+    assert all(
+        (pixels[0].dtype, pixels[0].shape, pixels[0].tobytes()) == (p.dtype, p.shape, p.tobytes())
+        for p in pixels[1:]
+    )  # decoded bit-identical
 
 
 # --- CPU vs GPU ---------------------------------------------------------------------------------

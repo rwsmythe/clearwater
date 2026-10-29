@@ -4,7 +4,8 @@
 
 | Turn / gate | Dispatcher-read depth or tokens | Source / disposition |
 |---|---|---|
-| Turn 1 / round 0 | Pending dispatcher reading | No figure supplied at dispatch. The dispatcher reads the Codex `tokens used` footer and fills this table; the cell does not estimate its depth or run `scripts/cell_depth.py` against an unidentified transcript. |
+| Turn 1 / round 0 | `tokens used` 77,213; input depth 88,453 / 475,000 | Dispatcher supplied on turn 2; driver log, 02:21:57Z start. |
+| Turn 2 / build | Pending dispatcher reading | No self-estimated depth; dispatcher reads this turn's footer. |
 
 Evaluation point: approximately 250K; STOP at a round boundary at approximately
 400K, using the dispatcher's reading.
@@ -45,7 +46,7 @@ Grounded anchors on base:
 |---|---|
 | `write_target_refusal`, `tools/headless_export.py:611` | Existing (iii) test precedes the inline (i) checks; replace only (i) with the helper call. |
 | `check_outputs`, `tools/headless_export.py:654` | Its None-footage return stays first. Existing `--out` branch's `continue` currently skips any further per-request work; restructure that branch within this owned function so both output-folder modes reach the new file check. |
-| `final_output_path`, `src/clearwater/jobs/naming.py` | Frozen naming function validates suffix, chooses photo PNG / video source extension, and protects the source name. Call it; never change it. `MediaKind` and `final_output_path` are exported by `clearwater.jobs`. Function-local imports in `check_outputs` avoid touching the unowned top-level import block. |
+| `final_output_path`, `src/clearwater/jobs/naming.py` | Frozen naming function validates suffix, chooses photo PNG / video source extension, and protects the source name. Call it; never change it. `MediaKind` and `final_output_path` are exported by `clearwater.jobs`. Turn-2 ruling 1 grants extending the existing top-level jobs import line; use that line, not function-local imports. |
 | `RefusedRequest`, runner | Perform the existing folder checks, then skip file planning for this type; its placeholder kind never reaches an engine. |
 
 The file check sits after each request's existing folder check, before moving to
@@ -181,7 +182,8 @@ follow the review/gate fill. Reviewer B runs at the orchestrator's seat.
 
 | Round | Head / turn | Critical | Major | Minor | In / out envelope | NEW / REOPENED | Reverts | Product / test-only fixes | Transport / version | Depth | Verdict / disposition |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| 0 | `aa4761b` / turn 1 | N/A | N/A | N/A | N/A | N/A | 0 | Neither: ledger only | Reviewer not run | Pending dispatcher | Read/map complete; YIELD for go before building. |
+| 0 | `aa4761b` / turn 1 | N/A | N/A | N/A | N/A | N/A | 0 | Neither: ledger only | Reviewer not run | 88,453 input; 77,213 tokens used | Read/map complete; committed by dispatcher as `933e33e`; turn-2 GO received. |
+| Build | `933e33e` + working diff / turn 2 | N/A | N/A | N/A | In-envelope implementation | No review yet | 0 | Runner tool + four test comparisons + new regressions | Reviewer not run | Pending dispatcher | STOP: three existing tests fail on the sandbox's administrative-share probe; no existing test edited. |
 
 ## Execution record
 
@@ -189,9 +191,101 @@ follow the review/gate fill. Reviewer B runs at the orchestrator's seat.
 |---|---|---|---|
 | 1 / 0 | Read-only `git status --short`, `git branch --show-current`, `git rev-parse --short HEAD` | Clean; `wp4.2a`; `aa4761b`; EXIT 0 | Tool output this turn; no runner log or heavy run. |
 
+All turn-2 commands below ran from the worktree. Pytest prefix:
+`PYTHONPATH=scripts uv run pytest`; all pytest calls include
+`-p sandbox_mkdir_shim -p no:cacheprovider`. PowerShell set `PYTHONPATH` via
+`$env:PYTHONPATH='scripts'`. The light run additionally set
+`QT_QPA_PLATFORM=offscreen`. Each log records the runner's `EXIT=` independently
+of the surrounding shell's exit status. No two-leg / heavy run occurred.
+
+| Turn / phase | Command (pytest prefix/plugins as above) | Counts / EXIT | Log under `work/wp4.2a/` |
+|---|---|---|---|
+| 2 / initial RED | `pytest -q -rs -s tests/test_wp42a_runner_hardening.py -k 'not planted_control and not no_footage and not refused_request' --basetemp=work/wp4.2a/tmp-red` | 26 failed, 4 passed, 3 deselected; EXIT=1. One failure was a test-selector bug, not product RED evidence; see below. | `red-all.log` |
+| 2 / bit RED | `pytest -q tests/test_wp42a_runner_hardening.py -k signed_zero --basetemp=work/wp4.2a/tmp-red-bits` | 4 failed, 32 deselected; EXIT=1; actual four comparison sites all equate signed zero on the base. | `red-bits.log` |
+| 2 / guard first GREEN attempt | `pytest -q -rs tests/test_wp42a_runner_hardening.py -k 'stream or planted_control or no_footage or refused_request or invalid_suffix' --basetemp=work/wp4.2a/tmp-green-guard` | 1 failed, 13 passed, 22 deselected; EXIT=1; planted failure was caught, but the new test expected the wrong pytest-rendered assertion text. | `green-guard.log` |
+| 2 / guard GREEN | Same selection with `-s`, `--basetemp=work/wp4.2a/tmp-green-guard-2` | 14 passed, 22 deselected; EXIT=0. Both real ADS/hard-link tests passed, no skips. | `green-guard-2.log` |
+| 2 / quote first GREEN attempt | `pytest -q -rs tests/test_wp42a_runner_hardening.py -k apostrophe --basetemp=work/wp4.2a/tmp-green-quote` | 1 failed, 5 passed, 30 deselected; EXIT=1; ordinary parent-pattern ordering consumed a quoted doubled-backslash form's prefix. | `green-quote.log` |
+| 2 / quote GREEN | Same selection, `--basetemp=work/wp4.2a/tmp-green-quote-2` | 6 passed, 30 deselected; EXIT=0; new quoted forms now precede ordinary patterns, with their own longest-first ordering. | `green-quote-2.log` |
+| 2 / resolve GREEN | `pytest -q -rs tests/test_wp42a_runner_hardening.py -k resolve_failure --basetemp=work/wp4.2a/tmp-green-resolve` | 10 passed, 26 deselected; EXIT=0. | `green-resolve.log` |
+| 2 / bits GREEN | `pytest -q tests/test_wp42a_runner_hardening.py -k signed_zero --basetemp=work/wp4.2a/tmp-green-bits` | 4 passed, 32 deselected; EXIT=0. | `green-bits.log` |
+| 2 / static | `uv run ruff check .` | One E501 at new test line 143; EXIT=1; not remediated after mandatory STOP. | `ruff-check.log` |
+| 2 / static | `uv run ruff format --check .` | 3 files would be reformatted, 257 already formatted; EXIT=1. Files: runner, new test, owned V8 assertion. Not remediated after STOP. | `ruff-format-check.log` |
+| 2 / static | `uv run mypy` | Success: no issues found in 141 source files; EXIT=0. | `mypy.log` |
+| 2 / light | `pytest -q -rs tests/test_wp42a_runner_hardening.py tests/test_headless_export.py tests/test_wp41_photo_path.py tests/test_wp41_v8.py -m 'not gpu and not footage and not slow' --basetemp=work/wp4.2a/tmp-light` | 3 failed, 337 passed, 2 deselected; EXIT=1. All 36 new cases passed; existing failures trigger STOP. | `light.log` |
+| 2 / independent STOP probe | `uv run python -c "from pathlib import Path; print(Path('//localhost/C$/').is_dir())"` | `PermissionError: [WinError 5] Access is denied`; EXIT=1. No runner module imported. | `unc-probe.log` |
+
+### RED/GREEN by regression node
+
+The filename prefix is `tests/test_wp42a_runner_hardening.py::` throughout.
+
+| Node / parameters | RED observation | GREEN observation |
+|---|---|---|
+| `test_stream_named_output_is_refused_before_jobs` [8 cases] | Missing library refusal / CLI status 1 instead of 2, `red-all.log`. | All 8 in `green-guard-2.log` and light run. |
+| `test_stream_output_on_hard_link_leaves_original_unchanged` [run/main] | Both real ADS cases failed at missing refusal, `red-all.log`; no capability skip. | Both in `green-guard-2.log`; original bytes, full stream names/sizes and output carrier unchanged. |
+| `test_apostrophe_folder_in_refused_suffix_is_hidden` | Escaped known basename was not replaced, `red-all.log`. | `green-quote-2.log`. |
+| `test_apostrophe_folder_in_record_and_summary_is_hidden` [5 forms] | All 5 retain quoted folder components, `red-all.log`. | All 5 in `green-quote-2.log`. |
+| `test_resolve_failure_is_a_cli_usage_refusal` [2 exception classes x 3 routes] | Parsed and constructor routes leak exceptions; discovery RuntimeError leaks. Discovery OSError already passes (existing suppression), so that case is a control, not new RED evidence. | All 6 in `green-resolve.log`. |
+| `test_resolve_failure_is_a_library_refusal` [run/record_object x OSError/RuntimeError] | All 4 leak original exception type, `red-all.log`. | All 4 in `green-resolve.log`. |
+| `test_signed_zero_is_distinct_in_bit_comparisons` [statistics/pre-encode/decoded/preview] | All 4 actual code forms numerically equate signed zero, `red-bits.log`. | All 4 in `green-bits.log`. |
+
+The initial signed-zero test selected a fourth unrelated assertion
+(`len(recording.pixels) == 4`) while extracting three pixel comparisons. This
+test-only selector bug was fixed before any comparison-site change; its initial
+failure is rejected as product RED evidence. The corrected selector extracts
+only array comparisons and all four sites then demonstrably failed on signed zero.
+
+The planted-control node is
+`test_output_file_form_check_has_a_planted_control`. A test-local monkeypatch
+lets the helper pass PNG file paths while preserving folder checks. It catches
+`_assert_stream_refusal`'s `assert status == 2` at new-file line 65, displaying
+`assert 1 == 2`; `green-guard-2.log` records the named failure and line. The
+plant exists only in the test. The first control run's assertion about pytest's
+rendered text was corrected from `status == 2` to `assert 1 == 2`.
+
+### DR-79 (b) executed reproduction
+
+`test_loop_resolution_reproduction[self-junction]` successfully created the
+self-junction with bounded `cmd /c mklink /J`, entirely under `tmp_path`, and
+`loop / 'x'` resolved to a path. The symlink-loop parameter also successfully
+created its loop and returned a path. Both link entries were removed without
+recursive traversal. `red-all.log` records both `RESOLVE_OBSERVATION` lines:
+Python 3.12.13, platform `win32`, no exception. Both tests also passed in the
+light run; no capability skips and no outside-sandbox reproduction needed.
+
+**Result: not reproduced on Python 3.12 / Windows.** DR-79 (b)'s implemented
+wrap is defensive. Injected OSError/RuntimeError tests verify the refusal paths;
+the original reasoned claim is not reclassified as an executed reproduction.
+
+### Verification-loop record and STOP
+
+| Suspected issue | Independent confirmation / rejection | Disposition |
+|---|---|---|
+| Source-derived output stream syntax bypasses folder guard | Eight stand-in cases and two real ADS/hard-link cases RED before helper extraction. | Fixed in owned functions; GREEN. |
+| Escaped apostrophe leaks known folder | CLI plus five record/summary forms RED. | Fixed; new quoted forms ordered before ordinary parent prefixes; GREEN. |
+| Resolve errors escape redactor construction | Nine failing injected paths plus one already-safe OSError discovery control. | Four sites wrapped; main handles propagated safe refusals; GREEN. |
+| Self-referential junction / symlink necessarily raises | Executed both on Python 3.12.13 / Windows; both returned paths. | Rejected as reproduced claim; defensive handling retained as ruled. |
+| Signed-zero assertions accept unequal bits | Corrected controls execute all four original comparisons and fail. | Four comparisons strengthened; GREEN. |
+| Existing UNC tests fail because of the new runner guard | All fail in unchanged `_unc_extended` at `LOCAL_SHARE.is_dir()`; standalone pathlib probe reproduces PermissionError without importing runner. | Environment failure confirmed independently; mandatory STOP, dispatcher ruling needed. |
+
+Existing failures (all `tests/test_headless_export.py`):
+
+- `test_g1_inside_sees_every_spelling_of_the_same_folder`
+- `test_g1_main_refuses_every_footage_check_through_another_spelling[unc]`
+- `test_g1_the_redactor_hides_the_extended_spellings`
+
+All three fail in unchanged helper line 612, probing `\\localhost\C$\`, with
+`PermissionError [WinError 5]`, before their UNC assertions. No edits to this
+file or tests/conftest.py. Recommended answer: have the dispatcher run these
+three existing nodes at its seat to establish administrative-share capability,
+then rule on the sandbox-only failure before granting continuation. Do not
+weaken or patch the tests in this package.
+
 ## Current disposition
 
-Round-0 note complete. No scope discrepancy or ruling question identified.
-Await the dispatcher's go and actual token/depth reading before tasks 3-6.
-DR-78 and DR-79 remain OPEN until implementation, validation and acceptance;
-the dispatcher owns the eventual debt-register closure. No mailbox post.
+Tasks 3-6 implemented and individually GREEN; the light suite finds the three
+existing administrative-share failures above. STOP under the turn-2 dispatch.
+Static formatting / E501 cleanup remains pending; strict mypy passed. Draft
+report written; Reviewer A, full two-leg gate and acceptance remain pending.
+The two-leg RUN REQUEST is conditional on the dispatcher resolving this STOP
+and the remaining formatting checks. DR-78 and DR-79 remain OPEN until
+acceptance; the dispatcher owns debt-register closure. No mailbox post.

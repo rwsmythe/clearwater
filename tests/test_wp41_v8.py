@@ -71,7 +71,7 @@ def equal_statistics(got: Any, expected: Any) -> bool:
         )
     if isinstance(expected, np.ndarray) or isinstance(got, np.ndarray):
         a, b = np.asarray(got), np.asarray(expected)
-        return a.dtype == b.dtype and a.shape == b.shape and bool(np.array_equal(a, b))
+        return a.dtype == b.dtype and a.shape == b.shape and a.tobytes() == b.tobytes()
     return bool(got == expected)
 
 
@@ -159,7 +159,9 @@ def test_v8b_k1_is_exact(sample, tmp_path: Path, sample_id: str) -> None:
     out = tmp_path / "out"
     out.mkdir()
     preview, written_pixels, output = _k1(source, out, Recording())
-    assert preview.dtype == written_pixels.dtype and np.array_equal(preview, written_pixels)
+    assert (preview.dtype, preview.shape, preview.tobytes()) == (
+        written_pixels.dtype, written_pixels.shape, written_pixels.tobytes()
+    )
     assert _within_half_step(output, preview)
 
 
