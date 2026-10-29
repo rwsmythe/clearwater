@@ -175,6 +175,14 @@
   product UI-thread work = RED-first fix as a fresh step + (c) re-run of record; outside the product = my ruling on
   evidence, one clean re-run is not a pass. WP4.4 turn 3 + footage RUN REQUEST run between windows first. Cell 7 at
   194,057; post-window code steps and the report to a fresh cell from the ledger.
+- **WP4.4 turn 3 `e4141f8` (stereo qt fixture passes V4; light run 1,021 passed; cell 189,237 / 258,400). SEAT RULING
+  CONFIRMED 22:31Z (status 1108d384, my fyi + cue):** the IMG_6702 footage test asserts state `done with warnings`
+  (not bare `done`): the Q2 `mebx` disclosure flows `verify.py:895` -> `export.py:1031-1033` 'Not carried to the
+  output' -> `batch.py:43` -> `headless_export.py:148` STATES_DONE, verified at my seat; plus exit 0, one output, the
+  warnings exactly the not-carried data-track ones naming `data track mebx`, V4 house form, 15 frames, display
+  orientation SAME. Brief task 6's 'done' wording corrected on the record. Turn 4 = footage test + RUN REQUEST +
+  RESUME HERE; A rounds and the report on a fresh Codex seat (~210K after turn 4). WP4.3 window 2 opens after the
+  footage node runs.
 - **(gen 7 history follows; newest facts at the end of the block)**
 - **GEN 7 PICKUP (was).** Orchestrator = **gen 22 `clearwater-orchestrator-20261029-0704`** (online 17:08Z from gen 21's
   state 736e403; gauge 38 ms; gen 21 was `clearwater-orchestrator-20261029-0425`, rolled 17:05Z at ~400K); ALL cues go there. Time the bash launch and record it here. Inbox: drain with `read --role charc --all`
