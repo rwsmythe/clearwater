@@ -124,8 +124,9 @@
   'Register rows'), AD-23 note stays with 4.3a. (3) WP4.3a (Codex, brief FINAL at brief-wp4.3-rev bc0b8a2 + my ruling
   fe7625ca; gen 21 commits it onto main): dispatches when WP-T6's Codex cell stands down; at its accept, mine: AD-13 note
   ('profile' writer provenance key), AD-23 'applied by WP4.3a', closures DR-58(b)/76/77/81(a-d)/85. Owner-pending inputs:
-  NONE since 17:10Z (phone footage received, see below). Open owner decisions: Insta360 SCOPE only (owner 17:50Z: 'we will
-  discuss further'; category SCUBA concurred; CHARC recommends native .insv NOT supported, Studio MP4 exports as input).
+  NONE since 17:10Z (phone footage received, see below). Open owner decisions: NONE. Insta360 is ON HOLD (owner 17:55Z: drive space; the .insv files were removed; the empty folder
+  remains; category SCUBA; CHARC's position recorded in CLAUDE.md for when it resumes). C: drive 97 % used, 35 GB free at
+  17:55Z: DISK is an operational constraint; the orchestrator checks free space before heavy runs.
   The `.MOV` wording is APPLIED as spec v0.5.7 (owner 17:50Z: 'update the spec to include .mov'). Every owner-facing
   summary ends with that line.
 - **GEN 7 ONLINE 14:29Z (`clearwater-charc-20261029-0428`, launched by gen 6 at its roll; msg `2d785723` to the
@@ -237,6 +238,33 @@
   `original_orientation` None from pillow-heif never falls back; ~23 rows) -> correction turn 5, then re-run, then my QA.
   WP4.3a R2 (Claude pass, 40eef4e) NO_NEW_CRITICAL_MAJOR (1 minor F2 partial, 4 advisories); turn 7 adjudication, a cleanup
   turn, B, gate. WP4.3 cell 6 Group B accepted (mutation-proved witnesses), depth 172,926, R4 review-only running.
+- **OWNER 17:55Z (verbatim): "The Insta360 investigation will need to be put on hold until I can upgrade my NVME drive.  I have
+  removed the .insv files I downloaded due to drive space concerns."** Verified: `Insta360/` empty (0 files), no .insv/.lrv
+  anywhere in the footage; C: 927 GB, 892 GB used, 35 GB free. Recorded in CLAUDE.md + memory; FYI to the orchestrator with
+  the disk constraint (check free space before each heavy run; `work/` pruning proposed to the owner with figures).
+- **DISK FIGURES 18:05-18:17Z (my du + the orchestrator's, agreeing):** `work/` 87 GB (wp3.12 24 = proxy-spike frame
+  dumps; wp3.21 23 = the AD-11 tier-1 ORACLE, keep until WP5.2; wp1.3d 9.8 + wp1.3 3.7 = CP2 packs, frames/ 12.6 of it);
+  `.worktrees/` 19 GB (34 trees, venvs hard-linked); evidence 197 MB. **OWNER 18:18Z (verbatim): "prune"** = APPROVED on my
+  list only (post 701ac3f8 to the orchestrator): wp3.12 whole, the two CP2 `frames/`, the named released worktrees (branches
+  kept), finished gate basetemps; oracle and live trees KEPT; executed between runs with a record
+  `docs/proofs/prune-2026-10-29.md`; expected recovery ~55 GB. **WP4.3a Reviewer B clean** (1 minor = DR-92 mine, 3 advisories
+  as record notes); stacked gate on 8e1114a: static green, collections 5619 + 1137 + 7 = 6763, serial released 18:07:45Z.
+  WP4.3 cell 6 stood down at 245,094 after the R4 cleanup; cell 7 (windows) after the serial leg.
+- **OWNER 18:25Z: external D: drive for archives** (verbatim in CLAUDE.md 'Inputs'; exFAT X9 Pro, 2.5 TB free). AMENDED the prune
+  (post 0fafd4de): MOVE to `D:\clearwater-archive\` with md5 manifests = the wp3.21 oracle, both CP2 packs WHOLE (frames
+  deletion withdrawn), work/wp1.4, wp1.4b, wp1.2b, wp2.2, pt-main-wp39, wp-t4; wp3.12 + finished basetemps still deleted;
+  worktrees removed. Between runs; record `docs/proofs/prune-2026-10-29.md`; expected C: recovery ~80 GB.
+- **STACK GATE RED 18:52Z + GEN 22 ROLLED (~420K; state 5a1538a; gen 23 = `clearwater-orchestrator-20261029-0852`):**
+  serial 2 failed / 1135: (a) DR-58 (c) bench bound -0.0773 under the orchestrator's own du scan, PASSED alone; (b)
+  `test_photo_check` real-photo round trip on IMG_6791.JPG loses `Exif.LensModel`, FAILS ON MAIN too. **ROOT CAUSE (my seat):**
+  the tag holds a binary blob with bytes >= 0x80 in an ASCII-typed tag; Pillow's `Image.Exif.tobytes()` re-encodes ASCII tags
+  with '?' replacement, so the writer mangles it = a pre-existing D63 defect (AD-17 path), exposed by the owner's phone JPGs.
+  OWNER to the orchestrator 18:47Z (verbatim): 'full re-run of the serial is not required once the issue with the round-trip
+  test is identified and fixed and that test verifies passed (along with any test impacted by code changed by the fix).'
+  **COMMISSIONED WP4.5 'EXIF byte fidelity'** (post d3ad4388; small; Codex-eligible; Claude nets; `io/photo/exif.py` + the
+  writer payload site; RED-first byte-identical round trips for >=0x80 bytes, NUL-filled strings, Latin-1 Artist; parallel
+  leg in full + the impacted serial tests by node id; LANDS FIRST, then stack-g22 rebases and merges without another full
+  serial leg). Order after: my register commit; prune/archive; WP4.3 cell 7; WP4.4; DR-87; WP3.6P.
 - **(gen 6 history follows; newest facts at the end of the block)**
 
 - **Gen 6 pickup facts:** bash gauge 45 ms; inbox 0 unread at pickup; announce posted to the orchestrator (gen 17, shell-busy in the WP4.1 gate) with ONE cue; the two register scripts copied from gen 5's scratchpad (18c10a55...) into this session's scratchpad (6687b6c9-eacd-4ffc-995e-51c9195391d1) as `edit_register_p4a.py` (drop its DR-65 block before running: already applied at 3114d23) and `edit_register_p4b.py`.
