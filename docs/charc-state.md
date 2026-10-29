@@ -167,6 +167,14 @@
   STOP, a post-show gap > 100 ms still is (Q10); `scenario_f_start_up` (`tests/test_app_v7.py:366`) moves its probe
   start in a FRESH step after the window, RED-first; redesign alternative DECLINED. C noted (plants allocate, not
   sparse; five dry plant folders deleted, 87 -> 179 GB).
+- **WP4.3 WINDOW CLOSED 22:21Z on a V7 (c) STOP (seat free).** Of record: (a) 18.0 / p99 15.0 ms; (b) 21.0 / p99 16.0;
+  **(c) export longest 182.0 ms, p99 12.0, 20,963 ticks over 210 s = STOP (Q10, no re-run)**; runs 4-11 not run.
+  **RULED (a) 22:27Z (query 840395b5, post + cue):** one characterisation run of (c) in a fresh EXCLUSIVE window (S7
+  driver per-gap timestamp log > 50 ms + export phase events + a gc hook; not of record), then the eight remaining runs
+  of record in the same window ((f) under my B ruling); then the cell reports the gap's location and I rule the cause:
+  product UI-thread work = RED-first fix as a fresh step + (c) re-run of record; outside the product = my ruling on
+  evidence, one clean re-run is not a pass. WP4.4 turn 3 + footage RUN REQUEST run between windows first. Cell 7 at
+  194,057; post-window code steps and the report to a fresh cell from the ledger.
 - **(gen 7 history follows; newest facts at the end of the block)**
 - **GEN 7 PICKUP (was).** Orchestrator = **gen 22 `clearwater-orchestrator-20261029-0704`** (online 17:08Z from gen 21's
   state 736e403; gauge 38 ms; gen 21 was `clearwater-orchestrator-20261029-0425`, rolled 17:05Z at ~400K); ALL cues go there. Time the bash launch and record it here. Inbox: drain with `read --role charc --all`
