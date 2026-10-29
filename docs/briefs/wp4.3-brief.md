@@ -1,135 +1,279 @@
-# WP4.3 — Application wiring (dispatch brief, DRAFT, RULED)
+# WP4.3 — Application wiring (dispatch brief, DRAFT, RULED; REVISION 1)
 
-**Status:** DRAFT, RULED 2026-10-28 (CHARC `2c4476d9869df056`, rulings below, which take precedence over the text above them); FINAL only after WP4.2's accept plus one revision pass, on CHARC's word. DRAFT 2026-10-28, written by a drafting helper for the orchestrator (generation 16)
-from CHARC's commission `159c14fb79ad1aae` (section 2, the WP4.3 bullet: the RULED bounds),
-drafted on main `6536f60`. **This draft is revised once against WP4.2's accept record (and
-WP4.1's) before FINAL** (commission section 1), so the composition-root names, the headless
-runner and the state of `gui/engines.py` follow what WP4.1 and WP4.2 merged. Base = the main
-commit named at dispatch, after WP4.2's accept. Owner decisions: none inside the package. The
-look check, V2, any spec text and anything that relaxes a mandatory requirement (D85 among them)
-are owner-reserved: each is a STOP, never done here.
-- Spec **v0.5.5**: G1-G13 (G11 deferred to v2, 0.5.3), D27, D34, D41, D66, D70-D72, D74, D85,
-  D88, D89, D107, D108, D111, D113; section 8.2 (encoder line), 8.3, 8.4; N1, N3, N4, N8, N9; V7, V8, V11 (the
-  "leftover temporaries removed on next start" leg), V18. Architecture FINAL 1.0: section 1
-  (modules, `app`), 2 ("video preview", "Parameter change (AD-7)"), 3 (IF-2, IF-5, IF-7, IF-8
-  with its "Export seam" paragraph, IF-10), 7. AD-1, AD-7 (with its two amendments), AD-9,
-  AD-11 (V8), AD-15, AD-20, AD-23 (extended 2026-10-21), AD-25 (a), AD-28, AD-29.
+**Status:** DRAFT, RULED; REVISION 1 for CHARC's FINAL ruling (main `cde1cd9`). RULED 2026-10-28
+(CHARC `2c4476d9869df056`, rulings at the end, which take precedence over the text above them);
+FINAL only on CHARC's word after this revision. DRAFT 2026-10-28, written by a drafting helper
+for the orchestrator (generation 16) from CHARC's commission `159c14fb79ad1aae` (section 2, the
+WP4.3 bullet: the RULED bounds), drafted on main `6536f60`. Revision 1 is the one pass the draft
+owed against WP4.1's and WP4.2's accepts (CHARC status `014ec135d9d64a3e`). Base = the main commit
+named at dispatch. Owner decisions: none inside the package. The look check, V2, any spec text and
+anything that relaxes a mandatory requirement (D85 among them) are owner-reserved: each is a STOP,
+never done here.
+
+**Revision 1 (gen 20, main `cde1cd9`):**
+1. Re-based on main `cde1cd9`. The records of WP4.1, WP4.2, WP4.2a, WP4.2b and WP-T5 were
+   added. Every "(as proposed in WP4.1's draft; final per its accept)" and every WP4.2-draft hedge in the body
+   is now the merged name, with file:line. The merged code matches the drafts. The same hedges
+   inside the ruled Questions 2 and 11 are left verbatim and are resolved by this item.
+2. Why: the stub state is restated from the merged `gui/engines.py:156-175`.
+3. Goal, Depends on, Interfaces: the root's eight builders and `export_jobs`'s keyword-only cache,
+   source and sink parameters (`app/composition.py:48-253`); WP4.2a's runner guards and WP4.2b's
+   `OutputNameError`.
+4. Files owned:
+   - `tests/test_app_deps.py` moves from NEW to EDIT. WP4.1's file exists and pins the app module
+     set and a no-Qt rule that ruled Q2 contradicts (`tests/test_app_deps.py:89-101`; Q15).
+   - New grants: `tests/test_app_composition.py` (DR-84); the third `stub_era_select_backend` test
+     in `tests/test_gui_status.py` (Q15); `config/presets.py`, `config/settings_store.py`, their
+     tests, `tools/headless_export.py` and one new runner test file (DR-76, DR-77, the start-up
+     sibling, DR-81); one additive public name in `jobs/export.py` and `jobs/__init__.py` (Q18).
+   - `app/composition.py` is re-grounded (Q16). `gui/__init__.py` is "never", as ruled.
+   - The NOT-owned list is extended.
+5. Register re-based on `cde1cd9`:
+   - Added: DR-75 (REQUIRED test), DR-76, DR-77, DR-81 (a)(b)(c), DR-82, DR-84.
+   - DR-52, DR-62, DR-68 and DR-69 were re-read: unchanged since `cffd243`.
+   - DR-58 (b)'s 2026-10-29 re-sighting is folded in. DR-47's note is updated for (a), now CLOSED.
+   - DR-67, DR-64, DR-65, DR-71, DR-73 and DR-74 leave the table (CLOSED).
+   - DR-46 and DR-83 join NOT REACHED. A DR-34 note covers the `config/` touch.
+6. NEW finding, executed at the drafting seat on `cde1cd9`: `config/settings_store.py:71` lets
+   the same `OverflowError` as DR-77 escape `load_settings`. A `settings.json` whose
+   `last_parameters.created` is `0001-01-01T00:00:00+01:00` therefore stops `MainWindow`'s
+   `start_up` (`gui/shell.py:148`): the program cannot start. Carried as Q21, with a row for
+   CHARC.
+7. Tasks:
+   - 1: the merged stub list.
+   - 2: round-0 items for Q14-Q24.
+   - 3: the root's names and the one shared cache.
+   - 4: the per-run source on the selected backend (DR-67's pattern) and `expected_frames`.
+   - 5: DR-82's pre-plan check in the `ExportJobs` wrapper.
+   - 6: DR-76, DR-77 and the sibling.
+   - 7: DR-75 at the display call sites.
+   - 8: DR-81 (c) at its source and (a)(b) in the runner.
+   - 10: DR-75's REQUIRED test, DR-84, the deps edit, V18 under AD-30.
+   - 11 and 12: the gate order.
+8. Done, Hardware flags, Review loop and Notes follow the current fill:
+   - the cell runs its touched files and markers;
+   - Reviewer A is Codex `gpt-6.1-sol` / high at the cell's seat;
+   - Reviewer B is Codex at the orchestrator's seat;
+   - then the ONE two-leg gate runs on the final candidate (fill Part 2, Order, 2026-10-29), as
+     GATE_CHECKS at dispatch, which WP-T6 (AD-30's `fullclip`) may amend before dispatch;
+   - the runner shape is copied from `wp4.2\r2\`.
+9. Questions 14-24 added, each with its recommended answer first. Questions 1-13 and the Rulings
+   are verbatim.
+10. Lane: stays `implementer-opus-high` with Codex nets. One Codex-eligible sibling is named
+    (Q14, recommended).
+
+- Spec **v0.5.6** (v0.5.5's clauses unchanged here; 0.5.6 is the N6 text, DR-64): G1-G13 (G11
+  deferred to v2, 0.5.3), D27, D34, D41, D53, D66, D70-D72, D74, D85, D88-D91, D107, D108, D111,
+  D113; section 8.2 (encoder line), 8.3, 8.4; N1, N3, N4, N8, N9; V7, V8, V11 (the "leftover
+  temporaries removed on next start" leg), V17, V18. Architecture FINAL 1.0: section 1 (modules,
+  `app`), 2 ("video preview", "Parameter change (AD-7)"), 3 (IF-2, IF-5, IF-7, IF-8 with its
+  "Export seam" paragraph, IF-9, IF-10), 7. AD-1, AD-7 (with its two amendments), AD-9, AD-11
+  (V8, as amended 2026-10-21), AD-13, AD-15, AD-20, AD-23 (extended 2026-10-21), AD-25 (a),
+  AD-28, AD-29, AD-30.
 - Plan row WP4.3 (section 6, Phase 4, size L, depends on "WP4.2, WP3.16–WP3.20", feeds "V7, V8,
   V18"); the bullet "**WP4.3** connects the interface to the engines, adds start-up work (encoder
   and graphics-card detection, leftover cleanup), and shows the user whether CPU or GPU is in
   use"; module table 8.1 "`clearwater.app` | Entry point and start-up | WP4.3".
-- Records and reports, consumer notes: WP3.16 accept ("Debt and consumer notes"), report sections
-  on `default_engines` and DR-44; WP3.17 accept "Consumer notes"; WP3.18 accept "Consumer notes",
-  report "The mapping for WP4.3" and "Erratum at the gate" items 1 and 5; WP3.19 accept and report
-  "Seam for WP3.14 and WP4.3"; WP3.20 accept "Consumer notes", report "Public API"; WP3.20R
-  accept (DR-61); WP3.10 accept "Consumer notes" (`resolve_encoder`, the CREATE_NO_WINDOW spawn
-  helper), report section 9; WP3.9 report "Limits" (CREATE_NO_WINDOW); WP3.12 report "Public
-  API"; WP3.13 report "Consumer notes" and brief question 3 (RULED by `871a371855bb1630`: "the
-  start-up wiring (WP4.3) passes the configured output folder plus the folders of a small journal
-  of in-flight writes"); WP3.14 report "Limits"; WP3.21 accept "IF-8 reporting deviation" and
-  "Debt and owed rows", report "Limits" (cuFFT plans).
+- Records and reports, consumer notes:
+  - **WP4.1** accept (`docs/proofs/wp4.1-accept.md`, "Banked and owed": H1, G5, the importer
+    `OverflowError`) and report (`docs/reports/wp4.1-photo-path.md`: "What WP4.1 adds", the GUI
+    preview of an nclx-only P3 photo, the importer items).
+  - **WP4.2** accept (`docs/proofs/wp4.2-accept.md`, "Owed to CHARC's register") and report
+    (`docs/reports/wp4.2-video-path.md`: "What WP4.2 adds", "Limits", "For WP4.3 (Reviewer B
+    B7)").
+  - **WP4.2a** and **WP4.2b** accepts (DR-81, DR-82 and the B-A3 note).
+  - WP3.16 accept ("Debt and consumer notes"), report sections on `default_engines` and DR-44;
+    WP3.17 accept "Consumer notes"; WP3.18 accept "Consumer notes", report "The mapping for WP4.3"
+    and "Erratum at the gate" items 1 and 5; WP3.19 accept and report "Seam for WP3.14 and WP4.3";
+    WP3.20 accept "Consumer notes", report "Public API"; WP3.20R accept (DR-61).
+  - WP3.10 accept "Consumer notes" (`resolve_encoder`, the CREATE_NO_WINDOW spawn helper), report
+    section 9; WP3.9 report "Limits" (CREATE_NO_WINDOW); WP3.12 report "Public API"; WP3.13
+    report "Consumer notes" and brief question 3 (RULED by `871a371855bb1630`: "the start-up
+    wiring (WP4.3) passes the configured output folder plus the folders of a small journal of
+    in-flight writes"); WP3.14 report "Limits"; WP3.21 accept "IF-8 reporting deviation" and "Debt
+    and owed rows", report "Limits" (cuFFT plans).
 - Cell: `implementer-opus-high` (commission section 1: a composition package across every
   frozen-interface consumer, design choices at round 0). Tier **STRONG**, Claude lane: Reviewer A
-  (your loop) and Reviewer B (the orchestrator's seat) are Codex at the pin `gpt-6.1-sol` / high.
+  (your loop, at your seat) and Reviewer B (the orchestrator's seat) are Codex at the pin
+  `gpt-6.1-sol` / high.
+- **Lane and the Codex-eligible sibling (Q14).** The package stays `implementer-opus-high` with
+  Codex nets: its core composes every frozen-interface consumer behind ruled design choices
+  (the adapter, the start-up order, the journal, DR-62, DR-68), which is not a Codex-lane package.
+  One part is separable. It touches no frozen interface, no `gui/` and no `app/` file, and every
+  rule in it is already written:
+  - the AD-23 spawn helper, Q9 and Q13 as ruled (`io/video/pipes.py` and the five spawn-site
+    files; DR-58 (b));
+  - DR-81 (a)(b)(c): (c) at its source in `io/video/verify.py`, (a)(b) in
+    `tools/headless_export.py`;
+  - DR-76 and DR-77 with the start-up sibling, in `config/presets.py` and
+    `config/settings_store.py`, under Q20 and Q21 as ruled.
+
+  Its files are disjoint from WP4.3's, so it can run on the Codex lane, with the Claude pass as
+  both nets, concurrently with WP4.3's round 0 and build. Recommended: split it as **WP4.3a**
+  (Codex), so the L package shrinks to the GUI and app wiring. WP4.1 and WP4.2 each took four
+  cells. The rows and files listed here leave this brief at FINAL. Otherwise they stay here,
+  where the text below already carries them.
 - Worktree `.worktrees/wp4.3`, branch `wp4.3` from main, base = the main commit named at dispatch.
 
-**Why.** After WP4.1 and WP4.2 the photo and video paths run end to end headless, but the
-application a user starts still runs on stubs: `gui/engines.py` `default_engines()` "refuses
-every photo and every video frame" (WP3.16 report), the export panels run against
-`unavailable_exports()`, the timeline against `stub_analysis_factory`, and nothing calls
-`install_parameter_panels`, `install_timeline`, `install_export_panels` or
-`install_settings_dialog`. `shell.run` is "what WP4.3 calls; this package has no entry point".
+**Why.** After WP4.1 and WP4.2 the photo and video paths run end to end headless
+(`tools/headless_export.py` over `clearwater.app.composition`). The application a user starts
+still runs partly on stubs:
+- `gui/engines.py` `default_engines()` takes the real photo reader and methods from the root, but
+  keeps the S1 stand-in `stub_era_select_backend` and the stub video legs (`StubVideoSource`,
+  `StubVideoSink`, `StubProxyCache`; `gui/engines.py:167-175`), so a video is refused with a G10
+  message;
+- the export panels fall back to `unavailable_exports()` (`gui/export_panel.py:218`) and the
+  timeline to `stub_analysis_factory` (`gui/timeline.py:799`);
+- nothing calls `install_parameter_panels`, `install_timeline`, `install_export_panels` or
+  `install_settings_dialog`;
+- `shell.run` is "what WP4.3 calls; this package has no entry point" (`gui/shell.py:5-6`).
+
 This package builds the program the owner starts, does the start-up work, and proves V7, V8, V18
 and G1-G13 on the running shell with the real engines.
 
 | Field | Content |
 |---|---|
 | ID and title | WP4.3 — Application wiring; plan section 6 Phase 4 row WP4.3 |
-| Goal | One entry point (`clearwater.app`) that builds the real engines (through WP4.1/WP4.2's composition root `clearwater.app.composition` (as proposed in WP4.1's draft; final per its accept)), builds the main window, attaches every Phase 3 panel and the settings dialog to the real engines (the GUI's video source, sink and cache swapped from the stubs here, with the analysis adapter: WP4.2 draft question 3), runs the start-up work (leftover cleanup before any job, encoder detection into the settings dialog's catalog, graphics-card detection shown in the status bar per AD-9), and runs the event loop; the GUI's analysis on WP3.11's engine through the WP3.18 mapping; a GUI recompute serialised against a running export of the same clip (DR-62); the preview's FFT plans released at a preview boundary (DR-68); every FFmpeg and ffprobe child spawned with CREATE_NO_WINDOW through one helper (AD-23 extended); V7 re-measured with the real engines in an EXCLUSIVE window; V8 and V18 shown on the running shell; G1-G13 each checked against the running shell. |
-| Spec / decision clauses | Plan bullet (above). G9 "GUI stays responsive during analysis, export and batch processing (work runs off the UI thread)"; V7/D66 "UI responds within 100 ms during analysis, export and batch processing"; V8 "screen-resolution preview vs downsampled full-resolution output differ by less than a threshold set at design; 1:1 view exact", AD-11 "V8 preview vs export (same frame, export downscaled to the preview size by area average): mean abs ≤ 1/255, max ≤ 3/255"; V18 "on opening a clip, a corrected frame is shown before analysis completes, and it updates to the smoothed statistics afterwards"; D85 "Outputs written to a temporary name and renamed on success; leftovers cleaned on next start", 8.4 "Leftover temporary files from a crash are cleaned up on the next start", V11 "leftover temporaries removed on next start"; D34 "Output location: source folder by default"; 8.2 "Encoder capabilities (including 10-bit support) are detected at startup; unavailable options are shown disabled with a reason (D74)"; AD-9 "CPU/GPU use is reported in the status bar ("GPU: RTX 4070 Laptop" / "CPU") and in each job's log line, with the reason when the fallback engaged"; AD-15 "export is unavailable until analysis of that clip completes"; AD-7 amendment 2026-10-26 "a parameter change while an analysis or recompute job is in flight is ABSORBED by that job, never cancelled"; AD-23 extended "FFmpeg and ffprobe child processes are spawned with the Windows CREATE_NO_WINDOW creation flag (a no-op elsewhere) ... implemented once in a shared spawn helper by WP4.3 (real-engine wiring), used by every spawn site"; AD-25 (a) app-data locations "resolved in one place, `clearwater.config.paths`"; AD-29 "Each lower consumer ... declares ONE small `runtime_checkable` Protocol in its own package"; N1 "no OS-specific code without the architect's approval"; N8 "source files never modified". |
-| Depends on | On main at dispatch: WP4.2 (accept, the video path and its composition) and WP4.1 (the composition root `src/clearwater/app/composition.py` and the headless runner `tools/headless_export.py` (as proposed in WP4.1's draft; final per its accept)), WP3.16 (`clearwater.gui.shell`, `contract`, `preview`, `jobs`), WP3.17 (`install_parameter_panels`), WP3.18 (`install_timeline`, the `ClipAnalysis` seam), WP3.19 (`install_export_panels`, `clearwater.jobs.export_seam`), WP3.20/WP3.20R (`install_settings_dialog`), WP3.10 (`detect_capabilities`, `resolve_encoder`, `tool_env`), WP3.11 (`AnalysisEngine`), WP3.12 (`DiskProxyCache`), WP3.13 (`remove_leftovers`), WP3.14/WP3.21 (`ExportEngine`, `release_fft_plans`). |
-| Files owned (question 1: proposed grants; question 2: the new modules) | NEW (names proposed, question 2): `src/clearwater/app/main.py` (`main(argv=None) -> int`), `src/clearwater/app/startup.py` (leftover cleanup, the write journal, detection), `src/clearwater/app/analysis_adapter.py` (the `ClipAnalysis` adapter over `AnalysisEngine` and its factory), `src/clearwater/app/activity.py` (the per-clip activity guard and the `ExportJobs` wrapper: journal, DR-62, AD-9 log line), `src/clearwater/__main__.py` (`python -m clearwater`, importing `clearwater.app.main`). EDIT (origin WP4.1): `src/clearwater/app/__init__.py` (as proposed in WP4.1's draft; final per its accept): Qt-free exports only, never an import of `gui` or `clearwater.app.main`. EDIT only if round 0 names the need (origin WP4.1, extended by WP4.2): `src/clearwater/app/composition.py` (as proposed in WP4.1's draft; final per its accept), with the builders `photo_reader()`, `photo_writer()`, `correction_methods()`, `backend_selector()` and `export_jobs(...)`, only to add a Qt-free builder for the GUI's video source, sink and cache if WP4.2 left none (round 0 names it). Tests: `tests/test_app_startup.py`, `tests/test_app_leftovers.py`, `tests/test_app_analysis_adapter.py`, `tests/test_app_activity.py`, `tests/test_app_preview_fft.py`, `tests/test_app_wiring.py` (the G-matrix), `tests/test_app_v7.py`, `tests/test_app_v8_v18.py`, `tests/test_app_deps.py`, `tests/test_io_video_spawn.py`. `docs/reports/wp4.3-application-wiring.md`; `docs/proofs/wp4.3-ledger.md`. EDIT, granted per question 1: `src/clearwater/gui/settings_dialog.py` (WP3.20/WP3.20R: DR-52, the `catalog` argument, DR-61), `tests/test_gui_settings_dialog.py` (WP3.20: DR-52's deletion and the default-rule tests), `src/clearwater/gui/engines.py` (WP3.16, EDITED by WP4.1 (as proposed in WP4.1's draft; final per its accept): `default_engines()` takes `photo_source` and `methods` from the root, keeps `stub_era_select_backend` for WP4.3 and keeps the video members on stubs, which WP4.2 draft question 3 leaves to WP4.3. Here the S1 stand-in is removed and the video members swapped, question 11), `tests/test_gui_status.py` (WP3.16: the two S1 tests, question 11), and any WP4.1 or WP4.2 test that pins `default_engines()`'s stub video members or its `stub_era_select_backend` (changed with that reason, listed at round 0), `src/clearwater/gui/preview.py` and `src/clearwater/gui/render_worker.py` (WP3.16: DR-68, question 6), `src/clearwater/io/video/pipes.py` (WP3.9, the AD-23 module: the spawn helper, question 9) and its call sites `capability.py`, `encode.py`, `verify.py` (WP3.10), `decode.py` (WP3.9), `probe.py` (WP3.7; DR-58 (b)), `docs/reports/wp3.20-settings.md` (an erratum appended, DR-52). EDIT only if the round-0 table names the need and the dispatcher grants it: `src/clearwater/gui/shell.py` (WP3.16: the start-up device text, question 5; panels attached before `show()` if `run` gives no hook) and `src/clearwater/gui/__init__.py` (only under question 11's alternative), `src/clearwater/gui/jobs.py` (WP3.16: DR-44 (c), question 8), `src/clearwater/gui/batch_panel.py` (WP3.19: DR-50's per-row update, only if the re-measure fails). NOT owned: `src/clearwater/interfaces/` (IF-1..IF-10 FROZEN), `gui/contract.py` and `gui/analysis_service.py` (frozen seams; a change is a CHARC ruling), `jobs/export_seam.py`, `jobs/export.py`, `jobs/safe_write.py`, `analysis/`, `cache/`, `config/`, `core/`, `methods/`, `color/`, `io/photo/`, the other `gui/` modules (`timeline.py`, `parameter_panels.py`, `preset_panel.py`, `export_panel.py`, `export_service.py`, `imaging.py`, `messages.py`, `session.py`, `sources.py`); WP4.1's composition root and headless runner (consumed; EDIT only by grant, question 2); `tools/`; `tests/conftest.py`, `tests/fixture_plugin.py`, `tests/fixtures/`, `tests/gui_support.py`; every existing test file not named above; `pyproject.toml`, `uv.lock` (question 2). |
-| Interfaces provided | `clearwater.app.main`; `python -m clearwater`. No frozen interface changes; the `ClipAnalysis` and `ExportJobs` seams are implemented, not changed. The one additive gui signature is `install_settings_dialog(..., catalog=None)` (DR-52's "start-up detection gets a catalog argument"). |
-| Interfaces consumed | IF-2 (`select_backend`, `free_device_bytes`, `memory_estimate_bytes`; the AD-29 device extension `release_fft_plans` through a consumer-side Protocol), IF-5 (`VideoSource`, `VideoSink.capabilities`), IF-6, IF-7 (`DiskProxyCache`: `lookup`, `proxy`, `set_limit_bytes`, its crash clean-up at open), IF-8 (`Progress`, `JobResult.device`), IF-9, IF-10 (`Settings.output_folder`, `cache_limit_bytes`, `force_cpu`, `video_encoder`); the gui contract (`ShellWindow`, `ShellContext`, `Engines`, `Session`), the `ClipAnalysis` seam, the export seam. |
+| Goal | One entry point (`clearwater.app.main`, `python -m clearwater`) that builds the real engines through the composition root `clearwater.app.composition` (WP4.1, extended by WP4.2: `photo_reader`, `photo_writer`, `correction_methods`, `backend_selector`, `video_source(device_backend)`, `video_sink(device_backend)`, `proxy_cache(folder, limit_bytes)`, `export_jobs(*, ..., cache_folder, cache_limit_bytes, source_for, sink_for) -> ExportEngine`; `app/composition.py:48-253`), with ONE proxy cache per process shared by the GUI and the export engine (Q16); builds the main window; attaches every Phase 3 panel and the settings dialog to the real engines (the GUI's video source, sink and cache swapped from the stubs here, with the analysis adapter: WP4.2 left `gui/` unchanged, its accept "Locks"); runs the start-up work (leftover cleanup before any job, encoder detection into the settings dialog's catalog, graphics-card detection shown in the status bar per AD-9); and runs the event loop. Also: the GUI's analysis on WP3.11's engine through the WP3.18 mapping, on the backend it selected (DR-67's pattern) with the frame-count check (Q18); a GUI recompute serialised against a running export of the same clip (DR-62); the preview's FFT plans released at a preview boundary (DR-68) and an nclx-only photo's display copy tagged with the D53 built-in (DR-75); every FFmpeg and ffprobe child spawned with CREATE_NO_WINDOW through one helper (AD-23 extended); the import, start-up and failed-item texts readable (DR-76, DR-77 and its start-up sibling, DR-82, DR-81); V7 re-measured with the real engines in an EXCLUSIVE window; V8 and V18 shown on the running shell; G1-G13 each checked against the running shell. |
+| Spec / decision clauses | Plan bullet (above). G9 "GUI stays responsive during analysis, export and batch processing (work runs off the UI thread)"; V7/D66 "UI responds within 100 ms during analysis, export and batch processing"; V8 "screen-resolution preview vs downsampled full-resolution output differ by less than a threshold set at design; 1:1 view exact", AD-11 as amended 2026-10-21 (ruled addendum (1)); V18 "on opening a clip, a corrected frame is shown before analysis completes, and it updates to the smoothed statistics afterwards"; D85 "Outputs written to a temporary name and renamed on success; leftovers cleaned on next start", 8.4 "Leftover temporary files from a crash are cleaned up on the next start", V11 "leftover temporaries removed on next start"; D34 "Output location: source folder by default"; D53 (the built-in profile for a tagged source without ICC); 8.2 "Encoder capabilities (including 10-bit support) are detected at startup; unavailable options are shown disabled with a reason (D74)"; AD-9 "CPU/GPU use is reported in the status bar ("GPU: RTX 4070 Laptop" / "CPU") and in each job's log line, with the reason when the fallback engaged"; AD-13 (the preset and provenance key set; DR-76); AD-15 "export is unavailable until analysis of that clip completes"; AD-7 amendment 2026-10-26 "a parameter change while an analysis or recompute job is in flight is ABSORBED by that job, never cancelled"; AD-23 extended "FFmpeg and ffprobe child processes are spawned with the Windows CREATE_NO_WINDOW creation flag (a no-op elsewhere) ... implemented once in a shared spawn helper by WP4.3 (real-engine wiring), used by every spawn site"; AD-25 (a) app-data locations "resolved in one place, `clearwater.config.paths`"; AD-29 "Each lower consumer ... declares ONE small `runtime_checkable` Protocol in its own package"; AD-30 (gate tests sized by their property; full-clip forms behind a marker both legs exclude); N1 "no OS-specific code without the architect's approval"; N4 (memory); N8 "source files never modified". |
+| Depends on | On main at dispatch: WP4.2 (accept `ff234ee` record, the video legs of the root, `ExportEngine`'s per-job device hook `source_for` / `sink_for`, `AnalysisEngine(expected_frames=...)`), WP4.2a (the runner's write-target and file-form guards) and WP4.2b (`jobs.naming.OutputNameError`), WP4.1 (the composition root `src/clearwater/app/composition.py`, `src/clearwater/app/__init__.py` re-exporting the eight builders, `app/__init__.py:12-32`; the headless runner `tools/headless_export.py`; `default_engines()`'s photo legs), WP3.16 (`clearwater.gui.shell`, `contract`, `preview`, `jobs`), WP3.17 (`install_parameter_panels`), WP3.18 (`install_timeline`, the `ClipAnalysis` seam), WP3.19 (`install_export_panels`, `clearwater.jobs.export_seam`), WP3.20/WP3.20R (`install_settings_dialog`), WP3.10 (`detect_capabilities`, `resolve_encoder`, `tool_env`), WP3.11 (`AnalysisEngine`), WP3.12 (`DiskProxyCache`), WP3.13 (`remove_leftovers`), WP3.14/WP3.21 (`ExportEngine`, `release_fft_plans`), WP3.15 (`PresetStore`, `load_settings`). WP-T6 (AD-30) may merge before dispatch; if it does, the gate expressions and the GX011627 trim fixture are its (Q24). |
+| Files owned (question 1 and Q15: grants; question 2: the new modules) | **NEW** (Q2, GRANTED): `src/clearwater/app/main.py` (`main(argv=None) -> int`; the only Qt-loading module), `src/clearwater/app/startup.py` (leftover cleanup, the write journal, detection), `src/clearwater/app/analysis_adapter.py` (the `ClipAnalysis` adapter over `AnalysisEngine` and its factory), `src/clearwater/app/activity.py` (the per-clip activity guard and the `ExportJobs` wrapper: journal, DR-62, DR-82's pre-plan check, AD-9 log line), `src/clearwater/__main__.py` (`python -m clearwater`, importing `clearwater.app.main`). Tests NEW: `tests/test_app_startup.py`, `tests/test_app_leftovers.py`, `tests/test_app_analysis_adapter.py`, `tests/test_app_activity.py`, `tests/test_app_preview_fft.py`, `tests/test_app_wiring.py` (the G-matrix), `tests/test_app_v7.py`, `tests/test_app_v8_v18.py`, `tests/test_io_video_spawn.py`, `tests/test_wp43_runner_redaction.py` (DR-81 (a)(b)). `docs/reports/wp4.3-application-wiring.md`; `docs/proofs/wp4.3-ledger.md`. **EDIT, origin WP4.1 (extended by WP4.2):** `src/clearwater/app/__init__.py` (docstring only, naming the WP4.3 modules; Qt-free; never an import of `gui` or `clearwater.app.main`; `__all__` unchanged unless Q16's builder joins it, and then `tests/test_app_composition.py::test_the_package_exports_the_root` (`:93-106`) changes with it); `src/clearwater/app/composition.py` (Q16 only: the additive keyword-only `cache=` on `export_jobs`, and nothing else); `tests/test_app_deps.py` (Q15: the app module set and the Qt rule, `:89-101`, and the module docstring `:1-7`; the one-edge pin `:77-86` and the load checks `:104-128` unchanged); `tests/test_app_composition.py` (DR-84: the import-time witness `:183-202`; Q16's case if it lands there). **EDIT, granted per question 1:** `src/clearwater/gui/settings_dialog.py` (WP3.20/WP3.20R: DR-52, the `catalog` argument, DR-61), `tests/test_gui_settings_dialog.py` (WP3.20: DR-52's deletion `:778` and the default-rule tests), `src/clearwater/gui/engines.py` (WP3.16, EDITED by WP4.1: `default_engines()` (`:156-175`) takes `photo_source` and `methods` from the root and keeps `stub_era_select_backend` (`:101-121`) and the stub video legs (`:170-172`); here the S1 stand-in is removed and the video members are swapped, question 11 as ruled, Q17), `tests/test_gui_status.py` (WP3.16: the two S1 tests `:128-146`, and Q15's third test `:148-162`), `src/clearwater/gui/preview.py` and `src/clearwater/gui/render_worker.py` (WP3.16: DR-68, question 6; DR-75, Q19), `src/clearwater/io/video/pipes.py` (WP3.9, the AD-23 module: the spawn helper, question 9) and its call sites `capability.py`, `encode.py`, `verify.py` (WP3.10; `verify.py` also DR-81 (c)), `decode.py` (WP3.9), `probe.py` (WP3.7; DR-58 (b)), `docs/reports/wp3.20-settings.md` (an erratum appended, DR-52). **EDIT, granted per Q15 (new rows):** `src/clearwater/config/presets.py` (WP3.15: DR-76, Q20; DR-77, Q21), `src/clearwater/config/settings_store.py` (WP3.15: the start-up sibling, Q21), `tests/test_config_presets.py` and `tests/test_config_settings.py` (WP3.15: the new failing-first tests only), `tools/headless_export.py` (WP4.1, extended by WP4.2, WP4.2a, WP4.2b: DR-76's key set beside the importer's, Q20; DR-81 (a)(b), Q23; nothing else). **EDIT, granted per Q18 (recommended):** `src/clearwater/jobs/export.py` and `src/clearwater/jobs/__init__.py` (WP3.14, extended by WP4.2: one additive public `expected_frames(probe)` carrying the body of the private `_expected_frames`, `jobs/export.py:435-451`, which then delegates or is replaced at its one call site `:988`; nothing else). **EDIT only if the round-0 table names the need and the dispatcher grants it:** `src/clearwater/gui/shell.py` (WP3.16: the Q5 device text only), `src/clearwater/gui/jobs.py` (WP3.16: DR-44 (c), only if measured, question 8), `src/clearwater/gui/batch_panel.py` (WP3.19: DR-50's per-row update, only on a failed re-measure). `src/clearwater/gui/__init__.py`: never (question 11 as ruled). **NOT owned:** `src/clearwater/interfaces/` (IF-1..IF-10 FROZEN; DR-77's root cause `interfaces/parameters.py:211` stays), `gui/contract.py` and `gui/analysis_service.py` (frozen seams; a change is a CHARC ruling), `jobs/` (`export_seam.py`, `naming.py`, `safe_write.py`, and `export.py` beyond Q18's one additive name; DR-82 is met in the app wrapper, Q22), `analysis/` (DR-47 (b)(c)), `cache/` (DR-83), `core/`, `methods/`, `color/`, `io/photo/` (DR-75 calls `built_in_profile` unchanged, Q19; DR-76 is met on the importer side, Q20), the other `gui/` modules (`timeline.py`, `parameter_panels.py`, `preset_panel.py`, `export_panel.py`, `export_service.py`, `imaging.py`, `messages.py`, `session.py`, `sources.py`); `tools/` other than `tools/headless_export.py`; `tests/conftest.py` (WP-T6's), `tests/fixture_plugin.py`, `tests/fixtures/` (DR-75's sample is built under `tmp_path`, Q19), `tests/gui_support.py`; `tests/test_wp42_composition.py` (its `test_each_export_jobs_call_opens_its_own_cache`, `:228-232`, stands for the `cache_folder` form), `tests/test_wp41_*.py`, `tests/test_wp42*_*.py`; every existing test file not named above; `pyproject.toml`, `uv.lock` (question 2). |
+| Interfaces provided | `clearwater.app.main`; `python -m clearwater`. No frozen interface changes; the `ClipAnalysis` and `ExportJobs` seams are implemented, not changed. Additive only: `install_settings_dialog(..., catalog=None)` (DR-52's "start-up detection gets a catalog argument"); `default_engines(*, locations=None, cache_limit_bytes=...)` (question 11 as ruled; Q17); `composition.export_jobs(..., cache=None)` (Q16). |
+| Interfaces consumed | IF-2 (`select_backend`, `free_device_bytes`, `memory_estimate_bytes`; the AD-29 device extension `release_fft_plans` through a consumer-side Protocol), IF-5 (`VideoSource`, `VideoSink.capabilities`), IF-6, IF-7 (`DiskProxyCache`: `key_for`, `lookup`, `proxy`, `set_limit_bytes`, `clear`, its crash clean-up at open), IF-8 (`Progress`, `JobResult.device`), IF-9, IF-10 (`Settings.output_folder`, `cache_limit_bytes`, `force_cpu`, `video_encoder`); the composition root's builders (above); `jobs.naming.final_output_path` and `OutputNameError` (`jobs/naming.py:53`, `:303-305`, `:314`; DR-82); `clearwater.io.photo.writer.built_in_profile` (`io/photo/writer.py:36-57`; DR-75); the gui contract (`ShellWindow`, `ShellContext`, `Engines`, `Session`), the `ClipAnalysis` seam, the export seam. |
 | Consumers | WP5.1 (the acceptance suite drives the shell; G and V legs), WP5.3 (the visual review pack runs the application), the owner (the program). |
-| Hardware flags | **EXCLUSIVE** for the V7 re-measure (timing figures, plan 4.3), the footage legs (V18 and V8 on GX011627 through `tools/local_config.find_footage_file`, read-only), and the full suite. `gui` (offscreen), `gpu`, `footage`, `slow` as their tests need. At least 5 GB free before a heavy run; one heavy job at a time; a figure from an ungranted or a parallel-worker run is not a figure of record (AD-28). |
-| Out of scope | Changes to `interfaces/`, the gui contract or the seams (AD-20: a STOP); the composition of the photo and video paths themselves (WP4.1, WP4.2; DR-67's `device_backend` test is WP4.2's); a device-wide memory figure in the GUI (question 7); a persistent encoder-capability cache (question 4); chapter grouping and G11 (v2); N6 and any timing of the export (WP5.2); an installer, a packaged executable or a CI service; the look check and V2 (owner, WP5.3); decoding, parsing or logging any `gpmd` packet, IMU or GPS data; reading or logging any location tag. |
-| Debt and decided items | Register on main `cffd243` (table below): CLOSES DR-52, DR-62, DR-68, DR-35 (c), DR-44 (c), DR-61, DR-51 (a), DR-58 (b) (with question 9's touch), DR-50 (by measurement, or the per-row fix); CONSUMER NOTE DR-35 (a), DR-47, DR-45 (a), DR-67, DR-34 (c); a Question DR-69 (7); NOT REACHED the rest listed. Decided items carried in: the WP3.18 mapping notes (task 4), WP3.17's "keep `"c3"` first in `engines.methods`", WP3.20's "create the real `DiskProxyCache` with `Settings.cache_limit_bytes`", WP3.16's S1 removal (question 11), WP3.19's "the panels never call `setEnabled` on `actions.export`". |
-| Done | Plan 4.5; ruff check, ruff format --check, mypy strict and the full suite per the fill's GATE_CHECKS at dispatch (the two-leg gate) green in a granted window, every existing test unchanged or changed only as named in this brief or by a CHARC ruling; `uv run python -m clearwater` starts the shell on the real engines (smoke test under `QT_QPA_PLATFORM=offscreen`, the event loop ended by a timer); every G row of the G-matrix checked on the running shell; V7 re-measured with the real engines in an EXCLUSIVE window, every scenario at or under 100 ms or the failing scenario a STOP with its figure; V8 within AD-11 and V18 shown on the running shell; the footage-absence test green; each register row disposed as the table says; Reviewer A converged. |
+| Hardware flags | **EXCLUSIVE** for the V7 re-measure (timing figures, plan 4.3) and the footage legs (V18 and V8 on GX011627 through `tools/local_config.find_footage_file`, read-only; under AD-30, Q24). The full two-leg gate is the orchestrator's ONE gate on the final candidate (fill Part 2, Order), not a cell window. `gui` (offscreen), `gpu`, `footage`, `slow` as their tests need. At least 5 GB free before a heavy run; one heavy job at a time; a figure from an ungranted or a parallel-worker run is not a figure of record (AD-28). |
+| Out of scope | Changes to `interfaces/`, the gui contract or the seams (AD-20: a STOP); the composition of the photo and video paths themselves (WP4.1, WP4.2); a device-wide memory figure in the GUI (question 7); a persistent encoder-capability cache (question 4); chapter grouping and G11 (v2); N6 and any timing of the export (WP5.2); an installer, a packaged executable or a CI service; the look check and V2 (owner, WP5.3); decoding, parsing or logging any `gpmd` packet, IMU or GPS data; reading or logging any location tag. |
+| Debt and decided items | Register on main `cde1cd9` (table below): CLOSES DR-52, DR-62, DR-68, DR-75 (REQUIRED test), DR-76, DR-77, DR-81 (a)(b)(c), DR-82, DR-84, DR-35 (c), DR-44 (c), DR-61, DR-51 (a), DR-58 (b), DR-50 (by measurement, or the per-row fix); CONSUMER NOTE DR-35 (a), DR-47, DR-45 (a), DR-34; a Question DR-69 (7); NOT REACHED the rest listed. NEW for CHARC: the start-up sibling of DR-77 (Q21). Decided items carried in: the WP3.18 mapping notes (task 4), WP3.17's "keep `"c3"` first in `engines.methods`", WP3.20's "create the real `DiskProxyCache` with `Settings.cache_limit_bytes`", WP3.16's S1 removal (question 11), WP3.19's "the panels never call `setEnabled` on `actions.export`", WP4.2's DR-41 note (the cache's own `key_for`). |
+| Done | Plan 4.5. ruff check, ruff format --check and mypy strict are clean, and the cell's touched test files and the markers they need are green. Every existing test is unchanged, or changed only as this brief or a CHARC ruling names. `uv run python -m clearwater` starts the shell on the real engines (smoke test under `QT_QPA_PLATFORM=offscreen`, the event loop ended by a timer). Every G row of the G-matrix is checked on the running shell. V7 is re-measured with the real engines in an EXCLUSIVE window: every scenario is at or under 100 ms, or the failing scenario is a STOP with its figure. V8 is within AD-11 as amended, with DR-75's REQUIRED test, and V18 is shown on the running shell. The footage-absence test is green, and each register row is disposed as the table says. Reviewer A converged, and Reviewer B returned (clean, or its one remediation and re-run done). Then the ONE two-leg gate per the fill's GATE_CHECKS at dispatch is green at the orchestrator's seat on the final candidate (WP-T6 may amend the expressions before dispatch). |
 
-### Register rows (main `cffd243`)
+### Register rows (main `cde1cd9`)
+
+Re-based on `cde1cd9`. Since `cffd243` these rows CLOSED and leave the table:
+- DR-67, closed at WP4.2's accept `ff234ee` (the per-job device hook);
+- DR-71, DR-73 and DR-74, closed at WP4.2's accept;
+- DR-64, closed by spec v0.5.6;
+- DR-65, closed at WP-T5's accept `4933a45`;
+- DR-80, closed at WP4.2b's accept `3cedac6`. Its trigger had said "at the latest WP4.3".
+
+The GUI route keeps WP4.2b's rule, and DR-82 is that route's wording.
 
 | Row | Signal / trigger naming this package or its files | Disposition and ground |
 |---|---|---|
-| DR-52 | "WP4.3: replace the stand-in with WP3.10's function, delete the stand-in and its mirror test; start-up detection gets a catalog argument"; amended: the report errata "WP4.3's swap fixes all three" | **CLOSES**: `interim_resolve_encoder` deleted, `capability.resolve_encoder` the default of `settings_dialog` and `install_settings_dialog`, `test_interim_rule_matches_the_wp310_rule` deleted, the `catalog` argument added, the erratum (the four candidate SHAs `262d24f`, `5d34e9e`, `1171731`, `639101c`; `cache_limiter=None` in the public API) appended to `docs/reports/wp3.20-settings.md`; a test that the dialog surfaces WP3.10's `VideoEncodeError("unavailable")` as the D74 reason. |
-| DR-62 | "WP4.3 (the export panels and the GUI sequencing): serialise a recompute against a running export of the same clip (refuse, queue or wait, AD-7 / AD-15), with a test that drives both" | **CLOSES** by task 5 (question 8 picks the form); the test drives a real export and a GUI recompute of one clip in both orders. |
-| DR-68 | BINDING: "WP4.3's brief: release plans at a preview boundary (clip change / unload) and count them in the GUI's memory reading; a test shows the pool returns to its pre-preview figure after the boundary" | **CLOSES** by task 7 (question 6 defines the boundary and the reading); `gpu` test. |
-| DR-69 | BINDING: "WP4.3: if the GUI shows a job's device-wide total, an IF-8 or IF-2 extension is a CHARC decision at that brief (AD-20 STOP); otherwise the figure stays bench-only and this row stays open" | **Question 7** (recommended: the GUI does not show it; then NOT REACHED, the row stays OPEN as the record of the gap). |
+| DR-52 | "WP4.3: replace the stand-in with WP3.10's function, delete the stand-in and its mirror test; start-up detection gets a catalog argument"; amended: the report errata "WP4.3's swap fixes all three" (unchanged since `cffd243`) | **CLOSES**: `interim_resolve_encoder` (`gui/settings_dialog.py:109`) deleted, `capability.resolve_encoder` the default of `settings_dialog` and `install_settings_dialog` (`:878-883`), `test_interim_rule_matches_the_wp310_rule` (`tests/test_gui_settings_dialog.py:778`) deleted, the `catalog` argument added, the erratum (the four candidate SHAs `262d24f`, `5d34e9e`, `1171731`, `639101c`; `cache_limiter=None` in the public API) appended to `docs/reports/wp3.20-settings.md`; a test that the dialog surfaces WP3.10's `VideoEncodeError("unavailable")` as the D74 reason. |
+| DR-62 | "WP4.3 (the export panels and the GUI sequencing): serialise a recompute against a running export of the same clip (refuse, queue or wait, AD-7 / AD-15), with a test that drives both" (unchanged) | **CLOSES** by task 5 (question 8 as ruled: WAIT); the test drives a real export and a GUI recompute of one clip in both orders. With Q16's one cache the two activities share one `DiskProxyCache`, whose per-key store guard (`cache/store.py:11-14`) then also holds across them. |
+| DR-68 | BINDING: "WP4.3's brief: release plans at a preview boundary (clip change / unload) and count them in the GUI's memory reading; a test shows the pool returns to its pre-preview figure after the boundary" (unchanged) | **CLOSES** by task 7 (question 6 as ruled); `gpu` test. |
+| DR-69 | BINDING: "WP4.3: if the GUI shows a job's device-wide total, an IF-8 or IF-2 extension is a CHARC decision at that brief (AD-20 STOP); otherwise the figure stays bench-only and this row stays open as the record of the gap" (unchanged) | **Question 7, RULED**: the GUI does not show it; NOT REACHED, the row stays OPEN as the record. |
+| DR-75 | BINDING: "WP4.3's V8 photo leg (REQUIRED test under its Q12): tag the display copy of a no-ICC source with a tagged colour description with the D53 built-in at the display call sites; a chromatic nclx-only P3 sample built under tmp_path or an nclx-only fixture added by WP4.3 at round 0." | **CLOSES** by task 7 and the REQUIRED V8 photo test (task 10, question 12; Q19 picks the rule's source and the sample): the display copies at `gui/preview.py:441-444` and `gui/render_worker.py:423`, `:450` (today `icc_profile` only) get the D53 built-in when the source has no ICC profile and a tagged description; the test is RED on the base and its expected colour is derived independently of the production chooser. |
+| DR-76 | "WP4.3 (presets are imported there): decide whether the importer accepts the writer's provenance form or the writer's field is renamed to an AD-13 key; one test imports an exported HEIC's provenance." | **CLOSES** under Q20 (recommended: the importer side, `config/presets.py:69`, with the runner's copy `tools/headless_export.py:143` in step); one test exports a tagged nclx HEIC through the real engine and imports the output's provenance. The AD-13 note is CHARC's. |
+| DR-77 | "WP4.3's touch of the preset import path (the settings dialog / preset panel wiring): catch and refuse readably, with the same failing-first test." | **CLOSES** under Q21 at `config/presets.py:577` (import, load and list share `_read`); failing-first test with `created` `0001-01-01T00:00:00+01:00`. The same `OverflowError` escapes `load_settings` at `config/settings_store.py:71` and stops start-up (executed at the drafting seat on `cde1cd9`): Q21 closes it in the same touch; a NEW row for CHARC. |
+| DR-81 | "WP4.3 (the runner's next redaction touch; WP4.2 made no `Redactor` edit): (a), (b) and (c) close together, (c) by adding the tool folder to the known folders or by redacting the timeout text at its source. N5 closes with the next touch of `equal_statistics`." | **CLOSES** (a), (b) and (c) together under Q23. (c) is fixed at its source, `io/video/verify.py:233-234`, which the spawn helper already touches, so the GUI's failed-item text is clean too. (a) and (b) are fixed in `tools/headless_export.py`. Each has a test, RED first. N5 is NOT REACHED: `tests/test_wp41_v8.py` is not owned. |
+| DR-82 | "WP4.3 (GUI wiring; the export panel's failed-item text and, if cheap, a pre-plan name check on the engine route before the read / probe): the item text names the source and says 'rename the file'; one test per route." | **CLOSES** under Q22 in the app's `ExportJobs` wrapper (`app/activity.py`). On the worker, before the engine's read or probe, `jobs.naming.final_output_path` raises `OutputNameError` (`jobs/naming.py:303-305`, reached today only in `_plan`, `jobs/export.py:707-719`). The failed item then names the source and says to rename the file. One test per route: photo and video, single and batch. F2 (`..`) is recorded only. `jobs/` is unedited. |
+| DR-84 | "WP4.3's touch of `test_app_composition.py` (the GUI wiring): extend the witness to the three video constructors." | **CLOSES**: `test_importing_the_root_builds_nothing_and_loads_no_qt_or_cupy` (`tests/test_app_composition.py:183-202`) also instruments `FFmpegVideoSource`, `FFmpegVideoSink` and `DiskProxyCache`, with a planted import-time construction that fails it. |
 | DR-35 (c) | "`remove_leftovers` deletes a live job's temporary if called while a job runs ... (c) stays with WP4.3's start-up clean-up before any job" | **CLOSES**: the cleanup ends before any job can start (task 3; a test that no export or batch job starts while it runs). |
 | DR-35 (a) | "Trigger for (a): WP4.3 shows the refusal text" | **CONSUMER NOTE**: a G10 leg shows the reserved-name refusal (`NUL` stem) as the export panel's readable message through the real engine; renumbering stays the owner's word. |
-| DR-44 (c) | "(c): WP4.3 real-engine wiring or any job that blocks past cancellation" | **CLOSES** by task 8 (question 8): measured with the real jobs at close; fixed in `gui/jobs.py` only if a real job outlives `SHUTDOWN_TIMEOUT_S`. |
-| DR-50 | "WP4.3's V7 re-measure with the real engines and a queue of a few hundred items; a per-row update if it fails" | **CLOSES** by the task 10 scenario (300 items); a per-row update in `batch_panel.py` only if it fails. |
+| DR-44 (c) | "(c): WP4.3 real-engine wiring or any job that blocks past cancellation" | **CLOSES** by task 9 (question 8 as ruled): measured with the real jobs at close; fixed in `gui/jobs.py` only if a real job outlives `SHUTDOWN_TIMEOUT_S` (`gui/shell.py:74`, 5.0 s). |
+| DR-50 | "WP4.3's V7 re-measure with the real engines and a queue of a few hundred items; a per-row update if it fails" | **CLOSES** by the task 12 scenario (300 items); a per-row update in `batch_panel.py` only if it fails. |
 | DR-51 | "WP4.3 (the real adapter replaces the stub; the oracle gains an intermediate-state check if the drag lane is touched again)" | (a) **CLOSES** for the product path: the real adapter's `statistics` gates on its own completed-run state (WP3.18 mapping), with a reader-versus-new-`run` race test on the real adapter; (b) NOT REACHED (`timeline.py` is not touched). |
 | DR-61 | "The next settings-dialog touch (WP4.3): format the detail with a fallback, re-evaluate OK on `set_settings`, de-duplicate banners" | **CLOSES** in the same touch as DR-52, with a test each for (i)-(iii). |
-| DR-58 (b) | "WP3.7's `probe.py` inherits `FFREPORT` ... (b) WP3.7's next touch clears `FFREPORT` for the probe" | **CLOSES** if question 9's touch of `probe.py` is granted: the spawn helper carries `tool_env()`'s environment; a test with `FFREPORT` set. (a) several GPUs: NOT REACHED (owner hardware, one GPU). |
-| DR-47 | "WP3.18 (the GUI's cancel wiring) and WP4.2 (end-to-end cancel): (a) a one-shot guard on the job callable" | **CONSUMER NOTE**: the adapter runs each job the engine returns at most once and never two at once (a test); `analysis/engine.py` is not owned, so (a)-(c) stay with WP4.2. |
-| DR-45 (a) | "the first consumer that closes a stream from another thread" | **CONSUMER NOTE**: every stream the adapter or the preview's frame worker opens is iterated and closed by one thread (a test); not reached. |
-| DR-67 | WP4.2's binding row (`device_backend` on source, sink and engine) | **CONSUMER NOTE**: the GUI's exports and analysis go through WP4.2's composition unchanged; WP4.2's test stands. |
-| DR-34 (c) | "a second same-folder `configure_logging` call updates only the level" | **CONSUMER NOTE**: `configure_logging` is called once per process (the shell's `start_up`); the app adds no second call. |
-| DR-43, DR-49, DR-56, DR-57 (d), DR-36, DR-2, DR-64, DR-65, DR-70, DR-71, DR-72, DR-73, DR-74 | Their triggers name other modules or packages (`io.photo`, a method schema, an owner audio report, `jobs/export.py`, `export_bench.py`, `core/backend.py`, the N6 text, the suite cost) | **NOT REACHED**: none of their files is touched here. DR-49's ground is checked on the running shell: c3 and ancuti2018 resolve at 6 decimals or fewer. |
+| DR-58 (b) | "(b) WP3.7's next touch clears `FFREPORT` for the probe"; **re-sighted 2026-10-29 (WP4.2 Reviewer B B10):** "an inherited `FFREPORT` also reaches the decoder launches and two WP4.2 test launches; the clearing belongs at the one launch site WP3.7's touch owns" | **CLOSES** for every spawn site in `src/` (the probe and the decoder included) under question 9's helper. The test is that a spawn with `FFREPORT` set writes no report. The WP4.2 test launches are test files, not owned; the closure text names them as the residual. (a) several GPUs: NOT REACHED (owner hardware, one GPU). |
+| DR-47 | "WP3.18 (the GUI's cancel wiring) and WP4.2 (end-to-end cancel)"; (a) CLOSED at WP4.2's accept (the one-shot guard, `analysis/engine.py`); (b)(c) OPEN, "trigger the next `analysis/engine.py` touch" | **CONSUMER NOTE**: the engine's own guard now refuses a retained job run twice. The adapter still runs each job at most once and never two at once (a test). `analysis/engine.py` is not owned, so (b) and (c) are NOT REACHED. |
+| DR-45 (a) | "the first consumer that closes a stream from another thread" ((b) CLOSED at WP4.2's accept) | **CONSUMER NOTE**: every stream the adapter or the preview's frame worker opens is iterated and closed by one thread (a test); not reached. |
+| DR-34 | "WP3.17 or WP3.20, whichever first touches `presets.py`, `settings_store.py` or `log.py`" | **CONSUMER NOTE.** Q20 and Q21 touch `presets.py` and `settings_store.py`, but only their decode-failure mapping and the provenance key set. So (a), the no-replace mechanism, and (b), the set-aside failure, are NOT REACHED, and the row stays OPEN; Q21 routes one more decode failure into (b)'s existing set-aside. For (c), `configure_logging` is called once per process (the shell's `start_up`), and the app adds no second call. |
+| DR-43, DR-46, DR-49, DR-56, DR-57 (d), DR-36, DR-2, DR-70, DR-72, DR-83 | Their triggers name other modules or packages: `io.photo`, the Y-2 checkers, a method schema, an owner audio report, none, another ffprobe build, a second GPU, WP5.2's N6 re-measure, `export_bench.py`, the next `cache/` touch. | **NOT REACHED**: no file of theirs is touched here (`probe.py`'s spawn kwargs are not DR-36's parse). DR-49's ground is checked on the running shell: c3 and ancuti2018 resolve at 6 decimals or fewer. DR-83: the GUI's cache folder is app data under `locations.cache_dir`; a link planted inside it stays out of envelope until the next `cache/` touch. |
 
 ## Task ladder
 
-1. **Read and rebase.** `uv sync`. Read WP4.1's and WP4.2's accept records and their composition
-   root, then list what is still a stub in the product path after them (Engines members, the
-   S1 stand-in, the export panels' engine, the timeline's factory). No product code yet.
+1. **Read and rebase.** `uv sync`. Read WP4.1's, WP4.2's, WP4.2a's and WP4.2b's accept records and
+   the root (`app/composition.py`), then confirm what is still a stub in the product path on the
+   base. On `cde1cd9` it is:
+   - `default_engines()`'s selector `stub_era_select_backend` and its three stub video members
+     (`gui/engines.py:170-174`);
+   - the export panels' `unavailable_exports()` (`gui/export_panel.py:218`);
+   - the timeline's `stub_analysis_factory` (`gui/timeline.py:799`);
+   - `install_settings_dialog`'s `interim_resolve_encoder` (`gui/settings_dialog.py:109`, `:872`).
+
+   No product code yet.
 2. **Round 0 yield: the design table**, in the ledger, before product code:
-   - the module layout of `clearwater.app` (question 2) and its import rule;
+   - the module layout of `clearwater.app` (question 2 as ruled) and its import rule, with the
+     `tests/test_app_deps.py` edit (Q15);
    - the start-up sequence step by step, with the thread of each step and each step's duration
-     measured on this laptop: `app_locations()`, the settings read, `DiskProxyCache` open on a
-     20 GB cache (crash clean-up and eviction, WP3.12), the leftover scan, `detect_capabilities()`
-     (about 2 s), the GPU probe (CuPy import, `_probe_gpu` through `select_backend`). Also how
-     the cache gets `Settings.cache_limit_bytes` when `MainWindow`'s `start_up` reads the settings;
-   - the leftover folder set and the journal's shape (question 3: a persistent-data shape, so
-     copy to CHARC);
-   - the analysis adapter's mapping, row by row against WP3.18's table and errata 1 and 5
-     (task 4);
+     measured on this laptop:
+     - `app_locations()`;
+     - the settings read;
+     - `DiskProxyCache` open through `composition.proxy_cache` on a 20 GB cache (crash clean-up
+       and eviction, WP3.12);
+     - the leftover scan;
+     - `detect_capabilities()` (about 2 s);
+     - the GPU probe (CuPy import, `_probe_gpu` through `select_backend`).
+
+     Also show how the ONE cache (Q16) gets `Settings.cache_limit_bytes` when `MainWindow`'s
+     `start_up` reads the settings, and what `default_engines()` gives without `locations` (Q17);
+   - the leftover folder set and the journal's shape (question 3 as ruled);
+   - the analysis adapter's mapping, row by row against WP3.18's table and errata 1 and 5, with
+     its backend, its per-run source and its `expected_frames` (task 4, Q18);
    - the DR-62 design (question 8), the DR-68 boundary (question 6), the DR-44 (c) measurement
      (question 8);
-   - the spawn helper and every spawn site in `src/` (question 9);
+   - the DR-75 display change and its sample (Q19); the DR-82 check (Q22); the DR-76 and DR-77
+     edits and their sibling (Q20, Q21);
+   - the spawn helper and every spawn site in `src/` (question 9); DR-81 (Q23);
    - the panel install order; the G-matrix; the V7 scenarios (question 10); the V8 and V18 legs
-     (question 12);
-   - every existing test the plan changes or deletes, with its reason;
+     (question 12, Q24);
+   - every existing test the plan changes or deletes, with its reason. On `cde1cd9` these are:
+     - `tests/test_gui_status.py:128-162`, three tests;
+     - `tests/test_gui_settings_dialog.py:778`;
+     - `tests/test_app_deps.py:89-101`;
+     - `tests/test_app_composition.py:183-202`.
+
+     `tests/test_gui_status.py:53-55` (`Device: -` before a file is open) stays if Q5's start-up
+     text is set only by the app's probe job. `tests/test_wp41_gui.py:28-44` and
+     `tests/test_wp41_v8.py:104-112` call `default_engines()` with no arguments and stay
+     unchanged under Q17;
    - the `scripts/cell_depth.py` figure your dispatcher gives you.
    YIELD. Any choice the brief leaves open is a STOP.
-3. **Entry point and start-up.** `main()`: one `QApplication`, `app_locations()` (AD-25 (a);
-   nothing else reads the environment for a folder), the real engines from WP4.1/WP4.2's root,
-   `MainWindow(engines, locations)`. The GUI's `Engines` are wholly real: the photo legs as WP4.1
-   composed them, and `video_source`, `video_sink` and `cache` swapped HERE together with the
-   analysis adapter (WP4.2 draft question 3 leaves them on the stubs for WP4.3). The cache is the
-   real `DiskProxyCache` at `locations.cache_dir` with `Settings.cache_limit_bytes` (WP3.20 note)
-   and the registered codec, keyed as the root keys it (DR-41 note in WP4.2). Then `install_parameter_panels(window)` with `"c3"` first in
-   `engines.methods` (WP3.17); `install_timeline(window, <adapter factory>)`;
-   `install_export_panels(window, <guarded exports>)`; `install_settings_dialog(window,
-   resolve_encoder=resolve_encoder, catalog=<the start-up catalog>)`. Then the start-up work
-   (question 4):
-   - (a) **leftover cleanup** (D85, V11) over the folder set of question 3 and the cache root.
-     The cache's own crash clean-up is its constructor's; never a folder outside the set. It
-     completes before any export or batch job can start (DR-35 (c)), and the removed and failed
-     files are logged (N9);
-   - (b) **encoder detection** into the catalog off the interface thread, so the first settings
-     dialog opens on a known result;
-   - (c) **graphics-card detection** off the interface thread. Its reason reaches the status bar
-     (AD-9, question 5) and the log.
-   CHECK: `python -m clearwater` under offscreen QPA reaches the event loop and exits 0; V7 holds
-   during start-up; nothing in start-up writes outside app data, the cache root, the journal's
-   folders and the log.
+3. **Entry point and start-up.** `main()` creates one `QApplication`, then calls `app_locations()`
+   (AD-25 (a); nothing else reads the environment for a folder). It builds the real engines with
+   `default_engines(locations=locations, cache_limit_bytes=...)` (question 11 as ruled), then
+   `MainWindow(engines, locations)`.
+   - The GUI's `Engines` are wholly real. The photo legs are as WP4.1 composed them. `video_source`
+     and `video_sink` come from `composition.video_source()` and `composition.video_sink()`. The
+     cache is ONE `composition.proxy_cache(locations.cache_dir, Settings.cache_limit_bytes)` with
+     its registered codec, keyed by its own `key_for` (DR-41). They are swapped HERE together
+     with the analysis adapter.
+   - The export engine is `composition.export_jobs(cache=engines.cache)` (Q16), so the GUI, the
+     adapter and every export share one cache instance.
+   - Then the panels, in this order:
+     - `install_parameter_panels(window)`, with `"c3"` first in `engines.methods` (WP3.17);
+     - `install_timeline(window, <adapter factory>)`;
+     - `install_export_panels(window, <guarded exports>)`;
+     - `install_settings_dialog(window, resolve_encoder=resolve_encoder, catalog=<the start-up
+       catalog>)`;
+     - then `show()` (question 11 as ruled).
+   - Then the start-up work (question 4):
+     - (a) **leftover cleanup** (D85, V11) over the folder set of question 3 and the cache root.
+       The cache's own crash clean-up is its constructor's; never a folder outside the set. It
+       completes before any export or batch job can start (DR-35 (c)), and the removed and failed
+       files are logged (N9);
+     - (b) **encoder detection** into the catalog off the interface thread, so the first settings
+       dialog opens on a known result;
+     - (c) **graphics-card detection** off the interface thread. Its reason reaches the status
+       bar (AD-9, question 5) and the log.
+
+   CHECK: `python -m clearwater` under offscreen QPA reaches the event loop and exits 0. V7 holds
+   during start-up. Nothing in start-up writes outside app data, the cache root, the journal's
+   folders and the log. A `settings.json` that fails to decode is set aside and start-up goes on
+   (Q21).
 4. **The analysis adapter** (`ClipAnalysis` over `AnalysisEngine`, WP3.18 report "The mapping for
    WP4.3" as corrected by "Erratum at the gate"):
    - The factory builds the adapter only; the engine is built lazily in the first `run` on the
      worker thread.
    - **Live settings by closure**: the factory reads `Settings` (`force_cpu`) through a provider
      over the session (erratum 5; the seam is unchanged).
+   - **Backend, source and frame count (Q18)**: the adapter selects its backend on the worker with
+     `engines.select_backend`. It builds its frame source with `composition.video_source(<the GPU
+     backend, or None on the CPU>)`, the rule of `jobs/export.py:728-734` (DR-67's pattern), with
+     `hw_decode = backend.device != "cpu"`. It passes `AnalysisEngine` (`analysis/engine.py:258-272`)
+     the export's `expected_frames` for the clip, so a short decode never marks the shared entry
+     complete (DR-45 (b)'s analysis half, `jobs/export.py:435-451`).
    - **Kept job priority**: when `retarget` gets a job back from `set_parameters`, the adapter
      keeps it and returns False. The next `run` offers the latest parameters, then runs the kept
      job and clears it (erratum 1). A test against the REAL engine shows that the kept job ends
@@ -139,48 +283,87 @@ and G1-G13 on the running shell with the real engines.
    - `statistics` stays None until a full `run` completes under the latest parameters.
    - Cancel goes through the job handle; `analysis.CANCELLED` returns; other failures raise with
      the engine's text.
-   CHECK: the WP3.18 seam rules (threading list in `analysis_service.py`) hold on the real
-   adapter; the A-B-A burst of WP3.18 B pass 1 #1 never completes under a kept job; V18 (task 10).
-5. **DR-62: one activity per clip.** Per cache key, a GUI analysis or recompute and an export
-   (single or batch item) of the same clip never run their engines at once (question 8 picks wait
-   or refuse). The guard lives in `clearwater.app` (the adapter and the `ExportJobs` wrapper share
-   it); no `jobs/` or `analysis/` change. AD-15 is unchanged, and the gate stays the panels'
-   (`ActivityGate`). CHECK: one test drives both orders with the real engines on a fixture clip;
-   a cancel while waiting returns CANCELLED (or the panel's cancelled state) with nothing written;
-   the cache entry stays complete and consistent (V17 reopen skips the decode pass).
-6. **Settings dialog: DR-52 and DR-61** (the rows' text is the specification). CHECK: WP3.20's
-   and WP3.20R's tests pass, except the deletion DR-52 orders; the DR-61 cases fail on the base.
-7. **DR-68: the preview's FFT plans.** cuFFT plans are per thread, so the release runs ON the
-   preview worker's thread (`clearwater-preview`) at the boundary of question 6. It goes through
-   ONE consumer-side `runtime_checkable` Protocol in `clearwater.gui` (AD-29: "same names and
-   signatures as `CupyBackend`'s, with a test that `CupyBackend` satisfies it and `NumpyBackend`
-   does not"); `clearwater.gui` still imports no `cupy` and touches no `.xp`. CHECK: the `gpu`
-   test reads the reading of question 6 before a 1:1 render of a 4K frame (short side ≥
-   `FFT_MIN_SHORT_SIDE`, sigma ≥ `FFT_MIN_SIGMA`), after it, and after the boundary; it is back
-   at its pre-preview figure after the boundary; a planted controller without the release fails
-   by name.
-8. **The spawn helper (AD-23 extended; Windows-specific code under N1, question 13).**
-   One helper used by every `subprocess.run`/`Popen` site
-   in `src/clearwater` (today: `capability.py` 89, `decode.py` 171, 330, 344, `encode.py` 879,
-   `probe.py` 127, `verify.py` 225). It sets `creationflags=CREATE_NO_WINDOW` on Windows (0
-   elsewhere) and the `FFREPORT`-free environment of `tool_env()` (DR-58 (b)). CHECK: an AST
-   test finds every spawn call in `src/` and requires the helper; a Windows test asserts the
-   flag; WP3.7, WP3.9 and WP3.10 tests pass unchanged. The `io/video` module-set pin
-   (`test_io_video_probe_rules.py`) is unchanged, so no new module there.
+
+   CHECK: the WP3.18 seam rules (the threading list in `analysis_service.py`) hold on the real
+   adapter. The A-B-A burst of WP3.18 B pass 1 #1 never completes under a kept job. A GUI
+   analysis's complete entry is reused by the export's analysis (V17: one decode pass). V18
+   (task 10).
+5. **DR-62: one activity per clip; DR-82: the pre-plan name check.**
+   - **DR-62.** Per cache key, a GUI analysis or recompute and an export (single or batch item) of
+     the same clip never run their engines at once (question 8 as ruled: WAIT). The guard lives
+     in `clearwater.app`, shared by the adapter and the `ExportJobs` wrapper; no `jobs/` or
+     `analysis/` change. The key is computed on the worker, since `ExportJobs.job` builds the
+     callable only (`jobs/export_seam.py:58-64`). AD-15 is unchanged, and the gate stays the
+     panels' (`ActivityGate`, `gui/export_service.py:53`).
+   - **DR-82 (Q22).** The wrapper's job callable first calls `jobs.naming.final_output_path`. An
+     `OutputNameError` becomes a failed `JobResult` that names the source and says to rename the
+     file, before the engine reads or probes.
+
+   CHECK:
+   - one test drives both orders with the real engines on a fixture clip;
+   - a cancel while waiting returns CANCELLED (or the panel's cancelled state) with nothing
+     written;
+   - the cache entry stays complete and consistent (V17 reopen skips the decode pass);
+   - the DR-82 test per route.
+6. **Settings dialog and the config readers.** The rows' text is the specification.
+   - DR-52 and DR-61 are fixed in `gui/settings_dialog.py`.
+   - DR-76 (Q20): the importer drops the writer's `"profile"` provenance key like `source` and
+     `settings` (`config/presets.py:69`), reports it in `dropped_keys`, and the runner's copy
+     (`tools/headless_export.py:143`) stays in step.
+   - DR-77 and its sibling (Q21): `OverflowError` joins the decode-failure mapping at
+     `config/presets.py:577` and `config/settings_store.py:71`.
+
+   CHECK: WP3.20's, WP3.20R's and WP3.15's tests pass, except the one deletion DR-52 orders. The
+   DR-61 cases fail on the base. The DR-77 and sibling tests fail on the base (`OverflowError`).
+   The DR-76 test imports a real exported provenance.
+7. **The preview: DR-68's FFT plans and DR-75's display profile.**
+   - cuFFT plans are per thread, so the release runs ON the preview worker's thread
+     (`clearwater-preview`) at the boundary of question 6. It goes through ONE consumer-side
+     `runtime_checkable` Protocol in `clearwater.gui` (AD-29: "same names and signatures as
+     `CupyBackend`'s, with a test that `CupyBackend` satisfies it and `NumpyBackend` does not";
+     precedent `jobs/export.py:146-168`). `clearwater.gui` still imports no `cupy` and touches no
+     `.xp`.
+   - **DR-75 (Q19):** at both display call sites (`gui/preview.py:441-444`;
+     `gui/render_worker.py:423`, `:450`), a source with no ICC profile and a tagged description is
+     shown through the profile the writer embeds (`built_in_profile`, D53). A source with an ICC
+     profile, an untagged source and video frames are unchanged.
+
+   CHECK:
+   - the `gpu` test reads the reading of question 6 at three points: before a 1:1 render of a 4K
+     frame (short side ≥ `FFT_MIN_SHORT_SIDE`, sigma ≥ `FFT_MIN_SIGMA`; `core/backend.py:76`,
+     `:79`), after it, and after the boundary. It is back at its pre-preview figure after the
+     boundary. A planted controller without the release fails by name;
+   - DR-75's REQUIRED test (task 10).
+8. **The spawn helper (AD-23 extended; Windows-specific code under N1, question 13) and DR-81.**
+   - One helper is used by every `subprocess.run`/`Popen` site in `src/clearwater`. On `cde1cd9`
+     they are `capability.py:89`, `decode.py:171`, `:330`, `:344`, `encode.py:879`,
+     `probe.py:127` and `verify.py:225`.
+   - It sets `creationflags=CREATE_NO_WINDOW` on Windows (0 elsewhere) and the `FFREPORT`-free
+     environment of `tool_env()` (`capability.py:73-83`; DR-58 (b)).
+   - DR-81 (Q23): (c) the packet-listing timeout text at `verify.py:233-234` no longer carries
+     the ffprobe path; (a) and (b) are fixed in the runner's `Redactor` and `main`.
+
+   CHECK: an AST test finds every spawn call in `src/` and requires the helper; a Windows test
+   asserts the flag; WP3.7, WP3.9 and WP3.10 tests pass unchanged. The `io/video` module-set pin
+   (`tests/test_io_video_probe_rules.py:31`) is unchanged, so no new module there. The DR-81
+   tests are RED first.
 9. **DR-44 (c): close with real jobs.** Measure how long each real job takes to end after cancel,
    from close: an analysis mid-decode, an export mid-encode, a batch item. If every one ends
    within `SHUTDOWN_TIMEOUT_S` (5 s), DR-44 (c) closes as measured (the figures in the report).
    If not, `gui/jobs.py` detaches the callbacks of a job still running at close (question 8),
    with a test.
 10. **Tests and the V legs.**
-    - The G-matrix (`tests/test_app_wiring.py`): one or more tests per G row on the running
-      shell built by `main`'s own builder over tmp app-data and the WP2.3 fixtures
-      (`tests/fixtures/stills/*`, `tests/fixtures/video/*.mp4`, `tests/fixtures/files/dng`). G1
-      open; G2 split; G3 the c3 schema's panels, live preview; G4 scrub proxies, then full
-      resolution on release; G5 progress and cancel; G6 presets; G7 batch skip-and-log; G8
-      progress and cancel with no partial output; G9 with V7; G10 the HLG/PQ refusal,
-      truncated, untagged, DNG refusal, DR-35 (a); G11 v2 (named, no test); G12 every setting,
-      force CPU giving `CPU: forced`; G13 persistence over two window lifetimes.
+    - The G-matrix (`tests/test_app_wiring.py`): one or more tests per G row, on the running shell
+      that `main`'s own builder makes over tmp app-data and the WP2.3 fixtures
+      (`tests/fixtures/stills/*`, `tests/fixtures/video/*.mp4`, `tests/fixtures/files/dng`):
+      - G1 open; G2 split; G3 the c3 schema's panels, live preview;
+      - G4 scrub proxies, then full resolution on release; G5 progress and cancel; G6 presets
+        (with DR-76's and DR-77's imports);
+      - G7 batch skip-and-log; G8 progress and cancel with no partial output; G9 with V7;
+      - G10 the HLG/PQ refusal, truncated, untagged, DNG refusal, DR-35 (a), DR-82's refused
+        name;
+      - G11 v2 (named, no test); G12 every setting, force CPU giving `CPU: forced`; G13
+        persistence over two window lifetimes.
     - **V11** leftover leg: a planted temporary in a journal folder and in the output folder is
       removed at the next start; a non-matching file is kept.
     - **The footage-absence test** (question 3): with the sources in a stand-in footage folder
@@ -188,98 +371,144 @@ and G1-G13 on the running shell with the real engines.
       spy) and a planted temporary-pattern file there survives. When `clearwater.local.toml`
       names the real footage folder, the computed folder set contains no path inside it; that
       folder is never scanned or written.
-    - V8 and V18 (question 12); `tests/test_app_deps.py`: `clearwater.app` is the only package
-      that imports `clearwater.gui` and `clearwater.methods` or `clearwater.analysis`; the one
-      edge into it from below is `gui/engines.py` -> `clearwater.app.composition` (as proposed in WP4.1's draft; final per its accept), pinned by WP4.1's static test;
-      importing `clearwater.app` or `clearwater.app.composition` loads no PySide6 (only
-      `clearwater.app.main` and modules it alone imports may); `clearwater.app` imports no
-      `cupy`/`cupyx`; `tests/test_gui_deps.py` still passes unchanged.
-11. **Review loop** (below), then the full suite in a granted window.
-12. **The V7 re-measure (EXCLUSIVE, LAST; question 10).** The dispatcher grants each window after
-    the review loop; do not start it unasked. Each scenario's longest main-thread gap, its p99
-    and its tick count go in the report beside the stub-era figures (WP3.16, WP3.18 12-39 ms,
-    WP3.19 11-13 ms). Send `WINDOW RELEASED: <summary>` at the end.
+    - V8 and V18 (question 12 as ruled, Q24). **DR-75's REQUIRED test** is part of the V8 photo
+      leg: a chromatic nclx-only Display P3 HEIC built under `tmp_path` (Q19) is previewed by the
+      shell and compared with its export.
+    - **Layering.** `tests/test_app_deps.py` (EDIT, Q15) pins five things:
+      - `gui/engines.py` -> `clearwater.app.composition` stays the ONE gui-to-app edge
+        (`:77-86`, ruled flag (3));
+      - `app/` holds exactly `__init__.py`, `composition.py` and the four Q2 modules;
+      - no `clearwater.app` module but `main.py` imports `clearwater.gui`, PySide6 or `shiboken6`;
+      - no `clearwater.app` module imports `cupy` or `cupyx`;
+      - importing `clearwater.app` or `clearwater.app.composition` loads no PySide6 and no CuPy
+        (`:104-128`, unchanged).
+
+      `tests/test_gui_deps.py` still passes unchanged. DR-84's witness extension goes in
+      `tests/test_app_composition.py`.
+11. **Review loop** (below) to convergence, the V7 window (task 12), then hand the final
+    candidate to the dispatcher. Reviewer B, then the ONE two-leg gate, are the orchestrator's
+    (fill Part 2, Order). Before them, you run only your touched files and the markers they need;
+    a full-suite run of yours is development evidence and gets no window.
+12. **The V7 re-measure (EXCLUSIVE, LAST of your work; question 10 as ruled).** The dispatcher
+    grants each window after Reviewer A converges; do not start it unasked. Each scenario's
+    longest main-thread gap, its p99 and its tick count go in the report beside the stub-era
+    figures (WP3.16; WP3.18 12-39 ms; WP3.19 11-13 ms). Send `WINDOW RELEASED: <summary>` at the
+    end.
 
 ## Declared operating envelope
 
 Windows 11; Python 3.12; PySide6-Essentials 6.12 as locked; FFmpeg 9.0.2 (gyan) with
 `hevc_nvenc` and `libx265`; the RTX 4070 Laptop GPU (8 GB) or the CPU fallback; the Ryzen 9
-7940HS, 32 GB RAM. ONE application process per app-data folder (two processes sharing the cache
-are outside WP3.12's envelope); one export activity at a time (the panels' `ActivityGate`) plus
-the open clip's analysis; inputs within WP3.6's, WP3.7's and WP3.9's envelopes. Tests run with
-`QT_QPA_PLATFORM=offscreen` over app data under `tmp_path`, never the real `%APPDATA%`. Out of
-envelope: several GUI processes, a second GPU, other operating systems (portable code, not run
-there), a pure-Python method holding the GIL (WP3.16's 216-796 ms figure stays out of
-envelope).
+7940HS, 32 GB RAM.
+- ONE application process per app-data folder, and ONE `DiskProxyCache` instance per process
+  (Q16). Two processes, or two instances over one folder, are outside WP3.12's envelope
+  (`cache/store.py:11-14`).
+- One export activity at a time (the panels' `ActivityGate`) plus the open clip's analysis.
+- Inputs within WP3.6's, WP3.7's and WP3.9's envelopes.
+- Tests run with `QT_QPA_PLATFORM=offscreen` over app data under `tmp_path`, never the real
+  `%APPDATA%`.
+
+Out of envelope: several GUI processes, a second GPU, other operating systems (portable code, not
+run there), a pure-Python method holding the GIL (WP3.16's 216-796 ms figure stays out of
+envelope), and a link planted inside the cache folder (DR-83).
 
 ## Review loop (Reviewer A), per `docs/review-gate-clearwater.md` Part 1
 
-- Tier **STRONG** (Codex `-m gpt-6.1-sol -c model_reasoning_effort=high`, WSL transport, probe
-  first), run by you at your seat to convergence; five-round gate. Evidence
-  `C:\Users\rwsmy\clearwater-review-evidence\wp4.3\rN\`; ledger `docs/proofs/wp4.3-ledger.md`.
-  Copy the runner and prompt shape from `...\wp3.21\r2\` (`run_review.sh`, `review-prompt.md`).
-  The banner must read `gpt-6.1-sol`; a round with another pin is void. Exclude `docs/proofs`
-  with `--glob '!docs/proofs/**'`.
+- Tier **STRONG**: Codex `-m gpt-6.1-sol -c model_reasoning_effort=high`, WSL transport, probe
+  first. You run it at your seat to convergence, under the five-round gate.
+  - Evidence: `C:\Users\rwsmy\clearwater-review-evidence\wp4.3\rN\`. Ledger:
+    `docs/proofs/wp4.3-ledger.md`.
+  - Copy the runner and the prompt shape from `...\wp4.2\r2\` (`run_review.sh`,
+    `review-prompt.md`, with its probe).
+  - The banner must read `gpt-6.1-sol`; a round with another pin is void.
+  - Exclude `docs/proofs` with `--glob '!docs/proofs/**'`.
 - **WHAT TO EXAMINE:**
   - wiring: every Phase 3 panel attached once, to the real engines; no stub left on a product
-    path; `"c3"` first; nothing reads app-data folders except through `clearwater.config`;
+    path; `"c3"` first; ONE cache instance shared by the GUI, the adapter and the export engine;
+    nothing reads app-data folders except through `clearwater.config`;
   - start-up: the order, the thread of each step, and no job before the cleanup ends; the
     cleanup's folder set (never a source folder as such, never the footage path); the journal
     written before a temporary exists and cleared after commit or abort; what a crash at each
-    step leaves;
+    step leaves; a settings file that fails to decode (Q21);
   - the analysis adapter against the WP3.18 seam's threading rules and mapping (kept-job
     priority, its own pts list, live settings, `statistics` gating, no job run twice or
-    concurrently);
-  - DR-62 in both orders; cancel while waiting; the cache entry after each order;
+    concurrently), its backend and source (DR-67's pattern) and its `expected_frames`;
+  - DR-62 in both orders; cancel while waiting; the cache entry after each order; DR-82's text
+    and its position before the read or probe;
   - DR-68: the release on the right thread at every boundary; the Protocol (AD-29); no `cupy`
-    in `gui` or `app`;
-  - the spawn helper at every spawn site; DR-52 and DR-61 against their rows' text;
+    in `gui` or `app`. DR-75: every display call site, and no change for an ICC source;
+  - the spawn helper at every spawn site; DR-81; DR-52, DR-61, DR-76 and DR-77 against their
+    rows' text;
   - close: no callback after the window is gone (DR-44 (c));
   - nothing in `interfaces/`, the contract, the seams or unowned files changed; no `gpmd`, IMU,
     GPS or location data read; no write to the footage folder.
-- Reviewer B is the orchestrator's seat pass on the merge candidate (Codex, the same pin).
+- Reviewer B is the orchestrator's seat pass on the merge candidate (Codex, the same pin, WSL),
+  after your loop converges. Then comes the ONE two-leg gate, per the fill's GATE_CHECKS at
+  dispatch (fill Part 2, Order).
 
 ## Notes for the cell
 
-- **Yields.** Task 2 (round 0): the table, then YIELD before product code; question 2's module
-  names and question 3's journal shape are CHARC tripwires, so your dispatcher copies the table
-  to CHARC. After each review round: END YOUR TURN as soon as round N's verdict is adjudicated,
-  BEFORE remediating; make NO change in the turn that adjudicates a round. Your dispatcher gives
-  you the `scripts/cell_depth.py` figure at every yield; record it in the ledger. ~250K is the
-  evaluation point ("REVIEW ONLY this turn" when told); STOP at ~400K.
+- **Yields.**
+  - Task 2 (round 0): the table, then YIELD before product code. Question 2's module names and
+    question 3's journal shape are GRANTED as ruled. Your dispatcher still copies the table to
+    CHARC for Q14-Q24 as ruled.
+  - After each review round: END YOUR TURN as soon as round N's verdict is adjudicated, BEFORE
+    remediating. Make NO change in the turn that adjudicates a round.
+  - Your dispatcher gives you the `scripts/cell_depth.py` figure at every yield; record it in the
+    ledger. ~250K is the evaluation point ("REVIEW ONLY this turn" when told); STOP at ~400K.
 - **Windows (X5, AD-28).** Heavy work runs ONLY in a window the dispatcher grants: the V7
-  re-measure, the footage legs, the full suite, any `gpu` run of more than your own targeted
-  tests. Ask for each with `WINDOW REQUEST: <what, how long>`. One heavy job at a time; at least
-  5 GB free before a run. The suite runs in the background with `QT_QPA_PLATFORM=offscreen`,
-  output under `work/`, with foreground poll-wait calls on its done marker (a reaped run is not a
-  result). The two-leg gate (from Git Bash, `PYTEST_ADDOPTS` unset):
-  `uv run pytest -q -rs -n 4 -m "not gpu and not footage and not gui and not slow" --basetemp=work/<run>-parallel`
-  then `uv run pytest -q -rs -m "gpu or footage or gui or slow" --basetemp=work/<run>-serial`.
-  Timing figures come only from serial runs. Send `WINDOW RELEASED: <summary>` after each window.
+  re-measure, the footage legs, and any `gpu` run of more than your own targeted tests. Ask for
+  each with `WINDOW REQUEST: <what, how long>`. One heavy job at a time; at least 5 GB free
+  before a run. Background runs use `QT_QPA_PLATFORM=offscreen`, output under `work/`, with
+  foreground poll-wait calls on the done marker (a reaped run is not a result).
+  - The full two-leg gate is NOT yours. It is the orchestrator's ONE gate on the final candidate,
+    after Reviewer A converged and Reviewer B returned (fill Part 2, Order, 2026-10-29), as the
+    fill's GATE_CHECKS at dispatch.
+  - Today that gate is, from Git Bash with `PYTEST_ADDOPTS` unset:
+    `uv run pytest -q -rs -n 4 -m "not gpu and not footage and not gui and not slow" --basetemp=work/<run>-parallel`,
+    then `uv run pytest -q -rs -m "gpu or footage or gui or slow" --basetemp=work/<run>-serial`.
+  - WP-T6 (AD-30) may amend both expressions with `and not fullclip` before dispatch.
+  - A new wall-clock bound in a parallel-leg test is `slow` with a reason (GATE_CHECKS). Timing
+    figures come only from serial runs. Send `WINDOW RELEASED: <summary>` after each window.
 - **Footage.** Read-only at `C:\Users\rwsmy\clearwater-footage\`, only through
-  `tools/local_config.find_footage_file`. Never a basetemp, an output folder, a journal entry or
-  a cleanup target there. Every output goes under `work/` or `tmp_path`.
+  `tools/local_config.find_footage_file` (or WP-T6's session trim, if it has merged; Q24). Never
+  a basetemp, an output folder, a journal entry or a cleanup target there. Every output goes
+  under `work/` or `tmp_path`.
 - **Return report** = your FINAL message to your dispatcher by your messaging tool, under about
-  70 lines: the start-up sequence with its measured steps; the wiring table (panel, engine,
-  test); the G-matrix; V7 per scenario beside the stub-era figures; V8 and V18 figures; the DR
-  dispositions; the gates; the Reviewer A rounds and verdict; open items.
-- **STOP for:** any change needed in `src/clearwater/interfaces/` (AD-20), `gui/contract.py`,
-  `gui/analysis_service.py`, `jobs/export_seam.py` or a file not owned or granted; a dependency;
-  OS-specific code beyond AD-23's extension; a V7 scenario over 100 ms that the owned files
-  cannot fix; V8 outside AD-11; a cleanup target outside question 3's set or inside the footage
-  folder; anything that relaxes D85, D74 or AD-15 (owner-reserved); a need to show the job's
-  device-wide memory (DR-69, AD-20); any need to decode a `gpmd` packet or read a location tag;
-  the round-0 table showing a choice the brief left open.
-- **Working rules:** commit inside the worktree by pathspec with `git -c core.autocrlf=false
-  commit -m "feat(wp4.3): ..." -- <paths>`, with a `Co-Authored-By:` footer naming your model;
-  every committed blob LF. Never `git stash`; never a bare `cd`; never post to a mailbox; never
-  `git clean -x`. Gates: ruff check, ruff format --check, mypy strict, the full suite (in a
-  window); no harness gate (no `scripts/`, `.claude/`, kernel doc or `tests/harness/` change).
-  Report `docs/reports/wp4.3-application-wiring.md` (claims, evidence paths, limits, the V7
-  figures beside the stub-era figures).
+  70 lines:
+  - the start-up sequence with its measured steps;
+  - the wiring table (panel, engine, test) and the G-matrix;
+  - V7 per scenario beside the stub-era figures; the V8 and V18 figures;
+  - the DR dispositions;
+  - the static checks and the light runs;
+  - the Reviewer A rounds and verdict;
+  - open items.
+- **STOP for:**
+  - any change needed in `src/clearwater/interfaces/` (AD-20), `gui/contract.py`,
+    `gui/analysis_service.py`, `jobs/export_seam.py` or a file not owned or granted;
+  - a dependency;
+  - OS-specific code beyond AD-23's extension;
+  - a V7 scenario over 100 ms that the owned files cannot fix; V8 outside AD-11;
+  - a cleanup target outside question 3's set or inside the footage folder;
+  - anything that relaxes D85, D74 or AD-15 (owner-reserved);
+  - a need to show the job's device-wide memory (DR-69, AD-20);
+  - any need to decode a `gpmd` packet or read a location tag;
+  - a second `DiskProxyCache` instance over the app's cache folder in one process (Q16);
+  - the round-0 table showing a choice the brief left open.
+- **Working rules:**
+  - Commit inside the worktree by pathspec with `git -c core.autocrlf=false commit -m
+    "feat(wp4.3): ..." -- <paths>`, with a `Co-Authored-By:` footer naming your model. Every
+    committed blob is LF.
+  - Never `git stash`; never a bare `cd`; never post to a mailbox; never `git clean -x`.
+  - Your gates: ruff check, ruff format --check, mypy strict, and your touched files plus the
+    markers they need. The full two-leg gate is the orchestrator's (above). No harness gate: no
+    `scripts/`, `.claude/`, kernel doc or `tests/harness/` change.
+  - Report: `docs/reports/wp4.3-application-wiring.md` (claims, evidence paths, limits, the V7
+    figures beside the stub-era figures).
 - **Layering tests in every light run (AD-29):** `tests/test_core_deps.py`,
   `tests/test_color_deps.py`, `tests/test_io_video_decode_rules.py`,
-  `tests/test_analysis_deps.py`, `tests/test_gui_deps.py`, plus your `tests/test_app_deps.py`.
+  `tests/test_analysis_deps.py`, `tests/test_gui_deps.py`, `tests/test_app_deps.py`,
+  `tests/test_app_composition.py`, `tests/test_wp42_composition.py`.
 
 ## Questions for CHARC (recommended answer first)
 
@@ -444,6 +673,173 @@ envelope).
     - Alternative: a new AD row recording the approval separately (more paperwork, the same
       code). Without approval: no flag, and a console may flash under the GUI on Windows (the
       WP3.9 limit stays).
+
+### Revision 1 questions (main `cde1cd9`; recommended answer first)
+
+14. **Lane: one Codex-eligible sibling.** Recommended: split **WP4.3a** onto the Codex lane
+    (`implementer-codex-sol-high`, the Claude pass as both nets; STRONG):
+    - the spawn helper (questions 9 and 13 as ruled; `io/video/pipes.py`, `capability.py`,
+      `decode.py`, `encode.py`, `probe.py`, `verify.py`, `tests/test_io_video_spawn.py`; DR-58 (b));
+    - DR-81 (a)(b)(c) (Q23; `tools/headless_export.py`, `tests/test_wp43_runner_redaction.py`);
+    - DR-76 and DR-77 with the start-up sibling (Q20, Q21; `config/presets.py`,
+      `config/settings_store.py`, `tests/test_config_presets.py`, `tests/test_config_settings.py`).
+
+    Ground: none of it touches a frozen interface, `gui/` or `app/`. Every rule is written: the
+    ruled Q9 and Q13, the rows' text and Q20/Q21 as ruled. Its files are disjoint from WP4.3's, so
+    it can run concurrently with WP4.3's round 0 and build, and it shrinks an L package that WP4.1
+    and WP4.2 needed four cells each to land. Cost: one more gate (about 52 min), and AD-23's
+    "applied by" note moves to WP4.3a's accept. It also serves the owner's 2026-10-29 lane
+    balance.
+    Alternative: keep all of it in WP4.3: one gate, a larger review surface.
+15. **Grants added by Revision 1** (recommended: grant now, each named with its origin package):
+    - `tests/test_app_deps.py` (WP4.1). `test_no_app_module_imports_the_gui_or_qt`
+      (`:89-101`) pins `app/` to `["__init__.py", "composition.py"]` and bans `clearwater.gui` and
+      PySide6 in every app module, which ruled Q2 (`main.py`, the only Qt-loading module)
+      contradicts. The module set gains the four Q2 modules; the gui and Qt ban exempts
+      `main.py` alone; the cupy ban stays for all; `:77-86` and `:104-128` are unchanged.
+    - `tests/test_app_composition.py` (WP4.1, extended by WP4.2): DR-84's witness, and Q16's case.
+    - `tests/test_gui_status.py` (WP3.16): beyond the two S1 tests, also
+      `test_real_selection_through_the_shell_shows_gpu` (`:148-162`, `gpu`). It calls
+      `stub_era_select_backend` with method `"stub"` (`:152`, `:156`), so deleting the stand-in
+      breaks it. It is edited to use `core.select_backend` with the real methods (`c3`), with its
+      assertions unchanged.
+    - `config/presets.py`, `config/settings_store.py` and the new tests in
+      `tests/test_config_presets.py` and `tests/test_config_settings.py` (WP3.15; Q20, Q21).
+    - `tools/headless_export.py` (WP4.1; extended by WP4.2, WP4.2a, WP4.2b) for Q20's key set
+      and DR-81 (a)(b) only, with the NEW `tests/test_wp43_runner_redaction.py`.
+
+    Under Q14's split the last two bullets go to WP4.3a.
+    Alternative: grant at round 0 on a named need.
+16. **One proxy cache per GUI process.** `composition.export_jobs(cache_folder=...)` opens its
+    OWN `DiskProxyCache` (`app/composition.py:238`; pinned by
+    `tests/test_wp42_composition.py:228-232`). The GUI's `engines.cache` would be a second
+    instance over the same folder. WP3.12's lock and its "one store call at a time per key" guard
+    are per instance (`cache/store.py:11-14`), eviction is not shared, and the settings dialog's
+    `set_limit_bytes` / `clear` (`gui/settings_dialog.py:716`, `:817`) would reach only the GUI's
+    instance.
+    Recommended:
+    - add an additive keyword-only `cache: DiskProxyCache | None = None` to `export_jobs`. It is
+      mutually exclusive with `cache_folder` (both given is a `ValueError`) and is keyed by that
+      cache's own `key_for` (DR-41);
+    - `app.main` passes `engines.cache`, so the GUI, the adapter and every export share one
+      instance, and the export reuses the GUI analysis's complete entry (V17);
+    - test it in `tests/test_app_composition.py`, with `test_each_export_jobs_call_opens_its_own_cache`
+      unchanged.
+
+    Alternative: two instances, with DR-62's lock as the only serialisation and the dialog's
+    limit and clear forwarded to both. Eviction by one instance could still remove an entry the
+    other is using.
+17. **`default_engines()` without `locations`** (question 11 as ruled makes `locations`
+    keyword-only and defaulted; the default is unstated). Recommended:
+    - with `locations=None` the video legs stay today's stubs (`gui/engines.py:170-172`), so a
+      caller without app data (`tests/test_wp41_gui.py:28-44`, `tests/test_wp41_v8.py:104-112`,
+      `shell.run()` with no engines, `gui/shell.py:600`) opens no real cache, writes nothing under
+      `%APPDATA%` and holds no real clip's proxies (N4; ruled flag (1)), and a video is refused
+      with the G10 message as on main;
+    - with `locations` given, all three video legs are real (task 3);
+    - the selector is the root's `backend_selector()` in both forms, so the S1 stand-in goes
+      entirely;
+    - a test pins that `clearwater.app.main`'s engines are wholly real.
+
+    Alternative: real legs over a refusing cache (the root's `_NoCacheFolder` made public). That
+    changes what the WP4.1 GUI tests run on, and the settings dialog's limit call then refuses.
+18. **The GUI analysis's device source and frame count.**
+    - **Source.** Recommended: the adapter follows WP4.2's export rule:
+      - it selects on the worker with `engines.select_backend`;
+      - its source is `composition.video_source(<the GPU backend or None>)`, the rule of
+        `jobs/export.py:728-734`, with `hw_decode = backend.device != "cpu"`;
+      - it passes `AnalysisEngine` (`analysis/engine.py:271`) the export's `expected_frames`.
+    - **Frame count.** That count comes from a private function (`jobs/export.py:435-451`).
+      Recommended: one additive public name in `clearwater.jobs` (`expected_frames(probe)`, the
+      private function's body; a grant of `jobs/export.py` and `jobs/__init__.py`, additive
+      only), so the rule has one copy (the DR-52 lesson). A test shows the adapter and the export
+      pass the same count for a clean, a `truncated` and an `unreadable_tail` probe.
+
+    Alternative: the adapter passes `expected_frames=None`. Then a short GUI decode marks the
+    shared entry complete and the export reuses it (V17), held only by the sink's
+    `missing_frames` rule (WP4.2 report, Limits).
+19. **DR-75: the rule's source and the sample.**
+    - **Rule.** Recommended: the display sites take the writer's own D53 choice,
+      `clearwater.io.photo.writer.built_in_profile(color, metadata.source_format)`
+      (`io/photo/writer.py:36-57`; public, not re-exported by `clearwater.io.photo`), when
+      `color.icc_profile is None`. That is one rule, no copy, and `io/photo/` is unchanged.
+      `preview.py` reads `session.source().metadata`; `render_worker.py` gets the chosen bytes in
+      its `RenderRequest` (round 0 names the field).
+    - **Sample.** It is built at test time under `tmp_path` from WP4.1 R3's recipe
+      (`clearwater-review-evidence\wp4.1\r3\r3_repro.py`: a 16x16 chromatic nclx-only Display P3
+      HEIC), with no fixture-set change.
+    - **Expected colour.** It is derived independently of `built_in_profile`, from the exported
+      PNG's embedded profile read back (WP4.1 R3 H6's lesson).
+
+    Alternative: an nclx-only fixture added at round 0 (a `tests/fixtures/`, manifest and recipe
+    grant).
+20. **DR-76: which side.** Recommended: the IMPORTER side.
+    - `config/presets.py:69` adds `"profile"` to the provenance keys that are dropped (reported in
+      `dropped_keys`, so the panel's existing "carried provenance (...); it was not kept" warning
+      names it, `gui/preset_panel.py:395-406`).
+    - The runner's copy (`tools/headless_export.py:143`) moves in step.
+    - The writer (`io/photo/writer.py:23`, `:79-81`) is unchanged, so every PNG already written
+      stays importable. CHARC adds an AD-13 note naming `"profile"` as a writer provenance key.
+    - Test: export a tagged nclx HEIC through the real engine, write its provenance text to a
+      file, import it: OK, `profile` dropped.
+
+    Alternative: rename the writer's key into AD-13's set. That is an `io/photo` grant and a
+    change of the D91 provenance shape, and files already written keep the old key.
+21. **DR-77 and its start-up sibling.** EXECUTED at the drafting seat on `cde1cd9`:
+    - a `settings.json` whose `last_parameters.created` is `0001-01-01T00:00:00+01:00` makes
+      `load_settings` raise `OverflowError` ("date value out of range"), because
+      `config/settings_store.py:71` maps only `(ValueError, RecursionError)`;
+    - the shell's `start_up` (`gui/shell.py:148`) does not catch it, so the program cannot start
+      until the user deletes the file;
+    - `PresetStore.import_preset` raises the same (DR-77); the root cause is
+      `interfaces/parameters.py:211` (`astimezone(UTC)`, FROZEN IF-9; not touched).
+
+    Recommended:
+    - add `OverflowError` to the decode-failure mapping at `config/presets.py:577` (import, load
+      and list all refuse readably as `FormatError`) and at `config/settings_store.py:71` (the
+      file is set aside, defaults are used, the existing path);
+    - each fix gets a failing-first test, and `tests/test_app_startup.py` starts the program over
+      such a file;
+    - CHARC registers a row for the sibling (closed by this touch).
+
+    Alternative: widen `gui/preset_panel.py:47` `_FAILURES` (WP3.17). That covers only the
+    panel, and start-up still fails.
+22. **DR-82's form.** Recommended: in the app's `ExportJobs` wrapper.
+    - Its job callable, on the worker (`ExportJobs.job` must touch no file,
+      `jobs/export_seam.py:58-64`), calls `jobs.naming.final_output_path(source, settings,
+      kind)` first.
+    - An `OutputNameError` returns a failed `JobResult` reading "<name>: this file name cannot be
+      used for an output file; rename the file." (`ascii_text`), before the engine's read or
+      probe.
+    - Every other error is left to the engine's own text. `jobs/` is unedited, and the rule is the
+      planner's own.
+    - "One test per route" is read as photo and video, each single and as a batch item, through
+      the panels.
+
+    Alternative: change `OutputNameError`'s text in `jobs/naming.py:303-305` (WP4.2b; a grant).
+    That fixes every caller's wording but saves no read or probe.
+23. **DR-81 (a)(b)(c).** Recommended:
+    - (c) at its SOURCE: the timeout text at `io/video/verify.py:233-234` names the file and the
+      120 s limit, not the ffprobe command, so the GUI's failed item is clean too. `verify.py` is
+      already a spawn-site edit;
+    - (a): the `Redactor` matches a known folder under any mix of `\` and `/`;
+    - (b): a raising footage-folder resolution in `main` becomes a redacted usage refusal (exit
+      2);
+    - each fix gets a RED-first test in `tests/test_wp43_runner_redaction.py`; N5 is NOT REACHED.
+
+    Alternative for (c): add the tool folder to the `Redactor`'s known folders (runner only; the
+    GUI's text keeps the path).
+24. **V18 and the footage legs under AD-30.** Recommended:
+    - The gate form of V18 runs on `tests/fixtures/video/hevc8-bt709-full.mp4`, with the
+      analysis held by a test hook so that "before analysis completes" is deterministic.
+    - The GX011627 V18 leg and every V7 scenario on GX011627 are EXCLUSIVE window evidence, not
+      gate tests.
+    - If WP-T6 has merged at dispatch, any test form on the whole clip carries `fullclip`, and a
+      gate test whose subject is the real container uses WP-T6's session trim (never the footage
+      folder for output).
+
+    Alternative: V18 on GX011627 as a `footage` gate test. It costs serial-leg minutes in every
+    gate, against AD-30.
 
 ## Rulings (CHARC `2c4476d9869df056`, 2026-10-28, verbatim; they GOVERN the Questions section above)
 
