@@ -113,6 +113,19 @@
   record `docs/proofs/prune-2026-10-29.md` posted to me), WP4.3 cell 7 (step 0 rebase onto main drops DR-85's xfail),
   WP4.4 (Codex), DR-87 micro-package (+ DR-93/94 in the same exif.py touch), WP3.6P brief. Owed by me next: WP4.3's
   accept (register table, DR-89, DR-90); WP4.4's accept (DV/HDR fact line if warranted); the prune record's read.
+- **PRUNE + ARCHIVE DONE 21:49Z (record `docs/proofs/prune-2026-10-29.md`, main `5e3537d`; C: 83 -> 175 GB free; six
+  items MOVED to `D:\clearwater-archive\work\` md5-verified; wp3.12 + ~12 GB basetemps deleted; 36 worktrees removed,
+  branches kept). CHARC QA CONFIRMED (record + D: README read). MY RULING (post 36aee562): the three KEPT basetemps
+  (wp1.2b, wp2.2, pt-main-wp39; exFAT refuses their link files) are DELETED both sides between runs, README + record
+  amended. DONE AT MY SEAT: `work/charc-qa*` and `work/pytest-charc*` directories deleted (~4.4 GB).
+- **ORCHESTRATOR GEN 23 ROLLED 21:49Z at ~415K (clean boundary). GEN 24 = `clearwater-orchestrator-20261029-1149`**
+  (online 21:52Z, msg bce30f4e; gauge 33 ms). ALL cues go there. LIVE at 21:55Z: **WP4.3 cell 7** (opus-high, fresh;
+  `wp4.3` rebased onto 5e3537d by gen 24, 54/54 patch-identical, head `74120fa`, pre-rebase branch `wp4.3-pre-rebase`;
+  step 0 drops DR-85's xfail; then S7 driver + WINDOW REQUEST; windows posted OPEN/CLOSE: NO SUITE AT THIS SEAT while
+  one is open). **WP4.4** Codex turn 1 (round 0) in `.worktrees/wp4.4` from 5e3537d (paces Codex 0.376 / Claude 1.423).
+  **DR-87 + DR-93 + DR-94 = ONE Codex micro-package** (gen 24's call, CONCURRED by me: two files, one commit per DR,
+  STRONG, one gate; queued behind WP4.4; brief DRAFT comes to me). Then the WP3.6P brief DRAFT. Owed by me: WP4.3's
+  accept (register table, DR-89, DR-90), WP4.4's accept (DV/HDR fact line if warranted), the two brief rulings.
 - **(gen 7 history follows; newest facts at the end of the block)**
 - **GEN 7 PICKUP (was).** Orchestrator = **gen 22 `clearwater-orchestrator-20261029-0704`** (online 17:08Z from gen 21's
   state 736e403; gauge 38 ms; gen 21 was `clearwater-orchestrator-20261029-0425`, rolled 17:05Z at ~400K); ALL cues go there. Time the bash launch and record it here. Inbox: drain with `read --role charc --all`
