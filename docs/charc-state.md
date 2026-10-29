@@ -111,6 +111,13 @@
   3(d) control in `test_wp42a_runner_hardening.py`, RED under M1; F2-F5 at the orchestrator's seat concurred (F3 = real `carrier:` stream
   + real reader instead of the brief's `c:` + double, forced by export.py:712 os.stat, deviation in the report). Next: Codex turn 6,
   R2, OWN window, B, accept (merges first). WP4.2 cell 3 (opus-high) = Reviewer A R1 from the ledger, concurrent.
+- **WP4.2 Y4 RULED 05:58Z (query `d1ed1dea8842ce87`; cell 3; readings applied at `wp4.2` 2e79df7 / 1fa33a8; Reviewer A R1 0/0/4
+  terminating, cleanup granted):** FLAG 2 = (a) ONE recorded CPU V3 run in an exclusive window (~11 min), backend named, both figures
+  files md5'd, the report cites equality by the two hashes (my item 3 had asserted a hash that was never recorded; `work\wp4.2-v3-
+  figures.txt` f76c42a5 is cell 2's unlabelled observation); a difference = STOP before the two-leg window. FLAG 1 concurred: the
+  unreadable_tail Limit now says a gap inside the written range is refused, an early end accepted (cell 2's 'sink refuses a short
+  set' was false for that case). Builders all in `__all__`, alias dropped. WP4.2b: turn 6 running; one extra parameter row in its one
+  runner test granted at the orchestrator's seat.
 - **(history) After WP4.1's accept:** WP4.2's brief (DRAFT RULED on main 3aa3c51) got ONE revision pass against WP4.1's accept record, then FINAL
   on CHARC's word; its revision must carry: DR-78/79 (B2 rows) as WP4.2 items, the WP4.1 runner's final names and the stream-syntax
   predicate, the Limit text. WP4.3's revision later carries DR-75 (REQUIRED test under its Q12), DR-76, DR-77, and the AD-23 'applied by
