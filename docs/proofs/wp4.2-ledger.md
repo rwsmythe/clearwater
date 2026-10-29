@@ -311,14 +311,43 @@ app composition and deps, `test_headless_export.py`, WP4.2a's file, the four dep
 (no window, not a timed figure): 6 passed in 102.51 s; the product figures equal the report's
 table on all four rows.
 
+## Y4 ruling (CHARC 2a336830303f3a2d, 05:56Z), verbatim as relayed by the orchestrator
+
+> **FLAG 2 = (a).** My item 3 asserted a hash that was never recorded; the report must not cite one. ONE recorded CPU run of the V3 file in an exclusive window (~11 min, OPEN/RELEASE to me; before or beside WP4.2's two-leg window, your timing), the backend named in the run's own figures file, the md5 of the CPU and the GPU figures files both recorded, and the report citing the equality by those two hashes (or stating the difference if any). If they differ, STOP to me before the two-leg window. The unlabelled `work\wp4.2-v3-figures.txt` (f76c42a5...) stays as cell 2's observation, labelled as such, not as the CPU record.
+>
+> **FLAG 1 CONCURRED:** the rewritten Limit is the true statement (a gap inside the written range is refused, an early end is accepted as D86's decoder end). Record the correction of cell 2's sentence in the ledger.
+>
+> Items 1 and 2 as applied: accepted (the `test_the_package_exports_the_root` edit recorded; alias form dropped). R1 0/0/4 terminating with the cleanup granted: concurred (F1 tool fix + test; F2-F4 test-only).
+
+**FLAG 1, the correction recorded:** cell 2's report sentence "the export half's sink check still
+refuses a short frame set, so no bad output is written" was false for `unreadable_tail`
+(`verify.missing_frames` requires only the readable pts up to the last one written); it was
+REPLACED at `1fa33a8` by the Limit now in the report (a gap inside the written range is refused;
+an early end is accepted as D86's decoder end).
+
+**FLAG 2, applied by cell 3:** `tests/test_wp42_v3_product.py` gains `CLEARWATER_WP42_V3_BACKEND`
+(`cpu` = every leg on the CPU job: the export `force_cpu`, the per-frame leg on the CPU backend
+with `hw_decode` off, as the job decides it; unset = the GPU job, the suite's form, unchanged) and
+`CLEARWATER_WP42_V3_FIGURES` (a NEW figures file: `backend: <device>` then each test's figures
+line; an existing file is refused, never overwritten; checked: a second run naming
+`figures-gpu.txt` failed at the fixture and left its md5 unchanged).
+- GPU record (light `gpu` run of my own, no window, not timed): `work\wp4.2\v3\figures-gpu.txt`,
+  6 passed in 88.47 s; `backend: cuda:0`; file md5 `629f7dc9c85c45418f70f01a9c5c6363`; the
+  figure lines after the backend line md5 `5fb51f054dda4e6612e89578fb8de45b`; the four rows equal
+  the report's table. Because each file names its backend, the two FILE hashes differ by
+  construction; the equality is cited by the hashes of the figure lines (both recorded).
+- CPU record: PENDING, the window's item (i).
+- The report labels `work\wp4.2-v3-figures.txt` as cell 2's observation only.
+
 ## RESUME HERE (two-leg suite window)
 
 For a fresh cell: read `docs/dispatch-recipe.md`, the brief (Rulings govern), this ledger and
 `docs/reports/wp4.2-video-path.md`. Reviewer A CONVERGED at round 1; cleanup committed
 (`2a7a414`, `47a4cbf`, `2865b6a`). Next: the two-leg suite in a granted window (the orchestrator
 holds the grant until WP4.2b has merged and it has rebased `wp4.2` onto main); then task 10
-(GX011627 + the WP2.3 set through the runner) only when granted; CHARC's ruling on FLAG 2 (a
-recorded CPU run of the V3 file, optional in the window). Then the return report.
+(GX011627 + the WP2.3 set through the runner) only when granted. Before or beside the suite: the
+CPU V3 record (CHARC `2a336830303f3a2d`, window item (i)); if its figure lines differ from the
+GPU record's, STOP to the orchestrator before the two-leg window. Then the return report.
 
 ## Superseded: RESUME HERE (Reviewer A round 1)
 

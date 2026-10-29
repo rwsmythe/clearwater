@@ -104,12 +104,16 @@ measurement (Reviewer A round 1): a 1/255 flicker on every other smoothed frame 
 1.0/255 on all four rows (refused against 0.5); the smoothed and per-frame frames interleaved
 give V3 ratios 0.63-5.05 per measure (refused against 0.25).
 
-V3 ran on the GPU job (device frames; CHARC `91c2c22f4b6edd18` 3, KEEP for question 9's budget).
-The CPU leg is NOT covered by the suite. What exists for it: the build ledger's statement that a
-CPU run of the file took 650 s and gave the same pre-encode figures; no hash of that run's
-figures was kept. The one figures file at the cell's seat, `work\wp4.2-v3-figures.txt` (md5
-`f76c42a5fae87b9cb691ac5594b5d3a2`, written 2026-10-29T05:22:48Z), holds the four rows above and
-names no backend.
+V3 runs on the GPU job in the suite (device frames; CHARC `91c2c22f4b6edd18` 3, KEEP for
+question 9's budget); the suite does not cover the CPU leg. Each run of the file can write its
+own figures file (`CLEARWATER_WP42_V3_FIGURES`), its first line naming the backend, and
+`CLEARWATER_WP42_V3_BACKEND=cpu` runs every leg on the CPU job (CHARC `2a336830303f3a2d`). The
+GPU record: `work\wp4.2\v3\figures-gpu.txt` (`backend: cuda:0`; file md5
+`629f7dc9c85c45418f70f01a9c5c6363`, the figure lines after the backend line md5
+`5fb51f054dda4e6612e89578fb8de45b`), the four rows above. The CPU record: PENDING, one recorded
+run in an exclusive window. Cell 2's observation `work\wp4.2-v3-figures.txt` (md5
+`f76c42a5fae87b9cb691ac5594b5d3a2`, 2026-10-29T05:22:48Z; four rows equal to the above, no
+backend named) is that cell's observation only, not the CPU record.
 
 WP1.4 real footage: 0.35-0.45. No product-method miss: no STOP. The encoded ratios include the
 encoder's frame-to-frame quantisation (NVENC, Standard); they are not V3's measurement point
