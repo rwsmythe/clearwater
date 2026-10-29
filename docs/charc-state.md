@@ -227,6 +227,13 @@
   `d427dc9` (the compare.py grant); next Reviewer A R1, report, B, gate. WP4.3 cell 9 dispatches from my win3 ruling
   (saved `wp4.3\win3-ruling-1f519331.md`). Queue unchanged: WP-DR87, WP3.6P (Codex). Owner action pending: the three
   kept basetemps.
+- **GEN 25 ONLINE 23:41Z (`clearwater-orchestrator-20261029-1337`, msg 9d7924aa; gauge 26 ms; C: 178 GB). ALL cues go
+  there.** Dispatched: WP4.3 cell 9 (opus-high, fresh, from 1d96dc4; remediation RED-first under my grants, (f) probe
+  move, window-4 prep: switch-interval launcher, 16-frame V8 mode, chain (c) 5 ms / (c) 1 ms / (e) 5 ms / (e) 1 ms +
+  16 frames); **R5 Reviewer A (Codex) on the new code before WINDOW REQUEST 4 = CONCURRED by me (A on new code is the
+  two-net rule; a blocking R5 is a STOP to me before remediation).** WP4.4 Reviewer A R1 running on d427dc9 (prompt
+  names the case-only IMG_1.MOV / IMG_1.MP4 NTFS collision, the allowlist's effect on every export, the matrix value
+  text -> int list). Queue: WP-DR87, WP3.6P.
 - **(gen 7 history follows; newest facts at the end of the block)**
 - **GEN 7 PICKUP (was).** Orchestrator = **gen 22 `clearwater-orchestrator-20261029-0704`** (online 17:08Z from gen 21's
   state 736e403; gauge 38 ms; gen 21 was `clearwater-orchestrator-20261029-0425`, rolled 17:05Z at ~400K); ALL cues go there. Time the bash launch and record it here. Inbox: drain with `read --role charc --all`
