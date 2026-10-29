@@ -590,3 +590,54 @@ def test_dr44c_a_real_job_ends_within_the_shutdown_timeout_at_close(
     print(f"DR-44 (c) {job}: ended {ended} in {elapsed * 1000:.0f} ms")
     assert ended and elapsed < SHUTDOWN_TIMEOUT_S
     assert no_temporaries(out)
+
+
+def test_dr49_the_shipped_schemas_resolve_at_six_decimals_or_fewer(make_app, qtbot) -> None:
+    """DR-49's ground, on the running shell: every float control of both methods."""
+    from clearwater.gui.parameter_panels import float_decimals
+
+    application = started(make_app, qtbot)
+    for method in application.window.context.engines.methods.values():
+        floats = [p for p in method.parameters if p.type == "float"]
+        assert floats, method.id
+        assert max(float_decimals(p) for p in floats) <= 6, method.id
+
+
+def test_s1_a_limit_and_a_clear_from_the_dialog_during_the_open_apply_after_it(
+    make_app, qtbot, monkeypatch, sample
+) -> None:
+    """S1 conditions 2 and 3, on the running shell: queued behind the open, off the UI thread."""
+    from clearwater.app import composition
+    from clearwater.app.composition import DeferredProxyCache
+
+    release = threading.Event()
+    real_open = composition.proxy_cache
+
+    def slow(folder: Path, limit: int = 0) -> Any:
+        assert release.wait(60)
+        return real_open(folder, limit)
+
+    threads: list[threading.Thread] = []
+    real_target = DeferredProxyCache._target
+
+    def target(self: DeferredProxyCache) -> Any:
+        threads.append(threading.current_thread())
+        return real_target(self)
+
+    monkeypatch.setattr(composition, "proxy_cache", slow)
+    monkeypatch.setattr(DeferredProxyCache, "_target", target)
+    application = make_app(cpu_settings(cache_limit_bytes=20 * 10**9), choosers=Choosers())
+    window = application.window
+    qtbot.waitUntil(lambda: not application.catalog.detecting(), timeout=30000)
+    dialog = dialog_open(application, qtbot)
+    assert not application.cache.wait_open(0)  # the open is still running
+    dialog.clear_button.click()
+    dialog.cache_spin.setValue(4)
+    dialog.accept()
+    qtbot.wait(200)
+    assert window.jobs.active() >= 3  # the open, the clear and the limit wait on workers
+    release.set()
+    qtbot.waitUntil(lambda: window.jobs.active() == 0, timeout=60000)
+    assert application.cache.limit_bytes() == 4 * 10**9  # the dialog's, applied after the open
+    assert threads and all(t is not threading.main_thread() for t in threads)
+    open_source(qtbot, application, sample("jpeg-gradient-srgb"))  # the window stayed usable
