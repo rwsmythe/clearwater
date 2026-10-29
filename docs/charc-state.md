@@ -51,6 +51,12 @@
   `_TIFF_STRUCTURE` + 330 drop set; Pillow stays on the read side; writer.py untouched. Added tests: unreduced RATIONAL,
   negative SRATIONAL, no-NUL ASCII count, MM order, 4/5-byte inline boundary, insertion cases, damaged child, damaged
   IFD0, SubIFDs drop. No register row; Limits in the report. Verification unchanged (owner 18:47Z).
+- **WP4.5 turn 2 BUILT (head `a804559`: tests 4da9f01, rewriter 409688b; 78 RED / 34 controls on base, 112 green after;
+  light run 788 / 1). ONE-TEST GRANT (1) 19:22Z (query d79773b0, post adea9a23 + cue):** `tests/test_io_photo_r1.py`
+  `test_a_tiff_with_an_unreadable_gps_ifd_keeps_its_other_fields` (:389-414) planted its GPS failure by monkeypatching
+  `Image.Exif.get_ifd`, which (b) never calls; grant = REAL damage (past-EOF GPS pointer 34853 LONG via tifffile
+  extratags), three assertions VERBATIM, mock removed, grant named in report + record with the msg id; base result of
+  the new form recorded in the ledger. xfail and a Pillow call-back both declined. Turn 3 = edit + report, then A R1.
 - **(gen 7 history follows; newest facts at the end of the block)**
 - **GEN 7 PICKUP (was).** Orchestrator = **gen 22 `clearwater-orchestrator-20261029-0704`** (online 17:08Z from gen 21's
   state 736e403; gauge 38 ms; gen 21 was `clearwater-orchestrator-20261029-0425`, rolled 17:05Z at ~400K); ALL cues go there. Time the bash launch and record it here. Inbox: drain with `read --role charc --all`
