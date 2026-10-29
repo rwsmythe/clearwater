@@ -140,7 +140,7 @@ PHOTO_SUFFIXES: Final = frozenset(
 VIDEO_SUFFIXES: Final = frozenset({".mp4"})
 """Video extensions, equal to ``clearwater.gui.sources.VIDEO_SUFFIXES`` (a ``gui`` test pins it)."""
 
-PROVENANCE_KEYS: Final = ("source", "settings")
+PROVENANCE_KEYS: Final = ("source", "settings", "profile")
 """The provenance keys a parameter file's set drops, as ``PresetStore`` import drops them."""
 
 STATES_DONE: Final = frozenset({"done", "done with warnings"})
@@ -380,11 +380,11 @@ class Redactor:
     r"""Replace every spelling of known folders in a text by the folder's name (case-insensitive).
 
     The spellings are the path as given, resolved and without a Windows extended-length prefix
-    (:func:`plain_path`), plus a UNC path's extended spelling; each with backslashes, with doubled
-    backslashes (an ``OSError`` or ``argparse`` text quotes the path's ``repr``) and with forward
-    slashes; and each of those also with its non-ASCII characters escaped as :func:`ascii_text`
-    escapes them (engine texts are escaped before they reach the runner), and that escaped form
-    with its backslashes doubled (the ``repr`` of an escaped path). Every form also matches
+    (:func:`plain_path`), plus a UNC path's extended spelling; each separator independently matches
+    a backslash or forward slash, including doubled backslashes (an ``OSError`` or ``argparse``
+    text quotes the path's ``repr``). Non-ASCII characters also match their :func:`ascii_text`
+    escapes (engine texts are escaped before they reach the runner), including escaped forms
+    with doubled backslashes (the ``repr`` of an escaped path). Every form also matches
     with apostrophes escaped as ``\'`` by ``repr``. Each escape matches the
     escape of any letter case of its character (``\xe9`` and ``\xc9`` alike, Reviewer B B2):
     ``re.IGNORECASE`` alone cannot equate two escapes. A spelling without a separator says
@@ -414,7 +414,12 @@ class Redactor:
                         continue
                     escaped = ascii_text(base)
                     for pattern, length, quoted_length in (
-                        (re.escape(base), len(base), len(base)),
+                        (_escaped_pattern(base, doubled=False, literal=True), len(base), len(base)),
+                        (
+                            _escaped_pattern(base, doubled=True, literal=True),
+                            len(base) + base.count("\\"),
+                            len(base) + base.count("\\"),
+                        ),
                         (_escaped_pattern(base, doubled=False), len(escaped), len(escaped)),
                         (
                             _escaped_pattern(base, doubled=True),
@@ -443,16 +448,21 @@ class Redactor:
         return ascii_text(text)
 
 
-def _escaped_pattern(text: str, *, doubled: bool) -> str:
-    """A pattern matching ``text`` as :func:`ascii_text` escapes it, in any letter case.
+def _escaped_pattern(text: str, *, doubled: bool, literal: bool = False) -> str:
+    r"""Match a path with mixed separators and optional character escapes, in any letter case.
 
-    Each non-ASCII character matches the escape of any of its case forms; with ``doubled`` every
-    backslash (an escape's or a separator's) is doubled, as a ``repr`` quotes it.
+    Every separator matches slash or backslash; with ``doubled``, a backslash separator is
+    doubled, as in ``repr``. Non-ASCII characters match their literal spelling when ``literal``
+    is true, otherwise the :func:`ascii_text` escape of any case form (with doubled escape
+    backslashes when requested). Escape backslashes are never treated as path separators.
     """
     parts = []
     for char in text:
-        if char.isascii():
-            parts.append(re.escape(char * 2 if doubled and char == "\\" else char))
+        if char in "\\/":
+            parts.append(r"(?:\\\\|/)" if doubled else r"[\\/]")
+            continue
+        if char.isascii() or literal:
+            parts.append(re.escape(char))
             continue
         cases = sorted({char, char.lower(), char.upper(), char.casefold(), char.title()})
         escapes = [ascii_text(case) for case in cases]
@@ -592,11 +602,11 @@ def read_parameter_file(path: Path) -> ParameterSet:
 
     A file over the importer's cap (``MAX_PRESET_BYTES``, 1 MiB) is refused unread. The
     document is decoded as the importer decodes it (``loads_object``: one JSON object, no
-    non-finite number anywhere), migrated (``clearwater.config.migrate``), its ``source`` and
-    ``settings`` provenance keys dropped and its keys checked (``check_parameter_set_keys``): the
-    forms ``PresetStore.import_preset`` reads, a preset and a preset with only those two keys added.
-    Any other key is refused, as the importer refuses it; so is the provenance text the photo
-    writer embeds when it adds ``profile`` for a built-in profile (an open item owned by CHARC).
+    non-finite number anywhere), migrated (``clearwater.config.migrate``), its ``source``,
+    ``settings`` and ``profile`` provenance keys dropped and its keys checked
+    (``check_parameter_set_keys``). These are the forms ``PresetStore.import_preset`` reads,
+    including the photo writer's provenance with ``profile`` for a built-in profile. Any other
+    key is refused, as the importer refuses it.
 
     Args:
         path: The JSON file.
@@ -1306,7 +1316,10 @@ def _main(
 ) -> int:
     """Run the parsed command line with the redactor in place (:func:`main`)."""
     try:
-        footage = configured_footage_folder()
+        try:
+            footage = configured_footage_folder()
+        except (OSError, RuntimeError) as exc:
+            raise RunnerRefusalError("the configured footage folder cannot be resolved.") from exc
         _check_own_paths(args, footage)
         settings = _settings(args)
         if args.parameters is not None:

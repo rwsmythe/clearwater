@@ -917,3 +917,60 @@ def test_huge_integers_and_deep_nesting_are_unreadable_not_crashes(tmp_path: Pat
         with pytest.raises(PresetImportError):
             store.import_preset(folder / f"{name}.json", SCHEMAS)
     assert (folder / "huge.json").read_text(encoding="utf-8") == huge  # untouched
+
+
+def test_year_one_created_import_is_a_readable_refusal(tmp_path: Path) -> None:
+    """DR-77: an offset crossing year 1 must not escape as OverflowError on import."""
+    data = _set().to_dict()
+    data["created"] = "0001-01-01T00:00:00+01:00"
+    source = _file(tmp_path, "year-one.json", data)
+    before = source.read_bytes()
+    with pytest.raises(PresetImportError, match="cannot decode the file"):
+        _store(tmp_path).import_preset(source, SCHEMAS)
+    assert source.read_bytes() == before
+    assert not (tmp_path / "presets").exists()
+
+
+def test_year_one_created_load_is_a_readable_refusal(tmp_path: Path) -> None:
+    """DR-77: loading the same foreign stamp must refuse without changing its file."""
+    store = _store(tmp_path)
+    store.folder.mkdir()
+    data = _set().to_dict()
+    data["created"] = "0001-01-01T00:00:00+01:00"
+    source = _file(store.folder, "year-one.json", data)
+    before = source.read_bytes()
+    with pytest.raises(PresetError, match=r"not a readable preset.*cannot decode the file"):
+        store.load("year-one")
+    assert source.read_bytes() == before
+
+
+def test_year_one_created_is_listed_as_unreadable(tmp_path: Path) -> None:
+    """DR-77: one unreadable preset must not prevent listing the remaining presets."""
+    store = _store(tmp_path)
+    store.save("good", _set())
+    data = _set().to_dict()
+    data["created"] = "0001-01-01T00:00:00+01:00"
+    source = _file(store.folder, "year-one.json", data)
+    before = source.read_bytes()
+    entries = {entry.name: entry for entry in store.list_presets()}
+    assert entries["good"].parameter_set == _set() and entries["good"].error is None
+    assert entries["year-one"].parameter_set is None
+    assert "cannot decode the file" in entries["year-one"].error
+    assert not entries["year-one"].unsupported_version
+    assert source.read_bytes() == before
+
+
+def test_writer_provenance_import_drops_profile(sample, tmp_path: Path) -> None:
+    """DR-76: provenance extracted from an actual HEIC export is a readable preset."""
+    from clearwater.app import composition
+    from test_wp43_runner_redaction import _writer_provenance
+
+    source, parameters, _ = _writer_provenance(sample, tmp_path)
+    schemas = {name: method.parameters for name, method in composition.correction_methods().items()}
+    store = _store(tmp_path)
+    result = store.import_preset(source, schemas)
+    assert result.parameter_set == parameters
+    assert result.dropped_keys == ("source", "settings", "profile")
+    assert result.provenance_dropped
+    assert "profile" not in json.loads(result.path.read_text(encoding="utf-8"))
+    assert store.load(result.name) == parameters

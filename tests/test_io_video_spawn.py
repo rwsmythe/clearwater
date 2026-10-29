@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import importlib
 import os
 import shutil
 import subprocess
@@ -158,3 +159,59 @@ def test_ffreport_parent_does_not_make_a_child_report(
     subprocess.run(command, cwd=tmp_path, capture_output=True, check=True, timeout=30, **helper())
     assert not (tmp_path / "protected-report.log").exists()
     assert sorted(path.name for path in tmp_path.iterdir()) == ["inherited-report.log"]
+
+
+@pytest.mark.parametrize("limit", [None, 17])
+def test_packet_listing_timeout_omits_tool_path(tmp_path: Path, monkeypatch, limit) -> None:
+    """DR-81 (c): report the input name and current limit, never the ffprobe command."""
+    verify = importlib.import_module("clearwater.io.video.verify")
+    tool = tmp_path / "private-tools" / "ffprobe.exe"
+    source = tmp_path / "private-inputs" / "input-\u00e9.mp4"
+    monkeypatch.setattr(verify, "find_tool", lambda name: tool)
+    if limit is not None:
+        monkeypatch.setattr(verify, "READ_TIMEOUT_S", limit)
+
+    def timeout(command, **kwargs):
+        raise subprocess.TimeoutExpired(command, kwargs["timeout"])
+
+    monkeypatch.setattr(verify.subprocess, "run", timeout)
+    with pytest.raises(verify.VideoProbeError) as caught:
+        verify._listing(source, ["-show_packets"], strict=True)
+    text = str(caught.value)
+    assert r"input-\xe9.mp4" in text and f"{verify.READ_TIMEOUT_S} s" in text
+    assert "private-tools" not in text and "private-inputs" not in text
+    assert str(tool) not in text and "-show_packets" not in text and text.isascii()
+
+
+@pytest.mark.parametrize("limit", [None, 19])
+def test_cuda_check_timeout_omits_command(tmp_path: Path, monkeypatch, limit) -> None:
+    """DR-81 (d): CUDA probe timeout text uses its configured limit, not its command."""
+    decode = importlib.import_module("clearwater.io.video.decode")
+    tool = tmp_path / "private-tools" / "ffmpeg.exe"
+    monkeypatch.setattr(decode, "find_tool", lambda name: tool)
+    if limit is not None:
+        monkeypatch.setattr(decode, "CUDA_CHECK_TIMEOUT_S", limit)
+
+    def timeout(command, **kwargs):
+        raise subprocess.TimeoutExpired(command, kwargs["timeout"])
+
+    monkeypatch.setattr(decode.subprocess, "run", timeout)
+    available, text = decode._check_cuda()
+    assert not available and f"{decode.CUDA_CHECK_TIMEOUT_S} s" in text
+    assert "private-tools" not in text and str(tool) not in text
+    assert "-init_hw_device" not in text and text.isascii()
+
+
+def test_cuda_check_oserror_omits_filename(tmp_path: Path, monkeypatch) -> None:
+    """DR-81 (d): a spawn failure exposes its class and strerror, without filename."""
+    decode = importlib.import_module("clearwater.io.video.decode")
+    tool = tmp_path / "private-tools" / "ffmpeg.exe"
+    monkeypatch.setattr(decode, "find_tool", lambda name: tool)
+
+    def refused(command, **kwargs):
+        raise FileNotFoundError(2, "tool unavailable", str(tool))
+
+    monkeypatch.setattr(decode.subprocess, "run", refused)
+    available, text = decode._check_cuda()
+    assert not available
+    assert text == "FileNotFoundError: tool unavailable"

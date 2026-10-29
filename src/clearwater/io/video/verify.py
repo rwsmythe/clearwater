@@ -230,7 +230,11 @@ def _listing(path: Path, arguments: Sequence[str], *, strict: bool) -> dict[str,
             check=False,
             **tool_spawn_kwargs(),
         )
-    except (OSError, subprocess.TimeoutExpired) as error:
+    except subprocess.TimeoutExpired as error:
+        raise VideoProbeError(
+            "unreadable", f"{name} could not be listed: timed out after {READ_TIMEOUT_S} s."
+        ) from error
+    except OSError as error:
         raise VideoProbeError("unreadable", f"{name} could not be listed: {error}") from error
     if strict and done.returncode != 0:
         raise VideoProbeError(

@@ -66,7 +66,7 @@ the ``.json`` suffix and for the 13 bytes ``atomic_write_text`` adds to its temp
 """
 
 _SUFFIX = ".json"
-_PROVENANCE_KEYS = ("source", "settings")
+_PROVENANCE_KEYS = ("source", "settings", "profile")
 _FORBIDDEN_CHARACTERS = frozenset('<>:"/\\|?*')
 _RESERVED_DEVICE_NAMES = frozenset(
     {"CON", "PRN", "AUX", "NUL", "CONIN$", "CONOUT$"}
@@ -139,8 +139,8 @@ class PresetImportResult:
         path: The stored file.
         parameter_set: The imported set, without provenance.
         dropped_keys: The provenance keys the source file carried and that were not kept: any of
-            ``"source"`` and ``"settings"`` (a provenance sidecar), in that order; empty for a
-            plain preset.
+            ``"source"``, ``"settings"`` and the photo writer's ``"profile"``, in that order;
+            empty for a plain preset.
     """
 
     name: str
@@ -574,7 +574,7 @@ class PresetStore:
             return self._parse(path)
         except (FormatError, UnicodeDecodeError):
             raise
-        except (ValueError, RecursionError) as error:
+        except (ValueError, RecursionError, OverflowError) as error:
             raise FormatError(f"cannot decode the file: {error}") from error
 
     def _parse(self, path: Path) -> tuple[ParameterSet, tuple[str, ...]]:

@@ -19,7 +19,8 @@
 | Turn / boundary | Dispatcher-provided depth | Window of record | Action |
 |---|---|---|---|
 | Turn 1 footer, supplied at Turn 2 dispatch | `tokens used` 96,223; input depth 102,475 | 258,400 tokens | Dispatcher-read figure for session `01a18856-955d-74e3-b211-dfb519efdf0c`; evaluate near 200K, stop at a step boundary near 250K. |
-| Turn 2 | Awaiting dispatcher footer reading | 258,400 tokens | Do not estimate depth. |
+| Turn 2 footer, supplied at Turn 3 dispatch | `tokens used` 238,706; input depth 146,818 | 258,400 tokens | Dispatcher-read figure; no estimate substituted. |
+| Turn 3 | Awaiting dispatcher footer reading | 258,400 tokens | Evaluate near 200K at the next boundary; do not estimate depth. |
 
 ## Round 0: observed base
 
@@ -328,3 +329,160 @@ post, commit or sibling-worktree access. No product timing or memory figure
 was measured. The inherited-report positive controls wrote only within
 tmp_path. No STOP or new open question. The remaining requested seat check is
 `uv run ruff format --check .`; no blocked FFmpeg run needs a request.
+
+## Turn 3: tasks 4-5, config readers and failure texts
+
+### Dispatcher-seat QA of Turn 2 (supplied at Turn 3 dispatch)
+
+The orchestrator committed Turn 2 as one green commit, `ef903e5`, and reported:
+
+- Product diff read: the sole helper owns CREATE_NO_WINDOW on win32, all seven
+  sites consume it, tool_env delegates, and pipes imports no package module.
+- `uv run ruff format --check .`: **268 files already formatted**.
+- `QT_QPA_PLATFORM=offscreen uv run pytest -q -rs tests/test_io_video_*.py
+  -m "not footage and not fullclip"`: **494 passed, 12 deselected in 640.87 s**.
+  Its non-footage decode-hardware, encode and bench cases passed unchanged.
+
+These are dispatcher-supplied seat results, not additional sandbox executions.
+No Reviewer A round has been supplied yet.
+
+### Task 4: produced and RED -> GREEN
+
+- Added OverflowError to PresetStore._read's decode-failure mapping and
+  load_settings' existing set-aside/defaults mapping; frozen IF-9 is untouched.
+- Added profile to the two provenance-key sets. Updated the runner's granted
+  parameter-reader docstring and the directly affected PresetImportResult
+  dropped_keys docstring. The writer's key and output shape remain unchanged.
+- Added three independent preset stamp regressions (import/load/list), the
+  settings stamp regression, a real-writer provenance import test, and a real
+  CLI --parameters test. A helper in the new runner test file exports the
+  synthetic HEIC through composition.export_jobs with force_cpu, reads the PNG's
+  actual iTXt through Pillow, and writes its provenance text under tmp_path.
+  The preset test reuses that test-only helper; no conftest or shared fixture
+  was changed.
+
+All six cases ran before the reader/key edits at product base `ef903e5`:
+**6 failed, 180 deselected in 1.62s**, exit 1. Log:
+`work/wp4.3a/turn3-config-red.log`.
+
+| Test | Observed RED | Final GREEN |
+|---|---|---|
+| `test_year_one_created_import_is_a_readable_refusal` | OverflowError escapes import. | PresetImportError, source unchanged, no store created. |
+| `test_year_one_created_load_is_a_readable_refusal` | OverflowError escapes load. | PresetError with readable decode reason; file unchanged. |
+| `test_year_one_created_is_listed_as_unreadable` | OverflowError aborts listing. | Good entry retained, corrupt entry has error/no parameter set, source unchanged. |
+| `test_year_one_created_settings_are_set_aside` | OverflowError escapes load_settings. | Defaults returned, original bytes moved aside, warning names decode failure and defaults. |
+| `test_writer_provenance_import_drops_profile` | PresetImportError: unknown keys: profile. | Actual exported metadata preserved as parameters; source/settings/profile reported dropped; stored file has no profile. |
+| `test_parameters_accept_writer_provenance` | CLI returns 2: unknown keys: profile. | Same extracted file is accepted by --parameters; real CPU export succeeds, record identifies file parameters. |
+
+The first post-fix run had four passes and two provenance-test expectation
+failures: the helper compared exported provenance to the original request.
+Independent source trace confirmed jobs.provenance.provenance_object builds a
+fresh export timestamp and records effective parameters with defaults overlaid
+(jobs/export.py photo export passes those effective parameters). This was a
+test expectation error, not another product defect. The helper now constructs
+its expected ParameterSet directly from the actual written method, parameter
+mapping, timestamp and version. No jobs or interface code changed. The original
+RED failures occur at the profile refusal before those comparison assertions.
+
+The corrected six cases passed: **6 passed, 180 deselected in 0.75s**, exit 0.
+Log: `work/wp4.3a/turn3-config-green-final.log`. Both real CPU export tests ran
+inside the sandbox; no DR-76 run request is needed.
+
+### Task 5: produced and RED -> GREEN
+
+- Redactor now matches every actual path separator independently as slash or
+  backslash. Literal Unicode, escaped Unicode, doubled separators/escapes and
+  quoted apostrophes retain their separate forms and ordering. Escape
+  backslashes generated for Unicode are not treated as path separators.
+- Only the configured-footage lookup in _main gained an OSError/RuntimeError
+  conversion into a fixed, path-free RunnerRefusalError, handled by the existing
+  usage-refusal route (exit 2, before request creation or export).
+- verify._listing's timeout branch names the ASCII-safe source basename and
+  READ_TIMEOUT_S, without the command or tool path. Its 600-second constant is
+  unchanged. Its existing non-timeout OSError handling was not widened.
+- decode._check_cuda now returns fixed timeout text through
+  CUDA_CHECK_TIMEOUT_S, or the OSError class and strerror only. The existing
+  warning caller is unchanged. This implements Q-C's DR-81 (d) disposition.
+
+Before these edits, all 13 task-5 cases failed for their intended reasons:
+**13 failed, 7 deselected in 0.91s**, exit 1. Log:
+`work/wp4.3a/turn3-redaction-red.log`.
+
+| Test / cases | Observed RED | Final GREEN |
+|---|---|---|
+| `test_redactor_matches_mixed_separators` (5 forms) | Mixed path remains visible, including raw/doubled/ASCII/ASCII-doubled/quoted forms. | Known child folder shown by its ASCII-safe basename, with no parent prefix. |
+| `test_argparse_redacts_mixed_separators` | Quoted invalid integer exposes private parent. | Exit 2, parser reason retained, private parent absent, no configuration lookup. |
+| `test_raising_footage_resolution_is_a_usage_refusal` (OSError/RuntimeError) | Injected Path.resolve error escapes main with the unknown folder path. | Exit 2, fixed ASCII-safe refusal, no request/export/output. |
+| `test_packet_listing_timeout_omits_tool_path` (native limit / 17) | TimeoutExpired includes ffprobe command and private folders. | Source basename and configured limit present, command/paths absent. |
+| `test_cuda_check_timeout_omits_command` (native limit / 19) | TimeoutExpired includes full FFmpeg command. | False plus fixed text with configured limit, no command/path. |
+| `test_cuda_check_oserror_omits_filename` | Raw FileNotFoundError includes errno and executable filename. | False plus exactly the error class and strerror. |
+
+The first post-fix pass caught one remaining doubled-literal Unicode form:
+the parent matched but the child prefix survived. The failure independently
+identified the missing literal-Unicode/doubled-separator pattern. Added that
+form, then the same 13 cases passed: **13 passed, 7 deselected in 0.72s**,
+exit 0. Log: `work/wp4.3a/turn3-redaction-green-final.log`.
+
+### Requested checks and the STOP finding
+
+- Final focused run, covering all new task-3/4/5 cases: **25 passed,
+  180 deselected in 2.15s**, exit 0. Log:
+  `work/wp4.3a/turn3-focused-final.log`. Required sandbox shim and no-cache
+  provider used throughout, with temp roots under work/wp4.3a.
+- Requested broader regression set (every tests/test_config_*.py, spawn tests,
+  headless tests, WP4.2a and WP4.2b runner tests, new runner tests):
+  **4 failed, 370 passed, 1 deselected in 11.72s**, exit 1. The marker expression
+  was `not gpu and not footage and not slow and not gui and not fullclip`.
+  Log: `work/wp4.3a/turn3-touched-regression.log`.
+- `uv run ruff check .`: initially reported a new-test regex-literal lint and
+  local-import order; both corrected in the added test code. Final exit 0,
+  `All checks passed!`. Log: `work/wp4.3a/turn3-ruff-final.log`.
+- `uv run mypy`: exit 0, `Success: no issues found in 141 source files`.
+  Log: `work/wp4.3a/turn3-mypy.log`.
+- Formatter write mode on the nine owned Python files: exit 0,
+  `1 file reformatted, 8 files left unchanged`. Log:
+  `work/wp4.3a/turn3-format.log`. Global format check remains at the seat.
+- Final scope/bytes check: exit 0, exactly ten owned paths changed, all LF;
+  unowned headless tests unchanged; `git diff --check` passed. Log:
+  `work/wp4.3a/turn3-scope-check.log`.
+
+| ID / severity | Finding and evidence | Disposition |
+|---|---|---|
+| T3-F1 / MINOR, out-of-envelope test alignment | `tests/test_headless_export.py:1093-1105`, `test_b4_a_settings_file_whose_created_stamp_overflows_is_a_usage_refusal`, expects status 2/no output for the exact DR-85 stamp. With the ruled fix, load_settings sets aside the file and returns defaults; the real CPU export succeeds with status 0. Isolated reproduction: exit 1, `1 failed in 0.69s`, `AssertionError: assert 0 == 2`; `work/wp4.3a/turn3-b4-repro.log`. Origin: `git log -S` identifies `f6023dd`, WP4.1 Reviewer B remediation. | **STOP: required test alignment is outside ownership.** Recommended grant: update only this test to assert the ruled set-aside/defaults behavior and successful CLI export. Do not restore the OverflowError or alter ungranted runner settings logic to preserve this stale expectation. Existing test is untouched. Dispatcher/CHARC ruling required; requested regression set is not green, so hold a green-commit claim. |
+| T3-F2 / MINOR, sandbox environment | Three existing tests fail at `tests/test_headless_export.py:615`, `_unc_extended` calling `LOCAL_SHARE.is_dir()`, with PermissionError/WinError 5 for the localhost administrative share: `test_g1_inside_sees_every_spelling_of_the_same_folder`; `test_g1_main_refuses_every_footage_check_through_another_spelling[unc]`; `test_g1_the_redactor_hides_the_extended_spellings`. They do not reach the relevant UNC assertions. Origin of helper: `git log -S` identifies `831e900`, WP4.1 R2. Digest: `work/wp4.3a/turn3-failure-digests.log` (exit 0, four actual failures confirmed). | RUN REQUEST at the orchestrator's seat for these three tests. No helper/test edit and no further share access attempted here. This is not evidence of a new product regression. |
+
+Cheap reproduction of T3-F1 (PowerShell sets PYTHONPATH to scripts first):
+
+```text
+uv run pytest tests/test_headless_export.py::test_b4_a_settings_file_whose_created_stamp_overflows_is_a_usage_refusal -q --basetemp=work/wp4.3a/tmp-b4 -p sandbox_mkdir_shim -p no:cacheprovider
+```
+
+Seat run request (no sandbox shim at the seat):
+
+```text
+uv run pytest -q -rs tests/test_headless_export.py::test_g1_inside_sees_every_spelling_of_the_same_folder "tests/test_headless_export.py::test_g1_main_refuses_every_footage_check_through_another_spelling[unc]" tests/test_headless_export.py::test_g1_the_redactor_hides_the_extended_spellings --basetemp=work/wp4.3a-seat-unc
+uv run ruff format --check .
+```
+
+### Verification record and handoff
+
+| Pass | Suspected / confirmed / rejected | Fix or remaining action |
+|---|---|---|
+| Task-4 RED/GREEN | All six required defects reproduced. A later equality failure was confirmed as an incorrect test expectation by tracing the real provenance writer. | Reader mappings/key sets fixed; test expectation corrected to the actual written metadata; six cases green. |
+| Task-5 RED/GREEN | All 13 cases reproduced their intended leaks or escaping exception. Doubled raw Unicode exposed one incomplete pattern after the first fix. | Added the missing form; all 13 cases green. |
+| Final focused pass | Twenty-five cases pass, including real CPU provenance exports, constant changes, both resolution exceptions and previous spawn policy. | No new in-envelope issue found in this pass. |
+| Broader unchanged-test pass | Three failures confirmed as share-access restrictions in existing helper code; one confirmed as a stale test contract after the required settings behavior change. | Route T3-F2 to a seat run; STOP for T3-F1's narrow test-update grant. No out-of-scope remediation. |
+
+This turn bundles tasks 4 and 5 in overlapping runner files; propose one combined
+commit only after the STOP is dispositioned so that the requested regression
+set can be green. No acceptance/full-pass claim, Reviewer A convergence, or
+package-completion claim is made. The final report remains scheduled for Turn 4.
+
+Turn 3 locks: changes remain in the five owned product modules, four owned test
+files and ledger; tests/test_headless_export.py is unchanged. No frozen
+interface, GUI, app, jobs, writer, dependency, local-config or register edit.
+No actual footage access, hardware-marked test execution, mailbox post, commit
+or sibling-worktree access. The attempted administrative-share access came from
+the authorized existing test set and failed in the sandbox; further execution
+of those cases is yielded to the seat. All new tests remain parallel-leg and
+all new writes stay under tmp_path. No new product timing/memory measurement.

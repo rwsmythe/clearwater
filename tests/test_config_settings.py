@@ -441,3 +441,17 @@ def test_a_step_returning_a_non_object_is_a_format_error_naming_the_step(
     _write(tmp_path, _document(format_version=0))
     assert load_settings(tmp_path, migrations=registry) == Settings()  # set aside as corrupt
     assert list(tmp_path.glob("settings.json.bad-*"))
+
+
+def test_year_one_created_settings_are_set_aside(tmp_path: Path, caplog) -> None:
+    """DR-85: an unrepresentable UTC stamp uses the corrupt-file/defaults route."""
+    last = _last().to_dict()
+    last["created"] = "0001-01-01T00:00:00+01:00"
+    source = _write(tmp_path, _document(last_parameters=last))
+    before = source.read_bytes()
+    with caplog.at_level(logging.WARNING, logger="clearwater.config.settings_store"):
+        assert load_settings(tmp_path) == Settings()
+    assert not source.exists()
+    (set_aside,) = tmp_path.glob("settings.json.bad-*")
+    assert set_aside.read_bytes() == before
+    assert "cannot be decoded" in caplog.text and "using defaults" in caplog.text
