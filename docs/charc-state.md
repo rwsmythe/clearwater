@@ -344,6 +344,10 @@
   fullclip if WP-T6 merged. STOP candidates 1-4 closed by Q15/Q21/Q16/Q15. Owed by me: at 4.3a's accept AD-13 + AD-23 notes and
   the DR-58(b)/76/77/81/85 closures; at 4.3's accept its table. NEXT: orchestrator appends the ruling, carves 4.3a, ff, dispatches
   WP4.3; WP-T6 W2 run 3 / rung 3 meanwhile; WP4.3a short brief for my ruling.
+- **WP-T6 W2 RUN 3 WINDOW OPEN ~12:23Z (status `dc24aecfe09cd0c0`, no reply owed; 2-5 min): checker change 13a5fe6 per my
+  controls ruling (pairing-count mismatch = named 4(d) FAIL, no raise; `4b_count` / `4b_packets` split; stage 3 plants both
+  cut flags one frame late); 0 pre-rung-2 conftest lines changed; seat 2 depth 101,282. NEXT: W2 release (controls caught by
+  name) -> rung 3 (W3) with the V4-delta check.
 - **(history) After WP4.1's accept:** WP4.2's brief (DRAFT RULED on main 3aa3c51) got ONE revision pass against WP4.1's accept record, then FINAL
   on CHARC's word; its revision must carry: DR-78/79 (B2 rows) as WP4.2 items, the WP4.1 runner's final names and the stream-syntax
   predicate, the Limit text. WP4.3's revision later carries DR-75 (REQUIRED test under its Q12), DR-76, DR-77, and the AD-23 'applied by
