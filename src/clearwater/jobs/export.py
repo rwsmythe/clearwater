@@ -432,7 +432,7 @@ class _Analysis:
             _LOG.warning("the export's analysis thread did not end within %s s", ANALYSIS_JOIN_S)
 
 
-def _expected_frames(probe: ProbeResult) -> int | None:
+def expected_frames(probe: ProbeResult) -> int | None:
     """Return the frames a whole decode of the probed clip yields, when it is known (DR-45 (b)).
 
     The probe's count for a clip with no D86 fault; for a ``truncated`` clip the readable count,
@@ -441,7 +441,14 @@ def _expected_frames(probe: ProbeResult) -> int | None:
     ``91c2c22f4b6edd18``) or an unknown count. With None, a decode of an ``unreadable_tail`` clip
     that ends early is marked complete at the decoder's end, as D86 intends, and no packet listing
     is made; the export half is still held by the sink's ``missing_frames`` rule (every readable
-    frame up to the last one written, none skipped).
+    frame up to the last one written, none skipped). Public (WP4.3, ruling Q18) so the GUI's
+    analysis passes the same count as the export's: one copy of the rule.
+
+    Args:
+        probe: The clip's probe result.
+
+    Returns:
+        The frame count, or None when it is not known before decoding.
     """
     kinds = {fault.kind for fault in probe.faults}
     if "unreadable_tail" in kinds:
@@ -449,6 +456,11 @@ def _expected_frames(probe: ProbeResult) -> int | None:
     if "truncated" in kinds:
         return len(readable_video_pts(probe, read_packet_table(probe.path)))
     return probe.video.nb_frames
+
+
+def _expected_frames(probe: ProbeResult) -> int | None:
+    """Return :func:`expected_frames` of ``probe`` (the export's own name for the one rule)."""
+    return expected_frames(probe)
 
 
 def _close_stream(frames: Iterator[Frame], *, quietly: bool) -> None:

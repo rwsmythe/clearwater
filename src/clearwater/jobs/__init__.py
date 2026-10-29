@@ -25,6 +25,7 @@ from .export import (
     BackendSelector,
     ExportEngine,
     effective_parameters,
+    expected_frames,
     is_reserved_device_name,
 )
 from .naming import (
@@ -76,6 +77,7 @@ __all__ = [
     "effective_parameters",
     "estimate_photo_bytes",
     "estimate_video_bytes",
+    "expected_frames",
     "final_output_path",
     "is_disk_full",
     "is_reserved_device_name",
