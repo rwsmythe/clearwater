@@ -264,3 +264,52 @@ Start-up figures noted for the report: imports 1.46 s, capabilities 550 ms fresh
 - Cell 1 (`wp43-cell1`) did tasks 1 and 2 (round 0, `649483b`) and retired at 263,162 by the evaluation rule; its full report is `C:\Users\rwsmy\clearwater-review-evidence\wp4.3\cell1-round0-return.md`; round-0 evidence `C:\Users\rwsmy\clearwater-review-evidence\wp4.3\r0\`.
 - Cell 2 builds tasks 3-12 with the round-0 design table above AS RULED: S1 = (a) the deferred-open handle with its FIVE conditions; S2 = the ALTERNATIVE (select at each run start, rebuild the engine over the same cache); S3, S6, S7 and the order as recommended. No product code exists yet.
 - Windows (V7 exclusive, the GX011627 legs) are requested by `WINDOW REQUEST`; the ONE two-leg gate is the orchestrator's after Reviewer A converged and Reviewer B returned.
+
+## Build (cell 2, brief tasks 3-10; 2026-10-29)
+
+Built on `49abe57` per the round-0 table AS RULED (S1 (a) with its five conditions, S2 rebuild at
+a run, S3, S6, S7, S-order). Commits (all LF, ASCII, pathspec):
+
+| Commit | Content |
+|---|---|
+| `b52b24a` | DR-52, DR-61: settings dialog on `resolve_encoder`, `catalog=`, erratum to the WP3.20 report |
+| `802354c` | S1/Q16/Q11/Q17/DR-84: `DeferredProxyCache`, `export_jobs(cache=)`, `default_engines(*, locations=None)`, S1 stand-in deleted |
+| `778d279` | Q18/Q3/Q8/Q22/S2/S6: `jobs.expected_frames`, `app/startup.py`, `app/activity.py`, `app/analysis_adapter.py` |
+| `5fcb673` | DR-68/DR-75: worker chores, the plan release on `clearwater-preview`, `RenderRequest.display_icc` |
+| `ab973c3` | Q2/Q4/Q5/S3/S-order/DR-35 (c)/DR-85 test: `app/main.py`, `__main__.py`, `set_idle_device`, `test_app_deps` |
+| `426662f` | the G-matrix (`tests/test_app_wiring.py`) |
+| `3a109de` | V8 and V18 on the shell; DR-75's REQUIRED test |
+| `1681d43` | V7 gate forms (a)-(f); DR-44 (c) at close |
+| `1a41abc` | DR-49's ground; the dialog's limit and clear queued behind the open |
+| `8daaee7` | report draft |
+
+Red-first: the DR-61 and DR-52 cases were run on the base dialog (6 failed, 3 passed by design);
+DR-75's base rule is a permanent planted control (`test_dr75_the_base_display_rule_fails_the_required_test`);
+DR-84's planted constructions; DR-68's planted controller without the release; the new modules
+fail to import on the base.
+
+Light run (touched files, their markers, the layering tests; NOT the gate; shared host):
+`567 passed, 1 xfailed in 341.74s` (`C:\Users\rwsmy\clearwater-review-evidence\wp4.3\build\light1.txt`,
+md5 `84b688123374d6f3c87d7f2b8cd51d60`); the xfail is DR-85's strict marker. ruff check, ruff
+format --check, mypy strict (146 files): clean.
+
+Decisions inside the ruled shapes (for Reviewer A to challenge):
+- A journal that cannot be written is logged and the export goes on; the output folder is
+  always scanned at start.
+- DR-61 (iii): one dialog never presents the same error text twice until its save clears its
+  banners (a per-window rule would break `test_every_message_of_the_dialog_is_ascii`).
+- The cache-open failure is one `warning` (owner `startup`); every member then refuses with
+  `the analysis cache could not be opened: <reason>`.
+- The device probe selects for a 1 x 1 frame with the default method's estimate.
+- The shared GUI fixture `make_app` lives in `tests/test_app_startup.py` (no unowned helper).
+- DR-82's single routes use an NTFS stream source (Windows; skipped elsewhere), as WP4.2b did.
+- DR-68's pre-preview figure is read after a warm pass (kernel loads are a one-time process
+  cost); tolerance 2 MiB.
+
+Flags: `gui/shell.py`'s module and `run` docstrings still say WP4.3 calls `run` (grant: the
+device text only). The export panel prefixes a failure with the file name, so DR-82's banner
+reads `<name>: <name>: this file name cannot be used ...` (the panel's form for every failure).
+Two node IDs renamed with their edits: `test_app_deps.py::test_no_app_module_imports_the_gui_or_qt`
+-> `::test_no_app_module_but_main_imports_the_gui_or_qt_and_none_imports_cupy`;
+`test_gui_settings_dialog.py::test_auto_is_resolved_by_a_rule_that_disagrees_with_the_interim_rule`
+-> `::..._default_rule`.
