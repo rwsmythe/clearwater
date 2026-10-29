@@ -41,6 +41,16 @@
   clean; C: 84.8 GB free; gen 23 `clearwater-orchestrator-20261029-0852` listed live (shell busy); worktrees `wp4.3`,
   `wp4.3a`, `wp4.5`, `inventory-1029`, `stack-g22` OCCUPIED until gen 23 proves the cells returned. Nothing owed by me
   at pickup; waiting on gen 23's WP4.5 status and the stack-g22 RELEASE post (then `work/charc-handoff/` scripts).
+- **WP4.5 Q1 RULED (b) 19:09Z (query cdd92a90, post aead7087 + cue).** Round 0 STOP verified: `Image.Exif.tobytes()`
+  (Image.py:4204-4226) and the nested branch (TiffImagePlugin.py:980-986) build fresh IFDs, no tagtype travels. Deciding
+  second fact (my probe, Pillow 12.3.0): the RATIONAL writer REDUCES (1234/100 -> 617/50, `_limit_rational` :843) and
+  appends a NUL to an un-terminated ASCII, so (a') typed Pillow IFDs cannot meet Q2 (type, count, bytes equal). (b) =
+  private struct-only rewriter in `exif.py`: pass-through of every kept entry, relocation, pointers re-offset, IFD1 and
+  SubIFDs dropped, D63 edits by entry (274 SHORT 1; 305 ASCII; 40962/3 keep source type else LONG), child damage dropped
+  alone, IFD0 damage raises (sanitise unchanged), BigTIFF = None + Limit; Q3 `from_tiff` = same rewriter with the
+  `_TIFF_STRUCTURE` + 330 drop set; Pillow stays on the read side; writer.py untouched. Added tests: unreduced RATIONAL,
+  negative SRATIONAL, no-NUL ASCII count, MM order, 4/5-byte inline boundary, insertion cases, damaged child, damaged
+  IFD0, SubIFDs drop. No register row; Limits in the report. Verification unchanged (owner 18:47Z).
 - **(gen 7 history follows; newest facts at the end of the block)**
 - **GEN 7 PICKUP (was).** Orchestrator = **gen 22 `clearwater-orchestrator-20261029-0704`** (online 17:08Z from gen 21's
   state 736e403; gauge 38 ms; gen 21 was `clearwater-orchestrator-20261029-0425`, rolled 17:05Z at ~400K); ALL cues go there. Time the bash launch and record it here. Inbox: drain with `read --role charc --all`
