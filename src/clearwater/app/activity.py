@@ -16,7 +16,9 @@ worker, in this order:
    find never starts.
 3. A video: the clip's lock (the key is computed here, on the worker: ``ExportJobs.job`` builds
    the callable only).
-4. DR-68: the preview's FFT plans are released before the job selects its backend.
+4. DR-68: the preview's FFT plans are released before the job selects its backend; the job
+   waits for the release with no deadline, and a cancel while waiting ends it unwritten
+   (R1-11).
 5. The engine's job; then the AD-9 log line naming ``JobResult.device``.
 6. Always: the lock released, and the journal entry removed unless its folder still holds a
    temporary output (the engine could not remove one, or the job died mid-write); the next
@@ -143,8 +145,9 @@ class GuardedExports:
         cache: The application's one cache (the clip's key and the open's wait).
         locks: The per-clip locks shared with the GUI's analysis.
         journal: The write journal.
-        release_device_plans: Releases the preview's FFT plans on the preview's thread (DR-68);
-            None when there is no preview.
+        release_device_plans: Releases the preview's FFT plans on the preview's thread and
+            waits for it, cancellably (DR-68, R1-11); False means the job was cancelled while
+            waiting, and it then ends before it selects. None when there is no preview.
     """
 
     def __init__(
@@ -154,7 +157,7 @@ class GuardedExports:
         cache: DeferredProxyCache,
         locks: ClipLocks,
         journal: WriteJournal,
-        release_device_plans: Callable[[], object] | None = None,
+        release_device_plans: Callable[[Progress], bool] | None = None,
     ) -> None:
         """Store the collaborators; nothing runs until a job runs."""
         self._engine = engine
@@ -240,8 +243,8 @@ class GuardedExports:
             if key is not None and not self._locks.acquire(key, progress):
                 return _cancelled(started)
         try:
-            if self._release is not None:
-                self._release()
+            if self._release is not None and not self._release(progress):
+                return _cancelled(started)  # never selects before the release (R1-11)
             result = inner(progress)
         finally:
             if key is not None:

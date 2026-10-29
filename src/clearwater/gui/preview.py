@@ -18,7 +18,8 @@ from __future__ import annotations
 import logging
 import math
 import threading
-from collections.abc import Mapping
+import time
+from collections.abc import Callable, Mapping
 
 import numpy as np
 from numpy.typing import NDArray
@@ -398,6 +399,10 @@ class PreviewWidget(QWidget):
             self.zoom_out()
 
 
+RELEASE_POLL_S = 0.05
+"""How often a job waiting for the preview's plan release looks at its cancel flag (R1-11)."""
+
+
 class PreviewController(QObject):
     """Drives the preview from the session (implements ``contract.PreviewSurface``).
 
@@ -515,17 +520,22 @@ class PreviewController(QObject):
         """Return True when no render or frame decode waits or runs."""
         return self._renderer.idle() and self._framer.idle()
 
-    def release_device_plans(self, timeout_s: float) -> bool:
+    def release_device_plans(
+        self, timeout_s: float | None, *, cancelled: Callable[[], bool] | None = None
+    ) -> bool:
         """Release the preview thread's FFT plans and wait for it (DR-68; any thread but it).
 
         The release runs on the preview worker's thread as a chore, after the render in flight
-        and before the next one; it is never superseded.
+        and before the next one; it is never superseded. The release is queued once; the wait
+        looks at ``cancelled`` every :data:`RELEASE_POLL_S` seconds (R1-11).
 
         Args:
-            timeout_s: The longest wait.
+            timeout_s: The longest wait, or None to wait until the release ran or ``cancelled``.
+            cancelled: Ends the wait early when it returns True (the waiting job's cancel).
 
         Returns:
-            True when the release ran within ``timeout_s``.
+            True when the release ran; False when the worker has stopped, the wait was
+            cancelled, or ``timeout_s`` passed first.
         """
         done = threading.Event()
 
@@ -537,7 +547,13 @@ class PreviewController(QObject):
 
         if not self._renderer.run_chore(chore):
             return False
-        return done.wait(timeout_s)
+        deadline = None if timeout_s is None else time.monotonic() + timeout_s
+        while not done.wait(RELEASE_POLL_S):
+            if cancelled is not None and cancelled():
+                return False
+            if deadline is not None and time.monotonic() >= deadline:
+                return False
+        return True
 
     def stop(self, timeout_s: float) -> bool:
         """Stop both workers (shell close); the preview thread releases its FFT plans first.

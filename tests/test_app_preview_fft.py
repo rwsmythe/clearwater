@@ -260,6 +260,49 @@ def test_a_release_asked_from_a_job_thread_runs_after_the_render_in_flight(
     assert box == {"ok": True} and backend.releases[-1] == "clearwater-preview"
 
 
+def test_the_release_wait_has_no_deadline_but_ends_on_a_cancel(make_window, qtbot) -> None:
+    """R1-11: a job waits for the release past any fixed timeout, or until it is cancelled."""
+    gate, rendering = threading.Event(), threading.Event()
+    backend = RecordingBackend()
+
+    def select(settings: Settings, height: int, width: int, method_id: str) -> Any:
+        if gate.is_set():
+            return backend, "GPU"
+        rendering.set()
+        assert gate.wait(30)  # a render holding the preview thread
+        return backend, "GPU"
+
+    path = Path("p.png")
+    window = make_window(photo_engines({path: image(60, 80)}, select_backend=select))
+    window.open_path(path)
+    qtbot.waitUntil(rendering.is_set, timeout=30000)
+    cancel = threading.Event()
+    box: dict[str, bool] = {}
+
+    def job() -> None:
+        box["cancelled"] = window.controller.release_device_plans(None, cancelled=cancel.is_set)
+
+    thread = threading.Thread(target=job, name="clearwater-job")
+    thread.start()
+    thread.join(0.5)
+    assert thread.is_alive()  # still waiting: the render holds the thread
+    cancel.set()
+    thread.join(5)
+    assert box == {"cancelled": False}
+
+    def waiting_job() -> None:
+        box["released"] = window.controller.release_device_plans(None, cancelled=lambda: False)
+
+    thread = threading.Thread(target=waiting_job, name="clearwater-job")
+    thread.start()
+    thread.join(0.5)
+    assert thread.is_alive()
+    gate.set()
+    thread.join(30)
+    assert box["released"] is True
+    wait_idle(qtbot, window)
+
+
 # DR-68's gpu test: the device reading returns to its pre-preview figure after the boundary.
 
 ONE_POOL_BLOCK = 2 * 1024**2

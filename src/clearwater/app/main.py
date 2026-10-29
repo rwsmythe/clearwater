@@ -63,9 +63,6 @@ OWNER_STARTUP = "startup"
 CACHE_FAILED_TEXT = "Videos cannot be analysed or exported in this session: {reason}."
 """The one warning shown when the cache's open failed (ruling S1 (a), condition 2)."""
 
-PLAN_RELEASE_TIMEOUT_S = 10.0
-"""The longest wait of a job for the preview's FFT plan release (DR-68)."""
-
 
 class _CloseWatch(QObject):
     """Sets ``closed`` when the window gets its close event, before the shell's shutdown runs."""
@@ -253,9 +250,11 @@ def build_application(
     locks = ClipLocks()
     controller = window.controller
 
-    def release_device_plans() -> None:
-        if not controller.release_device_plans(PLAN_RELEASE_TIMEOUT_S):
-            _LOG.warning("the preview's FFT plans were not released in time")
+    def release_device_plans(progress: Progress) -> bool:
+        """Wait for the preview's release, cancellably; True lets the job select (R1-11)."""
+        if controller.release_device_plans(None, cancelled=progress.cancelled):
+            return True
+        return not progress.cancelled()  # the preview worker had stopped: released at its stop
 
     exports = GuardedExports(
         composition.export_jobs(cache=cache),

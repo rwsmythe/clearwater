@@ -55,6 +55,13 @@ def request(source: Path, out: Path, kind: Any = "video") -> ExportRequest:
 class Rig:
     """The application's export side over a real engine, one opened cache and a journal."""
 
+    released = True
+    """What the planted plan release returns (False: the job was cancelled while waiting)."""
+
+    def release(self, progress: Progress) -> bool:
+        self.events.append("release")
+        return self.released
+
     def __init__(self, tmp_path: Path, config: Path | None = None) -> None:
         self.out = tmp_path / "out"
         self.out.mkdir()
@@ -68,7 +75,7 @@ class Rig:
             cache=self.cache,
             locks=self.locks,
             journal=self.journal,
-            release_device_plans=lambda: self.events.append("release"),
+            release_device_plans=self.release,
         )
 
 
@@ -282,6 +289,30 @@ def test_an_entry_stays_while_its_folder_holds_a_temporary(
     report = clean_leftovers(settings(None), WriteJournal(tmp_path / "config"))  # type: ignore[arg-type]
     assert report.removed == (planted[0],) and not planted[0].exists()
     assert rig.journal.entries() == ()
+
+
+def test_a_job_cancelled_while_waiting_for_the_plan_release_never_runs(
+    sample: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """R1-11: no backend is selected before the preview's release; a cancel ends the wait."""
+    rig = Rig(tmp_path)
+    rig.released = False
+    ran: list[str] = []
+
+    def job(req: ExportRequest) -> Any:
+        def run(progress: Progress) -> JobResult:
+            ran.append("engine")
+            return JobResult(True, (), (), None, "cpu", 0.0)
+
+        return run
+
+    monkeypatch.setattr(rig.exports._engine, "job", job)
+    result = rig.exports.job(request(sample("jpeg-gradient-srgb"), rig.out, "photo"))(
+        StubProgress()
+    )
+    assert rig.events == ["release"] and ran == []
+    assert not result.ok and result.failure is CANCELLED
+    assert rig.journal.entries() == () and list(rig.out.iterdir()) == []
 
 
 def test_the_ad9_log_line_names_the_jobs_device(
