@@ -235,6 +235,7 @@ appears in no computed set) and the import-time witness extension (DR-84).
 | 0 (design) | - | - | - | - | none (no product code) | - | 263,162 at the round-0 yield (cell 1 retired; `scripts/cell_depth.py`) |
 | build (tasks 3-10) | - | - | - | - | product + tests | - | 553,419 at the build yield (cell 2 retired PAST the ~400K stop: the whole build ran in one turn with no yield, so the dispatcher could not read it earlier) |
 | R1 (Reviewer A, `038f02e..99da8aa`) | 0 / 5 / 11 | 16 in / 0 out (R1-5's reachability to be proven on the `main()` path) | 16 new / 0 reopened | 0 | none yet (adjudicating turn; proposed: product + tests) | WSL, codex-cli 0.162.1, `gpt-6.1-sol` high | 129,481 at the R1 yield (cell 3; `scripts/cell_depth.py`, given by the dispatcher in cell 4's dispatch) |
+| R2 (Reviewer A, `038f02e..362a8b2`) | 0 / 3 / 6 | 9 in / 0 out | 8 new / 1 reopened (R2-9 = R1-12; the reviewer also tagged R2-1 as R1-3 and R2-3 as R1-5, adjudicated NEW: distinct paths, the R1 fixes hold) | 0 | R1 remediation (groups A-C): product + tests; R2: none yet (review-only turn); proposed: product (startup, adapter, preview, render worker) + tests, one grant decision (settings_dialog) | WSL, codex-cli 0.162.1, `gpt-6.1-sol` high | 316,716 at the Group C yield (cell 4, 156 turns; `scripts/cell_depth.py`) |
 
 ## CHARC round-0 ruling (`fcb2a9205c060013`, 2026-10-29 12:54:46Z, verbatim; it GOVERNS the STOP items above)
 
@@ -538,3 +539,34 @@ activity/preview_fft/startup/wiring/deps 70 passed 1 xfailed (not gpu); V7/V8/st
 the two red cases above fixed or recorded, then 4 passed on the reworked cases; DR-82 9 passed;
 gui/app deps, activity, wiring 54 passed. ruff check, ruff format --check (280), mypy strict
 (146): clean at every commit.
+
+## Reviewer A round 2 (cell 4, 2026-10-29; adjudicated, NOT remediated)
+
+- Reviewed `038f02e..362a8b2` minus `docs/proofs` (28 files, 7,625 diff lines) with a "THIS IS
+  ROUND 2" section listing R1's 16 items and dispositions; probe first (`READY`, one `succeeded
+  in`). Codex v0.162.1, `gpt-6.1-sol` / high, WSL, read-only; tokens 229,253; 76 `succeeded in`;
+  one VERDICT line. ERROR lines client-side (model-list refresh timeouts, the MCP transport) plus
+  one echoed source line. Withheld access checked on all 79 command lines: clean.
+- Before the round: light run at `362a8b2` (the twelve touched test files with their markers,
+  `gpu`/`gui`/`slow` included, plus the layering, thread and preview tests): 345 passed 1 xfailed
+  in 215 s; ruff check, ruff format --check (280), mypy strict (146): clean.
+- **Verdict `NEW_CRITICAL_MAJOR_FOUND`: 0 critical, 3 major, 6 minor.**
+  - R2-1 MAJOR (EXEC): a journal READ `OSError` reads as empty and the next `add`/`drop` overwrites
+    every retained entry (`startup.py` `_read`). Confirmed. FIX: no write after a failed read.
+  - R2-2 MAJOR (EXEC): a journal folder containing a NUL character passes `_decode`; `os.scandir`
+    raises `ValueError` and start-up crashes. Confirmed. FIX: reject it in `_decode` (S6 set-aside).
+  - R2-3 MAJOR (REAS): the settings dialog's clear and limit jobs wait on the deferred open and can
+    deliver an error to the closing window (`settings_dialog.py:737`, `:838`). Confirmed by reading.
+    NEEDS A GRANT for `gui/settings_dialog.py` beyond Q1's items (STOP item), or BANK as narrow.
+  - R2-4..R2-9 MINOR: Clear during an export fails the export (4, BANK recommended: WP3.20 gating);
+    the adapter after Clear cannot recompute (5); unload leaves an old pending render to recreate
+    plans (6); a chore accepted at the worker's exit is stranded (7); a second retarget reports
+    True with a kept job pending (8); V7 (f)'s witness can race on a busy host (9, REOPENED R1-12).
+- Per-finding table with the proposed fix and test for each: `adjudication.md`.
+- Evidence `C:\Users\rwsmy\clearwater-review-evidence\wp4.3\r2\` (prompt, diff, runner, test
+  summary, static, probe, transcript, commands, adjudication, `md5sums.txt`): review.txt
+  `d26c201b52231c3c675a2df9dc2225ea`, review.stderr.txt `8327bb308e5a865387571bbe88a81055`,
+  adjudication.md `01d9e373cdf0f0fc64a5e6454232ef38`, review-prompt.md
+  `b84174484ba220b8c7419e9271f7a3b7`, review-diff.txt `7eb9f5530b759cbda1eafdf7bce2916d`.
+- Yielded to the dispatcher BEFORE any remediation (review-only turn). Remediation goes to a fresh
+  cell from this ledger (cell 4 at 316,716 is past the evaluation point).
