@@ -815,7 +815,7 @@ after "keeps ...locked"); green after. Targeted run (`test_app_leftovers`, `test
 (146): clean. Every committed blob 0 CR, 0 NUL, ASCII. Logs under `work/wp4.3-c6/`.
 
 - R3-1 MAJOR, `13c96f7`: `clean_leftovers` skips every folder `_is_path` refuses (the output
-  folder included) with one warning naming it (`%r`, so the NUL prints as ` `), and the
+  folder included) with one warning naming it (`%r`, so the NUL prints as `\x00`), and the
   journal's folders are still scanned and cleared; nothing raises before `show()`. Tests
   `test_app_leftovers.py::test_an_output_folder_the_os_refuses_is_skipped_and_logged` (the bad
   `Settings` built directly) and `::test_a_settings_file_with_an_output_folder_the_os_refuses_still_starts`
@@ -833,4 +833,6 @@ after "keeps ...locked"); green after. Targeted run (`test_app_leftovers`, `test
 Decision for Reviewer A to challenge: `drop`'s argument changed from ids to pairs (its only
 product caller is `clean_leftovers`). R3-1 and R3-2 are two commits (the shared file split by
 content). Slip: one bare `cd` into the worktree at the start of a ledger-edit command (the tool
-resets its directory; `pwd` checked afterwards: the main tree); not repeated.
+resets its directory; `pwd` checked afterwards: the main tree); not repeated. A second slip: the ledger
+commit `031379a` carried one NUL byte (a heredoc collapsed a doubled backslash), caught by a
+post-commit check and replaced by its escape text in the next commit (a Write-tool script).
