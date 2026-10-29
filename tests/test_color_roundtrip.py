@@ -9,7 +9,8 @@ Two families, both with real FFmpeg and no encoder (raw Y'CbCr in the source pix
   both directions cancels).
 * round trip: decode -> ``samples.py`` -> encode -> decode, on every in-envelope WP2.3 sample, a
   generated BT.601 clip, the D76 path (8-bit source, 10-bit out) and, when the footage is there,
-  30 frames of GX011627. The planted asymmetric defects must exceed the bound.
+  the first ``frames`` frames of GX011627 (30 in the ``fullclip`` form, where the bounds were
+  measured). The planted asymmetric defects must exceed the bound.
 
 AD-11's V9 bound (max 2/255, mean 0.2/255) is met by the RGB-side legs
 (``test_rgb_side_legs_meet_ad11``). It cannot be met by the swscale pair through 8-bit 4:2:0
@@ -49,6 +50,7 @@ pytestmark = pytest.mark.usefixtures("ffmpeg_tools")
 # accurate_rnd and the siting defects through. Measured on the day (FFmpeg 9.0.2, bitexact, so
 # deterministic): GX011627 30 frames mean 0.687, share over 2/255 0.72 %; testsrc2 45 frames mean
 # 1.45 (10-bit) to 2.02 (8-bit), D76 8 -> 10 bit 1.59, BT.601 1.82.
+# WP-T6's six-frame form retains at least half of each positive 30-frame plant margin.
 PAIR_MEAN_REAL = 1.0
 PAIR_SHARE_OVER_2_REAL = 0.01
 PAIR_MEAN_SYNTHETIC = 2.5
@@ -57,7 +59,7 @@ AD11_MAX = 2.0
 AD11_MEAN = 0.2
 
 FRAMES = 45  # every frame of a WP2.3 sample
-FOOTAGE_FRAMES = 30
+FOOTAGE_FRAMES = 6
 
 Sample = Callable[[str], Path]
 
@@ -312,12 +314,22 @@ def test_planted_siting_mismatch_is_argument_level_only(sample: Sample) -> None:
 
 @pytest.mark.footage
 @pytest.mark.slow
-def test_pair_round_trip_on_the_owners_main_case() -> None:
-    """GX011627: 4K, 8-bit, BT.709 full range; read-only; untimed; the first 30 frames.
+@pytest.mark.parametrize(
+    "frames",
+    [
+        pytest.param(FOOTAGE_FRAMES, id="first6"),
+        pytest.param(30, id="first30", marks=pytest.mark.fullclip),
+    ],
+)
+def test_pair_round_trip_on_the_owners_main_case(frames: int) -> None:
+    """GX011627: read-only; the first ``frames`` frames (30 in the ``fullclip`` form).
 
     The planted defects must exceed the bounds on the mean or on the share over 2/255 (the
     figures are in the report beside each defect): the bound is the pass line, the defect's
     figure is its margin.
+
+    Args:
+        frames: The measured gate count or the 30 frames where the bounds were measured.
     """
     try:
         path = find_footage_file("GX011627")
@@ -327,8 +339,8 @@ def test_pair_round_trip_on_the_owners_main_case() -> None:
         pytest.skip("GX011627 is not in the footage folder")
     stream = probe(path).video
     assert (stream.width, stream.height, stream.pix_fmt) == (3840, 2160, "yuvj420p")
-    figures = measure_roundtrip(path, stream, frames=FOOTAGE_FRAMES)
-    assert figures.frames == FOOTAGE_FRAMES
+    figures = measure_roundtrip(path, stream, frames=frames)
+    assert figures.frames == frames
     assert figures.mean <= PAIR_MEAN_REAL, str(figures)
     assert figures.share_over_2 <= PAIR_SHARE_OVER_2_REAL, str(figures)  # measured 0.72 %
     decode = decode_filter(stream)
@@ -355,8 +367,8 @@ def test_pair_round_trip_on_the_owners_main_case() -> None:
         },  # 0.74, 2.11 %
     }
     for name, kwargs in plants.items():
-        planted = measure_roundtrip(path, stream, frames=FOOTAGE_FRAMES, **kwargs)
-        assert planted.frames == FOOTAGE_FRAMES
+        planted = measure_roundtrip(path, stream, frames=frames, **kwargs)
+        assert planted.frames == frames
         assert planted.mean > PAIR_MEAN_REAL or planted.share_over_2 > PAIR_SHARE_OVER_2_REAL, (
             name,
             str(planted),
