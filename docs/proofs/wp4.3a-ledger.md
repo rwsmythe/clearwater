@@ -23,7 +23,9 @@
 | Turn 2 footer, supplied at Turn 3 dispatch | `tokens used` 238,706; input depth 146,818 | 258,400 tokens | Dispatcher-read figure; no estimate substituted. |
 | Turn 3 footer, supplied at Turn 4 dispatch | `tokens used` 346,443; input depth 205,870 | 258,400 tokens | Past the evaluation point. Turn 4 is explicitly bounded; leave a successor handoff and await the next dispatcher depth. |
 | Seat 1 Turn 4 footer, supplied at Seat 2 dispatch | `tokens used` 439,112; input depth 237,170 | 258,400 tokens | Seat 1 retired at this boundary; Seat 2 is a fresh session. |
-| Seat 2 Turn 1 (ledger Turn 5) | 86,848 / 258,400; turn-5 tokens used 89,765 | 258,400 tokens | Dispatcher supplies the next footer reading; no estimate substituted. |
+| Seat 2 Turn 1 (ledger Turn 5) | 86,848 / 258,400; turn-5 tokens used 89,765 | 258,400 tokens | Supplied at Turn 6; no estimate substituted. |
+| Seat 2 Turn 2 (ledger Turn 6) | Input depth 154,379; tokens used 161,780 | 258,400 tokens | Supplied at Turn 7. Next turn or two may reach the evaluation point; this review-only turn is bounded. |
+| Seat 2 Turn 3 (ledger Turn 7) | Awaiting dispatcher footer reading | 258,400 tokens | No estimate substituted; evaluate near 200K and stop at a task boundary near 250K. |
 
 ## Round 0: observed base
 
@@ -203,7 +205,8 @@ Evidence is retained by the orchestrator outside the repository under
 
 | Round | Critical | Major | Minor / advisory | In / out of envelope | NEW / REOPENED | Reverts | Product / tests-only fixes | Transport / CLI | Dispatcher depth | Verdict / evidence |
 |---|---|---|---|---|---|---|---|---|---|---|
-| R1 | 0 | 1 | 2 minor / 6 advisory | 8 in / 1 out after F4 grant (F5 residual); original adjudication 7 / 2 | 9 NEW / 0 REOPENED | 0 | F1/F4/F9 product (3); F2 tests-only (1); F3 report; external R3-1 adds product/tests separately | Orchestrator process via codex_cell.py review; claude-opus-5-5 / high; CLI version not supplied | Turn 5: input 86,848 / 258,400; tokens used 89,765. Turn 6 pending dispatcher | NEW_CRITICAL_MAJOR_FOUND; Turn-6 fixes verified locally, awaiting R2; evidence below |
+| R1 | 0 | 1 | 2 minor / 6 advisory | 8 in / 1 out after F4 grant (F5 residual); original adjudication 7 / 2 | 9 NEW / 0 REOPENED | 0 | F1/F4/F9 product (3); F2 tests-only (1); F3 report; external R3-1 adds product/tests separately | Orchestrator process via codex_cell.py review; claude-opus-5-5 / high; CLI version not supplied | Turn 5: input 86,848 / 258,400; tokens used 89,765. Turn 6: input 154,379 / 258,400; tokens used 161,780 | NEW_CRITICAL_MAJOR_FOUND; R2 verifies closure of F1/F3/F4/F9 and R3-1; F2 partially reopened; evidence below |
+| R2 | 0 | 0 | 1 minor / 4 advisory | 4 in / 1 POSIX out; R2-3 report in, pre-existing redaction repair out of grant | 4 NEW / 1 REOPENED (R1 F2, partial) | 0 | 0 product / 0 tests-only this adjudication turn; bounded cleanup planned below | Orchestrator codex_cell.py review; claude-opus-5-5 / high; CLI version not supplied | Turn-6 input 154,379 / 258,400; tokens used 161,780; Turn-7 depth pending dispatcher | NO_NEW_CRITICAL_MAJOR; blocking-axis CONVERGED; cleanup then B/gate pending |
 
 At round 5 and every fifth round thereafter, yield with the cumulative ledger
 for approval to continue under the fill. Reviewer B and the final ONE two-leg
@@ -857,33 +860,158 @@ subagent or sibling-worktree access. Exact scope/bytes/ruling preservation and
 claims checks passed as recorded above; the final documentation-only diff check
 is retained at work/wp4.3a/turn6-final-diff-check.log.
 
+## Turn 7 (Seat 2 Turn 3): Reviewer A R2 adjudication only
+
+### Entry, depth and dispatcher-seat QA
+
+Turn 6 is committed as c9a7771 (six product/test paths) and 40eef4e
+(report/ledger). HEAD/history match the dispatch; the starting tracked tree is
+clean. All committed blobs are LF as supplied by the dispatcher. Turn-6 depth
+is **154,379 of 258,400**, footer **tokens used 161,780**. This is the supplied
+figure, not an estimate. Turn-7 depth awaits the next dispatcher reading.
+
+The dispatcher supplied these QA results on the Turn-6 amendment:
+
+| Requested check | Dispatcher-seat result |
+|---|---|
+| The three named UNC nodes | 3 passed in 0.98s |
+| uv run ruff format --check . | 269 files already formatted |
+
+The three nodes are test_g1_inside_sees_every_spelling_of_the_same_folder,
+test_g1_main_refuses_every_footage_check_through_another_spelling[unc], and
+test_g1_the_redactor_hides_the_extended_spellings in tests/test_headless_export.py.
+The Turn-6 RUN REQUEST is satisfied. The dispatcher also confirmed _decode has
+one caller, frozen interfaces/settings.py is untouched, and the per-field
+route follows CHARC's ruling. None of these checks is rerun in this turn.
+
+### R2 provenance and review verification
+
+- Review: base fe65e6a, candidate **40eef4e**, orchestrator's read-only Claude
+  process via scripts/codex_cell.py review, claude-opus-5-5 / high.
+- Supplied assertions: model correct; is_error false; 37 turns; one permission
+  denial; tracked tree clean afterward. CLI version not supplied/inferred.
+- Full 55-line review was read from the durable evidence file
+  `C:/Users/rwsmy/clearwater-review-evidence/wp4.3a/r2/review.txt`. The suggested
+  local work/wp4.3a/rA2/review.txt copy is absent; the authoritative file was
+  readable, so this is not a STOP or missing-review condition.
+- Dispatcher-supplied md5s (not independently rehashed here):
+  review.txt `99cd27d9394d8a4335eaa8885eb43450`;
+  review-prompt-r2.md `e7a77bf09bb167c1391af70b9dd46ed9`;
+  review-diff.txt `fd4914673bf259f970b2147a0122a17e`;
+  review.json `946580f219affe62f31938198c495ba6`.
+- Verdict: **NO_NEW_CRITICAL_MAJOR**. R2 has 0 critical, 0 major, 1 minor
+  (REOPENED R1 F2, partial), 4 advisory (NEW observations, including the newly
+  reported pre-existing-class leak). Thus 4 NEW / 1 REOPENED; no reverts.
+- R2 independently EXECUTED the real NUL footage case in a fresh process on
+  every main/run route and closed F1. It verified F3/F4/F9 and R3-1 (ii), all
+  162 existing guard controls, seven current sites and the per-field warnings.
+  It reports 108 config-reader mutations with no escaped exception, 395 passing
+  touched-test cases, Ruff green and 269 files formatted. Those are reviewer
+  results, not additional cell executions. Log-cited report figures were
+  withheld from the reviewer and are REASONED there; Turn-6 local claim checks
+  and the supplied seat results remain the evidence for those figures.
+
+### Independent checks and every finding adjudicated
+
+All five checks below ran against unchanged 40eef4e product/test/report code
+with `uv run --offline python -`, using in-memory ASTs, records and fault
+injection. Output: `work/wp4.3a/turn7-adjudication-probes.log`, exit 0.
+No test file, configuration, export or product file was written by the probes.
+
+| R2 finding / classification | Independent check and envelope | Disposition / cited ground / bounded cleanup plan |
+|---|---|---|
+| R2-1 / MINOR / **REOPENED R1 F2 (partial)** | Confirmed all 16 listed spelling classes return no spawn from the current _spawn_calls: asyncio.subprocess attribute/from-import; attribute binding; star import; submitted callable; default binding; walrus; dict lookup; Popen subclass; os.posix_spawn; os.startfile; __import__; importlib; _winapi; multiprocessing; pty. Injected kw["creationflags"] = 1 outside the helper into an in-memory source and called the actual flag guard: it passes. This is in-envelope test/control weakness; no present product bypass. | **FIX, bounded control cleanup plus report precision.** Accept the dispatch's cheap additions: asyncio.subprocess forms, star imports for the recognized subprocess family, attribute binding, os.posix_spawn/startfile and subscript creationflags stores, each with a failing planted control. Keep the seven-real-site pin. Narrow the report to the exact APIs and syntactic forms proved; explicitly disclose remaining dynamic/higher-order/subclass and other launcher families. The brief's Q13/task-3 AST control warrants the cheap fixes. Arbitrary Python call-flow coverage is not claimed or commissioned; residual forms are report-only limits. No further review round driven by this reopened minor. |
+| R2-2 / ADVISORY / **NEW** | Confirmed on the real own-path route: Path.resolve injected to raise OSError for the existing docs target, inside _check_own_paths under _footage_checks, produces the fixed configured-footage message and hides the injected detail. The target, not footage, failed. In-envelope diagnostic text; no natural trigger found by the reviewer or claimed by this probe. Exit/refusal safety holds. | **FIX, one message plus focused control.** Use neutral wording such as "a folder cannot be resolved for the footage write checks." It covers both configured footage and user targets, retains a fixed path-free refusal and changes neither status 2 nor the protected routes. Q23 commissions readable resolution refusal, not an exact message that must blame footage. This owns the wrapper already changed by F1; no new scope/grant is needed. |
+| R2-3 / ADVISORY / **NEW observation of a pre-existing class** | Confirmed: frozen Settings.from_json rejects a list-valued output_folder with a FormatError embedding its repr. Passed the real reason through _RedactingFormatter in a real settings WARNING-shaped LogRecord: an unknown synthetic private value survives via the %s reason, while the new per-field %r route is separate. Product reach is real, but redaction repair is outside the granted touch; report precision is in envelope. git log -S independently finds _field_error's repr at bf76136 (WP2.2 frozen IF-10) and the settings-store "is not valid settings:" route at 75d7dc5 (WP3.15). | **FIX report sentence; REPORT-ONLY pre-existing leak.** Say explicitly that the unknown-path suppression claim applies ONLY to the per-field out-of-range warning. Record the wrong-type/whole-file set-aside %s-reason limitation. CHARC d6e9abdf grants unusable string path values via the per-field rule; a wrong-typed value is still frozen IF-10's whole-file refusal. The B4 grant covers known settings/backup paths, not arbitrary private values nested in an IF-10 error. Dispatcher/CHARC owns banking and any future error-text/redaction hardening commission. Do not change frozen IF-10 or absorb a broader sanitizer here. |
+| R2-4 / ADVISORY / **NEW, OUT OF ENVELOPE (POSIX trigger)** | Confirmed mechanism in memory: injected FileNotFoundError from os.getcwd while _decode processes a relative output_folder escapes the current decode path. Actual deleted-POSIX-cwd reach is REASONED, not executed; no directory was deleted or cwd changed. Reviewer says Windows cannot delete the running process's cwd. This outside-envelope trigger is non-blocking. | **FIX, accept the dispatch's bounded option.** Next cleanup add OSError to the existing path-validation except arm, preserving _with_valid_values/_warn_out_of_range, original file and other fields; one injected-getcwd RED-first case proves it. Update load_settings's range-description text accordingly. The user explicitly proposes this one-line extension to the new R3-1 decode check; it uses the existing portable error path and adds no OS branch/dependency or frozen edit. No need to replace the validation design. Do not claim a real POSIX reproduction or full startup proof beyond this reader. |
+| R2-5 / ADVISORY / **NEW** | Confirmed by source and execution: _redacted_stderr on the clearwater logger prints a synthetic clearwater.synthetic.batch WARNING once, so its scope includes non-settings batch warnings. The module's exit-2 list omits the new resolution refusal; its existing logging paragraph already describes handler coverage correctly. In-envelope report/module documentation accuracy. | **FIX text only in cleanup.** Describe all clearwater.* WARNING records across _main in the report (including settings and batch); add the generic folder-resolution refusal to the module exit-2 list, matching R2-2's final message. The dispatch's findings-3/5 cleanup expressly names report/docstring text; no behavior expansion or existing-test change is needed for these prose corrections. |
+
+Planning-note decisions: accept the cheap R2-1 control fixes AND narrow the
+report, rather than promising exhaustive arbitrary-Python discovery; accept
+R2-4's one-line OSError option rather than replace the check; accept R2-3/5's
+text corrections and the pre-existing leak's report-only disposition. R2-2 is
+a small in-envelope diagnostic fix, supported by the independent injected-route
+check. No finding is declined or silently dropped. All fixes are **PLANNED**;
+none is executed in this ledger-only turn.
+
+### Cumulative accounting and convergence
+
+- R1 observations: 0 critical / 1 major / 2 minor / 6 advisory, 9 NEW.
+  Its F1 major is closed by R2's executed checks; F3/F4/F9 are closed, F2 is
+  partially reopened as a minor. R3-1 remains a separate external scope fix.
+- R2 observations: 0 critical / 0 major / 1 minor / 4 advisory;
+  4 NEW / 1 REOPENED, 4 in / 1 POSIX out for reachability. R2-3 is split:
+  report correction in, pre-existing leak repair out of the edit grant.
+- Across two review rounds: 14 observations, 13 NEW and 1 REOPENED; nominal
+  observation counts 0 critical / 1 major / 3 minor / 10 advisory. These count
+  historical observations, not current open blocking defects. No reverts.
+- Executed R2 cleanup this turn: **0 product, 0 tests-only, 0 report fixes**;
+  ledger adjudication only. Planned cleanup includes test/control changes for
+  R2-1, one message for R2-2, one exception tuple for R2-4, and report/docstring
+  corrections for R2-1/3/5. The R2-3 leak component is REPORT-ONLY.
+- **Reviewer A has CONVERGED on the blocking axis.** Fill Part 1
+  CONVERGENCE_CRITERION / ROUND_TERMINATION ends the loop on zero NEW blocking
+  findings. R2's verdict is NO_NEW_CRITICAL_MAJOR; independent checks found no
+  contrary in-envelope critical/major. A reopened minor and an out-of-envelope
+  POSIX advisory do not reopen the blocking loop.
+- Under that same fill, non-blocking cleanup happens once in the terminating
+  round and does not open another round. R2-1 test/control polish is not a basis
+  for R3. No round-5 continuation gate is due at R2. Reviewer B and the ONE final
+  two-leg gate remain the orchestrator's work after cleanup verification.
+
+### Turn discipline and next action
+
+This dispatch is REVIEW ONLY. No product, test or report file changed. No
+pytest, Ruff, mypy, format run, hardware/footage/fullclip test or gate is rerun.
+The fresh seat-6 QA above satisfies the old RUN REQUEST. No additional heavy
+RUN REQUEST or CHARC question is needed now; the next turn starts only after
+the dispatcher reply, as instructed.
+
+Only the owned ledger and gitignored probe/runner logs are written. No new
+module, OS branch, dependency, frozen/interface/GUI/app/jobs/photo-writer,
+fixture/local-config/register edit, footage access, configuration/export write,
+mailbox, commit, git write, stash, sibling-worktree access or subagent.
+Scope/byte/ruling-preservation/diff checks passed, exit 0, in
+work/wp4.3a/turn7-ledger-check.log: only the ledger changed, LF/ASCII, five
+dispositions and one R2 row, supplied QA/depth, CHARC blocks intact, no
+untracked deliverables and git diff --check clean. The final documentation-only
+diff check is retained in work/wp4.3a/turn7-final-diff-check.log. No
+cleanup-completion or final-gate claim is made.
+
 ## RESUME HERE - successor seat
 
-- Last committed head at Turn-6 entry: **a0b9235** (Turn-5 R1 adjudication),
-  product/test baseline **553d1f2**, branch wp4.3a, base fe65e6a.
-- Turn-5 supplied depth: **86,848 of 258,400**, tokens used **89,765**.
-  Turn-6 depth awaits the dispatcher footer reading; no estimate is substituted.
-  Evaluate near 200K, re-seat at a step boundary near 250K.
-- Turn 6 executed R1 F1/F2/F3/F4/F9 fixes and external R3-1 (ii) scope addition.
-  CHARC d6e9abdf item 2 and scope addition (ii) are verbatim FIRST in the
-  Turn-6 section. The older B4 ruling a2ef868a remains verbatim above.
-- Product changes: real footage resolution guards in main/run; CUDA strerror
-  fallback; settings path decode check with existing per-field default/warning;
-  one-line --parameters help update. Tests: real F1 routes replace the old
-  artificial test; widened AST guard/162 controls/seven-site pin; missing-strerror
-  case; three bad-path config cases plus one real CLI warning/export case.
-- Final evidence: **561 passed, 4 deselected in 13.65s**, three UNC plus one GUI
-  excluded; final spawn file **174 passed in 1.52s** after lint-only fixture split.
-  Ruff final green; strict mypy clean in 141 files. Baseline task 6 remains
-  **884 passed, 12 footage deselected on 553d1f2**, including UNC at that seat.
-- RUN REQUEST: dispatcher global format --check and the three named UNC nodes
-  above on this amendment. Do not rerun them in the known restricted sandbox.
-- R1 counts remain 1 major, 2 minor, 6 advisory; all NEW, none REOPENED; no
-  reverts. Five findings fixed; four report-only; external R3-1 fix separate.
-  No convergence claim. Report reflects actual results, limitations and new row.
-- NEXT: Reviewer A R2 at the dispatcher seat. Reviewer B then ONE final two-leg
-  gate only after A convergence; no premature full-suite request. No extra
-  independent reviewer/subagent is commissioned by this cell.
-- Dispatcher may split this turn into product/tests and report/ledger commits
-  as explicitly requested; suggested path groups are in the final return.
-  All original locks plus explicit B4 and d6e9abdf grants remain binding.
+- Current committed head at Turn-7 entry: **40eef4e**, after product/test
+  c9a7771 and Turn-5 ledger a0b9235; branch wp4.3a, base fe65e6a. Only this
+  R2 adjudication ledger is changed by Turn 7; dispatcher commits it.
+- Latest supplied depth: Turn 6 input **154,379 of 258,400**, tokens used
+  **161,780**. Turn-7 footer/depth awaits dispatcher reading. Evaluate near
+  200K; stop/re-seat at a task boundary near 250K, never estimate own depth.
+- Reviewer A R2 verdict **NO_NEW_CRITICAL_MAJOR**: blocking-axis CONVERGED.
+  0 critical, 0 major, 1 minor (REOPENED F2 partial), 4 NEW advisory. The five
+  dispositions, independent probes and cumulative accounting are above.
+- NEXT after dispatcher reply: one SHORT terminating-round cleanup, RED first
+  for control/behavior changes. R2-1: cheap asyncio.subprocess/star-import/
+  attribute-binding/os.posix_spawn/startfile/subscript-flag controls, then
+  narrow report claims and disclose remaining unsupported dynamic forms.
+  R2-2: neutral fixed folder-resolution refusal and focused own-target case.
+  R2-4: one-line OSError in path validation plus injected-getcwd per-field test.
+  R2-3/5: narrow per-field warning claim, disclose pre-existing wrong-type
+  set-aside leak, correct handler coverage and exit-2 module-docstring list.
+  Do not implement these in the review-only turn or fix the pre-existing leak.
+- Existing R1 F1/F3/F4/F9 and external R3-1 fixes verified by R2; no product
+  bypass today, seven current spawns all use helper, no per-site flag override.
+  Earlier CHARC d6e9abdf and B4 rulings remain verbatim in the ledger.
+- Supplied seat QA on Turn 6: UNC **3 passed in 0.98s**; global Ruff format
+  **269 files already formatted**. Old RUN REQUEST satisfied. Prior local
+  evidence: light **561 passed/4 deselected**, spawn **174 passed**, Ruff/mypy
+  green. These are prior-candidate development results, not cleanup results.
+- R2 local work/rA2/review.txt absent; full authoritative review read from
+  C:/Users/rwsmy/clearwater-review-evidence/wp4.3a/r2/review.txt. Probe evidence:
+  work/wp4.3a/turn7-adjudication-probes.log. No need to reread the full review;
+  this ledger carries its actionable findings and limits.
+- After bounded cleanup/verification, Reviewer B then the ONE final two-leg
+  gate at dispatcher seat. No new A round solely for this non-blocking polish;
+  no harness gate, no premature full-suite run.
+- Scope remains FINAL brief plus B4 and d6e9abdf grants and this dispatch's
+  cleanup directions. No frozen interface, dependency, unowned file, footage,
+  git write, mailbox, stash or sibling-worktree access.
