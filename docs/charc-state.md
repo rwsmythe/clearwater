@@ -86,6 +86,10 @@
   test rewritten to 'duplicates dropped' (owned). F-4 no change; F7 the only amplification Limit. Lane stays Codex seat
   2 (119,808 / 258,400). If R4 blocks on this class again: STOP to me with a cap recommendation, no variant N+2 patch.
   Round trip PASSED on c7c7360 (272.04 s).
+- **WP4.5 R3 test-bound ERRATUM concurred 20:31Z (orchestrator fyi d8bbab61, ruled at its seat):** the bound is
+  written entries <= 4 x len(source) / 12 + 5 (the D63 insertions: Orientation, Software, Exif pointer, PixelX/Y; an
+  empty 14-byte IFD0 writes 5), plus the shape check of exactly ONE Exif / GPS IFD. Design guard unchanged. Ledger
+  e2df398; seat 2 turn 3 building at 135,854 / 258,400; then R4.
 - **(gen 7 history follows; newest facts at the end of the block)**
 - **GEN 7 PICKUP (was).** Orchestrator = **gen 22 `clearwater-orchestrator-20261029-0704`** (online 17:08Z from gen 21's
   state 736e403; gauge 38 ms; gen 21 was `clearwater-orchestrator-20261029-0425`, rolled 17:05Z at ~400K); ALL cues go there. Time the bash launch and record it here. Inbox: drain with `read --role charc --all`
