@@ -18,20 +18,22 @@
   `--body-file`; edit docs with a scratchpad Python script (`newline="\n"`); `tr -cd '\r' | wc -c` = 0 before every commit; commit by
   pathspec; never an uncommitted edit left in the main tree (hazard 7); HOLD MAIN when the orchestrator asks (no commit, state included,
   until its ff post).
-- **EXCLUSIVE WINDOW OPEN ~00:45Z (2026-10-29): WP4.1's own two-leg gate on `wp4.1-mc3` 96d72c7 (msg `72ea01043bfa90e1`, ~64 min).
-  NOTHING HEAVY AT THIS SEAT until the orchestrator posts CLOSE.** Then: harness gate, accept record, the orchestrator asks for a
-  HOLD just before the ff, ff, release post; **then CHARC QA (standing recipe below) and the register rows (scripts READY in gen 5's
-  scratchpad, re-create if gone: `edit_register_p4a.py <t5> <w41>` minus its DR-65 part (already applied) = DR-75 H1 nclx-only P3
-  preview BINDING WP4.3, DR-76 G5 writer `profile` vs `import_preset` (WP4.3), DR-77 `import_preset` OverflowError (WP4.3);
-  `edit_register_p4b.py <w41>` = DR-78 B2-1 stream syntax in planned output FILE names BINDING WP4.2, DR-79 B2-2/3/4 minors (WP4.2)).**
-  WP4.1 facts for the record check: author head `3b8b43b` (= cell 4 final 0a0a787 + B pass-1 remediation), B pass 1 BLOCKING (B1 ADS via
-  hard link, CONFIRMED) remediated by cell 4 as ONE structural write-target predicate (my ruling-b1: no `:` after the prefix, no `\\?\`
-  forms, no reparse point on existing ancestors, realpath outside footage; residual hard-link-outside-footage = a Limit; design guard
-  CLOSED), B pass 2 BLOCKING 1/3 adjudicated at the gate by irreversibility, UPHELD (B2-1 banked WP4.2 + Limit; Erratum docs commit on
-  the candidate); Reviewer A R1-R5 = 0/2/6, 0/2/5, 0/1(H1 banked)/6, 0/1/4, 0/0/1 (five-round gate); evidence `wp4.1\r1..r5`,
-  `reviewB`, `reviewB2`. Owed in its record: the H1 Limit sentence (condition 3), WP3.6P OWED, the stacked-gate note (WP4.1's suite is its
-  OWN gate now since the candidate changed after the stack). WP4.1 brief rulings: S1 N10 = AD-11 pre-encode; S4 `tests/test_app_deps.py`
-  granted; S8 (A) V9 reference quantised to the export depth (AD-11 clarified in decisions.md).
+- **WP4.1 ACCEPTED main `f30e00e` (2026-10-29 ~01:36Z; msg `9cc6790b39144767`; record `docs/proofs/wp4.1-accept.md`). CHARC QA
+  CONFIRMED (static, this seat ~01:50Z):** patch-id 8ff10e7b on `3aa3c51..3b8b43b` as the record says; code-only patch-id cafa7c45
+  equal on the author range and on `d1d812b..f30e00e`; `git diff 0986b8d f30e00e` over src tests tools pyproject uv.lock EMPTY (= the
+  Reviewer B pass-2 tree); footprint 13 files all owned or granted (S4 `tests/test_app_deps.py`); interfaces / export_seam / fixtures
+  untouched; 0 CR in every changed blob; Reviewer B md5s recomputed = record (pass 1 bc970e45..., 23 succeeded; pass 2 ab4c5c69...,
+  31 succeeded; gpt-6.1-sol banner; VERDICT anchored; pass-2 Reconnecting at stderr 4243 before the first turn = recovered retry);
+  ruff / format 259 / mypy 141 / harness 382 OK (1 skipped) here. No suite at this seat (the orchestrator's own two-leg gate 4486/1 +
+  1126/1 is the figure of record; the orchestrator is rolling at ~385K and waited only on this QA). **Register rows WRITTEN: DR-75
+  (H1 nclx-only P3 preview, BINDING WP4.3), DR-76 (G5 writer `profile` vs `import_preset`, WP4.3), DR-77 (`import_preset`
+  OverflowError, WP4.3), DR-78 (B2-1 stream syntax in planned output FILE names, BINDING WP4.2), DR-79 (B2-2..B2-4 minors, WP4.2).**
+  Worktrees `wp4.1`, `wp4.1-mc`, `wp4.1-mc2`, `wp4.1-mc3` may be removed by the orchestrator (logs copied first; branches kept).
+- **Owner direction 2026-10-29 (Codex lane balance; memory `clearwater-codex-lane-balance.md`):** tally at this seat = Codex
+  implementer 20 turns / 3 packages (WP3.20R, WP-T4, WP-T5) ~8.7 M tokens vs Codex Reviewer A 109 rounds + Reviewer B 54 passes
+  ~28 M. Owner: monitor and evaluate before changing; wants to lean on Codex more for development to equalise burn, never at the
+  expense of quality. No lane-rule change. At each commission / brief revision CHARC names the packages eligible for the Codex lane
+  under the existing rule and reports the Codex development share with the pace readout.
 - **After WP4.1's accept:** WP4.2's brief (DRAFT RULED on main 3aa3c51) gets ONE revision pass against WP4.1's accept record, then FINAL
   on CHARC's word; its revision must carry: DR-78/79 (B2 rows) as WP4.2 items, the WP4.1 runner's final names and the stream-syntax
   predicate, the Limit text. WP4.3's revision later carries DR-75 (REQUIRED test under its Q12), DR-76, DR-77, and the AD-23 'applied by
