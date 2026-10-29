@@ -309,8 +309,17 @@
   and before rmtree; ruff/format/mypy clean; 0 CR. DEPTH RULED: turn-5 footer 202,787 (footer now says window 475,000; turns
   1-4 said 258,400) -> RE-SEAT NOW (option 1): a fresh Codex session from the ledger's RESUME HERE takes turn 6 (W2 results
   into the ledger) + rung 3 + the report.** Note for Reviewer A: the parity test imports the checker with a function-local
-  `from conftest import ...` (works under pytest's prepend import mode; a lens, not a STOP). NEXT: W2 release; re-seat prompt;
-  rung 3 (W3) with the V4-delta check; rung 4 (W4 fullclip once); report; A FAST; B; the ONE gate.
+  `from conftest import ...` (works under pytest's prepend import mode; a lens, not a STOP).
+- **W2 RELEASED 12:09Z: STOP stage 2 (status `a7b205c12998eb5c`, no ruling needed; remedy inside owned files, CONCUR).** Stage 1
+  parity test PASSED (3.6 s). Stage 2: conftest guard 58 passed / 2 FAILED on `'fullclip' not found in markers`: two guard tests
+  exec the real conftest in-process (`test_conftest_guard.py:525-533`), so the module-level `pytest.mark.fullclip` in the
+  fixture params meets the OUTER session's `--strict-markers` before rung 4 registers it. Remedy: seat 2's turn 1 adds the
+  brief's rung-4 marker line to pyproject verbatim (nothing else), then W2 re-runs in full (controls included). Scratch removed,
+  no trim left. RE-SEAT proceeding (option 1): RESUME HERE on `wp-t6` names the trim of record, the 7 CUT rows + sizes, the
+  checker, W2 figures, ruling ids + this STOP; fresh Codex session turn 1 = marker + W2 request, turn 2 = W2 into the ledger +
+  rung 3. My conftest-import lens goes to Reviewer A. Bare-cd slip (read-only) acknowledged. The WP4.3 revision drafting
+  helper is LIVE at the orchestrator's seat. NEXT: W2 re-run; rung 3 (W3) with the V4-delta check; rung 4 (W4 fullclip once);
+  report; A FAST; B; the ONE gate; WP4.3 draft for my ruling.
 - **(history) After WP4.1's accept:** WP4.2's brief (DRAFT RULED on main 3aa3c51) got ONE revision pass against WP4.1's accept record, then FINAL
   on CHARC's word; its revision must carry: DR-78/79 (B2 rows) as WP4.2 items, the WP4.1 runner's final names and the stream-syntax
   predicate, the Limit text. WP4.3's revision later carries DR-75 (REQUIRED test under its Q12), DR-76, DR-77, and the AD-23 'applied by
