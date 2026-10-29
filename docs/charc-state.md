@@ -9,9 +9,35 @@
 
 ---
 
-### RESUME HERE (CHARC generation 7 LIVE `clearwater-charc-20261029-0428` since 2026-10-29 14:29Z; read this block top to bottom; gen 6 `clearwater-charc-20261028-1443` ROLLED 2026-10-29 ~14:30Z at ~410K at a clean boundary, no cell at CHARC's seat; gen 5 rolled ~00:45Z at ~402K)
+### RESUME HERE (CHARC generation 8: read this block top to bottom; gen 7 `clearwater-charc-20261029-0428` ROLLED 2026-10-29 ~19:00Z at ~405K, clean boundary, no cell at CHARC's seat; gen 6 `clearwater-charc-20261028-1443` ROLLED 2026-10-29 ~14:30Z at ~410K at a clean boundary, no cell at CHARC's seat; gen 5 rolled ~00:45Z at ~402K)
 
-- **GEN 7 PICKUP (read first).** Orchestrator = **gen 22 `clearwater-orchestrator-20261029-0704`** (online 17:08Z from gen 21's
+- **GEN 8 PICKUP (read first).** Orchestrator = **gen 23 `clearwater-orchestrator-20261029-0852`** (online 18:57Z; gauge 37 ms;
+  gen 22 rolled 18:52Z at ~420K, state 5a1538a). ALL cues go there. Time the bash launch and record it here. Drain with
+  `read --role charc --all` (gen 7 stopped draining at its announce). **MAIN IS HELD** by the orchestrator (its HOLD ask
+  30dbc4d5 stands until its RELEASE post after the `stack-g22` merge): commit NOTHING on main until that post except, as here,
+  a state-only rollover commit. **TWO SCRIPTS WAIT FOR YOU, dry-run clean on mirrors, in `work/charc-handoff/`** (gitignored):
+  (1) `edit_43a_accept.py <wp4.3a-accept-sha> <inventory-merge-sha>` = register DR-15 note, closures DR-58(b)/76/77/81/85, NEW
+  DR-91 (IF-10 `_field_error` repr leak) + DR-92 (Redactor escaped mixed-separator spelling), AD-13 note, AD-23 'applied by
+  WP4.3a', CLAUDE.md current-state line; (2) `edit_insta_hold.py` (no args) = CLAUDE.md inputs (Insta360 ON HOLD, D: archive drive
+  bullet) + this state's owner facts. RUN BOTH on main right after the RELEASE post (the accept SHA and the inventory merge SHA
+  come from the release post / `git log`), verify 0 CR in the blobs (`git show HEAD:<f> | tr -cd '\r\v' | wc -c`), ONE commit by
+  pathspec (CLAUDE.md, docs/decisions.md, docs/debt-register.md, docs/charc-state.md), post the CHARC QA line (static: code
+  patch-id of the WP4.3a range equal on author and merged ranges; record read; harness 382 OK), cue. NEVER run a script with a
+  backslash path through a heredoc or sed (memory bash-heredoc-backslash-collapse); the scripts take the root as an argument for
+  mirror dry runs. **LIVE NOW (19:00Z):** WP4.5 'EXIF byte fidelity' (Codex turn 1 after fold-in of my ruling 5c28dff0; brief
+  `wp4.5` 90c7d11; lands FIRST; verification = full parallel leg + impacted serial nodes per the OWNER's 18:47Z direction, no
+  full serial re-run) -> then `stack-g22` (inventory 3186ea3 + WP4.3a 8e1114a, gate was green but for the two serial tests:
+  the bench flake passed alone, the round trip is WP4.5's) rebases onto it, re-runs (b), merges, RELEASE post -> my commit ->
+  prune/archive (owner 'prune' 18:18Z + D: drive 18:25Z, posts 701ac3f8 + 0fafd4de, saved under review-evidence
+  `prune-2026-10-29\`) -> WP4.3 cell 7 windows (V7, GX011627 V8/V18 with p99 asserted + p99.9 recorded, DR-44(c)/DR-50), B
+  (Codex), gate; at WP4.3's accept mine: register table (brief 'Register rows'), DR-89 (D85 missing-folder), DR-90 (Clear during
+  export) -> WP4.4 (.MOV input, brief FINAL 27a11ae, Codex; at its accept a DV/HDR fact line if warranted) -> DR-87 bench
+  micro-package -> WP3.6P brief (sonnet-medium or Codex; on the 73 phone photos; AD-24 on real Apple HEIC; pre-corrected Z/M
+  group reported separately). Owner facts today: phone footage in (Snorkel), spec v0.5.7 (.mov), Insta360 ON HOLD (files
+  removed), prune approved, D: archive drive. Owner-pending inputs: none. Open owner decisions: none. Every owner-facing summary
+  ends with that line. Next owner checkpoint: CP5 (WP5.3 pack) after Phase 4 closes.
+- **(gen 7 history follows; newest facts at the end of the block)**
+- **GEN 7 PICKUP (was).** Orchestrator = **gen 22 `clearwater-orchestrator-20261029-0704`** (online 17:08Z from gen 21's
   state 736e403; gauge 38 ms; gen 21 was `clearwater-orchestrator-20261029-0425`, rolled 17:05Z at ~400K); ALL cues go there. Time the bash launch and record it here. Inbox: drain with `read --role charc --all`
   (gen 6 stopped draining at its announce). Main at gen 6's last commit (this file) is clean and free; spec v0.5.6; fill has the
   Order bullet (one gate per package after A and B) and AD-30 (gate test sizing). Standing rules added today: build prompts yield
