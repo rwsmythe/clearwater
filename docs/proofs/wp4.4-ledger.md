@@ -1,13 +1,179 @@
 # WP4.4 cumulative ledger
 
-## Turn 3 STOP: phone record state versus required warnings
+## RESUME HERE -- fresh Codex seat after turn 4
 
-Recommended ruling: the phone record assertion should require
-`state == "done with warnings"`, with exit 0 and the expected output,
-preserving Q2's best-effort `data track mebx` disclosure. Literal `done`
-cannot coexist with those required warnings. No product behavior change is
-recommended. The footage test has NOT been written pending this clarification;
-it has not been run or replaced with a weaker assertion.
+### State and immediate next steps
+
+WP4.4 is the MOV-input package, CODEX lane, product tier STRONG. The binding
+brief is `docs/briefs/wp4.4-brief.md`; its CHARC Rulings govern the Questions.
+Read the dispatch protocol, APPLICATION and CLAUDE for a fresh dispatch, and
+use this ledger for the completed work and evidence. Do not re-derive the
+resolved STOPs or read another worktree.
+
+Worktree/branch: `.worktrees/wp4.4`, `wp4.4`; product base `5e3537d`.
+Known commits: round-0 ledger `7483e91`; round-0 grant in brief `0b71bd3`;
+MOV implementation `35391b0`; stereo fixture `e4141f8`. Turn 4 starts at
+`e4141f8`; the dispatcher will commit the two turn-4 paths and supply that
+HEAD to the fresh seat. No cell commits or .git writes are allowed.
+
+Product implementation is done within the grants: both suffix sets accept
+MOV; naming maps only case-insensitive MOV to lowercase MP4; the sink copies
+only gpmd data, excludes tmcd as before, drops other data deterministically
+and reports it through the existing not_carried path. Tests cover routing,
+naming, synthetic allowlist behavior and rotated stereo qt export with V4.
+Turn 4 adds the ONE footage test, now written but NOT RUN by the cell.
+
+Immediate dependency: the orchestrator must run the phone node below. Expect
+one pass with exit 0 and exactly two mebx omission warnings; this is an
+expectation, not footage evidence yet. Any new V4 MANDATORY/REQUIRED difference
+is a STOP to CHARC through the dispatcher, with item NAMES only. No broader
+audio, probe, decode, mux, comparison or interface change is authorized.
+
+After that evidence arrives: Reviewer A to convergence, final report per
+task 7, then the orchestrator's Reviewer B and ONE two-leg gate, in the order
+the dispatcher commissions. No Reviewer A or B has run so far; no gate has run.
+Do not claim package completion until all required evidence is supplied.
+
+### Rulings that must survive the re-seat
+
+1. CHARC `197131faf8764ebd` (original brief FINAL): Q1 permits only the old
+   clip.mov naming expected-value edit plus a new MP4-case control, and the
+   GUI filter/MOV routing edits. Q2 grants encode.py's explicit
+   `MP4_DATA_CODEC_TAGS = frozenset({"gpmd"})` data map only, one deterministic
+   command/no retry, omitted tags reported through existing not_carried.
+   Synthetic zzzz unit plus real mebx footage witness; no synthetic mebx authoring.
+   Q3 is house V4 (MANDATORY/REQUIRED and roster SAME), no runner pixel bound.
+   Q4 leaves DR-15 OPEN: add edit-list corroboration only; touch no register.
+   Q5 keeps Dolby Vision clips OUT, with the report fact below. Rotation is
+   required on the synthetic fixture and explicitly asserted on the phone output.
+2. CHARC `73d2797750c57625` (round-0 GRANT, 2026-10-29T21:59:13Z):
+   `tests/test_io_video_encode_units.py:80` changes only
+   `DataStreamInfo(3, "meta")` to `DataStreamInfo(3, "gpmd")`.
+   Adding meta to the allowlist is DECLINED. The assertion at base 365-372 is
+   verbatim; base row 753 is unchanged because it is a packet-table input to
+   not_carried, not the map probe. Verified by whole-file one-token diff and
+   80 passing encoder units. Report's owned-files list and accept record must
+   name the granted file/line and message ID.
+3. CHARC `093384f126589674` (2026-10-29T22:14:29Z): the qt fixture uses
+   stereo pcm_s16le (`-ac 2`); house V4 is unchanged. Shared-comparator change
+   DECLINED; no product fix exists/wanted. Owner mono lpcm has absent layout
+   in both files (seat probe); the synthetic declared-mono limitation is
+   CHARC's MINOR row at accept, quoted in full in the resolved STOP below.
+   The report must name that limit in one line. The cell touches no register.
+4. Orchestrator generation 24, turn 4 (FINAL unless CHARC overrides): phone
+   record state is `done with warnings`, exit 0, sole expected MP4. Warnings
+   must be exactly the not-carried data-track notices, including mebx, with no
+   other text. Two source mebx tracks and no copied data produce exactly two
+   identical `Not carried to the output: data track mebx` warnings: verify.py
+   enumerates missing source tracks without deduplication. The new test checks
+   prefix, total count 2, and exact mebx count 2, with safe count-only failures.
+
+### Remaining report content and evidence
+
+Report path (not created yet): `docs/reports/wp4.4-mov-input.md`.
+Quote spec 5.2 at 213 and 8.3 at 384; explain the suffix/naming/allowlist sites;
+list RED/GREEN node IDs and final-state light results; include seat round-0
+failure and the forthcoming phone result as format facts only. Name omitted
+best-effort items only; the expected mebx list has two entries, not deduplicated.
+For CHARC, provide IMG_6702's edit-list source/output rows as DR-15 corroboration
+only. Have the seat supply a safe subset of comparison facts if needed; the
+test does not save or print the full fidelity record. Do not dump record/tag data.
+The known source video edit is media_time 0 with negative ctts (inventory/seat
+evidence), not a new cell observation or a DR-15 closure.
+
+Q5 report facts are already grounded in the accepted inventory, no DV footage
+run needed: `IMG_6704.MOV` and `IMG_6772.MOV` are C2 in
+`docs/reports/inventory-2026-10-29.md:282,299`; C2 transfer is `arib-std-b67`
+(HLG), line 268. Spec 5.3 refuses HLG. The probe branch at
+`src/clearwater/io/video/probe.py:443-452` yields the text:
+`This video uses HLG HDR, which Clearwater does not support. Record in standard (SDR) mode instead.`
+Report only the clip names, transfer tag and refusal text, with clear attribution
+to inventory/code; they were not tested here. No second footage test or register row.
+
+Keep the one-line declared-mono PCM limit in the report, and leave its MINOR
+register entry to CHARC at accept. Retain the inherited encoding note:
+`tests/test_gui_open.py` has pre-existing U+00E9 (base 368/current 369);
+new lines are ASCII, original Unicode unchanged because Q1 does not permit
+normalizing that unrelated test. No ruling on whole-blob ASCII was supplied.
+
+### Validation state and run request
+
+Turn 4: the final non-footage file run is GREEN, 6 passed / 1 footage node
+deselected; ruff check GREEN; mypy GREEN, 141 source files. Commands/logs are
+in the turn-4 record below. The house helper is unchanged. Turn 3 full light
+run: 1021 passed, 3 UNC sandbox failures, 1 gui pin deselected. The same three
+UNC nodes PASS at the seat (3 passed, EXIT 0), so they are confirmed artifacts;
+never mask them or change the existing helper. Whole GUI file passed 31 in
+turn 2, naming file 865, encoder file 80 plus the new map test. Seat format at
+turn-4 entry: clean, 272 files; ruff check clean; zero CR (dispatcher-supplied).
+No full suite or harness gate is due from the cell.
+
+**RUN REQUEST (Git Bash, orchestrator seat only):**
+
+```bash
+env -u VIRTUAL_ENV uv run pytest -q -rs tests/test_wp44_mov_input.py::test_phone_mov_runner_and_v4 -m footage --basetemp=work/wp4.4/t4-seat-footage > work/wp4.4/t4/seat-footage.txt 2>&1
+```
+
+Scheduling allowance 1-3 minutes, CPU libx265; not a timing figure. All outputs,
+cache and runner-record.json are in that test's tmp_path under the basetemp.
+The source is located through local_config, read-only. No test execution at
+the cell and no source path, tag value, full record or private metadata in the
+ledger or return. A skip is not a phone proof; only genuinely absent footage
+may skip, while missing/unreadable/ambiguous roots are errors after conftest's
+configuration handling.
+
+### Frozen scope and operating disciplines
+
+Owned implementation paths are gui/sources.py (suffix set/docstring only),
+jobs/naming.py (extension rule/docstrings), tools/headless_export.py (suffix
+set/docstring only), io/video/encode.py (data map/allowlist only),
+tests/test_jobs_naming.py (new tests and Q1 expected value),
+tests/test_gui_open.py (Q1 edits only), the one-token encoder-unit grant,
+tests/test_wp44_mov_input.py, the report and this ledger. Every other existing
+test, fixtures, conftest, interfaces, export engine, V4 instruments, spec,
+register, dependencies and config are NOT owned. Any new existing-test
+conflict or need to cross that envelope is STOP, with a cheap reproduction.
+
+Footage is read-only and never accessed at the cell. Footage/GPU/network/heavy
+runs are exact RUN REQUESTS at the orchestrator's seat, scheduled around the
+other package's exclusive windows; never read another worktree. All output/logs
+are worktree-local under work/wp4.4; no writes outside the sandbox. No mailbox
+posts, no commits, no git stash, no deletion of kept basetemps. All runner
+output goes to files; report summaries, never dump logs. Keep new text ASCII/LF.
+
+Cell pytest always uses `PYTHONPATH=scripts` and
+`-p sandbox_mkdir_shim -p no:cacheprovider`, a fresh work-local basetemp, and
+the permitted non-heavy marker expression. Do not work around unreachable
+FFmpeg/index/sandbox restrictions. Ruff format is checked at the seat.
+Attribution and commits are the dispatcher's responsibility; every turn ends
+with FILES CHANGED and the conventional wp4.4 commit subject.
+
+Reviewer A is the driver-run Claude opus/high read-only pass between turns,
+not an agent the cell spawns. Adjudication turns modify only the ledger and
+YIELD before remediation. Maintain the cumulative round counts (severity,
+in/out, NEW/REOPENED, reverts, product versus test fixes, transport/version and
+dispatcher depth). Round 5 and every fifth round STOP for approval; convergence
+follows `docs/review-gate-clearwater.md`. Reviewer B and the ONE two-leg gate
+run at the orchestrator's seat after A converges and B returns; no fullclip leg
+and no harness gate for this package. See the fill for collection accounting.
+Report every lock, deviation, per-change list, review disposition and exact
+node additions/removals. Only removed ID so far is
+`tests/test_gui_open.py::test_routing_by_extension[a.mov-refusal]`, replaced
+by `[a.mov-video]` and `[a.MOV-video]`; naming's existing node is retained.
+
+Last dispatcher depth: 189,237 input tokens, binding window 258,400. This
+turn ends at the mandatory boundary; next work belongs to a FRESH cell as
+commissioned, not another build burst in this context. Do not estimate depth.
+
+## Turn 3 STOP resolved: phone record state versus required warnings
+
+Orchestrator generation 24 ruled at turn 4 (FINAL unless CHARC overrides):
+the phone record assertion requires `state == "done with warnings"`, exit 0,
+the one expected MP4, and exactly the not-carried data-track warnings, including
+`data track mebx`, with no other warning text. The warning count is asserted
+exactly when deterministic. This follows CHARC Q2's required disclosure; the
+brief's `done` means a successful item. No product behavior change is authorized.
+The test is now authorized for implementation; it remains a seat-only run.
 
 **[major, in-envelope, NEW, REASONED + EXECUTED]** Task 6 and the turn-3
 dispatch require the runner record's item `done`. The existing product reports
@@ -37,7 +203,7 @@ were printed; only the two states, warning counts and exit codes.
 This is a brief/assertion conflict, not a new existing-test conflict. It is
 raised under plan 4.5's no-assumptions rule before implementing the phone test.
 Neither warning suppression nor batch/runner changes are in this package's
-grant. The new exact-state assertion needs a ruling at the next turn boundary.
+grant. The exact-state assertion received the ruling above at the turn-4 boundary.
 
 ## Turn 2 STOP resolved: qt PCM audio layout differs in V4
 
@@ -157,7 +323,8 @@ The user-specified task ladder and yield schedule govern the work.
 | Turn 1 entry | Fresh session; no numeric depth supplied | Round 0 only |
 | Turn 1 exit / turn 2 entry | 102,496 input tokens; window 475,000 (dispatcher reading) | Continue tasks 3-5; evaluate near 200K, stop at a boundary near 250K |
 | Turn 2 exit / turn 3 entry | 163,747 input tokens; smaller reported window 258,400 binds | Bounded fixture/test turn, then dispatcher evaluation |
-| Turn 3 exit | Pending dispatcher reading | Mandatory yield; evaluate at this boundary |
+| Turn 3 exit / turn 4 entry | 189,237 input tokens; binding window 258,400 | Bounded test and run-request turn; fresh seat for report/reviews |
+| Turn 4 exit | Pending dispatcher reading | Mandatory yield and fresh-seat handoff |
 
 The dispatch's Codex/Claude pace readings describe account usage, not this
 cell's context depth; they are not substituted for a depth reading.
@@ -532,7 +699,7 @@ configuration, the register and all other worktrees remain unchanged.
 
 | Boundary (not Reviewer A) | Critical / major / minor | In / out | NEW / REOPENED | Reverts | Product / test fixes | Verdict | Depth |
 |---|---|---|---|---|---|---|---|
-| Turn 3 author verification | 0 / 1 / 0 | 1 / 0 | 1 / 0 | 0 | None / ruled stereo fixture, with layout self-check | STOP: literal phone record state needs ruling; no footage access | Pending dispatcher; entry 163,747 / 258,400 |
+| Turn 3 author verification | 0 / 1 / 0 | 1 / 0 | 1 / 0 | 0 | None / ruled stereo fixture, with layout self-check | STOP resolved by orchestrator gen 24's turn-4 ruling; no footage access | 189,237 at turn-3 yield; binding window 258,400 |
 
 Verification-loop record: applied the ruled stereo fixture and confirmed V4
 passes; discovered the phone-state requirement conflict while tracing its
@@ -540,3 +707,54 @@ record schema; independently confirmed the warning-free and warned states using
 real serializer calls. No false positives, no reverts, no out-of-scope fix.
 Reviewer A has not run. Yielding at the bounded turn's boundary for the
 dispatcher's depth evaluation and ruling; no package-completion claim.
+
+## Turn 4 test, validation and handoff record
+
+Applied the turn-4 orchestrator ruling without product changes. Added
+`tests/test_wp44_mov_input.py::test_phone_mov_runner_and_v4`, the file's ONE
+footage-marked node, with the reason beside its marker. `_phone_mov` uses
+local_config and the established skip-only-when-absent pattern: ambiguity,
+search errors and invalid roots are not silently skipped. The node runs the
+CPU libx265 runner with `--record`; all output/cache/record paths are under
+tmp_path. It checks exit 0, the sole expected MP4, successful-with-warnings
+record state, exactly two expected mebx omission notices, house V4, source and
+output frame counts 15, and the explicitly named display orientation SAME.
+
+Deterministic count proof: verify.py:890-895 enumerates each non-timecode
+source data stream and appends once if missing. Both mebx tracks are absent
+from the gpmd-only output, so it appends `data track mebx` twice, without
+deduplication. export.py:1031-1033 prefixes both entries once. The test requires
+two total warnings and two exact expected entries, leaving no other text.
+Prefix and count checks use precomputed booleans/integers so failures do not
+print arbitrary warnings. The record, source tags and fidelity record are
+never printed. The runner's captured stdout/stderr is discarded before
+assertions; assertions expose output names, states, counts and V4 item names.
+
+No footage execution was performed by the cell, including no manual call to
+the lookup helper. No footage result is claimed. The seat command is in
+RESUME HERE; any new MANDATORY/REQUIRED difference is STOP. No report or
+register change was made. Product files, prior tests, frozen interfaces,
+dependencies, configuration and all other worktrees remain unchanged.
+
+At entry, the orchestrator supplied clean ruff format (272 files), clean ruff
+check and zero CR at `e4141f8`. Current cell runs remove VIRTUAL_ENV; pytest
+sets `PYTHONPATH=scripts`. All logs are in `work/wp4.4/t4/`.
+
+| Run / log | Exact command or check | Counts / outcome | EXIT |
+|---|---|---|---|
+| light.txt | `uv run pytest -q tests/test_wp44_mov_input.py --basetemp=work/wp4.4/tmp/t4-light -p sandbox_mkdir_shim -p no:cacheprovider -m "not footage and not gpu and not gui and not slow and not fullclip"` | 6 passed, 1 footage node deselected | 0 |
+| ruff.txt | `uv run ruff check .` | All checks passed | 0 |
+| mypy.txt | `uv run mypy` | Success: no issues in 141 source files | 0 |
+| diff-check.txt | `git -c core.autocrlf=false diff --check` | No whitespace errors | 0 |
+| seat-footage.txt | Git Bash RUN REQUEST in RESUME HERE | Pending at orchestrator seat; NEVER run at cell | Pending |
+| locks.txt | `uv run python -` (AST and byte checks, without importing or executing the test) | Both modified files ASCII/LF; house helper unchanged; exactly one footage node | 0 |
+
+Verification-loop record: traced the fixed warning count against the unchanged
+verify/export code; checked that state and warning assertions implement the
+new ruling; ran the non-footage node selection to green without executing the
+new marker; no new suspect, confirmed defect, false positive or revert.
+Reviewer A has not run. Handoff is to a fresh seat after this bounded turn.
+
+| Boundary (not Reviewer A) | Critical / major / minor | In / out | NEW / REOPENED | Reverts | Product / test fixes | Verdict | Depth |
+|---|---|---|---|---|---|---|---|
+| Turn 4 author verification | 0 / 0 / 0 | 0 / 0 | 0 / 0 | 0 | None / ruled phone test written; seat run pending | No open build STOP; await footage evidence, fresh seat for remaining work | Pending dispatcher; entry 189,237 / 258,400 |

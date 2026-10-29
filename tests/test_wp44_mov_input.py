@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import subprocess
 from fractions import Fraction
 from pathlib import Path
@@ -21,6 +22,7 @@ from clearwater.interfaces.video import (
 from clearwater.io.video import FFmpegVideoSource, find_tool, probe
 from clearwater.io.video.encode import encode_command
 from container_spike import compare
+from local_config import FootageLookupError, find_footage_file, load_local_config
 
 
 @pytest.mark.parametrize("name", ["a.mov", "a.MOV", "a.Mov"])
@@ -164,4 +166,67 @@ def test_qt_mov_probe_decode_runner_and_v4(qt_mov: Path, tmp_path: Path) -> None
     output = out / "clip_corrected.mp4"
     assert list(out.iterdir()) == [output]
     items = _assert_v4(qt_mov, output)
+    assert items["display orientation: display matrix (ffprobe side data)"]["status"] == "SAME"
+
+
+def _phone_mov() -> Path:
+    """Locate the phone clip, skipping only absence in a successfully searched folder."""
+    root = load_local_config().footage_path
+    try:
+        return find_footage_file("IMG_6702", root)
+    except FootageLookupError as error:
+        if error.matches or error.__cause__ is not None or not root.is_dir():
+            raise
+        pytest.skip("IMG_6702 is not in the footage folder")
+
+
+@pytest.mark.footage  # Serial leg: reads owner footage, read-only.
+def test_phone_mov_runner_and_v4(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """Export the rotated phone MOV with V4 preserved and only omitted-data warnings."""
+    source = _phone_mov()
+    out, cache = tmp_path / "out", tmp_path / "cache"
+    out.mkdir()
+    cache.mkdir()
+    record_path = tmp_path / "runner-record.json"
+    status = he.main(
+        [
+            str(source),
+            "--out",
+            str(out),
+            "--cache-dir",
+            str(cache),
+            "--force-cpu",
+            "--encoder",
+            "libx265",
+            "--record",
+            str(record_path),
+        ]
+    )
+    capsys.readouterr()
+    assert status == 0
+    output = out / "IMG_6702_corrected.mp4"
+    output_names = [path.name for path in out.iterdir()]
+    assert output_names == ["IMG_6702_corrected.mp4"]
+
+    data = json.loads(record_path.read_text(encoding="ascii"))
+    item_count = len(data["items"])
+    assert item_count == 1
+    item = data["items"][0]
+    state = item["state"]
+    assert state == "done with warnings"
+    recorded_outputs = item["outputs"]
+    assert recorded_outputs == ["IMG_6702_corrected.mp4"]
+    # Keep assertion failures to counts/booleans; never display arbitrary warning text.
+    warnings = item["warnings"]
+    all_not_carried = all(warning.startswith("Not carried to the output: ") for warning in warnings)
+    assert all_not_carried, "only not-carried data-track warnings are permitted"
+    warning_count = len(warnings)
+    mebx_count = warnings.count("Not carried to the output: data track mebx")
+    # verify.not_carried emits one entry per missing track, with no deduplication.
+    assert warning_count == 2
+    assert mebx_count == 2
+
+    items = _assert_v4(source, output)
+    assert items["video frame count"]["source"] == 15
+    assert items["video frame count"]["output"] == 15
     assert items["display orientation: display matrix (ffprobe side data)"]["status"] == "SAME"
