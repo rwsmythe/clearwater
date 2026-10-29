@@ -6,7 +6,8 @@
 |---|---|---|
 | Turn 1 / round 0 | `tokens used` 77,213; input depth 88,453 / 475,000 | Dispatcher supplied on turn 2; driver log, 02:21:57Z start. |
 | Turn 2 / build | `tokens used` 127,137; input depth 134,393 / 475,000 | Dispatcher supplied on turn 3; 02:26:28Z start. |
-| Turn 3 / cleanup | Pending dispatcher reading | No self-estimated depth; dispatcher reads this turn's footer. |
+| Turn 3 / cleanup | `tokens used` 140,058; input depth 146,457 / 475,000 | Dispatcher supplied on turn 4. |
+| Turn 4 / Reviewer A round 1 adjudication | Pending dispatcher reading | No self-estimated depth; dispatcher reads this turn's footer. |
 
 Evaluation point: approximately 250K; STOP at a round boundary at approximately
 400K, using the dispatcher's reading.
@@ -186,6 +187,7 @@ follow the review/gate fill. Reviewer B runs at the orchestrator's seat.
 | 0 | `aa4761b` / turn 1 | N/A | N/A | N/A | N/A | N/A | 0 | Neither: ledger only | Reviewer not run | 88,453 input; 77,213 tokens used | Read/map complete; committed by dispatcher as `933e33e`; turn-2 GO received. |
 | Build | `933e33e` + working diff / turn 2 | N/A | N/A | N/A | In-envelope implementation | No review yet | 0 | Runner tool + four test comparisons + new regressions | Reviewer not run | Pending dispatcher | STOP: three existing tests fail on the sandbox's administrative-share probe; no existing test edited. |
 | Cleanup | `d5c9ae3` + working diff / turn 3 | N/A | N/A | N/A | In-envelope formatting | No review yet | 0 | Formatting only, no behavior change | Reviewer not run | Pending dispatcher | Turn-2 STOP resolved by dispatcher seat verification; static and permitted light checks clean; Reviewer A pending. |
+| A1 | `a05c13e` / turn 4 | 0 | 1 (F1) | 1 (F2); 5 advisory (F3-F7) | 6 in / 1 out (F4) | 7 NEW / 0 REOPENED | 0 | None this turn; proposed runner + tests + report fixes | Driver-run Claude process; `claude-opus-5-5`, high, STRONG; CLI version not supplied | Pending turn-4 reading | `NEW_CRITICAL_MAJOR_FOUND`; adjudicated below; YIELD before remediation. |
 
 ## Execution record
 
@@ -224,6 +226,89 @@ of the surrounding shell's exit status. No two-leg / heavy run occurred.
 | 3 / static | `uv run mypy` | Success: no issues found in 141 source files; EXIT=0. | `t3-mypy.log` |
 | 3 / no behavior change | `uv run python -c <AST comparison of the three formatted files against git show d5c9ae3:path>` | All three parsed ASTs identical (locations excluded); EXIT=0. | `t3-ast-check.log` |
 | 3 / light, three authorized UNC nodes deselected | `pytest -q -rs tests/test_wp42a_runner_hardening.py tests/test_headless_export.py tests/test_wp41_photo_path.py tests/test_wp41_v8.py -m 'not gpu and not footage and not slow' --deselect=tests/test_headless_export.py::test_g1_inside_sees_every_spelling_of_the_same_folder --deselect=tests/test_headless_export.py::test_g1_main_refuses_every_footage_check_through_another_spelling[unc] --deselect=tests/test_headless_export.py::test_g1_the_redactor_hides_the_extended_spellings --basetemp=work/wp4.2a/tmp-t3-light` | 337 passed, 5 deselected, EXIT=0. Three seat-verified UNC nodes explicitly deselected plus 2 marker deselections; no skips. Prefix/plugins as above, offscreen Qt. | `t3-light.log` |
+| 4 / F1 planning reproduction | `./.venv/Scripts/python.exe -` (stdin pathlib-only probe: join a source-derived `c:input_corrected.png` to relative, different-drive and same-drive stand-in output folders) | Relative and different-drive cases have parent `c:`, outside the checked folder; same-drive absolute case retains the checked parent and drops the stream colon. Assertions pass, EXIT=0. No resolution or test-file writes by the probe; shell output only under work. | `t4-f1-planning.log` |
+| 4 / F2 independent probe | `./.venv/Scripts/python.exe -` (stdin NumPy probe of identical float32 NaN arrays) | Original `np.array_equal` False; dtype/shape/bytes True; byte comparison AND original numeric equality False; EXIT=0. | `t4-f2-nan.log` |
+
+## Reviewer A round 1: adjudication only (turn 4)
+
+Review head: `a05c13e`; verdict `NEW_CRITICAL_MAJOR_FOUND`.
+Authorized evidence read: ONLY
+`C:\Users\rwsmy\clearwater-review-evidence\wp4.2a\r1\review.txt`,
+MD5 `36f0ed68fd4e935b70b7e668498b9323`. No other file in the evidence folder
+was opened or modified. Model/effort/tier are dispatcher-supplied
+(`claude-opus-5-5`, high, STRONG); invocation assertion details and CLI version
+were not supplied to the cell. Reviewer pytest was refused by its sandbox:
+test-claim checks are REASONED, not executed suite evidence. F1 and F2 are
+EXECUTED reviewer probes; the cell independently confirmed their planning and
+NaN mechanics using the two logged probes above. No pytest, heavy run, code,
+test or report edit this turn. The only tracked change is this ledger.
+
+### Dispositions
+
+| ID | Severity / reachability / evidence | Decision | Reason and precise disposition |
+|---|---|---|---|
+| F1 | MAJOR; in envelope; EXECUTED | ACCEPT | The new guard misses a required output path shape. The frozen join can reinterpret a one-letter carrier stream as a drive-relative filename. Independently reproduced with pathlib: relative `..\out` and different-drive `D:\stand-in\out` both produce `c:input_corrected.png`, parent `c:`. Fix inside owned `check_outputs`: compare the planned file's parent with the folder already checked, before its shared form check. No frozen naming edit and no second colon test. |
+| F2 | MINOR; in envelope; EXECUTED | ACCEPT | Recommend option (a), preserving NaN rejection with one numeric-equality guard expression per site. Keep the new dtype/shape/bytes check AND the original `np.array_equal` result. This is a conservative NaN-rejection guard and also preserves old behavior for any other supported dtype; a report-only qualification would not meet the brief's 'assertions only stricter' lock. |
+| F3 | ADVISORY; in envelope; REASONED | ACCEPT-DOC | Disclose the exact boundary: only the four Redactor construction expressions are wrapped. With configured footage, an earlier resolution failure in `check_outputs` can still escape library `run` raw. Base `aa4761b` already calls `check_outputs(requests, folder)` before `Redactor(folders)` (confirmed by `git show`); the turn-2 construction-site grant does not grant wrapping unrelated footage-check operations. No code expansion. |
+| F4 | ADVISORY; OUT of envelope; REASONED | ACCEPT-DOC | Disclose the mid-run mutation/race residual: a later redactor failure after jobs have run can yield exit 2, and a failure during record serialization can leave an empty newly created record. The review explicitly requires a mid-run change; the declared static Windows/local-NTFS envelope and owned construction-wrap scope do not authorize changing `_write_record` or the exit-status contract. No race-handling implementation here; dispatcher owns any follow-up commissioning. |
+| F5 | ADVISORY; in envelope; REASONED | ACCEPT | Tighten the new test helper: once the test has created its ADS and hard link, a PowerShell enumeration failure must fail, not skip, on either call. Keep capability skips only around actual link/stream creation. This prevents post-refusal enumeration failure from silently discarding preservation assertions. Add a planted enumerator-failure control. |
+| F6 | ADVISORY; in envelope; REASONED | DECLINE | New request-1 file refusal now precedes request-2 folder refusal, but all legacy folder texts and within-request precedence remain intact. R1-Q1 requires a per-request FILE check, and turn-2 ruling 3 concurs with reaching it from both folder modes; neither prescribes a new global two-pass ordering. Both shapes refuse before any jobs. Preserve the approved request-order implementation. |
+| F7 | ADVISORY; in envelope; REASONED | ACCEPT-DOC | Refresh report status to the actual reviewed/remediated head and update the Limit with F1's checked-parent invariant. Distinguish the pre-fix proven escape from the post-fix boundary; no stale working-diff claim. Include F3/F4's precise disclosures. Report stays untouched this adjudication turn. |
+
+Totals: 0 critical, 1 major, 1 minor, 5 advisory; 6 in envelope, 1 outside;
+7 NEW, 0 REOPENED; no reverts or fixes this turn. ACCEPT: F1/F2/F5;
+ACCEPT-DOC: F3/F4/F7; DECLINE: F6. The major remains open pending remediation,
+verification and the next review disposition. This round does not converge.
+
+### Proposed remediation, pending dispatcher GO
+
+1. **F1 RED-first:** add
+   `test_drive_relative_output_is_refused_before_jobs`, parameterized for
+   library/CLI and photo/video, covering relative output folders and a
+   beside-source one-letter stream on a different drive prefix. Construct the
+   source as a full path string (for example `Path(f"{src / 'c'}:input.jpg")`),
+   so joining the source itself does not normalize away its colon. A no-write
+   job spy must remain untouched. Add
+   `test_drive_relative_stream_cannot_write_into_footage_cwd` for the real JPEG
+   ADS case where the OS permits: cwd is a tmp_path stand-in footage folder,
+   output folder is a relative sibling, and the source carrier letter matches
+   the actual cwd drive. Verify usage refusal and no new entry in the stand-in
+   footage folder. Add a safe same-drive absolute-output control, because that
+   join retains its checked parent and does not need refusal.
+2. **F1 implementation:** immediately after successful `final_output_path`
+   planning and before `_write_form_refusal(output)` in `check_outputs`, set
+   `checked_folder = request.source.parent if folder is None else folder`;
+   if `output.parent != checked_folder`, raise `RunnerRefusalError` with exactly:
+   `the output for {ascii_text(request.source.name)} would leave its checked output folder.`
+   This is a lexical pathlib parent equality check, not a resolve call. It
+   closes the drive-reinterpretation escape while keeping (ii)/(iii) on the
+   checked folder and (i) solely in `_write_form_refusal`. Existing folder
+   checks/refusal precedence remain before this guard; RefusedRequest and
+   naming ValueError handling remain unchanged. No new `":"` check.
+3. **F2 RED-first:** add
+   `test_nan_remains_unequal_in_all_four_comparisons`, executing the real
+   statistics helper and the same three extracted pixel assertion expressions
+   on identical NaN arrays. It must fail on current byte-only comparisons.
+   Preserve signed-zero, dtype/shape and identical-finite controls. At the four
+   owned sites conjoin `np.array_equal(first, other)` (with bool conversion
+   where required) with dtype/shape/bytes equality. This is option (a)'s
+   strictness-preserving NaN guard, without a new helper or dtype special cases.
+4. **F5 RED-first:** add
+   `test_stream_enumeration_failure_is_not_a_skip`, planting a nonzero
+   subprocess result. Translate any caught pytest-skip exception into a failed
+   assertion so the current late-skip behavior is demonstrably RED, not an
+   apparent capability skip. `_streams` will assert subprocess success rather
+   than call pytest.skip. No product change.
+5. Run targeted RED/GREEN checks with sandbox plugins and work logs, then ruff,
+   format, strict mypy and the allowed light command with the three explicitly
+   authorized UNC-node deselections recorded. If a different existing test
+   fails, STOP under the standing rule. Update the report for F3/F4/F7, the
+   round execution record and final claims. Yield to the driver for the next
+   review/gate step; no two-leg suite is run by the cell.
+
+No new dependency, src/interface edit, external write or change to the
+one-predicate text test is proposed. Any request to fix F3/F4 in code requires
+an explicit envelope/ownership ruling rather than silent scope expansion.
 
 ### RED/GREEN by regression node
 
@@ -295,11 +380,9 @@ weakened or patched.
 
 ## Current disposition
 
-Tasks 3-6 implemented; turn-2 STOP resolved by the dispatcher's seat verification.
-Turn 3 makes formatter-only code/test changes; all three ASTs match `d5c9ae3`.
-Ruff check, format check and strict mypy pass. Sandbox light run: 337 passed,
-5 deselected (3 authorized UNC nodes and 2 marker exclusions), EXIT=0. The report
-is DRAFT -- for Reviewer A. Reviewer A, the full two-leg gate and acceptance
-remain pending. DR-78 and DR-79 remain OPEN until acceptance; the dispatcher
-owns register closure. No mailbox post. Yield after cleanup; adjudicate
-Reviewer A round 1 on turn 4 and yield before remediation, as dispatched.
+Reviewer A round 1 on `a05c13e` found one new major (F1), one minor (F2),
+and five advisories. Every finding is adjudicated above. The cell independently
+reproduced F1 planning and F2 NaN behavior; only this ledger changed. No code,
+test or report remediation this turn. YIELD for dispatcher GO on the precise
+plan above. Reviewer A is not converged; full two-leg gate and acceptance remain
+pending. DR-78/DR-79 stay OPEN. No mailbox post or evidence-folder write.
