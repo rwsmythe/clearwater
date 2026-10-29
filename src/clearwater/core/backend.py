@@ -682,7 +682,7 @@ class CupyBackend(CoreBackend):
         exponent of the smallest non-zero ``|v|``) below ``2**m``, ``m = ceil(log2(k * k + 1))``,
         which float64 holds exactly when ``m - (e_min - 23) <= 53``. A decoded frame always
         passes: its values are ``c / 255`` or ``c / 1023`` (``e_min`` -8 or -10), so 38 bits at
-        ``k = 8``.
+        ``k = 8`` for 8-bit input and 40 bits for 10-bit input.
 
         Args:
             a: A float32 ``(H, W, C)`` array on this backend's device.
