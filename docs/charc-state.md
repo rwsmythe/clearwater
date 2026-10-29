@@ -380,6 +380,16 @@
 - **W3 RUN 2 WINDOW OPEN ~12:51Z (status `2bf77bf16edff753`, no reply owed; ~7 min): w3.sh md5 0dd11553 (corrected reference
   path + the six-name explanation table) at head 89f9500.** NEXT: W3 release (stage 1, delta, both controls); rung 4
   (collections; W4 fullclip once ~27 min); report; A FAST; B; the ONE gate.
+- **WP4.3 ROUND 0 RULED ~13:00Z (query `d0a94cb7a23c5410`; ledger 649483b on `wp4.3`; my post ruling-wp43-r0). Measured:
+  imports 1.46 s; capabilities 550 ms fresh; first select_backend 947 ms + import core 1.03 s (worker); cache open at 20 GB
+  126 ms warm / 16.4 s first open (cause not isolated). S1 = (a) deferred-open handle GRANTED on 5 conditions (IF-7 by
+  delegation in app/composition.py; members worker-only and readable refusal if the open failed; limit from the ONE settings
+  read, dialog limit/clear queued behind the open; one DiskProxyCache per process provable through the handle; a slow-open V7
+  scenario); grants composition.py beyond Q16 + Q11 signature (limit arg dropped). S2 = the ALTERNATIVE: select at each run
+  start, in-flight keeps its backend, rebuild the engine over the same cache when the selection differs (force-CPU then
+  recompute shows CPU on that run). S3 set_idle_device GRANTED. S6 journal renamed aside .bad-<UTC>. S7 uncommitted V7
+  driver importing committed helpers. S-order CONFIRMED (cleanup after MainWindow, before installs and show). FRESH CELL 2
+  for the build (cell 1 at 262,719).** NEXT: cell 1 final report + stand-down; cell 2 dispatched; its yields.
 - **(history) After WP4.1's accept:** WP4.2's brief (DRAFT RULED on main 3aa3c51) got ONE revision pass against WP4.1's accept record, then FINAL
   on CHARC's word; its revision must carry: DR-78/79 (B2 rows) as WP4.2 items, the WP4.1 runner's final names and the stream-syntax
   predicate, the Limit text. WP4.3's revision later carries DR-75 (REQUIRED test under its Q12), DR-76, DR-77, and the AD-23 'applied by
