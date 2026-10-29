@@ -105,15 +105,55 @@ measurement (Reviewer A round 1): a 1/255 flicker on every other smoothed frame 
 give V3 ratios 0.63-5.05 per measure (refused against 0.25).
 
 V3 runs on the GPU job in the suite (device frames; CHARC `91c2c22f4b6edd18` 3, KEEP for
-question 9's budget); the suite does not cover the CPU leg. Each run of the file can write its
-own figures file (`CLEARWATER_WP42_V3_FIGURES`), its first line naming the backend, and
-`CLEARWATER_WP42_V3_BACKEND=cpu` runs every leg on the CPU job (CHARC `2a336830303f3a2d`). The
-GPU record: `work\wp4.2\v3\figures-gpu.txt` (`backend: cuda:0`; file md5
-`629f7dc9c85c45418f70f01a9c5c6363`, the figure lines after the backend line md5
-`5fb51f054dda4e6612e89578fb8de45b`), the four rows above. The CPU record: PENDING, one recorded
-run in an exclusive window. Cell 2's observation `work\wp4.2-v3-figures.txt` (md5
-`f76c42a5fae87b9cb691ac5594b5d3a2`, 2026-10-29T05:22:48Z; four rows equal to the above, no
-backend named) is that cell's observation only, not the CPU record.
+question 9's budget); the suite does not cover the CPU leg. After Reviewer A converged, `428d8b4`
+added two environment variables to `tests/test_wp42_v3_product.py` (CHARC `2a336830303f3a2d`;
+covered by the orchestrator's Reviewer B, not by Reviewer A): `CLEARWATER_WP42_V3_BACKEND=cpu`
+runs every leg on the CPU job (the export `force_cpu`, the per-frame leg on the CPU backend), and
+`CLEARWATER_WP42_V3_FIGURES` names a new figures file the run writes, its first line naming the
+backend. The suite never sets either; unset, the file is the GPU job as before.
+
+**The CPU leg: the same V3/AD-14 figures, not the same encoded characterisation** (CHARC ruling
+(a) on the V3 STOP). One recorded window, 2026-10-29 06:15:01Z-06:24:29Z, ran the file twice
+through its own measurement, unchanged, by the scratch driver `work\wp4.2\v3\driver.py` (md5
+`b128c6096945b5bc48b935c92361b7e8`, not committed), GPU (91.0 s) then CPU (470.3 s), 6 passed
+each. The cited figures files are the window's, under `work\wp4.2\v3\window\`:
+`figures-gpu.txt` (md5 `3ec7f59c682e8b8319d409a2f4bd5ed5`) and `figures-cpu.txt` (md5
+`1eba25f524befde9627fc063f9191efa`); each row names its backend, so the two file hashes differ by
+construction. The 24 rows V3 and AD-14 assert or record (`ad14_unsmoothed`, `ad14_smoothed` and
+the four V3 ratios on the four rows of the table above, the backend column removed; the selection
+is recorded in `compare.txt`) have the same md5 from both files,
+`b72d9e7b57b53b0e28593c1f55c91abd`. All four planted AD-14 rows and 15 of the 16 planted ratios
+are equal too. 13 of the 64 rows differ (`compare.txt`, GPU | CPU), verbatim:
+
+```
+ad14-flicker | c3 | encoded_ratios.L* | gpu 0.084 | cpu 0.085
+ad14-flicker | c3 | encoded_ratios.a* | gpu 1.134 | cpu 1.024
+ad14-flicker | c3 | encoded_ratios.b* | gpu 0.329 | cpu 0.292
+ad14-flicker | c3 | encoded_ratios.contrast | gpu 0.17 | cpu 0.143
+ad14-flicker | c3 | planted_ratios.a* | gpu 2.717 | cpu 2.716
+ad14-flicker | ancuti2018 | encoded_ratios.L* | gpu 0.124 | cpu 0.125
+ad14-flicker | ancuti2018 | encoded_ratios.a* | gpu 0.256 | cpu 0.265
+ad14-flicker | ancuti2018 | encoded_ratios.b* | gpu 0.097 | cpu 0.088
+ad14-flicker | ancuti2018 | encoded_ratios.contrast | gpu 0.152 | cpu 0.155
+jitter | c3 | ad14_encoded | gpu 0.0378 | cpu 0.0376
+jitter | c3 | encoded_ratios.a* | gpu 0.134 | cpu 0.145
+jitter | c3 | encoded_ratios.b* | gpu 0.167 | cpu 0.193
+jitter | c3 | encoded_ratios.contrast | gpu 0.136 | cpu 0.14
+```
+
+The encoded rows are characterisation only (not V3's measurement point, question 5); they are
+backend-dependent at the second or third decimal with the SAME encoder: `"auto"` resolves to
+`hevc_nvenc` on both jobs (`resolve_encoder`, `src/clearwater/io/video/capability.py:228`; the
+compute backend does not choose the encoder). The cell's READING, not established: the CPU and
+GPU pre-encode floats differ below the figures' rounding, and 8-bit quantisation and NVENC in a
+near-static masked region turn that into a different encoded flicker; its one direct evidence is
+the planted row's 0.001 (2.717 against 2.716). The pre-encode frames were not compared directly.
+V4's CPU/GPU SAME is AD-11's tolerance test and is unaffected by these rows (CHARC's ruling).
+Run to run the GPU is identical: the window's raw GPU file and the earlier light run's
+`work\wp4.2\v3\figures-gpu.txt` have the same md5 (`629f7dc9c85c45418f70f01a9c5c6363`); that
+earlier file is cited only as this determinism check. Cell 2's unlabelled observation
+`work\wp4.2-v3-figures.txt` (md5 `f76c42a5fae87b9cb691ac5594b5d3a2`, 2026-10-29T05:22:48Z; four
+rows equal to the above, no backend named) is that cell's observation only, not the CPU record.
 
 WP1.4 real footage: 0.35-0.45. No product-method miss: no STOP. The encoded ratios include the
 encoder's frame-to-frame quantisation (NVENC, Standard); they are not V3's measurement point

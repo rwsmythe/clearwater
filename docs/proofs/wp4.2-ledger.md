@@ -10,6 +10,9 @@ build waits for WP4.2a's merge and the orchestrator's rebase (R1-Q5 condition 3,
 |---|---|---|---|---|
 | Y1 (round 0) | cell 1 | 209,438 (70 turns) | 2026-10-29 02:33:37Z | at Y1; cell 1 STOOD DOWN 02:35Z, build to a fresh cell |
 | Y4 (Reviewer A R1) | cell 3 | 165,011 (turn 50) | 2026-10-29 05:55Z | R1 adjudicated; cleanup granted |
+| Y2 (window request) | cell 3 | 202,221 (turn 75) | 2026-10-29 06:09Z | cleanup concurred |
+| Y2 (window request 2) | cell 3 | 223,004 (turn 89) | 2026-10-29 06:14Z | CPU V3 record granted |
+| Y3 (V3 STOP) | cell 3 | 237,804 (turn 101) | 2026-10-29 06:26Z | near the 250K evaluation point |
 
 ## Round ledger (Reviewer A, Codex `gpt-6.1-sol` / high, WSL)
 
@@ -339,6 +342,54 @@ line; an existing file is refused, never overwritten; checked: a second run nami
 - CPU record: PENDING, the window's item (i).
 - The report labels `work\wp4.2-v3-figures.txt` as cell 2's observation only.
 
+## The V3 CPU/GPU window, the STOP and CHARC's ruling (a)
+
+**Window (orchestrator grant, item 3; 2026-10-29 06:15:01Z-06:24:29Z, 9.6 GiB free before).**
+The scratch driver `work\wp4.2\v3\driver.py` (md5 `b128c6096945b5bc48b935c92361b7e8`, never
+committed) ran `tests/test_wp42_v3_product.py` at `e3b5d5f` twice through its own `_v3` /
+`_figures`, unchanged, the only difference the committed switch of `428d8b4`
+(`CLEARWATER_WP42_V3_BACKEND` unset = the GPU job; `cpu` = the CPU job), each run writing its
+raw file through `CLEARWATER_WP42_V3_FIGURES`: GPU 6 passed in 91.0 s, CPU 6 passed in 470.3 s.
+The orchestrator's later grant of the same run by the env-switch route (conditions: (1) state
+that `428d8b4` came after Reviewer A converged and is covered by Reviewer B, the variables
+unset in the suite; (2) equality on the lines from line 2, both hashes per file; (3) any
+difference a STOP) crossed with the STOP; the run was not repeated. Outputs under
+`work\wp4.2\v3\window\` (not `v3\`, where `figures-gpu.txt` already held the earlier GPU
+record cited at `e3b5d5f`):
+
+| File | md5 | Note |
+|---|---|---|
+| `figures-gpu.txt` | `3ec7f59c682e8b8319d409a2f4bd5ed5` | head `e3b5d5f5`, backend on every row |
+| `figures-cpu.txt` | `1eba25f524befde9627fc063f9191efa` | as above, `cpu` |
+| `raw-gpu.txt` | `629f7dc9c85c45418f70f01a9c5c6363` (from line 2: `5fb51f054dda4e6612e89578fb8de45b`) | equal to the earlier light run's `v3\figures-gpu.txt`: GPU deterministic run to run |
+| `raw-cpu.txt` | `24a46d0e4c492b8247099da78c184c5c` (from line 2: `4f5b849290e3fb9a2a7a0fce88e782e7`) | |
+| `compare.txt` | `d094c8d468dd68a1dffe5fc79b5d52c8` (after the selection was appended; `8d5fc45a556cec2959bc5fc313ce08b3` before) | DIFFERENT, 13 of 64 rows; then the 24-row selection: md5 `b72d9e7b57b53b0e28593c1f55c91abd` from BOTH files, SAME |
+
+The 13 differing rows: 12 encoded-output characterisation (`ad14_encoded`, `encoded_ratios`)
+and `ad14-flicker | c3 | planted_ratios.a*` 2.717 against 2.716; listed verbatim in the report.
+The encoder was `hevc_nvenc` on both jobs (`resolve_encoder`, `io/video/capability.py:228`).
+STOP yielded at 06:26Z (Y3) with recommendation (a); window released.
+
+**CHARC RULING on the V3 STOP (query `e29ac0a1978afabb`, 06:3xZ), verbatim as relayed:**
+
+> RULING on the V3 CPU/GPU STOP (query e29ac0a1978afabb): **(a).** The claim narrows to what V3 and AD-14 decide, which is measured pre-encode by question 5 and matches exactly on all 24 asserted/recorded rows (plus the four planted AD-14 rows and 15 of 16 planted ratios). Conditions:
+> 1. The report cites CPU/GPU equality by the md5 of the 24 selected rows from each figures file (the selection recorded in compare.txt), names both whole-file md5s (3ec7f59c / 1eba25f5) and the driver md5 (b128c609), and lists the 13 differing rows verbatim.
+> 2. The mechanism (pre-encode floats differing below the figures' rounding, then 8-bit quantisation and NVENC in a near-static masked region) is stated as the cell's READING with the planted row's 0.001 as its one direct evidence, not as an established fact; (c) is NOT required. V4's CPU/GPU SAME is AD-11's tolerance test and is unaffected; say so in one sentence.
+> 3. The CPU leg's coverage sentence reads "the same V3/AD-14 figures, not the same encoded characterisation"; the encoded rows are characterisation only, backend-dependent at the second or third decimal with the same encoder (resolve_encoder -> hevc_nvenc on both; capability.py:228 cited).
+> 4. Cell 2's unlabelled file stays labelled as its observation.
+> Not (b): every deciding figure is equal; failing the claim on characterisation noise would misstate the evidence.
+
+Orchestrator's addition: cite the WINDOW pair of GPU/CPU figures files; name the earlier
+`v3\figures-gpu.txt` only as the run-to-run determinism check.
+
+**Applied (cell 3):** the 24-row selection and its md5s appended to `compare.txt` (rule: keys
+`ad14_unsmoothed`, `ad14_smoothed`, `ratios.<measure>`, from line 2 in file order, the leading
+backend column removed, LF); the report's V3 section REPLACED: the `428d8b4` sentence
+(condition (1) of the orchestrator's grant), the coverage sentence as ruled, the window files'
+md5s, the driver md5, the 24-row md5, the 13 rows verbatim, the encoder citation, the mechanism as
+the cell's READING with its one direct evidence, the V4 sentence, the determinism check, cell
+2's file as its observation.
+
 ## RESUME HERE (two-leg suite window)
 
 For a fresh cell: read `docs/dispatch-recipe.md`, the brief (Rulings govern), this ledger and
@@ -346,8 +397,9 @@ For a fresh cell: read `docs/dispatch-recipe.md`, the brief (Rulings govern), th
 (`2a7a414`, `47a4cbf`, `2865b6a`). Next: the two-leg suite in a granted window (the orchestrator
 holds the grant until WP4.2b has merged and it has rebased `wp4.2` onto main); then task 10
 (GX011627 + the WP2.3 set through the runner) only when granted. Before or beside the suite: the
-CPU V3 record (CHARC `2a336830303f3a2d`, window item (i)); if its figure lines differ from the
-GPU record's, STOP to the orchestrator before the two-leg window. Then the return report.
+CPU V3 record is DONE (above; CHARC ruling (a)). After the suite window, write a RESUME HERE for
+task 10 (orchestrator, 06:26Z: the cell is near the 250K evaluation point). Then the return
+report.
 
 ## Superseded: RESUME HERE (Reviewer A round 1)
 
