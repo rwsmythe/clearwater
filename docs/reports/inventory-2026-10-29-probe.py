@@ -77,6 +77,19 @@ def _photo(path: Path) -> dict[str, Any]:
     """Select permitted photo tags without loading pixel data."""
     with Image.open(path) as image:
         exif = image.getexif()
+        orientation = image.info.get("original_orientation")
+        if orientation is None:
+            # The HEIF Pillow plugin can normalize/remove orientation in its EXIF
+            # copy. Read the original bytes when its saved value is absent/None.
+            raw_bytes = (
+                pillow_heif.open_heif(path).info.get("exif")
+                if image.format == "HEIF"
+                else image.info.get("exif")
+            )
+            raw_exif = Image.Exif()
+            if raw_bytes:
+                raw_exif.load(raw_bytes)
+            orientation = raw_exif.get(274)
         record = {
             "kind": "photo",
             "container": image.format,
@@ -85,7 +98,7 @@ def _photo(path: Path) -> dict[str, Any]:
             "height": image.height,
             "bit_depth": inventory._photo_bit_depth(image, path),
             "icc_description": inventory._icc_description(image.info.get("icc_profile")),
-            "exif_orientation": image.info.get("original_orientation", exif.get(274)),
+            "exif_orientation": orientation,
             "Make": exif.get(271),
             "Model": exif.get(272),
             "Software": exif.get(305),

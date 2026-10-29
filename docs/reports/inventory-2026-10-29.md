@@ -5,7 +5,9 @@ no category assigned to included files. The inventory tool adds only the
 authorized top-level exclusion option and its regression test. This is a read-only mechanical instrument run;
 independent orchestrator re-run plus five spot checks plus CHARC QA substitute
 for Reviewers A and B (CHARC `a9fc36da`; precedent `inventory-2026-10-18`).
-Those acceptance checks are pending at handoff, not claimed complete here.
+The orchestrator re-ran the committed probe and completed five spot checks on
+`e4cf415`; those checks found the raw-EXIF correction documented in section 11.
+Checks of the revised artifacts and CHARC QA remain the acceptance step.
 
 **Commissioned scope:** the footage tree minus `Insta360/`, excluded by exact
 top-level name under CHARC `0fd08f9f` (superseding `481d63d8`): arriving;
@@ -201,20 +203,20 @@ ICC description `Display P3`, primary `nclx` absent, EXIF `Make=Apple`,
 `Model=iPhone 15 Pro`, `Software=26.6.2`, `ColorSpace=65535` (uncalibrated).
 The ICC supplies the named colour profile. Dimensions are stored primary
 `ispe` dimensions, before `irot`; rotations below are counterclockwise degrees.
-An absent EXIF orientation is distinguished from identity value 1.
+Raw EXIF identity value 1 is explicit; none of these HEICs lacks the tag.
 
 | IMG numbers (.HEIC) | Count | Stored dimensions | irot CCW | EXIF orientation |
 |---|---:|---|---:|---|
 | 6690-6701, 6706-6710, 6748-6750 | 20 | 5712x4284 | 180 | 3 |
-| 6703, 6711-6715, 6752-6753, 6761 | 9 | 4032x3024 | 0 | absent |
-| 6705, 6754-6759 | 7 | 5712x4284 | 0 | absent |
+| 6703, 6711-6715, 6752-6753, 6761 | 9 | 4032x3024 | 0 | 1 |
+| 6705, 6754-6759 | 7 | 5712x4284 | 0 | 1 |
 | 6718-6719, 6747 | 3 | 4032x3024 | 90 | 8 |
 | 6720-6726, 6730, 6732, 6737, 6739 | 11 | 4032x3024 | 270 | 6 |
 | 6740, 6743-6744, 6746, 6763 | 5 | 5712x4284 | 270 | 6 |
-| 6764-6770 | 7 | 3213x5712 | 0 | absent |
+| 6764-6770 | 7 | 3213x5712 | 0 | 1 |
 
 Easy HEIC spot checks: `IMG_6690.HEIC` is 5712x4284 with `irot=180`,
-EXIF 3; `IMG_6703.HEIC` is 4032x3024 with `irot=0`, EXIF orientation absent.
+EXIF 3; `IMG_6703.HEIC` is 4032x3024 with `irot=0`, EXIF orientation 1.
 These facts concern the primary image; auxiliary images and gain maps were not
 examined, and this is not a claim that all photo HDR mechanisms were excluded.
 
@@ -305,7 +307,7 @@ reconstructed from presentation timestamps. Seconds = duration / movie scale.
 
 | File | Movie scale | Video scale | Segment count | Segment duration | media_time | has_b_frames | ctts version | Signed offset min..max | Negative offsets |
 |---|---:|---:|---:|---:|---:|---:|---|---|---|
-| `dp_color_video_1791675261.mp4` | 600 | 600 | 1 | 26444 | 0 | 0 | absent | not stored | no (no ctts) |
+| `dp_color_video_1791675261.mp4` | 600 | 600 | 1 | 26444 | 0 | 0 | 1 | not stored | no (no ctts) |
 | `IMG_6702.MOV` | 600 | 600 | 1 | 300 | 0 | 2 | 0 | -40..60 | yes |
 | `IMG_6704.MOV` | 600 | 600 | 1 | 319 | 0 | 2 | 0 | -40..60 | yes |
 | `IMG_6716.MOV` | 600 | 600 | 1 | 500 | 0 | 2 | 0 | -40..60 | yes |
@@ -388,9 +390,11 @@ selected tags.
 ### DR-7
 
 All 62 HEICs have EXIF `Make=Apple`; no non-Apple HEIC was found, so the stated
-DR-7 trigger is absent. Primary `irot` and present EXIF rotations agree:
-180/3 (20), 90/8 (3), 270/6 (16). The remaining 23 have identity `irot=0`
-and absent EXIF orientation. DR-7 remains a tool limit, without a new trigger;
+DR-7 trigger is absent. All 62 carry both primary `irot` and raw EXIF
+orientation, and every pair agrees: 180/3 (20), 90/8 (3), 270/6 (16), 0/1 (23).
+There are no disagreeing HEICs and no genuinely absent EXIF orientations.
+All 23 previously reported null orientations were misreads of identity tag 1,
+not missing tags. DR-7 remains a tool limit, without a new trigger;
 DR-6 also remains unchanged.
 
 ## 11. Method and checks
@@ -411,17 +415,28 @@ uv run python docs/reports/inventory-2026-10-29-probe.py
 ```
 
 Exit 0: `Selected headers: 93; output: work/inventory-1029/phone-probe.json`.
-The supplemental Phone-only probe was rerun for the new composition facts;
-all previously selected Phone facts match its prior output exactly. The
-inventory CSV/summary remain the original 17:17:52Z snapshot.
+The earlier Phone-only composition probe matched all its prior selected facts.
+This final probe re-run corrects exactly 23 HEIC `exif_orientation` values from
+null to 1; no other field or row changed. When `original_orientation` is missing
+or None, the probe now opens the original HEIF header with
+`pillow_heif.open_heif`, loads only its raw EXIF bytes into `PIL.Image.Exif`,
+and selects tag 274. It does not use the Pillow HEIF plugin's transformed EXIF
+copy for that fallback. The selected tags and privacy scope are unchanged.
+A separate raw-EXIF read of all 62 HEICs found 0 mismatches after the fix
+(23 before), 0 genuinely absent orientation tags, and 0 disagreements with irot.
+The inventory CSV/summary remain the original 17:17:52Z snapshot and its
+row-identical excluded re-run. Their orientation column already reports 1 for
+these 23 HEICs; the corrected supplement now agrees with that column and the
+raw EXIF. This correction does not modify the inventory tool or regenerate
+its outputs.
 The script and final JSON use ASCII and LF. md5s (current tool includes the
 new exclusion option):
 
 | Evidence | md5 |
 |---|---|
 | `tools/inventory.py` | `aa0072b5f33590b50f6e650870dbf8a4` |
-| `docs/reports/inventory-2026-10-29-probe.py` | `7b6fe2905575881c71a48d10c85ab24a` |
-| `work/inventory-1029/phone-probe.json` | `9c5c2391dcf8c4291b95e68bfcaddbef` |
+| `docs/reports/inventory-2026-10-29-probe.py` | `235c2170efd7012550c76b414658fadc` |
+| `work/inventory-1029/phone-probe.json` | `af348461b43dbf7fbd00c25de16ea0e1` |
 
 The script checksum is of the LF bytes to be committed. Case-insensitive
 privacy grep over both the complete probe JSON and the committed report:
@@ -463,7 +478,8 @@ No matches means rg exit 1. Other checks:
   The regression checks traversal is pruned, all other rows remain identical,
   nested same-name folders stay included, and excluded ignored/sidecar files
   do not enter counts. The real excluded re-run has 128 identical rows and
-  unchanged included-folder stats. Five direct source spot checks passed;
+  unchanged included-folder stats. The five source spot checks are recorded
+  below with the later raw-EXIF correction;
   final privacy checks found no hits. No unresolved in-envelope finding.
 
 Runner logs: `work/inventory-1029/inventory-run.log`, `phone-probe-run.log`,
@@ -498,13 +514,16 @@ Five source spot checks were performed by this cell:
 | File under Phone | Source facts checked | Result |
 |---|---|---|
 | `IMG_6690.HEIC` | 5712x4284; primary irot 180; EXIF 3; Apple / iPhone 15 Pro / 26.6.2; Display P3 ICC | Pass |
-| `IMG_6703.HEIC` | 4032x3024; primary irot 0; EXIF absent; same camera/software/profile tags | Pass |
+| `IMG_6703.HEIC` | 4032x3024; primary irot 0; raw EXIF 1; same camera/software/profile tags | Corrected; raw EXIF confirmed |
 | `IMG_6791.JPG` | 3213x5712; Make/Model/Software are 5/13/6 NULs; ColorSpace 1; no ICC | Pass |
 | `IMG_6702.MOV` | Independent direct byte parse: elst v0, one segment, duration 300, media_time 0, rate 1; raw payload matches section 10 | Pass |
 | `dp_color_video_1791675261.mp4` | Direct selected ffprobe: mp42; H.264 1920x1080; has_b_frames 0; selected camera/software/encoder tags absent | Pass |
 
-The HEIC checks reopen selected headers and inspect the primary property's raw
-rotation byte; the JPG check reads only the permitted scalar tags. The MOV
+The original cell HEIC checks reopened selected headers and inspected the
+primary property's raw rotation byte, but the `IMG_6703.HEIC` EXIF check used
+the same normalized metadata as the probe. That field's original pass was a
+false positive, superseded by the all-62 raw-EXIF check above. The JPG check
+reads only the permitted scalar tags. The MOV
 check walks raw box spans separately from the product edit-list parser.
 Spot evidence: `work/inventory-1029/five-spot-checks.json`; command:
 `uv run python work/inventory-1029/five-spot-checks.py` (exit 0).
@@ -519,6 +538,22 @@ Authorized scope changes: output override, committed probe evidence, and the
 single-name inventory exclusion plus its test (CHARC `0fd08f9f`). No other
 product/tool files, dependencies, source footage or local config were changed.
 The report is complete for the commissioned tree minus `Insta360/`, with the
-17:17:52Z snapshot confirmed by the excluded re-run. Independent orchestrator
-re-run/spot checks and CHARC QA remain the acceptance step. Insta360 scope
+17:17:52Z snapshot confirmed by the excluded re-run. The orchestrator's
+re-run/spot checks on `e4cf415` found the correction now made; verification of
+the revised artifacts and CHARC QA remain the acceptance step. Insta360 scope
 remains undecided; no completion-triggered re-run is commissioned for it.
+
+The orchestrator's spot checks found the HEIC identity-orientation misread; the raw-EXIF fallback and all 23 affected rows were corrected.
+
+Verification pass 5: the pre-fix raw-EXIF comparison failed with 23 mismatches;
+the corrected probe and separate selected raw read agree on all 62 HEICs.
+Exactly 23 null-to-1 values changed; 0 genuine absences, 0 irot disagreements,
+and 0 other changed facts. Checks:
+`uv run ruff check docs/reports/inventory-2026-10-29-probe.py` and
+`uv run ruff format --check docs/reports/inventory-2026-10-29-probe.py`, both
+exit 0. The probe command remains the one in section 11 (exit 0, 93 rows).
+Final privacy grep over the revised report and final probe output: **0 hits
+in each**. Logs under `work/inventory-1029/`: `orientation-red.log`,
+`orientation-green.log`, `probe-ruff-turn5.log`, `probe-format-turn5.log`,
+`phone-probe-run-turn5.log`, `privacy-check.log`. No inventory or footage test
+was re-run for this correction.
