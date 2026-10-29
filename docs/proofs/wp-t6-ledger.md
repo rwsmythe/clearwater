@@ -21,7 +21,8 @@ the evaluation and re-seat lines. Turn 1's figures were supplied at turn 2.
 | Seat 2 turn 1 (ledger turn 6), marker registration | 68,477 | 73,738 | 258,400 | Dispatcher generation 20 at seat 2 turn 2; committed as `5f204e3` |
 | Seat 2 turn 2 (ledger turn 7), W2 controls ruling | 164,768 | 101,282 | 258,400 | Dispatcher generation 20 at seat 2 turn 3; committed as `13a5fe6` |
 | Seat 2 turn 3 (ledger turn 8), cuts / import-scope STOP | 215,059 | 122,744 | 258,400 | Dispatcher generation 20 at seat 2 turn 4; turn-8 changes remained uncommitted for this turn's per-file handoff |
-| Seat 2 turn 4 (ledger turn 9), import grant / W3 script | Pending dispatcher | Pending dispatcher | 258,400 | Figures to be supplied by the dispatcher at the next turn |
+| Seat 2 turn 4 (ledger turn 9), import grant / W3 script | 247,499 | 152,719 | 258,400 | Dispatcher generation 20 at seat 2 turn 5; R1 `1f86873`, R2-R3 `a2420fc`, R4 `5520ee4`, R5-R7 `7970d0b`, ledger `89f9500` |
+| Seat 2 turn 5 (ledger turn 10), W3 results / rung 4 request | Pending dispatcher | Pending dispatcher | 258,400 | Figures to be supplied by the dispatcher at the next turn |
 
 ## RESUME HERE (seat 2; written by the dispatcher, generation 20, 2026-10-29 ~12:12Z)
 
@@ -295,6 +296,148 @@ retention and scope. The synthetic plugin checks independently exercise the
 runtime controls without touching tracked tests. The scope-proof log reader
 was corrected for PowerShell's UTF-16 log encoding, then passed. The W3
 measurement and CHARC's branch decision remain pending the real seat run.
+
+## W3 run 1 -- reference-path STOP and dispatcher edits
+
+Run 1 evidence is preserved in `work/wp-t6/w3-run1/`. Window start was
+2026-10-29 12:42:26.485311Z, with 10,686,595,072 available bytes; cleanup
+ended 12:48:00.365103Z. Stage 1 passed all eight cases in 322.26 s, EXIT 0,
+and the observer verified the combined run. Stage 2 stopped with
+`KeyError: 'summary'`; controls did not run. Cleanup records stage EXIT 1,
+scratch removed, clean tests/diff and unchanged test bytes.
+
+The dispatcher identified its reference-path slip: the originally supplied
+`work/wp4.2/v4/gx/record.json` is a headless runner record without fidelity
+data. It corrected W3's baseline to
+`C:/Users/rwsmy/clearwater/work/wp3.10/wp4.2-v4/v4-GX011627-c3-gpu/GX011627_corrected.compare.json`,
+as named by `work/wp4.2/v4/logs/cmp-v4-GX011627-c3-gpu.log`. The cell did not
+read that outside-worktree compare record. The second dispatcher edit widened
+the explanation table to EXACTLY the six item names ruled below; any other
+best-effort delta still stops. No tracked test or product code changed.
+
+The ruling quotes interim script MD5 prefix `cd2e47e2`; the final dispatched
+script is MD5 `0dd11553112ae203b95a0952c9485f96`, verified this turn and used
+for run 2. This supersedes the cell's original `5c98800c...` W3 script for the
+measurement evidence, without changing any mapped test assertion.
+
+## CHARC W3 stage-2 ruling (verbatim)
+
+Message `c80aacc9844cd837`, 2026-10-29 12:50:19Z, supplied by orchestrator
+generation 20 at seat 2 turn 5:
+
+**CHARC RULING on WP-T6 W3 stage 2 (query 89d8d15e712cf983): BRANCH (i), PROCEED, option 1 as recommended.** MANDATORY and REQUIRED are empty on both sides, so the STOP condition is not met. The six-name best-effort delta is recorded as a Limit with its two reasons:
+
+- **Three trim-only items** (`creation time: container tag`, `creation time: mvhd`, `creation time: per-stream tags`) are the R-e two-part `creation_time` the export writes back as one value: the trim's own container representation, already accepted at STOP 2.
+- **Three full-only items** (`edit lists as written, non-video tracks`, `timecode value (stream tags)`, `track layout`) are FEWER differences on the trim because its container is FFmpeg-muxed and carries no audio `timecode` (R-c's Limit). The `[trim]` form therefore does not exercise those three best-effort items against a camera-written container; the `fullclip` form does, in W4 now and in package windows after. None of them is a gate assertion (R1 asserts MANDATORY and REQUIRED only).
+
+The script's explanation table widens to EXACTLY these six names; any other name stays a STOP. The report's Limits carry the six names with the two reasons, and the accept record repeats the sentence "the trim form proves V4 MANDATORY and REQUIRED; three best-effort container items are proved by the fullclip form only". Re-run W3 in full (stage 1, the delta, both controls).
+
+Your reference-path slip (the runner record for the compare record) is acknowledged; the corrected `w3.sh` (md5 cd2e47e2) is the one that runs. Stage 1's 322 s for the eight rows against 1,567 s baseline is noted as evidence; the gate's per-test sum stays the verdict (Q6).
+
+## W3 run 2 -- DONE; rung 3 CLOSED
+
+Evidence is `work/wp-t6/w3/`. The dispatcher reports W3 DONE, EXIT 0, in its
+rounded 12:51-12:57Z window. Saved window/cleanup records bound the run more
+precisely at 2026-10-29 12:50:55.706810Z to 12:56:23.544816Z (327.84 s), with
+11,001,569,280 bytes available before the window; each subprocess also records
+its own memory reading. The main session started with 10,989,305,856 bytes.
+
+| Step | Confirmed result |
+|---|---|
+| Sized SERIAL cases | 8 passed, 1 warning in 258.91 s; pytest EXIT 0; observer verified. Exactly one standard encode from `gx011627_standard_encode`, 90 frames, NVENC tied true with 169 samples. Exactly one engine fidelity record, MANDATORY/REQUIRED all SAME, roster SAME. |
+| V4 delta | `branch=i-proceed`, no unexplained items, no MANDATORY/REQUIRED differences on either side. Each side has eight best-effort differences, five shared plus the three-only lists below. |
+| Draft-as-standard control | Caught, verified; pytest EXIT 1, one call-phase `AssertionError` on the trim levels node at `level is not None and level.name == expected[quality]`; verifier EXIT 0. The real fixture encoded draft and wrote 90 frames. |
+| Truncated reference control | Caught, verified; pytest EXIT 1, one call-phase `AssertionError` on R5 at `len(footage_reference) == footage_frames`; one plant shortened 90 to 89; verifier EXIT 0. |
+| Cleanup | EXIT 0; steps complete, scratch removed, no remaining scratch files, tests status empty, `git diff --quiet` true and test bytes unchanged. No planted code was committed. |
+
+The six exact observed best-effort item names, retained as Limits for the
+report and accept record, are:
+
+| Direction | Item names | Ruled reason |
+|---|---|---|
+| Trim only | `creation time: container tag`; `creation time: mvhd (seconds since 1904)`; `creation time: per-stream tags` | R-e's two-part trim `creation_time` is written back as one value. |
+| Full only | `edit lists as written, non-video tracks (media_time in media seconds)`; `timecode value (stream tags)`; `track layout (key:sample entry:tkhd flags)` | The trim is FFmpeg-muxed and lacks audio `timecode` (R-c); these camera-container items require the preserved full form. |
+
+The trim form proves V4 MANDATORY and REQUIRED; three best-effort container
+items are proved by the fullclip form only. CHARC branch (i) is taken on the
+measured empty MANDATORY/REQUIRED lists and the explained six-name delta.
+Branch (ii)'s fallback is not needed. The R3 frame-count operand remains Q3's
+KEPT property, not a loss. Rung 3 is CLOSED. W3 is development evidence; its
+258.91 s is not the final gate's per-CUT sum or Q6's verdict.
+
+## Seat 2 turn 5 -- rung 4 collection and W4 requests
+
+The marker was registered earlier in `5f204e3`; no additional marker or
+`pyproject.toml` edit is made. Installed pytest is 8.4.2, confirmed by the
+light script-compile command; the seat-side collection checker also records
+its own imported version to prove the fixture parameter marks on that version.
+
+Full-repository collection is requested at the dispatcher's seat, using the
+established fallback for rung 0's non-returning sandbox collection. That
+earlier hang remains unexplained; no new full-repo sandbox attempt or GPU
+probe is made. The successful four-file collection from turn 4 is not treated
+as the all-repo collection proof.
+
+`work/wp-t6/cand-collect.sh`, MD5 `07744aa8ee2eebafacfd15ae78c6f751`,
+collects all / amended parallel / amended serial / fullclip separately with
+fresh basetemps under `work/wp-t6/`, `PYTEST_ADDOPTS` unset and headless Qt.
+It saves runner logs with EXIT lines, writes node-ID-only `cand-*.txt`, checks
+each count against pytest's own summary, then requires all of:
+
+- No duplicates; the three partitions pairwise disjoint and
+  parallel + serial + fullclip = all.
+- Fullclip equals exactly six `[full]` IDs and R4's `[first30]` ID.
+- ALL removes exactly seven unsuffixed CUT IDs and adds their fourteen
+  suffixed forms plus the parity test.
+- SERIAL removes the same seven and adds the seven gate forms plus parity;
+  PARALLEL is unchanged against `base-*`.
+
+Expected counts remain ALL 6,457, PARALLEL 5,313, SERIAL 1,137, FULLCLIP 7;
+these are predictions, not observed rung-4 results. The actual collection
+identity and version will be in `cand-collection-summary.json`. The checker
+passed a synthetic generated-map exercise and rejected duplicate and missing
+gate-ID controls; that validates the checker only, not the candidate collection.
+
+`work/wp-t6/w4.sh`, MD5 `16847bf19ddb53f9cc88f018fc9b8ad5`, must run
+AFTER the collection proof passes. It records window start/free memory,
+requires >= 5 GiB and a clean committed candidate, then runs the brief's
+FULLCLIP command once with the additional temporary observer plugin:
+
+```text
+PYTHONPATH=work/wp-t6/w4-scratch uv run pytest -q -rs -m "fullclip" --basetemp=work/wp-t6/w4-fullclip --durations=0 --junitxml=work/wp-t6/w4/w4-fullclip.xml -p wp_t6_w4_observer
+```
+
+The observer never changes tests or fixtures. A passing call report on the
+full sink node reads its already-resolved source count and encode report,
+checks the actual test still asserts `run.report.frames_written == frames`,
+and records both operands equal to 681. Final verification requires exactly
+the seven collected full IDs passing, no skips/failures, this one 681-frame
+observation and zero `gx011627_trim` setups. A false observation forces the
+session EXIT nonzero. Only counts, node IDs and verdicts are retained; no
+footage path, metadata value, frame or packet digest is saved by the observer.
+
+Both `w4-fullclip/` (all pytest outputs/caches) and `w4-scratch/` (the temporary
+plugin) are newly created and owned by the script. Pre-existing targets are
+refused and preserved. The EXIT/INT/TERM trap checks resolved absolute targets
+stay under this worktree's `work/wp-t6/`, removes only those two owned trees,
+checks clean tests/diff and lists retained JSON/log/XML filenames under `w4/`.
+The last line is `W4 DONE` or `W4 STOP stage=<n>`. Expected W4 window is about
+27 minutes; these figures are information, never a V16 row.
+
+| Light validation | Result / evidence |
+|---|---|
+| Five embedded Python programs compile / scripts LF / pytest version | PASS, EXIT 0; `work/wp-t6/seat2-turn5-script-compile.log`; pytest 8.4.2 |
+| Embedded F821/F811 checks | PASS, EXIT 0; `seat2-turn5-script-lint.log` |
+| Synthetic collection identities | PASS, EXIT 0; `seat2-turn5-identity-check.log`; generated map accepted, duplicate and missing-gate plants rejected; no real collection claimed |
+| Synthetic W4 observer at 681 | PASS, EXIT 0; seven miniature tests pass and observer verifies; `seat2-turn5-observer-681.log`; sandbox shim loaded, no footage/GPU used |
+| Synthetic W4 observer at 680 | PASS for the harness check, EXIT 0; all seven miniature tests pass their equal-count assertions, but observer deliberately forces pytest EXIT 1 for non-681 operands; `seat2-turn5-observer-680.log` |
+| `git diff --check` / owned scope / LF | PASS, EXIT 0; `seat2-turn5-diff-check.log`, `seat2-turn5-scope-proof.json`; only the ledger is tracked as changed |
+| Seat collections / Bash syntax / W4 | Pending dispatcher; no success claim made |
+
+Verification loop: W3's saved main/delta/control/cleanup JSON and concise log
+summaries confirm rung 3. The new scripts compile and pass targeted synthetic
+checks, including a passing sink assertion at 680 that the W4 observer rejects.
+Rung 4 remains open until the real collection identities and W4 are returned.
 
 ## Rung 0 facts (2026-10-29)
 
@@ -786,7 +929,9 @@ pending and are not validation results.
 | W1 run 3 | 2026-10-29 11:33:05.984516Z / 11:41:23.101978Z | `bash work/wp-t6/w1.sh > work/wp-t6/w1-seat-driver.log 2>&1` | 4(a)-(e) PASS; three encodes; four round-trip counts; row 10: 1 passed, 1 warning; W1 DONE, EXIT 0 | 10,804,830,208 bytes before item 1; exclusive per dispatcher | `work/wp-t6/w1/`; scratch removed; round-0 table above |
 | W2 run 2 | 2026-10-29 12:14:25Z / 12:15:41Z | `bash work/wp-t6/w2.sh` | Parity 1 passed in 3.63 s; guard 60 passed in 41.20 s; controls not caught, STOP stage 3, stage EXIT 1; cleanup EXIT 0 | 10.37 GB per dispatcher | `work/wp-t6/w2-run2/`; scratch removed, no trim left; controls ruling above |
 | W2 run 3 | 2026-10-29 12:23:16Z (dispatcher; window record 12:23:17.480106Z) / 12:24:30.353107Z | `bash work/wp-t6/w2.sh` | Parity 1 passed in 3.57 s; guard 60 passed in 41.55 s; both controls caught; W2 DONE, EXIT 0; cleanup EXIT 0 | 10,016,727,040 bytes in window record | `work/wp-t6/w2/`; script MD5 `e97c51289cb85137cf5553619970cf31`; scratch removed, no trim left |
-| W3 (requested, about 10 min) | Pending dispatcher | `bash work/wp-t6/w3.sh` | Pending eight gate passes, one standard encode, V4 name delta and two controls | Script records bytes; >= 5 GiB required before each session | `work/wp-t6/w3/`; script MD5 `5c98800cf7e6ba18d9b7dd3400e6dab0`; tracked files must be committed first |
+| W3 run 1 | 2026-10-29 12:42:26.485311Z / 12:48:00.365103Z | `bash work/wp-t6/w3.sh` | 8 passed in 322.26 s; stage 2 STOP on reference-path slip; controls not run; stage EXIT 1, cleanup EXIT 0 | 10,686,595,072 bytes | `work/wp-t6/w3-run1/`; scratch removed, tests/diff clean and bytes unchanged |
+| W3 run 2 | 2026-10-29 12:50:55.706810Z / 12:56:23.544816Z | `bash work/wp-t6/w3.sh` | 8 passed in 258.91 s; one standard encode; V4 branch (i); both controls caught; W3 DONE EXIT 0, cleanup EXIT 0 | 11,001,569,280 bytes before window; 10,989,305,856 before main pytest | `work/wp-t6/w3/`; script MD5 `0dd11553112ae203b95a0952c9485f96`; scratch removed, tests/diff clean and bytes unchanged |
+| W4 (requested, about 27 min) | Pending dispatcher | `bash work/wp-t6/w4.sh` (after `bash work/wp-t6/cand-collect.sh` passes) | Pending seven full passes and observed sink operands 681 | Script records bytes; >= 5 GiB required | `work/wp-t6/w4/`; script MD5 `16847bf19ddb53f9cc88f018fc9b8ad5`; collect script MD5 `07744aa8ee2eebafacfd15ae78c6f751` |
 
 ## Review-round ledger
 
