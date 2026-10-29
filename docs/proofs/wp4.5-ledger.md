@@ -153,6 +153,7 @@ no full serial leg is requested. No acceptance or convergence is claimed now.
 | T2 compatibility check | Executed existing test; not Reviewer A | 0 | 1 | 0 | 1 / 0 | 1 / 0 | 0 | Product rewrite + new regression tests; no compatibility remediation | Original STOP resolved by test-line grant `1d9f88948f4350c4`; granted injection blocked in T3 |
 | T3 grant check | Executed base/current test and independent TIFF inspection; not Reviewer A | 0 | 1 | 0 | 1 / 0 | 1 / 0 | 0 | Test-only attempted injection; no product change | STOP resolved by amended grant `8dd13704a85f2237`: placeholder tag then tag-ID patch and presence assertion |
 | T4 amended test check | Executed base test and final light run; not Reviewer A | 0 | 0 | 0 | 0 / 0 | 0 / 0 | 0 | Test-only remediation; no product change | Amended real GPS injection passes with rewrite; light run green; Reviewer A R1 pending |
+| A R1 | Claude opus/high, read-only; dispatch text and CHARC ruling `980818fc01eb77ea` | 0 | 3 | 2 (+4 advisory) | 8 / 1 | 9 / 0 | 0 | Product fixes F1/F2/F3/F4/F8; tests F6; docs F5/F7/F9 | NEW_CRITICAL_MAJOR_FOUND; remediation green at cell; R2 required |
 
 - Suspected: the fresh IFD construction drops source type pins.
 - Confirmed independently: source trace and parsed synthetic output agree for
@@ -168,6 +169,99 @@ no full serial leg is requested. No acceptance or convergence is claimed now.
 | Turn 1 / Round 0 | 70,739 input tokens; window 475,000 (supplied in turn 2) | STOP resolved; proceed under Q1(b) |
 | Turn 2 yield | 114,882 input tokens; window 258,400 (supplied in turn 3) | Proceed under test-line grant `1d9f88948f4350c4` |
 | Turn 3 yield | 128,189 input tokens; window 258,400 (supplied in turn 4) | Proceed under amendment `8dd13704a85f2237` |
+| Turn 4 yield | 140,712 input tokens; window 258,400 (supplied in turn 5) | R1 remediation; yield near 230K if incomplete, stop near 250K |
+
+## Reviewer A Round 1 - adjudication and remediation
+
+Reviewer: Claude opus/high, read-only, run by the dispatcher on `5a57d9f`.
+Verdict: `NEW_CRITICAL_MAJOR_FOUND`, 3 major, 2 minor, 4 advisory, all NEW.
+Evidence: reviewer text supplied in turn-5 dispatch; external evidence is held
+by the dispatcher under the brief's WP4.5 evidence root. Transcript filename,
+hash and process assertion records were not supplied to the cell. Governing
+ruling: CHARC `980818fc01eb77ea`, 2026-10-29T19:41:08Z.
+
+| Finding | Classification and disposition | Independent confirmation / action |
+| --- | --- | --- |
+| F1 | Major, in envelope, EXECUTED; accept amended entry/table damage rule | Entry value errors escape the non-pointer path; add RED cases, then drop only the faulty entry with one IFD/tag warning. Header/root-table faults still raise; child-table faults drop only that child. |
+| F2 | Major, in envelope, EXECUTED; accept | Type-13 check precedes supported pointer handling; add RED tests and carry supported pointer types 3/4/13. Other type-13 entries remain dropped. |
+| F3 | Major, in envelope, EXECUTED; accept | `_put` stops at the first match; later D63 duplicates survive. RED tests require first-position replacement and warning/removal of later D63 duplicates only. Other duplicates pass through. |
+| F4 | Minor, in envelope, EXECUTED; accept | Empty-child filtering is root-only in from_tiff. RED tests require pruning empty children/pointers at every level in both routes. |
+| F5 | Minor, documentation truth, REASONED; accept | Update edit/from_tiff docstrings, report implementation/damage rules and limits to match F1/F2/F4. |
+| F6 | Advisory, test coverage, REASONED; accept | New regressions cover the missing cases. Tighten root exception test to ValueError. Reviewer's independent alignment/overlap fuzz found no defect; no layout redesign. |
+| F7 | Advisory, out of envelope, EXECUTED; accepted named limit, no fix | Shared large source values can be duplicated on relocation; reviewer measured the same amplification in base. Disposition per CHARC: document limitation, no register row. |
+| F8 | Advisory, originally out of envelope, REASONED; commissioned into remediation by CHARC | `_write_entries` packs relocated SHORT pointers as H unconditionally. Add RED boundary cases; retain SHORT if offset fits, otherwise promote to LONG. |
+| F9 | Advisory, grant-record wording, REASONED; accept record only | Amendment `8dd13704a85f2237` explicitly authorizes the presence assertion/comment; record alongside grant `1d9f88948f4350c4`. No existing-test change needed. |
+
+R1 row counts F8 within the commissioned remediation; F7 is the sole
+out-of-envelope item. No reopened finding or revert. Adjudication was recorded
+before tests/product changes. Final RED/green evidence follows below.
+
+### Dispatcher-seat footage evidence
+
+On `5a57d9f`, the dispatcher ran
+`tests/test_photo_check.py::test_the_real_photo_leg_reads_and_round_trips_the_owners_photos`:
+**1 passed in 328.40 s**, over all the owner's Phone photos. This is supplied
+seat evidence, not a cell footage run, and predates R1 remediation. It is not
+substituted for the final candidate gate.
+
+### Reviewer-executed checks (supplied, not re-run by this cell)
+
+- 3,000 random valid blocks: zero fidelity/layout mismatches, including II/MM,
+  types 1-12, counts 0-9, unsorted IFD0 and child combinations; even offsets,
+  non-overlap and next-IFD zero checked.
+- 20,000 mutated/truncated blocks: only ValueError/struct.error, no hang;
+  reviewer's observed worst probe 1.8 ms is not a product performance claim.
+- Ordinary synthetic camera-style block: same 20 decoded fields as base.
+- Reviewer reports ruff/format and 318 selected tests passed, with scope locks
+  intact. These figures are reviewer evidence, not final gate results.
+
+### R1 remediation, verification and return
+
+F1 now catches value/type errors at the entry boundary, emits exactly one
+IFD/tag warning and continues with siblings. Root/header/table errors still
+raise into sanitise/from_tiff; child-table faults still drop only the child.
+F2 allows type 13 only at carried pointer positions. F3 replaces the first D63
+entry in place and drops later copies with individual warnings; non-D63
+duplicates, including duplicate Exif pointers, survive. Every Exif child gets
+the dimension edits. F4 prunes empty children recursively at parse time. F8
+retains fitting SHORT pointers and promotes only overflowing relocated offsets
+to LONG. F5/F6 update the docstrings and test controls with these rules.
+
+All rewriter warnings identify directory labels and tag IDs without value
+bytes. F7 is a documented limit only; no hostile-amplification mitigation was
+introduced. F9's presence assertion/comment are explicitly recorded as granted
+in the report's owned-files GRANT line and must be in the completion record.
+
+| Check | Exit | Actual result | Evidence under work/wp4.5/ |
+| --- | --- | --- | --- |
+| R1 RED, new file before any product fix | 1 | 84 failed, 119 passed in 1.95s | `r1-red.log`, `r1-red.xml`, per-case table below |
+| R1 GREEN, new file after fixes/formatting | 0 | 203 passed in 0.81s | `r1-green.log`, `r1-green.xml` |
+| Combined authorized light run | 0 | 880 passed, 5 deselected, 132 warnings in 15.69s | `r1-light.log`, `r1-light.xml`, `r1-light-summary.log` |
+| Targeted ruff check: exif.py, new test file, granted R1 file | 0 | All checks passed! | `r1-ruff.log` |
+| `uv run --offline mypy` | 0 | Success: no issues found in 141 source files | `r1-mypy.log` |
+| Format owned Python changes | 0 | 2 files reformatted | `r1-format.log`; dispatcher final format gate remains pending |
+
+Combined-light target counts (all passed): `test_io_photo_*.py` 636, including
+the new file's 203; `test_photo_check.py` 6; `test_wp41_photo_path.py` 223;
+`test_jobs_export_photo.py` 15. All executions use `PYTHONPATH=scripts`,
+`uv run --offline pytest`, the sandbox mkdir shim/no-cache plugins,
+`--basetemp=work/wp4.5/tmp`, and the same exclusion expression:
+`not gpu and not footage and not gui and not slow and not fullclip`.
+
+Verification loop: all blocking findings were independently reproduced on
+`5a57d9f` before fixing. All amended entry/table controls and the new
+regressions pass after the fixes. The complete authorized light pass and static
+checks find no further failure. No finding was rejected as a false positive;
+F7 is explicitly accepted as a limit, F8 is commissioned, F9 is record-only.
+No revert or unowned change. The existing granted test is unchanged this turn.
+
+Report implementation, damage rules, test counts and limits now reflect the
+R1 rulings; the pre-remediation footage pass is attributed to the dispatcher.
+All final gate placeholders remain pending. This is remediation evidence,
+not Reviewer A convergence: yield for R2. A second NEW major at R2 requires
+re-seating before any further remediation, per CHARC's ruling. No register row,
+mailbox post, commit, new dependency, interface/config/fixture change, or cell
+footage/GPU/GUI/slow/fullclip run.
 
 ## Turn 4 - amended grant implemented; light checks green
 
@@ -525,3 +619,116 @@ The first drafting run was 79 failed/33 passed. The garbage-header control was c
 | `test_from_tiff_preserves_raw_ascii_and_filters_structure` | AssertionError: ().315 type/count/value changed |
 | `test_from_tiff_without_metadata_returns_none` | PASS (control) |
 | `test_bigtiff_is_not_carried` | AssertionError: unsupported BigTIFF was not reported |
+
+### R1 RED evidence before fixes on 5a57d9f
+
+Final run: exit 1; **84 failed, 119 passed in 1.95s**. Product code remained unchanged from 5a57d9f. Output: `work/wp4.5/r1-red.log`; JUnit: `work/wp4.5/r1-red.xml`. Same sandbox shim, work temp root and five-marker exclusion as the earlier light runs.
+
+R1 adds 94 cases. Three old whole-child payload-damage cases are superseded by the entry-damage matrix under the amended rule; six offset/table controls remain. The oversized-root-value test now requires dropping only that entry. Root/header cases require ValueError. The first drafting run exposed incorrect big-endian SHORT fixture encoding, which was corrected before any product change; the final results below are authoritative.
+
+| R1 case / changed control | Actual pre-fix outcome |
+| --- | --- |
+| test_damaged_child_is_dropped_alone[34665-path0-offset] | PASS (control) |
+| test_damaged_child_is_dropped_alone[34665-path0-table] | PASS (control) |
+| test_damaged_child_is_dropped_alone[34853-path1-offset] | PASS (control) |
+| test_damaged_child_is_dropped_alone[34853-path1-table] | PASS (control) |
+| test_damaged_child_is_dropped_alone[40965-path2-offset] | PASS (control) |
+| test_damaged_child_is_dropped_alone[40965-path2-table] | PASS (control) |
+| test_damaged_root_raises_and_sanitise_drops[garbage] | PASS (control) |
+| test_damaged_root_raises_and_sanitise_drops[II*\x00\xff\xff\xff\xff] | PASS (control) |
+| test_damaged_root_raises_and_sanitise_drops[II*\x00\x08\x00\x00\x00\xff\xff] | PASS (control) |
+| test_oversized_root_value_is_dropped_alone | ValueError: IFD value runs past block |
+| test_r1_bad_entry_is_dropped_without_losing_siblings[unknown_type-path0-edit-<] | AssertionError: bad entry discarded whole block |
+| test_r1_bad_entry_is_dropped_without_losing_siblings[unknown_type-path0-edit->] | AssertionError: bad entry discarded whole block |
+| test_r1_bad_entry_is_dropped_without_losing_siblings[unknown_type-path0-from_tiff-<] | AssertionError: bad entry discarded all metadata |
+| test_r1_bad_entry_is_dropped_without_losing_siblings[unknown_type-path0-from_tiff->] | AssertionError: bad entry discarded all metadata |
+| test_r1_bad_entry_is_dropped_without_losing_siblings[unknown_type-path1-edit-<] | AssertionError: assert (33434, 5, 1, b'\xd2\x04\x00\x00d\x00\x00\x00') in [(40962, 4, 1, b'\x04\x00\x00\x00'), (40963, 4, 1, b'\x03\x00\x00\x00')] |
+| test_r1_bad_entry_is_dropped_without_losing_siblings[unknown_type-path1-edit->] | AssertionError: assert (33434, 5, 1, b'\x00\x00\x04\xd2\x00\x00\x00d') in [(40962, 4, 1, b'\x00\x00\x00\x04'), (40963, 4, 1, b'\x00\x00\x00\x03')] |
+| test_r1_bad_entry_is_dropped_without_losing_siblings[unknown_type-path1-from_tiff-<] | AssertionError: bad entry discarded sibling fields with its whole IFD |
+| test_r1_bad_entry_is_dropped_without_losing_siblings[unknown_type-path1-from_tiff->] | AssertionError: bad entry discarded sibling fields with its whole IFD |
+| test_r1_bad_entry_is_dropped_without_losing_siblings[unknown_type-path2-edit-<] | AssertionError: bad entry discarded sibling fields with its whole IFD |
+| test_r1_bad_entry_is_dropped_without_losing_siblings[unknown_type-path2-edit->] | AssertionError: bad entry discarded sibling fields with its whole IFD |
+| test_r1_bad_entry_is_dropped_without_losing_siblings[unknown_type-path2-from_tiff-<] | AssertionError: bad entry discarded sibling fields with its whole IFD |
+| test_r1_bad_entry_is_dropped_without_losing_siblings[unknown_type-path2-from_tiff->] | AssertionError: bad entry discarded sibling fields with its whole IFD |
+| test_r1_bad_entry_is_dropped_without_losing_siblings[unknown_type-path3-edit-<] | AssertionError: bad entry discarded sibling fields with its whole IFD |
+| test_r1_bad_entry_is_dropped_without_losing_siblings[unknown_type-path3-edit->] | AssertionError: bad entry discarded sibling fields with its whole IFD |
+| test_r1_bad_entry_is_dropped_without_losing_siblings[unknown_type-path3-from_tiff-<] | AssertionError: bad entry discarded sibling fields with its whole IFD |
+| test_r1_bad_entry_is_dropped_without_losing_siblings[unknown_type-path3-from_tiff->] | AssertionError: bad entry discarded sibling fields with its whole IFD |
+| test_r1_bad_entry_is_dropped_without_losing_siblings[past_eof-path0-edit-<] | AssertionError: bad entry discarded whole block |
+| test_r1_bad_entry_is_dropped_without_losing_siblings[past_eof-path0-edit->] | AssertionError: bad entry discarded whole block |
+| test_r1_bad_entry_is_dropped_without_losing_siblings[past_eof-path0-from_tiff-<] | AssertionError: bad entry discarded all metadata |
+| test_r1_bad_entry_is_dropped_without_losing_siblings[past_eof-path0-from_tiff->] | AssertionError: bad entry discarded all metadata |
+| test_r1_bad_entry_is_dropped_without_losing_siblings[past_eof-path1-edit-<] | AssertionError: assert (33434, 5, 1, b'\xd2\x04\x00\x00d\x00\x00\x00') in [(40962, 4, 1, b'\x04\x00\x00\x00'), (40963, 4, 1, b'\x03\x00\x00\x00')] |
+| test_r1_bad_entry_is_dropped_without_losing_siblings[past_eof-path1-edit->] | AssertionError: assert (33434, 5, 1, b'\x00\x00\x04\xd2\x00\x00\x00d') in [(40962, 4, 1, b'\x00\x00\x00\x04'), (40963, 4, 1, b'\x00\x00\x00\x03')] |
+| test_r1_bad_entry_is_dropped_without_losing_siblings[past_eof-path1-from_tiff-<] | AssertionError: bad entry discarded sibling fields with its whole IFD |
+| test_r1_bad_entry_is_dropped_without_losing_siblings[past_eof-path1-from_tiff->] | AssertionError: bad entry discarded sibling fields with its whole IFD |
+| test_r1_bad_entry_is_dropped_without_losing_siblings[past_eof-path2-edit-<] | AssertionError: bad entry discarded sibling fields with its whole IFD |
+| test_r1_bad_entry_is_dropped_without_losing_siblings[past_eof-path2-edit->] | AssertionError: bad entry discarded sibling fields with its whole IFD |
+| test_r1_bad_entry_is_dropped_without_losing_siblings[past_eof-path2-from_tiff-<] | AssertionError: bad entry discarded sibling fields with its whole IFD |
+| test_r1_bad_entry_is_dropped_without_losing_siblings[past_eof-path2-from_tiff->] | AssertionError: bad entry discarded sibling fields with its whole IFD |
+| test_r1_bad_entry_is_dropped_without_losing_siblings[past_eof-path3-edit-<] | AssertionError: bad entry discarded sibling fields with its whole IFD |
+| test_r1_bad_entry_is_dropped_without_losing_siblings[past_eof-path3-edit->] | AssertionError: bad entry discarded sibling fields with its whole IFD |
+| test_r1_bad_entry_is_dropped_without_losing_siblings[past_eof-path3-from_tiff-<] | AssertionError: bad entry discarded sibling fields with its whole IFD |
+| test_r1_bad_entry_is_dropped_without_losing_siblings[past_eof-path3-from_tiff->] | AssertionError: bad entry discarded sibling fields with its whole IFD |
+| test_r1_bad_entry_is_dropped_without_losing_siblings[inside_header-path0-edit-<] | AssertionError: bad entry discarded whole block |
+| test_r1_bad_entry_is_dropped_without_losing_siblings[inside_header-path0-edit->] | AssertionError: bad entry discarded whole block |
+| test_r1_bad_entry_is_dropped_without_losing_siblings[inside_header-path0-from_tiff-<] | AssertionError: bad entry discarded all metadata |
+| test_r1_bad_entry_is_dropped_without_losing_siblings[inside_header-path0-from_tiff->] | AssertionError: bad entry discarded all metadata |
+| test_r1_bad_entry_is_dropped_without_losing_siblings[inside_header-path1-edit-<] | AssertionError: assert (33434, 5, 1, b'\xd2\x04\x00\x00d\x00\x00\x00') in [(40962, 4, 1, b'\x04\x00\x00\x00'), (40963, 4, 1, b'\x03\x00\x00\x00')] |
+| test_r1_bad_entry_is_dropped_without_losing_siblings[inside_header-path1-edit->] | AssertionError: assert (33434, 5, 1, b'\x00\x00\x04\xd2\x00\x00\x00d') in [(40962, 4, 1, b'\x00\x00\x00\x04'), (40963, 4, 1, b'\x00\x00\x00\x03')] |
+| test_r1_bad_entry_is_dropped_without_losing_siblings[inside_header-path1-from_tiff-<] | AssertionError: bad entry discarded sibling fields with its whole IFD |
+| test_r1_bad_entry_is_dropped_without_losing_siblings[inside_header-path1-from_tiff->] | AssertionError: bad entry discarded sibling fields with its whole IFD |
+| test_r1_bad_entry_is_dropped_without_losing_siblings[inside_header-path2-edit-<] | AssertionError: bad entry discarded sibling fields with its whole IFD |
+| test_r1_bad_entry_is_dropped_without_losing_siblings[inside_header-path2-edit->] | AssertionError: bad entry discarded sibling fields with its whole IFD |
+| test_r1_bad_entry_is_dropped_without_losing_siblings[inside_header-path2-from_tiff-<] | AssertionError: bad entry discarded sibling fields with its whole IFD |
+| test_r1_bad_entry_is_dropped_without_losing_siblings[inside_header-path2-from_tiff->] | AssertionError: bad entry discarded sibling fields with its whole IFD |
+| test_r1_bad_entry_is_dropped_without_losing_siblings[inside_header-path3-edit-<] | AssertionError: bad entry discarded sibling fields with its whole IFD |
+| test_r1_bad_entry_is_dropped_without_losing_siblings[inside_header-path3-edit->] | AssertionError: bad entry discarded sibling fields with its whole IFD |
+| test_r1_bad_entry_is_dropped_without_losing_siblings[inside_header-path3-from_tiff-<] | AssertionError: bad entry discarded sibling fields with its whole IFD |
+| test_r1_bad_entry_is_dropped_without_losing_siblings[inside_header-path3-from_tiff->] | AssertionError: bad entry discarded sibling fields with its whole IFD |
+| test_r1_bad_tiff_software_value_keeps_make | AssertionError: bad Software discarded all TIFF metadata |
+| test_r1_bad_ifd0_description_keeps_make[edit] | ValueError: IFD value runs past block |
+| test_r1_bad_ifd0_description_keeps_make[from_tiff] | AssertionError: bad description discarded all metadata |
+| test_r1_child_table_fault_drops_child_only[edit] | PASS (control) |
+| test_r1_child_table_fault_drops_child_only[from_tiff] | PASS (control) |
+| test_r1_type13_carried_pointer_survives[parent0-34665-child0-33434-edit-<] | assert (4, 1) == (13, 1) |
+| test_r1_type13_carried_pointer_survives[parent0-34665-child0-33434-edit->] | assert (4, 1) == (13, 1) |
+| test_r1_type13_carried_pointer_survives[parent0-34665-child0-33434-from_tiff-<] | AssertionError: carried type-13 pointer lost its child |
+| test_r1_type13_carried_pointer_survives[parent0-34665-child0-33434-from_tiff->] | AssertionError: carried type-13 pointer lost its child |
+| test_r1_type13_carried_pointer_survives[parent1-34853-child1-1-edit-<] | AssertionError: carried type-13 pointer lost its child |
+| test_r1_type13_carried_pointer_survives[parent1-34853-child1-1-edit->] | AssertionError: carried type-13 pointer lost its child |
+| test_r1_type13_carried_pointer_survives[parent1-34853-child1-1-from_tiff-<] | AssertionError: carried type-13 pointer lost its child |
+| test_r1_type13_carried_pointer_survives[parent1-34853-child1-1-from_tiff->] | AssertionError: carried type-13 pointer lost its child |
+| test_r1_type13_carried_pointer_survives[parent2-40965-child2-1-edit-<] | AssertionError: carried type-13 pointer lost its child |
+| test_r1_type13_carried_pointer_survives[parent2-40965-child2-1-edit->] | AssertionError: carried type-13 pointer lost its child |
+| test_r1_type13_carried_pointer_survives[parent2-40965-child2-1-from_tiff-<] | AssertionError: carried type-13 pointer lost its child |
+| test_r1_type13_carried_pointer_survives[parent2-40965-child2-1-from_tiff->] | AssertionError: carried type-13 pointer lost its child |
+| test_r1_d63_duplicates_are_removed_other_duplicates_survive[<-274] | AssertionError: later D63 duplicate retained |
+| test_r1_d63_duplicates_are_removed_other_duplicates_survive[<-305] | AssertionError: later D63 duplicate retained |
+| test_r1_d63_duplicates_are_removed_other_duplicates_survive[<-40962] | AssertionError: later D63 duplicate retained |
+| test_r1_d63_duplicates_are_removed_other_duplicates_survive[<-40963] | AssertionError: later D63 duplicate retained |
+| test_r1_d63_duplicates_are_removed_other_duplicates_survive[>-274] | AssertionError: later D63 duplicate retained |
+| test_r1_d63_duplicates_are_removed_other_duplicates_survive[>-305] | AssertionError: later D63 duplicate retained |
+| test_r1_d63_duplicates_are_removed_other_duplicates_survive[>-40962] | AssertionError: later D63 duplicate retained |
+| test_r1_d63_duplicates_are_removed_other_duplicates_survive[>-40963] | AssertionError: later D63 duplicate retained |
+| test_r1_empty_child_pointer_is_pruned[path0-edit] | PASS (control) |
+| test_r1_empty_child_pointer_is_pruned[path0-from_tiff] | PASS (control) |
+| test_r1_empty_child_pointer_is_pruned[path1-edit] | AssertionError: empty child pointer retained |
+| test_r1_empty_child_pointer_is_pruned[path1-from_tiff] | PASS (control) |
+| test_r1_empty_child_pointer_is_pruned[path2-edit] | AssertionError: empty child pointer retained |
+| test_r1_empty_child_pointer_is_pruned[path2-from_tiff] | AssertionError: empty child pointer retained |
+| test_r1_nested_empty_tree_leaves_no_tiff_metadata | AssertionError: recursively empty metadata tree was retained |
+| test_r1_duplicate_exif_pointers_keep_both_children_with_d63_dimensions[<] | AssertionError: non-D63 duplicate pointer was dropped |
+| test_r1_duplicate_exif_pointers_keep_both_children_with_d63_dimensions[>] | AssertionError: non-D63 duplicate pointer was dropped |
+| test_r1_short_pointer_promotes_only_when_relocated_offset_overflows[parent0-34665-5-<] | PASS (control) |
+| test_r1_short_pointer_promotes_only_when_relocated_offset_overflows[parent0-34665-5->] | PASS (control) |
+| test_r1_short_pointer_promotes_only_when_relocated_offset_overflows[parent0-34665-70000-<] | struct.error: 'H' format requires 0 <= number <= 65535 |
+| test_r1_short_pointer_promotes_only_when_relocated_offset_overflows[parent0-34665-70000->] | struct.error: 'H' format requires 0 <= number <= 65535 |
+| test_r1_short_pointer_promotes_only_when_relocated_offset_overflows[parent1-34853-5-<] | PASS (control) |
+| test_r1_short_pointer_promotes_only_when_relocated_offset_overflows[parent1-34853-5->] | PASS (control) |
+| test_r1_short_pointer_promotes_only_when_relocated_offset_overflows[parent1-34853-70000-<] | struct.error: 'H' format requires 0 <= number <= 65535 |
+| test_r1_short_pointer_promotes_only_when_relocated_offset_overflows[parent1-34853-70000->] | struct.error: 'H' format requires 0 <= number <= 65535 |
+| test_r1_short_pointer_promotes_only_when_relocated_offset_overflows[parent2-40965-5-<] | PASS (control) |
+| test_r1_short_pointer_promotes_only_when_relocated_offset_overflows[parent2-40965-5->] | PASS (control) |
+| test_r1_short_pointer_promotes_only_when_relocated_offset_overflows[parent2-40965-70000-<] | struct.error: 'H' format requires 0 <= number <= 65535 |
+| test_r1_short_pointer_promotes_only_when_relocated_offset_overflows[parent2-40965-70000->] | struct.error: 'H' format requires 0 <= number <= 65535 |
