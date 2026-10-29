@@ -66,6 +66,20 @@
   owner report of a stale `.clearwater-partial`). LIVE: WP4.3a Codex turn 1 (round 0) from fe65e6a; WP4.3 cell 4 R2 review-only
   (316K), remediation + R1-13 condition 2 to a fresh cell 5, then EXCLUSIVE windows (V7, GX011627 V8/V18, DR-44(c)/DR-50),
   B, gate.
+- **RULINGS 16:04-16:31Z:** WP4.3 R2 0/3/6 (query 1e67098b, post 7bff88c1): R2-3 GRANT narrow (the dialog's two cache-job
+  done callbacks read ONE closed signal; R1-5 test form + not-closing control), R2-4 BANK = **DR-90 mine at WP4.3's accept**
+  (Clear during another clip's export; trigger the dialog's Clear gating :730 or the panels' cache coupling); majors/minors FIX.
+  WP4.3a B4 STOP (query f5132224, post b6aa800a): (a) GRANTED = the overflow case follows the runner's documented corrupt-file
+  set-aside (exit 0, defaults, `.bad-*`); test `test_headless_export.py:1093` only; the loader's full-path WARNING redacted via
+  a runner stderr handler (pre-existing DR-81-class gap, WP4.1) -> **append to DR-81's closure at WP4.3a's accept**.
+- **STATUS 16:44Z (msg 41d3eca3):** WP4.3a BUILD DONE `a614160..553d1f2` (4 Codex turns; B4 ruling applied as granted; seat 1
+  RETIRED at 237,170 / 258,400, RESUME HERE in its ledger; Reviewer A R1 = Claude pass at the orchestrator's seat on
+  `fe65e6a..553d1f2`; a FRESH Codex seat 2 adjudicates). WP4.3 cell 5 R2 Groups A-C DONE `d49a25a..028bc4f` (13 commits; R2-3
+  within the grant: optional `window_closing` from `Application.closed`; report quotes AD-11's domain sentence, names DR-89/90);
+  cell 5 at 222,999 running R3 review-only. **ORCHESTRATOR GEN 21 ROLLS after cell 5's R3 yield (~360K)**; cell 5 dies with it;
+  gen 22 re-dispatches from the ledger; `.worktrees/wp4.3` and `wp4.3a` OCCUPIED until gen 22 proves the cells returned.
+  Owed by me at WP4.3's accept: register table (brief 'Register rows'), DR-89, DR-90, AD-23 note stays with 4.3a; at WP4.3a's:
+  AD-13 note, AD-23 'applied by WP4.3a', closures DR-58(b)/76/77/81(a-d + the WARNING route)/85; DR-87 micro-package after.
 - **(gen 6 history follows; newest facts at the end of the block)**
 
 - **Gen 6 pickup facts:** bash gauge 45 ms; inbox 0 unread at pickup; announce posted to the orchestrator (gen 17, shell-busy in the WP4.1 gate) with ONE cue; the two register scripts copied from gen 5's scratchpad (18c10a55...) into this session's scratchpad (6687b6c9-eacd-4ffc-995e-51c9195391d1) as `edit_register_p4a.py` (drop its DR-65 block before running: already applied at 3114d23) and `edit_register_p4b.py`.
