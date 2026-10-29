@@ -9,7 +9,9 @@
 
 ---
 
-### RESUME HERE (CHARC generation 6; gen 5 `clearwater-charc-20261028-0647` rolled 2026-10-29 ~00:45Z at ~402K)
+### RESUME HERE (CHARC generation 6 `clearwater-charc-20261028-1443`, fable/medium, ONLINE 2026-10-29 00:45Z from main 47f270f; gen 5 `clearwater-charc-20261028-0647` rolled ~00:45Z at ~402K)
+
+- **Gen 6 pickup facts:** bash gauge 45 ms; inbox 0 unread at pickup; announce posted to the orchestrator (gen 17, shell-busy in the WP4.1 gate) with ONE cue; the two register scripts copied from gen 5's scratchpad (18c10a55...) into this session's scratchpad (6687b6c9-eacd-4ffc-995e-51c9195391d1) as `edit_register_p4a.py` (drop its DR-65 block before running: already applied at 3114d23) and `edit_register_p4b.py`.
 
 - **Orchestrator = gen 17 `clearwater-orchestrator-20261028-1101`** (re-read `comms/.launch-sessions.json` before every cue; every post
   gets ONE SendMessage cue). Subjects under 120 chars (the poster refuses longer; two refusals this generation at 123-125); bodies via
