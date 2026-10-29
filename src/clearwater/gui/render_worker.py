@@ -6,6 +6,12 @@ runs. A running task calls its ``check`` between steps and stops (:class:`Supers
 newer generation exists. Results come back through a queued signal to a bridge object that lives
 on the main thread, which drops any result whose generation is not the current one, so a stale
 result is never delivered. Worker threads touch no ``QObject`` except emitting that signal.
+
+A worker also runs CHORES (:meth:`LatestWorker.run_chore`, WP4.3): work that is never superseded,
+run on the worker's own thread before its next task and before the thread ends at
+:meth:`LatestWorker.stop`. The preview uses one to release its thread's FFT plans at a preview
+boundary (DR-68): cuFFT plans are per thread, so only that thread can release them, through the
+consumer-side :class:`PreviewDeviceBackend` (AD-29).
 """
 
 from __future__ import annotations
@@ -13,10 +19,10 @@ from __future__ import annotations
 import logging
 import threading
 import time
-from collections import OrderedDict
+from collections import OrderedDict, deque
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Protocol, runtime_checkable
 
 import numpy as np
 from numpy.typing import NDArray
@@ -37,6 +43,19 @@ from .imaging import (
 )
 
 _LOG = logging.getLogger(__name__)
+
+
+@runtime_checkable
+class PreviewDeviceBackend(Protocol):
+    """The IF-2 device extension the preview calls (AD-29, DR-68), by structure.
+
+    The same name and signature as ``CupyBackend.release_fft_plans``; the CPU backend lacks it,
+    and a backend without it has nothing to release.
+    """
+
+    def release_fft_plans(self) -> None:
+        """Free the calling thread's FFT plans and the device pool's free blocks."""
+        ...
 
 
 class Superseded(Exception):  # noqa: N818 -- a control-flow signal, not an error
@@ -107,6 +126,7 @@ class LatestWorker:
         self._lock = threading.Condition()
         self._generation = 0
         self._pending: tuple[int, Callable[[Check], object]] | None = None
+        self._chores: deque[Callable[[], None]] = deque()
         self._stopping = False
         self._busy = False
         self._undelivered = 0
@@ -136,6 +156,25 @@ class LatestWorker:
             self._lock.notify_all()
             return self._generation
 
+    def run_chore(self, chore: Callable[[], None]) -> bool:
+        """Queue ``chore`` to run on the worker's thread; it is never superseded (any thread).
+
+        Chores run in order, before the next task and before the thread ends at :meth:`stop`.
+        A chore that raises is logged.
+
+        Args:
+            chore: Called on the worker thread with no argument; its result is not delivered.
+
+        Returns:
+            True when queued; False when the worker has stopped (the chore never runs).
+        """
+        with self._lock:
+            if self._stopping and not self._thread.is_alive():
+                return False
+            self._chores.append(chore)
+            self._lock.notify_all()
+            return True
+
     def invalidate(self) -> None:
         """Supersede the waiting and running task without submitting a new one."""
         with self._lock:
@@ -145,10 +184,15 @@ class LatestWorker:
     def idle(self) -> bool:
         """Return True when no task waits or runs and no outcome is still on its way."""
         with self._lock:
-            return self._pending is None and not self._busy and self._undelivered == 0
+            return (
+                self._pending is None
+                and not self._chores
+                and not self._busy
+                and self._undelivered == 0
+            )
 
     def stop(self, timeout_s: float) -> bool:
-        """Stop the thread: supersede everything and wait for it to end.
+        """Stop the thread: supersede every task, run the queued chores, wait for it to end.
 
         Args:
             timeout_s: The longest wait.
@@ -165,14 +209,21 @@ class LatestWorker:
         return not self._thread.is_alive()
 
     def _run(self) -> None:
-        """The worker loop."""
+        """The worker loop: chores first, then the latest task."""
         while True:
             with self._lock:
-                while self._pending is None and not self._stopping:
+                while self._pending is None and not self._chores and not self._stopping:
                     self._lock.wait()
+                chores = list(self._chores)
+                self._chores.clear()
+            if chores:
+                self._run_chores(chores)
+                continue
+            with self._lock:
                 if self._stopping:
                     return
-                assert self._pending is not None
+                if self._pending is None:
+                    continue
                 generation, task = self._pending
                 self._pending = None
                 self._busy = True
@@ -202,6 +253,15 @@ class LatestWorker:
             except RuntimeError:  # the bridge was deleted at shutdown
                 return
 
+    @staticmethod
+    def _run_chores(chores: list[Callable[[], None]]) -> None:
+        """Run chores in order on the worker thread; a failing chore is logged."""
+        for chore in chores:
+            try:
+                chore()
+            except Exception:  # a chore never ends the worker
+                _LOG.exception("a worker chore failed")
+
     def _deliver(self, outcome: object) -> None:
         """Main thread: pass on an outcome of the current generation, drop a stale one."""
         assert isinstance(outcome, Outcome)
@@ -228,6 +288,9 @@ class RenderRequest:
             the same object), part of the render memo's key.
         k: The preview downscale factor.
         select_backend: IF-2 selection.
+        display_icc: The ICC profile the display copies are tagged with, or None for the
+            image's own (``color.icc_profile``). For a photo with no profile and a tagged
+            colour description it is the D53 built-in the writer embeds (WP4.3, DR-75).
     """
 
     token: int
@@ -240,6 +303,13 @@ class RenderRequest:
     statistics_revision: int
     k: int
     select_backend: SelectBackend
+    display_icc: bytes | None = None
+
+    def display_profile(self) -> bytes | None:
+        """Return the profile the display copies are tagged with (DR-75)."""
+        if self.display_icc is not None:
+            return self.display_icc
+        return self.image.color.icc_profile
 
 
 @dataclass(frozen=True)
@@ -364,17 +434,26 @@ class PreviewMemo:
             self._after.clear()
 
 
-def render_preview(request: RenderRequest, memo: PreviewMemo, check: Check) -> RenderResult:
+def render_preview(
+    request: RenderRequest,
+    memo: PreviewMemo,
+    check: Check,
+    *,
+    on_backend: Callable[[object], None] | None = None,
+) -> RenderResult:
     """Run one preview render on the worker thread (brief task 6).
 
     ``select_backend`` for the full size (the status bar) and for the preview size (the render);
     the downscale; the statistics (supplied, memoised, or measured stage by stage on the
-    statistics proxy); ``render``; ``to_host``; the display conversion of both sides.
+    statistics proxy); ``render``; ``to_host``; the display conversion of both sides, tagged with
+    :meth:`RenderRequest.display_profile`.
 
     Args:
         request: The snapshot.
         memo: The worker's caches.
         check: Raises :class:`Superseded` when a newer request exists.
+        on_backend: Called on the worker with the backend the render runs on, before it runs
+            (the preview remembers it to release its FFT plans, DR-68); none when None.
 
     Returns:
         The result.
@@ -387,6 +466,8 @@ def render_preview(request: RenderRequest, memo: PreviewMemo, check: Check) -> R
     _, full_reason = request.select_backend(request.settings, height, width, method_id)
     small_h, small_w = downscaled_size(height, width, request.k)
     backend, preview_reason = request.select_backend(request.settings, small_h, small_w, method_id)
+    if on_backend is not None:
+        on_backend(backend)
     check()
     try:
         after_key: AfterKey = (
@@ -420,7 +501,7 @@ def render_preview(request: RenderRequest, memo: PreviewMemo, check: Check) -> R
             )
             # Memoised before the check: a render superseded while it ran is not thrown away,
             # so a return to this state shows it without rendering again (question 6).
-            after = display_image(to_display_uint8(corrected), image.color.icc_profile)
+            after = display_image(to_display_uint8(corrected), request.display_profile())
             memo.put_after(after_key, request.method, request.statistics, after)
             check()
         before = _before_image(memo, request, pixels, small)
@@ -447,6 +528,6 @@ def _before_image(
     if before is None:
         if small is None:
             small = downscale(pixels, request.k)
-        before = display_image(to_display_uint8(small), request.image.color.icc_profile)
+        before = display_image(to_display_uint8(small), request.display_profile())
         memo.put_before(request.token, request.k, before)
     return before

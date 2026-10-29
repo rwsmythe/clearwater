@@ -6,12 +6,18 @@ steps, or 1:1 (one image pixel per device pixel, ``devicePixelRatio`` honoured);
 the divider pans. :class:`PreviewController` implements the contract's ``PreviewSurface``: it
 turns session changes into latest-wins render requests on the preview worker and decodes video
 frames on the frame worker, so nothing heavy runs on the interface thread.
+
+WP4.3: the preview worker's FFT plans are released on its own thread at each preview boundary
+(a source change, the shell's close, and :meth:`PreviewController.release_device_plans` before a
+job of the GUI process selects its backend; DR-68), and a photo with no ICC profile but a tagged
+colour description is displayed through the D53 built-in profile the writer embeds (DR-75).
 """
 
 from __future__ import annotations
 
 import logging
 import math
+import threading
 from collections.abc import Mapping
 
 import numpy as np
@@ -30,13 +36,15 @@ from PySide6.QtGui import (
 from PySide6.QtWidgets import QWidget
 
 from clearwater.interfaces import Frame, Image, Statistics
+from clearwater.io.photo.writer import built_in_profile
 
 from . import messages, sources
-from .contract import Engines, FrameOutcome, Message, MessagePresenter
+from .contract import Engines, FrameOutcome, Message, MessagePresenter, OpenedSource
 from .imaging import display_image, effective_parameters, view_factor
 from .render_worker import (
     LatestWorker,
     Outcome,
+    PreviewDeviceBackend,
     PreviewMemo,
     RenderError,
     RenderRequest,
@@ -52,6 +60,29 @@ ZOOM_STEPS: tuple[float, ...] = (1 / 16, 1 / 8, 1 / 4, 1 / 3, 1 / 2, 2 / 3, 1.0,
 
 _DIVIDER_GRAB_PX = 6
 _BACKGROUND = QColor(32, 32, 32)
+
+
+def display_profile(source: OpenedSource | None) -> bytes | None:
+    """Return the ICC profile a source's display copies are tagged with (DR-75, D53).
+
+    The source's own profile when it has one; for a photo without one, the built-in profile the
+    writer embeds for its colour description (``built_in_profile``, the writer's own choice: a
+    tagged HEIC with BT.709 or Display P3 primaries and the sRGB curve); else None (an untagged
+    photo, a video frame), so the display is unchanged.
+
+    Args:
+        source: The open source, or None.
+
+    Returns:
+        The profile's bytes, or None.
+    """
+    if source is None:
+        return None
+    color = source.image.color
+    if color.icc_profile is not None or source.metadata is None:
+        return color.icc_profile
+    chosen = built_in_profile(color, source.metadata.source_format)
+    return None if chosen is None else chosen[1]
 
 
 class PreviewWidget(QWidget):
@@ -407,6 +438,10 @@ class PreviewController(QObject):
         self._error_shown = False
         self._frame_error_shown = False
         self._frame_source: object = None
+        self._profile_source: OpenedSource | None = None
+        self._profile: bytes | None = None
+        self._device_lock = threading.Lock()
+        self._device_backend: object = None
         session.parameters_changed.connect(self.request)
         session.settings_changed.connect(self.request)
         session.statistics_changed.connect(self.request)
@@ -438,8 +473,7 @@ class PreviewController(QObject):
             corrected: The corrected side, or None to show ``proxy`` on both.
         """
         self._renderer.invalidate()
-        source = self._session.source()
-        icc = None if source is None else source.image.color.icc_profile
+        icc = self._display_profile()
         before = display_image(proxy, icc)
         after = before if corrected is None else display_image(corrected, icc)
         self._widget.set_proxy(before, after)
@@ -465,20 +499,46 @@ class PreviewController(QObject):
             statistics_revision=self._session.statistics_revision(),
             k=k,
             select_backend=self._engines.select_backend,
+            display_icc=self._display_profile(),
         )
         memo = self._memo
+        note = self._note_backend
         self._submitted_k = k
         # The indicator means "a full-resolution render replacing what is shown is in flight";
         # a k > 1 request supersedes any full render, which then never arrives.
         self._widget.set_pending_full(k == 1 and self._widget.after_image() is not None)
-        self._renderer.submit(lambda check: render_preview(snapshot, memo, check))
+        self._renderer.submit(lambda check: render_preview(snapshot, memo, check, on_backend=note))
 
     def idle(self) -> bool:
         """Return True when no render or frame decode waits or runs."""
         return self._renderer.idle() and self._framer.idle()
 
+    def release_device_plans(self, timeout_s: float) -> bool:
+        """Release the preview thread's FFT plans and wait for it (DR-68; any thread but it).
+
+        The release runs on the preview worker's thread as a chore, after the render in flight
+        and before the next one; it is never superseded.
+
+        Args:
+            timeout_s: The longest wait.
+
+        Returns:
+            True when the release ran within ``timeout_s``.
+        """
+        done = threading.Event()
+
+        def chore() -> None:
+            try:
+                self._release_plans()
+            finally:
+                done.set()
+
+        if not self._renderer.run_chore(chore):
+            return False
+        return done.wait(timeout_s)
+
     def stop(self, timeout_s: float) -> bool:
-        """Stop both workers (shell close).
+        """Stop both workers (shell close); the preview thread releases its FFT plans first.
 
         Args:
             timeout_s: The longest wait per worker.
@@ -486,9 +546,36 @@ class PreviewController(QObject):
         Returns:
             True when both threads have ended.
         """
+        self._renderer.run_chore(self._release_plans)
         first = self._renderer.stop(timeout_s)
         second = self._framer.stop(timeout_s)
         return first and second
+
+    def _note_backend(self, backend: object) -> None:
+        """Preview thread: remember the backend the latest render runs on (DR-68)."""
+        with self._device_lock:
+            self._device_backend = backend
+
+    def _release_plans(self) -> None:
+        """Preview thread: release its FFT plans through the device extension (AD-29, DR-68)."""
+        with self._device_lock:
+            backend = self._device_backend
+        if not isinstance(backend, PreviewDeviceBackend):
+            return
+        try:
+            backend.release_fft_plans()
+        except Exception as exc:  # for example a CUDA error at teardown; never ends the worker
+            _LOG.warning(
+                "releasing the preview's FFT plans failed: %s: %s", type(exc).__name__, exc
+            )
+
+    def _display_profile(self) -> bytes | None:
+        """The open source's display profile, chosen once per source (main thread; DR-75)."""
+        source = self._session.source()
+        if source is not self._profile_source:
+            self._profile_source = source
+            self._profile = display_profile(source)
+        return self._profile
 
     def _on_view(self) -> None:
         """Render again when the zoom or size needs another factor."""
@@ -511,8 +598,10 @@ class PreviewController(QObject):
         """A new source: drop any frame decode and the memo of the old one, reset, render.
 
         The memo is replaced, not cleared, so a job still running for the old source writes
-        into the discarded one; nothing of the old source stays resident.
+        into the discarded one; nothing of the old source stays resident. The preview thread's
+        FFT plans are released before the new source's first render (DR-68).
         """
+        self._renderer.run_chore(self._release_plans)
         self._memo = PreviewMemo()
         self._framer.invalidate()
         self._frame_pending = False
