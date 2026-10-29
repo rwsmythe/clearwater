@@ -1,6 +1,6 @@
-# WP3.6P -- Real-photo verification (dispatch brief, DRAFT)
+# WP3.6P -- Real-photo verification (dispatch brief, FINAL)
 
-**Status:** DRAFT 2026-10-29, written by a drafting helper for the orchestrator (generation 24)
+**Status:** FINAL on CHARC `2e95deafec8f84a5` (2026-10-29T22:09:47Z; its Rulings, verbatim at the end, GOVERN the Questions). DRAFT 2026-10-29, written by a drafting helper for the orchestrator (generation 24)
 from CHARC's commission (quoted verbatim below); CHARC rules it. Spec v0.5.7; no spec clause
 changes. Anchors read at main `1beadd0`; RE-LOCATE every line at round 0 on the dispatch base.
 Owner decisions: none inside the package (the photo look check is owner-reserved and NOT
@@ -9,9 +9,9 @@ commissioned).
 | Field | Content |
 |---|---|
 | ID and title | WP3.6P -- Real-photo verification on the owner's 73 phone photos: AD-24 on real Apple HEIC, V5 / D53 / V9 through the runner, the Result 2 photo memory leg; the pre-corrected Z/M group reported separately |
-| Lane | sonnet-medium (WP3.6 Q11) or CODEX by pace (Codex 0.376 vs Claude 1.423 at 21:50Z); the orchestrator re-reads both at dispatch; recommended CODEX (`implementer-codex-sol-high`, `codex exec` turns driven by `scripts/codex_cell.py`; the cell ends every turn with a FILES CHANGED block; the orchestrator commits and runs every footage, `gpu` and heavy command the cell yields). Q1 on task fit. |
-| Tier and nets | Recommended Tier **STRONG** (Q1). Nets are the OTHER model from the implementer: for the Codex lane, Reviewer A = the Claude pass, `scripts/codex_cell.py review` (`claude -p --model opus --effort high`, read-only), between turns, to convergence, five-round gate (`docs/review-gate-clearwater.md` Part 1); Reviewer B = the Claude pass at the orchestrator's seat (Part 2). Evidence `C:\Users\rwsmy\clearwater-review-evidence\wp3.6p\rN\`, `reviewB\`. |
-| Base and worktree | Base = main at dispatch, after the inventory QA (the report is on main at `e34c4a9`; the orchestrator confirms CHARC's QA at dispatch) and clear of WP4.3's windows (commission). Worktree `.worktrees/wp3.6p`, branch `wp3.6p`. On the Codex lane it queues behind WP4.4 and WP-DR87 (one Codex lane). No file overlap with WP-DR87 (`io/photo/exif.py`): this package owns no `src/` file. |
+| Lane | **CODEX** (ruled Q1; supersedes WP3.6 Q11's sonnet-medium; paces at drafting Codex 0.376 vs Claude 1.423 at 21:50Z, re-read at dispatch) (`implementer-codex-sol-high`, `codex exec` turns driven by `scripts/codex_cell.py`; the cell ends every turn with a FILES CHANGED block; the orchestrator commits and runs every footage, `gpu` and heavy command the cell yields). Q1 on task fit. |
+| Tier and nets | Tier **STRONG** (ruled Q1). Nets are the OTHER model from the implementer: for the Codex lane, Reviewer A = the Claude pass, `scripts/codex_cell.py review` (`claude -p --model opus --effort high`, read-only), between turns, to convergence, five-round gate (`docs/review-gate-clearwater.md` Part 1); Reviewer B = the Claude pass at the orchestrator's seat (Part 2). Evidence `C:\Users\rwsmy\clearwater-review-evidence\wp3.6p\rN\`, `reviewB\`. |
+| Base and worktree | Base = main at dispatch, after the inventory QA (the report is on main at `e34c4a9`; CHARC QA CONFIRMED `fffae21e`) and clear of WP4.3's windows (commission). Worktree `.worktrees/wp3.6p`, branch `wp3.6p`. On the Codex lane it queues behind WP4.4 and WP-DR87 (one Codex lane). No file overlap with WP-DR87 (`io/photo/exif.py`): this package owns no `src/` file. |
 | Goal | A committed, re-runnable instrument and a report that state, per photo class and from the owner's own files: (1) whether AD-24 orients every real Apple HEIC exactly once, shown against an oracle independent of the product's AD-24 logic; (2) V5 (EXIF except D63, ICC present and matching, bit depth honoured) and V9 (neutral identity within AD-11) on the RUNNER's output, not only the I/O round trip; (3) D53 (source primaries kept, matching ICC); (4) the Result 2 photo half: peak RAM, peak graphics memory, the estimate against free device memory and the device chosen, on the largest owner photo; (5) every figure of the pre-corrected Z/M group in its own rows. |
 | Files owned | NEW `tools/photo_verify.py` (Q2: subcommands `orientation`, `export`, `memory`); NEW `tests/test_photo_verify.py`; `docs/reports/wp3.6p-real-photos.md`; `docs/proofs/wp3.6p-ledger.md`. |
 | NOT owned | All of `src/` (`src/clearwater/interfaces/` IF-1..IF-10 FROZEN; `io/photo/` included: a defect the run proves is a STOP to CHARC with the evidence, never a fix here); `tools/photo_check.py` and `tests/test_photo_check.py` (Q2); `tools/headless_export.py`; `tools/local_config.py`; `tools/prototype/`; `tools/spike_io/`; every other existing test; `tests/conftest.py`, `tests/fixtures/`; `pyproject.toml`, `uv.lock`; the spec; `docs/decisions.md`; the register; the inventory report. |
@@ -315,3 +315,24 @@ seat-run figures by class; the AD-24 statement for CHARC; any deviation or STOP.
   representatives; `photo_check` keeps its PNGs as today (unchanged tool); the orchestrator checks
   free space before each run against round 0's measured PNG size and stops below 20 GB free.
   Alternative: keep every output and ask the owner for a prune afterwards.
+
+## Rulings (CHARC `2e95deafec8f84a5`, 2026-10-29T22:09:47Z, verbatim; they GOVERN the Questions above)
+
+PRIMARY: CHARC gen 8. Answers query d4f5553dfcd9748b (WP3.6P brief DRAFT 9fb2bed, 317 lines, read in full; AD-24, DR-42, DR-43, spec :567 and the inventory anchors re-read at my seat).
+
+The corrected premises are accepted as stated: photos are reached through photo_check.collect or Phone/<name>; AD-24's tag-only and irot-only branches have no real witness (62 HEICs = 39 irot + agreeing tag, 23 identity); the oracle must be pixel-level; the largest owner photo is 5712x4284 (about 24.5 MP); WP4.5 already proved MakerNote and GPS survival but allows refusals; DR-42 (c) is not touched. The inventory QA IS recorded as done (gen 22's state: CHARC QA CONFIRMED fffae21e, no finding; record e34c4a9).
+
+RULINGS, FINAL on fold-in:
+- Q1 = CODEX, Tier STRONG. It is an instrument build, not sonnet-medium's mechanical class; the blast radius of a missed finding is a false AD-24 CONFIRMED and two owed V5/V9 legs closed on bad evidence. It queues behind WP4.4 and WP-DR87 on the one Codex lane; that costs nothing, since it also waits on WP4.3's windows. Lane share at this commission: Codex WP4.4 (live), WP-DR87, WP3.6P (queued); Claude WP4.3 only (frontier wiring, in flight); paces 0.376 vs 1.423. The WP3.6 Q11 sizing (sonnet-medium) is superseded by this ruling.
+- Q2 = NEW tools/photo_verify.py (orientation, export, memory) + tests/test_photo_verify.py; photo_check.py and its test UNCHANGED.
+- Q3 = (a): the FFmpeg CLI decode with -noautorotate turned by the file's own irot/imir, compared pose by pose in the test_wp41_photo_path.py:324-339 form; fallback = the HEIC's thumbnail item through pillow-heif if round 0 shows FFmpeg cannot decode the Apple primary (round 0 says which). The report states AD-24 "confirmed on the Apple layouts present" with counts and names the unwitnessed branches (covered by the synthetic heic-ad24-* fixtures only). AD-24's status and D63's "provisional" words: MINE and the OWNER's respectively, at the accept; the brief changes neither.
+- Q4 = yes, ONE footage test on the four named HEICs (IMG_6703, IMG_6718, IMG_6690, IMG_6720), serial leg with the reason beside the marker, skip when footage is absent.
+- Q5 = as recommended: all 73 at --neutral --bit-depth 16 on the default device, plus --bit-depth 8 on one photo per class (seven); round 0 (d) sizes the wall time and disk first.
+- Q6 = as recommended: the PRODUCT runner on one 5712x4284 HEIC, default device then --force-cpu, EXCLUSIVE window, against 16 GB and 8,188 MiB; this closes Result 2's photo row on the owner's largest photo; V15 and 48 MP stay WP5.2's. The Z-group JPEG alternative is DECLINED (one decoder path suffices for the row).
+- Q7 = as recommended: class map from the inventory's lists (names only, a JSON under work/ the orchestrator writes); Z/M in separate rows, never pooled; NO scene classification; the report says the above-surface question is the owner's visual review.
+- Q8 = no product fix. The report counts per class the assumed readings and any sanitise drop. Register rows are MINE at the accept on the figures: DR-42 (a) and (c) notes (no real-file witness; tiff.py not touched), DR-43 a note, and a NEW MINOR row for EXIF ColorSpace 1 read as untagged (a spurious G10 warning on the Z/M JPGs; the colours are read as sRGB anyway). The color.py grant is DECLINED for this package.
+- Q9 = as recommended: the export leg deletes its own PNGs after measuring (md5 + size kept), keeps the seven class representatives; free disk checked before each seat run against round 0's PNG size; STOP below 20 GB free.
+
+Brief edits on fold-in: Status FINAL on this message id; Lane and Tier fields fixed to Codex / STRONG; the two "unverified" items resolved as above (inventory QA done; FFmpeg decode = round-0 RUN REQUEST with the ruled fallback). STOP list and Locks stand as drafted; the privacy lock is BINDING as written.
+
+Owner-pending inputs: none. Open owner decisions: none. Owner action pending: the three kept basetemps.
