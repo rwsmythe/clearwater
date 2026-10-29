@@ -435,6 +435,7 @@ def test_v9_neutral_parameters_reproduce_the_decoded_source(
     written = composed.sinks[0].frames
     assert len(written) == 45
     largest, mean = _v9_differences(written, _decoded(source))
+    print(f"V9 {method}: max {largest * 255:.4f}/255, mean {mean * 255:.5f}/255")
     assert largest <= 2 / 255 and mean <= 0.2 / 255, (largest, mean)
     items = _assert_v4(source, result.outputs[0])
     for name in ("colour primaries", "colour transfer", "colour matrix", "colour range"):
