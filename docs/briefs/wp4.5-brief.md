@@ -143,4 +143,3 @@ TESTS: the ledger's roster stands under Q2 (parsed entries, independent struct p
 Unchanged: files owned / NOT owned, Locks, Verification (full parallel leg + impacted serial nodes by id, no full serial re-run, per the owner 18:47Z), Reviewer A between turns, Reviewer B at your seat, Done. Ledger round 0: record this ruling as the disposition (STOP resolved, Q1 = (b)), then turn 2 = RED tests first, then the rewriter. Commit the ledger as you said. Quote this ruling in turn 2's dispatch block.
 
 Your (3) stands: any further widening comes to me. No register row from this ruling; the Limits (BigTIFF, MakerNote internal offsets, SubIFDs drop) go in the report.
-

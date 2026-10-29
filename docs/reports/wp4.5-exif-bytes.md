@@ -1,8 +1,9 @@
 # WP4.5 - EXIF byte fidelity through the photo writer
 
 Implementation and Reviewer A R4 cleanup are complete; light verification is
-recorded below. Reviewer A converged at R4. Reviewer B and the orchestrator's
-final gate remain pending. Product base: main `5a1538a`.
+recorded below. Reviewer A converged at R4. Reviewer B returned
+NO_NEW_CRITICAL_MAJOR and the orchestrator's gate passed (Verification below).
+Product base: main `5a1538a`; merge candidate `wp4.5-mc` `3e16f06` on main `f27368b`.
 This report contains synthetic evidence only; no real photo metadata is included.
 
 ## Root cause and mechanism decision
@@ -177,10 +178,25 @@ used `-m "not gpu and not footage and not gui and not slow and not fullclip"`,
 - Reviewer A R4: NO_NEW_CRITICAL_MAJOR, three advisories; documentation-only
   cleanup complete. First round with zero new critical or major, so Reviewer A
   converged at R4.
-- Reviewer B: pending.
-- Full parallel leg: @@PAR@@
-- Impacted serial nodes: @@SER@@
-- Real-photo round trip: @@FOOT@@
+- Reviewer B (Claude opus/high, the orchestrator's seat, candidate `3e16f06`):
+  NO_NEW_CRITICAL_MAJOR; 2 minor and 4 advisory, all out of envelope or wording
+  (Errata at the gate, below).
+- Static gates on the candidate: ruff check exit 0; ruff format 268 files
+  formatted; mypy no issues in 141 source files; 0 CR bytes in every changed blob.
+- Full parallel leg (`-n 4 -m "not gpu and not footage and not gui and not slow
+  and not fullclip"`): **5,566 passed, 1 skipped, EXIT=0, 753.34 s**
+  (20:50:47Z-21:03:26Z).
+- Impacted serial nodes (`-m "(gpu or footage or gui or slow) and not fullclip"`
+  over `tests/test_photo_check.py`, `tests/test_io_photo_*.py`,
+  `tests/test_wp41_photo_path.py`, `tests/test_wp41_v8.py`,
+  `tests/test_jobs_export_photo.py`): **13 passed, EXIT=0, 300.43 s**
+  (21:03:47Z-21:08:49Z); node ids in the accept record. No full serial leg
+  (the owner's direction).
+- Real-photo round trip
+  `tests/test_photo_check.py::test_the_real_photo_leg_reads_and_round_trips_the_owners_photos`:
+  PASSED within the serial nodes above on the candidate, and earlier at the
+  orchestrator's seat on every remediated head (`5a57d9f` 328.40 s, `3020648`
+  268.01 s, `c7c7360` 272.04 s, `2923402` 263.93 s).
 
 Earlier dispatcher-seat evidence on `5a57d9f`: the real-photo round-trip node
 passed over all the owner's Phone photos, **1 passed in 328.40 s**. This is
@@ -329,7 +345,8 @@ views, D63, grant and scope checks held. These are supplied reviewer checks.
 Dispatcher-seat evidence on `2923402`: ruff format/check and LF/ASCII clean;
 the real-photo round-trip node passed **1 test in 263.93 s**. This precedes the
 documentation-only cleanup and is not the final orchestrator gate. Reviewer B
-and the final full parallel + impacted serial gate remain pending.
+and the final full parallel + impacted serial gate ran at the orchestrator's
+seat (Verification above).
 
 Cleanup checks at the cell: `tests/test_io_photo_exif_bytes.py` plus
 `tests/test_io_photo_r1.py`, **288 passed, 1 warning in 2.27 s**, exit 0, with
@@ -359,12 +376,14 @@ green. F-D is an existing-behavior control, not a newly implemented fix.
 R3 independently confirmed the distinct-overlap and same-offset-label
 defects RED, then removed the cache under the guard and checked every new and
 amended case green. The final R3 light run and static checks found no further
-failure. Full acceptance depends on the pending reviews and gate figures above.
+failure. Reviewer B and the gate figures above complete the verification.
 
 Named limits:
 
 - BigTIFF magic 43 is unsupported for EXIF carry; it is rejected with a warning
-  through `from_tiff`/`sanitise` rather than rewritten.
+  through `from_tiff`/`sanitise` rather than rewritten. The base carried a
+  BigTIFF source's IFD0 fields through Pillow, so this is a regression for
+  BigTIFF photo sources (ruled; Reviewer B F4, erratum at the gate).
 - MakerNote value bytes are preserved. MakerNote internal offsets are not
   repaired or validated; their validity after relocation is a pre-existing limit.
 - SubIFDs, type-13 entries outside carried pointer positions, and other IFD
@@ -378,9 +397,11 @@ Named limits:
   count warning; header faults or an IFD0 offset past the block discard the
   block, while child offset/cycle faults discard only that child. IFD0 cannot
   form a cycle. Empty children are omitted.
-- An IFD0 already at 65,535 entries cannot take required D63 insertions: edit
-  raises and sanitise drops the block; this is out of envelope and the base
-  failed as well.
+- Any IFD0 or Exif table that the required D63 insertions would push past
+  65,535 entries cannot be written: edit raises and sanitise drops the block.
+  Out of envelope. The base also failed for 65,535 DISTINCT tags, but kept a
+  table of many REPEATED tags (Pillow collapsed them into one key), so for
+  that input this is a regression (Reviewer B F1, erratum at the gate).
 - Hostile inputs can make many entries share one large source value. Relocation
   copies each value separately and can substantially increase output size and
   memory use. Repeated SAME-tag entries sharing a value amplify where the base
@@ -393,3 +414,23 @@ Named limits:
 
 No further scope expansion is requested. No register row is required by the
 rulings. The grant line above must also accompany the completion/accept record.
+
+## Errata at the gate (orchestrator, from Reviewer B)
+
+- F1 (minor, out of envelope): the 65,535-entry Limit's wording was too narrow
+  and its "the base failed as well" was false for repeated tags; corrected
+  above. No behaviour change.
+- F4 (advisory, ruled Limit): the BigTIFF Limit now states that the base
+  carried such sources' IFD0 fields.
+- F2 (minor, out of envelope, REASONED): `from_tiff` catches
+  `(ValueError, struct.error)` where the base caught `Exception`; a MemoryError
+  from a crafted TIFF of the F7 pattern now propagates out of `read_photo`
+  instead of degrading to no EXIF. Recorded for CHARC; no code change at the
+  gate.
+- F3 (advisory): the F7 shared-value Limit re-measured, the same order as the
+  base; nothing grows faster than linearly beyond it.
+- F5 (advisory, PRE-EXISTING, out of scope): a TIFF's large non-EXIF blob such
+  as Photoshop ImageSourceData (tag 37724) is carried as EXIF into every
+  output, by the base and by this package alike. Recorded for CHARC.
+- F6 (hygiene): the placeholders above are filled; the brief's trailing blank
+  line is removed.
