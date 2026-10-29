@@ -159,6 +159,46 @@ WP1.4 real footage: 0.35-0.45. No product-method miss: no STOP. The encoded rati
 encoder's frame-to-frame quantisation (NVENC, Standard); they are not V3's measurement point
 (question 5).
 
+## V4 on GX011627 and the WP2.3 set (task 10)
+
+The window was the orchestrator's exclusive grant, 2026-10-29T08:42:01Z-08:48:18Z, at head
+`ab9ea83`. Free memory was 9.39 GiB at the start and at least 9.37 GiB before each export, and
+the GPU was idle beforehand. Each export ran through `tools/headless_export.py` on the product
+composition, with settings at their defaults: c3, encoder `auto`, `standard`, 8-bit from
+8-bit. Each output was then compared to its source by `tools/video_fidelity.py compare`, at the
+source's bit depth. GX011627 was found through `find_footage_file` and was not skipped (DR-27).
+The WP2.3 set is the six committed fixtures, each leg run as one batch. `vid-hlg` and `vid-pq`
+are refused by design and were not run; the suite's refusal test covers them (Evidence above).
+Commands, logs and record md5s are in `docs/proofs/wp4.2-ledger.md` (cell 4).
+
+| Item | Leg | Frames (src / out) | MANDATORY / REQUIRED / BEST-EFFORT different | V4 |
+|---|---|---|---|---|
+| GX011627 | GPU | 681 / 681 | 0 / 0 / 8 | SAME |
+| `vid-hevc8-bt709-full` | GPU, CPU | 45 / 45 | 0 / 0 / 6 | SAME, SAME |
+| `vid-hevc10` (10-bit) | GPU, CPU | 45 / 45 | 0 / 0 / 6 | SAME, SAME |
+| `vid-rotated` | GPU, CPU | 45 / 45 | 0 / 0 / 5 | SAME, SAME |
+| `vid-untagged` | GPU, CPU | 45 / 45 | 0 / 0 / 6 | SAME, SAME |
+| `vid-vfr` | GPU, CPU | 30 / 30 | 0 / 0 / 6 | SAME, SAME |
+| `vid-truncated` (D86) | GPU, CPU | 24 / 24 | 0 / 0 / 8 | SAME, SAME |
+
+Each of the 13 compares checked 46 items, and every MANDATORY and REQUIRED item was SAME.
+GX011627's eight BEST-EFFORT differences are the same eight items as in WP3.21's record of the
+engine-level run. `vid-truncated` was compared on its readable part, ending at 0.800800 s, as
+D86 says; the runner reported its "cut short" warning. `vid-untagged` got the assumed-tags
+warning. GX011627's warnings name the camera firmware tag and the camera settings atoms as not
+carried to the output.
+
+The record's facts, the same on every item of a leg:
+
+| Run | `JobResult.device` | `device_backend` | Sink frame device | Encoder | Decode passes | Elapsed (information only, not a V16 row) |
+|---|---|---|---|---|---|---|
+| GX011627 | `GPU` | `cuda:0` | `cuda:0` | `hevc_nvenc` | 2 | 218.9 s |
+| WP2.3, GPU | `GPU` | `cuda:0` | `cuda:0` | `hevc_nvenc` | 2 | 3.0-7.1 s per clip |
+| WP2.3, `--force-cpu` | `CPU: forced` | null | `cpu` | `hevc_nvenc` | 2 | 3.9-6.3 s per clip |
+
+Every output, cache, record and compare record is kept under `work\wp4.2\v4\` and
+`work\wp3.10\wp4.2-v4\`. Nothing derived from footage is committed.
+
 ## Limits
 
 - **The footage check** (WP4.1's Limit as WP4.2a revised it, the target list extended): one

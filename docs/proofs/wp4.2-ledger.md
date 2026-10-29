@@ -15,6 +15,9 @@ build waits for WP4.2a's merge and the orchestrator's rebase (R1-Q5 condition 3,
 | Y3 (V3 STOP) | cell 3 | 237,804 (turn 101) | 2026-10-29 06:26Z | near the 250K evaluation point |
 | ruling (a) applied | cell 3 | 256,795 (turn 114) | 2026-10-29 06:30Z | past 250K; bounded remaining load (suite, task-10 RESUME HERE) |
 | rebase + suite grant | cell 3 | 259,350 (turn 116) | 2026-10-29 07:28Z | rebased head `6e0eb1d` |
+| final | cell 3 | 278,978 (turn 142) | 2026-10-29 | re-seated for task 10 |
+| dispatch | cell 4 | 0 | 2026-10-29 | task 10 (the GX011627 V4 window) |
+| window request / release | cell 4 | not given at the grant (figure owed at the release yield) | 2026-10-29 | |
 
 ## Round ledger (Reviewer A, Codex `gpt-6.1-sol` / high, WSL)
 
@@ -436,7 +439,77 @@ fixture setup) are each under 8.51 s, so at most about 43 s more: **at most abou
 300 s.** The leg's wall is 396 s above WP4.2a's gate (2,540.97 s) on a shared laptop; WP4.2a's
 log carries no durations, so the like-for-like split is not available.
 
-## RESUME HERE (task 10, the GX011627 V4 window)
+## Cell 4 -- task 10, the GX011627 V4 window (orchestrator grant, 2026-10-29)
+
+**Seat.** Worktree head `ab9ea83` on main `38f291e`, tree clean. Every product command ran
+from the worktree as `UV_PROJECT_ENVIRONMENT=C:/Users/rwsmy/clearwater/.venv
+PYTHONPATH='scripts;src;tools' uv run --no-sync python ...` (Git Bash, `PYTEST_ADDOPTS` unset);
+under that form `clearwater.__file__` is `.worktrees\wp4.2\src\clearwater\__init__.py` and
+`headless_export` / `video_fidelity` load from the worktree's `tools\`.
+
+**Driver.** `work\wp4.2\v4\window.sh` (md5 `85ca41d64953868791c6b9975d1b5e08`, read and
+granted unchanged at the orchestrator's seat; never committed). One job at a time in order;
+stop at the first runner exit other than 0 or the first compare without "MANDATORY+REQUIRED
+all SAME: True"; a 5 GiB free-memory guard first. Settings were the defaults (no `--method`,
+`--encoder`, `--quality`, `--settings-dir`): c3, encoder `auto`, `standard`, 8-bit from 8-bit,
+provenance on (the records' `settings` say so). GX011627 was FOUND through
+`find_footage_file("GX011627")` (DR-27: found, not skipped); its path was held in a shell
+variable and never printed or logged. No `gpmd`, IMU, GPS or location tag was read.
+`vid-hlg` and `vid-pq` were left out by the grant (refused by design; the suite's refusal test
+covers them). Commands, in order (paths under `C:\Users\rwsmy\clearwater\work\`):
+
+1. `tools/headless_export.py "$GX" --out wp4.2/v4/gx/out --cache-dir wp4.2/v4/gx/cache --record wp4.2/v4/gx/record.json`
+2. `tools/video_fidelity.py compare "$GX" wp4.2/v4/gx/out/GX011627_corrected.mp4 --out wp3.10/wp4.2-v4/v4-GX011627-c3-gpu`
+3. `tools/headless_export.py <six> --out wp4.2/v4/gpu/out --cache-dir wp4.2/v4/gpu/cache --record wp4.2/v4/gpu/record.json`
+4. as 3 with `--force-cpu`, into `wp4.2/v4/cpu/{out,cache,record.json}`
+5. twelve `compare tests/fixtures/video/<s>.mp4 wp4.2/v4/<leg>/out/<s>_corrected.mp4 --out wp3.10/wp4.2-v4/v4-<s>-c3-<leg>`
+   (bit depth the source's, the tool's default), GPU leg then CPU leg.
+
+The six are the committed WP2.3 fixtures `tests/fixtures/video/{hevc8-bt709-full, hevc10,
+rotated, untagged, vfr, truncated}.mp4`, one batch per leg.
+
+**Window.** 2026-10-29T08:42:01Z-08:48:18Z, head `ab9ea83`; free memory 9.39 GiB at the start,
+9.37 / 9.68 / 9.66 GiB before the three runner steps, 9.56 GiB at the end; GPU idle before (518
+MiB used, 0 %, no compute job). Driver exit 0, `window.done` = OK. Orchestrator's Reviewer B
+(Codex in WSL, offline, no tests, no FFmpeg) ran on a separate worktree; nothing else heavy.
+Logs `work\wp4.2\v4\logs\` (`steps.txt`, one log per step).
+
+| Item | Leg | Runner state | Frames (src / out) | MANDATORY / REQUIRED / BEST-EFFORT different | Verdict |
+|---|---|---|---|---|---|
+| GX011627 | GPU | done with warnings (2: camera firmware tag, camera settings atoms not carried) | 681 / 681 | 0 / 0 / 8 | SAME |
+| hevc8-bt709-full | GPU / CPU | done / done | 45 / 45 | 0 / 0 / 6 | SAME / SAME |
+| hevc10 (10-bit record) | GPU / CPU | done / done | 45 / 45 | 0 / 0 / 6 | SAME / SAME |
+| rotated | GPU / CPU | done / done | 45 / 45 | 0 / 0 / 5 | SAME / SAME |
+| untagged | GPU / CPU | done with warnings (the assumed-tags warning) | 45 / 45 | 0 / 0 / 6 | SAME / SAME |
+| vfr | GPU / CPU | done / done | 30 / 30 | 0 / 0 / 6 | SAME / SAME |
+| truncated | GPU / CPU | done with warnings (the D86 "cut short" warning) | 24 / 24 | 0 / 0 / 8 (2 D86 notes: readable part to 0.800800 s; audio on the kept packets) | SAME / SAME |
+
+13 compares, 13 SAME on every MANDATORY and REQUIRED item, 46 items each. GX011627's eight
+BEST-EFFORT differences are the same eight item names as WP3.21's
+`work\wp3.10\wp3.21-v4\v4-GX011627-c3-gpu` record.
+
+**Record fields** (`record.json`, schema 1, method c3, `parameters_from` defaults, `cancelled`
+false, no failure):
+
+| Run | `JobResult.device` | `video.device_backend` | `video.frame_device` | `video.encoder` | `decode_passes` | Elapsed (information only, never V16) | md5 |
+|---|---|---|---|---|---|---|---|
+| GX011627 | `GPU` | `cuda:0` | `cuda:0` | `hevc_nvenc` | 2 | job 218.9 s (step wall 220.2 s) | `4922fd542dc4822171979fcdd93298e8` |
+| WP2.3 GPU (each of six) | `GPU` | `cuda:0` | `cuda:0` | `hevc_nvenc` | 2 | jobs 3.0-7.1 s, batch 23.8 s | `4d892589bc701a8bcea7958ba80ee5c7` |
+| WP2.3 `--force-cpu` (each of six) | `CPU: forced` | null | `cpu` | `hevc_nvenc` | 2 | jobs 3.9-6.3 s, batch 30.5 s | `99294d0a0e147ba263bd001e0d45a0e2` |
+
+Counts: GX011627 1 done with warnings; each WP2.3 leg 4 done, 2 done with warnings. Compare
+records under `work\wp3.10\wp4.2-v4\v4-<item>-c3-<leg>\` (`.compare.json` and `.compare.md`).
+Kept, nothing deleted: every output, cache, record, log and compare record above. Nothing
+footage-derived is committed.
+
+## RESUME HERE (the FINAL docs turn)
+
+Every task is done: task 10's V4 window is above, and the report's V4 section is filled from it.
+What remains is docs only, and only when the orchestrator sends it: after its Reviewer B and
+the accept checks, mark `docs/reports/wp4.2-video-path.md` FINAL and fold in whatever the
+orchestrator relays. No change to `src/`, `tools/` or `tests/`.
+
+## Done: RESUME HERE (task 10, the GX011627 V4 window) -- carried out by cell 4 above
 
 For a fresh cell: read `docs/dispatch-recipe.md`, the brief (task 10, question 10; the Rulings
 govern), this ledger and `docs/reports/wp4.2-video-path.md`. State: Reviewer A CONVERGED (R1,
