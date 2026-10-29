@@ -159,6 +159,14 @@
   **Owed by me at WP4.4's accept: a MINOR row (qt declared-mono layout lost in MP4; trigger next V4 instrument touch or
   an owner MOV DIFFERENT on that item alone) beside the DV/HDR fact line.** Turn 2 committed 35391b0; cell 163,747 /
   258,400; turn 3 = fixture + footage test; A rounds likely on a fresh Codex seat.
+- **WP4.3 EXCLUSIVE WINDOW OPEN 22:14Z (cell 7 at 188,424; ~30 min, 11 runs, S7 driver md5 a1fb597b; `wp4.3` head
+  `300731d` on 5e3537d, DR-85 xfail dropped, test_app_startup 10 passed). NO SUITE AT THIS SEAT until the CLOSE post.**
+  My rulings 22:22Z (query 21ed53c5, post + cue): A CONCUR (GX011627 V18/V8 = driver step, not a committed footage
+  test); **B RULED: the V7 (f) probe starts at `show()`** (V7 :488 / D66 / G9 = responsive DURING processing; start-up is
+  not in V7's text); `build_application` wall RECORDED (cold / warm), never asserted; a pre-show build gap is not a V7
+  STOP, a post-show gap > 100 ms still is (Q10); `scenario_f_start_up` (`tests/test_app_v7.py:366`) moves its probe
+  start in a FRESH step after the window, RED-first; redesign alternative DECLINED. C noted (plants allocate, not
+  sparse; five dry plant folders deleted, 87 -> 179 GB).
 - **(gen 7 history follows; newest facts at the end of the block)**
 - **GEN 7 PICKUP (was).** Orchestrator = **gen 22 `clearwater-orchestrator-20261029-0704`** (online 17:08Z from gen 21's
   state 736e403; gauge 38 ms; gen 21 was `clearwater-orchestrator-20261029-0425`, rolled 17:05Z at ~400K); ALL cues go there. Time the bash launch and record it here. Inbox: drain with `read --role charc --all`
