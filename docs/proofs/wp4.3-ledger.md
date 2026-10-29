@@ -1128,3 +1128,63 @@ grant (given by the dispatcher, gen 24).
 - Disciplines: never a bare `cd`; backslash-bearing text by the Write tool; LF, 0 CR, 0 NUL in
   every blob; a plant costs 19.96 GB of real disk (check free space; dry-run plants are deleted
   only on the dispatcher's word).
+
+## Cell 8 (implementer-opus-high, 2026-10-29): window 3 (the V7 stall characterisation + the six owed runs)
+
+Dispatch: orchestrator gen 24, `prompt-wp4.3-cell8.md`; CHARC ruling `62cd31f1fdf39406` (verbatim
+in the dispatch): (a) one more characterisation step, driver-side, no product change, three
+discriminators, then the six owed runs of record in the same EXCLUSIVE window 3, each INDEPENDENT.
+Head at start `990b778`, worktree clean.
+
+### Preparation (no window)
+
+New uncommitted files in `C:/Users/rwsmy/clearwater-review-evidence/wp4.3/windows/` (all LF,
+0 NUL; `md5sums.txt` updated). `s7_driver.py` is UNCHANGED (`0b9ee6cc3ebd2cf07c35dec934cfd901`) and
+drives the six runs of record.
+
+| File | md5 | What |
+|---|---|---|
+| `s7_char3.py` | `5b39ac085424257d5003d29568f75112` | sibling driver: imports `s7_driver` unchanged; modes `v7c-char3` (s7's v7c-char) and `v7e-char` (s7's `run_v7("e")` with the probe readings, watchdog, gc, log and job-runner stamps); exit 0 on completion (characterisation, never of record) |
+| `heartbeat.py` | `3b8a0551fb88bcc8be3e07981f38bc54` | discriminator 2: stdlib child, `perf_counter_ns` every 10 ms held in memory, written at stdin EOF |
+| `memwatch.py` | `e3520470f70b4c2fdaf664ecf58daee0` | beside it (psutil, in the venv already): the product process's working set, private bytes, page faults, CPU time and host available memory every 20 ms, out of process |
+| `char3_post.py` | `7d1817ddfc956864bc3356888900adee` | after each characterisation run: per probe gap over 50 ms, the wrapped calls in flight / spanning, the heartbeat's and memwatch's overlap, py-spy's change points; verdict line; privacy scan |
+| `window3-commands.sh` | `58478c4d0940bb008dbbcd66578e0925` | the chain: v7c-char3 (+post), v7e-char (+post), then v8v18, dr44c-analysis, dr44c-export, dr44c-batch, plant-f, v7f-settled; no exit stops it; `dry` argument = the same chain on the fixture |
+
+Discriminator 1, the call wrappers (start, end, thread, frame index, enclosing wrapped call), all
+installed before the build. REACHED: `CupyBackend.rgb_to_planes`, `cupy.asnumpy` (every caller),
+`FFmpegVideoSink._payload`, `.write`, `._send` (the pipe writes), `channel_means` (every module
+binding), `AncutiFusionMethod.analyze` (the analysis frame index), `gui.imaging.render_host`,
+CuPy pool `malloc` (`cupy.cuda.set_allocator`), `CupyBackend.release_fft_plans` and inside it
+`pool.free_all_blocks` and `plan_cache.clear` (timing proxies from `cupy.get_default_memory_pool`
+and `cupy.fft.config.get_plan_cache`). NOT REACHABLE (C-type methods): `host.tobytes()` (derived
+as `rgb_to_planes`'s tail after its `asnumpy`) and `channel_means`'s `.tolist()` (inside the
+`channel_means` wrapper).
+
+Discriminator 3, py-spy: `uvx py-spy@0.4.2 record --gil --native --threads --idle -r 200 -p <pid>
+-f chrometrace -o <disc>/pyspy-trace.json`, attached just before the scenario's probe starts
+(V7's `measured`), stopped right after it. py-spy VERSION 0.4.2 (MIT; uvx only, NOT in
+`pyproject.toml` / `uv.lock`). Findings at preparation:
+- `--native` attaches and works on this host, but `python312.dll` has no symbols: native frame
+  names are nearest exports (e.g. `PyFloat_FormatAdvancedWriter` under `PyEval_AcquireThread`) and
+  are NOT to be read as call names; the Python frames are right.
+- py-spy pins to the INTERPRETER's pid (`os.getpid()`), not the venv launcher's (attaching to the
+  launcher fails "Failed to find python version").
+- Left sampling to the target's exit, py-spy panicked ("Failed to resume process: Access is
+  denied") and wrote nothing (first dry run); so the driver stops it with CTRL_BREAK (new process
+  group) and waits for "Wrote chrome trace".
+- The chrometrace form: per sample only the GIL holder; a thread's frames are emitted only when its
+  stack CHANGES. So events inside a gap name a holder; NO events inside a gap is ambiguous (an
+  unchanged holder, or none); the post prints the last change before and the first after.
+- Clock: a 60 ms GIL-holding marker on the interface thread after the attach and before the stop;
+  the two markers agreed within 0.6-17 ms in the dry runs (one sample interval).
+- Achieved rate about 50-105 samples/s, not 200 (native unwinding); py-spy suspends the process
+  per sample, so it PERTURBS the figures (dry (c) longest 72-213 ms with py-spy against 43 ms
+  without on the fixture). The heartbeat is out of process and unaffected by that suspension.
+
+Dry runs (fixture, NOT of record; `work/wp4.3-c8/dry*`, logs copied to `windows/dry3/`):
+`bash window3-commands.sh dry` ran the whole chain: v7c-char3 0 (+post 0), v7e-char 0 (+post 0),
+v8v18 1 (expected: the fixture is outside AD-11's domain, as cell 7's dry), dr44c-analysis 0,
+dr44c-export 0, dr44c-batch 0, plant-f 0, v7f-settled 0; about 1.5 min. Heartbeat clock check
+(one QPC clock) True for both children; footage folder unchanged (128 files); product logs naming
+it 0; the privacy scan of every discriminator record and `char-events.json` 0 hits. The dry plant
+(19 GB) deleted under the dispatcher's grant; C: 179 GB free after.
