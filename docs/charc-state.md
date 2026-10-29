@@ -207,6 +207,20 @@
   discriminators, not of record, then six independent runs of record; ~30 min; py-spy 0.4.2 via uvx, perturbs the
   probe so char figures are not comparable, heartbeat unaffected). NO SUITE AT THIS SEAT until the CLOSE post.**
   WP4.4 seat-2 turn (compare.py grant) returned just before OPEN; processed outside the window.
+- **WP4.3 WINDOW 3 CLOSED 23:28Z (seat free; cell 8 retired 228,562, ledger 1d96dc4). Of record: v7f-settled PASS
+  from show() 47.5 ms (committed probe from build read 105.0: move confirmed); dr44c close 361/218/262 ms, no
+  temporaries (DR-44 (c) + DR-50 close at the accept); plant-f ok; V18 PASS; V8 k=2 frames 10/170/340 within, frame
+  510 p99 0.007885 vs 0.007843 = STOP of record (max 0.10 recorded; shown frame == harness preview).** V7 CAUSE (not of
+  record, concurred): heartbeat flat = every gap IN-PROCESS; py-spy --gil: no single holder, compute threads alternate,
+  UI thread's own progress delivery 30-55 ms; D2H copies ruled out; job boundaries = release_fft_plans finalizers +
+  gen-2 gc on the job thread. **RULED 23:40Z (query 59fb9ae6, post + cue): Q1 (a)** one bounded step, fresh cell:
+  coalesce progress + cheap eventFilter (GRANT `gui/jobs.py` _flush + `gui/export_panel.py` _progress), gc off the
+  boundary from the app layer (core untouched; STOP before any core grant), `sys.setswitchinterval` MEASURED at 5 / 1 ms
+  as a driver toggle, adopted only on my word (< 5 % export cost); then (c)/(e) re-runs of record in window 4; still
+  STOP = spawned export process, design scope, new package, V7 owner flag carried. **Q2 (ii):** the k=2 p99 <= 2/255 is
+  MY ruling (AD-11 V8 = mean 1/255, max 3/255, tunable; spec V8 'set at design'), frame 510 stands as STOP of record,
+  16-frame V8 characterisation in window 4, I re-rule the figure at the accept as an AD-11 note. Owed at WP4.3's accept:
+  register table, DR-89, DR-90, DR-44 (c) + DR-50 closures, AD-11 V8 note, switchinterval decision.
 - **(gen 7 history follows; newest facts at the end of the block)**
 - **GEN 7 PICKUP (was).** Orchestrator = **gen 22 `clearwater-orchestrator-20261029-0704`** (online 17:08Z from gen 21's
   state 736e403; gauge 38 ms; gen 21 was `clearwater-orchestrator-20261029-0425`, rolled 17:05Z at ~400K); ALL cues go there. Time the bash launch and record it here. Inbox: drain with `read --role charc --all`
