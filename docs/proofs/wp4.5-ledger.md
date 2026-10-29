@@ -1,5 +1,76 @@
 # WP4.5 - EXIF byte fidelity: cumulative ledger
 
+## Reviewer A Round 4 - CONVERGED, bounded documentation cleanup
+
+Reviewer: Claude opus/high, read-only on `2923402`; findings supplied in the
+seat-2 turn-4 dispatch. Verdict: **NO_NEW_CRITICAL_MAJOR**. R4 is the first
+round with zero new critical or major findings, so **Reviewer A converged at
+R4** under the fill's convergence criterion. Three NEW advisories; none
+reopened, no reverts. No additional Reviewer A round is opened for this
+documentation-only cleanup. Reviewer B and the orchestrator's gate remain
+pending. Evidence root supplied by the brief:
+`C:\Users\rwsmy\clearwater-review-evidence\wp4.5\r4\`; individual transcript
+filename/hash and process assertion records were not supplied to the cell.
+
+| Finding | Classification / disposition | Authorized cleanup |
+| --- | --- | --- |
+| A-1 | Advisory, out of envelope, EXECUTED; accept | Clarify F7: repeated same-tag entries can amplify where the base collapsed them into one key; the worst-case order matches the base using distinct tags. Documentation only. |
+| A-2 | Advisory, out of envelope, EXECUTED; accept named Limit | An IFD0 already at 65,535 entries cannot take required D63 insertions; edit raises and sanitise drops the block. Base failed too. Add one report Limit sentence; no behavior change. |
+| A-3 | Advisory, in envelope, REASONED; accept | Correct the report Implementation/Limit wording and edit docstring: header faults or an IFD0 offset past the block raise; cycles drop only the child (IFD0 has no ancestor). Excess output entries are the further whole-block case. |
+
+Initial git status was clean, HEAD `2923402`. This turn changes only report,
+ledger and exif.py docstring text, with no product behavior or test change.
+Dispatcher-seat evidence on `2923402` (supplied, not run by this cell): ruff
+format/check clean; blobs LF/ASCII; real-photo node
+`tests/test_photo_check.py::test_the_real_photo_leg_reads_and_round_trips_the_owners_photos`
+**1 passed in 263.93 s**. Depth at turn-3 yield supplied by dispatcher:
+**169,845 input tokens**, binding window **258,400**.
+
+Reviewer-executed evidence, supplied rather than re-run by this cell: 3,000
+valid blocks / 85,545 entries checked, zero edit-route fidelity mismatches;
+12 from_tiff structure-tag drops matched the rule; zero Pillow-view
+differences. Mutation checks covered 20,000 inputs / 54,865 valid outputs,
+at most four tables and the corrected +5 entry bound, no exception beyond
+ValueError/struct.error. The reviewer confirmed the grant, scope locks,
+254-case file and its 8/4/12 R3 case split, with 460 selected photo tests green.
+These are independent review results, not final orchestrator gate results.
+
+### R4 cleanup verification and return
+
+A-1's F7 clause now distinguishes repeated SAME-tag inputs (base collapsed
+them) from the equal-order worst case using distinct tags. A-2's single Limit
+sentence records the 65,535-entry IFD0 plus required D63 insertion failure,
+the sanitise whole-block drop and the base's failure. A-3 corrects current
+Implementation/Limit wording, the R2 F-C summary and edit's body/Raises
+docstring: header fault or IFD0 offset past the block, cycles isolate the
+child, entry-count overflow is the further whole-block case. No function
+body, test, interface or dependency changed. All three advisories accepted;
+no false-positive rejection, reopened item or revert. No register row added.
+
+| Check | Exit | Actual result | Evidence under work/wp4.5/ |
+| --- | --- | --- | --- |
+| Requested light files: new EXIF-byte file plus test_io_photo_r1.py | 0 | 288 passed, 1 warning in 2.27s | `r4-light.log/xml` |
+| `uv run --offline ruff check src/clearwater/io/photo/exif.py` | 0 | All checks passed! | `r4-ruff.log` |
+| `uv run --offline mypy` | 0 | Success: no issues found in 141 source files | `r4-mypy.log` |
+| Read-only scope/byte/AST/result audit | 0 | Three owned files only; no test change; ASCII/LF, final newlines, no trailing whitespace; diff check clean; executable AST equal to 2923402 after docstrings stripped; JUnit confirms 288 cases / zero failures | `r4-final-audit.log` |
+
+Pytest uses `PYTHONPATH=scripts`, `--basetemp=work/wp4.5/tmp`,
+`-p sandbox_mkdir_shim`, `-p no:cacheprovider`, and
+`-m "not gpu and not footage and not gui and not slow and not fullclip"`.
+All output is file-routed under work/wp4.5. The one Pillow UserWarning is the
+existing synthetic bad-value fixture; no warning suppression added. This
+bounded documentation cleanup needs no RED test or behavioral remediation.
+
+Verification loop: checked each advisory against the existing parser/writer
+paths and supplied execution evidence, corrected only text, then confirmed
+the executable AST and tests unchanged and the requested checks green. No
+additional in-envelope defect found. Reviewer A remains converged at R4;
+Reviewer B and the final orchestrator full parallel + impacted serial gate
+are pending. No footage accessed, commit, mailbox post, configuration change
+or write outside the worktree. One logical documentation cleanup spans the
+three named files. Last supplied depth is 169,845; current depth remains
+dispatcher-read at yield, binding window 258,400.
+
 ## Reviewer A Round 3 - seat 2 adjudication
 
 Reviewer: Claude opus/high, read-only on `c7c7360`; full R3 findings supplied
@@ -277,6 +348,7 @@ no full serial leg is requested. No acceptance or convergence is claimed now.
 | A R2 | Claude opus/high, read-only on `3020648`; CHARC `72fc47f6a4ecfd91` | 0 | 1 | 1 (+4 advisory) | 6 / 0 | 6 / 0 | 0 | Product fixes F-A/B/C/F; tests/controls; report F-E and F-D Limit | NEW_CRITICAL_MAJOR_FOUND; seat 2 remediation green (907 light tests); R3 next |
 | A R3 | Claude opus/high, read-only on `c7c7360`; CHARC `85978ce0cd76c577` + turn-3 bound erratum | 0 | 1 | 1 (+2 advisory) | 3 / 1 | 4 / 0 | 0 | Product guard F-1/F-2; tests; report F-3; F-4 unchanged | NEW_CRITICAL_MAJOR_FOUND; STOP resolved; 931 light tests green; R4 next |
 | R3 pre-build check | Cell independent synthetic struct probe | 0 | 0 | 1 | 1 / 0 | 1 / 0 | 0 | 0 / 0 | Confirmed exact-bound conflict; RESOLVED: five fixed D63 insertions allowed by turn-3 erratum |
+| A R4 | Claude opus/high, read-only on `2923402` | 0 | 0 | 0 (+3 advisory) | 1 / 2 | 3 / 0 | 0 | 0 / 0; report/docstring cleanup only | NO_NEW_CRITICAL_MAJOR; first zero-blocking round; Reviewer A CONVERGED at R4 |
 
 - Suspected: the fresh IFD construction drops source type pins.
 - Confirmed independently: source trace and parsed synthetic output agree for
@@ -296,6 +368,7 @@ no full serial leg is requested. No acceptance or convergence is claimed now.
 | Seat 1 retirement / Seat 2 dispatch | Seat 1: 188,902 input tokens supplied; seat 2 depth not yet supplied; binding window 258,400 | Fresh seat 2 on clean `3020648`; evaluate at 200K, stop near 250K at a step boundary |
 | Seat 2 turn 1 yield / turn 2 dispatch | 119,808 input tokens; binding window 258,400 | R3 design guard commissioned on `c7c7360`; pre-build check before implementation |
 | Seat 2 turn 2 yield / turn 3 dispatch | 135,854 input tokens; binding window 258,400 | STOP resolved by the bound erratum; proceed with R3 RED/fix/report/light checks |
+| Seat 2 turn 3 yield / turn 4 dispatch | 169,845 input tokens; binding window 258,400 | Reviewer A converged at R4; bounded report/docstring cleanup, no behavior/test changes |
 
 ## Reviewer A Round 1 - adjudication and remediation
 

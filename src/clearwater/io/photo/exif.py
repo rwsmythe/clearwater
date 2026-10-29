@@ -319,7 +319,8 @@ def edit(source: bytes | None, width: int, height: int, *, _warn: bool = True) -
     dropped with IFD/tag warnings. A cut array keeps all whole entries with one warning naming
     the IFD and declared/kept counts; an absent next-IFD pointer is accepted. Invalid child
     offsets/cycles, empty children and unsupported IFD-valued entries are dropped. Header
-    faults and invalid IFD0 offsets/cycles raise. Only the first occurrence of each carried
+    faults or an IFD0 offset past the block raise; cycles drop only the child. An output
+    directory exceeding 65,535 entries also raises. Only the first occurrence of each carried
     pointer tag per parent is followed; later occurrences warn and are dropped. At most IFD0,
     Exif, GPS and Interop are parsed and written. Same-offset siblings are parsed per label;
     D63 dimensions affect only Exif. Written entry count is bounded by four times the source
@@ -338,7 +339,7 @@ def edit(source: bytes | None, width: int, height: int, *, _warn: bool = True) -
         The bare TIFF-structured block (no ``Exif\0\0`` prefix).
 
     Raises:
-        ValueError: The source header or IFD0 offset is invalid or unsupported, or the
+        ValueError: The source header is faulty, the IFD0 offset runs past the block, or the
             output directory has too many entries for classic TIFF.
         struct.error: A requested dimension or relocated offset cannot be represented.
     """

@@ -1,8 +1,8 @@
 # WP4.5 - EXIF byte fidelity through the photo writer
 
-Implementation and R3 remediation are complete; light verification is recorded
-below. Reviewer A R4, Reviewer B and the orchestrator's final gate remain
-pending. Product base: main `5a1538a`.
+Implementation and Reviewer A R4 cleanup are complete; light verification is
+recorded below. Reviewer A converged at R4. Reviewer B and the orchestrator's
+final gate remain pending. Product base: main `5a1538a`.
 This report contains synthetic evidence only; no real photo metadata is included.
 
 ## Root cause and mechanism decision
@@ -66,9 +66,11 @@ entry array retains every whole entry that fits, in IFD0 or a child, with one
 warning naming the IFD and declared/kept counts. A complete table needs only
 its two-byte count and 12 bytes per entry; a missing next pointer is accepted
 as zero. Invalid child offsets or cycles drop that child alone with a warning;
-empty children are pruned recursively. Header faults, invalid IFD0 offsets
-and root cycles raise; `sanitise()` drops the block and `from_tiff()` returns
-None with a warning. One faulty IFD0 value does not discard the whole block.
+empty children are pruned recursively. Header faults or an IFD0 offset past
+the block raise; `sanitise()` drops the block and `from_tiff()` returns None
+with a warning. Cycles drop only the child; IFD0 cannot form a cycle. Output
+directory entry-count overflow is the further whole-block case noted below.
+One faulty IFD0 value does not discard the whole block.
 The sanitise trial edit suppresses entry warnings using a private, default-loud
 keyword; the writer's actual edit warns once per dropped entry.
 
@@ -171,7 +173,10 @@ used `-m "not gpu and not footage and not gui and not slow and not fullclip"`,
   superseded by the R3 guard.
 - Reviewer A R3: 1 major, 1 minor (out of envelope) and 2 advisory findings;
   adjudicated under CHARC `85978ce0cd76c577` and the turn-3 bound erratum;
-  guard remediation green. R4 pending, no convergence claim.
+  guard remediation green.
+- Reviewer A R4: NO_NEW_CRITICAL_MAJOR, three advisories; documentation-only
+  cleanup complete. First round with zero new critical or major, so Reviewer A
+  converged at R4.
 - Reviewer B: pending.
 - Full parallel leg: @@PAR@@
 - Impacted serial nodes: @@SER@@
@@ -224,7 +229,7 @@ Fresh Codex seat 2 remediated under CHARC `72fc47f6a4ecfd91`:
 | --- | --- |
 | F-A, major | FIXED by the R3 guard below, together with R3 F-1. R2's exact-offset cache was incomplete: distinct overlapping offsets still multiplied child entries. The superseded R2 candidate had 454 physical entries for A=B=C=150; pre-R2 had 3,397,952. The current guard drops duplicate pointers and has 156 entries. No timing bound. Distinct from R1 F7 shared values. |
 | F-B, minor | FIXED. Accept complete arrays without a next-IFD pointer in IFD0 and GPS; output next pointers remain zero. |
-| F-C, advisory, ruled amendment | FIXED under the new rule: retain all whole entries from a cut array, warn once with the IFD and declared/kept counts. Root header/offset/cycle faults raise; child offset/cycle faults drop only that child. Supersedes whole-table rejection wording and WP4.5 test controls. |
+| F-C, advisory, ruled amendment | FIXED under the new rule: retain all whole entries from a cut array, warn once with the IFD and declared/kept counts. Header faults or an IFD0 offset past the block raise; child offset/cycle faults drop only that child. Entry-count overflow is the further whole-block Limit named at R4. Supersedes whole-table rejection wording and WP4.5 test controls. |
 | F-D, advisory, ruled Limit | Existing type-9 pointer drop retained with an IFD/tag warning; four passing regression controls cover both routes/orders. No pointer-type widening. |
 | F-E, advisory | Report F-A as fixed separately from the shared-value Limit and replace obsolete damage wording. |
 | F-F, advisory | FIXED. Quiet sanitise trial edit, default-loud writer edit. Synthetic read_photo + write_photo tests require one rewriter warning per bad-value, duplicate-D63 or unsupported-pointer entry. |
@@ -300,7 +305,43 @@ Interop cannot recurse, so at most four tables are parsed. Offsets equal to
 ancestors still drop the cyclic child; equal sibling offsets get fresh lists
 under their own labels. Entry value relocation/type/count/order behavior and
 the F-C cut-array rule are unchanged. All new warnings name IFD/tag only.
-Reviewer A R4, Reviewer B and the final orchestrator gate remain pending.
+R3's candidate proceeded to R4; that round's result is recorded below.
+
+## Reviewer A R4
+
+Claude opus/high, read-only on `2923402`, returned
+`NO_NEW_CRITICAL_MAJOR`: the first round with zero new critical or major
+findings, so Reviewer A converged at R4. The three advisories require only
+this report and the edit docstring cleanup; no behavior or test change.
+
+- A-1, out of envelope: clarify the repeated-same-tag variation of F7 while
+  retaining its worst-case comparison to the base.
+- A-2, out of envelope: name the 65,535-entry IFD0 overflow Limit; no code fix.
+- A-3, in envelope: remove the impossible root-cycle raise claim and distinguish
+  header/IFD0-offset rejection from child-cycle isolation and entry overflow.
+
+The reviewer checked 3,000 valid blocks / 85,545 entries, with no edit-route
+fidelity mismatch; the twelve from_tiff differences were ruled structure-tag
+drops. Its 20,000 mutated/truncated inputs produced 54,865 valid outputs,
+with at most four tables and the corrected +5 bound. Layout, ordinary-photo
+views, D63, grant and scope checks held. These are supplied reviewer checks.
+
+Dispatcher-seat evidence on `2923402`: ruff format/check and LF/ASCII clean;
+the real-photo round-trip node passed **1 test in 263.93 s**. This precedes the
+documentation-only cleanup and is not the final orchestrator gate. Reviewer B
+and the final full parallel + impacted serial gate remain pending.
+
+Cleanup checks at the cell: `tests/test_io_photo_exif_bytes.py` plus
+`tests/test_io_photo_r1.py`, **288 passed, 1 warning in 2.27 s**, exit 0, with
+the sandbox shim, work temp root and the same five-marker exclusion. Targeted
+ruff check: exit 0, All checks passed. Strict mypy: exit 0, no issues in 141
+source files. No test changed. A read-only AST comparison against `2923402`,
+after stripping docstrings, confirms identical executable code. Final scope
+and byte checks pass: exactly report/ledger/exif.py, ASCII/LF-only, final
+newlines, no trailing whitespace, clean `git diff --check`. Evidence:
+`work/wp4.5/r4-light.log/xml`, `r4-ruff.log`, `r4-mypy.log`,
+`r4-final-audit.log`. The one Pillow warning is the previously recorded
+synthetic bad-value fixture. No behavior change or additional review round.
 
 ## Verification loop and limits
 
@@ -334,12 +375,19 @@ Named limits:
 - Classic TIFF field types 1-12 are supported; type 13 is supported at carried
   pointer positions. Unknown types or invalid value extents/offsets drop only
   that entry with an IFD/tag warning. Cut arrays retain whole entries with one
-  count warning; header/root-offset/cycle faults discard the block, child
-  offset/cycle faults discard only that child. Empty children are omitted.
+  count warning; header faults or an IFD0 offset past the block discard the
+  block, while child offset/cycle faults discard only that child. IFD0 cannot
+  form a cycle. Empty children are omitted.
+- An IFD0 already at 65,535 entries cannot take required D63 insertions: edit
+  raises and sanitise drops the block; this is out of envelope and the base
+  failed as well.
 - Hostile inputs can make many entries share one large source value. Relocation
   copies each value separately and can substantially increase output size and
-  memory use. Reviewer R1 reproduced the same behavior in the base; CHARC F7
-  accepts it as an out-of-envelope limit without remediation or a register row.
+  memory use. Repeated SAME-tag entries sharing a value amplify where the base
+  collapsed them into one key; the worst-case order matches the base, reachable
+  with distinct tags. Reviewer R1 reproduced that distinct-tag behavior in the
+  base; CHARC F7 accepts it as an out-of-envelope limit without remediation or
+  a register row.
 - Entry offsets and word padding can change; IFD1 is deliberately absent.
   The fidelity guarantee concerns retained entry types, counts and value bytes.
 
