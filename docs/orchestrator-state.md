@@ -7,18 +7,30 @@
 
 - **Generation 17 (`clearwater-orchestrator-20261028-1101`) picked up 2026-10-28 ~21:02Z at main `f706cc8`.** Bash gauge 34 ms.
   Scratchpad `C:\Users\rwsmy\AppData\Local\Temp\claude\C--Users-rwsmy-clearwater\feaa0684-02d2-4ce5-b7f4-580591a16a9c\scratchpad\`.
-  - **WP4.1:** cell 3 (`wp41-cell3`, opus-high, background) DISPATCHED from `dca6d1e` (prompt `dispatch-wp4.1-cell3.md`), depth 0.
-    R2 on `dca6d1e`: 0/2/5 (G1 the `\\?\` spelling defeats `inside()`; G2 F1 reopened), GO all seven; remediated `69e29a9`,
-    `4d80289`, `899102d` (depth 93,956 at the R2 yield). R3 on `899102d`: 0/1/6; H1 (nclx-only P3 HEIC preview unconverted,
-    WP3.16 gui code) STOP -> CHARC RULED (A) BANK to WP4.3 `5fab48cc2a5174cb` (four conditions; report Limits sentence
-    verbatim; register row at accept). H2-H4 downgraded (upheld). Cell 3 at 208,313 (R3 yield 21:56Z): doing the six minors,
-    then RESUME HERE for cell 4, stand down. Cell 4: R4, report FINAL, return report; its suite = my stacked candidate gate
-    if CHARC agrees (query posted 22:44Z).
-  - **WP-T5:** turn 4 `259a219` (w2b/w3 scripts). **W2b** 21:20-21:26Z PASS (both controls caught by name, restored 0 CR).
-    **W3** 21:57-22:44Z PASS: parallel 4174/1 509.95 s, serial 1104/10 2,261.41 s, collections identical, SAVING 536.97 s
-    (> 110). Turn 5 (report + ledger) RUNNING (prompt-5). Then Reviewer A (FAST, `codex_cell.py review`), the gate (stacked,
-    main-work config).
-  - Slip: one bare `cd` into the Claude projects dir at pickup (no cell live), reverted next call.
+  - **WP-T5 ACCEPTED 2026-10-29 ~00:37Z, main `4933a45`** (record `docs/proofs/wp-t5-accept.md`). CHARC QA CONFIRMED
+    (`029596e48a5b4d06`); DR-65 CLOSED and CLAUDE.md figure at `3114d23`. Worktrees `wp-t5`, `wp-t5-mc` REMOVED (logs copied to
+    `work\wp-t5\worktree-logs\`, 124 files); branches kept. Turns 4-6 (W2b/W3 scripts; report; R1 cleanup); W2b + W3 at my seat;
+    R1 (Claude pass) 0/0/2/5; Reviewer B (Claude pass) 0/0/1/5; STACKED gate on `aefd563` (WP-T5 + WP4.1) GREEN: parallel
+    4473/1 616.56 s, serial 1126/1 2,511.76 s; WP-T5 merged ALONE on those figures (CHARC `870c8ddeb64b4e12` Q3).
+  - **WP4.1 -- AT ITS OWN GATE (RESUME HERE if I die).** Cells 3 and 4 both stood down (final 238,831 / 283,239): R2-R5 done
+    (R5 clean at the five-round gate). Reviewer B pass 1 BLOCKING (B1 ADS via hard link, CONFIRMED at my seat) -> CHARC Q1 one
+    structural write-target predicate, design guard CLOSED; cell 4 remediated (`7003de7` etc.). **Reviewer B pass 2** (`wp4.1-mc2`
+    `0986b8d`) BLOCKING 1/3 -> ADJUDICATED AT THE GATE, UPHELD by CHARC `80bbf403266651df`: B2-1 banked to WP4.2 with the Limit,
+    B2-2..B2-4 MINOR banked to WP4.2. Candidate **`wp4.1-mc3`** = `wp4.1` `3b8b43b` rebased onto `4933a45` (patch-id 8ff10e7b,
+    code-identical to `0986b8d`) + my Erratum `96d72c7` (docs). **Accept record DRAFTED UNCOMMITTED** in
+    `.worktrees/wp4.1-mc3/docs/proofs/wp4.1-accept.md` with `GATE_FIGURES` / `HARNESS_FIGURES` placeholders.
+    **Own two-leg gate RUNNING** from 00:40:05Z in `.worktrees/wp4.1-mc3` (logs `work/wp41-gate-parallel.log`,
+    `work/wp41-gate-serial.log` there; expect 4473/1 + 1126/1). NEXT: fill the record; harness gate; `git add` +
+    commit the record in mc3; main moved to `d86e6dd`+ (CHARC docs), so rebase mc3 onto main (docs only; patch-id check);
+    ask CHARC (gen 6) to HOLD; ff; uv sync; ruff/format/harness on main; CR check; release post; operator FYI. Then remove
+    worktrees `wp4.1`, `wp4.1-mc`, `wp4.1-mc2`, `wp4.1-mc3` (stack logs copied to `work\wp4.1\stack-gate-logs\`) after CHARC QA.
+    CHARC's register rows owed at the accept: H1 -> WP4.3 (binding), B2-1 -> WP4.2 (binding), B2-2..B2-4 -> WP4.2 (minor), G5,
+    importer OverflowError (J1's twin).
+  - **CHARC gen 5 ROLLED ~00:47Z** (state `d86e6dd`); gen 6's session name comes in its announce: re-read
+    `comms/.launch-sessions.json` before every cue.
+  - Phase 4 next after WP4.1: WP4.2 brief revision -> FINAL on CHARC's word (binds B2-1..B2-4, DR-67, DR-71/73(a)/74), then dispatch.
+  - Slips: two bare `cd`s (pickup into the projects dir; one into `wp-t5-mc` at the WP-T5 accept), no cell live, each reverted
+    next call. Lesson: a new file in a worktree needs `git add` before a pathspec commit.
 
 - **Generation 16 ROLLED OVER 2026-10-28 ~21:05Z at ~421K (depth cap), at a clean boundary: no window open, no cell
   working (WP4.1 cell 2 STOOD DOWN at its READY-FOR-R2 yield; the WP-T5 Codex session idle between turns). GENERATION 17
