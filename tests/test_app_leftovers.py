@@ -57,23 +57,28 @@ def test_the_journal_records_one_absolute_folder_per_entry(tmp_path: Path) -> No
 
 
 @pytest.mark.parametrize(
-    "text",
+    "data",
     [
-        "not json",
-        '{"format_version": 2, "entries": []}',
-        '{"format_version": 1, "entries": [{"id": "x", "folder": "relative"}]}',
-        '{"format_version": 1, "entries": "none"}',
-        "[" * 100000,
+        b"not json",
+        b'{"format_version": 2, "entries": []}',
+        b'{"format_version": 1, "entries": [{"id": "x", "folder": "relative"}]}',
+        b'{"format_version": 1, "entries": "none"}',
+        b"[" * 100000,
+        b"\xff",
+        b'{"format_version": 1, "entries": [{"id": "\xe9", "folder": "/x"}]}',
     ],
-    ids=["text", "version", "relative", "shape", "deep"],
+    ids=["text", "version", "relative", "shape", "deep", "not-utf8", "latin1-inside"],
 )
 def test_an_undecodable_journal_is_set_aside_and_read_as_empty(
-    tmp_path: Path, caplog: pytest.LogCaptureFixture, text: str
+    tmp_path: Path, caplog: pytest.LogCaptureFixture, data: bytes
 ) -> None:
-    """Ruling S6: renamed ``write-journal.json.bad-<UTC stamp>``, logged, read as empty."""
+    """Ruling S6: renamed ``write-journal.json.bad-<UTC stamp>``, logged, read as empty.
+
+    The encoding failures (R1-1, ruling d530b564) take the same set-aside as the decode ones.
+    """
     config = tmp_path / "config"
     config.mkdir()
-    (config / JOURNAL_FILE_NAME).write_text(text, encoding="utf-8")
+    (config / JOURNAL_FILE_NAME).write_bytes(data)
     journal = WriteJournal(config)
     with caplog.at_level(logging.WARNING, logger=startup.__name__):
         assert journal.entries() == ()
@@ -122,6 +127,34 @@ def test_the_clean_up_removes_temporaries_keeps_the_rest_and_clears_the_journal(
     assert all(not p.exists() for p in removed) and all(p.exists() for p in kept)
     assert journal.entries() == ()
     assert all(str(p) in caplog.text for p in removed)  # N9
+
+
+def test_a_folder_whose_clean_up_failed_keeps_its_entry_until_it_succeeds(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """R1-3 (ruling d530b564): an entry stays until its folder's clean-up has succeeded."""
+    locked, clean = tmp_path / "locked", tmp_path / "clean"
+    for folder in (locked, clean):
+        folder.mkdir()
+    journal = WriteJournal(tmp_path / "config")
+    kept_id = journal.add(locked)
+    journal.add(clean)
+    planted = _temporary(locked)
+    real_unlink = os.unlink
+
+    def refuse(path: str) -> None:
+        if Path(path) == planted:
+            raise PermissionError("in use")
+        real_unlink(path)
+
+    monkeypatch.setattr(safe_write_module.os, "unlink", refuse)
+    report = clean_leftovers(cpu_settings(), journal)
+    assert [path for path, _ in report.failed] == [planted] and planted.exists()
+    assert journal.entries() == ((kept_id, locked),)  # the clean folder's entry is cleared
+    monkeypatch.setattr(safe_write_module.os, "unlink", real_unlink)
+    report = clean_leftovers(cpu_settings(), WriteJournal(tmp_path / "config"))  # the next start
+    assert report.removed == (planted,) and not planted.exists()
+    assert journal.entries() == ()
 
 
 # V11 and the footage-absence test on the running shell.

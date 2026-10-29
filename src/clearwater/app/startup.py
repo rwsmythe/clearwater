@@ -4,10 +4,12 @@ Spec D85 and 8.4: outputs are written to a temporary name and renamed on success
 leftovers of a crash are cleaned up on the next start. The folders scanned are the configured
 output folder plus the folders of a small journal of in-flight writes (WP3.13 question 3 and
 WP4.3 question 3 as ruled): each export job adds its destination folder before it can write a
-temporary and removes it when it returns, so a crash leaves the entry and the next start scans
-that folder with WP3.13's ``remove_leftovers`` (unchanged), then clears the scanned entries. A
-folder is never scanned only because a source lies there. The cache folder is cleaned by the
-proxy cache's own open.
+temporary and removes it when it returns with that folder clean, so a crash (or a temporary that
+could not be removed) leaves the entry and the next start scans that folder with WP3.13's
+``remove_leftovers`` (unchanged), then clears the entries of the folders it left clean; an entry
+stays until its folder's clean-up has succeeded (R1-3, ruling d530b564). A folder is never
+scanned only because a source lies there. The cache folder is cleaned by the proxy cache's own
+open.
 
 Qt-free: the entry point (:mod:`clearwater.app.main`) runs these on the threads the round-0
 table names; nothing here touches a Qt object.
@@ -17,6 +19,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import threading
 import time
 import uuid
@@ -27,7 +30,7 @@ from typing import Any
 
 from clearwater.config import atomic_write_text
 from clearwater.interfaces import ArrayBackend, JobResult, Progress, Settings
-from clearwater.jobs import LeftoverReport, remove_leftovers
+from clearwater.jobs import LeftoverReport, is_temporary_name, remove_leftovers
 
 from .composition import DeferredProxyCache
 
@@ -49,8 +52,10 @@ class WriteJournal:
     The file is ``config_dir/write-journal.json``: ``{"format_version": 1, "entries": [{"id":
     "<hex>", "folder": "<absolute folder>"}]}``, written with ``config.atomic_write_text``. One
     process-local lock guards every read-modify-write (one application process per app-data
-    folder, the declared envelope). A file that cannot be read or decoded is renamed beside
-    itself to ``write-journal.json.bad-<UTC stamp>``, logged, and read as empty (ruling S6).
+    folder, the declared envelope). A file that cannot be decoded (not UTF-8, not JSON, not a
+    version-1 journal) is renamed beside itself to ``write-journal.json.bad-<UTC stamp>``,
+    logged, and read as empty (ruling S6); a file that cannot be read is logged and read as
+    empty.
     Thread-safe; the export jobs call it from their worker threads.
 
     Args:
@@ -121,15 +126,15 @@ class WriteJournal:
     def _read(self) -> list[dict[str, str]]:
         """Read the entries (under the lock); an unreadable file is set aside and read as empty."""
         try:
-            text = self._path.read_text(encoding="utf-8")
+            data = self._path.read_bytes()
         except FileNotFoundError:
             return []
         except OSError as error:
             _LOG.warning("write journal %s could not be read: %s", self._path, error)
             return []
         try:
-            entries = _decode(json.loads(text))
-        except (ValueError, RecursionError) as error:
+            entries = _decode(json.loads(data.decode("utf-8")))
+        except (UnicodeDecodeError, ValueError, RecursionError) as error:
             self._set_aside(str(error))
             return []
         return entries
@@ -204,12 +209,39 @@ def leftover_folders(settings: Settings, journal_folders: Iterable[Path]) -> tup
     return tuple(folders)
 
 
+def holds_leftovers(folder: Path) -> bool:
+    """Return True unless ``folder`` is known to hold no temporary output file (D85).
+
+    A folder that does not exist holds none. A folder that cannot be listed may hold one, so it
+    counts as holding one: its journal entry stays (R1-3, ruling d530b564).
+
+    Args:
+        folder: A journal entry's folder.
+
+    Returns:
+        True when the folder holds a regular file named like a temporary output, or cannot be
+        listed; False when it is listed and holds none, or does not exist.
+    """
+    try:
+        with os.scandir(folder) as entries:
+            return any(
+                is_temporary_name(entry.name) and entry.is_file(follow_symlinks=False)
+                for entry in entries
+            )
+    except FileNotFoundError:
+        return False
+    except OSError:
+        return True
+
+
 def clean_leftovers(settings: Settings, journal: WriteJournal) -> LeftoverReport:
-    """Remove the leftover temporaries of a crash, then clear the scanned journal entries (D85).
+    """Remove the leftover temporaries of a crash, then clear the entries of the cleaned folders.
 
     Runs before any export or batch job can start (DR-35 (c)): the entry point calls it on the
     interface thread before it attaches the panels. Every removed file and every failure is
-    logged (N9). A journal that cannot be written afterwards is logged; the entries stay and are
+    logged (N9). An entry whose folder still holds a temporary afterwards (a removal failed, or
+    the folder cannot be listed) stays and is scanned again at the next start (R1-3, ruling
+    d530b564). A journal that cannot be written afterwards is logged; the entries stay and are
     scanned again at the next start.
 
     Args:
@@ -226,8 +258,11 @@ def clean_leftovers(settings: Settings, journal: WriteJournal) -> LeftoverReport
         _LOG.info("removed a leftover temporary file: %s", path)
     for path, error in report.failed:
         _LOG.warning("a leftover temporary file could not be removed: %s: %s", path, error)
+    unclean = {folder for folder in {folder for _, folder in entries} if holds_leftovers(folder)}
+    for folder in sorted(unclean):
+        _LOG.warning("the write journal keeps %s until its clean-up succeeds", folder)
     try:
-        journal.drop(entry_id for entry_id, _ in entries)
+        journal.drop(entry_id for entry_id, folder in entries if folder not in unclean)
     except OSError as error:
         _LOG.warning("the write journal could not be cleared: %s", error)
     return report
