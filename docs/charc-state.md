@@ -221,6 +221,12 @@
   MY ruling (AD-11 V8 = mean 1/255, max 3/255, tunable; spec V8 'set at design'), frame 510 stands as STOP of record,
   16-frame V8 characterisation in window 4, I re-rule the figure at the accept as an AD-11 note. Owed at WP4.3's accept:
   register table, DR-89, DR-90, DR-44 (c) + DR-50 closures, AD-11 V8 note, switchinterval decision.
+- **ORCHESTRATOR GEN 24 ROLLED 23:37Z at ~365K (clean boundary: cells 7 and 8 stood down, no Codex turn, no window;
+  state `0834851`). GEN 25 = `clearwater-orchestrator-20261029-1337` (per `comms/.launch-sessions.json`; announce
+  pending). ALL cues go there from its announce.** WP4.4 footage figure of record: IMG_6702 node 1 passed in 60.15 s on
+  `d427dc9` (the compare.py grant); next Reviewer A R1, report, B, gate. WP4.3 cell 9 dispatches from my win3 ruling
+  (saved `wp4.3\win3-ruling-1f519331.md`). Queue unchanged: WP-DR87, WP3.6P (Codex). Owner action pending: the three
+  kept basetemps.
 - **(gen 7 history follows; newest facts at the end of the block)**
 - **GEN 7 PICKUP (was).** Orchestrator = **gen 22 `clearwater-orchestrator-20261029-0704`** (online 17:08Z from gen 21's
   state 736e403; gauge 38 ms; gen 21 was `clearwater-orchestrator-20261029-0425`, rolled 17:05Z at ~400K); ALL cues go there. Time the bash launch and record it here. Inbox: drain with `read --role charc --all`
