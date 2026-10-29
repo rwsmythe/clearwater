@@ -2,7 +2,8 @@
 
 Status: rungs 0-4 complete; Reviewer A round 1 returned zero critical/major,
 three minor and eight advisory findings. Its single cleanup adds the F2/F3
-checker guards; W2b re-proof is pending. Reviewer B and the one final two-leg
+checker guards; W2b re-proof passed and R1 is converged, with no round 2 under
+Q11. Reviewer B and the one final two-leg
 gate are pending. The AFTER comparison below is intentionally unfilled.
 W3 is development evidence; W4 proves the retained full forms and is not a
 V16 row. Review source: `work/wp-t6/rA1/review-r1.txt`; adjudication is in the
@@ -210,10 +211,10 @@ groups instead of raising before the packet checks.
 |---|---|---|
 | 4(a) | N >= 66 | PASS |
 | 4(b) | Video packet count equals N **and** first N packet tuples agree in decode order by PTS, duration, size, flags and MD5 | PASS; count and packet clauses are separate named sub-results in the checker |
-| 4(c) | Time base 1/30000 and sorted PTS exactly `[k * 1001 for k in range(N)]`; cleanup also requires the source packet at N to carry `K` and have PTS equal to planned T | Original PTS check PASS in W1/W2; new `4c_cut_on_keyframe` passes synthetic controls, W2b pending (F3) |
+| 4(c) | Time base 1/30000 and sorted PTS exactly `[k * 1001 for k in range(N)]`; cleanup also requires the source packet at N to carry `K` and have PTS equal to planned T | Original PTS check PASS in W1/W2; W2b parity PASS and N=75 `4c_cut_on_keyframe` FAIL, caught (F3; `work/wp-t6/w2b/01-trim.log`, `03-non_keyframe.json`) |
 | 4(d) | Same roster multiset and paired video size/pixel format/colour/rotation, audio sample rate/channels, `gpmd`/`tmcd` presence | PASS under R-a's pairing |
 | 4(e) | Filtered tag dictionaries agree under scoped R-c exceptions and R-e's semantic rule; location-like keys agree in presence | PASS |
-| Data packets | Copied packet prefix agrees without decoding; cleanup also requires its count to equal source packets with PTS strictly before T | Original prefix check PASS: three trim `gpmd` packets from 23 source packets; new count guard passes synthetic controls, W2b pending (F2) |
+| Data packets | Copied packet prefix agrees without decoding; cleanup also requires its count to equal source packets with PTS strictly before T | Original prefix check PASS: three trim `gpmd` packets from 23 source packets; W2b parity PASS, truncated-data count FAIL with prefix PASS, caught (F2; `work/wp-t6/w2b/03-truncated_data.json`) |
 
 The fixture asserts all five checks and copied data equality before any
 consumer runs; the dedicated parity test repeats these named assertions.
@@ -224,8 +225,9 @@ callers derive T independently as the first source keyframe at or after
 three seconds. The cut result is conjoined into 4(c). Data records expose
 the expected count before T, count equality and packet equality separately;
 the existing data assertion requires their conjunction. These cleanup changes
-are proved synthetically in `work/wp-t6/rA1-cleanup-synthetic.log`; the four
-real controls and positive parity run are requested in `work/wp-t6/w2b.sh`.
+are proved synthetically in `work/wp-t6/rA1-cleanup-synthetic.log` and now
+re-proved by the positive parity pass and four caught real controls under
+`work/wp-t6/w2b/`; the cumulative ledger records their verified checksums.
 
 Scoped `ALLOWED_TAG_DIFFS` is format {`major_brand`, `minor_version`,
 `compatible_brands`, `encoder`}; all streams {`handler_name`, `language`};
@@ -328,6 +330,7 @@ unprofiled baseline time remains the map's timing source.
 | W2 run 1 | Parity passed; guard stopped on two strict-marker failures; marker registered early | `docs/proofs/wp-t6-ledger.md`, W2 run-1 facts / seat-2 turn 1 |
 | W2 run 2 | Parity 1 passed in 3.63 s; guard 60 passed in 41.20 s; controls STOPPED: pairing assertion prevented re-encode result; N+1 alone was masked | `work/wp-t6/w2-run2/`, recorded in ledger; resolved by CHARC controls ruling |
 | W2 run 3 | Parity 1 passed in 3.57 s; guard 60 passed in 41.55 s; both controls caught; W2 DONE EXIT 0; scratch/trim cleanup clean | `work/wp-t6/w2/01-trim.log`, `02-guard.log`, `03-reencode.json`, `03-extra_frame.json`, `04-cleanup.json`; ledger W2 DONE |
+| W2b, R1 cleanup re-proof | Parity 1 passed in 3.29 s; guard 60 passed in 41.67 s; all four controls caught; W2b DONE EXIT 0; scratch and both basetemps removed | `work/wp-t6/w2b/01-trim.log`, `02-guard.log`, four `03-*.json` control records, `04-cleanup.json` |
 | W3 run 1 | Eight passed in 322.26 s; V4 comparison stopped on dispatcher reference-path slip, before controls | `work/wp-t6/w3-run1/`; ledger reference-path correction |
 | W3 run 2 | Eight passed in 258.91 s; one standard encode, one engine record, MANDATORY/REQUIRED and roster SAME; branch (i), both controls caught; W3 DONE EXIT 0 | `work/wp-t6/w3/01-serial.log`, `01-serial.json`, `02-engine-v4-names.json`, `03-v4-delta.json`, control JSON and `06-cleanup.json` |
 | W4 | Seven passed, 6,450 deselected in 1,556.05 s; W4 DONE EXIT 0; full sink both count operands 681; zero trim setups; cleanup clean | `work/wp-t6/w4/01-fullclip.log`, `02-fullclip-check.json`, `03-cleanup.json`, `w4-fullclip.xml` |
@@ -341,8 +344,10 @@ The final controls and rejection sites are:
 
 | Control | Rejection / evidence |
 |---|---|
-| Re-encode trim | 4(b) FAIL: count PASS, packets FAIL; 4(d)/4(e) FAIL. Video codec groups `hvc1` and `hev1` differ; checker returns rather than raising. `work/wp-t6/w2/03-reencode.json` |
-| Late cut plan | Both `-frames:v 91` and `-t` one frame later; 4(b) FAIL: count FAIL, first-N packets PASS; 4(c) FAIL; 4(d)/4(e) PASS. `work/wp-t6/w2/03-extra_frame.json` |
+| Re-encode trim | 4(b) FAIL: count PASS, packets FAIL; 4(d)/4(e) FAIL. Video codec groups `hvc1` and `hev1` differ; checker returns rather than raising. W2b repeats these results; cut sub-result PASS, data verdict FAIL through pairing mismatch. `work/wp-t6/w2/03-reencode.json`, `work/wp-t6/w2b/03-reencode.json` |
+| Late cut plan | Both `-frames:v 91` and `-t` one frame later; 4(b) FAIL: count FAIL, first-N packets PASS; 4(c) FAIL; 4(d)/4(e) PASS. W2b repeats these results; cut sub-result and data count PASS. `work/wp-t6/w2/03-extra_frame.json`, `work/wp-t6/w2b/03-extra_frame.json` |
+| Non-keyframe plan | W2b N=75: 4(c) and `4c_cut_on_keyframe` FAIL; video count/packets PASS; data count also FAIL; caught by the required F3 sub-result. `work/wp-t6/w2b/03-non_keyframe.json` |
+| Truncated data | W2b 1 copied packet versus 3 expected before T: count FAIL, prefix PASS, `equal=false`; all 4(a)-(e) PASS and `failed_checks=[]`, but the fixture's separate `data_packet_checks[*].equal` assertion rejects it, as adjudicated for F2. `work/wp-t6/w2b/03-truncated_data.json` |
 | Draft yielded as standard | Levels `[trim]` fails `level is not None and level.name == expected[quality]`; expected pytest EXIT 1, control verified | `work/wp-t6/w3/04-draft-control.json` |
 | Reference shortened | R5 `[trim]` fails `len(footage_reference) == footage_frames`, 90 -> 89; expected pytest EXIT 1, control verified | `work/wp-t6/w3/05-reference-control.json` |
 
@@ -465,7 +470,7 @@ Reviewer B, may fill this section. W3 and W4 figures above are not substitutes.
 | KEEP rows' individual spread and aggregate noise estimate | PENDING matched final-gate durations versus historical map; state missing rows |
 | Q6 verdict | PENDING: seven-CUT reduction must be strictly more than 110 s, with timing categories reconciled; report leg wall alongside |
 | 900 s target | PENDING observed serial wall; informational, not pass/fail |
-| Reviewer A rounds / findings / convergence; Reviewer B return | R1: zero critical/major, three minor, eight advisory; cleanup F2/F3 is result-bearing and W2b re-proof is PENDING; B PENDING. Source: `work/wp-t6/rA1/review-r1.txt`, cumulative ledger |
+| Reviewer A rounds / findings / convergence; Reviewer B return | R1: zero critical/major, three minor, eight advisory; result-bearing F2/F3 cleanup re-proved in W2b, R1 converged with no round 2 under Q11; B PENDING. Source: `work/wp-t6/rA1/review-r1.txt`, `work/wp-t6/w2b/`, cumulative ledger |
 
 Static checks for this report turn and any remaining format/mypy verification
 are recorded in the cumulative ledger. No complete package/gate acceptance
