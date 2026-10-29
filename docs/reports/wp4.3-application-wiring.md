@@ -66,17 +66,21 @@ V7 (WP3.16's 10 ms probe; longest gap, p99, ticks). Gate forms on the fixture cl
 
 | Scenario | Gate form (fixture) | Window (GX011627) | Stub era |
 |---|---|---|---|
-| (a) analysis | 13.0 / 11.0 ms, 239 ticks | pending | WP3.18 12-39 ms |
-| (b) scrubbing during it | 13.0 / 12.0 ms, 249; 37 scrub moves during the analysis | pending | WP3.18 12-39 ms |
-| (c) File > Export | 12.0 / 11.0 ms, 437 | pending | WP3.19 11-13 ms |
+| (a) analysis | 19.0 / 17.0 ms, 257 ticks | pending | WP3.18 12-39 ms |
+| (b) scrubbing during it | 22.0 / 18.0 ms, 256; 62 proxies shown during the analysis | pending | WP3.18 12-39 ms |
+| (c) File > Export | 19.0 / 17.0 ms, 455 | pending | WP3.19 11-13 ms |
 | (d) a 300-still batch (DR-50) | 34.0 / 14.0 ms, 948 | pending | WP3.19 11-13 ms (2 items) |
-| (e) a 1:1 4K render during (c) | 25.0 / 15.0 ms, 1135; 1 render at 1:1 during the export | pending | WP3.16 11-12 ms |
+| (e) a 1:1 4K render during (c) | 57.0 / 24.0 ms, 1491; 1 render with k = 1 delivered inside the export sink's write | pending | WP3.16 11-12 ms |
 | (f) start-up, slow cache open | 35.0 / 12.0 ms, 338; the analysis waited for the open | pending | none |
 
-Each gate form now witnesses its workload (R1-12). The fixture clip's export ends before a 1:1 4K
-render does, so (e) arranges the overlap: the export's encode starts once the 1:1 view is asked
-for and its job returns only after a 1:1 render arrived. The figures above are from cell 4's
-targeted run (2026-10-29, after WP-T6's serial leg; a shared host).
+Each gate form witnesses its workload, derived from the scenario text quoted in its docstring
+(R1-12; R3-3 and R3-4). (b) counts the stored proxies the preview shows while the analysis phase
+is running, not slider moves. (e) counts the delivered renders of the photo with `k == 1` while
+the export's sink is inside a `write`: the fixture clip's encode ends before a 1:1 4K render
+does, so the sink holds its first `write` in progress (the frame written, the call not returned)
+until such a render has been delivered, and the 1:1 view is asked for only once that write has
+begun. Rows (a), (b), (c) and (e) are from cell 6's targeted run, (d) and (f) from cell 4's
+(2026-10-29; a shared host).
 
 V8 (AD-11 as amended) on the shell, (mean, p99, max) in [0, 1] units, the preview's uint8 against
 the exported 16-bit PNG: smooth synthetic scene k = 1 exact (within the 16-bit step), k = 2

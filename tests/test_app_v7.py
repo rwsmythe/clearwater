@@ -137,12 +137,25 @@ def scenario_a_analysis(qtbot: Any, application: Application, clip: Path) -> Fig
 
 
 def scenario_b_scrubbing(qtbot: Any, application: Application, clip: Path) -> Figures:
-    """(b) Scrubbing the stored proxies while the analysis runs."""
+    """(b) Scrubbing the stored proxies while the analysis runs.
+
+    The scenario text, verbatim. Spec V7: "**V7 Responsiveness:** UI responds within 100 ms
+    during analysis, export and batch processing (D66)." Brief question 10 (ruled: all six),
+    scenario (b): "scrubbing during that analysis", where (a) is "GX011627 analysis on the GPU
+    while the timeline updates (F-2 included)".
+
+    The witness follows from that text (R3-4, the second reopen of R1-12): scrubbing is the
+    stored proxies SHOWN as the slider moves, so ``proxies_shown_during_analysis`` counts the
+    proxies the preview widget displays (its ``set_proxy``) while the analysis phase is
+    ``running``; the slider moves only drive it and are not counted.
+    """
     window = application.window
     timeline = _panel(application, TimelinePanel)
     slider = timeline.slider()
+    widget = window.preview_widget
+    real_set_proxy = widget.set_proxy
     state = {"value": 0, "down": False}
-    moves = {"during_analysis": 0}
+    shown = {"proxies_shown_during_analysis": 0}
 
     def scrub() -> None:
         if window.session.analysis().phase != "running":
@@ -155,7 +168,11 @@ def scenario_b_scrubbing(qtbot: Any, application: Application, clip: Path) -> Fi
             state["down"] = True
         state["value"] = (state["value"] + 3) % (top + 1)
         slider.setValue(state["value"])
-        moves["during_analysis"] += 1
+
+    def set_proxy(before: Any, after: Any) -> None:
+        real_set_proxy(before, after)
+        if window.session.analysis().phase == "running":
+            shown["proxies_shown_during_analysis"] += 1
 
     mover = QTimer()
     mover.setInterval(40)
@@ -165,6 +182,7 @@ def scenario_b_scrubbing(qtbot: Any, application: Application, clip: Path) -> Fi
         window.open_path(clip)
         mover.start()
 
+    widget.set_proxy = set_proxy  # type: ignore[method-assign]
     try:
         figures = measured(
             qtbot, "(b) scrubbing", start, lambda: window.session.analysis().phase == "complete"
@@ -172,7 +190,8 @@ def scenario_b_scrubbing(qtbot: Any, application: Application, clip: Path) -> Fi
     finally:
         mover.stop()
         slider.setSliderDown(False)
-    figures.witness.update(moves)
+        del widget.set_proxy  # the class's method again
+    figures.witness.update(shown)
     return figures
 
 
@@ -217,41 +236,83 @@ def scenario_d_batch(qtbot: Any, application: Application, stills: list[Path]) -
     return measured(qtbot, f"(d) batch of {len(stills)}", batch.start, ended)
 
 
+class _HeldSink:
+    """A video sink whose first ``write`` stays in progress until ``release`` is set (R3-3).
+
+    The frame is written to ``inner`` first; ``writing`` is set when that first write begins and
+    ``returned`` when it returns. Every other call goes to ``inner``.
+    """
+
+    def __init__(self, inner: Any, release: threading.Event) -> None:
+        self._inner = inner
+        self._release = release
+        self.writing = threading.Event()
+        self.returned = threading.Event()
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._inner, name)
+
+    def write(self, frame: Any) -> None:
+        if self.writing.is_set():
+            self._inner.write(frame)
+            return
+        self.writing.set()
+        try:
+            self._inner.write(frame)
+            assert self._release.wait(120), "no 1:1 render arrived during the sink's write"
+        finally:
+            self.returned.set()
+
+    def in_write(self) -> bool:
+        """The first write has begun and has not returned."""
+        return self.writing.is_set() and not self.returned.is_set()
+
+
 def scenario_e_full_render_during_export(
     qtbot: Any, application: Application, photo_4k: Path
 ) -> Figures:
-    """(e) A 1:1 render of a 4K photo while the open clip's export runs.
+    """(e) A 1:1 render of a 4K photo while the open clip's export encodes.
 
-    The fixture clip's export ends before a 1:1 4K render does, so the overlap is arranged
-    (R1-12): the export job starts its encode once the 1:1 view is asked for, and returns only
-    after a 1:1 render of the photo has arrived; the witness counts those renders.
+    The scenario text, verbatim. Spec V7: "**V7 Responsiveness:** UI responds within 100 ms
+    during analysis, export and batch processing (D66)." Brief question 10 (ruled: all six),
+    scenario (e): "a 1:1 4K preview render (the FFT route) during (c)", where (c) is "a File >
+    Export of GX011627".
+
+    The witness follows from that text (R3-3, the second reopen of R1-12): a render is 1:1 when
+    its ``result.k == 1``, and it is during the export when the export's sink is still inside a
+    ``write``. The fixture clip's encode ends before a 1:1 4K render does, so the overlap is
+    arranged: the export's sink holds its first ``write`` in progress (the frame written, the
+    call not returned) until a ``k == 1`` render of the photo has been delivered; the 1:1 view is
+    asked for only once that write has begun. ``k1_renders_during_a_sink_write`` counts the
+    delivered renders of the photo with ``result.k == 1`` while that write is in progress; other
+    factors are not counted.
     """
     window = application.window
     export = _panel(application, ExportPanel)
-    overlap = {"renders_at_1_during_export": 0}
-    asked, rendered_at_1 = threading.Event(), threading.Event()
+    overlap = {"k1_renders_during_a_sink_write": 0}
+    release = threading.Event()
+    sinks: list[_HeldSink] = []
     engine = application.exports._engine
-    real_job = engine.job
+    real_sink_for = engine._sink_for
+    assert real_sink_for is not None, "the export engine builds its sink with sink_for (DR-67)"
 
-    def held_job(request: Any) -> Any:
-        inner = real_job(request)
+    def held_sink_for(device: Any) -> Any:
+        sink = _HeldSink(real_sink_for(device), release)
+        sinks.append(sink)
+        return sink
 
-        def run(progress: Any) -> Any:
-            assert asked.wait(120), "the 1:1 view was never asked for"
-            result = inner(progress)  # the encode runs while the 1:1 render does
-            assert rendered_at_1.wait(120), "no 1:1 render arrived during the export"
-            return result
+    def writing() -> bool:
+        return any(sink.in_write() for sink in sinks)
 
-        return run
-
-    def on_rendered(result: object) -> None:
+    def on_rendered(result: Any) -> None:
         source = window.session.source()
-        if asked.is_set() and source is not None and source.path == photo_4k:
-            if export.is_running():
-                overlap["renders_at_1_during_export"] += 1
-            rendered_at_1.set()
+        if source is None or source.path != photo_4k or result.k != 1:
+            return
+        if writing():
+            overlap["k1_renders_during_a_sink_write"] += 1
+            release.set()
 
-    engine.job = held_job  # type: ignore[method-assign]
+    engine._sink_for = held_sink_for
     window.controller.rendered.connect(on_rendered)
 
     def start() -> None:
@@ -263,8 +324,8 @@ def scenario_e_full_render_during_export(
         if source is None or source.path != photo_4k:
             return False
         if window.preview_widget.is_fit():
-            window.view_actions["one_to_one"].trigger()
-            asked.set()
+            if writing():
+                window.view_actions["one_to_one"].trigger()
             return False
         return (
             not export.is_running()
@@ -276,9 +337,8 @@ def scenario_e_full_render_during_export(
         figures = measured(qtbot, "(e) 1:1 4K render during an export", start, done)
     finally:
         window.controller.rendered.disconnect(on_rendered)
-        engine.job = real_job  # type: ignore[method-assign]
-        asked.set()
-        rendered_at_1.set()
+        engine._sink_for = real_sink_for
+        release.set()
     figures.witness.update(overlap)
     return figures
 
@@ -342,7 +402,7 @@ def test_v7_a_b_analysis_and_scrubbing(make_app, qtbot, sample, tmp_path) -> Non
     application.window.close()
     second = make_app(cpu_settings(), where=tmp_path / "b")  # a cold cache: the decode runs
     wait_started(qtbot, second)
-    _within(scenario_b_scrubbing(qtbot, second, sample(CLIP)), "during_analysis")
+    _within(scenario_b_scrubbing(qtbot, second, sample(CLIP)), "proxies_shown_during_analysis")
 
 
 def test_v7_c_e_export_and_a_full_render_during_it(make_app, qtbot, sample, tmp_path) -> None:
@@ -363,7 +423,7 @@ def test_v7_c_e_export_and_a_full_render_during_it(make_app, qtbot, sample, tmp_
     )
     _within(
         scenario_e_full_render_during_export(qtbot, application, photo_4k(tmp_path)),
-        "renders_at_1_during_export",
+        "k1_renders_during_a_sink_write",
     )
 
 
