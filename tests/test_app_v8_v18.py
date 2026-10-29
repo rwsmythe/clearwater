@@ -1,7 +1,8 @@
 """WP4.3 task 10: V8 and V18 on the running shell (question 12 and Q24 as ruled; DR-75).
 
 V8 (AD-11 AS AMENDED 2026-10-21, CHARC addendum (1)): k = 1 EXACT; k > 1 mean <= 1/255, p99 <=
-2/255 at k = 2 and <= 4/255 at k = 4; the max is recorded, never asserted.
+2/255 at k = 2 and <= 4/255 at k = 4; p99.9 and the max are recorded as characterisation, never
+asserted (R4-2).
 
 - Photo: the corrected preview the shell shows at 1:1, k = 2 and k = 4 against the exported
   16-bit PNG read back and ``imaging.downscale``d by the same k.
@@ -137,8 +138,11 @@ def look_check_crop() -> np.ndarray:
 
 def _v8_photo(
     make_app: Any, qtbot: Any, tmp_path: Path, pixels: np.ndarray, ks: tuple[int, ...]
-) -> dict[int, tuple[float, float, float]]:
-    """Preview ``pixels`` on the shell at each k, export, compare; return (mean, p99, max)."""
+) -> dict[int, tuple[float, float, float, float]]:
+    """Preview ``pixels`` on the shell at each k, export, compare; return (mean, p99, p99.9, max).
+
+    p99.9 and max are AD-11's characterisation: recorded, never asserted (R4-2).
+    """
     sources, out = tmp_path / "src", tmp_path / "out"
     sources.mkdir()
     out.mkdir()
@@ -151,19 +155,24 @@ def _v8_photo(
     written = export_open_source(qtbot, application, out)
     exported, _ = composition.photo_reader().read(written)
     full = np.asarray(exported.pixels, dtype=np.float32)
-    figures: dict[int, tuple[float, float, float]] = {}
+    figures: dict[int, tuple[float, float, float, float]] = {}
     for k, preview in shown.items():
         expected = full if k == 1 else downscale(full, k)
         assert preview.shape == expected.shape, k
         diff = np.abs(preview.astype(np.float64) / 255.0 - expected.astype(np.float64))
-        figures[k] = (float(diff.mean()), float(np.quantile(diff, 0.99)), float(diff.max()))
+        figures[k] = (
+            float(diff.mean()),
+            float(np.quantile(diff, 0.99)),
+            float(np.quantile(diff, 0.999)),
+            float(diff.max()),
+        )
         if k == 1:  # EXACT: the display quantisation of the same full-resolution render
             mismatch = to_display_uint8(expected) != preview
             # A value within the 16-bit step of a rounding boundary may round either way.
             near = np.abs((expected * 255.0) % 1.0 - 0.5) <= 255.0 * HALF_STEP_16 + 1e-4
             assert not (mismatch & ~near).any(), f"k = 1 is not exact: {figures[1]}"
         else:
-            mean, p99, _ = figures[k]
+            mean, p99, _, _ = figures[k]
             assert mean <= MEAN_BOUND and p99 <= P99_BOUND[k], f"k = {k}: {figures[k]}"
     return figures
 
@@ -172,14 +181,14 @@ def test_v8_photo_preview_at_1_1_and_k_2_and_4_against_the_downscaled_export(
     make_app, qtbot, tmp_path
 ) -> None:
     figures = _v8_photo(make_app, qtbot, tmp_path, smooth_scene(), (1, 2, 4))
-    print(f"V8 photo, smooth scene (mean, p99, max) by k: {figures}")
+    print(f"V8 photo, smooth scene (mean, p99, p99.9, max) by k: {figures}")
 
 
 @pytest.mark.slow
 def test_v8_photo_k_above_1_on_real_sized_content(make_app, qtbot, tmp_path) -> None:
     """The WP1.3 look-check crop (working folder; skipped without it), as WP4.1's V8 (c)."""
     figures = _v8_photo(make_app, qtbot, tmp_path, look_check_crop(), (1, 2, 4))
-    print(f"V8 photo, look-check crop (mean, p99, max) by k: {figures}")
+    print(f"V8 photo, look-check crop (mean, p99, p99.9, max) by k: {figures}")
 
 
 def p3_nclx_heic(folder: Path) -> Path:

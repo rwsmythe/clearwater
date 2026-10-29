@@ -82,10 +82,12 @@ until such a render has been delivered, and the 1:1 view is asked for only once 
 begun. Rows (a), (b), (c) and (e) are from cell 6's targeted run, (d) and (f) from cell 4's
 (2026-10-29; a shared host).
 
-V8 (AD-11 as amended) on the shell, (mean, p99, max) in [0, 1] units, the preview's uint8 against
-the exported 16-bit PNG: smooth synthetic scene k = 1 exact (within the 16-bit step), k = 2
-(0.00100, 0.00196, 0.0145), k = 4 (0.00106, 0.00422, 0.0228); the WP1.3 look-check crop k = 2
-(0.00117, 0.00459, 0.117), k = 4 (0.00156, 0.0146, 0.109). Video pre-encode at k = 2: mean
+V8 (AD-11 as amended) on the shell, (mean, p99, p99.9, max) in [0, 1] units, the preview's uint8
+against the exported 16-bit PNG; p99.9 and max are AD-11's characterisation, recorded and never
+asserted (R4-2): smooth synthetic scene k = 1 exact (within the 16-bit step), k = 2 (0.00100,
+0.00196, 0.00796, 0.0145), k = 4 (0.00106, 0.00422, 0.0108, 0.0228); the WP1.3 look-check crop
+k = 2 (0.00117, 0.00459, 0.0350, 0.117), k = 4 (0.00156, 0.0146, 0.0507, 0.109). Video pre-encode
+at k = 2: mean
 0.00305, p99 0.0392, max 0.0817 on the 320 x 180 fixture frame, RECORDED and printed, not
 asserted (R1-13 = (a), CHARC ruling ace08fbb). The reason is AD-11's domain: its k > 1 bound (p99
 within 2/255 at k = 2) is set "on real-sized content (at least 1080p)", and "small stills and
