@@ -1,13 +1,11 @@
 # WP-T6 -- gate test sizing (AD-30)
 
-Status: rungs 0-4 complete; Reviewer A round 1 returned zero critical/major,
-three minor and eight advisory findings. Its single cleanup adds the F2/F3
-checker guards; W2b re-proof passed and R1 is converged, with no round 2 under
-Q11. Reviewer B and the one final two-leg
-gate are pending. The AFTER comparison below is intentionally unfilled.
-W3 is development evidence; W4 proves the retained full forms and is not a
-V16 row. Review source: `work/wp-t6/rA1/review-r1.txt`; adjudication is in the
-cumulative ledger.
+Status: Reviewer A R1 converged after its single cleanup and W2b re-proof;
+Reviewer B returned and all dispositions were ruled by CHARC. The ONE two-leg
+gate is green on candidate `a4472fb`; Q6 PASS is established below. Accept
+is pending. W3 is development evidence; W4 proves the retained full forms
+and is not a V16 row. Review/gate evidence and dispositions are recorded in
+the cumulative ledger and the sources below.
 
 ## Claims and scope
 
@@ -46,7 +44,8 @@ log is not copied into this worktree. Rung 0's empty code diff against the
 baseline is recorded in `docs/proofs/wp-t6-ledger.md`.
 
 Historical leg spread was about 316 s and individual tests moved by up to
-40 s (brief, same section). That is a noise indicator, not a matched new
+43.58 s (engine 499.89 -> 456.31 s; brief, same section; corrected under B3).
+That is a noise indicator, not a matched new
 measurement. Q6's tightened verdict requires the final gate's seven CUT
 per-test sum to fall by more than 110 s. A shorter leg wall alone cannot
 establish PASS. The 900 s serial target is recorded separately and is not a
@@ -400,6 +399,7 @@ KEEP-row timing comparisons must account for changed warm-up/state order (F4;
 - On the trim, R5's 1/30000 time base follows the fixture's explicit track
   timescale flag and 4(c); only `[full]` retains proof of the camera container's
   original time base (F10).
+- The fixture checks its plan's own T, so a later keyframe plan (N=120, T=4.004) passes every fixture-path check; the parity test omits T, independently re-derives it and fails that plan in the same serial leg, so the gate still goes red (B1; CHARC `7c59772d`; DR trigger: next touch of the `gx011627` fixture).
 - The declared seat has one GPU, serial non-xdist execution, the pinned
   FFmpeg build and a configured clip. A missing clip skips; no skip substitutes
   for these positive proofs. Fixture sessions are per worker, so serial and
@@ -429,7 +429,7 @@ it. This does not claim the three full-only best-effort items are SAME.
 
 At accept, update the review/gate fill and `CLAUDE.md` test-conventions
 paragraph to record `fullclip`, the following expressions and collection
-identity, the measured gate counts/times after the gate, and the policy that
+identity, the measured gate counts/times below, and the policy that
 FULLCLIP runs at least once per phase-end gate report and whenever a package
 brief asks. AD-28's leg figures must use the final gate's observed parallel
 and serial walls and counts, with the baseline/AFTER comparison below. These
@@ -454,24 +454,139 @@ come from the brief's map and Q7, not an additive prediction of recoverable
 time. The gap to 900 s lies outside the current sizing envelope and locks.
 Also carry DR-22/DR-66 consumer notes for additive conftest use, the scoped
 tag exceptions and six-item Limit, plus the fullclip-per-phase-gate sentence.
+CHARC also writes B1's DR row, triggered by the next touch of `gx011627`;
+the Limit above is accepted without a code change in this package.
 
-## AFTER (the gate) -- PENDING
+## AFTER (the gate) -- GREEN; Q6 PASS
 
-Only the final candidate's ONE gate, after Reviewer A convergence and
-Reviewer B, may fill this section. W3 and W4 figures above are not substitutes.
+This is the final candidate's ONE gate after Reviewer A convergence and
+Reviewer B. W3 and W4 are separate development/full-form evidence. Sources
+are the copied `work/wp-t6/gate-g1/` records; all 13 entries in `md5sums.txt`
+were independently verified (`work/wp-t6/gate-g1-analysis.json`).
 
-| Final-gate field | Result / source to fill |
+| Final-gate field | Observed result / source |
 |---|---|
-| Candidate SHA, seat conditions, config supplied, start/end, free memory | PENDING gate evidence |
-| PARALLEL counts, EXIT, wall and log | PENDING |
-| SERIAL counts, EXIT, wall and log/XML paths | PENDING; baseline wall 2,621.32 s |
-| Seven CUT rows, individual setup/call/teardown from durations log and `testcase.time` from JUnit | PENDING one row per R1-R7; account for shared setup once and reconcile categories/rounding |
-| Seven CUT sum / reduction against baseline 1,567.37 s | PENDING; do not substitute the eight-node W3 wall |
-| KEEP rows' individual spread and aggregate noise estimate | PENDING matched final-gate durations versus historical map; state missing rows |
-| Q6 verdict | PENDING: seven-CUT reduction must be strictly more than 110 s, with timing categories reconciled; report leg wall alongside |
-| 900 s target | PENDING observed serial wall; informational, not pass/fail |
-| Reviewer A rounds / findings / convergence; Reviewer B return | R1: zero critical/major, three minor, eight advisory; result-bearing F2/F3 cleanup re-proved in W2b, R1 converged with no round 2 under Q11; B PENDING. Source: `work/wp-t6/rA1/review-r1.txt`, `work/wp-t6/w2b/`, cumulative ledger |
+| Candidate and integration | `a4472fbe485a306f09cbd7750d98f9e193299ed5` in `wp-t6-mc`; dispatcher records 21 commits rebased from `e2dc969` onto main `5fdcda4`, matching patch-id prefix `a7a7d115` on both sides; `progress.log` records candidate HEAD |
+| Seat conditions / config / start-end | Dispatcher seat, Git Bash, headless Qt, `PYTEST_ADDOPTS` unset, fresh work basetemps. Gate 14:43:42Z-15:23:27Z; serial held until the only other cell was verified idle. Candidate and main local configurations are byte-identical in a post-gate check at 15:28:25Z (`work/wp-t6/gate-g1-config-identity.json`); no configuration values retained |
+| Free memory before each leg | Parallel 9,086,959,616 bytes; serial 9,663,655,936 bytes, both above floor (`mem.log`) |
+| Static checks | Ruff PASS; format check: 267 files already formatted; mypy: no issues in 141 source files; all EXIT 0 (`ruff.log`, `format.log`, `mypy.log`) |
+| Collections | 6,457 = 5,313 parallel + 1,137 serial + 7 fullclip; no duplicates, pairwise disjoint, union all, every collection EXIT 0. Against main's 6,449/base set, exactly seven unsuffixed CUT IDs removed, fifteen added (split forms and parity); `collect-*.txt`, independent set proof in `gate-g1-analysis.json` |
+| PARALLEL | 5,312 passed, one skip (`test_color_roundtrip.py:123`), EXIT 0, 714.41 s. Process interval 14:44:08Z-14:56:04Z (`parallel.log`, `progress.log`) |
+| SERIAL -- AFTER | 1,136 passed, one standing photo skip (`test_photo_check.py:139`), 5,320 deselected, EXIT 0, **1,389.24 s**. JUnit suite 1,389.176 s (1,389.18 rounded); interval 15:00:16Z-15:23:27Z, alone (`serial.log`, `serial.xml`, `progress.log`) |
+| Seven CUT sum | **281.236 s** JUnit setup+call+teardown; rounded log setup+call sum 280.65 s, teardown sum 0.58 s; detailed reconciliation below |
+| Leg wall reduction | 2,621.32 -> 1,389.24 s: **1,232.08 s (47.00%)** shorter; reported alongside the per-test verdict, not used alone |
+| KEEP rows | All 31 matched, none missing; setup+call 659.54 -> 687.85 s, aggregate +28.31 s; individual deltas -1.81 to +8.80 s, median +0.34 s; table below |
+| Q6 verdict | **PASS**: 1,567.37 - 281.236 = **1,286.134 s** conservative seven-CUT reduction (82.06%), strictly more than 110 s. AFTER includes teardown and new shared trim setup, so neither can inflate this saving |
+| 900 s target | Not reached: AFTER is 489.24 s above target. Informational under Q7, not an acceptance failure |
+| Reviews | A R1: zero critical/major, three minor, eight advisory; single result-bearing cleanup re-proved in W2b, converged, no R2. B: zero critical/major, one minor, nine advisory; returned, all dispositions ruled by CHARC `7c59772d`; details below |
 
-Static checks for this report turn and any remaining format/mypy verification
-are recorded in the cumulative ledger. No complete package/gate acceptance
-is claimed until the review and gate evidence above is supplied.
+### Seven CUT bodies and timing-category reconciliation
+
+The BEFORE map is setup+call; JUnit's per-test `time` is setup+call+teardown.
+Each row below is keyed to the CUT map above. Rounded phase times come from
+`work/wp-t6/gate-g1/serial.log`, JUnit totals from `serial.xml`; not-listed
+phases are below the display threshold, not asserted zero.
+
+| CUT | BEFORE setup+call | AFTER setup | AFTER call | AFTER teardown | AFTER JUnit total |
+|---|---:|---:|---:|---:|---:|
+| R1 | 456.31 | Not listed | 88.42 | 0.08 | 88.511 |
+| R2 | 330.02 | Not listed | 54.14 | 0.08 | 54.223 |
+| R3 | 221.69 | 27.47 | 11.90 | 0.07 | 39.440 |
+| R4 | 169.97 | 0.01 | 41.28 | Not listed | 41.292 |
+| R5 | 152.09 | 10.77 | 14.35 | 0.11 | 25.220 |
+| R6 | 131.88 | Not listed | 17.98 | 0.15 | 18.127 |
+| R7 | 105.41 | Not listed | 14.33 | 0.09 | 14.423 |
+| Total | 1,567.37 | Included once | Included once | 0.58 displayed | **281.236** |
+
+The seven JUnit totals sum to **281.236 s**. Displayed setup+call sums to
+280.65 s and teardown to 0.58 s; their 281.23 s total differs by 0.006 s from
+JUnit because of rounding and undisplayed small phases. A matched displayed
+setup+call comparison gives 1,286.72 s saved. Q6 instead uses the conservative
+JUnit reduction of 1,286.134 s, counting teardown in AFTER only. Both exceed
+110 s by a wide margin; millisecond precision is not claimed for the rounded
+historical map.
+
+R5's 10.77 s setup carries the shared trim construction/checks and independent
+`footage_reference`; the log cannot split those internal fixture costs. R3's
+27.47 s setup carries `gx011627_standard_encode` and other fixture work. Both
+are included once in the seven-row sum. Their baseline setup charges were
+43.52 s and 171.57 s respectively (brief's map). The new parity node adds
+1.388 s JUnit (call 1.30 s, displayed teardown 0.09 s); including it gives
+282.624 s and still saves 1,284.746 s against the old seven tests. No shared
+setup is subtracted or charged twice to improve the verdict. The gate's
+broader item order differs from the baseline as disclosed under F4.
+
+### KEEP comparison and noise estimate
+
+Row numbers refer to the unchanged KEEP map above. All 31 actual gate node
+IDs matched, including expansion of the brief's abbreviated names; none are
+missing. BEFORE and AFTER below are setup+call seconds, with AFTER from the
+rounded duration log; the analysis record retains each full node ID and its
+JUnit total. No KEEP assertion or size changed.
+
+| KEEP row | BEFORE setup+call | AFTER setup+call | Delta (s) |
+|---|---:|---:|---:|
+| 8 | 121.45 | 130.25 | +8.80 |
+| 9 | 66.12 | 67.10 | +0.98 |
+| 10 | 63.67 | 62.94 | -0.73 |
+| 11 | 33.17 | 39.38 | +6.21 |
+| 12 | 28.45 | 27.43 | -1.02 |
+| 13 | 27.48 | 27.40 | -0.08 |
+| 14 | 26.98 | 27.65 | +0.67 |
+| 15 | 26.89 | 26.67 | -0.22 |
+| 16 | 22.58 | 24.15 | +1.57 |
+| 17 | 19.64 | 20.02 | +0.38 |
+| 18 | 19.57 | 17.76 | -1.81 |
+| 19 | 18.76 | 20.60 | +1.84 |
+| 20 | 18.41 | 22.40 | +3.99 |
+| 21 | 12.56 | 12.76 | +0.20 |
+| 22 | 12.15 | 12.38 | +0.23 |
+| 23 | 11.84 | 12.28 | +0.44 |
+| 24 | 11.76 | 12.08 | +0.32 |
+| 25 | 10.31 | 10.61 | +0.30 |
+| 26 | 10.02 | 10.02 | +0.00 |
+| 27 | 9.83 | 10.51 | +0.68 |
+| 28 | 9.70 | 10.91 | +1.21 |
+| 29 | 9.17 | 10.30 | +1.13 |
+| 30 | 9.07 | 9.72 | +0.65 |
+| 31 | 8.11 | 8.25 | +0.14 |
+| 32 | 7.97 | 8.95 | +0.98 |
+| 33 | 7.90 | 8.24 | +0.34 |
+| 34 | 7.84 | 8.12 | +0.28 |
+| 35 | 7.80 | 8.18 | +0.38 |
+| 36 | 6.97 | 7.04 | +0.07 |
+| 37 | 6.79 | 6.98 | +0.19 |
+| 38 | 6.58 | 6.77 | +0.19 |
+| Total | **659.54** | **687.85** | **+28.31** |
+
+The KEEP sum is 659.54 -> 687.85 s (+28.31 s); its JUnit total including
+teardown is 690.850 s, so that total is not used for the matched KEEP spread.
+The range -1.81 to +8.80 s and median +0.34 s describe this gate's observed
+variation, not a causal attribution or confidence interval. Fixture grouping,
+warm-up/state and host variation can contribute. This noise is much smaller
+than the seven-CUT reduction; the older host-spread indicator remains about
+316 s between legs, with 43.58 s for the engine pair. The non-CUT tail and
+runner/teardown overhead also affect leg wall, so leg-wall and CUT-sum savings
+need not agree. Sources: baseline map in the brief, `serial.log`, `serial.xml`,
+`work/wp-t6/gate-g1-analysis.json`.
+
+### Reviewer B and final handoff
+
+The dispatcher ran the Claude process `claude-opus-5-5`/high on `a4472fb`:
+model assertion passed, `is_error=false`, 36 turns, worktree clean afterward;
+eight sandbox permission denials, none a withheld-path access. Verdict:
+`NO_NEW_CRITICAL_MAJOR`, one minor and nine advisory. Full review text was
+not handed to the cell; the binding findings and dispositions are the
+dispatcher's quoted CHARC ruling `7c59772d`, recorded in the ledger.
+
+| Review | Ruled disposition |
+|---|---|
+| B | B1 REPORT-ONLY: exact later-keyframe Limit above, DR at next fixture touch; B2 and B9 REPORT-ONLY (already covered by F2 or minor per ruling); B3 FIX: historical maximum is 43.58 s; B4 DECLINED: descriptive docstring text, assertion retained; B5-B8 out of envelope or already-stated Limits, no implementation change; B10 sandbox guard run unavailable, W2b's 60 passes stand |
+
+Dispatcher evidence: `clearwater-review-evidence/wp-t6/reviewB/`; supplied
+MD5 prefixes review `ff96cce0`, prompt `92d44bf8`, diff `953355a8`. Gate
+checksums are in `work/wp-t6/gate-g1/md5sums.txt`; the serial XML/log and
+parallel log verified respectively as prefixes `5b88c916`, `9142b765`,
+`f080acfa`. Final docs-only whitespace/scope checks are in the ledger.
+The work package is ready for CHARC's accept actions; acceptance itself
+remains pending.
