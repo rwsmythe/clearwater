@@ -22,7 +22,7 @@
   gui-to-app edge (`tests/test_app_deps.py`).
 - **The headless runner** `tools/headless_export.py` (a test tool): library API `route`,
   `requests_for`, `parameters_for`, `read_parameter_file`, `configured_footage_folder`,
-  `inside`, `writes_inside`, `check_outputs`, `run`, `record_object`, `record_json`, `exit_status`,
+  `inside`, `write_target_refusal`, `check_outputs`, `run`, `record_object`, `record_json`, `exit_status`,
   `summary_lines`, `main`; a CLI with the full IF-10 flag set but `last_parameters`
   (`--out | --beside-source`, `--suffix`, `--bit-depth`, `--no-provenance`, `--force-cpu`,
   `--encoder`, `--quality`, `--ten-bit`, `--cache-limit-bytes`) plus `--method`,
@@ -52,6 +52,8 @@
 | Runner: exit 0/1/2, record schema 1 with names only, footage refusals, no PySide6 / CuPy, cancel and Ctrl-C, DR-62 order, DR-6, DR-35 (a), video unavailable | `tests/test_headless_export.py` |
 | Runner (Reviewer A round 2): footage refusals through the `\\?\` and `\\?\UNC\` spellings; no full path for a non-ASCII folder, an `argparse` refusal, a record field or a record that cannot be written; no EXIF tag value printed | `tests/test_headless_export.py::test_g1_*` to `::test_g7_*` |
 | Runner (Reviewer A round 4): every write target (each output folder as the export plans it, the record, the settings folder and file) checked by the real path of its nearest existing path, so a file link, a folder link or a dangling link into the footage folder is refused; a local-configuration refusal names no full path; `--parameters` validated against the method schema and capped at 1 MiB, as the importer does | `tests/test_headless_export.py::test_i1_*` to `::test_i4_*` |
+| Runner (Reviewer B at the gate): one write-target predicate refusing every class found (text spelling, `\\?\`, `\\.\`, file link, junction, folder link elsewhere, hard link plus stream, another case); a non-ASCII folder hidden in any case; an overflowing `settings.json` stamp a usage refusal; Ctrl-C in the last commit and during the record write give status 1 | `tests/test_headless_export.py::test_b1_*`, `::test_b2_*`, `::test_b4_*`, `::test_b5_*`, `::test_b6_*` |
+| N10 pre-encode: the writer's incoming pixels bit-identical across the four runs (Reviewer B B7) | `tests/test_wp41_photo_path.py::test_n10_the_same_still_twice_is_identical` |
 | Runner (Reviewer A round 5): a parameter file whose `created` stamp overflows in UTC is a usage refusal | `tests/test_headless_export.py::test_j1_a_created_stamp_out_of_range_is_a_usage_refusal` |
 | V5 on every WP2.3 still at 8 and 16 bit (planted `iCCP`-dropping writer); the Interop IFD kept on a test-built JPEG (no WP2.3 still carries one; planted drop) | `tests/test_wp41_photo_path.py::test_v5_*` |
 | V9 neutral identity, both methods, every still, 8 and 16 bit (planted off-neutral control) | `tests/test_wp41_photo_path.py::test_v9_*` |
@@ -74,12 +76,18 @@
   the run knows (the output folder, each source's folder, the settings, record and parameter
   folders, the local configuration's folder (R4 I2)) shown by its name only, in every spelling the runner can name (as given, resolved,
   without an extended-length prefix, escaped as `ascii_text` escapes it, quoted as `repr` quotes
-  it; `tools/headless_export.py` `Redactor`, R1 F1, R2 G2-G4, G6); an `argparse` refusal is
+  it, each escape in any letter case of its character (Reviewer B B2); `tools/headless_export.py`
+  `Redactor`, R1 F1, R2 G2-G4, G6); an `argparse` refusal is
   redacted against the paths its arguments name (R2 G3). A path the run does not know (a drive
   root, or a folder no request, flag or file names) would be printed as the engine gives it. No
-  EXIF tag value is printed: a WARNING from `clearwater.io.photo.exif`, and any `%r` argument,
-  is shown with `...` in its place (R2 G7). The library `run()` applies the same filter while its
-  batch runs (R3 H3).
+  EXIF tag value from the EXIF module's own WARNINGs is printed: each argument of a WARNING from
+  `clearwater.io.photo.exif`, and any `%r` argument, is shown with `...` in its place (R2 G7).
+  The library `run()` applies the same filter while its batch runs (R3 H3).
+- **EXIF content in failure texts (Reviewer B B3):** the runner adds no EXIF content and no
+  location tag of its own, but the record carries the engine's failure texts verbatim apart from
+  folder redaction (DR-35 (a)), and a reader failure text (`clearwater.io.photo`, not owned; for
+  example a malformed TIFF Orientation) may quote the malformed tag's value; so may the summary
+  line and the batch WARNING carrying the same text. It is not a location tag.
 - **Host logging (R3 H4):** a process that installs its own logging handlers (a host program,
   pytest) receives the engine's records as they are logged, full paths and tag values included
   (`run_batch`'s INFO report and WARNINGs, the photo modules' WARNINGs). The runner redacts what
@@ -90,13 +98,29 @@
   path passes only the source's ICC profile to `display_image` (WP3.16), and the real reader the
   WP4.1 swap installs gives such a photo no ICC profile. The WP2.3 P3 stills carry ICC profiles,
   so the shipped fixtures do not reach it.
-- **Footage check spellings:** the runner compares paths resolved, without the `\\?\` and
-  `\\?\UNC\` prefixes and, where the footage folder exists, by file identity (a share of the
-  same drive, a short 8.3 name) (R2 G1). A file system without file identities (`st_ino` 0)
-  falls back to the text comparison. Every write target is also followed through links: the real
-  path of its nearest existing path (the target itself when it exists, a dangling link included)
-  must lie outside the footage folder, and outputs beside a source go to the source's own folder,
-  not its link target's (R4 I1). A link created after the check (during the run) is not seen.
+- **The footage check (Reviewer B B1, CHARC Q1):** one predicate,
+  `write_target_refusal`, decides every write the run plans, before anything runs, when a
+  footage folder is configured: each output folder as `jobs.naming` plans it (`--out`, or the
+  source's own folder beside a source), the record file, the `--settings-dir` folder and its
+  `settings.json`. A target passes only if (i) after its drive or UNC prefix it has no `:` (no
+  NTFS stream name) and is not a `\\?\` or `\\.\` path; (ii) every existing path on the way
+  down is its own real path (no symbolic link, junction or other reparse point, and no short
+  8.3 name, so a link or short name is refused even when it leads elsewhere); (iii) the real path
+  of the deepest existing one is outside the footage folder (compared resolved, prefix-free,
+  case-normalised and, where the footage folder exists, by file identity; a file system without
+  file identities falls back to the text comparison). **Residual:** a hard link to a footage
+  file placed outside the footage folder cannot be told apart by its path; the runner never
+  writes over an existing file (D84), so only a stream name could reach the original, and (i)
+  refuses every stream name. A link created after the check (during the run) is not seen.
+- **Ctrl-C (Reviewer B B5, B6):** a Ctrl-C after the last item's last check (in its commit)
+  keeps that output and still gives status 1 with `"cancelled": true` (the runner reads the
+  cancel flag when the batch ends); the SIGINT handler stays installed until the record is
+  written, so a Ctrl-C then leaves the record whole and gives status 1. A record that cannot be
+  written is removed only if this run created it, absent a concurrent replacement of the path
+  by another process (B9, out of envelope).
+- **GUI test scope (Reviewer B B8):** `tests/test_wp41_gui.py` asserts that the shell opens the
+  real reader's image with the real methods and the forced CPU; the corrected preview's pixels
+  are asserted by the export legs, not there.
 - **`--parameters` and photo provenance (OPEN ITEM, owned by CHARC):** the runner reads the
   forms `PresetStore.import_preset` reads (an AD-13 preset; a preset with only `source` and
   `settings` added), with its 1 MiB cap and its method-schema validation (R4 I3, I4). The provenance text `PhotoWriter` embeds for a HEIC given a built-in profile
@@ -166,9 +190,11 @@ STRONG tier (Codex `gpt-6.1-sol` / high, WSL, codex-cli 0.162.1), whole-package 
 | 3 | `899102d` | 0 | 1 (H1 GUI preview, accepted code: BANKED to WP4.3) | 6 | NEW_CRITICAL_MAJOR_FOUND; minors fixed |
 | 4 | `844b996` | 0 | 1 (I1 linked source beside-source) | 4 | NEW_CRITICAL_MAJOR_FOUND; fixed (I1 broadened to every write target) |
 | 5 | `f17ab36` | 0 | 0 | 1 (J1) | NO_NEW_CRITICAL_MAJOR; J1 fixed in the cleanup (`23fc88b`) |
+| Reviewer B (gate) + remediation | `aefd563` (stacked candidate = `0a0a787` rebased) | 0 | 1 (B1 hard link plus stream; B2-B4 MAJOR reported, MINOR as adjudicated) | 8 (B2-B9; B9 out of envelope) | BLOCKING; remediated per CHARC `870c8ddeb64b4e12` (one predicate, B1; B2, B4-B7 fixed; B3, B8, B9 narrowed) |
 
-The loop terminated at round 5, the five-round gate, on a round with zero new blocking
-findings.
+The Reviewer A loop terminated at round 5, the five-round gate, on a round with zero new
+blocking findings; the orchestrator's Reviewer B at the gate then found B1, remediated in one
+bounded turn (the design guard closes with the single predicate).
 
 ## Register rows (main `cffd243`)
 
