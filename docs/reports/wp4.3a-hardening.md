@@ -1,101 +1,118 @@
-# WP4.3a hardening report - DRAFT
+# WP4.3a hardening report - R1 remediation, R2 pending
 
-This is development evidence for the dispatched WP4.3a package, not an accept
-record. Reviewer A, Reviewer B and the final two-leg gate remain pending.
-Base: `fe65e6a867106dd984d1c27ef3104e2ee3de0df4`; implementation through
-`fa2afab`, followed by the bounded Turn 4 WARNING/B4 amendment awaiting commit.
-The detailed evidence and verification history are in
-`docs/proofs/wp4.3a-ledger.md`.
+Development evidence for WP4.3a; this is not an accept record. Base:
+`fe65e6a867106dd984d1c27ef3104e2ee3de0df4`. Product commits through `553d1f2`
+were reviewed in R1; adjudication is committed as `a0b9235`. Turn 6 remedies
+R1 under CHARC `d6e9abdf` and adds the granted settings-path fix. Reviewer A R2,
+Reviewer B and the ONE final two-leg gate are **PENDING**.
 
-## Changes against the five register rows
+## Hardening table
 
-| Row | Implemented behavior and development evidence |
+| Row | Implemented behavior and evidence |
 |---|---|
-| DR-58 (b) / AD-23 | `pipes.tool_spawn_kwargs` supplies CREATE_NO_WINDOW on win32, zero elsewhere, and a fresh FFREPORT-free environment. All seven product subprocess calls use it; capability.tool_env delegates. AST guards, native/other-platform cases and actual FFmpeg/ffprobe report-file positive controls passed. |
-| DR-76 | Both preset readers drop and report/accept the writer's profile key. Synthetic nclx HEIC provenance extracted from a real CPU engine export imports into PresetStore and is accepted by CLI --parameters. The writer remains unchanged. |
-| DR-77 | Preset import/load/list map the year-1 offset overflow to readable failures/unreadable entries, preserving the source. Three failing-first cases passed after the reader mapping changed. |
-| DR-81 (a)(b)(c)(d), plus the ruled WARNING route | Redactor matches mixed separators in literal, doubled, escaped and quoted forms. Raising configured-footage resolution returns a path-free usage refusal. Packet-listing timeout text carries the input basename and READ_TIMEOUT_S; CUDA-check timeout carries CUDA_CHECK_TIMEOUT_S, and OSError carries only its class and strerror. The CLI now owns a scoped WARNING stderr handler whose formatter redacts a copy of the rendered record; it is installed in _main before settings loading and detached on exit. Settings/backup files are named by basename. |
-| DR-85 | load_settings sets aside the unrepresentable timestamp and uses defaults. The amended B4 integration test proves exit 0, exactly one byte-identical set-aside file, an actual export, default parameter values/bit depth instead of planted settings, and no full path in stderr. |
+| DR-58 (b) / AD-23 | pipes.tool_spawn_kwargs supplies CREATE_NO_WINDOW on win32, zero elsewhere, and a fresh FFREPORT-free environment. All seven product spawn sites consume it; capability.tool_env delegates. Native/other-platform and real FFmpeg/ffprobe report-file controls passed. R1's AST weakness is fixed: alternate process APIs, aliases, bound names, getattr and partial are detected by 162 planted controls; exactly seven real sites are pinned. |
+| DR-76 | PresetStore and the runner accept the writer's profile key as dropped provenance. Real CPU export of a synthetic nclx HEIC provides the PNG iTXt used by both importer and CLI tests. The writer is unchanged. The granted --parameters help line now describes writer provenance including profile. |
+| DR-77 | Preset import/load/list map the year-1 offset overflow to readable errors/unreadable entries while preserving the source. Three failing-first cases passed. |
+| DR-81 (a)(b)(c)(d), plus the ruled WARNING route | Mixed literal/escaped/quoted separator forms are redacted. The R1 remediation guards the actual footage resolve reached through write_target_refusal/inside/_resolved, including own-path, output and cache checks in main and run. OSError, RuntimeError and actual embedded-NUL ValueError become path-free RunnerRefusalError; main exits 2 before any export, including late run refusals. The old artificial-resolution test was moved to these real routes; 23 RED-first cases pass. Packet-listing timeout names the input basename and READ_TIMEOUT_S; CUDA timeout names CUDA_CHECK_TIMEOUT_S; CUDA OSError exposes class/strerror only, with a fixed fallback when strerror is absent. CLI settings WARNINGs use the scoped redacting formatter and detach on exit. |
+| DR-85 | load_settings sets aside the unrepresentable timestamp and returns defaults. The amended B4 test proves exit 0, one byte-identical backup, a real export using default parameter values/bit depth, and no full path in stderr. |
+| R3-1 (ii), CHARC `d6e9abdf` | output_folder is the only path-valued Settings field. A NUL or ValueError during path construction/absolute-path formation defaults only that field through _with_valid_values and _warn_out_of_range. Other settings and the original file survive; there is one warning and no set-aside. The decode check precedes frozen IF-10's Path construction and requires no output-directory existence or filesystem resolution. Three RED-first config cases and a real CLI export/warning case pass. The warning formatter hides the repr-valued invalid path even when it is unknown to Redactor. |
 
-Register closures and the AD-13/AD-23 accept notes remain CHARC's work.
+Register closures, the new register row and AD-13/AD-23 accept notes remain
+CHARC's work. No register change is made by this package.
 
-## Grounding and rulings
+## Rulings and behavior changes
 
-Round 0 found seven calls on the dispatch base: capability.py:89;
-decode.py:171/:330/:344; encode.py:879; probe.py:127; verify.py:225. Only
-capability, encode and verify passed env=tool_env. The new helper remains in
-standard-library-only pipes.py, so probe need not import capability and create
-a cycle. The existing video module set is unchanged.
+The ledger records Round 0, governing brief rulings, the verbatim B4 amendment
+`a2ef868a6e14b506` and CHARC `d6e9abdfa16feb0e` item 2 plus scope addition (ii).
 
-- Q-A: retain READ_TIMEOUT_S = 600 and construct the timeout text through the
-  constant. The historical 120-second figure belonged to probe's separate
-  TOOL_TIMEOUT_S. Tests also vary the limit to prove it is not hard-coded.
-- Q-B: the inherited-environment test launches at
-  tests/test_wp42_v3_product.py:141 (command starts at :133 on this base) and
-  tests/test_wp321_fft_release.py:165 remain unowned residuals. They can adopt
-  the helper at their next authorized touch; an operator-set FFREPORT during
-  those tests is outside this package's envelope. DR-58 (a) is not reached.
-- Q-C: both CUDA-check exception branches are covered; the timeout limit remains
-  30 seconds and is referenced through CUDA_CHECK_TIMEOUT_S. The warning caller
-  is unchanged. DR-81 N5 is not reached.
-- CHARC `a2ef868a6e14b506` grants only the B4 test function's rename/update and
-  the runner WARNING amendment. Its full text is recorded verbatim in the
-  ledger; authoritative source:
-  `C:\Users\rwsmy\clearwater-review-evidence\wp4.3a\b4-ruling-b6aa800a.md`.
+- The helper remains in existing, standard-library-only pipes.py; probe does
+  not import capability, avoiding the existing reverse edge. No new module.
+- Q-A: packet-listing READ_TIMEOUT_S remains 600; probe's separate TOOL_TIMEOUT_S
+  is 120. Timeout tests vary the limits to prove the messages use the constants.
+- Q-B: tests/test_wp42_v3_product.py:141 (command at :133 on the base) and
+  tests/test_wp321_fft_release.py:165 retain inherited-environment launches.
+  They are unowned test-only residuals; an operator-set FFREPORT during these
+  tests is outside this envelope. Their next authorized touch may add tool_env.
+  DR-58 (a) and DR-81 N5 are not reached.
+- Q-C: CUDA_CHECK_TIMEOUT_S remains 30. Both exception arms are covered; the
+  warning caller is unchanged. F9 adds only the missing-strerror fallback.
+- WP4.1 behavior change: B4's overflow refusal (exit 2) becomes D89's documented
+  corrupt-file behavior (set aside, defaults, successful export), because DR-85
+  classifies that timestamp as a reader decode failure for every caller, as
+  CHARC ruled in a2ef868a6e14b506. The defensive runner OverflowError arm stays
+  with its comment that load_settings handles the overflow.
+- Windows console behavior (F8, reasoned, not a signal experiment):
+  CREATE_NO_WINDOW prevents FFmpeg children receiving the runner console's
+  Ctrl-C/Ctrl-Break. Ctrl-C uses the runner cancellation handler; Ctrl-Break
+  killing Python can leave a child until stdin EOF. The flag is mandated by
+  Q13/AD-23; signal-policy changes are outside this touch.
 
-WP4.1 behavior change: B4's overflow refusal (exit 2) becomes the documented D89
-corrupt-file behavior (set aside, defaults, successful export), because DR-85
-classifies that timestamp as a reader decode failure for every caller, as
-CHARC ruled in `a2ef868a6e14b506`.
+The corrupt-settings WARNING gap was pre-existing for ordinary malformed JSON
+in WP4.1. The scoped handler covers that and the year-one stamp; R3-1's new
+per-field warning also passes through it. A host's own logging handlers still
+receive original records. The formatter copies records; library run retains
+its existing last-resort filtering without adding a handler.
 
-The corrupt-settings WARNING contains full paths at its source. CHARC identified
-the plain-corrupt-file WARNING route as a pre-existing WP4.1 DR-81-class gap;
-this amendment covers it alongside the overflow case. Under pytest capture,
-the RED cases received the raw logged record but no redacted stderr warning;
-the new handler makes that stderr warning explicit and redacted. The defensive
-OverflowError arm in runner _settings is retained, with a comment stating that
-DR-85 handles it in load_settings and this arm is unreachable through that loader.
+## Validation
 
-## Validation so far
+All logs below are under work/wp4.3a. Sandbox pytest runs use
+PYTHONPATH=scripts, sandbox_mkdir_shim, no cache provider and per-run temp roots
+under that directory. No owner-footage input is used by this cell.
 
-- Turn 2: six new cases RED then GREEN; 474 passed/36 deselected in the allowed
-  sandbox video/layering run. Dispatcher seat: 494 passed/12 footage cases
-  deselected; format check reported 268 files already formatted.
-- Turn 3: six config cases and thirteen redaction cases reproduced RED;
-  final focused set 25 passed. Broader set: 370 passed, four failures, one
-  deselected. The failures were the stale B4 assertion and three blocked
-  administrative-share tests. Dispatcher subsequently confirmed all three UNC
-  cases pass and format check reports 269 files already formatted.
-- Turn 4: both WARNING forms reproduced RED; both passed after the handler fix.
-  Updated B4 plus both WARNING cases: 3 passed/9 deselected. Bounded headless,
-  new runner and WP4.2a set: 136 passed/4 deselected (one GUI case and the three
-  known sandbox-blocked UNC cases), no failures/skips. The UNC cases require a
-  seat rerun on the amended candidate.
-- Ruff check and strict mypy passed at each build boundary; the latest mypy
-  summary is 141 source files. Global format check is a dispatcher-seat check.
-- Every sandbox pytest execution uses sandbox_mkdir_shim, disables the cache
-  provider and writes temp material under work/wp4.3a. Logs are under that same
-  directory, with turn-specific names listed in the ledger.
+| Check | Actual result / evidence |
+|---|---|
+| Task 6 at dispatcher seat on 553d1f2 | 884 passed, 12 footage deselected in 777.96s; all three UNC cases included. Ruff format: 269 files already formatted; Ruff check passed; mypy clean in 141 source files. seat-t6.log. This is baseline development evidence, not a gate on Turn 6. |
+| F1 real-route RED -> GREEN | 23 failed -> 23 passed, 9 deselected; 2.06s -> 0.69s. turn6-f1-red-final.log / turn6-f1-green.log. |
+| F2 AST controls RED -> GREEN | 156 failed/6 passed -> 164 passed including product AST guards; 11 -> 9 deselected, 0.89s -> 0.87s. turn6-f2-red.log / turn6-f2-green.log. |
+| F9 fallback RED -> GREEN | 1 failed -> 1 passed, 173 deselected; 0.18s -> 0.09s. turn6-f9-red.log / turn6-f9-green.log. |
+| R3-1 per-field defaults and CLI warning RED -> GREEN | 4 failed -> 4 passed, 96 deselected; 0.96s -> 0.88s. turn6-r31-red.log / turn6-r31-green.log. |
+| F4 help smoke | Old help fails the writer-provenance/profile assertion; granted line passes and --help exits 0. turn6-f4-red.log / turn6-f4-green.log. No existing test pins the old help wording. |
+| Requested Turn-6 light regression plus WP4.2b naming | 561 passed, 4 deselected in 13.65s, no skips/failures. All config files, headless, new runner redaction, WP4.2a/WP4.2b and spawn tests; excluded gpu/footage/slow/gui/fullclip and explicitly deselected the three sandbox-blocked UNC cases. turn6-light.log. |
+| Final spawn file after lint-only fixture line split | 174 passed in 1.52s, no deselections/skips/failures. turn6-spawn-final.log. |
+| Ruff check | All checks passed! turn6-ruff-final.log. Initial E501 in an added AST fixture was corrected. |
+| Strict mypy | Success: no issues found in 141 source files. turn6-mypy.log. |
+| Write-mode format on six touched Python files | 6 files reformatted. turn6-format.log. Global format --check remains a dispatcher-seat check. |
 
-The verification loop caught and fixed an incorrect provenance-test expectation
-(the engine records effective defaults and a fresh timestamp), a missing doubled
-literal-Unicode redaction form, and test lint issues. The external B4 test
-conflict was raised before editing and resolved only under CHARC's narrow grant.
-No new in-envelope finding arose in Turn 4's bounded GREEN pass.
+The initial 24-case F1 RED matrix included a redundant delayed-NUL case; it was
+removed because NUL necessarily fails the first resolve. The final 23-case
+matrix has seven actual NUL routes and two delayed transient-error routes.
+No failure is omitted: the only development check failure after the required
+RED runs was the corrected E501 fixture line. The three UNC cases were not
+retried in the known restricted sandbox; request a seat run on this amendment.
 
-## Limits and remaining work
+## Review status and limits
 
-- This report is DRAFT. Finish the task-6 light-run matrix on the amended head,
-  Reviewer A to convergence, Reviewer B, then the ONE final two-leg gate. This
-  package has no full-suite/gate pass claim yet.
-- The runner redacts its own outputs and warning handler. A host's existing
-  logging handlers receive their original records; formatting copies the record
-  rather than changing another handler's view. The library run API retains its
-  existing last-resort filtering and adds no handler.
-- No frozen interface, GUI/app/jobs/photo writer, dependency, fixture or local
-  configuration changed. The frozen timestamp parser's underlying overflow is
-  contained at the owned readers. WP4.3 owns the separate startup integration
-  test and its xfail removal after integration.
-- No actual footage test, hardware measurement or fullclip run was performed
-  by this cell. Synthetic inputs and per-test temp paths supplied the new
-  integration evidence. No timing or memory claim is made.
+Reviewer A R1: NEW_CRITICAL_MAJOR_FOUND, 1 major, 2 minor, 6 advisory. The ledger
+adjudicated every finding. Turn 6 fixes F1/F2/F3/F4/F9, with F4's explicit grant;
+F5-F8 are disclosed below/as the console behavior line. R3-1 (ii) is an external
+scope addition, not an extra R1 finding. R2 must assess the remediation;
+Reviewer A has not yet converged. Reviewer B and the ONE final two-leg gate
+remain pending at the dispatcher seat. There is no final-suite/acceptance claim.
+
+- F5: unchanged raw OSError arms at verify.py:238, probe.py:140, encode.py:886
+  and capability.py:99 (reviewed-candidate anchors) may expose filename on
+  POSIX. Reviewer A executed Windows CreateProcess failures with filename=None;
+  POSIX reachability is reasoned, not executed here. Q-C grants only decode's
+  two exception arms. Disposition: REPORT-ONLY; dispatcher/CHARC owns banking
+  and follow-on assignment at these arms' next authorized error-text touch.
+- F6: file:/// URI and dot-segment spellings are unsupported redaction forms;
+  the reviewer found no product text generating them. Disposition: REPORT-ONLY;
+  dispatcher/CHARC owns banking, triggered if a product surface emits either.
+  This package promises the ruled mixed-separator forms, not arbitrary text.
+- F7: a malformed logging call whose mapping omits a key can fail before the
+  formatter and make logging.handleError print a raw record. Normal product
+  messages do not produce this trigger; the filter has the same earlier shape.
+  Disposition: REPORT-ONLY; dispatcher/CHARC owns banking for the next logging
+  hardening touch or a reachable malformed product call.
+- F8: the console-signal consequence is disclosed above, REPORT-ONLY under the
+  mandated flag; dispatcher/CHARC owns any future signal-policy commission.
+- The new settings path check is lexical, does not require existence, and
+  preserves valid relative paths. It handles NUL and ValueError; it does not
+  turn an unavailable output directory into a corrupt settings file.
+- Global format check and three UNC cases need dispatcher-seat verification
+  on this amendment. Reviewer/gate work is not replaced by the baseline run.
+- Only owned files and the previously granted B4 function have changed over
+  the arc. This turn changes no existing headless test, frozen interface,
+  GUI/app/jobs/photo writer, dependency, fixture, local configuration or register.
+  WP4.3 owns startup defense and its integration tests. No hardware, footage or
+  fullclip test, product timing or memory measurement was run by this cell.

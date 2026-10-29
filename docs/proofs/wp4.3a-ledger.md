@@ -23,7 +23,7 @@
 | Turn 2 footer, supplied at Turn 3 dispatch | `tokens used` 238,706; input depth 146,818 | 258,400 tokens | Dispatcher-read figure; no estimate substituted. |
 | Turn 3 footer, supplied at Turn 4 dispatch | `tokens used` 346,443; input depth 205,870 | 258,400 tokens | Past the evaluation point. Turn 4 is explicitly bounded; leave a successor handoff and await the next dispatcher depth. |
 | Seat 1 Turn 4 footer, supplied at Seat 2 dispatch | `tokens used` 439,112; input depth 237,170 | 258,400 tokens | Seat 1 retired at this boundary; Seat 2 is a fresh session. |
-| Seat 2 Turn 1 (ledger Turn 5) | seat 2 turn 1, pending me | 258,400 tokens | Dispatcher supplies the next footer reading; no estimate substituted. |
+| Seat 2 Turn 1 (ledger Turn 5) | 86,848 / 258,400; turn-5 tokens used 89,765 | 258,400 tokens | Dispatcher supplies the next footer reading; no estimate substituted. |
 
 ## Round 0: observed base
 
@@ -203,7 +203,7 @@ Evidence is retained by the orchestrator outside the repository under
 
 | Round | Critical | Major | Minor / advisory | In / out of envelope | NEW / REOPENED | Reverts | Product / tests-only fixes | Transport / CLI | Dispatcher depth | Verdict / evidence |
 |---|---|---|---|---|---|---|---|---|---|---|
-| R1 | 0 | 1 | 2 minor / 6 advisory | 7 in / 2 out (F4 edit scope; F5 reachability) | 9 NEW / 0 REOPENED | 0 | 0 / 0 executed; ledger-only adjudication; product F1/F9 and test control F2 planned | Orchestrator process via codex_cell.py review; claude-opus-5-5 / high; CLI version not supplied | seat 2 turn 1, pending me | NEW_CRITICAL_MAJOR_FOUND; r1 evidence below; remediation pending |
+| R1 | 0 | 1 | 2 minor / 6 advisory | 8 in / 1 out after F4 grant (F5 residual); original adjudication 7 / 2 | 9 NEW / 0 REOPENED | 0 | F1/F4/F9 product (3); F2 tests-only (1); F3 report; external R3-1 adds product/tests separately | Orchestrator process via codex_cell.py review; claude-opus-5-5 / high; CLI version not supplied | Turn 5: input 86,848 / 258,400; tokens used 89,765. Turn 6 pending dispatcher | NEW_CRITICAL_MAJOR_FOUND; Turn-6 fixes verified locally, awaiting R2; evidence below |
 
 At round 5 and every fifth round thereafter, yield with the cumulative ledger
 for approval to continue under the fill. Reviewer B and the final ONE two-leg
@@ -702,27 +702,188 @@ No new dependency, module, OS branch, interface, GUI/app/jobs/photo-writer,
 fixture, local-config or register change; no footage read/write, mailbox post,
 subagent, commit, git write or sibling-worktree access.
 
+
+## Turn 6 (Seat 2 Turn 2): R1 remediation
+
+### CHARC ruling recorded verbatim before remediation
+
+Source: CHARC `d6e9abdfa16feb0e`, 2026-10-29T17:03:59Z;
+`C:/Users/rwsmy/clearwater-review-evidence/wp4.3a/r1-ruling-d6e9abdf.md`.
+
+```text
+**2. WP4.3a R1.**
+- **F1 MAJOR, FIX as the reviewer reads it:** DR-81 (b) closes only when the guard wraps the resolve that product code actually reaches (`write_target_refusal` via `_check_own_paths` / `check_outputs`), with the test planting the raise AT that site; NUL as `ValueError` included. The current test is moved, not kept beside.
+- F2, F3 FIX; F5-F9 as proposed.
+- **QUERY F4 = GRANT, RULED:** the ONE help-string line at `tools/headless_export.py:1203`, in step with Q20's `:143` and `:593-599`; text only; seat 2 confirms no test pins it (if one does, the test's expected text changes with it, same grant).
+
+(ii) **Scope addition to WP4.3a, GRANTED:** in `config/settings_store.py`, an `output_folder` (and any other path-valued field) that cannot be a path (NUL, or `Path()` raising `ValueError`) is treated like an out-of-range field by the EXISTING per-field rule (`_clamp`, :129: replaced by its default with one warning), NOT a whole-file set-aside: the file is well-formed, one value is unusable, and the user's other settings survive. One decode check + one RED-first test in `tests/test_config_settings.py` (owned). Codex seat 2 folds it into the R1 remediation turn; it is the DR-85 sibling in spirit ("a settings file cannot stop the program from starting") and the brief's register table gains one line. Banking it is DECLINED: the startup skip alone leaves a silently ignored output folder with no warning at the source.
+```
+
+### Turn-6 RED/GREEN record (in execution order)
+
+- F1: moved the old artificial-resolution test to the real write-check routes;
+  no defensive-lookup duplicate retained. Final RED: **23 failed, 9 deselected
+  in 2.06s**, exit 1, `work/wp4.3a/turn6-f1-red-final.log`. The main assertion
+  `assert he.main(argv) == 2` instead receives raw OSError/RuntimeError/ValueError;
+  library cases fail `pytest.raises(RunnerRefusalError)` with those raw errors.
+  The trace reaches write_target_refusal -> inside -> _resolved -> Path.resolve.
+  ValueError cases use an actual embedded-NUL path. Two transient-error cases
+  arm at the real run call to prove late refusal handling. Initial matrix was
+  24 RED cases; the redundant late-NUL case was removed because NUL necessarily
+  fails the first check, so it cannot represent a later transient failure.
+  GREEN: **23 passed, 9 deselected in 0.69s**, exit 0,
+  `work/wp4.3a/turn6-f1-green.log`. A private _footage_checks context wraps
+  configuration/own-path and output preflight checks, plus run's configuration,
+  output and cache checks. Each maps the three exception classes to a path-free
+  RunnerRefusalError before engine construction/export; CLI returns 2.
+
+- F2: synthetic launch forms RED: **156 failed, 6 passed, 11 deselected
+  in 0.89s**, `turn6-f2-red.log`, exit 1. Failing assertion:
+  `assert _spawn_calls(ast.parse(source))`, with `guard missed <form>: <api>`.
+  Six existing direct/module/direct-import run/Popen controls already passed;
+  the other call families, bound names, getattr and partial were missed.
+  Widened API recognition and import/bound-callable resolution conservatively;
+  callable factories count as suspicious sites too. Pin now requires exactly
+  seven product sites. GREEN including both product structural guards:
+  **164 passed, 9 deselected in 0.87s**, `turn6-f2-green.log`, exit 0.
+
+- F9: RED **1 failed, 173 deselected in 0.18s**, `turn6-f9-red.log`,
+  exit 1: expected "OSError: an operating-system error", got "OSError: None".
+  One-line fallback in _check_cuda's existing arm. GREEN **1 passed,
+  173 deselected in 0.09s**, `turn6-f9-green.log`, exit 0.
+
+- R3-1 (ii): confirmed frozen Settings.output_folder is the ONLY path-valued
+  Settings field. Added one parameterized config test (NUL, constructor
+  ValueError, path-use ValueError) and one real CPU CLI warning integration.
+  RED **4 failed, 96 deselected in 0.96s**, `turn6-r31-red.log`, exit 1:
+  the expected whole Settings equality fails (NUL/use retains the bad field;
+  constructor failure loses the other settings by setting aside the file);
+  CLI warning count is 0 instead of 1. A decode check now validates NUL,
+  Path construction and absolute-path formation without requiring existence
+  or resolving/reading the configured output directory. It substitutes null
+  only to let frozen IF-10 validate the other fields, then passes the invalid
+  original to _with_valid_values, which uses the actual default and existing
+  _warn_out_of_range exactly once. The other ranges use the same function,
+  now invoked after successful IF-10 decoding inside _decode. GREEN **4 passed,
+  96 deselected in 0.88s**, `turn6-r31-green.log`, exit 0. File bytes, other
+  settings, one warning, no backup and actual export suffix are proved.
+  The runner's existing formatter suppresses repr-valued warning arguments,
+  so even this output path, unknown to its Redactor, is hidden. No handler
+  change or frozen Settings edit was needed.
+- F4: repository test search found no pin of the old help wording; the existing
+  test_help_exits_0 checks status only. An in-memory --help check RED raised
+  `AssertionError: help omits the accepted writer provenance/profile form`
+  (`turn6-f4-red.log`); the single granted line now reads the recommended text.
+  The same check GREEN exits 0 and describes writer provenance/profile
+  (`turn6-f4-green.log`). No existing-test expectation was changed.
+
+### Executed fixes and cumulative accounting after Turn 6
+
+CHARC's grant changes F4 from the initial REPORT-ONLY disposition to FIX.
+R1 severity remains 0 critical / 1 major / 2 minor / 6 advisory, all 9 NEW,
+0 REOPENED. Current edit/reachability envelope is 8 in / 1 out (F5). No revert.
+R3-1 (ii) is an external granted scope addition from WP4.3 R3, nominal MAJOR;
+it is not counted as another Reviewer A R1 finding or a reopened finding.
+
+| Finding | Executed disposition | Product versus tests/control versus report |
+|---|---|---|
+| F1 / MAJOR | FIXED locally; real-route tests moved, guard now surrounds the actual checks. | Product plus 23 regression cases; RED/GREEN above. R2 confirmation pending. |
+| F2 / MINOR | FIXED locally; alternate launch detection and exactly-seven pin. | Tests/control only; 162 planted cases plus two product guards GREEN. |
+| F3 / MINOR | FIXED in the refreshed report. | Report only; supplied task-6 figures, committed anchors, actual F1 results and current review/gate status. |
+| F4 / ADVISORY | FIXED under the explicit one-line grant. | Product help text only; no existing test pin/expected-text edit. In-memory help check RED/GREEN. |
+| F5 / ADVISORY, outside ruled touch | REPORT-ONLY Limit recorded. | No product/test fix. Dispatcher/CHARC owns banking/follow-on at the four unchanged arms' next authorized error-text touch. |
+| F6 / ADVISORY | REPORT-ONLY Limit recorded. | No product/test fix. Dispatcher/CHARC owns banking, triggered if product text emits a URI/dot-segment spelling. |
+| F7 / ADVISORY | REPORT-ONLY Limit recorded. | No product/test fix. Dispatcher/CHARC owns banking at the next logging hardening touch or a reachable malformed product log call. |
+| F8 / ADVISORY | REPORT-ONLY behavior line recorded. | No product/test fix; reasoned console-signal consequence, no signal/orphan experiment. Dispatcher/CHARC owns any later signal-policy commission. |
+| F9 / ADVISORY | FIXED locally, one logical expression. | Product plus one None-strerror test; Ruff wraps the expression without a refactor. |
+| R3-1 (ii) / external scope addition | FIXED locally under CHARC d6e9abdf. | Product plus three config cases and one actual CLI warning/export case. Per-field default, one warning, no backup and other values preserved. |
+
+R1 disposition totals now **FIX 5** (F1/F2/F3/F4/F9), **REPORT-ONLY 4**
+(F5-F8), DECLINE 0. Product-bearing R1 fixes: 3; tests-only fixes: 1;
+report fix: 1. R3-1 adds 1 product-bearing scope fix separately.
+These are executed changes, not a claim that Reviewer A has converged.
+
+### Final light checks and verification loop
+
+| Check / surface | Actual result | Evidence under work/wp4.3a/ |
+|---|---|---|
+| All tests/test_config_*.py, tests/test_headless_export.py, tests/test_wp43_runner_redaction.py, tests/test_wp42a_runner_hardening.py, tests/test_wp42b_naming_guard.py, tests/test_io_video_spawn.py | 561 passed, 4 deselected in 13.65s, exit 0; no skips/failures. | turn6-light.log |
+| Final spawn file after E501 fixture-string line split | 174 passed in 1.52s, exit 0, no deselections/skips/failures. | turn6-spawn-final.log |
+| Ruff check . | Initial E501: one added AST fixture string exceeded 100 columns; fixed by literal concatenation. Final All checks passed!, exit 0. | turn6-ruff.log; turn6-ruff-final.log |
+| Strict mypy | Success: no issues found in 141 source files, exit 0. | turn6-mypy.log |
+| Write-mode Ruff format on six touched Python files | 6 files reformatted, exit 0. Global --check is the dispatcher's seat check. | turn6-format.log |
+| Final write-mode format after the lint/docstring edits | 6 files left unchanged, exit 0. No code changed after the passing checks. | turn6-format-final.log |
+| Scope, ruling preservation and claims audit | Exactly eight owned paths; LF, ASCII docs; existing config tests byte-identical; new CHARC excerpts and prior B4 ruling verbatim; report summaries match logs; one current handoff; no untracked deliverables; git diff --check clean, exit 0. | turn6-scope-claims-check.log |
+
+The light run uses PYTHONPATH=scripts, sandbox_mkdir_shim and no cache provider,
+with --basetemp under work/wp4.3a. Marker expression excludes gpu, footage,
+slow, gui and fullclip. Four deselections: one GUI case plus the three known
+sandbox-blocked UNC nodes explicitly deselected below. No new test has a marker;
+all use per-test tmp_path/synthetic inputs or in-memory AST sources. The baseline
+884-pass task-6 run is not rerun or relabeled as this candidate's gate.
+
+| Verification pass | Suspected / confirmed / rejected | Fix or resulting action |
+|---|---|---|
+| F1 actual route | Previous guard misses real own/output/cache resolves; independently confirmed at Turn 5 and 23 final RED cases at Turn 6. NUL is an actual ValueError, not a configured() fake. | _footage_checks covers all caller routes; 23 GREEN cases prove safe status/message and no export/config/cache writes. Old artificial test moved, not duplicated. |
+| F2 controls | Guard misses non-run/Popen APIs and indirect calls; 156 planted assertions failed while six old forms passed. | All 162 forms now detected; seven real sites and single flag-construction guard pass. No product spawning API changed. |
+| F9 | Missing strerror renders literal None, confirmed RED. | Fixed-text fallback, exact returned-message GREEN. |
+| R3-1 | Bad path is accepted or a constructor error sets aside the entire file; four RED cases confirm source behavior and missing warning. | Decode validation + existing per-field rule, four GREEN cases preserve bytes/other settings and hide even an unknown private path in CLI stderr. |
+| F4 | Help omits the newly accepted writer form; source and in-memory check confirm. No test pins it. | Only granted help line changed; check GREEN. |
+| Final light run / static checks | No regression in 561 selected cases; no new product defect found. One long added-test line confirmed by Ruff. | Literal split; all 174 spawn cases rechecked; Ruff and strict mypy pass. No broader rerun justified by this formatting-only edit. |
+| F3 claims audit | Prior report had stale commit/UNC statements and an unsupported F1 closure; R1/Turn-6 status must remain distinct from acceptance. | Report rewritten against actual logs, including external row and F5-F8; R2, B and final gate explicitly pending. |
+
+### RUN REQUEST and boundary
+
+At the dispatcher seat on the amendment, run global `uv run ruff format --check .`
+and these existing UNC nodes (the sandbox limitation is already documented;
+no additional administrative-share attempt is made here):
+
+```text
+tests/test_headless_export.py::test_g1_inside_sees_every_spelling_of_the_same_folder
+tests/test_headless_export.py::test_g1_main_refuses_every_footage_check_through_another_spelling[unc]
+tests/test_headless_export.py::test_g1_the_redactor_hides_the_extended_spellings
+```
+
+NEXT is the orchestrator's Reviewer A R2 on the amended candidate. Reviewer B
+and the ONE two-leg gate remain pending after A convergence; no harness gate.
+No open STOP/question: F4 is granted and the new path-field scope is implemented.
+
+All changes remain in six owned Python files and the owned report/ledger.
+No existing headless-test change this turn; the earlier B4 function grant stands.
+No frozen interface, GUI/app/jobs/photo writer, dependency/lock, fixture,
+local-config, register or harness file changed; no footage read/write, hardware
+or fullclip run, timing/memory measurement, mailbox, commit, git write, stash,
+subagent or sibling-worktree access. Exact scope/bytes/ruling preservation and
+claims checks passed as recorded above; the final documentation-only diff check
+is retained at work/wp4.3a/turn6-final-diff-check.log.
+
 ## RESUME HERE - successor seat
 
-- Current committed product/test/report head: **553d1f2**, branch wp4.3a, base
-  fe65e6a. Only this R1 adjudication ledger is uncommitted by this seat; the
-  dispatcher commits it. Prior commits and verbatim B4 ruling remain above.
-- Task 6 is COMPLETE as development evidence on 553d1f2: dispatcher seat
-  **884 passed, 12 footage deselected in 777.96s**, all three UNC cases included;
-  ruff format/check and strict mypy green. See the supplied evidence table.
-  Do not rerun that matrix merely to replace prior-seat evidence.
-- R1: 1 major, 2 minor, 6 advisory, all NEW. Full dispositions and independent
-  F1/F2 confirmations are above. Four fixes planned, none performed this turn.
-  Blocking item F1 means no Reviewer A convergence claim.
-- NEXT TURN after dispatch: RED-first F1 real-route tests and exception mapping,
-  F2 AST positive controls/seven-site pin, one-line F9 fallback plus focused
-  test; then refresh the report for F3 and disclosures F4-F8 against actual
-  results. Keep F4's help line untouched without CHARC's grant. Scope otherwise
-  remains the FINAL brief plus verbatim B4/runner grant above.
-- Remediation checks use the sandbox shim/no cache provider and work/wp4.3a
-  temp roots, exclude gpu/footage/slow/gui/fullclip; no administrative-share
-  cases in the sandbox. Global format check, heavy commands, Reviewer A/B and
-  the ONE final two-leg gate remain at the dispatcher seat as instructed.
-- Seat 1 retired at input depth 237,170 / 258,400, footer tokens used 439,112.
-  Seat 2 Turn 1 depth: **seat 2 turn 1, pending me**; dispatcher supplies it.
-  Re-seat discipline: evaluate near 200K, stop at a step boundary near 250K.
+- Last committed head at Turn-6 entry: **a0b9235** (Turn-5 R1 adjudication),
+  product/test baseline **553d1f2**, branch wp4.3a, base fe65e6a.
+- Turn-5 supplied depth: **86,848 of 258,400**, tokens used **89,765**.
+  Turn-6 depth awaits the dispatcher footer reading; no estimate is substituted.
+  Evaluate near 200K, re-seat at a step boundary near 250K.
+- Turn 6 executed R1 F1/F2/F3/F4/F9 fixes and external R3-1 (ii) scope addition.
+  CHARC d6e9abdf item 2 and scope addition (ii) are verbatim FIRST in the
+  Turn-6 section. The older B4 ruling a2ef868a remains verbatim above.
+- Product changes: real footage resolution guards in main/run; CUDA strerror
+  fallback; settings path decode check with existing per-field default/warning;
+  one-line --parameters help update. Tests: real F1 routes replace the old
+  artificial test; widened AST guard/162 controls/seven-site pin; missing-strerror
+  case; three bad-path config cases plus one real CLI warning/export case.
+- Final evidence: **561 passed, 4 deselected in 13.65s**, three UNC plus one GUI
+  excluded; final spawn file **174 passed in 1.52s** after lint-only fixture split.
+  Ruff final green; strict mypy clean in 141 files. Baseline task 6 remains
+  **884 passed, 12 footage deselected on 553d1f2**, including UNC at that seat.
+- RUN REQUEST: dispatcher global format --check and the three named UNC nodes
+  above on this amendment. Do not rerun them in the known restricted sandbox.
+- R1 counts remain 1 major, 2 minor, 6 advisory; all NEW, none REOPENED; no
+  reverts. Five findings fixed; four report-only; external R3-1 fix separate.
+  No convergence claim. Report reflects actual results, limitations and new row.
+- NEXT: Reviewer A R2 at the dispatcher seat. Reviewer B then ONE final two-leg
+  gate only after A convergence; no premature full-suite request. No extra
+  independent reviewer/subagent is commissioned by this cell.
+- Dispatcher may split this turn into product/tests and report/ledger commits
+  as explicitly requested; suggested path groups are in the final return.
+  All original locks plus explicit B4 and d6e9abdf grants remain binding.
