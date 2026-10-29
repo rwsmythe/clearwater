@@ -352,6 +352,18 @@
   late cut (91 + `-t` one frame later) -> 4(b) FAIL on `4b_count` and 4(c) FAIL. Rung 2 SETTLED.** NEXT: rung 3 (W3) with
   the V4-delta check in seat 2; rung 4 (W4 fullclip once); report; A FAST; B; the ONE gate. WP4.3 dispatch + WP4.3a short brief
   in parallel at the orchestrator's seat.
+- **WP4.3 DISPATCHED ~12:30Z on FINAL main `038f02e`** (one ff of brief-wp4.3-rev rebased onto 9fc2469; Rulings byte-identical,
+  my 7c7df3db appended verbatim; Q14 split applied with one-line pointers; DR-85 row in the brief; NOT-owned gains WP4.3a's
+  files). Cell `wp43-cell1` (opus-high; A and B Codex gpt-6.1-sol/high) in `.worktrees/wp4.3` on 038f02e; round 0 only this
+  turn, table to me. Codex pace 0.58 at 12:11Z.
+- **WP4.3a BRIEF RULED FINAL ~12:40Z (query `f62006da3a574003`; brief-wp4.3-rev bc0b8a2, `docs/briefs/wp4.3a-brief.md` 230
+  lines, 0 CR; my post ruling-wp43a): Q-A limit is 600 s (`READ_TIMEOUT_S`), named through the constant, DR-81 (c) figure
+  CORRECTED in the register now; Q-B the two test launches (test_wp42_v3_product.py:141, test_wp321_fft_release.py:165) NOT
+  owned = residual; Q-C `decode.py:178` `_check_cuda` fixed text in BOTH branches (TimeoutExpired -> limit via
+  CUDA_CHECK_TIMEOUT_S; OSError -> class + strerror only), RED-first each, = DR-81 (d) closed on arrival.** Orchestrator
+  commits it onto main; dispatches when WP-T6's Codex cell stands down. WP-T6 rung-3 F401 grant (encode test :48) CONCURRED.
+  Owed by me at 4.3a's accept: AD-13 note, AD-23 'applied by WP4.3a', DR-58(b)/76/77/81(a-d)/85 closures. NEXT: WP-T6 W3
+  window + rung 3 result; WP4.3 round-0 table; WP4.3a dispatch.
 - **(history) After WP4.1's accept:** WP4.2's brief (DRAFT RULED on main 3aa3c51) got ONE revision pass against WP4.1's accept record, then FINAL
   on CHARC's word; its revision must carry: DR-78/79 (B2 rows) as WP4.2 items, the WP4.1 runner's final names and the stream-syntax
   predicate, the Limit text. WP4.3's revision later carries DR-75 (REQUIRED test under its Q12), DR-76, DR-77, and the AD-23 'applied by
