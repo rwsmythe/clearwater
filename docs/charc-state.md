@@ -53,6 +53,19 @@
   (`bench.py:1305` stray_processes 59.5 s; Codex micro-package), DR-88 (B1 fixture self-check). Run it on main AFTER the ff post
   with the accept SHA (never before: a sed slip ran it on main once at 15:40Z, reverted with `git checkout --`, no commit).
   Working copies here are CRLF (autocrlf=true); the 0-CR check is on the BLOB (`git show HEAD:<f>`), scripts write LF.
+- **WP-T6 ACCEPTED main `fe65e6a` (15:44Z, msg 9865e220; record `docs/proofs/wp-t6-accept.md`). CHARC QA CONFIRMED (static):**
+  code patch-id 2db04036 equal on `5fdcda4..a4472fb` (gated) and `5e1fe8f..fe65e6a` (merged); docs-only difference; 8 files
+  (conftest +518 additive, four test files, the marker line, report, ledger); src/tools/uv.lock untouched; harness 382 OK here.
+  **MY ACCEPT EDITS COMMITTED (this commit):** fill GATE_CHECKS (three expressions `and not fullclip`, FULLCLIP once per
+  phase-end gate and when a brief asks, identity parallel + serial + fullclip = all, counts 5313 + 1137 + 7 = 6457); CLAUDE.md
+  gate paragraph; AD-28 amendment; register DR-22/DR-66 notes, NEW DR-86 (Q7 gap list, owner trigger), DR-87 (`bench.py:1305`
+  stray_processes, Codex micro-package AFTER WP4.3a), DR-88 (B1 fixture self-check). Worktrees `wp-t6`, `wp-t6-mc` releasable.
+  Codex lane share: WP-T6 = 14 turns over two seats; 5 Codex-built packages. **WP4.3 R1-13 RULED (a)** (post be611d89, AD-11
+  domain clause: 320x180 outside V8's domain; GX011627 leg asserts mean + p99 at k=2; report cites the clause; (b) declined);
+  **D85 missing-folder residual = Limit + DR-89 mine at WP4.3's accept** (trigger: next touch of the leftover journal or an
+  owner report of a stale `.clearwater-partial`). LIVE: WP4.3a Codex turn 1 (round 0) from fe65e6a; WP4.3 cell 4 R2 review-only
+  (316K), remediation + R1-13 condition 2 to a fresh cell 5, then EXCLUSIVE windows (V7, GX011627 V8/V18, DR-44(c)/DR-50),
+  B, gate.
 - **(gen 6 history follows; newest facts at the end of the block)**
 
 - **Gen 6 pickup facts:** bash gauge 45 ms; inbox 0 unread at pickup; announce posted to the orchestrator (gen 17, shell-busy in the WP4.1 gate) with ONE cue; the two register scripts copied from gen 5's scratchpad (18c10a55...) into this session's scratchpad (6687b6c9-eacd-4ffc-995e-51c9195391d1) as `edit_register_p4a.py` (drop its DR-65 block before running: already applied at 3114d23) and `edit_register_p4b.py`.

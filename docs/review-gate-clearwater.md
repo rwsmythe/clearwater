@@ -159,27 +159,33 @@ candidate rebased onto main, and records the actual output lines):
   discover -s tests/harness` whenever the change touches `scripts/`, `.claude/`,
   the kernel docs or `tests/harness/`.
 - **The two-leg pytest gate** (WP-T4, AD-28, from 2026-10-28; measurements and limits in
-  `docs/reports/wp-t4-parallel-tests.md`; median suite wall about 64 min against about 74 for
-  one process). From Git Bash (a PowerShell 5.1 redirect writes UTF-16), with
+  `docs/reports/wp-t4-parallel-tests.md`; sizing in `docs/reports/wp-t6-gate-sizing.md`; after
+  WP-T6 the per-package gate is parallel about 714 s + serial about 1,389 s, about 35 min wall,
+  against about 64 min at WP-T4). From Git Bash (a PowerShell 5.1 redirect writes UTF-16), with
   `QT_QPA_PLATFORM=offscreen`, `PYTEST_ADDOPTS` unset, and a new RUN identifier per gate; every
   execution and collection leg uses its own fresh `--basetemp` under `work/`, never footage.
   Before each heavy leg check at least 5 GiB available
   (`uv run python -c "import psutil; assert psutil.virtual_memory().available >= 5*2**30"`).
-  Run, one heavy job at a time:
-  `uv run pytest -q -rs -n 4 -m "not gpu and not footage and not gui and not slow" --basetemp=work/pytest-gate-RUN-parallel`,
-  then `uv run pytest -q -rs -m "gpu or footage or gui or slow" --basetemp=work/pytest-gate-RUN-serial`.
-  **Collection:** collect all and both expressions
-  (`uv run pytest --collect-only -q [-m "<expression>"] --basetemp=work/pytest-gate-RUN-collect-<all|parallel|serial> > work/pytest-gate-RUN-<all|parallel|serial>.txt`),
+  Run, one heavy job at a time (WP-T6, from 2026-10-29: the `fullclip` marker names the
+  full-GX011627 forms of the seven gate tests; the trim forms stay in the serial leg):
+  `uv run pytest -q -rs -n 4 -m "not gpu and not footage and not gui and not slow and not fullclip" --basetemp=work/pytest-gate-RUN-parallel`,
+  then `uv run pytest -q -rs -m "(gpu or footage or gui or slow) and not fullclip" --basetemp=work/pytest-gate-RUN-serial --durations=0 --junitxml=work/pytest-gate-RUN-serial.xml`.
+  **FULLCLIP** (`uv run pytest -q -rs -m "fullclip" --basetemp=work/pytest-gate-RUN-fullclip --durations=0`, no `-n`,
+  about 26 min) runs at least ONCE per phase-end gate report and whenever a package brief asks
+  for it; a per-package gate does not run it. The trim forms prove V4 MANDATORY and REQUIRED;
+  three best-effort container items are proved by the fullclip forms only (WP-T6 report, Limits).
+  **Collection:** collect all and the three expressions
+  (`uv run pytest --collect-only -q [-m "<expression>"] --basetemp=work/pytest-gate-RUN-collect-<all|parallel|serial|fullclip> > work/pytest-gate-RUN-<all|parallel|serial|fullclip>.txt`),
   each exiting 0, and keep only node-ID lines (starting `tests/` and containing `::`). Each
-  list's length equals pytest's own "N tests collected" line. Require no duplicates, an empty
-  parallel/serial intersection, a union equal to all, and parallel + serial = all. Diff the
+  list's length equals pytest's own "N tests collected" line. Require no duplicates, pairwise
+  disjoint lists, a union equal to all, and **parallel + serial + fullclip = all**. Diff the
   candidate's full list against main's: every removed ID is explained by the package's diff, or
   the gate is void.
   **Outcomes:** each leg is green with passed + skipped + xfailed + xpassed equal to its
   selected count and zero failures or errors. Quote each leg's `-rs` skip lines and compare them
   with the previous accepted gate's. A new or moved skip (a seat where CuPy does not initialise,
   or `clearwater.local.toml` not copied) is explained or the gate is void. Recollect at every
-  gate; the WP-T4 counts (4032 + 1046 = 5078) are not frozen.
+  gate; the counts are not frozen (WP-T4 4032 + 1046 = 5078; WP-T6 gate 5313 + 1137 + 7 = 6457).
   **New parallel-leg tests** use a per-test `tmp_path` and no shared path. A new wall-clock bound
   in one is marked `slow` with a reason, as E1 was. The reason names the bound and says the
   marker is for timing isolation, not duration. A generous sanity ceiling, ten times the
