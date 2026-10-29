@@ -836,3 +836,55 @@ content). Slip: one bare `cd` into the worktree at the start of a ledger-edit co
 resets its directory; `pwd` checked afterwards: the main tree); not repeated. A second slip: the ledger
 commit `031379a` carried one NUL byte (a heredoc collapsed a doubled backslash), caught by a
 post-commit check and replaced by its escape text in the next commit (a Write-tool script).
+
+Depth at the Group A yield: 110,453 (`scripts/cell_depth.py`, 45 turns; given by the dispatcher,
+gen 22). Dispatcher QA on `badece4`: the `startup.py` diff read (pair `drop` consistent with
+`entries()`, `remove` by id via `_keep_only`, the skip before `remove_leftovers`); every changed
+blob since `21ba03f` 0 CR and 0 NUL; the R3 row reads 0 / 1 / 4.
+
+### Group B (the witnesses)
+
+Test-only, each witness derived from the scenario text quoted verbatim in its docstring (spec V7,
+spec section 487; brief question 10 (b), (e) with (a), (c)). Each new witness was shown to
+distinguish by an UNCOMMITTED mutation run (temporary file `tests/test_zz_cell6_mutation.py`,
+deleted after the run; log `work/wp4.3-c6/mut.txt`): (b) with `EngineClipAnalysis.proxy` refusing
+every pts, the witness read 0 and `_within` failed; (e) with the preview never asking for k = 1
+(`needed_factor` held at 2 or more), no k = 1 render arrived, the held write's guard failed the
+export ("no 1:1 render arrived during the sink's write") and the scenario timed out. R3-5's
+predicates: the same test with no hold and a 5 s wait before the close read `at close [False]`
+for the analysis and the export, which failed (`dr44-mut.txt`). Targeted run (`test_app_v7`,
+`test_app_wiring`, the eight layering tests; `gui` and `slow` included): 99 passed in 144 s.
+ruff check, ruff format --check (280), mypy strict (146): clean. Every committed blob 0 CR, 0 NUL,
+ASCII.
+
+- R3-3 MINOR (REOPENED R1-12, second reopen), `065f5f0`: V7 (e)'s export sink (`_HeldSink`, put in
+  through the engine's `_sink_for`) holds its first `write` in progress after the frame is
+  written until a render of the photo with `result.k == 1` has been delivered; the 1:1 view is
+  asked for only once that write has begun; `k1_renders_during_a_sink_write` counts only k = 1
+  renders delivered while that write has not returned. Gate form: 57.0 / 24.0 ms, 1,491 ticks,
+  witness 1. Test `test_app_v7.py::test_v7_c_e_export_and_a_full_render_during_it`.
+- R3-4 MINOR (REOPENED R1-12, second reopen), `065f5f0`: V7 (b) counts the proxies the preview
+  widget displays (`set_proxy`, an instance wrapper calling the real method) while the analysis
+  phase is `running`; the slider moves only drive the scrub. Gate form: 22.0 / 18.0 ms, 256
+  ticks, `proxies_shown_during_analysis` 62. Test
+  `test_app_v7.py::test_v7_a_b_analysis_and_scrubbing`.
+- R3-5 MINOR, `a0f43cd`: the DR-44 (c) close test wraps the analysis's frame source (through
+  `build_application`'s `engine_factory`) and the export's sink (`_sink_for`); each holds its job
+  after the first frame until the first job runner's `close` begins, where the predicate is read
+  and asserted: the iterator has advanced and not ended (analysis); the sink is open, has written
+  a frame, and neither its close nor its abort has begun (export). The batch item's state is
+  printed, not asserted (unchanged scope). Figures: analysis 46 ms, export 18 ms, batch 28 ms
+  (were 17 / 10 / 23 ms unheld). The report sentence (`:100`, now `:104-109`) states exactly what
+  the predicates prove. Test `test_app_wiring.py::test_dr44c_a_real_job_ends_within_the_shutdown_timeout_at_close`.
+
+Beyond the named sentence: the report's V7 table rows (a), (b), (c), (e) and the witness paragraph
+were also updated (`065f5f0`), since rows (b) and (e) named the old witnesses ("scrub moves", "1
+render at 1:1 during the export") and the paragraph described the old arrangement; (d) and (f)
+keep cell 4's figures. Open for the window: the uncommitted S7 driver in the evidence folder
+imports these scenario functions; the witness keys it prints are now
+`proxies_shown_during_analysis` and `k1_renders_during_a_sink_write`.
+
+Decision for Reviewer A to challenge: the holds (V7 (e)'s write, R3-5's frame and write) are
+deterministic arrangements, released by the delivered render or by the close itself, never by a
+timer; the R3-5 hold shifts the measured close figures (the job resumes from its hold as the
+close begins), and the figures of record stay the exclusive window's.
