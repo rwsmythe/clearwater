@@ -208,18 +208,49 @@ RULING on WP4.2 round 0 (query 1286b25667b9ec63; ledger `wp4.2` 283f022). PRIMAR
 
 CAP at 05:33:37Z noted; WP4.2a in Codex turn 2 (round 0 at 933e33e). Build grant after WP4.2a's merge and the rebase, or at the cap, as the brief says. Nothing further from me.
 
-## RESUME HERE (build)
+## Build record (cell 2, on main `f991254`, WP4.2a merged)
 
-For a fresh cell after the build grant: read `docs/dispatch-recipe.md`, the brief (Rulings and
-Revision 1 rulings govern), this ledger's design table AS RULED (the orchestrator's reply to
-Y1 carries the rulings on G1 and R0-Q1..Q6; record them here verbatim first). Confirm the
-branch was rebased onto main with WP4.2a merged (`git -C <wt> log --oneline -3`; WP4.2a's
-helper and `check_outputs` file check present in `tools/headless_export.py`). Build order:
-item 1 (DR-67 hook + `test_wp42_device_backend.py`, RED first with planted wirings), item 2
-(root + `test_wp42_composition.py` + router pin (a)), item 3/4 (runner + pins (b) (c) +
-`test_wp42_runner_video.py`), items 8/9 (G1, RED on the reproduction first), item 10, items
-11/12, then `test_wp42_video_path.py` and `test_wp42_v3_product.py` (a V3 miss = STOP with the
-figures), light gates (ruff, format, mypy, the targeted files plus the four deps tests), then
-Reviewer A from WP4.1's `r5\` runner shape, then `WINDOW REQUEST` for the two-leg suite, then
-task 10 only when granted. Reproduction scripts: the round-0 scratchpad scripts are NOT durable;
-their content is summarised under "Round 0 -- read and map" and is re-derived by the RED tests.
+Commits, in order: `0b9a1a1` DR-67 hook + `test_wp42_device_backend.py`; `cfc94cf` DR-73 (a);
+`35e1c63` root + `test_wp42_composition.py` + router pin (a) renamed; `c5dc02d` runner +
+pins (b) (c) + `test_wp42_runner_video.py`; `e2a324a` G1 (DR-45 (b) count check, DR-47 (a)
+one-shot) + export `_expected_frames`; `2953d94` DR-71; `5b96e9c` DR-74 + DR-73 (b) rename;
+`e37a3c2` V4 / V9 / V17 / own clip / cancel; `00397cb` V3; then the report and this ledger.
+
+RED first: DR-67 (TypeError, no keyword), G1 (prefix: the job failed only at the sink's count
+check; `expected_frames` unknown; the one-shot callable ran twice), DR-71 (89,600 against the
+own rate's 864,985). The runner tests were written after the option (RED = argparse's unknown
+`--cache-dir` on the base). An existing plant
+(`test_jobs_export.py::test_planted_close_on_cancel_fails_by_name`, `args[6]` = the sink) caught
+a first draft that inserted `source` mid-signature; the new argument is now LAST in `_analyse`,
+`_encode` and `_write_frames` (no existing test changed).
+
+Readings recorded (not new choices; flagged at the yield):
+- CHARC B (R0-Q2 (b')) for `unreadable_tail`: no expected count (None), as R0-Q2 (b)'s own text
+  said ("`unreadable_tail` still unknowable without a decode"); `readable_video_pts` lists every
+  pts for it, so the listing there would fail every such clip. Residual in the report.
+- R0-Q4 (b): `__all__` is pinned by WP4.1's `test_the_package_exports_the_root` (not owned), so
+  the three builders are re-exported by redundant alias, not added to `__all__`.
+- V3 runs on the GPU job (device frames), the per-frame leg on the same decode and backend; the
+  round-0 test list said CPU, which took 650 s for the file (the same pre-encode figures); on the
+  GPU 169 s. Marked `gpu`, `slow`.
+
+Light gates at `00397cb` + report: `ruff check .` clean, `ruff format --check .` 265 files,
+`mypy` 141 files clean; targeted parallel set (the four WP4.2 files, the two WP4.1 files,
+WP4.2a's file, the four deps tests, `test_gui_export_panel.py`, `test_wp321_fft_release.py`) 266
+passed; analysis / export / GUI-analysis set 558 passed; the jobs layering test and
+`test_jobs_naming.py` 116 passed. Light `gpu` runs of my own (no window): the DR-67 gpu leg, the
+V4 gpu leg, DR-74 (18 s), the V3 file (169 s, 5 passed).
+
+New serial-leg cost (measured here, not in a window): V3 file 169 s, DR-74 18 s, DR-67 gpu 10 s,
+V4 gpu 13 s: about 210 s against question 9's 300 s.
+
+## RESUME HERE (Reviewer A round 1)
+
+For a fresh cell: read `docs/dispatch-recipe.md`, the brief (Rulings govern), this ledger and
+`docs/reports/wp4.2-video-path.md` (the claims). The build is complete and committed; light gates
+green. Next: Reviewer A per the fill Part 1 (Codex `gpt-6.1-sol` / high, WSL, probe first); copy
+`run_review.sh` and `review-prompt.md` from `C:\Users\rwsmy\clearwater-review-evidence\wp4.1\r5\`;
+diff `git diff -U8 f991254..HEAD` with `--glob '!docs/proofs/**'`; WHAT TO EXAMINE = the brief's
+list; evidence to `C:\Users\rwsmy\clearwater-review-evidence\wp4.2\r1\`. YIELD after
+adjudicating each round (no change in that turn). Then the two-leg suite in a granted window,
+then task 10 only when granted.
