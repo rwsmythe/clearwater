@@ -13,9 +13,8 @@
 
 - **Gen 6 pickup facts:** bash gauge 45 ms; inbox 0 unread at pickup; announce posted to the orchestrator (gen 17, shell-busy in the WP4.1 gate) with ONE cue; the two register scripts copied from gen 5's scratchpad (18c10a55...) into this session's scratchpad (6687b6c9-eacd-4ffc-995e-51c9195391d1) as `edit_register_p4a.py` (drop its DR-65 block before running: already applied at 3114d23) and `edit_register_p4b.py`.
 
-- **Orchestrator = gen 18 `clearwater-orchestrator-20261028-1555`** (online 2026-10-29 01:56Z at eb0074f, msg `7b1f3a775393c5e3`, gauge
-  36 ms; gen 17 rolled ~01:55Z at ~395K, state eb0074f; gen 18's first job = the WP4.2 brief revision packet with numbered questions and
-  the Codex-eligible sub-pieces named; re-read `comms/.launch-sessions.json` before every cue; every post
+- **Orchestrator = gen 19 `clearwater-orchestrator-20261028-1931`** (launched 05:31Z by gen 18, which rolled at ~405K, state b394e7b;
+  announce pending at my last read; gen 18 was `clearwater-orchestrator-20261028-1555`; re-read `comms/.launch-sessions.json` before every cue; every post
   gets ONE SendMessage cue). Subjects under 120 chars (the poster refuses longer; two refusals this generation at 123-125); bodies via
   `--body-file`; edit docs with a scratchpad Python script (`newline="\n"`); `tr -cd '\r' | wc -c` = 0 before every commit; commit by
   pathspec; never an uncommitted edit left in the main tree (hazard 7); HOLD MAIN when the orchestrator asks (no commit, state included,
@@ -99,6 +98,14 @@
   (they stay the parent guard's coverage) and (d) the planted file-form control isolated the same way; every edited node id + span +
   reason in ledger and report; no deletion, no skip, no weakened assertion. Correction of my condition 2: the tests at :266/:279 prove
   planning is SKIPPED, not that the guard fires. Cell idle at 167,794 before the word.
+- **GEN 18 ROLLED 05:31Z at a clean boundary (msg `3fbce47735fff00e`): WP4.2b head `215817a` GREEN for R1 (turn 4 built OutputNameError,
+  the runner branch, WP4.2a test edits (a)-(d); light 1076/12, the 22 nodes green); WP4.2 BUILD COMPLETE `wp4.2` 66169d2 (cell 2 stood
+  down at 374,198; V3 no miss c3 0.0102 / ancuti 0.0067 /255; V9 max 0; V17 decodes 2 then 1; V4 CPU and GPU SAME; new serial cost
+  ~210 s). THREE READINGS RULED 05:40Z (my post ruling-3readings): (1) unreadable_tail -> expected_frames None + Limit APPROVED
+  (verify.py:681-700: unknowable without decoding; sink's missing_frames still guards export); (2) three builders INTO `__all__`
+  with a one-line grant on `test_the_package_exports_the_root` (not KEEP); (3) V3 on the GPU job KEEP (169 s vs 650 s, same figures).
+  Gen 19 next: WP4.2b R1 -> own window -> B -> accept FIRST; rebase `wp4.2`; cell 3 = WP4.2 Reviewer A R1. Worktrees wp4.2a, wp4.2a-mc,
+  brief-wp4.2r, brief-wp4.2b removable by gen 19.
 - **(history) After WP4.1's accept:** WP4.2's brief (DRAFT RULED on main 3aa3c51) got ONE revision pass against WP4.1's accept record, then FINAL
   on CHARC's word; its revision must carry: DR-78/79 (B2 rows) as WP4.2 items, the WP4.1 runner's final names and the stream-syntax
   predicate, the Limit text. WP4.3's revision later carries DR-75 (REQUIRED test under its Q12), DR-76, DR-77, and the AD-23 'applied by
