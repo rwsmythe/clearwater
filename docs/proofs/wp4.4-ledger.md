@@ -1,169 +1,132 @@
 # WP4.4 cumulative ledger
 
-## RESUME HERE -- fresh Codex seat after turn 4
+## RESUME HERE -- seat 2, turn 1: granted comparison equivalences
 
 ### State and immediate next steps
 
-WP4.4 is the MOV-input package, CODEX lane, product tier STRONG. The binding
-brief is `docs/briefs/wp4.4-brief.md`; its CHARC Rulings govern the Questions.
-Read the dispatch protocol, APPLICATION and CLAUDE for a fresh dispatch, and
-use this ledger for the completed work and evidence. Do not re-derive the
-resolved STOPs or read another worktree.
+WP4.4 is the MOV-input package, CODEX lane, tier STRONG. Product base
+`5e3537d`; branch `wp4.4`; seat-2 entry HEAD `af4ccc0`. Entry `git status
+--short` was empty. Seat 1 retired after turn 4; its final depth was 206,634
+input tokens in the binding 258,400 window. Do not re-derive resolved STOPs.
 
-Worktree/branch: `.worktrees/wp4.4`, `wp4.4`; product base `5e3537d`.
-Known commits: round-0 ledger `7483e91`; round-0 grant in brief `0b71bd3`;
-MOV implementation `35391b0`; stereo fixture `e4141f8`. Turn 4 starts at
-`e4141f8`; the dispatcher will commit the two turn-4 paths and supply that
-HEAD to the fresh seat. No cell commits or .git writes are allowed.
+The original implementation is built: GUI and runner suffix sets accept MOV;
+only MOV maps to lowercase MP4 output names; the sink deterministically copies
+only proved gpmd data, excludes tmcd as before and reports omitted tracks through
+existing not_carried. The one phone test is written; its first seat run failed
+V4 only, and CHARC granted the instrument changes below. Seat 2 turn 1 adds
+those THREE equivalences in compare.py and a new synthetic test file. The qt
+fixture stays stereo: its existing passing export remains a separate integration
+witness, while synthetic one-channel facts cover the mono equivalence directly.
 
-Product implementation is done within the grants: both suffix sets accept
-MOV; naming maps only case-insensitive MOV to lowercase MP4; the sink copies
-only gpmd data, excludes tmcd as before, drops other data deterministically
-and reports it through the existing not_carried path. Tests cover routing,
-naming, synthetic allowlist behavior and rotated stereo qt export with V4.
-Turn 4 adds the ONE footage test, now written but NOT RUN by the cell.
+Next: the orchestrator runs the phone node on this candidate and supplies safe
+format/comparison facts for the report. Turn 2 writes the report. Reviewer A is
+the driver-run Claude opus/high read-only pass between turns; an adjudication
+turn changes only the ledger and yields before remediation. No A/B round or
+package gate has run yet. No package completion or fresh footage pass is claimed.
+The full importer light selection cannot finish at this cell: collection of
+test_prototype_clip.py stalls in CuPy's default compiler-cache temp creation.
+The bounded traceback and deferred seat request are recorded below. No cache
+relocation, sandbox workaround or existing-test change was made.
+Final available light result: 250 passed / 35 deselected, EXIT 0, including
+the rotated qt export and existing comparison/V4 regressions in the seven
+remaining files. The 27 new synthetic nodes are included in that count.
+Ruff check passes; mypy passes on 141 source files. The two changed Python
+files were formatted; whole-tree format checking remains at the seat.
 
-Immediate dependency: the orchestrator must run the phone node below. Expect
-one pass with exit 0 and exactly two mebx omission warnings; this is an
-expectation, not footage evidence yet. Any new V4 MANDATORY/REQUIRED difference
-is a STOP to CHARC through the dispatcher, with item NAMES only. No broader
-audio, probe, decode, mux, comparison or interface change is authorized.
+### Governing rulings and owned surface
 
-After that evidence arrives: Reviewer A to convergence, final report per
-task 7, then the orchestrator's Reviewer B and ONE two-leg gate, in the order
-the dispatcher commissions. No Reviewer A or B has run so far; no gate has run.
-Do not claim package completion until all required evidence is supplied.
-
-### Rulings that must survive the re-seat
-
-1. CHARC `197131faf8764ebd` (original brief FINAL): Q1 permits only the old
-   clip.mov naming expected-value edit plus a new MP4-case control, and the
-   GUI filter/MOV routing edits. Q2 grants encode.py's explicit
-   `MP4_DATA_CODEC_TAGS = frozenset({"gpmd"})` data map only, one deterministic
-   command/no retry, omitted tags reported through existing not_carried.
-   Synthetic zzzz unit plus real mebx footage witness; no synthetic mebx authoring.
+1. CHARC `197131faf8764ebd`: Q1 owns only the original clip.mov naming
+   expected-value edit plus a new MP4-case control and the GUI MOV filter/route
+   rows. Q2 owns encode.py's explicit `MP4_DATA_CODEC_TAGS = frozenset({"gpmd"})`
+   map only: one attempt, no retry, omitted tags through existing not_carried.
    Q3 is house V4 (MANDATORY/REQUIRED and roster SAME), no runner pixel bound.
-   Q4 leaves DR-15 OPEN: add edit-list corroboration only; touch no register.
-   Q5 keeps Dolby Vision clips OUT, with the report fact below. Rotation is
-   required on the synthetic fixture and explicitly asserted on the phone output.
-2. CHARC `73d2797750c57625` (round-0 GRANT, 2026-10-29T21:59:13Z):
-   `tests/test_io_video_encode_units.py:80` changes only
-   `DataStreamInfo(3, "meta")` to `DataStreamInfo(3, "gpmd")`.
-   Adding meta to the allowlist is DECLINED. The assertion at base 365-372 is
-   verbatim; base row 753 is unchanged because it is a packet-table input to
-   not_carried, not the map probe. Verified by whole-file one-token diff and
-   80 passing encoder units. Report's owned-files list and accept record must
-   name the granted file/line and message ID.
-3. CHARC `093384f126589674` (2026-10-29T22:14:29Z): the qt fixture uses
-   stereo pcm_s16le (`-ac 2`); house V4 is unchanged. Shared-comparator change
-   DECLINED; no product fix exists/wanted. Owner mono lpcm has absent layout
-   in both files (seat probe); the synthetic declared-mono limitation is
-   CHARC's MINOR row at accept, quoted in full in the resolved STOP below.
-   The report must name that limit in one line. The cell touches no register.
-4. Orchestrator generation 24, turn 4 (FINAL unless CHARC overrides): phone
-   record state is `done with warnings`, exit 0, sole expected MP4. Warnings
-   must be exactly the not-carried data-track notices, including mebx, with no
-   other text. Two source mebx tracks and no copied data produce exactly two
-   identical `Not carried to the output: data track mebx` warnings: verify.py
-   enumerates missing source tracks without deduplication. The new test checks
-   prefix, total count 2, and exact mebx count 2, with safe count-only failures.
+   Q4 leaves DR-15 OPEN; report corroboration only, no register change. Q5 keeps
+   Dolby Vision clips out, with the inventory/code report facts below.
+2. CHARC `73d2797750c57625` (round-0 GRANT) owns the ONE token at
+   `tests/test_io_video_encode_units.py:80`, meta -> gpmd. Base map assertion
+   365-372 remains verbatim; base 753 meta is a packet-table row, not map input,
+   and stays unchanged. Report and accept record must name file/line and grant.
+3. CHARC `093384f126589674` allowed the stereo PCM qt fixture. Its prohibition
+   on comparator changes and prospective mono-layout MINOR row are superseded
+   by `9c8f461b73ec8c05`; the row is folded into the granted fix, no row opens.
+4. Orchestrator generation 24's turn-4 ruling requires phone record state
+   `done with warnings`, exit 0, one expected output, and exactly two
+   `Not carried to the output: data track mebx` warnings. The existing warning
+   path enumerates missing tracks without deduplication. The test exposes
+   only states, names, counts and V4 item names, never arbitrary metadata.
+5. CHARC `9c8f461b73ec8c05` (Footage STOP GRANT) additionally owns
+   `tools/container_spike/compare.py` for THREE equivalences ONLY, RED-first:
+   orientation compares rotation and 2x2 linear matrix, with translations in
+   best-effort text; absent/null SAR equals 1:1; mono and absent/null layout
+   are equal at channels == 1. Controls retain real orientation, geometry,
+   channel count and layout differences. Tests belong in a NEW file, here
+   `tests/test_container_spike_compare_equivalences.py`. Every other comparator
+   change or existing-test conflict is a new STOP. This grant and owned path
+   must appear in the report and accept record.
 
-### Remaining report content and evidence
+Other owned paths remain gui/sources.py (suffix/docstring), jobs/naming.py
+(extension rule/docstrings), tools/headless_export.py (suffix/docstring),
+io/video/encode.py (data allowlist/map), tests/test_jobs_naming.py (new nodes
+and Q1), tests/test_gui_open.py (Q1), tests/test_wp44_mov_input.py, the report
+and this ledger. Frozen interfaces, other existing tests, fixtures, conftest,
+export engine, video_fidelity.py, spec, register, dependencies and config are
+untouched. No footage is read at the cell. All outputs/logs stay under work/;
+no commits, mailboxes, stash, other worktrees or kept-basetemp deletions.
 
-Report path (not created yet): `docs/reports/wp4.4-mov-input.md`.
-Quote spec 5.2 at 213 and 8.3 at 384; explain the suffix/naming/allowlist sites;
-list RED/GREEN node IDs and final-state light results; include seat round-0
-failure and the forthcoming phone result as format facts only. Name omitted
-best-effort items only; the expected mebx list has two entries, not deduplicated.
-For CHARC, provide IMG_6702's edit-list source/output rows as DR-15 corroboration
-only. Have the seat supply a safe subset of comparison facts if needed; the
-test does not save or print the full fidelity record. Do not dump record/tag data.
-The known source video edit is media_time 0 with negative ctts (inventory/seat
-evidence), not a new cell observation or a DR-15 closure.
+### Report content still due in turn 2
 
-Q5 report facts are already grounded in the accepted inventory, no DV footage
-run needed: `IMG_6704.MOV` and `IMG_6772.MOV` are C2 in
-`docs/reports/inventory-2026-10-29.md:282,299`; C2 transfer is `arib-std-b67`
-(HLG), line 268. Spec 5.3 refuses HLG. The probe branch at
-`src/clearwater/io/video/probe.py:443-452` yields the text:
-`This video uses HLG HDR, which Clearwater does not support. Record in standard (SDR) mode instead.`
-Report only the clip names, transfer tag and refusal text, with clear attribution
-to inventory/code; they were not tested here. No second footage test or register row.
+Create `docs/reports/wp4.4-mov-input.md` with spec 5.2/8.3 quoted, rule sites,
+RED/GREEN IDs, final light figures, round-0 failure and phone evidence as format
+facts only. Include both grants' owned paths/lines/message IDs. Name the two
+omitted mebx items and keep Core Media metadata out of the output (Q2, D105).
+Record the comparison equivalences as fixed, including the declared-mono case;
+no outstanding mono limit or new register row remains under the latest grant.
+For CHARC, provide IMG_6702's edit-list source/output rows as corroboration only
+for still-OPEN DR-15. Source media_time 0 with negative ctts is prior seat
+information, not a new cell observation. Ask the dispatcher for only a safe
+subset of the new footage record; do not dump its tags or full record.
 
-Keep the one-line declared-mono PCM limit in the report, and leave its MINOR
-register entry to CHARC at accept. Retain the inherited encoding note:
-`tests/test_gui_open.py` has pre-existing U+00E9 (base 368/current 369);
-new lines are ASCII, original Unicode unchanged because Q1 does not permit
-normalizing that unrelated test. No ruling on whole-blob ASCII was supplied.
+Q5 facts already grounded in accepted inventory/code: `IMG_6704.MOV` and
+`IMG_6772.MOV` are C2 (`docs/reports/inventory-2026-10-29.md:282,299`), whose
+transfer is `arib-std-b67` (HLG), line 268. Spec 5.3 refuses HLG; probe.py
+443-452 uses: `This video uses HLG HDR, which Clearwater does not support.
+Record in standard (SDR) mode instead.` Attribute to inventory/code; neither
+clip was tested here. No second footage test or register edit.
 
-### Validation state and run request
+Inherited encoding fact: tests/test_gui_open.py contains pre-existing U+00E9;
+new lines are ASCII and unrelated content was not normalized under Q1. All
+three paths changed in seat 2 turn 1 are ASCII/LF. The only removed node so far
+is `tests/test_gui_open.py::test_routing_by_extension[a.mov-refusal]`, replaced
+by `[a.mov-video]` and `[a.MOV-video]`. Naming's existing node is retained.
 
-Turn 4: the final non-footage file run is GREEN, 6 passed / 1 footage node
-deselected; ruff check GREEN; mypy GREEN, 141 source files. Commands/logs are
-in the turn-4 record below. The house helper is unchanged. Turn 3 full light
-run: 1021 passed, 3 UNC sandbox failures, 1 gui pin deselected. The same three
-UNC nodes PASS at the seat (3 passed, EXIT 0), so they are confirmed artifacts;
-never mask them or change the existing helper. Whole GUI file passed 31 in
-turn 2, naming file 865, encoder file 80 plus the new map test. Seat format at
-turn-4 entry: clean, 272 files; ruff check clean; zero CR (dispatcher-supplied).
-No full suite or harness gate is due from the cell.
-
-**RUN REQUEST (Git Bash, orchestrator seat only):**
+### Footage RUN REQUEST -- orchestrator seat only
 
 ```bash
-env -u VIRTUAL_ENV uv run pytest -q -rs tests/test_wp44_mov_input.py::test_phone_mov_runner_and_v4 -m footage --basetemp=work/wp4.4/t4-seat-footage > work/wp4.4/t4/seat-footage.txt 2>&1
+env -u VIRTUAL_ENV uv run pytest -q -rs tests/test_wp44_mov_input.py::test_phone_mov_runner_and_v4 -m footage --basetemp=work/wp4.4/s2t1-seat-footage > work/wp4.4/s2t1/seat-footage.txt 2>&1
 ```
 
-Scheduling allowance 1-3 minutes, CPU libx265; not a timing figure. All outputs,
-cache and runner-record.json are in that test's tmp_path under the basetemp.
-The source is located through local_config, read-only. No test execution at
-the cell and no source path, tag value, full record or private metadata in the
-ledger or return. A skip is not a phone proof; only genuinely absent footage
-may skip, while missing/unreadable/ambiguous roots are errors after conftest's
-configuration handling.
+CPU libx265, schedule around the other package's exclusive window. Outputs,
+cache and runner-record.json stay under tmp_path. A skip is not a phone proof;
+only genuinely absent footage may skip. Supply exit/counts, V4 differing item
+NAMES (if any), best-effort not_carried names, and safe edit-list rows for the
+report. No footage path, location/device/EXIF/IMU values or full record in the
+return or committed evidence. Format facts (rotation, matrix, size, SAR) are
+allowed. Run ruff format --check at the seat as dispatched.
 
-### Frozen scope and operating disciplines
+Also run the unchanged prototype comparison importer at the seat (its module
+import probes CUDA even with GPU tests deselected):
 
-Owned implementation paths are gui/sources.py (suffix set/docstring only),
-jobs/naming.py (extension rule/docstrings), tools/headless_export.py (suffix
-set/docstring only), io/video/encode.py (data map/allowlist only),
-tests/test_jobs_naming.py (new tests and Q1 expected value),
-tests/test_gui_open.py (Q1 edits only), the one-token encoder-unit grant,
-tests/test_wp44_mov_input.py, the report and this ledger. Every other existing
-test, fixtures, conftest, interfaces, export engine, V4 instruments, spec,
-register, dependencies and config are NOT owned. Any new existing-test
-conflict or need to cross that envelope is STOP, with a cheap reproduction.
+```bash
+env -u VIRTUAL_ENV uv run pytest -q -rs tests/test_prototype_clip.py -m "not gpu and not footage and not gui and not slow and not fullclip" --basetemp=work/wp4.4/s2t1-seat-prototype > work/wp4.4/s2t1/seat-prototype.txt 2>&1
+```
 
-Footage is read-only and never accessed at the cell. Footage/GPU/network/heavy
-runs are exact RUN REQUESTS at the orchestrator's seat, scheduled around the
-other package's exclusive windows; never read another worktree. All output/logs
-are worktree-local under work/wp4.4; no writes outside the sandbox. No mailbox
-posts, no commits, no git stash, no deletion of kept basetemps. All runner
-output goes to files; report summaries, never dump logs. Keep new text ASCII/LF.
-
-Cell pytest always uses `PYTHONPATH=scripts` and
-`-p sandbox_mkdir_shim -p no:cacheprovider`, a fresh work-local basetemp, and
-the permitted non-heavy marker expression. Do not work around unreachable
-FFmpeg/index/sandbox restrictions. Ruff format is checked at the seat.
-Attribution and commits are the dispatcher's responsibility; every turn ends
-with FILES CHANGED and the conventional wp4.4 commit subject.
-
-Reviewer A is the driver-run Claude opus/high read-only pass between turns,
-not an agent the cell spawns. Adjudication turns modify only the ledger and
-YIELD before remediation. Maintain the cumulative round counts (severity,
-in/out, NEW/REOPENED, reverts, product versus test fixes, transport/version and
-dispatcher depth). Round 5 and every fifth round STOP for approval; convergence
-follows `docs/review-gate-clearwater.md`. Reviewer B and the ONE two-leg gate
-run at the orchestrator's seat after A converges and B returns; no fullclip leg
-and no harness gate for this package. See the fill for collection accounting.
-Report every lock, deviation, per-change list, review disposition and exact
-node additions/removals. Only removed ID so far is
-`tests/test_gui_open.py::test_routing_by_extension[a.mov-refusal]`, replaced
-by `[a.mov-video]` and `[a.MOV-video]`; naming's existing node is retained.
-
-Last dispatcher depth: 189,237 input tokens, binding window 258,400. This
-turn ends at the mandatory boundary; next work belongs to a FRESH cell as
-commissioned, not another build burst in this context. Do not estimate depth.
+Review A/B and the ONE two-leg package gate remain at the orchestrator's seat,
+A to convergence and B returned before the gate. No fullclip or harness leg.
+Maintain counts by severity, in/out, NEW/REOPENED, reverts, product/test fixes,
+review transport/version and dispatcher depth each round. Round 5 and each
+fifth round STOP for approval. Depth is dispatcher-read, never estimated;
+seat-2 numeric depth is pending. The smaller footer window binds; evaluate
+near 200K and stop at a step boundary near 250K.
 
 ## Turn 3 STOP resolved: phone record state versus required warnings
 
@@ -209,10 +172,10 @@ grant. The exact-state assertion received the ruling above at the turn-4 boundar
 
 CHARC `093384f126589674` (2026-10-29T22:14:29Z) ruled (a): the qt fixture
 becomes stereo pcm_s16le with `-ac 2`; the house V4 assertion is unchanged.
-The real mono path is witnessed by IMG_6702's footage test. Comparator changes
-are DECLINED for this package; no product fix exists or is wanted. The original
-synthetic declared-mono limitation is retained as evidence below, not remediated.
-Q2 still grants the data map only.
+The fixture stays stereo. CHARC `9c8f461b73ec8c05` subsequently grants the
+one-channel mono/absent-layout equivalence in compare.py, implemented in seat 2.
+The original failure evidence below is retained; no mono-layout register row
+opens. Product mux changes remain outside the grant; Q2 owns the data map only.
 
 Seat PCM probe (FFmpeg 9.0.2, supplied at turn 3, script
 `work/wp4.4-seat/pcm_layout.py`, stream copy to MP4): synthetic mono sowt with
@@ -221,14 +184,9 @@ layout stereo becomes ipcm, two channels, stereo SAME; IMG_6702 lpcm is mono
 with no layout in both source and output, SAME. The cell did not read footage
 or rerun that seat probe.
 
-CHARC owns this MINOR register row at the accept; the cell touches no register:
-
-> a QuickTime PCM track that DECLARES a mono layout leaves the MP4 with the
-> channel count but no layout declaration (FFmpeg 9.0.2 ipcm writer; stream copy
-> cannot set one); V4's audio item reads DIFFERENT for such a source; the owner's
-> iPhone clips are unaffected (lpcm, no layout). Trigger: the next V4 instrument
-> touch (treat mono and absent as equal at channels == 1) or an owner MOV whose
-> V4 reads DIFFERENT on that item alone.
+The prospective MINOR row from `093384f126589674` is folded into the
+`9c8f461b73ec8c05` comparison fix. The report records this as fixed; the cell
+touches no register and no mono-layout row is due at the accept.
 
 **[major, in-envelope, NEW, EXECUTED]**
 `tests/test_wp44_mov_input.py::test_qt_mov_probe_decode_runner_and_v4` exports
@@ -324,7 +282,8 @@ The user-specified task ladder and yield schedule govern the work.
 | Turn 1 exit / turn 2 entry | 102,496 input tokens; window 475,000 (dispatcher reading) | Continue tasks 3-5; evaluate near 200K, stop at a boundary near 250K |
 | Turn 2 exit / turn 3 entry | 163,747 input tokens; smaller reported window 258,400 binds | Bounded fixture/test turn, then dispatcher evaluation |
 | Turn 3 exit / turn 4 entry | 189,237 input tokens; binding window 258,400 | Bounded test and run-request turn; fresh seat for report/reviews |
-| Turn 4 exit | Pending dispatcher reading | Mandatory yield and fresh-seat handoff |
+| Turn 4 exit | 206,634 input tokens; binding window 258,400 (dispatcher reading) | Seat 1 retired; seat 2 implements the Footage STOP GRANT |
+| Seat 2 turn 1 entry | Fresh session; no numeric depth supplied | Granted comparator equivalences only, then yield for footage run/report |
 
 The dispatch's Codex/Claude pace readings describe account usage, not this
 cell's context depth; they are not substituted for a depth reading.
@@ -746,7 +705,7 @@ sets `PYTHONPATH=scripts`. All logs are in `work/wp4.4/t4/`.
 | ruff.txt | `uv run ruff check .` | All checks passed | 0 |
 | mypy.txt | `uv run mypy` | Success: no issues in 141 source files | 0 |
 | diff-check.txt | `git -c core.autocrlf=false diff --check` | No whitespace errors | 0 |
-| seat-footage.txt | Git Bash RUN REQUEST in RESUME HERE | Pending at orchestrator seat; NEVER run at cell | Pending |
+| seat-footage.txt | Git Bash phone-node request in the turn-4 handoff | Seat supplied: 1 failed in 59.4 s, V4-only failure; see seat-2 grant record below | 1 |
 | locks.txt | `uv run python -` (AST and byte checks, without importing or executing the test) | Both modified files ASCII/LF; house helper unchanged; exactly one footage node | 0 |
 
 Verification-loop record: traced the fixed warning count against the unchanged
@@ -757,4 +716,190 @@ Reviewer A has not run. Handoff is to a fresh seat after this bounded turn.
 
 | Boundary (not Reviewer A) | Critical / major / minor | In / out | NEW / REOPENED | Reverts | Product / test fixes | Verdict | Depth |
 |---|---|---|---|---|---|---|---|
-| Turn 4 author verification | 0 / 0 / 0 | 0 / 0 | 0 / 0 | 0 | None / ruled phone test written; seat run pending | No open build STOP; await footage evidence, fresh seat for remaining work | Pending dispatcher; entry 189,237 / 258,400 |
+| Turn 4 author verification | 0 / 0 / 0 | 0 / 0 | 0 / 0 | 0 | None / ruled phone test written | Seat footage STOP resolved by 9c8f461b73ec8c05; fresh seat implements grant | 206,634 / 258,400 at yield |
+
+## Turn-4 seat footage evidence and Footage STOP GRANT
+
+Dispatcher-supplied evidence, not a cell footage run: the phone node at
+`c353dfd` returned 1 failed in 59.4 s, EXIT 1. The runner itself returned 0,
+wrote the sole expected output, and recorded done with warnings with exactly
+two data track mebx omissions. V4 differed on the two MANDATORY orientation
+items (ffprobe display matrix and tkhd matrix) and REQUIRED frame size/SAR.
+
+The seat's restricted format probe showed rotation -180 on both sides and
+identical linear matrix entries. The source translation row was
+`[125829120, 94371840]`, the output `[0, 0]`; size was 1920x1440 on both
+sides, source SAR unset/null and output 1:1. These are supplied format facts,
+not cell observations, timing benchmarks or private metadata values.
+
+CHARC `9c8f461b73ec8c05` granted exactly the three instrument equivalences
+listed in RESUME HERE and no product mux change. The earlier declared-mono
+MINOR-register proposal is folded into the third fix; no register row opens.
+The footprint additionally owns compare.py and a NEW synthetic test file;
+the report/accept record must name this grant. Prior prohibitions in the
+historical turn-2 record describe that earlier ruling, not the current grant.
+
+## Seat 2 turn 1 build and validation record
+
+Entry HEAD `af4ccc0`, branch wp4.4, empty git status. Read the dispatch
+protocol, APPLICATION, CLAUDE, prompting standard and review/gate fill; the
+dispatched-implementer exemption in using-superpowers applies. No agent was
+spawned, no review round was run and no footage was read or tested here.
+
+Relocated comparison anchors on entry: audio_layout 1194-1201 and its item
+1203-1213; ffprobe orientation 1250-1256; tkhd orientation 1263-1268;
+frame size/SAR 1308-1312. On this turn's candidate, matrix parsing/linear/note
+helpers are 882/899/904, normalized ffprobe rotation 911, audio_layout 1229,
+orientation item names 1289/1303 and geometry normalization 1351/1358.
+
+Implemented only the granted equivalences in compare.py:
+
+- Valid ffprobe matrix text is parsed as three labelled integer rows. Both
+  orientation items compare the 2x2 linear entries; the ffprobe item also
+  compares rotation. Translation terms appear in each item's BEST-EFFORT
+  note, outside equality comparison. Unparseable ffprobe text stays exact.
+- Only absent/null SAR normalizes to 1:1; width and height remain exact.
+- Only absent/null channel_layout at channels == 1 normalizes to mono.
+  Channel counts, other layouts, codec, profile and sample rate stay exact.
+
+The qt fixture remains stereo, unchanged: retain its existing integration
+witness and cover the mono equivalence directly with synthetic facts. No
+existing test file changed. All new tests use synthetic Facts/probe dicts
+and never invoke FFmpeg or read a file. The real phone witness is requested
+at the seat; no pass is claimed before it arrives.
+
+### RED/GREEN and controls
+
+RED on unchanged compare.py at af4ccc0: 12 failed, 15 passed, EXIT 1.
+All failing IDs use the prefix
+`tests/test_container_spike_compare_equivalences.py::`:
+
+```text
+test_translation_is_equivalent[forward-side]
+test_translation_is_equivalent[forward-tkhd]
+test_translation_is_equivalent[reverse-side]
+test_translation_is_equivalent[reverse-tkhd]
+test_unset_square_sar_is_equivalent[forward-absent]
+test_unset_square_sar_is_equivalent[forward-null]
+test_unset_square_sar_is_equivalent[reverse-absent]
+test_unset_square_sar_is_equivalent[reverse-null]
+test_unset_mono_layout_is_equivalent[forward-absent]
+test_unset_mono_layout_is_equivalent[forward-null]
+test_unset_mono_layout_is_equivalent[reverse-absent]
+test_unset_mono_layout_is_equivalent[reverse-null]
+```
+
+GREEN after the three changes: all 27 passed, EXIT 0. Named control run
+before the change: 14 passed / 13 deselected, EXIT 0. The same 14 controls
+also pass in the full verbose GREEN run, each asserting DIFFERENT:
+
+```text
+test_orientation_change_control[quarter-side]
+test_orientation_change_control[quarter-tkhd]
+test_orientation_change_control[mirror-side]
+test_orientation_change_control[mirror-tkhd]
+test_ffprobe_rotation_change_control
+test_geometry_change_control[nonsquare]
+test_geometry_change_control[width]
+test_geometry_change_control[height]
+test_audio_change_control[channels]
+test_audio_change_control[stereo-5.1]
+test_audio_change_control[stereo-absent]
+test_audio_change_control[mono-stereo]
+test_audio_change_control[rate]
+test_audio_change_control[codec]
+```
+
+The stereo-versus-5.1 control deliberately holds channel count constant to
+isolate layout comparison; the separate channel-count control catches 1 vs 2.
+The scaffold self-comparison passes on both versions, every item SAME.
+No translation equality is asserted by any test.
+
+### Commands and outcomes
+
+All logs are work-local under `work/wp4.4/s2t1/`. Runner output is routed to
+files; only summaries enter the return. VIRTUAL_ENV is removed; every pytest
+command sets PYTHONPATH=scripts and uses the sandbox shim/no-cacheprovider.
+Marker expression is `not gpu and not footage and not gui and not slow and
+not fullclip` unless a narrower test-only control selection is stated.
+
+The broader light targets are tests/test_wp44_mov_input.py,
+tests/test_container_spike.py, tests/test_container_spike_compare_equivalences.py,
+tests/test_wp42_video_path.py, tests/test_prototype_clip.py,
+tests/test_video_fidelity.py, tests/test_jobs_export_video.py and
+tests/test_io_video_encode.py. This is every file importing container_spike
+compare, confirmed by rg, including the new file; no unrelated suite is run.
+
+| Log | Command (pytest also uses `-p sandbox_mkdir_shim -p no:cacheprovider`) | Result | EXIT |
+|---|---|---|---|
+| red.txt | `uv run pytest -q tests/test_container_spike_compare_equivalences.py --basetemp=work/wp4.4/tmp/s2t1-red -m "not gpu and not footage and not gui and not slow and not fullclip"` | 12 failed / 15 passed, expected equivalence RED | 1 |
+| controls-before.txt | `uv run pytest -v tests/test_container_spike_compare_equivalences.py -k control --basetemp=work/wp4.4/tmp/s2t1-controls-before` | 14 passed / 13 deselected; DIFFERENT controls retained | 0 |
+| green.txt | `uv run pytest -v tests/test_container_spike_compare_equivalences.py --basetemp=work/wp4.4/tmp/s2t1-green -m "not gpu and not footage and not gui and not slow and not fullclip"` | 27 passed | 0 |
+| ruff.txt | `uv run ruff check .` | All checks passed | 0 |
+| mypy.txt | `uv run mypy` | Success: no issues in 141 source files | 0 |
+| format.txt | `uv run ruff format tools/container_spike/compare.py tests/test_container_spike_compare_equivalences.py` | 2 owned files reformatted; whole-tree format check remains at seat | 0 |
+| disk.txt | `uv run python -c` with shutil.disk_usage('.') before the fixture run | 178.4 GiB free; no prune performed | 0 |
+| light.txt | Broad pytest target list with literal `tests/test_container_spike*.py` | PowerShell did not expand wildcard; pytest found no matching file, no tests executed | 4 |
+| light-expanded.txt | Broad pytest target list above, `-q -rs --basetemp=work/wp4.4/tmp/s2t1-light-expanded` and marker expression above | Collection stalled; no basetemp/test execution; only identified pytest process terminated | -1 (tool termination) |
+| light-verbose.txt | Same targets/markers, `-v -rs --basetemp=work/wp4.4/tmp/s2t1-light-verbose -o faulthandler_timeout=60`, unbuffered output | Again stalled during collection, no basetemp; only identified pytest process terminated | -1 (tool termination) |
+| prototype-import.txt | `uv run python -u -c` with runpy.run_path on test_prototype_clip.py and a 20 s traceback alarm | Import completed; isolated import does not reproduce pytest's stall | 0 |
+| import-order.txt | `uv run python -u -` importing all eight target modules in order using runpy, 20 s alarm | All eight imports completed; not a pytest/test result | 0 |
+| collection-probe.txt | `uv run python -u -` with pytest.main, all eight targets, collect-only, shim, marker expression, fresh s2t1-collect-probe basetemp, 20 s alarm | Bounded diagnostic exited but captured no traceback; no test result claimed | 1 |
+| collection-stack.txt / collection-stack-run.txt | Same collect-only diagnostic with fresh s2t1-collect-stack basetemp, 10 s faulthandler alarm writing directly to a work-local file | Reproduces stall in tempfile._mkstemp_inner from CuPy cache save during test_prototype_clip.py import | 1 |
+| light-remaining.txt | `uv run pytest -q -rs` on the same target list EXCEPT test_prototype_clip.py, same markers/shim, `--basetemp=work/wp4.4/tmp/s2t1-light-remaining` | 250 passed / 35 deselected; deferred file remains a named seat RUN REQUEST | 0 |
+| remaining-collect.txt | `uv run pytest --collect-only -q` on those seven targets, same markers/shim, `--basetemp=work/wp4.4/tmp/s2t1-remaining-collect` | 250/285 nodes selected, 35 deselected; matches execution counts | 0 |
+| diff-check.txt | `git -c core.autocrlf=false diff --check` | No whitespace errors before ledger update | 0 |
+| ruff-final.txt | `uv run ruff check .` after formatting | All checks passed | 0 |
+| locks.txt | `uv run python -` checking git path set, ASCII/LF and top-level comparator AST changes | Exactly three owned paths; all ASCII/LF; other functions/classes unchanged | 0 |
+| locks-final.txt | `uv run python -` checking final git path set, byte encoding and public/module docstrings | Exactly three owned paths; ASCII/LF; docstrings present | 0 |
+| diff-check-final.txt | `git -c core.autocrlf=false diff --check` after ledger finalization | No whitespace errors | 0 |
+
+Verification-loop record: confirmed the three equivalences RED through the
+actual shared compare_facts entry point; checked every mandated planted
+difference remains DIFFERENT before/after; retained unparseable side-matrix
+text comparison rather than treating it as equivalent. Corrected the wildcard
+invocation by spelling out its two files, without changing markers or tests.
+No new comparator defect, out-of-envelope fix or revert. The
+scope check confirms only compare.py, the NEW test file and this ledger
+changed; no existing test, product module, frozen interface, dependency,
+config or register was edited. All three changed files are ASCII/LF.
+The broad light run's final outcome is recorded in the table before yield.
+
+| Boundary (not Reviewer A) | Critical / major / minor | In / out | NEW / REOPENED | Reverts | Product / test fixes | Verdict | Depth |
+|---|---|---|---|---|---|---|---|
+| Seat 2 turn 1 author verification | 0 / 0 / 1 new environment finding | 0 / 1 | 1 / 0 | 0 | Three granted shared-instrument equivalences / 27 new synthetic nodes | 250 passed / 35 deselected in available light selection; prototype importer and phone seat RUN REQUESTS pending; report next turn | Fresh seat; numeric exit depth pending dispatcher |
+
+Reviewer A rounds: none yet; driver supplies findings between turns. Reviewer
+B and the ONE two-leg gate remain pending at the seat. This turn is the
+single logical compare.py GRANT, with its tests/evidence, not completion of
+the whole package. No test node was removed or renamed during this turn.
+
+### Environment finding and verification-loop disposition
+
+**[minor, environment, NEW, EXECUTED]** The requested eight-file light run
+stalls during collection before any test/temp fixture. A bounded independent
+collect-only probe writes a traceback directly to work-local
+collection-stack.txt: test_prototype_clip.py:41 calls select_backend("auto"),
+prototype/backend.py:211 calls cupy.arange, CuPy compiler cache save enters
+NamedTemporaryFile and remains in tempfile._mkstemp_inner. CUDA/NVRTC modules
+were loaded in the first stalled pytest process. CUPY_CACHE_DIR is unset;
+the installed CuPy _compiler_cache.py:89-93 documents/selects its default
+home-directory cache, and :140 creates the temporary file there, outside the
+writable workspace. No successful external write was observed or is claimed. No cache
+relocation or permission workaround was attempted. This is an unchanged
+module-level GPU probe, not a comparator regression or an executed GPU test.
+
+The first hypothesis (the isolated module import itself always hangs) was
+rejected by both runpy probes, which finish. The actual pytest collection
+stall is independently reproduced by the work-file traceback. Termination
+targeted only each identified pytest interpreter, checking its PID and exact
+start time; no other process or file was removed. The two terminated runs
+have no test counts and are not passing evidence. The traceback alarms are
+diagnostic ceilings, not product timing assertions or performance figures.
+
+Disposition: COMMISSIONED WP4.4 seat RUN REQUEST for unchanged
+test_prototype_clip.py with the same non-heavy marker expression; the seven
+remaining importer files passed here (250 passed / 35 deselected, EXIT 0).
+No existing test is masked/edited, no marker changed, no dependency added.
+No product fix or CHARC scope extension is requested for this environment
+finding. The full package gate still belongs to the orchestrator's seat.

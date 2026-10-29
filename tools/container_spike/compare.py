@@ -879,11 +879,46 @@ def edit_effect(movie: Movie, track: Track) -> list[dict[str, Any]]:
     ]
 
 
-def _rotation(stream: Mapping[str, Any]) -> dict[str, Any]:
-    """Return the display matrix rotation and matrix text ``ffprobe`` reports, if any."""
+def _display_matrix(stream: Mapping[str, Any]) -> tuple[int, ...] | None:
+    """Read the nine integers in ffprobe's labelled display-matrix rows, if valid."""
     for entry in stream.get("side_data_list", []) or []:
         if isinstance(entry, dict) and "rotation" in entry:
-            return {"rotation": entry.get("rotation"), "displaymatrix": entry.get("displaymatrix")}
+            text = entry.get("displaymatrix")
+            if not isinstance(text, str):
+                return None
+            try:
+                rows = [line.split(":", 1)[1].split() for line in text.splitlines() if line.strip()]
+                if len(rows) != 3 or any(len(row) != 3 for row in rows):
+                    return None
+                return tuple(int(value) for row in rows for value in row)
+            except (IndexError, ValueError):
+                return None
+    return None
+
+
+def _matrix_linear(matrix: Sequence[int] | None) -> list[int] | None:
+    """Return the 2x2 linear part that determines orientation, excluding translation."""
+    return [matrix[i] for i in (0, 1, 3, 4)] if matrix is not None else None
+
+
+def _matrix_translation_note(source: Sequence[int] | None, output: Sequence[int] | None) -> str:
+    """Record translation as best-effort text beside an orientation verdict."""
+    left = list(source[6:8]) if source is not None else None
+    right = list(output[6:8]) if output is not None else None
+    return f"BEST-EFFORT matrix translation (not compared): source={left}; output={right}"
+
+
+def _rotation(stream: Mapping[str, Any]) -> dict[str, Any]:
+    """Return ffprobe's rotation and linear matrix; retain unparseable text exactly."""
+    for entry in stream.get("side_data_list", []) or []:
+        if isinstance(entry, dict) and "rotation" in entry:
+            matrix = _display_matrix(stream)
+            return {
+                "rotation": entry.get("rotation"),
+                "displaymatrix": _matrix_linear(matrix)
+                if matrix is not None
+                else entry.get("displaymatrix"),
+            }
     return {"rotation": None, "displaymatrix": None}
 
 
@@ -1192,13 +1227,17 @@ def compare_facts(source: Facts, output: Facts) -> list[Item]:
 
     # MANDATORY: audio present, passed through, in sync.
     def audio_layout(facts: Facts) -> dict[str, Any]:
-        return {
-            facts.keys[int(s["index"])]: {
+        result = {}
+        for s in _streams_of(facts, "audio"):
+            layout = {
                 k: s.get(k)
                 for k in ("codec_name", "profile", "sample_rate", "channels", "channel_layout")
             }
-            for s in _streams_of(facts, "audio")
-        }
+            # A one-channel PCM track can lose its explicit mono declaration in MP4.
+            if layout["channels"] == 1 and layout["channel_layout"] is None:
+                layout["channel_layout"] = "mono"
+            result[facts.keys[int(s["index"])]] = layout
+        return result
 
     items.append(
         _item(
@@ -1252,6 +1291,7 @@ def compare_facts(source: Facts, output: Facts) -> list[Item]:
             "D105, 8.2",
             _rotation(src_video),
             _rotation(out_video),
+            note=_matrix_translation_note(_display_matrix(src_video), _display_matrix(out_video)),
         )
     )
     src_track, out_track = (
@@ -1263,8 +1303,12 @@ def compare_facts(source: Facts, output: Facts) -> list[Item]:
             "display orientation: video tkhd matrix",
             MANDATORY,
             "D105, 8.2",
-            list(src_track.matrix) if src_track else None,
-            list(out_track.matrix) if out_track else None,
+            _matrix_linear(src_track.matrix) if src_track else None,
+            _matrix_linear(out_track.matrix) if out_track else None,
+            note=_matrix_translation_note(
+                src_track.matrix if src_track else None,
+                out_track.matrix if out_track else None,
+            ),
         )
     )
 
@@ -1303,13 +1347,19 @@ def compare_facts(source: Facts, output: Facts) -> list[Item]:
     )
     items.append(_item("chroma subsampling", REQUIRED, "D114, 8.2", src_shape[0], out_shape[0]))
     items.append(_item("bit depth", REQUIRED, "8.2, D76", src_shape[1], out_shape[1]))
+
+    def frame_geometry(stream: Mapping[str, Any]) -> list[Any]:
+        """Treat only absent/null sample aspect ratio as square pixels."""
+        sar = stream.get("sample_aspect_ratio")
+        return [stream.get("width"), stream.get("height"), "1:1" if sar is None else sar]
+
     items.append(
         _item(
             "frame size and sample aspect ratio",
             REQUIRED,
             "8.2 (identity re-encode)",
-            [src_video.get("width"), src_video.get("height"), src_video.get("sample_aspect_ratio")],
-            [out_video.get("width"), out_video.get("height"), out_video.get("sample_aspect_ratio")],
+            frame_geometry(src_video),
+            frame_geometry(out_video),
         )
     )
 
