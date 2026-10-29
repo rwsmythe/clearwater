@@ -25,7 +25,8 @@ the evaluation and re-seat lines. Turn 1's figures were supplied at turn 2.
 | Seat 2 turn 5 (ledger turn 10), W3 results / rung 4 request | 279,339 | 183,073 | 258,400 | Dispatcher generation 20 at seat 2 turn 6; committed as `b540844` |
 | Seat 2 turn 6 (ledger turn 11), collections / W4 results / report | 454,498 | 98,187 | 258,400 | Dispatcher generation 20 at seat 2 turn 7; report `7664b82`, ledger `04b01d2`; tokens-used footer is not input depth |
 | Seat 2 turn 7 (ledger turn 12), Reviewer A R1 cleanup / W2b request | 517,709 | 157,267 | 258,400 | Dispatcher generation 20 at turn-12 footer, supplied by generation 21 at seat 2 turn 8; conftest `18e2d53`, report `6892bbd`, ledger `f10d13b` |
-| Seat 2 turn 8 (ledger turn 13), W2b results / R1 convergence | Pending dispatcher | Pending dispatcher | 258,400 | Docs only; dispatcher generation 21, CHARC generation 7; depth pending dispatcher |
+| Seat 2 turn 8 (ledger turn 13), W2b results / R1 convergence | 532,875 | 171,104 | 258,400 | Dispatcher generation 21 at seat 2 turn 9; ledger `0ec1915`, report `e2dc969` |
+| Seat 2 turn 9 (ledger turn 14), Reviewer B / final gate / return | Pending dispatcher | Pending dispatcher | 258,400 | Last docs-only turn; depth not supplied; stand down after return |
 
 ## RESUME HERE (seat 2; written by the dispatcher, generation 20, 2026-10-29 ~12:12Z)
 
@@ -715,6 +716,159 @@ remain at the dispatcher's seat. AFTER figures and Q6's verdict remain open.
 Final `git diff --check` is recorded in
 `work/wp-t6/seat2-turn8-diff-check.log` before handoff.
 
+## Reviewer B -- returned; CHARC dispositions `7c59772d`
+
+Dispatcher generation 21 ran Reviewer B as a Claude process at its own seat,
+model `claude-opus-5-5`, effort high, on merge candidate `wp-t6-mc` `a4472fb`.
+Assertions supplied by the dispatcher: model ok, `is_error=false`, 36 turns,
+worktree clean afterward, eight permission denials all sandbox refusals and
+none withheld-path access. Verdict **NO_NEW_CRITICAL_MAJOR**: zero critical,
+zero major, one minor (B1), nine advisory. CLI version, exact start/end and
+an exact in/out-envelope or NEW/REOPENED split were not supplied; no values
+are inferred. This is the independent B return, not an A round 2.
+
+The full review text was not handed to the cell. The source for the following
+dispositions is the dispatcher's quoted CHARC ruling **`7c59772d`**, which
+settles all ten findings. Durable evidence is
+`C:\Users\rwsmy\clearwater-review-evidence\wp-t6\reviewB\`;
+dispatcher-supplied MD5 prefixes: review `ff96cce0`, prompt `92d44bf8`, diff
+`953355a8`. These B checksums are attested, not independently opened/verified
+by the cell.
+
+| Reviewer B row / findings | Severity | CHARC-ruled disposition and implementation |
+|---|---|---|
+| B1 | Minor | REPORT-ONLY under `7c59772d`. Fixture passes its plan's own T, so a later-keyframe plan N=120/T=4.004 passes fixture-path checks; the parity test independently derives T and fails it in the same serial leg. Added the required single Limit line. CHARC writes the DR, triggered by next touch of `gx011627`; no code change. |
+| B2, B9 | Advisory | REPORT-ONLY under `7c59772d`, already stated via F2 or minor per the ruling; named in this Reviewer B row only because their detailed text was not supplied. |
+| B3 | Advisory | FIX under `7c59772d`: report's historical maximum becomes 43.58 s, the engine pair 499.89 -> 456.31; arithmetic confirmed. Documentation correction only. |
+| B4 | Advisory | DECLINED under `7c59772d`: dropped R4 docstring text is descriptive; the assertion is kept. No code/docstring change. |
+| B5, B6, B7, B8 | Advisory | Out of envelope or already-stated Limits under `7c59772d`; accepted/report-only, no implementation change. The quoted ruling does not assign each individual mechanism or envelope, so none is invented. |
+| B10 | Advisory | B could not execute the guard suite in its sandbox; W2b's 60 passed stands under `7c59772d`. No repeat run or acceptance loss. |
+
+All findings are dispositioned. B produces no blocking remediation, product
+fix, test fix, revert or new review round; only B1's Limit and B3's numerical
+correction are added. R1's convergence and result-bearing F2/F3 cleanup proof
+remain W2b's. Acceptance is pending CHARC's register/docs actions.
+
+## The ONE gate -- GREEN; AFTER and Q6 (seat 2 turn 9)
+
+Dispatcher records the merge candidate as
+`a4472fbe485a306f09cbd7750d98f9e193299ed5`, `wp-t6-mc`, the 21-commit
+package through `e2dc969` rebased onto main `5fdcda4`. Patch-id prefix is
+`a7a7d115` on both sides per dispatcher; no rebase was performed by the cell.
+The gate's `progress.log` independently records candidate HEAD. The cell
+reads the copied evidence at `work/wp-t6/gate-g1/`; the script ran in the
+candidate worktree with outputs/basetemps under `work/gate-g1/`.
+
+Gate start/end: 2026-10-29 14:43:42Z / 15:23:27Z. Git Bash,
+`PYTEST_ADDOPTS` unset, `QT_QPA_PLATFORM=offscreen`, fresh basetemps;
+SERIAL has no `-n`. The script held SERIAL at 14:56:04Z until 15:00:16Z,
+after the dispatcher verified the only other live cell idle. Nothing else
+ran during that timed leg. `mem.log` records 9,086,959,616 available bytes
+before PARALLEL and 9,663,655,936 before SERIAL, both above 5 GiB. A separate
+read-only post-gate check at 15:28:25.434580Z confirms the candidate and main
+`clearwater.local.toml` files are present and byte-identical; no config values
+or hashes are retained (`work/wp-t6/gate-g1-config-identity.json`). This
+establishes their post-gate identity, not an independently logged copy time.
+
+Static checks all EXIT 0: `uv run ruff check .` PASS; `uv run ruff format
+--check .` reports 267 files already formatted; `uv run mypy` reports no
+issues in 141 source files. Evidence: `ruff.log`, `format.log`, `mypy.log`.
+
+Collection proof independently repeated from the four copied `collect-*.txt`
+files: all 6,457 = parallel 5,313 + serial 1,137 + fullclip 7; no duplicates,
+pairwise-disjoint sets and union all; every collection EXIT 0. Against the
+base/main set of 6,449, exactly seven unsuffixed CUT IDs are removed and
+fifteen added (their fourteen split forms plus parity). Analysis and full
+delta sets are saved in `work/wp-t6/gate-g1-analysis.json`.
+
+| Leg | Process interval UTC | Observed result | Evidence |
+|---|---|---|---|
+| PARALLEL, amended expression with `-n 4` | 14:44:08Z-14:56:04Z | 5,312 passed, one skipped (`test_color_roundtrip.py:123`), 5 warnings; EXIT 0; 714.41 s | `parallel.log`, `progress.log` |
+| SERIAL, amended expression, `--durations=0 --junitxml` | 15:00:16Z-15:23:27Z | 1,136 passed, one standing photo skip (`test_photo_check.py:139`), 5,320 deselected, 6 warnings; EXIT 0; **1,389.24 s** wall; JUnit suite **1,389.176 s** | `serial.log`, `serial.xml`, `progress.log` |
+
+Actual commands, from the copied `gate-g1.sh` (relative paths are candidate
+worktree paths):
+
+```text
+uv run pytest -q -rs -n 4 -m "not gpu and not footage and not gui and not slow and not fullclip" --basetemp=work/gate-g1/parallel
+uv run pytest -q -rs -m "(gpu or footage or gui or slow) and not fullclip" --basetemp=work/gate-g1/serial --durations=0 --junitxml=work/gate-g1/serial.xml
+```
+
+All 13 copied files match `md5sums.txt`, verified independently by the cell.
+These are artifact checksums, not footage packet digests:
+
+| Copied evidence file | Verified MD5 |
+|---|---|
+| `collect-all.txt` | `73d79ff93271c30ab2cb8d9d9679cb49` |
+| `collect-fullclip.txt` | `a01760318e04d9cc8bb18dc163d255d7` |
+| `collect-parallel.txt` | `d35a2c1b9bc00394f874a1b6703bbb53` |
+| `collect-serial.txt` | `f6d9ac350e9c1d1f114cc898c4bdbbbd` |
+| `format.log` | `b852383b929654d14581779fc0e2a4c7` |
+| `gate-g1.sh` | `f4cca36e6a0b0ab07a3f5abd0b5bd4ca` |
+| `mem.log` | `1280d60f236d2453802da9fec1f05841` |
+| `mypy.log` | `4cb1c99edee59d38af9b0acfdd91b652` |
+| `parallel.log` | `f080acfaf5f9dacb63795199f6c55cd7` |
+| `progress.log` | `057fdbb5f726063afd5207b9f21194a8` |
+| `ruff.log` | `15e308a5341b591ac685a3bf5fb8f100` |
+| `serial.log` | `9142b7655591b3db6693846a8e85d943` |
+| `serial.xml` | `5b88c916589c843e09dd2815f0e58f17` |
+
+### Final timing reconciliation and verdict
+
+JUnit `testcase.time` includes setup+call+teardown. The seven CUT totals,
+read directly from XML, are R1 88.511, R2 54.223, R3 39.440, R4 41.292,
+R5 25.220, R6 18.127, R7 14.423 s; sum **281.236 s**. The parity node is
+1.388 s, giving **282.624 s** with parity. The report now carries every
+CUT phase from the duration log beside these totals.
+
+Baseline is setup+call **1,567.37 s**. AFTER's displayed setup+call sum is
+280.65 s; displayed teardown totals 0.58 s. The 0.006 s difference between
+their sum and JUnit is rounding/undisplayed small phases. R5's 10.77 s setup
+carries the shared session trim and independent reference; R3's 27.47 s setup
+carries the shared standard encode (plus other fixture work). Each is counted
+once, with no unmeasured internal split asserted. BEFORE charged reference
+setup 43.52 s to R5 and standard setup 171.57 s to R3 (brief map).
+
+**Q6 PASS:** 1,567.37 - 281.236 = **1,286.134 s** (82.06%) conservative
+seven-CUT reduction, strictly > 110 s. This counts teardown in AFTER only
+and also retains the new trim setup cost; neither makes the claimed saving
+larger. Matched displayed setup+call gives 1,286.72 s reduction. Counting
+parity too still gives 1,284.746 s reduction. The leg wall is reported beside
+it: 2,621.32 -> 1,389.24 s, **1,232.08 s (47.00%)** shorter, not the sole
+verdict basis. The 900 s target is missed by **489.24 s**; informational
+under Q7, not a pass criterion.
+
+All 31 KEEP rows match actual XML/log node IDs; none is missing. Matched
+setup+call sums are **659.54 -> 687.85 s**, aggregate **+28.31 s**;
+individual deltas range **-1.81 to +8.80 s**, median **+0.34 s**. The report
+contains each row's baseline, AFTER and delta. KEEP JUnit sum is 690.850 s,
+including teardown, and is not substituted in that matched comparison.
+This is descriptive host/order variation, not a confidence interval or a
+claim that size edits caused it. The historical engine movement is corrected
+to 43.58 s per B3; leg-spread indicator remains about 316 s. Full comparison
+figures and mappings are in `gate-g1-analysis.json` and
+`work/wp-t6/gate-g1-comparison.log`.
+
+### Final documentation verification and handoff
+
+Only report and ledger change in turn 14. No code, marker, dependency,
+fixture, test assertion, command or measurement changes. Reviewer A converged,
+B returned with all dispositions ruled, full forms passed in W4, the ONE
+gate is green and Q6 PASS is established. No additional gate is run for these
+documentation-only updates. CHARC's accept/register/fill/CLAUDE.md updates
+and B1's owner-triggered DR remain at the superior seat; accept pending.
+Final `git diff --check` and source-evidence/scope proof are recorded under
+`work/wp-t6/seat2-turn9-*.log` before the structured return and STAND DOWN.
+
+Turn-14 checks PASS, EXIT 0: `seat2-turn9-diff-check.log` and
+`seat2-turn9-doc-proof.log`. The latter re-verifies all 13 artifact MD5s,
+reads the XML directly for all seven CUT, 31 KEEP and parity totals, confirms
+Q6 arithmetic and both gate summaries, checks the report's tables/B1 Limit
+and accept-pending status, and confirms only the two authorized Markdown
+files changed, both LF, with no staged changes or remaining placeholders.
+No new heavy run or code change was needed. Final whitespace check is
+repeated after this ledger entry.
+
 ## Rung 0 facts (2026-10-29)
 
 | Check | Observed result | Evidence / limits |
@@ -1209,16 +1363,20 @@ pending and are not validation results.
 | W3 run 2 | 2026-10-29 12:50:55.706810Z / 12:56:23.544816Z | `bash work/wp-t6/w3.sh` | 8 passed in 258.91 s; one standard encode; V4 branch (i); both controls caught; W3 DONE EXIT 0, cleanup EXIT 0 | 11,001,569,280 bytes before window; 10,989,305,856 before main pytest | `work/wp-t6/w3/`; script MD5 `0dd11553112ae203b95a0952c9485f96`; scratch removed, tests/diff clean and bytes unchanged |
 | W4 | 2026-10-29 13:06:46.706213Z / 13:32:45.218973Z | `bash work/wp-t6/w4.sh` (after candidate collections passed) | 7 passed, 6450 deselected, 1 warning in 1556.05 s; W4 DONE, pytest/cleanup EXIT 0; observed both sink operands 681; zero trim setups | 11,047,211,008 bytes | `work/wp-t6/w4/`; script MD5 `16847bf19ddb53f9cc88f018fc9b8ad5`; scratch/basetemp removed, tests/diff clean |
 | W2b, R1 cleanup | 2026-10-29 14:27:13Z (dispatcher; window record 14:27:14.410635Z) / 14:28:28.190149Z | `bash work/wp-t6/w2b.sh` | Parity 1 passed in 3.29 s; guard 60 passed in 41.67 s; four controls caught; W2b DONE, all stage/cleanup EXIT 0 | 9,408,053,248 bytes at window; 9,428,738,048 before controls | `work/wp-t6/w2b/`; script MD5 `273352e4c1ac2efd61ef6999b2ae5a9f`; scratch and both basetemps removed |
+| Gate G1 PARALLEL | 2026-10-29 14:44:08Z / 14:56:04Z | `uv run pytest -q -rs -n 4 -m "not gpu and not footage and not gui and not slow and not fullclip" --basetemp=work/gate-g1/parallel` | 5,312 passed, one skipped in 714.41 s; EXIT 0 | 9,086,959,616 bytes | Candidate `a4472fb`, dispatcher seat; copied `work/wp-t6/gate-g1/parallel.log`, `progress.log`, `mem.log`; artifact MD5s above |
+| Gate G1 SERIAL | 2026-10-29 15:00:16Z / 15:23:27Z | `uv run pytest -q -rs -m "(gpu or footage or gui or slow) and not fullclip" --basetemp=work/gate-g1/serial --durations=0 --junitxml=work/gate-g1/serial.xml` | 1,136 passed, one skipped, 5,320 deselected in 1,389.24 s; EXIT 0; seven CUT JUnit sum 281.236 s, Q6 PASS | 9,663,655,936 bytes | Candidate `a4472fb`, alone at dispatcher seat after idle hold; copied `work/wp-t6/gate-g1/serial.log`, `serial.xml`, `progress.log`, `mem.log`; artifact MD5s above |
 
 ## Review-round ledger
 
 Reviewer A uses the Codex-lane Claude pass at FAST tier under Q11; the fill
 governs convergence. Per-finding dispositions and evidence are in the R1
-section above. No Reviewer B pass has run.
+section above. Reviewer B returned on the merge candidate; all ten findings
+were dispositioned under CHARC `7c59772d`, as recorded above.
 
 | Round | Critical / major / minor / advisory | In / out | NEW / REOPENED | Reverts | Fixes | Transport / assertions / depth | Disposition |
 |---|---|---|---|---|---|---|---|
-| A R1, `6ecc4e5..04b01d2` | 0 / 0 / 3 / 8 | 9 / 2 (F5, F8 out; style F11 in) | 11 / 0; NEW blocking 0 | 0 | Product 0; test helper 2 result-bearing (F2, F3); attribute docstring and report/ledger cleanup; no R1-R7 assertion edits | Dispatcher native Claude process, `claude-opus-5-5`, high, 32 turns; model ok, `is_error=false`, clean worktree after; 10 scratch-write denials classified, no withheld access; CLI version not supplied. Seat-2 turn-6 input depth 98,187 / 258,400 | `NO_NEW_CRITICAL_MAJOR`; single cleanup complete, W2b positive proof and four controls caught; R1 CONVERGED, no round 2 under Q11. All F1-F11 adjudicated; B pending |
+| A R1, `6ecc4e5..04b01d2` | 0 / 0 / 3 / 8 | 9 / 2 (F5, F8 out; style F11 in) | 11 / 0; NEW blocking 0 | 0 | Product 0; test helper 2 result-bearing (F2, F3); attribute docstring and report/ledger cleanup; no R1-R7 assertion edits | Dispatcher native Claude process, `claude-opus-5-5`, high, 32 turns; model ok, `is_error=false`, clean worktree after; 10 scratch-write denials classified, no withheld access; CLI version not supplied. Seat-2 turn-6 input depth 98,187 / 258,400 | `NO_NEW_CRITICAL_MAJOR`; single cleanup complete, W2b positive proof and four controls caught; R1 CONVERGED, no round 2 under Q11. All F1-F11 adjudicated; B returned below |
+| B, merge candidate `a4472fb` | 0 / 0 / 1 / 9 | Exact split not supplied; B5-B8 out or already-stated Limits | Exact split not supplied; no blocking remediation | 0 | Product 0; test 0; report B1 Limit and B3 numerical correction, ledger dispositions | Dispatcher Claude process, `claude-opus-5-5` / high, 36 turns; model ok, `is_error=false`, clean afterward; 8 sandbox denials, none withheld; CLI version not supplied. Seat-2 turn-8 input depth 171,104 / 258,400 | `NO_NEW_CRITICAL_MAJOR`; all B1-B10 dispositioned under CHARC `7c59772d`; independent B return, no A round 2; gate green, accept pending |
 
 ## Verification loop and turn boundary
 
