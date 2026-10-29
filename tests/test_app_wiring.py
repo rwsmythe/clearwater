@@ -596,7 +596,8 @@ class _ProgressSource:
     """A frame source that records how far its frames have been read (R3-5).
 
     Its first ``frames`` iterator holds after its first frame until ``release`` is set, so the
-    close begins with the decode under way; every other call goes to ``inner``.
+    close begins with the decode under way; every other call goes to ``inner``. The iterator has
+    ended once it runs out, is closed or raises (R4-1).
     """
 
     def __init__(self, inner: Any, release: threading.Event) -> None:
@@ -609,12 +610,14 @@ class _ProgressSource:
         return getattr(self._inner, name)
 
     def frames(self, probe: Any, **kwargs: Any) -> Any:
-        for frame in self._inner.frames(probe, **kwargs):
-            self.advanced += 1
-            yield frame
-            if self.advanced == 1:
-                self._release.wait(60)
-        self.ended = True
+        try:
+            for frame in self._inner.frames(probe, **kwargs):
+                self.advanced += 1
+                yield frame
+                if self.advanced == 1:
+                    self._release.wait(60)
+        finally:
+            self.ended = True
 
     def mid_decode(self) -> bool:
         """The frame iterator has advanced and has not ended."""
@@ -662,6 +665,29 @@ class _ProgressSink:
         return self.opened and self.written > 0 and not self.closed
 
 
+def test_the_progress_source_has_ended_once_its_iterator_closes_or_runs_out() -> None:
+    """R4-1: an iterator its consumer closes after frame 1 (a processing failure) is not mid-decode.
+
+    Pure Python (no window): the R3-5 predicate must not stay True for a stopped decode.
+    """
+
+    class Inner:
+        def frames(self, probe: Any, **kwargs: Any) -> Any:
+            yield from range(5)
+
+    release = threading.Event()
+    source = _ProgressSource(Inner(), release)
+    iterator = source.frames(None, hw_decode=False)
+    next(iterator)
+    assert source.mid_decode()
+    iterator.close()  # what ``AnalysisEngine._decode`` does when processing a frame fails
+    assert not source.mid_decode()
+    release.set()
+    exhausted = _ProgressSource(Inner(), release)
+    assert list(exhausted.frames(None, hw_decode=False)) == [0, 1, 2, 3, 4]
+    assert not exhausted.mid_decode()
+
+
 @pytest.mark.slow
 @pytest.mark.parametrize("job", ["analysis", "export", "batch"])
 def test_dr44c_a_real_job_ends_within_the_shutdown_timeout_at_close(
@@ -670,8 +696,9 @@ def test_dr44c_a_real_job_ends_within_the_shutdown_timeout_at_close(
     """From ``close()``: an analysis mid-decode, an export mid-encode, a batch item.
 
     "Mid-decode" and "mid-encode" are predicates read when the first job runner's ``close``
-    begins (R3-5), not a timing: the analysis's frame source has yielded a frame and its
-    iterator has not ended; the export's sink is open and has written a frame, and neither its
+    begins (R3-5), not a timing: the analysis's frame source has yielded a frame, its iterator
+    has not ended (run out, closed or raised; R4-1) and the analysis phase is ``running``; the
+    export's sink is open and has written a frame, and neither its
     close nor its abort has begun. Each holds its job after the first frame until that moment,
     so the predicate cannot be missed; the hold is released as the close begins and the job then
     ends by its own cancel path.
@@ -698,7 +725,9 @@ def test_dr44c_a_real_job_ends_within_the_shutdown_timeout_at_close(
 
     def engine_factory(**kwargs: Any) -> AnalysisEngine:
         source = _ProgressSource(kwargs["source"], release)
-        progress["predicate"] = source.mid_decode
+        progress["predicate"] = lambda: (
+            source.mid_decode() and window.session.analysis().phase == "running"
+        )
         return AnalysisEngine(**{**kwargs, "source": source})
 
     monkeypatch.setattr(QtJobRunner, "close", timed)

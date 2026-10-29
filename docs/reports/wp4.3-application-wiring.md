@@ -102,9 +102,9 @@ DR-68 (`gpu`, this laptop): `free_device_bytes()` 7,388.9 MB before the 1:1 4K r
 MB after it (6 cuFFT plans on `clearwater-preview`), 7,388.9 MB after the boundary (0 plans).
 
 DR-44 (c), from the first job runner's `close()` (fixture clip, cell 6's targeted run, a shared
-host): an analysis whose frame source had yielded a frame and whose frame iterator had not ended
-ended in 46 ms; an export whose sink was open and had written a frame, with neither its close
-nor its abort begun, in 18 ms; a running batch item in 28 ms. The two predicates are read as
+host): an analysis whose frame source had yielded a frame, whose frame iterator had not ended
+(run out, closed or raised) and whose phase was running ended in 52 ms; an export whose sink was open and had written a frame, with neither its close
+nor its abort begun, in 33 ms; a running batch item in 39 ms. The two predicates are read as
 that close begins (R3-5); each job is held after its first frame until then, so neither can be
 missed. `gui/jobs.py` is not touched. GX011627: window, pending.
 The start-up jobs (R1-5), reproduced on the real `main()` path with a 12 s cache open and a
