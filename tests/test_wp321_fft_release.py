@@ -12,6 +12,7 @@ release, and a release that raises never replaces the job's outcome.
 
 from __future__ import annotations
 
+import subprocess
 import threading
 from pathlib import Path
 from typing import Any
@@ -147,12 +148,61 @@ def test_the_analysis_end_boundary_frees_the_pools_cached_blocks(
     assert before >= 64 * 1024**2 and after < before
 
 
+@pytest.mark.gpu
+@pytest.mark.slow  # a 1080p clip longer than c3's lead, generated and exported on the GPU
+def test_the_analysis_end_release_frees_the_pool_while_frames_render(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """DR-74 (WP4.2): at a gated resolution, longer than c3's derived lead (61 frames)."""
+    try:
+        gpu = backend_for("cuda:0")
+    except Exception as error:  # no CuPy or no device
+        pytest.skip(f"no GPU backend: {error}")
+    frames = 90
+    source = tmp_path / "gated-1080p.mp4"
+    subprocess.run(
+        [
+            "ffmpeg", "-nostdin", "-hide_banner", "-v", "error", "-y", "-f", "lavfi", "-i",
+            f"testsrc2=size=1920x1080:rate=30:duration={frames / 30}", "-vf", "hue=h=t*60",
+            "-bf", "0", "-c:v", "libx265", "-preset", "ultrafast", "-x265-params",
+            "log-level=error", "-pix_fmt", "yuv420p", "-color_primaries", "bt709",
+            "-color_trc", "bt709", "-colorspace", "bt709", "-color_range", "tv", str(source),
+        ],
+        check=True,
+        capture_output=True,
+    )  # fmt: skip
+    pool = gpu.xp.get_default_memory_pool()
+    release = export_module._release_fft_plans
+    sink = FakeSink()
+    seen: list[tuple[str, int, int, list[str], int]] = []
+
+    def spied(backend: object) -> None:
+        if threading.current_thread().name == "export-analysis":
+            planted = gpu.asarray(np.zeros((4096, 4096), dtype=np.float32))  # 64 MiB
+            del planted  # its block stays in the pool, cached
+        calls, written = list(sink.calls), len(sink.frames)
+        before = pool.total_bytes() - pool.used_bytes()
+        release(backend)
+        after = pool.total_bytes() - pool.used_bytes()
+        seen.append((threading.current_thread().name, before, after, calls, written))
+
+    monkeypatch.setattr(export_module, "_release_fft_plans", spied)
+    result = _video(tmp_path, source, gpu, sink)
+    assert result.ok, result.failure
+    assert len(sink.frames) == frames
+    assert [name for name, *_ in seen] == _both_boundaries()
+    _, before, after, calls, written = seen[0]
+    assert "open" in calls and "close" not in calls  # the encode was under way
+    assert written < frames  # frames still to render after the release
+    assert before >= 64 * 1024**2 and after < before  # the pool's cached blocks went back
+
+
 def _both_boundaries() -> list[str]:
     """The release threads of a video job: the analysis thread's return, then the job's end."""
     return ["export-analysis", threading.current_thread().name]
 
 
-def test_a_video_job_releases_at_the_analysis_end_and_after_every_frame(
+def test_a_video_job_releases_twice_at_the_analysis_end_and_at_the_job_end(
     sample: Any, tmp_path: Path
 ) -> None:
     sink = FakeSink()
