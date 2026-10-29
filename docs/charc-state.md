@@ -104,6 +104,14 @@
   V5/D53/V9, Result 2 memory leg; pre-corrected class reported separately; after the inventory QA and clear of WP4.3's
   windows); (3) DR-15 leg if a MOV carries the B-frame as-written media_time (micro-package, exclusive V4 window). Category:
   'Phone' = Snorkel (owner's words). Look-check on phone photos NOT commissioned (owner's visual review).
+- **INVENTORY REFRESH DISPATCHED 17:16Z (msg a87f01ca) to a CODEX session** in `.worktrees/inventory-1029` (branch
+  `inventory-1029`, base 1c59f15; OCCUPIED): read-only footage grant for this package; privacy rule binding (no GPS / location /
+  serial / MakerNote / gpmd; grep proof). **MY RULING (post e6a13fca): review form for THIS ARC ONLY** = the orchestrator's
+  re-run of the committed probe script (md5) + five named spot checks against disk (two HEIC incl. one irot, one IMG_6791-6802
+  JPG, one MOV edit list via ffprobe, the dp_color mp4) + the privacy grep over output AND report + CHARC QA, in place of
+  Reviewers A and B (precedent b1fd289); the fill is NOT amended, a second use needs its own ruling. Lane share at 17:14Z:
+  Codex 2 of 3 live seats (WP4.3a turn 6, inventory), Claude 1 (WP4.3 cell 6); paces Codex 0.324 / Claude 1.399. Items 2
+  (WP3.6P brief after the report's QA) and 3 (DR-15 leg if a MOV has non-zero video media_time) queued.
 - **(gen 6 history follows; newest facts at the end of the block)**
 
 - **Gen 6 pickup facts:** bash gauge 45 ms; inbox 0 unread at pickup; announce posted to the orchestrator (gen 17, shell-busy in the WP4.1 gate) with ONE cue; the two register scripts copied from gen 5's scratchpad (18c10a55...) into this session's scratchpad (6687b6c9-eacd-4ffc-995e-51c9195391d1) as `edit_register_p4a.py` (drop its DR-65 block before running: already applied at 3114d23) and `edit_register_p4b.py`.
