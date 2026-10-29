@@ -4,8 +4,10 @@
 
 The implementation and requested light checks are GREEN. Reviewer A round 1
 returned NO_NEW_CRITICAL_MAJOR (one minor and four advisory findings); its
-non-blocking remediation is complete. Reviewer A round 2, Reviewer B and the
-full two-leg gate are outstanding; this is not acceptance.
+non-blocking remediation is complete. Reviewer A CONVERGED at round 2
+(NO_NEW_CRITICAL_MAJOR, five non-blocking advisories, nothing reopened).
+Round-2 documentation cleanup is complete; Reviewer B and the full two-leg
+gate are outstanding; this is not acceptance.
 Base: `f991254`. Turn-2 WIP: `f1a6bba`; turn-3 STOP record: `79b60d9`.
 The governing CHARC rulings `0c8d52528a11b714`, `050c52106cd8c6ad` and
 `8262cd59b0d48c73` are recorded verbatim in the ledger. The last grants ONE
@@ -43,15 +45,18 @@ WP4.2a test file edited only for the two same-drive flips, exact refusal text,
 eight drive-relative plants and the planted file-form control's isolation.
 The round-1 remediation adds only the granted positive file-form twin and
 engine-drive-relative row, with report/ledger updates; no product edit.
-No frozen-interface, dependency, composition or export-engine edit.
+The terminating round-2 cleanup adds ONE naming-refusal line to the
+check_outputs Raises docstring under the seat interpretation of CHARC
+condition 2; no behavior changes. No frozen-interface, dependency,
+composition or export-engine edit.
 
 ## Runner and engine routes
 
-`tools/headless_export.py:724-727` catches `OutputNameError` before its broader
+`tools/headless_export.py:725-728` catches `OutputNameError` before its broader
 `ValueError` catch. It raises name-only, ASCII-safe `RunnerRefusalError` before
 any job, yielding CLI exit 2. Other `ValueError`s still continue to the engine:
 `test_invalid_suffix_stays_an_engine_refusal` passed unedited. The original
-parent and file-form guards below the catch (lines 728-736) are byte-for-byte
+parent and file-form guards below the catch (lines 729-737) are byte-for-byte
 unchanged and remain defence in depth.
 
 With `footage_folder=None`, `check_outputs` still returns before planning.
@@ -62,6 +67,10 @@ at 634-641 prefixes the actual exception type and ASCII-escapes the text.
 This unchanged route reports `<source>: OutputNameError: <message>` as a
 failed item with status 1, without a traceback. Other engine `ValueError`s
 retain their existing description route.
+
+For WP4.3: on POSIX a real source name containing `:` (for example
+`2026-10-12T10:30:00.mp4`) is now refused, and the failed-item text does not
+tell the user to rename the source; WP4.3 GUI wording should give that guidance.
 
 ## RED/GREEN and controls
 
@@ -142,7 +151,7 @@ Their original node IDs are retained; no WP4.2a test was deleted or added.
 
 ## Reviewer A edit list and assertion evidence
 
-Line spans below refer to the completed turn-4 tree. A helper-only text
+Line spans below refer to the current test tree (turn 6). A helper-only text
 change lists both the consuming node and helper span. The negative-call
 controls formerly at :272/:285 are unchanged, now functions at lines
 302-312 and 315-324; both passed. They prove planning is skipped, as CHARC's
@@ -223,6 +232,19 @@ All 22 previously failing node IDs, independently checked PASS in turn-6 XML:
 - `tests/test_wp42a_runner_hardening.py::test_stream_output_on_hard_link_leaves_original_unchanged[main]` -- PASS
 
 ## Checks, verification loop and acceptance transfer
+
+Reviewer A CONVERGED at round 2 on `30d8d81`: both rounds returned
+NO_NEW_CRITICAL_MAJOR, with nothing reopened. The terminating advisory
+cleanup documents the granted runner branch, adds the POSIX rename-guidance
+limitation and corrects the test-span framing. F2/F5 remain banked.
+Turn-7 light checks: 126 passed, three authorized UNC nodes deselected,
+zero failures/skips; ruff check, format (261 files) and mypy (141 files)
+passed. Evidence: `work/wp4.2b/turn7-light.log`, `turn7-light.xml`,
+`turn7-ruff-check.log`, `turn7-ruff-format.log`, `turn7-mypy.log`.
+The turn-7 diff against `30d8d81` contains only this report, the ledger
+and the single runner docstring line; `turn7-final-scope.log` records
+the scope, unchanged executable AST and zero-CR blob checks.
+Two-leg gate figures and Reviewer B remain pending; this report stays DRAFT.
 
 Final turn-6 `ruff check .`: all checks passed, EXIT 0
 (`turn6-ruff-check.log`). `ruff format --check .`: 261 files already formatted,

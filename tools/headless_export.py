@@ -700,6 +700,7 @@ def check_outputs(requests: Sequence[ExportRequest], footage_folder: Path | None
         RunnerRefusalError: An output folder, or the folder beside a source the outputs would go
             to, that :func:`write_target_refusal` refuses; or a planned output file in a
             refused text form or outside its checked output folder.
+            Or a planned name is not a single portable component (OutputNameError), before any job.
     """
     if footage_folder is None:
         return

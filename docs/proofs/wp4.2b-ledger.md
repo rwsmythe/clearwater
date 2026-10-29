@@ -7,7 +7,8 @@
 | Turn 3 / ruling check | tokens used 306,885; input depth 167,794 / 475,000 | Dispatcher supplied at turn 4; docs-only STOP committed as `79b60d9` |
 | Turn 4 / build | tokens used 379,056; input depth 206,526 / 475,000 | Dispatcher supplied at turn 6; committed as `215817a`; Reviewer A round 1 completed |
 | Turn 5 / round-1 adjudication | tokens used 413,658; input depth 237,641 / 475,000 | No tracked change; adjudication delivered in return and persisted below at turn 6 |
-| Turn 6 / round-1 remediation | Pending dispatcher reading | Bounded continuation authorized near evaluation point; test/report cleanup under `8262cd59b0d48c73` |
+| Turn 6 / round-1 remediation | tokens used 451,126; input depth 274,367 / 475,000 | Dispatcher supplied at turn 7; committed as `30d8d81`; bounded continuation past evaluation point authorized |
+| Turn 7 / round-2 terminating cleanup | Pending dispatcher reading | Bounded docs cleanup authorized; report-FINAL turn follows the seat gate |
 
 Base: `f991254`, branch `wp4.2b`. Dispatch: orchestrator generation 18,
 FINAL brief on CHARC `5c056d647ad9ca99`. Scope: DR-80 naming containment.
@@ -219,7 +220,8 @@ control evidence, not a post-change GREEN claim.
 | Turn 2 build (not a review round) | No Reviewer A run; initial scope STOP ruled at turn 3 | N/A | N/A | N/A | 0 | Product validation + new tests | Codex cell; reviewer not invoked | tokens 144,321; input 137,070 / 475,000 |
 | Turn 3 ruling check (not a review round) | No Reviewer A run; narrower STOP ruled at turn 4 | N/A | N/A | N/A | 0 | None; documentation + cheap reproductions only | Codex cell; reviewer not invoked | tokens 306,885; input 167,794 / 475,000 |
 | Turn 4 build (not a review round) | Reviewed at round 1 | N/A | N/A | N/A | 0 | Exception/export + one runner catch + granted tests | Codex cell | tokens 379,056; input 206,526 / 475,000 |
-| Reviewer A round 1, adjudication turn 5 / cleanup turn 6 | `NO_NEW_CRITICAL_MAJOR`; 1 minor / 4 advisory adjudicated below | 0 / 0 / 1; 4 advisory | 4 / 1 | 5 / 0 | 0 | Test/report-only remediation; no product change | Driver Claude `claude-opus-5-5` / high; exit 0, 38 turns; CLI version not supplied | Turn 4: input 206,526; turn 5: input 237,641; turn 6 pending |
+| Reviewer A round 1, adjudication turn 5 / cleanup turn 6 | `NO_NEW_CRITICAL_MAJOR`; 1 minor / 4 advisory adjudicated below | 0 / 0 / 1; 4 advisory | 4 / 1 | 5 / 0 | 0 | Test/report-only remediation; no product change | Driver Claude `claude-opus-5-5` / high; exit 0, 38 turns; CLI version not supplied | Turn 4: input 206,526; turn 5: input 237,641; turn 6: input 274,367 |
+| Reviewer A round 2, terminating adjudication / cleanup turn 7 | `NO_NEW_CRITICAL_MAJOR`; CONVERGED | 0 / 0 / 0; 5 advisory | 5 / 0 (reviewed envelope, including accepted bank entries) | 3 new / 0 reopened; 2 banked re-sightings | 0 | Docs-only plus ONE runner docstring line; no behavior/test changes | Driver Claude `claude-opus-5-5` / high; 37 turns; clean after; CLI version not supplied | Turn 6: tokens 451,126; input 274,367 / 475,000 |
 
 Review policy: the driver's Claude pass, STRONG tier, per the Clearwater
 seam-3 fill. Adjudicate every supplied finding; yield at each round boundary.
@@ -642,6 +644,10 @@ plan_output selects `.._2` because the directory exists. It is not a source
 file; routing rejects its empty extension (`headless_export.py:395-412`).
 The ruling explicitly excludes extending the stem check to `..`.
 BANKED HERE as an accepted boundary observation; no validation change.
+Round-2 R2-A4 re-sighting CONFIRMED against naming.py:293-304 and this
+explicit stem-rule boundary; remains advisory/non-blocking and BANKED.
+The round-2 ledger counts the five received entries in the reviewed envelope;
+this accepted observation still requires no extension of implementation scope.
 
 ### F3 -- CONFIRM report/coverage refinement; ADVISORY, non-blocking; FIX
 
@@ -674,6 +680,9 @@ Evidence: `turn5-document-audit.log`, EXIT 0.
 BANKED HERE as accepted cosmetics: extension is harmlessly rebound at test
 lines 110-111, and the same-drive test name is retained to preserve mandated
 node IDs. No code change, as concurred by CHARC.
+Round-2 R2-A5 re-sighting CONFIRMED against the retained function name
+and refusal assertions at test_wp42a_runner_hardening.py:165-185; remains
+advisory/non-blocking and BANKED, with no rename or behavioral change.
 
 ### Environment and unchanged adjudication state
 
@@ -796,3 +805,75 @@ add positive twin -> M1 RED / real GREEN; confirm F3 route with one-letter
 probe -> add one row -> original-rule M3 RED / real GREEN; settle report
 clarity -> full light gate/outcome audit GREEN. No further issue found.
 Own-window two-leg gate, Reviewer B and Reviewer A round 2 remain pending.
+
+
+## Reviewer A round 2 -- terminating adjudication and cleanup (turn 7)
+
+**Reviewer A -- CONVERGED at round 2.** On `30d8d81`, reviewer Claude
+`claude-opus-5-5` / high completed 37 turns; worktree clean after (dispatcher
+supplied). Verdict `NO_NEW_CRITICAL_MAJOR`, nothing reopened. Both rounds
+returned that verdict; round 2 has nothing new above advisory. Evidence:
+`C:\Users\rwsmy\clearwater-review-evidence\wp4.2b\r2\review.txt`, read in
+full this turn. No new reviewer pass was run by this cell.
+
+The dispatcher rules this advisory-only, terminating round may combine
+adjudication and cleanup in one turn. Its turn-7 instruction treats the ONE
+check_outputs Raises line as documentation of the branch already granted
+by CHARC `0c8d52528a11b714` condition 2; the dispatcher informs CHARC.
+No further product behavior/test change was authorized or made.
+
+| Finding | Independent confirmation | Classification / disposition |
+|---|---|---|
+| R2-A1 | At the reviewed tree, check_outputs Raises at 699-702 omitted the OutputNameError catch at 724-725. Compare actual source, not reviewer wording. | CONFIRM; ADVISORY, non-blocking; FIXED by ONE added docstring line at 703 (catch now 725-726), before any job. |
+| R2-A2 | naming.py:298-304 bans colon and its actual error message has no rename guidance. Independent PurePosixPath/posixpath probe confirms timestamp-style colon names are otherwise ordinary POSIX components (`turn7-cleanup.log`). | CONFIRM; ADVISORY, non-blocking; FIXED report's for-WP4.3 note: colon source refused, failed-item text lacks rename advice, GUI should provide it. No behavior/message change. |
+| R2-A3 | Report claimed completed turn-4 spans while its twin is at test lines 279-299 and following controls at 302-324 in the turn-6 test tree. | CONFIRM; ADVISORY, non-blocking; FIXED the framing to current test tree (turn 6). |
+| R2-A4 / R1 F2 | naming.py:293-304 excludes no additional stem symbols; literal '..' boundary is already explicitly banked under F2. No file can have that name. | CONFIRM; ADVISORY, non-blocking; BANKED re-sighting added to the existing F2 entry. No scope expansion. |
+| R2-A5 / R1 F5 | test_same_drive_stream_output_keeps_checked_parent at 165-185 retains its mandated node ID but explicitly asserts OutputNameError and RunnerRefusalError. | CONFIRM; ADVISORY, non-blocking; BANKED re-sighting added to the existing F5 entry. No rename. |
+
+Round totals: **0 critical / 0 major / 0 minor / 5 advisory; 5 in the reviewed
+envelope; 3 NEW / 0 REOPENED, plus 2 BANKED re-sightings; 0 reverts**.
+Fixes: report/ledger documentation plus ONE runner docstring line only.
+The F2 implementation-boundary observation remains outside validation scope.
+No finding rejected, no unresolved blocking question.
+
+### Reviewer-executed mutation record
+
+These are the reviewer's EXECUTED results, corroborating the prior cell
+M1/M3 probes; they were not rerun by this cell in turn 7.
+
+| Mutation | Red cases | Recorded implication |
+|---|---|---|
+| M1: file-form branch removed | exactly 2 | Positive twin [run] and [main] both detect deletion of the layer. |
+| M3: base _base_plan restored | 26 | All ten naming cases detect unchecked names; [engine-drive-relative] writes cwd/input_corrected.png on the base, while [engine] creates out/carrier then WinError 87. |
+| M4: OutputNameError catch changed to continue | 15 | Before-jobs route and real stream refusals detect the lost runner catch; the eight planted parent cases remain green. |
+| M5: parent guard off | exactly 8 | All eight planted drive-relative cases detect deletion of the parent guard. |
+| M7: colon removed from character ban | 18 | Multi-letter streams and extension-carried colon cases fail; other rules still refuse one-letter drive forms. |
+
+### Turn-7 checks and verification record
+
+Environment: UV_PROJECT_ENVIRONMENT=C:/Users/rwsmy/clearwater/.venv;
+PYTHONPATH=scripts;src; QT_QPA_PLATFORM=offscreen. uv run --no-sync reuses
+installed dependencies, no sync or stray-.venv modification. Every pytest
+run uses sandbox_mkdir_shim and disables cacheprovider. All outputs are
+under work/wp4.2b/; no full two-leg gate run by the cell.
+
+| Run | Command / method | Log | Result / EXIT |
+|---|---|---|---|
+| Source/report confirmation and cleanup | Inline python -B -; compare exact source/doc phrases, PurePosixPath/posixpath simulation | turn7-cleanup.log | Edits completed, then initial overly broad assertion rejected an unrelated safe-write 'rename' docstring (EXIT 1); corrected error-message-only probe PASS (EXIT 0). Probe setup issue, no product finding. |
+| Initial lint | uv run --no-sync ruff check . | turn7-ruff-check-initial.log | ONE E501 on the added line (104 > 100), EXIT 1; same line shortened to 99 characters. |
+| Final lint | uv run --no-sync ruff check . | turn7-ruff-check.log | All checks passed; EXIT 0. |
+| Format | uv run --no-sync ruff format --check . | turn7-ruff-format.log | 261 files already formatted; EXIT 0. |
+| Types | uv run --no-sync mypy | turn7-mypy.log | No issues in 141 source files, including tools/headless_export.py; EXIT 0. |
+| Focused light tests | Exact command below | turn7-light.log; turn7-light.xml | 126 passed, 3 authorized UNC deselections, zero failures/errors/skips; EXIT 0. |
+| Final scope/blob audit | Inline python -B -; git diff and AST/raw-byte comparison against 30d8d81 | turn7-final-scope.log | Exactly three authorized files; runner differs by ONE docstring line only, executable AST unchanged; report remains DRAFT; raw changed blobs all zero CR; git diff --check PASS; EXIT 0. |
+
+```text
+uv run --no-sync pytest -q -rf -rs tests/test_wp42a_runner_hardening.py tests/test_headless_export.py --deselect=tests/test_headless_export.py::test_g1_inside_sees_every_spelling_of_the_same_folder --deselect=tests/test_headless_export.py::test_g1_main_refuses_every_footage_check_through_another_spelling[unc] --deselect=tests/test_headless_export.py::test_g1_the_redactor_hides_the_extended_spellings --basetemp=work/wp4.2b/tmp-turn7-light --junitxml=work/wp4.2b/turn7-light.xml -o junit_family=xunit1 -p sandbox_mkdir_shim -p no:cacheprovider
+```
+
+Verification loop: confirm all five source/documentation observations ->
+apply the three advisory fixes and bank two re-sightings -> fix the one
+line-length slip -> lint/types/tests GREEN -> scope/AST/blob audit PASS.
+No behavior change or new issue; review loop CONVERGED at round 2 per the
+seat ruling. Report remains DRAFT pending own-window two-leg gate and
+Reviewer B; one final report/docs turn follows the seat's gate results.
