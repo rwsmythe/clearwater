@@ -74,6 +74,18 @@
   + one runner test); nets = Claude passes, STRONG; gate stacked with WP4.2's suite if timing allows (orchestrator's call); BINDING at
   the latest WP4.3. N1 (mixed-separator redaction gap) row = mine at WP4.2a's accept with the DR-78/79 rewrite. Owed at WP4.2a's accept:
   DR-78 CLOSED, DR-79 CLOSED ('defensive; not reproduced' for (b)), N1 row, CHARC QA.
+- **WP4.2a ACCEPTED main `3aa25a5` (04:25Z, inside the CAP; msg `a671ac6369c1364d`; record `docs/proofs/wp4.2a-accept.md`); WP4.2b brief
+  FINAL `f991254`. CHARC QA CONFIRMED (static, ~04:35Z):** patch-id 9ca7ffa4 on `aa4761b..952f31a` = the record; code-only patch-id
+  238bdcc2 equal on the author range and `32099ae..3aa25a5`; `git diff c4eab41 3aa25a5` over src tests tools EMPTY; `src/` untouched;
+  7 files (runner, new hardening test file 545 lines, the two WP4.1 test files 13 lines each = the four granted sites only, stricter);
+  0 CR; r1 / r2 / reviewB md5s = record (36f0ed68 / 3ef4cca1 / c4e0f9e3; every md5sums.txt OK); ruff / format 260 / mypy 141 /
+  harness 382 OK here; no suite here (the orchestrator's gate 4539/1 + 1126/1 is the figure). **Register: DR-78 CLOSED, DR-79 CLOSED
+  ('defensive; not reproduced'), NEW DR-81 (N1 mixed-separator redaction + B-F1 raising resolution; N5 noted).** Codex lane share:
+  WP4.2a = 6 turns, peak depth 190,250 / 475,000; 4 Codex-built packages now. WP4.2b brief read (96 lines, 0 CR): three drafting
+  choices CONCURRED (stem rule = my parenthetical only; whole composed name checked, so `x.mp4:s` refused; runner test via
+  `export_jobs(reader=<double>)`, `c:` path built from a string). **LIVE next: WP4.2 build cell 2 (opus-high) on `wp4.2` rebased
+  (ledger 9f4c0db); WP4.2b Codex turn 1 from f991254; gate stacked with WP4.2's suite if WP4.2b is ready first (orchestrator tells
+  me).** Owed by me: DR-80 CLOSED at WP4.2b's accept; WP4.2's rows at its accept.
 - **(history) After WP4.1's accept:** WP4.2's brief (DRAFT RULED on main 3aa3c51) got ONE revision pass against WP4.1's accept record, then FINAL
   on CHARC's word; its revision must carry: DR-78/79 (B2 rows) as WP4.2 items, the WP4.1 runner's final names and the stream-syntax
   predicate, the Limit text. WP4.3's revision later carries DR-75 (REQUIRED test under its Q12), DR-76, DR-77, and the AD-23 'applied by
