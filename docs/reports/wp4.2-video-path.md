@@ -1,4 +1,4 @@
-# WP4.2 -- Video path end to end (report, DRAFT; Reviewer A converged at round 1)
+# WP4.2 -- Video path end to end (report, FINAL; two-leg gate GREEN at `8bc927a`)
 
 Cell 2 (implementer-opus-high), worktree `.worktrees/wp4.2`, branch `wp4.2` on main `f991254`
 (WP4.2a merged). Brief `docs/briefs/wp4.2-brief.md` (FINAL; Rulings `2c4476d9869df056`, Revision
@@ -82,6 +82,54 @@ seat and CHARC `881cc956f1335e7e`).
 | Runner | `test_wp42_runner_video.py` (12 tests) | CPU run through `main`; refusals; exit 0/1/2; two outputs and two entries; record names only; forced-CPU run loads no PySide6 or CuPy |
 
 Bit-identity assertions compare dtype, shape and bytes (`same_bits`, with a signed-zero control).
+
+## The gate and the review nets
+
+**The two-leg gate.** This is the package's ONE gate, under the fill's Order bullet. It is GREEN.
+It ran at the orchestrator's seat on `wp4.2-mc` `8bc927a`, which is `798af0c` rebased onto main
+`246052b` (patch-id `7dfc431f`, equal on both bases). Conditions:
+- the main `work/` configuration and the worktree's own `.venv` from the lock;
+- Git Bash, with `PYTEST_ADDOPTS` unset and the offscreen Qt platform;
+- 10.99 GiB free before the run.
+
+| Leg | Command | Result | Wall | Window |
+|---|---|---|---|---|
+| parallel | `uv run pytest -q -rs -n 4 -m "not gpu and not footage and not gui and not slow" --basetemp=work/wp4.2-gate-parallel` | **5312 passed, 1 skipped** (`tests\test_color_roundtrip.py:121`), EXIT 0 | 659.60 s | 09:41:40Z-09:52:48Z |
+| serial | `uv run pytest -q -rs -m "gpu or footage or gui or slow" --durations=40 --basetemp=work/wp4.2-gate-serial` | **1135 passed, 1 skipped** (`tests\test_photo_check.py:139`), 5313 deselected, EXIT 0 | 2,621.32 s | ending 10:36:31Z |
+
+- The parallel count is the earlier suite window's 5304 plus the 8 rows of
+  `tests/test_wp42_v3_figures.py`.
+- Static checks on `8bc927a`: `ruff check .` passed every check; `ruff format --check .` found 267
+  files already formatted; `mypy` found no issues in 141 source files.
+- The harness gate ran 382 tests: OK, 1 skipped.
+- Logs are in `work\wp4.2\gate-logs\`.
+
+**Question 9 at the gate.** Five new serial tests appear in the top 40 durations:
+
+| Test | Seconds |
+|---|---|
+| V3 AD-14 [c3] | 28.45 |
+| V3 AD-14 [ancuti2018] | 27.48 |
+| DR-74 | 19.64 |
+| V3 jitter [ancuti2018] | 12.56 |
+| V3 jitter [c3] | 12.15 |
+| **Sum** | **100.28** |
+
+The other four new serial tests each fall under the 6.58 s cut-off, at most about 26 s together.
+So the new serial tests cost **at most about 127 s of the 300 s budget**. The suite window at
+`401521e` read about 207 s; that is the earlier, slower reading, kept for the record.
+
+**The review nets.** Evidence is under `C:\Users\rwsmy\clearwater-review-evidence\wp4.2\`.
+
+| Net | Head | `review*.txt` (md5) | Verdict | Findings | Outcome |
+|---|---|---|---|---|---|
+| Reviewer A round 1 (Codex `gpt-6.1-sol` / high) | `1fa33a8` | `r1\review.txt` (`afff4213e7ac9e268c5daae216a445a1`) | NO_NEW_CRITICAL_MAJOR | 0 / 0 / 4 | fixed in the terminating cleanup |
+| Reviewer B (orchestrator seat) | `ab9ea83` | `reviewB\review-B.txt` (`b1865ba284b429169fcdc798e15f7431`) | NEW_CRITICAL_MAJOR_FOUND | 2 MAJOR / 4 MINOR / 4 ADVISORY | the one bounded remediation `5e74d01`; dispositions CONCURRED by CHARC `d0ba2d12` |
+| Reviewer A round 2, on the remediation | `5e74d01` | `r2\review.txt` (`010afb8732c95876dd9902187cff2b8b`) | NO_NEW_CRITICAL_MAJOR | 0 / 0 / 3 | TERMINATED; test-only cleanup `9aa2783` |
+| Reviewer B re-run | `33f13e5` | `reviewB2\review-B.txt` (`cabd2c51e708ca23916b4f5bd4c81203`) | NO_NEW_CRITICAL_MAJOR | 4 MINOR | B'2-B'4 docs and help text in `798af0c`; B'1 banked as DR-81 (c) |
+
+CHARC CONCURRED (`a5decb35`) that `798af0c`'s diff over `src` and `tools` is docstrings and help
+text only. So the tree Reviewer B re-ran on and the gated tree differ by no logic.
 
 ## V3 ratios (information for CP5)
 
@@ -254,9 +302,25 @@ Every output, cache, record and compare record is kept under `work\wp4.2\v4\` an
   `tests/test_wp42_composition.py` still covers their construction outside the root. That file
   is not WP4.2's to change.
 
-## Register dispositions
+## Register dispositions (for CHARC at the accept)
 
-DR-67 CLOSES; DR-71 CLOSES; DR-73 (a) and (b) CLOSE; DR-74 CLOSES; DR-45 (b) CLOSES on both
-halves (the residual above); DR-47 (a) CLOSES (G1 exercised), (b) and (c) stay stated limits,
-the row open for them with trigger the next `analysis/engine.py` touch; DR-41 consumer note held
-(test); DR-78 / DR-79 WP4.2a's (closed); NEW for CHARC: the R1-Q4 cache-interior row.
+- **Rows that close:**
+  - DR-67, DR-71 and DR-74 CLOSE.
+  - DR-73 (a) and (b) CLOSE.
+  - DR-45 (b) CLOSES on both halves; the `unreadable_tail` residual is under Limits.
+  - DR-47 (a) CLOSES (G1 exercised). Its (b) and (c) stay stated limits, and the row stays open
+    for them with the trigger "the next `analysis/engine.py` touch".
+- **Held and closed elsewhere:** the DR-41 consumer note is held by a test. DR-78 and DR-79 belong
+  to WP4.2a and are closed there.
+- **NEW for CHARC:** the R1-Q4 cache-interior row (Limits), with the trigger "the next `cache/`
+  touch".
+- **Banked by the review nets:**
+  - Reviewer B B7: the import-time witness, noted for WP4.3 above.
+  - Reviewer B B10: an inherited `FFREPORT` is a write route. This is a **DR-58 (b)
+    re-sighting**: the decoder launches and the two new test FFmpeg launches inherit it, as the
+    probe does.
+- **DR-81:** not touched. WP4.2 made no `Redactor` edit, so (a), (b) and N5 stay OPEN and the
+  trigger moves to WP4.3, the runner's next redaction touch. A **(c) candidate** is added from
+  Reviewer B's re-run (B'1): a packet-listing timeout text (`io/video/verify.py:234`) carries the
+  full FFprobe executable path, which the `Redactor` does not know. It is reachable only on a
+  120 s ffprobe timeout.

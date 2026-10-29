@@ -21,6 +21,7 @@ build waits for WP4.2a's merge and the orchestrator's rebase (R1-Q5 condition 3,
 | WINDOW RELEASED | cell 4 | 105,663 (turn 47) | 2026-10-29 | release accepted; Reviewer B ordered |
 | Y4 (Reviewer A R2) | cell 4 | 184,286 (turn 100) | 2026-10-29 | R2 TERMINATED; cleanup ruled FIX x3 |
 | Reviewer B re-run minors | cell 4 | 213,446 (turn 118) | 2026-10-29 | docs-only turn before the gate |
+| FINAL docs turn | cell 4 | 227,702 (turn 129) | 2026-10-29 | report FINAL; package done |
 
 ## Round ledger (Reviewer A, Codex `gpt-6.1-sol` / high, WSL)
 
@@ -671,13 +672,48 @@ format --check .` 267 files; `mypy` 141 files clean; light set (`-n 4`):
 `tests/test_app_composition.py`, 97 passed (25.83 s). `--help` now opens with "Export photos and
 video through Clearwater's export engine without the interface."
 
-## RESUME HERE (the FINAL docs turn)
+## Two-leg gate (orchestrator seat)
 
-Every task is done: task 10's V4 window is above, and the report's V4 section is filled from it.
-What remains is docs only, and only when the orchestrator sends it: after its Reviewer B and
-the accept checks, mark `docs/reports/wp4.2-video-path.md` FINAL and fold in whatever the
-orchestrator relays. No change to `src/`, `tools/` or `tests/`.
+| Head | Leg | Command | Result | Wall | Window | EXIT |
+|---|---|---|---|---|---|---|
+| `wp4.2-mc` `8bc927a` (`798af0c` rebased onto `246052b`, patch-id `7dfc431f` equal) | parallel | `uv run pytest -q -rs -n 4 -m "not gpu and not footage and not gui and not slow" --basetemp=work/wp4.2-gate-parallel` | 5312 passed, 1 skipped (`test_color_roundtrip.py:121`) | 659.60 s | 09:41:40Z-09:52:48Z | 0 |
+| same | serial | `uv run pytest -q -rs -m "gpu or footage or gui or slow" --durations=40 --basetemp=work/wp4.2-gate-serial` | 1135 passed, 1 skipped (`test_photo_check.py:139`), 5313 deselected | 2,621.32 s | ending 10:36:31Z | 0 |
 
+Conditions: Git Bash, `PYTEST_ADDOPTS` unset, the offscreen Qt platform, the main `work/`
+configuration, the worktree's own `.venv` from the lock, 10.99 GiB free before.
+
+- Static checks on `8bc927a`: ruff check clean; ruff format 267 files; mypy 141 files clean.
+- Harness gate: 382 OK, 1 skipped.
+- Question 9 at the gate: at most about 127 s of 300 s (100.28 s measured in the top 40, plus at
+  most about 26 s for the four under the 6.58 s cut-off).
+- Logs: `work\wp4.2\gate-logs\`.
+
+## Done
+
+Every Definition-of-done item (plan 4.5 and the brief's Done row) with its evidence:
+
+| Item | Evidence |
+|---|---|
+| Scope within owned files; frozen interfaces unchanged | the build record and each turn's `git diff --stat`; no `interfaces/` change |
+| Docstrings; ruff, format, mypy | gate static checks on `8bc927a` |
+| The full two-leg suite | GREEN at the orchestrator's seat, above |
+| Existing tests unchanged except as ruled | Q2's router pins, R1-Q3's in-place edit, Q8's rename, plus the rebase match= fix `0109c39` (granted) |
+| DR-67 test | `tests/test_wp42_device_backend.py` (build record) |
+| V4 SAME in the suite | `vid-hevc8-bt709-full` on the CPU and the GPU |
+| V4 SAME in task 10 | GX011627 and the WP2.3 set: 13 of 13 SAME (cell 4, task 10) |
+| V9, V17, own clip, DR-45 (b), cancel and failure | `tests/test_wp42_video_path.py` (report Evidence) |
+| V3 with the product method | AD-14 asserted and ratios recorded; CPU/GPU equal by the 24-row md5 (CHARC ruling (a)) |
+| DR-71, DR-74, DR-73 (a)+(b), DR-45 (b) closed; DR-47 per Q6 | build record; report "Register dispositions" |
+| Write targets through the one predicate | task 5 tests |
+| Footage-check and cache-interior Limits | report Limits |
+| V3 ratios in the report; V12 deferred | report |
+| Serial-leg budget (Q9) | at most about 127 s of 300 s at the gate |
+| Reviewer A converged | R1 terminated, then R2 on the remediation terminated |
+| Reviewer B | NEW_CRITICAL_MAJOR_FOUND, then remediated `5e74d01` (CHARC `d0ba2d12`), then the re-run NO_NEW_CRITICAL_MAJOR with B'2-B'4 in `798af0c` (CHARC `a5decb35`: no logic) |
+| Completion report | `docs/reports/wp4.2-video-path.md`, FINAL |
+| Nothing footage-derived committed; outputs kept | task 10 and the remediation windows |
+
+The package is complete. Cell 4 is not resumed unless the accept finds something.
 ## Done: RESUME HERE (task 10, the GX011627 V4 window) -- carried out by cell 4 above
 
 For a fresh cell: read `docs/dispatch-recipe.md`, the brief (task 10, question 10; the Rulings
