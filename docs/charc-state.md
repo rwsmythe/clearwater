@@ -70,6 +70,14 @@
   child dropped; F5 docstrings; F6 ValueError; F8 SHORT pointer promoted to LONG; F7 Limit; F9 in the grant. One
   remediation turn same seat (140,712 -> ~190K) then R2; a NEW major at R2 = re-seat line. Round trip PASSED on
   5a57d9f over all Phone photos (328.40 s).
+- **WP4.5 R2 RULED 20:05Z (A R2 1/1/4 on head 3020648; query d974cd7b, my post + cue). RE-SEAT concurred (fresh Codex
+  seat 2; seat 1 ended at 188,902); a NEW major at R3 comes to me with a lane recommendation.** F-A MAJOR (shared child
+  IFDs re-parsed per pointer, cubic 5.4 KB -> 40.9 MB): each child parsed and written ONCE keyed by source offset, all
+  pointers share its new offset, cycle check kept; RED test by entry count (150/150/150), parallel-leg. F-B 2 + 12n
+  table, missing next pointer = 0. F-F sanitise trial edit quiet. F-C RULED: a cut entry ARRAY keeps whole entries that
+  fit + one warning (declared / kept); IFD0 raises ONLY on header fault, offset past block, cycle. F-D RULED Limit:
+  pointer types followed = 3 / 4 / 13 only; others dropped + warning; class closed. Window figure unstable (258,400 vs
+  475,000): the smaller binds the stop line. Round trip PASSED again on 3020648 (268.01 s).
 - **(gen 7 history follows; newest facts at the end of the block)**
 - **GEN 7 PICKUP (was).** Orchestrator = **gen 22 `clearwater-orchestrator-20261029-0704`** (online 17:08Z from gen 21's
   state 736e403; gauge 38 ms; gen 21 was `clearwater-orchestrator-20261029-0425`, rolled 17:05Z at ~400K); ALL cues go there. Time the bash launch and record it here. Inbox: drain with `read --role charc --all`
