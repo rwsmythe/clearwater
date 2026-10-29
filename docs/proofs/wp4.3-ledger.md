@@ -236,6 +236,7 @@ appears in no computed set) and the import-time witness extension (DR-84).
 | build (tasks 3-10) | - | - | - | - | product + tests | - | 553,419 at the build yield (cell 2 retired PAST the ~400K stop: the whole build ran in one turn with no yield, so the dispatcher could not read it earlier) |
 | R1 (Reviewer A, `038f02e..99da8aa`) | 0 / 5 / 11 | 16 in / 0 out (R1-5's reachability to be proven on the `main()` path) | 16 new / 0 reopened | 0 | none yet (adjudicating turn; proposed: product + tests) | WSL, codex-cli 0.162.1, `gpt-6.1-sol` high | 129,481 at the R1 yield (cell 3; `scripts/cell_depth.py`, given by the dispatcher in cell 4's dispatch) |
 | R2 (Reviewer A, `038f02e..362a8b2`) | 0 / 3 / 6 | 9 in / 0 out | 8 new / 1 reopened (R2-9 = R1-12; the reviewer also tagged R2-1 as R1-3 and R2-3 as R1-5, adjudicated NEW: distinct paths, the R1 fixes hold) | 0 | R1 remediation (groups A-C): product + tests; R2 remediation (cell 5, groups A-C): product (startup, adapter, preview, render worker, main, settings_dialog under the 38a7c702 grant) + tests; R2-9 test-only | WSL, codex-cli 0.162.1, `gpt-6.1-sol` high | 316,716 at the Group C yield (cell 4, 156 turns; `scripts/cell_depth.py`); seat retired at 355,066 (cell 4 stood down after the R2 yield) |
+| R3 (Reviewer A, `038f02e..028bc4f`) | 0 / 2 / 3 | 5 in / 0 out | 3 new / 2 reopened (R3-3, R3-4 = R1-12; the reviewer also tagged R3-1 as R2-2 and R3-2 as R1-3, adjudicated NEW: distinct routes, the earlier fixes hold) | 0 | none yet (review-only turn); proposed: product (`app/startup.py`) + tests, one report sentence | WSL, codex-cli 0.162.1, `gpt-6.1-sol` high | 222,999 at the Group C yield (cell 5, 109 turns; `scripts/cell_depth.py`); R3 adjudicated in the same seat |
 
 ## CHARC round-0 ruling (`fcb2a9205c060013`, 2026-10-29 12:54:46Z, verbatim; it GOVERNS the STOP items above)
 
@@ -745,3 +746,44 @@ Slip: an empty `python - <<'EOF'` left a stray interpreter waiting on stdin (mov
 background by the tool's timeout); I killed that one process (my own, PID-checked; the WP4.3a
 Codex turn untouched). A heredoc with nested quotes failed to parse; the edit script was written
 with the Write tool instead (nothing applied by the failed command).
+
+Depth at the Group C yield: 222,999 (`scripts/cell_depth.py`, 109 turns; given by the dispatcher,
+gen 21). Dispatcher QA: 3 commits, 0 CR and 0 NUL; the `settings_dialog.py` diff within the narrow
+grant; the process kill noted.
+
+## Reviewer A round 3 (cell 5, 2026-10-29; adjudicated, NOT remediated)
+
+- Reviewed `038f02e..028bc4f` minus `docs/proofs` (28 files, 8,077 diff lines) with a "THIS IS
+  ROUND 3" section listing R1's 16 and R2's 9 items with their dispositions and the rulings
+  `d530b564`, `ace08fbb`, `38a7c702`; probe first (`READY`, one `succeeded in`). Codex v0.162.1,
+  `gpt-6.1-sol` / high, WSL, read-only; tokens 219,702; 25 `succeeded in` (28 exec blocks); one
+  VERDICT line. ERROR lines client-side (model-list refresh timeouts, the MCP transport) plus two
+  echoed source lines. Withheld access checked on all 28 command lines and the whole transcript:
+  clean (`docs/proofs` only inside the matching `'!docs/proofs/**'` glob).
+- Before the round: light run at `028bc4f` (the twelve touched test files with their markers plus
+  the layering, thread and preview tests): 356 passed 1 xfailed in 230 s; ruff check, ruff format
+  --check (280), mypy strict (146): clean.
+- **Verdict `NEW_CRITICAL_MAJOR_FOUND`: 0 critical, 2 major, 3 minor.**
+  - R3-1 MAJOR (EXEC): a settings file whose `output_folder` holds a NUL loads, and start-up's
+    `clean_leftovers` raises `ValueError` before `show()`: the program cannot start. CONFIRMED on
+    the Windows side by the cell's probe. FIX in `app/startup.py` (skip and log a folder `_is_path`
+    refuses); FLAG for CHARC: the settings store accepts it at its source (`config/`, WP4.3a's).
+  - R3-2 MAJOR (EXEC): two journal entries with one id; a failed clean-up of one folder still drops
+    both (`drop` by id). CONFIRMED by probe (entries `()` after "keeps ...\a"). Reachable only via a
+    journal the program did not write (uuid4 ids); impact a lost record (a stale visible
+    `.clearwater-partial`, the DR-89 class); MAJOR kept under R2-2's corrupt-journal precedent unless
+    CHARC reclassifies. FIX: entry-level removal (recommended) or reject duplicate ids under S6.
+  - R3-3 MINOR (EXEC, REOPENED R1-12): V7 (e)'s witness proves the wrapper running, not the encode
+    overlapping a k = 1 render. FIX test-only.
+  - R3-4 MINOR (REAS, REOPENED R1-12): V7 (b) counts slider moves, not proxies shown. FIX test-only.
+  - R3-5 MINOR (REAS): the DR-44 (c) close test's predicates do not prove "mid-decode" /
+    "mid-encode"; the report sentence overstates them. FIX test-only plus one report sentence.
+- Per-finding table with each fix and test: `adjudication.md`.
+- Evidence `C:\Users\rwsmy\clearwater-review-evidence\wp4.3\r3\` (prompt, diff, runner, test
+  summary, static, probe, transcript, commands, adjudication, the cell's probes, `md5sums.txt`):
+  review.txt `21392d7604318b6bd4f884b0d99d00d6`, review.stderr.txt
+  `7572c24ad1d58099c0c9446502cd9998`, adjudication.md `abf49f67be7f00be20f2b52df287bdd4`,
+  review-prompt.md `154fed6b2262ec8ad8e9ebfe1d5839ce`, review-diff.txt
+  `846af4619ce41919d263948d70e3b7e2`.
+- Five-round gate: round 3 of 5; two NEW in-envelope majors whose fixes change product code, so
+  the loop continues after remediation (R4). Yielded BEFORE any remediation (review-only turn).
