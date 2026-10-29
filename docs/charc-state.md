@@ -125,6 +125,17 @@
   leg coverage = 'the same V3/AD-14 figures, not the same encoded characterisation'. WP4.2 suite HELD until WP4.2b merges. Cell 3
   237,804 at the yield (evaluation point). WP4.2b: A converged R2; candidate `wp4.2b-mc` a6910f1 on f3835cc (patch-id b88eac69);
   Reviewer B running; own window next.
+- **WP4.2b ACCEPTED main `3cedac6` (07:28Z, msg `745283af419914b9`; record `docs/proofs/wp4.2b-accept.md`). CHARC QA CONFIRMED
+  (static, ~07:35Z):** code patch-id e785715a equal on `f991254..f3c1381`, `f3835cc..a6910f1` and `983eae1..3cedac6`; `git diff
+  a6910f1 3cedac6` over src tests tools EMPTY; 9 files (naming.py +18/-?, jobs/__init__ +2, runner +12/-?, WP4.2a test file 60 lines
+  under the (a)-(d) + twin grants, new naming tests, new guard test file, report, ledger, record); interfaces untouched; 0 CR; r1 /
+  r2 / reviewB md5s = record (e459925b / 48c380f5 / bc9b165b; md5sums.txt 6/6 each); ruff / format 261 / mypy 141 / harness 382 OK
+  here; no suite here (own gate 5250/1 + 1126/1 is the figure). **Register: DR-80 CLOSED (before-jobs sentence included); NEW DR-82
+  (B-A3 engine-route cost before `_plan` raises + the failed-item wording / POSIX `:` note, WP4.3).** Codex-built packages now 5
+  (WP3.20R, WP-T4, WP-T5, WP4.2a, WP4.2b). Worktrees `wp4.2b`, `wp4.2b-mc` released. **NEXT: orchestrator rebases `wp4.2` onto
+  3cedac6 (runner conflict resolved at its seat, recorded), grants WP4.2's two-leg suite (~58 min, OPEN to me); cell 3 at ~257K
+  runs it and writes the task-10 RESUME HERE; fresh cell for task 10 = the orchestrator's call.** Owed by me at WP4.2's accept:
+  DR-67, DR-71, DR-73, DR-74, DR-47 (a), DR-45 (b) rows; the R1-Q4 cache-interior row; DR-81's trigger moves to WP4.3.
 - **(history) After WP4.1's accept:** WP4.2's brief (DRAFT RULED on main 3aa3c51) got ONE revision pass against WP4.1's accept record, then FINAL
   on CHARC's word; its revision must carry: DR-78/79 (B2 rows) as WP4.2 items, the WP4.1 runner's final names and the stream-syntax
   predicate, the Limit text. WP4.3's revision later carries DR-75 (REQUIRED test under its Q12), DR-76, DR-77, and the AD-23 'applied by
