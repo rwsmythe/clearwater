@@ -13,6 +13,8 @@ build waits for WP4.2a's merge and the orchestrator's rebase (R1-Q5 condition 3,
 | Y2 (window request) | cell 3 | 202,221 (turn 75) | 2026-10-29 06:09Z | cleanup concurred |
 | Y2 (window request 2) | cell 3 | 223,004 (turn 89) | 2026-10-29 06:14Z | CPU V3 record granted |
 | Y3 (V3 STOP) | cell 3 | 237,804 (turn 101) | 2026-10-29 06:26Z | near the 250K evaluation point |
+| ruling (a) applied | cell 3 | 256,795 (turn 114) | 2026-10-29 06:30Z | past 250K; bounded remaining load (suite, task-10 RESUME HERE) |
+| rebase + suite grant | cell 3 | 259,350 (turn 116) | 2026-10-29 07:28Z | rebased head `6e0eb1d` |
 
 ## Round ledger (Reviewer A, Codex `gpt-6.1-sol` / high, WSL)
 
@@ -389,6 +391,25 @@ backend column removed, LF); the report's V3 section REPLACED: the `428d8b4` sen
 md5s, the driver md5, the 24-row md5, the 13 rows verbatim, the encoder citation, the mechanism as
 the cell's READING with its one direct evidence, the V4 sentence, the determinism check, cell
 2's file as its observation.
+
+## Rebase onto main after WP4.2b (orchestrator seat)
+
+WP4.2b ACCEPTED (main `3cedac6`, then CHARC's docs `38f291e`). The orchestrator rebased `wp4.2`
+onto `38f291e`: clean, no conflict, 22 commits, head `6e0eb1d` (`git log` confirmed at this
+seat, tree clean). WP4.2b's `except OutputNameError` branch sits in `check_outputs` at
+`tools/headless_export.py:870`, untouched here.
+
+**Semantic collision (CHARC condition 4's anticipated case).** The orchestrator's light set on
+`6e0eb1d` (ruff and mypy clean): 966 passed, 1 FAILED, which is the RED:
+`tests/test_wp42_runner_video.py::test_a_video_source_whose_stem_carries_a_colon_is_refused_by_check_outputs`
+expected `match="in a form the footage check refuses"` (the file-form text, predicate (i)), but
+WP4.2b's naming check now refuses `carrier:clip.mp4` EARLIER, inside the same `check_outputs`,
+as `OutputNameError` -> `RunnerRefusalError("output name for 'carrier:clip.mp4' must be a single
+portable name component")`, still before any job. The test's intent holds (a colon-stemmed video
+is refused by `check_outputs` and by `run`, nothing written); only the text moved. FIX (granted
+at the orchestrator's seat): both `match=` arguments changed to `"single portable name
+component"`, nothing else (`0109c39`, 0 CR); GREEN: `tests/test_wp42_runner_video.py` 14 passed.
+The report names no file-form text for a colon video, so it needs no change.
 
 ## RESUME HERE (two-leg suite window)
 
