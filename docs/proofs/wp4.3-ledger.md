@@ -233,6 +233,7 @@ appears in no computed set) and the import-time witness extension (DR-84).
 | Round | Crit / maj / min | In-env / out | New / reopened | Reverts | Product vs test fixes | Transport, CLI | Depth (dispatcher) |
 |---|---|---|---|---|---|---|---|
 | 0 (design) | - | - | - | - | none (no product code) | - | 263,162 at the round-0 yield (cell 1 retired; `scripts/cell_depth.py`) |
+| build (tasks 3-10) | - | - | - | - | product + tests | - | 553,419 at the build yield (cell 2 retired PAST the ~400K stop: the whole build ran in one turn with no yield, so the dispatcher could not read it earlier) |
 
 ## CHARC round-0 ruling (`fcb2a9205c060013`, 2026-10-29 12:54:46Z, verbatim; it GOVERNS the STOP items above)
 
@@ -313,3 +314,10 @@ Two node IDs renamed with their edits: `test_app_deps.py::test_no_app_module_imp
 -> `::test_no_app_module_but_main_imports_the_gui_or_qt_and_none_imports_cupy`;
 `test_gui_settings_dialog.py::test_auto_is_resolved_by_a_rule_that_disagrees_with_the_interim_rule`
 -> `::..._default_rule`.
+
+## RESUME HERE (cell 3; written by the dispatcher, generation 20, 2026-10-29 ~14:05Z)
+
+- Cell 2 (`wp43-cell2`) built brief tasks 3-10 (`b52b24a`..`307d1e6`, above) and retired at 553,419, past the ~400K stop. Its full build report: `C:\Users\rwsmy\clearwater-review-evidence\wp4.3\cell2-build-return.md`; light run log `C:\Users\rwsmy\clearwater-review-evidence\wp4.3\build\light1.txt`.
+- Dispatcher QA at `307d1e6`: 11 commits, 29 files, 0 CR bytes in every changed blob; no file under `interfaces/`, `gui/contract.py`, `gui/analysis_service.py`, `jobs/export_seam.py`, `io/video/` or `config/` changed; `ruff check` clean, `ruff format --check` 280 formatted.
+- Cell 3 runs the REVIEWER A loop (Codex `gpt-6.1-sol` / high, WSL, probe first; runner and prompt shape from `C:\Users\rwsmy\clearwater-review-evidence\wp4.2\r2\`; evidence `...\wp4.3\rN\`) to convergence under the five-round gate, yielding at every verdict BEFORE remediating. After it converges: the window requests (V7 (a)-(f) of record via the S7 driver, the GX011627 V18 leg, DR-44 (c) and DR-50 on real footage), the report's final figures, then the orchestrator's Reviewer B and the ONE gate.
+- Cell 2's flags stand for Reviewer A to weigh: stale `gui/shell.py` docstrings (not granted); the doubled `<name>: <name>:` DR-82 banner (the panel's form); the two renamed node IDs.
