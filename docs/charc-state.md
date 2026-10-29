@@ -193,6 +193,16 @@
   channels == 1 (folds the turn-2 mono row: NO row opened). New test file; existing V4 tests untouched and green.
   xfail (b) and a product change (c) DECLINED. Turn 4 `c353dfd`; cell 206,634 / 258,400; fresh seat next, A rounds,
   report. Owed by me at WP4.4's accept: DV/HDR fact line only.
+- **WP4.3 WINDOW 2 CLOSED 22:44Z (seat free). Of record: (d) 66.0 / p99 55.0 PASS; (e) 1:1 4K render during export
+  longest 196.0 ms = second V7 STOP; (c) stands at 182.0. v7c-char (not of record): two mid-encode gaps (135.8 / 176.5
+  ms), nothing coincident, gc max 38 ms, watchdog starved, UI idle, workers at D2H copies at stall END = interface
+  thread STARVED, holder UNPROVEN. Cell 7 retired 246,674, ledger 990b778.** **RULED (a) 22:53Z (query 23176aff, post
+  + cue):** fresh cell, window 3 = three driver-side discriminators (call wrappers; an OUT-OF-PROCESS stdlib heartbeat
+  to split host stall from in-process; **py-spy APPROVED as a seat diagnostic only**, `uvx py-spy record --gil --native`,
+  MIT, NOT in pyproject/uv.lock, version in the ledger) + the six owed runs of record, each independent; then I rule
+  cause + remedy class (in-process GIL holder = RED-first fix + (c)/(e) re-runs; host stall = ruling on evidence; a
+  spawned export process = design scope, new package). **V7 relaxation is OWNER-reserved; nothing by default; (c)/(e)
+  stand as STOPs of record until a remedy passes or the owner rules; I go to the owner only with cause and cost.**
 - **(gen 7 history follows; newest facts at the end of the block)**
 - **GEN 7 PICKUP (was).** Orchestrator = **gen 22 `clearwater-orchestrator-20261029-0704`** (online 17:08Z from gen 21's
   state 736e403; gauge 38 ms; gen 21 was `clearwater-orchestrator-20261029-0425`, rolled 17:05Z at ~400K); ALL cues go there. Time the bash launch and record it here. Inbox: drain with `read --role charc --all`
