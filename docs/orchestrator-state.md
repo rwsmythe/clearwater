@@ -5,48 +5,102 @@
 
 ### Generation
 
-- **Generation 23 ROLLED OVER 2026-10-29 ~21:55Z at ~415K, at a clean boundary: no cell live, no Codex turn running, no gate or window open, main FREE (CHARC's HOLD lifted at `e96794f`).**
-  - Session `clearwater-orchestrator-20261029-0852`. CHARC is gen 8, `clearwater-charc-20261029-0859` (re-verify: `comms/.launch-sessions.json`).
-  - Bash-launch gauge 37 ms at bring-up.
-  - **Disk:** C: **175 GB free** after the prune (was 83 GB); D: 2.3 TB free. Check `df -h /c` before every gate leg, window and cache run, and STOP below 15 GB free.
-  - **Done this generation, all on main:**
-    - **WP4.5 EXIF byte fidelity ACCEPTED** `47a08ae` (record `docs/proofs/wp4.5-accept.md`; CHARC QA CONFIRMED). Codex lane, 2 seats, 9 turns. Reviewer A converged at R4 after:
-      - R1: entry damage, type-13 pointers, D63 duplicates;
-      - R2: shared-child cubic blow-up, then a re-seat;
-      - R3: distinct overlapping children, then the DESIGN GUARD: each carried pointer tag is followed once per parent, at most four tables.
+- **Generation 24** (session `clearwater-orchestrator-20261029-1149`; CHARC gen 8 `clearwater-charc-20261029-0859`; re-verify in `comms/.launch-sessions.json`). Bash gauge at bring-up: 33 ms. **ROLLED OVER 2026-10-29 ~23:40Z at ~365K at a CLEAN boundary: no cell live (cells 7 and 8 retired with STAND DOWN), no Codex turn running, no window open.**
+- **Disk:** C: had 179 GB free at the last check (D: 2.3 TB). Check `df -h /c` before every window, gate and footage run; STOP below 15 GB free (20 GB for WP3.6P).
+  - The WP4.3 20 GB cache plant is NOT sparse: every plant allocates the full 19.96 GB.
+  - Delete each finished plant: it is the cell's own scratch, and the cell has my grant.
+- **OWNER ACTION PENDING (the classifier REFUSED it at this seat; CHARC will not do it either):** delete `work/wp1.2b`, `work/wp2.2` and `work/pt-main-wp39` (about 3.6 GB) and their partial copies under `D:\clearwater-archive\work\`.
+  - Only on the owner's own word at this seat. Never work around the refusal.
+  - After the delete: update the D: README (Items list and "Not moved"); append lines to `docs/proofs/prune-2026-10-29.md`, including CHARC's charc-qa / pytest-charc deletion.
 
-      Reviewer B was clean. The gate ran under the owner's direction: parallel 5,566 / 1, plus 13 impacted serial nodes passed.
-    - **The stack merged:** inventory refresh (record `e34c4a9`) and **WP4.3a ACCEPTED** `649be3d`, CHARC QA CONFIRMED. The serial reds were dispositioned: (b) fixed by WP4.5 and re-run green on the rebased stack; (a), the bench load flake, passed twice in isolation.
-    - CHARC's register commit `8f10af5`: DR-58 (b), 76, 77, 81, 85 CLOSED; DR-91..DR-94 NEW (DR-93/94 are WP4.5 B F2/F5).
-    - **PRUNE + ARCHIVE DONE** (record `docs/proofs/prune-2026-10-29.md`).
-      - MOVED to `D:\clearwater-archive\work\`, md5-verified: the oracle, `wp1.3d`, `wp1.3`, `wp1.4`, `wp1.4b`, `wp-t4`.
-      - KEPT on C: (exFAT cannot hold their pytest link files): `wp1.2b`, `wp2.2`, `pt-main-wp39`, about 3.6 GB. Their partial D: copies are marked INCOMPLETE in the README; a decision is pending, but not urgent.
-      - Deleted: `wp3.12` and the basetemps.
-      - 36 worktrees removed, branches kept.
-  - **RESUME HERE (gen 24), in CHARC's order (`d509a3c2`):**
-    1. **Drain the inbox.** Post the prune record's path and the C:/D: figures to CHARC if gen 23's post is not in `comms/charc/read`. Gen 23 posted it as its last act before the rollover announce; check.
-    2. **WP4.3 cell 7** (opus-high, FRESH): the EXCLUSIVE windows.
-       - Dispatch prompt READY at `clearwater-review-evidence\wp4.3\prompt-wp4.3-cell7.md`. Update its head line to the current `wp4.3` head.
-       - **Step 0 = rebase `wp4.3` onto main** (WP4.3a is merged), dropping DR-85's `xfail(strict)` in `tests/test_app_startup.py`; re-prove the patch-id; light run of `tests/test_app_startup.py`. The worktree `.worktrees/wp4.3` is kept.
-       - Then the S7 driver, a `WINDOW REQUEST`, V7 (a)-(f), the GX011627 V18/V8 leg (p99 at k=2 ASSERTED, p99.9 RECORDED), DR-44 (c)/DR-50 on footage, and the report.
-       - Each window gets an OPEN/CLOSE post to CHARC and a disk check.
-       - Then Reviewer B (Codex `gpt-6.1-sol`/high, WSL runner as `clearwater-review-evidence\wp4.2\reviewB2\run_review_B.sh`), the ONE two-leg gate, and the accept. The record carries the AD-11 domain sentence (`ace08fbb` cond. 3), DR-89, DR-90, and the R4-2 p99.9 figures (recorded, never asserted).
-    3. **WP4.4 (.MOV input)**, Codex lane, brief FINAL on main (`27a11ae`; CHARC `197131fa`).
-       - Read both paces at dispatch. The preamble is `.claude/agents/implementer-codex-sol-high.md` + the brief + a dispatch block (form: `clearwater-review-evidence\wp4.5\cell\dispatch-1.md`).
-       - It owns only `encode.py`'s data-track allowlist. No heavy runs during WP4.3's windows.
-    4. **DR-87 micro-package** (`tools/prototype/bench.py:1305` `stray_processes`) WITH DR-93 and DR-94 folded into its `exif.py` touch (CHARC `d509a3c2`): one Codex micro-package with two files, or two sequential ones. **Your call; say which to CHARC.**
-       - DR-93: catch MemoryError beside the parser errors in `from_tiff`, with one bounded RED test.
-       - DR-94: extend `_TIFF_STRUCTURE` to the TIFF private blobs such as 37724.
-    5. **WP3.6P brief DRAFT** to CHARC (real-photo verification; from the WP3.6 brief's Q11 and WP4.1's owed owner-photo leg; the inventory report is its input).
-  - **Codex-lane practice confirmed this generation (WP4.5):**
-    - Prompts are files in `clearwater-review-evidence\<arc>\cell\` (seat 2 under `cell\seat2\`). Run with `codex_cell.py turn --worktree <ABS win path> --prompt <file> --evidence <dir> --turn N [--session <id>]` in the background.
-    - Commit at this seat by pathspec with the GPT-6.1 Sol footer. Read `depth_input_tokens` from `turn-N.seat.log` and give it to the cell next turn. The footer's `context_window` flips between 258,400 and 475,000; the SMALLER binds (CHARC).
-    - The cell cannot read `clearwater-review-evidence`, so paste review texts and rulings VERBATIM into the prompt (a small python assembler; see `cell\prompt-5.md`).
-    - Reviewer A = `codex_cell.py review --worktree <wt> --base <base> --prompt <file> --out <dir>`; it appends the diff itself. A round-N prompt = the R1 prompt + "THIS IS ROUND N" with the prior rulings verbatim (see `wp4.5\r4\review-prompt-r4.md`).
-    - Reviewer B = the same command on the `-mc` candidate. Its prompt gives the brief + CHARC's later rulings verbatim and withholds A's findings (`wp4.5\reviewB\review-prompt-B.md`).
-    - **"STOP if the ruled design cannot hold for a reason the ruling did not foresee"** in a remediation prompt paid off: the cell caught an arithmetic flaw in a ruled test bound before building.
-    - **DESIGN GUARD worked:** after three rounds blocking in one structure, CHARC adopted a simpler rule that closed the class at R4.
-  - **Gen-23 slips:** two bare `cd`s, into `.worktrees/wp4.5` (no cell live) and into `work/`, each reverted in the next call. One robocopy assumption: exFAT cannot store links, so three items stayed on C: (handled; source kept by the verify-before-remove design).
+#### Live work at write (RESUME HERE, gen 25)
+
+**WP4.3 application wiring (Claude lane, opus-high).**
+- Branch `wp4.3`, rebased by gen 24 onto main `5e3537d` (54/54 patch-identical; the old head is kept as `wp4.3-pre-rebase` at `99cc84c`). Step 0 is at `300731d`: DR-85's xfail dropped; `test_app_startup.py` gave 10 passed.
+- Ledger heads: `990b778` (cell 7), `480f232` (cell 8). The S7 drivers are in `clearwater-review-evidence\wp4.3\windows\`, with md5s in `md5sums.txt`.
+- **Figures of record (GX011627, real engines, GPU):**
+
+  | Run | Result |
+  |---|---|
+  | V7 (a) | 18.0 / p99 15.0 ms PASS |
+  | V7 (b) | 21.0 / 16.0 PASS |
+  | V7 (c) export | **182.0 ms STOP** |
+  | V7 (d) 300 stills | 66.0 / 55.0 PASS |
+  | V7 (e) 1:1 4K render during export | **196.0 ms STOP** |
+
+- **The (c)/(e) STOPs:** the characterisation shows a process-wide Python stall mid-encode, two per export. The interface thread is starved and idle; this is not gc. The holder is not yet proven.
+- **CHARC rulings** (all quoted in the cell prompts under `clearwater-review-evidence\wp4.3\`):
+  - B `b9a0ce01`: V7 (f) probes from `show()`; build time is recorded only; a pre-show gap is not a STOP; `scenario_f_start_up` moves its probe start RED-first after the windows.
+  - `805376769abe4177` (characterisation of (c)).
+  - `62cd31f1`: window 3 has three discriminators (call wrappers; an out-of-process heartbeat; py-spy 0.4.2 via uvx, seat-only and never in pyproject), plus six runs of record, each independent.
+  - CHARC then rules the cause: an in-process GIL holder gets a fix, RED-first, then (c)/(e) re-runs of record; a host stall gets a CHARC ruling; a spawned export process is DESIGN SCOPE, a new package.
+  - **Relaxing V7 is OWNER-reserved.** Nothing is decided by default.
+- **Window 3** (cell 8 `wp43-cell8`, `window3-commands.sh` md5 58478c4d) **CLOSED 23:28:55Z** (ledger `1d96dc4`; evidence `windows\win3\`):
+  - v8v18 is a STOP of record: frame 510 p99 0.007885 > 2/255; frames 10/170/340 are within; V18 PASS.
+  - dr44c analysis/export/batch: PASS (361/218/262 ms).
+  - plant-f: PASS.
+  - v7f-settled: PASS from show() at 47.5 ms (the committed probe from build reads 105.0 ms).
+  - CAUSE: in-process GIL contention, no single holder.
+    - The heartbeat stayed flat, so it is not the host.
+    - Mid-export, the compute threads alternate on the GIL, and the interface thread's progress delivery (`jobs.py:239 _flush` -> `export_panel.py:145-147 _progress` -> `app/main.py:78 eventFilter`) takes 30-55 ms.
+    - At job boundaries: `release_fft_plans` plus a gen-2 gc.
+- **CHARC RULING `7b32521f060044d9` (saved verbatim at `clearwater-review-evidence\wp4.3\win3-ruling-1f519331.md`; quote it in cell 9's prompt):**
+  - Q1 (a): ONE bounded remediation step in a FRESH cell 9 from ledger `1d96dc4`, RED-first where a stall can be planted.
+    1. Coalesce progress (one flush per interface tick, drop intermediate values, never block the worker) and make the `eventFilter` cheap.
+       - GRANT: `gui/jobs.py` (`_flush` rate) and `gui/export_panel.py` (`_progress` cost only).
+    2. `sys.setswitchinterval`: MEASURE at 5 and 1 ms as a driver toggle, never adopt. CHARC decides adoption (under 5 % export cost).
+    3. Keep gen-2 gc off the job boundary from the APP layer only (`gc.freeze`, deferred collection, or an idle release). `core/` is untouched; if the app layer cannot do it, STOP.
+  - Then the `scenario_f_start_up` probe move to `show()`, RED-first (ruling B).
+  - Then WINDOW 4: (c) and (e) re-runs of record on the uninstrumented driver `0b9ee6cc`, at 5 ms and at 1 ms switch interval, plus a 16-frame V8 k = 2 characterisation of GX011627 (not of record).
+  - If (c)/(e) still STOP, the remaining class is the spawned export process: DESIGN SCOPE, a new package, carrying the owner flag on V7.
+  - Q2 (ii): the k = 2 p99 bound is CHARC's (R1-13 / `ace08fbb`). Frame 510 stays a STOP of record; CHARC re-rules the figure at the accept on the 16-frame distribution.
+- **Cell 9's prompt** = the cell-8 form (`clearwater-review-evidence\wp4.3\prompt-wp4.3-cell8-head.md`; READ FIRST tight; WORKSPACE block verbatim) plus this ruling. Its first yield is the remediation's RED/GREEN commits, then `WINDOW REQUEST 4:`. Code steps run between windows; no light run overlaps a window.
+- **Then:**
+  1. CHARC's cause ruling.
+  2. A fresh cell for the code steps: the (f) probe move, plus any (c)/(e) fix and its re-runs as ruled.
+  3. The report's final figures, with start-up figures per B(3).
+  4. Reviewer B: Codex `gpt-6.1-sol`/high, WSL runner as `clearwater-review-evidence\wp4.2\reviewB2\run_review_B.sh`.
+  5. The ONE two-leg gate.
+  6. Accept. The record carries the AD-11 domain sentence (`ace08fbb` cond. 3), DR-89, DR-90, the R4-2 p99.9 figures, and the V7 window tables.
+
+**WP4.4 .MOV input (Codex lane).** Branch `wp4.4`, base `5e3537d`.
+- Commits: `7483e91` round 0, `0b71bd3` brief grant, `35391b0` build, `e4141f8` stereo fixture, `c353dfd` footage test, `af4ccc0` brief rulings, `d427dc9` (seat 2: `compare.py` three V4 equivalences).
+- Seat 1 session `01a189a6-...` RETIRED at 206,634. Seat 2 session `01a189d8-65d4-72f2-b952-bb2f40445a7e` was at 151,726 after its turn 1. The smaller footer window (258,400) binds.
+- Evidence: `clearwater-review-evidence\wp4.4\cell\` (seat 1) and `cell\seat2\`.
+- **CHARC rulings, appended verbatim to the brief on the branch:**
+  - round-0 GRANT `73d27977`: `test_io_video_encode_units.py:80` meta -> gpmd;
+  - PCM `093384f1`: stereo fixture;
+  - seat ruling CONFIRMED: the footage test asserts `done with warnings` with exactly 2 `data track mebx`;
+  - footage GRANT `9c8f461b`: `compare.py` rotation + 2x2 linear part with translation recorded only; unset SAR = 1:1; mono = absent at 1 channel. This FOLDS the mono row, so no DR is opened.
+- **NEXT:**
+  1. DONE by gen 24 at `d427dc9` (23:35Z):
+     - IMG_6702 footage node 1 passed in 60.15 s, EXIT 0: the footage figure of record (`work/wp4.4/s2t1/seat-footage.txt` in the worktree);
+     - `test_prototype_clip.py` light 52 passed / 10 deselected, EXIT 0 (`seat-prototype.txt`), so the sandbox stall was an artifact.
+     - Seat 2 has NOT yet been told these results: put them in its next prompt, with its depth 151,726.
+  2. Reviewer A R1: `codex_cell.py review --worktree <wt> --base 5e3537d --prompt <file> --out ...\wp4.4\r1\`, Claude opus/high. Note for A: the display-matrix record value changed from text to an int list.
+  3. Turn 2: the report (task 7).
+  4. Reviewer B (Claude pass) on `wp4.4-mc`.
+  5. The two-leg gate; accept. CHARC adds the DV/HDR fact line if warranted.
+- WP4.4's runs must never overlap a WP4.3 window.
+
+**Queued on the Codex lane (one lane), in order:**
+1. **WP-DR87:** brief FINAL on main `4b0bd4f`; CHARC `ef92adc8`; DR-87 test-side fixture, DR-93 MemoryError, DR-94 tags 37724 + 50740.
+2. **WP3.6P:** brief FINAL on main `afd83c6`; CHARC `2e95deaf`; Codex/STRONG, new `tools/photo_verify.py`. Its export and memory legs need EXCLUSIVE windows clear of WP4.3.
+
+Dispatch each with both paces read and recorded. The preamble is `.claude/agents/implementer-codex-sol-high.md` + the brief + a dispatch block (form: `clearwater-review-evidence\wp4.4\cell\dispatch-1.md`).
+
+**Kept worktrees:** `wp4.3`, `wp4.4`, `brief-wp4.4`, `brief-dr87`, `brief-wp3.6p`, `wp4.3-rev`, `orch-state-g21..g24`. Branch `wp4.3-pre-rebase` is kept.
+
+**Gen-24 slips:**
+- Two bare `cd`s, into `.worktrees/wp4.3` and `.worktrees/wp4.4`, each reverted in the next call. Neither happened with a cell mid-window.
+- One Codex turn launched with a bare `&` instead of `run_in_background`: it survived, but sent no notification; a log-watcher loop covered it.
+- A mailbox subject over 120 chars was refused; re-posted shorter.
+
+**Practice confirmed:**
+- Seat probes with format-facts-only scripts under `work/<pkg>-seat/` settled two STOPs fast (PCM layout, the Apple matrix).
+- Driver-side characterisation before any design ruling (CHARC concurred twice).
+- Every V7 run in a chain is independent.
+- Delete the plants promptly.
 
 ### Standing operator rulings
 
