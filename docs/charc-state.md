@@ -210,6 +210,18 @@
   (into work/wp4.2/gate-logs, read only) acknowledged. **NEXT: cell 4 FINAL docs turn (227,702); code identity `git diff 8bc927a
   <final> -- src tests tools` empty; accept record; HOLD REQUEST to me (main f225528; candidate rebased onto it, patch-id
   re-proved); ff; release; then my QA + rows.**
+- **WP4.2 ACCEPTED main `ff234ee` (10:42Z, HOLD 57de40e2 granted ~10:41Z, RELEASE `7cd0f8a00aadab2c`; record
+  `docs/proofs/wp4.2-accept.md`, report `docs/reports/wp4.2-video-path.md` FINAL). CHARC QA CONFIRMED (static, ~10:50Z):**
+  code patch-id af839429 equal on `246052b..8bc927a` and `f716417..922d1c6` = record; `git diff 8bc927a ff234ee -- src tests
+  tools` EMPTY (identity with the gated tree); 18 files = 15 package paths + report, ledger, record; `src/clearwater/interfaces`
+  untouched; 0 CR on every blob; evidence md5sums.txt all OK (r1 9/9, r2 9/9, reviewB 7/7, reviewB2 8/8; review-B b1865ba2 and
+  cabd2c51 = the posts); ruff / format 267 / mypy 141 / harness 382 OK on main; no suite here (own gate 5312/1 + 1135/1 on
+  8bc927a is the figure). **Register: DR-67, DR-71, DR-73, DR-74 CLOSED; DR-45 (b) CLOSED ((a) open); DR-47 (a) CLOSED ((b)(c)
+  open, next engine.py touch); DR-58 (b) re-sighted (B10); DR-81 (c) added, trigger WP4.3; NEW DR-83 (R1-Q4 cache-interior
+  link write-through, next `cache/` touch), DR-84 (B7 import-time witness, WP4.3's test_app_composition.py touch).** Lane:
+  WP4.2 = Claude (opus-high, cells 2-4), Codex nets A + B; Codex-built packages still 5. **NEXT: WP-T6 brief DRAFT from the
+  orchestrator for my ruling (baseline `work/wp4.2/gate-logs/wp4.2-serial.log`); then WP4.3 brief revision (DR-75 REQUIRED
+  test under Q12, DR-76, DR-77, DR-81 (a)(b)(c), DR-82, DR-84, DR-68, DR-69, DR-52, DR-62; AD-23 note at its accept).**
 - **(history) After WP4.1's accept:** WP4.2's brief (DRAFT RULED on main 3aa3c51) got ONE revision pass against WP4.1's accept record, then FINAL
   on CHARC's word; its revision must carry: DR-78/79 (B2 rows) as WP4.2 items, the WP4.1 runner's final names and the stream-syntax
   predicate, the Limit text. WP4.3's revision later carries DR-75 (REQUIRED test under its Q12), DR-76, DR-77, and the AD-23 'applied by
