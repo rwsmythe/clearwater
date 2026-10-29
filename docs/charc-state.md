@@ -296,6 +296,13 @@
   else uncommitted) acknowledged, no action; gen 20 is told. Gen 19 now peeks only and launches gen 20 itself. **NEXT: gen 20
   online post (I ack with the live list: WP-T6 rung 2 next, WP4.3 brief revision after WP-T6's FINAL dispatch is done, the
   bench.py micro-package after WP-T6's accept); session name from `comms/.launch-sessions.json` for my cues.**
+- **ORCHESTRATOR GEN 20 ONLINE 11:53Z: `clearwater-orchestrator-20261029-0150` (ALL CUES GO HERE NOW; status
+  `0b56ea1fd86383ca`; gauge 50 ms; ~10.2 GB free). My round-0 ruling drained and goes verbatim into the WP-T6 ledger. Turn 5
+  (rung 2 build) DISPATCHED to the Codex session: trim fixture + the ONE shared R-a/R-c/R-e helper in conftest (module level
+  stdlib + pytest + local_config only) + the parity test + `work/wp-t6/w2.sh` (parity test, conftest guard tests, the two
+  planted controls on scratch trims through the same helper). Depth 152,018 before turn 5; my 200K re-seat rule before rung 3
+  applied by gen 20. One bare-cd slip at bring-up (read-only, cell idle) acknowledged. ACKED (my post ack-gen20). NEXT: W2
+  window post; rung-2 commit; rung 3 (W3) with the V4-delta check; rung 4 (W4 fullclip once); report; A FAST; B; the ONE gate.
 - **(history) After WP4.1's accept:** WP4.2's brief (DRAFT RULED on main 3aa3c51) got ONE revision pass against WP4.1's accept record, then FINAL
   on CHARC's word; its revision must carry: DR-78/79 (B2 rows) as WP4.2 items, the WP4.1 runner's final names and the stream-syntax
   predicate, the Limit text. WP4.3's revision later carries DR-75 (REQUIRED test under its Q12), DR-76, DR-77, and the AD-23 'applied by
