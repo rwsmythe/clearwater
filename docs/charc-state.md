@@ -55,6 +55,15 @@
   `.worktrees/wp4.2` (branch `wp4.2`, base aa4761b; ROUND 0 ONLY, ledger-only commits; Y1 = table + R1-Q4 cache finding). Paces at
   dispatch Codex 0.414 / Claude 1.331. CAP clock = WP4.2's Y1 + 3 h (orchestrator decides, tells me). No window open; the orchestrator
   posts one before WP4.2a's two-leg suite. Owed by me: DR-78/79 rewrite at WP4.2a's accept; WP4.2's rows at its accept.
+- **WP4.2 ROUND 0 RULED 02:40Z (query `1286b25667b9ec63`, my post ruling-wp42r0; Y1 02:33:37Z, cell depth 209,438, build goes
+  to a FRESH cell; CAP 05:33:37Z):** tripwire APPROVED = additive per-item `"video"` record object {device_backend, frame_device,
+  encoder, decode_passes}, schema 1 kept, three conditions (existing fields unchanged; shape documented in the runner docstring +
+  report; decode_passes counted from source opens, V17 asserts it); R0-Q2 = (b') expected_frames from probe nb_frames, readable count
+  via one packet listing only on a D86 fault, analysis stays io-free; seat rulings concurred (G1 granted on the DR-45 (b)
+  reproduction -> DR-47 (a) CLOSES at the accept; R0-Q1 (a), R0-Q3 (a), R0-Q4 (b) one-line app/__init__ re-export, R0-Q5 (a)
+  lossless re-encode with decode proof + STOP, R0-Q6 (a)). **R1-Q4 REPRODUCED** (`cache/store.py:573` skips a junction entry at
+  discovery; `:660-666` mkdir/write through it; `keys.py:103` is_link uncalled): my register row at WP4.2's accept, trigger the next
+  `cache/` touch. WP4.2a: round 0 committed 933e33e, Codex turn 2 = build.
 - **(history) After WP4.1's accept:** WP4.2's brief (DRAFT RULED on main 3aa3c51) got ONE revision pass against WP4.1's accept record, then FINAL
   on CHARC's word; its revision must carry: DR-78/79 (B2 rows) as WP4.2 items, the WP4.1 runner's final names and the stream-syntax
   predicate, the Limit text. WP4.3's revision later carries DR-75 (REQUIRED test under its Q12), DR-76, DR-77, and the AD-23 'applied by
