@@ -103,7 +103,7 @@ def qt_mov(tmp_path: Path) -> Path:
         "-c:v", "libx265", "-pix_fmt", "yuv420p",
         "-x265-params", "bframes=2:log-level=error",
         "-color_primaries", "bt709", "-color_trc", "bt709", "-colorspace", "bt709",
-        "-color_range", "tv", "-c:a", "pcm_s16le", "-f", "mov", str(unrotated),
+        "-color_range", "tv", "-c:a", "pcm_s16le", "-ac", "2", "-f", "mov", str(unrotated),
     )  # fmt: skip
     _ffmpeg(
         "-display_rotation", "180", "-i", str(unrotated),
@@ -136,6 +136,7 @@ def test_qt_mov_probe_decode_runner_and_v4(qt_mov: Path, tmp_path: Path) -> None
     assert rotations and abs(rotations[0]) == 180
     assert any("displaymatrix" in side for side in video["side_data_list"])
     assert audio["codec_name"] == "pcm_s16le" and int(audio["sample_rate"]) == 48000
+    assert audio["channels"] == 2 and audio["channel_layout"] == "stereo"
 
     info = probe(qt_mov)
     assert "mov" in info.container.split(",")

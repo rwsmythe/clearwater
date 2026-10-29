@@ -1,11 +1,68 @@
 # WP4.4 cumulative ledger
 
-## Turn 2 STOP: qt PCM audio layout differs in V4
+## Turn 3 STOP: phone record state versus required warnings
 
-Recommended disposition: route to CHARC for an audio-mux or V4-instrument scope
-ruling; retain the fixture and the house assertion unchanged pending that ruling.
-No PCM conversion, fixture substitution, comparison weakening or audio-mux
-option has been added. Q2 grants the data map only.
+Recommended ruling: the phone record assertion should require
+`state == "done with warnings"`, with exit 0 and the expected output,
+preserving Q2's best-effort `data track mebx` disclosure. Literal `done`
+cannot coexist with those required warnings. No product behavior change is
+recommended. The footage test has NOT been written pending this clarification;
+it has not been run or replaced with a weaker assertion.
+
+**[major, in-envelope, NEW, REASONED + EXECUTED]** Task 6 and the turn-3
+dispatch require the runner record's item `done`. The existing product reports
+a successful item with warnings as `done with warnings`. Q2 necessarily adds
+warnings for the two omitted mebx tracks:
+
+1. `verify.not_carried` emits `data track mebx` for each absent data track
+   (`src/clearwater/io/video/verify.py:890-895`).
+2. `ExportEngine` carries those into `JobResult.warnings` as
+   `Not carried to the output: <item>`
+   (`src/clearwater/jobs/export.py:1029-1033`, unchanged and NOT owned).
+3. `BatchItem.state` returns `done with warnings` for `ok=True` and nonempty
+   warnings (`src/clearwater/jobs/batch.py:37-44`, unchanged and NOT owned).
+4. The runner writes `item.state` directly to the JSON record
+   (`tools/headless_export.py:1050`) and accepts both successful states for
+   exit 0 (`tools/headless_export.py:148`, `1134`).
+
+Cheap reproduction, no footage or FFmpeg: constructed real `ExportRequest`,
+`JobResult`, `BatchItem`, `BatchReport` and `he.RunRecord` values, then called
+`he.record_object` and `he.exit_status`. The warning-free positive control
+reports state `done`, exit 0. Adding only
+`Not carried to the output: data track mebx` reports state
+`done with warnings`, exit 0. Both assertions passed; EXIT 0.
+Log: `work/wp4.4/t3/record-state-conflict.txt`. No record or metadata values
+were printed; only the two states, warning counts and exit codes.
+
+This is a brief/assertion conflict, not a new existing-test conflict. It is
+raised under plan 4.5's no-assumptions rule before implementing the phone test.
+Neither warning suppression nor batch/runner changes are in this package's
+grant. The new exact-state assertion needs a ruling at the next turn boundary.
+
+## Turn 2 STOP resolved: qt PCM audio layout differs in V4
+
+CHARC `093384f126589674` (2026-10-29T22:14:29Z) ruled (a): the qt fixture
+becomes stereo pcm_s16le with `-ac 2`; the house V4 assertion is unchanged.
+The real mono path is witnessed by IMG_6702's footage test. Comparator changes
+are DECLINED for this package; no product fix exists or is wanted. The original
+synthetic declared-mono limitation is retained as evidence below, not remediated.
+Q2 still grants the data map only.
+
+Seat PCM probe (FFmpeg 9.0.2, supplied at turn 3, script
+`work/wp4.4-seat/pcm_layout.py`, stream copy to MP4): synthetic mono sowt with
+layout mono becomes ipcm, one channel, layout absent; synthetic stereo sowt with
+layout stereo becomes ipcm, two channels, stereo SAME; IMG_6702 lpcm is mono
+with no layout in both source and output, SAME. The cell did not read footage
+or rerun that seat probe.
+
+CHARC owns this MINOR register row at the accept; the cell touches no register:
+
+> a QuickTime PCM track that DECLARES a mono layout leaves the MP4 with the
+> channel count but no layout declaration (FFmpeg 9.0.2 ipcm writer; stream copy
+> cannot set one); V4's audio item reads DIFFERENT for such a source; the owner's
+> iPhone clips are unaffected (lpcm, no layout). Trigger: the next V4 instrument
+> touch (treat mono and absent as equal at channels == 1) or an owner MOV whose
+> V4 reads DIFFERENT on that item alone.
 
 **[major, in-envelope, NEW, EXECUTED]**
 `tests/test_wp44_mov_input.py::test_qt_mov_probe_decode_runner_and_v4` exports
@@ -41,8 +98,12 @@ token cannot access the localhost administrative share. Each raises
 `PermissionError [WinError 5]` before it can exercise the intended product
 assertion. The runner's `inside`, `plain_path`, and `Redactor` ASTs are unchanged
 from `5e3537d`; no existing test or helper was altered to hide these failures.
-Seat reproduction is requested below. This is an environment failure, not an
+Seat reproduction completed as recorded below. This is an environment failure, not an
 additional conflicting test expectation.
+
+Disposition at turn 3: CONFIRMED sandbox artifact. All three UNC nodes passed
+at the orchestrator's seat (3 passed, EXIT 0;
+`work/wp4.4/t2/seat-unc.txt`), using the exact requested command below.
 
 **[minor, pre-existing encoding, REASONED + EXECUTED]** The inherited
 `tests/test_gui_open.py` contains U+00E9 on base line 368 (current line 369).
@@ -95,7 +156,8 @@ The user-specified task ladder and yield schedule govern the work.
 |---|---|---|
 | Turn 1 entry | Fresh session; no numeric depth supplied | Round 0 only |
 | Turn 1 exit / turn 2 entry | 102,496 input tokens; window 475,000 (dispatcher reading) | Continue tasks 3-5; evaluate near 200K, stop at a boundary near 250K |
-| Turn 2 exit | Pending dispatcher reading | Mandatory task-group yield |
+| Turn 2 exit / turn 3 entry | 163,747 input tokens; smaller reported window 258,400 binds | Bounded fixture/test turn, then dispatcher evaluation |
+| Turn 3 exit | Pending dispatcher reading | Mandatory yield; evaluate at this boundary |
 
 The dispatch's Codex/Claude pace readings describe account usage, not this
 cell's context depth; they are not substituted for a depth reading.
@@ -402,15 +464,20 @@ attempted. Ruff format checking remains at the dispatcher's seat as instructed.
 
 ### Seat RUN REQUESTS
 
-After CHARC dispositions the qt STOP, the final fixture/light runs will need
-to pass. The three sandbox-blocked UNC nodes need this seat command now (from
-Git Bash, estimated scheduling allowance under one minute; no timing figure):
+The following three-node seat request was completed at the turn-3 boundary:
+3 passed, EXIT 0 (`work/wp4.4/t2/seat-unc.txt`), confirming the restricted-token
+artifact. The command was (Git Bash):
 
 ```bash
 env -u VIRTUAL_ENV uv run pytest -q tests/test_headless_export.py::test_g1_inside_sees_every_spelling_of_the_same_folder 'tests/test_headless_export.py::test_g1_main_refuses_every_footage_check_through_another_spelling[unc]' tests/test_headless_export.py::test_g1_the_redactor_hides_the_extended_spellings --basetemp=work/wp4.4/t2-seat-unc > work/wp4.4/t2/seat-unc.txt 2>&1
 ```
 
-Format at the seat as commissioned:
+The following seat format check identified two files needing formatting:
+`src/clearwater/jobs/naming.py` and `tests/test_wp44_mov_input.py`. The
+orchestrator applied mechanical formatting before commit `35391b0`, with no
+semantic changes, and reported ruff check clean. Both files were re-read on
+disk before turn-3 edits. The check's log is `work/wp4.4/t2/seat-format.txt`;
+its numeric exit was not supplied.
 
 ```bash
 env -u VIRTUAL_ENV uv run ruff format --check . > work/wp4.4/t2/seat-format.txt 2>&1
@@ -420,10 +487,56 @@ Reviewer A has not run; no convergence or package-completion claim is made.
 
 | Round / boundary | Critical / major / minor | In / environment or pre-existing | NEW / REOPENED | Reverts | Product / test fixes | Verdict | Depth |
 |---|---|---|---|---|---|---|---|
-| Turn 2 author verification (not Reviewer A) | 0 / 1 / 2 | 1 / 2 | 3 / 0 | 0 | Routing, naming, data map / RED tests and granted fixture token | STOP: qt MANDATORY audio difference; no out-of-envelope remediation | Pending dispatcher |
+| Turn 2 author verification (not Reviewer A) | 0 / 1 / 2 | 1 / 2 | 3 / 0 | 0 | Routing, naming, data map / RED tests and granted fixture token | qt STOP resolved by 093384f126589674; UNC artifact confirmed at seat | 163,747 at turn-2 yield |
 
 Verification-loop record: resolved the granted round-0 test conflict; confirmed
 the new qt audio difference independently with plain FFmpeg; confirmed UNC
 failures originate in the unchanged test helper before product assertions;
 confirmed non-ASCII is inherited rather than introduced. No false-positive
 rejections, no reverts, and no fix to the unowned audio-mux/instrument surface.
+
+## Turn 3 build and validation record
+
+Applied CHARC `093384f126589674` only in the owned test file: the qt fixture
+now requests `-ac 2`, and its self-check requires two channels and stereo
+layout. The house `_assert_v4` helper and every V4 requirement are unchanged.
+The qt node passes; the turn-2 MANDATORY difference is resolved for the ruled
+fixture. The inherited declared-mono limitation remains CHARC's register item
+at the accept. No register was edited.
+
+Footage task 6 was investigated but not implemented, because its literal record
+state conflicts with required warnings as confirmed in the new STOP above.
+No footage was read; no footage test was run or silently skipped. A footage
+RUN REQUEST cannot yet name a runnable node, so it is deferred until that
+assertion is ruled. No report was written this turn.
+
+Commands below ran with VIRTUAL_ENV removed. Each pytest invocation used
+`PYTHONPATH=scripts`, `-p sandbox_mkdir_shim -p no:cacheprovider`, and the fresh
+basetemp shown. Logs are under `work/wp4.4/t3/`.
+
+| Run / log | Exact command or probe | Counts / result | EXIT |
+|---|---|---|---|
+| qt-green.txt | `uv run pytest -q tests/test_wp44_mov_input.py::test_qt_mov_probe_decode_runner_and_v4 --basetemp=work/wp4.4/tmp/t3-qt-green -p sandbox_mkdir_shim -p no:cacheprovider` | 1 passed; qt/stereo/rotation/full decode/export/V4 checks passed | 0 |
+| record-state-conflict.txt | `uv run python -` constructing successful real batch/runner records with zero and one data-track warning | `done` / `done with warnings`, both exit 0; two assertions passed | 0 |
+| light.txt | `uv run pytest -q tests/test_wp44_mov_input.py tests/test_jobs_naming.py tests/test_headless_export.py tests/test_io_video_encode_units.py --basetemp=work/wp4.4/tmp/t3-light -p sandbox_mkdir_shim -p no:cacheprovider -m "not gpu and not footage and not gui and not slow and not fullclip"` | 1021 passed / 3 failed / 1 deselected; only the known UNC helper failures | 1 |
+| ruff.txt | `uv run ruff check .` | All checks passed | 0 |
+| mypy.txt | `uv run mypy` | Success: no issues in 141 source files | 0 |
+| diff-check.txt | `git -c core.autocrlf=false diff --check` | No whitespace errors | 0 |
+| locks.txt | `uv run python -` comparing `_assert_v4` AST to 35391b0 and checking both modified files' encoding | House helper unchanged; both files ASCII | 0 |
+
+The three light-run failures remain exactly the UNC nodes listed in turn 2.
+They passed at the seat; no test was changed, masked, or skipped by the cell.
+Only `tests/test_wp44_mov_input.py` and this ledger changed during turn 3.
+All added text is ASCII; product code, frozen interfaces, dependencies, local
+configuration, the register and all other worktrees remain unchanged.
+
+| Boundary (not Reviewer A) | Critical / major / minor | In / out | NEW / REOPENED | Reverts | Product / test fixes | Verdict | Depth |
+|---|---|---|---|---|---|---|---|
+| Turn 3 author verification | 0 / 1 / 0 | 1 / 0 | 1 / 0 | 0 | None / ruled stereo fixture, with layout self-check | STOP: literal phone record state needs ruling; no footage access | Pending dispatcher; entry 163,747 / 258,400 |
+
+Verification-loop record: applied the ruled stereo fixture and confirmed V4
+passes; discovered the phone-state requirement conflict while tracing its
+record schema; independently confirmed the warning-free and warned states using
+real serializer calls. No false positives, no reverts, no out-of-scope fix.
+Reviewer A has not run. Yielding at the bounded turn's boundary for the
+dispatcher's depth evaluation and ruling; no package-completion claim.
