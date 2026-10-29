@@ -982,3 +982,160 @@ def test_j1_a_created_stamp_out_of_range_is_a_usage_refusal(
         he.read_parameter_file(path)
     assert _main(sample(STILL), "--out", out, "--force-cpu", "--parameters", path) == 2
     assert "date value out of range" in capsys.readouterr().err and list(out.iterdir()) == []
+
+
+# --- Reviewer B: one write-target predicate, case-blind escapes, settings overflow, Ctrl-C -------
+
+
+def _junction(target: Path, link: Path) -> None:
+    """Create a directory junction, or skip the test where none can be created."""
+    if not WINDOWS:
+        pytest.skip("directory junctions exist only on Windows")
+    done = subprocess.run(
+        ["cmd", "/c", "mklink", "/J", str(link), str(target)], capture_output=True, check=False
+    )
+    if done.returncode != 0 or not link.is_dir():
+        pytest.skip("a directory junction cannot be created here")
+
+
+def _hard_link(target: Path, link: Path) -> None:
+    """Create a hard link, or skip the test where none can be created."""
+    try:
+        os.link(target, link)
+    except (OSError, NotImplementedError) as exc:
+        pytest.skip(f"a hard link cannot be created here: {type(exc).__name__}")
+
+
+B1_CASES = [
+    "text-spelling",
+    "extended",
+    "device",
+    "file-link",
+    "junction",
+    "folder-link-outside",
+    "hard-link-stream",
+    "case",
+]
+
+
+@pytest.mark.parametrize("case", B1_CASES)
+def test_b1_every_class_of_write_target_is_refused_before_anything_runs(
+    sample, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys, case: str
+) -> None:
+    footage, work, elsewhere = tmp_path / "footage", tmp_path / "work", tmp_path / "elsewhere"
+    for folder in (footage / "sub", work, elsewhere):
+        folder.mkdir(parents=True)
+    real = _copy(sample, STILL, footage / "sub", "real.jpg")
+    monkeypatch.setattr(he, "configured_footage_folder", lambda config=None: footage)
+    source = sample(STILL)
+    if case == "text-spelling":  # forward slashes and a ".." step (R1 F1's class of spellings)
+        args = [source, "--out", footage.as_posix() + "/x/../sub"]
+    elif case == "extended":  # R2 G1
+        if not WINDOWS:
+            pytest.skip("the extended-length spelling exists only on Windows")
+        args = [source, "--out", _extended(footage / "sub")]
+    elif case == "device":  # a device-path form, even outside the footage folder
+        if not WINDOWS:
+            pytest.skip("the device-path form exists only on Windows")
+        args = [source, "--out", Path("\\\\.\\" + str(work))]
+    elif case == "file-link":  # R4 I1: a linked source inside the footage, outputs beside it
+        _copy(sample, STILL, elsewhere, "target.jpg")
+        _symlink(elsewhere / "target.jpg", footage / "sub" / "linked.jpg")
+        args = [footage / "sub" / "linked.jpg", "--beside-source"]
+    elif case == "junction":
+        _junction(footage / "sub", work / "j")
+        args = [source, "--out", work / "j"]
+    elif case == "folder-link-outside":  # a link on the way down, even one leading elsewhere
+        _symlink(elsewhere, work / "l", directory=True)
+        args = [source, "--out", work / "l"]
+    elif case == "hard-link-stream":  # Reviewer B B1: a stream on a hard link to a footage file
+        _hard_link(real, work / "alias.jpg")
+        args = [source, "--out", work, "--record", f"{work / 'alias.jpg'}:record.json"]
+    else:  # the footage folder spelled in another case
+        if not WINDOWS:
+            pytest.skip("a case-insensitive file system is the Windows default")
+        args = [source, "--out", Path(str(footage).swapcase()) / "sub"]
+    before = sorted(p.name for p in (footage / "sub").iterdir())
+    assert _main(*args, "--force-cpu") == 2
+    err = capsys.readouterr().err
+    assert err.startswith("headless_export: ") and ("read-only" in err or "refuses" in err), err
+    assert sorted(p.name for p in (footage / "sub").iterdir()) == before
+    assert not list(work.rglob("*.png")) and not list(elsewhere.rglob("*.png"))
+    if WINDOWS:
+        assert not os.path.exists(f"{real}:record.json")  # no stream on the original
+
+
+def test_b1_the_predicate_names_why_and_passes_a_plain_target(tmp_path: Path) -> None:
+    footage, work = tmp_path / "footage", tmp_path / "work"
+    footage.mkdir()
+    work.mkdir()
+    assert he.write_target_refusal(work / "new" / "r.json", footage) is None
+    assert he.write_target_refusal(work, footage) is None
+    assert "inside the footage folder" in str(he.write_target_refusal(footage / "x", footage))
+    assert "stream" in str(he.write_target_refusal(Path(f"{work}:s.json"), footage))
+
+
+def test_b2_a_non_ascii_folder_in_another_case_is_hidden(tmp_path: Path) -> None:
+    out = tmp_path / "privé" / "out"
+    out.mkdir(parents=True)
+    other = str(out).replace("privé", "PRIVÉ")
+    redact = he.Redactor([out])
+    assert redact(he._unknown_method(other, {"c3": None})) == (
+        "unknown correction method 'out'; the methods are c3."
+    )
+    assert redact(f"failed in {he.ascii_text(other)}") == "failed in out"
+    assert redact(f"failed in {other}") == "failed in out"
+
+
+def test_b4_a_settings_file_whose_created_stamp_overflows_is_a_usage_refusal(
+    sample, tmp_path: Path, out: Path, no_footage: None, capsys
+) -> None:
+    folder = tmp_path / "settings"
+    folder.mkdir()
+    path = save_settings(folder, Settings(last_parameters=new_parameter_set("c3", {})))
+    data = json.loads(path.read_text(encoding="utf-8"))
+    data["last_parameters"]["created"] = "0001-01-01T00:00:00+01:00"
+    path.write_text(json.dumps(data), encoding="utf-8")
+    assert _main(sample(STILL), "--out", out, "--force-cpu", "--settings-dir", folder) == 2
+    err = capsys.readouterr().err
+    assert "settings cannot be used" in err and _no_full_path(err, tmp_path)
+    assert list(out.iterdir()) == []
+
+
+def test_b5_ctrl_c_in_the_last_items_commit_gives_status_1_and_a_cancelled_record(
+    sample, tmp_path: Path, out: Path, no_footage: None
+) -> None:
+    def hook(name: str) -> None:
+        if name == "committed":
+            signal.raise_signal(signal.SIGINT)
+
+    record = tmp_path / "r.json"
+    status = _main(
+        sample(STILL), "--out", out, "--force-cpu", "--record", record,
+        exports=composition.export_jobs(on_stage=hook),
+    )  # fmt: skip
+    data = json.loads(record.read_text(encoding="ascii"))
+    assert status == 1 and data["cancelled"] is True
+    assert [i["state"] for i in data["items"]] == ["done"]  # the committed output is kept (D44)
+    assert len(list(out.iterdir())) == 1
+
+
+def test_b6_ctrl_c_while_the_record_is_written_leaves_a_whole_record_and_status_1(
+    sample, tmp_path: Path, out: Path, no_footage: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    before = signal.getsignal(signal.SIGINT)
+    real_json = he.record_json
+
+    def interrupted(record: he.RunRecord) -> str:
+        signal.raise_signal(signal.SIGINT)
+        return real_json(record)
+
+    monkeypatch.setattr(he, "record_json", interrupted)
+    path = tmp_path / "r.json"
+    try:
+        status = _main(sample(STILL), "--out", out, "--force-cpu", "--record", path)
+    except KeyboardInterrupt:
+        pytest.fail("Ctrl-C while the record was written escaped main")
+    assert status == 1
+    assert json.loads(path.read_text(encoding="ascii"))["schema"] == 1
+    assert signal.getsignal(signal.SIGINT) is before

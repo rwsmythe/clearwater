@@ -502,11 +502,16 @@ def test_v10_a_cancel_after_item_1_keeps_it_and_runs_no_later_item(clash, tmp_pa
 def test_n10_the_same_still_twice_is_identical(sample, tmp_path, sample_id) -> None:
     source = sample(sample_id)
     outputs: dict[bool, list[Path]] = {True: [], False: []}
+    recording = Recording()  # the writer's incoming pixels, pre-encode (Reviewer B B7)
     for provenance in (False, True):
         for run in range(2):
             out = tmp_path / f"p{int(provenance)}-{run}"
             out.mkdir()
-            outputs[provenance].append(only_output(export([source], out, provenance=provenance)))
+            exports = composition.export_jobs(writer=recording)
+            items = export([source], out, exports=exports, provenance=provenance)
+            outputs[provenance].append(only_output(items))
+    assert len(recording.pixels) == 4
+    assert all(np.array_equal(recording.pixels[0], p) for p in recording.pixels[1:])  # pre-encode
     first, second = outputs[False]
     assert first.read_bytes() == second.read_bytes()  # provenance off: byte-identical
     a, b = (png_chunks(p) for p in outputs[True])

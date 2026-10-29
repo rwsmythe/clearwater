@@ -8,8 +8,9 @@ file it is asked for (``--settings-dir``'s loader, ``clearwater.config.load_sett
 corrupt ``settings.json`` beside itself, D89). It loads no PySide6, and with ``--force-cpu`` no
 CuPy.
 
-Library API: :func:`route`, :func:`requests_for`, :func:`parameters_for`, :func:`check_outputs`,
-:func:`run`, :func:`record_json`, :func:`exit_status` and :func:`main`. Command line::
+Library API: :func:`route`, :func:`requests_for`, :func:`parameters_for`,
+:func:`write_target_refusal`, :func:`check_outputs`, :func:`run`, :func:`record_json`,
+:func:`exit_status` and :func:`main`. Command line::
 
     uv run python tools/headless_export.py PATH [PATH ...] (--out DIR | --beside-source)
         [--suffix S] [--bit-depth {8,16}] [--no-provenance] [--force-cpu] [--encoder NAME]
@@ -24,29 +25,38 @@ Exit status: 0 when every item is done (with or without warnings); 1 when any it
 cancelled or was not run; 2 for a usage refusal, with nothing run (a bad flag, a missing
 ``--out`` folder, an invalid suffix (given or loaded), an unknown method, a parameter file that
 is unreadable, over the importer's 1 MiB cap or not valid for its method, a settings file that
-cannot be used, an unreadable local configuration, an output folder, settings file or record
-file that would be written inside the configured footage folder however either is spelled and
-through any link (the real path of the nearest existing path is checked), or a source inside it
-beside which outputs would go, a ``--record`` file that exists or does not end in ``.json``).
+cannot be used, an unreadable local configuration, a write target the footage check refuses
+when a footage folder is configured (:func:`write_target_refusal`: an output folder, the folder
+beside a source, the settings folder and file, or the record file inside the footage folder
+however spelled, reached through a link, junction or short 8.3 name, or spelled as a stream,
+extended-length or device path), a ``--record`` file that exists or does not end in ``.json``).
 A record file that appears during the run is not written, and one that cannot be written is
-removed if this run created it: a message, status 1.
+removed if this run created it (absent a concurrent replacement of the path by another
+process): a message, status 1.
 Ctrl-C sets the batch's cancel flag: the running job stops at its next check and leaves no
-partial output (D44), the rest are not run (D45), and the exit status is 1.
+partial output (D44), the rest are not run (D45), and the exit status is 1. A Ctrl-C after the
+last item's last check (in its commit) leaves its output and still gives status 1 with
+``"cancelled": true``; one while the record is written leaves the record whole and gives
+status 1.
 
 The record (``--record FILE``, JSON, ``"schema": 1``, fields additive only) names sources and
-outputs by file name only, never by full path (as AD-13 rules for provenance), and carries no
-EXIF content or location tag. The summary lines go to stdout and the ``[i/n]`` progress messages
-to stderr. Every folder the run knows (the output folder, each source's folder, the settings,
-record and parameter folders, and the local configuration's folder) is shown by its NAME in
-every record field and printed line, one :class:`Redactor` applied at each exit point: an engine
-text such as the D87 free-space refusal names its folder; an ``argparse`` refusal is redacted
-against the paths its arguments name. This tool installs no logging handler, so ``run_batch``'s
-INFO report (which names full output paths) is not emitted; Python's last-resort handler prints
-WARNING lines only, and while :func:`main` runs a filter on that handler passes them through the
-same redactor and prints no tag value (an EXIF module argument or a ``%r`` argument is shown as
-``...``); :func:`run` does the same while its batch runs. A process that installs its own
-logging handlers (a host program, pytest) receives the engine's records as they are logged, full
-paths and tag values included: the runner redacts what it prints and records, not another
+outputs by file name only, never by full path (as AD-13 rules for provenance), and adds no
+location tag and no EXIF content of its own. It carries the engine's failure texts verbatim
+apart from folder redaction (DR-35 (a)), and a reader failure text (``clearwater.io.photo``,
+for example a malformed TIFF Orientation) may quote the malformed tag's value; so may the
+summary line and the batch WARNING that carry the same text. The summary lines go to stdout
+and the ``[i/n]`` progress messages to stderr. Every folder the run knows (the output folder,
+each source's folder, the settings, record and parameter folders, and the local
+configuration's folder) is shown by its NAME in every record field and printed line, one
+:class:`Redactor` applied at each exit point: an engine text such as the D87 free-space refusal
+names its folder; an ``argparse`` refusal is redacted against the paths its arguments name. This
+tool installs no logging handler, so ``run_batch``'s INFO report (which names full output paths)
+is not emitted; Python's last-resort handler prints WARNING lines only, and while :func:`main`
+runs a filter on that handler passes them through the same redactor and prints no tag value
+from the EXIF module's own WARNINGs (each of their arguments, and every ``%r`` argument, is
+shown as ``...``); :func:`run` does the same while its batch runs. A process that installs its
+own logging handlers (a host program, pytest) receives the engine's records as they are logged,
+full paths and tag values included: the runner redacts what it prints and records, not another
 program's logging.
 """
 
@@ -198,6 +208,8 @@ class RunRecord:
             ``"neutral"`` or ``"given"`` (a library caller's own set).
         elapsed_s: The batch's wall time in seconds (information only).
         folders: The folders the record's texts show by name only (:class:`Redactor`).
+        cancel_requested: The cancel flag was set when the batch ended, even after the last
+            item's last check (a Ctrl-C in its commit), so the run counts as cancelled.
     """
 
     report: BatchReport
@@ -205,19 +217,22 @@ class RunRecord:
     parameters_from: str
     elapsed_s: float
     folders: tuple[Path, ...] = ()
+    cancel_requested: bool = False
 
 
 class Redactor:
-    """Replace every spelling of known folders in a text by the folder's name (case-insensitive).
+    r"""Replace every spelling of known folders in a text by the folder's name (case-insensitive).
 
     The spellings are the path as given, resolved and without a Windows extended-length prefix
     (:func:`plain_path`), plus a UNC path's extended spelling; each with backslashes, with doubled
     backslashes (an ``OSError`` or ``argparse`` text quotes the path's ``repr``) and with forward
     slashes; and each of those also with its non-ASCII characters escaped as :func:`ascii_text`
     escapes them (engine texts are escaped before they reach the runner), and that escaped form
-    with its backslashes doubled (the ``repr`` of an escaped path). A spelling without a
-    separator says nothing a name does not, so it is not replaced; nor is a folder without a
-    name (a drive root).
+    with its backslashes doubled (the ``repr`` of an escaped path). Each escape matches the
+    escape of any letter case of its character (``\xe9`` and ``\xc9`` alike, Reviewer B B2):
+    ``re.IGNORECASE`` alone cannot equate two escapes. A spelling without a separator says
+    nothing a name does not, so it is not replaced; nor is a folder without a name (a drive
+    root).
     """
 
     def __init__(self, folders: Iterable[Path]) -> None:
@@ -226,7 +241,7 @@ class Redactor:
         Args:
             folders: The folders to show by name only.
         """
-        forms: dict[str, str] = {}
+        forms: dict[str, tuple[int, str]] = {}  # pattern -> (the literal's length, name)
         for folder in folders:
             resolved = Path(folder).resolve()
             paths = [Path(folder), resolved, plain_path(resolved)]
@@ -235,15 +250,20 @@ class Redactor:
             for path in paths:
                 if not path.name:
                     continue
-                text = str(path)
+                text, name = str(path), ascii_text(path.name)
                 for base in (text, text.replace("\\", "\\\\"), path.as_posix()):
+                    if "\\" not in base and "/" not in base:
+                        continue
                     escaped = ascii_text(base)
-                    for form in (base, escaped, escaped.replace("\\", "\\\\")):
-                        if "\\" in form or "/" in form:
-                            forms.setdefault(form, ascii_text(path.name))
+                    for pattern, length in (
+                        (re.escape(base), len(base)),
+                        (_escaped_pattern(base, doubled=False), len(escaped)),
+                        (_escaped_pattern(base, doubled=True), len(escaped) * 2),
+                    ):
+                        forms.setdefault(pattern, (length, name))
         self._patterns = [
-            (re.compile(re.escape(form), re.IGNORECASE), name)
-            for form, name in sorted(forms.items(), key=lambda item: -len(item[0]))
+            (re.compile(pattern, re.IGNORECASE), name)
+            for pattern, (_, name) in sorted(forms.items(), key=lambda item: -item[1][0])
         ]
 
     def __call__(self, text: str) -> str:
@@ -251,6 +271,25 @@ class Redactor:
         for pattern, name in self._patterns:
             text = pattern.sub(name.replace("\\", r"\\"), text)  # the name, literally
         return ascii_text(text)
+
+
+def _escaped_pattern(text: str, *, doubled: bool) -> str:
+    """A pattern matching ``text`` as :func:`ascii_text` escapes it, in any letter case.
+
+    Each non-ASCII character matches the escape of any of its case forms; with ``doubled`` every
+    backslash (an escape's or a separator's) is doubled, as a ``repr`` quotes it.
+    """
+    parts = []
+    for char in text:
+        if char.isascii():
+            parts.append(re.escape(char * 2 if doubled and char == "\\" else char))
+            continue
+        cases = sorted({char, char.lower(), char.upper(), char.casefold(), char.title()})
+        escapes = [ascii_text(case) for case in cases]
+        if doubled:
+            escapes = [escape.replace("\\", "\\\\") for escape in escapes]
+        parts.append("(?:" + "|".join(re.escape(escape) for escape in escapes) + ")")
+    return "".join(parts)
 
 
 def folders_of(requests: Sequence[ExportRequest]) -> tuple[Path, ...]:
@@ -554,24 +593,62 @@ def inside(path: Path, folder: Path) -> bool:
     return False
 
 
-def writes_inside(target: Path, folder: Path) -> bool:
-    """Return whether a write to ``target`` would land inside ``folder``, links followed.
+INSIDE_FOOTAGE: Final = "is inside the footage folder, which is read-only"
+"""The refusal reason of a write target whose real place is inside the footage folder."""
 
-    ``target`` is followed to where a write really goes: the real path of its nearest existing
-    path (``target`` itself when it exists, a link included even when it dangles; otherwise its
-    nearest existing ancestor) is tested with :func:`inside`, so a file link, a folder link or a
-    junction anywhere on the way is seen through.
+THROUGH_A_LINK: Final = (
+    "reaches its place through a link (a symbolic link, junction or other reparse point, or a "
+    "short 8.3 name), which the footage check refuses"
+)
+"""The refusal reason of a write target with an existing path on the way that is not real."""
+
+REFUSED_FORM: Final = (
+    "is in a form the footage check refuses (a ':' stream name, or a \\\\?\\ or \\\\.\\ path)"
+)
+"""The refusal reason of a write target spelled as a stream, extended-length or device path."""
+
+
+def write_target_refusal(target: Path, footage_folder: Path) -> str | None:
+    r"""Return why a planned write to ``target`` is refused, or None when it may go ahead.
+
+    The one footage check of every write the run plans (CHARC Q1 on Reviewer B's B1): a target
+    passes only when all three hold:
+
+    (i) after its drive or UNC prefix its text has no ``:`` (an NTFS stream name such as
+    ``alias.jpg:record.json``), and it is not in a ``\\?\`` or ``\\.\`` form;
+    (ii) every existing path on the way down to it (the target itself when it exists, a
+    dangling link included) is its own real path (``os.path.realpath``, compared
+    case-normalised): no symbolic link, junction or other reparse point, and no short 8.3 name;
+    (iii) the real path of the deepest existing one lies outside the footage folder
+    (:func:`inside`: resolved, prefix-free, case-normalised and by file identity).
+
+    Residual: a hard link to a footage file placed outside the footage folder cannot be told
+    apart by its path. The runner never writes over an existing file (D84), so only a stream
+    name could reach the original, and (i) refuses every stream name.
 
     Args:
         target: A file or folder the run would write (need not exist).
-        folder: The folder no write may go into.
+        footage_folder: The read-only footage folder.
 
     Returns:
-        True when the write would land inside ``folder``.
+        None when the target passes; otherwise the reason (:data:`INSIDE_FOOTAGE`,
+        :data:`THROUGH_A_LINK` or :data:`REFUSED_FORM`), which follows the target's name in the
+        refusal text.
     """
-    path = Path(os.path.abspath(target))
-    nearest = next((p for p in (path, *path.parents) if os.path.lexists(p)), path)
-    return inside(target, folder) or inside(Path(os.path.realpath(nearest)), folder)
+    text = str(target)
+    path = Path(os.path.abspath(text))
+    existing = [p for p in (path, *path.parents) if os.path.lexists(p)]
+    deepest = existing[0] if existing else path
+    if inside(Path(os.path.realpath(deepest)), footage_folder):  # (iii), named first
+        return INSIDE_FOOTAGE
+    if text.replace("/", "\\")[:4] in ("\\\\?\\", "\\\\.\\"):  # (i)
+        return REFUSED_FORM
+    if ":" in os.path.splitdrive(text)[1]:
+        return REFUSED_FORM
+    for step in existing:
+        if os.path.normcase(os.path.realpath(step)) != os.path.normcase(str(step)):
+            return THROUGH_A_LINK
+    return None
 
 
 def check_outputs(requests: Sequence[ExportRequest], footage_folder: Path | None) -> None:
@@ -579,32 +656,31 @@ def check_outputs(requests: Sequence[ExportRequest], footage_folder: Path | None
 
     Each request's output folder is the one the export plans (``jobs.naming``): the output
     folder setting, or the source's own folder (``source.parent``, not the target of a linked
-    source); it is checked with :func:`writes_inside`. Outputs beside a source inside the footage
-    folder are refused too, however the source is spelled.
+    source); each is checked with :func:`write_target_refusal` before anything runs.
 
     Args:
         requests: The run's requests.
         footage_folder: The read-only footage folder; nothing is checked when None.
 
     Raises:
-        RunnerRefusalError: An output folder inside the footage folder, or outputs beside a source
-            inside it.
+        RunnerRefusalError: An output folder, or the folder beside a source the outputs would go
+            to, that :func:`write_target_refusal` refuses.
     """
     if footage_folder is None:
         return
     for request in requests:
         folder = request.settings.output_folder
-        if folder is not None and writes_inside(folder, footage_folder):
+        if folder is not None:
+            reason = write_target_refusal(folder, footage_folder)
+            if reason is not None:
+                raise RunnerRefusalError(f"the output folder {reason}.")
+            continue
+        reason = write_target_refusal(request.source.parent, footage_folder)
+        if reason is not None:
+            name = ascii_text(request.source.name)
+            where = name if reason == INSIDE_FOOTAGE else f"the folder of {name}"
             raise RunnerRefusalError(
-                "the output folder is inside the footage folder, which is read-only."
-            )
-        if folder is None and (
-            inside(request.source, footage_folder)
-            or writes_inside(request.source.parent, footage_folder)
-        ):
-            raise RunnerRefusalError(
-                f"{ascii_text(request.source.name)} is inside the footage folder, which is "
-                "read-only: outputs beside it are refused; give --out."
+                f"{where} {reason}: outputs beside it are refused; give --out."
             )
 
 
@@ -646,12 +722,14 @@ def run(
     engine = _WithRefusals(composition.export_jobs() if exports is None else exports)
     folders = tuple(dict.fromkeys([*folders_of(requests), *map(Path, known_folders)]))
     start = time.perf_counter()
+    batch_progress = progress or RunnerProgress()
     with _redacted_last_resort(Redactor(folders)):
-        report = run_batch(engine, list(requests), progress or RunnerProgress())
+        report = run_batch(engine, list(requests), batch_progress)
     routes = tuple(
         "refused" if isinstance(request, RefusedRequest) else request.kind for request in requests
     )
-    return RunRecord(report, routes, parameters_from, time.perf_counter() - start, folders)
+    elapsed = time.perf_counter() - start
+    return RunRecord(report, routes, parameters_from, elapsed, folders, batch_progress.cancelled())
 
 
 def record_object(record: RunRecord) -> dict[str, Any]:
@@ -693,7 +771,8 @@ def record_object(record: RunRecord) -> dict[str, Any]:
         "parameters_from": record.parameters_from,
         "settings": None if settings is None else _settings_object(settings),
         "counts": record.report.counts(),
-        "cancelled": any(state in ("cancelled", "not run") for state in states),
+        "cancelled": record.cancel_requested
+        or any(state in ("cancelled", "not run") for state in states),
         "elapsed_s": record.elapsed_s,
         "items": items,
     }
@@ -745,8 +824,11 @@ def exit_status(record: RunRecord) -> int:
         record: The run's record.
 
     Returns:
-        0 when every item is done (with or without warnings), else 1.
+        0 when every item is done (with or without warnings) and no cancel was requested,
+        else 1.
     """
+    if record.cancel_requested:
+        return 1
     return 0 if all(item.state in STATES_DONE for item in record.report.items) else 1
 
 
@@ -847,7 +929,8 @@ def _settings(args: argparse.Namespace) -> Settings:
         raise RunnerRefusalError("the --settings-dir folder does not exist.")
     try:
         base = Settings() if args.settings_dir is None else load_settings(args.settings_dir)
-    except (OSError, ValueError) as exc:  # FormatError, UnsupportedFormatVersionError
+    except (OSError, ValueError, OverflowError) as exc:  # FormatError, an unsupported version,
+        # or a stamp that overflows when normalised to UTC (Reviewer B B4)
         raise RunnerRefusalError(
             f"the --settings-dir settings cannot be used: {ascii_text(str(exc))}"
         ) from exc
@@ -888,7 +971,7 @@ def _check_own_paths(args: argparse.Namespace, footage: Path | None) -> None:
     """Refuse a record file that exists, is not ``.json``, has no folder or is in the footage.
 
     The settings folder, its settings file (the loader may rename a corrupt one, D89) and the
-    record file are write targets, each checked with :func:`writes_inside` (links followed).
+    record file are write targets, each checked with :func:`write_target_refusal`.
     """
     targets: list[tuple[str, Path]] = []
     if args.settings_dir is not None:
@@ -897,10 +980,9 @@ def _check_own_paths(args: argparse.Namespace, footage: Path | None) -> None:
     if args.record is not None:
         targets += [("--record", args.record)]
     for flag, path in targets:
-        if footage is not None and writes_inside(path, footage):
-            raise RunnerRefusalError(
-                f"the {flag} path is inside the footage folder, which is read-only."
-            )
+        reason = None if footage is None else write_target_refusal(path, footage)
+        if reason is not None:
+            raise RunnerRefusalError(f"the {flag} path {reason}.")
     if args.record is not None:
         if args.record.suffix.lower() != ".json":
             raise RunnerRefusalError("the --record file must end in .json.")
@@ -962,7 +1044,7 @@ def _main(
     progress = RunnerProgress(lambda message: print(redact(message), file=sys.stderr))
     on_main = threading.current_thread() is threading.main_thread()
     previous = signal.signal(signal.SIGINT, lambda *_: progress.cancel()) if on_main else None
-    try:
+    try:  # the handler stays until the record is written: a Ctrl-C then only sets the flag
         record = run(
             requests,
             exports=exports,
@@ -971,12 +1053,13 @@ def _main(
             parameters_from=source,
             known_folders=known,
         )
+        for line in summary_lines(record):
+            print(line)
+        written = args.record is None or _write_record(args.record, record, redact)
     finally:
         if previous is not None:
             signal.signal(signal.SIGINT, previous)
-    for line in summary_lines(record):
-        print(line)
-    if args.record is not None and not _write_record(args.record, record, redact):
+    if not written or progress.cancelled():  # a Ctrl-C while the record was written included
         return 1
     return exit_status(record)
 
@@ -984,7 +1067,8 @@ def _main(
 def _write_record(path: Path, record: RunRecord, redact: Redactor) -> bool:
     """Write the record file, never over another; on failure print why (redacted), return False.
 
-    A partial file is removed only when this run created it.
+    A partial file is removed only when this run created it (absent a concurrent replacement of
+    the path by another process).
     """
     created = False
     try:

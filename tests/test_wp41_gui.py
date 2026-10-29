@@ -1,8 +1,11 @@
-"""WP4.1 task 4: the shell on ``default_engines()`` opens a real photo with the real method.
+"""WP4.1 task 4: the shell on ``default_engines()`` opens a real photo with the real engines.
 
 ``default_engines()`` takes its photo reader and methods from the composition root, so a WP2.3
-still opens through ``clearwater.io.photo`` and previews with ``c3`` (the default, D16); under
-``force_cpu`` the status bar shows ``Device: CPU: forced`` (AD-9). Headless on ``offscreen``.
+still opens through ``clearwater.io.photo`` (the shown source image equals the real reader's),
+the methods are the real ones with ``c3`` first (D16), and under ``force_cpu`` the status bar
+shows ``Device: CPU: forced`` (AD-9). The corrected preview's pixels are not asserted here: the
+method's output is asserted by the export legs (``tests/test_wp41_photo_path.py``). Headless on
+``offscreen``.
 """
 
 # The shared fixture ``make_window`` is imported from gui_support and used as a parameter.
