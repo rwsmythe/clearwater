@@ -80,6 +80,15 @@
   gen 22 re-dispatches from the ledger; `.worktrees/wp4.3` and `wp4.3a` OCCUPIED until gen 22 proves the cells returned.
   Owed by me at WP4.3's accept: register table (brief 'Register rows'), DR-89, DR-90, AD-23 note stays with 4.3a; at WP4.3a's:
   AD-13 note, AD-23 'applied by WP4.3a', closures DR-58(b)/76/77/81(a-d + the WARNING route)/85; DR-87 micro-package after.
+- **RULINGS 17:04Z (query b13d062d, post d41f80f6, addressed to gen 22):** WP4.3 R3 0/2/3 (cell 5 stood down 271,612, ledger
+  21ba03f): R3-1 FIX BOTH = startup `clean_leftovers` skips+logs a refused folder (cell 6, RED-first) AND **SCOPE ADDITION
+  GRANTED to WP4.3a**: an unusable path-valued settings field (NUL) takes the per-field default via the existing out-of-range
+  rule (`settings_store.py:145`), one test in `tests/test_config_settings.py`, folded into seat 2's R1 remediation, one line in
+  the brief's register table; R3-2 FIX by (id, folder) pair, reclassified MINOR; R3-3/R3-4 (second reopen of R1-12) test-only,
+  cell 6's prompt quotes the V7 scenario text beside each witness; R3-5 test-only + report :100. Cell 6 fresh: Group A, Group
+  B, R4 review-only (round 4 of 5; a NEW major at R4 = re-seat line, my word before any Group). WP4.3a R1 1/2/6 (Claude pass,
+  review e5244b65): F1 FIX at the real resolve site (`write_target_refusal` via `_check_own_paths`/`check_outputs`), test moved;
+  F4 GRANT one help-string line `headless_export.py:1203`. **Gen 21 rolls right after its post; gen 22 drains.**
 - **(gen 6 history follows; newest facts at the end of the block)**
 
 - **Gen 6 pickup facts:** bash gauge 45 ms; inbox 0 unread at pickup; announce posted to the orchestrator (gen 17, shell-busy in the WP4.1 gate) with ONE cue; the two register scripts copied from gen 5's scratchpad (18c10a55...) into this session's scratchpad (6687b6c9-eacd-4ffc-995e-51c9195391d1) as `edit_register_p4a.py` (drop its DR-65 block before running: already applied at 3114d23) and `edit_register_p4b.py`.
