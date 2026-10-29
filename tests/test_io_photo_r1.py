@@ -387,28 +387,35 @@ def test_a_usable_exif_block_is_still_carried(sample: Callable[[str], Path]) -> 
 
 
 def test_a_tiff_with_an_unreadable_gps_ifd_keeps_its_other_fields(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
 ) -> None:
-    # Pillow reads every malformed GPS IFD this test could build as an empty one, so the failure
-    # is injected: the GPS IFD raises, Make must survive.
+    # tifffile refuses the GPS tag, so write a placeholder and patch only its tag ID.
+    # The resulting real GPS pointer is past EOF; Make must still survive.
     path = tmp_path / "gps.tif"
     tifffile.imwrite(
         path,
         np.zeros((4, 4, 3), dtype=np.uint8),
         photometric="rgb",
-        extratags=[(271, "s", 0, "Maker", True)],
+        extratags=[(271, "s", 0, "Maker", True), (65000, "I", 1, 0x00FFFFF0, True)],
     )
-    real = Image.Exif.get_ifd
-
-    def get_ifd(self: Image.Exif, tag: int) -> dict[int, object]:
-        if tag == exif_tools.GPS_IFD and getattr(self, "fp", None) is not None:  # the source
-            raise ValueError("planted GPS failure")
-        return real(self, tag)
-
-    monkeypatch.setattr(Image.Exif, "get_ifd", get_ifd)
+    data = bytearray(path.read_bytes())
+    order = "<" if data[:2] == b"II" else ">"
+    ifd0 = struct.unpack_from(order + "I", data, 4)[0]
+    count = struct.unpack_from(order + "H", data, ifd0)[0]
+    locations = [ifd0 + 2 + index * 12 for index in range(count)]
+    placeholder = next(
+        at for at in locations if struct.unpack_from(order + "H", data, at)[0] == 65000
+    )
+    struct.pack_into(order + "H", data, placeholder, 34853)
+    path.write_bytes(data)
+    assert any(
+        tag == 34853 and kind == 4 and number == 1 and offset > len(data)
+        for tag, kind, number, offset in (
+            struct.unpack_from(order + "HHII", data, at) for at in locations
+        )
+    ), "the synthetic TIFF must contain a LONG/count-1 GPS pointer past EOF"
     with caplog.at_level("WARNING", logger="clearwater.io.photo.exif"):
         _, meta = read_photo(path)
-    monkeypatch.undo()
     assert "GPS IFD cannot be read" in caplog.text
     assert meta.exif is not None
     assert exif_tools.describe(meta.exif)["IFD0.Make"] == "Maker"
