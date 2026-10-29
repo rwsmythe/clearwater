@@ -504,7 +504,10 @@ def gx011627_trim_checks(source: Path, trim: Path, count: int) -> dict[str, Any]
         Named 4(a)-(e) verdicts and diagnostics containing only counts, booleans,
         stream kinds, codec tags, tag keys and the ruled reasons. Data-packet
         equality is reported separately and must also pass before consumption.
+        Pairing-count mismatches fail stream parity, tags and data equality
+        without preventing the independent packet checks from returning.
     """
+    from collections import Counter
     from fractions import Fraction
 
     original, copied = _gx011627_document(source), _gx011627_document(trim)
@@ -512,20 +515,41 @@ def gx011627_trim_checks(source: Path, trim: Path, count: int) -> dict[str, Any]
     fields = ("pts_time", "duration_time", "size", "flags", "data_hash")
     a = _gx011627_packets(source, "v:0", fields)[:count]
     b = _gx011627_packets(trim, "v:0", (*fields, "pts"))
+    packet_count_equal = len(b) == count
+    packets_equal = len(a) == count and _gx011627_packet_rows(a, fields) == _gx011627_packet_rows(
+        b[:count], fields
+    )
     checks = {
         "4a": count >= 66,
-        "4b": len(a) == len(b) == count
-        and _gx011627_packet_rows(a, fields) == _gx011627_packet_rows(b, fields),
+        "4b": packet_count_equal and packets_equal,
     }
-    video = next(s for s in dst if s.get("codec_type") == "video")
-    checks["4c"] = Fraction(video["time_base"]) == Fraction(1, 30000) and sorted(
-        int(p["pts"]) for p in b
-    ) == [k * 1001 for k in range(count)]
+    video = next((s for s in dst if s.get("codec_type") == "video"), None)
+    checks["4c"] = (
+        video is not None
+        and Fraction(video["time_base"]) == Fraction(1, 30000)
+        and sorted(int(p["pts"]) for p in b) == [k * 1001 for k in range(count)]
+    )
     roster = ("codec_type", "codec_name", "codec_tag_string")
     parity = sorted(_gx011627_packet_rows(src, roster), key=repr) == sorted(
         _gx011627_packet_rows(dst, roster), key=repr
     )
-    paired = pair_streams(src, dst)
+    src_counts, dst_counts = (
+        Counter((s.get("codec_type"), s.get("codec_tag_string")) for s in streams)
+        for streams in (src, dst)
+    )
+    pairing_equal = src_counts == dst_counts
+    pairing_differences = [
+        {
+            "codec_type": key[0],
+            "codec_tag_string": key[1],
+            "source_count": src_counts[key],
+            "trim_count": dst_counts[key],
+        }
+        for key in sorted(src_counts.keys() | dst_counts.keys(), key=repr)
+        if src_counts[key] != dst_counts[key]
+    ]
+    paired = pair_streams(src, dst) if pairing_equal else []
+    parity = parity and pairing_equal
     details = []
     for left, right, key, ordinal in paired:
         kind = left.get("codec_type")
@@ -629,9 +653,12 @@ def gx011627_trim_checks(source: Path, trim: Path, count: int) -> dict[str, Any]
                         else "not allowed by R-c; values withheld",
                     }
                 )
-    checks["4e"] = location_presence and not any(not d["allowed"] for d in differences)
+    checks["4e"] = (
+        pairing_equal and location_presence and not any(not d["allowed"] for d in differences)
+    )
     # Data is never decoded: compare each copied data packet with the source prefix.
-    data_checks = []
+    # A failed pairing cannot establish per-stream tags or data-packet equality.
+    data_checks = [] if pairing_equal else [{"equal": False, "reason": "pairing counts differ"}]
     data_fields = ("pts_time", "duration_time", "size", "data_hash")
     for left, right, key, ordinal in paired:
         if left.get("codec_type") != "data" or left.get("codec_tag_string") == "tmcd":
@@ -655,6 +682,11 @@ def gx011627_trim_checks(source: Path, trim: Path, count: int) -> dict[str, Any]
         )
     record = {
         "checks": {k: "PASS" if v else "FAIL" for k, v in checks.items()},
+        "4b_count": "PASS" if packet_count_equal else "FAIL",
+        "4b_packets": "PASS" if packets_equal else "FAIL",
+        "pairing_counts_equal": pairing_equal,
+        "pairing_failure_reason": None if pairing_equal else "pairing counts differ",
+        "pairing_differences": pairing_differences,
         "streams": [
             dict(zip(roster, row, strict=True)) for row in _gx011627_packet_rows(src, roster)
         ],

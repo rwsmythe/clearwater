@@ -18,7 +18,8 @@ the evaluation and re-seat lines. Turn 1's figures were supplied at turn 2.
 | Turn 3, semantic creation_time amendment | 129,889 | 131,810 | 258,400 | Dispatcher at turn 4; committed as `78e0094` |
 | Turn 4, round-0 table | 152,628 | 152,018 | 258,400 | Dispatcher generation 20 at turn 5; committed as `65b9f4f`; CHARC authorizes rung 2 in this cell |
 | Turn 5, rung-2 build | 358,551 | 202,787 | 258,400 (footer reported 475,000, unexplained; CHARC: the window of record stands) | Dispatcher generation 20; committed as `0afec17`; above 200K, so CHARC ruled RE-SEAT NOW (`6f5ebd09c017753c`, option 1): seat 1 (session `01a18757-14d0-7840-9bf3-bd6590722181`) retired |
-| Seat 2 turn 1 (ledger turn 6), marker registration | Pending dispatcher | Pending dispatcher | 258,400 | Fresh seat 2; figures to be supplied by the dispatcher at the next turn |
+| Seat 2 turn 1 (ledger turn 6), marker registration | 68,477 | 73,738 | 258,400 | Dispatcher generation 20 at seat 2 turn 2; committed as `5f204e3` |
+| Seat 2 turn 2 (ledger turn 7), W2 controls ruling | Pending dispatcher | Pending dispatcher | 258,400 | Figures to be supplied by the dispatcher at the next turn |
 
 ## RESUME HERE (seat 2; written by the dispatcher, generation 20, 2026-10-29 ~12:12Z)
 
@@ -58,6 +59,85 @@ validate the entire guard suite under the sandbox's child-process permissions.
 No guard test or sandbox shim was changed. W2's parity test and two controls
 remain pending the seat-side run. No new STOP or question is raised; the
 existing W2 request provides the required unsandboxed validation.
+
+## W2 run 2 -- STOP stage 3
+
+The dispatcher ran W2 from 2026-10-29 12:14:25Z through 12:15:41Z, with
+10.37 GB available, using unchanged `w2.sh` MD5
+`1f4025ca3fa944daf62908e658f6423f`. Evidence is preserved under
+`work/wp-t6/w2-run2/`. Stage 1: parity test 1 passed in 3.63 s. Stage 2:
+guard suite 60 passed in 41.20 s; the marker registration fixed stage 2.
+Stage 3 stopped: the re-encode control returned `command_completed: false`,
+`error_type: AssertionError`, so it did not prove a named checker rejection.
+The N+1 control returned PASS for every check 4(a)-(e), with 91 requested
+frames and the expected count still 90. Cleanup EXIT 0: scratch removed,
+no trim left in either basetemp. `04-cleanup.json` records stage EXIT 1.
+
+`-frames:v N+1` alone is masked by `-t T` (the belt working, not a defect).
+
+The checker called `pair_streams` unconditionally; that helper asserts equal
+pairing-group counts. A changed video codec identifier is the suspected
+re-encode trigger, not yet a real-stream observation: run 2 saved no pairing
+keys before the assertion. Run 3 records the differing (`codec_type`,
+`codec_tag_string`) keys and counts, never container tag values, to confirm
+the cause at the dispatcher's seat without a cell-side footage probe.
+
+## CHARC W2 controls ruling (verbatim)
+
+Message `ce2069c54c57a1a1`, 2026-10-29 12:17:34Z, supplied by orchestrator
+generation 20 at seat 2 turn 2:
+
+**CHARC RULING on WP-T6 W2 run 2 (query 3bd1625d4d9deed2): Q-A option 1, Q-B option 1, each as recommended, with one clause made explicit.**
+
+**Q-A (re-encode control): option 1.** `gx011627_trim_checks` never raises on a pairing-count mismatch; it records it as a named 4(d) FAIL (stream parity) and still computes and returns 4(b) and the rest. The fixture keeps asserting every check PASS, so R-a's equal-count guarantee holds through 4(d). The control passes iff 4(b) FAILs, with 4(d) recorded beside it. Seat 2 confirms the cause by the video codec-tag KEY only (the tag string, never a value from the clip).
+
+**Q-B (off-by-one control): option 1, the realistic plant in the cut PLAN**: `-frames:v N+1` AND `-t` = the (N+1)th packet's pts (T + 1001/30000 s), both flags one frame late. EXPLICIT: 4(b)'s FIRST clause is 'the trim's video packet count equals N' (then the per-packet equality of the first N); so 91 packets FAIL 4(b) and 4(c) both. The control passes iff 4(b) or 4(c) FAILs, recorded which. `-frames:v N+1` alone being masked by `-t T` is the belt working, and the ledger says so in one line; it is not a defect.
+
+Sequencing as you have it: seat 2 turn 2 = the checker change + a W2 run 3 request; rung 3 only after W2 is green. Nothing heavy at my seat during W2 run 3.
+
+## Seat 2 turn 2 -- checker and control changes
+
+Only rung-2-added lines in `tests/conftest.py` change. Before calling the
+unchanged `pair_streams`, the checker compares pairing-group counts. A mismatch
+returns 4(d) FAIL, reason `pairing counts differ`, and differing stream kinds,
+codec identifiers and counts. It deliberately marks 4(e) and data equality
+FAIL when pairing cannot be established, rather than comparing partial pairs.
+Format-tag checks still run. Packet checks remain independent; a missing trim
+video stream returns 4(c) FAIL. No broad exception handler was added.
+
+4(b) is the conjunction of two named returned verdicts: `4b_count` asserts the
+trim's video packet count equals N; `4b_packets` asserts N source packets exist
+and the first N packet facts match in order. The fixture's five named asserts
+and data-packet equality assert remain unchanged, so no bad trim reaches a
+consumer. The source count, packet equality, stream/tag predicates and
+scoped exceptions are retained.
+
+Only stage 3 of gitignored `w2.sh` changes: the re-encode records 4(d), pairing
+differences and the split 4(b) verdicts, and requires 4(b) FAIL. The extra-frame
+plant moves both `-frames:v` and `-t` one frame late. It computes the latter as
+T + 1001/30000 with Decimal and formats it to the source plan's fractional
+precision (six places for the trim of record); it still requires 4(b) or 4(c)
+FAIL and records every failed check. New script MD5:
+`e97c51289cb85137cf5553619970cf31`. Rung 3 remains unbuilt.
+
+| Validation | Result / evidence |
+|---|---|
+| Synthetic mismatched codec groups, before change | Reproduced `AssertionError: stream pairing counts differ`, EXIT 1; `work/wp-t6/seat2-turn2-synthetic-before.log` |
+| Synthetic checker, after change | PASS, EXIT 0; `seat2-turn2-synthetic-after.log`: valid copy passes; differing codec groups and unequal counts within one group return 4(d), 4(e), data FAIL without exceptions; missing video returns 4(c) FAIL; extra/missing packet counts fail `4b_count`; first-N equality remains independently visible; changed packet facts fail `4b_packets` |
+| `uv run ruff check tests/conftest.py` | PASS, EXIT 0; `work/wp-t6/seat2-turn2-ruff.log` |
+| `uv run mypy` | PASS, EXIT 0; 141 source files; `work/wp-t6/seat2-turn2-mypy.log` |
+| `py_compile` | PASS, EXIT 0; conftest and all three embedded W2 Python programs; `work/wp-t6/seat2-turn2-static-proof.log` |
+| Additive conftest / consumer asserts / late-cut flags / LF / scope | PASS; `work/wp-t6/seat2-turn2-static-proof.json`: every pre-rung-2 line preserved, fixture AST unchanged, actual plant AST produces 91 and 3.036367 from N=90 and T=3.003000, only two owned tracked paths changed, all edited blobs LF |
+| `git diff --check` | PASS, EXIT 0; `work/wp-t6/seat2-turn2-diff-check.log` |
+| Real re-encode codec identifiers / control verdicts | Pending W2 run 3 at the dispatcher; synthetic identifiers do not establish the real clip's identifiers |
+| Bash syntax / full format check | Deferred to the dispatcher's seat per the sandbox limits; neither claimed here |
+
+Verification loop: reproduced the early pairing assertion with synthetic
+documents, applied Q-A's guarded pairing and Q-B's split count predicate,
+then confirmed the valid path and independent failure paths above. Both
+source-probe and packet readers were replaced by synthetic data for this
+light check; no footage was located or probed. Full W2 run 3 remains the
+required real control proof; the dispatcher moves `w2/` aside before running.
 
 ## Rung 0 facts (2026-10-29)
 
@@ -547,7 +627,8 @@ pending and are not validation results.
 | W1 run 1 | 2026-10-29 11:18:06.838947Z / 11:18:09.255278Z | `bash work/wp-t6/w1.sh > work/wp-t6/w1-seat-driver.log 2>&1` | N=90; 4(a)-(c) PASS, 4(d)-(e) FAIL; STOP; process EXIT not supplied | 10,942,857,216 bytes before item 1; 10,942,246,912 before item 2; guard passed | `work/wp-t6/w1/` to be preserved as `w1-run1/`; checker fixed, re-run requested |
 | W1 run 2 | 2026-10-29 11:27:22Z / 11:27:25Z | `bash work/wp-t6/w1.sh > work/wp-t6/w1-seat-driver.log 2>&1` | 4(a)-(d) PASS, 4(e) FAIL; STOP; process EXIT not supplied | Not supplied at turn 3 | `work/wp-t6/w1/` to be preserved as `w1-run2/`; semantic amendment authorized |
 | W1 run 3 | 2026-10-29 11:33:05.984516Z / 11:41:23.101978Z | `bash work/wp-t6/w1.sh > work/wp-t6/w1-seat-driver.log 2>&1` | 4(a)-(e) PASS; three encodes; four round-trip counts; row 10: 1 passed, 1 warning; W1 DONE, EXIT 0 | 10,804,830,208 bytes before item 1; exclusive per dispatcher | `work/wp-t6/w1/`; scratch removed; round-0 table above |
-| W2 (requested, about 5-10 min) | Pending dispatcher | `bash work/wp-t6/w2.sh` | Pending parity/guard counts, two controls and EXIT | Script records bytes; >= 5 GiB required | `work/wp-t6/w2/`; no run yet |
+| W2 run 2 | 2026-10-29 12:14:25Z / 12:15:41Z | `bash work/wp-t6/w2.sh` | Parity 1 passed in 3.63 s; guard 60 passed in 41.20 s; controls not caught, STOP stage 3, stage EXIT 1; cleanup EXIT 0 | 10.37 GB per dispatcher | `work/wp-t6/w2-run2/`; scratch removed, no trim left; controls ruling above |
+| W2 run 3 (requested, about 2-5 min) | Pending dispatcher | `bash work/wp-t6/w2.sh` | Pending parity/guard counts, two controls and EXIT | Script records bytes; >= 5 GiB required | `work/wp-t6/w2/`; script MD5 `e97c51289cb85137cf5553619970cf31`; move existing output aside first |
 
 ## Review-round ledger
 
