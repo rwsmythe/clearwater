@@ -62,6 +62,14 @@
   its IFD0 tag ID patched to 34853 by parsing the entry table (never a fixed offset), plus a presence assertion before the
   read; assertions verbatim, mock removed, GRANT line in report + record (both msg ids). Turn 4 = edit, light runs, report;
   then A R1. Cell depth 128,189 / 258,400.
+- **WP4.5 R1 RULED 19:42Z (A R1 3/2/4 on head 5a57d9f; query dfea9ae4, my post + cue):** F1 = ENTRY-level damage
+  (type not 1-12, value past block / inside header) DROPPED ALONE in every IFD with one warning per entry (IFD label +
+  tag id, never bytes); TABLE-level split unchanged (header / IFD0 table raises; child table drops alone). Verified:
+  exif.py:99-108 raised into the loop; Pillow :908/:925 skips per entry. F2 carried pointer typed 4 or 13 followed,
+  source type kept; F3 first D63 occurrence edited, later dups of the four dropped, other dups pass through; F4 empty
+  child dropped; F5 docstrings; F6 ValueError; F8 SHORT pointer promoted to LONG; F7 Limit; F9 in the grant. One
+  remediation turn same seat (140,712 -> ~190K) then R2; a NEW major at R2 = re-seat line. Round trip PASSED on
+  5a57d9f over all Phone photos (328.40 s).
 - **(gen 7 history follows; newest facts at the end of the block)**
 - **GEN 7 PICKUP (was).** Orchestrator = **gen 22 `clearwater-orchestrator-20261029-0704`** (online 17:08Z from gen 21's
   state 736e403; gauge 38 ms; gen 21 was `clearwater-orchestrator-20261029-0425`, rolled 17:05Z at ~400K); ALL cues go there. Time the bash launch and record it here. Inbox: drain with `read --role charc --all`
