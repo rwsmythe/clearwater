@@ -2,6 +2,27 @@
 
 **DRAFT -- for Reviewer A**
 
+**Current STOP (turn 3):** CHARC `0c8d52528a11b714` grants an additive
+`OutputNameError(ValueError)`, its jobs export, one runner catch branch and
+narrow test reconciliation. The full ruling is recorded verbatim in the
+ledger and governs. Its condition-3 test premise does not match `f1a6bba`:
+eight drive-relative cases directly assert that naming returns an unsafe
+plan, which requires edits beyond refusal text. A targeted reproduction
+fails before entering the runner. The two tests cited at :272/:285 pass
+unedited but prove planning is skipped, not that the parent guard is reached.
+The existing file-form planted control also needs a setup change to avoid
+being pre-empted by the new naming refusal. The narrow additional test grant
+requested in the ledger remains outstanding. No product/test edit this turn.
+
+Approved next scope delta (not built yet): one product exception class and
+its jobs export; one runner exception branch plus import; one WP4.2a test
+file under condition 3. The two same-drive cases are authorized to flip from
+accepted output to REFUSED because every colon is refused, but this flip
+has NOT been implemented while the scope premise is unresolved. No claim
+that the 22 old failures are now green. WP4.2b is to merge first and receive
+its OWN two-leg window after convergence, with the WP4.2 rebase handled by
+the dispatcher; no stacked gate.
+
 Base: `f991254`; round-0 ledger commit: `e5983bd`. Implementation is limited
 to `src/clearwater/jobs/naming.py`'s validation and the two public planning
 functions' `Raises:` documentation. Existing tests, frozen interfaces,
@@ -106,7 +127,7 @@ was changed.
   skips, EXIT 1 (`light.log`). Three UNC nodes were deselected as authorized;
   nine other deselections came from the requested marker filter.
 
-**STOP -- existing-test scope boundary.** All 22 failures are in the unchanged,
+**Turn-2 STOP, amended by the governing turn-3 ruling above.** All 22 failures are in the unchanged,
 unowned `tests/test_wp42a_runner_hardening.py`: eight stream-preflight cases,
 eight drive-relative-plan cases, the real stream/cwd case, two same-drive
 accepted-output cases, the enumerator's after-refusal setup, and two
@@ -127,7 +148,7 @@ or product revert. `final-scope.log` (EXIT 0) confirms exactly five owned files
 changed, original naming-test content preserved apart from new imports/tests,
 ONE new runner test, zero CR bytes and a clean diff whitespace check.
 Verification has not converged. Reviewer A, Reviewer B and the posted two-leg
-gate are outstanding; the gate request is held for the scope ruling. This
+gate are outstanding; the gate request is held for the narrower test-scope amendment. This
 draft does not claim acceptance or DR-80 closure.
 
 For CHARC (proposed closure on accept): **DR-80 CLOSED by WP4.2b** -- both
@@ -135,3 +156,4 @@ jobs.naming planners reject a composed output name that is not one portable
 name component before constructing a plan; drive/stream spellings in the
 stem or retained video extension cannot reach output-path composition.
 WP4.2a's parent and file-form checks remain as defence in depth.
+The runner refuses an `OutputNameError` before jobs (exit 2).
