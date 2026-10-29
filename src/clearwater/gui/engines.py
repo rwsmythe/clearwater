@@ -1,10 +1,10 @@
-"""The engines the shell runs on: stubs for tests, and what is merged for a manual run.
+"""The engines the shell runs on: stubs for tests, and the real engines of the application.
 
-Until WP4.3 wires the rest, :func:`default_engines` takes the photo reader and the correction
-methods from the composition root (:mod:`clearwater.app.composition`, WP4.1), uses the merged
-``clearwater.io.video.probe`` and ``clearwater.core.select_backend`` (through the S1 adapter) and
-the ``clearwater.interfaces.stubs`` for the video legs (decode WP3.9, encode WP3.10, cache
-WP3.12). This module is the one ``clearwater.gui`` module importing ``clearwater.app``.
+:func:`default_engines` takes every engine from the composition root
+(:mod:`clearwater.app.composition`): the photo reader and the correction methods (WP4.1), the
+IF-2 selection, and, given the app-data locations, the video source, sink and the one proxy
+cache (WP4.3); without locations the video legs stay the ``clearwater.interfaces.stubs`` ones.
+This module is the one ``clearwater.gui`` module importing ``clearwater.app``.
 """
 
 from __future__ import annotations
@@ -13,10 +13,9 @@ from collections.abc import Callable, Mapping, Sequence
 from fractions import Fraction
 from pathlib import Path
 
-from clearwater import core
 from clearwater.app import composition
+from clearwater.config import Locations
 from clearwater.interfaces import (
-    ArrayBackend,
     ColorDescription,
     CorrectionMethod,
     Fault,
@@ -24,7 +23,6 @@ from clearwater.interfaces import (
     Image,
     PhotoMetadata,
     ProbeResult,
-    Settings,
     VideoStreamInfo,
 )
 from clearwater.interfaces.stubs import (
@@ -38,12 +36,6 @@ from clearwater.interfaces.stubs import select_backend as stub_select_backend
 from clearwater.io.video import probe as video_probe_file
 
 from .contract import Engines, SelectBackend
-
-STUB_ERA_METHOD_ID = "c3"
-"""The method id whose memory estimate stands in for a method ``clearwater.core`` does not know.
-
-The default method (D16). Used only by :func:`stub_era_select_backend` (round-0 ruling S1).
-"""
 
 VIDEO_TIME_BASE = Fraction(1, 90000)
 """The time base of :func:`stub_probe` results: 90 kHz, the MP4 video convention."""
@@ -98,29 +90,6 @@ def stub_probe(
     )
 
 
-def stub_era_select_backend(
-    settings: Settings, height: int, width: int, method_id: str
-) -> tuple[ArrayBackend, str]:
-    """``clearwater.core.select_backend`` for the stub era (round-0 ruling S1; WP4.3 removes it).
-
-    The real selection raises ``ValueError`` for a method id it has no memory estimate for, and
-    the only method merged before WP3.4 is the stub (id ``"stub"``). An id outside
-    ``clearwater.core.METHOD_IDS`` is therefore estimated as :data:`STUB_ERA_METHOD_ID`; a known
-    id passes through unchanged. ``clearwater.core`` itself is not changed.
-
-    Args:
-        settings: The application settings (``force_cpu``).
-        height: Frame height in pixels.
-        width: Frame width in pixels.
-        method_id: The correction method id.
-
-    Returns:
-        The backend and the AD-9 reason, as ``clearwater.core.select_backend`` returns them.
-    """
-    known = method_id if method_id in core.METHOD_IDS else STUB_ERA_METHOD_ID
-    return core.select_backend(settings, height, width, known)
-
-
 def stub_engines(
     *,
     photos: Mapping[Path, tuple[Image, PhotoMetadata]] | None = None,
@@ -153,23 +122,40 @@ def stub_engines(
     )
 
 
-def default_engines() -> Engines:
-    """Build the engines for a manual run before WP4.3: real photo legs, stub video legs.
+def default_engines(*, locations: Locations | None = None) -> Engines:
+    """Build the real engines from the composition root (WP4.3, rulings Q11 and Q17, S1 (a)).
 
-    The photo reader and the methods (``"c3"`` first, D16) come from the composition root, so a
-    photo opens and previews with the real reader and method; the selection is
-    :func:`stub_era_select_backend` until WP4.3 removes it. A probed video yields no frame (the
-    stub video source holds none), so it is refused with a G10 message.
+    The photo reader, the methods (``"c3"`` first, D16) and the IF-2 selection
+    (``composition.backend_selector()``) always come from the root. Given ``locations``, the
+    video source and sink are the root's and the cache is the application's one cache over
+    ``locations.cache_dir`` (``composition.proxy_cache_opener``), NOT yet open: the caller's
+    start-up opens it once, with the limit of the one settings read, and every cache member
+    waits for that. Without ``locations`` the video legs are the stubs: no cache is opened and
+    nothing is written under app data, and a probed video yields no frame, so it is refused with
+    a G10 message.
+
+    Args:
+        locations: The app-data folders, or None for the engines without real video legs.
 
     Returns:
         The engines.
     """
+    if locations is None:
+        return Engines(
+            photo_source=composition.photo_reader(),
+            video_probe=video_probe_file,
+            video_source=StubVideoSource((), stub_probe(Path("stub.mp4"))),
+            video_sink=StubVideoSink(),
+            cache=StubProxyCache(),
+            methods=composition.correction_methods(),
+            select_backend=composition.backend_selector(),
+        )
     return Engines(
         photo_source=composition.photo_reader(),
         video_probe=video_probe_file,
-        video_source=StubVideoSource((), stub_probe(Path("stub.mp4"))),
-        video_sink=StubVideoSink(),
-        cache=StubProxyCache(),
+        video_source=composition.video_source(),
+        video_sink=composition.video_sink(),
+        cache=composition.proxy_cache_opener(locations.cache_dir),
         methods=composition.correction_methods(),
-        select_backend=stub_era_select_backend,
+        select_backend=composition.backend_selector(),
     )

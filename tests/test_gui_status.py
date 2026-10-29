@@ -1,7 +1,9 @@
-"""WP3.16 status bar (AD-9, question 4, G12 surfaced, DR-37 (a) trigger) and the S1 adapter.
+"""WP3.16 status bar (AD-9, question 4, G12 surfaced, DR-37 (a) trigger).
 
 Covers the task-8 row "status bar": every reason string of ``select_backend`` shown verbatim,
-``"CPU: forced"`` after ``force_cpu`` is set, and one ``gpu`` test with the real selection.
+``"CPU: forced"`` after ``force_cpu`` is set, and one ``gpu`` test with the real selection. The
+S1 stand-in and its two tests were deleted by WP4.3 (ruling Q11); the ``gpu`` test now uses
+``clearwater.core.select_backend`` with the real methods (ruling Q15).
 """
 
 # The shared fixture ``make_window`` is imported from gui_support and used as a parameter.
@@ -15,7 +17,8 @@ from pathlib import Path
 import pytest
 
 import gui_support
-from clearwater.gui.engines import STUB_ERA_METHOD_ID, default_engines, stub_era_select_backend
+from clearwater import core
+from clearwater.app import composition
 from clearwater.interfaces import Settings
 from clearwater.interfaces.stubs import StubArrayBackend
 from gui_support import (
@@ -125,35 +128,18 @@ def test_status_bar_shows_file_size_and_zoom(make_window, qtbot) -> None:
     assert window.zoom_label.text() == "100%"
 
 
-def test_stub_era_adapter_estimates_an_unknown_method_as_c3(monkeypatch) -> None:
-    from clearwater import core
-
-    seen: list[str] = []
-
-    def fake(settings: Settings, height: int, width: int, method_id: str):
-        seen.append(method_id)
-        return StubArrayBackend(), "CPU: forced"
-
-    monkeypatch.setattr(core, "select_backend", fake)
-    stub_era_select_backend(Settings(), 10, 10, "stub")
-    stub_era_select_backend(Settings(), 10, 10, "ancuti2018")
-    assert seen == [STUB_ERA_METHOD_ID, "ancuti2018"]
-    assert default_engines().select_backend is stub_era_select_backend
-
-
-def test_default_engines_select_cpu_forced_with_the_real_selection() -> None:
-    backend, reason = default_engines().select_backend(Settings(force_cpu=True), 100, 100, "stub")
-    assert reason == "CPU: forced" and backend.device == "cpu"
-
-
 @pytest.mark.gpu
 def test_real_selection_through_the_shell_shows_gpu(make_window, qtbot) -> None:
     pytest.importorskip("cupy")
-    _, probe_reason = stub_era_select_backend(Settings(), 64, 64, "stub")
+    _, probe_reason = core.select_backend(Settings(), 64, 64, "c3")
     if probe_reason != "GPU":
         pytest.skip(f"no usable CUDA device: {probe_reason}")
     path = Path("p.png")
-    engines = photo_engines({path: image(120, 160)}, select_backend=stub_era_select_backend)
+    engines = photo_engines(
+        {path: image(120, 160)},
+        methods=composition.correction_methods(),
+        select_backend=core.select_backend,
+    )
     window = make_window(engines)
     open_and_wait(qtbot, window, path, timeout_ms=60000)
     assert window.device_label.text() == "Device: GPU"

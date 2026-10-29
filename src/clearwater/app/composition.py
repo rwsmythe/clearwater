@@ -8,7 +8,9 @@ methods of :mod:`clearwater.methods` (``"c3"`` first, D16), the IF-2 selection o
 :mod:`clearwater.core` and the export engine of :mod:`clearwater.jobs` behind the WP3.19
 ``ExportJobs`` seam. WP4.2 adds the video legs: the IF-5 source and sink of
 :mod:`clearwater.io.video`, built per video job on the backend the job selected (DR-67), and the
-IF-7 proxy cache of :mod:`clearwater.cache` over a folder the caller passes in.
+IF-7 proxy cache of :mod:`clearwater.cache` over a folder the caller passes in. WP4.3 adds the
+application's one cache, opened later by a start-up job (:func:`proxy_cache_opener`), and lets
+:func:`export_jobs` share a cache instead of opening its own.
 
 This module imports nothing from ``clearwater.gui``, no PySide6 and no ``cupy``/``cupyx``
 (AD-29), and never resolves the app-data folder: the caller passes settings in.
@@ -16,6 +18,7 @@ This module imports nothing from ``clearwater.gui``, no PySide6 and no ``cupy``/
 
 from __future__ import annotations
 
+import threading
 from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import NoReturn
@@ -185,6 +188,167 @@ def proxy_cache(folder: Path, limit_bytes: int = DEFAULT_CACHE_LIMIT_BYTES) -> D
     return DiskProxyCache(folder, limit_bytes)
 
 
+CACHE_NOT_OPENED = "the analysis cache could not be opened: {reason}"
+"""The refusal of every :class:`DeferredProxyCache` member after a failed open."""
+
+
+class DeferredProxyCache:
+    """The application's one proxy cache, opened later by a start-up job (WP4.3, ruling S1 (a)).
+
+    It implements IF-7 (``ProxyCache``) plus ``key_for`` by DELEGATION to the
+    :class:`~clearwater.cache.DiskProxyCache` that :meth:`open` creates over the folder, so the
+    window can appear before the cache's crash clean-up and eviction have run (a first open of
+    a full cache took 16 s on the owner's laptop) and the limit comes from the one settings read.
+    Every member waits until the open has ended and is meant for worker threads only (the GUI's
+    jobs, the analysis and the export). After a failed open every member refuses with
+    :data:`CACHE_NOT_OPENED` naming the open's reason, except :meth:`limit_bytes`, which returns
+    0 (the refusing cache's form); :meth:`fail` ends the wait when the opening job cannot run,
+    so nothing waits for ever. A call made while the open runs (the settings dialog's limit or
+    clear) is applied after it.
+
+    Args:
+        folder: The cache folder (the caller's: ``app_locations().cache_dir``).
+    """
+
+    def __init__(self, folder: Path) -> None:
+        """Create the handle; nothing is read until :meth:`open`."""
+        self._folder = folder
+        self._lock = threading.Lock()
+        self._ended = threading.Event()
+        self._started = False
+        self._cache: DiskProxyCache | None = None
+        self._failure: str | None = None
+
+    @property
+    def folder(self) -> Path:
+        """The cache folder."""
+        return self._folder
+
+    def open(self, limit_bytes: int) -> str | None:
+        """Open the cache over the folder with ``limit_bytes`` (once, on a worker thread).
+
+        Args:
+            limit_bytes: The size limit (``Settings.cache_limit_bytes`` of the one settings
+                read).
+
+        Returns:
+            None when the cache opened; else the reason it could not, which every member then
+            refuses with.
+
+        Raises:
+            RuntimeError: The handle was opened or failed before.
+        """
+        self._start()
+        try:
+            self._cache = proxy_cache(self._folder, limit_bytes)
+        except Exception as exc:  # any failure is the reason every member refuses with
+            self._failure = str(exc) or type(exc).__name__
+        finally:
+            self._ended.set()
+        return self._failure
+
+    def fail(self, reason: str) -> None:
+        """End the wait without opening: every member refuses with ``reason`` (no open ran).
+
+        Args:
+            reason: Why the cache was not opened.
+
+        Raises:
+            RuntimeError: The handle was opened or failed before.
+        """
+        self._start()
+        self._failure = reason
+        self._ended.set()
+
+    def wait_open(self, timeout_s: float | None = None) -> bool:
+        """Wait until the open has ended (opened or failed).
+
+        Args:
+            timeout_s: The longest wait, or None to wait until it ends.
+
+        Returns:
+            True when the open has ended.
+        """
+        return self._ended.wait(timeout_s)
+
+    def failure(self) -> str | None:
+        """Return why the open failed, or None (also while it has not ended)."""
+        return self._failure if self._ended.is_set() else None
+
+    def opened(self) -> DiskProxyCache | None:
+        """Return the cache behind the handle once it opened, else None (never waits)."""
+        return self._cache if self._ended.is_set() else None
+
+    def _start(self) -> None:
+        """Claim the one open."""
+        with self._lock:
+            if self._started:
+                raise RuntimeError("the analysis cache is opened once")
+            self._started = True
+
+    def _target(self) -> DiskProxyCache:
+        """Wait for the open; return the cache, or refuse with the open's reason."""
+        self._ended.wait()
+        if self._cache is None:
+            raise RuntimeError(CACHE_NOT_OPENED.format(reason=self._failure))
+        return self._cache
+
+    def key_for(self, path: Path) -> CacheKey:
+        """Return the cache key of a source file (the cache's own ``key_for``, DR-41)."""
+        return self._target().key_for(path)
+
+    def lookup(self, key: CacheKey) -> CacheEntry | None:
+        """Return the entry for ``key`` (IF-7)."""
+        return self._target().lookup(key)
+
+    def store_proxy(self, key: CacheKey, pts_ticks: int, proxy: NDArray[np.uint8]) -> None:
+        """Store one frame's proxy (IF-7)."""
+        self._target().store_proxy(key, pts_ticks, proxy)
+
+    def proxy(self, key: CacheKey, pts_ticks: int) -> NDArray[np.uint8]:
+        """Return one stored proxy (IF-7)."""
+        return self._target().proxy(key, pts_ticks)
+
+    def store_source_statistics(
+        self, key: CacheKey, stage: str, pts_ticks: int, stats: Statistics
+    ) -> None:
+        """Store one frame's source-only statistics (IF-7)."""
+        self._target().store_source_statistics(key, stage, pts_ticks, stats)
+
+    def source_statistics(self, key: CacheKey, stage: str, pts_ticks: int) -> Statistics:
+        """Return one frame's source-only statistics (IF-7)."""
+        return self._target().source_statistics(key, stage, pts_ticks)
+
+    def mark_complete(self, key: CacheKey) -> None:
+        """Mark an entry complete (IF-7)."""
+        self._target().mark_complete(key)
+
+    def limit_bytes(self) -> int:
+        """Return the size limit (IF-7); 0 after a failed open."""
+        self._ended.wait()
+        return 0 if self._cache is None else self._cache.limit_bytes()
+
+    def set_limit_bytes(self, n: int) -> None:
+        """Set the size limit (IF-7); a call made during the open is applied after it."""
+        self._target().set_limit_bytes(n)
+
+    def clear(self) -> None:
+        """Remove every entry (IF-7); a call made during the open is applied after it."""
+        self._target().clear()
+
+
+def proxy_cache_opener(folder: Path) -> DeferredProxyCache:
+    """Return the application's one proxy cache over ``folder``, not yet open (ruling S1 (a)).
+
+    Args:
+        folder: The cache folder; the caller's (the root never resolves the app-data folder).
+
+    Returns:
+        A :class:`DeferredProxyCache`; one start-up job calls its ``open`` with the limit.
+    """
+    return DeferredProxyCache(folder)
+
+
 def export_jobs(
     *,
     app_version: str = clearwater.__version__,
@@ -197,6 +361,7 @@ def export_jobs(
     cache_limit_bytes: int = DEFAULT_CACHE_LIMIT_BYTES,
     source_for: Callable[[ArrayBackend | None], VideoSource] | None = None,
     sink_for: Callable[[ArrayBackend | None], VideoSink] | None = None,
+    cache: DiskProxyCache | DeferredProxyCache | None = None,
 ) -> ExportEngine:
     """Return a new export engine for photos and videos (the WP3.19 ``ExportJobs`` seam).
 
@@ -208,7 +373,9 @@ def export_jobs(
     encodes through ``SafeWrite``; each input file is its own clip (spec section 5.5). Without
     ``cache_folder`` a video request fails before any write, with :data:`VIDEO_NEEDS_A_CACHE`
     unless an earlier refusal (the encoder, output planning, the disk-space check) is reported
-    first.
+    first. Given ``cache`` instead, the engine analyses through that cache, keyed by its own
+    ``key_for`` (DR-41), and opens none: the application passes its one cache, so the GUI's
+    analysis and every export share one instance (WP4.3, ruling Q16).
     The overrides exist for tests and instruments only.
 
     Args:
@@ -225,25 +392,34 @@ def export_jobs(
             :func:`video_source` when None.
         sink_for: Builds a video job's sink from its device backend; :func:`video_sink` when
             None.
+        cache: The cache to analyse through (the application's one cache); None to open one
+            over ``cache_folder``.
 
     Returns:
         The export engine.
+
+    Raises:
+        ValueError: Both ``cache`` and ``cache_folder`` are given.
     """
-    cache: ProxyCache
+    shared: ProxyCache
     key: Callable[[Path], CacheKey]
-    if cache_folder is None:
+    if cache is not None:
+        if cache_folder is not None:
+            raise ValueError("give the export engine a cache or a cache folder, not both")
+        shared, key = cache, cache.key_for
+    elif cache_folder is None:
         refusing = _NoCacheFolder()
-        cache, key = refusing, refusing.key_for
+        shared, key = refusing, refusing.key_for
     else:
         disk = proxy_cache(cache_folder, cache_limit_bytes)
-        cache, key = disk, disk.key_for
+        shared, key = disk, disk.key_for
     return ExportEngine(
         methods=correction_methods() if methods is None else methods,
         video_source=video_source(),
         sink_factory=video_sink,
         photo_reader=photo_reader() if reader is None else reader,
         photo_writer=photo_writer() if writer is None else writer,
-        cache=cache,
+        cache=shared,
         cache_key=key,
         select_backend=backend_selector() if select_backend is None else select_backend,
         app_version=app_version,

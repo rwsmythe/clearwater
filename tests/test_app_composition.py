@@ -3,8 +3,11 @@
 Covers task 3: every function returns a fresh real component; ``"c3"`` is first (D16); the
 selection is ``clearwater.core.select_backend`` itself; ``export_jobs`` exports a photo through
 the real reader, method and writer and runs a video as the real video job (WP4.2); importing
-the root loads no PySide6 or CuPy and builds nothing; and no other module under
-``src/clearwater`` constructs the real photo engines (a static test with a planted control).
+the root loads no PySide6 or CuPy and builds nothing (WP4.3, DR-84: also no video source, sink
+or proxy cache, with a planted control); and no other module under ``src/clearwater`` constructs
+the real photo engines (a static test with a planted control). WP4.3 adds the application's one
+cache, opened later (``proxy_cache_opener``; ruling S1 (a)), and ``export_jobs(cache=...)``
+(ruling Q16).
 """
 
 from __future__ import annotations
@@ -12,6 +15,7 @@ from __future__ import annotations
 import ast
 import subprocess
 import sys
+import threading
 from pathlib import Path
 
 import pytest
@@ -19,8 +23,9 @@ import pytest
 import clearwater
 from clearwater import core
 from clearwater.app import composition
+from clearwater.cache import DiskProxyCache
 from clearwater.config import new_parameter_set
-from clearwater.interfaces import JobResult, Settings
+from clearwater.interfaces import JobResult, ProxyCache, Settings
 from clearwater.interfaces.stubs import StubProgress
 from clearwater.io.photo import PhotoReader, PhotoWriter
 from clearwater.jobs.export_seam import ExportRequest
@@ -180,16 +185,27 @@ def test_the_overrides_replace_their_default(sample, tmp_path: Path) -> None:
     assert not refused.ok and "unknown correction method 'c3'" in (refused.failure or "")
 
 
-def test_importing_the_root_builds_nothing_and_loads_no_qt_or_cupy() -> None:
+def _import_witness(planted: str = "") -> str:
+    """Import the root with every real constructor instrumented; return what was built or loaded.
+
+    Instrumented: the photo reader, writer, methods and export engine (WP4.1), and the video
+    source, sink and proxy cache (DR-84). ``planted`` runs after the instruments, before the
+    import, as a module of the package doing work at import time would.
+    """
     code = (
         "import sys\n"
         "import clearwater.io.photo.reader as r, clearwater.jobs.export as e\n"
         "import clearwater.io.photo.writer as w, clearwater.methods as m\n"
+        "import clearwater.io.video as v, clearwater.cache as c\n"
         "built = []\n"
         "r.PhotoReader.__init__ = lambda self, *a, **k: built.append('reader')\n"
         "e.ExportEngine.__init__ = lambda self, *a, **k: built.append('engine')\n"
         "w.PhotoWriter.__init__ = lambda self, *a, **k: built.append('writer')\n"
         "m.available_methods = lambda *a, **k: built.append('methods') or {}\n"
+        "v.FFmpegVideoSource.__init__ = lambda self, *a, **k: built.append('video_source')\n"
+        "v.FFmpegVideoSink.__init__ = lambda self, *a, **k: built.append('video_sink')\n"
+        "c.DiskProxyCache.__init__ = lambda self, *a, **k: built.append('proxy_cache')\n"
+        f"{planted}"
         "import clearwater.app, clearwater.app.composition\n"
         "bad = sorted(m for m in sys.modules\n"
         "             if m.split('.')[0] in ('PySide6', 'shiboken6', 'cupy', 'cupyx'))\n"
@@ -199,7 +215,122 @@ def test_importing_the_root_builds_nothing_and_loads_no_qt_or_cupy() -> None:
     out = subprocess.run(
         [sys.executable, "-c", code], capture_output=True, text=True, check=True, timeout=120
     )
-    assert out.stdout.strip() == ""
+    return out.stdout.strip()
+
+
+def test_importing_the_root_builds_nothing_and_loads_no_qt_or_cupy() -> None:
+    assert _import_witness() == ""
+
+
+@pytest.mark.parametrize(
+    ("planted", "seen"),
+    [
+        ("v.FFmpegVideoSource()\n", "video_source"),
+        ("v.FFmpegVideoSink()\n", "video_sink"),
+        ("c.DiskProxyCache(None)\n", "proxy_cache"),
+    ],
+    ids=["source", "sink", "cache"],
+)
+def test_the_witness_sees_a_planted_import_time_construction(planted: str, seen: str) -> None:
+    """DR-84: each video constructor is instrumented, so a construction at import is reported."""
+    assert _import_witness(planted) == seen
+
+
+# WP4.3: the application's one cache (ruling S1 (a), its conditions 1-4) and Q16.
+
+
+def _in_thread(call, *args):
+    """Start ``call(*args)`` on a thread; return the thread and a box for its result or error."""
+    box: dict[str, object] = {}
+
+    def body() -> None:
+        try:
+            box["value"] = call(*args)
+        except Exception as exc:
+            box["error"] = exc
+
+    thread = threading.Thread(target=body, daemon=True)
+    thread.start()
+    return thread, box
+
+
+def test_the_handle_is_an_if7_cache_that_waits_for_its_open(tmp_path: Path) -> None:
+    handle = composition.proxy_cache_opener(tmp_path / "cache")
+    assert isinstance(handle, ProxyCache)
+    assert handle.opened() is None and handle.failure() is None and not handle.wait_open(0)
+    thread, box = _in_thread(handle.limit_bytes)
+    thread.join(0.3)
+    assert thread.is_alive(), "a member did not wait for the open"
+    assert handle.open(7 * 10**9) is None
+    thread.join(5)
+    assert box == {"value": 7 * 10**9}
+    assert isinstance(handle.opened(), DiskProxyCache)
+    source = tmp_path / "clip.mp4"
+    source.write_bytes(b"x")
+    assert handle.key_for(source) == handle.opened().key_for(source)
+    assert handle.lookup(handle.key_for(source)) is None
+    with pytest.raises(RuntimeError, match="opened once"):
+        handle.open(1)
+
+
+def test_a_limit_or_clear_asked_during_the_open_is_applied_after_it(tmp_path: Path) -> None:
+    """Condition 3: the settings dialog's calls made before the open completes are queued."""
+    handle = composition.proxy_cache_opener(tmp_path / "cache")
+    limit, limit_box = _in_thread(handle.set_limit_bytes, 5 * 10**9)
+    clear, clear_box = _in_thread(handle.clear)
+    limit.join(0.2)
+    clear.join(0.2)
+    assert limit.is_alive() and clear.is_alive()
+    assert handle.open(20 * 10**9) is None
+    limit.join(5)
+    clear.join(5)
+    assert limit_box == {"value": None} and clear_box == {"value": None}
+    assert handle.limit_bytes() == 5 * 10**9  # the dialog's limit, not the open's
+
+
+def test_a_failed_open_refuses_every_member_readably(tmp_path: Path) -> None:
+    """Condition 2: a failed open never hangs or re-raises a traceback; members refuse."""
+    handle = composition.proxy_cache_opener(tmp_path / "cache")
+    reason = handle.open(-1)
+    assert reason == "the cache limit is not negative" and handle.failure() == reason
+    expected = f"the analysis cache could not be opened: {reason}"
+    for call in (
+        lambda: handle.key_for(tmp_path),
+        lambda: handle.lookup(None),
+        lambda: handle.proxy(None, 0),
+        lambda: handle.set_limit_bytes(1),
+        handle.clear,
+    ):
+        with pytest.raises(RuntimeError) as caught:
+            call()
+        assert str(caught.value) == expected
+    assert handle.limit_bytes() == 0  # the refusing cache's form
+
+
+def test_fail_ends_the_wait_when_no_open_runs(tmp_path: Path) -> None:
+    handle = composition.proxy_cache_opener(tmp_path / "cache")
+    thread, box = _in_thread(handle.clear)
+    handle.fail("the window closed before the cache was opened")
+    thread.join(5)
+    assert not thread.is_alive()
+    assert "the window closed before the cache was opened" in str(box["error"])
+
+
+def test_export_jobs_shares_the_given_cache_and_opens_none(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Q16: one instance; ``cache_folder`` and ``cache`` together are refused."""
+    disk = DiskProxyCache(tmp_path / "cache")
+    handle = composition.proxy_cache_opener(tmp_path / "cache2")
+    opened: list[Path] = []
+    monkeypatch.setattr(composition, "proxy_cache", lambda folder, *a: opened.append(folder))
+    for cache in (disk, handle):
+        engine = composition.export_jobs(cache=cache)
+        assert engine._cache is cache
+        assert engine._cache_key == cache.key_for  # keyed by the cache's own key_for (DR-41)
+    assert opened == []
+    with pytest.raises(ValueError, match="not both"):
+        composition.export_jobs(cache=disk, cache_folder=tmp_path / "cache")
 
 
 def test_only_the_root_constructs_the_real_photo_engines() -> None:
