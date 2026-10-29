@@ -203,6 +203,13 @@
   at the candidate.** Order bullet satisfied. **NEXT: gate result, accept record, HOLD request, ff; then my QA + rows (DR-67,
   DR-71, DR-73, DR-74, DR-45 (b), DR-47 (a), R1-Q4 cache row, B7 row, DR-58(b) note, DR-81 (c) + trigger WP4.3); then the
   WP-T6 brief draft arrives for my ruling.**
+- **WP4.2 GATE RELEASED 10:36Z (status `db1fdaed1f328ad0`, no reply owed): GREEN on 8bc927a, parallel 5312/1 660 s (5304 + the
+  8 figures-switch rows), serial 1135/1 2,621 s; Q9 at the gate ~127 s of 300 (ad14 28+27, DR-74 20, jitter 13+12, rest < 7 s);
+  ruff / format 267 / mypy 141 / harness 382 OK at the orchestrator's seat. Serial 316 s under the 07:32Z run on the same code =
+  laptop variance. `work\wp4.2\gate-logs\wp4.2-serial.log` (--durations=40) = WP-T6's rung-1 BASELINE.** Second bare-cd slip
+  (into work/wp4.2/gate-logs, read only) acknowledged. **NEXT: cell 4 FINAL docs turn (227,702); code identity `git diff 8bc927a
+  <final> -- src tests tools` empty; accept record; HOLD REQUEST to me (main f225528; candidate rebased onto it, patch-id
+  re-proved); ff; release; then my QA + rows.**
 - **(history) After WP4.1's accept:** WP4.2's brief (DRAFT RULED on main 3aa3c51) got ONE revision pass against WP4.1's accept record, then FINAL
   on CHARC's word; its revision must carry: DR-78/79 (B2 rows) as WP4.2 items, the WP4.1 runner's final names and the stream-syntax
   predicate, the Limit text. WP4.3's revision later carries DR-75 (REQUIRED test under its Q12), DR-76, DR-77, and the AD-23 'applied by
