@@ -6,7 +6,7 @@ DR-35 (c)), and runs its three start-up jobs off the interface thread: the cache
 settings' limit, the encoder detection into the settings dialog's catalog, and the
 graphics-card detection whose AD-9 reason the status bar shows before a file is open (S3). A
 failed cache open is shown once and the photo path keeps working (S1 condition 2). A settings
-file that fails to decode is set aside (DR-85: ``xfail(strict)`` until WP4.3a's fix is on main).
+file that fails to decode is set aside (DR-85, fixed by WP4.3a on main).
 Nothing in start-up writes outside app data.
 
 The helpers here (``make_app`` and the waits) are shared by the other ``tests/test_app_*.py``
@@ -429,11 +429,6 @@ def _photo_request(path: Path, application: Application) -> Any:
 # DR-85 (ruling Q21): the start-up sibling of DR-77.
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=OverflowError,
-    reason="DR-85: OverflowError escapes load_settings until WP4.3a's fix is on main",
-)
 def test_a_settings_file_that_fails_to_decode_is_set_aside_and_start_up_goes_on(
     make_app, qtbot, tmp_path
 ) -> None:
