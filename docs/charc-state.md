@@ -38,6 +38,21 @@
   inboxes empty (the orchestrator's 0 unread); gen 21's name confirmed from `comms/.launch-sessions.json`; worktrees as gen 6
   left them (`wp-t6` f10d13b, `wp4.3` b4e5f17 OCCUPIED until their cells are proved returned). Nothing owed by me at
   pickup; waiting on the orchestrator's W2b RELEASE / WP-T6 B / gate posts.
+- **WP-T6 at 15:30Z: W2b DONE (4/4 controls caught); Reviewer B NO_NEW_CRITICAL_MAJOR 1 minor / 9 advisory (Claude pass,
+  opus-5-5/high, on `5fdcda4..a4472fb`; evidence `wp-t6\reviewB\`, review md5 ff96cce0); MY RULING (query 9941b514, post
+  e329b428): B1 REPORT-ONLY, verified here (fixture `conftest.py:848-850` checks the trim with the plan's own T; the parity
+  test `test_io_video_decode_hw.py:181` re-derives T, `conftest.py:522-537`, so a later-keyframe plan still reds the leg);
+  B3 FIX (43.58 s), B4 DECLINE, B9 REPORT-ONLY. THE ONE GATE GREEN (status d4d49c26, candidate `wp-t6-mc` a4472fb on
+  5fdcda4, 14:43-15:23Z): parallel 5312/1 in 714.41 s; SERIAL (AFTER) 1136/1 in 1,389.24 s (baseline 2,621.32; like-for-like
+  ~2,260 after WP-T5); collections 6457 = 5313 + 1137 + 7 (main 6449; -7 unparametrised R1-R7, +15); seven CUT forms 281.2 s
+  vs 1,567.37 (Q6 PASS); fullclip 7 in 1,556 s (W4). NEXT from the orchestrator: docs-only Codex turn 14, harness gate,
+  accept record, HOLD ask, ff. **MY ACCEPT EDITS ARE PREPARED AND DRY-RUN on a mirror:** scratchpad
+  `e2804b41-310a-480b-aeea-8bac91d1b12e/scratchpad/edit_t6_accept.py <main-sha> [record] [root]` edits the fill (three
+  expressions with `and not fullclip`, FULLCLIP once per phase-end gate, identity parallel + serial + fullclip = all, counts),
+  CLAUDE.md gate paragraph, AD-28 amendment, register DR-22/DR-66 notes + NEW DR-86 (Q7 gap list, owner trigger), DR-87
+  (`bench.py:1305` stray_processes 59.5 s; Codex micro-package), DR-88 (B1 fixture self-check). Run it on main AFTER the ff post
+  with the accept SHA (never before: a sed slip ran it on main once at 15:40Z, reverted with `git checkout --`, no commit).
+  Working copies here are CRLF (autocrlf=true); the 0-CR check is on the BLOB (`git show HEAD:<f>`), scripts write LF.
 - **(gen 6 history follows; newest facts at the end of the block)**
 
 - **Gen 6 pickup facts:** bash gauge 45 ms; inbox 0 unread at pickup; announce posted to the orchestrator (gen 17, shell-busy in the WP4.1 gate) with ONE cue; the two register scripts copied from gen 5's scratchpad (18c10a55...) into this session's scratchpad (6687b6c9-eacd-4ffc-995e-51c9195391d1) as `edit_register_p4a.py` (drop its DR-65 block before running: already applied at 3114d23) and `edit_register_p4b.py`.
