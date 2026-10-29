@@ -222,9 +222,26 @@ def test_the_cleanup_ends_before_any_panel_or_job(make_app, qtbot, monkeypatch) 
 
     def clean(settings: Settings, journal: Any) -> Any:
         events.append("cleanup")
-        return real_clean(settings, journal)
+        report = real_clean(settings, journal)
+        events.append("cleanup ended")
+        return report
 
     monkeypatch.setattr(app_main, "clean_leftovers", clean)
+    real_window = app_main.MainWindow
+
+    def window(*args: Any, **kwargs: Any) -> Any:
+        built = real_window(*args, **kwargs)
+        events.append("MainWindow")
+        return built
+
+    monkeypatch.setattr(app_main, "MainWindow", window)
+    real_show = real_window.show
+
+    def show(self: Any) -> None:
+        events.append("show")
+        real_show(self)
+
+    monkeypatch.setattr(real_window, "show", show)
     for name in (
         "install_parameter_panels",
         "install_timeline",
@@ -246,14 +263,17 @@ def test_the_cleanup_ends_before_any_panel_or_job(make_app, qtbot, monkeypatch) 
 
     monkeypatch.setattr(QtJobRunner, "run", run)
     application = make_app(cpu_settings())
-    assert events[:5] == [
+    assert events[:8] == [
+        "MainWindow",  # the settings read and the log come first (S-order)
         "cleanup",
+        "cleanup ended",  # R1-14: it has ENDED before any panel or job exists
         "install_parameter_panels",
         "install_timeline",
         "install_export_panels",
         "install_settings_dialog",
+        "show",
     ]
-    assert events[5:] == ["job", "job", "job"]  # the three start-up jobs, after the installs
+    assert events[8:] == ["job", "job", "job"]  # the three start-up jobs, after the show
     wait_started(qtbot, application)
 
 

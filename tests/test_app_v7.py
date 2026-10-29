@@ -23,9 +23,10 @@ no committed test reads the footage folder.
 
 from __future__ import annotations
 
+import threading
 import time
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -34,7 +35,7 @@ import pytest
 from PySide6.QtCore import QElapsedTimer, QTimer
 
 import gui_support
-from clearwater.app import composition
+from clearwater.app import analysis_adapter, composition
 from clearwater.app.main import Application
 from clearwater.cache import DiskProxyCache
 from clearwater.gui.batch_panel import BatchPanel, ItemState
@@ -67,12 +68,13 @@ class Figures:
     longest_ms: float
     p99_ms: float
     ticks: int
+    witness: dict[str, int] = field(default_factory=dict)
 
     def line(self) -> str:
-        """The report line."""
+        """The report line, with the workload's witness counts (R1-12)."""
         return (
             f"{self.scenario}: longest {self.longest_ms:.1f} ms, p99 {self.p99_ms:.1f} ms, "
-            f"{self.ticks} ticks"
+            f"{self.ticks} ticks, witness {self.witness}"
         )
 
 
@@ -140,6 +142,7 @@ def scenario_b_scrubbing(qtbot: Any, application: Application, clip: Path) -> Fi
     timeline = _panel(application, TimelinePanel)
     slider = timeline.slider()
     state = {"value": 0, "down": False}
+    moves = {"during_analysis": 0}
 
     def scrub() -> None:
         if window.session.analysis().phase != "running":
@@ -152,6 +155,7 @@ def scenario_b_scrubbing(qtbot: Any, application: Application, clip: Path) -> Fi
             state["down"] = True
         state["value"] = (state["value"] + 3) % (top + 1)
         slider.setValue(state["value"])
+        moves["during_analysis"] += 1
 
     mover = QTimer()
     mover.setInterval(40)
@@ -162,12 +166,14 @@ def scenario_b_scrubbing(qtbot: Any, application: Application, clip: Path) -> Fi
         mover.start()
 
     try:
-        return measured(
+        figures = measured(
             qtbot, "(b) scrubbing", start, lambda: window.session.analysis().phase == "complete"
         )
     finally:
         mover.stop()
         slider.setSliderDown(False)
+    figures.witness.update(moves)
+    return figures
 
 
 def scenario_c_export(qtbot: Any, application: Application) -> Figures:
@@ -214,11 +220,39 @@ def scenario_d_batch(qtbot: Any, application: Application, stills: list[Path]) -
 def scenario_e_full_render_during_export(
     qtbot: Any, application: Application, photo_4k: Path
 ) -> Figures:
-    """(e) A 1:1 render of a 4K photo while the open clip's export runs."""
+    """(e) A 1:1 render of a 4K photo while the open clip's export runs.
+
+    The fixture clip's export ends before a 1:1 4K render does, so the overlap is arranged
+    (R1-12): the export job starts its encode once the 1:1 view is asked for, and returns only
+    after a 1:1 render of the photo has arrived; the witness counts those renders.
+    """
     window = application.window
     export = _panel(application, ExportPanel)
-    rendered: list[object] = []
-    window.controller.rendered.connect(rendered.append)
+    overlap = {"renders_at_1_during_export": 0}
+    asked, rendered_at_1 = threading.Event(), threading.Event()
+    engine = application.exports._engine
+    real_job = engine.job
+
+    def held_job(request: Any) -> Any:
+        inner = real_job(request)
+
+        def run(progress: Any) -> Any:
+            assert asked.wait(120), "the 1:1 view was never asked for"
+            result = inner(progress)  # the encode runs while the 1:1 render does
+            assert rendered_at_1.wait(120), "no 1:1 render arrived during the export"
+            return result
+
+        return run
+
+    def on_rendered(result: object) -> None:
+        source = window.session.source()
+        if asked.is_set() and source is not None and source.path == photo_4k:
+            if export.is_running():
+                overlap["renders_at_1_during_export"] += 1
+            rendered_at_1.set()
+
+    engine.job = held_job  # type: ignore[method-assign]
+    window.controller.rendered.connect(on_rendered)
 
     def start() -> None:
         window.shell_actions.export.trigger()
@@ -230,6 +264,7 @@ def scenario_e_full_render_during_export(
             return False
         if window.preview_widget.is_fit():
             window.view_actions["one_to_one"].trigger()
+            asked.set()
             return False
         return (
             not export.is_running()
@@ -237,7 +272,15 @@ def scenario_e_full_render_during_export(
             and window.preview_widget.shown_factor() == 1
         )
 
-    return measured(qtbot, "(e) 1:1 4K render during an export", start, done)
+    try:
+        figures = measured(qtbot, "(e) 1:1 4K render during an export", start, done)
+    finally:
+        window.controller.rendered.disconnect(on_rendered)
+        engine.job = real_job  # type: ignore[method-assign]
+        asked.set()
+        rendered_at_1.set()
+    figures.witness.update(overlap)
+    return figures
 
 
 def photo_4k(folder: Path) -> Path:
@@ -284,9 +327,12 @@ def scenario_f_start_up(
 # The gate forms on the fixture clip.
 
 
-def _within(figures: Figures) -> None:
+def _within(figures: Figures, *witnessed: str) -> None:
+    """Assert the bound, and that each named witness count is positive (R1-12)."""
     print(figures.line())
     assert figures.longest_ms <= V7_BOUND_MS, figures.line()
+    for name in witnessed:
+        assert figures.witness.get(name, 0) > 0, f"the workload was not witnessed: {figures.line()}"
 
 
 def test_v7_a_b_analysis_and_scrubbing(make_app, qtbot, sample, tmp_path) -> None:
@@ -296,7 +342,7 @@ def test_v7_a_b_analysis_and_scrubbing(make_app, qtbot, sample, tmp_path) -> Non
     application.window.close()
     second = make_app(cpu_settings(), where=tmp_path / "b")  # a cold cache: the decode runs
     wait_started(qtbot, second)
-    _within(scenario_b_scrubbing(qtbot, second, sample(CLIP)))
+    _within(scenario_b_scrubbing(qtbot, second, sample(CLIP)), "during_analysis")
 
 
 def test_v7_c_e_export_and_a_full_render_during_it(make_app, qtbot, sample, tmp_path) -> None:
@@ -315,7 +361,10 @@ def test_v7_c_e_export_and_a_full_render_during_it(make_app, qtbot, sample, tmp_
     qtbot.waitUntil(
         lambda: application.window.session.analysis().phase == "complete", timeout=120000
     )
-    _within(scenario_e_full_render_during_export(qtbot, application, photo_4k(tmp_path)))
+    _within(
+        scenario_e_full_render_during_export(qtbot, application, photo_4k(tmp_path)),
+        "renders_at_1_during_export",
+    )
 
 
 def test_v7_d_a_batch_of_300_stills(make_app, qtbot, tmp_path) -> None:
@@ -340,10 +389,23 @@ def test_v7_f_start_up_with_a_slow_cache_open(make_app, qtbot, sample, monkeypat
         opened.append(time.monotonic())
         return real(folder, limit)
 
+    waits: list[tuple[bool, float]] = []
+    real_wait = analysis_adapter.wait_for_cache
+
+    def witnessed_wait(cache: Any, progress: Any) -> bool:
+        pending = not cache.wait_open(0)
+        ended = real_wait(cache, progress)
+        waits.append((pending, time.monotonic()))
+        return ended
+
     monkeypatch.setattr(composition, "proxy_cache", slow)
+    monkeypatch.setattr(analysis_adapter, "wait_for_cache", witnessed_wait)
     figures, application = scenario_f_start_up(
         qtbot, lambda: make_app(cpu_settings()), sample(CLIP)
     )
-    _within(figures)
+    figures.witness["analysis_waited_for_the_open"] = sum(
+        1 for pending, returned in waits if pending and opened and returned >= opened[0]
+    )
+    _within(figures, "analysis_waited_for_the_open")
     assert opened, "the slow open did not run"
     wait_started(qtbot, application)
