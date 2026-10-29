@@ -261,6 +261,6 @@ Start-up figures noted for the report: imports 1.46 s, capabilities 550 ms fresh
 
 ## RESUME HERE (cell 2; written by the dispatcher, generation 20, 2026-10-29)
 
-- Cell 1 (`wp43-cell1`) did tasks 1 and 2 (round 0, `649483b`) and retired at 263,162 by the evaluation rule; its full report is `C:\Userswsmy\clearwater-review-evidence\wp4.3\cell1-round0-return.md`; round-0 evidence `...\wp4.30\`.
-- Cell 2 builds tasks 3-12 with the round-0 design table above AS RULED: S1 = (a) the deferred-open handle with its FIVE conditions; S2 = the ALTERNATIVE (select at each run start, rebuild the engine over the same cache); S3, S6, S7 and the order as recommended. No product code exists yet; the worktree is at `649483b` plus this commit.
+- Cell 1 (`wp43-cell1`) did tasks 1 and 2 (round 0, `649483b`) and retired at 263,162 by the evaluation rule; its full report is `C:\Users\rwsmy\clearwater-review-evidence\wp4.3\cell1-round0-return.md`; round-0 evidence `C:\Users\rwsmy\clearwater-review-evidence\wp4.3\r0\`.
+- Cell 2 builds tasks 3-12 with the round-0 design table above AS RULED: S1 = (a) the deferred-open handle with its FIVE conditions; S2 = the ALTERNATIVE (select at each run start, rebuild the engine over the same cache); S3, S6, S7 and the order as recommended. No product code exists yet.
 - Windows (V7 exclusive, the GX011627 legs) are requested by `WINDOW REQUEST`; the ONE two-leg gate is the orchestrator's after Reviewer A converged and Reviewer B returned.
