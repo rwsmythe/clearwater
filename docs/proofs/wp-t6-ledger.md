@@ -19,7 +19,9 @@ the evaluation and re-seat lines. Turn 1's figures were supplied at turn 2.
 | Turn 4, round-0 table | 152,628 | 152,018 | 258,400 | Dispatcher generation 20 at turn 5; committed as `65b9f4f`; CHARC authorizes rung 2 in this cell |
 | Turn 5, rung-2 build | 358,551 | 202,787 | 258,400 (footer reported 475,000, unexplained; CHARC: the window of record stands) | Dispatcher generation 20; committed as `0afec17`; above 200K, so CHARC ruled RE-SEAT NOW (`6f5ebd09c017753c`, option 1): seat 1 (session `01a18757-14d0-7840-9bf3-bd6590722181`) retired |
 | Seat 2 turn 1 (ledger turn 6), marker registration | 68,477 | 73,738 | 258,400 | Dispatcher generation 20 at seat 2 turn 2; committed as `5f204e3` |
-| Seat 2 turn 2 (ledger turn 7), W2 controls ruling | Pending dispatcher | Pending dispatcher | 258,400 | Figures to be supplied by the dispatcher at the next turn |
+| Seat 2 turn 2 (ledger turn 7), W2 controls ruling | 164,768 | 101,282 | 258,400 | Dispatcher generation 20 at seat 2 turn 3; committed as `13a5fe6` |
+| Seat 2 turn 3 (ledger turn 8), cuts / import-scope STOP | 215,059 | 122,744 | 258,400 | Dispatcher generation 20 at seat 2 turn 4; turn-8 changes remained uncommitted for this turn's per-file handoff |
+| Seat 2 turn 4 (ledger turn 9), import grant / W3 script | Pending dispatcher | Pending dispatcher | 258,400 | Figures to be supplied by the dispatcher at the next turn |
 
 ## RESUME HERE (seat 2; written by the dispatcher, generation 20, 2026-10-29 ~12:12Z)
 
@@ -138,6 +140,161 @@ then confirmed the valid path and independent failure paths above. Both
 source-probe and packet readers were replaced by synthetic data for this
 light check; no footage was located or probed. Full W2 run 3 remains the
 required real control proof; the dispatcher moves `w2/` aside before running.
+
+## W2 run 3 -- DONE
+
+The dispatcher reports an exclusive run starting 2026-10-29 12:23:16Z,
+10.02 GB available, script MD5 `e97c51289cb85137cf5553619970cf31`.
+`work/wp-t6/w2/00-window.json` records 12:23:17.480106Z and
+10,016,727,040 available bytes. The saved logs confirm parity 1 passed in
+3.57 s and guards 60 passed in 41.55 s, both EXIT 0. The dispatcher reports
+`W2 DONE`, EXIT 0; cleanup records end 12:24:30.353107Z, all steps complete,
+stage EXIT 0, scratch removed and no trim left in either basetemp.
+
+The two control JSON files confirm:
+
+| Control | Named checks / result |
+|---|---|
+| Re-encode | Caught; command completed; 4(b), 4(d), 4(e) FAIL; `4b_count` PASS, `4b_packets` FAIL. Pairing differs only for video codec identifiers: source `hvc1` count 1 vs trim 0; source `hev1` count 0 vs trim 1. This confirms the real-stream pairing-assertion cause suspected after run 2. |
+| Both flags one frame late | Caught; 91 requested vs 90 expected; 4(b), 4(c) FAIL; `4b_count` FAIL, `4b_packets` PASS; 4(d), 4(e) PASS. |
+
+`-frames:v N+1` alone is masked by `-t T` (the belt working, not a defect).
+
+Rung 2 is CLOSED: the parity and guard tests pass at the seat, both real
+controls fail by their required checks, and teardown leaves no trim. Evidence
+is `work/wp-t6/w2/`; earlier runs remain in `w2-run1/` and `w2-run2/`.
+
+## Seat 2 turn 3 -- mapped cuts and import-scope STOP
+
+The four owned test files now contain the mapped R1-R7 edits: engine, shared
+sink/levels fixture and three decoder paths use `gx011627`; sink and decode
+counts read the independently asserted count; the colour round trip has
+`first6` / `first30`, the latter marked `fullclip`. Only the mapped jobs
+locator and its now-unused imports were removed, after checking their uses.
+The encode locator and its own skip-rule test remain. Module-scoped decode
+fixtures now consume the session-parametrised source, so they are rebuilt
+once per source parameter as intended. R4's bounds and plants are unchanged;
+the report still owes the side-by-side base figures and deterministic-filter
+sentence from CHARC's round-0 ruling.
+
+**STOP: minor, confirmed, NEW, edit outside the named blocks needed.**
+`uv run ruff check tests/test_jobs_export_video.py tests/test_io_video_encode.py
+tests/test_color_roundtrip.py tests/test_io_video_decode_hw.py` reports exactly
+one F401, EXIT 1: `local_config.load_local_config` imported but unused at
+`tests/test_io_video_encode.py:48:65` (`work/wp-t6/seat2-turn3-ruff.log`).
+The grep reproduction in `seat2-turn3-locator-uses.txt` shows its only remaining
+occurrence is that import; `FootageLookupError` and `find_footage_file` still
+serve the retained encode locator and test. The mapped source substitutions
+eliminate all encode-file calls of `load_local_config`.
+
+The brief permits encode-file edits ONLY in the shared fixture and two tests;
+the turn instruction permits deleting unused imports only in the jobs file.
+The cell leaves the encode import unchanged and requests the one-name import
+removal as a scope exception. Recommended ruling: allow removal of only
+`load_local_config` from the encode import, keeping the other two names.
+W3 script, collection, mypy and heavy runs are deferred at this STOP; no
+W3 or gate result is claimed. The mapped edits are available for per-file
+commits; the next turn can perform that cleanup and prepare W3 after a ruling.
+
+## Seat 2 turn 4 -- dispatcher import grant and W3 plan
+
+**Dispatcher grant (generation 20, seat 2 turn 4):** remove ONLY
+`load_local_config` from `tests/test_io_video_encode.py`'s local-config import;
+leave the other names and `_footage_clip` unchanged. Ground supplied by the
+dispatcher: the same rule the brief gives the jobs file ("IF nothing else in
+the module uses them after the edit (ruff F401 decides; grep first)"). It is
+a direct consequence of the mapped cuts, not a new change. The dispatcher
+reports it to CHARC. The grant is applied; the prior STOP is resolved.
+
+All seven mapped cuts are built across the four owned test files. No test is
+deleted. A static AST comparison against HEAD confirms every assertion is
+unchanged after mapping only the ruled frame-count operands (`681` to `frames`,
+`FOOTAGE_FRAMES` to the selected count); every function/class outside the named
+blocks is unchanged, except the authorized jobs locator removal and new decode
+count fixture. The selected full forms still reach 681 or 30 as specified.
+The new R4 comment explicitly describes the retained half of each positive
+30-frame margin. The report's side-by-side base figures and bit-exact-filter
+sentence remain required; no full report or final gate claim is made here.
+
+### W3 script (requested, not run)
+
+`work/wp-t6/w3.sh` MD5 `5c98800cf7e6ba18d9b7dd3400e6dab0` is gitignored.
+It runs from Git Bash at the worktree root, unsets `PYTEST_ADDOPTS`, sets
+headless Qt, records start/free memory and requires >= 5 GiB before each pytest
+session. The dispatcher commits all five tracked paths before running: the
+script requires clean tests and an empty working and staged diff at entry.
+
+1. One fresh Python process calls `pytest.main` on exactly the seven changed
+   gate IDs (`trim` or `first6`) plus the parity test, with the amended SERIAL
+   expression, no `-n`, `--durations=0` and
+   `--junitxml=work/wp-t6/w3/w3-serial.xml`. A temporary plugin wraps the real
+   `vf.encode_file` and `vf.fidelity_record`. The main session requires eight
+   passes with no skips/errors, exactly ONE successful standard encode call
+   from `gx011627_standard_encode`, and one engine V4 record with all
+   MANDATORY/REQUIRED items and the roster SAME. The standard encode's count,
+   NVENC tied boolean and sample count are recorded as observations.
+2. The plugin captures the engine run's actual fidelity record synchronously
+   before the unchanged test deletes its output. Only difference-item NAMES,
+   the node ID and SAME booleans are saved in `02-engine-v4-names.json`; the
+   raw record never goes to disk. A separate step reads the specified full
+   reference at `C:/Users/rwsmy/clearwater/work/wp4.2/v4/gx/record.json` at the
+   dispatcher's seat and projects its three difference lists only. The
+   comparator saves `same`, `only_trim`, `only_full` by class in
+   `03-v4-delta.json`, checks the full reference has eight best-effort items
+   and no MANDATORY/REQUIRED differences, and STOPs on any new trim
+   MANDATORY/REQUIRED item. Identical best-effort sets proceed; a delta limited
+   to `creation time: container tag` or `container tags other than creation_time`
+   carries the R-e/R-b/R-c representation reasons as a Limit; other names STOP
+   for explanation. This step is attempted even when the main tests failed,
+   so an available named engine failure can still produce branch-ii evidence.
+3. A separate fresh session runs only the trim levels test. During setup of
+   `gx011627_standard_encode`, the plugin changes its real encode's requested
+   quality from standard to draft, so that fixture yields a draft encode as
+   standard. The original fixture teardown still deletes that output. A
+   successful control requires exactly one call-phase failure on the named
+   levels node, `AssertionError`, at
+   `level is not None and level.name == expected[quality]`, and one recorded
+   plant. An encoder/setup error cannot count as rejection.
+4. Another fresh session runs only R5. A fixture-setup hook shortens the real
+   reference by one and updates pytest's cached result, then requires exactly
+   one call-phase `AssertionError` on R5 at
+   `len(footage_reference) == footage_frames`, with one plant. Both controls
+   record pytest's real EXIT 1 separately from the control verifier's EXIT 0.
+   No tracked test file is edited or planted.
+5. All three fresh basetemps and the temporary runner lie inside the owned
+   `work/wp-t6/w3-scratch/`. An EXIT/INT/TERM trap removes that entire scratch
+   tree after checking its resolved target. Entry refuses pre-existing scratch.
+   Cleanup verifies the four tests' bytes against their pre-run code hashes,
+   `git status --porcelain -- tests` empty, and `git diff --quiet` successful;
+   any failure is W3 STOP. It lists retained evidence filenames and remaining
+   scratch filenames. Only count/name/verdict JSON, pytest logs and junit XML
+   stay under `work/wp-t6/w3/`. The final line is `W3 DONE` or `W3 STOP stage=<n>`.
+
+All runner outputs go to files with EXIT lines. This is a plan plus light
+validation, not a W3 result. Expected seat window: about 10 minutes, one heavy
+job at a time. Exact command: `bash work/wp-t6/w3.sh`.
+
+### Seat-2 turn-4 light checks
+
+| Check | Result / evidence |
+|---|---|
+| Ruff on the four changed test files | PASS, EXIT 0; `work/wp-t6/seat2-turn4-ruff.log` |
+| `uv run mypy` | PASS, EXIT 0; 141 source files; `seat2-turn4-mypy.log` |
+| Four-file `--collect-only -q` | Ran with `PYTHONPATH=scripts`, the sandbox shim, `-p no:cacheprovider`, and `--basetemp=work/wp-t6/turn4-collect`: 217 tests collected in 0.79 s, EXIT 0; `seat2-turn4-collection.log` |
+| Assertion retention / owned blocks / syntax / LF | PASS, EXIT 0; `seat2-turn4-static-proof.json`: unchanged assertions after ruled operand mapping, no test deleted, untouched blocks equal, four test modules and four embedded W3 programs compile, 217 unique IDs including seven full and seven gate forms; edited blobs LF |
+| Embedded runner undefined-name checks | PASS, EXIT 0; `ruff check --select F821,F811` on the four extracted programs; `seat2-turn4-w3-lint.log` |
+| W3 plugin synthetic main | PASS, EXIT 0; `seat2-turn4-plugin-main.log`: two real miniature pytest tests share one synthetic standard fixture encode; the same-call engine projection is captured. Sandbox shim loaded; no footage/GPU used |
+| W3 plugin synthetic controls | PASS, EXIT 0 for each harness check; `seat2-turn4-plugin-draft.log`, `seat2-turn4-plugin-reference.log`: each inner miniature pytest session fails at its expected assertion, proving draft substitution and cached-reference truncation reach the tests. These are synthetic checks, not W3's real controls |
+| V4 delta synthetic branches | PASS, EXIT 0; `seat2-turn4-delta-check.log`: same/ruled representation delta proceeds, new MANDATORY and unexplained best-effort names STOP, unrelated synthetic metadata is absent from saved projection |
+| `git diff --check` | PASS, EXIT 0; `seat2-turn4-diff-check.log` |
+| Seat-side Bash syntax / full format check / W3 | Pending dispatcher; no claim made for them |
+
+Verification loop: the granted import removal clears the reproduced F401.
+Fresh ruff and collection pass; the AST check confirms the map's assertion
+retention and scope. The synthetic plugin checks independently exercise the
+runtime controls without touching tracked tests. The scope-proof log reader
+was corrected for PowerShell's UTF-16 log encoding, then passed. The W3
+measurement and CHARC's branch decision remain pending the real seat run.
 
 ## Rung 0 facts (2026-10-29)
 
@@ -628,7 +785,8 @@ pending and are not validation results.
 | W1 run 2 | 2026-10-29 11:27:22Z / 11:27:25Z | `bash work/wp-t6/w1.sh > work/wp-t6/w1-seat-driver.log 2>&1` | 4(a)-(d) PASS, 4(e) FAIL; STOP; process EXIT not supplied | Not supplied at turn 3 | `work/wp-t6/w1/` to be preserved as `w1-run2/`; semantic amendment authorized |
 | W1 run 3 | 2026-10-29 11:33:05.984516Z / 11:41:23.101978Z | `bash work/wp-t6/w1.sh > work/wp-t6/w1-seat-driver.log 2>&1` | 4(a)-(e) PASS; three encodes; four round-trip counts; row 10: 1 passed, 1 warning; W1 DONE, EXIT 0 | 10,804,830,208 bytes before item 1; exclusive per dispatcher | `work/wp-t6/w1/`; scratch removed; round-0 table above |
 | W2 run 2 | 2026-10-29 12:14:25Z / 12:15:41Z | `bash work/wp-t6/w2.sh` | Parity 1 passed in 3.63 s; guard 60 passed in 41.20 s; controls not caught, STOP stage 3, stage EXIT 1; cleanup EXIT 0 | 10.37 GB per dispatcher | `work/wp-t6/w2-run2/`; scratch removed, no trim left; controls ruling above |
-| W2 run 3 (requested, about 2-5 min) | Pending dispatcher | `bash work/wp-t6/w2.sh` | Pending parity/guard counts, two controls and EXIT | Script records bytes; >= 5 GiB required | `work/wp-t6/w2/`; script MD5 `e97c51289cb85137cf5553619970cf31`; move existing output aside first |
+| W2 run 3 | 2026-10-29 12:23:16Z (dispatcher; window record 12:23:17.480106Z) / 12:24:30.353107Z | `bash work/wp-t6/w2.sh` | Parity 1 passed in 3.57 s; guard 60 passed in 41.55 s; both controls caught; W2 DONE, EXIT 0; cleanup EXIT 0 | 10,016,727,040 bytes in window record | `work/wp-t6/w2/`; script MD5 `e97c51289cb85137cf5553619970cf31`; scratch removed, no trim left |
+| W3 (requested, about 10 min) | Pending dispatcher | `bash work/wp-t6/w3.sh` | Pending eight gate passes, one standard encode, V4 name delta and two controls | Script records bytes; >= 5 GiB required before each session | `work/wp-t6/w3/`; script MD5 `5c98800cf7e6ba18d9b7dd3400e6dab0`; tracked files must be committed first |
 
 ## Review-round ledger
 
