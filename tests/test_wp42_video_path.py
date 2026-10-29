@@ -195,6 +195,46 @@ def test_an_unreadable_tail_source_is_not_given_a_count() -> None:
     assert export_module._expected_frames(make_probe(nb_frames=None)) is None
 
 
+def test_an_unreadable_tail_job_makes_no_listing_and_no_refusal(
+    sample: Sample, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """CHARC ``91c2c22f4b6edd18`` 1: a planted ``unreadable_tail`` probe and an early decoder end.
+
+    The job lists no packets for its expected count and does not refuse the short decode: the
+    entry is complete at the decoder's end (D86), and the sink's tail rule (none skipped up to
+    the last frame written) passes the 30 frames.
+    """
+    from clearwater.io.video.decode import FFmpegVideoSource
+
+    real_probe = FFmpegVideoSource.probe
+
+    def tail_probe(self: FFmpegVideoSource, path: Path) -> ProbeResult:
+        probe = real_probe(self, path)
+        return replace(probe, faults=(*probe.faults, Fault("unreadable_tail", "warn", "tail")))
+
+    listings: list[Path] = []
+
+    def listing(path: Path) -> Any:
+        listings.append(path)
+        raise AssertionError("the job listed packets for an unreadable_tail clip")
+
+    monkeypatch.setattr(FFmpegVideoSource, "probe", tail_probe)
+    monkeypatch.setattr(export_module, "read_packet_table", listing)  # the job's name only
+    out, cache = tmp_path / "out", tmp_path / "cache"
+    out.mkdir()
+
+    def source_for(device: ArrayBackend | None) -> Any:
+        return PrefixSource(composition.video_source(device), 30)  # of 45
+
+    exports = composition.export_jobs(cache_folder=cache, source_for=source_for)
+    result = exports.job(_request(sample(CLIP), out))(StubProgress())
+    assert listings == []
+    assert result.ok, result.failure
+    assert any("cannot be decoded" in w for w in result.warnings)  # the sink's D86 tail warning
+    assert [p.name for p in out.iterdir()] == [p.name for p in result.outputs]
+    assert _entry_states(cache) == [True]  # complete at the decoder's end
+
+
 # --- DR-47 (a): a job callable runs once ---------------------------------------------------------
 
 

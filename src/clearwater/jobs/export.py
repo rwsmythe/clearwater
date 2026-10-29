@@ -437,8 +437,11 @@ def _expected_frames(probe: ProbeResult) -> int | None:
 
     The probe's count for a clip with no D86 fault; for a ``truncated`` clip the readable count,
     from one packet listing (``readable_video_pts``, the set the sink's check also uses); None
-    for an ``unreadable_tail`` clip (its decodable end is known only by decoding) or an unknown
-    count.
+    for an ``unreadable_tail`` clip (its decodable end is known only by decoding; CHARC
+    ``91c2c22f4b6edd18``) or an unknown count. With None, a decode of an ``unreadable_tail`` clip
+    that ends early is marked complete at the decoder's end, as D86 intends, and no packet listing
+    is made; the export half is still held by the sink's ``missing_frames`` rule (every readable
+    frame up to the last one written, none skipped).
     """
     kinds = {fault.kind for fault in probe.faults}
     if "unreadable_tail" in kinds:

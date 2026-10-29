@@ -99,6 +99,9 @@ def test_the_package_exports_the_root() -> None:
         "export_jobs",
         "photo_reader",
         "photo_writer",
+        "proxy_cache",
+        "video_sink",
+        "video_source",
     ]
     assert all(getattr(app, name) is getattr(composition, name) for name in app.__all__)
 

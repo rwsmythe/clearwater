@@ -15,10 +15,10 @@ from .composition import (
     export_jobs,
     photo_reader,
     photo_writer,
+    proxy_cache,
+    video_sink,
+    video_source,
 )
-from .composition import proxy_cache as proxy_cache  # WP4.2 R0-Q4; __all__ is WP4.1's pin
-from .composition import video_sink as video_sink
-from .composition import video_source as video_source
 
 __all__ = [
     "backend_selector",
@@ -26,4 +26,7 @@ __all__ = [
     "export_jobs",
     "photo_reader",
     "photo_writer",
+    "proxy_cache",
+    "video_sink",
+    "video_source",
 ]
