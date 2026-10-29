@@ -174,26 +174,28 @@ def test_the_analysis_end_release_frees_the_pool_while_frames_render(
     pool = gpu.xp.get_default_memory_pool()
     release = export_module._release_fft_plans
     sink = FakeSink()
-    seen: list[tuple[str, int, int, list[str], int]] = []
+    seen: list[tuple[str, int, int, list[str], int, int]] = []
 
     def spied(backend: object) -> None:
         if threading.current_thread().name == "export-analysis":
             planted = gpu.asarray(np.zeros((4096, 4096), dtype=np.float32))  # 64 MiB
             del planted  # its block stays in the pool, cached
-        calls, written = list(sink.calls), len(sink.frames)
+        calls, started = list(sink.calls), len(sink.frames)
         before = pool.total_bytes() - pool.used_bytes()
         release(backend)
         after = pool.total_bytes() - pool.used_bytes()
-        seen.append((threading.current_thread().name, before, after, calls, written))
+        remaining = frames - len(sink.frames)  # sampled once the pool drop is observed
+        seen.append((threading.current_thread().name, before, after, calls, started, remaining))
 
     monkeypatch.setattr(export_module, "_release_fft_plans", spied)
     result = _video(tmp_path, source, gpu, sink)
     assert result.ok, result.failure
     assert len(sink.frames) == frames
     assert [name for name, *_ in seen] == _both_boundaries()
-    _, before, after, calls, written = seen[0]
+    _, before, after, calls, started, remaining = seen[0]
     assert "open" in calls and "close" not in calls  # the encode was under way
-    assert written < frames  # frames still to render after the release
+    assert started >= 1, started  # rendering had started before the release
+    assert remaining > 0, remaining  # frames still to render once the pool dropped
     assert before >= 64 * 1024**2 and after < before  # the pool's cached blocks went back
 
 

@@ -89,8 +89,9 @@ class _NoCacheFolder:
     """The IF-7 cache of an :func:`export_jobs` built without a cache folder: every use refuses.
 
     The video job asks for its cache key (:meth:`key_for`) before any cache method, so a video
-    request fails there, after its probe and before its analysis or any write; a photo job never
-    reaches the cache.
+    request that reaches the cache fails there, after its probe and before its analysis or any
+    write. An earlier refusal (the encoder, output planning, the disk-space check) may be
+    reported first; either way nothing is written. A photo job never reaches the cache.
     """
 
     def _refuse(self) -> NoReturn:
@@ -202,7 +203,9 @@ def export_jobs(
     builds its own source and sink with :func:`video_source` and :func:`video_sink` on the
     backend it selected (DR-67), analyses through :func:`proxy_cache` over ``cache_folder`` and
     encodes through ``SafeWrite``; each input file is its own clip (spec section 5.5). Without
-    ``cache_folder`` a video request fails with :data:`VIDEO_NEEDS_A_CACHE` and writes nothing.
+    ``cache_folder`` a video request fails before any write, with :data:`VIDEO_NEEDS_A_CACHE`
+    unless an earlier refusal (the encoder, output planning, the disk-space check) is reported
+    first.
     The overrides exist for tests and instruments only.
 
     Args:

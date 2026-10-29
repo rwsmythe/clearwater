@@ -2,10 +2,12 @@
 
 A test tool, not a product feature (plan section 6, WP4.1): acceptance tests (WP5.1) and manual
 runs drive the product's composition root (:mod:`clearwater.app.composition`) through one
-:func:`clearwater.jobs.run_batch` on the caller's thread, one job at a time (DR-62). Every write
-goes through the export engine and ``SafeWrite``; this tool writes nothing itself but the record
-file it is asked for (``--settings-dir``'s loader, ``clearwater.config.load_settings``, renames a
-corrupt ``settings.json`` beside itself, D89). It loads no PySide6, and with ``--force-cpu`` no
+:func:`clearwater.jobs.run_batch` on the caller's thread, one job at a time (DR-62). Every
+output goes through the export engine and ``SafeWrite``; the analysis cache under
+``--cache-dir`` writes proxies and statistics through ``DiskProxyCache``, and opening it may
+remove stale entries; this tool writes nothing itself but the record file it is asked for
+(``--settings-dir``'s loader, ``clearwater.config.load_settings``, renames a corrupt
+``settings.json`` beside itself, D89). It loads no PySide6, and with ``--force-cpu`` no
 CuPy.
 
 Library API: :func:`route`, :func:`requests_for`, :func:`parameters_for`,
@@ -799,8 +801,8 @@ def write_target_refusal(target: Path, footage_folder: Path) -> str | None:
     (:func:`inside`: resolved, prefix-free, case-normalised and by file identity).
 
     Residual: a hard link to a footage file placed outside the footage folder cannot be told
-    apart by its path. The runner never writes over an existing file (D84), so only a stream
-    name could reach the original, and (i) refuses every stream name.
+    apart by its path. The runner never writes over an existing output file (D84), so only a
+    stream name could reach the original, and (i) refuses every stream name.
 
     Args:
         target: A file or folder the run would write (need not exist).

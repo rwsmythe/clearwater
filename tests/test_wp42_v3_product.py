@@ -12,8 +12,9 @@ static region; ruling R0-Q5's condition is the first test: the lossless clips de
 RECORDED (CHARC ruling V3-1); on WP3.11's jittering-patch clip V3's 25 % is ASSERTED. c3 and
 ancuti2018 at their defaults, on the GPU job with device frames (the product's job on this
 machine; ``gpu``), or all on the CPU job when ``CLEARWATER_WP42_V3_BACKEND=cpu`` (the recorded CPU
-run); ``CLEARWATER_WP42_V3_FIGURES`` names a new figures file that the run writes, its backend
-on the first line. The encoded output's figures are recorded beside, as characterisation. Each
+run); ``CLEARWATER_WP42_V3_FIGURES`` names a new figures file that the run creates exclusively,
+after the runner's footage check, and writes through one held handle, its backend on the first
+line. The encoded output's figures are recorded beside, as characterisation. Each
 acceptance check reads the unrounded figure and has a planted control through the same
 measurement: a 1/255 flicker on every other smoothed frame for AD-14's bound, and the smoothed
 and per-frame frames interleaved for V3's ratio; both must be refused. A product-method miss is
@@ -24,17 +25,18 @@ from __future__ import annotations
 
 import os
 import subprocess
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
 from pathlib import Path
-from typing import Any
+from typing import Any, BinaryIO
 
 import numpy as np
 import pytest
 from numpy.typing import NDArray
 from PIL import Image as PILImage
 
+import headless_export
 from clearwater.analysis import AnalysisEngine
 from clearwater.app import composition
 from clearwater.cache import DiskProxyCache
@@ -60,28 +62,65 @@ FIGURES_VARIABLE = "CLEARWATER_WP42_V3_FIGURES"
 """When set, the path of a NEW figures file: a ``backend:`` line, then each test's figures line."""
 
 
-@pytest.fixture(scope="module")
-def figures_file() -> Path | None:
-    """The run's figures file, created with its backend line; None when not asked for.
+def create_figures_file(path: Path, footage_folder: Path | None, backend: str) -> BinaryIO:
+    """Create the run's figures file exclusively and return its one open handle.
 
-    An existing file is never overwritten (each run writes its own).
+    The path passes the runner's footage check (``headless_export.write_target_refusal``)
+    before anything is created; the switch is refused when no footage folder is configured (it
+    exists only for recorded runs on the owner's laptop). The file is then opened with ``"xb"``,
+    so an existing file is refused and left as it was, and the ``backend:`` line is written.
+
+    Args:
+        path: The figures file to create.
+        footage_folder: The configured footage folder, or None when there is none.
+        backend: The legs' backend device, written on the first line.
+
+    Returns:
+        The open handle; every later figures line is written through it.
+
+    Raises:
+        pytest.fail.Exception: The switch is refused (no footage folder, the footage check, or
+            an existing file); nothing is created then.
+    """
+    if footage_folder is None:
+        pytest.fail(f"{FIGURES_VARIABLE} is refused: no footage folder is configured")
+    reason = headless_export.write_target_refusal(path, footage_folder)
+    if reason is not None:
+        pytest.fail(f"{FIGURES_VARIABLE} is refused: {path.name} {reason}")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        handle = path.open("xb")
+    except FileExistsError:
+        pytest.fail(f"{FIGURES_VARIABLE} names an existing file; each run writes a new one")
+    handle.write(f"backend: {backend}\n".encode("ascii"))
+    handle.flush()
+    return handle
+
+
+@pytest.fixture(scope="module")
+def figures_file() -> Iterator[BinaryIO | None]:
+    """The run's figures file, held open for the module; None when not asked for.
+
+    Created by :func:`create_figures_file` (footage check, then exclusive creation); every
+    figures line goes through this one handle, which is closed at teardown.
     """
     named = os.environ.get(FIGURES_VARIABLE)
     if not named:
-        return None
-    path = Path(named)
-    if path.exists():
-        pytest.fail(f"{FIGURES_VARIABLE} names an existing file; each run writes a new one")
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_bytes(f"backend: {_backend().device}\n".encode("ascii"))
-    return path
+        yield None
+        return
+    try:
+        footage = headless_export.configured_footage_folder()
+    except headless_export.RunnerRefusalError as exc:
+        pytest.fail(f"{FIGURES_VARIABLE} is refused: {exc}")
+    with create_figures_file(Path(named), footage, _backend().device) as handle:
+        yield handle
 
 
-def _keep(figures_file: Path | None, line: str) -> None:
-    """Append one figures line to the run's figures file, when there is one."""
+def _keep(figures_file: BinaryIO | None, line: str) -> None:
+    """Write one figures line through the run's figures handle, when there is one."""
     if figures_file is not None:
-        with figures_file.open("ab") as handle:
-            handle.write(f"{line}\n".encode("ascii"))
+        figures_file.write(f"{line}\n".encode("ascii"))
+        figures_file.flush()
 
 
 def _encode_lossless(args: list[str], target: Path, *, stdin: bytes | None = None) -> Path:
@@ -375,7 +414,7 @@ def test_ad14_bound_with_the_product_method(
     tmp_path: Path,
     method: str,
     record_property: Callable[[str, object], None],
-    figures_file: Path | None,
+    figures_file: BinaryIO | None,
 ) -> None:
     """AD-14: under 0.5/255 after smoothing, ASSERTED; V3's four ratios RECORDED (V3-1)."""
     _backend()
@@ -394,7 +433,7 @@ def test_v3_ratio_on_the_jittering_patch_clip_with_the_product_method(
     tmp_path: Path,
     method: str,
     record_property: Callable[[str, object], None],
-    figures_file: Path | None,
+    figures_file: BinaryIO | None,
 ) -> None:
     """V3: per measure, the smoothed flicker <= 25 % of the per-frame, ASSERTED."""
     _backend()

@@ -502,6 +502,66 @@ records under `work\wp3.10\wp4.2-v4\v4-<item>-c3-<leg>\` (`.compare.json` and `.
 Kept, nothing deleted: every output, cache, record, log and compare record above. Nothing
 footage-derived is committed.
 
+## Reviewer B -- disposition and remediation (cell 4)
+
+**Reviewer B** (the orchestrator's seat, Codex `gpt-6.1-sol` / high, WSL, read-only, offline) on
+`wp4.2-mc` `ab9ea83`, base `38f291e`: probe READY, exit 0 (08:55:22Z), worktree clean after, no
+withheld path read. **`VERDICT: NEW_CRITICAL_MAJOR_FOUND`**: 2 MAJOR, 4 MINOR, 4 ADVISORY. Text
+`C:\Users\rwsmy\clearwater-review-evidence\wp4.2\reviewB\review-B.txt`, md5
+`b1865ba284b429169fcdc798e15f7431` (35 lines). The orchestrator's eleven dispositions, each
+CONFIRMED against the file at `265251f` before the change (the one bounded remediation, fill
+Part 2 "Disposition"):
+
+| # | Severity | Finding (where) | Confirmed | Disposition | Change |
+|---|---|---|---|---|---|
+| B1 | MAJOR | `CLEARWATER_WP42_V3_FIGURES` reaches `mkdir` / `write_bytes` with no footage check (`tests/test_wp42_v3_product.py:63-76`) | yes (no `write_target_refusal`, no containment) | FIX | `create_figures_file`: no configured footage folder = refused; `headless_export.write_target_refusal(path, configured_footage_folder())` BEFORE `mkdir`; a refusal is `pytest.fail` with its text, nothing created |
+| B2 | MAJOR | "NEW file" not atomic: `exists()` then `write_bytes` (`wb`), a dangling link passes (`:73`) | yes | FIX | exclusive `open(path, "xb")`; the module fixture yields that ONE handle and closes it at teardown; `_keep` writes through it (never reopened); docstrings corrected |
+| B3 | MINOR | the builder test never passes a backend to `video_sink` (`tests/test_wp42_composition.py:114`) | yes | FIX | a distinct `DeviceFrameBackend`-shaped stand-in (`device` `cuda:7`) passed to both builders; source and sink hold it (`sink._device_backend is backend`); the `None` variant holds None |
+| B4 | MINOR | DR-74's assertions allow a release before rendering (`tests/test_wp321_fft_release.py:195`) | yes (`written` sampled before the release; 0 satisfied it) | FIX, inside DR-74's case only | `started` = frames written when the release begins, asserted `>= 1`; `remaining` = frames still to write, sampled once the pool drop is observed, asserted `> 0`; the DR-73 (b) rename untouched |
+| B5 | MINOR | the missing-cache promise is not on every route (`src/clearwater/app/composition.py:204`) | yes: `jobs/export.py` `_video` runs `resolve_encoder`, `_plan`, `_check_space` before `_analyse` asks `key_for` | FIX, docs only | `_NoCacheFolder` and `export_jobs` docstrings: fails before any write; an earlier refusal (the encoder, output planning, the disk-space check) may be reported first. No control-flow change; the report does not repeat the promise (its runner line is the `RunnerRefusalError` route), so no report change |
+| B6 | MINOR | the runner's write-path description (`tools/headless_export.py:5`, `write_target_refusal`) | yes (`run()` opens `DiskProxyCache`; analysis writes without `SafeWrite`) | FIX, docs only | module docstring: outputs through the engine and `SafeWrite`; the cache under `--cache-dir` writes proxies and statistics through `DiskProxyCache`, opening it may remove stale entries; the predicate's residual: never writes over an existing OUTPUT file. Nothing else in the file |
+| B7 | ADVISORY | the import-time witness misses the three video constructors (`tests/test_app_composition.py:183`) | yes | BANK | report, "For WP4.3" note; no test change (not WP4.2's file) |
+| B8 | ADVISORY | the count guard is a minimum (`analysis/engine.py:780`) | yes (as stated) | RECORD | report Limit sentence |
+| B9 | ADVISORY | own clip inherits the key's size-and-mtime collision (`cache/keys.py:50`) | yes (pre-existing, documented) | RECORD | report Limit sentence |
+| B10 | ADVISORY | inherited `FFREPORT` is a write route (probe, decoder, the two new test launches) | yes (no explicit environment on the launches) | BANK, pre-existing | **DR-58 (b) re-sighting** for CHARC: the probe part is DR-58 (b); the decoder launches (`decode.py:330`, `:344`) and the two new test FFmpeg launches (`tests/test_wp42_v3_product.py` `_encode_lossless`, `tests/test_wp321_fft_release.py` DR-74's clip) inherit it the same way. No code change |
+
+**A correction to B2's premise (reproduced, not a disagreement with the fix).** On this laptop
+(Python 3.12, Windows 11, symlink creation allowed) `open(dangling_link, "xb")` SUCCEEDS and
+creates the link's target: probe in the session scratchpad, "symlink ok True False / xb opened!".
+So exclusive creation alone does not refuse a dangling link here; the footage check's rule (ii)
+(every existing step is its own real path, a dangling link included) does, before the open. The
+new test says so in a comment. A link planted between the check and the open is the predicate's
+stated residual ("a link created after the check is not seen", WP4.2a).
+
+**RED first (scratch, never committed; `work\wp4.2\b-remediation\red\`).**
+- B1/B2: `old_logic.py` reproduces the `265251f` fixture logic (exists, `mkdir`, `write_bytes`,
+  then append); `test_red_figures.py` = the new file with its import pointed there, run with
+  `--noconftest`: **3 failed, 2 passed**. Failed: inside-the-footage-folder (DID NOT RAISE), the
+  dangling link (DID NOT RAISE), no footage folder configured (DID NOT RAISE). Passed: the
+  existing file (the old `exists()` refused it) and the fresh-path control.
+- B3: plugin `plant_b3.py` (`video_sink` discards its argument): **1 failed, 1 passed**; `[gpu]`
+  failed (`None = FFmpegVideoSink._device_backend`), `[None]` passes by construction (a discard
+  yields None).
+- B4: plugin `plant_b4.py` (the first `FakeSink.write` waits until the `export-analysis` thread
+  has ended, so the analysis-end release runs with nothing written): **1 failed**, `assert 0 >=
+  1` on `started` (21.76 s).
+
+**GREEN.**
+- `tests/test_wp42_v3_figures.py`: 5 passed (2.75 s). B3 node: 2 passed.
+- Light window (orchestrator grant with this turn; 9.5 GiB free, 09:03:25Z-09:05:14Z, nothing
+  else heavy): `test_v3_ratio_on_the_jittering_patch_clip_with_the_product_method[c3]` with the
+  variable UNSET 1 passed (17.33 s); with `CLEARWATER_WP42_V3_FIGURES` =
+  `work\wp4.2\b-remediation\figures-jitter-c3.txt` (new) 1 passed (15.44 s), the file
+  (md5 `e3abba2b0040961b8604361fd3f1d6d1`) holds two lines: `backend: cuda:0`, then
+  `jitter c3: ad14_unsmoothed 0.1006; ad14_smoothed 0.0017; ad14_encoded 0.0378; ratios
+  {'L*': 0.018, 'a*': 0.014, 'b*': 0.026, 'contrast': 0.016}; encoded_ratios {...}`. DR-74's
+  case 1 passed (21.59 s). The one warning in each is CuPy's "CUDA path could not be detected".
+- `ruff check .` clean; `ruff format --check .` 267 files; `mypy` 141 files clean. Light set
+  (`-n 4`, `not gpu and not footage and not gui and not slow`): the new file,
+  `test_wp42_composition.py`, `test_wp321_fft_release.py`, `test_app_composition.py`,
+  `test_headless_export.py` (the last two unchanged): **107 passed** (12.51 s).
+- Logs `work\wp4.2\b-remediation\*.log`.
+
 ## RESUME HERE (the FINAL docs turn)
 
 Every task is done: task 10's V4 window is above, and the report's V4 section is filled from it.

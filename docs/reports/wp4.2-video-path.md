@@ -228,6 +228,13 @@ Every output, cache, record and compare record is kept under `work\wp4.2\v4\` an
   `tests/test_wp42_video_path.py::test_an_unreadable_tail_job_makes_no_listing_and_no_refusal`
   (a planted `unreadable_tail` probe and a 30-of-45 decoder: no listing, the job ok, the entry
   complete).
+- **The frame-count check is a minimum (Reviewer B B8).** Where an expected count is known, an
+  analysis that ends short of it is refused and its entry left incomplete; an expected count of
+  `None` or `0` marks the entry complete, a surplus passes, and reuse of a complete entry is not
+  rechecked.
+- **Own clip and the cache key (Reviewer B B9).** The own-clip result inherits the cache key's
+  known limit: two different clips with the same size and modification time share a key
+  (pre-existing, documented in `cache/keys.py`).
 - V12 is deferred to v2 (spec 0.5.3). V16 and every speed figure are out of scope (WP5.2).
 - Out of envelope as declared in the brief (concurrent runners on one cache folder, network
   shares, a CPU backend with a hardware decoder, other operating systems).
@@ -240,6 +247,12 @@ Every output, cache, record and compare record is kept under `work\wp4.2\v4\` an
   with device frames; about 170 s for the file in this seat; CHARC `91c2c22f4b6edd18` 3 KEEP).
   New serial-leg cost measured here: about 210 s (V3 file 169 s, DR-74 18 s, the two gpu V4 / DR-67 legs about 23 s), inside
   question 9's 300 s.
+
+- **For WP4.3 (Reviewer B B7, banked).** The import-time witness in
+  `tests/test_app_composition.py` does not instrument the three video constructors
+  (`FFmpegVideoSource`, `FFmpegVideoSink`, `DiskProxyCache`); the static scanner in
+  `tests/test_wp42_composition.py` still covers their construction outside the root. That file
+  is not WP4.2's to change.
 
 ## Register dispositions
 

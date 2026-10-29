@@ -110,13 +110,25 @@ def test_the_cache_has_the_registered_default_codec_and_keys_with_it(tmp_path: P
     assert key == cache_key(source) and key.cache_version == codec_cache_version(DEFAULT_CODEC)
 
 
+class _DeviceBackendStandIn:
+    """A distinct backend with the IF-2 device extensions' shape (``DeviceFrameBackend``)."""
+
+    device = "cuda:7"
+
+    def planes_to_rgb(self, data: object, *, width: int, height: int, bit_depth: int) -> object:
+        raise AssertionError("never called: the builders only hold the backend")
+
+    def rgb_to_planes(self, a: object, *, bit_depth: int) -> bytes:
+        raise AssertionError("never called: the builders only hold the backend")
+
+
 @pytest.mark.parametrize("device", [None, "gpu"])
 def test_the_video_builders_pass_the_device_backend_through(device: str | None) -> None:
-    backend = None if device is None else core.backend_for("cpu")
+    backend = None if device is None else _DeviceBackendStandIn()
     source = composition.video_source(backend)
-    sink = composition.video_sink()
+    sink = composition.video_sink(backend)
     assert type(source) is FFmpegVideoSource and source.device_backend is backend
-    assert type(sink) is FFmpegVideoSink
+    assert type(sink) is FFmpegVideoSink and sink._device_backend is backend
     assert composition.video_source() is not composition.video_source()
     assert composition.video_sink() is not composition.video_sink()
 
