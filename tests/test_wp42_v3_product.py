@@ -11,8 +11,11 @@ static region; ruling R0-Q5's condition is the first test: the lossless clips de
 ``ad14-mask``) AD-14's bound (under 0.5/255 after smoothing) is ASSERTED and V3's four ratios are
 RECORDED (CHARC ruling V3-1); on WP3.11's jittering-patch clip V3's 25 % is ASSERTED. c3 and
 ancuti2018 at their defaults, on the GPU job with device frames (the product's job on this
-machine; ``gpu``). The encoded output's figures are recorded beside, as characterisation. A
-product-method miss is a STOP (D96 and the threshold are the owner's).
+machine; ``gpu``). The encoded output's figures are recorded beside, as characterisation. Each
+acceptance check reads the unrounded figure and has a planted control through the same
+measurement: a 1/255 flicker on every other smoothed frame for AD-14's bound, and the smoothed
+and per-frame frames interleaved for V3's ratio; both must be refused. A product-method miss is
+a STOP (D96 and the threshold are the owner's).
 """
 
 from __future__ import annotations
@@ -261,30 +264,68 @@ def _encoded(output: Path, mask: NDArray[np.bool_]) -> list[NDArray[np.float32]]
 
 
 def _line(name: str, figures: dict[str, Any]) -> str:
-    shown = {k: v for k, v in figures.items() if not k.startswith("v3_")}
+    shown = {k: v for k, v in figures.items() if not k.startswith(("v3_", "raw_"))}
     return f"{name}: " + "; ".join(f"{key} {value}" for key, value in shown.items())
+
+
+def _ad14_holds(figure: float) -> bool:
+    """AD-14's acceptance: the mean abs frame-to-frame difference under 0.5/255 (unrounded)."""
+    return figure < 0.5
+
+
+def _v3_holds(smoothed: NDArray[np.float64], unsmoothed: NDArray[np.float64]) -> bool:
+    """V3's acceptance: per measure, the smoothed flicker at most 25 % of the per-frame one."""
+    return bool(np.all(smoothed <= 0.25 * unsmoothed))
+
+
+def _planted(
+    smoothed: list[NDArray[np.float32]], unsmoothed: list[NDArray[np.float32]]
+) -> tuple[list[NDArray[np.float32]], list[NDArray[np.float32]]]:
+    """Two wrong renders of the clip that the acceptance checks must refuse (planted controls).
+
+    AD-14's: the smoothed frames with 1/255 added to every other frame (a flicker of 1/255 in the
+    region, twice the bound). V3's: the smoothed and the per-frame legs' frames interleaved, as an
+    export that loses its smoothing on every other frame would render them.
+    """
+    flickered = [region + np.float32((i % 2) / 255.0) for i, region in enumerate(smoothed)]
+    interleaved = [
+        u if i % 2 else s for i, (s, u) in enumerate(zip(smoothed, unsmoothed, strict=True))
+    ]
+    return flickered, interleaved
 
 
 def _v3(clip: Path, method: str, mask: NDArray[np.bool_], folder: Path) -> dict[str, Any]:
     smoothed_regions, output = _smoothed_export(clip, method, mask, folder)
     unsmoothed_regions = _unsmoothed(clip, method, mask, folder)
     assert len(smoothed_regions) == len(unsmoothed_regions) == 90
-    legs = (smoothed_regions, unsmoothed_regions, _encoded(output, mask))
+    flickered, interleaved = _planted(smoothed_regions, unsmoothed_regions)
+    legs = (smoothed_regions, unsmoothed_regions, _encoded(output, mask), flickered, interleaved)
     with ThreadPoolExecutor(len(legs)) as pool:  # NumPy releases the GIL: the legs in parallel
-        (smoothed, v3_smoothed), (unsmoothed, v3_unsmoothed), (encoded, v3_encoded) = pool.map(
-            _figures, legs
-        )
+        (
+            (smoothed, v3_smoothed),
+            (unsmoothed, v3_unsmoothed),
+            (encoded, v3_encoded),
+            (planted_ad14, _),
+            (_, v3_planted),
+        ) = pool.map(_figures, legs)
     return {
         "ad14_unsmoothed": round(unsmoothed, 4),
         "ad14_smoothed": round(smoothed, 4),
         "ad14_encoded": round(encoded, 4),
+        "raw_ad14_smoothed": smoothed,  # the acceptance reads the unrounded figure (R1 F2)
+        "raw_planted_ad14": planted_ad14,
         "v3_unsmoothed": v3_unsmoothed,
         "v3_smoothed": v3_smoothed,
+        "v3_planted": v3_planted,
         "ratios": dict(
             zip(MEASURES, np.round(v3_smoothed / v3_unsmoothed, 3).tolist(), strict=True)
         ),
         "encoded_ratios": dict(
             zip(MEASURES, np.round(v3_encoded / v3_unsmoothed, 3).tolist(), strict=True)
+        ),
+        "ad14_planted": round(planted_ad14, 4),
+        "planted_ratios": dict(
+            zip(MEASURES, np.round(v3_planted / v3_unsmoothed, 3).tolist(), strict=True)
         ),
     }
 
@@ -303,7 +344,8 @@ def test_ad14_bound_with_the_product_method(
     print(_line(f"ad14-flicker {method}", figures))
     record_property("v3", _line(method, figures))
     assert np.all(np.isfinite(list(figures["ratios"].values())))
-    assert figures["ad14_smoothed"] < 0.5, figures
+    assert not _ad14_holds(figures["raw_planted_ad14"]), figures["raw_planted_ad14"]  # control
+    assert _ad14_holds(figures["raw_ad14_smoothed"]), figures
 
 
 @pytest.mark.parametrize("method", METHODS)
@@ -320,7 +362,24 @@ def test_v3_ratio_on_the_jittering_patch_clip_with_the_product_method(
     record_property("v3", _line(method, figures))
     unsmoothed = figures["v3_unsmoothed"]
     assert np.all(unsmoothed > 0)
-    # The planted failure: an export rendering with per-frame records has the per-frame leg's
-    # flicker (ratio 1 per measure), which the check refuses.
-    assert not np.all(unsmoothed <= 0.25 * unsmoothed)
-    assert np.all(figures["v3_smoothed"] <= 0.25 * unsmoothed), figures["ratios"]
+    # The planted control: every other frame rendered without smoothing, through the same
+    # measurement and acceptance, is refused.
+    assert not _v3_holds(figures["v3_planted"], unsmoothed), figures["v3_planted"] / unsmoothed
+    assert _v3_holds(figures["v3_smoothed"], unsmoothed), figures["ratios"]
+
+
+def test_the_acceptance_reads_the_unrounded_figures(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Reviewer A R1 F2: a figure just under the bound is accepted (it is not rounded first)."""
+    import sys
+
+    module = sys.modules[__name__]
+    regions = [np.zeros(3, dtype=np.float32)] * 90
+    monkeypatch.setattr(module, "_smoothed_export", lambda *args: (regions, Path("out.mp4")))
+    monkeypatch.setattr(module, "_unsmoothed", lambda *args: regions)
+    monkeypatch.setattr(module, "_encoded", lambda *args: regions)
+    monkeypatch.setattr(module, "_figures", lambda legs: (0.49999, np.ones(4)))
+    figures = _v3(Path("clip.mp4"), "c3", np.ones(3, dtype=bool), Path("."))
+    assert figures["ad14_smoothed"] == 0.5  # the shown figure is rounded
+    assert _ad14_holds(figures["raw_ad14_smoothed"])
+    assert not _ad14_holds(0.5) and _v3_holds(np.full(4, 0.25), np.ones(4))
+    assert not _v3_holds(np.array([0.1, 0.1, 0.1, 0.26]), np.ones(4))
