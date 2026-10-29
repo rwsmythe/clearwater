@@ -94,6 +94,11 @@
   the two same-drive cases flipping to REFUSED + exact-text assertions, no deletions, node ids listed; parent guard and its planted
   tests (:272/:285) unchanged. WP4.2b merges FIRST, OWN two-leg window (~52 min); `wp4.2` rebased at cell 2's next yield before
   task 5. DR-80 closure gains the before-jobs sentence at the accept. Codex depth 137,070 / 475,000 after turn 2.
+- **WP4.2b STOP 2 RULED 04:55Z (query `cb8a50fc31eb0187`; docs-only 79b60d9):** condition 3 EXTENDED test-only with (c) the eight
+  drive-relative cases take their precondition plan from a monkeypatched `final_output_path` returning the old drive-relative path
+  (they stay the parent guard's coverage) and (d) the planted file-form control isolated the same way; every edited node id + span +
+  reason in ledger and report; no deletion, no skip, no weakened assertion. Correction of my condition 2: the tests at :266/:279 prove
+  planning is SKIPPED, not that the guard fires. Cell idle at 167,794 before the word.
 - **(history) After WP4.1's accept:** WP4.2's brief (DRAFT RULED on main 3aa3c51) got ONE revision pass against WP4.1's accept record, then FINAL
   on CHARC's word; its revision must carry: DR-78/79 (B2 rows) as WP4.2 items, the WP4.1 runner's final names and the stream-syntax
   predicate, the Limit text. WP4.3's revision later carries DR-75 (REQUIRED test under its Q12), DR-76, DR-77, and the AD-23 'applied by
