@@ -73,7 +73,7 @@ def _parse(block):
             value = block[at : at + length]
             entries.append((tag, kind, count, value))
             if tag in _PATHS.get(path, {}):
-                child = struct.unpack(order + "I", value)[0]
+                child = struct.unpack(order + ("H" if kind == 3 else "I"), value)[0]
                 read(child, (*path, _PATHS[path][tag]))
         return struct.unpack_from(order + "I", block, offset + 2 + number * 12)[0]
 
@@ -89,6 +89,24 @@ def _same(before, after, path, tag):
     assert _entry(after, path, tag) == _entry(before, path, tag), (
         f"{path}.{tag} type/count/value changed"
     )
+
+
+def _record_locations(block, path=()):
+    """Locate raw entries independently, including entries with undecodable values."""
+    order = "<" if block[:2] == b"II" else ">"
+    offset = struct.unpack_from(order + "I", block, 4)[0]
+    for label in path:
+        pointer = {"Exif": 34665, "GPS": 34853, "Interop": 40965}[label]
+        count = struct.unpack_from(order + "H", block, offset)[0]
+        at = next(
+            offset + 2 + i * 12
+            for i in range(count)
+            if struct.unpack_from(order + "H", block, offset + 2 + i * 12)[0] == pointer
+        )
+        kind = struct.unpack_from(order + "H", block, at + 2)[0]
+        offset = struct.unpack_from(order + ("H" if kind == 3 else "I"), block, at + 8)[0]
+    count = struct.unpack_from(order + "H", block, offset)[0]
+    return [offset + 2 + i * 12 for i in range(count)]
 
 
 def _tiff_fixture(fields=(), **options):
@@ -244,7 +262,7 @@ def test_kept_entry_order_is_preserved(tmp_path):
     assert kept == [400, 271, 270], "kept entry order changed"
 
 
-@pytest.mark.parametrize("bad", ["offset", "table", "payload"])
+@pytest.mark.parametrize("bad", ["offset", "table"])
 @pytest.mark.parametrize("pointer,path", [(34665, ()), (34853, ()), (40965, ("Exif",))])
 def test_damaged_child_is_dropped_alone(tmp_path, caplog, bad, pointer, path):
     source = bytearray(
@@ -272,10 +290,8 @@ def test_damaged_child_is_dropped_alone(tmp_path, caplog, bad, pointer, path):
     child = struct.unpack_from("<I", source, record + 8)[0]
     if bad == "offset":
         struct.pack_into("<I", source, record + 8, len(source) + 100)
-    elif bad == "table":
-        struct.pack_into("<H", source, child, 65535)
     else:
-        struct.pack_into("<HHII", source, child + 2, 65000, 7, 100, len(source) + 100)
+        struct.pack_into("<H", source, child, 65535)
     (tmp_path / "damaged.exif").write_bytes(source)
     output = exif.edit(bytes(source), 4, 3)
     assert _entry(output, (), 271) == (271, 2, 4, b"abc\0")
@@ -290,17 +306,18 @@ def test_damaged_child_is_dropped_alone(tmp_path, caplog, bad, pointer, path):
 @pytest.mark.parametrize("bad", [b"garbage", b"II*\0\xff\xff\xff\xff", b"II*\0\x08\0\0\0\xff\xff"])
 def test_damaged_root_raises_and_sanitise_drops(tmp_path, bad):
     (tmp_path / "bad.exif").write_bytes(bad)
-    with pytest.raises((ValueError, struct.error, SyntaxError)):
+    with pytest.raises(ValueError):
         exif.edit(bad, 4, 3)
     assert exif.sanitise(bad, "synthetic") is None
 
 
-def test_oversized_root_value_is_rejected(tmp_path):
-    source = bytearray(_fixture([(271, 2, 4, b"abc\0")]))
+def test_oversized_root_value_is_dropped_alone(tmp_path):
+    source = bytearray(_fixture([(271, 2, 4, b"abc\0"), (272, 2, 4, b"xyz\0")]))
     struct.pack_into("<I", source, 14, 0xFFFFFFFF)
     (tmp_path / "huge.exif").write_bytes(source)
-    with pytest.raises(ValueError):
-        exif.edit(bytes(source), 4, 3)
+    output = exif.edit(bytes(source), 4, 3)
+    assert _entry(output, (), 272) == (272, 2, 4, b"xyz\0")
+    assert 271 not in [row[0] for row in _parse(output)[1][()]]
 
 
 def test_other_ifd_values_are_dropped_with_warning(tmp_path, caplog):
@@ -359,3 +376,236 @@ def test_bigtiff_is_not_carried(tmp_path, caplog):
     assert exif.from_tiff(source) is None
     assert "BigTIFF" in caplog.text, "unsupported BigTIFF was not reported"
     assert exif.sanitise(source, "synthetic") is None
+
+
+@pytest.mark.parametrize("order", ["<", ">"])
+@pytest.mark.parametrize("route", ["edit", "from_tiff"])
+@pytest.mark.parametrize("path", [(), ("Exif",), ("GPS",), ("Exif", "Interop")])
+@pytest.mark.parametrize("fault", ["unknown_type", "past_eof", "inside_header"])
+def test_r1_bad_entry_is_dropped_without_losing_siblings(
+    tmp_path, caplog, order, route, path, fault
+):
+    bad_tag = 65002
+    fields = [(33434, 5, 1, struct.pack(order + "II", 1234, 100)), (bad_tag, 7, 8, b"badvalue")]
+    options = {
+        (): {"root": [(271, 2, 4, b"abc\0"), *fields]},
+        ("Exif",): {"sub": fields},
+        ("GPS",): {"gps": fields},
+        ("Exif", "Interop"): {"interop": fields},
+    }
+    if path:
+        options[path]["root"] = [(271, 2, 4, b"abc\0")]
+    source = bytearray(_fixture(order=order, **options[path]))
+    at = next(
+        at
+        for at in _record_locations(source, path)
+        if struct.unpack_from(order + "H", source, at)[0] == bad_tag
+    )
+    if fault == "unknown_type":
+        struct.pack_into(order + "H", source, at + 2, 0)
+    else:
+        struct.pack_into(
+            order + "I", source, at + 8, len(source) + 100 if fault == "past_eof" else 2
+        )
+    (tmp_path / "entry-damage.exif").write_bytes(source)
+    if route == "edit":
+        assert exif.sanitise(bytes(source), "synthetic") is not None, (
+            "bad entry discarded whole block"
+        )
+        caplog.clear()
+        output = exif.edit(bytes(source), 4, 3)
+    else:
+        output = exif.from_tiff(bytes(source))
+    assert output is not None, "bad entry discarded all metadata"
+    directories = _parse(output)[1]
+    assert path in directories, "bad entry discarded sibling fields with its whole IFD"
+    assert (33434, 5, 1, struct.pack(order + "II", 1234, 100)) in directories[path]
+    assert _entry(output, (), 271) == (271, 2, 4, b"abc\0")
+    assert bad_tag not in [row[0] for row in directories[path]]
+    label = path[-1] if path else "IFD0"
+    messages = [record.getMessage() for record in caplog.records if record.levelname == "WARNING"]
+    assert len(messages) == 1, "one warning required per dropped entry"
+    assert label in messages[0] and str(bad_tag) in messages[0], "warning must name IFD and tag"
+    assert "badvalue" not in messages[0], "warning disclosed entry bytes"
+
+
+def test_r1_bad_tiff_software_value_keeps_make(tmp_path, caplog):
+    source = bytearray(_tiff_fixture([(271, 2, 6, b"Maker\0"), (305, 2, 8, b"oldtool\0")]))
+    at = next(
+        at for at in _record_locations(source) if struct.unpack_from("<H", source, at)[0] == 305
+    )
+    struct.pack_into("<I", source, at + 8, len(source) + 100)
+    (tmp_path / "software-damage.tif").write_bytes(source)
+    output = exif.from_tiff(bytes(source))
+    assert output is not None, "bad Software discarded all TIFF metadata"
+    assert _entry(output, (), 271) == (271, 2, 6, b"Maker\0")
+    assert 305 not in [row[0] for row in _parse(output)[1][()]]
+    assert len(caplog.records) == 1
+    assert "IFD0" in caplog.text and "305" in caplog.text
+
+
+@pytest.mark.parametrize("route", ["edit", "from_tiff"])
+def test_r1_bad_ifd0_description_keeps_make(tmp_path, route):
+    source = bytearray(_fixture([(270, 2, 8, b"badtext\0"), (271, 2, 6, b"Maker\0")]))
+    at = _record_locations(source)[0]
+    struct.pack_into("<I", source, at + 8, len(source) + 100)
+    (tmp_path / "description-damage.exif").write_bytes(source)
+    output = exif.edit(bytes(source), 4, 3) if route == "edit" else exif.from_tiff(bytes(source))
+    assert output is not None, "bad description discarded all metadata"
+    assert _entry(output, (), 271) == (271, 2, 6, b"Maker\0")
+
+
+@pytest.mark.parametrize("route", ["edit", "from_tiff"])
+def test_r1_child_table_fault_drops_child_only(tmp_path, route):
+    source = bytearray(
+        _fixture([(271, 2, 6, b"Maker\0")], sub=[(36864, 7, 4, b"0230")], gps=[(1, 2, 2, b"N\0")])
+    )
+    at = next(
+        at for at in _record_locations(source) if struct.unpack_from("<H", source, at)[0] == 34853
+    )
+    child = struct.unpack_from("<I", source, at + 8)[0]
+    struct.pack_into("<H", source, child, 65535)
+    (tmp_path / "child-table.exif").write_bytes(source)
+    output = exif.edit(bytes(source), 4, 3) if route == "edit" else exif.from_tiff(bytes(source))
+    assert output is not None
+    assert _entry(output, (), 271) == (271, 2, 6, b"Maker\0")
+    assert _entry(output, ("Exif",), 36864) == (36864, 7, 4, b"0230")
+    assert ("GPS",) not in _parse(output)[1]
+
+
+@pytest.mark.parametrize("order", ["<", ">"])
+@pytest.mark.parametrize("route", ["edit", "from_tiff"])
+@pytest.mark.parametrize(
+    "parent,tag,child,field",
+    [
+        ((), 34665, ("Exif",), 33434),
+        ((), 34853, ("GPS",), 1),
+        (("Exif",), 40965, ("Exif", "Interop"), 1),
+    ],
+)
+def test_r1_type13_carried_pointer_survives(tmp_path, order, route, parent, tag, child, field):
+    source = bytearray(
+        _fixture(
+            [(271, 2, 4, b"abc\0")],
+            order=order,
+            sub=[(33434, 5, 1, struct.pack(order + "II", 1234, 100))],
+            gps=[(1, 2, 2, b"N\0")],
+            interop=[(1, 2, 4, b"R98\0")],
+        )
+    )
+    at = next(
+        at
+        for at in _record_locations(source, parent)
+        if struct.unpack_from(order + "H", source, at)[0] == tag
+    )
+    struct.pack_into(order + "H", source, at + 2, 13)
+    (tmp_path / "type13.exif").write_bytes(source)
+    output = exif.edit(bytes(source), 4, 3) if route == "edit" else exif.from_tiff(bytes(source))
+    assert output is not None
+    assert child in _parse(output)[1], "carried type-13 pointer lost its child"
+    assert _entry(output, parent, tag)[1:3] == (13, 1)
+    _same(bytes(source), output, child, field)
+
+
+@pytest.mark.parametrize("tag", [274, 305, 40962, 40963])
+@pytest.mark.parametrize("order", ["<", ">"])
+def test_r1_d63_duplicates_are_removed_other_duplicates_survive(tmp_path, caplog, tag, order):
+    duplicates = (
+        [(tag, 2, 4, value) for value in (b"aaa\0", b"bbb\0", b"ccc\0")]
+        if tag == 305
+        else [(tag, 3, 1, struct.pack(order + "H", value)) for value in (6, 8, 3)]
+    )
+    fields = [(65001, 7, 1, b"a"), *duplicates, (65001, 7, 1, b"b")]
+    path = () if tag in (274, 305) else ("Exif",)
+    source = _fixture(fields if not path else (), sub=fields if path else None, order=order)
+    (tmp_path / "duplicates.exif").write_bytes(source)
+    output = exif.edit(source, 640, 480)
+    entries = _parse(output)[1][path]
+    assert sum(row[0] == tag for row in entries) == 1, "later D63 duplicate retained"
+    wanted = (
+        (tag, 2, 11, b"Clearwater\0")
+        if tag == 305
+        else (tag, 3, 1, struct.pack(order + "H", {274: 1, 40962: 640, 40963: 480}[tag]))
+    )
+    assert _entry(output, path, tag) == wanted
+    assert [row for row in entries if row[0] == 65001] == [(65001, 7, 1, b"a"), (65001, 7, 1, b"b")]
+    assert entries.index(wanted) > entries.index((65001, 7, 1, b"a"))
+    messages = [record.getMessage() for record in caplog.records]
+    assert len(messages) == 2
+    assert all(
+        str(tag) in message and (path[-1] if path else "IFD0") in message for message in messages
+    )
+
+
+@pytest.mark.parametrize("route", ["edit", "from_tiff"])
+@pytest.mark.parametrize("path", [("Exif",), ("GPS",), ("Exif", "Interop")])
+def test_r1_empty_child_pointer_is_pruned(tmp_path, route, path):
+    options = {
+        ("Exif",): {"sub": []},
+        ("GPS",): {"gps": []},
+        ("Exif", "Interop"): {"sub": [(36864, 7, 4, b"0230")], "interop": []},
+    }
+    source = _fixture([(271, 2, 4, b"abc\0")], **options[path])
+    (tmp_path / "empty-child.exif").write_bytes(source)
+    output = exif.edit(source, 4, 3) if route == "edit" else exif.from_tiff(source)
+    assert output is not None
+    directories = _parse(output)[1]
+    if route == "edit" and path == ("Exif",):
+        assert [row[0] for row in directories[path]] == [40962, 40963]
+    else:
+        assert path not in directories, "empty child pointer retained"
+
+
+def test_r1_nested_empty_tree_leaves_no_tiff_metadata(tmp_path):
+    source = _fixture(interop=[])
+    (tmp_path / "empty-tree.tif").write_bytes(source)
+    assert exif.from_tiff(source) is None, "recursively empty metadata tree was retained"
+
+
+@pytest.mark.parametrize("order", ["<", ">"])
+def test_r1_duplicate_exif_pointers_keep_both_children_with_d63_dimensions(tmp_path, order):
+    source = _fixture(
+        [(34665, 4, 1, [(36864, 7, 4, b"0230")]), (34665, 4, 1, [(36864, 7, 4, b"0231")])],
+        order=order,
+    )
+    (tmp_path / "duplicate-pointers.exif").write_bytes(source)
+    output = exif.edit(source, 640, 480)
+    pointers = [row for row in _parse(output)[1][()] if row[0] == 34665]
+    assert len(pointers) == 2, "non-D63 duplicate pointer was dropped"
+    for pointer, version in zip(pointers, (b"0230", b"0231"), strict=True):
+        offset = struct.unpack(order + "I", pointer[3])[0]
+        count = struct.unpack_from(order + "H", output, offset)[0]
+        rows = [
+            struct.unpack_from(order + "HHI4s", output, offset + 2 + i * 12) for i in range(count)
+        ]
+        assert (36864, 7, 4, version) in rows
+        assert (40962, 4, 1, struct.pack(order + "I", 640)) in rows
+        assert (40963, 4, 1, struct.pack(order + "I", 480)) in rows
+
+
+@pytest.mark.parametrize("order", ["<", ">"])
+@pytest.mark.parametrize("size", [5, 70000])
+@pytest.mark.parametrize("parent,tag", [((), 34665), ((), 34853), (("Exif",), 40965)])
+def test_r1_short_pointer_promotes_only_when_relocated_offset_overflows(
+    tmp_path, order, size, parent, tag
+):
+    child = [(1, 2, 4, b"R98\0")]
+    fields = [(tag, 4, 1, child), (65000, 7, size, b"x" * size)]
+    source = bytearray(
+        _fixture(sub=fields, order=order) if parent else _fixture(fields, order=order)
+    )
+    first, second = _record_locations(source, parent)
+    # Keep the child physically early, but place its entry after the large value's entry.
+    source[first : first + 12], source[second : second + 12] = (
+        source[second : second + 12],
+        source[first : first + 12],
+    )
+    child_offset = struct.unpack_from(order + "I", source, second + 8)[0]
+    assert child_offset < 65536
+    struct.pack_into(order + "H", source, second + 2, 3)
+    source[second + 8 : second + 12] = struct.pack(order + "H", child_offset).ljust(4, b"\0")
+    (tmp_path / "short-pointer.exif").write_bytes(source)
+    output = exif.edit(bytes(source), 4, 3)
+    row = _entry(output, parent, tag)
+    assert row[1:3] == (4 if size > 65535 else 3, 1)
+    _same(bytes(source), output, parent, 65000)
