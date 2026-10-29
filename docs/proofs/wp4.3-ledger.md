@@ -235,7 +235,7 @@ appears in no computed set) and the import-time witness extension (DR-84).
 | 0 (design) | - | - | - | - | none (no product code) | - | 263,162 at the round-0 yield (cell 1 retired; `scripts/cell_depth.py`) |
 | build (tasks 3-10) | - | - | - | - | product + tests | - | 553,419 at the build yield (cell 2 retired PAST the ~400K stop: the whole build ran in one turn with no yield, so the dispatcher could not read it earlier) |
 | R1 (Reviewer A, `038f02e..99da8aa`) | 0 / 5 / 11 | 16 in / 0 out (R1-5's reachability to be proven on the `main()` path) | 16 new / 0 reopened | 0 | none yet (adjudicating turn; proposed: product + tests) | WSL, codex-cli 0.162.1, `gpt-6.1-sol` high | 129,481 at the R1 yield (cell 3; `scripts/cell_depth.py`, given by the dispatcher in cell 4's dispatch) |
-| R2 (Reviewer A, `038f02e..362a8b2`) | 0 / 3 / 6 | 9 in / 0 out | 8 new / 1 reopened (R2-9 = R1-12; the reviewer also tagged R2-1 as R1-3 and R2-3 as R1-5, adjudicated NEW: distinct paths, the R1 fixes hold) | 0 | R1 remediation (groups A-C): product + tests; R2: none yet (review-only turn); proposed: product (startup, adapter, preview, render worker) + tests, one grant decision (settings_dialog) | WSL, codex-cli 0.162.1, `gpt-6.1-sol` high | 316,716 at the Group C yield (cell 4, 156 turns; `scripts/cell_depth.py`) |
+| R2 (Reviewer A, `038f02e..362a8b2`) | 0 / 3 / 6 | 9 in / 0 out | 8 new / 1 reopened (R2-9 = R1-12; the reviewer also tagged R2-1 as R1-3 and R2-3 as R1-5, adjudicated NEW: distinct paths, the R1 fixes hold) | 0 | R1 remediation (groups A-C): product + tests; R2: none yet (review-only turn); proposed: product (startup, adapter, preview, render worker) + tests, one grant decision (settings_dialog) | WSL, codex-cli 0.162.1, `gpt-6.1-sol` high | 316,716 at the Group C yield (cell 4, 156 turns; `scripts/cell_depth.py`); seat retired at 355,066 (cell 4 stood down after the R2 yield) |
 
 ## CHARC round-0 ruling (`fcb2a9205c060013`, 2026-10-29 12:54:46Z, verbatim; it GOVERNS the STOP items above)
 
@@ -570,3 +570,47 @@ gui/app deps, activity, wiring 54 passed. ruff check, ruff format --check (280),
   `b84174484ba220b8c7419e9271f7a3b7`, review-diff.txt `7eb9f5530b759cbda1eafdf7bce2916d`.
 - Yielded to the dispatcher BEFORE any remediation (review-only turn). Remediation goes to a fresh
   cell from this ledger (cell 4 at 316,716 is past the evaluation point).
+
+## CHARC R1-13 ruling (`ace08fbbb645c856`, 2026-10-29, verbatim; it GOVERNS R1-13 and the D85 missing-folder Limit, DR-89)
+
+PRIMARY: CHARC. Ruling on query 60a471ec3c0db163 (WP4.3 R1-13), plus the D85 residual you flagged.
+
+**R1-13 = (a). RULED.** AD-11 as amended 2026-10-21 says it outright: the k > 1 bound (p99 within 2/255 at k = 2) is set "on real-sized content (at least 1080p)", and "small stills and synthetic noise are outside V8's domain (a preview is a downscale of a real-sized image)". A 320x180 fixture frame is outside the domain, so a p99 of 10/255 there is a characterisation, not a V8 result, and asserting the bound on it would be asserting the wrong thing. Conditions:
+1. The figure of record for the V8 VIDEO leg is the GX011627 window leg (already in WP4.3's window list): mean abs within 1/255 AND p99 within 2/255 at k = 2 ASSERTED there, on the real-size frame, with the figures in the report; p99.9 and max RECORDED.
+2. The fixture-size p99 stays recorded and printed, and the report's V8 paragraph and Limits cite AD-11's domain sentence as the reason it is not asserted (not "the fixture is small", which invites a later reviewer to assert it anyway).
+3. The accept record carries that sentence.
+(b) is DECLINED for the reason you gave and the same AD-11 clause: a 1080p synthetic frame is still outside the domain, so a pass proves nothing and a failure is noise. No test after R2.
+
+**D85 residual (the missing-folder rule) = Limit + register row, mine at the accept.** Reading: a folder that has vanished at start-up counts as clean and its journal entry is dropped; a temporary on a drive that was unplugged at that start is not removed when the drive returns, unless the folder is the output folder or a later export's destination; it stays visible as `.clearwater-partial`. That is a narrow residual of D85 / spec 8.4 ("leftover temporary files from a crash are cleaned up on the next start"), bounded (removable media, exactly one start without the drive), fail-safe (nothing deleted on a path whose folder cannot be proved, which is the right side of the N8 line), and user-visible by the suffix. ACCEPTED as a Limit for WP4.3; the alternative (keeping the entry until the folder is seen again) is major 3's keep-until-cleanup-succeeds rule extended to a missing folder, and I do not want it decided inside a remediation cell. R2 is asked to challenge it; if R2 shows a route where the folder is PRESENT and the entry is still dropped, that is a finding, not this Limit. Register row (DR-89, mine at the accept): trigger = the next touch of the leftover journal, or an owner report of a stale `.clearwater-partial`.
+
+Noted and concurred: major 5 reproduced on the real main() path (delivery inside close(), 5 s shutdown timeout honoured, no exit hang), fix in app/main.py only, gui/jobs.py untouched; R1-11 cancellable release wait with the constant removed; R1-12 (e) rearranged to one witness; item 15 and the portable DR-82 form; the collection diff against 038f02e. R2 review-only in cell 4 at 316K, any remediation to a fresh cell: concurred.
+
+FYI for your rebases: main moved by one docs-only commit of mine, 5e1fe8f (charc state), after your gate; nothing of yours is held. HOLD when you ask.
+
+Owner-pending inputs: photos (WP3.6P), the iPhone clip (DR-15). Open owner decisions: none.
+
+
+## CHARC R2 ruling (`38a7c702a4cae38a`, 2026-10-29, verbatim; it GOVERNS R2's dispositions)
+
+PRIMARY: CHARC. Ruling on query 1e67098be8629740 (WP4.3 R2: R2-3 grant, R2-4 bank). Read at this seat on `wp4.3` 832360d: `gui/settings_dialog.py` `_on_clear_done` (:744-747) presents `_error` BEFORE its `_closed` check, and the limit job's `done` (:838-840) presents unconditionally; both block behind the S1 deferred open, which is this package's. The reading stands.
+
+**QUERY 1 (R2-3, major) = GRANT, narrow. RULED.** `gui/settings_dialog.py` is already in the brief's question-1 grant for DR-52 / `catalog` / DR-61; this extends it by exactly ONE mechanism:
+1. The two cache-job DONE callbacks (clear, limit) drop their error presentation when the MAIN window is closing, read from ONE closed signal the dialog can observe (the same signal R1-5's start-up callbacks read, not a second flag); the job itself still runs to its end and the result is still logged.
+2. No other change to the dialog: Q1's gating (:730), `_clearing`, `_update_clear_button`, the RuntimeError branches stay as they are.
+3. Test in R1-5's form in `tests/test_gui_settings_dialog.py`: a clear AND a limit queued behind a slow, FAILING open, the main window closed inside the wait, no error box presented, both results logged; RED before the fix. One further case: the same two jobs with the window NOT closing still present their error (the fix must not swallow the normal path).
+4. Introduced-here is agreed (the wait is S1's handle), so it is not banked; it counts toward this package's remediation, not WP3.20's.
+
+**QUERY 2 (R2-4, minor) = BANK. RULED.** A Clear during another clip's export fails that export readably with nothing partial written (D85/N8 hold); the alternative gates the dialog on the export and batch panels' state, which crosses files the brief does not own and is a design change to WP3.20's gating, not a remediation. Register row DR-90, MINE at WP4.3's accept: trigger = the next touch of the dialog's Clear gating (:730) or of the export/batch panels' cache coupling; remedy sketch = the activity guard (`app/activity.py`) exposes "an export is running" and the dialog refuses Clear while it is true. The report carries it as a Limit with the readable-failure sentence.
+
+R2-1, R2-2 (majors) FIX as proposed, each RED-first; R2-1's "read failure makes add/drop raise with NO write" is the right side of D85 (never overwrite retained entries on a doubtful read). R2-5..R2-8 FIX in owned files; R2-9 FIX test-only. Concurred.
+
+Cell 5 prompt also carries, as you listed: R1-13 condition 2 (the report's V8 paragraph and Limits cite AD-11's domain sentence) and the D85 missing-folder Limit with DR-89. Yields per task group (dispatch-recipe). Then R3 (round 3 of 5). Cell 4 stands down at 355K: concurred.
+
+Owner-pending inputs: photos (WP3.6P), the iPhone clip (DR-15). Open owner decisions: none.
+
+
+## Remediation of R2 (cell 5, implementer-opus-high; 2026-10-29)
+
+One line per finding: the finding, the commit, the test. Groups per the dispatch: A (start-up and the
+journal: R2-1, R2-2), B (the adapter, the preview and the worker: R2-5..R2-9), C (R2-3 under the grant,
+R2-4 as banked, the report's R1-13 / AD-11 wording).
