@@ -8,7 +8,7 @@ build waits for WP4.2a's merge and the orchestrator's rebase (R1-Q5 condition 3,
 
 | Gate | Cell | Depth (tokens) | Read at | Note |
 |---|---|---|---|---|
-| Y1 (round 0) | cell 1 | | | |
+| Y1 (round 0) | cell 1 | 209,438 (70 turns) | 2026-10-29 02:33:37Z | at Y1; cell 1 STOOD DOWN 02:35Z, build to a fresh cell |
 
 ## Round ledger (Reviewer A, Codex `gpt-6.1-sol` / high, WSL)
 
@@ -179,6 +179,34 @@ row (reproduced, `cache/store.py:660-661`; `cache/keys.py` `is_link` unused).
 - WP4.2a's final `check_outputs` / helper / `Redactor` code (in flight); item 3 assumes its
   brief's shape (`check_outputs(requests, footage_folder)` unchanged signature, file paths
   inside it).
+
+## Round-0 rulings (recorded by the orchestrator, generation 18, 2026-10-29)
+
+**Orchestrator seat rulings** (packet to CHARC `1286b25667b9ec63`, 02:34Z; CHARC CONCURRED, no overrule):
+- **G1 GRANTED** (`analysis/engine.py`: the frame-count check before `mark_complete` plus DR-47 (a)'s one-shot guard,
+  one touch), on the round-0 reproduction, under CHARC's Q2/Q7 ruling. DR-47 (a) CLOSES at the accept.
+- **R0-Q1 = (a)**: `export_jobs()` with no `cache_folder` gives a video request a private refusing `ProxyCache` /
+  `cache_key` in the root; the video job fails readably ("needs a cache folder"), nothing written; photo callers unchanged.
+- **R0-Q3 = (a)**: a `--cache-dir` that does not exist is exit 2, as `--out`.
+- **R0-Q4 = (b)**: GRANTED a one-line edit of `src/clearwater/app/__init__.py` re-exporting the three new builders.
+- **R0-Q5 = (a)**: unsmoothed leg = each frame's own statistics (`provisional_record`); the clips re-encoded in-test as
+  LOSSLESS libx265 8-bit 4:2:0 MP4 with BT.709 tags; CONDITION: first prove the lossless clip decodes through
+  `FFmpegVideoSource` inside WP3.9's envelope; if not, STOP with a recommendation, no silent lossy fallback.
+- **R0-Q6 = (a)**: the two pure router-pin tests are renamed in place.
+
+**CHARC RULING `881cc956f1335e7e` (2026-10-29 02:35:56Z), verbatim:**
+
+RULING on WP4.2 round 0 (query 1286b25667b9ec63; ledger `wp4.2` 283f022). PRIMARY: CHARC. Verified here: `verify.read_packet_table` (:482) and `readable_video_pts` (:681) exist; probe fault names `truncated` / `unreadable_tail` (probe.py:501/510); the bench's `device_backend` vocabulary (export_bench.py:395-428); `cache/store.py:573` skips a junction entry at discovery, consistent with the write-through you reproduced.
+
+**A. TRIPWIRE (item 4) = APPROVED.** The per-item `"video"` object `{device_backend, frame_device, encoder, decode_passes}`, null for photo and refused items, additive under `"schema": 1`, collected runner-side through wrappers on `source_for` / `sink_for`; no product module, interface or cache format touched. Conditions: (1) the record's existing fields and their order are unchanged and the WP4.1 schema test keeps passing without edit beyond the three router pins already granted; (2) the four field names and value domains are written in the runner's module docstring (the record's one documented shape) and in the report; (3) `decode_passes` is counted from the source wrapper's open calls, not inferred, and the V17 leg asserts it (reopen = fewer passes).
+
+**B. R0-Q2 = (b'), as you recommend.** `AnalysisEngine(expected_frames=None)`; the export job fills it with the probe's `nb_frames` when the probe reports no `truncated` / `unreadable_tail` fault (no extra cost), and with the readable count from ONE packet listing (`read_packet_table` + `readable_video_pts`) only when it does. `clearwater.analysis` stays free of `clearwater.io` (the job, not the engine, lists packets; `test_analysis_deps.py` unchanged). The check runs before `mark_complete`; a short count fails the job readably with nothing marked complete; a test plants each of the three cases (normal, truncated-with-listing, short-without-fault = DR-45 (b)'s reproduction). Q7's wording stands in full; (a) is not taken.
+
+**Ruled at your seat: all CONCURRED, no overrule.** G1 granted on the reproduction (count check + DR-47 (a) one-shot guard, one touch; DR-47 (a) CLOSES at the accept since the engine.py grant is exercised); R0-Q1 (a); R0-Q3 (a); R0-Q4 (b) the one-line `app/__init__.py` re-export (keep the package's one surface); R0-Q5 (a) with your lossless-decode proof condition and the STOP, no silent lossy fallback; R0-Q6 (a).
+
+**R1-Q4 reproduced:** noted with file:line (`store.py:573`, `:660-666`; `keys.py:103` `is_link` uncalled). The WP4.2 report carries the Limit; my register row (next `cache/` touch) lands at WP4.2's accept as ruled, with your evidence lines.
+
+CAP at 05:33:37Z noted; WP4.2a in Codex turn 2 (round 0 at 933e33e). Build grant after WP4.2a's merge and the rebase, or at the cap, as the brief says. Nothing further from me.
 
 ## RESUME HERE (build)
 
