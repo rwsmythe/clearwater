@@ -12,7 +12,8 @@ The only ``clearwater.app`` module that imports ``clearwater.gui`` or loads Qt.
    exists, so it ends before any export or batch job can start (DR-35 (c)).
 4. The panels: the parameter panels, the timeline (the analysis adapter's factory), the export
    panels (the guarded exports, sharing the one cache) and the settings dialog (WP3.10's rule,
-   the start-up's encoder catalog); then ``show()``.
+   the start-up's encoder catalog, and the window's one closed signal, which its cache jobs'
+   errors read, R2-3); then ``show()``.
 5. Three start-up jobs on the window's job runner, off the interface thread: (i) the cache's
    open with the settings' limit; (ii) the encoder detection into the catalog (D74, 8.2);
    (iii) the graphics-card detection, whose AD-9 reason the status bar shows while no file is
@@ -165,7 +166,8 @@ class Application:
         window is open (R1-5): the jobs run on the window's runner through :class:`_UnlessClosed`.
         """
         window = self.window
-        self._watch = _CloseWatch(window)
+        if self._watch is None:  # build_application watches from before the dialog's install
+            self._watch = _CloseWatch(window)
         jobs = _UnlessClosed(window.jobs, self.closed)
         limit = window.session.settings().cache_limit_bytes
         try:
@@ -272,6 +274,7 @@ def build_application(
         journal=journal,
         locks=locks,
         leftovers=leftovers,
+        _watch=_CloseWatch(window),
     )
     factory = make_analysis_factory(
         window.session.settings,
@@ -283,7 +286,11 @@ def build_application(
     install_timeline(window, factory)
     install_export_panels(window, exports)
     install_settings_dialog(
-        window, choosers=choosers, resolve_encoder=resolve_encoder, catalog=catalog
+        window,
+        choosers=choosers,
+        resolve_encoder=resolve_encoder,
+        catalog=catalog,
+        window_closing=application.closed,  # the start-up callbacks' one closed signal (R2-3)
     )
     window.show()
     application.start_jobs()

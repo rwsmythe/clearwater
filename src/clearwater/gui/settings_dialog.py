@@ -18,7 +18,10 @@ the first dialog that opens, or earlier by the application's start-up through th
 argument of :func:`install_settings_dialog` (WP4.3, DR-52). The one "auto" rule is WP3.10's
 ``clearwater.io.video.capability.resolve_encoder``.
 
-Message owner: every message this module presents has owner :data:`OWNER_SETTINGS`.
+Message owner: every message this module presents has owner :data:`OWNER_SETTINGS`. An error of
+the clear or limit job that ends while the MAIN window is closing is logged, not presented
+(WP4.3 R2-3: both jobs wait for the application's deferred cache open); the closed signal is the
+caller's ``window_closing`` argument of :func:`install_settings_dialog`.
 Threading: everything here runs on the interface thread except the job callables, which only
 call the injected engines.
 """
@@ -27,6 +30,7 @@ from __future__ import annotations
 
 import contextlib
 import dataclasses
+import logging
 import threading
 import time
 from collections.abc import Callable, Sequence
@@ -67,6 +71,8 @@ from clearwater.jobs import validate_suffix
 
 from .contract import Message, ShellContext, ShellWindow
 from .messages import ascii_text, file_name
+
+_LOG = logging.getLogger(__name__)
 
 OWNER_SETTINGS = "settings"
 """The owner of every message this dialog presents (DR-44 (b))."""
@@ -312,6 +318,7 @@ class SettingsDialog(QDialog):
         resolve_encoder: EncoderResolver,
         catalog: EncoderCatalog,
         cache_limiter: CacheLimiter,
+        window_closing: Callable[[], bool] | None = None,
     ) -> None:
         """Create the dialog on the session's current settings.
 
@@ -321,6 +328,7 @@ class SettingsDialog(QDialog):
             resolve_encoder: The one "auto" rule, used for the 10-bit rule.
             catalog: The session's encoder capabilities; started here when idle.
             cache_limiter: The session's cache-limit serialiser, shared between dialogs.
+            window_closing: True once the main window is closing (R2-3); never when None.
         """
         super().__init__(context.window)
         self._context = context
@@ -328,6 +336,7 @@ class SettingsDialog(QDialog):
         self._resolve = resolve_encoder
         self._catalog = catalog
         self._limiter = cache_limiter
+        self._window_closing = window_closing or (lambda: False)
         self._initial = context.session.settings()
         self._folder: Path | None = self._initial.output_folder
         self._clearing = False
@@ -358,6 +367,13 @@ class SettingsDialog(QDialog):
             return
         self._shown_errors.add(shown)
         _present_error(self._context, shown, path)
+
+    def _cache_job_error(self, text: str) -> None:
+        """A cache job's error: logged, and presented unless the main window is closing (R2-3)."""
+        if self._window_closing():
+            _LOG.warning("%s (not shown: the window is closing)", ascii_text(text))
+            return
+        self._error(text)
 
     # Construction.
 
@@ -743,7 +759,7 @@ class SettingsDialog(QDialog):
     def _on_clear_done(self, result: JobResult) -> None:
         """Main thread: the clear job ended."""
         if not result.ok:
-            self._error(f"The cache could not be cleared: {result.failure}")
+            self._cache_job_error(f"The cache could not be cleared: {result.failure}")
         if self._closed:
             return
         self._clearing = False
@@ -837,7 +853,7 @@ class SettingsDialog(QDialog):
 
         def done(result: JobResult) -> None:
             if not result.ok:
-                self._error(f"The cache limit could not be set: {result.failure}")
+                self._cache_job_error(f"The cache limit could not be set: {result.failure}")
 
         try:
             context.jobs.run(job, on_done=done)
@@ -864,6 +880,7 @@ def settings_dialog(
     resolve_encoder: EncoderResolver | None = None,
     catalog: EncoderCatalog | None = None,
     cache_limiter: CacheLimiter | None = None,
+    window_closing: Callable[[], bool] | None = None,
 ) -> SettingsDialog:
     """Build a new settings dialog on the session's current settings.
 
@@ -876,6 +893,7 @@ def settings_dialog(
             dialog when None.
         cache_limiter: The session's cache-limit serialiser, shared between dialogs so that the
             last accepted limit wins; a new one for this dialog when None.
+        window_closing: True once the main window is closing (R2-3); never when None.
 
     Returns:
         The dialog; the shell opens it with ``QDialog.open()``.
@@ -886,6 +904,7 @@ def settings_dialog(
         resolve_encoder or wp310_resolve_encoder,
         catalog or EncoderCatalog(context.window),
         cache_limiter or CacheLimiter(),
+        window_closing,
     )
 
 
@@ -895,6 +914,7 @@ def install_settings_dialog(
     choosers: SettingsChoosers | None = None,
     resolve_encoder: EncoderResolver | None = None,
     catalog: EncoderCatalog | None = None,
+    window_closing: Callable[[], bool] | None = None,
 ) -> None:
     """Register the settings dialog with the window (Tools > Settings).
 
@@ -908,6 +928,9 @@ def install_settings_dialog(
         resolve_encoder: The one "auto" rule; WP3.10's
             ``clearwater.io.video.capability.resolve_encoder`` when None.
         catalog: The session's encoder capabilities (the start-up's); a new one when None.
+        window_closing: True once the main window is closing: a clear or limit job's error is
+            then logged, not presented (R2-3; the application's ``Application.closed``). Never
+            closing when None.
     """
     catalog = catalog if catalog is not None else EncoderCatalog(window)
     cache_limiter = CacheLimiter()
@@ -919,6 +942,7 @@ def install_settings_dialog(
             resolve_encoder=resolve_encoder,
             catalog=catalog,
             cache_limiter=cache_limiter,
+            window_closing=window_closing,
         )
 
     window.set_settings_dialog(factory)

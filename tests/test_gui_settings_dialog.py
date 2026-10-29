@@ -8,12 +8,14 @@ injected, the sink reports a chosen capability list, the cache records the threa
 and the locations are under ``tmp_path``.
 """
 
-# The shared fixture ``make_window`` is imported from gui_support and used as a parameter.
+# The shared fixtures ``make_window`` (gui_support) and ``make_app`` (test_app_startup) are
+# imported and used as parameters.
 # ruff: noqa: F401, F811
 
 from __future__ import annotations
 
 import dataclasses
+import logging
 import threading
 from collections.abc import Callable, Sequence
 from pathlib import Path
@@ -43,6 +45,8 @@ from clearwater.io.video import capability
 from clearwater.io.video.encode import VideoEncodeError
 from clearwater.jobs import TEMP_MARKER, validate_suffix
 from gui_support import image, make_window, open_and_wait, photo_engines, presenter_of, wait_idle
+from test_app_startup import cpu_settings, make_app
+from test_app_startup import presenter as startup_presenter
 
 pytestmark = pytest.mark.gui
 
@@ -1370,3 +1374,61 @@ def test_repeated_refused_accepts_show_one_banner(env: Env) -> None:
     dialog.accept()
     errors = presenter_of(window).of("error")
     assert len(errors) == 1 and errors[0].text.startswith("The output suffix is not valid:")
+
+
+# R2-3 (ruling 38a7c702): the cache jobs' errors and the main window's close.
+
+
+@pytest.mark.parametrize("closing", [True, False], ids=["window-closing", "window-open"])
+def test_cache_job_errors_are_not_presented_once_the_main_window_closes(
+    make_app: Any, qtbot: Any, monkeypatch: pytest.MonkeyPatch, caplog: Any, closing: bool
+) -> None:
+    """A clear and a limit queued behind a slow, FAILING cache open (the R1-5 form).
+
+    With the main window closed inside the wait, neither error is presented and both are logged;
+    with the window open, both are presented as before. The closed signal is the application's
+    one (``Application.closed``), the one its start-up callbacks read.
+    """
+    from clearwater.app import composition
+    from clearwater.gui import shell
+
+    opening, release = threading.Event(), threading.Event()
+
+    def slow_failing_open(folder: Path, limit: int = 0) -> Any:
+        opening.set()
+        assert release.wait(30)
+        raise OSError("the cache volume is not mounted")
+
+    monkeypatch.setattr(composition, "proxy_cache", slow_failing_open)
+    monkeypatch.setattr(shell, "SHUTDOWN_TIMEOUT_S", 0.2)
+    choosers = FakeChoosers()
+    application = make_app(cpu_settings(), choosers=choosers)
+    window = application.window
+    assert opening.wait(30)
+    window.shell_actions.settings.trigger()
+    dialog = window._settings_dialog
+    assert isinstance(dialog, SettingsDialog)
+    qtbot.waitUntil(lambda: dialog.encoder_combo.isEnabled(), timeout=60000)
+    dialog.clear_button.click()  # the clear job waits for the open
+    assert choosers.confirms
+    dialog.cache_spin.setValue(dialog.cache_spin.value() + 1)
+    dialog.ok_button.click()  # the limit job waits for the open
+    assert window.jobs.active() >= 2
+    texts = ("The cache could not be cleared:", "The cache limit could not be set:")
+    with caplog.at_level(logging.WARNING, logger=module.__name__):
+        if closing:
+            window.close()
+            assert application.closed()
+        release.set()
+        qtbot.waitUntil(lambda: application.cache.wait_open(0), timeout=30000)
+        if not closing:
+            qtbot.waitUntil(lambda: window.jobs.active() == 0, timeout=30000)
+        qtbot.wait(300)  # a late completion is delivered by this loop
+    errors = [m.text for m in startup_presenter(application).messages if m.owner == OWNER_SETTINGS]
+    if closing:
+        assert errors == []
+        assert all(text in caplog.text for text in texts)
+    else:
+        assert sorted(text for text in texts if any(e.startswith(text) for e in errors)) == sorted(
+            texts
+        )
