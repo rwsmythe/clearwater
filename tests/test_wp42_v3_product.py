@@ -11,7 +11,9 @@ static region; ruling R0-Q5's condition is the first test: the lossless clips de
 ``ad14-mask``) AD-14's bound (under 0.5/255 after smoothing) is ASSERTED and V3's four ratios are
 RECORDED (CHARC ruling V3-1); on WP3.11's jittering-patch clip V3's 25 % is ASSERTED. c3 and
 ancuti2018 at their defaults, on the GPU job with device frames (the product's job on this
-machine; ``gpu``). The encoded output's figures are recorded beside, as characterisation. Each
+machine; ``gpu``), or all on the CPU job when ``CLEARWATER_WP42_V3_BACKEND=cpu`` (the recorded CPU
+run); ``CLEARWATER_WP42_V3_FIGURES`` names a new figures file that the run writes, its backend
+on the first line. The encoded output's figures are recorded beside, as characterisation. Each
 acceptance check reads the unrounded figure and has a planted control through the same
 measurement: a 1/255 flicker on every other smoothed frame for AD-14's bound, and the smoothed
 and per-frame frames interleaved for V3's ratio; both must be refused. A product-method miss is
@@ -20,6 +22,7 @@ a STOP (D96 and the threshold are the owner's).
 
 from __future__ import annotations
 
+import os
 import subprocess
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
@@ -50,6 +53,35 @@ Sample = Callable[[str], Path]
 METHODS = ("c3", "ancuti2018")
 JITTER_REGION_ROWS = 270 // 2
 """The jittering-patch clip's measured region: its upper half (WP3.11's ``REGION_ROWS``)."""
+BACKEND_VARIABLE = "CLEARWATER_WP42_V3_BACKEND"
+"""Set to ``cpu`` to run every leg on the CPU job (the recorded CPU run, CHARC
+``2a336830303f3a2d``); unset, the legs run on the GPU job with device frames (the suite's form)."""
+FIGURES_VARIABLE = "CLEARWATER_WP42_V3_FIGURES"
+"""When set, the path of a NEW figures file: a ``backend:`` line, then each test's figures line."""
+
+
+@pytest.fixture(scope="module")
+def figures_file() -> Path | None:
+    """The run's figures file, created with its backend line; None when not asked for.
+
+    An existing file is never overwritten (each run writes its own).
+    """
+    named = os.environ.get(FIGURES_VARIABLE)
+    if not named:
+        return None
+    path = Path(named)
+    if path.exists():
+        pytest.fail(f"{FIGURES_VARIABLE} names an existing file; each run writes a new one")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(f"backend: {_backend().device}\n".encode("ascii"))
+    return path
+
+
+def _keep(figures_file: Path | None, line: str) -> None:
+    """Append one figures line to the run's figures file, when there is one."""
+    if figures_file is not None:
+        with figures_file.open("ab") as handle:
+            handle.write(f"{line}\n".encode("ascii"))
 
 
 def _encode_lossless(args: list[str], target: Path, *, stdin: bytes | None = None) -> Path:
@@ -130,7 +162,10 @@ def test_the_lossless_clips_decode_inside_wp39s_envelope(clips: dict[str, Path])
 # --- the measurement --------------------------------------------------------------------------
 
 
-def _gpu() -> Any:
+def _backend() -> Any:
+    """The legs' backend: the CPU when :data:`BACKEND_VARIABLE` is ``cpu``, else the GPU."""
+    if os.environ.get(BACKEND_VARIABLE) == "cpu":
+        return backend_for("cpu")
     try:
         return backend_for("cuda:0")
     except Exception as exc:  # no usable CUDA device here
@@ -194,7 +229,8 @@ class _Recording:
 def _smoothed_export(
     clip: Path, method: str, mask: NDArray[np.bool_], folder: Path
 ) -> tuple[list[NDArray[np.float32]], Path]:
-    """Export through the composed engine (the GPU job); return the regions and the output."""
+    """Export through the composed engine (the legs' backend); return the regions and the output."""
+    device = _backend().device
     sinks: list[_Recording] = []
 
     def sink_for(device: ArrayBackend | None) -> Any:
@@ -204,11 +240,12 @@ def _smoothed_export(
     out = folder / f"out-{method}"
     out.mkdir()
     exports = composition.export_jobs(cache_folder=folder / f"cache-{method}", sink_for=sink_for)
-    settings = Settings(output_folder=out, video_encoder="auto")
+    settings = Settings(output_folder=out, video_encoder="auto", force_cpu=device == "cpu")
     request = ExportRequest(clip, "video", new_parameter_set(method, {}), settings)
     result = exports.job(request)(StubProgress())
     assert result.ok, result.failure
-    assert result.device.startswith("GPU") and sinks[0].devices == {"cuda:0"}, result.device
+    job = "CPU" if device == "cpu" else "GPU"
+    assert result.device.startswith(job) and sinks[0].devices == {device}, result.device
     return sinks[0].regions, result.outputs[0]
 
 
@@ -218,9 +255,10 @@ def _unsmoothed(
     """Render each decoded frame with its own (provisional) statistics, as the export would.
 
     The same decode (device frames on the job's backend), method, parameters and backend as the
-    composed GPU job; only the records differ (round-0 ruling R0-Q5 (a)).
+    composed job; only the records differ (round-0 ruling R0-Q5 (a)).
     """
-    gpu = _gpu()
+    gpu = _backend()
+    hw_decode = gpu.device != "cpu"  # as the export job decides it
     method = composition.correction_methods()[method_id]
     info = probe(clip)
     params = effective_parameters(method, new_parameter_set(method_id, {}))
@@ -234,12 +272,12 @@ def _unsmoothed(
         source=source,
         probe=info,
         params=params,
-        hw_decode=True,
+        hw_decode=hw_decode,
     )
     result = engine.analysis_job()(StubProgress())
     assert result.ok, result.failure
     regions = []
-    stream = source.frames(info, hw_decode=True)
+    stream = source.frames(info, hw_decode=hw_decode)
     try:
         for frame in stream:
             assert frame.device == gpu.device
@@ -337,11 +375,13 @@ def test_ad14_bound_with_the_product_method(
     tmp_path: Path,
     method: str,
     record_property: Callable[[str, object], None],
+    figures_file: Path | None,
 ) -> None:
     """AD-14: under 0.5/255 after smoothing, ASSERTED; V3's four ratios RECORDED (V3-1)."""
-    _gpu()
+    _backend()
     figures = _v3(clips["ad14"], method, ad14_mask, tmp_path)
     print(_line(f"ad14-flicker {method}", figures))
+    _keep(figures_file, _line(f"ad14-flicker {method}", figures))
     record_property("v3", _line(method, figures))
     assert np.all(np.isfinite(list(figures["ratios"].values())))
     assert not _ad14_holds(figures["raw_planted_ad14"]), figures["raw_planted_ad14"]  # control
@@ -354,11 +394,13 @@ def test_v3_ratio_on_the_jittering_patch_clip_with_the_product_method(
     tmp_path: Path,
     method: str,
     record_property: Callable[[str, object], None],
+    figures_file: Path | None,
 ) -> None:
     """V3: per measure, the smoothed flicker <= 25 % of the per-frame, ASSERTED."""
-    _gpu()
+    _backend()
     figures = _v3(clips["jitter"], method, _jitter_mask(), tmp_path)
     print(_line(f"jitter {method}", figures))
+    _keep(figures_file, _line(f"jitter {method}", figures))
     record_property("v3", _line(method, figures))
     unsmoothed = figures["v3_unsmoothed"]
     assert np.all(unsmoothed > 0)
