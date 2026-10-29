@@ -15,7 +15,8 @@ the evaluation and re-seat lines. Turn 1's figures were supplied at turn 2.
 |---|---:|---:|---:|---|
 | Turn 1, rung 0 / W1 script | 101,355 | 104,555 | 258,400 | Dispatcher at turn 2; turn 1 committed as `c06c808`; dispatch pace Codex 0.54 is not a depth figure |
 | Turn 2, W1 corrections | 120,962 | 123,658 | 258,400 | Dispatcher at turn 3; committed as `d88365d` |
-| Turn 3, semantic creation_time amendment | Pending dispatcher | Pending dispatcher | 258,400 | Fill after this turn; if depth after turn 4 exceeds about 190K, re-seat BEFORE rung 2 |
+| Turn 3, semantic creation_time amendment | 129,889 | 131,810 | 258,400 | Dispatcher at turn 4; committed as `78e0094` |
+| Turn 4, round-0 table | Pending dispatcher | Pending dispatcher | 258,400 | Fill after this turn; if input depth exceeds about 190K, re-seat BEFORE rung 2 |
 
 ## Rung 0 facts (2026-10-29)
 
@@ -124,16 +125,16 @@ Scratch-script MD5s (W1 updated at turn 2):
 | Turn-2 isolated pairing helper | PASS, EXIT 0 | `work/wp-t6/turn2-self-check.json`: swapped tmcd/gpmd pairs, unequal counts raise, two audio streams pair by sorted index and ordinal |
 | Turn-2 checker integration and margin logic | PASS, EXIT 0 | Same self-check: correctly paired gpmd has three packets; audio timecode difference allowed, video timecode and firmware differences stop; negative baseline margin not tested, positive margin below half rejected |
 
-Turn-3 seat-side re-run request (Git Bash): move the old `work/wp-t6/w1/` to
+Turn-3 seat-side re-run request (completed as run 3): move the old `work/wp-t6/w1/` to
 `work/wp-t6/w1-run2/` first, preserving every run-2 artifact. Then run W1 in full:
 
 ```bash
 bash work/wp-t6/w1.sh > work/wp-t6/w1-seat-driver.log 2>&1
 ```
 
-W1 requests one exclusive window of about 15 minutes. Return its final DONE/STOP
-and item output paths to the cell for turn 4's round-0 table; do not proceed to
-a build.
+The dispatcher completed this request in an exclusive window and supplied the
+outputs for turn 4's round-0 table below. Runs 1 and 2 are preserved in
+`w1-run1/` and `w1-run2/`. No build follows before CHARC reads the table.
 
 ## W1 run 1 -- STOP and diagnosis
 
@@ -243,6 +244,141 @@ drop R-b, require byte-identical `creation_time`, add `firmware` to the scoped
 allow-list, and re-run W1 and W3. The report must name the branch and evidence.
 This is a future measurement obligation; neither branch is claimed yet.
 
+## Rung-1 round-0 table -- W1 run 3
+
+Evidence is `work/wp-t6/w1/`, script MD5
+`47a9b605f54242f336c6cdf3b4c357ed`. The dispatcher ran it exclusively from
+2026-10-29 11:33:05.984516Z through 11:41:23.101978Z (497.12 s), with
+10,804,830,208 available bytes before item 1 (about 10.06 GiB). `status.json`
+records `W1 DONE`; dispatcher reports EXIT 0. `06-cleanup.json` confirms
+scratch removal. All figures below come from these saved outputs; turn 4 ran
+no new measurement, profile or test.
+
+| Item | Round-0 result / recommendation |
+|---|---|
+| 1. Cut point | N = 90, T = 3.003000 s; keyframes every 30 frames (180 packets listed). |
+| 2. Trim checks | 4(a) PASS; 4(b) PASS; 4(c) PASS; 4(d) PASS; 4(e) PASS. gpmd pairs source 3 -> trim 2, ordinal 0, three packets equal the source prefix; source has 23 packets. Location-key presence equal. |
+| 3. Tag rules | Retain R-c's scope-aware allow-list and R-e's format-only semantic rule. Every observed difference is allowed; all scopes, keys and reasons appear in the tag table below. No new exception proposed. |
+| 4. Audio timecode | Does not survive: source has the key, trim lacks it, `survives_by_key=false`. This answers R-b; audio-only exception remains under R-c. |
+| 5. R2 levels / sizes | PASS: high 27,731,069 bytes / 5.2 Main; standard 13,720,197 / 5.1 Main; draft 6,639,630 / 5.0 Main. Ratios 2.021186 and 2.066410, both > 1.25. Three-encode wall 76.565051 s; standard proof tied, 123 samples, 90 frames written. |
+| 6. R4 count | CUT to six, the smallest candidate: base and all six plants pass, all nine applicable positive-baseline half-margin tests pass. Six-frame wall 35.772337 s; 30-frame wall 160.467322 s; saving 124.694986 s > 30 s. Per-plant margins below. |
+| 7. Row 10 | Tools lever named: `tools/prototype/bench.py:1305` `stray_processes`, four calls, 59.501 s cumulative, performing repeated per-process CPU sampling. `stop` at line 1211 takes 16.303 s cumulatively (thread join and final sample). Keep the test unchanged; bank the instrument overhead for follow-on. |
+| 8. Updated estimate | R1-R7 estimated after sum 230.73 s vs baseline 1,567.37 s: gross saving 1,336.64 s. Add measured packet-list/trim setup 2.21 s: net serial saving about 1,334.44 s, projected AFTER about 1,286.88 s, plus unmeasured fixed/setup and new trim-test overhead. Per-row model below; this is not the gate result. |
+| 9. Rungs 2-4 | Proceed only after CHARC's round-0 reply. Share the corrected checker and single pairing helper (pairing helper copied verbatim); retain R-b, R-c and R-e. R4 gate form is `[first6]`, full form `[first30]`; the six other CUT tests use `[trim]` / `[full]`. Added rung-3 fidelity comparison and fallback remain mandatory; details below. |
+
+Observed tag differences (each grouped row enumerates every key that differed):
+
+| Scope | Keys | Allowed | Reason |
+|---|---|---|---|
+| format | `compatible_brands`, `encoder`, `major_brand`, `minor_version` | true for each | Muxer-written keys, R-c |
+| format | `creation_time` | true | R-e semantic rule; two parts, every part equals source |
+| stream-audio-mp4a-0 | `handler_name`, `language`, `timecode` | true for each | Muxer-written keys, R-c; timecode allowed only on audio |
+| stream-data-tmcd-0 | `handler_name` | true | Muxer-written key, R-c |
+| stream-data-gpmd-0 | `language` | true | Muxer-written key, R-c |
+
+The semantic record is:
+
+```json
+{"scope": "format", "key": "creation_time", "parts": 2, "every_part_equals_source": true}
+```
+
+`ALLOWED_TAG_DIFFS` remains format {`major_brand`, `minor_version`,
+`compatible_brands`, `encoder`}; every stream {`handler_name`, `language`};
+audio only {`timecode`}. Format `creation_time` is checked semantically, never
+unconditionally allowed. Missing either key or a nonmatching part stops the
+check. `firmware` needs no exception: it is retained by R-b's flag. tmcd's
+position is muxer placement, not a difference. The R-c Limit still applies:
+real-container `handler_name` and audio `timecode` are exercised only by the
+fullclip forms; trim exports are compared with the trim's own tags.
+
+R4's base at six frames has mean 0.684298522 and share-over-2 0.007303268;
+at 30 it has mean 0.686802822 and share 0.007224387. Both means are <= 1.0
+and both shares <= 0.01. Every plant exceeds at least one bound at six and 30.
+Margins below are signed figure-minus-bound; mean is in 1/255 units and share
+is a proportion (not percent). Half-margin retention tests only columns whose
+30-frame margin is positive.
+
+| Plant | Mean margin, 6 | Mean margin, 30 | Share margin, 6 | Share margin, 30 | Applicable half tests |
+|---|---:|---:|---:|---:|---|
+| encode range | 4.108201094 | 4.323826024 | 0.705041460 | 0.719845802 | Both PASS |
+| encode matrix | 2.111772140 | 1.980265734 | 0.587846894 | 0.560920048 | Both PASS |
+| accurate_rnd dropped in both halves | 0.131466726 | 0.141306802 | 0.059446286 | 0.063483034 | Both PASS |
+| accurate_rnd dropped in the first decode | -0.219201817 | -0.204205750 | 0.027213441 | 0.030655778 | Share PASS; mean untested |
+| siting center | -0.301407543 | -0.294479357 | 0.005481804 | 0.006681069 | Share PASS; mean untested |
+| siting topleft | -0.272250575 | -0.265261700 | 0.009787849 | 0.011094204 | Share PASS; mean untested |
+
+The saved comparisons also show all verdicts and applicable half-margin tests
+passing at 10 and 15. Six is therefore the smallest qualifying N; the other
+candidates do not alter the selection. The mean/share bounds and every planted
+defect assertion remain unchanged. This is a measured CUT decision, not a loss
+of an assertion.
+
+The row-10 cProfile reports 80.481 s overall; the enclosing command wall is
+80.873235 s. `05-result.json` records EXIT 0 and `1 passed, 1 warning in 79.54s`.
+The first top-15 block contains pytest/runpy wrappers. The separate bench block
+from the same profile names `bench.main` at 78.325 s and `stray_processes` at
+59.501 s in four calls. The latter samples other processes' CPU use before and
+after its sampling interval (`psutil.process_iter` and per-process
+`cpu_percent`). The `stop` method joins the sampling thread and takes a final
+sample. Cumulative timings overlap; the table is not an additive attribution.
+The follow-on lever is repeated whole-system sampling and sampler shutdown,
+not frame count. No deeper profile was run, no claim of a specific fix is made,
+and no profiled timing replaces the unprofiled baseline row in the projection.
+Disposition: BANKED follow-on candidate for CHARC's accept register, owner as
+trigger under Q7; no `tools/` change in WP-T6.
+
+Updated estimate, seconds (baseline setup+call totals, matching the brief):
+
+| CUT | Baseline | Estimated after | Estimated saving | Model / measurement |
+|---|---:|---:|---:|---|
+| R1 engine | 456.31 | 60.31 | 396.00 | Baseline x 90/681; unmeasured |
+| R2 levels | 330.02 | 51.04 | 278.98 | Two thirds of measured 76.565051 s encode triplet; allocation estimated |
+| R3 sink | 221.69 | 32.15 | 189.54 | Remaining encode third + baseline V4 call 50.12 x 90/681; allocation/check cost estimated |
+| R4 round trip | 169.97 | 35.77 | 134.20 | Six-frame wall measured in W1 |
+| R5 real decode | 152.09 | 20.10 | 131.99 | Baseline x 90/681; unmeasured |
+| R6 default pipe | 131.88 | 17.43 | 114.45 | Baseline x 90/681; unmeasured |
+| R7 CUDA decode | 105.41 | 13.93 | 91.48 | Baseline x 90/681; unmeasured |
+| Total | 1,567.37 | 230.73 | 1,336.64 | Rounded rows; sums calculated before rounding |
+
+The encode split is an allocation convention, not three per-quality timings:
+only their combined 76.565051 s is measured. It counts the shared standard
+encode exactly once. R3's 171.57 s baseline setup is replaced by its allocated
+standard encode; its 50.12 s V4 call is scaled separately. R5's scaled figure
+includes its reference setup, which is not charged again to R6 or R7.
+
+Packet listing (0.213327 s) plus trim/check setup (1.992035 s) add 2.205362 s
+once per session in this model. Keeping the rest of the baseline leg fixed
+gives 2,621.32 - 1,336.643625 + 2.205362 = 1,286.881737 s (about 21.45 min),
+before the unmeasured repeated checks in the new trim test and retained fixed
+costs in the scaled rows. Scaling an entire setup/call by frame count is
+optimistic about startup cost; W3 and the one final gate must replace the
+estimate. W1's within-run R4 saving is 124.694986 s; the 134.197663 s baseline
+comparison includes the 9.502678 s difference between the baseline and W1's
+30-frame runs and is not all attributable to sizing. Host spread remains the
+316 s between the identical-code WP4.2 legs, with single-test movements up to
+40 s. KEEP rows are not newly measured here. Q6's per-CUT-sum verdict remains
+pending the final gate's junit figures. The 900 s target remains out of reach
+in this estimate and is not a pass criterion.
+
+Build-plan consequences: rung 2 adds the guarded session trim and lazy trim/full
+fixture, the single stream-pairing helper and the shared R-c/R-e checks, with
+the fixed flags including R-b. Existing conftest lines remain byte-identical.
+W2's real re-encode and N+1 controls, guard tests and teardown proof remain
+required. Rung 3 implements all seven CUT rows, including R4 at six, preserving
+full-size assertions. The added engine fidelity check above compares all
+MANDATORY/REQUIRED/BEST-EFFORT difference names with WP4.2's full-clip record:
+only the ruled explained best-effort delta may proceed as a Limit; the stated
+mandatory/required mismatch triggers the R-b fallback and W1/W3 re-runs.
+No branch of that future check has been selected by W1.
+
+Rung 4 registers the marker and verifies seven fullclip forms (six `[full]`,
+one `[first30]`). Expected collection arithmetic, not yet observed: all 6,457,
+parallel 5,313 unchanged, serial 1,137, fullclip 7; pairwise disjoint and their
+union equal to all. Seven unsuffixed CUT IDs become fourteen suffixed forms,
+plus one new trim test. W4 must run all fullclip forms once, including the
+681-frame sink assertion. No build occurred at turn 4; yield this table for
+CHARC before rung 2, with the dispatcher's depth check at about 190K.
+
 ## Heavy-run ledger
 
 One row per actual heavy run will include start, end, exact command, selected
@@ -253,7 +389,7 @@ pending and are not validation results.
 |---|---|---|---|---|---|
 | W1 run 1 | 2026-10-29 11:18:06.838947Z / 11:18:09.255278Z | `bash work/wp-t6/w1.sh > work/wp-t6/w1-seat-driver.log 2>&1` | N=90; 4(a)-(c) PASS, 4(d)-(e) FAIL; STOP; process EXIT not supplied | 10,942,857,216 bytes before item 1; 10,942,246,912 before item 2; guard passed | `work/wp-t6/w1/` to be preserved as `w1-run1/`; checker fixed, re-run requested |
 | W1 run 2 | 2026-10-29 11:27:22Z / 11:27:25Z | `bash work/wp-t6/w1.sh > work/wp-t6/w1-seat-driver.log 2>&1` | 4(a)-(d) PASS, 4(e) FAIL; STOP; process EXIT not supplied | Not supplied at turn 3 | `work/wp-t6/w1/` to be preserved as `w1-run2/`; semantic amendment authorized |
-| W1 run 3 (requested, about 15 min) | Pending dispatcher | `bash work/wp-t6/w1.sh > work/wp-t6/w1-seat-driver.log 2>&1` | Pending | Script records bytes per stage; >= 5 GiB required | Fresh `work/wp-t6/w1/`; not yet run |
+| W1 run 3 | 2026-10-29 11:33:05.984516Z / 11:41:23.101978Z | `bash work/wp-t6/w1.sh > work/wp-t6/w1-seat-driver.log 2>&1` | 4(a)-(e) PASS; three encodes; four round-trip counts; row 10: 1 passed, 1 warning; W1 DONE, EXIT 0 | 10,804,830,208 bytes before item 1; exclusive per dispatcher | `work/wp-t6/w1/`; scratch removed; round-0 table above |
 
 ## Review-round ledger
 
@@ -281,7 +417,9 @@ Turn 3 changes only W1's format `creation_time` comparison and this ledger.
 The semantic rule and its failure cases pass synthetic checks; the extracted
 program compiles. No footage or GPU command ran in the cell.
 
-Pending at handoff: W1's full re-run and turn 4's round-0 table/ruling. No build
-in `tests/` or `pyproject.toml` is authorized before that ruling. The one tracked
-change this turn is this ledger; W1, the extracted program and synthetic checks
-remain under gitignored `work/`. No change was made to the base-collection script.
+Turn 4 confirms W1 run 3's saved results and records the round-0 table, the
+measured R2 chain and R4 six-frame choice, the row-10 tools lever and the
+explicitly estimated projection. No test, measurement, profile or build ran in
+this turn. Pending at handoff: CHARC's round-0 reply and dispatcher depth check
+before rung 2. No build in `tests/` or `pyproject.toml` is authorized before that
+reply. The one tracked change is this ledger; no scratch script changed.
