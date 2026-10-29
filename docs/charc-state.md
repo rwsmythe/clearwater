@@ -42,9 +42,9 @@
 - **Phase 4 commission (my msg 136bfecd) and ruling packet (c7452911) are verbatim in the four briefs on main 3aa3c51**; WP4.2 Q3
   narrowing accepted; DR-47 (a) closes in WP4.2 only if its Q7 engine.py grant fires; DR-62 = WAIT; DR-69 stays OPEN (GUI shows no
   device-wide total); 43-Q13 AD-23 extension = N1 approval for the CREATE_NO_WINDOW helper.
-- **Owner-pending inputs (carry):** photos (WP3.6P; WP4.1 records the owner-photo leg OWED), the iPhone clip (DR-15), the N6 body
-  erratum DR-64 (apply on the owner's word 'apply N6 erratum' as spec v0.5.6). Open owner decisions: none. Every owner-facing summary
-  ends with that line.
+- **Owner-pending inputs (carry):** photos (WP3.6P; WP4.1 records the owner-photo leg OWED), the iPhone clip (DR-15). **Spec v0.5.6
+  APPLIED 2026-10-29 ~00:55Z (owner verbatim "Apply N6 erratum"; text only; DR-64 CLOSED; CLAUDE.md updated).** Open owner decisions:
+  none. Every owner-facing summary ends with that line.
 - **Rules learned this generation:** a seat correction to a working cell lands only at its yield (warn cells of windows at the previous
   yield); the stacked-gate form needs a hold cap so a ready package is not held hostage; a design guard's pre-ruled remedy must fit the
   trigger's CLASS (the fifth finding was a stream-syntax route the Q9 alternative did not touch; the structural predicate did).
@@ -946,7 +946,7 @@ release post.
 
 ### Frozen inputs (verify each at its path)
 
-- Spec `docs/underwater-correction-spec.md` **v0.5.5** (text only, owner 2026-10-27 verbatim
+- Spec `docs/underwater-correction-spec.md` **v0.5.6** (text only, owner 2026-10-29 verbatim "Apply N6 erratum": N6 body = D106's interim; v0.5.5 owner 2026-10-27 verbatim
   "Apply D75 erratum": D75 parenthetical = AD-12 final mapping; v0.5.4 owner-approved 2026-10-20
   ~16:00Z, verbatim "Gate 1: Option C.  2. Keep.  3. approve 0.5.4"; applied 9cf16c5). D106 interim N6
   25 min/min; D100 caps KEPT; chapter handling deferred to v2 (v0.5.3).

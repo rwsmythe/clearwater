@@ -2,8 +2,8 @@
 
 ## Specification
 
-**Version:** 0.5.5 (draft)
-**Date:** 27 October 2026
+**Version:** 0.5.6 (draft)
+**Date:** 29 October 2026
 **Status:** Second review (10 concerns, 6 planning questions) worked through with the owner and incorporated. Requirements are stable for implementation planning. Items left to the design stage are listed in Section 14.1. Open decisions, including scope items that depend on test results, are listed in Section 14.2.
 
 **Change log**
@@ -15,6 +15,7 @@
 - 0.5.1 — Text only (owner-approved 2026-10-15): recorded the measured target machine (WP0.1 environment report, 2026-10-14) in D117, Section 12, Section 14.2 (item closed) and Section 15.2 Q1. No decision changed.
 - 0.5.2 — Text only (owner-approved 2026-10-15): D60 closed — no GoPro `.LRV` proxies exist for this project (sidecars deleted at cloud upload); Clearwater generates its own proxy (Section 7.3). Section 14.1 item closed; the `.LRV` leg removed from the analysis-speed measurement (Section 7.3, Section 13.1). No decision changed in substance.
 - 0.5.5 — Text only (owner-approved 2026-10-27: "Apply D75 erratum"): D75's parenthetical updated from the provisional AD-12 mapping (cq 18/23/28, crf 18/23/28) to the mapping measured and ruled at WP3.10 on 2026-10-27 (NVENC cq 22/26/30 with a 0.24 bit/pixel ceiling scaled 1, 1/2, 1/4; libx265 crf 21/26/30). No decision changed; D75 already deferred to AD-12.
+- 0.5.6 — Text only (owner-approved 2026-10-29: "Apply N6 erratum"): the N6 body in Section 10.2 still carried the original 3.3 min/min figure (10 minutes for a 3-minute clip; 0.11 s per frame at 30 fps, 0.056 s at 60 fps) that D106 (tuned 0.5.4, Gate 1 option C) had already replaced with the interim of about 25 minutes per minute of 4K footage; N6 now states D106's interim and the WP5.2 re-set. No decision changed; the register item DR-64 closes.
 - 0.5.4 — Prototype gate outcomes and WP2.1 design decisions recorded (owner-approved 2026-10-20 ~16:00Z: "Gate 1: Option C.  2. Keep.  3. approve 0.5.4"). D106 tuned to an interim 25 min/min with a named Phase 3 optimisation package (Gate 1, option C); D100 caps KEPT; D98 compared (no visible difference, one stage permitted); D94 reading by presentation effect (AD-22); G12 gains force-CPU and its first-run defaults; D75 names and provisional mapping; D63 HEIC rule (AD-24); N1 exception for the Windows pipe buffer (AD-23); Section 6 defaults, 7.2 smoothing default, Section 12 proxy-bounds measurement recorded; 14.1 items marked DECIDED with their AD numbers; chapter- and recording-group remnants removed from 7.3, V10 and V17. Design: `docs/architecture.md`, `docs/decisions.md`.
 - 0.5.3 — Owner decisions 2026-10-19 (CP1, CP2; owner-approved 2026-10-19: "approved as 0.5.3"). (a) D16 amended: 3C is the default channel-compensation method; Ancuti 2018 (red, optional blue) remains selectable. (b) Chapter handling deferred to v2: D21, D33, D80, D82 and the recording-group suffix of D83 marked deferred; Section 5.5 replaced; G11 and V12 deferred; the chapter clauses removed from G7, V3 (and D64's seam threshold), V4, Sections 8.2 and 8.3 and UC2/UC3; Section 14.2 item closed. Each file is one clip in v1.
 
@@ -449,7 +450,7 @@ The GUI, video and I/O layers depend only on this interface.
   4. **Gain-cap noise test (D100):** red-channel noise on a deep frame with caps on and off.
   5. **Staged versus flat statistics (D98).**
   6. **Container spike (D104):** one real chapter re-encoded with no correction; source and output compared on tracks, atoms, timestamps, edit list and color tags; the color tags and range the camera writes are recorded; NVENC and 10-bit confirmed in the chosen build.
-- **N6 Performance target (D106):** export takes at most about 3.3 minutes per minute of footage (10 minutes for a 3-minute clip), end to end including decode and encode. This is about 0.11 s per frame at 30 fps and 0.056 s at 60 fps. Measured at 4K in the owner's actual recording modes; tunable after measurement. 5.3K is supported but best-effort on speed. No other hard performance targets for v1.
+- **N6 Performance target (D106):** export takes, as an interim target, at most about 25 minutes of processing per minute of 4K footage on the owner's laptop, end to end including decode and encode (D106, tuned 0.5.4 under Gate 1 option C; the original intent of about 3.3 minutes per minute is recorded there as not reachable at 4K on this machine by any identified route). Measured at 4K in the owner's actual recording modes; the figure is re-set from the WP5.2 re-measure after the named optimisation package. 5.3K is supported but best-effort on speed. No other hard performance targets for v1.
 
 ### 10.3 Quality and robustness
 - **N7 Code quality:** well documented, Pythonic, each processing stage independently testable.
