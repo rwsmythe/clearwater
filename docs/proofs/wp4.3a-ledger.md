@@ -10,7 +10,8 @@
   `fe65e6a867106dd984d1c27ef3104e2ee3de0df4`. Initial `git status --short` was empty.
 - Turn 1 is tasks 1-2 only: read and Round 0 note, no product code or tests changed.
 - Reviewer A and B: the orchestrator's read-only Claude Opus / high process
-  passes. No reviewer has run for this package yet.
+  passes. Reviewer A R1 is adjudicated below; remediation, convergence,
+  Reviewer B and the final gate remain pending.
 - Dispatch overrides older generic instructions: yield after each named task
   group; adjudication turns change only the ledger before yielding; format check
   and the final two-leg gate run at the orchestrator's seat. Both gate expressions
@@ -21,7 +22,8 @@
 | Turn 1 footer, supplied at Turn 2 dispatch | `tokens used` 96,223; input depth 102,475 | 258,400 tokens | Dispatcher-read figure for session `01a18856-955d-74e3-b211-dfb519efdf0c`; evaluate near 200K, stop at a step boundary near 250K. |
 | Turn 2 footer, supplied at Turn 3 dispatch | `tokens used` 238,706; input depth 146,818 | 258,400 tokens | Dispatcher-read figure; no estimate substituted. |
 | Turn 3 footer, supplied at Turn 4 dispatch | `tokens used` 346,443; input depth 205,870 | 258,400 tokens | Past the evaluation point. Turn 4 is explicitly bounded; leave a successor handoff and await the next dispatcher depth. |
-| Turn 4 | Awaiting dispatcher footer reading | 258,400 tokens | No estimate substituted. Next seat may be fresh; stop at this task boundary. |
+| Seat 1 Turn 4 footer, supplied at Seat 2 dispatch | `tokens used` 439,112; input depth 237,170 | 258,400 tokens | Seat 1 retired at this boundary; Seat 2 is a fresh session. |
+| Seat 2 Turn 1 (ledger Turn 5) | seat 2 turn 1, pending me | 258,400 tokens | Dispatcher supplies the next footer reading; no estimate substituted. |
 
 ## Round 0: observed base
 
@@ -201,7 +203,7 @@ Evidence is retained by the orchestrator outside the repository under
 
 | Round | Critical | Major | Minor / advisory | In / out of envelope | NEW / REOPENED | Reverts | Product / tests-only fixes | Transport / CLI | Dispatcher depth | Verdict / evidence |
 |---|---|---|---|---|---|---|---|---|---|---|
-| Not started | - | - | - | - | - | - | - | Orchestrator Claude pass; version not yet supplied | Not supplied | Pending |
+| R1 | 0 | 1 | 2 minor / 6 advisory | 7 in / 2 out (F4 edit scope; F5 reachability) | 9 NEW / 0 REOPENED | 0 | 0 / 0 executed; ledger-only adjudication; product F1/F9 and test control F2 planned | Orchestrator process via codex_cell.py review; claude-opus-5-5 / high; CLI version not supplied | seat 2 turn 1, pending me | NEW_CRITICAL_MAJOR_FOUND; r1 evidence below; remediation pending |
 
 At round 5 and every fifth round thereafter, yield with the cumulative ledger
 for approval to continue under the fill. Reviewer B and the final ONE two-leg
@@ -586,77 +588,141 @@ and is requested again at the seat for the amended candidate. No new STOP.
 The final format/UNC seat checks, remainder of task 6 and reviewer/gate work
 remain pending; the DRAFT report does not claim acceptance.
 
+## Seat 2 Turn 1 (ledger Turn 5): Reviewer A R1 adjudication
+
+### Boundary and supplied task-6 evidence
+
+The fresh seat read the successor handoff, the verbatim CHARC B4 ruling and
+Round 0, then the binding dispatched brief, the four-commit history/status and
+R1 in full. History matches the dispatch: a614160, ef903e5, fa2afab and 553d1f2;
+HEAD is 553d1f2 and the starting tracked tree is clean. Seat 1's final depth is
+recorded above exactly as supplied. This turn changes only this ledger.
+
+The dispatcher ran task 6 at its seat on **553d1f2**. The supplied evidence is
+also present in `work/wp4.3a/seat-t6.log`; its summary lines were read here:
+
+| Seat check | Recorded result |
+|---|---|
+| Ruff format --check | 269 files already formatted |
+| Ruff check | All checks passed! |
+| Strict mypy | Success: no issues found in 141 source files |
+| Full brief task-6 list, including all three UNC cases, GPU and slow cases; QT_QPA_PLATFORM=offscreen; pytest -q -rs; -m "not footage and not fullclip" | 884 passed, 12 deselected in 777.96s (0:12:57); EXIT=0 |
+
+The list comprises tests/test_io_video_*.py, tests/test_config_*.py,
+tests/test_headless_export.py, tests/test_wp42a_runner_hardening.py,
+tests/test_wp42b_naming_guard.py, tests/test_wp43_runner_redaction.py and the
+brief's core/color/analysis/gui/app and video-rule layering set. The 12
+exclusions are footage tests, as the dispatcher reports. These are development
+checks on 553d1f2, not the final gate or evidence for an unbuilt remediation.
+They were **not rerun** by Seat 2. The previous UNC rerun request is satisfied.
+
+### R1 provenance and cumulative accounting
+
+- Reviewed candidate: fe65e6a..553d1f2, excluding docs/proofs and uv.lock.
+- Reviewer: orchestrator's read-only Claude process, claude-opus-5-5 / high,
+  via scripts/codex_cell.py review. Dispatcher assertions: model correct,
+  is_error false, 52 turns, tree clean afterward; 7 sandbox permission denials.
+  CLI version was not supplied; no version is inferred.
+- Full local review: `work/wp4.3a/rA1/review-r1.txt`, read in full.
+- Durable evidence, dispatcher-owned:
+  `C:\Users\rwsmy\clearwater-review-evidence\wp4.3a\r1\`.
+  Dispatcher-supplied md5 prefixes: review e5244b65, prompt cb643310,
+  diff de197b35, json a6b61860. No independent hash verification is claimed.
+- Verdict: **NEW_CRITICAL_MAJOR_FOUND**. Count the enumerated F1-F9:
+  0 critical, 1 major, 2 minor, 6 advisory; all 9 NEW, 0 REOPENED.
+- Envelope accounting: F1/F2/F3/F6/F7/F8/F9 are in; F4 concerns product help
+  but its edit is outside the grant; F5 is a POSIX residual outside the ruled
+  exception-arm touch. Thus 7 in / 2 out for remediation ownership/reachability.
+  The reviewer labels F4 in-envelope while explicitly acknowledging that its
+  line is ungranted; this ledger distinguishes those two meanings.
+- Executed remediation this turn: 0 product fixes, 0 test/control fixes,
+  0 reverts; documentation-only adjudication. Planned: product fixes F1/F9,
+  test/control fix F2, report fix F3 and report-only disclosures F4-F8.
+  No convergence claim: F1 is new, in-envelope and major.
+
+### Every finding adjudicated
+
+| Finding / severity / evidence | Decision and cited ground | Next-turn action or explicit disposition |
+|---|---|---|
+| F1 / MAJOR / reviewer EXECUTED; independently reproduced here | **FIX.** Confirmed. tools/headless_export.py:724-744 returns an unresolved configured path. _resolved:768 is reached through inside:788 from _check_own_paths:1282, check_outputs:900/904 and run:970/972. The new guard at :1353-1358 protects only configuration lookup. Q23 / DR-81 (b) requires a raising footage resolution to become a redacted usage refusal, so the current closure claim is unsupported. | Next turn, map OSError, RuntimeError and ValueError from EVERY footage-dependent check in _main and run to path-free RunnerRefusalError; main returns 2 before exporting, including a later run refusal. Rewrite the test so configured_footage_folder returns the unresolved path and Path.resolve or _resolved raises at the real check. Cover own-path, output and cache checks, main and library routes, and NUL-path ValueError. Remove the old artificial-resolution case unless retained under a name that proves only defensive configuration-lookup handling; it cannot prove DR-81 (b). RED first. |
+| F2 / MINOR / reviewer EXECUTED; independently reproduced here | **FIX.** Confirmed. tests/test_io_video_spawn.py:46-53 recognizes only run/Popen and :86 asserts count > 0. Brief goal 1 is EVERY FFmpeg/ffprobe child through the helper; task 3 supplies the AST control. Current product sites are all covered, but the control admits alternate launches. | Widen the guard to subprocess.call/check_call/check_output/getoutput/getstatusoutput as well as run/Popen; os.system/popen/spawn*/exec*; asyncio.create_subprocess_*; module and direct-import aliases; bound names, getattr and functools.partial references. Plant each form as a synthetic positive control and require exactly seven real sites. These alternate APIs must be caught or rejected as bypasses, not newly authorized for product use. RED first. |
+| F3 / MINOR / reviewer REASONED; source/report checked | **FIX (report).** Confirmed. docs/reports/wp4.3a-hardening.md:6 still awaits the already-recorded 553d1f2 commit, its validation section still requests the now-satisfied UNC seat rerun, and its DR-81 (b) row overclaims F1. Plan 4.5 and the model-prompting standard require evidence-backed return claims. | Next turn replace stale commit/seat-run statements with the supplied task-6 results above; correct DR-81 (b) only against F1's actual results; record R1 status and add F8's consequence. Preserve pending Reviewer B/final-gate status. No report edit this turn. |
+| F4 / ADVISORY / reviewer REASONED; exact help line checked | **REPORT-ONLY; proposed grant, no edit.** tools/headless_export.py:1203 says only source/settings additions are accepted, omitting the newly accepted writer profile. Files owned limits this provenance alignment to the key set and read_parameter_file docstring (:143 and :593-599 on the base); the B4 WARNING grant does not grant CLI help. Q20 changes importer acceptance, not ownership of this help line. | Dispatcher to ask CHARC for a one-line grant. Recommended replacement help: "an AD-13 preset JSON file (writer provenance, including profile, is read too)". The line remains untouched unless granted. This advisory does not block the authorized F1/F2/F3/F9 remediation. |
+| F5 / ADVISORY, OUT OF ENVELOPE / reviewer EXECUTED + REASONED | **REPORT-ONLY (Limit).** The four unchanged raw OSError arms at verify.py:238, probe.py:140, encode.py:886 and capability.py:99 may expose OSError.filename on POSIX. Reviewer executed Windows CreateProcess failures with filename=None; POSIX reach is reasoned. Q-C expressly widens ONLY _check_cuda's two arms; the brief says implement exactly its ruled touch. Ownership of a module does not widen that touch. | Add a Limit naming all four arms, platform distinction and the unexecuted POSIX claim. Dispatcher/CHARC owns banking and follow-on assignment at those arms' next authorized error-text touch. No cross-platform leak fix in this package and no claim of an executed POSIX reproduction. |
+| F6 / ADVISORY / reviewer EXECUTED | **REPORT-ONLY (Limit).** file:/// URI and dot-segment spellings survive redaction, but the reviewer finds no product text producing them. Q23 / task 5 requires mixed slash/backslash spellings of known folders; it does not commission arbitrary URI/canonicalization forms. Existing required separator spellings held in R1. | Disclose the two unsupported spellings; dispatcher/CHARC may bank with trigger: a product surface starts emitting either form. No redactor expansion or new review round driven by this advisory. No decline or claim that arbitrary caller text is safe. |
+| F7 / ADVISORY / reviewer REASONED | **REPORT-ONLY (Limit).** A malformed logging call with missing mapping keys can make getMessage fail before the redacting formatter, causing logging.handleError to print the raw record. The ruled B4 grant requires rendered product WARNING messages through the Redactor; a malformed log call is not a product-produced message, and the same shape predates this handler in _RedactingFilter. | Disclose the malformed-record limit; dispatcher/CHARC may bank for the next logging hardening touch or a reachable malformed product call. Preserve valid-record redaction, copy semantics and handler teardown. No claim of a malformed-record safety guarantee. |
+| F8 / ADVISORY / reviewer REASONED | **REPORT-ONLY (behavior line).** Q13 / AD-23 explicitly mandates CREATE_NO_WINDOW for all these Windows children, including the runner. Its console-signal consequence follows the mandated flag; changing signal policy is not granted. This is disclosure, not a reason to revert the flag. | Next report: Windows FFmpeg children no longer receive the runner console's Ctrl-C/Ctrl-Break; Ctrl-C uses the runner cancellation handler, while Ctrl-Break killing Python can leave a child until stdin EOF. Attribute the consequence as reasoned, not an executed signal/orphan test. |
+| F9 / ADVISORY / reviewer REASONED; source checked | **FIX (one line).** Confirmed. decode.py:182 interpolates error.strerror directly and can render OSError: None. Q-C owns this exact arm and requires class/strerror without raw exception or filename. A path-free fallback preserves that ruling. | Next turn use error.strerror or "an operating-system error" in the existing expression; add a focused None-strerror case in the owned spawn test, RED first. No wider exception refactor. |
+
+Disposition totals: **FIX 4** (F1/F2/F3/F9), **REPORT-ONLY 5** (F4-F8),
+**DECLINE 0**. No finding is silently discarded. Report-only does not imply
+that the reported spelling, malformed record or POSIX case is fixed.
+
+### Independent confirmation and turn verification
+
+Cheap probes ran against unchanged product/test code on 553d1f2 with
+`uv run --offline python -`; complete output is retained at
+`work/wp4.3a/seat2-turn1-adjudication-probes.log` (exit 0).
+
+- Monkeypatched Path.resolve only for a synthetic path under work/wp4.3a;
+  configured_footage_folder returned that path unresolved. For each of OSError,
+  RuntimeError and ValueError, both main's real own-path route and run's real
+  output-check route let the raw exception escape with the synthetic private
+  path. Six escapes confirmed. main used --settings-dir to reach the check
+  before any settings load; run failed before the supplied dummy export object
+  could be used. No output or configuration write occurred.
+- Loaded the current _spawn_calls helper and fed eleven synthetic AST sources:
+  check_output, aliased call, directly imported aliased check_call, os.system,
+  os.popen, os.spawnv, os.execv, asyncio.create_subprocess_exec, a bound Popen
+  name, getattr(subprocess, "run"), and functools.partial(subprocess.run).
+  All eleven bypassed the guard. This is a control failure, not an extra current
+  product spawn.
+- F3/F4/F9 were checked directly against the report, help string and exception
+  arm. F5-F8 retain the reviewer's EXECUTED/REASONED provenance above; no
+  independent POSIX, URI, malformed-record or console-signal run is claimed.
+- No pytest/lint/type/format rerun this documentation-only turn. The dispatcher
+  explicitly said not to rerun task 6. Ledger scope/byte/diff checks are recorded
+  after the edit: `work/wp4.3a/seat2-turn1-ledger-check.log`, exit 0, confirms
+  only this ledger changed, LF/ASCII, exactly one disposition for F1-F9,
+  consistent counts, task-6/depth/handoff anchors, no untracked deliverables
+  and a clean git diff --check. Product, tests and report remain unchanged.
+
+### Question and next boundary
+
+**F4 question for CHARC (recommended answer first):** grant only the
+--parameters help string at current tools/headless_export.py:1203 to use the
+replacement above; otherwise leave it and bank the stale help text. The literal
+file grant excludes this line, so the dispatcher must route it before any edit.
+This question does not stop the already-authorized R1 remediation.
+
+YIELD now as dispatched: remediation is the NEXT turn after the dispatcher's
+reply. No round-5 continuation gate is due at R1. Reviewer A has not converged;
+Reviewer B and the ONE two-leg gate remain pending at the orchestrator's seat.
+No new dependency, module, OS branch, interface, GUI/app/jobs/photo-writer,
+fixture, local-config or register change; no footage read/write, mailbox post,
+subagent, commit, git write or sibling-worktree access.
+
 ## RESUME HERE - successor seat
 
-### Commits and current work
-
-- Dispatch base: `fe65e6a867106dd984d1c27ef3104e2ee3de0df4`.
-- `a614160`: Round 0 ledger, accepted by the dispatcher.
-- `ef903e5`: task 3 spawn helper, seven callers, delegation, six regression
-  cases; green development checks and dispatcher-seat video QA.
-- `fa2afab`: tasks 4-5 config/provenance/redaction implementation and tests;
-  committed with the old B4 expectation red by design, as the dispatcher states.
-- Turn 4 current diff: tools/headless_export.py; the single granted B4 function
-  in tests/test_headless_export.py; added WARNING cases in
-  tests/test_wp43_runner_redaction.py; DRAFT report; this ledger. Dispatcher
-  assigns the commit SHA after this yield. Suggested subject:
-  `fix(wp4.3a): redact logged warnings and assert corrupt-settings defaults`.
-
-### Task 6 light-run matrix and actual status
-
-| Required surface | Latest evidence | Remaining action on the amended candidate |
-|---|---|---|
-| New spawn file | Six cases passed Turn 2; forced-error additions passed Turn 3 focused set. | Include in the final combined light run. |
-| tests/test_io_video_*.py | Turn 2 sandbox 474 passed/36 deselected including core layering; dispatcher video-only 494 passed/12 footage deselected. Turn 3 changed only failure texts and added forced-error checks. | Rerun permitted video cases after the text edits; leave hardware/footage/fullclip to the seat. |
-| tests/test_config_*.py | Turn 3 broad set contained their passing cases; new timestamp/provenance cases passed individually and in the focused set. | Rerun after the scoped CLI logging change to check logging state interactions. |
-| tests/test_headless_export.py | Turn 4 bounded run green, including renamed B4; one GUI plus three explicit UNC exclusions. | Seat run for the three UNC cases on this amendment; GUI handled at gate. |
-| tests/test_wp43_runner_redaction.py | Turn 4 entire file green in bounded run, including both new WARNING cases. | Include in final combined light run. |
-| tests/test_wp42a_runner_hardening.py | Turn 4 entire permitted file green in bounded run. | Include in final combined light run. |
-| tests/test_wp42b_naming_guard.py | Turn 3 broad set green for its permitted cases. | Rerun after the logging amendment. |
-| Layering: core_deps, io_video_decode_rules, io_video_probe_rules | Turn 2 all 48 selected layering cases passed unchanged. | Include in final layering run. |
-| Layering: color_deps, analysis_deps, gui_deps, app_deps | Not yet run by this cell. | Run the permitted nodes; no GUI execution. |
-| Ruff / mypy | Turn 4 both green; mypy 141 files. | Confirm against final candidate at the required boundary. |
-| Global format check | Dispatcher 269 files already formatted before Turn 4; write-mode format applied to this amendment. | Dispatcher `uv run ruff format --check .`. |
-
-### Remaining work and review discipline
-
-1. Complete the task-6 combined light-run and layering lists above, with the
-   required sandbox shim/no-cache options and work/wp4.3a temp roots. Do not
-   execute the three administrative-share cases in this sandbox.
-2. Refresh the DRAFT report's validation/limits after those checks and reviews;
-   the draft is written, so it need not be recreated.
-3. Reviewer A is the dispatcher's read-only Claude Opus/high PROCESS pass via
-   scripts/codex_cell.py review. No round has been supplied/run yet. Adjudication
-   turns change the ledger only and YIELD before remediation. Record cumulative
-   severity/envelope/NEW-REOPENED/revert/product-vs-test/depth rows. At round 5
-   and every fifth round, STOP under the fill's continuation policy.
-4. Reviewer B is also the dispatcher's Claude pass. Then the orchestrator runs
-   the ONE two-leg gate on the final candidate AFTER B; both expressions exclude
-   fullclip. Do not request a full suite before B. No harness gate is required
-   for this owned-file set.
-5. Gate collection delta is intentional: one existing B4 node is renamed, and
-   two new parameterized WARNING cases are added. This grant explains that
-   removal/addition; no other existing headless node is changed.
-6. All original locks persist, with only the explicit B4/runner grant added.
-   No interface, GUI/app/jobs/photo writer, dependency, fixtures or register edit.
-   No footage reads/writes, mailbox posts, git writes or sibling-worktree access.
-   Keep report/register closures distinct: CHARC owns the closure/AD notes.
-
-### Every ruling's location
-
-- FINAL brief and governing Q-A/Q-B/Q-C: docs/briefs/wp4.3a-brief.md,
-  CHARC `8fb519bac1878075`. The same brief carries the inherited Q9/Q13 approval
-  (`2c4476d9869df056`) and Q14/Q20/Q21/Q23 decisions
-  (`7c7df3dbe237ceb7`) verbatim.
-- B4 and WARNING amendment: CHARC `a2ef868a6e14b506`, authoritative file
-  C:\Users\rwsmy\clearwater-review-evidence\wp4.3a\b4-ruling-b6aa800a.md;
-  verbatim text is in this ledger immediately above the Turn 4 execution record.
-- AD-13 / AD-23 source: docs/decisions.md; accept notes remain owed by CHARC.
-- Round/gate policy: docs/review-gate-clearwater.md, with the dispatch's AD-30
-  not-fullclip amendment. The turn schedule/seat-only format/no-network sandbox
-  constraints are in the dispatch prompts; latest bounded-turn instruction is
-  the Turn 4 prompt. Do not replace them with generic skill workflow choices.
-
-Context of record: Turn 3 input depth 205,870 of 258,400, supplied by the
-orchestrator; Turn 4 footer depth is not yet supplied. Evaluate/re-seat from
-this committed handoff rather than assuming more room or compacting mid-task.
+- Current committed product/test/report head: **553d1f2**, branch wp4.3a, base
+  fe65e6a. Only this R1 adjudication ledger is uncommitted by this seat; the
+  dispatcher commits it. Prior commits and verbatim B4 ruling remain above.
+- Task 6 is COMPLETE as development evidence on 553d1f2: dispatcher seat
+  **884 passed, 12 footage deselected in 777.96s**, all three UNC cases included;
+  ruff format/check and strict mypy green. See the supplied evidence table.
+  Do not rerun that matrix merely to replace prior-seat evidence.
+- R1: 1 major, 2 minor, 6 advisory, all NEW. Full dispositions and independent
+  F1/F2 confirmations are above. Four fixes planned, none performed this turn.
+  Blocking item F1 means no Reviewer A convergence claim.
+- NEXT TURN after dispatch: RED-first F1 real-route tests and exception mapping,
+  F2 AST positive controls/seven-site pin, one-line F9 fallback plus focused
+  test; then refresh the report for F3 and disclosures F4-F8 against actual
+  results. Keep F4's help line untouched without CHARC's grant. Scope otherwise
+  remains the FINAL brief plus verbatim B4/runner grant above.
+- Remediation checks use the sandbox shim/no cache provider and work/wp4.3a
+  temp roots, exclude gpu/footage/slow/gui/fullclip; no administrative-share
+  cases in the sandbox. Global format check, heavy commands, Reviewer A/B and
+  the ONE final two-leg gate remain at the dispatcher seat as instructed.
+- Seat 1 retired at input depth 237,170 / 258,400, footer tokens used 439,112.
+  Seat 2 Turn 1 depth: **seat 2 turn 1, pending me**; dispatcher supplies it.
+  Re-seat discipline: evaluate near 200K, stop at a step boundary near 250K.
