@@ -77,6 +77,7 @@ from clearwater.io.video import (
 )
 from clearwater.io.video.encode import POLL_S
 from clearwater.io.video.inputs import ascii_text
+from clearwater.io.video.verify import read_packet_table, readable_video_pts
 
 from .disk_space import check_free_space, estimate_photo_bytes, estimate_video_bytes
 from .export_seam import CANCELLED, ExportRequest
@@ -429,6 +430,22 @@ class _Analysis:
         self._thread.join(ANALYSIS_JOIN_S)
         if self._thread.is_alive():  # pragma: no cover - the thread checks its cancel per frame
             _LOG.warning("the export's analysis thread did not end within %s s", ANALYSIS_JOIN_S)
+
+
+def _expected_frames(probe: ProbeResult) -> int | None:
+    """Return the frames a whole decode of the probed clip yields, when it is known (DR-45 (b)).
+
+    The probe's count for a clip with no D86 fault; for a ``truncated`` clip the readable count,
+    from one packet listing (``readable_video_pts``, the set the sink's check also uses); None
+    for an ``unreadable_tail`` clip (its decodable end is known only by decoding) or an unknown
+    count.
+    """
+    kinds = {fault.kind for fault in probe.faults}
+    if "unreadable_tail" in kinds:
+        return None
+    if "truncated" in kinds:
+        return len(readable_video_pts(probe, read_packet_table(probe.path)))
+    return probe.video.nb_frames
 
 
 def _close_stream(frames: Iterator[Frame], *, quietly: bool) -> None:
@@ -965,6 +982,7 @@ class ExportEngine:
             probe=probe,
             params=params,
             hw_decode=hw_decode,
+            expected_frames=_expected_frames(probe),
         )
         analysis = _Analysis(engine, backend, progress, run.name, self._cache, key)
         analysis.start()

@@ -6,6 +6,8 @@
    the cache and READ BACK, and the first stage is measured on the read-back proxy (it has no
    earlier stage). ``mark_complete`` follows the last frame, never a failure and never after a
    cancel the job has seen; a cancel during or after ``mark_complete`` leaves a complete entry.
+   Given the frames a whole decode yields (``expected_frames``), a pass that ends with fewer is
+   a failure and the entry is left incomplete (DR-45 (b)).
    A complete cache entry skips the pass (V17); a source-only first stage is then read back
    with ``source_statistics`` and passed through ``closed_form`` (Y-1 (e)).
 2. **Staged statistics** (7.2 item 2, D97, D57): each later stage is measured on every STORED
@@ -266,6 +268,7 @@ class AnalysisEngine:
         window_s: float = DEFAULT_WINDOW_S,
         kind: str = DEFAULT_KIND,
         hw_decode: bool = False,
+        expected_frames: int | None = None,
     ) -> None:
         """Create the engine; nothing runs until a job from :meth:`analysis_job` runs.
 
@@ -280,6 +283,9 @@ class AnalysisEngine:
             window_s: The smoothing window in seconds (AD-3 default 2.0, PROVISIONAL).
             kind: The smoothing kind (AD-3 default ``"median_gaussian"``).
             hw_decode: Passed to the frame source.
+            expected_frames: The frames a whole decode of the clip yields (the probe's count, or
+                the readable count of a cut-short source): a decode pass that ends with fewer
+                fails and leaves the cache entry incomplete. None: not checked.
 
         Raises:
             ValueError: The method has no stage, an unknown kind or an unusable window.
@@ -300,6 +306,7 @@ class AnalysisEngine:
         self._window_s = window_s
         self._kind = kind
         self._hw_decode = hw_decode
+        self._expected_frames = expected_frames
         self._lock = threading.Lock()
         self._params: dict[str, Any] = dict(params)
         self._hash = schema_hash(method, self._params, kind, window_s)
@@ -357,7 +364,8 @@ class AnalysisEngine:
                 engine's first job streams, and its parameters are then fixed.
 
         Returns:
-            A callable for ``JobRunner.run``.
+            A callable for ``JobRunner.run``; it runs once (a second call returns a failed
+            result and touches nothing, DR-47 (a)).
 
         Raises:
             RuntimeError: A job of this engine is already running, or ``stream`` is asked of
@@ -373,7 +381,7 @@ class AnalysisEngine:
             self._running = True
             self._cancel.clear()
             self._state = AnalysisSnapshot("running", 0, None, "starting")
-        return self._job
+        return self._once()
 
     def set_parameters(
         self, params: Mapping[str, Any], around_pts: int | None
@@ -391,7 +399,7 @@ class AnalysisEngine:
             around_pts: The displayed frame's pts ticks, or None.
 
         Returns:
-            A job to run when the change needs a recompute and no job is running; None when a
+            A job to run (once) when the change needs a recompute and no job is running; None when a
             running job absorbs the change, when no stage depends on a changed value, or when
             the clip is not analysed (phase none, cancelled or failed: the next
             :meth:`analysis_job` uses the new values).
@@ -437,7 +445,7 @@ class AnalysisEngine:
             self._running = True
             self._cancel.clear()
             self._state = AnalysisSnapshot("running", 0, None, "recomputing")
-        return self._job
+        return self._once()
 
     def cancel(self) -> None:
         """Ask the running job to stop; it returns to the unloaded state within one frame.
@@ -565,6 +573,27 @@ class AnalysisEngine:
         return results
 
     # --- the job ------------------------------------------------------------------------------
+
+    def _once(self) -> Callable[[Progress], JobResult]:
+        """Return a callable that runs the job once; a retained one called again fails (DR-47 (a)).
+
+        A second call returns a failed result at once, without touching the store or the cache,
+        so an old callable cannot run beside the job a later call started.
+        """
+        ran = threading.Event()
+        guard = threading.Lock()
+
+        def job(progress: Progress) -> JobResult:
+            with guard:
+                again = ran.is_set()
+                ran.set()
+            if again:
+                return JobResult(
+                    False, (), (), "this analysis job has already run", self._backend.device, 0.0
+                )
+            return self._job(progress)
+
+        return job
 
     def _job(self, progress: Progress) -> JobResult:
         """Run the state machine to completion (IF-8)."""
@@ -748,6 +777,12 @@ class AnalysisEngine:
                     _LOG.warning("the decode stream's close raised %s: %s", type(exc).__name__, exc)
         if not decoded:
             raise ValueError("the frame source yielded no frames")
+        expected = self._expected_frames
+        if expected is not None and len(decoded) < expected:  # DR-45 (b): a clean short end
+            raise ValueError(
+                f"the frame source ended after {len(decoded)} of the clip's {expected} frames; "
+                "the cache entry is left incomplete"
+            )
         self._check(progress, None)  # a cancel raised by the last frame's report
         entry = self._cache.lookup(self._key)
         stale = sorted(set(entry.pts_ticks) - set(decoded)) if entry is not None else []
