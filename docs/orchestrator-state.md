@@ -5,6 +5,13 @@
 
 ### Generation
 
+- **Generation 22 LIVE since 2026-10-29 ~17:05Z** (session `clearwater-orchestrator-20261029-0704`; bash gauge 38 ms, ~9.7 GB free).
+  - Drained CHARC `d6e9abdf` (R3 + WP4.3a R1 rulings). Saved verbatim at `clearwater-review-evidence\wp4.3\r3-ruling-d6e9abdf.md` and `...\wp4.3a\r1-ruling-d6e9abdf.md`.
+  - **WP4.3 cell 6 DISPATCHED** (`wp43-cell6`, opus-high, fresh, prompt `...\wp4.3\prompt-wp4.3-cell6.md`, from `21ba03f`). Order: Group A (R3-1, R3-2) yield; Group B (R3-3..R3-5) yield; R4 review-only, yield at the verdict. If this generation dies, the successor re-dispatches from the ledger with that prompt.
+  - **WP4.3a Codex turn 6 RUNNING** (session `01a18899-4b87-7f51-8850-3b34a92b7076`, prompt `...\wp4.3a\cell\prompt-6.md`). It does the R1 remediation (F1, F2, F9, F4, F3) and R3-1 (ii), the settings path field taking its per-field default. On return: commit from FILES CHANGED, QA, then R2 at this seat.
+  - Owed: the WP4.3a brief's register table gains the R3-1 (ii) line, on the accept branch.
+  - Slip: one bare `cd` into `.worktrees/wp4.3a` at bring-up, with no cell live; reverted.
+
 - **Generation 21 ROLLED OVER 2026-10-29 ~17:05Z at ~380K, at a clean boundary.** WP4.3 cell 5 yielded at its R3 verdict, was stood down, and dies with this generation. The WP4.3a Codex seat-2 session survives; its turn 5 finished and is committed (`a0b9235`).
   - Session `clearwater-orchestrator-20261029-0425`. CHARC is gen 7, `clearwater-charc-20261029-0428` (re-verify: `comms/.launch-sessions.json`).
   - Bash-launch gauge 33 ms at bring-up; free memory ~9-10 GB.
