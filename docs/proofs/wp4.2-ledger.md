@@ -411,16 +411,58 @@ at the orchestrator's seat): both `match=` arguments changed to `"single portabl
 component"`, nothing else (`0109c39`, 0 CR); GREEN: `tests/test_wp42_runner_video.py` 14 passed.
 The report names no file-form text for a colon video, so it needs no change.
 
-## RESUME HERE (two-leg suite window)
+## Two-leg suite window (orchestrator grant item (ii), 2026-10-29)
 
-For a fresh cell: read `docs/dispatch-recipe.md`, the brief (Rulings govern), this ledger and
-`docs/reports/wp4.2-video-path.md`. Reviewer A CONVERGED at round 1; cleanup committed
-(`2a7a414`, `47a4cbf`, `2865b6a`). Next: the two-leg suite in a granted window (the orchestrator
-holds the grant until WP4.2b has merged and it has rebased `wp4.2` onto main); then task 10
-(GX011627 + the WP2.3 set through the runner) only when granted. Before or beside the suite: the
-CPU V3 record is DONE (above; CHARC ruling (a)). After the suite window, write a RESUME HERE for
-task 10 (orchestrator, 06:26Z: the cell is near the 250K evaluation point). Then the return
-report.
+Head `401521e` (on main `38f291e`, after the rebase and `0109c39`), from Git Bash in the worktree,
+`PYTEST_ADDOPTS` unset, `QT_QPA_PLATFORM=offscreen`, the main tree's `clearwater.local.toml`
+present (byte-equal), free memory 10.3 GiB before the parallel leg and 11.6 GiB before the serial.
+
+| Leg | Command | Result | Wall | Window |
+|---|---|---|---|---|
+| parallel | `uv run pytest -q -rs -n 4 -m "not gpu and not footage and not gui and not slow" --basetemp=C:/Users/rwsmy/clearwater/work/wp4.2-mc1-parallel` | **5304 passed, 1 skipped**, EXIT 0 | 644.51 s | 07:33Z-07:43:48Z |
+| serial | `uv run pytest -q -rs -m "gpu or footage or gui or slow" --durations=40 --basetemp=C:/Users/rwsmy/clearwater/work/wp4.2-mc1-serial` | **1135 passed, 1 skipped**, 5305 deselected, EXIT 0 | 2,937.31 s | 07:44Z-08:33:27Z |
+
+Skips, the same two as WP4.2a's gate: parallel `tests\test_color_roundtrip.py:121` (swscale
+reads a yuvj format as full whatever in_range says); serial `tests\test_photo_check.py:139` (the
+footage folder has no photos yet). Logs `work\wp4.2-mc1-parallel.log`, `work\wp4.2-mc1-serial.log`
+with their `.done` markers. Serial selected 1136 = WP4.2a's gate 1127 + the 9 new WP4.2 serial
+tests (V3 file 6, DR-74 1, DR-67 `gpu` 1, V4 `gpu` 1).
+
+**Question 9 budget (new serial-leg tests, about 300 s).** From `--durations=40` (threshold
+8.51 s): V3 `test_ad14_bound...[ancuti2018]` 67.45 s, `[c3]` 44.35 s, the jitter V3 `[c3]` 15.34 s
+and `[ancuti2018]` 15.11 s, DR-74 21.81 s: 164.06 s measured; the other new serial entries (the V3
+lossless-decode test and the unrounded-figures test, the DR-67 and V4 `gpu` legs, the V3 clips
+fixture setup) are each under 8.51 s, so at most about 43 s more: **at most about 207 s, inside
+300 s.** The leg's wall is 396 s above WP4.2a's gate (2,540.97 s) on a shared laptop; WP4.2a's
+log carries no durations, so the like-for-like split is not available.
+
+## RESUME HERE (task 10, the GX011627 V4 window)
+
+For a fresh cell: read `docs/dispatch-recipe.md`, the brief (task 10, question 10; the Rulings
+govern), this ledger and `docs/reports/wp4.2-video-path.md`. State: Reviewer A CONVERGED (R1,
+cleanup committed); the CPU/GPU V3 record done (CHARC ruling (a)); the rebase onto `38f291e`
+done by the orchestrator; the two-leg suite GREEN at `401521e` (above). Remaining: task 10 ONLY
+when the orchestrator grants its ONE EXCLUSIVE window, then the return report (recipe section 4,
+under about 70 lines, by SendMessage to the orchestrator).
+
+Task 10, per the brief:
+- GX011627 through the runner on the product composition: c3 defaults, `--encoder auto` (NVENC),
+  Standard, 8-bit, the GPU job with device frames. Source path only from
+  `tools/local_config.find_footage_file("GX011627")` (never listed, written or decoded beyond
+  the export; no `gpmd`, IMU, GPS or location tag read). Shape:
+  `uv run python tools/headless_export.py <source> --out C:\Users\rwsmy\clearwater\work\wp4.2\v4
+  --cache-dir <an existing folder under work\wp4.2\> --record <new .json under work\wp4.2\>`
+  (`--cache-dir` must exist; the record must not).
+- Then `uv run python tools/video_fidelity.py compare SOURCE OUTPUT --out
+  C:\Users\rwsmy\clearwater\work\wp3.10\wp4.2-v4\` (the tool refuses an `--out` outside its
+  `wp3.10` root): every MANDATORY and REQUIRED item SAME, else a STOP.
+- In the same window, the WP2.3 V4 set (`vid-hevc8-bt709-full`, `vid-hevc10`, `vid-rotated`,
+  `vid-untagged`, `vid-vfr`, `vid-truncated`; `vid-hlg` and `vid-pq` are refused by design)
+  through the runner on the GPU and with `--force-cpu`, each compared the same way.
+- Record: `JobResult.device`, the record's `"video"` object (`device_backend`, `frame_device`
+  `cuda:0`, `encoder`, `decode_passes`), the encoder, the elapsed (information only, NEVER a V16
+  row). Nothing footage-derived committed; keep the outputs (no deletion without a grant naming
+  them). At least 5 GiB free before. End with `WINDOW RELEASED: <summary>`.
 
 ## Superseded: RESUME HERE (Reviewer A round 1)
 
