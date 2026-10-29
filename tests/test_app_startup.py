@@ -227,14 +227,14 @@ def test_the_cleanup_ends_before_any_panel_or_job(make_app, qtbot, monkeypatch) 
         return report
 
     monkeypatch.setattr(app_main, "clean_leftovers", clean)
-    real_window = app_main.MainWindow
+    real_window = app_main.AppWindow  # the shell's MainWindow, noting its close (ruling 7b32521f)
 
     def window(*args: Any, **kwargs: Any) -> Any:
         built = real_window(*args, **kwargs)
         events.append("MainWindow")
         return built
 
-    monkeypatch.setattr(app_main, "MainWindow", window)
+    monkeypatch.setattr(app_main, "AppWindow", window)
     real_show = real_window.show
 
     def show(self: Any) -> None:

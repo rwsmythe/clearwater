@@ -7,7 +7,8 @@ The only ``clearwater.app`` module that imports ``clearwater.gui`` or loads Qt.
 1. The real engines from the composition root (``default_engines(locations=...)``): the photo
    legs, the methods (``"c3"`` first), the IF-2 selection, the video source and sink, and the ONE
    proxy cache, not yet open.
-2. ``MainWindow``: the log, the ONE settings read, the starter presets.
+2. :class:`AppWindow` (the shell's ``MainWindow``): the log, the ONE settings read, the starter
+   presets.
 3. The leftover clean-up (D85, V11), synchronous on the interface thread before any panel
    exists, so it ends before any export or batch job can start (DR-35 (c)).
 4. The panels: the parameter panels, the timeline (the analysis adapter's factory), the export
@@ -26,15 +27,15 @@ import dataclasses
 import logging
 import sys
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
-from PySide6.QtCore import QEvent, QObject
+from PySide6.QtGui import QCloseEvent
 from PySide6.QtWidgets import QApplication
 
 from clearwater.analysis import AnalysisEngine
 from clearwater.config import Locations, app_locations
 from clearwater.gui import MainWindow, Message, MessagePresenter
-from clearwater.gui.contract import JobHandle, JobRunner
+from clearwater.gui.contract import Engines, JobHandle, JobRunner
 from clearwater.gui.engines import default_engines
 from clearwater.gui.export_panel import install_export_panels
 from clearwater.gui.parameter_panels import install_parameter_panels
@@ -65,19 +66,34 @@ CACHE_FAILED_TEXT = "Videos cannot be analysed or exported in this session: {rea
 """The one warning shown when the cache's open failed (ruling S1 (a), condition 2)."""
 
 
-class _CloseWatch(QObject):
-    """Sets ``closed`` when the window gets its close event, before the shell's shutdown runs."""
+class AppWindow(MainWindow):
+    """The program's main window: notes its close event before the shell's shutdown runs.
 
-    def __init__(self, window: MainWindow) -> None:
-        super().__init__(window)
-        self.closed = False
-        window.installEventFilter(self)
+    An override of ``closeEvent``, not an event filter: a Python event filter on the window is
+    entered for every event the window gets (the paint, update and layout requests a job's
+    progress causes), and each entry waits for the GIL behind the job's threads (V7, CHARC
+    ruling 7b32521f item 1). Only the close event runs Python here.
 
-    def eventFilter(self, watched: QObject, event: QEvent) -> bool:  # noqa: N802 -- Qt override
-        """Note a close event; never consume it."""
-        if event.type() == QEvent.Type.Close:
-            self.closed = True
-        return False
+    Attributes:
+        close_seen: True once the window got its close event.
+    """
+
+    def __init__(
+        self,
+        engines: Engines,
+        locations: Locations,
+        *,
+        presenter: MessagePresenter | None = None,
+        choose_file: FileChooser | None = None,
+    ) -> None:
+        """Build the shell's window (``MainWindow``'s arguments)."""
+        super().__init__(engines, locations, presenter=presenter, choose_file=choose_file)
+        self.close_seen = False
+
+    def closeEvent(self, event: QCloseEvent) -> None:  # noqa: N802 -- Qt override
+        """Note the close, then the shell's shutdown and close."""
+        self.close_seen = True
+        super().closeEvent(event)
 
 
 class _UnlessClosed:
@@ -144,7 +160,7 @@ class Application:
             not kept (R1-8).
     """
 
-    window: MainWindow
+    window: AppWindow
     cache: DeferredProxyCache
     exports: GuardedExports
     catalog: EncoderCatalog
@@ -153,11 +169,10 @@ class Application:
     leftovers: LeftoverReport
     analysis: EngineClipAnalysis | None = None
     _probe_generation: int = 0
-    _watch: _CloseWatch | None = field(default=None, repr=False)
 
     def closed(self) -> bool:
         """Return True once the window got its close event (the start-up callbacks stop)."""
-        return self._watch is not None and self._watch.closed
+        return self.window.close_seen
 
     def start_jobs(self) -> None:
         """Start the three start-up jobs (interface thread), their callbacks guarded by close.
@@ -166,8 +181,6 @@ class Application:
         window is open (R1-5): the jobs run on the window's runner through :class:`_UnlessClosed`.
         """
         window = self.window
-        if self._watch is None:  # build_application watches from before the dialog's install
-            self._watch = _CloseWatch(window)
         jobs = _UnlessClosed(window.jobs, self.closed)
         limit = window.session.settings().cache_limit_bytes
         try:
@@ -246,7 +259,7 @@ def build_application(
     engines = default_engines(locations=locations)
     cache = engines.cache
     assert isinstance(cache, DeferredProxyCache)  # default_engines with locations builds it
-    window = MainWindow(engines, locations, presenter=presenter, choose_file=choose_file)
+    window = AppWindow(engines, locations, presenter=presenter, choose_file=choose_file)
     journal = WriteJournal(locations.config_dir)
     leftovers = clean_leftovers(window.session.settings(), journal)
     locks = ClipLocks()
@@ -274,7 +287,6 @@ def build_application(
         journal=journal,
         locks=locks,
         leftovers=leftovers,
-        _watch=_CloseWatch(window),
     )
     factory = make_analysis_factory(
         window.session.settings,
