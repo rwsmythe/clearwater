@@ -329,7 +329,21 @@
   (`-frames:v N+1` AND `-t` = the (N+1)th packet's pts), with 4(b)'s COUNT clause explicit (trim video packet count == N as its
   first clause), control passes iff 4(b) or 4(c) FAILs, recorded which. The fixture still asserts every check PASS.** Seat 2
   turn 2 = checker change + W2 run 3 request; rung 3 only after W2 is green. NEXT: W2 run 3; rung 3 (W3) with the V4-delta
-  check; rung 4 (W4 fullclip once); report; A FAST; B; the ONE gate; WP4.3 draft for my ruling.
+  check; rung 4 (W4 fullclip once); report; A FAST; B; the ONE gate.
+- **WP4.3 BRIEF REVISION 1 RULED FINAL ~12:20Z (query `48f440de35ca09b6`; `brief-wp4.3-rev` efeb4bf on cde1cd9, 854 lines,
+  0 CR; Q1-Q13 + Rulings byte-identical; my post 1447b2a8). Q14-Q24 ALL CONCURRED; Q14 SPLIT APPLIED: WP4.3a (Codex,
+  Claude nets, STRONG) = AD-23 spawn helper + DR-58 (b), DR-81 (a)(b)(c), DR-76, DR-77 + start-up sibling; files disjoint;
+  dispatches when WP-T6's Codex cell stands down, from a SHORT brief carved by the orchestrator's helper for my quick ruling;
+  WP4.3 (opus-high) dispatches NOW; merge order = first ready, the other rebases. Q15 grants all (test_app_deps: main.py alone
+  exempt from the Qt ban; DR-84 witness; third gui_status test); Q16 one cache per process (additive `cache=`, exclusive with
+  cache_folder); Q17 locations=None keeps stub video legs, real selector both forms; Q18 adapter follows the export's device
+  rule + ONE additive public `jobs.expected_frames`; Q19 DR-75 via the writer's built_in_profile, tmp_path sample from R3's
+  recipe (fixture fallback at round 0 if it does not rebuild); Q20 importer drops `profile` (AD-13 note mine at 4.3a's accept);
+  Q21 OverflowError in both tuples -> **NEW DR-85** (start-up crash, reproduced on cde1cd9; closes at 4.3a); Q22 DR-82 in the
+  app wrapper; Q23 DR-81 (c) at source; Q24 V18 gate form on hevc8-bt709-full with a hook, GX011627 legs = window evidence,
+  fullclip if WP-T6 merged. STOP candidates 1-4 closed by Q15/Q21/Q16/Q15. Owed by me: at 4.3a's accept AD-13 + AD-23 notes and
+  the DR-58(b)/76/77/81/85 closures; at 4.3's accept its table. NEXT: orchestrator appends the ruling, carves 4.3a, ff, dispatches
+  WP4.3; WP-T6 W2 run 3 / rung 3 meanwhile; WP4.3a short brief for my ruling.
 - **(history) After WP4.1's accept:** WP4.2's brief (DRAFT RULED on main 3aa3c51) got ONE revision pass against WP4.1's accept record, then FINAL
   on CHARC's word; its revision must carry: DR-78/79 (B2 rows) as WP4.2 items, the WP4.1 runner's final names and the stream-syntax
   predicate, the Limit text. WP4.3's revision later carries DR-75 (REQUIRED test under its Q12), DR-76, DR-77, and the AD-23 'applied by
