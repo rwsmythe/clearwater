@@ -71,7 +71,7 @@ def _assert_stream_refusal(source, out, footage, api, jobs, monkeypatch, capsys)
             text = str(exc)
         else:
             pytest.fail("stream output must be refused before jobs")
-    assert source.name in text and he.REFUSED_FORM in text
+    assert source.name in text and "must be a single portable name component" in text
     assert str(source.parent) not in text
     assert not jobs.calls
 
@@ -107,9 +107,13 @@ def test_drive_relative_output_is_refused_before_jobs(
     output_folder = None if beside else Path(os.path.relpath(out, footage))
     monkeypatch.chdir(footage)
     requests = _requests(source, output_folder)
+    extension = ".png" if requests[0].kind == "photo" else source.suffix
+    planted = Path(f"{letter}:input_corrected{extension}")
+    monkeypatch.setattr(he, "final_output_path", lambda *args: planted)
     planned = he.final_output_path(source, requests[0].settings, he.MediaKind(requests[0].kind))
     checked = source.parent if beside else output_folder
     assert planned.parent != checked  # RED cause: the joined filename reinterprets its drive
+    assert planned.parent == Path(f"{letter}:")
     jobs = _Jobs()
     if api == "run":
         with pytest.raises(he.RunnerRefusalError) as caught:
@@ -153,7 +157,7 @@ def test_drive_relative_stream_cannot_write_into_footage_cwd(sample, tmp_path, m
     observed = sorted(path.name for path in footage.iterdir())
     assert status == 2, f"drive-relative output escaped into stand-in footage: {observed}"
     assert not jobs.calls and not observed and not list(out.iterdir())
-    assert "would leave its checked output folder" in capsys.readouterr().err
+    assert "must be a single portable name component" in capsys.readouterr().err
     assert source.read_bytes() == before
 
 
@@ -161,18 +165,24 @@ def test_drive_relative_stream_cannot_write_into_footage_cwd(sample, tmp_path, m
 def test_same_drive_stream_output_keeps_checked_parent(sample, tmp_path, beside, record_property):
     footage, out, src = _folders(tmp_path)
     source = _one_letter_jpeg_stream(sample, src)
+    before = source.read_bytes()
+    carrier = src / src.drive[0].lower()
+    carrier_before = carrier.read_bytes()
     requests = _requests(source, None if beside else out)
-    planned = he.final_output_path(source, requests[0].settings, he.MediaKind.PHOTO)
-    checked = source.parent if beside else out
-    assert planned.parent == checked and planned.name == "input_corrected.png"
-    he.check_outputs(requests, footage)  # the safe same-drive join must not be refused
-    record = he.run(requests, footage_folder=footage, exports=composition.export_jobs())
-    item = record.report.items[0]
-    assert item.state == "done", item.result.failure
-    assert item.result.outputs == (planned,) and planned.is_file()
+    with pytest.raises(he.OutputNameError):
+        he.final_output_path(source, requests[0].settings, he.MediaKind.PHOTO)
+    with pytest.raises(he.RunnerRefusalError):
+        he.check_outputs(requests, footage)
+    jobs = _Jobs(composition.export_jobs())
+    with pytest.raises(he.RunnerRefusalError) as caught:
+        he.run(requests, footage_folder=footage, exports=jobs)
+    assert source.name in str(caught.value)
+    assert str(tmp_path) not in str(caught.value)
+    assert not jobs.calls and not list(out.iterdir())
+    assert source.read_bytes() == before
+    assert carrier.read_bytes() == carrier_before
     assert not list(footage.iterdir())
-    record_property("actual_output", str(planned))
-    print(f"SAME_DRIVE_OUTPUT {planned}")
+    record_property("refusal", str(caught.value))
 
 
 def _streams(path):
@@ -250,6 +260,8 @@ def test_output_file_form_check_has_a_planted_control(
 ):
     footage, out, src = _folders(tmp_path)
     source = src / "carrier:input.jpg"
+    planted = Path(f"{out}{os.sep}carrier:input_corrected.png")
+    monkeypatch.setattr(he, "final_output_path", lambda *args: planted)
     real = he._write_form_refusal
     monkeypatch.setattr(
         he, "_write_form_refusal", lambda target: None if target.suffix == ".png" else real(target)

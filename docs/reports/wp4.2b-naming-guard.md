@@ -2,158 +2,210 @@
 
 **DRAFT -- for Reviewer A**
 
-**Current STOP (turn 3):** CHARC `0c8d52528a11b714` grants an additive
-`OutputNameError(ValueError)`, its jobs export, one runner catch branch and
-narrow test reconciliation. The full ruling is recorded verbatim in the
-ledger and governs. Its condition-3 test premise does not match `f1a6bba`:
-eight drive-relative cases directly assert that naming returns an unsafe
-plan, which requires edits beyond refusal text. A targeted reproduction
-fails before entering the runner. The two tests cited at :272/:285 pass
-unedited but prove planning is skipped, not that the parent guard is reached.
-The existing file-form planted control also needs a setup change to avoid
-being pre-empted by the new naming refusal. The narrow additional test grant
-requested in the ledger remains outstanding. No product/test edit this turn.
+The implementation and requested light checks are GREEN. Reviewer A round 1,
+Reviewer B and the full two-leg gate are outstanding; this is not acceptance.
+Base: `f991254`. Turn-2 WIP: `f1a6bba`; turn-3 STOP record: `79b60d9`.
+Both scope rulings, CHARC `0c8d52528a11b714` and `050c52106cd8c6ad`, are recorded
+verbatim in `docs/proofs/wp4.2b-ledger.md` and govern this build.
 
-Approved next scope delta (not built yet): one product exception class and
-its jobs export; one runner exception branch plus import; one WP4.2a test
-file under condition 3. The two same-drive cases are authorized to flip from
-accepted output to REFUSED because every colon is refused, but this flip
-has NOT been implemented while the scope premise is unresolved. No claim
-that the 22 old failures are now green. WP4.2b is to merge first and receive
-its OWN two-leg window after convergence, with the WP4.2 rebase handled by
-the dispatcher; no stacked gate.
+## Behavior and scope
 
-Base: `f991254`; round-0 ledger commit: `e5983bd`. Implementation is limited
-to `src/clearwater/jobs/naming.py`'s validation and the two public planning
-functions' `Raises:` documentation. Existing tests, frozen interfaces,
-dependencies, export engine, composition and runner are unchanged.
-
-## Validation and placement
-
-`_base_plan` (`src/clearwater/jobs/naming.py:287-307`) validates the whole
-composed unnumbered name, `base + extension`, before constructing `OutputPlan`.
-It rejects `/`, `\`, `:`, a name unequal to `Path(name).name`, or a nonempty
-`os.path.splitdrive(name)[0]`. `ValueError` identifies only `source.name`:
-`output name for '<source name>' must be a single portable name component`.
-The video extension is included, protecting `x.mp4:s` as well as source stems.
+`_base_plan` (`src/clearwater/jobs/naming.py:291-311`) validates the composed
+unnumbered name, `base + extension`, before constructing `OutputPlan`. It
+rejects `/`, `\`, `:`, a name unequal to `Path(name).name`, or a nonempty
+`os.path.splitdrive(name)[0]`. Video's retained extension is included, so
+`x.mp4:s` is refused as well as `c:x.jpg` and `carrier:x.jpg`.
 
 The colon ban is a portability rule under spec N1: POSIX permits colons in
-filenames, but the composed output name must also avoid Windows drive and
-stream syntax.
+filenames, but composed output names must avoid Windows drive and stream syntax.
 
-Both public planners call `_base_plan` first: `final_output_path` at line 335
-and `plan_output` at line 392. Folder scanning, source/collision checks and
-reservations occur later. Collision numbering adds only `_<N>` to the checked
-base, so the same component guarantee holds for every candidate. Validating
-the property instead would raise during candidate checks and reservations.
-Direct manual construction of `OutputPlan` is unchanged, as allowed by the
-ruling's `_base_plan` alternative.
+`OutputNameError(ValueError)` at `naming.py:53` identifies the source by
+`source.name` only, never a folder. It is exported from `clearwater.jobs`.
+Existing `except ValueError` callers still catch it; the ten direct refusal
+cases assert both that compatibility and the specific exported subclass.
+Suffix validation still raises ordinary `ValueError`.
 
-The suffix validator's other restrictions are not extended to source stems:
-`* ? " < > |`, controls, `..`, trailing dot/space and the temporary marker are
-not added to this guard. Existing source, collision and temporary-name rules
-are unchanged.
+Both public planners call `_base_plan` first (lines 339 and 396), before
+naming filesystem reads or reservations. Numbering only appends `_<N>` to the
+checked base; checking once covers later candidates. A raising path property
+would instead fail mid-loop. Direct manual `OutputPlan` construction remains
+unchanged, as allowed by the ruling. The suffix validator's other bans are
+not extended to source stems: `* ? " < > |`, controls, `..`, trailing dot/space
+and the temporary marker are not added to this guard.
 
-## RED/GREEN evidence
+Scope delta authorized by CHARC: one public exception class and its jobs
+export; one new catch in `check_outputs` plus its import; the existing
+WP4.2a test file edited only for the two same-drive flips, exact refusal text,
+eight drive-relative plants and the planted file-form control's isolation.
+No frozen-interface, dependency, composition or export-engine edit.
 
-All runs used the sandbox mkdir shim and disabled pytest's cache provider.
-Logs live under `work/wp4.2b/`; exact commands and exits are in
-`docs/proofs/wp4.2b-ledger.md`.
+## Runner and engine routes
 
-The following node families were run RED on unmodified product code:
+`tools/headless_export.py:724-727` catches `OutputNameError` before its broader
+`ValueError` catch. It raises name-only, ASCII-safe `RunnerRefusalError` before
+any job, yielding CLI exit 2. Other `ValueError`s still continue to the engine:
+`test_invalid_suffix_stays_an_engine_refusal` passed unedited. The original
+parent and file-form guards below the catch (lines 728-736) are byte-for-byte
+unchanged and remain defence in depth.
 
-- `tests/test_jobs_naming.py::test_composed_output_name_is_refused`, all 8
-  combinations of `c:x.jpg`/`carrier:x.jpg`, photo/video and final/plan.
-- `tests/test_jobs_naming.py::test_video_extension_stream_is_refused`,
-  `[final]` and `[plan]` for `x.mp4:s`.
+With `footage_folder=None`, `check_outputs` still returns before planning.
+The real photo engine reads/stats at `src/clearwater/jobs/export.py:711-712`,
+then calls `_plan` at 753; video probes at 808 and calls `_plan` at 837.
+`_plan` calls `plan_output` at 679. `_run` catches at 607-608 and `_describe`
+at 634-641 prefixes the actual exception type and ASCII-escapes the text.
+This unchanged route reports `<source>: OutputNameError: <message>` as a
+failed item with status 1, without a traceback. Other engine `ValueError`s
+retain their existing description route.
 
-All ten failed with `DID NOT RAISE ValueError`. The same run passed all 696
-`test_wp23_fixture_names_keep_output_paths` cases: every one of the manifest's
-87 paths, both media kinds, both planners, explicit output folder and beside
-source, default suffix. Expected names are composed from the spec's naming
-contract independently of the production planners. No legitimate fixture
-output name or path changes. Evidence: `red-planners.log`, EXIT 1.
+## RED/GREEN and controls
 
-The ONE runner test is
-`tests/test_wp42b_naming_guard.py::test_naming_refusal_is_readable_and_writes_nothing`.
-It uses the real `composition.export_jobs()`, the real photo reader, an actual
-JPEG ADS named `carrier:input.jpg`, and library `run(..., footage_folder=None)`.
-There is no reader double or stat double. The carrier, source stream, output
-folder and empty cwd all live under the test's `tmp_path`. A platform or ADS
-creation refusal produces an explicit skip; no such skip occurred here.
+Turn 2 RED on unmodified product code: all eight source-stem cases and both
+video-extension cases failed `DID NOT RAISE ValueError` (`red-planners.log`).
+All 696 fixture controls passed: every manifest path (87), both media kinds,
+both planners and explicit-folder/beside-source settings at the default
+suffix, compared with independently composed spec paths. No legitimate
+fixture output name or path changed.
 
-RED on base: the engine attempted a stream temporary/output name, created
-`out/carrier`, then failed its rename with `OSError: [WinError 87] The parameter
-is incorrect`. The test failed its empty-output-folder assertion. Its earlier
-assertions verified the carrier main data and JPEG source stream were
-unchanged. All attempted writes stayed under `tmp_path`.
-Evidence: `red-runner.log`, EXIT 1.
+The ONE WP4.2b runner test function,
+`tests/test_wp42b_naming_guard.py::test_naming_refusal_is_readable_and_writes_nothing`,
+now has `[engine]` and `[before-jobs]` cases. Both use a real JPEG ADS named
+`carrier:input.jpg`, real composition and reader, no stat or reader double.
+All carrier/stream/output/cwd paths are per-test `tmp_path` children. The
+engine case uses `footage_folder=None`; the preflight case uses a stand-in
+footage folder and a forwarding job spy to prove zero job calls and exit 2.
+Both check name-only text, no traceback, empty output/cwd, and unchanged
+carrier main data and source stream. ADS creation worked here; no skip.
 
-GREEN after the validation: the whole naming file plus the runner test passed
-**822 tests**, no skips, EXIT 0 (`green-naming.log`). The runner now observes
-one failed item whose message starts `carrier:input.jpg: ValueError:`, with no
-folder spelling or traceback in failure, summary or captured output/logging.
-The output folder and cwd are empty, and both source data streams are
-unchanged.
+Original runner RED on base attempted a stream output, created `out/carrier`,
+then failed rename with WinError 87; source data remained unchanged
+(`red-runner.log`). Turn 4 RED before the exception/catch change: `[engine]`
+reported plain ValueError instead of OutputNameError, `[before-jobs]` returned
+1 instead of 2, and the invalid-suffix control passed: **2 failed, 1 passed**,
+EXIT 1 (`turn4-red.log`).
 
-## Engine refusal route and defence in depth
+Turn 4 GREEN: **1076 passed, 12 deselected, zero failures/errors/skips**,
+EXIT 0 (`turn4-light.log`, `turn4-light.xml`). XML checks independently confirm
+all 22 previously failing nodes, both real-ADS cases, the unchanged suffix
+control and the guard controls passed (`turn4-outcomes.log`). The deselections
+are the three explicitly authorized UNC nodes plus nine marker exclusions.
+No additional suppression or skip was introduced.
 
-The real photo path reads the source at `src/clearwater/jobs/export.py:711`
-and stats it at line 712 before calling `_plan` at line 753. This is why the
-turn-2 ruling requires a real ADS source instead of the brief's nonexistent
-source plus reader double. `_plan` calls `plan_output` at line 679.
-The video path probes at line 808 and calls `_plan` at line 837.
+The two same-drive cases below intentionally flip from accepted output to
+REFUSED: DR-80 refuses every colon, including the formerly normalized
+same-drive spelling. They now assert planner/preflight refusal, zero jobs,
+empty output/stand-in footage, name-only text and unchanged main/stream data.
+Their original node IDs are retained; no WP4.2a test was deleted or added.
 
-`_run` catches the naming exception at lines 607-608. `_describe` at 634-641
-adds the exception type (ValueError is outside `_READABLE_ERRORS`, line 106)
-and ASCII-escapes the text. It returns a failed item rather than a traceback.
-The library failed-item route has status 1 via
-`tools/headless_export.py:874-886`; it is not a CLI usage refusal with exit 2.
+## Reviewer A edit list and assertion evidence
 
-WP4.2a's parent check remains at `tools/headless_export.py:719-724`, followed
-by its file-form check at 725-727, as defence in depth. Its existing
-`except ValueError` at 717-718 leaves a naming refusal to the engine; with
-`footage_folder=None`, preflight returns at 697-698. None of this runner code
-was changed.
+Line spans below refer to the completed turn-4 tree. A helper-only text
+change lists both the consuming node and helper span. The negative-call
+controls formerly at :272/:285 are unchanged, now functions at lines
+278-288 and 291-300; both passed. They prove planning is skipped, as CHARC's
+second ruling corrects. The eight planted drive-relative cases are the
+actual parent-guard coverage. The planted file-form control passed at
+258-275 with all original defect-catching assertions intact.
 
-## Checks, verification loop and acceptance status
+`work/wp4.2b/turn4-wp42a.diff` is the exact git diff against `79b60d9`.
+`turn4-diff-evidence.log` (EXIT 0) verifies:
 
-- `ruff check .`: PASS, EXIT 0 (`ruff-check-final.log`).
-- `ruff format --check .`: 261 files already formatted, EXIT 0
-  (`ruff-format-final.log`). Initial import-order and wrapping issues in the
-  new runner test were fixed in that file only.
-- `mypy`: no issues in 141 source files, EXIT 0 (`mypy.log`).
-- Broader requested light set: **22 failed, 1053 passed, 12 deselected**, zero
-  skips, EXIT 1 (`light.log`). Three UNC nodes were deselected as authorized;
-  nine other deselections came from the requested marker filter.
+- All original assertions are retained outside the two authorized behavior
+  flips and the two exact-text expectation changes. No assertion is weakened
+  by the plants: only the planner source moves to a plant, and a parent-drive
+  assertion is added to strengthen fidelity.
+- No WP4.2a test or parametrization was added, deleted or changed.
+- The entire runner AST matches the WIP head after removing only the new
+  import/catch; the parent/file-form guard text is identical.
+- All eight plants match the unchanged old `OutputPlan.path` composition for
+  their folder/media/drive cases; each plant has parent `<letter>:`.
 
-**Turn-2 STOP, amended by the governing turn-3 ruling above.** All 22 failures are in the unchanged,
-unowned `tests/test_wp42a_runner_hardening.py`: eight stream-preflight cases,
-eight drive-relative-plan cases, the real stream/cwd case, two same-drive
-accepted-output cases, the enumerator's after-refusal setup, and two
-hard-link/preflight cases. Full IDs and mechanisms are in the ledger and
-`work/wp4.2b/light-failures.txt`. These expectations require unchecked plans,
-or pre-job runner refusal; the mandated naming refusal now supersedes them
-through the existing choice-3 route. Recommended disposition: commission a
-test-only reconciliation of those expectations while preserving direct
-parent/file-form guard coverage. No existing test was edited or suppressed.
+Reviewer A should check that fidelity explicitly against the following list.
 
-Verification loop: the round-0 missing-source premise was independently
-confirmed and resolved by the dispatcher's real-ADS ruling. RED confirmed
-all ten missing planner refusals and the actual stream-writing attempt;
-the validation fixes them, with the full naming file and real runner GREEN.
-The broader run confirmed the suspected existing-runner expectation conflict;
-it remains unresolved at the owned-file tripwire. No false-positive rejection
-or product revert. `final-scope.log` (EXIT 0) confirms exactly five owned files
-changed, original naming-test content preserved apart from new imports/tests,
-ONE new runner test, zero CR bytes and a clean diff whitespace check.
-Verification has not converged. Reviewer A, Reviewer B and the posted two-leg
-gate are outstanding; the gate request is held for the narrower test-scope amendment. This
-draft does not claim acceptance or DR-80 closure.
+| Edited WP4.2a node ID | Current line span | Reason |
+|---|---|---|
+| `tests/test_wp42a_runner_hardening.py::test_stream_named_output_is_refused_before_jobs[explicit-out-jpg-run]` | 82-90; helper 60-76 | Helper exact-text expectation now names the portable-component refusal; exit/no-jobs/privacy unchanged. |
+| `tests/test_wp42a_runner_hardening.py::test_stream_named_output_is_refused_before_jobs[explicit-out-jpg-main]` | 82-90; helper 60-76 | Helper exact-text expectation now names the portable-component refusal; exit/no-jobs/privacy unchanged. |
+| `tests/test_wp42a_runner_hardening.py::test_stream_named_output_is_refused_before_jobs[explicit-out-mp4-run]` | 82-90; helper 60-76 | Helper exact-text expectation now names the portable-component refusal; exit/no-jobs/privacy unchanged. |
+| `tests/test_wp42a_runner_hardening.py::test_stream_named_output_is_refused_before_jobs[explicit-out-mp4-main]` | 82-90; helper 60-76 | Helper exact-text expectation now names the portable-component refusal; exit/no-jobs/privacy unchanged. |
+| `tests/test_wp42a_runner_hardening.py::test_stream_named_output_is_refused_before_jobs[beside-source-jpg-run]` | 82-90; helper 60-76 | Helper exact-text expectation now names the portable-component refusal; exit/no-jobs/privacy unchanged. |
+| `tests/test_wp42a_runner_hardening.py::test_stream_named_output_is_refused_before_jobs[beside-source-jpg-main]` | 82-90; helper 60-76 | Helper exact-text expectation now names the portable-component refusal; exit/no-jobs/privacy unchanged. |
+| `tests/test_wp42a_runner_hardening.py::test_stream_named_output_is_refused_before_jobs[beside-source-mp4-run]` | 82-90; helper 60-76 | Helper exact-text expectation now names the portable-component refusal; exit/no-jobs/privacy unchanged. |
+| `tests/test_wp42a_runner_hardening.py::test_stream_named_output_is_refused_before_jobs[beside-source-mp4-main]` | 82-90; helper 60-76 | Helper exact-text expectation now names the portable-component refusal; exit/no-jobs/privacy unchanged. |
+| `tests/test_wp42a_runner_hardening.py::test_drive_relative_output_is_refused_before_jobs[relative-out-jpg-run]` | 96-129 | Plant old drive-relative output; original escaped-parent/exit/no-jobs/no-write assertions retained, plus parent-drive check. |
+| `tests/test_wp42a_runner_hardening.py::test_drive_relative_output_is_refused_before_jobs[relative-out-jpg-main]` | 96-129 | Plant old drive-relative output; original escaped-parent/exit/no-jobs/no-write assertions retained, plus parent-drive check. |
+| `tests/test_wp42a_runner_hardening.py::test_drive_relative_output_is_refused_before_jobs[relative-out-mp4-run]` | 96-129 | Plant old drive-relative output; original escaped-parent/exit/no-jobs/no-write assertions retained, plus parent-drive check. |
+| `tests/test_wp42a_runner_hardening.py::test_drive_relative_output_is_refused_before_jobs[relative-out-mp4-main]` | 96-129 | Plant old drive-relative output; original escaped-parent/exit/no-jobs/no-write assertions retained, plus parent-drive check. |
+| `tests/test_wp42a_runner_hardening.py::test_drive_relative_output_is_refused_before_jobs[beside-source-jpg-run]` | 96-129 | Plant old drive-relative output; original escaped-parent/exit/no-jobs/no-write assertions retained, plus parent-drive check. |
+| `tests/test_wp42a_runner_hardening.py::test_drive_relative_output_is_refused_before_jobs[beside-source-jpg-main]` | 96-129 | Plant old drive-relative output; original escaped-parent/exit/no-jobs/no-write assertions retained, plus parent-drive check. |
+| `tests/test_wp42a_runner_hardening.py::test_drive_relative_output_is_refused_before_jobs[beside-source-mp4-run]` | 96-129 | Plant old drive-relative output; original escaped-parent/exit/no-jobs/no-write assertions retained, plus parent-drive check. |
+| `tests/test_wp42a_runner_hardening.py::test_drive_relative_output_is_refused_before_jobs[beside-source-mp4-main]` | 96-129 | Plant old drive-relative output; original escaped-parent/exit/no-jobs/no-write assertions retained, plus parent-drive check. |
+| `tests/test_wp42a_runner_hardening.py::test_drive_relative_stream_cannot_write_into_footage_cwd` | 148-161 | Exact refusal-text expectation only; exit 2, no jobs/writes and source-byte assertions unchanged. |
+| `tests/test_wp42a_runner_hardening.py::test_same_drive_stream_output_keeps_checked_parent[absolute-out]` | 165-185 | Authorized accepted-to-REFUSED flip; check planner/preflight refusal, no jobs/writes and both source data streams unchanged. |
+| `tests/test_wp42a_runner_hardening.py::test_same_drive_stream_output_keeps_checked_parent[beside-source]` | 165-185 | Authorized accepted-to-REFUSED flip; check planner/preflight refusal, no jobs/writes and both source data streams unchanged. |
+| `tests/test_wp42a_runner_hardening.py::test_stream_output_on_hard_link_leaves_original_unchanged[run]` | 231-255; helper 60-76 | Helper exact-text expectation only; hard-link data/stream and no-jobs assertions unchanged. |
+| `tests/test_wp42a_runner_hardening.py::test_stream_output_on_hard_link_leaves_original_unchanged[main]` | 231-255; helper 60-76 | Helper exact-text expectation only; hard-link data/stream and no-jobs assertions unchanged. |
+| `tests/test_wp42a_runner_hardening.py::test_output_file_form_check_has_a_planted_control` | 258-275 | Plant old stream output to isolate disabled file-form helper; all original planted-defect assertions unchanged. |
 
-For CHARC (proposed closure on accept): **DR-80 CLOSED by WP4.2b** -- both
-jobs.naming planners reject a composed output name that is not one portable
-name component before constructing a plan; drive/stream spellings in the
-stem or retained video extension cannot reach output-path composition.
-WP4.2a's parent and file-form checks remain as defence in depth.
-The runner refuses an `OutputNameError` before jobs (exit 2).
+All 22 previously failing node IDs, now independently checked PASS in XML:
+
+- `tests/test_wp42a_runner_hardening.py::test_stream_named_output_is_refused_before_jobs[explicit-out-jpg-run]` -- PASS
+- `tests/test_wp42a_runner_hardening.py::test_stream_named_output_is_refused_before_jobs[explicit-out-jpg-main]` -- PASS
+- `tests/test_wp42a_runner_hardening.py::test_stream_named_output_is_refused_before_jobs[explicit-out-mp4-run]` -- PASS
+- `tests/test_wp42a_runner_hardening.py::test_stream_named_output_is_refused_before_jobs[explicit-out-mp4-main]` -- PASS
+- `tests/test_wp42a_runner_hardening.py::test_stream_named_output_is_refused_before_jobs[beside-source-jpg-run]` -- PASS
+- `tests/test_wp42a_runner_hardening.py::test_stream_named_output_is_refused_before_jobs[beside-source-jpg-main]` -- PASS
+- `tests/test_wp42a_runner_hardening.py::test_stream_named_output_is_refused_before_jobs[beside-source-mp4-run]` -- PASS
+- `tests/test_wp42a_runner_hardening.py::test_stream_named_output_is_refused_before_jobs[beside-source-mp4-main]` -- PASS
+- `tests/test_wp42a_runner_hardening.py::test_drive_relative_output_is_refused_before_jobs[relative-out-jpg-run]` -- PASS
+- `tests/test_wp42a_runner_hardening.py::test_drive_relative_output_is_refused_before_jobs[relative-out-jpg-main]` -- PASS
+- `tests/test_wp42a_runner_hardening.py::test_drive_relative_output_is_refused_before_jobs[relative-out-mp4-run]` -- PASS
+- `tests/test_wp42a_runner_hardening.py::test_drive_relative_output_is_refused_before_jobs[relative-out-mp4-main]` -- PASS
+- `tests/test_wp42a_runner_hardening.py::test_drive_relative_output_is_refused_before_jobs[beside-source-jpg-run]` -- PASS
+- `tests/test_wp42a_runner_hardening.py::test_drive_relative_output_is_refused_before_jobs[beside-source-jpg-main]` -- PASS
+- `tests/test_wp42a_runner_hardening.py::test_drive_relative_output_is_refused_before_jobs[beside-source-mp4-run]` -- PASS
+- `tests/test_wp42a_runner_hardening.py::test_drive_relative_output_is_refused_before_jobs[beside-source-mp4-main]` -- PASS
+- `tests/test_wp42a_runner_hardening.py::test_drive_relative_stream_cannot_write_into_footage_cwd` -- PASS
+- `tests/test_wp42a_runner_hardening.py::test_same_drive_stream_output_keeps_checked_parent[absolute-out]` -- PASS
+- `tests/test_wp42a_runner_hardening.py::test_same_drive_stream_output_keeps_checked_parent[beside-source]` -- PASS
+- `tests/test_wp42a_runner_hardening.py::test_stream_enumeration_failure_is_not_a_skip[after-refusal]` -- PASS
+- `tests/test_wp42a_runner_hardening.py::test_stream_output_on_hard_link_leaves_original_unchanged[run]` -- PASS
+- `tests/test_wp42a_runner_hardening.py::test_stream_output_on_hard_link_leaves_original_unchanged[main]` -- PASS
+
+## Checks, verification loop and acceptance transfer
+
+Final `ruff check .`: all checks passed, EXIT 0
+(`turn4-ruff-check-final.log`). Final `ruff format --check .`: 261 files
+already formatted, EXIT 0 (`turn4-ruff-format-final.log`). Mypy: no issues
+in 141 source files, EXIT 0 (`turn4-mypy.log`). Initial wrapping findings
+were fixed in the new runner test only. Full light command and every run's
+exit/counts are in the ledger; all pytest runs used the sandbox mkdir shim
+and disabled cacheprovider. Installed dependencies were reused read-only
+with `uv run --no-sync` and `PYTHONPATH=scripts;src`.
+
+Owner verification loop: missing-source premise confirmed and resolved by
+real ADS; unsafe naming/write attempt confirmed RED and fixed; the 22 old
+runner conflicts confirmed, scope amendments obtained and implemented;
+RED/GREEN and the independent assertion/plant/outcome audits confirm the
+new routes and compatibility controls. Final pass found no additional
+issue. No false-positive rejection or product revert. The only deviations
+from the original brief are the explicitly recorded governing rulings.
+No unresolved scope question remains. Review/gate work remains outstanding.
+
+Only the eight owned files changed; `turn4-final-scope.log` (EXIT 0) confirms
+the restricted naming/export deltas, complete node lists in both documents,
+zero CR bytes and a clean diff whitespace check. Frozen interfaces, dependencies, local config,
+composition and export engine are unchanged. No owner footage was written;
+test media came from shared fixtures and scratch stayed under the worktree.
+
+WP4.2b merges FIRST. The dispatcher rebases WP4.2 at its next yield before
+its task 5 and resolves any runner-branch conflict at the seat. This package
+gets its OWN posted two-leg window after review convergence, not a stack.
+No heavy run or reviewer run was performed by this cell this turn.
+
+For CHARC (proposed on accept): **DR-80 CLOSED by WP4.2b** -- both jobs.naming
+planners reject a composed output name that is not one portable name component
+before constructing a plan; drive/stream spellings in the stem or retained
+video extension cannot reach output-path composition. WP4.2a's parent and
+file-form checks remain as defence in depth. The runner refuses an
+`OutputNameError` before jobs (exit 2). The engine failed-item route remains
+in force when footage preflight is disabled. Closure awaits the accept.

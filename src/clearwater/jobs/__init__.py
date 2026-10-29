@@ -30,6 +30,7 @@ from .export import (
 from .naming import (
     TEMP_MARKER,
     MediaKind,
+    OutputNameError,
     OutputPlan,
     Reservations,
     final_output_path,
@@ -64,6 +65,7 @@ __all__ = [
     "LeftoverReport",
     "MediaKind",
     "MissingFolderError",
+    "OutputNameError",
     "OutputPlan",
     "Reservations",
     "SafeWrite",

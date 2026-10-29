@@ -4,7 +4,8 @@
 |---|---|---|
 | Turn 1 / round 0 | tokens used 90,285; input depth 87,357 / 475,000 | Dispatcher supplied at turn 2; round-0 note committed as `e5983bd` |
 | Turn 2 / build | tokens used 144,321; input depth 137,070 / 475,000 | Dispatcher supplied at turn 3; WIP committed as `f1a6bba` |
-| Turn 3 / ruling check | Pending dispatcher reading | STOP: condition 3 does not cover eight unsafe-plan assertions or the file-form planted-control setup |
+| Turn 3 / ruling check | tokens used 306,885; input depth 167,794 / 475,000 | Dispatcher supplied at turn 4; docs-only STOP committed as `79b60d9` |
+| Turn 4 / build | Pending dispatcher reading | Scope amended; implementation and light checks GREEN; ready for Reviewer A round 1 |
 
 Base: `f991254`, branch `wp4.2b`. Dispatch: orchestrator generation 18,
 FINAL brief on CHARC `5c056d647ad9ca99`. Scope: DR-80 naming containment.
@@ -26,6 +27,23 @@ exception export, `tools/headless_export.py`'s one catch branch and needed
 import, and `tests/test_wp42a_runner_hardening.py` under condition 3. No
 frozen-interface grant. The two-leg suite has its OWN window after review
 convergence, never a stack. The dispatcher owns merge/rebase sequencing.
+
+## Governing scope extension -- CHARC `050c52106cd8c6ad`
+
+Received with turn 4, 2026-10-29 04:50Z. VERBATIM; GOVERNS together with
+`0c8d52528a11b714` and resolves the turn-3 STOP:
+
+> RULING on WP4.2b STOP 2 (query cb8a50fc31eb0187): **condition 3 EXTENDED with (c) and (d) as you recommend, test-only, no deletion, no skip.** Verified here: `test_drive_relative_output_is_refused_before_jobs` computes its precondition with the real `he.final_output_path` (:110) so DR-80 raises inside the test; and the tests at :266 and :279 monkeypatch `final_output_path` to FAIL if called, so they prove planning is skipped, not that the parent guard fires. My condition 2 mis-described them; the correction stands here.
+>
+> (c) In the eight drive-relative cases, the precondition's plan comes from a monkeypatched `he.final_output_path` returning the drive-relative path the old naming produced, built from a string (`Path(f"{letter}:{stem}_corrected{ext}")`); `planned.parent != checked` stays asserted on that plant; the rest of each case (run and main, exit 2, name only, nothing called on the jobs double) is unchanged. These eight remain the parent guard's coverage.
+> (d) The planted file-form control's setup is isolated from the naming refusal the same way, so it still proves the file-form helper refuses.
+> Conditions: every edited node id with its line span and a one-line reason in the ledger AND the report; no assertion weakened (the diff shows only the plan's source moving from the real function to a plant); the eight plus the two flipped same-drive cases plus any exact-text edits are the WHOLE WP4.2a test edit; real-name refusal is proved by WP4.2b's own naming tests and its runner before-jobs test. Reviewer A is told the edit list so it checks the plants are faithful to the old naming output (drive-relative, parent = `<letter>:`).
+>
+> Resume the cell. Sequencing and the own window unchanged.
+
+Implementation uses only the original owned files and the three files added
+by the first ruling, with WP4.2a edits restricted by both rulings. No new
+test was added to or deleted from the WP4.2a file, and none was skipped.
 
 ## Round 0 -- runner-test premise and FINAL ruling
 
@@ -180,7 +198,8 @@ control evidence, not a post-change GREEN claim.
 |---|---|---|---|---|---|---|---|---|
 | 0 | No Reviewer A run; read/map STOP ruled at turn 2 | N/A | N/A | N/A | 0 | None; ledger only | Codex cell; reviewer not invoked | tokens 90,285; input 87,357 / 475,000 |
 | Turn 2 build (not a review round) | No Reviewer A run; initial scope STOP ruled at turn 3 | N/A | N/A | N/A | 0 | Product validation + new tests | Codex cell; reviewer not invoked | tokens 144,321; input 137,070 / 475,000 |
-| Turn 3 ruling check (not a review round) | No Reviewer A run; narrower test-scope STOP below | N/A | N/A | N/A | 0 | None; documentation + cheap reproductions only | Codex cell; reviewer not invoked | Pending dispatcher |
+| Turn 3 ruling check (not a review round) | No Reviewer A run; narrower STOP ruled at turn 4 | N/A | N/A | N/A | 0 | None; documentation + cheap reproductions only | Codex cell; reviewer not invoked | tokens 306,885; input 167,794 / 475,000 |
+| Turn 4 build (not a review round) | Ready for driver's Reviewer A round 1 | N/A | N/A | N/A | 0 | Exception/export + one runner catch + granted tests | Codex cell; reviewer not invoked | Pending dispatcher |
 
 Review policy: the driver's Claude pass, STRONG tier, per the Clearwater
 seam-3 fill. Adjudicate every supplied finding; yield at each round boundary.
@@ -346,15 +365,12 @@ in this request has been executed by this cell. No harness gate is required.
 
 ## Turn 3 -- STOP: condition-3 premise does not match `f1a6bba`
 
-**Recommended amendment:** extend the test-only grant to (1) replacing the
-obsolete unsafe-plan setup/assertion in all eight drive-relative cases with
-an `OutputNameError` assertion while keeping their runner/no-jobs/no-write
-assertions, and (2) isolating the existing file-form planted control from
-naming via a planted `final_output_path`. Also authorize adding a genuine
-planted escaped-parent control. Keep production changes limited to the
-already granted exception/export/catch, keep the runner's parent guard
-unchanged, and keep the :272/:285 negative-call controls unedited. No test
-deletion or failure suppression. Await this narrow amendment before build.
+**Disposition at turn 4:** resolved by CHARC `050c52106cd8c6ad`, verbatim above.
+The eight drive-relative cases retain their original escaped-parent
+assertion on a planted old-style path; the file-form control is isolated
+the same way. The :272/:285 negative-call controls stay unedited. No new
+parent-guard test is needed because the eight existing cases now exercise
+that guard directly. Implementation and observed results follow below.
 
 **[MAJOR, EXECUTED] Eight non-text assertions require an additional grant.**
 `test_drive_relative_output_is_refused_before_jobs` calls
@@ -415,3 +431,144 @@ and no 22-now-green claim. No full light/lint/type rerun: the ruling's failed
 test premise was reproduced cheaply and the cell yields at the scope
 tripwire. No heavy run or reviewer run; report remains DRAFT. Depth for
 turn 3 is pending the dispatcher; turn-2 supplied readings are recorded.
+
+
+## Turn 4 -- implementation, GREEN checks and Reviewer A handoff
+
+Build complete within the amended scope; both prior STOPs resolved. Reviewer
+A round 1 has not run. No code review convergence, Reviewer B or full-gate
+claim. The report is DRAFT -- for Reviewer A. No new scope question remains.
+
+`OutputNameError(ValueError)` is public and exported from jobs. The composed
+name check now raises that subclass, and only the runner's exception branch
+plus import changes: OutputNameError becomes a name-only RunnerRefusalError
+before jobs; other ValueErrors continue unchanged (suffix control passed).
+The engine remains unchanged and reports OutputNameError readably without
+preflight. The ONE new runner test is parameterized over these two routes.
+All eight path plants match old OutputPlan.path composition, parent
+`<letter>:`; same-drive real-name cases flip to REFUSED under condition 3(a).
+
+### Runs (all light; no heavy suite or reviewer invoked)
+
+Environment: `UV_PROJECT_ENVIRONMENT=C:/Users/rwsmy/clearwater/.venv`,
+`PYTHONPATH=scripts;src`, `QT_QPA_PLATFORM=offscreen`; `uv run --no-sync`
+reuses installed dependencies without syncing outside the worktree.
+All stdout/stderr was captured to UTF-8 files under `work/wp4.2b/`.
+
+| Run | Command after `uv run --no-sync` | Evidence (under work/wp4.2b/) | Counts / EXIT |
+|---|---|---|---|
+| RED before exception/catch | `pytest -q -rf tests/test_wp42b_naming_guard.py tests/test_wp42a_runner_hardening.py::test_invalid_suffix_stays_an_engine_refusal --basetemp=work/wp4.2b/tmp-turn4-red -p sandbox_mkdir_shim -p no:cacheprovider` | `turn4-red.log` | 2 failed (both new runner modes), 1 passed (suffix); EXIT 1 |
+| Initial lint | `ruff check .` | `turn4-ruff-check.log` | 2 line-length findings in new runner test; EXIT 1 |
+| Initial format check | `ruff format --check .` | `turn4-ruff-format.log` | 1 file would reformat; EXIT 1 |
+| Wrap new test | `ruff format tests/test_wp42b_naming_guard.py` | `turn4-format-fix.log` | 1 file reformatted; EXIT 0 |
+| Final lint | `ruff check .` | `turn4-ruff-check-final.log` | All checks passed; EXIT 0 |
+| Final format | `ruff format --check .` | `turn4-ruff-format-final.log` | 261 files already formatted; EXIT 0 |
+| Types | `mypy` | `turn4-mypy.log` | No issues in 141 source files; EXIT 0 |
+| Full requested light set | Exact command below | `turn4-light.log`, `turn4-light.xml` | 1076 passed, 12 deselected, zero failures/errors/skips; EXIT 0 |
+| Assertion/scope/plant audit | `python -B -` (stdlib AST/git assertions plus old OutputPlan.path matrix) | `turn4-diff-evidence.log`, `turn4-wp42a.diff` | Only granted WP4.2a edits; original assertions retained except authorized flips/text; runner scope exact; 8 faithful plants; EXIT 0 |
+| Independent XML outcomes | `python -B -` (stdlib XML assertions) | `turn4-outcomes.log` | All 1076 cases passed, all prior 22 present, suffix/negative-call/file-form and real ADS cases passed; EXIT 0 |
+| Report and ledger assembly | `python -B -` (owned documentation writes using the audited node lists) | `turn4-docs.log` | DRAFT report and ledger contain every edited node/span/reason and every prior now-green node; EXIT 0 |
+| Final scope/encoding audit | `python -B -` (stdlib git/AST/document assertions) | `turn4-final-scope.log` | Exactly eight owned files; naming delta restricted to class/raise/Raises, additive jobs export; full lists in both docs; zero CR bytes; diff whitespace PASS; EXIT 0 |
+
+```text
+uv run --no-sync pytest -q -rf -rs tests/test_jobs_naming.py tests/test_wp42b_naming_guard.py tests/test_headless_export.py tests/test_wp42a_runner_hardening.py tests/test_jobs_export.py tests/test_jobs_export_photo.py tests/test_jobs_export_support.py tests/test_jobs_export_video.py -m "not gpu and not footage and not slow" --deselect=tests/test_headless_export.py::test_g1_inside_sees_every_spelling_of_the_same_folder --deselect=tests/test_headless_export.py::test_g1_main_refuses_every_footage_check_through_another_spelling[unc] --deselect=tests/test_headless_export.py::test_g1_the_redactor_hides_the_extended_spellings --basetemp=work/wp4.2b/tmp-turn4-light --junitxml=work/wp4.2b/turn4-light.xml -o junit_family=xunit1 -p sandbox_mkdir_shim -p no:cacheprovider
+```
+
+The 12 deselections are the authorized three UNC nodes plus nine marker
+exclusions. No failure was suppressed; no added skip occurred. Both real
+ADS cases ran, not skipped. The ten naming tests now check the exported
+subclass while keeping `pytest.raises(ValueError)` compatibility checks.
+The 696 fixture-name controls remain GREEN.
+
+### Edited WP4.2a nodes -- complete list for Reviewer A
+
+The following 22 node IDs include helper-only exact-text edits. Line spans
+are current function spans, with the helper span named where it changed.
+No test node/parametrization was added or deleted. The same-drive pair's
+accepted-output-to-REFUSED flip is intentional under DR-80. The new runner
+catch restores the unedited stream-enumerator after-refusal setup too.
+
+| Edited WP4.2a node ID | Current line span | Reason |
+|---|---|---|
+| `tests/test_wp42a_runner_hardening.py::test_stream_named_output_is_refused_before_jobs[explicit-out-jpg-run]` | 82-90; helper 60-76 | Helper exact-text expectation now names the portable-component refusal; exit/no-jobs/privacy unchanged. |
+| `tests/test_wp42a_runner_hardening.py::test_stream_named_output_is_refused_before_jobs[explicit-out-jpg-main]` | 82-90; helper 60-76 | Helper exact-text expectation now names the portable-component refusal; exit/no-jobs/privacy unchanged. |
+| `tests/test_wp42a_runner_hardening.py::test_stream_named_output_is_refused_before_jobs[explicit-out-mp4-run]` | 82-90; helper 60-76 | Helper exact-text expectation now names the portable-component refusal; exit/no-jobs/privacy unchanged. |
+| `tests/test_wp42a_runner_hardening.py::test_stream_named_output_is_refused_before_jobs[explicit-out-mp4-main]` | 82-90; helper 60-76 | Helper exact-text expectation now names the portable-component refusal; exit/no-jobs/privacy unchanged. |
+| `tests/test_wp42a_runner_hardening.py::test_stream_named_output_is_refused_before_jobs[beside-source-jpg-run]` | 82-90; helper 60-76 | Helper exact-text expectation now names the portable-component refusal; exit/no-jobs/privacy unchanged. |
+| `tests/test_wp42a_runner_hardening.py::test_stream_named_output_is_refused_before_jobs[beside-source-jpg-main]` | 82-90; helper 60-76 | Helper exact-text expectation now names the portable-component refusal; exit/no-jobs/privacy unchanged. |
+| `tests/test_wp42a_runner_hardening.py::test_stream_named_output_is_refused_before_jobs[beside-source-mp4-run]` | 82-90; helper 60-76 | Helper exact-text expectation now names the portable-component refusal; exit/no-jobs/privacy unchanged. |
+| `tests/test_wp42a_runner_hardening.py::test_stream_named_output_is_refused_before_jobs[beside-source-mp4-main]` | 82-90; helper 60-76 | Helper exact-text expectation now names the portable-component refusal; exit/no-jobs/privacy unchanged. |
+| `tests/test_wp42a_runner_hardening.py::test_drive_relative_output_is_refused_before_jobs[relative-out-jpg-run]` | 96-129 | Plant old drive-relative output; original escaped-parent/exit/no-jobs/no-write assertions retained, plus parent-drive check. |
+| `tests/test_wp42a_runner_hardening.py::test_drive_relative_output_is_refused_before_jobs[relative-out-jpg-main]` | 96-129 | Plant old drive-relative output; original escaped-parent/exit/no-jobs/no-write assertions retained, plus parent-drive check. |
+| `tests/test_wp42a_runner_hardening.py::test_drive_relative_output_is_refused_before_jobs[relative-out-mp4-run]` | 96-129 | Plant old drive-relative output; original escaped-parent/exit/no-jobs/no-write assertions retained, plus parent-drive check. |
+| `tests/test_wp42a_runner_hardening.py::test_drive_relative_output_is_refused_before_jobs[relative-out-mp4-main]` | 96-129 | Plant old drive-relative output; original escaped-parent/exit/no-jobs/no-write assertions retained, plus parent-drive check. |
+| `tests/test_wp42a_runner_hardening.py::test_drive_relative_output_is_refused_before_jobs[beside-source-jpg-run]` | 96-129 | Plant old drive-relative output; original escaped-parent/exit/no-jobs/no-write assertions retained, plus parent-drive check. |
+| `tests/test_wp42a_runner_hardening.py::test_drive_relative_output_is_refused_before_jobs[beside-source-jpg-main]` | 96-129 | Plant old drive-relative output; original escaped-parent/exit/no-jobs/no-write assertions retained, plus parent-drive check. |
+| `tests/test_wp42a_runner_hardening.py::test_drive_relative_output_is_refused_before_jobs[beside-source-mp4-run]` | 96-129 | Plant old drive-relative output; original escaped-parent/exit/no-jobs/no-write assertions retained, plus parent-drive check. |
+| `tests/test_wp42a_runner_hardening.py::test_drive_relative_output_is_refused_before_jobs[beside-source-mp4-main]` | 96-129 | Plant old drive-relative output; original escaped-parent/exit/no-jobs/no-write assertions retained, plus parent-drive check. |
+| `tests/test_wp42a_runner_hardening.py::test_drive_relative_stream_cannot_write_into_footage_cwd` | 148-161 | Exact refusal-text expectation only; exit 2, no jobs/writes and source-byte assertions unchanged. |
+| `tests/test_wp42a_runner_hardening.py::test_same_drive_stream_output_keeps_checked_parent[absolute-out]` | 165-185 | Authorized accepted-to-REFUSED flip; check planner/preflight refusal, no jobs/writes and both source data streams unchanged. |
+| `tests/test_wp42a_runner_hardening.py::test_same_drive_stream_output_keeps_checked_parent[beside-source]` | 165-185 | Authorized accepted-to-REFUSED flip; check planner/preflight refusal, no jobs/writes and both source data streams unchanged. |
+| `tests/test_wp42a_runner_hardening.py::test_stream_output_on_hard_link_leaves_original_unchanged[run]` | 231-255; helper 60-76 | Helper exact-text expectation only; hard-link data/stream and no-jobs assertions unchanged. |
+| `tests/test_wp42a_runner_hardening.py::test_stream_output_on_hard_link_leaves_original_unchanged[main]` | 231-255; helper 60-76 | Helper exact-text expectation only; hard-link data/stream and no-jobs assertions unchanged. |
+| `tests/test_wp42a_runner_hardening.py::test_output_file_form_check_has_a_planted_control` | 258-275 | Plant old stream output to isolate disabled file-form helper; all original planted-defect assertions unchanged. |
+
+### The original 22 failing node IDs -- now GREEN
+
+Verified individually from JUnit XML, not inferred from the aggregate count:
+
+- `tests/test_wp42a_runner_hardening.py::test_stream_named_output_is_refused_before_jobs[explicit-out-jpg-run]` -- PASS
+- `tests/test_wp42a_runner_hardening.py::test_stream_named_output_is_refused_before_jobs[explicit-out-jpg-main]` -- PASS
+- `tests/test_wp42a_runner_hardening.py::test_stream_named_output_is_refused_before_jobs[explicit-out-mp4-run]` -- PASS
+- `tests/test_wp42a_runner_hardening.py::test_stream_named_output_is_refused_before_jobs[explicit-out-mp4-main]` -- PASS
+- `tests/test_wp42a_runner_hardening.py::test_stream_named_output_is_refused_before_jobs[beside-source-jpg-run]` -- PASS
+- `tests/test_wp42a_runner_hardening.py::test_stream_named_output_is_refused_before_jobs[beside-source-jpg-main]` -- PASS
+- `tests/test_wp42a_runner_hardening.py::test_stream_named_output_is_refused_before_jobs[beside-source-mp4-run]` -- PASS
+- `tests/test_wp42a_runner_hardening.py::test_stream_named_output_is_refused_before_jobs[beside-source-mp4-main]` -- PASS
+- `tests/test_wp42a_runner_hardening.py::test_drive_relative_output_is_refused_before_jobs[relative-out-jpg-run]` -- PASS
+- `tests/test_wp42a_runner_hardening.py::test_drive_relative_output_is_refused_before_jobs[relative-out-jpg-main]` -- PASS
+- `tests/test_wp42a_runner_hardening.py::test_drive_relative_output_is_refused_before_jobs[relative-out-mp4-run]` -- PASS
+- `tests/test_wp42a_runner_hardening.py::test_drive_relative_output_is_refused_before_jobs[relative-out-mp4-main]` -- PASS
+- `tests/test_wp42a_runner_hardening.py::test_drive_relative_output_is_refused_before_jobs[beside-source-jpg-run]` -- PASS
+- `tests/test_wp42a_runner_hardening.py::test_drive_relative_output_is_refused_before_jobs[beside-source-jpg-main]` -- PASS
+- `tests/test_wp42a_runner_hardening.py::test_drive_relative_output_is_refused_before_jobs[beside-source-mp4-run]` -- PASS
+- `tests/test_wp42a_runner_hardening.py::test_drive_relative_output_is_refused_before_jobs[beside-source-mp4-main]` -- PASS
+- `tests/test_wp42a_runner_hardening.py::test_drive_relative_stream_cannot_write_into_footage_cwd` -- PASS
+- `tests/test_wp42a_runner_hardening.py::test_same_drive_stream_output_keeps_checked_parent[absolute-out]` -- PASS
+- `tests/test_wp42a_runner_hardening.py::test_same_drive_stream_output_keeps_checked_parent[beside-source]` -- PASS
+- `tests/test_wp42a_runner_hardening.py::test_stream_enumeration_failure_is_not_a_skip[after-refusal]` -- PASS
+- `tests/test_wp42a_runner_hardening.py::test_stream_output_on_hard_link_leaves_original_unchanged[run]` -- PASS
+- `tests/test_wp42a_runner_hardening.py::test_stream_output_on_hard_link_leaves_original_unchanged[main]` -- PASS
+
+### Guard integrity and verification-loop result
+
+Exact diff: `work/wp4.2b/turn4-wp42a.diff`, against `79b60d9`.
+The AST audit confirms that no original assertion was changed or removed
+outside the two authorized same-drive flips and two exact refusal-text
+expectations (helper and cwd case). In the eight parent-guard cases and the
+file-form planted control, only the planner source is planted; the original
+assertions all remain. A parent-drive assertion strengthens plant fidelity.
+Independent old OutputPlan.path comparisons confirm all eight plants, each
+with parent `<letter>:`. The entire runner AST matches the old module after
+removing only the new import/catch, and the parent/file-form guard source is
+identical. Reviewer A is explicitly directed to check this list/fidelity.
+
+Unedited controls verified PASS:
+`test_no_footage_still_skips_output_checks` (278-288),
+`test_refused_request_does_not_plan_an_output` (291-300), and
+`test_invalid_suffix_stays_an_engine_refusal` (303-316).
+The isolated `test_output_file_form_check_has_a_planted_control` (258-275)
+also PASSED with every original assertion retained.
+
+Owner loop: missing-source premise confirmed -> real ADS ruling; unsafe
+composed name/write attempt confirmed RED -> guard fixed; old runner/test
+conflicts independently confirmed -> both narrow scope rulings obtained ->
+exception/catch/plants/flips implemented -> full light set GREEN ->
+independent outcome/assertion/plant audit GREEN. Final pass found nothing
+new. No rejected false positive, product revert, unowned edit or open scope
+question. Report remains DRAFT; Reviewer A/B and own-window gate outstanding.
+
+The dispatcher merges WP4.2b first, rebases WP4.2 at the next yield before
+its task 5, and owns any runner-branch conflict resolution. No stacked gate.
+DR-80 closure proposal gains: the runner refuses an OutputNameError before
+jobs (exit 2); closure remains for CHARC at the accept.

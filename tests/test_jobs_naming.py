@@ -481,6 +481,7 @@ def test_composed_output_name_is_refused(tmp_path, planner, kind, name):
     with pytest.raises(ValueError) as error:
         planner(source, settings, kind)
 
+    assert isinstance(error.value, clearwater.jobs.OutputNameError)
     text = str(error.value)
     assert name in text
     assert str(tmp_path) not in text
@@ -497,6 +498,7 @@ def test_video_extension_stream_is_refused(tmp_path, planner):
     with pytest.raises(ValueError) as error:
         planner(source, settings, MediaKind.VIDEO)
 
+    assert isinstance(error.value, clearwater.jobs.OutputNameError)
     text = str(error.value)
     assert source.name in text
     assert str(tmp_path) not in text

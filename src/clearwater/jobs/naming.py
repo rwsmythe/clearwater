@@ -50,6 +50,10 @@ class MediaKind(enum.Enum):
     PHOTO = "photo"
 
 
+class OutputNameError(ValueError):
+    """A composed output name is not a single portable name component."""
+
+
 def validate_suffix(suffix: str) -> None:
     """Check that an output suffix is a single portable name fragment.
 
@@ -296,7 +300,7 @@ def _base_plan(source: Path, settings: Settings, kind: MediaKind) -> OutputPlan:
         or Path(name).name != name
         or os.path.splitdrive(name)[0] != ""
     ):
-        raise ValueError(
+        raise OutputNameError(
             f"output name for {source.name!r} must be a single portable name component"
         )
     return OutputPlan(
@@ -329,8 +333,8 @@ def final_output_path(source: Path, settings: Settings, kind: MediaKind) -> Path
         like a temporary.
 
     Raises:
-        ValueError: If the suffix is not a portable name fragment, or the composed output
-            name is not a single portable name component.
+        ValueError: If the suffix is not a portable name fragment.
+        OutputNameError: If the composed output name is not a single portable name component.
     """
     plan = _base_plan(source, settings, kind)
     while is_same_path(plan.path, source) or is_temporary_name(plan.path.name):
@@ -386,8 +390,8 @@ def plan_output(
         The plan; read ``plan.path`` for the final path.
 
     Raises:
-        ValueError: If the suffix is invalid, or the composed output name is not a single
-            portable name component.
+        ValueError: If the suffix is invalid.
+        OutputNameError: If the composed output name is not a single portable name component.
     """
     plan = _base_plan(source, settings, kind)
     temporaries = scan_temporaries(plan.folder)

@@ -97,7 +97,14 @@ from clearwater.interfaces import (
 )
 from clearwater.interfaces.parameters import loads_object
 from clearwater.io.video.inputs import ascii_text, is_sidecar, sidecar_fault
-from clearwater.jobs import BatchReport, MediaKind, final_output_path, run_batch, validate_suffix
+from clearwater.jobs import (
+    BatchReport,
+    MediaKind,
+    OutputNameError,
+    final_output_path,
+    run_batch,
+    validate_suffix,
+)
 from clearwater.jobs.export_seam import ExportJobs, ExportRequest
 from local_config import LocalConfigError, default_config_path, load_local_config
 
@@ -714,6 +721,8 @@ def check_outputs(requests: Sequence[ExportRequest], footage_folder: Path | None
             continue
         try:
             output = final_output_path(request.source, request.settings, MediaKind(request.kind))
+        except OutputNameError as exc:
+            raise RunnerRefusalError(ascii_text(str(exc))) from exc
         except ValueError:
             continue
         checked_folder = Path(request.source.parent if folder is None else folder)
