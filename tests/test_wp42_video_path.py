@@ -206,3 +206,49 @@ def test_an_analysis_job_callable_runs_once() -> None:
     assert (again.ok, again.failure) == (False, "this analysis job has already run")
     assert (source.iterations, cache.marks) == (iterations, marks)  # nothing touched
     assert engine.is_complete()
+
+
+# --- DR-71: the D87 re-check takes the larger of the marginal and the entry's own rate ---------
+
+
+class _Entries:
+    """A cache double whose ``lookup`` answers from a list, one entry per call."""
+
+    def __init__(self, *entries: Any) -> None:
+        self.entries = list(entries)
+
+    def lookup(self, key: Any) -> Any:
+        return self.entries.pop(0)
+
+
+def _entry(frames: int, size: int) -> Any:
+    from clearwater.interfaces import CacheEntry
+
+    return CacheEntry(KEY, tuple(range(frames)), (), size, False)
+
+
+def _growth(before: Any, after: Any, frames: int) -> int:
+    analysis = export_module._Analysis(
+        None,  # type: ignore[arg-type]  # the engine is not used by the estimate
+        StubArrayBackend(),
+        StubProgress(),
+        "clip.mp4",
+        _Entries(before, after),  # type: ignore[arg-type]
+        KEY,
+    )
+    analysis._before = analysis._cache.lookup(KEY)
+    return analysis.cache_growth_bytes(frames)
+
+
+def test_a_partially_extended_retry_takes_the_entrys_own_rate() -> None:
+    # The entry held 100 frames in 100,000 bytes; the lead added 4 frames whose proxies took only
+    # 400 bytes (100 per frame, a noisy few). 896 frames remain, at the entry's own bytes per
+    # stored frame after the lead (100,400 over 104), not at the lead's 100.
+    assert _growth(_entry(100, 100_000), _entry(104, 100_400), 1000) == -(-100_400 * 896 // 104)
+
+
+def test_a_marginal_rate_above_the_own_rate_is_kept() -> None:
+    # A fresh entry: the lead stored 10 frames in 20,000 bytes; the own rate is the same here,
+    # and a growing rate above the average (larger later proxies) is not lowered.
+    assert _growth(None, _entry(10, 20_000), 100) == 90 * 2000
+    assert _growth(_entry(10, 10_000), _entry(20, 40_000), 100) == 80 * 3000

@@ -338,10 +338,12 @@ class _Analysis:
 
         The D87 re-check runs after the lead (CHARC ruling Q-R6), while the analysis goes on
         storing proxies on a volume the output may share. The entry's growth since :meth:`start`,
-        per frame stored in that time, is scaled to the frames the entry does not hold yet. When
-        the lead stored nothing new (a retry over an incomplete entry that already holds the
-        lead's frames: a byte-identical proxy adds nothing), the entry's own bytes per stored
-        frame are scaled instead (Reviewer A round 1, F5).
+        per frame stored in that time (the marginal rate), and the entry's own bytes per stored
+        frame are each scaled to the frames the entry does not hold yet, and the larger is taken
+        (DR-71): on a retry whose lead extends an incomplete entry by a few frames the marginal
+        rate rests on those few. When the lead stored nothing new (a retry over an incomplete
+        entry that already holds the lead's frames: a byte-identical proxy adds nothing), only
+        the entry's own rate is defined (Reviewer A round 1, F5).
 
         Args:
             frames: The clip's frame count.
@@ -359,12 +361,10 @@ class _Analysis:
         before = self._before
         grown = after.size_bytes - (0 if before is None else before.size_bytes)
         stored = len(after.pts_ticks) - (0 if before is None else len(before.pts_ticks))
-        if grown > 0 and stored > 0:
-            return -(-grown * remaining // stored)
+        marginal = -(-grown * remaining // stored) if grown > 0 and stored > 0 else 0
         held = len(after.pts_ticks)
-        if held <= 0 or after.size_bytes <= 0:
-            return 0
-        return -(-after.size_bytes * remaining // held)
+        own = -(-after.size_bytes * remaining // held) if held > 0 and after.size_bytes > 0 else 0
+        return max(marginal, own)
 
     def _run(self) -> None:
         try:
