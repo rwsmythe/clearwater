@@ -1,10 +1,10 @@
 # WP4.2a runner hardening
 
-Status: FINAL pending the two-leg gate.
-Reviewer A converged at round 2 on `7addc2b`, verdict
-`NO_NEW_CRITICAL_MAJOR`. Its terminating cleanup fixes N2's argument-discovery
-redaction leak and corrects the report; pre-existing N1/N5 are banked below.
-The full two-leg gate, Reviewer B and acceptance remain pending.
+Status: FINAL. Reviewer A converged at round 2 on `7addc2b`, verdict
+`NO_NEW_CRITICAL_MAJOR`; its terminating cleanup fixes N2's argument-discovery
+redaction leak and corrects the report; pre-existing N1/N5 are banked below. The
+orchestrator's two-leg gate on the candidate is GREEN and Reviewer B returned
+`NO_NEW_CRITICAL_MAJOR` (see "Erratum at the gate").
 
 ## Changes and regression evidence
 
@@ -91,7 +91,11 @@ The defensive exception conversion covers the four Redactor construction
 expressions. In library `run` with a footage folder configured, the earlier
 `check_outputs` / `inside` resolution can still raise a raw OSError or
 RuntimeError. This call order predates WP4.2a; it is not a promise of generalized
-filesystem error conversion. Main builds its redactor before those checks.
+filesystem error conversion. `main` has the same residual: its redactor is built
+before those checks but never holds the footage folder, so a raising resolution
+of the footage folder in `check_outputs` / `_check_own_paths` / `inside` escapes
+`main` as a raw exception carrying that path (unchanged from `aa4761b`; Reviewer B
+F1, banked with N1).
 
 Outside the static-path envelope, a mid-run folder change can make later
 `summary_lines` / `record_json` construction fail after jobs have already run.
@@ -240,9 +244,8 @@ not a defect: the three names selected 4 passing cases, and the full light
 command passed 340 cases with 2 deselected at its seat on `d5c9ae3`. The permitted
 sandbox turn-5 rerun explicitly deselected the three listed nodes and passed
 the remaining 354 cases, with 5 total deselected. No test was changed to
-accommodate the sandbox. Reviewer A has now converged at round 2. The full
-two-leg suite and Reviewer B remain pending; acceptance and debt closure are
-conditional on those gates.
+accommodate the sandbox. Reviewer A converged at round 2; the two-leg suite and
+Reviewer B results are in "Erratum at the gate".
 
 ## For CHARC
 
@@ -256,13 +259,38 @@ conditional on those gates.
 - Register-row candidate (N1): pre-existing mixed-separator argparse redaction
   leak, origin WP4.1 `f7e7442`, reproduced on `aa4761b`. Commission broader known
   spelling coverage separately; this package owns escaped apostrophes only.
-- Register-row candidate (F1): the drive-relative join in
-  `jobs.naming.OutputPlan.path` accepts a source stem resembling a drive prefix.
-  Callers other than this runner can still plan outside their intended folder.
-  Assign product naming ownership and a trigger; no frozen-interface or product
-  fix is included here.
+  Reviewer B F1 belongs with it: a raising resolution of the footage folder escapes
+  `main` raw with the full path (`tools/headless_export.py` `_main`, unchanged from
+  `aa4761b`; defensive only, not reproduced on Python 3.12 / Windows).
+- F1's root cause is REGISTERED as DR-80 (CHARC, `0f138ff`): the drive-relative join
+  in `jobs.naming.OutputPlan.path` accepts a source stem resembling a drive prefix;
+  callers other than this runner can still plan outside their intended folder. The
+  fix is WP4.2b (Codex lane); this runner's parent check stays as defence in depth.
 - Banked N5: scalar statistics signed zero, origin WP4.1 `715fd08`, outside the
   four granted lines; current dict-of-ndarray statistics take the guarded branch.
 
 The dispatcher updates the register only at acceptance; no debt-register edit
 is part of this package.
+
+## Erratum at the gate (orchestrator, 2026-10-29)
+
+- **Two-leg gate** at the orchestrator's seat on the candidate `wp4.2a-mc` `c4eab41`
+  (WP4.2a rebased onto main `d5d4b00`; main `work\` config): PARALLEL 4539 passed /
+  1 skipped (`test_color_roundtrip.py:121`), 644.49 s, EXIT 0; SERIAL 1126 passed /
+  1 skipped (`test_photo_check.py:139`), 2,540.97 s, EXIT 0. 4539 = WP4.1's gate 4486
+  plus the 53 new hardening cases; the serial leg is unchanged (no serial-leg test
+  added).
+- **Reviewer B** (the Claude pass at the orchestrator's seat, `claude-opus-5-5`,
+  high, on `c4eab41`): `NO_NEW_CRITICAL_MAJOR`; all seven claims hold (claims 2, 3,
+  4, 6 and 7 by EXECUTED probes, including a 216-combination apostrophe fuzz with 0
+  leaks). Findings: F1 MINOR (pre-existing: `main` lets a raising footage-folder
+  resolution escape; the "Resolution and race boundaries" sentence above is
+  replaced accordingly, banked with N1); F2 ADVISORY (`test_loop_resolution_reproduction`
+  is an observation, not a regression test, though it is counted in the 53); F3
+  ADVISORY (a library caller passing a `str` source now gets `AttributeError` from
+  `check_outputs` in `--out` mode too; `run` already raised it on base, `main` always
+  passes a `Path`); F4 ADVISORY (a same-drive one-letter stream source writes a plain
+  file in the checked folder whose name drops the stream syntax, safe, numbered on a
+  collision); F5 ADVISORY (the logs this report cites under `work/wp4.2a/` are the
+  cell worktree's; they are copied to the main working folder
+  `work\wp4.2a\cell-logs\`, the gate logs to `work\wp4.2a\gate-logs\`).
