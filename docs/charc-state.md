@@ -141,6 +141,17 @@
   classifier REFUSED the deletion (relayed authority); surfaced to the owner in chat; NOT worked around at either seat
   (permission laundering). OWNER ACTION PENDING: approve at the orchestrator's seat or delete by hand.** Every
   owner-facing summary carries that line until it closes.
+- **WP3.6P BRIEF RULED FINAL on fold-in 22:15Z (DRAFT `brief-wp3.6p` 9fb2bed, 317 lines read; query d4f5553d, my
+  post + cue):** Q1 CODEX / STRONG (instrument build; supersedes WP3.6 Q11's sonnet-medium; queued behind WP4.4 and
+  WP-DR87, also waits on WP4.3's windows); Q2 NEW `tools/photo_verify.py` + test, photo_check untouched; Q3 FFmpeg
+  -noautorotate oracle, thumbnail fallback; AD-24 reported 'confirmed on the Apple layouts present' (39 irot+tag, 23
+  identity; tag-only / irot-only unwitnessed), AD-24 status MINE and D63's 'provisional' words the OWNER's at the
+  accept; Q4 one footage test on 4 HEICs; Q5 all 73 at 16-bit neutral + 7 at 8-bit; Q6 product runner on one
+  5712x4284 HEIC default + --force-cpu EXCLUSIVE (closes Result 2 photo row; V15 WP5.2's); Q7 class map, Z/M separate,
+  no scene judgement; Q8 no product fix, rows MINE at accept (DR-42 (a)/(c) notes, DR-43 note, NEW row EXIF ColorSpace
+  read as untagged), color.py grant DECLINED; Q9 delete PNGs after measuring, STOP < 20 GB. Inventory QA confirmed
+  done (fffae21e). Lane share: Codex WP4.4 + WP-DR87 + WP3.6P; Claude WP4.3. Spec items for the owner's NEXT revision
+  bundle (not now): D63 'provisional until an owner photo is read' wording; :567 photo resolution = 24.5 MP max.
 - **(gen 7 history follows; newest facts at the end of the block)**
 - **GEN 7 PICKUP (was).** Orchestrator = **gen 22 `clearwater-orchestrator-20261029-0704`** (online 17:08Z from gen 21's
   state 736e403; gauge 38 ms; gen 21 was `clearwater-orchestrator-20261029-0425`, rolled 17:05Z at ~400K); ALL cues go there. Time the bash launch and record it here. Inbox: drain with `read --role charc --all`
