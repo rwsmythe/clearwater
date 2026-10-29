@@ -7,7 +7,8 @@
 | Turn 1 / round 0 | `tokens used` 77,213; input depth 88,453 / 475,000 | Dispatcher supplied on turn 2; driver log, 02:21:57Z start. |
 | Turn 2 / build | `tokens used` 127,137; input depth 134,393 / 475,000 | Dispatcher supplied on turn 3; 02:26:28Z start. |
 | Turn 3 / cleanup | `tokens used` 140,058; input depth 146,457 / 475,000 | Dispatcher supplied on turn 4. |
-| Turn 4 / Reviewer A round 1 adjudication | Pending dispatcher reading | No self-estimated depth; dispatcher reads this turn's footer. |
+| Turn 4 / Reviewer A round 1 adjudication | `tokens used` 298,255; input depth 163,961 / 475,000 | Dispatcher supplied on turn 5; usage and input depth recorded separately as given. |
+| Turn 5 / round-1 remediation | Pending dispatcher reading | No self-estimated depth; dispatcher reads this turn's footer. |
 
 Evaluation point: approximately 250K; STOP at a round boundary at approximately
 400K, using the dispatcher's reading.
@@ -187,7 +188,7 @@ follow the review/gate fill. Reviewer B runs at the orchestrator's seat.
 | 0 | `aa4761b` / turn 1 | N/A | N/A | N/A | N/A | N/A | 0 | Neither: ledger only | Reviewer not run | 88,453 input; 77,213 tokens used | Read/map complete; committed by dispatcher as `933e33e`; turn-2 GO received. |
 | Build | `933e33e` + working diff / turn 2 | N/A | N/A | N/A | In-envelope implementation | No review yet | 0 | Runner tool + four test comparisons + new regressions | Reviewer not run | Pending dispatcher | STOP: three existing tests fail on the sandbox's administrative-share probe; no existing test edited. |
 | Cleanup | `d5c9ae3` + working diff / turn 3 | N/A | N/A | N/A | In-envelope formatting | No review yet | 0 | Formatting only, no behavior change | Reviewer not run | Pending dispatcher | Turn-2 STOP resolved by dispatcher seat verification; static and permitted light checks clean; Reviewer A pending. |
-| A1 | `a05c13e` / turn 4 | 0 | 1 (F1) | 1 (F2); 5 advisory (F3-F7) | 6 in / 1 out (F4) | 7 NEW / 0 REOPENED | 0 | None this turn; proposed runner + tests + report fixes | Driver-run Claude process; `claude-opus-5-5`, high, STRONG; CLI version not supplied | Pending turn-4 reading | `NEW_CRITICAL_MAJOR_FOUND`; adjudicated below; YIELD before remediation. |
+| A1 | Review `a05c13e`; adjudication turn 4; remediation turn 5 on `52e00c0` | 0 | 1 (F1) | 1 (F2); 5 advisory (F3-F7) | 6 in / 1 out (F4) | 7 NEW / 0 REOPENED | 0 | Runner code F1; four test assertions F2; test-only F5; docs F3/F4/F7; F6 declined | Driver-run Claude process; `claude-opus-5-5`, high, STRONG; CLI version not supplied | Turn 4 input 163,961; turn 5 pending | `NEW_CRITICAL_MAJOR_FOUND`; accepted fixes GREEN in turn 5; next review pending, not convergence. |
 
 ## Execution record
 
@@ -228,6 +229,57 @@ of the surrounding shell's exit status. No two-leg / heavy run occurred.
 | 3 / light, three authorized UNC nodes deselected | `pytest -q -rs tests/test_wp42a_runner_hardening.py tests/test_headless_export.py tests/test_wp41_photo_path.py tests/test_wp41_v8.py -m 'not gpu and not footage and not slow' --deselect=tests/test_headless_export.py::test_g1_inside_sees_every_spelling_of_the_same_folder --deselect=tests/test_headless_export.py::test_g1_main_refuses_every_footage_check_through_another_spelling[unc] --deselect=tests/test_headless_export.py::test_g1_the_redactor_hides_the_extended_spellings --basetemp=work/wp4.2a/tmp-t3-light` | 337 passed, 5 deselected, EXIT=0. Three seat-verified UNC nodes explicitly deselected plus 2 marker deselections; no skips. Prefix/plugins as above, offscreen Qt. | `t3-light.log` |
 | 4 / F1 planning reproduction | `./.venv/Scripts/python.exe -` (stdin pathlib-only probe: join a source-derived `c:input_corrected.png` to relative, different-drive and same-drive stand-in output folders) | Relative and different-drive cases have parent `c:`, outside the checked folder; same-drive absolute case retains the checked parent and drops the stream colon. Assertions pass, EXIT=0. No resolution or test-file writes by the probe; shell output only under work. | `t4-f1-planning.log` |
 | 4 / F2 independent probe | `./.venv/Scripts/python.exe -` (stdin NumPy probe of identical float32 NaN arrays) | Original `np.array_equal` False; dtype/shape/bytes True; byte comparison AND original numeric equality False; EXIT=0. | `t4-f2-nan.log` |
+| 5 / round-1 RED | `pytest -q -rs tests/test_wp42a_runner_hardening.py -k 'drive_relative or same_drive or nan_remains or enumeration_failure' --basetemp=work/wp4.2a/tmp-t5-red` | 15 failed, 2 passed, 36 deselected; EXIT=1. Nine F1 cases, four F2 cases, two F5 cases fail for expected defects; both safe same-drive controls pass. | `t5-red.log` |
+| 5 / round-1 GREEN | Same selection, `--basetemp=work/wp4.2a/tmp-t5-green` | 17 passed, 36 deselected; EXIT=0. | `t5-green.log` |
+| 5 / format | `uv run ruff format tools/headless_export.py tests/test_wp41_photo_path.py tests/test_wp41_v8.py tests/test_wp42a_runner_hardening.py` | 1 file reformatted, 3 unchanged; EXIT=0. | `t5-format.log` |
+| 5 / static | `uv run ruff check .` | All checks passed; EXIT=0. | `t5-ruff-check.log` |
+| 5 / static | `uv run ruff format --check .` | 260 files already formatted; EXIT=0. | `t5-format-check.log` |
+| 5 / static | `uv run mypy` | Success: no issues found in 141 source files; EXIT=0. | `t5-mypy.log` |
+| 5 / hardening file | `pytest -q -rs -s tests/test_wp42a_runner_hardening.py --basetemp=work/wp4.2a/tmp-t5-hardening` | 53 passed, no skips/deselections; EXIT=0. Uses sandbox plugins as above; this file contains no UNC seat-verification nodes. | `t5-hardening.log` |
+| 5 / light, three authorized UNC nodes deselected | `pytest -q -rs tests/test_wp42a_runner_hardening.py tests/test_headless_export.py tests/test_wp41_photo_path.py tests/test_wp41_v8.py -m 'not gpu and not footage and not slow' --deselect=tests/test_headless_export.py::test_g1_inside_sees_every_spelling_of_the_same_folder --deselect=tests/test_headless_export.py::test_g1_main_refuses_every_footage_check_through_another_spelling[unc] --deselect=tests/test_headless_export.py::test_g1_the_redactor_hides_the_extended_spellings --basetemp=work/wp4.2a/tmp-t5-light` | 354 passed, 5 deselected; EXIT=0. Three authorized UNC deselections plus 2 marker exclusions; no skips. Prefix/plugins as above, offscreen Qt. | `t5-light.log` |
+
+Turn-5 runner environment: default uv-cache writable root restored by dispatcher;
+no uv-cache failure this turn. Turn 4 made no `uv run` call and had no such
+failure: its two probes used `.venv/Scripts/python.exe` directly. The one
+nonzero turn-5 test run is the intentional regression RED run. No heavy suite
+or performance measurement was run.
+
+### Turn 5: round-1 remediation evidence
+
+GO received on all seven dispositions (FINAL, turn 5). No new scope or behavior
+change beyond that accepted plan.
+
+| Finding | RED-first test and observation on `52e00c0` before fixes | Implemented / GREEN evidence |
+|---|---|---|
+| F1 | `test_drive_relative_output_is_refused_before_jobs` [8 cases: relative-out / beside-source x run/main x jpg/mp4] fails: no library refusal, or CLI status 1 rather than 2. Planning assertion proves parent mismatch without opening any source. | `check_outputs` compares `output.parent` to `Path(request.source.parent if folder is None else folder)`, after naming and before shared (i). All 8 GREEN, no jobs. |
+| F1 end-to-end | `test_drive_relative_stream_cannot_write_into_footage_cwd`: valid JPEG in a one-letter carrier ADS, cwd is a tmp_path stand-in footage folder, relative sibling output. RED returns 0 and actually writes `input_corrected.png` into stand-in footage (logged failure, all within tmp_path). | GREEN returns 2 with the agreed basename-only refusal, untouched job spy, no output in stand-in footage or out, source stream bytes unchanged. |
+| F1 safe control | `test_same_drive_stream_output_keeps_checked_parent` [absolute-out/beside-source] already passes on RED form. Pathlib drops the stream colon in the output name and retains the checked parent. | Both real CPU exports continue to pass. Actual files: `<tmp_path>/out/input_corrected.png` and `<tmp_path>/src/input_corrected.png`; full stand-in paths are `SAME_DRIVE_OUTPUT` lines in `t5-hardening.log`. The guard does NOT refuse this safe shape. |
+| F2 | `test_nan_remains_unequal_in_all_four_comparisons` [statistics/pre-encode/decoded/preview]: identical float32 NaNs pass byte-only checks, so all 4 tests fail. | Each owned comparison now requires dtype/shape/bytes equality AND original `np.array_equal`; all 4 NaN tests and all 4 signed-zero controls pass. No cast or tolerance; no helper/interface addition. |
+| F5 | `test_stream_enumeration_failure_is_not_a_skip` [initial/after-refusal]: planted nonzero subprocess status invokes old skip; the test catches that skip and turns it into an explicit failure, so both cases are RED rather than skipped. | `_streams` asserts status 0, including stderr on failure, then parses the result. Both cases GREEN. Actual hard-link/ADS preservation tests also pass with both independent listings. Only actual link/ADS creation retains capability skips. |
+| F3/F4/F7 | Document-only accepted boundaries; no implementation tests claimed for these reasoned residuals. | Report scopes conversion to the four construction expressions, discloses earlier library check failures and the out-of-envelope post-batch/empty-record race, refreshes status and states the parent invariant. |
+| F6 | Declined by FINAL GO under the approved per-request behavior. | No implementation change. The report explicitly distinguishes within-request priority from cross-request ordering. |
+
+F1 refusal text is exactly:
+`the output for {ascii_text(request.source.name)} would leave its checked output folder.`
+Both comparison operands are Path objects; no resolve or new filesystem call
+was added. The existing folder checks run first for each request; the no-footage
+return, RefusedRequest skip and naming ValueError handling stay intact. Predicate
+(i)'s colon / extended-prefix implementation remains solely in
+`_write_form_refusal`.
+
+The report includes the requested **for CHARC register-row candidate**: frozen
+product `jobs/naming.py` `OutputPlan.path` still joins drive-looking source stems
+as paths; callers other than this runner can still reach the root cause. This
+package does not own or modify product naming. The dispatcher owns assigning a
+product follow-up and any debt-register row; no silent product fix or new debt
+ID is made here.
+
+Verification loop, turn 5: independently confirmed F1 with a real stand-in write,
+F2 at all actual comparison forms, and F5 via explicit failed-not-skipped plants;
+implemented only accepted fixes; reran the 17-case selection GREEN, all 53 new
+hardening cases, static checks and the allowed four-file light suite. No further
+issue found in the final owned-diff/claim check. Reviewer A round 2 and the full
+two-leg gate are still required; no convergence or package-complete claim.
 
 ## Reviewer A round 1: adjudication only (turn 4)
 
@@ -380,9 +432,12 @@ weakened or patched.
 
 ## Current disposition
 
-Reviewer A round 1 on `a05c13e` found one new major (F1), one minor (F2),
-and five advisories. Every finding is adjudicated above. The cell independently
-reproduced F1 planning and F2 NaN behavior; only this ledger changed. No code,
-test or report remediation this turn. YIELD for dispatcher GO on the precise
-plan above. Reviewer A is not converged; full two-leg gate and acceptance remain
-pending. DR-78/DR-79 stay OPEN. No mailbox post or evidence-folder write.
+Reviewer A round 1's accepted fixes F1/F2/F5 are implemented RED-first and
+locally GREEN in turn 5; F3/F4/F7 documented, F6 declined as ruled. Static checks
+pass; all 53 hardening tests pass; light suite 354 passed, 5 deselected (three
+authorized UNC nodes plus two marker exclusions), EXIT=0. Report status is
+DRAFT -- for Reviewer A round 2. Yield for the driver's commit and round-2 pass.
+Reviewer A convergence, full two-leg gate and acceptance remain pending;
+DR-78/DR-79 stay OPEN. Product-naming root cause is disclosed for CHARC as a
+register-row candidate, not fixed outside ownership. No mailbox post or
+evidence-folder write.

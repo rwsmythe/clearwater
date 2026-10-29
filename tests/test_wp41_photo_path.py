@@ -514,6 +514,7 @@ def test_n10_the_same_still_twice_is_identical(sample, tmp_path, sample_id) -> N
     assert all(
         (recording.pixels[0].dtype, recording.pixels[0].shape, recording.pixels[0].tobytes())
         == (p.dtype, p.shape, p.tobytes())
+        and np.array_equal(recording.pixels[0], p)
         for p in recording.pixels[1:]
     )  # pre-encode
     first, second = outputs[False]
@@ -531,6 +532,7 @@ def test_n10_the_same_still_twice_is_identical(sample, tmp_path, sample_id) -> N
     pixels = [PhotoReader().read(p)[0].pixels for p in outputs[False] + outputs[True]]
     assert all(
         (pixels[0].dtype, pixels[0].shape, pixels[0].tobytes()) == (p.dtype, p.shape, p.tobytes())
+        and np.array_equal(pixels[0], p)
         for p in pixels[1:]
     )  # decoded bit-identical
 

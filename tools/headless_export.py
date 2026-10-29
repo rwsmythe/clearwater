@@ -680,9 +680,10 @@ def check_outputs(requests: Sequence[ExportRequest], footage_folder: Path | None
     Each request's output folder is the one the export plans (``jobs.naming``): the output
     folder setting, or the source's own folder (``source.parent``, not the target of a linked
     source); each is checked with :func:`write_target_refusal` before anything runs.
-    Each planned output file (photo or video) also passes the shared text-form predicate
-    (i), :func:`_write_form_refusal`. Refused items plan no output, and an invalid suffix
-    is left to the engine's own refusal (the CLI validates it earlier).
+    Each planned output file (photo or video) must retain that checked folder as its
+    parent, then pass the shared text-form predicate (i), :func:`_write_form_refusal`.
+    Refused items plan no output, and an invalid suffix is left to the engine's own
+    refusal (the CLI validates it earlier).
 
     Args:
         requests: The run's requests.
@@ -691,7 +692,7 @@ def check_outputs(requests: Sequence[ExportRequest], footage_folder: Path | None
     Raises:
         RunnerRefusalError: An output folder, or the folder beside a source the outputs would go
             to, that :func:`write_target_refusal` refuses; or a planned output file in a
-            refused text form.
+            refused text form or outside its checked output folder.
     """
     if footage_folder is None:
         return
@@ -715,6 +716,12 @@ def check_outputs(requests: Sequence[ExportRequest], footage_folder: Path | None
             output = final_output_path(request.source, request.settings, MediaKind(request.kind))
         except ValueError:
             continue
+        checked_folder = Path(request.source.parent if folder is None else folder)
+        if output.parent != checked_folder:
+            raise RunnerRefusalError(
+                f"the output for {ascii_text(request.source.name)} would leave its checked output "
+                "folder."
+            )
         reason = _write_form_refusal(output)
         if reason is not None:
             raise RunnerRefusalError(f"the output for {ascii_text(request.source.name)} {reason}.")

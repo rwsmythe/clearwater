@@ -90,6 +90,91 @@ def test_stream_named_output_is_refused_before_jobs(
     assert not list(out.iterdir()) and not list(src.iterdir())
 
 
+@pytest.mark.parametrize("api", ["run", "main"])
+@pytest.mark.parametrize("extension", ["jpg", "mp4"])
+@pytest.mark.parametrize("beside", [False, True], ids=["relative-out", "beside-source"])
+def test_drive_relative_output_is_refused_before_jobs(
+    tmp_path, monkeypatch, capsys, api, extension, beside
+):
+    if sys.platform != "win32":
+        pytest.skip("drive-relative output planning requires Windows paths")
+    footage, out, src = _folders(tmp_path)
+    own_drive = src.drive[0].lower()
+    other_drive = "z" if own_drive != "z" else "y"
+    letter = other_drive if beside else own_drive
+    source = Path(f"{src / letter}:input.{extension}")
+    assert source.name == f"{letter}:input.{extension}"
+    output_folder = None if beside else Path(os.path.relpath(out, footage))
+    monkeypatch.chdir(footage)
+    requests = _requests(source, output_folder)
+    planned = he.final_output_path(source, requests[0].settings, he.MediaKind(requests[0].kind))
+    checked = source.parent if beside else output_folder
+    assert planned.parent != checked  # RED cause: the joined filename reinterprets its drive
+    jobs = _Jobs()
+    if api == "run":
+        with pytest.raises(he.RunnerRefusalError) as caught:
+            he.run(requests, footage_folder=footage, exports=jobs)
+        text = str(caught.value)
+    else:
+        monkeypatch.setattr(he, "configured_footage_folder", lambda: footage)
+        where = ["--beside-source"] if beside else ["--out", str(output_folder)]
+        assert he.main([str(source), *where, "--force-cpu"], exports=jobs) == 2
+        text = capsys.readouterr().err.removeprefix("headless_export: ").strip()
+    assert text == f"the output for {source.name} would leave its checked output folder."
+    assert not jobs.calls
+    assert not list(footage.iterdir()) and not list(out.iterdir()) and not list(src.iterdir())
+
+
+def _one_letter_jpeg_stream(sample, src):
+    """Build a JPEG ADS whose carrier letter matches this test folder's drive."""
+    if sys.platform != "win32":
+        pytest.skip("the real one-letter carrier requires Windows NTFS")
+    carrier = src / src.drive[0].lower()
+    carrier.write_bytes(b"source carrier")
+    source = Path(f"{carrier}:input.jpg")
+    data = sample("jpeg-gradient-srgb").read_bytes()
+    try:
+        source.write_bytes(data)
+        assert source.read_bytes() == data
+    except OSError as exc:
+        pytest.skip(f"alternate data stream creation unavailable: {type(exc).__name__}")
+    return source
+
+
+def test_drive_relative_stream_cannot_write_into_footage_cwd(sample, tmp_path, monkeypatch, capsys):
+    footage, out, src = _folders(tmp_path)
+    source = _one_letter_jpeg_stream(sample, src)
+    before = source.read_bytes()
+    relative_out = Path(os.path.relpath(out, footage))
+    monkeypatch.chdir(footage)
+    monkeypatch.setattr(he, "configured_footage_folder", lambda: footage)
+    jobs = _Jobs(composition.export_jobs())
+    status = he.main([str(source), "--out", str(relative_out), "--force-cpu"], exports=jobs)
+    observed = sorted(path.name for path in footage.iterdir())
+    assert status == 2, f"drive-relative output escaped into stand-in footage: {observed}"
+    assert not jobs.calls and not observed and not list(out.iterdir())
+    assert "would leave its checked output folder" in capsys.readouterr().err
+    assert source.read_bytes() == before
+
+
+@pytest.mark.parametrize("beside", [False, True], ids=["absolute-out", "beside-source"])
+def test_same_drive_stream_output_keeps_checked_parent(sample, tmp_path, beside, record_property):
+    footage, out, src = _folders(tmp_path)
+    source = _one_letter_jpeg_stream(sample, src)
+    requests = _requests(source, None if beside else out)
+    planned = he.final_output_path(source, requests[0].settings, he.MediaKind.PHOTO)
+    checked = source.parent if beside else out
+    assert planned.parent == checked and planned.name == "input_corrected.png"
+    he.check_outputs(requests, footage)  # the safe same-drive join must not be refused
+    record = he.run(requests, footage_folder=footage, exports=composition.export_jobs())
+    item = record.report.items[0]
+    assert item.state == "done", item.result.failure
+    assert item.result.outputs == (planned,) and planned.is_file()
+    assert not list(footage.iterdir())
+    record_property("actual_output", str(planned))
+    print(f"SAME_DRIVE_OUTPUT {planned}")
+
+
 def _streams(path):
     """List every NTFS stream and its size independently of the runner."""
     quoted = str(path).replace("'", "''")
@@ -105,11 +190,31 @@ def _streams(path):
         timeout=30,
         check=False,
     )
-    if done.returncode:
-        pytest.skip(f"NTFS stream enumeration unavailable (exit {done.returncode})")
+    assert done.returncode == 0, (
+        f"NTFS stream enumeration failed (exit {done.returncode}): {done.stderr}"
+    )
     data = json.loads(done.stdout)
     rows = [data] if isinstance(data, dict) else data
     return sorted((row["Stream"], row["Length"]) for row in rows)
+
+
+@pytest.mark.parametrize("after_refusal", [False, True], ids=["initial", "after-refusal"])
+def test_stream_enumeration_failure_is_not_a_skip(tmp_path, monkeypatch, after_refusal):
+    def enumerate_streams(*args, **kwargs):
+        return SimpleNamespace(returncode=1, stdout="", stderr="planted enumeration failure")
+
+    if after_refusal:
+        footage, out, src = _folders(tmp_path)
+        with pytest.raises(he.RunnerRefusalError):
+            he.run(
+                _requests(src / "carrier:input.jpg", out), footage_folder=footage, exports=_Jobs()
+            )
+    monkeypatch.setattr(subprocess, "run", enumerate_streams)
+    try:
+        with pytest.raises(AssertionError, match="stream enumeration failed"):
+            _streams(tmp_path / "original.jpg")
+    except pytest.skip.Exception:
+        pytest.fail("stream enumeration failure must fail, not skip")
 
 
 @pytest.mark.parametrize("api", ["run", "main"])
@@ -409,3 +514,29 @@ def test_signed_zero_is_distinct_in_bit_comparisons(tmp_path, site):
             assert eval(compile(expression, str(tmp_path / "comparison"), "eval"), namespace) == (
                 expected
             )
+
+
+@pytest.mark.parametrize("site", ["statistics", "pre-encode", "decoded", "preview"])
+def test_nan_remains_unequal_in_all_four_comparisons(tmp_path, site):
+    from test_wp41_v8 import equal_statistics
+
+    first = np.array([np.nan, 1.0], dtype=np.float32)
+    other = first.copy()
+    assert not np.array_equal(first, other)
+    assert (first.dtype, first.shape, first.tobytes()) == (
+        other.dtype,
+        other.shape,
+        other.tobytes(),
+    )
+    if site == "statistics":
+        assert not equal_statistics({"stage": [first]}, {"stage": [other]})
+    else:
+        expression = _comparison_expressions()[["pre-encode", "decoded", "preview"].index(site)]
+        namespace = {
+            "np": np,
+            "recording": SimpleNamespace(pixels=[first, other]),
+            "pixels": [first, other],
+            "preview": first,
+            "written_pixels": other,
+        }
+        assert not eval(compile(expression, str(tmp_path / "nan-comparison"), "eval"), namespace)
