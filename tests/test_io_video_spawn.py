@@ -30,7 +30,16 @@ def _bindings(tree: ast.Module) -> dict[str, str]:
                 )
         elif isinstance(node, ast.ImportFrom) and node.module and node.level == 0:
             for alias in node.names:
-                names[alias.asname or alias.name] = f"{node.module}.{alias.name}"
+                if alias.name == "*":
+                    names.update(
+                        {
+                            name: f"{module}.{name}"
+                            for module, name in _SPAWN_APIS
+                            if module == node.module
+                        }
+                    )
+                else:
+                    names[alias.asname or alias.name] = f"{node.module}.{alias.name}"
     assignments = [node for node in ast.walk(tree) if isinstance(node, (ast.Assign, ast.AnnAssign))]
     for _ in range(len(assignments) + 1):
         changed = False
@@ -40,8 +49,12 @@ def _bindings(tree: ast.Module) -> dict[str, str]:
                 continue
             targets = node.targets if isinstance(node, ast.Assign) else [node.target]
             for target in targets:
-                if isinstance(target, ast.Name) and names.get(target.id) != value:
-                    names[target.id] = value
+                if isinstance(target, (ast.Name, ast.Attribute)):
+                    target_name = ast.unparse(target)
+                else:
+                    continue
+                if names.get(target_name) != value:
+                    names[target_name] = value
                     changed = True
         if not changed:
             break
@@ -53,7 +66,8 @@ def _qualified(node: ast.expr, names: dict[str, str]) -> str:
     if isinstance(node, ast.Name):
         return names.get(node.id, node.id)
     if isinstance(node, ast.Attribute):
-        return f"{_qualified(node.value, names)}.{node.attr}"
+        qualified = f"{_qualified(node.value, names)}.{node.attr}"
+        return names.get(qualified, qualified)
     if isinstance(node, ast.Call):
         function = _qualified(node.func, names)
         if function == "getattr" and len(node.args) >= 2:
@@ -80,8 +94,12 @@ def _is_spawn(name: str) -> bool:
             "*",
         }
     if module == "os":
-        return member in {"system", "popen", "*"} or member.startswith(("spawn", "exec"))
-    return module == "asyncio" and (member.startswith("create_subprocess_") or member == "*")
+        return member in {"system", "popen", "posix_spawn", "startfile", "*"} or member.startswith(
+            ("spawn", "exec")
+        )
+    return module in {"asyncio", "asyncio.subprocess"} and (
+        member.startswith("create_subprocess_") or member == "*"
+    )
 
 
 def _spawn_calls(tree: ast.Module) -> list[ast.Call]:
@@ -113,6 +131,8 @@ _SPAWN_APIS = (
         for name in (
             "system",
             "popen",
+            "posix_spawn",
+            "startfile",
             "spawnl",
             "spawnle",
             "spawnlp",
@@ -131,13 +151,18 @@ _SPAWN_APIS = (
             "execvpe",
         )
     ]
-    + [("asyncio", "create_subprocess_exec"), ("asyncio", "create_subprocess_shell")]
+    + [
+        (module, name)
+        for module in ("asyncio", "asyncio.subprocess")
+        for name in ("create_subprocess_exec", "create_subprocess_shell")
+    ]
 )
 
 
 @pytest.mark.parametrize(("module", "name"), _SPAWN_APIS)
 @pytest.mark.parametrize(
-    "form", ["direct", "module-alias", "from-alias", "bound", "getattr", "partial"]
+    "form",
+    ["direct", "module-alias", "from-alias", "bound", "attribute-bound", "getattr", "partial"],
 )
 def test_spawn_guard_detects_planted_bypasses(module: str, name: str, form: str) -> None:
     """Every supported launch spelling must be visible to the product-policy guard."""
@@ -146,6 +171,7 @@ def test_spawn_guard_detects_planted_bypasses(module: str, name: str, form: str)
         "module-alias": f"import {module} as mod\nmod.{name}('tool')",
         "from-alias": f"from {module} import {name} as child\nchild('tool')",
         "bound": f"import {module}\nchild = {module}.{name}\nagain = child\nagain('tool')",
+        "attribute-bound": f"import {module}\nself.child = {module}.{name}\nself.child('tool')",
         "getattr": f"import {module} as mod\ngetattr(mod, '{name}')('tool')",
         "partial": (
             f"import {module} as mod\nfrom functools import partial as bind\n"
@@ -153,6 +179,31 @@ def test_spawn_guard_detects_planted_bypasses(module: str, name: str, form: str)
         ),
     }[form]
     assert _spawn_calls(ast.parse(source)), f"guard missed {form}: {module}.{name}"
+
+
+@pytest.mark.parametrize(("module", "name"), _SPAWN_APIS)
+def test_spawn_guard_detects_recognized_star_imports(module: str, name: str) -> None:
+    """R2-1: star-imported names from the finite recognized API set cannot bypass the guard."""
+    assert _spawn_calls(ast.parse(f"from {module} import *\n{name}('tool')"))
+
+
+@pytest.mark.parametrize(
+    "statement",
+    [
+        'kw["creationflags"] = 1',
+        'kw["creationflags"]: int = 1',
+        'kw["creationflags"] |= 1',
+    ],
+)
+def test_flag_guard_rejects_subscript_stores(tmp_path: Path, monkeypatch, statement: str) -> None:
+    """R2-1: a flag stored through a dict subscript outside the helper is rejected."""
+    helper = tmp_path / "pipes.py"
+    helper.write_text('def tool_spawn_kwargs():\n return {"creationflags": 0}\n', encoding="utf-8")
+    (tmp_path / "bypass.py").write_text(f"kw = {{}}\n{statement}\n", encoding="utf-8")
+    monkeypatch.setitem(globals(), "SRC", tmp_path)
+    monkeypatch.setitem(globals(), "PIPES", helper)
+    with pytest.raises(AssertionError, match="creationflags outside helper"):
+        test_only_the_helper_sets_creationflags()
 
 
 def test_every_product_spawn_uses_the_helper() -> None:
@@ -198,6 +249,10 @@ def test_only_the_helper_sets_creationflags() -> None:
         allowed = set(ast.walk(helpers[0])) if path == PIPES and len(helpers) == 1 else set()
         for node in ast.walk(tree):
             sets_flag = isinstance(node, ast.keyword) and node.arg == "creationflags"
+            if isinstance(node, ast.Subscript) and isinstance(node.ctx, ast.Store):
+                sets_flag = (
+                    isinstance(node.slice, ast.Constant) and node.slice.value == "creationflags"
+                )
             if isinstance(node, ast.Dict):
                 sets_flag = any(
                     isinstance(key, ast.Constant) and key.value == "creationflags"

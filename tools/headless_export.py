@@ -29,7 +29,8 @@ Exit status: 0 when every item is done (with or without warnings); 1 when any it
 cancelled or was not run; 2 for a usage refusal, with nothing run (a bad flag, a missing
 ``--out`` folder, an invalid suffix (given or loaded), an unknown method, a parameter file that
 is unreadable, over the importer's 1 MiB cap or not valid for its method, a settings file that
-cannot be used, an unreadable local configuration, a video item without ``--cache-dir`` or a
+cannot be used, an unreadable local configuration, a folder that cannot be resolved for the
+footage write checks, a video item without ``--cache-dir`` or a
 ``--cache-dir`` folder that does not exist, a write target the footage check refuses when a
 footage folder is configured (:func:`write_target_refusal`: an output folder, the folder beside
 a source, the settings folder and file, the record file, or the cache folder inside the footage
@@ -877,7 +878,9 @@ def _footage_checks() -> Iterator[None]:
     try:
         yield
     except (OSError, RuntimeError, ValueError) as exc:
-        raise RunnerRefusalError("the configured footage folder cannot be resolved.") from exc
+        raise RunnerRefusalError(
+            "a folder cannot be resolved for the footage write checks."
+        ) from exc
 
 
 def check_outputs(requests: Sequence[ExportRequest], footage_folder: Path | None) -> None:

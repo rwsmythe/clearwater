@@ -5,6 +5,7 @@ from __future__ import annotations
 import dataclasses
 import json
 import logging
+import os
 import subprocess
 import sys
 import textwrap
@@ -491,6 +492,42 @@ def test_unusable_output_folder_defaults_only_that_field(
             patch.setattr(Path, "__new__", staticmethod(construct))
         elif failure == "path-use":
             patch.setattr(Path, "absolute", absolute)
+        with caplog.at_level(logging.WARNING, logger="clearwater.config.settings_store"):
+            loaded = load_settings(tmp_path)
+    assert loaded == dataclasses.replace(
+        Settings(), output_suffix="_kept", png_bit_depth=8, force_cpu=True, last_parameters=_last()
+    )
+    assert path.read_bytes() == original and not list(tmp_path.glob("settings.json.bad-*"))
+    warnings = [
+        r.getMessage() for r in caplog.records if r.name == "clearwater.config.settings_store"
+    ]
+    assert len(warnings) == 1
+    assert (
+        "output_folder=" in warnings[0] and "is out of range; using the default None" in warnings[0]
+    )
+
+
+def test_relative_output_folder_getcwd_oserror_defaults_only_that_field(
+    tmp_path: Path, monkeypatch, caplog
+) -> None:
+    """R2-4: an injected getcwd OSError preserves the file and every other settings field."""
+    path = _write(
+        tmp_path,
+        _document(
+            output_folder="relative-output",
+            output_suffix="_kept",
+            png_bit_depth=8,
+            force_cpu=True,
+            last_parameters=_last().to_dict(),
+        ),
+    )
+    original = path.read_bytes()
+
+    def unavailable():
+        raise FileNotFoundError("synthetic missing current directory")
+
+    with monkeypatch.context() as patch:
+        patch.setattr(os, "getcwd", unavailable)
         with caplog.at_level(logging.WARNING, logger="clearwater.config.settings_store"):
             loaded = load_settings(tmp_path)
     assert loaded == dataclasses.replace(

@@ -36,7 +36,7 @@ def load_settings(folder: Path, *, migrations: MigrationRegistry | None = None) 
     A document of an older format version is migrated in memory and not rewritten. A field
     outside its allowed range (``png_bit_depth`` not 8 or 16, ``quality_level`` not
     high/standard/draft, ``cache_limit_bytes`` negative, ``output_folder`` containing NUL or
-    raising ValueError when made into an absolute path) takes its default with a logged
+    raising ValueError or OSError when made into an absolute path) takes its default with a logged
     warning. The other fields and the file are kept. Encoder names are not checked here (D74).
 
     A file that cannot be read, is not valid JSON, or fails IF-10 (missing, unknown or
@@ -126,7 +126,7 @@ def _decode(text: str, migrations: MigrationRegistry | None) -> Settings:
             if "\0" in folder:
                 raise ValueError("a path cannot contain NUL")
             Path(folder).absolute()  # Validate construction/use without requiring it to exist.
-        except ValueError:
+        except (ValueError, OSError):
             invalid_output_folder = folder
             # Let frozen IF-10 validate every other field before the per-field warning/default.
             data = {**data, "output_folder": None}
