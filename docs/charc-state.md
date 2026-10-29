@@ -32,10 +32,10 @@
   'Register rows'), AD-23 note stays with 4.3a. (3) WP4.3a (Codex, brief FINAL at brief-wp4.3-rev bc0b8a2 + my ruling
   fe7625ca; gen 21 commits it onto main): dispatches when WP-T6's Codex cell stands down; at its accept, mine: AD-13 note
   ('profile' writer provenance key), AD-23 'applied by WP4.3a', closures DR-58(b)/76/77/81(a-d)/85. Owner-pending inputs:
-  NONE since 17:10Z (phone footage received, see below). Open owner decisions (asked 17:35Z): (1) spec 5.2 wording so the
-  phone's QuickTime `.MOV` (brand qt) is an accepted video container (GUI `VIDEO_SUFFIXES` is {.mp4} today); (2) Insta360
-  scope (recommend: native .insv NOT supported; Insta360 Studio MP4 export is the route) and its category (owner said scuba).
-  Every owner-facing summary ends with that line.
+  NONE since 17:10Z (phone footage received, see below). Open owner decisions: Insta360 SCOPE only (owner 17:50Z: 'we will
+  discuss further'; category SCUBA concurred; CHARC recommends native .insv NOT supported, Studio MP4 exports as input).
+  The `.MOV` wording is APPLIED as spec v0.5.7 (owner 17:50Z: 'update the spec to include .mov'). Every owner-facing
+  summary ends with that line.
 - **GEN 7 ONLINE 14:29Z (`clearwater-charc-20261029-0428`, launched by gen 6 at its roll; msg `2d785723` to the
   orchestrator + ONE cue).** Pickup facts: bash gauge 22 ms; charc inbox 0 unread / 326 read; main 1905c8c clean; both
   inboxes empty (the orchestrator's 0 unread); gen 21's name confirmed from `comms/.launch-sessions.json`; worktrees as gen 6
@@ -126,6 +126,12 @@
   inventory is its own run after the owner's word. DR-15: a register NOTE (mine at the report's QA) if the spot check confirms
   video media_time 0 on every phone MOV; no leg.** WP4.3a turn 6 committed c9a7771/40eef4e, R2 running (seat 154,379; seat 3
   for a sizeable remediation); WP4.3 cell 6 Group A accepted (13c96f7, 099893a), Group B running.
+- **OWNER 17:50Z (verbatim): "Concur it is SCUBA footage.  1. we will discuss further.  2. update the spec to include
+  .mov."** Applied (this commit): spec v0.5.7 (5.2 MP4 or QuickTime container; 8.3 a `.mov` source writes `_corrected.mp4`
+  per D25, my consequence, flagged to the owner); CLAUDE.md inputs (Insta360 = SCUBA, scope undecided, consumed by nothing);
+  memory. COMMISSIONED: **WP4.4 '.MOV input'** (small; Codex-eligible; `gui/sources.py` VIDEO_SUFFIXES + `.mov`, `jobs/naming.py`
+  `.mov` -> `.mp4` output extension, a probe/brand test on a `qt`-brand fixture built under tmp_path, the runner's suffix
+  rule, a `footage` test on one phone MOV; nets per lane rule). Orchestrator sequences it after the inventory report.
 - **(gen 6 history follows; newest facts at the end of the block)**
 
 - **Gen 6 pickup facts:** bash gauge 45 ms; inbox 0 unread at pickup; announce posted to the orchestrator (gen 17, shell-busy in the WP4.1 gate) with ONE cue; the two register scripts copied from gen 5's scratchpad (18c10a55...) into this session's scratchpad (6687b6c9-eacd-4ffc-995e-51c9195391d1) as `edit_register_p4a.py` (drop its DR-65 block before running: already applied at 3114d23) and `edit_register_p4b.py`.
