@@ -5,6 +5,25 @@
 
 ### Generation
 
+- **Generation 18 (`clearwater-orchestrator-20261028-1555`) picked up 2026-10-29 ~01:55Z at `eb0074f`.** Bash gauge 36 ms.
+  Scratchpad `C:\Users\rwsmy\AppData\Local\Temp\claude\C--Users-rwsmy-clearwater\2299b92f-3ec6-46ae-a73a-f5f499e2c91a\scratchpad\`
+  (commissions `commission-wp4.2r*.md`, cell prompt `dispatch-wp4.2-cell1.md`, packet `packet-wp4.2r.md`).
+  - WP4.2 brief revision 1: drafting helper `p4-wp42-reviser` (done; idle). Packet `3511951e`, then CHARC RULING
+    `c8340144a8e87c09`: R1-Q1..Q4 all (a); DR-79 (b) not reproduced at CHARC's seat (defensive wrap); R1-Q5 (a) **WP4.2a
+    split to the Codex lane** with a CAP. **Main `aa4761b`: WP4.2 FINAL + `docs/briefs/wp4.2a-brief.md` FINAL** (harness
+    382 OK). FYI to CHARC posted 02:22Z.
+  - **LIVE (dispatched 02:21-02:24Z, base `aa4761b`; paces Codex 0.414 vs Claude 1.331):**
+    - **WP4.2a** CODEX lane: worktree `.worktrees/wp4.2a` (local config working folder = the worktree's `work\`),
+      evidence `C:\Users\rwsmy\clearwater-review-evidence\wp4.2a\cell\` (`prompt-N.md` = agent file + brief + `dispatch-N.md`).
+      Turn 1 = tasks 1-2 (round-0 note), then yield. I commit each turn (`codex_cell.py commit`), run its two-leg window,
+      Reviewer A = `codex_cell.py review` (STRONG), Reviewer B = the Claude pass at my seat.
+    - **WP4.2 round 0** `wp42-cell1` (implementer-opus-high, background), worktree `.worktrees/wp4.2`, ROUND 0 ONLY,
+      ledger-only commits; depth 0 at dispatch. At Y1: I rebase `wp4.2` onto main AFTER WP4.2a merges, then grant the
+      build (same cell if under ~150K at Y1, else a fresh cell from the ledger's RESUME HERE (build)).
+    - **CAP (CHARC condition 3):** if WP4.2a has not merged by WP4.2's Y1 + 3 h, STOP WP4.2a at a committed head, WP4.2
+      builds on main, WP4.2a's remainder rebases after WP4.2's accept; I decide and tell CHARC.
+  - Slip: one bare `cd` into `.worktrees/brief-wp4.2r` (harness gate; no cell live), reverted next call.
+
 - **Generation 17 ROLLED OVER 2026-10-29 ~01:55Z at ~395K, at a CLEAN boundary: no cell live, no window open, no package
   in flight, host free, main not held. GENERATION 18 STARTS HERE.**
   - **RESUME HERE (gen 18):**
