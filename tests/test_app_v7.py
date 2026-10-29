@@ -9,7 +9,7 @@ two ticks, the gaps' p99 and the tick count. The six scenarios of question 10:
 - (c) a File > Export of the clip;
 - (d) a batch of 300 small synthetic stills under ``tmp_path`` (DR-50);
 - (e) a 1:1 4K preview render (the FFT route on the GPU) during (c);
-- (f) start-up, here with a slow cache open (S1 condition 5: a stub open that sleeps past
+- (f) start-up, here with a slow cache open (S1 condition 5: a stub open that lasts past
   100 ms; the first analysis waits for it on its worker while the interface responds).
 
 These are the GATE forms, on the WP2.3 fixture clip (``gui`` and ``slow``: wall-clock bounds,
@@ -380,12 +380,19 @@ def test_v7_d_a_batch_of_300_stills(make_app, qtbot, tmp_path) -> None:
 
 
 def test_v7_f_start_up_with_a_slow_cache_open(make_app, qtbot, sample, monkeypatch) -> None:
-    """S1 condition 5: the open sleeps past 100 ms; the analysis waits on its worker."""
+    """S1 condition 5: the open lasts past 100 ms; the analysis waits on its worker.
+
+    The open holds until the analysis's wait has begun (an event, capped at 30 s), then sleeps
+    150 ms more, so the witnessed wait is real and longer than 100 ms on any host (R2-9: a fixed
+    sleep raced a slow first probe or decode).
+    """
     real = composition.proxy_cache
     opened: list[float] = []
+    waiting = threading.Event()
 
     def slow(folder: Path, limit: int = 0) -> DiskProxyCache:
-        time.sleep(1.5)
+        waiting.wait(30)
+        time.sleep(0.15)
         opened.append(time.monotonic())
         return real(folder, limit)
 
@@ -394,6 +401,7 @@ def test_v7_f_start_up_with_a_slow_cache_open(make_app, qtbot, sample, monkeypat
 
     def witnessed_wait(cache: Any, progress: Any) -> bool:
         pending = not cache.wait_open(0)
+        waiting.set()
         ended = real_wait(cache, progress)
         waits.append((pending, time.monotonic()))
         return ended
