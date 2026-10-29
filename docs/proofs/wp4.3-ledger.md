@@ -1188,3 +1188,61 @@ dr44c-export 0, dr44c-batch 0, plant-f 0, v7f-settled 0; about 1.5 min. Heartbea
 (one QPC clock) True for both children; footage folder unchanged (128 files); product logs naming
 it 0; the privacy scan of every discriminator record and `char-events.json` 0 hits. The dry plant
 (19 GB) deleted under the dispatcher's grant; C: 179 GB free after.
+
+### Window 3 (granted ~23:13Z by the orchestrator, gen 24; `window3-commands.sh` md5 `58478c4d`; host exclusive)
+
+Chain 23:14:16Z-23:28:55Z, CHAIN-DONE, every run independent. RAM available 9.61 of 33.52 GB before;
+C: 179 GB free before, 159 GB after (the plant-f cache, 19.96 GB, kept under
+`work/wp4.3-c8-win3/v7f` on the dispatcher's word). py-spy 0.4.2. Logs and records copied to
+`windows/win3/` (35 files, md5s in `md5sums.txt`); privacy: 0 hits for the footage folder in any
+file there (grep, and the post's scan of every discriminator record); footage folder unchanged
+(128 files) in every run; product logs naming it 0.
+
+**The six runs OF RECORD** (`s7_driver.py` `0b9ee6cc...`, unchanged):
+
+| Run | EXIT | Figures |
+|---|---|---|
+| v8v18 | **1 STOP** | V18: first render with the analysis running, statistics None, corrected side True; after completion shown statistics == `smoothed_record(pts)` True (analysis 68.7 s, 681 frames). V8 video at k = 2, 3840x2160, GPU: frame 10 mean 0.000488 / p99 0.007203; 170 0.000330 / 0.003579; 340 0.000185 / 0.002301 (within); **frame 510 mean 0.000315 (within), p99 0.007885 > 2/255 = 0.007843: OVER** by 0.000042; p99.9 0.027003, max 0.101342 (recorded). Shown == harness preview at all four (max diff 0) |
+| dr44c-analysis | 0 | ended True in 361 ms, at close [True], no temporaries |
+| dr44c-export | 0 | ended True in 218 ms, at close [True], no temporaries (analysis before 63.8 s) |
+| dr44c-batch | 0 | ended True in 262 ms, at close [True], no temporaries |
+| plant-f | 0 | 309 entries, 19.96 GB; settling opens 4,515.5 ms then 96.5 ms |
+| v7f-settled | 0 | ruling B, OF RECORD: from show() longest **47.5 ms**, p99 15.1 ms, 6,179 gaps (PASS). Recorded only: before show() longest 78.7 ms; one 104.7 ms gap SPANS show() (78.7 ms before it, 26.0 ms after); build_application cold 85.9 ms, warm 40.0 ms; cache open 223.8 ms; analysis found it pending [False]; the committed probe from before the build 105.0 ms / p99 15.0 ms |
+
+**The two characterisations (NOT of record; py-spy and the wrappers perturb them):**
+
+| Run | Figures | Gaps over 50 ms |
+|---|---|---|
+| v7c-char3 | longest 412.0 ms, p99 26.0 ms, 21,410 ticks; export 681 frames; analysis before 60.5 s | 48 (window 2's v7c-char: 2) |
+| v7e-char | longest 161.0 ms, p99 27.0 ms, 21,934 ticks; witness k1 renders during a sink write 1 | 45 |
+
+What each discriminator answered (`windows/win3/*-post.txt`, `gapsum.txt`, `callstats.txt`):
+- **(2) heartbeat: answered, unambiguous.** Over both probes the out-of-process heartbeat's longest
+  interval was 16.3 ms (p99 11.6 ms, none over 30 ms); every one of the 93 gaps has the heartbeat's longest overlapping interval at
+  10.2-14.6 ms. memwatch: host available 6.5-9.8 GB, working set 0.29-1.58 GB. The stall
+  is INSIDE the product process; not the host, not paging.
+- **(3) py-spy: answered.** Inside the gaps the GIL was sampled with `clearwater-job` (35 of 48 /
+  32 of 45 gaps), `export-analysis` (19 / 19) and the INTERFACE THREAD itself (20 / 15), mostly at
+  `jobs.py:239 _flush` -> on_progress -> `export_panel.py:145-147 _progress` -> (Qt) ->
+  `app/main.py:78 eventFilter`. No single thread holds the GIL across a gap: it passes among the
+  two compute threads and the interface thread.
+- **(1) call wrappers: answered (negatively for the copies).** No device-to-host call is a holder:
+  `rgb_to_planes` (p50 148-177 ms per frame, of which `asnumpy` about 5 ms) spans 1 / 2 gaps, each
+  time together with `export-analysis`'s `channel_means` (both at GPU syncs, GIL released);
+  `pool.malloc` p99 0.01-0.02 ms; `sink._send` max 29.6-33.5 ms. `method.analyze [export-analysis]`
+  spans 15 / 15 gaps (a long per-frame call). s7's runner stamps: the interface thread's progress
+  delivery (`on_progress`) took 30-55 ms in most mid-export gaps (39 / 49 interface-thread runner stamps over 5 ms, on_progress and poll).
+  At the job boundaries (the preview release before the export, the export analysis's end, the
+  export's end) `release_fft_plans` -> `plan_cache.clear` (weakref finalizers) with a gen-2 gc on
+  the same thread spans the gap: 405 / 72.5 / 147.7 ms (c), 117 / 101.6 / 145.2 ms (e) gc; window 2
+  saw gen-2 passes at the same three moments at 38.1 ms at most, so these lengths are inflated by
+  the instrumentation (660k call records live in the process; py-spy suspensions).
+
+Cell 8's reading (for CHARC to rule): IN-PROCESS GIL contention, no single holder and nothing
+below Python. The two compute threads alternate on the GIL; the interface thread's own Python work
+during the export (progress delivery through `ExportPanel._progress` and the window's Python event
+filter, one GIL re-acquisition per callback, each up to the 5 ms switch interval behind the
+workers) stretches to 30-55 ms; at job boundaries `plan_cache.clear` + a gen-2 gc on a worker
+holds the GIL. The perturbation (48 gaps here against 2 in window 2) means the figures are not
+comparable with (c) 182.0 ms and (e) 196.0 ms of record; the mechanism, not the size, is the
+evidence.
