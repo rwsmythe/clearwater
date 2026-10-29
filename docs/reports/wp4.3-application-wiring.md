@@ -82,10 +82,15 @@ V8 (AD-11 as amended) on the shell, (mean, p99, max) in [0, 1] units, the previe
 the exported 16-bit PNG: smooth synthetic scene k = 1 exact (within the 16-bit step), k = 2
 (0.00100, 0.00196, 0.0145), k = 4 (0.00106, 0.00422, 0.0228); the WP1.3 look-check crop k = 2
 (0.00117, 0.00459, 0.117), k = 4 (0.00156, 0.0146, 0.109). Video pre-encode at k = 2: mean
-0.00305, p99 0.0392, max 0.0817 on the 320 x 180 fixture frame: the p99 is over AD-11's 2/255
-for k = 2, which AD-11 sets for real-size content, so it is RECORDED and not asserted (R1-13;
-a CHARC ruling is asked at cell 4's Group C yield). DR-75: the nclx-only Display P3 sample shows (217, 0, 54), the colour its
-export's embedded profile gives; the base rule shows (199, 40, 60) and its planted form fails.
+0.00305, p99 0.0392, max 0.0817 on the 320 x 180 fixture frame, RECORDED and printed, not
+asserted (R1-13 = (a), CHARC ruling ace08fbb). The reason is AD-11's domain: its k > 1 bound (p99
+within 2/255 at k = 2) is set "on real-sized content (at least 1080p)", and "small stills and
+synthetic noise are outside V8's domain (a preview is a downscale of a real-sized image)", so the
+fixture-frame p99 is a characterisation, not a V8 result. The V8 video figure of record is the
+GX011627 window leg: mean abs within 1/255 AND p99 within 2/255 at k = 2 ASSERTED on the real-size
+frame, p99.9 and max recorded (window, pending). DR-75: the nclx-only Display P3 sample shows
+(217, 0, 54), the colour its export's embedded profile gives; the base rule shows (199, 40, 60)
+and its planted form fails.
 V18 gate form on `hevc8-bt709-full` with the held engine: a corrected frame before completion,
 the engine's `smoothed_record` after. GX011627 V18: window, pending.
 
@@ -122,23 +127,36 @@ shows a late delivery to a loop that keeps running reaches nothing (evidence
 | DR-85 | the start-up test is `xfail(strict, raises=OverflowError)` until WP4.3a's fix is on main. |
 | DR-35 (a), DR-47, DR-45 (a), DR-34 | CONSUMER NOTES as the brief says; DR-49's ground checked on the shell. |
 | DR-69 | NOT REACHED (Q7): stays OPEN. |
+| DR-89 | OPENS (CHARC's row at the accept, ruling ace08fbb): the D85 missing-folder residual, a Limit below. |
+| DR-90 | OPENS (CHARC's row at the accept, ruling 38a7c702): R2-4, a Clear during another clip's export, a Limit below. |
 
 ## Limits
 
 - The V7 and start-up figures above come from a shared host; the figures of record come from the
   exclusive window.
 - The shell's close waits up to `SHUTDOWN_TIMEOUT_S` (5 s) for a start-up job that cannot be
-  cancelled (the cache's first open); the interface thread is held for that wait (R1-5).
-- The V8 video leg's p99 is measured on the 320 x 180 fixture only (R1-13); a real-size video
-  frame's p99 is window evidence.
-- A journal entry that cannot be written fails the export readably before any read or probe,
-  with nothing written (R1-2, ruling d530b564); the output folder is always scanned.
+  cancelled (the cache's first open); the interface thread is held for that wait (R1-5). A
+  settings-dialog clear or limit job that waits on that open and fails after the window's close
+  logs its error and presents nothing (R2-3, ruling 38a7c702).
+- The V8 video leg's fixture-frame p99 (10/255 at k = 2) is recorded, not asserted, because AD-11
+  sets the k > 1 bound "on real-sized content (at least 1080p)" and "small stills and synthetic
+  noise are outside V8's domain" (R1-13 = (a), ruling ace08fbb); the asserted p99 is the GX011627
+  window leg's.
+- A journal entry that cannot be written, or a journal that exists but cannot be read, fails the
+  export readably before any read or probe, with nothing written; a doubtful read never
+  overwrites the retained entries (R1-2, ruling d530b564; R2-1, ruling 38a7c702); the output
+  folder is always scanned.
+- A Clear during another clip's export fails that export readably, with nothing partial written
+  (R2-4, banked as DR-90 by ruling 38a7c702; the dialog's Clear is gated only by the open clip's
+  analysis, WP3.20's rule).
 - A journal entry stays until its folder's clean-up has succeeded (R1-3). A folder that no longer
   exists counts as clean and its entry is dropped; a folder that cannot be listed keeps its
   entry. For D85 this means: a temporary left on a drive that is unplugged when the program
   next starts (its path then reads as missing) is not removed when the drive comes back, unless
   that folder is the output folder or a later export's destination again; it stays a visible
-  `.clearwater-partial` file the user can delete.
+  `.clearwater-partial` file the user can delete. ACCEPTED as a Limit, register row DR-89
+  (CHARC's at the accept, ruling ace08fbb; trigger: the next touch of the leftover journal, or an
+  owner report of a stale `.clearwater-partial`).
 
 ## Collection diff against `038f02e`
 
