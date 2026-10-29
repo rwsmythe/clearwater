@@ -14,7 +14,8 @@ the evaluation and re-seat lines. Turn 1's figures were supplied at turn 2.
 | Turn / gate | Tokens-used footer | Last-request input tokens | Context window | Supplied by / disposition |
 |---|---:|---:|---:|---|
 | Turn 1, rung 0 / W1 script | 101,355 | 104,555 | 258,400 | Dispatcher at turn 2; turn 1 committed as `c06c808`; dispatch pace Codex 0.54 is not a depth figure |
-| Turn 2, W1 corrections | Pending dispatcher | Pending dispatcher | 258,400 | Fill after this turn; keep the round-0 table and rung 2 before about turn 5; evaluate re-seat at the rung-2 commit |
+| Turn 2, W1 corrections | 120,962 | 123,658 | 258,400 | Dispatcher at turn 3; committed as `d88365d` |
+| Turn 3, semantic creation_time amendment | Pending dispatcher | Pending dispatcher | 258,400 | Fill after this turn; if depth after turn 4 exceeds about 190K, re-seat BEFORE rung 2 |
 
 ## Rung 0 facts (2026-10-29)
 
@@ -68,7 +69,11 @@ specified stream-copy flags as amended by CHARC R-b below, and checks 4(a)-(e)
 before any trim encode. `ALLOWED_TAG_DIFFS` applies R-c by scope: format
 `major_brand`, `minor_version`, `compatible_brands`, `encoder`; per-stream
 `handler_name`, `language`; audio-only `timecode`. Every tag difference records
-scope, KEY and allowed status only. Any disallowed difference stops 4(e).
+scope, KEY and allowed status only. Format `creation_time` additionally uses
+R-e's semantic rule below, not an unconditional allow-list entry: split trim
+text on `;`, require both keys and at least one part, and require every part
+equal to the source text. Only the part count and equality boolean are recorded.
+Missing either key is disallowed. Any disallowed difference stops 4(e).
 Other failed trim checks and a levels/size-chain failure also stop the run.
 
 Location values are removed from probe tag dictionaries before comparison.
@@ -99,7 +104,8 @@ inside scratch are removed. A cleanup failure becomes `W1 STOP`.
 
 Scratch-script MD5s (W1 updated at turn 2):
 
-- `work/wp-t6/w1.sh`: `d7b695280f2d5f48444d0cfa7f96cdd3`.
+- `work/wp-t6/w1.sh`: `47a9b605f54242f336c6cdf3b4c357ed` (turn 3).
+  Turn 2's script was `d7b695280f2d5f48444d0cfa7f96cdd3`.
   Turn 1's script was `7e6d01a6a9ce5483a5e44ba254b0c135` (17,356 bytes).
 - `work/wp-t6/base-collect.sh`: `7e5b253bec40c5b9e16ecda6c1d931ed`
   (2,641 bytes).
@@ -118,15 +124,15 @@ Scratch-script MD5s (W1 updated at turn 2):
 | Turn-2 isolated pairing helper | PASS, EXIT 0 | `work/wp-t6/turn2-self-check.json`: swapped tmcd/gpmd pairs, unequal counts raise, two audio streams pair by sorted index and ordinal |
 | Turn-2 checker integration and margin logic | PASS, EXIT 0 | Same self-check: correctly paired gpmd has three packets; audio timecode difference allowed, video timecode and firmware differences stop; negative baseline margin not tested, positive margin below half rejected |
 
-Turn-2 seat-side re-run request (Git Bash): move the old `work/wp-t6/w1/` to
-`work/wp-t6/w1-run1/` first, preserving every run-1 artifact. Then run W1 in full:
+Turn-3 seat-side re-run request (Git Bash): move the old `work/wp-t6/w1/` to
+`work/wp-t6/w1-run2/` first, preserving every run-2 artifact. Then run W1 in full:
 
 ```bash
 bash work/wp-t6/w1.sh > work/wp-t6/w1-seat-driver.log 2>&1
 ```
 
 W1 requests one exclusive window of about 15 minutes. Return its final DONE/STOP
-and item output paths to the cell for turn 3's round-0 table; do not proceed to
+and item output paths to the cell for turn 4's round-0 table; do not proceed to
 a build.
 
 ## W1 run 1 -- STOP and diagnosis
@@ -185,6 +191,58 @@ for a margin strictly positive at 30 frames; report both margins regardless.
 The script marks other margins untested and applies every positive margin's
 half-margin test. The unit check uses the script's actual comparison AST.
 
+## W1 run 2 -- STOP 2
+
+The dispatcher ran turn 2's corrected script (MD5 `d7b695280f2d5f48444d0cfa7f96cdd3`)
+at its seat on 2026-10-29 from 11:27:22Z to 11:27:25Z. Checks 4(a)-4(d) PASS;
+4(e) FAIL. The only disallowed tag difference is format `creation_time`.
+Pairing now correctly matches source gpmd index 3 with trim index 2: three trim
+packets equal the source prefix. The audio `timecode` key is present in the
+source and absent in the trim (`survives_by_key` false), answering R-b's question.
+No levels, round-trip or profile measurements ran after this STOP.
+
+The dispatcher's boolean-only probe at
+`work/wp-t6/w1diag/creation_time.json` reports byte-identical format
+`creation_time` without `use_metadata_tags`. Under that flag it reports two
+semicolon-separated parts, each equal to the source's text. It also records
+scratch removal. No tag text is copied into this ledger or the saved checks.
+
+Turn 3 adds the format-only semantic check inside the existing `trim_checks`
+helper. The record is exactly scope, key, parts and every-part-equals-source;
+tag differences also retain their allowed status. Neither the scoped R-c
+allow-list nor the FFmpeg flags change. No other tag receives semantic treatment.
+The extracted program passes `python -m py_compile`, EXIT 0
+(`work/wp-t6/turn3-py-compile.log`). Synthetic checks pass for equal repeated
+parts, an unequal part, a missing key on either side, both keys missing, and
+rejection of the same exception on stream tags, EXIT 0
+(`work/wp-t6/turn3-self-check.json`, `turn3-self-check.log`).
+
+## CHARC STOP 2 ruling (verbatim)
+
+Ruling ID `42a1be58329e3559`, status `33ff5687`, supplied at turn 3:
+
+**CHARC RULING on WP-T6 W1 STOP 2 (query 42a1be58329e3559): R-e CONCURRED, R-b KEPT, with ONE rung-3 check that can still flip to your alternative on evidence. Re-run W1 on turn 3's one-key amendment.**
+
+- **(R-e) CONCUR.** Format `creation_time` is allowed under the SEMANTIC rule: the trim's value split on `;` gives one or more parts and EVERY part equals the source's value; anything else is a STOP. The shared helper checks it; the record carries only `parts` and `every_part_equals_source`. No other key gets a semantic rule; the allow-list (R-c) is otherwise unchanged. Audio `timecode` not surviving under the flag is recorded as answered (R-b's question) and stays in the allow-list.
+- **R-b stays** because `firmware` is why the flag exists: the trim is a source stand-in, and a V4 comparison between an export and its source should see the same best-effort tag differences on the trim as on the real clip.
+- **ADDED rung-3 CHECK (the measurement that settles it).** The `[trim]` engine run's `fidelity_record` lists its MANDATORY, REQUIRED and BEST-EFFORT differences by item NAME. Compare the best-effort list with the full clip's known eight (WP4.2 task 10, `work\wp4.2\v4\`). (i) Same set, or the trim's set differs only by items the trim's own container representation explains (the duplicated `creation_time` key, the kept `firmware`): record the delta by item name as a Limit and proceed. (ii) Any MANDATORY or REQUIRED item differs on the trim that is SAME on the real clip: STOP, and the fallback is your alternative (drop R-b, `creation_time` byte-identical, `firmware` joins the allow-list), re-running W1 and W3. The report states which branch was taken and why.
+- **Slip 2 (the `creation_time` value printed once to your terminal):** acknowledged, no action. It is a recording timestamp, not a location key and not the footage path; it reached no file, post or report. Lock 3 still holds for every artefact: no tag VALUE in the report, the ledger or the evidence folder, this one included.
+- **Slip 1 (bare cd, read-only, cell idle):** acknowledged, no action.
+
+Depth: Codex 123,658 of 258,400 after turn 2; turns 3 (amendment) and 4 (round-0 table) are small. The rung-2 fixture build is the first real turn; if the figure after turn 4 is above about 190K, re-seat BEFORE rung 2 so the build and rung 3 happen in one cell.
+
+## Rung-3 plan notes -- added fidelity check
+
+The trim engine run must retain its `fidelity_record` difference item NAMES
+separately for MANDATORY, REQUIRED and BEST-EFFORT. Compare BEST-EFFORT names
+with the full clip's known eight from WP4.2 task 10 (`work/wp4.2/v4/`). The
+same set, or a delta explained only by duplicated format `creation_time` or
+kept `firmware`, proceeds with the named delta recorded as a Limit. Any
+MANDATORY or REQUIRED trim difference that is SAME on the real clip is a STOP:
+drop R-b, require byte-identical `creation_time`, add `firmware` to the scoped
+allow-list, and re-run W1 and W3. The report must name the branch and evidence.
+This is a future measurement obligation; neither branch is claimed yet.
+
 ## Heavy-run ledger
 
 One row per actual heavy run will include start, end, exact command, selected
@@ -194,7 +252,8 @@ pending and are not validation results.
 | Window | Start / end UTC | Command | Counts / EXIT | Free memory before | Evidence / disposition |
 |---|---|---|---|---|---|
 | W1 run 1 | 2026-10-29 11:18:06.838947Z / 11:18:09.255278Z | `bash work/wp-t6/w1.sh > work/wp-t6/w1-seat-driver.log 2>&1` | N=90; 4(a)-(c) PASS, 4(d)-(e) FAIL; STOP; process EXIT not supplied | 10,942,857,216 bytes before item 1; 10,942,246,912 before item 2; guard passed | `work/wp-t6/w1/` to be preserved as `w1-run1/`; checker fixed, re-run requested |
-| W1 run 2 (requested, about 15 min) | Pending dispatcher | `bash work/wp-t6/w1.sh > work/wp-t6/w1-seat-driver.log 2>&1` | Pending | Script records bytes per stage; >= 5 GiB required | Fresh `work/wp-t6/w1/`; not yet run |
+| W1 run 2 | 2026-10-29 11:27:22Z / 11:27:25Z | `bash work/wp-t6/w1.sh > work/wp-t6/w1-seat-driver.log 2>&1` | 4(a)-(d) PASS, 4(e) FAIL; STOP; process EXIT not supplied | Not supplied at turn 3 | `work/wp-t6/w1/` to be preserved as `w1-run2/`; semantic amendment authorized |
+| W1 run 3 (requested, about 15 min) | Pending dispatcher | `bash work/wp-t6/w1.sh > work/wp-t6/w1-seat-driver.log 2>&1` | Pending | Script records bytes per stage; >= 5 GiB required | Fresh `work/wp-t6/w1/`; not yet run |
 
 ## Review-round ledger
 
@@ -218,7 +277,11 @@ collections. The isolated pairing and integration controls and extracted-program
 `py_compile` pass, EXIT 0; the corrected script MD5 is recorded above. This is
 script validation, not real footage evidence or W2's planted controls.
 
-Pending at handoff: W1's full re-run and turn 3's round-0 table/ruling. No build
+Turn 3 changes only W1's format `creation_time` comparison and this ledger.
+The semantic rule and its failure cases pass synthetic checks; the extracted
+program compiles. No footage or GPU command ran in the cell.
+
+Pending at handoff: W1's full re-run and turn 4's round-0 table/ruling. No build
 in `tests/` or `pyproject.toml` is authorized before that ruling. The one tracked
 change this turn is this ledger; W1, the extracted program and synthetic checks
 remain under gitignored `work/`. No change was made to the base-collection script.
