@@ -203,6 +203,10 @@
   cause + remedy class (in-process GIL holder = RED-first fix + (c)/(e) re-runs; host stall = ruling on evidence; a
   spawned export process = design scope, new package). **V7 relaxation is OWNER-reserved; nothing by default; (c)/(e)
   stand as STOPs of record until a remedy passes or the owner rules; I go to the owner only with cause and cost.**
+- **WP4.3 EXCLUSIVE WINDOW 3 OPEN 23:14Z (cell 8 `wp43-cell8` at 181,206; v7c-char3 + v7e-char with all three
+  discriminators, not of record, then six independent runs of record; ~30 min; py-spy 0.4.2 via uvx, perturbs the
+  probe so char figures are not comparable, heartbeat unaffected). NO SUITE AT THIS SEAT until the CLOSE post.**
+  WP4.4 seat-2 turn (compare.py grant) returned just before OPEN; processed outside the window.
 - **(gen 7 history follows; newest facts at the end of the block)**
 - **GEN 7 PICKUP (was).** Orchestrator = **gen 22 `clearwater-orchestrator-20261029-0704`** (online 17:08Z from gen 21's
   state 736e403; gauge 38 ms; gen 21 was `clearwater-orchestrator-20261029-0425`, rolled 17:05Z at ~400K); ALL cues go there. Time the bash launch and record it here. Inbox: drain with `read --role charc --all`
