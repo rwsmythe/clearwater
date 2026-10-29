@@ -5,32 +5,55 @@
 
 ### Generation
 
-- **Generation 17 (`clearwater-orchestrator-20261028-1101`) picked up 2026-10-28 ~21:02Z at main `f706cc8`.** Bash gauge 34 ms.
-  Scratchpad `C:\Users\rwsmy\AppData\Local\Temp\claude\C--Users-rwsmy-clearwater\feaa0684-02d2-4ce5-b7f4-580591a16a9c\scratchpad\`.
-  - **WP-T5 ACCEPTED 2026-10-29 ~00:37Z, main `4933a45`** (record `docs/proofs/wp-t5-accept.md`). CHARC QA CONFIRMED
-    (`029596e48a5b4d06`); DR-65 CLOSED and CLAUDE.md figure at `3114d23`. Worktrees `wp-t5`, `wp-t5-mc` REMOVED (logs copied to
-    `work\wp-t5\worktree-logs\`, 124 files); branches kept. Turns 4-6 (W2b/W3 scripts; report; R1 cleanup); W2b + W3 at my seat;
-    R1 (Claude pass) 0/0/2/5; Reviewer B (Claude pass) 0/0/1/5; STACKED gate on `aefd563` (WP-T5 + WP4.1) GREEN: parallel
-    4473/1 616.56 s, serial 1126/1 2,511.76 s; WP-T5 merged ALONE on those figures (CHARC `870c8ddeb64b4e12` Q3).
-  - **WP4.1 -- AT ITS OWN GATE (RESUME HERE if I die).** Cells 3 and 4 both stood down (final 238,831 / 283,239): R2-R5 done
-    (R5 clean at the five-round gate). Reviewer B pass 1 BLOCKING (B1 ADS via hard link, CONFIRMED at my seat) -> CHARC Q1 one
-    structural write-target predicate, design guard CLOSED; cell 4 remediated (`7003de7` etc.). **Reviewer B pass 2** (`wp4.1-mc2`
-    `0986b8d`) BLOCKING 1/3 -> ADJUDICATED AT THE GATE, UPHELD by CHARC `80bbf403266651df`: B2-1 banked to WP4.2 with the Limit,
-    B2-2..B2-4 MINOR banked to WP4.2. Candidate **`wp4.1-mc3`** = `wp4.1` `3b8b43b` rebased onto `4933a45` (patch-id 8ff10e7b,
-    code-identical to `0986b8d`) + my Erratum `96d72c7` (docs). **Accept record DRAFTED UNCOMMITTED** in
-    `.worktrees/wp4.1-mc3/docs/proofs/wp4.1-accept.md` with `GATE_FIGURES` / `HARNESS_FIGURES` placeholders.
-    **Own two-leg gate RUNNING** from 00:40:05Z in `.worktrees/wp4.1-mc3` (logs `work/wp41-gate-parallel.log`,
-    `work/wp41-gate-serial.log` there; expect 4473/1 + 1126/1). NEXT: fill the record; harness gate; `git add` +
-    commit the record in mc3; main moved to `d86e6dd`+ (CHARC docs), so rebase mc3 onto main (docs only; patch-id check);
-    ask CHARC (gen 6) to HOLD; ff; uv sync; ruff/format/harness on main; CR check; release post; operator FYI. Then remove
-    worktrees `wp4.1`, `wp4.1-mc`, `wp4.1-mc2`, `wp4.1-mc3` (stack logs copied to `work\wp4.1\stack-gate-logs\`) after CHARC QA.
-    CHARC's register rows owed at the accept: H1 -> WP4.3 (binding), B2-1 -> WP4.2 (binding), B2-2..B2-4 -> WP4.2 (minor), G5,
-    importer OverflowError (J1's twin).
-  - **CHARC gen 5 ROLLED ~00:47Z** (state `d86e6dd`); gen 6's session name comes in its announce: re-read
-    `comms/.launch-sessions.json` before every cue.
-  - Phase 4 next after WP4.1: WP4.2 brief revision -> FINAL on CHARC's word (binds B2-1..B2-4, DR-67, DR-71/73(a)/74), then dispatch.
-  - Slips: two bare `cd`s (pickup into the projects dir; one into `wp-t5-mc` at the WP-T5 accept), no cell live, each reverted
-    next call. Lesson: a new file in a worktree needs `git add` before a pathspec commit.
+- **Generation 17 ROLLED OVER 2026-10-29 ~01:55Z at ~395K, at a CLEAN boundary: no cell live, no window open, no package
+  in flight, host free, main not held. GENERATION 18 STARTS HERE.**
+  - **RESUME HERE (gen 18):**
+    - **Phase 4 state:** WP4.1 ACCEPTED main `f30e00e` (record `docs/proofs/wp4.1-accept.md`; CHARC QA CONFIRMED
+      `03b3212abac40d2d`; register DR-75..DR-79 at `c358816`). WP-T5 ACCEPTED main `4933a45` (DR-65 CLOSED). Spec is v0.5.6
+      (N6 erratum, owner word, DR-64 CLOSED). Next in order: **WP4.2 video path**, then WP4.3 wiring.
+    - **First job: WP4.2's brief revision** (`docs/briefs/wp4.2-brief.md`, DRAFT RULED). CHARC: ONE revision pass against
+      the WP4.1 record, then FINAL on CHARC's word. The pass must bind or reflect:
+      - DR-78 (B2-1, BINDING): predicate (i) applied to every planned output FILE path, or a source path carrying stream
+        syntax refused; a RED test on a stand-in hard link;
+      - DR-79 (B2-2..B2-4 minors): the quoted-apostrophe redaction spelling, a symlink loop as `--out` crashing before the
+        refusal handling, signed zero in the pre-encode checks;
+      - DR-67 (`device_backend`) and DR-71/73(a)/74;
+      - the runner's final names (`tools/headless_export.py`: `write_target_refusal`, `Redactor`, `run`, `main`, record
+        schema 1), the structural write-target predicate and its Limit text, `clearwater.app.composition` (video routes
+        to `unavailable_exports()` until WP4.2).
+      Use a drafting helper in a worktree branch if it saves depth; QA the draft against disk (grep every cited
+      AD/DR/clause); post the revision packet to CHARC with numbered questions.
+    - **Owner direction (2026-10-29, via CHARC, no rule change; memory `clearwater-codex-lane-balance`):** monitor the
+      Codex development share and lean on the Codex lane where the existing rule allows and quality holds. In the WP4.2
+      revision packet, NAME any WP4.2 sub-piece that would qualify for the Codex lane (never a frozen-interface piece), so
+      CHARC can report it. Read the pace at dispatch (`scripts/usage_codex.py`, `scripts/usage_claude.py`).
+    - **CHARC = gen 6, `clearwater-charc-20261028-1443`** (re-read `comms/.launch-sessions.json` before every cue).
+    - **Worktrees:** `wp-t5`, `wp-t5-mc`, `wp4.1`, `wp4.1-mc`, `wp4.1-mc2`, `wp4.1-mc3` all REMOVED (branches kept). Logs
+      copied to `work\wp-t5\worktree-logs\` (124), `work\wp4.1\stack-gate-logs\`, `work\wp4.1\own-gate-logs\`,
+      `work\wp4.1\worktree-logs\` (8). `orch-state-g17` is this state branch (reuse or make `orch-state-g18`).
+  - **Gen 17 summary (picked up 2026-10-28 ~21:02Z at `f706cc8`; bash gauge 34 ms; scratchpad
+    `C:\Users\rwsmy\AppData\Local\Temp\claude\C--Users-rwsmy-clearwater\feaa0684-02d2-4ce5-b7f4-580591a16a9c\scratchpad\`,
+    prompts `dispatch-wp4.1-cell3.md`, `dispatch-wp4.1-cell4.md`, B prompt builders `mk_b41.py`, `mk_b41r.py`):**
+    - WP-T5 (Codex lane): turns 4-6, then W2b and W3 at my seat (saving 536.97 s); R1 and B (Claude pass) both clean. The
+      STACKED gate (CHARC `6be5d8cdcc500129`) on `aefd563` was green, and WP-T5 merged alone on it.
+    - WP4.1 (Claude lane): cell 3 ran R2 and R3 (H1 banked to WP4.3); cell 4 ran R4 and R5 (converged at the five-round
+      gate). Reviewer B pass 1 was BLOCKING (B1 hard link + ADS, confirmed at my seat with `b1_probe.py`); CHARC ruled ONE
+      structural write-target predicate and the design guard CLOSED. Cell 4 remediated. Reviewer B pass 2 was BLOCKING
+      1/3, adjudicated AT THE GATE (B2-1 banked to WP4.2 by irreversibility). The Erratum commit, then WP4.1's own gate
+      4486/1 + 1126/1.
+    - **Practice learned:**
+      - Reviewer B on a Codex-lane package = `codex_cell.py review` with a prompt built neutrally from R1's (sed the header
+        to "REVIEWER B", the candidate sha, the main base).
+      - A B re-run prompt = pass 1's prompt plus a "THIS IS THE RE-RUN" section listing pass 1's findings and any ruled
+        contract that replaces a claim.
+      - A docs edit after a gate (report FINAL, Erratum) keeps the code identity; prove it with the patch-id and an empty
+        `git diff` over src/tests/tools.
+      - Ask CHARC for the hold just before the ff; CHARC commits nothing from the ask until the release post.
+      - A new file in a worktree needs `git add` before a pathspec commit.
+      - Copy only TOP-LEVEL files out of a worktree's `work/` (`find -maxdepth 1 -type f`); a recursive `cp` trips on the
+        basetemp `current` links.
+    - Slips: two bare `cd`s (into the projects dir at pickup; into `wp-t5-mc` at the WP-T5 accept), no cell live, each
+      reverted next call.
 
 - **Generation 16 ROLLED OVER 2026-10-28 ~21:05Z at ~421K (depth cap), at a clean boundary: no window open, no cell
   working (WP4.1 cell 2 STOOD DOWN at its READY-FOR-R2 yield; the WP-T5 Codex session idle between turns). GENERATION 17
