@@ -132,6 +132,19 @@
   memory. COMMISSIONED: **WP4.4 '.MOV input'** (small; Codex-eligible; `gui/sources.py` VIDEO_SUFFIXES + `.mov`, `jobs/naming.py`
   `.mov` -> `.mp4` output extension, a probe/brand test on a `qt`-brand fixture built under tmp_path, the runner's suffix
   rule, a `footage` test on one phone MOV; nets per lane rule). Orchestrator sequences it after the inventory report.
+- **WP4.4 BRIEF RULED 17:46Z (query 22bb1c4f, post 021c723b; `brief-wp4.4` 7852664 read in full): FINAL on fold-in.** Q1 (a)
+  three test edits owned (`test_jobs_naming.py:64-66`, `test_gui_open.py:93/:109`); **Q2 GRANT `io/video/encode.py` data-track
+  map ONLY** (explicit allowlist of carriable data-track tags = the HERO13 set; `mebx` not mapped, reported `not_carried`,
+  D105 best-effort; seat evidence: `-map 0 -c copy -f mp4` FAILS on IMG_6702's two mebx tracks, PCM copies fine); Q3 house V4
+  assertion (my 'AD-11 bound' was a slip); Q4 DR-15 NOTE is mine at the inventory QA (all 20 video elst at time 0, reorder in
+  negative ctts; row stays OPEN); Q5 the two Dolby Vision phone clips OUT (report states their transfer tag: HLG/PQ = refused
+  under 5.3, correct); rotation fixture (180) concurred. **WP4.4 dispatches only AFTER WP4.3a's accept** (runner + io/video
+  ownership); lane Codex, nets Claude. Owed by me at WP4.4's accept: a DV/HDR fact line in the register if warranted.
+- **STATUS 17:36-17:45Z:** inventory turn 4 applied the exclusion ruling; the orchestrator's re-run byte-identical (md5
+  9c5c2391), privacy grep 0, 4 of 5 spot checks MATCH, one MISMATCH (IMG_6703 'EXIF orientation absent' vs raw EXIF 1: the probe's
+  `original_orientation` None from pillow-heif never falls back; ~23 rows) -> correction turn 5, then re-run, then my QA.
+  WP4.3a R2 (Claude pass, 40eef4e) NO_NEW_CRITICAL_MAJOR (1 minor F2 partial, 4 advisories); turn 7 adjudication, a cleanup
+  turn, B, gate. WP4.3 cell 6 Group B accepted (mutation-proved witnesses), depth 172,926, R4 review-only running.
 - **(gen 6 history follows; newest facts at the end of the block)**
 
 - **Gen 6 pickup facts:** bash gauge 45 ms; inbox 0 unread at pickup; announce posted to the orchestrator (gen 17, shell-busy in the WP4.1 gate) with ONE cue; the two register scripts copied from gen 5's scratchpad (18c10a55...) into this session's scratchpad (6687b6c9-eacd-4ffc-995e-51c9195391d1) as `edit_register_p4a.py` (drop its DR-65 block before running: already applied at 3114d23) and `edit_register_p4b.py`.
