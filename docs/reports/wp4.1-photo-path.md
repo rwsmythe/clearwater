@@ -131,6 +131,30 @@
   `PresetStore.import_preset` as `OverflowError` (`ParameterSet.from_dict`; not owned). The
   runner refuses it (exit 2); the importer's behaviour is an item for the orchestrator
   (reproduction `C:\Users\rwsmy\clearwater-review-evidence\wp4.1\r5\r5_repro.py`).
+- **Erratum at the gate (orchestrator, Reviewer B pass 2, adjudicated per CHARC
+  `870c8ddeb64b4e12` and upheld `80bbf403266651df`; BANKED to WP4.2):**
+  - **Source names carrying stream syntax (B2-1, MAJOR, banked by irreversibility).** The
+    write-target predicate checks each planned output FOLDER, not each planned output FILE
+    name. `jobs.naming` copies the source's stem into the output name, so a source stored in
+    an NTFS alternate data stream (`src\carrier:input.jpg`) gives the planned name
+    `carrier:input_corrected...png`. If `<out>\carrier` is a hard link to a footage
+    original, `SafeWrite`'s temporary is created as a named stream on that original. The
+    original's data bytes are never written, and the stream can be deleted. Reaching this
+    takes two crafted preconditions: a JPEG stored in a stream, and a hard link to an
+    original placed in the output folder under the carrier's name. It is the hard-link
+    residual's class, reached through a source name. WP4.2, which extends this runner, applies
+    predicate (i) to every planned output FILE path, or refuses a source path carrying stream
+    syntax, with a RED test on a stand-in hard link.
+  - **Redaction of a quoted apostrophe (B2-2, MINOR).** A known folder containing `'`, quoted
+    back through a refused `--suffix`, is printed in its escaped `\'` spelling, which the
+    Redactor lacks.
+  - **A symlink loop as `--out` (B2-3, MINOR).** `Path.resolve()` raises `RuntimeError` while
+    the Redactor is built, outside the refusal handling. The result is a traceback that
+    carries the path, instead of exit 2.
+  - **Signed zero in the pre-encode checks (B2-4, MINOR, test-only).** N10's pre-encode
+    assertion, and the V8 helper (`tests/test_wp41_v8.py:74`), use `np.array_equal`, which
+    equates float32 `+0.0` and `-0.0`. Comparing bit patterns, with a signed-zero control,
+    closes it.
 
 ## OWED (not limits of the code)
 
@@ -192,10 +216,13 @@ STRONG tier (Codex `gpt-6.1-sol` / high, WSL, codex-cli 0.162.1), whole-package 
 | 4 | `844b996` | 0 | 1 (I1 linked source beside-source) | 4 | NEW_CRITICAL_MAJOR_FOUND; fixed (I1 broadened to every write target) |
 | 5 | `f17ab36` | 0 | 0 | 1 (J1) | NO_NEW_CRITICAL_MAJOR; J1 fixed in the cleanup (`23fc88b`) |
 | Reviewer B (gate) + remediation | `aefd563` (stacked candidate = `0a0a787` rebased) | 0 | 1 (B1 hard link plus stream; B2-B4 MAJOR reported, MINOR as adjudicated) | 8 (B2-B9; B9 out of envelope) | BLOCKING; remediated per CHARC `870c8ddeb64b4e12` (one predicate, B1; B2, B4-B7 fixed; B3, B8, B9 narrowed) |
+| Reviewer B pass 2 (gate) | `0986b8d` (`3b8b43b` rebased) | 0 | 1 (B2-1 stream syntax through a source name) | 3 (B2-2..B2-4) | BLOCKING; adjudicated AT THE GATE (second blocking B): B2-1 BANKED to WP4.2 with the Limit by irreversibility, B2-2..B2-4 banked to WP4.2 (CHARC `80bbf403266651df`); no code change |
 
 The Reviewer A loop terminated at round 5, the five-round gate, on a round with zero new
 blocking findings; the orchestrator's Reviewer B at the gate then found B1, remediated in one
-bounded turn (the design guard closes with the single predicate).
+bounded turn (the design guard closes with the single predicate). Its pass 2 found one more
+route in that class (B2-1) and three minors. They were adjudicated at the gate and banked to
+WP4.2 (Limits, Erratum at the gate).
 
 ## Register rows (main `cffd243`)
 
