@@ -202,3 +202,35 @@ Round 0 (c) noted: the unchanged base fails IMG_6702 at the mux exactly as Q2's 
 The kept basetemps: understood, and correctly NOT worked around. I will not delete them at my seat either (the refusal at your seat is the owner's permission decision, not a routing problem). It stays with the owner: approve at your seat, or delete the three folders themselves. I carry it as an owner action pending, not a decision.
 
 Owner-pending inputs: none. Open owner decisions: none. Owner action pending: the three kept basetemps (work/wp1.2b, work/wp2.2, work/pt-main-wp39 and their partial D: copies), approve the deletion at the orchestrator's seat or delete by hand.
+
+## Turn-2 STOP ruling (CHARC `093384f126589674`, 2026-10-29T22:14:29Z, verbatim; its register paragraph is SUPERSEDED by the footage GRANT below, item 3)
+
+PRIMARY: CHARC gen 8. Answers query 52fcd7bf154d08c5 (WP4.4 turn-2 STOP: qt mono PCM layout lost in MP4).
+
+RULING: (a). The qt fixture's audio becomes stereo pcm_s16le (-ac 2); the V4 assertion stays the house form unchanged; the real mono path is witnessed by the footage test on IMG_6702 in turn 3 (Apple's mono lpcm declares no layout, so SAME, as your seat table shows). Verified at my seat: tools/container_spike/compare.py:1194-1209 compares channel_layout by s.get(k) under the MANDATORY "audio streams present" item, so a declared mono against absent reads DIFFERENT; the loss is FFmpeg's MP4 ipcm writer, not the product sink.
+
+(b) the comparator change is DECLINED for this package (shared V4 instrument; blast radius every V4 test). (c) no product fix exists and none is wanted.
+
+REGISTER: a MINOR row, MINE at WP4.4's accept (with the DV/HDR fact line if warranted): "a QuickTime PCM track that DECLARES a mono layout leaves the MP4 with the channel count but no layout declaration (FFmpeg 9.0.2 ipcm writer; stream copy cannot set one); V4's audio item reads DIFFERENT for such a source; the owner's iPhone clips are unaffected (lpcm, no layout). Trigger: the next V4 instrument touch (treat mono and absent as equal at channels == 1) or an owner MOV whose V4 reads DIFFERENT on that item alone." The report names the limit in one line, as you wrote it.
+
+Noted: 35391b0 (suffix sets, naming rule, MP4_DATA_CODEC_TAGS, the granted :80 token, the qt fixture); the three UNC nodes a sandbox artifact (3 passed at your seat); ruff format applied mechanically before the commit. Depth plan concurred: turn 3 (fixture + footage test) at 163,747 / 258,400, evaluate at its yield; Reviewer A rounds and the report to a fresh Codex seat from the ledger if the window is short.
+
+Owner-pending inputs: none. Open owner decisions: none. Owner action pending: the three kept basetemps.
+
+## Footage STOP GRANT (CHARC `9c8f461b73ec8c05`, 2026-10-29, verbatim; it extends the Files owned list with `tools/container_spike/compare.py`, three equivalences only)
+
+PRIMARY: CHARC gen 8. Answers query 5833f17af2e7e0e7 (WP4.4 footage STOP: IMG_6702 V4 DIFFERENT on the Apple matrix translation and unset SAR) and acknowledges status 1dd0d2c4 (WP4.3 WINDOW 2 OPEN: nothing heavy at my seat until your CLOSE).
+
+RULING: (a) as a GRANT to WP4.4's fresh Codex seat, Tier STRONG (shared V4 instrument). Verified at my seat: compare.py:1250-1256 compares ffprobe's rotation AND displaymatrix text; :1263-1268 compares the full nine-element tkhd matrix; :1308-1312 compares raw SAR. Orientation itself is preserved (rotation -180 both sides; linear part identical); the differences are the translation row (Apple's tx = w<<16, ty = h<<16 vs FFmpeg's zeros) and unset vs explicit 1:1 SAR, neither of which any reader or player acts on. These are instrument equivalences, not product defects. (b) xfail + a DR is DECLINED (the witness would land red); (c) a product change is DECLINED (no muxer path to the source translation through a re-encode; an unset SAR buys nothing).
+
+GRANT to WP4.4 on tools/container_spike/compare.py, THREE equivalences, each RED-first on synthetic records with a planted-difference CONTROL proving the narrowing cannot hide a real change:
+1. The two display-orientation items (ffprobe side data; tkhd matrix) compare the ROTATION and the 2x2 linear part of the matrix; the translation terms are recorded beside the verdict as best-effort text, never asserted. Controls: a 90-degree change and a mirrored linear part still read DIFFERENT.
+2. "frame size and sample aspect ratio": an unset / null SAR equals 1:1. Control: 1:1 vs 4:3 still DIFFERENT; a size change still DIFFERENT.
+3. "audio streams present" (the turn-2 STOP, ruled (a) at ced362cb): channel_layout mono and absent are equal when channels == 1. Control: 1 vs 2 channels still DIFFERENT; stereo vs 5.1 still DIFFERENT. This FOLDS the MINOR row I owed at the accept into the fix: no row is opened; the qt fixture may stay stereo (it already passes) or return to mono as the cell prefers; the report's limit line becomes a fixed line.
+Tests in WP4.4's new test file or a new tests/test_container_spike_compare_equivalences.py (not an existing test file; the existing V4 tests stay untouched and must stay green: the GoPro sources have zero translation, explicit SAR and declared layouts). The grant is named in the report's owned-files list and the record with this msg id. Any other compare.py change is a new STOP.
+
+Footage witness: the IMG_6702 test then runs green at your seat with V4 SAME on every MANDATORY item; the footage figure of record is that run. The two Dolby Vision clips stay out (Q5). At WP4.4's accept, mine: the DV/HDR fact line if warranted; no mono-layout row.
+
+Noted: turn 4 committed c353dfd; cell 206,634 / 258,400; next = fresh Codex seat for this step, Reviewer A rounds, report.
+
+Owner-pending inputs: none. Open owner decisions: none. Owner action pending: the three kept basetemps.
