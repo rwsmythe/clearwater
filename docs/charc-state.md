@@ -9,7 +9,31 @@
 
 ---
 
-### RESUME HERE (CHARC generation 6 `clearwater-charc-20261028-1443`, fable/medium, ONLINE 2026-10-29 00:45Z from main 47f270f; gen 5 `clearwater-charc-20261028-0647` rolled ~00:45Z at ~402K)
+### RESUME HERE (CHARC generation 7: read this block top to bottom; gen 6 `clearwater-charc-20261028-1443` ROLLED 2026-10-29 ~14:30Z at ~410K at a clean boundary, no cell at CHARC's seat; gen 5 rolled ~00:45Z at ~402K)
+
+- **GEN 7 PICKUP (read first).** Orchestrator = **gen 21 `clearwater-orchestrator-20261029-0425`** (online 14:27Z from its state
+  236cce3; gauge 33 ms); ALL cues go there. Time the bash launch and record it here. Inbox: drain with `read --role charc --all`
+  (gen 6 stopped draining at its announce). Main at gen 6's last commit (this file) is clean and free; spec v0.5.6; fill has the
+  Order bullet (one gate per package after A and B) and AD-30 (gate test sizing). Standing rules added today: build prompts yield
+  after each task group (dispatch-recipe, e831448); scripts with backslash paths go through the Write tool (memory
+  bash-heredoc-backslash-collapse); subjects < 120 chars; post THEN cue. Owner direction 2026-10-29: lean on Codex for
+  development, never at the cost of quality; report the Codex share at each commission (memory clearwater-codex-lane-balance).
+  **LIVE NOW (14:27Z):** (1) WP-T6 (Codex seat 2, session 01a18792, idle between turns 12/13, depth 157,267): W2b window OPEN
+  at gen 21's seat (re-proof on the cleaned checker, 4 controls); then turn 13 ledger; Reviewer B (Claude pass at gen 21's seat);
+  the ONE two-leg gate with the amended expressions = the AFTER figure (Q6 verdict = the seven CUT bodies' per-test sum > 110 s
+  under 1,567 s; projected serial ~1,290 s). At its ACCEPT, mine: standing QA; fill two-leg command + `and not fullclip` +
+  collection rule 'parallel + serial + fullclip = all' + fullclip once per phase-end gate; CLAUDE.md gate paragraph; AD-28
+  figures; DR rows: Q7 gap list (owner trigger), row 10 `tools/prototype/bench.py:1305` `stray_processes` 59.5 s (then a Codex
+  micro-package), DR-22/DR-66 consumer notes; the six-name V4 best-effort Limit sentence in the record. (2) WP4.3 (opus-high):
+  build DONE 11 commits on `wp4.3` (b52b24a..307d1e6, R1 at 99da8aa); Reviewer A R1 0/5/11; my R1 ruling (post 84ab8ef5 =
+  gen 21's d530b564): major 2 REVERSED to fail-readably, 1/3/4/5 as proposed, minors FIX; fresh cell 4 dispatches after W2b's
+  RELEASE with yields per group, then R2; after A converges: EXCLUSIVE windows (V7 of record via the uncommitted S7 driver,
+  GX011627 V18, DR-44(c)/DR-50), Reviewer B (Codex), its gate AFTER WP-T6's. At its accept, mine: its register table (brief
+  'Register rows'), AD-23 note stays with 4.3a. (3) WP4.3a (Codex, brief FINAL at brief-wp4.3-rev bc0b8a2 + my ruling
+  fe7625ca; gen 21 commits it onto main): dispatches when WP-T6's Codex cell stands down; at its accept, mine: AD-13 note
+  ('profile' writer provenance key), AD-23 'applied by WP4.3a', closures DR-58(b)/76/77/81(a-d)/85. Owner-pending inputs:
+  photos (WP3.6P), the iPhone clip (DR-15). Open owner decisions: none. Every owner-facing summary ends with that line.
+- **(gen 6 history follows; newest facts at the end of the block)**
 
 - **Gen 6 pickup facts:** bash gauge 45 ms; inbox 0 unread at pickup; announce posted to the orchestrator (gen 17, shell-busy in the WP4.1 gate) with ONE cue; the two register scripts copied from gen 5's scratchpad (18c10a55...) into this session's scratchpad (6687b6c9-eacd-4ffc-995e-51c9195391d1) as `edit_register_p4a.py` (drop its DR-65 block before running: already applied at 3114d23) and `edit_register_p4b.py`.
 
@@ -412,6 +436,10 @@
   render must not overwrite the remembered GPU backend (DR-68 test GPU->CPU->boundary); major 5 reproduce on real main() first,
   closed-flag guard in app/main.py, gui/jobs.py only if shown; minors FIX; fresh cell 4 with yields per group; then R2.** Two
   gen-20 slips acknowledged. NEXT: gen 21 online post (cue there); w2b; WP-T6 B + gate; WP4.3 cell 4 remediation + R2.
+- **GEN 21 ONLINE 14:27Z (`clearwater-orchestrator-20261029-0425`; status `4c527acfd8f75bc0`): drained my R1 ruling (saved as
+  r1-ruling-d530b564.md); W2b WINDOW OPEN (~2-5 min; w2b.sh md5 273352e4); WP4.3 cell 4 dispatches after the RELEASE. Order:
+  W2b, WP-T6 turn 13, WP-T6 B, WP-T6 gate, WP4.3 gate; WP4.3a after WP-T6's cell. GEN 6 ROLLS HERE (~410K): announce posted,
+  peek-only after, successor launched by gen 6 itself.**
 - **WP-T6 W3 DONE 12:57Z (status `fa801fad17d48fc2`, no reply owed): RUNG 3 CLOSED.** Stage 1: 8 passed in 259 s (run 1
   322 s); ONE standard encode; engine record M+R all SAME, roster SAME. Stage 2: `branch=i-proceed`, BE delta = exactly the six
   ruled names. Stage 3 draft control caught (level name assert); stage 4 reference control caught (89 vs 90). Tree clean, tests
