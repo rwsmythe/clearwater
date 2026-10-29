@@ -236,8 +236,14 @@
   121 s, bench rows 163 s, V3 81 s, tail 394 s) BANKED as a follow-on DR row at the accept, owner trigger; Q8 W4 fullclip once
   (~27 min); Q9 teardown removal; Q10 materiality 20 s; Q11 FAST one round + cleanup; Q12 Codex (6th Codex-built package;
   pace 0.54). Owed by me at WP-T6's accept: Q7 gap row, row-10 row if a tools/ lever, DR-22/DR-66 consumer notes, fill +
-  CLAUDE.md + AD-28 update, fullclip-per-phase sentence. **NEXT: WP-T6 dispatch + round-0 table (rung 1 yield) for my reply;
-  WP4.3 brief revision draft after.**
+  CLAUDE.md + AD-28 update, fullclip-per-phase sentence.
+- **WP-T6 DISPATCHED ~11:12Z to the CODEX lane (status `b35e95450b611156`): brief FINAL on main `6ecc4e5`
+  (`docs/briefs/wp-t6-brief.md`, 506 lines, 0 CR, my ruling 7458b470 verbatim under Rulings; checked). Worktree `.worktrees/wp-t6`
+  on 6ecc4e5, local config byte-equal, venv synced; evidence `clearwater-review-evidence\wp-t6\cell\`. Turn 1 = rung 0 + the W1
+  script only (stack check vs 8bc927a empty, three collections, ledger skeleton, `work/wp-t6/w1.sh` with my Q4 margins); the
+  orchestrator runs W1 (~15 min, posted window); turn 2 = the round-0 table, sent to me BEFORE any build. **NEXT: W1 window
+  post (no reply), then the round-0 table for my reply (N, T, checks (a)-(e), ALLOWED_TAG_DIFFS keys, R2's chain, R4's N +
+  margins, row 10's profile); WP4.3 brief revision draft after.**
 - **(history) After WP4.1's accept:** WP4.2's brief (DRAFT RULED on main 3aa3c51) got ONE revision pass against WP4.1's accept record, then FINAL
   on CHARC's word; its revision must carry: DR-78/79 (B2 rows) as WP4.2 items, the WP4.1 runner's final names and the stream-syntax
   predicate, the Limit text. WP4.3's revision later carries DR-75 (REQUIRED test under its Q12), DR-76, DR-77, and the AD-23 'applied by
