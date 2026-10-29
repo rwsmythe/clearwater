@@ -3,8 +3,10 @@
 ``ClipLocks`` lets one activity per cache key run its engine; the other waits on its worker,
 cancellably, reporting "Waiting for the other job on this clip". ``GuardedExports`` runs, on
 the worker and in this order: the DR-82 pre-plan name check (a failed item naming the source
-and saying to rename it, before any read or probe), the clip's lock for a video, the preview's
-FFT plan release (DR-68), the journal entry (D85), the engine's job, the AD-9 log line. Both
+and saying to rename it, before any read or probe), the journal entry (D85; a journal that
+cannot be written fails the export, before any read or probe), the clip's lock for a video, the
+preview's FFT plan release (DR-68), the engine's job, the AD-9 log line; the entry stays while
+its folder holds a temporary (R1-2, R1-3, ruling d530b564). Both
 orders of a real export and a real GUI analysis of one fixture clip are driven, the cache entry
 is complete and consistent afterwards (V17: a reopen skips the decode pass), and a cancel while
 waiting returns ``CANCELLED`` with nothing written.
@@ -24,12 +26,13 @@ from clearwater.analysis import AnalysisEngine
 from clearwater.app import activity, composition
 from clearwater.app.activity import RENAME_TEXT, WAITING_TEXT, ClipLocks, GuardedExports
 from clearwater.app.analysis_adapter import EngineClipAnalysis
-from clearwater.app.startup import WriteJournal
+from clearwater.app.startup import WriteJournal, clean_leftovers
 from clearwater.config import new_parameter_set
 from clearwater.interfaces import JobResult, Progress, Settings
 from clearwater.interfaces.stubs import StubProgress
 from clearwater.io.photo import PhotoReader
 from clearwater.io.video import FFmpegVideoSource
+from clearwater.jobs import MediaKind, final_output_path, new_token, temporary_path
 from clearwater.jobs.export_seam import CANCELLED, ExportRequest
 
 CLIP = "vid-hevc8-bt709-full"
@@ -52,13 +55,13 @@ def request(source: Path, out: Path, kind: Any = "video") -> ExportRequest:
 class Rig:
     """The application's export side over a real engine, one opened cache and a journal."""
 
-    def __init__(self, tmp_path: Path) -> None:
+    def __init__(self, tmp_path: Path, config: Path | None = None) -> None:
         self.out = tmp_path / "out"
         self.out.mkdir()
         self.cache = composition.proxy_cache_opener(tmp_path / "cache")
         assert self.cache.open(10**10) is None
         self.locks = ClipLocks()
-        self.journal = WriteJournal(tmp_path / "config")
+        self.journal = WriteJournal(tmp_path / "config" if config is None else config)
         self.events: list[str] = []
         self.exports = GuardedExports(
             composition.export_jobs(cache=self.cache),
@@ -195,6 +198,90 @@ def test_the_journal_holds_the_folder_while_the_engine_runs(
         assert not result.ok and list(rig.out.iterdir()) == []
         if ending == "cancel":
             assert result.failure is CANCELLED
+
+
+@pytest.mark.parametrize("kind", ["photo", "video"])
+def test_an_unwritable_journal_fails_the_export_before_any_read_or_probe(
+    sample: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, kind: str
+) -> None:
+    """R1-2 (ruling d530b564): no clean-up record, no export; nothing is read or written."""
+    blocked = tmp_path / "config"
+    blocked.write_text("a file where the configuration folder should be", encoding="utf-8")
+    rig = Rig(tmp_path, config=blocked)
+    sources = tmp_path / "sources"
+    sources.mkdir()
+    name = "IMG_1.jpg" if kind == "photo" else "clip.mp4"
+    source = sources / name
+    source.write_bytes(sample("jpeg-gradient-srgb" if kind == "photo" else CLIP).read_bytes())
+    touched: list[str] = []
+    monkeypatch.setattr(PhotoReader, "read", lambda self, path: touched.append("read"))
+    monkeypatch.setattr(FFmpegVideoSource, "probe", lambda self, path: touched.append("probe"))
+    monkeypatch.setattr(rig.cache, "key_for", lambda path: touched.append("key"))
+    real = rig.exports._engine.job
+
+    def job(req: ExportRequest) -> Any:
+        inner = real(req)
+
+        def run(progress: Progress) -> JobResult:
+            touched.append("engine")
+            return inner(progress)
+
+        return run
+
+    monkeypatch.setattr(rig.exports._engine, "job", job)
+    result = rig.exports.job(request(source, None, kind))(StubProgress())  # type: ignore[arg-type]
+    assert not result.ok and result.failure is not None
+    assert result.failure.startswith(
+        "the export was not started because its clean-up record could not be written in "
+        f"{blocked} ("
+    )
+    assert touched == [] and rig.events == []
+    assert [p.name for p in sources.iterdir()] == [name] and list(rig.out.iterdir()) == []
+
+
+class _Crash(BaseException):
+    """A planted process death mid-job: nothing runs after it but the ``finally`` blocks."""
+
+
+@pytest.mark.parametrize("ending", ["crash", "locked"])
+def test_an_entry_stays_while_its_folder_holds_a_temporary(
+    sample: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, ending: str
+) -> None:
+    """R1-3 (ruling d530b564): the entry stays until that folder's clean-up has succeeded.
+
+    A crash after the temporary is written, and a job that returns with its temporary left (the
+    engine's "it is removed at the next start"), both keep the source folder's entry, so the
+    next start with no output folder set removes the temporary (D85 at the default placement).
+    """
+    rig = Rig(tmp_path)
+    sources = tmp_path / "sources"
+    sources.mkdir()
+    photo = sources / "IMG_1.jpg"
+    photo.write_bytes(sample("jpeg-gradient-srgb").read_bytes())
+    planted: list[Path] = []
+
+    def job(req: ExportRequest) -> Any:
+        def run(progress: Progress) -> JobResult:
+            final = final_output_path(req.source, req.settings, MediaKind.PHOTO)
+            planted.append(temporary_path(final, new_token()))
+            planted[0].write_bytes(b"partial")
+            if ending == "crash":
+                raise _Crash
+            return JobResult(True, (), ("its temporary could not be removed",), None, "cpu", 0.0)
+
+        return run
+
+    monkeypatch.setattr(rig.exports._engine, "job", job)
+    run = rig.exports.job(request(photo, None, "photo"))  # type: ignore[arg-type]
+    if ending == "crash":
+        with pytest.raises(_Crash):
+            run(StubProgress())
+    else:
+        assert run(StubProgress()).ok
+    assert [folder for _, folder in rig.journal.entries()] == [sources.absolute()]
+    report = clean_leftovers(settings(None), WriteJournal(tmp_path / "config"))  # type: ignore[arg-type]
+    assert report.removed == (planted[0],) and not planted[0].exists()
+    assert rig.journal.entries() == ()
 
 
 def test_the_ad9_log_line_names_the_jobs_device(

@@ -10,12 +10,17 @@ worker, in this order:
 1. DR-82: ``jobs.naming.final_output_path`` for the source. An ``OutputNameError`` is a failed
    result naming the source and saying to rename the file, before the engine reads or probes;
    any other error is left to the engine's own text.
-2. A video: the clip's lock (the key is computed here, on the worker: ``ExportJobs.job`` builds
+2. The journal entry of the destination folder (D85), before any temporary can exist. A journal
+   that cannot be written fails the export readably, before the engine reads or probes and
+   with nothing written (R1-2, ruling d530b564): an export whose leftovers no start-up would
+   find never starts.
+3. A video: the clip's lock (the key is computed here, on the worker: ``ExportJobs.job`` builds
    the callable only).
-3. DR-68: the preview's FFT plans are released before the job selects its backend.
-4. The journal entry of the destination folder (D85), before any temporary can exist.
+4. DR-68: the preview's FFT plans are released before the job selects its backend.
 5. The engine's job; then the AD-9 log line naming ``JobResult.device``.
-6. Always: the journal entry removed and the lock released.
+6. Always: the lock released, and the journal entry removed unless its folder still holds a
+   temporary output (the engine could not remove one, or the job died mid-write); the next
+   start then removes it (R1-3, ruling d530b564).
 
 Qt-free; nothing here touches a Qt object.
 """
@@ -34,7 +39,7 @@ from clearwater.jobs import MediaKind, OutputNameError, final_output_path
 from clearwater.jobs.export_seam import CANCELLED, ExportJobs, ExportRequest
 
 from .composition import DeferredProxyCache
-from .startup import WriteJournal
+from .startup import WriteJournal, holds_leftovers
 
 _LOG = logging.getLogger(__name__)
 
@@ -46,6 +51,12 @@ OPENING_CACHE_TEXT = "Opening the analysis cache"
 
 RENAME_TEXT = "{name}: this file name cannot be used for an output file; rename the file."
 """The failed item's text for a source whose name gives no portable output name (DR-82, Q22)."""
+
+JOURNAL_FAILED_TEXT = (
+    "the export was not started because its clean-up record could not be written in {folder} "
+    "({reason})."
+)
+"""The failed item's text when the journal entry cannot be written (R1-2, ruling d530b564)."""
 
 POLL_S = 0.05
 """How often a waiting job looks at its cancel flag."""
@@ -192,6 +203,32 @@ class GuardedExports:
             return JobResult(False, (), (), failure, "none", time.perf_counter() - started)
         except (ValueError, OSError):
             folder = None  # the engine refuses the same request with its own text, unwritten
+        entry: str | None = None
+        if folder is not None:
+            try:
+                entry = self._journal.add(folder)
+            except OSError as error:
+                failure = JOURNAL_FAILED_TEXT.format(
+                    folder=ascii_text(str(self._journal.path.parent)),
+                    reason=ascii_text(str(error)),
+                )
+                _LOG.warning("export %s: refused before reading; %s", name, failure)
+                return JobResult(False, (), (), failure, "none", time.perf_counter() - started)
+        try:
+            return self._guarded(request, inner, progress, name, started)
+        finally:
+            if entry is not None and folder is not None:
+                self._journal_remove(entry, folder)
+
+    def _guarded(
+        self,
+        request: ExportRequest,
+        inner: Callable[[Progress], JobResult],
+        progress: Progress,
+        name: str,
+        started: float,
+    ) -> JobResult:
+        """Run steps 3 to 5 of the module docstring's order (the journal entry is held)."""
         key: CacheKey | None = None
         if request.kind == "video":
             if not wait_for_cache(self._cache, progress):
@@ -205,11 +242,7 @@ class GuardedExports:
         try:
             if self._release is not None:
                 self._release()
-            entry = self._journal_add(folder)
-            try:
-                result = inner(progress)
-            finally:
-                self._journal_remove(entry)
+            result = inner(progress)
         finally:
             if key is not None:
                 self._locks.release(key)
@@ -217,19 +250,14 @@ class GuardedExports:
         _LOG.info("export job %s: %s; device %s", name, outcome, result.device)
         return result
 
-    def _journal_add(self, folder: Path | None) -> str | None:
-        """Add the destination folder to the journal; a journal that cannot be written is logged."""
-        if folder is None:
-            return None
-        try:
-            return self._journal.add(folder)
-        except OSError as error:
-            _LOG.warning("the write journal could not record %s: %s", folder, error)
-            return None
+    def _journal_remove(self, entry: str, folder: Path) -> None:
+        """Remove a journal entry unless its folder still holds a temporary (logged when kept).
 
-    def _journal_remove(self, entry: str | None) -> None:
-        """Remove a journal entry; a journal that cannot be written is logged."""
-        if entry is None:
+        A journal that cannot be written is logged; the entry stays and the next start scans
+        its folder.
+        """
+        if holds_leftovers(folder):
+            _LOG.warning("the write journal keeps %s until its clean-up succeeds", folder)
             return
         try:
             self._journal.remove(entry)
