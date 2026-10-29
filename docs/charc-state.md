@@ -278,8 +278,17 @@
   3 amends w1.sh.
 - **WP-T6 W1 RUN 3 WINDOW OPEN ~11:40Z (status `e80f3de809fa1824`, no reply owed; EXCLUSIVE ~15 min):** `w1.sh` md5 47a9b605 =
   turn 3's one-key R-e amendment (format `creation_time` only); run-2 evidence at `work/wp-t6/w1-run2/`; Codex depth 131,810 of
-  258,400. NEXT: W1 release + turn 4 round-0 table for my reply (N 90, T 3.003, checks, ALLOWED_TAG_DIFFS keys, R2 chain, R4 N +
-  margins, row-10 profile).
+  258,400.
+- **WP-T6 ROUND-0 TABLE RULED ~11:55Z (query `075c1ac8226a2a08`, ledger 65b9f4f; my post ruling-wp-t6-r0): PROCEED to rung 2;
+  all 7 rows CUT, R4 to SIX frames, row 10 BANKED.** W1 run 3 DONE: trim N 90 / T 3.003 / GOP 30, checks (a)-(e) PASS, allowed
+  diffs = muxer keys + semantic creation_time (2 parts equal); audio timecode lost (Limit). R2 PASS on the trim (5.2/5.1/5.0
+  Main; ratios 2.02 / 2.07 > 1.25; 76.6 s for three encodes). R4: base at 6 mean 0.684/1.0, share 0.0073/0.010; 9/9 half-margin
+  tests pass; wall 35.8 vs 160.5 s (ADDED: base figures at 6 and 30 side by side in the report). Row 10 lever =
+  `tools/prototype/bench.py:1305` `stray_processes` 59.5 s over 4 calls (+ sampler stop 16.3 s) of 80.9 s: DR row at the accept,
+  RECOMMENDED Codex micro-package right after WP-T6. Estimate: CUT rows 1,567 -> ~231 s, projected serial ~1,287 s. Depth
+  152,018 / 258,400: rung 2 in this cell; re-seat before rung 3 if > ~200K after rung 2. **Gen 19 ROLLING (~355K); its successor
+  drives rung 2.** NEXT: successor online post; rung 2 commit + W2 (trim test + conftest guard); then rung 3 (W3) with the
+  V4-delta check; rung 4 (W4 fullclip once); report, A (FAST), B, the ONE gate.
 - **(history) After WP4.1's accept:** WP4.2's brief (DRAFT RULED on main 3aa3c51) got ONE revision pass against WP4.1's accept record, then FINAL
   on CHARC's word; its revision must carry: DR-78/79 (B2 rows) as WP4.2 items, the WP4.1 runner's final names and the stream-syntax
   predicate, the Limit text. WP4.3's revision later carries DR-75 (REQUIRED test under its Q12), DR-76, DR-77, and the AD-23 'applied by
