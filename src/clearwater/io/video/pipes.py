@@ -1,18 +1,24 @@
-"""The frame-transport pipe: an enlarged anonymous pipe with a portable fallback (WP3.9, AD-23).
+"""Frame transport and the shared tool launch policy (WP3.9, WP4.3a; AD-23).
 
 FFmpeg writes raw frames to an anonymous pipe. On Windows the pipe's buffer is enlarged to
-:data:`BIG_PIPE_BYTES` (AD-2, AD-23: the one approved exception to N1); when the large pipe
+:data:`BIG_PIPE_BYTES` (AD-2, AD-23: an approved exception to N1); when the large pipe
 cannot be created, or on any other operating system, :func:`open_frame_pipe` returns None and the
 caller uses the default pipe (``subprocess.PIPE``), which carries the same bytes more slowly.
 The reason for the fallback is logged once per process.
+
+Every product FFmpeg and ffprobe launch uses :func:`tool_spawn_kwargs`: no inherited FFREPORT
+log file, and no console window on Windows (AD-23's approved extension), with a zero creation
+flag on every other platform. This module imports nothing from the package.
 """
 
 from __future__ import annotations
 
 import logging
 import os
+import subprocess
 import sys
 import threading
+from typing import TypedDict
 
 _log = logging.getLogger(__name__)
 
@@ -26,6 +32,27 @@ frame (49,766,400 bytes) is larger than the buffer; the transport is correct eit
 
 _fallback_logged = False
 _fallback_lock = threading.Lock()
+
+
+class _ToolSpawnKwargs(TypedDict):
+    """The subprocess keyword arguments shared by all product tool launches."""
+
+    creationflags: int
+    env: dict[str, str]
+
+
+def tool_spawn_kwargs() -> _ToolSpawnKwargs:
+    """Return the window and environment policy for an FFmpeg or ffprobe child (AD-23).
+
+    Returns:
+        Subprocess keyword arguments: CREATE_NO_WINDOW on Windows, zero creation flags
+        elsewhere, and a fresh copy of the parent environment without any case spelling of
+        FFREPORT, which would make either tool write an unsolicited log file.
+    """
+    return {
+        "creationflags": subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0,
+        "env": {key: value for key, value in os.environ.items() if key.upper() != "FFREPORT"},
+    }
 
 
 def _create_pipe(size: int) -> tuple[int, int]:

@@ -74,10 +74,10 @@ from clearwater.io.video.capability import (
     ENCODERS,
     HARDWARE_ENCODER,
     detect_capabilities,
-    tool_env,
 )
 from clearwater.io.video.decode import DeviceFrameBackend
 from clearwater.io.video.inputs import ascii_text
+from clearwater.io.video.pipes import tool_spawn_kwargs
 from clearwater.io.video.probe import VideoProbeError, find_tool
 from clearwater.io.video.verify import (
     TIMECODE_TAG,
@@ -881,7 +881,7 @@ class FFmpegVideoSink:
                 stdin=subprocess.PIPE,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.PIPE,
-                env=tool_env(),  # no FFREPORT: FFmpeg writes out_path and nothing else
+                **tool_spawn_kwargs(),
             )
         except OSError as error:
             failure = VideoEncodeError(

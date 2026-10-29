@@ -38,8 +38,8 @@ from typing import Any
 
 from clearwater.interfaces.video import ProbeResult
 from clearwater.io.video.boxes import MAX_MOOV_BYTES, BoxError, read_movie_boxes
-from clearwater.io.video.capability import tool_env
 from clearwater.io.video.inputs import ascii_text
+from clearwater.io.video.pipes import tool_spawn_kwargs
 from clearwater.io.video.probe import VideoProbeError, find_tool
 
 READ_TIMEOUT_S = 600
@@ -228,7 +228,7 @@ def _listing(path: Path, arguments: Sequence[str], *, strict: bool) -> dict[str,
             capture_output=True,
             timeout=READ_TIMEOUT_S,
             check=False,
-            env=tool_env(),
+            **tool_spawn_kwargs(),
         )
     except (OSError, subprocess.TimeoutExpired) as error:
         raise VideoProbeError("unreadable", f"{name} could not be listed: {error}") from error

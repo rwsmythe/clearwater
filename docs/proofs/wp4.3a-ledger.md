@@ -18,7 +18,8 @@
 
 | Turn / boundary | Dispatcher-provided depth | Window of record | Action |
 |---|---|---|---|
-| Turn 1 dispatch | Not supplied; fresh session (usage pace is not context depth) | 258,400 tokens | Record the next dispatcher reading without estimating; evaluate near 200K, stop at a step boundary near 250K. |
+| Turn 1 footer, supplied at Turn 2 dispatch | `tokens used` 96,223; input depth 102,475 | 258,400 tokens | Dispatcher-read figure for session `01a18856-955d-74e3-b211-dfb519efdf0c`; evaluate near 200K, stop at a step boundary near 250K. |
+| Turn 2 | Awaiting dispatcher footer reading | 258,400 tokens | Do not estimate depth. |
 
 ## Round 0: observed base
 
@@ -203,3 +204,127 @@ Evidence is retained by the orchestrator outside the repository under
 At round 5 and every fifth round thereafter, yield with the cumulative ledger
 for approval to continue under the fill. Reviewer B and the final ONE two-leg
 gate remain the orchestrator's work after Reviewer A convergence.
+
+## Turn 2: task 3, shared spawn policy
+
+Round 0 was accepted by the orchestrator; its ledger was committed as `a614160`.
+This turn implements only task 3. The config and DR-81 text changes remain for
+Turn 3, including the still-raw exceptions in verify and decode.
+
+### Produced
+
+- `pipes.tool_spawn_kwargs() -> _ToolSpawnKwargs` returns the two policy kwargs.
+  The only new platform-specific branch is in that helper: Windows
+  `subprocess.CREATE_NO_WINDOW`, else `0`. It copies the current environment,
+  removing FFREPORT in any letter case without modifying the parent.
+- All seven product spawn calls consume `**tool_spawn_kwargs()` directly.
+  `capability.tool_env` retains its signature and delegates to the helper's
+  environment. The helper's module remains standard-library-only. No new module
+  or change to the module-set pin.
+- Added only `tests/test_io_video_spawn.py`; existing tests remain unchanged.
+  Its AST inventory recognizes aliased subprocess module/direct imports, checks
+  every discovered run/Popen call, and rejects explicit per-site environment or
+  flag overrides. The second AST test requires exactly one flag construction,
+  inside the helper, so this structural guard also fails on the original base.
+
+### RED -> GREEN
+
+RED was run at product base `a614160` (only the accepted ledger differs from
+`fe65e6a`) after writing the new tests and before any product edit. It returned
+exit 1, **6 failed in 1.08s**, with no setup errors. Log:
+`work/wp4.3a/turn2-spawn-red.log`.
+
+The unchanged six cases then returned exit 0, **6 passed in 1.17s**, after the
+product edit. Log: `work/wp4.3a/turn2-spawn-green.log`.
+
+| Test | Observed RED reason | Observed GREEN |
+|---|---|---|
+| `test_every_product_spawn_uses_the_helper` | Assertion lists all seven product sites bypassing the helper. | Every discovered product run/Popen consumes helper kwargs without a local env/creationflags override. |
+| `test_only_the_helper_sets_creationflags` | Zero flag constructions, expected exactly one in the helper. | Exactly one, within pipes.tool_spawn_kwargs. |
+| `test_spawn_kwargs_windows_and_other_platforms` | Shared policy helper absent. | Native Windows constant and monkeypatched Linux zero; literal expected environment, mixed-case FFREPORT exclusion, parent preservation and fresh copies. |
+| `test_tool_env_delegates_to_spawn_helper` | Existing tool_env ignores the injected shared policy. | The real compatibility function returns the helper's environment. |
+| `test_ffreport_parent_does_not_make_a_child_report[ffmpeg]` | Real inherited-environment positive control wrote a nonempty report; protected launch could not proceed because helper was absent. | Positive-control report exists, actual helper-protected child succeeds, no protected report or other file appears. |
+| `test_ffreport_parent_does_not_make_a_child_report[ffprobe]` | Same observed distinction for ffprobe. | Same actual-child result for ffprobe. |
+
+Both tools executed in the sandbox. The child tests require the tools rather
+than silently skipping when absent; all reports are in each test's tmp_path.
+No hardware, GUI, footage, slow or fullclip marker was added.
+
+### Validation and verification
+
+- `uv run ruff check .`: exit 0, `All checks passed!`.
+  Logs: `work/wp4.3a/turn2-ruff.log` and, after formatting the new test,
+  `work/wp4.3a/turn2-ruff-final.log` (same exit and summary).
+- `uv run mypy`: exit 0,
+  `Success: no issues found in 141 source files`.
+  Log: `work/wp4.3a/turn2-mypy.log`.
+- `uv` emitted the inherited VIRTUAL_ENV mismatch warning and used this
+  worktree's project environment; neither runner failed.
+- Formatting (write mode, only owned Python files): exit 0, new test file
+  reformatted; all six product files unchanged. Logs:
+  `work/wp4.3a/turn2-format-test.log` and
+  `work/wp4.3a/turn2-format-product.log`. The global `ruff format --check .`
+  remains the orchestrator-seat check specified at dispatch.
+- The broader permitted run passed: **474 passed, 36 deselected in 502.55s
+  (0:08:22)**, exit 0, no skips, failures or errors. It ran every
+  `tests/test_io_video_*.py` file plus `tests/test_core_deps.py`, with
+  `-q -rA -m "not gpu and not footage and not slow and not gui and not fullclip"`,
+  `PYTHONPATH=scripts`, `--basetemp=work/wp4.3a/tmp`,
+  `-p sandbox_mkdir_shim -p no:cacheprovider`.
+  Log: `work/wp4.3a/turn2-video-layering.log`.
+- Passed-node inventory: 474 node IDs, matching the pytest summary.
+  Log: `work/wp4.3a/turn2-test-counts.log`.
+- Excluded-node collection (no marked test executed): exit 0,
+  `36/510 tests collected (474 deselected) in 0.36s`, using the complement
+  expression `gpu or footage or slow or gui or fullclip`, with the same shim
+  and no cache provider, basetemp `work/wp4.3a/tmp-collect`.
+  The exact 36 unrun node IDs are retained in
+  `work/wp4.3a/turn2-excluded-collection.log`.
+- Final rerun of the formatted new test file: exit 0,
+  **6 passed in 1.11s**, using basetemp `work/wp4.3a/tmp-final` and the required
+  shim/no-cache options. Log: `work/wp4.3a/turn2-spawn-final.log`.
+- Scope/bytes audit: exit 0, exactly eight owned paths changed, all LF;
+  `git diff --check` passed. Log: `work/wp4.3a/turn2-scope-check.log`.
+
+All selected pre-existing WP3.7, WP3.9 and WP3.10 tests ran unchanged and green:
+
+| Package / file under tests/ | Passed | Deselected, not executed |
+|---|---|---|
+| WP3.7 `test_io_video_probe.py` | 83 | 0 |
+| WP3.7 `test_io_video_probe_boxes.py` | 45 | 0 |
+| WP3.7 `test_io_video_probe_rules.py` | 25 | 1 footage case |
+| WP3.9 `test_io_video_decode.py` | 36 | 0 |
+| WP3.9 `test_io_video_decode_lifecycle.py` | 32 | 0 |
+| WP3.9 `test_io_video_decode_rules.py` | 19 | 0 |
+| WP3.9 `test_io_video_decode_hw.py` | 0 | 13 GPU / footage / slow / fullclip cases |
+| WP3.10 `test_io_video_encode.py` | 96 | 20 GPU / footage / slow / fullclip cases |
+| WP3.10 `test_io_video_encode_units.py` | 80 | 0 |
+| WP3.10 `test_io_video_encode_bench.py` | 48 | 2 GPU / slow cases |
+| New `test_io_video_spawn.py` | 6 | 0 |
+| Layering `test_core_deps.py` | 4 | 0 |
+| Total | 474 | 36 |
+
+The requested probe/decode/core layering subset totals 48 passing cases and is
+included in this run, not counted a second time. The marked exclusions remain
+for the orchestrator's appropriate gate/package windows; this is development
+evidence, not the final two-leg gate.
+
+| Pass | Suspected / independently checked | Confirmed / rejected | Disposition |
+|---|---|---|---|
+| Task-3 RED | Seven launches lack common window/env policy; compatibility filter is independent; helper is absent. | All six regression cases failed for the stated product reasons. Both real tools wrote the positive-control report before the absent-helper assertion. | Added the helper, wired the seven calls, delegated tool_env. |
+| Task-3 GREEN | Branch, environment-copy, delegation and real-tool behavior may differ. | All six unchanged tests passed; native Windows flag and other-platform zero both checked. | Fixed within the granted files. |
+| Task-3 source pass | Missing/overridden helper at a spawn, extra flag owner, import cycle or module-set change. | AST guards pass; direct pipes imports have no reverse package import; existing module set unchanged. Product diff contains only task-3 policy, imports and related docs. | No new issue found in this pass; later-task exception redaction remains explicitly pending. |
+| Task-3 unchanged-suite pass | Spawn kwargs might break existing decode lifecycle, probe rules, encode checks or layer boundaries. | All 474 selected cases passed, including all 48 requested layering cases; 36 marked cases deliberately not executed. Final formatted-file rerun also passed. | No new issue found; no existing test changed to obtain GREEN. |
+
+The tests and product edit should be committed together to keep committed
+states green; the RED state is preserved in its log, not as a failing commit.
+The ledger accompanies the same logical task-3 commit.
+
+Turn 2 locks: only the eight owned paths changed (the six video modules, new
+spawn tests, ledger); no frozen interface, GUI, app, jobs, photo, config,
+existing test, dependency, register or local-config edit. No new video module,
+unapproved OS branch, network operation, hardware-marked test execution, mailbox
+post, commit or sibling-worktree access. No product timing or memory figure
+was measured. The inherited-report positive controls wrote only within
+tmp_path. No STOP or new open question. The remaining requested seat check is
+`uv run ruff format --check .`; no blocked FFmpeg run needs a request.

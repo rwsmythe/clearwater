@@ -12,13 +12,12 @@ cached for the process.
 available, else the software encoder"); the settings dialog and the export call it, and the
 sink only ever receives the resolved name, which is what provenance records.
 
-:func:`tool_env` is the environment of every FFmpeg and ffprobe process the detection and the sink
-start (the encoder, the test encodes and the packet listings of :mod:`.verify`).
+:func:`tool_env` retains the environment-only API and delegates to the shared launch policy
+in :mod:`.pipes`, which every product FFmpeg and ffprobe launch uses.
 """
 
 from __future__ import annotations
 
-import os
 import subprocess
 import threading
 from collections.abc import Sequence
@@ -27,6 +26,7 @@ from pathlib import Path
 
 from clearwater.interfaces.video import EncoderCapability
 from clearwater.io.video.inputs import ascii_text
+from clearwater.io.video.pipes import tool_spawn_kwargs
 from clearwater.io.video.probe import VideoProbeError, find_tool
 
 AUTO = "auto"
@@ -80,7 +80,7 @@ def tool_env() -> dict[str, str]:
     Returns:
         A copy of ``os.environ`` without ``FFREPORT`` (in any letter case).
     """
-    return {key: value for key, value in os.environ.items() if key.upper() != "FFREPORT"}
+    return tool_spawn_kwargs()["env"]
 
 
 def _run(command: Sequence[str]) -> tuple[int, str]:
@@ -92,7 +92,7 @@ def _run(command: Sequence[str]) -> tuple[int, str]:
             capture_output=True,
             timeout=TEST_TIMEOUT_S,
             check=False,
-            env=tool_env(),
+            **tool_spawn_kwargs(),
         )
     except subprocess.TimeoutExpired:
         return -1, f"timed out after {TEST_TIMEOUT_S} s"

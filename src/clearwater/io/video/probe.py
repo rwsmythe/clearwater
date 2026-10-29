@@ -41,6 +41,7 @@ from clearwater.interfaces.video import (
 from clearwater.io.video.boxes import BoxError, MovieBoxes, read_movie_boxes
 from clearwater.io.video.gopro import GPMFError, parse_settings
 from clearwater.io.video.inputs import ascii_text, is_sidecar
+from clearwater.io.video.pipes import tool_spawn_kwargs
 
 _log = logging.getLogger(__name__)
 
@@ -124,7 +125,13 @@ def _run_ffprobe(args: Sequence[str]) -> tuple[int, str, str]:
     """Run ``ffprobe`` with the given arguments and return exit status, stdout and stderr."""
     command = [str(find_tool("ffprobe")), *args]
     try:
-        done = subprocess.run(command, capture_output=True, timeout=TOOL_TIMEOUT_S, check=False)
+        done = subprocess.run(
+            command,
+            capture_output=True,
+            timeout=TOOL_TIMEOUT_S,
+            check=False,
+            **tool_spawn_kwargs(),
+        )
     except subprocess.TimeoutExpired as error:
         raise VideoProbeError(
             "unreadable", "The file took too long to read and was given up on."

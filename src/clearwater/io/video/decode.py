@@ -47,7 +47,7 @@ from clearwater.color import decode_filter, planes_to_rgb, rgb_frame_bytes
 from clearwater.interfaces.image import Array, Frame
 from clearwater.interfaces.video import ProbeResult
 from clearwater.io.video.inputs import ascii_text
-from clearwater.io.video.pipes import open_frame_pipe
+from clearwater.io.video.pipes import open_frame_pipe, tool_spawn_kwargs
 from clearwater.io.video.probe import find_tool
 from clearwater.io.video.probe import probe as probe_file
 
@@ -174,6 +174,7 @@ def _check_cuda() -> tuple[bool, str]:
             capture_output=True,
             timeout=CUDA_CHECK_TIMEOUT_S,
             check=False,
+            **tool_spawn_kwargs(),
         )
     except (OSError, subprocess.TimeoutExpired) as error:
         return False, ascii_text(f"{type(error).__name__}: {error}")
@@ -333,6 +334,7 @@ class _Process:
                     stdout=write_fd,
                     stderr=subprocess.PIPE,
                     bufsize=0,
+                    **tool_spawn_kwargs(),
                 )
             except BaseException:
                 os.close(read_fd)
@@ -347,6 +349,7 @@ class _Process:
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 bufsize=0,
+                **tool_spawn_kwargs(),
             )
             self.stdout = self.process.stdout
         raw_stderr = self.process.stderr
