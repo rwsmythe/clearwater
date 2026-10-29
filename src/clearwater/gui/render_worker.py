@@ -128,6 +128,7 @@ class LatestWorker:
         self._pending: tuple[int, Callable[[Check], object]] | None = None
         self._chores: deque[Callable[[], None]] = deque()
         self._stopping = False
+        self._ended = False
         self._busy = False
         self._undelivered = 0
         self._bridge = _Bridge()
@@ -166,10 +167,11 @@ class LatestWorker:
             chore: Called on the worker thread with no argument; its result is not delivered.
 
         Returns:
-            True when queued; False when the worker has stopped (the chore never runs).
+            True when queued; False when the worker's thread has ended or has decided to end
+            (the chore never runs; R2-7).
         """
         with self._lock:
-            if self._stopping and not self._thread.is_alive():
+            if self._ended:
                 return False
             self._chores.append(chore)
             self._lock.notify_all()
@@ -213,8 +215,17 @@ class LatestWorker:
 
         The queued chores and the task are taken in ONE critical section, so a chore queued
         before the task is taken always runs before it (R1-6); the worker is busy while a chore
-        runs (R1-10).
+        runs (R1-10). The end is recorded in the section that decides it, so no chore is
+        accepted after it (R2-7).
         """
+        try:
+            self._loop()
+        finally:
+            with self._lock:
+                self._ended = True
+
+    def _loop(self) -> None:
+        """The body of :meth:`_run`; returns when the worker ends."""
         while True:
             with self._lock:
                 while self._pending is None and not self._chores and not self._stopping:
@@ -223,6 +234,7 @@ class LatestWorker:
                 self._chores.clear()
                 if not chores:
                     if self._stopping or self._pending is None:
+                        self._ended = True
                         return
                     generation, task = self._pending
                     self._pending = None

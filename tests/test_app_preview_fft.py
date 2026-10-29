@@ -137,6 +137,46 @@ def test_a_chore_queued_after_the_worker_looked_still_runs_before_the_task(qtbot
     assert worker.stop(5)
 
 
+class _ExitHold(_HookedCondition):
+    """The hooked condition, holding the worker thread just AFTER it leaves its last section."""
+
+    def __init__(self, inner: Any) -> None:
+        super().__init__(inner, lambda: None, lambda: None)
+        self.armed = False
+        self.exited, self.go = threading.Event(), threading.Event()
+
+    def __exit__(self, *exc: object) -> Any:
+        worker_thread = threading.current_thread().name == "clearwater-test"
+        returning = worker_thread and self.armed and not self.exited.is_set()
+        result = self._inner.__exit__(*exc)
+        if returning:  # the lock is free; the thread is alive and has decided to return
+            self.exited.set()
+            assert self.go.wait(5)
+        return result
+
+
+def test_a_chore_offered_after_the_worker_decided_to_end_is_refused(qtbot: Any) -> None:
+    """R2-7: the end is recorded where it is decided, so no chore is accepted and stranded."""
+    worker = LatestWorker("clearwater-test", lambda outcome: None)
+    inner = worker._lock
+    hold = _ExitHold(inner)
+    with inner:
+        worker._lock = hold  # type: ignore[assignment]
+    assert worker.run_chore(lambda: None)  # the worker now waits in a hooked section
+    qtbot.waitUntil(worker.idle, timeout=5000)
+    hold.armed = True
+    stopped: dict[str, bool] = {}
+    stopper = threading.Thread(target=lambda: stopped.update(ended=worker.stop(5)))
+    stopper.start()
+    assert hold.exited.wait(5)  # stop() woke the worker; it left its section to return
+    ran: list[str] = []
+    accepted = worker.run_chore(lambda: ran.append("chore"))
+    hold.go.set()
+    stopper.join(10)
+    assert stopped == {"ended": True}
+    assert accepted is False and ran == [] and not worker._chores
+
+
 def test_the_worker_is_busy_while_a_chore_runs(qtbot: Any) -> None:
     """R1-10: ``idle()`` is False while a chore runs, so a boundary wait sees it finish."""
     gate, started = threading.Event(), threading.Event()
@@ -238,6 +278,41 @@ def test_a_source_change_queues_the_release_before_the_new_sources_render(
     open_and_wait(qtbot, window, second)
     assert calls and calls[0] == "release" and calls.count("release") == 1
     assert "render" in calls
+
+
+def test_an_unload_drops_the_old_sources_pending_render(make_window, qtbot, monkeypatch) -> None:
+    """R2-6: a render of the old source still waiting at an unload never runs after the release."""
+    backend = RecordingBackend()
+    path = Path("p.png")
+    window = make_window(photo_engines({path: image(60, 80)}, select_backend=_recording(backend)))
+    open_and_wait(qtbot, window, path)
+    renderer = window.controller._renderer
+    gate, started = threading.Event(), threading.Event()
+
+    def blocking(check: Any) -> None:
+        started.set()
+        assert gate.wait(10)
+
+    renderer.submit(blocking)
+    assert started.wait(5)
+    order: list[str] = []
+    real_submit = renderer.submit
+
+    def submit(task: Any) -> int:
+        def recorded(check: Any) -> object:
+            order.append("render")
+            return task(check)
+
+        return int(real_submit(recorded))
+
+    monkeypatch.setattr(renderer, "submit", submit)
+    monkeypatch.setattr(backend, "release_fft_plans", lambda: order.append("release"))
+    window.session.set_parameters(window.session.parameters())  # an old-source render waits
+    assert renderer._pending is not None
+    window.session._open(None)  # the unload
+    gate.set()
+    qtbot.waitUntil(renderer.idle, timeout=5000)
+    assert order == ["release"]
 
 
 def test_a_release_asked_from_a_job_thread_runs_after_the_render_in_flight(

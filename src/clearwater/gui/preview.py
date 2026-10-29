@@ -636,9 +636,12 @@ class PreviewController(QObject):
         """A new source: drop any frame decode and the memo of the old one, reset, render.
 
         The memo is replaced, not cleared, so a job still running for the old source writes
-        into the discarded one; nothing of the old source stays resident. The preview thread's
-        FFT plans are released before the new source's first render (DR-68).
+        into the discarded one; nothing of the old source stays resident. A render of the old
+        source still waiting is dropped (an unload submits none to replace it, R2-6), and the
+        preview thread's FFT plans are released before the new source's first render (DR-68).
         """
+        self._renderer.invalidate()
+        self._widget.set_pending_full(False)  # the invalidated render never arrives
         self._release_for_source()
         self._memo = PreviewMemo()
         self._framer.invalidate()
