@@ -32,7 +32,10 @@
   'Register rows'), AD-23 note stays with 4.3a. (3) WP4.3a (Codex, brief FINAL at brief-wp4.3-rev bc0b8a2 + my ruling
   fe7625ca; gen 21 commits it onto main): dispatches when WP-T6's Codex cell stands down; at its accept, mine: AD-13 note
   ('profile' writer provenance key), AD-23 'applied by WP4.3a', closures DR-58(b)/76/77/81(a-d)/85. Owner-pending inputs:
-  NONE since 17:10Z (phone footage received, see below). Open owner decisions: none. Every owner-facing summary ends with that line.
+  NONE since 17:10Z (phone footage received, see below). Open owner decisions (asked 17:35Z): (1) spec 5.2 wording so the
+  phone's QuickTime `.MOV` (brand qt) is an accepted video container (GUI `VIDEO_SUFFIXES` is {.mp4} today); (2) Insta360
+  scope (recommend: native .insv NOT supported; Insta360 Studio MP4 export is the route) and its category (owner said scuba).
+  Every owner-facing summary ends with that line.
 - **GEN 7 ONLINE 14:29Z (`clearwater-charc-20261029-0428`, launched by gen 6 at its roll; msg `2d785723` to the
   orchestrator + ONE cue).** Pickup facts: bash gauge 22 ms; charc inbox 0 unread / 326 read; main 1905c8c clean; both
   inboxes empty (the orchestrator's 0 unread); gen 21's name confirmed from `comms/.launch-sessions.json`; worktrees as gen 6
@@ -112,6 +115,17 @@
   Reviewers A and B (precedent b1fd289); the fill is NOT amended, a second use needs its own ruling. Lane share at 17:14Z:
   Codex 2 of 3 live seats (WP4.3a turn 6, inventory), Claude 1 (WP4.3 cell 6); paces Codex 0.324 / Claude 1.399. Items 2
   (WP3.6P brief after the report's QA) and 3 (DR-15 leg if a MOV has non-zero video media_time) queued.
+- **17:25-17:35Z: `clearwater-footage/Insta360/` appeared mid-download** (owner question in chat ~17:30Z: 'Insta360 scuba
+  footage (.insv) -- can it be supported?'; 9 `VID_..._-Original` folders, growing; `.lrv` sidecars). Probed read-only at my
+  seat: the complete VID_20261009_130644_00_115.insv = ISOBMFF avc1/isom, TWO HEVC Main 2880x2880 yuvj420p BT.709 29.97 fps
+  streams (unstitched dual fisheye, handler INS.HVC) + AAC, Insta360 trailer magic at the end; incomplete files say 'moov atom
+  not found'. **Phone `.MOV` = brand `qt`** (HEVC 1920x1440 yuvj420p 30 fps, PCM, two Core Media data tracks): NOT in
+  `gui/sources.py:25` VIDEO_SUFFIXES ({.mp4}); naming keeps `.MOV`. Both to the owner (open decisions above). FYI 990f1dd4 +
+  **RULING 55e59965 on the inventory STOP (query 222cf456): do NOT hold; report = tree MINUS Insta360 excluded by name (tool
+  `--exclude` + test if needed), stability over the included folders, spot checks + privacy grep as ruled, commit; Insta360
+  inventory is its own run after the owner's word. DR-15: a register NOTE (mine at the report's QA) if the spot check confirms
+  video media_time 0 on every phone MOV; no leg.** WP4.3a turn 6 committed c9a7771/40eef4e, R2 running (seat 154,379; seat 3
+  for a sizeable remediation); WP4.3 cell 6 Group A accepted (13c96f7, 099893a), Group B running.
 - **(gen 6 history follows; newest facts at the end of the block)**
 
 - **Gen 6 pickup facts:** bash gauge 45 ms; inbox 0 unread at pickup; announce posted to the orchestrator (gen 17, shell-busy in the WP4.1 gate) with ONE cue; the two register scripts copied from gen 5's scratchpad (18c10a55...) into this session's scratchpad (6687b6c9-eacd-4ffc-995e-51c9195391d1) as `edit_register_p4a.py` (drop its DR-65 block before running: already applied at 3114d23) and `edit_register_p4b.py`.
