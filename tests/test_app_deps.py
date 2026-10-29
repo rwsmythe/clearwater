@@ -1,9 +1,10 @@
-"""WP4.1 layering of ``clearwater.app`` (CHARC Phase 4 ruling flag (3); spec 10.1, plan 8.1).
+"""Layering of ``clearwater.app`` (WP4.1; WP4.3 ruling Q15; CHARC ruling flag (3); spec 10.1).
 
 The ONE ``clearwater.gui`` -> ``clearwater.app`` edge is ``gui/engines.py`` importing
-``clearwater.app.composition``; no ``clearwater.app`` module imports ``clearwater.gui`` or
-PySide6, and importing ``clearwater.app`` or ``clearwater.app.composition`` loads no PySide6 and
-no CuPy.
+``clearwater.app.composition``; ``app/`` holds exactly the root, its package file and WP4.3's
+four modules; no ``clearwater.app`` module but ``main.py`` imports ``clearwater.gui``, PySide6 or
+``shiboken6``; none imports ``cupy`` or ``cupyx``; and importing ``clearwater.app`` or
+``clearwater.app.composition`` loads no PySide6 and no CuPy.
 """
 
 from __future__ import annotations
@@ -86,15 +87,30 @@ def test_a_planted_second_edge_is_reported(tmp_path: Path) -> None:
     assert app_edges(tmp_path) == [EDGE, ("shell.py", "clearwater.app")]
 
 
-def test_no_app_module_imports_the_gui_or_qt() -> None:
+APP_MODULES = [
+    "__init__.py",
+    "activity.py",
+    "analysis_adapter.py",
+    "composition.py",
+    "main.py",
+    "startup.py",
+]
+"""The ``clearwater.app`` modules: WP4.1's two and WP4.3's four (ruling Q2)."""
+
+
+def test_no_app_module_but_main_imports_the_gui_or_qt_and_none_imports_cupy() -> None:
     paths = sorted((SRC / "app").glob("*.py"))
-    assert [p.name for p in paths] == ["__init__.py", "composition.py"]
+    assert [p.name for p in paths] == APP_MODULES
     for path in paths:
         names = imported_modules(path.read_text(encoding="utf-8"), "clearwater.app")
+        gpu = sorted(n for n in names if n.split(".")[0] in ("cupy", "cupyx"))
+        assert gpu == [], path.name
+        if path.name == "main.py":
+            continue
         bad = sorted(
             n
             for n in names
-            if n.split(".")[0] in ("PySide6", "shiboken6", "cupy", "cupyx")
+            if n.split(".")[0] in ("PySide6", "shiboken6")
             or n == "clearwater.gui"
             or n.startswith("clearwater.gui.")
         )

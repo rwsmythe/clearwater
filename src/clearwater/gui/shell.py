@@ -302,6 +302,7 @@ class MainWindow(ShellWindow):
         self._save_at_close = startup.save_at_close
         self._choose = choose_file or _choose_file
         self._closed = False
+        self._idle_device = "-"
         self.session = ShellSession(
             engines,
             startup.settings,
@@ -526,13 +527,25 @@ class MainWindow(ShellWindow):
         reason = export_reason(self.session.source(), self.session.analysis())
         self._export.set_shell_reason(reason)
 
+    def set_idle_device(self, reason: str) -> None:
+        """Show the start-up's AD-9 reason while no file is open (WP4.3, ruling S3).
+
+        Until it is called the status bar shows ``Device: -`` before a file is open; once a file
+        is open it shows the full-resolution selection's reason, as before.
+
+        Args:
+            reason: The reason of the application's graphics-card detection.
+        """
+        self._idle_device = reason
+        self._update_status()
+
     def _update_status(self, *_: object) -> None:
         """Refresh the status bar (AD-9 device text, question 4)."""
         source = self.session.source()
         full = self.session.backend()
         preview = self.session.preview_backend()
         if source is None:
-            self.device_label.setText("Device: -")
+            self.device_label.setText(f"Device: {self._idle_device}")
             self.device_label.setToolTip("")
             self.file_label.setText("")
             self.size_label.setText("")
