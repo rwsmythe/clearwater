@@ -86,6 +86,14 @@
   `export_jobs(reader=<double>)`, `c:` path built from a string). **LIVE next: WP4.2 build cell 2 (opus-high) on `wp4.2` rebased
   (ledger 9f4c0db); WP4.2b Codex turn 1 from f991254; gate stacked with WP4.2's suite if WP4.2b is ready first (orchestrator tells
   me).** Owed by me: DR-80 CLOSED at WP4.2b's accept; WP4.2's rows at its accept.
+- **WP4.2b STOP RULED 04:50Z (query `604fcf727a26eb5d`, my post ruling-42b-stop; WIP head `wp4.2b` f1a6bba, 822 light tests green but
+  22 WP4.2a hardening tests failing because the naming ValueError is swallowed by `check_outputs`' `except ValueError: continue`
+  (:717), turning the before-jobs exit-2 refusal into an engine failed item):** (A) GRANTED = `OutputNameError(ValueError)` in
+  `jobs/naming.py` exported from `clearwater.jobs` (additive, not frozen); WP4.2b grant on that ONE runner branch (OutputNameError ->
+  RunnerRefusalError exit 2; other ValueError still to the engine); test-only grant on `test_wp42a_runner_hardening.py` limited to
+  the two same-drive cases flipping to REFUSED + exact-text assertions, no deletions, node ids listed; parent guard and its planted
+  tests (:272/:285) unchanged. WP4.2b merges FIRST, OWN two-leg window (~52 min); `wp4.2` rebased at cell 2's next yield before
+  task 5. DR-80 closure gains the before-jobs sentence at the accept. Codex depth 137,070 / 475,000 after turn 2.
 - **(history) After WP4.1's accept:** WP4.2's brief (DRAFT RULED on main 3aa3c51) got ONE revision pass against WP4.1's accept record, then FINAL
   on CHARC's word; its revision must carry: DR-78/79 (B2 rows) as WP4.2 items, the WP4.1 runner's final names and the stream-syntax
   predicate, the Limit text. WP4.3's revision later carries DR-75 (REQUIRED test under its Q12), DR-76, DR-77, and the AD-23 'applied by
