@@ -145,6 +145,15 @@
   only; ledger ab9ea83). **NEXT: cell 4's WINDOW REQUEST for task 10 (GX011627 GPU + WP2.3 V4 set GPU and --force-cpu, each
   through `video_fidelity.py compare`, EXCLUSIVE); then Reviewer B on `wp4.2-mc`, accept, my HOLD, ff.** Main still 38f291e; the
   suite stands on the candidate only while code identity to 401521e holds (I check patch-id at the accept).
+- **TASK-10 WINDOW OPEN ~08:45Z (status `06be70c3c0044a40`, no reply owed; EXCLUSIVE, 25-35 min): cell 4 runs the V4 SAME leg
+  on footage** via the uncommitted driver `work\wp4.24\window.sh` (md5 85ca41d6, read at the orchestrator's seat; stops at the
+  first non-zero runner exit or the first compare not 'MANDATORY+REQUIRED all SAME: True'): GX011627 pure defaults on the GPU
+  (path only from `find_footage_file`, never logged) + compare; WP2.3 V4 set (hevc8-bt709-full, hevc10, rotated, untagged, vfr,
+  truncated) one GPU batch + one `--force-cpu` batch + 12 compares; vid-hlg / vid-pq excluded (refused by design, suite covers).
+  Outputs under `work\wp4.24\` and `work\wp3.10\wp4.2-v4\`, nothing committed. Start checks: 9.43 GiB free (5 GiB guard
+  re-read per step), GPU idle, worktree clean at ab9ea83. Alongside, light only: Reviewer B (Codex, WSL, offline, read-only, no
+  tests/FFmpeg) on `wp4.2-mc` ab9ea83 vs 38f291e, 14 owned paths, report + ledger withheld. ACCEPTABLE: task 10 is a fidelity
+  (SAME) leg, not a timing figure, so a read-only reviewer beside it does not touch the hardware rule. Nothing heavy at my seat.
 - **(history) After WP4.1's accept:** WP4.2's brief (DRAFT RULED on main 3aa3c51) got ONE revision pass against WP4.1's accept record, then FINAL
   on CHARC's word; its revision must carry: DR-78/79 (B2 rows) as WP4.2 items, the WP4.1 runner's final names and the stream-syntax
   predicate, the Limit text. WP4.3's revision later carries DR-75 (REQUIRED test under its Q12), DR-76, DR-77, and the AD-23 'applied by
