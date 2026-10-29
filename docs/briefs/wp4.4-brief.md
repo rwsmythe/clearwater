@@ -188,3 +188,17 @@ Lane Codex, nets the Claude pass, after WP4.3a's accept: concurred. Fold in, mar
 Inventory: the orientation-fallback mismatch (IMG_6703, `original_orientation` None from pillow-heif) and its correction turn noted; I QA the report after your re-run of the corrected probe.
 
 Owner-pending inputs: none. Open owner decisions: Insta360 scope (to be discussed).
+
+## Round-0 GRANT (CHARC `73d2797750c57625`, 2026-10-29T21:59:13Z, verbatim; it extends the Files owned list and governs Q2's test consequence)
+
+PRIMARY: CHARC gen 8. Answers query 9cc2bfa769bcfa7c (WP4.4 round-0 STOP on Q2 vs tests/test_io_video_encode_units.py).
+
+RULING: (a) GRANTED. A one-token test-line grant to WP4.4 on tests/test_io_video_encode_units.py:80: DataStreamInfo(3, "meta") becomes DataStreamInfo(3, "gpmd"); nothing else in that file. Verified at my seat: :80 builds the synthetic probe, :365-368 asserts maps ["0:v:0", "1:1", "1:3"] (data copied, timecode not), the HERO13 roster is {"tmcd", "gpmd"} (tests/test_io_video_probe_rules.py:117, wp1.5 spike report :198). The assertion's intent is unchanged and the new synthetic-tag unit test covers the dropped branch. (b) adding meta to the allowlist is DECLINED: no HERO13 evidence; Q2 reads "proved on, by name". Naming gpmd in a copy allowlist is a stream copy, not a decode; the GPMF rule holds.
+
+Conditions: :753 ("meta" in a packet-table StreamRow) is confirmed unaffected by the cell, with the reason in the ledger (a packet table row, not a map input); the assertion at :365-368 stays verbatim; the GRANT line (file, line, this msg id) goes in the report's owned-files list and the accept record. Any further existing-test conflict is a new STOP.
+
+Round 0 (c) noted: the unchanged base fails IMG_6702 at the mux exactly as Q2's seat evidence predicted (encoder_failed; mebx x2 and lpcm); MP4_DATA_CODEC_TAGS = frozenset({"gpmd"}) is the constant as ruled. Commit the ledger; dispatch turn 2 (RED first).
+
+The kept basetemps: understood, and correctly NOT worked around. I will not delete them at my seat either (the refusal at your seat is the owner's permission decision, not a routing problem). It stays with the owner: approve at your seat, or delete the three folders themselves. I carry it as an owner action pending, not a decision.
+
+Owner-pending inputs: none. Open owner decisions: none. Owner action pending: the three kept basetemps (work/wp1.2b, work/wp2.2, work/pt-main-wp39 and their partial D: copies), approve the deletion at the orchestrator's seat or delete by hand.
