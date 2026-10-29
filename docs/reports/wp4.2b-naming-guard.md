@@ -1,13 +1,15 @@
 # WP4.2b -- output-name containment in jobs.naming (DR-80)
 
-**DRAFT -- for Reviewer A**
+**FINAL -- implementation handoff; acceptance remains with the dispatcher/CHARC**
 
-The implementation and requested light checks are GREEN. Reviewer A round 1
-returned NO_NEW_CRITICAL_MAJOR (one minor and four advisory findings); its
-non-blocking remediation is complete. Reviewer A CONVERGED at round 2
-(NO_NEW_CRITICAL_MAJOR, five non-blocking advisories, nothing reopened).
-Round-2 documentation cleanup is complete; Reviewer B and the full two-leg
-gate are outstanding; this is not acceptance.
+The implementation, static checks and two-leg gate are GREEN. Reviewer A
+CONVERGED at round 2; both rounds and Reviewer B returned
+NO_NEW_CRITICAL_MAJOR. Reviewer B's two report corrections and engine-order
+note are applied below; its F2 re-sighting remains banked. The cell's work
+is complete; acceptance and the DR-80 register update remain at the seat.
+Validated merge candidate: `wp4.2b-mc` at `a6910f1`, rebased onto main
+`f3835cc`, unchanged package patch-id `b88eac69` (dispatcher supplied).
+The pre-rebase package head for this docs-only turn is `f3c1381`.
 Base: `f991254`. Turn-2 WIP: `f1a6bba`; turn-3 STOP record: `79b60d9`.
 The governing CHARC rulings `0c8d52528a11b714`, `050c52106cd8c6ad` and
 `8262cd59b0d48c73` are recorded verbatim in the ledger. The last grants ONE
@@ -68,9 +70,14 @@ This unchanged route reports `<source>: OutputNameError: <message>` as a
 failed item with status 1, without a traceback. Other engine `ValueError`s
 retain their existing description route.
 
-For WP4.3: on POSIX a real source name containing `:` (for example
-`2026-10-12T10:30:00.mp4`) is now refused, and the failed-item text does not
-tell the user to rename the source; WP4.3 GUI wording should give that guidance.
+For WP4.3: on POSIX a real source name containing `:` or `\` (for example
+`2026-10-12T10:30:00.mp4` or `a\b.jpg`) is now refused, and the failed-item
+text does not tell the user to rename the source; WP4.3 GUI wording should
+give that guidance.
+With no footage preflight (the GUI engine route), refusal occurs after photo
+read/measure/render (`export.py:711-753`) or video probe/encoder resolution
+(`:808-837`); this existing late-planning order is outside the grant, and
+CHARC decides whether to add a register row (Reviewer B B-A3).
 
 ## RED/GREEN and controls
 
@@ -147,7 +154,9 @@ The two same-drive cases below intentionally flip from accepted output to
 REFUSED: DR-80 refuses every colon, including the formerly normalized
 same-drive spelling. They now assert planner/preflight refusal, zero jobs,
 empty output/stand-in footage, name-only text and unchanged main/stream data.
-Their original node IDs are retained; no WP4.2a test was deleted or added.
+Their original node IDs are retained; turn 4 deleted or added no WP4.2a
+test. Turn 6 added the granted file-form twin with [run]/[main] rows;
+no WP4.2a test was deleted.
 
 ## Reviewer A edit list and assertion evidence
 
@@ -244,12 +253,12 @@ passed. Evidence: `work/wp4.2b/turn7-light.log`, `turn7-light.xml`,
 The turn-7 diff against `30d8d81` contains only this report, the ledger
 and the single runner docstring line; `turn7-final-scope.log` records
 the scope, unchanged executable AST and zero-CR blob checks.
-Two-leg gate figures and Reviewer B remain pending; this report stays DRAFT.
+The completed seat gate and Reviewer B evidence are recorded below.
 
 Final turn-6 `ruff check .`: all checks passed, EXIT 0
 (`turn6-ruff-check.log`). `ruff format --check .`: 261 files already formatted,
 EXIT 0 (`turn6-ruff-format.log`). Mypy: no issues in 141 source files, EXIT 0
-(`turn6-mypy.log`). Full commands/counts are in the ledger. Every pytest run
+(`turn6-mypy.log`). Full commands/counts are in the ledger. Every cell pytest run
 used the sandbox mkdir shim and disabled cacheprovider; installed dependencies
 were reused read-only with uv run --no-sync and PYTHONPATH=scripts;src.
 
@@ -263,7 +272,7 @@ local rebinding / mandated retained name) are BANKED in the ledger, with no
 code change. Final light checks and independent outcomes/scope audits find
 no additional issue; no product revert or unresolved scope question.
 
-This remediation's diff against `215817a` is exactly four files: the two
+The turn-6 remediation diff against `215817a` was exactly four files: the two
 tests, this report and the ledger. The WP4.2a delta is ONE added twin test
 only; the WP4.2b delta is ONE parameter row and its source/output setup.
 `turn6-final-scope.log` records the final audit, including raw blob IDs and
@@ -273,8 +282,55 @@ remain unchanged. No owner footage was written; scratch stayed under work/.
 
 WP4.2b merges FIRST. The dispatcher rebases WP4.2 at its next yield before
 its task 5 and resolves any runner-branch conflict at the seat. This package
-gets its OWN posted two-leg window after review convergence, not a stack.
+received its OWN two-leg window after review convergence, not a stack.
 No heavy run or reviewer run was performed by this cell this turn.
+
+## Final review evidence
+
+Evidence files were read and MD5s computed in turn 8 (Reviewer A findings
+were independently adjudicated in their recorded turns). All three verdicts
+are **NO_NEW_CRITICAL_MAJOR**. The Claude passes used `claude-opus-5-5` / high;
+worktrees were clean after each pass (dispatcher supplied).
+
+| Review | Reviewed head / turns | Evidence path | Review MD5 | Prompt file / MD5 |
+|---|---|---|---|---|
+| Reviewer A round 1 | `215817a` / 38 | `C:/Users/rwsmy/clearwater-review-evidence/wp4.2b/r1/review.txt` | `E459925B4E409A65254FE27F4AB51FC7` | `review-prompt-r1.md` / `2A0C552F24327FF4B4DB51B39D14D8FE` |
+| Reviewer A round 2 (CONVERGED) | `30d8d81` / 37 | `C:/Users/rwsmy/clearwater-review-evidence/wp4.2b/r2/review.txt` | `48C380F529FE205DC6F0034848AB5135` | `review-prompt-r2.md` / `5D901E7632F21D0E11C6A404E78C7590` |
+| Reviewer B | `a6910f1` / 45 | `C:/Users/rwsmy/clearwater-review-evidence/wp4.2b/reviewB/review.txt` | `BC9B165B5C8493994B987D27A535BFAC` | `review-prompt-B.md` / `19FE20C9D101E96E1E089C370CA8CE7A` |
+
+Round 1: one minor and four advisories, fixed/banked with evidence. Round 2:
+five advisories, nothing reopened; three documentation fixes and two banked
+re-sightings. Reviewer B: four non-blocking advisories; B-A1/B-A2 fixed in
+this FINAL report, B-A3 recorded for WP4.3/CHARC, B-A4 banked with F2.
+The ledger records every disposition. Hashes of every file in all three
+review folders are in `work/wp4.2b/turn8-review-evidence.json`.
+The 126-test turn-7 check is explicitly the two runner files with the three
+UNC deselections and sandbox shim (exact command/XML in the ledger); the
+seat's complete gate below is the acceptance-suite evidence.
+
+## Two-leg gate -- GREEN (dispatcher seat)
+
+Run on `wp4.2b-mc` `a6910f1`, main `work/` config, Git Bash,
+PYTEST_ADDOPTS unset, offscreen, 10.3 GiB free beforehand. These figures
+and EXITs are supplied by the dispatcher in turn 8; the cell did not rerun
+the heavy suite. Seat runs do not load the sandbox mkdir shim.
+
+| Leg | Exact command | Result | Duration / UTC window | EXIT |
+|---|---|---|---|---|
+| PARALLEL | `uv run pytest -q -rs -n 4 -m "not gpu and not footage and not gui and not slow" --basetemp=work/wp4.2b-parallel` | **5250 passed, 1 skipped** (`tests/test_color_roundtrip.py:121`) | 660.85 s; 2026-10-29 06:27:30Z-06:38:43Z | 0 |
+| SERIAL | `uv run pytest -q -rs -m "gpu or footage or gui or slow" --basetemp=work/wp4.2b-serial` | **1126 passed, 1 skipped** (`tests/test_photo_check.py:139`), 5251 deselected | 2,558.54 s; ended 2026-10-29 07:21:24Z (start not supplied) | 0 |
+
+Both skips are the standard gate's. Parallel count: WP4.2a's 4539 + 711
+(the 696 fixture-name controls plus the package's other new cases) = 5250.
+Serial count remains WP4.2a's 1126. No failing gate node remains.
+Candidate static checks: `uv run ruff check .` all checks passed;
+`uv run ruff format --check .` 261 files already formatted;
+`uv run mypy` no issues in 141 source files (dispatcher supplied).
+
+Final docs-only scope/zero-CR evidence:
+`work/wp4.2b/turn8-final-scope.log`; exactly this report and the ledger
+changed against `f3c1381`. No code, test, fixture, config or dependency
+change follows the reviewed/gated candidate. No open implementation issue.
 
 For CHARC (proposed on accept): **DR-80 CLOSED by WP4.2b** -- both jobs.naming
 planners reject a composed output name that is not one portable name component

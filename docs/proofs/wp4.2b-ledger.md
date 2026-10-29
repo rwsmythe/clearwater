@@ -8,7 +8,7 @@
 | Turn 4 / build | tokens used 379,056; input depth 206,526 / 475,000 | Dispatcher supplied at turn 6; committed as `215817a`; Reviewer A round 1 completed |
 | Turn 5 / round-1 adjudication | tokens used 413,658; input depth 237,641 / 475,000 | No tracked change; adjudication delivered in return and persisted below at turn 6 |
 | Turn 6 / round-1 remediation | tokens used 451,126; input depth 274,367 / 475,000 | Dispatcher supplied at turn 7; committed as `30d8d81`; bounded continuation past evaluation point authorized |
-| Turn 7 / round-2 terminating cleanup | Pending dispatcher reading | Bounded docs cleanup authorized; report-FINAL turn follows the seat gate |
+| Turn 7 / round-2 terminating cleanup | tokens used 499,899; input depth 59,755 / 475,000 (context compacted by the CLI) | Dispatcher supplied at turn 8; committed as `f3c1381`; lower input figure recorded as read |
 
 Base: `f991254`, branch `wp4.2b`. Dispatch: orchestrator generation 18,
 FINAL brief on CHARC `5c056d647ad9ca99`. Scope: DR-80 naming containment.
@@ -222,11 +222,13 @@ control evidence, not a post-change GREEN claim.
 | Turn 4 build (not a review round) | Reviewed at round 1 | N/A | N/A | N/A | 0 | Exception/export + one runner catch + granted tests | Codex cell | tokens 379,056; input 206,526 / 475,000 |
 | Reviewer A round 1, adjudication turn 5 / cleanup turn 6 | `NO_NEW_CRITICAL_MAJOR`; 1 minor / 4 advisory adjudicated below | 0 / 0 / 1; 4 advisory | 4 / 1 | 5 / 0 | 0 | Test/report-only remediation; no product change | Driver Claude `claude-opus-5-5` / high; exit 0, 38 turns; CLI version not supplied | Turn 4: input 206,526; turn 5: input 237,641; turn 6: input 274,367 |
 | Reviewer A round 2, terminating adjudication / cleanup turn 7 | `NO_NEW_CRITICAL_MAJOR`; CONVERGED | 0 / 0 / 0; 5 advisory | 5 / 0 (reviewed envelope, including accepted bank entries) | 3 new / 0 reopened; 2 banked re-sightings | 0 | Docs-only plus ONE runner docstring line; no behavior/test changes | Driver Claude `claude-opus-5-5` / high; 37 turns; clean after; CLI version not supplied | Turn 6: tokens 451,126; input 274,367 / 475,000 |
+| Reviewer B, seat gate / cleanup turn 8 | `NO_NEW_CRITICAL_MAJOR` on `a6910f1` | 0 / 0 / 0; 4 advisory | 4 / 0 reviewed envelope | 3 new / 0 reopened; 1 banked F2 re-sighting | 0 | Docs-only: B-A1/B-A2 corrections; B-A3 note; B-A4 banked | Claude `claude-opus-5-5` / high; 45 turns; clean after; CLI version not supplied | Turn 7: tokens 499,899; input 59,755 / 475,000 (context compacted by the CLI) |
 
 Review policy: the driver's Claude pass, STRONG tier, per the Clearwater
 seam-3 fill. Adjudicate every supplied finding; yield at each round boundary.
 At round 5 and every fifth round, STOP for the dispatcher gate. Reviewer A
-convergence and Reviewer B remain outstanding.
+converged at round 2; Reviewer B and the two-leg gate are GREEN as recorded
+in the final turn-8 sections below. Earlier pending statements are historical.
 
 ## Runs and verification record
 
@@ -648,6 +650,9 @@ Round-2 R2-A4 re-sighting CONFIRMED against naming.py:293-304 and this
 explicit stem-rule boundary; remains advisory/non-blocking and BANKED.
 The round-2 ledger counts the five received entries in the reviewed envelope;
 this accepted observation still requires no extension of implementation scope.
+Reviewer B B-A4 re-sighting (turn 8): CONFIRMED at naming.py:298-302;
+literal `..`/empty names remain unreachable media-source spellings.
+BANKED, advisory/non-blocking; not reopened and no code change.
 
 ### F3 -- CONFIRM report/coverage refinement; ADVISORY, non-blocking; FIX
 
@@ -877,3 +882,74 @@ line-length slip -> lint/types/tests GREEN -> scope/AST/blob audit PASS.
 No behavior change or new issue; review loop CONVERGED at round 2 per the
 seat ruling. Report remains DRAFT pending own-window two-leg gate and
 Reviewer B; one final report/docs turn follows the seat's gate results.
+
+
+## Reviewer B -- gate pass and final documentation (turn 8)
+
+Reviewer B ran at the dispatcher seat on merge candidate `wp4.2b-mc`
+`a6910f1`, package rebased onto main `f3835cc`, unchanged package patch-id
+`b88eac69` (dispatcher supplied). Claude `claude-opus-5-5` / high,
+45 turns, clean worktree after. **VERDICT: NO_NEW_CRITICAL_MAJOR**.
+Read the complete review in turn 8; all three review verdicts and review/
+prompt hashes were independently read/computed. The FINAL report contains
+the full evidence table; all folder files are inventoried in
+`work/wp4.2b/turn8-review-evidence.json`.
+
+| Advisory | Confirmation / disposition |
+|---|---|
+| B-A1 | CONFIRM: report's same-drive paragraph wrongly generalized turn-4 'no test added' wording beyond the turn-6 twin. FIXED: qualify turn 4, name granted twin addition, retain no-deletion statement. |
+| B-A2 | CONFIRM: naming.py:299 bans backslash as well as colon, and POSIX treats backslash as a name character. FIXED report's WP4.3 note to include `a\b.jpg`, both characters and rename guidance. No code change. |
+| B-A3 | CONFIRM independently at export.py:711-753 / 808-837: photo read/measure/render and video probe/encoder resolution precede _plan. RECORD report note for WP4.3; this existing order is outside the grant. CHARC decides whether to add a register row. No implementation issue left in this package. |
+| B-A4 / F2 | CONFIRM: existing accepted literal '..'/empty-name boundary. BANKED re-sighting appended to the original F2 entry; not reopened. |
+
+All four ADVISORY, non-blocking; 0 critical/major/minor; 3 new observations
+and 1 banked re-sighting; 0 reopens/reverts. No finding rejected as a false
+positive. Two report corrections plus recorded notes only. The cell did
+not invoke another reviewer or heavy suite.
+
+The reviewer's inability to reconstruct '126 selected tests' is unverified,
+not a finding: turn-7's exact command names tests/test_wp42a_runner_hardening.py
+and tests/test_headless_export.py with three UNC deselections; its saved
+XML contains all 126 passing nodes. The final report explicitly names that
+set; the seat's full two-leg counts below supersede light checks for the gate.
+
+### Two-leg gate -- GREEN, seat evidence supplied in turn 8
+
+Gate candidate: `wp4.2b-mc` `a6910f1`, main `work/` config, Git Bash,
+PYTEST_ADDOPTS unset, offscreen; 10.3 GiB free before. Own window, not
+stacked, as ruled. No sandbox shim at the seat. These commands/counts/times
+and EXIT values are the dispatcher's executed evidence, not cell reruns.
+
+| Gate row | Command | Counts | Duration / UTC time | EXIT |
+|---|---|---|---|---|
+| Two-leg gate / PARALLEL | `uv run pytest -q -rs -n 4 -m "not gpu and not footage and not gui and not slow" --basetemp=work/wp4.2b-parallel` | 5250 passed, 1 skipped (`tests/test_color_roundtrip.py:121`) | 660.85 s; 2026-10-29 06:27:30Z-06:38:43Z | 0 |
+| Two-leg gate / SERIAL | `uv run pytest -q -rs -m "gpu or footage or gui or slow" --basetemp=work/wp4.2b-serial` | 1126 passed, 1 skipped (`tests/test_photo_check.py:139`), 5251 deselected | 2,558.54 s; ended 2026-10-29 07:21:24Z; start not supplied | 0 |
+| Candidate static / lint | `uv run ruff check .` | All checks passed | Seat; timing not supplied | 0 |
+| Candidate static / format | `uv run ruff format --check .` | 261 files already formatted | Seat; timing not supplied | 0 |
+| Candidate static / strict types | `uv run mypy` | No issues in 141 source files | Seat; timing not supplied | 0 |
+
+Both skips are standard gate skips. 5250 = WP4.2a 4539 + 711 (696 fixture
+controls plus all other new package cases); serial 1126 is unchanged.
+No test failure. Gate/merge identity above supplied by the dispatcher;
+Reviewer B independently confirmed no source/tools/tests/report differences
+between the package and candidate trees before this docs-only final turn.
+
+### Done -- Definition-of-done evidence and acceptance transfer
+
+| Item | Evidence / disposition |
+|---|---|
+| Composed-name containment / documented public behavior | _base_plan naming.py:291-311; public Raises docs and exported OutputNameError; runner check_outputs Raises line 703; both planner entry points, engine and runner routes documented in FINAL report. |
+| RED-first tests and unchanged legitimate fixture names | Ten original planner RED cases, 696 fixture controls; turn-6 M1 twin two-row RED and M3 engine-drive-relative RED; real GREEN logs/XML and independent Reviewer A/B mutations recorded above. |
+| Granted scope only / frozen interfaces / no dependency change | Per-turn scope audits, ruling-specific test-node lists/reasons and preserved assertions; Reviewer B executed patch/plant fidelity checks; final turn changes report/ledger only. |
+| Formatting, lint and strict types | Seat candidate ruff check PASS, 261 files formatted, mypy 141 files no issues; cell turn-7 logs likewise GREEN. Public docs completed and comments reviewed with code; no new OS-specific product code. |
+| Full two-leg suite | PARALLEL 5250 passed/1 standard skip; SERIAL 1126 passed/1 standard skip/5251 deselected; both EXIT 0 on unchanged candidate a6910f1, as supplied above. |
+| Reviewer A convergence / Reviewer B | Both A verdicts NO_NEW_CRITICAL_MAJOR, converged round 2 with no reopen; B same verdict. FINAL report evidence paths and computed review/prompt MD5s; cumulative disposition ledger complete. |
+| Owner verification loop | Suspect -> independently confirm -> fix -> repeat; R1 missing layer coverage fixed with mutation-red twin; drive-relative route added with base mutation RED; R2/B documentation fixes applied; no unresolved blocking issue or rejected false positive. |
+| Read-only footage / safe scratch | No owner footage writes or local-config edits by cell; all probes, artifacts and runner writes stayed under worktree work/ and isolated test tmp_path. Real source carrier/ADS preservation asserted; no new dependency or frozen-interface edit. |
+| FINAL handoff / DR-80 | Report FINAL, closure text retains runner OutputNameError refusal before jobs (exit 2). B-A3 recorded for WP4.3/CHARC; B-A4/F2 and F5 banked. Actual acceptance/register update belongs to dispatcher/CHARC. |
+| This docs-only turn | work/wp4.2b/turn8-final-scope.log: diff f3c1381 exactly two authorized files, both blobs CR=0, git diff --check PASS; review hash inventory saved; EXIT 0. No new code/test change or repeat heavy run. |
+
+Cell work is complete. WP4.2b merges FIRST; dispatcher owns the WP4.2
+rebase/conflict handling already ruled. No open implementation question.
+This return delivers the FINAL report and ledger; no register was edited
+and no accept/merge was performed by this cell.
