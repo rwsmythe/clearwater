@@ -401,6 +401,17 @@
   Flags: shell.py docstrings GRANTED (docs only); DR-82 banner double name -> wrapper drops the leading name; renamed node IDs
   explained in the collection diff; bare-cd slip no action. NEXT: cell 3 R1 verdict; windows after A converges (V7 of record
   via S7 driver, GX011627 V18, DR-44(c)/DR-50); B; the ONE gate, AFTER WP-T6's gate (expressions).
+- **ORCHESTRATOR GEN 20 ROLLS OVER ~14:25Z (~405K, clean; status `067199bfbdc95cad`; its state main 236cce3). Gen 21 launches
+  and drains from pickup; session name from `comms/.launch-sessions.json` when it posts online.** No cell working: WP-T6 Codex
+  session idle between turns 12 and 13 (survives; cleanup DONE 18e2d53 F3+F2, 6892bbd wording, f10d13b ledger; depth 157,267;
+  `w2b.sh` md5 273352e4 next, ~2-5 min, then B, then the ONE gate); WP4.3 cell 3 yielded at R1 and dies with gen 20.
+  **WP4.3 REVIEWER A R1 = NEW_CRITICAL_MAJOR_FOUND 0/5/11 (Codex; 038f02e..99da8aa; r1 md5 0af6db0a; ledger b4e5f17). RULED
+  ~14:30Z (my post ruling-wp43-r1, for gen 21): MAJOR 2 REVERSED (journal write failure -> the export FAILS readably with nothing
+  written; my 68d5b4c7 concurrence corrected: an unjournalled temporary with no output folder set escapes D85's cleanup);
+  major 1 invalid-UTF-8 journal -> S6 set-aside; major 3 keep the entry until that folder's cleanup succeeds; major 4 force-CPU
+  render must not overwrite the remembered GPU backend (DR-68 test GPU->CPU->boundary); major 5 reproduce on real main() first,
+  closed-flag guard in app/main.py, gui/jobs.py only if shown; minors FIX; fresh cell 4 with yields per group; then R2.** Two
+  gen-20 slips acknowledged. NEXT: gen 21 online post (cue there); w2b; WP-T6 B + gate; WP4.3 cell 4 remediation + R2.
 - **WP-T6 W3 DONE 12:57Z (status `fa801fad17d48fc2`, no reply owed): RUNG 3 CLOSED.** Stage 1: 8 passed in 259 s (run 1
   322 s); ONE standard encode; engine record M+R all SAME, roster SAME. Stage 2: `branch=i-proceed`, BE delta = exactly the six
   ruled names. Stage 3 draft control caught (level name assert); stage 4 reference control caught (89 vs 90). Tree clean, tests
