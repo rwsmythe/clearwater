@@ -236,7 +236,8 @@ appears in no computed set) and the import-time witness extension (DR-84).
 | build (tasks 3-10) | - | - | - | - | product + tests | - | 553,419 at the build yield (cell 2 retired PAST the ~400K stop: the whole build ran in one turn with no yield, so the dispatcher could not read it earlier) |
 | R1 (Reviewer A, `038f02e..99da8aa`) | 0 / 5 / 11 | 16 in / 0 out (R1-5's reachability to be proven on the `main()` path) | 16 new / 0 reopened | 0 | none yet (adjudicating turn; proposed: product + tests) | WSL, codex-cli 0.162.1, `gpt-6.1-sol` high | 129,481 at the R1 yield (cell 3; `scripts/cell_depth.py`, given by the dispatcher in cell 4's dispatch) |
 | R2 (Reviewer A, `038f02e..362a8b2`) | 0 / 3 / 6 | 9 in / 0 out | 8 new / 1 reopened (R2-9 = R1-12; the reviewer also tagged R2-1 as R1-3 and R2-3 as R1-5, adjudicated NEW: distinct paths, the R1 fixes hold) | 0 | R1 remediation (groups A-C): product + tests; R2 remediation (cell 5, groups A-C): product (startup, adapter, preview, render worker, main, settings_dialog under the 38a7c702 grant) + tests; R2-9 test-only | WSL, codex-cli 0.162.1, `gpt-6.1-sol` high | 316,716 at the Group C yield (cell 4, 156 turns; `scripts/cell_depth.py`); seat retired at 355,066 (cell 4 stood down after the R2 yield) |
-| R3 (Reviewer A, `038f02e..028bc4f`) | 0 / 2 / 3 | 5 in / 0 out | 3 new / 2 reopened (R3-3, R3-4 = R1-12; the reviewer also tagged R3-1 as R2-2 and R3-2 as R1-3, adjudicated NEW: distinct routes, the earlier fixes hold) | 0 | none yet (review-only turn); proposed: product (`app/startup.py`) + tests, one report sentence | WSL, codex-cli 0.162.1, `gpt-6.1-sol` high | 222,999 at the Group C yield (cell 5, 109 turns; `scripts/cell_depth.py`); R3 adjudicated in the same seat; seat retired at 271,612 (cell 5 yielded R3 there and stood down). CHARC `d6e9abdf`: R3-2 RECLASSIFIED MINOR (counts now 0 / 1 / 4) |
+| R3 (Reviewer A, `038f02e..028bc4f`) | 0 / 2 / 3 | 5 in / 0 out | 3 new / 2 reopened (R3-3, R3-4 = R1-12; the reviewer also tagged R3-1 as R2-2 and R3-2 as R1-3, adjudicated NEW: distinct routes, the earlier fixes hold) | 0 | R3 remediation (cell 6, groups A-B): product (`app/startup.py`: R3-1 `13c96f7`, R3-2 `099893a`) + tests; R3-3, R3-4, R3-5 test-only (`065f5f0`, `a0f43cd`) + the report's V7 rows and DR-44 (c) sentence | WSL, codex-cli 0.162.1, `gpt-6.1-sol` high | 222,999 at the Group C yield (cell 5, 109 turns; `scripts/cell_depth.py`); R3 adjudicated in the same seat; seat retired at 271,612 (cell 5 yielded R3 there and stood down). CHARC `d6e9abdf`: R3-2 RECLASSIFIED MINOR (counts now 0 / 1 / 4) |
+| R4 (Reviewer A, `038f02e..5d8e0df`) | 0 / 0 / 2 | 2 in / 0 out | 1 new / 1 reopened (R4-1 = R3-5) | 0 | none yet (review-only turn); proposed: test-only (`test_app_wiring.py`, `test_app_v8_v18.py`) + the report's V8 paragraph | WSL, codex-cli 0.162.1, `gpt-6.1-sol` high | 110,453 at the Group A yield (cell 6, 45 turns), 172,926 at the Group B yield (88 turns; `scripts/cell_depth.py`, given by the dispatcher); R4 adjudicated in the same seat. CONVERGED: zero new blocking |
 
 ## CHARC round-0 ruling (`fcb2a9205c060013`, 2026-10-29 12:54:46Z, verbatim; it GOVERNS the STOP items above)
 
@@ -888,3 +889,48 @@ Decision for Reviewer A to challenge: the holds (V7 (e)'s write, R3-5's frame an
 deterministic arrangements, released by the delivered render or by the close itself, never by a
 timer; the R3-5 hold shifts the measured close figures (the job resumes from its hold as the
 close begins), and the figures of record stay the exclusive window's.
+
+Depth at the Group B yield: 172,926 (`scripts/cell_depth.py`, 88 turns; given by the dispatcher,
+gen 22). Dispatcher QA on `5d8e0df`: `badece4..HEAD` touches only `tests/test_app_v7.py`,
+`tests/test_app_wiring.py`, the report and the ledger (no product code); 0 CR in every blob; both
+V7 docstrings carry the spec V7 and Q10 (b)/(e) text verbatim; the mutation runs stand as the
+distinguishing evidence. The report's V7 rows (a), (b), (c), (e) and the witness paragraph:
+APPROVED by the dispatcher (in scope: the report stays true to the witnesses).
+
+## Reviewer A round 4 (cell 6, 2026-10-29; adjudicated, NOT remediated)
+
+- Reviewed `038f02e..5d8e0df` minus `docs/proofs` (28 files, 8,359 diff lines) with a "THIS IS
+  ROUND 4" section listing R1's 16, R2's 9 and R3's 5 items with their dispositions (R3-2 MINOR per
+  `d6e9abdf`), the round-3 remediation decisions (the `drop` signature from ids to pairs; the
+  deterministic holds) and the report's updated V7 rows named for checking; probe first (`READY`,
+  one `succeeded in`). Codex v0.162.1, `gpt-6.1-sol` / high, WSL, read-only; tokens 311,492; 23
+  `succeeded in` (23 exec blocks, 0 exited); one VERDICT line. ERROR lines client-side: two
+  model-list refresh timeouts, the MCP transport, and NEW in this arc one websocket connect failure
+  (DNS lookup) at 17:40:58Z before the model's first output, after which the session ran to its end
+  (classified not disqualifying; flagged to the dispatcher). Withheld access checked on all 23
+  command lines and the transcript: clean (`docs/proofs` only inside the matching
+  `'!docs/proofs/**'` glob; the only evidence file read is `r4/test-summary.txt`).
+- Before the round: light run at `5d8e0df` (the twelve touched test files with their markers plus
+  the layering, thread and preview tests): 359 passed 1 xfailed in 315 s; ruff check, ruff format
+  --check (280), mypy strict (146): clean.
+- **Verdict `NO_NEW_CRITICAL_MAJOR`: 0 critical, 0 major, 2 minor.**
+  - R4-1 MINOR (EXEC, REOPENED R3-5): `_ProgressSource.ended` is set only on normal exhaustion, so
+    an iterator the engine closes after frame 1 (a processing failure) still reads `mid_decode()`
+    True. CONFIRMED by the cell's probe (`r4_probe.txt`: `ended: False`, `mid_decode ... True`).
+    Introduced by `a0f43cd`. FIX test-only: `ended` in a `finally`, plus the analysis phase
+    `running` in the predicate; a pure-Python unit test of the helper.
+  - R4-2 MINOR (REAS, NEW): the V8 photo legs omit AD-11's p99.9 characterisation ("p99.9 and max
+    are RECORDED as characterisation, never a V8 bound"); `_v8_photo` returns mean, p99, max only
+    and the report has no p99.9. CONFIRMED by reading. FIX test-only plus the report's V8 paragraph;
+    the GX011627 window leg records p99.9 too (open item for the window driver). Result-bearing:
+    named in the accept record.
+- Per-finding table with each fix and test: `adjudication.md`.
+- Evidence `C:\Users\rwsmy\clearwater-review-evidence\wp4.3\r4\` (prompt, diff, runner, test
+  summary, static, probe, transcript, commands, adjudication, the cell's probe, `md5sums.txt`):
+  review.txt `d1a9182d3c66b1a5bc51b02c038a2139`, review.stderr.txt
+  `c0100aa66cb4e615f2b477a0b8993cf9`, adjudication.md `738ad81bcd556d4b90acaa760df9ae0c`,
+  review-prompt.md `d1a61609381fbead69ac767bcbb74c6a`, review-diff.txt
+  `3fe4f0cc7954472e042ad7fef9cc741b`.
+- Five-round gate: round 4 of 5. ZERO new blocking findings: by the fill's CONVERGENCE_CRITERION
+  Reviewer A's loop TERMINATES here; R4-1 and R4-2 are fixed once in the terminating round's
+  cleanup and open no further round. Yielded BEFORE any remediation (review-only turn).
