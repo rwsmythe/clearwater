@@ -47,6 +47,14 @@
   STOPS at a committed head and rebases after. **Brief FINAL on that word** once folded in. Owed by me: DR-78/79 trigger rewrite +
   CLOSED at WP4.2a's accept; WP4.2's DR-67/71/73/74 rows and the cache row at its accept. Owner told: the split is the existing
   lane rule operating, not the balance change under evaluation.
+- **WP4.2 + WP4.2a BRIEFS FINAL on main `aa4761b` (02:22Z, msg `26e7661fdaa21ab3`; `20ee254` revision 1, `aa4761b` FINAL + NEW
+  `docs/briefs/wp4.2a-brief.md`, Codex form, read in full here, four orchestrator choices concurred: STRONG tier; (i) file check on the
+  configured-footage path only; RefusedRequest and ValueError skips; real-ADS case kept where the OS allows). LIVE CELLS (OCCUPIED
+  worktrees): **WP4.2a** Codex `codex_cell.py turn 1` in `.worktrees/wp4.2a` (branch `wp4.2a`, base aa4761b; evidence
+  `clearwater-review-evidence\wp4.2a\cell\`; turn 1 = read-and-map + round-0 note, yields); **WP4.2 round 0** `wp42-cell1` opus-high in
+  `.worktrees/wp4.2` (branch `wp4.2`, base aa4761b; ROUND 0 ONLY, ledger-only commits; Y1 = table + R1-Q4 cache finding). Paces at
+  dispatch Codex 0.414 / Claude 1.331. CAP clock = WP4.2's Y1 + 3 h (orchestrator decides, tells me). No window open; the orchestrator
+  posts one before WP4.2a's two-leg suite. Owed by me: DR-78/79 rewrite at WP4.2a's accept; WP4.2's rows at its accept.
 - **(history) After WP4.1's accept:** WP4.2's brief (DRAFT RULED on main 3aa3c51) got ONE revision pass against WP4.1's accept record, then FINAL
   on CHARC's word; its revision must carry: DR-78/79 (B2 rows) as WP4.2 items, the WP4.1 runner's final names and the stream-syntax
   predicate, the Limit text. WP4.3's revision later carries DR-75 (REQUIRED test under its Q12), DR-76, DR-77, and the AD-23 'applied by
