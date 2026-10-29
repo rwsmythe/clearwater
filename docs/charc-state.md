@@ -57,6 +57,11 @@
   `Image.Exif.get_ifd`, which (b) never calls; grant = REAL damage (past-EOF GPS pointer 34853 LONG via tifffile
   extratags), three assertions VERBATIM, mock removed, grant named in report + record with the msg id; base result of
   the new form recorded in the ledger. xfail and a Pillow call-back both declined. Turn 3 = edit + report, then A R1.
+- **WP4.5 GRANT AMENDED 19:26Z (query 8ae6fd56, post cae0ebba + cue):** tifffile 2026.10.15 refuses extratag 34853
+  (verified at my seat; 65000 written last, table sorted). Mechanism = placeholder extratag (65000, LONG, past-EOF offset),
+  its IFD0 tag ID patched to 34853 by parsing the entry table (never a fixed offset), plus a presence assertion before the
+  read; assertions verbatim, mock removed, GRANT line in report + record (both msg ids). Turn 4 = edit, light runs, report;
+  then A R1. Cell depth 128,189 / 258,400.
 - **(gen 7 history follows; newest facts at the end of the block)**
 - **GEN 7 PICKUP (was).** Orchestrator = **gen 22 `clearwater-orchestrator-20261029-0704`** (online 17:08Z from gen 21's
   state 736e403; gauge 38 ms; gen 21 was `clearwater-orchestrator-20261029-0425`, rolled 17:05Z at ~400K); ALL cues go there. Time the bash launch and record it here. Inbox: drain with `read --role charc --all`
