@@ -101,8 +101,12 @@ the engine's `smoothed_record` after. GX011627 V18: window, pending.
 DR-68 (`gpu`, this laptop): `free_device_bytes()` 7,388.9 MB before the 1:1 4K render, 7,338.1
 MB after it (6 cuFFT plans on `clearwater-preview`), 7,388.9 MB after the boundary (0 plans).
 
-DR-44 (c): from `close()`, an analysis mid-decode ended in 17 ms, an export mid-encode in 10 ms,
-a batch item in 23 ms (fixture clip); `gui/jobs.py` is not touched. GX011627: window, pending.
+DR-44 (c), from the first job runner's `close()` (fixture clip, cell 6's targeted run, a shared
+host): an analysis whose frame source had yielded a frame and whose frame iterator had not ended
+ended in 46 ms; an export whose sink was open and had written a frame, with neither its close
+nor its abort begun, in 18 ms; a running batch item in 28 ms. The two predicates are read as
+that close begins (R3-5); each job is held after its first frame until then, so neither can be
+missed. `gui/jobs.py` is not touched. GX011627: window, pending.
 The start-up jobs (R1-5), reproduced on the real `main()` path with a 12 s cache open and a
 close 0.3 s after the window showed: the close returned after the 5 s `SHUTDOWN_TIMEOUT_S` wait
 (the open cannot be cancelled), `app.exec()` returned with it, and the process ended 0.3 s later

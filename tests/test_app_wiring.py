@@ -29,6 +29,7 @@ import logging
 import sys
 import threading
 import time
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -37,6 +38,7 @@ import pytest
 from PIL import Image as PILImage
 
 import gui_support
+from clearwater.analysis import AnalysisEngine
 from clearwater.app.activity import RENAME_TEXT
 from clearwater.app.main import Application
 from clearwater.config import load_settings
@@ -590,52 +592,161 @@ def test_g13_settings_and_last_parameters_persist_over_two_window_lifetimes(
 # DR-44 (c) (question 8 as ruled): measured with the real jobs at close.
 
 
+class _ProgressSource:
+    """A frame source that records how far its frames have been read (R3-5).
+
+    Its first ``frames`` iterator holds after its first frame until ``release`` is set, so the
+    close begins with the decode under way; every other call goes to ``inner``.
+    """
+
+    def __init__(self, inner: Any, release: threading.Event) -> None:
+        self._inner = inner
+        self._release = release
+        self.advanced = 0
+        self.ended = False
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._inner, name)
+
+    def frames(self, probe: Any, **kwargs: Any) -> Any:
+        for frame in self._inner.frames(probe, **kwargs):
+            self.advanced += 1
+            yield frame
+            if self.advanced == 1:
+                self._release.wait(60)
+        self.ended = True
+
+    def mid_decode(self) -> bool:
+        """The frame iterator has advanced and has not ended."""
+        return self.advanced > 0 and not self.ended
+
+
+class _ProgressSink:
+    """A video sink that records its progress (R3-5).
+
+    Its first ``write`` holds after the frame is written until ``release`` is set, so the close
+    begins with the encode under way; every other call goes to ``inner``.
+    """
+
+    def __init__(self, inner: Any, release: threading.Event) -> None:
+        self._inner = inner
+        self._release = release
+        self.opened = False
+        self.written = 0
+        self.closed = False
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._inner, name)
+
+    def open(self, *args: Any, **kwargs: Any) -> Any:
+        result = self._inner.open(*args, **kwargs)
+        self.opened = True
+        return result
+
+    def write(self, frame: Any) -> None:
+        self._inner.write(frame)
+        self.written += 1
+        if self.written == 1:
+            self._release.wait(60)
+
+    def close(self) -> Any:
+        self.closed = True
+        return self._inner.close()
+
+    def abort(self) -> None:
+        self.closed = True
+        self._inner.abort()
+
+    def mid_encode(self) -> bool:
+        """The sink is open and has written frames, and neither its close nor its abort began."""
+        return self.opened and self.written > 0 and not self.closed
+
+
 @pytest.mark.slow
 @pytest.mark.parametrize("job", ["analysis", "export", "batch"])
 def test_dr44c_a_real_job_ends_within_the_shutdown_timeout_at_close(
     make_app, qtbot, sample, tmp_path, monkeypatch, job
 ) -> None:
-    """From ``close()``: an analysis mid-decode, an export mid-encode, a batch item."""
+    """From ``close()``: an analysis mid-decode, an export mid-encode, a batch item.
+
+    "Mid-decode" and "mid-encode" are predicates read when the first job runner's ``close``
+    begins (R3-5), not a timing: the analysis's frame source has yielded a frame and its
+    iterator has not ended; the export's sink is open and has written a frame, and neither its
+    close nor its abort has begun. Each holds its job after the first frame until that moment,
+    so the predicate cannot be missed; the hold is released as the close begins and the job then
+    ends by its own cancel path.
+    """
     from clearwater.gui.jobs import QtJobRunner
     from clearwater.gui.shell import SHUTDOWN_TIMEOUT_S
 
     out = tmp_path / "out"
     out.mkdir()
+    release = threading.Event()
+    progress: dict[str, Callable[[], bool]] = {}
     closes: list[tuple[bool, float]] = []
+    at_close: list[bool] = []
     real_close = QtJobRunner.close
 
     def timed(self: QtJobRunner, timeout_s: float) -> bool:
+        if not at_close:
+            at_close.append(progress["predicate"]())
+            release.set()
         began = time.perf_counter()
         ended = real_close(self, timeout_s)
         closes.append((ended, time.perf_counter() - began))
         return ended
 
+    def engine_factory(**kwargs: Any) -> AnalysisEngine:
+        source = _ProgressSource(kwargs["source"], release)
+        progress["predicate"] = source.mid_decode
+        return AnalysisEngine(**{**kwargs, "source": source})
+
     monkeypatch.setattr(QtJobRunner, "close", timed)
-    application = started(make_app, qtbot, cpu_settings(output_folder=out))
-    window = application.window
-    if job == "analysis":
-        window.open_path(sample(CLIP))
-        qtbot.waitUntil(
-            lambda: (
-                window.session.analysis().phase == "running" and window.session.analysis().done > 0
-            ),
-            timeout=60000,
-        )
-    elif job == "export":
-        open_source(qtbot, application, sample(CLIP))
-        wait_analysis(qtbot, application)
-        export = panel(application, ExportPanel)
-        window.shell_actions.export.trigger()
-        qtbot.waitUntil(lambda: export.bar.maximum() > 0 and export.bar.value() > 0, timeout=60000)
-    else:
-        batch = panel(application, BatchPanel)
-        batch.add_paths([sample(CLIP), sample("jpeg-gradient-srgb")])
-        batch.start()
-        qtbot.waitUntil(lambda: batch.items()[0].state is ItemState.RUNNING, timeout=60000)
-        qtbot.waitUntil(lambda: batch.bar.value() > 0, timeout=60000)
-    window.close()
+    try:
+        if job == "analysis":
+            application = started(
+                make_app, qtbot, cpu_settings(output_folder=out), engine_factory=engine_factory
+            )
+            window = application.window
+            window.open_path(sample(CLIP))
+            qtbot.waitUntil(
+                lambda: "predicate" in progress and progress["predicate"](), timeout=60000
+            )
+        elif job == "export":
+            application = started(make_app, qtbot, cpu_settings(output_folder=out))
+            window = application.window
+            open_source(qtbot, application, sample(CLIP))
+            wait_analysis(qtbot, application)
+            engine = application.exports._engine
+            real_sink_for = engine._sink_for
+            assert real_sink_for is not None
+
+            def sink_for(device: Any) -> _ProgressSink:
+                sink = _ProgressSink(real_sink_for(device), release)
+                progress["predicate"] = sink.mid_encode
+                return sink
+
+            monkeypatch.setattr(engine, "_sink_for", sink_for)
+            window.shell_actions.export.trigger()
+            qtbot.waitUntil(
+                lambda: "predicate" in progress and progress["predicate"](), timeout=60000
+            )
+        else:
+            application = started(make_app, qtbot, cpu_settings(output_folder=out))
+            window = application.window
+            batch = panel(application, BatchPanel)
+            batch.add_paths([sample(CLIP), sample("jpeg-gradient-srgb")])
+            batch.start()
+            qtbot.waitUntil(lambda: batch.items()[0].state is ItemState.RUNNING, timeout=60000)
+            qtbot.waitUntil(lambda: batch.bar.value() > 0, timeout=60000)
+            progress["predicate"] = lambda: batch.items()[0].state is ItemState.RUNNING
+        window.close()
+    finally:
+        release.set()
     (ended, elapsed) = closes[0]
-    print(f"DR-44 (c) {job}: ended {ended} in {elapsed * 1000:.0f} ms")
+    print(f"DR-44 (c) {job}: ended {ended} in {elapsed * 1000:.0f} ms, at close {at_close}")
+    if job != "batch":  # a batch item's state is printed, not asserted
+        assert at_close == [True], f"the job was not under way when the close began ({job})"
     assert ended and elapsed < SHUTDOWN_TIMEOUT_S
     assert no_temporaries(out)
 
