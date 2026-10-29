@@ -32,7 +32,7 @@
   'Register rows'), AD-23 note stays with 4.3a. (3) WP4.3a (Codex, brief FINAL at brief-wp4.3-rev bc0b8a2 + my ruling
   fe7625ca; gen 21 commits it onto main): dispatches when WP-T6's Codex cell stands down; at its accept, mine: AD-13 note
   ('profile' writer provenance key), AD-23 'applied by WP4.3a', closures DR-58(b)/76/77/81(a-d)/85. Owner-pending inputs:
-  photos (WP3.6P), the iPhone clip (DR-15). Open owner decisions: none. Every owner-facing summary ends with that line.
+  NONE since 17:10Z (phone footage received, see below). Open owner decisions: none. Every owner-facing summary ends with that line.
 - **GEN 7 ONLINE 14:29Z (`clearwater-charc-20261029-0428`, launched by gen 6 at its roll; msg `2d785723` to the
   orchestrator + ONE cue).** Pickup facts: bash gauge 22 ms; charc inbox 0 unread / 326 read; main 1905c8c clean; both
   inboxes empty (the orchestrator's 0 unread); gen 21's name confirmed from `comms/.launch-sessions.json`; worktrees as gen 6
@@ -95,6 +95,15 @@
   yield, R4 review-only yield at the verdict. **WP4.3a Codex seat 2 turn 6** (session 01a18899, depth 86,848 / 258,400) in
   `.worktrees/wp4.3a` (OCCUPIED): F1 at the real resolve, F2, F9, R3-1 (ii) per-field default, F4 help line, F3 report; then
   R2 at the orchestrator's seat. The brief's register-table line for R3-1 (ii) lands on the ACCEPT branch (concurred).
+- **OWNER INPUT 17:10Z (in chat to CHARC, verbatim in CLAUDE.md 'Inputs the owner has supplied'): phone footage added at
+  `clearwater-footage\Phone\` (93 files, 1.3 GB: 62 HEIC, 11 JPG, 19 MOV, 1 mp4 `dp_color_video_1791675261.mp4`); all snorkel
+  depth, a couple above the surface, a few possibly pre-corrected (owner did not investigate). CLOSES both owner-pending inputs.
+  COMMISSIONED to gen 22 (my post, this commit): (1) inventory refresh `docs/reports/inventory-2026-10-29.md` (mechanical, no
+  window; names above-surface and pre-corrected candidates from tags; my prior = the dp_color mp4 + IMG_6791-6802 JPGs);
+  (2) WP3.6P real-photo verification (sonnet-medium as approved at WP3.6 Q11, or Codex by pace; AD-24 on real Apple HEIC,
+  V5/D53/V9, Result 2 memory leg; pre-corrected class reported separately; after the inventory QA and clear of WP4.3's
+  windows); (3) DR-15 leg if a MOV carries the B-frame as-written media_time (micro-package, exclusive V4 window). Category:
+  'Phone' = Snorkel (owner's words). Look-check on phone photos NOT commissioned (owner's visual review).
 - **(gen 6 history follows; newest facts at the end of the block)**
 
 - **Gen 6 pickup facts:** bash gauge 45 ms; inbox 0 unread at pickup; announce posted to the orchestrator (gen 17, shell-busy in the WP4.1 gate) with ONE cue; the two register scripts copied from gen 5's scratchpad (18c10a55...) into this session's scratchpad (6687b6c9-eacd-4ffc-995e-51c9195391d1) as `edit_register_p4a.py` (drop its DR-65 block before running: already applied at 3114d23) and `edit_register_p4b.py`.

@@ -25,6 +25,8 @@ Both were owner-set on 2026-10-14; do not substitute other paths.
 - Footage folder: SUPPLIED 2026-10-14 by the owner (in chat to CHARC: \"concur with footage location\"): `C:\Users\rwsmy\clearwater-footage\`, OUTSIDE the repository so no git command in this tree can reach it. Treated as **read-only**, never committed. The owner is still downloading into it. No `.LRV`/`.THM` sidecars exist for this footage (owner, 2026-10-15: deleted from the camera at cloud upload), so D60's proxy leg is not testable here.
 - Working folder: SUPPLIED 2026-10-14 by the owner (in chat to the orchestrator: "let's create a working folder within clearwater", confirmed as ignored by git): `C:\Users\rwsmy\clearwater\work\`, gitignored as `work/` (69311b1). Outputs, caches and reports go there; never committed. Never run `git clean -x` in this tree (it deletes ignored files).
 
+- Phone footage: SUPPLIED 2026-10-29 ~17:10Z by the owner (in chat to CHARC, verbatim: "I added the phone footage to the footage folder. This is all at snorkel depth (with a couple that are above the surface), and a mix of photos and a few videos. A few may have already been corrected by some other mechanism, but I did not investigate too closely."): `C:\Users\rwsmy\clearwater-footage\Phone\`, 93 files, 1.3 GB (62 HEIC, 11 JPG, 19 MOV, 1 mp4). Category Snorkel for the folder (owner's words); the above-surface and possibly pre-corrected files are identified by the inventory refresh and WP3.6P, never assumed. This closes the two owner-pending inputs (photos for WP3.6P / AD-24 / WP4.1's owner-photo leg; iPhone video for DR-15).
+
 Both go into the uncommitted `clearwater.local.toml` (template: `clearwater.local.example.toml`, created by WP0.1).
 
 ## Conventions (plan §2, §4)
