@@ -1,4 +1,4 @@
-# WP4.2 -- Video path end to end (report, DRAFT before Reviewer A)
+# WP4.2 -- Video path end to end (report, DRAFT; Reviewer A converged at round 1)
 
 Cell 2 (implementer-opus-high), worktree `.worktrees/wp4.2`, branch `wp4.2` on main `f991254`
 (WP4.2a merged). Brief `docs/briefs/wp4.2-brief.md` (FINAL; Rulings `2c4476d9869df056`, Revision
@@ -98,6 +98,11 @@ condition is the first test (Main profile, no fault, every frame decoded).
 | jittering patch | ancuti2018 | 0.1055 / 0.0017 | **0.012 / 0.016 / 0.024 / 0.012** (<= 0.25 asserted) | 0.0332; 0.082 / 0.110 / 0.034 / 0.137 |
 | ad14-flicker (WP3.11) | GrayWorld | -- | 0.475 / 0.447 / 0.488 / 0.476 | -- |
 | ad14-flicker (WP3.11) | GainsStretch | -- | 0.387 / 0.482 / 0.455 / 0.400 | -- |
+
+Each acceptance reads the unrounded figure and has a planted control through the same
+measurement (Reviewer A round 1): a 1/255 flicker on every other smoothed frame gives AD-14
+1.0/255 on all four rows (refused against 0.5); the smoothed and per-frame frames interleaved
+give V3 ratios 0.63-5.05 per measure (refused against 0.25).
 
 V3 ran on the GPU job (device frames; CHARC `91c2c22f4b6edd18` 3, KEEP for question 9's budget).
 The CPU leg is NOT covered by the suite. What exists for it: the build ledger's statement that a

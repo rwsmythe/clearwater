@@ -9,12 +9,13 @@ build waits for WP4.2a's merge and the orchestrator's rebase (R1-Q5 condition 3,
 | Gate | Cell | Depth (tokens) | Read at | Note |
 |---|---|---|---|---|
 | Y1 (round 0) | cell 1 | 209,438 (70 turns) | 2026-10-29 02:33:37Z | at Y1; cell 1 STOOD DOWN 02:35Z, build to a fresh cell |
+| Y4 (Reviewer A R1) | cell 3 | 165,011 (turn 50) | 2026-10-29 05:55Z | R1 adjudicated; cleanup granted |
 
 ## Round ledger (Reviewer A, Codex `gpt-6.1-sol` / high, WSL)
 
 | Round | Critical | Major | Minor | In / out of envelope | New / reopened | Reverts | Fixes: product / test-only | Transport, CLI | Depth |
 |---|---|---|---|---|---|---|---|---|---|
-| (none yet) | | | | | | | | | |
+| 1 (`1fa33a8`) | 0 | 0 | 4 | 4 in / 0 out | 4 new / 0 reopened | 0 | 1 tool code (F1) / 3 test-only (F2-F4) | WSL, codex-cli 0.162.1, `gpt-6.1-sol` / high | 165,011 (turn 50, 05:55Z) |
 
 ## Round 0 -- read and map (task 1), evidence
 
@@ -279,7 +280,47 @@ Applied by cell 3 (before Reviewer A round 1):
    `f76c42a5fae87b9cb691ac5594b5d3a2`, mtime 2026-10-29T05:22:48Z, four rows equal to the report's
    table, no backend named). The report says exactly that; no hash was invented.
 
-## RESUME HERE (Reviewer A round 1)
+## Reviewer A round 1 (cell 3) -- TERMINATING
+
+Head `1fa33a8` (base `f991254`), Codex `gpt-6.1-sol` / high over WSL; probe READY (one
+`succeeded in`). Evidence `C:\Users\rwsmy\clearwater-review-evidence\wp4.2\r1\` (prompt, diff,
+transcript, test summary, `adjudication.md`, `md5sums.txt`; `review.txt` md5
+`afff4213e7ac9e268c5daae216a445a1`). Assertions: banner model and effort PASS; 25 `succeeded in`;
+`tokens used` 175,076; `VERDICT: NO_NEW_CRITICAL_MAJOR`. ERROR lines: a model-list refresh
+timeout and an `rmcp` MCP connector closing (neither is the model transport; the session
+completed), the rest echoed source. The reviewer could not run repository tests (WSL Python has no
+NumPy); its probes were dependency-free.
+
+| # | Severity | Tag | Finding | Adjudication | Fix (commit) |
+|---|---|---|---|---|---|
+| F1 | MINOR | EXECUTED | `tools/headless_export.py:248` `_ObservedSink.open` notes the encoder before the wrapped open: a refused open leaves `"encoder"` non-null against the docstring's "null when it was not opened" | CONFIRMED | encoder noted after a successful open; `tests/test_wp42_runner_video.py::test_the_encoder_is_recorded_only_once_the_sink_has_opened` (RED on `1fa33a8`: `'libx265' is None` failed) (`2a7a414`) |
+| F2 | MINOR | EXECUTED | `tests/test_wp42_v3_product.py:279/306` AD-14 rounded to 4 places before `< 0.5` (0.49999 rejected; only ever stricter) | CONFIRMED | `_ad14_holds` / `_v3_holds` read unrounded figures (`raw_ad14_smoothed`); `::test_the_acceptance_reads_the_unrounded_figures` (`47a4cbf`) |
+| F3 | MINOR | REASONED | `:325` the V3 "planted failure" `not all(u <= 0.25*u)` is a tautology; AD-14 has no plant | CONFIRMED | `_planted`: AD-14 plant = 1/255 on every other smoothed frame (figure 1.0 on all four rows, refused); V3 plant = smoothed and per-frame frames interleaved (ratios 0.63-5.05, refused); both through `_figures` and the acceptance (`47a4cbf`) |
+| F4 | MINOR | EXECUTED | `tests/test_wp42_composition.py:48-67` the static check misses `from ... import FFmpegVideoSource as Source; Source()` | CONFIRMED | ImportFrom aliases resolved; `::test_the_video_static_check_reports_an_aliased_construction` (RED on `1fa33a8`: `[] == [...]` failed) (`2865b6a`) |
+
+Zero new blocking: the loop TERMINATES at round 1 (fill CONVERGENCE_CRITERION); F1-F4 fixed once
+in the terminating cleanup (orchestrator grant at Y4), no further counted round. Ruling
+`91c2c22f` FLAG 1 (the Limit rewritten to what `missing_frames` holds) CONCURRED by the
+orchestrator; FLAG 2 (no hash of the 650 s CPU V3 run) is with CHARC, the report text held as
+written.
+
+Cleanup gates at `2865b6a`: `ruff check .` clean; `ruff format --check .` 265 files; `mypy` 141
+files clean; 0 CR in every changed blob. Light targeted parallel-expression set (the WP4.2 files,
+app composition and deps, `test_headless_export.py`, WP4.2a's file, the four deps tests,
+`test_wp321_fft_release.py`) 232 passed in 118.92 s. Light `gpu`/`slow` run of my own V3 file
+(no window, not a timed figure): 6 passed in 102.51 s; the product figures equal the report's
+table on all four rows.
+
+## RESUME HERE (two-leg suite window)
+
+For a fresh cell: read `docs/dispatch-recipe.md`, the brief (Rulings govern), this ledger and
+`docs/reports/wp4.2-video-path.md`. Reviewer A CONVERGED at round 1; cleanup committed
+(`2a7a414`, `47a4cbf`, `2865b6a`). Next: the two-leg suite in a granted window (the orchestrator
+holds the grant until WP4.2b has merged and it has rebased `wp4.2` onto main); then task 10
+(GX011627 + the WP2.3 set through the runner) only when granted; CHARC's ruling on FLAG 2 (a
+recorded CPU run of the V3 file, optional in the window). Then the return report.
+
+## Superseded: RESUME HERE (Reviewer A round 1)
 
 For a fresh cell: read `docs/dispatch-recipe.md`, the brief (Rulings govern), this ledger and
 `docs/reports/wp4.2-video-path.md` (the claims). The build is complete and committed; light gates
