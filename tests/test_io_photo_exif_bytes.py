@@ -262,7 +262,7 @@ def test_kept_entry_order_is_preserved(tmp_path):
     assert kept == [400, 271, 270], "kept entry order changed"
 
 
-@pytest.mark.parametrize("bad", ["offset", "table"])
+@pytest.mark.parametrize("bad", ["offset", "missing_count"])
 @pytest.mark.parametrize("pointer,path", [(34665, ()), (34853, ()), (40965, ("Exif",))])
 def test_damaged_child_is_dropped_alone(tmp_path, caplog, bad, pointer, path):
     source = bytearray(
@@ -287,11 +287,11 @@ def test_damaged_child_is_dropped_alone(tmp_path, caplog, bad, pointer, path):
         for i in range(rows)
         if struct.unpack_from("<H", source, root + 2 + i * 12)[0] == pointer
     )
-    child = struct.unpack_from("<I", source, record + 8)[0]
     if bad == "offset":
         struct.pack_into("<I", source, record + 8, len(source) + 100)
     else:
-        struct.pack_into("<H", source, child, 65535)
+        # One byte remains: even the two-byte entry count cannot be read.
+        struct.pack_into("<I", source, record + 8, len(source) - 1)
     (tmp_path / "damaged.exif").write_bytes(source)
     output = exif.edit(bytes(source), 4, 3)
     assert _entry(output, (), 271) == (271, 2, 4, b"abc\0")
@@ -303,7 +303,7 @@ def test_damaged_child_is_dropped_alone(tmp_path, caplog, bad, pointer, path):
     assert "cannot be read" in caplog.text, "damaged child was not reported"
 
 
-@pytest.mark.parametrize("bad", [b"garbage", b"II*\0\xff\xff\xff\xff", b"II*\0\x08\0\0\0\xff\xff"])
+@pytest.mark.parametrize("bad", [b"garbage", b"II*\0\xff\xff\xff\xff", b"II*\0\x08\0\0\0\xff"])
 def test_damaged_root_raises_and_sanitise_drops(tmp_path, bad):
     (tmp_path / "bad.exif").write_bytes(bad)
     with pytest.raises(ValueError):
@@ -456,15 +456,14 @@ def test_r1_bad_ifd0_description_keeps_make(tmp_path, route):
 
 
 @pytest.mark.parametrize("route", ["edit", "from_tiff"])
-def test_r1_child_table_fault_drops_child_only(tmp_path, route):
+def test_r1_child_offset_fault_drops_child_only(tmp_path, route):
     source = bytearray(
         _fixture([(271, 2, 6, b"Maker\0")], sub=[(36864, 7, 4, b"0230")], gps=[(1, 2, 2, b"N\0")])
     )
     at = next(
         at for at in _record_locations(source) if struct.unpack_from("<H", source, at)[0] == 34853
     )
-    child = struct.unpack_from("<I", source, at + 8)[0]
-    struct.pack_into("<H", source, child, 65535)
+    struct.pack_into("<I", source, at + 8, len(source) + 100)
     (tmp_path / "child-table.exif").write_bytes(source)
     output = exif.edit(bytes(source), 4, 3) if route == "edit" else exif.from_tiff(bytes(source))
     assert output is not None
@@ -609,3 +608,158 @@ def test_r1_short_pointer_promotes_only_when_relocated_offset_overflows(
     row = _entry(output, parent, tag)
     assert row[1:3] == (4 if size > 65535 else 3, 1)
     _same(bytes(source), output, parent, 65000)
+
+
+def _unique_ifds(block):
+    """Count physical directories once, independently of duplicate pointer fanout."""
+    order = "<" if block[:2] == b"II" else ">"
+    pending = [(struct.unpack_from(order + "I", block, 4)[0], ())]
+    directories = {}
+    while pending:
+        offset, path = pending.pop()
+        if offset in directories:
+            continue
+        count = struct.unpack_from(order + "H", block, offset)[0]
+        assert offset + 6 + count * 12 <= len(block)
+        rows = []
+        directories[offset] = rows
+        for index in range(count):
+            at = offset + 2 + index * 12
+            tag, kind, number = struct.unpack_from(order + "HHI", block, at)
+            rows.append((tag, kind, number))
+            if tag in _PATHS.get(path, {}):
+                child = struct.unpack_from(order + ("H" if kind == 3 else "I"), block, at + 8)[0]
+                pending.append((child, (*path, _PATHS[path][tag])))
+    return directories
+
+
+@pytest.mark.parametrize("order", ["<", ">"])
+@pytest.mark.parametrize("route", ["edit", "from_tiff"])
+def test_r2_shared_children_are_written_once_by_entry_count(tmp_path, order, route):
+    a = b = c = 150
+    exif_offset = 8 + 6 + 12 * (a + 2)
+    interop_offset = exif_offset + 6 + 12 * (b + 2)
+    # All four D63 fields already exist, so editing must not add any entries.
+    root = [
+        (274, 3, 1, struct.pack(order + "H", 6)),
+        (305, 2, 4, b"old\0"),
+        *[(34665, (3, 4, 13)[i % 3], 1, exif_offset) for i in range(a)],
+    ]
+    sub = [
+        (40962, 4, 1, struct.pack(order + "I", 4)),
+        (40963, 4, 1, struct.pack(order + "I", 3)),
+        *[(40965, (3, 4, 13)[i % 3], 1, interop_offset) for i in range(b)],
+    ]
+    interop = [(65000, 7, 1, b"x")] * c
+    source = bytearray((b"II" if order == "<" else b"MM") + struct.pack(order + "HI", 42, 8))
+    for fields in (root, sub, interop):
+        source.extend(struct.pack(order + "H", len(fields)))
+        for tag, kind, count, value in fields:
+            if isinstance(value, int):
+                value = struct.pack(order + ("H" if kind == 3 else "I"), value)
+            source.extend(struct.pack(order + "HHI", tag, kind, count) + value.ljust(4, b"\0"))
+        source.extend(bytes(4))
+    (tmp_path / "shared-children.exif").write_bytes(source)
+    before = _unique_ifds(source)
+    assert sum(map(len, before.values())) == a + b + c + 4
+    output = exif.edit(bytes(source), 4, 3) if route == "edit" else exif.from_tiff(bytes(source))
+    assert output is not None
+    after = _unique_ifds(output)
+    assert sum(map(len, after.values())) == a + b + c + 4, "shared child entries multiplied"
+    assert len(after) == 3, "shared child was serialized more than once"
+    before_pointers = [
+        [row for row in rows if row[0] in (34665, 40965)] for rows in before.values()
+    ]
+    after_pointers = [[row for row in rows if row[0] in (34665, 40965)] for rows in after.values()]
+    assert after_pointers == before_pointers, "pointer type/count/order changed"
+
+
+@pytest.mark.parametrize("order", ["<", ">"])
+@pytest.mark.parametrize("route", ["edit", "from_tiff"])
+@pytest.mark.parametrize("path", [(), ("GPS",)])
+def test_r2_complete_table_without_next_pointer_survives(tmp_path, caplog, order, route, path):
+    fields = [(271, 2, 4, b"abc\0"), (272, 2, 4, b"xyz\0")]
+    source = (
+        _fixture([(270, 2, 4, b"pic\0")], gps=fields, order=order)
+        if path
+        else _fixture(fields, order=order)
+    )[:-4]
+    (tmp_path / "no-next.exif").write_bytes(source)
+    output = exif.edit(source, 4, 3) if route == "edit" else exif.from_tiff(source)
+    assert output is not None, "complete IFD0 lost without next pointer"
+    directories = _parse(output)[1]
+    assert path in directories, "complete child lost without next pointer"
+    assert all(field in directories[path] for field in fields), "complete table entries lost"
+    assert not caplog.records, "missing unused next pointer warned"
+
+
+@pytest.mark.parametrize("order", ["<", ">"])
+@pytest.mark.parametrize("route", ["edit", "from_tiff"])
+@pytest.mark.parametrize("path", [(), ("GPS",)])
+def test_r2_cut_array_keeps_whole_entries(tmp_path, caplog, order, route, path):
+    fields = [(271, 2, 4, b"abc\0"), (272, 2, 4, b"xyz\0")]
+    source = bytearray(
+        (
+            _fixture([(270, 2, 4, b"pic\0")], gps=fields, order=order)
+            if path
+            else _fixture(fields, order=order)
+        )[:-4]
+    )
+    offset = _record_locations(source, path)[0] - 2
+    struct.pack_into(order + "H", source, offset, 3)
+    (tmp_path / "cut-array.exif").write_bytes(source)
+    output = exif.edit(bytes(source), 4, 3) if route == "edit" else exif.from_tiff(bytes(source))
+    assert output is not None, "cut IFD0 discarded all metadata"
+    directories = _parse(output)[1]
+    assert path in directories, "cut child discarded whole entries"
+    assert all(field in directories[path] for field in fields), "whole entries were discarded"
+    messages = [record.getMessage() for record in caplog.records]
+    assert len(messages) == 1, "cut array must warn once"
+    assert all(word in messages[0] for word in (path[-1] if path else "IFD0", "3", "2")), (
+        "cut-array warning must name IFD and declared/kept counts"
+    )
+
+
+@pytest.mark.parametrize("order", ["<", ">"])
+@pytest.mark.parametrize("route", ["edit", "from_tiff"])
+def test_r2_slong_carried_pointer_is_dropped_with_warning(tmp_path, caplog, order, route):
+    source = bytearray(_fixture([(271, 2, 4, b"abc\0")], gps=[(1, 2, 2, b"N\0")], order=order))
+    at = _record_locations(source)[1]
+    struct.pack_into(order + "H", source, at + 2, 9)
+    (tmp_path / "slong-pointer.exif").write_bytes(source)
+    output = exif.edit(bytes(source), 4, 3) if route == "edit" else exif.from_tiff(bytes(source))
+    assert output is not None
+    assert _entry(output, (), 271) == (271, 2, 4, b"abc\0")
+    assert ("GPS",) not in _parse(output)[1]
+    messages = [record.getMessage() for record in caplog.records]
+    assert len(messages) == 1
+    assert "IFD0" in messages[0] and "34853" in messages[0]
+
+
+@pytest.mark.parametrize("fault", ["bad_value", "duplicate_d63", "unsupported_pointer"])
+def test_r2_read_then_write_warns_once_per_dropped_entry(tmp_path, caplog, fault):
+    fields = [(271, 2, 4, b"abc\0")]
+    if fault == "bad_value":
+        fields.append((65002, 7, 8, b"badvalue"))
+        tag = 65002
+    elif fault == "duplicate_d63":
+        fields.extend([(305, 2, 4, b"old\0"), (305, 2, 4, b"dup\0")])
+        tag = 305
+    else:
+        fields.append((330, 4, 1, struct.pack("<I", 8)))
+        tag = 330
+    source = bytearray(_fixture(fields))
+    if fault == "bad_value":
+        struct.pack_into("<I", source, _record_locations(source)[1] + 8, len(source) + 100)
+    path = tmp_path / "source.png"
+    PilImage.new("RGB", (4, 3), (20, 40, 60)).save(path, exif=b"Exif\0\0" + source)
+    image, meta = read_photo(path)
+    write_photo(image, meta, tmp_path / "written.png", bit_depth=16)
+    messages = [
+        record.getMessage()
+        for record in caplog.records
+        if record.name == "clearwater.io.photo.exif" and str(tag) in record.getMessage()
+    ]
+    assert len(messages) == 1, "read + write warned more than once per dropped entry"
+    assert "IFD0" in messages[0]
+    assert "badvalue" not in messages[0]

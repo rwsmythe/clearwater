@@ -60,8 +60,10 @@ class _Entry:
         self.child = child
 
 
-def _read_entries(data: bytes, drop: frozenset[int]) -> tuple[str, list[_Entry]]:
-    """Read raw entries, isolating entry faults and pruning faulty or empty child tables."""
+def _read_entries(
+    data: bytes, drop: frozenset[int], *, warn: bool = True
+) -> tuple[str, list[_Entry]]:
+    """Read each source IFD once, keeping whole entries from truncated arrays."""
     if len(data) < 8 or data[:2] not in (b"II", b"MM"):
         raise ValueError("invalid TIFF header")
     order = "<" if data[:2] == b"II" else ">"
@@ -70,13 +72,23 @@ def _read_entries(data: bytes, drop: frozenset[int]) -> tuple[str, list[_Entry]]
         raise ValueError("BigTIFF cannot be read for EXIF")
     if magic != 42:
         raise ValueError("invalid TIFF magic")
+    parsed: dict[int, list[_Entry]] = {}
 
     def read(offset: int, label: str, ancestors: frozenset[int]) -> list[_Entry]:
-        if offset < 8 or offset > len(data) - 6 or offset in ancestors:
+        # Test ancestry before the cache: an ancestor is a cycle, a sibling is a share.
+        if offset < 8 or offset > len(data) - 2 or offset in ancestors:
             raise ValueError("invalid or cyclic IFD offset")
-        count = struct.unpack_from(order + "H", data, offset)[0]
-        if count > (len(data) - offset - 6) // 12:
-            raise ValueError("IFD entry table runs past block")
+        if offset in parsed:
+            return parsed[offset]
+        declared = struct.unpack_from(order + "H", data, offset)[0]
+        count = min(declared, (len(data) - offset - 2) // 12)
+        if count < declared and warn:
+            _log.warning(
+                "TIFF %s entry array cut short: declared %s entries, kept %s whole entries",
+                label,
+                declared,
+                count,
+            )
         pointers = (
             {int(EXIF_IFD): "Exif", int(GPS_IFD): "GPS"}
             if label == "IFD0"
@@ -93,7 +105,8 @@ def _read_entries(data: bytes, drop: frozenset[int]) -> tuple[str, list[_Entry]]
                 or tag == 330
                 or (tag in IFD_POINTERS and tag not in pointers)
             ):
-                _log.warning("%s IFD-valued entry %s (type %s) dropped", label, tag, kind)
+                if warn:
+                    _log.warning("%s IFD-valued entry %s (type %s) dropped", label, tag, kind)
                 continue
             if label == "IFD0" and (tag in drop or tag in (513, 514)):
                 continue
@@ -114,7 +127,8 @@ def _read_entries(data: bytes, drop: frozenset[int]) -> tuple[str, list[_Entry]]
             try:
                 value = value_bytes()
             except ValueError as error:
-                _log.warning("TIFF %s entry %s cannot be read (%s); dropped", label, tag, error)
+                if warn:
+                    _log.warning("TIFF %s entry %s cannot be read (%s); dropped", label, tag, error)
                 continue
             if tag in pointers:
                 try:
@@ -123,24 +137,26 @@ def _read_entries(data: bytes, drop: frozenset[int]) -> tuple[str, list[_Entry]]
                     child_offset = struct.unpack(order + ("H" if kind == 3 else "I"), value)[0]
                     child = read(child_offset, pointers[tag], ancestors | {offset})
                 except ValueError as error:
-                    _log.warning(
-                        "TIFF %s IFD cannot be read (%s); %s entry %s dropped",
-                        pointers[tag],
-                        error,
-                        label,
-                        tag,
-                    )
+                    if warn:
+                        _log.warning(
+                            "TIFF %s IFD cannot be read (%s); %s entry %s dropped",
+                            pointers[tag],
+                            error,
+                            label,
+                            tag,
+                        )
                     continue
                 if child:
                     entries.append(_Entry(tag, kind, number, value, child))
             else:
                 entries.append(_Entry(tag, kind, number, value))
+        parsed[offset] = entries
         return entries
 
     return order, read(root, "IFD0", frozenset())
 
 
-def _put(entries: list[_Entry], replacement: _Entry, label: str) -> None:
+def _put(entries: list[_Entry], replacement: _Entry, label: str, *, warn: bool = True) -> None:
     """Replace the first D63 entry, drop later copies, or insert an absent entry by tag."""
     for index, entry in enumerate(entries):
         if entry.tag == replacement.tag:
@@ -148,7 +164,10 @@ def _put(entries: list[_Entry], replacement: _Entry, label: str) -> None:
             for later in range(len(entries) - 1, index, -1):
                 if entries[later].tag == replacement.tag:
                     del entries[later]
-                    _log.warning("TIFF %s duplicate D63 entry %s dropped", label, replacement.tag)
+                    if warn:
+                        _log.warning(
+                            "TIFF %s duplicate D63 entry %s dropped", label, replacement.tag
+                        )
             return
     index = next(
         (index for index, entry in enumerate(entries) if entry.tag > replacement.tag), len(entries)
@@ -156,17 +175,23 @@ def _put(entries: list[_Entry], replacement: _Entry, label: str) -> None:
     entries.insert(index, replacement)
 
 
-def _apply_d63(entries: list[_Entry], order: str, width: int, height: int) -> None:
-    """Change only the D63 fields, creating the Exif directory when necessary."""
-    _put(entries, _Entry(ORIENTATION, 3, 1, struct.pack(order + "H", 1)), "IFD0")
-    _put(entries, _Entry(SOFTWARE_TAG, 2, 11, b"Clearwater\0"), "IFD0")
+def _apply_d63(
+    entries: list[_Entry], order: str, width: int, height: int, *, warn: bool = True
+) -> None:
+    """Change the D63 fields once per shared Exif child, creating one when absent."""
+    _put(entries, _Entry(ORIENTATION, 3, 1, struct.pack(order + "H", 1)), "IFD0", warn=warn)
+    _put(entries, _Entry(SOFTWARE_TAG, 2, 11, b"Clearwater\0"), "IFD0", warn=warn)
     pointers = [entry for entry in entries if entry.tag == EXIF_IFD]
     if not pointers:
         pointer = _Entry(int(EXIF_IFD), 4, 1, bytes(4), [])
-        _put(entries, pointer, "IFD0")
+        _put(entries, pointer, "IFD0", warn=warn)
         pointers.append(pointer)
+    edited: set[int] = set()
     for pointer in pointers:
         assert pointer.child is not None
+        if id(pointer.child) in edited:
+            continue
+        edited.add(id(pointer.child))
         for tag, size in ((PIXEL_X, width), (PIXEL_Y, height)):
             previous = next((entry for entry in pointer.child if entry.tag == tag), None)
             kind = 3 if previous is not None and previous.kind == 3 and 0 <= size <= 65535 else 4
@@ -174,17 +199,22 @@ def _apply_d63(entries: list[_Entry], order: str, width: int, height: int) -> No
                 pointer.child,
                 _Entry(tag, kind, 1, struct.pack(order + ("H" if kind == 3 else "I"), size)),
                 "Exif",
+                warn=warn,
             )
 
 
 def _write_entries(order: str, entries: list[_Entry]) -> bytes:
-    """Lay out directories and raw values with new offsets and word padding."""
+    """Write each shared directory once, relocating raw values with word padding."""
     output = bytearray((b"II" if order == "<" else b"MM") + struct.pack(order + "HI", 42, 8))
+    written: dict[int, int] = {}
 
     def write(fields: list[_Entry]) -> int:
+        if id(fields) in written:
+            return written[id(fields)]
         if len(fields) > 65535:
             raise ValueError("too many TIFF entries")
         offset = len(output)
+        written[id(fields)] = offset
         output.extend(bytes(6 + len(fields) * 12))
         struct.pack_into(order + "H", output, offset, len(fields))
         for index, entry in enumerate(fields):
@@ -266,7 +296,8 @@ def sanitise(block: bytes | None, name: str) -> bytes | None:
 
     A damaged block (a CRC-valid ``eXIf`` chunk or a JPEG APP1 segment holding bytes that are not
     a TIFF structure) is dropped at read, so :func:`edit` never meets it in the writer; the written
-    file then carries the minimal block. The check runs the same edit the writer will run.
+    file then carries the minimal block. The trial edit suppresses entry warnings; the writer
+    emits them once when it performs the actual edit. A rejected block still warns here.
 
     Args:
         block: The bare EXIF block of the source, or None.
@@ -278,40 +309,46 @@ def sanitise(block: bytes | None, name: str) -> bytes | None:
     if not block:
         return None
     try:
-        edit(block, 1, 1)
-    except Exception as error:  # Pillow raises assorted types on malformed blocks
+        edit(block, 1, 1, _warn=False)
+    except Exception as error:  # Reject any block the trial cannot rewrite.
         _log.warning("%s: the EXIF block is damaged (%s); it is not carried", name, error)
         return None
     return block
 
 
-def edit(source: bytes | None, width: int, height: int) -> bytes:
+def edit(source: bytes | None, width: int, height: int, *, _warn: bool = True) -> bytes:
     r"""Return the D63-edited EXIF block a written image carries.
 
     Orientation is set to 1 (the rotation is in the pixels), the thumbnail (IFD1) is dropped
     (the next-IFD pointer is zero), PixelXDimension and PixelYDimension are set to the
     written size, Software is set to :data:`SOFTWARE`; every other field of IFD0, the Exif IFD,
     the Interop IFD and the GPS IFD is kept when readable. Individual damaged entries are
-    dropped with IFD/tag warnings. Faulty or empty child tables and unsupported IFD-valued
-    entries are dropped; header and root-table faults raise. Later duplicates of the four
-    D63 fields are removed; other duplicates are retained. A source without EXIF gets a
+    dropped with IFD/tag warnings. A cut array keeps all whole entries with one warning naming
+    the IFD and declared/kept counts; an absent next-IFD pointer is accepted. Invalid child
+    offsets/cycles, empty children and unsupported IFD-valued entries are dropped. Header
+    faults and invalid IFD0 offsets/cycles raise. Shared children are parsed and written once.
+    Later duplicates of the four D63 fields are removed; other duplicates are retained.
+    A source without EXIF gets a
     minimal block with those four fields. A relocated SHORT pointer promotes to LONG if needed.
 
     Args:
         source: The source EXIF block, or None.
         width: Width of the written image.
         height: Height of the written image.
+        _warn: Emit entry/damage warnings; False is reserved for sanitise's trial edit.
 
     Returns:
         The bare TIFF-structured block (no ``Exif\0\0`` prefix).
 
     Raises:
-        ValueError: The source header or IFD0 table is damaged or unsupported, or the
+        ValueError: The source header or IFD0 offset is invalid or unsupported, or the
             output directory has too many entries for classic TIFF.
         struct.error: A requested dimension or relocated offset cannot be represented.
     """
-    order, entries = _read_entries(strip_prefix(source), frozenset()) if source else (">", [])
-    _apply_d63(entries, order, width, height)
+    order, entries = (
+        _read_entries(strip_prefix(source), frozenset(), warn=_warn) if source else (">", [])
+    )
+    _apply_d63(entries, order, width, height, warn=_warn)
     return _write_entries(order, entries)
 
 
@@ -321,16 +358,19 @@ def from_tiff(data: bytes) -> bytes | None:
     Raw entry bytes are carried without decoding values or reading pixels. Structural tags,
     the embedded profile and the XMP, IPTC and Photoshop blobs are left out. The Exif IFD's Interop
     IFD is carried as an IFD, not as the file offset the TIFF stores. A faulty entry is
-    dropped alone with an IFD/tag warning. An unreadable or empty child table is dropped
-    with its pointer; a faulty header or IFD0 table discards the block. Carried pointers
-    retain type 4 or 13; type 3 is retained unless relocation requires promotion to LONG.
+    dropped alone with an IFD/tag warning. Cut arrays retain all whole entries with one
+    IFD/declared-count/kept-count warning; a missing next pointer is accepted. Invalid child
+    offsets/cycles and empty children are dropped with their pointers; a faulty header or
+    invalid IFD0 offset discards the block. Shared children are parsed and written once.
+    Carried pointers retain type 4 or 13; type 3 is retained unless relocation requires
+    promotion to LONG. Other pointer types are dropped with an IFD/tag warning.
 
     Args:
         data: The TIFF file's bytes.
 
     Returns:
         The bare EXIF block, or None when no EXIF-like fields survive or the header/IFD0
-        table cannot be read (a warning is logged). BigTIFF is unsupported. D63 field replacement
+        offset cannot be read (a warning is logged). BigTIFF is unsupported. D63 field replacement
         happens subsequently in :func:`edit`.
     """
     try:

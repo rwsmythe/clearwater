@@ -1,7 +1,7 @@
 # WP4.5 - EXIF byte fidelity through the photo writer
 
-Implementation and R1 remediation are complete; light verification is recorded
-below. Reviewer A R2, Reviewer B and the orchestrator's final gate remain
+Implementation and R2 remediation are complete; light verification is recorded
+below. Reviewer A R3, Reviewer B and the orchestrator's final gate remain
 pending. Product base: main `5a1538a`.
 This report contains synthetic evidence only; no real photo metadata is included.
 
@@ -35,6 +35,12 @@ offset exceeds 65535, when it promotes to LONG. The next-IFD pointer is zero, dr
 IFD1 and its thumbnail. Inserted entries precede the first greater tag, so a
 sorted source stays sorted.
 
+Each child IFD is parsed once by source offset and written once by shared
+directory identity. All pointers to that child use its single new offset;
+an ancestor offset is a cycle, while repeated sibling offsets share the child.
+The dimension edit also runs once per shared Exif child. This fixes R2 F-A's
+shared-child entry multiplication; the separate shared-value limit below remains.
+
 The D63 replacements are Orientation SHORT/count 1/value 1, Software ASCII
 Clearwater with its terminating NUL, and the written pixel dimensions. Existing
 SHORT dimensions remain SHORT when the new value fits; otherwise they become
@@ -48,11 +54,16 @@ four D63 fields and their structural Exif pointer.
 Counts, table extents, value lengths and offsets are checked before the
 corresponding reads or value copies. An entry with an unknown type or an invalid
 value extent/offset is dropped alone, with one warning naming the IFD and tag
-ID, never the value bytes. Sibling entries survive in every directory. A faulty
-child table is removed with its pointer and a warning; empty children are
-pruned recursively in both routes. A damaged header or root IFD0 table raises;
-`sanitise()` drops that block and `from_tiff()` returns None with a warning.
-One faulty IFD0 value does not discard the whole block.
+ID, never the value bytes. Sibling entries survive in every directory. A cut
+entry array retains every whole entry that fits, in IFD0 or a child, with one
+warning naming the IFD and declared/kept counts. A complete table needs only
+its two-byte count and 12 bytes per entry; a missing next pointer is accepted
+as zero. Invalid child offsets or cycles drop that child alone with a warning;
+empty children are pruned recursively. Header faults, invalid IFD0 offsets
+and root cycles raise; `sanitise()` drops the block and `from_tiff()` returns
+None with a warning. One faulty IFD0 value does not discard the whole block.
+The sanitise trial edit suppresses entry warnings using a private, default-loud
+keyword; the writer's actual edit warns once per dropped entry.
 
 `from_tiff()` uses the same raw parser and serializer on the original TIFF
 bytes, dropping TIFF structure/profile/XMP/IPTC/Photoshop entries. It returns
@@ -147,7 +158,9 @@ used `-m "not gpu and not footage and not gui and not slow and not fullclip"`,
 - Dispatcher reported changed-file format/ruff and LF/ASCII clean after turn 2.
   Final candidate formatting and blob checks remain dispatcher gate checks.
 - Reviewer A R1: 3 major, 2 minor and 4 advisory findings; adjudicated and
-  remediated under CHARC `980818fc01eb77ea`; R2 pending, no convergence claim.
+  remediated under CHARC `980818fc01eb77ea`.
+- Reviewer A R2: 1 major, 1 minor and 4 advisory findings; adjudicated and
+  remediated under CHARC `72fc47f6a4ecfd91`; R3 pending, no convergence claim.
 - Reviewer B: pending.
 - Full parallel leg: @@PAR@@
 - Impacted serial nodes: @@SER@@
@@ -157,6 +170,10 @@ Earlier dispatcher-seat evidence on `5a57d9f`: the real-photo round-trip node
 passed over all the owner's Phone photos, **1 passed in 328.40 s**. This is
 pre-remediation evidence supplied by the dispatcher and does not replace the
 final candidate gate or the placeholder above.
+
+Dispatcher-seat evidence on `3020648`, supplied to seat 2: the same real-photo
+round-trip node passed over all 73 Phone photos, **1 passed in 268.01 s**.
+This also predates R2 remediation and is not the final candidate gate.
 
 The owner directed that a full serial re-run is unnecessary. The orchestrator's
 gate is the full parallel leg plus the named impacted serial nodes and real-photo
@@ -170,7 +187,7 @@ CHARC `980818fc01eb77ea` amended the damage rule and dispositioned all findings:
 
 | Finding | Disposition and remediation |
 | --- | --- |
-| F1, major | Confirmed with RED entry-damage cases across all four IFDs and both routes. Drop only faulty entries; preserve siblings. Header/root-table faults still raise, child-table faults still isolate the child. |
+| F1, major | Confirmed with RED entry-damage cases across all four IFDs and both routes. Drop only faulty entries; preserve siblings. The current array/offset damage rule is the R2 F-C rule below. |
 | F2, major | Confirmed with carried type-13 pointers in both byte orders/routes. Carry type 13 at the supported Exif/GPS/Interop pointer positions and retain its source type. Other type-13 entries remain dropped. |
 | F3, major | Confirmed duplicate D63 entries survived. Replace the first occurrence and warn/drop later D63 copies. Retain all other duplicates; duplicate Exif children each receive dimension edits. |
 | F4, minor | Confirmed empty Interop pointers survived. Prune empty child trees recursively in both routes. |
@@ -187,6 +204,40 @@ also supplied zero mismatches over 3,000 valid layout/fidelity probes and no
 unexpected exception/hang over 20,000 mutated/truncated blocks; these are
 reviewer checks, not a substitute for the gate.
 
+## Reviewer A R2
+
+Claude opus/high, read-only, returned `NEW_CRITICAL_MAJOR_FOUND` on `3020648`.
+Fresh Codex seat 2 remediated under CHARC `72fc47f6a4ecfd91`:
+
+| Finding | Disposition and remediation |
+| --- | --- |
+| F-A, major | FIXED. Cache parsed children by source offset and written directories by identity, retaining duplicate pointers, source pointer types/counts and the ancestor cycle check. A=B=C=150 shared-pointer fixtures now have exactly 454 physical entries in three IFDs in both byte orders/routes; pre-fix output had 3,397,952 entries. No timing bound. This is distinct from R1 F7 shared values. |
+| F-B, minor | FIXED. Accept complete arrays without a next-IFD pointer in IFD0 and GPS; output next pointers remain zero. |
+| F-C, advisory, ruled amendment | FIXED under the new rule: retain all whole entries from a cut array, warn once with the IFD and declared/kept counts. Root header/offset/cycle faults raise; child offset/cycle faults drop only that child. Supersedes whole-table rejection wording and WP4.5 test controls. |
+| F-D, advisory, ruled Limit | Existing type-9 pointer drop retained with an IFD/tag warning; four passing regression controls cover both routes/orders. No pointer-type widening. |
+| F-E, advisory | Report F-A as fixed separately from the shared-value Limit and replace obsolete damage wording. |
+| F-F, advisory | FIXED. Quiet sanitise trial edit, default-loud writer edit. Synthetic read_photo + write_photo tests require one rewriter warning per bad-value, duplicate-D63 or unsupported-pointer entry. |
+
+R2 adds 27 cases. On unchanged `3020648`, **23 failed, 4 passed, 203
+deselected**, exit 1, before any product fix. The ledger records each actual
+failure: shared-child multiplication, missing-next-pointer table rejection,
+cut-array field loss, and duplicate read/write warnings. The four SLONG cases
+already pass on that head and serve as controls. After remediation and the
+superseded damage controls' update, **230 passed**, exit 0. The entry-count
+test's secondary assertion compares pointer types/counts/order, allowing the
+intentional D63 Software count change.
+
+Authorized light run on the final product/test changes: **907 passed, 5
+deselected, 133 warnings in 15.81 s**, exit 0, using the sandbox form and
+targets listed above. Targeted ruff check: exit 0, All checks passed. Mypy:
+exit 0, no issues in 141 source files. Ruff formatting applied to the two
+changed Python files; the dispatcher owns the final format check. The new
+bad-value read/write fixture triggers one Pillow `Truncated File Read`
+UserWarning while decoding its synthetic metadata; it is separate from the
+single product logger warning asserted by the test. No cell footage run.
+Logs and JUnit files: `work/wp4.5/r2-{red,green,light}.{log,xml}`,
+`r2-ruff.log`, `r2-mypy.log`, `r2-format.log`.
+
 ## Verification loop and limits
 
 The raw-fidelity problem was confirmed independently by source inspection,
@@ -197,7 +248,10 @@ extratag failure was reproduced on both product versions and traced to
 tifffile's filtered-tag set; the amended real-pointer test resolves it. R1's
 additional entry-damage, duplicate, pointer-type, empty-child and SHORT
 relocation regressions were confirmed RED before fixes and green afterward.
-The final R1 light run and static checks found no further failure. Full acceptance
+R2's shared-child, missing-next-pointer, cut-array and warning-count defects
+were independently confirmed by the code paths and RED tests, fixed and checked
+green. F-D is an existing-behavior control, not a newly implemented fix. The
+final R2 light run and static checks found no further failure. Full acceptance
 depends on the pending reviews and gate figures above.
 
 Named limits:
@@ -209,10 +263,13 @@ Named limits:
 - SubIFDs, type-13 entries outside carried pointer positions, and other IFD
   pointers outside the carried tree are dropped
   with warnings because the structures they address are not carried.
+- Carried pointers of types other than 3, 4 or 13 (including SLONG/9) are dropped
+  with a warning: no known writer emits one; the base followed any type.
 - Classic TIFF field types 1-12 are supported; type 13 is supported at carried
   pointer positions. Unknown types or invalid value extents/offsets drop only
-  that entry with an IFD/tag warning. Header/root-table faults discard the block;
-  child-table faults discard only that child. Empty children are omitted.
+  that entry with an IFD/tag warning. Cut arrays retain whole entries with one
+  count warning; header/root-offset/cycle faults discard the block, child
+  offset/cycle faults discard only that child. Empty children are omitted.
 - Hostile inputs can make many entries share one large source value. Relocation
   copies each value separately and can substantially increase output size and
   memory use. Reviewer R1 reproduced the same behavior in the base; CHARC F7

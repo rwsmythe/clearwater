@@ -1,5 +1,40 @@
 # WP4.5 - EXIF byte fidelity: cumulative ledger
 
+## Reviewer A Round 2 - seat 2 adjudication
+
+Reviewer: Claude opus/high, read-only on `3020648`; full findings supplied in
+the seat-2 dispatch. Evidence root supplied by the brief:
+`C:\Users\rwsmy\clearwater-review-evidence\wp4.5\r2\` (individual transcript
+filename/hash not supplied). Verdict: `NEW_CRITICAL_MAJOR_FOUND`.
+Governing ruling: CHARC `72fc47f6a4ecfd91`, 2026-10-29T20:02:35Z.
+All six reviewer findings are NEW; none reopened, reverted or rejected as false positive.
+This adjudication precedes the RED tests and all product changes.
+
+| Finding | Classification / CHARC disposition | Confirmation and authorized action |
+| --- | --- | --- |
+| F-A | Major, in envelope, EXECUTED; concur, FIX commissioned | `read` and `write` recurse per pointer without memoization. Parse each source child offset once, serialize its shared object once, and retain every pointer's type/count. Ancestor offsets remain cycles. RED uses A=B=C=150 and independent unique-IFD entry counting, with no time bound. Distinct from R1 F7 shared values. |
+| F-B | Minor, in envelope, EXECUTED; concur | Parser subtracts six bytes instead of two. Complete entry arrays survive without the unused next pointer; output next pointers remain zero. RED for IFD0 and GPS. |
+| F-C | Advisory, in envelope, EXECUTED; ruled damage amendment | Cut arrays retain all whole entries, with one warning identifying the IFD and declared/kept counts. Root raises only for header, invalid root offset or cycle; child offset/cycle faults drop that child. RED for IFD0 and GPS. Supersedes R1's whole-table-fault controls in this WP's new test file. |
+| F-D | Advisory, in envelope, EXECUTED; ruled Limit | Follow only pointer types 3/4/13. Type 9 and every other carried pointer type are dropped with an IFD/tag warning. Add a regression control; no pointer-type widening. |
+| F-E | Advisory, in envelope, REASONED; concur | Report F-A as FIXED separately from F7. Amend damage wording, add F-D Limit and R2 evidence. |
+| F-F | Advisory, in envelope, REASONED; concur | sanitise's trial edit runs quietly using a private keyword, default loud. Writer warns once. RED over actual synthetic read_photo + write_photo, without clearing captured warnings between them. |
+
+Ruling quoted for this dispatch: "Each child IFD is parsed ONCE and written
+ONCE, keyed by its SOURCE offset"; "An entry ARRAY cut short, in IFD0 or a child,
+keeps every WHOLE entry that fits"; "sanitise()'s trial edit runs quietly
+(a private keyword, default loud)". Q1 remains (b), stdlib struct byte rewrite.
+No new dependency, frozen-interface change, writer change or other-file grant.
+New major at R3 must return to CHARC before remediation; R3 runs after yield.
+
+Dispatcher-seat evidence on `3020648` (supplied, not run by seat 2):
+`tests/test_photo_check.py::test_the_real_photo_leg_reads_and_round_trips_the_owners_photos`
+**1 passed in 268.01 s**, all 73 Phone photos. Reviewer supplied 409 light
+tests passed and 1,500 valid fuzz blocks / zero mismatches. These predate the
+R2 fixes and do not replace final-candidate verification. Seat 2 initial
+`git status --short` was empty; no foreign change found. No footage accessed.
+
+RED outcomes and final checks are recorded in the R2 sections at the end.
+
 ## Round 0 - STOP resolved: Q1 = (b)
 
 STOP resolved, Q1 = (b) (CHARC `c64900357c363330`, brief commit `b4f2785`).
@@ -154,6 +189,7 @@ no full serial leg is requested. No acceptance or convergence is claimed now.
 | T3 grant check | Executed base/current test and independent TIFF inspection; not Reviewer A | 0 | 1 | 0 | 1 / 0 | 1 / 0 | 0 | Test-only attempted injection; no product change | STOP resolved by amended grant `8dd13704a85f2237`: placeholder tag then tag-ID patch and presence assertion |
 | T4 amended test check | Executed base test and final light run; not Reviewer A | 0 | 0 | 0 | 0 / 0 | 0 / 0 | 0 | Test-only remediation; no product change | Amended real GPS injection passes with rewrite; light run green; Reviewer A R1 pending |
 | A R1 | Claude opus/high, read-only; dispatch text and CHARC ruling `980818fc01eb77ea` | 0 | 3 | 2 (+4 advisory) | 8 / 1 | 9 / 0 | 0 | Product fixes F1/F2/F3/F4/F8; tests F6; docs F5/F7/F9 | NEW_CRITICAL_MAJOR_FOUND; remediation green at cell; R2 required |
+| A R2 | Claude opus/high, read-only on `3020648`; CHARC `72fc47f6a4ecfd91` | 0 | 1 | 1 (+4 advisory) | 6 / 0 | 6 / 0 | 0 | Product fixes F-A/B/C/F; tests/controls; report F-E and F-D Limit | NEW_CRITICAL_MAJOR_FOUND; seat 2 remediation green (907 light tests); R3 next |
 
 - Suspected: the fresh IFD construction drops source type pins.
 - Confirmed independently: source trace and parsed synthetic output agree for
@@ -170,6 +206,7 @@ no full serial leg is requested. No acceptance or convergence is claimed now.
 | Turn 2 yield | 114,882 input tokens; window 258,400 (supplied in turn 3) | Proceed under test-line grant `1d9f88948f4350c4` |
 | Turn 3 yield | 128,189 input tokens; window 258,400 (supplied in turn 4) | Proceed under amendment `8dd13704a85f2237` |
 | Turn 4 yield | 140,712 input tokens; window 258,400 (supplied in turn 5) | R1 remediation; yield near 230K if incomplete, stop near 250K |
+| Seat 1 retirement / Seat 2 dispatch | Seat 1: 188,902 input tokens supplied; seat 2 depth not yet supplied; binding window 258,400 | Fresh seat 2 on clean `3020648`; evaluate at 200K, stop near 250K at a step boundary |
 
 ## Reviewer A Round 1 - adjudication and remediation
 
@@ -732,3 +769,122 @@ R1 adds 94 cases. Three old whole-child payload-damage cases are superseded by t
 | test_r1_short_pointer_promotes_only_when_relocated_offset_overflows[parent2-40965-5->] | PASS (control) |
 | test_r1_short_pointer_promotes_only_when_relocated_offset_overflows[parent2-40965-70000-<] | struct.error: 'H' format requires 0 <= number <= 65535 |
 | test_r1_short_pointer_promotes_only_when_relocated_offset_overflows[parent2-40965-70000->] | struct.error: 'H' format requires 0 <= number <= 65535 |
+
+### R2 RED on unchanged product 3020648
+
+Command: `PYTHONPATH=scripts uv run --offline pytest tests/test_io_photo_exif_bytes.py -k r2 --basetemp=work/wp4.5/tmp -p sandbox_mkdir_shim -p no:cacheprovider -m "not gpu and not footage and not gui and not slow and not fullclip" --junitxml=work/wp4.5/r2-red.xml`. Output: `work/wp4.5/r2-red.log`.
+
+Exit 1: **23 failed, 4 passed, 203 deselected, 1 warning in 28.46s**. All 27 new cases ran before changing exif.py. F-D's four cases are passing controls because the ruled SLONG drop already exists; no artificial RED claimed. F-A actual output entry count was 3,397,952 versus the required 454.
+
+| Case | Actual pre-fix result |
+| --- | --- |
+| `test_r2_shared_children_are_written_once_by_entry_count[edit-<]` | AssertionError: shared child entries multiplied |
+| `test_r2_shared_children_are_written_once_by_entry_count[edit->]` | AssertionError: shared child entries multiplied |
+| `test_r2_shared_children_are_written_once_by_entry_count[from_tiff-<]` | AssertionError: shared child entries multiplied |
+| `test_r2_shared_children_are_written_once_by_entry_count[from_tiff->]` | AssertionError: shared child entries multiplied |
+| `test_r2_complete_table_without_next_pointer_survives[path0-edit-<]` | ValueError: IFD entry table runs past block |
+| `test_r2_complete_table_without_next_pointer_survives[path0-edit->]` | ValueError: IFD entry table runs past block |
+| `test_r2_complete_table_without_next_pointer_survives[path0-from_tiff-<]` | AssertionError: complete IFD0 lost without next pointer |
+| `test_r2_complete_table_without_next_pointer_survives[path0-from_tiff->]` | AssertionError: complete IFD0 lost without next pointer |
+| `test_r2_complete_table_without_next_pointer_survives[path1-edit-<]` | AssertionError: complete child lost without next pointer |
+| `test_r2_complete_table_without_next_pointer_survives[path1-edit->]` | AssertionError: complete child lost without next pointer |
+| `test_r2_complete_table_without_next_pointer_survives[path1-from_tiff-<]` | AssertionError: complete child lost without next pointer |
+| `test_r2_complete_table_without_next_pointer_survives[path1-from_tiff->]` | AssertionError: complete child lost without next pointer |
+| `test_r2_cut_array_keeps_whole_entries[path0-edit-<]` | ValueError: IFD entry table runs past block |
+| `test_r2_cut_array_keeps_whole_entries[path0-edit->]` | ValueError: IFD entry table runs past block |
+| `test_r2_cut_array_keeps_whole_entries[path0-from_tiff-<]` | AssertionError: cut IFD0 discarded all metadata |
+| `test_r2_cut_array_keeps_whole_entries[path0-from_tiff->]` | AssertionError: cut IFD0 discarded all metadata |
+| `test_r2_cut_array_keeps_whole_entries[path1-edit-<]` | AssertionError: cut child discarded whole entries |
+| `test_r2_cut_array_keeps_whole_entries[path1-edit->]` | AssertionError: cut child discarded whole entries |
+| `test_r2_cut_array_keeps_whole_entries[path1-from_tiff-<]` | AssertionError: cut child discarded whole entries |
+| `test_r2_cut_array_keeps_whole_entries[path1-from_tiff->]` | AssertionError: cut child discarded whole entries |
+| `test_r2_slong_carried_pointer_is_dropped_with_warning[edit-<]` | PASS (F-D limit control) |
+| `test_r2_slong_carried_pointer_is_dropped_with_warning[edit->]` | PASS (F-D limit control) |
+| `test_r2_slong_carried_pointer_is_dropped_with_warning[from_tiff-<]` | PASS (F-D limit control) |
+| `test_r2_slong_carried_pointer_is_dropped_with_warning[from_tiff->]` | PASS (F-D limit control) |
+| `test_r2_read_then_write_warns_once_per_dropped_entry[bad_value]` | AssertionError: read + write warned more than once per dropped entry |
+| `test_r2_read_then_write_warns_once_per_dropped_entry[duplicate_d63]` | AssertionError: read + write warned more than once per dropped entry |
+| `test_r2_read_then_write_warns_once_per_dropped_entry[unsupported_pointer]` | AssertionError: read + write warned more than once per dropped entry |
+
+### R2 remediation and verification (seat 2)
+
+F-A FIXED: `_read_entries` caches each completed source directory by its offset;
+the ancestor check precedes the cache lookup. Every retained pointer shares
+that directory object. `_write_entries` caches the object's new offset and
+writes its fields once. `_apply_d63` likewise edits each shared Exif child
+once, so duplicate pointers do not repeat dimension scans or duplicate-drop
+warnings. Source pointer types/counts survive (SHORT still promotes only on
+overflow under R1 F8). A=B=C=150 now gives 454 physical entries in exactly
+three IFDs for edit/from_tiff and II/MM. This fixes shared CHILD amplification,
+distinct from R1 F7 shared VALUES, which remains a named Limit.
+
+F-B FIXED: bounds require only the two-byte count plus whole 12-byte entries;
+the ignored source next-IFD pointer need not exist. Serialization always
+reserves a zero next pointer. F-C FIXED under the new ruling: clamp the
+declared count to whole entries remaining in the block, warn once with IFD
+label and declared/kept counts, and carry those entries. Bad entry payloads
+still drop individually; invalid child offsets/cycles isolate the child.
+F-D is the existing 3/4/13-only pointer policy with four passing controls,
+not a new fix. F-E report updated, including F-A FIXED and the one-sentence
+F-D Limit. F-F FIXED by private keyword `edit(..., _warn=True)` and quiet
+`sanitise(...)->edit(..., _warn=False)`; parser and D63 warning paths both
+honor it. Actual writer edits remain loud. Warnings contain labels/tag IDs
+or declared/kept counts, never value bytes.
+
+Test-control changes, all inside the WP4.5 new test file:
+
+- The three old child `table` cases (declared count 65535) now exercise a
+  missing two-byte count via offset `len(block)-1`, named `missing_count`.
+  Cut arrays are covered by the new F-C cases and are no longer child-fatal.
+- The root raise case formerly containing a full count of 65535 now ends
+  after one count byte, preserving the ruled invalid-root-offset control.
+- `test_r1_child_table_fault_drops_child_only[edit/from_tiff]` is renamed to
+  `test_r1_child_offset_fault_drops_child_only` and uses a past-EOF pointer.
+  These six removed/replacement node IDs reflect F-C's amended contract;
+  no existing test outside the owned file was edited in seat 2.
+- First GREEN attempt: exit 1, 8 failed / 222 passed, `r2-first-green.log/xml`.
+  Six failures were the superseded controls above; the other two were a
+  secondary F-A test assertion inadvertently including Software's intentional
+  D63 count change. Corrected to compare pointer types/counts/order only.
+  The primary entry-count assertion and source fixture did not change, so
+  all four original F-A RED failures remain applicable. These two secondary
+  failures were test false positives, not additional product defects.
+
+| Check | Exit | Actual result | Evidence under work/wp4.5/ |
+| --- | --- | --- | --- |
+| R2 RED on unchanged `3020648`, `-k r2` | 1 | 23 failed, 4 passed, 203 deselected, 1 warning in 28.46s | `r2-red.log/xml`; per-case table above |
+| New file GREEN | 0 | 230 passed, 1 warning in 0.91s | `r2-green.log/xml` |
+| Authorized combined light run, after Python formatting | 0 | 907 passed, 5 deselected, 133 warnings in 15.81s | `r2-light.log/xml` |
+| Targeted `uv run --offline ruff check` | 0 | All checks passed! | `r2-ruff.log` |
+| `uv run --offline mypy` | 0 | Success: no issues found in 141 source files | `r2-mypy.log` |
+| Format the two changed Python files | 0 | 2 files reformatted | `r2-format.log` |
+| Owned-file byte/scope/result audit | 0 | Exactly four owned files; ASCII/LF-only, final newlines, no trailing whitespace; diff check clean; JUnit confirms 27 RED / 230 GREEN / 907 light cases | `r2-final-audit.log` |
+
+Light targets: all `tests/test_io_photo_*.py` (including the new file once),
+`tests/test_photo_check.py`, `tests/test_wp41_photo_path.py` and
+`tests/test_jobs_export_photo.py`. Every pytest run uses `PYTHONPATH=scripts`,
+`--basetemp=work/wp4.5/tmp`, `-p sandbox_mkdir_shim`, `-p no:cacheprovider`, and
+`-m "not gpu and not footage and not gui and not slow and not fullclip"`.
+All runner output goes to files under `work/wp4.5/`. The added bad-value PNG
+fixture produces one Pillow `Truncated File Read` UserWarning on the decoded
+read side. The F-F assertions count product logger warnings separately and
+require exactly one across read and write without clearing captured logs.
+No warning suppression was applied to the pytest run itself.
+
+Verification loop: suspected each R2 mechanism from the review; independently
+confirmed with the existing code paths and actual RED failures; fixed in the
+owned module; repeated the new-file and combined light checks with no further
+failure. Reviewed the final product diff against F-A/B/C/D/F, warning privacy,
+docstrings, source byte/type/count carry, and scope. No additional in-envelope
+product defect found. No reviewer finding rejected; the secondary test false
+positive is recorded above. No dependency/interface/writer/reader/PNG changes,
+no existing-test change outside the owned file, no local-config change, no
+footage access, no mailbox post, no commit and no write outside the worktree.
+No register row or harness gate is required by the ruling.
+
+Seat 2 yields one logical R2 remediation spanning product/tests/report/ledger;
+dispatcher commits by the listed pathspec. No convergence/acceptance claim:
+Reviewer A R3 runs next, then Reviewer B and final full parallel + impacted
+serial nodes at the orchestrator's seat, per the owner's direction. Final
+format/blob checks are also dispatcher-owned. Seat 2's depth is not supplied;
+the dispatcher reads it at this boundary (binding window 258,400).
