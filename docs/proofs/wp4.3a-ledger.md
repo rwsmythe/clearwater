@@ -20,7 +20,8 @@
 |---|---|---|---|
 | Turn 1 footer, supplied at Turn 2 dispatch | `tokens used` 96,223; input depth 102,475 | 258,400 tokens | Dispatcher-read figure for session `01a18856-955d-74e3-b211-dfb519efdf0c`; evaluate near 200K, stop at a step boundary near 250K. |
 | Turn 2 footer, supplied at Turn 3 dispatch | `tokens used` 238,706; input depth 146,818 | 258,400 tokens | Dispatcher-read figure; no estimate substituted. |
-| Turn 3 | Awaiting dispatcher footer reading | 258,400 tokens | Evaluate near 200K at the next boundary; do not estimate depth. |
+| Turn 3 footer, supplied at Turn 4 dispatch | `tokens used` 346,443; input depth 205,870 | 258,400 tokens | Past the evaluation point. Turn 4 is explicitly bounded; leave a successor handoff and await the next dispatcher depth. |
+| Turn 4 | Awaiting dispatcher footer reading | 258,400 tokens | No estimate substituted. Next seat may be fresh; stop at this task boundary. |
 
 ## Round 0: observed base
 
@@ -486,3 +487,176 @@ or sibling-worktree access. The attempted administrative-share access came from
 the authorized existing test set and failed in the sandbox; further execution
 of those cases is yielded to the seat. All new tests remain parallel-leg and
 all new writes stay under tmp_path. No new product timing/memory measurement.
+
+
+## Turn 4: CHARC ruling, recorded verbatim before remediation
+
+Ruling `a2ef868a6e14b506`, authoritative source: `C:\Users\rwsmy\clearwater-review-evidence\wp4.3a\b4-ruling-b6aa800a.md`.
+
+```text
+---
+
+PRIMARY: CHARC. Ruling on query f513222455172d4e (WP4.3a STOP, B4).
+
+**(a) GRANTED. RULED.** Grounds, read at this seat on `wp4.3a` ef903e5: the runner's module docstring (`tools/headless_export.py:9-10`) already documents that `load_settings` "renames a corrupt settings.json beside itself" (D89) and the run proceeds on defaults; the `OverflowError` arm at `:1196-1200` was WP4.1's defensive refusal for the CRASH that DR-85 now classifies as a decode failure of the same class. One reader, one behaviour for every caller: the overflow case follows the documented corrupt-file case (set aside, defaults, exit 0). (b) is DECLINED for the reason you gave (a per-caller split with a duplicated decode).
+
+Conditions:
+1. **Scope of the test grant:** `tests/test_headless_export.py` `test_b4_...` (`:1093-1105`) ONLY, renamed to say what it now proves. Assertions: exit 0; the original bytes kept at `settings.json.bad-*` (exactly one such file, equal bytes); the export written; stderr carries no full path (`_no_full_path`); and the export used DEFAULT parameters (the record or the output shows the default set, not the planted one), so the set-aside is proved, not inferred.
+2. **The WARNING route (owned file, RED-first):** the runner installs no logging handler (no `basicConfig` / `StreamHandler` in `tools/headless_export.py`), so `settings_store._log.warning(... %s ...)` (`settings_store.py:161/168`, full path) reaches stderr through logging's last-resort handler UNREDACTED. Fix in the runner: a stderr handler (or `logging` filter) whose formatter passes the record's rendered message through the run's `Redactor`, installed once in `_main` before `_settings`. Test: the B4 stderr line names the file by basename only. This gap is PRE-EXISTING for the plain-corrupt-file case (WP4.1), DR-81-class; closes with the same edit; I append it to DR-81's closure text at the accept. Note it in the report.
+3. The `:1196` tuple may keep `OverflowError` as defensive; the comment changes to say the loader handles it (DR-85) and the arm is unreachable through `load_settings`. The cell's call; say which in the ledger.
+4. Report: one line naming the WP4.1 behaviour change (B4's refusal -> the documented corrupt-file behaviour), the grounds above, and the accept record carries it.
+
+Everything else in turn 3 stands as built; resume the Codex cell from the STOP (tasks 4-5 commit, then this edit, then task 6 and the report). Depth 205,870 / 258,400 noted: if the remaining work does not fit under the cap in this seat, re-seat at a committed head per the depth discipline rather than compacting mid-task.
+
+Slip noted, no action. WP4.3 cell 5 Group A noted.
+
+Owner-pending inputs: photos (WP3.6P), the iPhone clip (DR-15). Open owner decisions: none.
+
+
+```
+
+
+### Turn 4 execution and verification
+
+The dispatcher committed Turn 3 as `fa2afab`, recording the stale B4 expectation
+as intentionally red at that commit. The prior STOP is now resolved by CHARC's
+verbatim ruling above. Scope extends only to the one B4 test function and the
+owned runner WARNING route; no other existing headless test was changed.
+
+Dispatcher-seat results supplied at this boundary (not additional sandbox runs):
+format check **269 files already formatted**; the three UNC cases **3 passed**;
+old B4 reproduces exit 0 versus its stale expected exit 2, with full paths in the
+captured settings WARNING record.
+
+Implementation:
+
+- `_main` scopes `_redacted_stderr` around its execution, installing the handler
+  once before `_settings`. The handler belongs to the clearwater application
+  logger, emits WARNING or above only, and is removed/closed in finally.
+- `_RedactingFormatter` copies the record, suppresses existing tag-value forms,
+  formats it and passes the complete rendered text through the run's Redactor.
+  It does not mutate the records seen by a host's handlers. The existing library
+  run/last-resort policy remains in place.
+- The settings file is also a known redaction path, so both settings.json and
+  its .bad-* sibling appear by file basename, without even the settings-folder
+  prefix. Existing redactor construction/refusal handling guards this path too.
+- Renamed only the granted B4 function to
+  `test_b4_overflowing_settings_are_preserved_and_export_uses_defaults`.
+  It plants nondefault gamma, PNG depth and suffix, then proves exit 0, exactly
+  one byte-identical backup, an actual corrected PNG, the entire default
+  parameter mapping (including gamma 1.5 rather than planted 2.25), default
+  16-bit output and path-free stderr.
+- Kept the runner _settings OverflowError arm as defensive. Its comment now
+  explicitly says DR-85 handles it in load_settings and this arm is unreachable
+  through that loader, as condition 3 permits.
+- Wrote `docs/reports/wp4.3a-hardening.md` as DRAFT, including the five rows,
+  Round 0 facts, Q-A/Q-B/Q-C, the WP4.1 behavior change, the WARNING route and
+  Limits. Reviewer/gate claims are explicitly pending.
+
+| Check | RED or final result | Evidence under work/wp4.3a/ |
+|---|---|---|
+| WARNING route, year-one and plain corrupt JSON | RED: 2 failed, 9 deselected in 0.98s, exit 1. Existing pytest logging capture receives the warning record, while stderr has progress only, not the required redacted warning. | turn4-warning-red.log |
+| Same two WARNING cases after fix | 2 passed, 9 deselected in 0.73s, exit 0. File names only; warning printed once; application handlers restored. | turn4-warning-green.log |
+| Updated B4 plus both WARNING cases | 3 passed, 9 deselected in 0.85s, exit 0. | turn4-b4-warning-green.log |
+| Bounded headless / new runner / WP4.2a regression | 136 passed, 4 deselected in 8.22s, exit 0; no failures or skips. Deselects: the three known sandbox-blocked UNC tests and one GUI-marked case. | turn4-regression.log |
+| Ruff check | All checks passed!, exit 0. | turn4-ruff.log |
+| Strict mypy | Success: no issues found in 141 source files, exit 0. | turn4-mypy.log |
+| Write-mode formatting, three changed Python files | 2 files reformatted, 1 file left unchanged, exit 0. Global --check remains at the seat. | turn4-format.log |
+| Ownership / LF / diff check | Exactly five changed owned/granted paths; byte-for-byte equality outside the B4 function in test_headless_export.py; ruling text still preserved; all LF; diff check passed, exit 0. | turn4-scope-check.log |
+
+The bounded pytest command includes tests/test_headless_export.py,
+tests/test_wp43_runner_redaction.py and tests/test_wp42a_runner_hardening.py,
+with the standard exclusion expression for gpu/footage/slow/gui/fullclip and
+three explicit --deselect node IDs for the administrative-share cases.
+All executions use PYTHONPATH=scripts, sandbox_mkdir_shim, no cache provider,
+and a temp root under work/wp4.3a. No further share access was attempted.
+
+Verification loop:
+
+| Suspected / checked | Confirmed or rejected | Fix / final status |
+|---|---|---|
+| WARNING needs an explicit CLI stderr route under captured logging. | Both corrupt-file forms lack the required warning in stderr before the change. | Scoped handler and copying redacting formatter; both cases green. The standalone last-resort filtering already existed; no claim is made that the RED test observed a raw path in stderr. |
+| B4 could pass while silently using planted settings. | The old assertion is obsolete under DR-85; defaults need direct evidence. | Byte-identical set-aside and exported provenance prove the required defaults, bit depth and suffix. Updated B4 green under the narrow grant. |
+| Handler might leak or duplicate output across runs. | Two distinct corrupt-file invocations each print the settings warning exactly once and restore the handler list. | No new issue found in the bounded GREEN pass. |
+| Fix might cross the test grant. | Source comparison strips only the B4 function and proves the rest is byte-identical. | Grant honored; no other headless test edited. |
+
+Current disposition: T3-F1 resolved by CHARC and the passing amended test;
+T3-F2 passes at the dispatcher's seat on fa2afab, remains a sandbox limitation,
+and is requested again at the seat for the amended candidate. No new STOP.
+The final format/UNC seat checks, remainder of task 6 and reviewer/gate work
+remain pending; the DRAFT report does not claim acceptance.
+
+## RESUME HERE - successor seat
+
+### Commits and current work
+
+- Dispatch base: `fe65e6a867106dd984d1c27ef3104e2ee3de0df4`.
+- `a614160`: Round 0 ledger, accepted by the dispatcher.
+- `ef903e5`: task 3 spawn helper, seven callers, delegation, six regression
+  cases; green development checks and dispatcher-seat video QA.
+- `fa2afab`: tasks 4-5 config/provenance/redaction implementation and tests;
+  committed with the old B4 expectation red by design, as the dispatcher states.
+- Turn 4 current diff: tools/headless_export.py; the single granted B4 function
+  in tests/test_headless_export.py; added WARNING cases in
+  tests/test_wp43_runner_redaction.py; DRAFT report; this ledger. Dispatcher
+  assigns the commit SHA after this yield. Suggested subject:
+  `fix(wp4.3a): redact logged warnings and assert corrupt-settings defaults`.
+
+### Task 6 light-run matrix and actual status
+
+| Required surface | Latest evidence | Remaining action on the amended candidate |
+|---|---|---|
+| New spawn file | Six cases passed Turn 2; forced-error additions passed Turn 3 focused set. | Include in the final combined light run. |
+| tests/test_io_video_*.py | Turn 2 sandbox 474 passed/36 deselected including core layering; dispatcher video-only 494 passed/12 footage deselected. Turn 3 changed only failure texts and added forced-error checks. | Rerun permitted video cases after the text edits; leave hardware/footage/fullclip to the seat. |
+| tests/test_config_*.py | Turn 3 broad set contained their passing cases; new timestamp/provenance cases passed individually and in the focused set. | Rerun after the scoped CLI logging change to check logging state interactions. |
+| tests/test_headless_export.py | Turn 4 bounded run green, including renamed B4; one GUI plus three explicit UNC exclusions. | Seat run for the three UNC cases on this amendment; GUI handled at gate. |
+| tests/test_wp43_runner_redaction.py | Turn 4 entire file green in bounded run, including both new WARNING cases. | Include in final combined light run. |
+| tests/test_wp42a_runner_hardening.py | Turn 4 entire permitted file green in bounded run. | Include in final combined light run. |
+| tests/test_wp42b_naming_guard.py | Turn 3 broad set green for its permitted cases. | Rerun after the logging amendment. |
+| Layering: core_deps, io_video_decode_rules, io_video_probe_rules | Turn 2 all 48 selected layering cases passed unchanged. | Include in final layering run. |
+| Layering: color_deps, analysis_deps, gui_deps, app_deps | Not yet run by this cell. | Run the permitted nodes; no GUI execution. |
+| Ruff / mypy | Turn 4 both green; mypy 141 files. | Confirm against final candidate at the required boundary. |
+| Global format check | Dispatcher 269 files already formatted before Turn 4; write-mode format applied to this amendment. | Dispatcher `uv run ruff format --check .`. |
+
+### Remaining work and review discipline
+
+1. Complete the task-6 combined light-run and layering lists above, with the
+   required sandbox shim/no-cache options and work/wp4.3a temp roots. Do not
+   execute the three administrative-share cases in this sandbox.
+2. Refresh the DRAFT report's validation/limits after those checks and reviews;
+   the draft is written, so it need not be recreated.
+3. Reviewer A is the dispatcher's read-only Claude Opus/high PROCESS pass via
+   scripts/codex_cell.py review. No round has been supplied/run yet. Adjudication
+   turns change the ledger only and YIELD before remediation. Record cumulative
+   severity/envelope/NEW-REOPENED/revert/product-vs-test/depth rows. At round 5
+   and every fifth round, STOP under the fill's continuation policy.
+4. Reviewer B is also the dispatcher's Claude pass. Then the orchestrator runs
+   the ONE two-leg gate on the final candidate AFTER B; both expressions exclude
+   fullclip. Do not request a full suite before B. No harness gate is required
+   for this owned-file set.
+5. Gate collection delta is intentional: one existing B4 node is renamed, and
+   two new parameterized WARNING cases are added. This grant explains that
+   removal/addition; no other existing headless node is changed.
+6. All original locks persist, with only the explicit B4/runner grant added.
+   No interface, GUI/app/jobs/photo writer, dependency, fixtures or register edit.
+   No footage reads/writes, mailbox posts, git writes or sibling-worktree access.
+   Keep report/register closures distinct: CHARC owns the closure/AD notes.
+
+### Every ruling's location
+
+- FINAL brief and governing Q-A/Q-B/Q-C: docs/briefs/wp4.3a-brief.md,
+  CHARC `8fb519bac1878075`. The same brief carries the inherited Q9/Q13 approval
+  (`2c4476d9869df056`) and Q14/Q20/Q21/Q23 decisions
+  (`7c7df3dbe237ceb7`) verbatim.
+- B4 and WARNING amendment: CHARC `a2ef868a6e14b506`, authoritative file
+  C:\Users\rwsmy\clearwater-review-evidence\wp4.3a\b4-ruling-b6aa800a.md;
+  verbatim text is in this ledger immediately above the Turn 4 execution record.
+- AD-13 / AD-23 source: docs/decisions.md; accept notes remain owed by CHARC.
+- Round/gate policy: docs/review-gate-clearwater.md, with the dispatch's AD-30
+  not-fullclip amendment. The turn schedule/seat-only format/no-network sandbox
+  constraints are in the dispatch prompts; latest bounded-turn instruction is
+  the Turn 4 prompt. Do not replace them with generic skill workflow choices.
+
+Context of record: Turn 3 input depth 205,870 of 258,400, supplied by the
+orchestrator; Turn 4 footer depth is not yet supplied. Evaluate/re-seat from
+this committed handoff rather than assuming more room or compacting mid-task.

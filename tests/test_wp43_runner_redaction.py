@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from datetime import datetime
 from pathlib import Path
 
@@ -146,3 +147,46 @@ def test_raising_footage_resolution_is_a_usage_refusal(
     assert "hidden-private-parent" not in captured.err and str(tmp_path) not in captured.err
     assert "Traceback" not in captured.err and captured.err.isascii()
     assert not captured.out and not list(out.iterdir())
+
+
+@pytest.mark.parametrize("corrupt", ["year-one", "plain-json"])
+def test_settings_warning_is_printed_with_file_names_only(
+    sample, tmp_path: Path, monkeypatch, capsys, corrupt
+) -> None:
+    """A CLI-owned warning handler must show corrupt settings by basename and then detach."""
+    from clearwater.config import new_parameter_set, save_settings
+
+    folder = tmp_path / "private-settings-parent" / "settings"
+    folder.mkdir(parents=True)
+    path = save_settings(folder, Settings(last_parameters=new_parameter_set("c3", {})))
+    if corrupt == "year-one":
+        data = json.loads(path.read_text(encoding="utf-8"))
+        data["last_parameters"]["created"] = "0001-01-01T00:00:00+01:00"
+        path.write_text(json.dumps(data), encoding="utf-8")
+    else:
+        path.write_text("{not json", encoding="utf-8")
+    out = tmp_path / "out"
+    out.mkdir()
+    logger = logging.getLogger("clearwater")
+    before_handlers = tuple(logger.handlers)
+    monkeypatch.setattr(he, "configured_footage_folder", lambda: None)
+    assert (
+        he.main(
+            [
+                str(sample("jpeg-gradient-srgb")),
+                "--out",
+                str(out),
+                "--force-cpu",
+                "--settings-dir",
+                str(folder),
+            ],
+            exports=composition.export_jobs(),
+        )
+        == 0
+    )
+    err = capsys.readouterr().err
+    assert "settings file settings.json " in err and "using defaults" in err
+    assert err.count("settings file settings.json ") == 1
+    assert "private-settings-parent" not in err and str(tmp_path) not in err
+    assert "settings\\settings.json" not in err and "settings/settings.json" not in err
+    assert tuple(logger.handlers) == before_handlers

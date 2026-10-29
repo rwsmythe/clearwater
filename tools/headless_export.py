@@ -63,14 +63,15 @@ summary lines go to stdout and the ``[i/n]`` progress messages to stderr. Every 
 (the output folder, each source's folder, the settings, record, parameter and cache folders, and the
 local configuration's folder) is shown by its NAME in every record field and printed line, one
 :class:`Redactor` applied at each exit point: an engine text such as the D87 free-space refusal
-names its folder; an ``argparse`` refusal is redacted against the paths its arguments name. This
-tool installs no logging handler, so ``run_batch``'s INFO report (which names full output paths) is
-not emitted; Python's last-resort handler prints WARNING lines only, and while :func:`main` runs a
-filter on that handler passes them through the same redactor and prints no tag value from the EXIF
-module's own WARNINGs (each of their arguments, and every ``%r`` argument, is shown as ``...``);
-:func:`run` does the same while its batch runs. A process that installs its own logging handlers (a
-host program, pytest) receives the engine's records as they are logged, full paths and tag values
-included: the runner redacts what it prints and records, not another program's logging.
+names its folder; an ``argparse`` refusal is redacted against the paths its arguments name.
+:func:`main` temporarily installs a WARNING-level stderr handler before settings are loaded. Its
+formatter passes rendered messages through the same redactor and prints no tag value from the
+EXIF module's own WARNINGs (each of their arguments, and every ``%r`` argument, is shown as
+``...``); the handler emits no INFO report. The library :func:`run` adds no handler: it filters
+Python's last-resort WARNING output while its batch runs. A process that installs its own
+logging handlers (a host program, pytest) receives the engine's records as they are logged,
+full paths and tag values included: the runner redacts what it prints and records, not another
+program's logging.
 """
 
 from __future__ import annotations
@@ -549,6 +550,36 @@ def _redacted_last_resort(redact: Redactor) -> Iterator[None]:
         yield
     finally:
         handler.removeFilter(log_filter)
+
+
+class _RedactingFormatter(logging.Formatter):
+    """Format a redacted warning without altering records received by a host's handlers."""
+
+    def __init__(self, redact: Redactor) -> None:
+        super().__init__()
+        self._redact = redact
+
+    def format(self, record: logging.LogRecord) -> str:
+        """Render the warning, suppress tag values and redact the complete formatted text."""
+        copied = logging.makeLogRecord(record.__dict__.copy())
+        copied.msg = _without_tag_values(record)
+        copied.args = None
+        return self._redact(super().format(copied))
+
+
+@contextlib.contextmanager
+def _redacted_stderr(redact: Redactor) -> Iterator[None]:
+    """Print the CLI's application warnings through its redactor, only for this run."""
+    logger = logging.getLogger("clearwater")
+    handler = logging.StreamHandler(sys.stderr)
+    handler.setLevel(logging.WARNING)
+    handler.setFormatter(_RedactingFormatter(redact))
+    logger.addHandler(handler)
+    try:
+        yield
+    finally:
+        logger.removeHandler(handler)
+        handler.close()
 
 
 def route(path: Path) -> Literal["photo", "video"] | str:
@@ -1193,8 +1224,9 @@ def _settings(args: argparse.Namespace) -> Settings:
         raise RunnerRefusalError("the --settings-dir folder does not exist.")
     try:
         base = Settings() if args.settings_dir is None else load_settings(args.settings_dir)
-    except (OSError, ValueError, OverflowError) as exc:  # FormatError, an unsupported version,
-        # or a stamp that overflows when normalised to UTC (Reviewer B B4)
+    except (OSError, ValueError, OverflowError) as exc:
+        # DR-85: load_settings handles timestamp overflow by setting aside the file. The
+        # OverflowError arm remains defensive and is unreachable through load_settings.
         raise RunnerRefusalError(
             f"the --settings-dir settings cannot be used: {ascii_text(str(exc))}"
         ) from exc
@@ -1294,6 +1326,7 @@ def main(argv: Sequence[str] | None = None, *, exports: ExportJobs | None = None
     except SystemExit as exc:  # the help was printed (0)
         return exc.code if isinstance(exc.code, int) else 2
     own = [args.out, args.settings_dir, args.cache_dir]
+    own += [None if args.settings_dir is None else args.settings_dir / SETTINGS_FILE_NAME]
     own += [None if args.record is None else args.record.parent]
     own += [None if args.parameters is None else args.parameters.parent]
     known = [Path(p) for p in own if p is not None] + [Path(p).parent for p in args.paths]
@@ -1315,49 +1348,54 @@ def _main(
     args: argparse.Namespace, exports: ExportJobs | None, redact: Redactor, known: list[Path]
 ) -> int:
     """Run the parsed command line with the redactor in place (:func:`main`)."""
-    try:
+    with _redacted_stderr(redact):
         try:
-            footage = configured_footage_folder()
-        except (OSError, RuntimeError) as exc:
-            raise RunnerRefusalError("the configured footage folder cannot be resolved.") from exc
-        _check_own_paths(args, footage)
-        settings = _settings(args)
-        if args.parameters is not None:
-            parameters = parameters_for(args.method, file=args.parameters)
-            source = "file"
-        else:
-            parameters = parameters_for(args.method, neutral=args.neutral)
-            source = "neutral" if args.neutral else "defaults"
-        requests = requests_for(args.paths, parameters=parameters, settings=settings)
-        check_outputs(requests, footage)
-        videos = [r for r in requests if r.kind == "video" and not isinstance(r, RefusedRequest)]
-        if videos and args.cache_dir is None:
-            raise RunnerRefusalError("--cache-dir is required when an item is a video.")
-    except RunnerRefusalError as exc:
-        print(f"headless_export: {redact(str(exc))}", file=sys.stderr)
-        return 2
-    progress = RunnerProgress(lambda message: print(redact(message), file=sys.stderr))
-    on_main = threading.current_thread() is threading.main_thread()
-    previous = signal.signal(signal.SIGINT, lambda *_: progress.cancel()) if on_main else None
-    try:  # the handler stays until the record is written: a Ctrl-C then only sets the flag
-        record = run(
-            requests,
-            exports=exports,
-            progress=progress,
-            footage_folder=footage,
-            parameters_from=source,
-            known_folders=known,
-            cache_folder=args.cache_dir,
-        )
-        for line in summary_lines(record):
-            print(line)
-        written = args.record is None or _write_record(args.record, record, redact)
-    finally:
-        if previous is not None:
-            signal.signal(signal.SIGINT, previous)
-    if not written or progress.cancelled():  # a Ctrl-C while the record was written included
-        return 1
-    return exit_status(record)
+            try:
+                footage = configured_footage_folder()
+            except (OSError, RuntimeError) as exc:
+                raise RunnerRefusalError(
+                    "the configured footage folder cannot be resolved."
+                ) from exc
+            _check_own_paths(args, footage)
+            settings = _settings(args)
+            if args.parameters is not None:
+                parameters = parameters_for(args.method, file=args.parameters)
+                source = "file"
+            else:
+                parameters = parameters_for(args.method, neutral=args.neutral)
+                source = "neutral" if args.neutral else "defaults"
+            requests = requests_for(args.paths, parameters=parameters, settings=settings)
+            check_outputs(requests, footage)
+            videos = [
+                r for r in requests if r.kind == "video" and not isinstance(r, RefusedRequest)
+            ]
+            if videos and args.cache_dir is None:
+                raise RunnerRefusalError("--cache-dir is required when an item is a video.")
+        except RunnerRefusalError as exc:
+            print(f"headless_export: {redact(str(exc))}", file=sys.stderr)
+            return 2
+        progress = RunnerProgress(lambda message: print(redact(message), file=sys.stderr))
+        on_main = threading.current_thread() is threading.main_thread()
+        previous = signal.signal(signal.SIGINT, lambda *_: progress.cancel()) if on_main else None
+        try:  # the handler stays until the record is written: a Ctrl-C then only sets the flag
+            record = run(
+                requests,
+                exports=exports,
+                progress=progress,
+                footage_folder=footage,
+                parameters_from=source,
+                known_folders=known,
+                cache_folder=args.cache_dir,
+            )
+            for line in summary_lines(record):
+                print(line)
+            written = args.record is None or _write_record(args.record, record, redact)
+        finally:
+            if previous is not None:
+                signal.signal(signal.SIGINT, previous)
+        if not written or progress.cancelled():  # a Ctrl-C while the record was written included
+            return 1
+        return exit_status(record)
 
 
 def _write_record(path: Path, record: RunRecord, redact: Redactor) -> bool:

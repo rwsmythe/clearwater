@@ -1090,19 +1090,39 @@ def test_b2_a_non_ascii_folder_in_another_case_is_hidden(tmp_path: Path) -> None
     assert redact(f"failed in {other}") == "failed in out"
 
 
-def test_b4_a_settings_file_whose_created_stamp_overflows_is_a_usage_refusal(
+def test_b4_overflowing_settings_are_preserved_and_export_uses_defaults(
     sample, tmp_path: Path, out: Path, no_footage: None, capsys
 ) -> None:
+    """CHARC a2ef868a: keep corrupt settings intact and prove the export uses defaults."""
+    from PIL import Image as PILImage
+
+    from clearwater.io.photo.png import PROVENANCE_KEYWORD
+
     folder = tmp_path / "settings"
     folder.mkdir()
-    path = save_settings(folder, Settings(last_parameters=new_parameter_set("c3", {})))
+    planted = new_parameter_set("c3", {"gamma": 2.25})
+    path = save_settings(
+        folder, Settings(last_parameters=planted, png_bit_depth=8, output_suffix="_planted")
+    )
     data = json.loads(path.read_text(encoding="utf-8"))
     data["last_parameters"]["created"] = "0001-01-01T00:00:00+01:00"
     path.write_text(json.dumps(data), encoding="utf-8")
-    assert _main(sample(STILL), "--out", out, "--force-cpu", "--settings-dir", folder) == 2
+    before = path.read_bytes()
+    assert _main(sample(STILL), "--out", out, "--force-cpu", "--settings-dir", folder) == 0
+    assert not path.exists()
+    (set_aside,) = folder.glob("settings.json.bad-*")
+    assert set_aside.read_bytes() == before
+    (exported,) = out.iterdir()
+    assert exported.name == f"{STILL}_corrected.png"
+    with PILImage.open(exported) as image:
+        provenance = json.loads(image.text[PROVENANCE_KEYWORD])
+    defaults = {p.name: p.default for p in composition.correction_methods()["c3"].parameters}
+    assert provenance["parameters"] == defaults
+    assert provenance["parameters"]["gamma"] == 1.5 != planted.parameters["gamma"]
+    assert provenance["settings"]["png_bit_depth"] == 16
     err = capsys.readouterr().err
-    assert "settings cannot be used" in err and _no_full_path(err, tmp_path)
-    assert list(out.iterdir()) == []
+    assert "settings file settings.json " in err and "using defaults" in err
+    assert _no_full_path(err, tmp_path)
 
 
 def test_b5_ctrl_c_in_the_last_items_commit_gives_status_1_and_a_cancelled_record(
