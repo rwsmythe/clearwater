@@ -392,3 +392,44 @@ Gen 20's two late slips (bare cd into the memory folder; a heredoc CR caught bef
 One line per finding: the finding, the commit, the test. Groups per the dispatch: A (journal and
 start-up: R1-1, R1-2, R1-3, R1-9), B (preview and render: R1-4, R1-6, R1-7, R1-8, R1-10), C (the rest).
 
+### Group A (the journal and start-up)
+
+Red first on `ad855ed` (8 failed the right way: the `UnicodeDecodeError` escape, the dropped
+entries, the export that ran, the 0 limit); green after. Targeted runs: `tests/test_app_leftovers.py`,
+`test_app_activity.py`, `test_app_composition.py`, `test_app_startup.py`, `test_app_wiring.py`,
+`test_app_analysis_adapter.py`, `test_app_preview_fft.py`, `test_app_v8_v18.py` and the layering
+tests: 69 passed 1 xfailed (DR-85's strict marker) and 92 passed. ruff check, ruff format --check
+(280), mypy strict (146): clean.
+
+- R1-1 MAJOR, `1d0a3eb`: the journal is read as bytes and decoded inside S6's set-aside;
+  `UnicodeDecodeError` joins the tuple. Test
+  `test_app_leftovers.py::test_an_undecodable_journal_is_set_aside_and_read_as_empty[not-utf8]`
+  and `[latin1-inside]` (the parameter became bytes; the five old ids kept).
+- R1-2 MAJOR (REVERSED, d530b564), `c8574c9`: the journal entry is now step 2, right after DR-82's
+  plan and before the cache wait, the key (a read of the source), the lock, the release and the
+  engine; an `OSError` returns a failed `JobResult` "the export was not started because its
+  clean-up record could not be written in <config_dir> (<reason>)." with nothing read or
+  written. Test `test_app_activity.py::test_an_unwritable_journal_fails_the_export_before_any_read_or_probe[photo]`
+  and `[video]` (default placement, a file in the config folder's place).
+- R1-3 MAJOR, `1d0a3eb` (start-up) and `c8574c9` (job end): new `startup.holds_leftovers(folder)`
+  (a temporary-named regular file present, or the folder unlistable; a missing folder holds
+  none). The job's entry is removed only when its folder holds none; `clean_leftovers` drops only
+  the entries of folders it left clean, and logs each one kept. Tests
+  `test_app_activity.py::test_an_entry_stays_while_its_folder_holds_a_temporary[crash]` (a
+  `BaseException` after the temporary is written) and `[locked]` (the job returns with its
+  temporary left), each followed by the next start with no output folder removing it;
+  `test_app_leftovers.py::test_a_folder_whose_clean_up_failed_keeps_its_entry_until_it_succeeds`.
+- R1-9 MINOR, `80d7adf`: `DeferredProxyCache.limit_bytes` goes through `_target`, so it refuses
+  like every member (no product caller reads it). Test
+  `test_app_composition.py::test_a_failed_open_refuses_every_member_readably`; and
+  `test_app_wiring.py::test_s1_a_limit_and_a_clear_from_the_dialog_during_the_open_apply_after_it`
+  now checks the product's threads BEFORE its own main-thread limit read (that read now passes
+  the `_target` spy).
+
+Decisions for Reviewer A to challenge: a folder that no longer exists counts as clean (its entry
+is dropped; an unplugged drive whose path then reads as missing loses its entry, and a temporary
+on it stays until that folder is next an output folder); an unlistable folder keeps its entry.
+The step order in `activity.py`'s docstring moved (journal before the lock and the release) as
+the ruling's "before any read or probe" needs; the lock is now released before the entry is
+removed. Slip: one bare `cd` at the end of a test-writing command (harmless no-op `true`), not
+repeated.
