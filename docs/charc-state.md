@@ -90,6 +90,18 @@
   written entries <= 4 x len(source) / 12 + 5 (the D63 insertions: Orientation, Software, Exif pointer, PixelX/Y; an
   empty 14-byte IFD0 writes 5), plus the shape check of exactly ONE Exif / GPS IFD. Design guard unchanged. Ledger
   e2df398; seat 2 turn 3 building at 135,854 / 258,400; then R4.
+- **WP4.5 ACCEPTED main `47a08ae` 21:11Z (msg fc563895; record `docs/proofs/wp4.5-accept.md`; A converged R4, B clean
+  2 minor / 4 advisory md5 5cd73c47; parallel 5,566 / 1 in 753 s; 13 impacted serial nodes in 300 s incl. the red round
+  trip; no full serial per the owner). CHARC QA CONFIRMED (static, this seat 21:20Z):** code patch-id a1344eac equal on
+  `f27368b..3e16f06` and `f27368b..47a08ae` (ff); 7 files all owned or granted (exif.py, new exif_bytes tests, the granted
+  r1 test, brief, report, ledger, record); writer/reader/png/interfaces/tools/pyproject/uv.lock untouched; 0 CR in every
+  blob. HOLD STAYS (stack-g22 rebases onto 47a08ae next). **MY RELEASE-TIME EDITS now THREE scripts in
+  `work/charc-handoff/`, run in order: `edit_43a_accept.py <43a-sha> <inv-sha>`, `edit_insta_hold.py`, then NEW
+  `edit_45_accept.py` (no args; SHA 47a08ae fixed) = DR-93 (B F2: `from_tiff` catches `(ValueError, struct.error)`,
+  a MemoryError on a hostile TIFF escapes `read_photo`; fix with DR-87's exif.py touch) + DR-94 (B F5 pre-existing: TIFF
+  private blobs e.g. 37724 ImageSourceData carried as EXIF; extend `_TIFF_STRUCTURE`) + the CLAUDE.md WP4.5 sentence.**
+  All three dry-run clean in sequence on a mirror. Lane share: WP4.5 Codex-built (2 seats, 9 turns), nets Claude (4 A + B);
+  Codex-built packages now 7 (WP3.20R, WP-T4, WP-T5, WP-T6, WP4.3a, inventory-1029, WP4.5).
 - **(gen 7 history follows; newest facts at the end of the block)**
 - **GEN 7 PICKUP (was).** Orchestrator = **gen 22 `clearwater-orchestrator-20261029-0704`** (online 17:08Z from gen 21's
   state 736e403; gauge 38 ms; gen 21 was `clearwater-orchestrator-20261029-0425`, rolled 17:05Z at ~400K); ALL cues go there. Time the bash launch and record it here. Inbox: drain with `read --role charc --all`
