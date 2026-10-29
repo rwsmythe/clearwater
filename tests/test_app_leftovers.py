@@ -66,19 +66,23 @@ def test_the_journal_records_one_absolute_folder_per_entry(tmp_path: Path) -> No
         b"[" * 100000,
         b"\xff",
         b'{"format_version": 1, "entries": [{"id": "\xe9", "folder": "/x"}]}',
+        b'{"format_version": 1, "entries": [{"id": "x", "folder": "@ABS@\\u0000folder"}]}',
     ],
-    ids=["text", "version", "relative", "shape", "deep", "not-utf8", "latin1-inside"],
+    ids=["text", "version", "relative", "shape", "deep", "not-utf8", "latin1-inside", "nul-folder"],
 )
 def test_an_undecodable_journal_is_set_aside_and_read_as_empty(
     tmp_path: Path, caplog: pytest.LogCaptureFixture, data: bytes
 ) -> None:
     """Ruling S6: renamed ``write-journal.json.bad-<UTC stamp>``, logged, read as empty.
 
-    The encoding failures (R1-1, ruling d530b564) take the same set-aside as the decode ones.
+    The encoding failures (R1-1, ruling d530b564) take the same set-aside as the decode ones, and
+    so does an absolute folder the operating system refuses as a path (R2-2: a NUL character;
+    ``@ABS@`` stands for an absolute folder under ``tmp_path``).
     """
     config = tmp_path / "config"
     config.mkdir()
-    (config / JOURNAL_FILE_NAME).write_bytes(data)
+    absolute = json.dumps(str(tmp_path))[1:-1].encode("ascii")
+    (config / JOURNAL_FILE_NAME).write_bytes(data.replace(b"@ABS@", absolute))
     journal = WriteJournal(config)
     with caplog.at_level(logging.WARNING, logger=startup.__name__):
         assert journal.entries() == ()
@@ -97,6 +101,74 @@ def test_an_undecodable_journal_still_lets_the_output_folder_be_scanned(tmp_path
     planted = _temporary(out)
     report = clean_leftovers(cpu_settings(output_folder=out), WriteJournal(config))
     assert report.removed == (planted,) and not planted.exists()
+
+
+def test_a_journal_folder_the_os_refuses_lets_the_start_up_proceed(tmp_path: Path) -> None:
+    """R2-2: a NUL character in a journal folder is set aside (S6); the output folder is scanned."""
+    config, out = tmp_path / "config", tmp_path / "out"
+    config.mkdir()
+    out.mkdir()
+    entry = {"id": "x", "folder": str(tmp_path / "bad\x00folder")}
+    document = {"format_version": 1, "entries": [entry]}
+    (config / JOURNAL_FILE_NAME).write_text(json.dumps(document), encoding="utf-8")
+    planted = _temporary(out)
+    report = clean_leftovers(cpu_settings(output_folder=out), WriteJournal(config))
+    assert report.removed == (planted,) and not planted.exists()
+    assert [p.name.startswith(f"{JOURNAL_FILE_NAME}.bad-") for p in config.iterdir()] == [True]
+    assert startup.holds_leftovers(tmp_path / "bad\x00folder")  # unlistable: the entry would stay
+
+
+def _refuse_reading(monkeypatch: pytest.MonkeyPatch, journal: WriteJournal) -> None:
+    """Plant a read denial of the journal file (a scanner's lock, say); other reads proceed."""
+    real = Path.read_bytes
+
+    def read_bytes(self: Path) -> bytes:
+        if self == journal.path:
+            raise PermissionError("the journal is locked")
+        return real(self)
+
+    monkeypatch.setattr(Path, "read_bytes", read_bytes)
+
+
+def test_a_journal_that_cannot_be_read_is_never_overwritten(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    """R2-1 (ruling 38a7c702): on a doubtful read ``add`` and ``drop`` raise and write nothing."""
+    journal = WriteJournal(tmp_path / "config")
+    kept = journal.add(tmp_path / "a")
+    before = journal.path.read_bytes()
+    with monkeypatch.context() as patch:
+        _refuse_reading(patch, journal)
+        with pytest.raises(OSError, match="the journal is locked"):
+            journal.add(tmp_path / "b")
+        with pytest.raises(OSError, match="the journal is locked"):
+            journal.drop([kept])
+        with caplog.at_level(logging.WARNING, logger=startup.__name__):
+            assert journal.entries() == ()
+        assert "could not be read" in caplog.text
+    assert journal.path.read_bytes() == before
+    assert journal.entries() == ((kept, tmp_path / "a"),)
+
+
+def test_a_start_up_over_an_unreadable_journal_logs_and_keeps_it(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    """R2-1: start-up still scans the output folder; the journal file is kept unchanged."""
+    out, journaled = tmp_path / "out", tmp_path / "journaled"
+    out.mkdir()
+    journaled.mkdir()
+    journal = WriteJournal(tmp_path / "config")
+    kept = journal.add(journaled)
+    before = journal.path.read_bytes()
+    planted = _temporary(out)
+    with monkeypatch.context() as patch:
+        _refuse_reading(patch, journal)
+        with caplog.at_level(logging.WARNING, logger=startup.__name__):
+            report = clean_leftovers(cpu_settings(output_folder=out), journal)
+    assert report.removed == (planted,)
+    assert "could not be cleared" in caplog.text
+    assert journal.path.read_bytes() == before
+    assert journal.entries() == ((kept, journaled),)
 
 
 def test_the_folder_set_is_the_output_folder_then_the_journals_each_once(tmp_path: Path) -> None:

@@ -54,8 +54,10 @@ class WriteJournal:
     process-local lock guards every read-modify-write (one application process per app-data
     folder, the declared envelope). A file that cannot be decoded (not UTF-8, not JSON, not a
     version-1 journal) is renamed beside itself to ``write-journal.json.bad-<UTC stamp>``,
-    logged, and read as empty (ruling S6); a file that cannot be read is logged and read as
-    empty.
+    logged, and read as empty (ruling S6). A file that cannot be read (an ``OSError`` other than
+    its absence) is never overwritten: :meth:`add` and :meth:`drop` raise with nothing written,
+    so a retained entry is never lost to a doubtful read (R2-1, ruling 38a7c702), and
+    :meth:`entries` logs it and reads it as empty.
     Thread-safe; the export jobs call it from their worker threads.
 
     Args:
@@ -82,7 +84,7 @@ class WriteJournal:
             The entry's id, for :meth:`remove`.
 
         Raises:
-            OSError: The journal cannot be written.
+            OSError: The journal cannot be read or written; nothing was written.
         """
         entry_id = uuid.uuid4().hex
         with self._lock:
@@ -98,7 +100,7 @@ class WriteJournal:
             entry_id: What :meth:`add` returned.
 
         Raises:
-            OSError: The journal cannot be written.
+            OSError: The journal cannot be read or written; nothing was written.
         """
         self.drop((entry_id,))
 
@@ -109,7 +111,7 @@ class WriteJournal:
             entry_ids: The ids to remove.
 
         Raises:
-            OSError: The journal cannot be written.
+            OSError: The journal cannot be read or written; nothing was written.
         """
         gone = set(entry_ids)
         with self._lock:
@@ -119,18 +121,24 @@ class WriteJournal:
                 self._write(kept)
 
     def entries(self) -> tuple[tuple[str, Path], ...]:
-        """Return ``(id, folder)`` of every entry, oldest first."""
+        """Return ``(id, folder)`` of every entry, oldest first; none if the file cannot be read."""
         with self._lock:
-            return tuple((entry["id"], Path(entry["folder"])) for entry in self._read())
+            try:
+                entries = self._read()
+            except OSError as error:
+                _LOG.warning("write journal %s could not be read: %s", self._path, error)
+                return ()
+            return tuple((entry["id"], Path(entry["folder"])) for entry in entries)
 
     def _read(self) -> list[dict[str, str]]:
-        """Read the entries (under the lock); an unreadable file is set aside and read as empty."""
+        """Read the entries (under the lock); an undecodable file is set aside and read as empty.
+
+        Raises:
+            OSError: The file exists but cannot be read (R2-1: the caller writes nothing).
+        """
         try:
             data = self._path.read_bytes()
         except FileNotFoundError:
-            return []
-        except OSError as error:
-            _LOG.warning("write journal %s could not be read: %s", self._path, error)
             return []
         try:
             entries = _decode(json.loads(data.decode("utf-8")))
@@ -170,6 +178,10 @@ class WriteJournal:
 def _decode(document: Any) -> list[dict[str, str]]:
     """Check the journal document's shape and return its entries.
 
+    A folder the operating system refuses as a path (a NUL character, or on POSIX a string the
+    file-system encoding cannot encode; ``os`` raises ``ValueError`` for both) is not a folder,
+    so the file is set aside under S6 (R2-2).
+
     Raises:
         ValueError: Not a version-1 journal of entries with a string id and an absolute folder.
     """
@@ -184,11 +196,23 @@ def _decode(document: Any) -> list[dict[str, str]]:
             not isinstance(entry, dict)
             or not isinstance(entry.get("id"), str)
             or not isinstance(entry.get("folder"), str)
+            or not _is_path(entry["folder"])
             or not Path(entry["folder"]).is_absolute()
         ):
             raise ValueError("a journal entry is not an id and an absolute folder")
         decoded.append({"id": entry["id"], "folder": entry["folder"]})
     return decoded
+
+
+def _is_path(text: str) -> bool:
+    """Return True when the operating system accepts ``text`` as a path (R2-2)."""
+    if "\x00" in text:
+        return False
+    try:
+        os.fsencode(text)
+    except UnicodeEncodeError:
+        return False
+    return True
 
 
 def leftover_folders(settings: Settings, journal_folders: Iterable[Path]) -> tuple[Path, ...]:
@@ -212,8 +236,9 @@ def leftover_folders(settings: Settings, journal_folders: Iterable[Path]) -> tup
 def holds_leftovers(folder: Path) -> bool:
     """Return True unless ``folder`` is known to hold no temporary output file (D85).
 
-    A folder that does not exist holds none. A folder that cannot be listed may hold one, so it
-    counts as holding one: its journal entry stays (R1-3, ruling d530b564).
+    A folder that does not exist holds none. A folder that cannot be listed (an ``OSError``, or
+    a ``ValueError`` for a path the operating system refuses, R2-2) may hold one, so it counts as
+    holding one: its journal entry stays (R1-3, ruling d530b564).
 
     Args:
         folder: A journal entry's folder.
@@ -230,7 +255,7 @@ def holds_leftovers(folder: Path) -> bool:
             )
     except FileNotFoundError:
         return False
-    except OSError:
+    except (OSError, ValueError):
         return True
 
 
@@ -241,8 +266,8 @@ def clean_leftovers(settings: Settings, journal: WriteJournal) -> LeftoverReport
     interface thread before it attaches the panels. Every removed file and every failure is
     logged (N9). An entry whose folder still holds a temporary afterwards (a removal failed, or
     the folder cannot be listed) stays and is scanned again at the next start (R1-3, ruling
-    d530b564). A journal that cannot be written afterwards is logged; the entries stay and are
-    scanned again at the next start.
+    d530b564). A journal that cannot be read or written is logged and left as it is; its
+    entries stay and are scanned again at the next start (R2-1, ruling 38a7c702).
 
     Args:
         settings: The settings of the one settings read.

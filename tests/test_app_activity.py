@@ -244,6 +244,35 @@ def test_an_unwritable_journal_fails_the_export_before_any_read_or_probe(
     assert [p.name for p in sources.iterdir()] == [name] and list(rig.out.iterdir()) == []
 
 
+def test_a_journal_that_cannot_be_read_fails_the_export_and_keeps_its_entries(
+    sample: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """R2-1 (ruling 38a7c702): a doubtful read writes nothing; the export fails as R1-2 says."""
+    rig = Rig(tmp_path)
+    kept = rig.journal.add(tmp_path / "earlier")
+    before = rig.journal.path.read_bytes()
+    source = tmp_path / "IMG_1.jpg"
+    source.write_bytes(sample("jpeg-gradient-srgb").read_bytes())
+    real = Path.read_bytes
+
+    def read_bytes(self: Path) -> bytes:
+        if self == rig.journal.path:
+            raise PermissionError("the journal is locked")
+        return real(self)
+
+    monkeypatch.setattr(Path, "read_bytes", read_bytes)
+    result = rig.exports.job(request(source, rig.out, "photo"))(StubProgress())  # type: ignore[arg-type]
+    monkeypatch.undo()
+    assert not result.ok and result.failure is not None
+    assert result.failure.startswith(
+        "the export was not started because its clean-up record could not be written in "
+    )
+    assert "the journal is locked" in result.failure
+    assert rig.journal.path.read_bytes() == before
+    assert rig.journal.entries() == ((kept, tmp_path / "earlier"),)
+    assert rig.events == [] and list(rig.out.iterdir()) == []
+
+
 class _Crash(BaseException):
     """A planted process death mid-job: nothing runs after it but the ``finally`` blocks."""
 
