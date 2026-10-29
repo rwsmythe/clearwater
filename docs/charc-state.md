@@ -222,6 +222,22 @@
   WP4.2 = Claude (opus-high, cells 2-4), Codex nets A + B; Codex-built packages still 5. **NEXT: WP-T6 brief DRAFT from the
   orchestrator for my ruling (baseline `work/wp4.2/gate-logs/wp4.2-serial.log`); then WP4.3 brief revision (DR-75 REQUIRED
   test under Q12, DR-76, DR-77, DR-81 (a)(b)(c), DR-82, DR-84, DR-68, DR-69, DR-52, DR-62; AD-23 note at its accept).**
+- **WP-T6 BRIEF RULED FINAL ~11:15Z (query `699ca89c367b9a9d`; draft `work/wp-t6/wp-t6-brief-DRAFT.md` md5 87d8c915, 469
+  lines, read in full; my ruling post ruling-wp-t6). Orchestrator commits it as `docs/briefs/wp-t6-brief.md` FINAL + rulings
+  and dispatches to the CODEX lane from d1d8fd9+.** Map: 38 rows of the serial top 40 (2,227 of 2,621 s): CUT R1 engine 456 s,
+  R2 NVENC levels 330 s, R3 sink 222 s, R4 colour round trip 170 s (only if Q4's measured rule passes), R5-R7 hardware decode
+  389 s; 30 KEEP with reasons; row 10 OPEN (63 s for two 128x72 frames inside tools/prototype/bench.py; rung 1 profiles).
+  Projected AFTER serial ~1,310-1,445 s (saving ~1,180-1,315 s). Rulings: Q1 conftest additive (imports in bodies; guard copies
+  conftest beside local_config only, verified :122); Q2 `fullclip` marker, amended expressions at the gate (fill, CLAUDE.md,
+  AD-28 figures mine at the accept; ADDED fullclip runs once per phase-end gate); Q3 operand KEPT not a loss; Q4 as drafted +
+  plant MARGINS reported, KEEP if any margin at N < half its margin at 30; Q5 whole trim for R2, STOP on a 1.25 link; Q6 BEFORE
+  = baseline log, AFTER = the one gate, verdict TIGHTENED to the seven CUT bodies' per-test sum > 110 s under 1,567 s (316 s
+  host spread makes a leg-wall verdict unreliable); Q7 900 s = TARGET not pass criterion (my commission figure; gap: 5.3K CPU
+  121 s, bench rows 163 s, V3 81 s, tail 394 s) BANKED as a follow-on DR row at the accept, owner trigger; Q8 W4 fullclip once
+  (~27 min); Q9 teardown removal; Q10 materiality 20 s; Q11 FAST one round + cleanup; Q12 Codex (6th Codex-built package;
+  pace 0.54). Owed by me at WP-T6's accept: Q7 gap row, row-10 row if a tools/ lever, DR-22/DR-66 consumer notes, fill +
+  CLAUDE.md + AD-28 update, fullclip-per-phase sentence. **NEXT: WP-T6 dispatch + round-0 table (rung 1 yield) for my reply;
+  WP4.3 brief revision draft after.**
 - **(history) After WP4.1's accept:** WP4.2's brief (DRAFT RULED on main 3aa3c51) got ONE revision pass against WP4.1's accept record, then FINAL
   on CHARC's word; its revision must carry: DR-78/79 (B2 rows) as WP4.2 items, the WP4.1 runner's final names and the stream-syntax
   predicate, the Limit text. WP4.3's revision later carries DR-75 (REQUIRED test under its Q12), DR-76, DR-77, and the AD-23 'applied by
