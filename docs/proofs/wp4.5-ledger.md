@@ -1,13 +1,19 @@
 # WP4.5 - EXIF byte fidelity: cumulative ledger
 
-## Round 0 - STOP: the Image.Exif writer discards type pins
+## Round 0 - STOP resolved: Q1 = (b)
 
-Recommended ruling: authorize the Q1(b) fallback. Alternatively, explicitly
-approve assembling separately serialized, typed Pillow IFDs with explicit
-nested-IFD offsets as Q1(a). No implementation of either alternative has begun.
+STOP resolved, Q1 = (b) (CHARC `c64900357c363330`, brief commit `b4f2785`).
 The existing `Image.Exif.tobytes()` path cannot carry source type pins into its
-fresh IFD objects, including Exif, GPS and Interop. A change in serialization
-mechanism needs the dispatcher's/CHARC's ruling under Q1 before turn 2.
+fresh IFD objects, including Exif, GPS and Interop. CHARC also confirmed rational
+reduction and an added NUL for unterminated ASCII, excluding a Pillow value
+re-encoding solution. The following Round 0 evidence is historical.
+
+Turn 2 dispatch quotes the governing decision: "RULING: Q1 = (b), the byte-level
+IFD rewrite in exif.py. NOT (a')." The rewrite passes source type/count/value
+bytes through, relocates supported child IFDs in source byte order, preserves
+entry order, inserts D63 entries by tag, drops IFD1/other IFD-valued entries,
+isolates damaged children and rejects damaged roots. `from_tiff` uses the same
+parser/writer with its structural drop set. BigTIFF is unsupported.
 
 ### Dispatch and scope
 
@@ -143,7 +149,8 @@ no full serial leg is requested. No acceptance or convergence is claimed now.
 
 | Round | Source | Critical | Major | Minor | In / out | NEW / REOPENED | Reverts | Product / test fixes | Disposition |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 0 | Cell source trace + executed synthetic probe; not Reviewer A | 0 | 1 | 0 | 1 / 0 | 1 / 0 | 0 | 0 / 0 | STOP for mechanism ruling; no remediation begun |
+| 0 | Cell source trace + executed synthetic probe; not Reviewer A | 0 | 1 | 0 | 1 / 0 | 1 / 0 | 0 | 0 / 0 | STOP resolved, Q1 = (b) (CHARC `c64900357c363330`) |
+| T2 compatibility check | Executed existing test; not Reviewer A | 0 | 1 | 0 | 1 / 0 | 1 / 0 | 0 | Product rewrite + new regression tests; no compatibility remediation | STOP: existing test injects failure in removed Pillow dependency; existing tests not owned |
 
 - Suspected: the fresh IFD construction drops source type pins.
 - Confirmed independently: source trace and parsed synthetic output agree for
@@ -156,4 +163,227 @@ no full serial leg is requested. No acceptance or convergence is claimed now.
 
 | Turn / boundary | Depth supplied by dispatcher | Action |
 | --- | --- | --- |
-| Turn 1 / Round 0 | Not supplied | No estimate recorded; yield after ledger |
+| Turn 1 / Round 0 | 70,739 input tokens; window 475,000 (supplied in turn 2) | STOP resolved; proceed under Q1(b) |
+
+## Turn 2 - RED-first roster additions
+
+Added by CHARC's re-ruling: unreduced RATIONAL 1234/100, negative SRATIONAL,
+unterminated ASCII, MM source byte order, inline 4-byte/out-of-line 5-byte
+boundaries, missing Orientation/dimensions/Exif IFD insertion, damaged child
+offset/table isolation, damaged root raising with sanitise dropping, and
+SubIFDs/type-13 dropping. Tests also cover source entry order, SHORT dimension
+retention/promotion, bounded count/value reads, BigTIFF rejection and None input.
+Actual baseline outcomes and light-run results will be recorded below.
+
+### Turn 2 outcome: STOP on an existing test conflict
+
+**[major]** `tests/test_io_photo_r1.py::test_a_tiff_with_an_unreadable_gps_ifd_keeps_its_other_fields`
+fails with actual assertion text:
+
+```text
+AssertionError: assert 'GPS IFD cannot be read' in ''
+```
+
+Mechanism: the test at `tests/test_io_photo_r1.py:389-414` constructs a TIFF with
+Make but no GPS IFD, monkeypatches `Image.Exif.get_ifd` to raise for GPS, then
+expects the resulting warning. Q1(b) explicitly removes Pillow from `from_tiff`;
+the real raw parser sees no GPS pointer and correctly emits no damage warning.
+The failure injection is no longer reached. The synthetic damaged-child tests
+exercise actual malformed offsets, tables and payloads and all pass.
+
+Recommended disposition: have the owning seat replace the obsolete Pillow
+failure injection with a synthetic damaged GPS IFD. This cell cannot edit the
+existing test, and has not added an artificial Pillow call or warning to make
+the mock fire. Per the dispatch, STOP and yield before any remediation. Reviewer
+A has not run; no convergence or completed acceptance is claimed.
+
+Built in `exif.py`: bounded classic-TIFF parsing of IFD0/Exif/GPS/Interop; raw
+entry byte carry and relocation; source byte order and kept order preservation;
+D63 replacement/insertion with SHORT dimension retention and LONG promotion;
+IFD1 removal; unsupported IFD-valued entry dropping with warnings; damaged-child
+isolation; malformed-root rejection; BigTIFF rejection; shared raw extraction
+for `from_tiff` with structural filtering. Public signatures and Pillow read
+views remain unchanged. `from_tiff` extracts source fields; the subsequent
+writer call to `edit` applies D63, preserving read-side metadata semantics.
+
+### Light-run evidence
+
+All commands ran offline in the worktree. All pytest invocations set
+`PYTHONPATH=scripts`, load `-p sandbox_mkdir_shim -p no:cacheprovider`, and use
+`--basetemp=work/wp4.5/tmp`. Marker expression for every invocation:
+`not gpu and not footage and not gui and not slow and not fullclip`.
+
+| Run | Exit | Observed summary | Evidence under work/wp4.5/ |
+| --- | --- | --- | --- |
+| New file after implementation | 0 | 112 passed in 0.55s | `new-green.log`, `new-green.xml` |
+| All `tests/test_io_photo_*.py` plus `test_photo_check.py`, `test_wp41_photo_path.py`, `test_jobs_export_photo.py` | 1 | 1 failed, 788 passed, 5 deselected, 132 warnings in 32.61s | `light.log`, `light.xml`, `light-summary.log` |
+| `uv run --offline ruff check src/clearwater/io/photo tests/test_io_photo_exif_bytes.py` | 0 | All checks passed! | `ruff-final.log` |
+| `uv run --offline mypy` | 0 | Success: no issues found in 141 source files | `mypy-final.log` |
+| `uv run --offline ruff format src/clearwater/io/photo/exif.py tests/test_io_photo_exif_bytes.py` | 0 | 2 files reformatted | `format.log`; format CHECK remains at dispatcher seat |
+
+Per-file results from the combined run's JUnit XML (deselected cases are not
+emitted as test cases; 5 deselected is pytest's overall summary):
+
+| File under tests/ | Passed | Failed |
+| --- | --- | --- |
+| test_io_photo_errors.py | 3 | 0 |
+| test_io_photo_exif_bytes.py | 112 | 0 |
+| test_io_photo_p3.py | 13 | 0 |
+| test_io_photo_planted.py | 12 | 0 |
+| test_io_photo_r1.py | 33 | 1 |
+| test_io_photo_read.py | 163 | 0 |
+| test_io_photo_rules.py | 17 | 0 |
+| test_io_photo_srgb.py | 19 | 0 |
+| test_io_photo_units.py | 68 | 0 |
+| test_io_photo_write.py | 104 | 0 |
+| test_jobs_export_photo.py | 15 | 0 |
+| test_photo_check.py | 6 | 0 |
+| test_wp41_photo_path.py | 223 | 0 |
+
+The combined invocation also re-ran all 112 new cases on the formatted product.
+An initial targeted lint run found six formatting/list-concatenation findings;
+formatting and the new test helper's list expression were corrected before the
+final runs. Initial and final mypy both passed. No full suite, footage, GPU,
+GUI, slow or fullclip execution was requested or performed by the cell.
+
+### Turn 2 verification loop and locks
+
+- Suspected: Pillow value re-encoding changes kept field bytes/types/counts.
+  Confirmed by 78 RED cases on the base; fixed by raw entry copying; all 112 new
+  tests pass, including 34 baseline controls.
+- Suspected: the existing Pillow-specific GPS injection conflicts with Q1(b).
+  Confirmed by the named existing-test failure. No fix made: existing tests are
+  outside the owned paths. This is the only failure in the authorized light run.
+- Rejected false positives: garbage headers already raised `SyntaxError`; the
+  new control now accepts that existing behavior rather than requiring a
+  particular exception class.
+- Only three owned files changed: `exif.py`, the new test file and this ledger.
+  Writer, all existing tests, interfaces, dependencies/lock file, local config,
+  fixtures, register and harness files are untouched. No real photos/metadata,
+  footage writes, mailbox posts or commits. New tests write only under tmp_path.
+- Limits to carry into the final report: BigTIFF unsupported, other IFD-valued
+  entries (including SubIFDs and type 13) dropped with warnings, MakerNote
+  internal-offset validity not repaired. The report awaits turn 3/seat figures.
+
+### Executed RED baseline (before product changes)
+
+Final RED run: exit 1; **78 failed, 34 passed**, 12 warnings. Product code was unchanged from main `5a1538a`.
+
+Command: `PYTHONPATH=scripts uv run --offline pytest tests/test_io_photo_exif_bytes.py -q -m "not gpu and not footage and not gui and not slow and not fullclip" --basetemp=work/wp4.5/tmp -p sandbox_mkdir_shim -p no:cacheprovider --junitxml=work/wp4.5/red.xml`. Output: `work/wp4.5/red.log`; machine-readable results: `work/wp4.5/red.xml`.
+
+The first drafting run was 79 failed/33 passed. The garbage-header control was corrected to accept the existing `SyntaxError` alongside other parse errors; no product code changed between runs. The final baseline below is authoritative.
+
+| Test case (new file) | Baseline result / actual first failure line |
+| --- | --- |
+| `test_ascii_type_count_and_value_bytes_survive[42036-\x80\x81\x82\x83\x84\x85\x86\x87\x88\x89\x8a\x8b\x8c\x8d\x8e\x8f\x90\x91\x92\x93\x94\x95\x96\x97\x98\x99\x9a\x9b\x9c\x9d\x9e\x9f\xa0\xa1\xa2\xa3\xa4\xa5\xa6\xa7\xa8\xa9\xaa\xab\xac\xad\xae\xaf\xb0\xb1\xb2\xb3\xb4\xb5\xb6\xb7\xb8\xb9\xba\xbb\xbc\xbd\xbe\xbf\xc0\xc1\xc2\xc3\xc4\xc5\xc6\xc7\xc8\xc9\xca\xcb\xcc\xcd\xce\xcf\xd0\xd1\xd2\xd3\xd4\xd5\xd6\xd7\xd8\xd9\xda\xdb\xdc\xdd\xde\xdf\xe0\xe1\xe2\xe3\xe4\xe5\xe6\xe7\xe8\xe9\xea\xeb\xec\xed\xee\xef\xf0\xf1\xf2\xf3\xf4\xf5\xf6\xf7\xf8\xf9\xfa\xfb\xfc\xfd\xfe\xff\x00-path0-<]` | AssertionError: ('Exif',).42036 type/count/value changed |
+| `test_ascii_type_count_and_value_bytes_survive[42036-\x80\x81\x82\x83\x84\x85\x86\x87\x88\x89\x8a\x8b\x8c\x8d\x8e\x8f\x90\x91\x92\x93\x94\x95\x96\x97\x98\x99\x9a\x9b\x9c\x9d\x9e\x9f\xa0\xa1\xa2\xa3\xa4\xa5\xa6\xa7\xa8\xa9\xaa\xab\xac\xad\xae\xaf\xb0\xb1\xb2\xb3\xb4\xb5\xb6\xb7\xb8\xb9\xba\xbb\xbc\xbd\xbe\xbf\xc0\xc1\xc2\xc3\xc4\xc5\xc6\xc7\xc8\xc9\xca\xcb\xcc\xcd\xce\xcf\xd0\xd1\xd2\xd3\xd4\xd5\xd6\xd7\xd8\xd9\xda\xdb\xdc\xdd\xde\xdf\xe0\xe1\xe2\xe3\xe4\xe5\xe6\xe7\xe8\xe9\xea\xeb\xec\xed\xee\xef\xf0\xf1\xf2\xf3\xf4\xf5\xf6\xf7\xf8\xf9\xfa\xfb\xfc\xfd\xfe\xff\x00-path0->]` | AssertionError: ('Exif',).42036 type/count/value changed |
+| `test_ascii_type_count_and_value_bytes_survive[271-\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00-path1-<]` | PASS (control) |
+| `test_ascii_type_count_and_value_bytes_survive[271-\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00-path1->]` | PASS (control) |
+| `test_ascii_type_count_and_value_bytes_survive[272-\x00A\x00\x00B\x00\x00\x00-path2-<]` | PASS (control) |
+| `test_ascii_type_count_and_value_bytes_survive[272-\x00A\x00\x00B\x00\x00\x00-path2->]` | PASS (control) |
+| `test_ascii_type_count_and_value_bytes_survive[315-caf\xe9\x00-path3-<]` | AssertionError: ().315 type/count/value changed |
+| `test_ascii_type_count_and_value_bytes_survive[315-caf\xe9\x00-path3->]` | AssertionError: ().315 type/count/value changed |
+| `test_ascii_type_count_and_value_bytes_survive[270-caf\xc3\xa9\x00-path4-<]` | AssertionError: ().270 type/count/value changed |
+| `test_ascii_type_count_and_value_bytes_survive[270-caf\xc3\xa9\x00-path4->]` | AssertionError: ().270 type/count/value changed |
+| `test_ascii_type_count_and_value_bytes_survive[33432-synthetic copyright\x00-path5-<]` | PASS (control) |
+| `test_ascii_type_count_and_value_bytes_survive[33432-synthetic copyright\x00-path5->]` | PASS (control) |
+| `test_ascii_type_count_and_value_bytes_survive[65000-abcd-path6-<]` | AssertionError: ().65000 type/count/value changed |
+| `test_ascii_type_count_and_value_bytes_survive[65000-abcd-path6->]` | AssertionError: ().65000 type/count/value changed |
+| `test_ascii_type_count_and_value_bytes_survive[65000-abcde-path7-<]` | AssertionError: ().65000 type/count/value changed |
+| `test_ascii_type_count_and_value_bytes_survive[65000-abcde-path7->]` | AssertionError: ().65000 type/count/value changed |
+| `test_ascii_type_count_and_value_bytes_survive[65000-x\x80\x00-path8-<]` | AssertionError: ('GPS',).65000 type/count/value changed |
+| `test_ascii_type_count_and_value_bytes_survive[65000-x\x80\x00-path8->]` | AssertionError: ('GPS',).65000 type/count/value changed |
+| `test_ascii_type_count_and_value_bytes_survive[65000-x\x80\x00-path9-<]` | AssertionError: ('Exif', 'Interop').65000 type/count/value changed |
+| `test_ascii_type_count_and_value_bytes_survive[65000-x\x80\x00-path9->]` | AssertionError: ('Exif', 'Interop').65000 type/count/value changed |
+| `test_non_ascii_source_types_and_raw_values_survive[path0-4-<]` | AssertionError: ().65001 type/count/value changed |
+| `test_non_ascii_source_types_and_raw_values_survive[path0-4->]` | AssertionError: ().65001 type/count/value changed |
+| `test_non_ascii_source_types_and_raw_values_survive[path0-5-<]` | AssertionError: ().65001 type/count/value changed |
+| `test_non_ascii_source_types_and_raw_values_survive[path0-5->]` | AssertionError: ().65001 type/count/value changed |
+| `test_non_ascii_source_types_and_raw_values_survive[path0-7-<]` | AssertionError: ().65001 type/count/value changed |
+| `test_non_ascii_source_types_and_raw_values_survive[path0-7->]` | AssertionError: ().65001 type/count/value changed |
+| `test_non_ascii_source_types_and_raw_values_survive[path0-8-<]` | PASS (control) |
+| `test_non_ascii_source_types_and_raw_values_survive[path0-8->]` | PASS (control) |
+| `test_non_ascii_source_types_and_raw_values_survive[path0-9-<]` | AssertionError: ().65001 type/count/value changed |
+| `test_non_ascii_source_types_and_raw_values_survive[path0-9->]` | AssertionError: ().65001 type/count/value changed |
+| `test_non_ascii_source_types_and_raw_values_survive[path0-10-<]` | PASS (control) |
+| `test_non_ascii_source_types_and_raw_values_survive[path0-10->]` | PASS (control) |
+| `test_non_ascii_source_types_and_raw_values_survive[path0-11-<]` | AssertionError: ().65001 type/count/value changed |
+| `test_non_ascii_source_types_and_raw_values_survive[path0-11->]` | AssertionError: ().65001 type/count/value changed |
+| `test_non_ascii_source_types_and_raw_values_survive[path0-12-<]` | PASS (control) |
+| `test_non_ascii_source_types_and_raw_values_survive[path0-12->]` | PASS (control) |
+| `test_non_ascii_source_types_and_raw_values_survive[path1-4-<]` | AssertionError: ('Exif',).65001 type/count/value changed |
+| `test_non_ascii_source_types_and_raw_values_survive[path1-4->]` | AssertionError: ('Exif',).65001 type/count/value changed |
+| `test_non_ascii_source_types_and_raw_values_survive[path1-5-<]` | AssertionError: ('Exif',).65001 type/count/value changed |
+| `test_non_ascii_source_types_and_raw_values_survive[path1-5->]` | AssertionError: ('Exif',).65001 type/count/value changed |
+| `test_non_ascii_source_types_and_raw_values_survive[path1-7-<]` | AssertionError: ('Exif',).65001 type/count/value changed |
+| `test_non_ascii_source_types_and_raw_values_survive[path1-7->]` | AssertionError: ('Exif',).65001 type/count/value changed |
+| `test_non_ascii_source_types_and_raw_values_survive[path1-8-<]` | PASS (control) |
+| `test_non_ascii_source_types_and_raw_values_survive[path1-8->]` | PASS (control) |
+| `test_non_ascii_source_types_and_raw_values_survive[path1-9-<]` | AssertionError: ('Exif',).65001 type/count/value changed |
+| `test_non_ascii_source_types_and_raw_values_survive[path1-9->]` | AssertionError: ('Exif',).65001 type/count/value changed |
+| `test_non_ascii_source_types_and_raw_values_survive[path1-10-<]` | PASS (control) |
+| `test_non_ascii_source_types_and_raw_values_survive[path1-10->]` | PASS (control) |
+| `test_non_ascii_source_types_and_raw_values_survive[path1-11-<]` | AssertionError: ('Exif',).65001 type/count/value changed |
+| `test_non_ascii_source_types_and_raw_values_survive[path1-11->]` | AssertionError: ('Exif',).65001 type/count/value changed |
+| `test_non_ascii_source_types_and_raw_values_survive[path1-12-<]` | PASS (control) |
+| `test_non_ascii_source_types_and_raw_values_survive[path1-12->]` | PASS (control) |
+| `test_non_ascii_source_types_and_raw_values_survive[path2-4-<]` | AssertionError: ('GPS',).65001 type/count/value changed |
+| `test_non_ascii_source_types_and_raw_values_survive[path2-4->]` | AssertionError: ('GPS',).65001 type/count/value changed |
+| `test_non_ascii_source_types_and_raw_values_survive[path2-5-<]` | AssertionError: ('GPS',).65001 type/count/value changed |
+| `test_non_ascii_source_types_and_raw_values_survive[path2-5->]` | AssertionError: ('GPS',).65001 type/count/value changed |
+| `test_non_ascii_source_types_and_raw_values_survive[path2-7-<]` | AssertionError: ('GPS',).65001 type/count/value changed |
+| `test_non_ascii_source_types_and_raw_values_survive[path2-7->]` | AssertionError: ('GPS',).65001 type/count/value changed |
+| `test_non_ascii_source_types_and_raw_values_survive[path2-8-<]` | PASS (control) |
+| `test_non_ascii_source_types_and_raw_values_survive[path2-8->]` | PASS (control) |
+| `test_non_ascii_source_types_and_raw_values_survive[path2-9-<]` | AssertionError: ('GPS',).65001 type/count/value changed |
+| `test_non_ascii_source_types_and_raw_values_survive[path2-9->]` | AssertionError: ('GPS',).65001 type/count/value changed |
+| `test_non_ascii_source_types_and_raw_values_survive[path2-10-<]` | PASS (control) |
+| `test_non_ascii_source_types_and_raw_values_survive[path2-10->]` | PASS (control) |
+| `test_non_ascii_source_types_and_raw_values_survive[path2-11-<]` | AssertionError: ('GPS',).65001 type/count/value changed |
+| `test_non_ascii_source_types_and_raw_values_survive[path2-11->]` | AssertionError: ('GPS',).65001 type/count/value changed |
+| `test_non_ascii_source_types_and_raw_values_survive[path2-12-<]` | PASS (control) |
+| `test_non_ascii_source_types_and_raw_values_survive[path2-12->]` | PASS (control) |
+| `test_non_ascii_source_types_and_raw_values_survive[path3-4-<]` | AssertionError: ('Exif', 'Interop').65001 type/count/value changed |
+| `test_non_ascii_source_types_and_raw_values_survive[path3-4->]` | AssertionError: ('Exif', 'Interop').65001 type/count/value changed |
+| `test_non_ascii_source_types_and_raw_values_survive[path3-5-<]` | AssertionError: ('Exif', 'Interop').65001 type/count/value changed |
+| `test_non_ascii_source_types_and_raw_values_survive[path3-5->]` | AssertionError: ('Exif', 'Interop').65001 type/count/value changed |
+| `test_non_ascii_source_types_and_raw_values_survive[path3-7-<]` | AssertionError: ('Exif', 'Interop').65001 type/count/value changed |
+| `test_non_ascii_source_types_and_raw_values_survive[path3-7->]` | AssertionError: ('Exif', 'Interop').65001 type/count/value changed |
+| `test_non_ascii_source_types_and_raw_values_survive[path3-8-<]` | PASS (control) |
+| `test_non_ascii_source_types_and_raw_values_survive[path3-8->]` | PASS (control) |
+| `test_non_ascii_source_types_and_raw_values_survive[path3-9-<]` | AssertionError: ('Exif', 'Interop').65001 type/count/value changed |
+| `test_non_ascii_source_types_and_raw_values_survive[path3-9->]` | AssertionError: ('Exif', 'Interop').65001 type/count/value changed |
+| `test_non_ascii_source_types_and_raw_values_survive[path3-10-<]` | PASS (control) |
+| `test_non_ascii_source_types_and_raw_values_survive[path3-10->]` | PASS (control) |
+| `test_non_ascii_source_types_and_raw_values_survive[path3-11-<]` | AssertionError: ('Exif', 'Interop').65001 type/count/value changed |
+| `test_non_ascii_source_types_and_raw_values_survive[path3-11->]` | AssertionError: ('Exif', 'Interop').65001 type/count/value changed |
+| `test_non_ascii_source_types_and_raw_values_survive[path3-12-<]` | PASS (control) |
+| `test_non_ascii_source_types_and_raw_values_survive[path3-12->]` | PASS (control) |
+| `test_makernote_and_synthetic_gps_bytes_survive` | AssertionError: ('Exif',).37500 type/count/value changed |
+| `test_d63_replaces_fields_and_drops_thumbnail[3-640-3]` | PASS (control) |
+| `test_d63_replaces_fields_and_drops_thumbnail[3-65536-4]` | PASS (control) |
+| `test_d63_replaces_fields_and_drops_thumbnail[4-640-4]` | AssertionError: assert (40962, 3, 1, b'\x80\x02') == (40962, 4, 1,...\x02\x00\x00') |
+| `test_d63_inserts_missing_entries[None]` | AssertionError: assert (40962, 3, 1, b'\x1e\x00') == (40962, 4, 1,...\x00\x00\x00') |
+| `test_d63_inserts_missing_entries[sub1]` | AssertionError: assert (40962, 3, 1, b'\x1e\x00') == (40962, 4, 1,...\x00\x00\x00') |
+| `test_d63_inserts_missing_entries[sub2]` | AssertionError: assert (40962, 3, 1, b'\x1e\x00') == (40962, 4, 1,...\x00\x00\x00') |
+| `test_none_source_has_only_the_four_d63_fields` | AssertionError: assert [(40962, 3, 1... b'\x00\x14')] == [(40962, 4, 1...x00\x00\x14')] |
+| `test_kept_entry_order_is_preserved` | AssertionError: kept entry order changed |
+| `test_damaged_child_is_dropped_alone[34665-path0-offset]` | AssertionError: damaged child was not reported |
+| `test_damaged_child_is_dropped_alone[34665-path0-table]` | assert [1, 36864, 40... 40963, 40965] == [40962, 40963] |
+| `test_damaged_child_is_dropped_alone[34665-path0-payload]` | AssertionError: damaged child was not reported |
+| `test_damaged_child_is_dropped_alone[34853-path1-offset]` | assert 34853 not in [271, 274, 305, 34665, 34853] |
+| `test_damaged_child_is_dropped_alone[34853-path1-table]` | assert 34853 not in [271, 274, 305, 34665, 34853] |
+| `test_damaged_child_is_dropped_alone[34853-path1-payload]` | assert 34853 not in [271, 274, 305, 34665, 34853] |
+| `test_damaged_child_is_dropped_alone[40965-path2-offset]` | assert 40965 not in [36864, 40962, 40963, 40965] |
+| `test_damaged_child_is_dropped_alone[40965-path2-table]` | assert 40965 not in [36864, 40962, 40963, 40965] |
+| `test_damaged_child_is_dropped_alone[40965-path2-payload]` | assert 40965 not in [36864, 40962, 40963, 40965] |
+| `test_damaged_root_raises_and_sanitise_drops[garbage]` | PASS (control) |
+| `test_damaged_root_raises_and_sanitise_drops[II*\x00\xff\xff\xff\xff]` | Failed: DID NOT RAISE any of (<class 'ValueError'>, <class 'struct.error'>, <class 'SyntaxError'>) |
+| `test_damaged_root_raises_and_sanitise_drops[II*\x00\x08\x00\x00\x00\xff\xff]` | Failed: DID NOT RAISE any of (<class 'ValueError'>, <class 'struct.error'>, <class 'SyntaxError'>) |
+| `test_oversized_root_value_is_rejected` | Failed: DID NOT RAISE <class 'ValueError'> |
+| `test_other_ifd_values_are_dropped_with_warning` | AssertionError: unsupported IFD retained |
+| `test_write_photo_preserves_bytes_through_png_exif[png]` | AssertionError: ('Exif',).42036 type/count/value changed |
+| `test_write_photo_preserves_bytes_through_png_exif[jpeg]` | AssertionError: ('Exif',).42036 type/count/value changed |
+| `test_from_tiff_preserves_raw_ascii_and_filters_structure` | AssertionError: ().315 type/count/value changed |
+| `test_from_tiff_without_metadata_returns_none` | PASS (control) |
+| `test_bigtiff_is_not_carried` | AssertionError: unsupported BigTIFF was not reported |
