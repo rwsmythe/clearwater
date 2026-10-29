@@ -1,5 +1,80 @@
 # WP4.5 - EXIF byte fidelity: cumulative ledger
 
+## Reviewer A Round 3 - seat 2 adjudication
+
+Reviewer: Claude opus/high, read-only on `c7c7360`; full R3 findings supplied
+in the seat-2 turn-2 dispatch. Verdict: `NEW_CRITICAL_MAJOR_FOUND`.
+Governing ruling: CHARC `85978ce0cd76c577`, 2026-10-29, DESIGN GUARD.
+Evidence root: `C:\Users\rwsmy\clearwater-review-evidence\wp4.5\r3\`;
+individual transcript filename/hash and process assertions were not supplied.
+All four findings are NEW; no reopened findings or reverts. This adjudication
+precedes new tests and product changes. Initial git status was clean, HEAD
+`c7c7360`.
+
+| Finding | Classification / CHARC disposition | Confirmation and commissioned action |
+| --- | --- | --- |
+| F-1 | Major, in envelope, EXECUTED; replace the R2 cache with the design guard | Distinct overlapping child offsets evade the exact-offset cache. Follow only the first occurrence of each carried pointer tag per parent (34665/34853 in IFD0, 40965 in Exif); drop later occurrences with individual IFD/tag warnings. Remove the cache. RED construction P=200/N=400 for Exif and GPS, entry-count assertions only. Exact written-entry bound requires the pre-build check recorded below. |
+| F-2 | Minor, out of envelope, EXECUTED; resolved by the commissioned guard | The offset cache ignores the label and shares the D63-modified list. Parse same-offset siblings separately per label; judge cycles by ancestor offsets. Add the ruled same-offset regression. |
+| F-3 | Advisory, in envelope, REASONED; report correction commissioned | Replace R2's shared-child mechanism/claim with the design guard and its valid bound. Name F-A and F-1 as fixed only after remediation is verified. F7 shared values remains the sole amplification Limit. |
+| F-4 | Advisory, in envelope, REASONED; no change ruled | Keep the warning on SubIFDs and other unsupported IFD-valued entries in from_tiff; this matches the binding warning policy. |
+
+The guard narrows R1 F3 only for the three structural pointer tags. All other
+non-D63 duplicate fields retain the prior pass-through rule. The R2 shared
+child test and R1 duplicate-Exif-child test will need amendment to the newly
+ruled first-pointer-only contract inside the owned test file. No other scope
+or dependency change is authorized. R4 blocking on this class must STOP to
+CHARC with a cap recommendation, per the dispatch.
+
+Dispatcher-seat evidence on `c7c7360` (supplied, not run by this cell): ruff
+format/check clean, all blobs LF/ASCII; real-photo node
+`tests/test_photo_check.py::test_the_real_photo_leg_reads_and_round_trips_the_owners_photos`
+**1 passed in 272.04 s**. This predates R3 changes. Depth supplied at seat-2
+turn-1 yield: **119,808 input tokens**, binding window **258,400**.
+
+### R3 pre-build STOP - exact bound omits D63 insertions
+
+**[minor, in envelope, EXECUTED] STOP** under the dispatch instruction:
+"If you see that the ruled design cannot hold for a reason the ruling did
+not foresee, STOP and say so with evidence before building around it."
+The rule states "written entries <= 4 x len(block) / 12 by construction".
+That exact bound conflicts with mandatory D63 insertion for a valid empty
+source table, independently of the pointer/cache design.
+
+Cheap reproduction on unchanged `c7c7360` product:
+`uv run --offline python work/wp4.5/r3_bound_probe.py`, exit 0;
+output `work/wp4.5/r3-bound-probe.log`. The probe constructs only a classic
+TIFF header and empty IFD0, confirms sanitise retains it, then independently
+counts output entries using struct. No Pillow serializer or product parser
+is used for the output count.
+
+| Synthetic source | Input bytes | Source entries | Required output entries | Exact bound check |
+| --- | --- | --- | --- | --- |
+| Empty IFD0 with next pointer | 14 | 0 | 5 | `12 * 5 <= 4 * 14` is `60 <= 56`: false |
+| Empty IFD0 without next pointer (F-B) | 10 | 0 | 5 | `12 * 5 <= 4 * 10` is `60 <= 40`: false |
+
+The five output entries are IFD0 tags 274, 305, 34665 and Exif tags 40962,
+40963: the four mandatory D63 fields plus the required Exif pointer. These
+inputs have no source pointer, duplicate, overlap, shared child or cache hit;
+the ruled cache removal cannot change this result. Returning fewer entries
+would break the unchanged D63 requirement. This is an exact-bound conflict,
+not a rejection of the first-pointer-only design or a new amplification class.
+
+Recommendation to CHARC: keep the design guard unchanged, and rule the bound
+as `written entries <= 4 * len(source) / 12 + 5` (equivalently, distinguish
+the bounded carried source entries from at most five fixed D63 insertions).
+This preserves linear growth and the commissioned P=200/N=400 entry-count
+tests. Do not silently amend the binding exact bound in code or report.
+
+No new RED tests, product fixes, report amendments, light pytest run or static
+gates were performed this turn because the STOP is before building. F-1/F-2
+remain unremediated and F-3's report change remains pending; F-4 requires no
+change. The R2 test rewrite remains pending, explicitly recorded above.
+Only this ledger changes. Scratch probe/log are ignored under work/wp4.5;
+no footage access, dependency/interface/config changes, mailbox posts or
+commits. R3 process/evidence assertions and final R4/B/gate remain dispatcher
+owned. Current depth must be read by the dispatcher; last supplied depth is
+119,808 input tokens, binding window 258,400.
+
 ## Reviewer A Round 2 - seat 2 adjudication
 
 Reviewer: Claude opus/high, read-only on `3020648`; full findings supplied in
@@ -190,6 +265,8 @@ no full serial leg is requested. No acceptance or convergence is claimed now.
 | T4 amended test check | Executed base test and final light run; not Reviewer A | 0 | 0 | 0 | 0 / 0 | 0 / 0 | 0 | Test-only remediation; no product change | Amended real GPS injection passes with rewrite; light run green; Reviewer A R1 pending |
 | A R1 | Claude opus/high, read-only; dispatch text and CHARC ruling `980818fc01eb77ea` | 0 | 3 | 2 (+4 advisory) | 8 / 1 | 9 / 0 | 0 | Product fixes F1/F2/F3/F4/F8; tests F6; docs F5/F7/F9 | NEW_CRITICAL_MAJOR_FOUND; remediation green at cell; R2 required |
 | A R2 | Claude opus/high, read-only on `3020648`; CHARC `72fc47f6a4ecfd91` | 0 | 1 | 1 (+4 advisory) | 6 / 0 | 6 / 0 | 0 | Product fixes F-A/B/C/F; tests/controls; report F-E and F-D Limit | NEW_CRITICAL_MAJOR_FOUND; seat 2 remediation green (907 light tests); R3 next |
+| A R3 | Claude opus/high, read-only on `c7c7360`; CHARC `85978ce0cd76c577` | 0 | 1 | 1 (+2 advisory) | 3 / 1 | 4 / 0 | 0 | None; documentation only | NEW_CRITICAL_MAJOR_FOUND; STOP before building: exact output-entry bound conflicts with D63 insertion |
+| R3 pre-build check | Cell independent synthetic struct probe | 0 | 0 | 1 | 1 / 0 | 1 / 0 | 0 | 0 / 0 | Confirmed exact-bound conflict; recommend fixed D63 allowance, ruling pending |
 
 - Suspected: the fresh IFD construction drops source type pins.
 - Confirmed independently: source trace and parsed synthetic output agree for
@@ -207,6 +284,7 @@ no full serial leg is requested. No acceptance or convergence is claimed now.
 | Turn 3 yield | 128,189 input tokens; window 258,400 (supplied in turn 4) | Proceed under amendment `8dd13704a85f2237` |
 | Turn 4 yield | 140,712 input tokens; window 258,400 (supplied in turn 5) | R1 remediation; yield near 230K if incomplete, stop near 250K |
 | Seat 1 retirement / Seat 2 dispatch | Seat 1: 188,902 input tokens supplied; seat 2 depth not yet supplied; binding window 258,400 | Fresh seat 2 on clean `3020648`; evaluate at 200K, stop near 250K at a step boundary |
+| Seat 2 turn 1 yield / turn 2 dispatch | 119,808 input tokens; binding window 258,400 | R3 design guard commissioned on `c7c7360`; pre-build check before implementation |
 
 ## Reviewer A Round 1 - adjudication and remediation
 
