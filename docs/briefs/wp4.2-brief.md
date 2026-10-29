@@ -1,21 +1,41 @@
-# WP4.2 — Video path end to end (dispatch brief, DRAFT, RULED)
+# WP4.2 — Video path end to end (dispatch brief, REVISED, RULED)
 
-**Status:** DRAFT, RULED 2026-10-28 (CHARC `2c4476d9869df056`, rulings below, which take precedence over the text above them); FINAL only after WP4.1's accept plus one revision pass, on CHARC's word. DRAFT 2026-10-28, written by a drafting helper for the orchestrator (generation 16) from
-CHARC's Phase 4 commission `159c14fb79ad1aae` (section 1 lanes, section 2 the WP4.2 bounds). Base =
-the main commit named at dispatch (drafted on `6536f60`). **This draft is revised once against
-WP4.1's accept record before FINAL** (commission section 1: "the WP4.2 and WP4.3 drafts are revised
-once against their predecessor's accept record"). Every WP4.1 name below is (as proposed in WP4.1's draft; final per its accept), from
-`docs/briefs/wp4.1-brief.md` questions 1-6, 9 and 10: the root `src/clearwater/app/composition.py`
-in a new Qt-free `clearwater.app` package, with `export_jobs(*, app_version, reader, writer,
-methods, select_backend, on_stage) -> ExportJobs` (its question 4: `kind == "video"` routes to
-`unavailable_exports().job(request)`) and the builders `photo_reader()`, `photo_writer()`,
-`correction_methods()`, `backend_selector()`; the runner `tools/headless_export.py` (its
-question 5: `requests_for`, `run`, `record_json`, `main`; every IF-10 field a flag; exit 0 / 1 /
-2; record `"schema": 1`, additive only; its question 9: the footage-folder refusals).
+**Status:** REVISED 2026-10-29 (revision 1 against WP4.1's accept `f30e00e`); FINAL on CHARC's word. Rulings govern: RULED 2026-10-28 (CHARC `2c4476d9869df056`, rulings below, which take precedence over the text above them). DRAFT 2026-10-28, written by a drafting helper for the orchestrator (generation 16) from
+CHARC's Phase 4 commission `159c14fb79ad1aae` (section 1 lanes, section 2 the WP4.2 bounds);
+revision 1 by a drafting helper for the orchestrator (generation 18) on `eb0074f`, per CHARC
+`03b3212abac40d2d` (one revision pass against the WP4.1 record, then FINAL on CHARC's word). Base =
+the main commit named at dispatch, after this revision lands (drafted on `6536f60`, revised on
+`eb0074f`). Every WP4.1 name below is the name on main as accepted (`docs/proofs/wp4.1-accept.md`,
+`f30e00e`), checked against the code: the root `src/clearwater/app/composition.py` in the Qt-free
+package `clearwater.app` (`__init__.py` re-exports the five builders), with `export_jobs(*,
+app_version=clearwater.__version__, reader=None, writer=None, methods=None, select_backend=None,
+on_stage=None) -> ExportJobs` and the builders `photo_reader()`, `photo_writer()`,
+`correction_methods()`, `backend_selector()`. As accepted, `export_jobs()` builds ONE
+`ExportEngine` whose video collaborators are interface stubs no job reaches
+(`StubVideoSource((), _no_video_probe())`, `sink_factory=StubVideoSink`, `StubProxyCache()`,
+`cache_key=_no_cache_key`) and wraps it in the private `_PhotoExports`, whose `job()` routes
+`kind == "video"` to `unavailable_exports().job(request)` (`UNAVAILABLE_TEXT`, nothing written)
+and every other request to the engine (WP4.1 question 4). The WP4.1 report's "WP4.2 extension
+points": "`export_jobs()` builds the real `FFmpegVideoSource`, sink factory and `DiskProxyCache`
+and passes the selected device backend to source, sink and engine there (DR-67), with new keyword
+arguments only (for example the cache folder); it then returns the `ExportEngine` itself and
+`_PhotoExports` and the stub video collaborators are deleted. No public name changes." The runner
+`tools/headless_export.py` (a test tool): library API `route`, `requests_for(paths, *, parameters,
+settings)` (the kind is decided by `route()` per extension; WP4.1 built no `kind=` parameter, so
+question 12's `kind="auto"` reads as `route()`), `parameters_for`, `read_parameter_file`,
+`configured_footage_folder`, `inside`, `write_target_refusal(target, footage_folder)`,
+`check_outputs(requests, footage_folder)`, `run(requests, *, exports=None, progress=None,
+footage_folder=CONFIGURED, parameters_from="given", known_folders=())`, `record_object`,
+`record_json`, `exit_status`, `summary_lines`, `main(argv=None, *, exports=None)`, and the class
+`Redactor`; exit 0 / 1 / 2; record `"schema": 1` (`SCHEMA`), fields additive only; WP4.1 question
+9's footage refusals now decided by the one write-target predicate `write_target_refusal` (CHARC
+`870c8ddeb64b4e12`).
 Owner decisions: none inside the package. A V3 failure of the product method
 (D96), any change to the 25 % threshold, and anything relaxing a mandatory V4 item are
 owner-reserved: a STOP, never done here.
-- Spec **v0.5.5**: section 5.5 ("In v1 every input file is its own clip: smoothing starts and ends
+- Spec **v0.5.6** (v0.5.5 -> v0.5.6 is text only, owner 2026-10-29 "Apply N6 erratum": the
+  section 10.2 N6 body now states D106's interim of about 25 min/min and the WP5.2 re-set; no
+  decision changed. WP4.2 does not cite N6: V16 and every speed figure are out of scope): section 5.5 ("In v1 every input file is its own clip: smoothing starts and ends
   within the file"); V3, V4, V9, V12 (deferred to v2), V17; D54, D55, D71, D76, D83, D86, D87, D94,
   D95, D96, D105, D107, D111, D112, D113, D114, D115; N3, N4, N8, N10. Architecture FINAL 1.0:
   sections 1, 2 ("video analysis", "video export (jobs)"), 3 (IF-1, IF-2, IF-5, IF-7, IF-8 with its
@@ -25,7 +45,11 @@ owner-reserved: a STOP, never done here.
   V4, V9, V12, V17"; "joins probe, decode, analysis, cache, render and encode; every input file is
   its own clip (no cross-chapter smoothing in v1)"); section 7 rows V3, V4, V9, V17 ("Built in ...
   WP4.2", completed in WP5.1).
-- Accept records and reports, Phase-4 notes: WP3.21 accept (`docs/proofs/wp3.21-accept.md`, "Debt
+- Accept records and reports, Phase-4 notes: WP4.1 accept (`docs/proofs/wp4.1-accept.md`,
+  "Banked and owed": B2-1 -> WP4.2 BINDING, B2-2 / B2-3 / B2-4 -> WP4.2 MINOR) and report
+  (`docs/reports/wp4.1-photo-path.md`: "What WP4.1 adds", "WP4.2 extension points", "Limits"
+  (the footage check), "Erratum at the gate"); WP-T5 accept (`docs/proofs/wp-t5-accept.md`: the
+  serial leg after DR-65); WP3.21 accept (`docs/proofs/wp3.21-accept.md`, "Debt
   and owed rows") and report "Design as built", "V4 SAME", "Limits"; WP3.14 accept "Debt and owed
   rows" and report "Debt dispositions" (DR-45 (b) "WP4.2's (the sink's `close` refuses a short
   frame set)"); WP3.11 accept "Results" and report "V3 ratios on steadily moving content
@@ -37,7 +61,7 @@ owner-reserved: a STOP, never done here.
   Reviewer A (your loop) and Reviewer B (the orchestrator's seat) are Codex at the pin
   `gpt-6.1-sol` / high.
 - Worktree `.worktrees/wp4.2`, branch `wp4.2` from main, base = the main commit named at dispatch
-  (after WP4.1's accept).
+  (after WP4.1's accept `f30e00e` and this revision).
 
 **Why.** Every video component is on main (probe WP3.7, colour WP3.5, decode WP3.9, sink WP3.10,
 analysis WP3.11, cache WP3.12, the export engine WP3.14 as optimised by WP3.21), but no PRODUCT
@@ -51,37 +75,44 @@ selected backend, and proves V3, V4, V9 and V17 through it.
 | Field | Content |
 |---|---|
 | ID and title | WP4.2 — Video path end to end; plan section 6 Phase 4 row WP4.2 |
-| Goal | Extend WP4.1's composition root (`clearwater.app.composition` (as proposed in WP4.1's draft; final per its accept)) and headless runner (`tools/headless_export.py` (as proposed in WP4.1's draft; final per its accept)) with the video path, replacing `export_jobs()`'s video router to `unavailable_exports()` with the real engine: probe -> decode -> analysis -> cache -> render -> encode through the real `FFmpegVideoSource`, `AnalysisEngine`, `DiskProxyCache`, the IF-3 methods and `FFmpegVideoSink`, one job (one clip) per input file. The GPU job's source and sink are built with `device_backend=<the backend the job selected>` and its analysis engine gets that backend; the CPU job passes None (DR-67). Prove through the product composition: V4 (every MANDATORY and REQUIRED item SAME; GX011627 in ONE exclusive window), V9 (neutral parameters, AD-11's bound), V17 (reopen skips the decode pass; a version mismatch re-analyses), V3 with the product method, and the own-clip rule. V16 is NOT re-measured (WP5.2, AD-21). |
+| Goal | Extend WP4.1's composition root (`clearwater.app.composition`, accepted `f30e00e`) and headless runner (`tools/headless_export.py`, accepted `f30e00e`) with the video path, replacing `export_jobs()`'s video router (`_PhotoExports`, which sends `kind == "video"` to `unavailable_exports()`) and the engine's stub video collaborators with the real engine: probe -> decode -> analysis -> cache -> render -> encode through the real `FFmpegVideoSource`, `AnalysisEngine`, `DiskProxyCache`, the IF-3 methods and `FFmpegVideoSink`, one job (one clip) per input file. The GPU job's source and sink are built with `device_backend=<the backend the job selected>` and its analysis engine gets that backend; the CPU job passes None (DR-67). Prove through the product composition: V4 (every MANDATORY and REQUIRED item SAME; GX011627 in ONE exclusive window), V9 (neutral parameters, AD-11's bound), V17 (reopen skips the decode pass; a version mismatch re-analyses), V3 with the product method, and the own-clip rule. Close the runner debt WP4.1 banked here: DR-78 (BINDING: no planned output FILE path carries stream syntax; R1-Q1) and DR-79 (a) (b) (c per R1-Q2), the video outputs and `--cache-dir` going through the same one write-target predicate. V16 is NOT re-measured (WP5.2, AD-21). |
 | Spec / decision clauses | Section 5.5 "every input file is its own clip: smoothing starts and ends within the file". V3 "pass if flicker with smoothing ≤ 25% of flicker with per-frame (unsmoothed) statistics"; AD-14 "must stay under 0.5/255 after smoothing", extended: "V3's 25 % RATIO is not met on it ... and is not asserted on it; the figures are recorded"; "V3 on real footage is V2's (D112, WP4.2); the 25 % threshold stays tunable and the owner's". V4 "output matches source frame count, per-frame timestamps, start offset, resolution, bit depth (or the selected 10-bit option), chroma format, audio and display orientation; color tags match the source"; D115 "One variable-frame-rate sample". V9 "every stage set to its neutral value ... output matches the input within a small color-difference tolerance ... including color tags"; AD-11 "V9 identity round trip (neutral parameters, pre-encode): max abs diff ≤ 2/255, mean ≤ 0.2/255", "measured on the decoded-RGB side with the encoder AND its 8-bit Y'CbCr 4:2:0 conversion excluded". V12 "(deferred to v2, 0.5.3)". V17 "reopening an unchanged clip skips the decode pass; a cache format version mismatch triggers re-analysis"; D113 "Cache key includes a cache format version". D86 "Truncated/corrupt video: process the readable portion and warn". D96 "Weight-map temporal smoothing is conditional: added to v1 if V3 fails" (owner, CP5). N3/D107 "the same code runs on CPU or GPU"; D111 "Automatic CPU fallback"; N4 "frame parallelism and buffering are bounded"; N8 "source files never modified". AD-29 "Device extensions of IF-2 by consumer-side Protocols; CuPy only in `core`". AD-21: V16 "re-run at WP5.2". |
-| Depends on | WP4.1 (its accept: `clearwater.app.composition` `export_jobs()` and its builders `photo_reader()`, `photo_writer()`, `correction_methods()`, `backend_selector()`; `tools/headless_export.py`; the photo legs; every name (as proposed in WP4.1's draft; final per its accept)). On main: WP3.21 (`7e228fb`: the overlap, device frames, `DeviceFrameBackend` in `io/video/decode.py`, `AnalysisDeviceBackend` in `analysis/proxy.py`, `JobDeviceBackend` in `jobs/export.py`), WP3.14 (`ba6e923`: `ExportEngine`, `run_batch`), WP3.11 (`47235b6`: `AnalysisEngine`), WP3.10 (`47bc6d6`: `FFmpegVideoSink`, `tools/video_fidelity.py`), WP3.9 (`09ab408`: `FFmpegVideoSource`), WP3.12 (`DiskProxyCache`, `cache_key`), WP3.7 (`probe`, `filter_inputs`), WP3.5 (`clearwater.color`), WP3.4 (`available_methods`), WP3.1 (`core.select_backend`). WP3.8 is removed (AD-19). |
-| Debt and decided items | The table "Register rows" below (every row whose Signal or trigger names WP4.2, WP4.x, or a module this package touches). BINDING (commission section 2): **DR-67** CLOSES; **DR-71** CLOSES; **DR-73 (a)** per question 2; **DR-74** CLOSES (question 8). **Information for CP5:** the WP3.11 V3 ratio figures go into the accept record and the report, beside this package's product-method figures (task 7). |
-| Files owned (questions 1, 2, 11) | NEW: `tests/test_wp42_device_backend.py` (DR-67), `tests/test_wp42_composition.py` (the video legs of the root), `tests/test_wp42_video_path.py` (V4 small set, V9, V17, own clip, DR-45 (b), cancel and failure through the composition), `tests/test_wp42_v3_product.py` (V3 with c3 and ancuti2018), `tests/test_wp42_runner_video.py` (the runner's video legs); `docs/reports/wp4.2-video-path.md`; `docs/proofs/wp4.2-ledger.md`. (Test file names are proposals; round 0 may merge them.) EDIT: `src/clearwater/app/composition.py` (WP4.1; replace the `kind == "video"` router with the real engine, add the video builders; the photo builders and WP4.1's tests unchanged) and `tools/headless_export.py` (WP4.1; video-specific options and additive record fields only, `"schema": 1` kept); both EXTEND, never rewrite, names (as proposed in WP4.1's draft; final per its accept). WP4.1's tests pass unchanged EXCEPT those that pin the video router (WP4.1 task 5 CHECK "a video path in WP4.1 yields the question-4 failure as a failed item", and any test asserting the `unavailable_exports()` routing): they must change when the router goes, so round 0 lists each by node id for a ruling (question 2); `src/clearwater/jobs/export.py` (WP3.14/WP3.21; the per-job device-backend hook, question 1, and DR-71); `src/clearwater/core/backend.py` DOCSTRING ONLY at `block_sums` (DR-73 (a), question 2); `tests/test_wp321_fft_release.py` (question 8: DR-74's case and DR-73 (b)'s rename only). EDIT only by a round-0 grant: `src/clearwater/analysis/engine.py` (WP3.11; question 7's frame-count check, question 6's DR-47 items). NOT owned: `src/clearwater/interfaces/` (IF-1..IF-10 FROZEN, AD-20), `jobs/export_seam.py`, `jobs/naming.py`, `safe_write.py`, `disk_space.py`, `batch.py`; `io/video/` (every module), `color/`, `cache/`, `methods/`, `config/`, `analysis/proxy.py`, `analysis/store.py`, `analysis/smoothing.py`, `core/` except the docstring; `gui/` including `gui/engines.py` (question 3); `tools/export_bench.py`, `tools/export_oracle.py`, `tools/video_fidelity.py`, `tools/video_io_bench.py` and `tests/test_jobs_export_support.py` `product_engine` (imported or run, never edited; question 11, WP4.1 question 10); WP4.1's static "one place" test (`tests/test_app_composition.py`, WP4.1 task 3) is not edited: WP4.2's own static test adds `FFmpegVideoSource`, `FFmpegVideoSink` and `DiskProxyCache` to the constructors only the root may call in `src/clearwater/`; `tests/conftest.py`, `tests/fixture_plugin.py`, `tests/fixtures/`; every other existing test file; `pyproject.toml`, `uv.lock`. |
+| Depends on | WP4.1 (accepted `f30e00e`, `docs/proofs/wp4.1-accept.md`: `clearwater.app.composition` `export_jobs()` and its builders `photo_reader()`, `photo_writer()`, `correction_methods()`, `backend_selector()`; `tools/headless_export.py` with `write_target_refusal`, `check_outputs`, `Redactor`, `run`, `main`, record `"schema": 1`; the photo legs; the names as listed in the header, checked on main). On main: WP3.21 (`7e228fb`: the overlap, device frames, `DeviceFrameBackend` in `io/video/decode.py`, `AnalysisDeviceBackend` in `analysis/proxy.py`, `JobDeviceBackend` in `jobs/export.py`), WP3.14 (`ba6e923`: `ExportEngine`, `run_batch`), WP3.11 (`47235b6`: `AnalysisEngine`), WP3.10 (`47bc6d6`: `FFmpegVideoSink`, `tools/video_fidelity.py`), WP3.9 (`09ab408`: `FFmpegVideoSource`), WP3.12 (`DiskProxyCache`, `cache_key`), WP3.7 (`probe`, `filter_inputs`), WP3.5 (`clearwater.color`), WP3.4 (`available_methods`), WP3.1 (`core.select_backend`). WP3.8 is removed (AD-19). |
+| Debt and decided items | The table "Register rows" below (every row whose Signal or trigger names WP4.2, WP4.x, or a module this package touches; re-grepped at `eb0074f`). BINDING (commission section 2): **DR-67** CLOSES; **DR-71** CLOSES; **DR-73 (a)** CLOSES (question 2 granted the docstring line) and **(b)** CLOSES (question 8); **DR-74** CLOSES (question 8). BINDING from WP4.1's accept: **DR-78** CLOSES (R1-Q1 sets the form). **DR-79** (a) and (b) CLOSE; (c) per R1-Q2. **DR-45 (b)** CLOSES on both halves (question 7). **DR-47** per question 6 as amended (CLOSES (a) only if the question 7 `analysis/engine.py` grant is exercised; otherwise OPEN, trigger the next `analysis/engine.py` touch). **Information for CP5:** the WP3.11 V3 ratio figures go into the accept record and the report, beside this package's product-method figures (task 7). |
+| Files owned (questions 1, 2, 11; R1-Q1..R1-Q3) | NEW: `tests/test_wp42_device_backend.py` (DR-67), `tests/test_wp42_composition.py` (the video legs of the root), `tests/test_wp42_video_path.py` (V4 small set, V9, V17, own clip, DR-45 (b), cancel and failure through the composition), `tests/test_wp42_v3_product.py` (V3 with c3 and ancuti2018), `tests/test_wp42_runner_video.py` (the runner's video legs), `tests/test_wp42_runner_hardening.py` (DR-78, DR-79 (a) (b), and (c)'s signed-zero control if R1-Q2 grants it); `docs/reports/wp4.2-video-path.md`; `docs/proofs/wp4.2-ledger.md`. (Test file names are proposals; round 0 may merge them.) EDIT: `src/clearwater/app/composition.py` (WP4.1; replace `_PhotoExports`' `kind == "video"` router and the stub video collaborators (`StubVideoSource`, `StubVideoSink`, `StubProxyCache`, `_no_video_probe`, `_no_cache_key`) with the real engine, add the video builders; `export_jobs()` returns the `ExportEngine` itself, as the WP4.1 report's extension points say; the photo builders unchanged) and `tools/headless_export.py` (WP4.1; video-specific options and additive record fields, `"schema": 1` kept; and the DR-78 / DR-79 (a) (b) fixes: `check_outputs` / `write_target_refusal` for every planned output FILE path per R1-Q1, `Redactor` for the `\'` spelling and a `Path.resolve()` failure); both EXTEND, never rewrite, and no public name changes. WP4.1's tests pass unchanged EXCEPT the three that pin the video router (question 2, RULED: replaced by assertions on the real video job, no further ask), edited in place and only there: `tests/test_app_composition.py::test_a_video_request_fails_unavailable_and_writes_nothing` (asserts `UNAVAILABLE_TEXT` for a video request through `export_jobs()`); `tests/test_headless_export.py::test_a_video_fails_unavailable_in_wp41` (the same through `run`); `tests/test_headless_export.py::test_the_record_has_schema_1_and_file_names_only` (its third item `GX010001.MP4` asserts `items[2]["failure"] == UNAVAILABLE_TEXT`, and under question 12 a video item without `--cache-dir` is exit 2 with nothing run, so its command line changes too: R1-Q3); with them the two files' module docstrings (`test_app_composition.py` line 5, `test_headless_export.py` lines 8-9) and their now-unused `UNAVAILABLE_TEXT` imports. NOT router pins, unchanged: `tests/test_gui_export_panel.py::test_the_gui_module_re_exports_the_seam`, `::test_the_unavailable_default_fails_and_writes_nothing` and `::test_the_product_default_reports_that_export_is_unavailable` (they pin the seam's `unavailable_exports()`, which stays the GUI's default until WP4.3); the `route` / `requests_for` tests that expect the `"video"` kind; `tests/test_headless_export.py::test_the_runner_process_loads_no_pyside6_and_no_cupy_when_forced`, `tests/test_app_composition.py::test_importing_the_root_builds_nothing_and_loads_no_qt_or_cupy` and `tests/test_app_deps.py::test_importing_the_app_loads_no_pyside6_and_no_cupy` (run, not changed: the root's video imports must still load no PySide6 or CuPy, else a STOP). Every other test in `tests/test_headless_export.py` and `tests/test_app_composition.py` is NOT owned: the runner's new tests go in the WP4.2 files above. `tests/test_wp41_photo_path.py` and `tests/test_wp41_v8.py`: EDIT only if R1-Q2 grants DR-79 (c)'s two comparisons; `src/clearwater/jobs/export.py` (WP3.14/WP3.21; the per-job device-backend hook, question 1, and DR-71); `src/clearwater/core/backend.py` DOCSTRING ONLY at `block_sums` (DR-73 (a), question 2); `tests/test_wp321_fft_release.py` (question 8: DR-74's case and DR-73 (b)'s rename only). EDIT only by a round-0 grant: `src/clearwater/analysis/engine.py` (WP3.11; question 7's frame-count check and, in the same touch, DR-47 (a)'s one-shot guard, question 6 as amended). NOT owned: `src/clearwater/interfaces/` (IF-1..IF-10 FROZEN, AD-20), `jobs/export_seam.py`, `jobs/naming.py`, `safe_write.py`, `disk_space.py`, `batch.py`; `io/video/` (every module), `color/`, `cache/`, `methods/`, `config/`, `analysis/proxy.py`, `analysis/store.py`, `analysis/smoothing.py`, `core/` except the docstring; `gui/` including `gui/engines.py` (question 3); `tools/export_bench.py`, `tools/export_oracle.py`, `tools/video_fidelity.py`, `tools/video_io_bench.py` and `tests/test_jobs_export_support.py` `product_engine` (imported or run, never edited; question 11, WP4.1 question 10); WP4.1's static "one place" test (`tests/test_app_composition.py::test_only_the_root_constructs_the_real_photo_engines` with its `BUILDERS` set and planted control `::test_the_static_check_reports_a_planted_construction`, WP4.1 task 3) is not edited: WP4.2's own static test adds `FFmpegVideoSource`, `FFmpegVideoSink` and `DiskProxyCache` to the constructors only the root may call in `src/clearwater/`; `tests/conftest.py`, `tests/fixture_plugin.py`, `tests/fixtures/`; every other existing test file; `pyproject.toml`, `uv.lock`. |
 | Interfaces provided | None frozen. `ExportEngine` gains only ADDITIVE, keyword-only, defaulted constructor parameters (question 1), so every existing caller (`export_bench.py`, `export_oracle.py`, the WP3.14 and WP3.21 tests) is unchanged; the root's video builder and the runner's video options per round 0. |
 | Interfaces consumed | IF-1 `Frame` (`device` `"cuda:0"`), IF-2 `ArrayBackend` plus the AD-29 device extensions by Protocol, IF-3 (`available_methods()`, `Parameter.neutral`), IF-4 (through the engine), IF-5 `VideoSource` / `VideoSink` / `ProbeResult`, IF-7 `ProxyCache` / `CacheKey`, IF-8 `Progress` / `JobResult`, IF-9, IF-10 `Settings` (`output_folder`, `video_encoder`, `quality_level`, `ten_bit_for_eight_bit`, `force_cpu`, `cache_limit_bytes`); the seam `ExportRequest`, `ExportJobs`, `CANCELLED`. |
 | Consumers | WP4.3 (wires the GUI to the same root; DR-62, DR-68, DR-69; the GUI's video legs, question 3), WP5.1 (completes V3, V4, V9, V17 through the runner), WP5.2 (V15, V16 through the product composition), WP5.3 (the review pack's video exports). |
 | Hardware flags | `gpu`, `footage`, `slow` as WP3.14 and WP3.21. **EXCLUSIVE** for task 10 (the GX011627 V4 leg) and the full suite: plan 4.3 "one at a time, nothing else heavy running"; at least 5 GiB free before a run; GX011627 read only through `tools/local_config.find_footage_file`; every output under `work/`; a run from an ungranted or a parallel-worker window is not a figure of record (AD-28). |
-| Out of scope | V16 and every speed figure of record (WP5.2, AD-21; the window's elapsed is information only); the analysis speed (DR-70); the GUI wiring and the GUI's video engines (WP4.3, question 3); DR-62's serialisation; DR-68, DR-69; chapter grouping and V12 (v2); D109; any change to what the statistics are (AD-3, AD-5) or to the encoder mapping (AD-12); any change in `src/clearwater/interfaces/`; decoding, parsing or logging any `gpmd` packet, IMU or GPS data; reading or logging any location tag. |
-| Done | Plan 4.5; ruff check, ruff format --check, mypy strict, the full suite per the fill's GATE_CHECKS at dispatch (the two-leg command) green in a granted window, every existing test unchanged except as ruled (question 8); the DR-67 test on main; V4 SAME through the product composition on the small set (suite) and on GX011627 plus the WP2.3 set (task 10, one EXCLUSIVE window); V9, V17, own-clip, DR-45 (b), cancel and failure tests; V3 with the product method asserted where AD-14 asserts it and recorded where it records; DR-71 and DR-74 closed, DR-73 per question 2 and question 8; the WP3.11 V3 ratios and this package's in the report and the accept record; V12 recorded as deferred; the new serial-leg cost within question 9's budget; Reviewer A converged. |
+| Out of scope | V16 and every speed figure of record (WP5.2, AD-21; the window's elapsed is information only); the analysis speed (DR-70); the GUI wiring and the GUI's video engines (WP4.3, question 3); DR-62's serialisation; DR-68, DR-69; DR-75, DR-76, DR-77 (WP4.3's); any GX011627 suite test, and whether this package's product-composition leg later supersedes `tests/test_jobs_export_video.py::test_gx011627_through_the_engine_keeps_every_mandatory_and_required_item` (WP5.1's; the T5-Q7 note in the Rulings); chapter grouping and V12 (v2); D109; any change to what the statistics are (AD-3, AD-5) or to the encoder mapping (AD-12); any change in `src/clearwater/interfaces/`; decoding, parsing or logging any `gpmd` packet, IMU or GPS data; reading or logging any location tag. |
+| Done | Plan 4.5; ruff check, ruff format --check, mypy strict, the full suite per the fill's GATE_CHECKS at dispatch (the two-leg command) green in a granted window, every existing test unchanged except as ruled (question 2's three router pins, question 8's rename, and R1-Q2 if granted); the DR-67 test on main; V4 SAME through the product composition on the small set (suite) and on GX011627 plus the WP2.3 set (task 10, one EXCLUSIVE window); V9, V17, own-clip, DR-45 (b), cancel and failure tests; V3 with the product method asserted where AD-14 asserts it and recorded where it records; DR-71 and DR-74 closed, DR-73 (a) and (b) closed (questions 2 and 8); DR-78 closed with its RED-first test (R1-Q1), DR-79 (a) and (b) closed with their tests and (c) per R1-Q2; DR-45 (b) closed on both halves (question 7); DR-47 per question 6 as amended; the three router-pin tests replaced as ruled (question 2, R1-Q3); the report's footage-check Limit revised for DR-78 (task 8); the WP3.11 V3 ratios and this package's in the report and the accept record; V12 recorded as deferred; the new serial-leg tests within question 9's budget (about 5 min, 300 s, over the base's serial leg; at WP4.1's own gate the serial leg was 2,431.06 s, `docs/proofs/wp4.1-accept.md`); Reviewer A converged. |
 
 ### Register rows (commission section 2 register rule)
 
-Found by greps on `WP4.2`, `WP4.x` and every owned or edited path (`jobs/export.py`, `io/video`,
-`analysis/`, `cache/`, `core/backend.py`, `gui/engines.py`, `tools/export_bench.py`,
-`test_wp321_fft_release.py`) in `docs/debt-register.md` at `6536f60` (register `cffd243`).
+Found by greps on `WP4.2`, `WP4.x` and every owned or edited path (`tools/headless_export.py`,
+`app/composition.py` / `clearwater.app`, `test_headless_export.py`, `test_app_composition.py`,
+`test_wp41`, `jobs/export.py`, `io/video`, `analysis/`, `cache/`, `core/backend.py`,
+`gui/engines.py`, `tools/export_bench.py`, `test_wp321_fft_release.py`) in
+`docs/debt-register.md` at `eb0074f` (register `c358816`; DR-75..DR-79 are new since `cffd243`,
+DR-64 and DR-65 closed since; DR-67, DR-71, DR-73 and DR-74 are unchanged since `cffd243`). The
+WP4.1 paths match only DR-79 (`tools/headless_export.py`); DR-78 names "the runner".
 
 | Row | Disposition | Ground |
 |---|---|---|
-| DR-67 | **CLOSES** (binding) | Trigger "a test asserts the product job passes the selected GPU backend to source, sink and engine, and that the CPU-backend job passes `None`; closes when that test is on main". Task 2, question 1. |
-| DR-71 | **CLOSES** (binding) | Trigger "The next touch of `jobs/export.py` (WP4.2 or WP5.2): take the larger of the marginal and the own rate, with a test on a partially extended retry". Task 2 touches `export.py`; task 8. |
-| DR-73 | (a) **CLOSES** if question 2 grants the docstring line, else NOT REACHED; (b) per question 8 | (a) "WP4.2's touch of `core/backend.py`": `block_sums` docstring "38 bits at k = 8" holds for 8-bit, 10-bit needs 40. (b) "the next touch of `test_wp321_fft_release.py`": the rename of `test_a_video_job_releases_at_the_analysis_end_and_after_every_frame` (asserts two releases). |
+| DR-67 | **CLOSES** (binding) | Trigger "WP4.2's brief: a test asserts the product job passes the selected GPU backend to source, sink and engine, and that the CPU-backend job passes `None`; closes when that test is on main". Task 3, question 1. |
+| DR-71 | **CLOSES** (binding) | Trigger "The next touch of `jobs/export.py` (WP4.2 or WP5.2): take the larger of the marginal and the own rate, with a test on a partially extended retry". Task 3 touches `export.py`; task 8. |
+| DR-73 | (a) **CLOSES** (question 2 granted the docstring line); (b) **CLOSES** (question 8) | (a) trigger "WP4.2's touch of `core/backend.py` (a)": `block_sums` docstring "38 bits at k = 8" holds for 8-bit, 10-bit input needs 40. (b) trigger "the next touch of `test_wp321_fft_release.py` (b)": the rename of `test_a_video_job_releases_at_the_analysis_end_and_after_every_frame` (asserts exactly two releases), assertion unchanged. |
 | DR-74 | **CLOSES** (binding) | Trigger "WP4.2 or WP5.2: one case longer than the lead at a gated resolution, asserting the pool drop during rendering" (c3's derived lead is 61 frames; the gate is `min(H, W) >= 1080`, `sigma >= 32`). Task 8, question 8. |
-| DR-45 | (a) NOT REACHED; (b) **CLOSES** (question 7) | (a) every `FrameStream` is iterated and closed by one thread (WP3.21's design, `jobs/export.py` module docstring; the cancel watchdog calls the sink's `abort`, never a stream's `close`); WP4.2 adds no cross-thread close. (b) trigger "WP4.2's end-to-end frame-count check": the export half is held by the sink (`close` refuses a short frame set, WP3.14 report); the analysis half is question 7. |
-| DR-47 | NOT REACHED, CONSUMER NOTE (question 6) | Trigger names "WP4.2 (end-to-end cancel)". The export builds one fresh `AnalysisEngine` per job and runs its job callable once (`_Analysis.start`), so (a)'s retained callable is not reached; (b)/(c) are stated limits; end-to-end cancel tests through the composition (task 6). |
+| DR-78 | **CLOSES** (BINDING, WP4.1 accept "B2-1 -> WP4.2, BINDING"; R1-Q1 sets the form) | Trigger and close condition, verbatim (the row's Signal / trigger column; it states no separate "closes when"): "WP4.2 (extends the runner): apply predicate (i) (no `:` after the drive prefix) to every planned output FILE path, or refuse a source path carrying stream syntax; RED test on a stand-in hard link, skipping where the OS cannot build it." Task 8; the video outputs get the same check (task 5); the report revises the WP4.1 Limit (task 8). |
+| DR-79 | (a) **CLOSES**; (b) **CLOSES**; (c) per R1-Q2 | Trigger "WP4.2's touch of `tools/headless_export.py` and its tests." (a) the `\'` spelling of a known folder quoted back through a refused `--suffix` is added to `Redactor`'s forms; closing test: a known folder containing `'`, quoted back through a refused `--suffix`, printed and recorded by name only (RED first). (b) a self-referential directory link as `--out` makes `Path.resolve()` raise `RuntimeError` inside `Redactor` construction (`main` builds the redactor before `_main`'s refusal handling); WP4.2's `--cache-dir`, a folder the run's texts must show by name only, joins the same construction, so the fix covers every folder the redactor is given: such a folder is a usage refusal, exit 2, naming no full path; closing test: a directory link pointing at itself as `--out` (and as `--cache-dir`) gives exit 2 and no traceback, skipping where the OS cannot build the link. (c) the two comparisons are in WP4.1's files (`tests/test_wp41_photo_path.py::test_n10_the_same_still_twice_is_identical`, `np.array_equal` on the writer's incoming pixels; `tests/test_wp41_v8.py` `equal_statistics`, line 74, used by `::test_v8a_job_statistics_equal_the_previews`), which WP4.2 does not own: R1-Q2. In any case WP4.2's OWN bit-identity assertions (V17, own clip) compare bit patterns, not `np.array_equal`. |
+| DR-45 | (a) NOT REACHED; (b) **CLOSES** on both halves (question 7) | (a) every `FrameStream` is iterated and closed by one thread (WP3.21's design, `jobs/export.py` module docstring; the cancel watchdog calls the sink's `abort`, never a stream's `close`); WP4.2 adds no cross-thread close. (b) trigger "WP4.2's end-to-end frame-count check": the export half is held by the sink (`close` refuses a short frame set, WP3.14 report); the analysis half: task 6 drives a strict-prefix decoder, and a complete entry after a prefix is the round-0 grant for a frame-count check before `mark_complete` (the probe's count, or the readable count for D86 sources; the entry left incomplete; a readable failure). |
+| DR-47 | NOT REACHED with a CONSUMER NOTE, unless the question 7 grant is exercised, then (a) **CLOSES** (question 6 AMENDED) | Trigger names "WP4.2 (end-to-end cancel)". The export builds one fresh `AnalysisEngine` per job and runs its job callable once (`_Analysis.start`), so (a)'s retained callable is not reached on the product job path; (b)/(c) are stated limits; end-to-end cancel tests through the composition (task 6). If the `analysis/engine.py` grant is exercised, (a)'s one-shot guard is closed in the same touch; otherwise the row stays OPEN with trigger = the next `analysis/engine.py` touch (it does NOT move to WP4.3, which does not own the file; WP4.3's consumer note stands). |
 | DR-46 | NOT REACHED | "The next touch of the Y-2 checkers (WP4.2 or a methods change)": `methods/ancuti_fusion.py` `_checked_record` and `analysis/store.py` `put` are not owned or touched; reachable only by a hand-made record. |
 | DR-41 | CONSUMER NOTE | The composition passes `DiskProxyCache` its registered `DEFAULT_CODEC` and keys with `cache_key(path)` / `key_for` of the same codec; a test pins it (task 3). Stays open (test-hook codecs only). |
 | DR-62 | NOT REACHED | WP4.3's (GUI recompute vs export). The runner runs one activity at a time by construction; nothing here widens it (the export half never writes the cache, WP3.21 Q2 (b)). |
 | DR-56 | NOT REACHED | "WP4.x if an owner clip shows an audible tail difference": an owner listening check, not this package; the window's compare records the audio items as they are. |
-| DR-65 | CONSUMER NOTE | WP-T5's (the four export tests); WP4.2 edits none of them and keeps its own serial-leg cost within question 9's budget. |
+| DR-65 | CLOSED (WP-T5's accept `4933a45`); CONSUMER NOTE | The serial leg after WP-T5: 2,261.41 s like-for-like (W3), 2,511.76 s on the WP-T5 + WP4.1 stack top, 2,431.06 s at WP4.1's own gate (`wp4.1-mc3`, 1126 passed / 1 skipped). WP4.2 edits none of WP-T5's tests and keeps its new serial-leg tests within question 9's budget (about 5 min over the base's serial leg). |
+| DR-75, DR-76, DR-77 | NOT REACHED (WP4.3's) | New since `cffd243` (WP4.1 accept). DR-75: the GUI preview of an nclx-only P3 PHOTO (`gui/render_worker.py`, `gui/preview.py`); DR-76: the photo writer's HEIC provenance `"profile"` key against `PresetStore.import_preset`; DR-77: the importer's `OverflowError`. The video path reaches none of them: WP4.2 touches no `gui/` module (question 3), no photo writer, and no preset import (`read_parameter_file` and `parameters_for` are used unchanged). |
 | DR-68, DR-69 | NOT REACHED | WP4.3's rows; WP4.2 shows nothing in the GUI and leaves the GUI's video engines as they are (question 3), so the preview's FFT-plan case is not opened before WP4.3. |
 | DR-70 | NOT REACHED | Trigger "An owner wish below ~9.5 min/min at 4K, or WP5.2's N6 re-measure". |
 | DR-72 | NOT REACHED | `tools/export_bench.py` is not touched (question 11). |
@@ -92,7 +123,11 @@ Found by greps on `WP4.2`, `WP4.x` and every owned or edited path (`jobs/export.
 
 ## Task ladder
 
-1. **Read and map.** WP4.1's accept record, its composition root and runner; `jobs/export.py`
+1. **Read and map.** WP4.1's accept record, its report ("WP4.2 extension points", "Limits": the
+   footage check, "Erratum at the gate"), its composition root (`_PhotoExports`, the stub video
+   collaborators) and runner (`check_outputs`, `write_target_refusal`, `Redactor`, `run`, `main`,
+   `_main`, `_check_own_paths`); `jobs/naming.py` (`plan_output`: the base is the source stem plus
+   the suffix, so a source name reaches every planned output FILE name); `jobs/export.py`
    (`ExportEngine.__init__`, `_video`, `_analyse`, `_write_frames`, `_Analysis`), `io/video/decode.py`
    (`FFmpegVideoSource(device_backend=...)`, `DeviceFrameBackend`), `io/video/encode.py`
    (`FFmpegVideoSink(device_backend=...)`, `_payload`'s device rule), `analysis/proxy.py`
@@ -106,8 +141,11 @@ Found by greps on `WP4.2`, `WP4.x` and every owned or edited path (`jobs/export.
    probe and the analysis use, every existing caller unchanged); the root's video builder and the
    runner's video options (question 12), with WP4.1's names; the GUI's video legs (question 3); the
    test list with each test's markers and its expected serial-leg seconds against question 9's
-   budget; the V3 measurement point (question 5); the DR-45 (b) analysis-half finding (question
-   7); the register dispositions above, confirmed or corrected; every grant asked for; the
+   budget (new serial-leg tests at most about 5 min in all); the three router-pin tests by node id
+   with each one's replacement assertion (question 2, as listed under "Files owned"); the DR-78
+   form as R1-Q1 rules and the DR-79 fixes; the V3 measurement point (question 5: pre-encode at
+   the sink seam); the DR-45 (b) analysis-half finding (question 7); the register dispositions
+   above, confirmed or corrected; every grant asked for; the
    `scripts/cell_depth.py` figure your dispatcher gives you. **YIELD.** A choice the brief leaves
    open is a STOP. A new module, a new dependency or a persistent-data shape in the table is a
    tripwire: the dispatcher copies the table to CHARC (commission section 4).
@@ -123,7 +161,9 @@ Found by greps on `WP4.2`, `WP4.x` and every owned or edited path (`jobs/export.
    fail by name: a GPU job whose source or sink gets None (the silent OFF row), a CPU job that
    gets the GPU backend, a second `select_backend` call whose answer differs from the job's.
 4. **The composition root's video legs** (EXTEND `clearwater.app.composition`: `export_jobs()`'s
-   video branch stops routing to `unavailable_exports()` and the router goes). The real `FFmpegVideoSource`,
+   video branch stops routing to `unavailable_exports()`; `_PhotoExports`, `_no_video_probe`,
+   `_no_cache_key` and the root's `StubVideoSource` / `StubVideoSink` / `StubProxyCache` go, and
+   `export_jobs()` returns the `ExportEngine` itself). The real `FFmpegVideoSource`,
    `FFmpegVideoSink` per job through the question 1 factories, `DiskProxyCache(<cache folder>,
    settings.cache_limit_bytes)` with its default registered codec, `cache_key`, `core.select_backend`
    (never `stub_era_select_backend`), `available_methods()`. CHECK: `tests/test_wp42_composition.py`
@@ -134,17 +174,36 @@ Found by greps on `WP4.2`, `WP4.x` and every owned or edited path (`jobs/export.
    `clearwater.jobs` still loads no `clearwater.gui`, `clearwater.methods`, PySide6 or CuPy at
    import (WP3.13's test, run, not changed).
 5. **The runner's video legs** (EXTEND `tools/headless_export.py`; question 12). WP4.1 already
-   carries every IF-10 flag (`--out`, `--beside-source`, `--encoder`, `--quality`, `--ten-bit`,
-   `--force-cpu`, ...), `--method`, `--parameters`, `--neutral`, `--record`; WP4.2 adds only
-   video-specific options and additive record fields. Video inputs through
-   `filter_inputs` (sidecars excluded, D83), one `ExportRequest` per file through `run_batch` (each
-   file its own clip: D81 skip-and-log, D45 stop), `--cache-dir`; WP4.1 question 9's refusals
-   (`--out` inside the footage folder, `--beside-source` for a source inside it) apply to video
-   unchanged, and `--cache-dir` inside it is refused the same way. CHECK: a CPU run on
-   `vid-hevc8-bt709-full` through `main`; the refusals on video paths; the exit statuses; a
+   carries every IF-10 flag but `last_parameters` (`--out | --beside-source`, `--suffix`,
+   `--bit-depth`, `--no-provenance`, `--force-cpu`, `--encoder`, `--quality`, `--ten-bit`,
+   `--cache-limit-bytes`), plus `--method`, `--parameters | --neutral`, `--settings-dir`,
+   `--record`; WP4.2 adds only video-specific options and additive record fields under
+   `"schema": 1`. `route()` already sends `.mp4` to `"video"` and refuses a sidecar (D83) with
+   `sidecar_fault`'s text, through the same `is_sidecar` test `filter_inputs` applies, so question
+   12's "through `filter_inputs` in `requests_for`'s `kind="auto"`" is met by `requests_for` and
+   `route()` as built (no second sidecar filter); one `ExportRequest` per file through `run`
+   (`run_batch`; each file its own clip: D81 skip-and-log, D45 stop). ONE new option, `--cache-dir`, REQUIRED when any
+   item is a video (exit 2, nothing run, otherwise), passed to the root as an `export_jobs()`
+   argument (the root never resolves app data, WP4.1 question 6). **The one write-target
+   predicate (CHARC `870c8ddeb64b4e12`; DR-78):** every write the video legs plan goes through
+   `write_target_refusal`, before anything runs, exactly as the photo legs' do: each video
+   request's output folder as `jobs.naming` plans it (`--out`, or the source's own folder with
+   `--beside-source`) and, with task 8's DR-78 fix, its planned output FILE path (R1-Q1); and the
+   `--cache-dir` folder (refused inside the footage folder however spelled, through a link,
+   junction or short 8.3 name, or in a stream, `\\?\` or `\\.\` form, as every other target is).
+   No second footage check is written for video. The `--cache-dir` folder joins the redactor's
+   known folders (the record and every printed line show it by name only). CHECK: a CPU run on
+   `vid-hevc8-bt709-full` through `main`; the refusals on video paths (`--out`, `--beside-source`
+   and `--cache-dir` each refused inside a stand-in footage folder, and through a link into it);
+   `--cache-dir` missing with a video item gives exit 2 with nothing run; the exit statuses; a
    two-file run gives two outputs and two cache entries; with `--force-cpu` a video run loads no
-   CuPy (WP4.1 task 5's subprocess check, extended to video); the record keeps source NAMES only.
-6. **End to end through the composition** (question 4 sets the split between the suite and task 10).
+   CuPy (`tests/test_headless_export.py::test_the_runner_process_loads_no_pyside6_and_no_cupy_when_forced`'s
+   subprocess check, extended to video in a WP4.2 file); the record keeps source NAMES only.
+6. **End to end through the composition** (question 4 RULED: the suite carries the
+   composition-identity tests, ONE V4 sample per backend and the items below; the WP2.3 V4 set and
+   GX011627 run through the runner in task 10's window). Every bit-identity assertion here
+   compares bit patterns (dtype, shape and bytes), not `np.array_equal`, which equates float32
+   `+0.0` and `-0.0` (DR-79 (c)).
    - V4 small set: `vid-hevc8-bt709-full` on the CPU (always) and the GPU with device frames
      (`gpu`), compared in-test by `tools/video_fidelity.py`'s comparison: every MANDATORY and
      REQUIRED item SAME; `vid-truncated` warns (D86); `vid-hlg`, `vid-pq` and a sidecar are
@@ -159,12 +218,18 @@ Found by greps on `WP4.2`, `WP4.x` and every owned or edited path (`jobs/export.
    - Own clip (section 5.5): two files in one batch; each output's pre-encode frames equal that
      file's export run alone (bit for bit), in either order; no record of one file is read by the
      other's job.
-   - DR-45 (b) (question 7): a planted decoder that yields a strict prefix and ends cleanly.
+   - DR-45 (b) (question 7): a planted decoder that yields a strict prefix and ends cleanly. A
+     complete cache entry after the prefix is the round-0 grant of `analysis/engine.py` for a
+     frame-count check before `mark_complete` (the probe's count, or the readable count for a
+     D86 `truncated` / `unreadable_tail` source; the entry left incomplete; a readable failure),
+     with DR-47 (a)'s one-shot guard in the same touch (question 6 as amended).
    - Cancel and failure through the composition: a cancel during the analysis lead and one
      mid-encode give `CANCELLED`, no temporary, no final, every thread joined; a failure in the
      analysis half gives the job's failure with its own text (WP3.14 and WP3.21 guarantees, now
      on the composed engine).
-7. **V3 with the product method** (question 5). On the AD-14 clip (`ad14-flicker`, with
+7. **V3 with the product method** (question 5 RULED: measured pre-encode, on the frames the sink
+   receives from an export through the composed engine, the clip itself decoded from an encoded
+   file; the encoded output's figures recorded beside as characterisation). On the AD-14 clip (`ad14-flicker`, with
    `ad14-mask`) and on WP3.11's jittering-patch clip (built in-test as `test_analysis_v3.py`
    builds it), through the composed engine with c3 and ancuti2018 at their defaults: assert
    AD-14's bound (mean abs frame-to-frame difference in the mask under 0.5/255 after smoothing) on
@@ -178,9 +243,33 @@ Found by greps on `WP4.2`, `WP4.x` and every owned or edited path (`jobs/export.
    rate (growth over the lead per frame stored) and the entry's own bytes per stored frame, with a
    test on a partially extended retry (the F5 fallback test unchanged). DR-74: a `gpu`, `slow` case
    longer than c3's derived lead at a gated resolution (short side ≥ 1080), asserting the pool's
-   drop WHILE frames render (question 8). DR-73 (a) per question 2; (b) per question 8.
+   drop WHILE frames render (question 8). DR-73 (a): the `block_sums` docstring line (question 2,
+   no code change); (b): the rename, assertion unchanged (question 8).
+   **DR-78 (BINDING) in the runner** (R1-Q1 sets the form): RED first, a test on a stand-in hard
+   link (a source whose name carries stream syntax, `carrier:input.jpg` or a video's
+   `carrier:clip.mp4`, and `<out>\carrier` a hard link to a stand-in original under `tmp_path`,
+   never a footage file; skipping where the OS cannot build either) fails on the accepted runner;
+   then `check_outputs` refuses the run (exit 2, nothing run, the stand-in original's bytes and
+   streams unchanged) for photo and video requests alike. **DR-79 (a) and (b)** as the register
+   table says, each RED first, in `tests/test_wp42_runner_hardening.py`; **(c)** per R1-Q2.
+   **The footage-check Limit.** WP4.1's report, "Limits", "The footage check (Reviewer B B1,
+   CHARC Q1)", reads (verbatim): "one predicate, `write_target_refusal`, decides every write the
+   run plans, before anything runs, when a footage folder is configured: each output folder as
+   `jobs.naming` plans it (`--out`, or the source's own folder beside a source), the record file,
+   the `--settings-dir` folder and its `settings.json`." and "**Residual:** a hard link to a
+   footage file placed outside the footage folder cannot be told apart by its path; the runner
+   never writes over an existing file (D84), so only a stream name could reach the original, and
+   (i) refuses every stream name. A link created after the check (during the run) is not seen."
+   Reviewer B pass 2's B2-1 (the report's "Erratum at the gate") showed "(i) refuses every stream
+   name" untrue for a planned output FILE name, because (i) was applied to output FOLDERS only.
+   The WP4.2 report restates this Limit with the target list extended (each planned output FILE
+   path as R1-Q1 rules, and the `--cache-dir` folder) and the residual sentence true of what is
+   built (for example "... and (i), applied to every planned output file path, refuses every
+   stream name in a planned output"), and states that WP4.1's B2-1 is closed by DR-78's test (the
+   WP4.1 report itself is not edited).
 9. **Tests and static.** Every new test file above; every existing test passes unchanged (except
-   question 8's one rename). Every light run includes `tests/test_core_deps.py`,
+   question 8's one rename, question 2's three router pins, and R1-Q2's two comparisons if
+   granted). Every light run includes `tests/test_core_deps.py`,
    `tests/test_color_deps.py`, `tests/test_io_video_decode_rules.py`, `tests/test_analysis_deps.py`
    (AD-29; plan 8.1 frame rule 5: nothing outside `clearwater.core` imports `cupy`/`cupyx` or reads
    `.xp`). No module opens a `gpmd` packet. Then the review loop (below), then the full two-leg
@@ -225,6 +314,10 @@ with a hardware decoder (WP3.21 Limits), chaptered recordings (v2), other operat
     build nothing on a device; no second selection that can disagree;
   - the composition: the real classes, the registered codec (DR-41), `core.select_backend`, no stub
     on a product video leg; the cache and output folders never inside the footage folder;
+  - the runner: every write the video legs plan (output folder, planned output FILE path,
+    `--cache-dir`) goes through the ONE predicate `write_target_refusal`, no second check; DR-78's
+    stream route through a source name is refused (RED-first test on a stand-in hard link);
+    DR-79 (a) and (b) hold for every folder the redactor is given, `--cache-dir` included;
   - each file its own clip: no state carried between jobs (engine, store, key, source);
   - V17: a complete entry skips the decode pass; a version mismatch re-analyses; a prefix decode
     cannot leave a complete entry for a clip it did not fully decode (question 7);
@@ -253,6 +346,10 @@ with a hardware decoder (WP3.21 Limits), chaptered recordings (v2), other operat
   `QT_QPA_PLATFORM=offscreen`, each leg with its own fresh basetemp under `work/`:
   `uv run pytest -q -rs -n 4 -m "not gpu and not footage and not gui and not slow" --basetemp=work/wp4.2-<run>-parallel`
   then `uv run pytest -q -rs -m "gpu or footage or gui or slow" --basetemp=work/wp4.2-<run>-serial`.
+  Current costs (WP4.1's own gate, `docs/proofs/wp4.1-accept.md`): parallel 4486 passed / 1
+  skipped in 616.12 s, serial 1126 passed / 1 skipped in 2,431.06 s (after WP-T5: 2,261.41 s
+  like-for-like, `CLAUDE.md`); the serial leg is the floor and question 9's budget is measured
+  against it.
   Run in the background with foreground poll-wait calls on its done marker (a reaped run is not a
   result). A new wall-clock bound in a parallel-leg test is `slow` with a reason.
 - **Footage.** Read-only at `C:\Users\rwsmy\clearwater-footage\`, reached only through
@@ -375,6 +472,44 @@ with a hardware decoder (WP3.21 Limits), chaptered recordings (v2), other operat
     Alternative: a default cache folder under the working folder named in `clearwater.local.toml`
     (convenient for acceptance runs; the runner then depends on the machine's local config,
     against WP4.1 question 6's isolation rule).
+
+## Revision 1 questions for CHARC (recommended answer first)
+
+R1-Q1. **DR-78's form (the row offers two).** Recommended: apply predicate (i) of
+   `write_target_refusal` (no `:` after the drive or UNC prefix; no `\\?\` or `\\.\` form) to
+   every planned output FILE path in `check_outputs`, for photo and video requests alike, the path
+   being `clearwater.jobs.final_output_path(source, settings, kind)` (public, writes nothing:
+   `jobs.naming` builds it from the output folder and the source stem plus the suffix; the
+   numbered names and the temporary `temporary_path` makes share that folder and stem, so (i) on it
+   covers them). Only (i) on the file path: (ii) and (iii) are already decided on its folder, and
+   applying them to an existing unnumbered final would refuse a run whose earlier output is a link
+   although D84 never writes over it. This keeps ONE predicate (CHARC `870c8ddeb64b4e12`) and
+   makes the Limit's "(i) refuses every stream name" true for outputs. Alternatives: (b) refuse a
+   source path carrying stream syntax (a `:` after the drive prefix) in `requests_for` / `route()`
+   (narrower: closes the source-name route only); (c) both.
+
+R1-Q2. **DR-79 (c) lives in WP4.1's test files, which WP4.2 does not own.** The two comparisons
+   are `np.array_equal` in `tests/test_wp41_photo_path.py::test_n10_the_same_still_twice_is_identical`
+   (line 514, the writer's incoming pixels; line 528 makes the same comparison on the decoded
+   pixels) and in `tests/test_wp41_v8.py` `equal_statistics` (line 74, used by
+   `::test_v8a_job_statistics_equal_the_previews`). Recommended: grant a test-only edit of those
+   comparisons (dtype, shape and bytes equal, so `+0.0` and `-0.0` differ), with a signed-zero
+   control in `tests/test_wp42_runner_hardening.py`; the assertions only get stricter; DR-79 (c)
+   CLOSES. This adds existing-test changes beyond question 8's rename and question 2's router
+   pins, hence the ask. Alternative: (c) NOT REACHED, the row stays OPEN with trigger "the next
+   touch of `tests/test_wp41_photo_path.py` or `tests/test_wp41_v8.py`"; WP4.2's own bit-identity
+   assertions compare bit patterns either way (task 6).
+
+R1-Q3. **The mixed router-pin test.** `tests/test_headless_export.py::test_the_record_has_schema_1_and_file_names_only`
+   pins the record schema and the names-only redaction over two photo items AND the video router
+   (its third item expects `UNAVAILABLE_TEXT`; with question 12 its command line, which has no
+   `--cache-dir`, becomes exit 2 with nothing run). Recommended: question 2's ruling covers it;
+   edit it in place, adding `--cache-dir <tmp_path folder>` and replacing only the third item's
+   expectation with the real video job's (a failed item whose failure is the engine's readable
+   text for the missing `GX010001.MP4`, the cache folder shown by name only), every photo and
+   schema assertion unchanged. Alternative: leave it unchanged except for `--cache-dir` and move
+   the video item out to a WP4.2 test (the WP4.1 test then keeps a video item that is no longer
+   meaningful).
 
 ## Rulings (CHARC `2c4476d9869df056`, 2026-10-28, verbatim; they GOVERN the Questions section above)
 
