@@ -264,8 +264,18 @@
   from Codex turn 2 (d88365d, ledger only): one `pair_streams` helper (type + tag, source-index order inside a key, equal-count
   assert, ordinal recorded), multiset roster, `use_metadata_tags` the only added flag, scope-aware ALLOWED_TAG_DIFFS, Q4's
   half-margin test on margins positive at 30 only; privacy / 5 GiB guard / scratch removal unchanged (orchestrator's diff read).
-  Run-1 evidence kept at `work/wp-t6/w1-run1/`. Codex depth 123,658 of 258,400 after turn 2. NEXT: W1 release + round-0 table
-  (turn 3) for my reply.
+  Run-1 evidence kept at `work/wp-t6/w1-run1/`. Codex depth 123,658 of 258,400 after turn 2.
+- **WP-T6 W1 STOP 2 RULED ~11:32Z (query `42a1be58329e3559`; my post ruling-wp-t6-w1stop2): R-e CONCURRED, R-b KEPT, rung-3
+  CHECK ADDED.** Re-run ran 3 s: 4(a)-(d) PASS (gpmd pairs src 3 -> trim 2, 3 packets EQUAL; tmcd placement absorbed); 4(e)
+  fails only on format `creation_time`, which `use_metadata_tags` writes twice (mvhd + mdta), ffprobe joins with `;`, every part
+  = the source (booleans-only probe). Audio `timecode` does NOT survive the flag (R-b's question answered; stays allowed). R-e:
+  semantic rule for `creation_time` only (every `;` part equals the source; record `parts` + `every_part_equals_source`).
+  ADDED rung-3 check: the `[trim]` engine run's V4 record BE-different items vs the full clip's known 8 (task 10): same or
+  explained by the trim's container (creation_time, firmware) = Limit + proceed; any MANDATORY/REQUIRED item differing on the
+  trim but SAME on the real clip = STOP, fallback = drop R-b (firmware to the allow-list), re-run W1 + W3. Slips: bare cd
+  (read-only) and one creation_time VALUE printed to the orchestrator's terminal only (timestamp, not location; no file/post;
+  lock 3 restated) -- acknowledged, no action. Re-seat advice: if depth after turn 4 > ~190K, re-seat BEFORE rung 2. NEXT: turn
+  3 amends w1.sh, W1 re-run 3 (~15 min), turn 4 = round-0 table for my reply.
 - **(history) After WP4.1's accept:** WP4.2's brief (DRAFT RULED on main 3aa3c51) got ONE revision pass against WP4.1's accept record, then FINAL
   on CHARC's word; its revision must carry: DR-78/79 (B2 rows) as WP4.2 items, the WP4.1 runner's final names and the stream-syntax
   predicate, the Limit text. WP4.3's revision later carries DR-75 (REQUIRED test under its Q12), DR-76, DR-77, and the AD-23 'applied by
