@@ -1,6 +1,6 @@
 # WP4.5 — EXIF byte fidelity (dispatch brief, FINAL)
 
-**Status:** FINAL on CHARC `f34420e1c8ff5d29` (2026-10-29T18:58:23Z); its Rulings at the end GOVERN
+**Status:** FINAL on CHARC `f34420e1c8ff5d29` (2026-10-29T18:58:23Z), Q1 RE-RULED (b) by CHARC `c64900357c363330` (19:09:01Z); its Rulings at the end GOVERN
 the Questions. DRAFT 2026-10-29 by the orchestrator (generation 23) on CHARC's commission
 `ec87b18228de2958` (file `d3ad4388`, 2026-10-29T18:54:29Z). Spec v0.5.7; no spec clause changes. Base = main `5a1538a`. Worktree `.worktrees/wp4.5`,
 branch `wp4.5`. Owner decisions: none.
@@ -120,3 +120,27 @@ CHARC `f34420e1c8ff5d29` (2026-10-29T18:58:23Z), FINAL on fold-in, verbatim:
 - **Q4 = yes.** NEW `tests/test_io_photo_exif_bytes.py`; no existing test edited; an existing test that pins a guessed type is a STOP to me, not an edit.
 
 Verification per the owner's direction as the brief quotes it: the full parallel leg + the impacted serial nodes by id (`test_photo_check.py` real-photo round trip over all 73 Phone photos now green; `test_io_photo*`, `test_wp41_photo_path.py`, `test_wp41_v8.py` with markers). Lane Codex (0.359 vs 1.433): concurred.
+
+### Q1 RE-RULED at the round-0 STOP: CHARC `c64900357c363330` (2026-10-29T19:09:01Z), verbatim
+
+This supersedes Q1 = (a) above. Q2-Q4 and Verification stand.
+
+RULING: Q1 = (b), the byte-level IFD rewrite in exif.py. NOT (a').
+
+Grounds, both verified at my seat on the venv's Pillow 12.3.0:
+1. The STOP condition in my Q1 ruling is MET. Image.py:4204-4226 builds a fresh ImageFileDirectory_v2 and assigns values only; TiffImagePlugin.py:980-986 builds a fresh IFD per nested dict. No tagtype travels. The cell's and your reading of the lines is correct.
+2. (a') fails Q2 on a SECOND fact the ledger only planned to test: Pillow's RATIONAL/SRATIONAL writer REDUCES fractions (TiffImagePlugin.py:843 via _limit_rational / Fraction.limit_denominator). Probe at my seat: a pinned type-5 entry loaded from raw bytes 1234/100 is written back as 617/50. Apple writes GPS coordinates, lens specifications and exposure values unreduced, so (a') would change the bytes of kept rationals across the owner's photos while photo_check's numeric compare stayed green. The same writer path also appends a NUL to an ASCII value that has none in the source (count +1). Q2 as ruled (type, count, value bytes equal for every kept entry) is therefore not reachable by any route that re-encodes values through Pillow; only pass-through of the source entry bytes reaches it. (b) is that route.
+
+SHAPE OF (b), binding on the cell:
+- A private rewriter in exif.py, stdlib struct only, no new dependency (AD-17). It parses the TIFF header (II or MM, magic 42; a BigTIFF magic 43 is "cannot be read": None with a warning, a named Limit), walks IFD0, the Exif IFD (34665), the Interop IFD (40965 inside Exif) and the GPS IFD (34853), and writes a new block in the SOURCE byte order. Every kept entry is copied as its source (tag, type, count, value bytes); an out-of-line value is relocated (data copied, offset rewritten, word padded); a pointer entry keeps its source type and count and gets the child's new offset. Kept entries keep their source order; an inserted entry goes at its ascending tag position (a sorted source stays sorted). IFD0's next-IFD pointer is written 0: IFD1 and its thumbnail (513/514) are dropped. Any other IFD-valued entry (330 SubIFDs, or a type-13 IFD entry) is dropped with a warning and named in the report: its value is an offset into a structure the block does not carry.
+- The D63 edits by entry: Orientation 274 = SHORT count 1 value 1 (replaced in place, or inserted); Software 305 = ASCII "Clearwater\0" count 11; PixelXDimension 40962 and PixelYDimension 40963 in the Exif IFD keep the source entry's type when present (SHORT or LONG are both legal; a value that does not fit SHORT promotes the entry to LONG), else inserted as LONG; the Exif IFD is created when absent; a None source yields the minimal four-field block as today.
+- Damage: a child IFD whose offset or entry table runs past the block is dropped alone with a warning (its pointer removed from the parent), matching from_tiff's documented isolation today; a damaged IFD0 or header RAISES, so sanitise() drops the block exactly as today. Parsing is bounded: every count and offset is checked against the block length before any read or allocation.
+- Q3: from_tiff runs the SAME rewriter on the TIFF file bytes (a TIFF file is a header plus IFD0) with a drop set for IFD0 = _TIFF_STRUCTURE plus 330, then the D63 edit; Pillow's Image.open is no longer needed there. Returns None when no entry survives, as today. Existing from_tiff tests (not owned) must stay green; a conflict is a STOP to me, not an edit (Q4 stands).
+- Pillow stays on the READ side (load, orientation_of, describe, has_thumbnail) unchanged. The module docstring's "Pillow serialises" sentence is corrected. writer.py untouched (round 0 confirmed the hand-off is bare bytes).
+
+TESTS: the ledger's roster stands under Q2 (parsed entries, independent struct parser, synthetic only, parallel-leg). ADD: an unreduced RATIONAL (1234/100) and a negative SRATIONAL, bytes equal; an ASCII entry with no terminal NUL keeps its count; a big-endian (MM) source; out-of-line boundary values (exactly 4 bytes inline, 5 bytes out of line); insertion cases (no Orientation in IFD0, no Pixel dims in Exif, no Exif IFD at all); a damaged child offset dropped alone; a damaged IFD0 raising so sanitise returns None; the SubIFDs drop. Base failures on main 5a1538a recorded in the ledger with their assertion text.
+
+Unchanged: files owned / NOT owned, Locks, Verification (full parallel leg + impacted serial nodes by id, no full serial re-run, per the owner 18:47Z), Reviewer A between turns, Reviewer B at your seat, Done. Ledger round 0: record this ruling as the disposition (STOP resolved, Q1 = (b)), then turn 2 = RED tests first, then the rewriter. Commit the ledger as you said. Quote this ruling in turn 2's dispatch block.
+
+Your (3) stands: any further widening comes to me. No register row from this ruling; the Limits (BigTIFF, MakerNote internal offsets, SubIFDs drop) go in the report.
+
