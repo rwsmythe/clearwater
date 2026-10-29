@@ -165,6 +165,23 @@
   cache-interior row (store.py:573 skips a link at discovery, :660-666 writes through it; trigger next `cache/` touch); DR-81
   untouched, trigger -> WP4.3. **NEXT: Reviewer B still running on `wp4.2-mc` ab9ea83; cell 4 report FINAL (docs only); orchestrator
   code identity + harness gate + accept record; HOLD request to me; ff; then my QA + the rows above.**
+- **WP4.2 REVIEWER B BLOCKED 08:55Z: NEW_CRITICAL_MAJOR_FOUND (2 MAJOR / 4 MINOR / 4 ADVISORY) on `wp4.2-mc` ab9ea83 vs 38f291e
+  (msg `9ba4ebbb651162db`; evidence reviewB/review-B.txt md5 b1865ba2). CHARC CONCURRED with every disposition (my fyi
+  d17f0088, ~08:59Z).** B1 MAJOR: test-only figures switch `CLEARWATER_WP42_V3_FIGURES` (`tests/test_wp42_v3_product.py:63-76`)
+  writes an operator-named path with no footage check -> route through `write_target_refusal(target,
+  configured_footage_folder())`, refused when none is configured; MY NOTE: the check runs BEFORE the fixture's parent mkdir (:71),
+  plus one planted row for a not-yet-existing parent inside the stand-in footage folder. B2 MAJOR: new-file rule not atomic ->
+  `open(path, 'xb')`, one module-scope handle; new light test file `tests/test_wp42_v3_figures.py` (granted at the orchestrator's
+  seat; refusal rows existing file / stand-in footage / dangling link + control, RED first). B3 builder test asserts the sink's
+  backend; B4 DR-74 case asserts rendering started and frames remain at the release; B5 docs (`composition.py` no-cache-folder
+  promise overstated); B6 docs (runner docstring: cache writes bypass SafeWrite). B7 ADVISORY banked -> NEW ROW mine at the
+  accept (import-time witness does not instrument the video constructors; trigger WP4.3's `test_app_composition.py` touch); B8
+  (frame count is a minimum when known; surplus passes; reuse not rechecked) and B9 (own-clip result inherits the cache key's
+  size+mtime collision) = Limit sentences; B10 PRE-EXISTING = DR-58(b) re-sighting (inherited FFREPORT) noted in that row.
+  Fill Part 2: ONE bounded remediation (cell 4 + Reviewer A R2 at its seat; light window = one V3 node jitter c3 unset then set
+  under work/wp4.2/b-remediation, DR-74's case, builder test), ONE B re-run, then the orchestrator's OWN two-leg gate on the final
+  candidate (identity with the 401521e suite is broken). Bare-cd SLIP into `.worktrees/wp4.2-mc` acknowledged (read-only, both
+  trees clean). **NEXT: remediation commit(s), A R2, B re-run, new gate (~52 min, OPEN to me), accept record, HOLD, ff.**
 - **(history) After WP4.1's accept:** WP4.2's brief (DRAFT RULED on main 3aa3c51) got ONE revision pass against WP4.1's accept record, then FINAL
   on CHARC's word; its revision must carry: DR-78/79 (B2 rows) as WP4.2 items, the WP4.1 runner's final names and the stream-syntax
   predicate, the Limit text. WP4.3's revision later carries DR-75 (REQUIRED test under its Q12), DR-76, DR-77, and the AD-23 'applied by
