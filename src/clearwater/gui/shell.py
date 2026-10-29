@@ -2,8 +2,9 @@
 
 Start-up and close go through the ``clearwater.config`` API only (AD-25 (a)): the log, the
 settings and the presets live in the injected :class:`~clearwater.config.Locations`; nothing is
-written anywhere else and no ``QSettings`` is used. :func:`run` is what WP4.3 calls; this package
-has no entry point (question 12).
+written anywhere else and no ``QSettings`` is used. The program's entry point is
+``python -m clearwater`` (:func:`clearwater.app.main.main`, WP4.3), which builds this window over
+the real engines with every panel attached; :func:`run` shows the window alone, with no panel.
 """
 
 from __future__ import annotations
@@ -600,7 +601,10 @@ class MainWindow(ShellWindow):
 
 
 def run(engines: Engines | None = None, locations: Locations | None = None) -> int:
-    """Run the application until the main window closes (WP4.3 calls this).
+    """Show the main window alone, with no panel attached, until it closes.
+
+    The program does not call this: ``python -m clearwater`` runs
+    :func:`clearwater.app.main.main`, which attaches the panels and the start-up jobs (WP4.3).
 
     Args:
         engines: The engines; :func:`~clearwater.gui.engines.default_engines` when None.
