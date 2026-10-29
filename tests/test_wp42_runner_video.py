@@ -309,9 +309,9 @@ def test_a_video_source_whose_stem_carries_a_colon_is_refused_by_check_outputs(
     stand_in = folders["src"] / "carrier:clip.mp4"  # a stand-in name, never created
     requests = _requests(stand_in, folders["out"])
     assert requests[0].kind == "video"
-    with pytest.raises(he.RunnerRefusalError, match="in a form the footage check refuses"):
+    with pytest.raises(he.RunnerRefusalError, match="single portable name component"):
         he.check_outputs(requests, footage)
-    with pytest.raises(he.RunnerRefusalError, match="in a form the footage check refuses"):
+    with pytest.raises(he.RunnerRefusalError, match="single portable name component"):
         he.run(requests, footage_folder=footage, cache_folder=folders["cache"])
     assert list(folders["out"].iterdir()) == [] and list(folders["cache"].iterdir()) == []
 
