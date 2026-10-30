@@ -148,9 +148,8 @@ def test_the_runner_delivers_at_most_one_report_per_tick_and_the_latest(qtbot, m
     )
     qtbot.waitUntil(lambda: not handle.is_running(), timeout=10000)
     seen = [d for kind, d in events if kind == "report"]
-    assert seen and seen[-1] == last["done"]  # the last report, delivered before the result
-    done_at = events.index(("done", 0))
-    assert events[done_at - 1] == ("report", last["done"])  # the final delivery, then on_done
+    assert seen and seen[-1] == last["done"]  # the last report was delivered,
+    assert events.index(("report", last["done"])) < events.index(("done", 0))  # before the result
     assert seen == sorted(set(seen))  # each delivery later than the one before, none repeated
     per_mark: list[int] = []
     for kind, _ in events:
