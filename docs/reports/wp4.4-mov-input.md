@@ -249,3 +249,12 @@ record.
    such an item reads `done with warnings` with `data track <tag>` (ruled
    Q2, best-effort under D105). The owner's HERO13 clips carry `tmcd` and
    `gpmd` only, so they are unaffected.
+4. **Owned files, one more grant.** CHARC `e3a7a4ea2dc9477f` (the gate):
+   `tests/test_io_video_probe_rules.py`, the io/video token guard ONLY. The
+   guard exempts exactly one whole line, `MP4_DATA_CODEC_TAGS =
+   frozenset({"gpmd"})`, in `encode.py` (a stream-copy allowlist entry, never
+   parsed: the GPMF rule), and fails on a missing or doubled line or any other
+   mention of the token; three planted controls prove it. The same turn added
+   Reviewer B F5's controls in `tests/test_container_spike_compare_equivalences.py`
+   (unset vs non-square SAR, declared mono vs absent at two channels, both read
+   DIFFERENT).
