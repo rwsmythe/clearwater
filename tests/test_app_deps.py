@@ -92,10 +92,11 @@ APP_MODULES = [
     "activity.py",
     "analysis_adapter.py",
     "composition.py",
+    "export_worker.py",
     "main.py",
     "startup.py",
 ]
-"""The ``clearwater.app`` modules: WP4.1's two and WP4.3's four (ruling Q2)."""
+"""The ``clearwater.app`` modules: WP4.1's two, WP4.3's four and WP4.6's worker (ruling Q2)."""
 
 
 def test_no_app_module_but_main_imports_the_gui_or_qt_and_none_imports_cupy() -> None:

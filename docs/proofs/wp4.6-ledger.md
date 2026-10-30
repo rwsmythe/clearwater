@@ -8,7 +8,7 @@ Brief `docs/briefs/wp4.6-brief.md` FINAL on CHARC `39dad78f5b10ceeb`; base `b6a3
 | Round | Date | Transport / CLI | Critical | Major | Minor | In-env / out | NEW / REOPENED | Reverts | Fixes: product / test-only | Depth (dispatcher) |
 |---|---|---|---|---|---|---|---|---|---|---|
 | 0 | 2026-10-30 | (no review: round-0 note) | - | - | - | - | - | - | - | 194,313 (cell 1, retired at round 0) |
-| Y1 (build) | 2026-10-30 | (no review: tasks 3-4, cell 2) | - | - | - | - | - | - | - | (dispatcher fills: cell 2 at Y1) |
+| Y1 (build) | 2026-10-30 | (no review: tasks 3-4, cell 2) | - | - | - | - | - | - | - | 171,586 (cell 2 at Y1, 05:08Z) |
 
 ## Round 0 (task 2): the design restated, the Questions, the stops
 
@@ -230,7 +230,7 @@ On base `b6a31b5` both new files fail at import (`ModuleNotFoundError` for
 
 Cell 1 retired at round 0, depth 194,313 (dispatcher's figure). Cell 2 dispatched fresh on CHARC's
 ruling `a265489d371695e2` (STOP-1 granted with its exact scope, STOP-2 no environment change, Q2
-as proposed, grants (b) and (c)). Cell 2 depth at Y1: (dispatcher fills).
+as proposed, grants (b) and (c)). Cell 2 depth at Y1: 171,586 (dispatcher, 05:08Z).
 
 ### Commits
 
