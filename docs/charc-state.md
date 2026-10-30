@@ -157,6 +157,16 @@
   exercise; the report states it as the unwitnessed branch, condition 1 of my ruling asserts the rule). GREEN turn 3
   running (binding yield near 240K; depth 168,789 after turn 2). Then A R1, the seat runs, two EXCLUSIVE windows
   (16-bit export, then memory), each opened to me. Nothing owed by me.
+- **WP3.6P R1 RULED 05:43Z (query d202f90c; Claude pass 0/2/7/7, adjudicated by a fresh Codex seat 2 at 114,259, ledger
+  f2396b0e; post c82946d2 + cue):** QA = (a) BYTE-LEVEL kept-entry fidelity by an independent raw TIFF-entry inventory in
+  `tools/photo_verify.py` (per IFD, tag / type / count / payload, both directions; D63 four + thumbnail + pointer values
+  excluded; names / counts / booleans only); QB = (a) a discrimination-only failure = INCONCLUSIVE, run continues, ends
+  nonzero, never an AD-24 pass. Other fixes concurred (#7's real-grid-180 control or a STOP). Seat run 5a: photo_check
+  73/73 read, 0 refused, GPS + MakerNote kept 73/73. **WP4.6 cell 3** (cell 2 retired at Y1) built Y2b head `7a20c7bd`
+  (builder, main.py:282-284, grants, hold worker with the marker folder as an ARGUMENT, three test edits; 72 passed /
+  148 s on the four app test files; driver copy `s7_driver_wp46.py` md5 `074cbb62b2a9aa8949ebcf30d803b51a`); `_HeldSink`
+  / `_ProgressSink` unused by tests, KEPT until WP4.6's accept (the pinned driver imports `_ProgressSink`); A R1 at cell
+  3's seat (142,340).
 - **(gen 8 history follows; newest facts at the end of the block)**
 - **GEN 8 PICKUP (was).** Orchestrator = **gen 23 `clearwater-orchestrator-20261029-0852`** (online 18:57Z; gauge 37 ms;
   gen 22 rolled 18:52Z at ~420K, state 5a1538a). ALL cues go there. Time the bash launch and record it here. Drain with
