@@ -9,8 +9,9 @@ two ticks, the gaps' p99 and the tick count. The six scenarios of question 10:
 - (c) a File > Export of the clip;
 - (d) a batch of 300 small synthetic stills under ``tmp_path`` (DR-50);
 - (e) a 1:1 4K preview render (the FFT route on the GPU) during (c);
-- (f) start-up, here with a slow cache open (S1 condition 5: a stub open that lasts past
-  100 ms; the first analysis waits for it on its worker while the interface responds).
+- (f) start-up from the window's ``show()`` (ruling B), here with a slow cache open (S1
+  condition 5: a stub open that lasts past 100 ms; the first analysis waits for it on its
+  worker while the interface responds).
 
 These are the GATE forms, on the WP2.3 fixture clip (``gui`` and ``slow``: wall-clock bounds,
 serial leg only). The figures of record come from the EXCLUSIVE window on GX011627, run by an
@@ -39,6 +40,7 @@ from clearwater.app import analysis_adapter, composition
 from clearwater.app import main as app_main
 from clearwater.app.main import Application
 from clearwater.cache import DiskProxyCache
+from clearwater.gui import MainWindow
 from clearwater.gui.batch_panel import BatchPanel, ItemState
 from clearwater.gui.export_panel import ExportPanel
 from clearwater.gui.timeline import TimelinePanel
@@ -108,10 +110,14 @@ class GapProbe:
 
 
 def measured(qtbot: Any, scenario: str, start: Callable[[], None], until: Callable[[], bool],
-             timeout_ms: int = 600000) -> Figures:  # fmt: skip
-    """Probe from just before ``start`` until ``until()``; return the scenario's figures."""
-    probe = GapProbe()
-    probe.start()
+             timeout_ms: int = 600000, *, probe: GapProbe | None = None) -> Figures:  # fmt: skip
+    """Probe from just before ``start`` until ``until()``; return the scenario's figures.
+
+    Given ``probe``, the caller starts it (scenario (f): at ``show()``); it is stopped here.
+    """
+    if probe is None:
+        probe = GapProbe()
+        probe.start()
     QTimer.singleShot(30, start)
     try:
         qtbot.wait(60)
@@ -367,8 +373,22 @@ def photo_4k(folder: Path) -> Path:
 def scenario_f_start_up(
     qtbot: Any, build: Callable[[], Application], clip: Path
 ) -> tuple[Figures, Application]:
-    """(f) Start-up: build the application, open a clip at once, wait for its analysis."""
+    """(f) Start-up: build the application, open a clip at once, wait for its analysis.
+
+    Ruling B (CHARC b9a0ce01): the probe starts at the window's ``show()``; the build before it
+    is not counted (the window driver records ``build_application``'s time, cold and warm).
+    """
     box: dict[str, Application] = {}
+    probe = GapProbe()
+    shown: list[bool] = []
+    real_show = MainWindow.show
+    owned = "show" in MainWindow.__dict__
+
+    def show(window: Any) -> None:
+        if not shown:
+            shown.append(True)
+            probe.start()
+        real_show(window)
 
     def start() -> None:
         application = build()
@@ -381,7 +401,15 @@ def scenario_f_start_up(
             "complete"
         )
 
-    figures = measured(qtbot, "(f) start-up", start, done)
+    MainWindow.show = show  # type: ignore[method-assign]
+    try:
+        figures = measured(qtbot, "(f) start-up", start, done, probe=probe)
+    finally:
+        if owned:
+            MainWindow.show = real_show  # type: ignore[method-assign]
+        else:
+            del MainWindow.show
+    assert shown, "the window was never shown"
     return figures, box["app"]
 
 
