@@ -11,18 +11,23 @@ import hashlib
 import io
 import json
 import shutil
+import struct
 import zlib
 from dataclasses import replace
 from pathlib import Path
+from types import SimpleNamespace
 
 import numpy as np
-import photo_verify as pv
+import pillow_heif
 import pytest
 from PIL import ExifTags
 from PIL import Image as PILImage
 from PIL.TiffImagePlugin import IFDRational
+from pillow_heif.constants import HeifCompressionFormat
+from pillow_heif.misc import CtxEncode
 
 import headless_export as he
+import photo_verify as pv
 from clearwater.app import composition
 from clearwater.config import new_parameter_set
 from clearwater.core.memory import memory_estimate_bytes
@@ -393,6 +398,9 @@ class StubMemorySampler:
     def stop(self):
         pass
 
+    def attach(self, runner):
+        pass
+
     def record(self):
         return {
             "rss_baseline_bytes": 1000,
@@ -402,6 +410,8 @@ class StubMemorySampler:
             "device_used_peak_bytes": 5000,
             "rss_samples": 3,
             "device_samples": 2,
+            "rss_active_samples": 2,
+            "device_active_samples": 2,
             "sample_intervals_s": {"rss": 0.05, "device": 0.2},
             "sampler_errors": [],
         }
@@ -621,3 +631,495 @@ def test_owner_heic_orientation_four_irot_classes(tmp_path):
         assert record["upright_mean_255"] < 6.0, name
         assert record["nearest_other_mean_255"] > 10.0, name
         assert "thumbnail_witness" in record
+
+
+# Reviewer A round 1 controls. Each names the verification defect it catches.
+def test_r1_size_is_checked_before_pose_reduction(sample, configured, monkeypatch):
+    _, guard = configured
+    read = pv.read_photo
+
+    def half(path):
+        image, meta = read(path)
+        return replace(image, pixels=np.ascontiguousarray(image.pixels[::2, ::2])), meta
+
+    monkeypatch.setattr(pv, "read_photo", half)
+    record = pv.verify_orientation(
+        sample("heic-ad24-both"), guard, photo_class="HEIC-270", max_side=32
+    )
+    assert not record["orientation_ok"], "wrong-size product read passed"
+    assert "orientation_size" in record["failed_checks"]
+    assert record["decoded_size"] != record["oracle_size"]
+
+
+def _r1_replace_exif(path, mutate):
+    chunks = []
+    for kind, body in _png_chunks(path):
+        if kind == b"eXIf":
+            body = mutate(body)
+        chunks.append(
+            len(body).to_bytes(4, "big")
+            + kind
+            + body
+            + (zlib.crc32(kind + body) & 0xFFFFFFFF).to_bytes(4, "big")
+        )
+    path.write_bytes(b"\x89PNG\r\n\x1a\n" + b"".join(chunks))
+
+
+def _r1_root_entry(block, tag):
+    order = "<" if block[:2] == b"II" else ">"
+    root = struct.unpack_from(order + "I", block, 4)[0]
+    count = struct.unpack_from(order + "H", block, root)[0]
+    for index in range(count):
+        at = root + 2 + 12 * index
+        if struct.unpack_from(order + "H", block, at)[0] == tag:
+            return order, at
+    raise AssertionError("test entry missing")
+
+
+@pytest.mark.parametrize("damage", ["rational-bytes", "added-field", "interop-value"])
+def test_r1_kept_exif_is_byte_exact_in_both_directions(configured, damage):
+    config, guard = configured
+    source = config.footage_path / "Phone" / "byte-control.JPG"
+    exif = PILImage.Exif()
+    exif[282] = IFDRational(72, 1)
+    if damage == "interop-value":
+        exif.get_ifd(34665)[40965] = {1: "R98", 2: b"0100"}
+    # Start with the D63 fields already laid out, so a coarse pointer-offset
+    # false failure cannot hide a byte-fidelity mutant. Expected mutations below
+    # are still independently specified raw entry changes, not writer results.
+    block = pv.exif_tools.edit(exif.tobytes(), 96, 64)
+    PILImage.fromarray(spike.upright_image(8, 96, 64)).save(source, exif=b"Exif\0\0" + block)
+
+    class Mutated(PhotoWriter):
+        def write(self, image, meta, out_path, *, bit_depth, provenance):
+            super().write(image, meta, out_path, bit_depth=bit_depth, provenance=provenance)
+
+            def mutate(block):
+                if damage == "rational-bytes":
+                    data = bytearray(block)
+                    order, at = _r1_root_entry(data, 282)
+                    offset = struct.unpack_from(order + "I", data, at + 8)[0]
+                    struct.pack_into(order + "II", data, offset, 144, 2)
+                    return bytes(data)
+                if damage == "interop-value":
+                    assert b"0100" in block
+                    return block.replace(b"0100", b"0200")
+                exif = pv.exif_tools.load(block)
+                exif[315] = "synthetic-added-field"
+                return pv.exif_tools.strip_prefix(exif.tobytes())
+
+            _r1_replace_exif(Path(out_path), mutate)
+
+    record = pv.verify_export(
+        source,
+        guard,
+        photo_class="JPG-A",
+        bit_depth=16,
+        force_cpu=True,
+        keep=True,
+        exports=composition.export_jobs(writer=Mutated()),
+    )
+    assert not record["v5_ok"], f"byte-level EXIF mutation passed: {damage}"
+    assert "v5_kept_exif" in record["failed_checks"]
+    expected = {
+        "rational-bytes": "IFD0.282",
+        "added-field": "IFD0.315",
+        "interop-value": "Interop.2",
+    }
+    assert expected[damage] in record["changed_kept_fields"]
+    assert "text_kept_fields_equal" in record
+    assert record["text_kept_fields_equal"] is (damage != "added-field")
+
+
+def test_r1_source_exif_parse_failure_cannot_pass(configured, monkeypatch):
+    config, guard = configured
+    source = _private_jpeg(config)
+    raw = pv._raw_exif(source.read_bytes(), "jpeg")
+    describe = pv.exif_tools.describe
+
+    def fail_source(block):
+        if block == raw:
+            raise ValueError("synthetic parse failure")
+        return describe(block)
+
+    monkeypatch.setattr(pv.exif_tools, "describe", fail_source)
+    record = pv.verify_export(
+        source,
+        guard,
+        photo_class="JPG-Z",
+        bit_depth=8,
+        force_cpu=True,
+        exports=composition.export_jobs(writer=DropKeptExif()),
+    )
+    assert not record["v5_ok"], "present unparsed EXIF passed vacuously"
+    assert "v5_kept_exif" in record["failed_checks"]
+
+
+def _r1_stub_memory(monkeypatch, *, os_peak=None, active=2, free=7000, reason="CPU: forced"):
+    class Sampler(StubMemorySampler):
+        def record(self):
+            return {
+                **super().record(),
+                "os_peak_working_set_bytes": os_peak,
+                "rss_active_samples": active,
+                "device_active_samples": active,
+            }
+
+    monkeypatch.setattr(pv, "MemorySampler", Sampler)
+    monkeypatch.setattr(
+        pv,
+        "device_memory",
+        lambda: {"free_bytes": free, "total_bytes": free + 5000, "used_bytes": 5000},
+    )
+    monkeypatch.setattr(pv, "launch_runner", lambda *a, **k: (0, {"items": [{"device": reason}]}))
+
+
+def test_r1_os_peak_also_enforces_ram_limit(sample, configured, monkeypatch):
+    _, guard = configured
+    _r1_stub_memory(monkeypatch, os_peak=20_000_000_000)
+    record = pv.verify_memory(
+        sample("jpeg-gradient-none"), guard, photo_class="JPG-Z", force_cpu=True
+    )
+    assert not record["ram_within_limit"], "OS peak above limit was ignored"
+    assert "memory_ram_limit" in record["failed_checks"]
+
+
+def test_r1_baseline_and_final_are_not_active_samples(sample, configured, monkeypatch):
+    _, guard = configured
+    _r1_stub_memory(monkeypatch, active=0)
+    record = pv.verify_memory(
+        sample("jpeg-gradient-none"), guard, photo_class="JPG-Z", force_cpu=True
+    )
+    assert "memory_rss_measurement" in record["failed_checks"], "no active RSS sample passed"
+    assert "memory_device_measurement" in record["failed_checks"]
+
+
+def test_r1_sampler_counts_only_live_runner_samples(sample, configured, monkeypatch):
+    _, guard = configured
+
+    class Process:
+        def memory_info(self):
+            return SimpleNamespace(rss=1000)
+
+        def children(self, recursive):
+            return []
+
+    monkeypatch.setattr(pv.psutil, "Process", lambda _: Process())
+    monkeypatch.setattr(
+        pv, "device_memory", lambda: {"free_bytes": 7000, "total_bytes": 12000, "used_bytes": 5000}
+    )
+    record = pv.verify_memory(
+        sample("jpeg-gradient-none"), guard, photo_class="JPG-Z", force_cpu=True
+    )
+    assert record.get("rss_active_samples", 0) > 0, "runner lifetime was not sampled"
+    assert record.get("device_active_samples", 0) > 0
+    assert not record["failed_checks"]
+
+
+def test_r1_memory_scope_is_explicit(sample, configured, monkeypatch):
+    _, guard = configured
+    _r1_stub_memory(monkeypatch)
+    record = pv.verify_memory(
+        sample("jpeg-gradient-none"), guard, photo_class="JPG-Z", force_cpu=True
+    )
+    assert record.get("rss_scope") == "tool-runner-tree-including-sampler-children"
+
+
+def test_r1_estimate_fit_is_strict(sample, configured, monkeypatch):
+    _, guard = configured
+    image, _ = PhotoReader().read(sample("jpeg-gradient-none"))
+    h, w = image.pixels.shape[:2]
+    estimate = memory_estimate_bytes(h, w, "c3")
+    _r1_stub_memory(monkeypatch, free=estimate)
+    record = pv.verify_memory(
+        sample("jpeg-gradient-none"), guard, photo_class="JPG-Z", force_cpu=True
+    )
+    assert record.get("estimate_fits_free_before") is False, "equality must not fit"
+    assert record["estimate_exceeds_free_before"] is False
+
+
+@pytest.mark.parametrize(
+    "reason,capacity",
+    [("CPU: no CUDA device", False), ("CPU: estimate 3 MiB exceeds free 2 MiB", True)],
+)
+def test_r1_capacity_fallback_is_distinct(sample, configured, monkeypatch, reason, capacity):
+    _, guard = configured
+    _r1_stub_memory(monkeypatch, reason=reason)
+    record = pv.verify_memory(sample("jpeg-gradient-none"), guard, photo_class="JPG-Z")
+    assert record.get("memory_capacity_fallback") is capacity
+    assert record["automatic_fallback"]
+
+
+def _r1_cli(config, tmp_path, command, selected, **kwargs):
+    path, classes = _class_map(tmp_path)
+    config_path = tmp_path / "r1.local.toml"
+    config_path.write_text(
+        f"footage_path = '{config.footage_path}'\nworking_path = '{config.working_path}'\n",
+        encoding="ascii",
+    )
+    args = [
+        command,
+        "--config",
+        str(config_path),
+        "--class-map",
+        str(path),
+        "--name",
+        "r1",
+        "--files",
+        *selected(classes),
+    ]
+    if command == "export":
+        args += ["--bit-depth", "8", "--force-cpu"]
+    return pv.main(args), classes
+
+
+def test_r1_inconclusive_continues_without_becoming_a_pass(
+    configured, tmp_path, monkeypatch, capsys
+):
+    config, _ = configured
+    seen = []
+    symmetric = np.broadcast_to(np.linspace(0, 255, 64)[:, None, None], (64, 96, 3)).copy()
+    source = Path("tests/fixtures/stills/heic/heic-ad24-neither.heic")
+
+    def orientation(path, run_guard, **kwargs):
+        seen.append(path.name)
+        if len(seen) == 1:
+            image, meta = PhotoReader().read(source)
+            with pytest.MonkeyPatch.context() as patch:
+                patch.setattr(
+                    pv,
+                    "read_photo",
+                    lambda _: (replace(image, pixels=symmetric.astype(np.float32) / 255), meta),
+                )
+                patch.setattr(pv, "ffmpeg_decode", lambda *a: symmetric)
+                return pv.verify_orientation(path, run_guard, **kwargs)
+        return {
+            "file": path.name,
+            "class": kwargs["photo_class"],
+            "read_ok": True,
+            "orientation_ok": True,
+            "failed_checks": [],
+        }
+
+    # Keep header/class checking real: selected synthetic HEICs have identity layouts.
+    _, classes = _class_map(tmp_path)
+    for name in classes["HEIC-0"]["files"][:2]:
+        shutil.copyfile(source, config.footage_path / "Phone" / name)
+    real_verify = pv.verify_orientation
+
+    def routed(path, run_guard, **kwargs):
+        # Avoid recursion while retaining the real discrimination/status logic.
+        with pytest.MonkeyPatch.context() as patch:
+            patch.setattr(pv, "verify_orientation", real_verify)
+            return orientation(path, run_guard, **kwargs)
+
+    monkeypatch.setattr(pv, "verify_orientation", routed)
+    status, _ = _r1_cli(config, tmp_path, "orientation", lambda c: c["HEIC-0"]["files"][:2])
+    summary = json.loads(capsys.readouterr().out)
+    assert len(seen) == 2, "inconclusive frame hid later inputs"
+    assert status == 1 and not summary["complete"]
+    row = summary["classes"]["HEIC-0"]
+    assert row["orientation_inconclusive_count"] == 1
+    assert row["orientation_ok_passed"] == 1 and row["orientation_ok_failed"] == 0
+    assert len(row["orientation_inconclusive_files"]) == 1
+    assert row["orientation_inconclusive_files"] == classes["HEIC-0"]["files"][:1]
+
+
+def test_r1_owner_map_rejects_wrong_irot(configured, tmp_path, capsys):
+    config, _ = configured
+    _, classes = _class_map(tmp_path)
+    name = classes["HEIC-180"]["representative"]
+    shutil.copyfile(
+        Path("tests/fixtures/stills/heic/heic-ad24-both.heic"), config.footage_path / "Phone" / name
+    )
+    status, _ = _r1_cli(
+        config, tmp_path, "orientation", lambda c: [c["HEIC-180"]["representative"]]
+    )
+    summary = json.loads(capsys.readouterr().out)
+    assert status == 1, "wrong irot was accepted into an owner class"
+    assert "class_layout" in summary["records"][0]["failed_checks"]
+
+
+def _r1_generated_heic(guard, orientation, *, grid=True, thumbnail=True):
+    upright = spike.upright_image(8, 384, 256)
+    stored = spike.stored_image(upright, orientation)
+    h, w = stored.shape[:2]
+    path = guard.check(guard.root / f"generated-{orientation}-{grid}-{thumbnail}.heic")
+    encoder = CtxEncode(HeifCompressionFormat.HEVC, quality=100, chroma="444")
+    encoder.add_image(
+        (w, h),
+        "RGB",
+        np.ascontiguousarray(stored).tobytes(),
+        image_orientation=orientation,
+        primary=True,
+        exif=spike.source_exif(orientation, w, h),
+        tile_size=128 if grid else 0,
+        thumbnails=[192] if thumbnail else [],
+    )
+    encoder.save(str(path))
+    return path, upright.astype(np.float64)
+
+
+@pytest.mark.parametrize("orientation,irot", [(1, 0), (8, 90), (3, 180), (6, 270)])
+def test_r1_real_grid_rotations_and_thumbnail_class_counts(configured, orientation, irot):
+    _, guard = configured
+    source, upright = _r1_generated_heic(guard, orientation)
+    layout = pv.read_layout(source.read_bytes())
+    assert layout.is_grid and layout.item_type == "grid", "control must be a real grid"
+    assert (layout.irot or 0) == irot
+    decoded = pv.ffmpeg_decode(source, guard.root / "grid-oracle.png", guard)
+    assert pv.compare_poses(decoded, upright)["orientation_ok"], (
+        "FFmpeg grid rotation disagrees with generated scene"
+    )
+    record = pv.verify_orientation(source, guard, photo_class=f"HEIC-{irot}")
+    assert record["orientation_ok"]
+    summary = pv.summarise([record], command="orientation")
+    row = summary["classes"][f"HEIC-{irot}"]
+    assert row.get("thumbnail_available_count") == 1, "thumbnail evidence is missing from class row"
+    assert row["thumbnail_concordant_count"] == 1
+    assert row["thumbnail_discordant_count"] == 0
+    if irot == 180:
+        mutant = pv.compare_poses(np.rot90(decoded, 2), upright)
+        assert "orientation_upright" in mutant["failed_checks"]
+
+
+def test_r1_real_thumbnail_item_is_decoded(configured):
+    _, guard = configured
+    source, _ = _r1_generated_heic(guard, 3)
+    assert len(pv.read_layout(source.read_bytes()).thumbnail_ids) == 1
+    thumbnail = pv.thumbnail_decode(source)
+    assert thumbnail is not None and list(thumbnail.shape[:2]) == [128, 192]
+    record = pv.verify_orientation(source, guard, photo_class="HEIC-180")
+    assert record["thumbnail_witness"]["available"]
+    assert record["thumbnail_witness"]["orientation_ok"], (
+        "real thumbnail could not be compared at a common size"
+    )
+
+
+def test_r1_decoder_versions_are_safe_and_reproducible(sample, configured):
+    _, guard = configured
+    record = pv.verify_orientation(sample("heic-ad24-both"), guard, photo_class="HEIC-270")
+    versions = record.get("decoder_versions", {})
+    assert set(versions) == {"ffmpeg", "pillow_heif", "libheif"}, (
+        "decoder versions were not recorded"
+    )
+    assert versions["pillow_heif"] == pillow_heif.__version__
+    assert versions["libheif"] == pillow_heif.libheif_version()
+    contaminated = {
+        **record,
+        "decoder_versions": {**versions, "ffmpeg": "private/path GPS sentinel"},
+    }
+    safe = pv.summarise([contaminated], command="orientation")
+    assert "private/path" not in json.dumps(safe)
+
+
+@pytest.mark.parametrize("order,header", [("<", b"II"), (">", b"MM")])
+def test_r1_raw_inventory_preserves_types_counts_duplicates_and_pointer_types(order, header):
+    # Independently laid-out classic TIFF: IFD0 at 8, Exif at 50, Interop at 80.
+    def entry(tag, kind, count, payload):
+        return struct.pack(order + "HHI", tag, kind, count) + payload
+
+    def pointer(offset):
+        return struct.pack(order + "I", offset)
+
+    raw = (
+        header
+        + struct.pack(order + "HI", 42, 8)
+        + struct.pack(order + "H", 3)
+        + entry(271, 2, 4, b"AB\0\0") * 2
+        + entry(34665, 4, 1, pointer(50))
+        + pointer(0)
+        + struct.pack(order + "H", 2)
+        + entry(40962, 4, 1, pointer(96))
+        + entry(40965, 4, 1, pointer(80))
+        + pointer(0)
+        + struct.pack(order + "H", 1)
+        + entry(2, 7, 4, b"0100")
+        + pointer(0)
+    )
+    inventory = pv._entry_inventory(raw)
+    assert set(inventory) == {("IFD0", 271), ("IFD0", 34665), ("Exif", 40965), ("Interop", 2)}
+    assert dict(inventory[("IFD0", 271)]) == {(2, 4, b"AB\0\0"): 2}
+    assert dict(inventory[("Interop", 2)]) == {(7, 4, b"0100"): 1}
+    for at, kind, count in ((10, 7, 4), (10, 2, 3), (34, 13, 1)):
+        mutant = bytearray(raw)
+        struct.pack_into(order + "HI", mutant, at + 2, kind, count)
+        assert pv._entry_inventory(bytes(mutant)) != inventory
+    # Relocating children is legal; changing their pointer type is not.
+    relocated = bytearray(raw[:50] + b"padding!" + raw[50:])
+    struct.pack_into(order + "I", relocated, 42, 58)
+    struct.pack_into(order + "I", relocated, 58 + 2 + 12 + 8, 88)
+    assert pv._entry_inventory(bytes(relocated)) == inventory
+    # IFD1 is explicitly discarded, even when its pointer cannot be followed.
+    thumbnail = bytearray(raw)
+    struct.pack_into(order + "I", thumbnail, 46, 99999)
+    assert pv._entry_inventory(bytes(thumbnail)) == inventory
+
+
+def test_r1_no_source_exif_is_distinct_from_parse_failure(configured):
+    config, guard = configured
+    source = config.footage_path / "Phone" / "no-exif.JPG"
+    PILImage.fromarray(spike.upright_image(8, 96, 64)).save(source)
+    record = pv.verify_export(source, guard, photo_class="JPG-Z", bit_depth=8, force_cpu=True)
+    assert not record["raw_exif_present"] and record["kept_exif_parse_ok"]
+    assert record["v5_ok"] and record["kept_fields_equal"]
+
+
+def test_r1_owner_map_rejects_jpeg_as_heic(configured, tmp_path, capsys):
+    config, _ = configured
+    _, classes = _class_map(tmp_path)
+    source = Path("tests/fixtures/stills/jpeg/jpeg-gradient-none.jpg")
+    name = classes["HEIC-0"]["representative"]
+    shutil.copyfile(source, config.footage_path / "Phone" / name)
+    status, _ = _r1_cli(config, tmp_path, "orientation", lambda c: [c["HEIC-0"]["representative"]])
+    summary = json.loads(capsys.readouterr().out)
+    assert status == 1 and "class_layout" in summary["records"][0]["failed_checks"]
+
+
+def test_r1_gps_kept_uses_byte_fidelity(configured):
+    config, guard = configured
+    source = _private_jpeg(config)
+
+    class GpsBytes(PhotoWriter):
+        def write(self, image, meta, out_path, *, bit_depth, provenance):
+            super().write(image, meta, out_path, bit_depth=bit_depth, provenance=provenance)
+
+            def mutate(block):
+                data = bytearray(block)
+                order, pointer_at = _r1_root_entry(data, 34853)
+                gps = struct.unpack_from(order + "I", data, pointer_at + 8)[0]
+                count = struct.unpack_from(order + "H", data, gps)[0]
+                for index in range(count):
+                    at = gps + 2 + index * 12
+                    if struct.unpack_from(order + "H", data, at)[0] == 2:
+                        offset = struct.unpack_from(order + "I", data, at + 8)[0]
+                        n, d = struct.unpack_from(order + "II", data, offset)
+                        struct.pack_into(order + "II", data, offset, n * 2, d * 2)
+                        return bytes(data)
+                raise AssertionError("test GPS entry missing")
+
+            _r1_replace_exif(Path(out_path), mutate)
+
+    record = pv.verify_export(
+        source,
+        guard,
+        photo_class="JPG-Z",
+        bit_depth=8,
+        force_cpu=True,
+        exports=composition.export_jobs(writer=GpsBytes()),
+    )
+    assert not record["gps_kept"], "text-equal GPS bytes were incorrectly called kept"
+    assert "GPS.2" in record["changed_kept_fields"] and not record["v5_ok"]
+
+
+def test_r1_known_os_limit_failure_survives_missing_active_samples(sample, configured, monkeypatch):
+    _, guard = configured
+    _r1_stub_memory(monkeypatch, active=0, os_peak=20_000_000_000)
+    record = pv.verify_memory(
+        sample("jpeg-gradient-none"), guard, photo_class="JPG-Z", force_cpu=True
+    )
+    assert "memory_ram_limit" in record["failed_checks"], (
+        "known OS limit breach was hidden by missing samples"
+    )
+    assert "memory_rss_measurement" in record["failed_checks"]
+    assert record["ram_within_limit"] is False

@@ -25,14 +25,17 @@ import logging
 import math
 import os
 import re
+import struct
 import subprocess
 import sys
 import threading
 import uuid
 import zlib
+from collections import Counter
 from collections.abc import Iterator, Mapping, Sequence
 from contextvars import ContextVar
 from datetime import UTC, datetime
+from functools import lru_cache
 from pathlib import Path
 from typing import Any, NoReturn
 
@@ -74,12 +77,14 @@ _RAM_LIMIT = 16_000_000_000
 _DEVICE_LIMIT = 8188 * 2**20
 _DISK_LIMIT = 20_000_000_000
 _ACTIVE_GUARD: ContextVar[WriteGuard | None] = ContextVar("photo_verify_guard", default=None)
+_ACTIVE_SAMPLER: ContextVar[MemorySampler | None] = ContextVar("photo_verify_sampler", default=None)
 _CHECKS = frozenset(
     {
         "read_failed",
         "oracle_failed",
         "orientation_upright",
         "orientation_discrimination",
+        "orientation_size",
         "runner_failed",
         "v5_bit_depth",
         "v5_icc_equal",
@@ -127,10 +132,15 @@ _BOOL_FIELDS = frozenset(
         "primaries_equal",
         "transfer_equal",
         "kept_fields_equal",
+        "text_kept_fields_equal",
+        "kept_exif_parse_ok",
+        "text_exif_parse_ok",
         "force_cpu",
         "forced_cpu",
         "automatic_fallback",
         "estimate_exceeds_free_before",
+        "estimate_fits_free_before",
+        "memory_capacity_fallback",
         "exclusive",
     ]
 )
@@ -169,6 +179,8 @@ _NUMBER_FIELDS = frozenset(
         "device_used_peak_bytes",
         "rss_samples",
         "device_samples",
+        "rss_active_samples",
+        "device_active_samples",
         "ram_limit_bytes",
         "device_limit_bytes",
     ]
@@ -181,6 +193,8 @@ _ENUMS = {
     "primaries": {"bt709", "display-p3", "bt2020", "unknown"},
     "transfer": {"srgb", "bt709", "unknown"},
     "oracle_kind": {"ffmpeg-default"},
+    "orientation_status": {"passed", "inconclusive", "failed"},
+    "rss_scope": {"tool-runner-tree-including-sampler-children"},
     "method": {"c3"},
     "primary_type": {"grid", "hvc1", "av01", "iden"},
     "failure_code": {
@@ -367,7 +381,10 @@ def compare_poses(pixels: Pixels, reference: Pixels, *, max_side: int = 256) -> 
     """
     if max_side < 1:
         raise ValueError("invalid comparison size")
-    got, ref = _small(pixels, max_side), _small(reference, max_side)
+    # A thumbnail can be smaller than the configured bound. Use a common bound
+    # without upscaling; full-size primary equality is checked by the caller.
+    bound = min(max_side, max(pixels.shape[:2]), max(reference.shape[:2]))
+    got, ref = _small(pixels, bound), _small(reference, bound)
     poses = [
         ref,
         np.fliplr(ref),
@@ -392,6 +409,13 @@ def compare_poses(pixels: Pixels, reference: Pixels, *, max_side: int = 256) -> 
         failures.append("orientation_upright")
     if nearest is None or nearest <= 10.0 or winner != 1:
         failures.append("orientation_discrimination")
+    inconclusive = (
+        upright is not None
+        and upright < 6
+        and winner == 1
+        and nearest is not None
+        and nearest <= 10
+    )
     return {
         "scores_by_pose": scores,
         "shape_mismatches": [int(k) for k, v in scores.items() if v is None],
@@ -400,6 +424,11 @@ def compare_poses(pixels: Pixels, reference: Pixels, *, max_side: int = 256) -> 
         "nearest_other_mean_255": nearest,
         "margin_255": None if nearest is None or upright is None else nearest - upright,
         "orientation_ok": not failures,
+        "orientation_status": "inconclusive"
+        if inconclusive
+        else "failed"
+        if failures
+        else "passed",
         "failed_checks": failures,
     }
 
@@ -429,6 +458,85 @@ def _raw_exif(data: bytes, kind: str | None) -> bytes | None:
     return exif_tools.strip_prefix(raw) if isinstance(raw, bytes) and raw else None
 
 
+@lru_cache(maxsize=1)
+def _decoder_versions() -> Record:
+    versions: Record = {
+        "ffmpeg": None,
+        "pillow_heif": pillow_heif.__version__,
+        "libheif": pillow_heif.libheif_version(),
+    }
+    try:
+        done = subprocess.run(
+            ["ffmpeg", "-version"], capture_output=True, text=True, timeout=10, check=False
+        )
+        match = re.match(r"ffmpeg version ([0-9]+(?:\.[0-9]+){1,3})(?:[-\s]|$)", done.stdout)
+        if done.returncode == 0 and match:
+            versions["ffmpeg"] = match[1]
+    except (OSError, subprocess.SubprocessError):
+        pass
+    return versions
+
+
+def _entry_inventory(block: bytes | None) -> dict[tuple[str, int], Counter[tuple[int, int, bytes]]]:
+    """Inventory raw TIFF entries independently of the product EXIF rewriter.
+
+    Pointer locations and IFD1 are structural. Pointer presence/type is retained;
+    other kept entries retain type, count, payload and duplicate multiplicity.
+    Malformed or unsupported structures fail closed rather than disappearing.
+    """
+    result: dict[tuple[str, int], Counter[tuple[int, int, bytes]]] = {}
+    if block is None:
+        return result
+    data = block[6:] if block.startswith(b"Exif\0\0") else block
+    if len(data) < 8 or data[:2] not in (b"II", b"MM"):
+        raise ValueError("invalid TIFF header")
+    order = "<" if data[:2] == b"II" else ">"
+    if struct.unpack_from(order + "H", data, 2)[0] != 42:
+        raise ValueError("invalid TIFF magic")
+    sizes = {1: 1, 2: 1, 3: 2, 4: 4, 5: 8, 6: 1, 7: 1, 8: 2, 9: 4, 10: 8, 11: 4, 12: 8, 13: 4}
+
+    def directory(offset: int, label: str, ancestors: frozenset[int]) -> None:
+        if offset < 8 or offset > len(data) - 2 or offset in ancestors:
+            raise ValueError("invalid TIFF directory")
+        count = struct.unpack_from(order + "H", data, offset)[0]
+        if offset + 2 + count * 12 > len(data):
+            raise ValueError("truncated TIFF directory")
+        pointers = (
+            {34665: "Exif", 34853: "GPS"}
+            if label == "IFD0"
+            else {40965: "Interop"}
+            if label == "Exif"
+            else {}
+        )
+        for index in range(count):
+            at = offset + 2 + 12 * index
+            tag, kind, number = struct.unpack_from(order + "HHI", data, at)
+            if kind not in sizes:
+                raise ValueError("unsupported TIFF type")
+            length = number * sizes[kind]
+            start = at + 8 if length <= 4 else struct.unpack_from(order + "I", data, at + 8)[0]
+            if start < 8 or start > len(data) or length > len(data) - start:
+                raise ValueError("truncated TIFF payload")
+            payload = data[start : start + length]
+            if tag in pointers:
+                if kind not in (3, 4, 13) or number != 1:
+                    raise ValueError("invalid TIFF pointer")
+                result.setdefault((label, tag), Counter())[(kind, 0, b"")] += 1
+                child = int.from_bytes(payload, "little" if order == "<" else "big")
+                directory(child, pointers[tag], ancestors | {offset})
+            elif (label == "IFD0" and tag in (274, 305)) or (
+                label == "Exif" and tag in (40962, 40963)
+            ):
+                continue
+            else:
+                if kind == 13 or tag in (330, 34665, 34853, 40965):
+                    raise ValueError("unsupported TIFF directory pointer")
+                result.setdefault((label, tag), Counter())[(kind, number, payload)] += 1
+
+    directory(struct.unpack_from(order + "I", data, 4)[0], "IFD0", frozenset())
+    return result
+
+
 def _base(source: Path, photo_class: str) -> tuple[Record, Image, PhotoMetadata, bytes | None]:
     _name(source.name)
     if photo_class not in _CLASSES:
@@ -438,11 +546,13 @@ def _base(source: Path, photo_class: str) -> tuple[Record, Image, PhotoMetadata,
         kind = detect_format(data)
         raw = _raw_exif(data, kind)
         image, meta = read_photo(source)
+        text_parse_ok = True
         try:
             fields = exif_tools.describe(raw)
         except Exception:
             # Raw presence and sanitise_dropped still distinguish damaged metadata.
             fields = {}
+            text_parse_ok = False
     height, width = image.pixels.shape[:2]
     color = image.color
     profile = color.icc_profile
@@ -467,6 +577,8 @@ def _base(source: Path, photo_class: str) -> tuple[Record, Image, PhotoMetadata,
         "sanitise_dropped": raw is not None and meta.exif is None,
         "fields_before": sorted(fields),
         "field_count_before": len(fields),
+        "text_exif_parse_ok": text_parse_ok,
+        "decoder_versions": _decoder_versions(),
         "gps_ifd_present": any(k.startswith("GPS.") for k in fields),
         "maker_note_present": "Exif.MakerNote" in fields,
         "failed_checks": [],
@@ -527,11 +639,21 @@ def verify_orientation(
     record["command"] = "orientation"
     try:
         reference = ffmpeg_decode(source, folder / "oracle.png", guard)
-        record.update(compare_poses(image.pixels * 255, reference, max_side=max_side))
         record["oracle_size"] = [reference.shape[1], reference.shape[0]]
+        if image.pixels.shape != reference.shape:
+            record.update(
+                orientation_ok=False,
+                orientation_status="failed",
+                failed_checks=["orientation_size", "orientation_upright"],
+            )
+        else:
+            record.update(compare_poses(image.pixels * 255, reference, max_side=max_side))
     except (OSError, ValueError, subprocess.SubprocessError):
         record.update(
-            orientation_ok=False, failure_code="oracle_failed", failed_checks=["oracle_failed"]
+            orientation_ok=False,
+            orientation_status="failed",
+            failure_code="oracle_failed",
+            failed_checks=["oracle_failed"],
         )
     witness: Record = {"available": False}
     try:
@@ -612,16 +734,44 @@ def _export_checks(
     depth: int,
 ) -> None:
     output_depth, profile, block = _png_metadata(output)
+    text_parse_ok = record.get("text_exif_parse_ok", True)
     with _quiet_logs():
         again, _ = read_photo(output)
         try:
             before = exif_tools.describe(raw_exif)
         except Exception:
             before = {}
-        after = exif_tools.describe(block)
+            text_parse_ok = False
+        try:
+            after = exif_tools.describe(block)
+        except Exception:
+            after = {}
+            text_parse_ok = False
     height, width = image.pixels.shape[:2]
     expected = _expected_icc(image, meta)
-    lost = sorted(k for k in before if k not in _D63 and before[k] != after.get(k))
+    text_pointers = {"Exif.ExifInteroperabilityOffset", "Exif.40965"}
+    text_lost = sorted(
+        k
+        for k in before.keys() | after.keys()
+        if k not in _D63 | text_pointers and before.get(k) != after.get(k)
+    )
+    parse_ok = True
+    lost: list[str] = []
+    try:
+        raw_before = _entry_inventory(raw_exif)
+        raw_after = _entry_inventory(block)
+        # D63 dimensions require an Exif directory even if the input had none.
+        # Only that newly required pointer is structural; existing pointers
+        # always compare presence/type, including pointers to empty children.
+        if ("IFD0", 34665) not in raw_before and not any(label == "Exif" for label, _ in raw_after):
+            raw_after.pop(("IFD0", 34665), None)
+        lost = sorted(
+            f"{label}.{tag}"
+            for label, tag in raw_before.keys() | raw_after.keys()
+            if raw_before.get((label, tag)) != raw_after.get((label, tag))
+        )
+    except (ValueError, struct.error):
+        parse_ok = False
     record.update(
         output_depth=output_depth,
         icc_expected_present=expected is not None,
@@ -631,15 +781,21 @@ def _export_checks(
         dimensions_ok=(after.get("Exif.ExifImageWidth"), after.get("Exif.ExifImageHeight"))
         == (str(width), str(height)),
         thumbnail_absent=block is not None and not exif_tools.has_thumbnail(block),
-        kept_fields_equal=not lost,
+        kept_fields_equal=parse_ok and text_parse_ok and not lost,
+        kept_exif_parse_ok=parse_ok,
+        text_exif_parse_ok=text_parse_ok,
+        text_kept_fields_equal=text_parse_ok and not text_lost,
+        text_changed_kept_fields=text_lost,
         changed_kept_fields=lost,
         fields_after=sorted(after),
         field_count_after=len(after),
-        maker_note_kept=all(after.get(k) == v for k, v in before.items() if k == "Exif.MakerNote"),
-        gps_kept=all(after.get(k) == v for k, v in before.items() if k.startswith("GPS.")),
         primaries_equal=image.color.primaries == again.color.primaries,
         transfer_equal=image.color.transfer == again.color.transfer,
     )
+    # These presence booleans carry the same byte-level meaning as V5. The
+    # text witness remains separately labelled and is never a byte-fidelity claim.
+    record["maker_note_kept"] = parse_ok and "Exif.37500" not in lost
+    record["gps_kept"] = parse_ok and not any(name.startswith("GPS.") for name in lost)
     checks = {
         "v5_bit_depth": depth == output_depth,
         "v5_icc_equal": record["icc_equal"],
@@ -647,7 +803,7 @@ def _export_checks(
         "v5_software": record["software_ok"],
         "v5_dimensions": record["dimensions_ok"],
         "v5_thumbnail": record["thumbnail_absent"],
-        "v5_kept_exif": not lost and not record["sanitise_dropped"],
+        "v5_kept_exif": record["kept_fields_equal"] and not record["sanitise_dropped"],
     }
     record["v5_ok"] = all(checks.values())
     record["d53_ok"] = bool(
@@ -798,6 +954,9 @@ class MemorySampler:
         self._errors: set[str] = set()
         self._rss_samples = 0
         self._device_samples = 0
+        self._rss_active_samples = 0
+        self._device_active_samples = 0
+        self._runner: subprocess.Popen[bytes] | None = None
         self._rss_peak: int | None = None
         self._device_peak: int | None = None
         self._os_peak: int | None = None
@@ -815,6 +974,7 @@ class MemorySampler:
             sample()
 
     def _rss(self) -> None:
+        active = self._runner is not None and self._runner.poll() is None
         try:
             processes = [self._process, *self._process.children(recursive=True)]
             total = 0
@@ -829,16 +989,31 @@ class MemorySampler:
                     continue
             self._rss_peak = max(self._rss_peak or 0, total)
             self._rss_samples += 1
+            if active and self._runner is not None and self._runner.poll() is None:
+                self._rss_active_samples += 1
         except psutil.Error:
             self._errors.add("rss_unavailable")
 
     def _gpu(self) -> None:
+        active = self._runner is not None and self._runner.poll() is None
         memory = device_memory()
         if memory is None:
             self._errors.add("device_unavailable")
             return
         self._device_peak = max(self._device_peak or 0, memory["used_bytes"])
         self._device_samples += 1
+        if active and self._runner is not None and self._runner.poll() is None:
+            self._device_active_samples += 1
+
+    def attach(self, runner: subprocess.Popen[bytes]) -> None:
+        """Begin counting observations made entirely within the runner lifetime.
+
+        Args:
+            runner: The actual subprocess, checked live before and after sampling.
+        """
+        self._runner = runner
+        self._rss()
+        self._gpu()
 
     def start(self) -> None:
         """Start both sampling threads before the runner is launched."""
@@ -868,6 +1043,9 @@ class MemorySampler:
             "device_used_peak_bytes": self._device_peak,
             "rss_samples": self._rss_samples,
             "device_samples": self._device_samples,
+            "rss_active_samples": self._rss_active_samples,
+            "device_active_samples": self._device_active_samples,
+            "rss_scope": "tool-runner-tree-including-sampler-children",
             "sample_intervals_s": {"rss": 0.05, "device": 0.2},
             "sampler_errors": sorted(self._errors),
         }
@@ -928,10 +1106,14 @@ def launch_runner(
     with (
         guard.check(record_path.with_suffix(".stdout")).open("wb") as stdout,
         guard.check(record_path.with_suffix(".stderr")).open("wb") as stderr,
+        subprocess.Popen(args, stdout=stdout, stderr=stderr) as runner,
     ):
-        done = subprocess.run(args, stdout=stdout, stderr=stderr, check=False)
+        sampler = _ACTIVE_SAMPLER.get()
+        if sampler is not None:
+            sampler.attach(runner)
+        exit_code = runner.wait()
     raw = json.loads(record_path.read_text(encoding="utf-8")) if record_path.exists() else {}
-    return done.returncode, raw if isinstance(raw, dict) else {}
+    return exit_code, raw if isinstance(raw, dict) else {}
 
 
 def _dimensions(source: Path) -> tuple[int, int]:
@@ -966,6 +1148,8 @@ def verify_memory(
     Returns:
         Estimate, pre-run free memory, actual device reason, peaks and limitations.
     """
+    if photo_class not in _CLASSES:
+        raise ValueError("invalid class")
     width, height = _dimensions(source)
     _disk_check(guard.root, width * height * 6)
     folder = _folder(guard, source.stem)
@@ -988,6 +1172,9 @@ def verify_memory(
         "device_free_before_bytes": None if memory is None else memory["free_bytes"],
         "device_total_bytes": None if memory is None else memory["total_bytes"],
         "estimate_exceeds_free_before": None if memory is None else estimate > memory["free_bytes"],
+        "estimate_fits_free_before": None if memory is None else estimate < memory["free_bytes"],
+        "rss_scope": "tool-runner-tree-including-sampler-children",
+        "decoder_versions": _decoder_versions(),
         "ram_limit_bytes": _RAM_LIMIT,
         "device_limit_bytes": _DEVICE_LIMIT,
         "measured_at_utc": datetime.now(UTC).isoformat(),
@@ -995,6 +1182,7 @@ def verify_memory(
     }
     sampler = MemorySampler(psutil.Process(os.getpid()))
     token = _ACTIVE_GUARD.set(guard)
+    sampler_token = _ACTIVE_SAMPLER.set(sampler)
     sampler.start()
     try:
         exit_code, raw = launch_runner(
@@ -1008,6 +1196,7 @@ def verify_memory(
         )
     finally:
         sampler.stop()
+        _ACTIVE_SAMPLER.reset(sampler_token)
         _ACTIVE_GUARD.reset(token)
     record.update(sampler.record())
     items = raw.get("items", [])
@@ -1017,6 +1206,7 @@ def verify_memory(
         device_reason=reason,
         read_ok=exit_code == 0,
         automatic_fallback=bool(reason and reason.startswith("CPU:") and reason != "CPU: forced"),
+        memory_capacity_fallback=bool(reason and reason.startswith("CPU: estimate ")),
     )
     failures = []
     if exit_code != 0 or reason is None:
@@ -1026,15 +1216,28 @@ def verify_memory(
         ("device", "device_used_peak_bytes", "device_samples", _DEVICE_LIMIT),
     ):
         measured = record.get(peak)
-        if measured is None or record.get(count, 0) <= 0:
+        active_count = "rss_active_samples" if prefix == "ram" else "device_active_samples"
+        if measured is None or record.get(count, 0) <= 0 or record.get(active_count, 0) <= 0:
             record[prefix + "_within_limit"] = None
             failures.append(
                 "memory_rss_measurement" if prefix == "ram" else "memory_device_measurement"
             )
         else:
-            record[prefix + "_within_limit"] = measured <= limit
-            if measured > limit:
+            os_peak = record.get("os_peak_working_set_bytes") if prefix == "ram" else None
+            effective_peak = max(measured, os_peak if os_peak is not None else 0)
+            record[prefix + "_within_limit"] = effective_peak <= limit
+            if effective_peak > limit:
                 failures.append("memory_ram_limit" if prefix == "ram" else "memory_device_limit")
+        # A missing active observation cannot erase an independently known
+        # breach. Measurement completeness and limit compliance are separate.
+        known = [record.get(peak)]
+        if prefix == "ram":
+            known.append(record.get("os_peak_working_set_bytes"))
+        if any(value is not None and value > limit for value in known):
+            record[prefix + "_within_limit"] = False
+            failure = "memory_ram_limit" if prefix == "ram" else "memory_device_limit"
+            if failure not in failures:
+                failures.append(failure)
     if (memory is None or "device_unavailable" in record.get("sampler_errors", [])) and (
         "memory_device_measurement" not in failures
     ):
@@ -1068,7 +1271,12 @@ def _safe_record(record: Mapping[str, Any]) -> Record:
         value = record.get(key)
         if key in record and (value is None or _number(value)):
             safe[key] = value
-    for key in ("ram_within_limit", "device_within_limit", "estimate_exceeds_free_before"):
+    for key in (
+        "ram_within_limit",
+        "device_within_limit",
+        "estimate_exceeds_free_before",
+        "estimate_fits_free_before",
+    ):
         if key in record and (record[key] is None or type(record[key]) is bool):
             safe[key] = record[key]
     for key, values in _ENUMS.items():
@@ -1097,7 +1305,7 @@ def _safe_record(record: Mapping[str, Any]) -> Record:
             and all(type(v) is int and v > 0 for v in value)
         ):
             safe[key] = list(value)
-    for key in ("fields_before", "fields_after", "changed_kept_fields"):
+    for key in ("fields_before", "fields_after", "changed_kept_fields", "text_changed_kept_fields"):
         value = record.get(key)
         if isinstance(value, list):
             safe[key] = [
@@ -1106,6 +1314,14 @@ def _safe_record(record: Mapping[str, Any]) -> Record:
                 if isinstance(v, str)
                 and re.fullmatch(r"(?:IFD0|Exif|GPS|Interop)\.[A-Za-z0-9_]+", v)
             ]
+    versions = record.get("decoder_versions")
+    if isinstance(versions, dict):
+        safe["decoder_versions"] = {
+            key: value
+            for key in ("ffmpeg", "pillow_heif", "libheif")
+            if (value := versions.get(key)) is None
+            or (isinstance(value, str) and re.fullmatch(r"[0-9]+(?:\.[0-9]+){1,3}", value))
+        }
     failures = record.get("failed_checks")
     if isinstance(failures, list):
         safe["failed_checks"] = [v for v in failures if isinstance(v, str) and v in _CHECKS]
@@ -1177,7 +1393,36 @@ def summarise(
         }
         for field in ("orientation_ok", "v5_ok", "d53_ok", "v9_ok"):
             row[field + "_passed"] = sum(r.get(field) is True for r in group)
-            row[field + "_failed"] = sum(r.get(field) is False for r in group)
+            row[field + "_failed"] = sum(
+                r.get(field) is False
+                and not (
+                    field == "orientation_ok" and r.get("orientation_status") == "inconclusive"
+                )
+                for r in group
+            )
+        row["orientation_inconclusive_count"] = sum(
+            r.get("orientation_status") == "inconclusive" for r in group
+        )
+        row["orientation_inconclusive_files"] = [
+            r["file"]
+            for r in group
+            if r.get("orientation_status") == "inconclusive" and "file" in r
+        ]
+        witnesses = [
+            r["thumbnail_witness"]
+            for r in group
+            if isinstance(r.get("thumbnail_witness"), dict)
+            and r["thumbnail_witness"].get("available") is True
+        ]
+        row["thumbnail_available_count"] = len(witnesses)
+        row["thumbnail_concordant_count"] = sum(w.get("orientation_ok") is True for w in witnesses)
+        row["thumbnail_discordant_count"] = sum(
+            w.get("orientation_status") != "inconclusive" and w.get("orientation_ok") is False
+            for w in witnesses
+        )
+        row["thumbnail_inconclusive_count"] = sum(
+            w.get("orientation_status") == "inconclusive" for w in witnesses
+        )
         for field in ("quantised_max_255", "quantised_mean_255", "raw_max_255", "raw_mean_255"):
             values = [r[field] for r in group if _number(r.get(field))]
             if values:
@@ -1299,6 +1544,14 @@ def _selection(
     return chosen
 
 
+def _owner_class_matches(source: Path, label: str) -> bool:
+    data = source.read_bytes()
+    kind = detect_format(data)
+    if label.startswith("HEIC-"):
+        return kind == "heic" and (read_layout(data).irot or 0) == int(label[5:])
+    return kind == "jpeg"
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Run the guarded instrument and print a safe summary on every normal exit.
 
@@ -1347,7 +1600,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         summary_path = guard.check(folder / "summary.json")
         for source, label, representative in selected:
             try:
-                if command == "orientation":
+                if not _owner_class_matches(source, label):
+                    record = _failure(source, label, "invalid_request", "class_layout")
+                elif command == "orientation":
                     record = verify_orientation(
                         source, run_guard, photo_class=label, max_side=args.max_side
                     )
@@ -1374,7 +1629,11 @@ def main(argv: Sequence[str] | None = None) -> int:
             except Exception:
                 record = _failure(source, label, "runner_failed", "runner_failed")
             records.append(record)
-            if record.get("failed_checks") or not record.get("read_ok"):
+            if (record.get("failed_checks") or not record.get("read_ok")) and not (
+                record.get("orientation_status") == "inconclusive"
+                and record.get("failed_checks") == ["orientation_discrimination"]
+                and record.get("read_ok") is True
+            ):
                 break
         status = (
             0

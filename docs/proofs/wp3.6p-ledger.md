@@ -4,8 +4,9 @@
 
 - Package: WP3.6P, CODEX lane, STRONG tier; CHARC's FINAL rulings govern.
 - Dispatch base verified: `c3bf602fe9ac94cd5df25499d97f3a2bc439bb72`.
-- Current boundary: turn 4, Reviewer A round 1 ADJUDICATED; remediation has
-  NOT started. Tool/tests remain at `70bd699`. Turn 1's ledger was committed
+- Current boundary: turn 5, Reviewer A round 1 REMEDIATED in the owned tool,
+  tests and ledger; Reviewer A round 2 is NOT RUN. Turn 4's adjudication was
+  committed as `f2396b0e`. Turn 1's ledger was committed
   as `6cc7cdb`; RED as `a66eea6`.
   No owner photo was opened by the cell in any turn.
 - `uv sync`: already run by the dispatcher before dispatch, as stated in the
@@ -15,8 +16,9 @@
   (2026-10-30T04:46:00Z)
   RE-RULES Q3: FFmpeg default composed primary as delivered is the oracle.
   The thumbnail is a recorded second witness, never the pass criterion.
-- Current handoff: YIELD for the round-1 adjudication and two ruling questions
-  below. No product defect is asserted from a planted instrument control.
+- Current handoff: YIELD for Reviewer A round 2. CHARC resolved R1-QA/QB in
+  `d9133089b58091d8`; the ruling and remediation evidence are recorded below.
+  No product defect is asserted from a planted instrument control.
 - No real-photo acceptance claim, measurement, review convergence or gate pass is
   made at this boundary. All requests below are NOT RUN by this cell.
 
@@ -1010,7 +1012,7 @@ EXIT 0. No prohibited value was discovered in a committed-facing artifact.
 |---|---:|---:|---:|---|---|---|---|---|---|
 | 0 | - | - | - | - | - | 0 | None; ledger only | R0 seat evidence received; mapped tile scores VOID; Q3 replaced by CHARC | 118,810 after turn 1 |
 | Build turn 3 (not A) | - | - | - | Owned tool/ledger | - | 0 | New tool; no test fix | GREEN: 33 passed, 1 footage deselected; ruff/mypy green; Reviewer A PENDING | 168,789 after turn 2; turn-3 reading pending |
-| A1 / turn 4 adjudication | 0 | 2 | 6 (+8 advisory) | 15 / 1; #15 out | 16 NEW / 0 REOPENED; #11 rejected, #9/#13 partially rejected | 0 | 0 / 0; ledger only, no remediation | NEW_CRITICAL_MAJOR_FOUND remains; 18 synthetic probes confirm dispositions; R1-QA/QB pending; review.txt at r1 path above | Previous session 240,970 after turn 3; fresh turn-4 reading for dispatcher to fill |
+| A1 / turns 4-5 | 0 | 2 | 6 (+8 advisory) | 15 / 1; #15 out | 16 NEW / 0 REOPENED; #11 rejected, #9/#13 partially rejected | 0 | 13 tool fix groups with RED/GREEN tests; 0 src fixes; 0 test-only fix groups; #16 Limit in ledger | NEW_CRITICAL_MAJOR_FOUND was A1's verdict; adjudication committed f2396b0e; CHARC R1-QA/QB ruled; remediated turn 5; A2 pending | Turn 4: 114,259; turn 5 dispatcher to fill; previous session 240,970 after turn 3 |
 
 | Suspected item | Independent confirmation | Disposition |
 |---|---|---|
@@ -1020,6 +1022,228 @@ EXIT 0. No prohibited value was discovered in a committed-facing artifact.
 | [MAJOR] R0 mapped output might establish the primary oracle | Dispatcher extra probes: mapped stream 0 is a tile; default selection composes the primary and already applies irot | Confirmed; tile pose scores VOID; Q3 mechanism replaced under CHARC ruling, with no product change. |
 | [MINOR] psutil may accept a Path in disk_usage | Dispatcher initial R0-O TypeError; successful reruns passed str(root) | Confirmed seat edit folded into both historical snippets (four calls); new tool must pass str. |
 | FFmpeg might honour raw EXIF as well as irot | Four default synthetic decodes: tag-only stays stored, both/irot-only upright | Rejected EXIF-handling assumption; test explicitly records irot-only rule and generated-reference branch controls. |
+
+### Turn 5: CHARC ruling and round-1 remediation
+
+Dispatch head: `f2396b0eeee9dc0932d781d44c1a846d9c31d115`, initial status
+empty. Dispatcher-read depth after turn 4: **114,259 tokens**, this fresh session.
+Previous session's 240,970 reading is historical and is not this session's depth.
+Turn 5 bundles the new RED tests and their fixes in ONE logical round-1
+remediation commit, as authorised; there are no intervening cell commits.
+
+CHARC `d9133089b58091d8` (2026-10-30T05:43:16Z), verbatim:
+
+> R1-QA = (a) BYTE-LEVEL kept-entry fidelity. V5 reads "all EXIF preserved except fields made invalid by processing (D63)" and WP4.5 built exactly that at the byte level, so the verification instrument measures what the product claims: an INDEPENDENT raw TIFF-entry inventory in `tools/photo_verify.py` (not `exif.py`, which is the thing under test) compares, per IFD (IFD0 / Exif / GPS / Interop), tag, type, count and payload bytes with multiplicity, in BOTH directions (nothing lost, nothing added); excluded exactly the four D63 fields (Orientation, Software, PixelX/YDimension), the dropped thumbnail / IFD1 and the relocated pointer VALUES (pointer tags compared by presence and type only). Privacy stands: the record and the report expose tag names, IFD labels, counts and booleans, never bytes or values. A mismatch names the IFD and tag id. The text-level comparison of `photo_check` is kept as the second, coarser witness in the record (not the criterion).
+>
+> R1-QB = (a) INCONCLUSIVE and CONTINUE for a discrimination-only failure: a file whose pose-1 (upright) score wins and is under 6/255 but whose nearest other pose is not over 10/255 is recorded INCONCLUSIVE (symmetric or featureless scene), never an AD-24 pass; all eight poses and the fixed bounds are kept; the thumbnail never turns it into a pass; the run continues to the next file and ends nonzero / incomplete; a read, oracle, size or upright failure still STOPs the run. The report counts inconclusive files per class beside the thumbnail-concordance counts (#7), and names them (file names only). Reason: the instrument's job is to attempt every owner file and report what each shows; one open-water frame must not hide the other 61.
+>
+> The other fixes (#1, #3, #5, #6, #7 with the real-grid-180 control or a STOP, #8, #9, #10, #12, #13, #14; #16 a Limit; #11 rejected): concurred as listed; owned files only, no `src/` change, no dependency.
+>
+> Seat run 5a (photo_check 73/73 read, 0 refused, 0 round-trip problems, GPS and MakerNote kept 73/73): noted; the "allows refusals" caveat closes in the report.
+
+#### RED record on the unchanged tool
+
+All initial RED nodes below ran BEFORE any tools/photo_verify.py change. Command:
+
+```powershell
+$env:PYTHONPATH = 'scripts'
+uv run pytest -q tests/test_photo_verify.py -k r1_ --basetemp=work/wp3.6p/rA1-fix/red-tmp -p sandbox_mkdir_shim -p no:cacheprovider --junitxml=work/wp3.6p/rA1-fix/red.xml *> work/wp3.6p/rA1-fix/red.log
+```
+
+Observed EXIT 1: **20 failed, 34 deselected in 7.13s**, all assertion failures;
+no collection, fixture, dependency or grid-generation error. Full local evidence
+is red.log/red.xml; compact failure-line index is red-node-summary.txt under
+work/wp3.6p/rA1-fix. Every node in the table has prefix
+`tests/test_photo_verify.py::`; parameter suffixes are literal node ids.
+
+| Finding | RED node id(s), after the prefix above | Failure line on unchanged tool | GREEN on final state |
+|---|---|---|---|
+| #1 | test_r1_size_is_checked_before_pose_reduction | AssertionError: wrong-size product read passed | PASSED |
+| #2 | test_r1_kept_exif_is_byte_exact_in_both_directions[rational-bytes], [added-field], [interop-value] | Initial RED: expected IFD0.282 / IFD0.315 / Interop.2 missing from changed_kept_fields; incidental coarse pointer-offset failure isolated and corrected below | All 3 PASSED |
+| #3 | test_r1_os_peak_also_enforces_ram_limit | AssertionError: OS peak above limit was ignored | PASSED |
+| #4 | test_r1_inconclusive_continues_without_becoming_a_pass | AssertionError: inconclusive frame hid later inputs | PASSED |
+| #5 | test_r1_source_exif_parse_failure_cannot_pass | AssertionError: present unparsed EXIF passed vacuously | PASSED |
+| #6 | test_r1_owner_map_rejects_wrong_irot | AssertionError: wrong irot was accepted into an owner class | PASSED |
+| #7 | test_r1_real_grid_rotations_and_thumbnail_class_counts[1-0], [8-90], [3-180], [6-270] | AssertionError: thumbnail evidence is missing from class row | All 4 PASSED; grid/rotation assertions already succeeded before that RED line |
+| #8 | test_r1_baseline_and_final_are_not_active_samples; test_r1_sampler_counts_only_live_runner_samples | AssertionError: no active RSS sample passed; AssertionError: runner lifetime was not sampled | Both PASSED |
+| #9 | test_r1_memory_scope_is_explicit | AssertionError: assert None == 'tool-runner-tree-including-sampler-children' | PASSED |
+| #10 | test_r1_decoder_versions_are_safe_and_reproducible | AssertionError: decoder versions were not recorded | PASSED |
+| #12 | test_r1_real_thumbnail_item_is_decoded | AssertionError: real thumbnail could not be compared at a common size | PASSED; actual item API, no thumbnail mock |
+| #13 | test_r1_estimate_fit_is_strict | AssertionError: equality must not fit | PASSED |
+| #14 | test_r1_capacity_fallback_is_distinct[CPU: no CUDA device-False], [CPU: estimate 3 MiB exceeds free 2 MiB-True] | AssertionError: assert None is False / True | Both PASSED |
+
+EXIF control correction (disclosed, not a hidden product/test fix): the initial
+three controls had a coarse Interop pointer-location failure unrelated to the
+planted mutation, so v5_ok was already false even though the required raw tag
+failure was missing. The corrected test source starts with D63 layout already
+present; only the Interop case contains that child. Mutations remain independently
+specified raw payload/addition changes. An ignored, byte-exact copy obtained with
+`git show f2396b0e:tools/photo_verify.py` was loaded as photo_verify by a temporary
+pytest plugin; the tracked tool was never reverted or overwritten. All three
+corrected controls then fail against that UNCHANGED baseline at the stronger line:
+`AssertionError: byte-level EXIF mutation passed: <case>`. Command: same shim,
+`-k r1_kept_exif_is_byte`, `-p baseline_override`, basetemp exif-red-tmp;
+PYTHONPATH includes scripts and work/wp3.6p/rA1-fix/baseline. EXIT 1:
+**3 failed, 57 deselected in 0.38s**. Evidence: exif-red.log/exif-red.xml and
+baseline/ under that local evidence root. All three are GREEN in final2.xml.
+
+#### Fixes implemented in owned files
+
+- **#1 size:** verify_orientation compares full product and FFmpeg primary shapes
+  before reduction. A mismatch records both sizes, failed status and named
+  orientation_size/orientation_upright checks. It stops; a smaller same-aspect
+  read cannot pass through resampling. Existing extra-tag mutant stays detected.
+- **#2 byte fidelity:** independent _entry_inventory parses classic TIFF in both
+  byte orders, traversing IFD0/Exif/GPS/Interop with bounds/type/cycle checks.
+  Counters retain entry multiplicity, tag/type/count/payload bytes; source and
+  output inventories are compared in both directions. Only IFD-qualified D63
+  fields and IFD1 are discarded. Existing directory pointers compare presence,
+  type and multiplicity without their relocated addresses. The Exif pointer
+  newly required to hold inserted D63 dimensions is accounted for when the
+  source had none and the output child contains no kept entries; arbitrary
+  added kept fields or other pointers are never exempted. A no-source-EXIF
+  positive test covers that necessary D63 scaffolding. Raw mismatches name
+  IFD plus numeric tag id, never payload values. The product's parser/rewriter
+  is NOT the inventory oracle. The separately labelled text_kept_fields_equal,
+  text_changed_kept_fields and text parse status retain the coarser witness;
+  relocated Interop offsets do not become spurious text changes. GPS/MakerNote
+  kept booleans now use the same byte-level result as the V5 preservation claim.
+- **#3 RAM:** either a sampled tree peak or an available individual-process OS
+  peak over the limit fails RAM. Missing active samples still fail measurement;
+  they cannot erase an already known limit breach. Both original figures remain
+  distinct; no separate-process peaks are summed and no baseline is subtracted.
+- **#4 inconclusive:** compare_poses retains all eight scores and fixed bounds,
+  classifies the ruled discrimination-only case as orientation_status=inconclusive
+  with orientation_ok=False, and leaves the thumbnail non-gating. main continues
+  ONLY that exact failed-check/status/read-ok combination. Final exit is nonzero,
+  complete=False. Class rows count/name inconclusive files separately from true
+  failures and passes. All other failure kinds retain the existing STOP.
+- **#5 parse failure:** a present block that cannot be inventoried cannot pass
+  V5. Source text parse failure is explicitly recorded, never converted into a
+  successful empty-source comparison. Raw parse status is independent. Absent
+  source EXIF remains a valid distinct case; output D63 fields are still checked.
+- **#6 class labels:** owner CLI checks detected format and HEIC irot against
+  each selected inventory label before running that photo. Wrong format/irot
+  records class_layout and stops. All library legs reject unknown class enums.
+  Synthetic library PNG/HEIC export tests retain their test reporting buckets;
+  the owner CLI only accepts the commissioned HEIC/JPEG map formats. A/Z/M
+  contents are not inferred or reclassified by scene or camera/editor strings.
+- **#7 real grids/witness counts:** the EXISTING installed pillow-heif CtxEncode
+  supports tile_size and thumbnails. Test-local generation encodes asymmetric
+  384x256 scenes as real multi-tile grid primaries with all four rotations and
+  agreeing tags; read_layout must establish grid, not hvc1, for every control.
+  FFmpeg default delivery is checked against generated upright pixels, before
+  the product comparison; the 180 control rejects a planted extra 180 turn.
+  No shared fixture/dependency change or hvc1 substitute was needed. Class rows
+  now show thumbnail available/concordant/discordant/inconclusive counts.
+- **#8 active memory observations:** baseline/final counts remain recorded, but
+  separate rss_active_samples/device_active_samples must each be positive for
+  completeness. launch_runner uses the actual Popen lifetime; the sampler polls
+  it live before AND after a reading. Thread startup or a surrounding adapter
+  call alone cannot create an active observation. A tiny real CPU subprocess
+  exercises that lifecycle with RSS/device readings stubbed, not host figures.
+- **#9 scope:** the allow-listed rss_scope enum is explicitly
+  tool-runner-tree-including-sampler-children in every memory record. No claim
+  of runner-only RSS or estimate of a baseline-subtracted peak was added.
+- **#10 versions:** records include constrained numeric FFmpeg, pillow-heif and
+  libheif versions. Only a numeric FFmpeg prefix is parsed from the captured
+  version command; banners, build paths and arbitrary output are not projected.
+  Unavailable numeric facts remain null; malformed/private version strings are
+  excluded on summary reprojection. No source metadata is used as a version.
+- **#12 thumbnail item:** a real encoded HEIF thumbnail item is decoded through
+  get_thumbnail, with item count/size and concordance asserted. compare_poses
+  uses the smaller common maximum side, without upscaling a small thumbnail.
+  Primary size equality is separately enforced by #1. Existing absent/error
+  handling and discordant-witness tests retain the non-gating policy.
+- **#13 fit:** estimate_fits_free_before uses strict <, remains null if the
+  sample is unavailable, and is distinct from the literal exceeds predicate.
+  Equality does not fit; neither predicate claims to be the backend's later
+  internal free-memory sample.
+- **#14 capacity:** memory_capacity_fallback is true only for the validated
+  estimate/free CPU reason. Broad automatic CPU selection, explicit forced CPU
+  and actual reason remain separate; no-CUDA is not evidence of a D111 event.
+- **#16 LIMIT FOR THE REPORT:** FFmpeg/libheif RGB matrix or range differences
+  may exceed the fixed upright bound even when poses agree. No such owner-file
+  discrepancy is proved by the synthetic offset probe. Preserve scores; a real
+  upright/oracle failure still STOPs for CHARC. No automatic bound relaxation.
+
+#11 remains rejected; the authorised FFmpeg default command is unchanged.
+#15 remains out-of-envelope; the explicitly permitted ICC description exception
+is unchanged. No recommendation here changes a product interface or source file.
+
+Additional raw-inventory controls independently lay out TIFF bytes in both
+endiannesses and assert duplicate multiplicity, type, count, payload, pointer
+type, permitted child relocation and discarded IFD1 behavior. They do not derive
+their expected inventory from the product rewriter. A real JPEG-in-HEIC-map
+negative control and a genuinely absent-source-EXIF positive control also pass.
+
+#### Owner verification loop, then final light checks
+
+| Suspected / confirmed issue during implementation | Evidence / independent control | Fixed / rejected |
+|---|---|---|
+| [MINOR] Thumbnail comparison at separate small sizes cannot compare an actual smaller thumbnail | RED real item decoded, but witness concordance false | CONFIRMED/FIXED by common bound; actual item now concordant; no oracle policy change |
+| [MINOR] Interop relocated pointer values contaminate the coarser text witness | First GREEN raw mismatches correct but text witness false on equivalent/hidden payload mutations | CONFIRMED/FIXED; structural text pointer value excluded, raw pointer type/presence comparison retained |
+| [MINOR] Initial EXIF RED could be confounded by a different coarse failure | Corrected sources, isolated unchanged f2396b0e module; all 3 now pass the old V5 and fail the new test | CONFIRMED; control corrected and stronger baseline RED recorded; no tool revert |
+| [MINOR] GPS kept boolean could remain true for text-equivalent changed bytes | test_r1_gps_kept_uses_byte_fidelity RED: text-equal GPS bytes were incorrectly called kept | CONFIRMED/FIXED; final node PASSED, GPS.2 named and V5 fails |
+| [MINOR] Missing active samples could hide a known OS-limit breach in the record | test_r1_known_os_limit_failure_survives_missing_active_samples RED: known OS limit breach was hidden by missing samples | CONFIRMED/FIXED; final node PASSED, both measurement and limit failures retained |
+| A real grid/180 witness might require a dependency or shared fixture change | Four generated grid controls decode with installed CtxEncode/FFmpeg; grid and known-pose assertions pass | REJECTED; no dependency/fixture change and no STOP needed |
+| Version facts or new field/tag records could bypass privacy projection | Numeric-version contamination control and existing planted GPS/Make/path tests | REJECTED on final tested surfaces; constrained nested projection retained |
+
+The two additional verification-loop RED nodes ran on the first remediated tool,
+not on f2396b0e: EXIT 1, 2 failed / 58 deselected in 0.86s, verify-red.log.
+This distinction is intentional. Their subsequent final GREEN is in final2.xml.
+After those fixes, traced raw read/inventory/metadata -> record -> summary,
+orientation failure/inconclusive continuation, guard/retention, and memory
+sampling/lifetime/limits again. Ran the final selected suite and independent
+static/privacy checks. No new issue found in that last pass. This is cell
+verification, not independent review convergence or owner-photo acceptance.
+
+Final light commands (outputs under work/wp3.6p/rA1-fix, PowerShell environment
+spelling of PYTHONPATH; all logs captured, not pasted):
+
+| Check | Exact command | Observed final result / evidence |
+|---|---|---|
+| Tests | PYTHONPATH=scripts uv run pytest -q tests/test_photo_verify.py --basetemp=work/wp3.6p/rA1-fix/final2-tmp -p sandbox_mkdir_shim -p no:cacheprovider -m "not gpu and not footage and not gui and not slow and not fullclip" -o junit_family=legacy --junitxml=work/wp3.6p/rA1-fix/final2.xml | EXIT 0; 59 passed, 1 deselected in 10.30s; final2-pytest.log |
+| Ruff | uv run ruff check tools/photo_verify.py tests/test_photo_verify.py | EXIT 0; All checks passed!; final2-ruff.log |
+| Strict typing | uv run mypy | EXIT 0; Success: no issues found in 147 source files; final2-mypy.log |
+| Formatting | uv run ruff format --check tools/photo_verify.py tests/test_photo_verify.py | EXIT 0; 2 files already formatted; final2-format-check.log |
+
+The 59 include the original 33 selected cases plus 26 new regression/control
+cases. The ONE footage node remains deselected. All exports in tests force CPU;
+memory figures in tests are stubbed, including the live-subprocess sampling
+control's process/device readings. No owner photo, GPU, GUI, slow, fullclip or
+heavy/exclusive measurement ran. Final pytest has no test warnings; legacy JUnit
+avoids the four record_property/xunit2 warnings on the first intermediate run.
+uv still emits the existing VIRTUAL_ENV mismatch notice and uses this worktree's
+environment. No full suite or additional gate is claimed/run by the cell.
+
+Scope/privacy on disk: only tools/photo_verify.py, tests/test_photo_verify.py and
+this ledger are changed. All three are ASCII with LF blobs. New raw inventories
+and comparisons live in memory; serialized records contain names, numeric tag
+ids, IFD labels, counts, format facts and booleans only. Synthetic private values
+remain excluded from commitment-facing records/summary/stdout, as exercised by
+the unchanged privacy/guard tests and final static projection check. No footage
+path/value, camera/editor/serial string, GPS/location or MakerNote content is
+copied into this ledger or the return. No src, frozen interface, shared fixture,
+existing unrelated test, config, dependency, lockfile or other-worktree edit.
+No read/edit of the owner's local config, owner-footage read/write, commit, mailbox post, scene
+judgement or evidence deletion. The fixture/control files are temporary guarded
+test outputs; the original synthetic input bytes stay read-only during tool runs.
+
+Seat run 5a remains the supplied successful 73-photo evidence below. The report
+will close its historical refusal allowance caveat on those actual counts, not
+merely on the old test's permissive assertion. Other seat runs, the report,
+Reviewer A round 2, Reviewer B and the one two-leg gate remain owed. R1-QA/QB
+are resolved; no new ruling request or STOP. YIELD now before Reviewer A round 2.
+Final scope/privacy/static validation logs are final-scope.log and
+final-ledger-validation.log under the same local evidence root.
+Observed final static validation: EXIT 0, PASS for the exact three-file scope,
+ASCII/LF/whitespace, 59 executed passing cases / one footage deselection,
+26 round-1 controls, 49 safe record/summary JSON files scanned without planted
+private markers, nested privacy projection, ruling/depth entries, public tool
+docstrings and importability. git diff --check EXIT 0. The initial scratch
+validator's JUnit deselection accounting and PowerShell-log decoding were
+corrected before this PASS; neither required a product/tool/test change.
 
 ## Seat-run ledger
 
@@ -1041,7 +1265,8 @@ EXIT 0. No prohibited value was discovered in a committed-facing artifact.
 | 1 / round 0 | 118,810 tokens (dispatcher reading after turn 1) | R0 committed 6cc7cdb; evidence and ruling received on turn 2 |
 | 2 / RED | 168,789 tokens (dispatcher reading after turn 2) | RED committed a66eea6; GREEN dispatched on turn 3 |
 | 3 / GREEN | 240,970 tokens (dispatcher reading after turn 3; previous session) | GREEN committed 70bd699; previous session retired at depth boundary |
-| 4 / Reviewer A round 1 adjudication | PENDING dispatcher reading for this FRESH session; dispatcher to fill | Ledger only; 16 dispositions; no remediation; YIELD for R1-QA/QB |
+| 4 / Reviewer A round 1 adjudication | 114,259 tokens (dispatcher reading after turn 4; FRESH session) | Ledger committed f2396b0e; 16 dispositions; no remediation; R1-QA/QB ruled before turn 5 |
+| 5 / Reviewer A round 1 remediation | PENDING dispatcher reading | 13 tool fix groups plus RED/GREEN controls; #16 Limit staged in ledger; all light checks green; YIELD for A2 |
 
 Evaluate near 200K; stop at a step boundary near 250K per this dispatch.
 Historical turn-1 validation was limited to the ledger's ASCII/LF and owned-file diff.
