@@ -135,9 +135,7 @@ def _request(tmp_path: Path, *, kind: str = "video", **values: object) -> Export
     )
 
 
-def _jobs(
-    tmp_path: Path, command: list[str], photo: ExportJobs | None = None
-) -> ProcessExportJobs:
+def _jobs(tmp_path: Path, command: list[str], photo: ExportJobs | None = None) -> ProcessExportJobs:
     return ProcessExportJobs(
         photo_exports=photo if photo is not None else _PhotoJobs(),
         cache_dir=tmp_path / "cache",
@@ -570,9 +568,7 @@ def test_a_wrong_typed_result_is_ignored_and_the_job_ends_without_one(
     tmp_path: Path, caplog: pytest.LogCaptureFixture, body: str
 ) -> None:
     caplog.set_level(logging.DEBUG)
-    command = _child(
-        tmp_path, 'raw(b\'{"result": \' + ARGS[0].encode() + b"}\\n")\n', body
-    )
+    command = _child(tmp_path, 'raw(b\'{"result": \' + ARGS[0].encode() + b"}\\n")\n', body)
     result, _ = _run(tmp_path, command)
     assert result.ok is False
     assert result.failure == "The export worker ended without a result (exit status 0)."
@@ -621,6 +617,49 @@ def test_a_child_alive_after_its_result_is_killed_and_the_result_kept(
     assert time.perf_counter() - start < 10
     assert result.ok and result.device == "kept"
     assert any("killed" in m for m in _messages(caplog, PROCESS_LOGGER))
+
+
+def test_a_worker_that_never_reads_its_stdin_is_still_cancelled(
+    tmp_path: Path, quick_kill: float
+) -> None:
+    """The request is written by a thread: a worker that never reads cannot block the job."""
+    command = [sys.executable, "-c", "import time; time.sleep(30)"]
+    request = _request(tmp_path, padding="p" * (4 << 20))  # far larger than any pipe buffer
+    progress = _Progress()
+    timer = threading.Timer(0.3, progress._cancel.set)
+    timer.start()
+    start = time.perf_counter()
+    try:
+        result = _jobs(tmp_path, command).job(request)(progress)
+    finally:
+        timer.cancel()
+    assert time.perf_counter() - start < 10
+    assert result.failure == "The export worker did not stop after cancel and was ended."
+
+
+def test_an_exception_from_the_progress_kills_the_worker(tmp_path: Path) -> None:
+    beat = tmp_path / "beat"
+    command = _child(
+        tmp_path,
+        """\
+        send({"progress": [1, 100, "working"]})
+        for n in range(600):
+            Path(ARGS[0]).write_text(str(n))
+            time.sleep(0.05)
+        """,
+        str(beat),
+    )
+
+    class _Raising(_Progress):
+        def report(self, done: int, total: int | None, message: str) -> None:
+            raise RuntimeError("the interface went away")
+
+    with pytest.raises(RuntimeError, match="went away"):
+        _run(tmp_path, command, _Raising())
+    time.sleep(0.2)
+    before = beat.read_text()
+    time.sleep(0.4)
+    assert beat.read_text() == before  # the worker is gone, not left running
 
 
 # --- the child's log records -----------------------------------------------------------------
