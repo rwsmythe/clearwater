@@ -1485,3 +1485,54 @@ lane's use meanwhile), 146 GB with it, 164 GB after. RAM available 8.20 then 4.8
 of every dry output for the footage folder: 0 hits. Stale labels (cell 9's note) still print in
 v7f-settled ("the committed probe, from before the build"; "before show() ... 0.0 ms"): the line
 of record is "from show() (ruling B, OF RECORD)".
+
+### Window 4 (EXCLUSIVE, granted by orchestrator gen 25 at ~01:24Z; runs OF RECORD except where marked)
+
+Command: `bash /c/Users/rwsmy/clearwater-review-evidence/wp4.3/windows/window4-commands.sh` (md5
+`fb943904...`), once, foreground (the tool moved the call to the background at its 600 s cap; the
+cell then waited in the foreground on `exits.txt` until `CHAIN-DONE`), 2026-10-30 ~01:24Z-01:48:34Z.
+HEAD `b4c8561` (product code = `86ba69a`); drivers `s7_driver.py` `0b9ee6cc...` (unchanged),
+`s7_switch.py` `5457aca8...`, `s7_v8char.py` `60ab95a2...`. GX011627 (158.5 MB) located
+read-only; device GPU in every run. Logs copied to `windows/win4/` (md5s in `md5sums.txt`;
+`exits.txt` `71221c11...`). No tuning, no re-run.
+
+| Run | Switch | EXIT | Longest / p99 (ms) | Export wall (job / trigger-to-result) | Working set trigger -> result (growth) | Private bytes | At the result: count, garbage, freeze count, third threshold |
+|---|---|---|---|---|---|---|---|
+| v7c | 5 ms | 1 STOP | **180.0** / 12.0 (20,897 ticks) | 209.1 / 209.1 s (86.0 MB out) | 853.4 -> 954.5 MB (+101.1) | 2534.7 -> 2724.5 MB | (37, 0, 0), 0, 89,132, 2147483647 |
+| v7c | 1 ms | 1 STOP | **181.0** / 12.0 (21,025) | 210.7 / 210.7 s | 853.6 -> 954.6 MB (+101.1) | 2531.6 -> 2723.4 MB | (39, 0, 0), 0, 89,149, 2147483647 |
+| v7e | 5 ms | 1 STOP | **182.0** / 12.0 (21,080; witness 1) | 210.9 / 211.2 s | 991.5 -> 1238.7 MB (+247.2) | 2844.6 -> 3069.9 MB | (42, 0, 0), 0, 89,121, 2147483647 |
+| v7e | 1 ms | 0 PASS | 80.0 / 12.0 (21,102; witness 1) | 210.8 / 211.0 s | 1002.4 -> 1239.4 MB (+237.0) | 2843.3 -> 3060.8 MB | (42, 0, 0), 0, 89,233, 2147483647 |
+| v8char (NOT of record) | 5 ms | 0 | 16 frames, table below | - | - | - | - |
+| v7a | 5 ms | 0 PASS | 18.0 / 15.0 (analysis 62.7 s, 681 frames) | - | - | - | - |
+| v7b | 5 ms | 1 STOP | **195.0** / 15.0 (6,550 ticks; witness 1,339) | - | - | - | - |
+| v7d | 5 ms | 0 PASS | 65.0 / 47.0 (batch 29.3 s, 300 done) | - | - | - | - |
+| plant-f | 5 ms | 0 | settling opens 4473.3 / 104.4 ms | - | - | - | - |
+| v7f-settled | 5 ms | 1 STOP | from show() (ruling B, OF RECORD) **395.4** / 14.9 (5,978 gaps); cache open 188.2 ms; build_application cold 94.9 ms | - | - | - | - |
+
+Against history (pre-remediation, windows 1-3): (a) 18.0 -> 18.0; (b) 21.0 PASS -> **195.0 STOP**
+(NEW); (c) 182.0 -> 180.0 / 181.0 (unchanged); (d) 66.0 -> 65.0; (e) 196.0 -> 182.0 (5 ms) / 80.0
+(1 ms, one sample); (f) settled 47.5 PASS -> **395.4 STOP** (NEW). Memory (CHARC cc0703a7 Q1): (c)
++101.1 MB per 4K export at both intervals, (e) +247.2 / +237.0 MB including the 1:1 4K render; all
+under 512 MB; `len(gc.garbage)` 0 and `gc.get_count()` at most (42, 0, 0) at every result; no
+within-export trend readable from two points per export.
+
+16-frame V8 (k = 2, 3840x2160, GPU, NOT of record; values x 1/255): p99 median 1.169, max 1.946
+(frame 276); frames over p99 2/255: 0; mean max 0.132 (frame 63); p99.9 2.744-6.679; max
+15.758-40.848 (frame 659); shown-vs-preview max diff 0 on all 16. Full table in
+`windows/win4/v8char.txt`.
+
+Disk: C: 173 GB free before, 172 GB before the plant, 153 GB with it, 171 GB after (plant
+deleted: yes). RAM available 8.50 then 8.43 of 33.52 GB. Footage folder unchanged (128 files) in
+every run; product logs naming it 0; a grep of every window output for the footage folder: 0
+hits. Kept outputs 850 MB in `work/wp4.3-c10-win4/`.
+
+Cell's reading (REASONED, not measured; for CHARC): (b) and (f) are new STOPs on the remediated
+code. Candidate cause: `FullCollections`' idle-time `gc.collect()` on the interface thread. It
+fires once `gc.get_count()[2]` exceeds 10 (the saved third threshold) and so skips CPython's own
+rule that an automatic full collection waits until the pending long-lived objects exceed 25 % of
+the long-lived total; after the start-up freeze, the objects the first open / analysis creates
+(module imports of the core and CuPy on the worker, 1.03 s + 947 ms of import at round 0) are
+unfrozen, and the next idle check (the opener's `LatestWorker` beside it counts as idle, R6-1)
+scans them on the interface thread inside (b)'s and (f)'s probes. Not verified: a
+characterisation run with `gc.callbacks` stamps (thread, duration, object counts) against the
+probe's gap times would confirm or refute it. (c) and (e) did not move with items 1 and 3.
