@@ -10,7 +10,9 @@ methods of :mod:`clearwater.methods` (``"c3"`` first, D16), the IF-2 selection o
 :mod:`clearwater.io.video`, built per video job on the backend the job selected (DR-67), and the
 IF-7 proxy cache of :mod:`clearwater.cache` over a folder the caller passes in. WP4.3 adds the
 application's one cache, opened later by a start-up job (:func:`proxy_cache_opener`), and lets
-:func:`export_jobs` share a cache instead of opening its own.
+:func:`export_jobs` share a cache instead of opening its own. WP4.6 adds
+:func:`process_export_jobs`, the application's export engine whose video jobs run in a worker
+process.
 
 This module imports nothing from ``clearwater.gui``, no PySide6 and no ``cupy``/``cupyx``
 (AD-29), and never resolves the app-data folder: the caller passes settings in.
@@ -18,8 +20,9 @@ This module imports nothing from ``clearwater.gui``, no PySide6 and no ``cupy``/
 
 from __future__ import annotations
 
+import sys
 import threading
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 from typing import NoReturn
 
@@ -45,6 +48,8 @@ from clearwater.interfaces import (
 from clearwater.io.photo import PhotoReader, PhotoWriter
 from clearwater.io.video import FFmpegVideoSink, FFmpegVideoSource
 from clearwater.jobs import BackendSelector, ExportEngine
+from clearwater.jobs.export_process import ProcessExportJobs
+from clearwater.jobs.export_seam import ExportJobs
 from clearwater.methods import available_methods
 
 
@@ -425,4 +430,35 @@ def export_jobs(
         on_stage=on_stage,
         source_for=video_source if source_for is None else source_for,
         sink_for=video_sink if sink_for is None else sink_for,
+    )
+
+
+def process_export_jobs(
+    *,
+    photo_exports: ExportJobs,
+    cache_dir: Path,
+    app_version: str = clearwater.__version__,
+    command: Sequence[str] | None = None,
+) -> ExportJobs:
+    """Return the export engine whose video jobs run in a worker process (WP4.6, Q2).
+
+    Each video job spawns ``python -m clearwater.app.export_worker``, which builds
+    :func:`export_jobs` with its own scratch cache under ``cache_dir / "export"``; the job's
+    cache limit travels in the request's settings. A photo request is handed to
+    ``photo_exports`` in this process. Building spawns nothing and touches no folder.
+
+    Args:
+        photo_exports: The in-process engine for photo requests (the application's
+            :func:`export_jobs` over its one cache).
+        cache_dir: The application's cache folder (the caller's: ``Locations.cache_dir``).
+        app_version: The version recorded in provenance (D91).
+        command: The worker's command line; ``[sys.executable, "-m",
+            "clearwater.app.export_worker"]`` when None (tests pass another worker).
+
+    Returns:
+        The export engine (a :class:`~clearwater.jobs.export_process.ProcessExportJobs`).
+    """
+    worker = [sys.executable, "-m", "clearwater.app.export_worker"] if command is None else command
+    return ProcessExportJobs(
+        photo_exports=photo_exports, cache_dir=cache_dir, app_version=app_version, command=worker
     )

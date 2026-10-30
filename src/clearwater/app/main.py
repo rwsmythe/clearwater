@@ -279,7 +279,9 @@ def build_application(
         return not progress.cancelled()  # the preview worker had stopped: released at its stop
 
     exports = GuardedExports(
-        composition.export_jobs(cache=cache),
+        composition.process_export_jobs(
+            photo_exports=composition.export_jobs(cache=cache), cache_dir=locations.cache_dir
+        ),
         cache=cache,
         locks=locks,
         journal=journal,

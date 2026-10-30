@@ -6,9 +6,10 @@ cannot be created, or on any other operating system, :func:`open_frame_pipe` ret
 caller uses the default pipe (``subprocess.PIPE``), which carries the same bytes more slowly.
 The reason for the fallback is logged once per process.
 
-Every product FFmpeg and ffprobe launch uses :func:`tool_spawn_kwargs`: no inherited FFREPORT
-log file, and no console window on Windows (AD-23's approved extension), with a zero creation
-flag on every other platform. This module imports nothing from the package.
+Every product FFmpeg, ffprobe and Python worker launch uses :func:`tool_spawn_kwargs` (the
+Python worker since WP4.6): no inherited FFREPORT log file, and no console window on Windows
+(AD-23's approved extension), with a zero creation flag on every other platform. This module
+imports nothing from the package.
 """
 
 from __future__ import annotations
@@ -42,12 +43,14 @@ class _ToolSpawnKwargs(TypedDict):
 
 
 def tool_spawn_kwargs() -> _ToolSpawnKwargs:
-    """Return the window and environment policy for an FFmpeg or ffprobe child (AD-23).
+    """Return the window and environment policy for an FFmpeg, ffprobe or Python worker child.
+
+    Every product FFmpeg, ffprobe and Python worker launch takes these (AD-23; WP4.6).
 
     Returns:
         Subprocess keyword arguments: CREATE_NO_WINDOW on Windows, zero creation flags
         elsewhere, and a fresh copy of the parent environment without any case spelling of
-        FFREPORT, which would make either tool write an unsolicited log file.
+        FFREPORT, which would make FFmpeg or ffprobe write an unsolicited log file.
     """
     return {
         "creationflags": subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0,

@@ -144,7 +144,8 @@ class GuardedExports:
     """The application's ``ExportJobs``: the export engine behind the per-job guards above.
 
     Args:
-        engine: The export engine (``composition.export_jobs(cache=...)``).
+        engine: The export engine (the application's ``composition.process_export_jobs(...)``:
+            video jobs in a worker process, photos on ``composition.export_jobs(cache=...)``).
         cache: The application's one cache (the clip's key and the open's wait).
         locks: The per-clip locks shared with the GUI's analysis.
         journal: The write journal.
