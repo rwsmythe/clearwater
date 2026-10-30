@@ -345,8 +345,9 @@ def test_v8_video_pre_encode_through_the_harness_on_the_shells_frame(
     expected = image_bytes(display_image(to_display_uint8(preview), frame.color.icc_profile))
     assert np.array_equal(shown, expected)  # the shell shows the harness's preview side
     # R1-13: AD-11 as amended also bounds p99 at k = 2 (the harness reports mean and max only).
-    # At the fixture's 320 x 180 the p99 is about 10/255, over the 2/255 bound that AD-11 sets
-    # for real-size content; the figure is RECORDED here, not asserted, pending CHARC's ruling.
+    # AD-11 sets that bound on real-sized content (at least 1080p), so at the fixture's 320 x 180
+    # (p99 about 10/255) the figure is RECORDED here, not asserted (CHARC ruling ace08fbb); the
+    # GX011627 window leg is the V8 video figure of record.
     export_side = downscale(
         render_host(method, backend, np.asarray(frame.pixels, dtype=np.float32), frame.color,
                     params, record),
