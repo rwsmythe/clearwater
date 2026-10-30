@@ -11,6 +11,8 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
+import subprocess
 import sys
 import textwrap
 import threading
@@ -19,6 +21,7 @@ from collections.abc import Callable
 from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -173,6 +176,46 @@ def _read_beat(beat: Path) -> int:
     raise AssertionError("the beat file stayed empty")
 
 
+def _ended(status: int) -> str:
+    """The fixed exit-without-result text (CHARC 55959e2f (d)), before any type name."""
+    return (
+        f"The export worker ended without a result (exit status {status}); "
+        "details are in the application log."
+    )
+
+
+def _tail_records(caplog: pytest.LogCaptureFixture) -> list[logging.LogRecord]:
+    """The log records that carry the worker's stderr tail."""
+    return [
+        r
+        for r in caplog.records
+        if r.name == WORKER_LOGGER and r.getMessage().startswith("export worker stderr")
+    ]
+
+
+class _Clock:
+    """A monotonic clock that moves one unit per reading: the module's loop reads it once per
+    pass (and once more for a result), so a deadline is counted in readings, not seconds."""
+
+    def __init__(self) -> None:
+        self.now = 0.0
+
+    def monotonic(self) -> float:
+        self.now += 1.0
+        return self.now
+
+
+@pytest.fixture
+def clock(monkeypatch: pytest.MonkeyPatch) -> _Clock:
+    """Replace the module's ``time.monotonic`` (only its own; the queues keep real time)."""
+    fake = _Clock()
+    namespace = SimpleNamespace(
+        monotonic=fake.monotonic, perf_counter=time.perf_counter, time=time.time
+    )
+    monkeypatch.setattr(export_process, "time", namespace)
+    return fake
+
+
 @pytest.fixture
 def quick_kill(monkeypatch: pytest.MonkeyPatch) -> float:
     """Shorten the kill grace so a kill test ends quickly."""
@@ -287,15 +330,21 @@ def test_the_request_document_is_one_ascii_line_with_the_ruled_keys(tmp_path: Pa
     assert len(scratch.name) == 32  # a uuid4 hex
 
 
-def test_a_request_that_cannot_be_encoded_fails_without_a_spawn(tmp_path: Path) -> None:
+def test_a_request_that_cannot_be_encoded_fails_without_a_spawn(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    caplog.set_level(logging.DEBUG)
     marker = tmp_path / "spawned"
     command = _child(tmp_path, "Path(ARGS[0]).write_text('x')\nresult()\n", str(marker))
     request = _request(tmp_path, strength=float("nan"))
     result = _jobs(tmp_path, command).job(request)(_Progress())
     assert result.ok is False
-    assert result.failure is not None
-    assert result.failure.startswith("The export request could not be encoded: ")
-    assert result.failure.isascii()
+    # the same rule as the spawn's (CHARC 3ed8335f): the type name; the full text to the log
+    assert result.failure == (
+        "The export request could not be encoded (ValueError); details are in the application log."
+    )
+    logged = [r for r in caplog.records if r.name == WORKER_LOGGER]
+    assert len(logged) == 1 and "ValueError" in logged[0].getMessage()
     assert result.device == "none"
     assert not marker.exists()
     assert _scratch_folders(tmp_path) == []
@@ -433,60 +482,69 @@ def test_an_exit_without_a_result_is_a_failed_result(tmp_path: Path, status: int
     assert result.ok is False
     assert result.outputs == ()
     assert result.device == "unknown"
-    assert result.failure == (
-        f"The export worker ended without a result (exit status {status}).\nsomething went wrong"
-    )
+    # CHARC 55959e2f (d): no stderr content in the text; the last line is no exception line
+    assert result.failure == _ended(status)
     assert _scratch_folders(tmp_path) == []  # nothing is left running: removed
 
 
-def test_a_traceback_tail_is_redacted_to_names(tmp_path: Path) -> None:
-    known = tmp_path / "my clips" / "deep folder" / "clip.mp4"  # under the source's folder
-    unknown = (
-        "D:\\private owner\\secret\\leaked_name.mp4"
-        if sys.platform == "win32"
-        else "/home/private_owner/secret/leaked_name.mp4"
-    )
+def test_the_stderr_tail_goes_to_the_log_and_the_text_names_only_the_exception_type(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    """CHARC 55959e2f (d): the tail is logged verbatim; the text carries the type name only."""
+    caplog.set_level(logging.DEBUG)
     command = _child(
         tmp_path,
         """\
         sys.stderr.write("noise line\\n" * 50)
-        sys.stderr.write("could not open " + repr(ARGS[1]) + "\\n")
-        sys.stderr.write("also tried " + ARGS[1] + "\\n")
-        sys.stderr.write("and " + ARGS[2] + "\\n")
         raise FileNotFoundError(2, "No such file", ARGS[0])
         """,
-        str(known),
-        unknown,
-        # a sibling whose name begins with the known folder's: cut whole, never at the prefix
-        str(tmp_path / "my clips2" / "sibling.mp4"),
+        str(tmp_path / "Owner's hidden folder" / "clip.mp4"),
     )
     result, _ = _run(tmp_path, command)
-    failure = result.failure
-    assert failure is not None
-    assert failure.startswith("The export worker ended without a result (exit status 1).\n")
-    assert failure.isascii()
-    assert "FileNotFoundError" in failure
-    assert "clip.mp4" in failure and "leaked_name.mp4" in failure and "sibling.mp4" in failure
-    for folder_name in ("my clips", "deep folder", "private", "secret", tmp_path.name):
-        assert folder_name not in failure, folder_name
-    assert str(Path(sys.executable).parent) not in failure
+    assert result.failure == _ended(1) + "\nFileNotFoundError"
+    (logged,) = _tail_records(caplog)
+    assert logged.levelno == logging.WARNING
+    assert "Traceback (most recent call last)" in logged.getMessage()
+    assert repr(str(tmp_path / "Owner's hidden folder" / "clip.mp4")) in logged.getMessage()
 
 
-def test_a_folder_name_that_continues_a_known_folder_or_holds_an_apostrophe_is_cut(
-    tmp_path: Path,
+@pytest.mark.parametrize(
+    "last_line",
+    [
+        "something went wrong",
+        "C:\\Owner\\FooError: no",  # a path before the colon is not a type name
+        "Error",  # the pattern needs a name before the suffix
+        "a b Error: x",
+    ],
+)
+def test_a_last_line_that_is_no_exception_line_adds_nothing(tmp_path: Path, last_line: str) -> None:
+    command = _child(tmp_path, "sys.stderr.write(ARGS[0] + '\\n')\nsys.exit(1)\n", last_line)
+    result, _ = _run(tmp_path, command)
+    assert result.failure == _ended(1)
+
+
+def test_the_failure_text_contains_no_path_component_from_a_planted_hostile_folder_name(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
 ) -> None:
-    """R1 F5 (CHARC e15d408a): file names only, over folder names with spaces, apostrophes and
-    non-ASCII characters, past a known folder or in an unknown path."""
+    """R1 F5 and R2-2 under CHARC 55959e2f (d): their planted folder names, as controls.
+
+    The worker's stderr names them plain and as ``repr`` (spaces, apostrophes, a leading space,
+    non-ASCII) and ends with an exception line whose MESSAGE holds one: the failure text carries
+    none of them; the application log carries them all, verbatim.
+    """
+    caplog.set_level(logging.DEBUG)
     known = tmp_path / "my clips"  # the source's folder
     unknown_root = Path("D:\\owner home") if sys.platform == "win32" else Path("/home/owner_home")
     paths = [
-        f"{known} Archive{os.sep}hiddenA{os.sep}a.mp4",  # a longer name beginning with it
-        str(known / "Diver's hiddenB" / "b.mp4"),  # an apostrophe inside a name
-        str(known / "'Tis hiddenC" / "c.mp4"),  # an apostrophe that begins a name
-        str(unknown_root / "Owner's hiddenD" / "d.mp4"),  # the same in an unknown path
-        str(known / "Divers' hiddenE" / "e.mp4"),  # an apostrophe that ends a word
-        str(known / "Tauchg\u00e4nge hiddenF" / "f.mp4"),  # non-ASCII under a known folder
-        str(unknown_root / "Plong\u00e9e \u00e9t\u00e9 hiddenG" / "g.mp4"),  # and unknown
+        f"{known} Archive{os.sep}hiddenA{os.sep}a.mp4",  # F5: a name continuing a known folder
+        str(known / "Diver's hiddenB" / "b.mp4"),  # F5: an apostrophe inside a name
+        str(known / "'Tis hiddenC" / "c.mp4"),
+        str(unknown_root / "Owner's hiddenD" / "d.mp4"),
+        str(known / "Divers' hiddenE" / "e.mp4"),
+        str(known / "Tauchg\u00e4nge hiddenF" / "f.mp4"),  # non-ASCII (CHARC e15d408a)
+        str(unknown_root / "Plong\u00e9e \u00e9t\u00e9 hiddenG" / "g.mp4"),
+        str(unknown_root / " privateH" / "h.mp4"),  # R2-2: a leading space
+        str(unknown_root / "' privateI" / "i.mp4"),  # R2-2: an apostrophe, then a space
     ]
     command = _child(
         tmp_path,
@@ -495,23 +553,26 @@ def test_a_folder_name_that_continues_a_known_folder_or_holds_an_apostrophe_is_c
             for shown in (path, repr(path)):
                 sys.stderr.buffer.write(("could not open " + shown + "\\n").encode("utf-8"))
         sys.stderr.flush()
-        sys.exit(1)
+        raise OSError(2, "No such file", ARGS[-1])
         """,
         *paths,
     )
     result, _ = _run(tmp_path, command)
-    failure = result.failure
-    assert failure is not None and failure.isascii()
-    for name in ("a.mp4", "b.mp4", "c.mp4", "d.mp4", "e.mp4", "f.mp4", "g.mp4"):
-        assert failure.count(name) == 2, (name, failure)
-    for folder_name in (
-        *("Archive", "hidden", "Diver", "Tis", "Owner", "owner", "Tauchg", "Plong"),
-        *("\\xe4", "\\xe9", tmp_path.name),
+    assert result.failure == _ended(1) + "\nFileNotFoundError"
+    for planted in (
+        *("Archive", "hidden", "Diver", "Tis", "Owner", "owner", "Tauchg", "Plong", "private"),
+        *("my clips", tmp_path.name, ".mp4"),
     ):
-        assert folder_name not in failure, (folder_name, failure)
+        assert planted not in result.failure, planted
+    (logged,) = _tail_records(caplog)
+    assert str(known / "Tauchg\u00e4nge hiddenF" / "f.mp4") in logged.getMessage()  # verbatim
+    assert repr(paths[-1]) in logged.getMessage()
 
 
-def test_a_stderr_flood_neither_blocks_nor_overflows_the_failure(tmp_path: Path) -> None:
+def test_a_stderr_flood_neither_blocks_nor_overflows_the_log(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    caplog.set_level(logging.DEBUG)
     command = _child(
         tmp_path,
         """\
@@ -522,11 +583,11 @@ def test_a_stderr_flood_neither_blocks_nor_overflows_the_failure(tmp_path: Path)
         """,
     )
     result, _ = _run(tmp_path, command)
-    assert result.failure is not None
-    header, _, tail = result.failure.partition("\n")
-    assert header == "The export worker ended without a result (exit status 1)."
-    assert tail.endswith("the last line")
-    assert len(tail) <= STDERR_TAIL_BYTES
+    assert result.failure == _ended(1)
+    (logged,) = _tail_records(caplog)
+    tail = logged.getMessage().partition("\n")[2]
+    assert tail.endswith("the last line\n")
+    assert len(tail.encode()) <= STDERR_TAIL_BYTES
 
 
 def test_a_stderr_flood_before_a_result_does_not_block(tmp_path: Path) -> None:
@@ -542,16 +603,50 @@ def test_a_stderr_flood_before_a_result_does_not_block(tmp_path: Path) -> None:
     assert result.ok, result.failure
 
 
-def test_a_spawn_failure_is_a_failed_result_with_a_redacted_reason(tmp_path: Path) -> None:
-    missing = tmp_path / "no such folder" / "missing-interpreter"
+def test_a_spawn_failure_names_the_error_type_and_errno_only(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    """CHARC 3ed8335f: a planted hostile interpreter path leaves no component in the text."""
+    caplog.set_level(logging.DEBUG)
+    missing = tmp_path / "Owner's hidden folder" / " private" / "missing-interpreter"
     result, _ = _run(tmp_path, [str(missing)])
     assert result.ok is False
-    assert result.failure is not None
-    assert result.failure.startswith("The export worker could not be started: ")
-    assert result.failure.isascii()
-    assert "no such folder" not in result.failure
+    assert result.failure == (
+        "The export worker could not be started (FileNotFoundError, errno 2); "
+        "details are in the application log."
+    )
     assert result.device == "none"
     assert _scratch_folders(tmp_path) == []
+    logged = [r for r in caplog.records if r.name == WORKER_LOGGER]
+    assert len(logged) == 1 and logged[0].levelno == logging.WARNING
+    assert "FileNotFoundError" in logged[0].getMessage()  # the full OSError text
+
+
+def test_a_scratch_folder_that_cannot_be_made_names_the_error_type_only(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    """CHARC 3ed8335f: the same rule for the scratch folder's creation."""
+    caplog.set_level(logging.DEBUG)
+    hostile = tmp_path / "Owner's hidden folder" / " private"
+    hostile.mkdir(parents=True)
+    (hostile / "cache").write_text("a file where the cache folder should be")
+    jobs = ProcessExportJobs(
+        photo_exports=_PhotoJobs(),
+        cache_dir=hostile / "cache",
+        app_version="9.9.9",
+        command=_child(tmp_path, "result()\n"),
+    )
+    result = jobs.job(_request(tmp_path))(_Progress())
+    assert result.failure is not None
+    assert re.fullmatch(
+        r"The export worker could not be started \([A-Za-z]+Error(, errno \d+)?\); "
+        r"details are in the application log\.",
+        result.failure,
+    ), result.failure
+    for planted in ("Owner", "hidden", "private", "cache", tmp_path.name):
+        assert planted not in result.failure, planted
+    logged = [r for r in caplog.records if r.name == WORKER_LOGGER]
+    assert len(logged) == 1 and logged[0].levelno == logging.WARNING
 
 
 # --- strictness: ignored lines ---------------------------------------------------------------
@@ -686,7 +781,7 @@ def test_a_wrong_typed_result_is_ignored_and_the_job_ends_without_one(
     command = _child(tmp_path, 'raw(b\'{"result": \' + ARGS[0].encode() + b"}\\n")\n', body)
     result, _ = _run(tmp_path, command)
     assert result.ok is False
-    assert result.failure == "The export worker ended without a result (exit status 0)."
+    assert result.failure == _ended(0)
     assert any("ignored" in m for m in _messages(caplog, PROCESS_LOGGER))
 
 
@@ -699,7 +794,7 @@ def test_an_unterminated_last_line_is_ignored(tmp_path: Path) -> None:
         """,
     )
     result, _ = _run(tmp_path, command)
-    assert result.failure == "The export worker ended without a result (exit status 0)."
+    assert result.failure == _ended(0)
 
 
 def test_the_first_result_is_kept_and_a_second_one_ignored(
@@ -751,6 +846,74 @@ def test_a_result_after_the_cancel_does_not_restart_the_kill_grace(
     assert result.failure is CANCELLED  # the result is kept
     killed = [m for m in _messages(caplog, PROCESS_LOGGER) if "killed:" in m]
     assert killed == ["export worker killed: still running 1.0 s after its cancel"]
+
+
+def test_the_kill_deadline_counts_from_the_cancel_not_from_a_later_result(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, clock: _Clock
+) -> None:
+    """R2-5: on the controlled clock the kill falls at the cancel's deadline (no wall clock)."""
+    grace = 40.0
+    monkeypatch.setattr(export_process, "KILL_AFTER_CANCEL_S", grace)
+    command = _child(
+        tmp_path,
+        """\
+        send({"progress": [1, 100, "working"]})
+        sys.stdin.buffer.readline()  # the cancel line
+        time.sleep(0.5)  # several of the parent's passes go by before the result
+        result(ok=False, failure="cancelled")
+        time.sleep(30)
+        """,
+    )
+    cancel_at: list[float] = []
+    kill_at: list[float] = []
+
+    class _Recording(_Progress):
+        def cancelled(self) -> bool:
+            answer = super().cancelled()
+            if answer and not cancel_at:
+                cancel_at.append(clock.now)  # the pass's reading, taken just before
+            return answer
+
+    real_kill = subprocess.Popen.kill
+
+    def kill(process: subprocess.Popen[bytes]) -> None:
+        kill_at.append(clock.now)
+        real_kill(process)
+
+    monkeypatch.setattr(subprocess.Popen, "kill", kill)
+    result, _ = _run(tmp_path, command, _Recording(cancel_after=1))
+    assert result.failure is CANCELLED  # the result arrived inside the grace and is kept
+    (killed,) = kill_at
+    # the first pass at or past the cancel's deadline (the result's reading may add one);
+    # timed from the result instead, the kill would come several passes later
+    assert grace <= killed - cancel_at[0] <= grace + 1, (cancel_at, kill_at)
+
+
+def test_the_two_drains_after_a_kill_share_one_window(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, clock: _Clock
+) -> None:
+    """R2-1: with a grandchild holding both pipes, the stderr tail gets only what is left."""
+    monkeypatch.setattr(export_process, "KILL_AFTER_CANCEL_S", 3.0)
+    monkeypatch.setattr(export_process, "DRAIN_AFTER_EXIT_S", 4.0)
+    waits: list[float] = []
+    real_wait = export_process._Tail.wait
+
+    def wait(self: export_process._Tail, timeout: float) -> None:
+        waits.append(timeout)
+        real_wait(self, timeout)
+
+    monkeypatch.setattr(export_process._Tail, "wait", wait)
+    command = _child(
+        tmp_path,
+        """\
+        subprocess.Popen([sys.executable, "-c", "import time; time.sleep(3)"])  # inherits both
+        send({"progress": [1, 100, "working"]})
+        time.sleep(30)
+        """,
+    )
+    result, _ = _run(tmp_path, command, _Progress(cancel_after=1))
+    assert result.failure == "The export worker did not stop after cancel and was ended."
+    assert waits == [0.0]  # the stdout's quiet wait used the whole window
 
 
 def test_a_worker_that_never_reads_its_stdin_is_still_cancelled(
