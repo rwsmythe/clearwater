@@ -86,17 +86,21 @@ def test_the_runner_delivers_at_most_one_report_per_tick_and_the_latest(qtbot, m
     Holds, not a clock (B-6): the first poll waits until the job has made its first burst of
     :data:`MIN_REPORTS` reports, so that poll has a burst to coalesce; the job then waits until
     an observed poll has run before its second burst, so a poll delivers before the final
-    delivery however the host schedules either thread. The waits are hang ceilings only.
+    delivery however the host schedules either thread. The waits are hang ceilings only. The
+    count advances before its report, both under one lock a mark also takes, so a mark is the
+    exact count published (Reviewer B re-run, item 3).
     """
     events: list[tuple[str, int]] = []
     real_poll, real_finished = QtJobRunner._poll, QtJobRunner._on_finished
     produced = {"done": 0}
+    gate = threading.Lock()  # a count and its report, made together
     burst = threading.Event()  # the job's first burst is made
     polled = threading.Event()  # a poll has run since: the job may go on
 
     def poll(self: QtJobRunner) -> None:
         assert burst.wait(HANG_CEILING_S)
-        events.append(("tick", produced["done"]))
+        with gate:
+            events.append(("tick", produced["done"]))
         real_poll(self)
         polled.set()
 
@@ -108,17 +112,17 @@ def test_the_runner_delivers_at_most_one_report_per_tick_and_the_latest(qtbot, m
     monkeypatch.setattr(QtJobRunner, "_on_finished", finished)
     runner = QtJobRunner()
 
-    def job(progress: Progress) -> JobResult:
+    def reports(progress: Progress) -> None:
         for _ in range(MIN_REPORTS):
-            done = produced["done"] + 1
-            progress.report(done, None, "step")
-            produced["done"] = done  # after the report: a mark never counts one not yet made
+            with gate:
+                produced["done"] += 1  # before the report: a mark never lags one made
+                progress.report(produced["done"], None, "step")
+
+    def job(progress: Progress) -> JobResult:
+        reports(progress)
         burst.set()
         assert polled.wait(HANG_CEILING_S)
-        for _ in range(MIN_REPORTS):
-            done = produced["done"] + 1
-            progress.report(done, None, "step")
-            produced["done"] = done
+        reports(progress)
         return _ok()
 
     handle = runner.run(
