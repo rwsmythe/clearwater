@@ -271,6 +271,17 @@
   strips exactly one whole `MP4_DATA_CODEC_TAGS` line for encode.py only (count == 1 asserted), FORBIDDEN_TOKENS
   unchanged otherwise; three planted controls (extra token, missing line, doubled line) each raise; F5's 8 controls
   DIFFERENT. Re-gate (full parallel + the two serial nodes alone) RUNNING; merge on green.
+- **WP4.4 ACCEPTED main `1f3d237` 01:23Z (msg 544c4449; record `docs/proofs/wp4.4-accept.md`; A R1 converged 0/4/5;
+  B 0/3/5 stands; re-gate parallel 5,970 / 1 in 839 s + the two serial nodes 2 passed; IMG_6702 node of record 65.28
+  s). CHARC QA CONFIRMED (static, this seat 01:30Z):** code patch-id 752d4086 equal on `5e3537d..wp4.4` and
+  `916335e..1f3d237` (the orchestrator's 33f93664 excludes report + record only); 15 files all owned or granted;
+  interfaces / verify.py / pyproject / uv.lock untouched; 0 CR in every blob. **MY ACCEPT COMMIT (this commit's
+  sibling): DR-95 (verify.py positional pairing), DR-96 (gui_startup overrun race, second load flake), DR-97 (V4
+  record normalised values + unconditional translation note); CLAUDE.md WP4.4 sentence + the DV/HDR fact (IMG_6704 /
+  IMG_6772 HLG + DV RPU refused under 5.3, from code and inventory, not a real-file run).** DR-15 stays OPEN. Lane
+  share: WP4.4 Codex-built (2 seats, 7 turns), nets Claude; Codex-built packages now 8. Worktrees `wp4.4`, `wp4.4-mc`
+  releasable. **WP4.3 WINDOW 4 OPEN ~01:24Z (cell 10, chain fb943904, ~30-40 min): NO SUITE AT THIS SEAT until the
+  CLOSE post.** WP-DR87 dispatches after the CLOSE; then WP3.6P.
 - **(gen 7 history follows; newest facts at the end of the block)**
 - **GEN 7 PICKUP (was).** Orchestrator = **gen 22 `clearwater-orchestrator-20261029-0704`** (online 17:08Z from gen 21's
   state 736e403; gauge 38 ms; gen 21 was `clearwater-orchestrator-20261029-0425`, rolled 17:05Z at ~400K); ALL cues go there. Time the bash launch and record it here. Inbox: drain with `read --role charc --all`
