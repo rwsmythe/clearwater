@@ -238,6 +238,7 @@ appears in no computed set) and the import-time witness extension (DR-84).
 | R2 (Reviewer A, `038f02e..362a8b2`) | 0 / 3 / 6 | 9 in / 0 out | 8 new / 1 reopened (R2-9 = R1-12; the reviewer also tagged R2-1 as R1-3 and R2-3 as R1-5, adjudicated NEW: distinct paths, the R1 fixes hold) | 0 | R1 remediation (groups A-C): product + tests; R2 remediation (cell 5, groups A-C): product (startup, adapter, preview, render worker, main, settings_dialog under the 38a7c702 grant) + tests; R2-9 test-only | WSL, codex-cli 0.162.1, `gpt-6.1-sol` high | 316,716 at the Group C yield (cell 4, 156 turns; `scripts/cell_depth.py`); seat retired at 355,066 (cell 4 stood down after the R2 yield) |
 | R3 (Reviewer A, `038f02e..028bc4f`) | 0 / 2 / 3 | 5 in / 0 out | 3 new / 2 reopened (R3-3, R3-4 = R1-12; the reviewer also tagged R3-1 as R2-2 and R3-2 as R1-3, adjudicated NEW: distinct routes, the earlier fixes hold) | 0 | R3 remediation (cell 6, groups A-B): product (`app/startup.py`: R3-1 `13c96f7`, R3-2 `099893a`) + tests; R3-3, R3-4, R3-5 test-only (`065f5f0`, `a0f43cd`) + the report's V7 rows and DR-44 (c) sentence | WSL, codex-cli 0.162.1, `gpt-6.1-sol` high | 222,999 at the Group C yield (cell 5, 109 turns; `scripts/cell_depth.py`); R3 adjudicated in the same seat; seat retired at 271,612 (cell 5 yielded R3 there and stood down). CHARC `d6e9abdf`: R3-2 RECLASSIFIED MINOR (counts now 0 / 1 / 4) |
 | R4 (Reviewer A, `038f02e..5d8e0df`) | 0 / 0 / 2 | 2 in / 0 out | 1 new / 1 reopened (R4-1 = R3-5) | 0 | terminating-round cleanup (cell 6): test-only (R4-1 `a4b2d5a`, R4-2 `67a285a`) + the report's DR-44 (c) sentence and V8 paragraph | WSL, codex-cli 0.162.1, `gpt-6.1-sol` high (a websocket DNS failure before the model's first output: client-side, NOT disqualifying, the dispatcher's ruling, gen 22) | 110,453 at the Group A yield (cell 6, 45 turns), 172,926 at the Group B yield (88 turns; `scripts/cell_depth.py`, given by the dispatcher); R4 adjudicated in the same seat; 213,877 at the R4 yield (117 turns). CONVERGED: zero new blocking |
+| R5 (Reviewer A, `1d96dc4..28c4ece`: the V7 remediation step, cell 9) | 0 / 3 / 4 | 6 in / 2 out (R5-2, R5-4 out of the one-window envelope) (cell dispositions; proposed RECLASSIFY R5-2 and R5-3 to MINOR, pending ruling) | 7 new / 0 reopened | 0 | NONE yet (blocking verdict: no change in the verdict turn); proposed: R5-1..R5-4 product (`app/main.py`), R5-5/R5-6 test-only, R5-7 docs-only | WSL, codex-cli, `gpt-6.1-sol` high, 85,061 tokens, clean | (dispatcher) |
 
 ## CHARC round-0 ruling (`fcb2a9205c060013`, 2026-10-29 12:54:46Z, verbatim; it GOVERNS the STOP items above)
 
@@ -1246,3 +1247,109 @@ workers) stretches to 30-55 ms; at job boundaries `plan_cache.clear` + a gen-2 g
 holds the GIL. The perturbation (48 gaps here against 2 in window 2) means the figures are not
 comparable with (c) 182.0 ms and (e) 196.0 ms of record; the mechanism, not the size, is the
 evidence.
+
+## Cell 9 (implementer-opus-high, 2026-10-29/30): the V7 remediation step, the (f) probe move, window 4 preparation, R5
+
+Dispatch: orchestrator gen 25, `prompt-wp4.3-cell9.md`. Governing ruling: CHARC `7b32521f060044d9`
+(2026-10-29 23:35:47Z; verbatim in the dispatch): query 1 (a) ONE bounded remediation step,
+RED-first, then (c) and (e) re-runs of record in window 4 at the default 5 ms and at 1 ms switch
+interval; query 2 (ii) the 16-frame V8 characterisation at k = 2. **GRANT (item 1, msg
+`7b32521f060044d9`): `src/clearwater/gui/jobs.py` (`_flush` rate) and
+`src/clearwater/gui/export_panel.py` (`_progress` cost only), tests in WP4.3's own test files or
+the panels' existing test files for new cases only. NOT USED: neither file changed (below).**
+Ruling B (`b9a0ce010581a296`) consequence 2 (the (f) probe move). Head at start `1d96dc4`, clean.
+
+### The step (commits, each RED alone and shown failing at its parent)
+
+| Pair | RED | What it plants | At the parent | GREEN | After |
+|---|---|---|---|---|---|
+| item 1 | `6c06e54` | `tests/test_app_interface_load.py`: a counting profiler (`sys.setprofile`, Python `call` events) around a status-bar `window.repaint(rect)` and `QCoreApplication.sendEvent` of UpdateRequest, LayoutRequest and a `QTimerEvent` to the window | 5 `_CloseWatch.eventFilter` entries (+ the enum conversion's Python): FAIL | `6dd9f19`: `AppWindow(MainWindow)` notes the close in `closeEvent` before the shell's shutdown; `_CloseWatch` gone; the start-up order test spies on `AppWindow` | 0 Python calls: PASS |
+| item 1 pin | (same commit) | `test_the_runner_delivers_at_most_one_report_per_tick_and_the_latest` | PASS (the rule already held at `1d96dc4`: a pin, NOT a RED) | none (`gui/jobs.py` unchanged) | PASS |
+| item 3 | `4639bd8` (an amend of `1c21702`, mine, unshared: the first form planted before start-up's end and the GREEN's first idle check froze the load) | after a 2.5 s settle, a job's end allocates max(300,000, tracked objects) small lists kept alive; `gc.callbacks` records the thread of each generation-2 start; and the policy test (freeze above the interpreter's own 377 after start-up, third threshold raised, both undone at close) | 3 full collections on `clearwater-job`: FAIL; no freeze: FAIL | `3e2db4d` (+ `2124390`, a docstring rewrap: `3e2db4d` was committed with an E501 the chained check printed; my slip, fixed in the next commit): `FullCollections` (below) | none on the job's thread before `on_done`, one on the main thread at an idle check: PASS |
+| (f) | `838b665` | `test_v7_f_a_planted_pre_show_build_cost_is_not_counted` (0.4 s in `install_settings_dialog`, before `show()`); `test_v7_f_a_planted_post_show_stall_still_fails` (0.4 s at `Application.start_jobs`, after `show()`, asserted >= 390 ms) | pre-show 459.0 ms: FAIL; post-show 446.0 ms: PASS | `28c4ece`: `measured()` takes a caller-started probe; `scenario_f_start_up` starts it in a wrapped `MainWindow.show` (restored, or deleted when inherited); signature unchanged | pre-show 27.0 ms PASS; post-show 415.0 ms PASS; the slow-cache-open gate form 18.0 ms |
+
+Item 1's RED was first committed with a synthetic `QPaintEvent` sent to the window; QMainWindow
+painted outside the paint system and pytest-qt's Python message handler counted 312 calls on the
+GREEN too, so the RED commit was amended (`6c06e54`) to a real `window.repaint(rect)` over the
+status bar, re-shown failing at `1d96dc4` (main.py from `1d96dc4` restored into the tree for the
+run, the GREEN copy put back after; no stash).
+
+Why `gui/jobs.py` and `gui/export_panel.py` did not change (item 1's grant was permission): the
+runner already delivers at most one report per job per 50 ms tick, the latest, the last before
+`on_done` (pinned). Host probes (development, scratch, NOT of record): PySide6 setters do not
+release the GIL (a `setValue` cost 0.5 ms with or without two Python spinner threads) and Qt
+returns early on unchanged values, so `_progress` skipping unchanged calls saves nothing; the
+cost per report was the Python event filter entered by each paint / update / layout event the
+setters cause (a bare window: 27 ms per report without a filter, 57-68 ms with one, under two
+spinners). On the REAL window (`build_application`, `ExportPanel._progress` + `processEvents`,
+alternating the export's and the analysis's messages, two spinners, 120 reports): `1d96dc4`'s
+`main.py` median 101.3 ms / max 264.0 ms per report; `6dd9f19` median 31.2 ms / max 111.4 ms
+(the remaining one GIL re-acquisition per Python entry is item 2's subject).
+
+Item 3's form (`FullCollections`, `app/main.py`, owned by `AppWindow`, started at the end of
+`build_application`, stopped in `closeEvent` after the shutdown): CPython's automatic generation-2
+collection off while started (third threshold 2**31 - 1; generations 0 and 1 automatic); a 1 s
+`QTimer`: the first idle tick freezes (`gc.freeze`, no collection first), later idle ticks
+collect past the process's own third threshold, busy ticks past 10x it; the last stop restores the
+thresholds and unfreezes. `core/` and `release_fft_plans` untouched: the app-layer form keeps the
+collection off the job's thread (no STOP needed). Host figures: a full collection over 2M objects
+74.6 ms, 0.003 ms after a freeze; the freeze 8.0 ms. `gc.freeze()` resets the collection counts
+(observed: (6, 0, 43) -> (1, 0, 0)).
+
+Targeted tests at `28c4ece` (offscreen, shared host): `tests/test_app_*.py` (every marker, the V7
+gate forms included) + `tests/test_gui_threads.py` + `tests/test_gui_export_panel.py`: **201
+passed, 1 skipped** (`tests/test_app_v8_v18.py:133`, the look-check frame absent: pre-existing) in
+198.8 s. `uv run ruff check .` exit 0; `uv run ruff format --check .` 285 files formatted; `uv run
+mypy` (strict) no issues in 146 files. Every committed blob LF, 0 CR, 0 NUL.
+
+### Window 4 preparation (no window; files in `C:/Users/rwsmy/clearwater-review-evidence/wp4.3/windows/`, uncommitted, LF, 0 NUL)
+
+| File | md5 | What |
+|---|---|---|
+| `s7_driver.py` | `0b9ee6cc3ebd2cf07c35dec934cfd901` | UNCHANGED, the driver of record |
+| `s7_switch.py` | `bd19cbbae614bc3a067d798dc5d23c59` | item 2 toggle: `sys.setswitchinterval(<ms>/1000)` first, checks the driver's md5, then `runpy.run_path(s7_driver.py, run_name="__main__")`; its one addition prints the export wall time at the Export panel's result (`JobResult.elapsed_s` and trigger-to-result); both 5 ms and 1 ms runs use it |
+| `s7_v8char.py` | `60ab95a2a69355f8ccd134f2d64a0348` | query 2 (ii): imports `s7_driver` unchanged; `run_v8v18`'s per-frame steps at 16 frames `int((i + 0.5) * n / 16)`, mean / p99 / p99.9 / max and the shown-vs-harness-preview max diff each, a TABLE and a SUMMARY; no bound asserted; exit 0 on completion |
+| `window4-commands.sh` | `b2ec4f483949ea60e93849c34705f5e3` | the chain: v7c 5 ms, v7c 1 ms, v7e 5 ms, v7e 1 ms (`s7_switch.py`, work folders `sw5/` and `sw1/`), then `s7_v8char.py`; every run independent, every exit recorded; disk and RAM before and after, driver md5s, HEAD; `dry` = the same on the fixture into `work/wp4.3-c9/dry-chain/` |
+
+Dry run (fixture, NOT of record, 2026-10-30 00:11:18Z-00:12:09Z, 51 s; logs copied to
+`windows/dry4/`, md5s in `md5sums.txt`): v7c-sw5 0 (longest 12.0 ms, p99 11.0, export job 3.1 s),
+v7c-sw1 0 (13.0 / 11.0, 3.0 s), v7e-sw5 0 (18.0 / 12.2, witness k1 1, 3.8 s), v7e-sw1 0 (19.0 /
+13.1, witness 1, 3.9 s), v8char 0 (45 frames, 16 rows, p99 about 10/255 on every row: the fixture
+is outside AD-11's domain as in every earlier dry run; shown-vs-preview max diff 0 on all 16).
+Each run printed `switch interval 5.000 / 1.000 ms` and the driver md5 `0b9ee6cc...`. Footage folder
+unchanged (128 files), product logs naming it 0, a grep of every dry output for the footage folder
+0 hits. C: 177 GB free before and after; RAM available 8.67 of 33.52 GB.
+
+### Reviewer A round 5 (`1d96dc4..28c4ece` minus `docs/proofs`; R4's form)
+
+Runner `r5/run_review.sh` (R4's, unchanged), prompt `r5/review-prompt.md`, diff
+`r5/review-diff.txt`, transcript `r5/review.stderr.txt`, verdict `r5/review.txt`, adjudication
+`r5/adjudication.md`, md5s `r5/md5sums.txt` (all under
+`C:/Users/rwsmy/clearwater-review-evidence/wp4.3/r5/`). Codex `gpt-6.1-sol` / high, WSL, 85,061
+tokens, exit 0 at 00:25:06Z, no transport error, every search excluded `docs/proofs/**`.
+**VERDICT: NEW_CRITICAL_MAJOR_FOUND (0 / 3 / 4).** Dispositions (cell; for the ruling):
+
+- R5-1 MAJOR CONFIRMED, blocking: the busy-time `gc.collect()` (`main.py:147-149`) runs on the
+  interface thread for as long as the unfrozen heap takes (reviewer's synthetic 8M objects 163.6
+  ms; and before start-up's first idle moment it scans the whole heap). Proposed: drop the busy
+  collection, collect only at idle (the ruling's own option); measure the memory cost in window 4.
+- R5-2 MAJOR CONFIRMED as a defect, proposed RECLASSIFY MINOR: one window's idle freezes another
+  window's working heap; OUT of envelope (the program builds one window); fix cheaply (idle = no
+  started window has an active job).
+- R5-3 MAJOR, first half CONFIRMED (the policy starts after `start_jobs()`'s workers), second half
+  NOT REACHABLE (no event is processed between the two calls); proposed RECLASSIFY MINOR; fix:
+  start before `start_jobs()`, and guard `start()` with `close_seen`.
+- R5-4 MINOR CONFIRMED (`_frozen` not reset on restart; not reachable in the program).
+- R5-5, R5-6 MINOR CONFIRMED, test-only (the runner pin asserts an average; a descheduled worker
+  can starve its 1 s budget).
+- R5-7 MINOR CONFIRMED, docs-only (`AppWindow.__init__` without Args).
+
+Per the dispatch, NO change was made after the verdict; the cell yields `R5 VERDICT:`.
+
+### Notes for the record
+
+- The window driver's `v7f` / `v7f-settled` modes still import `scenario_f_start_up` (signature
+  unchanged), but with the probe now starting at `show()` their "the committed probe, from before
+  the build" result line and their "before show()" figure (about 0 ms by construction) are stale
+  labels. Neither mode is in window 4.
+- Disk at the R5 yield: C: 166 GB free (another lane's use since the dry run's 177 GB).
