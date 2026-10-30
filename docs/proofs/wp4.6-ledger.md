@@ -11,7 +11,8 @@ Brief `docs/briefs/wp4.6-brief.md` FINAL on CHARC `39dad78f5b10ceeb`; base `b6a3
 | Y1 (build) | 2026-10-30 | (no review: tasks 3-4, cell 2) | - | - | - | - | - | - | - | 171,586 (cell 2 at Y1, 05:08Z) |
 | Y2a (build) | 2026-10-30 | (no review: tasks 5-6, cell 2) | - | - | - | - | - | - | - | 228,358 (cell 2 at Y2a); retired at 230,050 (05:21Z) |
 | Y2b (build) | 2026-10-30 | (no review: task 7 and 8, cell 3) | - | - | - | - | - | - | - | 142,340 (cell 3 at Y2b, 05:33Z) |
-| R1 | 2026-10-30 | WSL, codex-cli 0.162.1, gpt-6.1-sol / high; HEAD `7a20c7bd` | 0 | 8 reported: 5 confirmed blocking (F1 F2 F3 F5 F6), 2 banked pre-existing (F4 F8), 1 reclassified minor (F7) | 6 reported (+F7) | 5 blocking in / 2 minor out (F9 F10) | 14 NEW / 0 REOPENED | 0 | (remediation not started) | (dispatcher fills: cell 3 at R1) |
+| R1 | 2026-10-30 | WSL, codex-cli 0.162.1, gpt-6.1-sol / high; HEAD `7a20c7bd` | 0 | 8 reported: 5 confirmed blocking (F1 F2 F3 F5 F6), 2 banked pre-existing (F4 F8), 1 reclassified minor (F7) | 6 reported (+F7) | 5 blocking in / 2 minor out (F9 F10) | 14 NEW / 0 REOPENED | 0 | product 8 (F1 F2 F3 F5 F6 F7 F9 F10) / test-only 4 (F11-F14), by cell 4 | 224,076 (cell 3 at the R1 yield); retired at 231,402 (05:57Z) |
+| R1 remediation | 2026-10-30 | (no review: cell 4 fixes, HEAD `c80061d1`) | - | - | - | - | - | 0 | product 8 / test-only 4 | (dispatcher fills: cell 4 at the remediation) |
 
 ## Round 0 (task 2): the design restated, the Questions, the stops
 
@@ -606,4 +607,94 @@ Seat run (the orchestrator, on `7a20c7bd`, 05:33:33Z, offscreen): `tests/test_ap
 147.77s`, exit 0 (`clearwater-review-evidence\wp4.6\seat-y2b-app.log`). The Y2b list of
 untouched video-export app tests is green; nothing joins the remediation from it.
 
-Remediation is NOT started (the dispatcher's order: yield first).
+Remediation: cell 4, the next section.
+
+## R1 remediation (cell 4, implementer-opus-high)
+
+Dispatch `prompt-wp4.6-cell4.md` (orchestrator gen 27). Base `bab063a5`; no rebase. Orchestrator
+rulings applied: F2, F3 and F6 IN envelope (design item 4's strict-ignore rule names wrong types
+and unknown keys); remediate F1 F2 F3 F5 F6 F7 F9 F10 F11-F14 as cell 3's plan names them; F4
+and F8 BANKED (no fix; `jobs/export.py` not owned), their Limit text below.
+
+### Commits (each blocking fix: its RED test first, then the fix)
+
+| Finding | RED commit and its failure line | Fix commit |
+|---|---|---|
+| F1 | `0dccdc61` `test_a_result_after_the_cancel_does_not_restart_the_kill_grace`: `'export worker killed: still running 1.0 s after its result' != '... after its cancel'` | `e900cb1c` the grace runs from the EARLIER trigger (the cancel line when one was sent, else the result); the kill log names that trigger |
+| F3 | `1046a21d` `test_an_invalid_line_is_ignored_and_logged[elapsed_s-overflow]`: `AssertionError: ('an elapsed_s too large for a float (R1 F3)', 'The export worker ended without a result (exit status 0).')` | `775b0111` `float(elapsed)`'s `OverflowError` is an invalid line ("a non-finite number") |
+| F2 | `49e6f971` two failures: the list-level case of `test_an_invalid_line_is_ignored_and_logged` and `test_any_error_decoding_one_line_ignores_that_line_only`, both `The export worker ended without a result (exit status 0).` | `3144d567` the level is type-checked before the lookup; `_read_lines` turns ANY exception from one line's decode into `("invalid", "a line that could not be decoded (<type>)")` |
+| F6 | `5325f866` `test_an_unknown_key_is_logged_without_the_key`: `"export worker line ignored: an unknown key 'C:\\\\Owner\\\\Private\\\\GPS'" != 'export worker line ignored: an unknown key'` | `a1d8d538` the reason is "an unknown key", nothing more |
+| F5 | `549c9854` `test_a_folder_name_that_continues_a_known_folder_or_holds_an_apostrophe_is_cut`: `AssertionError: ('Archive', '... could not open my clips Archive\\hiddenA\\a.mp4 ...')` | `89d16c3b` a known folder followed by more name text up to a separator is cut with it; an apostrophe is part of a name when a word character follows it or when the text after it reaches a separator before any quote; a segment may begin with `'` before a word character |
+| F7, F9 | (minor) | `9bf3dff0` the cancel re-checked after the first job's sweep (nothing spawned); the drain warning says "no longer waited for" |
+| F10 | (minor) | `403fa1bf` `type(format_version) is not int` refused; the malformed-request test gains "format_version 1.0" |
+| F7 test, F11-F14 | (test-only) | `c80061d1` see below |
+
+Product vs test-only: product code changed for F1 F2 F3 F5 F6 F7 F9 F10 (8); tests only for
+F11 F12 F13 F14 (4). Reverts: 0.
+
+### Choices and deviations (stated, for review)
+
+- **F5, one case beyond the RED.** My own check of the fix found a third apostrophe shape that
+  leaked: a possessive at a word's end (`Divers' gear\z.mp4` kept `Divers' gear`). The rule
+  above covers it; the case (`Divers' hiddenE`) joined the F5 test in the fix commit, so it has
+  no RED commit of its own (by reading, the pre-fix segment stops at the apostrophe exactly as
+  for `Diver's`; not run separately on `549c9854`).
+- **F5, over-redaction accepted.** A known folder followed by prose that reaches a later
+  separator is cut through it: `C:\Photos\Dive is not writable: C:\other\x.mp4` becomes
+  `x.mp4`. No name leaks; diagnostic words can be lost. `C:\Photos\Dive is not writable` (no
+  later separator) keeps its words (`Dive is not writable`). Quoted paths (tracebacks, OSError
+  texts, list reprs) are bounded by their quotes and come out as `'a.mp4' -> 'b.mp4'`.
+- **F13, the reader retries instead of an atomic replace.** `os.replace` onto `beat` fails on
+  Windows while the test holds the file open (no delete sharing), which would end the
+  grandchild. The grandchild keeps `write_text`; the test reads through `_read_beat`, which
+  retries an empty read (write_text's truncation) up to 200 x 5 ms. The F12 test reads its beat
+  the same way.
+- **F11:** the never-reading test's progress answers `cancelled()` True from its 5th call (the
+  1st and 2nd are `_run`'s checks before the spawn, the rest the conversation's polls); the
+  `threading.Timer` is gone.
+- **F14:** the three `< 10` s bounds are removed (the third went with F11's rewrite). The
+  `0.0 < result.elapsed_s <= wall` relation at the result test is kept: it compares the job's
+  figure with its own enclosing measure, not with a fixed bound.
+- **F1's test** sets `KILL_AFTER_CANCEL_S` to 1.0 (not `quick_kill`'s 0.3) so the result line
+  surely lands inside the grace; its witness is the kill log's trigger word, no wall clock.
+
+### Limits for the report (banked findings)
+
+- **F4 (banked pre-existing).** A failure or log text the worker relays from the export engine
+  can carry the full path of the file an `OSError` names: the text is the engine's own
+  (`ExportEngine._describe`, `jobs/export.py:678-685`, introduced by `bda46fc6`, WP3.14), shown
+  and logged in-process before WP4.6 exactly as it is now relayed. The parent adds no path and
+  passes such a text unchanged; only the worker's stderr tail and the parent's own start and
+  encode texts are cut to file names. A register candidate (the engine's OSError texts carry
+  the path); `jobs/export.py` is not WP4.6's.
+- **F8 (banked pre-existing, widened; with CHARC).** The worker's scratch cache is not checked
+  against its own volume: the engine's D87 re-check charges the analysis cache's growth to the
+  OUTPUT folder's volume (`jobs/export.py:916`, introduced by `0daab17f`, WP3.21). Before WP4.6
+  only a cold batch video item met this; now every video export's analysis is cold (the
+  worker's per-job scratch), so an export whose cache folder and output folder are on different
+  volumes can fill the cache volume without D87's refusal. Design item 7's sentence "now
+  against the scratch folder's volume" does not hold. Recommendation (b) put to CHARC: a DR
+  row and this Limit.
+
+### Targeted runs (worktree, CPU only; no full suite, footage, GPU, fullclip or window)
+
+- `tests/test_jobs_export_process.py` alone, three runs: `59 passed` in 12.03 s, 11.51 s,
+  11.54 s; once with `-n 4`: `59 passed in 5.58s`.
+- `tests/test_jobs_export_process.py tests/test_app_export_worker.py tests/test_app_deps.py
+  tests/test_io_video_spawn.py` (the Y1/Y2a files plus the deps and spawn pins; the worker file
+  is `slow`, CPU fixture): `349 passed in 56.67s`, exit 0.
+- `uv run ruff check .`: All checks passed. `uv run ruff format --check .`: 292 files already
+  formatted. `uv run mypy`: Success, no issues found in 148 source files.
+- Committed blobs carry no CR (`tr -cd '\r' | wc -c` = 0 on the four touched files).
+
+### Verification loop (R1 remediation)
+
+| Pass | Suspected | Confirmed | Rejected | Fixed |
+|---|---|---|---|---|
+| 1 (the fixes) | F5: a possessive apostrophe before a space still leaks | yes (ad-hoc probe: `Divers' gear\z.mp4` kept the folder) | - | `89d16c3b` (rule widened, case added) |
+| 1 | F13 by `os.replace`: Windows replace onto an open file | yes by reading (no FILE_SHARE_DELETE on Python's open) | - | reader-side retry instead |
+| 1 | F5 regex: catastrophic backtracking | - | rejected: the name-char alternatives are disjoint and the folder pattern's only trailing constraint is a one-character lookahead; the tail is at most 4096 bytes | - |
+| 1 | F5 commit left the pattern unformatted | yes (`ruff format --check`) | - | formatted in `9bf3dff0` |
+| 2 (the whole product diff `bab063a5..HEAD -- src/`) | nothing new | - | - | - |
+
+Depth: (dispatcher fills: cell 4 at the remediation yield).
