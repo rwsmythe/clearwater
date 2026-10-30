@@ -1756,3 +1756,36 @@ the table's (d) gate form 34.0 ms and was replaced by the window figure. CHARC's
 (`424f573b` Q1) named a MINOR register row for R6-1 (the gc policy's residual) at the accept; the
 policy is reverted, so the report names no such row. The "Collection diff against `038f02e`"
 section is unchanged (the base is now `5e3537d`).
+
+## Cell 12 (implementer-opus-high, 2026-10-30): Reviewer B's cleanup
+
+Dispatch: orchestrator gen 26, `prompt-wp4.3-cell12.md`; governing ruling CHARC `775d01481eb159b5`
+(2026-10-30T02:41:33Z) on Reviewer B's 1 major / 10 minor / 4 advisory over `d9a29c9` (transcript
+`clearwater-review-evidence/wp4.3/reviewB/review-B.txt`). Worktree `.worktrees/wp4.3-mc`, head at
+start `b64e0c1`, clean. No suite, window, GPU or footage run; scratch `work/wp4.3-c12/`. Depth:
+the dispatcher's figure at the yield.
+
+| Item | Commit(s) | Kind | RED / plant shown | Run |
+|---|---|---|---|---|
+| B-7 | `6b39622` RED, `8b9b431` GREEN | product, `app/startup.py` only (the RED in `tests/test_app_leftovers.py`) | RED at the parent: `test_an_output_folder_that_cannot_be_listed_is_logged_once[unlistable]` `assert 0 == 1` (no warning), `[missing]` green; "1 failed, 1 passed" | GREEN: leftovers non-gui "21 passed, 3 deselected" |
+| B-3 | `3345d57` | test-only | scratch probe over the new `k1_mismatch` and the parent's rule: planted 0 -> 255 inside `near`: old rejects False, new rejects True; one step inside `near` accepted by both; one step outside rejected by both | v8v18 file "6 passed, 1 skipped" |
+| B-10 | `9810bfb` | comment | none (text) | ruff |
+| B-4 | `7c81085` | test-only, TAKEN as a fix (one design) | the hold moved inside the engine's frame iteration (DR-44 (c)'s form: the decode holds after its first frame); the witness asserts mid-decode and phase running while the corrected frame shows with statistics None. No plant (the faulty preview-after-analysis form needs a product change) | V18 alone x3: 3.53 / 3.62 / 3.74 s call, "1 passed" each |
+| B-9 | `0dc2381` | docstring | sentence deleted | ruff |
+| B-15 | `2645611` | test-only | none (restore of `sys.getprofile()`'s prior) | event test "1 passed" |
+| B-5 | `c9ac6ad` | test-only | scratch probe: the parent's checker accepts B's `1, 2, 20000` (PASS = the gap); committed `test_the_runner_pin_rejects_stale_deliveries_at_a_poll` raises on the same sequence with produced counts | interface-load "4 passed" |
+| B-6 | `d98465d` | test-only (one design) | the first poll waits for the job's first burst of `MIN_REPORTS`; the job waits for an observed poll before its second burst; 60 s hang ceiling, no deadline. Scratch plants (`work/wp4.3-c12/test_plant_b5b6.py`): a stale FIFO runner and a two-deliveries-per-mark runner both raise | interface-load x3: "4 passed" each; the pin 0.07 / 0.08 / 0.07 s call (was over 1 s) |
+| B-11 | `d46a4a6` | docstring | none | ruff |
+| B-12 | `7e288b1` | test rename + docstring | renamed to `test_start_up_and_close_write_only_config_and_cache_inside_app_data` (a new file on the base, so no collection-diff row) | "1 passed" |
+| report | `ecdd11f` | docs | Limits B-8 (CHARC's wording verbatim), B-2, B-13; the Reviewer B section; the STATUS line's last sentence | - |
+
+Light runs on `ecdd11f` (offscreen, all markers of each touched file): leftovers "24 passed";
+v8v18 "6 passed, 1 skipped" (the skip: `test_v8_photo_k_above_1_on_real_sized_content`, "the
+look-check frame is absent", since `work/wp1.3` was archived to D: on 2026-10-29; not this
+cell's); interface_load "4 passed"; settings_dialog "95 passed"; startup "10 passed".
+`uv run ruff check .` "All checks passed!"; `uv run ruff format --check .` "287 files already
+formatted"; `uv run mypy` "Success: no issues found in 146 source files". Every touched blob LF,
+0 CR, 0 NUL.
+
+Not done, by the ruling: B-1 (rejected), B-8 (declined, a Limit), B-2 / B-14 (CHARC's register
+rows at the accept), B-13 (a Limit). B-14 has no Limit line (the ruling names none).
