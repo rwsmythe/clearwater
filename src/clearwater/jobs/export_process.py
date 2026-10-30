@@ -439,7 +439,7 @@ def _converse(
             if quiet_since is None or kind is not None:
                 quiet_since = now
             elif now - quiet_since >= DRAIN_AFTER_EXIT_S:
-                _LOG.warning("export worker output still open after its exit; no longer read")
+                _LOG.warning("export worker output still open after its exit; no longer waited for")
                 break
     except BaseException:
         process.kill()
