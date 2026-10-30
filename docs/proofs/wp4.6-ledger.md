@@ -876,3 +876,51 @@ afterwards. Verdict `NEW_CRITICAL_MAJOR_FOUND`.
 Counts: reported critical 0, major 2, minor 3. NEW in-envelope blocking 1 (R3-1, protocol class:
 the terminating clean-up). REOPENED 2 (R3-2 of F7; R3-3 of F9). NEW minor 2 (R3-4, R3-5).
 Rejected 0. The clean-up is NOT started (the dispatch: yield with `R3 ADJUDICATED:` first).
+
+## RESUME HERE (successor of cell 4)
+
+Written by cell 4 at the orchestrator's rollover order. Worktree `.worktrees/wp4.6`, branch
+`wp4.6`, head before this section `305355a6`; status clean apart from this commit.
+
+Rulings, latest wins: (1) CHARC `e15d408ac31ce62b` < (2) `55959e2ffd95df7f` (design change (d))
+< (3) `3ed8335fe96a8e2c` (spawn text). ALL APPLIED:
+- F1 (one deadline from the earlier of cancel and result), F2, F3, F5, F6 (the length and first
+  8 characters form, `bf1035dc`), F7, F11-F14: done.
+- F9 and F10: reverted under (1) (`bf1035dc`, `c328be95`), RESTORED under (2) (`4b54beca`); no
+  Limit text for them.
+- (d): the stderr tail goes to the log only; the failure text is the fixed sentence plus at most
+  the exception type name; the redaction helpers DELETED; R2-2 and R2-3 closed by removal; F5's
+  test is the planted-hostile-folder-name absence test (`5b7e04ed` RED, `3bc6ffff` fix).
+- (3): spawn, scratch-folder and (cell's choice) encode failures give the type name and errno,
+  with the full text logged (`3bc6ffff`); a hostile interpreter path absence test.
+- R2-1 shared drain window, R2-4 type name only, R2-5 controlled-clock test: done (`3bc6ffff`).
+- F4 and F8: banked Limits (texts in the R1 remediation section); CHARC writes the rows.
+
+Last targeted run (at `3bc6ffff`): `tests/test_jobs_export_process.py tests/test_app_export_worker.py
+tests/test_app_deps.py tests/test_io_video_spawn.py`: `356 passed in 59.91s`, exit 0; ruff, format
+and mypy clean.
+
+R3 (the LAST full round) WAS RUN AND ADJUDICATED (section above; evidence `r3\`): R3-1 MAJOR
+protocol class (thread starts outside the cleanup `try`) -> the terminating clean-up by the cap;
+R3-2 REOPENED F7 (MINOR as at R1; the dispatcher's routing call is PENDING: CHARC if taken as new);
+R3-3 REOPENED F9, out of envelope (a Limit sentence); R3-4 test-only; R3-5 out of envelope.
+
+NEXT EXACT STEP (the terminating clean-up; no R4), once the dispatcher answers R3-2's routing:
+1. R3-1 RED: in `tests/test_jobs_export_process.py`, make `threading.Thread.start` raise on the
+   second `export-worker-*` thread (see `r3\probe_r3.py`), record the Popen, assert the job
+   re-raises AND the worker is reaped (`poll()` not None) and its stdin closed. Commit RED, then
+   move the three thread starts in `_converse` inside the `try` (the `BaseException` path kills,
+   reaps and closes the stdin). Commit.
+2. R3-4: freeze the `_Clock` from the cancel until a wrapper on `_decode_line` sees a result,
+   then jump 10 readings; keep the bound `grace <= kill - cancel <= grace + 1`.
+3. R3-5: `app/export_worker.py` `decode_request` treats `OverflowError` like `ValueError`
+   (exit 2, one stderr line); add the `created="0001-01-01T00:00:00+01:00"` case to the
+   malformed-request test.
+4. R3-2 (unless routed to CHARC): the sweep's docstring "bounded" corrected; a cancel check
+   between entries (needs `progress` passed to `_sweep_once`).
+5. R3-3: a Limit sentence in this ledger (reader threads and handles live until a pipe-holding
+   descendant exits; no product spawn makes one).
+6. Targeted runs (the four files above), ruff / format / mypy, the clean-up ledger entry, yield
+   `R3 CLEAN-UP DONE`.
+
+Depth cells still for the dispatcher: "R2 remediation" and "R3" rows.
