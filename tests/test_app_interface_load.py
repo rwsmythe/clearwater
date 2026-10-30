@@ -88,7 +88,8 @@ def test_the_runner_delivers_at_most_one_report_per_tick_and_the_latest(qtbot, m
     an observed poll has run before its second burst, so a poll delivers before the final
     delivery however the host schedules either thread. The waits are hang ceilings only. The
     count advances before its report, both under one lock a mark also takes, so a mark is the
-    exact count published (Reviewer B re-run, item 3).
+    exact count published (Reviewer B re-run, item 3). A failure anywhere releases both holds
+    and closes the runner at once (item 4).
     """
     events: list[tuple[str, int]] = []
     real_poll, real_finished = QtJobRunner._poll, QtJobRunner._on_finished
@@ -101,8 +102,10 @@ def test_the_runner_delivers_at_most_one_report_per_tick_and_the_latest(qtbot, m
         assert burst.wait(HANG_CEILING_S)
         with gate:
             events.append(("tick", produced["done"]))
-        real_poll(self)
-        polled.set()
+        try:
+            real_poll(self)
+        finally:
+            polled.set()
 
     def finished(self: QtJobRunner, handle: object, result: object) -> None:
         events.append(("end", produced["done"]))
@@ -119,18 +122,25 @@ def test_the_runner_delivers_at_most_one_report_per_tick_and_the_latest(qtbot, m
                 progress.report(produced["done"], None, "step")
 
     def job(progress: Progress) -> JobResult:
-        reports(progress)
-        burst.set()
+        try:
+            reports(progress)
+        finally:
+            burst.set()
         assert polled.wait(HANG_CEILING_S)
         reports(progress)
         return _ok()
 
-    handle = runner.run(
-        job,
-        on_done=lambda _r: events.append(("done", 0)),
-        on_progress=lambda d, _t, _m: events.append(("report", d)),
-    )
-    qtbot.waitUntil(lambda: not handle.is_running(), timeout=HANG_CEILING_S * 1000)
+    try:
+        handle = runner.run(
+            job,
+            on_done=lambda _r: events.append(("done", 0)),
+            on_progress=lambda d, _t, _m: events.append(("report", d)),
+        )
+        qtbot.waitUntil(lambda: not handle.is_running(), timeout=HANG_CEILING_S * 1000)
+    finally:
+        burst.set()
+        polled.set()
+        runner.close(HANG_CEILING_S)  # its timer stops: the connected wrapper never runs again
     _assert_delivered_per_tick(events, 2 * MIN_REPORTS)
 
 

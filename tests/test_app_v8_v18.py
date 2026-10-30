@@ -410,15 +410,17 @@ def test_v18_a_corrected_frame_shows_before_the_analysis_completes_and_updates_a
     window = application.window
     rendered: list[Any] = []
     window.controller.rendered.connect(rendered.append)
-    open_source(qtbot, application, sample(CLIP))
-    qtbot.waitUntil(hook.mid_decode, timeout=60000)
-    qtbot.waitUntil(lambda: bool(rendered) and window.controller.idle(), timeout=30000)
-    assert hook.mid_decode()  # held inside the decode: the analysis is substantively unfinished
-    assert window.session.analysis().phase == "running"
-    assert window.preview_widget.after_image() is not None  # a corrected frame is shown
-    assert window.session.statistics() is None  # its own provisional statistics (D108)
-    before = len(rendered)
-    hook.release.set()
+    try:
+        open_source(qtbot, application, sample(CLIP))
+        qtbot.waitUntil(hook.mid_decode, timeout=60000)
+        qtbot.waitUntil(lambda: bool(rendered) and window.controller.idle(), timeout=30000)
+        assert hook.mid_decode()  # held inside the decode: the analysis is unfinished
+        assert window.session.analysis().phase == "running"
+        assert window.preview_widget.after_image() is not None  # a corrected frame is shown
+        assert window.session.statistics() is None  # its own provisional statistics (D108)
+        before = len(rendered)
+    finally:
+        hook.release.set()  # a failure above never holds the decode to its ceiling (item 4)
     wait_analysis(qtbot, application)
     qtbot.waitUntil(lambda: window.session.statistics() is not None, timeout=30000)
     qtbot.waitUntil(lambda: len(rendered) > before, timeout=30000)
