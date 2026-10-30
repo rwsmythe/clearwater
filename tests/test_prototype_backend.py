@@ -37,6 +37,12 @@ TRANSFER_LIMIT = 16
 METHODS = ["ancuti2018", "c3"]
 
 
+@pytest.fixture(autouse=True)
+def _short_stray_check(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The stray-process check samples 10 s in a timed window; 0.2 s is enough for a test."""
+    monkeypatch.setattr(bench, "STRAY_SAMPLE_S", 0.2)
+
+
 def _fake_cupy(count: Any = 1, kernel_error: Exception | None = None) -> types.SimpleNamespace:
     """A stand-in for the cupy module: a device count and a test kernel that may fail."""
 
