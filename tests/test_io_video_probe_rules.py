@@ -25,6 +25,19 @@ FORBIDDEN_TOKENS = re.compile(
     r"\b(ACCL|GYRO|GRAV|CORI|IORI|GPS\w*|gpmd|HDRV|BITR)\b", re.IGNORECASE
 )
 FORBIDDEN_COMMANDS = re.compile(r"-show_data|-show_frames|-count_frames|-show_packets|-dump")
+_MP4_COPY_ALLOWLIST_LINE = 'MP4_DATA_CODEC_TAGS = frozenset({"gpmd"})'
+
+
+def _assert_no_forbidden_tokens(module: Path, text: str) -> None:
+    """Check tokens after excluding exactly one ruled encoder copy-allowlist line."""
+    if module.name == "encode.py":
+        # e3a7a4ea2dc9477f: GPMF rule - this stream-copy allowlist tag is never parsed.
+        lines = text.splitlines()
+        assert lines.count(_MP4_COPY_ALLOWLIST_LINE) == 1, (
+            "exactly one allowlist definition required"
+        )
+        text = "\n".join(line for line in lines if line != _MP4_COPY_ALLOWLIST_LINE)
+    assert FORBIDDEN_TOKENS.findall(text) == []
 
 
 def test_the_package_exists_and_has_the_expected_modules() -> None:
@@ -46,8 +59,24 @@ def test_the_package_exists_and_has_the_expected_modules() -> None:
 @pytest.mark.parametrize("module", sorted(PACKAGE.glob("*.py")), ids=lambda p: p.name)
 def test_no_module_names_an_imu_gps_or_telemetry_token(module: Path) -> None:
     text = module.read_text(encoding="utf-8")
-    assert FORBIDDEN_TOKENS.findall(text) == []
+    _assert_no_forbidden_tokens(module, text)
     assert FORBIDDEN_COMMANDS.findall(text) == []
+
+
+@pytest.mark.parametrize("change", ["extra-token", "missing-line", "doubled-line"])
+def test_encoder_token_guard_rejects_planted_changes(change: str) -> None:
+    """Reject another forbidden token or a missing or repeated allowlist definition."""
+    module = PACKAGE / "encode.py"
+    text = module.read_text(encoding="utf-8")
+    if change == "extra-token":
+        text += "\n# gpmd planted guard control\n"
+    elif change == "missing-line":
+        text = text.replace(_MP4_COPY_ALLOWLIST_LINE + "\n", "")
+    else:
+        text += "\n" + _MP4_COPY_ALLOWLIST_LINE + "\n"
+    message = None if change == "extra-token" else "exactly one allowlist definition required"
+    with pytest.raises(AssertionError, match=message):
+        _assert_no_forbidden_tokens(module, text)
 
 
 @pytest.mark.parametrize("module", sorted(PACKAGE.glob("*.py")), ids=lambda p: p.name)

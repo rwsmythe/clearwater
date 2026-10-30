@@ -164,6 +164,20 @@ def test_geometry_change_control(video: dict[str, Any]) -> None:
 
 @pytest.mark.parametrize("unset", ["absent", "null"])
 @pytest.mark.parametrize("reverse", [False, True], ids=["forward", "reverse"])
+def test_unset_sar_against_nonsquare_control(unset: str, reverse: bool) -> None:
+    """Keep an unspecified SAR different from a non-square pixel aspect ratio."""
+    source = _facts(video={"sample_aspect_ratio": None})
+    output = _facts(video={"sample_aspect_ratio": "4:3"})
+    if unset == "absent":
+        del source.probe["streams"][0]["sample_aspect_ratio"]
+    if reverse:
+        source, output = output, source
+    item = _item(source, output, GEOMETRY)
+    assert (item.item_class, item.status) == (compare.REQUIRED, compare.DIFFERENT)
+
+
+@pytest.mark.parametrize("unset", ["absent", "null"])
+@pytest.mark.parametrize("reverse", [False, True], ids=["forward", "reverse"])
 def test_unset_mono_layout_is_equivalent(unset: str, reverse: bool) -> None:
     """Only a one-channel track treats absent layout as declared mono."""
     source, output = _facts(audio={"channel_layout": None}), _facts()
@@ -173,6 +187,20 @@ def test_unset_mono_layout_is_equivalent(unset: str, reverse: bool) -> None:
         source, output = output, source
     item = _item(source, output, AUDIO)
     assert (item.item_class, item.status) == (compare.MANDATORY, compare.SAME)
+
+
+@pytest.mark.parametrize("unset", ["absent", "null"])
+@pytest.mark.parametrize("reverse", [False, True], ids=["forward", "reverse"])
+def test_two_channel_mono_against_unset_layout_control(unset: str, reverse: bool) -> None:
+    """Keep declared mono distinct from absent layout when both have two channels."""
+    source = _facts(audio={"channels": 2, "channel_layout": "mono"})
+    output = _facts(audio={"channels": 2, "channel_layout": None})
+    if unset == "absent":
+        del output.probe["streams"][1]["channel_layout"]
+    if reverse:
+        source, output = output, source
+    item = _item(source, output, AUDIO)
+    assert (item.item_class, item.status) == (compare.MANDATORY, compare.DIFFERENT)
 
 
 @pytest.mark.parametrize(

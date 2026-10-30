@@ -1,6 +1,31 @@
 # WP4.4 cumulative ledger
 
-## RESUME HERE -- seat 2, turn 2: R1 cleanup and report handed off
+## RESUME HERE -- seat 2, turn 3: bounded gate guard/test cleanup
+
+Entry HEAD c804f47, clean status; no product or report change this turn.
+CHARC e3a7a4ea2dc9477f grants only the token-guard exemption and its controls
+in tests/test_io_video_probe_rules.py. Exactly one whole allowlist definition
+line is required/removed before matching encode.py; every other forbidden
+token, module and command guard is unchanged. The one-line comment names the
+ruling and GPMF stream-copy-only rule. Extra-token, missing-line and doubled-line
+controls all reject their planted text. B F5 adds unset/non-square SAR and
+mono/absent-at-two-channels controls in the existing WP4.4 equivalence file.
+
+Final light: 155 passed / 2 deselected, EXIT 0. Ruff check and format check
+(273 files) pass after mechanical line wrapping; mypy passes (141 files).
+Only the two granted test files and this ledger change. No report edit;
+the grant's report line belongs to the orchestrator's merge-candidate errata.
+No footage/GPU/GUI/slow/fullclip node run, footage read, dependency, interface,
+product change, register edit or git write. Yield to orchestrator for commit,
+final candidate gate/accept. No new unresolved STOP.
+
+Depth at turn-2 yield / turn-3 entry: **83,227 input tokens / 258,400**,
+exact dispatcher footer reading; no inference from earlier depth readings.
+Final-state footage supplied by seat: **1 passed in 65.28 s, EXIT 0** at
+c804f47, log work/wp4.4/s2t2/seat-footage.txt. This supersedes the earlier
+60.15 s footage figure; no cell footage execution.
+
+## Historical resume -- seat 2, turn 2: R1 cleanup and report handed off
 
 WP4.4 MOV input, CODEX lane, tier STRONG. Product base `5e3537d`;
 branch `wp4.4`; this turn's entry HEAD `d427dc9`. Entry status was clean.
@@ -1026,3 +1051,64 @@ rule sites, RED/GREEN and Q1 collection diff, every grant, phone/r0 evidence,
 two mebx omissions, privacy key names/counts, fixed mono equivalence, Q5 HLG
 refusal code text, Q4 corroboration and explicitly missing raw rows, Limits
 2/7, review disposition and remaining seat actions. No register change.
+
+
+## Seat 2 turn 3 -- gate failure and CHARC e3a7a4ea2dc9477f
+
+Dispatcher gen 25 supplies Reviewer B: Claude opus/high, single pass on
+wp4.4-mc (rebased onto acde834, patch-id identical), NO_NEW_CRITICAL_MAJOR,
+3 minor / 5 advisory. Its two report findings were closed as merge-candidate
+errata at the gate; this branch report is deliberately untouched. B F5's
+missing narrowing controls are addressed here. No new Reviewer A round.
+
+The two-leg candidate gate found one WP4.4 defect: the existing token guard
+for encode.py rejected the literal gpmd in the ruled copy allowlist. No net
+had selected that test file. Serial-leg failures were other packages' load
+flakes and passed alone, per dispatcher; not product findings for this cell.
+
+CHARC e3a7a4ea2dc9477f Q1 grants exactly one whole line
+`MP4_DATA_CODEC_TAGS = frozenset({"gpmd"})` removed before the encode.py token
+match, with a count == 1 assertion; no spelling obfuscation, allowlist move,
+FORBIDDEN_TOKENS change or FORBIDDEN_COMMANDS relaxation. Matching is factored
+into a private helper used by the original named/parametrized test and three
+new planted controls. The command guard still examines original module text.
+The real encoder is not edited. This grant must enter the accept record and
+the orchestrator's report errata; this ledger is its cell record.
+
+Verification loop: reproduce gate failure on c804f47 (1 failed) -> add B F5
+controls before guard change (8 pass, each DIFFERENT on today's comparator)
+-> exact-line exemption with extra gpmd comment/missing/doubled definition
+controls -> requested four-file run GREEN (155 passed). No comparator/product
+fix was required. Formatting found one new overlong assertion, mechanically
+wrapped; final lint/format are green. No rejected finding, reopened finding,
+revert or additional scope change. All fixes are test-only.
+
+New control families in tests/test_container_spike_compare_equivalences.py:
+`test_unset_sar_against_nonsquare_control` and
+`test_two_channel_mono_against_unset_layout_control`; each covers forward/reverse
+and absent/null (4 nodes each). The equivalence file now has 41 nodes.
+Guard control nodes: tests/test_io_video_probe_rules.py::
+`test_encoder_token_guard_rejects_planted_changes[extra-token]`,
+`[missing-line]`, `[doubled-line]`. Original guard name and parametrization
+remain unchanged, including its encode.py node which was RED then GREEN.
+
+Logs under work/wp4.4/s2t3/. Every pytest command uses PYTHONPATH=scripts,
+VIRTUAL_ENV removed, -p sandbox_mkdir_shim -p no:cacheprovider and
+-m "not gpu and not footage and not gui and not slow and not fullclip".
+No excluded marker was executed. Fresh basetemps are retained, never deleted.
+
+| Log | Command / selection | Result | EXIT |
+|---|---|---|---|
+| red.txt | `uv run pytest -q 'tests/test_io_video_probe_rules.py::test_no_module_names_an_imu_gps_or_telemetry_token[encode.py]' --basetemp=work/wp4.4/tmp/s2t3-red` plus shim/markers | 1 failed, expected baseline gpmd guard rejection | 1 |
+| controls-before.txt | `uv run pytest -q tests/test_container_spike_compare_equivalences.py -k 'unset_sar_against_nonsquare_control or two_channel_mono_against_unset_layout_control' --basetemp=work/wp4.4/tmp/s2t3-controls` plus shim/markers | 8 passed / 33 deselected, all DIFFERENT before any guard fix | 0 |
+| green.txt | `uv run pytest -q tests/test_io_video_probe_rules.py tests/test_container_spike_compare_equivalences.py tests/test_io_video_encode_units.py tests/test_wp44_mov_input.py --basetemp=work/wp4.4/tmp/s2t3-green` plus shim/markers | 155 passed / 2 deselected in 9.69 s | 0 |
+| ruff.txt | `uv run ruff check .` | One E501 in new assertion | 1 |
+| format.txt | `uv run ruff format --check .` | One test file would be reformatted / 272 already formatted | 1 |
+| format-fix.txt | `uv run ruff format tests/test_io_video_probe_rules.py` | One file mechanically reformatted | 0 |
+| ruff-final.txt | `uv run ruff check .` | All checks passed | 0 |
+| format-final.txt | `uv run ruff format --check .` | 273 files already formatted | 0 |
+| mypy.txt | `uv run mypy` | No issues in 141 source files | 0 |
+| locks.txt | Work-local `uv run python -`: changed paths, ASCII/LF, regex/command/decorator AST and whitespace checks | Only three paths; regex constants, original guard parametrization/command assertion and every other original probe-rule test unchanged; report/product untouched | 0 |
+
+Only the two owned/granted tests plus ledger are handed off under one logical
+test commit. Remaining gate/report-errata/accept work is the orchestrator's.
