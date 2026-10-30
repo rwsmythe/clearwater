@@ -367,8 +367,10 @@ class HeldEngines:
     """The engine factory hook: the analysis's decode holds after its first frame until released.
 
     The hold is inside the engine's frame iteration (the DR-44 (c) test's form, B-4): while it
-    holds, the analysis is running with its decode under way, and its statistics, smoothing and
-    completion are all still to come. Every other call goes to the real frame source.
+    holds, the analysis is running with its decode under way: the engine has measured the first
+    frame only (it stores that frame's statistics before it asks for the next), and the other
+    frames' statistics, the smoothing and the completion are still to come. Every other call goes
+    to the real frame source.
     """
 
     def __init__(self) -> None:

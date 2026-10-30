@@ -7,7 +7,8 @@ settings' limit, the encoder detection into the settings dialog's catalog, and t
 graphics-card detection whose AD-9 reason the status bar shows before a file is open (S3). A
 failed cache open is shown once and the photo path keeps working (S1 condition 2). A settings
 file that fails to decode is set aside (DR-85, fixed by WP4.3a on main).
-Nothing in start-up writes outside app data.
+Inside app data, start-up and close write only the config and cache folders (a write outside
+app data is not observed here; the leftover clean-up acts on the output and journal folders).
 
 The helpers here (``make_app`` and the waits) are shared by the other ``tests/test_app_*.py``
 GUI files. Headless on ``offscreen``, app data under ``tmp_path``.
