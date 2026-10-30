@@ -2,11 +2,11 @@
 
 ## Round 0 - dispatch-base map and requests (turn 1)
 
-STOP / next-seat input: recommend confirming the final DR-94 additions as
-**37724 ImageSourceData + 50740 DNGPrivateData**, with no further tags. Await
-CHARC's round-0 ruling before building DR-94, as the dispatch requires. The
-baseline timings and profile below are RUN REQUESTS, not executed results.
-This turn yields before any product or test edit.
+Round-0 inputs resolved on turn 2: CHARC `492c000c93b33597` (2026-10-30T02:15:31Z)
+confirmed exactly **37724 ImageSourceData + 50740 DNGPrivateData**, with no
+further tags. PrintIM 50341 and Photoshop Annotations 50255 stay carried;
+existing exclusions stay unchanged. The orchestrator returned the baseline
+timings/profile below, all EXIT 0. Round 0 itself made no product or test edit.
 
 - Base verified: `00518bba0d90acb03707459862951e8365dd9bcb` (`00518bb`).
 - Initial `git status --short`: empty. Branch/worktree supplied by dispatch:
@@ -150,13 +150,20 @@ date -u '+%Y-%m-%dT%H:%M:%SZ' > work/wp-dr87/r0/base-script-start-utc.txt
 printf 'EXIT=%s\n' "$?" > work/wp-dr87/r0/base-script-exit.txt
 ```
 
-| Seat result to return | Current state |
+| Seat result returned | Result (orchestrator seat, 2026-10-30; all EXIT 0) |
 | --- | --- |
-| GPU node pytest call duration / external wall / EXIT / UTC conditions | Pending R0-A; no new figure measured by cell. |
-| Profile wall / EXIT / top-15 / stray count and cumulative time | Pending R0-B. |
-| Exact `stop` function, callers/callees, join versus final-sample cost | Pending R0-B; source trace below rejects card-sampler attribution for this core path. |
-| Child-script pytest duration / external wall / EXIT | Pending R0-C; parallel leg, 10 s sampling remains per Q1. |
-| Remedy for residual child cost if material | Await measured result and CHARC ruling; no child bootstrap, tool flag or environment seam built. |
+| GPU node pytest call duration / external wall / EXIT / UTC conditions | R0-A start 02:08:11Z: 87.01 s call; 1 passed, 1 warning in 90.93 s; wall 96.684 s; EXIT 0, ratio assertion passed. Nothing else heavy, outside WP4.3 windows; source diff vs 00518bb empty (seat report). |
+| Profile wall / EXIT / top-15 / stray count and cumulative time | R0-B start 02:09:48Z: 66.558 s profiled, wall 67.015 s, EXIT 0; ratio passed. Top-15 is pytest frames down to runner.py:114(pytest_runtest_protocol), 64.268 s. Stray check: 4 calls, own 0.010 s, cumulative 63.242 s (15.811 s/call). |
+| Exact `stop` function, callers/callees, join versus final-sample cost | R0-B: bench.py:1211 `_PeakRssSampler.stop`, 1 call, own 0.000 s, cumulative 0.606 s. The 16.303 s historical stop cost did not reproduce; `_GpuSampler` is not constructed on this core path. No separate join/final-sample split is claimed from the seat's returned summary. |
+| Child-script pytest duration / external wall / EXIT | R0-C start 02:10:55Z: 32.81 s call; 1 passed, 1 warning in 33.83 s; wall 34.917 s; EXIT 0. Parallel leg; 10 s sampling stays per Q1. |
+| Remedy for residual child cost | DECLINED by CHARC `492c000c93b33597`: cost not material; no child-side seam, tool flag or environment seam. Existing subprocess test unchanged. |
+
+Evidence: `work/wp-dr87/r0/base-node.log`, `base-node-wall.txt`,
+`base-node-exit.txt`, `base-profile-top15-and-samplers.txt`,
+`base-profile-wall.txt`, `base-profile-exit.txt`, `base-script.log`,
+`base-script-wall.txt`, `base-script-exit.txt`, and each run's
+`*-start-utc.txt`. The cell read the summary/duration/profile lines and
+wall/EXIT/UTC files on turn 2; none of these runs was executed by the cell.
 
 ### Sampler observation and ratio observation
 
@@ -169,8 +176,10 @@ core node reaches `_PeakRssSampler.stop` (`bench.py:355,1211`), which includes a
 join and a final process-memory sample. `_GpuSampler` is only in the clip
 path. Thus the brief's possible card-sampler attribution is not supported by
 the call graph. It is not evidence of a 60 s uninterruptible sampler sleep:
-both workers use interruptible `Event.wait`. R0-B must locate the actual
-cost. No sampler change is owned or proposed before that result/ruling.
+both workers use interruptible `Event.wait`. R0-B returned 0.606 s at
+`_PeakRssSampler.stop` and 63.242 s across four
+stray calls in a 66.558 s profile; the historical stop delay did not reproduce.
+CHARC ruled no sampler remedy. No sampler code is owned or changed.
 
 **[MINOR, pre-existing / observation-only; REASONED] Ratio flake.** The dispatch
 reports the WP4.4 loaded gate failure `0.514 < 1.0`, followed by an alone pass.
@@ -242,7 +251,7 @@ the two severity-tagged source observations above are disclosed separately.
 
 | Round | Reviewer / transport | Critical / major / minor | In / out | NEW / REOPENED | Reverts | Product / test fixes | Verdict / evidence | Dispatcher depth |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 0 | Not run; Claude opus/high pass scheduled by driver later | 0 / 0 / 0 | 0 / 0 | 0 / 0 | 0 | 0 / 0 | Map complete; baseline/profile and final Q2 ruling pending. No convergence claim. | Not supplied (fresh turn 1). |
+| 0 | Not run; Claude opus/high pass scheduled by driver later | 0 / 0 / 0 | 0 / 0 | 0 / 0 | 0 | 0 / 0 | Map complete; baseline/profile returned EXIT 0; final Q2 confirmed on turn 2. No convergence claim. | 131,491 after turn 1, supplied on turn 2. |
 
 Reviewer A uses `scripts/codex_cell.py review`, Claude opus/high, STRONG.
 Durable reviewer evidence belongs at the orchestrator-managed
@@ -253,13 +262,15 @@ criterion follow the seam fill, not an improvised round count.
 
 | Turn / boundary | Dispatcher-read context depth | Action |
 | --- | --- | --- |
-| Turn 1 / round 0 | Not supplied; no estimate substituted | Yield this ledger. Record the dispatcher's reading on resume; evaluate around 200K and stop at a step boundary near 250K. |
+| Turn 1 / round 0 | 131,491 after turn 1, supplied by dispatcher on turn 2 | Continue with RED-only turn 2; evaluate around 200K and stop at a step boundary near 250K. |
+| Turn 2 / RED tests and fixture | Not yet supplied | Yield at the scheduled boundary; no estimate substituted. |
 
 Round-0 verification loop: suspected stale caller anchors and ambiguous
 sampler attribution; confirmed the caller corrections by direct source search,
 and rejected `_GpuSampler` as the core-node sampler by its sole instantiation
 and `main`'s mode branch. Historical 16.303 s attribution remains pending the
-seat profile. Confirmed the missing exception class and the two absent drop
+seat profile at the round-0 boundary; R0-B has now resolved it as above.
+Confirmed the missing exception class and the two absent drop
 ids by source inspection; their executable RED checks await the build turns.
 No fixes applied and no final-state test claims made.
 
@@ -279,3 +290,110 @@ Locks honored this turn: only this owned ledger is added; product/tests,
 frozen interfaces, `bench.py`, dependencies, spec/register and local config
 remain untouched. No footage path accessed, no other worktree accessed, no
 mailbox post, commit, GPU run, profile or deletion performed.
+
+## Turn 2 - committed RED preparation and DR-87 fixture
+
+Turn parent: `44005a3060fa357e226a0cc4a11de0a08c76d83b`, the round-0
+ledger commit. CHARC's final ruling `492c000c93b33597` is applied above.
+No product code is changed on this turn. The dispatcher commits the RED tests
+before the fixture and ledger, preserving the requested RED/GREEN split;
+GREEN belongs to turn 3.
+
+### Changes and RED evidence
+
+- Added `tests/test_io_photo_exif_bytes.py::test_from_tiff_memory_error_returns_none_with_warning`:
+  a tiny valid TIFF with Make reaches the real `from_tiff`; only the private
+  `_write_entries` step is replaced with a bounded synthetic `MemoryError`.
+  The desired result is None with exactly one warning from the EXIF logger,
+  preserving the warning's full text. No large allocation is attempted.
+- Added `tests/test_io_photo_exif_bytes.py::test_from_tiff_drops_private_ifd0_blobs_and_keeps_metadata`:
+  a tiny synthetic IFD0 contains 37724/type 7 and 50740/type 1 beside Make and
+  PrintIM. `_same` independently verifies kept type/count/value bytes before
+  the drop assertion; both private tags remain on the unchanged product and
+  trigger the intended failure. No existing test body or assertion changed.
+- Added autouse `_short_stray_check` at `tests/test_prototype_backend.py:41`:
+  copied from `tests/test_prototype_clip.py:58-61`, including the same signature,
+  0.2 s value and docstring: "The stray-process check samples 10 s in a timed
+  window; 0.2 s is enough for a test." `bench.py` and the subprocess smoke
+  test remain unchanged.
+
+Required sandbox light run (PowerShell `PYTHONPATH=scripts`, exact pytest
+arguments from the turn-2 dispatch):
+
+```text
+uv run pytest -q tests/test_io_photo_exif_bytes.py tests/test_prototype_backend.py --basetemp=work/wp-dr87/tmp -p sandbox_mkdir_shim -p no:cacheprovider -m "not gpu and not footage and not gui and not slow and not fullclip"
+```
+
+Result: **2 failed, 289 passed, 18 deselected, 2 warnings in 65.78s (0:01:05)**,
+EXIT 1, exactly the two newly added tests; no existing test failed.
+
+| RED node | Observed failure headline |
+| --- | --- |
+| `tests/test_io_photo_exif_bytes.py::test_from_tiff_memory_error_returns_none_with_warning` | `MemoryError: synthetic rewrite exhaustion` escapes the unchanged product exception tuple. |
+| `tests/test_io_photo_exif_bytes.py::test_from_tiff_drops_private_ifd0_blobs_and_keeps_metadata` | `AssertionError: private IFD0 blobs retained: [37724, 50740]`; Make and PrintIM comparisons passed first. |
+
+Evidence: `work/wp-dr87/r2/light-red.log` and `light-red-exit.txt`.
+`uv run ruff check tests/test_io_photo_exif_bytes.py tests/test_prototype_backend.py`
+returned **All checks passed!**, EXIT 0; evidence `ruff-check.log` and
+`ruff-check-exit.txt` in the same folder. uv's inherited-environment warning
+is the already recorded mismatch with the project environment; it was
+ignored by uv and did not prevent either runner. The two pytest warnings
+were CuPy's CUDA-path detection warning and Pillow's truncated-file warning
+in the existing `test_r2_read_then_write_warns_once_per_dropped_entry[bad_value]` case.
+No format or type check,
+profile, GPU node or full suite was run by the cell this turn.
+
+Verification-loop disposition: both planned product debts are now independently
+confirmed by bounded RED failures, with no unexpected failure to adjudicate.
+The fixture has only test scope; real-run tool cost and recorded keys are
+unchanged by construction. Reviewer A has not run; turn 2 is a build step,
+not an adversarial review round. Counts remain critical/major/minor 0/0/0,
+in/out 0/0, NEW/REOPENED 0/0, reverts 0; product fixes 0, test changes 3
+(two RED tests and one fixture). No convergence claim is made.
+
+Bounded final scope check: `work/wp-dr87/r2/scope-check.log`, EXIT 0. It
+confirmed exactly the three owned files changed, ASCII/LF bytes, unchanged
+existing test ASTs after removing only the new definitions, fixture AST and
+docstring identical to the precedent, and byte-unchanged `exif.py`/`bench.py`
+against `00518bb`. `git diff --check` also exited 0 (`diff-check.log`). Git's
+read-only diff emitted its normal autocrlf conversion warning; file bytes
+were verified LF and the dispatcher's commits use `core.autocrlf=false`.
+
+### RUN REQUEST: DR-87 after figure (orchestrator seat, after turn-2 commits)
+
+Run the **same R0-A node and options**, changing only the output/basetemp paths
+to `work/wp-dr87/r2/`. No EXIF product change is needed for this measurement.
+Use a quiet seat with nothing else heavy and outside WP4.3 windows, as CHARC
+directed; this is not an EXCLUSIVE fullclip measurement. Allow approximately
+15-60 s; this is an estimate, because whole-system enumeration still runs
+and its observed cost varies. No after result is claimed until returned.
+
+From this worktree in Git Bash (no sandbox shim):
+
+```bash
+unset PYTEST_ADDOPTS
+export QT_QPA_PLATFORM=offscreen
+mkdir -p work/wp-dr87/r2
+git rev-parse HEAD > work/wp-dr87/r2/after-head.txt
+git diff 00518bb -- tools/prototype/bench.py src/clearwater/io/photo/exif.py > work/wp-dr87/r2/after-product-diff.txt
+uv run python -c "import shutil, psutil; print('disk_free_bytes=', shutil.disk_usage('.').free); print('ram_available_bytes=', psutil.virtual_memory().available); assert psutil.virtual_memory().available >= 5*2**30" > work/wp-dr87/r2/after-preflight.txt 2>&1
+TIMEFORMAT='WALL_SECONDS=%3R'
+date -u '+%Y-%m-%dT%H:%M:%SZ' > work/wp-dr87/r2/after-node-start-utc.txt
+{ time uv run pytest -q tests/test_prototype_backend.py::test_bench_gpu_records_graphics_memory --durations=0 -p no:cacheprovider --basetemp=work/wp-dr87/r2/after-node-tmp > work/wp-dr87/r2/after-node.log 2>&1; } 2> work/wp-dr87/r2/after-node-wall.txt
+printf 'EXIT=%s\n' "$?" > work/wp-dr87/r2/after-node-exit.txt
+```
+
+Require successful preflight and an empty `after-product-diff.txt` before
+running. Check free disk and report quiet-seat conditions; no deletion is
+granted. Use a fresh suffix if any named measurement output/basetemp already
+exists and report it. Return pytest call duration, total/summary, external
+wall, UTC, EXIT and whether the ratio assertion passed. A skipped node is not
+valid; a ratio flake goes to CHARC with the record, without modifying that
+assertion. No extra profile or child-script rerun is requested.
+
+Turn-2 locks: only the two owned test files and this ledger are changed;
+`src/clearwater/io/photo/exif.py`, `bench.py`, every frozen interface, the
+subprocess assertion, dependencies, spec/register and local config are
+unchanged. No footage or other worktree was accessed, and no mailbox post,
+commit, profile, GPU command or deletion was performed. The two REDs are
+intentional, with GREEN deferred to the next turn as dispatched.
