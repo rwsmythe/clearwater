@@ -358,14 +358,14 @@ def from_tiff(data: bytes) -> bytes | None:
     Raw entry bytes are carried without decoding values or reading pixels. Structural tags,
     the embedded profile, XMP, IPTC, Photoshop image resources, ImageSourceData (37724,
     Photoshop layer data) and DNGPrivateData (50740, a raw converter's private block) are
-    left out. The Exif IFD's Interop
-    IFD is carried as an IFD, not as the file offset the TIFF stores. A faulty entry is
-    dropped alone with an IFD/tag warning. Cut arrays retain all whole entries with one
-    IFD/declared-count/kept-count warning; a missing next pointer is accepted. Invalid child
-    offsets/cycles and empty children are dropped with their pointers; a faulty header or
-    invalid IFD0 offset discards the block. Only the first carried pointer tag per parent is
-    followed; later occurrences are dropped with individual IFD/tag warnings. At most four
-    directories are parsed and written; same-offset siblings are parsed separately per label.
+    left out of IFD0. The Exif IFD's Interop IFD is carried as an IFD, not as the file offset
+    the TIFF stores. A faulty entry is dropped alone with an IFD/tag warning. Cut arrays
+    retain all whole entries with one IFD/declared-count/kept-count warning; a missing next
+    pointer is accepted. Invalid child offsets/cycles and empty children are dropped with
+    their pointers; a faulty header or invalid IFD0 offset discards the block. Only the first
+    carried pointer tag per parent is followed; later occurrences are dropped with individual
+    IFD/tag warnings. At most four directories are parsed and written; same-offset siblings
+    are parsed separately per label.
     Carried pointers retain type 4 or 13; type 3 is retained unless relocation requires
     promotion to LONG. Other pointer types are dropped with an IFD/tag warning.
 
