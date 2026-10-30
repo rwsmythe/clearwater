@@ -7,7 +7,8 @@ Brief `docs/briefs/wp4.6-brief.md` FINAL on CHARC `39dad78f5b10ceeb`; base `b6a3
 
 | Round | Date | Transport / CLI | Critical | Major | Minor | In-env / out | NEW / REOPENED | Reverts | Fixes: product / test-only | Depth (dispatcher) |
 |---|---|---|---|---|---|---|---|---|---|---|
-| 0 | 2026-10-30 | (no review: round-0 note) | - | - | - | - | - | - | - | (dispatcher fills) |
+| 0 | 2026-10-30 | (no review: round-0 note) | - | - | - | - | - | - | - | 194,313 (cell 1, retired at round 0) |
+| Y1 (build) | 2026-10-30 | (no review: tasks 3-4, cell 2) | - | - | - | - | - | - | - | (dispatcher fills: cell 2 at Y1) |
 
 ## Round 0 (task 2): the design restated, the Questions, the stops
 
@@ -224,3 +225,99 @@ On base `b6a31b5` both new files fail at import (`ModuleNotFoundError` for
   each, on the video items of the export and batch triggers in `tests/test_app_*.py`).
 - The GUI cache's size accounting does not see `export/<uuid>` (its folder grows by up to one
   clip's proxies during an export, then is removed): a report Limit.
+
+## Y1 (cell 2, implementer-opus-high): tasks 3-4, the parent side
+
+Cell 1 retired at round 0, depth 194,313 (dispatcher's figure). Cell 2 dispatched fresh on CHARC's
+ruling `a265489d371695e2` (STOP-1 granted with its exact scope, STOP-2 no environment change, Q2
+as proposed, grants (b) and (c)). Cell 2 depth at Y1: (dispatcher fills).
+
+### Commits
+
+- `61ceef55` test(wp4.6): RED. `tests/test_jobs_export_process.py` (new) and the spawn pin
+  `tests/test_io_video_spawn.py:235` 7 -> 8, "the eight ruled product spawn sites" (R0-STOP-2's
+  owned line). RED lines: `ImportError: cannot import name 'export_process' from
+  'clearwater.jobs'`; `AssertionError: expected the eight ruled product spawn sites, found 7`.
+- `baffd2d2` feat(wp4.6): `src/clearwater/jobs/export_process.py` (`ProcessExportJobs`), plus two
+  verification-loop tests and the formatter's pass over the test file.
+- `8f5dadc1` test(wp4.6): the redaction sibling-prefix regression test.
+
+Green (targeted, the worktree): `tests/test_jobs_export_process.py` + `tests/test_io_video_spawn.py`
++ the jobs import/telemetry guard: `316 passed in 11.56s`; the file alone `52 passed in 9.22s`
+(slowest call 1.02 s, the Q11 grandchild test). `ruff check`: All checks passed; `ruff format
+--check`: already formatted; `mypy src/clearwater/jobs/export_process.py`: no issues. No full
+suite, no window, no footage, no GPU.
+
+### Built as ruled, and the choices the ruling left to the cell (stated, for review)
+
+- Constructor `ProcessExportJobs(*, photo_exports, cache_dir, app_version, command)`; `command`
+  is REQUIRED here (the builder in `app/composition.py` supplies the product default at Y2, so
+  `jobs` never names an `app` module in code); an empty command is `ValueError`.
+- Spawn: `subprocess.Popen(list(command), stdin=PIPE, stdout=PIPE, stderr=PIPE,
+  **tool_spawn_kwargs())`, no `env=` (R0-STOP-2). Request: one ASCII line, `json.dumps(...,
+  ensure_ascii=True, allow_nan=False)`, `source` = `request.source.absolute()`, `settings` = the
+  object of `Settings.to_json()`, `cache_limit_bytes` = the request's settings' (Q2).
+- `device`: `"none"` when no worker ran (cancel before the start, encode failure, start
+  failure: the engine's own pre-start value, `jobs/export.py:186`); `"unknown"` when a worker ran
+  and gave no result (exit without a result, a kill), design item 6.
+- ONE failure text beyond Q10's three: `ENCODE_TEXT` "The export request could not be encoded:
+  <error>" (a non-finite parameter or a non-JSON value; nothing spawned, nothing made), the
+  round-0 note's "failed result, nothing spawned" given a fixed form. A scratch-folder `mkdir`
+  failure uses Q10's start text.
+- I/O on three daemon threads: a stdin WRITER (queue-fed; `None` closes), the stdout line
+  reader, the stderr tail drain; the job thread only waits on the line queue for `POLL_S` = 0.05
+  s. Each stream is closed only by the thread that reads or writes it. After the worker's exit
+  the job reads until the end of the output, or until the output has been quiet
+  `DRAIN_AFTER_EXIT_S` = 1.0 s (the timer restarts at each line, so a lagging reader never loses
+  the result line, and a grandchild holding the output cannot hold the job).
+- The kill grace `KILL_AFTER_CANCEL_S` = 3.0 s runs from the cancel line, or from the result
+  line (design item 4 / round-0 note). The scratch folder is KEPT on ANY kill (a grandchild may
+  still hold a file in it) and removed otherwise; a later instance's first-job sweep removes it
+  after `STALE_AFTER_S` = 3600 s.
+- Line strictness: content over `MAX_LINE_BYTES` (65,536, without the `\n`; one `\r` tolerated)
+  ignored and its remainder skipped; an unterminated last line ignored; non-UTF-8, non-JSON,
+  `NaN`/`Infinity` and numbers that overflow to infinity, a non-object, not exactly one key, an
+  unknown key, wrong shapes or types (including a `bool` for an int, an unknown log level, a
+  result missing or adding a field) ignored. Each is logged at WARNING by its REASON only
+  ("export worker line ignored: ..."), never its content.
+- Redaction (the crash tail and the start and encode texts): known folders first, matched
+  exactly and case-insensitively in three spellings (native, repr-doubled backslashes, forward
+  slashes) and only where the folder's name ENDS (a lookahead); the folder plus its following
+  components becomes the last component. Then any remaining absolute path (a drive, a UNC root,
+  or a `/` root not after a word character) likewise. A component may contain spaces; it ends at
+  a separator, a quote or a line end. Known folders: the source's folder, the output folder, the
+  scratch folder, the cache folder, the interpreter's folder, `sys.prefix`, `sys.base_prefix`,
+  the cwd, the home folder. The tail keeps the last 4,096 bytes, drops a cut first line, redacts,
+  escapes non-ASCII, and keeps the last 4,096 characters.
+
+### Verification loop (Y1)
+
+| # | Suspected | Confirmed how | Outcome |
+|---|---|---|---|
+| 1 | The request write could block the job thread (a worker that never reads, a request over the pipe buffer), so a cancel could never be checked | `test_a_worker_that_never_reads_its_stdin_is_still_cancelled` on the first form: 30.1 s, `assert (... - ...) < 10` failed | FIXED: the stdin writer thread (`baffd2d2`) |
+| 2 | An exception escaping the loop (a `progress.report` that raises) left the worker running | `test_an_exception_from_the_progress_kills_the_worker` on the first form: the worker's heartbeat went on (`'11' == '3'`) | FIXED: the loop kills and reaps the worker before re-raising (`baffd2d2`) |
+| 3 | A fixed 1 s window after the exit could drop the result line if the reader lags under load | By reading (not reproduced: needs a starved reader thread) | FIXED: the quiet timer restarts at every line (`baffd2d2`) |
+| 4 | A known folder matched as a PREFIX of a sibling (`my clips` in `my clips2`) leaked the sibling's name | The extended redaction test with the lookahead removed: `assert 'my clips' not in ...` failed | FIXED (code `baffd2d2`, test `8f5dadc1`) |
+| 5 | Closing a pipe from the job thread while a reader is blocked in it can deadlock on Windows | Design review | REJECTED for this code: every stream is closed only by the thread using it |
+
+Product fixes 4, test-only 0, reverts 0 (all before the first green commit, except #4's test).
+
+### Q11 (shown by the committed test)
+
+`test_a_kill_leaves_the_grandchild_running` passes on this machine: after `Popen.kill` of the
+fake worker (the venv launcher `sys.executable`, which takes its interpreter with it), a
+grandchild the worker started keeps beating its file; the test then ends it through a `stop`
+file. Note on cell 1's probe `r0\q11_grandchild.py`: its `alive()` used `os.kill(pid, 0)`, which
+on Windows TERMINATES the process (`TerminateProcess` with exit code 0) rather than testing it;
+its "alive" verdict still held (the call succeeded, so the process existed at that moment), but
+the probe itself ended the grandchild. The committed test uses a heartbeat file instead.
+
+### Open for Y2 / the window (no stop)
+
+- A real GPU worker's teardown after its result line (interpreter exit, a CUDA context) longer
+  than `KILL_AFTER_CANCEL_S` = 3.0 s would be killed: the result is still returned, the scratch
+  folder is kept until a later instance's sweep. Measure the result-to-exit time in the window
+  beside Q8's spawn figures; a figure near 3 s comes to CHARC.
+- The worker's log records are re-logged as `"<child logger name>: <message>"` under
+  `clearwater.app.export_worker`, so the engine's INFO outcome line reaches the parent's log once,
+  in that form.
