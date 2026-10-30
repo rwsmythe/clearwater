@@ -14,9 +14,10 @@ asserted (R4-2).
   ``downscale(render(full frame))`` with the engine's smoothed record at that pts, through
   ``imaging.preview_export_difference`` on the real method and backend.
 
-V18 (gate form, Q24): on ``hevc8-bt709-full`` with the analysis held by a test hook, a corrected
-frame is shown before the analysis completes, and after it the shown statistics equal the
-engine's ``smoothed_record`` of the shown frame. The GX011627 leg is exclusive window evidence.
+V18 (gate form, Q24): on ``hevc8-bt709-full`` with the analysis held inside its decode by a test
+hook (B-4), a corrected frame is shown while the analysis is still running, and after it the
+shown statistics equal the engine's ``smoothed_record`` of the shown frame. The GX011627 leg is
+exclusive window evidence.
 """
 
 # ``make_app`` is imported from test_app_startup and used as a parameter.
@@ -363,28 +364,40 @@ def test_v8_video_pre_encode_through_the_harness_on_the_shells_frame(
 
 
 class HeldEngines:
-    """The engine factory hook: each job does its work, then waits until released."""
+    """The engine factory hook: the analysis's decode holds after its first frame until released.
+
+    The hold is inside the engine's frame iteration (the DR-44 (c) test's form, B-4): while it
+    holds, the analysis is running with its decode under way, and its statistics, smoothing and
+    completion are all still to come. Every other call goes to the real frame source.
+    """
 
     def __init__(self) -> None:
         self.release = threading.Event()
-        self.waiting = threading.Event()
+        self.advanced = 0
+        self.ended = False
 
     def __call__(self, **kwargs: Any) -> AnalysisEngine:
-        hook = self
+        hook, inner = self, kwargs["source"]
 
-        class Held(AnalysisEngine):
-            def _once(self) -> Any:
-                job = super()._once()
+        class Source:
+            def __getattr__(self, name: str) -> Any:
+                return getattr(inner, name)
 
-                def held(progress: Any) -> Any:
-                    result = job(progress)
-                    hook.waiting.set()
-                    assert hook.release.wait(60)
-                    return result
+            def frames(self, probe: Any, **options: Any) -> Any:
+                try:
+                    for frame in inner.frames(probe, **options):
+                        hook.advanced += 1
+                        yield frame
+                        if hook.advanced == 1:
+                            assert hook.release.wait(60)
+                finally:
+                    hook.ended = True
 
-                return held
+        return AnalysisEngine(**{**kwargs, "source": Source()})
 
-        return Held(**kwargs)
+    def mid_decode(self) -> bool:
+        """The frame iterator has advanced and has not ended."""
+        return self.advanced > 0 and not self.ended
 
 
 def test_v18_a_corrected_frame_shows_before_the_analysis_completes_and_updates_after(
@@ -398,10 +411,11 @@ def test_v18_a_corrected_frame_shows_before_the_analysis_completes_and_updates_a
     rendered: list[Any] = []
     window.controller.rendered.connect(rendered.append)
     open_source(qtbot, application, sample(CLIP))
-    assert hook.waiting.wait(60)
-    qtbot.waitUntil(window.controller.idle, timeout=30000)
-    assert window.session.analysis().phase == "running"  # held: not complete
-    assert window.preview_widget.after_image() is not None and rendered  # a corrected frame
+    qtbot.waitUntil(hook.mid_decode, timeout=60000)
+    qtbot.waitUntil(lambda: bool(rendered) and window.controller.idle(), timeout=30000)
+    assert hook.mid_decode()  # held inside the decode: the analysis is substantively unfinished
+    assert window.session.analysis().phase == "running"
+    assert window.preview_widget.after_image() is not None  # a corrected frame is shown
     assert window.session.statistics() is None  # its own provisional statistics (D108)
     before = len(rendered)
     hook.release.set()
