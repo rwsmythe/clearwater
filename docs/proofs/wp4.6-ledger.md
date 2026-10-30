@@ -601,4 +601,9 @@ connector, neither the review transport).
 | F11-F13 | three test races (cancel before spawn, kill before beat, truncated beat) | MINOR test-only |
 | F14 | wall-clock bounds in the parallel leg | MINOR test-only |
 
+Seat run (the orchestrator, on `7a20c7bd`, 05:33:33Z, offscreen): `tests/test_app_wiring.py`
+`test_app_leftovers.py` `test_app_startup.py` `test_app_v7.py` whole: `72 passed, 1 warning in
+147.77s`, exit 0 (`clearwater-review-evidence\wp4.6\seat-y2b-app.log`). The Y2b list of
+untouched video-export app tests is green; nothing joins the remediation from it.
+
 Remediation is NOT started (the dispatcher's order: yield first).
