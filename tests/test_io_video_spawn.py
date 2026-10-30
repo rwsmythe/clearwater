@@ -232,7 +232,7 @@ def test_every_product_spawn_uses_the_helper() -> None:
             )
             if not uses_helper or overrides_policy:
                 offenders.append(f"{path.relative_to(SRC).as_posix()}:{call.lineno}")
-    assert count == 7, f"expected the seven ruled product spawn sites, found {count}"
+    assert count == 8, f"expected the eight ruled product spawn sites, found {count}"
     assert not offenders, f"product spawns bypassing the shared policy: {offenders}"
 
 
