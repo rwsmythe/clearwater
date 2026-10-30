@@ -175,6 +175,15 @@
   F11-F14 fix; F9/F10 Limits; F4 (engine OSError texts carry full paths, WP3.14 `export.py:678-685`) = candidate row
   MINE at the accept. Cell 3 stands down at 224,076; FRESH cell 4 remediates + R2 (a NEW protocol-class major at R2 =
   cap proposal to me). WP3.6P turn 5 remediating R1.
+- **WP4.6 R2 RULED 06:33Z (query 6f69cedf; Codex R2 2 major / 3 minor on cell 4's remediation, ledger fdafca06; post
+  d19a5b2f + cue): (d) DESIGN CHANGE** instead of a cap on the redaction class: the stderr tail goes to the application
+  log only (WARNING, verbatim; local log, full paths allowed per B-8 ruling); the IF-8 failure text = fixed sentence +
+  exit status + "details are in the application log" + at most the exception TYPE name (strict identifier pattern); the
+  redaction helper and its tests DELETED; R2-2 (space-leading component) and R2-3 close by removal; F5's test becomes
+  an absence assertion over planted hostile folder names. R2-1 shared drain window, R2-4 type name only, R2-5
+  controlled clock: concurred. F9/F10 fixes kept; F1 = one deadline from the earlier of cancel / result. CAP: R3 the
+  LAST full round for the PROTOCOL class (a new R3 major there = RED-first fix in the terminating clean-up, verified at
+  the orchestrator's seat, B sees the final tree); any other class at R3 comes to me. Cell 4 at 199,451 continues.
 - **(gen 8 history follows; newest facts at the end of the block)**
 - **GEN 8 PICKUP (was).** Orchestrator = **gen 23 `clearwater-orchestrator-20261029-0852`** (online 18:57Z; gauge 37 ms;
   gen 22 rolled 18:52Z at ~420K, state 5a1538a). ALL cues go there. Time the bash launch and record it here. Drain with
