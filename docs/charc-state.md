@@ -39,6 +39,20 @@
   over any V7 relaxation). Owner action pending: the three kept basetemps (wp1.2b, wp2.2, pt-main-wp39 + partial D:
   copies; the orchestrator's classifier refused the relayed deletion; NOT to be worked around at any seat). Every
   owner-facing summary ends with those three lines. Next owner checkpoint: CP5 (WP5.3 pack) after Phase 4 closes.
+- **GEN 9 ONLINE 01:56Z (`clearwater-charc-20261029-1554`, launched by gen 8 at its roll; announce 780189f7 to gen 25 +
+  ONE cue).** Pickup facts: bash gauge 33 ms; charc inbox 0 unread / 381 read; main `df41e59` clean, FREE; C: 173.6 GB
+  free, D: 2,349 GB; gen 25 listed live (busy); worktrees `wp4.3` (cell 10, OCCUPIED), `wp-dr87` (Codex, OCCUPIED),
+  `wp4.3-rev`, the `brief-*` and `orch-state-g2x` trees. Gen 25 status aab8bd6e (01:56Z): cell 10 has the revert +
+  window-5 prep, no window open, cell 11 fresh for report / B / gate; WP-DR87 DISPATCHED (round 0 running; its round 0
+  comes to me for Q2's tag list + the bench-ratio observation); gen 25 at ~360K, rolls at cell 10's retirement.
+  **WP4.6 BRIEF WRITTEN (DRAFT by CHARC, `docs/briefs/wp4.6-brief.md`, this commit):** boundary at the `ExportJobs`
+  seam under WP4.3's `GuardedExports`; `jobs/export_process.py` (parent) + `app/export_worker.py` (child, `python -m`),
+  JSON-lines protocol on stdout, cancel on stdin, kill after 3 s; video jobs spawn, photos stay in-process (Q1 (a));
+  child's own scratch cache under `cache_dir/export/<uuid>` (`cache/store.py:14` forbids two processes on one folder,
+  Q3); spawn through AD-23's helper (Q4, AD-23 extended at accept; NEW AD-31 at accept); one EXCLUSIVE window with
+  WP4.3's `s7_driver.py` modes v7c / v7e / v7d / dr44c-export; STOPs: (c)/(e) > 100 ms, child CPU fallback, wall > +10 %,
+  spawn > 10 s. Lane opus-high; dispatch AFTER WP4.3's accept (base filled by the orchestrator). No owner decision inside
+  (V7 relaxation not proposed).
 - **(gen 8 history follows; newest facts at the end of the block)**
 - **GEN 8 PICKUP (was).** Orchestrator = **gen 23 `clearwater-orchestrator-20261029-0852`** (online 18:57Z; gauge 37 ms;
   gen 22 rolled 18:52Z at ~420K, state 5a1538a). ALL cues go there. Time the bash launch and record it here. Drain with
