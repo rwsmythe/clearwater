@@ -136,6 +136,25 @@ def look_check_crop() -> np.ndarray:
     return np.ascontiguousarray(frame[top : top + 1080, left : left + 1920])
 
 
+def k1_mismatch(preview: np.ndarray, expected: np.ndarray) -> np.ndarray:
+    """Return where a k = 1 preview breaks EXACT (B-3): True at each pixel V8 refuses.
+
+    EXACT is the display quantisation of the same full-resolution render. A value within the
+    16-bit step of a rounding boundary may round either way, so there the preview may differ by
+    one display step and no more; everywhere else it must be equal.
+
+    Args:
+        preview: The corrected preview the shell shows (uint8).
+        expected: The exported image read back (float, 0..1), the same shape.
+
+    Returns:
+        A boolean array of ``preview``'s shape.
+    """
+    gap = np.abs(preview.astype(np.int16) - to_display_uint8(expected).astype(np.int16))
+    near = np.abs((expected * 255.0) % 1.0 - 0.5) <= 255.0 * HALF_STEP_16 + 1e-4
+    return np.where(near, gap > 1, gap > 0)
+
+
 def _v8_photo(
     make_app: Any, qtbot: Any, tmp_path: Path, pixels: np.ndarray, ks: tuple[int, ...]
 ) -> dict[int, tuple[float, float, float, float]]:
@@ -167,10 +186,7 @@ def _v8_photo(
             float(diff.max()),
         )
         if k == 1:  # EXACT: the display quantisation of the same full-resolution render
-            mismatch = to_display_uint8(expected) != preview
-            # A value within the 16-bit step of a rounding boundary may round either way.
-            near = np.abs((expected * 255.0) % 1.0 - 0.5) <= 255.0 * HALF_STEP_16 + 1e-4
-            assert not (mismatch & ~near).any(), f"k = 1 is not exact: {figures[1]}"
+            assert not k1_mismatch(preview, expected).any(), f"k = 1 is not exact: {figures[1]}"
         else:
             mean, p99, _, _ = figures[k]
             assert mean <= MEAN_BOUND and p99 <= P99_BOUND[k], f"k = {k}: {figures[k]}"
