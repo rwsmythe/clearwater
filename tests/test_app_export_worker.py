@@ -197,8 +197,9 @@ def test_the_worker_imports_no_qt(tmp_path: Path) -> None:
     modules = tmp_path / "modules.txt"
     probe = (
         "import atexit, runpy, sys\n"
+        "target = sys.argv.pop(1)  # the worker itself takes no arguments\n"
         "def record():\n"
-        "    with open(sys.argv[1], 'w') as f:\n"
+        "    with open(target, 'w') as f:\n"
         "        f.write('\\n'.join(sorted(sys.modules)))\n"
         "atexit.register(record)\n"
         "runpy.run_module('clearwater.app.export_worker', run_name='__main__', alter_sys=True)\n"
@@ -224,3 +225,26 @@ def test_q9_the_worker_and_the_in_process_engine_encode_the_same_frames(tmp_path
     frames_a, frames_b = _framemd5(a), _framemd5(b)
     assert len(frames_a) == len(frames_b) > 0
     assert frames_a == frames_b
+
+
+@pytest.mark.parametrize(
+    ("levelno", "name"),
+    [
+        (5, "DEBUG"),
+        (logging.INFO, "INFO"),
+        (25, "INFO"),
+        (logging.WARNING, "WARNING"),
+        (60, "CRITICAL"),
+    ],
+)
+def test_a_log_record_carries_a_level_the_parent_accepts(levelno: int, name: str) -> None:
+    """A custom level travels as the standard level at or below it (the parent's five)."""
+    import io
+
+    from clearwater.app import export_worker
+
+    stream = io.BytesIO()
+    handler = export_worker._ProtocolHandler(export_worker._Channel(stream, threading.Event()))
+    handler.emit(logging.LogRecord("clearwater.x", levelno, __file__, 1, "m %s", ("a",), None))
+    (line,) = stream.getvalue().splitlines()
+    assert json.loads(line) == {"log": {"level": name, "name": "clearwater.x", "message": "m a"}}
