@@ -120,7 +120,7 @@ def decode_request(line: bytes) -> WorkerRequest:
     if keys != _REQUEST_KEYS:
         missing, unknown = sorted(_REQUEST_KEYS - keys), sorted(keys - _REQUEST_KEYS)
         raise RequestError(f"the request's keys differ (missing {missing}, unknown {unknown})")
-    if data["format_version"] != 1 or isinstance(data["format_version"], bool):
+    if type(data["format_version"]) is not int or data["format_version"] != 1:  # not 1.0, true
         raise RequestError("the request's format_version is not 1")
     for name in ("source", "cache_folder", "app_version"):
         if not isinstance(data[name], str) or not data[name]:
