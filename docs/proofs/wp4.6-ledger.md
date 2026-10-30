@@ -13,6 +13,7 @@ Brief `docs/briefs/wp4.6-brief.md` FINAL on CHARC `39dad78f5b10ceeb`; base `b6a3
 | Y2b (build) | 2026-10-30 | (no review: task 7 and 8, cell 3) | - | - | - | - | - | - | - | 142,340 (cell 3 at Y2b, 05:33Z) |
 | R1 | 2026-10-30 | WSL, codex-cli 0.162.1, gpt-6.1-sol / high; HEAD `7a20c7bd` | 0 | 8 reported: 5 confirmed blocking (F1 F2 F3 F5 F6), 2 banked pre-existing (F4 F8), 1 reclassified minor (F7) | 6 reported (+F7) | 5 blocking in / 2 minor out (F9 F10) | 14 NEW / 0 REOPENED | 0 | product 8 (F1 F2 F3 F5 F6 F7 F9 F10) / test-only 4 (F11-F14), by cell 4 | 224,076 (cell 3 at the R1 yield); retired at 231,402 (05:57Z) |
 | R1 remediation | 2026-10-30 | (no review: cell 4 fixes, HEAD `c80061d1`) | - | - | - | - | - | 0 | product 8 / test-only 4 | (dispatcher fills: cell 4 at the remediation) |
+| R2 | 2026-10-30 | WSL, codex-cli 0.162.1, gpt-6.1-sol / high; HEAD `f91aea96` | 0 | 2 reported: 1 confirmed blocking (R2-2), 1 non-blocking by the verifiably-prevents rule (R2-1) | 3 reported (R2-3 R2-4 R2-5) | 1 blocking in; R2-1 not reachable by a product spawn | 5 NEW / 0 REOPENED | 0 | (remediation not started) | (dispatcher fills: cell 4 at R2) |
 
 ## Round 0 (task 2): the design restated, the Questions, the stops
 
@@ -698,3 +699,28 @@ F11 F12 F13 F14 (4). Reverts: 0.
 | 2 (the whole product diff `bab063a5..HEAD -- src/`) | nothing new | - | - | - |
 
 Depth: (dispatcher fills: cell 4 at the remediation yield).
+
+## Reviewer A round 2 (cell 4)
+
+Evidence `C:\Users\rwsmy\clearwater-review-evidence\wp4.6\r2\` (prompt, diff, transcript,
+`adjudication.md`, the reproduction `probe_r2.py` / `probe_r2.log`, `test-summary.txt`,
+`md5sums.txt`). The prompt is round 1's with: HEAD and round number; the orchestrator's
+rulings (strict-ignore in the envelope; the hold argument endorsed by CHARC; F4 and F8 known
+and banked) as "accepted by ruling"; round 1's changes as claims; the claim list updated;
+round 1's transcript and adjudication WITHHELD. Liveness probe `READY`, one `succeeded in`,
+06:11:22Z. Round run 06:11Z-06:26:51Z, exit 0. Verdict `NEW_CRITICAL_MAJOR_FOUND`; mechanical
+assertions met (banner model and effort, 26 executions, the tokens footer 146,138, the anchored
+VERDICT; ERROR lines: the model-list refresh and the offline MCP connector, as in round 1; the
+worktree clean afterwards). The reviewer could not run the committed tests under WSL (no NumPy)
+and showed its own source-level probes.
+
+| # | Finding | Adjudication |
+|---|---|---|
+| R2-1 | after a kill, the stdout quiet wait and the stderr tail wait run in sequence (5.062 s cancel-to-return with a pipe-holding grandchild) | CONFIRMED (5.069 s at my seat); MAJOR nominal, NON-BLOCKING: only a grandchild that inherits the worker's stdout or stderr reaches it, and every product spawn in the worker redirects all three streams (`capability.py:89-96`, `decode.py:171-178`, `:335-339`, `:350-354`, `encode.py:886-890`, `verify.py:225-232`; default `close_fds=True`). Clean-up: one shared drain window |
+| R2-2 | a component beginning with whitespace (or `'` then whitespace) stops the generic path match: `D:\ private\secret\clip.mp4` survives whole | CONFIRMED (Windows accepts the name: made and listed at my seat): MAJOR, in-envelope, NEW (F5's family, a different mechanism; the rule dates from Y1 `baffd2d2`). BLOCKING |
+| R2-3 | a single-quoted path followed by prose and a second path is joined to it | CONFIRMED: MINOR, NEW, introduced by R1's F5 fix `89d16c3b` (over-redaction, no leak). Clean-up: the apostrophe lookahead does not cross a `:` |
+| R2-4 | three DEBUG logs with `exc_info` put absolute code paths in the log | CONFIRMED: MINOR, NEW (no other `src/clearwater` module logs `exc_info`). Clean-up: the type name only |
+| R2-5 | F1's test witnesses the trigger word, not the grace's moment | CONFIRMED by reading: MINOR test-only. Clean-up: a controlled clock |
+
+Counts: reported critical 0, major 2, minor 3. Blocking NEW in-envelope 1 (R2-2). REOPENED 0.
+Rejected 0. Remediation is NOT started (the dispatch: yield with `R2 ADJUDICATED:` first).
