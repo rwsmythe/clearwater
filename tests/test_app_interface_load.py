@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import re
 import sys
-import time
+import threading
 from collections import Counter
 from collections.abc import Callable
 from types import FrameType
@@ -31,7 +31,10 @@ from test_app_startup import cpu_settings, make_app, wait_started
 pytestmark = pytest.mark.gui
 
 MIN_REPORTS = 20_000
-"""The runner pin's job reports at least this often, whatever the host does to its worker."""
+"""The runner pin's job reports this many times in each of its two bursts."""
+
+HANG_CEILING_S = 60.0
+"""The runner pin's holds give up after this long: a hang ceiling, never a timing (B-6)."""
 
 
 def _ok() -> JobResult:
@@ -78,17 +81,24 @@ def test_the_runner_delivers_at_most_one_report_per_tick_and_the_latest(qtbot, m
     count the job had produced by then; no stretch between two marks may carry more than one
     report (a burst fails), a mark that had a newer report to hand delivers one no older than
     that count (the latest, B-5), and at least one poll must deliver one before the final
-    delivery (R6-3). The job reports at
-    least :data:`MIN_REPORTS` times and for at least a second, so a host that pauses its worker
-    still leaves reports to coalesce.
+    delivery (R6-3).
+
+    Holds, not a clock (B-6): the first poll waits until the job has made its first burst of
+    :data:`MIN_REPORTS` reports, so that poll has a burst to coalesce; the job then waits until
+    an observed poll has run before its second burst, so a poll delivers before the final
+    delivery however the host schedules either thread. The waits are hang ceilings only.
     """
     events: list[tuple[str, int]] = []
     real_poll, real_finished = QtJobRunner._poll, QtJobRunner._on_finished
     produced = {"done": 0}
+    burst = threading.Event()  # the job's first burst is made
+    polled = threading.Event()  # a poll has run since: the job may go on
 
     def poll(self: QtJobRunner) -> None:
+        assert burst.wait(HANG_CEILING_S)
         events.append(("tick", produced["done"]))
         real_poll(self)
+        polled.set()
 
     def finished(self: QtJobRunner, handle: object, result: object) -> None:
         events.append(("end", produced["done"]))
@@ -97,16 +107,18 @@ def test_the_runner_delivers_at_most_one_report_per_tick_and_the_latest(qtbot, m
     monkeypatch.setattr(QtJobRunner, "_poll", poll)  # before the runner connects its slots
     monkeypatch.setattr(QtJobRunner, "_on_finished", finished)
     runner = QtJobRunner()
-    last = {"done": 0}
 
     def job(progress: Progress) -> JobResult:
-        done = 0
-        ends = time.monotonic() + 1.0
-        while done < MIN_REPORTS or time.monotonic() < ends:
-            done += 1
+        for _ in range(MIN_REPORTS):
+            done = produced["done"] + 1
             progress.report(done, None, "step")
             produced["done"] = done  # after the report: a mark never counts one not yet made
-        last["done"] = done
+        burst.set()
+        assert polled.wait(HANG_CEILING_S)
+        for _ in range(MIN_REPORTS):
+            done = produced["done"] + 1
+            progress.report(done, None, "step")
+            produced["done"] = done
         return _ok()
 
     handle = runner.run(
@@ -114,8 +126,8 @@ def test_the_runner_delivers_at_most_one_report_per_tick_and_the_latest(qtbot, m
         on_done=lambda _r: events.append(("done", 0)),
         on_progress=lambda d, _t, _m: events.append(("report", d)),
     )
-    qtbot.waitUntil(lambda: not handle.is_running(), timeout=10000)
-    _assert_delivered_per_tick(events, last["done"])
+    qtbot.waitUntil(lambda: not handle.is_running(), timeout=HANG_CEILING_S * 1000)
+    _assert_delivered_per_tick(events, 2 * MIN_REPORTS)
 
 
 def _assert_delivered_per_tick(events: list[tuple[str, int]], reports: int) -> None:
