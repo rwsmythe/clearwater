@@ -1622,3 +1622,80 @@ product logs naming it 0; a grep of every window output for the footage folder 0
 142 MB in `work/wp4.3-c10-win5/`. The revert took (b) from 195.0 back to 19.0 ms and (f) from 395.4
 back to 50.6 ms: the window-4 STOPs in (b) and (f) were the gc policy's, as CHARC's ruling read
 them.
+
+## RESUME HERE (successor of cell 10 = cell 11; written by cell 10, 2026-10-30 ~02:10Z)
+
+- **State.** Branch `wp4.3`, base main `5e3537d` (main has moved on, at least to `1f3d237` with
+  WP4.4; NO rebase unless the dispatcher says so). Product code final at `7b4c10b` (item 3
+  reverted); head = this commit; worktree clean apart from untracked `work/`; uncommitted
+  `clearwater.local.toml` in place (never edit or commit it). Cell 10 retired after window 5
+  (depth 231,467 at the window-4 yield, dispatcher's figure).
+- **What the V7 step left in product code** (`git diff 1d96dc4..7b4c10b -- src/`: `app/main.py`
+  only): item 1, `AppWindow(MainWindow)` noting its close in `closeEvent` (no Python event filter
+  on the window; `Application.closed()` reads `close_seen`). Tests kept: the paint/update/layout/
+  timer no-Python test, the runner pin (`_assert_delivered_per_tick`, R5-5 / R5-6 / R6-3) and its
+  vacuous-list test (`tests/test_app_interface_load.py`), `test_app_startup.py`'s spy on
+  `AppWindow`, the (f) probe move (`tests/test_app_v7.py`, probe starts at `show()`, `838b665` /
+  `28c4ece`). Item 3 (the gc policy) is GONE (`7b4c10b`); its epitaph is above.
+- **Rulings of this step (every one in the record by msg id):** `7b32521f060044d9` (the
+  remediation step: items 1 / 2 / 3; the `gui/jobs.py` / `export_panel.py` grant GRANTED and NOT
+  USED), `b9a0ce010581a296` (ruling B: (f) probe at `show()`), `cc0703a7` (`cc0703a79f98154e`,
+  R5: idle-only gc, R5-2 / R5-3 minor), `424f573b88b5a203` (R6: R6-1 minor, THE CAP, no R7;
+  window 4 content), `921babda38ba1f3a` (window 4: revert item 3; switch interval NOT adopted;
+  WP4.3 closes with (c) / (e) OPEN; V8 bound re-ruled). The round count exceeds the fill's five
+  because R5 / R6 reviewed a NEW step after R1-R4 converged (CHARC's record note).
+- **The V7 table of record** (WP3.16 probe, longest / p99; GX011627, GPU, owner's laptop,
+  exclusive windows; `s7_driver.py` `0b9ee6cc...`):
+
+  | Scenario | Figure of record | Window, head | Verdict |
+  |---|---|---|---|
+  | (a) analysis | 18.0 / 15.0 ms (681 frames, 59.1 s) | 5, `8eaa897` (product `7b4c10b`) | PASS |
+  | (b) scrubbing during it | 19.0 / 15.0 ms (1,300 proxies shown) | 5, `8eaa897` | PASS |
+  | (c) File > Export | 180.0 / 12.0 ms at 5 ms switch interval; 181.0 / 12.0 at 1 ms (export 209-211 s) | 4, `b4c8561` (product `86ba69a`, gc policy present; CHARC 921babda: the revert cannot move them, the figures stand) | **OPEN STOP** |
+  | (d) 300-still batch (DR-50) | 56.0 / 43.0 ms | 5, `8eaa897` | PASS |
+  | (e) 1:1 4K render during (c) | 182.0 / 12.0 ms at 5 ms; 80.0 / 12.0 at 1 ms (one sample) | 4, `b4c8561` | **OPEN STOP** |
+  | (f) start-up, settled 20 GB cache, from `show()` (ruling B) | 50.6 / 14.8 ms; build_application cold 93.8 ms; cache open 186.1 ms | 5, `8eaa897` | PASS |
+
+  History, kept as history: windows 1-2 (pre-remediation) (a) 18.0, (b) 21.0, (c) 182.0, (d)
+  66.0, (e) 196.0; window 3 (f) settled 47.5; window 4 (gc policy) (b) 195.0 and (f) 395.4 STOPs,
+  removed by the revert. (c) / (e) CAUSE: in-process GIL contention, no single holder (windows 3-4:
+  the out-of-process heartbeat never over 16.3 ms; py-spy --gil; the two compute threads alternate
+  on the GIL and the interface thread's Python entries wait for it). CHARC writes DR-98 (V7 (c) /
+  (e) at 4K export, open; trigger = the follow-on) and briefs WP4.6 (export process isolation)
+  at the accept. Switch interval: NOT adopted; the report records both intervals' figures.
+  Memory (not of record): working set +101.1 MB per 4K export ((c)), +247.2 / +237.0 MB in (e)
+  with the render; `gc.garbage` 0 (window 4, gc policy present).
+- **V8 / V18 (window 3, `v8v18`, and window 4's 16-frame characterisation).** V18 on GX011627: a
+  corrected frame before completion with statistics None, the shown statistics ==
+  `smoothed_record(pts)` after (window 3). V8 video at k = 2 RE-RULED (921babda Q4): per frame
+  mean <= 1/255, p99 <= 2.5/255, p99.9 and max recorded only; CHARC writes AD-11's note. Window 4's
+  16 frames: p99 median 1.169/255, max 1.946/255 (frame 276); mean max 0.132/255; p99.9 2.744-6.679
+  /255; max 15.758-40.848/255; shown == preview (max diff 0) at all 16. Window 3's four frames:
+  frame 510 p99 2.011/255 (over the old 2/255, WITHIN the re-ruled 2.5/255). v8v18 is NOT re-run.
+  OPEN QUESTION for the dispatcher (do not change without a ruling): `tests/test_app_v8_v18.py`'s
+  committed `P99_BOUND = {2: 2.0 / 255.0, 4: 4.0 / 255.0}` binds the synthetic / look-check stills
+  (green); whether the video re-rule touches it is CHARC's AD-11 note to say.
+- **DR-44 (c) on GX011627 (window 3, of record):** analysis close 361 ms, export 218 ms, batch
+  262 ms, each ended at close, no temporaries.
+- **The report `docs/reports/wp4.3-application-wiring.md`** (cell 11's first task; "V7, V8, V18"
+  section at `:62-121` still says "pending" everywhere): fill the V7 "Window" column from the
+  table above (driver md5, command, EXIT per figure; (c) / (e) as OPEN STOPs with cause, DR-98,
+  WP4.6; both switch intervals; "not adopted"); one sentence stating (f)'s rule (probe from
+  `show()`, ruling B; build_application recorded, never asserted); the start-up figures (cell 7's
+  RESUME HERE: 55 / 37 ms cold process, 933 / 771 ms after 20 GB of writes, 158 / 157 ms planted /
+  settled in-process; window 5: build_application cold 93.8 ms, cache open 186.1 ms); DR-50 =
+  (d)'s 300-item figure 56.0 ms; DR-85 closed by WP4.3a (the xfail dropped at `300731d`); the V8
+  window leg (re-ruled bound, the 16-frame table, frame 510); V18 and DR-44 (c) on GX011627 (above);
+  the V7 remediation step in a short paragraph (item 1 kept with its host witness 101.3 / 264.0 ->
+  31.2 / 111.4 ms per progress report, development, not of record; the grant GRANTED and NOT USED;
+  item 3 tried and reverted with its epitaph; R5 / R6 and the CAP); the round-0 "sparse"
+  correction (the 20 GB plant is fully allocated, 19.96 GB real disk; cell 7's note). Every figure
+  names its run (window, head, driver md5, EXIT).
+- **Then:** Reviewer B (the orchestrator's own Codex pass; its prompt names R6-1..R6-4 and their
+  fixes, and that item 3 was reverted), then the two-leg gate (and `fullclip` only if the
+  dispatcher asks). Evidence: `C:/Users/rwsmy/clearwater-review-evidence/wp4.3/` (`r5/`, `r6/`,
+  `windows/win1`-`win5`, `dry*`, the ruling files `r5-ruling-cc0703a7.md`,
+  `r6-ruling-424f573b.md`, `win4-ruling-921babda.md`; `windows/md5sums.txt`).
+- **Disciplines:** never a bare `cd`; backslash-bearing text by the Write tool; LF, 0 CR, 0 NUL in
+  every blob; commit by pathspec with `-c core.autocrlf=false`; a plant costs 19.96 GB of real disk
+  (none is left on disk now: windows 4 and 5 and both dry runs deleted theirs).
