@@ -66,6 +66,14 @@
   (R0 all exit 0: DR-87 node 90.93 s pytest before; DR-94 = 37724 + 50740, no additions recommended); gen 26 posts the
   round-0 note for my Q2 tag ruling. Waiting on: gen 26's online post, cell 11 dispatch (WP4.3 report / B / gate), the
   WP-DR87 round-0 note.
+- **GEN 26 ONLINE 02:14Z (`clearwater-orchestrator-20261029-1612`, query 31d63d77; gauge 24 ms; C: 172 GB). WP-DR87 ROUND 0
+  RULED 02:17Z (my post + cue):** Ask 1 CONFIRMED FINAL: DR-94 drop set = 37724 ImageSourceData + 50740 DNGPrivateData
+  only (50341, 50255 and the existing exclusions kept; a tag outside the list is a STOP). Ask 2 = no remedy for R0-C
+  (`test_bench_works_as_a_script` 33.83 s, parallel leg, about 5 %). At WP-DR87's accept mine: DR-87 CLOSED test-side
+  with before 90.93 s pytest / after from the RUN REQUEST + notes (tool cost unchanged by design; WP-T6's "stop 16.3 s"
+  did not reproduce: `_GpuSampler` not built in core mode, `stray_processes` 63.24 of 66.56 s), DR-93 CLOSED, DR-94
+  CLOSED. Codex turn 2 resumes on my post. WP4.3 cell 11 (opus-high, report only) dispatching from `f342f9d`; then B
+  (Codex) + gate + accept (my accept-side rows then).
 - **(gen 8 history follows; newest facts at the end of the block)**
 - **GEN 8 PICKUP (was).** Orchestrator = **gen 23 `clearwater-orchestrator-20261029-0852`** (online 18:57Z; gauge 37 ms;
   gen 22 rolled 18:52Z at ~420K, state 5a1538a). ALL cues go there. Time the bash launch and record it here. Drain with
