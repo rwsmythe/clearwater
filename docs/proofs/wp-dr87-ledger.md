@@ -263,7 +263,8 @@ criterion follow the seam fill, not an improvised round count.
 | Turn / boundary | Dispatcher-read context depth | Action |
 | --- | --- | --- |
 | Turn 1 / round 0 | 131,491 after turn 1, supplied by dispatcher on turn 2 | Continue with RED-only turn 2; evaluate around 200K and stop at a step boundary near 250K. |
-| Turn 2 / RED tests and fixture | Not yet supplied | Yield at the scheduled boundary; no estimate substituted. |
+| Turn 2 / RED tests and fixture | 155,735 after turn 2, supplied by dispatcher on turn 3 | Continue with GREEN/report turn 3; evaluate around 200K and stop at a step boundary near 250K. |
+| Turn 3 / GREEN and report | Not yet supplied | Yield for Reviewer A; no estimate substituted. |
 
 Round-0 verification loop: suspected stale caller anchors and ambiguous
 sampler attribution; confirmed the caller corrections by direct source search,
@@ -397,3 +398,91 @@ subprocess assertion, dependencies, spec/register and local config are
 unchanged. No footage or other worktree was accessed, and no mailbox post,
 commit, profile, GPU command or deletion was performed. The two REDs are
 intentional, with GREEN deferred to the next turn as dispatched.
+
+## Turn 3 - GREEN and candidate report
+
+Turn parent: `d301d989929664e5bb9b477edf4d22523d79deeb`. The dispatcher
+committed the RED tests as `51a90dd`, the Q1 fixture as `4d066da`, and the
+turn-2 ledger as `d301d98`, all LF. Its Ruff format/check pass on the two test
+files was clean. Depth supplied after turn 2: **155,735** tokens.
+
+### DR-87 after figure returned
+
+The seat executed the guarded `work/wp-dr87/r2/run_after.sh` on `d301d98`;
+the product diff vs `00518bb` was empty. Preflight: disk free
+188,014,583,808 bytes, RAM available 8,648,544,256 bytes. It reported nothing
+else heavy; one read-only WSL Codex review on another package and one Claude
+cell writing a report were active. Outside WP4.3 windows, not EXCLUSIVE.
+
+| Figure | Before R0-A | After R2 |
+| --- | --- | --- |
+| UTC start, 2026-10-30 | 02:08:11Z | 02:23:03Z |
+| DR-87 node call | 87.01 s | 24.24 s |
+| Pytest summary | 1 passed, 1 warning in 90.93 s | 1 passed, 1 warning in 25.24 s |
+| External wall | 96.684 s | 26.511 s |
+| EXIT / ratio assertion | 0 / passed | 0 / passed |
+
+Observed reduction: 65.69 s pytest, 70.173 s external wall. The cell read
+`r2/after-head.txt`, `after-node-start-utc.txt`, `after-node-wall.txt`,
+`after-node-exit.txt` and summary/duration lines in `after-node.log`.
+All paths are relative to `work/wp-dr87/`. No GPU command was run by the cell.
+The unchanged 10 s default and real tool cost, non-reproduced 16.3 s sampler
+delay, declined R0-C remedy and observation-only ratio are recorded in the
+report with CHARC's ruling.
+
+### GREEN changes and validation
+
+Only the owned portions of `src/clearwater/io/photo/exif.py` change:
+
+- `from_tiff` catches `(ValueError, struct.error, MemoryError)` and retains
+  the exact warning literal; no bare Exception added.
+- `_TIFF_STRUCTURE` gains exactly 37724 and 50740. The new comment identifies
+  ImageSourceData as Photoshop layer data and DNGPrivateData as a raw
+  converter's private block; the dropped-blob docstring sentence names both ids.
+- No test change on this turn. The existing RED nodes from `51a90dd` now
+  pass in the required full light selection on the product diff.
+
+| Command | Result | Evidence under `work/wp-dr87/r3/` |
+| --- | --- | --- |
+| Brief's light pytest command, `PYTHONPATH=scripts`, `--basetemp=work/wp-dr87/tmp`, sandbox shim and no-cache plugin, all five marker exclusions | **291 passed, 18 deselected, 2 warnings in 59.71s**, EXIT 0 | `light-green.log`, `light-green-exit.txt` |
+| `uv run ruff check .` | **All checks passed!**, EXIT 0 | `ruff-check.log`, `ruff-check-exit.txt` |
+| `uv run mypy` | **Success: no issues found in 141 source files**, EXIT 0 | `mypy.log`, `mypy-exit.txt` |
+
+The warnings are the same CuPy CUDA-path/Pillow malformed-input warnings;
+uv's inherited-environment mismatch warning is ignored in favor of the
+project environment. Format check is reserved to the seat. No full suite,
+profile or GPU node was executed by the cell. The single two-leg gate follows
+Reviewer A convergence and Reviewer B's return, as dispatched.
+
+Created `docs/reports/wp-dr87.md` with the per-change list, complete seated
+before/after/profile/script figures, RED sha/node ids and GREEN evidence,
+sources and exact tag ids, locks and depth readings. Reviewer A has the
+requested placeholder for completion after its rounds; B/gate remain pending.
+
+Verification loop: all three debts were confirmed by the previously recorded
+bounded REDs/profile and then addressed within the owned envelope. Both
+regression nodes and every other selected test are green; lint/types pass.
+Sampler delay was not reproduced and remains unmodified; pool-ratio causation
+remains unproven and observation-only. Final cell scope verification checks
+the exact exception/drop-set changes, warning identity and unchanged source
+outside the authorized edit. No new issue or unresolved choice is raised.
+
+Final bounded scope check: `work/wp-dr87/r3/scope-check.log` and
+`scope-check-exit.txt`, EXIT 0. It confirms exact tag additions, protected
+fields kept, warning AST unchanged, no other product AST change after
+normalizing only the authorized edits, no test change on turn 3, and
+`bench.py` byte-identical to `00518bb`. Exactly three owned files changed
+this turn, exactly five cumulatively; all five artifacts are ASCII/LF.
+`git diff --check` exited 0 (`r3/diff-check.log`).
+
+Reviewer A has not run. This is a build turn, not a counted reviewer round:
+critical/major/minor 0/0/0, in/out 0/0, NEW/REOPENED 0/0, reverts 0;
+one product file changed, no test fix. Yield for the driver's Claude pass;
+the next adjudication turn changes only the ledger and yields before any
+remediation.
+
+Turn-3 locks: only `exif.py`, the report and ledger changed on this turn;
+cumulative scope is exactly the five owned paths. Frozen interfaces,
+`bench.py`, existing test assertions, dependencies, spec/register and local
+config are untouched. No owner footage or other worktree was accessed, and
+no commit, stash, mailbox post, hardware run, profile or deletion was performed.
