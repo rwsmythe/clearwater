@@ -48,7 +48,8 @@ three keys, of the wrong shape or types, holds a non-finite number, is longer th
 :data:`MAX_LINE_BYTES` or has no ``\n`` at the end of the output is IGNORED and logged by its
 reason (never its content). Only the FIRST result counts (a later one is logged); a result
 followed by a non-zero exit is still the result (the status is logged); a worker still running
-:data:`KILL_AFTER_CANCEL_S` after its result is killed (logged) and the result kept. The
+:data:`KILL_AFTER_CANCEL_S` after its result (or after the cancel line, when that came first)
+is killed (logged) and the result kept. The
 result's ``elapsed_s`` is the parent's own measure, spawn included; a ``failure`` equal to
 :data:`~clearwater.jobs.export_seam.CANCELLED` is returned as the constant itself.
 
@@ -102,7 +103,7 @@ SCRATCH_FOLDER = "export"
 """The folder under the cache folder that holds one scratch folder per running job."""
 
 KILL_AFTER_CANCEL_S = 3.0
-"""Seconds a worker has to exit after the cancel line (or after its result) before it is killed.
+"""Seconds a worker has to exit after the cancel line or its result, whichever came first.
 
 Under the interface's ``SHUTDOWN_TIMEOUT_S`` (5.0), so a close during an export still ends in time.
 """
@@ -407,7 +408,11 @@ def _converse(
                 cancel_at = now
             status = process.poll()
             if status is None:
-                grace_from = result_at if result_at is not None else cancel_at
+                # The grace runs from the EARLIER trigger: a cancel line is only ever sent
+                # before a result, so a result after the cancel never restarts it.
+                trigger, grace_from = (
+                    ("cancel", cancel_at) if cancel_at is not None else ("result", result_at)
+                )
                 if grace_from is None or now - grace_from < KILL_AFTER_CANCEL_S:
                     continue
                 process.kill()
@@ -416,7 +421,7 @@ def _converse(
                 _LOG.warning(
                     "export worker killed: still running %.1f s after its %s",
                     KILL_AFTER_CANCEL_S,
-                    "result" if result is not None else "cancel",
+                    trigger,
                 )
             if ended:
                 break
