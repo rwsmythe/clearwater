@@ -15,12 +15,13 @@ The only ``clearwater.app`` module that imports ``clearwater.gui`` or loads Qt.
    panels (the guarded exports, sharing the one cache) and the settings dialog (WP3.10's rule,
    the start-up's encoder catalog, and the window's one closed signal, which its cache jobs'
    errors read, R2-3); then ``show()``.
-5. Three start-up jobs on the window's job runner, off the interface thread: (i) the cache's
+5. The window's :class:`FullCollections` check, before any worker starts: from here on
+   CPython's full garbage collection runs on the interface thread at an idle moment only, never
+   while a job runs (V7).
+6. Three start-up jobs on the window's job runner, off the interface thread: (i) the cache's
    open with the settings' limit; (ii) the encoder detection into the catalog (D74, 8.2);
    (iii) the graphics-card detection, whose AD-9 reason the status bar shows while no file is
    open (and the log records); it runs again when the settings change with no file open.
-6. The window's :class:`FullCollections` check: from here on CPython's full garbage collection
-   runs on the interface thread at an idle moment only, never while a job runs (V7).
 """
 
 from __future__ import annotations
@@ -106,22 +107,29 @@ class FullCollections:
     when the last started instance stops (the window's close). Interface thread only.
     """
 
-    def __init__(self, jobs: JobRunner, parent: QObject) -> None:
+    def __init__(
+        self, jobs: JobRunner, parent: QObject, *, closed: Callable[[], bool] = lambda: False
+    ) -> None:
         """Create the check, not yet started.
 
         Args:
             jobs: The window's job runner (``active()`` tells whether a job is running).
             parent: The timer's owner (the window).
+            closed: True once the window saw its close; :meth:`start` then does nothing.
         """
         self._jobs = jobs
+        self._closed = closed
         self._timer = QTimer(parent)
         self._timer.setInterval(IDLE_CHECK_MS)
         self._timer.timeout.connect(self._check)
         self._frozen = False
 
     def start(self) -> None:
-        """Turn the automatic full collection off and start the check (idempotent)."""
-        if self in _STARTED:
+        """Turn the automatic full collection off and start the check (idempotent).
+
+        Nothing happens once the window saw its close (its :meth:`stop` has run, or never will).
+        """
+        if self in _STARTED or self._closed():
             return
         if not _STARTED:
             _SAVED_THRESHOLDS[:] = [gc.get_threshold()]
@@ -176,7 +184,7 @@ class AppWindow(MainWindow):
         """Build the shell's window (``MainWindow``'s arguments)."""
         super().__init__(engines, locations, presenter=presenter, choose_file=choose_file)
         self.close_seen = False
-        self.full_collections = FullCollections(self.jobs, self)
+        self.full_collections = FullCollections(self.jobs, self, closed=lambda: self.close_seen)
 
     def closeEvent(self, event: QCloseEvent) -> None:  # noqa: N802 -- Qt override
         """Note the close, then the shell's shutdown and close, then stop the collection check."""
@@ -396,8 +404,8 @@ def build_application(
         window_closing=application.closed,  # the start-up callbacks' one closed signal (R2-3)
     )
     window.show()
+    window.full_collections.start()  # before any worker; the freeze waits for start-up's end
     application.start_jobs()
-    window.full_collections.start()  # the freeze waits for the start-up jobs' end
     return application
 
 
