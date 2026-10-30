@@ -439,7 +439,7 @@ def _converse(
             if quiet_since is None or kind is not None:
                 quiet_since = now
             elif now - quiet_since >= DRAIN_AFTER_EXIT_S:
-                _LOG.warning("export worker output still open after its exit; no longer waited for")
+                _LOG.warning("export worker output still open after its exit; no longer read")
                 break
     except BaseException:
         process.kill()
@@ -541,7 +541,8 @@ def _decode_line(content: bytes) -> tuple[str, Any]:
         return key, _decode_log(value)
     if key == "result":
         return key, _decode_result(value)
-    raise _InvalidLineError("an unknown key")  # never the key: it is the line's content
+    # CHARC e15d408a (F6): the key's length and at most its first 8 characters, never more
+    raise _InvalidLineError(f"an unknown key of {len(key)} characters, first {_ascii(key[:8])!r}")
 
 
 def _is_int(value: object) -> bool:

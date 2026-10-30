@@ -475,7 +475,8 @@ def test_a_traceback_tail_is_redacted_to_names(tmp_path: Path) -> None:
 def test_a_folder_name_that_continues_a_known_folder_or_holds_an_apostrophe_is_cut(
     tmp_path: Path,
 ) -> None:
-    """R1 F5: no folder component survives, past a known folder or around an apostrophe."""
+    """R1 F5 (CHARC e15d408a): file names only, over folder names with spaces, apostrophes and
+    non-ASCII characters, past a known folder or in an unknown path."""
     known = tmp_path / "my clips"  # the source's folder
     unknown_root = Path("D:\\owner home") if sys.platform == "win32" else Path("/home/owner_home")
     paths = [
@@ -484,13 +485,16 @@ def test_a_folder_name_that_continues_a_known_folder_or_holds_an_apostrophe_is_c
         str(known / "'Tis hiddenC" / "c.mp4"),  # an apostrophe that begins a name
         str(unknown_root / "Owner's hiddenD" / "d.mp4"),  # the same in an unknown path
         str(known / "Divers' hiddenE" / "e.mp4"),  # an apostrophe that ends a word
+        str(known / "Tauchg\u00e4nge hiddenF" / "f.mp4"),  # non-ASCII under a known folder
+        str(unknown_root / "Plong\u00e9e \u00e9t\u00e9 hiddenG" / "g.mp4"),  # and unknown
     ]
     command = _child(
         tmp_path,
         """\
         for path in ARGS:
-            sys.stderr.write("could not open " + path + "\\n")
-            sys.stderr.write("could not open " + repr(path) + "\\n")
+            for shown in (path, repr(path)):
+                sys.stderr.buffer.write(("could not open " + shown + "\\n").encode("utf-8"))
+        sys.stderr.flush()
         sys.exit(1)
         """,
         *paths,
@@ -498,9 +502,12 @@ def test_a_folder_name_that_continues_a_known_folder_or_holds_an_apostrophe_is_c
     result, _ = _run(tmp_path, command)
     failure = result.failure
     assert failure is not None and failure.isascii()
-    for name in ("a.mp4", "b.mp4", "c.mp4", "d.mp4", "e.mp4"):
+    for name in ("a.mp4", "b.mp4", "c.mp4", "d.mp4", "e.mp4", "f.mp4", "g.mp4"):
         assert failure.count(name) == 2, (name, failure)
-    for folder_name in ("Archive", "hidden", "Diver", "Tis", "Owner", "owner", tmp_path.name):
+    for folder_name in (
+        *("Archive", "hidden", "Diver", "Tis", "Owner", "owner", "Tauchg", "Plong"),
+        *("\\xe4", "\\xe9", tmp_path.name),
+    ):
         assert folder_name not in failure, (folder_name, failure)
 
 
@@ -591,10 +598,10 @@ def test_an_invalid_line_is_ignored_and_logged(
     assert any("ignored" in m for m in _messages(caplog, PROCESS_LOGGER)), why
 
 
-def test_an_unknown_key_is_logged_without_the_key(
+def test_an_unknown_key_is_logged_by_its_length_and_first_8_characters(
     tmp_path: Path, caplog: pytest.LogCaptureFixture
 ) -> None:
-    """R1 F6: an ignored line is logged by its reason only, never its content (the key)."""
+    """R1 F6 (CHARC e15d408a): the key's length and at most its first 8 characters, no more."""
     caplog.set_level(logging.DEBUG)
     command = _child(
         tmp_path,
@@ -603,7 +610,10 @@ def test_an_unknown_key_is_logged_without_the_key(
     result, _ = _run(tmp_path, command)
     assert result.ok, result.failure
     ignored = [m for m in _messages(caplog, PROCESS_LOGGER) if "ignored" in m]
-    assert ignored == ["export worker line ignored: an unknown key"]
+    assert ignored == [
+        "export worker line ignored: an unknown key of 20 characters, first 'C:\\\\Owner'"
+    ]
+    assert "Private" not in ignored[0]
 
 
 def test_any_error_decoding_one_line_ignores_that_line_only(
