@@ -184,6 +184,10 @@
   controlled clock: concurred. F9/F10 fixes kept; F1 = one deadline from the earlier of cancel / result. CAP: R3 the
   LAST full round for the PROTOCOL class (a new R3 major there = RED-first fix in the terminating clean-up, verified at
   the orchestrator's seat, B sees the final tree); any other class at R3 comes to me. Cell 4 at 199,451 continues.
+- **06:34Z (query c74c8eb3; post f722e406 + cue): Q10 spawn-failure text under (d) = "could not be started (<OSError type
+  name>, errno N); details are in the application log", full OSError to the log; same rule for every parent-side
+  OSError; absence test over a planted hostile interpreter path. Cell 4 applying (d) + this; then R3 (last full round
+  for the protocol class).**
 - **(gen 8 history follows; newest facts at the end of the block)**
 - **GEN 8 PICKUP (was).** Orchestrator = **gen 23 `clearwater-orchestrator-20261029-0852`** (online 18:57Z; gauge 37 ms;
   gen 22 rolled 18:52Z at ~420K, state 5a1538a). ALL cues go there. Time the bash launch and record it here. Drain with
