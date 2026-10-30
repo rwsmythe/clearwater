@@ -13,6 +13,7 @@ job per tick, the latest (already so at ``1d96dc4``: pinned, not a RED).
 
 from __future__ import annotations
 
+import re
 import sys
 import time
 from collections import Counter
@@ -73,21 +74,24 @@ def test_the_windows_paint_update_layout_and_timer_events_run_no_python(make_app
 def test_the_runner_delivers_at_most_one_report_per_tick_and_the_latest(qtbot, monkeypatch) -> None:
     """Item 1's delivery rule, pinned per tick (green at base; R5-5, R5-6).
 
-    Each poll of the runner's timer and its final delivery before ``on_done`` are marked, and no
-    stretch between two marks may carry more than one report (a burst fails), and at least one
-    poll must deliver one before the final delivery (R6-3). The job reports at
+    Each poll of the runner's timer and its final delivery before ``on_done`` are marked with the
+    count the job had produced by then; no stretch between two marks may carry more than one
+    report (a burst fails), a mark that had a newer report to hand delivers one no older than
+    that count (the latest, B-5), and at least one poll must deliver one before the final
+    delivery (R6-3). The job reports at
     least :data:`MIN_REPORTS` times and for at least a second, so a host that pauses its worker
     still leaves reports to coalesce.
     """
     events: list[tuple[str, int]] = []
     real_poll, real_finished = QtJobRunner._poll, QtJobRunner._on_finished
+    produced = {"done": 0}
 
     def poll(self: QtJobRunner) -> None:
-        events.append(("tick", 0))
+        events.append(("tick", produced["done"]))
         real_poll(self)
 
     def finished(self: QtJobRunner, handle: object, result: object) -> None:
-        events.append(("end", 0))
+        events.append(("end", produced["done"]))
         real_finished(self, handle, result)
 
     monkeypatch.setattr(QtJobRunner, "_poll", poll)  # before the runner connects its slots
@@ -101,6 +105,7 @@ def test_the_runner_delivers_at_most_one_report_per_tick_and_the_latest(qtbot, m
         while done < MIN_REPORTS or time.monotonic() < ends:
             done += 1
             progress.report(done, None, "step")
+            produced["done"] = done  # after the report: a mark never counts one not yet made
         last["done"] = done
         return _ok()
 
@@ -114,21 +119,31 @@ def test_the_runner_delivers_at_most_one_report_per_tick_and_the_latest(qtbot, m
 
 
 def _assert_delivered_per_tick(events: list[tuple[str, int]], reports: int) -> None:
-    """The runner pin's postconditions over its marked event list and the job's report count."""
+    """The runner pin's postconditions over its marked event list and the job's report count.
+
+    A mark is ``("tick", produced)`` or ``("end", produced)``: the count of reports the job had
+    made when the poll or the final delivery began.
+    """
     seen = [d for kind, d in events if kind == "report"]
     assert seen and seen[-1] == reports  # the last report was delivered,
     assert events.index(("report", reports)) < events.index(("done", 0))  # before the result
     assert seen == sorted(set(seen))  # each delivery later than the one before, none repeated
-    per_mark: list[int] = []
-    for kind, _ in events:
+    marks: list[tuple[int, list[int]]] = []  # (produced at the mark, the reports it delivered)
+    for kind, value in events:
         if kind in ("tick", "end"):
-            per_mark.append(0)
+            marks.append((value, []))
         elif kind == "report":
-            assert per_mark, events[:5]  # a report only from a poll or the final delivery
-            per_mark[-1] += 1
-    assert max(per_mark) <= 1, per_mark
+            assert marks, events[:5]  # a report only from a poll or the final delivery
+            marks[-1][1].append(value)
+    assert max(len(delivered) for _, delivered in marks) <= 1, marks
+    latest = 0
+    for produced, delivered in marks:
+        if produced > latest:  # a newer report was there to hand: the mark delivers the latest
+            assert delivered and delivered[0] >= produced, (produced, delivered)
+        if delivered:
+            latest = delivered[0]
     assert len(seen) < reports  # fewer deliveries than reports: the rest were dropped
-    polled = events[: events.index(("end", 0))]
+    polled = events[: next(i for i, (kind, _) in enumerate(events) if kind == "end")]
     assert any(kind == "report" for kind, _ in polled), events[:5]  # a tick delivered (R6-3)
 
 
@@ -137,6 +152,25 @@ def test_the_runner_pin_rejects_a_run_whose_polls_delivered_nothing() -> None:
 
     Planted on ``74586d4``: that event list passes every postcondition of the pin.
     """
-    vacuous = [("end", 0), ("report", MIN_REPORTS), ("done", 0)]
+    vacuous = [("end", MIN_REPORTS), ("report", MIN_REPORTS), ("done", 0)]
     with pytest.raises(AssertionError):
         _assert_delivered_per_tick(vacuous, MIN_REPORTS)
+
+
+def test_the_runner_pin_rejects_stale_deliveries_at_a_poll() -> None:
+    """B-5: a runner draining old reports one per poll delivers ``1, 2`` while thousands exist.
+
+    Reviewer B's sequence: deliveries ``1, 2, 20000``, one per mark, increasing, the last before
+    the result. Without the produced count at each mark it passes every other postcondition.
+    """
+    stale = [
+        ("tick", MIN_REPORTS // 2),
+        ("report", 1),
+        ("tick", MIN_REPORTS),
+        ("report", 2),
+        ("end", MIN_REPORTS),
+        ("report", MIN_REPORTS),
+        ("done", 0),
+    ]
+    with pytest.raises(AssertionError, match=re.escape(str((MIN_REPORTS // 2, [1])))):
+        _assert_delivered_per_tick(stale, MIN_REPORTS)
