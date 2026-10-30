@@ -31,7 +31,7 @@ from typing import Any
 import pytest
 from PySide6.QtCore import QCoreApplication, QEvent, QObject, QTimerEvent
 
-from clearwater.app.main import IDLE_CHECK_MS, FullCollections
+from clearwater.app.main import IDLE_CHECK_MS, Application, FullCollections
 from clearwater.gui.jobs import PROGRESS_INTERVAL_MS, QtJobRunner
 from clearwater.interfaces import JobResult, Progress
 from test_app_startup import cpu_settings, make_app, wait_started
@@ -232,3 +232,42 @@ def test_an_idle_window_neither_freezes_nor_collects_while_another_windows_job_r
         a.stop()
         b.stop()
     assert gc.get_freeze_count() <= frozen_before
+
+
+def test_the_collection_policy_starts_before_the_start_up_workers(
+    make_app, qtbot, monkeypatch
+) -> None:
+    """R5-3: no start-up worker runs before the automatic full collection is off.
+
+    Planted on ``d13f84b``: ``build_application`` starts the jobs, then the policy.
+    """
+    seen: list[int] = []
+    real = Application.start_jobs
+
+    def start_jobs(self: Application) -> None:
+        seen.append(gc.get_threshold()[2])  # the third threshold as the workers start
+        real(self)
+
+    monkeypatch.setattr(Application, "start_jobs", start_jobs)
+    application = make_app(cpu_settings())
+    wait_started(qtbot, application)
+    assert len(seen) == 1 and seen[0] > 1_000_000, seen
+
+
+def test_a_closed_windows_collection_policy_does_not_start(make_app, qtbot) -> None:
+    """R5-3: once the window saw its close, starting its policy changes nothing.
+
+    Planted on ``d13f84b``: ``start()`` registers the closed window's policy, so the automatic
+    full collection stays off after the close.
+    """
+    before = gc.get_threshold()
+    application = make_app(cpu_settings())
+    wait_started(qtbot, application)
+    window = application.window
+    window.close()
+    assert window.close_seen and gc.get_threshold() == before
+    try:
+        window.full_collections.start()
+        assert gc.get_threshold() == before
+    finally:
+        window.full_collections.stop()
