@@ -9,9 +9,38 @@
 
 ---
 
-### RESUME HERE (CHARC generation 8: read this block top to bottom; gen 7 `clearwater-charc-20261029-0428` ROLLED 2026-10-29 ~19:00Z at ~405K, clean boundary, no cell at CHARC's seat; gen 6 `clearwater-charc-20261028-1443` ROLLED 2026-10-29 ~14:30Z at ~410K at a clean boundary, no cell at CHARC's seat; gen 5 rolled ~00:45Z at ~402K)
+### RESUME HERE (CHARC generation 9: read this block top to bottom; gen 8 `clearwater-charc-20261029-0859` ROLLED 2026-10-30 ~01:58Z at ~410K, clean boundary, no cell at CHARC's seat; gen 7 `clearwater-charc-20261029-0428` rolled 2026-10-29 ~19:00Z at ~405K; gen 6 `clearwater-charc-20261028-1443` ROLLED 2026-10-29 ~14:30Z at ~410K at a clean boundary, no cell at CHARC's seat; gen 5 rolled ~00:45Z at ~402K)
 
-- **GEN 8 PICKUP (read first).** Orchestrator = **gen 23 `clearwater-orchestrator-20261029-0852`** (online 18:57Z; gauge 37 ms;
+- **GEN 9 PICKUP (read first).** Orchestrator = **gen 25 `clearwater-orchestrator-20261029-1337`** (online 23:41Z
+  2026-10-29; gauge 26 ms). ALL cues go there; re-read `comms/.launch-sessions.json` before every cue. Time the bash
+  launch and record it here. Drain with `read --role charc --all` (gen 8 stopped draining at its announce). Main is FREE
+  (no HOLD); last state commit is this one. The gen 8 block below is HISTORY, newest facts at its end; the live picture:
+  **(1) WP4.3 application wiring (opus-high, cell 10 at 231,467 in `.worktrees/wp4.3`, OCCUPIED):** my window-4 ruling
+  (post 50215f0c) = REVERT the gc policy (item 3 + R5/R6 follow-ups), keep item 1 (closeEvent watch) and the (f) probe
+  move; WINDOW 5 of record on the reverted code: (a), (b), (d), plant-f + v7f-settled (a STOP there comes to you);
+  (c)/(e) stay OPEN STOPs of record (180 / 181 / 182 ms, cause in-process GIL contention); switch interval NOT adopted;
+  V8 k=2 re-ruled p99 <= 2.5/255 per frame (mean <= 1/255; p99.9 / max recorded). Then report, Reviewer B, gate on a
+  fresh cell 11. **OWED BY YOU AT WP4.3's ACCEPT:** the brief's register table; DR-89 (D85 missing-folder residual),
+  DR-90 (Clear during another clip's export), DR-44 (c) + DR-50 CLOSED (close 361/218/262 ms, 300/300 batch), the R6-1
+  gc residual row is VOID (policy reverted: say so in the record), NEW DR-98 (V7 (c)/(e) at 4K export OPEN, trigger
+  WP4.6), the AD-11 V8 note (k=2 p99 2.5/255), the setswitchinterval decision (not adopted), the grant-not-used note
+  (gui/jobs.py / export_panel.py). **(2) BRIEF TO WRITE (yours): WP4.6 'export process isolation'** = the export's
+  per-frame work in a spawned process through AD-23's helper (`io/video/pipes.py`), the interface process keeping
+  progress and the result; design scope, STRONG, opus-high likely; sizes the cost; the V7 owner flag rides with it (CHARC
+  recommends WP4.6 over any V7 relaxation; a relaxation is owner-reserved and NOT proposed). Commission it to gen 25
+  after WP4.3's accept. **(3) WP-DR87** (Codex, brief FINAL `4b0bd4f`, ruled 1a59b0ab): dispatches now that window 4 is
+  closed; at its accept close DR-87 (note: fixed test-side), DR-93, DR-94; bench ratio flake (0.514 < 1.0 under load) is
+  its round-0 observation. **(4) WP3.6P** (Codex, brief FINAL ruled 056fb449) after WP-DR87 and clear of WP4.3's
+  windows; at its accept: AD-24 status (mine), DR-42 (a)/(c) notes, DR-43 note, NEW row EXIF ColorSpace read as
+  untagged, Result 2 photo row closed; spec items for the owner's next revision bundle: D63 'provisional' wording,
+  :567 photo resolution = 24.5 MP max. Accepted this generation: WP4.5 (47a08ae), inventory + WP4.3a stack (649be3d),
+  WP4.4 (1f3d237); prune done (5e3537d). Register through DR-97. Codex-built packages: 8. Owner facts: Insta360 ON
+  HOLD; D: archive drive; phone footage in. Owner-pending inputs: none. Open owner decisions: none (WP4.6 recommended
+  over any V7 relaxation). Owner action pending: the three kept basetemps (wp1.2b, wp2.2, pt-main-wp39 + partial D:
+  copies; the orchestrator's classifier refused the relayed deletion; NOT to be worked around at any seat). Every
+  owner-facing summary ends with those three lines. Next owner checkpoint: CP5 (WP5.3 pack) after Phase 4 closes.
+- **(gen 8 history follows; newest facts at the end of the block)**
+- **GEN 8 PICKUP (was).** Orchestrator = **gen 23 `clearwater-orchestrator-20261029-0852`** (online 18:57Z; gauge 37 ms;
   gen 22 rolled 18:52Z at ~420K, state 5a1538a). ALL cues go there. Time the bash launch and record it here. Drain with
   `read --role charc --all` (gen 7 stopped draining at its announce). **MAIN IS HELD** by the orchestrator (its HOLD ask
   30dbc4d5 stands until its RELEASE post after the `stack-g22` merge): commit NOTHING on main until that post except, as here,
@@ -282,6 +311,13 @@
   share: WP4.4 Codex-built (2 seats, 7 turns), nets Claude; Codex-built packages now 8. Worktrees `wp4.4`, `wp4.4-mc`
   releasable. **WP4.3 WINDOW 4 OPEN ~01:24Z (cell 10, chain fb943904, ~30-40 min): NO SUITE AT THIS SEAT until the
   CLOSE post.** WP-DR87 dispatches after the CLOSE; then WP3.6P.
+- **WP4.3 WINDOW 4 CLOSED 01:48Z: (c) 180 / 181 (5 / 1 ms), (e) 182 / 80 (one sample) STOPs; (b) 195.0 and (f)
+  395.4 NEW STOPs (the idle gc on the interface thread beside the opener); working set +101 MB per 4K export, garbage
+  0; V8 16 frames p99 median 1.169 / max 1.946 per 255. RULED 01:53Z (query ec65702a, post 50215f0c): Q1 revert the
+  gc policy, window 5 (a)(b)(d)(f) of record; Q2 switch interval not adopted; Q3 WP4.3 closes with (c)/(e) OPEN STOPs
+  of record, WP4.6 follow-on briefed by CHARC; Q4 p99 <= 2.5/255 at k=2. Cell 10 reverts + window 5; fresh cell 11
+  for report, B, gate.**
+- **GEN 8 ROLLED ~01:58Z at ~410K** (clean boundary: no cell at CHARC's seat; the orchestrator's cells are its own).
 - **(gen 7 history follows; newest facts at the end of the block)**
 - **GEN 7 PICKUP (was).** Orchestrator = **gen 22 `clearwater-orchestrator-20261029-0704`** (online 17:08Z from gen 21's
   state 736e403; gauge 38 ms; gen 21 was `clearwater-orchestrator-20261029-0425`, rolled 17:05Z at ~400K); ALL cues go there. Time the bash launch and record it here. Inbox: drain with `read --role charc --all`
