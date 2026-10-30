@@ -157,8 +157,16 @@ _LOG_KEYS = frozenset({"level", "name", "message"})
 
 _WORKER_LOG = logging.getLogger(WORKER_LOGGER)
 
-_SEGMENT = r"(?:[\\/]+[^\\/\s'\"][^\\/\r\n'\"]*)"
-"""One path component after its separator(s); spaces inside a name are part of it."""
+_NAME_CHAR = r"(?:[^\\/\r\n'\"]|'(?=\w|[^\\/\r\n'\"]*[\\/]))"
+"""A character inside a name: spaces are, and so is an apostrophe that does not close a quote.
+
+An apostrophe is part of the name when a word character follows it (``Diver's``) or when the
+text after it reaches a separator before any quote (``Divers' gear``); a closing quote is
+followed by neither.
+"""
+
+_SEGMENT = r"(?:[\\/]+(?:[^\\/\s'\"]|'(?=\w))" + _NAME_CHAR + "*)"
+"""One path component after its separator(s); it may begin with an apostrophe (``'Tis``)."""
 
 _ABSOLUTE_PATH = re.compile(r"(?:[A-Za-z]:|(?<![\w:\\/])(?=[\\/]))" + _SEGMENT + "+")
 """An absolute path: a drive, a UNC root or a ``/`` root, then its components."""
@@ -711,11 +719,19 @@ def _redact(text: str, folders: list[str]) -> str:
     """Cut every path in ``text`` to its last component (file names only, AD-13's rule).
 
     The known folders go first, matched exactly (so a name with a space or a quote in it is cut
-    whole); then any other absolute path (a drive, a UNC root or a ``/`` root).
+    whole); a known folder followed by more name text up to a separator (``<folder> Archive``
+    then a separator: a longer name that begins with it) is cut with that text. Then any other
+    absolute path (a drive, a UNC root or a ``/`` root).
     """
-    for folder in folders:  # the folder itself, not a longer name that begins with it
+    for folder in folders:
         pattern = re.compile(
-            re.escape(folder) + r"(?=[\\/'\"\s]|$)" + _SEGMENT + "*", re.IGNORECASE
+            re.escape(folder)
+            + r"(?:"
+            + _NAME_CHAR
+            + r"*(?=[\\/])|(?=['\"\s]|$))"
+            + _SEGMENT
+            + "*",
+            re.IGNORECASE,
         )
         text = pattern.sub(_last_name, text)
     return _ABSOLUTE_PATH.sub(_last_name, text)

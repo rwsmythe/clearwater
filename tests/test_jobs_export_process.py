@@ -458,6 +458,7 @@ def test_a_folder_name_that_continues_a_known_folder_or_holds_an_apostrophe_is_c
         str(known / "Diver's hiddenB" / "b.mp4"),  # an apostrophe inside a name
         str(known / "'Tis hiddenC" / "c.mp4"),  # an apostrophe that begins a name
         str(unknown_root / "Owner's hiddenD" / "d.mp4"),  # the same in an unknown path
+        str(known / "Divers' hiddenE" / "e.mp4"),  # an apostrophe that ends a word
     ]
     command = _child(
         tmp_path,
@@ -472,7 +473,7 @@ def test_a_folder_name_that_continues_a_known_folder_or_holds_an_apostrophe_is_c
     result, _ = _run(tmp_path, command)
     failure = result.failure
     assert failure is not None and failure.isascii()
-    for name in ("a.mp4", "b.mp4", "c.mp4", "d.mp4"):
+    for name in ("a.mp4", "b.mp4", "c.mp4", "d.mp4", "e.mp4"):
         assert failure.count(name) == 2, (name, failure)
     for folder_name in ("Archive", "hidden", "Diver", "Tis", "Owner", "owner", tmp_path.name):
         assert folder_name not in failure, (folder_name, failure)
