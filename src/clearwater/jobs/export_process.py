@@ -36,7 +36,8 @@ Parent to worker (the worker's stdin):
 - :data:`CANCEL_LINE` once the cancel is asked, after which the parent closes the stdin; the
   end of the stdin (also when the parent dies) means cancel too.
 
-Worker to parent (the worker's stdout; its stderr is kept only for the crash tail):
+Worker to parent (the worker's stdout; its stderr is kept only for the crash tail, which goes
+to the application log, never into a failure text):
 
 - ``{"progress": [done, total or null, message]}``: forwarded to ``progress.report``;
 - ``{"log": {"level": <DEBUG|INFO|WARNING|ERROR|CRITICAL>, "name": <logger>, "message":
@@ -50,23 +51,26 @@ three keys, of the wrong shape or types, holds a non-finite number, is longer th
 reason (never its content). Only the FIRST result counts (a later one is logged); a result
 followed by a non-zero exit is still the result (the status is logged); a worker still running
 :data:`KILL_AFTER_CANCEL_S` after its result (or after the cancel line, when that came first)
-is killed (logged) and the result kept. The
-result's ``elapsed_s`` is the parent's own measure, spawn included; a ``failure`` equal to
+is killed (logged) and the result kept. The result's ``elapsed_s`` is the parent's own measure,
+spawn included; a ``failure`` equal to
 :data:`~clearwater.jobs.export_seam.CANCELLED` is returned as the constant itself.
 
-The failure texts (ASCII, none equal to ``CANCELLED``):
+The failure texts (ASCII, none equal to ``CANCELLED``) carry NO text of the worker's stderr
+and no error message (CHARC rulings 55959e2f and 3ed8335f): the details, which may name full
+paths, go to the application log at WARNING under :data:`WORKER_LOGGER`, which is local.
 
-- :data:`ENDED_TEXT`: the worker exited without a valid result; the last lines of its stderr
-  (at most :data:`STDERR_TAIL_BYTES`, every path cut to its last name) follow after a newline;
-  ``device`` is ``"unknown"``;
+- :data:`ENDED_TEXT`: the worker exited without a valid result; its stderr tail (the last
+  :data:`STDERR_TAIL_BYTES`, verbatim) is logged. When the tail's last line is an exception line
+  (:data:`EXCEPTION_LINE`), its TYPE NAME alone follows the text after a newline; ``device`` is
+  ``"unknown"``;
 - :data:`KILLED_TEXT`: the worker had not exited :data:`KILL_AFTER_CANCEL_S` after the cancel
   line and was killed; ``device`` ``"unknown"``. ``Popen.kill`` ends the worker but not a
   process the worker started: an FFmpeg grandchild ends when its pipes break, and a temporary
   file left behind is the next start's leftover (D85);
-- :data:`START_TEXT`: the scratch folder or the worker could not be made (the error's text, paths
-  cut to names); ``device`` ``"none"``;
-- :data:`ENCODE_TEXT`: the request holds a value JSON cannot carry (a non-finite number);
-  nothing is spawned; ``device`` ``"none"``.
+- :data:`START_TEXT`: the scratch folder or the worker could not be made: the error's type name
+  and its errno (when it has one); the error's own text is logged; ``device`` ``"none"``;
+- :data:`ENCODE_TEXT`: the request holds a value JSON cannot carry (a non-finite number): the
+  error's type name; its text is logged; nothing is spawned; ``device`` ``"none"``.
 
 This module imports only the standard library, ``clearwater.interfaces``, the export seam and
 ``io/video/pipes.py``'s launch policy: no Qt and no ``clearwater.app`` module (the worker is
@@ -83,7 +87,6 @@ import queue
 import re
 import shutil
 import subprocess
-import sys
 import threading
 import time
 import uuid
@@ -123,7 +126,7 @@ MAX_LINE_BYTES = 64 * 1024
 """The longest protocol line accepted, without its ``\\n``; a longer one is ignored."""
 
 STDERR_TAIL_BYTES = 4096
-"""The most of the worker's stderr kept and shown in a failure text."""
+"""The most of the worker's stderr kept and logged when it ends without a result."""
 
 STALE_AFTER_S = 3600.0
 """A scratch folder older than this (by its modification time) is removed by the sweep."""
@@ -134,17 +137,30 @@ CANCEL_LINE = b'{"cancel": true}\n'
 WORKER_LOGGER = "clearwater.app.export_worker"
 """The logger the worker's own log records are re-logged under, in the interface process."""
 
-ENDED_TEXT = "The export worker ended without a result (exit status {status})."
+ENDED_TEXT = (
+    "The export worker ended without a result (exit status {status}); "
+    "details are in the application log."
+)
 """The failure text of a worker that exited without a valid result line."""
+
+EXCEPTION_LINE = re.compile(r"^[A-Za-z_][A-Za-z0-9_.]*(Error|Exception|Exit|Interrupt)(: .*)?$")
+"""A last stderr line whose identifier before the colon is added to :data:`ENDED_TEXT` (only it)."""
 
 KILLED_TEXT = "The export worker did not stop after cancel and was ended."
 """The failure text of a worker killed after it ignored the cancel."""
 
-START_TEXT = "The export worker could not be started: {reason}"
-"""The failure text of a scratch folder or a worker process that could not be made."""
+START_TEXT = (
+    "The export worker could not be started ({reason}); details are in the application log."
+)
+"""The failure text of a scratch folder or a worker process that could not be made.
 
-ENCODE_TEXT = "The export request could not be encoded: {reason}"
-"""The failure text of a request JSON cannot carry (nothing is spawned)."""
+``reason`` is the error's type name, then ``, errno N`` when it has an errno.
+"""
+
+ENCODE_TEXT = (
+    "The export request could not be encoded ({reason}); details are in the application log."
+)
+"""The failure text of a request JSON cannot carry (nothing is spawned); ``reason`` as above."""
 
 _LEVELS = {
     "DEBUG": logging.DEBUG,
@@ -157,20 +173,6 @@ _RESULT_KEYS = frozenset({"ok", "outputs", "warnings", "failure", "device", "ela
 _LOG_KEYS = frozenset({"level", "name", "message"})
 
 _WORKER_LOG = logging.getLogger(WORKER_LOGGER)
-
-_NAME_CHAR = r"(?:[^\\/\r\n'\"]|'(?=\w|[^\\/\r\n'\"]*[\\/]))"
-"""A character inside a name: spaces are, and so is an apostrophe that does not close a quote.
-
-An apostrophe is part of the name when a word character follows it (``Diver's``) or when the
-text after it reaches a separator before any quote (``Divers' gear``); a closing quote is
-followed by neither.
-"""
-
-_SEGMENT = r"(?:[\\/]+(?:[^\\/\s'\"]|'(?=\w))" + _NAME_CHAR + "*)"
-"""One path component after its separator(s); it may begin with an apostrophe (``'Tis``)."""
-
-_ABSOLUTE_PATH = re.compile(r"(?:[A-Za-z]:|(?<![\w:\\/])(?=[\\/]))" + _SEGMENT + "+")
-"""An absolute path: a drive, a UNC root or a ``/`` root, then its components."""
 
 
 class _InvalidLineError(Exception):
@@ -266,12 +268,11 @@ class ProcessExportJobs:
         if progress.cancelled():  # asked during the sweep: still nothing spawned
             return _failed(CANCELLED, "none", start)
         scratch = self._cache_dir / SCRATCH_FOLDER / uuid.uuid4().hex
-        folders = _known_folders(request, self._cache_dir, scratch)
         try:
             line = self._request_line(request, scratch)
         except (ValueError, TypeError) as error:
-            reason = _ascii(_redact(f"{type(error).__name__}: {error}", folders))
-            return _failed(ENCODE_TEXT.format(reason=reason), "none", start)
+            _log_error("the export request could not be encoded", error)
+            return _failed(ENCODE_TEXT.format(reason=_reason(error)), "none", start)
         try:
             scratch.mkdir(parents=True)
             process = subprocess.Popen(
@@ -283,9 +284,9 @@ class ProcessExportJobs:
             )
         except (OSError, ValueError) as error:
             _remove(scratch)
-            reason = _ascii(_redact(f"{type(error).__name__}: {error}", folders))
-            return _failed(START_TEXT.format(reason=reason), "none", start)
-        outcome = _converse(process, progress, line, folders)
+            _log_error("the export worker could not be started", error)
+            return _failed(START_TEXT.format(reason=_reason(error)), "none", start)
+        outcome = _converse(process, progress, line)
         if outcome.killed:
             _LOG.warning("export worker killed; its scratch folder %s is kept", scratch.name)
         else:
@@ -293,9 +294,16 @@ class ProcessExportJobs:
         if outcome.result is None:
             if outcome.killed:
                 return _failed(KILLED_TEXT, "unknown", start)
+            _WORKER_LOG.warning(
+                "export worker stderr (the last %d bytes; it ended without a result, "
+                "exit status %d):\n%s",
+                STDERR_TAIL_BYTES,
+                outcome.status,
+                outcome.stderr_tail,
+            )
             text = ENDED_TEXT.format(status=outcome.status)
-            if outcome.stderr_tail:
-                text = f"{text}\n{outcome.stderr_tail}"
+            if error_type := _exception_type(outcome.stderr_tail):
+                text = f"{text}\n{error_type}"
             return _failed(text, "unknown", start)
         child = outcome.result
         if outcome.status != 0 and not outcome.killed:
@@ -366,7 +374,7 @@ class ProcessExportJobs:
 
 
 def _converse(
-    process: subprocess.Popen[bytes], progress: Progress, request_line: bytes, folders: list[str]
+    process: subprocess.Popen[bytes], progress: Progress, request_line: bytes
 ) -> _Outcome:
     """Send the request, forward the worker's lines and deliver the cancel until it has ended.
 
@@ -447,8 +455,10 @@ def _converse(
         writes.put(None)
         raise
     writes.put(None)
-    tail.wait(DRAIN_AFTER_EXIT_S)
-    return _Outcome(result, killed, status, tail.text(folders))
+    # One drain window for both outputs (R2-1): the stderr gets what the stdout's wait left of it
+    drain_from = quiet_since if quiet_since is not None else time.monotonic()
+    tail.wait(max(0.0, drain_from + DRAIN_AFTER_EXIT_S - time.monotonic()))
+    return _Outcome(result, killed, status, tail.text())
 
 
 def _write_lines(stdin: IO[bytes], writes: queue.Queue[bytes | None]) -> None:
@@ -460,13 +470,13 @@ def _write_lines(stdin: IO[bytes], writes: queue.Queue[bytes | None]) -> None:
         while (data := writes.get()) is not None:
             stdin.write(data)
             stdin.flush()
-    except (OSError, ValueError):
-        _LOG.debug("the export worker's stdin is gone", exc_info=True)
+    except (OSError, ValueError) as error:
+        _LOG.debug("the export worker's stdin is gone: %s", _reason(error))
     finally:
         try:
             stdin.close()
-        except (OSError, ValueError):
-            _LOG.debug("the export worker's stdin could not be closed", exc_info=True)
+        except (OSError, ValueError) as error:
+            _LOG.debug("the export worker's stdin could not be closed: %s", _reason(error))
 
 
 def _read_lines(stream: IO[bytes], lines: queue.Queue[tuple[str, Any]]) -> None:
@@ -608,7 +618,6 @@ class _Tail:
 
     def __init__(self) -> None:
         self._data = bytearray()
-        self._cut = False
         self._lock = threading.Lock()
         self._done = threading.Event()
 
@@ -621,9 +630,8 @@ class _Tail:
                     self._data += chunk
                     if len(self._data) > 2 * STDERR_TAIL_BYTES:
                         del self._data[:-STDERR_TAIL_BYTES]
-                        self._cut = True
-        except (OSError, ValueError):
-            _LOG.debug("the export worker's stderr could not be read", exc_info=True)
+        except (OSError, ValueError) as error:
+            _LOG.debug("the export worker's stderr could not be read: %s", _reason(error))
         finally:
             with contextlib.suppress(OSError):
                 stream.close()
@@ -633,16 +641,11 @@ class _Tail:
         """Wait up to ``timeout`` seconds for the stderr to end (a grandchild may hold it)."""
         self._done.wait(timeout)
 
-    def text(self, folders: list[str]) -> str:
-        """Return the tail as ASCII text: whole lines only, every path cut to its last name."""
+    def text(self) -> str:
+        """Return the tail as text, verbatim (undecodable bytes replaced): it goes to the log."""
         with self._lock:
             data = bytes(self._data[-STDERR_TAIL_BYTES:])
-            cut = self._cut or len(self._data) > STDERR_TAIL_BYTES
-        text = data.decode("utf-8", "replace").replace("\r\n", "\n").replace("\r", "\n")
-        if cut:  # the first line may be a part of a line, so a part of a path: drop it
-            text = text.partition("\n")[2]
-        text = _ascii(_redact(text, folders)).strip()
-        return text[-STDERR_TAIL_BYTES:]
+        return data.decode("utf-8", "replace")
 
 
 # --- helpers ----------------------------------------------------------------------------------
@@ -693,44 +696,20 @@ def _ascii(text: str) -> str:
     return text.encode("ascii", "backslashreplace").decode("ascii")
 
 
-def _known_folders(request: ExportRequest, cache_dir: Path, scratch: Path) -> list[str]:
-    """Return the folders whose exact names a failure text must never carry, longest first."""
-    candidates: list[Path | str] = [
-        request.source.absolute().parent,
-        request.settings.output_folder or request.source.absolute().parent,
-        scratch,
-        cache_dir,
-        Path(sys.executable).parent,
-        sys.prefix,
-        sys.base_prefix,
-    ]
-    with contextlib.suppress(OSError, RuntimeError):  # no cwd, or no home folder
-        candidates += [Path.cwd(), Path.home()]
-    folders: set[str] = set()
-    for candidate in candidates:
-        text = str(Path(candidate).absolute()).rstrip("\\/")
-        if len(text) > 3:  # never a bare drive or root
-            folders.update({text, text.replace("\\", "\\\\"), text.replace("\\", "/")})
-    return sorted(folders, key=len, reverse=True)
+def _reason(error: BaseException) -> str:
+    """Return the error's type name, then ``, errno N`` when it has one (never its message)."""
+    errno = getattr(error, "errno", None)
+    name = type(error).__name__
+    return f"{name}, errno {errno}" if isinstance(errno, int) else name
 
 
-def _last_name(match: re.Match[str]) -> str:
-    """Return the last component of a matched path."""
-    return re.split(r"[\\/]+", match.group(0).rstrip("\\/"))[-1]
+def _log_error(what: str, error: BaseException) -> None:
+    """Log ``error``'s own text (which may name full paths) under :data:`WORKER_LOGGER`."""
+    _WORKER_LOG.warning("%s: %s: %s", what, type(error).__name__, error)
 
 
-def _redact(text: str, folders: list[str]) -> str:
-    """Cut every path in ``text`` to its last component (file names only, AD-13's rule).
-
-    The known folders go first, matched exactly (so a name with a space or a quote in it is cut
-    whole); a known folder followed by more name text up to a separator (``<folder> Archive``
-    then a separator: a longer name that begins with it) is cut with that text. Then any other
-    absolute path (a drive, a UNC root or a ``/`` root).
-    """
-    for folder in folders:
-        pattern = re.compile(
-            re.escape(folder) + r"(?:" + _NAME_CHAR + r"*(?=[\\/])|(?=['\"\s]|$))" + _SEGMENT + "*",
-            re.IGNORECASE,
-        )
-        text = pattern.sub(_last_name, text)
-    return _ABSOLUTE_PATH.sub(_last_name, text)
+def _exception_type(tail: str) -> str | None:
+    """Return the exception's type name when the tail's last line is an exception line."""
+    lines = tail.splitlines()
+    match = EXCEPTION_LINE.match(lines[-1]) if lines else None
+    return match.group(0).partition(":")[0] if match else None

@@ -340,11 +340,12 @@ def test_a_request_that_cannot_be_encoded_fails_without_a_spawn(
     result = _jobs(tmp_path, command).job(request)(_Progress())
     assert result.ok is False
     # the same rule as the spawn's (CHARC 3ed8335f): the type name; the full text to the log
+    # (the frozen ParameterSet refuses the NaN itself: IF-9's FormatError, a ValueError)
     assert result.failure == (
-        "The export request could not be encoded (ValueError); details are in the application log."
+        "The export request could not be encoded (FormatError); details are in the application log."
     )
     logged = [r for r in caplog.records if r.name == WORKER_LOGGER]
-    assert len(logged) == 1 and "ValueError" in logged[0].getMessage()
+    assert len(logged) == 1 and "FormatError" in logged[0].getMessage()
     assert result.device == "none"
     assert not marker.exists()
     assert _scratch_folders(tmp_path) == []
