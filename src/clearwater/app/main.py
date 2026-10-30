@@ -90,7 +90,8 @@ class FullCollections:
     plan cache's release), holding the GIL while the interface waited. While started, CPython's
     automatic full collection is off (its third threshold is never reached; generations 0 and 1
     stay automatic) and the interface thread runs it instead, only at an idle moment, from a
-    check every :data:`IDLE_CHECK_MS` (CHARC ruling cc0703a7 Q1 (a)):
+    check every :data:`IDLE_CHECK_MS` (CHARC ruling cc0703a7 Q1 (a)). Idle means that no
+    started instance's window has a job running (the policy is process-wide):
 
     - a check that finds a job running does nothing: no full collection runs on any thread
       while a job runs, however many younger collections are pending (that is the bound this
@@ -141,8 +142,8 @@ class FullCollections:
 
     def _check(self) -> None:
         """At an idle moment only: freeze once after start-up, then collect when due."""
-        if self._jobs.active():
-            return  # nothing collects while a job runs (R5-1)
+        if any(started._jobs.active() for started in _STARTED):
+            return  # nothing collects while any window's job runs (R5-1, R5-2)
         if not self._frozen:
             self._frozen = True
             gc.freeze()
