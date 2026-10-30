@@ -506,6 +506,12 @@ def test_a_spawn_failure_is_a_failed_result_with_a_redacted_reason(tmp_path: Pat
         (b'{"progress": [1, NaN, "a"]}', "a non-finite constant"),
         (b'{"log": {"level": "LOUD", "name": "x", "message": "m"}}', "unknown level"),
         (b'{"log": {"level": "INFO", "name": "x"}}', "log shape"),
+        pytest.param(
+            b'{"result": {"ok": true, "outputs": [], "warnings": [], "failure": null,'
+            b' "device": "cpu", "elapsed_s": 1' + b"0" * 400 + b"}}",
+            "an elapsed_s too large for a float (R1 F3)",
+            id="elapsed_s-overflow",
+        ),
     ],
 )
 def test_an_invalid_line_is_ignored_and_logged(
