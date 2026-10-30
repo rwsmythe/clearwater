@@ -310,8 +310,8 @@ def clean_leftovers(settings: Settings, journal: WriteJournal) -> LeftoverReport
         _LOG.warning("a leftover temporary file could not be removed: %s: %s", path, error)
     if settings.output_folder is not None and settings.output_folder in folders:
         try:
-            with os.scandir(settings.output_folder):
-                pass
+            with os.scandir(settings.output_folder) as listing:
+                next(listing, None)  # a denial can come at the open or at the first entry
         except FileNotFoundError:
             pass
         except (OSError, ValueError) as error:
