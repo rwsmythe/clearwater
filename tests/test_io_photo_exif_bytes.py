@@ -364,6 +364,58 @@ def test_from_tiff_preserves_raw_ascii_and_filters_structure(tmp_path):
     _same(source, exif.edit(output, 4, 3), (), 315)
 
 
+def test_from_tiff_memory_error_returns_none_with_warning(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Degrade a failed TIFF relocation to no EXIF with one warning."""
+    source = _tiff_fixture([(271, 2, 7, b"Camera\0")])
+    (tmp_path / "source.tiff").write_bytes(source)
+    calls = 0
+
+    def exhausted_writer(order: str, entries: object) -> bytes:
+        nonlocal calls
+        calls += 1
+        raise MemoryError("synthetic rewrite exhaustion")
+
+    monkeypatch.setattr(exif, "_write_entries", exhausted_writer)
+    with caplog.at_level("WARNING", logger="clearwater.io.photo.exif"):
+        output = exif.from_tiff(source)
+
+    assert calls == 1
+    assert output is None
+    records = [record for record in caplog.records if record.name == "clearwater.io.photo.exif"]
+    assert [(record.levelname, record.getMessage()) for record in records] == [
+        (
+            "WARNING",
+            "TIFF tags cannot be read for EXIF (synthetic rewrite exhaustion); no EXIF carried",
+        )
+    ]
+
+
+def test_from_tiff_drops_private_ifd0_blobs_and_keeps_metadata(tmp_path: Path) -> None:
+    """Omit private image blobs while preserving Make and PrintIM bytes."""
+    image_source_data = b"Adobe Photoshop Document Data Block\0" + bytes(range(16))
+    dng_private_data = b"SyntheticMaker\0" + bytes(range(16, 48))
+    printim = b"PrintIM\x000300\x00\x00"
+    source = _tiff_fixture(
+        [
+            (271, 2, 7, b"Camera\0"),
+            (37724, 7, len(image_source_data), image_source_data),
+            (50341, 7, len(printim), printim),
+            (50740, 1, len(dng_private_data), dng_private_data),
+        ]
+    )
+    (tmp_path / "source.tiff").write_bytes(source)
+    output = exif.from_tiff(source)
+    assert output is not None, "TIFF metadata was lost"
+    _same(source, output, (), 271)
+    _same(source, output, (), 50341)
+    carried = {row[0] for row in _parse(output)[1][()]}
+    retained = {37724, 50740}.intersection(carried)
+    assert not retained, f"private IFD0 blobs retained: {sorted(retained)}"
+    assert not {256, 257}.intersection(carried)
+
+
 def test_from_tiff_without_metadata_returns_none(tmp_path):
     source = _tiff_fixture()
     (tmp_path / "empty.tiff").write_bytes(source)
