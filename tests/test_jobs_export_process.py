@@ -534,6 +534,21 @@ def test_an_invalid_line_is_ignored_and_logged(
     assert any("ignored" in m for m in _messages(caplog, PROCESS_LOGGER)), why
 
 
+def test_an_unknown_key_is_logged_without_the_key(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    """R1 F6: an ignored line is logged by its reason only, never its content (the key)."""
+    caplog.set_level(logging.DEBUG)
+    command = _child(
+        tmp_path,
+        'send({"C:\\\\Owner\\\\Private\\\\GPS": 1})\nresult()\n',
+    )
+    result, _ = _run(tmp_path, command)
+    assert result.ok, result.failure
+    ignored = [m for m in _messages(caplog, PROCESS_LOGGER) if "ignored" in m]
+    assert ignored == ["export worker line ignored: an unknown key"]
+
+
 def test_any_error_decoding_one_line_ignores_that_line_only(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
 ) -> None:
