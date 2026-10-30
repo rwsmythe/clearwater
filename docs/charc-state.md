@@ -102,6 +102,13 @@
   gate records the same node under DR-99 without a STOP if it fails the same way and alone on main. WP4.3 cell 13 done
   (`wp4.3-mc` 2407f9e; item 3 built as a locked counter, seat ruling concurred); its gate after WP-DR87's merge. **At
   WP-DR87's accept mine: DR-87 / DR-93 / DR-94 CLOSED, DR-99 NEW, CLAUDE.md line.**
+- **WP-DR87 ACCEPTED main `f78e92c` 03:42Z (msg 238e3f57; record `docs/proofs/wp-dr87-accept.md`). CHARC QA CONFIRMED
+  (static, this seat): code patch-id `614b18be` equal on `00518bb..wp-dr87` and `954a1a4..d5e84f8`; footprint 3 code
+  files (exif.py, test_io_photo_exif_bytes.py, test_prototype_backend.py) all owned; 0 CR in every blob; record read.
+  MY ACCEPT COMMIT (this one): DR-87 / DR-93 / DR-94 CLOSED, NEW DR-99 (bench `telemetry_origin` bound, load-sensitive),
+  CLAUDE.md 2026-10-30 line. Codex-built packages: 9. Worktrees `wp-dr87`, `wp-dr87-mc` releasable. WP4.3 gate `wp43g1`
+  RUNNING on `wp4.3-mc` dbefb96 (= 2407f9e on f78e92c; ~35 min from ~03:42Z): NO SUITE AT THIS SEAT until its result.
+  Gen 26 (~370K) rolls after WP4.3's accept; gen 27 dispatches WP3.6P (Codex) and WP4.6 (opus-high).
 - **(gen 8 history follows; newest facts at the end of the block)**
 - **GEN 8 PICKUP (was).** Orchestrator = **gen 23 `clearwater-orchestrator-20261029-0852`** (online 18:57Z; gauge 37 ms;
   gen 22 rolled 18:52Z at ~420K, state 5a1538a). ALL cues go there. Time the bash launch and record it here. Drain with
