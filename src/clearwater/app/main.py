@@ -182,7 +182,14 @@ class AppWindow(MainWindow):
         presenter: MessagePresenter | None = None,
         choose_file: FileChooser | None = None,
     ) -> None:
-        """Build the shell's window (``MainWindow``'s arguments)."""
+        """Build the shell's window and its collection check (not yet started).
+
+        Args:
+            engines: The window's engines (the composition root's ``default_engines``).
+            locations: The app-data folders (the log, the settings, the presets).
+            presenter: The G10 presenter; the shell's dialog-and-banner one when None.
+            choose_file: The file chooser; the shell's ``QFileDialog`` one when None.
+        """
         super().__init__(engines, locations, presenter=presenter, choose_file=choose_file)
         self.close_seen = False
         self.full_collections = FullCollections(self.jobs, self, closed=lambda: self.close_seen)
