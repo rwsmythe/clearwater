@@ -239,6 +239,7 @@ appears in no computed set) and the import-time witness extension (DR-84).
 | R3 (Reviewer A, `038f02e..028bc4f`) | 0 / 2 / 3 | 5 in / 0 out | 3 new / 2 reopened (R3-3, R3-4 = R1-12; the reviewer also tagged R3-1 as R2-2 and R3-2 as R1-3, adjudicated NEW: distinct routes, the earlier fixes hold) | 0 | R3 remediation (cell 6, groups A-B): product (`app/startup.py`: R3-1 `13c96f7`, R3-2 `099893a`) + tests; R3-3, R3-4, R3-5 test-only (`065f5f0`, `a0f43cd`) + the report's V7 rows and DR-44 (c) sentence | WSL, codex-cli 0.162.1, `gpt-6.1-sol` high | 222,999 at the Group C yield (cell 5, 109 turns; `scripts/cell_depth.py`); R3 adjudicated in the same seat; seat retired at 271,612 (cell 5 yielded R3 there and stood down). CHARC `d6e9abdf`: R3-2 RECLASSIFIED MINOR (counts now 0 / 1 / 4) |
 | R4 (Reviewer A, `038f02e..5d8e0df`) | 0 / 0 / 2 | 2 in / 0 out | 1 new / 1 reopened (R4-1 = R3-5) | 0 | terminating-round cleanup (cell 6): test-only (R4-1 `a4b2d5a`, R4-2 `67a285a`) + the report's DR-44 (c) sentence and V8 paragraph | WSL, codex-cli 0.162.1, `gpt-6.1-sol` high (a websocket DNS failure before the model's first output: client-side, NOT disqualifying, the dispatcher's ruling, gen 22) | 110,453 at the Group A yield (cell 6, 45 turns), 172,926 at the Group B yield (88 turns; `scripts/cell_depth.py`, given by the dispatcher); R4 adjudicated in the same seat; 213,877 at the R4 yield (117 turns). CONVERGED: zero new blocking |
 | R5 (Reviewer A, `1d96dc4..28c4ece`: the V7 remediation step, cell 9) | 0 / 3 / 4 | 6 in / 2 out (R5-2, R5-4 out of the one-window envelope) (cell dispositions; proposed RECLASSIFY R5-2 and R5-3 to MINOR, pending ruling) | 7 new / 0 reopened | 0 | NONE yet (blocking verdict: no change in the verdict turn); proposed: R5-1..R5-4 product (`app/main.py`), R5-5/R5-6 test-only, R5-7 docs-only | WSL, codex-cli, `gpt-6.1-sol` high, 85,061 tokens, clean | (dispatcher) |
+| R6 (Reviewer A, `175a8e8..987681c`: the R5 remediation, cell 10; THE RE-RUN) | 0 / 1 / 3 | 3 in / 1 out (R6-1 out of V7's states, cell disposition, pending ruling) | 3 new / 1 reopened (R6-3 = R5-5; the reviewer tagged R6-1 as R5-1, adjudicated NEW: a distinct route, R5-1's fix holds for runner jobs) | 0 | R5 remediation (cell 10): product (`app/main.py`: R5-1 `e1a8599`, R5-2 `d13f84b`, R5-3 `4611ed6`, R5-4 `83af26f`, each after its RED) + test-only (R5-5/R5-6 `a3e73b5`, `987681c`) + docs (R5-7 `f9ea560`); R6 fixes NONE yet (blocking verdict: no change in the verdict turn) | WSL, codex-cli, `gpt-6.1-sol` high, 77,380 tokens, clean | (dispatcher) |
 
 ## CHARC round-0 ruling (`fcb2a9205c060013`, 2026-10-29 12:54:46Z, verbatim; it GOVERNS the STOP items above)
 
@@ -1353,3 +1354,74 @@ Per the dispatch, NO change was made after the verdict; the cell yields `R5 VERD
   the build" result line and their "before show()" figure (about 0 ms by construction) are stale
   labels. Neither mode is in window 4.
 - Disk at the R5 yield: C: 166 GB free (another lane's use since the dry run's 177 GB).
+
+## Cell 10 (implementer-opus-high, 2026-10-30): the R5 remediation, R6
+
+Dispatch: orchestrator gen 25, `prompt-wp4.3-cell10.md`. Governing ruling: CHARC
+`cc0703a79f98154e` (2026-10-30T00:30:08Z, verbatim in the dispatch and in
+`clearwater-review-evidence/wp4.3/r5-ruling-cc0703a7.md`): Q1 (a) DROP the busy-time collection,
+full collections only at an idle moment (no started window has an active job), the memory cost
+MEASURED in window 4, a heap-size cap DECLINED; Q2 (a) R5-2 and R5-3 RECLASSIFIED MINOR, all
+seven fixed, product items RED-first; Q3 cell 9 stood down at 282,316, fresh cell 10. Head at
+start `175a8e8`, clean. Record note (CHARC's, for the accept): this step's round count exceeds the
+fill's five because R5 and R6 review a NEW step after R1-R4 converged on the main build.
+
+### The R5 remediation (each RED committed alone and shown failing at its parent)
+
+All new tests are in `tests/test_app_interface_load.py`; product changes only in
+`src/clearwater/app/main.py`; `core/`, `gui/` untouched.
+
+| Finding | RED | What it plants | At the parent | GREEN | After |
+|---|---|---|---|---|---|
+| R5-1 | `f1ab586` | `test_no_full_collection_runs_while_a_job_runs_however_far_overdue`: a bare `FullCollections` over a stand-in runner (`active()` 1), `gc.collect(1)` until 20x the interpreter's own third threshold is pending, two checks, `gc.callbacks` records generation-2 starts | `['MainThread']`: FAIL | `e1a8599`: the busy branch and `BUSY_COLLECTION_FACTOR` dropped; the docstring states the bound (no full collection while a job runs; a collection's duration has none) and the cost | `[]`: PASS |
+| R5-2 | `00ca290` | `test_an_idle_window_neither_freezes_nor_collects_while_another_windows_job_runs`: A active, B idle, two checks; then A idles and a freeze must follow | freeze count 377 -> 87,040: FAIL | `d13f84b`: idle = no started instance's runner active | PASS |
+| R5-3 | `2b7e30b` | `test_the_collection_policy_starts_before_the_start_up_workers` (spies `Application.start_jobs` for the third threshold); `test_a_closed_windows_collection_policy_does_not_start` | 10 (not raised): FAIL; 2147483647 after a post-close start: FAIL | `4611ed6`: `start()` before `start_jobs()`; `FullCollections(..., closed=)`, `AppWindow` passes `lambda: self.close_seen`; `start()` does nothing once closed | PASS |
+| R5-4 | `f3757f1` | `test_a_restarted_collection_policy_freezes_again` | the wait for the second freeze timed out (5 s): FAIL | `83af26f`: `start()` resets `_frozen` | PASS |
+| R5-5, R5-6 | test-only `a3e73b5` | the runner pin: class-level marks on `QtJobRunner._poll` and `_on_finished` (set before construction); at most one report between two marks; the job reports at least 20,000 times and for at least 1 s; "fewer deliveries than reports" replaces the ratio | (pin: green at base) | a local mutation (the poll delivering twice per tick) FAILS it (`max(per_mark)` 2) | PASS |
+| R5-5 follow-up | test-only `987681c` | `a3e73b5` asserted the final delivery itself carried the last report; the first targeted run failed it (`('end', 0)` before `done`: a poll had delivered the last report already); the property kept is the order (the last report precedes `on_done`) | - | 5/5 local runs PASS | PASS |
+| R5-7 | docs `f9ea560` | `AppWindow.__init__` Args section (checked against `MainWindow`'s own) | - | - | - |
+
+Targeted tests at `987681c` (offscreen, shared host): `tests/test_app_*.py` (every marker) +
+`tests/test_gui_threads.py` + `tests/test_gui_export_panel.py`: **206 passed, 1 skipped**
+(`tests/test_app_v8_v18.py:133`, the look-check frame absent: pre-existing) in 239.9 s (the run
+before `987681c`, at `f9ea560`: 1 failed (the pin, above), 205 passed, 1 skipped in 233.2 s). `uv
+run ruff check .` exit 0; `uv run ruff format --check .` 285 files formatted; `uv run mypy`
+(strict) no issues in 146 files. Every committed blob LF, 0 CR, 0 NUL.
+
+### Reviewer A round 6 (`175a8e8..987681c` minus `docs/proofs`; R4/R5's form, THE RE-RUN)
+
+Runner `r6/run_review.sh` (R5's, unchanged, md5 `ee1de28c...`), prompt `r6/review-prompt.md`
+(R5's form plus R5's findings and their dispositions), diff `r6/review-diff.txt`, transcript
+`r6/review.stderr.txt`, commands `r6/commands.txt` (26, every search excluding `docs/proofs/**`),
+verdict `r6/review.txt`, adjudication `r6/adjudication.md`, the cell's R6-1 reproduction
+`r6/r6_1_repro.py` / `.txt`, md5s `r6/md5sums.txt` (all under
+`C:/Users/rwsmy/clearwater-review-evidence/wp4.3/r6/`). Codex `gpt-6.1-sol` / high, WSL, 77,380
+tokens, probe READY, review exit 0 at 00:55:18Z, no transport error.
+**VERDICT: NEW_CRITICAL_MAJOR_FOUND (0 / 1 / 3).** Dispositions (cell; for the ruling):
+
+- R6-1 MAJOR (reviewer: REOPENED R5-1) CONFIRMED by the cell's reproduction (a real
+  `LatestWorker` holding a task, an idle runner: froze while the worker was busy `[True]`;
+  generation-2 starts `[('MainThread', True)]`): the idle test does not see the window's three
+  `LatestWorker` threads (opener, preview renderer, framer). Adjudicated NEW (a distinct route;
+  R5-1's fix holds for runner jobs). Proposed RECLASSIFY MINOR: out of V7's states (analysis,
+  export and batch are runner jobs; in (a)-(e) a job is active whenever a render or a frame fetch
+  runs; in (f) the first idle check beside the opener freezes, it does not collect). Options for
+  CHARC: (A, recommended) keep the ruled definition, the docstring states the bound exactly, a DR
+  names the residual with window 4's working-set figures as evidence; (B) widen idle to the
+  `LatestWorker`s: a grant on `gui/render_worker.py`, `gui/shell.py`, `gui/preview.py`, a RED, and
+  new unreviewed code (R7 on that diff alone).
+- R6-2 MINOR CONFIRMED, docs-only: the docstring's "freed at the next idle moment" is false for
+  garbage present at the first idle check (frozen until the last stop) and ignores the threshold.
+- R6-3 MINOR CONFIRMED, test-only, REOPENED R5-5: the pin passes vacuously when no poll runs.
+- R6-4 MINOR CONFIRMED, docs-only: "before any worker starts" is false (`AppWindow`'s
+  construction starts the three `LatestWorker` threads); "before the start-up jobs".
+
+Cap proposal: R6-1 per (A); then R6-2/R6-4 (docs) and R6-3 (test-only, shown passing on the
+vacuous event list at the parent's assertions and failing after) with NO R7, read by the gate's
+Reviewer B; then window 4 as ordered (the working-set readings: preparation after the ruling).
+Per the dispatch, NO change was made after the verdict; the cell yields `R6 VERDICT:`.
+
+### Notes for the record
+
+- Window 4 preparation (dispatch step 3) NOT started: it follows R6 in the order, and R6 blocked.
+- Scratch outputs under `work/wp4.3-c10*` (not of record).
