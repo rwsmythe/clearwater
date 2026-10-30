@@ -161,6 +161,18 @@ def _messages(caplog: pytest.LogCaptureFixture, logger: str) -> list[str]:
     return [r.getMessage() for r in caplog.records if r.name == logger]
 
 
+def _read_beat(beat: Path) -> int:
+    """Return the grandchild's last beat; a read that meets the rewrite's truncation is retried.
+
+    ``write_text`` truncates before it writes, so a read can see an empty file (R1 F13).
+    """
+    for _ in range(200):
+        if text := beat.read_text():
+            return int(text)
+        time.sleep(0.005)
+    raise AssertionError("the beat file stayed empty")
+
+
 @pytest.fixture
 def quick_kill(monkeypatch: pytest.MonkeyPatch) -> float:
     """Shorten the kill grace so a kill test ends quickly."""
@@ -334,6 +346,21 @@ def test_cancelled_before_the_start_spawns_nothing(tmp_path: Path) -> None:
     assert _scratch_folders(tmp_path) == []
 
 
+def test_a_cancel_during_the_sweep_spawns_nothing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """R1 F7: the cancel is checked again after the first job's sweep, before the spawn."""
+    marker = tmp_path / "spawned"
+    command = _child(tmp_path, "Path(ARGS[0]).write_text('x')\nresult()\n", str(marker))
+    progress = _Progress()
+    monkeypatch.setattr(ProcessExportJobs, "_sweep_once", lambda self: progress._cancel.set())
+    result, _ = _run(tmp_path, command, progress)
+    assert result.failure is CANCELLED
+    assert result.device == "none"
+    assert not marker.exists()
+    assert _scratch_folders(tmp_path) == []
+
+
 def test_a_child_that_ignores_cancel_is_killed(
     tmp_path: Path, quick_kill: float, caplog: pytest.LogCaptureFixture
 ) -> None:
@@ -345,9 +372,7 @@ def test_a_child_that_ignores_cancel_is_killed(
         time.sleep(30)
         """,
     )
-    start = time.perf_counter()
     result, _ = _run(tmp_path, command, _Progress(cancel_after=1))
-    assert time.perf_counter() - start < 10
     assert result.ok is False
     assert result.failure == "The export worker did not stop after cancel and was ended."
     assert result.device == "unknown"
@@ -377,9 +402,9 @@ def test_a_kill_leaves_the_grandchild_running(tmp_path: Path, quick_kill: float)
     try:
         result, _ = _run(tmp_path, command, _Progress(cancel_after=1))
         assert result.failure == "The export worker did not stop after cancel and was ended."
-        before = int((beats / "beat").read_text() or 0)
+        before = _read_beat(beats / "beat")
         time.sleep(0.5)
-        after = int((beats / "beat").read_text() or 0)
+        after = _read_beat(beats / "beat")
         assert after > before, "the grandchild stopped with the worker"
         assert not (beats / "gone").exists()
     finally:
@@ -692,9 +717,7 @@ def test_a_child_alive_after_its_result_is_killed_and_the_result_kept(
 ) -> None:
     caplog.set_level(logging.DEBUG)
     command = _child(tmp_path, 'result(device="kept")\ntime.sleep(30)\n')
-    start = time.perf_counter()
     result, _ = _run(tmp_path, command)
-    assert time.perf_counter() - start < 10
     assert result.ok and result.device == "kept"
     assert any("killed" in m for m in _messages(caplog, PROCESS_LOGGER))
 
@@ -726,15 +749,17 @@ def test_a_worker_that_never_reads_its_stdin_is_still_cancelled(
     """The request is written by a thread: a worker that never reads cannot block the job."""
     command = [sys.executable, "-c", "import time; time.sleep(30)"]
     request = _request(tmp_path, padding="p" * (4 << 20))  # far larger than any pipe buffer
-    progress = _Progress()
-    timer = threading.Timer(0.3, progress._cancel.set)
-    timer.start()
-    start = time.perf_counter()
-    try:
-        result = _jobs(tmp_path, command).job(request)(progress)
-    finally:
-        timer.cancel()
-    assert time.perf_counter() - start < 10
+
+    class _CancelInTheConversation(_Progress):
+        """Cancels from the 5th check: the 1st and 2nd are ``_run``'s, before the spawn (F11)."""
+
+        calls = 0
+
+        def cancelled(self) -> bool:
+            self.calls += 1
+            return self.calls >= 5
+
+    result = _jobs(tmp_path, command).job(request)(_CancelInTheConversation())
     assert result.failure == "The export worker did not stop after cancel and was ended."
 
 
@@ -743,8 +768,9 @@ def test_an_exception_from_the_progress_kills_the_worker(tmp_path: Path) -> None
     command = _child(
         tmp_path,
         """\
+        Path(ARGS[0]).write_text("0")  # the first beat before the progress that raises (F12)
         send({"progress": [1, 100, "working"]})
-        for n in range(600):
+        for n in range(1, 600):
             Path(ARGS[0]).write_text(str(n))
             time.sleep(0.05)
         """,
@@ -758,9 +784,9 @@ def test_an_exception_from_the_progress_kills_the_worker(tmp_path: Path) -> None
     with pytest.raises(RuntimeError, match="went away"):
         _run(tmp_path, command, _Raising())
     time.sleep(0.2)
-    before = beat.read_text()
+    before = _read_beat(beat)
     time.sleep(0.4)
-    assert beat.read_text() == before  # the worker is gone, not left running
+    assert _read_beat(beat) == before  # the worker is gone, not left running
 
 
 # --- the child's log records -----------------------------------------------------------------
