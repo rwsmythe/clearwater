@@ -1789,3 +1789,32 @@ formatted"; `uv run mypy` "Success: no issues found in 146 source files". Every 
 
 Not done, by the ruling: B-1 (rejected), B-8 (declined, a Limit), B-2 / B-14 (CHARC's register
 rows at the accept), B-13 (a Limit). B-14 has no Limit line (the ruling names none).
+
+## Cell 13 (implementer-opus-high, 2026-10-30): the re-run's five minor fixes
+
+Dispatch: orchestrator gen 26, `prompt-wp4.3-cell13.md`; governing ruling CHARC `b0d679b06033a23b`
+(2026-10-30T03:10:49Z) on the narrow Reviewer B re-run over `b64e0c1..f644488` (transcript
+`clearwater-review-evidence/wp4.3/reviewB2/review-B2.txt`, NO_NEW_CRITICAL_MAJOR, 4 minor / 2
+advisory). Worktree `.worktrees/wp4.3-mc`, head at start `f644488`, clean. No suite, window, GPU
+or footage run; scratch `work/wp4.3-c13/` (the probes live there, uncommitted). Depth: the
+dispatcher's figure at the yield.
+
+| Item | Commit(s) | Kind | RED / probe | Run |
+|---|---|---|---|---|
+| 1 | `d292449` RED, `71de8b8` GREEN, `0e12801` style | product, one line in `clean_leftovers` (`next(listing, None)` inside the same `try`); the B-7 test parametrised over open fails / first iteration fails / journaled / missing / listable | RED on `f644488`'s product: `[unlistable-on-iteration]` `assert 0 == 1`, "1 failed, 4 passed" | GREEN "5 passed" |
+| 2 | `d292449` (the pinning line) | test-only, ACCEPTED as is by the ruling | no test pinned the two-line case: `[unlistable-and-journaled]` asserts exactly two warnings, each line once, each naming the folder (green on the parent too) | in item 1's runs |
+| 3 | `f6d04ff` | test-only | scratch `test_probe_item3.py`, a forced 1 ms deschedule at each ordering's gap, each poll's mark against the published report: parent order 7/7 polls lag (B's gap); count-before-report with no lock 7/7 polls lead (a false failure of the `>= produced` check); before-report under one lock the mark also takes 0/4 off. Committed: the third form | interface-load "4 passed" |
+| 4 | `ddbeb4c` | test-only | scratch `plant4.py` + `threadwatch.py`: a failure planted inside each witness, threads listed 1 s after each test. Before (`f644488` V18, `f6d04ff` runner): V18 `alive=['clearwater-job'] decode_ended=False`, teardown 5.01 s; runner `alive=['clearwater-job', 'clearwater-job']`. After: `alive=[] decode_ended=True` for both, no teardown over 0.5 s. V18: `try`/`finally` sets the release; runner: the job's first burst sets `burst` in a `finally`, the poll sets `polled` in a `finally`, the test's `finally` sets both and calls `runner.close` (its timer stops, so the connected wrapper never runs again) | V18 x3, interface-load x3 below |
+| 5 | `7766491` | docstring | the hold's docstring: the engine has measured the first frame only (`engine.py` stores its statistics before it asks for the next) | ruff |
+| 6 | `7766491` | docstring | the start-up module's write claim scoped to app data, as the B-12 test observes | ruff |
+
+Light runs on `0e12801` (offscreen): leftovers "27 passed"; interface_load "4 passed"; v8_v18
+"6 passed, 1 skipped" (the skip: the look-check frame is absent, as cell 12 recorded); startup
+"10 passed, 1 warning" (CuPy's `CUDA_PATH` notice in this shell, not this change). V18 alone x3:
+4.21 / 4.00 / 4.26 s call, "1 passed" each; interface_load x3: "4 passed" each. `uv run ruff check
+.` "All checks passed!"; `uv run ruff format --check .` "287 files already formatted"; `uv run
+mypy` "Success: no issues found in 146 source files". Every touched blob LF, 0 CR, 0 NUL. Slip:
+the RED commit's ids line was over 100 characters (ruff E501); fixed in `0e12801`.
+
+No new Limit lines (the ruling). Not done, by the dispatch: anything else from either Reviewer B
+pass, a bound, the report, the full suite, a Reviewer B, the gate, the rebase.
