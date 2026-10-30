@@ -19,16 +19,20 @@ The only ``clearwater.app`` module that imports ``clearwater.gui`` or loads Qt.
    open with the settings' limit; (ii) the encoder detection into the catalog (D74, 8.2);
    (iii) the graphics-card detection, whose AD-9 reason the status bar shows while no file is
    open (and the log records); it runs again when the settings change with no file open.
+6. The window's :class:`FullCollections` check: from here on CPython's full garbage collection
+   runs on the interface thread at a moment the app chooses, never at a job's boundary (V7).
 """
 
 from __future__ import annotations
 
 import dataclasses
+import gc
 import logging
 import sys
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
+from PySide6.QtCore import QObject, QTimer
 from PySide6.QtGui import QCloseEvent
 from PySide6.QtWidgets import QApplication
 
@@ -66,6 +70,90 @@ CACHE_FAILED_TEXT = "Videos cannot be analysed or exported in this session: {rea
 """The one warning shown when the cache's open failed (ruling S1 (a), condition 2)."""
 
 
+IDLE_CHECK_MS = 1000
+"""How often the interface thread looks for the moment to run a deferred full collection."""
+
+BUSY_COLLECTION_FACTOR = 10
+"""While a job runs, a full collection waits for this many times CPython's own threshold."""
+
+_NO_AUTOMATIC_FULL_COLLECTION = 2**31 - 1
+"""The third collector threshold while an application runs: never reached."""
+
+_STARTED: list[FullCollections] = []
+"""The started instances; the first saves the process's thresholds, the last restores them."""
+
+_SAVED_THRESHOLDS: list[tuple[int, int, int]] = []
+"""The process's collector thresholds from before the first start."""
+
+
+class FullCollections:
+    """Keeps CPython's full garbage collection off the job boundaries (V7, ruling 7b32521f item 3).
+
+    Window 3 saw a generation-2 collection on a job's thread at each job boundary (inside the
+    plan cache's release), holding the GIL while the interface waited. While started, CPython's automatic full collection is off (its third
+    threshold is never reached; generations 0 and 1 stay automatic) and the interface thread
+    runs it instead, from a check every :data:`IDLE_CHECK_MS`:
+
+    - the first check that finds no job running ends start-up: it freezes every object then
+      tracked (``gc.freeze``), so no later full collection scans them;
+    - a later check that finds no job running collects once more younger collections are pending
+      than CPython's own third threshold;
+    - a check while a job runs collects only past :data:`BUSY_COLLECTION_FACTOR` times that
+      threshold, so a long job's cyclic garbage stays bounded.
+
+    The process's thresholds come back, and the frozen objects are unfrozen, when the last
+    started instance stops (the window's close). Interface thread only.
+    """
+
+    def __init__(self, jobs: JobRunner, parent: QObject) -> None:
+        """Create the check, not yet started.
+
+        Args:
+            jobs: The window's job runner (``active()`` tells whether a job is running).
+            parent: The timer's owner (the window).
+        """
+        self._jobs = jobs
+        self._timer = QTimer(parent)
+        self._timer.setInterval(IDLE_CHECK_MS)
+        self._timer.timeout.connect(self._check)
+        self._frozen = False
+
+    def start(self) -> None:
+        """Turn the automatic full collection off and start the check (idempotent)."""
+        if self in _STARTED:
+            return
+        if not _STARTED:
+            _SAVED_THRESHOLDS[:] = [gc.get_threshold()]
+            first, second, _ = _SAVED_THRESHOLDS[0]
+            gc.set_threshold(first, second, _NO_AUTOMATIC_FULL_COLLECTION)
+        _STARTED.append(self)
+        self._timer.start()
+
+    def stop(self) -> None:
+        """Stop the check; the last one restores the thresholds and unfreezes (idempotent)."""
+        if self not in _STARTED:
+            return
+        self._timer.stop()
+        _STARTED.remove(self)
+        if not _STARTED:
+            gc.set_threshold(*_SAVED_THRESHOLDS.pop())
+            gc.unfreeze()
+
+    def _check(self) -> None:
+        """Freeze after start-up, then collect at an idle moment (or when far overdue)."""
+        threshold = _SAVED_THRESHOLDS[0][2]
+        pending = gc.get_count()[2]  # the younger collections since the last full one
+        if self._jobs.active():
+            if pending > BUSY_COLLECTION_FACTOR * threshold:
+                gc.collect()
+            return
+        if not self._frozen:
+            self._frozen = True
+            gc.freeze()
+        elif pending > threshold:
+            gc.collect()
+
+
 class AppWindow(MainWindow):
     """The program's main window: notes its close event before the shell's shutdown runs.
 
@@ -76,6 +164,8 @@ class AppWindow(MainWindow):
 
     Attributes:
         close_seen: True once the window got its close event.
+        full_collections: The window's garbage-collection check (item 3), started by
+            :func:`build_application` and stopped after the shell's shutdown at close.
     """
 
     def __init__(
@@ -89,11 +179,15 @@ class AppWindow(MainWindow):
         """Build the shell's window (``MainWindow``'s arguments)."""
         super().__init__(engines, locations, presenter=presenter, choose_file=choose_file)
         self.close_seen = False
+        self.full_collections = FullCollections(self.jobs, self)
 
     def closeEvent(self, event: QCloseEvent) -> None:  # noqa: N802 -- Qt override
-        """Note the close, then the shell's shutdown and close."""
+        """Note the close, then the shell's shutdown and close, then stop the collection check."""
         self.close_seen = True
-        super().closeEvent(event)
+        try:
+            super().closeEvent(event)
+        finally:
+            self.full_collections.stop()
 
 
 class _UnlessClosed:
@@ -306,6 +400,7 @@ def build_application(
     )
     window.show()
     application.start_jobs()
+    window.full_collections.start()  # the freeze waits for the start-up jobs' end
     return application
 
 
