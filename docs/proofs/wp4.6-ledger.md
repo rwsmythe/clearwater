@@ -10,7 +10,8 @@ Brief `docs/briefs/wp4.6-brief.md` FINAL on CHARC `39dad78f5b10ceeb`; base `b6a3
 | 0 | 2026-10-30 | (no review: round-0 note) | - | - | - | - | - | - | - | 194,313 (cell 1, retired at round 0) |
 | Y1 (build) | 2026-10-30 | (no review: tasks 3-4, cell 2) | - | - | - | - | - | - | - | 171,586 (cell 2 at Y1, 05:08Z) |
 | Y2a (build) | 2026-10-30 | (no review: tasks 5-6, cell 2) | - | - | - | - | - | - | - | 228,358 (cell 2 at Y2a); retired at 230,050 (05:21Z) |
-| Y2b (build) | 2026-10-30 | (no review: task 7 and 8, cell 3) | - | - | - | - | - | - | - | (dispatcher fills: cell 3 at Y2b) |
+| Y2b (build) | 2026-10-30 | (no review: task 7 and 8, cell 3) | - | - | - | - | - | - | - | 142,340 (cell 3 at Y2b, 05:33Z) |
+| R1 | 2026-10-30 | WSL, codex-cli 0.162.1, gpt-6.1-sol / high; HEAD `7a20c7bd` | 0 | 8 reported: 5 confirmed blocking (F1 F2 F3 F5 F6), 2 banked pre-existing (F4 F8), 1 reclassified minor (F7) | 6 reported (+F7) | 5 blocking in / 2 minor out (F9 F10) | 14 NEW / 0 REOPENED | 0 | (remediation not started) | (dispatcher fills: cell 3 at R1) |
 
 ## Round 0 (task 2): the design restated, the Questions, the stops
 
@@ -576,3 +577,28 @@ Untouched app tests that now export video through the worker: `test_app_wiring.p
 `test_g7_a_batch_skips_a_failed_item_logs_it_and_goes_on`, `test_g12_every_setting_through_the_dialog`,
 `test_g10_dr35a_a_reserved_device_name_is_refused_readably`, the three `test_g10_dr82_*`, and
 `test_dr44c_...[batch]`; `test_app_leftovers.py::test_start_up_never_scans_a_folder_because_a_source_lies_there`.
+
+## Reviewer A round 1 (cell 3)
+
+Evidence `C:\Users\rwsmy\clearwater-review-evidence\wp4.6\r1\` (prompt, diff, transcript,
+`adjudication.md`, the reproduction `probe_r1.py` / `probe_r1.log`, `md5sums.txt`). Verdict
+`NEW_CRITICAL_MAJOR_FOUND`; mechanical assertions met (banner model and effort, 25 executions,
+the tokens footer, the anchored VERDICT; ERROR lines: the model-list refresh and an offline MCP
+connector, neither the review transport).
+
+| # | Finding | Adjudication |
+|---|---|---|
+| F1 | a result after the cancel restarts the kill grace | CONFIRMED (5.730 s cancel-to-return): MAJOR |
+| F2 | an unhashable log level ends the stdout reader; the later result is lost | CONFIRMED: MAJOR (the strict-ignore rule is in the envelope) |
+| F3 | an overflowing `elapsed_s` ends the reader | CONFIRMED: MAJOR |
+| F4 | relayed engine texts carry full OSError paths | BANKED pre-existing (`ExportEngine._describe`, `bda46fc6`); no new path added |
+| F5 | redaction leaves folder components (space after a known folder; apostrophe) | CONFIRMED: MAJOR |
+| F6 | the unknown-key reason carries the key | CONFIRMED: MAJOR |
+| F7 | sweep / removal on the job thread, no cancel check | CONFIRMED IN PART (no cancel re-check after the sweep); duration RECLASSIFIED MINOR |
+| F8 | the scratch volume's space is never checked | BANKED pre-existing (`jobs/export.py:916`, `0daab17f`); widened by the process form; to CHARC |
+| F9 | reader threads outlive the drain timeout | MINOR out-of-envelope; the warning's words |
+| F10 | `format_version: 1.0` accepted | MINOR out-of-envelope |
+| F11-F13 | three test races (cancel before spawn, kill before beat, truncated beat) | MINOR test-only |
+| F14 | wall-clock bounds in the parallel leg | MINOR test-only |
+
+Remediation is NOT started (the dispatcher's order: yield first).
