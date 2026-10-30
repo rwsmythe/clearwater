@@ -140,44 +140,79 @@ def test_an_output_folder_the_os_refuses_is_skipped_and_logged(
     assert "skips" in caplog.text and repr(str(bad)) in caplog.text
 
 
+class _FailsOnIteration:
+    """A listing that opens, then refuses its first entry (Windows can deny at either step)."""
+
+    def __init__(self, error: OSError) -> None:
+        self.error = error
+
+    def __enter__(self) -> _FailsOnIteration:
+        return self
+
+    def __exit__(self, *_exc: object) -> None:
+        return None
+
+    def __iter__(self) -> _FailsOnIteration:
+        return self
+
+    def __next__(self) -> os.DirEntry[str]:
+        raise self.error
+
+
+_LIST = "could not list the output folder"
+_KEEP = "the write journal keeps"
+
+
 @pytest.mark.parametrize(
-    ("error", "logged"),
-    [(PermissionError("access is denied"), True), (FileNotFoundError("gone"), False)],
-    ids=["unlistable", "missing"],
+    ("fault", "journaled", "expected"),
+    [
+        ("open", False, [_LIST]),
+        ("iterate", False, [_LIST]),
+        ("open", True, [_LIST, _KEEP]),
+        ("missing", False, []),
+        (None, False, []),
+    ],
+    ids=["unlistable", "unlistable-on-iteration", "unlistable-and-journaled", "missing", "listable"],
 )
 def test_an_output_folder_that_cannot_be_listed_is_logged_once(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     caplog: pytest.LogCaptureFixture,
-    error: OSError,
-    logged: bool,
+    fault: str | None,
+    journaled: bool,
+    expected: list[str],
 ) -> None:
     """B-7: an unlistable ``output_folder`` logs one warning; a missing one has nothing to log.
 
     The rule is ``holds_leftovers``': an ``OSError`` (or ``ValueError``) means the folder cannot
-    be listed, a ``FileNotFoundError`` means it holds nothing. The folder is in no journal entry,
-    so only the output folder's own line can report it.
+    be listed, a ``FileNotFoundError`` means it holds nothing. A denial on opening the listing
+    and one on reading its first entry are both unlistable (cell 13, item 1). An output folder
+    that is also a journal folder logs two facts, each once: the folder cannot be listed, and
+    its entry stays (CHARC ruling b0d679b0, item 2).
     """
     out = tmp_path / "out"
     out.mkdir()
+    journal = WriteJournal(tmp_path / "c")
+    if journaled:
+        journal.add(out)
     real = os.scandir
 
     def scandir(path: os.PathLike[str] | str) -> object:
-        if Path(path) == out:
-            raise error
+        if Path(path) == out and fault is not None:
+            if fault == "iterate":
+                return _FailsOnIteration(PermissionError("access is denied"))
+            raise PermissionError("access is denied") if fault == "open" else FileNotFoundError()
         return real(path)
 
     monkeypatch.setattr(os, "scandir", scandir)
     with caplog.at_level(logging.WARNING, logger=startup.__name__):
-        report = clean_leftovers(cpu_settings(output_folder=out), WriteJournal(tmp_path / "c"))
+        report = clean_leftovers(cpu_settings(output_folder=out), journal)
     assert report.removed == () and report.failed == ()
-    warnings = [r for r in caplog.records if r.levelno == logging.WARNING]
-    if logged:
-        assert len(warnings) == 1, caplog.text
-        assert "could not list the output folder" in warnings[0].getMessage()
-        assert str(out) in warnings[0].getMessage()
-    else:
-        assert warnings == [], caplog.text
+    warnings = [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING]
+    assert len(warnings) == len(expected), caplog.text
+    for line in expected:
+        assert [m for m in warnings if line in m and str(out) in m] != [], (line, caplog.text)
+        assert sum(line in m for m in warnings) == 1, (line, caplog.text)
 
 
 def _refuse_reading(monkeypatch: pytest.MonkeyPatch, journal: WriteJournal) -> None:
