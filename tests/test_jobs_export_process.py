@@ -427,10 +427,13 @@ def test_a_traceback_tail_is_redacted_to_names(tmp_path: Path) -> None:
         sys.stderr.write("noise line\\n" * 50)
         sys.stderr.write("could not open " + repr(ARGS[1]) + "\\n")
         sys.stderr.write("also tried " + ARGS[1] + "\\n")
+        sys.stderr.write("and " + ARGS[2] + "\\n")
         raise FileNotFoundError(2, "No such file", ARGS[0])
         """,
         str(known),
         unknown,
+        # a sibling whose name begins with the known folder's: cut whole, never at the prefix
+        str(tmp_path / "my clips2" / "sibling.mp4"),
     )
     result, _ = _run(tmp_path, command)
     failure = result.failure
@@ -438,7 +441,7 @@ def test_a_traceback_tail_is_redacted_to_names(tmp_path: Path) -> None:
     assert failure.startswith("The export worker ended without a result (exit status 1).\n")
     assert failure.isascii()
     assert "FileNotFoundError" in failure
-    assert "clip.mp4" in failure and "leaked_name.mp4" in failure
+    assert "clip.mp4" in failure and "leaked_name.mp4" in failure and "sibling.mp4" in failure
     for folder_name in ("my clips", "deep folder", "private", "secret", tmp_path.name):
         assert folder_name not in failure, folder_name
     assert str(Path(sys.executable).parent) not in failure
