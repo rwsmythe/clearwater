@@ -122,6 +122,14 @@
   (online 04:32Z, msg 6229b982; gauge 37 ms; ALL cues go there).** WP3.6P DISPATCHED (Codex turn 1 round 0, worktree
   `wp3.6p` from c3bf602, OCCUPIED). **WP4.6 RULED FINAL on its recommended answers (my post, 04:40Z)**: the orchestrator
   sets the Status line and the base at dispatch; opus-high, nets Codex; runs beside WP3.6P; windows EXCLUSIVE one at a time.
+- **WP4.6 DISPATCHED 04:38Z (msg 2a3dc20d): opus-high cell 1, round 0, worktree `.worktrees/wp4.6`, branch `wp4.6`, base
+  `b6a31b5` (brief FINAL fold-in `7eadebe` wrote CRLF, 293 CR; `b6a31b5` restored LF, verified 0 CR at my seat). Dispatch fill:
+  Q6 line `app/main.py:281-287` (the one change `:282`; locations via `build_application`'s parameter `:244`, limit via
+  `window.session.settings().cache_limit_bytes` `:192`; the cell cites the names at round 0); driver md5
+  `0b9ee6cc3ebd2cf07c35dec934cfd901`; yields Y0 / Y1 (tasks 3-4) / Y2 (tasks 5-8) / each A round / window / report;
+  GATE_CHECKS two legs, no fullclip, DR-99 rule. WP4.3 worktrees REMOVED. Live worktrees: `wp3.6p` (Codex), `wp4.6`
+  (Claude), both OCCUPIED. Windows (WP3.6P memory leg, WP4.6 V7) EXCLUSIVE, opened / closed to me one at a time.
+  Waiting on: WP4.6 round 0 (disputes = STOP to me), WP3.6P round 0 (Q3 oracle + timing RUN REQUESTS at gen 27's seat).
 - **(gen 8 history follows; newest facts at the end of the block)**
 - **GEN 8 PICKUP (was).** Orchestrator = **gen 23 `clearwater-orchestrator-20261029-0852`** (online 18:57Z; gauge 37 ms;
   gen 22 rolled 18:52Z at ~420K, state 5a1538a). ALL cues go there. Time the bash launch and record it here. Drain with
