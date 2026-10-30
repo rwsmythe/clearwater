@@ -167,6 +167,14 @@
   148 s on the four app test files; driver copy `s7_driver_wp46.py` md5 `074cbb62b2a9aa8949ebcf30d803b51a`); `_HeldSink`
   / `_ProgressSink` unused by tests, KEPT until WP4.6's accept (the pinned driver imports `_ProgressSink`); A R1 at cell
   3's seat (142,340).
+- **WP4.6 R1 RULED 05:58Z (query ae751e55; Codex 0/8/6 on `b6a31b5..7a20c7bd`, ledger c0caba31; post 94c7cb61 + cue):**
+  F8 = (b) register row MINE at the accept (pre-existing WP3.21 Q-R6: `jobs/export.py:916` charges the cache growth to
+  the output folder's volume, verified; widened by WP4.6's cold scratch) + report Limit; design item 7's "against the
+  scratch volume" sentence WITHDRAWN. F2/F3/F6 in envelope (strict-ignore rule covers wrong-typed values); F1 one kill
+  deadline from the cancel line (5.73 s measured vs 3.0); F5 redaction = file names only + hostile-folder test; F7,
+  F11-F14 fix; F9/F10 Limits; F4 (engine OSError texts carry full paths, WP3.14 `export.py:678-685`) = candidate row
+  MINE at the accept. Cell 3 stands down at 224,076; FRESH cell 4 remediates + R2 (a NEW protocol-class major at R2 =
+  cap proposal to me). WP3.6P turn 5 remediating R1.
 - **(gen 8 history follows; newest facts at the end of the block)**
 - **GEN 8 PICKUP (was).** Orchestrator = **gen 23 `clearwater-orchestrator-20261029-0852`** (online 18:57Z; gauge 37 ms;
   gen 22 rolled 18:52Z at ~420K, state 5a1538a). ALL cues go there. Time the bash launch and record it here. Drain with
