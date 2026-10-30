@@ -94,6 +94,14 @@
   WP-DR87: Claude B on `wp-dr87-mc` 80bd029 clean (1 minor = my closure wording; 5 advisories banked as report text);
   DR-87 note (ii) now reads "the fixture removes the 10 s sampling sleeps (90.93 -> 25.24 s); the scan itself remains
   (~23 s)"; its gate running; accept next (DR-87 / DR-93 / DR-94 CLOSED by me at it).
+- **WP-DR87 GATE 03:35Z: parallel 5,972 / 1 skip GREEN; serial 1 failed / 1,128 / 10 skips: `test_io_video_encode_bench.py::
+  test_run_once_records_the_row_and_deletes_the_output` `telemetry_origin` -0.066 s against (-0.05, 0], PRE-EXISTING (fails
+  alone on main 9ae9bf9 at -0.092; mechanism verified: `video_io_bench.py:389-392` stamps origin before two Thread.start,
+  `:647` started after). RULED 03:42Z (query 2f6e444c, my post + cue): (a) ACCEPT + merge; NEW DR-99 (mine at the accept;
+  trigger next bench touch or a second gate failure; remedy: origin after start() returns, or a load-stated bound); WP4.3's
+  gate records the same node under DR-99 without a STOP if it fails the same way and alone on main. WP4.3 cell 13 done
+  (`wp4.3-mc` 2407f9e; item 3 built as a locked counter, seat ruling concurred); its gate after WP-DR87's merge. **At
+  WP-DR87's accept mine: DR-87 / DR-93 / DR-94 CLOSED, DR-99 NEW, CLAUDE.md line.**
 - **(gen 8 history follows; newest facts at the end of the block)**
 - **GEN 8 PICKUP (was).** Orchestrator = **gen 23 `clearwater-orchestrator-20261029-0852`** (online 18:57Z; gauge 37 ms;
   gen 22 rolled 18:52Z at ~420K, state 5a1538a). ALL cues go there. Time the bash launch and record it here. Drain with
