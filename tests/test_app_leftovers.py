@@ -172,7 +172,13 @@ _KEEP = "the write journal keeps"
         ("missing", False, []),
         (None, False, []),
     ],
-    ids=["unlistable", "unlistable-on-iteration", "unlistable-and-journaled", "missing", "listable"],
+    ids=[
+        "unlistable",
+        "unlistable-on-iteration",
+        "unlistable-and-journaled",
+        "missing",
+        "listable",
+    ],
 )
 def test_an_output_folder_that_cannot_be_listed_is_logged_once(
     tmp_path: Path,
