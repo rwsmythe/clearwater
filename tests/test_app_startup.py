@@ -446,10 +446,16 @@ def test_a_settings_file_that_fails_to_decode_is_set_aside_and_start_up_goes_on(
     wait_started(qtbot, application)
 
 
-# Nothing in start-up writes outside app data.
+# Inside app data, start-up and close write only the config and cache folders.
 
 
-def test_start_up_and_close_write_only_app_data(make_app, qtbot, tmp_path) -> None:
+def test_start_up_and_close_write_only_config_and_cache_inside_app_data(
+    make_app, qtbot, tmp_path
+) -> None:
+    """Under the app-data root, only ``config`` (logs, presets, settings) and ``cache`` appear.
+
+    It lists the app-data root only (B-12): a write outside that root is not observed here.
+    """
     where = tmp_path / "home"
     application = make_app(cpu_settings(), where=where)
     wait_started(qtbot, application)
