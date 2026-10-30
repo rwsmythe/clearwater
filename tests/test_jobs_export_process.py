@@ -506,6 +506,7 @@ def test_a_spawn_failure_is_a_failed_result_with_a_redacted_reason(tmp_path: Pat
         (b'{"progress": [1, NaN, "a"]}', "a non-finite constant"),
         (b'{"log": {"level": "LOUD", "name": "x", "message": "m"}}', "unknown level"),
         (b'{"log": {"level": "INFO", "name": "x"}}', "log shape"),
+        (b'{"log": {"level": ["x"], "name": "x", "message": "m"}}', "a list level (R1 F2)"),
         pytest.param(
             b'{"result": {"ok": true, "outputs": [], "warnings": [], "failure": null,'
             b' "device": "cpu", "elapsed_s": 1' + b"0" * 400 + b"}}",
@@ -531,6 +532,29 @@ def test_an_invalid_line_is_ignored_and_logged(
     assert result.ok, (why, result.failure)
     assert progress.reports == [(3, 4, "valid")], why
     assert any("ignored" in m for m in _messages(caplog, PROCESS_LOGGER)), why
+
+
+def test_any_error_decoding_one_line_ignores_that_line_only(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    """R1 F2: no exception from one line's decode ends the reader; the later lines arrive."""
+    caplog.set_level(logging.DEBUG)
+    decode = export_process._decode_line
+    calls: list[bytes] = []
+
+    def first_one_raises(content: bytes) -> tuple[str, object]:
+        calls.append(content)
+        if len(calls) == 1:
+            raise LookupError("an error the decoder did not foresee")
+        return decode(content)
+
+    monkeypatch.setattr(export_process, "_decode_line", first_one_raises)
+    command = _child(tmp_path, 'send({"progress": [1, 2, "first"]})\nresult(device="kept")\n')
+    result, progress = _run(tmp_path, command)
+    assert result.ok and result.device == "kept", result.failure
+    assert progress.reports == []  # the first line was ignored
+    ignored = [m for m in _messages(caplog, PROCESS_LOGGER) if "ignored" in m]
+    assert ignored == ["export worker line ignored: a line that could not be decoded (LookupError)"]
 
 
 def test_a_line_over_the_limit_is_ignored_and_one_at_it_is_kept(
