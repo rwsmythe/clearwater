@@ -1536,3 +1536,66 @@ unfrozen, and the next idle check (the opener's `LatestWorker` beside it counts 
 scans them on the interface thread inside (b)'s and (f)'s probes. Not verified: a
 characterisation run with `gc.callbacks` stamps (thread, duration, object counts) against the
 probe's gap times would confirm or refute it. (c) and (e) did not move with items 1 and 3.
+
+### CHARC's window-4 ruling (`921babda38ba1f3a`, 2026-10-30T01:53:17Z; saved verbatim at `clearwater-review-evidence/wp4.3/win4-ruling-921babda.md`)
+
+Q1 (a): REVERT item 3 (the gc policy) and its R5 / R6 follow-ups, keeping item 1 and the (f) probe
+move; no new design, no new review round; window 5 re-runs (a), (b), (d), plant-f + v7f-settled on
+the reverted head; (c) / (e) not re-run (their window-4 figures of record stand); the gc
+characterisation DECLINED. Q2 (a): `sys.setswitchinterval` NOT adopted, the default stays; the
+report records both intervals' figures. Q3 (a): WP4.3 closes after window 5 (report, Reviewer B,
+gate); (c) and (e) are OPEN STOPs of record (CHARC writes DR-98 and briefs WP4.6 export process
+isolation). Q4: V8 at k = 2 per frame mean <= 1/255, p99 <= 2.5/255, p99.9 and max recorded only
+(CHARC's AD-11 note); window 3's frame 510 (p99 2.011/255) is within the re-ruled bound; v8v18 is
+NOT re-run (the 16-frame characterisation is the evidence). Depth at the window-4 yield 231,467
+(dispatcher). The CAP stands.
+
+### Item 3's epitaph (the reverted gc policy)
+
+`FullCollections` (cell 9 `3e2db4d`, remediated by cell 10 through R5 / R6) kept CPython's full
+collection off the job boundaries: automatic generation 2 off while a window was open, a freeze at
+the first idle check, a collection at later idle checks once 10 younger collections were pending.
+Window 4 measured it: (c) 180.0 / 181.0 ms and (e) 182.0 ms longest (vs 182.0 / 196.0 before):
+nothing measurable bought; (b) 195.0 ms and (f) settled 395.4 ms were NEW STOPs where the policy
+acts (an idle-time collection on the interface thread beside the opener worker; the cell's
+reading, not characterised: the gc characterisation was declined). Its memory readings, kept for
+the record: working set +101.1 MB per 4K export ((c), both intervals), +247.2 / +237.0 MB in (e)
+with the 1:1 4K render; `len(gc.garbage)` 0 and `gc.get_count()` at most (42, 0, 0) at every
+export result.
+
+### The revert (`7b4c10b`)
+
+One hand-made revert commit (the gc lines interleave with item 1's in `app/main.py`):
+`src/clearwater/app/main.py` is item 1's GREEN (`6dd9f19`) plus R5-7's Args section on
+`AppWindow` (its "and its collection check" wording dropped); `tests/test_app_interface_load.py`
+loses every gc test and helper (`_Runner`, `_full_collections`, `_overdue`, `SETTLE_MS`, item 3's
+two tests, the R5-1..R5-4 tests). Reverted in effect: `4639bd8`, `3e2db4d`, `2124390`, `e1a8599`,
+`d13f84b`, `4611ed6`, `83af26f`, `86ba69a` and the gc tests of `f1ab586`, `00ca290`, `2b7e30b`,
+`f3757f1`. Kept: item 1 (`6c06e54` / `6dd9f19`, the paint test, `test_app_startup.py`'s spy on
+`AppWindow`), the runner pin with R5-5 / R5-6 / R6-3 (`a3e73b5`, `987681c`, `43dccd4`,
+`779b66f`), R5-7's Args section, the (f) probe move (`838b665`, `28c4ece`). `git diff
+1d96dc4..7b4c10b -- src/`: `app/main.py` only, 134 lines, item 1's lines only (`_CloseWatch` ->
+`AppWindow.closeEvent`, `Application.window: AppWindow`, `closed()` reads `close_seen`, module
+step 2's wording, the imports). No `FullCollections`, `full_collections`, `IDLE_CHECK_MS` or
+`BUSY_COLLECTION_FACTOR` left in `src/`, `tests/` or `tools/`.
+
+Targeted tests at `7b4c10b` (offscreen, shared host): `tests/test_app_*.py` (every marker) +
+`tests/test_gui_threads.py` + `tests/test_gui_export_panel.py`: **200 passed, 1 skipped**
+(`test_app_v8_v18.py:133`, pre-existing) in 191.3 s (207 before the revert, less the 7 gc tests);
+`ruff check .` exit 0; `ruff format --check .` 285 files formatted; `mypy` (strict) no issues in 146
+files. Every committed blob LF, 0 CR.
+
+### Window 5 preparation (no window)
+
+`windows/window5-commands.sh` md5 `5b14d9812ec4259c7c00004d07aea523` (uncommitted, LF, 0 CR):
+v7a, v7b, v7d, then the free-disk check (>= 40 GB, else both (f) runs SKIPPED and recorded),
+plant-f, v7f-settled, `rm -rf rec/v7f/cache`; every run on `s7_driver.py` `0b9ee6cc...`
+(unchanged) at the default switch interval; outputs `work/wp4.3-c10-win5/`; `dry` = the fixture
+into `work/wp4.3-c10/dry5-chain/`.
+
+Dry run (fixture, NOT of record, HEAD `7b4c10b`, 2026-10-30 ~01:59Z-02:01:13Z, chain exit 0; logs
+in `windows/dry6/`, md5s in `md5sums.txt`): v7a 0 (12.0 / 11.0 ms), v7b 0 (12.0 / 11.0, witness
+14), v7d 0 (92.0 / 46.0, 300 done), plant-f 0 (settling opens 4377.5 / 105.1 ms), v7f-settled 0
+(from show() 46.7 / 11.7 ms; build_application 147.5 ms); plant deleted: yes. C: 174 GB free
+before, 154 GB with the plant, 173 GB after; RAM available 7.63 / 7.80 of 33.52 GB. Footage folder
+unchanged (128 files), product logs naming it 0, a grep of the dry outputs for it 0 hits.
