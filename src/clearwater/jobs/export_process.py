@@ -12,7 +12,8 @@ One job, one worker. The job's run:
 1. returns :data:`~clearwater.jobs.export_seam.CANCELLED` at once when the cancel was asked
    before the start (nothing is spawned, no folder is made);
 2. on the instance's first run only, removes the scratch folders under ``<cache_dir>/export``
-   older than :data:`STALE_AFTER_S` (a worker that was killed leaves its folder behind);
+   older than :data:`STALE_AFTER_S` (a worker that was killed leaves its folder behind), then
+   returns ``CANCELLED`` as in step 1 when the cancel was asked during that sweep;
 3. encodes the request document, creates the job's scratch folder
    ``<cache_dir>/export/<uuid4 hex>`` (the worker's own proxy cache: two processes never share
    one cache folder) and spawns the worker through AD-23's ``tool_spawn_kwargs()``;
@@ -262,6 +263,8 @@ class ProcessExportJobs:
         if progress.cancelled():
             return _failed(CANCELLED, "none", start)
         self._sweep_once()
+        if progress.cancelled():  # asked during the sweep: still nothing spawned
+            return _failed(CANCELLED, "none", start)
         scratch = self._cache_dir / SCRATCH_FOLDER / uuid.uuid4().hex
         folders = _known_folders(request, self._cache_dir, scratch)
         try:
@@ -436,7 +439,7 @@ def _converse(
             if quiet_since is None or kind is not None:
                 quiet_since = now
             elif now - quiet_since >= DRAIN_AFTER_EXIT_S:
-                _LOG.warning("export worker output still open after its exit; no longer read")
+                _LOG.warning("export worker output still open after its exit; no longer waited for")
                 break
     except BaseException:
         process.kill()
@@ -725,12 +728,7 @@ def _redact(text: str, folders: list[str]) -> str:
     """
     for folder in folders:
         pattern = re.compile(
-            re.escape(folder)
-            + r"(?:"
-            + _NAME_CHAR
-            + r"*(?=[\\/])|(?=['\"\s]|$))"
-            + _SEGMENT
-            + "*",
+            re.escape(folder) + r"(?:" + _NAME_CHAR + r"*(?=[\\/])|(?=['\"\s]|$))" + _SEGMENT + "*",
             re.IGNORECASE,
         )
         text = pattern.sub(_last_name, text)
