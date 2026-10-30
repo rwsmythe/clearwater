@@ -109,6 +109,19 @@
   CLAUDE.md 2026-10-30 line. Codex-built packages: 9. Worktrees `wp-dr87`, `wp-dr87-mc` releasable. WP4.3 gate `wp43g1`
   RUNNING on `wp4.3-mc` dbefb96 (= 2407f9e on f78e92c; ~35 min from ~03:42Z): NO SUITE AT THIS SEAT until its result.
   Gen 26 (~370K) rolls after WP4.3's accept; gen 27 dispatches WP3.6P (Codex) and WP4.6 (opus-high).
+- **WP4.3 ACCEPTED main `28c4a75` 04:30Z (msg 7393f036; record `docs/proofs/wp4.3-accept.md`; gate `wp43g1` GREEN: parallel
+  6,043 / 1 skip, serial 1,207 / 11 skips / 0 failed, the DR-99 node passed). CHARC QA CONFIRMED (static, this seat): code
+  patch-id `11a91ba5` equal on `f78e92c..dbefb96` and `f78e92c..28c4a75`; 29 code / test files all within Files owned or
+  the named grants (Q18 jobs, Q5 shell, R2-3 settings_dialog); interfaces / contract / seam / cache untouched; 0 CR in
+  every blob; record read. MY ACCEPT COMMIT (this one): DR-52 / 61 / 62 / 68 / 75 / 82 / 84 CLOSED, DR-35 (c), DR-44
+  (whole row), DR-51 (a) CLOSED, DR-50 CLOSED by measurement, DR-69 NOT REACHED note; NEW DR-89 (D85 missing-folder
+  residual), DR-90 (Clear during another clip's export), DR-98 (V7 (c)/(e) OPEN STOP, switch interval not adopted,
+  grants unused; trigger WP4.6), DR-100 (B-2 source named like a temporary), DR-101 (B-14 analysis engine retained);
+  AD-11 note (video k = 2 p99 <= 2.5/255; stills unchanged); CLAUDE.md. Worktrees `wp4.3`, `wp4.3-mc`, `wp4.3-rev`
+  releasable. **ORCHESTRATOR GEN 26 ROLLED 04:30Z (~405K, state `c3bf602`). GEN 27 = `clearwater-orchestrator-20261029-1830`
+  (online 04:32Z, msg 6229b982; gauge 37 ms; ALL cues go there).** WP3.6P DISPATCHED (Codex turn 1 round 0, worktree
+  `wp3.6p` from c3bf602, OCCUPIED). **WP4.6 RULED FINAL on its recommended answers (my post, 04:40Z)**: the orchestrator
+  sets the Status line and the base at dispatch; opus-high, nets Codex; runs beside WP3.6P; windows EXCLUSIVE one at a time.
 - **(gen 8 history follows; newest facts at the end of the block)**
 - **GEN 8 PICKUP (was).** Orchestrator = **gen 23 `clearwater-orchestrator-20261029-0852`** (online 18:57Z; gauge 37 ms;
   gen 22 rolled 18:52Z at ~420K, state 5a1538a). ALL cues go there. Time the bash launch and record it here. Drain with
