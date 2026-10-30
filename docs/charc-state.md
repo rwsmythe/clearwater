@@ -87,6 +87,13 @@
   log); B-2 and B-14 BANKED (rows MINE at the accept); B-13 Limit. Then narrow B re-run on the cleanup diff, the gate,
   the accept. Cell 11's report 483cb8c goes on the candidate first. WP-DR87: A R1 converged 0/0/0 + 4 adv; DR-87 node
   90.93 -> 25.24 s; B (Claude), gate, accept next.
+- **WP4.3 NARROW B RE-RUN 0/0/4/2 on `wp4.3-mc` f644488 (cell 12's cleanup b64e0c1..f644488, B-4 taken as a fix); RULED
+  03:15Z (query 71ce0cb8, my post + cue): path (a):** fresh cell 13 fixes item 1 (reopened B-7: the scandir is opened
+  and never iterated, verified `startup.py:312-314`), 3 (counter before report), 4 (try/finally releases on the held
+  witnesses), 5, 6 (sentences); item 2 (two warnings, two facts) ACCEPTED; NO third B; then the ONE gate and the accept.
+  WP-DR87: Claude B on `wp-dr87-mc` 80bd029 clean (1 minor = my closure wording; 5 advisories banked as report text);
+  DR-87 note (ii) now reads "the fixture removes the 10 s sampling sleeps (90.93 -> 25.24 s); the scan itself remains
+  (~23 s)"; its gate running; accept next (DR-87 / DR-93 / DR-94 CLOSED by me at it).
 - **(gen 8 history follows; newest facts at the end of the block)**
 - **GEN 8 PICKUP (was).** Orchestrator = **gen 23 `clearwater-orchestrator-20261029-0852`** (online 18:57Z; gauge 37 ms;
   gen 22 rolled 18:52Z at ~420K, state 5a1538a). ALL cues go there. Time the bash launch and record it here. Drain with
