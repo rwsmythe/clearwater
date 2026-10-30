@@ -112,7 +112,8 @@ def test_the_runner_delivers_at_most_one_report_per_tick_and_the_latest(qtbot, m
     """Item 1's delivery rule, pinned per tick (green at base; R5-5, R5-6).
 
     Each poll of the runner's timer and its final delivery before ``on_done`` are marked, and no
-    stretch between two marks may carry more than one report (a burst fails). The job reports at
+    stretch between two marks may carry more than one report (a burst fails), and at least one
+    poll must deliver one before the final delivery (R6-3). The job reports at
     least :data:`MIN_REPORTS` times and for at least a second, so a host that pauses its worker
     still leaves reports to coalesce.
     """
@@ -165,6 +166,8 @@ def _assert_delivered_per_tick(events: list[tuple[str, int]], reports: int) -> N
             per_mark[-1] += 1
     assert max(per_mark) <= 1, per_mark
     assert len(seen) < reports  # fewer deliveries than reports: the rest were dropped
+    polled = events[: events.index(("end", 0))]
+    assert any(kind == "report" for kind, _ in polled), events[:5]  # a tick delivered (R6-3)
 
 
 def test_the_runner_pin_rejects_a_run_whose_polls_delivered_nothing() -> None:
