@@ -36,6 +36,7 @@ from PySide6.QtCore import QElapsedTimer, QTimer
 
 import gui_support
 from clearwater.app import analysis_adapter, composition
+from clearwater.app import main as app_main
 from clearwater.app.main import Application
 from clearwater.cache import DiskProxyCache
 from clearwater.gui.batch_panel import BatchPanel, ItemState
@@ -476,4 +477,47 @@ def test_v7_f_start_up_with_a_slow_cache_open(make_app, qtbot, sample, monkeypat
     )
     _within(figures, "analysis_waited_for_the_open")
     assert opened, "the slow open did not run"
+    wait_started(qtbot, application)
+
+
+PLANT_S = 0.4
+"""A planted interface-thread stall, four times the bound."""
+
+
+def test_v7_f_a_planted_pre_show_build_cost_is_not_counted(
+    make_app, qtbot, sample, monkeypatch
+) -> None:
+    """Ruling B (CHARC b9a0ce01): (f)'s probe starts at ``show()``; the build before is not counted.
+
+    Planted: ``build_application`` stalls the interface thread before ``show()`` (inside the
+    settings dialog's install); the figure stays within the bound.
+    """
+    real = app_main.install_settings_dialog
+
+    def slow(*args: Any, **kwargs: Any) -> Any:
+        time.sleep(PLANT_S)
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(app_main, "install_settings_dialog", slow)
+    figures, application = scenario_f_start_up(
+        qtbot, lambda: make_app(cpu_settings()), sample(CLIP)
+    )
+    _within(figures)
+    wait_started(qtbot, application)
+
+
+def test_v7_f_a_planted_post_show_stall_still_fails(make_app, qtbot, sample, monkeypatch) -> None:
+    """Ruling B: a stall after ``show()`` still counts (the start-up jobs' start is after it)."""
+    real = Application.start_jobs
+
+    def slow(self: Application) -> None:
+        time.sleep(PLANT_S)
+        real(self)
+
+    monkeypatch.setattr(Application, "start_jobs", slow)
+    figures, application = scenario_f_start_up(
+        qtbot, lambda: make_app(cpu_settings()), sample(CLIP)
+    )
+    print(figures.line())
+    assert figures.longest_ms >= PLANT_S * 1000 - PROBE_MS, figures.line()
     wait_started(qtbot, application)
