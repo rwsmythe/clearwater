@@ -11,9 +11,10 @@ Brief `docs/briefs/wp4.6-brief.md` FINAL on CHARC `39dad78f5b10ceeb`; base `b6a3
 | Y1 (build) | 2026-10-30 | (no review: tasks 3-4, cell 2) | - | - | - | - | - | - | - | 171,586 (cell 2 at Y1, 05:08Z) |
 | Y2a (build) | 2026-10-30 | (no review: tasks 5-6, cell 2) | - | - | - | - | - | - | - | 228,358 (cell 2 at Y2a); retired at 230,050 (05:21Z) |
 | Y2b (build) | 2026-10-30 | (no review: task 7 and 8, cell 3) | - | - | - | - | - | - | - | 142,340 (cell 3 at Y2b, 05:33Z) |
-| R1 | 2026-10-30 | WSL, codex-cli 0.162.1, gpt-6.1-sol / high; HEAD `7a20c7bd` | 0 | 8 reported: 5 confirmed blocking (F1 F2 F3 F5 F6), 2 banked pre-existing (F4 F8), 1 reclassified minor (F7) | 6 reported (+F7) | 5 blocking in / 2 minor out (F9 F10) | 14 NEW / 0 REOPENED | 0 | product 6 (F1 F2 F3 F5 F6 F7) / test-only 4 (F11-F14), by cell 4; F9 F10 Limits (CHARC `e15d408a`) | 224,076 (cell 3 at the R1 yield); retired at 231,402 (05:57Z) |
-| R1 remediation | 2026-10-30 | (no review: cell 4 fixes, HEAD `c80061d1`; CHARC `e15d408a` applied at `c328be95`) | - | - | - | - | - | 2 (F9, F10 by ruling) | product 6 / test-only 4 | (dispatcher fills: cell 4 at the remediation) |
-| R2 | 2026-10-30 | WSL, codex-cli 0.162.1, gpt-6.1-sol / high; HEAD `f91aea96` | 0 | 2 reported: 1 confirmed blocking (R2-2), 1 non-blocking by the verifiably-prevents rule (R2-1) | 3 reported (R2-3 R2-4 R2-5) | 1 blocking in; R2-1 not reachable by a product spawn | 5 NEW / 0 REOPENED | 0 | (remediation not started) | (dispatcher fills: cell 4 at R2) |
+| R1 | 2026-10-30 | WSL, codex-cli 0.162.1, gpt-6.1-sol / high; HEAD `7a20c7bd` | 0 | 8 reported: 5 confirmed blocking (F1 F2 F3 F5 F6), 2 banked pre-existing (F4 F8), 1 reclassified minor (F7) | 6 reported (+F7) | 5 blocking in / 2 minor out (F9 F10) | 14 NEW / 0 REOPENED | 0 | product 8 (F1 F2 F3 F5 F6 F7 F9 F10) / test-only 4 (F11-F14), by cell 4 (F9 F10 reverted under `e15d408a`, restored under `55959e2f`) | 224,076 (cell 3 at the R1 yield); retired at 231,402 (05:57Z) |
+| R1 remediation | 2026-10-30 | (no review: cell 4 fixes, HEAD `c80061d1`; CHARC `e15d408a` applied at `c328be95`) | - | - | - | - | - | 2 (F9, F10 under `e15d408a`), both restored under `55959e2f` (`4b54beca`) | product 8 / test-only 4 | 199,451 (cell 4 at its R2 yield, 06:31Z; the dispatcher took ONE reading for this row and R2) |
+| R2 | 2026-10-30 | WSL, codex-cli 0.162.1, gpt-6.1-sol / high; HEAD `f91aea96` | 0 | 2 reported: 1 confirmed blocking (R2-2), 1 non-blocking by the verifiably-prevents rule (R2-1) | 3 reported (R2-3 R2-4 R2-5) | 1 blocking in; R2-1 not reachable by a product spawn | 5 NEW / 0 REOPENED | 0 | product: CHARC's design change (d) and the spawn rule, R2-1, R2-4 (R2-2 and R2-3 CLOSED BY REMOVAL); test-only: R2-5 | 199,451 (06:31Z, the same reading as the row above) |
+| R2 remediation | 2026-10-30 | (no review: cell 4, HEAD `3bc6ffff`) | - | - | - | - | - | 0 | product (d) + spawn rule + R2-1 + R2-4 / test-only R2-5 | (dispatcher fills: cell 4 at the R2 remediation yield) |
 
 ## Round 0 (task 2): the design restated, the Questions, the stops
 
@@ -637,29 +638,20 @@ parent-side check, design item 7's sentence WITHDRAWN; F4 a register candidate a
 | F6 | `5325f866` `test_an_unknown_key_is_logged_without_the_key`: `"export worker line ignored: an unknown key 'C:\\\\Owner\\\\Private\\\\GPS'" != 'export worker line ignored: an unknown key'` | `a1d8d538` the reason dropped the key; then `bf1035dc` per CHARC: "an unknown key of <length> characters, first '<at most 8 characters>'" (test renamed `test_an_unknown_key_is_logged_by_its_length_and_first_8_characters`) |
 | F5 | `549c9854` `test_a_folder_name_that_continues_a_known_folder_or_holds_an_apostrophe_is_cut`: `AssertionError: ('Archive', '... could not open my clips Archive\\hiddenA\\a.mp4 ...')` | `89d16c3b` a known folder followed by more name text up to a separator is cut with it; an apostrophe is part of a name when a word character follows it or when the text after it reaches a separator before any quote; a segment may begin with `'` before a word character |
 | F7 | (minor) | `9bf3dff0` the cancel re-checked after the first job's sweep (nothing spawned) |
-| F9 | (minor, out of envelope) | `9bf3dff0` changed the drain warning's words; REVERTED in `bf1035dc` per CHARC (a Limit) |
-| F10 | (minor, out of envelope) | `403fa1bf` an integer check; REVERTED in `c328be95` per CHARC (a Limit) |
-| F5 (ruling) | (test) | `bf1035dc` non-ASCII folder names under a known folder and in an unknown path, written to stderr as UTF-8; green on the F5 code |
+| F9 | (minor, out of envelope) | `9bf3dff0` the drain warning's words; reverted in `bf1035dc` under `e15d408a`; RESTORED in `4b54beca` under `55959e2f` (FIXED, kept) |
+| F10 | (minor, out of envelope) | `403fa1bf` an integer check; reverted in `c328be95` under `e15d408a`; RESTORED in `4b54beca` under `55959e2f` (FIXED, kept) |
+| F5 (ruling) | (test) | `bf1035dc` non-ASCII folder names; the redaction and this test were then replaced under `55959e2f` (d): see R2 remediation |
 | F7 test, F11-F14 | (test-only) | `c80061d1` see below |
 
-Product vs test-only: product code changed for F1 F2 F3 F5 F6 F7 (6); tests only for F11 F12
-F13 F14 (4). Reverts: 2 (F9 and F10, by CHARC's ruling; the product is as at `bab063a5` for
-both).
+Product vs test-only: product code changed for F1 F2 F3 F5 F6 F7 F9 F10 (8); tests only for
+F11 F12 F13 F14 (4). Reverts: 2 (F9 and F10 under `e15d408a`), both undone in `4b54beca` under
+`55959e2f`, so F9 and F10 stand FIXED as built in `9bf3dff0` / `403fa1bf`. F5's redaction was
+later DELETED by `55959e2f` (d) (R2 remediation).
 
 ### Choices and deviations (stated, for review)
 
-- **F5, one case beyond the RED.** My own check of the fix found a third apostrophe shape that
-  leaked: a possessive at a word's end (`Divers' gear\z.mp4` kept `Divers' gear`). The rule
-  above covers it; the case (`Divers' hiddenE`) joined the F5 test in the fix commit, so it has
-  no RED commit of its own (by reading, the pre-fix segment stops at the apostrophe exactly as
-  for `Diver's`; not run separately on `549c9854`).
-- **F5, over-redaction accepted.** A known folder followed by prose that reaches a later
-  separator is cut through it: `C:\Photos\Dive is not writable: C:\other\x.mp4` becomes
-  `x.mp4`. No name leaks; diagnostic words can be lost. `C:\Photos\Dive is not writable` (no
-  later separator) keeps its words (`Dive is not writable`). Quoted paths (tracebacks, OSError
-  texts, list reprs) come out as `'a.mp4' -> 'b.mp4'`; but a quoted path followed by prose that
-  reaches a second path is joined to it (R2-3, below), so "bounded by their quotes" is not
-  true of every shape.
+- **F5's redaction no longer exists.** CHARC `55959e2f` (d) deleted it in the R2 remediation
+  (`3bc6ffff`); F5 closes there by the failure text carrying no stderr content at all.
 - **F13, the reader retries instead of an atomic replace.** `os.replace` onto `beat` fails on
   Windows while the test holds the file open (no delete sharing), which would end the
   grandchild. The grandchild keeps `write_text`; the test reads through `_read_beat`, which
@@ -680,8 +672,8 @@ both).
   can carry the full path of the file an `OSError` names: the text is the engine's own
   (`ExportEngine._describe`, `jobs/export.py:678-685`, introduced by `bda46fc6`, WP3.14), shown
   and logged in-process before WP4.6 exactly as it is now relayed. The parent adds no path and
-  passes such a text unchanged; only the worker's stderr tail and the parent's own start and
-  encode texts are cut to file names. A register candidate (the engine's OSError texts carry
+  passes such a text unchanged. (Since `55959e2f` (d) the worker's stderr tail and the parent's
+  own start and encode errors reach the log only, never a failure text.) A register candidate (the engine's OSError texts carry
   the path); `jobs/export.py` is not WP4.6's.
 - **F8 (banked pre-existing, widened; with CHARC).** The worker's scratch cache is not checked
   against its own volume: the engine's D87 re-check charges the analysis cache's growth to the
@@ -694,14 +686,7 @@ both).
   (CHARC `e15d408a`); the actual rule: the D87 re-check charges the analysis cache's growth to
   the OUTPUT folder's volume (`jobs/export.py:916`). CHARC writes the register row at the
   accept (ruled (b)).
-- **F9 (out of envelope; CHARC: a Limit, no code change).** After the worker exits, the parent
-  stops waiting for its stdout once the output has been quiet `DRAIN_AFTER_EXIT_S` (1.0 s); the
-  stdout and stderr reader threads (daemon) then live on until whatever holds the pipe closes
-  it. The warning's words "no longer read" mean "no longer waited for". Reachable only when a
-  grandchild inherits the worker's stdout or stderr, which no product spawn does.
-- **F10 (out of envelope; CHARC: a Limit, no code change).** The worker accepts a request whose
-  `format_version` equals 1 as any JSON number (`1.0`), refusing `true` and every other value;
-  the parent always writes the integer 1, and the request is written by no one else.
+- **F9 and F10: no Limit.** FIXED and kept (CHARC `55959e2f`, superseding `e15d408a`'s Limits).
 
 ### Targeted runs (worktree, CPU only; no full suite, footage, GPU, fullclip or window)
 
@@ -753,34 +738,113 @@ and showed its own source-level probes.
 | R2-5 | F1's test witnesses the trigger word, not the grace's moment | CONFIRMED by reading: MINOR test-only. Clean-up: a controlled clock |
 
 Counts: reported critical 0, major 2, minor 3. Blocking NEW in-envelope 1 (R2-2). REOPENED 0.
-Rejected 0. Remediation is NOT started (the dispatch: yield with `R2 ADJUDICATED:` first).
+Rejected 0. Remediation: the section "R2 remediation" below, under CHARC's rulings.
 
 Round 2 reviewed `f91aea96`, which still held F6's bare form and the F9/F10 code changes that
 CHARC's ruling (`e15d408a`, relayed after the round) then reverted or reshaped (`bf1035dc`,
 `c328be95`); the round raised nothing on them.
 
-**For CHARC (`e15d408a`: "a NEW major at R2 on the protocol class comes to me with a cap
-proposal").** The NEW majors at R2 are in the protocol class: R2-2 (BLOCKING: the parent's
-redaction of what the worker emits misses a folder name that begins with a space) and R2-1
-(non-blocking by citation: the drain waits after a kill). R2-2 is the second round running in
-which the reviewer found a redaction shape the name grammar missed (R1 F5: a space after a known
-folder, an apostrophe; R2-2: a leading space; R2-3: the F5 fix over-reaching). The cell's cap
-proposal:
+**CHARC ruled on R2: `55959e2ffd95df7f` (06:32:47Z) and `3ed8335fe96a8e2c` (06:33:56Z).** Not
+the cell's line-cut proposal: (d) a DESIGN CHANGE. On exit without a result the parent LOGS the
+stderr tail (last 4 KiB, verbatim, WARNING, `clearwater.app.export_worker`; the application log
+is local and carries full paths by ruling 775d0148 / B-8) and the failure text carries NO stderr
+content: a fixed sentence, plus the exception TYPE NAME when the tail's last line matches
+`^[A-Za-z_][A-Za-z0-9_.]*(Error|Exception|Exit|Interrupt)(: .*)?$`. The redaction helper and
+its tests are DELETED; R2-2 and R2-3 CLOSE BY REMOVAL (not as fixes); F5's test becomes "the
+failure text contains no path component from a planted hostile folder name" with F5's and
+R2-2's names as controls. `3ed8335f` (a): the spawn-failure text is the error's type name and
+errno, the full text logged; the same for every other OSError the parent raises around the
+child. R2-1, R2-4, R2-5 as planned. F9 and F10 FIXED, kept. F1's form confirmed (design item
+5's rule). CAP: R3 is the LAST full round; a NEW in-envelope major at R3 in the PROTOCOL class
+(reader, result, cancel, kill, drains) is fixed RED-first in the terminating clean-up, no R4;
+any other class, or anything about the failure text's content, goes to CHARC.`:`), with R2-3's residual stated.
 
-1. Close the redaction class BY CONSTRUCTION, not by a name grammar: in every text the parent
-   makes from the worker's output (the stderr tail) and in its own start and encode texts, each
-   line is cut from its FIRST path root (a drive `X:`, a UNC `\\`, a known folder, or a `/` after
-   a non-word character) to the LAST separator on that line; only what follows that separator
-   is kept. No rule about spaces, apostrophes, quotes or non-ASCII is involved, so no folder
-   component on such a line can survive. The cost is over-redaction: words between two paths
-   on one line are lost (`could not open 'one.mp4' while checking D:\x\two.mp4` keeps only
-   `two.mp4`), which also turns R2-3 into accepted behaviour. Relative paths stay as today.
-2. The round cap for the protocol class: round 3 is the last counted round for it. A finding
-   in that class at R3 or later that is reachable only through a non-product grandchild or a
-   line beyond the strict-ignore rule is a report Limit and never drives a loop; a NEW
-   in-envelope major in it at R3 comes to CHARC as a STOP with its reproduction, not as
-   another remediation round.
+## R2 remediation (cell 4)
 
-If CHARC prefers the existing grammar, the cell's fallback is the adjudicated plan (an anchored
-component may begin with whitespace or an apostrophe; the apostrophe lookahead does not cross a
-`:`), with R2-3's residual stated.
+Orders: the dispatcher's GO (R2-2 RED-first plus R2-1, R2-3, R2-4, R2-5), then CHARC
+`55959e2ffd95df7f` (d) and `3ed8335fe96a8e2c` (a), which REPLACED the R2-2 and R2-3 plan before any
+redaction work began. Depth at the R2 yield: 199,451 (06:31Z), one dispatcher reading recorded on
+both the "R1 remediation" and "R2" rows (not read between them).
+
+### Commits
+
+| Commit | What |
+|---|---|
+| `4b54beca` | F9 and F10 RESTORED (`55959e2f`: FIXED, kept): `403fa1bf`'s worker file and test case, the drain warning's "no longer waited for" |
+| `5b7e04ed` | RED: `20 failed, 46 passed` on `4b54beca`. Failure lines: exit without a result `'The export w...it status 0).' == 'The export w...lication log.'`; the hostile-name control `'The export w...teI\\\\i.mp4"' == 'The export w...NotFoundError'` (R2-2's `' privateI` reached the text); the spawn `'The export w...ile specified' == 'The export w...lication log.'`; the scratch folder `The export worker could not be started: FileExistsError: [WinError 183] ... "cache"`; the drains `[4.0] == [0.0]` (R2-1). R2-5's clock test is GREEN on the F1 code (a strengthening, see below) |
+| `3bc6ffff` | the fix: (d), the spawn/scratch/encode rule, the redaction helpers deleted, R2-1, R2-4. One test correction rides along: the RED's encode case expected `ValueError`; the frozen `ParameterSet` raises its own `FormatError` (a `ValueError`), so the test names that |
+
+### As built (`src/clearwater/jobs/export_process.py`)
+
+- Exit without a result: the tail (the last `STDERR_TAIL_BYTES` = 4096 bytes, decoded as UTF-8
+  with replacement, otherwise verbatim) logged at WARNING under `WORKER_LOGGER` as `export worker
+  stderr (the last 4096 bytes; it ended without a result, exit status N):\n<tail>`. The text is
+  `ENDED_TEXT` = "The export worker ended without a result (exit status N); details are in the
+  application log." and, when the tail's LAST line (`splitlines()[-1]`) matches the ruled
+  pattern (`EXCEPTION_LINE`), a newline and the identifier before its colon. The cell's choice:
+  the type name follows after a NEWLINE, so the ruled sentence stays verbatim (the old layout
+  also put the details after a newline).
+- `START_TEXT` = "The export worker could not be started (<type>, errno N); details are in the
+  application log." (errno only when it is an int); for the spawn's `OSError` and `ValueError`
+  and the scratch folder's `mkdir`. `ENCODE_TEXT` = "The export request could not be encoded
+  (<type>); details are in the application log." The cell's choice: the SAME rule for the encode
+  failure (the ruling names OSErrors; with the redaction gone, an encode error's message would
+  otherwise reach the text unscrubbed). The error's full text is logged at WARNING under
+  `WORKER_LOGGER` (`<what>: <type>: <message>`). No text equals `CANCELLED`.
+- The parent's other OSErrors around the child (stdin write and close, the stderr read): DEBUG
+  log with the type name and errno (R2-4: no `exc_info`); no failure text comes from them. The
+  sweep's and the removal's logs already named the folder's name and the type only.
+- Deleted: `_known_folders`, `_last_name`, `_redact`, `_SEGMENT`, `_NAME_CHAR`,
+  `_ABSOLUTE_PATH`, the `folders` argument of `_converse` and `_Tail.text`, `_Tail._cut`,
+  `import sys`. `_ascii` stays (F6's warning).
+- R2-1: after the loop, the stderr tail waits `max(0, quiet_since + DRAIN_AFTER_EXIT_S - now)`:
+  what the stdout's quiet wait left of the same window (the whole window when the output ended
+  on the first pass after the exit).
+
+### Tests (`tests/test_jobs_export_process.py`)
+
+- Replaced or rewritten: the exit-without-result test (the fixed text); the traceback test
+  (`test_the_stderr_tail_goes_to_the_log_and_the_text_names_only_the_exception_type`: the log
+  holds the traceback and the hostile path verbatim; the text ends `\nFileNotFoundError`); four
+  non-exception last lines add nothing (`something went wrong`, `C:\Owner\FooError: no`,
+  `Error`, `a b Error: x`); F5's test is now
+  `test_the_failure_text_contains_no_path_component_from_a_planted_hostile_folder_name` (F5's
+  seven planted names, R2-2's ` privateH` and `' privateI`, plain and `repr`, the last line an
+  OSError whose message holds one: the text is exactly the fixed sentence plus
+  `FileNotFoundError`; no planted name and no `.mp4` in it; the log has them verbatim); the
+  flood test checks the LOG (tail ends with the last line, at most 4096 bytes); the spawn test
+  plants `Owner's hidden folder\ private\missing-interpreter` and expects exactly `(FileNotFoundError,
+  errno 2)`; a new scratch-folder test (the cache folder is a FILE under a hostile folder name);
+  the encode test (`FormatError`).
+- R2-1: `test_the_two_drains_after_a_kill_share_one_window` (a controlled clock replaces the
+  module's `time.monotonic`; a grandchild inheriting both pipes; the stderr wait's timeout is
+  recorded: `[0.0]`, against `[4.0]` before).
+- R2-5: `test_the_kill_deadline_counts_from_the_cancel_not_from_a_later_result` (the controlled
+  clock; the cancel's and the kill's readings recorded; the kill falls within one reading of the
+  cancel's deadline). It is green on the F1 code, so its proof is a MUTATION run at my seat: the
+  grace timed from the result whenever one arrived (the word still "cancel") gave
+  `assert (51.0 - 2.0) <= (40.0 + 1)` FAILED while the F1 word test PASSED; the file restored
+  byte-identical (`cmp`).
+
+### Targeted runs (worktree, CPU only; no full suite, footage, GPU, fullclip or window)
+
+- `tests/test_jobs_export_process.py` alone, three runs: `66 passed` in 14.99 s, 15.06 s,
+  14.94 s; with `-n 4`: `66 passed in 7.87s`.
+- The four files (the parent's, the worker's (`slow`, CPU), `test_app_deps.py`,
+  `test_io_video_spawn.py`): `356 passed in 59.91s`, exit 0.
+- `ruff check .`: All checks passed; `ruff format --check .`: 292 files already formatted;
+  `mypy`: no issues in 148 source files. No CR in the four committed files.
+
+### Verification loop (R2 remediation)
+
+| Pass | Suspected | Confirmed | Rejected | Fixed |
+|---|---|---|---|---|
+| 1 | the RED's encode expectation | yes: the type is `FormatError` (IF-9's, a `ValueError`) | - | `3bc6ffff` (test) |
+| 1 | `_ascii` deleted with the redaction would break F6 | yes (caught before running: F6's warning uses it) | - | kept |
+| 1 | `_Tail._cut` and `import sys` dead after the deletion | yes (ruff F401; `_cut` by reading) | - | removed |
+| 1 | R2-5's test could pass on the defect | - | rejected by the mutation run above | - |
+| 2 (the whole product diff `4b54beca..3bc6ffff -- src/`) | nothing new | - | - | - |
+
+Q10's fixed texts as amended (for the report): ENDED and START as above; KILLED unchanged.
+
+Depth: (dispatcher fills: cell 4 at the R2 remediation yield).
