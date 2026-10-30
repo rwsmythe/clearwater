@@ -1699,3 +1699,60 @@ them.
 - **Disciplines:** never a bare `cd`; backslash-bearing text by the Write tool; LF, 0 CR, 0 NUL in
   every blob; commit by pathspec with `-c core.autocrlf=false`; a plant costs 19.96 GB of real disk
   (none is left on disk now: windows 4 and 5 and both dry runs deleted theirs).
+
+## Cell 11 (implementer-opus-high, 2026-10-30): the completion report
+
+Dispatch: orchestrator gen 26, `prompt-wp4.3-cell11.md`; governing ruling CHARC
+`95392965dc5f8a6c` (2026-10-30T02:12:38Z): the V8 re-rule to p99 <= 2.5/255 at k = 2 is the
+GX011627 video leg only; `tests/test_app_v8_v18.py`'s `P99_BOUND` for the stills is NOT changed
+(no bound touched). Head at start `f342f9d`, clean apart from untracked `work/`. No suite, window,
+GPU or footage run; docs only.
+
+What changed in `docs/reports/wp4.3-application-wiring.md`: the STATUS line (base rebased to
+`5e3537d`, R1-R6, windows 1-5 done, product final `7b4c10b`); the round-0 "sparse" record
+correction under the start-up table; the V7 table's window column filled (renamed "Window (of
+record)", (d) being 300 synthetic stills), the runs of record (window, HEAD, chain md5, command,
+driver md5, EXIT), the history line, (c) / (e) as OPEN STOPs with cause, both switch intervals,
+"not adopted", DR-98 "to be opened at the accept", WP4.6; (f)'s rule (ruling B quoted) and the
+start-up figures; the V7 remediation step paragraph (item 1 kept with its development witness,
+grant GRANTED and NOT USED, item 3 tried and reverted with its epitaph, R5 / R6 and the CAP, the
+round-count note); the V8 video leg (window 3 four frames, frame 510, CHARC's re-rule worded per
+`95392965`, the 16-frame table); V18 and DR-44 (c) on GX011627; the DR table (DR-44 (c), DR-50
+CLOSES by measurement per the brief's DR table, DR-85 closed by WP4.3a at `300731d`, DR-98 row);
+two Limits (the shared-host line, a (c) / (e) Limit) and the V8 fixture Limit's last clause. The
+gate-form paragraph moved up under the V7 table (no text change).
+
+Trace table (every figure the report adds; L = this ledger's line at `f342f9d`, W = the window log
+under `clearwater-review-evidence/wp4.3/windows/`):
+
+| Report figure | Source |
+|---|---|
+| (a) 18.0 / 15.0, 5,909, 59.1 s, 681; (b) 19.0 / 15.0, 6,352, 1,300; (d) 56.0 / 43.0, 1,855, 28.6 s, 300 | L1613-1615; W `win5/v7a.txt`, `v7b.txt`, `v7d.txt` |
+| (f) 50.6 / 14.8, 5,898; build cold 93.8, warm 40.1; cache open 186.1; plant 4,243.1 / 108.4 | L1616-1617; W `win5/v7f-settled.txt` (warm 40.1 from the log only), `win5/plant-f.txt` |
+| window 5 times, HEAD `8eaa897`, chain md5 `5b14d981`, EXITs | L1605-1609; W `win5/exits.txt`, `head.txt`, `drivers-md5.txt` |
+| (c) 180.0 / 181.0, 12.0, 20,897 / 21,025, 209.1 / 210.7 s, 86.0 MB; (e) 182.0 / 80.0, 21,080 / 21,102, witness 1 | L1501-1504; W `win4/v7c-sw5.txt`, `v7c-sw1.txt`, `v7e-sw5.txt`, `v7e-sw1.txt` |
+| window 4 HEAD `b4c8561`, product `86ba69a`, chain md5 `fb943904`, `s7_switch.py` `5457aca8`, EXITs 1/1/1/0 | L1491-1497; W `win4/exits.txt`, `head.txt` |
+| memory +101.1, +247.2 / +237.0 MB, `gc.garbage` 0 | L1501-1504, L1561-1564 |
+| history (a) 18.0 (b) 21.0 (c) 182.0 (d) 66.0 (e) 196.0; (f) 47.5; window 4 (b) 195.0 (f) 395.4 | L1064-1078, L1212, L1507, L1510 |
+| windows 1-2 product `300731d`, window 3 HEAD `480f232` | DERIVED from commit times (`git log`: `300731d` 21:52Z, `990b778` 22:46Z; `480f232` 23:08Z, `1d96dc4` 23:32Z) against W `win1-3/exits.txt` times; no src / tests / tools change `300731d..480f232` (`git diff --stat`: empty) |
+| window 1 driver `a1fb597b`, window 3 chain md5 `58478c4d` | L1023, L1153 |
+| heartbeat 16.3 ms; py-spy holders; no device-to-host holder | L1222-1235 |
+| (f) rule quote | L1046-1048 (ruling B) |
+| 55 / 37; 933 / 771; 158 and 651 planted, 157 settled; 609 / 126 build | L1041-1045; W `dry/fprof-default.txt`, `fprof-plant1.txt`, `fprof-plant2.txt`, `dry-v7f.txt`, `dry-v7f-2.txt`, `dry-v7f-settled.txt` |
+| window 3 build cold 85.9, warm 40.0, cache open 223.8 | L1212 |
+| item 1 witness 101.3 / 264.0 -> 31.2 / 111.4 | L1286-1288; `r5-ruling-cc0703a7.md` record notes |
+| (f) gate form 18.0 ms after the move | L1270 |
+| V8 frames 10/170/340/510 means, p99, frame 510 p99.9 / max, over by 0.000042 | L1207; W `win3/v8v18.txt` |
+| 16-frame table, p99 median 1.169, max 1.946 (276), mean max 0.132 | L1519-1521; W `win4/v8char.txt` (TABLE / SUMMARY lines) |
+| V18 (analysis 68.7 s, 681 frames) | L1207; W `win3/v8v18.txt` |
+| DR-44 (c) 361 / 218 / 262 ms | L1208-1210; W `win3/dr44c-*.txt` |
+| sparse correction, 19.96 GB | L1049-1055 |
+| DR-50 CLOSES by measurement | brief `docs/briefs/wp4.3-brief.md:167` |
+| ruling quotes `921babda` Q1-Q4 | `win4-ruling-921babda.md` (verbatim) |
+
+Noted, not changed: the report's gate-form figures (the V7 table's gate column, from cells 4 / 6's
+targeted runs) have no line in this ledger; the old DR-50 row's "gate form 30 ms" disagreed with
+the table's (d) gate form 34.0 ms and was replaced by the window figure. CHARC's R6 ruling
+(`424f573b` Q1) named a MINOR register row for R6-1 (the gc policy's residual) at the accept; the
+policy is reverted, so the report names no such row. The "Collection diff against `038f02e`"
+section is unchanged (the base is now `5e3537d`).
