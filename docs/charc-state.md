@@ -79,6 +79,14 @@
   session): `work/wp1.2b`, `work/wp2.2`, `work/pt-main-wp39`, `work/wp2.2-sync.log` on C: and the three INCOMPLETE
   partials under `D:\clearwater-archive\work\` gone (verified absent); prune record + D: README amended (this commit).
   **Owner action pending: NONE** from here; drop the line from owner-facing summaries.
+- **WP4.3 REVIEWER B RULED 02:50Z (query e33c02c5, B 1/10/4 on `wp4.3-mc` d9a29c9 = f342f9d on main d6cd877; my post +
+  cue):** B-1 MAJOR REJECTED BY RULING (brief Q3 :520-523, D34 / D85 owner-reserved; the product has no footage-folder
+  concept; verified). Cleanup cell 12 (opus-high, no window): B-7 product fix in `app/startup.py` (warn when a scanned
+  output folder cannot be listed, RED-first); test-only B-3 (bound the near-boundary allowance to +/-1), B-4 (hold inside
+  the frame iteration, else Limit), B-5, B-6 (no wall clock), B-15; docs B-9..B-12; B-8 DECLINED (no path rule for the GUI
+  log); B-2 and B-14 BANKED (rows MINE at the accept); B-13 Limit. Then narrow B re-run on the cleanup diff, the gate,
+  the accept. Cell 11's report 483cb8c goes on the candidate first. WP-DR87: A R1 converged 0/0/0 + 4 adv; DR-87 node
+  90.93 -> 25.24 s; B (Claude), gate, accept next.
 - **(gen 8 history follows; newest facts at the end of the block)**
 - **GEN 8 PICKUP (was).** Orchestrator = **gen 23 `clearwater-orchestrator-20261029-0852`** (online 18:57Z; gauge 37 ms;
   gen 22 rolled 18:52Z at ~420K, state 5a1538a). ALL cues go there. Time the bash launch and record it here. Drain with
