@@ -271,3 +271,23 @@ def test_a_closed_windows_collection_policy_does_not_start(make_app, qtbot) -> N
         assert gc.get_threshold() == before
     finally:
         window.full_collections.stop()
+
+
+def test_a_restarted_collection_policy_freezes_again(qtbot) -> None:
+    """R5-4: a policy started again after its stop freezes again at its first idle moment.
+
+    Planted on ``4611ed6``: the instance keeps its frozen flag across the stop (which unfroze the
+    process), so the restarted policy never freezes.
+    """
+    frozen_before = gc.get_freeze_count()
+    owner = QObject()  # the timer's parent, alive for the test
+    policy = FullCollections(_Runner(active=0), owner)
+    try:
+        policy.start()
+        qtbot.waitUntil(lambda: gc.get_freeze_count() > frozen_before, timeout=5000)
+        policy.stop()
+        assert gc.get_freeze_count() <= frozen_before
+        policy.start()
+        qtbot.waitUntil(lambda: gc.get_freeze_count() > frozen_before, timeout=5000)
+    finally:
+        policy.stop()
