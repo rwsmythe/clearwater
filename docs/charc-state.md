@@ -266,6 +266,11 @@
   Q2 (a) CAP: R6-2/3/4 fixed, NO R7, B reads them (named in B's prompt), record states the cap. Q3 (a): window 4
   re-runs (a), (b), (d), plant-f + v7f-settled of record on the FINAL code after the (c)/(e) pairs and the 16-frame
   V8, one consistent V7 table on one head. Cell 10 continues (157,884).
+- **WP4.4 guard-exemption diff APPROVED 01:12Z (query ce4069e4, my fyi + cue):** `952afd6` on wp4.4 = `0db74f6` on
+  `wp4.4-mc` (b70efcf + errata b901d7f + 0db74f6 on main acde834; patch-id 33f93664 author = candidate). The helper
+  strips exactly one whole `MP4_DATA_CODEC_TAGS` line for encode.py only (count == 1 asserted), FORBIDDEN_TOKENS
+  unchanged otherwise; three planted controls (extra token, missing line, doubled line) each raise; F5's 8 controls
+  DIFFERENT. Re-gate (full parallel + the two serial nodes alone) RUNNING; merge on green.
 - **(gen 7 history follows; newest facts at the end of the block)**
 - **GEN 7 PICKUP (was).** Orchestrator = **gen 22 `clearwater-orchestrator-20261029-0704`** (online 17:08Z from gen 21's
   state 736e403; gauge 38 ms; gen 21 was `clearwater-orchestrator-20261029-0425`, rolled 17:05Z at ~400K); ALL cues go there. Time the bash launch and record it here. Inbox: drain with `read --role charc --all`
