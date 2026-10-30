@@ -33,10 +33,12 @@ IFD_POINTERS = frozenset({int(ExifTags.IFD.Exif), int(ExifTags.IFD.GPSInfo), INT
 
 # TIFF structure and embedded blobs that are not EXIF fields: dropped when an EXIF block is
 # built from a TIFF source's IFD0 (WP3.6 round 0, section E).
+# ImageSourceData is Photoshop layer data; DNGPrivateData is a raw converter's private block.
 _TIFF_STRUCTURE = frozenset(
     {254, 256, 257, 258, 259, 262, 266, 273, 277, 278, 279, 284, 317, 320, 322, 323, 324, 325}
     | {338, 339, 347, 529, 530, 531, 532}  # extra samples, sample format, JPEG, YCbCr
     | {700, 33723, 34377, 34675}  # XMP, IPTC, Photoshop, ICC profile
+    | {37724, 50740}  # ImageSourceData, DNGPrivateData
 )
 
 _TYPE_SIZES = {1: 1, 2: 1, 3: 2, 4: 4, 5: 8, 6: 1, 7: 1, 8: 2, 9: 4, 10: 8, 11: 4, 12: 8, 13: 4}
@@ -354,7 +356,9 @@ def from_tiff(data: bytes) -> bytes | None:
     """Build the EXIF block of a TIFF source from its IFD0, Exif IFD and GPS IFD.
 
     Raw entry bytes are carried without decoding values or reading pixels. Structural tags,
-    the embedded profile and the XMP, IPTC and Photoshop blobs are left out. The Exif IFD's Interop
+    the embedded profile, XMP, IPTC, Photoshop image resources, ImageSourceData (37724,
+    Photoshop layer data) and DNGPrivateData (50740, a raw converter's private block) are
+    left out. The Exif IFD's Interop
     IFD is carried as an IFD, not as the file offset the TIFF stores. A faulty entry is
     dropped alone with an IFD/tag warning. Cut arrays retain all whole entries with one
     IFD/declared-count/kept-count warning; a missing next pointer is accepted. Invalid child
@@ -378,7 +382,7 @@ def from_tiff(data: bytes) -> bytes | None:
         if not entries:
             return None
         return _write_entries(order, entries)
-    except (ValueError, struct.error) as error:
+    except (ValueError, struct.error, MemoryError) as error:
         _log.warning("TIFF tags cannot be read for EXIF (%s); no EXIF carried", error)
         return None
 
