@@ -147,9 +147,14 @@ def test_the_runner_delivers_at_most_one_report_per_tick_and_the_latest(qtbot, m
         on_progress=lambda d, _t, _m: events.append(("report", d)),
     )
     qtbot.waitUntil(lambda: not handle.is_running(), timeout=10000)
+    _assert_delivered_per_tick(events, last["done"])
+
+
+def _assert_delivered_per_tick(events: list[tuple[str, int]], reports: int) -> None:
+    """The runner pin's postconditions over its marked event list and the job's report count."""
     seen = [d for kind, d in events if kind == "report"]
-    assert seen and seen[-1] == last["done"]  # the last report was delivered,
-    assert events.index(("report", last["done"])) < events.index(("done", 0))  # before the result
+    assert seen and seen[-1] == reports  # the last report was delivered,
+    assert events.index(("report", reports)) < events.index(("done", 0))  # before the result
     assert seen == sorted(set(seen))  # each delivery later than the one before, none repeated
     per_mark: list[int] = []
     for kind, _ in events:
@@ -159,7 +164,17 @@ def test_the_runner_delivers_at_most_one_report_per_tick_and_the_latest(qtbot, m
             assert per_mark, events[:5]  # a report only from a poll or the final delivery
             per_mark[-1] += 1
     assert max(per_mark) <= 1, per_mark
-    assert len(seen) < last["done"]  # fewer deliveries than reports: the rest were dropped
+    assert len(seen) < reports  # fewer deliveries than reports: the rest were dropped
+
+
+def test_the_runner_pin_rejects_a_run_whose_polls_delivered_nothing() -> None:
+    """R6-3: a run where only the final delivery carried a report never exercised a tick.
+
+    Planted on ``74586d4``: that event list passes every postcondition of the pin.
+    """
+    vacuous = [("end", 0), ("report", MIN_REPORTS), ("done", 0)]
+    with pytest.raises(AssertionError):
+        _assert_delivered_per_tick(vacuous, MIN_REPORTS)
 
 
 def test_a_planted_full_collection_load_at_a_job_boundary_runs_no_full_collection_there(
