@@ -136,6 +136,7 @@ class FullCollections:
             first, second, _ = _SAVED_THRESHOLDS[0]
             gc.set_threshold(first, second, _NO_AUTOMATIC_FULL_COLLECTION)
         _STARTED.append(self)
+        self._frozen = False  # a new lifetime: its first idle moment freezes again (R5-4)
         self._timer.start()
 
     def stop(self) -> None:
