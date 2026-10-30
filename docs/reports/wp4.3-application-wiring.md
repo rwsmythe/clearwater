@@ -5,7 +5,8 @@ ruling `fcb2a9205c060013` (ledger `docs/proofs/wp4.3-ledger.md`). Base main `038
 onto `5e3537d` by the orchestrator (cell 7's entry). Built by cell 2 (`implementer-opus-high`).
 STATUS: build complete; Reviewer A ran six rounds (R1-R4 converged on the build, R5-R6 on the V7
 remediation step, below); the exclusive windows 1-5 are done (V7 of record, the GX011627 legs);
-product code final at `7b4c10b`. Reviewer B and the gate follow.
+product code final at `7b4c10b`, plus Reviewer B's cleanup (below, B-7's one log line). Reviewer
+B's narrow re-run and the gate follow.
 
 ## What WP4.3 adds
 
@@ -292,6 +293,41 @@ shows a late delivery to a loop that keeps running reaches nothing (evidence
   `.clearwater-partial` file the user can delete. ACCEPTED as a Limit, register row DR-89
   (CHARC's at the accept, ruling ace08fbb; trigger: the next touch of the leftover journal, or an
   owner report of a stale `.clearwater-partial`).
+- The application log names full paths of removed temporaries and journal folders; local to the
+  machine, not a record (Reviewer B's B-8, DECLINED by ruling 775d0148: N9 / D88 set a rotating
+  log in app data; AD-13's name-only rule is the provenance and record contract).
+- A SOURCE whose own name matches WP3.13's temporary pattern (`.clearwater-partial-<12 hex>`)
+  and beside which an export ran keeps its folder's journal entry, so the next start removes it
+  (an N8 edge; Reviewer B's B-2). The pattern is WP3.13's and WP3.13's report accepts the
+  deliberate-name residual; no fix here; banked as a register row (CHARC's at the accept, ruling
+  775d0148).
+- The import-time witness (`tests/test_app_composition.py`) instruments the photo, jobs,
+  methods, video and cache dependencies after importing them, so a construction during their
+  first import is not observed (Reviewer B's B-13; an accepted limit since WP4.2).
+
+## Reviewer B
+
+Reviewer B (Codex, the other model) ran on the merge candidate `d9a29c9`: 1 major / 10 minor / 4
+advisory. B-1 (major: no protection of a configured originals folder across the write routes) is
+REJECTED BY RULING 775d0148, not a defect of this package: the brief's Q3 ruling (start-up never
+scans a folder only because a source lies there; a journal folder that is a source folder under
+default settings is still scanned, D85), D34 (outputs beside the source by default), and N8 is
+honoured (only `.clearwater-partial-<12 hex>` names are removed). Its three probes were the
+clean-up admitting an output folder and a journal folder inside a stand-in originals folder, an
+export beside a source in that folder under the default location, and the OS app-data roots
+placed inside it: the owner's own exports beside their originals plus an app-data root inside the
+originals folder, the user's environment and out of envelope. The cleanup (cell 12): B-7 FIXED in
+product code, RED `6b39622` then GREEN `8b9b431` (`clean_leftovers` logs one warning when the
+output folder cannot be listed); test-only fixes B-3 `3345d57` (V8's k = 1 near-boundary
+allowance bounded to one display step), B-4 `7c81085` (the V18 hold inside the engine's frame
+iteration, so the witness sees a running analysis), B-5 `c9ac6ad` (the runner pin records the
+produced count at each mark and asserts the latest), B-6 `d98465d` (the runner pin holds on an
+observed poll, no wall-clock deadline), B-15 `2645611` (the event test restores the prior
+profiler); docs and names B-9 `0dc2381`, B-10 `9810bfb`, B-11 `d46a4a6`, B-12 `7e288b1` (the
+app-data test renamed to `test_start_up_and_close_write_only_config_and_cache_inside_app_data`);
+B-8 DECLINED, B-2 and B-13 Limits above; B-2 and B-14 (the last video's analysis engine kept
+alive while a photo is open; memory retained, no wrong output) banked as CHARC's register rows
+at the accept. The re-run and the gate are recorded in the accept record.
 
 ## Collection diff against `038f02e`
 
