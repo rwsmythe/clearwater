@@ -137,6 +137,19 @@
   honours; the libheif thumbnail is the 2nd witness (pose 1 at 2.82 / 1.38 per 255 on IMG_6690 / IMG_6720), never the
   criterion. R0-E: one neutral 5712x4284 export 37.1 s GPU, 51.9 MB PNG; the 16-bit leg (73 photos, ~45 min, ~3.8 GB) is
   an EXCLUSIVE window. Codex turn 2 (RED tests) resumes on my post.
+- **WP4.6 ROUND 0 RULED 04:51Z (query 5c75a863, ledger 85a0d141; post c0f44398 + cue; claims re-read at my seat):**
+  STOP-1 GRANTED: the brief's "(c)/(e) need no test change" was wrong for (e) and for two tests reaching
+  `exports._engine._sink_for` / `isinstance(ExportEngine)`; exact amended scope = NEW `tests/export_worker_hold.py`
+  (marker-file sink hold in a test worker command), edits to scenario (e) in `test_app_v7.py`, the dr44c `export` branch
+  in `test_app_wiring.py`, `test_app_startup.py:212-213` (photo leg's ExportEngine shares the one cache; the Q16 rule
+  re-worded), a WP4.6 driver copy for `v7e` / `dr44c-export` (md5 at the window). STOP-2: NO env change; JSON
+  `ensure_ascii` on binary streams, strict UTF-8; AD-23 pin count 7 -> 8. Q2 agreed (per-request `cache_limit_bytes`);
+  Q3 sweep in the first job's run; Q5 the frozen types' `from_json`; Q9 decoded framemd5; Q11 Limit (Windows kill: the
+  venv launcher kill ends the interpreter, FFmpeg grandchildren end on broken pipes). N6: WP4.3's 209-211 s was a
+  cache-hit export; measured in the window, 10 % STOP stands; seeding remedy = my `cache/` ruling if it trips. Grants:
+  `activity.py:147` docstring sentence, `composition.py` module docstring sentence. Limits: serial-leg +1-2 s per GUI
+  video-export test; GUI cache accounting blind to `export/<uuid>` during an export (row of mine at the accept if
+  material). Cell 1 retires at 194,313; FRESH cell 2 builds from the ledger. WP3.6P in turn 2 (RED tests).
 - **(gen 8 history follows; newest facts at the end of the block)**
 - **GEN 8 PICKUP (was).** Orchestrator = **gen 23 `clearwater-orchestrator-20261029-0852`** (online 18:57Z; gauge 37 ms;
   gen 22 rolled 18:52Z at ~420K, state 5a1538a). ALL cues go there. Time the bash launch and record it here. Drain with
