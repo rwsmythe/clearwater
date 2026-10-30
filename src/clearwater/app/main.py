@@ -20,7 +20,7 @@ The only ``clearwater.app`` module that imports ``clearwater.gui`` or loads Qt.
    (iii) the graphics-card detection, whose AD-9 reason the status bar shows while no file is
    open (and the log records); it runs again when the settings change with no file open.
 6. The window's :class:`FullCollections` check: from here on CPython's full garbage collection
-   runs on the interface thread at a moment the app chooses, never at a job's boundary (V7).
+   runs on the interface thread at an idle moment only, never while a job runs (V7).
 """
 
 from __future__ import annotations
@@ -71,10 +71,7 @@ CACHE_FAILED_TEXT = "Videos cannot be analysed or exported in this session: {rea
 
 
 IDLE_CHECK_MS = 1000
-"""How often the interface thread looks for the moment to run a deferred full collection."""
-
-BUSY_COLLECTION_FACTOR = 10
-"""While a job runs, a full collection waits for this many times CPython's own threshold."""
+"""How often the interface thread looks for an idle moment to run a deferred full collection."""
 
 _NO_AUTOMATIC_FULL_COLLECTION = 2**31 - 1
 """The third collector threshold while an application runs: never reached."""
@@ -92,18 +89,20 @@ class FullCollections:
     Window 3 saw a generation-2 collection on a job's thread at each job boundary (inside the
     plan cache's release), holding the GIL while the interface waited. While started, CPython's
     automatic full collection is off (its third threshold is never reached; generations 0 and 1
-    stay automatic) and the interface thread runs it instead, from a check every
-    :data:`IDLE_CHECK_MS`:
+    stay automatic) and the interface thread runs it instead, only at an idle moment, from a
+    check every :data:`IDLE_CHECK_MS` (CHARC ruling cc0703a7 Q1 (a)):
 
+    - a check that finds a job running does nothing: no full collection runs on any thread
+      while a job runs, however many younger collections are pending (that is the bound this
+      policy gives; a collection's own duration has none, as CPython offers none);
     - the first check that finds no job running ends start-up: it freezes every object then
       tracked (``gc.freeze``), so no later full collection scans them;
     - a later check that finds no job running collects once more younger collections are pending
-      than CPython's own third threshold;
-    - a check while a job runs collects only past :data:`BUSY_COLLECTION_FACTOR` times that
-      threshold, so a long job's cyclic garbage stays bounded.
+      than CPython's own third threshold.
 
-    The process's thresholds come back, and the frozen objects are unfrozen, when the last
-    started instance stops (the window's close). Interface thread only.
+    The cost: cyclic garbage that reaches generation 2 during a job is freed at the next idle
+    moment, not before. The process's thresholds come back, and the frozen objects are unfrozen,
+    when the last started instance stops (the window's close). Interface thread only.
     """
 
     def __init__(self, jobs: JobRunner, parent: QObject) -> None:
@@ -141,17 +140,13 @@ class FullCollections:
             gc.unfreeze()
 
     def _check(self) -> None:
-        """Freeze after start-up, then collect at an idle moment (or when far overdue)."""
-        threshold = _SAVED_THRESHOLDS[0][2]
-        pending = gc.get_count()[2]  # the younger collections since the last full one
+        """At an idle moment only: freeze once after start-up, then collect when due."""
         if self._jobs.active():
-            if pending > BUSY_COLLECTION_FACTOR * threshold:
-                gc.collect()
-            return
+            return  # nothing collects while a job runs (R5-1)
         if not self._frozen:
             self._frozen = True
             gc.freeze()
-        elif pending > threshold:
+        elif gc.get_count()[2] > _SAVED_THRESHOLDS[0][2]:  # younger collections since a full one
             gc.collect()
 
 
