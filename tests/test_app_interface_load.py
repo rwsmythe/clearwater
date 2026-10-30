@@ -29,8 +29,9 @@ from types import FrameType
 from typing import Any
 
 import pytest
-from PySide6.QtCore import QCoreApplication, QEvent, QTimerEvent
+from PySide6.QtCore import QCoreApplication, QEvent, QObject, QTimerEvent
 
+from clearwater.app.main import IDLE_CHECK_MS, FullCollections
 from clearwater.gui.jobs import PROGRESS_INTERVAL_MS, QtJobRunner
 from clearwater.interfaces import JobResult, Progress
 from test_app_startup import cpu_settings, make_app, wait_started
@@ -43,6 +44,33 @@ SETTLE_MS = 2500
 
 def _ok() -> JobResult:
     return JobResult(ok=True, outputs=(), warnings=(), failure=None, device="cpu", elapsed_s=0.0)
+
+
+class _Runner:
+    """A job runner stand-in for the collection policy: ``active()`` is what the test sets."""
+
+    def __init__(self, active: int) -> None:
+        self.count = active
+
+    def active(self) -> int:
+        return self.count
+
+
+def _full_collections() -> tuple[list[str], Callable[[str, dict[str, int]], None]]:
+    """A ``gc.callbacks`` entry recording the thread of each full (generation 2) collection."""
+    full: list[str] = []
+
+    def on_gc(phase: str, info: dict[str, int]) -> None:
+        if phase == "start" and info["generation"] == 2:
+            full.append(threading.current_thread().name)
+
+    return full, on_gc
+
+
+def _overdue(pending: int) -> None:
+    """Make more than ``pending`` younger collections pending since the last full one."""
+    while gc.get_count()[2] <= pending:
+        gc.collect(1)  # each generation-1 collection counts one toward the full one
 
 
 def test_the_windows_paint_update_layout_and_timer_events_run_no_python(make_app, qtbot) -> None:
@@ -155,3 +183,25 @@ def test_the_collection_policy_holds_while_the_window_is_open_and_ends_at_its_cl
     application.window.close()
     assert gc.get_threshold() == before
     assert gc.get_freeze_count() <= frozen_before
+
+
+def test_no_full_collection_runs_while_a_job_runs_however_far_overdue(qtbot) -> None:
+    """R5-1 (CHARC cc0703a7 Q1 (a)): while a job runs, no full collection runs on any thread.
+
+    Before the start-up freeze (no idle moment yet) and however many younger collections are
+    pending (here 20 times the interpreter's own third threshold): the collection waits for an
+    idle moment. Planted on ``28c4ece``: the busy check collects on the interface thread.
+    """
+    own = gc.get_threshold()[2]
+    owner = QObject()  # the timer's parent, alive for the test
+    policy = FullCollections(_Runner(active=1), owner)
+    full, on_gc = _full_collections()
+    policy.start()
+    gc.callbacks.append(on_gc)
+    try:
+        _overdue(20 * own)
+        qtbot.wait(int(2.5 * IDLE_CHECK_MS))  # two checks, each with a job running
+        assert full == []
+    finally:
+        gc.callbacks.remove(on_gc)
+        policy.stop()
