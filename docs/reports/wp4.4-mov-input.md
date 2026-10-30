@@ -222,3 +222,30 @@ explicit; no new unresolved product/design STOP is claimed.
 The ledger carries exact final phone RUN REQUEST and safe edit-row extraction.
 Reviewer B, the final footage rerun, the standard two-leg gate (no fullclip),
 and accept remain with the orchestrator.
+
+## Errata at the gate (orchestrator gen 25, Reviewer B on `wp4.4-mc`)
+
+Reviewer B (Claude opus/high, single pass, `wp4.4-mc` at `b70efcf`)
+returned `NO_NEW_CRITICAL_MAJOR`: 0 critical, 0 major, 3 minor, 5 advisory.
+These errata close its two report findings; the rest are banked in the accept
+record.
+
+1. **Candidate.** The merge candidate is `wp4.4-mc`, the package rebased onto
+   main `acde834` (patch-id identical to `wp4.4` at `c804f47`), not the base
+   named in the header.
+2. **Q4 edit-list rows (format facts, extracted at the orchestrator's seat from
+   the footage run of record on the final state, `c804f47`, 1 passed in
+   65.28 s).** Video track as written: source one entry, duration 0.5 s
+   (1/2), media_time 0, rate 1; output the same: SAME. Presentation effect:
+   video duration 1/2 media_start 0, audio duration 299/600 media_start 0,
+   rate 1, on both sides: SAME. The two dropped `mebx` tracks' edit lists
+   (duration 1/2, media_time 0) are absent from the output, so the
+   best-effort non-video and data-track edit-list items read DIFFERENT, as
+   the not-carried disclosure requires. This replaces the sentence above
+   that the rows were not supplied.
+3. **Limits, the allowlist's reach.** The allowlist applies to EVERY source
+   container, not only `.mov`: a data track whose tag is neither `tmcd` nor
+   `gpmd` is no longer copied from an MP4 source either (it was before), and
+   such an item reads `done with warnings` with `data track <tag>` (ruled
+   Q2, best-effort under D105). The owner's HERO13 clips carry `tmcd` and
+   `gpmd` only, so they are unaffected.
