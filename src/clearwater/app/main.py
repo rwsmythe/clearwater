@@ -15,9 +15,9 @@ The only ``clearwater.app`` module that imports ``clearwater.gui`` or loads Qt.
    panels (the guarded exports, sharing the one cache) and the settings dialog (WP3.10's rule,
    the start-up's encoder catalog, and the window's one closed signal, which its cache jobs'
    errors read, R2-3); then ``show()``.
-5. The window's :class:`FullCollections` check, before any worker starts: from here on
-   CPython's full garbage collection runs on the interface thread at an idle moment only, never
-   while a job runs (V7).
+5. The window's :class:`FullCollections` check, before the start-up jobs (the shell's own
+   worker threads already run): from here on CPython's full garbage collection runs on the
+   interface thread at an idle moment only, never while a runner job runs (V7).
 6. Three start-up jobs on the window's job runner, off the interface thread: (i) the cache's
    open with the settings' limit; (ii) the encoder detection into the catalog (D74, 8.2);
    (iii) the graphics-card detection, whose AD-9 reason the status bar shows while no file is
@@ -91,20 +91,26 @@ class FullCollections:
     plan cache's release), holding the GIL while the interface waited. While started, CPython's
     automatic full collection is off (its third threshold is never reached; generations 0 and 1
     stay automatic) and the interface thread runs it instead, only at an idle moment, from a
-    check every :data:`IDLE_CHECK_MS` (CHARC ruling cc0703a7 Q1 (a)). Idle means that no
-    started instance's window has a job running (the policy is process-wide):
+    check every :data:`IDLE_CHECK_MS` (CHARC rulings cc0703a7 Q1 (a), 424f573b Q1 (A)). Idle
+    means that no started instance's window has a job running on its job runner (the policy is
+    process-wide):
 
-    - a check that finds a job running does nothing: no full collection runs on any thread
-      while a job runs, however many younger collections are pending (that is the bound this
-      policy gives; a collection's own duration has none, as CPython offers none);
+    - a check that finds a runner job running does nothing: no full collection runs on any
+      thread while any window's runner job runs, however many younger collections are pending.
+      That is the bound this policy gives, and its only one: the shell's opener and the
+      preview's renderer and framer (``LatestWorker`` threads) are not jobs, so a check beside
+      them alone counts as idle; and a collection's own duration is unbounded (CPython offers no
+      bound);
     - the first check that finds no job running ends start-up: it freezes every object then
-      tracked (``gc.freeze``), so no later full collection scans them;
+      tracked (``gc.freeze``, no collection first), so no later full collection scans them;
     - a later check that finds no job running collects once more younger collections are pending
       than CPython's own third threshold.
 
-    The cost: cyclic garbage that reaches generation 2 during a job is freed at the next idle
-    moment, not before. The process's thresholds come back, and the frozen objects are unfrozen,
-    when the last started instance stops (the window's close). Interface thread only.
+    The cost: cyclic garbage that reaches generation 2 during a job waits for a later idle check
+    that finds the collection due; garbage already present at the first idle check (start-up's,
+    or a job's that ended before it) is frozen with everything else and stays until the last
+    stop. The process's thresholds come back, and the frozen objects are unfrozen, when the last
+    started instance stops (the window's close). Interface thread only.
     """
 
     def __init__(
@@ -412,7 +418,7 @@ def build_application(
         window_closing=application.closed,  # the start-up callbacks' one closed signal (R2-3)
     )
     window.show()
-    window.full_collections.start()  # before any worker; the freeze waits for start-up's end
+    window.full_collections.start()  # before the start-up jobs; the freeze waits for their end
     application.start_jobs()
     return application
 
