@@ -188,6 +188,13 @@
   name>, errno N); details are in the application log", full OSError to the log; same rule for every parent-side
   OSError; absence test over a planted hostile interpreter path. Cell 4 applying (d) + this; then R3 (last full round
   for the protocol class).**
+- **WP3.6P R2 RULED 06:40Z (query de6d2323; Claude pass 1 major / 1 minor / 8 adv on 7a3810a, ledger 081f851c; post
+  734a880e + cue):** M-1 (the expected ICC was taken from the product reader itself: a planted profile-dropping reader
+  passed V5 / D53) = fix with an INDEPENDENT source-ICC read (Pillow info / pillow-heif primary profile) + a planted-reader
+  control. R2-QA = (a): exactly one entry per D63 field (Orientation SHORT 1 = 1; Software ASCII "Clearwater"+NUL, count
+  derived from the value, today 11 per `exif.py:188`; PixelX/Y SHORT or LONG count 1 = upright size). Advisories a-4 /
+  a-5 / a-8 fixed, the rest wording / Limits. Codex seat 2 at 101,571 after turn 6 (compacted once). WP4.6 cell 4 at
+  229,908 applying (d) then R3; re-seat line ~330K.
 - **(gen 8 history follows; newest facts at the end of the block)**
 - **GEN 8 PICKUP (was).** Orchestrator = **gen 23 `clearwater-orchestrator-20261029-0852`** (online 18:57Z; gauge 37 ms;
   gen 22 rolled 18:52Z at ~420K, state 5a1538a). ALL cues go there. Time the bash launch and record it here. Drain with
