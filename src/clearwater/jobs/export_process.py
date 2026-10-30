@@ -530,7 +530,7 @@ def _decode_line(content: bytes) -> tuple[str, Any]:
         return key, _decode_log(value)
     if key == "result":
         return key, _decode_result(value)
-    raise _InvalidLineError(f"an unknown key {_ascii(key)[:40]!r}")
+    raise _InvalidLineError("an unknown key")  # never the key: it is the line's content
 
 
 def _is_int(value: object) -> bool:
