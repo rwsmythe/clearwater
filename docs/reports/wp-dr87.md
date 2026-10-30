@@ -1,8 +1,9 @@
 # WP-DR87 - bench test sampling and TIFF EXIF debts
 
-Candidate status: implementation and cell checks complete on turn 3; awaiting
-Reviewer A, Reviewer B and the orchestrator's final two-leg gate. This is not
-an acceptance record. Dispatch base: `00518bb`; turn-3 parent: `d301d98`.
+Candidate status: Reviewer A converged in round 1; its two docstring
+advisories are addressed on turn 4. Reviewer B and the final two-leg gate
+are at the orchestrator's seat, recorded in the accept record. This is not
+an acceptance record. Dispatch base: `00518bb`; turn-4 parent: `5103ef9`.
 
 ## Changes
 
@@ -17,7 +18,8 @@ an acceptance record. Dispatch base: `00518bb`; turn-3 parent: `d301d98`.
   unchanged; no bare `Exception` handler was added.
 - DR-94: the IFD0 drop set gains exactly 37724 ImageSourceData and 50740
   DNGPrivateData. The comment and dropped-blob docstring sentence name both
-  and describe their payloads. No other tag is newly excluded.
+  and describe their payloads. The round-1 cleanup explicitly says the
+  exclusions apply to IFD0 and rewraps the paragraph. No other tag is newly excluded.
 
 ## DR-87 measurements of record
 
@@ -116,24 +118,27 @@ private tag was proposed or removed; no DNG input support was added.
 
 ## Final-state cell checks
 
-On the turn-3 product diff, using the required sandbox shim:
+On the final turn-4 docstring cleanup, using the required sandbox shim:
 
 ```text
 PYTHONPATH=scripts uv run pytest -q tests/test_io_photo_exif_bytes.py tests/test_prototype_backend.py --basetemp=work/wp-dr87/tmp -p sandbox_mkdir_shim -p no:cacheprovider -m "not gpu and not footage and not gui and not slow and not fullclip"
-291 passed, 18 deselected, 2 warnings in 59.71s
+291 passed, 18 deselected, 2 warnings in 58.19s
 EXIT 0
 
 uv run ruff check .
 All checks passed!
 EXIT 0
 
-uv run mypy
+uv run mypy (turn 3; executable code unchanged by turn 4)
 Success: no issues found in 141 source files
 EXIT 0
 ```
 
-Logs: `work/wp-dr87/r3/light-green.log`, `light-green-exit.txt`,
-`ruff-check.log`, `ruff-check-exit.txt`, `mypy.log`, `mypy-exit.txt`.
+Final light/Ruff logs: `work/wp-dr87/r4/light.log`, `light-exit.txt`,
+`ruff-check.log`, `ruff-check-exit.txt`. The initial turn-3 GREEN light run
+was 291 passed, 18 deselected, 2 warnings in 59.71s, EXIT 0; its logs and
+the mypy result are in `r3/light-green.log`, `light-green-exit.txt`,
+`mypy.log`, `mypy-exit.txt`.
 RED logs are in `r2/light-red.log` and `light-red-exit.txt`.
 The two light-run warnings are the CuPy CUDA-path warning and Pillow's
 truncated-file warning on the existing malformed-value test. uv also reports
@@ -141,7 +146,8 @@ the inherited `VIRTUAL_ENV` mismatch and ignores it in favor of this project's
 environment. Neither runner failed for those warnings.
 
 The dispatcher reported both test files clean under Ruff check/format after
-turn 2. `ruff format --check` for the turn-3 candidate is reserved to the seat.
+turn 2, and "3 files already formatted" on the three code files after turn 3.
+The final format check is at the orchestrator's seat.
 No final two-leg gate, fullclip leg or harness gate was run by this cell.
 The package requires one two-leg gate after Reviewer A converges and B returns;
 no fullclip leg or harness gate is commissioned here.
@@ -158,8 +164,10 @@ no fullclip leg or harness gate is commissioned here.
 
 The final cell pass checks the owned diff against the brief, exact tag/exception
 changes, warning identity, unchanged controls and green light/lint/type output.
-No new issue was found in that pass. Independent review and the final gate
-remain pending; this does not claim package acceptance.
+No new issue was found in that pass. Reviewer A subsequently converged in
+round 1 as recorded below; Reviewer B and the final gate are at the
+orchestrator's seat, recorded in the accept record. This does not claim
+package acceptance.
 
 Bounded AST/byte checks returned EXIT 0 in `work/wp-dr87/r3/scope-check.log`:
 the drop-set difference is exactly the ruled two ids, the warning AST is
@@ -198,13 +206,47 @@ Depth readings, supplied by the dispatcher (no estimates substituted):
 | --- | --- |
 | After turn 1, received turn 2 | 131,491 |
 | After turn 2, received turn 3 | 155,735 |
-| After turn 3 | Await dispatcher reading; evaluate around 200K, stop at a step boundary near 250K. |
+| After turn 3, received turn 4 | 171,077 |
+| After turn 4 | Await dispatcher reading; evaluate around 200K, stop at a step boundary near 250K. |
 
-Reviewer A: **to be filled after the rounds**. Claude opus/high process,
-STRONG tier, run by the driver on `00518bb..HEAD`; adjudication turns update
-only the ledger and yield before remediation.
+## Reviewer A round 1
 
-Reviewer B and the single two-leg gate: pending at the orchestrator's seat.
+The orchestrator's read-only Claude `claude-opus-5-5`/high process, STRONG
+tier, reviewed `00518bb..5103ef9`. **VERDICT: NO_NEW_CRITICAL_MAJOR**;
+**0 critical, 0 major, 0 minor, 4 advisory**. Round 1 converged; the
+dispatcher authorized the docstring-only cleanup below without round 2.
+Reviewer B reads the final candidate.
+
+Evidence: `C:\Users\rwsmy\clearwater-review-evidence\wp-dr87\r1\`
+(`review-prompt-r1.md`, `review-diff.txt`, `review.txt`, `review.json`).
+The dispatcher reported the expected model, high effort, 22 turns,
+`is_error=false`, one VERDICT and a clean worktree after review. Four
+permission denials (mkdir / sandbox-shim invocation) were recovered by
+rerunning with another basetemp; they were not suppressed as a clean run.
+
+The reviewer confirmed all five claims. Executed controls included the
+bounded writer failure (base MemoryError escaped; head None and one WARNING),
+the exact drop-set difference `[37724, 50740]`, and IFD0 contents changing
+from `[271, 37724, 50341, 50740]` to `[271, 50341]` with authored fields
+byte-exact. The same private ids survived in Exif/GPS children, confirming
+the IFD0-only filter. Its three-module light run (EXIF bytes, backend, clip)
+returned **343 passed, 28 deselected, 2 warnings in 138.49s**; Ruff format
+and check were clean on the three code files.
+
+| Advisory | Classification / evidence | Dispatcher disposition and final state |
+| --- | --- | --- |
+| A1 | Advisory, out of envelope, EXECUTED: dropped-blob sentence omitted the IFD0 qualification; filtering is IFD0-only, including the pre-existing excluded blobs. | FIX: docstring now says the blobs are left out of IFD0. No filtering logic changed. |
+| A2 | Advisory, EXECUTED: a genuine `MemoryError()` has an empty message and renders `TIFF tags cannot be read for EXIF (); no EXIF carried`. | DECLINED: DR-93 locks the warning text. Literal and logging behavior unchanged. |
+| A3 | Advisory, REASONED: short line left by the paragraph rewrap. | FIX: rewrapped the descriptive paragraph to the module's line length; docstring only. |
+| A4 | Advisory, REASONED: both new tests write the synthetic source without reading it back. | DECLINED: follows the sibling tests' form and does not affect behavior. Tests unchanged. |
+
+Reviewer B and the single two-leg gate are **at the orchestrator's seat,
+recorded in the accept record**.
+Final turn-4 scope checks passed, EXIT 0 (`work/wp-dr87/r4/scope-check.log`):
+the source edit is confined to `from_tiff`'s docstring, normalized wording
+differs only by "of IFD0", and all executable AST, tests and `bench.py` are
+unchanged from the reviewed candidate. Ownership, ASCII/LF and trailing
+whitespace checks passed; `git diff --check` returned EXIT 0.
 No deviation or unresolved product choice is raised. Dispositions: child-test
 remedy DECLINED by CHARC; sampler remedy not commissioned because the reported
 delay did not reproduce; ratio flake remains observation-only under CHARC's

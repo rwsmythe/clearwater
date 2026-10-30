@@ -245,13 +245,15 @@ Photoshop resource blob, without claiming that arbitrary EXIF is discarded.
 
 ### Verification / review ledger
 
-Round 0 is mapping and test design, not a Reviewer A round. No finding was
-received from either reviewer. Counts below count reviewer findings only;
-the two severity-tagged source observations above are disclosed separately.
+Round 0 is mapping and test design, not a Reviewer A round. R1 records the
+driver-supplied Claude review and turn-4 dispositions. Counts below count
+reviewer findings only; the two severity-tagged source observations above
+are disclosed separately.
 
-| Round | Reviewer / transport | Critical / major / minor | In / out | NEW / REOPENED | Reverts | Product / test fixes | Verdict / evidence | Dispatcher depth |
+| Round | Reviewer / transport | Critical / major / minor / advisory | In / out | NEW / REOPENED | Reverts | Product / test fixes | Verdict / evidence | Dispatcher depth |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 0 | Not run; Claude opus/high pass scheduled by driver later | 0 / 0 / 0 | 0 / 0 | 0 / 0 | 0 | 0 / 0 | Map complete; baseline/profile returned EXIT 0; final Q2 confirmed on turn 2. No convergence claim. | 131,491 after turn 1, supplied on turn 2. |
+| 0 | Not run; Claude opus/high pass scheduled by driver later | 0 / 0 / 0 / 0 | 0 / 0 | 0 / 0 | 0 | 0 / 0 | Map complete; baseline/profile returned EXIT 0; final Q2 confirmed on turn 2. No convergence claim. | 131,491 after turn 1, supplied on turn 2. |
+| 1 | Claude claude-opus-5-5/high; read-only process at dispatcher seat | 0 / 0 / 0 / 4 | 3 / 1 | 4 / 0 | 0 | 0 / 0 executable/test fixes; 2 docstring advisory fixes | NO_NEW_CRITICAL_MAJOR; converged. A1 FIX, A2 DECLINED (warning lock), A3 FIX, A4 DECLINED (sibling-test form). Evidence r1 folder below. | 171,077 after turn 3, supplied on turn 4. |
 
 Reviewer A uses `scripts/codex_cell.py review`, Claude opus/high, STRONG.
 Durable reviewer evidence belongs at the orchestrator-managed
@@ -264,7 +266,8 @@ criterion follow the seam fill, not an improvised round count.
 | --- | --- | --- |
 | Turn 1 / round 0 | 131,491 after turn 1, supplied by dispatcher on turn 2 | Continue with RED-only turn 2; evaluate around 200K and stop at a step boundary near 250K. |
 | Turn 2 / RED tests and fixture | 155,735 after turn 2, supplied by dispatcher on turn 3 | Continue with GREEN/report turn 3; evaluate around 200K and stop at a step boundary near 250K. |
-| Turn 3 / GREEN and report | Not yet supplied | Yield for Reviewer A; no estimate substituted. |
+| Turn 3 / GREEN and report | 171,077 after turn 3, supplied by dispatcher on turn 4 | Bounded docstring/report cleanup tail; evaluate around 200K and stop at a step boundary near 250K. |
+| Turn 4 / R1 cleanup and report | Not yet supplied | Yield for Reviewer B/final gate at seat; no estimate substituted. |
 
 Round-0 verification loop: suspected stale caller anchors and ambiguous
 sampler attribution; confirmed the caller corrections by direct source search,
@@ -486,3 +489,84 @@ cumulative scope is exactly the five owned paths. Frozen interfaces,
 `bench.py`, existing test assertions, dependencies, spec/register and local
 config are untouched. No owner footage or other worktree was accessed, and
 no commit, stash, mailbox post, hardware run, profile or deletion was performed.
+
+## Turn 4 - Reviewer A R1 cleanup and handoff
+
+Turn parent: `5103ef922e611169f4f3ec6b9a790c9f39fe15e6`. The dispatcher
+committed turn-3 product/report/ledger as `42309c0`, `b76eac5`, `5103ef9`;
+all changed blobs had zero CR, and its format check reported "3 files already
+formatted". Dispatcher-read depth after turn 3: **171,077** tokens. Turn 4
+is the explicitly authorized final advisory cleanup and report update.
+
+### R1 adjudication and dispositions
+
+Review input: `00518bb..5103ef9`; read-only Claude `claude-opus-5-5`/high
+process, STRONG, run by the dispatcher. **VERDICT: NO_NEW_CRITICAL_MAJOR**;
+critical/major/minor/advisory **0/0/0/4**. R1 converged. In-envelope 3,
+out-of-envelope 1 (A1); NEW 4, REOPENED 0; reverts 0. No executable product
+or test fix; A1 and A3 change one product docstring. No R2 is required under
+the dispatcher's ruling; Reviewer B reads the final candidate.
+
+Durable evidence (dispatcher-managed, not written by this cell):
+`C:\Users\rwsmy\clearwater-review-evidence\wp-dr87\r1\`, containing
+`review-prompt-r1.md`, `review-diff.txt`, `review.txt`, `review.json`.
+The dispatcher reported model/effort as expected, 22 turns, `is_error=false`,
+one VERDICT, and clean worktree afterwards. Four permission denials (mkdir
+and the shim-form run) were recovered by another basetemp and rerun. CLI
+version was not supplied; no version is inferred.
+
+The review confirmed all five claims, with EXECUTED controls for the bounded
+MemoryError boundary, exact drop-set difference and kept raw fields. It saw
+IFD0 `[271, 37724, 50341, 50740]` on the base and `[271, 50341]` on the head,
+with the same private ids kept in Exif/GPS children. Its broader three-module
+light run returned **343 passed, 28 deselected, 2 warnings in 138.49s**;
+Ruff check/format were clean on all three code files. These are seat-review
+results, not cell executions.
+
+| Advisory | Classification / adjudication | Disposition |
+| --- | --- | --- |
+| A1 | Advisory, out of envelope, EXECUTED. The dropped-blob wording lacked IFD0 qualification; `_read_entries` filters only IFD0, including the pre-existing exclusions. | FIX as directed: the docstring says "left out of IFD0". Runtime behavior unchanged. |
+| A2 | Advisory, EXECUTED. Empty `MemoryError()` message yields `TIFF tags cannot be read for EXIF (); no EXIF carried`. | DECLINED as directed: DR-93 explicitly locks the warning text. No logging change. |
+| A3 | Advisory, REASONED. The inserted sentence left a short paragraph line. | FIX as directed: rewrapped the descriptive paragraph; no semantic change beyond A1. |
+| A4 | Advisory, REASONED. New tests write their source TIFF without reading it back. | DECLINED as directed: matches sibling tests' form, no behavior affected. Tests unchanged. |
+
+### Final cleanup checks and handoff
+
+Only `from_tiff`'s descriptive docstring changed in `exif.py`; the warning,
+exception tuple, drop set and all executable code are unchanged. The report's
+R1 placeholder is replaced with the verdict, counts, executed controls, four
+advisories/dispositions and evidence folder. Reviewer B and the one two-leg
+gate remain at the orchestrator's seat, recorded in the accept record.
+
+| Cell command on final docstring state | Result | Evidence under `work/wp-dr87/r4/` |
+| --- | --- | --- |
+| Brief's light pytest command with `PYTHONPATH=scripts`, sandbox shim, work basetemp, no cache and five marker exclusions | **291 passed, 18 deselected, 2 warnings in 58.19s**, EXIT 0 | `light.log`, `light-exit.txt` |
+| `uv run ruff check .` | **All checks passed!**, EXIT 0 | `ruff-check.log`, `ruff-check-exit.txt` |
+
+No mypy rerun was needed for the docstring-only cleanup; the turn-3 result
+remains Success with 141 source files. The two pytest warnings and uv's
+ignored inherited-environment warning are unchanged. No GPU/profile run,
+full-suite leg or harness gate was run by this cell.
+
+Verification-loop disposition: all four R1 advisories were adjudicated;
+the two authorized docstring fixes are applied, the two declined items are
+left unchanged with their binding reasons recorded. The final light and Ruff
+runs pass. No further product issue or unresolved choice was found. Final
+bounded scope verification checks that the only source change is the IFD0
+qualification and paragraph rewrap, with all executable AST unchanged.
+
+Final bounded scope check returned EXIT 0 (`work/wp-dr87/r4/scope-check.log`,
+`scope-check-exit.txt`): replacing only the new docstring with its parent
+version makes the source bytes identical, and normalized wording differs
+only by the IFD0 qualifier. All executable AST (including warning, tuple and
+drop set) is identical; tests and `bench.py` are byte-unchanged. Exactly three
+owned paths changed this turn and five cumulatively. All five artifacts
+are ASCII/LF without trailing whitespace; `git diff --check` exited 0
+(`r4/diff-check.log`). The empty MemoryError message was independently
+confirmed with `str(MemoryError()) == ""`; the locked warning stays unchanged.
+
+Locks: only the owned `exif.py` docstring, report and ledger changed on turn 4;
+cumulative ownership remains the same five paths. No test/assertion, warning,
+dependency, frozen interface, `bench.py`, spec/register or local config change.
+No footage or other worktree access, commit, stash, mailbox post, deletion,
+GPU command or profile. Yield for Reviewer B and gate; no acceptance claimed.
