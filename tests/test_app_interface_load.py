@@ -60,12 +60,13 @@ def test_the_windows_paint_update_layout_and_timer_events_run_no_python(make_app
             caller = frame.f_back.f_code.co_qualname if frame.f_back else "-"
             calls.append(f"{frame.f_code.co_qualname} <- {caller}")
 
+    prior = sys.getprofile()  # a host's profiler, restored after each send (B-15)
     for send, args in sends:  # a C call each: only Python that Qt itself enters is counted
         sys.setprofile(count)
         try:
             send(*args)
         finally:
-            sys.setprofile(None)
+            sys.setprofile(prior)
     assert calls == [], Counter(calls).most_common(10)
 
 
