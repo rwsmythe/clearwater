@@ -572,7 +572,11 @@ def _decode_result(value: object) -> _ChildResult:
         or not isinstance(elapsed, int | float)
     ):
         raise _InvalidLineError("a result line with a value of the wrong type")
-    return _ChildResult(ok, tuple(outputs), tuple(warnings), failure, device, float(elapsed))
+    try:
+        seconds = float(elapsed)  # a JSON integer may be too large for a float
+    except OverflowError as error:
+        raise _InvalidLineError("a non-finite number") from error
+    return _ChildResult(ok, tuple(outputs), tuple(warnings), failure, device, seconds)
 
 
 class _Tail:
