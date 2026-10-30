@@ -4,14 +4,15 @@
 
 - Package: WP3.6P, CODEX lane, STRONG tier; CHARC's FINAL rulings govern.
 - Dispatch base verified: `c3bf602fe9ac94cd5df25499d97f3a2bc439bb72`.
-- Turn 1 / round 0: map, design, RED roster and seat RUN REQUESTs only.
-  No tool or test code is introduced. No owner photo was opened by the cell.
+- Current boundary: turn 2, RED tests and ledger only; no tool code. Turn 1's
+  ledger was committed by the dispatcher as `6cc7cdb`.
+  No owner photo was opened by the cell in either turn.
 - `uv sync`: already run by the dispatcher before dispatch, as stated in the
   binding turn-1 instructions. Not repeated: this sandbox cannot reach the index.
 - Initial `git status --short`: empty. The existing isolated worktree is retained.
-- No STOP or question from the source mapping. Oracle selection remains PENDING
-  the requested seat evidence; inability of FFmpeg to decode the primary selects
-  the ruled thumbnail fallback, rather than stopping the package.
+- No STOP or question. CHARC `e40b0d7b06ee9af8` (2026-10-30T04:46:00Z)
+  RE-RULES Q3: FFmpeg default composed primary as delivered is the oracle.
+  The thumbnail is a recorded second witness, never the pass criterion.
 - No real-photo acceptance claim, measurement, review convergence or gate pass is
   made at this boundary. All requests below are NOT RUN by this cell.
 
@@ -80,8 +81,8 @@ class map, with optional `--files NAME [NAME ...]` to select listed basenames.
 Basenames resolve below configured `footage_path / 'Phone'`; synthetic library
 tests pass explicit source paths and a tmp_path-backed config/guard.
 
-- `orientation`: `--oracle ffmpeg|thumbnail` (required, selected from round 0),
-  `--max-side 256`. Selects HEIC only, runs the independent pose comparison, and
+- `orientation`: `--max-side 256`. Selects HEIC only, runs the independent
+  FFmpeg-default pose comparison plus the recorded thumbnail witness, and
   records all eight scores, dimensions and discrimination margins. A wrong-size
   candidate is marked shape-mismatch, not silently omitted.
 - `export`: `--bit-depth {8,16}` (required), `--force-cpu` (default false),
@@ -157,30 +158,44 @@ No pixels are classified as above-surface, underwater or visually corrected.
 
 ### Oracle and per-photo record
 
-FFmpeg oracle: independently decode the PRIMARY image with `-noautorotate`,
-validate full stored extent (a decoded tile/auxiliary/thumbnail is not primary),
-apply its associated irot/imir transforms in association order, then downscale.
-Read these associations independently of product AD-24 selection. For tag-only
-synthetic fixtures, the expected pose is the known generated upright image;
-raw EXIF is read independently. The four fixtures also cross-check the transform
-code against that generated reference, so the oracle cannot merely share a
-faulty product decision. Never call `heic_tag_to_apply` to build the reference.
+FFmpeg oracle, per CHARC's replacement ruling: decode the PRIMARY using FFmpeg
+9.0.2 DEFAULT stream selection, no `-map`, `-frames:v 1 -update 1`,
+`-map_metadata -1 -pix_fmt rgb24`. Use the resulting pixels AS DELIVERED. Never
+add `-noautorotate`, turn the result by irot/EXIF again, or select a tile by map.
+Validate primary dimensions; FFmpeg composes the tile grid and applies its own
+transform. FFmpeg's HEIF demuxer/HEVC decoder and the product's pillow-heif /
+libheif decode plus Python AD-24 selection share no AD-24 code. The report must
+name these libraries and describe the independent implementations explicitly.
 
-If round 0 shows FFmpeg cannot deliver the Apple primary, select the HEIC's own
-thumbnail item through pillow-heif, whose item transforms are applied by libheif.
-No product EXIF rule is used. Verify thumbnail identity and transformed size;
-absent/unreadable thumbnail or a non-discriminating comparison is an oracle
-failure, not an acceptance. Fixture tests use their known upright source when
-no thumbnail exists. Record which independent oracle actually supported each
-result; do not label generated-fixture evidence as an owner-thumbnail check.
+The four synthetic fixtures RECORD and ASSERT FFmpeg's honoured rule rather
+than assuming it. Reading their generator predicts irot-only handling; the
+cell's light default-decode probe confirmed it: both and irot-only are upright,
+exif-only stays stored, neither stays upright. FFmpeg does NOT honour an
+EXIF-only Orientation. Compare each default decode with its known expected pose
+from the asymmetric generated scene. Separately compare the product read with
+the generated upright scene on ALL four fixtures. A correct tag-only product
+read deliberately DISAGREES with FFmpeg; an EXIF-never mutant agrees with
+FFmpeg but fails the generated-reference control. The tests retain both facts,
+not a compensating transform that conceals the oracle's limitation.
+
+The HEIC thumbnail through pillow-heif/libheif is a SECOND independent item
+witness relative to the product's EXIF selection, recorded for every photo as
+`thumbnail_witness` (availability, decoded size, pose scores and fixed failure
+code). Record missing or discordant thumbnail evidence without changing the
+FFmpeg-based pass criterion. It is not a second independent codec from the
+product: the implementations compared for the primary are FFmpeg and libheif;
+the thumbnail is additional independently transformed item evidence. The
+report says two decoders agree on pose where measured; it does not claim three
+independent decoders. Thumbnail fallback is DECLINED because FFmpeg CAN decode
+the Apple primary. Never call `heic_tag_to_apply` to build an oracle.
 
 Compare the product read with the upright oracle and all seven other dihedral
 poses at a common small size, preserving aspect ratio. Record mean absolute
 RGB differences in 1/255 units, the winning pose, upright error, nearest-other
 error, margin and shape mismatches. Synthetic fixtures retain the established
 <6 upright / >10 other-pose bounds. Owner comparisons use the same explicit
-bounds, not an automatically relaxed threshold: if independent decoders or
-thumbnails cannot meet them, report the evidence and STOP for a ruling.
+bounds, not an automatically relaxed threshold: a primary/oracle failure is a
+failed check and STOP. Thumbnail scores are recorded without gating that check.
 
 Per-photo allow-listed record groups:
 
@@ -191,7 +206,7 @@ Per-photo allow-listed record groups:
 | HEIC | primary_type, grid, irot, imir, clap, ispe, auxiliary_count, thumbnail_count; no auxiliary payload |
 | Colour | primaries, transfer, assumed, icc_present, icc_description, icc_valid, icc_bytes, icc_md5 |
 | EXIF | raw_exif_present, exif_present, sanitise_dropped, fields_before/after (names), field_count_before/after, changed_kept_fields (names), gps_ifd_present, gps_kept, maker_note_present, maker_note_kept |
-| Orientation | oracle_kind, oracle_size, scores_by_pose, shape_mismatches, winning_pose, upright_mean_255, nearest_other_mean_255, margin_255, orientation_ok |
+| Orientation | oracle_kind (ffmpeg-default), oracle_size, scores_by_pose, shape_mismatches, winning_pose, upright_mean_255, nearest_other_mean_255, margin_255, orientation_ok, thumbnail_witness (availability, size, scores, fixed failure code) |
 | Export | requested_depth, output_depth, png_bytes, png_md5, retained, device_reason, runner_exit, v5_ok, d53_ok, orientation_normal, software_ok, dimensions_ok, thumbnail_absent, icc_expected_present, icc_equal, primaries_equal, transfer_equal, kept_fields_equal, v9_ok, quantised_max_255, quantised_mean_255, raw_max_255, raw_mean_255, failed_checks |
 | Memory | method, force_cpu, estimate_bytes, device_free_before_bytes, device_total_bytes, estimate_exceeds_free_before, device_reason, automatic_fallback, forced_cpu, rss_baseline_bytes, rss_tree_peak_bytes, os_peak_working_set_bytes, device_used_baseline_bytes, device_used_peak_bytes, rss_samples, device_samples, sample_intervals_s, sampler_errors, ram_limit_bytes, device_limit_bytes, ram_within_limit, device_within_limit, runner_exit, measured_at_utc, exclusive |
 
@@ -242,9 +257,12 @@ records and FFmpeg stderr are never promoted into the summary. stdout prints
 this same safe summary only, encoded ASCII. Local raw runner logs remain guarded,
 ignored evidence and are not committed or quoted into the return report.
 
-## RUN REQUEST R0-O: FFmpeg primary/orientation feasibility
+## R0-O historical RUN REQUEST: tile evidence VOID
 
-NOT RUN. Orchestrator only, from the worktree root in PowerShell. Planning
+RUN AT THE SEAT, 2026-10-30T04:42:08Z; not run by the cell. This original request
+is preserved as the exact historical recipe with the seat's psutil fix folded
+in. Its mapped tile-level pose evidence is VOID and MUST NOT be rerun as the
+orientation oracle. CHARC's replacement mechanism above governs. Planning
 allowance: 1-5 minutes for two photos and raw/default decode pairs, not a measured
 timing claim. Run one heavy job at a time. This block uses no hard-coded footage
 path. Every output is worktree-relative under `work/wp3.6p/r0/`. Refuse reruns
@@ -273,7 +291,7 @@ guard.check(root)
 root.mkdir(parents=True, exist_ok=True)
 target = guard.check(root / 'oracle-facts.json')
 assert not target.exists(), 'use a fresh request folder for a rerun'
-free_before = psutil.disk_usage(root).free
+free_before = psutil.disk_usage(str(root)).free
 assert free_before >= 20_000_000_000, 'STOP: below 20 GB free'
 records = []
 for name in ('IMG_6690.HEIC', 'IMG_6720.HEIC'):
@@ -364,30 +382,26 @@ for name in ('IMG_6690.HEIC', 'IMG_6720.HEIC'):
         'raw_auto_pose_scores': pose_scores, 'thumbnail_sizes': thumbnail_sizes,
         'thumbnail_error_type': thumbnail_error})
 facts = {'disk_free_before_bytes': free_before,
-    'disk_free_after_bytes': psutil.disk_usage(root).free, 'records': records}
+    'disk_free_after_bytes': psutil.disk_usage(str(root)).free, 'records': records}
 target.write_text(json.dumps(facts, indent=2, ensure_ascii=True) + '\n', encoding='ascii')
 print('R0-O: format facts recorded; return only oracle-facts.json facts')
 '@ | uv run python - > work/wp3.6p/r0/oracle-request.log 2>&1
 ```
 
-`oracle-facts.json` answers: primary grid/non-grid and associated irot/imir;
+`oracle-facts.json` recorded: primary grid/non-grid and associated irot/imir;
 stored/transformed dimensions; which streams FFmpeg exposes; its rotation side
 data; raw/default decoding EXIT and dimensions; all eight raw-to-default pose
 scores; thumbnail item count and decoded sizes for fallback. For a non-mirrored
 source the associated irot predicts pose 1/8/3/6 for 0/90/180/270 respectively.
 The numeric raw-to-default comparison tests that prediction without a visual
-look check; it is feasibility evidence, not yet the product/oracle comparison.
-Return those scores as format evidence, not scene descriptions. An output
-matching only a tile's dimensions is NOT a primary
-decode. If a full raw primary cannot be obtained, use Q3's thumbnail oracle for
-owner files; return whether each tested HEIC has a usable thumbnail. If FFmpeg
-does deliver the primary, return which stream and whether raw/default pixel
-comparison agrees with stored/turned orientation. These results determine the
-tool's actual oracle mode before the GREEN implementation turn.
+look check. These TILE-LEVEL scores are VOID: no full-size stream was found,
+so stream 0 was one tile. The default-selection extra probes, not this request's
+mapped output, established primary decoding. FFmpeg's transformed result was
+identical with and without noautorotate, so a further irot would turn it twice.
 
-## RUN REQUEST R0-E: one largest-size neutral runner export
+## R0-E historical RUN REQUEST: one largest-size neutral runner export
 
-NOT RUN. Orchestrator only, from the worktree root in PowerShell. Selected file:
+RUN AT THE SEAT, 2026-10-30T04:43:51Z; not run by the cell. Selected file:
 `IMG_6690.HEIC`, inventory 5712x4284. Planning allowance: 1-5 minutes for this
 neutral export; this request obtains the actual wall time needed for Q5/Q9.
 It is a timing observation: schedule alone, nothing else heavy. No claim on the
@@ -416,7 +430,7 @@ out = guard.check(root / 'out')
 settings = guard.check(root / 'settings')
 assert not record.exists() and not facts_path.exists() and not out.exists()
 assert not settings.exists(), 'fresh default settings required'
-free_before = psutil.disk_usage(root).free
+free_before = psutil.disk_usage(str(root)).free
 assert free_before >= 20_000_000_000, 'STOP: below 20 GB free'
 out.mkdir()
 settings.mkdir()
@@ -437,7 +451,7 @@ pngs = list(out.glob('*.png'))
 facts = {'file': 'IMG_6690.HEIC', 'measured_at_utc': moment,
     'runner_exit': done.returncode, 'wall_seconds': elapsed,
     'disk_free_before_bytes': free_before,
-    'disk_free_after_bytes': psutil.disk_usage(root).free,
+    'disk_free_after_bytes': psutil.disk_usage(str(root)).free,
     'counts': raw.get('counts', {}),
     'device_reason': items[0].get('device') if len(items) == 1 else None,
     'png_count': len(pngs), 'png_bytes': [p.stat().st_size for p in pngs]}
@@ -454,31 +468,85 @@ unchanged `wp3.6` root) and retained representatives plus transient export budge
 Measured wall time sizes neutral-export scheduling; it does not predict default
 correction memory-leg duration.
 
-## RED roster for the next turn
+## Round-0 seat evidence and replacement ruling
+
+Evidence below was supplied by the dispatcher, 2026-10-30 04:41Z-04:45Z.
+The cell did not open owner files or the dispatcher-written class map.
+
+- Seat edit folded into this commit: R0-O initially raised `TypeError` because
+  this psutil requires a string, not WindowsPath, in disk_usage. The dispatcher
+  reran with `psutil.disk_usage(str(root))`; all four calls in the two historical
+  snippets now match that seat fix. Initial failure log:
+  `work/wp3.6p/r0/oracle-request.failed-typeerror.log`. The tool must pass str too.
+- R0-O: each photo exposed 61 HEVC streams, none at primary size. IMG_6690
+  streams included 640x896 tiles and a 416x312 thumbnail. IMG_6720 streams
+  included 512x512 tiles and a 416x312 thumbnail with Display Matrix rotation
+  -90. The request fell back to stream 0, one tile; its pose scores are VOID.
+  libheif thumbnail decoded sizes: IMG_6690 416x312, IMG_6720 312x416.
+- Extra seat probes (`work/wp3.6p/r0/extra-*`): ffprobe showed two Tile Grid
+  groups of 45 and 15 tiles. Mapping a group emitted uncomposed tiles and
+  failed image2's single-file constraint. DEFAULT selection, no map, with
+  `-frames:v 1 -update 1 -map_metadata -1 -pix_fmt rgb24`, composed the primary:
+  IMG_6690 5712x4284; IMG_6720 3024x4032. With/without noautorotate was
+  identical, pose 1 error 0.000/255. FFmpeg version:
+  `ffmpeg version 9.0.2-full_build-www.gyan.dev`.
+- FFmpeg primary versus libheif thumbnail, resized to thumbnail dimensions:
+
+| File | Pose 1 | Pose 2 | Pose 3 | Pose 4 | Poses 5-8 |
+|---|---:|---:|---:|---:|---|
+| IMG_6690.HEIC | 2.82 | 33.4 | 43.0 | 41.0 | Shape mismatch |
+| IMG_6720.HEIC | 1.38 | 14.1 | 46.1 | 45.6 | Shape mismatch |
+
+Errors above are mean absolute RGB differences in 1/255 units, not look scores.
+No result here is a 62-photo orientation pass.
+
+- CHARC `e40b0d7b06ee9af8`, 04:46:00Z: default FFmpeg primary as delivered is
+  the replacement Q3 mechanism; the fixture leg must establish its transform
+  rule; thumbnail is recorded second witness only. No further irot is applied.
+  The 39 agreeing irot/tag owner files cannot distinguish AD-24 branches.
+- R0-E sizes Q5 at about 73 * 37.14 s = 45 minutes, with about 3.8 GB if all
+  73 PNGs of the measured size were kept. This is planning arithmetic, not a
+  measured total or a retention-policy change. Q9 still keeps seven class
+  representative PNGs and removes only the tool's own successfully measured
+  nonrepresentative outputs. The 16-bit run is EXCLUSIVE, opened and closed to
+  CHARC, with no WP4.6 heavy test/window while open. Stop below 20 GB free.
+- Dispatcher class map: schema 1, seven counts 23/3/20/16/2/8/1, total 73,
+  reported set-equal to the listing; md5 `07ef683ee2b5a5275a31cdc2597f2fbd`.
+  Representatives as specified in the schema example. Not read by this cell.
+
+## RED tests (turn 2)
 
 All new tests are parallel-leg, use tmp_path and synthetic/committed WP2.3
 fixtures, except the ONE expressly marked footage test. No gpu test is added.
 Committed fixtures are read-only; any mutated copy is under tmp_path.
-Base `c3bf602` has neither new module nor test file. The initial RED is the
+Base `c3bf602` and pre-RED head `6cc7cdb` have neither new module nor test file. The RED is the
 intentional import/collection failure for `photo_verify`; after its API exists,
 the assertions below must fail on their named planted bad implementation.
 
-| Planned test / cases | RED baseline and discriminating failure |
+| Test / cases | RED baseline and discriminating failure |
 |---|---|
-| `test_orientation_matches_generated_upright`, four heic-ad24-* | c3bf602: missing module. Generated asymmetric upright reference, all eight poses and shape checks catch a wrong pose. No oracle derived from product AD-24. |
-| `test_orientation_rejects_exif_always`, both | c3bf602: missing module; planted extra tag application fails `orientation_ok`, naming heic-ad24-both. |
-| `test_orientation_rejects_exif_never`, exif-only | c3bf602: missing module; planted omission of additional tag fails `orientation_ok`, naming heic-ad24-exif-only. |
+| `test_ffmpeg_default_decode_records_irot_only_rule`, four heic-ad24-* | 6cc7cdb: missing module. Actual default decode must be upright for both/irot-only/neither, stored for exif-only. record_property retains rule and pose scores. An additional rotation or EXIF assumption fails by case. |
+| `test_orientation_matches_generated_upright`, four heic-ad24-* | 6cc7cdb: missing module. Product must match generated upright on all four; FFmpeg agreement is asserted false for exif-only and true otherwise. Eight poses and shape discrimination prevent a nearest-only false pass. |
+| `test_orientation_rejects_exif_always`, both | 6cc7cdb: missing module; planted extra tag application fails `orientation_upright`, naming heic-ad24-both. |
+| `test_orientation_rejects_exif_never`, exif-only | 6cc7cdb: missing module; planted omission fails generated-reference `orientation_upright`, naming heic-ad24-exif-only, while explicitly agreeing with FFmpeg. This records the oracle's branch limitation. |
+| `test_thumbnail_disagreement_is_recorded_but_never_the_pass_criterion` | 6cc7cdb: missing module; a planted wrong-pose thumbnail must produce discordant witness scores while the correct primary/FFmpeg comparison still passes. |
 | `test_export_v5_v9`, heic8-gradient-none / png16-lowred-display-p3 / jpeg-gradient-none, depths 8 and 16 | c3bf602: missing module; actual runner output must satisfy V5/D53 rules, AD-11 quantised bounds and applicable raw bounds. P3 PNG16 at depth 8 witnesses below-source quantisation. |
 | `test_export_rejects_off_neutral_gamma` | c3bf602: missing module; planted gamma default instead of neutral fails `v9_identity`, not merely a pixel inequality in the test. |
 | `test_export_rejects_dropped_iccp` | c3bf602: missing module; planted writer removes iCCP from a profile-bearing export and fails `v5_icc_equal`/`v5_icc_present` by name. |
 | `test_export_d63_and_kept_exif` | c3bf602: missing module; synthetic EXIF contains kept entries and thumbnail. Assert Orientation normal, dimensions, Software equality boolean, thumbnail absence and kept-field comparison; planted loss of a kept entry fails `v5_kept_exif` by name. |
+| `test_export_rejects_lost_kept_exif` | 6cc7cdb: missing module; writer double drops the whole kept block, actual runner output fails `v5_kept_exif`. |
 | `test_summary_and_stdout_exclude_private_values` | c3bf602: missing module; tmp JPEG has synthetic GPS and Make in a tmp footage folder. Parse every safe record/summary and stdout: planted values and absolute footage path must be absent, including errors/nested extra keys. No comparison value is printed. |
-| `test_all_records_and_runner_targets_stay_guarded` | c3bf602: missing module; spy on writes and runner arguments. A planted escaped target is refused; no target or deletion escapes the working guard or reaches footage. |
-| `test_memory_records_sampler_facts`, default and force CPU | c3bf602: missing module; tiny still and stubbed samplers provide known estimate/free/reason/RSS/device peaks. Force CPU must record `CPU: forced`; missing sample is null plus failure, never a zero-peak pass. |
-| `test_class_map_validation_and_separate_candidate_rows` | c3bf602: missing module; validate schema/counts/traversal/duplicates and separate JPG-Z/JPG-M rows. Reject a planted pooled candidate metric. |
+| `test_cli_summary_and_record_files_stay_private_and_guarded` | 6cc7cdb: missing module; actual export CLI on a synthetic mapped JPEG must print/save safe summary, select one photo, preserve input hashes and put summary under the working guard. |
+| `test_export_deletes_only_measured_nonrepresentative_png` | 6cc7cdb: missing module; measured PNG is removed with bytes/md5 retained and unrelated evidence preserved. |
+| `test_all_records_and_runner_targets_stay_guarded` | c3bf602: missing module; spy on guard checks during a real runner export. An escaped oracle target is refused before a write; successful export targets stay under the guard. CLI input hashes and deletion-control tests supply the complementary write/deletion evidence. |
+| `test_memory_records_sampler_facts` | 6cc7cdb: missing module; real tiny CPU runner plus stubbed samplers supplies estimate/free/RSS/device peak and `CPU: forced`. No GPU run. |
+| `test_memory_default_records_actual_runner_reason` | 6cc7cdb: missing module; controlled CPU runner adapter simulates no-CUDA reason while samplers are stubbed. Wrapper must retain that actual adapter reason and distinguish automatic fallback from force CPU. |
+| `test_memory_missing_device_samples_cannot_pass` | 6cc7cdb: missing module; absent device samples remain null and fail `memory_device_measurement`, never become a zero-peak pass. |
+| `test_class_map_rejects_unsafe_or_incomplete_inventory`, four damages | 6cc7cdb: missing module; traversal, duplicate, wrong count and unknown class each refuse. |
+| `test_class_map_and_summary_keep_candidate_rows_separate` | 6cc7cdb: missing module; full synthetic map and unequal A/Z/M metrics retain separate rows and assumed counts; no pooled error at top level. |
 | `test_owner_heic_orientation_four_irot_classes` | c3bf602: missing module; ONE `footage` test, reason beside marker: serial owner-photo I/O. IMG_6703/6718/6690/6720, independent oracle upright checks. Skip only absent footage; when available, missing/refused photo or unusable oracle fails. Cell does not execute it. |
 
-Next-turn RED command (PowerShell environment spelling of the required shim):
+RED command run this turn (PowerShell environment spelling of the required shim):
 
 ```powershell
 $env:PYTHONPATH = 'scripts'
@@ -491,6 +559,71 @@ to the known sandbox artifact. No full suite before Reviewer B; ONE two-leg
 gate on the final candidate after reviews and seat evidence; no fullclip or
 harness gate for this owned file set.
 
+### Turn-2 execution and test-facing API
+
+Observed final RED: pytest EXIT 2, `ModuleNotFoundError: No module named
+'photo_verify'`, `1 error in 0.18s`. This is the required new-module collection
+RED; none of the individual test bodies ran. Every test above is RED on the
+pre-RED head through that absent module, rather than a claimed executed mutant
+failure. Evidence: `work/wp3.6p/red.log`; the command is shown above.
+
+Light synthetic probe, separate from the blocked test collection: all four
+FFmpeg default decodes EXIT 0. Command per fixture (via the local venv Python
+subprocess adapter, stdout/stderr captured under work):
+
+```text
+ffmpeg -nostdin -hide_banner -loglevel error -y -i tests/fixtures/stills/heic/heic-ad24-<case>.heic -frames:v 1 -update 1 -map_metadata -1 -pix_fmt rgb24 work/wp3.6p/r0/synthetic-ffmpeg/<case>.png
+```
+
+| Case | Default decoded size | Expected reference | Mean error /255 |
+|---|---|---|---:|
+| both | 96x64 | Generated upright | 1.174262 |
+| irot-only | 96x64 | Generated upright | 1.174262 |
+| exif-only | 64x96 | Stored pose (generated upright turned CCW 90) | 1.174262 |
+| neither | 96x64 | Generated upright | 1.170736 |
+
+Evidence: `work/wp3.6p/r0/synthetic-ffmpeg-probe.log` and
+`work/wp3.6p/r0/synthetic-ffmpeg/facts.json`. No owner footage was involved.
+These are fixture characterization figures, not product/owner verification.
+The committed tests reproduce the characterization and record the rule with
+pytest record_property once the new module exists. No RUN REQUEST is pending
+from this turn.
+
+Test-facing Python API for the GREEN turn (new tool API, no frozen interface):
+
+- `make_guard(config)` creates the guarded wp3.6p root.
+- `ffmpeg_decode(source, out_png, guard)` returns RGB in 0..255 as delivered by
+  FFmpeg default selection; validates the write target before subprocess work.
+- `compare_poses(pixels, reference)` accepts RGB in 0..255 and returns the
+  allow-listed pose figures plus named `orientation_upright` failure.
+- `verify_orientation(source, guard, photo_class=...)` uses `read_photo` and
+  FFmpeg, records `thumbnail_decode(source)` as a non-gating witness.
+- `verify_export(source, guard, photo_class=..., bit_depth=..., force_cpu=...,
+  keep=..., parameters=None, exports=None)` runs the real runner; optional
+  runner parameters/engine injection support the planted controls without
+  modifying product code. Public result contains facts, never output paths.
+- `verify_memory(source, guard, photo_class=..., force_cpu=...)` launches a
+  fresh real runner, with MemorySampler start/stop/record lifecycle and a
+  separately sampled `device_memory()` dictionary (free/total/used bytes).
+  `launch_runner(source, out, record_path, settings_dir, bit_depth=...,
+  force_cpu=..., neutral=...)` returns `(exit_code, runner_record)`; the default
+  selection test uses a controlled real-CPU adapter simulating a no-CUDA host.
+  Default memory processing remains non-neutral. Sample failures stay null.
+- `load_class_map(path)` validates and returns the schema-1 map;
+  `summarise(records, command=...)` applies nested allow-lists and class
+  separation; `print_summary(summary)` prints only its ASCII-safe projection;
+  `main(argv)` exercises the actual CLI on a synthetic inventory.
+
+Additional light checks: `uv run ruff check tests/test_photo_verify.py` EXIT 0,
+`All checks passed!`; ruff format applied to that file, EXIT 0. Seat format
+check remains owed. `git diff --check` EXIT 0 (Git emitted its standard LF/CRLF
+configuration warning; actual file bytes are LF). Static validation passed:
+ASCII/LF/whitespace, 20 test functions, exactly one footage marker, no gpu
+marker, both historical request snippets parse, four str disk_usage calls
+inside those snippets, and tool file absent. Logs:
+`work/wp3.6p/red-ruff.log`, `red-format.log`, `red-static-validation.log`.
+Mypy and full suite are not claimed run for this RED-only turn.
+
 ## Review ledger and verification record
 
 Reviewer A runs via dispatcher (Claude opus/high, read-only) between turns.
@@ -500,23 +633,26 @@ round: yield for dispatcher approval under the fill; no self-authorised extensio
 
 | Round | Critical | Major | Minor | In / out envelope | NEW / REOPENED | Reverts | Product / test-only fixes | Verdict / evidence | Depth |
 |---|---:|---:|---:|---|---|---|---|---|---|
-| 0 | - | - | - | - | - | 0 | None; ledger only | Mapping/design complete; R0-O/R0-E NOT RUN; A not started | Dispatcher fills |
+| 0 | - | - | - | - | - | 0 | None; ledger only | R0 seat evidence received; mapped tile scores VOID; Q3 replaced by CHARC | 118,810 after turn 1 |
 
 | Suspected item | Independent confirmation | Disposition |
 |---|---|---|
 | Existing photo_check's success might prove every photo reads | Code at tests/test_photo_check.py:146 explicitly permits refusals | Rejected inference; new wrapper requires every selected photo read. No product defect asserted. |
 | Current reader might still use the opener named in AD-24 prose | `_read_heic` at reader.py:250 uses open_heif and later returns the additional-tag decision | Current mechanic mapped explicitly; no behavior defect or interface change inferred. |
 | Generic runner records might be safe to copy wholesale | headless_export.py:48-57 documents malformed-tag text in failures; record_object retains warning/failure strings | Confirmed privacy hazard for copying raw records; explicit safe schema planned. No existing tool edited. |
+| [MAJOR] R0 mapped output might establish the primary oracle | Dispatcher extra probes: mapped stream 0 is a tile; default selection composes the primary and already applies irot | Confirmed; tile pose scores VOID; Q3 mechanism replaced under CHARC ruling, with no product change. |
+| [MINOR] psutil may accept a Path in disk_usage | Dispatcher initial R0-O TypeError; successful reruns passed str(root) | Confirmed seat edit folded into both historical snippets (four calls); new tool must pass str. |
+| FFmpeg might honour raw EXIF as well as irot | Four default synthetic decodes: tag-only stays stored, both/irot-only upright | Rejected EXIF-handling assumption; test explicitly records irot-only rule and generated-reference branch controls. |
 
-## Seat-run ledger (pending)
+## Seat-run ledger
 
 | Run | Command / scope | Counts | EXIT | Wall time | Free disk before / after | Evidence / conditions |
 |---|---|---|---|---|---|---|
-| R0-O | PowerShell request above; two named HEICs | PENDING | NOT RUN | PENDING | PENDING | work/wp3.6p/r0/oracle-facts.json; no cell footage access |
-| R0-E | PowerShell request above; one largest-size neutral PNG16 | PENDING | NOT RUN | PENDING | PENDING | work/wp3.6p/r0/export-facts.json; exclusive timing observation |
+| R0-O | Historical request above, psutil str fix; two HEICs | 2 probed; 61 HEVC streams each; mapped stream 0 was a tile | 0 | 2 s | 189,229,633,536 / 189,228,720,128 bytes | 2026-10-30T04:42:08Z; oracle-facts.json; mapped tile pose scores VOID |
+| R0-E | Historical request above, psutil str fix; IMG_6690 neutral PNG16/default device | done 1, others 0; one PNG 51,873,583 bytes; GPU | 0 | 37.14 s | 189,175,160,832 / 189,113,147,392 bytes | 2026-10-30T04:43:51Z; export-facts.json; dispatcher-seat timing observation |
 | 5a | photo_check --name wp3.6p-io, all 73 | PENDING | NOT RUN | PENDING | PENDING | Dispatcher; unchanged instrument has its existing wp3.6 output root |
-| 5b | photo_verify orientation, all 62 HEICs | PENDING | NOT RUN | PENDING | PENDING | Oracle determined by R0-O |
-| 5c-16 | photo_verify export, all 73, neutral/depth 16 | PENDING | NOT RUN | PENDING | PENDING | Seven retained representative PNGs |
+| 5b | photo_verify orientation, all 62 HEICs | PENDING | NOT RUN | PENDING | PENDING | FFmpeg DEFAULT primary; thumbnail is recorded witness |
+| 5c-16 | photo_verify export, all 73, neutral/depth 16 | PENDING | NOT RUN | PENDING | PENDING | EXCLUSIVE window opened/closed to CHARC; WP4.6 cannot run heavy work; seven retained representative PNGs |
 | 5c-8 | photo_verify export, seven representatives, neutral/depth 8 | PENDING | NOT RUN | PENDING | PENDING | PNGs measured then removed by tool |
 | 5d-default | photo_verify memory, IMG_6690.HEIC/default device/c3 defaults | PENDING | NOT RUN | PENDING | PENDING | EXCLUSIVE; default processing, not neutral |
 | 5d-cpu | photo_verify memory, same photo/force CPU/c3 defaults | PENDING | NOT RUN | PENDING | PENDING | EXCLUSIVE; 16 GB and 8188 MiB comparisons |
@@ -525,16 +661,16 @@ round: yield for dispatcher approval under the fill; no self-authorised extensio
 
 | Turn / boundary | Dispatcher-read depth | Action |
 |---|---|---|
-| 1 / round 0 | PENDING dispatcher reading; not estimated by cell | Yield for oracle/timing evidence and next-turn dispatch |
+| 1 / round 0 | 118,810 tokens (dispatcher reading after turn 1) | R0 committed 6cc7cdb; evidence and ruling received on turn 2 |
+| 2 / RED | PENDING dispatcher reading | Tests and ledger only; yield before GREEN |
 
 Evaluate near 200K; stop at a step boundary near 250K per this dispatch.
-Turn 1 validation is limited to the ledger's ASCII/LF and owned-file diff.
+Historical turn-1 validation was limited to the ledger's ASCII/LF and owned-file diff.
 Observed validation: PASS for ASCII, LF, final newline, no trailing whitespace,
 both embedded Python RUN REQUEST snippets parsing, seven-class example JSON
 parsing, and absence of a literal footage path. Evidence:
 `work/wp3.6p/r0/ledger-validation.log`. Snippets were parsed, not executed.
-Final scope check: only this ledger is untracked; no tracked-file changes.
-No pytest, lint, mypy, Reviewer A/B or owner-photo command is claimed run.
-Only docs/proofs/wp3.6p-ledger.md is changed; no src, frozen interface,
-dependency, fixture, existing test, local config or other-worktree change.
-No deletion, commit, mailbox post or footage read was made by the cell.
+Turn 1 changed only this ledger. Turn 2 changes the ledger and new test file;
+no src, frozen interface, dependency, fixture, existing test, local config or
+other-worktree change. No deletion, commit, mailbox post or footage read was
+made by the cell. Turn-2 RED and light-probe evidence is recorded below.
