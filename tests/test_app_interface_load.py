@@ -205,3 +205,30 @@ def test_no_full_collection_runs_while_a_job_runs_however_far_overdue(qtbot) -> 
     finally:
         gc.callbacks.remove(on_gc)
         policy.stop()
+
+
+def test_an_idle_window_neither_freezes_nor_collects_while_another_windows_job_runs(qtbot) -> None:
+    """R5-2 (CHARC cc0703a7 Q2): idle means no started window has a job running.
+
+    Window B idles while window A's job runs: B's checks must not freeze A's working heap nor
+    collect. Once A's job ends, the next check freezes (the positive control). Planted on
+    ``e1a8599``: B's check reads only B's runner and freezes.
+    """
+    frozen_before = gc.get_freeze_count()
+    owner = QObject()  # the timers' parent, alive for the test
+    a_jobs = _Runner(active=1)
+    a, b = FullCollections(a_jobs, owner), FullCollections(_Runner(active=0), owner)
+    full, on_gc = _full_collections()
+    a.start()
+    b.start()
+    gc.callbacks.append(on_gc)
+    try:
+        qtbot.wait(int(2.5 * IDLE_CHECK_MS))  # two checks of each, A's job running throughout
+        assert (gc.get_freeze_count(), full) == (frozen_before, [])
+        a_jobs.count = 0
+        qtbot.waitUntil(lambda: gc.get_freeze_count() > frozen_before, timeout=5000)
+    finally:
+        gc.callbacks.remove(on_gc)
+        a.stop()
+        b.stop()
+    assert gc.get_freeze_count() <= frozen_before
