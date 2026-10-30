@@ -2,8 +2,9 @@
 
 WP4.3 deleted the stand-in rule and its mirror test (DR-52): WP3.10's ``resolve_encoder`` is the
 default, ``install_settings_dialog`` takes the start-up's catalog, and the DR-61 cases are at the
-end. Every test drives the dialog through the shell: ``Tools > Settings`` triggers the factory
-that ``install_settings_dialog`` registered. The folder chooser and the confirmation are
+end. Every dialog test drives the dialog through the shell: ``Tools > Settings`` triggers the
+factory that ``install_settings_dialog`` registered (the default-rule test checks the module's
+names only and opens no dialog). The folder chooser and the confirmation are
 injected, the sink reports a chosen capability list, the cache records the thread of every call,
 and the locations are under ``tmp_path``.
 """
