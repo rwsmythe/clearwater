@@ -9,7 +9,7 @@
 
 ---
 
-### RESUME HERE (CHARC generation 9: read this block top to bottom; gen 8 `clearwater-charc-20261029-0859` ROLLED 2026-10-30 ~01:58Z at ~410K, clean boundary, no cell at CHARC's seat; gen 7 `clearwater-charc-20261029-0428` rolled 2026-10-29 ~19:00Z at ~405K; gen 6 `clearwater-charc-20261028-1443` ROLLED 2026-10-29 ~14:30Z at ~410K at a clean boundary, no cell at CHARC's seat; gen 5 rolled ~00:45Z at ~402K)
+### RESUME HERE (CHARC generation 9, HOLDING: EXECUTION PAUSED BY THE OWNER 2026-10-30 ~07:05Z, see the PAUSE bullet at the end of the gen 9 block; read this block top to bottom; gen 8 `clearwater-charc-20261029-0859` ROLLED 2026-10-30 ~01:58Z at ~410K, clean boundary, no cell at CHARC's seat; gen 7 `clearwater-charc-20261029-0428` rolled 2026-10-29 ~19:00Z at ~405K; gen 6 `clearwater-charc-20261028-1443` ROLLED 2026-10-29 ~14:30Z at ~410K at a clean boundary, no cell at CHARC's seat; gen 5 rolled ~00:45Z at ~402K)
 
 - **GEN 9 PICKUP (read first).** Orchestrator = **gen 26 `clearwater-orchestrator-20261029-1612`** (gen 25 rolled 02:12Z; the pickup text below was written against gen 25, online 23:41Z
   2026-10-29; gauge 26 ms). ALL cues go there; re-read `comms/.launch-sessions.json` before every cue. Time the bash
@@ -195,6 +195,23 @@
   derived from the value, today 11 per `exif.py:188`; PixelX/Y SHORT or LONG count 1 = upright size). Advisories a-4 /
   a-5 / a-8 fixed, the rest wording / Limits. Codex seat 2 at 101,571 after turn 6 (compacted once). WP4.6 cell 4 at
   229,908 applying (d) then R3; re-seat line ~330K.
+- **EXECUTION PAUSED BY THE OWNER 2026-10-30 ~07:05Z (weekly token burn).** Owner verbatim (chat to CHARC): "We are going to
+  pause work for now due to weekly token burn. When we pick up, we can commission phase 5 in parallel with completing
+  the remaining danglers. Orchestrator is getting ready to roll to a new generation, I told it that we will halt
+  execution once it has rolled. I expect new generation to bootstrap and hold for further direction." Orchestrator gen
+  27 ROLLED 07:03Z (~420K, state `1ad6b72d`); **GEN 28 = `clearwater-orchestrator-20261029-2103`, bootstraps and HOLDS**
+  (my posts 39e4f1d0 + 3d9488ea + one cue). Nothing running: no cell, Codex turn, seat run or window; WP4.6 cell 4 stood
+  down (327,017). **Live state at the pause:** WP3.6P head `081f851c` (R1, R2 ruled; turn 7 prompt ready at
+  `clearwater-review-evidence\wp3.6p\cell\prompt-7.md` for Codex session 01a18b4b; seat run 5a 73/73); WP4.6 head
+  `305355a6` (R2 remediation done under (d); R3 adjudicated: R3-1 protocol major = RED-first fix in the terminating
+  clean-up under the cap, R3-2 RULED MINOR in the clean-up (cancel check between sweep entries), encode-failure text
+  follows the type-name rule CONFIRMED; next = fresh cell 5 clean-up, window, report, B, gate). **PICKUP ORDER:** owner
+  says resume -> gen 28 resumes WP3.6P turn 7 + dispatches WP4.6 cell 5 -> CHARC commissions Phase 5 (WP5.1 acceptance
+  suite, WP5.3 visual review pack for CP5; WP5.2 exclusive after the danglers' windows) IN PARALLEL (owner-decided);
+  paces reported before any dispatch; one heavy job on the host at a time. Phase 4 (plan rows WP4.1-4.3) is COMPLETE;
+  the danglers are added packages. CHARC gen 9 at ~390K: still under the cap, HOLDING; if the owner's resume comes to
+  this seat it acts, else gen 28 relays. Owner-pending inputs: none. Open owner decisions: none (Phase 5 parallel =
+  decided). Owner action pending: none.
 - **(gen 8 history follows; newest facts at the end of the block)**
 - **GEN 8 PICKUP (was).** Orchestrator = **gen 23 `clearwater-orchestrator-20261029-0852`** (online 18:57Z; gauge 37 ms;
   gen 22 rolled 18:52Z at ~420K, state 5a1538a). ALL cues go there. Time the bash launch and record it here. Drain with
