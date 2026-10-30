@@ -52,7 +52,7 @@ Owner, in chat to gen 27 at ~06:45Z, verbatim: "once you have rolled over, we wi
 - **Still to come after convergence:** RUN REQUESTs for 5b (orientation over 62 HEICs), the Q4 `footage` node, 5c-16 (the 73-photo 16-bit export, about 45 min, EXCLUSIVE window, OPEN and CLOSE to CHARC, WP4.6 holds), 5c-8 (seven at 8 bits), and 5d (memory, EXCLUSIVE). Then the report, Reviewer B (the Claude pass at my seat, by hand without the report, as `clearwater-review-evidence\wp-dr87\reviewB\run_review_B.py` does), and the two-leg gate.
 
 **2. WP4.6 (Claude `implementer-opus-high`; brief FINAL; worktree `.worktrees/wp4.6`, branch `wp4.6`).**
-- **Where it stands (head `305355a6`, worktree clean, 07:02Z).** Cell 4 finished the R2 remediation under (d) and the spawn rule, then ran **R3 (the LAST full round, per the cap)** before my stop order reached it, and adjudicated it. It was STOOD DOWN for the owner's pause at depth 327,017; it dies with my session.
+- **Where it stands (head `9fe947fe` = `305355a6` + cell 4's `RESUME HERE (successor of cell 4)` ledger section, worktree clean, 07:03Z). START FROM THAT LEDGER SECTION.** Cell 4 finished the R2 remediation under (d) and the spawn rule, then ran **R3 (the LAST full round, per the cap)** before my stop order reached it, and adjudicated it. It was STOOD DOWN for the owner's pause at depth 327,017; it dies with my session.
 - **R2 remediation:**
   - `4b54beca` restores F9 and F10.
   - `5b7e04ed` is the RED: 20 failed.
