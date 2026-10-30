@@ -5,8 +5,7 @@ own Python work during an export (each entry into Python from the event loop wai
 behind the two compute threads). These are item 1's planted forms: the window's paint, update,
 layout and timer events run no Python (the close watch was a Python event filter on the window,
 called for every one of them); the job runner hands the interface thread at most one report per
-job per tick, the latest (already so at ``1d96dc4``: pinned, not a RED). Item 3 (a garbage
-collection policy) was reverted under CHARC ruling 921babda, with its tests.
+job per tick, the latest (already so at ``1d96dc4``: pinned, not a RED).
 """
 
 # ``make_app`` is imported from test_app_startup and used as a parameter.
