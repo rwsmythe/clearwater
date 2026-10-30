@@ -447,6 +447,37 @@ def test_a_traceback_tail_is_redacted_to_names(tmp_path: Path) -> None:
     assert str(Path(sys.executable).parent) not in failure
 
 
+def test_a_folder_name_that_continues_a_known_folder_or_holds_an_apostrophe_is_cut(
+    tmp_path: Path,
+) -> None:
+    """R1 F5: no folder component survives, past a known folder or around an apostrophe."""
+    known = tmp_path / "my clips"  # the source's folder
+    unknown_root = Path("D:\\owner home") if sys.platform == "win32" else Path("/home/owner_home")
+    paths = [
+        f"{known} Archive{os.sep}hiddenA{os.sep}a.mp4",  # a longer name beginning with it
+        str(known / "Diver's hiddenB" / "b.mp4"),  # an apostrophe inside a name
+        str(known / "'Tis hiddenC" / "c.mp4"),  # an apostrophe that begins a name
+        str(unknown_root / "Owner's hiddenD" / "d.mp4"),  # the same in an unknown path
+    ]
+    command = _child(
+        tmp_path,
+        """\
+        for path in ARGS:
+            sys.stderr.write("could not open " + path + "\\n")
+            sys.stderr.write("could not open " + repr(path) + "\\n")
+        sys.exit(1)
+        """,
+        *paths,
+    )
+    result, _ = _run(tmp_path, command)
+    failure = result.failure
+    assert failure is not None and failure.isascii()
+    for name in ("a.mp4", "b.mp4", "c.mp4", "d.mp4"):
+        assert failure.count(name) == 2, (name, failure)
+    for folder_name in ("Archive", "hidden", "Diver", "Tis", "Owner", "owner", tmp_path.name):
+        assert folder_name not in failure, (folder_name, failure)
+
+
 def test_a_stderr_flood_neither_blocks_nor_overflows_the_failure(tmp_path: Path) -> None:
     command = _child(
         tmp_path,
