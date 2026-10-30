@@ -9,7 +9,8 @@ Brief `docs/briefs/wp4.6-brief.md` FINAL on CHARC `39dad78f5b10ceeb`; base `b6a3
 |---|---|---|---|---|---|---|---|---|---|---|
 | 0 | 2026-10-30 | (no review: round-0 note) | - | - | - | - | - | - | - | 194,313 (cell 1, retired at round 0) |
 | Y1 (build) | 2026-10-30 | (no review: tasks 3-4, cell 2) | - | - | - | - | - | - | - | 171,586 (cell 2 at Y1, 05:08Z) |
-| Y2a (build) | 2026-10-30 | (no review: tasks 5-6, cell 2) | - | - | - | - | - | - | - | (dispatcher fills: cell 2 at Y2a) |
+| Y2a (build) | 2026-10-30 | (no review: tasks 5-6, cell 2) | - | - | - | - | - | - | - | 228,358 (cell 2 at Y2a); retired at 230,050 (05:21Z) |
+| Y2b (build) | 2026-10-30 | (no review: task 7 and 8, cell 3) | - | - | - | - | - | - | - | (dispatcher fills: cell 3 at Y2b) |
 
 ## Round 0 (task 2): the design restated, the Questions, the stops
 
@@ -454,3 +455,124 @@ Product fixes 1, test-only 1, reverts 0.
    - (d) of the ruling: the serial-leg cost per GUI video-export test.
 8. **Unbuilt by choice:** the `gpu` form of the worker test. The brief makes it optional and
    this dispatch said nothing on the GPU, so it is offered for the window, not built.
+
+## Y2b (cell 3, implementer-opus-high): task 7 (wiring, docstrings, the granted test edits, the driver copy) and task 8
+
+Cell 2 retired at 230,050 (dispatcher, read 05:21Z at its stand-down; 228,358 at the Y2a yield).
+Cell 3 dispatched fresh on the orchestrator's cell-3 prompt; base `f8ce41c9`.
+
+### Item 4's CHECK first (no stop)
+
+The scenario (e) and dr44c tests build the application through `make_app` ->
+`build_application(locations, presenter=..., **kwargs)` (`tests/test_app_startup.py:71-93`);
+`build_application` takes no export-engine injection (`main.py:244-251`). The tests already
+reach the engine as `application.exports._engine` (`GuardedExports`' wrapped engine), so after
+the wiring they reach the `ProcessExportJobs` there and replace its instance attribute
+`_command` (`jobs/export_process.py:219`, a tuple) with the hold worker's command, restoring it
+afterwards. Nothing in `main.py` or `composition.py` beyond items 1-2 is needed.
+
+### Commits
+
+- `64161f83` test(wp4.6): RED. `tests/export_worker_hold.py` (new, R0-STOP-1 (i)); scenario (e)
+  in `tests/test_app_v7.py`, the `export` branch of the dr44c test in `tests/test_app_wiring.py`
+  and `tests/test_app_startup.py:212-213` (R0-STOP-1 (ii)); the builder test appended to
+  `tests/test_app_export_worker.py`. RED lines: `AttributeError: module
+  'clearwater.app.composition' has no attribute 'process_export_jobs'`; `assert
+  isinstance(exports, ProcessExportJobs)` False (startup); `AssertionError: the panels export
+  through the worker (WP4.6)` ((e)); `assert isinstance(engine, ProcessExportJobs)` False
+  (dr44c export, plus its teardown `KeyError: 'predicate'` from the close hook, the base's own
+  behaviour when the branch fails before its predicate is set). `4 failed, 1 error`.
+- `bb216f9c` feat(wp4.6): `composition.process_export_jobs` (Q2: no cache limit; `command` None
+  = `[sys.executable, "-m", "clearwater.app.export_worker"]`), `main.py:282-284` (the first
+  argument only: `composition.process_export_jobs(photo_exports=composition.export_jobs(cache=
+  cache), cache_dir=locations.cache_dir)`), grant (c)'s one sentence in composition's module
+  docstring, grant (b)'s sentence at `activity.py:147-148`, `app/__init__.py` names the worker,
+  `pipes.py` module and helper docstrings name the Python worker launch (no code change; the
+  helper's "either tool" became "FFmpeg or ffprobe", since FFREPORT concerns those two only).
+- (this commit) docs(wp4.6): this entry.
+
+### Built, and the choices left to the cell (stated, for review)
+
+- **The hold worker** `tests/export_worker_hold.py`: `main` takes over stdout exactly as the
+  product worker's `main`, then calls `export_worker.run(stdin, protocol, cancel=<its Event>,
+  sink_for=<wrapper over composition.video_sink>)`. The sink's first `write` writes the frame,
+  creates `writing`, waits (polling 20 ms) until `release` exists or the cancel flag is set, then
+  creates `returned` in a `finally`; `HOLD_S` = 120 s ends the wait with `TimeoutError` (the
+  original `_HeldSink` asserted after 120 s). Parent helpers: `command(markers)`,
+  `fresh(markers)` (mkdir, delete only the three markers), `in_write(markers)`,
+  `release(markers)`.
+- **DEVIATION from the Y2b plan (item 4 (i) said "a folder named by an environment
+  variable"):** the marker folder travels as the hold worker's ONE argument
+  (`[sys.executable, tests/export_worker_hold.py, <folder>]`). Reason: setting `os.environ` in
+  the GUI process while its analysis and preview threads spawn FFmpeg races
+  `tool_spawn_kwargs`' iteration over `os.environ` (a dict changed during iteration); the
+  argument needs no global state and still goes through the unchanged spawn
+  (`Popen(command, ...)`). The ruling's wording ("a test worker command ... with a marker-file
+  sink hold") is met either way.
+- **Scenario (e):** the marker folder is `photo_4k.parent / "<stem>-export-hold"` (the scenario's
+  signature is unchanged, so the driver's call is unchanged); `writing()` reads the markers; the
+  count's `release.set()` became `hold.release(markers)`; the `finally` restores the command and
+  releases. The witness's name and meaning are unchanged; the docstring gained one paragraph.
+- **dr44c export branch:** the predicate is `hold.in_write(markers)` (a frame written, the first
+  write not returned: the old `mid_encode` with "neither close nor abort began" implied by the
+  held call); the close's cancel releases the hold (the `release` Event the close hook sets is
+  in-process and never reaches the child).
+- **Startup :212-213:** the engine is a `ProcessExportJobs` whose `_cache_dir` is the GUI cache's
+  folder and whose photo leg is an `ExportEngine` with `_cache is application.cache`. Q16 now
+  reads: one GUI cache per process, shared by the GUI and the photo export leg; the video
+  worker has its per-job scratch (the report says so).
+- **Local imports** in the three edited tests (`export_worker_hold`, `ProcessExportJobs`) keep
+  every edit inside the granted lines; ruff allows them (`tests/**` ignores only D and ANN, and
+  the dr44c test already imports locally).
+- **Left in place (outside the exact scope, for CHARC):** `_HeldSink` (`test_app_v7.py:246`)
+  and `_ProgressSink` (`test_app_wiring.py:627`) are no longer used by any committed test; the
+  pinned driver uses `wiring._ProgressSink` in its `dr44c-export` mode. Removing them is an edit
+  beyond the grant.
+
+### The driver copy (R0-STOP-1 (iii))
+
+`C:\Users\rwsmy\clearwater-review-evidence\wp4.6\windows\s7_driver_wp46.py`, md5
+`074cbb62b2a9aa8949ebcf30d803b51a` (from the pinned `0b9ee6cc3ebd2cf07c35dec934cfd901`). `diff`:
+ONE region, `run_dr44c`'s `export` branch (pinned `:979-989`), 10 lines out, 13 in: the
+`engine._sink_for` swap became the hold worker's command on the `ProcessExportJobs` (markers
+under `<work>/dr44c-export/export-hold`), restored by the same `restore` list. `v7e` needed NO
+driver line: it calls the committed `scenario_e_full_render_during_export`, which now carries the
+hook. Nothing else differs (the header still says "wp4.3 worktree"; its check only looks for
+`tests/test_app_v7.py`, so it runs from the wp4.6 worktree). `py_compile` clean; ruff reports the
+same 40 findings on the copy as on the pinned file. `v7c-char` (not of record) still swaps
+`_sink_for` and would fail on the process form: unchanged, not run.
+
+### Targeted runs (worktree, offscreen, CPU fixture only; no full suite, footage, GPU or window)
+
+- `tests/test_jobs_export_process.py tests/test_app_export_worker.py tests/test_app_deps.py
+  tests/test_io_video_spawn.py`: `341 passed in 54.75s`.
+- The four touched or named nodes (startup engines, `python -m clearwater`, `test_v7_c_e_...`,
+  `dr44c[export]`): `4 passed in 52.87s`. Development prints (fixture, NOT of record): `(c)
+  export: longest 33.0 ms, p99 17.0 ms, 696 ticks`; `(e) ... longest 27.0 ms, p99 19.0 ms, 1282
+  ticks, witness {'k1_renders_during_a_sink_write': 1}`; `DR-44 (c) export: ended True in 181
+  ms, at close [True]`. Durations: c/e 40.8 s, dr44c export 8.1 s, `python -m` 2.7 s.
+- `ruff check .` All checks passed; `ruff format --check .` 292 files already formatted; `mypy`
+  Success, 148 source files. Every committed blob checked for CR: 0.
+
+### Verification loop (Y2b)
+
+| # | Suspected | Confirmed how | Outcome |
+|---|---|---|---|
+| 1 | The hold folder by environment variable races `tool_spawn_kwargs`' `os.environ` iteration on the GUI's spawning threads | By reading `pipes.py:57` (a dict comprehension over `os.environ.items()`) | AVOIDED by design: the folder is the hold worker's argument (deviation stated above) |
+| 2 | The dr44c close cannot release a hold in the child (the close hook's `release` Event is in-process) | The targeted run: `ended True in 181 ms, at close [True]`, no temporaries | REJECTED: the close cancels the job, the parent sends the cancel line, the hold waits on the cancel flag too |
+| 3 | A hold worker run by path puts `tests/` first on its `sys.path` and could shadow a module | `tests/*.py` listed: no stdlib or dependency name; the hold worker exported in (e) and dr44c | REJECTED |
+| 4 | `main.py:14-15` ("the guarded exports, sharing the one cache") is stale after the wiring | By reading: the guard still takes the one cache (key, open wait) and the photo leg analyses through it | REJECTED: still true; no `main.py` edit beyond item 2 |
+| 5 | `app/__init__.py` says importing `clearwater.app` loads no GUI or CuPy; composition now imports `jobs.export_process` | `test_app_deps.py` green in the 341 run; `export_process` imports stdlib, interfaces, `export_seam` and `pipes` only | REJECTED |
+| 6 | The wiring witness at startup could pass with the scratch under the wrong folder | Added `exports._cache_dir == application.cache.folder` to the granted lines; green | FIXED in the RED commit (test-only, before green) |
+| 7 | Scenario (e) restoring the command while a child still holds would leave it waiting | By reading: the `finally` writes `release` after the restore; `HOLD_S` bounds the wait regardless | REJECTED |
+
+Product fixes 0, test-only 1 (#6, before the first green), reverts 0. A second full pass over the
+diff found nothing new.
+
+### Not run here (named for the dispatcher: the wiring changes their path, they are not mine to run)
+
+Untouched app tests that now export video through the worker: `test_app_wiring.py::`
+`test_g8_export_cancel_leaves_no_partial_output`, `test_g8_batch_cancel_keeps_completed_files_and_stops_the_rest`,
+`test_g7_a_batch_skips_a_failed_item_logs_it_and_goes_on`, `test_g12_every_setting_through_the_dialog`,
+`test_g10_dr35a_a_reserved_device_name_is_refused_readably`, the three `test_g10_dr82_*`, and
+`test_dr44c_...[batch]`; `test_app_leftovers.py::test_start_up_never_scans_a_folder_because_a_source_lies_there`.
