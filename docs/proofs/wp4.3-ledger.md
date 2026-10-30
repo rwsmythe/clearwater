@@ -1423,5 +1423,65 @@ Per the dispatch, NO change was made after the verdict; the cell yields `R6 VERD
 
 ### Notes for the record
 
-- Window 4 preparation (dispatch step 3) NOT started: it follows R6 in the order, and R6 blocked.
 - Scratch outputs under `work/wp4.3-c10*` (not of record).
+- At the R6 yield, window 4's preparation (dispatch step 3) had not started (it follows R6); done
+  after the ruling, below.
+
+### CHARC's R6 ruling (`424f573b88b5a203`, 2026-10-30T01:02:33Z; saved verbatim at `clearwater-review-evidence/wp4.3/r6-ruling-424f573b.md`)
+
+Q1 (A): R6-1 RECLASSIFIED MINOR (the LatestWorkers are not jobs; V7's states are runner jobs); the
+docstring states the bound exactly; a MINOR register row is CHARC's at the accept (the cell
+touches no register); (B) DECLINED. Q2 (a), THE CAP: R6-2 / R6-4 (docs) and R6-3 (test-only,
+RED-shaped) with NO R7; Reviewer B on the final candidate reads them. Q3 (a): window 4 also
+re-runs (a), (b), (d), plant-f then v7f-settled OF RECORD on the final code, after the (c) / (e)
+pairs and the 16-frame V8, each independent; the pre-remediation figures stay here as history;
+the plant is deleted after v7f-settled (grant).
+
+**CAP: R6 was this step's last Reviewer A round; the remaining findings (R6-1..R6-4) were minor.**
+
+### The R6 fixes
+
+| Finding | Commits | What |
+|---|---|---|
+| R6-3 (test-only) | RED `43dccd4`, GREEN `779b66f` | the pin's postconditions moved unchanged into `_assert_delivered_per_tick`; `test_the_runner_pin_rejects_a_run_whose_polls_delivered_nothing` feeds it the vacuous list `[end, report 20000, done]`: at `74586d4`'s assertions DID NOT RAISE (FAIL); after, the helper requires a poll-delivered report before the `end` mark (PASS; the real pin 3/3 local runs PASS) |
+| R6-1, R6-2, R6-4 (docs) | `86ba69a` | `FullCollections`: the bound is "no full collection while any window's runner job runs", and its only one (the opener / renderer / framer `LatestWorker`s are not jobs; a collection's own duration unbounded); garbage present at the first idle check is frozen until the last stop, later garbage waits for a due idle check (R6-2); module step 5 and the `start()` comment say "before the start-up jobs" (R6-4) |
+
+Targeted tests at `86ba69a` (offscreen, shared host): **207 passed, 1 skipped**
+(`test_app_v8_v18.py:133`, pre-existing) in 311.0 s; `ruff check .` exit 0; `ruff format --check
+.` 285 files formatted; `mypy` (strict) no issues in 146 files. Every committed blob LF, 0 CR.
+
+### Window 4 preparation (no window; `C:/Users/rwsmy/clearwater-review-evidence/wp4.3/windows/`, uncommitted, LF, 0 CR)
+
+| File | md5 | What |
+|---|---|---|
+| `s7_driver.py` | `0b9ee6cc3ebd2cf07c35dec934cfd901` | UNCHANGED, the driver of record |
+| `s7_switch.py` | `5457aca801849b2008b82baec82c8386` | cell 9's (`bd19cbba`) plus, at each export's trigger and result, the process's working set and private bytes (`psutil`, one `memory_info()` read; in the venv, no new dependency), and at the result `gc.get_count()`, `len(gc.garbage)`, `gc.get_freeze_count()`, `gc.get_threshold()` and the working-set growth trigger-to-result (NOT of record) |
+| `s7_v8char.py` | `60ab95a2a69355f8ccd134f2d64a0348` | unchanged (cell 9's) |
+| `window4-commands.sh` | `fb94390453f25decd082421d171cc7ea` | the chain as ruled: v7c 5 / 1 ms, v7e 5 / 1 ms (`s7_switch.py`, `sw5/`, `sw1/`), v8char, then v7a, v7b, v7d (`s7_driver.py`, `rec/`), a free-disk check (>= 40 GB, else both (f) runs SKIPPED and recorded), plant-f, v7f-settled (`rec/`), `rm -rf rec/v7f/cache` (the plant; config and log kept); every exit recorded; disk / RAM before and after, disk before the plant and with it; `dry` = the fixture into `work/wp4.3-c10/dry-chain/` |
+
+Dry run of the WHOLE chain (fixture, NOT of record, 2026-10-30 01:05:58Z-01:08:50Z, 172 s, chain
+exit 0; logs in `windows/dry5/`, md5s in `md5sums.txt`), each run at HEAD `86ba69a`, driver md5
+`0b9ee6cc...` printed:
+
+| Run | EXIT | Longest / p99 (ms) | Export wall (job / trigger-to-result) | Working set trigger -> result (growth) | Private bytes trigger -> result | At the result: count, garbage, freeze count |
+|---|---|---|---|---|---|---|
+| v7c 5 ms | 0 | 14.0 / 11.0 | 3.0 / 3.0 s | 671.5 -> 673.3 MB (+1.8) | 1929.9 -> 1931.4 MB | (37, 0, 0), 0, 89,193 |
+| v7c 1 ms | 0 | 11.0 / 11.0 | 3.2 / 3.2 s | 671.4 -> 672.8 MB (+1.3) | 1931.8 -> 1932.6 MB | (37, 0, 0), 0, 89,126 |
+| v7e 5 ms | 0 | 16.0 / 14.0 (witness 1) | 4.0 / 4.0 s | 674.1 -> 1004.1 MB (+330.1) | 1924.5 -> 2837.8 MB | (41, 0, 0), 0, 89,240 |
+| v7e 1 ms | 0 | 15.0 / 12.0 (witness 1) | 4.0 / 4.0 s | 675.7 -> 1004.6 MB (+328.9) | 1925.2 -> 2835.6 MB | (41, 0, 0), 0, 89,239 |
+| v8char | 0 | 16 rows; p99 about 10/255 (fixture outside AD-11's domain); shown-vs-preview max diff 0 | - | - | - | - |
+| v7a | 0 | 13.0 / 11.9 (analysis 2.1 s, 45 frames) | - | - | - | - |
+| v7b | 0 | 12.0 / 11.9 (witness 15) | - | - | - | - |
+| v7d | 0 | 69.0 / 58.0 (batch 39.5 s, 300 done) | - | - | - | - |
+| plant-f | 0 | settling opens 5476.3 / 150.7 ms | - | - | - | - |
+| v7f-settled | 0 | from show() 39.3 / 18.3 (of-record form); build_application 189.4 ms | - | - | - | - |
+
+The third threshold read 2147483647 at every export result (the policy active). (e)'s working-set
+growth includes the 1:1 4K preview render's own buffers (the scenario renders a 4K photo during
+the export), so CHARC's 512 MB reading applies to (c) cleanly and to (e) with that included.
+Plant deleted ("plant deleted: yes"); C: 175 GB free before, 165 GB before the plant (another
+lane's use meanwhile), 146 GB with it, 164 GB after. RAM available 8.20 then 4.80 of 33.52 GB
+(shared host). Footage folder unchanged (128 files) in every run; product logs naming it 0; a grep
+of every dry output for the footage folder: 0 hits. Stale labels (cell 9's note) still print in
+v7f-settled ("the committed probe, from before the build"; "before show() ... 0.0 ms"): the line
+of record is "from show() (ruling B, OF RECORD)".
