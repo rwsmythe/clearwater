@@ -15,6 +15,7 @@ Brief `docs/briefs/wp4.6-brief.md` FINAL on CHARC `39dad78f5b10ceeb`; base `b6a3
 | R1 remediation | 2026-10-30 | (no review: cell 4 fixes, HEAD `c80061d1`; CHARC `e15d408a` applied at `c328be95`) | - | - | - | - | - | 2 (F9, F10 under `e15d408a`), both restored under `55959e2f` (`4b54beca`) | product 8 / test-only 4 | 199,451 (cell 4 at its R2 yield, 06:31Z; the dispatcher took ONE reading for this row and R2) |
 | R2 | 2026-10-30 | WSL, codex-cli 0.162.1, gpt-6.1-sol / high; HEAD `f91aea96` | 0 | 2 reported: 1 confirmed blocking (R2-2), 1 non-blocking by the verifiably-prevents rule (R2-1) | 3 reported (R2-3 R2-4 R2-5) | 1 blocking in; R2-1 not reachable by a product spawn | 5 NEW / 0 REOPENED | 0 | product: CHARC's design change (d) and the spawn rule, R2-1, R2-4 (R2-2 and R2-3 CLOSED BY REMOVAL); test-only: R2-5 | 199,451 (06:31Z, the same reading as the row above) |
 | R2 remediation | 2026-10-30 | (no review: cell 4, HEAD `3bc6ffff`) | - | - | - | - | - | 0 | product (d) + spawn rule + R2-1 + R2-4 / test-only R2-5 | (dispatcher fills: cell 4 at the R2 remediation yield) |
+| R3 (LAST full round) | 2026-10-30 | WSL, codex-cli 0.162.1, gpt-6.1-sol / high; HEAD `cf378034` | 0 | 2 reported: R3-1 confirmed (protocol class, to the terminating clean-up by CHARC's cap); R3-2 REOPENED (F7, minor as adjudicated at R1) | 3 reported (R3-3 REOPENED F9 out of envelope; R3-4 test-only; R3-5 out of envelope) | 1 blocking in; 2 out of envelope | 3 NEW / 2 REOPENED | 0 | (clean-up not started) | (dispatcher fills: cell 4 at R3) |
 
 ## Round 0 (task 2): the design restated, the Questions, the stops
 
@@ -848,3 +849,30 @@ both the "R1 remediation" and "R2" rows (not read between them).
 Q10's fixed texts as amended (for the report): ENDED and START as above; KILLED unchanged.
 
 Depth: (dispatcher fills: cell 4 at the R2 remediation yield).
+
+## Reviewer A round 3 (cell 4; the LAST full round, CHARC `55959e2f`)
+
+Evidence `C:\Users\rwsmy\clearwater-review-evidence\wp4.6\r3\` (prompt, diff, transcript,
+`adjudication.md`, `probe_r3.py` / `probe_r3.log`, `test-summary.txt`, `md5sums.txt`,
+`probe-attempt1\`). The prompt is round 2's with HEAD, round number, rounds 1-2 WITHHELD, CHARC
+`e15d408a`, `55959e2f` (d) and `3ed8335f` as "accepted by ruling" (a finding that the failure
+text should carry more, or that the log carries full paths, named a dispute with the ruling), F4
+and F8 known and banked, the round-1/2 changes as claims; the redaction claims removed.
+
+Liveness: attempt 1 (06:48:04Z) exited 1 on `ERROR: Selected model is at capacity` (a provider
+refusal, no answer); attempt 2 (06:48:45Z) `READY`, exit 0. Round 06:48:53Z-06:59:38Z, exit 0.
+Mechanical assertions met: banner model and effort, 47 executions, tokens 131,953, VERDICT
+anchored; ERROR lines the model-list refresh and the offline MCP connector only; worktree clean
+afterwards. Verdict `NEW_CRITICAL_MAJOR_FOUND`.
+
+| # | Finding | Adjudication |
+|---|---|---|
+| R3-1 | the I/O threads start before `_converse`'s cleanup `try`: a failed second start leaves the worker running | CONFIRMED at my seat (`worker still running: True`): MAJOR, in-envelope, NEW, PROTOCOL class (kill / cleanup). By CHARC's cap: fixed RED-first in the terminating clean-up, no R4 (start the threads inside the `try`) |
+| R3-2 | the first job's stale sweep is unbounded and does not see a cancel; its docstring says "bounded" | CONFIRMED as a fact (`0` cancel checks during a held delete). REOPENED: R1 F7's duration part, MINOR as adjudicated at R1 and fixed as adjudicated under `e15d408a`. Housekeeping class, not protocol. For the dispatcher: the reviewer rates it MAJOR; if taken as new it goes to CHARC by the cap. Offer: correct the docstring; a cancel check between entries |
+| R3-3 | reader threads and pipe handles live until a pipe-holding descendant exits | CONFIRMED by reading: MINOR, OUT-OF-ENVELOPE, REOPENED (F9's mechanism; no product spawn makes such a descendant). A Limit sentence |
+| R3-4 | the controlled-clock deadline test still depends on the child's scheduling | CONFIRMED by reading (a false failure under a long stall, never a false pass): MINOR test-only, NEW. Clean-up: freeze the clock from the cancel until the result is decoded, then jump 10 |
+| R3-5 | an overflowing `created` escapes `decode_request` as `OverflowError` | CONFIRMED (`escaped OverflowError: date value out of range`): MINOR, OUT-OF-ENVELOPE, NEW. Clean-up: treat it as a `RequestError` (exit 2), as F10 was kept |
+
+Counts: reported critical 0, major 2, minor 3. NEW in-envelope blocking 1 (R3-1, protocol class:
+the terminating clean-up). REOPENED 2 (R3-2 of F7; R3-3 of F9). NEW minor 2 (R3-4, R3-5).
+Rejected 0. The clean-up is NOT started (the dispatch: yield with `R3 ADJUDICATED:` first).
