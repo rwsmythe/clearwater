@@ -459,7 +459,11 @@ def _write_lines(stdin: IO[bytes], writes: queue.Queue[bytes | None]) -> None:
 
 
 def _read_lines(stream: IO[bytes], lines: queue.Queue[tuple[str, Any]]) -> None:
-    """Read the worker's stdout into ``lines`` until it ends, then put ``("end", None)``."""
+    """Read the worker's stdout into ``lines`` until it ends, then put ``("end", None)``.
+
+    A line whose decode fails in any way is put as ``("invalid", reason)``; it never ends the
+    reading, so a valid line after it still arrives.
+    """
     limit = MAX_LINE_BYTES + 2  # room for the "\r\n" of a line at the limit
     try:
         while chunk := stream.readline(limit):
@@ -479,6 +483,9 @@ def _read_lines(stream: IO[bytes], lines: queue.Queue[tuple[str, Any]]) -> None:
                 lines.put(_decode_line(content))
             except _InvalidLineError as error:
                 lines.put(("invalid", str(error)))
+            except Exception as error:  # one line never ends the reader: no later line is lost
+                reason = f"a line that could not be decoded ({type(error).__name__})"
+                lines.put(("invalid", reason))
     except (OSError, ValueError) as error:
         lines.put(("invalid", f"the output could not be read: {type(error).__name__}"))
     finally:
@@ -551,7 +558,12 @@ def _decode_log(value: object) -> tuple[int, str, str]:
     if not isinstance(value, dict) or set(value) != _LOG_KEYS:
         raise _InvalidLineError("a log line without exactly level, name and message")
     level, name, message = value["level"], value["name"], value["message"]
-    if not isinstance(name, str) or not isinstance(message, str) or level not in _LEVELS:
+    if (
+        not isinstance(name, str)
+        or not isinstance(message, str)
+        or not isinstance(level, str)  # first: a list or an object cannot be looked up
+        or level not in _LEVELS
+    ):
         raise _InvalidLineError("a log line with a value of the wrong type or level")
     return _LEVELS[level], name, message
 
