@@ -15,10 +15,7 @@ The only ``clearwater.app`` module that imports ``clearwater.gui`` or loads Qt.
    panels (the guarded exports, sharing the one cache) and the settings dialog (WP3.10's rule,
    the start-up's encoder catalog, and the window's one closed signal, which its cache jobs'
    errors read, R2-3); then ``show()``.
-5. The window's :class:`FullCollections` check, before the start-up jobs (the shell's own
-   worker threads already run): from here on CPython's full garbage collection runs on the
-   interface thread at an idle moment only, never while a runner job runs (V7).
-6. Three start-up jobs on the window's job runner, off the interface thread: (i) the cache's
+5. Three start-up jobs on the window's job runner, off the interface thread: (i) the cache's
    open with the settings' limit; (ii) the encoder detection into the catalog (D74, 8.2);
    (iii) the graphics-card detection, whose AD-9 reason the status bar shows while no file is
    open (and the log records); it runs again when the settings change with no file open.
@@ -27,13 +24,11 @@ The only ``clearwater.app`` module that imports ``clearwater.gui`` or loads Qt.
 from __future__ import annotations
 
 import dataclasses
-import gc
 import logging
 import sys
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
-from PySide6.QtCore import QObject, QTimer
 from PySide6.QtGui import QCloseEvent
 from PySide6.QtWidgets import QApplication
 
@@ -71,101 +66,6 @@ CACHE_FAILED_TEXT = "Videos cannot be analysed or exported in this session: {rea
 """The one warning shown when the cache's open failed (ruling S1 (a), condition 2)."""
 
 
-IDLE_CHECK_MS = 1000
-"""How often the interface thread looks for an idle moment to run a deferred full collection."""
-
-_NO_AUTOMATIC_FULL_COLLECTION = 2**31 - 1
-"""The third collector threshold while an application runs: never reached."""
-
-_STARTED: list[FullCollections] = []
-"""The started instances; the first saves the process's thresholds, the last restores them."""
-
-_SAVED_THRESHOLDS: list[tuple[int, int, int]] = []
-"""The process's collector thresholds from before the first start."""
-
-
-class FullCollections:
-    """Keeps CPython's full garbage collection off the job boundaries (V7, ruling 7b32521f item 3).
-
-    Window 3 saw a generation-2 collection on a job's thread at each job boundary (inside the
-    plan cache's release), holding the GIL while the interface waited. While started, CPython's
-    automatic full collection is off (its third threshold is never reached; generations 0 and 1
-    stay automatic) and the interface thread runs it instead, only at an idle moment, from a
-    check every :data:`IDLE_CHECK_MS` (CHARC rulings cc0703a7 Q1 (a), 424f573b Q1 (A)). Idle
-    means that no started instance's window has a job running on its job runner (the policy is
-    process-wide):
-
-    - a check that finds a runner job running does nothing: no full collection runs on any
-      thread while any window's runner job runs, however many younger collections are pending.
-      That is the bound this policy gives, and its only one: the shell's opener and the
-      preview's renderer and framer (``LatestWorker`` threads) are not jobs, so a check beside
-      them alone counts as idle; and a collection's own duration is unbounded (CPython offers no
-      bound);
-    - the first check that finds no job running ends start-up: it freezes every object then
-      tracked (``gc.freeze``, no collection first), so no later full collection scans them;
-    - a later check that finds no job running collects once more younger collections are pending
-      than CPython's own third threshold.
-
-    The cost: cyclic garbage that reaches generation 2 during a job waits for a later idle check
-    that finds the collection due; garbage already present at the first idle check (start-up's,
-    or a job's that ended before it) is frozen with everything else and stays until the last
-    stop. The process's thresholds come back, and the frozen objects are unfrozen, when the last
-    started instance stops (the window's close). Interface thread only.
-    """
-
-    def __init__(
-        self, jobs: JobRunner, parent: QObject, *, closed: Callable[[], bool] = lambda: False
-    ) -> None:
-        """Create the check, not yet started.
-
-        Args:
-            jobs: The window's job runner (``active()`` tells whether a job is running).
-            parent: The timer's owner (the window).
-            closed: True once the window saw its close; :meth:`start` then does nothing.
-        """
-        self._jobs = jobs
-        self._closed = closed
-        self._timer = QTimer(parent)
-        self._timer.setInterval(IDLE_CHECK_MS)
-        self._timer.timeout.connect(self._check)
-        self._frozen = False
-
-    def start(self) -> None:
-        """Turn the automatic full collection off and start the check (idempotent).
-
-        Nothing happens once the window saw its close (its :meth:`stop` has run, or never will).
-        """
-        if self in _STARTED or self._closed():
-            return
-        if not _STARTED:
-            _SAVED_THRESHOLDS[:] = [gc.get_threshold()]
-            first, second, _ = _SAVED_THRESHOLDS[0]
-            gc.set_threshold(first, second, _NO_AUTOMATIC_FULL_COLLECTION)
-        _STARTED.append(self)
-        self._frozen = False  # a new lifetime: its first idle moment freezes again (R5-4)
-        self._timer.start()
-
-    def stop(self) -> None:
-        """Stop the check; the last one restores the thresholds and unfreezes (idempotent)."""
-        if self not in _STARTED:
-            return
-        self._timer.stop()
-        _STARTED.remove(self)
-        if not _STARTED:
-            gc.set_threshold(*_SAVED_THRESHOLDS.pop())
-            gc.unfreeze()
-
-    def _check(self) -> None:
-        """At an idle moment only: freeze once after start-up, then collect when due."""
-        if any(started._jobs.active() for started in _STARTED):
-            return  # nothing collects while any window's job runs (R5-1, R5-2)
-        if not self._frozen:
-            self._frozen = True
-            gc.freeze()
-        elif gc.get_count()[2] > _SAVED_THRESHOLDS[0][2]:  # younger collections since a full one
-            gc.collect()
-
-
 class AppWindow(MainWindow):
     """The program's main window: notes its close event before the shell's shutdown runs.
 
@@ -176,8 +76,6 @@ class AppWindow(MainWindow):
 
     Attributes:
         close_seen: True once the window got its close event.
-        full_collections: The window's garbage-collection check (item 3), started by
-            :func:`build_application` and stopped after the shell's shutdown at close.
     """
 
     def __init__(
@@ -188,7 +86,7 @@ class AppWindow(MainWindow):
         presenter: MessagePresenter | None = None,
         choose_file: FileChooser | None = None,
     ) -> None:
-        """Build the shell's window and its collection check (not yet started).
+        """Build the shell's window.
 
         Args:
             engines: The window's engines (the composition root's ``default_engines``).
@@ -198,15 +96,11 @@ class AppWindow(MainWindow):
         """
         super().__init__(engines, locations, presenter=presenter, choose_file=choose_file)
         self.close_seen = False
-        self.full_collections = FullCollections(self.jobs, self, closed=lambda: self.close_seen)
 
     def closeEvent(self, event: QCloseEvent) -> None:  # noqa: N802 -- Qt override
-        """Note the close, then the shell's shutdown and close, then stop the collection check."""
+        """Note the close, then the shell's shutdown and close."""
         self.close_seen = True
-        try:
-            super().closeEvent(event)
-        finally:
-            self.full_collections.stop()
+        super().closeEvent(event)
 
 
 class _UnlessClosed:
@@ -418,7 +312,6 @@ def build_application(
         window_closing=application.closed,  # the start-up callbacks' one closed signal (R2-3)
     )
     window.show()
-    window.full_collections.start()  # before the start-up jobs; the freeze waits for their end
     application.start_jobs()
     return application
 
