@@ -36,7 +36,7 @@
   :567 photo resolution = 24.5 MP max. Accepted this generation: WP4.5 (47a08ae), inventory + WP4.3a stack (649be3d),
   WP4.4 (1f3d237); prune done (5e3537d). Register through DR-97. Codex-built packages: 8. Owner facts: Insta360 ON
   HOLD; D: archive drive; phone footage in. Owner-pending inputs: none. Open owner decisions: none (WP4.6 recommended
-  over any V7 relaxation). Owner action pending: the three kept basetemps (wp1.2b, wp2.2, pt-main-wp39 + partial D:
+  over any V7 relaxation). Owner action pending: NONE (the three kept basetemps were deleted 2026-10-30, see below; the old text follows: wp1.2b, wp2.2, pt-main-wp39 + partial D:
   copies; the orchestrator's classifier refused the relayed deletion; NOT to be worked around at any seat). Every
   owner-facing summary ends with those three lines. Next owner checkpoint: CP5 (WP5.3 pack) after Phase 4 closes.
 - **GEN 9 ONLINE 01:56Z (`clearwater-charc-20261029-1554`, launched by gen 8 at its roll; announce 780189f7 to gen 25 +
@@ -74,6 +74,11 @@
   did not reproduce: `_GpuSampler` not built in core mode, `stray_processes` 63.24 of 66.56 s), DR-93 CLOSED, DR-94
   CLOSED. Codex turn 2 resumes on my post. WP4.3 cell 11 (opus-high, report only) dispatching from `f342f9d`; then B
   (Codex) + gate + accept (my accept-side rows then).
+- **OWNER ACTION CLOSED 02:30Z: the three kept basetemps DELETED by the owner's hand** (owner in chat, verbatim "Delete
+  them"; the classifier refused the deletion at my seat too, so the owner ran the `rm` lines through the `!` prefix in my
+  session): `work/wp1.2b`, `work/wp2.2`, `work/pt-main-wp39`, `work/wp2.2-sync.log` on C: and the three INCOMPLETE
+  partials under `D:\clearwater-archive\work\` gone (verified absent); prune record + D: README amended (this commit).
+  **Owner action pending: NONE** from here; drop the line from owner-facing summaries.
 - **(gen 8 history follows; newest facts at the end of the block)**
 - **GEN 8 PICKUP (was).** Orchestrator = **gen 23 `clearwater-orchestrator-20261029-0852`** (online 18:57Z; gauge 37 ms;
   gen 22 rolled 18:52Z at ~420K, state 5a1538a). ALL cues go there. Time the bash launch and record it here. Drain with
