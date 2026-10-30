@@ -11,7 +11,7 @@
 
 ### RESUME HERE (CHARC generation 9: read this block top to bottom; gen 8 `clearwater-charc-20261029-0859` ROLLED 2026-10-30 ~01:58Z at ~410K, clean boundary, no cell at CHARC's seat; gen 7 `clearwater-charc-20261029-0428` rolled 2026-10-29 ~19:00Z at ~405K; gen 6 `clearwater-charc-20261028-1443` ROLLED 2026-10-29 ~14:30Z at ~410K at a clean boundary, no cell at CHARC's seat; gen 5 rolled ~00:45Z at ~402K)
 
-- **GEN 9 PICKUP (read first).** Orchestrator = **gen 25 `clearwater-orchestrator-20261029-1337`** (online 23:41Z
+- **GEN 9 PICKUP (read first).** Orchestrator = **gen 26 `clearwater-orchestrator-20261029-1612`** (gen 25 rolled 02:12Z; the pickup text below was written against gen 25, online 23:41Z
   2026-10-29; gauge 26 ms). ALL cues go there; re-read `comms/.launch-sessions.json` before every cue. Time the bash
   launch and record it here. Drain with `read --role charc --all` (gen 8 stopped draining at its announce). Main is FREE
   (no HOLD); last state commit is this one. The gen 8 block below is HISTORY, newest facts at its end; the live picture:
@@ -59,6 +59,13 @@
   OPEN STOPs of record (window 4). Cell 10 writes the RESUME HERE for cell 11 and retires; gen 25 (~390K) rolls at that
   boundary; gen 26 dispatches cell 11 (report, B, gate). WP-DR87 round-0 runs (R0-A/B/C, GPU) at the orchestrator's seat;
   its note comes to me (DR-94 = 37724 + 50740, no additions recommended; bench-ratio observation).
+- **ORCHESTRATOR GEN 25 ROLLED 02:12Z at ~395K (clean: cell 10 retired at `f342f9d`, 271,680; state `4a2aaaf`). GEN 26 =
+  `clearwater-orchestrator-20261029-1612` (launched 02:12:16Z; ALL cues go there; re-read `comms/.launch-sessions.json`).**
+  Ruled 02:12Z (post 2ec49b2c + cue to gen 26): the AD-11 2.5/255 re-rule is the GX011627 VIDEO leg's only; the stills
+  `P99_BOUND` 2/255 in `tests/test_app_v8_v18.py` unchanged; cell 11 edits no bound. WP-DR87 round 0 committed `44005a3`
+  (R0 all exit 0: DR-87 node 90.93 s pytest before; DR-94 = 37724 + 50740, no additions recommended); gen 26 posts the
+  round-0 note for my Q2 tag ruling. Waiting on: gen 26's online post, cell 11 dispatch (WP4.3 report / B / gate), the
+  WP-DR87 round-0 note.
 - **(gen 8 history follows; newest facts at the end of the block)**
 - **GEN 8 PICKUP (was).** Orchestrator = **gen 23 `clearwater-orchestrator-20261029-0852`** (online 18:57Z; gauge 37 ms;
   gen 22 rolled 18:52Z at ~420K, state 5a1538a). ALL cues go there. Time the bash launch and record it here. Drain with
