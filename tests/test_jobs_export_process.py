@@ -622,6 +622,27 @@ def test_a_child_alive_after_its_result_is_killed_and_the_result_kept(
     assert any("killed" in m for m in _messages(caplog, PROCESS_LOGGER))
 
 
+def test_a_result_after_the_cancel_does_not_restart_the_kill_grace(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    """R1 F1: the grace runs from the cancel line, the earlier of the two triggers."""
+    monkeypatch.setattr(export_process, "KILL_AFTER_CANCEL_S", 1.0)
+    caplog.set_level(logging.DEBUG)
+    command = _child(
+        tmp_path,
+        """\
+        send({"progress": [1, 100, "working"]})
+        sys.stdin.buffer.readline()  # the cancel line
+        result(ok=False, failure="cancelled")
+        time.sleep(30)
+        """,
+    )
+    result, _ = _run(tmp_path, command, _Progress(cancel_after=1))
+    assert result.failure is CANCELLED  # the result is kept
+    killed = [m for m in _messages(caplog, PROCESS_LOGGER) if "killed:" in m]
+    assert killed == ["export worker killed: still running 1.0 s after its cancel"]
+
+
 def test_a_worker_that_never_reads_its_stdin_is_still_cancelled(
     tmp_path: Path, quick_kill: float
 ) -> None:
