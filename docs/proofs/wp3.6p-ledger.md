@@ -4,9 +4,9 @@
 
 - Package: WP3.6P, CODEX lane, STRONG tier; CHARC's FINAL rulings govern.
 - Dispatch base verified: `c3bf602fe9ac94cd5df25499d97f3a2bc439bb72`.
-- Current boundary: turn 2, RED tests and ledger only; no tool code. Turn 1's
-  ledger was committed by the dispatcher as `6cc7cdb`.
-  No owner photo was opened by the cell in either turn.
+- Current boundary: turn 3, GREEN tool and ledger; the committed RED tests are
+  unchanged. Turn 1's ledger was committed as `6cc7cdb`; RED as `a66eea6`.
+  No owner photo was opened by the cell in any turn.
 - `uv sync`: already run by the dispatcher before dispatch, as stated in the
   binding turn-1 instructions. Not repeated: this sandbox cannot reach the index.
 - Initial `git status --short`: empty. The existing isolated worktree is retained.
@@ -91,7 +91,8 @@ tests pass explicit source paths and a tmp_path-backed config/guard.
   device unless explicitly forced for synthetic tests. This yields 73 runs at
   16 bits and seven representative runs at 8 bits at the seat.
 - `memory`: `--file NAME` (one mapped file), `--force-cpu`, `--bit-depth {8,16}`
-  (default 16). Uses c3 DEFAULT correction parameters, not neutral parameters,
+  (default 16), `--exclusive` (required declaration at the CLI). Uses c3 DEFAULT
+  correction parameters, not neutral parameters,
   to measure the full processing memory path. Default-device and forced-CPU legs
   run in separate fresh runner processes in the EXCLUSIVE seat window.
 
@@ -626,6 +627,107 @@ Mypy and full suite are not claimed run for this RED-only turn.
 
 ## Review ledger and verification record
 
+### Turn 3 GREEN: implementation and final light evidence
+
+Built NEW `tools/photo_verify.py`, with no RED test modification or test fix:
+
+- Three CLI legs plus the test-facing library functions listed above. FFmpeg
+  default selection composes the primary; the code neither maps a tile nor
+  adds a transform. It independently checks the primary dimensions using the
+  fixture-side property parser. All eight pose scores and shape mismatches are
+  recorded. Thumbnail availability/scores are a non-gating second witness.
+- Export runs the real headless runner library API through the composition
+  root, with neutral c3 parameters by default, chosen depth and actual device
+  reason. It saves the local runner record, independently parses written PNG
+  metadata, compares D63/kept EXIF and ICC, and measures AD-11 quantised/raw
+  errors. Untagged JPEG's expected ICC absence is explicit, not an assertion
+  that a profile was embedded. Successful nonrepresentative PNGs are hashed,
+  sized and removed; representatives and failed-check PNGs stay.
+- Memory uses a fresh runner subprocess with c3 defaults, isolated settings,
+  explicit output and no neutral flag. Its parent reads dimensions without
+  decoding the full photo. Separate sampler threads collect simultaneous
+  process-tree RSS sums and device-wide nvidia-smi memory.used; optional OS
+  peak is the maximum observed INDIVIDUAL process peak, not a tree sum.
+  Pre-run free memory is labelled separately from the backend's actual choice.
+  Missing measurements or sampler errors cannot produce a complete pass.
+- Every tool write/delete is guarded under the configured wp3.6p root; isolated
+  per-run/per-photo directories prevent accidental overwrites. Disk checks use
+  str paths, the 20 GB floor and header-derived output budgets. CLI memory's
+  --exclusive records the seat's window declaration, not an automatic claim
+  that the tool inspected every other host process. Real window scheduling
+  remains the dispatcher's responsibility, as commissioned.
+- Per-photo JSON and summaries use typed allow-lists; stdout is re-projected.
+  Seven class rows keep Z and M separate. Failed photos stop the CLI with safe
+  codes; source/config exception text and raw subprocess logs are never copied
+  into public summaries. Raw runner/oracle logs remain ignored local evidence.
+
+Final-state light runs, from the worktree root, all output redirected to files:
+
+| Check | Command | Observed result | Evidence |
+|---|---|---|---|
+| Selected tests | PYTHONPATH=scripts uv run pytest -q tests/test_photo_verify.py --basetemp=work/wp3.6p/tmp -p sandbox_mkdir_shim -p no:cacheprovider -m "not gpu and not footage and not gui and not slow and not fullclip" -o junit_family=legacy --junitxml=work/wp3.6p/green-synthetic.xml | EXIT 0; 33 passed, 1 deselected in 4.97s | work/wp3.6p/green-pytest.log |
+| Ruff | uv run ruff check tools/photo_verify.py tests/test_photo_verify.py | EXIT 0; All checks passed! | work/wp3.6p/green-ruff.log |
+| Strict typing | uv run mypy | EXIT 0; Success: no issues found in 147 source files | work/wp3.6p/green-mypy.log |
+| Formatting applied | uv run ruff format tools/photo_verify.py | EXIT 0; seat format --check still owed | work/wp3.6p/green-format.log |
+| RED tests unchanged | git diff --exit-code -- tests/test_photo_verify.py | EXIT 0; no diff | work/wp3.6p/green-tests-unchanged.log |
+
+The sole deselection is the explicitly marked owner-footage node. No footage,
+gpu, gui, slow or fullclip node ran. Tests use synthetic inputs and tmp_path;
+memory tests stub samplers/device readings and force actual work to CPU.
+JUnit's four ffmpeg_transform_rule properties were parsed and verified present:
+irot honoured, EXIF-only ignored. The JUnit legacy output option avoids pytest's
+four record_property/xunit2 compatibility warnings seen on the earlier evidence
+run. The final run has no pytest warnings. uv still prints the existing harmless
+VIRTUAL_ENV mismatch notice; it selects this worktree's .venv. No test was changed
+to suppress a failure or warning.
+
+Additional independent synthetic verification logs:
+`work/wp3.6p/green-verification.log` (confirmed early-summary defect),
+`green-verification-after.log` (fixed summary/config/read/EXIF checks), and
+`green-final-verification.log` (final failure/schema/record-persistence checks).
+No owner photo, class-map file or other worktree was read for these probes.
+The build ran no full suite, Reviewer A/B, harness gate or seat measurement.
+Final scope/privacy check: PASS for ASCII/LF/whitespace of tool and ledger,
+absence of planted private markers/literal footage-folder name there, and no
+planted GPS/Make values or synthetic input-folder name in the test CLI summaries.
+`git diff --check` EXIT 0; RED-test diff EXIT 0; status shows only the owned
+ledger modified and new tool untracked. Evidence:
+`work/wp3.6p/green-final-scope.log`, `green-diff-check.log`.
+
+| Turn-3 suspect | Confirmation / control | Disposition |
+|---|---|---|
+| [MINOR] stdout projection could drop unattempted class rows | Independent two-class partial summary: saved selected JPG-Z row vanished from print_summary output | CONFIRMED and FIXED; final probe retains selected=1/attempted=0 for that class. |
+| [MINOR] invalid configuration/read errors could expose paths or look complete | Traced exceptions beyond the old typed catch; synthetic missing-config and broken-photo probes | CONFIRMED and FIXED; config exits 2 without a path/complete claim; broken selected photo exits 1 with read_failed and attempted=1. |
+| [MINOR] malformed raw EXIF could be confused with a failed photo read | Synthetic JPEG with a damaged EXIF block reads successfully but sanitise drops metadata | CONFIRMED and FIXED; read_ok=True, sanitise_dropped=True, V5 fails v5_kept_exif by name. |
+| [MINOR] missing RSS samples could be mislabelled as a device failure | Traced the shared sampler-error branch; separated RSS/device error checks | CONFIRMED and FIXED; missing peaks remain null and incomplete, with the corresponding fixed code. |
+| A RED test might require a product change | All 33 selected cases pass against the new tool, including planted controls | REJECTED; no test fix, product file or frozen interface change required. |
+| Public summary might admit synthetic private values | Planted GPS/Make/path contamination, CLI summary and source-hash tests pass | REJECTED after verification; allow-list boundary and source preservation hold on tested paths. |
+
+Verification loop: after these fixes, traced read -> oracle/export/memory ->
+record -> summary and each guarded write/delete again, then ran the final
+selected suite, ruff, strict mypy and independent synthetic probes. This pass
+found no new issue. This is build verification, not independent review or
+real-photo acceptance. Public module/functions/classes have Google-style
+docstrings; the module explicitly names both decoding implementations.
+
+For Reviewer A, the tool's required claims (whole artifact, not a review verdict):
+
+1. FFmpeg default composed-primary agreement with all eight poses; fixture
+   characterization says irot-only, with EXIF-only limitation explicit. Thumbnail
+   evidence is recorded and does not decide the result.
+2. V5/D53/AD-11 measurement on actual runner output at selected depth; permitted
+   D63 edits only, ICC expected-presence/matching facts explicit, Z/M separated.
+3. Fresh non-neutral memory runner, estimate/pre-run free/actual device reason,
+   simultaneous RSS tree peak, device-wide memory peak, limits and unavailable
+   measurement failures recorded without inferring unmeasured host conditions.
+4. Config-derived read-only inputs, guarded outputs/deletion, disk floor, safe
+   schema/ASCII stdout and no private metadata values in summary JSON.
+
+Owned files this turn: tool and ledger only. No test fix is bundled. No src,
+dependency, local-config, fixture, existing test or other-worktree change.
+The owner-photo, EXCLUSIVE export/memory, seat format check, Reviewer A/B and
+final two-leg gate remain PENDING. No new RUN REQUEST is issued this turn.
+
 Reviewer A runs via dispatcher (Claude opus/high, read-only) between turns.
 Each adjudication turn changes only this ledger and yields before remediation.
 Convergence is zero NEW in-envelope blocking findings. At round 5 and each fifth
@@ -634,6 +736,7 @@ round: yield for dispatcher approval under the fill; no self-authorised extensio
 | Round | Critical | Major | Minor | In / out envelope | NEW / REOPENED | Reverts | Product / test-only fixes | Verdict / evidence | Depth |
 |---|---:|---:|---:|---|---|---|---|---|---|
 | 0 | - | - | - | - | - | 0 | None; ledger only | R0 seat evidence received; mapped tile scores VOID; Q3 replaced by CHARC | 118,810 after turn 1 |
+| Build turn 3 (not A) | - | - | - | Owned tool/ledger | - | 0 | New tool; no test fix | GREEN: 33 passed, 1 footage deselected; ruff/mypy green; Reviewer A PENDING | 168,789 after turn 2; turn-3 reading pending |
 
 | Suspected item | Independent confirmation | Disposition |
 |---|---|---|
@@ -662,7 +765,8 @@ round: yield for dispatcher approval under the fill; no self-authorised extensio
 | Turn / boundary | Dispatcher-read depth | Action |
 |---|---|---|
 | 1 / round 0 | 118,810 tokens (dispatcher reading after turn 1) | R0 committed 6cc7cdb; evidence and ruling received on turn 2 |
-| 2 / RED | PENDING dispatcher reading | Tests and ledger only; yield before GREEN |
+| 2 / RED | 168,789 tokens (dispatcher reading after turn 2) | RED committed a66eea6; GREEN dispatched on turn 3 |
+| 3 / GREEN | PENDING dispatcher reading | New tool and ledger; RED tests unchanged |
 
 Evaluate near 200K; stop at a step boundary near 250K per this dispatch.
 Historical turn-1 validation was limited to the ledger's ASCII/LF and owned-file diff.
@@ -670,7 +774,7 @@ Observed validation: PASS for ASCII, LF, final newline, no trailing whitespace,
 both embedded Python RUN REQUEST snippets parsing, seven-class example JSON
 parsing, and absence of a literal footage path. Evidence:
 `work/wp3.6p/r0/ledger-validation.log`. Snippets were parsed, not executed.
-Turn 1 changed only this ledger. Turn 2 changes the ledger and new test file;
+Turn 1 changed only this ledger. Turn 2 changed the ledger and new test file;
 no src, frozen interface, dependency, fixture, existing test, local config or
 other-worktree change. No deletion, commit, mailbox post or footage read was
-made by the cell. Turn-2 RED and light-probe evidence is recorded below.
+made by the cell. Turn-2 RED and turn-3 GREEN evidence is recorded above.
