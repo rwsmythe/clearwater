@@ -293,23 +293,25 @@ def scenario_e_full_render_during_export(
     asked for only once that write has begun. ``k1_renders_during_a_sink_write`` counts the
     delivered renders of the photo with ``result.k == 1`` while that write is in progress; other
     factors are not counted.
+
+    The export runs in a worker process (WP4.6), so the hold is set through the process form's
+    command: the test worker ``export_worker_hold`` holds its sink's first write on marker files
+    in a folder beside ``photo_4k`` (ruling R0-STOP-1); the witness's name and meaning are
+    unchanged.
     """
+    import export_worker_hold as hold
+    from clearwater.jobs.export_process import ProcessExportJobs
+
     window = application.window
     export = _panel(application, ExportPanel)
     overlap = {"k1_renders_during_a_sink_write": 0}
-    release = threading.Event()
-    sinks: list[_HeldSink] = []
+    markers = hold.fresh(photo_4k.parent / f"{photo_4k.stem}-export-hold")
     engine = application.exports._engine
-    real_sink_for = engine._sink_for
-    assert real_sink_for is not None, "the export engine builds its sink with sink_for (DR-67)"
-
-    def held_sink_for(device: Any) -> Any:
-        sink = _HeldSink(real_sink_for(device), release)
-        sinks.append(sink)
-        return sink
+    assert isinstance(engine, ProcessExportJobs), "the panels export through the worker (WP4.6)"
+    real_command = engine._command
 
     def writing() -> bool:
-        return any(sink.in_write() for sink in sinks)
+        return hold.in_write(markers)
 
     def on_rendered(result: Any) -> None:
         source = window.session.source()
@@ -317,9 +319,9 @@ def scenario_e_full_render_during_export(
             return
         if writing():
             overlap["k1_renders_during_a_sink_write"] += 1
-            release.set()
+            hold.release(markers)
 
-    engine._sink_for = held_sink_for
+    engine._command = hold.command(markers)
     window.controller.rendered.connect(on_rendered)
 
     def start() -> None:
@@ -344,8 +346,8 @@ def scenario_e_full_render_during_export(
         figures = measured(qtbot, "(e) 1:1 4K render during an export", start, done)
     finally:
         window.controller.rendered.disconnect(on_rendered)
-        engine._sink_for = real_sink_for
-        release.set()
+        engine._command = real_command
+        hold.release(markers)
     figures.witness.update(overlap)
     return figures
 

@@ -209,8 +209,15 @@ def test_the_applications_engines_are_wholly_real(make_app, qtbot) -> None:
     assert engines.cache is application.cache and isinstance(engines.cache, DeferredProxyCache)
     assert engines.select_backend is core.select_backend
     assert list(engines.methods) == ["c3", "ancuti2018"]
+    # WP4.6: one GUI cache per process, shared by the GUI and the photo export leg; the video
+    # worker has its per-job scratch.
+    from clearwater.jobs.export_process import ProcessExportJobs
+
     exports = application.exports._engine
-    assert isinstance(exports, ExportEngine) and exports._cache is application.cache
+    assert isinstance(exports, ProcessExportJobs)
+    assert exports._cache_dir == application.cache.folder
+    photo = exports._photo_exports
+    assert isinstance(photo, ExportEngine) and photo._cache is application.cache
     for member in (engines.photo_source, engines.video_source, engines.video_sink, engines.cache):
         assert not type(member).__module__.startswith("clearwater.interfaces.stubs")
     wait_started(qtbot, application)

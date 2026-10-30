@@ -252,3 +252,23 @@ def test_a_log_record_carries_a_level_the_parent_accepts(levelno: int, name: str
     handler.emit(logging.LogRecord("clearwater.x", levelno, __file__, 1, "m %s", ("a",), None))
     (line,) = stream.getvalue().splitlines()
     assert json.loads(line) == {"log": {"level": name, "name": "clearwater.x", "message": "m a"}}
+
+
+def test_the_builder_spawns_the_worker_module_and_keeps_the_photo_engine(tmp_path: Path) -> None:
+    """Q2 as ruled: ``process_export_jobs`` takes no cache limit; its default is the worker."""
+    import clearwater
+
+    photo = unavailable_exports()
+    built = composition.process_export_jobs(photo_exports=photo, cache_dir=tmp_path / "cache")
+    assert isinstance(built, ProcessExportJobs)
+    assert built._command == tuple(WORKER)
+    assert built._photo_exports is photo
+    assert built._cache_dir == tmp_path / "cache"
+    assert built._app_version == clearwater.__version__
+    fake = ("python", "-c", "pass")
+    given = composition.process_export_jobs(
+        photo_exports=photo, cache_dir=tmp_path, app_version="9.9.9", command=fake
+    )
+    assert isinstance(given, ProcessExportJobs)
+    assert (given._command, given._app_version) == (fake, "9.9.9")
+    assert not (tmp_path / "cache").exists()  # building touches no folder

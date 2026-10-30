@@ -746,16 +746,17 @@ def test_dr44c_a_real_job_ends_within_the_shutdown_timeout_at_close(
             window = application.window
             open_source(qtbot, application, sample(CLIP))
             wait_analysis(qtbot, application)
+            # WP4.6: the export runs in a worker process, so the test worker holds its sink's
+            # first write on marker files (mid-encode: a frame written, the call not returned);
+            # the close's cancel releases it (ruling R0-STOP-1).
+            import export_worker_hold as hold
+            from clearwater.jobs.export_process import ProcessExportJobs
+
             engine = application.exports._engine
-            real_sink_for = engine._sink_for
-            assert real_sink_for is not None
-
-            def sink_for(device: Any) -> _ProgressSink:
-                sink = _ProgressSink(real_sink_for(device), release)
-                progress["predicate"] = sink.mid_encode
-                return sink
-
-            monkeypatch.setattr(engine, "_sink_for", sink_for)
+            assert isinstance(engine, ProcessExportJobs)
+            markers = hold.fresh(tmp_path / "export-hold")
+            progress["predicate"] = lambda: hold.in_write(markers)
+            monkeypatch.setattr(engine, "_command", hold.command(markers))
             window.shell_actions.export.trigger()
             qtbot.waitUntil(
                 lambda: "predicate" in progress and progress["predicate"](), timeout=60000
