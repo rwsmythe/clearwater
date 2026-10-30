@@ -90,9 +90,10 @@ class FullCollections:
     """Keeps CPython's full garbage collection off the job boundaries (V7, ruling 7b32521f item 3).
 
     Window 3 saw a generation-2 collection on a job's thread at each job boundary (inside the
-    plan cache's release), holding the GIL while the interface waited. While started, CPython's automatic full collection is off (its third
-    threshold is never reached; generations 0 and 1 stay automatic) and the interface thread
-    runs it instead, from a check every :data:`IDLE_CHECK_MS`:
+    plan cache's release), holding the GIL while the interface waited. While started, CPython's
+    automatic full collection is off (its third threshold is never reached; generations 0 and 1
+    stay automatic) and the interface thread runs it instead, from a check every
+    :data:`IDLE_CHECK_MS`:
 
     - the first check that finds no job running ends start-up: it freezes every object then
       tracked (``gc.freeze``), so no later full collection scans them;
