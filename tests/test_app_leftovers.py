@@ -140,6 +140,46 @@ def test_an_output_folder_the_os_refuses_is_skipped_and_logged(
     assert "skips" in caplog.text and repr(str(bad)) in caplog.text
 
 
+@pytest.mark.parametrize(
+    ("error", "logged"),
+    [(PermissionError("access is denied"), True), (FileNotFoundError("gone"), False)],
+    ids=["unlistable", "missing"],
+)
+def test_an_output_folder_that_cannot_be_listed_is_logged_once(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+    error: OSError,
+    logged: bool,
+) -> None:
+    """B-7: an unlistable ``output_folder`` logs one warning; a missing one has nothing to log.
+
+    The rule is ``holds_leftovers``': an ``OSError`` (or ``ValueError``) means the folder cannot
+    be listed, a ``FileNotFoundError`` means it holds nothing. The folder is in no journal entry,
+    so only the output folder's own line can report it.
+    """
+    out = tmp_path / "out"
+    out.mkdir()
+    real = os.scandir
+
+    def scandir(path: os.PathLike[str] | str) -> object:
+        if Path(path) == out:
+            raise error
+        return real(path)
+
+    monkeypatch.setattr(os, "scandir", scandir)
+    with caplog.at_level(logging.WARNING, logger=startup.__name__):
+        report = clean_leftovers(cpu_settings(output_folder=out), WriteJournal(tmp_path / "c"))
+    assert report.removed == () and report.failed == ()
+    warnings = [r for r in caplog.records if r.levelno == logging.WARNING]
+    if logged:
+        assert len(warnings) == 1, caplog.text
+        assert "could not list the output folder" in warnings[0].getMessage()
+        assert str(out) in warnings[0].getMessage()
+    else:
+        assert warnings == [], caplog.text
+
+
 def _refuse_reading(monkeypatch: pytest.MonkeyPatch, journal: WriteJournal) -> None:
     """Plant a read denial of the journal file (a scanner's lock, say); other reads proceed."""
     real = Path.read_bytes
