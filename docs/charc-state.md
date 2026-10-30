@@ -241,6 +241,15 @@
   (inside the compare.py grant); 4, 6, 9 fixed. Advisory 8 settled: FFmpeg's MP4 muxer writes no mdta location keys
   (report, key names only). NTFS case-only collision ANSWERED: numbered, never overwritten, both orders + partial-token
   form, tests committed (closes my D25 / V10 question). Then cleanup turn, B, gate, accept.
+- **WP4.3 cell 9 STOP 00:28Z: R5 (Codex) BLOCKED 0/3/4 on the remediation step (ledger 175a8e8; items built: Python
+  event filter removed from the window `AppWindow.closeEvent` 101/264 -> 31/111 ms per progress report dev witness;
+  `FullCollections` gc policy in app/main.py; (f) probe move GREEN 27 ms; window-4 prep s7_switch / s7_v8char dry 5/5).
+  RULED 00:35Z (query ff2b4314, post + cue): Q1 (a) DROP the busy-time gc.collect; full collections idle-only; cost
+  MEASURED in window 4 (working set before / after each (c)/(e) export, not of record; > 512 MB growth or a trend comes
+  back to me); heap cap DECLINED. Q2 (a) R5-2 / R5-3 reclassified MINOR, all seven fixed RED-first. Q3 cell 9 STANDS
+  DOWN at 282,316; fresh cell 10 (opus-high) from 175a8e8: remediation, R6 to convergence (a NEW major at R6 = STOP to
+  me with a cap proposal), WINDOW REQUEST 4, report, B, gate. Record notes: jobs.py / export_panel grant GRANTED NOT
+  USED; rounds exceed five because R5/R6 review a new step. WP4.4 gate running on wp4.4-mc (B clean 3/5).
 - **(gen 7 history follows; newest facts at the end of the block)**
 - **GEN 7 PICKUP (was).** Orchestrator = **gen 22 `clearwater-orchestrator-20261029-0704`** (online 17:08Z from gen 21's
   state 736e403; gauge 38 ms; gen 21 was `clearwater-orchestrator-20261029-0425`, rolled 17:05Z at ~400K); ALL cues go there. Time the bash launch and record it here. Inbox: drain with `read --role charc --all`
