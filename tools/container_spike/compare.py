@@ -897,8 +897,8 @@ def _display_matrix(stream: Mapping[str, Any]) -> tuple[int, ...] | None:
 
 
 def _matrix_linear(matrix: Sequence[int] | None) -> list[int] | None:
-    """Return the 2x2 linear part that determines orientation, excluding translation."""
-    return [matrix[i] for i in (0, 1, 3, 4)] if matrix is not None else None
+    """Return all non-translation coefficients, keeping scale and perspective exact."""
+    return [matrix[i] for i in (0, 1, 2, 3, 4, 5, 8)] if matrix is not None else None
 
 
 def _matrix_translation_note(source: Sequence[int] | None, output: Sequence[int] | None) -> str:
@@ -909,7 +909,7 @@ def _matrix_translation_note(source: Sequence[int] | None, output: Sequence[int]
 
 
 def _rotation(stream: Mapping[str, Any]) -> dict[str, Any]:
-    """Return ffprobe's rotation and linear matrix; retain unparseable text exactly."""
+    """Return rotation and the non-translation matrix; keep unparseable text exact."""
     for entry in stream.get("side_data_list", []) or []:
         if isinstance(entry, dict) and "rotation" in entry:
             matrix = _display_matrix(stream)
@@ -1233,7 +1233,7 @@ def compare_facts(source: Facts, output: Facts) -> list[Item]:
                 k: s.get(k)
                 for k in ("codec_name", "profile", "sample_rate", "channels", "channel_layout")
             }
-            # A one-channel PCM track can lose its explicit mono declaration in MP4.
+            # Any one-channel track treats absent layout as mono, regardless of codec.
             if layout["channels"] == 1 and layout["channel_layout"] is None:
                 layout["channel_layout"] = "mono"
             result[facts.keys[int(s["index"])]] = layout

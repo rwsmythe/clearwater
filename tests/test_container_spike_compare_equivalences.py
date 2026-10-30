@@ -102,6 +102,28 @@ def test_translation_is_equivalent(name: str, reverse: bool) -> None:
 
 
 @pytest.mark.parametrize("name", [SIDE, TKHD], ids=["side", "tkhd"])
+def test_translation_note_records_both_sides(name: str) -> None:
+    """Keep both translations in the note without comparing them in the verdict."""
+    item = _item(_facts(matrix=TRANSLATED), _facts(), name)
+    assert item.status == compare.SAME
+    assert "BEST-EFFORT" in item.note
+    assert f"source={list(TRANSLATED[6:8])}" in item.note
+    assert f"output={list(TURN[6:8])}" in item.note
+
+
+@pytest.mark.parametrize("name", [SIDE, TKHD], ids=["side", "tkhd"])
+@pytest.mark.parametrize(
+    "matrix",
+    [(*TURN[:8], 2 << 30), (*TURN[:2], 12345, *TURN[3:5], 678, *TURN[6:])],
+    ids=["w", "uv"],
+)
+def test_nontranslation_matrix_change_control(name: str, matrix: tuple[int, ...]) -> None:
+    """Keep homogeneous scale and perspective differences in both orientation items."""
+    item = _item(_facts(), _facts(matrix=matrix), name)
+    assert (item.item_class, item.status) == (compare.MANDATORY, compare.DIFFERENT)
+
+
+@pytest.mark.parametrize("name", [SIDE, TKHD], ids=["side", "tkhd"])
 @pytest.mark.parametrize(
     ("matrix", "rotation"), [(QUARTER, -90), (MIRRORED, -180)], ids=["quarter", "mirror"]
 )

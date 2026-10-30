@@ -581,3 +581,34 @@ def test_mov_extension_stream_is_refused(tmp_path, planner):
     source = tmp_path / "x.mov:s"
     with pytest.raises(clearwater.jobs.OutputNameError):
         planner(source, Settings(output_folder=tmp_path / "out"), MediaKind.VIDEO)
+
+
+@pytest.mark.parametrize(
+    ("first", "second", "expected_first", "expected_second"),
+    [
+        ("IMG_1.MOV", "IMG_1.MP4", "IMG_1_corrected.mp4", "IMG_1_corrected_2.MP4"),
+        ("IMG_1.MP4", "IMG_1.MOV", "IMG_1_corrected.MP4", "IMG_1_corrected_2.mp4"),
+    ],
+    ids=["mov-first", "mp4-first"],
+)
+def test_mov_and_uppercase_mp4_share_run_registry(
+    tmp_path: Path, first: str, second: str, expected_first: str, expected_second: str
+) -> None:
+    """Number suffix-case collisions in either order using one run registry."""
+    reservations = Reservations()
+    settings = Settings(output_folder=tmp_path)
+    one = plan_output(tmp_path / first, settings, MediaKind.VIDEO, reservations)
+    two = plan_output(tmp_path / second, settings, MediaKind.VIDEO, reservations)
+    assert one.path == tmp_path / expected_first
+    assert two.path == tmp_path / expected_second
+
+
+@pytest.mark.parametrize("temporary", [False, True], ids=["final", "temporary"])
+def test_mov_collision_with_uppercase_mp4_on_disk(tmp_path: Path, temporary: bool) -> None:
+    """Keep an existing uppercase MP4 final or partial intact and choose _2.mp4."""
+    final = tmp_path / "IMG_2_corrected.MP4"
+    taken = temporary_path(final, "0123456789ab") if temporary else final
+    taken.write_bytes(b"occupied")
+    output = plan_output(tmp_path / "IMG_2.MOV", Settings(), MediaKind.VIDEO, Reservations())
+    assert output.path == tmp_path / "IMG_2_corrected_2.mp4"
+    assert taken.read_bytes() == b"occupied"

@@ -188,21 +188,23 @@ def test_phone_mov_runner_and_v4(tmp_path: Path, capsys: pytest.CaptureFixture[s
     out.mkdir()
     cache.mkdir()
     record_path = tmp_path / "runner-record.json"
-    status = he.main(
-        [
-            str(source),
-            "--out",
-            str(out),
-            "--cache-dir",
-            str(cache),
-            "--force-cpu",
-            "--encoder",
-            "libx265",
-            "--record",
-            str(record_path),
-        ]
-    )
-    capsys.readouterr()
+    try:
+        status = he.main(
+            [
+                str(source),
+                "--out",
+                str(out),
+                "--cache-dir",
+                str(cache),
+                "--force-cpu",
+                "--encoder",
+                "libx265",
+                "--record",
+                str(record_path),
+            ]
+        )
+    finally:
+        capsys.readouterr()
     assert status == 0
     output = out / "IMG_6702_corrected.mp4"
     output_names = [path.name for path in out.iterdir()]
