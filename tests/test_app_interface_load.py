@@ -32,7 +32,7 @@ import pytest
 from PySide6.QtCore import QCoreApplication, QEvent, QObject, QTimerEvent
 
 from clearwater.app.main import IDLE_CHECK_MS, Application, FullCollections
-from clearwater.gui.jobs import PROGRESS_INTERVAL_MS, QtJobRunner
+from clearwater.gui.jobs import QtJobRunner
 from clearwater.interfaces import JobResult, Progress
 from test_app_startup import cpu_settings, make_app, wait_started
 
@@ -40,6 +40,9 @@ pytestmark = pytest.mark.gui
 
 SETTLE_MS = 2500
 """Long enough for the app to see start-up over (an idle moment after the start-up jobs)."""
+
+MIN_REPORTS = 20_000
+"""The runner pin's job reports at least this often, whatever the host does to its worker."""
 
 
 def _ok() -> JobResult:
@@ -105,30 +108,59 @@ def test_the_windows_paint_update_layout_and_timer_events_run_no_python(make_app
     assert calls == [], Counter(calls).most_common(10)
 
 
-def test_the_runner_delivers_at_most_one_report_per_tick_and_the_latest(qtbot) -> None:
-    """Item 1's delivery rule, pinned: a job reporting far faster than the tick (green at base)."""
+def test_the_runner_delivers_at_most_one_report_per_tick_and_the_latest(qtbot, monkeypatch) -> None:
+    """Item 1's delivery rule, pinned per tick (green at base; R5-5, R5-6).
+
+    Each poll of the runner's timer and its final delivery before ``on_done`` are marked, and no
+    stretch between two marks may carry more than one report (a burst fails). The job reports at
+    least :data:`MIN_REPORTS` times and for at least a second, so a host that pauses its worker
+    still leaves reports to coalesce.
+    """
+    events: list[tuple[str, int]] = []
+    real_poll, real_finished = QtJobRunner._poll, QtJobRunner._on_finished
+
+    def poll(self: QtJobRunner) -> None:
+        events.append(("tick", 0))
+        real_poll(self)
+
+    def finished(self: QtJobRunner, handle: object, result: object) -> None:
+        events.append(("end", 0))
+        real_finished(self, handle, result)
+
+    monkeypatch.setattr(QtJobRunner, "_poll", poll)  # before the runner connects its slots
+    monkeypatch.setattr(QtJobRunner, "_on_finished", finished)
     runner = QtJobRunner()
-    seen: list[int] = []
     last = {"done": 0}
-    span_s = 1.0
 
     def job(progress: Progress) -> JobResult:
         done = 0
-        ends = time.monotonic() + span_s
-        while time.monotonic() < ends:
+        ends = time.monotonic() + 1.0
+        while done < MIN_REPORTS or time.monotonic() < ends:
             done += 1
             progress.report(done, None, "step")
         last["done"] = done
         return _ok()
 
-    began = time.monotonic()
-    handle = runner.run(job, on_done=lambda _r: None, on_progress=lambda d, _t, _m: seen.append(d))
+    handle = runner.run(
+        job,
+        on_done=lambda _r: events.append(("done", 0)),
+        on_progress=lambda d, _t, _m: events.append(("report", d)),
+    )
     qtbot.waitUntil(lambda: not handle.is_running(), timeout=10000)
-    elapsed_ms = (time.monotonic() - began) * 1000
-    assert seen[-1] == last["done"]  # the last report, delivered before the result
+    seen = [d for kind, d in events if kind == "report"]
+    assert seen and seen[-1] == last["done"]  # the last report, delivered before the result
+    done_at = events.index(("done", 0))
+    assert events[done_at - 1] == ("report", last["done"])  # the final delivery, then on_done
     assert seen == sorted(set(seen))  # each delivery later than the one before, none repeated
-    assert len(seen) <= elapsed_ms / PROGRESS_INTERVAL_MS + 2, (len(seen), elapsed_ms)
-    assert last["done"] > 100 * len(seen)  # far faster than the tick: the rest were dropped
+    per_mark: list[int] = []
+    for kind, _ in events:
+        if kind in ("tick", "end"):
+            per_mark.append(0)
+        elif kind == "report":
+            assert per_mark, events[:5]  # a report only from a poll or the final delivery
+            per_mark[-1] += 1
+    assert max(per_mark) <= 1, per_mark
+    assert len(seen) < last["done"]  # fewer deliveries than reports: the rest were dropped
 
 
 def test_a_planted_full_collection_load_at_a_job_boundary_runs_no_full_collection_there(
