@@ -1599,3 +1599,26 @@ in `windows/dry6/`, md5s in `md5sums.txt`): v7a 0 (12.0 / 11.0 ms), v7b 0 (12.0 
 (from show() 46.7 / 11.7 ms; build_application 147.5 ms); plant deleted: yes. C: 174 GB free
 before, 154 GB with the plant, 173 GB after; RAM available 7.63 / 7.80 of 33.52 GB. Footage folder
 unchanged (128 files), product logs naming it 0, a grep of the dry outputs for it 0 hits.
+
+### Window 5 (EXCLUSIVE, granted by orchestrator gen 25 at ~02:05Z; runs OF RECORD on the reverted head)
+
+Command: `bash /c/Users/rwsmy/clearwater-review-evidence/wp4.3/windows/window5-commands.sh` (md5
+`5b14d981...`), once, foreground, 2026-10-30 02:02:51Z-02:07:14Z (4 min 23 s), chain exit 0. HEAD
+`8eaa897` (product `7b4c10b`); `s7_driver.py` `0b9ee6cc...` unchanged, default switch interval;
+GX011627 (158.5 MB) located read-only; device GPU. Logs copied to `windows/win5/` (md5s in
+`md5sums.txt`; `exits.txt` `20c4d84b...`). No tuning, no re-run.
+
+| Run | EXIT | Figures |
+|---|---|---|
+| v7a | 0 PASS | longest **18.0 ms**, p99 15.0 ms, 5,909 ticks; analysis 59.1 s, 681 frames |
+| v7b | 0 PASS | longest **19.0 ms**, p99 15.0 ms, 6,352 ticks; witness proxies shown during the analysis 1,300 |
+| v7d | 0 PASS | longest **56.0 ms**, p99 43.0 ms, 1,855 ticks; batch 28.6 s, 300 done |
+| plant-f | 0 | settling opens 4,243.1 ms then 108.4 ms |
+| v7f-settled | 0 PASS | ruling B, OF RECORD: from show() longest **50.6 ms**, p99 14.8 ms, 5,898 gaps. Recorded only: before show() 0.0 ms (stale label: the probe now starts at show()); build_application cold 93.8 ms; cache open 186.1 ms; analysis found it pending [False] |
+
+Plant deleted: yes. C: 173 GB free before, 173 GB at the plant check, 154 GB with the plant, 172 GB
+after; RAM available 8.00 then 8.13 of 33.52 GB. Footage folder unchanged (128 files) in every run;
+product logs naming it 0; a grep of every window output for the footage folder 0 hits. Kept outputs
+142 MB in `work/wp4.3-c10-win5/`. The revert took (b) from 195.0 back to 19.0 ms and (f) from 395.4
+back to 50.6 ms: the window-4 STOPs in (b) and (f) were the gc policy's, as CHARC's ruling read
+them.
