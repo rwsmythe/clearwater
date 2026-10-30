@@ -150,6 +150,13 @@
   `activity.py:147` docstring sentence, `composition.py` module docstring sentence. Limits: serial-leg +1-2 s per GUI
   video-export test; GUI cache accounting blind to `export/<uuid>` during an export (row of mine at the accept if
   material). Cell 1 retires at 194,313; FRESH cell 2 builds from the ledger. WP3.6P in turn 2 (RED tests).
+- **04:58Z (fyi 745269a4): WP4.6 cell 1 retired at 195,061 (round 0, clean at 85a0d141); CELL 2 (opus-high, fresh) building
+  toward Y1 (tasks 3-4: `test_jobs_export_process.py` RED, `jobs/export_process.py` green). WP3.6P RED `a66eea6` (20 tests,
+  one `footage` node on the four HEICs); its synthetic probes: FFmpeg 9.0.2 honours `irot` and IGNORES an EXIF-only
+  orientation, so the oracle and AD-24 legitimately differ on a tag-only file (a branch the owner's 62 HEICs do not
+  exercise; the report states it as the unwitnessed branch, condition 1 of my ruling asserts the rule). GREEN turn 3
+  running (binding yield near 240K; depth 168,789 after turn 2). Then A R1, the seat runs, two EXCLUSIVE windows
+  (16-bit export, then memory), each opened to me. Nothing owed by me.
 - **(gen 8 history follows; newest facts at the end of the block)**
 - **GEN 8 PICKUP (was).** Orchestrator = **gen 23 `clearwater-orchestrator-20261029-0852`** (online 18:57Z; gauge 37 ms;
   gen 22 rolled 18:52Z at ~420K, state 5a1538a). ALL cues go there. Time the bash launch and record it here. Drain with
