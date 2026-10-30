@@ -278,12 +278,13 @@ def clean_leftovers(settings: Settings, journal: WriteJournal) -> LeftoverReport
     interface thread before it attaches the panels. Every removed file and every failure is
     logged (N9). An entry whose folder still holds a temporary afterwards (a removal failed, or
     the folder cannot be listed) stays and is scanned again at the next start (R1-3, ruling
-    d530b564). A journal that cannot be read or written is logged and left as it is; its
-    entries stay and are scanned again at the next start (R2-1, ruling 38a7c702). A folder the
-    operating system refuses as a path (a NUL character in ``output_folder``, say) is skipped and
-    logged, so nothing here raises before the window shows (R3-1, ruling d6e9abdf); a journal
-    entry with such a folder keeps its entry (``holds_leftovers``). An entry is cleared by its
-    ``(id, folder)`` pair (R3-2).
+    d530b564). An output folder that cannot be listed is logged (``holds_leftovers``' rule; a
+    missing one holds nothing to log; B-7). A journal that cannot be read or written is logged
+    and left as it is; its entries stay and are scanned again at the next start (R2-1, ruling
+    38a7c702). A folder the operating system refuses as a path (a NUL character in
+    ``output_folder``, say) is skipped and logged, so nothing here raises before the window shows
+    (R3-1, ruling d6e9abdf); a journal entry with such a folder keeps its entry
+    (``holds_leftovers``). An entry is cleared by its ``(id, folder)`` pair (R3-2).
 
     Args:
         settings: The settings of the one settings read.
@@ -307,6 +308,18 @@ def clean_leftovers(settings: Settings, journal: WriteJournal) -> LeftoverReport
         _LOG.info("removed a leftover temporary file: %s", path)
     for path, error in report.failed:
         _LOG.warning("a leftover temporary file could not be removed: %s: %s", path, error)
+    if settings.output_folder is not None and settings.output_folder in folders:
+        try:
+            with os.scandir(settings.output_folder):
+                pass
+        except FileNotFoundError:
+            pass
+        except (OSError, ValueError) as error:
+            _LOG.warning(
+                "the leftover clean-up could not list the output folder %s: %s",
+                settings.output_folder,
+                error,
+            )
     unclean = {folder for folder in {folder for _, folder in entries} if holds_leftovers(folder)}
     for folder in sorted(unclean):
         _LOG.warning("the write journal keeps %s until its clean-up succeeds", folder)
