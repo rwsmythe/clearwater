@@ -250,6 +250,22 @@
   DOWN at 282,316; fresh cell 10 (opus-high) from 175a8e8: remediation, R6 to convergence (a NEW major at R6 = STOP to
   me with a cap proposal), WINDOW REQUEST 4, report, B, gate. Record notes: jobs.py / export_panel grant GRANTED NOT
   USED; rounds exceed five because R5/R6 review a new step. WP4.4 gate running on wp4.4-mc (B clean 3/5).
+- **WP4.4 GATE RED 01:00Z on `wp4.4-mc` b901d7f: ONE package defect, the io/video token guard
+  (`tests/test_io_video_probe_rules.py:23-25` forbids `gpmd`; my Q2 allowlist names it; no net ran that file: shared
+  miss). Parallel 1 failed / 5,958; serial 2 failed (both pass alone, not WP4.4's). RULED 01:01Z (query e27c6641, post
+  f3519f74):** Q1 (a) GRANT on the guard test only: strip exactly one whole allowlist line before matching encode.py
+  (missing / doubled fails), controls (a second gpmd mention fails), comment names the msg id + GPMF rule; Q2 (a)
+  re-gate = full parallel + the two serial nodes alone, B stands, diff shown to me before the merge. Rows MINE at
+  WP4.4's accept: verify.py positional pairing; gui_startup overrun race (second load flake); V4 record raw values +
+  translation note only when non-zero (B F3/F4). B F5 controls FIXED in the same turn (test-only). Bench ratio flake
+  -> WP-DR87 observation. Lane: Codex seat 2 (83,227), one bounded turn.
+- **WP4.3 cell 10 STOP 01:01Z: R6 (Codex) blocked 0/1/3 (head 74586d4; R5 remediation done, app/main.py + one test
+  file only). RULED 01:08Z (query 2b2dfb47, post + cue):** Q1 (A) R6-1 (LatestWorkers not seen by the idle test)
+  RECLASSIFIED MINOR: outside V7's states (preview / frame / opener workers are not jobs); docstring states the exact
+  bound; **MINOR row MINE at WP4.3's accept** (residual, window-4 working-set evidence); (B) widened grant DECLINED.
+  Q2 (a) CAP: R6-2/3/4 fixed, NO R7, B reads them (named in B's prompt), record states the cap. Q3 (a): window 4
+  re-runs (a), (b), (d), plant-f + v7f-settled of record on the FINAL code after the (c)/(e) pairs and the 16-frame
+  V8, one consistent V7 table on one head. Cell 10 continues (157,884).
 - **(gen 7 history follows; newest facts at the end of the block)**
 - **GEN 7 PICKUP (was).** Orchestrator = **gen 22 `clearwater-orchestrator-20261029-0704`** (online 17:08Z from gen 21's
   state 736e403; gauge 38 ms; gen 21 was `clearwater-orchestrator-20261029-0425`, rolled 17:05Z at ~400K); ALL cues go there. Time the bash launch and record it here. Inbox: drain with `read --role charc --all`
