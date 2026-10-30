@@ -8,6 +8,7 @@ The parent side is ``ProcessExportJobs`` (its protocol tests, with fake children
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import subprocess
@@ -225,6 +226,9 @@ def test_q9_the_worker_and_the_in_process_engine_encode_the_same_frames(tmp_path
     frames_a, frames_b = _framemd5(a), _framemd5(b)
     assert len(frames_a) == len(frames_b) > 0
     assert frames_a == frames_b
+    # recorded, not asserted: the container's bytes may differ between two libx265 runs (Q9)
+    files = [hashlib.md5(path.read_bytes()).hexdigest() for path in (a, b)]
+    print(f"Q9: {len(frames_a)} decoded frames equal; file md5s (in-process, worker) {files}")
 
 
 @pytest.mark.parametrize(

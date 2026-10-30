@@ -9,6 +9,7 @@ Brief `docs/briefs/wp4.6-brief.md` FINAL on CHARC `39dad78f5b10ceeb`; base `b6a3
 |---|---|---|---|---|---|---|---|---|---|---|
 | 0 | 2026-10-30 | (no review: round-0 note) | - | - | - | - | - | - | - | 194,313 (cell 1, retired at round 0) |
 | Y1 (build) | 2026-10-30 | (no review: tasks 3-4, cell 2) | - | - | - | - | - | - | - | 171,586 (cell 2 at Y1, 05:08Z) |
+| Y2a (build) | 2026-10-30 | (no review: tasks 5-6, cell 2) | - | - | - | - | - | - | - | (dispatcher fills: cell 2 at Y2a) |
 
 ## Round 0 (task 2): the design restated, the Questions, the stops
 
@@ -321,3 +322,135 @@ the probe itself ended the grandchild. The committed test uses a heartbeat file 
 - The worker's log records are re-logged as `"<child logger name>: <message>"` under
   `clearwater.app.export_worker`, so the engine's INFO outcome line reaches the parent's log once,
   in that form.
+
+## Y2a (cell 2): tasks 5-6, the worker
+
+Dispatched after Y1 was accepted, with depth 171,586 at the Y1 yield (05:08Z). Y2 was SPLIT for
+depth: Y2a covers tasks 5-6 plus the `APP_MODULES` line; Y2b is listed below. Cell 2 depth at
+Y2a: (dispatcher fills).
+
+### Commits
+
+- `214d2624` test(wp4.6): RED. Adds `tests/test_app_export_worker.py` (new; module-level `slow`
+  with the brief's reason, plus `usefixtures("ffmpeg_tools")`) and `tests/test_app_deps.py`
+  (`APP_MODULES` gains `"export_worker.py"`; its docstring now says "WP4.1's two, WP4.3's four
+  and WP4.6's worker"). The Y1 depth is also filled in this ledger. RED lines: the worker
+  tests fail with `No module named clearwater.app.export_worker` (the malformed cases on
+  `assert 1 == 2`; the process-jobs cases on "The export worker ended without a result (exit
+  status 1)", whose tail is already redacted to `python.exe: No module named ...`); the deps
+  test fails on the module list. `15 failed, 5 passed`.
+- `5c060d44` feat(wp4.6): `src/clearwater/app/export_worker.py`. Two test changes ride with
+  it: the no-Qt probe now pops its own argument (`main` refuses arguments), and a new
+  level-mapping test, which failed for levels 5, 25 and 60 before the fix (see the loop below).
+- (this commit) test(wp4.6): the Q9 test prints the two file md5s (recorded, not asserted), plus
+  this entry.
+
+Green (targeted, in the worktree, CPU fixture only): `tests/test_app_export_worker.py` +
+`tests/test_app_deps.py` gave `25 passed in 43.55s`. Adding the Y1 files
+(`test_jobs_export_process.py`, `test_io_video_spawn.py`) gave `340 passed in 54.72s` (run
+before the md5 print was added). Slowest calls: Q9 16.9 s (two exports), the ok export 8.5 s,
+no-Qt 7.4 s, cancel 1.5 s, each malformed case under 1 s. `ruff check` passed on all touched
+files; `ruff format --check` reported them already formatted; `mypy
+src/clearwater/app/export_worker.py src/clearwater/jobs/export_process.py` found no issues. No
+GPU, no footage, no window, no full suite.
+
+Q9 of record (`clearwater-review-evidence\wp4.6\y2a\q9_identity.log`): `45 decoded frames equal;
+file md5 in-process 56a7d4676fa1c7774df0e3d11639c9bb, worker 1df16348f1ba1d5ce432590ff1f3baf7`.
+The decoded frames are identical and the files differ, as the round-0 probe found.
+
+### The worker as built (`src/clearwater/app/export_worker.py`)
+
+- Public surface: `main(argv=None) -> int`; `run(stdin, protocol, *, cancel=None,
+  sink_for=None) -> int`; `decode_request(line) -> WorkerRequest`; `RequestError(ValueError)`;
+  `EXIT_OK` 0, `EXIT_BAD_REQUEST` 2, `LOG_MESSAGE_CHARS` 8192.
+- `main` refuses any argument (exit 2, one stderr line). It then takes over stdout: it dups fd
+  1 as the binary protocol stream, `dup2`s stderr onto fd 1, sets `sys.stdout = sys.stderr`, and
+  calls `run(sys.stdin.buffer, protocol)`.
+- `run`:
+  1. Decodes the first stdin line. A failure writes one line `export worker: <reason>` to stderr
+     and returns 2; nothing goes to the protocol and no file is touched.
+  2. Starts the stdin watcher, which sets the cancel flag on `{"cancel": true}` or at EOF and
+     ignores other lines.
+  3. Installs the protocol log handler on the root logger (root at WARNING, `clearwater` at
+     INFO; both restored in a `finally`).
+  4. Builds `composition.export_jobs(app_version=..., cache_folder=<scratch>,
+     cache_limit_bytes=<request>, [sink_for=...])`, runs the job, sends the result line, and
+     returns 0.
+  5. An exception that escapes the engine propagates (a traceback on stderr, exit 1), so the
+     parent reports an exit without a result, with the redacted tail.
+- **For the Y2b hold worker:** `run(..., cancel=<its own Event>, sink_for=<a wrapper over
+  composition.video_sink>)`. Its sink can wait on "`release` marker exists or
+  `cancel.is_set()`". `run` uses the caller's Event as the stdin watcher's flag.
+- `decode_request` requires:
+  - exactly the eight keys and `format_version` 1 (not a bool);
+  - `source`, `cache_folder` and `app_version` as non-empty strings;
+  - `kind` "video" or "photo" (the engine's own kinds; the parent sends only "video");
+  - `cache_limit_bytes` as an int >= 0 (not a bool);
+  - `parameters` decoded by `ParameterSet.from_dict` and `settings` by
+    `Settings.from_json(json.dumps(obj))` (Q5; no migration or repair).
+- Protocol lines are sent whole under a lock as `json.dumps(ensure_ascii=True,
+  allow_nan=False)` + `\n`, flushed per line. A write that fails (the parent is gone) sets the
+  cancel flag instead of raising.
+- Log lines carry the message only (`record.getMessage()`, cut to 8,192 characters; no exception
+  text, so no path travels). The level becomes the standard one at or below the record's.
+
+### Verification loop (Y2a)
+
+| # | Suspected | Confirmed how | Outcome |
+|---|---|---|---|
+| 1 | After the takeover, a stray print, a raw fd-1 write or a grandchild started WITHOUT a stdout argument could reach the protocol | Probe `clearwater-review-evidence\wp4.6\y2a\stray_probe.py` (+ `.log`) on win32: `MARK-print`, `MARK-fd1` and `MARK-grandchild` all reached stderr; only `MARK-protocol` reached the protocol | REJECTED: the takeover covers all three on this machine (the UCRT `dup2` also moves the standard handle a grandchild inherits) |
+| 2 | A record at a custom level (e.g. 25) travels as `Level 25`, which the parent ignores as an unknown level | `test_a_log_record_carries_a_level_the_parent_accepts` failed for 5, 25 and 60 before the fix | FIXED (`5c060d44`): the standard level at or below the record's |
+| 3 | `python -m` with an argument (the no-Qt probe's `runpy` path) | The probe test failed by design once `main` refused arguments | Test changed (the probe pops its argument), product kept strict |
+| 4 | An engine exception escaping the job leaves no result | By reading: the traceback goes to stderr and the parent's exit-without-result path redacts it (Y1 tests) | Accepted as designed: no product change |
+
+Product fixes 1, test-only 1, reverts 0.
+
+### Y2b: what remains (for this cell or a fresh one; nothing below is started)
+
+1. **Builder** `composition.process_export_jobs(*, photo_exports, cache_dir, app_version=
+   clearwater.__version__, command=None) -> ExportJobs` in `src/clearwater/app/composition.py`
+   (Q2 as ruled: no `cache_limit_bytes`). `command` None = `[sys.executable, "-m",
+   "clearwater.app.export_worker"]`. It returns `ProcessExportJobs(...)`. Grant (c): ONE sentence
+   in composition's module docstring naming the builder; nothing else in that file.
+2. **Wiring** `src/clearwater/app/main.py:282` (inside `:281-287`): the first argument of
+   `GuardedExports(...)` becomes `composition.process_export_jobs(photo_exports=composition.
+   export_jobs(cache=cache), cache_dir=locations.cache_dir)`, where `locations` is
+   `build_application`'s parameter (`:244`). Nothing else in `main.py`.
+3. **Docstrings:**
+   - `src/clearwater/io/video/pipes.py`: the module and helper docstrings say "every product
+     FFmpeg, ffprobe AND Python worker launch" (no code change).
+   - `src/clearwater/app/__init__.py`: name the new module.
+   - Grant (b): the one sentence at `src/clearwater/app/activity.py:147` names the process form.
+4. **The three granted test edits (R0-STOP-1, the EXACT scope):**
+   - (i) NEW `tests/export_worker_hold.py`: a worker command for tests that calls
+     `export_worker.run` with its own cancel Event and a `sink_for` wrapper. The sink's first
+     `write` creates `writing` in a folder named by an environment variable, waits for `release`
+     or the cancel, then writes `returned`.
+   - (ii) Scenario (e) in `tests/test_app_v7.py:302-304, :322, :347`: the hold is set through the
+     process form's command and the marker folder. The witness `k1_renders_during_a_sink_write`
+     keeps its name and meaning.
+   - (ii) The `export` branch of `tests/test_app_wiring.py:749-760` (dr44c), same hook.
+   - (ii) `tests/test_app_startup.py:212-213`: the process form's type; its PHOTO leg is an
+     `ExportEngine` whose `_cache is application.cache`. The Q16 rule now reads "one GUI cache
+     per process, shared by the GUI and the photo export leg; the video worker has its per-job
+     scratch", and the report says so.
+   - The hold command needs a way in: `ProcessExportJobs`' `command` is set at construction, so
+     the test reaches it through the builder's `command=` or by replacing the instance's command.
+     **CHECK before building:** how the scenario/dr44c tests build the application (do they call
+     `build_application` with injectable engines?). If the hold cannot be set without a
+     `main.py` or `composition` change beyond items 1-2, that is a STOP.
+5. **Driver copy (iii):** a WP4.6 copy of `clearwater-review-evidence\wp4.3\windows\s7_driver.py`
+   (pinned md5 `0b9ee6cc3ebd2cf07c35dec934cfd901`). Its modes `v7e` and `dr44c-export`
+   (`s7_driver.py:979-989` swaps `exports._engine._sink_for`) use the same hook. `v7c` and `v7d`
+   run on the pinned driver unchanged. Its md5 is recorded at the window.
+6. **Task 8, the verification loop:** over the whole diff, then the targeted tests and markers
+   (the app tests touched by the wiring run serial-leg-sized; the dispatcher names which), ruff,
+   format, mypy.
+7. **Open for the window and the report (carried):**
+   - teardown versus `KILL_AFTER_CANCEL_S` after the result;
+   - the re-logged form `"<logger>: <message>"`;
+   - the cold analysis in the child versus N6's 10 % (ruling (a));
+   - (e) of the ruling: the GUI cache's accounting does not see `export/<uuid>`;
+   - (d) of the ruling: the serial-leg cost per GUI video-export test.
+8. **Unbuilt by choice:** the `gpu` form of the worker test. The brief makes it optional and
+   this dispatch said nothing on the GPU, so it is offered for the window, not built.
