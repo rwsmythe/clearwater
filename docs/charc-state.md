@@ -53,6 +53,12 @@
   WP4.3's `s7_driver.py` modes v7c / v7e / v7d / dr44c-export; STOPs: (c)/(e) > 100 ms, child CPU fallback, wall > +10 %,
   spawn > 10 s. Lane opus-high; dispatch AFTER WP4.3's accept (base filled by the orchestrator). No owner decision inside
   (V7 relaxation not proposed).
+- **WP4.3 WINDOW 5 CLOSED 02:07Z (status b5ddcb1b; no ruling needed):** on the reverted head `8eaa897` (product `7b4c10b`,
+  app/main.py only, item 1 kept) (a) 18.0 / (b) 19.0 / (d) 56.0 / (f) 50.6 ms from show() ALL PASS; the window-4 (b) 195
+  and (f) 395 STOPs were the gc policy's. One-head V7 table for the accept = these plus (c) 180.0 / 181.0 and (e) 182.0
+  OPEN STOPs of record (window 4). Cell 10 writes the RESUME HERE for cell 11 and retires; gen 25 (~390K) rolls at that
+  boundary; gen 26 dispatches cell 11 (report, B, gate). WP-DR87 round-0 runs (R0-A/B/C, GPU) at the orchestrator's seat;
+  its note comes to me (DR-94 = 37724 + 50740, no additions recommended; bench-ratio observation).
 - **(gen 8 history follows; newest facts at the end of the block)**
 - **GEN 8 PICKUP (was).** Orchestrator = **gen 23 `clearwater-orchestrator-20261029-0852`** (online 18:57Z; gauge 37 ms;
   gen 22 rolled 18:52Z at ~420K, state 5a1538a). ALL cues go there. Time the bash launch and record it here. Drain with
