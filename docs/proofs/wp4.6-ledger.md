@@ -11,8 +11,8 @@ Brief `docs/briefs/wp4.6-brief.md` FINAL on CHARC `39dad78f5b10ceeb`; base `b6a3
 | Y1 (build) | 2026-10-30 | (no review: tasks 3-4, cell 2) | - | - | - | - | - | - | - | 171,586 (cell 2 at Y1, 05:08Z) |
 | Y2a (build) | 2026-10-30 | (no review: tasks 5-6, cell 2) | - | - | - | - | - | - | - | 228,358 (cell 2 at Y2a); retired at 230,050 (05:21Z) |
 | Y2b (build) | 2026-10-30 | (no review: task 7 and 8, cell 3) | - | - | - | - | - | - | - | 142,340 (cell 3 at Y2b, 05:33Z) |
-| R1 | 2026-10-30 | WSL, codex-cli 0.162.1, gpt-6.1-sol / high; HEAD `7a20c7bd` | 0 | 8 reported: 5 confirmed blocking (F1 F2 F3 F5 F6), 2 banked pre-existing (F4 F8), 1 reclassified minor (F7) | 6 reported (+F7) | 5 blocking in / 2 minor out (F9 F10) | 14 NEW / 0 REOPENED | 0 | product 8 (F1 F2 F3 F5 F6 F7 F9 F10) / test-only 4 (F11-F14), by cell 4 | 224,076 (cell 3 at the R1 yield); retired at 231,402 (05:57Z) |
-| R1 remediation | 2026-10-30 | (no review: cell 4 fixes, HEAD `c80061d1`) | - | - | - | - | - | 0 | product 8 / test-only 4 | (dispatcher fills: cell 4 at the remediation) |
+| R1 | 2026-10-30 | WSL, codex-cli 0.162.1, gpt-6.1-sol / high; HEAD `7a20c7bd` | 0 | 8 reported: 5 confirmed blocking (F1 F2 F3 F5 F6), 2 banked pre-existing (F4 F8), 1 reclassified minor (F7) | 6 reported (+F7) | 5 blocking in / 2 minor out (F9 F10) | 14 NEW / 0 REOPENED | 0 | product 6 (F1 F2 F3 F5 F6 F7) / test-only 4 (F11-F14), by cell 4; F9 F10 Limits (CHARC `e15d408a`) | 224,076 (cell 3 at the R1 yield); retired at 231,402 (05:57Z) |
+| R1 remediation | 2026-10-30 | (no review: cell 4 fixes, HEAD `c80061d1`; CHARC `e15d408a` applied at `c328be95`) | - | - | - | - | - | 2 (F9, F10 by ruling) | product 6 / test-only 4 | (dispatcher fills: cell 4 at the remediation) |
 | R2 | 2026-10-30 | WSL, codex-cli 0.162.1, gpt-6.1-sol / high; HEAD `f91aea96` | 0 | 2 reported: 1 confirmed blocking (R2-2), 1 non-blocking by the verifiably-prevents rule (R2-1) | 3 reported (R2-3 R2-4 R2-5) | 1 blocking in; R2-1 not reachable by a product spawn | 5 NEW / 0 REOPENED | 0 | (remediation not started) | (dispatcher fills: cell 4 at R2) |
 
 ## Round 0 (task 2): the design restated, the Questions, the stops
@@ -617,6 +617,16 @@ rulings applied: F2, F3 and F6 IN envelope (design item 4's strict-ignore rule n
 and unknown keys); remediate F1 F2 F3 F5 F6 F7 F9 F10 F11-F14 as cell 3's plan names them; F4
 and F8 BANKED (no fix; `jobs/export.py` not owned), their Limit text below.
 
+**CHARC ruling `e15d408ac31ce62b` (05:57:49Z, relayed after the R2 yield; it GOVERNS and supersedes
+the dispatch where they differ):** F1 one deadline from the cancel line, no restart (as built);
+F5 file names only, with a test over folder names holding spaces, apostrophes and NON-ASCII
+(non-ASCII cases added, `bf1035dc`); F6 the warning names the key's LENGTH and at most its first
+8 characters (`bf1035dc`, superseding `a1d8d538`'s bare "an unknown key"); F9 and F10 out of
+envelope: report LIMITS, no code change (F9's words reverted in `bf1035dc`, F10 reverted in
+`c328be95`); F8 = (b): CHARC's register row at the accept and a report Limit, no grant, no
+parent-side check, design item 7's sentence WITHDRAWN; F4 a register candidate at the accept
+(CHARC's); F2/F3/F6 in envelope concurred; F7 and F11-F14 as adjudicated.
+
 ### Commits (each blocking fix: its RED test first, then the fix)
 
 | Finding | RED commit and its failure line | Fix commit |
@@ -624,14 +634,17 @@ and F8 BANKED (no fix; `jobs/export.py` not owned), their Limit text below.
 | F1 | `0dccdc61` `test_a_result_after_the_cancel_does_not_restart_the_kill_grace`: `'export worker killed: still running 1.0 s after its result' != '... after its cancel'` | `e900cb1c` the grace runs from the EARLIER trigger (the cancel line when one was sent, else the result); the kill log names that trigger |
 | F3 | `1046a21d` `test_an_invalid_line_is_ignored_and_logged[elapsed_s-overflow]`: `AssertionError: ('an elapsed_s too large for a float (R1 F3)', 'The export worker ended without a result (exit status 0).')` | `775b0111` `float(elapsed)`'s `OverflowError` is an invalid line ("a non-finite number") |
 | F2 | `49e6f971` two failures: the list-level case of `test_an_invalid_line_is_ignored_and_logged` and `test_any_error_decoding_one_line_ignores_that_line_only`, both `The export worker ended without a result (exit status 0).` | `3144d567` the level is type-checked before the lookup; `_read_lines` turns ANY exception from one line's decode into `("invalid", "a line that could not be decoded (<type>)")` |
-| F6 | `5325f866` `test_an_unknown_key_is_logged_without_the_key`: `"export worker line ignored: an unknown key 'C:\\\\Owner\\\\Private\\\\GPS'" != 'export worker line ignored: an unknown key'` | `a1d8d538` the reason is "an unknown key", nothing more |
+| F6 | `5325f866` `test_an_unknown_key_is_logged_without_the_key`: `"export worker line ignored: an unknown key 'C:\\\\Owner\\\\Private\\\\GPS'" != 'export worker line ignored: an unknown key'` | `a1d8d538` the reason dropped the key; then `bf1035dc` per CHARC: "an unknown key of <length> characters, first '<at most 8 characters>'" (test renamed `test_an_unknown_key_is_logged_by_its_length_and_first_8_characters`) |
 | F5 | `549c9854` `test_a_folder_name_that_continues_a_known_folder_or_holds_an_apostrophe_is_cut`: `AssertionError: ('Archive', '... could not open my clips Archive\\hiddenA\\a.mp4 ...')` | `89d16c3b` a known folder followed by more name text up to a separator is cut with it; an apostrophe is part of a name when a word character follows it or when the text after it reaches a separator before any quote; a segment may begin with `'` before a word character |
-| F7, F9 | (minor) | `9bf3dff0` the cancel re-checked after the first job's sweep (nothing spawned); the drain warning says "no longer waited for" |
-| F10 | (minor) | `403fa1bf` `type(format_version) is not int` refused; the malformed-request test gains "format_version 1.0" |
+| F7 | (minor) | `9bf3dff0` the cancel re-checked after the first job's sweep (nothing spawned) |
+| F9 | (minor, out of envelope) | `9bf3dff0` changed the drain warning's words; REVERTED in `bf1035dc` per CHARC (a Limit) |
+| F10 | (minor, out of envelope) | `403fa1bf` an integer check; REVERTED in `c328be95` per CHARC (a Limit) |
+| F5 (ruling) | (test) | `bf1035dc` non-ASCII folder names under a known folder and in an unknown path, written to stderr as UTF-8; green on the F5 code |
 | F7 test, F11-F14 | (test-only) | `c80061d1` see below |
 
-Product vs test-only: product code changed for F1 F2 F3 F5 F6 F7 F9 F10 (8); tests only for
-F11 F12 F13 F14 (4). Reverts: 0.
+Product vs test-only: product code changed for F1 F2 F3 F5 F6 F7 (6); tests only for F11 F12
+F13 F14 (4). Reverts: 2 (F9 and F10, by CHARC's ruling; the product is as at `bab063a5` for
+both).
 
 ### Choices and deviations (stated, for review)
 
@@ -644,7 +657,9 @@ F11 F12 F13 F14 (4). Reverts: 0.
   separator is cut through it: `C:\Photos\Dive is not writable: C:\other\x.mp4` becomes
   `x.mp4`. No name leaks; diagnostic words can be lost. `C:\Photos\Dive is not writable` (no
   later separator) keeps its words (`Dive is not writable`). Quoted paths (tracebacks, OSError
-  texts, list reprs) are bounded by their quotes and come out as `'a.mp4' -> 'b.mp4'`.
+  texts, list reprs) come out as `'a.mp4' -> 'b.mp4'`; but a quoted path followed by prose that
+  reaches a second path is joined to it (R2-3, below), so "bounded by their quotes" is not
+  true of every shape.
 - **F13, the reader retries instead of an atomic replace.** `os.replace` onto `beat` fails on
   Windows while the test holds the file open (no delete sharing), which would end the
   grandchild. The grandchild keeps `write_text`; the test reads through `_read_beat`, which
@@ -673,9 +688,20 @@ F11 F12 F13 F14 (4). Reverts: 0.
   OUTPUT folder's volume (`jobs/export.py:916`, introduced by `0daab17f`, WP3.21). Before WP4.6
   only a cold batch video item met this; now every video export's analysis is cold (the
   worker's per-job scratch), so an export whose cache folder and output folder are on different
-  volumes can fill the cache volume without D87's refusal. Design item 7's sentence "now
-  against the scratch folder's volume" does not hold. Recommendation (b) put to CHARC: a DR
-  row and this Limit.
+  volumes can fill the cache volume without D87's refusal. Bounded: the scratch cache is a
+  `DiskProxyCache` under `request.settings.cache_limit_bytes`, one clip per job, removed after
+  the result. Design item 7's sentence "now against the scratch folder's volume" is WITHDRAWN
+  (CHARC `e15d408a`); the actual rule: the D87 re-check charges the analysis cache's growth to
+  the OUTPUT folder's volume (`jobs/export.py:916`). CHARC writes the register row at the
+  accept (ruled (b)).
+- **F9 (out of envelope; CHARC: a Limit, no code change).** After the worker exits, the parent
+  stops waiting for its stdout once the output has been quiet `DRAIN_AFTER_EXIT_S` (1.0 s); the
+  stdout and stderr reader threads (daemon) then live on until whatever holds the pipe closes
+  it. The warning's words "no longer read" mean "no longer waited for". Reachable only when a
+  grandchild inherits the worker's stdout or stderr, which no product spawn does.
+- **F10 (out of envelope; CHARC: a Limit, no code change).** The worker accepts a request whose
+  `format_version` equals 1 as any JSON number (`1.0`), refusing `true` and every other value;
+  the parent always writes the integer 1, and the request is written by no one else.
 
 ### Targeted runs (worktree, CPU only; no full suite, footage, GPU, fullclip or window)
 
@@ -687,6 +713,10 @@ F11 F12 F13 F14 (4). Reverts: 0.
 - `uv run ruff check .`: All checks passed. `uv run ruff format --check .`: 292 files already
   formatted. `uv run mypy`: Success, no issues found in 148 source files.
 - Committed blobs carry no CR (`tr -cd '\r' | wc -c` = 0 on the four touched files).
+- After CHARC's ruling (`c328be95`): `tests/test_jobs_export_process.py` `59 passed in 12.05s`;
+  the same four files `348 passed in 62.17s`, exit 0 (one fewer: the F10 case is gone); ruff
+  check passed, 292 files already formatted, mypy no issues in 148 files; no CR in the four
+  committed files.
 
 ### Verification loop (R1 remediation)
 
@@ -724,3 +754,33 @@ and showed its own source-level probes.
 
 Counts: reported critical 0, major 2, minor 3. Blocking NEW in-envelope 1 (R2-2). REOPENED 0.
 Rejected 0. Remediation is NOT started (the dispatch: yield with `R2 ADJUDICATED:` first).
+
+Round 2 reviewed `f91aea96`, which still held F6's bare form and the F9/F10 code changes that
+CHARC's ruling (`e15d408a`, relayed after the round) then reverted or reshaped (`bf1035dc`,
+`c328be95`); the round raised nothing on them.
+
+**For CHARC (`e15d408a`: "a NEW major at R2 on the protocol class comes to me with a cap
+proposal").** The NEW majors at R2 are in the protocol class: R2-2 (BLOCKING: the parent's
+redaction of what the worker emits misses a folder name that begins with a space) and R2-1
+(non-blocking by citation: the drain waits after a kill). R2-2 is the second round running in
+which the reviewer found a redaction shape the name grammar missed (R1 F5: a space after a known
+folder, an apostrophe; R2-2: a leading space; R2-3: the F5 fix over-reaching). The cell's cap
+proposal:
+
+1. Close the redaction class BY CONSTRUCTION, not by a name grammar: in every text the parent
+   makes from the worker's output (the stderr tail) and in its own start and encode texts, each
+   line is cut from its FIRST path root (a drive `X:`, a UNC `\\`, a known folder, or a `/` after
+   a non-word character) to the LAST separator on that line; only what follows that separator
+   is kept. No rule about spaces, apostrophes, quotes or non-ASCII is involved, so no folder
+   component on such a line can survive. The cost is over-redaction: words between two paths
+   on one line are lost (`could not open 'one.mp4' while checking D:\x\two.mp4` keeps only
+   `two.mp4`), which also turns R2-3 into accepted behaviour. Relative paths stay as today.
+2. The round cap for the protocol class: round 3 is the last counted round for it. A finding
+   in that class at R3 or later that is reachable only through a non-product grandchild or a
+   line beyond the strict-ignore rule is a report Limit and never drives a loop; a NEW
+   in-envelope major in it at R3 comes to CHARC as a STOP with its reproduction, not as
+   another remediation round.
+
+If CHARC prefers the existing grammar, the cell's fallback is the adjudicated plan (an anchored
+component may begin with whitespace or an apostrophe; the apostrophe lookahead does not cross a
+`:`), with R2-3's residual stated.
