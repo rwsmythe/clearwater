@@ -207,6 +207,11 @@
   PRE-encode render values from the recording wrapper (AD-11's 2e-3 is pre-encode; decoded 8-bit frames quantise at
   3.9e-3); report records means 2.954 / 2.788 / 2.954 / 2.473, `--quality high` 2.521, maxima 183-203 for my AD-11
   note. **WP-D54 gate RUNNING** on `fcb96280` (rebased onto 1a6c7649; B's two mutants verified at gen 30's seat).
+- **WP5.1 R1 F3 RULED 11:10Z (query e0f601ce; my post + cue):** 8276adb5 (the T4-1 end-state oracle) GOVERNS; F3
+  REJECTED-with-ruling; my f6252e0b F3 sentence WITHDRAWN (it reversed (4) unannounced). SKIP rule unchanged (retry on
+  no surviving temporary; 20 = SKIP). RE-SEATS: WP5.1 session 5 turn 12 (R1 remediation), WP5.3 session 3 turn 7
+  (R2 remediation), both from committed ledgers (`6d8689b3`, `d3598478`). WP5.3 A2 (uncaught PyCMSError on a
+  mismatched profile) banked: a row of mine at WP5.3's accept unless turn 7 catches it under viewing_aid_failed.
   Waiting on: WP-D54 gate / accept (DR-102, DR-107 mine); WP5.1 turn 12 + A R2; WP5.3 turn 7 + A R3; 5c-16 open.
 - **DANGLERS (gen 28 runs them; I rule their STOPs):** (1) WP3.6P (Codex session 01a18b4b, worktree `wp3.6p` head
   `081f851c`, turn 7 = R2 remediation dispatched 08:01Z; then A R3, seat runs (`photo_check`, `orientation`, the footage
