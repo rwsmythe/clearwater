@@ -9,7 +9,68 @@
 
 ---
 
-### RESUME HERE (CHARC generation 10 LIVE: `clearwater-charc-20261031-2201`, online 2026-11-01 08:03Z, launched by gen 9 at its roll; gen 9 rolled 2026-11-01 ~08:00Z at ~410K; gen 8 2026-10-30 ~01:58Z; gen 7 2026-10-29 ~19:00Z)
+### RESUME HERE (CHARC generation 11: read this block top to bottom; gen 10 `clearwater-charc-20261031-2201` ROLLED 2026-11-01 ~17:30Z at ~403K, clean boundary, no cell at CHARC's seat; gen 9 rolled 2026-11-01 ~08:00Z; gen 8 2026-10-30 ~01:58Z)
+
+- **GEN 11 PICKUP (read first).** Orchestrator = **gen 30 `clearwater-orchestrator-20261101-0043`** (online 10:45Z;
+  re-read `comms/.launch-sessions.json` before every cue; the launcher rewrites it). Time the bash launch and record
+  it here. Drain with `read --role charc --all` (gen 10 stopped draining at its announce). Main `c81831f9` + any later
+  orchestrator commit; FREE. Subjects: the outcome and ONE item, about 80 chars (gen 10 slipped twice at 125 / 136).
+  Any script or body with a backslash goes through the Write tool (gen 10 committed one CR byte via a heredoc, fixed
+  `3a950ed8`); `tr -cd '\r\v' | wc -c` = 0 BEFORE every commit. **Claude usage 89 % at 17:24Z, pace ~1.0, reset
+  2026-11-02 09:59Z; THE 92 % RULE (my c2f1d6f4) STANDS: no Claude review pass (A or B) starts at >= 92 %; Codex
+  turns continue; WP3.6P's passes before WP5.x; no reviewer-tier downgrade.** Codex 14 % / 0.228.
+  **LIVE BOARD (verify in `docs/orchestrator-state.md` and gen 30's last posts):**
+  (1) **WP-D54** (Codex; `encode.py` D54 warning two-branch text by resolved range, my 26f0d3d0; A clean, B clean, test-only
+  turn 5 with B's mutants verified): gate on `fcb96280`; parallel GREEN; SERIAL attempt 2 running ALONE since 17:21Z
+  after attempt 1 HUNG 6 h on `test_gui_export_panel.py::test_failure_is_an_error_naming_the_file_with_owner_export`
+  (DR-108). A second hang = STOP to you with the node. At its accept MINE: DR-102 (D54 wording defect CLOSED, both
+  branches; F2/F3/F5 notes) and DR-107 (probe open-path `missing_tags` text says limited range for an untagged
+  yuvj full-range source; remedy in `io/video/probe.py`); then WP5.1's T6-1 witness node on a rebased candidate.
+  (2) **WP-T7** (gate hygiene; brief DRAFTED by gen 30 on branch `wp-t7` `a9fa11cd`, my commission 28ac8400 folded;
+  Codex, XS): `pytest-timeout` MIT in dev (N13 approved by me), per-leg `--timeout` 600 / 1,200 / 2,400 s, method
+  `thread`, `timeout_func_only`, `faulthandler_timeout = 300`, one proof test, GATE_CHECKS + CLAUDE.md. **RULED at my
+  roll (announce post): the thread method os._exit-s the process after the dump (gen 30's reading of the docs is
+  right): a timed-out leg = STOP with the node and the stacks, re-run after; the proof test asserts the ACTUAL
+  behaviour (whether a later test runs) and the brief/GATE_CHECKS wording follows it.** Turn 1 HELD until the serial
+  leg ends (standing rule: no other pytest on the host during a serial leg). At its accept MINE: DR-109 CLOSED,
+  CLAUDE.md gate line.
+  (3) **WP5.1 acceptance suite** (Codex session 5; brief `2050a89a` + my rulings: round 0 aef1b5e5, T2-1 1e1c5cf1,
+  T3-1 0306493b, T4-1 d0167d13 (the crash oracle by END STATE, final; F3 346d33b8: it governs), T6-1 fc8120b4
+  (product defect -> WP-D54), T6-2 3741291b (`RUNNER_POSTENCODE_MEAN = 3.5`; serial budget 300 s), A R1 c6e471f3
+  (real-interpreter kill; control +8/255; gpu node pre-encode)). Head `a53a4f03`+; R1 remediation done `5f75a03a`.
+  Queue after the serial leg: the gpu + 2 gui seat run, then Reviewer A R2 (Claude, 92 % rule). T6-1 node stays RED
+  until WP-D54 lands. Gate = two legs + the `fullclip` leg once. At its accept MINE: plan section 7 completion
+  pointer; AD-11 NOTE (post-encode 3.5/255 at shipped quality; means 2.954 / 2.788 / 2.954 / 2.473, `--quality
+  high` 2.521, maxima 183-203; pre-encode bound unchanged); AD-30 NOTE (committed fixtures used unchanged for the
+  sweep); the serial-leg delta; G2 creation-time Limit if WP3.10 / WP4.4 did not document it.
+  (4) **WP5.3 review pack** (Codex session 3; brief `2050a89a` + rulings: round 0 0a962acc (photo resolver, rotation
+  adapter, IMG_6762 whole), R1 F1 bc6da3fe (copy + regenerate `tmcd`; silent whole-source fallback WITHDRAWN, fail
+  loudly), R2 e6a66c87 (fail-loudly generalised to viewing aids; row KEPT with `viewing_aid_failed`, output linked)).
+  Head `ed787934` (R2 remediation, 123 passed). Next: Reviewer A R3 (round 3 of 5), then the RUN REQUESTS at gen
+  30's seat (Q8 order: photos, presets, page; phone, Snorkel, SCUBA clips; one heavy job at a time, 25 GB free), B,
+  gate, accept. At its accept MINE: AD-13 NOTE (both starter presets value-identical in v1; the owner may diverge
+  Scuba at CP5); a row for A2 (uncaught PyCMSError on a mismatched profile) unless caught; then the pack + sheet go
+  to the OWNER for CP5 (look check and V2 are OWNER-reserved; I write `docs/proofs/cp5-visual-review.md` after).
+  (5) **WP3.6P** (Codex session 3; A converged R3 (reasoned only; convergence CONDITIONAL on an executing B, my
+  88ed545f); 5b-r2 CLOSED 62/62: 50 discriminating, 12 inconclusive, 0 discordant, 7 oracle-rounded; Q4 and 5c-8
+  EXIT 0). Owed: 5c-16 (16-bit export, ~45 min / 3.8 GB) and 5d (memory), each EXCLUSIVE, opened / closed to you;
+  then report, B (Claude, EXECUTING, 92 % rule), gate, accept. At its accept MINE: **AD-24 status = CONFIRMED on 50
+  discriminating real HEICs across all four irot classes** (tag-only branch unwitnessed: FFmpeg honours irot and
+  ignores EXIF-only); DR-42 (a)/(c) notes; DR-43 note; NEW row EXIF ColorSpace read as untagged; Result 2 photo row
+  closed; spec items for the owner's next revision bundle: D63 'provisional' wording, :567 photo resolution = 24.5
+  MP max.
+  (6) **WP5.2** (performance and memory, EXCLUSIVE, gpu) NOT commissioned: after the danglers' windows close; brief
+  yours (plan rows; V15 / V16 on full clips; N6 final figure, AD-21).
+  **DONE THIS GENERATION:** Phase 5 commissioned (`dd3cf1eb` briefs; dispatched `2050a89a`); WP4.6 ACCEPTED
+  `bbb4ef3e` (my rows `ae8afd9a`: DR-98 CLOSED, AD-31, AD-23 extended, DR-103..106). Register through DR-109
+  (DR-102 / DR-107 reserved for WP-D54). Orchestrator gens 28 -> 29 -> 30 rolled cleanly.
+  **OWNER NOTE (advisory, relayed in my recaps): keep gen 29's pane (`-20261031-2335`) open until gen 30 says its
+  three child passes returned; the resumed gen 28 pane (`-20261029-2103`) may be closed.** Open owner decisions:
+  none. Owner-pending inputs: none. Owner action pending: none. Next owner checkpoint: CP5 (the WP5.3 pack with
+  its sheet). Every owner-facing summary ends with those lines. Form debt of this file (2,300 lines of history under
+  an overwritten pointer): propose the split into `docs/charc-log.md` at the Phase 5 close, not mid-phase.
+- **(gen 10 history follows; newest facts at the end of its block; then gen 9 and older)**
+### GEN 10 (was LIVE: `clearwater-charc-20261031-2201`, online 2026-11-01 08:03Z, launched by gen 9 at its roll)
 
 - **GEN 10 LIVE STATE (read first; a successor re-verifies each fact by its method).** Orchestrator = **gen 30
   `clearwater-orchestrator-20261101-0043`** (online 10:45Z, gauge 38 ms; gen 29 rolled 10:43Z; gen 28 09:35Z) (gen 28 resumed 08:01Z on the owner's "resume"; status 225d1163: paces Codex 0.197,
