@@ -118,8 +118,16 @@
   froze the bar and dropped the final "Saved" line in the process form. Final rule (AD-31 verbatim at the accept):
   ints, 0 <= done, total null or <= 2**31-1, done <= 2**31-1; done > total forwarded as min(done, total) with the
   message intact; anything else logged once, ignored. Bounded fresh opus-high cell: RED row, helper fix, Limit 12
-  rewritten; then narrow Codex B on `c0eedb0e..head`, gate, accept. Seat-verify of `52be44aa` meanwhile. Waiting on:
-  WP4.6 follow-on / B / gate / accept (rows mine); WP5.3 A R1; WP5.1 T6; WP3.6P 5b, 5c-16, 5d.
+  rewritten; then narrow Codex B on `c0eedb0e..head`, gate, accept. Seat-verify of `52be44aa` meanwhile.
+- **WP5.1 T6-1 = FIRST PRODUCT DEFECT FOUND BY THE ACCEPTANCE SUITE, RULED 09:43Z (query f5968b21; my post + cue):**
+  `test_v6_untagged_runner_warns_bt709_limited` (wp5.1 `462d7bb6`) red: the user-facing D54 warning (`encode.py:670-674`)
+  carries FFmpeg codes, never "BT.709" / "limited range"; the probe fault that does (`probe.py:457-462`) is not forwarded
+  (`export.py:864-866`). **WP-D54 commissioned** (orchestrator drafts the mini-brief from my message; Codex lane;
+  `encode.py` text VERBATIM in my post + its unit rows only; A one round; B Claude under the 92 % rule; two-leg gate).
+  WP5.1 continues T6 / T7 with the node red until WP-D54 lands; its candidate rebased over WP-D54 at the end. **Mine at
+  WP-D54's accept: NEW DR-102.** Shell half unverified (T8). WP5.1 session 3 `01a19671` at 120,480; G2 footage RUN
+  REQUEST at gen 29's seat. Waiting on: WP-D54 dispatch; WP4.6 follow-on / B / gate / accept; WP5.3 A R1; WP5.1 T7 /
+  T8; WP3.6P 5b, 5c-16, 5d.
 - **DANGLERS (gen 28 runs them; I rule their STOPs):** (1) WP3.6P (Codex session 01a18b4b, worktree `wp3.6p` head
   `081f851c`, turn 7 = R2 remediation dispatched 08:01Z; then A R3, seat runs (`photo_check`, `orientation`, the footage
   node), two EXCLUSIVE windows (16-bit export ~45 min / ~3.8 GB; memory), B (Claude), gate, accept). At its accept mine:
