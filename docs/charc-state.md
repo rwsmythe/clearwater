@@ -16,7 +16,7 @@
   Claude 0.994 = 84 % at 84.5 % of the window, Claude resets 2026-11-02 09:59Z, Codex 2026-11-04 10:07Z). ALL cues go
   there; re-read `comms/.launch-sessions.json` before every cue. Bash gauge 34 ms. Drain `read --role charc --all`.
   Main `ae8afd9a` clean, FREE. C: 176 GB free, D: 2.4 TB. Subjects under 100 chars; see the `posted ->` line before
-  cueing. Codex-built packages: 9. Register through DR-106 (DR-102 reserved for WP-D54).
+  cueing. Codex-built packages: 9. Register through DR-109 (DR-102 / DR-107 reserved for WP-D54).
 - **PHASE 5 COMMISSIONED 08:14Z (post b488ac53 + cue; owner-decided parallel with the danglers):** briefs
   `docs/briefs/wp5.3-brief.md` (165 lines) and `docs/briefs/wp5.1-brief.md` (185 lines), both DRAFT by me on main
   `dd3cf1eb` (0 CR), FINAL on b488ac53 with the orchestrator's dispatch fill (base, yields, GATE_CHECKS). Both Codex lane,
@@ -212,7 +212,17 @@
   no surviving temporary; 20 = SKIP). RE-SEATS: WP5.1 session 5 turn 12 (R1 remediation), WP5.3 session 3 turn 7
   (R2 remediation), both from committed ledgers (`6d8689b3`, `d3598478`). WP5.3 A2 (uncaught PyCMSError on a
   mismatched profile) banked: a row of mine at WP5.3's accept unless turn 7 catches it under viewing_aid_failed.
-  Waiting on: WP-D54 gate / accept (DR-102, DR-107 mine); WP5.1 turn 12 + A R2; WP5.3 turn 7 + A R3; 5c-16 open.
+- **WP-D54 GATE: SERIAL LEG HUNG 6 h (status 81530290, 17:21Z): `test_gui_export_panel.py::test_failure_is_an_error_
+  naming_the_file_with_owner_export` stuck in `rig.wait_export_idle()` at node 242 from ~11:09Z, found 17:18Z (the
+  watch saw only the final line); passes alone; two Codex light suites ran concurrently; no stack. Parallel leg had
+  passed (6,132 / 1 skip, 413 s). Serial RE-RUNNING ALONE (attempt 2, 5-min stall watch). MY RULING (post + this
+  commit): NEW DR-108 (the deadlock; trigger second occurrence or the next owner of the rig, 50x under load) and
+  DR-109 (no per-test timeout) WRITTEN; **WP-T7 COMMISSIONED** (orchestrator drafts; Codex; `pytest-timeout` MIT in
+  dev (N13 approved here; tripwire pass = the post), per-leg `--timeout` 600 / 1,200 / 2,400 s thread method,
+  `timeout_func_only`, `faulthandler_timeout = 300`, one proof test, GATE_CHECKS + CLAUDE.md); STANDING RULE: no other
+  pytest on the host during a serial leg. Second hang = STOP with the node. WP5.1 turn 12 `5f75a03a` (crash node
+  15/15); WP5.3 turn 7 `ed787934` (123 passed). Claude 88 %. Register through DR-109 (DR-102 / DR-107 reserved for
+  WP-D54's accept). Waiting on: serial attempt 2; WP-D54 accept; WP5.1 A R2; WP5.3 A R3; WP-T7 dispatch; 5c-16 open.
 - **DANGLERS (gen 28 runs them; I rule their STOPs):** (1) WP3.6P (Codex session 01a18b4b, worktree `wp3.6p` head
   `081f851c`, turn 7 = R2 remediation dispatched 08:01Z; then A R3, seat runs (`photo_check`, `orientation`, the footage
   node), two EXCLUSIVE windows (16-bit export ~45 min / ~3.8 GB; memory), B (Claude), gate, accept). At its accept mine:
