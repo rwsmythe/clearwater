@@ -389,28 +389,29 @@ def _converse(
 
     Three daemon threads do the blocking I/O (stdin writes, stdout lines, the stderr tail), so
     this thread only waits on a queue for at most :data:`POLL_S` at a time. An exception that
-    escapes (a ``progress.report`` that raises, or a thread that cannot start) kills the worker
-    first: it never outlives its job. A pipe whose thread never started is closed here.
+    escapes (a ``progress.report`` that raises, a failure while the conversation is set up, or
+    a thread that cannot start) kills the worker first: it never outlives its job. A pipe whose
+    thread never started is closed here.
     """
     stdin, stdout, stderr = process.stdin, process.stdout, process.stderr
     assert stdin is not None and stdout is not None and stderr is not None  # all three are PIPE
-    lines: queue.Queue[tuple[str, Any]] = queue.Queue()
-    writes: queue.Queue[bytes | None] = queue.Queue()
-    tail = _Tail()
-    unstarted: list[IO[bytes]] = [stdin, stdout, stderr]
-    result: _ChildResult | None = None
-    result_at: float | None = None
-    cancel_at: float | None = None
-    quiet_since: float | None = None  # the worker has exited: when its output last moved
-    ended = killed = False
+    started = 0  # the I/O threads started, in pipe order; each closes its own pipe from then on
     try:
+        lines: queue.Queue[tuple[str, Any]] = queue.Queue()
+        writes: queue.Queue[bytes | None] = queue.Queue()
+        tail = _Tail()
+        result: _ChildResult | None = None
+        result_at: float | None = None
+        cancel_at: float | None = None
+        quiet_since: float | None = None  # the worker has exited: when its output last moved
+        ended = killed = False
         for target, args, name in (
             (_write_lines, (stdin, writes), "export-worker-stdin"),
             (_read_lines, (stdout, lines), "export-worker-stdout"),
             (tail.drain, (stderr,), "export-worker-stderr"),
         ):
             threading.Thread(target=target, args=args, name=name, daemon=True).start()
-            unstarted.pop(0)  # from here that thread closes its pipe
+            started += 1
         writes.put(request_line)
         while True:
             kind: str | None
@@ -464,8 +465,9 @@ def _converse(
     except BaseException:
         process.kill()
         process.wait()
-        writes.put(None)
-        for stream in unstarted:
+        if started:  # the stdin thread runs: it closes the pipe on the None
+            writes.put(None)
+        for stream in (stdin, stdout, stderr)[started:]:
             with contextlib.suppress(OSError, ValueError):
                 stream.close()
         raise
