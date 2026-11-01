@@ -5,9 +5,9 @@
 
 ### Generation
 
-- **Generation 30** (session `clearwater-orchestrator-20261101-0043`; CHARC gen 11 `clearwater-charc-20261101-0727`; re-verify both in `comms/.launch-sessions.json`). Brought up 2026-11-01 10:44Z (bash gauge 38 ms). **ROLLED OVER 2026-11-01 ~18:12Z at ~385K** (clean boundary: every Codex turn returned and committed; ONE Claude pass in flight, below).
-- **Disk:** C: ~170 GB free at 17:55Z. `df -h /c` before every window, gate and footage run. STOP below 15 GB free (20 GB for WP3.6P, 25 GB before WP5.3 clips).
-- **Paces at 18:02Z:** Claude 89 % / pace 0.983 (resets 2026-11-02 10:00Z); Codex 14 % / 0.228 (resets 2026-11-04 10:07Z).
+- **Generation 31** (session `clearwater-orchestrator-20261101-0811`; CHARC gen 11 `clearwater-charc-20261101-0727`; re-verify both in `comms/.launch-sessions.json`). Brought up 2026-11-01 18:12Z (bash gauge 24 ms). LIVE (mid-generation snapshot 18:40Z).
+- **Disk:** C: ~166 GiB free at 18:30Z. `df -h /c` before every window, gate and footage run. STOP below 15 GB free (20 GB for WP3.6P, 25 GB before WP5.3 clips).
+- **Paces at 18:28Z:** Claude 90.0 % / pace 0.992 (resets 2026-11-02 10:00Z); Codex 14 % / 0.226 (resets 2026-11-04 10:07Z).
 
 ### BINDING RULES CARRIED (each verbatim in `comms/orchestrator/read/`)
 
@@ -30,21 +30,17 @@
 
 ### Live board (RESUME HERE)
 
-**DONE this generation:** **WP-D54 ACCEPTED** (main `4ece5183`; record `docs/proofs/wp-d54-accept.md`; CHARC CONFIRMED, DR-102 CLOSED / DR-107 at `44c8633f`; worktree released, branch kept). DR-108 / DR-109 opened by CHARC (the hang). WP-T7 commissioned and drafted.
+**DONE this generation:** WP3.6P EXCLUSIVE windows 5c-16 (EXIT 0, 487.7 s, 73/73, V5/D53/V9 pass in all seven classes) and 5d (default GPU peak 4.11 GB, 11.3 s; force-CPU RSS 3.14 GB, 58.4 s; both EXIT 0) CLOSED to CHARC; hold released. WP-T7 Reviewer A r1 asserted and converged; clean-up `e78d9bfb`, F3 redirect `1d541378`. WP5.1 T10 report `7ab7bd39`.
 
-**1. WP-T7 (Codex; gate hygiene, closes DR-109).** Worktree `.worktrees/wp-t7`, branch `wp-t7`, brief `a9fa11cd` + folds `facd98ee`; RED `aa88d12d`; partial build `53b4e4b2` (pytest-timeout 2.4.0 in `dev`, uv.lock +14, three ini lines). Session `01a1983a-45de-7530-8ca2-8d53963ad4c7` (108,375 after turn 2). Turn 3 committed **`e4938910`** (session at 147,790): proof GREEN (3.05 s at my seat); facts per the cell: thread = stacks then `os._exit`; under xdist the crashed worker is REPLACED and the leg continues; func-only leaves fixtures un-timed; faulthandler dumps without failing. The cell's harness-gate STOP is ANSWERED: at my seat in the worktree `Ran 382 tests ... OK (skipped=1)`. **Reviewer A round 1 (Claude pass) IN FLIGHT at roll** (started ~18:08Z; prompt and output `clearwater-review-evidence\wp-t7\r1\`; if `review.seat.log` stays empty and no `claude -p` process runs, it died with gen 30's pane: re-run the same command). Next: assert it; adjudication turn (resume the session); report turn; Reviewer B; the gate WITH the new flags (no fullclip) + the harness gate; accept (DR-109 CHARC's).
+Claude-pass queue (CHARC order, 92 % rule): WP3.6P B -> WP-T7 B -> WP5.3 A R4 -> WP5.1 B. Prompts ready: `clearwater-review-evidence\<pkg>\B\review-prompt-B.md` + `run_review_B.py` (launch: `uv run python <run_review_B.py> review --worktree <abs> --base <sha> --prompt <p> --out <dir> > <dir>\review.seat.log 2>&1`, background). WP3.6P's prompt has `HEADSHA` placeholders (sed them to the final head). Probe folders `work/<pkg>/rB-tmp` created.
 
-**2. WP5.3 (Codex; CP5 review pack).** Head **`a14a25ed`** (turn 8: R3 adjudicated, all seven ACCEPTED per `c25ff7a9`, which is folded at `4d5922eb`; code at `ed787934`). Session 3 `01a196ca-bf8b-7533-8a65-e61fa8aef47e` RETIRES at 182,934 (evaluation point, seven-item remediation ahead). Reviewer A: R1, R2, R3 each found a MAJOR (silent-loss paths); R3 ruled ALL SEVEN items (F1 manifest never prunes state, audit every `state["items"]` write with a "cannot shrink" table; F2/F3 in the round-2 viewing_aid_failed form; F4 item error; F5 page exit 2 while pending; F6 sanitiser collapses to the last component and survives spaces; F7 a README/page sentence). **A fourth silent-loss finding in round 4 = STOP to CHARC.** NEXT: turn 9 = remediation per `c25ff7a9` in a FRESH session 4 (prompt = preamble + brief + a `dispatch-9.md` in the form of `wp5.3\cell\dispatch-7.md`: the ledger's `## Reviewer A round 3 (adjudicated)`, the r3 findings file, the ruling's audit table of every `state["items"]` write), Reviewer A round 4 (prompt: copy `r3\review-prompt-r3.md` with head/round/probe-folder updated), round 5 is the cap. Then RUN REQUESTs (photos, presets, page, clips; 25 GB free; never in a window or during a serial leg).
+1. **WP3.6P** (session 3 `01a1965f-ef09-7e52-b182-63fcf730d355`, 184,466 before turn 10). Turn 10 (seat runs recorded + report) RUNNING since 18:31Z. NEXT: turn 11 = CHARC `dbf02ad7` items (saved `clearwater-review-evidence\wp3.6p\report-items-dbf02ad7.md`; fold into the brief first): item 1 CORRECTED by my query `4224e6af` (the quant field IS /255, x255 at `photo_verify.py:1037`; 7.57e-06 /255 = exact to float32), RULED by CHARC `e0c7b856` (turn 11 carries that form verbatim); items 2 (classes separate, 9 assumed named) and 3 (5d estimate 6.13 vs 4.11 GB a Limit; CPU leg as characterisation). Then B (EXECUTING E1-E3), the two-leg gate (new timeout flags only after WP-T7 lands), accept.
+2. **WP5.3** turn 9 RUNNING since 18:30Z in a FRESH session 4 (prompt `wp5.3\cell\prompt-9.md`; read the session id from `turn-9.driver.stdout`). Then Reviewer A round 4 (copy `r3\review-prompt-r3.md`, head/round/probe updated); a fourth silent-loss finding = STOP to CHARC; round 5 is the cap.
+3. **WP-T7** head `1d541378` (session `01a1983a-...` at 180,712). Next: B (prompt ready), the two-leg gate WITH the new flags + redirects + the harness gate, accept (DR-109 CHARC's).
+4. **WP5.1** head `7ab7bd39` (session 5 at 238,374: any remediation goes to a FRESH session). Next: B (prompt ready, base `4ece5183`), rebase onto main after WP-T7 lands, the gate = parallel + serial + ONE fullclip (with flags), the accept (fill the report's `(gate)` figures in the accept commit).
+5. WP5.2 after the danglers (CHARC).
 
-**3. WP5.1 (Codex; acceptance suite).** REBASED onto main `4ece5183` (head `f059b2e0`, patch-id `b82a2353de70` unchanged); **T6-1 GREEN** (witness 1 passed). Session 5 `01a196ca-bef4-73a3-bf82-98d429e96768` (158,027 after turn 13). **Reviewer A CONVERGED at round 2** (NO_NEW_CRITICAL_MAJOR). Turn 13 committed **`d44db8d1`** (the terminating clean-up: crash node pins pid + `__file__`, the launcher mutant now FAILS; 15/15; V17 row; advisories; light 34 passed; format 297 clean; 0 CR). It changed `tests/test_v51_video_acceptance.py` (+11/-3): check whether the gpu node changed; a seat re-run of the gpu + gui nodes ONLY if turn 13 touched them (form: `t12-seat` command in `cell\prompt-13.md`), T10 report turn, Reviewer B (Claude pass, executing), the gate = parallel + serial + ONE fullclip leg (each with the stall watch, nothing else on the host during serial and fullclip), the accept (CHARC: AD-11 / AD-30 notes).
-
-**4. WP3.6P (Codex) -- the 5c-16 EXCLUSIVE window is OWED** (head `790541e7`; the command and ledger lines 1904-1930 as in the gen-29 state: `git show f4dc507d:docs/orchestrator-state.md`). Open it to CHARC only when NOTHING else runs (no Codex turn running tests, no Claude pass, no gate). Then 5d EXCLUSIVE (default then force-cpu), then one cell turn (session `01a1965f-ef09-7e52-b182-63fcf730d355`), Reviewer B (executing, `650bea20`), gate, accept.
-
-**5. WP5.2** after the windows (CHARC).
-
-**Mail:** inbox drained 18:00Z (last post 18:07Z, status batch) (`work/orch-g30/drain-*.txt`; my posts `work/orch-g30/*.md`). No query open with CHARC.
-
-**Kept worktrees:** `wp3.6p`, `wp5.3`, `wp5.1`, `wp-t7` (LIVE); `wp4.6` (releasable per gen 29; copy its gate logs first); `orch-state-g30`; older `brief-*` and `orch-state-g21..g29`. Leftover dir `.worktrees/wp-d54/work` (1.8 GB, unregistered; owner prune).
+**Mail:** drained 18:31Z (`work/orch-g31/drain-*.txt`; posts `work/orch-g31/*.md`). No query open with CHARC.
 
 ### Standing operator rulings
 
