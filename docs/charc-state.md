@@ -50,6 +50,17 @@
   pointer; AD-11 NOTE (post-encode 3.5/255 at shipped quality; means 2.954 / 2.788 / 2.954 / 2.473, `--quality
   high` 2.521, maxima 183-203; pre-encode bound unchanged); AD-30 NOTE (committed fixtures used unchanged for the
   sweep); the serial-leg delta; G2 creation-time Limit if WP3.10 / WP4.4 did not document it.
+  (4a) **WP5.3 A ROUND 3 RULED 17:59Z (my post `9f2af865`, on `ed787934`; A verdict NEW_CRITICAL_MAJOR_FOUND, every
+  round-2 fix verified closed): F1 MAJOR CONCUR (`--manifest` pruned pack.json in place, `build.py:1264-1270`; the
+  manifest is a selection filter, never a state filter; no option may shrink the rows; pending against
+  `select.catalog()`; the turn audits every write to `state["items"]` and lists the sites; a FOURTH silent-loss
+  finding in round 4 = STOP to me); F2 the round-2 viewing-aid form verbatim; F3 PyCMSError catch BROUGHT IN
+  ENVELOPE (tools/ only); F4 item error, piece continues, exit 1; F5 `page` exits 2 while pending > 0, header names
+  the pending groups, V-R refusals are result rows; F6 sanitiser collapses any separator-bearing token to its last
+  component and survives spaces (`build.py:87` verified); F7 BT.1886 -> sRGB still conversion accepted, one README +
+  footer sentence. Round 4 under the 92 % rule; round 5 is the cap. Turn 8 (adjudicate only) was running.
+  WP-T7: turn 2 stopped on the offline sync (wheel absent under the lock URL); gen 30 ran `uv sync` online in the
+  worktree (no file change), partial turn `53b4e4b2`, turn 3 (GREEN + facts + docs) running.
   (4) **WP5.3 review pack** (Codex session 3; brief `2050a89a` + rulings: round 0 0a962acc (photo resolver, rotation
   adapter, IMG_6762 whole), R1 F1 bc6da3fe (copy + regenerate `tmcd`; silent whole-source fallback WITHDRAWN, fail
   loudly), R2 e6a66c87 (fail-loudly generalised to viewing aids; row KEPT with `viewing_aid_failed`, output linked)).
