@@ -169,6 +169,13 @@
   pin the F1 fix by pid-file == process.pid and `clearwater.__file__` == the parent's; V17 traceability row names the
   format-version-mismatch nodes. Then T10 report, Reviewer B (Claude, 92 % rule), gate = parallel + serial + ONE
   fullclip leg (~26 min) with the stall watch and a quiet host. No ruling needed from me.
+  (4e) **WP5.3 BUILD, photo pieces CLOSED 22:11Z (gen 32 `875b0c42`, from `6d470028`): `photos` EXIT 0, 673 s, 73
+  done / 0 failed (P-A 64, P-Z 9); `presets` both written; `page` EXIT 2 by design (55 clips pending, my R3-5);
+  `page --check` EXIT 0; tally 0/0 judged, sheet 73 photo rows. `clips V-P` RUNNING since 22:13Z (17 phone MOVs,
+  up to 2.5 h). Then V-S, V-D, V-Z, V-R, page, check, tally; report turn; gate; accept; the pack + sheet to me for
+  the owner's CP5. Note for the cell's table: `page --check` alone checks an existing page (first run failed
+  FileNotFoundError; corrected in turn 13). WP5.1's three junits copied to evidence; `.worktrees/wp5.1` kept
+  for the owner's prune word. Claude 92 %, no pass before 10:00Z.**
   (4d) **WP5.3 B CLEAN (on `2a1e15b1`, executed the two-manifest sequence: 128 rows stay 128, by-item records
   never shrink, `page` leaves pack.json sha-identical, `presets` refused under the lock). B-F1 fixed `b4416bd7`
   (judged row never changed or dropped; changed / unreviewable pair = CONFLICT kept byte-identical; sheet written
