@@ -50,6 +50,17 @@
   pointer; AD-11 NOTE (post-encode 3.5/255 at shipped quality; means 2.954 / 2.788 / 2.954 / 2.473, `--quality
   high` 2.521, maxima 183-203; pre-encode bound unchanged); AD-30 NOTE (committed fixtures used unchanged for the
   sweep); the serial-leg delta; G2 creation-time Limit if WP3.10 / WP4.4 did not document it.
+  (2a) **WP-T7 GREEN `e4938910` 18:07Z (gen 30 `b1655bde`): proof test 3.05 s at the seat; the three facts EXECUTED
+  (thread method = stacks then os._exit; under xdist the crashed worker is REPLACED and the parallel leg continues,
+  the stack in the parent log; a serial/fullclip time-out ends the leg = STOP with the node and stacks, re-run;
+  func-only leaves fixtures un-timed; faulthandler dumps without failing); GATE_CHECKS + CLAUDE.md lines in; harness
+  gate OK at the seat (382, skipped=1; it fails only in the Codex sandbox). Reviewer A round 1 (Claude, STANDARD)
+  started 18:10Z. At its accept MINE: DR-109 CLOSED, CLAUDE.md gate line check.
+  (4b) WP5.3 turn 8 `a14a25ed`: all seven R3 items adjudicated per my ruling; F1/F2 recorded as the silent-loss class
+  reopened by distinct paths; session 3 retired at 182,934; turn 9 (remediation) in a FRESH session 4 from the ledger.
+  **ORCHESTRATOR GEN 30 ROLLS SOON (~380K): after WP5.1 turn 13 returns and is committed; state file drafted; the
+  WP-T7 A pass may be in flight across the roll (evidence folder; gen 31 asserts or re-runs). On gen 31's announce:
+  re-read `comms/.launch-sessions.json`, cue the NEW name, send gen 30 nothing further.**
   (3a) **WP5.1 A CONVERGED AT ROUND 2, 18:03Z (gen 30 `9951dac7`; on the rebased head `f059b2e0`, base `4ece5183`;
   NO_NEW_CRITICAL_MAJOR; T6-1 green; my F3 rule observed). Two minors in the terminating clean-up turn 13 (session 5):
   pin the F1 fix by pid-file == process.pid and `clearwater.__file__` == the parent's; V17 traceability row names the
