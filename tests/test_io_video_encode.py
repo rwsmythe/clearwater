@@ -347,6 +347,62 @@ def test_d54_warning_words_and_computed_codes(
     )
 
 
+def test_d54_sink_preparation_warns_once_for_assumed_yuvj_full_range(
+    sample: Sample, tmp_path: Path
+) -> None:
+    """Warn through the sink for untagged yuvj without claiming a limited range.
+
+    Args:
+        sample: Provider of committed synthetic video fixtures.
+        tmp_path: Per-test folder for the unused output path.
+    """
+    from clearwater.io.video.probe import _resolve_color
+
+    info = probe(sample("vid-hevc8-bt709-full"))
+    color = _resolve_color({}, "yuvj420p", info.video.bit_depth).description
+    assert color.assumed and color.range == "full"
+    info = replace(info, video=replace(info.video, pix_fmt="yuvj420p", color=color))
+    sink = FFmpegVideoSink()
+    sink._prepare(
+        info,
+        tmp_path / "unused.mp4",
+        encoder="libx265",
+        quality="standard",
+        bit_depth=info.video.bit_depth,
+        provenance=None,
+    )
+    warnings = [w for w in sink._warnings if "colour tags" in w]
+    assert len(warnings) == 1
+    assert warnings[0] == (
+        "The source's colour tags are missing or unexpected; Clearwater assumed BT.709 "
+        "colours for the missing or unexpected ones, and the output is tagged with these "
+        "values (color_primaries bt709, color_trc bt709, colorspace bt709, color_range pc)."
+    )
+
+
+def test_d54_sink_preparation_does_not_warn_for_tagged_source(
+    sample: Sample, tmp_path: Path
+) -> None:
+    """Keep the sink's colour warning absent when all source tags are known.
+
+    Args:
+        sample: Provider of committed synthetic video fixtures.
+        tmp_path: Per-test folder for the unused output path.
+    """
+    info = probe(sample("vid-hevc8-bt709-full"))
+    assert not info.video.color.assumed
+    sink = FFmpegVideoSink()
+    sink._prepare(
+        info,
+        tmp_path / "unused.mp4",
+        encoder="libx265",
+        quality="standard",
+        bit_depth=info.video.bit_depth,
+        provenance=None,
+    )
+    assert not [w for w in sink._warnings if "colour tags" in w]
+
+
 def test_ten_bit_source_stays_ten_bit(sample: Sample, runs: Runs) -> None:
     out, _, _ = runs.get(sample("vid-hevc10"), "libx265", 10)
     assert probe(out).video.bit_depth == 10

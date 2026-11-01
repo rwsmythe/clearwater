@@ -264,14 +264,102 @@ deselected, ruff clean, 287 files formatted, mypy 146 source files clean.
 Reviewer B, the final two-leg gate and the post-merge WP5.1 witness remain
 commissioned to the dispatcher; no accept or full-gate result is claimed.
 
+## Turn 5: Reviewer B gap rows
+
+Starting HEAD: `cc9f3d44`, the dispatcher's committed report. Supplied depth
+after Turn 4: 130,046 tokens (recorded below). Reviewer B, the dispatcher's
+Claude pass on that commit, returned `NO_NEW_CRITICAL_MAJOR` after executing
+the light file (100 passed, 19 deselected). Its findings and dispositions were
+supplied in the Turn 5 dispatch; no transcript path, CLI version or further
+mechanical assertions were supplied to this cell.
+
+### Findings and changes
+
+| Finding | Disposition |
+|---|---|
+| B-F1, MINOR / EXECUTED, in envelope, NEW | Confirmed test gap: pure FULL cases bypassed the sink's emission condition. Added `test_d54_sink_preparation_warns_once_for_assumed_yuvj_full_range`, using the real `_resolve_color({}, "yuvj420p", depth)` result in planted probe metadata and executing `_prepare`. It asserts exactly one warning equal to the complete FULL sentence, including literal `color_range pc`. |
+| B-F2, ADVISORY / EXECUTED, in envelope, NEW | Confirmed test gap: no assertion forbade a colour warning for `assumed=False`. Added `test_d54_sink_preparation_does_not_warn_for_tagged_source`, executing `_prepare` with an unchanged fully tagged probe result and asserting no colour warning. |
+| B-F3, ADVISORY, in envelope, NEW | No change by dispatch; LIMITED sentence's per-field reading BANKED with CHARC, trigger: accept. |
+| B-F4, OUT OF ENVELOPE, nominal severity not supplied, NEW | No change by dispatch; probe open-path `missing_tags` text still says limited range for untagged yuvj. BANKED with CHARC, trigger: accept. |
+| B-F5, ADVISORY, in envelope, NEW | No change by dispatch; fallback beyond the reachable `tv` / `pc` names is unreachable. BANKED with CHARC, trigger: accept. |
+
+Chosen form: two tests call the actual `FFmpegVideoSink._prepare` using the
+existing `vid-hevc8-bt709-full` fixture. The first replaces only probe metadata
+with an untagged yuvj description resolved by real probe code; the second uses
+the fixture's unchanged tagged description. Both run `encode.py:690-692` and
+inspect the resulting sink warnings. They retain real packet-table/source
+checks, command and NUT-header construction, without encoding frames or
+starting an output encoder. This is cheaper than another full export and
+directly covers the missed sink condition. No fixture file was added or edited.
+
+### Positive run and planted mutants
+
+All pytest runs unset `PYTEST_ADDOPTS` and inherited `VIRTUAL_ENV`, set
+`PYTHONPATH=scripts`, and use the required shim and fresh basetemps under this
+worktree. The positive run on unchanged product:
+
+```text
+uv run pytest -q tests/test_io_video_encode.py -k "d54_sink_preparation" --basetemp=work/wp-d54/turn5-rows-tmp -p sandbox_mkdir_shim -p no:cacheprovider
+```
+
+`turn5-rows-pytest.log`: exit 0, **2 passed, 119 deselected in 2.79s**.
+
+The scratch driver `work/wp-d54/turn5_mutants.py` wraps `_prepare` in process,
+calls the original, changes only the warning list, invokes the selected real
+test via `pytest.main`, and restores the original method in `finally`. It is
+gitignored evidence, never a committed fixture or product change.
+
+```text
+uv run python work/wp-d54/turn5_mutants.py drop-full
+uv run python work/wp-d54/turn5_mutants.py warn-tagged
+```
+
+| Mutant | Failing node under `tests/test_io_video_encode.py` | Failed line | Result and log under `work/wp-d54/` |
+|---|---|---|---|
+| B's FULL-drop wrapper: remove colour-tag warnings when resolved range is full | `test_d54_sink_preparation_warns_once_for_assumed_yuvj_full_range` | `:375`, `assert len(warnings) == 1`, actual 0 | Exit 1; 1 failed in 0.86s; `MUTANT_RESTORED=True`; `turn5-mutant-drop-full.log` |
+| Add the colour warning when `assumed` is false | `test_d54_sink_preparation_does_not_warn_for_tagged_source` | `:403`, expected empty colour-warning list | Exit 1; 1 failed in 0.97s; `MUTANT_RESTORED=True`; `turn5-mutant-warn-tagged.log` |
+
+### Light validation and verification
+
+```text
+uv run pytest -q -rs tests/test_io_video_encode.py -m "not gpu and not footage and not gui and not fullclip" --basetemp=work/wp-d54/turn5-encoder-tmp -p sandbox_mkdir_shim -p no:cacheprovider
+uv run ruff check .
+uv run ruff format --check .
+uv run mypy
+```
+
+| Run | Log under `work/wp-d54/` | Exit | Result |
+|---|---|---|---|
+| Encoder file, dispatched markers | `turn5-encoder-pytest.log` | 0 | 102 passed, 19 deselected in 123.44s (0:02:03); no skips |
+| Repository-wide ruff check | `turn5-ruff-check.log` | 0 | All checks passed! |
+| Repository-wide ruff format check | `turn5-ruff-format.log` | 0 | 287 files already formatted |
+| Repository-wide mypy | `turn5-mypy.log` | 0 | Success: no issues found in 146 source files |
+
+Ruff uses `RUFF_CACHE_DIR=work/wp-d54/turn5-ruff-cache`; no configuration
+changed. This turn changes tests and reporting only. Product, frozen interfaces,
+dependencies, source tags and warning text are untouched. Both identified test
+gaps are independently demonstrated by the intended mutant failures. The
+banked findings are disclosed, not silently treated as fixed. No footage or
+other worktree was read; no commit, stash or `.git` write was attempted.
+The final verification pass confirms the positive rows and complete selected
+file pass after the mutant processes restored their methods. Scope is limited
+to the two added test rows, report and ledger. The three touched owned files
+were normalized to LF and each has 0 CR bytes. `git diff --check` exited 0;
+`git diff --quiet HEAD -- src` exited 0, independently confirming no product
+edit. No further test gap was found in this bounded pass; B-F3/F4/F5 remain
+banked by dispatch rather than altered.
+
 ## Cumulative review rounds
 
 Reviewer A round 1 counts and terminates the loop with zero new blocking
-findings. All four findings are adjudicated above; Reviewer B remains pending.
+findings. All four findings are adjudicated above. Reviewer B returned with
+zero new blocking findings; its two dispatched test gaps are addressed in
+Turn 5, with F3-F5 banked for CHARC at the accept.
 
 | Round | Critical / major / minor | In / out of envelope | NEW / REOPENED | Reverts | Product / test-only fixes | Transport / CLI | Verdict | Evidence |
 |---|---|---|---|---|---|---|---|---|
 | A1 | 0 critical / 0 major / 2 minor / 2 advisory | 4 in / 0 out | 4 NEW / 0 REOPENED | 0 | Product helper changed for F1; F4 shares that fix. F2/F3 and case updates are tests. | `claude -p`, Opus high (`claude-opus-5-5`); CLI version not supplied | `NO_NEW_CRITICAL_MAJOR`; terminating clean-up | `C:\Users\rwsmy\clearwater-review-evidence\wp-d54\r1\review.txt` (MD5 above); dispatcher validity assertions recorded above |
+| B | 0 critical / 0 major / 1 minor / 3 advisory / 1 out-of-envelope severity unspecified | 4 in / 1 out | 5 NEW / 0 REOPENED | 0 | Test-only fixes for B-F1/F2; B-F3/F4/F5 banked | Claude pass at dispatcher seat; CLI version not supplied | `NO_NEW_CRITICAL_MAJOR`; two test gaps addressed | Turn 5 dispatcher packet; transcript path not supplied |
 
 ## Dispatcher-read depth
 
@@ -280,4 +368,5 @@ findings. All four findings are adjudicated above; Reviewer B remains pending.
 | Turn 1 RED yield | 75,711 tokens (dispatcher supplied in Turn 2; session `01a19680-681b-7e73-9fa1-893bc1fdefaa`) | RED accepted and committed as `549b4ca4`. |
 | Turn 2 GREEN yield | 89,798 tokens (dispatcher supplied in Turn 3) | Committed as `4aae3824`; Reviewer A round 1 returned. |
 | Turn 3 terminating clean-up yield | 118,386 tokens (dispatcher supplied in Turn 4) | Committed as `5fa56fc4`; Reviewer A converged. |
-| Turn 4 report yield | Pending dispatcher figure | Report delivered; dispatcher owns Reviewer B, gate and acceptance witness. |
+| Turn 4 report yield | 130,046 tokens (dispatcher supplied in Turn 5) | Committed as `cc9f3d44`; Reviewer B returned. |
+| Turn 5 Reviewer B gap-row yield | Pending dispatcher figure | Two sink-path tests and mutant evidence delivered; final gate and acceptance witness remain with dispatcher. |
