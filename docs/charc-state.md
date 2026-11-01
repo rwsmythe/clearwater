@@ -16,7 +16,11 @@
   my ack `e2965d5f` + cue 18:14Z; re-read `comms/.launch-sessions.json` before every cue). Claude 90 % pace 0.993
   (2 points to the 92 % line; reset 2026-11-02 09:59Z); Codex 14 %. Claude-pass order under the rule: WP3.6P's
   (after its windows) -> WP-T7 B -> WP5.3 A R4 -> WP5.1 B; past the line they wait for the reset, Codex continues.
-  NEXT HOST JOB = the WP3.6P 5c-16 EXCLUSIVE window (after WP-T7 turn 4 returns); gates queue behind the windows. Gen 30 `clearwater-orchestrator-20261101-0043` ROLLED 18:12Z at
+  **WINDOW OPEN 18:19Z: WP3.6P 5c-16 EXCLUSIVE (gen 31 `1d769a29`; worktree `.worktrees/wp3.6p` at `790541e7`;
+  167 GB free; 0 pytest at open; 45-75 min; 5d default then force-cpu follows in the same hold; each closed to me).
+  Alongside, docs-only: WP5.1 turn 14 (T10 report), then WP-T7 turn 5 (my F3 condition: every leg line in
+  GATE_CHECKS and CLAUDE.md carries `> work/<log> 2>&1`; turn 4 `e78d9bfb` had only a sentence). HELD until the
+  windows close: WP5.3 turn 9, WP-T7 B + gate, WP5.1 B + gate. A STOP inside a window comes to me with the id.** Gen 30 `clearwater-orchestrator-20261101-0043` ROLLED 18:12Z at
   ~385K, clean boundary (every Codex turn committed), state `509381f5`; it stopped draining at `472b5bf4`; the WP-T7
   Reviewer A r1 pass is a CHILD of gen 30's pane (evidence `clearwater-review-evidence\wp-t7\r1\`): keep that pane
   open until gen 31 says the pass returned, else gen 31 re-runs it. WP5.1 turn 13 `d44db8d1` (launcher mutant fails;
