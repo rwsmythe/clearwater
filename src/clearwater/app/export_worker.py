@@ -139,7 +139,7 @@ def decode_request(line: bytes) -> WorkerRequest:
         raise RequestError("the request's parameters or settings are not objects")
     try:
         parameters = ParameterSet.from_dict(data["parameters"])
-    except ValueError as error:
+    except (ValueError, OverflowError) as error:  # R3-5: a created out of range in UTC
         raise RequestError(f"the request's parameters are not a parameter set: {error}") from error
     try:
         settings = Settings.from_json(json.dumps(data["settings"]))
