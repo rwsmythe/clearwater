@@ -41,7 +41,10 @@ Worker to parent (the worker's stdout; its stderr is kept only for the crash tai
 to the application log, never into a failure text):
 
 - ``{"progress": [done, total or null, message]}``: forwarded to ``progress.report`` only when
-  ``0 <= done <= total <= PROGRESS_MAX`` (``0 <= done <= PROGRESS_MAX`` with a null total);
+  ``0 <= done <= PROGRESS_MAX`` and ``total`` is null or ``0 <= total <= PROGRESS_MAX``; a
+  ``done > total`` is forwarded as ``total`` with the message unchanged, the first such line
+  in a job logged at WARNING with its counts (CHARC 89a98d58: the engine counts written frames
+  against the container's declared count);
 - ``{"log": {"level": <DEBUG|INFO|WARNING|ERROR|CRITICAL>, "name": <logger>, "message":
   <text>}}``: re-logged under :data:`WORKER_LOGGER` at that level as ``"<name>: <message>"``;
 - ``{"result": {"ok": bool, "outputs": [str], "warnings": [str], "failure": str or null,
@@ -516,9 +519,12 @@ def _read_lines(stream: IO[bytes], lines: queue.Queue[tuple[str, Any]]) -> None:
     """Read the worker's stdout into ``lines`` until it ends, then put ``("end", None)``.
 
     A line whose decode fails in any way is put as ``("invalid", reason)``; it never ends the
-    reading, so a valid line after it still arrives.
+    reading, so a valid line after it still arrives. A progress line with ``done > total`` is
+    put with ``done`` clamped to ``total`` and its message unchanged; the first in the job is
+    logged at WARNING with its counts (CHARC 89a98d58).
     """
     limit = MAX_LINE_BYTES + 2  # room for the "\r\n" of a line at the limit
+    clamp_warned = False  # one reader per job: the clamp's own once-per-job WARNING
     try:
         while chunk := stream.readline(limit):
             if not chunk.endswith(b"\n"):
@@ -534,7 +540,20 @@ def _read_lines(stream: IO[bytes], lines: queue.Queue[tuple[str, Any]]) -> None:
                 lines.put(("invalid", f"a line longer than {MAX_LINE_BYTES} bytes"))
                 continue
             try:
-                lines.put(_decode_line(content))
+                kind, payload = _decode_line(content)
+                if kind == "progress" and payload[1] is not None and payload[0] > payload[1]:
+                    done, total, message = payload  # bounded already: the clamp comes after
+                    if not clamp_warned:
+                        clamp_warned = True  # once per job (CHARC 89a98d58)
+                        _LOG.warning(
+                            "export worker progress done %d > total %d clamped to %d"
+                            " (later ones in this job unlogged)",
+                            done,
+                            total,
+                            total,
+                        )
+                    payload = (total, total, message)
+                lines.put((kind, payload))
             except _InvalidProgressError as error:
                 lines.put(("invalid progress", str(error)))
             except _InvalidLineError as error:
@@ -615,10 +634,12 @@ def _is_texts(value: object) -> bool:
 def _decode_progress(value: object) -> tuple[int, int | None, str]:
     """Check a ``progress`` payload: ``[done, total or null, message]`` within the bound.
 
+    ``done > total`` passes unchanged; the reader clamps it (CHARC 89a98d58).
+
     Raises:
         _InvalidProgressError: The payload is malformed, a count is not float-convertible, or
-            ``0 <= done <= total <= PROGRESS_MAX`` fails (``total`` null: ``0 <= done <=
-            PROGRESS_MAX``).
+            ``0 <= done <= PROGRESS_MAX`` fails, or ``0 <= total <= PROGRESS_MAX`` fails for a
+            ``total`` that is not null.
     """
     if not isinstance(value, list) or len(value) != 3:
         raise _InvalidProgressError("a progress line that is not [done, total, message]")
@@ -631,11 +652,8 @@ def _decode_progress(value: object) -> tuple[int, int | None, str]:
             _float_safe(total)
     except _InvalidLineError as error:
         raise _InvalidProgressError(str(error)) from error
-    upper = PROGRESS_MAX if total is None else total
-    if not 0 <= done <= upper <= PROGRESS_MAX:
-        raise _InvalidProgressError(
-            f"a progress count outside 0 <= done <= total <= {PROGRESS_MAX}"
-        )
+    if not 0 <= done <= PROGRESS_MAX or not (total is None or 0 <= total <= PROGRESS_MAX):
+        raise _InvalidProgressError(f"a progress count outside 0 <= count <= {PROGRESS_MAX}")
     return done, total, message
 
 
