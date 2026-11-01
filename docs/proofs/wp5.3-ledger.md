@@ -355,6 +355,7 @@ DR-99 is handled only under its stated main-alone equivalence condition.
 | Session 2 / turn 3 (GREEN verification, not Reviewer A) | 0 / 6 / 0 | 6 / 0 | 6 / 0 | 0 | instrument fixes / regression additions | Six independently reproduced instrument gaps fixed; 70 nodes green; Reviewer A pending | 142,467 after turn 3 |
 | A1 (session 2 / turn 4 adjudication; turn 5 remediation) | 0 / 3 / 3; 6 advisory | 10 / 2 after adjudication | 12 / 0; accepted blocking 3 | 0 | turn 5: 10 instrument behavior fixes with regression controls; no src/ changes | Counted Claude pass; 10 ACCEPTED fixed under F1 ruling; F10 OUT/banked Limit; F11 REJECTED; ready for A2 | turn 3: 142,467; turn 4: 36,709 (dispatcher supplied) |
 | A2 (session 2 / turn 6 adjudication; session 3 / turn 7 remediation) | 0 / 1 / 4; 8 advisory | 11 / 2 | 12 / 1 by distinct finding; F1 NEW path reopens R1 F1 pattern, A1 repeats rejected R1 F11 | 0 | turn 7: seven accepted instrument behavior fixes and regression controls; zero src/ or frozen-interface changes | Counted claude -p pass; F1-F5 and A3/A7 FIXED under CHARC 0358beda; A2/A5/A6 BANK; A1 REJECT; A4/A8 DECLINE code change; ready for A3, not converged | turn 5: 142,541; turn 6: 198,059; turn 7 dispatcher pending |
+| A3 (session 3 / turn 8, adjudication only) | 0 / 1 / 3; 3 advisory | reviewer: 6 / 1; effective: 7 / 0 under c25ff7a9 R3-3 | 5 NEW / 2 REOPENED distinct findings; F1/F2 also REOPEN silent-loss class | 0 | no remediation; instrument/tests-only plans, no src/ or interface change | Counted claude -p pass; all observations independently reproduced; F1-F6 ACCEPTED to fix; F7 ACCEPTED AS IS, document; CHARC ruling governs turn 9 | turn 7: 143,373; turn 8 dispatcher pending |
 
 Subsequent Reviewer A turns adjudicate every finding, update this cumulative table
 and yield without remediation. Fixes belong to a separately dispatched turn.
@@ -370,7 +371,8 @@ At rounds 5, 10, ... STOP with the ledger for approval to continue under the fil
 | Session 2 / turn 4 / A1 adjudication | same session 2 | 36,709 | Dispatcher supplied in turn 5; adjudication committed as 0553d317. Figure is recorded verbatim despite its decrease from turn 3; no independent counter is available. |
 | Session 2 / turn 5 / A1 remediation | same session 2 | 142,541 | Dispatcher supplied in turn 6; remediation committed as 03731250. Session window 475,000; evaluate near 200K and stop near 250K remain binding. |
 | Session 2 / turn 6 / A2 adjudication | same session 2 | 198,059 | Dispatcher supplied at turn 7; session 2 retired at the evaluation boundary before multi-finding remediation. |
-| Session 3 / turn 7 / A2 remediation | fresh session 3; dispatcher to fill ID | dispatcher pending | F1-F5, A3/A7 instrument fixes and RED/GREEN controls; YIELD for Reviewer A round 3. |
+| Session 3 / turn 7 / A2 remediation | fresh session 3; dispatcher to fill ID | 143,373 | Dispatcher supplied at turn 8; remediation committed ed787934, all five blobs 0 CR; seat format check 293 files clean. |
+| Session 3 / turn 8 / A3 adjudication | same session 3 | dispatcher pending | Ledger only; independent planted probes, no remediation; YIELD for turn 9. |
 
 Evaluate near 200K; stop at a step boundary near 250K. No self-estimated figures.
 
@@ -1430,3 +1432,192 @@ Original runner record bytes are retained under the explicit R2 F3 ruling;
 pack state, page-facing messages and logs use sanitized projections. No STOP or
 open owner input this turn. Report and real-build RUN REQUESTs remain later
 ladder tasks. **YIELD for Reviewer A round 3.**
+
+
+## Reviewer A round 3 (adjudicated)
+
+### Candidate, transport, depth and ruling
+
+- Reviewed candidate and initial HEAD: **ed787934**. The dispatcher reports all
+  five changed blobs have 0 CR and its format check found 293 files formatted.
+  Turn-7 depth is **143,373 depth_input_tokens**, session 3, window 475,000;
+  recorded verbatim above. Evaluate around 200K and stop at a step boundary near
+  250K. Turn-8 depth remains for the dispatcher; no estimate is made.
+- Transport **claude -p --model opus --effort high**, executed by the dispatcher:
+  exit 0; model claude-opus-5-5; requested effort high; is_error false; 28 turns;
+  VERDICT NEW_CRITICAL_MAJOR_FOUND; worktree clean after review. One denied
+  heredoc was rerun inline, with no finding losing execution. No CLI version is
+  supplied, so none is inferred. This is counted round **3 of 5**. The reviewer
+  ran its light tests FIRST: 123 passed in 34.61 s, including the slow node.
+- review.txt, review-prompt-r3.md and review.seat.log were read in place in the
+  dispatcher's wp5.3/r3 evidence folder, never copied into the repository.
+- During this turn, HEAD advanced to **4d5922eb**, folding CHARC **c25ff7a9**
+  (2026-11-01T17:59:31Z) into the brief. A read-only diff against ed787934 lists
+  only docs/briefs/wp5.3-brief.md; tools/reviewpack and tests/test_reviewpack.py
+  are identical. The new ruling was read and governs the dispositions below.
+  No instrument/test edit occurred. The new brief fold is the dispatcher's work,
+  not a file changed or a commit made by this cell.
+
+Reviewer counts: **0 critical / 1 major / 3 minor / 3 advisory**, nominally
+6 in-envelope / 1 out (F3). R3-3 explicitly brings F3 IN, so the effective
+remediation envelope is **7 in / 0 out**. Zero reverts, no fix this turn. The
+reviewer reports every round-2 fix VERIFIED CLOSED; own baseline remains green.
+This is not convergence: F1 is a new blocking path requiring remediation.
+
+**NEW / REOPENED:** five NEW concrete findings (F1/F2/F4/F5/F6); two REOPENED
+findings (F3 repeats round-2 A2's exact ICC exception, F7 challenges round-1 F7's
+now-consistent transfer policy). **F1 and F2 REOPEN the silent-loss CLASS** under
+the generalized ruling: F1 silently discards persisted inventory; F2 loudly
+omits a successful product from links and the sheet. They are NEW concrete paths,
+not regressions of the previously repaired aid catch: manifest pruning and
+neutral-result status handling both originate at f506b597, unchanged by turn 7.
+F2 is not silent at the CLI (both pieces return 1). This distinct-path/pattern
+accounting follows the same distinction recorded for round 2; both levels are
+explicit for the dispatcher's gate decision. No finding is dismissed as external
+pre-existing code; all challenged mechanics originate in this package.
+
+### Independent probes and their limits
+
+Own scripts, planted sources, derived artifacts and runner outputs are only in
+ignored **work/wp5.3/turn8/** in this worktree. No owner footage folder, real
+configuration, main-tree work folder or other worktree was read or written.
+Every simulated product uses the complete schema-1 runner shape and writes real
+small PNG artifacts; only the expensive external runner boundary is replaced.
+These probes prove instrument behavior, not product correction or image quality.
+No judgement is made of any image.
+
+- probes.py / probes.log confirms F1, then stops on a **probe assumption error**:
+  it expects one 73-photo batch rather than the actual P-A 64 and P-Z 9 batches,
+  each with corrected and neutral calls. Its exit 1 is retained and disclosed;
+  it is not a product or test-suite failure. probes-followup.py / .log uses
+  fresh planted roots and the correct four-batch structure and completes every
+  F1-F7 assertion, **exit 0**. No source change was made to get these results.
+- F1 uses the real selection, pack persistence, sheet and HTML. Only the runner
+  and expensive thumbnails are replaced. A full photos command leaves 128 rows;
+  a one-name manifest command saves 1; page returns 0 with a one-row sheet and
+  no IMG_6690.HEIC anywhere. A subsequent full photos command actually writes
+  64+9 corrected and 64+9 neutral results but STILL saves 1 row, proving the
+  missing-append path separately. It prints one item accounted for, pending=0.
+- F2 uses actual thumbnail generation and two complete runner records. The
+  first corrected export succeeds while its neutral fails; the second photo
+  completes. photos/page both return 1. The first corrected PNG exists, but its
+  name is absent from HTML and its sheet row is absent. Only the healthy photo
+  remains on the sheet. The failure message begins with a semicolon and space.
+- F3 constructs a real Pillow LAB ICC profile on RGB PNGs, rather than raising
+  a fake exception. ImageCms raises PyCMSError, not OSError; the group has four
+  product PNGs but no pack.json and the healthy item's state is lost too.
+- F4 first probes an actual planted unreadable MP4 followed by the tiny valid
+  committed HEVC fixture: exit 2, no group state written and no later product.
+  Separate controlled ffprobe/packet responses prove uncaught StopIteration
+  (no video stream), KeyError (keyframe with missing pts_time), TypeError
+  (null pts_time), and TypeError from a null duration. These establish fault
+  handling defects, not that any commissioned owner file has such metadata.
+- F5 executes page on a pending-only 128-row state (exit 0, pending=128), then
+  a control with only V-R/V-Z pending (exit 0, pending=4). All four names ARE
+  visible under Not built. The 124 other rows are deliberately planted accounted
+  placeholders; no real-media completion or judgement is claimed. Its behavior
+  was previously allowed by round 2; c25ff7a9 R3-5 now changes that policy.
+- F6 executes _safe_text on planted/synthetic strings only. A root-prefixed
+  diagnostic retains the Phone folder and separator; an unquoted or quoted
+  drive-rooted path with a space retains its trailing folders; a quoted POSIX
+  path with a space does too. No synthetic diagnostic path was opened. Summary
+  output contains the safe projection, not an owner's full path.
+- F7 makes fresh uniform-128, unprofiled RGB PNG controls. Unknown tags remain
+  (128,128,128); explicitly tagged bt709/bt709 and smpte432/bt709 both become
+  (121,121,121), each tagged sRGB afterwards. frames.colour_filter at :750
+  performs range/matrix-to-RGB conversion and its documented PNG path has no
+  colour chunk; _browser_frame adds the explicit tagged-SDR display conversion.
+  _rgb still performs no ICC transform when its input lacks a profile. Numeric
+  display transformation is confirmed; perceptual mismatch/preference is not
+  judged. R3-7 now explicitly accepts this treatment of both halves.
+- origins.log (git log -S, literal argument vectors) identifies f506b597 for
+  manifest pruning, neutral failure mapping, ICC profile conversion, duration
+  pre-probe and path filtering; 03731250 for the active excerpt packet indexing
+  and consistent tagged-SDR branch; ed787934 for the current _failed/pending
+  page policy. Every origin is inside this arc; the banked ICC finding is not
+  pre-existing external code. summary.log retains the AST mutation inventory,
+  extra quoted/space path controls and independent JUnit timings.
+
+### Per-finding adjudication and turn-9 disposition
+
+| Finding | Verdict / severity / envelope / evidence | Bounded disposition (no fix this turn) |
+|---|---|---|
+| F1 | ACCEPTED MAJOR, in, EXECUTED. 128 -> 1 persisted rows after a manifest; page/sheet then have 1 and pending=0. A later full photos export still cannot append absent rows. Silent-loss class REOPENED, NEW concrete selection/persistence path. | At build.py:1264 remove persistent pruning; the manifest filters selected inputs only. At :1127/:1177 replace-by-item OR append for excerpt/product rows. Retain the loaded inventory; count pending from commissioned names without a nonpending result, including missing catalog rows. R3-1 requires every state assignment/slice be audited for cannot-shrink behavior; turn 9 returns the final site table. |
+| F2 | ACCEPTED MINOR, in, EXECUTED. A done corrected PNG remains on disk but status becomes failed after a neutral error; no product link or sheet row; photos/page return 1. Loud rather than silent, but REOPENED successful-product omission class in a NEW neutral-source path. | At build.py:1162 treat failed neutral export as viewing_aid_failed, reviewable=False, keeping corrected status done and the row; add the neutral reason without a leading separator. page.py links the corrected product under Not built and conditionally omits the unavailable neutral link. Piece exits 1. Same round-2 form, explicitly reaffirmed R3-2. |
+| F3 | ACCEPTED MINOR; originally OUT, now IN by R3-3; EXECUTED. Real mismatched LAB/RGB profile raises uncaught PyCMSError, losing group state. REOPENED round-2 A2, origin f506b597. | One-line catch extension at build.py:1171: add ImageCms.PyCMSError at the per-item viewing-aid boundary, yielding the same flagged row/product link/nonzero form and continuing the healthy item. No broad Exception catch or product edit. |
+| F4 | ACCEPTED MINOR, in, upgraded from REASONED to EXECUTED controls. Actual probe ValueError aborts the piece; controlled missing/null packet facts escape as KeyError/StopIteration/TypeError. No owner-file fault asserted. | Wrap each item's duration/preparation at build.py:1105 and normalize known schema faults in prepare_excerpt's :656 catch; record safe failed/excerpt_failed item messages, continue later items, aggregate exit 1. R3-4 asks for continuation controls past one ValueError and one KeyError, not a redundant matrix of each exception type. |
+| F5 | ACCEPTED ADVISORY, in, EXECUTED; NEW completion-policy challenge at build.py:1270/1283. Pending rows are visible and counted but page returns 0 under the prior policy. R3-5 supersedes that policy. | FIX per R3-5: page header lists pending count/groups, page exits 2 while pending > 0 (distinct from item failure 1), and tally shows pending coverage using the catalog and persisted item facts rather than guessing all missing rows are pending. V-R must be run to obtain refused result rows; include V-R/V-Z in later RUN REQUEST scheduling. No owner handoff before pending=0. |
+| F6 | ACCEPTED ADVISORY, in, EXECUTED at build.py:87. Footage-relative separators and quoted/unquoted spaced path tails survive; a full owner path/GPS leak was not shown. Origin f506b597. | FIX per R3-6: collapse any residual path token to its last component; recognize quoted spans and drive-rooted/absolute paths containing spaces before basename projection. Three RED cases: relative Phone form, quoted drive path with a space, POSIX path with a space. |
+| F7 | ACCEPTED ADVISORY observation at build.py:989, in, EXECUTED; REOPENED round-1 F7 policy, not a regression or proved preference bias. Tagged grey128 -> 121 equally in both halves; unknown stays128. | ACCEPT AS IS / DOCUMENT under R3-7: no pixel change or reversal. Add the specified BT.1886 -> sRGB/both-halves/player-rendering sentence to the generated pack README and page footer. No new committed README path is needed; the page builder can emit the pack-local README. |
+
+All seven observations have independent evidence. The ruling provides the
+bounded policy choices; no adjudication requires an owner answer or product /
+frozen-interface change. No STOP this turn. Earlier unrelated banks/rejections
+remain unchanged.
+
+### Planned RED for the F1 blocker and cross-path audit
+
+Turn 9, before modifying instrument code:
+
+1. Full-state fixture plus a one-name manifest: persist every catalog item,
+   exactly one selected row replaced, all other rows and pending count retained.
+   Build the page and sheet and prove all previously reviewable items stay
+   linked/available, including unselected owner answers. Keep V-R excluded from
+   review rows and keep pending/failed items visible under Not built.
+2. A manifest naming an item absent from saved state must append its result;
+   a later complete command must not silently discard any newly exported item.
+   Missing catalog names contribute to pending coverage, never pending=0 merely
+   because the loaded state was pruned. Empty/missing versus explicit pending
+   facts are counted consistently against select.catalog().
+3. A chosen output identity change must STILL retain the old owner sheet and
+   refuse vote transfer. Do not weaken that guard to obtain the row-count RED.
+   The catalog-retention test uses a compatible selected identity or a previously
+   failed item with no prior vote; it isolates pruning from regeneration.
+
+Current-site inventory from AST inspection of the unchanged candidate (not a
+claim that it is safe already):
+
+| Current state site | Present property | Turn-9 no-shrink obligation |
+|---|---|---|
+| main initial state load/creation, :1224 | New pack starts with catalog; old pruned state is loaded unchanged | Include absent commissioned names in pending accounting; never use loading as a pruning step. |
+| _build_groups excerpt result, :1127 | Index replacement cannot shrink, but absent entries are ignored | Replace an existing item or append a missing item; cannot shrink. |
+| _build_groups product result, :1177 | Same replacement-only gap | Replace or append; cannot shrink. |
+| main manifest comprehension, :1264 | UNSAFE persistent row-count reduction | Remove the assignment; filter inputs in memory only, cannot shrink saved state. |
+| main exit scope lists, :1270/:1272 | Filter is ephemeral and not assigned to state | Keep it ephemeral; cannot shrink saved state. |
+
+No AST slice expression of state items exists; the comprehension at :1264 is
+the persistent filter. The remediation must repeat this inventory on its FINAL
+code and list every mutation/slice with cannot shrink proved, as R3-1 requires.
+R3-1 additionally makes a fourth silent-loss finding in round 4 a STOP to CHARC,
+not an automatic extra round. Round 4 follows remediation only at the
+orchestrator's seat and under its Claude 92-percent hold rule; round 5 remains
+the cap and convergence requires an executing pass.
+
+The other planned RED controls are the ruled neutral-source failure row/link,
+one actual mismatched-profile row with healthy continuation, probe/prepare
+ValueError and KeyError continuation, page/tally pending coverage, and the three
+path-with-space/name-only cases. F7 only adds explanation; its numeric control
+must remain unchanged. R3-5 requires a named contract amendment of earlier
+pending-page exit-0 controls to exit 2, preserving link-only --check semantics.
+
+### Own light baseline and yield
+
+Command from the worktree root, PowerShell sets PYTHONPATH=scripts:
+
+```text
+uv run pytest -q tests/test_reviewpack.py --basetemp=work/wp5.3/turn8/baseline-tmp -p sandbox_mkdir_shim -p no:cacheprovider -m "not gpu and not footage and not gui and not fullclip" --durations=0 --junitxml=work/wp5.3/turn8/baseline.xml
+```
+
+**123 passed in 28.29 s**, exit 0; JUnit: zero failures/errors/skips. Sole slow
+integration aggregate **16.212 s**; largest parallel node (excerpt-failure /
+later-group continuation) **1.097 s**, all parallel nodes below 5 s. No marker
+change is needed. The baseline retains the tiny force-CPU runner control and
+its existing automatic encoder behavior; direct F7 conversion probes are tiny
+software FFmpeg operations. No real-media job, performance figure or GPU quality
+measurement was commissioned or run.
+
+Only this ledger is edited. No test or instrument remediation, full gate,
+new reviewer invocation, dependency/config/product/interface edit, mailbox post,
+commit/git mutation, other-worktree access or owner image judgement. The final
+scope/LF/diff checks are retained in turn8/scope-lf-audit.log. **YIELD**; turn 9
+owns RED and the bounded fixes under c25ff7a9.
