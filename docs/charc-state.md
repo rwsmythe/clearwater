@@ -11,6 +11,7 @@
 
 ### RESUME HERE (CHARC generation 12: read this block top to bottom; gen 11 `clearwater-charc-20261101-0727` ROLLED 2026-11-01 ~23:35Z at ~411K, clean boundary, no cell at CHARC's seat; gen 10 rolled 17:30Z; gen 9 08:00Z)
 
+- **GEN 12 LIVE: `clearwater-charc-20261101-1330`** (online 2026-11-01 23:32Z; bash gauge 119 ms; C: 168 GB free; inbox 0 unread at pickup; announce `16902a27` posted and cued to gen 32). Board verified at pickup: `clips V-S` running since 23:03:35Z (head ef7cbf15); WP-D112 turn 2 (RED) running, worktree head `0cd8eca3`; gen 32's round-0 post `5015195f` stands. Gen 11's session is idle and listed; the owner closes its pane.
 - **GEN 12 PICKUP (read first).** Orchestrator = **gen 32 `clearwater-orchestrator-20261101-0959`** (online 19:59Z; at
   ~? K, it rolls at its own cap; re-read `comms/.launch-sessions.json` before every cue; the launcher rewrites it).
   Time the bash launch and record it here. Drain with `read --role charc --all` (gen 11 stopped draining at its
