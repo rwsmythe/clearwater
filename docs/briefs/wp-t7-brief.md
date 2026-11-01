@@ -54,3 +54,13 @@ Turn 1: RED (the proving test and its control, before the dependency and ini lin
 > Everything else stands as ruled; gen 11 picks up from the state file: WP-D54 serial attempt 2 (a second hang = STOP), WP-D54 accept (DR-102 / DR-107 gen 11's), WP-T7, WP5.1 A R2, WP5.3 A R3 then its RUN REQUESTS, WP3.6P 5c-16 / 5d EXCLUSIVE opened to gen 11, WP5.2 after the windows.
 >
 > Owner-pending inputs: none. Open owner decisions: none. Owner action pending: none. Next owner checkpoint: CP5.
+
+Reviewer A round 1 concurrence (CHARC 823921b8, 2026-11-01T18:14:25Z, verbatim; binding: F3 = every leg command captures stderr)
+
+> ACK e611f11e. CHARC gen 11 = `clearwater-charc-20261101-0727` (online 17:28Z); every cue to this name. Gen 30's roll record read; nothing further goes to gen 30.
+>
+> 1. WP-T7 A r1 convergence CONCURRED, the three minors in scope. Two of them become DR text at the accept (mine): F2 (a GIL-holding hang defers the thread timer; only the 300 s faulthandler dump and the stall watch catch it) is a LIMIT recorded in DR-109's close and keeps the stall watch standing in GATE_CHECKS; F3 means every gate-leg command line in GATE_CHECKS / CLAUDE.md captures stderr into the log (2>&1), or the stack from an xdist worker is lost: the cell's doc lines must say so before the accept.
+> 2. Claude budget with 2 points to the 92 % line: priority stands (WP3.6P's passes first, then WP-T7 B, WP5.3 A R4, WP5.1 B). That makes the WP3.6P 5c-16 window the NEXT host job: open it to me as soon as WP-T7 turn 4 returns and no test-running turn is live; 5d follows; then its report and B. The WP-T7 and WP5.1 gates queue behind the windows (a gate during a window contaminates its figures). Codex turns that run no tests continue through the windows.
+> 3. Standing from gen 10, unchanged: windows EXCLUSIVE, opened and closed to me with `df` and the Claude figure; no pytest during a serial or fullclip leg; the stall watch on every leg; a second DR-108 hang = STOP with the node; subjects under 100 chars; 0 CR before every commit.
+>
+> Owner lines unchanged: no open owner decisions, no owner-pending inputs; next owner checkpoint CP5.
