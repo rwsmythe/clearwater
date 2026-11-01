@@ -386,3 +386,157 @@ synthetic packet tables satisfy exact per-packet duration/payload sample-count
 equality. Ledger ASCII decoding succeeds and CR count is 0; `git diff --check`
 is clean, and status shows only this new ledger. Existing committed fixtures
 total 894960 bytes; candidate MOV is 219463 bytes (comfortably under both caps).
+
+## Turn 2: rulings and RED
+
+Base: `0cd8eca3` (round-0 ledger committed by the dispatcher).
+Depth: PENDING -- dispatcher to fill from the transcript; no cell estimate.
+This turn changes only the PCM unit rows and this ledger. No product change,
+fixture, manifest, generator or consumer-test edit; no commit attempted.
+
+### Rulings received (quoted)
+
+> 1. **Consumer edits: GRANTED, exactly the four you named** (`tests/test_fixtures.py::test_sample_inventory_matches_the_brief`, `::test_mp4_user_data_holds_nothing_beyond_the_empty_meta`, `::test_video_has_audio_and_no_data_streams_or_location`, and the expectation in `tests/test_jobs_naming.py::test_wp23_fixture_names_keep_output_paths`), each changed only to admit the new sample with its true facts, in a separately named step in the fixture turn, never weakening an assertion for the existing samples. Any fifth consumer is a new ruling.
+>
+> 2. **The numerical discrepancy: RECONCILED at my seat; your arithmetic is right and the brief's two decoded figures are the STORED count.** ffprobe on the two owner sources and the product's kept outputs: IMG_6731 source 100 packets, sum(packet `duration`) **100,720** = stream `duration_ts`, sum(payload `size`)/2 **100,812** = stream `nb_frames` = the decoded s16le count; the ONLY packet whose duration differs from its stored samples is the LAST (duration 148, stored 240); output 99 packets, sum(duration) 100,720, sum(size)/2 100,812, last packet duration 884 / stored 976. IMG_6729 source and output: 133 packets each, sum(duration) **134,400**, sum(size)/2 **134,414**, last packet duration 291 / stored 305 in both. So the container presents fewer samples than the last packet stores (the track's duration trims the tail), and BOTH totals are identical between source and output. **RULING: the PCM rule compares BOTH totals within the cut window: (a) PRESENTED samples = the sum of packet `duration`s, and (b) STORED samples = the sum of payload bytes / (channels x bytes per sample) for the sample format; both must equal the source's.** A refusal names which total failed. Your two RED rows keep the stated boundary shapes with their duration totals (100,720 and 134,400) AND plant the last packet's payload so the stored totals are 100,812 and 134,414 on both sides, by number only. Add one row each where only (a) differs and only (b) differs (both REFUSED). The cut-window rule counts whole packets for both totals as your straddling rows already do.
+>
+> 3. **The seven other refused stems** (ledger only, privacy lock): IMG_6733, IMG_6735, IMG_6736, IMG_6738, IMG_6741, IMG_6742, IMG_6760 (with IMG_6729 and IMG_6731: nine). IMG_6734 is a passing control, as you said.
+>
+> 4. **Your N3 citation correction: accepted** (the ASCII lock stands as the brief's own lock; no spec edit).
+>
+> 5. **Fullclip trigger: accepted.** The gate runs the fullclip leg at my seat (alone); you never run it.
+>
+> 6. **The fixture row is a CONTROL** (your measured result: the real sink keeps the fixture's packetization, NVENC and libx265); the unit rows carry the RED; the report carries the one-paragraph Limit CHARC's ADDITION 2 names (why the owner's files re-chunk through the product and the fixture does not is not established; out of scope as a fix).
+
+The two-total ruling above governs the implementation; round 0's duration-only
+proposal was not implemented. Add `audio_sizes` alongside `audio_durations` to
+the planned packet facts. The quoted owner-file measurements are the
+dispatcher's evidence, not experiments repeated by this cell. All three routed
+round-0 items are resolved; the granted consumer edits wait for their separately
+named fixture step. There is no remaining STOP or new scope request this turn.
+
+### Tests built
+
+Added test-only frozen `_PcmStreamRow` / `_PcmPacketTable` subclasses and pure
+tables in `tests/test_io_video_encode_units.py:749-995`. They plant codec name,
+sample rate, channel count, sample format, packet durations and payload sizes
+without changing production dataclasses. `_pcm_check` calls the real
+`check_output`; only the unrelated file edit-list read is stubbed, as in the
+neighboring existing rows. Probe audio facts identify PCM, not AAC.
+
+The two acceptance rows retain the exact numerical shapes: 100-to-99 packets
+with presented/stored totals 100720/100812 (last source duration/stored 148/240,
+output 884/976); 133-to-133 packets with totals 134400/134414 (last 291/305 on
+both sides). Literal preconditions on totals and the moved/last pts pass before
+each check assertion. No test contains an owner's stem.
+
+The regular control is seven packets of 1024 samples. Refusal rows change one
+sample, rate, format, first packet pts, time base or channels; the two added
+rows independently change only presented or only stored samples. Missing
+duration/size and stream facts must not be filled from unchanged container
+aggregates. Cut rows count whole packets in both totals and permit only whole
+source-prefix totals at the two-microsecond boundary, never a partial count.
+
+### RED record
+
+All node suffixes below follow the exact prefix
+`tests/test_io_video_encode_units.py::`. Line numbers refer to the final test
+file at this turn. Refusal rows fail the shared assertion at line 827; the table
+also records each test's call line. `[]` means today's check incorrectly reports
+no problems. A generic packet refusal is a failure when the contract instead
+requires a named PCM rule and the failed comparison. No constructor error or
+fixture error is counted as RED.
+
+| Node suffix | Expected rule | Failure line(s) | Today's check result / assertion message |
+| --- | --- | --- | --- |
+| `test_check_output_pcm_accepts_coalesced_packets` | Accept equal presented AND stored samples across 100-to-99 re-chunking. | 844 | `audio stream 0: 99 packets in the output where 100 of the source's 100 were to be copied` |
+| `test_check_output_pcm_accepts_moved_packet_boundaries` | Accept equal totals despite moved packet boundary. | 875 | `audio stream 0: packet 119 at 24217/9600 s where the source has 120797/48000 s` |
+| `test_check_output_pcm_refuses_one_sample_fewer` | PCM presented 7167 vs 7168; both totals lost one. | 886, 827 | `[]` |
+| `test_check_output_pcm_refuses_only_presented_samples_changed` | PCM presented 7167 vs 7168; stored remains 7168. | 896, 827 | `[]` |
+| `test_check_output_pcm_refuses_only_stored_samples_changed` | PCM stored 7167 vs 7168; presented remains 7168. | 906, 827 | `[]` |
+| `test_check_output_pcm_refuses_another_sample_rate` | PCM sample rate 44100 vs 48000. | 914, 827 | `[]` |
+| `test_check_output_pcm_refuses_another_sample_format` | PCM sample format s32 vs s16. | 922, 827 | `[]` |
+| `test_check_output_pcm_refuses_another_first_pts` | PCM first packet pts mismatch. | 930, 827 | `audio stream 0: packet 0 at 1/48000 s where the source has 0 s` (no PCM label) |
+| `test_check_output_pcm_cut_counts_the_whole_straddling_packet[whole]` | Accept 1532 samples coalesced into one packet across cut at 1200. | 941 | `audio stream 0: 1 packets in the output where 2 of the source's 3 were to be copied` |
+| `test_check_output_pcm_cut_counts_the_whole_straddling_packet[at-cut]` | PCM presented 1200 vs required 1532. | 943, 827 | `audio stream 0: 1 packets in the output where 2 of the source's 3 were to be copied` (wrong comparison, no PCM label) |
+| `test_check_output_pcm_cut_counts_the_whole_straddling_packet[one-fewer]` | PCM presented 1531 vs required 1532. | 943, 827 | `audio stream 0: 1 packets in the output where 2 of the source's 3 were to be copied` (wrong comparison, no PCM label) |
+| `test_check_output_pcm_cut_slack_allows_only_complete_packet_totals[partial]` | Refuse 1025 samples; only complete totals 1024 or 1532 are admissible. | 956, 827 | `[]` |
+| `test_check_output_pcm_refuses_another_time_base_or_channel_count[time-base]` | PCM time base mismatch. | 971, 827 | `audio stream 0: packet 1 at 4/375 s where the source has 8/375 s` (no PCM label) |
+| `test_check_output_pcm_refuses_another_time_base_or_channel_count[channels]` | PCM channel-count mismatch. | 971, 827 | `[]` |
+| `test_check_output_pcm_refuses_missing_sample_evidence[duration]` | PCM refusal without a packet duration. | 994, 827 | `[]` |
+| `test_check_output_pcm_refuses_missing_sample_evidence[size]` | PCM refusal without a packet payload size. | 994, 827 | `[]` |
+| `test_check_output_pcm_refuses_missing_sample_evidence[sample_rate]` | PCM refusal without a sample rate. | 994, 827 | `[]` |
+| `test_check_output_pcm_refuses_missing_sample_evidence[time_base]` | PCM refusal without a time base. | 994, 827 | `audio stream 0: packet 1 at 1024 s where the source has 8/375 s` (no PCM label) |
+| `test_check_output_pcm_refuses_missing_sample_evidence[channels]` | PCM refusal without a channel count. | 994, 827 | `[]` |
+| `test_check_output_pcm_refuses_missing_sample_evidence[sample_fmt]` | PCM refusal without a sample format. | 994, 827 | `[]` |
+| `test_check_output_pcm_refuses_missing_sample_evidence[first_pts]` | PCM refusal without a first packet pts. | 994, 827 | `audio stream 0: packet 0 at None s where the source has 0 s` (no PCM label) |
+
+Three new controls pass on today's implementation:
+
+- `test_check_output_pcm_regular_packets_are_unchanged`.
+- `test_check_output_pcm_cut_slack_allows_only_complete_packet_totals[drop]`.
+- `test_check_output_pcm_cut_slack_allows_only_complete_packet_totals[keep]`.
+
+The full node/line/message data from JUnit is stored at
+`work/wp-d112/turn2-red-final-record.json`; the final pytest transcript is
+`work/wp-d112/turn2-red-final.log` and JUnit is `turn2-red-final.xml`.
+
+### Validation and verification-loop record
+
+Final permitted light command (PowerShell environment assignments set
+`PYTHONPATH=scripts` and unset `PYTEST_ADDOPTS` before this command):
+
+```text
+uv run pytest -q tests/test_io_video_encode_units.py tests/test_io_video_encode.py -k "audio or pcm or check_output" -m "not gpu and not footage and not gui and not slow and not fullclip" --basetemp=work/wp-d112/tmp/turn2-red-final -p sandbox_mkdir_shim -p no:cacheprovider --tb=short --junitxml=work/wp-d112/turn2-red-final.xml
+```
+
+Result: pytest exit 1, **21 failed, 12 passed, 192 deselected**. All 21 failures
+are the intentional new check assertions above. The three new controls and all
+nine existing nodes selected by the authorized filter passed, without skips or
+errors. The other 192 nodes were deselected, not run or claimed green. No
+gpu/footage/gui/slow/fullclip node or full suite ran.
+
+Existing selected GREEN nodes (unchanged):
+
+- `tests/test_io_video_encode_units.py::test_the_map_copies_audio_and_data_but_not_the_timecode_track`.
+- `tests/test_io_video_encode_units.py::test_check_output_names_each_mismatch`.
+- `tests/test_io_video_encode_units.py::test_a_cut_audio_stream_must_be_the_source_packets_before_the_cut`.
+- `tests/test_io_video_encode.py::test_a_truncated_source_cuts_audio_at_the_readable_end`.
+- `tests/test_io_video_encode.py::test_the_cut_short_reading_keeps_media_time_rate_and_the_audio_effect[video-media-time]`.
+- `tests/test_io_video_encode.py::test_the_cut_short_reading_keeps_media_time_rate_and_the_audio_effect[video-rate]`.
+- `tests/test_io_video_encode.py::test_the_cut_short_reading_keeps_media_time_rate_and_the_audio_effect[audio-duration]`.
+- `tests/test_io_video_encode.py::test_the_cut_short_reading_keeps_media_time_rate_and_the_audio_effect[audio-media-time]`.
+- `tests/test_io_video_encode.py::test_planted_audio_reencode_is_caught`.
+
+Other checks:
+
+| Command / check | Observed result | Evidence |
+| --- | --- | --- |
+| `uv run ruff check tests/test_io_video_encode_units.py` | Exit 0, `All checks passed!` | `work/wp-d112/turn2-ruff.log` |
+| `uv run ruff format --check tests/test_io_video_encode_units.py` | Exit 0, `1 file already formatted` | `work/wp-d112/turn2-format.log` |
+| `uv run mypy` | Exit 0, `Success: no issues found in 149 source files` | `work/wp-d112/turn2-mypy.log` |
+| Existing two unit rows against HEAD | AST-identical | `work/wp-d112/turn2-eol-qa.log` |
+| Changed-file byte and diff QA | ASCII, zero CR, no whitespace errors | `work/wp-d112/turn2-final-qa.log` |
+
+Verification loop: suspected constructor-error RED REJECTED (all tables reach
+the real check; no errors, all failure sites are check assertions); each
+presented/stored acceptance precondition CONFIRMED by its literal assertions;
+existing selected regression behavior CONFIRMED GREEN. Initial lint found one
+long line, FIXED with ruff format; final lint/format are clean. Byte QA found
+formatter-preserved CRLF, FIXED by LF normalization; the subsequent AST check
+confirmed the two protected unit functions are unchanged. Both RED runs show
+the same 21 failures / 12 passes; the second followed formatting and supplies
+the final failure lines. LF normalization does not change code or line numbers.
+No additional product issue or scope dispute was found in this test-only pass.
+
+No Reviewer A/B pass was started. No register, decision, frozen interface,
+dependency or local configuration was changed. No owner's footage or another
+worktree was opened.
+The dispatcher owns review scheduling, the heavy/fullclip gate and witness.
+
+| Round / turn | Reviewer | Critical / major / minor | In / out | NEW / REOPENED | Reverts | Product / test changes | Depth |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 0 | Mapping | 0 / 1 / 2 | 3 / 0 | 3 / 0 | 0 | 0 / 0 | Dispatcher pending |
+| Turn 2 | RED only; no review | 0 / 0 / 0 new; all 3 prior items ruled | 0 / 0 new | 0 / 0 | 0 | 0 product; 24 new unit cases (21 RED, 3 controls) | Dispatcher pending |
+
+Turn 2 YIELD. GREEN, fixture, granted consumers and report remain for later turns.

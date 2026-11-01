@@ -9,7 +9,8 @@ from __future__ import annotations
 import json
 import math
 import subprocess
-from dataclasses import replace
+from collections.abc import Mapping
+from dataclasses import dataclass, field, replace
 from fractions import Fraction
 from pathlib import Path
 from typing import Any
@@ -741,6 +742,256 @@ def test_a_cut_audio_stream_must_be_the_source_packets_before_the_cut(
     assert _check(_out_table(video, AUDIO_PTS[:5]), on_a_packet) == []
     problems = _check(_out_table(video, AUDIO_PTS[:3]), on_a_packet)
     assert any("where 4 to 5 of" in p for p in problems), problems
+
+
+@dataclass(frozen=True)
+class _PcmStreamRow(StreamRow):
+    """Plant additive PCM facts without changing the production stream class for RED."""
+
+    codec_name: str = "pcm_s16le"
+    sample_rate: int | None = 48000
+    channels: int | None = 1
+    sample_fmt: str | None = "s16"
+
+
+@dataclass(frozen=True)
+class _PcmPacketTable(PacketTable):
+    """Plant packet durations and payload sizes alongside the unchanged pts mapping."""
+
+    audio_durations: Mapping[int, tuple[int | None, ...]] = field(default_factory=dict)
+    audio_sizes: Mapping[int, tuple[int | None, ...]] = field(default_factory=dict)
+
+
+def _pcm_table(
+    durations: tuple[int, ...] = (1024,) * 7,
+    *,
+    last_stored_samples: int | None = None,
+) -> _PcmPacketTable:
+    """Build a mono s16 table with independently planted presentation and stored extents."""
+    starts = [0]
+    for duration in durations[:-1]:
+        starts.append(starts[-1] + duration)
+    sizes = [2 * duration for duration in durations]
+    if last_stored_samples is not None:
+        sizes[-1] = 2 * last_stored_samples
+    base = _table((0, 1001, 2002, 3003))
+    stream = _PcmStreamRow(
+        index=1,
+        codec_type="audio",
+        codec_tag="lpcm",
+        time_base=Fraction(1, 48000),
+        start_pts=0,
+        duration_ts=sum(durations),
+        sample_aspect_ratio=None,
+        rotation=None,
+        packets=len(durations),
+        frames=sum(sizes) // 2,
+    )
+    return _PcmPacketTable(
+        streams=(base.video, stream),
+        video_index=base.video_index,
+        video_pts=base.video_pts,
+        video_missing_pts=base.video_missing_pts,
+        video_corrupt_pts=base.video_corrupt_pts,
+        tags=base.tags,
+        audio_pts={1: tuple(starts)},
+        audio_durations={1: durations},
+        audio_sizes={1: tuple(sizes)},
+    )
+
+
+def _pcm_check(
+    monkeypatch: pytest.MonkeyPatch,
+    source: _PcmPacketTable,
+    output: _PcmPacketTable,
+    end: Fraction | None = None,
+) -> list[str]:
+    """Run the real mandatory check with only the unrelated file-box read stubbed."""
+    from clearwater.interfaces.video import AudioStreamInfo
+
+    monkeypatch.setattr(verify, "_edit_problems", lambda path, first, end: [])
+    info = replace(_probe(), audio=(AudioStreamInfo(1, "pcm_s16le", 48000, 1, Fraction(0)),))
+    return verify.check_output(
+        Path("o"),
+        output,
+        probe=info,
+        source=source,
+        written=[0, 1001, 2002, 3003],
+        end_pts=4004,
+        audio_end=end,
+    )
+
+
+def _assert_pcm_refusal(problems: list[str], *words: str) -> None:
+    """Require a refusal to identify both the PCM rule and its failed comparison."""
+    assert any(
+        problem.startswith("audio stream 0 (PCM)") and all(word in problem for word in words)
+        for problem in problems
+    ), problems
+
+
+def test_check_output_pcm_accepts_coalesced_packets(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Coalescing 100 packets into 99 preserves both presented and stored samples."""
+    source = _pcm_table(
+        (1024,) * 70 + (508,) + (1024,) * 23 + (736,) + (1024,) * 4 + (148,),
+        last_stored_samples=240,
+    )
+    output = _pcm_table((1024,) * 70 + (508,) + (1024,) * 27 + (884,), last_stored_samples=976)
+    assert sum(source.audio_durations[1]) == sum(output.audio_durations[1]) == 100720
+    assert sum(source.audio_sizes[1]) // 2 == sum(output.audio_sizes[1]) // 2 == 100812
+    assert source.audio_pts[1][-1] == 100572 and output.audio_pts[1][-1] == 99836
+    problems = _pcm_check(monkeypatch, source, output)
+    assert problems == [], problems
+
+
+def test_check_output_pcm_accepts_moved_packet_boundaries(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A boundary moves by 1024 samples while both 133-packet totals remain exact."""
+    source = _pcm_table(
+        (1024,) * 70
+        + (541,)
+        + (1024,) * 23
+        + (736,)
+        + (1024,) * 23
+        + (736,)
+        + (1024,) * 13
+        + (291,),
+        last_stored_samples=305,
+    )
+    output = _pcm_table(
+        (1024,) * 70
+        + (541,)
+        + (1024,) * 23
+        + (736,)
+        + (1024,) * 24
+        + (736,)
+        + (1024,) * 12
+        + (291,),
+        last_stored_samples=305,
+    )
+    assert sum(source.audio_durations[1]) == sum(output.audio_durations[1]) == 134400
+    assert sum(source.audio_sizes[1]) // 2 == sum(output.audio_sizes[1]) // 2 == 134414
+    assert source.audio_pts[1][119] == 120797 and output.audio_pts[1][119] == 121085
+    problems = _pcm_check(monkeypatch, source, output)
+    assert problems == [], problems
+
+
+def test_check_output_pcm_regular_packets_are_unchanged(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The existing regular-packet PCM control still passes."""
+    assert _pcm_check(monkeypatch, _pcm_table(), _pcm_table()) == []
+
+
+def test_check_output_pcm_refuses_one_sample_fewer(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Losing one presented and stored sample must name the failed sample count."""
+    problems = _pcm_check(monkeypatch, _pcm_table(), _pcm_table((1024,) * 6 + (1023,)))
+    _assert_pcm_refusal(problems, "presented", "7167", "7168")
+
+
+def test_check_output_pcm_refuses_only_presented_samples_changed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A presentation trim changes even when all stored payload samples remain."""
+    output = _pcm_table((1024,) * 6 + (1023,), last_stored_samples=1024)
+    assert sum(output.audio_sizes[1]) // 2 == 7168
+    problems = _pcm_check(monkeypatch, _pcm_table(), output)
+    _assert_pcm_refusal(problems, "presented", "7167", "7168")
+
+
+def test_check_output_pcm_refuses_only_stored_samples_changed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A lost payload sample is refused even when all presented durations remain."""
+    output = _pcm_table(last_stored_samples=1023)
+    assert sum(output.audio_durations[1]) == 7168
+    problems = _pcm_check(monkeypatch, _pcm_table(), output)
+    _assert_pcm_refusal(problems, "stored", "7167", "7168")
+
+
+def test_check_output_pcm_refuses_another_sample_rate(monkeypatch: pytest.MonkeyPatch) -> None:
+    """An unchanged packet list cannot conceal a changed sample rate."""
+    output = _pcm_table()
+    output = replace(output, streams=(output.video, replace(output.streams[1], sample_rate=44100)))
+    problems = _pcm_check(monkeypatch, _pcm_table(), output)
+    _assert_pcm_refusal(problems, "sample rate", "44100", "48000")
+
+
+def test_check_output_pcm_refuses_another_sample_format(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The same pts and durations cannot conceal a different stored sample format."""
+    output = _pcm_table()
+    output = replace(output, streams=(output.video, replace(output.streams[1], sample_fmt="s32")))
+    problems = _pcm_check(monkeypatch, _pcm_table(), output)
+    _assert_pcm_refusal(problems, "sample format", "s32", "s16")
+
+
+def test_check_output_pcm_refuses_another_first_pts(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A moved first packet must be refused by name under the PCM rule."""
+    output = _pcm_table()
+    output = replace(output, audio_pts={1: (1, *output.audio_pts[1][1:])})
+    problems = _pcm_check(monkeypatch, _pcm_table(), output)
+    _assert_pcm_refusal(problems, "first", "pts")
+
+
+@pytest.mark.parametrize("samples", [1532, 1200, 1531], ids=["whole", "at-cut", "one-fewer"])
+def test_check_output_pcm_cut_counts_the_whole_straddling_packet(
+    monkeypatch: pytest.MonkeyPatch, samples: int
+) -> None:
+    """A start before the cut includes the whole packet in both sample totals."""
+    source = _pcm_table((1024, 508, 1024))
+    problems = _pcm_check(monkeypatch, source, _pcm_table((samples,)), Fraction(1200, 48000))
+    if samples == 1532:
+        assert problems == [], problems
+    else:
+        _assert_pcm_refusal(problems, "presented", str(samples), "1532")
+
+
+@pytest.mark.parametrize("samples", [1024, 1532, 1025], ids=["drop", "keep", "partial"])
+def test_check_output_pcm_cut_slack_allows_only_complete_packet_totals(
+    monkeypatch: pytest.MonkeyPatch, samples: int
+) -> None:
+    """Cut slack permits whole source prefixes, not intermediate sample counts."""
+    source = _pcm_table((1024, 508, 1024))
+    problems = _pcm_check(monkeypatch, source, _pcm_table((samples,)), Fraction(1024, 48000))
+    if samples in (1024, 1532):
+        assert problems == [], problems
+    else:
+        _assert_pcm_refusal(problems, "presented", "1025")
+
+
+@pytest.mark.parametrize(
+    ("changes", "words"),
+    [({"time_base": Fraction(1, 96000)}, ("time base",)), ({"channels": 2}, ("channel",))],
+    ids=["time-base", "channels"],
+)
+def test_check_output_pcm_refuses_another_time_base_or_channel_count(
+    monkeypatch: pytest.MonkeyPatch, changes: dict[str, Any], words: tuple[str, ...]
+) -> None:
+    """Both stream-clock and channel-count changes must identify the PCM rule."""
+    output = _pcm_table()
+    output = replace(output, streams=(output.video, replace(output.streams[1], **changes)))
+    problems = _pcm_check(monkeypatch, _pcm_table(), output)
+    _assert_pcm_refusal(problems, *words)
+
+
+@pytest.mark.parametrize(
+    "missing",
+    ["duration", "size", "sample_rate", "time_base", "channels", "sample_fmt", "first_pts"],
+)
+def test_check_output_pcm_refuses_missing_sample_evidence(
+    monkeypatch: pytest.MonkeyPatch, missing: str
+) -> None:
+    """Container aggregates must not hide unavailable packet or stream evidence."""
+    output = _pcm_table()
+    if missing == "duration":
+        output = replace(output, audio_durations={1: (1024,) * 6 + (None,)})
+    elif missing == "size":
+        output = replace(output, audio_sizes={1: (2048,) * 6 + (None,)})
+    elif missing == "first_pts":
+        output = replace(output, audio_pts={1: (None, *output.audio_pts[1][1:])})
+    else:
+        output = replace(
+            output, streams=(output.video, replace(output.streams[1], **{missing: None}))
+        )
+    problems = _pcm_check(monkeypatch, _pcm_table(), output)
+    _assert_pcm_refusal(problems)
 
 
 def test_not_carried_lists_best_effort_items() -> None:
