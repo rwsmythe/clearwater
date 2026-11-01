@@ -97,8 +97,15 @@
   `oracle_size_rounded` + `oracle_crop_edge`, fixture proves pass / 2-px fail / tile fail; one RED-first turn then 5b
   re-runs. Oracle LIMIT, no product finding. Inconclusive rate = characterisation; per-class table at the accept feeds my
   AD-24 status; if irot 90/180/270 are mostly inconclusive too, a follow-on discriminator may be asked (not in package).
-  Q4 + 5c-8 run meanwhile. Waiting on: 5b re-run; 5c-16 / 5d EXCLUSIVE opens; WP4.6 report / B / gate; WP5.3 GREEN;
-  WP5.1 video module.
+  Q4 + 5c-8 run meanwhile.
+- **WP4.6 REVIEWER B 09:27Z (status 43179fa7; Codex on `c0eedb0e` the report candidate; 1 MAJOR + 2 MINOR, EXECUTED):**
+  B-1 `_decode_progress` (`export_process.py:583`) forwards a 401-digit int (my strict-ignore rule missed it); B-2
+  `_converse` allocates before the clean-up try; B-3 OverflowError catch misses nested `last_parameters` (exit 1 not 2).
+  Disposition concurred: ONE remediation by cell 5 (229,249), RED first, narrow Codex B re-run, two-leg gate. **MY
+  RULING (post after 43179fa7):** the parent's progress rule tightened to `0 <= done <= total <= 2**31-1` (ints; else log
+  once, ignore): the process form is a TRUST BOUNDARY the parent owns; the GUI panel is not taught to clamp. AD-31
+  carries the bound. Window figures unaffected; DR-98 closes on 1fe0f209 at the accept. Waiting on: WP4.6 narrow B +
+  gate -> accept (rows mine); 5b re-run; 5c-16 / 5d EXCLUSIVE opens; WP5.3 GREEN; WP5.1 video module.
 - **DANGLERS (gen 28 runs them; I rule their STOPs):** (1) WP3.6P (Codex session 01a18b4b, worktree `wp3.6p` head
   `081f851c`, turn 7 = R2 remediation dispatched 08:01Z; then A R3, seat runs (`photo_check`, `orientation`, the footage
   node), two EXCLUSIVE windows (16-bit export ~45 min / ~3.8 GB; memory), B (Claude), gate, accept). At its accept mine:
