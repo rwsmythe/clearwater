@@ -196,13 +196,16 @@ def _tail_records(caplog: pytest.LogCaptureFixture) -> list[logging.LogRecord]:
 
 class _Clock:
     """A monotonic clock that moves one unit per reading: the module's loop reads it once per
-    pass (and once more for a result), so a deadline is counted in readings, not seconds."""
+    pass (and once more for a result), so a deadline is counted in readings, not seconds.
+    While ``frozen`` is set a reading does not move it."""
 
     def __init__(self) -> None:
         self.now = 0.0
+        self.frozen = False
 
     def monotonic(self) -> float:
-        self.now += 1.0
+        if not self.frozen:
+            self.now += 1.0
         return self.now
 
 
@@ -853,27 +856,43 @@ def test_a_result_after_the_cancel_does_not_restart_the_kill_grace(
 def test_the_kill_deadline_counts_from_the_cancel_not_from_a_later_result(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, clock: _Clock
 ) -> None:
-    """R2-5: on the controlled clock the kill falls at the cancel's deadline (no wall clock)."""
+    """R2-5: on the controlled clock the kill falls at the cancel's deadline (no wall clock).
+
+    R3-4: the clock is frozen from the cancel until the reader decodes the result, then jumps
+    10 readings, so the grace cannot expire before the result however the child is scheduled.
+    """
     grace = 40.0
+    jump = 10.0
     monkeypatch.setattr(export_process, "KILL_AFTER_CANCEL_S", grace)
     command = _child(
         tmp_path,
         """\
         send({"progress": [1, 100, "working"]})
         sys.stdin.buffer.readline()  # the cancel line
-        time.sleep(0.5)  # several of the parent's passes go by before the result
+        time.sleep(0.5)  # several of the parent's passes go by (frozen) before the result
         result(ok=False, failure="cancelled")
         time.sleep(30)
         """,
     )
     cancel_at: list[float] = []
     kill_at: list[float] = []
+    decode = export_process._decode_line
+
+    def thaw_on_the_result(content: bytes) -> tuple[str, object]:
+        decoded = decode(content)
+        if decoded[0] == "result" and clock.frozen:
+            clock.now += jump
+            clock.frozen = False
+        return decoded
+
+    monkeypatch.setattr(export_process, "_decode_line", thaw_on_the_result)
 
     class _Recording(_Progress):
         def cancelled(self) -> bool:
             answer = super().cancelled()
             if answer and not cancel_at:
                 cancel_at.append(clock.now)  # the pass's reading, taken just before
+                clock.frozen = True
             return answer
 
     real_kill = subprocess.Popen.kill
@@ -887,7 +906,7 @@ def test_the_kill_deadline_counts_from_the_cancel_not_from_a_later_result(
     assert result.failure is CANCELLED  # the result arrived inside the grace and is kept
     (killed,) = kill_at
     # the first pass at or past the cancel's deadline (the result's reading may add one);
-    # timed from the result instead, the kill would come several passes later
+    # timed from the result instead, the kill would come at least `jump` readings later
     assert grace <= killed - cancel_at[0] <= grace + 1, (cancel_at, kill_at)
 
 
