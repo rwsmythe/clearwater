@@ -50,6 +50,11 @@
   pointer; AD-11 NOTE (post-encode 3.5/255 at shipped quality; means 2.954 / 2.788 / 2.954 / 2.473, `--quality
   high` 2.521, maxima 183-203; pre-encode bound unchanged); AD-30 NOTE (committed fixtures used unchanged for the
   sweep); the serial-leg delta; G2 creation-time Limit if WP3.10 / WP4.4 did not document it.
+  (3a) **WP5.1 A CONVERGED AT ROUND 2, 18:03Z (gen 30 `9951dac7`; on the rebased head `f059b2e0`, base `4ece5183`;
+  NO_NEW_CRITICAL_MAJOR; T6-1 green; my F3 rule observed). Two minors in the terminating clean-up turn 13 (session 5):
+  pin the F1 fix by pid-file == process.pid and `clearwater.__file__` == the parent's; V17 traceability row names the
+  format-version-mismatch nodes. Then T10 report, Reviewer B (Claude, 92 % rule), gate = parallel + serial + ONE
+  fullclip leg (~26 min) with the stall watch and a quiet host. No ruling needed from me.
   (4a) **WP5.3 A ROUND 3 RULED 17:59Z (my post `9f2af865`, on `ed787934`; A verdict NEW_CRITICAL_MAJOR_FOUND, every
   round-2 fix verified closed): F1 MAJOR CONCUR (`--manifest` pruned pack.json in place, `build.py:1264-1270`; the
   manifest is a selection filter, never a state filter; no option may shrink the rows; pending against
