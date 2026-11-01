@@ -1004,3 +1004,34 @@ result-to-exit teardown 0.15-0.18 s; two compute contexts at the result (parent 
 Expected wall of the real chain: about 25 min (WP4.3's window-4 v7c 271-278 s, v7e 282 s, v7d
 31 s, dr44c-export 70 s; twice for v7c and v7e), up to about 35 min if the worker's cold
 analysis adds a minute to each of the four exports.
+
+## The EXCLUSIVE window (run at the orchestrator's seat)
+
+Granted by the orchestrator; opened to CHARC 2026-11-01 08:46Z; chain 08:46:17Z-09:08:23Z (about
+22 min); closed 09:08:23Z. The chain exactly as committed in the plan (`window-commands.sh` md5
+`c18ba54d...`, helper `ea4d61e4...`, both drivers' md5s matched: `<work>\drivers-md5.txt`), head
+`1563da2a`, `<work>` = the worktree's `work\wp4.6-window\`; the seat's stdout
+`<evidence>\windows\window-run.stdout` (`CHAIN EXIT=0`). C: 178 GB free before, 177 GB after;
+RAM available 17.72 / 17.92 of 33.52 GB.
+
+Exits (`<work>\exits.txt`): v7c 0 (08:51:13Z), v7e 0 (08:56:15Z), v7d 0 (08:56:52Z),
+dr44c-export 0 (08:58:05Z), v7c-measure 0 (09:03:02Z), v7e-measure 0 (09:08:11Z), spawn-measure 0
+(09:08:23Z), CHAIN-DONE. NO STOP.
+
+Of record (checked against the files): (c) longest 39.0 ms, p99 11.0 ms, 22,616 ticks, export
+226.2 s, one 86.0 MB output (WP4.3: 180.0 / 181.0 ms, export 209.1-210.9 s: **+7.3 % to +8.2 %**,
+under N6's 10 % STOP); (e) 48.0 / 12.0 ms, 23,359 ticks, the k = 1 witness 1 (WP4.3: 182.0 ms);
+(d) 67.0 / 53.0 ms, 1,882 ticks, 300 of 300 in 33.7 s; DR-44 (c) export: ended True in 509 ms,
+at close [True], no temporaries. Footage folder unchanged (128 files) and no product log naming
+it, in every driver run.
+
+Not of record (`wp46_measure.py`): spawn to the first protocol line 1,078 / 793 ms (v7c / v7e
+measure; spawn subcommand GPU 662-689 ms, CPU 709-765 ms); device `GPU` in every export job;
+result-to-exit teardown 270 / 265 ms (grace 3.0 s), none killed; parent private peak 2,549 /
+3,810 MiB; worker tree private peak 7,766 / 7,671 MiB (interpreter 3,730 / 3,603); device used
+peak 3,307 / 4,269 MiB, two compute contexts at the result; F8 scratch 61.6 MiB in 3 files. The
+instrumented v7c-measure's export wall was 233.1 s (+10.5 % to +11.5 %): reported as Limit 3's
+thin margin, not a figure of record.
+
+Report `docs/reports/wp4.6-export-process.md` written (brief task 11). Next: Reviewer B (Codex at
+the orchestrator's seat) on the final head, then the gate.
