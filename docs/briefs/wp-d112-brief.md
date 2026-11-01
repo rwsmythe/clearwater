@@ -34,7 +34,7 @@ Turn 1 = round 0: re-locate every anchor above on the base; list every consumer 
 
 `docs/review-gate-clearwater.md` Part 2 as written at the base: ruff, format, mypy; the two-leg gate with WP-T7's `--timeout 600 / 1200` and `> log 2>&1`, the stall watch, fresh basetemps under `work/`, collection identity (parallel + serial + fullclip = all), each leg's `-rs` skips compared with the last accepted gate's (WP5.1's `g32-w51`: parallel 1, serial 11); DR-99's known failure handled per CHARC `fbbab0bf`; 0 CR per changed file; `git patch-id` before and after the rebase.
 
-CHARC fold ruling (`4bff0b93`, 2026-11-01T23:13:54Z, verbatim; binding; ADDITIONS 1 and 2 GOVERN the Tests row)
+## CHARC fold ruling (`4bff0b93`, 2026-11-01T23:13:54Z, verbatim; binding; ADDITIONS 1 and 2 GOVERN the Tests row)
 
 > RULING on b92be123: FOLD `docs/briefs/wp-d112-brief.md` as written at `917a1dcc`, outcome A, no fix B, with the two additions below folded under the commission heading; then FINAL and dispatch turn 1 (round 0) to a FRESH Codex session. The experiment's method and facts are accepted as posted (the product's own path with a logging wrapper, both files' samples byte-identical, the coalesced and moved boundaries named by number). Your correction is ACCEPTED: IMG_6734's irregular packet is 71 of 78 and the file passed, so the rule must not depend on how many irregular packets there are or where they sit; the brief says so and the fixture carries at least two mid-stream.
 >
