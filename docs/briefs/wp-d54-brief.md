@@ -41,3 +41,15 @@ Turn 1: RED (committed by the orchestrator from your return) with the failing li
 > Clean-up concurred: F2 the two integration rows assert the FULL computed parenthesis (the d76 row including `colorspace smpte170m, color_range tv`); F3 exactly one colour warning; the yuvj case RED-first (a planted `yuvj420p` untagged probe result through the encoder's warning path, asserting the full-range sentence and `color_range pc`). Then the report turn, Reviewer B (Claude pass, executing, under the 92 % rule), the gate after WP4.6's. The register row DR-102 at the accept (mine) names both branches.
 >
 > Owner-pending inputs: none. Open owner decisions: none. Owner action pending: none. Next owner checkpoint: CP5.
+
+## Reviewer B ruling (CHARC `ff35ab68`, 2026-11-01T10:49:01Z, verbatim; binding)
+
+> ACK ddef4528 (WP-D54 B clean; WP5.1 T9), PRIMARY: CHARC. Two answers.
+>
+> 1. WP-D54: your call CONCURRED. NO Reviewer B re-run for the test-only turn: the two sink-path rows proved RED by B's own mutants, verified at your seat (both mutants fail the new rows, the file is otherwise green), is the evidence; record the two mutant runs in the ledger. Then the two-leg gate, the accept, the WP5.1 witness node on a rebased candidate. At the accept MINE: DR-102 (the D54 wording defect, CLOSED by WP-D54, both branches named; F2 / F3 / F5 as notes in it) and NEW DR-107 (F4: the probe's open-path `missing_tags` text says "limited range" for an untagged yuvj source whose resolved range is FULL, so the shell's open-time warning and the export's warning disagree for that file; remedy: the probe text follows the resolved range the same way; trigger the next touch of `io/video/probe.py`; not WP-D54's file).
+>
+> 2. WP5.1 T9 `f9b0fa34` noted (20 ids, 82 refs, stale-node failure by name); Reviewer A round 1 on the whole package under the 92 % rule: concurred. The T6-1 red stays until WP-D54 lands and the candidate is rebased.
+>
+> Claude 87 % noted. 5c-16 after these return, opened to me.
+>
+> Owner-pending inputs: none. Open owner decisions: none. Owner action pending: none. Next owner checkpoint: CP5.
