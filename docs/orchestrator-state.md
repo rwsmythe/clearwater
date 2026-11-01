@@ -5,9 +5,15 @@
 
 ### Generation
 
-- **Generation 27** (session `clearwater-orchestrator-20261029-1830`; CHARC gen 9 `clearwater-charc-20261029-1554`; re-verify both in `comms/.launch-sessions.json`). Bash gauge at bring-up: 37 ms. **ROLLED OVER 2026-10-30 ~06:45Z at ~405K.**
-- **Disk:** C: 174 GB free at 06:40Z (D: 2.4 TB). Run `df -h /c` before every window, gate and footage run. STOP below 15 GB free (20 GB for WP3.6P).
-- **Paces at 06:40Z:** Codex 0.415 (11 % at 26.5 %), Claude 1.45 (80 % at 55.2 %), from `scripts/usage_codex.py` and `scripts/usage_claude.py`. The owner's lane rule: lean on Codex where task fit allows, and report the share at each commission.
+- **Generation 28** (session `clearwater-orchestrator-20261029-2103`; CHARC gen 10 `clearwater-charc-20261031-2201`, not yet announced at write; re-verify both in `comms/.launch-sessions.json`). Bash gauge at bring-up: 37 ms. Brought up PAUSED 2026-10-30 07:03Z; **RESUMED 2026-11-01 08:00Z** on the owner's "resume" (relayed by CHARC gen 9 in `bc8b1a74`). Gen 27 rolled over 2026-10-30 ~06:45Z at ~405K.
+- **Disk:** C: 179 GB free at 08:00Z 11-01 (D: 2.4 TB). Run `df -h /c` before every window, gate and footage run. STOP below 15 GB free (20 GB for WP3.6P).
+- **Paces at 08:01Z 11-01:** Codex 0.197 (11 % at 55.9 %, resets 11-04 10:07Z), Claude 0.994 (84 % at 84.5 %, resets 11-02 09:59Z), from `scripts/usage_codex.py` and `scripts/usage_claude.py`; posted to CHARC before any dispatch (`b79bc9d8`). The owner's lane rule: lean on Codex where task fit allows, and report the share at each commission.
+- **Owner decision (CHARC `3d9488ea`):** Phase 5 (WP5.1 acceptance suite, WP5.3 CP5 visual review pack; WP5.2 EXCLUSIVE after the danglers' windows) is commissioned by CHARC gen 10 IN PARALLEL with the WP3.6P and WP4.6 danglers. One heavy job on the host at a time.
+
+#### Gen 28 dispatches (2026-11-01)
+
+- **WP3.6P turn 7** started ~08:02Z in the background (driver stdout `clearwater-review-evidence\wp3.6p\cell\turn-7.driver.stdout`).
+- **WP4.6 cell 5** (`implementer-opus-high`, Agent name `wp46-cell5`) dispatched ~08:06Z, prompt `clearwater-review-evidence\wp4.6\prompt-wp4.6-cell5.md`, under the R3 ruling saved verbatim as `wp4.6\r3-ruling.md` (CHARC `acc0255d`). Depth at dispatch: 22,632. A fresh cell dies with this session, so a successor re-dispatches from the ledger.
 
 #### Done by gen 27
 
@@ -15,17 +21,7 @@
 - WP4.6 brief FINAL on main (`7eadebe` + `b6a31b5`; `7eadebe` had CRLF, `b6a31b5` restored LF; see the memory `crlf-checkout-autocrlf-override`).
 - Two packages dispatched and run in parallel (details below).
 
-#### PAUSED BY THE OWNER (binding on gen 28)
-
-Owner, in chat to gen 27 at ~06:45Z, verbatim: "once you have rolled over, we will pause execution".
-
-**Gen 28 starts PAUSED:**
-- Bring up, read this file, drain the inbox, and post the online announce to CHARC saying PAUSED.
-- Then do NOTHING else: no dispatch, no Codex turn, no Reviewer pass, no seat run, no window, no gate.
-- Hold until the owner says resume, in chat to the orchestrator or relayed by CHARC with the owner's words.
-- Mail may be drained and answered (fyi or status) while paused; a ruling is recorded but not acted on.
-
-#### Live work at write (RESUME HERE, gen 28, AFTER the owner's resume)
+#### Live work (as gen 27 left it; the gen 28 dispatches above supersede the NEXT steps they started)
 
 **1. WP3.6P (Codex lane; brief `docs/briefs/wp3.6p-brief.md` FINAL; worktree `.worktrees/wp3.6p`, branch `wp3.6p`, head `081f851c`, base `c3bf602`).**
 - **State:** Reviewer A round 2 is ADJUDICATED and CHARC has RULED it (`688ef40f`). Turn 7 (the R2 remediation) is NOT started.
