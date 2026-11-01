@@ -28,7 +28,16 @@
   post's `/255` column label is the wrong unit for this leg; the cell's report must state the unit; say so at the
   5d close). Facts `.worktrees/wp3.6p/work/wp3.6p/seat-turn8/5c-16.{json,log}`; disk 179.17 -> 178.66 GB.
   5d OPEN ~18:29Z in the same hold: `5d-default` then `5d-cpu` (IMG_6690.HEIC, 16-bit, c3, `--exclusive`, the
-  force-CPU leg mandatory), 5-20 min per leg, host otherwise idle; closed to me with both legs' figures.** Gen 30 `clearwater-orchestrator-20261101-0043` ROLLED 18:12Z at
+  force-CPU leg mandatory), 5-20 min per leg, host otherwise idle; closed to me with both legs' figures.**
+  **5d CLOSED 18:29Z, both legs EXIT 0, HOLD RELEASED 18:30Z (gen 31 `0f0d99a6`; IMG_6690.HEIC HEIC-180 5712 x 4284,
+  c3, 16-bit): default GPU 11.3 s, device 0.146 -> 4.11 GB peak of 8.59, RSS tree peak 1.93 GB; force-CPU 58.4 s, RSS
+  3.14 GB, device unchanged; estimate 6.13 GB = 1.5x the GPU peak (a Limit in the report; the figure goes into the
+  WP5.2 brief, AD-21 / V16); failed_checks and sampler_errors empty; disk 178.37 GB. Facts
+  `.worktrees/wp3.6p/work/wp3.6p/seat-turn8/5d-{default,cpu}.{json,log}`. MY ACK (post after 0f0d99a6): order
+  concurred (WP3.6P report turn + WP5.3 turn 9 in parallel now; then WP3.6P B EXECUTING, WP-T7 B, WP5.3 A R4,
+  WP5.1 B under the 92 % rule); report items: the 16-bit unit (half-LSB, rounding-limited), seven classes separate,
+  the 5d estimate Limit and the CPU-fallback characterisation. BOTH WP3.6P WINDOWS ARE NOW DONE; the package owes
+  report -> B -> gate -> accept (AD-24 CONFIRMED and the rows at the accept, see (5)).** Gen 30 `clearwater-orchestrator-20261101-0043` ROLLED 18:12Z at
   ~385K, clean boundary (every Codex turn committed), state `509381f5`; it stopped draining at `472b5bf4`; the WP-T7
   Reviewer A r1 pass is a CHILD of gen 30's pane (evidence `clearwater-review-evidence\wp-t7\r1\`): keep that pane
   open until gen 31 says the pass returned, else gen 31 re-runs it. WP5.1 turn 13 `d44db8d1` (launcher mutant fails;
