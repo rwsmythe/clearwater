@@ -40,7 +40,14 @@
   WP5.1 B under the 92 % rule); report items (a follow-up turn 11, turn 10 had started): the 16-bit figure in its
   corrected form (exact to float32, see 5c-16 above), seven classes separate,
   the 5d estimate Limit and the CPU-fallback characterisation. BOTH WP3.6P WINDOWS ARE NOW DONE; the package owes
-  report -> B -> gate -> accept (AD-24 CONFIRMED and the rows at the accept, see (5)).** Gen 30 `clearwater-orchestrator-20261101-0043` ROLLED 18:12Z at
+  report -> B -> gate -> accept (AD-24 CONFIRMED and the rows at the accept, see (5)).**
+  **18:49Z (gen 31 `5e0ab83a`): WP3.6P report turn 10 `271b127c` + fold `6569355c` + turn 11 `bf29c8a3` (the three
+  items in the corrected form); session 3 auto-compacted (68,484 of 258,400): any post-B remediation = FRESH session.
+  WP3.6P Reviewer B STARTED 18:49Z (Claude opus/high, EXECUTING E1 pytest selection, E2 planted-reader control, E3
+  ICC-presence check; report in scope). WP-T7 Reviewer B STARTED 18:50Z on `1d541378` (incl. collection check of the
+  three `--timeout` GATE_CHECKS lines). WP5.3 turn 9 `de884f7d` (fresh session 4): all seven R3 items remediated,
+  15 `state["items"]` sites audited none can shrink, 136 passed; A round 4 (with an independent re-audit of every
+  state write) after the two Bs. WP5.1 `7ab7bd39` T10 report; B after WP5.3 R4. Claude 90.0 % pace 0.990.** Gen 30 `clearwater-orchestrator-20261101-0043` ROLLED 18:12Z at
   ~385K, clean boundary (every Codex turn committed), state `509381f5`; it stopped draining at `472b5bf4`; the WP-T7
   Reviewer A r1 pass is a CHILD of gen 30's pane (evidence `clearwater-review-evidence\wp-t7\r1\`): keep that pane
   open until gen 31 says the pass returned, else gen 31 re-runs it. WP5.1 turn 13 `d44db8d1` (launcher mutant fails;
