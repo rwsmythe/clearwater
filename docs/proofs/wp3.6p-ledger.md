@@ -4,9 +4,12 @@
 
 - Package: WP3.6P, CODEX lane, STRONG tier; CHARC's FINAL rulings govern.
 - Dispatch base verified: `c3bf602fe9ac94cd5df25499d97f3a2bc439bb72`.
-- Current boundary: turn 6, Reviewer A round 2 ADJUDICATED, ledger only.
+- Current boundary: turn 7, Reviewer A round 2 REMEDIATED in the owned tool,
+  tests and ledger. Reviewer A round 3 is NOT RUN. Turn 6's adjudication was
+  committed as `081f851c`.
   Reviewer A found one new MAJOR, one MINOR and eight ADVISORY findings at
-  `7a3810af`; remediation is NOT RUN and belongs to turn 7. Turn 5's round-1
+  `7a3810af`; the four tool fix groups and one test-only group are recorded
+  below with RED/GREEN evidence. Turn 5's round-1
   remediation was committed as `7a3810af`. Turn 4's adjudication was
   committed as `f2396b0e`. Turn 1's ledger was committed
   as `6cc7cdb`; RED as `a66eea6`.
@@ -18,8 +21,9 @@
   (2026-10-30T04:46:00Z)
   RE-RULES Q3: FFmpeg default composed primary as delivered is the oracle.
   The thumbnail is a recorded second witness, never the pass criterion.
-- Current handoff: YIELD after round-2 adjudication; R2-QA below asks CHARC
-  to rule the rewritten D63 fields' structural criterion before turn 7.
+- Current handoff: YIELD for Reviewer A round 3. CHARC resolved R2-QA in
+  `688ef40fca871a0d`; its verbatim ruling below supersedes the turn-6 proposal's
+  pinned Software count. The found Software value determines its count.
   CHARC resolved R1-QA/QB in `d9133089b58091d8`; round-1 ruling/remediation
   and round-2 synthetic confirmation evidence are recorded below.
   No product defect is asserted from a planted instrument control.
@@ -1017,7 +1021,7 @@ EXIT 0. No prohibited value was discovered in a committed-facing artifact.
 | 0 | - | - | - | - | - | 0 | None; ledger only | R0 seat evidence received; mapped tile scores VOID; Q3 replaced by CHARC | 118,810 after turn 1 |
 | Build turn 3 (not A) | - | - | - | Owned tool/ledger | - | 0 | New tool; no test fix | GREEN: 33 passed, 1 footage deselected; ruff/mypy green; Reviewer A PENDING | 168,789 after turn 2; turn-3 reading pending |
 | A1 / turns 4-5 | 0 | 2 | 6 (+8 advisory) | 15 / 1; #15 out | 16 NEW / 0 REOPENED; #11 rejected, #9/#13 partially rejected | 0 | 13 tool fix groups with RED/GREEN tests; 0 src fixes; 0 test-only fix groups; #16 Limit in ledger | NEW_CRITICAL_MAJOR_FOUND was A1's verdict; adjudication committed f2396b0e; CHARC R1-QA/QB ruled; remediated/committed 7a3810af turn 5; checked A1 fixes HOLD in A2 | Turn 4: 114,259; turn 5: 178,999; previous session 240,970 after turn 3 |
-| A2 / turn 6 adjudication | 0 | 1 | 1 (+8 advisory) | 7 / 3; a-3/a-7/a-10 out | 10 NEW / 0 REOPENED; a-9 behavior confirmed, defect rejected; a-6 conservative rejection retained | 0 | 0 tool or src changes; 0 test-only fixes; ledger only; proposed: 4 tool fix groups with controls, 1 test-only group, limits/report wording | NEW_CRITICAL_MAJOR_FOUND; all 10 adjudicated; 21 synthetic probe cases PASS on unchanged 7a3810af; R2-QA pending; turn-7 remediation owed | Turn 5: 178,999; turn 6 dispatcher to fill |
+| A2 / turns 6-7 | 0 | 1 | 1 (+8 advisory) | 7 / 3; a-3/a-7/a-10 out | 10 NEW / 0 REOPENED; a-9 behavior confirmed, defect rejected; a-6 conservative rejection retained | 0 | 4 tool fix groups with RED/GREEN controls; 0 src fixes; 1 test-only group (a-8); 5 advisory Limit/report lines in ledger | NEW_CRITICAL_MAJOR_FOUND was A2's verdict; adjudication committed 081f851c; CHARC R2-QA ruled; remediated turn 7; 87 light cases pass; A3 pending | Turn 5: 178,999 before compaction; turn 6: 101,571 after compaction; turn 7 dispatcher to fill |
 
 | Suspected item | Independent confirmation | Disposition |
 |---|---|---|
@@ -1485,6 +1489,186 @@ The scratch validator initially decoded a PowerShell UTF-16 log as UTF-8;
 correcting that local log reader produced the stated PASS, with no tool/test
 change. Full ruff/mypy/test gates are not rerun for this ledger-only turn.
 
+## Reviewer A round 2: turn-7 remediation
+
+Dispatch head verified: 081f851c2c19df1d7efd380a97422024999cc5ed; tracked
+status was empty. The turn bundles the RED tests with their fixes in one
+logical review-remediation change; the dispatcher commits after the turn.
+No intermediate commit or write to .git was attempted.
+
+### Governing ruling, verbatim
+
+CHARC 688ef40fca871a0d (2026-10-30T06:39:51Z):
+
+> R2-QA: the D63 output structure is checked by exactly ONE entry per rewritten field in its IFD: IFD0 Orientation SHORT count 1 value 1; IFD0 Software ASCII, value starting "Clearwater" and ending in exactly one NUL, count = the byte length of the value INCLUDING that NUL (derived from the value found, never a pinned number, so a version suffix is not a silent rule change; the report records the string seen); Exif PixelXDimension and PixelYDimension SHORT or LONG, count 1, equal to the upright width and height of the written image. A duplicate, a missing entry, a wrong type, count or value fails the named V5 check (the record names the field and the defect, never the bytes). (b) declined: type and count are what WP4.5's rewriter promises for the D63 edits.
+>
+> M-1 (expected ICC taken from the product reader itself): a real oracle defect, fix as proposed: the source ICC read INDEPENDENTLY (Pillow `info["icc_profile"]` for PNG / JPEG; the pillow-heif primary's profile and type for HEIC), compared to the PNG's iCCP bytes, or to the D53 built-in for a profile-less nclx source; a planted-reader control that drops or swaps the profile must FAIL. Advisories a-4, a-5, a-8 fixed; a-3, a-6, a-7, a-9, a-10 report wording or Limits: concurred.
+
+The valid rewritten Software string is the ruling's explicit reporting
+exception. It is read from the output, not copied from source EXIF. Invalid or
+source Software values are not emitted. All other privacy restrictions stand.
+
+### RED on the unchanged 081f851c tool
+
+Added failing controls before any tool edit. All evidence is local under
+work/wp3.6p/rA2-fix/. The final corrected baseline run is red2.log/red2.xml:
+
+`PYTHONPATH=scripts uv run pytest -q tests/test_photo_verify.py --basetemp=work/wp3.6p/rA2-fix/red2-tmp -p sandbox_mkdir_shim -p no:cacheprovider -m "not gpu and not footage and not gui and not slow and not fullclip" -k "r2 or test_r1_inconclusive_continues or test_r1_owner_map_rejects_wrong_irot or test_r1_owner_map_rejects_jpeg" -o junit_family=legacy --junitxml=work/wp3.6p/rA2-fix/red2.xml`
+
+Observed EXIT 1: **25 failed, 3 passed, 57 deselected in 2.59s**, with one
+expected Pillow warning for the deliberately excessive Orientation count.
+Tool bytes were still the dispatch version. Only the owned test file had been
+changed. Three existing a-8 controls were given a work-folder cwd to expose
+their relative paths. The remaining REDs exercise real guarded CPU exports,
+independent TIFF mutations and the real sampler loop with fake readings/clock.
+
+Node IDs below have the common prefix tests/test_photo_verify.py::. GREEN
+means PASSED in final4.xml on the final state, not only an intermediate run.
+
+| Fix | RED node id(s) on 081f851c | Observed RED failure line | Final GREEN |
+|---|---|---|---|
+| M-1 embedded ICC | test_r2_source_icc_is_independent_of_reader[drop-png], [drop-jpeg], [drop-heic], [swap-png], [swap-jpeg], [swap-heic] | AssertionError: reader-corrupted ICC passed V5/D53 | All 6 PASSED; named v5_icc_equal failure and D53 false for planted product faults |
+| M-1 nclx expectation | test_r2_nclx_builtin_cannot_be_suppressed_by_reader[1], [12] | AssertionError: lost nclx silently removed D53 built-in | Both PASSED; absence no longer matches the independent built-in expectation |
+| m-2 type / duplicate / count | test_r2_d63_structure_rejects_malformed_entries[IFD0-274-IFD0.Orientation-v5_orientation-type], [IFD0-274-IFD0.Orientation-v5_orientation-duplicate], [IFD0-274-IFD0.Orientation-v5_orientation-count] | AssertionError: malformed D63 structure passed V5 | All 3 PASSED; field and type/duplicate/count defects recorded |
+| m-2 missing Orientation | test_r2_d63_structure_rejects_malformed_entries[IFD0-274-IFD0.Orientation-v5_orientation-missing] | AssertionError: D63 field/defect not recorded | PASSED; named missing field |
+| m-2 Software count / missing | test_r2_d63_structure_rejects_malformed_entries[IFD0-305-IFD0.Software-v5_software-extra-nul], [IFD0-305-IFD0.Software-v5_software-missing] | AssertionError: D63 field/defect not recorded | Both PASSED; v5_software and count/missing defects |
+| m-2 dimension type / duplicate | test_r2_d63_structure_rejects_malformed_entries[Exif-40962-Exif.ExifImageWidth-v5_dimensions-type], [Exif-40963-Exif.ExifImageHeight-v5_dimensions-duplicate] | Type: AssertionError: D63 field/defect not recorded; duplicate: AssertionError: malformed D63 structure passed V5 | Both PASSED; v5_dimensions and field/defect facts |
+| m-2 dimension count / missing | test_r2_d63_structure_rejects_malformed_entries[Exif-40962-Exif.ExifImageWidth-v5_dimensions-count], [Exif-40963-Exif.ExifImageHeight-v5_dimensions-missing] | AssertionError: D63 field/defect not recorded | Both PASSED |
+| m-2 derived Software count | test_r2_software_version_uses_derived_count_and_records_string (unparameterised at baseline RED) | AssertionError: valid Software version suffix was rejected | Final version and tab-version parameter cases PASSED; found string recorded and count derived |
+| a-4 | test_r2_gps_pointer_is_part_of_kept_boolean | AssertionError: lost empty GPS pointer was called kept | PASSED; pointer mismatch makes gps_kept false, V5 remains false |
+| a-5 | test_r2_device_cadence_includes_sample_duration[0.3-0.5], [0.9-1.1] | AssertionError: device cadence missing or nominal | Both PASSED; means/min/max 0.5 and 1.1 from fake post-call waits, not nominal 0.2 |
+| a-8 | test_r1_inconclusive_continues_without_becoming_a_pass; test_r1_owner_map_rejects_wrong_irot; test_r1_owner_map_rejects_jpeg_as_heic | FileNotFoundError on each relative synthetic fixture path after cwd changed | All 3 PASSED with sample fixture; actual CLI assertions still exercised |
+
+The three baseline positive cases already passed: two normal nclx exports
+matching independently pinned sRGB/P3 byte contracts and a legal SHORT
+dimension. They are supporting controls, not falsely claimed REDs.
+The first scratch RED's dimension-SHORT mutator had left a LONG's big-endian
+inline bytes in place. Corrected the test's encoding and reran before changing
+the tool. red2.xml is the baseline evidence; no product or tool fix is credited
+for that harness correction. red2-lines.log contains the extracted failure
+messages; full logs and values are not copied into the ledger.
+
+### Final changes and independent witnesses
+
+- **M-1:** _source_icc reads PNG/JPEG metadata through PIL and HEIC primary
+  metadata through pillow-heif with its explicit primary index and profile
+  type. It does not call a product format detector, reader, classifier,
+  profile builder or writer. Embedded bytes are compared directly with the
+  independent PNG chunk reader's inflated iCCP. nclx raw primaries/transfer
+  choose the existing pinned byte-length/md5 contracts, never Image.color.
+  Unknown or unreadable colour metadata fails closed. Safe records include
+  source ICC presence, origin, parse status and digest; never profile bytes.
+  Product-derived primaries/transfer comparisons remain coarser witnesses and
+  cannot turn a raw ICC mismatch into a V5/D53 pass. V9 is unchanged.
+- **m-2:** the independent TIFF inventory optionally includes the four D63
+  fields for a separate output-structure pass. The kept-entry comparison still
+  excludes exactly those four and retains its existing pointer/IFD1 rules.
+  Checks enforce exactly one entry, the ruled type/count/value, and actual PNG
+  header dimensions read independently through PIL. Software count comes from
+  the found ASCII value with exactly one terminal NUL. ASCII version suffixes
+  are permitted, including ASCII control characters escaped by JSON; no extra
+  printable-only restriction was authorised. Valid output software_seen and
+  allow-listed field/defect pairs are reported; invalid Software bytes/values
+  and every unrelated EXIF value remain private.
+- **a-4:** gps_kept includes IFD0.34853 presence/type/multiplicity changes as
+  well as GPS.* raw-entry differences. A valid empty source child also counts
+  as gps_ifd_present by its raw pointer, even with no coarse GPS.* fields.
+- **a-5:** retain nominal waits in sample_intervals_s, explicitly labelled
+  sample_interval_kind=wait-after-sample. Record actual successful-sample
+  start-gap count/min/mean/max for RSS and device, plus sampler_elapsed_s from
+  monotonic construction through stop, including baseline/final observations.
+  Sort start timestamps before gap calculation because attach/background calls
+  can complete out of order. These are sampling-cadence facts, not guaranteed
+  instantaneous peaks or the runner's exact process duration. Active-run counts
+  and strict unavailable-sample failure policy are unchanged. Only numeric
+  cadence keys pass projection; process paths/ids and arbitrary nested values
+  do not. No host memory/timing figure is measured in the fake-clock tests.
+- **a-8, test only:** the three cited nodes now use sample and run from an
+  alternate work-folder cwd. Their actual orientation/selection assertions are
+  retained. No shared fixture or conftest is changed.
+
+### Owner verification loop
+
+| Suspected issue | Independent confirmation / rejection | Resolution and final evidence |
+|---|---|---|
+| [MINOR] New elapsed time froze at attachment rather than stop | test_r2_sampler_elapsed_finishes_at_stop: RED on first remediated tool, elapsed-red.xml, EXIT 1; "elapsed time stopped at runner attachment", 2.0 instead of 10.0 | Fixed finish timestamp in stop; final4 PASSED; later record does not extend stopped elapsed time |
+| [MINOR] Out-of-order completions could give negative/incorrect cadence | test_r2_overlapping_sample_completions_keep_chronological_cadence: deterministic re-entry completes later-started observation first; cadence-red.xml EXIT 1; "completion order corrupted chronological sample gaps", min -0.5 / mean 0.25 | Fixed chronological snapshot; final4 PASSED, all gaps 0.5 |
+| [MINOR] New Software test imposed printable-only ASCII beyond R2-QA | Added tab-version parameter: ascii-red.xml EXIT 1, one failed / one passed / 86 deselected; "valid Software version suffix was rejected" | Fixed ASCII check and safe projection; both final version cases PASSED; JSON escaping retained |
+| [MINOR] Empty GPS child presence still depended on coarse field names | Extended test_r2_gps_pointer_is_part_of_kept_boolean: gps-presence-red.xml EXIT 1; "an empty source GPS IFD was reported absent" | Fixed presence from independent raw pointer; final4 PASSED; no source GPS value emitted |
+| New fields might bypass privacy projection | Extended existing planted private-value/path test with Software, D63 defect and cadence contamination; scan final safe JSON artifacts | Rejected on final tested surfaces; constrained projection and private-value test PASSED |
+
+The four verification-loop REDs above are on intermediate remediated tools,
+NOT on 081f851c. They refine the same m-2/a-4/a-5 groups; no fix is counted as
+src/product code. No reverts. Following these fixes, traced independent source
+ICC -> raw output iCCP -> V5/D53, both raw EXIF inventories -> D63/coarse
+witnesses -> safe projection, GPS pointer handling, sampler start/attach/stop
+and chronological cadence -> safe record, and cwd-independent CLI controls.
+Then ran the final light checks and scope/privacy validation. No new issue
+found in that last pass. This is cell verification, not Reviewer A convergence.
+
+### Limit / report wording staged for the later report turn
+
+- **a-3 LIMIT:** unsupported EXIF types (including non-Apple UTF-8/type 129 and
+  non-pointer type 13) fail closed. Do not call such a failure proven byte loss
+  or claim those vendor/type classes verified. No support expansion here.
+- **a-6 LIMIT:** any unavailable RSS/device reading invalidates that leg even
+  after later successful active samples. Preserve error/count facts and obtain
+  a complete seat rerun; partial availability does not establish an accepted
+  peak. The conservative policy remains unchanged.
+- **a-7 LIMIT:** oracle_failed and orientation_size are broad comparison
+  failure labels for invalid/non-finite/wrong-channel product arrays too;
+  they do not alone prove that FFmpeg is at fault. Both remain failures/STOPs,
+  never AD-24 passes. No invalid IF-1 product behavior was proved on owner data.
+- **a-9 REPORT:** keep exactly seven successful representative PNGs from the
+  16-bit leg. The seven 8-bit validation outputs are measured then removed.
+  Failed-check diagnostic PNGs remain retained. Do not imply both depths kept.
+- **a-10 LIMIT:** maker_note_kept establishes raw-entry type/count/payload and
+  multiplicity fidelity, not universal vendor MakerNote offset semantics after
+  relocation. The cell does not parse private MakerNote contents or prove
+  semantic validity for other camera vendors. Actual product defects still STOP.
+
+### Final light checks / handoff
+
+All output is captured under work/wp3.6p/rA2-fix/; summaries read from the
+final state. PowerShell sets PYTHONPATH=scripts for every pytest invocation.
+
+| Check | Exact command | Observed result / evidence |
+|---|---|---|
+| Tests | PYTHONPATH=scripts uv run pytest -q tests/test_photo_verify.py --basetemp=work/wp3.6p/rA2-fix/final4-tmp -p sandbox_mkdir_shim -p no:cacheprovider -m "not gpu and not footage and not gui and not slow and not fullclip" -o junit_family=legacy --junitxml=work/wp3.6p/rA2-fix/final4.xml | EXIT 0; 87 passed, 1 deselected in 10.01s; final4-pytest.log |
+| Ruff | uv run ruff check tools/photo_verify.py tests/test_photo_verify.py | EXIT 0; All checks passed!; final4-ruff.log |
+| Strict typing | uv run mypy | EXIT 0; Success: no issues found in 147 source files; final4-mypy.log |
+| Formatting | uv run ruff format --check tools/photo_verify.py tests/test_photo_verify.py | EXIT 0; 2 files already formatted; final4-format.log |
+
+The 87 cases comprise 59 prior cases plus 28 new round-2 cases. The one footage
+node is deselected. All exports force CPU, all memory readings are stubs, and
+no gpu/footage/gui/slow/fullclip node or heavy/exclusive measurement ran. The
+deliberate excessive-Orientation-count case filters only its known Pillow
+metadata warning; final pytest has no warnings. uv's existing environment
+mismatch notice remains and uv uses this worktree's environment. Initial
+ruff formatting/pairwise and third-party metadata/Literal typing issues were
+fixed; only the final checks above support the final claims. No full suite,
+independent review, owner run, report or gate is claimed at this boundary.
+
+Only tools/photo_verify.py, tests/test_photo_verify.py and this ledger are
+submitted. No src, frozen interface, dependency, lockfile, shared fixture,
+unrelated test, local config or other-worktree edit. Source ICC/TIFF bytes stay
+in memory, not safe records. The valid rewritten Software string is the sole
+new EXIF reporting exception authorised by R2-QA. Inputs and outputs in the
+tests are synthetic and guarded under the worktree basetemp. No owner-footage
+read/write, direct owner-config read/edit, mailbox post, commit or scene
+judgement. Seat 5a remains supplied evidence; other seat runs, the report,
+Reviewer A round 3/convergence, Reviewer B and the one two-leg gate remain owed.
+No new ruling request or STOP. YIELD now before Reviewer A round 3.
+
+Observed final scope/privacy validation: EXIT 0, final-validation.log under
+work/wp3.6p/rA2-fix/. PASS for the exact three-file tracked scope, ASCII/LF,
+newline/whitespace and git diff --check; 25 baseline REDs, four independent
+verification-loop RED records, 87 final passing cases / one footage deselection,
+28 new cases, independent source-ICC helper, public tool docstrings, ruling,
+depth and cumulative entries. The ledger and 73 safe record/summary JSON files
+were scanned without planted private markers or absolute synthetic input roots.
+Supporting scope/diff evidence: final-scope.log and final-diff-check.log.
+
 ## Seat-run ledger
 
 | Run | Command / scope | Counts | EXIT | Wall time | Free disk before / after | Evidence / conditions |
@@ -1507,12 +1691,14 @@ change. Full ruff/mypy/test gates are not rerun for this ledger-only turn.
 | 3 / GREEN | 240,970 tokens (dispatcher reading after turn 3; previous session) | GREEN committed 70bd699; previous session retired at depth boundary |
 | 4 / Reviewer A round 1 adjudication | 114,259 tokens (dispatcher reading after turn 4; FRESH session) | Ledger committed f2396b0e; 16 dispositions; no remediation; R1-QA/QB ruled before turn 5 |
 | 5 / Reviewer A round 1 remediation | 178,999 tokens (dispatcher reading after turn 5) | 13 tool fix groups plus RED/GREEN controls; committed 7a3810af; #16 Limit staged in ledger; all light checks green; A2 dispatched on turn 6 |
-| 6 / Reviewer A round 2 adjudication | PENDING dispatcher reading | 10 dispositions, 21 passing synthetic probe cases against unchanged tool; ledger only; R2-QA for CHARC; YIELD before turn-7 remediation |
+| 6 / Reviewer A round 2 adjudication | 101,571 tokens (dispatcher reading after turn 6; transcript context compaction) | Adjudication committed 081f851c; 10 dispositions, 21 passing probes; R2-QA ruled before turn 7; turn-5 reading 178,999 was before compaction |
+| 7 / Reviewer A round 2 remediation | PENDING dispatcher reading | 4 tool fix groups plus RED/GREEN controls, 1 test-only group; 87 light cases pass; 5 Limit/report lines staged; YIELD for A3 |
 
 Evaluate near 200K; stop at a step boundary near 250K per this dispatch.
-The last supplied depth is 178,999 after turn 5. Evaluated at this adjudication
+The supplied readings are 178,999 after turn 5 and 101,571 after turn 6,
+with transcript context compaction between them. Evaluated at this remediation
 boundary; this turn ends here as dispatched. No current cumulative token number
-is invented; the dispatcher fills the turn-6 row from its reading.
+is invented; the dispatcher fills the turn-7 row from its reading.
 Historical turn-1 validation was limited to the ledger's ASCII/LF and owned-file diff.
 Observed validation: PASS for ASCII, LF, final newline, no trailing whitespace,
 both embedded Python RUN REQUEST snippets parsing, seven-class example JSON

@@ -29,6 +29,7 @@ import struct
 import subprocess
 import sys
 import threading
+import time
 import uuid
 import zlib
 from collections import Counter
@@ -36,8 +37,9 @@ from collections.abc import Iterator, Mapping, Sequence
 from contextvars import ContextVar
 from datetime import UTC, datetime
 from functools import lru_cache
+from itertools import pairwise
 from pathlib import Path
-from typing import Any, NoReturn
+from typing import Any, Literal, NoReturn
 
 import numpy as np
 import pillow_heif
@@ -52,9 +54,7 @@ from clearwater.io.photo import PhotoReadError, read_photo
 from clearwater.io.photo import exif as exif_tools
 from clearwater.io.photo import icc as icc_tools
 from clearwater.io.photo.heif_boxes import read_layout
-from clearwater.io.photo.p3_profile import display_p3_profile
 from clearwater.io.photo.reader import detect_format
-from clearwater.io.photo.srgb_profile import srgb_profile
 from clearwater.jobs.export_seam import ExportJobs
 from fixtures.stills import heif_primary_properties
 from local_config import LocalConfig, load_local_config
@@ -76,6 +76,12 @@ _D63 = {"IFD0.Orientation", "IFD0.Software", "Exif.ExifImageWidth", "Exif.ExifIm
 _RAM_LIMIT = 16_000_000_000
 _DEVICE_LIMIT = 8188 * 2**20
 _DISK_LIMIT = 20_000_000_000
+# Existing D53 byte contracts, pinned independently in test_io_photo_{srgb,p3}.
+# Do not derive these expectations by calling the product's profile builders.
+_BUILTIN_ICC = {
+    "nclx-srgb": (608, "ca34a0279325928fc9fd3fc7eff99eb9"),
+    "nclx-display-p3": (620, "ee27975c71b9ed10be950a696f6fe6f4"),
+}
 _ACTIVE_GUARD: ContextVar[WriteGuard | None] = ContextVar("photo_verify_guard", default=None)
 _ACTIVE_SAMPLER: ContextVar[MemorySampler | None] = ContextVar("photo_verify_sampler", default=None)
 _CHECKS = frozenset(
@@ -129,6 +135,8 @@ _BOOL_FIELDS = frozenset(
         "thumbnail_absent",
         "icc_expected_present",
         "icc_equal",
+        "source_icc_present",
+        "source_icc_parse_ok",
         "primaries_equal",
         "transfer_equal",
         "kept_fields_equal",
@@ -183,6 +191,7 @@ _NUMBER_FIELDS = frozenset(
         "device_active_samples",
         "ram_limit_bytes",
         "device_limit_bytes",
+        "sampler_elapsed_s",
     ]
 )
 _ENUMS = {
@@ -195,6 +204,8 @@ _ENUMS = {
     "oracle_kind": {"ffmpeg-default"},
     "orientation_status": {"passed", "inconclusive", "failed"},
     "rss_scope": {"tool-runner-tree-including-sampler-children"},
+    "source_icc_origin": {"embedded", "nclx-srgb", "nclx-display-p3", "untagged", "unverifiable"},
+    "sample_interval_kind": {"wait-after-sample"},
     "method": {"c3"},
     "primary_type": {"grid", "hvc1", "av01", "iden"},
     "failure_code": {
@@ -477,12 +488,16 @@ def _decoder_versions() -> Record:
     return versions
 
 
-def _entry_inventory(block: bytes | None) -> dict[tuple[str, int], Counter[tuple[int, int, bytes]]]:
+def _entry_inventory(
+    block: bytes | None, *, include_d63: bool = False
+) -> dict[tuple[str, int], Counter[tuple[int, int, bytes]]]:
     """Inventory raw TIFF entries independently of the product EXIF rewriter.
 
     Pointer locations and IFD1 are structural. Pointer presence/type is retained;
     other kept entries retain type, count, payload and duplicate multiplicity.
     Malformed or unsupported structures fail closed rather than disappearing.
+    include_d63 additionally exposes the four rewritten entries for independent
+    output-structure validation; preservation comparisons leave it false.
     """
     result: dict[tuple[str, int], Counter[tuple[int, int, bytes]]] = {}
     if block is None:
@@ -527,7 +542,8 @@ def _entry_inventory(block: bytes | None) -> dict[tuple[str, int], Counter[tuple
             elif (label == "IFD0" and tag in (274, 305)) or (
                 label == "Exif" and tag in (40962, 40963)
             ):
-                continue
+                if include_d63:
+                    result.setdefault((label, tag), Counter())[(kind, number, payload)] += 1
             else:
                 if kind == 13 or tag in (330, 34665, 34853, 40965):
                     raise ValueError("unsupported TIFF directory pointer")
@@ -556,6 +572,11 @@ def _base(source: Path, photo_class: str) -> tuple[Record, Image, PhotoMetadata,
     height, width = image.pixels.shape[:2]
     color = image.color
     profile = color.icc_profile
+    gps_present = any(k.startswith("GPS.") for k in fields)
+    with contextlib.suppress(ValueError, struct.error):
+        # An empty GPS child still exists even though the text witness has no
+        # GPS.* values to describe. Pointer presence is the independent fact.
+        gps_present = ("IFD0", 34853) in _entry_inventory(raw)
     record: Record = {
         "schema": 1,
         "file": source.name,
@@ -579,7 +600,7 @@ def _base(source: Path, photo_class: str) -> tuple[Record, Image, PhotoMetadata,
         "field_count_before": len(fields),
         "text_exif_parse_ok": text_parse_ok,
         "decoder_versions": _decoder_versions(),
-        "gps_ifd_present": any(k.startswith("GPS.") for k in fields),
+        "gps_ifd_present": gps_present,
         "maker_note_present": "Exif.MakerNote" in fields,
         "failed_checks": [],
     }
@@ -703,16 +724,106 @@ def _png_metadata(path: Path) -> tuple[int, bytes | None, bytes | None]:
     return ihdr[8], profile, chunks.get(b"eXIf")
 
 
-def _expected_icc(image: Image, meta: PhotoMetadata) -> bytes | None:
-    color = image.color
-    if color.icc_profile is not None:
-        return color.icc_profile
-    if meta.source_format == "heic" and not color.assumed and color.transfer == "srgb":
-        if color.primaries == "bt709":
-            return srgb_profile()
-        if color.primaries == "display-p3":
-            return display_p3_profile()
-    return None
+def _source_icc(source: Path) -> tuple[bytes | None, str]:
+    """Read the source colour expectation without any product photo helper.
+
+    Embedded ICC bytes must survive exactly. Profile-less nclx uses the pinned
+    D53 built-in contract selected by raw primary metadata, not Image.color.
+    """
+    with source.open("rb") as stream:
+        signature = stream.read(8)
+    if signature.startswith(b"\xff\xd8") or signature == b"\x89PNG\r\n\x1a\n":
+        with PILImage.open(source) as header:
+            if header.format not in {"PNG", "JPEG"}:
+                raise ValueError("unsupported source colour container")
+            profile = header.info.get("icc_profile")
+        if profile is None:
+            return None, "untagged"
+    else:
+        container = pillow_heif.open_heif(source)
+        info: Mapping[str, Any] = container[container.primary_index].info
+        profile = info.get("icc_profile")
+        if profile is not None:
+            if info.get("icc_profile_type") not in {"prof", "rICC"}:
+                raise ValueError("unsupported source ICC type")
+        else:
+            nclx = info.get("nclx_profile")
+            if nclx is None:
+                return None, "untagged"
+            if not isinstance(nclx, dict) or nclx.get("transfer_characteristics") != 13:
+                raise ValueError("unverifiable nclx colour")
+            primaries = nclx.get("color_primaries")
+            if primaries not in (1, 12):
+                raise ValueError("unverifiable nclx primaries")
+            return None, "nclx-srgb" if primaries == 1 else "nclx-display-p3"
+    if not isinstance(profile, bytes) or not profile:
+        raise ValueError("invalid source ICC payload")
+    return profile, "embedded"
+
+
+def _d63_output(block: bytes | None, width: int, height: int) -> Record:
+    """Check rewritten output entries by the ruled types/counts and values.
+
+    Only field names and fixed defect codes leave this parser. The valid
+    Clearwater Software string is the explicit R2-QA reporting exception;
+    source or invalid Software values and all raw payloads stay private.
+    """
+    fields = (
+        ("IFD0", 274, "IFD0.Orientation", (3,), 1),
+        ("IFD0", 305, "IFD0.Software", (2,), None),
+        ("Exif", 40962, "Exif.ExifImageWidth", (3, 4), width),
+        ("Exif", 40963, "Exif.ExifImageHeight", (3, 4), height),
+    )
+    defects: list[Record] = []
+    good: dict[str, bool] = {}
+    software: str | None = None
+    try:
+        inventory = _entry_inventory(block, include_d63=True)
+    except (ValueError, struct.error):
+        inventory = None
+    data = b"" if block is None else block.removeprefix(b"Exif\0\0")
+    byte_order: Literal["little", "big"] = "little" if data[:2] == b"II" else "big"
+    for label, tag, name, types, expected in fields:
+        entries = Counter() if inventory is None else inventory.get((label, tag), Counter())
+        defect = None
+        if inventory is None:
+            defect = "parse"
+        elif sum(entries.values()) != 1:
+            defect = "missing" if not entries else "duplicate"
+        else:
+            kind, count, payload = next(iter(entries))
+            if kind not in types:
+                defect = "type"
+            elif tag == 305:
+                # Derive the expected count from the found string, never pin it
+                # to today's versionless Software length (CHARC R2-QA).
+                text_bytes = payload.split(b"\0", 1)[0]
+                if count != len(text_bytes) + 1:
+                    defect = "count"
+                elif (
+                    not payload.endswith(b"\0")
+                    or not text_bytes.startswith(b"Clearwater")
+                    or not text_bytes.isascii()
+                ):
+                    defect = "value"
+                else:
+                    software = text_bytes.decode("ascii")
+            elif count != 1:
+                defect = "count"
+            elif int.from_bytes(payload, byte_order) != expected:
+                defect = "value"
+        good[name] = defect is None
+        if defect is not None:
+            defects.append({"field": name, "defect": defect})
+    result: Record = {
+        "orientation_normal": good["IFD0.Orientation"],
+        "software_ok": good["IFD0.Software"],
+        "dimensions_ok": good["Exif.ExifImageWidth"] and good["Exif.ExifImageHeight"],
+        "d63_defects": defects,
+    }
+    if software is not None:
+        result["software_seen"] = software
+    return result
 
 
 def _device_reason(raw: object) -> str | None:
@@ -732,6 +843,7 @@ def _export_checks(
     raw_exif: bytes | None,
     output: Path,
     depth: int,
+    source: Path,
 ) -> None:
     output_depth, profile, block = _png_metadata(output)
     text_parse_ok = record.get("text_exif_parse_ok", True)
@@ -747,8 +859,21 @@ def _export_checks(
         except Exception:
             after = {}
             text_parse_ok = False
-    height, width = image.pixels.shape[:2]
-    expected = _expected_icc(image, meta)
+    try:
+        expected, origin = _source_icc(source)
+        icc_parse_ok = True
+    except (OSError, ValueError, RuntimeError, SyntaxError):
+        expected, origin, icc_parse_ok = None, "unverifiable", False
+    if origin in _BUILTIN_ICC:
+        contract = _BUILTIN_ICC[origin]
+        icc_equal = (
+            profile is not None and (len(profile), hashlib.md5(profile).hexdigest()) == contract
+        )
+    else:
+        icc_equal = icc_parse_ok and profile == expected
+    with PILImage.open(output) as header:
+        width, height = header.size
+    record.update(_d63_output(block, width, height))
     text_pointers = {"Exif.ExifInteroperabilityOffset", "Exif.40965"}
     text_lost = sorted(
         k
@@ -774,12 +899,11 @@ def _export_checks(
         parse_ok = False
     record.update(
         output_depth=output_depth,
-        icc_expected_present=expected is not None,
-        icc_equal=profile == expected,
-        orientation_normal=after.get("IFD0.Orientation") == "1",
-        software_ok=after.get("IFD0.Software") == exif_tools.SOFTWARE,
-        dimensions_ok=(after.get("Exif.ExifImageWidth"), after.get("Exif.ExifImageHeight"))
-        == (str(width), str(height)),
+        icc_expected_present=expected is not None or origin in _BUILTIN_ICC,
+        icc_equal=icc_equal,
+        source_icc_present=expected is not None,
+        source_icc_parse_ok=icc_parse_ok,
+        source_icc_origin=origin,
         thumbnail_absent=block is not None and not exif_tools.has_thumbnail(block),
         kept_fields_equal=parse_ok and text_parse_ok and not lost,
         kept_exif_parse_ok=parse_ok,
@@ -792,10 +916,14 @@ def _export_checks(
         primaries_equal=image.color.primaries == again.color.primaries,
         transfer_equal=image.color.transfer == again.color.transfer,
     )
+    if expected is not None:
+        record["source_icc_md5"] = hashlib.md5(expected).hexdigest()
     # These presence booleans carry the same byte-level meaning as V5. The
     # text witness remains separately labelled and is never a byte-fidelity claim.
     record["maker_note_kept"] = parse_ok and "Exif.37500" not in lost
-    record["gps_kept"] = parse_ok and not any(name.startswith("GPS.") for name in lost)
+    record["gps_kept"] = parse_ok and not any(
+        name == "IFD0.34853" or name.startswith("GPS.") for name in lost
+    )
     checks = {
         "v5_bit_depth": depth == output_depth,
         "v5_icc_equal": record["icc_equal"],
@@ -806,9 +934,7 @@ def _export_checks(
         "v5_kept_exif": record["kept_fields_equal"] and not record["sanitise_dropped"],
     }
     record["v5_ok"] = all(checks.values())
-    record["d53_ok"] = bool(
-        profile == expected and record["primaries_equal"] and record["transfer_equal"]
-    )
+    record["d53_ok"] = bool(icc_equal and record["primaries_equal"] and record["transfer_equal"])
     failures = [k for k, passed in checks.items() if not passed]
     if not record["d53_ok"]:
         failures.append("d53_primaries")
@@ -900,7 +1026,7 @@ def verify_export(
             png_bytes=output.stat().st_size, png_md5=hashlib.md5(output.read_bytes()).hexdigest()
         )
         try:
-            _export_checks(record, image, meta, raw, output, bit_depth)
+            _export_checks(record, image, meta, raw, output, bit_depth, source)
         except (OSError, ValueError, PhotoReadError, zlib.error):
             record.update(v5_ok=False, v9_ok=False, d53_ok=False, failed_checks=["runner_failed"])
         record["retained"] = keep or bool(record["failed_checks"])
@@ -950,6 +1076,9 @@ class MemorySampler:
             process: psutil root process; its descendants include the runner.
         """
         self._process = process
+        self._started_at = time.monotonic()
+        self._finished_at: float | None = None
+        self._sample_starts: dict[str, list[float]] = {"rss": [], "device": []}
         self._stop = threading.Event()
         self._errors: set[str] = set()
         self._rss_samples = 0
@@ -974,6 +1103,7 @@ class MemorySampler:
             sample()
 
     def _rss(self) -> None:
+        started = time.monotonic()
         active = self._runner is not None and self._runner.poll() is None
         try:
             processes = [self._process, *self._process.children(recursive=True)]
@@ -989,12 +1119,14 @@ class MemorySampler:
                     continue
             self._rss_peak = max(self._rss_peak or 0, total)
             self._rss_samples += 1
+            self._sample_starts["rss"].append(started)
             if active and self._runner is not None and self._runner.poll() is None:
                 self._rss_active_samples += 1
         except psutil.Error:
             self._errors.add("rss_unavailable")
 
     def _gpu(self) -> None:
+        started = time.monotonic()
         active = self._runner is not None and self._runner.poll() is None
         memory = device_memory()
         if memory is None:
@@ -1002,6 +1134,7 @@ class MemorySampler:
             return
         self._device_peak = max(self._device_peak or 0, memory["used_bytes"])
         self._device_samples += 1
+        self._sample_starts["device"].append(started)
         if active and self._runner is not None and self._runner.poll() is None:
             self._device_active_samples += 1
 
@@ -1027,14 +1160,27 @@ class MemorySampler:
             thread.join()
         self._rss()
         self._gpu()
+        self._finished_at = time.monotonic()
 
     def record(self) -> Record:
         """Return sampled peaks and availability without process or device identifiers.
 
         Returns:
             Simultaneous tree RSS, the maximum observed individual-process OS peak,
-            device peaks, sample counts/intervals and fixed sampler error codes.
+            device peaks, sample counts, nominal post-sample waits, observed
+            successful-sample start gaps, elapsed sampler time and error codes.
         """
+        cadence: Record = {}
+        for key, starts in self._sample_starts.items():
+            # attach() and a background sample may complete out of start order.
+            gaps = [right - left for left, right in pairwise(sorted(starts))]
+            cadence[key] = {
+                "gap_count": len(gaps),
+                "min": min(gaps) if gaps else None,
+                "mean": sum(gaps) / len(gaps) if gaps else None,
+                "max": max(gaps) if gaps else None,
+            }
+        finished = self._finished_at if self._finished_at is not None else time.monotonic()
         return {
             "rss_baseline_bytes": self._baseline,
             "rss_tree_peak_bytes": self._rss_peak,
@@ -1047,6 +1193,9 @@ class MemorySampler:
             "device_active_samples": self._device_active_samples,
             "rss_scope": "tool-runner-tree-including-sampler-children",
             "sample_intervals_s": {"rss": 0.05, "device": 0.2},
+            "sample_interval_kind": "wait-after-sample",
+            "sampling_cadence_s": cadence,
+            "sampler_elapsed_s": finished - self._started_at,
             "sampler_errors": sorted(self._errors),
         }
 
@@ -1289,11 +1438,31 @@ def _safe_record(record: Mapping[str, Any]) -> Record:
     reason = _device_reason(record.get("device_reason"))
     if "device_reason" in record:
         safe["device_reason"] = reason
-    for key in ("icc_md5", "png_md5"):
+    for key in ("icc_md5", "png_md5", "source_icc_md5"):
         if isinstance(record.get(key), str) and re.fullmatch(r"[a-f0-9]{32}", record[key]):
             safe[key] = record[key]
     if isinstance(record.get("icc_description"), str):
         safe["icc_description"] = record["icc_description"][:1024]
+    # R2-QA authorises this rewritten Software string, not arbitrary EXIF values.
+    software = record.get("software_seen")
+    if (
+        isinstance(software, str)
+        and software.startswith("Clearwater")
+        and software.isascii()
+        and "\0" not in software
+    ):
+        safe["software_seen"] = software
+    defects = record.get("d63_defects")
+    if isinstance(defects, list):
+        safe["d63_defects"] = [
+            {"field": defect["field"], "defect": defect["defect"]}
+            for defect in defects
+            if isinstance(defect, dict)
+            and isinstance(defect.get("field"), str)
+            and defect["field"] in _D63
+            and isinstance(defect.get("defect"), str)
+            and defect["defect"] in {"missing", "duplicate", "type", "count", "value", "parse"}
+        ]
     stamp = record.get("measured_at_utc")
     if isinstance(stamp, str) and re.fullmatch(r"[0-9T:.+Z-]+", stamp):
         safe["measured_at_utc"] = stamp
@@ -1348,6 +1517,18 @@ def _safe_record(record: Mapping[str, Any]) -> Record:
             for k in ("rss", "device")
             if _number(intervals.get(k)) and intervals[k] > 0
         }
+    cadence = record.get("sampling_cadence_s")
+    if isinstance(cadence, dict):
+        safe["sampling_cadence_s"] = {}
+        for key in ("rss", "device"):
+            stats = cadence.get(key)
+            if isinstance(stats, dict):
+                safe["sampling_cadence_s"][key] = {
+                    name: stats[name]
+                    for name in ("gap_count", "min", "mean", "max")
+                    if name in stats
+                    and (stats[name] is None or (_number(stats[name]) and stats[name] >= 0))
+                }
     errors = record.get("sampler_errors")
     if isinstance(errors, list):
         safe["sampler_errors"] = [

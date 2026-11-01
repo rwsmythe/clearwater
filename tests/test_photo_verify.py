@@ -12,6 +12,7 @@ import io
 import json
 import shutil
 import struct
+import time
 import zlib
 from dataclasses import replace
 from pathlib import Path
@@ -334,6 +335,12 @@ def test_summary_and_stdout_exclude_private_values(configured, capsys):
         "failure": "WP36P_PRIVATE_GPS_SENTINEL",
         "exif_values": {"GPS": "private"},
         "unexpected": {"source_path": str(source)},
+        "software_seen": "WP36P_PRIVATE_CAMERA_SENTINEL",
+        "d63_defects": [
+            {"field": str(source), "defect": "value"},
+            {"field": "IFD0.Software", "defect": "WP36P_PRIVATE_GPS_SENTINEL"},
+        ],
+        "sampling_cadence_s": {"device": {"min": str(source)}, "private": str(source)},
     }
     summary = pv.summarise([contaminated], command="export")
     pv.print_summary(summary)
@@ -874,12 +881,13 @@ def _r1_cli(config, tmp_path, command, selected, **kwargs):
 
 
 def test_r1_inconclusive_continues_without_becoming_a_pass(
-    configured, tmp_path, monkeypatch, capsys
+    configured, tmp_path, monkeypatch, capsys, sample
 ):
+    monkeypatch.chdir(tmp_path)
     config, _ = configured
     seen = []
     symmetric = np.broadcast_to(np.linspace(0, 255, 64)[:, None, None], (64, 96, 3)).copy()
-    source = Path("tests/fixtures/stills/heic/heic-ad24-neither.heic")
+    source = sample("heic-ad24-neither")
 
     def orientation(path, run_guard, **kwargs):
         seen.append(path.name)
@@ -925,13 +933,12 @@ def test_r1_inconclusive_continues_without_becoming_a_pass(
     assert row["orientation_inconclusive_files"] == classes["HEIC-0"]["files"][:1]
 
 
-def test_r1_owner_map_rejects_wrong_irot(configured, tmp_path, capsys):
+def test_r1_owner_map_rejects_wrong_irot(configured, tmp_path, capsys, monkeypatch, sample):
+    monkeypatch.chdir(tmp_path)
     config, _ = configured
     _, classes = _class_map(tmp_path)
     name = classes["HEIC-180"]["representative"]
-    shutil.copyfile(
-        Path("tests/fixtures/stills/heic/heic-ad24-both.heic"), config.footage_path / "Phone" / name
-    )
+    shutil.copyfile(sample("heic-ad24-both"), config.footage_path / "Phone" / name)
     status, _ = _r1_cli(
         config, tmp_path, "orientation", lambda c: [c["HEIC-180"]["representative"]]
     )
@@ -1065,10 +1072,11 @@ def test_r1_no_source_exif_is_distinct_from_parse_failure(configured):
     assert record["v5_ok"] and record["kept_fields_equal"]
 
 
-def test_r1_owner_map_rejects_jpeg_as_heic(configured, tmp_path, capsys):
+def test_r1_owner_map_rejects_jpeg_as_heic(configured, tmp_path, capsys, monkeypatch, sample):
+    monkeypatch.chdir(tmp_path)
     config, _ = configured
     _, classes = _class_map(tmp_path)
-    source = Path("tests/fixtures/stills/jpeg/jpeg-gradient-none.jpg")
+    source = sample("jpeg-gradient-none")
     name = classes["HEIC-0"]["representative"]
     shutil.copyfile(source, config.footage_path / "Phone" / name)
     status, _ = _r1_cli(config, tmp_path, "orientation", lambda c: [c["HEIC-0"]["representative"]])
@@ -1123,3 +1131,359 @@ def test_r1_known_os_limit_failure_survives_missing_active_samples(sample, confi
     )
     assert "memory_rss_measurement" in record["failed_checks"]
     assert record["ram_within_limit"] is False
+
+
+@pytest.mark.parametrize("kind", ["png", "jpeg", "heic"])
+@pytest.mark.parametrize("damage", ["drop", "swap"])
+def test_r2_source_icc_is_independent_of_reader(sample, configured, monkeypatch, kind, damage):
+    _, guard = configured
+    source = sample(
+        {
+            "png": "png16-lowred-display-p3",
+            "jpeg": "jpeg-gradient-display-p3",
+            "heic": "heic8-gradient-display-p3",
+        }[kind]
+    )
+    if kind == "heic":
+        container = pillow_heif.open_heif(source)
+        info = container[container.primary_index].info
+        assert info["icc_profile_type"] in ("prof", "rICC")
+        expected = info["icc_profile"]
+    else:
+        with PILImage.open(source) as header:
+            expected = header.info["icc_profile"]
+    with PILImage.open(sample("png8-gradient-srgb")) as header:
+        replacement = header.info["icc_profile"]
+    original = PhotoReader.read
+
+    def corrupt(self, path):
+        image, meta = original(self, path)
+        color = replace(
+            image.color,
+            icc_profile=None if damage == "drop" else replacement,
+            primaries="bt709",
+            transfer="srgb",
+            assumed=damage == "drop",
+        )
+        return replace(image, color=color), meta
+
+    monkeypatch.setattr(PhotoReader, "read", corrupt)
+    record = pv.verify_export(
+        source, guard, photo_class="JPG-A", bit_depth=16, force_cpu=True, keep=True
+    )
+    assert _icc(_only_png(guard)) != expected, "reader mutation did not reach the real writer"
+    assert not record["v5_ok"] and not record["d53_ok"], "reader-corrupted ICC passed V5/D53"
+    assert "v5_icc_equal" in record["failed_checks"]
+    assert record["source_icc_md5"] == hashlib.md5(expected).hexdigest()
+    assert record["source_icc_present"]
+
+
+def _r2_nclx(config, primaries):
+    path = config.footage_path / "Phone" / f"nclx-{primaries}.heic"
+    pixels = spike.upright_image(8, 32, 24)
+    pillow_heif.encode(
+        "RGB",
+        (32, 24),
+        pixels.tobytes(),
+        str(path),
+        quality=95,
+        nclx_profile={
+            "color_primaries": primaries,
+            "transfer_characteristics": 13,
+            "matrix_coefficients": 6,
+            "full_range_flag": 1,
+        },
+    )
+    return path
+
+
+@pytest.mark.parametrize("primaries", [1, 12])
+def test_r2_nclx_builtin_cannot_be_suppressed_by_reader(configured, monkeypatch, primaries):
+    config, guard = configured
+    source = _r2_nclx(config, primaries)
+    original = PhotoReader.read
+
+    def untagged(self, path):
+        image, meta = original(self, path)
+        return replace(
+            image,
+            color=replace(
+                image.color, icc_profile=None, assumed=True, primaries="bt709", transfer="srgb"
+            ),
+        ), meta
+
+    monkeypatch.setattr(PhotoReader, "read", untagged)
+    record = pv.verify_export(
+        source, guard, photo_class="HEIC-0", bit_depth=16, force_cpu=True, keep=True
+    )
+    assert _icc(_only_png(guard)) is None
+    assert not record["v5_ok"] and not record["d53_ok"], "lost nclx silently removed D53 built-in"
+    assert "v5_icc_equal" in record["failed_checks"]
+
+
+@pytest.mark.parametrize(
+    "primaries,digest",
+    [(1, "ca34a0279325928fc9fd3fc7eff99eb9"), (12, "ee27975c71b9ed10be950a696f6fe6f4")],
+)
+def test_r2_nclx_builtin_matches_independent_contract(configured, primaries, digest):
+    config, guard = configured
+    record = pv.verify_export(
+        _r2_nclx(config, primaries),
+        guard,
+        photo_class="HEIC-0",
+        bit_depth=16,
+        force_cpu=True,
+        keep=True,
+    )
+    assert hashlib.md5(_icc(_only_png(guard))).hexdigest() == digest
+    assert record["v5_ok"] and record["d53_ok"]
+
+
+def _r2_directory(block, label):
+    order = "<" if block[:2] == b"II" else ">"
+    root = struct.unpack_from(order + "I", block, 4)[0]
+    if label == "Exif":
+        _, entry = _r1_root_entry(block, 34665)
+        root = struct.unpack_from(order + "I", block, entry + 8)[0]
+    count = struct.unpack_from(order + "H", block, root)[0]
+    return (
+        order,
+        root,
+        [bytearray(block[root + 2 + i * 12 : root + 14 + i * 12]) for i in range(count)],
+    )
+
+
+def _r2_d63_mutation(block, label, tag, damage):
+    data = bytearray(block)
+    order, _, entries = _r2_directory(block, label)
+    index = next(
+        i for i, entry in enumerate(entries) if struct.unpack_from(order + "H", entry)[0] == tag
+    )
+    entry = entries[index]
+    kind = struct.unpack_from(order + "H", entry, 2)[0]
+    value = int.from_bytes(entry[8 : 10 if kind == 3 else 12], "little" if order == "<" else "big")
+    if damage == "type":
+        struct.pack_into(order + "H", entry, 2, 4 if tag == 274 else 1)
+        entry[8:12] = struct.pack(order + "I", value) if tag == 274 else bytes([value, 0, 0, 0])
+    elif damage == "count":
+        struct.pack_into(order + "H", entry, 2, 3)
+        struct.pack_into(order + "I", entry, 4, 2)
+        entry[8:12] = struct.pack(order + "HH", 1, 1)
+    elif damage == "duplicate":
+        entries.insert(index, bytearray(entry))
+    elif damage == "missing":
+        entries.pop(index)
+    elif damage in {"version", "tab-version"}:
+        value = b"Clearwater 0.5.7\0" if damage == "version" else b"Clearwater\t0.5.7\0"
+        struct.pack_into(order + "I", entry, 4, len(value))
+        struct.pack_into(order + "I", entry, 8, len(data))
+        data.extend(value)
+    elif damage == "extra-nul":
+        value = b"Clearwater\0\0"
+        struct.pack_into(order + "I", entry, 4, len(value))
+        struct.pack_into(order + "I", entry, 8, len(data))
+        data.extend(value)
+    elif damage == "short":
+        struct.pack_into(order + "H", entry, 2, 3)
+        entry[8:12] = struct.pack(order + "H", value) + bytes(2)
+    else:
+        raise AssertionError("unknown test mutation")
+    new_directory = len(data)
+    data.extend(struct.pack(order + "H", len(entries)) + b"".join(entries) + bytes(4))
+    if label == "IFD0":
+        struct.pack_into(order + "I", data, 4, new_directory)
+    else:
+        _, pointer = _r1_root_entry(data, 34665)
+        struct.pack_into(order + "I", data, pointer + 8, new_directory)
+    return bytes(data)
+
+
+class D63Mutation(PhotoWriter):
+    def __init__(self, label, tag, damage):
+        self.label, self.tag, self.damage = label, tag, damage
+
+    def write(self, image, meta, out_path, *, bit_depth, provenance):
+        super().write(image, meta, out_path, bit_depth=bit_depth, provenance=provenance)
+        _r1_replace_exif(
+            out_path, lambda block: _r2_d63_mutation(block, self.label, self.tag, self.damage)
+        )
+
+
+@pytest.mark.parametrize(
+    "label,tag,field,check,damage",
+    [
+        ("IFD0", 274, "IFD0.Orientation", "v5_orientation", "type"),
+        ("IFD0", 274, "IFD0.Orientation", "v5_orientation", "duplicate"),
+        ("IFD0", 274, "IFD0.Orientation", "v5_orientation", "count"),
+        ("IFD0", 274, "IFD0.Orientation", "v5_orientation", "missing"),
+        ("IFD0", 305, "IFD0.Software", "v5_software", "extra-nul"),
+        ("IFD0", 305, "IFD0.Software", "v5_software", "missing"),
+        ("Exif", 40962, "Exif.ExifImageWidth", "v5_dimensions", "type"),
+        ("Exif", 40963, "Exif.ExifImageHeight", "v5_dimensions", "duplicate"),
+        ("Exif", 40962, "Exif.ExifImageWidth", "v5_dimensions", "count"),
+        ("Exif", 40963, "Exif.ExifImageHeight", "v5_dimensions", "missing"),
+    ],
+)
+@pytest.mark.filterwarnings("ignore:Metadata Warning, tag 274 had too many entries:UserWarning")
+def test_r2_d63_structure_rejects_malformed_entries(
+    sample, configured, label, tag, field, check, damage
+):
+    _, guard = configured
+    record = pv.verify_export(
+        sample("jpeg-gradient-none"),
+        guard,
+        photo_class="JPG-Z",
+        bit_depth=8,
+        force_cpu=True,
+        exports=composition.export_jobs(writer=D63Mutation(label, tag, damage)),
+    )
+    assert not record["v5_ok"] and check in record["failed_checks"], (
+        "malformed D63 structure passed V5"
+    )
+    expected = "count" if damage == "extra-nul" else damage
+    assert {"field": field, "defect": expected} in record.get("d63_defects", []), (
+        "D63 field/defect not recorded"
+    )
+
+
+@pytest.mark.parametrize(
+    "damage,text", [("version", "Clearwater 0.5.7"), ("tab-version", "Clearwater\t0.5.7")]
+)
+def test_r2_software_version_uses_derived_count_and_records_string(
+    sample, configured, damage, text
+):
+    _, guard = configured
+    record = pv.verify_export(
+        sample("jpeg-gradient-none"),
+        guard,
+        photo_class="JPG-Z",
+        bit_depth=8,
+        force_cpu=True,
+        keep=True,
+        exports=composition.export_jobs(writer=D63Mutation("IFD0", 305, damage)),
+    )
+    assert record["v5_ok"], "valid Software version suffix was rejected"
+    assert record.get("software_seen") == text
+    assert record.get("d63_defects") == []
+
+
+def test_r2_dimensions_may_use_short(sample, configured):
+    _, guard = configured
+    record = pv.verify_export(
+        sample("jpeg-gradient-none"),
+        guard,
+        photo_class="JPG-Z",
+        bit_depth=8,
+        force_cpu=True,
+        exports=composition.export_jobs(writer=D63Mutation("Exif", 40962, "short")),
+    )
+    assert record["v5_ok"]
+
+
+def test_r2_gps_pointer_is_part_of_kept_boolean(configured):
+    config, guard = configured
+    block = b"II" + struct.pack("<HIH", 42, 8, 1)
+    block += struct.pack("<HHIII", 34853, 4, 1, 26, 0) + struct.pack("<HI", 0, 0)
+    source = config.footage_path / "Phone" / "empty-gps.jpg"
+    PILImage.new("RGB", (16, 12), (32, 64, 96)).save(source, exif=b"Exif\0\0" + block)
+    record = pv.verify_export(source, guard, photo_class="JPG-Z", bit_depth=8, force_cpu=True)
+    assert "IFD0.34853" in record["changed_kept_fields"] and not record["v5_ok"]
+    assert not record["gps_kept"], "lost empty GPS pointer was called kept"
+    assert record["gps_ifd_present"], "an empty source GPS IFD was reported absent"
+
+
+@pytest.mark.parametrize("duration,gap", [(0.3, 0.5), (0.9, 1.1)])
+def test_r2_device_cadence_includes_sample_duration(monkeypatch, duration, gap):
+    clock = [0.0]
+
+    class Process:
+        def memory_info(self):
+            return SimpleNamespace(rss=1000)
+
+        def children(self, recursive):
+            return []
+
+    class Stop:
+        calls = 0
+
+        def wait(self, interval):
+            self.calls += 1
+            clock[0] += interval
+            return self.calls > 2
+
+    def device():
+        clock[0] += duration
+        return {"free_bytes": 7000, "total_bytes": 12000, "used_bytes": 5000}
+
+    monkeypatch.setattr(time, "monotonic", lambda: clock[0])
+    monkeypatch.setattr(pv, "device_memory", device)
+    sampler = pv.MemorySampler(Process())
+    sampler._stop = Stop()
+    sampler._loop(0.2, sampler._gpu)
+    record = pv._safe_record(sampler.record())
+    cadence = record.get("sampling_cadence_s", {}).get("device", {})
+    assert cadence.get("mean") == pytest.approx(gap), "device cadence missing or nominal"
+    assert cadence["min"] == pytest.approx(gap) and cadence["max"] == pytest.approx(gap)
+    assert cadence["gap_count"] == 2
+    assert record["sampler_elapsed_s"] == pytest.approx(3 * (duration + 0.2))
+    assert record["sample_interval_kind"] == "wait-after-sample"
+
+
+def test_r2_sampler_elapsed_finishes_at_stop(monkeypatch):
+    clock = [10.0]
+
+    class Process:
+        def memory_info(self):
+            return SimpleNamespace(rss=1000)
+
+        def children(self, recursive):
+            return []
+
+    monkeypatch.setattr(time, "monotonic", lambda: clock[0])
+    monkeypatch.setattr(
+        pv, "device_memory", lambda: {"free_bytes": 7000, "total_bytes": 12000, "used_bytes": 5000}
+    )
+    sampler = pv.MemorySampler(Process())
+    sampler.start()
+    try:
+        clock[0] = 12.0
+        sampler.attach(SimpleNamespace(poll=lambda: None))
+        clock[0] = 20.0
+    finally:
+        sampler.stop()
+    clock[0] = 30.0
+    assert sampler.record()["sampler_elapsed_s"] == 10.0, (
+        "elapsed time stopped at runner attachment"
+    )
+
+
+def test_r2_overlapping_sample_completions_keep_chronological_cadence(monkeypatch):
+    clock = [0.0]
+    calls = [0]
+
+    class Process:
+        def memory_info(self):
+            return SimpleNamespace(rss=1000)
+
+        def children(self, recursive):
+            return []
+
+    def device():
+        calls[0] += 1
+        if calls[0] == 2:
+            # Re-enter the real sampler to complete a later-started observation
+            # first, as attach() and the background thread can do concurrently.
+            clock[0] = 1.0
+            sampler._gpu()
+            clock[0] = 1.5
+        return {"free_bytes": 7000, "total_bytes": 12000, "used_bytes": 5000}
+
+    monkeypatch.setattr(time, "monotonic", lambda: clock[0])
+    monkeypatch.setattr(pv, "device_memory", device)
+    sampler = pv.MemorySampler(Process())
+    clock[0] = 0.5
+    sampler._gpu()
+    cadence = sampler.record()["sampling_cadence_s"]["device"]
+    assert cadence["min"] == cadence["mean"] == cadence["max"] == 0.5, (
+        "completion order corrupted chronological sample gaps"
+    )
