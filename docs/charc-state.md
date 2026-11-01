@@ -20,7 +20,15 @@
   167 GB free; 0 pytest at open; 45-75 min; 5d default then force-cpu follows in the same hold; each closed to me).
   Alongside, docs-only: WP5.1 turn 14 (T10 report), then WP-T7 turn 5 (my F3 condition: every leg line in
   GATE_CHECKS and CLAUDE.md carries `> work/<log> 2>&1`; turn 4 `e78d9bfb` had only a sentence). HELD until the
-  windows close: WP5.3 turn 9, WP-T7 B + gate, WP5.1 B + gate. A STOP inside a window comes to me with the id.** Gen 30 `clearwater-orchestrator-20261101-0043` ROLLED 18:12Z at
+  windows close: WP5.3 turn 9, WP-T7 B + gate, WP5.1 B + gate. A STOP inside a window comes to me with the id.**
+  **5c-16 CLOSED 18:27Z, NO STOP (gen 31 `3ab6c81a`): EXIT 0, wall 487.7 s (not the planned 45-75 min); 73/73
+  selected = attempted = complete; depth 16/16, GPU, runner exit 0, failed_checks empty, D63 defects 0 on every
+  record; all seven classes separate (HEIC-0/90/180/270 23/3/20/16, JPG-A 2, JPG-Z 8, JPG-M 1), V5 / D53 / V9 all
+  pass; `assumed` only the 9 no-ICC JPGs; quant max 7.57e-06 everywhere = half a 16-bit LSB in [0,1] units (the
+  post's `/255` column label is the wrong unit for this leg; the cell's report must state the unit; say so at the
+  5d close). Facts `.worktrees/wp3.6p/work/wp3.6p/seat-turn8/5c-16.{json,log}`; disk 179.17 -> 178.66 GB.
+  5d OPEN ~18:29Z in the same hold: `5d-default` then `5d-cpu` (IMG_6690.HEIC, 16-bit, c3, `--exclusive`, the
+  force-CPU leg mandatory), 5-20 min per leg, host otherwise idle; closed to me with both legs' figures.** Gen 30 `clearwater-orchestrator-20261101-0043` ROLLED 18:12Z at
   ~385K, clean boundary (every Codex turn committed), state `509381f5`; it stopped draining at `472b5bf4`; the WP-T7
   Reviewer A r1 pass is a CHILD of gen 30's pane (evidence `clearwater-review-evidence\wp-t7\r1\`): keep that pane
   open until gen 31 says the pass returned, else gen 31 re-runs it. WP5.1 turn 13 `d44db8d1` (launcher mutant fails;
