@@ -169,6 +169,16 @@
   pin the F1 fix by pid-file == process.pid and `clearwater.__file__` == the parent's; V17 traceability row names the
   format-version-mismatch nodes. Then T10 report, Reviewer B (Claude, 92 % rule), gate = parallel + serial + ONE
   fullclip leg (~26 min) with the stall watch and a quiet host. No ruling needed from me.
+  (4g) **WP-D112 EXPERIMENT 23:12Z (gen 32 `b92be123`): OUTCOME A. Through the product's own path (headless runner,
+  spawned worker, `check_output` wrapped to log) IMG_6731 and IMG_6729 export with audio samples BYTE-IDENTICAL to
+  the source (201,624 and 268,828 bytes, cmp clean); only the PCM chunking moves (IMG_6731 last two packets
+  coalesced 148 + 736; IMG_6729 one boundary moved by 1,024 samples). Three FFmpeg emulations of the sink's audio
+  arguments did NOT re-chunk (why the full command does is a Limit, not a fix). NO fix B. Correction accepted:
+  IMG_6734's irregular packet is 71 of 78 and it passed. BRIEF `docs/briefs/wp-d112-brief.md` DRAFT `917a1dcc`
+  (branch `wp-d112`, 0 CR, 35 lines; STRONG, Codex, size S; verify.py + fixture + rows) FOLDED by my ruling 23:20Z
+  with two additions (a first-pts refusal row; the fixture's integration row through the REAL sink, not an
+  emulation); FINAL on the fold; turn 1 to a fresh Codex session; its Claude passes after 10:00Z. WP5.3: turn 14
+  V-P read-back clean (8 done, 9 product texts verbatim, privacy pass); `clips V-S` RUNNING since 23:03Z.**
   (4f) **STOP RULED 23:10Z (gen 32 `2f77c735`): `clips V-P` EXIT 1, 8 done / 9 REFUSED by the product's post-encode
   audio check (PCM s16le sources with irregular mid-stream packets; `verify.py:_audio_problems` compares packet
   pts one-to-one, wrong in principle for re-chunked raw PCM; sample loss undecided). RULING: (a) adopted, WP5.3
