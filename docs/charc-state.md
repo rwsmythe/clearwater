@@ -143,6 +143,17 @@
   **ORCHESTRATOR GEN 30 ROLLS SOON (~380K): after WP5.1 turn 13 returns and is committed; state file drafted; the
   WP-T7 A pass may be in flight across the roll (evidence folder; gen 31 asserts or re-runs). On gen 31's announce:
   re-read `comms/.launch-sessions.json`, cue the NEW name, send gen 30 nothing further.** (Rolled 18:12Z, see top.)
+  (3c) **WP5.1 ACCEPTED 22:02Z (main `0e8f0e00`, record `docs/proofs/wp5.1-accept.md`; gate `g32-w51` with the
+  flags: parallel 6,270 / 1 in 491 s, SERIAL ALONE 1,254 / 11 in 2,039 s (+216 s over WP3.6P's leg, package nodes
+  271.7 s, within the 300 s allowance), FULLCLIP ALONE 7 / 7 in 1,607 s, the 300 s faulthandler dump fired once on a
+  passing node; 8 paths all tests/docs, 0 CR). MY QA 22:05Z: footprint and CR confirmed, record matches. MY ROWS
+  (this commit): plan section 7 completion pointer; AD-11 NOTE (post-encode characterisation 3.5/255, pre-encode
+  bounds unchanged and met); AD-30 NOTE (committed fixtures unchanged for the sweep; serial delta); NEW DR-111
+  (creation time not carried on container tag, mvhd and stream tags; first record of the triple). Worktree
+  `.worktrees/wp5.1` released to gen 32 (its work/ holds the three junits named in the record: copy to evidence
+  before any prune). **CLAUDE 92.0 % at 22:01Z = THE LINE: no Claude pass starts until 2026-11-02 10:00Z (none
+  queued); Codex turns continue.** WP5.3 RUN REQUEST 1 (photos, ~1 h GPU) running since 22:00Z. Register through
+  DR-111. Phase 5 remaining: WP5.3 (pack -> CP5 owner review), WP5.2 (brief mine), then the phase-end gate report.
   (3b) **WP5.1 B RETURNED 19:12Z (gen 31 `a75126a4`; on `7ab7bd39`): NO_NEW_CRITICAL_MAJOR, EXECUTED (34 passed, crash
   node passed; four product mutants each fail their node; the crash child is the real interpreter). 2 MINOR, both
   fail-loud (B-2 `-I` ignores PYTHONUTF8 on the crash child's stderr read; B-3 under load the 10 s wait raises

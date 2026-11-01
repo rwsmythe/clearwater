@@ -370,6 +370,8 @@ Run in order. Each is one implementer's package, working on the main branch afte
 
 Every acceptance test in spec §11, with where it is built and where it is run to completion.
 
+**Completion pointer (2026-11-01, WP5.1 accepted, main `0e8f0e00`):** every test this table completes in WP5.1 (V1, V3 minus the deferred chapter seam, V4-V11, V13, V17, V18; N10 / D92 and D91) has a committed, passing node or a cited figure of record, traced in `tests/test_v51_traceability.py`; the matrix of nodes, figures and gate results is `docs/reports/wp5.1-acceptance.md`, the accept record `docs/proofs/wp5.1-accept.md`. Still open after WP5.1: V2 (the owner's visual review at CP5, from the WP5.3 pack), V14 (the prototype gate, done), V15 and V16 (WP5.2, performance and memory on full clips, EXCLUSIVE), and the V7 figures of record (WP4.6's window).
+
 | Test | Subject | Built in | Completed in |
 |---|---|---|---|
 | V1 | Stage correctness | WP3.1–WP3.4 | WP5.1 |
