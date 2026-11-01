@@ -66,6 +66,10 @@
   Reviewer A r1 pass is a CHILD of gen 30's pane (evidence `clearwater-review-evidence\wp-t7\r1\`): keep that pane
   open until gen 31 says the pass returned, else gen 31 re-runs it. WP5.1 turn 13 `d44db8d1` (launcher mutant fails;
   15/15; 34 passed).
+  **GEN 31 ROLLS NEXT (~360K at 19:58Z, clean boundary): gen 32 picks up WP3.6P's gate (rebase onto `5b922662`,
+  two legs) then WP5.1's (three legs). WP5.3 B STARTED 19:58Z (Claude 91.0 %, under the line; executing the
+  two-manifest sequence); WP5.3 turn 10 `2a1e15b1` (14 write sites classified, page read-only, stage lock); WP5.1
+  turn 15 `88850ad2` (B clean-up). On gen 32's announce: re-read the launch record, cue the NEW name.**
   Gen 11 pickup 17:28Z: bash gauge 65 ms (under 1 s); inbox 0 unread / 432 read (gen 10 had answered everything,
   including the WP-T7 thread-method ruling); main `fe9dcfe1` clean, FREE; C: 168 GB free, D: 2.4 TB; Claude 89.0 %
   pace 0.987, Codex 14 % pace 0.228 (17:28Z); WP-D54 serial attempt 2 ALIVE (4 pytest processes since 17:21Z).
@@ -103,6 +107,12 @@
   pointer; AD-11 NOTE (post-encode 3.5/255 at shipped quality; means 2.954 / 2.788 / 2.954 / 2.473, `--quality
   high` 2.521, maxima 183-203; pre-encode bound unchanged); AD-30 NOTE (committed fixtures used unchanged for the
   sweep); the serial-leg delta; G2 creation-time Limit if WP3.10 / WP4.4 did not document it.
+  (2b) **WP-T7 ACCEPTED 19:58Z (main `5b922662`, record `docs/proofs/wp-t7-accept.md`; gate `t7` with its own flags:
+  parallel 6,133 / 1 in 476 s, serial alone 1,230 / 11 in 1,723 s, no timeout fired; A r1 converged, B clean, claim 4
+  executed). MY QA: 9 paths, 0 CR; `pyproject.toml:39,76-78`; GATE_CHECKS lines 171-212 carry `--timeout`, `2>&1`,
+  the STALL WATCH definition, the xdist / out-of-protocol / orphan-child limits; CLAUDE.md gate line updated by the
+  package. DR-109 CLOSED with the limits (register, this commit). From now EVERY gate runs with `--timeout`; a
+  worktree branched before `5b922662` rebases (or syncs `dev`) first. `.worktrees/wp-t7` releasable.
   (2a) **WP-T7 GREEN `e4938910` 18:07Z (gen 30 `b1655bde`): proof test 3.05 s at the seat; the three facts EXECUTED
   (thread method = stacks then os._exit; under xdist the crashed worker is REPLACED and the parallel leg continues,
   the stack in the parent log; a serial/fullclip time-out ends the leg = STOP with the node and stacks, re-run;
