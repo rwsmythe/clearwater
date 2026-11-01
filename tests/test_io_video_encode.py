@@ -285,7 +285,61 @@ def test_untagged_source_is_tagged_bt709_limited_with_a_warning(sample: Sample, 
         "limited",
     )
     assert not color.assumed
-    assert any("assumed values" in w for w in run.report.warnings)
+    assert any(
+        "BT.709" in w and "limited range" in w and "(color_primaries bt709" in w
+        for w in run.report.warnings
+    )
+
+
+@pytest.mark.parametrize(
+    ("matrix", "color_range", "expected_codes"),
+    [
+        pytest.param(
+            "bt709",
+            "limited",
+            "color_primaries bt709, color_trc bt709, colorspace bt709, color_range tv",
+            id="fully-defaulted",
+        ),
+        pytest.param(
+            "bt601",
+            "full",
+            "color_primaries bt709, color_trc bt709, colorspace smpte170m, color_range pc",
+            id="partially-defaulted-full-range",
+        ),
+    ],
+)
+def test_d54_warning_words_and_computed_codes(
+    matrix: str, color_range: str, expected_codes: str
+) -> None:
+    """Name D54's assumptions in ASCII while retaining the resolved source tags.
+
+    Args:
+        matrix: Resolved matrix, including a retained BT.601 tag in the partial case.
+        color_range: Resolved range, including a retained full-range tag.
+        expected_codes: Independently specified FFmpeg tags for the description.
+    """
+    from clearwater.color import ffmpeg_color_names
+    from clearwater.interfaces.image import ColorDescription
+
+    color = ColorDescription(
+        primaries="bt709",
+        transfer="bt709",
+        matrix=matrix,
+        range=color_range,
+        bit_depth=8,
+        assumed=True,
+        icc_profile=None,
+    )
+    names = ffmpeg_color_names(color)
+    assert ", ".join(f"{k} {v}" for k, v in names.items()) == expected_codes
+    warning = encode_module._assumed_color_warning(names)
+    assert warning.isascii()
+    assert "BT.709" in warning and "limited range" in warning
+    assert warning == (
+        "The source's colour tags are missing or unexpected; Clearwater assumed BT.709 "
+        "colours and limited range for the missing or unexpected ones, and the output is "
+        f"tagged with these values ({expected_codes})."
+    )
 
 
 def test_ten_bit_source_stays_ten_bit(sample: Sample, runs: Runs) -> None:
@@ -409,7 +463,10 @@ def test_d76_from_a_bt601_source(clips: Clips, runs: Runs) -> None:
     _, run, record = runs.get(source, "libx265", 10)
     _assert_v4(record)
     assert probe(Path(record["output"])).video.bit_depth == 10
-    assert any("assumed values" in w for w in run.report.warnings)  # Q17: BT.709 primaries
+    assert any(
+        "BT.709" in w and "limited range" in w and "(color_primaries bt709" in w
+        for w in run.report.warnings
+    )  # Q17: BT.709 primaries
 
 
 @pytest.mark.slow
