@@ -11,8 +11,8 @@
 
 ### RESUME HERE (CHARC generation 10 LIVE: `clearwater-charc-20261031-2201`, online 2026-11-01 08:03Z, launched by gen 9 at its roll; gen 9 rolled 2026-11-01 ~08:00Z at ~410K; gen 8 2026-10-30 ~01:58Z; gen 7 2026-10-29 ~19:00Z)
 
-- **GEN 10 LIVE STATE (read first; a successor re-verifies each fact by its method).** Orchestrator = **gen 29
-  `clearwater-orchestrator-20261031-2335`** (online 09:37Z, gauge 33 ms; gen 28 rolled 09:35Z) (gen 28 resumed 08:01Z on the owner's "resume"; status 225d1163: paces Codex 0.197,
+- **GEN 10 LIVE STATE (read first; a successor re-verifies each fact by its method).** Orchestrator = **gen 30 (name from
+  `comms/.launch-sessions.json`; gen 29 `clearwater-orchestrator-20261031-2335` rolled 10:43Z; gen 28 09:35Z)** (gen 28 resumed 08:01Z on the owner's "resume"; status 225d1163: paces Codex 0.197,
   Claude 0.994 = 84 % at 84.5 % of the window, Claude resets 2026-11-02 09:59Z, Codex 2026-11-04 10:07Z). ALL cues go
   there; re-read `comms/.launch-sessions.json` before every cue. Bash gauge 34 ms. Drain `read --role charc --all`.
   Main `ae8afd9a` clean, FREE. C: 176 GB free, D: 2.4 TB. Subjects under 100 chars; see the `posted ->` line before
@@ -173,8 +173,12 @@
   **MY ACCEPT COMMIT `ae8afd9a`:** DR-98 CLOSED; NEW AD-31; AD-23 extended (pin 8); DR-44 (c) re-confirmed; DR-62 /
   DR-69 notes; NEW DR-103 (B2-1/B2-2), DR-104 (F8 widened + scratch accounting), DR-105 (F4), DR-106 (dead sink helpers);
   CLAUDE.md 2026-11-01 line. Register through DR-106 (DR-102 reserved for WP-D54). Worktree `wp4.6` releasable. Claude
-  87 % (10:35Z). Waiting on: 5c-16 EXCLUSIVE open (after WP-D54 B and WP5.3 A R2 return); WP-D54 report / B / gate;
-  WP5.3 A R2; WP5.1 T8.
+  87 % (10:35Z).
+- **ORCHESTRATOR GEN 29 ROLLED 10:43Z at ~405K (status ddd3ddfd; its state main `f4dc507d`; stopped draining). GEN 30
+  launches next: re-read `comms/.launch-sessions.json` for its name before ANY cue; wait for its online announce.**
+  Gen 29 done: WP4.6 accepted; WP-D54 built, A converged, report `cc9f3d44`. Running across the roll (gen 30 reads the
+  output files): WP-D54 Reviewer B (Claude, `wp-d54\B\`), WP5.3 A R2 (Claude, `wp5.32\`), WP5.1 turn 10 (Codex, T9
+  traceability). Next host job: 5c-16 EXCLUSIVE opened to me by gen 30, then 5d. No query open with me. Claude 87 %.
 - **DANGLERS (gen 28 runs them; I rule their STOPs):** (1) WP3.6P (Codex session 01a18b4b, worktree `wp3.6p` head
   `081f851c`, turn 7 = R2 remediation dispatched 08:01Z; then A R3, seat runs (`photo_check`, `orientation`, the footage
   node), two EXCLUSIVE windows (16-bit export ~45 min / ~3.8 GB; memory), B (Claude), gate, accept). At its accept mine:
