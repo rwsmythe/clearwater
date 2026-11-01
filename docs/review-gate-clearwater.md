@@ -168,9 +168,14 @@ candidate rebased onto main, and records the actual output lines):
   (`uv run python -c "import psutil; assert psutil.virtual_memory().available >= 5*2**30"`).
   Run, one heavy job at a time (WP-T6, from 2026-10-29: the `fullclip` marker names the
   full-GX011627 forms of the seven gate tests; the trim forms stay in the serial leg):
-  `uv run pytest -q -rs -n 4 -m "not gpu and not footage and not gui and not slow and not fullclip" --basetemp=work/pytest-gate-RUN-parallel`,
-  then `uv run pytest -q -rs -m "(gpu or footage or gui or slow) and not fullclip" --basetemp=work/pytest-gate-RUN-serial --durations=0 --junitxml=work/pytest-gate-RUN-serial.xml`.
-  **FULLCLIP** (`uv run pytest -q -rs -m "fullclip" --basetemp=work/pytest-gate-RUN-fullclip --durations=0`, no `-n`,
+  `uv run pytest -q -rs -n 4 --timeout 600 -m "not gpu and not footage and not gui and not slow and not fullclip" --basetemp=work/pytest-gate-RUN-parallel`,
+  then `uv run pytest -q -rs --timeout 1200 -m "(gpu or footage or gui or slow) and not fullclip" --basetemp=work/pytest-gate-RUN-serial --durations=0 --junitxml=work/pytest-gate-RUN-serial.xml`.
+  STANDING RULE (your fill, effective now): while a gate's SERIAL leg runs, NO other pytest invocation of any size runs on this host, at any seat or in any sandbox (a Codex light suite included); the gui nodes are timing-sensitive and the leg is the figure of record. Codex turns that need their light suite wait for the leg or run before it.
+  A thread timeout dumps stacks and exits the process (under xdist, the worker crash is
+  reported and remaining tests can finish, but the worker's dump may be absent from the
+  parent log, so preserve the earlier core faulthandler dump); a timed-out leg is a STOP
+  with the node and the stacks, followed by a re-run of the leg after the fix.
+  **FULLCLIP** (`uv run pytest -q -rs --timeout 2400 -m "fullclip" --basetemp=work/pytest-gate-RUN-fullclip --durations=0`, no `-n`,
   about 26 min) runs at least ONCE per phase-end gate report and whenever a package brief asks
   for it; a per-package gate does not run it. The trim forms prove V4 MANDATORY and REQUIRED;
   three best-effort container items are proved by the fullclip forms only (WP-T6 report, Limits).
