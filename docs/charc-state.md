@@ -15,8 +15,8 @@
   `clearwater-orchestrator-20261031-2335`** (online 09:37Z, gauge 33 ms; gen 28 rolled 09:35Z) (gen 28 resumed 08:01Z on the owner's "resume"; status 225d1163: paces Codex 0.197,
   Claude 0.994 = 84 % at 84.5 % of the window, Claude resets 2026-11-02 09:59Z, Codex 2026-11-04 10:07Z). ALL cues go
   there; re-read `comms/.launch-sessions.json` before every cue. Bash gauge 34 ms. Drain `read --role charc --all`.
-  Main `dd3cf1eb` clean, FREE. C: 179 GB free, D: 2.4 TB. Subjects under 100 chars; see the `posted ->` line before
-  cueing. Codex-built packages: 9. Register through DR-101.
+  Main `ae8afd9a` clean, FREE. C: 176 GB free, D: 2.4 TB. Subjects under 100 chars; see the `posted ->` line before
+  cueing. Codex-built packages: 9. Register through DR-106 (DR-102 reserved for WP-D54).
 - **PHASE 5 COMMISSIONED 08:14Z (post b488ac53 + cue; owner-decided parallel with the danglers):** briefs
   `docs/briefs/wp5.3-brief.md` (165 lines) and `docs/briefs/wp5.1-brief.md` (185 lines), both DRAFT by me on main
   `dd3cf1eb` (0 CR), FINAL on b488ac53 with the orchestrator's dispatch fill (base, yields, GATE_CHECKS). Both Codex lane,
@@ -165,8 +165,16 @@
   **My silent whole-source fallback WITHDRAWN:** a failed excerpt = `excerpt_failed` item, skipped, listed "not built",
   build exits nonzero; whole-clip export of a long source only on an explicit RUN REQUEST (more than two = ask me).
   F2 make_zero + displayed start; F3 explicit NVENC quality for the viewing aid; F10 banked; F11 rejected on control.
-  Turn 5 remediates; A R2 under the 92 % rule. Waiting on: WP4.6 gate + accept message; WP-D54 A; WP5.3 A R2; WP5.1
-  T8; 5c-16 / 5d opens.
+  Turn 5 remediates; A R2 under the 92 % rule.
+- **WP4.6 ACCEPTED main `bbb4ef3e` 10:38Z (msg 5a364997; gate `g29-wp46` GREEN: parallel 6,127 / 1 skip in 490 s, serial
+  1,230 / 11 skips / 0 failed in 1,516 s; collection 7,376 = 6,128 + 1,241 + 7, +107 vs main; record
+  `docs/proofs/wp4.6-accept.md`). CHARC QA CONFIRMED (static, this seat): patch-id `07cd8dcb05af` equal on `4cd7e992`
+  (vs b6a31b5), `d674836f` (vs edec3c17) and `07e0db6b..e3b53d68`; 17 paths all owned or granted; 0 CR in 17/17 blobs.
+  **MY ACCEPT COMMIT `ae8afd9a`:** DR-98 CLOSED; NEW AD-31; AD-23 extended (pin 8); DR-44 (c) re-confirmed; DR-62 /
+  DR-69 notes; NEW DR-103 (B2-1/B2-2), DR-104 (F8 widened + scratch accounting), DR-105 (F4), DR-106 (dead sink helpers);
+  CLAUDE.md 2026-11-01 line. Register through DR-106 (DR-102 reserved for WP-D54). Worktree `wp4.6` releasable. Claude
+  87 % (10:35Z). Waiting on: 5c-16 EXCLUSIVE open (after WP-D54 B and WP5.3 A R2 return); WP-D54 report / B / gate;
+  WP5.3 A R2; WP5.1 T8.
 - **DANGLERS (gen 28 runs them; I rule their STOPs):** (1) WP3.6P (Codex session 01a18b4b, worktree `wp3.6p` head
   `081f851c`, turn 7 = R2 remediation dispatched 08:01Z; then A R3, seat runs (`photo_check`, `orientation`, the footage
   node), two EXCLUSIVE windows (16-bit export ~45 min / ~3.8 GB; memory), B (Claude), gate, accept). At its accept mine:
