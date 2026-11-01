@@ -8,6 +8,7 @@ pending output Orientation, missing ENOSPC handling or leftover partial fails.
 from __future__ import annotations
 
 import errno
+import re
 import shutil
 import subprocess
 import time
@@ -231,6 +232,34 @@ def _assert_no_new_outputs(output: Path, before: Mapping[str, str]) -> None:
     )
 
 
+def _assert_complete_finals(
+    output: Path, sentinels: Mapping[str, str], expected_size: tuple[int, int]
+) -> dict[str, str]:
+    """Verify and fully decode every final, then retain its byte identity."""
+    finals: dict[str, str] = {}
+    for path in output.iterdir():
+        if path.name in sentinels or is_temporary_name(path.name):
+            continue
+        try:
+            with PILImage.open(path) as image:
+                image.verify()
+            with PILImage.open(path) as image:
+                image.load()
+                assert image.size == expected_size, "crash final has unexpected dimensions"
+        except (OSError, ValueError) as exc:
+            raise AssertionError(f"crash left a partial final: {path.name}") from exc
+        finals[path.name] = file_md5(path)
+    return finals
+
+
+def _assert_crash_before_cleanup(
+    output: Path, sentinels: Mapping[str, str], expected_size: tuple[int, int], in_flight: Path
+) -> dict[str, str]:
+    """Apply CHARC's complete-final and absent-in-flight-final assertions."""
+    assert not in_flight.exists(), "in-flight item has a final before cleanup"
+    return _assert_complete_finals(output, sentinels, expected_size)
+
+
 @pytest.mark.slow(reason="runs the headless runner as a subprocess")
 def test_v11_photo_crash_leftovers_are_cleaned_at_start(
     sample: Sample,
@@ -239,9 +268,10 @@ def test_v11_photo_crash_leftovers_are_cleaned_at_start(
     fixture_manifest: dict[str, Any],
     record_property: RecordProperty,
 ) -> None:
-    """Kill an observed real temporary, then exercise the shipped startup cleanup."""
+    """Preserve complete batch items, forbid an in-flight final, and clean real temporaries."""
     source = sample("png16-gradient-srgb")
     facts = sample_entry("png16-gradient-srgb")["facts"]
+    expected_size = (facts["width"], facts["height"])
     # No owner photo is read: this is a maximum-area committed-fixture tie.
     assert facts["width"] * facts["height"] == max(
         entry["facts"].get("width", 0) * entry["facts"].get("height", 0)
@@ -261,7 +291,7 @@ def test_v11_photo_crash_leftovers_are_cleaned_at_start(
             output = root / "out"
             sentinel = output / "keep.txt"
             sentinel.write_bytes(b"existing output must survive")
-            before = {sentinel.name: file_md5(sentinel)}
+            sentinels = {sentinel.name: file_md5(sentinel)}
             observed: list[str] = []
             with (
                 (root / "stdout.log").open("wb") as stdout,
@@ -281,20 +311,56 @@ def test_v11_photo_crash_leftovers_are_cleaned_at_start(
                     if process.poll() is None:
                         process.kill()
                     process.wait(timeout=10)
+            finals = _assert_complete_finals(output, sentinels, expected_size)
+            record_property(f"attempt_{attempt:02d}_completed_finals", len(finals))
             if not observed:
                 assert process.returncode == 0, "runner crashed before a temporary was observed"
                 continue
             record_property("crash_attempt", attempt)
             record_property("observed_temporaries", ",".join(observed))
-            assert all(
-                path.name in before or is_temporary_name(path.name) for path in output.iterdir()
-            ), "crash produced a new final output"
+            stderr_text = (root / "stderr.log").read_text(encoding="utf-8")
+            writing = re.findall(r"^\[(\d+)/40\] Writing (photo-\d{2}\.png)$", stderr_text, re.M)
+            assert writing, "runner stderr did not identify an in-flight Writing item"
+            item_number, source_name = writing[-1]
+            assert sources[int(item_number) - 1].name == source_name
+            in_flight_stem = Path(source_name).stem
+            assert any(
+                name.startswith(f"{in_flight_stem}_corrected.clearwater-partial-")
+                for name in observed
+            ), "observed temporary does not belong to stderr's in-flight item"
+            record_property("in_flight_source", source_name)
+            in_flight_final = output / f"{in_flight_stem}_corrected.png"
+            assert (
+                _assert_crash_before_cleanup(output, sentinels, expected_size, in_flight_final)
+                == finals
+            )
+
+            # The same pre-cleanup oracle must reject a partial final beside
+            # the real temporary and a complete final for the in-flight item.
+            partial_final = output / "planted-truncated.png"
+            partial_final.write_bytes(source.read_bytes()[:32])
+            try:
+                with pytest.raises(AssertionError, match="crash left a partial final"):
+                    _assert_crash_before_cleanup(output, sentinels, expected_size, in_flight_final)
+            finally:
+                partial_final.unlink()
+            record_property("mutation_probe_partial_final", "truncated final rejected")
+            shutil.copyfile(source, in_flight_final)
+            try:
+                with pytest.raises(AssertionError, match="in-flight item has a final"):
+                    _assert_crash_before_cleanup(output, sentinels, expected_size, in_flight_final)
+            finally:
+                in_flight_final.unlink()
+            record_property("mutation_probe_in_flight_final", "in-flight final rejected")
+
             leftovers = {p for p in output.iterdir() if is_temporary_name(p.name)}
             report = clean_leftovers(
                 Settings(output_folder=output, force_cpu=True), WriteJournal(root / "journal")
             )
             assert report.failed == (), "startup could not remove a crash temporary"
             assert set(report.removed) == leftovers, "startup did not remove the real leftovers"
+            assert _assert_complete_finals(output, sentinels, expected_size) == finals
+            before = {**sentinels, **finals}
             _assert_no_new_outputs(output, before)
             # Plant the omission of cleanup and show the same final-state oracle fails.
             planted = output / observed[0]
@@ -305,7 +371,10 @@ def test_v11_photo_crash_leftovers_are_cleaned_at_start(
             finally:
                 planted.unlink()
             record_property("mutation_probe", "planted leftover rejected")
-            assert_names_only([observed, list(before)])
+            assert_names_only(
+                [observed, list(before), stderr_text, (root / "stdout.log").read_text("utf-8")],
+                folders=[root, copies, output],
+            )
             return
         record_property("crash_observation", "not observable at this size")
         pytest.skip("not observable at this size")

@@ -440,7 +440,8 @@ ruling; evaluate depth near 200K and stop at a step boundary near 250K.
 |---|---|---|---|
 | 1 / T1 round 0 | pending dispatcher | pending dispatcher | read footer; rule on R0-1 through R0-4 before T2 |
 | 1 / retirement | `01a1962f-69c6-...` (dispatcher supplied abbreviation) | 210,098 | CHARC concurred with a fresh session for T2 onward |
-| 2 / T2 build | session 2; id pending dispatcher | pending dispatcher | read this turn's footer; resolve T2-1 before T3/T4 continuation |
+| 2 / T2 build | `01a1963b-002e-7cc3-9d5d-0f7807bb5ed9` | 136,776 | T2 committed as `087892d8`; CHARC `755ef1b004b92902` resolved T2-1 with the in-flight tightening |
+| 3 / T2-1 amendment | `01a1963b-002e-7cc3-9d5d-0f7807bb5ed9` | pending dispatcher | read turn footer; STOP T3-1 on the tightened in-flight assertion |
 
 Next authorized build group after rulings: T2 support + photo RED, then yield.
 Later yields remain after T4, T6, T8, every adjudicated review round, and before
@@ -609,3 +610,158 @@ Yield: T2 complete as test construction, **STOP T2-1 before T3/T4 continuation**
 No seat run is requested until CHARC rules on the retained failing crash oracle.
 The final gate, footage/GPU/GUI runs, final serial-leg delta and T9/T10 remain
 pending at their authorized boundaries.
+
+## Session 2 / Turn 3: T2-1 amended, T4 complete
+
+Intended T4 completion is **BLOCKED by T3-1 below**; the heading names the
+dispatched milestone, not a passing acceptance claim. T2 was committed by the
+dispatcher as `087892d8`, with zero CR in the three blobs. The supplied session
+2 id and depth after T2 (136,776) are recorded in the depth table. This turn's
+depth is not estimated. Evaluate near 200K; stop at a step boundary near 250K.
+
+### Ruling applied and delivered change
+
+CHARC `755ef1b004b92902` resolved T2-1 and withdrew "nothing else new". The
+crash node now implements its five amended assertions without a relaxation:
+
+1. Every non-sentinel, non-temporary file in the output folder is opened with
+   Pillow verify, reopened for full decode, and checked against 96 x 64. Its
+   MD5 is saved before cleanup and compared after cleanup.
+2. A partial final causes an assertion failure, including a truncated PNG.
+3. The last `[n/40] Writing photo-NN.png` line in the actual runner stderr
+   identifies the in-flight source. Its index is checked against the batch,
+   its stem is matched against the observed temporary, and its final must be
+   ABSENT before cleanup. No inference solely from the temporary replaces
+   the required stderr identification.
+4. The shipped clean_leftovers must remove exactly all remaining temporaries,
+   report no failed removal, and preserve all verified finals and the sentinel
+   byte-identically. The prior planted-leftover negative remains in the node.
+5. The original fixture and all 40 scratch copies retain their source MD5s in
+   the finally guard, including on a failing assertion.
+
+The real runner subprocess, maximum-area fixture tie, 40-copy batch, 10 ms
+polling, 20-attempt ceiling and exact allowed skip reason are unchanged.
+Each attempt records its verified completed-final count in a JUnit property,
+including attempts where no temporary was seen. No bound is imposed on that
+count. There was one attempt in this turn; it observed a temporary and failed,
+so the unobserved-temporary skip is not applicable.
+
+The committed node includes two new negative probes against its SAME
+pre-cleanup assertion, planting a truncated final beside the real temporary
+and a valid final for the in-flight item. It fails the actual-product assertion
+before reaching those probes. Both probes were therefore also exercised
+independently on a separate planted folder under the failing node's temp root;
+the original failure folder was only read by that inspection. Details below.
+
+### T3-1 [MAJOR, NEW, in envelope]: kill can interrupt link-before-unlink commit
+
+**STOP to CHARC. Recommended ruling:** classify a fully verified, successfully
+installed final as completed even when its temporary hard link remains after
+kill; allow that state when temporary and final refer to the same file and
+startup removes only the temporary. Keep the prohibition on a partial final.
+This requires amending the in-flight tightening. It has NOT been applied.
+
+Failing node remains:
+`tests/test_v51_photo_acceptance.py::test_v11_photo_crash_leftovers_are_cleaned_at_start`.
+Actual assertion: **"in-flight item has a final before cleanup"**.
+The failing node is retained, with no xfail, retry on a failed observation,
+tolerance change, hold hook, smaller poll interval or product edit.
+
+Evidence from `t3-photo.log`, `t3-photo.xml` and `t3-inspect.log`:
+
+- Attempt 1: the runner's last writing line is
+  `[3/40] Writing photo-02.png`. The observed temporary is
+  `photo-02_corrected.clearwater-partial-ea178a35f2b4.png`, matching that source.
+- Three completed finals exist: `photo-00_corrected.png`,
+  `photo-01_corrected.png` and `photo-02_corrected.png`. Pillow verify AND full
+  decode independently succeeded on all three, each 96 x 64.
+- The in-flight final `photo-02_corrected.png` and its temporary have the
+  **same file identity** (os.path.samefile True) and the **same MD5**. Thus this
+  run caught a successfully installed final while its temporary name survived.
+- The read-only source trace is `src/clearwater/jobs/safe_write.py:88`:
+  `_install` calls `os.link(temp, final)` at `:101`, then `_unlink_quietly(temp)`
+  at `:107`. The observed two names for the same complete file agree with kill
+  in that interval. No source edit is proposed or made here.
+- The source MD5 finally guard did not fail. The real node stops before its
+  cleanup call; no passing cleanup result is claimed for this run.
+
+This is additional evidence about the tightened oracle, not evidence of a
+partial final. The prior race characterisations **4 and 7** completed finals
+remain in the T2 record for the final report; this run adds **3** (including
+the installed final with a surviving temporary hard link). No bound is proposed
+on those counts. No product defect is established from this complete-file state.
+
+Independent planted-failure probes, `t3-inspect.log`:
+
+- A copied real temporary plus sentinel, with no final, first passed the same
+  `_assert_crash_before_cleanup` baseline in its own scratch folder.
+- A 32-byte truncated PNG planted as another final beside that temporary was
+  rejected with **"crash left a partial final: planted-truncated.png"**.
+- After removing that truncation, a copied VALID completed PNG planted at the
+  in-flight final name was rejected with **"in-flight item has a final before
+  cleanup"**. This proves that the third assertion is distinct from the
+  completeness check. Probe files were removed in finally blocks; the original
+  failing evidence folder and all its files were retained unchanged.
+
+### Per-node result and time on this base
+
+File prefix for each node is `tests/test_v51_photo_acceptance.py::`.
+Times are JUnit testcase seconds (setup + call + teardown), from the full-module
+light run on this candidate, not fresh isolated measurements. T2's isolated
+figures remain the marker evidence; these are development observations only.
+
+| Node | Marker / leg | Result | Seconds |
+|---|---|---|---:|
+| test_v5_jpeg_two_readers_and_pose[land-o1] | none / parallel | PASS | 0.197 |
+| test_v5_jpeg_two_readers_and_pose[land-o3] | none / parallel | PASS | 0.143 |
+| test_v5_jpeg_two_readers_and_pose[land-o6] | none / parallel | PASS | 0.146 |
+| test_v5_jpeg_two_readers_and_pose[land-o8] | none / parallel | PASS | 0.136 |
+| test_v5_jpeg_two_readers_and_pose[port-o1] | none / parallel | PASS | 0.126 |
+| test_v5_jpeg_two_readers_and_pose[port-o3] | none / parallel | PASS | 0.138 |
+| test_v5_jpeg_two_readers_and_pose[port-o6] | none / parallel | PASS | 0.118 |
+| test_v5_jpeg_two_readers_and_pose[port-o8] | none / parallel | PASS | 0.105 |
+| test_v5_heic_two_readers_and_ad24[both] | none / parallel | PASS | 0.118 |
+| test_v5_heic_two_readers_and_ad24[irot-only] | none / parallel | PASS | 0.109 |
+| test_v5_heic_two_readers_and_ad24[exif-only] | none / parallel | PASS | 0.113 |
+| test_v5_heic_two_readers_and_ad24[neither] | none / parallel | PASS | 0.119 |
+| test_v11_png_disk_full_removes_partial_output | none / parallel | PASS | 0.134 |
+| test_v11_photo_crash_leftovers_are_cleaned_at_start | slow / serial | FAIL, T3-1 | 0.929 |
+
+### Validation and verification loop
+
+Command for the full photo-module run (stdout/stderr redirected to
+`work/wp5.1/t3-photo.log`):
+
+```bash
+PYTHONPATH=scripts uv run pytest -q tests/test_v51_photo_acceptance.py --basetemp=work/wp5.1/t3-tmp -p sandbox_mkdir_shim -p no:cacheprovider -m "not gpu and not footage and not gui and not fullclip" --durations=0 -o junit_family=xunit1 --junitxml=work/wp5.1/t3-photo.xml
+```
+
+| Evidence | Observed summary |
+|---|---|
+| t3-photo.log / t3-photo.xml | 13 passed, 1 failed in 3.33 s; failure is the tightened in-flight assertion; no skip |
+| t3-inspect.log | all three finals verify/decode; in-flight final/temporary same file and bytes; both requested negative probes rejected |
+| t3-ruff.log | All checks passed! for both new modules |
+| t3-format.log | Only the owned photo module formatted; seat format --check remains pending |
+| t3-test-mypy.log | Success: no issues found in 2 source files |
+| t3-mypy.log | Success: no issues found in 146 source files |
+
+Verification loop: suspected that the amendment would distinguish completed
+batch items from the in-flight item; confirmed that parsing identifies the
+correct source, but the last writing line does not distinguish commit's
+link/unlink interval from an uncommitted write. Independently confirmed file
+completeness, equal MD5 and equal file identity; rejected partial-output product
+defect as a false positive for this observation. Confirmed both requested
+negative probes against the node's exact assertion helper. Fixed: test-only
+oracle amendment per CHARC, with no product change. Remaining: T3-1 ruling.
+
+No Reviewer A round has run in this turn. This new build finding is Critical 0 /
+Major 1 / Minor 0; in-envelope 1 / out 0; NEW 1 / REOPENED 0 (T2-1's withdrawn
+blanket assertion was resolved; this is the new in-flight tightening); reverts
+0; product fixes 0; test-only modification 1 module. Only that owned test module
+and this ledger changed. No existing test, support module, configuration,
+dependency, frozen interface, footage file or other worktree was changed or
+opened. No commit or git-index write was attempted.
+
+Yield: **STOP T3-1**, as required when the amended node fails on the shipped
+product. T4 is not claimed complete. No further build task or seat run is
+requested before the ruling; no whole-set gate was run.
