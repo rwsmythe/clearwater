@@ -14,8 +14,9 @@ Brief `docs/briefs/wp4.6-brief.md` FINAL on CHARC `39dad78f5b10ceeb`; base `b6a3
 | R1 | 2026-10-30 | WSL, codex-cli 0.162.1, gpt-6.1-sol / high; HEAD `7a20c7bd` | 0 | 8 reported: 5 confirmed blocking (F1 F2 F3 F5 F6), 2 banked pre-existing (F4 F8), 1 reclassified minor (F7) | 6 reported (+F7) | 5 blocking in / 2 minor out (F9 F10) | 14 NEW / 0 REOPENED | 0 | product 8 (F1 F2 F3 F5 F6 F7 F9 F10) / test-only 4 (F11-F14), by cell 4 (F9 F10 reverted under `e15d408a`, restored under `55959e2f`) | 224,076 (cell 3 at the R1 yield); retired at 231,402 (05:57Z) |
 | R1 remediation | 2026-10-30 | (no review: cell 4 fixes, HEAD `c80061d1`; CHARC `e15d408a` applied at `c328be95`) | - | - | - | - | - | 2 (F9, F10 under `e15d408a`), both restored under `55959e2f` (`4b54beca`) | product 8 / test-only 4 | 199,451 (cell 4 at its R2 yield, 06:31Z; the dispatcher took ONE reading for this row and R2) |
 | R2 | 2026-10-30 | WSL, codex-cli 0.162.1, gpt-6.1-sol / high; HEAD `f91aea96` | 0 | 2 reported: 1 confirmed blocking (R2-2), 1 non-blocking by the verifiably-prevents rule (R2-1) | 3 reported (R2-3 R2-4 R2-5) | 1 blocking in; R2-1 not reachable by a product spawn | 5 NEW / 0 REOPENED | 0 | product: CHARC's design change (d) and the spawn rule, R2-1, R2-4 (R2-2 and R2-3 CLOSED BY REMOVAL); test-only: R2-5 | 199,451 (06:31Z, the same reading as the row above) |
-| R2 remediation | 2026-10-30 | (no review: cell 4, HEAD `3bc6ffff`) | - | - | - | - | - | 0 | product (d) + spawn rule + R2-1 + R2-4 / test-only R2-5 | (dispatcher fills: cell 4 at the R2 remediation yield) |
-| R3 (LAST full round) | 2026-10-30 | WSL, codex-cli 0.162.1, gpt-6.1-sol / high; HEAD `cf378034` | 0 | 2 reported: R3-1 confirmed (protocol class, to the terminating clean-up by CHARC's cap); R3-2 REOPENED (F7, minor as adjudicated at R1) | 3 reported (R3-3 REOPENED F9 out of envelope; R3-4 test-only; R3-5 out of envelope) | 1 blocking in; 2 out of envelope | 3 NEW / 2 REOPENED | 0 | (clean-up not started) | (dispatcher fills: cell 4 at R3) |
+| R2 remediation | 2026-10-30 | (no review: cell 4, HEAD `3bc6ffff`) | - | - | - | - | - | 0 | product (d) + spawn rule + R2-1 + R2-4 / test-only R2-5 | 327,017 (one reading, at stand-down, 2026-10-30 07:02Z) |
+| R3 (LAST full round) | 2026-10-30 | WSL, codex-cli 0.162.1, gpt-6.1-sol / high; HEAD `cf378034` | 0 | 2 reported: R3-1 confirmed (protocol class, to the terminating clean-up by CHARC's cap); R3-2 REOPENED (F7, minor as adjudicated at R1) | 3 reported (R3-3 REOPENED F9 out of envelope; R3-4 test-only; R3-5 out of envelope) | 1 blocking in; 2 out of envelope | 3 NEW / 2 REOPENED | 0 | in the R3 clean-up row below | 327,017 (one reading, at stand-down, 2026-10-30 07:02Z) |
+| R3 clean-up (terminating, no R4) | 2026-11-01 | (no review: cell 5, HEAD `6e7caf1f`; CHARC `acc0255d`) | - | - | - | - | - | 0 | product 3 (R3-1, R3-5, R3-2) / test-only 1 (R3-4); R3-3 a Limit | (dispatcher fills: cell 5 at the clean-up yield) |
 
 ## Round 0 (task 2): the design restated, the Questions, the stops
 
@@ -924,3 +925,41 @@ NEXT EXACT STEP (the terminating clean-up; no R4), once the dispatcher answers R
    `R3 CLEAN-UP DONE`.
 
 Depth cells still for the dispatcher: "R2 remediation" and "R3" rows.
+
+## R3 clean-up (cell 5, implementer-opus-high; the terminating clean-up, no R4)
+
+Dispatch: orchestrator gen 28, `prompt-wp4.6-cell5.md`; CHARC R3 ruling `acc0255dbda23ae2`
+(R3-2 MINOR, fixed here; R3-1 RED-first under the cap; R3-3..5 as adjudicated; cell 4's ENCODE
+extension confirmed, no change). Base `9fe947fe`, no rebase. The RESUME HERE work list above
+(items 1-6) is DONE.
+
+| # | Fix | Commits | Product / test-only |
+|---|---|---|---|
+| R3-1 | `_converse` starts the three I/O threads INSIDE the clean-up `try`; the `BaseException` path kills and reaps the worker, the stdin thread (when started) closes its pipe on the `None`, and any pipe whose thread never started is closed in place. Test `test_an_io_thread_that_cannot_start_kills_the_worker_and_closes_its_stdin[1|2|3]` (the 1st, 2nd or 3rd `export-worker-*` start raises; the job re-raises, `poll()` is not None, stdin closed) | RED `7479f4c4`, fix `b96a6381` | product |
+| R3-4 | `_Clock` gains `frozen`; the deadline test freezes it at the cancel and a wrapper on `_decode_line` jumps it 10 readings when the result is decoded; bound `grace <= kill - cancel <= grace + 1` kept. Negative control (grace timed from the result, product edited and restored, not committed): fails `([2.0], [53.0])` | `c8eb5988` | test-only |
+| R3-5 | `decode_request` catches `OverflowError` from `ParameterSet.from_dict` with `ValueError` (exit 2, one stderr line); the malformed-request test gains `a created that overflows` (`0001-01-01T00:00:00+01:00`). `Settings` has no date field, so its clause is unchanged | RED `0c91dd33`, fix `a1345696` | product |
+| R3-2 | `_sweep_once(progress)` checks the cancel before each entry and logs `the stale export scratch sweep stopped at a cancel`; the docstring's "bounded" now says by what (entry count and the cancel; a removal begun runs to its end; the entries left stay until another instance's first job); module docstring step 2 says the same. Test `test_the_stale_sweep_stops_at_a_cancel_before_its_next_entry` (on the previous product: `['a_old', 'b_old'] == ['a_old']` fails); `test_a_cancel_during_the_sweep_spawns_nothing`'s stand-in takes the new argument | `6e7caf1f` | product |
+| R3-3 | Limit, below | this commit | (ledger only) |
+
+RED evidence. R3-1 on `9fe947fe`'s product: `FAILED tests/test_jobs_export_process.py::test_an_io_thread_that_cannot_start_kills_the_worker_and_closes_its_stdin[1]`
+(and `[2]`, `[3]`): `AssertionError: the worker outlived its job` (`assert None is not None`,
+`where None = poll()`); `3 failed, 66 deselected`. GREEN at `b96a6381`: `3 passed, 66 deselected`;
+the file `69 passed`. R3-5 on `c8eb5988`: `FAILED ...test_a_malformed_request_exits_2_with_one_stderr_line[a created that overflows]`,
+exit 1 with a traceback ending `OverflowError: date value out of range`; GREEN at `a1345696`:
+`12 passed, 10 deselected`.
+
+**R3-3 Limit (banked; CHARC writes the row):** after the drain deadline the worker's stdout and
+stderr reader threads, and the pipe handles they hold, stay alive until every process holding
+the pipes' write ends has exited; a descendant that inherits the worker's stdout or stderr keeps
+them alive past the job. No product spawn makes such a descendant (the R3 adjudication, citing
+round 2), so this is out of envelope; the threads are daemons and end when the holder exits.
+
+Run lines at `6e7caf1f` (Git Bash, `PYTEST_ADDOPTS` unset, `QT_QPA_PLATFORM=offscreen`):
+- `uv run pytest -q -p no:cacheprovider tests/test_jobs_export_process.py tests/test_app_export_worker.py tests/test_app_deps.py tests/test_io_video_spawn.py --basetemp=work/cell5-targeted`:
+  `361 passed in 50.12s`, exit 0 (356 at `3bc6ffff` + 3 R3-1 + 1 R3-5 + 1 R3-2).
+- `uv run ruff check` on the four changed code files: `All checks passed!`, exit 0.
+- `uv run ruff format --check` on the same: `4 files already formatted`, exit 0.
+- `uv run mypy` (project config): `Success: no issues found in 148 source files`, exit 0.
+
+Every commit's blob checked for CR bytes: 0 each. No Codex run, no new review round. Next: the
+orchestrator verifies R3-1 at its seat; Reviewer B on the final tree; the EXCLUSIVE window.
