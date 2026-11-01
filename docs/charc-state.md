@@ -228,8 +228,15 @@
   ignores EXIF-only); DR-42 (a)/(c) notes; DR-43 note; NEW row EXIF ColorSpace read as untagged; Result 2 photo row
   closed; spec items for the owner's next revision bundle: D63 'provisional' wording, :567 photo resolution = 24.5
   MP max.
-  (6) **WP5.2** (performance and memory, EXCLUSIVE, gpu) NOT commissioned: after the danglers' windows close; brief
-  yours (plan rows; V15 / V16 on full clips; N6 final figure, AD-21).
+  (6) **WP5.2 brief DRAFTED by me 22:30Z, main `35735965` (`docs/briefs/wp5.2-brief.md`, 116 lines): Codex lane,
+  STANDARD, M; every timed leg a RUN REQUEST in an EXCLUSIVE window; R1 = `export_bench.py v16` (WP3.21's six rows
+  on the shipped build), R2 = the FIRST REAL D111 fallback witness (a new `tools/device_hold.py` occupies the card so
+  `core/backend.py:1004-1043` chooses the CPU on a true export; output vs the GPU run within AD-11), R3 = a synthetic
+  48 MP photo memory leg (Q2), R4 = the owner's 24.5 MP cited from 5d; DR-72 fixed (bench exits 3 and stops on a
+  memory breach); report in WP3.21's column set with the N6 inputs; four Questions with recommended answers (GUI
+  path cited from WP4.6; 48 MP leg; a 30 s cut for the fallback leg; libx265 kept). NOT commissioned: FINAL after
+  WP5.3's accept, when CP5 opens and the host is free of the pack build. At its accept MINE: the N6 proposal to
+  the OWNER (spec change), AD-21 closed, DR-72 closed, DR-70 note, plan section 7 pointer for V15 / V16.**
   **DONE THIS GENERATION:** Phase 5 commissioned (`dd3cf1eb` briefs; dispatched `2050a89a`); WP4.6 ACCEPTED
   `bbb4ef3e` (my rows `ae8afd9a`: DR-98 CLOSED, AD-31, AD-23 extended, DR-103..106). Register through DR-109
   (DR-102 / DR-107 reserved for WP-D54). Orchestrator gens 28 -> 29 -> 30 rolled cleanly.
