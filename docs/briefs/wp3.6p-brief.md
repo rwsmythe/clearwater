@@ -336,3 +336,20 @@ RULINGS, FINAL on fold-in:
 Brief edits on fold-in: Status FINAL on this message id; Lane and Tier fields fixed to Codex / STRONG; the two "unverified" items resolved as above (inventory QA done; FFmpeg decode = round-0 RUN REQUEST with the ruled fallback). STOP list and Locks stand as drafted; the privacy lock is BINDING as written.
 
 Owner-pending inputs: none. Open owner decisions: none. Owner action pending: the three kept basetemps.
+
+Report items (CHARC dbf02ad7, 2026-11-01T18:31:00Z, verbatim; item 1 WITHDRAWN and re-ruled by e0c7b856 below)
+
+> ACK 3ab6c81a (5c-16 closed) and 0f0d99a6 (5d closed, hold released). Both windows accepted as posted; the order you give (WP3.6P report turn and WP5.3 turn 9 in parallel now; then WP3.6P B executing, WP-T7 B, WP5.3 A R4, WP5.1 B under the 92 % rule) is CONCURRED.
+>
+> Three items for WP3.6P's report turn, so they are in the report before Reviewer B reads it:
+> 1. UNIT. The 5c-16 "quant max" 7.57e-06 is half a 16-bit LSB in [0,1] units (1 / 131070 = 7.63e-06), which is exactly what correct 16-bit rounding gives; your table's "/255" column label is the 8-bit unit and is wrong for this leg. The report states the unit per leg and reads this figure as "rounding-limited at 16 bits", a positive finding, not a near-zero error.
+> 2. CLASSES. The seven classes stay separate in the report (no pooled row), with the 9 `assumed` rows named as the no-ICC JPG-Z / JPG-M set from the class map, as the ledger rule says.
+> 3. 5d ESTIMATE. The 6.13 GB estimate against a measured 4.11 GB GPU peak (1.5x) is recorded as a Limit with the numbers, not fixed in this package: the estimate is the V16 / AD-21 admission check, conservative by design; whether it is too conservative is a WP5.2 question (performance and memory, EXCLUSIVE, after the danglers), and I will carry the figure into the WP5.2 brief. The force-CPU leg's 3.14 GB RSS and the 58.4 s wall are recorded as the CPU-fallback characterisation for one 24.5 MP HEIC at 16 bits.
+>
+> Also for your queue: WP3.6P Reviewer B must EXECUTE (my 88ed545f / 650bea20 stand): the pytest selection, the planted-reader control and the ICC-presence class check, each proved by one succeeded line; a refused B is not a returned B and the convergence stays conditional until it returns. Claude 90 %: if the line is crossed before B starts, hold it for the reset; the report turn and WP5.3 turn 9 are Codex and continue.
+
+Report item 1 ruling (CHARC e0c7b856, 2026-11-01T18:32:29Z, verbatim; GOVERNS item 1)
+
+> RULING on 30d278f9: your correction is RIGHT and my item 1 is WITHDRAWN. I read photo_verify.py:1036-1039 at 790541e7 myself: `quantised = |reference - again| * 255` and `raw = |pixels - again| * 255`, so `quantised_max_255` IS in /255 units (AD-11's unit) and 7.57e-06 /255 = 2.97e-08 in [0,1], about 1/257 of half a 16-bit LSB. My "half an LSB" reading took the field as [0,1] units; it is not.
+>
+> Turn 11 carries item 1 in your corrected form, verbatim: the report keeps the /255 unit and reads the 5c-16 figure as "the written 16-bit values equal the writer-rounded reference exactly, up to float32 representation (quantised max 7.57e-06 /255 = 2.97e-08 in [0,1]; half a 16-bit LSB would be 1.95e-03 /255)", consistent with raw_max_255 = 0.0 in every class. Items 2 and 3 as written. Reviewer B reads the report after turn 11.
