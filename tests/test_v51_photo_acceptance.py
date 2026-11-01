@@ -30,6 +30,7 @@ from numpy.typing import NDArray
 from PIL import Image as PILImage
 from PIL import ImageOps
 
+import clearwater
 from acceptance_support import (
     RunnerResult,
     assert_names_only,
@@ -369,17 +370,28 @@ def test_v11_photo_crash_leftovers_are_cleaned_at_start(
         shutil.copyfile(source, copy)
     hashes = {path: file_md5(path) for path in [source, *sources]}
     try:
-        # Prove the base interpreter can reach the same editable package/dependencies.
+        package_file = Path(clearwater.__file__).resolve()
+        assert package_file == Path(__file__).resolve().parents[1] / "src/clearwater/__init__.py", (
+            "parent imported clearwater outside this worktree"
+        )
+        # Check package identity, not just whether some installed copy is importable.
         with (tmp_path / "interpreter-import.log").open("wb") as log:
             imported = subprocess.run(
-                interpreter_command("import clearwater"),
+                interpreter_command(
+                    "import clearwater; from pathlib import Path; "
+                    "assert Path(clearwater.__file__).resolve() == Path(sys.argv[1]).resolve(), "
+                    "'real interpreter imported a different clearwater package'",
+                    [str(package_file)],
+                ),
                 stdout=log,
                 stderr=log,
                 timeout=10,
                 check=False,
             )
-        assert imported.returncode == 0, "real interpreter cannot import clearwater"
-        record_property("real_interpreter_import", "clearwater import succeeded")
+        assert imported.returncode == 0, (
+            "real interpreter did not import this worktree's clearwater"
+        )
+        record_property("real_interpreter_import", "same worktree clearwater.__file__")
         for attempt in range(1, 21):
             root = tmp_path / f"attempt-{attempt:02d}"
             args = runner_arguments(sources, root, extra=("--force-cpu", "--bit-depth", "16"))
@@ -388,11 +400,14 @@ def test_v11_photo_crash_leftovers_are_cleaned_at_start(
             sentinel.write_bytes(b"existing output must survive")
             sentinels = {sentinel.name: file_md5(sentinel)}
             observed: list[str] = []
+            pid_file = root / "writer.pid"
             with (
                 (root / "stdout.log").open("wb") as stdout,
                 (root / "stderr.log").open("wb") as stderr,
             ):
-                process = subprocess.Popen(runner_command(args), stdout=stdout, stderr=stderr)
+                process = subprocess.Popen(
+                    runner_command(args, pid_file=pid_file), stdout=stdout, stderr=stderr
+                )
                 try:
                     deadline = time.monotonic() + 30.0
                     while process.poll() is None and time.monotonic() < deadline:
@@ -406,6 +421,10 @@ def test_v11_photo_crash_leftovers_are_cleaned_at_start(
                     if process.poll() is None:
                         process.kill()
                     process.wait(timeout=10)
+            assert pid_file.is_file(), "runner prologue did not report the writing interpreter PID"
+            writer_pid = int(pid_file.read_text(encoding="ascii"))
+            assert writer_pid == process.pid, "crash kill target is not the writing interpreter"
+            record_property(f"attempt_{attempt:02d}_writer_pid_matches_popen", True)
             _assert_writes_stopped(output)
             record_property(f"attempt_{attempt:02d}_writes_stopped", True)
             finals = _assert_complete_finals(output, sentinels, expected_size)

@@ -275,9 +275,17 @@ def test_v6_untagged_runner_warns_bt709_limited(
     warnings = result.record["items"][0]["warnings"]
     record_property("warnings", warnings)
     _assert_untagged_warning(warnings)
-    with pytest.raises(AssertionError, match=r"D54 BT\.709/limited warning missing"):
-        _assert_untagged_warning([])
-    record_property("mutation_probe", "missing untagged warning rejected")
+    for wrong in (
+        [],
+        ["BT.709 assumed"],
+        ["limited range assumed"],
+        ["BT.709 LIMITED range assumed"],
+    ):
+        with pytest.raises(AssertionError, match=r"D54 BT\.709/limited warning missing"):
+            _assert_untagged_warning(wrong)
+    record_property(
+        "mutation_probe", "absent warning, either missing word and uppercase-only LIMITED rejected"
+    )
 
 
 def _assert_untagged_warning(warnings: Sequence[str]) -> None:

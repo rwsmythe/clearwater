@@ -113,6 +113,8 @@ def interpreter_command(code: str, arguments: Sequence[str] = ()) -> list[str]:
     A venv executable can be a launcher whose child outlives its ``wait()``.
     Using the base executable makes the Popen PID the interpreter being killed;
     copying sys.path retains the venv dependencies and editable source paths.
+    Isolated startup without site initialization prevents user/base .pth code
+    from preloading modules before these explicit paths are installed.
 
     Args:
         code: Python code executed after restoring the import paths.
@@ -122,20 +124,30 @@ def interpreter_command(code: str, arguments: Sequence[str] = ()) -> list[str]:
         A shell-independent command vector, also valid without a venv launcher.
     """
     executable = getattr(sys, "_base_executable", None) or sys.executable
-    return [executable, "-c", f"import sys; sys.path[:] = {sys.path!r}; {code}", *arguments]
+    return [
+        executable,
+        "-I",
+        "-S",
+        "-c",
+        f"import sys; sys.path[:] = {sys.path!r}; {code}",
+        *arguments,
+    ]
 
 
-def runner_command(arguments: Sequence[str]) -> list[str]:
+def runner_command(arguments: Sequence[str], *, pid_file: Path) -> list[str]:
     """Return the shipped script's command with the writing interpreter as its PID.
 
     Args:
         arguments: Arguments from ``runner_arguments``.
+        pid_file: File under the attempt root, written before importing the runner.
 
     Returns:
         A shell-independent command vector.
     """
     script = Path(he.__file__).resolve()
     return interpreter_command(
+        "import os; from pathlib import Path; "
+        f"Path({str(pid_file)!r}).write_text(str(os.getpid()), encoding='ascii'); "
         "import runpy; sys.argv = sys.argv[1:]; "
         f"sys.path.insert(0, {str(script.parent)!r}); "
         "runpy.run_path(sys.argv[0], run_name='__main__')",
@@ -187,31 +199,6 @@ def run_main(
     ):
         status = he.main(args, exports=exports)
     return _result(status, sources, root, out)
-
-
-def run_subprocess(
-    sources: Sequence[Path], root: Path, *, extra: Sequence[str], timeout: float = 120
-) -> RunnerResult:
-    """Run the shipped process to completion with bounded waits and file-backed logs.
-
-    Args:
-        sources: Read-only input files.
-        root: A fresh invocation folder under ``tmp_path``.
-        extra: CLI options.
-        timeout: Maximum seconds; ``subprocess.run`` kills and reaps on expiry.
-
-    Returns:
-        The same checked record as the in-process helper.
-    """
-    args = runner_arguments(sources, root, extra=extra)
-    with (
-        (root / "stdout.log").open("wb") as stdout,
-        (root / "stderr.log").open("wb") as stderr,
-    ):
-        done = subprocess.run(
-            runner_command(args), stdout=stdout, stderr=stderr, timeout=timeout, check=False
-        )
-    return _result(done.returncode, sources, root, None)
 
 
 def only_output(result: RunnerResult, out: Path) -> Path:
@@ -694,6 +681,14 @@ ACCEPTANCE_NODES: dict[str, tuple[str, ...]] = {
         *_test_nodes(
             "test_analysis_engine",
             "test_a_complete_entry_skips_the_decode_pass_and_gives_the_same_statistics",
+        ),
+        *_test_nodes(
+            "test_cache_store",
+            "test_other_versions_and_unreadable_entries_are_removed_when_opening",
+        ),
+        *_test_nodes(
+            "test_cache_jpeg",
+            "test_the_format_number_was_bumped_and_a_format_1_entry_is_removed_when_opening",
         ),
     ),
     "V18": (

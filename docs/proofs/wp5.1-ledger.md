@@ -427,10 +427,13 @@ relative to the acceptance brief: a false acceptance oracle blocks its build.
 | Round | Critical | Major | Minor | Advisory | In / out envelope | NEW / REOPENED | Reverts | Fix surface | Transport / model | Verdict |
 |---|---:|---:|---:|---:|---|---|---:|---|---|---|
 | 0 / T1 | 0 | 4 | 0 | 0 | 4 / 0 | 4 / 0 | 0 | ledger only; no test/product fix | no external reviewer yet | STOP for R0-1 through R0-4; yield before T2 |
-| 1 / Reviewer A, adjudicated and remediated T12 | 0 | 1 | 2 | 5 | 8 / 0 reviewed | 8 / 0 reviewed | 0 | tests/support fixes for F1/F2/F4-F8 (7); product-code fixes 0 | claude -p; claude-opus-5-5; requested high | NEW_CRITICAL_MAJOR_FOUND; F1/F2/F4-F8 remediated per CHARC f6252e0b; F3 HOLD per turn-12 dispatch pending reconciliation of 8276adb5; GUI/GPU seat validation and round 2 pending |
+| 1 / Reviewer A, adjudicated and remediated T12 | 0 | 1 | 2 | 5 | 8 / 0 reviewed | 8 / 0 reviewed | 0 | tests/support fixes for F1/F2/F4-F8 (7); product-code fixes 0 | claude -p; claude-opus-5-5; requested high | NEW_CRITICAL_MAJOR_FOUND; fixes verified at seat and in R2; F3 REJECTED-WITH-RULING, CHARC c39cc00d confirms 8276adb5 end-state retry/SKIP |
+| 2 / Reviewer A, adjudicated with terminating cleanup T13 | 0 | 0 | 2 | 5 | 7 / 0 reviewed | 7 / 0 reviewed | 0 | tests/support fixes F1/F3/F5/F6/F7 (5); requested supplemental V17 addresses added; product-code fixes 0 | claude -p; claude-opus-5-5; requested high | NO_NEW_CRITICAL_MAJOR; CONVERGED; F2's missing-coverage premise rejected with existing version-reanalysis evidence; F4 banked; final light checks recorded below |
 
-For every future Reviewer A round, adjudicate every finding in a ledger-only
-turn and yield before remediation. Track product-code versus test-only fixes
+For a further blocking Reviewer A round, adjudicate every finding in a ledger-only
+turn and yield before remediation. A terminating clean round can combine its
+adjudication and one cleanup when the dispatcher orders it, as in turn 13.
+Track product-code versus test-only fixes
 (product changes prohibited here), evidence names, reopened findings and depth.
 At round 5 and every five thereafter, yield for the dispatcher's continuation
 ruling; evaluate depth near 200K and stop at a step boundary near 250K.
@@ -451,7 +454,8 @@ ruling; evaluate depth near 200K and stop at a step boundary near 250K.
 | 9 / T8; session 4 starts | `01a1968e-ac9f-7f81-aecc-78a4b492c479` | 91,630 | committed `84a030a1` (0 CR); seat format check and both GUI nodes pass |
 | 10 / T8 seat result and T9 | `01a1968e-ac9f-7f81-aecc-78a4b492c479` | 147,709 | committed `f9b0fa34` (0 CR); seat ruff/format clean; Reviewer A round 1 returned 1 major, 2 minor, 5 advisories |
 | 11 / Reviewer A round 1 adjudication; session 4 retires | `01a1968e-ac9f-7f81-aecc-78a4b492c479` | 191,275 | committed `6d8689b3`; retired at the evaluation point before multi-finding remediation; fresh session 5 starts T12 |
-| 12 / Reviewer A round 1 remediation; session 5 starts | pending dispatcher | pending dispatcher | tests/support remediation and ledger; yield for GUI/GPU seat run, F3 reconciliation and Reviewer A round 2; evaluate near 200K, stop near 250K at a step boundary |
+| 12 / Reviewer A round 1 remediation; session 5 starts | session 5; id pending dispatcher | 118,369 | committed `5f75a03a` before rebase; seat GUI/GPU 3 passed; F3 ruled closed; WP-D54 accepted and branch rebased to `f059b2e0`; R2 converged |
+| 13 / Reviewer A round 2 adjudicated, terminating cleanup | session 5; id pending dispatcher | pending dispatcher | owned tests/support cleanup and ledger; yield before T10, Reviewer B and three-leg gate; evaluate near 200K, stop near 250K at a step boundary |
 
 Next authorized build group after rulings: T2 support + photo RED, then yield.
 Later yields remain after T4, T6, T8, every adjudicated review round, and before
@@ -2514,3 +2518,218 @@ Return summary counts and the recorded pre-encode/decoded CPU-GPU values,
 provisional/original difference, and mutation controls. Yield after this
 remediation; the dispatcher owns the F3 ruling, seat runs, commit and
 Reviewer A round 2. T10 waits for its authorized boundary.
+
+## Session 5 / Turn 13: round 2 adjudicated, terminating clean-up
+
+### Carried seat results, rebase and depth
+
+Dispatcher-supplied depth after turn 12: **118,369** input tokens, session
+5, window 475,000. The depth table records it; this turn's depth and the
+session id remain for the dispatcher to fill. Turn 12 committed as
+**5f75a03a** before the dispatcher rebase (patch-id unchanged). The current
+starting HEAD is **f059b2e0**, rebased onto accepted main **4ece5183**,
+which includes WP-D54 and WP4.6. The dispatcher ran the previously red
+`test_v6_untagged_runner_warns_bt709_limited`: **1 passed**. T6-1 is now
+GREEN; no local product fix or assertion weakening was made.
+
+CHARC **c39cc00d** closes round-1 F3 **REJECTED-WITH-RULING** and withdraws
+the contrary F3 sentence in f6252e0b. **8276adb5** governs: attempts with
+no surviving temporary are recorded/retried; after 20 such attempts the
+node skips `not observable at this size`. The code follows that rule and
+is not changed on F3. The current round ledger row replaces the prior
+HOLD; historical turn-12 notes describe only that turn's disposition.
+
+Returned turn-12 RUN REQUEST, on 5f75a03a at about **2026-11-01 17:50Z**,
+offscreen QPA, PYTEST_ADDOPTS unset: exit **0**, **3 passed in 86.69 s**,
+no skip. This is dispatcher seat evidence, not a sandbox hardware run.
+Read only its returned XML properties for exact values, summarized in
+work/wp5.1/**t13-seat-summary.log**; original evidence remains
+**t12-seat.log/xml**.
+
+| Seat node | Call seconds | Recorded result |
+|---|---:|---|
+| T7 GPU N10 | 12.10 | 45 rendered pts, devices ['cuda:0'], repeat digests identical, files byte-identical True; CPU/GPU PRE-encode max 6.556510925292969e-07, mean 7.77701347100514e-08; both above-max/above-mean controls rejected; decoded first frames equal, max 0.0 |
+| V6 real untagged shell | 0.34 | absent warning, either missing word and uppercase-only LIMITED rejected |
+| V18 real trim shell | 70.98 | provisional/original max 73/255; uncorrected provisional copy rejected; post-analysis change max 3/255, mean 0.5784706147119342/255 |
+
+These figures verify the round-1 GPU/V18 changes at the seat. No GUI,
+GPU, footage or fullclip node is run by this cell this turn.
+
+### Reviewer A round 2 packet and convergence
+
+Read the external **r2/review.txt**, **review-prompt-r2.md** and
+**review.seat.log** read-only, in place; none copied into the repository.
+The dispatcher confirms exit **0**, model **claude-opus-5-5**, effort
+requested **high**, is_error **false**, **36** turns, worktree clean,
+and verdict **NO_NEW_CRITICAL_MAJOR** on f059b2e0 against 4ece5183.
+The seat log records 2 permission denials; the reviewer reports the
+loop retry through uv run python. These do not silence the executed
+light path: **34 passed, 2 deselected in 108.09 s**. The reviewer also
+reports the unmarked parallel nodes **15 passed in 2.86 s**, and three
+isolated real crash passes. These are reviewer measurements, not new
+cell runs. CLI version is not supplied and is not inferred from model.
+
+Round 2 counts: **Critical0 / Major0 / Minor2 / Advisory5**;
+all 7 in envelope, NEW7/REOPENED0, reverts0. Minor 1 is accepted and
+fixed; minor 2's missing-coverage premise is rejected with direct source
+evidence, while its two requested supplemental addresses are still added.
+Advisories 3/5/6/7 are accepted/fixed; advisory 4 is banked. All changes
+are tests/support, **product-code fixes0**. Round 1 counts remain
+C0/Major1/Minor2/Advisory5, its fixes verified and F3 rejected by ruling.
+
+**Reviewer A CONVERGED at round 2**: no new critical or major finding.
+Per the turn-13 dispatch, adjudication and this one terminating cleanup
+share a turn; no new review round is opened for these minors/advisories.
+Reviewer B and the final three-leg gate remain the dispatcher's next nets.
+
+### Finding-by-finding adjudication and cleanup
+
+**R2-1 [MINOR, ACCEPTED, in envelope, NEW, EXECUTED].**
+Reproduced the reviewer's exact in-process mutant
+`sys._base_executable = sys.executable`, restoring the venv launcher.
+The first pre-change run happened to fail the existing writes-stopped
+witness (**1 failed in 1.79 s**); the second **PASSED in 1.91 s**, proving
+the witness does not reliably pin the chosen interpreter. This confirms
+the finding despite the stochastic first result. The two baseline logs
+are **t13-mutant-before.log/xml** and **t13-mutant-before2.log/xml**.
+
+The runner command's -c prologue now writes **os.getpid()** to
+**writer.pid** under each attempt root BEFORE importing the unchanged
+shipped runner. After kill/wait and before any end-state inspection,
+the crash node requires that PID equal **process.pid** and records
+`attempt_NN_writer_pid_matches_popen = True`. The import probe now
+compares resolved **clearwater.__file__** with the parent's, and the
+parent is itself required to resolve to this worktree's
+**src/clearwater/__init__.py**. Absolute package paths are compared as
+arguments, never emitted in the new record; the property records only
+`same worktree clearwater.__file__`. The existing writes-stopped witness
+and all D85 cleanup/source-identity checks remain in place.
+
+**RED with the new regression check:** the SAME launcher mutant now
+fails deterministically at
+`crash kill target is not the writing interpreter`, writer PID **36484**
+versus Popen PID **23496**: **1 failed in 1.87 s**. Evidence
+**t13-mutant-after.log/xml**. Its exit 1 and failure name were checked;
+this is the intended RED, not an unrelated import error.
+
+**GREEN:** real crash node **15/15 isolated runs passed**, zero errors,
+failures or skips, summed pytest suite times **30.422 s** (not loop wall
+time or gate delta). Successful attempt counts, in trial order:
+**1,1,1,1,1,1,2,1,1,1,1,1,1,2,2**. All attempts record matching PIDs and
+stable outputs; every run records the matching worktree package. The
+three second-attempt successes follow CHARC's surviving-temporary rule,
+and are recorded for T10 rather than hidden. No new SKIP or flaky failure.
+Evidence: **t13-crash-01.log/xml** through **t13-crash-15.log/xml**,
+**t13-crash-repeat.log**, **t13-crash-summary.log**. The XML reader checks
+every package/PID/stability witness, not just the runner's exit code.
+
+**R2-2 [MINOR, REJECTED missing-coverage premise, in envelope, NEW,
+REASONED with source confirmation; requested traceability enhancement applied].**
+The matrix already lists
+`test_wp42_video_path.py::test_v17_a_reopen_skips_the_decode_and_renders_the_same_frames`.
+At that function's **:519-524**, it renames the complete entry to a
+different cache_version, requires removal on reopening, runs a third
+export, and asserts **third.decodes == [2]**. Thus version-mismatch
+re-analysis is already tested AND traced, as the turn-11 ledger noted;
+the claim that V17 lacks its second half is false. The cheap independent
+probe confirms that the two supplemental addresses themselves were
+absent, which is true but not missing clause coverage.
+
+As expressly requested, add both existing addresses to V17 anyway:
+`test_cache_store.py::test_other_versions_and_unreadable_entries_are_removed_when_opening`
+and `test_cache_jpeg.py::test_the_format_number_was_bumped_and_a_format_1_entry_is_removed_when_opening`.
+These additionally trace cache-format invalidation; no existing test is
+edited or duplicated. Actual traceability plus both existing cache nodes
+pass **3 in 0.87 s**, with the sandbox shim, evidence **t13-trace.log/xml**.
+
+**R2-3 [ADVISORY, ACCEPTED, in envelope, NEW, EXECUTED].**
+The old helper's real child reports **user_site_enabled True** while
+resolving the same parent package (cheap independent probe in
+**t13-adjudicate.log**). The helper now starts with **-I -S**: -I
+disables user-site/environment processing and -S also prevents automatic
+base-site .pth execution before the explicit sys.path restoration.
+No new dependency or OS-specific branch. A real child asserts
+sys.flags.isolated/no_user_site/no_site and resolves the same worktree
+clearwater package; it passes. A wrong expected package path fails by
+`real interpreter imported a different clearwater package` (exit 1).
+Evidence **t13-import-probe.log**. The 15 real crash passes also prove
+the venv dependencies remain reachable through the restored paths.
+
+**R2-4 [ADVISORY, BANKED, in envelope, NEW, REASONED]:** pytest import paths are intentionally retained to reach this venv; tools is explicitly prepended before the runner loads, no collision is observed, package identity is now asserted, and a pristine script-start sys.path is not claimed.
+
+**R2-5 [ADVISORY, ACCEPTED, in envelope, NEW, EXECUTED].**
+Before cleanup, patching a real referenced module's __file__ to a
+same-named file under work/wp5.1 still passes the entire matrix check
+(**t13-adjudicate.log**). The traceability helper now requires every
+imported module's resolved __file__ equal the referenced
+**tests/<module>.py**, in addition to its function/name/module checks.
+The committed node patches the file location under tmp_path and requires
+rejection by `module file differs from the referenced test file`.
+The actual node and control pass in the three-node trace run; its
+existing stale-address control also still passes.
+
+**R2-6 [ADVISORY, ACCEPTED control-coverage observation, in envelope,
+NEW, EXECUTED].** The existing runner warning assertion already rejects
+each single missing word and uppercase-only LIMITED (independent direct
+helper probes), so there is no weakened product assertion. Add those
+three cases beside the empty-list control in the real runner node,
+matching the shell's controls. The literal BT.709/limited assertion is
+unchanged. The changed node is included in the whole-light run.
+
+**R2-7 [ADVISORY, ACCEPTED, in envelope, NEW, REASONED with source search].**
+Independent rg over tests/tools finds only the definition of
+**run_subprocess**, no caller. Remove it. The real crash still launches
+the shipped runner through runner_command; no process-boundary coverage
+is removed. After cleanup rg finds no occurrences (exit 1, meaning no
+matches), recorded in **t13-dead-helper-search.log**.
+
+### Verification and boundary
+
+Actual whole-light command (Git Bash form; executed with the same arguments
+from PowerShell with PYTHONPATH=scripts):
+
+```bash
+PYTHONPATH=scripts uv run pytest -q -rs tests/test_v51_photo_acceptance.py tests/test_v51_video_acceptance.py tests/test_v51_shell_acceptance.py tests/test_v51_traceability.py --basetemp=work/wp5.1/t13-light-tmp -p sandbox_mkdir_shim -p no:cacheprovider -m "not gpu and not footage and not gui and not fullclip" --durations=0 -o junit_family=xunit1 --junitxml=work/wp5.1/t13-light.xml > work/wp5.1/t13-light.log 2>&1
+```
+
+Exit **0**, **34 passed, 4 deselected in 114.78 s**, no failures, errors
+or skips. T6-1's actual runner node is GREEN after WP-D54, including all
+four warning controls. The reviewer's two rather than four deselections
+are because its command omits the shell module. The total roster remains
+**38** instances; no test function or marker was added or removed.
+
+| Final check | Actual result / evidence under work/wp5.1 |
+|---|---|
+| Launcher mutant with new PID check | t13-mutant-after.log/xml: expected exit 1, named PID assertion; 1 failed in 1.87 s |
+| Same worktree package / isolated startup | t13-import-probe.log: real child exit 0; wrong expected package rejected by name with exit 1 |
+| Crash node, 15 isolated runs | t13-crash-summary.log: 15 passed / 0 failed / 0 skipped; all package, PID and stability witnesses present; summed suite seconds 30.422 |
+| Traceability and two added existing V17 nodes | t13-trace.log/xml: 3 passed in 0.87 s, including wrong-module-file and stale-node controls |
+| All WP5.1 light nodes | t13-light.log/xml: 34 passed / 4 deselected in 114.78 s |
+| Ruff on support and all four new test modules | t13-ruff.log: exit 0, All checks passed! |
+| Mypy, configured src/clearwater and tools scope | t13-mypy.log: exit 0, Success: no issues found in 148 source files (rebased tree) |
+| Owned-file formatting | t13-format.log: 3 files reformatted / 1 unchanged; seat owns format --check |
+| Changed-file bytes and whitespace | t13-lf.log: every changed file 0 CR, final LF; t13-diff-check.log: diff --check exit 0 |
+
+Verification loop: independently confirmed the intermittent mutant escape,
+user-site startup, missing module-file guard and sparse warning controls;
+fixed those and removed the unused helper. Rejected the V17 missing-half
+claim using its existing version-mismatch re-analysis assertions, while
+adding the expressly requested supplemental addresses. Banked the retained
+harness sys.path limitation in one line above. After the cleanup, the
+deterministic launcher RED and package mismatch control fail for their
+named reasons; all legitimate local runs pass. The final diff and run
+summaries reveal no additional finding in this verification pass.
+
+Changed files are only acceptance_support.py, the owned photo/video/
+traceability modules and this ledger. The shell module, every existing
+package test, product/tool/fixture/dependency/config file, register and
+git metadata are unchanged. Scratch programs and every runner log/XML
+are under work/wp5.1, with test writes under tmp_path. No footage-folder
+read, other-worktree access, GUI/GPU/footage/fullclip run, mailbox post,
+commit, stash or rebase by the cell. No new STOP or run request.
+
+Yield at the requested boundary **before T10**. Reviewer A is converged
+at round 2 with this terminating cleanup; T10 is the next turn. Reviewer B,
+the final parallel + serial + ONE fullclip gate, collection identity,
+and the actual serial-leg delta against the 300 s allowance remain at
+the dispatcher's seat and are not claimed as completed here.
