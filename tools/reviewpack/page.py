@@ -67,6 +67,7 @@ def write_page(
     presets: Mapping[str, Mapping[str, Any]],
     *,
     roots: OutputRoots,
+    sheet_message: str = "",
 ) -> Path:
     """Write the grouped CP5 page with escaped labels and pack-relative links.
 
@@ -74,6 +75,7 @@ def write_page(
         items: Persisted item results.
         presets: Product-exported preset objects.
         roots: Pack and source roots.
+        sheet_message: Safe explanation if the existing owner sheet was retained.
 
     Returns:
         The written index path.
@@ -97,6 +99,11 @@ def write_page(
         "<p>Source is on the left; corrected is on the right. Photo source views use the "
         "product's neutral export with the same orientation, ICC handling and bit depth. "
         "Each pair clip is a viewing aid; the linked product output is the item of record.</p>",
+        "<p>Sheet entries use exact lowercase values with no surrounding spaces: "
+        "blank means unjudged; yes, no and undecided count as judged; "
+        "only yes counts as preferred. A viewing_aid_failed flag is shown when a viewing aid "
+        "could not be built. Those rows keep the linked product output and count normally "
+        "when judged.</p>",
         "<p>Pair viewing aid encoding: NVENC HEVC, p5/hq, VBR CQ 20 with no bitrate target. "
         "CPU fixture controls use libx265 ultrafast. Product exports keep shipped defaults.</p>",
         "<p>Limit: run commands from the worktree root; invocation from another working "
@@ -104,6 +111,8 @@ def write_page(
     ]
     if (roots.allowed / "review-sheet.csv").is_file():
         parts.append(_link("", "review-sheet.csv", "Owner review sheet (CSV)"))
+    if sheet_message:
+        parts.append(f"<p>Sheet: {escape(sheet_message)}</p>")
     parts.extend(["<h2>Starter presets</h2>", f"<p>{PRESET_SENTENCE}</p>"])
     for name, preset in presets.items():
         parts.append(f"<h3>{escape(name)}</h3>" + _link("presets", name + ".json", name + ".json"))
@@ -151,14 +160,25 @@ def write_page(
                 parts.append(f"<p>Viewing aid: {escape(item['aid_message'])}</p>")
             parts.append("</article>")
     not_built = [
-        item for item in items if item["status"] in {"excerpt_failed", "failed", "pending"}
+        item
+        for item in items
+        if item["status"] in {"excerpt_failed", "failed", "pending", "not run", "cancelled"}
+        or item.get("viewing_aid_failed")
+        or item.get("aid_message")
     ]
     parts.append("<h2>Not built</h2>")
     for item in not_built:
+        aid_failed = item.get("viewing_aid_failed") or item.get("aid_message")
+        status = "viewing_aid_failed" if aid_failed else str(item["status"])
+        message = item.get("aid_message", "") if aid_failed else item.get("message", "")
         parts.append(
-            f"<p>{escape(str(item['source_name']))}: {escape(str(item['status']))} "
-            f"{escape(str(item.get('message', '')))}</p>"
+            f"<p>{escape(str(item['source_name']))}: {escape(status)} {escape(str(message))}</p>"
         )
+        if item["status"] == "done":
+            folder = "photos" if item["kind"] == "photo" else "clips"
+            parts.append(
+                _link(folder, item["corrected_name"], "Product: " + item["corrected_name"])
+            )
     parts.append("</html>")
     return roots.write_text(roots.allowed / "index.html", "\n".join(parts) + "\n")
 

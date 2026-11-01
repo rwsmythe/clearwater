@@ -25,6 +25,7 @@ HEADER = (
     *ARTIFACTS,
     "above_surface",
     "note",
+    "viewing_aid_failed",
 )
 HEADLINE = frozenset({"P-A", "V-S", "V-D", "V-P"})
 
@@ -33,14 +34,24 @@ def _read(path: Path) -> list[dict[str, str]]:
     expected = {item.stem: item for item in catalog() if item.group != "V-R"}
     seen: set[str] = set()
     rows = []
-    with path.open(encoding="utf-8-sig", newline="") as handle:
+    data = path.read_bytes()
+    try:
+        decoded = data.decode("utf-8-sig")
+    except UnicodeDecodeError as exc:
+        # Count CSV records, including a partially decoded quoted multiline cell.
+        # The sentinel also accounts for an error at the first byte of a new row.
+        prefix = exc.object[: exc.start].decode("utf-8")
+        number = sum(1 for _ in csv.reader(io.StringIO(prefix + "\ufffd", newline="")))
+        raise ValueError(f"row {number}: invalid UTF-8 encoding; save the sheet as UTF-8") from exc
+    with io.StringIO(decoded, newline="") as handle:
         reader = csv.DictReader(handle)
-        if tuple(reader.fieldnames or ()) != HEADER:
+        if tuple(reader.fieldnames or ()) not in {HEADER, HEADER[:-1]}:
             raise ValueError("sheet header must match the CP5 columns exactly")
         for number, raw in enumerate(reader, 2):
             if None in raw or any(value is None for value in raw.values()):
                 raise ValueError(f"row {number}: incorrect cell count")
             row = {key: str(value) for key, value in raw.items()}
+            row.setdefault("viewing_aid_failed", "")
             item = expected.get(row["item"])
             if (
                 item is None
@@ -67,12 +78,24 @@ def _read(path: Path) -> list[dict[str, str]]:
                 raise ValueError(f"row {number}: invalid corrected name")
             if row["preferred"] not in {"", "yes", "no", "undecided"}:
                 raise ValueError(f"row {number}: invalid preferred value")
-            for key in (*ARTIFACTS, "above_surface"):
+            for key in (*ARTIFACTS, "above_surface", "viewing_aid_failed"):
                 if row[key] not in {"", "yes"}:
                     raise ValueError(f"row {number}: invalid {key} value")
             seen.add(row["item"])
             rows.append(row)
     return rows
+
+
+def _available(item: Mapping[str, Any]) -> bool:
+    return bool(
+        item["status"] == "done"
+        and item["group"] != "V-R"
+        and (
+            item.get("reviewable", True)
+            or item.get("viewing_aid_failed")
+            or item.get("aid_message")
+        )
+    )
 
 
 def write_sheet(
@@ -89,25 +112,29 @@ def write_sheet(
         The sheet path.
     """
     roots.check(destination)
+    bom = destination.exists() and destination.read_bytes().startswith(b"\xef\xbb\xbf")
     old = _read(destination) if destination.exists() else []
     by_item = {row["item"]: row for row in old}
     current = {str(item["item"]): item for item in items}
     for existing_row in old:
         item = current.get(existing_row["item"])
-        if item is None or item["status"] != "done" or not item.get("reviewable", True):
+        if item is None or not _available(item):
             raise ValueError(
                 f"changed reviewable pair for {existing_row['item']}; owner sheet retained"
             )
     rows = list(old)
     for item in items:
-        if item["status"] != "done" or item["group"] == "V-R" or not item.get("reviewable", True):
+        if not _available(item):
             continue
         row = dict.fromkeys(HEADER, "")
         row.update({key: str(item[key]) for key in HEADER[:5]})
         previous = by_item.get(row["item"])
+        flag = "yes" if item.get("viewing_aid_failed") or item.get("aid_message") else ""
+        row["viewing_aid_failed"] = flag
         if previous is not None:
             if any(previous[key] != row[key] for key in HEADER[:5]):
                 raise ValueError(f"changed pair identity for {row['item']}; owner sheet retained")
+            previous["viewing_aid_failed"] = flag
         else:
             rows.append(row)
             by_item[row["item"]] = row
@@ -117,7 +144,7 @@ def write_sheet(
     writer.writerows(rows)
     temporary = destination.with_name(f".{destination.name}-{uuid.uuid4().hex}.tmp")
     try:
-        roots.write_text(temporary, buffer.getvalue())
+        roots.write_bytes(temporary, buffer.getvalue().encode("utf-8-sig" if bom else "utf-8"))
         roots.rename(temporary, destination)
     finally:
         if temporary.exists():
@@ -151,6 +178,7 @@ def tally(path: Path) -> dict[str, Any]:
             "fraction": preferred / judged if judged else 0.0,
             "artifacts": {key: sum(row[key] == "yes" for row in selected) for key in ARTIFACTS},
             "above_surface": sum(row["above_surface"] == "yes" for row in selected),
+            "viewing_aid_failed": sum(row["viewing_aid_failed"] == "yes" for row in selected),
         }
 
     return {
@@ -191,5 +219,6 @@ def format_tally(result: Mapping[str, Any]) -> str:
             "  "
             + ", ".join(f"{key}={values['artifacts'][key]}" for key in ARTIFACTS)
             + f", above_surface={values['above_surface']}"
+            + f", viewing_aid_failed={values['viewing_aid_failed']}"
         )
     return "\n".join(lines)

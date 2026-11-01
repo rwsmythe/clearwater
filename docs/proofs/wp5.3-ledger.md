@@ -354,7 +354,7 @@ DR-99 is handled only under its stated main-alone equivalence condition.
 | 0 (mapping, not Reviewer A) | 0 / 3 / 1 | 4 / 0 | 4 / 0 | 0 | none / none | R0-1..3 granted at turn 2; R0-4 resolved by CSV copy; uv Python probe exit 0 | 118,603 after turn 1 |
 | Session 2 / turn 3 (GREEN verification, not Reviewer A) | 0 / 6 / 0 | 6 / 0 | 6 / 0 | 0 | instrument fixes / regression additions | Six independently reproduced instrument gaps fixed; 70 nodes green; Reviewer A pending | 142,467 after turn 3 |
 | A1 (session 2 / turn 4 adjudication; turn 5 remediation) | 0 / 3 / 3; 6 advisory | 10 / 2 after adjudication | 12 / 0; accepted blocking 3 | 0 | turn 5: 10 instrument behavior fixes with regression controls; no src/ changes | Counted Claude pass; 10 ACCEPTED fixed under F1 ruling; F10 OUT/banked Limit; F11 REJECTED; ready for A2 | turn 3: 142,467; turn 4: 36,709 (dispatcher supplied) |
-| A2 (session 2 / turn 6, adjudication only) | 0 / 1 / 4; 8 advisory | 11 / 2 | 12 / 1 by distinct finding; F1 NEW path reopens R1 F1 pattern, A1 repeats rejected R1 F11 | 0 | none this turn; planned instrument behavior and regression changes, no src/ or frozen-interface changes | Counted claude -p pass; F1-F5 ACCEPTED with narrowed premises; A3/A7 FIX; A2/A5/A6 BANK; A1 REJECT; A4/A8 DECLINE code change | turn 5: 142,541; turn 6 dispatcher pending |
+| A2 (session 2 / turn 6 adjudication; session 3 / turn 7 remediation) | 0 / 1 / 4; 8 advisory | 11 / 2 | 12 / 1 by distinct finding; F1 NEW path reopens R1 F1 pattern, A1 repeats rejected R1 F11 | 0 | turn 7: seven accepted instrument behavior fixes and regression controls; zero src/ or frozen-interface changes | Counted claude -p pass; F1-F5 and A3/A7 FIXED under CHARC 0358beda; A2/A5/A6 BANK; A1 REJECT; A4/A8 DECLINE code change; ready for A3, not converged | turn 5: 142,541; turn 6: 198,059; turn 7 dispatcher pending |
 
 Subsequent Reviewer A turns adjudicate every finding, update this cumulative table
 and yield without remediation. Fixes belong to a separately dispatched turn.
@@ -369,7 +369,8 @@ At rounds 5, 10, ... STOP with the ledger for approval to continue under the fil
 | Session 2 / turn 3 / GREEN | fresh session; dispatcher to fill ID | 142,467 | Dispatcher supplied in turn 4; GREEN committed as f506b597. |
 | Session 2 / turn 4 / A1 adjudication | same session 2 | 36,709 | Dispatcher supplied in turn 5; adjudication committed as 0553d317. Figure is recorded verbatim despite its decrease from turn 3; no independent counter is available. |
 | Session 2 / turn 5 / A1 remediation | same session 2 | 142,541 | Dispatcher supplied in turn 6; remediation committed as 03731250. Session window 475,000; evaluate near 200K and stop near 250K remain binding. |
-| Session 2 / turn 6 / A2 adjudication | same session 2 | dispatcher pending | Ledger-only adjudication; no remediation, real-media run or convergence claim. |
+| Session 2 / turn 6 / A2 adjudication | same session 2 | 198,059 | Dispatcher supplied at turn 7; session 2 retired at the evaluation boundary before multi-finding remediation. |
+| Session 3 / turn 7 / A2 remediation | fresh session 3; dispatcher to fill ID | dispatcher pending | F1-F5, A3/A7 instrument fixes and RED/GREEN controls; YIELD for Reviewer A round 3. |
 
 Evaluate near 200K; stop at a step boundary near 250K. No self-estimated figures.
 
@@ -1267,3 +1268,165 @@ real-media RUN REQUEST, product/interface/config edit, mailbox post, commit/git
 mutation, footage read, other-worktree access or image judgement. Only this
 ledger changes. Final diff/LF/ownership checks are recorded before return.
 Turn6 YIELDS; turn7 owns the blocking RED and authorized instrument remediation.
+
+
+## Session 3 / Turn 7: round 2 remediation
+
+### Boundary, governing ruling and scope
+
+Session 2 retired at **198,059 depth_input_tokens** (dispatcher supplied), before
+this multi-finding remediation. This is fresh session 3 at dispatch HEAD
+5b8038db; its ID and turn-7 depth are for the dispatcher to fill. No depth is
+estimated. The round-2 finding counts and NEW/REOPENED classifications remain
+unchanged in the cumulative table above; this is a remediation turn, not another
+review round. Reviewer A round 3 is next at the dispatcher's seat.
+
+CHARC **0358beda** governs the fixes. In particular, its F1 replaces the earlier
+planned row exclusion: a successful product export retains its sheet row even
+when its viewing aid fails. Its F3 replaces the earlier planned record rewrite:
+the runner's original group JSON is never rewritten. The historical turn-6
+adjudication evidence above describes the old candidate and its initial plan;
+the implemented dispositions below are the current contract.
+
+This turn bundles the five accepted findings and two accepted advisories into
+one logical review remediation, as commissioned. All code changes are inside
+owned tools/reviewpack files and tests/test_reviewpack.py. No product module,
+frozen interface, runner, shared helper, fixture, existing foreign test,
+dependency, local configuration or harness file was edited.
+
+### Per-finding RED / GREEN and final behavior
+
+All outputs below are in this worktree's ignored **work/wp5.3/turn7/**. Every
+pytest invocation sets PYTHONPATH=scripts and enables sandbox_mkdir_shim with
+-p no:cacheprovider and a unique work/wp5.3/turn7/*-tmp basetemp. Logs and JUnit
+are retained locally; the external review.txt was read in place and not copied.
+
+| Finding | Observed RED before its fix | Implemented fix and GREEN evidence |
+|---|---|---|
+| F1 MAJOR / in | f1-red.log/.xml: 4 failed, 92 deselected, 1.35 s. Photo and video pieces incorrectly return 0; an existing answered failed-aid row is refused; a sheet identity error prevents current HTML from being written. | Product status stays done. A failed aid sets viewing_aid_failed=True and the safe aid_message; the row stays on the sheet with viewing_aid_failed=yes. The original corrected output is linked both in its group and under Not built with the aid message. photos/clips/all exit 1 for attempted failures and continue later items. page writes known failures and returns 1; --check remains link-only. Sheet identity errors retain owner bytes and still produce the current page and an escaped sheet notice. f1-f4-green.log: all 6 F1/F4 controls pass, 1.45 s. |
+| F2 MINOR / in | minors-red.log/.xml: BOM rebuild drops the BOM; non-UTF-8 rows 1/2/3 lack row and UTF-8 context. The no-BOM multiline control also independently exposes LF -> CRLF mutation inside the owner's note. | Existing BOM presence is preserved; replacement CSV is encoded once and atomically written as bytes with LF row delimiters. Quoted Unicode and multiline notes survive exactly. UTF-8 stays strict; invalid decoding reports the logical CSV row and UTF-8 encoding, including after a multiline cell; no CP1252 inference. All five F2 controls pass in minors-green.log. |
+| F3 MINOR / in | Same RED run: harmless EXIF/GPS messages are withheld, and _invoke changes the original runner record bytes. | Known static metadata diagnostics are preserved; parenthesized value details or unclassifiable value-bearing fragments become [withheld]. If the value boundary is uncertain, the whole line is withheld. Only pack-facing projections/logs are filtered; runner records stay byte-for-byte as emitted, including their supplied warning/failure strings, per 0358beda. One boundary test proves unchanged noncanonical JSON bytes plus a safe pack result/log. Five text cases and that boundary pass in minors-green.log; verification refinements below also pass. |
+| F4 MINOR / in | f4-red.log: 2 failed, 96 deselected, 3.02 s. An earlier V-S excerpt failure makes a clean later V-R refusal piece return 1; a pending page claims all 128 items accounted for. | Media exit/count scope is this invocation's selected/attempted items only. Expected HLG refusals are accounted without failure; old unrelated failures do not poison later clean pieces. page reports pack-wide known failures; pending-only pages return 0. Pending inventory is shown separately and never counted as accounted. The 6-node F1/F4 GREEN run also verifies link-only page --check. |
+| F5 MINOR / in | Four minors-red nodes map not run/cancelled to failed, with absent or supplied messages. | Preserve each runner state word and supplied reason. If absent, say runner reported <state>; no further reason was supplied. Both states appear under Not built, have no review row, and cause their attempted piece to fail. Four mapping/page/sheet controls pass in minors-green.log. |
+| A3 ADVISORY / in | a3-red.log/.xml: 5 failed, 114 deselected, 2.22 s. Size extraction, partial pair encode, later browser conversion, second photo thumbnail and partial sRGB conversion each leak files. | Scoped ownership tracks only newly allocated aid paths before writers run. On failure, partial/temp/unreferenced files from that attempt are guarded and removed, stale result links reset; earlier aid files and product/source bytes stay unchanged. Scratch size and sRGB PNGs are always removed. Fresh naming preserves older successful aids. a3-green2.log: 5 passed, 114 deselected, 1.79 s. No directory-wide prune or pre-existing evidence deletion. |
+| A7 ADVISORY / in | minors-red page instruction control fails: blank/undecided/case/flag semantics are absent. | Page explains blank = unjudged; yes/no/undecided = judged; only yes = preferred; exact lowercase and no surrounding spaces. Failed-aid rows count normally when judged. Control passes in minors-green.log. |
+
+The combined minors RED was **16 failed, 98 deselected in 1.45 s**, exit 1;
+its GREEN was **16 passed, 98 deselected in 0.88 s**, exit 0. All failures
+listed as RED above are expected behavior failures, not collection errors.
+
+**D65 counting:** viewing_aid_failed is an instrument-owned sheet column,
+appended after note, with blank/yes values. A judged flagged row counts exactly
+like every other judged row: yes adds to preferred and judged; no or undecided
+adds only to judged. An unjudged flagged row remains available without adding a
+vote. Per-group/headline/candidate summaries show the flag count; the required
+headline line remains `headline: <preferred>/<judged> = <pct> %  (D65 bar 80 %)`.
+The preserved-answer control proves 1 yes + 1 flagged no => 1/2 = 50.0 %, with
+available=2, missing=113 and viewing_aid_failed=1. Original exact CP5 headers
+remain readable and migrate to the appended flag without losing owner answers;
+other malformed headers are still rejected. No preference or artifact judgement
+is made by this instrument or cell.
+
+A1 remains REJECTED; A2/A5/A6 remain BANKED; A4/A8 remain declined as code
+changes, exactly as adjudicated. No new general whole-clip override, malformed-ICC
+support, matrix-name expansion or permissive CSV scoring was added.
+
+### Named contract/control adaptation step
+
+Full run **full1.log/.xml** observed **115 passed / 4 failed in 29.93 s**.
+The following four existing checks needed a separately named contract/control
+adaptation; no other existing assertion was removed or relaxed:
+
+1. Empty tally's verdict guard used substring `fail`, which now matches the
+   required `viewing_aid_failed` field. Match standalone verdict words instead;
+   retain zero-judged/zero-preferred and exact headline assertions.
+2. The malformed-header case removed the last column. After appending the flag,
+   that is the valid original header. Remove the mandatory preferred column
+   instead; retain strict header refusal. A separate original-header migration
+   control proves preservation and the new flag.
+3. The interrupted-write control hooked OutputRoots.write_text. F2 now uses
+   write_bytes to preserve BOM and note newlines; move the interruption to that
+   actual boundary and still write partial bytes, raise OSError, and assert the
+   original owner file is unchanged.
+4. The prior excerpt-failure test expected page exit 0. CHARC's generalized loud
+   failure policy requires page exit 1. Change only that expected status; retain
+   all record/skip/no-submission/no-output/later-refusal/HTML/no-vote assertions.
+
+**contract-green.log:** 7 passed, 112 deselected in 1.84 s, exit 0.
+This is an explicit contract and injection-boundary correction, not a change to
+expected pixels, packet identities, scores or source preservation.
+
+### Verification loop: suspect / confirm independently / fix / repeat
+
+1. **Confirmed / fixed, F2 follow-through [MINOR]:** the no-BOM multiline
+   regression independently showed Path.write_text translating a note's embedded
+   LF into CRLF on Windows. The byte writer needed for BOM preservation also
+   prevents that mutation; both original assertions now pass unchanged.
+2. **Confirmed / fixed, F3 boundary [MINOR]:** inspection suspected an ambiguous
+   semicolon could separate an EXIF label from its value. Three independent text
+   controls were RED in verification-red.log (3 failed / 119 deselected in 0.31 s):
+   `EXIF GPSLatitude; 21.3` leaked its trailing value; parenthesized details lost
+   an otherwise static diagnostic; a filename-prefixed static message was
+   over-withheld. Withhold an uncertain whole line, redact known parenthesized
+   details locally, and recognize a safe filename prefix. verification-green.log:
+   all 9 metadata/boundary nodes pass in 0.14 s, including prior controls.
+3. **Confirmed / fixed, mechanical:** first A3 edit had an indentation error
+   because a code transformation matched the earlier excerpt-cleanup if block.
+   a3-green.log records the collection error (no test result claimed). Restore
+   that unchanged block from HEAD and scope the transform to make_pair;
+   a3-green2 is green. Ruff initially found 14 style violations, then one raw
+   regex annotation; format owned files and correct it. Mypy found one Any/None
+   return in _available; explicitly return bool. Final checks below are clean.
+4. **Rejected mechanical audit assumption (false positive):** the first
+   scope-lf-audit.log wrongly demanded a Returns section on the existing
+   validate_stream_copy -> None function. Its Google-style Args/Raises docstring
+   is present; no code/docstring fix is warranted. Limit that assertion to
+   value-returning functions. scope-lf-audit-final.log exits 0 and checks all
+   public instrument docstrings, all five changed paths, zero CR and whitespace.
+5. **No new finding:** full final run plus scoped diff, docstrings/comments,
+   output guards, preservation controls, import/dependency and LF review found
+   no further issue. No further finding, revert or product defect this
+   turn. Existing rejected/banked advisories retain their dispositions.
+
+### Final light verification / AD-30
+
+PowerShell sets PYTHONPATH=scripts; commands run from this worktree root:
+
+```text
+uv run pytest -q tests/test_reviewpack.py --basetemp=work/wp5.3/turn7/final-tmp -p sandbox_mkdir_shim -p no:cacheprovider -m "not gpu and not footage and not gui and not fullclip" --durations=0 --junitxml=work/wp5.3/turn7/final.xml
+uv run ruff check tools/reviewpack tests/test_reviewpack.py
+uv run ruff format --check tools/reviewpack tests/test_reviewpack.py
+uv run mypy
+```
+
+- **123 passed in 28.66 s**, exit 0; JUnit has zero failures/errors/skips.
+  Exactly one existing slow integration node remains (headless runner + FFmpeg),
+  **16.492 s** including setup/teardown. No new slow/GPU/footage/fullclip node.
+- Slowest parallel node: excerpt-copy-failure/continuation, **1.116 s** aggregate;
+  every parallel node is under 5 s. Per-node measured times are retained in
+  per-node-final.csv; summary.log joins counts, maximum times and exit files.
+- Ruff **All checks passed**, exit 0 (ruff-final.log/.exit); owned-file format
+  **6 files already formatted**, exit 0 (format-final.log/.exit); mypy
+  **Success: no issues found in 151 source files**, exit 0 (mypy-final.log/.exit).
+  Inherited VIRTUAL_ENV points outside this worktree; uv explicitly reports it
+  ignored and uses this project's .venv. No --active or other worktree access.
+- The sole slow control retains the commissioned --force-cpu product path and
+  existing automatic encoder behavior; its explicit-libx265 excerpt acceptance
+  control remains intact. New direct aid controls use software encoding; no
+  real NVENC-quality judgement or performance figure of record was run.
+- scope-lf-audit-final.log records only the five named owned paths, zero CR per changed
+  file, public instrument docstrings, and git diff --check success. No full
+  two-leg gate or whole-tree formatting check is claimed: those remain at the
+  dispatcher's seat after the reviews.
+
+**Locks and return:** only owned instrument/tests/ledger paths changed; every
+new aid write/remove uses OutputRoots checks inside the configured pack. All test
+sources are planted committed fixtures, and source/product preservation is
+asserted. No owner footage folder was opened, listed or probed; no main-tree
+work directory or other worktree was accessed; no local configuration was edited;
+no dependency, Qt import, OS-specific behavior, frozen/product/shared-helper
+change, commit, git mutation, mailbox post, image judgement or real-media run.
+Original runner record bytes are retained under the explicit R2 F3 ruling;
+pack state, page-facing messages and logs use sanitized projections. No STOP or
+open owner input this turn. Report and real-build RUN REQUESTs remain later
+ladder tasks. **YIELD for Reviewer A round 3.**

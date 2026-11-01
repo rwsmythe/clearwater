@@ -10,7 +10,8 @@ import sys
 import time
 import uuid
 from collections import Counter, defaultdict
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
+from contextlib import contextmanager
 from dataclasses import replace
 from fractions import Fraction
 from pathlib import Path
@@ -37,6 +38,46 @@ from lookcheck.frames import run_tool as run_tool
 from . import page, select, sheet
 
 
+def _metadata_text(line: str) -> str:
+    """Keep static metadata diagnostics; withhold unclassifiable value fragments."""
+    if not re.search(r"\b(?:EXIF|GPS)\w*\b", line, re.I):
+        return line
+    fragments = []
+    uncertain = False
+    unclassified_tail = False
+    for fragment in line.split(";"):
+        if not re.search(r"\b(?:EXIF|GPS)\w*\b", fragment, re.I):
+            fragments.append(fragment)
+            if not re.fullmatch(
+                r"\s*(?:it is not carried|orientation taken as 1)\.?\s*", fragment, re.I
+            ):
+                unclassified_tail = True
+            continue
+        # These value-free diagnostic forms carry no source tag contents. Unknown
+        # forms are withheld rather than trying to infer where a tag value ends.
+        candidate = re.sub(r"\([^()]*\)", "([withheld])", fragment)
+        skeleton = candidate.replace("([withheld])", "").strip()
+        static = re.fullmatch(
+            r"(?:[A-Za-z0-9_.-]+\.(?:HEIC|JPG|PNG|TIFF?|MOV|MP4):\s*)?"
+            r"(?:the )?(?:EXIF|GPS) (?:block|metadata|tags?) "
+            r"(?:is damaged|is missing|is absent|was not carried|is not carried|"
+            r"cannot be parsed|cannot be read|was dropped|is invalid)\.?",
+            skeleton,
+            re.I,
+        ) or re.fullmatch(
+            r"(?:no (?:EXIF|GPS) carried|BigTIFF cannot be read for EXIF)\.?", skeleton, re.I
+        )
+        if static:
+            fragments.append(candidate)
+        else:
+            uncertain = True
+            leading = fragment[: len(fragment) - len(fragment.lstrip())]
+            fragments.append(leading + "[withheld]")
+    if uncertain and unclassified_tail:
+        return "[withheld]"
+    return ";".join(fragments)
+
+
 def _safe_text(value: object, roots: OutputRoots) -> str:
     text = str(value)
     # Diagnostics are kept name-only even when an external tool quotes a path.
@@ -46,10 +87,7 @@ def _safe_text(value: object, roots: OutputRoots) -> str:
     text = re.sub(r"(?:[A-Za-z]:[\\/]|\\\\)[^\s\"'<>]+", "[path]", text)
     text = re.sub(r"(?<![\w])/(?:[^\s/\"'<>]+/)+([^\s/\"'<>]+)", r"\1", text)
     return (
-        "\n".join(
-            "[metadata diagnostic withheld]" if re.search(r"\b(?:GPS|EXIF)\b", line, re.I) else line
-            for line in text.splitlines()
-        )
+        "\n".join(_metadata_text(line) for line in text.splitlines())
         .encode("ascii", "backslashreplace")
         .decode("ascii")
     )
@@ -84,6 +122,31 @@ def _fresh(path: Path, roots: OutputRoots) -> Path:
         check_target(target, roots)
         counter += 1
     return target
+
+
+@contextmanager
+def _aid_files(
+    roots: OutputRoots, *, temporary: bool = False, result: dict[str, Any] | None = None
+) -> Iterator[Callable[[Path], Path]]:
+    """Track new aid paths only, removing scratch files and failed-attempt outputs."""
+    paths: list[Path] = []
+    completed = False
+
+    def create(path: Path) -> Path:
+        target = _fresh(path, roots)
+        paths.append(target)
+        return target
+
+    try:
+        yield create
+        completed = True
+    finally:
+        if temporary or not completed:
+            for path in reversed(paths):
+                roots.remove(path)
+        if not completed and result is not None:
+            result.update(source_thumb="", corrected_thumb="", pair_name="", stills=[])
+            result.pop("view_dimensions", None)
 
 
 def _probe(source: Path, *options: str) -> dict[str, Any]:
@@ -240,6 +303,8 @@ def read_runner_record(path: Path, *, group: str, roots: OutputRoots) -> list[di
         primary = [name for name in outputs if Path(name).suffix.lower() == suffix]
         done = raw["state"] in {"done", "done with warnings"}
         message = _safe_text(raw.get("failure") or "", roots)
+        if raw["state"] in {"not run", "cancelled"} and not message:
+            message = f"runner reported {raw['state']}; no further reason was supplied"
         if done:
             if len(primary) != 1:
                 raise ValueError("completed runner item has no unique product output")
@@ -257,7 +322,11 @@ def read_runner_record(path: Path, *, group: str, roots: OutputRoots) -> list[di
                 "source_view_name": "",
                 "status": "done"
                 if done
-                else ("refused" if group == "V-R" and "hlg" in message.lower() else "failed"),
+                else (
+                    raw["state"]
+                    if raw["state"] in {"not run", "cancelled"}
+                    else ("refused" if group == "V-R" and "hlg" in message.lower() else "failed")
+                ),
                 "message": message,
                 "warnings": [_safe_text(v, roots) for v in raw["warnings"]],
                 "device": _safe_text(raw.get("device") or "", roots),
@@ -684,87 +753,90 @@ def make_pair(
     Returns:
         Oriented source, corrected and rendered pair dimensions.
     """
-    target = check_target(destination, roots)
-    roots.mkdir(target.parent)
-    source_stream = _video(source)
-    sizes = []
-    # Decode with each input's default autorotate: actual display dimensions, not a
-    # handwritten interpretation of its matrix, determine whether hstack is safe.
-    for index, video in enumerate((source, corrected)):
-        frame = roots.allowed / "pairs" / f".size-{uuid.uuid4().hex}-{index}.png"
-        extract_view_frame(video, 0.0, frame, roots=roots)
-        with Image.open(frame) as image:
-            sizes.append(image.size)
-        roots.check(frame).unlink()
-    if sizes[0] != sizes[1]:
-        raise ValueError("source and corrected display dimensions differ")
-    width, height = sizes[0]
-    half_w, half_h = max(2, (width // 2) // 2 * 2), max(2, (height // 2) // 2 * 2)
-    tags = tags_from_stream(source_stream)
-    # Normalize SAR and start time in both halves. Keep the source's colour tags
-    # and frame rate; audio and metadata belong only to the product item of record.
-    scale = (
-        f"scale={half_w}:{half_h}:in_range={tags.color_range}"
-        f":out_range={tags.color_range}:in_color_matrix={tags.color_space}"
-        f":out_color_matrix={tags.color_space},setsar=1,"
-        f"settb={source_stream['time_base']},setpts=PTS-STARTPTS"
-    )
-    filters = (
-        f"[0:v:0]{scale},pad=iw+2:ih:0:0:white[left];"
-        f"[1:v:0]{scale}[right];[left][right]hstack=inputs=2:shortest=1[out]"
-    )
-    args = [
-        "ffmpeg",
-        "-nostdin",
-        "-hide_banner",
-        "-v",
-        "error",
-        "-y",
-        "-i",
-        str(source),
-        "-i",
-        str(corrected),
-        "-filter_complex",
-        filters,
-        "-map",
-        "[out]",
-        "-an",
-        "-sn",
-        "-dn",
-        "-map_metadata",
-        "-1",
-        "-c:v",
-        "libx265" if force_cpu else "hevc_nvenc",
-        "-pix_fmt",
-        "yuv420p",
-        "-fps_mode",
-        "passthrough",
-        "-enc_time_base",
-        "filter",
-        "-color_range",
-        tags.color_range,
-        "-colorspace",
-        tags.color_space,
-    ]
-    for flag, value in (
-        ("-color_trc", tags.color_transfer),
-        ("-color_primaries", tags.color_primaries),
-    ):
-        if value != "unknown":
-            args += [flag, value]
-    if force_cpu:
-        args += ["-preset", "ultrafast", "-x265-params", "log-level=error:pools=1"]
-    else:
-        args += ["-preset", "p5", "-tune", "hq", "-rc", "vbr", "-cq", "20", "-b:v", "0"]
-    args += ["-tag:v", "hvc1", "-movflags", "+faststart", str(target)]
-    done = run_tool(args, timeout=24 * 3600)
-    if done.returncode:
-        raise ValueError("pair viewing-aid encode failed")
-    result = _video(target)
-    pair_size = (int(result["width"]), int(result["height"]))
-    if pair_size != (half_w * 2 + 2, half_h):
-        raise ValueError("pair encode dimensions differ from planned display dimensions")
-    return {"source_size": sizes[0], "corrected_size": sizes[1], "pair_size": pair_size}
+    with _aid_files(roots) as create, _aid_files(roots, temporary=True) as scratch:
+        if destination.exists():
+            raise ValueError("pair destination already exists")
+        target = create(destination)
+        roots.mkdir(target.parent)
+        source_stream = _video(source)
+        sizes = []
+        # Decode with each input's default autorotate: actual display dimensions, not a
+        # handwritten interpretation of its matrix, determine whether hstack is safe.
+        for index, video in enumerate((source, corrected)):
+            frame = scratch(roots.allowed / "pairs" / f".size-{uuid.uuid4().hex}-{index}.png")
+            extract_view_frame(video, 0.0, frame, roots=roots)
+            with Image.open(frame) as image:
+                sizes.append(image.size)
+            roots.check(frame).unlink()
+        if sizes[0] != sizes[1]:
+            raise ValueError("source and corrected display dimensions differ")
+        width, height = sizes[0]
+        half_w, half_h = max(2, (width // 2) // 2 * 2), max(2, (height // 2) // 2 * 2)
+        tags = tags_from_stream(source_stream)
+        # Normalize SAR and start time in both halves. Keep the source's colour tags
+        # and frame rate; audio and metadata belong only to the product item of record.
+        scale = (
+            f"scale={half_w}:{half_h}:in_range={tags.color_range}"
+            f":out_range={tags.color_range}:in_color_matrix={tags.color_space}"
+            f":out_color_matrix={tags.color_space},setsar=1,"
+            f"settb={source_stream['time_base']},setpts=PTS-STARTPTS"
+        )
+        filters = (
+            f"[0:v:0]{scale},pad=iw+2:ih:0:0:white[left];"
+            f"[1:v:0]{scale}[right];[left][right]hstack=inputs=2:shortest=1[out]"
+        )
+        args = [
+            "ffmpeg",
+            "-nostdin",
+            "-hide_banner",
+            "-v",
+            "error",
+            "-y",
+            "-i",
+            str(source),
+            "-i",
+            str(corrected),
+            "-filter_complex",
+            filters,
+            "-map",
+            "[out]",
+            "-an",
+            "-sn",
+            "-dn",
+            "-map_metadata",
+            "-1",
+            "-c:v",
+            "libx265" if force_cpu else "hevc_nvenc",
+            "-pix_fmt",
+            "yuv420p",
+            "-fps_mode",
+            "passthrough",
+            "-enc_time_base",
+            "filter",
+            "-color_range",
+            tags.color_range,
+            "-colorspace",
+            tags.color_space,
+        ]
+        for flag, value in (
+            ("-color_trc", tags.color_transfer),
+            ("-color_primaries", tags.color_primaries),
+        ):
+            if value != "unknown":
+                args += [flag, value]
+        if force_cpu:
+            args += ["-preset", "ultrafast", "-x265-params", "log-level=error:pools=1"]
+        else:
+            args += ["-preset", "p5", "-tune", "hq", "-rc", "vbr", "-cq", "20", "-b:v", "0"]
+        args += ["-tag:v", "hvc1", "-movflags", "+faststart", str(target)]
+        done = run_tool(args, timeout=24 * 3600)
+        if done.returncode:
+            raise ValueError("pair viewing-aid encode failed")
+        result = _video(target)
+        pair_size = (int(result["width"]), int(result["height"]))
+        if pair_size != (half_w * 2 + 2, half_h):
+            raise ValueError("pair encode dimensions differ from planned display dimensions")
+        return {"source_size": sizes[0], "corrected_size": sizes[1], "pair_size": pair_size}
 
 
 def export_presets(*, roots: OutputRoots) -> dict[str, dict[str, Any]]:
@@ -882,16 +954,8 @@ def _invoke(
         + "\n",
     )
     if record.exists():
-        # The runner already emits names only. Apply the instrument's diagnostic
-        # policy as well, so metadata warnings never enter a CP5 evidence record.
-        document = json.loads(record.read_text(encoding="utf-8"))
-        for item_record in document.get("items", []):
-            if item_record.get("failure") is not None:
-                item_record["failure"] = _safe_text(item_record["failure"], roots)
-            item_record["warnings"] = [
-                _safe_text(warning, roots) for warning in item_record.get("warnings", [])
-            ]
-        _json_write(record, document, roots)
+        # CHARC R2 F3: retain the product's authoritative bytes; read_runner_record
+        # projects safe diagnostics into the pack state, sheet and HTML instead.
         results = read_runner_record(record, group=group, roots=roots)
         if len(results) != len(sources) or any(
             result["source_name"] != source.name
@@ -915,12 +979,11 @@ def _invoke(
 
 
 def _view_photo(result: dict[str, Any], roots: OutputRoots) -> None:
-    for role, key in (("source", "source_view_name"), ("corrected", "corrected_name")):
-        name = f"{Path(result[key]).stem}_{role}.jpg"
-        page.thumbnail(
-            roots.allowed / "photos" / result[key], roots.allowed / "thumbs" / name, roots=roots
-        )
-        result[f"{role}_thumb"] = name
+    with _aid_files(roots, result=result) as create:
+        for role, key in (("source", "source_view_name"), ("corrected", "corrected_name")):
+            target = create(roots.allowed / "thumbs" / f"{Path(result[key]).stem}_{role}.jpg")
+            page.thumbnail(roots.allowed / "photos" / result[key], target, roots=roots)
+            result[f"{role}_thumb"] = target.name
 
 
 def _browser_frame(path: Path, stream: Mapping[str, Any], roots: OutputRoots) -> None:
@@ -928,28 +991,29 @@ def _browser_frame(path: Path, stream: Mapping[str, Any], roots: OutputRoots) ->
     primaries = str(stream.get("color_primaries", "unknown"))
     transfer = str(stream.get("color_transfer", "unknown"))
     if primaries not in {"unknown", "unspecified"} and transfer not in {"unknown", "unspecified"}:
-        temporary = check_target(path.with_name(path.stem + "-srgb.png"), roots)
-        done = run_tool(
-            [
-                "ffmpeg",
-                "-nostdin",
-                "-v",
-                "error",
-                "-y",
-                "-i",
-                str(path),
-                "-vf",
-                f"zscale=primariesin={primaries}:transferin={transfer}:matrixin=gbr:"
-                "rangein=full:primaries=bt709:transfer=iec61966-2-1:matrix=gbr:range=full",
-                "-frames:v",
-                "1",
-                str(temporary),
-            ]
-        )
-        if done.returncode:
-            raise ValueError("video primary conversion for browser viewing failed")
-        roots.write_bytes(path, temporary.read_bytes())
-        roots.check(temporary).unlink()
+        with _aid_files(roots, temporary=True) as scratch:
+            temporary = scratch(path.with_name(path.stem + "-srgb.png"))
+            done = run_tool(
+                [
+                    "ffmpeg",
+                    "-nostdin",
+                    "-v",
+                    "error",
+                    "-y",
+                    "-i",
+                    str(path),
+                    "-vf",
+                    f"zscale=primariesin={primaries}:transferin={transfer}:matrixin=gbr:"
+                    "rangein=full:primaries=bt709:transfer=iec61966-2-1:matrix=gbr:range=full",
+                    "-frames:v",
+                    "1",
+                    str(temporary),
+                ]
+            )
+            if done.returncode:
+                raise ValueError("video primary conversion for browser viewing failed")
+            roots.write_bytes(path, temporary.read_bytes())
+            roots.check(temporary).unlink()
     # Tag only the normalized browser derivative; source/product metadata is untouched.
     profile = ImageCms.ImageCmsProfile(ImageCms.createProfile("sRGB")).tobytes()
     with Image.open(path) as image:
@@ -961,51 +1025,50 @@ def _browser_frame(path: Path, stream: Mapping[str, Any], roots: OutputRoots) ->
 def _view_video(
     result: dict[str, Any], source: Path, roots: OutputRoots, *, force_cpu: bool
 ) -> None:
-    corrected = roots.allowed / "clips" / result["corrected_name"]
-    pair = _fresh(roots.allowed / "pairs" / f"{result['item']}_pair.mp4", roots)
-    dimensions = make_pair(source, corrected, pair, roots=roots, force_cpu=force_cpu)
-    result["pair_name"] = pair.name
-    result["view_dimensions"] = dimensions
-    source_stream = _video(source)
-    corrected_stream = _video(corrected)
-    duration = min(source_stream["duration_s"], corrected_stream["duration_s"])
-    for fraction in (0.1, 0.5, 0.9):
-        wanted = duration * fraction
-        source_pts = _frame_time(source, wanted)
-        corrected_pts = _frame_time(corrected, float(source_pts))
-        if abs(source_pts - corrected_pts) > Fraction(1, 1000000):
-            raise ValueError("source and corrected viewing still PTS differ")
-        frames = []
-        for role, video, pts, stream in (
-            ("source", source, source_pts, source_stream),
-            ("corrected", corrected, corrected_pts, corrected_stream),
-        ):
-            frame = _fresh(
-                roots.allowed / "pairs" / f".{result['item']}-{role}-{fraction}.png", roots
+    with _aid_files(roots, result=result) as create:
+        corrected = roots.allowed / "clips" / result["corrected_name"]
+        pair = create(roots.allowed / "pairs" / f"{result['item']}_pair.mp4")
+        dimensions = make_pair(source, corrected, pair, roots=roots, force_cpu=force_cpu)
+        result["pair_name"] = pair.name
+        result["view_dimensions"] = dimensions
+        source_stream = _video(source)
+        corrected_stream = _video(corrected)
+        duration = min(source_stream["duration_s"], corrected_stream["duration_s"])
+        for fraction in (0.1, 0.5, 0.9):
+            wanted = duration * fraction
+            source_pts = _frame_time(source, wanted)
+            corrected_pts = _frame_time(corrected, float(source_pts))
+            if abs(source_pts - corrected_pts) > Fraction(1, 1000000):
+                raise ValueError("source and corrected viewing still PTS differ")
+            frames = []
+            for role, video, pts, stream in (
+                ("source", source, source_pts, source_stream),
+                ("corrected", corrected, corrected_pts, corrected_stream),
+            ):
+                frame = create(roots.allowed / "pairs" / f".{result['item']}-{role}-{fraction}.png")
+                extract_view_frame(video, float(pts), frame, roots=roots)
+                _browser_frame(frame, stream, roots)
+                frames.append(frame)
+                if fraction == 0.5:
+                    thumb = create(
+                        roots.allowed
+                        / "thumbs"
+                        / f"{Path(result['corrected_name']).stem}_{role}.jpg"
+                    )
+                    page.thumbnail(frame, thumb, roots=roots)
+                    result[f"{role}_thumb"] = thumb.name
+            target = create(roots.allowed / "pairs" / f"{result['item']}_{int(fraction * 100)}.jpg")
+            page.pair_still(frames[0], frames[1], target, roots=roots)
+            result["stills"].append(
+                {
+                    "name": target.name,
+                    "fraction": fraction,
+                    "source_pts_s": float(source_pts),
+                    "corrected_pts_s": float(corrected_pts),
+                }
             )
-            extract_view_frame(video, float(pts), frame, roots=roots)
-            _browser_frame(frame, stream, roots)
-            frames.append(frame)
-            if fraction == 0.5:
-                thumb = (
-                    roots.allowed / "thumbs" / f"{Path(result['corrected_name']).stem}_{role}.jpg"
-                )
-                page.thumbnail(frame, thumb, roots=roots)
-                result[f"{role}_thumb"] = thumb.name
-        target = _fresh(
-            roots.allowed / "pairs" / f"{result['item']}_{int(fraction * 100)}.jpg", roots
-        )
-        page.pair_still(frames[0], frames[1], target, roots=roots)
-        result["stills"].append(
-            {
-                "name": target.name,
-                "fraction": fraction,
-                "source_pts_s": float(source_pts),
-                "corrected_pts_s": float(corrected_pts),
-            }
-        )
-        for frame in frames:
-            roots.check(frame).unlink()
+            for frame in frames:
+                roots.check(frame).unlink()
 
 
 def _build_groups(
@@ -1108,11 +1171,18 @@ def _build_groups(
                     result["aid_message"] = _safe_text(exc, roots)
                     # Keep product success distinct from an incomplete viewing aid.
                     result["reviewable"] = False
+                    result["viewing_aid_failed"] = True
             for position, previous in enumerate(state["items"]):
                 if previous["item"] == item.stem:
                     state["items"][position] = result
                     break
         _json_write(roots.allowed / "records" / "pack.json", state, roots)
+
+
+def _failed(item: Mapping[str, Any]) -> bool:
+    return item["status"] in {"failed", "excerpt_failed", "not run", "cancelled"} or bool(
+        item.get("viewing_aid_failed") or item.get("aid_message")
+    )
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -1156,14 +1226,28 @@ def main(argv: Sequence[str] | None = None) -> int:
             if state_path.exists()
             else {"schema": 1, "items": [_pending(item) for item in select.catalog()]}
         )
+        attempted: set[str] = set()
         for stage in stages:
             if stage == "presets":
                 state["presets"] = export_presets(roots=roots)
             elif stage == "page":
-                sheet.write_sheet(state["items"], roots.allowed / "review-sheet.csv", roots=roots)
-                page.write_page(state["items"], state.get("presets", {}), roots=roots)
+                sheet_error = None
+                try:
+                    sheet.write_sheet(
+                        state["items"], roots.allowed / "review-sheet.csv", roots=roots
+                    )
+                except (ValueError, OSError) as exc:
+                    sheet_error = exc
+                page.write_page(
+                    state["items"],
+                    state.get("presets", {}),
+                    roots=roots,
+                    sheet_message=_safe_text(sheet_error, roots) if sheet_error else "",
+                )
                 if page.check_links(roots.allowed / "index.html", roots=roots):
                     raise ValueError("generated page contains unresolved links")
+                if sheet_error is not None:
+                    raise sheet_error
             else:
                 selected = _selection(args.manifest, roots)
                 selected = [
@@ -1181,13 +1265,22 @@ def main(argv: Sequence[str] | None = None) -> int:
                         item for item in state["items"] if item["source_name"] in names
                     ]
                 _build_groups(selected, state, roots, force_cpu=args.force_cpu)
+                attempted.update(item.stem for item in selected)
             _json_write(state_path, state, roots)
-        print(f"{args.stage}: completed; {len(state['items'])} items accounted for")
-        if args.stage in {"clips", "all"} and any(
-            item["status"] == "excerpt_failed" for item in state["items"]
-        ):
+        scope = [item for item in state["items"] if item["item"] in attempted]
+        if args.stage == "page":
+            scope = state["items"]
+        accounted = sum(item["status"] != "pending" for item in scope)
+        pending = sum(item["status"] == "pending" for item in state["items"])
+        failures = sum(_failed(item) for item in scope)
+        print(
+            f"{args.stage}: completed; {accounted} items accounted for; "
+            f"failed={failures}, pending={pending}"
+        )
+        if failures:
             print(
-                "reviewpack: excerpt failures recorded; see Not built on the page", file=sys.stderr
+                "reviewpack: build/viewing-aid failures recorded; see Not built on the page",
+                file=sys.stderr,
             )
             return 1
         return 0

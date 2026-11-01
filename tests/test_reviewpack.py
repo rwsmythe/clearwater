@@ -11,6 +11,7 @@ import csv
 import io
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -41,6 +42,7 @@ HEADER = (
     "flicker",
     "above_surface",
     "note",
+    "viewing_aid_failed",
 )
 ARTIFACTS = ("halos", "banding", "color_errors", "shimmer", "flicker")
 PRESET_SENTENCE = (
@@ -696,7 +698,8 @@ def test_tally_empty_sheet_is_zero_judged_without_verdict(roots: OutputRoots) ->
     assert result["headline"]["judged"] == result["headline"]["preferred"] == 0
     text = sheet.format_tally(result)
     assert "headline: 0/0 = 0.0 %  (D65 bar 80 %)" in text
-    assert not any(word in text.lower() for word in ("pass", "fail", "approved", "rejected"))
+    # The required viewing_aid_failed field is a status flag, never a quality verdict.
+    assert not re.search(r"\b(?:pass|fail|approved|rejected)\b", text.lower())
 
 
 def test_tally_filled_headline_candidates_artifacts_and_above_surface(
@@ -752,7 +755,7 @@ def test_tally_invalid_value_names_row(roots: OutputRoots, field: str, value: st
 def test_tally_refuses_malformed_sheet(roots: OutputRoots, fault: str) -> None:
     path = roots.allowed / "bad-shape.csv"
     if fault == "header":
-        _csv(path, [], header=HEADER[:-1])
+        _csv(path, [], header=tuple(key for key in HEADER if key != "preferred"))
     elif fault == "duplicate":
         _csv(path, [_row(_item()), _row(_item())])
     else:
@@ -1100,13 +1103,13 @@ def test_sheet_write_failure_preserves_original_answers(
     destination = roots.allowed / "review-sheet.csv"
     _csv(destination, [_row(_item(), preferred="yes")])
     before = destination.read_bytes()
-    original = OutputRoots.write_text
+    original = OutputRoots.write_bytes
 
-    def interrupted(self, target, text):
-        original(self, target, "partial")
+    def interrupted(self, target, data):
+        original(self, target, b"partial")
         raise OSError("planted write interruption")
 
-    monkeypatch.setattr(OutputRoots, "write_text", interrupted)
+    monkeypatch.setattr(OutputRoots, "write_bytes", interrupted)
     with pytest.raises(OSError, match="planted"):
         sheet.write_sheet([_item(), _item("IMG_6791", "P-Z")], destination, roots=roots)
     assert destination.read_bytes() == before
@@ -1296,7 +1299,7 @@ def test_excerpt_copy_failure_is_recorded_skipped_and_exits_nonzero(
     group = json.loads((roots.allowed / "records" / "V-S-excerpts.json").read_text())
     assert group["items"][0]["status"] == "excerpt_failed"
     assert not list((roots.allowed / "clips").glob("*.mp4"))
-    assert build.main(["page", *args]) == 0
+    assert build.main(["page", *args]) == 1
     html = (roots.allowed / "index.html").read_text()
     assert "Not built" in html and source.name in html and "planted mux failure" in html
     assert list(csv.DictReader((roots.allowed / "review-sheet.csv").open())) == []
@@ -1504,3 +1507,433 @@ def test_pair_preserves_variable_presentation_intervals(roots: OutputRoots) -> N
         return [p - pts[0] for p in pts]
 
     assert times(pair) == times(source)
+
+
+def _selection_args(roots: OutputRoots, items: list[dict]) -> list[str]:
+    """Plant config and a commissioned manifest without resolving real footage."""
+    config = roots.allowed / "control.toml"
+    config.write_text(
+        f"footage_path = {json.dumps(str(roots.footage))}\n"
+        f"working_path = {json.dumps(str(roots.allowed.parent))}\n",
+        encoding="utf-8",
+    )
+    manifest = roots.allowed / "selection.json"
+    manifest.write_text(
+        json.dumps(
+            [
+                {"name": item["source_name"], "group": item["group"], "kind": item["kind"]}
+                for item in items
+            ]
+        ),
+        encoding="utf-8",
+    )
+    return ["--config", str(config), "--manifest", str(manifest), "--force-cpu"]
+
+
+def _fake_product(argv, **kwargs):
+    """Replace only the expensive product subprocess, including its output/record writes."""
+    if argv[0] != "uv":
+        return media_tool(argv, **kwargs)
+    sources = [Path(value) for value in argv[4 : argv.index("--out")]]
+    folder = Path(argv[argv.index("--out") + 1])
+    suffix = argv[argv.index("--suffix") + 1]
+    document = None
+    records = []
+    for source in sources:
+        photo = source.suffix.lower() == ".jpg"
+        refused = source.stem == "IMG_6704"
+        output = source.stem + suffix + (".png" if photo else ".mp4")
+        record = _runner_record(
+            source.name, "" if refused else output, "Unsupported HLG transfer." if refused else None
+        )
+        record["items"][0]["kind"] = "photo" if photo else "video"
+        if not refused:
+            if photo:
+                Image.new("RGB", (16, 12), "blue").save(folder / output)
+            else:
+                shutil.copyfile(source, folder / output)
+        document = record
+        records.extend(record["items"])
+    assert document is not None
+    document["items"] = records
+    document["counts"] = dict(Counter(item["state"] for item in records))
+    Path(argv[argv.index("--record") + 1]).write_text(json.dumps(document), encoding="utf-8")
+    return subprocess.CompletedProcess(
+        argv, int(any(r["state"] == "failed" for r in records)), b"", b""
+    )
+
+
+@pytest.mark.parametrize("kind", ["photo", "video"])
+def test_done_item_with_failed_aid_is_loud(
+    roots: OutputRoots, monkeypatch: pytest.MonkeyPatch, kind: str
+) -> None:
+    """A failed aid must keep the product link and row while failing the attempted piece."""
+    first = _item() if kind == "photo" else _item("GX011604", "V-S", "video")
+    later = _item("IMG_6771") if kind == "photo" else _item("IMG_6704", "V-R", "video", "refused")
+    fixture = FIXTURES / (
+        "stills/jpeg/jpeg-gradient-srgb.jpg" if kind == "photo" else "video/hevc8-bt709-full.mp4"
+    )
+    for item in (first, later):
+        shutil.copyfile(fixture, roots.footage / item["source_name"])
+    args = _selection_args(roots, [first, later])
+    monkeypatch.setattr(build, "run_tool", _fake_product)
+    real_thumbnail = page.thumbnail
+
+    def fail_aid(*a, **kw):
+        if kind == "photo" and first["item"] not in a[0].name:
+            return real_thumbnail(*a, **kw)
+        raise ValueError("planted aid failure")
+
+    monkeypatch.setattr(
+        page if kind == "photo" else build,
+        "thumbnail" if kind == "photo" else "make_pair",
+        fail_aid,
+    )
+    assert build.main(["photos" if kind == "photo" else "clips", *args]) == 1
+    state = json.loads((roots.allowed / "records/pack.json").read_text())
+    failed = state["items"][0]
+    assert failed["status"] == "done" and failed["viewing_aid_failed"] is True
+    assert failed["aid_message"] == "planted aid failure"
+    assert state["items"][1]["status"] == ("done" if kind == "photo" else "refused")
+    assert build.main(["page", *args]) == 1
+    html = (roots.allowed / "index.html").read_text()
+    not_built = html.split("<h2>Not built</h2>")[1]
+    assert first["source_name"] in not_built and "planted aid failure" in not_built
+    assert (
+        f'href="{"photos" if kind == "photo" else "clips"}/{first["corrected_name"]}"' in not_built
+    )
+    assert page.check_links(roots.allowed / "index.html", roots=roots) == []
+    with (roots.allowed / "review-sheet.csv").open(encoding="utf-8-sig") as handle:
+        rows = list(csv.DictReader(handle))
+    assert rows[0]["item"] == first["item"] and rows[0]["viewing_aid_failed"] == "yes"
+    assert rows[0]["preferred"] == ""
+    # all must also finish its page and report the same attempted-item failure.
+    assert build.main(["all", *args]) == 1
+
+
+def test_judged_aid_failure_keeps_votes_and_counts_normally(roots: OutputRoots) -> None:
+    """The aid flag must never remove an available row or change D65's divisor."""
+    first, failed = _item(), _item("IMG_6771")
+    destination = roots.allowed / "review-sheet.csv"
+    _csv(destination, [_row(first, preferred="yes"), _row(failed, preferred="no", note="owner")])
+    failed.update(reviewable=False, viewing_aid_failed=True, aid_message="thumbnail failed")
+    sheet.write_sheet([first, failed], destination, roots=roots)
+    with destination.open(encoding="utf-8-sig") as handle:
+        rows = list(csv.DictReader(handle))
+    assert rows[1]["viewing_aid_failed"] == "yes" and rows[1]["note"] == "owner"
+    result = sheet.tally(destination)
+    assert result["headline"]["judged"] == 2 and result["headline"]["preferred"] == 1
+    assert result["headline"]["viewing_aid_failed"] == 1
+    assert result["headline"]["available"] == 2 and result["headline"]["missing"] == 113
+    text = sheet.format_tally(result)
+    assert "headline: 1/2 = 50.0 %  (D65 bar 80 %)" in text
+    assert "viewing_aid_failed=1" in text
+
+
+def test_page_lists_current_failures_even_when_sheet_identity_is_stale(roots: OutputRoots) -> None:
+    """A sheet preservation error must not hide the current item failure inventory."""
+    item = _item()
+    _plant_page_item(item, roots)
+    args = _selection_args(roots, [item])
+    destination = roots.allowed / "review-sheet.csv"
+    _csv(destination, [_row(item, preferred="yes")])
+    before = destination.read_bytes()
+    item.update(
+        corrected_name="IMG_6751_corrected_2.png",
+        viewing_aid_failed=True,
+        reviewable=False,
+        aid_message="current thumbnail failure",
+    )
+    (roots.allowed / "photos" / item["corrected_name"]).write_bytes(b"product")
+    (roots.allowed / "records").mkdir()
+    (roots.allowed / "records/pack.json").write_text(json.dumps({"schema": 1, "items": [item]}))
+    assert build.main(["page", *args]) != 0
+    assert destination.read_bytes() == before
+    html = (roots.allowed / "index.html").read_text()
+    assert "owner sheet retained" in html and "current thumbnail failure" in html
+    assert "current thumbnail failure" in html.split("<h2>Not built</h2>")[1]
+
+
+def test_clean_piece_does_not_inherit_old_failures(
+    roots: OutputRoots, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A saved failed group must not turn a later accounted HLG refusal into failure."""
+    failed = _item("GX011604", "V-S", "video", "excerpt_failed")
+    refused = _item("IMG_6704", "V-R", "video", "refused")
+    args = _selection_args(roots, [failed, refused])
+    shutil.copyfile(FIXTURES / "video/hlg.mp4", roots.footage / refused["source_name"])
+    records = roots.allowed / "records"
+    records.mkdir()
+    (records / "pack.json").write_text(json.dumps({"schema": 1, "items": [failed, refused]}))
+    monkeypatch.setattr(build, "run_tool", _fake_product)
+    assert build.main(["clips", "V-R", *args]) == 0
+    assert "1 items accounted for" in capsys.readouterr().out
+    # The rendered pack still reports its known failure, without running any item.
+    assert build.main(["page", *args]) == 1
+    assert build.main(["page", "--check", *args]) == 0
+
+
+def test_pending_pack_is_not_reported_as_accounted_for(
+    roots: OutputRoots, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """An initial page must distinguish pending inventory from completed attempts."""
+    args = _selection_args(roots, [_item()])
+    assert build.main(["page", *args]) == 0
+    text = capsys.readouterr().out
+    assert "0 items accounted for" in text and "pending=128" in text
+
+
+@pytest.mark.parametrize("bom", [False, True])
+def test_page_rebuild_preserves_existing_bom_and_unicode_answers(
+    roots: OutputRoots, bom: bool
+) -> None:
+    """Rebuilding the page must preserve the owner's chosen UTF-8 BOM form."""
+    item = _item()
+    _plant_page_item(item, roots)
+    args = _selection_args(roots, [item])
+    destination = roots.allowed / "review-sheet.csv"
+    _csv(destination, [_row(item, preferred="yes", note="caf\u00e9, owner\nsecond line")])
+    if bom:
+        destination.write_bytes(b"\xef\xbb\xbf" + destination.read_bytes())
+    (roots.allowed / "records").mkdir()
+    (roots.allowed / "records/pack.json").write_text(json.dumps({"schema": 1, "items": [item]}))
+    assert build.main(["page", *args]) == 0
+    assert destination.read_bytes().startswith(b"\xef\xbb\xbf") is bom
+    with destination.open(encoding="utf-8-sig", newline="") as handle:
+        row = next(csv.DictReader(handle))
+    assert row["preferred"] == "yes" and row["note"] == "caf\u00e9, owner\nsecond line"
+
+
+@pytest.mark.parametrize("fault_row", [1, 2, 3])
+def test_non_utf8_sheet_names_csv_row_and_encoding(
+    roots: OutputRoots, capsys: pytest.CaptureFixture[str], fault_row: int
+) -> None:
+    """Invalid UTF-8 must name the logical CSV row, including a multiline note."""
+    destination = roots.allowed / "owner.csv"
+    _csv(destination, [_row(_item(), note="two\nlines"), _row(_item("IMG_6771"), note="caf\u00e9")])
+    data = destination.read_bytes()
+    if fault_row == 1:
+        data = data.replace(b"item", b"it\xe9m", 1)
+    elif fault_row == 2:
+        data = data.replace(b"two", b"tw\xe9", 1)
+    else:
+        data = data.replace("caf\u00e9".encode(), b"caf\xe9")
+    destination.write_bytes(data)
+    assert build.main(["tally", str(destination)]) == 2
+    text = capsys.readouterr().err
+    assert f"row {fault_row}" in text and "UTF-8" in text
+    assert destination.read_bytes() == data
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        (
+            "the EXIF block is damaged; it is not carried",
+            "the EXIF block is damaged; it is not carried",
+        ),
+        ("GPS metadata was not carried", "GPS metadata was not carried"),
+        (
+            "EXIF GPSLatitude=21.3; the EXIF block is damaged",
+            "[withheld]; the EXIF block is damaged",
+        ),
+        ("EXIF Orientation: 9", "[withheld]"),
+        ("bad EXIF value 'private location'", "[withheld]"),
+    ],
+)
+def test_metadata_filter_preserves_diagnostics_and_withholds_values(
+    roots: OutputRoots, text: str, expected: str
+) -> None:
+    """The privacy projection must preserve value-free product diagnostics."""
+    assert build._safe_text(text, roots) == expected
+
+
+def test_invoke_never_rewrites_product_record_and_filters_only_projection(
+    roots: OutputRoots, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The original runner bytes stay authoritative; only pack-facing text is filtered."""
+    source = roots.footage / "IMG_6751.JPG"
+    shutil.copyfile(FIXTURES / "stills/jpeg/jpeg-gradient-srgb.jpg", source)
+    raw_record = _runner_record(source.name, failure="EXIF Orientation: 9")
+    raw_record["items"][0]["warnings"] = ["the EXIF block is damaged; it is not carried"]
+    raw_bytes = json.dumps(raw_record, separators=(",", ":")).encode() + b"\n"
+
+    def product(argv, **kw):
+        Path(argv[argv.index("--record") + 1]).write_bytes(raw_bytes)
+        return subprocess.CompletedProcess(argv, 1, b"EXIF GPSLatitude=21.3\n", b"")
+
+    monkeypatch.setattr(build, "run_tool", product)
+    rows, code = build._invoke([source], "P-A", roots, neutral=False, force_cpu=True)
+    assert code == 1 and (roots.allowed / "records/P-A.json").read_bytes() == raw_bytes
+    assert rows[0]["message"] == "[withheld]"
+    assert rows[0]["warnings"] == ["the EXIF block is damaged; it is not carried"]
+    assert "21.3" not in (roots.allowed / "logs/P-A.log").read_text()
+
+
+@pytest.mark.parametrize("state", ["not run", "cancelled"])
+@pytest.mark.parametrize("message", [None, "runner supplied reason"])
+def test_runner_unfinished_states_keep_status_and_reason(
+    roots: OutputRoots, state: str, message: str | None
+) -> None:
+    """Runner cancellation facts must survive mapping and remain visible under Not built."""
+    document = _runner_record("GX011604.mp4", failure=message)
+    document["items"][0].update(state=state, kind="video", outputs=[])
+    path = roots.allowed / "record.json"
+    path.write_text(json.dumps(document))
+    result = build.read_runner_record(path, group="V-S", roots=roots)[0]
+    assert result["status"] == state
+    if message:
+        assert result["message"] == message
+    else:
+        assert result["message"] == f"runner reported {state}; no further reason was supplied"
+    html = page.write_page([result], {}, roots=roots).read_text()
+    not_built = html.split("<h2>Not built</h2>")[1]
+    assert f": {state}" in not_built and result["message"] in not_built
+    destination = roots.allowed / "sheet.csv"
+    sheet.write_sheet([result], destination, roots=roots)
+    assert sheet.tally(destination)["headline"]["available"] == 0
+
+
+def test_page_explains_blank_undecided_exact_case_and_aid_flag(roots: OutputRoots) -> None:
+    """The owner must be told which literal entries affect D65's numerator and divisor."""
+    html = page.write_page([], {}, roots=roots).read_text()
+    assert "blank means unjudged" in html
+    assert "yes, no and undecided count as judged" in html
+    assert "only yes counts as preferred" in html
+    assert "exact lowercase" in html
+    assert "viewing_aid_failed" in html and "count normally" in html
+
+
+@pytest.mark.parametrize("failure", ["size", "encode", "browser", "photo"])
+def test_failed_aid_removes_only_its_own_artifacts(
+    roots: OutputRoots, monkeypatch: pytest.MonkeyPatch, failure: str
+) -> None:
+    """Failed size, pair, browser and thumbnail work must not leak or prune older files."""
+    pairs = roots.allowed / "pairs"
+    thumbs = roots.allowed / "thumbs"
+    pairs.mkdir()
+    thumbs.mkdir()
+    old_pair = pairs / "GX011604_pair.mp4"
+    old_pair.write_bytes(b"earlier successful aid")
+    (thumbs / "earlier.jpg").write_bytes(b"older thumbnail")
+    item = _item() if failure == "photo" else _item("GX011604", "V-S", "video")
+    item.update(source_thumb="", corrected_thumb="", pair_name="", stills=[])
+    product = roots.allowed / ("photos" if failure == "photo" else "clips") / item["corrected_name"]
+    product.parent.mkdir()
+    if failure == "photo":
+        Image.new("RGB", (16, 12), "blue").save(product)
+        Image.new("RGB", (16, 12), "red").save(product.parent / item["source_view_name"])
+    else:
+        shutil.copyfile(FIXTURES / "video/hevc8-bt709-full.mp4", product)
+    before = {
+        p.relative_to(roots.allowed): p.read_bytes()
+        for p in roots.allowed.rglob("*")
+        if p.is_file()
+    }
+
+    if failure == "size":
+
+        def fail_size(source, time, destination, **kw):
+            destination.write_bytes(b"partial frame")
+            raise ValueError("planted size failure")
+
+        monkeypatch.setattr(build, "extract_view_frame", fail_size)
+    elif failure == "encode":
+
+        def fail_encode(argv, **kw):
+            if "-filter_complex" in argv:
+                Path(argv[-1]).write_bytes(b"partial pair")
+                return subprocess.CompletedProcess(argv, 1, b"", b"planted encoder failure")
+            return media_tool(argv, **kw)
+
+        monkeypatch.setattr(build, "run_tool", fail_encode)
+    elif failure == "browser":
+
+        def fail_browser(path, stream, roots):
+            raise ValueError("planted browser failure")
+
+        monkeypatch.setattr(build, "_browser_frame", fail_browser)
+    else:
+        real_thumbnail = page.thumbnail
+        count = 0
+
+        def fail_thumbnail(source, destination, **kw):
+            nonlocal count
+            count += 1
+            if count == 2:
+                destination.write_bytes(b"partial thumbnail")
+                raise ValueError("planted thumbnail failure")
+            return real_thumbnail(source, destination, **kw)
+
+        monkeypatch.setattr(page, "thumbnail", fail_thumbnail)
+    with pytest.raises(ValueError, match=r"planted|encode failed"):
+        if failure == "photo":
+            build._view_photo(item, roots)
+        else:
+            build._view_video(item, product, roots, force_cpu=True)
+    after = {
+        p.relative_to(roots.allowed): p.read_bytes()
+        for p in roots.allowed.rglob("*")
+        if p.is_file()
+    }
+    assert after == before
+    assert item["source_thumb"] == item["corrected_thumb"] == item["pair_name"] == ""
+    assert item["stills"] == []
+
+
+def test_failed_browser_conversion_cleans_partial_srgb_file(
+    roots: OutputRoots, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A failed conversion must remove its unique scratch PNG and retain its input."""
+    path = roots.allowed / "frame.png"
+    Image.new("RGB", (16, 12), "blue").save(path)
+    before = path.read_bytes()
+
+    def fail_conversion(argv, **kw):
+        Path(argv[-1]).write_bytes(b"partial conversion")
+        return subprocess.CompletedProcess(argv, 1, b"", b"planted conversion failure")
+
+    monkeypatch.setattr(build, "run_tool", fail_conversion)
+    with pytest.raises(ValueError, match="conversion"):
+        build._browser_frame(path, {"color_primaries": "bt709", "color_transfer": "bt709"}, roots)
+    assert path.read_bytes() == before
+    assert list(roots.allowed.glob("*.png")) == [path]
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("EXIF GPSLatitude; 21.3", "[withheld]"),
+        (
+            "the EXIF block is damaged (bad value 9); it is not carried",
+            "the EXIF block is damaged ([withheld]); it is not carried",
+        ),
+        (
+            "IMG_6751.JPG: the EXIF block is damaged; it is not carried",
+            "IMG_6751.JPG: the EXIF block is damaged; it is not carried",
+        ),
+    ],
+)
+def test_metadata_filter_handles_uncertain_boundaries_and_embedded_details(
+    roots: OutputRoots, text: str, expected: str
+) -> None:
+    """A semicolon must not leak a tag value; embedded details need only local withholding."""
+    assert build._safe_text(text, roots) == expected
+
+
+def test_original_sheet_header_migrates_without_losing_owner_answers(roots: OutputRoots) -> None:
+    """The required new flag must extend an existing original CP5 sheet safely."""
+    destination = roots.allowed / "review-sheet.csv"
+    item = _item()
+    row = _row(item, preferred="undecided", note="owner's earlier answer")
+    del row["viewing_aid_failed"]
+    _csv(destination, [row], header=HEADER[:-1])
+    assert sheet.tally(destination)["headline"]["judged"] == 1
+    item.update(reviewable=False, viewing_aid_failed=True, aid_message="pair unavailable")
+    sheet.write_sheet([item], destination, roots=roots)
+    with destination.open(encoding="utf-8-sig", newline="") as handle:
+        reader = csv.DictReader(handle)
+        migrated = next(reader)
+        assert tuple(reader.fieldnames) == HEADER
+    assert migrated["preferred"] == "undecided" and migrated["note"] == "owner's earlier answer"
+    assert migrated["viewing_aid_failed"] == "yes"
