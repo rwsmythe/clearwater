@@ -48,7 +48,14 @@
   constraint: ambiguous and junction tests), R0-2 GRANTED (rotation adapter in `tools/reviewpack/` for rotated phone
   MOVs, FFmpeg default autorotate on both halves, proved on `rotated.mp4`; `frames.py` unchanged), R0-3 = IMG_6762.MOV
   (749 s; my "under 2 min" was wrong) whole, last in V-P. Q6: `config/presets.py:42/45/228/478/504`, pack-local store.
-  Codex turn 2 (RED) resumes. Waiting on: WP5.1 round 0; the WP4.6 V7 window open; WP3.6P turn 7.
+  Codex turn 2 (RED) resumes.
+- **WP5.1 ROUND 0 RULED 08:32Z (query 22ad0e23, turn 1 `55767734`, ledger :16-116; my post + cue): all four CONCURRED,
+  AD-11 unchanged.** R0-1 pose bound 2/255 against Pillow exif_transpose of the source (the fixtures are lossy JPEG q95:
+  the recipe is RECORDED, 3/255 offset is a fixture property); R0-2 ENOSPC after 1 KiB of actual writes at io.open /
+  Path.open scoped to the output folder (`png.py:184`), proved fired; R0-3 MY ERROR: `truncated` SUCCEEDS per D86 with
+  the warning, exit 0; R0-4 the committed fixtures used UNCHANGED for the fixture sweep (sizing exception by analogy
+  with AD-30's real-container clause; AD-30 NOTE mine at the accept). Re-seat: fresh Codex session from the ledger for
+  T2 onward (first retired at 210,098). Waiting on: the WP4.6 V7 window open; WP3.6P turn 7; WP5.3 RED; WP5.1 T2.
 - **DANGLERS (gen 28 runs them; I rule their STOPs):** (1) WP3.6P (Codex session 01a18b4b, worktree `wp3.6p` head
   `081f851c`, turn 7 = R2 remediation dispatched 08:01Z; then A R3, seat runs (`photo_check`, `orientation`, the footage
   node), two EXCLUSIVE windows (16-bit export ~45 min / ~3.8 GB; memory), B (Claude), gate, accept). At its accept mine:
