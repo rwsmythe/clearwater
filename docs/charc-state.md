@@ -137,8 +137,17 @@
   (pre-encode bound binds; post-encode characterised 3.5 at shipped quality). **Serial-leg budget RAISED to 300 s for
   the package** (T6 alone 191.7 s; nodes stay `slow`, none behind `fullclip`; delta measured at the gate). G2: creation
   time NOT carried (best-effort, recorded; the report cites the WP3.10 / WP4.4 limitation or I add the line). Session 3
-  at 143,997. Waiting on: WP-D54 dispatch; WP4.6 follow-on / B / gate / accept; WP5.3 A R1; WP5.1 T7 / T8; WP3.6P 5b,
-  5c-16, 5d.
+  at 143,997.
+- **WP3.6P 5b-r2 CLOSED 09:50Z (status 036f5520; on `790541e7`; 62/62 attempted, 0 read / orientation / oracle failures;
+  EXIT 1 by design because 12 inconclusive):** HEIC-0 23 = 14 pass / 9 inconclusive / 7 oracle-rounded (edge `last`);
+  HEIC-90 3/3; HEIC-180 20/20; HEIC-270 16 = 13 / 3 inconclusive. 36 of 39 rotated discriminate: NO follow-on
+  discriminator needed. IMG_6764 passes rounded. Thumbnail witness irot 0: 7 concordant / 0 discordant / 9
+  inconclusive. **AD-24 status at the accept (mine): CONFIRMED on 50 discriminating real HEICs across all four irot
+  classes; 12 inconclusive (scene texture), 0 discordant.** Next WP3.6P: 5c-16 then 5d, EXCLUSIVE, opened to me.
+- **WP4.6 CLAMP DONE `4cd7e992` (cell 6, RED `ed62be55`, fix `a1df2023`; seat-verified 376 passed, ruff / format / mypy
+  clean, 0 CR).** Narrow Codex B running on `c0eedb0e..4cd7e992`; then two-leg gate; then accept (rows mine). WP-D54
+  turn 2 and WP5.3 turn 4 running; WP5.1 resumes on my T6-2 ruling. Claude 86 %. Waiting on: WP4.6 B / gate / accept;
+  WP-D54 A; WP5.3 A R2; WP5.1 T7 / T8; 5c-16 / 5d window opens.
 - **DANGLERS (gen 28 runs them; I rule their STOPs):** (1) WP3.6P (Codex session 01a18b4b, worktree `wp3.6p` head
   `081f851c`, turn 7 = R2 remediation dispatched 08:01Z; then A R3, seat runs (`photo_check`, `orientation`, the footage
   node), two EXCLUSIVE windows (16-bit export ~45 min / ~3.8 GB; memory), B (Claude), gate, accept). At its accept mine:
