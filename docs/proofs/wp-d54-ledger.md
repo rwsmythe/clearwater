@@ -241,6 +241,29 @@ changed. No footage or other worktree was read; no commit, stash or `.git` write
 was attempted. The final report turn, Reviewer B, final two-leg gate and
 post-merge WP5.1 witness remain pending at the dispatcher's boundaries.
 
+## Turn 4: report
+
+Starting HEAD: `5fa56fc4`, the dispatcher's committed terminating clean-up.
+The dispatcher reports 0 CR in all four package files and confirms Reviewer A
+has converged. Supplied depth after Turn 3: 118,386 tokens (recorded below).
+
+Added `docs/reports/wp-d54-warning-words.md`: the original finding, three CHARC
+rulings, verbatim final range branches, implementation, RED and GREEN evidence
+by commit with commands and counts, all four finding dispositions, limits,
+acceptance witness still owed, and DR-102's two-branch handoff to CHARC.
+The cumulative round-1 row below is complete; no new review round is opened.
+
+This is a documentation-only turn: no product or test change, no new test run,
+no dependency or configuration change. Report claims use the recorded run
+results, the unchanged implementation and the dispatcher's commit assertions.
+Validation found 0 non-ASCII bytes and 0 CR bytes in the new report;
+`git diff --check` exited 0. `git diff --quiet HEAD -- src tests` exited 0,
+confirming product and tests are unchanged. Rechecked the recorded Turn 3 log
+summaries: targeted 6 passed, pure 3 passed, encoder file 100 passed / 19
+deselected, ruff clean, 287 files formatted, mypy 146 source files clean.
+Reviewer B, the final two-leg gate and the post-merge WP5.1 witness remain
+commissioned to the dispatcher; no accept or full-gate result is claimed.
+
 ## Cumulative review rounds
 
 Reviewer A round 1 counts and terminates the loop with zero new blocking
@@ -256,4 +279,5 @@ findings. All four findings are adjudicated above; Reviewer B remains pending.
 |---|---|---|
 | Turn 1 RED yield | 75,711 tokens (dispatcher supplied in Turn 2; session `01a19680-681b-7e73-9fa1-893bc1fdefaa`) | RED accepted and committed as `549b4ca4`. |
 | Turn 2 GREEN yield | 89,798 tokens (dispatcher supplied in Turn 3) | Committed as `4aae3824`; Reviewer A round 1 returned. |
-| Turn 3 terminating clean-up yield | Pending dispatcher figure | Reviewer A loop terminated; clean-up delivered for the report turn. |
+| Turn 3 terminating clean-up yield | 118,386 tokens (dispatcher supplied in Turn 4) | Committed as `5fa56fc4`; Reviewer A converged. |
+| Turn 4 report yield | Pending dispatcher figure | Report delivered; dispatcher owns Reviewer B, gate and acceptance witness. |
