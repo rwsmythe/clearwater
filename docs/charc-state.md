@@ -145,9 +145,16 @@
   inconclusive. **AD-24 status at the accept (mine): CONFIRMED on 50 discriminating real HEICs across all four irot
   classes; 12 inconclusive (scene texture), 0 discordant.** Next WP3.6P: 5c-16 then 5d, EXCLUSIVE, opened to me.
 - **WP4.6 CLAMP DONE `4cd7e992` (cell 6, RED `ed62be55`, fix `a1df2023`; seat-verified 376 passed, ruff / format / mypy
-  clean, 0 CR).** Narrow Codex B running on `c0eedb0e..4cd7e992`; then two-leg gate; then accept (rows mine). WP-D54
-  turn 2 and WP5.3 turn 4 running; WP5.1 resumes on my T6-2 ruling. Claude 86 %. Waiting on: WP4.6 B / gate / accept;
-  WP-D54 A; WP5.3 A R2; WP5.1 T7 / T8; 5c-16 / 5d window opens.
+  clean, 0 CR).** WP-D54 turn 2 and WP5.3 turn 4 running; WP5.1 resumes on my T6-2 ruling.
+- **WP4.6 NARROW B RETURNED 09:54Z (query 290bea84; `c0eedb0e..4cd7e992`; NO_NEW_CRITICAL_MAJOR; claims 2-6 HOLD executed;
+  B2-1 MINOR per-line WARNING for a count failing in json.loads, unreachable from the shipped worker; B2-2 docstring).
+  RULED: BANK both (NEW DR-103 mine at the accept, B2-2 named in it); two-leg GATE NOW on `4cd7e992` rebased onto main,
+  GATE FIRST (~35 min) then 5c-16 and 5d back to back. **ACCEPT COMMIT OF MINE (ready to write on GREEN):** DR-98
+  CLOSED (1fe0f209 figures); NEW AD-31 (design, figures, wall +7.3..8.2 %, final progress rule with clamp, nb_frames
+  note); AD-23 extended; DR-44 (c) re-confirmed; DR-62 / DR-69 notes; NEW F8, F4, DR-103; cache-accounting row if
+  material; `_HeldSink` / `_ProgressSink` per the report; CLAUDE.md line. Claude 86 %. Waiting on: the WP4.6 gate
+  result + accept message (with the cache-accounting and helper answers); WP-D54 A; WP5.3 A R2; WP5.1 T7 / T8;
+  5c-16 / 5d opens.
 - **DANGLERS (gen 28 runs them; I rule their STOPs):** (1) WP3.6P (Codex session 01a18b4b, worktree `wp3.6p` head
   `081f851c`, turn 7 = R2 remediation dispatched 08:01Z; then A R3, seat runs (`photo_check`, `orientation`, the footage
   node), two EXCLUSIVE windows (16-bit export ~45 min / ~3.8 GB; memory), B (Claude), gate, accept). At its accept mine:
