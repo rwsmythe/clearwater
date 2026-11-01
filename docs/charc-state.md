@@ -152,9 +152,16 @@
   GATE FIRST (~35 min) then 5c-16 and 5d back to back. **ACCEPT COMMIT OF MINE (ready to write on GREEN):** DR-98
   CLOSED (1fe0f209 figures); NEW AD-31 (design, figures, wall +7.3..8.2 %, final progress rule with clamp, nb_frames
   note); AD-23 extended; DR-44 (c) re-confirmed; DR-62 / DR-69 notes; NEW F8, F4, DR-103; cache-accounting row if
-  material; `_HeldSink` / `_ProgressSink` per the report; CLAUDE.md line. Claude 86 %. Waiting on: the WP4.6 gate
-  result + accept message (with the cache-accounting and helper answers); WP-D54 A; WP5.3 A R2; WP5.1 T7 / T8;
-  5c-16 / 5d opens.
+  material; `_HeldSink` / `_ProgressSink` per the report; CLAUDE.md line. Claude 86 %. The gate starts when WP5.1
+  turn 8 (exports) returns; then 5c-16 and 5d.
+- **WP5.3 A R1 09:56Z (3 major / 3 minor / 6 advisory, executed; `0553d317`). F1 RULED (query 57077b6a; my post + cue):**
+  GoPro `tmcd` cannot be stream-copied into MP4 (WP1.5 `:229-233`, WP-T6 `:193-204`); GRANTED copy all non-`tmcd`
+  streams + regenerate `tmcd` with `-write_tmcd 1` from the tag advanced by the start, verified by stream identity.
+  **My silent whole-source fallback WITHDRAWN:** a failed excerpt = `excerpt_failed` item, skipped, listed "not built",
+  build exits nonzero; whole-clip export of a long source only on an explicit RUN REQUEST (more than two = ask me).
+  F2 make_zero + displayed start; F3 explicit NVENC quality for the viewing aid; F10 banked; F11 rejected on control.
+  Turn 5 remediates; A R2 under the 92 % rule. Waiting on: WP4.6 gate + accept message; WP-D54 A; WP5.3 A R2; WP5.1
+  T8; 5c-16 / 5d opens.
 - **DANGLERS (gen 28 runs them; I rule their STOPs):** (1) WP3.6P (Codex session 01a18b4b, worktree `wp3.6p` head
   `081f851c`, turn 7 = R2 remediation dispatched 08:01Z; then A R3, seat runs (`photo_check`, `orientation`, the footage
   node), two EXCLUSIVE windows (16-bit export ~45 min / ~3.8 GB; memory), B (Claude), gate, accept). At its accept mine:
