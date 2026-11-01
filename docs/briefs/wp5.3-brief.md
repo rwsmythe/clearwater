@@ -204,3 +204,23 @@ Codex turn 2 (RED) resumes on this post. Claude figure 84 % noted.
 > Claude 87 % noted.
 >
 > Owner-pending inputs: none. Open owner decisions: none. Owner action pending: none. Next owner checkpoint: CP5.
+
+## Reviewer A round 3 ruling (CHARC `c25ff7a9`, 2026-11-01T17:59:31Z, verbatim; binding)
+
+> RULING WP5.3 Reviewer A round 3 (on ed787934; your dd5bfc66). PRIMARY: CHARC for all seven items; the adjudication turn 8 and the remediation plan follow these. I verified F1 (build.py:1264-1267 filters state["items"] to the manifest's names and :1270 writes it) and F6 (the regex at build.py:87 stops at whitespace; a root-stripped remainder keeps its leading separator) in the worktree at ed787934 before ruling.
+>
+> R3-1 (F1, MAJOR): CONCUR, fix as proposed. The manifest is a SELECTION filter, never a STATE filter: pack.json is replace-by-item or append, and no option on any stage may reduce its row count. Pending is counted against select.catalog() minus the rows present, not against the loaded state. Rows: (a) full-state fixture + a one-name manifest -> row count unchanged, exactly one row replaced, pending unchanged; (b) a manifest naming an item with no row -> appended. GENERAL RULE for this remediation (third silent-loss path): the turn audits EVERY assignment to state["items"] and every slice of it, and the return lists each site with "cannot shrink" shown (a one-line table in the ledger). A fourth silent-loss finding in round 4 is a STOP to me, not a round.
+>
+> R3-2 (F2, MINOR): the round-2 form applies verbatim. The neutral source view is a viewing aid: the row is KEPT, the corrected product linked, viewing_aid_failed set, reviewable false, exit 1. Not "failed".
+>
+> R3-3 (F3, MINOR, out of envelope): BROUGHT IN ENVELOPE (tools/ only, no product edit): catch ImageCms.PyCMSError at the viewing-aid boundary and record it in the SAME form as R3-2. A crash that loses a group's state is the loss the fail-loudly rule exists to prevent; the catch is a few lines. One row with a planted mismatched profile.
+>
+> R3-4 (F4, MINOR): CONCUR. A per-item probe or prepare fault (ValueError, KeyError, StopIteration, TypeError) is an ITEM error row (message through _safe_text), the piece continues, exit 1 at the piece end. One row per exception class is not needed; one row proving the piece continues past a planted ValueError and one past a planted KeyError.
+>
+> R3-5 (F5, advisory -> fix): the final `page` with pending > 0 is NOT a finished pack: the page header names the pending count and the groups; `page` exits 2 (distinct from 1 = item failures) while pending > 0; the sheet's tally shows pending. The pack goes to the owner only at pending = 0. V-R (the two HLG MOVs) are RESULTS, not pending items: the clips stage runs them and records the probe's refusal text as the row (status refused), so a Q8 order that never ran V-R shows them pending, which is correct and loud.
+>
+> R3-6 (F6, advisory -> fix): AD-13's file-name rule binds the pack. After root stripping, any remaining token with a path separator collapses to its LAST component (so "\Phone\IMG_6702.MOV" -> "IMG_6702.MOV"); the Windows-path pattern must survive a space inside the path (match a drive-rooted path up to a known extension or to the end of the quoted span, then collapse to the base name). Rows: the footage-relative form, a quoted path with a space, a POSIX path with a space.
+>
+> R3-7 (F7, advisory): ACCEPTED AS IS, documented. A BT.1886 -> sRGB conversion applied alike to both halves is a fair viewing aid for stills; add one sentence to the pack README and the page footer ("video stills are converted BT.1886 -> sRGB for display; both halves alike; the player's rendering differs") so the owner does not read a still's tone as the export's. No frame change.
+>
+> Rounds: round 4 (Claude pass) follows the remediation turn under the 92 % rule; Claude 89 % now. If 92 % is reached before round 4 can start, HOLD the pass (Codex turns continue). Round 5 remains the cap; convergence needs an executing pass.
