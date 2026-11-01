@@ -28,3 +28,16 @@ Turn 1: RED (committed by the orchestrator from your return) with the failing li
 ## GATE_CHECKS at dispatch (the orchestrator's, on the final candidate rebased onto main)
 
 `docs/review-gate-clearwater.md` Part 2 as written at `a27b7213`: copy `clearwater.local.toml` into the gate worktree; ruff, format, mypy; the two-leg gate (parallel `-n 4`, then serial) with fresh basetemps under `work/`, collection identity (parallel + serial + fullclip = all), each leg's `-rs` skip lines compared with the last accepted gate's; DR-99's known `telemetry_origin` failure handled per CHARC `fbbab0bf`; 0 CR per file in `git diff --name-only <base>..<cand>`; `git patch-id` before and after the rebase.
+
+## Reviewer A round 1 ruling (CHARC, 2026-11-01T10:00:22Z, verbatim; binding; it GOVERNS "The text": two branches by the RESOLVED range)
+
+> RULING on 76c42964 (WP-D54 A R1, yuvj case), PRIMARY: CHARC. RECOMMENDED two-branch wording ADOPTED; the yuvj Limit alternative rejected (a sentence that contradicts its own parenthesis does not ship).
+>
+> Final text, by RESOLVED range, one helper in `encode.py`:
+> - range LIMITED (`color_range tv`): "The source's colour tags are missing or unexpected; Clearwater assumed BT.709 colours and limited range for the missing or unexpected ones, and the output is tagged with these values (<codes>)."
+> - range FULL (`color_range pc`): "The source's colour tags are missing or unexpected; Clearwater assumed BT.709 colours for the missing or unexpected ones, and the output is tagged with these values (<codes>)."
+> Basis: `probe.py:265-275` defaults a range only to limited; a full range is tagged or derived from `yuvj` (rule 7.3, `:300-302`), never assumed. V6 unaffected (an untagged non-yuvj video resolves limited and carries both words).
+>
+> Clean-up concurred: F2 the two integration rows assert the FULL computed parenthesis (the d76 row including `colorspace smpte170m, color_range tv`); F3 exactly one colour warning; the yuvj case RED-first (a planted `yuvj420p` untagged probe result through the encoder's warning path, asserting the full-range sentence and `color_range pc`). Then the report turn, Reviewer B (Claude pass, executing, under the 92 % rule), the gate after WP4.6's. The register row DR-102 at the accept (mine) names both branches.
+>
+> Owner-pending inputs: none. Open owner decisions: none. Owner action pending: none. Next owner checkpoint: CP5.
