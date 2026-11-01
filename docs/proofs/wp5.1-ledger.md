@@ -443,7 +443,8 @@ ruling; evaluate depth near 200K and stop at a step boundary near 250K.
 | 2 / T2 build | `01a1963b-002e-7cc3-9d5d-0f7807bb5ed9` | 136,776 | T2 committed as `087892d8`; CHARC `755ef1b004b92902` resolved T2-1 with the in-flight tightening |
 | 3 / T2-1 amendment | `01a1963b-002e-7cc3-9d5d-0f7807bb5ed9` | 155,324 | committed as `9d662f09` (0 CR); CHARC `da72ec040fc4de35` resolved T3-1 |
 | 4 / T3-1 amendment | `01a1963b-002e-7cc3-9d5d-0f7807bb5ed9` | 178,501 | committed as `0d310b87` (0 CR); CHARC `8276adb56f541a57` resolved T4-1 by end state |
-| 5 / T4 complete; session 2 ends | `01a1963b-002e-7cc3-9d5d-0f7807bb5ed9` | pending dispatcher | retire session 2 after this turn; fresh session 3 starts T5 from this ledger |
+| 5 / T4 complete; session 2 ends | `01a1963b-002e-7cc3-9d5d-0f7807bb5ed9` | 194,928 | retired after `93869f4c`; fresh session 3 starts T5 from this ledger |
+| 6 / T5-T6 product STOP; session 3 starts | pending dispatcher | pending dispatcher | dispatcher reads footer; route T6-1 to CHARC before further exports |
 
 Next authorized build group after rulings: T2 support + photo RED, then yield.
 Later yields remain after T4, T6, T8, every adjudicated review round, and before
@@ -1110,3 +1111,163 @@ Handoff for session 3:
 - No new seat RUN REQUEST is issued in this retirement turn. The dispatcher
   controls review scheduling and the fresh-session T5 dispatch. No further
   work is authorized in session 2 after this yield.
+
+## Session 3 / Turn 6: T5-T6
+
+### Session boundary and build scope
+
+Fresh session 3 starts from committed handoff `93869f4c`. Session 2 retired
+after turn 5 at **194,928**, supplied by the dispatcher; the depth table is
+updated. Session 3's id and this turn's depth are for the dispatcher to fill,
+never estimated here. This turn builds T6 only, with T5's failure controls;
+T7's two N10 instances are NOT implemented in this turn.
+
+Added `tests/test_v51_video_acceptance.py`: **18 instances** (17 sandbox-eligible,
+one footage-only). All currently carry `slow(reason="FFmpeg encode")`; the real
+trim additionally carries `footage`. Scheduling markers are provisional until
+the owner's isolated measurements under AD-30; some sandbox call times are
+under five seconds, others exceed five seconds. No new fullclip/GPU/GUI node.
+
+The module contains the five unchanged-container V4 cases, readable-prefix
+truncated batch, real-trim best-effort presence/GPMF node, HDR refusal batch,
+untagged warning, four post-encode neutral comparisons at the unchanged 2.5/255
+mean bound, three numbering/collision nodes, and provenance default/off. All
+runner calls are in-process `headless_export.main`, via the committed support
+helper, with explicit settings/cache/record/output under tmp_path. A module
+autouse fixture MD5-guards every committed video source in `finally`; the MOV
+copies and real trim have additional local finally guards.
+
+Extended support with a names-only `fidelity_record`: the existing instrument
+compares the files; only its two top-level path fields become file names before
+the new JSON is saved. Existing comparison facts and tolerances are unchanged.
+Corrected the support presence extraction to distinguish the instrument's
+`"absent"`, `{count: 0}` and dictionaries of null stream tags from present
+metadata. This was unexercised scaffolding from T2, not a product change.
+An independent literal probe of absent/zero/null and present/count cases passes
+(`work/wp5.1/t6-evidence.log`). The actual real-trim presence result awaits the seat.
+
+### T6-1 [MAJOR, NEW, in envelope]: D54 words missing in the real runner record
+
+**STOP. Recommended: route the warning propagation/text defect to its owning
+product package; retain this failing node and the literal BT.709/limited
+assertion; resume T6 validation after CHARC's disposition.** No product fix,
+xfail, tolerance increase or weakened assertion was made.
+
+Failing node:
+`tests/test_v51_video_acceptance.py::test_v6_untagged_runner_warns_bt709_limited`.
+
+`tests/test_v51_video_acceptance.py:256` requires one item warning containing
+both `BT.709` and `limited`. Export succeeds, status 0, item `done with warnings`,
+but its only warning is:
+
+> The source's colour tags are missing or unexpected; the output is tagged with the assumed values (color_primaries bt709, color_trc bt709, colorspace bt709, color_range tv).
+
+It has neither required substring. The node remains FAILING on the shipped
+product, as Q3 requires. Runner stdout/stderr and its JSON already passed the
+support helper's names-only checks; this failure is the warning assertion,
+not path redaction, encoding, parsing or fixture availability.
+
+Independent confirmation: directly probing the unchanged real committed
+`untagged.mp4` yields a `missing_tags` warning ending:
+`Clearwater assumes BT.709 colours and limited range for those.` Evidence in
+`t6-evidence.log` records both that probe fault and the actual runner warning.
+Mechanic: `src/clearwater/io/video/probe.py:457` builds the missing-tags fault;
+`src/clearwater/jobs/export.py:864` only forwards `gp_log` warning faults;
+`src/clearwater/io/video/encode.py:668` instead adds the encoder's tag-code
+message above. Those files were read only. The existing shell case with empty
+words is unchanged; T8's real-shell assertion has not yet been built or run.
+
+### Actual run and per-node evidence
+
+The sandbox command below stopped at the first product failure. Logs and raw
+outputs stay under this worktree; no footage fixture or other worktree was read.
+
+```bash
+PYTHONPATH=scripts uv run pytest -q -x tests/test_v51_video_acceptance.py --basetemp=work/wp5.1/tmp -p sandbox_mkdir_shim -p no:cacheprovider -m "not gpu and not footage and not gui and not fullclip" --durations=0 -o junit_family=xunit1 --junitxml=work/wp5.1/t6-video.xml > work/wp5.1/t6-video.log 2>&1
+```
+
+Observed summary: **1 failed, 7 passed, 1 deselected in 40.39 s**. Nine later
+sandbox instances were not executed because of `-x`; they are not skips or
+passing evidence. The footage node was deselected. No further export was run
+after the STOP. All rows have prefix `tests/test_v51_video_acceptance.py::`.
+Times are JUnit setup + call + teardown in this sandbox run, not exclusive
+hardware or owner's isolated/leg figures.
+
+| Node | Marker / leg | Result | Seconds |
+|---|---|---|---:|
+| test_v4_runner_preserves_fixture_fidelity[hevc8-bt709-full] | slow / serial provisional | PASS | 5.406 |
+| test_v4_runner_preserves_fixture_fidelity[hevc10] | slow / serial provisional | PASS | 5.050 |
+| test_v4_runner_preserves_fixture_fidelity[untagged] | slow / serial provisional | PASS | 4.813 |
+| test_v4_runner_preserves_fixture_fidelity[vfr] | slow / serial provisional | PASS | 3.836 |
+| test_v4_runner_preserves_fixture_fidelity[rotated] | slow / serial provisional | PASS | 5.059 |
+| test_v4_truncated_runner_batch_obeys_d86 | slow / serial provisional | PASS | 7.257 |
+| test_v4_real_trim_records_best_effort_presence | footage, slow / serial | NOT RUN: seat-only | pending |
+| test_v6_hdr_refusals_do_not_stop_batch | slow / serial provisional | PASS | 4.120 |
+| test_v6_untagged_runner_warns_bt709_limited | slow / serial provisional | FAIL: T6-1 | 4.115 |
+| test_v9_neutral_runner_postencode[hevc8-bt709-full] | slow / serial provisional | NOT RUN: STOP | pending |
+| test_v9_neutral_runner_postencode[untagged] | slow / serial provisional | NOT RUN: STOP | pending |
+| test_v9_neutral_runner_postencode[rotated] | slow / serial provisional | NOT RUN: STOP | pending |
+| test_v9_neutral_runner_postencode[hevc10] | slow / serial provisional | NOT RUN: STOP | pending |
+| test_v10_repeated_video_exports_are_numbered | slow / serial provisional | NOT RUN: STOP | pending |
+| test_v10_existing_video_output_is_unchanged | slow / serial provisional | NOT RUN: STOP | pending |
+| test_v10_mov_mp4_share_one_numbering_sequence | slow / serial provisional | NOT RUN: STOP | pending |
+| test_d91_video_provenance[default] | slow / serial provisional | NOT RUN: STOP | pending |
+| test_d91_video_provenance[off] | slow / serial provisional | NOT RUN: STOP | pending |
+
+The seven green-on-arrival nodes all executed planted-failure controls:
+mandatory frame-count difference and missing roster rejected in each of the
+six V4 nodes; the VFR node additionally rejected a one-microsecond change to
+one rational pts after comparing ALL 30 actual rational timestamps (variable
+steps also checked); the truncated batch rejected a dropped D86 warning and
+an unrun following item; the HDR batch rejected generic HLG and PQ refusals
+and an unrun SDR item. JUnit properties and `t6-evidence.log` retain these
+results. Truncated output contains exactly the 24 readable frames; the next
+item exports. All tested mandatory/required comparisons pass with zero
+differences. Controls in the unrun nodes are written but NOT claimed executed.
+
+### Validation, verification-loop record and handoff
+
+| Evidence under work/wp5.1/ | Actual result |
+|---|---|
+| t6-sync.log | uv sync resolved 62 / audited 61 packages; no dependency-file change |
+| t6-video.log / t6-video.xml | 7 pass, 1 product failure, 1 deselected; stopped in 40.39 s |
+| t6-evidence.log | independent real-file warning, runner counts/warning, all executed properties/times; presence-helper literal probe passes |
+| t6-ruff.log | All checks passed! for support and all existing new v51 modules |
+| t6-format.log | owned support/video format only; seat format --check pending |
+| t6-test-mypy.log | Success: no issues found in 2 source files (MYPYPATH=tools;tests) |
+| t6-mypy.log | Success: no issues found in 146 source files |
+| t6-collect.log | 18 test instances collected in 0.59 s; no fixture execution |
+| t6-lf.log | zero CR bytes in each of the three changed files |
+
+Verification loop: suspected missing propagation of the real probe's D54
+warning; CONFIRMED by the runner failure and independent probe/source trace.
+Not a false positive: the encoder warning spells neither required substring.
+No product fix authorized or made; T6-1 remains open for CHARC. The passing
+oracles independently rejected their planted wrong results. Fixed test-only
+typing/style slips before final validation; no additional product issue was
+observed before the required STOP. No complete clean verification pass, full
+suite, isolated node timing sweep, serial delta or phase-end gate is claimed.
+
+New build findings: Critical 0 / Major 1 / Minor 0; in-envelope 1 / out 0;
+NEW 1 / REOPENED 0; reverts 0; product-code fixes 0; test-only files changed 2.
+No Reviewer A round ran this turn; its cumulative round ledger is unchanged.
+The turn bundles support extension and T6 test construction as commissioned.
+
+Locks honored on disk: only the owned support, new video module and ledger
+changed. No product/existing-test edit, dependency, committed fixture, frozen
+interface, local-config edit, footage-folder read, other-worktree access,
+mailbox post, git-index write or commit. New records use file names only.
+No bound changed. Every node's files are below its tmp_path. T6 validation,
+T7/T8, traceability/report, reviews and final gate remain pending.
+
+RUN REQUEST (dispatcher schedules after the STOP disposition; cell cannot run
+the footage fixture), from the worktree root in Git Bash, expected **30-120 s**
+with usable GPU, longer on CPU; this is an estimate, not a measured figure:
+
+```bash
+PYTHONPATH=scripts uv run pytest -q -rs tests/test_v51_video_acceptance.py::test_v4_real_trim_records_best_effort_presence --basetemp=work/wp5.1/t6-seat-metadata --durations=0 -o junit_family=xunit1 --junitxml=work/wp5.1/t6-seat-metadata.xml > work/wp5.1/t6-seat-metadata.log 2>&1
+```
+
+Return the log/XML plus the best-effort presence and device properties for the
+later report. No heavy seat run is started here. This is the binding T6 yield;
+await CHARC's T6-1 disposition and the dispatcher's next-turn instructions.

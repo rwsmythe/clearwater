@@ -329,6 +329,25 @@ def assert_fidelity(record: Mapping[str, Any]) -> None:
     assert items[vf._ROSTER_ITEM]["status"] == compare.SAME
 
 
+def fidelity_record(source: Path, output: Path, scratch: Path) -> dict[str, Any]:
+    """Save the instrument's comparison with file names in place of its paths.
+
+    Args:
+        source: Read-only input clip.
+        output: Exported clip under the node's temporary folder.
+        scratch: Where the names-only fidelity JSON is saved.
+
+    Returns:
+        The unmodified comparisons, with only the two path fields redacted.
+    """
+    record = vf.fidelity_record(source, output)
+    record.update(source=source.name, output=output.name)
+    assert_names_only(record, folders=[source.parent, output.parent, scratch])
+    scratch.mkdir(parents=True, exist_ok=True)
+    (scratch / "fidelity.json").write_text(json.dumps(record, indent=2), encoding="utf-8")
+    return record
+
+
 def best_effort_presence(record: Mapping[str, Any]) -> dict[str, dict[str, bool]]:
     """Extract presence only, never metadata payloads, from best-effort comparisons.
 
@@ -338,9 +357,17 @@ def best_effort_presence(record: Mapping[str, Any]) -> dict[str, dict[str, bool]
     Returns:
         Creation-time, GPMF, timecode and camera-atom rows with source/output presence.
     """
+
+    def present(value: Any) -> bool:
+        if isinstance(value, Mapping):
+            if "count" in value:
+                return bool(value["count"])
+            return any(present(entry) for entry in value.values())
+        return bool(value) and value != "absent"
+
     prefixes = ("creation time:", vf.TELEMETRY_ITEM, "timecode", "camera atoms:")
     return {
-        item["name"]: {side: bool(item[side]) for side in ("source", "output")}
+        item["name"]: {side: present(item[side]) for side in ("source", "output")}
         for item in record["items"]
         if item["class"] == compare.BEST_EFFORT and item["name"].startswith(prefixes)
     }
