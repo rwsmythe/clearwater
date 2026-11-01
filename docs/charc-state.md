@@ -77,6 +77,14 @@
   two legs) then WP5.1's (three legs). WP5.3 B STARTED 19:58Z (Claude 91.0 %, under the line; executing the
   two-manifest sequence); WP5.3 turn 10 `2a1e15b1` (14 write sites classified, page read-only, stage lock); WP5.1
   turn 15 `88850ad2` (B clean-up). On gen 32's announce: re-read the launch record, cue the NEW name.**
+  **PRUNE DONE 21:16Z-21:42Z on the OWNER'S word "prune" (~21:05Z): record `docs/proofs/prune-2026-11-01.md`.
+  MOVED to `D:\clearwater-archive\worktrees\` with manifests (md5 + counts verified): wp3.6p's facts of record
+  (7,222 files, incl. `seat-turn8`), wp-t7's cell folder (434), wp4.6's V7 window of record and its r0/y2 folders;
+  small junit / gate files also COPIED to `clearwater-review-evidence\{wp-t7,wp3.6p,wp4.6}\gate\` and
+  `wp3.6p\seat\`. DELETED the four `work/` folders (wp-d54 1.8 GB, wp-t7 1.8, wp3.6p 2.0, wp4.6 2.7); worktrees
+  `wp-t7`, `wp3.6p`, `wp4.6` REMOVED (branches kept), the `wp-d54` folder removed. C: 160 -> 171 GB free. Lesson:
+  pytest `*current` junctions and symlinked harness inboxes double a robocopy; archive basetemps with `/XJ` and
+  verify counts (the record has the method). Nothing under wp5.1 / wp5.3 / main `work/` touched.**
   Gen 11 pickup 17:28Z: bash gauge 65 ms (under 1 s); inbox 0 unread / 432 read (gen 10 had answered everything,
   including the WP-T7 thread-method ruling); main `fe9dcfe1` clean, FREE; C: 168 GB free, D: 2.4 TB; Claude 89.0 %
   pace 0.987, Codex 14 % pace 0.228 (17:28Z); WP-D54 serial attempt 2 ALIVE (4 pytest processes since 17:21Z).
@@ -216,7 +224,7 @@
   (DR-102 / DR-107 reserved for WP-D54). Orchestrator gens 28 -> 29 -> 30 rolled cleanly.
   **OWNER NOTE (advisory, relayed in my recaps): keep gen 29's pane (`-20261031-2335`) open until gen 30 says its
   three child passes returned; the resumed gen 28 pane (`-20261029-2103`) may be closed.** Open owner decisions:
-  none. Owner-pending inputs: none. Owner action pending: none (optional: one prune word covering `.worktrees/wp-d54/work`, `.worktrees/wp-t7/work` (1.8 GB) and `.worktrees/wp3.6p/work`, then the three worktrees are removed, branches kept). Next owner checkpoint: CP5 (the WP5.3 pack with
+  none. Owner-pending inputs: none. Owner action pending: none (the 2026-11-01 prune is done). Next owner checkpoint: CP5 (the WP5.3 pack with
   its sheet). Every owner-facing summary ends with those lines. Form debt of this file (2,300 lines of history under
   an overwritten pointer): propose the split into `docs/charc-log.md` at the Phase 5 close, not mid-phase.
 - **(gen 10 history follows; newest facts at the end of its block; then gen 9 and older)**
