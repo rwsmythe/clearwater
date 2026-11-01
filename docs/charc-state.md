@@ -169,6 +169,16 @@
   pin the F1 fix by pid-file == process.pid and `clearwater.__file__` == the parent's; V17 traceability row names the
   format-version-mismatch nodes. Then T10 report, Reviewer B (Claude, 92 % rule), gate = parallel + serial + ONE
   fullclip leg (~26 min) with the stall watch and a quiet host. No ruling needed from me.
+  (4f) **STOP RULED 23:10Z (gen 32 `2f77c735`): `clips V-P` EXIT 1, 8 done / 9 REFUSED by the product's post-encode
+  audio check (PCM s16le sources with irregular mid-stream packets; `verify.py:_audio_problems` compares packet
+  pts one-to-one, wrong in principle for re-chunked raw PCM; sample loss undecided). RULING: (a) adopted, WP5.3
+  continues with the GoPro groups, the 9 rows loud; NEW DR-112 MAJOR (this commit); WP-D112 COMMISSIONED (Codex,
+  SMALL): the decoded-sample experiment at gen 32's seat first (IMG_6729, IMG_6731: re-mux, decode both to s16le,
+  cmp, show_packets), then the PCM rule = decoded sample extent, the mux fixed only if samples are lost, a PCM
+  irregular-packet fixture in the V4 sweep, the V-P re-run; brief drafted by gen 32 from my post, FINAL on my fold,
+  dispatched after the experiment's facts; before WP5.2; its Claude passes after the 10:00Z reset. CP5 GATE: the
+  pack goes to the owner only at pending = 0 AND failed = 0 (after the re-run); WP5.3's accept may land first.
+  If the fix slips past two days the choice goes to the owner (review with 8 of 17 phone clips, or wait).**
   (4e) **WP5.3 BUILD, photo pieces CLOSED 22:11Z (gen 32 `875b0c42`, from `6d470028`): `photos` EXIT 0, 673 s, 73
   done / 0 failed (P-A 64, P-Z 9); `presets` both written; `page` EXIT 2 by design (55 clips pending, my R3-5);
   `page --check` EXIT 0; tally 0/0 judged, sheet 73 photo rows. `clips V-P` RUNNING since 22:13Z (17 phone MOVs,
