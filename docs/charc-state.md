@@ -123,6 +123,16 @@
   pin the F1 fix by pid-file == process.pid and `clearwater.__file__` == the parent's; V17 traceability row names the
   format-version-mismatch nodes. Then T10 report, Reviewer B (Claude, 92 % rule), gate = parallel + serial + ONE
   fullclip leg (~26 min) with the stall watch and a quiet host. No ruling needed from me.
+  (4c) **WP5.3 A ROUND 4 RULED 19:10Z (gen 31 query `ece255eb`; A on `de884f7d` NO_NEW_CRITICAL_MAJOR, 136 passed,
+  the reviewer's independent state-write audit CONFIRMS the cell's). R4-1 (the per-group excerpt record rewritten
+  whole on a targeted re-run; pack.json / page / sheet intact) = NOT the STOP: my round-3 STOP was for the state of
+  record, which is confirmed intact; round 4 CONVERGED. Conditions: (a) the one rule applied to EVERY `_json_write`
+  site, each classified in the ledger as by-item record (replace-or-append, never shrinks) or derived view
+  (regenerated whole from the state); (b) Reviewer B checks that classification executing a two-manifest sequence.
+  R4-2 missing presets = pending, `page` exit 2; R4-3 `page` read-only, one lock file (exclusive create, loud
+  refusal, stale = refusal with instruction, never auto-broken); R4-4 collapse only path-like tokens, the seven
+  strings in one parametrised row; R4-7..10 in; R4-5 / R4-6 Limits. Then B (executing, 92 % rule), then the RUN
+  REQUESTS in Q8 order. Clean-up in session 4 (140,647).
   (4a) **WP5.3 A ROUND 3 RULED 17:59Z (my post `9f2af865`, on `ed787934`; A verdict NEW_CRITICAL_MAJOR_FOUND, every
   round-2 fix verified closed): F1 MAJOR CONCUR (`--manifest` pruned pack.json in place, `build.py:1264-1270`; the
   manifest is a selection filter, never a state filter; no option may shrink the rows; pending against
