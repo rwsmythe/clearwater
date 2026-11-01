@@ -233,3 +233,20 @@ RE-SEAT CONCURRED: a FRESH Codex session from the committed ledger for T2 onward
 > Session 3 at 143,997 continues. Claude figure with the next post, please.
 >
 > Owner-pending inputs: none. Open owner decisions: none. Owner action pending: none. Next owner checkpoint: CP5.
+
+## Reviewer A round 1 ruling (CHARC `f6252e0b`, 2026-11-01T10:58:25Z, verbatim; binding)
+
+> RULING on b3deb7ac (WP5.1 A R1), PRIMARY: CHARC. For turn 12's remediation; all inside WP5.1's owned files.
+>
+> F1 (crash node flaky: the kill lands on the venv LAUNCHER and the interpreter behind it commits the link before it dies): FIX = the crash node spawns the runner with the REAL interpreter, `sys._base_executable` when it exists and differs from `sys.executable` (a uv venv on Windows: the launcher is `.venv\Scripts\python.exe`, the interpreter is the base one; on POSIX the two coincide), with the venv's `site-packages` reached the same way the launcher would (the simplest proof: `-c "import clearwater"` under the same `sys.path` set-up the node already uses, or `PYTHONPATH`-free `uv run --no-sync python` is NOT used because it re-inserts the launcher). Then `kill()` ends the writer itself and `wait()` is the end of writes. The node ASSERTS the premise: after `wait()`, no file under the output folder changes size across two reads 100 ms apart (the "writes have stopped" witness) before the state is inspected. Document the launcher lag in the module docstring (it is also WP4.6's Limit 1's mechanism; WP4.6's parent survives it because it waits for the pipes to close: no action there).
+>
+> F2: fix (the V18 node asserts the "after" frame differs from `before_image()`, max abs > 0; the existing `test_app_v8_v18.py:421` gap is NOT edited, named in the report). F3: fix (the SKIP path narrows to the brief's rule: 20 attempts with no temporary ever observed; any other early exit is a failure).
+>
+> Advisories, ruled because they touch my bounds:
+> - G5 control margin: the planted offset becomes +8/255 (the control must fail the 3.5 bound by a clear margin, not 0.22); the bound stays 3.5. Record the four means (2.954 / 2.788 / 2.954 / 2.473), the `--quality high` 2.521 and the maxima 183-203 in the report for my AD-11 note.
+> - GPU node: AD-11's CPU-vs-GPU bound (2e-3 max, 2e-4 mean) is PRE-ENCODE; a decoded 8-bit post-encode frame quantises at 3.9e-3, so the comparison there is sub-quantum and false-red only. FIX: compare the first frame's PRE-encode render values captured by the T7 recording wrapper (the values, not only the digest) against the CPU run's; the decoded post-encode frames are compared only for equality-or-1/255 and RECORDED.
+> - The shell "limited" check case-insensitive, the disk-full text by name only, G2's dict non-empty: fix all three (one line each).
+>
+> WP-D54 gate running on `fcb96280` noted (DR-99 rule stands); WP5.3 turn 6 noted. Claude 87 %.
+>
+> Owner-pending inputs: none. Open owner decisions: none. Owner action pending: none. Next owner checkpoint: CP5.
