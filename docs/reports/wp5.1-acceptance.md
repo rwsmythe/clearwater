@@ -62,99 +62,99 @@ functions. An address covers all its parameterized instances. P = parallel
 S = serial (`(gpu or footage or gui or slow) and not fullclip`),
 F = fullclip. Mixed forms list their markers and legs separately.
 `none` means no scheduling marker; usefixtures/parametrize are not leg markers.
-`(gate)` means the current-candidate execution is pending, not a passing claim.
+Every former `(gate)` cell was filled at the accept from gate run `g32-w51` (legs P, S and F as named in each cell).
 Existing nodes were preserved and statically checked; L15/H12/M6/X13 identify
 actual development or returned-seat results. Figures of record follow the table.
 
 | ID | Node id / non-node disposition | Scheduling markers | Leg | Result / source |
 |---|---|---|---|---|
-| V1 | `tests/test_methods_compensation.py::test_ancuti_chain_matches_prototype` | none (CPU); +gpu (CUDA) | P / S | (gate) |
-| V1 | `tests/test_methods_compensation.py::test_ancuti_render_matches_prototype_on_supplied_values` | none (CPU); +gpu (CUDA) | P / S | (gate) |
-| V1 | `tests/test_methods_compensation.py::test_c3_matches_prototype` | none (CPU); +gpu (CUDA) | P / S | (gate) |
-| V1 | `tests/test_methods_compensation.py::test_c3_matches_prototype_off_default` | none (CPU); +gpu (CUDA) | P / S | (gate) |
-| V1 | `tests/test_methods_compensation.py::test_uniform_image` | none (CPU); +gpu (CUDA) | P / S | (gate) |
-| V1 | `tests/test_methods_compensation.py::test_near_zero_red_cap_binds_and_none_compensates` | none (CPU); +gpu (CUDA) | P / S | (gate) |
-| V1 | `tests/test_methods_compensation.py::test_cap_binding_not_binding_and_none` | none | P | (gate) |
-| V1 | `tests/test_methods_compensation.py::test_blue_off_leaves_blue_and_green_unchanged` | none (CPU); +gpu (CUDA) | P / S | (gate) |
-| V1 | `tests/test_methods_compensation.py::test_c3_mask_below_at_and_above_threshold` | none (CPU); +gpu (CUDA) | P / S | (gate) |
-| V1 | `tests/test_methods_white_balance.py::test_measure_closed_form_and_render_match_prototype` | none (CPU); +gpu (CUDA) | P / S | (gate) |
-| V1 | `tests/test_methods_white_balance.py::test_near_zero_red_hits_the_floor_and_the_clamp` | none (CPU); +gpu (CUDA) | P / S | (gate) |
-| V1 | `tests/test_methods_white_balance.py::test_clamp_binds_as_d99_says` | none | P | (gate) |
-| V1 | `tests/test_methods_fusion_prototype.py::test_fusion_inputs_with_supplied_bounds` | none (CPU); +gpu (CUDA) | P / S | (gate) |
-| V1 | `tests/test_methods_fusion_prototype.py::test_weights` | none (CPU); +gpu (CUDA) | P / S | (gate) |
-| V1 | `tests/test_methods_fusion_prototype.py::test_multiscale_fusion` | none (CPU); +gpu (CUDA) | P / S | (gate) |
-| V1 | `tests/test_methods_fusion.py::test_v1_edge_cases` | none (CPU); +gpu (CUDA) | P / S | (gate) |
-| V1 | `tests/test_methods_assembly.py::test_v1_stage_measured_with_the_supplied_earlier_records` | none | P | (gate) |
-| V1 | `tests/test_methods_assembly_prototype.py::test_analyze_against_statistics_of` | none | P | (gate) |
-| V1 | `tests/test_methods_assembly_prototype.py::test_render_against_correct_with_the_same_record` | none | P | (gate) |
-| V1 | `tests/test_methods_assembly_prototype.py::test_cpu_against_gpu_within_ad11` | gpu | S | (gate) |
+| V1 | `tests/test_methods_compensation.py::test_ancuti_chain_matches_prototype` | none (CPU); +gpu (CUDA) | P / S | PASS 36 (P + S, gate g32-w51) |
+| V1 | `tests/test_methods_compensation.py::test_ancuti_render_matches_prototype_on_supplied_values` | none (CPU); +gpu (CUDA) | P / S | PASS 36 (P + S, gate g32-w51) |
+| V1 | `tests/test_methods_compensation.py::test_c3_matches_prototype` | none (CPU); +gpu (CUDA) | P / S | PASS 18 (P + S, gate g32-w51) |
+| V1 | `tests/test_methods_compensation.py::test_c3_matches_prototype_off_default` | none (CPU); +gpu (CUDA) | P / S | PASS 8 (P + S, gate g32-w51) |
+| V1 | `tests/test_methods_compensation.py::test_uniform_image` | none (CPU); +gpu (CUDA) | P / S | PASS 6 (P + S, gate g32-w51) |
+| V1 | `tests/test_methods_compensation.py::test_near_zero_red_cap_binds_and_none_compensates` | none (CPU); +gpu (CUDA) | P / S | PASS 2 (P + S, gate g32-w51) |
+| V1 | `tests/test_methods_compensation.py::test_cap_binding_not_binding_and_none` | none | P | PASS 1 (P, gate g32-w51) |
+| V1 | `tests/test_methods_compensation.py::test_blue_off_leaves_blue_and_green_unchanged` | none (CPU); +gpu (CUDA) | P / S | PASS 2 (P + S, gate g32-w51) |
+| V1 | `tests/test_methods_compensation.py::test_c3_mask_below_at_and_above_threshold` | none (CPU); +gpu (CUDA) | P / S | PASS 2 (P + S, gate g32-w51) |
+| V1 | `tests/test_methods_white_balance.py::test_measure_closed_form_and_render_match_prototype` | none (CPU); +gpu (CUDA) | P / S | PASS 72 (P + S, gate g32-w51) |
+| V1 | `tests/test_methods_white_balance.py::test_near_zero_red_hits_the_floor_and_the_clamp` | none (CPU); +gpu (CUDA) | P / S | PASS 6 (P + S, gate g32-w51) |
+| V1 | `tests/test_methods_white_balance.py::test_clamp_binds_as_d99_says` | none | P | PASS 1 (P, gate g32-w51) |
+| V1 | `tests/test_methods_fusion_prototype.py::test_fusion_inputs_with_supplied_bounds` | none (CPU); +gpu (CUDA) | P / S | PASS 40 (P + S, gate g32-w51) |
+| V1 | `tests/test_methods_fusion_prototype.py::test_weights` | none (CPU); +gpu (CUDA) | P / S | PASS 40 (P + S, gate g32-w51) |
+| V1 | `tests/test_methods_fusion_prototype.py::test_multiscale_fusion` | none (CPU); +gpu (CUDA) | P / S | PASS 40 (P + S, gate g32-w51) |
+| V1 | `tests/test_methods_fusion.py::test_v1_edge_cases` | none (CPU); +gpu (CUDA) | P / S | PASS 64 (P + S, gate g32-w51) |
+| V1 | `tests/test_methods_assembly.py::test_v1_stage_measured_with_the_supplied_earlier_records` | none | P | PASS 2 (P, gate g32-w51) |
+| V1 | `tests/test_methods_assembly_prototype.py::test_analyze_against_statistics_of` | none | P | PASS 64 (P, gate g32-w51) |
+| V1 | `tests/test_methods_assembly_prototype.py::test_render_against_correct_with_the_same_record` | none | P | PASS 64 (P, gate g32-w51) |
+| V1 | `tests/test_methods_assembly_prototype.py::test_cpu_against_gpu_within_ad11` | gpu | S | PASS 6 (S, gate g32-w51) |
 | V2 | Owner visual review at CP5 | n/a | n/a | Pending CP5; no automated preference oracle |
-| V3 | `tests/test_wp42_v3_product.py::test_the_lossless_clips_decode_inside_wp39s_envelope` | gpu, slow | S | (gate) |
-| V3 | `tests/test_wp42_v3_product.py::test_ad14_bound_with_the_product_method` | gpu, slow | S | (gate) |
-| V3 | `tests/test_wp42_v3_product.py::test_v3_ratio_on_the_jittering_patch_clip_with_the_product_method` | gpu, slow | S | (gate) |
+| V3 | `tests/test_wp42_v3_product.py::test_the_lossless_clips_decode_inside_wp39s_envelope` | gpu, slow | S | PASS 1 (S, gate g32-w51) |
+| V3 | `tests/test_wp42_v3_product.py::test_ad14_bound_with_the_product_method` | gpu, slow | S | PASS 2 (S, gate g32-w51) |
+| V3 | `tests/test_wp42_v3_product.py::test_v3_ratio_on_the_jittering_patch_clip_with_the_product_method` | gpu, slow | S | PASS 2 (S, gate g32-w51) |
 | V4 | `tests/test_v51_video_acceptance.py::test_v4_runner_preserves_fixture_fidelity` | slow | S | PASS L15 |
 | V4 | `tests/test_v51_video_acceptance.py::test_v4_truncated_runner_batch_obeys_d86` | slow | S | PASS L15 |
 | V4 | `tests/test_v51_video_acceptance.py::test_v4_real_trim_records_best_effort_presence` | footage, slow | S | PASS M6 observation; current gate pending |
-| V4 | `tests/test_wp42_video_path.py::test_v4_through_the_composition_on_the_cpu` | none | P | (gate) |
-| V4 | `tests/test_wp42_video_path.py::test_v4_through_the_composition_on_the_gpu_with_device_frames` | gpu | S | (gate) |
-| V4 | `tests/test_jobs_export_video.py::test_v4_every_decodable_sample_through_the_engine` | none (libx265); gpu (NVENC) | P / S | (gate) |
-| V4 | `tests/test_jobs_export_video.py::test_v4_synthetic_5k3_8_7_clip` | slow | S | (gate) |
-| V4 | `tests/test_jobs_export_video.py::test_gx011627_through_the_engine_keeps_every_mandatory_and_required_item` | footage, gpu, slow; +fullclip on full | S trim / F full | (gate) |
-| V5 | `tests/test_wp41_photo_path.py::test_v5_bit_depth_icc_exif_and_provenance` | none | P | (gate) |
+| V4 | `tests/test_wp42_video_path.py::test_v4_through_the_composition_on_the_cpu` | none | P | PASS 1 (P, gate g32-w51) |
+| V4 | `tests/test_wp42_video_path.py::test_v4_through_the_composition_on_the_gpu_with_device_frames` | gpu | S | PASS 1 (S, gate g32-w51) |
+| V4 | `tests/test_jobs_export_video.py::test_v4_every_decodable_sample_through_the_engine` | none (libx265); gpu (NVENC) | P / S | PASS 12 (P + S, gate g32-w51) |
+| V4 | `tests/test_jobs_export_video.py::test_v4_synthetic_5k3_8_7_clip` | slow | S | PASS 1 (S, gate g32-w51) |
+| V4 | `tests/test_jobs_export_video.py::test_gx011627_through_the_engine_keeps_every_mandatory_and_required_item` | footage, gpu, slow; +fullclip on full | S trim / F full | PASS 2 (F + S, gate g32-w51) |
+| V5 | `tests/test_wp41_photo_path.py::test_v5_bit_depth_icc_exif_and_provenance` | none | P | PASS 66 (P, gate g32-w51) |
 | V5 | `tests/test_v51_photo_acceptance.py::test_v5_jpeg_two_readers_and_pose` | none | P | PASS L15 |
 | V5 | `tests/test_v51_photo_acceptance.py::test_v5_heic_two_readers_and_ad24` | none | P | PASS L15 |
 | V6 | `tests/test_v51_video_acceptance.py::test_v6_hdr_refusals_do_not_stop_batch` | slow | S | PASS L15 |
 | V6 | `tests/test_v51_video_acceptance.py::test_v6_untagged_runner_warns_bt709_limited` | slow | S | PASS L15 |
 | V6 | `tests/test_v51_video_acceptance.py::test_v4_truncated_runner_batch_obeys_d86` | slow | S | PASS L15 |
 | V6 | `tests/test_v51_shell_acceptance.py::test_v6_real_untagged_shell_warns_bt709_limited` | gui | S | PASS H12 |
-| V6 | `tests/test_headless_export.py::test_refused_items_fail_and_the_batch_continues` | none | P | (gate) |
-| V6 | `tests/test_headless_export.py::test_damaged_photos_are_failed_items_and_the_batch_continues` | none | P | (gate) |
-| V6 | `tests/test_app_wiring.py::test_g10_damaged_unsupported_and_untagged_inputs_get_a_readable_message` | gui | S | (gate) |
-| V7 | `tests/test_app_v7.py::test_v7_a_b_analysis_and_scrubbing` | gui, slow | S | (gate); PASS figure of record below |
-| V7 | `tests/test_app_v7.py::test_v7_c_e_export_and_a_full_render_during_it` | gui, slow | S | (gate); PASS figure of record below |
-| V7 | `tests/test_app_v7.py::test_v7_d_a_batch_of_300_stills` | gui, slow | S | (gate); PASS figure of record below |
-| V7 | `tests/test_app_v7.py::test_v7_f_start_up_with_a_slow_cache_open` | gui, slow | S | (gate); PASS figure of record below |
-| V8 | `tests/test_app_v8_v18.py::test_v8_photo_preview_at_1_1_and_k_2_and_4_against_the_downscaled_export` | gui | S | (gate); WP4.3 figure cited below |
-| V8 | `tests/test_app_v8_v18.py::test_v8_photo_k_above_1_on_real_sized_content` | gui, slow | S | (gate); WP4.3 figure cited below |
-| V8 | `tests/test_app_v8_v18.py::test_dr75_an_nclx_only_p3_photo_is_displayed_through_the_profile_its_export_embeds` | gui | S | (gate); WP4.3 figure cited below |
-| V8 | `tests/test_app_v8_v18.py::test_v8_video_pre_encode_through_the_harness_on_the_shells_frame` | gui | S | (gate); WP4.3 figure cited below |
-| V8 | `tests/test_methods_assembly_v8.py::test_v8_preview_against_the_downscaled_export` | slow (CPU); gpu (CUDA) | S | (gate); WP4.3 figure cited below |
-| V9 | `tests/test_wp41_photo_path.py::test_v9_neutral_is_the_identity` | none | P | (gate) |
-| V9 | `tests/test_wp42_video_path.py::test_v9_neutral_parameters_reproduce_the_decoded_source` | none | P | (gate) |
+| V6 | `tests/test_headless_export.py::test_refused_items_fail_and_the_batch_continues` | none | P | PASS 1 (P, gate g32-w51) |
+| V6 | `tests/test_headless_export.py::test_damaged_photos_are_failed_items_and_the_batch_continues` | none | P | PASS 1 (P, gate g32-w51) |
+| V6 | `tests/test_app_wiring.py::test_g10_damaged_unsupported_and_untagged_inputs_get_a_readable_message` | gui | S | PASS 5 (S, gate g32-w51) |
+| V7 | `tests/test_app_v7.py::test_v7_a_b_analysis_and_scrubbing` | gui, slow | S | PASS 1 (S, gate g32-w51); PASS figure of record below |
+| V7 | `tests/test_app_v7.py::test_v7_c_e_export_and_a_full_render_during_it` | gui, slow | S | PASS 1 (S, gate g32-w51); PASS figure of record below |
+| V7 | `tests/test_app_v7.py::test_v7_d_a_batch_of_300_stills` | gui, slow | S | PASS 1 (S, gate g32-w51); PASS figure of record below |
+| V7 | `tests/test_app_v7.py::test_v7_f_start_up_with_a_slow_cache_open` | gui, slow | S | PASS 1 (S, gate g32-w51); PASS figure of record below |
+| V8 | `tests/test_app_v8_v18.py::test_v8_photo_preview_at_1_1_and_k_2_and_4_against_the_downscaled_export` | gui | S | PASS 1 (S, gate g32-w51); WP4.3 figure cited below |
+| V8 | `tests/test_app_v8_v18.py::test_v8_photo_k_above_1_on_real_sized_content` | gui, slow | S | passed 0, skipped 1, failed 0 (S, gate g32-w51); standing skip: the look-check frame is archived to D: (one of the 11 standing serial skips); WP4.3 figure cited below |
+| V8 | `tests/test_app_v8_v18.py::test_dr75_an_nclx_only_p3_photo_is_displayed_through_the_profile_its_export_embeds` | gui | S | PASS 1 (S, gate g32-w51); WP4.3 figure cited below |
+| V8 | `tests/test_app_v8_v18.py::test_v8_video_pre_encode_through_the_harness_on_the_shells_frame` | gui | S | PASS 1 (S, gate g32-w51); WP4.3 figure cited below |
+| V8 | `tests/test_methods_assembly_v8.py::test_v8_preview_against_the_downscaled_export` | slow (CPU); gpu (CUDA) | S | passed 0, skipped 8, failed 0 (S, gate g32-w51); standing skip: the look-check frame is archived to D: (one of the 11 standing serial skips); WP4.3 figure cited below |
+| V9 | `tests/test_wp41_photo_path.py::test_v9_neutral_is_the_identity` | none | P | PASS 132 (P, gate g32-w51) |
+| V9 | `tests/test_wp42_video_path.py::test_v9_neutral_parameters_reproduce_the_decoded_source` | none | P | PASS 2 (P, gate g32-w51) |
 | V9 | `tests/test_v51_video_acceptance.py::test_v9_neutral_runner_postencode` | slow | S | PASS L15 |
-| V10 | `tests/test_wp41_photo_path.py::test_v10_cross_format_clash_is_numbered` | none | P | (gate) |
-| V10 | `tests/test_wp41_photo_path.py::test_v10_an_existing_output_is_never_overwritten` | none | P | (gate) |
-| V10 | `tests/test_wp41_photo_path.py::test_v10_custom_suffix` | none | P | (gate) |
+| V10 | `tests/test_wp41_photo_path.py::test_v10_cross_format_clash_is_numbered` | none | P | PASS 2 (P, gate g32-w51) |
+| V10 | `tests/test_wp41_photo_path.py::test_v10_an_existing_output_is_never_overwritten` | none | P | PASS 1 (P, gate g32-w51) |
+| V10 | `tests/test_wp41_photo_path.py::test_v10_custom_suffix` | none | P | PASS 1 (P, gate g32-w51) |
 | V10 | `tests/test_v51_video_acceptance.py::test_v10_repeated_video_exports_are_numbered` | slow | S | PASS L15 |
 | V10 | `tests/test_v51_video_acceptance.py::test_v10_existing_video_output_is_unchanged` | slow | S | PASS L15 |
 | V10 | `tests/test_v51_video_acceptance.py::test_v10_mov_mp4_share_one_numbering_sequence` | slow | S | PASS L15 |
 | V11 | `tests/test_v51_photo_acceptance.py::test_v11_png_disk_full_removes_partial_output` | none | P | PASS L15 |
 | V11 | `tests/test_v51_photo_acceptance.py::test_v11_photo_crash_leftovers_are_cleaned_at_start` | slow | S | PASS L15 / C15 |
 | V11 | `tests/test_v51_photo_acceptance.py::test_d85_same_file_cleanup_preserves_installed_final` | none | P | PASS L15 |
-| V11 | `tests/test_jobs_export_video.py::test_v11_an_encoder_killed_mid_stream_leaves_no_partial_output` | none | P | (gate) |
-| V11 | `tests/test_jobs_export_video.py::test_a_cancel_mid_encode_leaves_nothing_and_keeps_earlier_outputs` | none | P | (gate) |
-| V11 | `tests/test_jobs_export_video.py::test_a_cancel_during_the_product_sinks_close_is_aborted_and_leaves_nothing` | none | P | (gate) |
-| V11 | `tests/test_jobs_export_video.py::test_v11_a_killed_export_process_leaves_only_a_temporary_that_is_cleaned_up` | slow | S | (gate) |
-| V11 | `tests/test_jobs_export.py::test_cancel_at_each_phase_leaves_nothing` | none | P | (gate) |
-| V11 | `tests/test_jobs_export.py::test_disk_full_from_the_sink_is_named_and_leaves_nothing` | none | P | (gate) |
-| V11 | `tests/test_app_leftovers.py::test_v11_leftovers_of_a_crash_are_removed_at_the_next_start` | gui | S | (gate) |
+| V11 | `tests/test_jobs_export_video.py::test_v11_an_encoder_killed_mid_stream_leaves_no_partial_output` | none | P | PASS 1 (P, gate g32-w51) |
+| V11 | `tests/test_jobs_export_video.py::test_a_cancel_mid_encode_leaves_nothing_and_keeps_earlier_outputs` | none | P | PASS 1 (P, gate g32-w51) |
+| V11 | `tests/test_jobs_export_video.py::test_a_cancel_during_the_product_sinks_close_is_aborted_and_leaves_nothing` | none | P | PASS 3 (P, gate g32-w51) |
+| V11 | `tests/test_jobs_export_video.py::test_v11_a_killed_export_process_leaves_only_a_temporary_that_is_cleaned_up` | slow | S | PASS 1 (S, gate g32-w51) |
+| V11 | `tests/test_jobs_export.py::test_cancel_at_each_phase_leaves_nothing` | none | P | PASS 3 (P, gate g32-w51) |
+| V11 | `tests/test_jobs_export.py::test_disk_full_from_the_sink_is_named_and_leaves_nothing` | none | P | PASS 1 (P, gate g32-w51) |
+| V11 | `tests/test_app_leftovers.py::test_v11_leftovers_of_a_crash_are_removed_at_the_next_start` | gui | S | PASS 1 (S, gate g32-w51) |
 | V12 | Chapter grouping deferred to v2 | n/a | n/a | Deferred v2 |
-| V13 | `tests/test_config_presets.py::test_v13_export_then_import_reproduces_the_set` | none | P | (gate) |
+| V13 | `tests/test_config_presets.py::test_v13_export_then_import_reproduces_the_set` | none | P | PASS 1 (P, gate g32-w51) |
 | V14 | Six N5 results and decisions in docs/reports/wp1.6-gate-report.md | n/a | n/a | Recorded; PASS V14, see six-result table |
 | V15 | Memory measurement owned by WP5.2 | n/a | n/a | Pending WP5.2 |
 | V16 | Performance measurement owned by WP5.2 | n/a | n/a | Pending WP5.2 |
-| V17 | `tests/test_wp42_video_path.py::test_v17_a_reopen_skips_the_decode_and_renders_the_same_frames` | none | P | (gate) |
-| V17 | `tests/test_analysis_engine.py::test_a_complete_entry_skips_the_decode_pass_and_gives_the_same_statistics` | none | P | (gate) |
+| V17 | `tests/test_wp42_video_path.py::test_v17_a_reopen_skips_the_decode_and_renders_the_same_frames` | none | P | PASS 1 (P, gate g32-w51) |
+| V17 | `tests/test_analysis_engine.py::test_a_complete_entry_skips_the_decode_pass_and_gives_the_same_statistics` | none | P | PASS 1 (P, gate g32-w51) |
 | V17 | `tests/test_cache_store.py::test_other_versions_and_unreadable_entries_are_removed_when_opening` | none | P | PASS X13 |
 | V17 | `tests/test_cache_jpeg.py::test_the_format_number_was_bumped_and_a_format_1_entry_is_removed_when_opening` | none | P | PASS X13 |
 | V18 | `tests/test_v51_shell_acceptance.py::test_v18_real_trim_preview_precedes_analysis_and_updates` | footage, gui, slow | S | PASS H12 |
-| V18 | `tests/test_app_v8_v18.py::test_v18_a_corrected_frame_shows_before_the_analysis_completes_and_updates_after` | gui | S | (gate) |
-| N10 | `tests/test_wp41_photo_path.py::test_n10_the_same_still_twice_is_identical` | none | P | (gate) |
-| N10 | `tests/test_wp41_photo_path.py::test_gpu_export_reports_gpu_and_matches_the_cpu` | gpu | S | (gate) |
-| N10 | `tests/test_methods_assembly_prototype.py::test_same_device_twice_is_bit_identical` | none (CPU); +gpu (CUDA) | P / S | (gate) |
+| V18 | `tests/test_app_v8_v18.py::test_v18_a_corrected_frame_shows_before_the_analysis_completes_and_updates_after` | gui | S | PASS 1 (S, gate g32-w51) |
+| N10 | `tests/test_wp41_photo_path.py::test_n10_the_same_still_twice_is_identical` | none | P | PASS 2 (P, gate g32-w51) |
+| N10 | `tests/test_wp41_photo_path.py::test_gpu_export_reports_gpu_and_matches_the_cpu` | gpu | S | PASS 1 (S, gate g32-w51) |
+| N10 | `tests/test_methods_assembly_prototype.py::test_same_device_twice_is_bit_identical` | none (CPU); +gpu (CUDA) | P / S | PASS 4 (P + S, gate g32-w51) |
 | N10 | `tests/test_v51_video_acceptance.py::test_n10_video_cpu_render_digests_repeat` | slow | S | PASS L15 |
 | N10 | `tests/test_v51_video_acceptance.py::test_n10_video_gpu_render_digests_repeat_and_match_cpu` | gpu, slow | S | PASS H12 |
-| D91 | `tests/test_wp41_photo_path.py::test_v5_bit_depth_icc_exif_and_provenance` | none | P | (gate) |
+| D91 | `tests/test_wp41_photo_path.py::test_v5_bit_depth_icc_exif_and_provenance` | none | P | PASS 66 (P, gate g32-w51) |
 | D91 | `tests/test_v51_video_acceptance.py::test_d91_video_provenance` | slow | S | PASS L15 |
 
 The table's existence check is itself committed as
@@ -375,7 +375,7 @@ conflicting sentence and confirmed 8276adb5's end-state retry/SKIP rule.
 | Hardware/source availability | GPU form can skip if no usable CUDA device; footage fixture can skip without configured footage. Neither occurred in returned seat runs; the final gate must use the configured host. |
 | Prior main gate: standing swscale case | WP-D54 parallel had 1 skip: yuvj is read as full regardless of in_range, so that planted range-misread case is refused; not a new WP5.1 skip. |
 | Prior main gate: archived look-check content | WP-D54 serial had 11 skips: absent frames archived to D:, 1 shell V8 crop, 5+4 method V8 cases, 1 WP4.1 V8 crop. Existing availability guards unchanged; no current-candidate skip count invented. |
-| Final whole-set gate skips | (gate); exact nodes/reasons copied from the accept record. |
+| Final whole-set gate skips | Parallel 1: `test_color_roundtrip.py:123` (swscale reads a yuvj format as full whatever in_range says; refused). Serial 11: look-check frames archived to D: (`test_app_v8_v18.py:134` 1, `test_methods_assembly_v8.py:44` 5 + 4, `test_wp41_v8.py:193` 1). Fullclip 0. No new WP5.1 skip. |
 
 ## Reviews and verification
 
@@ -455,12 +455,12 @@ any other gate failure is a STOP. It passed in the cited prior main gate.
 
 | Final candidate / check | Passed | Skipped | Failed | Deselected / selected | Wall seconds | Exit / source |
 |---|---|---|---|---|---|---|
-| Candidate and base ids | (gate) | (gate) | (gate) | (gate) | (gate) | (gate) |
-| Parallel P | (gate) | (gate) | (gate) | (gate) | (gate) | (gate) |
-| Serial S | (gate) | (gate) | (gate) | (gate) | (gate) | (gate) |
-| Fullclip F, ONE run | (gate) | (gate) | (gate) | (gate) | (gate) | (gate) |
-| Collection identity, no duplicates / overlaps | (gate) | (gate) | (gate) | (gate) | (gate) | (gate) |
-| Ruff / format / mypy / LF checks | (gate) | (gate) | (gate) | (gate) | (gate) | (gate) |
+| Candidate and base ids | candidate `232e4af5` | on main `f1733802` | 19 package patch ids identical to the author branch | - | - | gate run `g32-w51`; record `docs/proofs/wp5.1-accept.md` |
+| Parallel P | 6,270 | 1 | 0 | 1,272 / 6,271 | 491 | EXIT 0; the skip is the standing swscale refusal |
+| Serial S | 1,254 | 11 | 0 | 6,278 / 1,265 | 2,039 | EXIT 0, alone on the host; the 11 standing archived-frame skips |
+| Fullclip F, ONE run | 7 | 0 | 0 | 7,536 / 7 | 1,607 | EXIT 0, alone on the host |
+| Collection identity, no duplicates / overlaps | 7,543 = 6,271 + 1,265 + 7 | - | - | 0 duplicates; union = collect-all | - | holds |
+| Ruff / format / mypy / LF checks | ruff clean; 300 files formatted; mypy 149 files, no issues | - | - | - | - | 0 CR in every changed blob |
 
 Two serial baselines are preserved rather than mixing their populations:
 
@@ -478,11 +478,11 @@ contribution at the gate, without substituting a mixed-condition sum.
 
 | Serial addition / comparison | Figure | Rule / interpretation |
 |---|---|---|
-| New WP5.1 serial node count and measured time contribution | (gate) | Marked addition measured in the leg; development figures are not this value |
-| Final serial wall minus primary WP-D54 1,606 s | (gate) | Primary contemporary leg delta |
-| Final serial wall minus historical WP-T6 1,389.24 s | (gate) | Historical floor comparison |
-| Package serial addition against allowance | (gate) | <= 300 s per CHARC 2bd14e3a; over allowance goes to CHARC, never hidden behind fullclip |
-| Final skips with reasons / any STOP disposition | (gate) | Accept record names exact nodes and outcomes |
+| New WP5.1 serial node count and measured time contribution | 23 nodes, 271.7 s summed junit time (video 190.3, shell 80.0, photo 1.4); parallel 15 nodes 3.3 s; fullclip 0 | Marked addition measured in the leg; development figures are not this value |
+| Final serial wall minus primary WP-D54 1,606 s | 2,039 - 1,606 = +433 s; main has since gained WP-T7 and WP3.6P, whose gate on main without this package read 1,823 s alone (+216 s against that) | Primary contemporary leg delta |
+| Final serial wall minus historical WP-T6 1,389.24 s | +650 s (different populations) | Historical floor comparison |
+| Package serial addition against allowance | 271.7 s measured node time, +216 s against the contemporary main leg: within the 300 s allowance | <= 300 s per CHARC 2bd14e3a; over allowance goes to CHARC, never hidden behind fullclip |
+| Final skips with reasons / any STOP disposition | The standing 1 + 11 skips above; no failure, no timeout, no stall; no STOP | Accept record names exact nodes and outcomes |
 
 The accept commit fills these figures and dispositions from its gate
 record. V2/CP5, V12/v2 and V15/V16/WP5.2 retain their separate owners and
