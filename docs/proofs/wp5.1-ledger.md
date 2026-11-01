@@ -446,7 +446,8 @@ ruling; evaluate depth near 200K and stop at a step boundary near 250K.
 | 5 / T4 complete; session 2 ends | `01a1963b-002e-7cc3-9d5d-0f7807bb5ed9` | 194,928 | retired after `93869f4c`; fresh session 3 starts T5 from this ledger |
 | 6 / T5-T6 product STOP; session 3 starts | `01a19671-ba33-7f71-a3ee-47dd1c74f2db` | 120,480 | committed `462d7bb6` (0 CR); CHARC `3a1497d6` permits T6/T7 continuation with T6-1 KNOWN RED, owned by WP-D54 |
 | 7 / T6 validation | `01a19671-ba33-7f71-a3ee-47dd1c74f2db` | 143,997 | committed `7687f564` (ledger, 0 CR); brief amendment `1ed04a21` folds in CHARC's T6-1/T6-2 rulings |
-| 8 / T6-2 remediation and T7 | `01a19671-ba33-7f71-a3ee-47dd1c74f2db` | pending dispatcher | dispatcher reads footer; evaluate near 200K, stop at a step boundary near 250K |
+| 8 / T6-2 remediation and T7; session 3 ends | `01a19671-ba33-7f71-a3ee-47dd1c74f2db` | 177,474 | retired after `2f1c0954`; fresh session 4 starts T8 from this ledger |
+| 9 / T8; session 4 starts | pending dispatcher | pending dispatcher | dispatcher reads footer and runs both GUI nodes at its seat; yield after T8 |
 
 Next authorized build group after rulings: T2 support + photo RED, then yield.
 Later yields remain after T4, T6, T8, every adjudicated review round, and before
@@ -1687,3 +1688,136 @@ CPU/GPU first-frame mean/max and executed mutation properties. Any GPU
 failure is adjudicated against the brief's unchanged T7 bounds; no fallback
 or softening. Yield here after T7 for the seat run; T8 shell construction
 is not started in this turn.
+
+## Session 4 / Turn 9: T8
+
+### Session boundary, inherited state and scope
+
+Fresh session 4 starts from committed HEAD `2f1c0954`, as dispatched.
+Session 3 retired after turn 8 at **177,474** depth_input_tokens; that
+dispatcher-supplied figure and the retirement are now in the depth table.
+Session 4's id and depth remain for the dispatcher to fill; no estimate.
+
+This turn builds only `tests/test_v51_shell_acceptance.py` and updates this
+ledger. T9 traceability and T10 report construction have not begun. Known
+T6-1 runner-warning RED remains unchanged, awaiting the separate WP-D54
+product fix and rebase. No new product STOP is established by collection or
+static inspection; the two GUI outcomes require the seat run below.
+
+### G8 GPU seat result returned by the dispatcher
+
+The turn-9 dispatch supplies the following result on `2f1c0954`. This is
+seat evidence returned by the dispatcher, not a GPU run in this sandbox;
+it supersedes turn 8's pending GPU row without rewriting that history.
+Evidence requested in turn 8: `work/wp5.1/t8-seat-gpu.log` and
+`work/wp5.1/t8-seat-gpu.xml`.
+
+| Node (tests/test_v51_video_acceptance.py::) | Markers / leg | Returned result | Returned figures |
+|---|---|---|---|
+| test_n10_video_gpu_render_digests_repeat_and_match_cpu | gpu, slow / serial | 1 passed in 19.37 s; call 18.75 s | render_frame_count 45; render_devices ['cuda:0']; output_files_byte_identical True; cpu_gpu_first_frame_max 0.0; cpu_gpu_first_frame_mean 0.0; both mutation probes rejected |
+
+All 45 rendered pts have repeat-identical GPU digests. The decoded 8-bit
+CPU/GPU first frames are identical: unchanged AD-11 max 2e-3 and mean 2e-4
+bounds hold. File-byte identity is recorded only, not a requirement.
+
+### T8 nodes and reused anchors
+
+Exactly **two** nodes are added, matching round 0's roster. All shell
+startup uses the existing real `make_app` fixture from
+`tests/test_app_startup.py:71`, `cpu_settings` at `:63`, `wait_started`
+at `:105`, `open_source` at `:114`, `presenter` at `:98`, and
+`wait_analysis` / `latest_analysis` at `:123` / `:131`. Importing
+`gui_support` sets offscreen QPA before the shell imports. Settings,
+startup journal, cache and configured output folder are below tmp_path.
+
+| Collected node (tests/test_v51_shell_acceptance.py::) | Markers / leg | Runner surface / assertions | Result |
+|---|---|---|---|
+| test_v6_real_untagged_shell_warns_bt709_limited | gui / serial | real committed vid-untagged, build_application/open_path, capturing presenter; warning identifies source and contains both BT.709 and limited; ASCII and names-only text; source MD5 unchanged | COLLECTED; GUI execution pending seat |
+| test_v18_real_trim_preview_precedes_analysis_and_updates | gui, footage, slow(reason="real-trim analysis and FFmpeg decode") / serial | gx011627_trim, existing HeldEngines hook, displayed provisional pixels during running analysis, later nonzero displayed-pixel change at unchanged pts and geometry, exact smoothed_record statistics | COLLECTED; GUI/footage execution pending seat |
+
+V6 follows `tests/test_app_wiring.py:382`'s real G10 case; the existing
+empty-word row at `:377` remains unchanged. Its stricter new literal assertion
+is not softened or xfailed. The actual product route is
+`gui/sources.py:169` open_video -> fault_messages / assumed_colour ->
+`gui/shell.py:436` _on_opened -> presenter. Message text is checked for
+names only; the presenter's internal Message.path identity is not serialized
+as a record. Names-only source and actual warning texts are JUnit properties.
+Controls reject no warning, BT.709-only and limited-only warnings, inside
+the node; their execution awaits the seat. V6 has gui only, as planned;
+its measured duration will decide whether it also needs slow under AD-30.
+
+V18 reuses `tests/test_app_v8_v18.py:366` HeldEngines and the `:405` test's
+form. The only hold is inside the real analysis frame iterator after the
+first frame: it does not replace any probe, correction method or decoder.
+The node releases the hold in finally even if the provisional assertions
+fail. Before release: a rendered corrected after_image exists, analysis
+phase is running and session.statistics is None. Its RGB888 image_bytes
+snapshot is a copy (`gui/imaging.py:257`), so later widget replacement
+cannot mutate the baseline. After release: analysis completes, a later
+render arrives, hook decode ends after the expected real-trim frame count,
+the same pts and shape remain, and maximum absolute pixel change is > 0.
+Mean and max change (1/255 units), pts, source name and frame count are
+recorded. The supplied statistics must equal the engine's smoothed_record
+at that same pts. Source MD5 is guarded on success and failure. This node
+uses the trim fixture directly, adding no fullclip instance.
+
+### Light validation and verification-loop record
+
+All runner outputs are file-backed below work/wp5.1. No GUI, footage or
+GPU execution occurred in this sandbox. Collection invokes pytest with
+the mandatory sandbox_mkdir_shim and no cache provider; it does not
+instantiate any fixture or open the footage folder.
+
+| Evidence under work/wp5.1/ | Observed summary |
+|---|---|
+| t9-collect.log | exit 0; 2 tests collected in 1.01 s on the final source; both full node ids and all markers printed by collection-only hook |
+| t9-ruff.log | exit 0; All checks passed! for support and all three new acceptance modules |
+| t9-mypy.log | exit 0; Success: no issues found in 146 source files (project strict mypy) |
+| t9-test-mypy.log | supplementary unscoped new-test check encountered 32 existing errors in the two imported GUI test modules; no existing test edited |
+| t9-test-mypy-scoped.log | exit 0; Success: no issues found in 1 source file; strict check of the new module with MYPYPATH=tools;tests and --follow-imports=silent |
+| t9-lf.log | zero CR bytes in both changed files |
+| t9-diff-check.log | exit 0; diff whitespace check clean |
+
+The unscoped test check follows imports into existing test_app_startup and
+test_app_v8_v18, which the project's mypy files list does not include. The
+scoped supplementary check keeps strict checking enabled for the owned
+module while suppressing errors inside those read-only imported modules;
+the normal project mypy check also passes. No type-ignore or project
+configuration change was added. Ruff format --check remains the dispatcher's
+seat check, as the fill specifies.
+
+Verification loop: checked the real warning dispatch path independently
+against the G10 test; no missing-warning defect inferred from the existing
+empty-string assertion. Confirmed collection and intended markers without
+running GUI fixtures. Checked pixel snapshots are copies and held analysis
+is released in finally, and guarded unchanged pts/shape so a different
+frame cannot satisfy the statistics-update assertion. Behavior, controls
+and pixel figures remain unverified until the seat run; they are not
+claimed green. No confirmed new product finding, false-positive product
+finding, product fix or review round this turn. NEW 0 / REOPENED 0;
+reverts 0; product-code fixes 0; one new test module and this ledger.
+
+Locks: no product/existing-test edit, dependency, committed fixture,
+interface, local configuration, footage-folder read, other-worktree access,
+mailbox post, git-index write or commit. Names-only records and source MD5
+checks are implemented; their runtime outcome is pending. T6-1's failing
+node and its helper are untouched. Every node write is under tmp_path;
+the existing guarded session trim is managed by its session fixture.
+
+### T8 RUN REQUEST and yield
+
+ONE run at the dispatcher's seat, from the worktree root in Git Bash with
+PYTEST_ADDOPTS unset, no exclusive window or other heavy job running.
+Expected **30-150 s** (estimate, not a timing figure); covers both nodes,
+including the footage node. No sandbox shim at the seat.
+
+```bash
+PYTHONPATH=scripts QT_QPA_PLATFORM=offscreen uv run pytest -q -rs tests/test_v51_shell_acceptance.py -m "gui" --basetemp=work/wp5.1/t9-seat-shell --durations=0 -o junit_family=xunit1 --junitxml=work/wp5.1/t9-seat-shell.xml > work/wp5.1/t9-seat-shell.log 2>&1
+```
+
+Return the log/XML, per-node setup/call/teardown times, actual warning
+texts and executed controls, V18 pixel-change max/mean and smoothed-statistics
+result, and any skips/failures. A real-product failure stays red and is a
+STOP to CHARC under Q3; no softening or product repair is authorized here.
+The 300 s package serial-leg budget remains in force, measured at the gate;
+these pending durations are not yet a serial delta. Yield after T8.
