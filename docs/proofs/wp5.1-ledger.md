@@ -455,7 +455,8 @@ ruling; evaluate depth near 200K and stop at a step boundary near 250K.
 | 10 / T8 seat result and T9 | `01a1968e-ac9f-7f81-aecc-78a4b492c479` | 147,709 | committed `f9b0fa34` (0 CR); seat ruff/format clean; Reviewer A round 1 returned 1 major, 2 minor, 5 advisories |
 | 11 / Reviewer A round 1 adjudication; session 4 retires | `01a1968e-ac9f-7f81-aecc-78a4b492c479` | 191,275 | committed `6d8689b3`; retired at the evaluation point before multi-finding remediation; fresh session 5 starts T12 |
 | 12 / Reviewer A round 1 remediation; session 5 starts | session 5; id pending dispatcher | 118,369 | committed `5f75a03a` before rebase; seat GUI/GPU 3 passed; F3 ruled closed; WP-D54 accepted and branch rebased to `f059b2e0`; R2 converged |
-| 13 / Reviewer A round 2 adjudicated, terminating cleanup | session 5; id pending dispatcher | pending dispatcher | owned tests/support cleanup and ledger; yield before T10, Reviewer B and three-leg gate; evaluate near 200K, stop near 250K at a step boundary |
+| 13 / Reviewer A round 2 adjudicated, terminating cleanup | session 5; id pending dispatcher | 158,027 | committed `d44db8d1`, 0 CR; Reviewer A converged at R2; T12 seat run stands because the three nodes and their called helpers are unchanged |
+| 14 / T10 report | session 5; id pending dispatcher | pending dispatcher | documentation only through an exclusive host window; yield for Reviewer B and the final three-leg gate; no pytest, ruff or mypy |
 
 Next authorized build group after rulings: T2 support + photo RED, then yield.
 Later yields remain after T4, T6, T8, every adjudicated review round, and before
@@ -2733,3 +2734,121 @@ at round 2 with this terminating cleanup; T10 is the next turn. Reviewer B,
 the final parallel + serial + ONE fullclip gate, collection identity,
 and the actual serial-leg delta against the 300 s allowance remain at
 the dispatcher's seat and are not claimed as completed here.
+
+## Session 5 / Turn 14: T10 report
+
+### Base, depth and standing seat evidence
+
+Turn 13 committed as **d44db8d1**, with 0 CR confirmed by the dispatcher.
+Dispatcher-supplied depth after turn 13 is **158,027** input tokens;
+the depth table records it. Session 5 continues; this turn's depth and
+the session id remain for the dispatcher, never estimated by the cell.
+
+The turn-14 seat check confirms turn 13 changed only the owned support,
+photo and traceability modules plus the light runner warning control.
+The GPU N10 and two shell nodes, and the helpers they call, are unchanged;
+interpreter_command/runner_command are used only by the photo crash node.
+Therefore **H12's 3 passes in 86.69 s on 5f75a03a stand**, with no repeat
+seat run. Exact returned pre-encode, provisional and post-analysis
+figures remain those in turn 13 above. No new RUN REQUEST.
+
+An EXCLUSIVE host measurement window is open. This turn ran **no pytest,
+ruff or mypy**, no product/runner export, no test import/collection, and
+no GUI/GPU/footage/fullclip node. Only source/document reading, stdlib
+documentation assembly, rg reference lookup and byte checks were used.
+Those scripts/logs live under work/wp5.1; no host measurement was started.
+
+### Report delivered and source mapping
+
+Created **docs/reports/wp5.1-acceptance.md**, the T10 acceptance report.
+It contains the full V1-V18/N10/D91 Python roster (84 function addresses,
+82 unique functions), each with scheduling markers, P/S/F leg and an
+actual development/seat result or explicit gate-pending result. Parameter
+and fixture-derived GPU/fullclip forms are distinguished; no scheduling
+marker or test is changed. The separate T9 node is also cited and checked.
+
+The report cites V7 (a)18/(b)19/(d)56/(f)50.6 ms from WP4.3 window 5 and
+(c)39/(e)48 ms from WP4.6's accepted window. **DR-98 CLOSED** at WP4.6's
+accept, main **bbb4ef3e**, source **docs/proofs/wp4.6-accept.md**; the old
+180-182 ms STOPs are clearly historical. WP4.6's batch control 67 ms is
+not substituted for the commissioned WP4.3 56 ms record. V8's amended
+video/still bounds and existing window figures are cited separately.
+V18 distinguishes WP4.3 full-clip evidence from the stronger automated
+trim provisional/original comparison. V14 cites all six N5 outcomes and
+decisions from wp1.6-gate-report.md, including the original missed speed
+target and owner's Option C; no historical failure is relabelled a pass.
+
+All pending scope is explicit: V2 CP5, V12 v2, V15/V16 WP5.2 and the
+unavailable real-static V3 leg. The report includes M6's seven-item
+metadata presence table and its three creation-time losses, with the
+WP3.10 generic limitation distinguished from this new triple-loss
+observation. It records the post-encode means/maxima and high-quality
+characterisation, +8 control margin, exact CPU/GPU pre-encode figures,
+bit-identical per-PTS repeat digests, byte identity as observation only,
+names-only provenance and the two-reader viewer surrogate.
+
+The STOP table covers R0-1..4, T2-1/T3-1/T4-1, T6-1/T6-2, the serial
+allowance ruling, review crash flake, carried V7 STOPs and depth yields.
+The D85 deterministic witness is explicitly separate from natural race
+observations. Every recorded WP5.1 successful run has zero skips; the
+allowed no-surviving-temporary skip and the exact current crash retry
+counts are disclosed, along with prior main's swscale/archived-frame
+skips and future gate placeholders. Reviewer A R1/R2 counts, dispositions
+and round-2 convergence are recorded; Reviewer B remains pending.
+
+### Gate figures deliberately pending and baseline choice
+
+The report contains the exact required sentence:
+
+> Figures recorded at the gate by the orchestrator (accept record `docs/proofs/wp5.1-accept.md`); this section is filled from it in the accept commit.
+
+Parallel, serial, ONE fullclip leg, candidate/base ids, collection
+identity, gate static checks, exact skips, serial contribution and deltas
+all retain **(gate)** placeholders. No final count, timing, acceptance or
+Reviewer B result is invented. The section states B precedes the ONE
+gate on the final rebased candidate, with all configuration/window rules.
+
+Read the branch's **wp-t6-gate-sizing.md** and **wp-d54-accept.md**:
+historical sized SERIAL AFTER is **1,136 passed / 1 skipped / 1,389.24 s**
+(1,389 rounded), and the latest completed main gate, WP-D54 serial
+attempt 2, is **1,230 passed / 11 skipped / 0 failed / 1,606 s**.
+The report uses **WP-D54's 1,606 s as the primary contemporary comparison**
+and retains the exact WP-T6 floor as a second delta. Its first hung
+attempt is excluded, with DR-108/109 attribution to that accept record.
+Different suite populations prevent claiming the full wall difference
+is all WP5.1; new serial contribution and both deltas are left for the
+orchestrator's gate. The ruled package allowance remains **300 s**;
+over allowance goes to CHARC. No tolerance proposal beyond the already
+ruled 3.5/255 runner characterisation is pending from the cell.
+
+### Documentation verification and scope
+
+Source-only AST reading expands the literal _test_nodes calls without
+importing acceptance_support or any test. It reads local/module markers,
+fixture parameter marks and the two special mixed forms from source.
+The report matrix is assembled from that roster. A second static pass
+extracts every report test address, uses **rg** to locate the definitions
+in the correct files, verifies the exact Python roster plus T9, checks
+Markdown source links and confirms the pending-gate sentence. No pytest
+collection or code-under-test execution is used.
+
+| Evidence under work/wp5.1 | Observed result |
+|---|---|
+| t14-roster.log/json | 20 acceptance ids, 84 addresses, 82 unique existing functions from source AST |
+| t14-fill-matrix.log | 89 report rows: 84 addresses plus 5 non-node dispositions |
+| t14-source-check.log / t14-grep-nodes.log | 85 cited address occurrences, 83 unique functions (including T9), all found by rg in their correct files; roster exact, source links exist |
+| t14-lf.log | report and ledger each 0 CR, final LF |
+| t14-diff-check.log | diff --check exit 0 |
+
+Verification loop for this documentation gate: suspected stale node names,
+incorrect parameter-derived markers, outdated DR-98 state and stale serial
+baseline; confirmed names/markers from source and figures from the accepted
+reports, populated the matrix, and checked the assembled references/bytes.
+No additional finding or open STOP in that pass. No prior document was
+rerun as a tool, and no test result is inferred from a reference existing.
+
+Only **the report and this ledger** change. No test/support/product/tool/
+fixture/dependency/local-config/register edit, footage-folder read,
+other-worktree access, mailbox post, commit, stash or rebase. All scratch
+writes are under work/wp5.1. Yield after T10 for the dispatcher's Reviewer
+B and final gate; the accept commit fills the report from its gate record.
