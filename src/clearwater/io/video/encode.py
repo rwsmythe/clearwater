@@ -503,6 +503,10 @@ def _remove(path: Path) -> None:
 def _assumed_color_warning(names: Mapping[str, str]) -> str:
     """Describe D54's assumptions and the resolved output colour tags.
 
+    Mention limited range only for resolved ``color_range tv``; omit that clause
+    for full range (``pc``). The probe defaults a range only to limited. Full
+    range is tagged or derived from a yuvj pixel format, never assumed.
+
     Args:
         names: FFmpeg option names and values for the resolved colour description.
 
@@ -510,9 +514,10 @@ def _assumed_color_warning(names: Mapping[str, str]) -> str:
         The warning with the resolved tags listed in their mapping order.
     """
     shown = ", ".join(f"{k} {v}" for k, v in names.items())
+    range_clause = " and limited range" if names.get("color_range") == "tv" else ""
     return (
         "The source's colour tags are missing or unexpected; Clearwater assumed BT.709 "
-        "colours and limited range for the missing or unexpected ones, and the output is "
+        f"colours{range_clause} for the missing or unexpected ones, and the output is "
         f"tagged with these values ({shown})."
     )
 

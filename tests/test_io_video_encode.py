@@ -285,59 +285,64 @@ def test_untagged_source_is_tagged_bt709_limited_with_a_warning(sample: Sample, 
         "limited",
     )
     assert not color.assumed
-    assert any(
-        "BT.709" in w and "limited range" in w and "(color_primaries bt709" in w
-        for w in run.report.warnings
+    warnings = [w for w in run.report.warnings if "colour tags" in w]
+    assert len(warnings) == 1
+    assert "BT.709" in warnings[0] and "limited range" in warnings[0]
+    assert warnings[0].endswith(
+        "(color_primaries bt709, color_trc bt709, colorspace bt709, color_range tv)."
     )
 
 
 @pytest.mark.parametrize(
-    ("matrix", "color_range", "expected_codes"),
+    ("tags", "pix_fmt", "expected_codes", "expected_assumptions"),
     [
         pytest.param(
-            "bt709",
-            "limited",
+            {},
+            "yuv420p",
             "color_primaries bt709, color_trc bt709, colorspace bt709, color_range tv",
+            "BT.709 colours and limited range",
             id="fully-defaulted",
         ),
         pytest.param(
-            "bt601",
-            "full",
+            {"color_space": "smpte170m", "color_range": "pc"},
+            "yuv420p",
             "color_primaries bt709, color_trc bt709, colorspace smpte170m, color_range pc",
+            "BT.709 colours",
             id="partially-defaulted-full-range",
+        ),
+        pytest.param(
+            {},
+            "yuvj420p",
+            "color_primaries bt709, color_trc bt709, colorspace bt709, color_range pc",
+            "BT.709 colours",
+            id="untagged-yuvj420p-full-range",
         ),
     ],
 )
 def test_d54_warning_words_and_computed_codes(
-    matrix: str, color_range: str, expected_codes: str
+    tags: dict[str, str], pix_fmt: str, expected_codes: str, expected_assumptions: str
 ) -> None:
     """Name D54's assumptions in ASCII while retaining the resolved source tags.
 
     Args:
-        matrix: Resolved matrix, including a retained BT.601 tag in the partial case.
-        color_range: Resolved range, including a retained full-range tag.
+        tags: Source tags, including retained BT.601 and full range in the partial case.
+        pix_fmt: Source pixel format, including untagged full-range yuvj420p.
         expected_codes: Independently specified FFmpeg tags for the description.
+        expected_assumptions: The ruled assumption words for the resolved range.
     """
     from clearwater.color import ffmpeg_color_names
-    from clearwater.interfaces.image import ColorDescription
+    from clearwater.io.video.probe import _resolve_color
 
-    color = ColorDescription(
-        primaries="bt709",
-        transfer="bt709",
-        matrix=matrix,
-        range=color_range,
-        bit_depth=8,
-        assumed=True,
-        icc_profile=None,
-    )
+    color = _resolve_color(tags, pix_fmt, 8).description
+    assert color.assumed
     names = ffmpeg_color_names(color)
     assert ", ".join(f"{k} {v}" for k, v in names.items()) == expected_codes
     warning = encode_module._assumed_color_warning(names)
     assert warning.isascii()
-    assert "BT.709" in warning and "limited range" in warning
+    assert "BT.709" in warning
     assert warning == (
-        "The source's colour tags are missing or unexpected; Clearwater assumed BT.709 "
-        "colours and limited range for the missing or unexpected ones, and the output is "
+        "The source's colour tags are missing or unexpected; Clearwater assumed "
+        f"{expected_assumptions} for the missing or unexpected ones, and the output is "
         f"tagged with these values ({expected_codes})."
     )
 
@@ -463,10 +468,12 @@ def test_d76_from_a_bt601_source(clips: Clips, runs: Runs) -> None:
     _, run, record = runs.get(source, "libx265", 10)
     _assert_v4(record)
     assert probe(Path(record["output"])).video.bit_depth == 10
-    assert any(
-        "BT.709" in w and "limited range" in w and "(color_primaries bt709" in w
-        for w in run.report.warnings
-    )  # Q17: BT.709 primaries
+    warnings = [w for w in run.report.warnings if "colour tags" in w]
+    assert len(warnings) == 1
+    assert "BT.709" in warnings[0] and "limited range" in warnings[0]  # Q17: BT.709 primaries
+    assert warnings[0].endswith(
+        "(color_primaries bt709, color_trc bt709, colorspace smpte170m, color_range tv)."
+    )
 
 
 @pytest.mark.slow

@@ -144,17 +144,116 @@ witness and the final completion report remain pending at their dispatched
 boundaries. No footage or other worktree was read; no commit, stash or `.git`
 write was attempted.
 
+## Turn 3: Reviewer A round 1 clean-up (terminating)
+
+Turn 2 was committed by the dispatcher as `4aae3824` with 0 CR reported. Turn 3
+started at `3c27d51e`, which adds CHARC's ruling to the brief. Ruling
+`26f0d3d0`, at `docs/briefs/wp-d54-brief.md:32-43`, supersedes the original
+single sentence: resolved `tv` keeps "BT.709 colours and limited range"; resolved
+`pc` says "BT.709 colours". No owner input or interface change is needed.
+
+Reviewer A round 1 evidence (read-only):
+`C:\Users\rwsmy\clearwater-review-evidence\wp-d54\r1\review.txt`, MD5
+`f95dcc5c566a457db3b0f02aaa1e8cab`. The reviewer returned
+`VERDICT: NO_NEW_CRITICAL_MAJOR` and reported an executed encoder-file run of
+99 passed, 19 deselected in 110.63s. The dispatcher supplied these validity
+assertions: model `claude-opus-5-5`, high effort requested, 18 turns,
+`is_error=false`, zero permission denials, and a clean worktree after review.
+The round counts and terminates the loop; this turn is its bounded clean-up,
+not another review round. The dispatcher retains the durable evidence bundle.
+
+### Findings and adjudication
+
+| Finding | Classification and confirmation | RED / already-green evidence | Fix and surface |
+|---|---|---|---|
+| F1 | MINOR, in envelope, NEW, EXECUTED. Confirmed: `probe._resolve_color({}, "yuvj420p", 8)` derives full range while defaulting the other colour fields. `probe.py:301-304` distinguishes that derivation from the limited-only range default; :265-275 records actual defaults. | The new `untagged-yuvj420p-full-range` case fails on the unchanged `4aae3824` product, because the sentence includes "and limited range" with `color_range pc`. | Product: the existing private helper chooses its range clause from `names.get("color_range") == "tv"`; its docstring explains both branches and why full range is never assumed. The call site stays unchanged. Test: add the untagged yuvj case to the existing pure test, using the real pure probe resolver and then the same mapping/helper path as the encoder. |
+| F2 | MINOR, in envelope, NEW, EXECUTED. Confirmed test gap: the prefix-only checks accept a wrong matrix/range suffix. No current output defect was found. | Both strengthened integration rows already pass on `4aae3824`'s product. | Test-only: assert the entire parenthesis through its final `).`; the d76 row pins `colorspace smpte170m, color_range tv`. |
+| F3 | ADVISORY, in envelope, NEW, REASONED. Confirmed assertion gap: the former `any(...)` could accept duplicate colour warnings; reviewer found no actual duplicate emission. | Both strengthened integration rows already pass on `4aae3824`'s product. | Test-only: select colour-tag warnings and assert length exactly one before checking its words and full parenthesis. |
+| F4 | ADVISORY, in envelope, NEW, REASONED. The old partial full-range wording was permitted by the earlier ruling but reads inconsistently with `pc`; CHARC's new wording removes that ambiguity. | The existing `partially-defaulted-full-range` case now expects the FULL branch and fails on the unchanged `4aae3824` product. This is an intentional expected-sentence change under the new ruling. | Same product fix as F1; test-only expected words now omit limited range for this case. No additional product change. |
+
+The single parametrized pure test now resolves source tags through
+`probe._resolve_color` rather than constructing descriptions manually. Its
+three cases cover untagged non-yuvj limited range, tagged BT.601 / full range
+with other fields defaulted, and completely untagged yuvj-derived full range.
+Independent literal code expectations still check the resolved mapping before
+the helper is called. Exact sentence and ASCII assertions remain in place.
+
+### RED before the helper fix
+
+With `PYTEST_ADDOPTS` and inherited `VIRTUAL_ENV` unset, `PYTHONPATH=scripts`:
+
+```text
+uv run pytest -q -v tests/test_io_video_encode.py -k "untagged_source or d76 or d54_warning_words_and_computed_codes" --basetemp=work/wp-d54/turn3-red-tmp -p sandbox_mkdir_shim -p no:cacheprovider
+```
+
+Log: `work/wp-d54/turn3-red-pytest.log`; exit **1**:
+**2 failed, 4 passed, 113 deselected in 8.54s**. Immediately after this run,
+`git diff --quiet 4aae3824 -- src/clearwater/io/video/encode.py` exited 0,
+confirming that the RED ran on Turn 2's unchanged product.
+
+| Failing node ID (under `tests/test_io_video_encode.py`) | RED failure line | Observed failure |
+|---|---|---|
+| `test_d54_warning_words_and_computed_codes[partially-defaulted-full-range]` | `:343` | Exact sentence assertion: actual contains "and limited range"; expected FULL branch omits it, retaining `colorspace smpte170m, color_range pc`. |
+| `test_d54_warning_words_and_computed_codes[untagged-yuvj420p-full-range]` | `:343` | Same wrong range clause, retaining `colorspace bt709, color_range pc`. |
+
+The four passes include both integration rows, so F2 and F3's stronger checks
+were already green before the product fix. The fully-defaulted LIMITED case
+also remained green. RED and fix are delivered together in this turn as
+dispatched; no intermediate commit was attempted.
+
+### GREEN and light checks
+
+All commands ran from this worktree root. Pytest used `PYTEST_ADDOPTS` unset,
+`PYTHONPATH=scripts`, and the required sandbox shim. Each run has its own fresh
+basetemp; all logs and generated data stay under `work/wp-d54/`.
+
+```text
+uv run pytest -q tests/test_io_video_encode.py -k "untagged_source or d76 or d54_warning_words_and_computed_codes" --basetemp=work/wp-d54/turn3-light-tmp -p sandbox_mkdir_shim -p no:cacheprovider
+uv run pytest -q tests/test_io_video_encode.py::test_d54_warning_words_and_computed_codes --basetemp=work/wp-d54/turn3-pure-tmp -p sandbox_mkdir_shim -p no:cacheprovider
+uv run pytest -q -rs tests/test_io_video_encode.py -m "not gpu and not footage and not gui" --basetemp=work/wp-d54/turn3-encoder-tmp -p sandbox_mkdir_shim -p no:cacheprovider
+uv run ruff check .
+uv run ruff format --check .
+uv run mypy
+```
+
+| Run | Log under `work/wp-d54/` | Exit | Result |
+|---|---|---|---|
+| Targeted GREEN | `turn3-light-pytest.log` | 0 | 6 passed, 113 deselected in 7.06s |
+| Pure test's own node | `turn3-pure-pytest.log` | 0 | 3 passed in 0.20s |
+| Whole encoder file, permitted markers | `turn3-encoder-pytest.log` | 0 | 100 passed, 19 deselected in 155.62s (0:02:35); no skips |
+| Repository-wide ruff check | `turn3-ruff-check.log` | 0 | All checks passed! |
+| Repository-wide ruff format check | `turn3-ruff-format.log` | 0 | 287 files already formatted |
+| Repository-wide mypy | `turn3-mypy.log` | 0 | Success: no issues found in 146 source files |
+
+Ruff used `RUFF_CACHE_DIR=work/wp-d54/turn3-ruff-cache` to avoid the known
+default-cache permissions warning; no configuration file changed. Verification
+so far confirms both full-range RED failures are fixed, the LIMITED sentence is
+unchanged, complete parentheses and one-warning checks pass, and `git diff
+--check` passes. Scope inspection finds product changes confined to the existing
+helper and test changes confined to the two owned assertions and pure test.
+The whole encoder-file run passed all 100 selected tests, including the added
+yuvj case, with no failure or skip. The final verification pass against the
+ruling, diff and run results found no new in-envelope issue. All four review
+findings are addressed; no finding was rejected as a false positive.
+
+No frozen interface, probe, export, GUI, dependency or local configuration was
+changed. No footage or other worktree was read; no commit, stash or `.git` write
+was attempted. The final report turn, Reviewer B, final two-leg gate and
+post-merge WP5.1 witness remain pending at the dispatcher's boundaries.
+
 ## Cumulative review rounds
 
-No Reviewer A or Reviewer B round yet. The following row schema will be populated
-when findings are dispatched; this RED turn is not a review round.
+Reviewer A round 1 counts and terminates the loop with zero new blocking
+findings. All four findings are adjudicated above; Reviewer B remains pending.
 
 | Round | Critical / major / minor | In / out of envelope | NEW / REOPENED | Reverts | Product / test-only fixes | Transport / CLI | Verdict | Evidence |
 |---|---|---|---|---|---|---|---|---|
+| A1 | 0 critical / 0 major / 2 minor / 2 advisory | 4 in / 0 out | 4 NEW / 0 REOPENED | 0 | Product helper changed for F1; F4 shares that fix. F2/F3 and case updates are tests. | `claude -p`, Opus high (`claude-opus-5-5`); CLI version not supplied | `NO_NEW_CRITICAL_MAJOR`; terminating clean-up | `C:\Users\rwsmy\clearwater-review-evidence\wp-d54\r1\review.txt` (MD5 above); dispatcher validity assertions recorded above |
 
 ## Dispatcher-read depth
 
 | Boundary | Context depth (dispatcher fills) | Disposition |
 |---|---|---|
 | Turn 1 RED yield | 75,711 tokens (dispatcher supplied in Turn 2; session `01a19680-681b-7e73-9fa1-893bc1fdefaa`) | RED accepted and committed as `549b4ca4`. |
-| Turn 2 GREEN yield | Pending dispatcher figure | Fix and light validation; yield for Reviewer A round 1. |
+| Turn 2 GREEN yield | 89,798 tokens (dispatcher supplied in Turn 3) | Committed as `4aae3824`; Reviewer A round 1 returned. |
+| Turn 3 terminating clean-up yield | Pending dispatcher figure | Reviewer A loop terminated; clean-up delivered for the report turn. |
