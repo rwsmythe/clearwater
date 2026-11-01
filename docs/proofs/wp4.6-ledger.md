@@ -963,3 +963,44 @@ Run lines at `6e7caf1f` (Git Bash, `PYTEST_ADDOPTS` unset, `QT_QPA_PLATFORM=offs
 
 Every commit's blob checked for CR bytes: 0 each. No Codex run, no new review round. Next: the
 orchestrator verifies R3-1 at its seat; Reviewer B on the final tree; the EXCLUSIVE window.
+
+Accepted at the orchestrator's seat (R3-1 independently RED on `9fe947fe`'s product, 70 passed at
+`d1ba71f2`); Reviewer A CONVERGED (the cap: no R4).
+
+## Window plan (cell 5; brief task 10, the WINDOW REQUEST; NOT yet run of record)
+
+Folder `C:\Users\rwsmy\clearwater-review-evidence\wp4.6\windows\` (md5s in `md5sums.txt`):
+- `window-commands.sh`, md5 `c18ba54db038b04c0dd73386ab79cac6`: one foreground chain from Git
+  Bash in the form of WP4.3's `window4-commands.sh` (PYTEST_ADDOPTS unset, offscreen, every run
+  independent, every exit recorded, no tuning, no re-run). It refuses (exit 4) on a driver or
+  helper md5 mismatch, a tracked change in the worktree, `src/` or `tests/` differing from
+  `d1ba71f2` (the head may carry ledger-only commits), or under 5 GB free on C:; exit 5 if
+  `work/wp4.6-window/` exists. Writes head.txt, status.txt, drivers-md5.txt, disk, RAM and device
+  memory before and after.
+- OF RECORD: `v7c` and `v7d` on the pinned `wp4.3\windows\s7_driver.py`
+  (`0b9ee6cc3ebd2cf07c35dec934cfd901`); `v7e` and `dr44c-export` on `s7_driver_wp46.py`
+  (`074cbb62b2a9aa8949ebcf30d803b51a`); nothing wraps them. The export wall beside WP4.3's
+  209.1-210.9 s is v7c's own `export N s` line.
+- NOT of record: `wp46_measure.py` (md5 `ea4d61e4add35bda793abc72234794c7`, a new helper; no
+  product or driver edit): `wrap` re-runs v7c and v7e in-process with hooks on
+  `export_process` (`_run`, `_converse`, `_decode_line`, `_remove`) and a 250 ms sampler: Q8 spawn
+  (job start to Popen, to the first protocol line, to the first progress), the result-to-exit
+  teardown beside `KILL_AFTER_CANCEL_S`, the F8 scratch size at removal (or kept), Q7 parent and
+  worker working set / private bytes before / peak / at result / after (the worker = the python
+  process under the uv launcher; the tree with FFmpeg summed beside it), device used / free from
+  one looping `nvidia-smi` (per-process device memory is N/A under WDDM) and which pids hold a
+  compute context at the first line and the result. `spawn`: three GPU-form and three CPU-form
+  jobs through the product worker, each cancelled at its first protocol line (Q8 in both forms;
+  cancel-to-exit).
+
+Dry chain (`bash window-commands.sh dry`, the fixture clip, `work/wp4.6-window-dry/`, NOT of
+record, the host possibly shared with the WP3.6P Codex turn): the first pass exited clean but its
+worker memory read the uv launcher (4 / 1 MiB), so the helper learned the process tree; the
+second pass (08:22:34Z-08:24:09Z) exits: v7c 0, v7e 0, v7d 0, dr44c-export 0, v7c-measure 0,
+v7e-measure 0, spawn-measure 0, CHAIN-DONE; footage folder unchanged in all six driver runs; no
+traceback. Seen on the fixture (plumbing only): spawn to the first protocol line 0.63-0.80 s
+(a progress line, before the device is chosen, so the two spawn forms coincide there); the
+result-to-exit teardown 0.15-0.18 s; two compute contexts at the result (parent and worker).
+Expected wall of the real chain: about 25 min (WP4.3's window-4 v7c 271-278 s, v7e 282 s, v7d
+31 s, dr44c-export 70 s; twice for v7c and v7e), up to about 35 min if the worker's cold
+analysis adds a minute to each of the four exports.
