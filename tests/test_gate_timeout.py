@@ -6,6 +6,7 @@ import os
 import subprocess
 import sys
 import time
+import tomllib
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -85,14 +86,20 @@ def test_thread_timeout_exits_with_stack_and_under_bound_control(tmp_path: Path)
     Args:
         tmp_path: Isolated directory for both inner pytest invocations and their logs.
     """
-    # On Windows, omitting timeout_method still falls back to thread (no SIGALRM).
+    with (REPO_ROOT / "pyproject.toml").open("rb") as config_file:
+        options = tomllib.load(config_file)["tool"]["pytest"]["ini_options"]
+    # Pin thread explicitly even where Windows would default to it (no SIGALRM).
+    assert options["timeout_method"] == "thread"
+    assert options["timeout_func_only"] is True
+    assert options["faulthandler_timeout"] == 300
+    assert "timeout" not in options
     with ThreadPoolExecutor(max_workers=2) as executor:
         control_future = executor.submit(
             _run_inner, tmp_path / "control", 0.01, fixture_sleep_seconds=2.5
         )
         expired_future = executor.submit(_run_inner, tmp_path / "expired", 30.0)
         control, _ = control_future.result()
-        expired, elapsed = expired_future.result()
+        expired, _ = expired_future.result()
     control_output = control.stdout + control.stderr
     expired_output = expired.stdout + expired.stderr
 
@@ -100,7 +107,7 @@ def test_thread_timeout_exits_with_stack_and_under_bound_control(tmp_path: Path)
     assert "2 passed" in control_output, control_output
     assert (tmp_path / "control" / "after-sleep-ran").read_text() == "ran"
     assert expired.returncode != 0, expired_output
-    assert elapsed < 15, f"Inner timeout took {elapsed:.3f} s; output:\n{expired_output}"
     assert "Timeout" in expired_output, expired_output
+    assert "Stack of" in expired_output, expired_output
     assert "test_planted_sleep" in expired_output, expired_output
     assert not (tmp_path / "expired" / "after-sleep-ran").exists(), expired_output

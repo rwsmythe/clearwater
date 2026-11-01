@@ -124,6 +124,64 @@ completion or review-convergence claim. `git diff --check` exited 0; byte
 counts for all three changed files are recorded in
 `work/wp-t7/turn2-byte-audit.log` (zero CR).
 
+## Turn 6: Reviewer B clean-up
+
+Started on clean `1d541378`; dispatcher-supplied end-of-turn-5 depth is
+**180,712 tokens**. Read the whole read-only findings file
+`C:/Users/rwsmy/clearwater-review-evidence/wp-t7/B/review.txt`.
+Reviewer B (dispatcher Claude Opus / high) returned
+`VERDICT: NO_NEW_CRITICAL_MAJOR`; claims 1-5 HOLD. Its collection-only
+commands exit 0 with disjoint lists whose union is all:
+6,129 + 1,241 + 7 = 7,377. These are Reviewer B's figures, not a cell gate.
+
+| Finding | Severity / envelope | Disposition |
+| --- | --- | --- |
+| B-F1 | MINOR, in | ACCEPTED / FIXED. Defined per-leg completion/stale-log watch, 5 min threshold (15 fullclip), node lookup and CPU/file progress investigation; further 5 min without progress means STOP. Resolves the diagnostic timer's coincident 300 s dump without treating that alone as failure. |
+| B-F2 | MINOR, in | ACCEPTED / FIXED. Xdist does not forward the worker terminal writer; timeout dump IS absent. Named node-down/crash lines, stderr-only core stack, lack of node ID and one-shot timing after setup starts. |
+| B-F3 | MINOR, in | ACCEPTED / FIXED. Collection/import, session hooks, interpreter exit and controller-shutdown hangs require the stall watch; neither per-test timer covers them. |
+| B-F4 | MINOR, in | ACCEPTED / FIXED. Windows children survive parent `os._exit`; identify/end only run-specific leftover python/ffmpeg processes and use fresh basetemp before rerun. No processes were ended by this documentation-only guidance. |
+| B-F5 | MINOR, in | ACCEPTED / FIXED. Same marker-free node parses real TOML and asserts thread, func-only true, diagnostic 300, and no default timeout key. |
+| B-F6 | ADVISORY, POSIX trigger outside envelope | ACCEPTED / FIXED as hardening. Stack output now requires `Stack of` as well as the sleeping function. |
+| B-F7 | ADVISORY, in | ACCEPTED / FIXED. Removed unreachable elapsed assertion; kept per-subprocess timeout 15 s and result timing metadata. Current ceiling ratios recorded below. |
+| B-F8 | ADVISORY, in | ACCEPTED / FIXED. Appended exact CHARC fullclip-isolation extension after the unchanged verbatim standing rule and provenance. |
+| B-F9 | ADVISORY, in | ACCEPTED / FIXED. Documented output losses and exit/signature of terminated process; xdist controller can still finish with a summary (already observed in both reviewers' probes). Avoids claiming an xdist controller summary is always absent. |
+| B-F10 | ADVISORY, in | DECLINED by binding dispatcher adjudication: sandbox_mkdir_shim is required for the cell's sandbox invocation and inert at the gate; branch unchanged. |
+
+All ten findings are NEW, none REOPENED; nine are in envelope, one advisory
+has an outside-envelope trigger accepted for hardening. No reverts and no
+product changes; only test assertions and gate/report documentation changed.
+This is the one bounded Reviewer B cleanup, not another Reviewer A round.
+
+The STALL WATCH now covers every leg: report completion or unchanged log
+for 5 minutes (15 fullclip), investigate node via newest basetemp directories
+against collection order and check process-tree CPU/file growth; progress
+means keep watching, a further 5 minutes without progress means STOP with
+node and available stderr stack. The 300 s diagnostic alone remains non-failing.
+The report adds Reviewer B's verdict, all ten dispositions and limits.
+
+### Turn 6 light verification
+
+`PYTHONPATH=scripts`, `PYTEST_ADDOPTS` unset; the required proof command adds
+only the mandated sandbox shim. No harness gate was run at this seat.
+
+| Check | Observed result | Evidence under `work/wp-t7/` |
+| --- | --- | --- |
+| `uv run pytest -q tests/test_gate_timeout.py -p sandbox_mkdir_shim -p no:cacheprovider --basetemp=work/wp-t7/tmp --durations=0` | Exit 0; `1 passed in 3.35s`, node call 3.30 s | `turn6-green.log` |
+| `uv run ruff check .` | Exit 0, `All checks passed!` | `turn6-ruff.log` |
+| `uv run ruff format --check .` | Exit 0, `293 files already formatted` | `turn6-format.log` |
+| `uv run mypy` | Exit 0, `Success: no issues found in 148 source files` | `turn6-mypy.log` |
+
+Inner result files below `tmp/test_thread_timeout_exits_with0/` show control
+exit 0 in 3.297 s and expired exit 1 in 2.703 s. The 15 s subprocess ceiling
+is 4.55x / 5.55x those observed wall times, respectively, retained as the
+commissioned planted-hang bound under AD-30; the dead elapsed assertion is
+gone. The single marker-free node remains below 5 s in this light run.
+No real config, dependency, selection expression, command redirect,
+CLAUDE.md line or existing test was changed. Final scope/byte/diff evidence:
+`work/wp-t7/turn6-{scope-audit,byte-audit,diff-check}.log`, zero CR in all
+four changed files. Review of final assertions and wording found no further
+in-envelope issue; the final gate remains at the dispatcher seat.
+
 ## Turn 5: F3 redirect in the leg commands (CHARC 823921b8)
 
 Dispatcher-supplied end-of-turn-4 depth: **171,971 tokens**. Turn 4 was
@@ -543,6 +601,7 @@ Reviewer A, Reviewer B and the final gate remain explicitly outstanding.
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | 0 (grounding, no review) | 0 / 0 / 0 review findings | N/A | N/A | 0 | No product; new test only | Not run | RED rung recorded; yield |
 | 1 | 0 / 0 / 3, plus 4 advisory | 7 / 0 | 7 / 0 | 0 | No product; tests + docs fixed | Dispatcher Claude Opus high process; CLI version not supplied in findings file | NO_NEW_CRITICAL_MAJOR; all seven accepted; terminating cleanup complete |
+| B (single pass) | 0 / 0 / 5, plus 5 advisory | 9 / 1 | 10 / 0 | 0 | No product; tests + docs fixed | Dispatcher Claude Opus high process | NO_NEW_CRITICAL_MAJOR; F1-F9 accepted, F10 declined; bounded cleanup complete |
 
 The operational package-access finding above is not a Reviewer A finding
 and does not open or count a review round.
@@ -555,4 +614,5 @@ and does not open or count a review round.
 | 1 / 2 | 108,375 tokens (dispatcher supplied at turn 3) | Offline sync STOP; remaining GREEN rung held |
 | 1 / 3 | 147,790 tokens (dispatcher supplied at turn 4) | GREEN proof/facts yield; harness gate routed to dispatcher seat |
 | 1 / 4 | 171,971 tokens (dispatcher supplied at turn 5) | Reviewer A round 1 terminating cleanup + report; yield for Reviewer B |
-| 1 / 5 | Pending dispatcher fill; no estimate | Docs-only F3 command redirects; exclusive window honored; yield for Reviewer B |
+| 1 / 5 | 180,712 tokens (dispatcher supplied at turn 6) | Docs-only F3 command redirects; exclusive window honored; yield for Reviewer B |
+| 1 / 6 | Pending dispatcher fill; no estimate | Bounded Reviewer B cleanup; yield for final gate |

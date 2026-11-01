@@ -172,18 +172,43 @@ candidate rebased onto main, and records the actual output lines):
   then `uv run pytest -q -rs --timeout 1200 -m "(gpu or footage or gui or slow) and not fullclip" --basetemp=work/pytest-gate-RUN-serial --durations=0 --junitxml=work/pytest-gate-RUN-serial.xml > work/pytest-gate-RUN-serial.log 2>&1`.
   Under `-n 4`, the earlier core faulthandler dump on stderr is the only stack,
   so each leg's log must retain both streams.
+  **STALL WATCH:** every leg reports on completion or after its log has not changed
+  for 5 minutes (15 minutes for fullclip, whose single nodes can run for minutes
+  without output). A watch report triggers INVESTIGATION, not automatic STOP:
+  identify the running node from the basetemp's newest directories against the
+  `--collect-only` order, and check process-tree CPU time and files growing under
+  the basetemp. Progress means a long node: keep watching; no progress for a further
+  5 minutes means STOP with the node and whatever stack exists, including the core
+  dump on stderr (DR-108). This resolves the coincidence with the 300 s diagnostic
+  timer: a dump alone is not a STOP; a dump plus sustained lack of progress is.
   STANDING RULE (your fill, effective now): while a gate's SERIAL leg runs, NO other pytest invocation of any size runs on this host, at any seat or in any sandbox (a Codex light suite included); the gui nodes are timing-sensitive and the leg is the figure of record. Codex turns that need their light suite wait for the leg or run before it. (CHARC 97d5abbf, 2026-11-01)
+  CHARC `823921b8` (item 3) extends it to the fullclip leg: no other pytest runs during a serial OR fullclip leg.
   A thread timeout dumps stacks and exits the process once its timer can acquire the
   GIL (a native GIL-holding deadlock defers it; only the 300 s faulthandler dump on stderr
   and the stall watch catch that case, with the stall watch providing the STOP and the
-  dump its stack); under xdist, the worker crash is
-  reported and remaining tests can finish, but the worker's dump may be absent from the
-  parent log, so preserve the earlier core faulthandler dump; a timed-out leg is a STOP
-  with the node and the stacks, followed by a re-run of the leg after the fix.
+  dump its stack); a timed-out leg is a STOP with the node and the stacks, followed
+  by a re-run of the leg after the fix.
+  Under xdist the worker's pytest-timeout dump IS absent: xdist does not forward
+  its terminal writer; the parent reports `node down: Not properly terminated` and
+  `worker 'gwN' crashed while running '<node>'`, can replace the worker and finish
+  the remaining tests, and retains only the core faulthandler stack on stderr.
+  That dump carries no node ID (tie it to the crash line), fires once 300 s after
+  the node starts (setup included), and shows normal work if the node hangs later.
   `timeout_func_only` leaves every fixture (session and function, setup and teardown)
   un-timed: a fixture hang gets the faulthandler dump and the stall watch, not a test failure.
   Faulthandler dumps from legitimately long nodes (fullclip or slow session trims) are
   diagnostic noise, not failures; a dump alone is not a STOP.
+  Hangs outside the test protocol (collection/import, session-start/session-finish
+  hooks, interpreter exit such as a non-daemon thread or multiprocessing atexit
+  join, or the xdist controller waiting on a worker at shutdown) get neither a
+  test timer nor a timed faulthandler dump; only the stall watch catches them.
+  The thread method's `os._exit` kills only the pytest process: on Windows spawned
+  export-worker/FFmpeg children survive, so identify and end leftover `python` /
+  `ffmpeg` processes belonging to that run before re-running with a fresh `--basetemp`.
+  The terminated process loses its summary, `--durations` and `--junitxml`; exit 1
+  also means ordinary failure, so identify a timeout by `+++ Timeout +++` without
+  a summary in-process, or by the xdist crash line (the controller can still finish
+  with a summary after losing the worker's normal final output).
   **FULLCLIP** (`uv run pytest -q -rs --timeout 2400 -m "fullclip" --basetemp=work/pytest-gate-RUN-fullclip --durations=0 > work/pytest-gate-RUN-fullclip.log 2>&1`, no `-n`,
   about 26 min) runs at least ONCE per phase-end gate report and whenever a package brief asks
   for it; a per-package gate does not run it. The trim forms prove V4 MANDATORY and REQUIRED;

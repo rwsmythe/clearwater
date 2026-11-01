@@ -24,13 +24,14 @@ directories so the node remains under 5 s.
 | Copied-config ablation: remove `timeout_func_only` | `FAILED tests/test_gate_timeout.py::test_thread_timeout_exits_with_stack_and_under_bound_control`; `1 failed in 2.73s`, at `assert control.returncode == 0` with a timeout in `slow_session` | `turn4-ablation.log`, `turn4-ablation/output.log` |
 
 The real config was never edited for the ablation. Against AD-30, the
-commission explicitly retains the 15 s expired-run wall assertion and
-per-subprocess timeout in this parallel node: the measured expired run has
-12.438 s headroom (5.85x margin), and the longer control has 11.875 s
-headroom (4.80x). These are planted-hang checks, not product timing bounds;
-the node's 3.13 s call qualifies it to remain marker-free. Removing the
-method setting alone is advisory on Windows: without SIGALRM the plugin
-defaults to thread, as the test comment states.
+commission retains the 15 s per-subprocess timeout in this parallel node;
+Reviewer B cleanup removes the redundant wall assertion that cannot run on
+`TimeoutExpired`. The current expired run is 2.703 s (5.55x ceiling ratio),
+and the control is 3.297 s (4.55x). These are planted-hang checks, not product
+timing bounds; the current node call is 3.30 s, under 5 s. The proof now
+explicitly pins thread, func-only, the 300 s diagnostic and absence of a
+default timeout by parsing the real ini with `tomllib`, including where
+Windows would default to thread without SIGALRM.
 
 The three runtime facts were verified with pytest 8.4.2 / xdist 3.8.0:
 
@@ -79,9 +80,51 @@ are diagnostic noise and do not alone justify STOP. These accepted limits
 are explicit in GATE_CHECKS; the GIL probe figures are Reviewer A's executed
 evidence, not a new cell-side OS-specific probe.
 
+Under xdist, the worker terminal-writer timeout dump IS absent; correlate
+the parent's `worker 'gwN' crashed while running '<node>'` line with the
+core stack on stderr, which has no node ID and fires once 300 s after setup
+starts, so a later hang can have only a stack of earlier normal work.
+Collection/import, session hooks, interpreter exit and controller shutdown
+waits are outside the timed protocol: only the stall watch catches those
+hangs. On Windows `os._exit` leaves spawned export-worker/FFmpeg children
+alive; identify and end that run's leftovers before rerunning with a fresh
+basetemp. The terminated process loses summary/durations/JUnit output and
+exits 1 like an ordinary failure: use its `+++ Timeout +++` signature or the
+xdist crash line; the xdist controller can still finish with its own summary.
+The stall watch investigates unchanged logs after 5 minutes (15 for
+fullclip), checks node/CPU/file progress, and stops only after a further
+5 minutes without progress; diagnostic noise alone is not STOP.
+
+## Reviewer B
+
+Claude Opus / high on `1d541378` returned **`VERDICT: NO_NEW_CRITICAL_MAJOR`**;
+claims 1-5 HOLD. Its collection-only commands with flags and redirects exit
+0 and partition 7,377 nodes (6,129 parallel + 1,241 serial + 7 fullclip).
+Evidence: `C:/Users/rwsmy/clearwater-review-evidence/wp-t7/B/review.txt`.
+Five minor and five advisory findings received the dispatcher's binding
+dispositions:
+
+| Finding | Severity | Disposition |
+| --- | --- | --- |
+| F1: undefined stall watch | Minor | Accepted; thresholds, progress checks and investigation/STOP distinction defined |
+| F2: xdist dump availability and timing | Minor | Accepted; terminal-writer loss, crash-line correlation and one-shot 300 s dump documented |
+| F3: out-of-protocol hangs | Minor | Accepted; collection/hooks/exit/controller limits documented |
+| F4: surviving children | Minor | Accepted; run-specific cleanup and fresh basetemp required before rerun |
+| F5: remaining ini facts unpinned | Minor | Accepted; real-config assertions pin all three values and no default timeout |
+| F6: weak stack match | Advisory | Accepted; expired output must contain `Stack of` and the sleeping function |
+| F7: unreachable elapsed assertion | Advisory | Accepted; removed it, retained 15 s subprocess timeout and ratios above |
+| F8: fullclip isolation | Advisory | Accepted; appended CHARC's fullclip extension without changing the verbatim rule |
+| F9: lost timeout output | Advisory | Accepted; documented terminated-process losses/signature; xdist controller may retain a summary |
+| F10: sandbox shim branch | Advisory | Declined by dispatcher; required for the cell and inert at the gate |
+
+Turn-6 light proof: `1 passed in 3.35s`, 3.30 s call
+(`work/wp-t7/turn6-green.log`); ruff/format/mypy pass. No harness run was
+made in the sandbox this turn.
+
 Light proof, parallel qualification, ruff, format and mypy pass. The
 dispatcher reported the ordinary-seat harness run on `e4938910`:
 `Ran 382 tests ... OK (skipped=1)`; the sandbox harness STOP is resolved and
 was not re-run this turn. Final scope/byte audits record only owned paths
-and zero CR bytes. Reviewer B and the final candidate gate remain at the
-dispatcher seat; this report contains no final gate figures.
+and zero CR bytes. Reviewer B has returned and its bounded cleanup is
+complete; the final candidate gate remains at the dispatcher seat. This
+report contains no final gate figures.
