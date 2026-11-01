@@ -118,6 +118,16 @@
   **ORCHESTRATOR GEN 30 ROLLS SOON (~380K): after WP5.1 turn 13 returns and is committed; state file drafted; the
   WP-T7 A pass may be in flight across the roll (evidence folder; gen 31 asserts or re-runs). On gen 31's announce:
   re-read `comms/.launch-sessions.json`, cue the NEW name, send gen 30 nothing further.** (Rolled 18:12Z, see top.)
+  (3b) **WP5.1 B RETURNED 19:12Z (gen 31 `a75126a4`; on `7ab7bd39`): NO_NEW_CRITICAL_MAJOR, EXECUTED (34 passed, crash
+  node passed; four product mutants each fail their node; the crash child is the real interpreter). 2 MINOR, both
+  fail-loud (B-2 `-I` ignores PYTHONUTF8 on the crash child's stderr read; B-3 under load the 10 s wait raises
+  TimeoutExpired as an ERROR instead of the 8276adb5 retry) + B-4..B-7 fixed in a FRESH session 6 (session 5 retired
+  at 238,374); B-8 (`os.link` needs NTFS) a Limit; B-1: gen 31 reads the shell 'limited' check as STRICT (my
+  f6252e0b listed case-insensitivity among the defects) = CONFIRMED by my silence, ledger line. No second B
+  (test-only, fail-loud fixes; crash node 15x at the seat). Then rebase onto WP-T7's merge, three-leg gate.
+  GATE QUEUE 19:12Z: WP-T7 parallel leg RUNNING since 19:10Z (static / collect 7,382 / harness 382 green); its
+  serial waits for a pytest-free host (WP5.3 t10 and WP5.1 t15 are test-running turns); WP3.6P `775a0697`
+  seat-verified (B-1 / B-2 RED then 122 passed; static clean), gate after WP-T7 lands, rebased with the flags.
   (3a) **WP5.1 A CONVERGED AT ROUND 2, 18:03Z (gen 30 `9951dac7`; on the rebased head `f059b2e0`, base `4ece5183`;
   NO_NEW_CRITICAL_MAJOR; T6-1 green; my F3 rule observed). Two minors in the terminating clean-up turn 13 (session 5):
   pin the F1 fix by pid-file == process.pid and `clearwater.__file__` == the parent's; V17 traceability row names the
