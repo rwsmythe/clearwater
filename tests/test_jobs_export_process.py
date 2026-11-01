@@ -700,7 +700,9 @@ def test_a_scratch_folder_that_cannot_be_made_names_the_error_type_only(
             id="total-2to31",
         ),
         pytest.param(
-            b'{"progress": [5, 4, "a"]}', "done over total (CHARC bc6847dd)", id="done-over-total"
+            b'{"progress": [2147483648, 90, "a"]}',
+            "a done of 2**31 over total: the bound before the clamp (CHARC 89a98d58)",
+            id="done-2to31-over-total",
         ),
         pytest.param(
             b'{"progress": [-1, 4, "a"]}', "a negative done (CHARC bc6847dd)", id="negative-done"
@@ -749,6 +751,70 @@ def test_progress_at_the_bound_is_forwarded(tmp_path: Path) -> None:
     ]
 
 
+@pytest.mark.parametrize(
+    ("sent", "forwarded"),
+    [
+        pytest.param([91, 90, "frame 91"], (90, 90, "frame 91"), id="done-total-plus-1"),
+        pytest.param(
+            [91, 90, "Saved GX011627_corrected.mp4"],
+            (90, 90, "Saved GX011627_corrected.mp4"),
+            id="final-line",
+        ),
+        pytest.param([1000000, None, "decoded"], (1000000, None, "decoded"), id="null-total"),
+    ],
+)
+def test_progress_over_total_is_forwarded_clamped(
+    tmp_path: Path, sent: list[Any], forwarded: tuple[int, int | None, str]
+) -> None:
+    """CHARC 89a98d58: done > total is forwarded as min(done, total) with the message unchanged
+    (the engine counts written frames against the container's declared nb_frames); a null
+    total passes done through."""
+    command = _child(
+        tmp_path,
+        """\
+        send({"progress": json.loads(ARGS[0])})
+        result()
+        """,
+        json.dumps(sent),
+    )
+    result, progress = _run(tmp_path, command)
+    assert result.ok, result.failure
+    assert progress.reports == [forwarded]
+
+
+def test_a_clamp_is_logged_once_per_job_apart_from_ignored_lines(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    """CHARC 89a98d58: the first clamped line of a job logs one WARNING naming its counts, later
+    ones none; the clamp's budget is its own, so a later malformed line is still logged."""
+    caplog.set_level(logging.DEBUG)
+    command = _child(
+        tmp_path,
+        """\
+        send({"progress": [91, 90, "first"]})
+        send({"progress": [95, 90, "second"]})
+        send({"progress": [-1, 90, "negative"]})
+        result()
+        """,
+    )
+    jobs = _jobs(tmp_path, command)
+    for _ in range(2):
+        caplog.clear()
+        progress = _Progress()
+        result = jobs.job(_request(tmp_path))(progress)
+        assert result.ok, result.failure
+        assert progress.reports == [(90, 90, "first"), (90, 90, "second")]
+        warnings = [
+            r.getMessage()
+            for r in caplog.records
+            if r.name == PROCESS_LOGGER and r.levelno == logging.WARNING
+        ]
+        clamps = [m for m in warnings if "clamped" in m]
+        assert len(clamps) == 1, warnings
+        assert "progress done 91 > total 90 clamped to 90" in clamps[0], clamps
+        assert len([m for m in warnings if "progress line ignored" in m]) == 1, warnings
+
+
 def test_ignored_progress_lines_are_logged_once_per_job(
     tmp_path: Path, caplog: pytest.LogCaptureFixture
 ) -> None:
@@ -758,7 +824,7 @@ def test_ignored_progress_lines_are_logged_once_per_job(
     command = _child(
         tmp_path,
         """\
-        send({"progress": [5, 4, "over"]})
+        send({"progress": [2147483648, 4, "over the bound"]})
         send({"progress": [-1, 4, "negative"]})
         send({"progress": [1, 2, 3]})
         send({"bogus": 1})
