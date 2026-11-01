@@ -55,7 +55,14 @@
   Path.open scoped to the output folder (`png.py:184`), proved fired; R0-3 MY ERROR: `truncated` SUCCEEDS per D86 with
   the warning, exit 0; R0-4 the committed fixtures used UNCHANGED for the fixture sweep (sizing exception by analogy
   with AD-30's real-container clause; AD-30 NOTE mine at the accept). Re-seat: fresh Codex session from the ledger for
-  T2 onward (first retired at 210,098). Waiting on: the WP4.6 V7 window open; WP3.6P turn 7; WP5.3 RED; WP5.1 T2.
+  T2 onward (first retired at 210,098).
+- **WP3.6P A R3 CLEAN 08:32Z (status d9505417; on `649b5662` = turn 7's R2 remediation; 9 advisories; ALL REASONED, the
+  reviewer's permission layer refused its 8 executions). MY RULING (ack post): convergence on condition Reviewer B
+  EXECUTES on the final candidate (proved execution path; a refused B is not a returned B). Clean-up list concurred
+  (#8 ICC-presence class check, #1 failure labels, #9 JPEG refusal; #4/#6 wording; 3 out-of-envelope = Limits). Fresh
+  Codex session 3 from the ledger (session 2 at 187,455). Order: WP4.6 V7 window (opens when WP5.3 turn 2 and WP5.1
+  session 2 turn 2 return; all turns held while open) -> WP3.6P clean-up -> RUN REQUESTs 5b, Q4 node, 5c-16 EXCLUSIVE,
+  5c-8, 5d EXCLUSIVE -> report, B, gate. Claude 85 % at pace 1.002 (08:31Z). Waiting on: the V7 window open / figures.
 - **DANGLERS (gen 28 runs them; I rule their STOPs):** (1) WP3.6P (Codex session 01a18b4b, worktree `wp3.6p` head
   `081f851c`, turn 7 = R2 remediation dispatched 08:01Z; then A R3, seat runs (`photo_check`, `orientation`, the footage
   node), two EXCLUSIVE windows (16-bit export ~45 min / ~3.8 GB; memory), B (Claude), gate, accept). At its accept mine:
