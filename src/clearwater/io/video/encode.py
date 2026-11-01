@@ -500,6 +500,23 @@ def _remove(path: Path) -> None:
             time.sleep(_REMOVE_PAUSE_S)
 
 
+def _assumed_color_warning(names: Mapping[str, str]) -> str:
+    """Describe D54's assumptions and the resolved output colour tags.
+
+    Args:
+        names: FFmpeg option names and values for the resolved colour description.
+
+    Returns:
+        The warning with the resolved tags listed in their mapping order.
+    """
+    shown = ", ".join(f"{k} {v}" for k, v in names.items())
+    return (
+        "The source's colour tags are missing or unexpected; Clearwater assumed BT.709 "
+        "colours and limited range for the missing or unexpected ones, and the output is "
+        f"tagged with these values ({shown})."
+    )
+
+
 class FFmpegVideoSink:
     """Writes corrected frames to an HEVC MP4 with the source's timing and tracks (IF-5).
 
@@ -667,11 +684,7 @@ class FFmpegVideoSink:
         self._shape = (probe.video.height, probe.video.width, 3)
         if probe.video.color.assumed:
             names = ffmpeg_color_names(probe.video.color)
-            shown = ", ".join(f"{k} {v}" for k, v in names.items())
-            self._warnings.append(
-                "The source's colour tags are missing or unexpected; the output is tagged with "
-                f"the assumed values ({shown})."
-            )
+            self._warnings.append(_assumed_color_warning(names))
         command = encode_command(
             ffmpeg,
             probe,

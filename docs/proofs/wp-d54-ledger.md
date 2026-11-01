@@ -83,6 +83,67 @@ test files are unchanged. No footage was read or written. Runner outputs and
 temporary data are under this worktree's `work/`. No commit or `.git` write was
 attempted. The dispatcher owns the commit and its committed-blob LF checks.
 
+## Turn 2: fix and GREEN
+
+Starting HEAD: `549b4ca4`, the dispatcher's accepted RED commit (reported 0 CR in
+both committed files). Added `_assumed_color_warning(names: Mapping[str, str])`
+at `src/clearwater/io/video/encode.py:503`, with a Google-style docstring, and
+replaced only the old sentence-construction block with its call at :687. The
+existing `assumed` condition and `ffmpeg_color_names(probe.video.color)` call
+remain unchanged. The helper uses the original
+`", ".join(f"{k} {v}" for k, v in names.items())` expression and returns CHARC
+`377fcd25`'s sentence verbatim.
+
+This turn changes product code and this ledger only; the accepted RED tests are
+unchanged. No tag, flag, exit status, interface, dependency, other message or
+configuration change was made.
+
+All pytest runs below used `PYTEST_ADDOPTS` unset, `PYTHONPATH=scripts`, the
+sandbox mkdir shim and no cache provider. Inherited `VIRTUAL_ENV` was unset so uv
+uses the worktree environment without its Turn 1 warning. Commands ran from the
+worktree root, with all logs and basetemps under `work/wp-d54/`.
+
+```text
+uv run pytest -q tests/test_io_video_encode.py -k "untagged_source or d76 or d54_warning_words_and_computed_codes" --basetemp=work/wp-d54/turn2-light-tmp -p sandbox_mkdir_shim -p no:cacheprovider
+uv run pytest -q tests/test_io_video_encode.py::test_d54_warning_words_and_computed_codes --basetemp=work/wp-d54/turn2-pure-tmp -p sandbox_mkdir_shim -p no:cacheprovider
+uv run pytest -q -rs tests/test_io_video_encode.py -m "not gpu and not footage and not gui" --basetemp=work/wp-d54/turn2-encoder-tmp -p sandbox_mkdir_shim -p no:cacheprovider
+```
+
+| Run | Log under `work/wp-d54/` | Exit | Result |
+|---|---|---|---|
+| Targeted GREEN | `turn2-light-pytest.log` | 0 | 5 passed, 113 deselected in 6.32s |
+| Pure test's own node | `turn2-pure-pytest.log` | 0 | 2 passed in 0.13s |
+| Whole encoder file with permitted markers | `turn2-encoder-pytest.log` | 0 | 99 passed, 19 deselected in 108.45s (0:01:48); no skips |
+
+Repository-wide light checks (not a substitute for the dispatcher's final gate):
+
+| Command | Log under `work/wp-d54/` | Exit | Summary |
+|---|---|---|---|
+| `uv run ruff check .` | `turn2-ruff-check-clean.log` | 0 | All checks passed! |
+| `uv run ruff format --check .` | `turn2-ruff-format.log` | 0 | 287 files already formatted |
+| `uv run mypy` | `turn2-mypy.log` | 0 | Success: no issues found in 146 source files |
+
+The first lint attempt also exited 0 with `All checks passed!` but emitted
+nonfatal default-cache write warnings (`turn2-ruff-check.log`). Re-ran the same
+command with `RUFF_CACHE_DIR=work/wp-d54/turn2-ruff-cache`; the recorded clean run
+has no warnings. No repository configuration was edited.
+
+Verification loop: confirmed the two Turn 1 report-warning failures and both
+missing-helper failures are fixed by the targeted GREEN run and the separate
+pure-node run. The pure cases independently check literal FFmpeg codes, the full
+ruled sentence and ASCII, including retained BT.601 / full-range tags. Inspected
+the product diff: only the helper insertion and original :670-674 replacement
+changed; the conversion and warning condition are preserved. `git diff --check`
+passed. The whole encoder-file run passed all 99 tests selected by the dispatched
+marker expression, with no remaining old-warning assertion failure or other
+failure. A final pass against the brief and the diff found no new in-envelope
+issue. No false-positive finding was recorded in Turn 2.
+
+Reviewer A round 1, Reviewer B, the final two-leg gate, the post-merge WP5.1
+witness and the final completion report remain pending at their dispatched
+boundaries. No footage or other worktree was read; no commit, stash or `.git`
+write was attempted.
+
 ## Cumulative review rounds
 
 No Reviewer A or Reviewer B round yet. The following row schema will be populated
@@ -95,4 +156,5 @@ when findings are dispatched; this RED turn is not a review round.
 
 | Boundary | Context depth (dispatcher fills) | Disposition |
 |---|---|---|
-| Turn 1 RED yield | Pending dispatcher figure | RED recorded; yield for commit and Turn 2. |
+| Turn 1 RED yield | 75,711 tokens (dispatcher supplied in Turn 2; session `01a19680-681b-7e73-9fa1-893bc1fdefaa`) | RED accepted and committed as `549b4ca4`. |
+| Turn 2 GREEN yield | Pending dispatcher figure | Fix and light validation; yield for Reviewer A round 1. |
