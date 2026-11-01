@@ -70,9 +70,18 @@
   recorded as the race characterisation. Session 2 at 136,776.
 - **WP4.6 V7 EXCLUSIVE WINDOW OPEN 08:46Z (status 6393275f; chain `window-commands.sh` md5 c18ba54d..., head `1563da2a`,
   src/tests = `d1ba71f2`; of record v7c / v7d pinned driver, v7e / dr44c-export the copy; ~25-35 min; outputs
-  `work/wp4.6-window/`). ALL Codex held at yields (WP5.3 RED `10f1f70b`; WP5.1 T2 `087892d8`, turn 3 staged; WP3.6P
-  waiting for session 3). NOTHING HEAVY AT THIS SEAT until the close post. Claude 85 % (pace 1.000). Waiting on: the
-  close post with exits and figures (STOPs: (c)/(e) > 100 ms, child CPU fallback, wall > +10 %, spawn > 10 s).
+  `work/wp4.6-window/`). ALL Codex held at yields (WP5.3 RED `10f1f70b`; WP5.1 T2 `087892d8`, turn 3 staged).
+- **WP4.6 V7 WINDOW CLOSED 09:08Z, NO STOP (status 1fe0f209; every run EXIT 0; outputs `.worktrees/wp4.6/work/
+  wp4.6-window/`). OF RECORD (GX011627, GPU): (c) export longest 39.0 ms p99 11.0 (WP4.3: 180-181); (e) 1:1 4K render
+  during export longest 48.0 ms p99 12.0 (WP4.3: 182); (d) control 67.0 / p99 53.0; DR-44 (c) process form close 509 ms,
+  no temporaries; export wall 226.2 s vs 209.1-210.9 = +7.3..8.2 % (under 10 %; cold analysis 65.2 s in the child).
+  Not of record: spawn to first protocol line 1,078 / 793 ms; every job GPU, no CPU fallback; teardown 270 / 265 ms,
+  never killed; worker tree private peak 7.8 GB, device peak 4.3 GB of 8.2; F8 scratch 61.6 MiB / 3 files per job.
+  NEXT: cell 5 report, B (Codex), two-leg gate, accept. **MINE AT THE ACCEPT:** DR-98 CLOSED on these figures; NEW AD-31
+  (export in a spawned worker; figures + wall delta); AD-23 extended; DR-44 (c) re-confirmed; DR-69 note (two contexts,
+  device peak 4.3 GB); F8 / F4 rows; GUI cache accounting row if material; `_HeldSink` / `_ProgressSink`. Codex turns
+  resumed: WP5.1 turn 3, WP3.6P session 3, WP5.3 GREEN. Claude 85 % (pace 0.997, 09:09Z). Waiting on: WP4.6 B + gate;
+  WP5.3 GREEN; WP5.1 T4; WP3.6P clean-up and RUN REQUESTs.
 - **DANGLERS (gen 28 runs them; I rule their STOPs):** (1) WP3.6P (Codex session 01a18b4b, worktree `wp3.6p` head
   `081f851c`, turn 7 = R2 remediation dispatched 08:01Z; then A R3, seat runs (`photo_check`, `orientation`, the footage
   node), two EXCLUSIVE windows (16-bit export ~45 min / ~3.8 GB; memory), B (Claude), gate, accept). At its accept mine:
