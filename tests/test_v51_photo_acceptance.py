@@ -256,7 +256,7 @@ def _assert_complete_finals(
 def _assert_crash_before_cleanup(
     output: Path, sentinels: Mapping[str, str], expected_size: tuple[int, int], in_flight: Path
 ) -> dict[str, str]:
-    """Allow only an absent final or the verified link-before-unlink commit state."""
+    """Require complete finals, with shared identity when an in-flight temporary survives."""
     finals = _assert_complete_finals(output, sentinels, expected_size)
     if in_flight.exists():
         temporaries = [
@@ -265,11 +265,56 @@ def _assert_crash_before_cleanup(
             if is_temporary_name(path.name)
             and path.name.startswith(f"{in_flight.stem}.clearwater-partial-")
         ]
-        assert any(
-            os.path.samefile(path, in_flight) and file_md5(path) == finals[in_flight.name]
-            for path in temporaries
-        ), "in-flight final is not the same file as a surviving temporary"
+        if temporaries:
+            assert any(
+                os.path.samefile(path, in_flight) and file_md5(path) == finals[in_flight.name]
+                for path in temporaries
+            ), "in-flight final is not the same file as a surviving temporary"
     return finals
+
+
+def test_d85_same_file_cleanup_preserves_installed_final(
+    sample: Sample, tmp_path: Path, record_property: RecordProperty
+) -> None:
+    """Witness D85 deterministically: cleanup removes a temporary hard link, keeping its final."""
+    source = sample("png16-gradient-srgb")
+    source_before = file_md5(source)
+    output = tmp_path / "out"
+    output.mkdir()
+    sentinel = output / "keep.txt"
+    sentinel.write_bytes(b"keep the sentinel")
+    sentinels = {sentinel.name: file_md5(sentinel)}
+    temporary = output / "inflight_corrected.clearwater-partial-0123456789ab.png"
+    final = output / "inflight_corrected.png"
+    earlier = output / "earlier_corrected.png"
+    try:
+        shutil.copyfile(source, temporary)
+        shutil.copyfile(source, earlier)
+        # Equal bytes are insufficient: a distinct file must fail the same oracle.
+        shutil.copyfile(temporary, final)
+        assert file_md5(temporary) == file_md5(final)
+        assert not os.path.samefile(temporary, final)
+        with pytest.raises(AssertionError, match="in-flight final is not the same file"):
+            _assert_crash_before_cleanup(output, sentinels, (96, 64), final)
+        final.unlink()
+        record_property("mutation_probe", "byte-identical unrelated final rejected")
+
+        os.link(temporary, final)
+        assert os.path.samefile(temporary, final)
+        assert file_md5(temporary) == file_md5(final)
+        before = _assert_crash_before_cleanup(output, sentinels, (96, 64), final)
+        report = clean_leftovers(
+            Settings(output_folder=output, force_cpu=True), WriteJournal(tmp_path / "journal")
+        )
+        assert report.failed == () and report.removed == (temporary,)
+        assert not temporary.exists(), "temporary NAME survived cleanup"
+        assert final.is_file(), "startup removed the installed final"
+        assert file_md5(final) == before[final.name], "startup altered the installed final"
+        assert _assert_complete_finals(output, sentinels, (96, 64)) == before
+        _assert_no_new_outputs(output, {**sentinels, **before})
+        record_property("d85_same_file_cleanup", "temporary name removed; both finals preserved")
+    finally:
+        assert file_md5(source) == source_before, "D85 probe changed its source"
 
 
 @pytest.mark.slow(reason="runs the headless runner as a subprocess")
@@ -325,45 +370,49 @@ def test_v11_photo_crash_leftovers_are_cleaned_at_start(
                     process.wait(timeout=10)
             finals = _assert_complete_finals(output, sentinels, expected_size)
             record_property(f"attempt_{attempt:02d}_completed_finals", len(finals))
+            leftovers = {p for p in output.iterdir() if is_temporary_name(p.name)}
+            record_property(
+                f"attempt_{attempt:02d}_surviving_temporaries",
+                ",".join(sorted(path.name for path in leftovers)),
+            )
+            assert file_md5(sentinel) == sentinels[sentinel.name], "export altered the sentinel"
             if not observed:
-                record_property(f"attempt_{attempt:02d}_state", "no temporary observed")
                 assert process.returncode == 0, "runner crashed before a temporary was observed"
-                continue
-            record_property("crash_attempt", attempt)
-            record_property("observed_temporaries", ",".join(observed))
             stderr_text = (root / "stderr.log").read_text(encoding="utf-8")
             writing = re.findall(r"^\[(\d+)/40\] Writing (photo-\d{2}\.png)$", stderr_text, re.M)
             assert writing, "runner stderr did not identify an in-flight Writing item"
             item_number, source_name = writing[-1]
             assert sources[int(item_number) - 1].name == source_name
             in_flight_stem = Path(source_name).stem
-            assert any(
-                name.startswith(f"{in_flight_stem}_corrected.clearwater-partial-")
-                for name in observed
-            ), "observed temporary does not belong to stderr's in-flight item"
-            record_property("in_flight_source", source_name)
+            record_property(f"attempt_{attempt:02d}_in_flight_source", source_name)
+            record_property(f"attempt_{attempt:02d}_observed_temporaries", ",".join(observed))
             in_flight_final = output / f"{in_flight_stem}_corrected.png"
             installed_final = in_flight_final.exists()
-            same_file_temporary = installed_final and any(
-                os.path.samefile(path, in_flight_final)
-                for path in output.iterdir()
-                if is_temporary_name(path.name)
-                and path.name.startswith(f"{in_flight_stem}_corrected.clearwater-partial-")
-            )
+            matching_temporaries = [
+                path
+                for path in leftovers
+                if path.name.startswith(f"{in_flight_stem}_corrected.clearwater-partial-")
+            ]
             record_property(
                 f"attempt_{attempt:02d}_state",
                 "no final"
                 if not installed_final
-                else (
-                    "same-file final"
-                    if same_file_temporary
-                    else "final without same-file temporary"
-                ),
+                else ("same-file final" if matching_temporaries else "complete with no temporary"),
             )
             assert (
                 _assert_crash_before_cleanup(output, sentinels, expected_size, in_flight_final)
                 == finals
             )
+            assert_names_only(
+                [observed, list(finals), stderr_text, (root / "stdout.log").read_text("utf-8")],
+                folders=[root, copies, output],
+            )
+            # A poll may see a temporary whose commit finishes before kill.
+            # Record that end state, but never claim cleanup on a clean folder.
+            if not observed or not leftovers:
+                continue
+            record_property("crash_attempt", attempt)
+            record_property("in_flight_source", source_name)
 
             # Keep the real crash state intact for startup cleanup. These
             # independent files exercise the SAME oracle in a scratch folder.
@@ -381,20 +430,8 @@ def test_v11_photo_crash_leftovers_are_cleaned_at_start(
             finally:
                 partial_final.unlink()
             record_property("mutation_probe_partial_final", "truncated final rejected")
-            shutil.copyfile(probe_temporary, probe_final)
-            assert file_md5(probe_final) == file_md5(probe_temporary)
-            assert not os.path.samefile(probe_final, probe_temporary)
-            try:
-                with pytest.raises(AssertionError, match="in-flight final is not the same file"):
-                    _assert_crash_before_cleanup(probes, {}, expected_size, probe_final)
-            finally:
-                probe_final.unlink()
-                probe_temporary.unlink()
-            record_property(
-                "mutation_probe_in_flight_final", "byte-identical unrelated final rejected"
-            )
+            probe_temporary.unlink()
 
-            leftovers = {p for p in output.iterdir() if is_temporary_name(p.name)}
             report = clean_leftovers(
                 Settings(output_folder=output, force_cpu=True), WriteJournal(root / "journal")
             )

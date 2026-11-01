@@ -442,7 +442,8 @@ ruling; evaluate depth near 200K and stop at a step boundary near 250K.
 | 1 / retirement | `01a1962f-69c6-...` (dispatcher supplied abbreviation) | 210,098 | CHARC concurred with a fresh session for T2 onward |
 | 2 / T2 build | `01a1963b-002e-7cc3-9d5d-0f7807bb5ed9` | 136,776 | T2 committed as `087892d8`; CHARC `755ef1b004b92902` resolved T2-1 with the in-flight tightening |
 | 3 / T2-1 amendment | `01a1963b-002e-7cc3-9d5d-0f7807bb5ed9` | 155,324 | committed as `9d662f09` (0 CR); CHARC `da72ec040fc4de35` resolved T3-1 |
-| 4 / T3-1 amendment | `01a1963b-002e-7cc3-9d5d-0f7807bb5ed9` | pending dispatcher | read turn footer; STOP T4-1 before T5 |
+| 4 / T3-1 amendment | `01a1963b-002e-7cc3-9d5d-0f7807bb5ed9` | 178,501 | committed as `0d310b87` (0 CR); CHARC `8276adb56f541a57` resolved T4-1 by end state |
+| 5 / T4 complete; session 2 ends | `01a1963b-002e-7cc3-9d5d-0f7807bb5ed9` | pending dispatcher | retire session 2 after this turn; fresh session 3 starts T5 from this ledger |
 
 Next authorized build group after rulings: T2 support + photo RED, then yield.
 Later yields remain after T4, T6, T8, every adjudicated review round, and before
@@ -927,3 +928,185 @@ post, commit or git-index write occurred.
 Yield: **STOP T4-1**. T4 is not claimed green or complete; T5 remains unstarted.
 No further task or seat run is requested before the ruling. The whole-set gate,
 Reviewers A/B and remaining acceptance work are still pending.
+
+## Session 2 / Turn 5: T4 complete (session 2 ends)
+
+### Final ruling applied
+
+Inspected base: `0d310b87` (dispatcher: zero CR). The dispatcher supplied
+**178,501** as session 2's depth after T4; the depth table records it. This is
+the LAST turn of session 2, as directed. No current-depth estimate is made.
+
+CHARC `8276adb56f541a57` resolves T4-1 with the final end-state oracle:
+
+- All finals in every attempt still undergo Pillow verify, full decode and
+  expected-dimension checks. Sources retain their MD5 guards.
+- The source named by the last real stderr Writing line may have no final,
+  a complete final sharing identity AND bytes with its surviving temporary,
+  or a complete final with no surviving temporary for that item. A present
+  unrelated final beside a surviving temporary still fails. Temporary
+  observation and the last stderr line are recorded independently: a job
+  can advance between polling and termination, so the earlier snapshot is
+  not used to impose an extra in-flight correspondence assertion.
+- Every attempt records completed-final count, observed and surviving
+  temporary names, the stderr-named source and end state. A recorded attempt
+  without a surviving temporary is retried within the existing 20 attempts.
+  No cleanup is invoked on a clean output folder as a crash witness. An
+  unobserved, normally completed process is likewise recorded and retried.
+  Twenty attempts without a surviving crash temporary still skip with the
+  exact reason `not observable at this size`.
+- Once a killed attempt leaves at least one temporary, shipped clean_leftovers
+  must remove every temporary NAME and preserve every verified final and the
+  sentinel byte-identically. The node explicitly checks the installed final
+  remains present and unchanged when that branch is observed.
+- The largest-fixture tie, 40 copies, 10 ms polling, real runner subprocess,
+  output folders, source guards and 20-attempt limit are unchanged.
+
+### Committed deterministic D85 witness
+
+Added the independent parallel-leg node:
+`tests/test_v51_photo_acceptance.py::test_d85_same_file_cleanup_preserves_installed_final`.
+
+It copies the committed fixture under a valid temporary name under tmp_path,
+plants another complete final and a sentinel, and first demonstrates the
+negative control: a byte-identical COPY at the in-flight final name has a
+different file identity and is rejected by the same pre-cleanup oracle. It
+then replaces that test-only copy with a HARD LINK to the temporary, verifies
+the shared identity and identical MD5, and runs the actual shipped
+clean_leftovers. The temporary name disappears; the installed final remains
+present and byte-identical; the earlier final and sentinel are unchanged.
+The fixture's own source MD5 is guarded in finally.
+
+**The deterministic probe, not the race, is the D85 witness.** The race remains
+the end-to-end shipped-runner crash/leftover acceptance leg. No new product
+hook, product change, dependency, fixture or existing-test edit was introduced.
+
+The D85 node is GREEN-ON-ARRIVAL, with the requested planted unrelated-final
+failure control actually executed and recorded as a property. It has no marker:
+the isolated node passed in 0.63 s wall time (about 0.01 s call), below AD-30's
+5 s boundary in this sandbox observation. The owner's isolated/leg measurements
+remain the final scheduling figures.
+
+### Actual crash attempts and race characterisation
+
+Full-module run: crash node PASS in 2.035 JUnit testcase seconds. Both attempts
+used fresh output folders under the node's own tmp_path and the same 40 guarded
+scratch sources. Properties in `t5-photo.xml`, summarized in `t5-results.log`:
+
+| Attempt | Last Writing source | End state | Completed finals | Surviving temporaries | Action |
+|---|---|---|---:|---:|---|
+| 1 | photo-00.png | complete with no temporary | 1 | 0 | recorded and retried; no cleanup call |
+| 2 | photo-06.png | same-file final | 7 | 1 | actual cleanup removed the temporary name and preserved all seven finals and sentinel |
+
+Attempt 2 observed
+`photo-06_corrected.clearwater-partial-58ebbc987e5e.png`. Before cleanup its
+final shared the same file identity and MD5 and verified/decoded at 96 x 64.
+The shipped cleanup removed that temporary name; final and other outputs
+passed the before/after checks. The crash node's planted truncated-final and
+planted-leftover controls both ran and were rejected by their respective
+assertions. The source MD5 finally guard passed. There was NO skip.
+
+End states for the report are `no final`, `same-file final`, and `complete with
+no temporary`. No-final was accepted in the earlier independent branch probes;
+this actual run observed the latter two states. Historical real-run counts
+**3, 4, 5, 7** remain race characterisations, not bounds; this run adds **1** and
+another **7**. The report must distinguish branch-probe evidence from natural
+race observations and retain the sentence identifying the D85 witness above.
+
+### Per-node result and time
+
+Every row has prefix `tests/test_v51_photo_acceptance.py::`. JUnit times are
+setup + call + teardown from the full-module run, not exclusive hardware
+figures. No marker choice changed except the addition of the unmarked D85 node.
+
+| Node | Marker / leg | Result | Seconds |
+|---|---|---|---:|
+| test_v5_jpeg_two_readers_and_pose[land-o1] | none / parallel | PASS | 0.156 |
+| test_v5_jpeg_two_readers_and_pose[land-o3] | none / parallel | PASS | 0.123 |
+| test_v5_jpeg_two_readers_and_pose[land-o6] | none / parallel | PASS | 0.133 |
+| test_v5_jpeg_two_readers_and_pose[land-o8] | none / parallel | PASS | 0.137 |
+| test_v5_jpeg_two_readers_and_pose[port-o1] | none / parallel | PASS | 0.152 |
+| test_v5_jpeg_two_readers_and_pose[port-o3] | none / parallel | PASS | 0.120 |
+| test_v5_jpeg_two_readers_and_pose[port-o6] | none / parallel | PASS | 0.122 |
+| test_v5_jpeg_two_readers_and_pose[port-o8] | none / parallel | PASS | 0.121 |
+| test_v5_heic_two_readers_and_ad24[both] | none / parallel | PASS | 0.118 |
+| test_v5_heic_two_readers_and_ad24[irot-only] | none / parallel | PASS | 0.120 |
+| test_v5_heic_two_readers_and_ad24[exif-only] | none / parallel | PASS | 0.120 |
+| test_v5_heic_two_readers_and_ad24[neither] | none / parallel | PASS | 0.112 |
+| test_v11_png_disk_full_removes_partial_output | none / parallel | PASS | 0.138 |
+| test_d85_same_file_cleanup_preserves_installed_final | none / parallel | PASS | 0.021 |
+| test_v11_photo_crash_leftovers_are_cleaned_at_start | slow / serial | PASS | 2.035 |
+
+### Validation and verification loop
+
+Full photo-module command (stdout/stderr redirected to
+`work/wp5.1/t5-photo.log`):
+
+```bash
+PYTHONPATH=scripts uv run pytest -q tests/test_v51_photo_acceptance.py --basetemp=work/wp5.1/t5-tmp -p sandbox_mkdir_shim -p no:cacheprovider -m "not gpu and not footage and not gui and not fullclip" --durations=0 -o junit_family=xunit1 --junitxml=work/wp5.1/t5-photo.xml
+```
+
+| Evidence | Observed summary |
+|---|---|
+| t5-photo.log / t5-photo.xml | 15 passed in 4.36 s; no skip; crash succeeds on attempt 2 |
+| t5-results.log | all node times/properties; two crash end states/counts; all planted controls recorded |
+| t5-d85-isolated.log / .xml | 1 passed in 0.63 s; about 0.01 s call; negative copy control and actual cleanup both pass |
+| t5-ruff.log | All checks passed! for both new modules |
+| t5-format.log | Only the owned photo module formatted; seat format --check remains pending |
+| t5-test-mypy.log | Success: no issues found in 2 source files |
+| t5-mypy.log | Success: no issues found in 146 source files |
+
+Verification loop: suspected the observed-temporary/no-survivor race could
+still bypass or falsely prove cleanup; confirmed attempt 1 was recorded and
+retried without a cleanup call, and attempt 2 had a real surviving temporary
+before shipped cleanup. Confirmed installed-final preservation deterministically
+in the separate D85 node; independently distinguished file identity from equal
+bytes with its rejected planted copy. Partial-final and leftover controls also
+ran in the passing crash node. Rejected product defect: none found in this
+turn. Fixed: the test-only end-state oracle and deterministic witness per final
+CHARC ruling. Full pass found no new in-envelope issue. Earlier oracle STOPs
+T2-1, T3-1 and T4-1 are resolved by their recorded rulings; no product fix was
+needed or made.
+
+No Reviewer A round ran in this turn. New build findings: Critical 0 / Major 0 /
+Minor 0; NEW 0 / REOPENED 0; reverts 0; product-code fixes 0; test-only changes
+1 module (including one added node). This is not the phase-end gate or a claim
+that all WP5.1 acceptance work is complete. Only the owned photo module and
+this ledger changed; no product/existing-test edit, new dependency, tolerance
+change, footage-folder read, configuration edit, other-worktree access, mailbox
+post, commit or git-index write occurred.
+
+### Session boundary: session 2 retires; fresh session 3 starts T5
+
+**T2 support and T3/T4 photo construction are complete. Session 2 ENDS at this
+yield. T5 onward is assigned to a FRESH session 3 from the committed ledger.**
+The dispatcher supplies the final depth/session boundary figure; do not infer
+one from this text. All new photo nodes are green in the latest light run.
+
+Handoff for session 3:
+
+- Reuse `tests/acceptance_support.py`; its photo/main helpers have the evidence
+  above. Future video helpers (decode, fidelity/best-effort, provenance and
+  RenderDigests) remain scaffolding to exercise against the real consumers at
+  T5-T8. Their strict typing is checked; their video acceptance behavior has
+  NOT yet been claimed passing. ACCEPTANCE_NODES rows remain explicitly pending
+  for T9 population alongside the report.
+- Start T5: write the 20 planned video instances in the new owned video module,
+  then run the sandbox-eligible ones. Keep the named committed fixtures
+  unchanged (R0-4); truncated SUCCEEDS with D86 warning and readable-prefix
+  fidelity (R0-3). Use the ledger's relocated anchors and roster, not another
+  worktree. GPU/footage/GUI nodes are written here but run ONLY by the
+  dispatcher from RUN REQUEST lines. A genuine product failure stays failing
+  and yields a STOP with evidence; never xfail, soften or edit the product.
+- The new D85 node changes the planned total to **38 instances**: photo 15,
+  video 20, shell 2, traceability 1. Tentative split: **15 parallel candidates,
+  23 serial**, zero new fullclip; slow 22, gui 2, footage 2, gpu 1 (overlap).
+  The serial-leg delta and 180 s budget are still pending seat measurements.
+- Carry into T9/T10 the new D85 node, final crash oracle `8276adb56f541a57`,
+  the per-attempt states/counts and the deterministic-witness sentence. The
+  final report file has NOT been created yet. Reviewer A/B, the final rebase,
+  full matrix, two legs + one fullclip gate, collection identity, final
+  format/LF checks and final DR-98 status remain the later authorized work.
+- No new seat RUN REQUEST is issued in this retirement turn. The dispatcher
+  controls review scheduling and the fresh-session T5 dispatch. No further
+  work is authorized in session 2 after this yield.
