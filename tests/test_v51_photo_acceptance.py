@@ -8,6 +8,7 @@ pending output Orientation, missing ENOSPC handling or leftover partial fails.
 from __future__ import annotations
 
 import errno
+import os
 import re
 import shutil
 import subprocess
@@ -255,9 +256,20 @@ def _assert_complete_finals(
 def _assert_crash_before_cleanup(
     output: Path, sentinels: Mapping[str, str], expected_size: tuple[int, int], in_flight: Path
 ) -> dict[str, str]:
-    """Apply CHARC's complete-final and absent-in-flight-final assertions."""
-    assert not in_flight.exists(), "in-flight item has a final before cleanup"
-    return _assert_complete_finals(output, sentinels, expected_size)
+    """Allow only an absent final or the verified link-before-unlink commit state."""
+    finals = _assert_complete_finals(output, sentinels, expected_size)
+    if in_flight.exists():
+        temporaries = [
+            path
+            for path in output.iterdir()
+            if is_temporary_name(path.name)
+            and path.name.startswith(f"{in_flight.stem}.clearwater-partial-")
+        ]
+        assert any(
+            os.path.samefile(path, in_flight) and file_md5(path) == finals[in_flight.name]
+            for path in temporaries
+        ), "in-flight final is not the same file as a surviving temporary"
+    return finals
 
 
 @pytest.mark.slow(reason="runs the headless runner as a subprocess")
@@ -268,7 +280,7 @@ def test_v11_photo_crash_leftovers_are_cleaned_at_start(
     fixture_manifest: dict[str, Any],
     record_property: RecordProperty,
 ) -> None:
-    """Preserve complete batch items, forbid an in-flight final, and clean real temporaries."""
+    """Preserve complete batch items and installed finals while cleaning crash temporaries."""
     source = sample("png16-gradient-srgb")
     facts = sample_entry("png16-gradient-srgb")["facts"]
     expected_size = (facts["width"], facts["height"])
@@ -314,6 +326,7 @@ def test_v11_photo_crash_leftovers_are_cleaned_at_start(
             finals = _assert_complete_finals(output, sentinels, expected_size)
             record_property(f"attempt_{attempt:02d}_completed_finals", len(finals))
             if not observed:
+                record_property(f"attempt_{attempt:02d}_state", "no temporary observed")
                 assert process.returncode == 0, "runner crashed before a temporary was observed"
                 continue
             record_property("crash_attempt", attempt)
@@ -330,28 +343,56 @@ def test_v11_photo_crash_leftovers_are_cleaned_at_start(
             ), "observed temporary does not belong to stderr's in-flight item"
             record_property("in_flight_source", source_name)
             in_flight_final = output / f"{in_flight_stem}_corrected.png"
+            installed_final = in_flight_final.exists()
+            same_file_temporary = installed_final and any(
+                os.path.samefile(path, in_flight_final)
+                for path in output.iterdir()
+                if is_temporary_name(path.name)
+                and path.name.startswith(f"{in_flight_stem}_corrected.clearwater-partial-")
+            )
+            record_property(
+                f"attempt_{attempt:02d}_state",
+                "no final"
+                if not installed_final
+                else (
+                    "same-file final"
+                    if same_file_temporary
+                    else "final without same-file temporary"
+                ),
+            )
             assert (
                 _assert_crash_before_cleanup(output, sentinels, expected_size, in_flight_final)
                 == finals
             )
 
-            # The same pre-cleanup oracle must reject a partial final beside
-            # the real temporary and a complete final for the in-flight item.
-            partial_final = output / "planted-truncated.png"
+            # Keep the real crash state intact for startup cleanup. These
+            # independent files exercise the SAME oracle in a scratch folder.
+            probes = root / "oracle-probes"
+            probes.mkdir()
+            probe_temporary = probes / observed[0]
+            shutil.copyfile(source, probe_temporary)
+            probe_final = probes / in_flight_final.name
+            assert _assert_crash_before_cleanup(probes, {}, expected_size, probe_final) == {}
+            partial_final = probes / "planted-truncated.png"
             partial_final.write_bytes(source.read_bytes()[:32])
             try:
                 with pytest.raises(AssertionError, match="crash left a partial final"):
-                    _assert_crash_before_cleanup(output, sentinels, expected_size, in_flight_final)
+                    _assert_crash_before_cleanup(probes, {}, expected_size, probe_final)
             finally:
                 partial_final.unlink()
             record_property("mutation_probe_partial_final", "truncated final rejected")
-            shutil.copyfile(source, in_flight_final)
+            shutil.copyfile(probe_temporary, probe_final)
+            assert file_md5(probe_final) == file_md5(probe_temporary)
+            assert not os.path.samefile(probe_final, probe_temporary)
             try:
-                with pytest.raises(AssertionError, match="in-flight item has a final"):
-                    _assert_crash_before_cleanup(output, sentinels, expected_size, in_flight_final)
+                with pytest.raises(AssertionError, match="in-flight final is not the same file"):
+                    _assert_crash_before_cleanup(probes, {}, expected_size, probe_final)
             finally:
-                in_flight_final.unlink()
-            record_property("mutation_probe_in_flight_final", "in-flight final rejected")
+                probe_final.unlink()
+                probe_temporary.unlink()
+            record_property(
+                "mutation_probe_in_flight_final", "byte-identical unrelated final rejected"
+            )
 
             leftovers = {p for p in output.iterdir() if is_temporary_name(p.name)}
             report = clean_leftovers(
@@ -359,6 +400,12 @@ def test_v11_photo_crash_leftovers_are_cleaned_at_start(
             )
             assert report.failed == (), "startup could not remove a crash temporary"
             assert set(report.removed) == leftovers, "startup did not remove the real leftovers"
+            assert all(not path.exists() for path in leftovers), "temporary NAME survived cleanup"
+            if installed_final:
+                assert in_flight_final.is_file(), "startup removed the installed in-flight final"
+                assert file_md5(in_flight_final) == finals[in_flight_final.name], (
+                    "startup altered the installed in-flight final"
+                )
             assert _assert_complete_finals(output, sentinels, expected_size) == finals
             before = {**sentinels, **finals}
             _assert_no_new_outputs(output, before)

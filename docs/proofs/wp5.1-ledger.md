@@ -441,7 +441,8 @@ ruling; evaluate depth near 200K and stop at a step boundary near 250K.
 | 1 / T1 round 0 | pending dispatcher | pending dispatcher | read footer; rule on R0-1 through R0-4 before T2 |
 | 1 / retirement | `01a1962f-69c6-...` (dispatcher supplied abbreviation) | 210,098 | CHARC concurred with a fresh session for T2 onward |
 | 2 / T2 build | `01a1963b-002e-7cc3-9d5d-0f7807bb5ed9` | 136,776 | T2 committed as `087892d8`; CHARC `755ef1b004b92902` resolved T2-1 with the in-flight tightening |
-| 3 / T2-1 amendment | `01a1963b-002e-7cc3-9d5d-0f7807bb5ed9` | pending dispatcher | read turn footer; STOP T3-1 on the tightened in-flight assertion |
+| 3 / T2-1 amendment | `01a1963b-002e-7cc3-9d5d-0f7807bb5ed9` | 155,324 | committed as `9d662f09` (0 CR); CHARC `da72ec040fc4de35` resolved T3-1 |
+| 4 / T3-1 amendment | `01a1963b-002e-7cc3-9d5d-0f7807bb5ed9` | pending dispatcher | read turn footer; STOP T4-1 before T5 |
 
 Next authorized build group after rulings: T2 support + photo RED, then yield.
 Later yields remain after T4, T6, T8, every adjudicated review round, and before
@@ -765,3 +766,164 @@ opened. No commit or git-index write was attempted.
 Yield: **STOP T3-1**, as required when the amended node fails on the shipped
 product. T4 is not claimed complete. No further build task or seat run is
 requested before the ruling; no whole-set gate was run.
+
+## Session 2 / Turn 4
+
+### Scope, ruling and change
+
+The dispatcher supplied depth **155,324** after T3 and commit `9d662f09`
+(zero CR); both are now in the depth table. This turn's depth is not estimated.
+T3-1 was resolved by CHARC `da72ec040fc4de35`. Applied only the authorized
+test changes to assertions (3) and (4):
+
+- The in-flight source is still identified from the actual runner stderr,
+  checked against its batch index, and matched to the observed temporary.
+  A present final is allowed ONLY if a surviving temporary for that final
+  passes os.path.samefile AND MD5 identity. The final still undergoes Pillow
+  verify, full decode and expected-dimension checks. An absent final is allowed.
+- After shipped clean_leftovers, every remaining temporary NAME must be gone.
+  In the installed-final branch the final must explicitly remain a file and
+  retain its before-cleanup MD5. All other finals are reverified and compared
+  with their pre-cleanup digests, and the sentinel and exact output-name set
+  must remain unchanged. Assertions (1), (2) and (5) remain in force.
+- The new unrelated-final negative probe uses two byte-identical but distinct
+  files, ensuring that equal content alone cannot satisfy the same-file branch.
+  Probes moved into a separate folder under the node's temporary root so they
+  cannot overwrite, unlink or alter the REAL installed final before cleanup.
+- Each attempt records its completed-final count and state. Successful observed
+  branches are `no final` / `same-file final`; the additional rejected state
+  `final without same-file temporary` is recorded diagnostically before the
+  assertion. An unobserved attempt records `no temporary observed`.
+
+The fixture, 40 copies, actual runner process, 10 ms poll and 20-attempt skip
+rule remain unchanged. No failed observed state is retried or softened. T4
+remains blocked by the new state below; **T5 was not started** because the
+photo node failed, independently of depth headroom.
+
+### T4-1 [MAJOR, NEW, in envelope]: the temporary can disappear before kill
+
+**STOP to CHARC. Recommended ruling:** recognize a third valid commit state,
+complete final with NO surviving temporary, and apply the same verification,
+before/after byte identity and cleanup-preservation requirements to it. The
+poll can observe a temporary whose commit finishes before the process is
+killed. That is different from a surviving temporary beside an unrelated
+final, which must still fail. This recommendation is NOT applied to the node.
+
+Failing node:
+`tests/test_v51_photo_acceptance.py::test_v11_photo_crash_leftovers_are_cleaned_at_start`.
+Actual assertion: **"in-flight final is not the same file as a surviving
+temporary"**. Under the ruling's literal disjunction, it correctly rejects a
+present final with no surviving temporary. It remains failing, without xfail
+or skip. No product defect is established from the observed complete-file state.
+
+Evidence: `t4-photo.log`, `t4-photo.xml`, `t4-inspect.log`:
+
+- Attempt 1 observed
+  `photo-04_corrected.clearwater-partial-577d968ceb79.png`, matching stderr's
+  last writing line, `[5/40] Writing photo-04.png`.
+- After kill there were **five** completed finals (`photo-00_corrected.png`
+  through `photo-04_corrected.png`) and **zero** temporary names. Independent
+  Pillow verify plus full decode succeeded on all five, all 96 x 64.
+- The original fixture and all 40 copies passed the node's source-MD5 finally
+  guard. The real node failed BEFORE clean_leftovers, so no real-crash cleanup
+  PASS or D85 cleanup defect is claimed for this run.
+- Source mechanic: `src/clearwater/jobs/safe_write.py:101` installs the final
+  link, then `:107` unlinks the temporary. The observed absence of the temporary
+  and presence of a complete final are consistent with a commit that finished
+  between directory observation and process termination. A last Writing line
+  does not prove the item remained uncommitted at the actual kill instant.
+- After adding diagnostic state recording (assertions unchanged), the final
+  candidate's exact pre-cleanup helper was re-applied read-only to the retained
+  real output folder and rejected the same state with the same assertion.
+  The full module was not rerun to seek a different race outcome.
+
+Race characterisation for the eventual report: prior completed-final counts
+**3, 4, 7** remain of record; this run adds **5**. The observed states now
+include no-final, same-file final and final-without-surviving-temporary in the
+branch probes/real evidence as explicitly distinguished below. No bound on
+completed-final count is introduced.
+
+### Requested branch probes and cleanup evidence
+
+The committed negative probes follow the same helper used by the real node,
+but the actual failure precedes them. Independently exercised those branches
+against the final candidate in a scratch sibling under the failing node's
+temporary root; the actual output folder was not modified. `t4-inspect.log`
+records:
+
+1. A valid file under a recognized temporary name, with no final: accepted by
+   the node's exact pre-cleanup helper.
+2. A 32-byte truncated final beside that temporary: rejected as a partial final.
+3. A valid byte-identical COPY at the in-flight final name: MD5 equal, samefile
+   False, rejected by the new same-file assertion. The copy was then removed.
+4. A hard link at the in-flight final name: samefile True, accepted by the
+   helper after verify/decode/dimension checks. An additional valid earlier
+   final and sentinel were planted beside it. The actual shipped clean_leftovers
+   removed exactly the temporary NAME, reported no failed removal, and left
+   the installed final, earlier final and sentinel present and byte-identical.
+
+Thus the newly authorized same-file branch and its cleanup addition have
+positive planted evidence, and the unrelated-final branch has the requested
+negative evidence. This is separate from the real-run node, which is still RED
+on the final-without-temporary state and has not passed its full cleanup leg.
+
+### Per-node result and time
+
+Prefix for each node: `tests/test_v51_photo_acceptance.py::`.
+JUnit elapsed seconds include setup/call/teardown for the full-module run;
+these are sandbox observations, not an isolated marker remeasurement or a
+hardware figure of record. Existing marker choices remain unchanged.
+
+| Node | Marker / leg | Result | Seconds |
+|---|---|---|---:|
+| test_v5_jpeg_two_readers_and_pose[land-o1] | none / parallel | PASS | 0.141 |
+| test_v5_jpeg_two_readers_and_pose[land-o3] | none / parallel | PASS | 0.105 |
+| test_v5_jpeg_two_readers_and_pose[land-o6] | none / parallel | PASS | 0.102 |
+| test_v5_jpeg_two_readers_and_pose[land-o8] | none / parallel | PASS | 0.101 |
+| test_v5_jpeg_two_readers_and_pose[port-o1] | none / parallel | PASS | 0.101 |
+| test_v5_jpeg_two_readers_and_pose[port-o3] | none / parallel | PASS | 0.103 |
+| test_v5_jpeg_two_readers_and_pose[port-o6] | none / parallel | PASS | 0.102 |
+| test_v5_jpeg_two_readers_and_pose[port-o8] | none / parallel | PASS | 0.100 |
+| test_v5_heic_two_readers_and_ad24[both] | none / parallel | PASS | 0.105 |
+| test_v5_heic_two_readers_and_ad24[irot-only] | none / parallel | PASS | 0.108 |
+| test_v5_heic_two_readers_and_ad24[exif-only] | none / parallel | PASS | 0.109 |
+| test_v5_heic_two_readers_and_ad24[neither] | none / parallel | PASS | 0.112 |
+| test_v11_png_disk_full_removes_partial_output | none / parallel | PASS | 0.128 |
+| test_v11_photo_crash_leftovers_are_cleaned_at_start | slow / serial | FAIL, T4-1 | 0.914 |
+
+### Validation, verification and handoff
+
+The full photo-module light command included slow nodes, used the mandatory
+sandbox mkdir shim and disabled cacheprovider. Basetemp was
+`work/wp5.1/t4-tmp`, with durations and xunit1 JUnit added. All output went to
+worktree files; no full runner log is copied into the handoff.
+
+| Evidence | Observed summary |
+|---|---|
+| t4-photo.log / t4-photo.xml | 13 passed, 1 failed in 2.94 s; no skip; observed-final count 5 |
+| t4-inspect.log | retained real state rejected by final candidate helper; no-final/same-file branches accepted; unrelated copy and truncated final rejected; shipped same-file cleanup preserved installed/earlier finals and sentinel |
+| t4-ruff.log | All checks passed! for the two new modules, after final test edit |
+| t4-format.log | Only the owned photo module formatted; seat format --check pending |
+| t4-test-mypy.log | Success: no issues found in 2 source files, after final test edit |
+| t4-mypy.log | Success: no issues found in 146 source files |
+
+Verification loop: confirmed implementation of the authorized same-file and
+cleanup branches with positive and negative planted evidence. Suspected a
+product partial/final preservation defect in the real run; independently
+verified all five finals and no surviving temporary, rejecting that product
+interpretation for this observation. Confirmed instead the new poll-to-kill
+post-commit state that the ruled disjunction excludes. Fixed only the authorized
+test assertions/probes and diagnostic recording. T4-1 remains for CHARC; no
+additional acceptance branch was guessed or silently allowed.
+
+No Reviewer A round ran this turn. Build finding: Critical 0 / Major 1 /
+Minor 0; in-envelope 1 / out 0; NEW 1 / REOPENED 0 (T3-1's same-file state was
+resolved; this is the distinct state with no surviving temporary); reverts 0;
+product-code fixes 0; test-only modification 1 module. Only that owned module
+and this ledger changed. No product/existing-test edit, new dependency, tolerance
+change, configuration edit, footage-folder read, other-worktree access, mailbox
+post, commit or git-index write occurred.
+
+Yield: **STOP T4-1**. T4 is not claimed green or complete; T5 remains unstarted.
+No further task or seat run is requested before the ruling. The whole-set gate,
+Reviewers A/B and remaining acceptance work are still pending.
