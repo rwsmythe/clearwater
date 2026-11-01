@@ -11,8 +11,13 @@
 
 ### RESUME HERE (CHARC generation 11 LIVE: `clearwater-charc-20261101-0727`, online 2026-11-01 17:28Z, launched by gen 10 at its roll; gen 10 `clearwater-charc-20261031-2201` ROLLED 2026-11-01 ~17:30Z at ~403K, clean boundary; gen 9 rolled 2026-11-01 ~08:00Z)
 
-- **GEN 11 LIVE STATE (read first; a successor re-verifies each fact by its method).** Orchestrator = **gen 30
-  `clearwater-orchestrator-20261101-0043`** (online 10:45Z; re-read `comms/.launch-sessions.json` before every cue).
+- **GEN 11 LIVE STATE (read first; a successor re-verifies each fact by its method).** Orchestrator = **gen 31
+  `clearwater-orchestrator-20261101-0811`** (launched 18:12Z by gen 30 at its roll; ANNOUNCE AWAITED; re-read
+  `comms/.launch-sessions.json` before every cue). Gen 30 `clearwater-orchestrator-20261101-0043` ROLLED 18:12Z at
+  ~385K, clean boundary (every Codex turn committed), state `509381f5`; it stopped draining at `472b5bf4`; the WP-T7
+  Reviewer A r1 pass is a CHILD of gen 30's pane (evidence `clearwater-review-evidence\wp-t7\r1\`): keep that pane
+  open until gen 31 says the pass returned, else gen 31 re-runs it. WP5.1 turn 13 `d44db8d1` (launcher mutant fails;
+  15/15; 34 passed).
   Gen 11 pickup 17:28Z: bash gauge 65 ms (under 1 s); inbox 0 unread / 432 read (gen 10 had answered everything,
   including the WP-T7 thread-method ruling); main `fe9dcfe1` clean, FREE; C: 168 GB free, D: 2.4 TB; Claude 89.0 %
   pace 0.987, Codex 14 % pace 0.228 (17:28Z); WP-D54 serial attempt 2 ALIVE (4 pytest processes since 17:21Z).
@@ -60,7 +65,7 @@
   reopened by distinct paths; session 3 retired at 182,934; turn 9 (remediation) in a FRESH session 4 from the ledger.
   **ORCHESTRATOR GEN 30 ROLLS SOON (~380K): after WP5.1 turn 13 returns and is committed; state file drafted; the
   WP-T7 A pass may be in flight across the roll (evidence folder; gen 31 asserts or re-runs). On gen 31's announce:
-  re-read `comms/.launch-sessions.json`, cue the NEW name, send gen 30 nothing further.**
+  re-read `comms/.launch-sessions.json`, cue the NEW name, send gen 30 nothing further.** (Rolled 18:12Z, see top.)
   (3a) **WP5.1 A CONVERGED AT ROUND 2, 18:03Z (gen 30 `9951dac7`; on the rebased head `f059b2e0`, base `4ece5183`;
   NO_NEW_CRITICAL_MAJOR; T6-1 green; my F3 rule observed). Two minors in the terminating clean-up turn 13 (session 5):
   pin the F1 fix by pid-file == process.pid and `clearwater.__file__` == the parent's; V17 traceability row names the
